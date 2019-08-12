@@ -351,7 +351,7 @@ MODULE simple_models
    ! Implements a simple model with moving spherical shells
   ! ----------------------------------------------------------- !
    integer :: n_zones = 1, izone, i, j, k, icell
-   double precision, parameter :: i_incl = 45d0 !deg
+   double precision, parameter :: Lstar = 3.5e4, i_incl = 45d0 !deg
    double precision, parameter :: Mdot = 3.16d-7, Vinf_p = 2000d3, gamma = 0.86, Vinf_eq = 200d3
    double precision, parameter :: Vrot_eq = 326d3, Vsini = 230d3, Mdisk = 4.43d-9 !Msun
    double precision, parameter :: year_to_sec = 3.154d7, r0 = 1d0, v0_p = 0.11d3, v0_eq = 0d0
@@ -362,7 +362,9 @@ MODULE simple_models
    lkeplerian = .false.
    lmagnetoaccr = .true. !not really magneto accretion, but we have rotation + expansion
    						 !but, cannot be factorised in lkep + linfall with infall vel prop to keplerian
+   !Remmeber, Vxyz is either (Vx, Vy, Vz) or (VR, vz, vphi); equatorial, z and azimutal 
    lstatic = .false.
+   lwind_rotation = .not.lmagnetoaccr
    CALL init_atomic_atmos()
    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
 
@@ -376,13 +378,16 @@ MODULE simple_models
    m1 = 6d0
    C1 = 30d0
    m2 = 0.3
-   vbreak = (Ggrav*Mstar/Rstar)**0.5
+
+   bigGamma = 2.5e-5 * Lstar/etoile(1)%M !grad/g, M in Msun, L in Lsun
+   vbreak = (Ggrav*Mstar*(1.-bigGamma)/Rstar)**0.5
+   !vbreak = (Ggrav*Mstar/Rstar)**0.5 !* dsqrt(2.)
    chi = Vsini / sin(i_incl * pi / 180d0) / vbreak
-   bigGamma = 0d0 !?
    !mass flux to pole
-   phi_p = 1.7d-9 * Msun_to_kg / year_to_sec !Msun/yr/sr -> kg/s/sr
+   phi_p = 1.7d-9 * Msun_to_kg / year_to_sec / (etoile(1)%r * AU_to_m)**2 !Msun/yr/sr -> kg/s/sr/m2
    rho0 = 5.12d-11 * 1d3 !kg/m3 !!density, theta independent
-   
+   write(*,*) "Vbreak", vbreak/1d3, " chi(%)=", chi*100, " Gamma=", bigGamma
+   write(*,*) "rho0 (kg/m3) = ", rho0, " phi(0) = ", phi_p
    all_loop : do i=1, n_rad
      do j=j_start,nz !j_start = -nz in 3D
       do k=1, n_az
@@ -401,22 +406,41 @@ MODULE simple_models
        !theta = acos(z/r)
        sTheta = rcyl/r
        O = (1d0 - (etoile(1)%r*r0)/r)**gamma
+
        rp = (r/(etoile(1)%r*r0))
+       
+       write(*,*) icell, "R=",rcyl, " z=", z, " r=", r, rp, O, " theta=", theta*180/pi, sTheta
        
        if (sTheta==0d0) then !pole
          Vr = v0_p + (Vinf_p - v0_p) * O
          rhor = phi_p / rp**2 / Vr
          vphi = 0d0
+!           if (Vr > Vinf_p) then
+!            write(*,*) Vr, v0_p, Vinf_p, O, rhor
+!            stop
+!           end if
        else
          phi_t = phi_p * (1+(C1-1)*sTheta**m1)
          Vinf_t = Vinf_p + (Vinf_eq - Vinf_p)*sTheta**m2
          v0_t = phi_t / rho0
          Vr = V0_t + (Vinf_t - V0_t) * O 
-         vphi = chi * (Ggrav*Mstar*(1.-bigGamma)/Rstar)**0.5 * sTheta * rp**-0.5
+         vphi = sTheta * rp**-0.5 * chi * vbreak! * (Ggrav*Mstar*(1.-bigGamma)/Rstar)**0.5 
          rhor = phi_t / rp**2 / Vr
+
+!           if (Vr > Vinf_p) then
+!            write(*,*) Vr, phi_t, Vinf_t, v0_t, Vinf_eq, O
+!            stop
+!           end if
        end if
-       
+
        atmos%T(icell) = etoile(1)%T * rp**-0.5
+       atmos%nHtot(icell) = rho_to_nH * rhor
+       !Project Ve_r onto e_R and e_z, to be used with v_proj()
+       atmos%Vxyz(icell,1) = Vr * sTheta !R !R=rsin(t); z=rcos(t)
+       atmos%Vxyz(icell,2) = Vr * dsqrt(1-sTheta**2)!z
+! 	   atmos%Vxyz(icell,1) = Vr; atmos%Vxyz(icell,2) = 0d0
+!        atmos%Vxyz(icell,3) = vphi!phi
+!        write(*,*) "Vr=", Vr/1d3, " vphi=", vphi/1d3, rhor, " T=", atmos%T(icell), " nH=", atmos%nHtot(icell)
 
       end do
      end do
@@ -432,15 +456,23 @@ MODULE simple_models
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0) 
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0)
+   write(*,*) "Typical velocity in the model (km.s^-1):"
+   write(*,*) atmos%v_char/1d3
+   
+   CALL writeTemperature()
+   CALL writeHydrogenDensity()
 
   RETURN
   END SUBROUTINE spherical_shells_model
   
  
-  FUNCTION feqv(R1, R2, rr, inverse) result (rrp)
+  FUNCTION feqv(Rgrid_min, Rgrid_max, R1, R2, rr, inverse) result (rrp)
   !convert from mcfost grid to stellar grid
-   double precision :: R1, R2, rr, rrp
+  !1.00000000000740     
+  ! 49.7370802905699     
+
+   double precision :: R1, R2, rr, rrp, Rgrid_min, Rgrid_max
    logical, optional :: inverse
    logical :: get_rs
    
@@ -452,13 +484,12 @@ MODULE simple_models
    
    
    if (get_rs) then
-     rrp = (rr - R1) * (Rmax-Rmin) / (R2-R1) + Rmax 
+     rrp = (rr - R1) * (Rgrid_max-Rgrid_min) / (R2-R1) + Rgrid_min 
     return
    end if
    
-   rrp = (rr-Rmin) / (Rmax-Rmin) * (R2-R1) + Rmin
-!    write(*,*) rrp
-!    stop
+   rrp = (rr-Rgrid_min) / (Rgrid_max-Rgrid_min) * (R2-R1) + R1
+
   RETURN
   END FUNCTION feqv
   
@@ -538,18 +569,23 @@ MODULE simple_models
   RETURN
   END SUBROUTINE FALC_MODEL
   
+  
+  !building
   SUBROUTINE spherical_star()
   ! ----------------------------------------------------------- !
-   ! Implements a simple model with moving spherical shells
+   ! star with MCFOST
   ! ----------------------------------------------------------- !
-   integer :: n_zones = 1, izone, i, j, k, icell, m
+   integer :: n_zones = 1, izone, i, j, k, icell, m, NDEP_lim
    integer, parameter :: Pmax = 4, NDEP = 82
    double precision, parameter :: r0 = 1d0, v0 = 1d0, Prot = 8.
    double precision :: Vr, rhor, rho_to_nH, R0s, Mstar, Rstar
-   double precision :: rcyl, z, r, phi, rs, omega, Vrot, cm
-   double precision, dimension(NDEP) :: m_mod, r_mod, rho_mod, T_mod, ne_mod
+   double precision :: rcyl, z, r, phi, rs, omega, Vrot, cm, Rsphere_mcfost(n_cells), Rsmin, Rsmax
+   double precision, dimension(NDEP) :: m_mod, r_mod, rho_mod, T_mod, ne_mod, V_mod, f_mod, mass_mod, cm2, S_mod
    double precision, dimension(Pmax) :: p0, p1, p2, p3
    
+   Rsphere_mcfost(:) = dsqrt(r_grid**2 + z_grid**2)
+   Rsmin = minval(Rsphere_mcfost); Rsmax = maxval(Rsphere_mcfost)
+   NDEP_lim = NDEP
    
    Data m_mod / -4.58623126, -4.5857112 , -4.58516185, -4.58438554, -4.58353816,&
        -4.58306938, -4.58256495, -4.58200811, -4.58140527, -4.5810861 ,&
@@ -644,32 +680,52 @@ MODULE simple_models
        1.099800d20, 1.719226d20, 2.789487d20, 4.446967d20,&
        6.869667d20, 1.041290d21, 1.531806d21, 2.194603d21,&
        2.952398d21, 3.831726d21 /     
- 
-!     m_mod(NDEP:1:-1) = m_mod(1:NDEP:1)
-!     r_mod(NDEP:1:-1) = r_mod(1:NDEP:1)
-!     T_mod(NDEP:1:-1) = T_mod(1:NDEP:1)
+
+  !put in decreasing order, because first point is the inner point
+   m_mod(NDEP:1:-1) = m_mod(1:NDEP:1)
+   r_mod(NDEP:1:-1) = r_mod(1:NDEP:1)
+   T_mod(NDEP:1:-1) = T_mod(1:NDEP:1)
+   ne_mod(NDEP:1:-1) = ne_mod(1:NDEP:1)
+   rho_mod(NDEP:1:-1) = rho_mod(1:NDEP:1)
 
    linfall = .false. 
-   lkeplerian = .false. !only rotation
+   lkeplerian = .false.
    lmagnetoaccr = .false. 
    lstatic = .true.
    CALL init_atomic_atmos()
    rho_to_nH = 1d3/masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
+   
+   f_mod(:) = ne_mod(:)/(rho_mod(:)*rho_to_nH)
+   !V_mod(1) = (abs(r_mod(2)-r_mod(1))/2d0)**3 * Rsun**3 !m**3
+   !V_mod(1) = 4./3. * pi * (abs(r_mod(2)-r_mod(1)))**3 * Rsun**3 !m**3
+   V_mod(1) = 4./3. * pi * r_mod(1)**3 * Rsun**3
+   !V_mod(1) = (4./3 * pi * Rsun**3) * abs(r_mod(2)-r_mod(1))**3 * 2d0**-3
+   
+   S_mod(1) = 4.*pi * r_mod(1)**2 * Rsun**2
+   k = 1
+   mass_mod(1) = rho_mod(1) * V_mod(1)
+   write(*,*) k, r_mod(k), mass_mod(k), V_mod(k)
+   do k=2, NDEP
+    !V_mod(k) = 4./3. * pi * (abs(r_mod(k-1)-r_mod(k))/2d0)**3 * Rsun**3
+    !V_mod(k) = 4./3. * pi * (abs(r_mod(k)-r_mod(k-1)))**3 * Rsun**3 !m**3
+    !V_mod(k) = (4./3 * pi * Rsun**3) * abs(r_mod(k)-r_mod(k-1))**3 * 2d0**-3
+    V_mod(k) = r_mod(k)**3 * 4./3. * pi * Rsun**3
+    !V_mod(k) = (4./3 * pi * Rsun**3) * abs(r_mod(k)-r_mod(k-1))**3
+    S_mod(k) = 4. * pi * r_mod(k)**2 * Rsun**2
+    mass_mod(k) = rho_mod(k) * V_mod(k)
+    write(*,*)k, r_mod(k), mass_mod(k), V_mod(k)
+   end do
+   
+   cm2 = m_mod * S_mod !kg
+
 
    R0s = etoile(1)%r!inner boundary in au
    Mstar = etoile(1)%M * Msun_to_kg !kg
-   Rstar = feqv(minval(r_mod), maxval(r_mod), 1d0, .true.) !in au
-   write(*,*) "Rstar in mcfost grid (au) = ", Rstar
-   omega = 2d0 * PI / Prot / 86400d0
-   Vrot = 1000d3 !Omega * (r*AU_to_m)
+   Rstar = feqv(Rsmin, Rsmax, minval(r_mod), maxval(r_mod), 1d0, .true.) !in au
+   write(*,*) "Rstar in mcfost grid (au) = ", Rstar, (Rsmax - Rstar)/Rstar, 1., (maxval(r_mod)-1.)
    
    if (lstatic) then
     if (allocated(atmos%Vxyz)) deallocate(atmos%Vxyz)
-   end if
-   
-   if (lkeplerian) then
-    if (allocated(atmos%Vxyz)) deallocate(atmos%Vxyz)
-    allocate(Vfield(n_cells))
    end if
    
    all_loop : do i=1, n_rad
@@ -687,35 +743,43 @@ MODULE simple_models
        phi = phi_grid(icell)
        r = dsqrt(z**2 + rcyl**2)
 
-       rs = feqv(minval(r_mod), maxval(r_mod), r)!in Rstar
-       !get a value of column mass
-       cm = interp_dp(m_mod, r_mod, rs)
+       rs = feqv(Rsmin, Rsmax, minval(r_mod), maxval(r_mod), r)!in Rstar
+       !cm = interp_dp(m_mod, r_mod, rs)
+       cm = interp_dp(cm2, r_mod, rs)
        !then interpolate
-
+  
+       !! UNIFORM LAW
+!    CALL Warning(&
+!    	"Beware, I do not take into account vturb anymore. Small discrepancies can arise")
+!       if (r <= 0.8*Rsmax) then !remove if for uniform squared
+!        atmos%nHtot(icell) = 1d15
+!        atmos%T(icell) = 3000d0
+!        atmos%ne(icell) = 1d12
+!       end if
+       !!
+! 
        !used a different scale for Rstar to au
-!        atmos%nHtot(icell) = interp_dp(rho_mod, m_mod, cm) * rho_to_nH
-!        atmos%T(icell) = interp_dp(T_mod, m_mod, cm)
-!        atmos%ne(icell) = interp_dp(ne_mod, m_mod, cm)
-!        write(*,*) r, Rstar, rs, cm, atmos%nHtot(icell), atmos%T(icell), atmos%ne(icell)
-
-       atmos%nHtot(icell) = 1d23 * (R0s/r)**2
-       atmos%T(icell) = 3d3 !etoile(1)%T * (R0s/r)**2
-       atmos%ne(icell) = atmos%nHtot(icell) * 1d-2
-    
-       !if (lmagnetoaccr) atmos%Vxyz(:,3) = Omega * (r*AU_to_m) * dsqrt(rcyl**2 / (rcyl**2+z**2))
-       if (lkeplerian) Vfield(icell) = Vrot * dsqrt(rcyl**2 / (rcyl**2+z**2))
+       atmos%nHtot(icell) = interp_dp(mass_mod, cm2, cm) * rho_to_nH / (Volume(icell) * Au3_to_m3)
+       atmos%T(icell) = interp_dp(T_mod, cm2, cm)
+       !atmos%ne(icell) = interp_dp(ne_mod, m_mod, cm)
+       atmos%ne(icell) = interp_dp(f_mod, cm2, cm) * atmos%nHtot(icell)
+       write(*,*) r, rs, cm, interp_dp(mass_mod, m_mod, cm)
 
       end do
      end do
     end do all_loop
+    
+
+   CALL define_atomRT_domain()
 
    CALL writeTemperature()
    CALL writeHydrogenDensity()
+   CALL write_atmos_domain()
+
    atmos%calc_ne = .false.
    
    if (lkeplerian) atmos%v_char = maxval(Vfield)
 
-   CALL define_atomRT_domain()
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
@@ -723,40 +787,5 @@ MODULE simple_models
 
   RETURN
   END SUBROUTINE spherical_star
-  
-   !Futuru removing
- SUBROUTINE uniform_law_model()
-  ! ----------------------------------------------------------------- !
-   ! Implements a simple model with density and electron density
-   ! constant on the grid.
-   ! Values width idk are from a Solar model atmosphere by 
-   ! Fontenla et al. namely the FAL C model.
-   ! idk = 0, top of the atmosphere, idk = 81 (max) bottom.
-  ! ----------------------------------------------------------------- !
-   CALL init_atomic_atmos()
-   lstatic = .true. !force to be static for this case
-   atmos%magnetized = .false.
-   atmos%calc_ne = .true.
-   linfall = .false.; lkeplerian = .false.; lmagnetoaccr = .false.
-   
-   CALL Warning(&
-   	"Beware, I do not take into account vturb anymore. Small discrepancies can arise")
-
-   atmos%T(:)=7590d0
-   atmos%ne(:) = 4.446967d20
-   atmos%nHtot(:) = 1.259814d23   
-   !!atmos%vturb(:) = 2d0
-
-
-   CALL define_atomRT_domain()
-   write(*,*) "Maximum/minimum Temperature in the model (K):"
-   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
-   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0) 
-   write(*,*) "Maximum/minimum Electron density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%ne),MINVAL(atmos%ne,mask=atmos%icompute_atomRT>0)
-
-  RETURN
-  END SUBROUTINE uniform_law_model
 
  END MODULE simple_models
