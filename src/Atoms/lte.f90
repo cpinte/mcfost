@@ -284,7 +284,7 @@ MODULE lte
 	!!Incorpore Hminus
 !     if (atom%ID=="H") atmos%nHmin(k) = atmos%nHmin(k) * atom%nstar(1,k)
 
-    if (MAXVAL(atom%nstar(:,k)) <= tiny_dp) then !at the cell
+    if (MAXVAL(atom%nstar(:,k)) <= tiny_dp .or. minval(atom%nstar(:,k)) <= tiny_dp) then !at the cell
      write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k)
      write(*,*) atom%nstar(:,k)
      write(*,*) "Error, populations negative or lower than tiny dp for this atom at this cell point"
