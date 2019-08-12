@@ -160,6 +160,7 @@ MODULE AtomicTransfer
      eval_operator = (labs .and. (nbr_cell == 1)) !labs if false for images
      											  !so no pb if Nact>0 and we use a different grid
      CALL initAtomOpac(id,eval_operator) !set opac to 0 for this cell and thread id
+     if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id)
      CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms
      if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops

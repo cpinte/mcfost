@@ -308,60 +308,6 @@ MODULE statequil_atoms
  RETURN 
  END SUBROUTINE FillGamma_bb_zero_radiation
  
- !building
- SUBROUTINE fill_XCoupling(id, icell)
-  ! -------------------------------------------- !
-   ! fill X coupling terms for all transitions
-   ! of all active atoms.
-  ! -------------------------------------------- !
-  !previously allocated for this thread
-  integer, intent(in) :: id, icell
-  integer nact, i, j, kl, Nblue, Nred
-  type (AtomType), pointer :: atom
-  type (AtomicContinuum) :: cont
-  type (AtomicLine) :: line
-  real(kind=dp), allocatable :: Vij(:,:), gij(:,:)
-  double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, chicc
-  
-  do nact=1,atmos%Nactiveatoms
-   atom => atmos%ActiveAtoms(nact)%ptr_atom
-   do kl=1,atom%Ncont
-    cont = atom%continua(kl)
-    Nblue = cont%Nblue; Nred = cont%Nred
-    twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NM_TO_M * NLTEspec%lambda)**(3d0)
-    i = cont%i; j = cont%j
-    chicc = 0d0
-!     chicc(Nblue:Nred) = cont%Vij(:,id) * (atom%n(i,icell) &
-!     					-cont%gij(:,id)*atom%n(j,icell))
-!     					
-!     atom%Uji_down(j,Nblue:Nred,id) = atom%Uji_down(j,Nblue:Nred,id) +&
-!     				 twohnu3_c2(Nblue:Nred)*cont%gij(:,id)*cont%Vij(:,id)
-!     				 
-!     atom%chi_up(i,Nblue:Nred,id) = atom%chi_up(i,Nblue:Nred,id) + chicc(Nblue:Nred)
-!     atom%chi_down(j,Nblue:Nred,id) = atom%chi_down(j,Nblue:Nred,id) + chicc(Nblue:Nred)
-   end do
-
-   do kl=1,atom%Nline
-    line = atom%lines(kl)
-    twohnu3_c2 = line%Aji/line%Bji
-    i = line%i; j = line%j
-    Nblue = line%Nblue; Nred=line%Nred
-    chicc = 0d0
-!     chicc(Nblue:Nred) = line%Vij(:,id) * (atom%n(i,icell) &
-!     					- line%gij(:,id)*atom%n(j,icell))
-! 
-!     atom%Uji_down(j,Nblue:Nred,id) = atom%Uji_down(j,Nblue:Nred,id) + &
-!     				twohnu3_c2(Nblue:Nred)*line%gij(:,id)*line%Vij(:,id)
-!     				
-!     atom%chi_up(i,Nblue:Nred,id) = atom%chi_up(i,Nblue:Nred,id) + chicc(Nblue:Nred)
-!     atom%chi_down(j,Nblue:Nred,id) = atom%chi_down(j,Nblue:Nred,id) + chicc(Nblue:Nred)
-    
-   end do   
-   NULLIFY(atom)
-  end do
- RETURN
- END SUBROUTINE fill_Xcoupling
- 
  SUBROUTINE FillGamma_bb_mali(id, atom, n_rayons, switch_to_lte)
   integer, intent(in) :: id, n_rayons
   type (AtomType), intent(inout), pointer :: atom
@@ -480,6 +426,60 @@ MODULE statequil_atoms
 ! !   end do !loop over atoms  
 !  RETURN
 !  END SUBROUTINE fillGamma_MALI
+!---> now included in NLTEOpacity if methode is MALI
+!  building
+!  SUBROUTINE fill_XCoupling(id, icell)
+!   -------------------------------------------- !
+!    fill X coupling terms for all transitions
+!    of all active atoms.
+!   -------------------------------------------- !
+!   previously allocated for this thread
+!   integer, intent(in) :: id, icell
+!   integer nact, i, j, kl, Nblue, Nred
+!   type (AtomType), pointer :: atom
+!   type (AtomicContinuum) :: cont
+!   type (AtomicLine) :: line
+!   real(kind=dp), allocatable :: Vij(:,:), gij(:,:)
+!   double precision, dimension(NLTEspec%Nwaves) :: twohnu3_c2, chicc
+!   
+!   do nact=1,atmos%Nactiveatoms
+!    atom => atmos%ActiveAtoms(nact)%ptr_atom
+!    do kl=1,atom%Ncont
+!     cont = atom%continua(kl)
+!     Nblue = cont%Nblue; Nred = cont%Nred
+!     twohnu3_c2 = 2d0 * HPLANCK * CLIGHT / (NM_TO_M * NLTEspec%lambda)**(3d0)
+!     i = cont%i; j = cont%j
+!     chicc = 0d0
+!     chicc(Nblue:Nred) = cont%Vij(:,id) * (atom%n(i,icell) &
+!     					-cont%gij(:,id)*atom%n(j,icell))
+!     					
+!     atom%Uji_down(j,Nblue:Nred,id) = atom%Uji_down(j,Nblue:Nred,id) +&
+!     				 twohnu3_c2(Nblue:Nred)*cont%gij(:,id)*cont%Vij(:,id)
+!     				 
+!     atom%chi_up(i,Nblue:Nred,id) = atom%chi_up(i,Nblue:Nred,id) + chicc(Nblue:Nred)
+!     atom%chi_down(j,Nblue:Nred,id) = atom%chi_down(j,Nblue:Nred,id) + chicc(Nblue:Nred)
+!    end do
+! 
+!    do kl=1,atom%Nline
+!     line = atom%lines(kl)
+!     twohnu3_c2 = line%Aji/line%Bji
+!     i = line%i; j = line%j
+!     Nblue = line%Nblue; Nred=line%Nred
+!     chicc = 0d0
+!     chicc(Nblue:Nred) = line%Vij(:,id) * (atom%n(i,icell) &
+!     					- line%gij(:,id)*atom%n(j,icell))
+! 
+!     atom%Uji_down(j,Nblue:Nred,id) = atom%Uji_down(j,Nblue:Nred,id) + &
+!     				twohnu3_c2(Nblue:Nred)*line%gij(:,id)*line%Vij(:,id)
+!     				
+!     atom%chi_up(i,Nblue:Nred,id) = atom%chi_up(i,Nblue:Nred,id) + chicc(Nblue:Nred)
+!     atom%chi_down(j,Nblue:Nred,id) = atom%chi_down(j,Nblue:Nred,id) + chicc(Nblue:Nred)
+!     
+!    end do   
+!    NULLIFY(atom)
+!   end do
+!  RETURN
+!  END SUBROUTINE fill_Xcoupling
 
  SUBROUTINE SEE_atom(id, icell,atom)
  ! --------------------------------------------------------------------!

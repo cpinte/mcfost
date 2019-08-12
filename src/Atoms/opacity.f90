@@ -81,9 +81,9 @@ MODULE Opacity
 !   NLTEspec%AtomOpac%eta(:,id) = 0d0
   !We need to recompute LTE opacities for this cell and ray
   CALL initAtomOpac(id, .true.)
+  if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id)
 !   NLTEspec%Psi(:,iray,id) = 0d0; NLTEspec%dtau(:,iray,id) = 0d0
   !set atom%eta to zero also
-  !CALL initCrossCoupling(id)
   !NOTE Zeeman opacities are not re set to zero and are accumulated
   !change that or always use FIELD_FREE
   !is equivalent to P(icell,id, iray) ?
@@ -228,14 +228,17 @@ MODULE Opacity
     	if (aatom%n(j,icell) <= tiny_dp .or. aatom%n(i,icell) <= tiny_dp) then
     	 write(*,*) aatom%n(j,icell), aatom%n(i,icell)
     	 write(*,*) aatom%n(:,icell)
-     	 CALL ERROR("too small cont populations") !or Warning()
+     	 !CALL ERROR("too small cont populations") !or Warning()
+     	 CALL WARNING("too small cont populations")
+     	 aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
+     	 aatom%n(i,icell) = max(tiny_dp, aatom%n(i,icell))
     	end if
       	allocate(gijk(cont%Nlambda))
         gijk(:) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
 
       !Cannot be negative because we alread tested if < tiny_dp
-!       if ((aatom%n(i,icell) <= minval(gijk)*aatom%n(j,icell)).or.&
-!         (aatom%n(i,icell) <= maxval(gijk)*aatom%n(j,icell))) then
+      if ((aatom%n(i,icell) <= minval(gijk)*aatom%n(j,icell)).or.&
+        (aatom%n(i,icell) <= maxval(gijk)*aatom%n(j,icell))) then
 ! !           write(*,*) id, icell, aatom%ID, &
 ! !           	" ** Stimulated emission for continuum transition ",j,i,&
 ! !           								cont%lambda0, cont%lambdamin, " neglected"
@@ -248,8 +251,11 @@ MODULE Opacity
 ! !          write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
 ! !          write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
 ! !                   stop
-!          stm = 0d0
-!       end if
+         stm = 0d0
+!          write(*,*) id, icell, aatom%ID, &
+!           	" ** Stimulated emission for continuum transition ",j,"-> ", i,&
+!           								cont%lambda0, cont%lambdamin, " neglected"
+      end if
       !allocate Vij, to avoid computing bound_free_Xsection(cont) 3 times for a continuum
 	  allocate(Vij(cont%Nlambda), twohnu3_c2k(cont%Nlambda))
     	
@@ -271,9 +277,22 @@ MODULE Opacity
     	   gijk(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2k(:)
 
     	
-    	if (iterate) &
+    	if (iterate) then
          aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
          							gijk(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2k
+         							
+
+        !Xcoupling terms if necessary 
+         if (atmos%nLTE_methode=="MALI") then
+    		aatom%Uji_down(j,Nblue:Nred,id) = aatom%Uji_down(j,Nblue:Nred,id) + &
+    				 gijk * Vij * twohnu3_c2k
+    				 
+    		aatom%chi_up(i,Nblue:Nred,id) = aatom%chi_up(i,Nblue:Nred,id) + &
+    			Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
+    		aatom%chi_down(j,Nblue:Nred,id) = aatom%chi_down(j,Nblue:Nred,id) + &
+    			Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
+         end if						
+        end if !end iterate
 
     !Do not forget to add continuum opacities to the all continnum opacities
     !after all populations have been converged    
@@ -292,22 +311,27 @@ MODULE Opacity
     if ((aatom%n(j,icell) <= tiny_dp).or.(aatom%n(i,icell) <= tiny_dp)) then !no transition
     	write(*,*) tiny_dp, aatom%n(j, icell), aatom%n(i,icell)
         write(*,*) aatom%n(:,icell)
-     	CALL ERROR("too small line populations") !or Warning()
+     	!CALL ERROR("too small line populations") !or Warning()
+     	CALL WARNING("too small line populations")
+     	aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
+     	aatom%n(i,icell) = max(tiny_dp, aatom%n(i,icell))
     end if 
 
     gij = line%Bji / line%Bij !array of constant Bji/Bij
     
     !!Cannot be negative because we alread tested if < tiny_dp
-!     if ((aatom%n(i,icell) <= gij*aatom%n(j,icell)).or.&
-!         (aatom%n(i,icell) <= gij*aatom%n(j,icell))) then
+    if ((aatom%n(i,icell) <= gij*aatom%n(j,icell)).or.&
+         (aatom%n(i,icell) <= gij*aatom%n(j,icell))) then
 ! !           write(*,*) id, icell, aatom%ID, &
 ! !           	" ** Stimulated emission for line transition ",j,i,line%lambda0, " neglected"
 ! !          write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
 ! !          write(*,*) gij
 ! !          write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
 ! !          write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
-!         stm = 0d0 !not gij !! look at eta
-!     end if
+        stm = 0d0 !not gij !! look at eta
+!           write(*,*) id, icell, aatom%ID, &
+!           	" ** Stimulated emission for line transition ",j,"-> ", i,line%lambda0, " neglected"
+    end if
     
     twohnu3_c2 = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
@@ -324,6 +348,7 @@ MODULE Opacity
      Vij(:) = hc_4PI * line%Bij * phi(:) !normalized in Profile()
                                                              ! / (SQRTPI * VBROAD_atom(icell,aatom)) 
       
+    !opacity
      NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
        		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
        		
@@ -335,7 +360,19 @@ MODULE Opacity
       aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
       								twohnu3_c2 * gij * Vij(:) * aatom%n(j,icell)
       aatom%lines(kr)%phi(:,iray,id) = phi(:)
-     end if
+      
+           
+      !Xcoupling terms if necessary                                                  
+      if (atmos%nLTE_methode=="MALI") then
+    	aatom%Uji_down(j,Nblue:Nred,id) = aatom%Uji_down(j,Nblue:Nred,id) + &
+    				twohnu3_c2*gij*Vij
+    				
+   	 	aatom%chi_up(i,Nblue:Nred,id) = aatom%chi_up(i,Nblue:Nred,id) + &
+   	 		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
+    	aatom%chi_down(j,Nblue:Nred,id) = aatom%chi_down(j,Nblue:Nred,id) + &
+    		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
+      end if
+    end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
        write(*,*) "Beware, NLTE part of Zeeman opac not set to 0 between iteration!"
