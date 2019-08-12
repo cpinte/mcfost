@@ -398,7 +398,7 @@ MODULE spectrum_type
 !    deallocate(Nblue_array, Nmid_array, Nred_array)
 
    if (allocated(NLTEspec%Ksi)) deallocate(NLTEspec%ksi)
-   if (NLTEspec%scale_ref) deallocate(NLTEspec%scale_ref)
+   if (allocated(NLTEspec%scale_ref)) deallocate(NLTEspec%scale_ref)
 
   RETURN
   END SUBROUTINE freeSpectrum
@@ -756,9 +756,9 @@ MODULE spectrum_type
  ! -------------------------------------------------- !
   ! Write contribution function to disk.
  ! --------------------------------------------------- !
-  integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(7) :: naxes
-  integer :: group,fpixel,nelements
+  integer :: status,unit,blocksize,bitpix,naxis, naxis2
+  integer, dimension(7) :: naxes, naxes2
+  integer :: group,fpixel,nelements, nelements2
   logical :: simple, extend
   character(len=6) :: comment=""
   real :: pixel_scale_x, pixel_scale_y 
@@ -787,6 +787,11 @@ MODULE spectrum_type
    naxes(3) = RT_n_incl
    naxes(4) = RT_n_az
    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+   naxis2 = 3
+   naxes2(1) = NLTEspec%atmos%Nspace ! equivalent n_cells
+   naxes2(2) = RT_n_incl
+   naxes2(3) = RT_n_az
+   nelements2 = naxes2(1) * naxes2(2) * naxes2(3)
   else
    if (l3D) then
     naxis = 6
@@ -797,6 +802,13 @@ MODULE spectrum_type
     naxes(5) = RT_n_incl
     naxes(6) = RT_n_az
     nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) * naxes(6)
+    naxis2 = 5
+    naxes2(1) = n_rad
+    naxes2(2) = 2*nz
+    naxes2(3) = n_az
+    naxes2(4) = RT_n_incl
+    naxes2(5) = RT_n_az
+    nelements2 = naxes2(1) * naxes2(2) * naxes2(3) * naxes2(4) * naxes2(5)
    else
     naxis = 5
     naxes(1) = n_rad
@@ -805,6 +817,12 @@ MODULE spectrum_type
     naxes(4) = RT_n_incl
     naxes(5) = RT_n_az
     nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) 
+    naxis2 = 4
+    naxes2(1) = n_rad
+    naxes2(2) = nz
+    naxes2(3) = RT_n_incl
+    naxes2(4) = RT_n_az
+    nelements2 = naxes2(1) * naxes2(2) * naxes2(3) * naxes2(4)
    end if
   end if
 
@@ -819,13 +837,9 @@ MODULE spectrum_type
   !open new hdu for reference scale
   CALL ftcrhd(unit, status)
   
-  naxis = naxis - 1!remove the frequency dependence
-  nelements = nelements / NLTEspec%Nwaves
-  naxes = pack(naxes, naxes/=NLTEspec%Nwaves)
-  
-  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  CALL ftphpr(unit,simple,bitpix,naxis2,naxes2,0,1,extend,status)
   CALL ftpkys(unit, "Optical depth", "", "", status)
-  CALL ftpprd(unit,group,fpixel,naxes,NLTEspec%scale_ref,status)
+  CALL ftpprd(unit,group,fpixel,nelements2,NLTEspec%scale_ref,status)
 
   !  Close the file and free the unit number.
   CALL ftclos(unit, status)
