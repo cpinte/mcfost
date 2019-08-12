@@ -29,7 +29,7 @@ MODULE AtomicTransfer
  use statequil_atoms
  use init_solution, only 			: Init_NLTE, free_NLTE_sol, gpop_old, pop_old, pop
  use writeatom
- use simple_models, only 				: magneto_accretion_model, FALC_MODEL, spherical_star !for tests
+ use simple_models, only 				: magneto_accretion_model, spherical_shells_model!, FALC_MODEL, spherical_star, feqv !for tests
  !$ use omp_lib
 
  !MCFOST's original modules
@@ -50,7 +50,7 @@ MODULE AtomicTransfer
  
  PROCEDURE(INTEG_RAY_LINE_I), pointer :: INTEG_RAY_LINE => NULL()
 
- real(kind=dp), allocatable :: S_contrib(:,:,:), chil(:), Sl(:), scale_ref(:)
+ real(kind=dp), allocatable :: S_contrib(:,:,:), chil(:), Sl(:), scale_ref(:,:)
 
  CONTAINS
  
@@ -452,8 +452,7 @@ MODULE AtomicTransfer
               !ne marche pas, car ici, icell est la cellule à la surface du modèle pour
               ! un pixel de la carte, vu qu'on se propage à l'envers.
              if (lcontrib_function) then
-              NLTEspec%scale_ref(:,ibin,iaz) = scale_ref(:)
-              scale_ref = 0d0
+              NLTEspec%scale_ref(:,ibin,iaz) = scale_ref(:,iray)
               NLTEspec%Ksi(:,:,ibin,iaz) = NLTEspec%Ksi(:,:,ibin,iaz) + S_contrib(:,:,iray) / npix2
               !the other numerical factors are useless
              end if	
@@ -752,8 +751,8 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   !CALL spherical_shells_model()
-   CALL spherical_star()
+   CALL spherical_shells_model()
+   !CALL spherical_star()
    !CALL magneto_accretion_model()  
   end if
 !! --------------------------------------------------------- !!
@@ -874,11 +873,10 @@ MODULE AtomicTransfer
   write(*,*) "Computing emission flux map..."
   !Use converged NLTEOpac
   if (lcontrib_function) then 
-   allocate(S_contrib(n_cells, NLTEspec%Nwaves, nb_proc))
-   allocate(chil(NLTEspec%Nwaves), Sl(NLTEspec%Nwaves, scale_ref(n_cells)))
+   allocate(S_contrib(n_cells, NLTEspec%Nwaves, atmos%Nrays))
+   allocate(chil(NLTEspec%Nwaves), Sl(NLTEspec%Nwaves), scale_ref(n_cells,atmos%Nrays))
    INTEG_RAY_LINE => NULL()
    INTEG_RAY_LINE => INTEG_RAY_LINE_I_CNTRB
-   scale_ref = 0d0
   end if
   do ibin=1,RT_n_incl
      do iaz=1,RT_n_az
@@ -1565,7 +1563,9 @@ MODULE AtomicTransfer
   Istar(:) = 0d0
   !!if (lcontrib_function .and.(.not.labs)) then
    S_contrib(:,:, iray) = 0d0 !for the moment not at NLTE
-   idref = locate(NLTEspec%lambda, 500d0)
+   scale_ref(:,iray) = 0d0
+   Sl(:) = 0d0
+   idref = locate(NLTEspec%lambda, 500d0)!656.469162229810d0)
   !!end if
   
   ! -------------------------------------------------------------- !
@@ -1651,7 +1651,9 @@ MODULE AtomicTransfer
             
       !!if (lcontrib_function.and.(.not.labs)) then
         chil(:) = NLTEspec%AtomOpac%chi(:,id) -  NLTEspec%AtomOpac%chic_nlte(:,id) + &
-        			   NLTEspec%AtomOpac%chi_p(:,id)
+        			   NLTEspec%AtomOpac%chi_p(:,id) + 1d-300
+        Sl(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) - &
+                 NLTEspec%AtomOpac%etac_nlte(:,id)!) / chil(:) !eta_l
       !!end if
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1
@@ -1678,8 +1680,11 @@ MODULE AtomicTransfer
       			 (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300 + NLTEspec%AtomOpac%chic_nlte(:,id))
       			 
       !!if (lcontrib_function.and.(.not.labs)) then
-        chil(:) = (NLTEspec%AtomOpac%chi_p(:,id)-NLTEspec%AtomOpac%chi_c(:,id) + &
-        			NLTEspec%AtomOpac%chi(:,id) -  NLTEspec%AtomOpac%chic_nlte(:,id))
+        chil(:) = NLTEspec%AtomOpac%chi_p(:,id)-NLTEspec%AtomOpac%chi_c(:,id) + &
+        			NLTEspec%AtomOpac%chi(:,id) -  NLTEspec%AtomOpac%chic_nlte(:,id) + 1d-300
+        !actually eta here
+        Sl(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) - &
+                 NLTEspec%AtomOpac%eta_c(:,id) - NLTEspec%AtomOpac%etac_nlte(:,id) !) / chil(:)
       !!end if
     end if
 
@@ -1702,10 +1707,12 @@ MODULE AtomicTransfer
     !!if (lcontrib_function.and.(.not.labs)) then
      !for this direction and thread, at this cell
      !will be summed over all rays for this cell
-     scale_ref(icell) = scale_ref(icell) + tau_c(idref)     
-     Sl(:) = Snu(:) - Snu_c(:)
+     scale_ref(icell,iray) = scale_ref(icell,iray) + dtau_c(idref)    
+     !!write(*,*) icell_star, id, icell, scale_ref(icell, iray), minval(abs(S_contrib(icell,:,iray))), maxval(abs(S_contrib(icell,:,iray)))
+     !!Sl(:) = Snu(:) - Snu_c(:)
      S_contrib(icell,:,iray) = S_contrib(icell,:,iray) + chil(:) * &
-     		(NLTEspec%Ic(:,iray,id) - Sl(:) * dexp(-tau))
+     		NLTEspec%Ic(:,iray,id) - Sl(:) * dexp(-tau)
+     !S_contrib(icell,:,iray) = dexp(-tau) * (1.0_dp - dexp(-dtau)) * (Snu-Snu_c * 0d0)
      if (next_cell==icell_star) then 
       CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x1, y1, z1, u,v,w,Istar)
       S_contrib(icell,:,iray) = S_contrib(icell,:,iray) + chil(:)*Istar
