@@ -225,7 +225,8 @@ MODULE Opacity
     	i = cont%i; j=cont%j
     	if (.not.cont%lcontrib_to_opac) CYCLE!(Nred==-99 .and. Nblue==-99) CYCLE
 
-    	if (aatom%n(j,icell) <= tiny_dp .or. aatom%n(i,icell) <= tiny_dp) then
+        !<= or < 
+    	if (aatom%n(j,icell) < tiny_dp .or. aatom%n(i,icell) < tiny_dp) then
     	 write(*,*) aatom%n(j,icell), aatom%n(i,icell)
     	 write(*,*) aatom%n(:,icell)
      	 !CALL ERROR("too small cont populations") !or Warning()
@@ -308,7 +309,8 @@ MODULE Opacity
     if (.not.line%lcontrib_to_opac) CYCLE
     i = line%i; j=line%j
     
-    if ((aatom%n(j,icell) <= tiny_dp).or.(aatom%n(i,icell) <= tiny_dp)) then !no transition
+    !<= or <
+    if ((aatom%n(j,icell) < tiny_dp).or.(aatom%n(i,icell) < tiny_dp)) then !no transition
     	write(*,*) tiny_dp, aatom%n(j, icell), aatom%n(i,icell)
         write(*,*) aatom%n(:,icell)
      	!CALL ERROR("too small line populations") !or Warning()
