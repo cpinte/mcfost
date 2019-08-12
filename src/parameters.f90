@@ -58,7 +58,7 @@ module parametres
 
   ! Atomic line radiative transfer
   logical :: lemission_atom, lstore_opac, lsolve_for_ne, lvacuum_to_air, lstatic, &
-       lcontrib_function, lmagnetoaccr
+       lcontrib_function, lmagnetoaccr, lwind_rotation
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image
   logical :: ltab_wavelength_image

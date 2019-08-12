@@ -690,13 +690,7 @@ function v_proj(icell,x,y,z,u,v,w) !
         vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
         v_proj = vx * u + vy * v + vz * w
      else ! Using analytical velocity field
-        if (.not.lmagnetoaccr.and.(lkeplerian.or.linfall)) &
-        	vitesse = vfield(icell)
-        	
-       !  if (.not.lmagnetoaccr.and.(.not.lkeplerian.and..not.linfall)) then
-!           v_proj = atmos%Vxyz(icell,1) * u + atmos%Vxyz(icell,2) * v + atmos%Vxyz(icell,3) * w
-!           return
-!         end if
+        if (.not.lmagnetoaccr.and.(lkeplerian.or.linfall)) vitesse = vfield(icell)
 
         if (lkeplerian) then
            r = sqrt(x*x+y*y)
@@ -729,21 +723,47 @@ function v_proj(icell,x,y,z,u,v,w) !
            else
               v_proj = 0.0_dp
            endif
-        else if (lmagnetoaccr) then
-           r = sqrt(x*x+y*y)
+        else if (lmagnetoaccr) then !lwind_rotation
+           r = sqrt(x*x+y*y) !projection in the x,y plane. Projection in the z plane elsewhere
+           					 !as Vxyz is either (x,y,z) or (R, z, phi) !!
            vx = 0_dp; vy = 0_dp; vz = 0_dp
-           if (r > tiny_dp) then !rotational (and Keplerian) velocity + v poloidal
+           if (r > tiny_dp) then !rotational  + wind
               norme = 1.0_dp/r
+              !rotational velocity changes with z, but lies only in the (x,y) plane
+              ! -> e_phi on (e_x, e_y)
               vx = -y * norme * atmos%Vxyz(icell,3)  !Vphi proj_x
-              vy =  x * norme * atmos%Vxyz(icell,3)  !Vphi projy
-              vx = vx + x*norme*atmos%Vxyz(icell, 1) !Vr proj_x
-              vy = vy + y*norme*atmos%Vxyz(icell, 1) !Vr proj_y
+              vy =  x * norme * atmos%Vxyz(icell,3)  !Vphi proj_y
+              !equatorial velocity lies in x, y plane, x*norme=x/r=cos(phi); y*norme=sin(phi)
+              ! -> e_R on (e_x, e_y)
+              vx = vx + x*norme*atmos%Vxyz(icell, 1) !VR proj_x
+              vy = vy + y*norme*atmos%Vxyz(icell, 1) !VR proj_y
               vz = atmos%Vxyz(icell, 2) !Vz
-              if (z<0) vz = -vz
+              !and z is paralel to e_z
+              if (z < 0_dp) vz = -vz !symmetrical change
               v_proj = vx*u + vy*v + vz*w
            else
               v_proj = 0_dp
            endif
+        else if (lwind_rotation) then
+           r = sqrt(x*x+y*y)
+           vx = 0_dp; vy = 0_dp; vz = 0_dp
+           if (r > tiny_dp) then !rotational  + wind
+              norme = 1.0_dp/r
+              vx = -y * norme * atmos%Vxyz(icell,3)  !Vphi proj_x
+              vy =  x * norme * atmos%Vxyz(icell,3)  !Vphi proj_y
+           else
+              vx = 0d0; vy = 0d0
+           end if
+           r = sqrt(x*x+y*y+z*z)
+           if (r>tiny_dp) then
+           	  norme = 1.0_dp / r
+              vx = vx + x*norme*atmos%Vxyz(icell, 1)
+              vy = vy + y*norme*atmos%Vxyz(icell, 1)
+              vz = z*norme*atmos%Vxyz(icell, 1)
+           else
+              vz = 0d0
+           endif
+           v_proj = vx*u + vy*v + vz*w
         else
            call error("velocity field not defined")
         endif
