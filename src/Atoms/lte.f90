@@ -142,8 +142,8 @@ MODULE lte
     ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
     !j = -1 for Hminus (l=element=H)
     atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
-    !-> the following is in RH, but it doesn't make sens for me
-     !atmos%nHmin(k) = nTotal_atom(k, Hydrogen) * atmos%ne(k)*PhiHmin!faster?
+    !-> the following is in RH, but it doesn't make sens to me
+    !! atmos%nHmin(k) = nTotal_atom(k, Hydrogen) * atmos%ne(k)*PhiHmin
    end do !over depth points
    !$omp end do
    !$omp  end parallel
