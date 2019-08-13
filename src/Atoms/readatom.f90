@@ -366,6 +366,7 @@ MODULE readatom
      !Now parse Broedening recipe
      if (trim(vdWChar).eq."PARAMTR") then
        atom%lines(kr)%vdWaals = "RIDDER_RENSBERGEN"
+       CALL Error ("Not used anymore!")
      else if (trim(vdWChar).eq."UNSOLD") then
        !write(*,*) "Using UNSOLD recipe for broadening"
        atom%lines(kr)%vdWaals = "UNSOLD"

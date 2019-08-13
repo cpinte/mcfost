@@ -10,6 +10,8 @@ MODULE broad
  use atom_type
  use atmos_type, only : atmos, Hydrogen, Helium, VBROAD_atom
  use math, only : dpow, SQ, CUBE
+ 
+ use messages, only : error, warning
 
  IMPLICIT NONE
 
@@ -158,7 +160,6 @@ MODULE broad
            Helium%abund*vrel35_He)*C625
    !write(*,*) Helium%abund, C625
     GvdW = cross * dpow(atmos%T(icell), 3d-1)
-    !write(*,*) GvdW(k)
   CASE ("BARKLEM")
    write(*,*) "Warning-> vdWaals broadening following BARKLEM ",&
      "not tested yet!"
@@ -167,21 +168,22 @@ MODULE broad
     GvdW = line%cvdWaals(1) * dpow(atmos%T(icell),real(1.-&
           line%cvdWaals(2),kind=8)/2.) + cross*dpow(atmos%T(icell),3d-1)
   CASE ("RIDDER_RENSBERGEN")
-   write(*,*) "Warning-> vdWaals broadening following ",&
-     "RIDDER_RENSBERGEN not tested yet!"
-  !alpha = 1.0E-8 * cvdW[0]  (Hydrogen broadening)
-  !      = 1.0E-9 * cvdW[1]  (Helium broadening)
-   gammaCorrH = 1d-8 * CUBE(CM_TO_M) * &
-     dpow(1.+Hydrogen%weight/atom%weight,&
-         real(line%cvdWaals(2),kind=8))
-   gammaCorrHe = 1d-9 * CUBE(CM_TO_M) * &
-     dpow(1.+Helium%weight/atom%weight, &
-         real(line%cvdWaals(4),kind=8))
-    GvdW = gammaCorrH*line%cvdWaals(1) * &
-      dpow(atmos%T(icell),real(line%cvdWaals(2),kind=8)) + &
-      gammaCorrHe*line%cvdWaals(3) * &
-      dpow(atmos%T(icell),real(line%cvdWaals(4),kind=8)) *&
-           Helium%abund
+   CALL Error("Not implemented")
+!    write(*,*) "Warning-> vdWaals broadening following ",&
+!      "RIDDER_RENSBERGEN not tested yet!"
+!   !alpha = 1.0E-8 * cvdW[0]  (Hydrogen broadening)
+!   !      = 1.0E-9 * cvdW[1]  (Helium broadening)
+!    gammaCorrH = 1d-8 * CUBE(CM_TO_M) * &
+!      dpow(1.+Hydrogen%weight/atom%weight,&
+!          real(line%cvdWaals(2),kind=8))
+!    gammaCorrHe = 1d-9 * CUBE(CM_TO_M) * &
+!      dpow(1.+Helium%weight/atom%weight, &
+!          real(line%cvdWaals(4),kind=8))
+!     GvdW = gammaCorrH*line%cvdWaals(1) * &
+!       dpow(atmos%T(icell),real(line%cvdWaals(2),kind=8)) + &
+!       gammaCorrHe*line%cvdWaals(3) * &
+!       dpow(atmos%T(icell),real(line%cvdWaals(4),kind=8)) *&
+!            Helium%abund
   CASE DEFAULT
    write(*,*) "Method for van der Waals broadening unknown"
    write(*,*) "exiting..."
@@ -345,18 +347,21 @@ MODULE broad
   if ((line%cvdWaals(1).gt.0).or.(line%cvdWaals(3).gt.0)) then
    CALL VanderWaals(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
+    !write(*,*) " Van der Waals:", adamp
     !write(*,*),"vdW", adamp* cDop/VBROAD_atom(icell,atom)
   end if
   ! Quadratic Stark broadening
   if (line%cStark > 0.) then
    CALL Stark(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
+    !write(*,*) " Stark qu:", adamp
     !write(*,*),"Stark2", adamp* cDop/VBROAD_atom(icell,atom)
   end if
   ! Linear Stark broadening only for Hydrogen
   if (atom%ID.eq."H ") then
    CALL StarkLinear(icell, atom,kr, adamp)
     Qelast = Qelast + adamp
+    !write(*,*) " Stark linear:", adamp
     !write(*,*),"Stark1", adamp* cDop/VBROAD_atom(icell,atom)
   end if
   ! Store Qelast, total rate of elastic collisions, if PFR only
@@ -366,6 +371,7 @@ MODULE broad
   end if
   !write(*,*) "Grad=", line%Grad * cDop/VBROAD_atom(icell,atom), cDop/VBROAD_atom(icell,atom)
   adamp = (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
+
   !write(*,*) "adamp (m/s) vBroad (m/s) = ", adamp*VBROAD_atom(icell,atom),VBROAD_atom(icell,atom)
 
 !     if (atom%ID == "H" .and. (atom%g(line%i)==8. .and. atom%g(line%j)==18)) then
