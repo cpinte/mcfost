@@ -5,26 +5,45 @@ MODULE math
 
   CONTAINS
   
-   FUNCTION check_nan_infinity_dp(y) result(val)
+   FUNCTION any_nan_infinity_matrix(y) result(val)
     double precision :: y(:,:)
     integer :: val, i, j
     
      val = 0
      do i=1,size(y(:,1))
-      do j=1, size(y(0,:))
+      do j=1, size(y(1,:))
        if (y(i,j) /= y(i,j)) then
-        write(*,*) y(i,j)
+        write(*,*) "(Nan):", y(i,j)
         val = 1
         return
        else if (y(i,j)==y(i,j)+1) then
-        write(*,*) y(i,j), y(i,j)*(1+0.1)
+        write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1)
         val = 2
         return
        end if      
       end do
      end do
    RETURN
-   END FUNCTION check_nan_infinity_dp
+   END FUNCTION any_nan_infinity_matrix
+
+   FUNCTION any_nan_infinity_table(y) result(val)
+    double precision :: y(:)
+    integer :: val, i
+    
+     val = 0
+     do i=1,size(y)
+       if (y(i) /= y(i)) then
+        write(*,*) "(Nan):", y(i)
+        val = 1
+        return
+       else if (y(i)==y(i)+1) then
+        write(*,*) "(infinity):", y(i), y(i)*(1+0.1)
+        val = 2
+        return
+       end if      
+     end do
+   RETURN
+   END FUNCTION any_nan_infinity_table
   
    FUNCTION Integrate_x(N, x, y) result(integ)
     integer :: N
