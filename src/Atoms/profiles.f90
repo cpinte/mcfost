@@ -47,7 +47,7 @@ MODULE PROFILES
    v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
    omegav(1) = v0
   end if
-  
+  !!write(*,*) "v0", v0/1d3
   vbroad = VBROAD_atom(icell,line%atom)
   if (.not.lstatic .and. .not.lVoronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
@@ -61,9 +61,10 @@ MODULE PROFILES
       yphi=y+delta_vol_phi*v
       zphi=z+delta_vol_phi*w
       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+      !!write(*,*) "v=", omegav(nv)/1d3
     end do 
   end if
-
+ !!write(*,*) "v1", v1/1d3
 
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
@@ -74,7 +75,6 @@ MODULE PROFILES
   vv(:) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
            CLIGHT / (line%lambda0 * vbroad)
 
-
   if (line%voigt) then
   !Now we have a pointer to atom in line. atom(n)%lines(kr)%atom => atom(n) 
   !Computed before or change damping to use only line
@@ -83,7 +83,8 @@ MODULE PROFILES
                         !                 2) Voronoi grid is used                 
                         
           vvoigt(:) = vv(:) - omegav(nv) / vbroad
-
+!           write(*,*) nv, "0loc=", locate(vvoigt, 0d0)
+!           write(*,*) maxval(vvoigt), vbroad
           P(:) = P(:) + &
              Voigt(line%Nlambda, line%adamp,vvoigt(:), F, VoigtMethod) / Nvspace
 
@@ -97,7 +98,14 @@ MODULE PROFILES
       end do
  end if !line%voigt
  P(:) = P(:) / (SQRTPI * vbroad)
- if (minval(P) < 0) CALL error("P should not be negative")
+!! write(*,*) "Max prof", maxval(P)
+
+ if (any_nan_infinity_vector(P)>0 .or. minval(P) < 0) then
+  write(*,*) line%adamp, line%Nlambda
+  write(*,*) vvoigt
+  write(*,*) " Error with Profile"
+  stop
+ end if
 
  !deallocate(vv, vvoigt, F)
  RETURN
