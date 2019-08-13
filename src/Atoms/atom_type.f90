@@ -92,8 +92,9 @@ MODULE atom_type
    type (AtomicContinuum) , allocatable, dimension(:)   :: continua
    !one emissivity per atom, used in the construction of the gamma matrix
    !where I have to distinguish between atom own opac and overlapping transitions
-   double precision, allocatable, dimension(:,:,:) :: eta
-   double precision, allocatable, dimension(:,:,:) :: chi_up, chi_down, Uji_down
+   double precision, allocatable, dimension(:,:,:) :: eta !Nwaves, Nrays, Nproc
+   !Nlevel, Nlam_max, Nrays, Nproc
+   double precision, allocatable, dimension(:,:,:,:) :: chi_up, chi_down, Uji_down
    type (Ng) :: Ngs
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
