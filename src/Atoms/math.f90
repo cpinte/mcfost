@@ -26,7 +26,7 @@ MODULE math
    RETURN
    END FUNCTION any_nan_infinity_matrix
 
-   FUNCTION any_nan_infinity_table(y) result(val)
+   FUNCTION any_nan_infinity_vector(y) result(val)
     double precision :: y(:)
     integer :: val, i
     
@@ -43,7 +43,7 @@ MODULE math
        end if      
      end do
    RETURN
-   END FUNCTION any_nan_infinity_table
+   END FUNCTION any_nan_infinity_vector
   
    FUNCTION Integrate_x(N, x, y) result(integ)
     integer :: N
