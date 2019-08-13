@@ -139,9 +139,7 @@ MODULE AtomicTransfer
 
     ! Calcul longeur de vol et profondeur optique dans la cellule
     previous_cell = 0 ! unused, just for Voronoi
-
     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-
 
 !     if (.not.atmos%lcompute_atomRT(icell)) lcellule_non_vide = .false. !chi and chi_c = 0d0, cell is transparent  
 !	   this makes the code to break down  --> the atomRT is defined on n_cells
@@ -157,10 +155,17 @@ MODULE AtomicTransfer
      														  !and we need to compute the length path
      !! Compute background opacities for PASSIVE bound-bound and bound-free transitions
      !! at all wavelength points including vector fields in the bound-bound transitions
+     ! evaluate Psi operator ?
      eval_operator = (labs .and. (nbr_cell == 1)) !labs if false for images
      											  !so no pb if Nact>0 and we use a different grid
-     CALL initAtomOpac(id,eval_operator) !set opac to 0 for this cell and thread id
-     if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id)
+     CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
+     if (eval_operator) then
+ !here test, to check the old previous init of Psi and dtau in initAtomOpac with eval_operator=.true.
+!NLTEspec%Psi(:,:,id) = 0d0
+!if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") NLTEspec%dtau(:,:,id) = 0d0    
+      CALL init_psi_operator(iray, id)
+      if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(iray, id)
+     end if
      CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms
      if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops
@@ -201,6 +206,7 @@ MODULE AtomicTransfer
       			 (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300 + NLTEspec%AtomOpac%chic_nlte(:,id))
     end if
 
+	!Should never happen if we neglect STM
     if (minval(Snu) < 0. .or. maxval(Snu) < 0.) then
       write(*,*) "eta (max/min)", maxval(NLTEspec%AtomOpac%eta(:,id)), minval(NLTEspec%AtomOpac%eta(:,id))
       write(*,*) "chi (max/min)", maxval(NLTEspec%AtomOpac%chi(:,id)), minval(NLTEspec%AtomOpac%chi(:,id))
@@ -304,7 +310,7 @@ MODULE AtomicTransfer
      l_contrib = l_contrib * AU_to_m
      if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
 
-     CALL initAtomOpac(id,(labs.and.(nbr_cell==1)))
+     CALL initAtomOpac(id)
      CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, .false.)!(labs.and.(nbr_cell==1)))
 
      if (lstore_opac) then
@@ -1128,12 +1134,13 @@ MODULE AtomicTransfer
                          ARGMT = PI * (2.0_dp * rand - 1.0_dp)
                          U0 = SRW02 * cos(ARGMT)
                          V0 = SRW02 * sin(ARGMT)  
-						end if !etape    					
+						end if !etape 
+						   					
 						xyz0(1,iray,id) = x0; xyz0(2,iray,id) = y0; xyz0(3,iray,id) = z0
 						uvw0(1,iray,id) = U0; uvw0(2,iray,id) = V0; uvw0(3,iray,id) = W0
-
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       				end do !iray
+
       				!Fill the Rate matrix and integrates over rays and frequencies
       				!rays and waves integration for all atoms
                     CALL FillGamma(id, icell, n_rayons, force_lte)
@@ -1633,7 +1640,11 @@ MODULE AtomicTransfer
      !! at all wavelength points including vector fields in the bound-bound transitions
      eval_operator = (labs .and. (nbr_cell == 1)) !labs if false for images
      											  !so no pb if Nact>0 and we use a different grid
-     CALL initAtomOpac(id,eval_operator) !set opac to 0 for this cell and thread id
+     CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
+     if (eval_operator) then
+      CALL init_psi_operator(iray, id)
+      if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(iray, id)
+     end if
      CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms
      if (lstore_opac) then !not updated during NLTE loop, just recomputed using initial pops

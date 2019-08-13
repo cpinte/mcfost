@@ -230,7 +230,7 @@ MODULE spectrum_type
   SUBROUTINE allocSpectrum(alloc_atom_nlte, alloc_image)!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
    !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
    !Polarized quantities allocated in adjustStokesMode
-   integer :: nat, k
+   integer :: nat, k, Nlambda_max
    type (AtomicContinuum) :: cont
    type (AtomicLine) 	  :: line
    logical, intent(in)    :: alloc_atom_nlte, alloc_image
@@ -308,19 +308,35 @@ MODULE spectrum_type
     	allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
 
     do nat=1,NLTEspec%atmos%Nactiveatoms
-    if (NLTEspec%atmos%NLTE_methode=="MALI") then
+    if (NLTEspec%atmos%NLTE_methode=="MALI") then !allocate only, for each atom, according to the maximum
+    											  !wavelength used for all transitions ?, b-f transitions
+    											  !cover a large range of frequencies by the way
+    											  !but we need to know the location on the frequency grid
+    											  !as for each atom we sum over all transitions
+      Nlambda_max = NLTEspec%Nwaves
+!      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
+!       Nlambda_max = max(Nlambda_max, NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Nlambda)
+!      end do
+!      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
+!       Nlambda_max = max(Nlambda_max, NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Nlambda)
+!      end do
+     
      CALL Warning("Allocating space for Cross-coupling terms")
+     !write(*,*) " -> Xoupling, Nlambda max for atom", NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%ID,Nlambda_max
+     
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
-     (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
+     (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nlambda_max,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
      NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up = 0d0
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down&
-     (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
+     (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nlambda_max,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
      NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down = 0d0
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down&
-     (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves ,NLTEspec%NPROC))
+     (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nlambda_max,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
      NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down = 0d0
     end if !methode==MALI
     
+    !!for all
+    !too big, how to reduce it?
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
 
      ! do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
@@ -403,20 +419,21 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE freeSpectrum
 
-  SUBROUTINE initAtomOpac(id, eval_operator)
+  SUBROUTINE initAtomOpac(id)!, eval_operator)
     ! set opacities to 0d0 for thread id
     integer, intent(in) :: id
-    logical, intent(in) :: eval_operator
+    !logical, intent(in) :: eval_operator !: evaluate operator psi
     
     if (id <= 0) then
      write(*,*) "(initAtomOpac) thread id has to be >= 1!"
      stop
     end if
     
-    if (eval_operator) then
-   		 NLTEspec%Psi(:,:,id) = 0d0
-   		 if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") NLTEspec%dtau(:,:,id) = 0d0
-   	end if
+!! Wrong because at each rays, the all rays is reset ? instead of the previous value at this ray and id for the new cell    
+!     if (eval_operator) then
+!    		 NLTEspec%Psi(:,:,id) = 0d0
+!    		 if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") NLTEspec%dtau(:,:,id) = 0d0
+!    	end if
 
     NLTEspec%AtomOpac%chi(:,id) = 0d0
     NLTEspec%AtomOpac%eta(:,id) = 0d0
@@ -454,6 +471,15 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE initAtomOpac
   
+  SUBROUTINE init_psi_operator(iray, id)
+    integer, intent(in) :: iray, id
+    
+   	NLTEspec%Psi(:,iray,id) = 0d0
+   	if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") NLTEspec%dtau(:,iray,id) = 0d0
+ 
+  
+  RETURN
+  END SUBROUTINE init_psi_operator
   
   SUBROUTINE alloc_phi_lambda()
   ! --------------------------------------------------- !
@@ -492,7 +518,7 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE dealloc_phi_lambda
   
- SUBROUTINE init_XCoupling(id)
+ SUBROUTINE init_XCoupling(iray,id) !iray is necessary or not ?
   ! --------------------------------------------------- !
    ! Init the X coupling terms for each active atoms.
    ! they are used in the Rybicki Hummer MALI scheme,
@@ -504,13 +530,13 @@ MODULE spectrum_type
    ! For all wavelength
   ! --------------------------------------------------- !
 
-  integer, intent(in) :: id
+  integer, intent(in) :: iray, id
   integer :: nact
   
   do nact=1,atmos%Nactiveatoms
-   atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,id) = 0d0!0 if j<i
-   atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,id) = 0d0
-   atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,id) = 0d0
+   atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,iray,id) = 0d0!0 if j<i
+   atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,iray,id) = 0d0
+   atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,iray,id) = 0d0
   end do
  
  RETURN

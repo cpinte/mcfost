@@ -1,8 +1,8 @@
 MODULE Opacity
 
- use atmos_type, only : atmos
+ use atmos_type, only : atmos, hydrogen
  use atom_type
- use spectrum_type, only : NLTEspec, initAtomOpac, init_Xcoupling 
+ use spectrum_type, only : NLTEspec, initAtomOpac, init_Xcoupling, init_psi_operator
  use constant
  use constantes, only				 : tiny_dp, huge_dp, AU_to_m
  use messages
@@ -80,8 +80,9 @@ MODULE Opacity
 !   NLTEspec%AtomOpac%chi(:,id) = 0d0
 !   NLTEspec%AtomOpac%eta(:,id) = 0d0
   !We need to recompute LTE opacities for this cell and ray
-  CALL initAtomOpac(id, .true.)
-  if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id)
+  CALL initAtomOpac(id)
+  CALL init_psi_operator(iray,id)
+  if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(iray,id)
 !   NLTEspec%Psi(:,iray,id) = 0d0; NLTEspec%dtau(:,iray,id) = 0d0
   !set atom%eta to zero also
   !NOTE Zeeman opacities are not re set to zero and are accumulated
@@ -281,16 +282,15 @@ MODULE Opacity
     	if (iterate) then
          aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
          							gijk(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2k
-         							
 
-        !Xcoupling terms if necessary 
+        !Xcoupling terms if necessary, no angle dependence
          if (atmos%nLTE_methode=="MALI") then
-    		aatom%Uji_down(j,Nblue:Nred,id) = aatom%Uji_down(j,Nblue:Nred,id) + &
+    		aatom%Uji_down(j,Nblue:Nred,iray,id) = aatom%Uji_down(j,Nblue:Nred,iray,id) + &
     				 gijk * Vij * twohnu3_c2k
     				 
-    		aatom%chi_up(i,Nblue:Nred,id) = aatom%chi_up(i,Nblue:Nred,id) + &
+    		aatom%chi_up(i,Nblue:Nred,iray,id) = aatom%chi_up(i,Nblue:Nred,iray,id) + &
     			Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
-    		aatom%chi_down(j,Nblue:Nred,id) = aatom%chi_down(j,Nblue:Nred,id) + &
+    		aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + &
     			Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
          end if						
         end if !end iterate
@@ -334,7 +334,7 @@ MODULE Opacity
 !           write(*,*) id, icell, aatom%ID, &
 !           	" ** Stimulated emission for line transition ",j,"-> ", i,line%lambda0, " neglected"
     end if
-    
+
     twohnu3_c2 = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
     if (line%adamp>5.) write(*,*) " large damping for line", line%j, line%i, line%atom%ID, line%adamp
@@ -362,18 +362,17 @@ MODULE Opacity
       aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
       								twohnu3_c2 * gij * Vij(:) * aatom%n(j,icell)
       aatom%lines(kr)%phi(:,iray,id) = phi(:)
-      
-           
-      !Xcoupling terms if necessary                                                  
-      if (atmos%nLTE_methode=="MALI") then
-    	aatom%Uji_down(j,Nblue:Nred,id) = aatom%Uji_down(j,Nblue:Nred,id) + &
-    				twohnu3_c2*gij*Vij
-    				
-   	 	aatom%chi_up(i,Nblue:Nred,id) = aatom%chi_up(i,Nblue:Nred,id) + &
-   	 		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
-    	aatom%chi_down(j,Nblue:Nred,id) = aatom%chi_down(j,Nblue:Nred,id) + &
-    		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
-      end if
+          
+      !Xcoupling terms if necessary, angle dependent                                                  
+!       if (atmos%nLTE_methode=="MALI") then
+!     	aatom%Uji_down(j,Nblue:Nred,id) = aatom%Uji_down(j,Nblue:Nred,id) + &
+!     				twohnu3_c2*gij*Vij
+!     				
+!    	 	aatom%chi_up(i,Nblue:Nred,id) = aatom%chi_up(i,Nblue:Nred,id) + &
+!    	 		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
+!     	aatom%chi_down(j,Nblue:Nred,id) = aatom%chi_down(j,Nblue:Nred,id) + &
+!     		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
+!       end if
     end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then

@@ -368,7 +368,7 @@ subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot
 
      if (icell0<=n_cells) then
         if (NLTEspec%Atmos%icompute_atomRT(icell0)>0) then
-           call initAtomOpac(id,.false.) !set opac to zero for this cell and thread.
+           call initAtomOpac(id) !set opac to zero for this cell and thread.
            if (lstore_opac) then !LTE continua are kept in memory
                                              !Fast but memory expensive
               !call NLTEOPACity_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
