@@ -163,8 +163,8 @@ MODULE AtomicTransfer
  !here test, to check the old previous init of Psi and dtau in initAtomOpac with eval_operator=.true.
 !NLTEspec%Psi(:,:,id) = 0d0
 !if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") NLTEspec%dtau(:,:,id) = 0d0    
-      CALL init_psi_operator(iray, id)
-      if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(iray, id)
+      CALL init_psi_operator(id, iray)
+      if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id, iray)
      end if
      CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms
@@ -1642,8 +1642,8 @@ MODULE AtomicTransfer
      											  !so no pb if Nact>0 and we use a different grid
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      if (eval_operator) then
-      CALL init_psi_operator(iray, id)
-      if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(iray, id)
+      CALL init_psi_operator(id, iray)
+      if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id, iray)
      end if
      CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms

@@ -471,7 +471,7 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE initAtomOpac
   
-  SUBROUTINE init_psi_operator(iray, id)
+  SUBROUTINE init_psi_operator(id, iray)
     integer, intent(in) :: iray, id
     
    	NLTEspec%Psi(:,iray,id) = 0d0
