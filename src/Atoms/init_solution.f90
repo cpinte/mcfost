@@ -58,7 +58,8 @@ MODULE init_solution
            !no rays integration here
            CALL FillGamma_bf_zero_radiation(1, icell, atom, 1)
            !the next one is cell independent but we init Gamma at each cell
-           CALL FillGamma_bb_zero_radiation(1, atom, 1) !no parallèle yet
+           !even if the cell index appears, it is just here for consistance with the others FillGamma_bb_XXXX
+           CALL FillGamma_bb_zero_radiation(1, icell, atom, 1) !no parallèle yet
            CALL SEE_atom(1, icell,atom)
 !            write(*,*) "n(zerR)", atmos%ActiveAtoms(1)%ptr_atom%n(:,icell)
 !            write(*,*) "nstar", atmos%ActiveAtoms(1)%ptr_atom%nstar(:,icell)
