@@ -283,7 +283,8 @@ MODULE statequil_atoms
       !the -eta is here because in MALI, I = Idag - Psi*etadag + Psieta = (O-Psi)etadag + Psi*eta
       !but with Hogereijde, (O-Psi)*etadag + Psi*eta is replaced by Iincexp(-dtau) + Psi*eta
       !the latter suggest that, to add MALI preconditioning here, we just need to add the Xcoupling
-      Ieff(:) = NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)
+      !Ieff(:) = NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)
+      Ieff(:) = NLTEspec%I(Nblue:Nred,iray,id) * dexp(-NLTEspec%dtau(Nblue:Nred,iray,id))
   
      do l=1,line%Nlambda
       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*Ieff(l)*weight(l)
