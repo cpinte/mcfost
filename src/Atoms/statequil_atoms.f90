@@ -131,10 +131,6 @@ MODULE statequil_atoms
   if (present(switch_to_lte)) then
    if (switch_to_lte) RETURN !Gamma initialized to Cul
   end if
-  
-  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
-  
-   !atom => atmos%ActiveAtoms(nact)%ptr_atom
    
    do kr=1,atom%Ncont
     cont = atom%continua(kr)
@@ -165,18 +161,19 @@ MODULE statequil_atoms
     enddo
     
     deallocate(Ieff,twohnu3_c2k, weight, gijk)!, Jnu)
-   end do !over cont
+   end do 
 !    if (any_nan_infinity_matrix(atom%Gamma(:,:,id))>0) then
 !     write(*,*) "Error in Gamma_bf"
 !     write(*,*) atom%Gamma(:,:,id)
 !    end if
-   !atom => NULL()
-  !enddo !over atom
+
   
  RETURN
  END SUBROUTINE FillGamma_bf_hjde
  
  SUBROUTINE FillGamma_bb_hjde(id, icell, atom, n_rayons, switch_to_lte)
+ !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-dtau) + Psi * eta
+ ! "Hogereijde-like"
   integer, intent(in) :: icell, id, n_rayons !icell is not need, except if we introduce Xcoupling terms here
   type (AtomType), intent(inout), pointer :: atom
   logical, optional, intent(in) :: switch_to_lte
@@ -189,11 +186,6 @@ MODULE statequil_atoms
   if (present(switch_to_lte)) then
    if (switch_to_lte) RETURN !Gamma initialized to Cul
   end if
-  
-  !factor = n_rayons
-  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
-  
-   !atom => atmos%ActiveAtoms(nact)%ptr_atom
 
    do kr=1,atom%Nline
     line = atom%lines(kr)
@@ -228,8 +220,7 @@ MODULE statequil_atoms
 
     deallocate(Ieff, weight)
    enddo !over lines
-   !NULLIFY(atom)
-  !end do !loop over atoms    
+  
 !    if (any_nan_infinity_matrix(atom%Gamma(:,:,id))>0) then
 !     write(*,*) "Error in Gamma_bb"
 !     write(*,*) atom%Gamma(:,:,id)
@@ -239,6 +230,8 @@ MODULE statequil_atoms
  END SUBROUTINE FillGamma_bb_hjde
 
  
+ ! ---> Before implementing MALI with cross-coupling. Rewrite the same as Hogereijde BUT,
+ ! now Ieff = NLTEspec%I * dexp(-dtau) instead of Iexp(-dtau) + eta <=> (Psi-Psi*)*etadag
  SUBROUTINE FillGamma_bb_mali(id, icell, atom, n_rayons, switch_to_lte)
   integer, intent(in) :: icell, id, n_rayons
   type (AtomType), intent(inout), pointer :: atom
@@ -287,6 +280,9 @@ MODULE statequil_atoms
 !      end do 
 
     do iray=1, n_rayons
+      !the -eta is here because in MALI, I = Idag - Psi*etadag + Psieta = (O-Psi)etadag + Psi*eta
+      !but with Hogereijde, (O-Psi)*etadag + Psi*eta is replaced by Iincexp(-dtau) + Psi*eta
+      !the latter suggest that, to add MALI preconditioning here, we just need to add the Xcoupling
       Ieff(:) = NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)
   
      do l=1,line%Nlambda

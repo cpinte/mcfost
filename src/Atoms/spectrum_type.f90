@@ -215,8 +215,7 @@ MODULE spectrum_type
     deallocate(NLTEspec%Psi)
     if (allocated(NLTEspec%dtau)) deallocate(NLTEspec%dtau)
    	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-   	if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") &
-   		allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
+   	allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
    end if 
     
    !Could be also LTE opac if line are kept in memory ?
@@ -304,8 +303,7 @@ MODULE spectrum_type
    if (alloc_atom_nlte) then !NLTE loop activated
      
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-    if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") &
-    	allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
+    allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
 
     do nat=1,NLTEspec%atmos%Nactiveatoms
     if (NLTEspec%atmos%NLTE_methode=="MALI") then !allocate only, for each atom, according to the maximum
@@ -337,6 +335,7 @@ MODULE spectrum_type
     
     !!for all
     !too big, how to reduce it?
+    !! if MALI we do not need it, as Ieff = I0exp(-dtau) <=> (Psi-Psi*)etadag and we use Xcoupling terms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
 
      ! do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
@@ -475,8 +474,7 @@ MODULE spectrum_type
     integer, intent(in) :: iray, id
     
    	NLTEspec%Psi(:,iray,id) = 0d0
-   	if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") NLTEspec%dtau(:,iray,id) = 0d0
- 
+   	NLTEspec%dtau(:,iray,id) = 0d0 !always allocated
   
   RETURN
   END SUBROUTINE init_psi_operator
