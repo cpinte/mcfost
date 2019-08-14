@@ -41,20 +41,19 @@ MODULE Opacity
    end if !store_opac
    !Choose eval operatore depending on the method
 
-   SELECT CASE (atmos%nLTE_methode)
-     CASE ("MALI")
-       CALL Error("Not implemented MALI") !should create an error before, in init_NLTE
-       !!not allocated
-       !!NLTEspec%dtau(:,iray,id) = 0d0 !not used in SEE
-       NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-chi(:)*ds)) / chi !missing a exp(-tau) here ?
-     CASE ("HOGEREIJDE")
+   !SELECT CASE (atmos%nLTE_methode)
+     !CASE ("MALI")
+       !CALL Error("Not implemented MALI") !should create an error before, in init_NLTE
+       !!NLTEspec%dtau(:,iray,id) = chi(:)*ds
+       !NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-chi(:)*ds)) / chi !missing a exp(-tau) here ?
+     !CASE ("HOGEREIJDE")
        NLTEspec%dtau(:,iray,id) = chi(:)*ds !J = Sum_ray I0*exp(-dtau) + Psi*S
        !NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))* eta_loc/(chi+1d-300)
        NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))/(chi+1d-300)
        !or do not use atom%eta, and Psi = Psi * eta_total
-     CASE DEFAULT
-       CALL error(" In evaluate Psi operators!", atmos%nLTE_methode)
-   END SELECT
+     !CASE DEFAULT
+       !CALL error(" In evaluate Psi operators!", atmos%nLTE_methode)
+   !END SELECT
 
   RETURN
   END SUBROUTINE add_to_psi_operator
@@ -81,8 +80,8 @@ MODULE Opacity
 !   NLTEspec%AtomOpac%eta(:,id) = 0d0
   !We need to recompute LTE opacities for this cell and ray
   CALL initAtomOpac(id)
-  CALL init_psi_operator(iray,id)
-  if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(iray,id)
+  CALL init_psi_operator(id, iray)
+  if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id, iray)
 !   NLTEspec%Psi(:,iray,id) = 0d0; NLTEspec%dtau(:,iray,id) = 0d0
   !set atom%eta to zero also
   !NOTE Zeeman opacities are not re set to zero and are accumulated
@@ -230,6 +229,16 @@ MODULE Opacity
     	if (aatom%n(j,icell) < tiny_dp .or. aatom%n(i,icell) < tiny_dp) then
     	 write(*,*) aatom%n(j,icell), aatom%n(i,icell)
     	 write(*,*) aatom%n(:,icell)
+    	 
+        if (aatom%n(j,icell)==0d0 .or. aatom%n(i,icell)==0d0) then
+         write(*,*) icell, iray, id, aatom%ID, aatom%Nlevel, kc, shape(aatom%n)
+         write(*,*) i, cont%i, j, cont%j
+         write(*,*) aatom%n(:,icell)
+         write(*,*) aatom%n(i,icell), aatom%n(j,icell), aatom%n(cont%i,icell), aatom%n(cont%j,icell)
+         write(*,*) "1", aatom%n(1,icell), "2", aatom%n(2,icell), "3", aatom%n(3,icell),"4", aatom%n(4,icell)
+         stop
+        end if    	 
+    	 
      	 !CALL ERROR("too small cont populations") !or Warning()
      	 CALL WARNING("too small cont populations")
      	 aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
@@ -238,9 +247,20 @@ MODULE Opacity
       	allocate(gijk(cont%Nlambda))
         gijk(:) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
 
+!! ---------- STIMULATED EMISSION --------- !!
       !Cannot be negative because we alread tested if < tiny_dp
-      if ((aatom%n(i,icell) <= minval(gijk)*aatom%n(j,icell)).or.&
-        (aatom%n(i,icell) <= maxval(gijk)*aatom%n(j,icell))) then
+
+!       if ((aatom%n(i,icell) <= minval(gijk)*aatom%n(j,icell)).or.&
+!         (aatom%n(i,icell) <= maxval(gijk)*aatom%n(j,icell))) then
+!          stm = 0d0
+!       end if
+
+!         write(*,*) "stm=", aatom%n(i,icell), aatom%n(j,icell)*minval(gijk), aatom%n(j,icell)*maxval(gijk)
+!         write(*,*) aatom%n(:,icell), minval(gijk), maxval(gijk)
+!         stop
+!          write(*,*) id, icell, aatom%ID, &
+!           	" ** Stimulated emission for continuum transition ",j,"-> ", i,&
+!           								cont%lambda0, cont%lambdamin, " neglected"      
 ! !           write(*,*) id, icell, aatom%ID, &
 ! !           	" ** Stimulated emission for continuum transition ",j,i,&
 ! !           								cont%lambda0, cont%lambdamin, " neglected"
@@ -252,12 +272,10 @@ MODULE Opacity
 ! !          write(*,*) minval(gijk)*aatom%n(j,icell), maxval(gijk)*aatom%n(j,icell)
 ! !          write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
 ! !          write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
-! !                   stop
-         stm = 0d0
-!          write(*,*) id, icell, aatom%ID, &
-!           	" ** Stimulated emission for continuum transition ",j,"-> ", i,&
-!           								cont%lambda0, cont%lambdamin, " neglected"
-      end if
+! !                   stop  
+!! ---------- STIMULATED EMISSION --------- !!
+    
+      
       !allocate Vij, to avoid computing bound_free_Xsection(cont) 3 times for a continuum
 	  allocate(Vij(cont%Nlambda), twohnu3_c2k(cont%Nlambda))
     	
@@ -313,6 +331,17 @@ MODULE Opacity
     if ((aatom%n(j,icell) < tiny_dp).or.(aatom%n(i,icell) < tiny_dp)) then !no transition
     	write(*,*) tiny_dp, aatom%n(j, icell), aatom%n(i,icell)
         write(*,*) aatom%n(:,icell)
+        
+        if (aatom%n(j,icell)==0d0 .or. aatom%n(i,icell)==0d0) then
+         write(*,*) icell, iray, id, aatom%ID, aatom%Nlevel, kr, shape(aatom%n)
+         write(*,*) i, line%i, j, line%j
+         write(*,*) aatom%n(:,icell)
+         write(*,*) aatom%n(i,icell), aatom%n(j,icell), aatom%n(line%i,icell), aatom%n(line%j,icell)
+         write(*,*) "1", aatom%n(1,icell), "2", aatom%n(2,icell), "3", aatom%n(3,icell),"4", aatom%n(4,icell)
+         stop
+        end if
+        !!But here there is a pb, as it appears that n(j) or n(i) = 0 but no n(:) is 0 -_-"
+        
      	!CALL ERROR("too small line populations") !or Warning()
      	CALL WARNING("too small line populations")
      	aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
@@ -321,19 +350,23 @@ MODULE Opacity
 
     gij = line%Bji / line%Bij !array of constant Bji/Bij
     
+!! ---------- STIMULATED EMISSION --------- !!
     !!Cannot be negative because we alread tested if < tiny_dp
-    if ((aatom%n(i,icell) <= gij*aatom%n(j,icell)).or.&
-         (aatom%n(i,icell) <= gij*aatom%n(j,icell))) then
+
+!     if (aatom%n(i,icell) <= gij*aatom%n(j,icell)) then
+!         stm = 0d0
+!     end if
+
+!! not gij is 0, because it appears in eta also
+!           write(*,*) id, icell, aatom%ID, &
+!           	" ** Stimulated emission for line transition ",j,"-> ", i,line%lambda0, " neglected"
 ! !           write(*,*) id, icell, aatom%ID, &
 ! !           	" ** Stimulated emission for line transition ",j,i,line%lambda0, " neglected"
 ! !          write(*,*) id, icell, i, j, aatom%n(i,icell), aatom%n(j,icell)
 ! !          write(*,*) gij
 ! !          write(*,*) "nstar =", (aatom%nstar(nk,icell), nk=1,aatom%Nlevel)
 ! !          write(*,*) "n     =", (aatom%n(nk,icell), nk=1,aatom%Nlevel)
-        stm = 0d0 !not gij !! look at eta
-!           write(*,*) id, icell, aatom%ID, &
-!           	" ** Stimulated emission for line transition ",j,"-> ", i,line%lambda0, " neglected"
-    end if
+!! ---------- STIMULATED EMISSION --------- !!
 
     twohnu3_c2 = line%Aji / line%Bji
     if (line%voigt)  CALL Damping(icell, aatom, kr, line%adamp)
@@ -359,6 +392,7 @@ MODULE Opacity
       
     !line and cont are not pointers. Modification of line does not affect atom%lines(kr)
     if (iterate) then
+      !eta is not used for MALI, because eta is decomposed in Uji ? 
       aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
       								twohnu3_c2 * gij * Vij(:) * aatom%n(j,icell)
       aatom%lines(kr)%phi(:,iray,id) = phi(:)

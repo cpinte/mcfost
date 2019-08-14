@@ -162,7 +162,7 @@ MODULE AtomicTransfer
      if (eval_operator) then
  !here test, to check the old previous init of Psi and dtau in initAtomOpac with eval_operator=.true.
 !NLTEspec%Psi(:,:,id) = 0d0
-!if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") NLTEspec%dtau(:,:,id) = 0d0    
+!NLTEspec%dtau(:,:,id) = 0d0    
       CALL init_psi_operator(id, iray)
       if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id, iray)
      end if
