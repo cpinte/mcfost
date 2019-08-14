@@ -8,7 +8,7 @@ MODULE broad
 
  use constant
  use atom_type
- use atmos_type, only : atmos, Hydrogen, Helium, VBROAD_atom
+ use atmos_type, only : atmos, Hydrogen, VBROAD_atom !, Helium !alias to ptr_atom of Helium, which might not exist
  use math, only : dpow, SQ, CUBE
  
  use messages, only : error, warning
@@ -112,13 +112,13 @@ MODULE broad
   integer, intent(in) :: icell
   type (AtomType), intent(in) :: atom
   type (AtomicLine) :: line
-  type (Element) :: Helium
+  type (Element), pointer :: Helium
   integer, intent(in) :: kr
   integer :: i, j, ic, Z, k
   double precision :: vrel35_H, vrel35_He, fourPIeps0, deltaR
   double precision :: cross, gammaCorrH, gammaCorrHe, C625
 
-  Helium = atmos%Elements(2)%ptr_elem ! Helium basic informations
+  Helium => atmos%Elements(2)%ptr_elem ! Helium basic informations
   line = atom%lines(kr)
 
   ! here, starts a 1 because it is j saved in line%j, which
@@ -129,10 +129,8 @@ MODULE broad
   !could be nice to keep vrel35 for each atom ? as it depends only on the weight
   if (line%vdWaals.eq."UNSOLD" .or. line%vdWaals.eq."BARKLEM") then
    fourPIeps0 = 4.*PI*EPSILON_0
-   ! write(*,*) atom%weight/Helium%weight
-!    write(*,*) 8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Helium%weight)
-   vrel35_He = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * &
-         (1.+atom%weight/Helium%weight))**0.3
+   !write(*,*) atom%weight, Helium%weight, Hydrogen%weight, atmos%Elements(2)%ptr_elem%weight
+   vrel35_He = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Helium%weight))**0.3
 
    Z = atom%stage(j)+1 !remember, stage starts at 0 like in C
    !--> voir barklem.f90, Z is not an index but a physical value
@@ -143,11 +141,8 @@ MODULE broad
     ic = ic+1
    end do
    !write(*,*) Z, ic
-   deltaR = SQ(E_RYDBERG/(atom%E(ic)-atom%E(j))) - &
-            SQ(E_RYDBERG/(atom%E(ic)-atom%E(i)))
-   C625 = dpow(2.5*(SQ(Q_ELECTRON)/fourPIeps0)*&
-           (ABARH/fourPIeps0) * 2.*PI*&
-           SQ(Z*RBOHR)/HPLANCK * deltaR,4d-1) !0.4
+   deltaR = SQ(E_RYDBERG/(atom%E(ic)-atom%E(j))) - SQ(E_RYDBERG/(atom%E(ic)-atom%E(i)))
+   C625 = dpow(2.5*(SQ(Q_ELECTRON)/fourPIeps0)*(ABARH/fourPIeps0) * 2.*PI*SQ(Z*RBOHR)/HPLANCK * deltaR,4d-1) !0.4
   end if
 
   SELECT CASE (line%vdWaals)
