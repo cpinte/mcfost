@@ -729,6 +729,7 @@ MODULE readatom
    if (.not.associated(atmos%Elements(atmos%Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model, &
     atmos%Atoms(nmet)%ptr_atom)) CALL Warning(" Elemental model not associated to atomic model!")
    if (atmos%Atoms(nmet)%ptr_atom%periodic_table.eq.2)  then
+           NULLIFY(Helium) !Because, it is associated to an Elem by default
            Helium => atmos%Atoms(nmet)%ptr_atom
      if (.not.associated(Helium,atmos%Atoms(nmet)%ptr_atom)) &
       CALL Warning(" Helium alias not associated to atomic model!")
