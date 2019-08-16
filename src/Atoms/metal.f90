@@ -129,12 +129,11 @@ MODULE metal
      ! even if lcompute_atomRT(icell) it is still possible to not have a continuum transition
      ! between the level i and j, but not for the others.
 !	  if (metal%nstar(j,icell) <= tiny_dp .or. metal%nstar(i,icell)<=tiny_dp) CYCLE
-    if (metal%nstar(j,icell) <= tiny_dp) then
-       if (metal%nstar(j,icell) <= 0) then
+    if (metal%nstar(j,icell) < tiny_dp) then
         write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
-        write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell)
+        write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell), i, metal%n(i,icell)
         write(*,*) "skipping this level"
-       end if
+        write(*,*) "nstar=", metal%nstar(:,icell)
        CYCLE
     end if
 
@@ -355,13 +354,15 @@ MODULE metal
      ! even if lcompute_atomRT(icell) it is still possible to not have a transition
      ! between the levels i and j, but not for the others.
 
-     if ((atom%n(j,icell) <=tiny_dp).or.(atom%n(i,icell) <=tiny_dp)) then !no transition
-       !but show the message only if pops is negative
-      if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
+     if ((atom%n(j,icell) <tiny_dp).or.(atom%n(i,icell) <tiny_dp)) then !no transition
+       !!but show the message only if pops is negative
+      !if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
         write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
         write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
         write(*,*) "skipping this level"
-      end if
+        write(*,*) "nstar=", atom%nstar(:,icell)
+        write(*,*) "n = ", atom%n(:,icell)
+      !!end if
       CYCLE
      end if
 
