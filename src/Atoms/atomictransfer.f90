@@ -207,11 +207,11 @@ MODULE AtomicTransfer
     end if
 
 	!Should never happen if we neglect STM
-    if (minval(Snu) < 0. .or. maxval(Snu) < 0.) then
-      write(*,*) "eta (max/min)", maxval(NLTEspec%AtomOpac%eta(:,id)), minval(NLTEspec%AtomOpac%eta(:,id))
-      write(*,*) "chi (max/min)", maxval(NLTEspec%AtomOpac%chi(:,id)), minval(NLTEspec%AtomOpac%chi(:,id))
-      call Warning("Snu negative")   
-    end if
+!     if (minval(Snu) < 0. .or. maxval(Snu) < 0.) then
+!       write(*,*) "eta (max/min)", maxval(NLTEspec%AtomOpac%eta(:,id)), minval(NLTEspec%AtomOpac%eta(:,id))
+!       write(*,*) "chi (max/min)", maxval(NLTEspec%AtomOpac%chi(:,id)), minval(NLTEspec%AtomOpac%chi(:,id))
+!       call Warning("Snu negative")   
+!     end if
 
     !In ray-traced map (which is used this subroutine) we integrate from the observer
     ! to the source(s), but we actually get the outgoing intensity/flux. Direct
@@ -1698,12 +1698,6 @@ MODULE AtomicTransfer
         Sl(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) - &
                  NLTEspec%AtomOpac%eta_c(:,id) - NLTEspec%AtomOpac%etac_nlte(:,id) !) / chil(:)
       !!end if
-    end if
-
-    if (minval(Snu) < 0. .or. maxval(Snu) < 0.) then
-      write(*,*) "eta (max/min)", maxval(NLTEspec%AtomOpac%eta(:,id)), minval(NLTEspec%AtomOpac%eta(:,id))
-      write(*,*) "chi (max/min)", maxval(NLTEspec%AtomOpac%chi(:,id)), minval(NLTEspec%AtomOpac%chi(:,id))
-      call Warning("Snu negative")   
     end if
 
     !In ray-traced map (which is used this subroutine) we integrate from the observer
