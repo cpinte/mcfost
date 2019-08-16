@@ -409,7 +409,7 @@ MODULE simple_models
 
        rp = (r/(etoile(1)%r*r0))
        
-       write(*,*) icell, "R=",rcyl, " z=", z, " r=", r, rp, O, " theta=", theta*180/pi, sTheta
+!        write(*,*) icell, "R=",rcyl, " z=", z, " r=", r, rp, O, " theta=", theta*180/pi, sTheta
        
        if (sTheta==0d0) then !pole
          Vr = v0_p + (Vinf_p - v0_p) * O
