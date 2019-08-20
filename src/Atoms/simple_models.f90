@@ -450,8 +450,7 @@ MODULE simple_models
     atmos%v_char = atmos%v_char + maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
 
-
-
+   !write(*,*) size(atmos%icompute_atomRT), N_cells, atmos%Nspace, size(atmos%T)
    CALL define_atomRT_domain()
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
