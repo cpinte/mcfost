@@ -10,6 +10,7 @@ MODULE init_solution
  use collision, only : openCollisionFile, closeCollisionFile, keep_collision_lines
  use accelerate
  use messages
+ use parametres
  
  IMPLICIT NONE
  
@@ -98,23 +99,17 @@ MODULE init_solution
     endif
    endif
    allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,atmos%Nspace)); gpop_old = 0d0
-  
+
   !at the end because if ZERO_RADIATION for instance the pointers is changed
-  SELECT CASE (atmos%NLTE_methode)
-    CASE ("MALI")
-   !if (atmos%NLTE_methode=="MALI") then
+  if (atmos%include_xcoupling) then
      FillGamma_bf => FillGamma_bf_mali
      FillGamma_bb => FillGamma_bb_mali
-     CALL Error("MALI not implemented yet") 
-    CASE ("HOGEREIJDE")
-   !else if (atmos%NLTE_methode=='HOGEREIJDE')
+     CALL WARNING("Partial Cross-coupling with the line itself only") 
+  else !HOGEREIJDE
      FillGamma_bf => FillGamma_bf_hjde
      FillGamma_bb => FillGamma_bb_hjde
-    CASE DEFAULT 
-   !else
-    CALL Error ("Unkown, methode", atmos%NLTE_methode)
-   !end if
-   END SELECT
+  end if
+
    
  RETURN
  END SUBROUTINE init_nlte
