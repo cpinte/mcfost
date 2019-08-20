@@ -2,7 +2,7 @@ MODULE Opacity
 
  use atmos_type, only : atmos, hydrogen
  use atom_type
- use spectrum_type, only : NLTEspec, initAtomOpac, init_Xcoupling, init_psi_operator
+ use spectrum_type, only : NLTEspec, initAtomOpac, init_psi_operator!,init_Xcoupling
  use constant
  use constantes, only				 : tiny_dp, huge_dp, AU_to_m
  use messages
@@ -39,21 +39,10 @@ MODULE Opacity
      chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)
      !eta_loc(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)
    end if !store_opac
-   !Choose eval operatore depending on the method
 
-   !SELECT CASE (atmos%nLTE_methode)
-     !CASE ("MALI")
-       !CALL Error("Not implemented MALI") !should create an error before, in init_NLTE
-       !!NLTEspec%dtau(:,iray,id) = chi(:)*ds
-       !NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-chi(:)*ds)) / chi !missing a exp(-tau) here ?
-     !CASE ("HOGEREIJDE")
        NLTEspec%dtau(:,iray,id) = chi(:)*ds !J = Sum_ray I0*exp(-dtau) + Psi*S
-       !NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))* eta_loc/(chi+1d-300)
        NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))/(chi+1d-300)
-       !or do not use atom%eta, and Psi = Psi * eta_total
-     !CASE DEFAULT
-       !CALL error(" In evaluate Psi operators!", atmos%nLTE_methode)
-   !END SELECT
+
 
   RETURN
   END SUBROUTINE add_to_psi_operator
@@ -81,7 +70,6 @@ MODULE Opacity
   !We need to recompute LTE opacities for this cell and ray
   CALL initAtomOpac(id)
   CALL init_psi_operator(id, iray)
-  if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id, iray)
 !   NLTEspec%Psi(:,iray,id) = 0d0; NLTEspec%dtau(:,iray,id) = 0d0
   !set atom%eta to zero also
   !NOTE Zeeman opacities are not re set to zero and are accumulated
@@ -180,8 +168,18 @@ MODULE Opacity
 
  RETURN
  END FUNCTION cont_wlam
+ 
+ !building, not ready
+ SUBROUTINE calc_J_coherent(id, icell, n_rayons)
+  integer, intent(in) :: id, icell, n_rayons
+  
+  NLTEspec%J(:,icell) = sum(NLTEspec%I(:,1:n_rayons,id),dim=2)
+  NLTEspec%Jc(:,icell) = sum(NLTEspec%Ic(:,1:n_rayons,id),dim=2)
 
- !setting gij to 0 for tests
+ 
+ RETURN
+ END SUBROUTINE calc_J_coherent
+ 
  SUBROUTINE NLTEOpacity(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
   !
   !
@@ -212,17 +210,18 @@ MODULE Opacity
   
   do nact = 1, atmos%Nactiveatoms
    aatom => atmos%ActiveAtoms(nact)%ptr_atom
-   if (iterate) aatom%eta(:,iray,id) = 0d0 !init Eta only if iterate, for this cell and thread
 
-   
+
    	do kc = 1, aatom%Ncont
         stm = 1d0 !init for each transition
         !Car tu ne peux pas mettre gij a 0 si tu veux neglier l'émission stimulée. Sinon, eta aussi
         ! est nulle car prop to gij. Or, seulement le terme en nj*gij est nulle dans chi.
   
     	cont = aatom%continua(kc)
-    	Nred = cont%Nred; Nblue = cont%Nblue    	
-    	i = cont%i; j=cont%j
+    	Nred = cont%Nred
+    	Nblue = cont%Nblue    	
+    	i = cont%i
+    	j = cont%j
     	if (.not.cont%lcontrib_to_opac) CYCLE!(Nred==-99 .and. Nblue==-99) CYCLE
 
         !<= or < 
@@ -284,11 +283,11 @@ MODULE Opacity
 
     
     !store total emissivities and opacities
-        NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
-       		Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
-       		
-		NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
-    	gijk(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2k
+!         NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
+!        		Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
+!        		
+! 		NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
+!     	gijk(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2k
     	
 
     	NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) + &
@@ -297,35 +296,34 @@ MODULE Opacity
     	   gijk(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2k(:)
 
     	
-    	if (iterate) then
-         aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
-         							gijk(:) * Vij(:) * aatom%n(j,icell) * twohnu3_c2k
+       
+       if ((atmos%include_xcoupling.and.iterate) .and. iray==1) then
+        aatom%continua(kc)%chi(:,id) = Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
+        aatom%continua(kc)%U(:,id) = gijk(:) * Vij(:) * twohnu3_c2k(:)
+       end if					
 
-        !Xcoupling terms if necessary, no angle dependence
-         if (atmos%nLTE_methode=="MALI") then
-    		aatom%Uji_down(j,Nblue:Nred,iray,id) = aatom%Uji_down(j,Nblue:Nred,iray,id) + &
-    				 gijk * Vij * twohnu3_c2k
-    				 
-    		aatom%chi_up(i,Nblue:Nred,iray,id) = aatom%chi_up(i,Nblue:Nred,iray,id) + &
-    			Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
-    		aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + &
-    			Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell))
-         end if						
-        end if !end iterate
 
     !Do not forget to add continuum opacities to the all continnum opacities
     !after all populations have been converged    
      deallocate(Vij, gijk, twohnu3_c2k)
    	end do
+   	
+   	!because chicnlte and etaccnlte are 0 when entering the function and are allocated for this ray and id
+    if (iterate) then !for this icell (or id here)
+       aatom%eta(:,iray,id) = NLTEspec%AtomOpac%etac_nlte(:, id)
+    end if !end iterate   	
+   	
 
    do kr = 1, aatom%Nline
    
     stm = 1d0 !re init
    
     line = aatom%lines(kr)
-    Nred = line%Nred; Nblue = line%Nblue
+    Nred = line%Nred
+    Nblue = line%Nblue
     if (.not.line%lcontrib_to_opac) CYCLE
-    i = line%i; j=line%j
+    i = line%i
+    j = line%j
     
     !<= or <
     if ((aatom%n(j,icell) < tiny_dp).or.(aatom%n(i,icell) < tiny_dp)) then !no transition
@@ -385,28 +383,23 @@ MODULE Opacity
       
     !opacity
      NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
-       		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
+       		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell)) + &
+       	    NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id)
        		
      NLTEspec%AtomOpac%eta(Nblue:Nred,id)= NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
-       		twohnu3_c2 * gij * Vij(:) * aatom%n(j,icell)
+       		twohnu3_c2 * gij * Vij(:) * aatom%n(j,icell) + &
+       	    NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id)
       
     !line and cont are not pointers. Modification of line does not affect atom%lines(kr)
     if (iterate) then
-      !eta is not used for MALI, because eta is decomposed in Uji ? 
       aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
       								twohnu3_c2 * gij * Vij(:) * aatom%n(j,icell)
       aatom%lines(kr)%phi(:,iray,id) = phi(:)
-          
-      !Xcoupling terms if necessary, angle dependent                                                  
-!       if (atmos%nLTE_methode=="MALI") then
-!     	aatom%Uji_down(j,Nblue:Nred,id) = aatom%Uji_down(j,Nblue:Nred,id) + &
-!     				twohnu3_c2*gij*Vij
-!     				
-!    	 	aatom%chi_up(i,Nblue:Nred,id) = aatom%chi_up(i,Nblue:Nred,id) + &
-!    	 		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
-!     	aatom%chi_down(j,Nblue:Nred,id) = aatom%chi_down(j,Nblue:Nred,id) + &
-!     		Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
-!       end if
+      
+      if (atmos%include_xcoupling) then
+       aatom%lines(kr)%chi(:,iray,id) = Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell))
+       aatom%lines(kr)%U(:,iray,id) = twohnu3_c2 * gij * Vij(:) 
+      end if
     end if
     
      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
@@ -428,6 +421,7 @@ MODULE Opacity
     if (PRT_SOLUTION=="FULL_STOKES") deallocate(phiZ, psiZ)
    end do
   
+   aatom => NULL()
   end do !over activeatoms
 
  RETURN

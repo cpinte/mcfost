@@ -44,7 +44,8 @@ MODULE atom_type
    !!Stores the information for that atom only, necessary to  construct the Gamma matrix
    !!and to compute the cross-coupling terms. We need to know for each wavelength and each
    !!proc what are the active transitions involved in the Gamma matrix.
-   !double precision, allocatable, dimension(:,:)  :: gij, Vij
+   !Nlambda, Nray, Nproc
+   double precision, allocatable, dimension(:,:,:)  :: U, chi
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
    integer :: ZeemanPattern! 0 = WF, -1=EFFECTIVEE TRIPLET, 1=FULL
    type (AtomType), pointer :: atom => NULL()
@@ -59,7 +60,8 @@ MODULE atom_type
    double precision :: Rji, Rij
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
-   !double precision, allocatable, dimension(:,:)  :: gij, Vij
+   !Nlambda, Nray, Nproc
+   double precision, allocatable, dimension(:,:)  :: U, chi
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 
@@ -94,7 +96,9 @@ MODULE atom_type
    !where I have to distinguish between atom own opac and overlapping transitions
    double precision, allocatable, dimension(:,:,:) :: eta !Nwaves, Nrays, Nproc
    !Nlevel, Nlam_max, Nrays, Nproc
-   double precision, allocatable, dimension(:,:,:,:) :: chi_up, chi_down, Uji_down
+   !!double precision, allocatable, dimension(:,:,:,:) :: chi_up, chi_down, Uji_down
+   !!double precision, allocatable, dimension(:,:,:,:,:) :: Vij, Uji
+   !!double precision, allocatable, dimension(:,:,:,:) :: gij
    type (Ng) :: Ngs
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

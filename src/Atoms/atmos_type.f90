@@ -62,7 +62,7 @@ MODULE atmos_type
    double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T!, vturb
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
-   character(len=10) :: nLTE_methode = "HOGEREIJDE"
+   logical :: include_xcoupling = .false., coherent_scattering
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
    logical :: Magnetized = .false., XRD=.false., calc_ne
    !dark zone are in lcompute_atomRT->icompute_atomRT == -1
@@ -147,9 +147,9 @@ MODULE atmos_type
     end if
 !     if (allocated(atom%gij)) deallocate(atom%gij)
 !     if (allocated(atom%Vij)) deallocate(atom%Vij)
-    if (allocated(atom%chi_up)) deallocate(atom%chi_up)
-    if (allocated(atom%chi_down)) deallocate(atom%chi_down)
-    if (allocated(atom%Uji_down)) deallocate(atom%Uji_down)
+    !if (allocated(atom%chi_up)) deallocate(atom%chi_up)
+    !if (allocated(atom%chi_down)) deallocate(atom%chi_down)
+    !if (allocated(atom%Uji_down)) deallocate(atom%Uji_down)
     if (allocated(atom%eta)) deallocate(atom%eta)
 
 !!!     for this atom, free lines if allocated
@@ -178,8 +178,8 @@ MODULE atmos_type
       !if (allocated(line%gij)) deallocate(line%gij)
       !if (allocated(line%Vij)) deallocate(line%Vij)
 !       if (allocated(line%chi_up)) deallocate(line%chi_up)
-!       if (allocated(line%chi_down)) deallocate(line%chi_down)
-!       if (allocated(line%Uji_down)) deallocate(line%Uji_down)
+       if (allocated(line%chi)) deallocate(line%chi)
+       if (allocated(line%U)) deallocate(line%U)
       !!if (allocated(line%Jbar)) deallocate(line%Jbar)
       if (associated(line%atom)) NULLIFY(line%atom)
       CALL freeZeemanMultiplet(line)
@@ -197,8 +197,8 @@ MODULE atmos_type
       !if (allocated(cont%gij)) deallocate(cont%gij)
       !if (allocated(cont%Vij)) deallocate(cont%Vij)
 !       if (allocated(cont%chi_up)) deallocate(cont%chi_up)
-!       if (allocated(cont%chi_down)) deallocate(cont%chi_down)
-!       if (allocated(cont%Uji_down)) deallocate(cont%Uji_down)
+       if (allocated(cont%chi)) deallocate(cont%chi)
+       if (allocated(cont%U)) deallocate(cont%U)
 	  !!if (allocated(cont%Jbar)) deallocate(cont%Jbar)
       if (associated(cont%atom)) NULLIFY(cont%atom)
      end do

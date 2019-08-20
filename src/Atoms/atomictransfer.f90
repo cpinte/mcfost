@@ -159,12 +159,8 @@ MODULE AtomicTransfer
      eval_operator = (labs .and. (nbr_cell == 1)) !labs if false for images
      											  !so no pb if Nact>0 and we use a different grid
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
-     if (eval_operator) then
- !here test, to check the old previous init of Psi and dtau in initAtomOpac with eval_operator=.true.
-!NLTEspec%Psi(:,:,id) = 0d0
-!NLTEspec%dtau(:,:,id) = 0d0    
+     if (eval_operator) then  
       CALL init_psi_operator(id, iray)
-      if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id, iray)
      end if
      CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms
@@ -172,7 +168,7 @@ MODULE AtomicTransfer
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
       dtau(:)   = l_contrib * (NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
                     NLTEspec%AtomOpac%Kc(icell,:,1))
-      dtau_c(:) = l_contrib * (NLTEspec%AtomOpac%Kc(icell,:,1)++ NLTEspec%AtomOpac%chic_nlte(:,id))
+      dtau_c(:) = l_contrib * (NLTEspec%AtomOpac%Kc(icell,:,1)+ NLTEspec%AtomOpac%chic_nlte(:,id))
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
                NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)) / &
                  (NLTEspec%AtomOpac%Kc(icell,:,1) + &
@@ -962,66 +958,7 @@ MODULE AtomicTransfer
   max_sub_iter = 25
  ! ----------------------------  INITIAL POPS------------------------------------------ !
    CALL Init_NLTE(sub_iterations_enabled=.not.disable_subit,Ng_acceleration=Ng_acceleration)!Ng_acceleration
-!   if OLD_POPULATIONS, the init is done at the reading
-!   for now initialSol() is replaced by this if loop on active atoms
-!   NmaxLevel = 0
-!   do nact=1,atmos%Nactiveatoms
-!      atom => atmos%ActiveAtoms(nact)%ptr_atom
-!      Now we can set it to .true. The new background pops or the new ne pops
-!      will used the H%n
-!      atom%NLTEpops = .true.
-!      Nlevel_total = Nlevel_total + atom%Nlevel**2
-!      NmaxLevel = max(NmaxLevel, atom%Nlevel)
-!      write(*,*) "Setting initial solution for active atom ", atom%ID, atom%active
-!      atom%n(:,:) = 1d0*atom%nstar(:,:)
-! 
-! !Check collisionRate new before completely removing atom%Ckij
-!        allocate(atom%Ckij(atmos%Nspace,atom%Nlevel*atom%Nlevel))
-!        !open collision file
-!        atom%Ckij = 0d0
-!      CALL openCollisionFile(atom) !closed at the end of the NLTE, it is not nice to do that
-!        								but cheap in memory. Cause problem if parallel or
-!        								run on a machine. Extra I/O overhead expected
-! 
-!      CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
-!      !Allocate Ng structure of all levels of all atoms, updated at each cell
-!      !-> check allocation in statequil
-!      !if (Ng_acceleration) CALL initNg(atom%Nlevel, 2, 3, 6,atom%n(:,1), atom%Ngs)
-!      allocate(atom%Gamma(atom%Nlevel,atom%Nlevel,NLTEspec%NPROC))
-! 
-! 	 CALL Keep_collision_lines(atom) !an array containing the lines in file read from atom%offset_col to END
-! 	 it avoids reading in the file, instead it reads an array (small)
-! 	 CALL closeCollisionFile(atom)
-!      do icell=1,atmos%Nspace
-!         if (atmos%lcompute_atomRT(icell)) CALL CollisionRate(icell, atom) !open and allocated in LTE.f90
-!       !try keeping in memory until better collision routine !
-!   	 end do	
-!   	 write(*,*) "Fill collision rates for that atom.."
-!   	 CALL closeCollisionFile(atom) !if opened
-!     !CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom) !to move elsewhere
-!   	 deallocate(atom%C) !not used anymore if stored on RAM
-!      atom => NULL()
-!   end do
-!   FillGamma_bb => FillGamma_bb_zero_radiation
-!   FillGamma_bf => FillGamma_bf_zero_Radiation
-!   write(*,*) " --> (forcing) ZERO_RADIATION initial SOLUTION!"
-!   do icell=1,n_Cells
-!    if (atmos%icompute_atomRT(icell)>0) then
-!     CALL initGamma(id, icell)
-!     CALL FillGamma(1, icell, n_rayons)
-!     CALL updatePopulations(id, icell)
-!     write(*,*) "n(zerR)", atmos%ActiveAtoms(1)%ptr_atom%n(:,icell)
-!     write(*,*) "nstar", atmos%ActiveAtoms(1)%ptr_atom%nstar(:,icell)
-!    end if
-!   end do
-!   FillGamma_bb => NULL(); FillGamma_bf => NULL()
-!   end replacing initSol()
 !  ------------------------------------------------------------------------------------ !
-!   allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
-!   allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
-!   allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,n_cells)); gpop_old = 0d0
-!   
-!   CALL alloc_phi_lambda() !alloc space for line profiles for each line: line%phi(line%Nlambda, Nrays, Nproc)
 
      do etape=etape_start, etape_end
 
@@ -1140,7 +1077,11 @@ MODULE AtomicTransfer
 						uvw0(1,iray,id) = U0; uvw0(2,iray,id) = V0; uvw0(3,iray,id) = W0
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       				end do !iray
+      				
+!       				with the old radiation field, and will be used for next cell
+!       				CALL calc_J_coherent(icell, n_rayons)
 
+!---> Should check that Istar is well accounted in rate matrix
       				!Fill the Rate matrix and integrates over rays and frequencies
       				!rays and waves integration for all atoms
                     CALL FillGamma(id, icell, n_rayons, force_lte)
@@ -1643,7 +1584,6 @@ MODULE AtomicTransfer
      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
      if (eval_operator) then
       CALL init_psi_operator(id, iray)
-      if (atmos%nLTE_methode=="MALI") CALL init_XCoupling(id, iray)
      end if
      CALL NLTEopacity(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
      !never enter NLTEopacity if no activeatoms

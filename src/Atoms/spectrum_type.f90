@@ -24,6 +24,7 @@ MODULE spectrum_type
    logical :: lcompute_continuum !if false, do not allocate cont only opacities (save memory)
    								 !if lcontrib_function, set it to true, before computing contrib function
   
+  !! Store S, Sc, Slte, Sclte, and jc and Kc, to save memory ???
   TYPE AtomicOpacity
    !active opacities
    double precision, allocatable, dimension(:,:)   :: chi, eta
@@ -56,7 +57,7 @@ MODULE spectrum_type
    !nlambda, nrays, nproc
    double precision, allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
    !nlambda, nproc
-   double precision, allocatable, dimension(:,:) :: J, J20, Jc
+   double precision, allocatable, dimension(:,:) :: J, Jc, J20
    !Nlambda, xpix, ypix, Nincl, Naz
    double precision, allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
    double precision, allocatable, dimension(:,:,:,:,:,:) :: F_QUV
@@ -157,7 +158,17 @@ MODULE spectrum_type
    ! and not in the total grid ! Otherwise, the transitions are kept if they fall
    ! between lambda(min) and lambda(max)
    CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, Nlam_R, NLTEspec%atmos%Atoms)
-   deallocate(Nlam_R) !not used anymore  
+   deallocate(Nlam_R) !not used anymore
+   
+   !Reallocate J and Jc keeping their value if coherent_scattering
+   !NB: the spatial grid is the same
+   !if (NLTEspec%atmos%coherent_scattering) then
+   ! Jold = J; Joldc = Jc
+   ! dealloc(J, Jc)
+   ! allocate(J, Jc)
+   ! J = PACK(Jold, mask=NLTEspec%mlamba==old_grid) !may not work directly
+   !end if
+   
    Ntrans_new = 0
    write(*,*) " -> Using ", NLTEspec%Nwaves," wavelengths for image and spectrum."
 !I do not removed transitions for the moment
@@ -250,13 +261,15 @@ MODULE spectrum_type
    NLTEspec%I = 0d0
    NLTEspec%Ic = 0d0
 
-   allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%NPROC))
-   allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%NPROC))
-   !Just to try
-   !CALL Warning("(allocSpectrum()) J20 allocated")
-   !allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC)); NLTEspec%J20 = 0d0
-   NLTEspec%J = 0.0
-   NLTEspec%Jc = 0.0
+!    if (NLTEspec%atmos%coherent_scattering) then
+!     allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))!%NPROC))
+!     allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))
+!    !Just to try
+!    !CALL Warning("(allocSpectrum()) J20 allocated")
+!    !allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC)); NLTEspec%J20 = 0d0
+!     NLTEspec%J = 0.0
+!     NLTEspec%Jc = 0.0
+!    end if
       
    if (alloc_image) then
     allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ))
@@ -301,55 +314,30 @@ MODULE spectrum_type
    !Fursther, with labs=.false. for images, we do not enter in eval_operator condition
    !in NLTEOpacity()
    if (alloc_atom_nlte) then !NLTE loop activated
+   
+    if (lxcoupling) NLTEspec%atmos%include_xcoupling = .true.
      
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
 
     do nat=1,NLTEspec%atmos%Nactiveatoms
-    if (NLTEspec%atmos%NLTE_methode=="MALI") then !allocate only, for each atom, according to the maximum
-    											  !wavelength used for all transitions ?, b-f transitions
-    											  !cover a large range of frequencies by the way
-    											  !but we need to know the location on the frequency grid
-    											  !as for each atom we sum over all transitions
-      Nlambda_max = NLTEspec%Nwaves
-!      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
-!       Nlambda_max = max(Nlambda_max, NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Nlambda)
-!      end do
-!      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
-!       Nlambda_max = max(Nlambda_max, NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Nlambda)
-!      end do
-     
-     CALL Warning("Allocating space for Cross-coupling terms")
-     !write(*,*) " -> Xoupling, Nlambda max for atom", NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%ID,Nlambda_max
-     
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up&
-     (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nlambda_max,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
-     NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up = 0d0
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down&
-     (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nlambda_max,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
-     NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down = 0d0
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down&
-     (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,Nlambda_max,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
-     NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down = 0d0
-    end if !methode==MALI
-    
-    !!for all
-    !too big, how to reduce it?
-    !! if MALI we do not need it, as Ieff = I0exp(-dtau) <=> (Psi-Psi*)etadag and we use Xcoupling terms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
 
-     ! do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
-!       cont = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)
-!       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Vij(cont%Nlambda ,NLTEspec%NPROC))
-!       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%gij(cont%Nlambda ,NLTEspec%NPROC))
-      !!allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Jbar(NLTEspec%Nproc))
-!      end do
-!      do k=1,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
-!       line = NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)
-!       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Vij(line%Nlambda ,NLTEspec%NPROC))
-!       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%gij(line%Nlambda ,NLTEspec%NPROC))
-      !!allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Jbar(NLTEspec%Nproc))
-     !end do
+     if (NLTEspec%atmos%include_xcoupling) then 
+      do k=1, NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
+       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%U&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Nlambda, NLTEspec%NPROC))
+       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%chi&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Nlambda, NLTEspec%NPROC))
+      end do
+      do k=1, NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
+       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%U&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Nlambda, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
+       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%chi&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Nlambda, NLTEspec%atmos%Nrays, NLTEspec%NPROC))      
+      end do
+     end if
+
     end do
    end if
 
@@ -375,10 +363,16 @@ MODULE spectrum_type
   
    if (allocated(NLTEspec%Istar)) deallocate(NLTEspec%Istar)
    deallocate(NLTEspec%lambda)
-   deallocate(NLTEspec%J, NLTEspec%I)
+   deallocate(NLTEspec%Ic, NLTEspec%I)
     if (allocated(NLTEspec%Flux)) deallocate(NLTEspec%Flux, NLTEspec%Fluxc)
-   deallocate(NLTEspec%Jc, NLTEspec%Ic)
-   if (allocated(NLTEspec%J20)) deallocate(NLTEspec%J20)
+    
+   !if wavelength image do not remove the scattering part ?
+!    if (.not.ltab_wavelength_image .and. NLTEspec%atmos%coherent_scattering) then
+!     deallocate(NLTEspec%Jc, NLTEspec%J)
+! 
+!     if (allocated(NLTEspec%J20)) deallocate(NLTEspec%J20)
+!    end if
+
    if (NLTEspec%atmos%Magnetized) then 
     !check allocation due to field_free sol
     if (allocated(NLTEspec%StokesQ)) & !same for all dangerous
@@ -387,7 +381,6 @@ MODULE spectrum_type
     if (allocated(NLTEspec%AtomOpac%etaQUV_p)) deallocate(NLTEspec%AtomOpac%etaQUV_p)
     if (allocated(NLTEspec%AtomOpac%chiQUV_p)) deallocate(NLTEspec%AtomOpac%chiQUV_p)
    end if
-   !! deallocate(NLTEspec%J20)
    
    !active
    deallocate(NLTEspec%AtomOpac%chi)
@@ -428,15 +421,9 @@ MODULE spectrum_type
      stop
     end if
     
-!! Wrong because at each rays, the all rays is reset ? instead of the previous value at this ray and id for the new cell    
-!     if (eval_operator) then
-!    		 NLTEspec%Psi(:,:,id) = 0d0
-!    		 if (NLTEspec%atmos%NLTE_methode=="HOGEREIJDE") NLTEspec%dtau(:,:,id) = 0d0
-!    	end if
-
     NLTEspec%AtomOpac%chi(:,id) = 0d0
     NLTEspec%AtomOpac%eta(:,id) = 0d0
-    NLTEspec%AtomOpac%chic_nlte(:,id) = 0d0
+    NLTEspec%AtomOpac%chic_nlte(:,id) = 0d0 !ray indep
     NLTEspec%AtomOpac%etac_nlte(:,id) = 0d0
     if (.not.lstore_opac) then
       NLTEspec%AtomOpac%chi_c(:,id) = 0d0
@@ -445,12 +432,6 @@ MODULE spectrum_type
     end if !else thay are not allocated
     NLTEspec%AtomOpac%chi_p(:,id) = 0d0
     NLTEspec%AtomOpac%eta_p(:,id) = 0d0
-    
-    !Not here, otherwise it cannot be accumulated for each rays, as they are set
-    !to zero with opacities which are computed ray by ray.
-!     NLTEspec%J(:,id) = 0d0
-!     NLTEspec%Jc(:,id) = 0d0
-!     if (allocated(NLTEspec%J20)) NLTEspec%J20(:,id) = 0d0
     
     !Currently LTE or NLTE Zeeman opac are not stored on memory. They change with 
     !direction. BUT the star is assumed to not emit polarised photons (from ZeemanEffect)
@@ -470,6 +451,16 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE initAtomOpac
   
+  SUBROUTINE init_J_coherent()!(id)
+   !integer, intent(in) :: id
+  
+    NLTEspec%J(:,:) = 0d0
+    NLTEspec%Jc(:,:) = 0d0
+!     if (allocated(NLTEspec%J20)) NLTEspec%J20(:,id) = 0d0
+  
+  RETURN
+  END SUBROUTINE init_J_coherent
+  
   SUBROUTINE init_psi_operator(id, iray)
     integer, intent(in) :: iray, id
     
@@ -478,6 +469,16 @@ MODULE spectrum_type
   
   RETURN
   END SUBROUTINE init_psi_operator
+  
+!   SUBROUTINE init_nlte_eta(id)
+!    integer :: n
+!   
+!    do n=1, NLTEspec%atmos%NActiveatoms
+!     NLTEspec%atmos%ActiveAtoms(n)%ptr_atom%eta(:,:,id) = 0d0   
+!    end do
+!   
+!   RETURN
+!   END SUBROUTINE init_nlte_eta
   
   SUBROUTINE alloc_phi_lambda()
   ! --------------------------------------------------- !
@@ -515,30 +516,7 @@ MODULE spectrum_type
  
   RETURN
   END SUBROUTINE dealloc_phi_lambda
-  
- SUBROUTINE init_XCoupling(iray,id) !iray is necessary or not ?
-  ! --------------------------------------------------- !
-   ! Init the X coupling terms for each active atoms.
-   ! they are used in the Rybicki Hummer MALI scheme,
-   ! with full preconditioning (overlapping transitions
-   ! and background continua)
-   !
-   ! init a cell level (when eval_operator is true) for
-   ! thread id.
-   ! For all wavelength
-  ! --------------------------------------------------- !
 
-  integer, intent(in) :: iray, id
-  integer :: nact
-  
-  do nact=1,atmos%Nactiveatoms
-   atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,iray,id) = 0d0!0 if j<i
-   atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,iray,id) = 0d0
-   atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,iray,id) = 0d0
-  end do
- 
- RETURN
- END SUBROUTINE init_XCoupling
 
  SUBROUTINE WRITE_FLUX()
  ! -------------------------------------------------- !
@@ -876,45 +854,6 @@ MODULE spectrum_type
 
  RETURN
  END SUBROUTINE WRITE_CNTRB_FUNC_PIX
- 
-  
-!   !!building 
-!   SUBROUTINE write_opacities()
-!   ! --------------------------------------------------------------- !
-!    Write the different contributions to opacities to fits file
-!   ! --------------------------------------------------------------- !
-!   integer :: status,unit,blocksize,bitpix,naxis
-!   integer, dimension(4) :: naxes
-!   integer :: group,fpixel,nelements, i, xcenter
-!   integer :: la, Nred, Nblue, kr, kc, m
-!   logical :: simple, extend
-!   character(len=6) :: comment=""
-!   
-!   write(*,*) "Writing opacities"
-!   
-!    !!!  Get an unused Logical Unit Number to use to open the FITS file.
-!    status=0
-!    CALL ftgiou (unit,status)
-! 
-!    !!  Create the new empty FITS file.
-!    blocksize=1
-!    CALL ftinit(unit,trim(OPAC_CONTRIB_FILE),blocksize,status)
-! 
-!    simple=.true.
-!    extend=.true.
-!    group=1
-!    fpixel=1
-! 
-!    bitpix=-64
-!    naxis=4
-!    naxes(1)=NLTEspec%Nwaves
-!    naxes(2)=NLTEspec%atmos%Nspace
-!    naxes(3)=RT_n_incl
-!    naxes(4)=RT_n_az
-!    nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-!   
-!   RETURN
-!   END SUBROUTINE write_opacities
 
 END MODULE spectrum_type
 
