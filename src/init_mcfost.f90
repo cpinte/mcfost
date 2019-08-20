@@ -72,6 +72,7 @@ subroutine set_default_variables()
   lpluto_file = .false.
   lascii_pluto_file = .false.
   lmagnetic_field = .true.
+  lxcoupling=.false.
   ! AL-RT
   lpuffed_rim = .false.
   lno_backup = .false.
@@ -708,6 +709,9 @@ subroutine initialisation_mcfost()
      case("-no_magnetic_field")
         i_arg = i_arg + 1
         lmagnetic_field=.false.
+     case("-x_coupling")
+        i_arg = i_arg + 1
+        lxcoupling=.true.
      case("-tab_wavelength_image")
         i_arg = i_arg + 1
         ltab_wavelength_image = .true.
@@ -1594,6 +1598,7 @@ subroutine display_help()
   write(*,*) "        : -static_model : force the model to be static, and neglect velocity field"
   write(*,*) "        : -store_atom_opac: keep in memory background continuum opacities"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
+  write(*,*) "        : -x_coupling : Add (partial) cross coupling terms to SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "
   write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."
