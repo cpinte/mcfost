@@ -754,9 +754,9 @@ MODULE AtomicTransfer
   !apply a correction for atomic line if needed.
   !if not flag atom in parafile, never enter this subroutine
   if (.not.lpluto_file) then 
-   CALL spherical_shells_model()
+   !CALL spherical_shells_model()
    !CALL spherical_star()
-   !CALL magneto_accretion_model()  
+   CALL magneto_accretion_model()  
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -915,7 +915,7 @@ MODULE AtomicTransfer
  ! -------------------------------------------------------- !
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 10 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start = 7 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max = 0!n_rayons_start2 * (2**(n_iter2_max-1))
@@ -950,7 +950,7 @@ MODULE AtomicTransfer
   labs = .true. !to have ds at cell icell
   id = 1
   etape_start = 1
-  etape_end = 1
+  etape_end = 2
   disable_subit = .true. !set to true to avoid subiterations over the emissivity
   Ng_acceleration = .false.
   iterate_ne = .true.

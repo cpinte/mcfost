@@ -49,7 +49,7 @@ MODULE simple_models
    integer :: n_zones = 1, izone, i, j, k, icell, southern_hemp, idmax, niter
    integer, parameter :: NiterMax = 0!50
    double precision, parameter :: Tmax = 7.5d3, days_to_sec = 86400d0, Prot = 6.53 !days
-   double precision, parameter :: rmi=2.2, rmo=3.0, Tshk=8d3, Macc = 1d-9, Tiso=0d3
+   double precision, parameter :: rmi=2.2, rmo=3.0, Tshk=8d3, Macc = 1d-8, Tiso=0d3
    double precision, parameter :: yroot = (15d0 - dsqrt(33d0)) / 12d0 !value of y for which T is maximum (max(-nH**2 * r**3))
    double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 0.99!99
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0, fp
