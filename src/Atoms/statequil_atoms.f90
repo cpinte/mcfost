@@ -207,6 +207,7 @@ MODULE statequil_atoms
     
     gij = line%Bji/line%Bij
 
+    atom%Gamma(j,i,id) = line%Aji !init
     do iray=1, n_rayons
 
       Ieff(:) = NLTEspec%I(Nblue:Nred,iray,id)*dexp(-NLTEspec%dtau(Nblue:Nred,iray,id)) + \
@@ -217,7 +218,8 @@ MODULE statequil_atoms
      do l=1,line%Nlambda
      !write(*,*) icell, id, iray, l, Ieff(l), line%Bij, line%phi(l, iray, id), weight(l)
       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*Ieff(l)*weight(l)
-      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*(line%Aji+line%Bji*Ieff(l))
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*line%Bji*Ieff(l)
+      !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*(line%Aji+line%Bji*Ieff(l))
  
       
      enddo
