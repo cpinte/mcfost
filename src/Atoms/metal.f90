@@ -978,6 +978,9 @@ MODULE metal
    if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
    ! we avoid H passive in metal_bf if H is passive
    						!, chi, eta)
+   						
+   !--> at this point, eta_p and chi_p are 0 because of initAtomOpac(id), therefore
+   !after metal_bf they only points to continuum bound-free.
     CALL Metal_bf(id, icell) !Return if Npassive=1 and PassiveAtoms(1)==" H"
 !     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
 !     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
