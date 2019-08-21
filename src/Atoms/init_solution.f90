@@ -100,11 +100,15 @@ MODULE init_solution
    endif
    allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,atmos%Nspace)); gpop_old = 0d0
 
+  if (atmos%include_xcoupling) then
+   CALL Warning("Cross-coupling not ready yet, avoiding.")
+   atmos%include_xcoupling = .false.
+  end if
   !at the end because if ZERO_RADIATION for instance the pointers is changed
   if (atmos%include_xcoupling) then
      FillGamma_bf => FillGamma_bf_mali
      FillGamma_bb => FillGamma_bb_mali
-     CALL WARNING("Partial Cross-coupling with the line itself only") 
+     CALL WARNING("Partial Cross-coupling with the line itself only")
   else !HOGEREIJDE
      FillGamma_bf => FillGamma_bf_hjde
      FillGamma_bb => FillGamma_bb_hjde
