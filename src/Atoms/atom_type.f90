@@ -8,12 +8,12 @@ MODULE atom_type
 
    integer, parameter :: ATOM_LABEL_WIDTH=20
    integer, parameter :: ATOM_ID_WIDTH=2, MAX_LENGTH=512
-   real(8), parameter :: BRK=4.0
-   integer, parameter :: MSHELL=5
-   character(len=20), dimension(16) :: col_recipes !16 recipes for collision rates
-   data col_recipes / "OMEGA", "CE", "CI", "CP", "CH0", "CH+", "CH", "CR",&
-                    "AR85-CHP", "AR85-CHH", "AR85-CEA", "BURGESS", "SHULL82",&
-                    "BADNELL", "SUMMERS", "AR85-CDI" /
+!    real(8), parameter :: BRK=4.0
+!    integer, parameter :: MSHELL=5
+!    character(len=20), dimension(16) :: col_recipes !16 recipes for collision rates
+!    data col_recipes / "OMEGA", "CE", "CI", "CP", "CH0", "CH+", "CH", "CR",&
+!                     "AR85-CHP", "AR85-CHH", "AR85-CEA", "BURGESS", "SHULL82",&
+!                     "BADNELL", "SUMMERS", "AR85-CDI" /
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE ZeemanType
@@ -21,6 +21,11 @@ MODULE atom_type
    integer, allocatable, dimension(:)  :: q
    double precision, allocatable, dimension(:)  :: shift, strength
   END TYPE ZeemanType
+  
+  TYPE AtomicTransition
+   character(len=16) :: trtype
+   integer :: ik
+  END TYPE AtomicTransition
  
   TYPE AtomicLine
    logical           :: symmetric, polarizable, lcontrib_to_opac !default is yes, set at reading
@@ -74,7 +79,7 @@ MODULE atom_type
    ! atom can be passive but NLTEpops true. This is the case of
    ! populations read from previous run
    character(len=15)      :: initial_solution
-   integer                :: Nlevel, Nline, Ncont, Nfixed, Npfr=0
+   integer                :: Nlevel, Nline, Ncont, Ntr, Nfixed, Npfr=0
    integer                :: periodic_table, activeindex !order of the active atom in the
    														! active atoms array ActiveAtoms
    ! BY CONVENTION, stage=0 for neutrals, 1 for singly ionised
@@ -92,6 +97,7 @@ MODULE atom_type
    ! arrays of lines, continua containing different line, continuum each
    type (AtomicLine), allocatable, dimension(:)         :: lines
    type (AtomicContinuum) , allocatable, dimension(:)   :: continua
+   type (AtomicTransition), allocatable, dimension(:)   :: at !Atomic transition
    !one emissivity per atom, used in the construction of the gamma matrix
    !where I have to distinguish between atom own opac and overlapping transitions
    double precision, allocatable, dimension(:,:,:) :: eta !Nwaves, Nrays, Nproc

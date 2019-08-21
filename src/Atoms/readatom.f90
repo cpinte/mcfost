@@ -107,8 +107,11 @@ MODULE readatom
     allocate(determined(atom%Nlevel))
     allocate(parse_label(atom%Nlevel))
     allocate(atom%nstar(atom%Nlevel,atmos%Nspace))
+    
+    atom%Ntr = atom%Nline + atom%Ncont
+    allocate(atom%at(atom%Ntr))
 
-    atom%nstar = 0d0
+    atom%nstar(:,:) = 0d0
 
     do i=1,atom%Nlevel
      CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
@@ -160,6 +163,8 @@ MODULE readatom
     do kr=1,atom%Nline
      atom%lines(kr)%atom => atom
      atom%lines(kr)%lcontrib_to_opac=.true. !init
+     atom%at(kr)%trtype = atom%lines(kr)%trtype; atom%at(kr)%ik=kr
+     
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
      atom%lines(kr)%glande_i = -99; atom%lines(kr)%glande_j = -99
@@ -436,6 +441,8 @@ MODULE readatom
      atom%continua(kr)%isotope_frac=1.
      atom%continua(kr)%atom => atom
      atom%continua(kr)%lcontrib_to_opac=.true.
+     atom%at(atom%Nline+kr)%trtype = atom%continua(kr)%trtype; atom%at(kr+atom%Nline)%ik=kr
+
 
      CALL getnextline(atomunit, COMMENT_CHAR, &
           FormatLine, inputline, Nread)
@@ -762,6 +769,7 @@ MODULE readatom
 !   do nmet=1, atmos%Npassiveatoms
 !    write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID, atmos%PassiveAtoms(nmet)%ptr_atom%ID
 !   end do
+
 
   RETURN
   END SUBROUTINE readAtomicModels
