@@ -1,7 +1,6 @@
 MODULE init_solution
 
- use statequil_atoms, only : FillGamma_bb, FillGamma_bf, FillGamma_bb_hjde, FillGamma_bf_hjde, &
- 							 FillGamma_bb_mali, FillGamma_bf_mali, FillGamma_bb_zero_radiation, &
+ use statequil_atoms, only : FillGamma_bb_zero_radiation, &
  							 FillGamma_bf_zero_radiation, initGamma_atom, SEE_atom
  use atmos_type, only : atmos
  use atom_type, only : AtomType
@@ -50,8 +49,6 @@ MODULE init_solution
         atom%n(:,:) = atom%nstar(:,:)
         
       CASE ("ZERO_RADIATION")
-  		FillGamma_bb => FillGamma_bb_zero_radiation
-        FillGamma_bf => FillGamma_bf_zero_Radiation
         do icell=1,atmos%Nspace
          if (atmos%icompute_atomRT(icell)>0) then
            !atom level version of initGamma and FillGamma and updatePopulations
@@ -61,12 +58,12 @@ MODULE init_solution
            !the next one is cell independent but we init Gamma at each cell
            !even if the cell index appears, it is just here for consistance with the others FillGamma_bb_XXXX
            CALL FillGamma_bb_zero_radiation(1, icell, atom, 1) !no parallèle yet
+           ! not yet ready CALL FillGamma_atom_zero_radiation(id, icell, atom)
            CALL SEE_atom(1, icell,atom)
 !            write(*,*) "n(zerR)", atmos%ActiveAtoms(1)%ptr_atom%n(:,icell)
 !            write(*,*) "nstar", atmos%ActiveAtoms(1)%ptr_atom%nstar(:,icell)
          end if
         enddo
-        FillGamma_bb => NULL(); FillGamma_bf => NULL() !because the final pointers should be the one of the methode
      !CASE ("OLD_POPULATIONS")
      !CASE ("ITERATIONS")
      !CASE ("SOBOLEV")
@@ -103,16 +100,14 @@ MODULE init_solution
   if (atmos%include_xcoupling) then
    CALL Warning("Cross-coupling not ready yet, avoiding.")
    atmos%include_xcoupling = .false.
-  end if
-  !at the end because if ZERO_RADIATION for instance the pointers is changed
-  if (atmos%include_xcoupling) then
-     FillGamma_bf => FillGamma_bf_mali
-     FillGamma_bb => FillGamma_bb_mali
-     CALL WARNING("Partial Cross-coupling with the line itself only")
-  else !HOGEREIJDE
-     FillGamma_bf => FillGamma_bf_hjde
-     FillGamma_bb => FillGamma_bb_hjde
-  end if
+  end if! 
+!   
+!   if (atmos%include_xcoupling) then
+!      CALL WARNING("Partial Cross-coupling with the line itself only")
+!   else !HOGEREIJDE !SOOn will desappear
+!      FillGamma_bf => FillGamma_bf_hjde
+!      FillGamma_bb => FillGamma_bb_hjde
+!   end if
 
    
  RETURN
@@ -123,8 +118,8 @@ MODULE init_solution
   type (AtomType), pointer :: atom
   integer :: nact
   
-  FillGamma_bb => NULL()
-  FillGamma_bf => NULL() !not needed anymore at the end of the NLTE
+!   FillGamma_bb => NULL()
+!   FillGamma_bf => NULL() !not needed anymore at the end of the NLTE
  
   deallocate(gpop_old)
   if (sub_iterations_enabled) then
