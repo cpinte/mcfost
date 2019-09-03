@@ -49,7 +49,7 @@ MODULE simple_models
    integer :: n_zones = 1, izone, i, j, k, icell, southern_hemp, idmax, niter
    integer, parameter :: NiterMax = 0!50
    double precision, parameter :: Tmax = 7.5d3, days_to_sec = 86400d0, Prot = 6.53 !days
-   double precision, parameter :: rmi=2.2, rmo=3.0, Tshk=8d3, Macc = 1d-8, Tiso=0d3
+   double precision, parameter :: rmi=2.2, rmo=3.0, Tshk=8d3, Macc = 1d-7, Tiso=0d3
    double precision, parameter :: yroot = (15d0 - dsqrt(33d0)) / 12d0 !value of y for which T is maximum (max(-nH**2 * r**3))
    double precision, parameter :: year_to_sec = 3.154d7, y_lim_z0 = 0.99!99
    double precision ::  OmegasK, Rstar, Mstar, thetao, thetai, Lr, Tring, Sr, Q0, nH0, fp
@@ -178,7 +178,7 @@ MODULE simple_models
        phi = phi_grid(icell)
        
 
-       Vphi = Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
+       Vphi = 0d0 !Omega * (r*AU_to_m) * dsqrt(y) !m/s *sinTheta, the pole doesn't rotate
 
        if (.not.lstatic.and.lmagnetoaccr) atmos%Vxyz(icell,3) = Vphi !phihat       
 
@@ -721,7 +721,7 @@ MODULE simple_models
    R0s = etoile(1)%r!inner boundary in au
    Mstar = etoile(1)%M * Msun_to_kg !kg
    Rstar = feqv(Rsmin, Rsmax, minval(r_mod), maxval(r_mod), 1d0, .true.) !in au
-   write(*,*) "Rstar in mcfost grid (au) = ", Rstar, (Rsmax - Rstar)/Rstar, 1., (maxval(r_mod)-1.)
+   !write(*,*) "Rstar in mcfost grid (au) = ", Rstar, (Rsmax - Rstar)/Rstar, 1., (maxval(r_mod)-1.)
    
    if (lstatic) then
     if (allocated(atmos%Vxyz)) deallocate(atmos%Vxyz)
@@ -750,19 +750,19 @@ MODULE simple_models
        !! UNIFORM LAW
 !    CALL Warning(&
 !    	"Beware, I do not take into account vturb anymore. Small discrepancies can arise")
-!       if (r <= 0.8*Rsmax) then !remove if for uniform squared
-!        atmos%nHtot(icell) = 1d15
-!        atmos%T(icell) = 3000d0
-!        atmos%ne(icell) = 1d12
-!       end if
+      if (r <= 0.9*Rsmax) then !remove if for uniform squared
+       atmos%nHtot(icell) = 1d23 * (r/Rmin)**6
+       atmos%T(icell) = etoile(1)%T * (r/Rmin)**0.5
+       atmos%ne(icell) = 1d-2 * atmos%nHtot(icell)
+      end if
        !!
 ! 
        !used a different scale for Rstar to au
-       atmos%nHtot(icell) = interp_dp(mass_mod, cm2, cm) * rho_to_nH / (Volume(icell) * Au3_to_m3)
-       atmos%T(icell) = interp_dp(T_mod, cm2, cm)
-       !atmos%ne(icell) = interp_dp(ne_mod, m_mod, cm)
-       atmos%ne(icell) = interp_dp(f_mod, cm2, cm) * atmos%nHtot(icell)
-       write(*,*) r, rs, cm, interp_dp(mass_mod, m_mod, cm)
+!        atmos%nHtot(icell) = interp_dp(mass_mod, cm2, cm) * rho_to_nH / (Volume(icell) * Au3_to_m3)
+!        atmos%T(icell) = interp_dp(T_mod, cm2, cm)
+!        !atmos%ne(icell) = interp_dp(ne_mod, m_mod, cm)
+!        atmos%ne(icell) = interp_dp(f_mod, cm2, cm) * atmos%nHtot(icell)
+!        write(*,*) r, rs, cm, interp_dp(mass_mod, m_mod, cm)
 
       end do
      end do
