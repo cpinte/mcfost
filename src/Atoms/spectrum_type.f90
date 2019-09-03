@@ -63,9 +63,9 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:,:,:,:,:) :: F_QUV
    !!double precision, allocatable, dimension(:,:) :: S_QUV
    !Contribution function
-   ! N_cells, Nlambda ...
+   !N_cells, Nlambda, N_INCL, N_AZ
    double precision, allocatable, dimension(:,:,:,:) :: Ksi 
-   real(kind=dp), allocatable, dimension(:,:,:) :: scale_ref
+   !real(kind=dp), allocatable, dimension(:,:,:,:,:) :: taur
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
    double precision, allocatable, dimension(:,:,:) :: Psi, dtau !for cell icell in direction iray, thread id
    !size of Psi could change during the devlopment
@@ -108,20 +108,7 @@ MODULE spectrum_type
    CALL make_wavelength_grid(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, & 
                         NLTEspec%lambda, NLTEspec%Ntrans, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
-   
-   !determine maximum wavelength per transition
-!    NLTEspec%Nwaves_trans = 0
-!    do nat = 1, NLTEspec%atmos%Natom
-!     do kr=1, NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont
-!      NLTEspec%Nwaves_trans = max(NLTEspec%Nwaves_trans, &
-!      	NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%Nlambda)
-!     end do
-!     do kr=1, NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline
-!      NLTEspec%Nwaves_trans = max(NLTEspec%Nwaves_trans, &
-!      	NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%Nlambda)    
-!     end do
-!    end do
-!    write(*,*)"  Maximum number of wavelengths per transition is", NLTEspec%Nwaves_trans
+
    
    CALL writeWavelength()
    CALL allocSpectrum(alloc_nlte_vars,& !.true. => alloc atom%eta, %chi, %Xcoupling if NLTE
@@ -141,7 +128,7 @@ MODULE spectrum_type
   ! -------------------------------------------------------------------- !
    double precision, dimension(NLTEspec%Nwaves) :: old_grid
    integer, dimension(:), allocatable :: Nlam_R
-   integer :: nat, kr, Ntrans_new, kp
+   integer :: nat, kr, Ntrans_new, kp, kc
    
    old_grid = NLTEspec%lambda
    write(*,*) " -> Redefining a wavelength grid for image.."
@@ -179,36 +166,56 @@ MODULE spectrum_type
 !      NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline, "b-b", &
 !      NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont, "b-f"
      kp = 0
-     do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline
-      if (NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%Nblue >= 1 .and. &
-      		NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%Nred <= NLTEspec%Nwaves) then
-       kp = kp + 1
-       write(*,*) "    b-b #", kp, NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%lambda0, &
-        "nm"
-       Ntrans_new = Ntrans_new + 1    
-      endif 
+     
+     !do sum over transitions
+     do kr=1,NLTEspec%atmos%atoms(nat)%ptr_Atom%Ntr
+      kc = NLTEspec%atmos%atoms(nat)%ptr_Atom%at(kr)%ik
+      SELECT CASE (NLTEspec%atmos%atoms(nat)%ptr_Atom%at(kr)%trtype)
+      
+      CASE ("ATOMIC_LINE")
+        write(*,*) "    b-b #", kc, NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kc)%lambda0,"nm"
+
+      CASE ("ATOMIC_CONTINUUM")
+        write(*,*) "    b-f #", kc, NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kc)%lambdamin, &
+        "nm", NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kc)%lambda0, "nm"       
+      CASE DEFAULT
+       CALL error ("transition type unkown",NLTEspec%atmos%atoms(nat)%ptr_Atom%at(kr)%trtype)
+      END SELECT
+      
      end do
-    write(*,*) "   --> ", kp, "b-b transitions"
-     kp = 0
-     do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont
-      if (NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%Nblue >= 1 .and. &
-      		NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%Nred <= NLTEspec%Nwaves) then
-       kp = kp + 1
-       write(*,*) "    b-f #", kp, NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambdamin, &
-        "nm", NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambda0, "nm"  
-       Ntrans_new = Ntrans_new + 1  
-      endif
-     end do
-    write(*,*) "   --> ", kp, "b-f transitions"
+     Ntrans_new = Ntrans_new + NLTEspec%atmos%atoms(nat)%ptr_atom%Ntr
    end do
-   write(*,*) "  ** Total number of transitions for image:", Ntrans_new
+     
+!      do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline
+!       if (NLTEspec%atmos%Atoms(nat)%ptr_atom%at(kr)%lcontrib_to_opac) then
+!        kp = kp + 1
+!        write(*,*) "    b-b #", kp, NLTEspec%atmos%Atoms(nat)%ptr_atom%lines(kr)%lambda0, &
+!         "nm"
+!        Ntrans_new = Ntrans_new + 1    
+!       endif 
+!      end do
+!     write(*,*) "   --> ", kp, "b-b transitions"
+!      kp = 0
+!      do kr=1,NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont
+!       if (NLTEspec%atmos%Atoms(nat)%ptr_atom%at(kr+NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline)%lcontrib_to_opac) then
+!        kp = kp + 1
+!        write(*,*) "    b-f #", kp, NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambdamin, &
+!         "nm", NLTEspec%atmos%Atoms(nat)%ptr_atom%continua(kr)%lambda0, "nm"  
+!        Ntrans_new = Ntrans_new + 1  
+!       endif
+!      end do
+!     write(*,*) "   --> ", kp, "b-f transitions"
+!    end do
+!    write(*,*) "  ** Total number of transitions for image:", Ntrans_new
    NLTEspec%Ntrans = Ntrans_new
+
+   write(*,*) "  ** Total number of transitions for image:", NLTEspec%Ntrans
+   !write(*,*) NLTEspec%atmos%Atoms(1)%ptr_atom%Nline, NLTEspec%atmos%Atoms(1)%ptr_atom%Ntr_line
+
    !reallocate wavelength arrays, except polarisation ? which are in adjustStokesMode
    CALL allocSpectrum(.false.,.true.) !do not realloc NLTE atom%chi;%eta;%Xcoupling
    							   !even if NLTEpops are present
    							   !NLTE eval_opartor condition never reached for images.
-   !!CALL writeWavelength() !not useful because they are written with the flux and
-   						    ! here the wavelength comes from a file..
   RETURN
   END SUBROUTINE initSpectrumImage
   
@@ -237,10 +244,9 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE reallocate_rays_arrays
 
-  SUBROUTINE allocSpectrum(alloc_atom_nlte, alloc_image)!NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH)
-   !integer, intent(in) :: NPIX_X, NPIX_Y, N_INCL, N_AZIMUTH
+  SUBROUTINE allocSpectrum(alloc_atom_nlte, alloc_image)
    !Polarized quantities allocated in adjustStokesMode
-   integer :: nat, k, Nlambda_max
+   integer :: nat, k, Nlambda_max, alloc_status
    type (AtomicContinuum) :: cont
    type (AtomicLine) 	  :: line
    logical, intent(in)    :: alloc_atom_nlte, alloc_image
@@ -323,19 +329,13 @@ MODULE spectrum_type
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
 
+     !Now the waves and angle integraed X coupling terms for each atom and for all transitions
+     !(Sum over all active transitions for each transition) is kept.
      if (NLTEspec%atmos%include_xcoupling) then 
-      do k=1, NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Ncont
-       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%U&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Nlambda, NLTEspec%NPROC))
-       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%chi&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%continua(k)%Nlambda, NLTEspec%NPROC))
-      end do
-      do k=1, NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nline
-       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%U&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Nlambda, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%chi&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%lines(k)%Nlambda, NLTEspec%atmos%Nrays, NLTEspec%NPROC))      
-      end do
+       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Xc&
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,&
+       NLTEspec%Nproc))
+      !loop over atom%at if %U and %chi are stored for each transitions
      end if
 
     end do
@@ -346,10 +346,19 @@ MODULE spectrum_type
 		!hence ksi should be computed for small waves intervals.
 	 !because otherwise, it is allocated with the alloc spectrum before initSpectrumImage()
      if (alloc_image) then 
-      allocate(NLTEspec%Ksi(NLTEspec%atmos%Nspace, NLTEspec%Nwaves,RT_N_INCL,RT_N_AZ))  
-      allocate(NLTEspec%scale_ref(NLTEspec%atmos%Nspace, RT_N_INCL, RT_N_AZ))
+      write(*,*) "Trying to allocate",real(NLTEspec%atmos%Nspace)/1024. * real(NLTEspec%Nwaves)/1024. * &
+      	real(RT_N_INCL*RT_N_AZ), " MB for ksi"!, and ", &
+        !real(NLTEspec%Nwaves)/1024. * real(NPIX_X*NPIX_Y*RT_N_INCL*RT_N_AZ)/1024., " GB for taur"   
+
+      allocate(NLTEspec%Ksi(NLTEspec%atmos%Nspace, NLTEspec%Nwaves,RT_N_INCL,RT_N_AZ),stat=alloc_status)
+      !allocate(NLTEspec%taur(NLTEspec%atmos%Nspace, npix_x, npix_y, RT_N_INCL, RT_N_AZ),stat=alloc_status)
+      if (alloc_status > 0) then
+       call ERROR('Cannot allocate ksi')
+       lcontrib_function = .false.
+      end if
+
       NLTEspec%Ksi(:,:,:,:) = 0d0
-      NLTEspec%scale_ref(:,:,:) = 0d0
+      !NLTEspec%taur(:,:,:,:,:) = 0d0
      end if
    else if (lcontrib_function .and. .not.ltab_wavelength_image) then
     CALL Warning(" Contribution function not taken into account. Use a wavelength table.")
@@ -406,7 +415,7 @@ MODULE spectrum_type
 !    deallocate(Nblue_array, Nmid_array, Nred_array)
 
    if (allocated(NLTEspec%Ksi)) deallocate(NLTEspec%ksi)
-   if (allocated(NLTEspec%scale_ref)) deallocate(NLTEspec%scale_ref)
+   !if (allocated(NLTEspec%taur)) deallocate(NLTEspec%taur)
 
   RETURN
   END SUBROUTINE freeSpectrum
@@ -489,7 +498,6 @@ MODULE spectrum_type
    
    do nact=1,atmos%Nactiveatoms
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-       		
        !!if I keep phi, I should condiser using it everywhere in Profile() !! ??
        allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%&
        		phi(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nlambda,atmos%Nrays,NLTEspec%Nproc))
@@ -759,13 +767,13 @@ MODULE spectrum_type
   ! Write contribution function to disk.
  ! --------------------------------------------------- !
   integer :: status,unit,blocksize,bitpix,naxis, naxis2
-  integer, dimension(7) :: naxes, naxes2
+  integer, dimension(8) :: naxes, naxes2
   integer :: group,fpixel,nelements, nelements2
   logical :: simple, extend
   character(len=6) :: comment=""
-  real :: pixel_scale_x, pixel_scale_y 
+  real :: pixel_scale_x, pixel_scale_y
   
-   write(*,*)" -> writing contribution function.."
+   write(*,*)" -> writing contribution function..."
   
    !  Get an unused Logical Unit Number to use to open the FITS file.
    status=0
@@ -781,67 +789,81 @@ MODULE spectrum_type
    fpixel=1
 
    bitpix=-64
-   
-  if (lVoronoi) then
+
+  if (lVoronoi) then   
    naxis = 4
+   !naxes(1) = 3
    naxes(1) = NLTEspec%atmos%Nspace ! equivalent n_cells
    naxes(2) = NLTEspec%Nwaves
+!    naxes(3) = npix_x
+!    naxes(4) = npix_y
    naxes(3) = RT_n_incl
    naxes(4) = RT_n_az
    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
-   naxis2 = 3
-   naxes2(1) = NLTEspec%atmos%Nspace ! equivalent n_cells
-   naxes2(2) = RT_n_incl
-   naxes2(3) = RT_n_az
-   nelements2 = naxes2(1) * naxes2(2) * naxes2(3)
+!    naxis2 = 3
+!    naxes2(1) = NLTEspec%atmos%Nspace ! equivalent n_cells
+!    naxes2(2) = npix_x
+!    naxes2(3) = npix_y
+!    naxes2(4) = RT_n_incl
+!    naxes2(5) = RT_n_az
+!    nelements2 = naxes2(1) * naxes2(2) * naxes2(3) * naxes2(4) * naxes2(5)
   else
    if (l3D) then
     naxis = 6
+    !naxes(1) = 3
     naxes(1) = n_rad
     naxes(2) = 2*nz
     naxes(3) = n_az
     naxes(4) = NLTEspec%Nwaves
+!     naxes(5) = npix_x
+!     naxes(6) = npix_y
     naxes(5) = RT_n_incl
     naxes(6) = RT_n_az
     nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) * naxes(6)
-    naxis2 = 5
-    naxes2(1) = n_rad
-    naxes2(2) = 2*nz
-    naxes2(3) = n_az
-    naxes2(4) = RT_n_incl
-    naxes2(5) = RT_n_az
-    nelements2 = naxes2(1) * naxes2(2) * naxes2(3) * naxes2(4) * naxes2(5)
+!     naxis2 = 7
+!     naxes2(1) = n_rad
+!     naxes2(2) = 2*nz
+!     naxes2(3) = n_az
+!     naxes2(4) = npix_x
+!     naxes2(5) = npix_y
+!     naxes2(6) = RT_n_incl
+!     naxes2(7) = RT_n_az
+!     nelements2 = naxes2(1) * naxes2(2) * naxes2(3) * naxes2(4) * naxes2(5) * naxes2(6) * naxes2(7)
    else
     naxis = 5
+    !naxes(1) = 3
     naxes(1) = n_rad
     naxes(2) = nz
     naxes(3) = NLTEspec%Nwaves
+!     naxes(4) = npix_x
+!     naxes(5) = npix_y
     naxes(4) = RT_n_incl
     naxes(5) = RT_n_az
-    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) 
-    naxis2 = 4
-    naxes2(1) = n_rad
-    naxes2(2) = nz
-    naxes2(3) = RT_n_incl
-    naxes2(4) = RT_n_az
-    nelements2 = naxes2(1) * naxes2(2) * naxes2(3) * naxes2(4)
+    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5)
+!     naxis2 = 6
+!     naxes2(1) = n_rad
+!     naxes2(2) = nz
+!     naxes2(3) = npix_x
+!     naxes2(4) = npix_y
+!     naxes2(5) = RT_n_incl
+!     naxes2(6) = RT_n_az
+!     nelements2 = naxes2(1) * naxes2(2) * naxes2(3) * naxes2(4) * naxes2(5) *  naxes2(6)
    end if
   end if
 
   !  Write the required header keywords.
   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   CALL ftpkys(unit,'UNIT',"W.m-2.Hz-1.pixel-1",'Ksi',status)
-
-
-  !  Write the array to the FITS file.
-  CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%ksi,status)
-  
-  !open new hdu for reference scale
-  CALL ftcrhd(unit, status)
-  
-  CALL ftphpr(unit,simple,bitpix,naxis2,naxes2,0,1,extend,status)
-  CALL ftpkys(unit, "Optical depth", "", "", status)
-  CALL ftpprd(unit,group,fpixel,nelements2,NLTEspec%scale_ref,status)
+  !  Write line CF to fits
+  write(*,*) "Max,min Ksi=",maxval(NLTEspec%Ksi), minval(NLTEspec%Ksi,mask=NLTEspec%Ksi>0)
+  CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%ksi(:,:,:,:),status)
+! 
+!   !open new hdu for reference scale
+!   CALL ftcrhd(unit, status)
+!   CALL ftphpr(unit,simple,bitpix,naxis2,naxes2,0,1,extend,status)
+!   CALL ftpkys(unit, "Optical depth", "", "", status)
+!   write(*,*) "Max,min taur=",maxval(NLTEspec%taur), minval(NLTEspec%taur,mask=NLTEspec%taur>0)
+!   CALL ftpprd(unit,group,fpixel,nelements2,NLTEspec%taur,status)
 
   !  Close the file and free the unit number.
   CALL ftclos(unit, status)
