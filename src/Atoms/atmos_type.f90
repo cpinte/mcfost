@@ -1,7 +1,7 @@
 MODULE atmos_type
 
   use atom_type, only : AtomType, Element, ATOM_ID_WIDTH, &
-    AtomicLine, AtomicContinuum
+    AtomicLine, AtomicContinuum, AtomicTransition
   use uplow
   use constant
   use messages
@@ -147,6 +147,8 @@ MODULE atmos_type
     end if
 !     if (allocated(atom%gij)) deallocate(atom%gij)
 !     if (allocated(atom%Vij)) deallocate(atom%Vij)
+    if (allocated(atom%Xc)) deallocate(atom%Xc)
+
     !if (allocated(atom%chi_up)) deallocate(atom%chi_up)
     !if (allocated(atom%chi_down)) deallocate(atom%chi_down)
     !if (allocated(atom%Uji_down)) deallocate(atom%Uji_down)
@@ -178,8 +180,8 @@ MODULE atmos_type
       !if (allocated(line%gij)) deallocate(line%gij)
       !if (allocated(line%Vij)) deallocate(line%Vij)
 !       if (allocated(line%chi_up)) deallocate(line%chi_up)
-       if (allocated(line%chi)) deallocate(line%chi)
-       if (allocated(line%U)) deallocate(line%U)
+       !if (allocated(line%chi)) deallocate(line%chi)
+       !if (allocated(line%U)) deallocate(line%U)
       !!if (allocated(line%Jbar)) deallocate(line%Jbar)
       if (associated(line%atom)) NULLIFY(line%atom)
       CALL freeZeemanMultiplet(line)
@@ -197,8 +199,8 @@ MODULE atmos_type
       !if (allocated(cont%gij)) deallocate(cont%gij)
       !if (allocated(cont%Vij)) deallocate(cont%Vij)
 !       if (allocated(cont%chi_up)) deallocate(cont%chi_up)
-       if (allocated(cont%chi)) deallocate(cont%chi)
-       if (allocated(cont%U)) deallocate(cont%U)
+       !if (allocated(cont%chi)) deallocate(cont%chi)
+       !if (allocated(cont%U)) deallocate(cont%U)
 	  !!if (allocated(cont%Jbar)) deallocate(cont%Jbar)
       if (associated(cont%atom)) NULLIFY(cont%atom)
      end do
@@ -207,9 +209,43 @@ MODULE atmos_type
 
   RETURN
   END SUBROUTINE freeAtom
+
+
+  SUBROUTINE realloc_transitions(atom, Nt, mask)
+  !Only kept indexes in atom%at if line contribute to opac
+   integer, intent(in) :: Nt
+   type (AtomType), intent(inout) :: atom
+   logical, intent(in), dimension(:) :: mask
+   integer :: k, k1
+   type (AtomicTransition), dimension(atom%Ntr) :: trans
+   
+    !temporary storage
+    trans = atom%at
+
+    deallocate(atom%at)
+    allocate(atom%at(Nt));atom%Ntr=Nt
+    k1=1
+    do k=1,atom%Nline
+     if (mask(k)) then 
+      atom%at(k1) = trans(k)
+      k1 = k1 + 1
+     end if
+    end do
+    
+    atom%Ntr_line = k1-1
+    
+    do k=Atom%Nline+1,atom%Nline+atom%Ncont
+     if (mask(k)) then 
+      atom%at(k1) = trans(k)
+      k1 = k1 + 1
+     end if
+    end do
   
-  !it is not a free atom, just a reduction of atom%lines array.
-  SUBROUTINE realloc_line_transitions(atom, Nl_new, mask)
+  RETURN
+  END SUBROUTINE realloc_transitions
+  
+
+  SUBROUTINE realloc_line_transitions_deprec(atom, Nl_new, mask)
   !basicazlly does what PAck does
    integer, intent(in) :: Nl_new
    type (AtomType), intent(inout) :: atom
@@ -257,9 +293,9 @@ MODULE atmos_type
     deallocate(lines)
   
   RETURN
-  END SUBROUTINE realloc_line_transitions
+  END SUBROUTINE realloc_line_transitions_deprec
   
-  SUBROUTINE realloc_continuum_transitions(atom, Nc_new, mask)
+  SUBROUTINE realloc_continuum_transitions_deprec(atom, Nc_new, mask)
    integer, intent(in) :: Nc_new
    logical, intent(in), dimension(:) :: mask
    type (AtomType), intent(inout) :: atom
@@ -301,7 +337,7 @@ MODULE atmos_type
     deallocate(conta)
 
   RETURN
-  END SUBROUTINE realloc_continuum_transitions
+  END SUBROUTINE realloc_continuum_transitions_deprec
 
   SUBROUTINE readKurucz_pf(code, Npf, Nstage, ionpot, pf)
    !return pf function for atom with Z = code
@@ -604,11 +640,11 @@ MODULE atmos_type
    if (.not.allocated(atmos%nHtot)) allocate(atmos%nHtot(atmos%Nspace))
    !if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(atmos%Nspace))
    if (.not.allocated(atmos%ne)) allocate(atmos%ne(atmos%Nspace))
-   if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(atmos%Nspace))
+   !if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(atmos%Nspace)) temporary
 
    
    atmos%ne(:) = 0d0
-   atmos%nHmin(:) = 0d0
+   !atmos%nHmin(:) = 0d0 !temporary
    atmos%nHtot(:) = 0d0
    !atmos%vturb(:) = 0d0 !m/s
 

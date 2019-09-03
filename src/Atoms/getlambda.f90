@@ -12,8 +12,8 @@ MODULE getlambda
   IMPLICIT NONE
   
   !Number of points for each transition
-  integer, parameter :: Nlambda_cont = 30, &
-  						Nlambda_line_w = 7, Nlambda_line_c = 51
+  integer, parameter :: Nlambda_cont = 20, &
+  						Nlambda_line_w = 5, Nlambda_line_c = 41
   						!Nwing from -vchar to vcore; Ncore from vcore to 0
 
   CONTAINS
@@ -386,9 +386,6 @@ MODULE getlambda
 !     	
 !     !TEST 
 !     Atoms(n)%ptr_atom%continua(kc)%Nlambda = size( Atoms(n)%ptr_atom%continua(kc)%alpha)
-
-    	
-    	
       !!-> also deallocates cont%lambda which is the original lambda read from file
     !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
     !Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nblue:Atoms(n)%continua(kc)%Nred) &
@@ -436,7 +433,7 @@ MODULE getlambda
     ! to compute images on a user defined grid
    ! ------------------------------------------ !
    use math, only : locate
-   use atmos_type, only : realloc_continuum_Transitions, realloc_line_Transitions
+   use atmos_type, only : realloc_Transitions
    double precision, dimension(:), intent(in) :: old_grid
    integer, dimension(:), intent(in) :: lam_region
    type (atomPointerArray), dimension(:), intent(inout) :: Atoms
@@ -466,7 +463,9 @@ MODULE getlambda
    !is not the sum of the individual grid, some transitions can be neglected because
    !they are out of range
    do n=1,Natom
-    allocate(trans_contribute(Atoms(n)%ptr_atom%Ncont)); trans_contribute(:)=.true.
+       
+    allocate(trans_contribute(atoms(n)%ptr_atom%Ntr)); trans_contribute(:)=.true.!by default
+    
     do kc=1,Atoms(n)%ptr_atom%Ncont
      !on the old_Grid (i.e., the grid for NLTE which is built using all transitions)
      Nlambda_original = Atoms(n)%ptr_atom%continua(kc)%Nlambda !on the old_grid
@@ -474,20 +473,7 @@ MODULE getlambda
      Nred = Atoms(n)%ptr_atom%continua(kc)%Nred
      l0 = Atoms(n)%ptr_atom%continua(kc)%lambdamin!old_grid(Nblue)
      l1 = Atoms(n)%ptr_atom%continua(kc)%lambda0!old_grid(Nred)
-     !!if l0 out of the new grid, remove it, otherwise get the new index
-     !if (l1 < minval(lambda)) then
-!      if (l1 <= x0.or. l0 >= x1) then
-!       !if l1 < x0 then automatically l0 < x0;
-! 									!because l0<l1.
-!      								!and conversely, if l0 > x1 -> l1 > x1
-!       Atoms(n)%ptr_atom%continua(kc)%Nred = -99
-!       Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
-!      else
-!       !Otherwise, if l1 in )x0, x1] and l0 < x0 then l0==x0
-!       !and if l0 in [x0, x1( and l1 > x1 then l1 == x1
-!       Atoms(n)%ptr_atom%continua(kc)%Nred = locate(lambda,l1) ! closest value return by locate is Nwaves if l1>lambda(Nwaves)
-!       Atoms(n)%ptr_atom%continua(kc)%Nblue = locate(lambda,l0) !
-!      end if
+
      in_chan = .false. !equivalent of trans_contribute so be smarter please
      ll = 0
      region_loop : do kr=1, size(lam_region)
@@ -510,18 +496,7 @@ MODULE getlambda
       Atoms(n)%ptr_atom%continua(kc)%Nred = -99
       Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
      end if
-!      if (l0 > maxval(lambda)) then
-!       Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
-!      else
-!       Atoms(n)%ptr_atom%continua(kc)%Nblue = locate(lambda,l0)
-!      end if
-!      
-!      if ((Atoms(n)%ptr_atom%continua(kc)%Nblue==-99).and.(Atoms(n)%ptr_atom%continua(kc)%Nred/=-99)) then
-!       Atoms(n)%ptr_atom%continua(kc)%Nred=-99
-!      end if
-!      if ((Atoms(n)%ptr_atom%continua(kc)%Nblue/=-99).and.(Atoms(n)%ptr_atom%continua(kc)%Nred==-99)) then
-!       Atoms(n)%ptr_atom%continua(kc)%Nblue=-99
-!      end if
+
      
      Nblue = Atoms(n)%ptr_atom%continua(kc)%Nblue; Nred = Atoms(n)%ptr_atom%continua(kc)%Nred
      if (Nred==-99.and.Nblue==-99) then
@@ -529,8 +504,9 @@ MODULE getlambda
 
       Atoms(n)%ptr_atom%continua(kc)%Nmid = -99
       
-      Atoms(n)%ptr_atom%continua(kc)%lcontrib_to_opac=.false.
-      trans_contribute(kc) = Atoms(n)%ptr_atom%continua(kc)%lcontrib_to_opac!.false.
+      !!Atoms(n)%ptr_atom%continua(kc)%lcontrib_to_opac=.false.
+      trans_contribute(atoms(n)%ptr_atom%Nline+kc) = .false.
+      Atoms(n)%ptr_atom%at(atoms(n)%ptr_atom%Nline+kc)%lcontrib_to_opac=.false.
       write(*,*) " :: b-f transition", Atoms(n)%ptr_atom%continua(kc)%j,"->",Atoms(n)%ptr_atom%continua(kc)%i,&
        " for atom ",Atoms(n)%ptr_atom%ID, l0,"-",l1," not counted." !, " removed."
      else
@@ -538,37 +514,18 @@ MODULE getlambda
                                  Atoms(n)%ptr_atom%continua(kc)%Nblue + 1
 
       Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(lambda,lambda(Atoms(n)%ptr_atom%continua(kc)%Nlambda)/2+1)
-     !cont%alpha presently defined on old_lambda, and then on new lambda lambda.
-     !cont%lambda deallocated
-     !!deprectaed
-      !!CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, old_grid, Nwaves, lambda)
-      !!-> also deallocates cont%lambda for hydrogenic atoms
-      !! for all transitions even if we removed them?
+
      end if                          
     end do
-    !If the transition is removed no need for testing Nred and Nlblue in the opacities
-!CALL realloc_continuum_transitions(Atoms(n)%ptr_atom, count(trans_contribute), trans_contribute)
-    !write(*,*) maxval(Atoms(n)%ptr_atom%continua(1)%alpha)
-    deallocate(trans_contribute)
+
     !then bound-bound transitions
-    allocate(trans_contribute(Atoms(n)%ptr_atom%Nline)); trans_contribute(:)=.true.
     do kr=1,Atoms(n)%ptr_atom%Nline
      Nlambda_original = Atoms(n)%ptr_atom%lines(kr)%Nlambda !on the old_grid
      Nblue = Atoms(n)%ptr_atom%lines(kr)%Nblue
      Nred = Atoms(n)%ptr_atom%lines(kr)%Nred
      l0 = old_grid(Nblue)
      l1 = old_grid(Nred)
-     !if l0 out of the new grid, remove it, otherwise get the new index
-     !if (l0 > maxval(lambda)) then
-     !relative index of regions
-!      if (l1 <= x0 .or. l0 >= x1) then
-!       Atoms(n)%ptr_atom%lines(kr)%Nblue = -99
-!       Atoms(n)%ptr_atom%lines(kr)%Nred = -99
-!      else
-!       Atoms(n)%ptr_atom%lines(kr)%Nblue = locate(lambda,l0)
-!       Atoms(n)%ptr_atom%lines(kr)%Nred = locate(lambda,l1)
-!       exit region_loop_l !because if in one region no need to test the others
-!      end if
+
      in_chan = .false.
      ll = 0
      !!write(*,*) size(lam_region), l0, l1, Atoms(n)%ptr_atom%lines(kr)%lambda0
@@ -595,18 +552,6 @@ MODULE getlambda
       Atoms(n)%ptr_atom%lines(kr)%Nblue = -99
       Atoms(n)%ptr_atom%lines(kr)%Nred = -99
      end if
-!      if (l1 < minval(lambda)) then
-!       Atoms(n)%ptr_atom%lines(kr)%Nred = -99
-!      else
-!       Atoms(n)%ptr_atom%lines(kr)%Nred = locate(lambda,l1)
-!      end if
-!      
-!      if ((Atoms(n)%ptr_atom%lines(kr)%Nblue==-99).and.(Atoms(n)%ptr_atom%lines(kr)%Nred/=-99)) then
-!       Atoms(n)%ptr_atom%lines(kr)%Nred=-99
-!      end if
-!      if ((Atoms(n)%ptr_atom%lines(kr)%Nblue/=-99).and.(Atoms(n)%ptr_atom%lines(kr)%Nred==-99)) then
-!       Atoms(n)%ptr_atom%lines(kr)%Nblue=-99
-!      end if
      
      Nblue = Atoms(n)%ptr_atom%lines(kr)%Nblue; Nred = Atoms(n)%ptr_atom%lines(kr)%Nred
      if (Nred==-99.and.Nblue==-99) then
@@ -614,8 +559,9 @@ MODULE getlambda
 
       Atoms(n)%ptr_atom%lines(kr)%Nmid = -99
 
-      Atoms(n)%ptr_atom%lines(kr)%lcontrib_to_opac=.false.
-      trans_contribute(kr) = Atoms(n)%ptr_atom%lines(kr)%lcontrib_to_opac!.false.
+      !!Atoms(n)%ptr_atom%lines(kr)%lcontrib_to_opac=.false.
+      trans_contribute(kr) = .false.
+      Atoms(n)%ptr_atom%at(kr)%lcontrib_to_opac=.false.
       write(*,*) " :: b-b transition", Atoms(n)%ptr_atom%lines(kr)%j,"->",Atoms(n)%ptr_atom%lines(kr)%i,&
        " for atom " ,Atoms(n)%ptr_atom%ID, l0,"-",l1," not counted."!, " removed."
      else
@@ -627,96 +573,12 @@ MODULE getlambda
     if (allocated(Atoms(n)%ptr_atom%lines(kr)%lambda)) &
     	deallocate(Atoms(n)%ptr_atom%lines(kr)%lambda)
     end do
-!      Atoms(n)%ptr_atom%lines = PACK(Atoms(n)%ptr_atom%lines, trans_contribute)
-!      Atoms(n)%ptr_atom%Nline = count(trans_contribute)
-!CALL realloc_line_transitions(Atoms(n)%ptr_atom, count(trans_contribute), trans_contribute)
+    
+     CALL realloc_transitions(Atoms(n)%ptr_atom, count(trans_contribute), trans_contribute)
      deallocate(trans_contribute)
    end do !over atoms
-   if (allocated(trans_contribute)) deallocate(trans_contribute) !in case
 
   RETURN
   END SUBROUTINE adjust_wavelength_grid
 
   END MODULE getlambda
-! --> Futur deprecation of this. Two memory consuming  
-!   SUBROUTINE fillPhotoionisationCrossSection(atom, kc, old_waves, Nwaves, waves)
-!    computes photoionisation Xsections on the waves grid.
-!    Eventually interpolate the values of the old grid old_waves onto waves
-!    use atmos_type, only : Hydrogen
-!    use math, only : bezier3_interp, Gaunt_bf
-!     type(AtomType), intent(inout) :: atom
-!     integer, intent(in) :: kc, Nwaves
-!     double precision, dimension(Nwaves) :: waves
-!     integer :: i, j, Nblue, Nred
-!     double precision, dimension(:), intent(in) :: old_waves
-!     double precision, dimension(Nwaves) :: uu, g_bf
-!     double precision, dimension(:), allocatable :: old_alpha
-!     double precision :: n_eff, Z, gbf_0(1), uu0(1), lambdaEdge, sigma0
-!     
-!     pour H only?
-!     sigma0 = (32.)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
-!           (HPLANCK**(3d0)) / (CLIGHT * &
-!           (M_ELECTRON*Q_ELECTRON)**(2d0))
-!     
-!     i = atom%continua(kc)%i; j = atom%continua(kc)%j
-!     Z = real(atom%stage(i)+1); lambdaEdge = atom%continua(kc)%lambda0
-!     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
-!     if (Nblue==-99 .and. Nred==-99) then
-!      if (allocated(atom%continua(kc)%lambda)) deallocate(atom%continua(kc)%lambda)
-!      if (allocated(atom%continua(kc)%alpha)) deallocate(atom%continua(kc)%alpha)
-!      RETURN !no need to compute
-!     end if
-! 
-!     if (atom%continua(kc)%hydrogenic) then
-!      
-!      if (atom%ID == "H ") then
-!       n_eff = dsqrt(Hydrogen%g(i)/2.)  !only for Hydrogen !
-!      else
-!      obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
-!      if (.not.obtained_n) &
-!         n_eff = Z*dsqrt(E_RYDBERG / (atom%E(j) - atom%E(i)))
-!      end if
-!      if (allocated(atom%continua(kc)%alpha)) deallocate(atom%continua(kc)%alpha)
-!      allocate(atom%continua(kc)%alpha(Nwaves)) !it is allocated in readatom only for non
-!      									   hydrogenic continua
-!      atom%continua(kc)%alpha(:) = 0d0
-!      g_bf = 0d0
-!      uu(Nblue:Nred) = n_eff*n_eff*HPLANCK*CLIGHT/ & 
-!         (NM_TO_M*waves(Nblue:Nred)) / (Z*Z) / E_RYDBERG - 1.
-!      uu0 = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * lambdaEdge) / Z / Z / E_RYDBERG - 1.
-!        
-!      gbf_0 = Gaunt_bf(1, uu0, n_eff)
-!     
-!      g_bf(Nblue:Nred) = &
-!       Gaunt_bf(Nred-Nblue+1, uu(Nblue:Nred), n_eff)
-!       
-!      atom%continua(kc)%alpha(Nblue:Nred) = &
-!         atom%continua(kc)%alpha0 * g_bf(Nblue:Nred) * (waves(Nblue:Nred)/lambdaEdge)**3  / gbf_0(1)!m^2
-! 
-!     else !cont%alpha is allocated and filled with read values
-!      !CALL Warning(" Beware, memory error if tow many cross-sections")
-!      write(*,*) "Interpolating photoionisation cross-section for atom ", &
-!       j,'->',i,atom%continua(kc)%atom%ID, " (", atom%ID,')'
-!      
-!      that is because in this case, %alpha and %lambda have their size taken from the atomic
-!      file with is not %Nlambda anymore at this point.
-!      allocate(old_alpha(size(old_waves)))
-!      old_alpha(:) = atom%continua(kc)%alpha(:)
-!      if (size(waves)==1) then
-!      write(*,*) size(atom%continua(kc)%alpha(:)), size(old_waves)
-!      write(*,*) size(old_alpha)
-!      write(*,*) waves(Nblue:Nred), atom%continua(kc)%Nlambda
-!      end if
-!      deallocate(atom%continua(kc)%alpha)
-!      allocate(atom%continua(kc)%alpha(Nwaves))
-! 
-!      atom%continua(kc)%alpha(:) = 0d0
-!      CALL bezier3_interp(size(old_alpha),old_waves, old_alpha, & !Now the interpolation grid
-!              atom%continua(kc)%Nlambda,  waves(Nblue:Nred), &
-!              atom%continua(kc)%alpha(Nblue:Nred)) !end
-!      deallocate(old_alpha)
-!     end if
-!     if (allocated(atom%continua(kc)%lambda)) deallocate(atom%continua(kc)%lambda) !not used
-!     !if (atom%ID=="He") read(*,*)
-!   RETURN
-!   END SUBROUTINE fillPhotoionisationCrossSection
