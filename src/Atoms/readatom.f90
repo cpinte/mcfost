@@ -40,7 +40,7 @@ MODULE readatom
     type (AtomType), intent(inout), target :: atom
     character(len=*), intent(in) :: atom_file
     character(len=MAX_LENGTH) :: inputline, FormatLine
-    integer :: Nread, i,j, EOF, nll, nc
+    integer :: Nread, i,j, EOF, nll, nc, Nfixed !deprecation future
     real, allocatable, dimension(:) :: levelNumber
     logical :: Debeye, match, res=.false.
     logical, dimension(:), allocatable :: determined, parse_label
@@ -87,7 +87,7 @@ MODULE readatom
 
     !read Nlevel, Nline, Ncont and Nfixed transitions
     CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
-    read(inputline,*) atom%Nlevel, atom%Nline, atom%Ncont, atom%Nfixed
+    read(inputline,*) atom%Nlevel, atom%Nline, atom%Ncont, Nfixed
     write(*,*) "Nlevel=",atom%Nlevel," Nline=",atom%Nline,&
               " Ncont=", atom%Ncont!, " Nfixed=", atom%Nfixed
               !deprecated Nfixed will be removed
@@ -162,8 +162,9 @@ MODULE readatom
 
     do kr=1,atom%Nline
      atom%lines(kr)%atom => atom
-     atom%lines(kr)%lcontrib_to_opac=.true. !init
+     !!atom%lines(kr)%lcontrib_to_opac=.true. !init
      atom%at(kr)%trtype = atom%lines(kr)%trtype; atom%at(kr)%ik=kr
+     atom%at(kr)%lcontrib_to_opac=.true.; atom%Ntr_line = atom%Nline
      
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
@@ -440,9 +441,9 @@ MODULE readatom
     do kr=1,atom%Ncont
      atom%continua(kr)%isotope_frac=1.
      atom%continua(kr)%atom => atom
-     atom%continua(kr)%lcontrib_to_opac=.true.
+     !!atom%continua(kr)%lcontrib_to_opac=.true.
+     atom%at(kr)%lcontrib_to_opac=.true.
      atom%at(atom%Nline+kr)%trtype = atom%continua(kr)%trtype; atom%at(kr+atom%Nline)%ik=kr
-
 
      CALL getnextline(atomunit, COMMENT_CHAR, &
           FormatLine, inputline, Nread)
@@ -523,7 +524,7 @@ MODULE readatom
     ! computational cost.
     ! They are not implemented because only relevent for solar
     ! application
-    if (atom%Nfixed.gt.0) then
+    if (Nfixed.gt.0) then
      write(*,*) "Fixed transitions not implemented yet"
      write(*,*) "exiting..."
      stop
