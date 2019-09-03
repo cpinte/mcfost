@@ -1,7 +1,6 @@
 MODULE init_solution
 
- use statequil_atoms, only : FillGamma_bb_zero_radiation, &
- 							 FillGamma_bf_zero_radiation, initGamma_atom, SEE_atom
+ use statequil_atoms, only : FillGamma_atom_zero_radiation, initGamma_atom, SEE_atom
  use atmos_type, only : atmos
  use atom_type, only : AtomType
  use spectrum_type, only : alloc_phi_lambda, NLTEspec, dealloc_phi_lambda
@@ -54,11 +53,11 @@ MODULE init_solution
            !atom level version of initGamma and FillGamma and updatePopulations
            CALL initGamma_atom(1, icell, atom)
            !no rays integration here
-           CALL FillGamma_bf_zero_radiation(1, icell, atom, 1)
+           !!CALL FillGamma_bf_zero_radiation(1, icell, atom, 1)
            !the next one is cell independent but we init Gamma at each cell
            !even if the cell index appears, it is just here for consistance with the others FillGamma_bb_XXXX
-           CALL FillGamma_bb_zero_radiation(1, icell, atom, 1) !no parallèle yet
-           ! not yet ready CALL FillGamma_atom_zero_radiation(id, icell, atom)
+           !!CALL FillGamma_bb_zero_radiation(1, icell, atom, 1) !no parallèle yet
+           CALL FillGamma_atom_zero_radiation(1, icell, atom)
            CALL SEE_atom(1, icell,atom)
 !            write(*,*) "n(zerR)", atmos%ActiveAtoms(1)%ptr_atom%n(:,icell)
 !            write(*,*) "nstar", atmos%ActiveAtoms(1)%ptr_atom%nstar(:,icell)
@@ -101,13 +100,6 @@ MODULE init_solution
    CALL Warning("Cross-coupling not ready yet, avoiding.")
    atmos%include_xcoupling = .false.
   end if! 
-!   
-!   if (atmos%include_xcoupling) then
-!      CALL WARNING("Partial Cross-coupling with the line itself only")
-!   else !HOGEREIJDE !SOOn will desappear
-!      FillGamma_bf => FillGamma_bf_hjde
-!      FillGamma_bb => FillGamma_bb_hjde
-!   end if
 
    
  RETURN
