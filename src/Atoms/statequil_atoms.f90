@@ -84,9 +84,7 @@ MODULE statequil_atoms
   end do
  RETURN
  END SUBROUTINE initGamma
- 
- !futur deprecation, FillGamma will direclty compute the full matrix for lines and continua
- !using the new atom%at informations and atom%Ntr
+
  SUBROUTINE fillGamma(id, icell, n_rayons, switch_to_lte)
   ! ------------------------------------------------------------------------- !
    ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
@@ -104,17 +102,17 @@ MODULE statequil_atoms
   integer :: nact
   type (AtomType), pointer :: atom
   
-  !Later I will replace by a unique function
+
   do nact=1, atmos%NactiveAtoms
    atom=>atmos%ActiveAtoms(nact)%ptr_atom
-   CALL FillGamma_bf_hjde(id, icell, atom, n_rayons, switch_to_lte)
-   CALL FillGamma_bb_hjde(id, icell, atom, n_rayons, switch_to_lte)
+   CALL FillGamma_atom(id, icell, atom, n_rayons, switch_to_lte)
    atom=>NULL()
   enddo
 
  RETURN
  END SUBROUTINE fillGamma
- 
+  
+ !need cross coupling + Ieff from MALI not hogereijde
  SUBROUTINE FillGamma_atom(id, icell, atom, n_rayons, switch_to_lte)
  !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-dtau) + Psi * eta
  ! "Hogereijde-like". There is no expansion of eta in S_jS_i Uji * nj, hence no Xcoupling yet
@@ -216,134 +214,114 @@ MODULE statequil_atoms
     atom%Gamma(l,l,id) = 0d0
     atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
   end do
-!    if (atmos%include_xcoupling) then
-!     !to do, for this transition, add the Xcoupling terms (=Sum over all transitions that overlap)
-!    
-!    end if
+  !Sure that cross-coupling not in diagonal part ??
+  
+  if (atmos%include_xcoupling) then
+   ! Only for the transition with itself of the moment
+   CALL Xcoupling_rates_atom(id, icell, n_rayons, atom)
+   atom%Gamma(:,:,id) = atom%Gamma(:,:,id) + atom%Xc(:,:,id)
+  end if
   
  RETURN
  END SUBROUTINE FillGamma_atom
  
  
- ! for that atom
- SUBROUTINE FillGamma_bf_hjde(id, icell, atom, n_rayons, switch_to_lte)
-  integer, intent(in) :: id, n_rayons, icell
-  type (AtomType), intent(inout), pointer :: atom
-  logical, optional, intent(in) :: switch_to_lte
-  integer :: nact, kr, i, j, Nblue, Nred, l
-  !type (AtomType), pointer :: atom
-  type (AtomicContinuum) :: cont
-  real(kind=dp) :: Jnu
-  real(kind=dp), allocatable, dimension(:,:) :: Ieff
-  real(kind=dp), dimension(:), allocatable :: twohnu3_c2k, weight, gijk
-
-  if (present(switch_to_lte)) then
-   if (switch_to_lte) RETURN !Gamma initialized to Cul
-  end if
+!I need to handle overlap otherwise will be complicated to multiply Psi * U * chi of differet trans
+!and Psi index should also be consistent with the product
+ SUBROUTINE Xcoupling_rates_atom(id, icell, n_rayons, atom)
+   integer, intent(in) :: id, icell, n_rayons
+   type (AtomType), intent(inout) :: atom
+   integer :: kr, kc, la, iray, krr
+   type (AtomicLine) :: line, line_p
+   type (AtomicContinuum) :: cont, cont_p
+   real(kind=dp) :: Psim, U_ji, chi_ij, U_iip ! I mean, transition j->i (Uj->i and ch_ji = -chi_ij)
+   real(kind=dp), dimension(:), allocatable :: weight, overlap, alpha_nu
+   real(kind=dp) :: norm
    
-   do kr=1,atom%Ncont
-    cont = atom%continua(kr)
-    i = cont%i; j = cont%j
-    Nblue = cont%Nblue; Nred = cont%Nred
+   !       l',l
+   atom%Xc(:,:,id) = 0d0 !Zero cross-coupling
+   
+   do kr=1,atom%Ntr
+   
+    kc = atom%at(kr)%ik
     
-    allocate(Ieff(cont%Nlambda,n_rayons), twohnu3_c2k(cont%Nlambda), weight(cont%Nlambda), gijk(cont%Nlambda))
-    !Accelerated I
-    Ieff(:,:) = NLTEspec%I(Nblue:Nred,1:n_rayons,id)*dexp(-NLTEspec%dtau(Nblue:Nred,1:n_rayons,id)) + \
-             NLTEspec%Psi(Nblue:Nred,1:n_rayons,id) * atom%eta(Nblue:Nred,1:n_rayons,id)
-
-             
-    !nstar(i)/nstar(j)*exp(-hnu/kT)
-    gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell) * &
-    		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
-    !2hnu3/c2 = 2hc/lambda3
-    twohnu3_c2k(:) = twohc / NLTEspec%lambda(Nblue:Nred)**(3d0)
+    select case (atom%at(kr)%trtype)
     
-    weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
-    ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
-
-    !explicit do loop
-    do l=1,cont%Nlambda
-     Jnu = sum(Ieff(l,1:n_rayons))/n_rayons
-     !write(*,*) j, i, NLTEspec%lambda(Nblue+l-1), Jnu(l)
-     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu*weight(l)
-     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu+twohnu3_c2k(l))*gijk(l)*weight(l)  
-     
-    enddo
-    
-    deallocate(Ieff,twohnu3_c2k, weight, gijk)!, Jnu)
-   end do 
-!    if (any_nan_infinity_matrix(atom%Gamma(:,:,id))>0) then
-!     write(*,*) "Error in Gamma_bf"
-!     write(*,*) atom%Gamma(:,:,id)
-!    end if
-
-  
- RETURN
- END SUBROUTINE FillGamma_bf_hjde
- 
- SUBROUTINE FillGamma_bb_hjde(id, icell, atom, n_rayons, switch_to_lte)
- !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-dtau) + Psi * eta
- ! "Hogereijde-like"
-  integer, intent(in) :: icell, id, n_rayons !icell is not need, except if we introduce Xcoupling terms here
-  type (AtomType), intent(inout), pointer :: atom
-  logical, optional, intent(in) :: switch_to_lte
-  integer :: nact, kr, i, j, Nblue, Nred, l, iray
-  !type (AtomType), pointer :: atom
-  type (AtomicLine) :: line
-  real(kind=dp), dimension(:), allocatable :: Ieff, weight
-  real(kind=dp) :: factor, gij, twohnu3_c2, Vij, norm, norm_test, WTest(1)
-
-  if (present(switch_to_lte)) then
-   if (switch_to_lte) RETURN !Gamma initialized to Cul
-  end if
-
-   do kr=1,atom%Nline
-    line = atom%lines(kr)
-    i = line%i; j = line%j
-    Nblue = line%Nblue; Nred = line%Nred
-    
-    allocate(Ieff(line%Nlambda), weight(line%Nlambda))
-
-    twohnu3_c2 = line%Aji / line%Bji 
-
-    norm = 0d0
-    do iray=1, n_rayons
-     norm = norm + sum(line%phi(:,iray,id)*line_wlam(line))!/n_rayons !angle and frequency integrated
-    enddo
-    !the n_rayons simplify
-    weight(:) =  line_wlam(line) / norm! / factor
-!     write(*,*) id, j, i, maxval(weight), norm
-    
-    gij = line%Bji/line%Bij
-
-    atom%Gamma(j,i,id) = line%Aji !init
-    do iray=1, n_rayons
-
-      Ieff(:) = NLTEspec%I(Nblue:Nred,iray,id)*dexp(-NLTEspec%dtau(Nblue:Nred,iray,id)) + \
-             NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)
-
-
-     !write(*,*) "id=",id, iray, maxval(atom%eta(Nblue:Nred,iray,id))
-     do l=1,line%Nlambda
-     !write(*,*) icell, id, iray, l, Ieff(l), line%Bij, line%phi(l, iray, id), weight(l)
-      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*Ieff(l)*weight(l)
-      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*line%Bji*Ieff(l)
-      !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*(line%Aji+line%Bji*Ieff(l))
- 
+     case ("ATOMIC_LINE")
+      line = atom%lines(kc)
+      allocate(weight(line%Nlambda), overlap(line%Nlambda))
+      norm = 0d0; weight(:) = line_wlam(line)
+      do iray=1,n_rayons
+       norm = norm + sum(line%phi(:,iray,id)*weight(:))
+      enddo
+      weight(:) = weight(:)/norm
       
-     enddo
-    enddo
+      do iray=1,n_rayons
+       do la=1,line%Nlambda
+        U_ji = line%phi(la,iray,id)*hc_4PI*line%Aji * NLTEspec%Psi(line%Nblue+la-1,iray,id)
+        !and which psi index?
+        chi_ij = line%phi(la,iray,id)*hc_4PI*line%Bij*atom%n(line%i,icell) 
+        
+!         need to check that by wrting at hand
+!         U_iip = 0.
+!         do krr=1,atom%Ntr
+!          ip = 0
+!          if (atom%at(krr)%trtype=='ATOMIC_LINE') then
+!           if (atom%lines(atom%at(krr)%ik)%j == line%i) then
+!            ip = atom%lines(atom%at(krr)%ik)%i; line_p=atom%lines(atom%at(krr)%ik)
+!            overlap(:) = overlapping_transitions(&
+!				NLTEspec%lambda, line%Nlambda, line%Nblue, line_p%Nlambda, line_p%Nblue)
+!            U_iip = U_iip + line_p%phi(la,iray,id)*hc_4PI*line_p%Aji
+!           end if
+!          else if (atom%at(krr)%trtype=="ATOMIC_CONTINUUM") then
+!           if (atom%continua(atom%at(krr)%ik)%j == line%i) then
+!            ip = atom%continua(atom%at(krr)%ik)%i; cont_p=atom%continua(atom%at(krr)%ik)
+!            U_iip = U_iip + 0 'alpha * 2hnu3/c2 * nistar/njstar exp(-hnu/kT)'
+!           end if
+!          else
+!           call error("bug xc")
+!          end if
+!         end do
+        !atom%Xc(line%i,line%j,id) = atom%Xc(line%i, line%j, id) - chi_ij * U_iip
+        atom%Xc(line%j, line%i, id) = atom%Xc(line%j, line%i, id) + chi_ij * U_ji
+        
+       enddo
+      enddo
+     
+      deallocate(weight, overlap)
+     case ("ATOMIC_CONTINUUM")
+      cont = atom%continua(kc)
+      allocate(weight(cont%Nlambda), overlap(cont%Nlambda), alpha_nu(cont%Nlambda))
 
-    deallocate(Ieff, weight)
-   enddo !over lines
-  
-!    if (any_nan_infinity_matrix(atom%Gamma(:,:,id))>0) then
-!     write(*,*) "Error in Gamma_bb"
-!     write(*,*) atom%Gamma(:,:,id)
-!     stop
-!    end if
- RETURN 
- END SUBROUTINE FillGamma_bb_hjde
+      alpha_nu(:) = bound_free_Xsection(cont)
+      weight(:) = fourPI_h * cont_wlam(cont) * alpha_nu(:)
+     ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
+
+     !explicit do loop
+      do la=1,cont%Nlambda
+        Psim = 0d0
+        do iray=1, n_rayons
+         Psim = Psim + NLTEspec%Psi(cont%Nblue+la-1,iray,id)/n_rayons
+        enddo
+        U_ji  = alpha_nu(la) * Psim * twohc / NLTEspec%lambda(cont%Nblue-1+la)**(3d0)
+        chi_ij = weight(la) * atom%n(line%i,icell)
+        
+        
+        atom%Xc(cont%j, cont%i, id) = atom%Xc(cont%j, cont%i, id) + chi_ij * U_ji
+
+      enddo
+    
+      deallocate(weight, overlap, alpha_nu)
+          
+     case default
+      call error("Transition type unkown", atom%at(kr)%trtype)
+     end select
+   
+   enddo !over transitions
+ 
+ RETURN
+ END SUBROUTINE Xcoupling_rates_atom
+
  
  SUBROUTINE FillGamma_atom_zero_radiation(id, icell, atom)
  !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-dtau) + Psi * eta
@@ -415,85 +393,8 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE FillGamma_atom_zero_radiation
  
- SUBROUTINE FillGamma_bf_zero_radiation(id, icell, atom, n_rayons, switch_to_lte)
-  integer, intent(in) :: id, n_rayons, icell
-  type (AtomType), intent(inout), pointer :: atom
-  logical, optional, intent(in) :: switch_to_lte
-  integer :: nact, kr, i, j, Nblue, Nred, l
-  !type (AtomType), pointer :: atom
-  type (AtomicContinuum) :: cont
-  real(kind=dp), dimension(:), allocatable :: twohnu3_c2k, weight, gijk
-
-  if (present(switch_to_lte)) then
-   if (switch_to_lte) RETURN !Gamma initialized to Cul
-  end if
-  
-  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
-  
-   !atom => atmos%ActiveAtoms(nact)%ptr_atom
-   
-   do kr=1,atom%Ncont
-    cont = atom%continua(kr)
-    i = cont%i; j = cont%j
-    Nblue = cont%Nblue; Nred = cont%Nred
-    
-    allocate(twohnu3_c2k(cont%Nlambda), weight(cont%Nlambda), gijk(cont%Nlambda))
-       
-    !nstar(i)/nstar(j)*exp(-hnu/kT)
-    gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell) * &
-    		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
-    !2hnu3/c2 = 2hc/lambda3
-    twohnu3_c2k(:) = twohc / NLTEspec%lambda(Nblue:Nred)**(3d0)
-    
-    weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
-    ! alpha_nu * 4pi / h / n_rayons * dnu / nu = domega dnu/hnu alpha_nu
-
-    !explicit do loop
-    do l=1,cont%Nlambda
-     !!atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + 0d0
-     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + twohnu3_c2k(l)*gijk(l)*weight(l)
-    enddo
-    
-    deallocate(twohnu3_c2k, weight, gijk)
-   end do !over cont
-   
-   !atom => NULL()
-  !enddo !over atom
-  
- RETURN
- END SUBROUTINE FillGamma_bf_zero_radiation
  
- SUBROUTINE FillGamma_bb_zero_radiation(id, icell, atom, n_rayons, switch_to_lte)
-  integer, intent(in) :: icell, id, n_rayons
-  type (AtomType), intent(inout), pointer :: atom
-  logical, optional, intent(in) :: switch_to_lte
-  integer :: nact, kr, i, j
-  !type (AtomType), pointer :: atom
-  type (AtomicLine) :: line
-
-  if (present(switch_to_lte)) then
-   if (switch_to_lte) RETURN !Gamma initialized to Cul
-  end if
-  
-  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
-  
-   !atom => atmos%ActiveAtoms(nact)%ptr_atom
-
-   do kr=1,atom%Nline
-    line = atom%lines(kr)
-    i = line%i; j = line%j
-
-    !!atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + 0d0
-    atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%Aji !integration over domega/4PI dv phi = 1
-
-   enddo !over lines
-   !NULLIFY(atom)
-  !end do !loop over atoms    
-  
- RETURN 
- END SUBROUTINE FillGamma_bb_zero_radiation
-
-
+ !This version assumes, that the term in delta(l,l') has already been removed
  SUBROUTINE SEE_atom(id, icell,atom)
  ! --------------------------------------------------------------------!
   ! For atom atom solves for the Statistical Equilibrium Equations (SEE) 
@@ -525,15 +426,6 @@ MODULE statequil_atoms
   type(AtomType), intent(inout) :: atom
   integer :: lp, imaxpop, l
   double precision, dimension(atom%Nlevel, atom%Nlevel) :: Aij
-
-  !-> futuru, will be done in FillGamma
-   do l = 1, atom%Nlevel
-    atom%Gamma(l,l,id) = 0d0
-    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
-!!atom%Gamma(l,l,id) = sum(abs(atom%Gamma(l,:,id))) !sum over rows for this column
-   end do
-  !write(*,*) atom%ID, id, icell, maxval(atom%Gamma(:,:,id)), minval(atom%Gamma(:,:,id))
-  !write(*,*) id, icell, atom%n(:,icell)
 
   imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
   !write(*,*) "imaxpop", imaxpop, atom%n(imaxpop,icell)
@@ -688,5 +580,323 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE addtoRadiativeRates
 
+!! --> OLD VERSIONS 
+ !futur deprecation, FillGamma will direclty compute the full matrix for lines and continua
+ !using the new atom%at informations and atom%Ntr
+ SUBROUTINE fillGamma_1(id, icell, n_rayons, switch_to_lte)
+  ! ------------------------------------------------------------------------- !
+   ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
+   ! of transition from level l' to l.
+   ! At initialisation, Gamma(l',l) = C(J,I), the collisional rates from upper
+   ! level j to lower level i.
+   !
+   !
+   ! The Sum_l" represents a sommation over each column for the lth row.
+   !
+  ! ------------------------------------------------------------------------- !
+
+  integer, intent(in) :: id, n_rayons, icell !here for debug not used
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact
+  type (AtomType), pointer :: atom
+  
+  !Later I will replace by a unique function
+  do nact=1, atmos%NactiveAtoms
+   atom=>atmos%ActiveAtoms(nact)%ptr_atom
+   CALL FillGamma_bf_hjde(id, icell, atom, n_rayons, switch_to_lte)
+   CALL FillGamma_bb_hjde(id, icell, atom, n_rayons, switch_to_lte)
+   atom=>NULL()
+  enddo
+
+ RETURN
+ END SUBROUTINE fillGamma_1
+ 
+ SUBROUTINE FillGamma_bb_hjde(id, icell, atom, n_rayons, switch_to_lte)
+ !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-dtau) + Psi * eta
+ ! "Hogereijde-like"
+  integer, intent(in) :: icell, id, n_rayons !icell is not need, except if we introduce Xcoupling terms here
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j, Nblue, Nred, l, iray
+  !type (AtomType), pointer :: atom
+  type (AtomicLine) :: line
+  real(kind=dp), dimension(:), allocatable :: weight
+  real(kind=dp) :: factor, gij, twohnu3_c2, Vij, norm, Ieff
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) RETURN !Gamma initialized to Cul
+  end if
+
+   do kr=1,atom%Nline
+    line = atom%lines(kr)
+    i = line%i; j = line%j
+    Nblue = line%Nblue; Nred = line%Nred
+    
+    allocate(weight(line%Nlambda)); weight(:) = line_wlam(line)
+
+    twohnu3_c2 = line%Aji / line%Bji 
+
+    norm = 0d0
+    do iray=1, n_rayons
+     norm = norm + sum(line%phi(:,iray,id)*weight(:))!/n_rayons !angle and frequency integrated
+    enddo
+    !the n_rayons simplify
+    weight(:) =  weight(:) / norm! / factor
+!     write(*,*) id, j, i, maxval(weight), norm
+    
+    gij = line%Bji/line%Bij
+
+    atom%Gamma(j,i,id) = line%Aji !init
+    do iray=1, n_rayons
+     !write(*,*) "id=",id, iray, maxval(atom%eta(Nblue:Nred,iray,id))
+     do l=1,line%Nlambda
+
+      Ieff = NLTEspec%I(Nblue-1+l,iray,id)*dexp(-NLTEspec%dtau(Nblue-1+l,iray,id)) + \
+             NLTEspec%Psi(Nblue-1+l,iray,id) * atom%eta(Nblue-1+l,iray,id)
+     !write(*,*) icell, id, iray, l, Ieff(l), line%Bij, line%phi(l, iray, id), weight(l)
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*Ieff*weight(l)
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*line%Bji*Ieff
+      !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*(line%Aji+line%Bji*Ieff(l))
+ 
+      
+     enddo
+    enddo
+
+    deallocate(weight)
+   enddo !over lines
+  
+!    if (any_nan_infinity_matrix(atom%Gamma(:,:,id))>0) then
+!     write(*,*) "Error in Gamma_bb"
+!     write(*,*) atom%Gamma(:,:,id)
+!     stop
+!    end if
+ RETURN 
+ END SUBROUTINE FillGamma_bb_hjde
+ 
+ ! for that atom
+ SUBROUTINE FillGamma_bf_hjde(id, icell, atom, n_rayons, switch_to_lte)
+  integer, intent(in) :: id, n_rayons, icell
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j, Nblue, Nred, l, iray
+  !type (AtomType), pointer :: atom
+  type (AtomicContinuum) :: cont
+  real(kind=dp) :: Jnu, twohnu3_c2
+  real(kind=dp), dimension(:), allocatable :: weight, gijk
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) RETURN !Gamma initialized to Cul
+  end if
+   
+   do kr=1,atom%Ncont
+    cont = atom%continua(kr)
+    i = cont%i; j = cont%j
+    Nblue = cont%Nblue; Nred = cont%Nred
+    
+    allocate(weight(cont%Nlambda), gijk(cont%Nlambda))
+             
+    !nstar(i)/nstar(j)*exp(-hnu/kT)
+    gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell) * &
+    		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+    
+    weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
+    ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
+
+    !explicit do loop
+    do l=1,cont%Nlambda
+      twohnu3_c2 = twohc / NLTEspec%lambda(Nblue-1+l)**(3d0)
+      Jnu = 0d0
+      do iray=1,n_rayons
+       Jnu = Jnu + NLTEspec%I(Nblue-1+l,iray,id)*dexp(-NLTEspec%dtau(Nblue-1+l,iray,id)) + \
+             NLTEspec%Psi(Nblue-1+l,iray,id) * atom%eta(Nblue-1+l,iray,id)
+      enddo
+      Jnu = Jnu / n_rayons
+     !write(*,*) j, i, NLTEspec%lambda(Nblue+l-1), Jnu(l)
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu*weight(l)
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu+twohnu3_c2)*gijk(l)*weight(l)  
+     
+    enddo
+    
+    deallocate(weight, gijk)
+   end do 
+!    if (any_nan_infinity_matrix(atom%Gamma(:,:,id))>0) then
+!     write(*,*) "Error in Gamma_bf"
+!     write(*,*) atom%Gamma(:,:,id)
+!    end if
+
+  
+ RETURN
+ END SUBROUTINE FillGamma_bf_hjde
+ 
+ SUBROUTINE FillGamma_bf_zero_radiation(id, icell, atom, n_rayons, switch_to_lte)
+  integer, intent(in) :: id, n_rayons, icell
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j, Nblue, Nred, l
+  !type (AtomType), pointer :: atom
+  type (AtomicContinuum) :: cont
+  real(kind=dp), dimension(:), allocatable :: twohnu3_c2k, weight, gijk
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) RETURN !Gamma initialized to Cul
+  end if
+  
+  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
+  
+   !atom => atmos%ActiveAtoms(nact)%ptr_atom
+   
+   do kr=1,atom%Ncont
+    cont = atom%continua(kr)
+    i = cont%i; j = cont%j
+    Nblue = cont%Nblue; Nred = cont%Nred
+    
+    allocate(twohnu3_c2k(cont%Nlambda), weight(cont%Nlambda), gijk(cont%Nlambda))
+       
+    !nstar(i)/nstar(j)*exp(-hnu/kT)
+    gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell) * &
+    		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+    !2hnu3/c2 = 2hc/lambda3
+    twohnu3_c2k(:) = twohc / NLTEspec%lambda(Nblue:Nred)**(3d0)
+    
+    weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
+    ! alpha_nu * 4pi / h / n_rayons * dnu / nu = domega dnu/hnu alpha_nu
+
+    !explicit do loop
+    do l=1,cont%Nlambda
+     !!atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + 0d0
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + twohnu3_c2k(l)*gijk(l)*weight(l)
+    enddo
+    
+    deallocate(twohnu3_c2k, weight, gijk)
+   end do !over cont
+   
+   !atom => NULL()
+  !enddo !over atom
+  
+ RETURN
+ END SUBROUTINE FillGamma_bf_zero_radiation
+ 
+ SUBROUTINE FillGamma_bb_zero_radiation(id, icell, atom, n_rayons, switch_to_lte)
+  integer, intent(in) :: icell, id, n_rayons
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact, kr, i, j
+  !type (AtomType), pointer :: atom
+  type (AtomicLine) :: line
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) RETURN !Gamma initialized to Cul
+  end if
+  
+  !do nact=1,atmos%NactiveAtoms !loop over each active atoms
+  
+   !atom => atmos%ActiveAtoms(nact)%ptr_atom
+
+   do kr=1,atom%Nline
+    line = atom%lines(kr)
+    i = line%i; j = line%j
+
+    !!atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + 0d0
+    atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%Aji !integration over domega/4PI dv phi = 1
+
+   enddo !over lines
+   !NULLIFY(atom)
+  !end do !loop over atoms    
+  
+ RETURN 
+ END SUBROUTINE FillGamma_bb_zero_radiation
+
+
+ SUBROUTINE SEE_atom_1(id, icell,atom)
+ ! --------------------------------------------------------------------!
+  ! For atom atom solves for the Statistical Equilibrium Equations (SEE) 
+  !
+  ! We solve for :
+  !  Sum_l' Gamma_l'l n_l' = 0 (m^-3 s^-1)
+  !
+  ! which is equivalent in matrix notation to:
+  !
+  ! GG(l,l') dot n_l' = 0 with l' is on the columns and l on the rows
+  !
+  ! In particular for a 2-level atom the two equations are:
+  !
+  ! n1*G_11 + n2*G_21 = 0
+  ! n1*G12 + n2*G22 = 0,
+  ! with one of these equations has to be replaced by
+  ! n1 + n2 = N
+  !
+  ! For numerical stability, the row with the largest populations is 
+  ! removed (i.e., it is replaced by the mass conservation law).
+  !
+  ! This matrix Gamma for atoms (or later molecules) is compared to 
+  ! molecules A matrix in mcfost:
+  ! diag(Gamma) = -diag(A); offdiag(Gamma) = -offdiag(A)
+  ! A = transpose(Gamma)
+ ! --------------------------------------------------------------------!
+  
+  integer, intent(in) :: icell, id
+  type(AtomType), intent(inout) :: atom
+  integer :: lp, imaxpop, l
+  double precision, dimension(atom%Nlevel, atom%Nlevel) :: Aij
+
+  !-> futuru, will be done in FillGamma
+   do l = 1, atom%Nlevel
+    atom%Gamma(l,l,id) = 0d0
+    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+!!atom%Gamma(l,l,id) = sum(abs(atom%Gamma(l,:,id))) !sum over rows for this column
+   end do
+  !write(*,*) atom%ID, id, icell, maxval(atom%Gamma(:,:,id)), minval(atom%Gamma(:,:,id))
+  !write(*,*) id, icell, atom%n(:,icell)
+
+  imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
+  !write(*,*) "imaxpop", imaxpop, atom%n(imaxpop,icell)
+  atom%n(:,icell) = 0d0
+  atom%n(imaxpop,icell) = nTotal_atom(icell, atom)
+  
+  !Sum_l'_imaxpop * n_l' = N
+  atom%Gamma(:,imaxpop,id) = 1d0 !all columns of the last row for instance
+  !(G11 G21)  (n1)  (0)
+  !(       ) .(  ) =( )
+  !(1    1 )  (n2)  (N)
+  
+  !Y a peut être un transpose ici  par rapport à MCFOST, atom%Gamma.T ?
+
+  Aij = transpose(atom%Gamma(:,:,id))
+  !!Aij = atom%Gamma(:,:,id)
+  CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
+  !!atom%n(:,icell) = atom%n(:,icell) * nTotal_atom(icell, atom)
+  if (any_nan_infinity_matrix(Aij)>0) then
+    write(*,*) atom%Gamma(:,:,id)
+    write(*,*) id, icell, atom%n(:,icell)
+    stop
+  end if
+
+ RETURN
+ END SUBROUTINE SEE_atom_1
+ 
+ SUBROUTINE updatePopulations_1(id, icell)
+ ! --------------------------------------------------------------------!
+  ! Performs a solution of SEE for each atom.
+  !
+  ! to do: implements Ng's acceleration iteration. 
+ ! --------------------------------------------------------------------!
+
+  integer, intent(in) :: id, icell
+  type(AtomType), pointer :: atom
+  integer :: nat, nati, natf
+  logical :: accelerate = .false.
+  double precision :: dM
+  
+  !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
+  !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
+  nati = 1; natf = atmos%Nactiveatoms
+  do nat=nati,natf !loop over each active atoms
+   atom => atmos%ActiveAtoms(nat)%ptr_atom
+   CALL SEE_atom_1(id, icell, atom)
+   atom => NULL()
+  end do
+ 
+ RETURN
+ END SUBROUTINE updatePopulations_1
 
 END MODULE statequil_atoms
