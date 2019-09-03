@@ -37,7 +37,11 @@ MODULE broad
   !will be divided by 4PI later
  RETURN
  END SUBROUTINE Broad_Kurosawa
- 
+
+  !!!!
+  !!!! CANNOT REMOVE TRANSITIONS EVEN IF THEY DO NO CONTRIBUTE TO OPAC. BECAUSE WE NEED TO SUM OVER ALL OF THEM
+  !!!! TO COMPUTE THE CROSS-SECTIONS
+  !!!! 
  SUBROUTINE RadiativeDamping(icell, atom, kr, Grad)
  ! -------------------------------------------------------------------------- !
   ! Radiative damping of a line transition j->i,
@@ -186,7 +190,8 @@ MODULE broad
   END SELECT
 
    !write(*,*) "GvdW=", GvdW(k)
-   GvdW = GvdW * Hydrogen%n(1,icell) !ground level pops
+   GvdW = GvdW * atmos%nHtot(icell)
+   !GvdW = GvdW * Hydrogen%n(1,icell) !ground level pops
    !GvdW = GvdW * sum(Hydrogen%n(1:Hydrogen%Nlevel-1,icell)) !total nH_I pops
 
  RETURN
