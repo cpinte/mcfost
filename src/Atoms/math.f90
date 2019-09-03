@@ -1,9 +1,37 @@
 MODULE math
 
+  use mcfost_env, only : dp
+
   IMPLICIT NONE
 
 
   CONTAINS
+  
+  
+  FUNCTION overlapping_transitions(lambda, Nl, Nblue, Nl2, Nblue2) result(overlap)
+  !Find where lambda(Nblue:Nblue+Nl-1)==lambda(Nblue2:Nblue2+Nl2-1)
+  !meaning where two transitions overlap.
+  !All transitions share the same wavelength grid, so they have the same value of lambda
+  !for the same index. But they have differents Nblue, Nl
+   integer :: Nblue, Nl, Nl2, Nblue2, overlap(Nl)
+   real(kind=dp) :: lambda(:)
+   integer :: i, j 
+  
+   overlap(:) = 0
+
+   i_loop : do i=1,Nl
+    do j=1,Nl2
+     if (lambda(Nblue+i-1) == lambda(Nblue2+j-1)) then
+       overlap(i) = Nblue+i-1 !index on lambda grid
+       cycle i_loop
+     end if
+    
+    enddo
+   enddo i_loop
+  
+  RETURN
+  END FUNCTION overlapping_transitions
+  
   
    FUNCTION any_nan_infinity_matrix(y) result(val)
     double precision :: y(:,:)
