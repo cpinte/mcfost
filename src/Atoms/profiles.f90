@@ -29,9 +29,8 @@ MODULE PROFILES
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
-  character(len=20)							                :: VoigtMethod = "HUMLICEK"
   type (AtomicLine), intent(in)								:: line
-  double precision, dimension(line%Nlambda)					:: vvoigt, F, vv
+  double precision, dimension(line%Nlambda)					:: vvoigt, vv!,F
   integer, parameter										:: NvspaceMax = 101
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv, Nred, Nblue, i, j
@@ -86,7 +85,7 @@ MODULE PROFILES
 !           write(*,*) nv, "0loc=", locate(vvoigt, 0d0)
 !           write(*,*) maxval(vvoigt), vbroad
           P(:) = P(:) + &
-             Voigt(line%Nlambda, line%adamp,vvoigt(:), F, VoigtMethod) / Nvspace
+             Voigt(line%Nlambda, line%adamp,vvoigt(:)) / Nvspace
 
       end do
   else !Gaussian !only for checking
@@ -116,7 +115,6 @@ MODULE PROFILES
   double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
-  character(len=20)							                :: VoigtMethod = "HUMLICEK"
   type (AtomicLine), intent(in)								:: line
   double precision, dimension(line%Nlambda)                 :: vvoigt, vv, F, LV, vvoigt_b
   integer, parameter										:: NvspaceMax = 101, NbspaceMax=101
@@ -236,7 +234,7 @@ MODULE PROFILES
                                LARMOR * line%lambda0 * NM_TO_M / vbroad
              !The normalisation by Nzc is done when compute the strength*profiles.
              !In case of unpolarised line, Nzc = 1 and there is no need to normalised
-             LV(:) = Voigt(line%Nlambda, line%adamp,vvoigt_b,F, VoigtMethod)
+             LV(:) = Voigt(line%Nlambda, line%adamp,vvoigt_b, F)
              !qz = 1 if line%zm%q = - 1, 2 if line%zm%q=0, 3 if line%zm%q = 1
              !with negative index, qz = -line%zm%q
              SELECT CASE (line%zm%q(nc))
