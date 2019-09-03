@@ -37,6 +37,7 @@ MODULE constant
   double precision, parameter ::  JOULE_TO_CM1=5.040963080525957d+22
   double precision, parameter ::  G_TO_KG=1.0d-03
   double precision, parameter ::  MICRON_TO_NM=1.0d+03
+
   
   ! ------- Useful RT constants --------- !
   real(kind=dp), parameter :: sigma_e = 8.0*PI/3.0 * (Q_ELECTRON/(dsqrt(4.0*PI*EPSILON_0) *&
