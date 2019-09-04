@@ -523,7 +523,7 @@ MODULE AtomicTransfer
   end if
   if (lcontrib_function) then !sum over pix
       NLTEspec%Ksi(:,:,ibin,iaz) =  NLTEspec%Ksi(:,:,ibin,iaz) + S_contrib2(:,:) * normF
- end if
+  end if
     
 
   RETURN
@@ -882,6 +882,7 @@ MODULE AtomicTransfer
   if (lcontrib_function) then 
    !!CALL compute_contribution_function()
    CALL WRITE_CNTRB_FUNC_pix()
+   S_contrib(:,:,:,:) = 0d0; S_contrib2(:,:) = 0d0
    deallocate(S_contrib, chil, Sl, S_contrib2)!, taur, taur2)
   end if
  ! ------------------------------------------------------------------------------------ !
@@ -1494,7 +1495,7 @@ MODULE AtomicTransfer
 
   NLTEspec%I(:,iray,id) = 0d0
   NLTEspec%Ic(:,iray,id) = 0d0
-  Istar(:) = 0d0 !only once per call of intteg_ray_line, as touching star kills the propagation
+  Istar(:) = 0d0 !only once per call of integ_ray_line, as touching star kills the propagation
 
   S_contrib(:,:,iray,id) = 0d0 !global
   !taur(:,iray,id) = 0d0 !global
@@ -1542,6 +1543,7 @@ MODULE AtomicTransfer
 
     !count opacity only if the cell is filled, else go to next cell
     if (lcellule_non_vide) then
+    
      lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
      ! opacities in m^-1
      l_contrib = l_contrib * AU_to_m !l_contrib in AU
@@ -1616,7 +1618,7 @@ MODULE AtomicTransfer
      !! which one should be used, as CF, is the integrand of the RTE, thus tau (or tau+dtau).
 
 
-      S_contrib(icell,:,iray,id) = (chil(:) * NLTEspec%Ic(:,iray,id) - Sl(:)) * dexp(-tau) / (tiny_dp + chi_I)
+      S_contrib(icell,:,iray,id) = (chil(:) * NLTEspec%Ic(:,iray,id) - Sl(:)) * dexp(-tau-dtau) / (tiny_dp + chi_I)
 
       !S_contrib(2,icell,:,iray,id) = dexp(-tau) * Sl(:)/(tiny_dp + chi_I(:)) * (1.0_dp - dexp(-dtau))
       
