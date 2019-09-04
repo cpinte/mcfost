@@ -49,7 +49,7 @@ MODULE AtomicTransfer
  IMPLICIT NONE
  
  PROCEDURE(INTEG_RAY_LINE_I), pointer :: INTEG_RAY_LINE => NULL()
-
+ real(kind=dp), dimension(:,:), allocatable :: QUV
  real(kind=dp), allocatable :: S_contrib(:,:,:,:), S_contrib2(:,:), chil(:), Sl(:)!, taur(:,:,:), taur2(:)
 
  CONTAINS
@@ -391,10 +391,9 @@ MODULE AtomicTransfer
    double precision, intent(in) :: pixelsize,u,v,w
    integer, parameter :: maxSubPixels = 32
    double precision :: x0,y0,z0,u0,v0,w0
-   double precision, dimension(NLTEspec%Nwaves) :: Iold, nu, I0, I0c
-   double precision, dimension(:,:), allocatable :: QUV
+   double precision, dimension(NLTEspec%Nwaves) :: Iold, I0, I0c !, nu
    double precision, dimension(3) :: sdx, sdy
-   double precision:: npix2, diff
+   double precision:: npix2, diff, normF
    double precision, parameter :: precision = 1.e-2
    integer :: i, j, subpixels, iray, ri, zj, phik, icell, iter
    logical :: lintersect, labs
@@ -414,8 +413,7 @@ MODULE AtomicTransfer
      Iold = I0
      I0 = 0d0
      I0c = 0d0
-     if (atmos%magnetized.and. PRT_SOLUTION == "FULL_STOKES") then
-      allocate(QUV(3, NLTEspec%Nwaves))
+     if (atmos%magnetized.and. PRT_SOLUTION == "FULL_STOKES") then !move outside
       QUV(:,:) = 0d0
      endif
      if (lcontrib_function) then
@@ -449,9 +447,9 @@ MODULE AtomicTransfer
              I0 = I0 + NLTEspec%I(:,iray,id)
              I0c = I0c + NLTEspec%Ic(:,iray,id)
              if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") then
-             	QUV(3,:) = QUV(3,:) + NLTEspec%STokesV(:,iray,id)
-             	QUV(1,:) = QUV(1,:) + NLTEspec%STokesQ(:,iray,id)
-             	QUV(2,:) = QUV(2,:) + NLTEspec%STokesU(:,iray,id)
+             	QUV(3,:) = QUV(3,:) + NLTEspec%STokesV(:,iray,id) / npix2
+             	QUV(1,:) = QUV(1,:) + NLTEspec%STokesQ(:,iray,id) / npix2
+             	QUV(2,:) = QUV(2,:) + NLTEspec%STokesU(:,iray,id) / npix2
              end if
              if (lcontrib_function) then
               !taur2(:) = taur2(:) + taur(:,iray,id) / npix2
@@ -465,7 +463,6 @@ MODULE AtomicTransfer
 
      I0 = I0 / npix2
      I0c = I0c / npix2
-     if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") QUV(:,:) = QUV(:,:) / npix2
 
      if (iter < n_iter_min) then
         ! On itere par defaut
@@ -497,49 +494,38 @@ MODULE AtomicTransfer
 
   !Because unit(Bnu)=unit(I) = W/m2/Hz/sr = unit(Blambda*lambda**2/c)
   !if we want I in W/m2 --> I*nu
-  nu = 1d0 !c_light / NLTEspec%lambda * 1d9 !to get W/m2 instead of W/m2/Hz !in Hz
+  !nu = 1d0 !c_light / NLTEspec%lambda * 1d9 !to get W/m2 instead of W/m2/Hz !in Hz
+  ! --> Deprecated, convert in post processing or before adding disk, dust, molecular flux to 
+  ! atomic flux or reversed case.
+
   ! Flux out of a pixel in W/m2/Hz
-  I0 = nu * I0 * (pixelsize / (distance*pc_to_AU) )**2
-  I0c = nu * I0c * (pixelsize / (distance*pc_to_AU) )**2
-  if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") then 
-   QUV(1,:) = QUV(1,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
-   QUV(2,:) = QUV(2,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
-   QUV(3,:) = QUV(3,:) * nu * (pixelsize / (distance*pc_to_AU) )**2
-  end if
+  normF = (pixelsize / (distance*pc_to_AU) )**2
+!   I0 = nu * I0 * (pixelsize / (distance*pc_to_AU) )**2
+!   I0c = nu * I0c * (pixelsize / (distance*pc_to_AU) )**2
 
   ! adding to the total flux map.
   if (RT_line_method==1) then
-    NLTEspec%Flux(:,1,1,ibin,iaz) = NLTEspec%Flux(:,1,1,ibin,iaz) + I0
-    NLTEspec%Fluxc(:,1,1,ibin,iaz) = NLTEspec%Fluxc(:,1,1,ibin,iaz) + I0c
+    NLTEspec%Flux(:,1,1,ibin,iaz) = NLTEspec%Flux(:,1,1,ibin,iaz) + I0 * normF
+    NLTEspec%Fluxc(:,1,1,ibin,iaz) = NLTEspec%Fluxc(:,1,1,ibin,iaz) + I0c * normF
     if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") then 
-     NLTEspec%F_QUV(1,:,1,1,ibin,iaz) = NLTEspec%F_QUV(1,:,1,1,ibin,iaz)+QUV(1,:) !U
-     NLTEspec%F_QUV(2,:,1,1,ibin,iaz) = NLTEspec%F_QUV(2,:,1,1,ibin,iaz)+QUV(2,:) !Q
-     NLTEspec%F_QUV(3,:,1,1,ibin,iaz) =  NLTEspec%F_QUV(3,:,1,1,ibin,iaz)+QUV(3,:) !V
-     deallocate(QUV)
-    end if
-!     if (lcontrib_function) then
-!       !NLTEspec%taur(:,1,1,ibin,iaz) = NLTEspec%taur(:,1,1,ibin,iaz) + taur2(:)
-!       NLTEspec%Ksi(:,:,1,1,ibin,iaz) = NLTEspec%Ksi(:,:,1,1,ibin,iaz) + S_contrib2(:,:) * (pixelsize / (distance*pc_to_AU) )**2
-!               !the other numerical factors are useless
-!     end if	
-  else
-    NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = I0
-    NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = I0c
-    if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") then 
-     NLTEspec%F_QUV(1,:,ipix,jpix,ibin,iaz) = QUV(1,:) !U
-     NLTEspec%F_QUV(2,:,ipix,jpix,ibin,iaz) = QUV(2,:) !Q
-     NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) = QUV(3,:) !V
-     deallocate(QUV) !for next pix
-    end if
-!     if (lcontrib_function) then
-!       !NLTEspec%taur(:,ipix,jpix,ibin,iaz) = NLTEspec%taur(:,ipix,jpix,ibin,iaz) + taur2(:)
-!       NLTEspec%Ksi(:,:,ipix,jpix,ibin,iaz) = NLTEspec%Ksi(:,:,ipix,jpix,ibin,iaz) + S_contrib2(:,:) * (pixelsize / (distance*pc_to_AU) )**2
-!               !the other numerical factors are useless
-!     end if	
-  end if
-    if (lcontrib_function) then
-      NLTEspec%Ksi(:,:,ibin,iaz) = NLTEspec%Ksi(:,:,ibin,iaz) + S_contrib2(:,:) * (pixelsize / (distance*pc_to_AU) )**2
+     NLTEspec%F_QUV(1,:,1,1,ibin,iaz) = NLTEspec%F_QUV(1,:,1,1,ibin,iaz)+QUV(1,:) * normF !U
+     NLTEspec%F_QUV(2,:,1,1,ibin,iaz) = NLTEspec%F_QUV(2,:,1,1,ibin,iaz)+QUV(2,:) * normF !Q
+     NLTEspec%F_QUV(3,:,1,1,ibin,iaz) = NLTEspec%F_QUV(3,:,1,1,ibin,iaz)+QUV(3,:) * normF !V
     end if	
+  else
+    NLTEspec%Flux(:,ipix,jpix,ibin,iaz) = I0 * normF
+    NLTEspec%Fluxc(:,ipix,jpix,ibin,iaz) = I0c * normF
+    if (atmos%magnetized.and.PRT_SOLUTION == "FULL_STOKES") then 
+     NLTEspec%F_QUV(1,:,ipix,jpix,ibin,iaz) = QUV(1,:) * normF !U
+     NLTEspec%F_QUV(2,:,ipix,jpix,ibin,iaz) = QUV(2,:) * normF !Q
+     NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) = QUV(3,:) * normF !V
+    end if	
+  end if
+  if (lcontrib_function) then !sum over pix
+      NLTEspec%Ksi(:,:,ibin,iaz) =  NLTEspec%Ksi(:,:,ibin,iaz) + S_contrib2(:,:) * normF
+ end if
+    
+
   RETURN
   END SUBROUTINE FLUX_PIXEL_LINE
 
@@ -689,20 +675,6 @@ MODULE AtomicTransfer
      !$omp end do
      !$omp end parallel
   end if
-
-!    write(*,*) " -> Adding stellar flux" !Stellar flux by MCFOST is in W/m2 = Blambda*lambda
-! ! 									 !Divide by nu to obtain W/m2/Hz (Bnu = Blambda*c/nu**2)
-! !   !! This is slow in my implementation actually
-!   do lambda = 1, NLTEspec%Nwaves
-!    nu = c_light / NLTEspec%lambda(lambda) * 1d9 !if NLTEspec%Flux in W/m2 set nu = 1d0 Hz
-!                                              !else it means that in FLUX_PIXEL_LINE, nu
-!                                              !is 1d0 (to have flux in W/m2/Hz)
-!    CALL compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
-!    NLTEspec%Flux(lambda,:,:,ibin,iaz) =  NLTEspec%Flux(lambda,:,:,ibin,iaz) +  &
-!                                          stars_map(:,:,1) / nu
-!    NLTEspec%Fluxc(lambda,:,:,ibin,iaz) = NLTEspec%Fluxc(lambda,:,:,ibin,iaz) + &
-!                                          stars_map_cont(:,:,1) / nu
-!   end do
 
  RETURN
  END SUBROUTINE EMISSION_LINE_MAP
@@ -885,6 +857,8 @@ MODULE AtomicTransfer
   if (atmos%magnetized .and. PRT_SOLUTION /= "NO_STOKES") then
    if (PRT_SOLUTION == "FIELD_FREE") PRT_SOLUTION = newPRT_SOLUTION
     CALL adjustStokesMode(PRT_SOLUTION)
+    allocate(QUV(3, NLTEspec%Nwaves))
+    QUV = 0d0
   end if
 
   write(*,*) "Computing emission flux map..."
@@ -904,6 +878,7 @@ MODULE AtomicTransfer
      end do
   end do
   CALL WRITE_FLUX()
+  if (allocated(QUV)) deallocate(QUV)
   if (lcontrib_function) then 
    !!CALL compute_contribution_function()
    CALL WRITE_CNTRB_FUNC_pix()
@@ -920,7 +895,7 @@ MODULE AtomicTransfer
  !CALL WRITEATOM() !keep C in memory for that ?
  CALL freeSpectrum() !deallocate spectral variables
  CALL free_atomic_atmos()
- NULLIFY(optical_length_tot, Profile)
+ NULLIFY(optical_length_tot, Profile, Voigt, INTEG_RAY_LINE)
 
  RETURN
  END SUBROUTINE
@@ -1435,7 +1410,6 @@ MODULE AtomicTransfer
   integer :: ns
   logical :: lintersect_spot
   
-   HC = HPLANCK * CLIGHT / KBOLTZMANN / NM_TO_M
    gamma(:) = 1d0
    !cos(theta) = dot(r,n)/module(r)/module(n)
    mu = abs(x*u + y*v + z*w)/dsqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
@@ -1463,8 +1437,8 @@ MODULE AtomicTransfer
    !2) Correct with the contrast gamma of a hotter/cooler region if any
    CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
    if (lintersect_spot) then
-     gamma(:) = (dexp(HC/NLTEspec%lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
-     			(dexp(HC/NLTEspec%lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
+     gamma(:) = (dexp(hc_k/NLTEspec%lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
+     			(dexp(hc_k/NLTEspec%lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
      !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
    end if
 
@@ -1506,7 +1480,7 @@ MODULE AtomicTransfer
   double precision :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, chir
   double precision, dimension(NLTEspec%Nwaves) :: Snu, Snu_c, etau, Istar
   double precision, dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, chi_I
-  integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, idref
+  integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star!, idref
   logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, eval_operator
 
   x1=x;y1=y;z1=z
@@ -1520,13 +1494,11 @@ MODULE AtomicTransfer
 
   NLTEspec%I(:,iray,id) = 0d0
   NLTEspec%Ic(:,iray,id) = 0d0
-  Istar(:) = 0d0
+  Istar(:) = 0d0 !only once per call of intteg_ray_line, as touching star kills the propagation
 
   S_contrib(:,:,iray,id) = 0d0 !global
   !taur(:,iray,id) = 0d0 !global
-  Sl(:) = 0d0 !local
-  chi_I(:) = 0d0 !local
-  idref = locate(NLTEspec%lambda, 500d0)
+  !idref = locate(NLTEspec%lambda, 500d0)
 
   
   ! -------------------------------------------------------------- !
@@ -1603,7 +1575,7 @@ MODULE AtomicTransfer
       Sl(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) - &
                  NLTEspec%AtomOpac%etac_nlte(:,id)
                  
-      chir = NLTEspec%AtomOpac%Kc(icell,idref,1) + NLTEspec%AtomOpac%chic_nlte(idref,id)
+      !chir = NLTEspec%AtomOpac%Kc(icell,idref,1) + NLTEspec%AtomOpac%chic_nlte(idref,id)
     
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) 
@@ -1627,7 +1599,7 @@ MODULE AtomicTransfer
                  NLTEspec%AtomOpac%eta_c(:,id) - NLTEspec%AtomOpac%etac_nlte(:,id) !) / chil(:)
                  
        !cont only
-      chir = NLTEspec%AtomOpac%chi_c(idref,id) + NLTEspec%AtomOpac%chic_nlte(idref,id)
+      !chir = NLTEspec%AtomOpac%chi_c(idref,id) + NLTEspec%AtomOpac%chic_nlte(idref,id)
       !chir = chi_I(idref)
     end if
 
@@ -1643,9 +1615,7 @@ MODULE AtomicTransfer
      !! tau after = tau(k+1) = tau(k) + dtau(k) == tau at the edge of the cell before leaving
      !! which one should be used, as CF, is the integrand of the RTE, thus tau (or tau+dtau).
 
-!---> this one is less smooth at the edge why? because of taur or chir maybe, if there is no continuum maybe.
-!     S_contrib(icell,:,iray,id) = taur(icell,iray)/(tiny_dp+chir) * (chil(:) * NLTEspec%Ic(:,iray,id) - Sl(:)) &
-!     									* dexp(-(tau+dtau)) * dlog(10d0)
+
       S_contrib(icell,:,iray,id) = (chil(:) * NLTEspec%Ic(:,iray,id) - Sl(:)) * dexp(-tau) / (tiny_dp + chi_I)
 
       !S_contrib(2,icell,:,iray,id) = dexp(-tau) * Sl(:)/(tiny_dp + chi_I(:)) * (1.0_dp - dexp(-dtau))
