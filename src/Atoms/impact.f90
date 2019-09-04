@@ -1,7 +1,7 @@
 MODULE IMPACT
 ! ------------------------------------------------------------------------------------- ! 
  ! Hydrogen Collisional excitation / ionisation.
- !Collision coefficients C(j,i) = ne * CE * gi/gj * sqrt(T) in s^-1 with 
+ ! Collision coefficients C(j,i) = ne * CE * gi/gj * sqrt(T) in s^-1 with 
  ! CE in s^-1 K^-1/2 m^3.
  !
  ! - Effective collision strength 
@@ -21,12 +21,15 @@ MODULE IMPACT
  !
  ! Other Elements
  !
- !
+ ! TODO: Integration of the cross-section itself. 
 ! ------------------------------------------------------------------------------------- !
 
- use atmos_type, only : atmos
+ use atmos_type, only : atmos, Hydrogen
+ use atom_type, only : AtomicLine, AtomicContinuum, AtomType
  use mcfost_env, only : dp
  use constant
+ use special_functions
+ use math
  
  IMPLICIT NONE
  
@@ -41,19 +44,168 @@ MODULE IMPACT
 
  !Giovanardi coefficients, Cl are for low temperature , see table 1.
  !it is Cl_1s(1,:) = 1s_2s, C0, C1, C2, C3
- real(kind=dp), Cl_1s(5, 4), Cl_2s(3, 4), Cl_2p(3,4)
- data Cl_1s(1,:) / 2.302d-1, 5.248d-6, -1.144d-10, 8.24d-16 /
+!  real(kind=dp), Cl_1s(5, 4), Cl_2s(3, 4), Cl_2p(3,4)
+!  data Cl_1s(1,:) / 2.302d-1, 5.248d-6, -1.144d-10, 8.24d-16 /
  
  
  
  CONTAINS
+
  
- CONTAINS
+ SUBROUTINE Collision_with_electrons(icell, atom, C)
+ !Landolt-Boernstein, Volume 2, Astronomy and Astrophysics,
+ !       subvolume b, Stars and Star clusters, Springer-Verlag, 98-100).
+ ! For optically forbidden transition, set correct = 0.1, not really optimal
+  integer, intent(in) :: icell
+  type(AtomType), intent(in) :: atom
+  real(kind=dp), intent(out) :: C(atom%Nlevel, atom%Nlevel)
+  integer :: i, j, kr
+  type(AtomicLine) :: line
+  type(AtomicContinuum) :: cont
+  real :: gbar_i, correct = 1.!, xions, xneutrals
+  real(kind=dp) :: C2_ions, C2_neutrals, dE, C_bf
+  logical :: forbidden
+  
+   !xions = 0.
+   !xneutrals = 0.68
+   C2_ions = 3.96d-6 !s^-1 m^3 K^3/2
+   C2_neutrals = 2.15d-6
+   C_bf = 1.55d11 ! s^-1 K^1/2 m^1
+   
+   C(:,:) = 0d0
+   
+   do i=1,atom%Nlevel !between pair of levels resulting in a b-b transition
+    do j=i+1,atom%Nlevel
+     
+      dE = (atom%E(j) - atom%E(i)) / (KBOLTZMANN * atmos%T(icell)) !Joules I hope
+     
+      !eq. 34
+      if (atom%stage(j) == atom%stage(i)) then !collisions between bound-bound transitions
+       
+       forbidden = .false.
+       correct = 1.
+       lines_loop : do kr=1, atom%Nline
+         line = atom%lines(kr)
+          if (line%i == i .and. line%j == j) then
+           forbidden = .true.
+           correct = 0.1
+           exit lines_loop
+          endif
+       enddo lines_loop
+
+       if (atom%stage(i) == 0) then !neutral
+ 
+         C(i,j) = correct * C2_neutrals * atmos%T(icell)**(-1.5) * dexp(-dE) * line%fosc * &
+                         dE**(-1.68) !power of 1+xneutrals
+       else !ions
+          C(i,j) = correct * C2_ions * atmos%T(icell)**(-1.5) * dexp(-dE) * line%fosc * dE
+       endif
+
+      endif !eq. 34
+    
+    enddo
+   enddo
+   
+   !now bound-free eq. 26
+   do kr=1,atom%Ncont !only over continua
+    cont = atom%continua(kr)
+    i = cont%i; j = cont%j
+    dE = (atom%E(j) - atom%E(i)) / (KBOLTZMANN * atmos%T(icell))
+    
+    select case (atom%stage(i))
+     case (0)
+      gbar_i = 0.1 ! stage neutral
+     case (1) 
+      gbar_i = 0.2 ! Z = 2
+     case default
+      gbar_i = 0.3 ! Z > 2
+    end select
+    
+    C(i,j) = C_bf * atmos%T(icell)**(-0.5) * cont%alpha0 * gbar_i * (dE**-1) * &
+              dexp(-dE)
+    
+   enddo
+ 
+ RETURN
+ END SUBROUTINE Collision_with_electrons
+ 
+ FUNCTION Psi_Drawin(u)
+  real(kind=dp) :: Psi_Drawin, u
+
+  Psi_Drawin = dexp(-u) / (1d0 + 2d0/u)
+  
+ RETURN
+ END FUNCTION Psi_Drawin
+
+ FUNCTION Psi_Drawin_ionisation(u)
+  real(kind=dp) :: Psi_Drawin_ionisation, u
+
+  Psi_Drawin_ionisation = (1d0 + 2d0/u) * dexp(-u)
+  Psi_drawin_ionisation = Psi_drawin_ionisation / &
+     1d0 + 2d0 * M_ELECTRON / (u * (M_ELECTRON + atomic_weights(1)*AMU))
+  
+ RETURN
+ END FUNCTION Psi_Drawin_ionisation
+ 
+ SUBROUTINE Collision_with_HI(icell, atom, C)
+  !Hubeny Mihalas, eq. 9.62 Drawin approximation
+  integer :: icell
+  type (AtomType) :: atom
+  real(kind=dp), intent(out) :: C(atom%Nlevel, atom%Nlevel)
+  type (AtomicContinuum) :: cont
+  type (AtomicLine) :: line
+  real(kind=dp) :: psi0, dE, mu, u0, C0, qij, f, psi
+  integer :: kr, i, j
+  
+  !reduce mass of the system
+  mu = atomic_weights(atom%periodic_table)*atomic_weights(1) /&
+      (atomic_weights(atom%periodic_table) + atomic_weights(1))
+  C0 = 16*PI*RBOHR**2 * (2d0 * KBOLTZMANN * atmos%T(icell) / PI / mu)**(0.5)
+  
+  do kr=1, atom%Ntr
+   
+   select case (atom%at(kr)%trtype)
+   
+    case ("ATOMIC_LINE") !collisional excitation
+     line = atom%lines(atom%at(kr)%ik)
+     i = line%i; j = line%j
+     dE = atom%E(j) - atom%E(i)
+     u0 = dE / KBOLTZMANN / atmos%T(icell)
+     f = line%fosc
+     psi = Psi_drawin(u0)
+     
+    case ("ATOMIC_CONTNUUM") !collisional ionisation
+     cont = atom%continua(atom%at(kr)%ik)
+     i = cont%i; j = cont%j
+     dE = atom%E(j) - atom%E(i)
+     f = real(i)/2. ! HERE IT IS NOT CORRECT
+     u0 = dE / KBOLTZMANN / atmos%T(icell)
+     psi = Psi_Drawin_ionisation(u0)
+    
+    case default
+     write(*,*) atom%at(kr)%trtype, " unkown!"
+     stop
+   end select
+   
+   !Drawin approx
+   qij = (E_RYDBERG/dE)**2 * f * atomic_weights(atom%periodic_table)/atomic_weights(1) * &
+     M_ELECTRON / (M_ELECTRON + AMU * atomic_weights(1)) * psi
+     
+   C(i,j) = qij
+  end do
+  
+ RETURN
+ END SUBROUTINE Collision_with_HI
+ 
+ SUBROUTINE Charge_transfer()
+ 
+ RETURN
+ END SUBROUTINE Charge_transfer 
  
  FUNCTION Collision_Hydrogen(icell) result(Cji)
   integer :: icell, i, j
-  double precision :: Cji(Hydrogen%Nlevel, Hydrogen%Nlevel)
-  double precision :: nr_ji, CI(Hydrogen%Nlevel,Hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)
+  real(kind=dp) :: Cji(Hydrogen%Nlevel, Hydrogen%Nlevel)
+  real(kind=dp) :: nr_ji, CI(Hydrogen%Nlevel,Hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)
   
    Cji(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0 
    CALL Johnson_CI(icell, CI(:,Hydrogen%Nlevel)) !bound-free i->Nlevel
@@ -83,9 +235,9 @@ MODULE IMPACT
   ! return C(i,j) with j = Nlevel (bound-free)
  ! --------------------------------------------------- !
    integer, intent(in) :: icell
-   double precision, intent(out), dimension(:) :: Cje
+   real(kind=dp), intent(out), dimension(:) :: Cje
    integer :: i, j, Nl
-   double precision :: C0, pia0sq, rn, bn, n, An, En, yn, zn, S, Bnp
+   real(kind=dp) :: C0, pia0sq, rn, bn, n, An, En, yn, zn, S, Bnp
    type (AtomType) :: atom
    
    atom = atmos%Atoms(1)%ptr_atom
@@ -97,7 +249,7 @@ MODULE IMPACT
    !Hydrogen level are ordered by n increasing, except for the continuum level
    !n = 1., but stops before Nlevel
    
-   do i=1, Nl-1 !collision from neutral states to the ground state of H+
+   do i=1, Nl-2 !collision from neutral states to the ground state of H+
     n = real(i,kind=dp)
     if (i==1) then !n=i
      rn = 0.45
@@ -143,10 +295,10 @@ MODULE IMPACT
   ! at LTE: (gi/gj * nj/ni)  = exp(-hnu/kT) )
  ! ----------------------------------------------------- !
    integer, intent(in) :: icell
-   double precision, intent(out), dimension(:,:) :: Cje
+   real(kind=dp), intent(out), dimension(:,:) :: Cje
    integer :: i, j, Nl
-   double precision :: C0, pia0sq, rn, bn, n, Ennp, y, z, S, Bnnp, En
-   double precision :: np, x, fnnp, rnnp, Annp, Gaunt_bf
+   real(kind=dp) :: C0, pia0sq, rn, bn, n, Ennp, y, z, S, Bnnp, En
+   real(kind=dp) :: np, x, fnnp, rnnp, Annp, Gaunt_bf
    type (AtomType) :: atom
    
    atom = atmos%Atoms(1)%ptr_atom
@@ -158,7 +310,7 @@ MODULE IMPACT
    !Hydrogen level are ordered by n increasing, except for the continuum level
    !n = 1., but stops before Nlevel
    
-   do i=1, Nl-1 !collision between neutral states, n to n'
+   do i=1, Nl-2 !collision between neutral states, n to n'
     n = real(i,kind=dp)
     if (i==1) then !n=i
      rn = 0.45
@@ -168,7 +320,7 @@ MODULE IMPACT
      bn = 1d0/n * (4. - 18.63/n + 36.24/n/n - 28.09/n/n/n)
     end if
     
-    do j=i+1, Nl-1
+    do j=i+1, Nl-2
      np = dble(j)!n'
      x = 1d0 - (n/np)**2 ! = Enn'/Rdybg
      !Gauntfactor * 32./3./dsqrt(3.)/pi * n/np**3 /x**3
@@ -203,7 +355,7 @@ MODULE IMPACT
  END FUNCTION ksi_johnson
  
  FUNCTION g0 (n) result(g)
-  double precision :: g, n
+  real(kind=dp) :: g, n
   
   SELECT CASE (int(n))
   CASE (1)
@@ -218,7 +370,7 @@ MODULE IMPACT
  END FUNCTION g0
  
  FUNCTION g1 (n) result(g)
-  double precision :: g, n
+  real(kind=dp) :: g, n
   
   SELECT CASE (int(n))
   CASE (1)
@@ -233,7 +385,7 @@ MODULE IMPACT
  END FUNCTION g1
  
  FUNCTION g2 (n) result(g)
-  double precision :: g, n
+  real(kind=dp) :: g, n
  
   SELECT CASE (int(n))
   CASE (1)
@@ -253,15 +405,15 @@ MODULE IMPACT
   real(kind=dp), intent(inout) :: C !to define
   
   real(kind=dp) :: gamma_1s_2s, gamma_1s_2p, Omega_2s, Omega_2p
-  real(kind=dp) :: b(8), c(6), x
-  real(kind=dp), parameter: expdE = dexp(-7.5d-1), g0 = 2d0 !g value for ground-state of Hydrogen is 2
+  real(kind=dp) :: b(8), cc(6), x, dE_kT
+  real(kind=dp), parameter :: expdE = dexp(-7.5d-1), gi = 2d0 !g value for ground-state of Hydrogen is 2
   
   if (atmos%T(icell) < 5d3 .or. atmos%T(icell) > 5d5) RETURN
   
   data b / 4.5168d-02,  2.8056d+01,  7.2945d+00, 2.4805d-01,  1.0044d-01, -1.1143d-02,  &
           -1.3432d-03,  3.7570d-04  / 
   
-  data c / 3.6177d-01,  1.3891d+00,  5.0866d-01, -3.8011d-01,  1.0158d-01, -1.0072d-02 /
+  data cc / 3.6177d-01,  1.3891d+00,  5.0866d-01, -3.8011d-01,  1.0158d-01, -1.0072d-02 /
   
   x = (KBOLTZMANN * atmos%T(icell)) / E_RYDBERG
   dE_kT = E_RYDBERG
@@ -269,7 +421,7 @@ MODULE IMPACT
   gamma_1s_2s = b(1) * log(b(2)*x) * dexp(-b(3)*x) + b(4) + b(5)*x + b(6)*x*x * &
   				b(7)*x*x*x + b(8)*x*x*x*x
   				 !c0   !c1*x     !c2*x**3   !c3*x**3      !c4*x**4        !c5*x**5
-  gamma_1s_2p = c(1) + c(2)*x + c(3)*x*x + c(4)*x*x*x + c(5)*x*x*x*x + c(6)*x*x*x*x*x
+  gamma_1s_2p = cc(1) + cc(2)*x + cc(3)*x*x + cc(4)*x*x*x + cc(5)*x*x*x*x + cc(6)*x*x*x*x*x
  
   Omega_2s = 8.63d-6 * gamma_1s_2s * expdE / gi / dsqrt(atmos%T(icell))
   Omega_2p = 8.63d-6 * gamma_1s_2p * expdE / gi / dsqrt(atmos%T(icell))
