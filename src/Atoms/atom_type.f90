@@ -138,6 +138,19 @@ MODULE atom_type
 
  CONTAINS
 
+ FUNCTION atomic_orbital_radius(n, l, Z)
+ !return atomic orbital radius wrt the Bohr radius
+  real(kind=dp) :: atomic_orbital_radius
+  real(kind=dp) :: n ! quantum principal number
+  integer :: l ! orbital quantum number
+  integer :: Z ! charge ?
+  
+  atomic_orbital_radius = n*n/real(Z) * (1d0 + 0.5*(1d0 - real(l)*(real(l)+1)/n/n))
+  
+  RETURN
+ END FUNCTION atomic_orbital_radius
+ 
+
  FUNCTION getOrbital(orbit) result (L)
   integer :: L
   character(len=1), intent(in) :: orbit
@@ -190,6 +203,8 @@ MODULE atom_type
 
   END FUNCTION getOrbital
 
+
+  !Not working correctly, using effective quantum Number instead. n**2 = Z**2 * Rydberg/deltaE
   FUNCTION getPrincipal(label, n) result(determined)
   ! Read principal quantum number of H I
   ! (should work on other elements)

@@ -1,4 +1,15 @@
 MODULE IMPACT
+! ----------------------------------------------------------------------
+!Note: C in Unit of number density is m^-3 and atom%Ckij and atom%C in s^-1.
+!
+!Convention: C_ij = C[i][j] represents the
+!transition j --> i = Cul
+! C_ij = C[ith ligne][jth column]
+! fortran is column row
+!     ij = (i-1)*atom%Nlevel +j : j-->i
+!     ji = (j-1)*atom%Nlevel +i : i-->j
+! ----------------------------------------------------------------------
+
 ! ------------------------------------------------------------------------------------- ! 
  ! Hydrogen Collisional excitation / ionisation.
  ! Collision coefficients C(j,i) = ne * CE * gi/gj * sqrt(T) in s^-1 with 
@@ -25,15 +36,16 @@ MODULE IMPACT
 ! ------------------------------------------------------------------------------------- !
 
  use atmos_type, only : atmos, Hydrogen
- use atom_type, only : AtomicLine, AtomicContinuum, AtomType
+ use atom_type!, only : AtomicLine, AtomicContinuum, AtomType
  use mcfost_env, only : dp
  use constant
- use special_functions
+ !!use special_functions
  use math
+ use utils, only : interp_sp
  
  IMPLICIT NONE
  
- !abscissa and weights for Gauss Laguerre integration of function int_0înf f(x)*exp(-x) dx
+ !abscissa and weights for Gauss Laguerre integration of function int_0^inf f(x)*exp(-x) dx
  real(kind=dp), dimension(8) :: x_laguerre, w_laguerre
  !integ = sum(y(x_laguerre)*w_laguerre) with y = f(x)*exp(-x)
  data x_laguerre / 0.170279632305d0,  0.903701776799d0,  2.251086629866d0,  4.266700170288d0, &
@@ -42,14 +54,37 @@ MODULE IMPACT
  data w_laguerre / 3.69188589342d-01, 4.18786780814d-01, 1.75794986637d-01, 3.33434922612d-02, & 
                    2.79453623523d-03, 9.07650877336d-05, 8.48574671627d-07, 1.04800117487d-09 /
 
- !Giovanardi coefficients, Cl are for low temperature , see table 1.
- !it is Cl_1s(1,:) = 1s_2s, C0, C1, C2, C3
-!  real(kind=dp), Cl_1s(5, 4), Cl_2s(3, 4), Cl_2p(3,4)
-!  data Cl_1s(1,:) / 2.302d-1, 5.248d-6, -1.144d-10, 8.24d-16 /
- 
+ !Impact Parameter approximation of Seaton 1962 vol 72
+ !I interpolate using its calculations, could be better to compute everything direcly
+ !but beta involves calculations of transcendental equation using modified Bessel function K1 and K0..
+ real, dimension(24) :: beta, zeta, phi
+ data beta  / 0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.4, 0.5, 0.6, 0.7, &
+              0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0 / 
+ !these are two functions of beta
+ data zeta  / 1.0, 1.015, 1.030, 1.035, 1.035, 1.025, 1.010, 0.963, 0.9, 0.829, 0.754, &
+ 			  0.68, 0.608, 0.540, 0.476, 0.418, 0.365, 0.318, 0.276, 0.239, 0.206, 0.177, 0.152, 0.130 /
+              
+ data phi  / 3.1, 2.392, 1.972, 1.674, 1.444, 1.259, 0.974, 0.766, 0.608, 0.486, 0.390, &
+ 			 0.314, 0.253, 0.2049, 0.1661, 0.1347, 0.1095, 0.0889, 0.0723, 0.0589, 0.0480, &
+ 			 0.0390, 0.0319 /
+              
  
  
  CONTAINS
+ 
+ FUNCTION Seaton_IP(Sji)
+ !
+ ! Seaton Impact Parameter approximation
+ ! eq. 17 + eq. 19 and eq. 
+ !
+  real(kind=dp) :: Seaton_IP, Sji
+  
+  Seaton_IP = 4d0 * pia0squarex2 * E_RYDBERG**2  * Sji
+  
+  RETURN
+ END FUNCTION Seaton_IP
+ 
+ !Check addition of Collision ! probably a missing factor<
 
  
  SUBROUTINE Collision_with_electrons(icell, atom, C)
@@ -59,13 +94,15 @@ MODULE IMPACT
   integer, intent(in) :: icell
   type(AtomType), intent(in) :: atom
   real(kind=dp), intent(out) :: C(atom%Nlevel, atom%Nlevel)
-  integer :: i, j, kr
+  integer :: i, j, kr, ic
   type(AtomicLine) :: line
   type(AtomicContinuum) :: cont
   real :: gbar_i, correct = 1.!, xions, xneutrals
-  real(kind=dp) :: C2_ions, C2_neutrals, dE, C_bf
+  real(kind=dp) :: C2_ions, C2_neutrals, dE, C_bf, deltam, R0, beta0, ri, rj, neff, Sji, Wi
   logical :: forbidden
   
+  
+   deltam = 1. + M_ELECTRON / (atom%weight * AMU)
    !xions = 0.
    !xneutrals = 0.68
    C2_ions = 3.96d-6 !s^-1 m^3 K^3/2
@@ -75,9 +112,10 @@ MODULE IMPACT
    C(:,:) = 0d0
    
    do i=1,atom%Nlevel !between pair of levels resulting in a b-b transition
+    Wi = atmos%T(icell) * KBOLTZMANN
     do j=i+1,atom%Nlevel
      
-      dE = (atom%E(j) - atom%E(i)) / (KBOLTZMANN * atmos%T(icell)) !Joules I hope
+      dE = (atom%E(j) - atom%E(i)) / Wi !Joules I hope
      
       !eq. 34
       if (atom%stage(j) == atom%stage(i)) then !collisions between bound-bound transitions
@@ -94,10 +132,34 @@ MODULE IMPACT
        enddo lines_loop
 
        if (atom%stage(i) == 0) then !neutral
+       
+         if (forbidden) then !Modified Van Regemorter with correct.
  
-         C(i,j) = correct * C2_neutrals * atmos%T(icell)**(-1.5) * dexp(-dE) * line%fosc * &
+            C(i,j) = correct * C2_neutrals * atmos%T(icell)**(-1.5) * dexp(-dE) * line%fosc * &
                          dE**(-1.68) !power of 1+xneutrals
-       else !ions
+         else !optically allowed: could also use Van Regemorter with correct = 1.
+            ic = locate(atom%stage*1d0, 1d0*atom%stage(i)+1d0)
+            if (ic == i) then
+             write(*,*) "Error, couldn't find continuum for level", atom%label(i)
+            end if
+            neff = (atom%stage(i)+1) * dsqrt(E_RYDBERG/deltam / (atom%E(ic)-atom%E(i)))
+            write(*,*) "(n,l,Z)", neff, atom%Lorbit(i), atom%stage(i)+1
+            ri = atomic_orbital_radius(neff, atom%Lorbit(i),atom%stage(i)+1)
+            ic = locate(atom%stage*1d0, 1d0*atom%stage(j)+1d0)
+            if (ic == j) then
+             write(*,*) "Error, couldn't find continuum for level", atom%label(j)
+            end if
+            neff = (atom%stage(j)+1) * dsqrt(E_RYDBERG/deltam / (atom%E(ic)-atom%E(j)))
+            write(*,*) "(n,l,Z)", neff, atom%Lorbit(j), atom%stage(j)+1
+            ri = atomic_orbital_radius(neff, atom%Lorbit(j),atom%stage(j)+1)
+            R0 = min(ri, rj)
+            beta0 = R0 * dsqrt(Wi*deltam/E_RYDBERG) * dE
+            write(*,*) "R0 (a0) = ", R0," beta0 = ", real(beta0), beta0
+            Sji = line%fosc*interp_sp(phi,beta, real(beta0)) / deltam / deltam / dE / Wi**2
+            C(i,j) = Seaton_IP(Sji)
+         
+         end if !forbidden neutral stage 
+       else !ions !Van Regemorter
           C(i,j) = correct * C2_ions * atmos%T(icell)**(-1.5) * dexp(-dE) * line%fosc * dE
        endif
 
@@ -107,6 +169,7 @@ MODULE IMPACT
    enddo
    
    !now bound-free eq. 26
+   !or eq. 9.60 Hubeny Mihalas
    do kr=1,atom%Ncont !only over continua
     cont = atom%continua(kr)
     i = cont%i; j = cont%j
@@ -142,7 +205,7 @@ MODULE IMPACT
 
   Psi_Drawin_ionisation = (1d0 + 2d0/u) * dexp(-u)
   Psi_drawin_ionisation = Psi_drawin_ionisation / &
-     1d0 + 2d0 * M_ELECTRON / (u * (M_ELECTRON + atomic_weights(1)*AMU))
+     1d0 + 2d0 * M_ELECTRON / (u * (M_ELECTRON + Hydrogen%weight*AMU))
   
  RETURN
  END FUNCTION Psi_Drawin_ionisation
@@ -154,14 +217,16 @@ MODULE IMPACT
   real(kind=dp), intent(out) :: C(atom%Nlevel, atom%Nlevel)
   type (AtomicContinuum) :: cont
   type (AtomicLine) :: line
-  real(kind=dp) :: psi0, dE, mu, u0, C0, qij, f, psi
+  real(kind=dp) :: psi0, dE, mu, u0, C0, qij, f, psi, deltam
   integer :: kr, i, j
   
   !reduce mass of the system
-  mu = atomic_weights(atom%periodic_table)*atomic_weights(1) /&
-      (atomic_weights(atom%periodic_table) + atomic_weights(1))
-  C0 = 16*PI*RBOHR**2 * (2d0 * KBOLTZMANN * atmos%T(icell) / PI / mu)**(0.5)
-  
+  !mu = atomic_weights(atom%periodic_table)*atomic_weights(1) /&
+  !    (atomic_weights(atom%periodic_table) + atomic_weights(1))
+  mu = atom%weight * Hydrogen%weight / (atom%weight + Hydrogen%weight)
+  deltam = 1. + M_ELECTRON/ (atom%weight * AMU) !correction to E_RYDBERG = Rinf
+  C0 = 8* pia0squarex2 * (2d0 * KBOLTZMANN * atmos%T(icell) / PI / mu)**(0.5)
+        !16 * pi * RBHOR**2
   do kr=1, atom%Ntr
    
    select case (atom%at(kr)%trtype)
@@ -188,8 +253,8 @@ MODULE IMPACT
    end select
    
    !Drawin approx
-   qij = (E_RYDBERG/dE)**2 * f * atomic_weights(atom%periodic_table)/atomic_weights(1) * &
-     M_ELECTRON / (M_ELECTRON + AMU * atomic_weights(1)) * psi
+   qij = (E_RYDBERG/deltaM/dE)**2 * f * atom%weight/Hydrogen%weight * &
+     M_ELECTRON / (M_ELECTRON + AMU * Hydrogen%weight) * psi
      
    C(i,j) = qij
   end do
@@ -197,10 +262,10 @@ MODULE IMPACT
  RETURN
  END SUBROUTINE Collision_with_HI
  
- SUBROUTINE Charge_transfer()
+ SUBROUTINE Charge_transfer_with_H()
  
  RETURN
- END SUBROUTINE Charge_transfer 
+ END SUBROUTINE Charge_transfer_with_H
  
  FUNCTION Collision_Hydrogen(icell) result(Cji)
   integer :: icell, i, j
@@ -237,13 +302,13 @@ MODULE IMPACT
    integer, intent(in) :: icell
    real(kind=dp), intent(out), dimension(:) :: Cje
    integer :: i, j, Nl
-   real(kind=dp) :: C0, pia0sq, rn, bn, n, An, En, yn, zn, S, Bnp
+   real(kind=dp) :: C0, rn, bn, n, An, En, yn, zn, S, Bnp, deltaM
    type (AtomType) :: atom
    
    atom = atmos%Atoms(1)%ptr_atom
+   deltam = 1. + M_ELECTRON/ (atom%weight * AMU)
 
    C0 = dsqrt(8.*KBOLTZMANN*atmos%T(icell) / pi / M_ELECTRON)
-   pia0sq = 2d0 * pi * RBOHR**2
    
    Nl = atom%Nlevel
    !Hydrogen level are ordered by n increasing, except for the continuum level
@@ -260,13 +325,13 @@ MODULE IMPACT
     end if
 
     ! in Joules
-    En = E_RYDBERG / n / n !energie of level with different quantum number in 13.6eV: En = 13.6/n**2
+    En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV: En = 13.6/n**2
     yn = En / KBOLTZMANN / atmos%T(icell)
     An = 32. / 3. / dsqrt(3d0) / pi * n  * (g0(n)/3. + g1(n)/4. + g2(n)/5.)
     Bnp = 2./3. * n*n * (5. + bn)
     zn = rn + yn
 
-    S = C0 * pia0sq * (n*yn)**2 * (An*(E1(yn)/yn - E1(zn)/zn) + &
+    S = C0 * pia0squarex2 * (n*yn)**2 * (An*(E1(yn)/yn - E1(zn)/zn) + &
    			(Bnp - An*log(2*n*n))*(ksi_johnson(yn)-ksi_johnson(zn)))
    	!!write(*,*) i-1, Nl-1, "S=", S, S*dexp(yn)/dsqrt(atmos%T(icell)) 
     !check that otherwise multiply by dexp(yn)
@@ -297,14 +362,14 @@ MODULE IMPACT
    integer, intent(in) :: icell
    real(kind=dp), intent(out), dimension(:,:) :: Cje
    integer :: i, j, Nl
-   real(kind=dp) :: C0, pia0sq, rn, bn, n, Ennp, y, z, S, Bnnp, En
-   real(kind=dp) :: np, x, fnnp, rnnp, Annp, Gaunt_bf
+   real(kind=dp) :: C0, rn, bn, n, Ennp, y, z, S, Bnnp, En
+   real(kind=dp) :: np, x, fnnp, rnnp, Annp, Gaunt_bf, deltam
    type (AtomType) :: atom
    
    atom = atmos%Atoms(1)%ptr_atom
+   deltam = 1. + M_ELECTRON/ (atom%weight * AMU)
 
    C0 = dsqrt(8.*KBOLTZMANN*atmos%T(icell) / pi / M_ELECTRON)
-   pia0sq = 2d0 * pi * RBOHR**2
    
    Nl = atom%Nlevel
    !Hydrogen level are ordered by n increasing, except for the continuum level
@@ -329,12 +394,12 @@ MODULE IMPACT
      rnnp = rn * x
      Annp = 2d0 * n*n*fnnp/x
     ! in Joules
-     En = E_RYDBERG / n / n !energie of level with different quantum number in 13.6eV = ionisation E of n
+     En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV = ionisation E of n
      y = x * En / KBOLTZMANN / atmos%T(icell) !x = ratio of E/En
      Bnnp = 4d0 * (n**4)/(np**3) / x / x * (1. + 4./3. /x + bn/x/x)
      z = rnnp + y
    
-     S = C0 * pia0sq * n*n*y*y/x * (Annp*((1./y + 0.5)*E1(y)-(1./z + 0.5)*E1(z))+&
+     S = C0 * pia0squarex2 * n*n*y*y/x * (Annp*((1./y + 0.5)*E1(y)-(1./z + 0.5)*E1(z))+&
      	(Bnnp-Annp*dlog(2*n*n/x))*(E2(y)/y - E2(z)/z))
      
      Cje(j,i) = S * dexp(y) * atom%g(i)/atom%g(j)
@@ -415,7 +480,7 @@ MODULE IMPACT
   
   data cc / 3.6177d-01,  1.3891d+00,  5.0866d-01, -3.8011d-01,  1.0158d-01, -1.0072d-02 /
   
-  x = (KBOLTZMANN * atmos%T(icell)) / E_RYDBERG
+  x = (KBOLTZMANN * atmos%T(icell)) / E_RYDBERG / (1d0 + M_ELECTRON/hydrogen%weight*AMU)
   dE_kT = E_RYDBERG
   !natural log
   gamma_1s_2s = b(1) * log(b(2)*x) * dexp(-b(3)*x) + b(4) + b(5)*x + b(6)*x*x * &
@@ -430,7 +495,10 @@ MODULE IMPACT
  RETURN
  END SUBROUTINE Scholz_et_al
  
- 
+  !Giovanardi coefficients, Cl are for low temperature , see table 1.
+ !it is Cl_1s(1,:) = 1s_2s, C0, C1, C2, C3
+!  real(kind=dp), Cl_1s(5, 4), Cl_2s(3, 4), Cl_2p(3,4)
+!  data Cl_1s(1,:) / 2.302d-1, 5.248d-6, -1.144d-10, 8.24d-16 /
  
  SUBROUTINE Giovanardi_et_al()
   

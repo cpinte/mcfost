@@ -25,7 +25,7 @@ MODULE constant
   double precision, parameter ::  EV =1.60217733d-19 ! One electronVolt [J]
   double precision, parameter ::  THETA0 =5.03974756d+3!log10(e) * eV/k [K^-1]
   double precision, parameter ::  ABARH=7.42d-41 !polarizabilty of Hydrogen in [Fm^2]
-
+  real(kind=dp), parameter    ::  pia0squarex2 = PI * 2d0 * RBOHR**2 !constant for collision Cross-sections
 
  ! --- Unit conversions ---
 
