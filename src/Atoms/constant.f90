@@ -48,10 +48,14 @@ MODULE constant
   real(kind=dp), parameter    :: twohc = (2.*HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
   real(kind=dp), parameter    :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
   real(kind=dp), parameter    :: fourPI_h = fourPI / HPLANCK
-  !Photoionisation Xsection of Hydrogen
+  !Photoionisation Xsection of Hydrogen, at nu0, alpha0 = sigma0_H * g_bg(0) * neff / Z/Z
+  !Note an error in Hubeny Mihalas eq. 7.92. unit should be cm2 not cm^-2 !
   real(kind=dp), parameter    :: sigma0_H = (32d0)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
-          (HPLANCK**(3d0)) / (CLIGHT * (M_ELECTRON*Q_ELECTRON)**(2d0))
-          
+          (HPLANCK**(3d0)) / (CLIGHT * (M_ELECTRON*Q_ELECTRON)**(2d0)) ! 7.904e-22 m^2
+
+  !here I have a problem if I try to compute sigma0_H_ff using 7.100 of Hubeny Mihalas with SI units value
+  !So I Take the cgs result and turn it to SI ...
+  real(kind=dp), parameter    :: sigma0_H_ff = 3.6923284d8 * 1d-10 ! cm^5 K^1/2 Hz^3 -> m^5 K^1/2 Hz^3
           
  ! --- Mathematical constants ---
   !double precision, parameter ::  PI  =3.14159265358979

@@ -9,11 +9,11 @@
 ! Emissivities in J/s/m3/Hz/sr (eta)
 MODULE hydrogen_opacities
 
- use atom_type, only : AtomicContinuum
+ use atom_type, only : AtomicContinuum, find_continuum
  use atmos_type, only : atmos, Hydrogen, Helium
  use constant
  use spectrum_type, only : NLTEspec
- use math, only : bezier3_interp, interp2Darr, gaunt_bf, gaunt_ff
+ use math, only : bezier3_interp, interp2Darr
  
  use constantes, only : tiny_dp
  use mcfost_env, only : dp
@@ -24,87 +24,159 @@ MODULE hydrogen_opacities
 
  CONTAINS
 
-!  FUNCTION Gaunt_bf(Nl,u, n_eff) result(GII)
+ ELEMENTAL FUNCTION Gaunt_bf(u, n_eff)
+  ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
+  ! See also Menzel & Pekeris 1935
+  real(kind=dp), intent(in) :: n_eff,  u ! = n_Eff**2 * eps = hnu/Z/Z/E_RYDBERG - 1
+  real(kind=dp) :: Gaunt_bf
+  Gaunt_bf = 1d0 + 0.1728 * (n_eff**(-2./3.)) * (u+1d0)**(-2./3.) * (u-1d0) &
+             - 0.0496*(n_eff**(-4./3.)) * (u+1d0)**(-4./3.) * (u*u + 4./3. * u + 1d0)
+             
+  if (Gaunt_bf <= 0d0 .or. Gaunt_bf > 2d0) then
+   Gaunt_bf = 1d0
+  end if
+
+ RETURN
+ END FUNCTION Gaunt_bf
+ 
+!! I test the element function 
+!  FUNCTION Gaunt_bf(u, n_eff)
 !   ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
 !   ! See also Menzel & Pekeris 1935
-!   integer :: Nl
-!   double precision :: n_eff, GII(Nl)
-!   double precision :: u(Nl), n23
-! 
-!   n23 = n_eff**(-6.6666666666667d-1) !n^-2/3
-! 
-!   GII = 1.+0.1728 * n23 * (u+1)**(-6.6666666666667d-1) * &
-!       (u-1) - 0.0496*n23*n23 * (u+1)**(-4d0/3d0) * (u*u + 4./3. * u + 1) !+...
-! 
-!   if (MINVAL(GII) < 0d0) then
-!    !write(*,*) "Warning, Gaunt factor is less than 0"
-!    !write(*,*) Nl, minval(u), maxval(u), n_eff, minval(GII)
-!    GII = dabs(GII)
-!   end if
-! 
-!   if (MAXVAL(GII) > 2d0) then
-!     write(*,*) "Bound-free Gaunt factor gII = ", MAXVAL(GII)
+!   real(kind=dp) :: n_eff,  u ! = n_Eff**2 * eps = hnu/Z/Z/E_RYDBERG - 1
+!   real(kind=dp) :: Gaunt_bf
+!   Gaunt_bf = 1d0 + 0.1728 * (n_eff**(-2./3.)) * (u+1d0)**(-2./3.) * (u-1d0) &
+!              - 0.0496*(n_eff**(-4./3.)) * (u+1d0)**(-4./3.) * (u*u + 4./3. * u + 1d0)
+!              
+!   if (Gaunt_bf <= 0d0 .or. Gaunt_bf > 2d0) then
+!    write(*,*) "Bound-free Gaunt factor gII = ", gaunt_bf
+!    Gaunt_bf = 1d0
 !   end if
 ! 
 !  RETURN
 !  END FUNCTION Gaunt_bf
-! 
-!  FUNCTION Gaunt_ff(N, lambda, charge, T) result(GIII)
-!  ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
-!  !
-!  ! Note: There is a problem with this expansion at higher temperatures
-!  ! (T > 3.0E4 and longer wavelengths (lambda > 2000 nm). Set to
-!  ! 1.0 when the value goes below 1.0
-!   integer, intent(in) :: N
-!   double precision, intent(in) :: lambda(N)
-!   double precision, dimension(N) :: x, x3, y, GIII
-!   double precision :: charge, T
-! 
-!   x = ((HPLANCK * CLIGHT)/(lambda * NM_TO_M)) / &
-!        (E_RYDBERG * (charge)**(2d0))
-!   x3 = (x**(3.3333333d-1))
-!   y  = (2.0 * lambda * NM_TO_M * KBOLTZMANN*T) / &
-!        (HPLANCK*CLIGHT)
-! 
-!   gIII = 1.0 + 0.1728*x3 * (1.0 + y) - &
-!         0.0496*(x3*x3) * (1.0 + (1.0 + y)*0.33333333*y)
-! 
-!   where (GIII <= 1d0) gIII = 1.
-! 
-!   if (MAXVAL(GIII) > 2d0) write(*,*) "free-free Gaunt factor gIII = ", &
-!       MAXVAL(gIII)
-! 
-!  RETURN
-!  END FUNCTION Gaunt_ff
- FUNCTION  H_bf_Xsection(cont) result(alpha)
-  Type (AtomicContinuum) :: cont
-  real(kind=dp), dimension(cont%Nlambda) :: alpha
-  real(kind=dp) :: n_eff, g_bf(cont%Nlambda), uu(cont%Nlambda), Z, uu0(1), g_bf0(1)
+  
+
+ Elemental FUNCTION Gaunt_ff(lambda, Z, T)
+ ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
+ !
+ ! Note: There is a problem with this expansion at higher temperatures
+ ! (T > 3.0E4 and longer wavelengths (lambda > 2000 nm). Set to
+ ! 1.0 when the value goes below 1.0
+  real(kind=dp),intent(in) :: lambda, T
+  real(kind=dp) :: x, x3, y, Gaunt_ff
+  integer, intent(in) :: Z
+
+  x = ((HPLANCK * CLIGHT)/(lambda * NM_TO_M)) / &
+       (E_RYDBERG * (Z)**(2d0))
+  x3 = (x**(3.3333333d-1))
+  y  = (2.0 * lambda * NM_TO_M * KBOLTZMANN*T) / &
+       (HPLANCK*CLIGHT)
+
+  gaunt_ff = 1.0 + 0.1728*x3 * (1.0 + y) - &
+        0.0496*(x3*x3) * (1.0 + (1.0 + y)*0.33333333*y)
+
+  if (gaunt_ff <= 0d0 .or. gaunt_ff > 2d0) gaunt_ff = 1d0
+
+ RETURN
+ END FUNCTION Gaunt_ff
+
+ ELEMENTAL FUNCTION  H_bf_Xsection(cont, lambda) result(alpha) !_lambda
+  Type (AtomicContinuum), intent(in) :: cont
+  real(kind=dp), intent(in) :: lambda
+  real(kind=dp) :: n_eff, g_bf, u, Z, u0, g_bf0, alpha
+  
   
    Z = real(cont%atom%stage(cont%i) + 1,kind=dp)
-  if (cont%atom%ID == "H ") then
+   if (cont%atom%ID == "H ") then
       n_eff = dsqrt(Hydrogen%g(cont%i)/2.)  !only for Hydrogen !
-  else
+   else
      !obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
      !if (.not.obtained_n) &
         n_eff = Z*dsqrt(E_RYDBERG / (cont%atom%E(cont%j) - cont%atom%E(cont%i))) 
-  end if
-
-     uu(:) = n_eff*n_eff*HPLANCK*CLIGHT / (NM_TO_M*NLTEspec%lambda(cont%Nblue:cont%Nred)) &
-     	/ (Z*Z) / E_RYDBERG - 1.
-     uu0(1) = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * cont%lambda0) / Z / Z / E_RYDBERG - 1.
-       
-     g_bf0(:) = Gaunt_bf(1, uu0, n_eff)
+   end if
+   
+    !1d4 here to convert from cm^-2 to m^-2
+    !alpha0 = C0 * neff/Z**2 * (nu0/nu=nu0)**3 * g_bg(0) with C0 = 7.904d-18 * 1d4 m^-2
     
-     g_bf(:) = Gaunt_bf(cont%Nlambda, uu(:), n_eff)
-
-     alpha = &
-        cont%alpha0 * g_bf(:) * (NLTEspec%lambda(cont%Nblue:cont%Nred)/cont%lambda0)**3  / g_bf0(1)!m^2  
- 
+    u = n_eff**2 * HPLANCK*CLIGHT / (NM_TO_M * lambda) / Z*Z / E_RYDBERG - 1
+    u0 = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * cont%lambda0) / Z / Z / E_RYDBERG - 1.
+    
+    g_bf = Gaunt_bf(u, n_eff)
+    g_bf0 = Gaunt_bf(u0, n_eff)
+    
+    alpha = cont%alpha0 * g_bf / g_bf0 * (lambda/cont%lambda0)**3   
  
  RETURN
- END FUNCTION H_bf_Xsection
+ END FUNCTION H_bf_Xsection!_lambda
+ 
+ ELEMENTAL FUNCTION  H_ff_Xsection(Z, T, lambda) result(alpha)
+  real(kind=dp), intent(in) :: lambda, T
+  real(kind=dp) :: u,u0, nu3, alpha
+  integer, intent(in) :: Z
+  
+   nu3 = (CLIGHT / (NM_TO_M * lambda))**3
+   
+   alpha = sigma0_H_ff * real(Z) * real(Z) / nu3 * Gaunt_ff(lambda, Z, T)
+ 
+ RETURN
+ END FUNCTION H_ff_Xsection
 
+!! I test the element function
+!  FUNCTION  H_bf_Xsection(cont) result(alpha)
+!   
+!   integer :: la
+!   Type (AtomicContinuum) :: cont
+!   real(kind=dp), dimension(cont%Nlambda) :: alpha
+! 
+!   do la=1,cont%Nlambda
+!     alpha(la) = H_bf_Xsection_lambda(cont, NLTEspec%lambda(cont%Nblue+la-1))
+!   end do
+!  
+!  RETURN
+!  END FUNCTION H_bf_Xsection
+
+
+ SUBROUTINE Hydrogen_ff(icell, chi)
+ ! Hubeny & Mihalas eq. 7.100 (from cgs to SI)
+ ! takes place at LTE because it is collisional
+  integer, intent(in) :: icell
+  double precision, dimension(NLTEspec%Nwaves), intent(out) :: chi
+  double precision :: stim(NLTEspec%Nwaves), np
+
+  np = Hydrogen%n(Hydrogen%Nlevel,icell) !nH+=Nion H
+  stim = 1.-dexp(-hc_k/NLTEspec%lambda/atmos%T(icell))
+
+  chi =  H_ff_Xsection(1, atmos%T(icell), NLTEspec%lambda) / &
+    dsqrt(atmos%T(icell)) * atmos%ne(icell) * np * stim
+
+ RETURN
+ END SUBROUTINE Hydrogen_ff
+ 
+ SUBROUTINE atom_ff_transitions(cont, icell, chi)
+ ! Hubeny & Mihalas eq. 7.100 (from cgs to SI)
+ ! takes place at LTE because it is collisional
+ !should work with Hydrogen
+  integer, intent(in) :: icell
+  type (AtomicContinuum), intent(in) :: cont
+  double precision, dimension(NLTEspec%Nwaves), intent(out) :: chi
+  double precision :: stim(NLTEspec%Nwaves), nion
+  integer :: ic, Z
+
+
+  !ic = find_continuum(cont%atom, cont%i)
+  ic = cont%j
+  Z = cont%atom%stage(cont%i) + 1  
+
+  nion = cont%atom%n(ic, icell)
+  stim = 1.-dexp(-hc_k/NLTEspec%lambda/atmos%T(icell))
+
+  chi =  H_ff_Xsection(Z, atmos%T(icell), NLTEspec%lambda) / &
+    dsqrt(atmos%T(icell)) * atmos%ne(icell) * nion * stim
+
+ RETURN
+ END SUBROUTINE atom_ff_transitions
+ 
 !  SUBROUTINE Hydrogen_bf (icell, chi, eta)
 !   ! Computes LTE hydrogen bound-free opacity
 !   ! See Hubeny & Mihalas 2014, chap. 7
@@ -186,39 +258,6 @@ MODULE hydrogen_opacities
 ! 
 !  RETURN
 !  END SUBROUTINE Hydrogen_bf
-
- SUBROUTINE Hydrogen_ff(icell, chi)
- ! Hubeny & Mihalas eq. 7.100 (from cgs to SI)
- ! takes place at LTE because it is collisional
-  integer, intent(in) :: icell
-  double precision, dimension(NLTEspec%Nwaves), intent(out) :: chi
-  double precision :: gff(NLTEspec%Nwaves), hc_kla(NLTEspec%Nwaves), &
-     stim(NLTEspec%Nwaves), nu3(NLTEspec%Nwaves), np, sigma0, charge, e0cgs, KBcgs
-
-  charge = 1d0
-  ! CGS units constants
-  e0cgs = 4.80320427/(1d10) !Fr (ESU, Gaussian)
-  KBcgs = 1.3806504/(1d16) !erg/K
-  sigma0 = dsqrt(32.*PI) / (3.*dsqrt(3d0)) * &
-    ((e0cgs)**(6d0)) / (1d2*CLIGHT*1d7 * HPLANCK*dsqrt(KBcgs*&
-      (1d3*M_ELECTRON)**(3d0))) !cm^5 K^1/2 Hz^3
-  ! = 3.6923284d8 ! cm^5 K^1/2 Hz^3
-  nu3 = (NLTEspec%lambda*NM_TO_M/CLIGHT)**3 !inverse of nu3=1/nu3
-  hc_kla = (HPLANCK*CLIGHT) / (KBOLTZMANN*NM_TO_M*NLTEspec%lambda)
-
-  np = Hydrogen%n(Hydrogen%Nlevel,icell) !nH+=Nion H
-  stim = 1.-dexp(-hc_kla/atmos%T(icell))
-
-  gff = Gaunt_ff(NLTEspec%Nwaves, NLTEspec%lambda, charge, atmos%T(icell))
-
-   !write(*,*) gff
-   !1e-10 = cm5 ->m5
-  chi = 1d-10 * gff * charge*charge*sigma0 / &
-    dsqrt(atmos%T(icell)) * nu3 * atmos%ne(icell) * np * stim
-   !write(*,*) chi(k), 1d-10 * sigma0, nu3, atmos%ne(k), np(k), stim, gff
-
- RETURN
- END SUBROUTINE Hydrogen_ff
  
 !fit
  SUBROUTINE Hminus_bf(icell, chi, eta)

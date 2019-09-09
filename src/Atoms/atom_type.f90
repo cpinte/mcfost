@@ -137,6 +137,28 @@ MODULE atom_type
  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
  CONTAINS
+ 
+ !for lines only, for continuum it is simply cont%j
+ FUNCTION find_continuum(atom, l)
+  integer :: l, find_continuum
+  type (AtomType) :: atom
+  
+  find_continuum = l + 1
+  do while ((atom%stage(find_continuum) < atom%stage(l)+1).and.(find_continuum <= atom%Nlevel))
+   find_continuum = find_continuum + 1
+  end do
+  
+  if (atom%stage(find_continuum) == atom%stage(l)+1) then
+     return !continuum level reach
+ else
+     write(*,*) "Coundn't find continuum level for level ", l, find_continuum, atom%Nlevel
+     find_continuum = 0
+     return
+ end if
+  
+ RETURN
+ END FUNCTION find_continuum
+ 
 
  FUNCTION atomic_orbital_radius(n, l, Z)
  !return atomic orbital radius wrt the Bohr radius
@@ -149,6 +171,20 @@ MODULE atom_type
   
   RETURN
  END FUNCTION atomic_orbital_radius
+ 
+ FUNCTION atomic_orbital_sqradius(n, l, Z)
+ !Bates-Damguard mean suare radius 
+  real(kind=dp) :: atomic_orbital_sqradius
+  !in a0**2 units
+  real(kind=dp) :: n ! quantum principal number
+  integer :: l ! orbital quantum number
+  integer :: Z ! charge ?
+  
+  atomic_orbital_sqradius = 0.5*n*n/real(Z*Z) * (5.*n*n + 1 - 3.*real(l)*(real(l)+1))
+  
+  
+  RETURN
+ END FUNCTION atomic_orbital_sqradius
  
 
  FUNCTION getOrbital(orbit) result (L)
@@ -339,6 +375,20 @@ MODULE atom_type
    !WK = wKul**2
   RETURN
   END FUNCTION wKul
+  
+   FUNCTION atomZnumber(atom)
+   ! --------------------------------------
+   ! return the atomic number of an atom
+   ! with ID = atomID.
+   ! Hydrogen is 1
+   ! --------------------------------------
+    type (AtomType), intent(in) :: atom
+    integer :: atomZnumber
+    
+    atomZnumber = atom%periodic_table
+
+   RETURN
+   END FUNCTION atomZnumber
 
    SUBROUTINE PTrowcol(Z, row, col)
    ! ---------------------------------------------------

@@ -37,32 +37,10 @@ MODULE metal
  
  FUNCTION bound_free_Xsection(cont) result(alpha)
   type (AtomicContinuum) :: cont
-  !real(kind=dp) :: n_eff, g_bf(cont%Nlambda), uu(cont%Nlambda), Z, uu0(1), g_bf0(1)
-  real(kind=dp) :: alpha(cont%Nlambda) !note that, size(cont%alpha) /= cont%Nlambda
-  									 !one represent the wavelength tabulated and the other one
-  									 !the number of points on the total grid between Nblue and Nred
+  real(kind=dp) :: alpha(cont%Nlambda) 
   									 
-!   Z = real(cont%atom%stage(cont%i) + 1,kind=dp)
    if (cont%Hydrogenic) then !Kramer's formula with quantum mechanical correction
-     alpha = H_bf_Xsection(cont)
-!      if (cont%atom%ID == "H ") then
-!       n_eff = dsqrt(Hydrogen%g(cont%i)/2.)  !only for Hydrogen !
-!      else
-!      !obtained_n = getPrincipal(metal%label(continuum%i), n_eff)
-!      !if (.not.obtained_n) &
-!         n_eff = Z*dsqrt(E_RYDBERG / (cont%atom%E(cont%j) - cont%atom%E(cont%i))) 
-!      end if
-!      sigma0_H
-!      uu(:) = n_eff*n_eff*HPLANCK*CLIGHT / (NM_TO_M*NLTEspec%lambda(cont%Nblue:cont%Nred)) &
-!      	/ (Z*Z) / E_RYDBERG - 1.
-!      uu0(1) = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * cont%lambda0) / Z / Z / E_RYDBERG - 1.
-!        
-!      g_bf0(:) = Gaunt_bf(1, uu0, n_eff)
-!     
-!      g_bf(:) = Gaunt_bf(cont%Nlambda, uu(:), n_eff)
-! 
-!      alpha = &
-!         cont%alpha0 * g_bf(:) * (NLTEspec%lambda(cont%Nblue:cont%Nred)/cont%lambda0)**3  / g_bf0(1)!m^2
+     alpha = H_bf_Xsection(cont, NLTEspec%lambda(cont%Nblue:cont%Nred))
    else !interpolation of the read Cross-section
     !alpha = interp_dp(cont%alpha, cont%lambda, NLTEspec%lambda(cont%Nblue:cont%Nred))
     CALL bezier3_interp(size(cont%alpha), cont%lambda, cont%alpha, & !read values
@@ -105,7 +83,6 @@ MODULE metal
   ! run over all passive atoms
    metal = atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
    !if (metal%ID == "H ") CYCLE !H cont is treated in Hydrogen_bf()
-
     do kc=metal%Ntr_line+1,metal%Ntr
      kr = metal%at(kc)%ik 
     !do kr=1,metal%Ncont
@@ -558,8 +535,8 @@ MODULE metal
    !--> at this point, eta_p and chi_p are 0 because of initAtomOpac(id), therefore
    !after metal_bf they only points to continuum bound-free.
     CALL Metal_bf(id, icell) !Return if Npassive=1 and PassiveAtoms(1)==" H"
-!     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
-!     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
+!!     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+!!     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
 
    !keep pure continuum opacities now
    if (MINVAL(NLTEspec%AtomOpac%eta_p(:,id))<0 .or. &

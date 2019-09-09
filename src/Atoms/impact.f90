@@ -19,12 +19,6 @@ MODULE IMPACT
  ! 1s - 2s; 2s - 2p
  !    T. T Scholz, H.R.J Walters, P.G. Burke, and M.P. Scott 1990,
  !    MNRAS 242, 692-697
- !
- ! - Electron impact excitation rates
- !   C. Giovanardi, A. Natta, and F. Palla 1987,
- !   Astron. Astrophys. Suppl. 70, 269-280
- !   C. Giovanardi, A, and F. Palla 1989
- !   Astron. Astrophys. Suppl. 77, 157-160 
  !   
  !   and also:
  !    E.S Chang, E.H. Avrett, and R. Loeser 1991, 
@@ -42,6 +36,7 @@ MODULE IMPACT
  !!use special_functions
  use math
  use utils, only : interp_sp
+ use messages, only : error, warning
  
  IMPLICIT NONE
  
@@ -55,8 +50,6 @@ MODULE IMPACT
                    2.79453623523d-03, 9.07650877336d-05, 8.48574671627d-07, 1.04800117487d-09 /
 
  !Impact Parameter approximation of Seaton 1962 vol 72
- !I interpolate using its calculations, could be better to compute everything direcly
- !but beta involves calculations of transcendental equation using modified Bessel function K1 and K0..
  real, dimension(24) :: beta, zeta, phi
  data beta  / 0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.4, 0.5, 0.6, 0.7, &
               0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0 / 
@@ -72,20 +65,18 @@ MODULE IMPACT
  
  CONTAINS
  
- FUNCTION Seaton_IP(Sji)
- !
- ! Seaton Impact Parameter approximation
- ! eq. 17 + eq. 19 and eq. 
- !
-  real(kind=dp) :: Seaton_IP, Sji
-  
-  Seaton_IP = 4d0 * pia0squarex2 * E_RYDBERG**2  * Sji
-  
-  RETURN
- END FUNCTION Seaton_IP
- 
  !Check addition of Collision ! probably a missing factor<
+ !and the rates from j->i missing only i->j and i->ionisation (not recombination) present yet
 
+ FUNCTION collision_atom(icell, atom) result(Cji)
+  integer :: i, j, icell
+  type (AtomType) :: atom
+  real(kind=dp), dimension(atom%Nlevel, atom%Nlevel) :: Cji
+    
+   Cji(:,:) = 0d0
+ 
+ RETURN
+ END FUNCTION collision_atom
  
  SUBROUTINE Collision_with_electrons(icell, atom, C)
  !Landolt-Boernstein, Volume 2, Astronomy and Astrophysics,
@@ -98,7 +89,7 @@ MODULE IMPACT
   type(AtomicLine) :: line
   type(AtomicContinuum) :: cont
   real :: gbar_i, correct = 1.!, xions, xneutrals
-  real(kind=dp) :: C2_ions, C2_neutrals, dE, C_bf, deltam, R0, beta0, ri, rj, neff, Sji, Wi
+  real(kind=dp) :: C2_ions, C2_neutrals, dE, C_bf, deltam, R0, beta0, ri, rj, neff, Qij, Wi, Qij_strong
   logical :: forbidden
   
   
@@ -133,32 +124,41 @@ MODULE IMPACT
 
        if (atom%stage(i) == 0) then !neutral
        
-         if (forbidden) then !Modified Van Regemorter with correct.
+        if (forbidden) then !Modified Van Regemorter with correct.
  
             C(i,j) = correct * C2_neutrals * atmos%T(icell)**(-1.5) * dexp(-dE) * line%fosc * &
                          dE**(-1.68) !power of 1+xneutrals
-         else !optically allowed: could also use Van Regemorter with correct = 1.
-            ic = locate(atom%stage*1d0, 1d0*atom%stage(i)+1d0)
-            if (ic == i) then
-             write(*,*) "Error, couldn't find continuum for level", atom%label(i)
-            end if
+          else !optically allowed: could also use Van Regemorter with correct = 1.
+          ! Seaton Impact Paramater approximations !
+          ! min of (Qij_weak, Qij_strong)
+          
+            ic = find_continuum(atom, i)
+		    if (ic==0) CALL Error ("Impact")
             neff = (atom%stage(i)+1) * dsqrt(E_RYDBERG/deltam / (atom%E(ic)-atom%E(i)))
             write(*,*) "(n,l,Z)", neff, atom%Lorbit(i), atom%stage(i)+1
             ri = atomic_orbital_radius(neff, atom%Lorbit(i),atom%stage(i)+1)
-            ic = locate(atom%stage*1d0, 1d0*atom%stage(j)+1d0)
-            if (ic == j) then
-             write(*,*) "Error, couldn't find continuum for level", atom%label(j)
-            end if
+!             ic = locate(atom%stage*1d0, 1d0*atom%stage(j)+1d0)
+!             if (ic == j) then
+!              write(*,*) "Error, couldn't find continuum for level", atom%label(j)
+!             end if
+		    ic = find_continuum(atom, j)
+		    if (ic==0) CALL Error ("Impact")
             neff = (atom%stage(j)+1) * dsqrt(E_RYDBERG/deltam / (atom%E(ic)-atom%E(j)))
             write(*,*) "(n,l,Z)", neff, atom%Lorbit(j), atom%stage(j)+1
             ri = atomic_orbital_radius(neff, atom%Lorbit(j),atom%stage(j)+1)
             R0 = min(ri, rj)
+            !! or neff = min(neff_i, neff_u) and R0 = 5*neff*2 + 1 / 4.
             beta0 = R0 * dsqrt(Wi*deltam/E_RYDBERG) * dE
             write(*,*) "R0 (a0) = ", R0," beta0 = ", real(beta0), beta0
-            Sji = line%fosc*interp_sp(phi,beta, real(beta0)) / deltam / deltam / dE / Wi**2
-            C(i,j) = Seaton_IP(Sji)
+            !in the weak coupling
+            Qij = 4d0 * pia0squarex2 * E_RYDBERG**2 * &
+            	line%fosc*interp_sp(phi,beta, real(beta0)) / deltam / deltam / dE / Wi**2
+            
+            !Estimate of Qij_strong. The real calculation involved to solve for beta1 un beta1**2 * A = f(beta1)
+            Qij_Strong = 2d0 * pia0squarex2 * (E_RYDBERG/deltam)**2 * line%fosc / dE/ Wi
+            C(i,j) = min(Qij, Qij_strong)
          
-         end if !forbidden neutral stage 
+          end if !forbidden neutral stage 
        else !ions !Van Regemorter
           C(i,j) = correct * C2_ions * atmos%T(icell)**(-1.5) * dexp(-dE) * line%fosc * dE
        endif
@@ -494,16 +494,6 @@ MODULE IMPACT
    
  RETURN
  END SUBROUTINE Scholz_et_al
- 
-  !Giovanardi coefficients, Cl are for low temperature , see table 1.
- !it is Cl_1s(1,:) = 1s_2s, C0, C1, C2, C3
-!  real(kind=dp), Cl_1s(5, 4), Cl_2s(3, 4), Cl_2p(3,4)
-!  data Cl_1s(1,:) / 2.302d-1, 5.248d-6, -1.144d-10, 8.24d-16 /
- 
- SUBROUTINE Giovanardi_et_al()
-  
 
- RETURN
- END SUBROUTINE Giovanardi_et_al
 
 END MODULE IMPACT

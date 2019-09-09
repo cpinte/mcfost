@@ -13,9 +13,9 @@
 MODULE collision
  use math, only : E1, E2, bezier3_interp, SQ, CUBE, dPOW, interp1D
  use constant
- use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol
+ use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol, atomZnumber
  use readatom,only : path_to_atoms
- use atmos_type, only : atomZnumber, atmos, Hydrogen, Helium
+ use atmos_type, only : atmos, Hydrogen, Helium
  use getline
  use mcfost_env
  use messages
@@ -410,7 +410,7 @@ MODULE collision
   cup = 0.
 
   ! -- Search for element --
-  iz = atomZnumber(atom%ID)!Hydrogen 1
+  iz = atomZnumber(atom)!Hydrogen 1 !old atomID
   zz = iz
   if (iz.lt.1 .and. iz.gt.92) then
    write(*,*) "Limits of the routine in terms of ", &
@@ -537,7 +537,7 @@ MODULE collision
   type (AtomType) :: atom
   character(len=ATOM_ID_WIDTH) :: cseq
 
-  iz = atomZnumber(atom%ID)
+  iz = atomZnumber(atom)
   if (iz.lt.1 .or. iz.gt.92) then
    write(*,*) "In summers, out of bound"
   end if
