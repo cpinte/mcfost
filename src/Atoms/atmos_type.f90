@@ -6,6 +6,7 @@ MODULE atmos_type
   use constant
   use messages
   use constantes, only : tiny_dp
+
   
   !$ use omp_lib
   
@@ -13,6 +14,7 @@ MODULE atmos_type
   use mcfost_env, only : mcfost_utils ! convert from the relative location of atomic data
                                       ! to mcfost's environnement folders.
   use parametres
+  use utils, only : appel_syst
   
   IMPLICIT NONE
 
@@ -224,23 +226,31 @@ MODULE atmos_type
 
     deallocate(atom%at)
     allocate(atom%at(Nt));atom%Ntr=Nt
+
     k1=1
     do k=1,atom%Nline
+     !write(*,*) trans(k)%ik, trans(k)%trtype
      if (mask(k)) then 
       atom%at(k1) = trans(k)
+      !write(*,*) atom%at(k1)%ik, atom%at(k1)%trtype
       k1 = k1 + 1
      end if
     end do
     
     atom%Ntr_line = k1-1
     
+    k1 = atom%Ntr_line + 1
     do k=Atom%Nline+1,atom%Nline+atom%Ncont
+     !write(*,*) trans(k)%ik, trans(k)%trtype
      if (mask(k)) then 
       atom%at(k1) = trans(k)
+      !write(*,*) atom%at(k1)%ik, atom%at(k1)%trtype
       k1 = k1 + 1
      end if
     end do
-  
+    
+    !write(*,*) atom%Ntr_line, atom%Ntr, size(trans), size(atom%lines), size(atom%continua)
+   k1 = 0
   RETURN
   END SUBROUTINE realloc_transitions
   
@@ -776,28 +786,28 @@ MODULE atmos_type
     RETURN
    END FUNCTION B_project
    
-   !should be moved in Atom_type
-   FUNCTION atomZnumber(atomID) result(Z)
-   ! --------------------------------------
-   ! return the atomic number of an atom
-   ! with ID = atomID.
-   ! Hydrogen is 1
-   ! --------------------------------------
-    character(len=ATOM_ID_WIDTH) :: atomID
-    integer :: Z, i
-
-    Z = 1
-    !do i=1,Nelem
-    !  if (atmos%Elements(i)%ID.eq.atomID) then
-    !    Z = i
-    !    exit
-    !  end if
-    do while (atmos%Elements(Z)%ptr_elem%ID.ne.atomID)
-     Z=Z+1
-    end do
-
-   RETURN
-   END FUNCTION atomZnumber
+!    !!should be moved in Atom_type
+!    FUNCTION atomZnumber_old(atomID) result(Z)
+!    --------------------------------------
+!    return the atomic number of an atom
+!    with ID = atomID.
+!    Hydrogen is 1
+!    --------------------------------------
+!     character(len=ATOM_ID_WIDTH) :: atomID
+!     integer :: Z, i
+! 
+!     Z = 1
+!     do i=1,Nelem
+!      if (atmos%Elements(i)%ID.eq.atomID) then
+!        Z = i
+!        exit
+!      end if
+!     do while (atmos%Elements(Z)%ptr_elem%ID.ne.atomID)
+!      Z=Z+1
+!     end do
+! 
+!    RETURN
+!    END FUNCTION atomZnumber_old
    
   SUBROUTINE write_atmos_domain()
  ! ------------------------------------ !
@@ -910,6 +920,171 @@ MODULE atmos_type
   
   RETURN
   END SUBROUTINE writeVfield
+  
+
+  SUBROUTINE readAtmos_ascii(filename, Tshk, Oi, Oo, accretion_spots)
+  ! ------------------------------------------- !
+   ! Read from ascii file a model to be used
+   ! with the spherical grid of mcfost.
+   ! Suppose that the model read is computed on 
+   ! a predefined grid by mcfost.
+  ! ------------------------------------------- !
+   use getline
+   use constantes
+   use grid, only : cell_map
+   character(len=*), intent(in)	:: filename
+   real(kind=dp), optional :: Tshk, Oi, Oo
+   real(kind=dp) :: Tring, thetai, thetao
+   integer :: icell, Nread, syst_status, N_points, k, i, j
+   character(len=MAX_LENGTH*2) :: inputline, FormatLine, cmd
+   logical, optional :: accretion_spots
+   real :: south
+   real(kind=dp), dimension(n_cells) :: rr, zz, pp
+   logical :: is_not_dark
+   real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-8, tc, phic
+   
+   lmagnetoaccr = .not.(lstatic)
+   CALL init_atomic_atmos()
+   !For now we do not necessarily need to compute B if no polarization at all
+   atmos%magnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
+   if (atmos%magnetized) CALL init_magnetic_field()
+   
+   rho_to_nH = 1d3 /masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
+
+   
+   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
+   
+   !could add header with magnetic field and so on
+   
+   cmd = "wc -l "//trim(filename)//" > ntest.txt"
+   call appel_syst(cmd,syst_status)
+   open(unit=1,file="ntest.txt",status="old")
+   read(1,*) N_points
+   close(unit=1)
+   write(*,*) "Found ", N_points - 0, " points and grid has", n_cells, " points"
+   if (N_points /= n_cells) then
+    write(*,*) "Should read a model for the exact same grid as mcfost !"
+    stop
+   end if
+
+   open(unit=1,file=filename, status="old")
+   do i=1, n_rad
+     do j=j_start,nz !j_start = -nz in 3D
+      do k=1, n_az
+       if (j==0) then !midplane
+        icell = cell_map(i,1,k)
+       else
+         icell = cell_map(i,j,k)
+       end if
+    Nread = 0
+    if (atmos%magnetized) then
+     write(*,*) "Magnetic atmos not ready yet"
+     stop
+     CALL getnextline(1, "#", FormatLine, inputline, Nread)
+     read(inputline,*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), & 
+         atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3), &
+         atmos%Bxyz(icell,1), atmos%Bxyz(icell,2), atmos%Bxyz(icell,3), atmos%icompute_atomRT(icell)
+    else
+     CALL getnextline(1, "#", FormatLine, inputline, Nread)
+     read(inputline,*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), & 
+         atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3), atmos%icompute_atomRT(icell)
+    end if
+     end do
+    end do
+   end do
+
+   !rho -> nH
+   atmos%nHtot = atmos%nHtot * rho_to_nH
+   close(unit=1)
+   write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT>0)), " density zones"
+   write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT==0)), " transparent zones"
+   write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT<0)), " dark zones"
+
+
+   if ((present(Oi)) .and. (present(Oo))) then
+    rmi = 1d0 / sin(Oi * PI/180.)**2
+    rmo = 1d0 / sin(Oo * PI/180.)**2
+    thetai = Oi * PI/180.!asin(dsqrt(1d0/rmi))
+    thetao = Oo * PI/180 !asin(dsqrt(1d0/rmo))
+   else
+    rmi = 2d0
+    rmo = 3d0
+    thetai = asin(dsqrt(1d0/2d0))
+    thetao = asin(dsqrt(1d0/3d0))   
+   end if
+   Lr = Ggrav * etoile(1)%M * Msun_to_kg * Mdot / (etoile(1)%r*au_to_m) * (1. - 2./(rmi + rmo))   
+   
+   
+   write(*,*) "Angles at stellar surface (deg)", thetao*rad_to_deg, thetai*rad_to_deg
+   Tring = Lr / (4d0 * PI * (etoile(1)%r*au_to_m)**2 * sigma * abs(cos(thetai)-cos(thetao)))
+   Tring = Tring**0.25
+   
+   if (present(Tshk)) then 
+    if (Tshk > 0) Tring = Tshk
+   end if
+   
+  !2 is for two rings, 2Pi is dphi from 0 to 2pi / total sphere surface
+   write(*,*) "Ring T ", Tring, "K"
+   write(*,*) "Surface ", 100*(abs(cos(thetai)-cos(thetao))), "%" !couverte par les deux anneaux sur toute la sphere
+   write(*,*) "Luminosity", Lr/Lsun, "Lsun"
+   write(*,*) "Mean molecular weight", atmos%avgWeight
+
+   !Add ring
+   if (present(accretion_spots)) then
+    if (accretion_spots) then
+     etoile(1)%Nr = 2
+   	 allocate(etoile(1)%SurfB(etoile(1)%Nr))
+   	 do k=1,etoile(1)%Nr!should be 1 ring for testing
+   	    south = 1.
+    	tc = 0d0 * PI/180 !center of vector position
+    	phic = 0d0 !vector position, pointing to the center of the spot
+    	if (k==2) south = -1. !for the ring in the southern hemisphere
+    	etoile(1)%SurfB(k)%T = Tring
+        !center of the spot
+   	    etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)
+   	    etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
+   	    etoile(1)%SurfB(k)%r(3) = cos(tc)*south
+    	etoile(1)%SurfB(k)%muo = cos(thetao); etoile(1)%SurfB(k)%mui = cos(thetai)
+    	etoile(1)%SurfB(k)%phio = 2*PI; etoile(1)%SurfB(k)%phii = 0d0
+  	 end do
+    end if 
+   end if !accretion_spots 
+  
+   if (.not.lstatic) then
+    atmos%v_char = atmos%v_char + maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
+    	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
+   end if
+   
+   if (atmos%magnetized) then
+    atmos%B_char = maxval(sum(atmos%Bxyz(:,:)**2,dim=2))
+    write(*,*)  "Typical Magnetic field modulus (G)", atmos%B_char * 1d4
+   end if
+
+   !!here not used, done by model
+  !!CALL define_atomRT_domain() !can be defined earlier so that we avoid create a dark_zone array?	
+  							  !for instance, cell by cell init of icompute_atomRT, when density
+  							  !is computed
+  !but this one is needed
+   if (maxval(atmos%ne) == 0d0) atmos%calc_ne = .true.
+
+   CALL write_atmos_domain()
+   
+   if (.not.lstatic) then
+    write(*,*) "Maximum/minimum velocities in the model (km/s):"
+    write(*,*) maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
+     		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
+     		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
+   end if
+   write(*,*) "Typical velocity in the model (km/s):"
+   write(*,*) atmos%v_char/1d3
+
+   write(*,*) "Maximum/minimum Temperature in the model (K):"
+   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
+   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0)  
+stop
+  RETURN
+  END SUBROUTINE readAtmos_ascii
   
   SUBROUTINE writeAtmos_ascii()
   ! ------------------------------------- !
