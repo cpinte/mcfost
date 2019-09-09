@@ -70,7 +70,7 @@ subroutine set_default_variables()
   lcontrib_function = .false.
   lmagnetoaccr = .false.
   lpluto_file = .false.
-  lascii_pluto_file = .false.
+  lmodel_ascii = .false.
   lmagnetic_field = .true.
   lxcoupling=.false.
   ! AL-RT
@@ -694,12 +694,12 @@ subroutine initialisation_mcfost()
         allocate(density_files(n_pluto_files))
         density_files(1) = s
         i_arg = i_arg + 1
-     case("-ascii_pluto")
+     case("-model_ascii")
         i_arg = i_arg + 1
-        lascii_pluto_file = .true.
-        lpluto_file = .true.
-        lVoronoi = .true.
-        l3D = .true.
+        lmodel_ascii = .true.
+        lpluto_file = .false.
+        lVoronoi = .false.
+        !l3D = .true. !not necessarily, depends on the grid used to generate the model
         call get_command_argument(i_arg,s)
         if (s=="") call error("No filename provided for ascii Pluto file!")
         density_file = s
@@ -1175,7 +1175,7 @@ subroutine initialisation_mcfost()
 
   write(*,*) 'Input file read successfully'
 
-  if ((lascii_pluto_file.or.lpluto_file).and.(lascii_sph_file.or.lphantom_file)) then
+  if ((lmodel_ascii.or.lpluto_file).and.(lascii_sph_file.or.lphantom_file)) then
    call error("Cannot use Phantom and Pluto files at the same time presently.")
   end if
 
@@ -1485,7 +1485,7 @@ subroutine display_help()
   write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
   write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
   write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
-  write(*,*) "        : -ascii_pluto <file> : read the <file> pluto ascii file"
+  write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
   write(*,*) "        : -no_magnetic_field : Force magnetic field to be zero."
 
 

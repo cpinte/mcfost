@@ -64,9 +64,9 @@ module parametres
   logical :: ltab_wavelength_image
   !Magnetic Polarized RT equation
   character(len=20) :: prt_solution
-  ! PLUTO MHD
+  ! PLUTO / MHD / ascii_model
   integer :: n_pluto_files
-  logical :: lpluto_file, lascii_pluto_file, lmagnetic_field
+  logical :: lpluto_file, lmodel_ascii, lmagnetic_field
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
