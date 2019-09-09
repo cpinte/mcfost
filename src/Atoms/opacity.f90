@@ -205,7 +205,7 @@ MODULE Opacity
   type(AtomType), pointer :: aatom
   real(kind=dp) :: gij, twohnu3_c2, stm
   double precision, dimension(:), allocatable :: Vij, gijk, twohnu3_c2k
-  double precision, allocatable :: phiZ(:,:), psiZ(:,:)!, phi(:)
+  double precision, allocatable :: phiZ(:,:), psiZ(:,:)
   
   
   atom_loop : do nact = 1, atmos%Nactiveatoms
@@ -215,7 +215,9 @@ MODULE Opacity
    
    	tr_loop : do kr = 1, aatom%Ntr
    	
-   	    if (.not.aatom%at(kr)%lcontrib_to_opac) cycle
+   	    !!not useful now. Transition not appearing for the image are removed in aatom%at
+   	    !!and for the NLTEloop all transitions are kept ATM.
+   	    !!if (.not.aatom%at(kr)%lcontrib_to_opac) cycle
    	
         stm = 1d0 
         kc = aatom%at(kr)%ik !relative index of a transition among continua or lines

@@ -9,7 +9,8 @@ MODULE statequil_atoms
  use utils, only : GaussSlv
  use parametres
  use accelerate
- use collision, only : CollisionRate, Collision_Hydrogen
+ use collision, only : CollisionRate !future deprecation
+ use impact, only : Collision_Hydrogen
  use metal, only : bound_free_Xsection
 
  IMPLICIT NONE
