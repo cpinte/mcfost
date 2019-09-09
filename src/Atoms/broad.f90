@@ -1,15 +1,9 @@
-! Routines for line broadening, including van der Waals and
-! Stark broadening by electronic collisions.
-!
-! Adapted from RH H. Uitenbroek
-
 
 MODULE broad
 
  use constant
  use atom_type
  use atmos_type, only : atmos, Hydrogen, VBROAD_atom !, Helium !alias to ptr_atom of Helium, which might not exist
- use math, only : dpow, SQ, CUBE
  
  use messages, only : error, warning
 
@@ -38,10 +32,7 @@ MODULE broad
  RETURN
  END SUBROUTINE Broad_Kurosawa
 
-  !!!!
-  !!!! CANNOT REMOVE TRANSITIONS EVEN IF THEY DO NO CONTRIBUTE TO OPAC. BECAUSE WE NEED TO SUM OVER ALL OF THEM
-  !!!! TO COMPUTE THE CROSS-SECTIONS
-  !!!! 
+ !Building
  SUBROUTINE RadiativeDamping(icell, atom, kr, Grad)
  ! -------------------------------------------------------------------------- !
   ! Radiative damping of a line transition j->i,
@@ -131,58 +122,33 @@ MODULE broad
   i = line%i
 
   !could be nice to keep vrel35 for each atom ? as it depends only on the weight
-  if (line%vdWaals.eq."UNSOLD" .or. line%vdWaals.eq."BARKLEM") then
-   fourPIeps0 = 4.*PI*EPSILON_0
+
+  fourPIeps0 = 4.*PI*EPSILON_0
    !write(*,*) atom%weight, Helium%weight, Hydrogen%weight, atmos%Elements(2)%ptr_elem%weight
-   vrel35_He = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Helium%weight))**0.3
+  vrel35_He = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Helium%weight))**0.3
 
-   Z = atom%stage(j)+1 !remember, stage starts at 0 like in C
-   !--> voir barklem.f90, Z is not an index but a physical value
-   ! independent of the language (??)
+  Z = atom%stage(j)+1
+  ic = find_Continuum(line%atom, j)
 
-   ic = j+1 !ic is an index, the law of +1 wrt C index applies
-   do while (atom%stage(ic).lt.atom%stage(j)+1)
-    ic = ic+1
-   end do
-   !write(*,*) Z, ic
-   deltaR = SQ(E_RYDBERG/(atom%E(ic)-atom%E(j))) - SQ(E_RYDBERG/(atom%E(ic)-atom%E(i)))
-   C625 = dpow(2.5*(SQ(Q_ELECTRON)/fourPIeps0)*(ABARH/fourPIeps0) * 2.*PI*SQ(Z*RBOHR)/HPLANCK * deltaR,4d-1) !0.4
-  end if
+  deltaR = (E_RYDBERG/(atom%E(ic)-atom%E(j)))**2. - (E_RYDBERG/(atom%E(ic)-atom%E(i)))**2.
+  C625 = (2.5*((Q_ELECTRON)**2./fourPIeps0)*(ABARH/fourPIeps0) * 2.*PI*(Z*RBOHR)**2./HPLANCK * deltaR)**(4d-1)
+
 
   SELECT CASE (line%vdWaals)
   CASE ("UNSOLD")
    ! Relative velocity of radiator and perturber with Maxwellian
    ! velocity distributions
-   vrel35_H = dpow(8.*KBOLTZMANN/(PI*AMU*atom%weight) *&
-         (1.+atom%weight/Hydrogen%weight),3d-1)
-   cross = 8.08 * (line%cvdWaals(1)*vrel35_H+line%cvdWaals(3)*&
-           Helium%abund*vrel35_He)*C625
+   vrel35_H = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Hydrogen%weight))**(3d-1)
+   cross = 8.08 * (line%cvdWaals(1)*vrel35_H+line%cvdWaals(3)*Helium%abund*vrel35_He)*C625
    !write(*,*) Helium%abund, C625
-    GvdW = cross * dpow(atmos%T(icell), 3d-1)
+   GvdW = cross * atmos%T(icell)**(3d-1)
   CASE ("BARKLEM")
    write(*,*) "Warning-> vdWaals broadening following BARKLEM ",&
      "not tested yet!"
    ! UNSOLD for Helium
    cross = 8.08 * line%cvdWaals(3)*Helium%abund*vrel35_He*C625
-    GvdW = line%cvdWaals(1) * dpow(atmos%T(icell),real(1.-&
-          line%cvdWaals(2),kind=8)/2.) + cross*dpow(atmos%T(icell),3d-1)
-  CASE ("RIDDER_RENSBERGEN")
-   CALL Error("Not implemented")
-!    write(*,*) "Warning-> vdWaals broadening following ",&
-!      "RIDDER_RENSBERGEN not tested yet!"
-!   !alpha = 1.0E-8 * cvdW[0]  (Hydrogen broadening)
-!   !      = 1.0E-9 * cvdW[1]  (Helium broadening)
-!    gammaCorrH = 1d-8 * CUBE(CM_TO_M) * &
-!      dpow(1.+Hydrogen%weight/atom%weight,&
-!          real(line%cvdWaals(2),kind=8))
-!    gammaCorrHe = 1d-9 * CUBE(CM_TO_M) * &
-!      dpow(1.+Helium%weight/atom%weight, &
-!          real(line%cvdWaals(4),kind=8))
-!     GvdW = gammaCorrH*line%cvdWaals(1) * &
-!       dpow(atmos%T(icell),real(line%cvdWaals(2),kind=8)) + &
-!       gammaCorrHe*line%cvdWaals(3) * &
-!       dpow(atmos%T(icell),real(line%cvdWaals(4),kind=8)) *&
-!            Helium%abund
+    GvdW = line%cvdWaals(1) * atmos%T(icell)**(real(1.-&
+          line%cvdWaals(2),kind=8)/2.) + cross*atmos%T(icell)**(3d-1)
   CASE DEFAULT
    write(*,*) "Method for van der Waals broadening unknown"
    write(*,*) "exiting..."
@@ -201,7 +167,7 @@ MODULE broad
  ! Quadratic Stark broadening by electrons and singly charged
  ! ions.
  !
- ! Gamma = 11.37 * vrel^1/3 * C_4^2/3 * (ne + nion)
+ ! Gamma4 = 11.37 * vrel^1/3 * C_4^2/3 * (ne + nion)
  !
  ! Use estimate for C_4 from Traving.
  !
@@ -229,7 +195,7 @@ MODULE broad
   line = atom%lines(kr)
 
   if (line%cStark .lt. 0.) then
-   cStark = dabs(real(line%cStark,kind=8))
+   cStark = dabs(real(line%cStark,kind=dp))
     GStark = cStark * atmos%ne(icell)
   else
    ! Constants for relative velocity. Assume that nion = ne
@@ -237,34 +203,25 @@ MODULE broad
    ! given by AVERAGE_ATOMIC_WEIGHT
 
    C = 8. * KBOLTZMANN / (PI*AMU*atom%weight)
-   Cm = dpow(1.+atom%weight/melONamu, 1.6666667d-1) + &
-      dpow(1.+atom%weight/AVERAGE_ATOMIC_WEIGHT,1.6666667d-1)
+   Cm = (1.+atom%weight/melONamu)**(1.6666667d-1) + &
+      (1.+atom%weight/AVERAGE_ATOMIC_WEIGHT)**(1.6666667d-1)
 
    ! Find core charge Z and effective quantumer numbers neff_u
    ! and neff_l for upper and lower level
    Z = atom%stage(line%i) + 1 !physical, not index
-   ic = line%i + 1
-   do while ((atom%stage(ic).lt.atom%stage(line%i)+1).and.&
-        ic.lt.atom%Nlevel)
-    ic = ic + 1
-   end do
+   ic = find_continuum(line%atom, line%i)
    
-   if (atom%stage(ic).eq.atom%stage(line%i)) then
-    write(*,*) "(Broad.Stark) Cannot find overlying continuum for level ",&
-      line%i," of atom ",atom%ID," exiting..."
-    write(*,*) atom%stage(ic), atom%stage(line%i)
-    stop
-   end if
-   ERYDBERG = E_RYDBERG / (1.+M_ELECTRON / (atom%weight*AMU))
+   ERYDBERG = E_RYDBERG / (1.+M_ELECTRON / (atom%weight*AMU)) !corection
    neff_l = Z*dsqrt(ERYDBERG/(atom%E(ic)-atom%E(line%i)))
    neff_u = Z*dsqrt(ERYDBERG/(atom%E(ic)-atom%E(line%j)))
-   C4 = (SQ(Q_ELECTRON)/(4.*PI*EPSILON_0))*RBOHR *   &
-     (2.*PI*SQ(RBOHR)/HPLANCK) / (18.*Z*Z*Z*Z) * &
-     (SQ(neff_u*(5.0*SQ(neff_u) + 1.0)) - SQ(neff_l* &
-     (5.0*SQ(neff_l) + 1.0)))
-   cStark23 = 11.37 * dpow(line%cStark * C4,6.6666667d-1)
+   
+    C4 = ((Q_ELECTRON)**2./(4.*PI*EPSILON_0))*RBOHR *   &
+     (2.*PI*RBOHR**2./HPLANCK) / (18.*Z*Z*Z*Z) * &
+     ((neff_u*(5.0*(neff_u)**2. + 1.0))**2. - (neff_l*(5.0*(neff_l)**2. + 1.0))**2.)
+     
+    cStark23 = 11.37 * (line%cStark * C4)**(6.6666667d-1)
 
-    vrel = dpow(C*atmos%T(icell),1.6666667d-1) * Cm
+    vrel = (C*atmos%T(icell))**(1.6666667d-1) * Cm
     GStark = cStark23 * vrel * atmos%ne(icell)
   end if
 
@@ -309,9 +266,9 @@ MODULE broad
   else
    a1 = 1.
   end if
-  C = a1 * 0.6 * (n_upper*n_upper-n_lower*n_lower) * SQ(CM_TO_M)
+  C = a1 * 0.6 * (n_upper*n_upper-n_lower*n_lower) * (CM_TO_M)**2.
 
-   GStark = C*dpow(atmos%ne(icell), 2d0/3d0)
+   GStark = C*atmos%ne(icell)**(2d0/3d0)
 
  RETURN
  END SUBROUTINE StarkLinear
@@ -372,14 +329,6 @@ MODULE broad
   !write(*,*) "Grad=", line%Grad * cDop/VBROAD_atom(icell,atom), cDop/VBROAD_atom(icell,atom)
   adamp = (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
 
-  !write(*,*) "adamp (m/s) vBroad (m/s) = ", adamp*VBROAD_atom(icell,atom),VBROAD_atom(icell,atom)
-
-!     if (atom%ID == "H" .and. (atom%g(line%i)==8. .and. atom%g(line%j)==18)) then
-!      CALL Broad_Kurosawa(icell, atom, kr, adamp)
-!      write(*,*) "Kurosawa damping for Halpha=", adamp, adamp * cDop/VBROAD_atom(icell,atom), &
-!       " Ben=", (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
-!      adamp = adamp * cDop / VBROAD_atom(icell,atom)
-!     end if
 
  RETURN
  END SUBROUTINE Damping
