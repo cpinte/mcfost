@@ -489,12 +489,7 @@ contains
     if (lpluto_file) then
        write(*,*) "Performing pluto to mcfost setup..."
        !read and convert to mcfost units
-       !init StellarSpots structure
-       if (lascii_pluto_file) then 
-        CALL readAtmos_ascii(density_file,Nmod,x,y,z,h,rho,vx,vy,vz)
-       else
-        CALL  read_hdF5(pluto_file,Nmod,x,y,z,h,rho,vx,vy,vz) ! to date empty
-       end if
+        CALL read_hdF5(pluto_file,Nmod,x,y,z,h,rho,vx,vy,vz) ! to date empty
     else
      CALL error("PLUTO HDF5 file expected !")
     end if
