@@ -200,7 +200,6 @@ MODULE lte
    !$omp do
    do k=1,atmos%Nspace
     if (atmos%icompute_atomRT(k) /= 1) CYCLE
-
     if (Debeye) dEion = c2*sqrt(atmos%ne(k)/atmos%T(k))
     sum = 1.
     phik = atmos%ne(k)*phi_jl(k,1.d0,1.d0,0.d0)
