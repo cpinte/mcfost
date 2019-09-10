@@ -1067,7 +1067,8 @@ MODULE atmos_type
   !but this one is needed
    if (maxval(atmos%ne) == 0d0) atmos%calc_ne = .true.
 
-   CALL write_atmos_domain()
+  !no need if we do not the dark_zones from input file.
+   !CALL write_atmos_domain()
    
    if (.not.lstatic) then
     write(*,*) "Maximum/minimum velocities in the model (km/s):"

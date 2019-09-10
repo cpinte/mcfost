@@ -744,8 +744,10 @@ MODULE AtomicTransfer
    !CALL spherical_shells_model()
    !CALL spherical_star()
    !CALL magneto_accretion_model()
-   if (lmodel_ascii) &
+   if (lmodel_ascii) then
     CALL readAtmos_ascii(density_file, Tshk=8000d0, accretion_spots=.true.)
+    CALL writeHydrogenDensity()
+   end if
   end if
 !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -757,8 +759,8 @@ MODULE AtomicTransfer
   if (atmos%NactiveAtoms > 0) then 
    atmos%Nrays = 50 !maximum number of rays allowed
   end if
-  stop
-  
+
+ stop 
  ! ------------------------------------------------------------------------------------ !  
 !   test impacts
 !   atmos%T(1) = 2000.
