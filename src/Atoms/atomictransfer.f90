@@ -757,6 +757,8 @@ MODULE AtomicTransfer
   if (atmos%NactiveAtoms > 0) then 
    atmos%Nrays = 50 !maximum number of rays allowed
   end if
+  stop
+  
  ! ------------------------------------------------------------------------------------ !  
 !   test impacts
 !   atmos%T(1) = 2000.

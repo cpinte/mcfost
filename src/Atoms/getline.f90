@@ -9,7 +9,36 @@ MODULE getline
 
   CONTAINS
 
+  
   SUBROUTINE getnextLine(unit, commentChar, FMT, line, Nread)
+
+  !Read next line which is not a comment line nor an empty line
+  !return that line and the len of the line Nread
+
+  character(len=MAX_LENGTH), intent(out) :: line
+  character(len=1), intent(in) :: commentChar
+  integer, intent(out) :: Nread
+  integer, intent(in) :: unit
+  integer :: EOF
+  character(len=*), intent(in) :: FMT
+
+  Nread = 0
+  EOF = 0
+
+  !Is there problem here with an infiniy while ?
+  do while (EOF == 0)
+   read(unit, FMT, IOSTAT=EOF) line !'(512A)'
+   Nread = len(trim(line))
+   if ((line(1:1).eq.commentChar).or.(Nread==0)) cycle !comment or empty, go to next line
+   ! line read exit ! to process it
+   exit
+  enddo ! if EOF > 0 reaches end of file, leaving
+  
+  RETURN
+  END SUBROUTINE getnextLine
+
+!! Keep this for retrocompatibility with old subroutine using this version
+  SUBROUTINE getnextLine_old(unit, commentChar, FMT, line, Nread)
 
   !Read next line which is not a comment line nor an empty line
   !return that line and the len of the line Nread
@@ -42,7 +71,7 @@ MODULE getline
     !stop
    else
     n = 1
-    Nread = len(line)!len(trim(line))
+    Nread = len(trim(line)) !len(line)
    end if
    count = count + 1
   end do
@@ -53,29 +82,7 @@ MODULE getline
   end if
 
   RETURN
-  END SUBROUTINE getnextLine
-
-  SUBROUTINE KompressIndex (str, i, j)
-   character(len=*), intent(in) :: str
-   integer, intent(out) :: i, j
-   integer :: N, k
-   N = len(str)
-
-   do k=1,N
-    if (str(k:k).ne." ") then
-     i = k
-     exit
-    end if
-   end do
-   do k=N,1,-1
-    if (str(k:k).ne." ") then
-     j = k
-     exit
-    end if
-   end do
-
-  RETURN
-  END SUBROUTINE KompressIndex
+  END SUBROUTINE getnextLine_old
 
 
   END MODULE getline

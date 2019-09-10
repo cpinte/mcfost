@@ -936,7 +936,7 @@ MODULE atmos_type
    real(kind=dp), optional :: Tshk, Oi, Oo
    real(kind=dp) :: Tring, thetai, thetao
    integer :: icell, Nread, syst_status, N_points, k, i, j
-   character(len=MAX_LENGTH*2) :: inputline, FormatLine, cmd
+   character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
    logical, optional :: accretion_spots
    real :: south
    real(kind=dp), dimension(n_cells) :: rr, zz, pp
@@ -981,12 +981,12 @@ MODULE atmos_type
      write(*,*) "Magnetic atmos not ready yet"
      stop
      CALL getnextline(1, "#", FormatLine, inputline, Nread)
-     read(inputline,*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), & 
+     read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), & 
          atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3), &
          atmos%Bxyz(icell,1), atmos%Bxyz(icell,2), atmos%Bxyz(icell,3), atmos%icompute_atomRT(icell)
     else
-     CALL getnextline(1, "#", FormatLine, inputline, Nread)
-     read(inputline,*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), & 
+     CALL getnextLine(1, "#", FormatLine, inputline, Nread)
+     read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), & 
          atmos%Vxyz(icell,1), atmos%Vxyz(icell,2), atmos%Vxyz(icell,3), atmos%icompute_atomRT(icell)
     end if
      end do
@@ -1082,7 +1082,7 @@ MODULE atmos_type
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
    write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0)  
-stop
+
   RETURN
   END SUBROUTINE readAtmos_ascii
   

@@ -635,17 +635,16 @@ MODULE readatom
   allocate(atmos%Atoms(atmos%Natom))
 
   do nmet = 1, atmos%Natom
-   CALL getnextline(unit, COMMENT_CHAR, FormatLine, &
-     inputline, Nread)
-     
+   CALL getnextline(unit, COMMENT_CHAR, FormatLine, inputline, Nread)
+
    allocate(atmos%Atoms(nmet)%ptr_atom)
   
-   read(inputline,'(1A28, 1A7, 1A22, 1A20)') &
-        filename, actionKey, popsKey, popsFile
+   read(inputline,'(1A28, 1A7, 1A22, 1A20)') filename, actionKey, popsKey, popsFile
    !write(*,*) ".",trim(filename),"."
    !write(*,*) ".",adjustl(actionKey),"."
    !write(*,*) ".",adjustl(popsKey),"."
    !write(*,*) ".",trim(popsFile),"."
+   
    atmos%Atoms(nmet)%ptr_atom%initial_solution=adjustl(popsKey)
    atmos%Atoms(nmet)%ptr_atom%inputFile=trim(filename)
 
