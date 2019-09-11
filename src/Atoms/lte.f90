@@ -273,7 +273,7 @@ MODULE lte
 !     write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%Abund*atmos%nHtot(k)/sum
     if (atom%nstar(1,k) <= tiny_dp) then
-       write(*,*) "Warning too small ground state populations ", atom%ID, atom%nstar(i,k)
+       write(*,*) "Warning too small ground state populations ", atom%ID, atom%nstar(1,k)
        write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%ne(k)
         atom%nstar(1,k) = tiny_dp    
     end if
