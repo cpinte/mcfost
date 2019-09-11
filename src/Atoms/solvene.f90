@@ -285,8 +285,10 @@ END FUNCTION getPartitionFunctionk
 
     if (atmos%T(k) >= 20d3) then
       ZM = 2 !He
+    else if (atmos%T(k) <= 500.) then
+      ZM = 11 ! Na !trade off between higher A and lower ionpot
     else
-      ZM = 26
+      ZM = 26 ! Fe
     end if    
     !add Metal
     Uk = getPartitionFunctionk(atmos%Elements(ZM)%ptr_elem, 1, k)
