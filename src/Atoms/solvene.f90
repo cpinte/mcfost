@@ -27,11 +27,13 @@ MODULE solvene
  !use accelerate, only : initNg, freeNg, NgAcceleration
  use messages, only : Error, Warning
  use input
+ use mcfost_env, only : dp
+ use constantes, only : tiny_dp, huge_dp
  !$ use omp_lib
 
  IMPLICIT NONE
 
- double precision, parameter :: MAX_ELECTRON_ERROR=1e-6
+ real(kind=dp), parameter :: MAX_ELECTRON_ERROR=1e-6
  integer, parameter :: N_MAX_ELECTRON_ITERATIONS=50
  integer, parameter :: N_MAX_ELEMENT=26 !100 is the max
 
@@ -54,9 +56,9 @@ MODULE solvene
  ! ----------------------------------------------------------------------!
 
   integer, intent(in) :: k
-  double precision, intent(in) :: U0, U1
-  double precision :: phiH
-  double precision, intent(out) :: ne
+  real(kind=dp), intent(in) :: U0, U1
+  real(kind=dp) :: phiH
+  real(kind=dp), intent(out) :: ne
   phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ptr_elem%ionpot(1))
 
   !if no free e-, Nt = NH + NH+ with NH+=ne
@@ -77,9 +79,9 @@ MODULE solvene
  ! ----------------------------------------------------------------------!
 
   integer, intent(in) :: k
-  double precision, intent(in) :: U0, U1
-  double precision :: phiH
-  double precision, intent(out) :: ne
+  real(kind=dp), intent(in) :: U0, U1
+  real(kind=dp) :: phiH
+  real(kind=dp), intent(out) :: ne
   phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ptr_elem%ionpot(1))
 
   !if no free e-, Nt = NH + NH+ with NH+=ne
@@ -97,9 +99,9 @@ MODULE solvene
  ! ----------------------------------------------------------------------!
 
   integer, intent(in) :: k
-  double precision, intent(in) :: U0, U1, chi, A
-  double precision :: phiM, alphaM
-  double precision, intent(out) :: ne
+  real(kind=dp), intent(in) :: U0, U1, chi, A
+  real(kind=dp) :: phiM, alphaM
+  real(kind=dp), intent(out) :: ne
 
   phiM = phi_jl(k, U0, U1, chi)
   alphaM = A ! relative to H, for instance 1.-6 etc
@@ -117,7 +119,7 @@ MODULE solvene
 
   type(Element) :: elem
   integer, intent(in) :: stage, k
-  double precision :: Uk, part_func(atmos%Npf)
+  real(kind=dp) :: Uk, part_func(atmos%Npf)
   
   part_func = elem%pf(stage,:)
   Uk = Interp1D(atmos%Tpf,part_func,atmos%T(k))
@@ -139,12 +141,12 @@ END FUNCTION getPartitionFunctionk
   ! instead of LTE.
  ! ----------------------------------------------------------------------!
 
-  double precision, intent(in) :: ne
+  real(kind=dp), intent(in) :: ne
   integer, intent(in) :: k
   type (Element), intent(in), target :: Elem
   type (AtomType), pointer :: atom
-  double precision, dimension(:), intent(inout) :: fjk, dfjk
-  double precision :: Uk, Ukp1, sum1, sum2
+  real(kind=dp), dimension(:), intent(inout) :: fjk, dfjk
+  real(kind=dp) :: Uk, Ukp1, sum1, sum2
   logical :: has_nlte_pops = .false.
   integer :: nll, j, i
 
@@ -221,11 +223,12 @@ END FUNCTION getPartitionFunctionk
  ! ----------------------------------------------------------------------!
   character(len=20), optional :: ne_initial_solution
   character(len=20) :: initial
-  double precision :: error, ne_old, akj, sum, Uk, dne, Ukp1
-  double precision :: ne_oldM, UkM, PhiHmin
-!   double precision, dimension(atmos%Nspace) :: np
-  double precision, dimension(:), allocatable :: fjk, dfjk
+  real(kind=dp) :: error, ne_old, akj, sum, Uk, dne, Ukp1
+  real(kind=dp):: ne_oldM, UkM, PhiHmin
+!   real(kind=dp), dimension(atmos%Nspace) :: np
+  real(kind=dp), dimension(:), allocatable :: fjk, dfjk
   integer :: Nmaxstage=0, n, k, niter, j, ZM, id, ninit, nfini
+  integer :: unconverged_cells(nb_proc)
 
   if (.not. present(ne_initial_solution)) then
       initial="H_IONISATION"!use HIONISAtion
@@ -237,6 +240,7 @@ END FUNCTION getPartitionFunctionk
 !     end if
   end if
 
+  unconverged_cells(:) = 0
   id = 1
   do n=1,Nelem
    Nmaxstage=max(Nmaxstage,atmos%Elements(n)%ptr_elem%Nstage)
@@ -259,7 +263,7 @@ END FUNCTION getPartitionFunctionk
   !$omp default(none) &
   !$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
   !$omp private(dne, akj, id, ninit, nfini) &
-  !$omp shared(atmos, initial,Hydrogen, ZM)
+  !$omp shared(atmos, initial,Hydrogen, ZM, unconverged_cells)
   !$omp do
   do k=1,atmos%Nspace
    !$ id = omp_get_thread_num() + 1
@@ -285,7 +289,7 @@ END FUNCTION getPartitionFunctionk
 
     if (atmos%T(k) >= 20d3) then
       ZM = 2 !He
-    else if (atmos%T(k) <= 500.) then
+    else if (atmos%T(k) <= 1000d0) then
       ZM = 11 ! Na !trade off between higher A and lower ionpot
     else
       ZM = 26 ! Fe
@@ -337,14 +341,24 @@ END FUNCTION getPartitionFunctionk
 !               "dne = ",dne, " ne=",atmos%ne(k)    
     
     niter = niter + 1
-    if (dne.le.MAX_ELECTRON_ERROR) then
+    if (dne <= MAX_ELECTRON_ERROR) then
       !write(*,*) "icell=",k," T=",atmos%T(k)," ne=",atmos%ne(k)
      exit
     else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
-      CALL Warning("Electron density not converged for this cell")
-      write(*,*) "icell=",k," T=",atmos%T(k)," nH=",atmos%nHtot(k), &
-               "dne = ",dne, " ne=",atmos%ne(k)
-    end if
+      if (dne >= 1) then !shows the warning only if dne is actually greater than 1
+          CALL Warning("Electron density has not converged for this cell")
+          write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, &
+          "ne=",atmos%ne(k), "T=",atmos%T(k)," nH=",atmos%nHtot(k)
+          !set articially ne to some value ?
+          atmos%ne(k) = ne_oldM
+          write(*,*) "Setting ne to ionisation of ", atmos%elements(ZM)%ptr_elem%ID, ne_oldM
+!       else
+!           write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, &
+!           "ne=",atmos%ne(k), "T=",atmos%T(k)," nH=",atmos%nHtot(k)
+      end if
+      unconverged_cells(id) = unconverged_cells(id) + 1
+    end if !convergence test
+    
    end do !while loop
   end do !loop over spatial points
   !$omp end do
@@ -354,6 +368,14 @@ END FUNCTION getPartitionFunctionk
   
   write(*,*) "Maximum/minimum Electron density in the model (m^-3):"
   write(*,*) MAXVAL(atmos%ne),MINVAL(atmos%ne,mask=atmos%icompute_atomRT>0)
+  
+  !that's because I use the sum as a variable so the function doesn't exist.
+  do k=2, nb_proc
+   unconverged_cells(1) = unconverged_cells(1) + unconverged_cells(k)
+  end do
+  if (unconverged_cells(1) > 0) write(*,*) "Found ", unconverged_cells(1)," unconverged cells:", &
+  													real(unconverged_Cells(1))/real(atmos%Nspace)
+  
  RETURN
  END SUBROUTINE SolveElectronDensity
 
