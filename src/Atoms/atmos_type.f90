@@ -972,7 +972,8 @@ MODULE atmos_type
      do j=j_start,nz !j_start = -nz in 3D
       do k=1, n_az
        if (j==0) then !midplane
-        icell = cell_map(i,1,k)
+        !icell = cell_map(i,1,k)
+        cycle
        else
          icell = cell_map(i,j,k)
        end if
@@ -1068,7 +1069,7 @@ MODULE atmos_type
    if (maxval(atmos%ne) == 0d0) atmos%calc_ne = .true.
 
   !no need if we do not the dark_zones from input file.
-   !CALL write_atmos_domain()
+   CALL write_atmos_domain() !but for consistency with the plot functions in python
    
    if (.not.lstatic) then
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
