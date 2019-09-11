@@ -272,36 +272,44 @@ MODULE lte
 !     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
 !     write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%Abund*atmos%nHtot(k)/sum
+    if (atom%nstar(1,k) <= tiny_dp) then
+       write(*,*) "Warning too small ground state populations ", atom%ID, atom%nstar(i,k)
+       write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%ne(k)
+        atom%nstar(1,k) = tiny_dp    
+    end if
     !write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
     do i=2,atom%Nlevel !debug
       atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
       !to avoid very low populations in calculations
       !if (atom%nstar(i,k) < 1d-30) atom%nstar(i,k) = 1d-30
       !write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
+      
+      !! Assuming than atom%nstar(1,k), the ground state, cannot be lower than tiny_dp or negative.
+      !! by the way it will certainly produce error here
+      if (atom%nstar(i,k) <= tiny_dp) then
+       write(*,*) "Warning populations of atom ", atom%ID, atom%nstar(i,k), " lower than", &
+        " tiny_dp. Replacing by tiny_dp"
+       write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%ne(k)
+        atom%nstar(i,k) = tiny_dp
+      end if
     end do
+    
+    if (maxval(atom%nstar(:,k)) >= huge_dp) then
+     write(*,*) "ERROR, populations of atom larger than huge_dp"
+     write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%ne(k)
+     write(*,*) atom%nstar(:,k)
+     stop
+    end if
+    
     !faster ? 
 !    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
 	!!Incorpore Hminus
 !     if (atom%ID=="H") atmos%nHmin(k) = atmos%nHmin(k) * atom%nstar(1,k)
 
-    if (MAXVAL(atom%nstar(:,k)) <= tiny_dp .or. minval(atom%nstar(:,k)) <= tiny_dp) then !at the cell
-     write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k)
-     write(*,*) atom%nstar(:,k)
-     write(*,*) "Error, populations negative or lower than tiny dp for this atom at this cell point"
-     write(*,*) "stop!"
-     stop !beware if low T, np -> 0, check to not divide by 0 density
-    end if
    end do !over depth points
    !$omp end do
    !$omp  end parallel
 !    write(*,*) "-------------------"
-
-!    if (MAXVAL(atom%nstar) <= tiny_dp .and. atmos%lcompute_atomRT(k)) then !Total
-!      write(*,*) "cell=",k, atom%ID,atmos%lcompute_atomRT(k)
-!      write(*,*) "Error, populations negative or lower than tiny dp for this atom on the grid!"
-!      write(*,*) "Exciting..."
-!      stop !beware if low T, np -> 0, check to not divide by 0 density
-!    end if
 
   if (allocated(nDebeye)) deallocate(nDebeye)
  RETURN
