@@ -745,8 +745,10 @@ MODULE AtomicTransfer
    !CALL spherical_star()
    !CALL magneto_accretion_model()
    if (lmodel_ascii) then
-    CALL readAtmos_ascii(density_file, Tshk=8000d0, accretion_spots=.true.)
+    CALL readAtmos_ascii(density_file, Tshk=10000d0, accretion_spots=.true.,Oo=26d0, Oi=31d0)
     CALL writeHydrogenDensity()
+    !could write also T, V ect and grid domain icompute_atomRT, but present in the model.s
+    !I write the density here just to check the cell mapping.
    end if
   end if
 !! --------------------------------------------------------- !!
@@ -760,7 +762,6 @@ MODULE AtomicTransfer
    atmos%Nrays = 50 !maximum number of rays allowed
   end if
 
- stop 
  ! ------------------------------------------------------------------------------------ !  
 !   test impacts
 !   atmos%T(1) = 2000.
@@ -795,7 +796,6 @@ MODULE AtomicTransfer
 
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
 
-
  ! ------------------------------------------------------------------------------------ !
  ! ------------- INITIALIZE WAVELNGTH GRID AND BACKGROUND OPAC ------------------------ !
  ! ------------------------------------------------------------------------------------ !
@@ -809,7 +809,7 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! --------------------- ADJUST MCFOST FOR STELLAR MAP AND VELOCITY ------------------- !
   ! ----- ALLOCATE SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT ------!
-  CALL reallocate_mcfost_vars()
+  CALL reallocate_mcfost_vars() !assumes more than 1 wavelength otherwise delta_wl is 0!
   ! --- END ALLOCATING SOME MCFOST'S INTRINSIC VARIABLES NEEDED FOR AL-RT --!
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
@@ -834,7 +834,8 @@ MODULE AtomicTransfer
 
    if (lstore_opac) CALL storeBackground() !recompute background opac
    ! TO DO: add NLTE continua and LTE/NLTE lines if possible
-   CALL reallocate_mcfost_vars() !wavelength only?
+   !!CALL reallocate_mcfost_vars() !wavelength only?
+   CALL reallocate_mcfost_wavelength_arrays()
   end if
 !   write(*,*) atmos%atoms(1)%ptr_atom%lines(1)%i, atmos%atoms(1)%ptr_atom%lines(1)%j, maxval(atmos%atoms(1)%ptr_atom%continua(1)%alpha)
 !   write(*,*) atmos%passiveatoms(1)%ptr_atom%lines(1)%i, atmos%passiveatoms(1)%ptr_atom%lines(1)%j, maxval(atmos%passiveatoms(1)%ptr_atom%continua(1)%alpha)
@@ -868,7 +869,7 @@ MODULE AtomicTransfer
    INTEG_RAY_LINE => NULL()
    INTEG_RAY_LINE => INTEG_RAY_LINE_I_CNTRB
   end if
-  
+
   do ibin=1,RT_n_incl
      do iaz=1,RT_n_az
        CALL EMISSION_LINE_MAP(ibin,iaz)
@@ -1326,10 +1327,13 @@ MODULE AtomicTransfer
   if (allocated(tab_delta_lambda)) deallocate(tab_delta_lambda)
   allocate(tab_delta_lambda(n_lambda))
   tab_lambda = NLTEspec%lambda / MICRON_TO_NM
-  tab_delta_lambda(1) = 0d0
+  tab_delta_lambda(1) = 0d0! + tiny_dp !! I assume that Nwaves > 1 here
+  !!if (NLTEspec%Nwaves==1) tab_delta_lambda(1) = tab_delta_lambda(1) + tiny_dp
+
   do la=2,NLTEspec%Nwaves
    tab_delta_lambda(la) = tab_lambda(la) - tab_lambda(la-1)
   end do
+  
   if (allocated(tab_lambda_inf)) deallocate(tab_lambda_inf)
   allocate(tab_lambda_inf(n_lambda))
   if (allocated(tab_lambda_sup)) deallocate(tab_lambda_sup)
@@ -1368,12 +1372,16 @@ MODULE AtomicTransfer
   allocate(tab_delta_lambda(n_lambda))
   tab_lambda = NLTEspec%lambda / MICRON_TO_NM
   tab_delta_lambda(1) = 0d0
+
   do la=2,NLTEspec%Nwaves
    tab_delta_lambda(la) = tab_lambda(la) - tab_lambda(la-1)
   end do
   !unlikely in NLTE because of the different atomic grids
   !but if an image at only one wavelength --> tab_Delta_lambda=0
+  !!if I do not put a tiny_dp here, if only one wavelength delta_wl is 0
+  !which creates an overflow in stars.f90, because spectre and spectre0 are 0
   if (size(tab_lambda)==1) tab_delta_lambda = tab_delta_lambda + tiny_dp
+  
   if (allocated(tab_lambda_inf)) deallocate(tab_lambda_inf)
   allocate(tab_lambda_inf(n_lambda))
   if (allocated(tab_lambda_sup)) deallocate(tab_lambda_sup)
