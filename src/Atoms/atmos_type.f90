@@ -955,6 +955,8 @@ MODULE atmos_type
    write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
    
    !could add header with magnetic field and so on
+   !location of spots + lmagnetoaccretion flags if other kind of models with the use of spots
+   ! + Tschok
    
    cmd = "wc -l "//trim(filename)//" > ntest.txt"
    call appel_syst(cmd,syst_status)
