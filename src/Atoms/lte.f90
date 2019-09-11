@@ -273,7 +273,7 @@ MODULE lte
 !     write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%Abund*atmos%nHtot(k)/sum
     if (atom%nstar(1,k) <= tiny_dp) then
-       write(*,*) "Warning too small ground state populations ", atom%ID, atom%nstar(1,k)
+       write(*,*) "Warning too small ground state population ", atom%ID, atom%nstar(1,k)
        write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%ne(k)
         atom%nstar(1,k) = tiny_dp    
     end if
@@ -287,7 +287,7 @@ MODULE lte
       !! Assuming than atom%nstar(1,k), the ground state, cannot be lower than tiny_dp or negative.
       !! by the way it will certainly produce error here
       if (atom%nstar(i,k) <= tiny_dp) then
-       write(*,*) "Warning populations of atom ", atom%ID, atom%nstar(i,k), " lower than", &
+       write(*,*) "Warning population of atom ", atom%ID, i, atom%nstar(i,k), " lower than", &
         " tiny_dp. Replacing by tiny_dp"
        write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%ne(k)
         atom%nstar(i,k) = tiny_dp
