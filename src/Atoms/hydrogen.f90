@@ -153,6 +153,7 @@ MODULE hydrogen_opacities
  RETURN
  END SUBROUTINE Hydrogen_ff
  
+ !not test yet
  SUBROUTINE atom_ff_transitions(cont, icell, chi)
  ! Hubeny & Mihalas eq. 7.100 (from cgs to SI)
  ! takes place at LTE because it is collisional
