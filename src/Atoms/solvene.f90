@@ -356,7 +356,7 @@ END FUNCTION getPartitionFunctionk
 !           write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, &
 !           "ne=",atmos%ne(k), "T=",atmos%T(k)," nH=",atmos%nHtot(k)
       end if
-      unconverged_cells(id) = unconverged_cells(id) + 1 !but count each cells for with dne > MAX_ELECTRON_ERROR
+      unconverged_cells(id) = unconverged_cells(id) + 1 !but count each cell for with dne > MAX_ELECTRON_ERROR
     end if !convergence test
     
    end do !while loop
