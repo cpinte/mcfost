@@ -642,7 +642,7 @@ subroutine transfert_poussiere()
 
                     time_1 = time_2
                     call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
-                    if (ltau1_surface) call tau_surface_map(lambda,1.0_dp, ibin,iaz)
+                    if (ltau1_surface) call tau_surface_map(lambda,1.0, ibin,iaz)
                     call system_clock(time_2)
                     time_RT = time_RT + (time_2 - time_1)
                  enddo
@@ -655,7 +655,7 @@ subroutine transfert_poussiere()
 
                  time_1 = time_2
                  call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
-                 if (ltau1_surface) call tau_surface_map(lambda,1.0_dp, ibin,iaz)
+                 if (ltau1_surface) call tau_surface_map(lambda,1.0, ibin,iaz)
                  call system_clock(time_2)
                  time_RT = time_RT + (time_2 - time_1)
               endif
@@ -1727,7 +1727,7 @@ end subroutine intensite_pixel_dust
 
 subroutine tau_surface_map(lambda,tau, ibin,iaz)
 
-  real(dp), intent(in) :: tau
+  real, intent(in) :: tau
   integer, intent(in) :: lambda, ibin, iaz
   real(kind=dp) :: u,v,w
 
@@ -1736,7 +1736,7 @@ subroutine tau_surface_map(lambda,tau, ibin,iaz)
 
   integer :: i,j, id, p_lambda, icell
 
-  real :: extrin, ltot
+  real :: ltot
   real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0
   logical :: lintersect, flag_star, flag_direct_star, flag_sortie
 
@@ -1785,8 +1785,8 @@ subroutine tau_surface_map(lambda,tau, ibin,iaz)
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,Stokes,icell,lintersect,x0,y0,z0,u0,v0,w0) &
-  !$omp private(flag_star,flag_direct_star,extrin,ltot,flag_sortie) &
-  !$omp shared(Icorner,lambda,P_lambda,pixelcenter,dx,dy,u,v,w) &
+  !$omp private(flag_star,flag_direct_star,ltot,flag_sortie) &
+  !$omp shared(tau,Icorner,lambda,P_lambda,pixelcenter,dx,dy,u,v,w) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface,move_to_grid)
   id = 1 ! pour code sequentiel
 
@@ -1809,7 +1809,7 @@ subroutine tau_surface_map(lambda,tau, ibin,iaz)
 
         if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
            call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
-                flag_star,flag_direct_star,extrin,ltot,flag_sortie)
+                flag_star,flag_direct_star,tau,ltot,flag_sortie)
            if (flag_sortie) then ! We do not reach the surface tau=1
               tau_surface(i,j,ibin,iaz,:,id) = 0.0
            else
