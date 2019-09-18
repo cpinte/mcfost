@@ -14,6 +14,7 @@ MODULE Opacity
  !!use molecular_emission, only : v_proj
  use math, only : locate, integrate_dx
  use grid, only : cross_cell
+ use mcfost_env, only : dp
 
 
 
@@ -21,33 +22,28 @@ MODULE Opacity
 
  CONTAINS
  
-  SUBROUTINE add_to_psi_operator(id, icell, iray, ds)
+  SUBROUTINE add_to_psi_operator(id, icell, iray, chi, dtau, tau)
   ! ----------------------------------------------------------- !
    ! Computes Psi and Ieff at the cell icell, for the thread id
    ! in the direction iray, using ds path length of the ray.
   ! ----------------------------------------------------------- !
    integer, intent(in) :: iray, id, icell
-   double precision, intent(in) :: ds
-   double precision, dimension(NLTEspec%Nwaves) :: chi!, eta_loc
-  
-   if (lstore_opac) then
-     chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
-                    NLTEspec%AtomOpac%Kc(icell,:,1)
-     !eta_loc(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id) + &
-     !               NLTEspec%AtomOpac%jc(icell,:)
-   else
-     chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)
-     !eta_loc(:) = NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)
-   end if !store_opac
+   real(kind=dp), dimension(NLTEspec%Nwaves), intent(in) :: chi, dtau
+   real(kind=dp), dimension(NLTEspec%Nwaves), intent(in), optional :: tau
+   !tau is present only for xcoupling
 
-   NLTEspec%dtau(:,iray,id) = chi(:)*ds !J = Sum_ray I0*exp(-dtau) + Psi*S
-   NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))/(chi+1d-300)
+   if (atmos%include_xcoupling) then
+     NLTEspec%Psi(:,iray,id) = dexp(-tau)*(1d0 - dexp(-dtau)) / (chi + tiny_dp)
+   else
+     NLTEspec%dtau(:,iray,id) = dtau !only allocated for .not.lxcoupling
+     NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))/(chi+tiny_dp)
+   end if
 
 
   RETURN
   END SUBROUTINE add_to_psi_operator
   
- 
+
  SUBROUTINE init_local_field_atom(id, icell, iray, x0, y0, z0, u0, v0, w0)
   ! ------------------------------------------------------------------------- !
    ! Computes local radiation field, keeping External radiation constant
@@ -56,10 +52,11 @@ MODULE Opacity
    ! atom, for each cell and thread.
   ! ------------------------------------------------------------------------- !  
   
-  double precision, intent(in) :: x0, y0, z0, u0, v0, w0
+  real(kind=dp), intent(in) :: x0, y0, z0, u0, v0, w0
   integer, intent(in) :: id, icell, iray
-  double precision :: l_dum, l_c_dum, l_v_dum, x1, x2, x3, ds
+  real(kind=dp) :: l_dum, l_c_dum, l_v_dum, x1, x2, x3, ds
   integer 		   :: n_c_dum
+  real(kind=dp), dimension(NLTEspec%Nwaves) :: chi, dtau
   !recompute opacity of this cell., but I need angles and pos...
   !NLTEspec%I not changed
   ! move to the cell icell.
@@ -79,16 +76,17 @@ MODULE Opacity
   CALL NLTEOpacity(id, icell, iray, x0, y0, z0, x1, x2, x3, u0, v0, w0, l_dum, .true.)
   if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, x2, x3, u0, v0, w0, l_dum)
+      chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id)+&
+                    NLTEspec%AtomOpac%Kc(icell,:,1) + tiny_dp
   else
       CALL Background(id, icell, x0, y0, z0, x1, x2, x3, u0, v0, w0, l_dum)
+      chi(:) = NLTEspec%AtomOpac%chi_p(:,id)+NLTEspec%AtomOpac%chi(:,id) + tiny_dp
   end if
-  !last .true. is to compute atom%gij, atom%Uji,atom%Vij 
-  !CALL fillCrossCoupling_terms(id, icell)
-  !il faut recalculer Psi dans les sous-iterations et Ieff si Hogereijde.
-  !Sinon, seulement Psi depend de chi a besoin d'être mis à jour.
+
   ds = l_dum * AU_to_m
+  dtau = chi*ds
   !recompute Psi and eventually Ieff.
-  CALL add_to_psi_operator(id, icell, iray, ds)
+  CALL add_to_psi_operator(id, icell, iray, chi, dtau)
   
  RETURN
  END SUBROUTINE init_local_field_atom 
@@ -106,9 +104,9 @@ MODULE Opacity
   ! phi in s in the former case, and phi in s/m in the later.
  ! --------------------------------------------------------- !
   type(AtomicLine), intent(in) :: line
-  double precision, dimension(line%Nlambda) :: wlam
+  real(kind=dp), dimension(line%Nlambda) :: wlam
   integer :: la, Nblue, Nred, la_start, la_end, la0
-  double precision :: norm !beware this is not the result of the integral 
+  real(kind=dp) :: norm !beware this is not the result of the integral 
   						   ! just a factor to convert dv/c from dlambda/lambda
    !la0: index of wavelengths on the frequency grid (size Nwaves). 
    !la:  index of wavelengths on the lambda grid of the line (size Nlambda).
@@ -145,7 +143,7 @@ MODULE Opacity
   ! a 1/h is missing
  ! --------------------------------------------------------- !
   type(AtomicContinuum), intent(in) :: cont
-  double precision, dimension(cont%Nlambda) :: wlam
+  real(kind=dp), dimension(cont%Nlambda) :: wlam
   integer :: la, Nblue, Nred, la_start, la_end , la0
 
   !Nblue = cont%Nblue; Nred = cont%Nred
@@ -197,15 +195,15 @@ MODULE Opacity
   ! if not iterate means that atom%gij atom%vij atom%eta are not allocated (after NLTE for image for instance)
   !
   integer, intent(in) :: id, icell, iray
-  double precision, intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
+  real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
   logical, intent(in) :: iterate
   integer :: nact, Nred, Nblue, kc, kr, i, j, nk
   type(AtomicLine) :: line
   type(AtomicContinuum) :: cont
   type(AtomType), pointer :: aatom
   real(kind=dp) :: gij, twohnu3_c2, stm
-  double precision, dimension(:), allocatable :: Vij, gijk, twohnu3_c2k
-  double precision, allocatable :: phiZ(:,:), psiZ(:,:)
+  real(kind=dp), dimension(:), allocatable :: Vij, gijk, twohnu3_c2k
+  real(kind=dp), allocatable :: phiZ(:,:), psiZ(:,:)
   
   
   atom_loop : do nact = 1, atmos%Nactiveatoms
@@ -221,13 +219,13 @@ MODULE Opacity
    	
         stm = 1d0 
         kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
-write(*,*) "kc=",kc, id, icell, iray, "stm=",stm,"trtype=",aatom%at(kr)%trtype
+!write(*,*) "kc=",kc, id, icell, iray, "stm=",stm,"trtype=",aatom%at(kr)%trtype
         !if (.not.aatom%at(kr)%contrib_to_opac) CYCLE
         
         SELECT CASE (aatom%at(kr)%trtype)
         
         CASE ('ATOMIC_CONTINUUM')
-write(*,*) "cont loc", loc(cont)
+!write(*,*) "cont loc", loc(cont)
     	  cont = aatom%continua(kc)
     	  !!if (.not.cont%lcontrib_to_opac) CYCLE tr_loop
 
@@ -289,7 +287,7 @@ end if
         deallocate(Vij, gijk, twohnu3_c2k)
    
        CASE ('ATOMIC_LINE')
-write(*,*) 'line loc', loc(line)
+!write(*,*) 'line loc', loc(line)
         line = aatom%lines(kc)
         !!if (.not.line%lcontrib_to_opac) CYCLE tr_loop
         Nred = line%Nred;Nblue = line%Nblue

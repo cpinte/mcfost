@@ -12,6 +12,9 @@ MODULE statequil_atoms
  use collision, only : CollisionRate !future deprecation
  use impact, only : Collision_Hydrogen
  use metal, only : bound_free_Xsection
+ 
+ use mcfost_env, only : dp
+ use constantes, only : tiny_dp
 
  IMPLICIT NONE
 
@@ -50,7 +53,7 @@ MODULE statequil_atoms
   integer :: nact, Nlevel, lp, l, ij, ji, nati, natf
   integer, intent(in) :: icell, id
   type (AtomType), pointer :: atom
-  double precision :: c_lte = 1d0
+  real(kind=dp) :: c_lte = 1d0
   
 !   nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
 !   natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
@@ -158,8 +161,13 @@ MODULE statequil_atoms
      atom%Gamma(j,i,id) = line%Aji !init
      do iray=1, n_rayons
       do l=1,line%Nlambda
-       Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%dtau(Nblue+l-1,iray,id)) + \
+        if (atmos%include_xcoupling) then
+           Ieff = NLTEspec%I(Nblue+l-1,iray,id) - \
              NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+        else
+           Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%dtau(Nblue+l-1,iray,id)) + \
+             NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+		endif
              
        atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*weight(l)*Ieff
          
@@ -190,8 +198,13 @@ MODULE statequil_atoms
       twohnu3_c2 = twohc / NLTEspec%lambda(Nblue-1+l)**(3d0)
       Jnu = 0d0
       do iray=1, n_rayons
-       Jnu = Jnu + NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%dtau(Nblue+l-1,iray,id)) + \
+        if (atmos%include_xcoupling) then
+           Jnu = Jnu + NLTEspec%I(Nblue+l-1,iray,id) - \
+             NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)        
+        else
+           Jnu = Jnu + NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%dtau(Nblue+l-1,iray,id)) + \
              NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+        endif
       enddo
       Jnu = Jnu / n_rayons
 
@@ -209,19 +222,19 @@ MODULE statequil_atoms
    END SELECT
   
   end do tr_loop
-  
+    
   !Remove therm in delta(l,l')
   do l = 1, atom%Nlevel
     atom%Gamma(l,l,id) = 0d0
     atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
   end do
-  !Sure that cross-coupling not in diagonal part ??
-  
+
   if (atmos%include_xcoupling) then
    ! Only for the transition with itself of the moment
    CALL Xcoupling_rates_atom(id, icell, n_rayons, atom)
    atom%Gamma(:,:,id) = atom%Gamma(:,:,id) + atom%Xc(:,:,id)
   end if
+
   
  RETURN
  END SUBROUTINE FillGamma_atom
@@ -264,6 +277,7 @@ MODULE statequil_atoms
         chi_ij = line%phi(la,iray,id)*hc_4PI*line%Bij*atom%n(line%i,icell) 
         
 !         need to check that by wrting at hand
+!Sum over transition for which line%i is an upper level
 !         U_iip = 0.
 !         do krr=1,atom%Ntr
 !          ip = 0
@@ -283,8 +297,8 @@ MODULE statequil_atoms
 !           call error("bug xc")
 !          end if
 !         end do
-        !atom%Xc(line%i,line%j,id) = atom%Xc(line%i, line%j, id) - chi_ij * U_iip
-        atom%Xc(line%j, line%i, id) = atom%Xc(line%j, line%i, id) + chi_ij * U_ji
+        !atom%Xc(line%i,line%j,id) = atom%Xc(line%i, line%j, id) + chi_ij * U_iip
+        atom%Xc(line%j, line%i, id) = atom%Xc(line%j, line%i, id) - chi_ij * U_ji
         
        enddo
       enddo
@@ -308,7 +322,7 @@ MODULE statequil_atoms
         chi_ij = weight(la) * atom%n(line%i,icell)
         
         
-        atom%Xc(cont%j, cont%i, id) = atom%Xc(cont%j, cont%i, id) + chi_ij * U_ji
+        atom%Xc(cont%j, cont%i, id) = atom%Xc(cont%j, cont%i, id) - chi_ij * U_ji
 
       enddo
     
@@ -426,7 +440,7 @@ MODULE statequil_atoms
   integer, intent(in) :: icell, id
   type(AtomType), intent(inout) :: atom
   integer :: lp, imaxpop, l
-  double precision, dimension(atom%Nlevel, atom%Nlevel) :: Aij
+  real(kind=dp), dimension(atom%Nlevel, atom%Nlevel) :: Aij
 
   imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
   !write(*,*) "imaxpop", imaxpop, atom%n(imaxpop,icell)
@@ -465,7 +479,7 @@ MODULE statequil_atoms
   type(AtomType), pointer :: atom
   integer :: nat, nati, natf
   logical :: accelerate = .false.
-  double precision :: dM
+  real(kind=dp) :: dM
   
   !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
   !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
@@ -838,7 +852,7 @@ MODULE statequil_atoms
   integer, intent(in) :: icell, id
   type(AtomType), intent(inout) :: atom
   integer :: lp, imaxpop, l
-  double precision, dimension(atom%Nlevel, atom%Nlevel) :: Aij
+  real(kind=dp), dimension(atom%Nlevel, atom%Nlevel) :: Aij
 
   !-> futuru, will be done in FillGamma
    do l = 1, atom%Nlevel
@@ -886,7 +900,7 @@ MODULE statequil_atoms
   type(AtomType), pointer :: atom
   integer :: nat, nati, natf
   logical :: accelerate = .false.
-  double precision :: dM
+  real(kind=dp) :: dM
   
   !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
   !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms

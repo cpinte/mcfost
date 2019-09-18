@@ -96,10 +96,10 @@ MODULE init_solution
    endif
    allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,atmos%Nspace)); gpop_old = 0d0
 
-  if (atmos%include_xcoupling) then
-   CALL Warning("Cross-coupling not ready yet, avoiding.")
-   atmos%include_xcoupling = .false.
-  end if! 
+!   if (atmos%include_xcoupling) then
+!    CALL Warning("Cross-coupling not ready yet, avoiding.")
+!    atmos%include_xcoupling = .false.
+!   end if! 
 
    
  RETURN
