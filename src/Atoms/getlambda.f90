@@ -13,7 +13,7 @@ MODULE getlambda
   
   !Number of points for each transition
   integer, parameter :: Nlambda_cont = 20, &
-  						Nlambda_line_w = 5, Nlambda_line_c = 41
+  						Nlambda_line_w = 9, Nlambda_line_c = 101
   						!Nwing from -vchar to vcore; Ncore from vcore to 0
 
   CONTAINS
@@ -31,7 +31,7 @@ MODULE getlambda
   ! lambda(sum(Nlam_I)) (last region, last point)
   ! -------------------------------------------------------- !
 
-   double precision, dimension(:), allocatable, intent(inout) :: lambda_table
+   real(kind=dp), dimension(:), allocatable, intent(inout) :: lambda_table
    integer, dimension(:), allocatable, intent(out) :: Nlam_I
    character(len=MAX_LENGTH) :: inputline, FormatLine
    integer :: Nread = 0, Nl, k, Nr, Nt
@@ -74,10 +74,10 @@ MODULE getlambda
    ! cont%alpha (cross-section of photoionisation) is not used.
   ! ----------------------------------------------------------------- !
    type (AtomicContinuum), intent(inout) :: cont
-   double precision, intent(in) :: lambdamin
-   double precision :: resol
+   real(kind=dp), intent(in) :: lambdamin
+   real(kind=dp) :: resol
    integer :: la
-   double precision :: l0, l1
+   real(kind=dp) :: l0, l1
    
    !write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
 
@@ -97,6 +97,58 @@ MODULE getlambda
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_cont
   
+  !Probleme passe pas part lambda0
+  SUBROUTINE make_sub_wavelength_grid_line_lin(line, vD)
+  ! ------------------------------------------------------------ !
+   ! Make an individual wavelength grid for the AtomicLine line.
+   ! The wavelength grid is symmetric wrt lambda0.
+   ! It is by default, logarithmic in the wing and linear in the
+   ! core.
+  ! ------------------------------------------------------------ !
+   type (AtomicLine), intent(inout) :: line
+   real(kind=dp), intent(in) :: vD !maximum thermal width of the atom in m/s
+   real(kind=dp) :: v_char, dlam
+   real(kind=dp) :: vB
+   real(kind=dp) :: lam0, lam1
+   integer :: la, Nlambda, Nmid
+   real(kind=dp) :: adamp_char = 0d0
+   real, parameter :: L = 0.55 ! L% of max extent contains the line
+   real(kind=dp), dimension(Nlambda_line_c) :: xlam !dimension(2*(Nlambda_line_c+Nlambda_line_w-1)-1)
+
+   adamp_char = 1d3 * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
+   vB = 0d0
+   if (line%polarizable) vB =  &
+   				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
+   								 
+   v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
+
+   xlam = 0d0
+   lam0 = line%lambda0*(1-v_char/CLIGHT)
+   lam1 = line%lambda0*(1+v_char/CLIGHT)
+
+   !if (dabs(vel(Nlambda_line_w+Nlambda_line_c-1)) /= 0d0) vel(Nlambda_line_w+Nlambda_line_c-1) = 0d0
+   !if (vel(Nlambda_line_w+Nlambda_line_c-1) /= 0) write(*,*) 'Vel(Nw+Nc-1) should be 0.0'
+   
+   Nlambda = Nlambda_line_c!2 * (Nlambda_line_w + Nlambda_line_c - 1) - 1 
+   line%Nlambda = Nlambda
+   if (mod(line%Nlambda,2)==0) line%Nlambda = line%Nlambda + 1
+   !Nmid = Nlambda/2 + 1 !As Nlambda is odd '1--2--3', Nmid = N/2 + 1 = 2, because 3/2 = 1
+   !						!because the division of too integers is the real part. 
+   allocate(line%lambda(line%Nlambda))
+   line%lambda(1) = lam0
+   dlam = (lam1-lam0) / (real(line%Nlambda-1))
+   do la=2,line%Nlambda
+     line%lambda(la) = line%lambda(la-1) + dlam
+   enddo
+
+   !line%lambda(1:Nmid) = line%lambda0*(1d0 + vel(1:Nmid)/CLIGHT)
+   !line%lambda(Nmid+1:Nlambda) = line%lambda0*(1d0 -vel(Nmid-1:1:-1)/CLIGHT)
+
+   !if (line%lambda(Nmid) /= line%lambda0) write(*,*) 'Lambda(Nlambda/2+1) should be lambda0'
+
+  RETURN
+  END SUBROUTINE make_sub_wavelength_grid_line_lin
+  
   SUBROUTINE make_sub_wavelength_grid_line(line, vD)
   ! ------------------------------------------------------------ !
    ! Make an individual wavelength grid for the AtomicLine line.
@@ -105,16 +157,16 @@ MODULE getlambda
    ! core.
   ! ------------------------------------------------------------ !
    type (AtomicLine), intent(inout) :: line
-   double precision, intent(in) :: vD !maximum thermal width of the atom in m/s
-   double precision :: v_char, dvc, dvw
-   double precision :: vcore, vB, v0, v1!km/s
+   real(kind=dp), intent(in) :: vD !maximum thermal width of the atom in m/s
+   real(kind=dp) :: v_char, dvc, dvw
+   real(kind=dp) :: vcore, vB, v0, v1!km/s
    integer :: la, Nlambda, Nmid
-   double precision :: adamp_char = 0d0
-   double precision, parameter :: wing_to_core = 0.5, L = 5d0 !only if velocity field
+   real(kind=dp) :: adamp_char = 0d0
+   real, parameter :: wing_to_core = 0.5, L = 2. !only if velocity field
    		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
    !!integer, parameter :: Nc = 51, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
    real(kind=dp), dimension(2*(Nlambda_line_c+Nlambda_line_w-1)-1) :: vel
-   !!double precision, dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
+   !!real(kind=dp), dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
 
    adamp_char = 1d3 * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
@@ -165,7 +217,8 @@ MODULE getlambda
     vel(la) = vel(la-1) + dvc
     !write(*,*) la-Nw+1,la, vel(la) !relative index of core grid starts at 2 because vel(Nw)
     							   ! is the first point.
-   end do
+   end do   
+   
    !! Just a check here, maybe forcing the mid point to be zero is brutal
    !! but by construction it should be zero !
    !if (dabs(vel(Nw+Nc-1)) <= 1d-7) vel(Nw+Nc-1) = 0d0
@@ -210,11 +263,11 @@ MODULE getlambda
   ! --------------------------------------------------------------------------- !
    type (atomPointerArray), intent(inout), dimension(Natom) :: Atoms
    integer, intent(in) :: Natom
-   double precision, intent(in) :: wl_ref
+   real(kind=dp), intent(in) :: wl_ref
    integer, intent(out) :: Ntrans !Total number of transitions (cont + line)
    ! output grid. May contain values that are added to the final list before
    ! deallocating the array. It is reallocated when the final list is known.
-   double precision, allocatable, dimension(:), intent(inout) :: inoutgrid
+   real(kind=dp), allocatable, dimension(:), intent(inout) :: inoutgrid
    ! temporary storage for transitions, to count and add them.
    integer, parameter :: MAX_TRANSITIONS = 50000
    type (AtomicLine), allocatable, dimension(:) :: alllines
@@ -222,8 +275,8 @@ MODULE getlambda
    integer :: kr, kc, n, Nspect, Nwaves, Nlinetot, Nctot
    integer :: la, nn, nnn !counters: wavelength, number of wavelengths, line wavelength
    integer :: Nred, Nblue, Nlambda_original!read from model
-   double precision, allocatable, dimension(:) :: tempgrid, sorted_indexes
-   double precision :: l0, l1 !ref wavelength of each transitions
+   real(kind=dp), allocatable, dimension(:) :: tempgrid, sorted_indexes
+   real(kind=dp) :: l0, l1 !ref wavelength of each transitions
    
    write(*,*) ' Defining the nLTE wavelength grid, using ', Nlambda_cont,' points for each continuum, and ', &
     2*(Nlambda_line_w+Nlambda_line_c-1)-1, " points for each line."
@@ -434,14 +487,14 @@ MODULE getlambda
    ! ------------------------------------------ !
    use math, only : locate
    use atmos_type, only : realloc_Transitions
-   double precision, dimension(:), intent(in) :: old_grid
+   real(kind=dp), dimension(:), intent(in) :: old_grid
    integer, dimension(:), intent(in) :: lam_region
    type (atomPointerArray), dimension(:), intent(inout) :: Atoms
-   double precision, dimension(:), intent(inout) :: lambda
-   double precision, dimension(size(lambda)) :: lambda_us
+   real(kind=dp), dimension(:), intent(inout) :: lambda
+   real(kind=dp), dimension(size(lambda)) :: lambda_us
    integer :: Nwaves, n, kr, kc, Nlambda_original, Nblue, Nred, Natom, ll, lll
-   double precision :: l0, l1 !ref wavelength of each transitions
-   double precision :: x0, x1 !bound of the new grid
+   real(kind=dp) :: l0, l1 !ref wavelength of each transitions
+   real(kind=dp) :: x0, x1 !bound of the new grid
    integer, dimension(:), allocatable :: sorted_indexes
    logical, dimension(:), allocatable :: trans_contribute
    type (AtomicContinuum), dimension(:), allocatable :: conta
