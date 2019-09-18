@@ -88,13 +88,6 @@ MODULE broad
  !Gamma = 8.08 * vrel^3/5 * C_6^2/5 * atmos.H.ntotal_neutral
  !
  !
- ! Or with parametrization using Smirnov-Roueff potential.
- !
- ! See: DeRidder & van Rensbergen 1976, A&A Suppl. 23, 147-165
- !
- ! Gamma = alpha * T^{beta} * atmos.H.ntotal_neutral
- !
- !
  ! Or with the Anstee, Barklem & O'Mara formalism.
  !
  ! See: Anstee & O'Mara 1995, MNRAS 276, 859-866
