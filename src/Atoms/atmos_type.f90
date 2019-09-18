@@ -28,7 +28,7 @@ MODULE atmos_type
   !path to your partition function data
 
   !Wrappers to create arrays of Pointers
-
+!!-> move then to Atom_type.f90
   TYPE atomPointerArray
    type(AtomType), pointer :: ptr_atom => NULL()
   END TYPE atomPointerArray
@@ -922,7 +922,7 @@ MODULE atmos_type
   END SUBROUTINE writeVfield
   
 
-  SUBROUTINE readAtmos_ascii(filename, Tshk, Oi, Oo, accretion_spots)
+  SUBROUTINE readAtmos_ascii(filename)
   ! ------------------------------------------- !
    ! Read from ascii file a model to be used
    ! with the spherical grid of mcfost.
@@ -933,15 +933,16 @@ MODULE atmos_type
    use constantes
    use grid, only : cell_map
    character(len=*), intent(in)	:: filename
-   real(kind=dp), optional :: Tshk, Oi, Oo
+   real(kind=dp) Tshk!, Oi, Oo
    real(kind=dp) :: Tring, thetai, thetao
-   integer :: icell, Nread, syst_status, N_points, k, i, j
+   integer, parameter :: Nhead = 2 !Add more
+   integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
    character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
-   logical, optional :: accretion_spots
+   logical :: accretion_spots
    real :: south
    real(kind=dp), dimension(n_cells) :: rr, zz, pp
    logical :: is_not_dark
-   real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-8, tc, phic
+   real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic
    
    lmagnetoaccr = .not.(lstatic)
    CALL init_atomic_atmos()
@@ -963,13 +964,25 @@ MODULE atmos_type
    open(unit=1,file="ntest.txt",status="old")
    read(1,*) N_points
    close(unit=1)
-   write(*,*) "Found ", N_points - 0, " points and grid has", n_cells, " points"
-   if (N_points /= n_cells) then
+   !-2 because 2 headers lines
+   write(*,*) "Found ", N_points - Nhead, " points and grid has", n_cells, " points"
+   if (N_points - Nhead/= n_cells) then
     write(*,*) "Should read a model for the exact same grid as mcfost !"
     stop
    end if
 
    open(unit=1,file=filename, status="old")
+   !read T shock and if accretion spots
+   CALL getnextline(1, "#", FormatLine, inputline, Nread)
+   read(inputline(1:Nread),*) Tshk, acspot
+   accretion_spots = .false.
+   if (acspot==1) accretion_spots = .true.
+   !now read thetao and thetai
+   CALL getnextline(1, "#", FormatLine, inputline, Nread)
+   read(inputline(1:Nread),*) thetai, thetao
+   thetai = thetai * pi/180.
+   thetao = thetao * pi/180.
+      
    do i=1, n_rad
      do j=j_start,nz !j_start = -nz in 3D
       do k=1, n_az
@@ -1003,18 +1016,19 @@ MODULE atmos_type
    write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT==0)), " transparent zones"
    write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT<0)), " dark zones"
 
-
-   if ((present(Oi)) .and. (present(Oo))) then
-    rmi = 1d0 / sin(Oi * PI/180.)**2
-    rmo = 1d0 / sin(Oo * PI/180.)**2
-    thetai = Oi * PI/180.!asin(dsqrt(1d0/rmi))
-    thetao = Oo * PI/180 !asin(dsqrt(1d0/rmo))
-   else
-    rmi = 2d0
-    rmo = 3d0
-    thetai = asin(dsqrt(1d0/2d0))
-    thetao = asin(dsqrt(1d0/3d0))   
-   end if
+   rmi = 1d0 / sin(thetai)**2
+   rmo = 1d0 / sin(thetao)**2
+!    if ((present(Oi)) .and. (present(Oo))) then
+!     rmi = 1d0 / sin(Oi * PI/180.)**2
+!     rmo = 1d0 / sin(Oo * PI/180.)**2
+!     thetai = Oi * PI/180.!asin(dsqrt(1d0/rmi))
+!     thetao = Oo * PI/180 !asin(dsqrt(1d0/rmo))
+!    else
+!     rmi = 2d0
+!     rmo = 3d0
+!     thetai = asin(dsqrt(1d0/2d0))
+!     thetao = asin(dsqrt(1d0/3d0))   
+!    end if
    Lr = Ggrav * etoile(1)%M * Msun_to_kg * Mdot / (etoile(1)%r*au_to_m) * (1. - 2./(rmi + rmo))   
    
    
@@ -1022,9 +1036,9 @@ MODULE atmos_type
    Tring = Lr / (4d0 * PI * (etoile(1)%r*au_to_m)**2 * sigma * abs(cos(thetai)-cos(thetao)))
    Tring = Tring**0.25
    
-   if (present(Tshk)) then 
-    if (Tshk > 0) Tring = Tshk
-   end if
+
+   if (Tshk > 0) Tring = Tshk
+
    
   !2 is for two rings, 2Pi is dphi from 0 to 2pi / total sphere surface
    write(*,*) "Ring T ", Tring, "K"
@@ -1033,7 +1047,6 @@ MODULE atmos_type
    write(*,*) "Mean molecular weight", atmos%avgWeight
 
    !Add ring
-   if (present(accretion_spots)) then
     if (accretion_spots) then
      etoile(1)%Nr = 2
    	 allocate(etoile(1)%SurfB(etoile(1)%Nr))
@@ -1050,8 +1063,8 @@ MODULE atmos_type
     	etoile(1)%SurfB(k)%muo = cos(thetao); etoile(1)%SurfB(k)%mui = cos(thetai)
     	etoile(1)%SurfB(k)%phio = 2*PI; etoile(1)%SurfB(k)%phii = 0d0
   	 end do
-    end if 
-   end if !accretion_spots 
+  	endif
+
   
    if (.not.lstatic) then
     atmos%v_char = atmos%v_char + maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
