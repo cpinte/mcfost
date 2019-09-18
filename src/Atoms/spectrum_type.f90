@@ -312,7 +312,9 @@ MODULE spectrum_type
     if (lxcoupling) NLTEspec%atmos%include_xcoupling = .true.
      
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-    allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
+    
+    if (.not.lxcoupling) &
+       allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
 
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
@@ -470,7 +472,7 @@ MODULE spectrum_type
     integer, intent(in) :: iray, id
     
    	NLTEspec%Psi(:,iray,id) = 0d0
-   	NLTEspec%dtau(:,iray,id) = 0d0 !always allocated
+   	if (.not.lxcoupling) NLTEspec%dtau(:,iray,id) = 0d0
   
   RETURN
   END SUBROUTINE init_psi_operator
