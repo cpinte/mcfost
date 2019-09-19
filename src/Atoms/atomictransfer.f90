@@ -819,7 +819,7 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
   !The BIG PART IS HERE
-if (atmos%Nactiveatoms > 0)
+if (atmos%Nactiveatoms > 0) then
 write(*,*) " "
 write(*,*) " "
 
