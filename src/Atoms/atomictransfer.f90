@@ -920,8 +920,8 @@ endif
  ! -------------------------------------------------------- !
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 9 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
-  integer, parameter :: n_rayons_start2 = 30 !
+  integer, parameter :: n_rayons_start = 7 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
+  integer, parameter :: n_rayons_start2 = 15 !
   integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max != n_rayons_start2 * (2**(n_iter2_max-1)
   !! it is atmos%Nrays in atom transfer
@@ -965,7 +965,7 @@ endif
   n_rayons_max = atmos%Nrays
   labs = .true. !to have ds at cell icell
   id = 1
-  etape_start = 2
+  etape_start = 1
   etape_end = 2
   !if no cross-coupling == hogereijde == sub iterations, itself sets in spectrum_type.f90
   disable_subit = atmos%include_xcoupling!set to true to avoid subiterations over the emissivity
@@ -985,12 +985,12 @@ do icell=1, atmos%Nspace
  if (atmos%icompute_atomRT(icell) >0) ncells_filled = ncells_filled + 1
 end do	
 open(16,file="testI3", status='old')
-write(16, *) ncells_filled, NLTEspec%Nwaves, n_rayons_start
+write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_start
 
      do etape=etape_start, etape_end
 
       !precision = fac_etape* precision
-      if (etape==1) then !two rays
+      if (etape==0) then !two rays
         lfixed_rays=.true.
         n_rayons = 2
         iray_start = 1
@@ -998,22 +998,23 @@ write(16, *) ncells_filled, NLTEspec%Nwaves, n_rayons_start
         lprevious_converged = .false.
         
       !building
-      else if (etape==11) then ! Try new angular quadrature
+      else if (etape==1) then ! Try new angular quadrature
       !test with N random directions starting at the centre of the cell
         !!CALL Gauleg(0d0, 1d0, xmu, wmu,n_rayons_start)
         !!to_obs0 = -1
         lfixed_rays = .true.
-        n_rayons = n_rayons_start !the limit is atmos%Nrays for etape 3
+        n_rayons = min(n_rayons_max,n_rayons_start) !the limit is atmos%Nrays for etape 3
   		iray_start = 1
   		lprevious_converged = .false.
   		fac_etape = 1. !1d-2
   		
       else if (etape==2) then !random directions + random positions
   		lfixed_rays = .true.
-  		n_rayons = n_rayons_start
+  		n_rayons = min(n_rayons_max,n_rayons_start2)
   		iray_start = 1
   		lprevious_converged = .false.
   		fac_etape = 1. !1d-2
+
   	  else
   	    CALL ERROR("etape unkown")
   	  end if
@@ -1144,7 +1145,7 @@ write(16, *) ncells_filled, NLTEspec%Nwaves, n_rayons_start
       				end do !iray
 !end do ! over to_obs
 
-write(16, *) n_iter, icell	
+write(16, *) etape, n_iter, icell	
 do la=1,NLTEspec%Nwaves
    write(16,'(52E)') NLTEspec%lambda(la),(NLTEspec%I(la, imu, id), imu=1,n_rayons), sum(NLTEspec%I(la, :, id))/n_rayons
 end do
@@ -1196,7 +1197,7 @@ end do
      				    		dN = abs((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/(pop_old(nact,ilevel,id)+1d-300))
      				    		diff = max(diff, dN)
      				    		if (diff >= 1) then
-     				    		 write(*,*) 'subit', n_iter_loc, "dpops = ", diff, atom%ID, ilevel
+     				    		 write(*,*) id, 'subit', n_iter_loc, "dpops = ", diff, atom%ID, ilevel
      				    		end if
      						end do
      						atom => NULL()
@@ -1221,7 +1222,7 @@ end do
 
        					end if
        					if (n_iter_loc >= max_sub_iter) then 
-       					  if (diff>1) write(*,*) " sub-it not converged after", n_iter_loc, &
+       					  if (diff>1) write(*,*) id, " sub-it not converged after", n_iter_loc, &
        					  	" iterations; diff=", diff
        					  lconverged_loc = .true.
        					end if
