@@ -668,6 +668,7 @@ MODULE AtomicTransfer
      !$omp do schedule(dynamic,1)
      do i = 1,npix_x_max
         !$ id = omp_get_thread_num() + 1
+
         do j = 1,npix_y
            ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)

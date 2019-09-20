@@ -724,8 +724,8 @@ function v_proj(icell,x,y,z,u,v,w) !
               v_proj = 0.0_dp
            endif
         else if (lmagnetoaccr) then !lwind_rotation
-           r = sqrt(x*x+y*y) !projection in the x,y plane. Projection in the z plane elsewhere
-           					 !as Vxyz is either (x,y,z) or (R, z, phi) !!
+           r = sqrt(x*x+y*y)
+           !Good projection or  sqrt(x*x+y*y+z*z) ?       					 
            vx = 0_dp; vy = 0_dp; vz = 0_dp
            if (r > tiny_dp) then !rotational  + wind
               norme = 1.0_dp/r
@@ -739,7 +739,11 @@ function v_proj(icell,x,y,z,u,v,w) !
               vy = vy + y*norme*atmos%Vxyz(icell, 1) !VR proj_y
               vz = atmos%Vxyz(icell, 2) !Vz
               !and z is paralel to e_z
-              if (z < 0_dp) vz = -vz !symmetrical change
+              !! -> but this doesn't work if vz is already negative in 3D models
+              !!if (z < 0_dp) vz = -vz !symmetrical change
+              if (z < 0_dp .and. vz > 0) vz = -vz
+              !change vz in -vz only if z < 0 and vz >0 == 2D model (with theta = 0 to pi/2)
+              !otherwise, vz is < 0 for < 0 in 3D models (wuth theta=0 to pi)
               v_proj = vx*u + vy*v + vz*w
            else
               v_proj = 0_dp
