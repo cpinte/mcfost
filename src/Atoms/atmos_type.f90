@@ -931,7 +931,6 @@ MODULE atmos_type
   ! ------------------------------------------- !
    use getline
    use constantes
-   use input, only : linfall, lkeplerian, lVoronoi, ldensity_file
    use grid, only : cell_map
    character(len=*), intent(in)	:: filename
    real(kind=dp) Tshk!, Oi, Oo
@@ -946,12 +945,7 @@ MODULE atmos_type
    logical :: is_not_dark
    real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic
    
-   if (ldensity_file) then
-    write(*,*) "Error ldensity_file not handled here, for the velocity"
-    stop
-   end if 
-   
-   linfall = .false.; lkeplerian = .false.; lmagnetoaccr = .false.
+   lmagnetoaccr = .false.
    lVoronoi = .false.
    !read from file the velocity law if any
    CALL init_atomic_atmos()
