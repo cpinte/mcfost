@@ -932,7 +932,7 @@ endif
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
   integer, dimension(nb_proc) :: max_n_iter_loc
   
-  integer :: la, imu, to_obs, to_obs0, ncells_filled
+  integer :: la, imu, to_obs, to_obs0, ncells_filled, Ne_period
   real(kind=dp) :: xmu(30), wmu(30), dOmega
 
   logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
@@ -975,6 +975,7 @@ endif
   Ng_acceleration = .false.
   
   iterate_ne = lsolve_for_ne !temp
+  Ne_period = 3 !every Ne_period iterations, solve for ne if iterate_ne
   force_lte = .false.
   max_sub_iter = 25
   maxIter = 30
@@ -1302,7 +1303,7 @@ end do
           	   end if
         	end if
         	
-        	if (iterate_ne .and. (mod(n_iter,3)==1))  then
+        	if (iterate_ne .and. (mod(n_iter,Ne_period)==1))  then
         	 write(*,*) n_iter, "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
         	 CALL SolveElectronDensity(ne_start_sol)
         	 !Recompute LTE pops used in continua radiative rates
