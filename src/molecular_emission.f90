@@ -727,7 +727,8 @@ function v_proj(icell,x,y,z,u,v,w) !
            r = sqrt(x*x+y*y)
            !Good projection or  sqrt(x*x+y*y+z*z) ?       					 
            vx = 0_dp; vy = 0_dp; vz = 0_dp
-           if (r > tiny_dp) then !rotational  + wind
+           if (r > tiny_dp) then !rotational + wind, should work also with
+           						 !spherical wind of stars
               norme = 1.0_dp/r
               !rotational velocity changes with z, but lies only in the (x,y) plane
               ! -> e_phi on (e_x, e_y)
