@@ -1302,8 +1302,9 @@ end do
 
           	   end if
         	end if
-        	
-        	if (iterate_ne .and. (mod(n_iter,Ne_period)==1))  then
+        									!if ==1 for Ne_period=3: 1 ok, 2, 3, 4 ok, 5, 6, 7 ok etc
+        									! if 0: 1, 2, 3ok, 4, 5, 6ok ect
+        	if (iterate_ne .and. (mod(n_iter,Ne_period)==0))  then
         	 write(*,*) n_iter, "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
         	 CALL SolveElectronDensity(ne_start_sol)
         	 !Recompute LTE pops used in continua radiative rates
