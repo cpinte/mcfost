@@ -994,7 +994,7 @@ write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_s
         lfixed_rays=.true.
         n_rayons = 2
         iray_start = 1
-        fac_etape = 0.1
+        fac_etape = 1e-2
         lprevious_converged = .false.
         
       !building
@@ -1006,14 +1006,14 @@ write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_s
         n_rayons = min(n_rayons_max,n_rayons_start) !the limit is atmos%Nrays for etape 3
   		iray_start = 1
   		lprevious_converged = .false.
-  		fac_etape = 1. !1d-2
+  		fac_etape = 1 !1d-2
   		
       else if (etape==2) then !random directions + random positions
   		lfixed_rays = .true.
   		n_rayons = min(n_rayons_max,n_rayons_start2)
   		iray_start = 1
   		lprevious_converged = .false.
-  		fac_etape = 1. !1d-2
+  		fac_etape = 1d-2
 
   	  else
   	    CALL ERROR("etape unkown")
@@ -1073,7 +1073,7 @@ write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_s
 !do to_obs=to_obs0, 1, 2 !-1 or 1 I hope
      				do iray=iray_start, iray_start-1+n_rayons
      				
-      					if (etape==1) then
+      					if (etape==0) then
                         ! Position = milieu de la cellule
                          x0 = r_grid(icell)
                          y0 = 0.0_dp
@@ -1100,7 +1100,7 @@ write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_s
                           endif
                          endif !lkeplerian
                          
-                        else if (etape==11) then !etape 1 bis, Nrays from the centre of the cell, in random dir
+                        else if (etape==1) then 
                         
                          !centre of the cell 
                          x0 = r_grid(icell)
