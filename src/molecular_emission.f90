@@ -744,26 +744,6 @@ function v_proj(icell,x,y,z,u,v,w) !
            else
               v_proj = 0_dp
            endif
-        else if (lwind_rotation) then
-           r = sqrt(x*x+y*y)
-           vx = 0_dp; vy = 0_dp; vz = 0_dp
-           if (r > tiny_dp) then !rotational  + wind
-              norme = 1.0_dp/r
-              vx = -y * norme * atmos%Vxyz(icell,3)  !Vphi proj_x
-              vy =  x * norme * atmos%Vxyz(icell,3)  !Vphi proj_y
-           else
-              vx = 0d0; vy = 0d0
-           end if
-           r = sqrt(x*x+y*y+z*z)
-           if (r>tiny_dp) then
-           	  norme = 1.0_dp / r
-              vx = vx + x*norme*atmos%Vxyz(icell, 1)
-              vy = vy + y*norme*atmos%Vxyz(icell, 1)
-              vz = z*norme*atmos%Vxyz(icell, 1)
-           else
-              vz = 0d0
-           endif
-           v_proj = vx*u + vy*v + vz*w
         else
            call error("velocity field not defined")
         endif

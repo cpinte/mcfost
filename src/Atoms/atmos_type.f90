@@ -931,11 +931,13 @@ MODULE atmos_type
   ! ------------------------------------------- !
    use getline
    use constantes
+   use input, only : linfall, lkeplerian, lVoronoi, ldensity_file
    use grid, only : cell_map
    character(len=*), intent(in)	:: filename
    real(kind=dp) Tshk!, Oi, Oo
    real(kind=dp) :: Tring, thetai, thetao
-   integer, parameter :: Nhead = 2 !Add more
+   integer, parameter :: Nhead = 3 !Add more
+   character(len=MAX_LENGTH) :: rotation_law
    integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
    character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
    logical :: accretion_spots
@@ -944,7 +946,14 @@ MODULE atmos_type
    logical :: is_not_dark
    real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic
    
-   lmagnetoaccr = .not.(lstatic)
+   if (ldensity_file) then
+    write(*,*) "Error ldensity_file not handled here, for the velocity"
+    stop
+   end if 
+   
+   linfall = .false.; lkeplerian = .false.; lmagnetoaccr = .false.
+   lVoronoi = .false.
+   !read from file the velocity law if any
    CALL init_atomic_atmos()
    !For now we do not necessarily need to compute B if no polarization at all
    atmos%magnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
@@ -972,6 +981,24 @@ MODULE atmos_type
    end if
 
    open(unit=1,file=filename, status="old")
+   CALL getnextline(1, "#", FormatLine, inputline, Nread)
+   read(inputline(1:Nread),*) rotation_law
+   
+   if (.not.lstatic) then
+    SELECT CASE (rotation_law)
+     CASE ("magneto-accretion")
+     	lmagnetoaccr = .true.
+     	write(*,*) " Velocity law is ", trim(rotation_law), lmagnetoaccr
+     CASE ("None")
+     	write(*,*) " No interpolation of the velocity field", trim(rotation_law)
+     	write(*,*) " Profile and v_proj not modified to use that with not Voronoi grid yet"
+     	stop
+     CASE DEFAULT
+        write(*,*) " Velocity law ", rotation_law," not handled yet"
+        stop
+    END SELECT
+   end if
+   
    !read T shock and if accretion spots
    CALL getnextline(1, "#", FormatLine, inputline, Nread)
    read(inputline(1:Nread),*) Tshk, acspot
@@ -1016,6 +1043,7 @@ MODULE atmos_type
    write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT==0)), " transparent zones"
    write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT<0)), " dark zones"
 
+   if (thetai-thetao /= 0.) then
    rmi = 1d0 / sin(thetai)**2
    rmo = 1d0 / sin(thetao)**2
 !    if ((present(Oi)) .and. (present(Oo))) then
@@ -1029,28 +1057,29 @@ MODULE atmos_type
 !     thetai = asin(dsqrt(1d0/2d0))
 !     thetao = asin(dsqrt(1d0/3d0))   
 !    end if
-   Lr = Ggrav * etoile(1)%M * Msun_to_kg * Mdot / (etoile(1)%r*au_to_m) * (1. - 2./(rmi + rmo))   
+    Lr = Ggrav * etoile(1)%M * Msun_to_kg * Mdot / (etoile(1)%r*au_to_m) * (1. - 2./(rmi + rmo))   
    
    
-   write(*,*) "Angles at stellar surface (deg)", thetao*rad_to_deg, thetai*rad_to_deg
-   Tring = Lr / (4d0 * PI * (etoile(1)%r*au_to_m)**2 * sigma * abs(cos(thetai)-cos(thetao)))
-   Tring = Tring**0.25
+    write(*,*) "Angles at stellar surface (deg)", thetao*rad_to_deg, thetai*rad_to_deg
+    Tring = Lr / (4d0 * PI * (etoile(1)%r*au_to_m)**2 * sigma * abs(cos(thetai)-cos(thetao)))
+    Tring = Tring**0.25
    
+   
+    if (Tshk > 0) Tring = Tshk
 
-   if (Tshk > 0) Tring = Tshk
-
    
-  !2 is for two rings, 2Pi is dphi from 0 to 2pi / total sphere surface
-   write(*,*) "Ring T ", Tring, "K"
-   write(*,*) "Surface ", 100*(abs(cos(thetai)-cos(thetao))), "%" !couverte par les deux anneaux sur toute la sphere
-   write(*,*) "Luminosity", Lr/Lsun, "Lsun"
-   write(*,*) "Mean molecular weight", atmos%avgWeight
+   !2 is for two rings, 2Pi is dphi from 0 to 2pi / total sphere surface
+    write(*,*) "Ring T ", Tring, "K"
+    write(*,*) "Surface ", 100*(abs(cos(thetai)-cos(thetao))), "%" !couverte par les deux anneaux sur toute la sphere
+    write(*,*) "Luminosity", Lr/Lsun, "Lsun"
+    
+    
 
-   !Add ring
-    if (accretion_spots) then
-     etoile(1)%Nr = 2
-   	 allocate(etoile(1)%SurfB(etoile(1)%Nr))
-   	 do k=1,etoile(1)%Nr!should be 1 ring for testing
+    !Add ring
+     if (accretion_spots) then
+      etoile(1)%Nr = 2
+   	  allocate(etoile(1)%SurfB(etoile(1)%Nr))
+   	  do k=1,etoile(1)%Nr!should be 1 ring for testing
    	    south = 1.
     	tc = 0d0 * PI/180 !center of vector position
     	phic = 0d0 !vector position, pointing to the center of the spot
@@ -1062,10 +1091,13 @@ MODULE atmos_type
    	    etoile(1)%SurfB(k)%r(3) = cos(tc)*south
     	etoile(1)%SurfB(k)%muo = cos(thetao); etoile(1)%SurfB(k)%mui = cos(thetai)
     	etoile(1)%SurfB(k)%phio = 2*PI; etoile(1)%SurfB(k)%phii = 0d0
-  	 end do
-  	endif
+  	  end do
+  	 endif    
+    
+   end if !thetai-thetao /= 0
+   write(*,*) "Mean molecular weight", atmos%avgWeight
 
-  
+
    if (.not.lstatic) then
     atmos%v_char = atmos%v_char + maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
     	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
