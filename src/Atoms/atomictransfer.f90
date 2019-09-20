@@ -923,7 +923,6 @@ endif
 
   integer, parameter :: n_rayons_start = 7 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 15 !
-  integer, parameter :: n_iter2_max = 3
   integer :: n_rayons_max != n_rayons_start2 * (2**(n_iter2_max-1)
   !! it is atmos%Nrays in atom transfer
   integer :: n_level_comp
@@ -941,9 +940,10 @@ endif
   real :: rand, rand2, rand3, fac_etape
 
   real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dN, dN1
+  real(kind=dp), allocatable :: dM(:)
 
   logical :: labs, disable_subit, Ng_acceleration, iterate_ne, force_lte
-  integer :: atomunit = 1, nact
+  integer :: atomunit = 1, nact, maxIter
   integer :: icell
   integer :: Nlevel_total = 0, NmaxLevel, ilevel, max_sub_iter
   character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
@@ -961,6 +961,8 @@ endif
   if (allocated(ds)) deallocate(ds)
   allocate(ds(atmos%Nrays,NLTEspec%NPROC))
   ds = 0d0 !meters
+  
+  allocate(dM(atmos%Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
 
   to_obs0 = 1
   n_rayons_max = atmos%Nrays
@@ -974,7 +976,8 @@ endif
   
   iterate_ne = lsolve_for_ne !temp
   force_lte = .false.
-  max_sub_iter = 10
+  max_sub_iter = 25
+  maxIter = 30
   xyz0(:,:,:) = 0d0
   uvw0(:,:,:) = 0d0
  ! ----------------------------  INITIAL POPS------------------------------------------ !
@@ -1004,17 +1007,17 @@ write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_s
         !!CALL Gauleg(0d0, 1d0, xmu, wmu,n_rayons_start)
         !!to_obs0 = -1
         lfixed_rays = .true.
-        n_rayons = min(n_rayons_max,n_rayons_start) !the limit is atmos%Nrays for etape 3
+        n_rayons = min(n_rayons_max,n_rayons_start) 
   		iray_start = 1
   		lprevious_converged = .false.
-  		fac_etape = 1 !1d-2
+  		fac_etape = 1d-1
   		
       else if (etape==2) then !random directions + random positions
   		lfixed_rays = .true.
   		n_rayons = min(n_rayons_max,n_rayons_start2)
   		iray_start = 1
   		lprevious_converged = .false.
-  		fac_etape = 1d-2
+  		fac_etape = 1d-1
 
   	  else
   	    CALL ERROR("etape unkown")
@@ -1025,7 +1028,9 @@ write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_s
   		n_iter = 0 
 
         do while (.not.lconverged)
-        	n_iter = n_iter + 1    
+        
+        	n_iter = n_iter + 1
+        	if (n_iter >= maxIter) exit !change step
             write(*,*) " -> Iteration #", n_iter, " Step #", etape
             	
   			if (lfixed_rays) then
@@ -1034,7 +1039,7 @@ write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_s
      				stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
     			end do
  			 end if
-
+ 
             max_n_iter_loc = 0
             
  			!!$omp parallel &
@@ -1088,7 +1093,7 @@ write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_s
                           endif
                           u0 = 0.0_dp !nx
                           v0 = 0.0_dp !ny
-                         else !not keplerian, spherical, infall even lmagneto_accr
+                         else
                           norme = sqrt(x0*x0 + y0*y0 + z0*z0)
                           if (iray==1) then
                            u0 = x0/norme !sin(theta)sin(phi) = nx
@@ -1194,19 +1199,19 @@ end do
 								   !for this cell
      					do nact=1,atmos%NactiveAtoms
      					    atom => atmos%ActiveAtoms(nact)%ptr_atom
+     					    dN1 = 0.0 !for one atom
      						do ilevel=1,atom%Nlevel
      				    		dN = abs((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/(pop_old(nact,ilevel,id)+1d-300))
      				    		diff = max(diff, dN)
-     				    		if (diff >= 1) then
-     				    		 write(*,*) id, 'subit', n_iter_loc, "dpops = ", diff, atom%ID, ilevel
-     				    		end if
-     						end do
+     				    		dN1 = max(dN1, dN)
+     						end do 
+     						!if (dN1 >= 1) write(*,*) id, " --> subit",n_iter_loc,atom%ID, " dpops = ", dN1   				    	
      						atom => NULL()
      					end do
 
        					if (diff < precision_sub) then
        						lconverged_loc = .true.
-       						!write(*,*) " sub it converged! icell#", icell," maxdpops=", diff
+     					    !write(*,*) id, "dpops(sub) = ", diff
        					else
         					!recompute opacity of this cell., but I need angles and pos...
        						!NLTEspec%I not changed
@@ -1238,6 +1243,7 @@ end do
         	!I cannot iterate on unconverged cells because the radiation coming for each cell
         	!depends on the other cell.
         	diff = 0d0
+        	dM(:) = 0d0
   			cell_loop2 : do icell=1, atmos%Nspace
   				if (atmos%icompute_atomRT(icell)>0) then
 						dN = 0d0 !for all levels of all atoms of this cell
@@ -1246,22 +1252,28 @@ end do
      						do ilevel=1,atom%Nlevel
 
      				    		dN1 = abs((gpop_old(nact,ilevel,icell)-atom%n(ilevel,icell))/(gpop_old(nact,ilevel,icell)+tiny_dp))
-     				    		dN = max(dN1, dN)
+     				    		dN = max(dN1, dN) !compare with all atoms and levels
+     				    						  !for this cell
 
-     						    if (dN >= 1) then
-     				    		   write(*,*) atom%ID, "Pops:",icell, ilevel," dN =",dN
-     				    		   write(*,*) "nold(i) =",gpop_old(nact,ilevel,icell), "n(i) =",atom%n(ilevel,icell)
-     				    		 end if
+!      						    if (dN >= 1) then
+!      				    		   write(*,*) atom%ID, "Pops:",icell, ilevel," dN =",dN
+!      				    		   write(*,*) "nold(i) =",gpop_old(nact,ilevel,icell), "n(i) =",atom%n(ilevel,icell)
+!      				    		 end if
+
+     				    		 dM(nact) = max(dM(nact), dN1) !compare for one atom
+     				    		 							   !for all cells
      						end do
      						atom => NULL()
      					end do
-     					diff = max(diff, dN) !for all cells
-     					!write(*,*) icell, "dpops(icell) =",diff
+     					diff = max(diff, dN) !compare for all atoms and all cells
      			end if
      		end do cell_loop2
 
          	!if (maxval(max_n_iter_loc)> max_sub_iter) &
          	if (.not.disable_subit)	write(*,*) maxval(max_n_iter_loc), "sub-iterations"
+         	do nact=1,atmos%NactiveAtoms
+         	 write(*,*) "   ***", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dM = ", dM(nact)
+         	enddo
          	write(*,*) "dpops =", diff !at the end of the loop over n_cells
         	write(*,*) "Threshold =", precision*fac_etape
 
@@ -1277,7 +1289,7 @@ end do
               		n_rayons = n_rayons * 2
               		write(*,*) ' -- Increasing number of rays'
              		if (n_rayons > n_rayons_max) then
-              			if (n_iter >= n_iter2_max) then
+              			if (n_iter >= maxIter) then
              		 		write(*,*) "Warning : not enough rays to converge !!"
                  			lconverged = .true.
               			end if
@@ -1290,8 +1302,8 @@ end do
           	   end if
         	end if
         	
-        	if (iterate_ne)  then !.and. n_iter > 1
-        	 write(*,*) "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+        	if (iterate_ne .and. (mod(n_iter,3)==1))  then
+        	 write(*,*) n_iter, "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
         	 CALL SolveElectronDensity(ne_start_sol)
         	 !Recompute LTE pops used in continua radiative rates
         	 do nact=1,atmos%NpassiveAtoms
