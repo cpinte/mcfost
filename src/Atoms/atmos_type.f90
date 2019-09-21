@@ -64,7 +64,7 @@ MODULE atmos_type
    double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T!, vturb
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
-   logical :: include_xcoupling = .false., coherent_scattering
+   logical :: include_xcoupling = .false., coherent_scattering =.false.
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
    logical :: Magnetized = .false., XRD=.false., calc_ne
    !dark zone are in lcompute_atomRT->icompute_atomRT == -1
@@ -941,6 +941,7 @@ MODULE atmos_type
    character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
    logical :: accretion_spots
    real :: south
+   real, parameter :: Lextent = 1.5 !vchar=Lextent * vchar
    real(kind=dp), dimension(n_cells) :: rr, zz, pp
    logical :: is_not_dark
    real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic
@@ -1098,7 +1099,7 @@ MODULE atmos_type
    end if
    
    if (atmos%magnetized) then
-    atmos%B_char = maxval(sum(atmos%Bxyz(:,:)**2,dim=2))
+    atmos%B_char = maxval(sum(atmos%Bxyz(:,:)**2,dim=2)) !* Lextent
     write(*,*)  "Typical Magnetic field modulus (G)", atmos%B_char * 1d4
    end if
 
@@ -1119,6 +1120,7 @@ MODULE atmos_type
      		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
    end if
    write(*,*) "Typical velocity in the model (km/s):"
+   atmos%v_char = Lextent * atmos%v_char
    write(*,*) atmos%v_char/1d3
 
    write(*,*) "Maximum/minimum Temperature in the model (K):"

@@ -112,7 +112,7 @@ MODULE getlambda
    real(kind=dp) :: lam0, lam1
    integer :: la, Nlambda, Nmid
    real(kind=dp) :: adamp_char = 0d0
-   real, parameter :: L = 1.2 ! L% of max extent contains the line
+   real, parameter :: L = 1.01 ! L% of max extent contains the line
    real(kind=dp), dimension(Nlambda_line_c) :: xlam !dimension(2*(Nlambda_line_c+Nlambda_line_w-1)-1)
 
    adamp_char = 1d3 * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
