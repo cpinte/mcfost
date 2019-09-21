@@ -955,7 +955,7 @@ endif
   integer :: atomunit = 1, nact, maxIter
   integer :: icell
   integer :: Nlevel_total = 0, NmaxLevel, ilevel, max_sub_iter
-  character(len=20) :: ne_start_sol = "NE_MODEL" !iterate from the starting guess
+  character(len=20) :: ne_start_sol = "H_IONISATION"!"NE_MODEL"
   real(kind=dp), dimension(3, atmos%Nrays, nb_proc) :: xyz0, uvw0
   type (AtomType), pointer :: atom
 
@@ -1163,7 +1163,8 @@ endif
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       				end do !iray
       				
-      				CALL calc_J_coherent(id, icell, n_rayons)
+      				if (atmos%coherent_scattering) &
+      					CALL calc_J_coherent(id, icell, n_rayons)
 !end do ! over to_obs
 
 ! write(16, *) etape, n_iter, icell	
@@ -1282,11 +1283,12 @@ endif
      						atom => NULL()
      					end do
      					diff = max(diff, dN) !compare for all atoms and all cells
-     					dJ = max(dJ, maxval((NLTEspec%J(:,icell)-Jold(:,icell))/(tiny_dp + Jold(:,icell))))
+     					if (atmos%coherent_scattering) &
+     						dJ = max(dJ, maxval((NLTEspec%J(:,icell)-Jold(:,icell))/(tiny_dp + Jold(:,icell))))
      			end if
      		end do cell_loop2
-     		write(*,*) " dJ = ", dJ
-     		Jold(:,:) = NLTEspec%J(:,:)
+     		if (dJ > 0) write(*,*) " dJ = ", dJ
+     		if (atmos%coherent_scattering) Jold(:,:) = NLTEspec%J(:,:)
 
          	!if (maxval(max_n_iter_loc)> max_sub_iter) &
          	if (.not.disable_subit)	write(*,*) maxval(max_n_iter_loc), "sub-iterations"
@@ -1327,9 +1329,12 @@ endif
         	if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
         	 write(*,*) n_iter, "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
         	 CALL SolveElectronDensity(ne_start_sol)
-        	 !Recompute LTE pops used in continua radiative rates for Activeatoms only
-        	 do nact=1,atmos%NactiveAtoms
-               atom => atmos%ActiveAtoms(nact)%ptr_atom
+        	 !Recompute LTE pops used in continua radiative rates 
+        	 !for Activeatoms only ?
+        	 !do nact=1,atmos%NactiveAtoms
+             !  atom => atmos%ActiveAtoms(nact)%ptr_atom
+             do nact=1,atmos%NAtom
+               atom => atmos%Atoms(nact)%ptr_atom
                CALL LTEpops(atom,.true.)
                atom => Null()
              end do
