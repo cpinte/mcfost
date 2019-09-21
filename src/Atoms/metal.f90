@@ -105,11 +105,11 @@ MODULE metal
      ! even if lcompute_atomRT(icell) it is still possible to not have a continuum transition
      ! between the level i and j, but not for the others.
 !	  if (metal%nstar(j,icell) <= tiny_dp .or. metal%nstar(i,icell)<=tiny_dp) CYCLE
-    if (metal%nstar(j,icell) < tiny_dp) then
+    if (metal%n(j,icell) < tiny_dp) then
         write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
         write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell), i, metal%n(i,icell)
         write(*,*) "skipping this level"
-        write(*,*) "nstar=", metal%nstar(:,icell)
+        write(*,*) "nstar=", metal%n(:,icell)
        CYCLE
     end if
 
