@@ -167,12 +167,12 @@ MODULE Opacity
  RETURN
  END FUNCTION cont_wlam
  
- !building, not ready
+
  SUBROUTINE calc_J_coherent(id, icell, n_rayons)
   integer, intent(in) :: id, icell, n_rayons
   
-  NLTEspec%J(:,icell) = sum(NLTEspec%I(:,1:n_rayons,id),dim=2)
-  NLTEspec%Jc(:,icell) = sum(NLTEspec%Ic(:,1:n_rayons,id),dim=2)
+  NLTEspec%J(:,icell) = sum(NLTEspec%I(:,1:n_rayons,id),dim=2) / n_rayons
+  NLTEspec%Jc(:,icell) = sum(NLTEspec%Ic(:,1:n_rayons,id),dim=2) / n_rayons
 
  
  RETURN

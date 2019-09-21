@@ -57,7 +57,7 @@ module parametres
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
 
   ! Atomic line radiative transfer
-  logical :: lemission_atom, lstore_opac, lsolve_for_ne, lvacuum_to_air, lstatic, &
+  logical :: lemission_atom, lstore_opac, lsolve_for_ne, lcoherent_scattering, lvacuum_to_air, lstatic, &
        lcontrib_function, lmagnetoaccr, lxcoupling, lwind_rotation
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image
@@ -65,7 +65,7 @@ module parametres
   !Magnetic Polarized RT equation
   character(len=20) :: prt_solution
   ! PLUTO / MHD / ascii_model
-  integer :: n_pluto_files
+  integer :: n_pluto_files, n_iterate_ne
   logical :: lpluto_file, lmodel_ascii, lmagnetic_field
 
   ! Decomposition image

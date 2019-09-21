@@ -64,7 +64,9 @@ subroutine set_default_variables()
   ! Atomic lines Radiative Transfer (AL-RT)
   lemission_atom = .false.
   lstore_opac = .false.
+  lcoherent_scattering = .false.
   lsolve_for_ne = .false.
+  n_iterate_ne = 0
   lstatic = .false.
   lvacuum_to_air = .false.
   lcontrib_function = .false.
@@ -597,9 +599,18 @@ subroutine initialisation_mcfost()
      case("-contrib_function")
         i_arg = i_arg + 1
         lcontrib_function = .true.
-     case("-solve_ne")
+     case("-coherent_scatt") !force solving ne density even if provided in the model
+        i_arg = i_arg + 1
+        lcoherent_scattering = .true.
+     case("-solve_ne") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
         lsolve_for_ne = .true.
+     case("-iterate_ne") !Iterate electron density in the NLTE loop
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ne period needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) n_iterate_ne
+        i_arg= i_arg+1
      case("-vacuum_to_air")
         i_arg = i_arg + 1
         lvacuum_to_air = .true.
@@ -1598,7 +1609,9 @@ subroutine display_help()
   write(*,*) "        : -static_model : force the model to be static, and neglect velocity field"
   write(*,*) "        : -store_atom_opac: keep in memory background continuum opacities"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
+  write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -x_coupling : Add (partial) cross coupling terms to SEE"
+  write(*,*) "        : -coherent_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "
   write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."

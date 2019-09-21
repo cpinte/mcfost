@@ -262,16 +262,6 @@ MODULE spectrum_type
    NLTEspec%I = 0d0
    NLTEspec%Ic = 0d0
 
-!    if (NLTEspec%atmos%coherent_scattering) then
-!     allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))!%NPROC))
-!     allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))
-!    !Just to try
-!    !CALL Warning("(allocSpectrum()) J20 allocated")
-!    !allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC)); NLTEspec%J20 = 0d0
-!     NLTEspec%J = 0.0
-!     NLTEspec%Jc = 0.0
-!    end if
-
    
    !Now opacities
    if (lstore_opac) then !keep continuum LTE opacities in memory
@@ -309,6 +299,8 @@ MODULE spectrum_type
    !in NLTEOpacity()
    if (alloc_atom_nlte) then !NLTE loop activated
    
+    if (NLTEspec%atmos%coherent_scattering) CALL alloc_J_coherent()
+   
     if (lxcoupling) NLTEspec%atmos%include_xcoupling = .true.
      
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
@@ -329,14 +321,14 @@ MODULE spectrum_type
      end if
 
     end do
-   end if
-
+  endif
 
   RETURN
   END SUBROUTINE allocSpectrum
   
   SUBROUTINE alloc_flux_image
-   !allocated at the end only, save memory
+   !allocated at the end only, to save memory
+   !alloc also contribution function at the moment
    integer :: alloc_status
 
     allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ))
@@ -373,13 +365,6 @@ MODULE spectrum_type
    deallocate(NLTEspec%lambda)
    deallocate(NLTEspec%Ic, NLTEspec%I)
     if (allocated(NLTEspec%Flux)) deallocate(NLTEspec%Flux, NLTEspec%Fluxc)
-    
-   !if wavelength image do not remove the scattering part ?
-!    if (.not.ltab_wavelength_image .and. NLTEspec%atmos%coherent_scattering) then
-!     deallocate(NLTEspec%Jc, NLTEspec%J)
-! 
-!     if (allocated(NLTEspec%J20)) deallocate(NLTEspec%J20)
-!    end if
 
    if (NLTEspec%atmos%Magnetized) then 
     !check allocation due to field_free sol
@@ -458,15 +443,30 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE initAtomOpac
   
-  SUBROUTINE init_J_coherent()!(id)
-   !integer, intent(in) :: id
+  SUBROUTINE alloc_J_coherent()
   
-    NLTEspec%J(:,:) = 0d0
-    NLTEspec%Jc(:,:) = 0d0
-!     if (allocated(NLTEspec%J20)) NLTEspec%J20(:,id) = 0d0
-  
+     allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))!%NPROC))
+     allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))
+   !Just to try
+   !CALL Warning("(allocSpectrum()) J20 allocated")
+   !allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC)); NLTEspec%J20 = 0d0
+     NLTEspec%J = 0.0
+     NLTEspec%Jc = 0.0
+
+   
   RETURN
-  END SUBROUTINE init_J_coherent
+  END SUBROUTINE alloc_J_coherent
+  
+  SUBROUTINE freeJ()
+    
+   !if (NLTEspec%atmos%coherent_scattering) then
+    if (allocated(NLTEspec%J)) deallocate(NLTEspec%J)
+    if (allocated(NLTEspec%Jc)) deallocate(NLTEspec%Jc)
+    if (allocated(NLTEspec%J20)) deallocate(NLTEspec%J20)
+   !end if
+   
+  RETURN 
+  END SUBROUTINE freeJ
   
   SUBROUTINE init_psi_operator(id, iray)
     integer, intent(in) :: iray, id

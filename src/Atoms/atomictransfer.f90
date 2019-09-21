@@ -175,10 +175,13 @@ MODULE AtomicTransfer
       dtau_c(:) = l_contrib * (NLTEspec%AtomOpac%Kc(icell,:,1)+ NLTEspec%AtomOpac%chic_nlte(:,id))
       Snu = (NLTEspec%AtomOpac%jc(icell,:) + &
                NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)) / chiI(:)
-                 ! + &NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%J(:,id)
-                 ! + &NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(:,id)
+
       Snu_c = (NLTEspec%AtomOpac%jc(icell,:) + NLTEspec%AtomOpac%etac_nlte(:,id)) / &
             (NLTEspec%AtomOpac%Kc(icell,:,1) + tiny_dp + NLTEspec%AtomOpac%chic_nlte(:,id)) 
+      if (atmos%coherent_scattering) then
+        Snu = Snu + NLTEspec%J(:,icell)*NLTEspec%AtomOpac%Kc(icell,:,2) / chiI(:)
+        Snu_c = NLTEspec%AtomOpac%Kc(icell,:,2) * NLTEspec%Jc(:,icell) / (NLTEspec%AtomOpac%Kc(icell,:,1) + tiny_dp + NLTEspec%AtomOpac%chic_nlte(:,id))
+      endif
      else
       CALL Background(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l) !x,y,z,u,v,w,x1,y1,z1
                                 !define the projection of the vector field (velocity, B...)
@@ -196,12 +199,16 @@ MODULE AtomicTransfer
       ! it multiplies the continuum scattering coefficient for isotropic (unpolarised)
       ! scattering. chi, eta are opacity and emissivity for ACTIVE lines.
       Snu = (NLTEspec%AtomOpac%eta_p(:,id) + NLTEspec%AtomOpac%eta(:,id)) / chiI(:)
-      ! + &NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%J(:,id)
-      ! + &NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%Jc(:,id)
       
       ! continuum source function
       Snu_c = (NLTEspec%AtomOpac%eta_c(:,id) + NLTEspec%AtomOpac%etac_nlte(:,id)) / &
-      			 (NLTEspec%AtomOpac%chi_c(:,id) + 1d-300 + NLTEspec%AtomOpac%chic_nlte(:,id))
+      			 (NLTEspec%AtomOpac%chi_c(:,id) + tiny_dp + NLTEspec%AtomOpac%chic_nlte(:,id))
+      			 
+      if (atmos%coherent_scattering) then
+        Snu = Snu + NLTEspec%J(:,icell)*NLTEspec%AtomOpac%sca_c(:,id) / chiI(:)
+        Snu_c = NLTEspec%AtomOpac%sca_c(:,id) * NLTEspec%Jc(:,icell) / (NLTEspec%AtomOpac%chi_c(:,id) + tiny_dp + NLTEspec%AtomOpac%chic_nlte(:,id))
+      endif
+      
     end if
 
 	!Should never happen if we neglect STM
@@ -805,6 +812,7 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
  ! ------------- INITIALIZE WAVELNGTH GRID AND BACKGROUND OPAC ------------------------ !
  ! ------------------------------------------------------------------------------------ !
+  atmos%coherent_scattering=lcoherent_scattering
   if (ltab_wavelength_image) NLTEspec%write_wavelength_grid = .true.
   !otherwise not necessary to write them, because they are in flux.fits
   CALL initSpectrum(vacuum_to_air=lvacuum_to_air)
@@ -906,6 +914,7 @@ endif
 !   CALL closeCollisionFile(atmos%ActiveAtoms(nact)%ptr_atom) !if opened
 !  end do
  !CALL WRITEATOM() !keep C in memory for that ?
+ if (atmos%coherent_scattering) CALL freeJ()
  CALL freeSpectrum() !deallocate spectral variables
  CALL free_atomic_atmos()
  NULLIFY(optical_length_tot, Profile, Voigt, INTEG_RAY_LINE)
@@ -922,7 +931,7 @@ endif
 #include "sprng_f.h"
 
   integer, parameter :: n_rayons_start = 7 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
-  integer, parameter :: n_rayons_start2 = 15 !
+  integer, parameter :: n_rayons_start2 = 25 !
   integer :: n_rayons_max != n_rayons_start2 * (2**(n_iter2_max-1)
   !! it is atmos%Nrays in atom transfer
   integer :: n_level_comp
@@ -932,17 +941,17 @@ endif
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
   integer, dimension(nb_proc) :: max_n_iter_loc
   
-  integer :: la, imu, to_obs, to_obs0, ncells_filled, Ne_period
+  integer :: la, imu, to_obs, to_obs0, ncells_filled
   real(kind=dp) :: xmu(30), wmu(30), dOmega
 
   logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
 
   real :: rand, rand2, rand3, fac_etape
 
-  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dN, dN1
-  real(kind=dp), allocatable :: dM(:)
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dN, dN1, dJ
+  real(kind=dp), allocatable :: dM(:), Jold(:,:)
 
-  logical :: labs, disable_subit, Ng_acceleration, iterate_ne, force_lte
+  logical :: labs, disable_subit, Ng_acceleration, iterate_ne = .false., force_lte
   integer :: atomunit = 1, nact, maxIter
   integer :: icell
   integer :: Nlevel_total = 0, NmaxLevel, ilevel, max_sub_iter
@@ -963,19 +972,22 @@ endif
   ds = 0d0 !meters
   
   allocate(dM(atmos%Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
+  if (atmos%coherent_scattering) then
+   allocate(Jold(NLTEspec%Nwaves, atmos%Nspace))
+   Jold = 0d0
+  endif
 
   to_obs0 = 1
   n_rayons_max = atmos%Nrays
   labs = .true. !to have ds at cell icell
   id = 1
-  etape_start = 1
+  etape_start = 2
   etape_end = 2
   !if no cross-coupling == hogereijde == sub iterations, itself sets in spectrum_type.f90
   disable_subit = atmos%include_xcoupling!set to true to avoid subiterations over the emissivity
   Ng_acceleration = .false.
   
-  iterate_ne = lsolve_for_ne !temp
-  Ne_period = 3 !every Ne_period iterations, solve for ne if iterate_ne
+  iterate_ne = (n_iterate_ne>0)
   force_lte = .false.
   max_sub_iter = 25
   maxIter = 30
@@ -985,12 +997,12 @@ endif
    CALL Init_NLTE(sub_iterations_enabled=.not.disable_subit,Ng_acceleration=Ng_acceleration)!Ng_acceleration
  !  ------------------------------------------------------------------------------------ !
 
-ncells_filled = 0
-do icell=1, atmos%Nspace
- if (atmos%icompute_atomRT(icell) >0) ncells_filled = ncells_filled + 1
-end do	
-open(16,file="testI3", status='old')
-write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_start
+! ncells_filled = 0
+! do icell=1, atmos%Nspace
+!  if (atmos%icompute_atomRT(icell) >0) ncells_filled = ncells_filled + 1
+! end do	
+! open(16,file="testI3", status='old')
+! write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_start
 
      do etape=etape_start, etape_end
 
@@ -1150,15 +1162,17 @@ write(16, *) etape_end-etape_start+1, ncells_filled, NLTEspec%Nwaves, n_rayons_s
 						uvw0(1,iray,id) = U0; uvw0(2,iray,id) = V0; uvw0(3,iray,id) = W0
       					CALL INTEG_RAY_LINE(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
       				end do !iray
+      				
+      				CALL calc_J_coherent(id, icell, n_rayons)
 !end do ! over to_obs
 
-write(16, *) etape, n_iter, icell	
-do la=1,NLTEspec%Nwaves
-   write(16,'(52E)') NLTEspec%lambda(la),(NLTEspec%I(la, imu, id), imu=1,n_rayons), sum(NLTEspec%I(la, :, id))/n_rayons
-end do
+! write(16, *) etape, n_iter, icell	
+! do la=1,NLTEspec%Nwaves
+!    write(16,'(52E)') NLTEspec%lambda(la),(NLTEspec%I(la, imu, id), imu=1,n_rayons), sum(NLTEspec%I(la, :, id))/n_rayons
+!    !make sure J is the same
+!    !write(*,*) sum(NLTEspec%I(la, :, id))/n_rayons, NLTEspec%J(la, icell)
+! end do
 
-!       				with the old radiation field, and will be used for next cell
-!       				CALL calc_J_coherent(icell, n_rayons)
 
       				!Fill the Rate matrix and integrates over rays and frequencies
       				!rays and waves integration for all atoms
@@ -1202,7 +1216,7 @@ end do
      					    atom => atmos%ActiveAtoms(nact)%ptr_atom
      					    dN1 = 0.0 !for one atom
      						do ilevel=1,atom%Nlevel
-     				    		dN = abs((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/(pop_old(nact,ilevel,id)+1d-300))
+     				    		dN = abs((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/(pop_old(nact,ilevel,id)+tiny_dp))
      				    		diff = max(diff, dN)
      				    		dN1 = max(dN1, dN)
      						end do 
@@ -1245,6 +1259,7 @@ end do
         	!depends on the other cell.
         	diff = 0d0
         	dM(:) = 0d0
+        	dJ = 0.0
   			cell_loop2 : do icell=1, atmos%Nspace
   				if (atmos%icompute_atomRT(icell)>0) then
 						dN = 0d0 !for all levels of all atoms of this cell
@@ -1267,8 +1282,11 @@ end do
      						atom => NULL()
      					end do
      					diff = max(diff, dN) !compare for all atoms and all cells
+     					dJ = max(dJ, maxval((NLTEspec%J(:,icell)-Jold(:,icell))/(tiny_dp + Jold(:,icell))))
      			end if
      		end do cell_loop2
+     		write(*,*) " dJ = ", dJ
+     		Jold(:,:) = NLTEspec%J(:,:)
 
          	!if (maxval(max_n_iter_loc)> max_sub_iter) &
          	if (.not.disable_subit)	write(*,*) maxval(max_n_iter_loc), "sub-iterations"
@@ -1278,6 +1296,7 @@ end do
          	write(*,*) "dpops =", diff !at the end of the loop over n_cells
         	write(*,*) "Threshold =", precision*fac_etape
 
+            if (atmos%coherent_scattering) diff = dJ
         	if (diff < precision*fac_etape) then
            		if (lprevious_converged) then
             	  lconverged = .true.
@@ -1303,32 +1322,41 @@ end do
           	   end if
         	end if
         									!if ==1 for Ne_period=3: 1 ok, 2, 3, 4 ok, 5, 6, 7 ok etc
-        									! if 0: 1, 2, 3ok, 4, 5, 6ok ect
-        	if (iterate_ne .and. (mod(n_iter,Ne_period)==0))  then
+        									! if 0: 1, 2, 3ok, 4, 5, 6ok ect								
+        	!Only if specified
+        	if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
         	 write(*,*) n_iter, "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
         	 CALL SolveElectronDensity(ne_start_sol)
-        	 !Recompute LTE pops used in continua radiative rates
-        	 do nact=1,atmos%NpassiveAtoms
-               atom => atmos%PassiveAtoms(nact)%ptr_atom
+        	 !Recompute LTE pops used in continua radiative rates for Activeatoms only
+        	 do nact=1,atmos%NactiveAtoms
+               atom => atmos%ActiveAtoms(nact)%ptr_atom
                CALL LTEpops(atom,.true.)
                atom => Null()
              end do
         	end if
-        	
 	    end do !while
 	  end do !over etapes
 	
-close(16)
+!close(16)
   
-  if (iterate_ne) then
-   !! For the moment I do not used atmos%nHmin
-   !!write(*,*) "  --> old max/min nHmin", maxval(atmos%nHmin), minval(atmos%nHmin,mask=atmos%nHmin>0)
-   !!CALL calc_nHmin() !At the end, because ff and pure H minus are not updated during the NLTE loop
-   				     !only lte pops of b-f transitions because we need nstar(i)/nstar(j) = gij
-   CALL writeElectron(.true.) !the .true. means append, to compare with initial solution.
-  end if
+  !Force to compute a new value of electron density after convergence
+  if (n_iterate_ne < 0) then
+   write(*,*) "END LOOP: old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+   CALL SolveElectronDensity(ne_start_sol)
+   !Recompute for all atoms the LTE pops
+   do nact=1,atmos%NAtom
+      atom => atmos%Atoms(nact)%ptr_atom
+      CALL LTEpops(atom,.true.)
+      atom => Null()
+   end do  
+  end if 
+
+  if (iterate_ne .or. (n_iterate_ne < 0)) &
+  	CALL writeElectron(.true.) !the .true. means append, to compare with initial solution.
  ! -------------------------------- CLEANING ------------------------------------------ !
-  ! Remove NLTE quantities not useful now
+  !to move inside free_nlte_sol
+  deallocate(dM)
+  if (allocated(Jold)) deallocate(Jold)
   CALL free_nlte_sol(Ng_acceleration, disable_subit)
   deallocate(ds)  
  ! ------------------------------------------------------------------------------------ !

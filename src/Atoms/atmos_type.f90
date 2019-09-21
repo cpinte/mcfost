@@ -659,7 +659,7 @@ MODULE atmos_type
    !atmos%vturb(:) = 0d0 !m/s
 
    CALL fillElements()
-   
+      
 !    allocate(atmos%lcompute_atomRT(atmos%Nspace))
    allocate(atmos%icompute_atomRT(atmos%Nspace))
    atmos%icompute_atomRT(:) = 0 !everything transparent at init.
