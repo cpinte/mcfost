@@ -126,7 +126,7 @@ MODULE metal
 !        				continuum%alpha(Nblue:Nred) * &
 !        				(1.-expla(Nblue:Nred))*metal%n(i,icell)
       NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) = NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) + &
-       				Vij(:) * (metal%n(i,icell)-gijk(:)*metal%n(i,icell))
+       				Vij(:) * (metal%n(i,icell)-gijk(:)*metal%n(j,icell))
        				
       NLTEspec%AtomOpac%jc(icell,Nblue:Nred) = NLTEspec%AtomOpac%jc(icell,Nblue:Nred) + &
        				twohnu3_c2(:) * gijk(:) * Vij(:)*metal%n(j,icell)
