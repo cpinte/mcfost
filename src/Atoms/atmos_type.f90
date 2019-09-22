@@ -944,7 +944,7 @@ MODULE atmos_type
    real, parameter :: Lextent = 1.5 !vchar=Lextent * vchar
    real(kind=dp), dimension(n_cells) :: rr, zz, pp
    logical :: is_not_dark
-   real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic
+   real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic, VRz
    
    lmagnetoaccr = .false.
    lVoronoi = .false.
@@ -1115,9 +1115,15 @@ MODULE atmos_type
    
    if (.not.lstatic) then
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
-    write(*,*) maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
-     		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
-     		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
+    write(*,*) " VRz = ", 1e-3 * maxval(dsqrt(atmos%Vxyz(:,1)**2 + atmos%Vxyz(:,2)**2)), &
+    	1e-3*minval(dsqrt(atmos%Vxyz(:,1)**2 + atmos%Vxyz(:,2)**2),mask=atmos%icompute_atomRT>0)
+    write(*,*) " VR = ", 1e-3 * maxval(dsqrt(atmos%Vxyz(:,1)**2)), &
+    	1e-3*minval(dsqrt(atmos%Vxyz(:,1)**2),mask=atmos%icompute_atomRT>0)
+    write(*,*) " Vz = ",  1e-3 * maxval(dsqrt(atmos%Vxyz(:,2)**2)), &
+    	1e-3*minval(dsqrt(atmos%Vxyz(:,2)**2),mask=atmos%icompute_atomRT>0) 
+    write(*,*) " Vphi = ",  1e-3 * maxval(dsqrt(atmos%Vxyz(:,3)**2)), &
+    	1e-3*minval(dsqrt(atmos%Vxyz(:,3)**2),mask=atmos%icompute_atomRT>0)
+    
    end if
    write(*,*) "Typical line extent (km/s):"
    atmos%v_char = Lextent * atmos%v_char
