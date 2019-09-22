@@ -60,12 +60,6 @@ MODULE Opacity
   logical :: lintersect_stars
   !recompute opacity of this cell., but I need angles and pos...
   !NLTEspec%I not changed
-  ! move to the cell icell.
-  call intersect_stars(x0,y0,z0, u0,v0,w0, lintersect_stars, i_star, icell_star)
-  if (test_exit_grid(icell, x0, y0, z0)) RETURN
-  if (lintersect_stars) then
-      if (icell == icell_star) return
-  endif
 
   CALL cross_cell(x0,y0,z0, u0,v0,w0, icell, &
        						n_c_dum, x1,x2,x3, n_c_dum, l_dum, l_c_dum, l_v_dum)
@@ -204,7 +198,7 @@ MODULE Opacity
   integer, intent(in) :: id, icell, iray
   real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
   logical, intent(in) :: iterate
-  integer :: nact, Nred, Nblue, kc, kr, i, j, nk
+  integer :: nact, Nred, Nblue, kc, kr, i, j, nk, la
   type(AtomicLine) :: line
   type(AtomicContinuum) :: cont
   type(AtomType), pointer :: aatom
@@ -224,86 +218,19 @@ MODULE Opacity
    	    !!and for the NLTEloop all transitions are kept ATM.
    	    !!if (.not.aatom%at(kr)%lcontrib_to_opac) cycle
    	
-        stm = 1d0 
+        stm = 1d0 !reset for each transition.
         kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
 !write(*,*) "kc=",kc, id, icell, iray, "stm=",stm,"trtype=",aatom%at(kr)%trtype
         !if (.not.aatom%at(kr)%contrib_to_opac) CYCLE
         
         SELECT CASE (aatom%at(kr)%trtype)
         
-        CASE ('ATOMIC_CONTINUUM')
-!write(*,*) "cont loc", loc(cont)
-    	  cont = aatom%continua(kc)
-    	  !!if (.not.cont%lcontrib_to_opac) CYCLE tr_loop
-
-    	  Nred = cont%Nred;Nblue = cont%Nblue    	
-    	  i = cont%i;j = cont%j
-if ((i>aatom%Nlevel .or. i < 1).or.(j>aatom%Nlevel.or.j<1).or.(id<1.or.id>NLTEspec%NPROC).or.&
-	(icell<1.or.icell>atmos%Nspace)) then
- write(*,*) "bf", id, icell, i, j
- stop
-end if
-        
-    	  if (aatom%n(j,icell) < tiny_dp .or. aatom%n(i,icell) < tiny_dp) then !test
-    	   write(*,*) id, icell, loc(aatom), loc(cont)
-    	   write(*,*) tiny_dp, aatom%n(j,icell), aatom%n(i,icell)
-    	   write(*,*) aatom%n(:,icell)
-    	 
-          if (aatom%n(j,icell)==0d0 .or. aatom%n(i,icell)==0d0) then
-           write(*,*) icell, iray, id, aatom%ID, aatom%Nlevel, kc, shape(aatom%n)
-           write(*,*) i, cont%i, j, cont%j
-           write(*,*) aatom%n(:,icell)
-           write(*,*) aatom%n(i,icell), aatom%n(j,icell), aatom%n(cont%i,icell), aatom%n(cont%j,icell)
-           write(*,*) "1", aatom%n(1,icell), "2", aatom%n(2,icell), "3", aatom%n(3,icell),"4", aatom%n(4,icell)
-           stop
-          end if    	 
-    	 
-     	  CALL WARNING("too small cont populations")
-     	  aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
-     	  aatom%n(i,icell) = max(tiny_dp, aatom%n(i,icell))
-    	  end if !end test
-    	  
-      	  allocate(gijk(cont%Nlambda))
-          gijk(:) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
-      
-         !allocate Vij, to avoid computing bound_free_Xsection(cont) 3 times for a continuum
-	     allocate(Vij(cont%Nlambda), twohnu3_c2k(cont%Nlambda))
-	     
-    	 Vij(:) = bound_free_Xsection(cont) 	
-    	       !write(*,*) 'bf', icell, id, iray, maxval(Vij), minval(Vij)
-
-         twohnu3_c2k(:) = twohc / NLTEspec%lambda(Nblue:Nred)**(3d0) * &
-              Vij(:) * gijk(:) * aatom%n(j,icell) !eta
-         
-         Vij(:) = Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell)) !chi
-
-
-         !keep copy of continuum only
-    	 NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) + Vij(:)
-    	 NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) + twohnu3_c2k(:)
-
-         !gather total NLTE
-         NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + Vij(:)
-       		
-         NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + twohnu3_c2k(:)
-    	
-    	 if (iterate) then
-    	   aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + twohnu3_c2k(:)
-         end if			
-   
-        deallocate(Vij, gijk, twohnu3_c2k)
-   
-       CASE ('ATOMIC_LINE')
+         CASE ('ATOMIC_LINE')
 !write(*,*) 'line loc', loc(line)
-        line = aatom%lines(kc)
+         line = aatom%lines(kc)
         !!if (.not.line%lcontrib_to_opac) CYCLE tr_loop
-        Nred = line%Nred;Nblue = line%Nblue
-        i = line%i;j = line%j
-if ((i>aatom%Nlevel .or. i < 1).or.(j>aatom%Nlevel.or.j<1).or.(id<1.or.id>NLTEspec%NPROC).or.&
-	(icell<1.or.icell>atmos%Nspace)) then
- write(*,*) "bb", id, icell, iray,  id, icell, i, j
- stop
-end if
+          Nred = line%Nred;Nblue = line%Nblue
+          i = line%i;j = line%j
     
     if ((aatom%n(j,icell) < tiny_dp).or.(aatom%n(i,icell) < tiny_dp)) then !no transition
         write(*,*) id, icell, loc(aatom), loc(line)
@@ -341,6 +268,10 @@ end if
          Vij(:) = hc_4PI * line%Bij * Vij(:)!phi(:) !normalized in Profile()
                                                              ! / (SQRTPI * VBROAD_atom(icell,aatom)) 
             !write(*,*) 'bb', icell, id, iray, maxval(Vij), minval(Vij)
+            
+         !I don't know how to handle negative chi due to stimulated emission...
+         !Problem of physics (model) or code ?
+        if (gij*aatom%n(j,icell) > aatom%n(i,icell)) stm = 0d0
 
          !opacity total
          NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
@@ -372,6 +303,67 @@ end if
      
        deallocate(Vij)!, phi)
        if (PRT_SOLUTION=="FULL_STOKES") deallocate(phiZ, psiZ)
+        
+        CASE ('ATOMIC_CONTINUUM')
+!write(*,*) "cont loc", loc(cont)
+    	  cont = aatom%continua(kc)
+    	  !!if (.not.cont%lcontrib_to_opac) CYCLE tr_loop
+
+    	  Nred = cont%Nred;Nblue = cont%Nblue    	
+    	  i = cont%i;j = cont%j
+        
+    	  if (aatom%n(j,icell) < tiny_dp .or. aatom%n(i,icell) < tiny_dp) then !test
+    	   write(*,*) id, icell, loc(aatom), loc(cont)
+    	   write(*,*) tiny_dp, aatom%n(j,icell), aatom%n(i,icell)
+    	   write(*,*) aatom%n(:,icell)
+    	 
+          if (aatom%n(j,icell)==0d0 .or. aatom%n(i,icell)==0d0) then
+           write(*,*) icell, iray, id, aatom%ID, aatom%Nlevel, kc, shape(aatom%n)
+           write(*,*) i, cont%i, j, cont%j
+           write(*,*) aatom%n(:,icell)
+           write(*,*) aatom%n(i,icell), aatom%n(j,icell), aatom%n(cont%i,icell), aatom%n(cont%j,icell)
+           write(*,*) "1", aatom%n(1,icell), "2", aatom%n(2,icell), "3", aatom%n(3,icell),"4", aatom%n(4,icell)
+           stop
+          end if    	 
+    	 
+     	  CALL WARNING("too small cont populations")
+     	  aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
+     	  aatom%n(i,icell) = max(tiny_dp, aatom%n(i,icell))
+    	  end if !end test
+    	  
+      	  allocate(gijk(cont%Nlambda))
+          gijk(:) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+      
+         !allocate Vij, to avoid computing bound_free_Xsection(cont) 3 times for a continuum
+	     allocate(Vij(cont%Nlambda), twohnu3_c2k(cont%Nlambda))
+	     
+    	 Vij(:) = bound_free_Xsection(cont) 	
+    	       !write(*,*) 'bf', icell, id, iray, maxval(Vij), minval(Vij)
+
+         twohnu3_c2k(:) = twohc / NLTEspec%lambda(Nblue:Nred)**(3d0) * &
+              Vij(:) * gijk(:) * aatom%n(j,icell) !eta
+              
+         
+         !I don't know how to handle negative chi due to stimulated emission...
+         !Problem of physics (model) or code ?
+         if (minval(gijk)*aatom%n(j,icell) > aatom%n(i,icell)) stm = 0d0
+         
+         Vij(:) = Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell)) !chi
+
+         !keep copy of continuum only
+    	 NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) + Vij(:)
+    	 NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) + twohnu3_c2k(:)
+
+         !gather total NLTE
+         NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + Vij(:)
+       		
+         NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + twohnu3_c2k(:)
+    	
+    	 if (iterate) then
+    	   aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + twohnu3_c2k(:)
+         end if			
+   
+        deallocate(Vij, gijk, twohnu3_c2k)
     
     CASE DEFAULT
      CALL Error("Transition type unknown", aatom%at(kr)%trtype)

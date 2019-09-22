@@ -1204,6 +1204,15 @@ endif
 						
 						!Solve SEE for all atoms
 						CALL updatePopulations(id, icell)
+!         				if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
+!         	 				write(*,*) n_iter, "  subit--> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+!         	 				CALL SolveElectronDensity(ne_start_sol)
+!         	 				do nact=1,atmos%NactiveAtoms
+!                					atom => atmos%ActiveAtoms(nact)%ptr_atom
+!                					CALL LTEpops(atom,.true.)
+!                					atom => Null()
+!              				end do
+!         				end if
 						
     				    do nact=1,atmos%NactiveAtoms
     				     atom => atmos%ActiveAtoms(nact)%ptr_atom
@@ -1328,6 +1337,7 @@ endif
         									!if ==1 for Ne_period=3: 1 ok, 2, 3, 4 ok, 5, 6, 7 ok etc
         									! if 0: 1, 2, 3ok, 4, 5, 6ok ect								
         	!Only if specified
+!         if (disable_subit) then
         	if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
         	 write(*,*) n_iter, "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
         	 CALL SolveElectronDensity(ne_start_sol)
@@ -1343,6 +1353,8 @@ endif
                atom => Null()
              end do
         	end if
+!         endif	
+        	
 	    end do !while
 	  end do !over etapes
 	

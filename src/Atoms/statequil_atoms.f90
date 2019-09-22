@@ -24,11 +24,18 @@ MODULE statequil_atoms
   integer, intent(in) :: icell, id
   type (AtomType), pointer, intent(inout) :: atom
   
+     atom%Gamma(:,:,id) = 0d0
 	 if (atom%ID=="H") then
 	  atom%Gamma(:,:,id) = Collision_Hydrogen(icell)
 	 else
       atom%Gamma(:,:,id) = CollisionRate(icell, atom) 
      end if
+     
+     if (any_nan_infinity_matrix(atom%Gamma(:,:,id))>0) then
+    	write(*,*) atom%Gamma(:,:,id)
+    	write(*,*) "Big at init", id, icell, atom%ID, atom%n(:,icell)
+    	stop
+  	 endif
   
   RETURN 
  END SUBROUTINE initGamma_atom
@@ -168,12 +175,12 @@ MODULE statequil_atoms
            Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%dtau(Nblue+l-1,iray,id)) + \
              NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
 		endif
-             
+
        atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*weight(l)*Ieff
          
              
        atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*line%Bji*Ieff
-       
+
       enddo
      enddo
 
@@ -210,7 +217,7 @@ MODULE statequil_atoms
 
       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu*weight(l)
       atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu+twohnu3_c2)*gijk(l)*weight(l)
-         
+      
      enddo
     
      deallocate(weight, gijk)
