@@ -1227,7 +1227,7 @@ endif
 
        					if (diff < precision_sub) then
        						lconverged_loc = .true.
-     					    !write(*,*) id, "dpops(sub) = ", diff
+     					    !write(*,*) id, n_iter_loc, "dpops(sub) = ", diff
        					else
         					!recompute opacity of this cell., but I need angles and pos...
        						!NLTEspec%I not changed
@@ -1247,6 +1247,8 @@ endif
        					  if (diff>1) write(*,*) id, " sub-it not converged after", n_iter_loc, &
        					  	" iterations; diff=", diff
        					  lconverged_loc = .true.
+       					  !write(*,*) id, n_iter_loc, "dpops(sub) = ", diff
+
        					end if
      				end do
      	            if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
