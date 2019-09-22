@@ -1204,15 +1204,16 @@ endif
 						
 						!Solve SEE for all atoms
 						CALL updatePopulations(id, icell)
-!         				if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
-!         	 				write(*,*) n_iter, "  subit--> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
-!         	 				CALL SolveElectronDensity(ne_start_sol)
-!         	 				do nact=1,atmos%NactiveAtoms
-!                					atom => atmos%ActiveAtoms(nact)%ptr_atom
-!                					CALL LTEpops(atom,.true.)
-!                					atom => Null()
-!              				end do
-!         				end if
+        				if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
+        					write(*,*) " Solve ne local iteration:", n_iter_loc
+        	 				write(*,*) "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+        	 				CALL SolveElectronDensity(ne_start_sol)
+        	 				do nact=1,atmos%NactiveAtoms
+               					atom => atmos%ActiveAtoms(nact)%ptr_atom
+               					CALL LTEpops(atom,.true.)
+               					atom => Null()
+             				end do
+        				end if
 						
     				    do nact=1,atmos%NactiveAtoms
     				     atom => atmos%ActiveAtoms(nact)%ptr_atom
@@ -1337,23 +1338,24 @@ endif
         									!if ==1 for Ne_period=3: 1 ok, 2, 3, 4 ok, 5, 6, 7 ok etc
         									! if 0: 1, 2, 3ok, 4, 5, 6ok ect								
         	!Only if specified
-!         if (disable_subit) then
-        	if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
-        	 write(*,*) n_iter, "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
-        	 CALL SolveElectronDensity(ne_start_sol)
+        	if (disable_subit) then
+        		if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
+        		write(*,*) " Solve ne Global iteration:", n_iter
+        	 	write(*,*) " --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+        	 	CALL SolveElectronDensity(ne_start_sol)
         	 !Recompute LTE pops used in continua radiative rates 
         	 !for Activeatoms only ?
-        	 do nact=1,atmos%NactiveAtoms !if over Active only, should recompute for passive also
+        	 	do nact=1,atmos%NactiveAtoms !if over Active only, should recompute for passive also
         	 							  !but this preserve the constant background opac
         	 							  !as passiveatoms%n = passiveatoms%nstar with ne init.
-               atom => atmos%ActiveAtoms(nact)%ptr_atom
+               	atom => atmos%ActiveAtoms(nact)%ptr_atom
              !do nact=1,atmos%NAtom
                !atom => atmos%Atoms(nact)%ptr_atom
-               CALL LTEpops(atom,.true.)
-               atom => Null()
-             end do
-        	end if
-!         endif	
+               	CALL LTEpops(atom,.true.)
+               	atom => Null()
+             	end do
+        		end if
+        	endif	
         	
 	    end do !while
 	  end do !over etapes
@@ -1366,13 +1368,14 @@ endif
    write(*,*) "END LOOP: old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
    CALL SolveElectronDensity(ne_start_sol)
    !Recompute for all atoms the LTE pops
+   write(*,*) "   recompute LTE pops for all atoms"
    do nact=1,atmos%NAtom
       atom => atmos%Atoms(nact)%ptr_atom
       CALL LTEpops(atom,.true.)
       atom => Null()
    end do 
   else if (iterate_ne) then
-   write(*,*) "END LOOP: old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+   write(*,*) "END LOOP: recompute LTE pops of passive atoms"
    !Recompute for all passive atoms the LTE pops
    !because the lte pops of active atoms only is updated with iterate_ne
    do nact=1,atmos%NpassiveAtoms
