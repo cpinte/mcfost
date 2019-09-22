@@ -1203,7 +1203,7 @@ endif
        					
             			do nact=1, atmos%NactiveAtoms
             	    		atom => atmos%ActiveAtoms(nact)%ptr_atom
-             				gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
+             				pop_old(nact, 1:atom%Nlevel,id) = atom%n(:,icell)
              				atom => NULL()
             			end do
 !                         pop_old(:,:,id) = pop(:,:,id)
