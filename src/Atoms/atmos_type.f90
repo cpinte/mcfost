@@ -1119,7 +1119,7 @@ MODULE atmos_type
      		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
      		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
    end if
-   write(*,*) "Typical velocity in the model (km/s):"
+   write(*,*) "Typical line extent (km/s):"
    atmos%v_char = Lextent * atmos%v_char
    write(*,*) atmos%v_char/1d3
 
