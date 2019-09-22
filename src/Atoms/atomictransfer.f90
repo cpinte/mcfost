@@ -935,7 +935,7 @@ endif
   integer :: n_rayons_max != n_rayons_start2 * (2**(n_iter2_max-1)
   !! it is atmos%Nrays in atom transfer
   integer :: n_level_comp
-  real, parameter :: precision_sub = 1.0e-2 !1e-3
+  real, parameter :: precision_sub = 5e-3 !1e-3
   real, parameter :: precision = 1.0e-1
   integer :: etape, etape_start, etape_end, iray, n_rayons
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
