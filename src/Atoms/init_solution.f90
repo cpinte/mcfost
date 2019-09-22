@@ -12,7 +12,7 @@ MODULE init_solution
  
  IMPLICIT NONE
  
- real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, pop_old, pop
+ real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, pop_old!, pop
  
  CONTAINS
  
@@ -91,7 +91,7 @@ MODULE init_solution
     if (sub_iterations_enabled) then
       Write(*,*) " Allocating space for sub-iterations populations"
       allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
-      allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
+      !allocate(pop(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop = 0d0
     endif
    endif
    allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,atmos%Nspace)); gpop_old = 0d0
@@ -115,7 +115,7 @@ MODULE init_solution
  
   deallocate(gpop_old)
   if (sub_iterations_enabled) then
-   if (allocated(pop)) deallocate(pop)
+   !if (allocated(pop)) deallocate(pop)
    if (allocated(pop_old)) deallocate(pop_old)
   endif
   CALL dealloc_phi_lambda() !not used anymore, except if we kept them in Profile() ?

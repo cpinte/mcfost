@@ -28,7 +28,7 @@ MODULE AtomicTransfer
  use impact
  use solvene
  use statequil_atoms
- use init_solution, only 			: Init_NLTE, free_NLTE_sol, gpop_old, pop_old, pop
+ use init_solution, only 			: Init_NLTE, free_NLTE_sol, gpop_old, pop_old!, pop
  use voigtfunctions
  use writeatom
  !$ use omp_lib
@@ -973,7 +973,7 @@ endif
   
   allocate(dM(atmos%Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
   if (atmos%coherent_scattering) then
-   allocate(Jold(NLTEspec%Nwaves, atmos%Nspace))
+   allocate(Jold(NLTEspec%Nwaves, atmos%Nspace))!move to initsol
    Jold = 0d0
   endif
 
@@ -994,7 +994,7 @@ endif
   xyz0(:,:,:) = 0d0
   uvw0(:,:,:) = 0d0
  ! ----------------------------  INITIAL POPS------------------------------------------ !
-   CALL Init_NLTE(sub_iterations_enabled=.not.disable_subit,Ng_acceleration=Ng_acceleration)!Ng_acceleration
+   CALL Init_NLTE(sub_iterations_enabled=.not.disable_subit,Ng_acceleration=Ng_acceleration)
  !  ------------------------------------------------------------------------------------ !
 
 ! ncells_filled = 0
@@ -1081,7 +1081,7 @@ endif
             !!$omp shared(atmos,NLTEspec) & !private or shared ??
             !!$omp shared(xyz0, uvw0, lkeplerian,n_iter) & !before nact was shared
             !!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
-            !!$omp shared(n_cells, pop_old, pop, ds,disable_subit, dN, gpop_old,force_lte) &
+            !!$omp shared(n_cells, pop_old, ds,disable_subit, dN, gpop_old,force_lte) & !pop
             !!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
             !!$omp do schedule(static,1)
   			do icell=1, n_cells
@@ -1187,11 +1187,11 @@ endif
     				 lconverged_loc = .false.
     				!save pops for all active atoms
     				!pop(NactAtom, Nmaxlvel, Nthreads)
-    				 do nact=1,atmos%NactiveAtoms
-    				  atom => atmos%ActiveAtoms(nact)%ptr_atom
-    				  pop(nact,1:atom%Nlevel,id) = atom%n(:,icell)
-    				  atom => NULL()
-    				 end do
+!     				 do nact=1,atmos%NactiveAtoms
+!     				  atom => atmos%ActiveAtoms(nact)%ptr_atom
+!     				  pop(nact,1:atom%Nlevel,id) = atom%n(:,icell)
+!     				  atom => NULL()
+!     				 end do
     				end if
 
 
@@ -1200,26 +1200,31 @@ endif
      				do while (.not.lconverged_loc)
      				!write(*,*) "Starting subit for cell ", icell
        					n_iter_loc = n_iter_loc + 1
-                        pop_old(:,:,id) = pop(:,:,id)
+       					
+            			do nact=1, atmos%NactiveAtoms
+            	    		atom => atmos%ActiveAtoms(nact)%ptr_atom
+             				gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
+             				atom => NULL()
+            			end do
+!                         pop_old(:,:,id) = pop(:,:,id)
 						
 						!Solve SEE for all atoms
 						CALL updatePopulations(id, icell)
-        				if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
-        					write(*,*) " Solve ne local iteration:", n_iter_loc
-        	 				write(*,*) "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
-        	 				CALL SolveElectronDensity(ne_start_sol)
-        	 				do nact=1,atmos%NactiveAtoms
-               					atom => atmos%ActiveAtoms(nact)%ptr_atom
-               					CALL LTEpops(atom,.true.)
-               					atom => Null()
-             				end do
-        				end if
-						
-    				    do nact=1,atmos%NactiveAtoms
-    				     atom => atmos%ActiveAtoms(nact)%ptr_atom
-    				     pop(nact,1:atom%Nlevel,id) = atom%n(:,icell)
-    				     atom => NULL()
-    				    end do
+!         				if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
+!         					write(*,*) " Solve ne local iteration:", n_iter_loc
+!         	 				write(*,*) "  --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+!         	 				CALL SolveElectronDensity(ne_start_sol)
+!         	 				do nact=1,atmos%NactiveAtoms
+!                					atom => atmos%ActiveAtoms(nact)%ptr_atom
+!                					CALL LTEpops(atom,.true.)
+!                					atom => Null()
+!              				end do
+!         				end if
+!     				    do nact=1,atmos%NactiveAtoms
+!     				     atom => atmos%ActiveAtoms(nact)%ptr_atom
+!     				     pop(nact,1:atom%Nlevel,id) = atom%n(:,icell)
+!     				     atom => NULL()
+!     				    end do
 						
 						diff = 0.0 !keeps track of the maximum dpops(dN) among each atom.
 								   !for this cell
@@ -1227,7 +1232,7 @@ endif
      					    atom => atmos%ActiveAtoms(nact)%ptr_atom
      					    dN1 = 0.0 !for one atom
      						do ilevel=1,atom%Nlevel
-     				    		dN = abs((pop_old(nact,ilevel,id)-pop(nact,ilevel,id))/(pop_old(nact,ilevel,id)+tiny_dp))
+     				    		dN = abs((pop_old(nact,ilevel,id)-atom%n(ilevel,id))/(pop_old(nact,ilevel,id)+tiny_dp))
      				    		diff = max(diff, dN)
      				    		dN1 = max(dN1, dN)
      						end do 
@@ -1338,7 +1343,7 @@ endif
         									!if ==1 for Ne_period=3: 1 ok, 2, 3, 4 ok, 5, 6, 7 ok etc
         									! if 0: 1, 2, 3ok, 4, 5, 6ok ect								
         	!Only if specified
-        	if (disable_subit) then
+        	!if (disable_subit) then
         		if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
         		write(*,*) " Solve ne Global iteration:", n_iter
         	 	write(*,*) " --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
@@ -1355,7 +1360,7 @@ endif
                	atom => Null()
              	end do
         		end if
-        	endif	
+        	!endif	
         	
 	    end do !while
 	  end do !over etapes
