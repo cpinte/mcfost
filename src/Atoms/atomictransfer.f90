@@ -989,8 +989,8 @@ endif
   
   iterate_ne = (n_iterate_ne>0)
   force_lte = .false.
-  max_sub_iter = 25
-  maxIter = 30
+  max_sub_iter = 50
+  maxIter = 50
   xyz0(:,:,:) = 0d0
   uvw0(:,:,:) = 0d0
  ! ----------------------------  INITIAL POPS------------------------------------------ !
@@ -1043,7 +1043,7 @@ endif
         do while (.not.lconverged)
         
         	n_iter = n_iter + 1
-        	if (n_iter >= maxIter) exit !change step
+        	if (n_iter > maxIter) exit !change step
             write(*,*) " -> Iteration #", n_iter, " Step #", etape
             	
   			if (lfixed_rays) then
@@ -1331,10 +1331,12 @@ endif
         	 CALL SolveElectronDensity(ne_start_sol)
         	 !Recompute LTE pops used in continua radiative rates 
         	 !for Activeatoms only ?
-        	 !do nact=1,atmos%NactiveAtoms
-             !  atom => atmos%ActiveAtoms(nact)%ptr_atom
-             do nact=1,atmos%NAtom
-               atom => atmos%Atoms(nact)%ptr_atom
+        	 do nact=1,atmos%NactiveAtoms !if over Active only, should recompute for passive also
+        	 							  !but this preserve the constant background opac
+        	 							  !as passiveatoms%n = passiveatoms%nstar with ne init.
+               atom => atmos%ActiveAtoms(nact)%ptr_atom
+             !do nact=1,atmos%NAtom
+               !atom => atmos%Atoms(nact)%ptr_atom
                CALL LTEpops(atom,.true.)
                atom => Null()
              end do
@@ -1345,11 +1347,21 @@ endif
 !close(16)
   
   !Force to compute a new value of electron density after convergence
+  !and new lte populations for all atoms
   if (n_iterate_ne < 0) then
    write(*,*) "END LOOP: old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
    CALL SolveElectronDensity(ne_start_sol)
    !Recompute for all atoms the LTE pops
    do nact=1,atmos%NAtom
+      atom => atmos%Atoms(nact)%ptr_atom
+      CALL LTEpops(atom,.true.)
+      atom => Null()
+   end do 
+  else if (iterate_ne) then
+   write(*,*) "END LOOP: old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+   !Recompute for all passive atoms the LTE pops
+   !because the lte pops of active atoms only is updated with iterate_ne
+   do nact=1,atmos%NpassiveAtoms
       atom => atmos%Atoms(nact)%ptr_atom
       CALL LTEpops(atom,.true.)
       atom => Null()

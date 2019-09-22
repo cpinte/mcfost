@@ -13,9 +13,9 @@ MODULE Opacity
  use metal, only : bound_free_Xsection, Background, BackgroundLines
  !!use molecular_emission, only : v_proj
  use math, only : locate, integrate_dx
- use grid, only : cross_cell
+ use grid, only : cross_cell, test_exit_grid
  use mcfost_env, only : dp
-
+ use stars, only : intersect_stars
 
 
  IMPLICIT NONE
@@ -55,11 +55,18 @@ MODULE Opacity
   real(kind=dp), intent(in) :: x0, y0, z0, u0, v0, w0
   integer, intent(in) :: id, icell, iray
   real(kind=dp) :: l_dum, l_c_dum, l_v_dum, x1, x2, x3, ds
-  integer 		   :: n_c_dum
+  integer 		   :: n_c_dum, i_star, icell_star
   real(kind=dp), dimension(NLTEspec%Nwaves) :: chi, dtau
+  logical :: lintersect_stars
   !recompute opacity of this cell., but I need angles and pos...
   !NLTEspec%I not changed
   ! move to the cell icell.
+  call intersect_stars(x0,y0,z0, u0,v0,w0, lintersect_stars, i_star, icell_star)
+  if (test_exit_grid(icell, x0, y0, z0)) RETURN
+  if (lintersect_stars) then
+      if (icell == icell_star) return
+  endif
+
   CALL cross_cell(x0,y0,z0, u0,v0,w0, icell, &
        						n_c_dum, x1,x2,x3, n_c_dum, l_dum, l_c_dum, l_v_dum)
 !   NLTEspec%AtomOpac%chi(:,id) = 0d0
