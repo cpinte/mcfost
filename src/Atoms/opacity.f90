@@ -346,8 +346,12 @@ MODULE Opacity
          
          !I don't know how to handle negative chi due to stimulated emission...
          !Problem of physics (model) or code ?
-         if (minval(gijk)*aatom%n(j,icell) > aatom%n(i,icell)) stm = 0d0
-         
+         do la=1,cont%Nlambda
+          if (gijk(la)*aatom%n(j,icell) > aatom%n(i,icell)) then 
+            stm = 0d0 
+            exit
+          endif
+         enddo         
          Vij(:) = Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell)) !chi
 
          !keep copy of continuum only
