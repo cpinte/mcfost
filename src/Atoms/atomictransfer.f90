@@ -695,7 +695,6 @@ MODULE AtomicTransfer
   ! This routine initialises the necessary quantities for atomic line transfer
   ! and calls the appropriate routines for LTE or NLTE transfer.
  ! --------------------------------------------------------------------------- !
-  !!use simple_models, only 				: magneto_accretion_model, spherical_shells_model, FALC_MODEL, spherical_star, feqv !for tests
   integer :: atomunit = 1, nact
   integer :: icell
   integer :: ibin, iaz
@@ -703,7 +702,7 @@ MODULE AtomicTransfer
   real(kind=dp) :: dumm
   character(len=20) :: ne_start_sol = "H_IONISATION"
   character(len=20)  :: newPRT_SOLUTION = "FULL_STOKES"
-  logical :: lwrite_waves = .false.
+
 !   
 !   integer :: i, j
 !   real(kind=dp), dimension(:), allocatable :: test_col
@@ -760,6 +759,7 @@ MODULE AtomicTransfer
    if (lmodel_ascii) then
     CALL readAtmos_ascii(density_file)
     CALL writeHydrogenDensity()
+    CALL writeTemperature()
     !could write also T, V ect and grid domain icompute_atomRT, but present in the model.s
     !I write the density here just to check the cell mapping.
    end if
@@ -849,7 +849,16 @@ endif
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
-  if (ltab_wavelength_image) then
+ 
+   !should add an other flag to force to avoid continua lines
+   !Define a wavelength grid for image with only lines, if not input wavelength
+!    if (.not.(ltab_wavelength_image)) then !or for all passive lines also
+!     ltab_wavelength_image = .true.
+!     !!CALL write_wavelengths_table_NLTE_lines(NLTEspec%lambda) !!after grid creation actually
+!     tab_wavelength_image = "line_waves.s"
+!    endif
+ 
+  if (ltab_wavelength_image) then    
    !Check smarter to deallocate/reallocated NLTE wavelength arrays
    CALL initSpectrumImage() !deallocate waves arrays/ define a new grid
    !shorter than the grid for NLTE / reallocate waves arrays
@@ -860,7 +869,8 @@ endif
    ! TO DO: add NLTE continua and LTE/NLTE lines if possible
    !!CALL reallocate_mcfost_vars() !wavelength only?
    CALL reallocate_mcfost_wavelength_arrays()
-  end if
+  end if !grid for image
+!check
 !   write(*,*) atmos%atoms(1)%ptr_atom%lines(1)%i, atmos%atoms(1)%ptr_atom%lines(1)%j, maxval(atmos%atoms(1)%ptr_atom%continua(1)%alpha)
 !   write(*,*) atmos%passiveatoms(1)%ptr_atom%lines(1)%i, atmos%passiveatoms(1)%ptr_atom%lines(1)%j, maxval(atmos%passiveatoms(1)%ptr_atom%continua(1)%alpha)
 !   write(*,*) Hydrogen%lines(1)%i, Hydrogen%lines(1)%j, maxval(Hydrogen%continua(1)%alpha)
@@ -989,7 +999,7 @@ endif
   
   iterate_ne = (n_iterate_ne>0)
   force_lte = .false.
-  max_sub_iter = 50
+  max_sub_iter = 60
   maxIter = 50
   xyz0(:,:,:) = 0d0
   uvw0(:,:,:) = 0d0
@@ -1074,18 +1084,22 @@ endif
         	!!$omp end parallel
         	
             
- 			!!$omp parallel &
-            !!$omp default(none) &
-            !!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, imu) &
-            !!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, atom,nact) &
-            !!$omp shared(atmos,NLTEspec) & !private or shared ??
-            !!$omp shared(xyz0, uvw0, lkeplerian,n_iter) & !before nact was shared
-            !!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
-            !!$omp shared(n_cells, pop_old, ds,disable_subit, dN, gpop_old,force_lte) & !pop
-            !!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
-            !!$omp do schedule(static,1)
+ 			!$omp parallel &
+            !$omp default(none) &
+            !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, imu) &
+            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, atom,nact) &
+            !$omp shared(atmos,NLTEspec) & !private or shared ??
+            !$omp shared(xyz0, uvw0, lkeplerian,n_iter) & !before nact was shared
+            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter) &
+            !$omp shared(n_cells, pop_old, ds,disable_subit, dN, dN1,gpop_old,force_lte) & !pop
+            !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
+            !$omp do schedule(static,1)
   			do icell=1, n_cells
-   				!!$ id = omp_get_thread_num() + 1
+   				!$ id = omp_get_thread_num() + 1
+   				
+   				!Should consider to add a different positive flag for cells in NLTE
+   				!Because, if we keep low T, low nH and low ne region, the transfer
+   				!could become very unstable, no ?
    				if (atmos%icompute_atomRT(icell)>0) then !nor transparent nor dark
 
   			        CALL initGamma(id,icell)
@@ -1173,6 +1187,11 @@ endif
 !    !make sure J is the same
 !    !write(*,*) sum(NLTEspec%I(la, :, id))/n_rayons, NLTEspec%J(la, icell)
 ! end do
+! 					write(*,*) id, n_iter, icell
+! 					write(*,*) "n", atmos%Atoms(1)%ptr_atom%n(:,icell)
+! 					write(*,*) "n",  atmos%ActiveAtoms(1)%ptr_atom%n(:,icell)
+! 					write(*,*) "nstar", atmos%Atoms(1)%ptr_atom%nstar(:,icell)
+! 					write(*,*) "nstar", atmos%ActiveAtoms(1)%ptr_atom%nstar(:,icell)
 
 
       				!Fill the Rate matrix and integrates over rays and frequencies
@@ -1269,8 +1288,8 @@ endif
      	            if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
      			end if !icompute_atomRT
      		end do !icell
-        	!!$omp end do
-        	!!$omp end parallel
+        	!$omp end do
+        	!$omp end parallel
 
         	!Global convergence criterion
         	!I cannot iterate on unconverged cells because the radiation coming for each cell
@@ -1362,6 +1381,9 @@ endif
         		end if
         	!endif	
         	
+!         	do nact=1, atmos%NActiveAtoms
+!         	 CALL writePops(atmos%Activeatoms(nact)%ptr_atom, 1)
+!         	enddo
 	    end do !while
 	  end do !over etapes
 	

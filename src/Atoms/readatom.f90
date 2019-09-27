@@ -547,22 +547,13 @@ MODULE readatom
     else
       atom%dataFile = atom%ID(1:2)//".fits"
     end if
-    CALL create_pops_file(atom,atom%Active)
-    !write(*,*) "Populations file for writing: .", &
-    !          trim(atom%popsoutFile),"."
+    CALL create_pops_file(atom)
+
+    write(*,*) "Populations file for writing: .",trim(atom%dataFile),"."
 
    if (atom%active) then
-!    !create file name for writing populations
-!    !for each atom. File will be created at the end
-!    !of the NLTE calculations
-!     if (atom%ID(2:2) .eq." ") then
-!       atom%popsoutFile = "pops."//atom%ID(1:1)//".fits.gz"
-!     else
-!       atom%popsoutFile = "pops."//atom%ID(1:2)//".fits.gz"
-!     end if
-!     !write(*,*) "Populations file for writing: .", &
-!     !         trim(atom%popsoutFile),"."
 
+    !Not implemented, futur removal in atomic file
     if (atom%Npfr.gt.0) then
      write(*,*) "PFR not implemented yet, do not write file"
     end if
@@ -771,6 +762,9 @@ MODULE readatom
 !    write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID, atmos%PassiveAtoms(nmet)%ptr_atom%ID
 !   end do
 
+  write(*,*) "  -> writing lines individual wavelength grid"
+  !write lines grid
+  CALL write_lines_grid()
 
   RETURN
   END SUBROUTINE readAtomicModels

@@ -31,9 +31,8 @@ MODULE writeatom !Futur write....
  character(len=15), parameter :: neFile = "ne.fits"
  character(len=15), parameter :: nHminFile = "nHmin.fits"
  character(len=15), parameter :: nHFile = "nHtot.fits.gz"
- character(len=50), parameter :: TemperatureFile = "Temperature.fits.gz"
  
- integer, parameter :: Nmax_kept_iter = 3 !keep the three latest iterations.
+ integer, parameter :: Nmax_kept_iter = 1 !keep the Nmax_kept_iter latest iterations.
  !the first is the oldest one
 
  
@@ -237,77 +236,25 @@ MODULE writeatom !Futur write....
  RETURN
  END SUBROUTINE writeHydrogenMinusDensity
  
- SUBROUTINE writeTemperature()
- ! ------------------------------------ !
- ! T in K
- ! ------------------------------------ !
-  integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
-  logical :: extend, simple
-  integer :: nelements
-  
-  !get unique unit number
-  CALL ftgiou(unit,EOF)
-
-  blocksize=1
-  CALL ftinit(unit,trim(TemperatureFile),blocksize,EOF)
-  !  Initialize parameters about the FITS image
-  simple = .true. !Standard fits
-  group = 1 !??
-  fpixel = 1
-  extend = .false. !??
-  bitpix = -64  
-
-  if (lVoronoi) then
-   naxis = 1
-   naxes(1) = atmos%Nspace ! equivalent n_cells
-   nelements = naxes(1)
-  else
-   if (l3D) then
-    naxis = 3
-    naxes(1) = n_rad
-    naxes(2) = 2*nz
-    naxes(3) = n_az
-    nelements = naxes(1) * naxes(2) * naxes(3) ! != n_cells ? should be
-   else
-    naxis = 2
-    naxes(1) = n_rad
-    naxes(2) = nz
-    nelements = naxes(1) * naxes(2) ! should be n_cells also
-   end if
-  end if
-  ! write(*,*) 'yoyo2', n_rad, nz, n_cells, atmos%Nspace
-  !  Write the required header keywords.
-
-  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
-  ! Additional optional keywords
-  CALL ftpkys(unit, "UNIT", "K", ' ', EOF)
-  !write data
-  CALL ftpprd(unit,group,fpixel,nelements,atmos%T,EOF)
-  
-  CALL ftclos(unit, EOF)
-  CALL ftfiou(unit, EOF)
-  
-  if (EOF > 0) CALL print_error(EOF)
- 
- RETURN
- END SUBROUTINE writeTemperature
- 
- SUBROUTINE create_pops_file(atom, lte_only)
+ SUBROUTINE create_pops_file(atom)
  ! Create file to write populations
  ! 
   type (AtomType), intent(inout) :: atom
-  logical, intent(in) :: lte_only
-  character(len=20) :: popsF, comment
+  logical :: lte_only
+  character(len=MAX_LENGTH) :: popsF, comment, iter_number
   integer :: unit, EOF = 0, blocksize, naxes(5), naxis,group, bitpix, fpixel, i
   logical :: extend, simple
   integer :: nelements, syst_status, Nplus, N0
+  real(kind=dp), dimension(:), allocatable :: zero_arr
 
-   if (popsF(len(popsF)-3:len(popsF))==".gz") then
-    CALL Warning("Atomic pops file cannot be compressed fits.")
-    write(*,*) popsF, popsF(len(popsF)-3:len(popsF))
-    atom%dataFile = popsF(1:len(popsF)-3)
-    write(*,*) atom%dataFile
-   end if
+!    if (popsF(len(popsF)-3:len(popsF))==".gz") then
+!     CALL Warning("Atomic pops file cannot be compressed fits.")
+!     write(*,*) popsF, popsF(len(popsF)-3:len(popsF))
+!     atom%dataFile = popsF(1:len(popsF)-3)
+!     write(*,*) atom%dataFile
+!    end if
+
+  lte_only = .not.atom%active
   
   !get unique unit number
   CALL ftgiou(unit,EOF)
@@ -323,7 +270,7 @@ MODULE writeatom !Futur write....
   Nplus = 2 !lte + NLTE
   if (lte_only) Nplus = 1
   
-  N0 = Nmax_kept_iter
+  N0 = max(1,Nmax_kept_iter) !at mini LTE, NLTE and last iteration atm
   if (lte_only) N0 = 0
 
   if (lVoronoi) then
@@ -344,21 +291,32 @@ MODULE writeatom !Futur write....
     nelements = naxes(1) * naxes(2) * naxes(3)
    end if
   end if
+  
+  allocate(zero_arr(nelements)); zero_arr=0d0
 
   CALL appel_syst('mkdir -p '//trim(atom%ID),syst_status) !create a dir for populations 
   CALL ftinit(unit,trim(atom%ID)//"/"//trim(atom%dataFile),blocksize,EOF)
+ 
+  do i=1, N0 + Nplus
+  
+    write(iter_number, '(A10,I,A1)') "(Iteration", i,")"
 
-  do i=1,N0 + Nplus
    	CALL ftcrhd(unit, EOF)
    	CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
-   	COMMENT = "Iteration "//char(i)
+   	
+   	COMMENT = trim(iter_number)
    	if (lte_only) COMMENT = "(LTE)"
-   	if (i>Nmax_kept_iter) then
+   	if (i==Nmax_kept_iter+1) then
+   	 COMMENT = "(NLTE)"
+   	else if (i==Nmax_kept_iter+2) then
    	 COMMENT = "(LTE)"
-   	 if (i==2) COMMENT = "(NLTE)"
    	end if
   	CALL ftpkys(unit, "UNIT", "m^-3", COMMENT, EOF)  
+    CALL ftpprd(unit,group,fpixel,nelements,zero_arr,EOF)
+
   end do
+  
+  deallocate(zero_arr)
   
   CALL ftclos(unit, EOF) !close
   CALL ftfiou(unit, EOF) !free
@@ -435,8 +393,10 @@ MODULE writeatom !Futur write....
   end if
   
   if (count>0) then !iterations
+    if (count <= Nmax_kept_iter) then
     CALL FTMAHD(unit,count,hdutype,EOF)
   	CALL ftpprd(unit,group,fpixel,nelements,atom%n,EOF)
+  	endif
   else if (count<=0) then !final solutions + LTE
    if (lte_only) then
     CALL FTMAHD(unit,1,hdutype,EOF) !only one if lte_only
