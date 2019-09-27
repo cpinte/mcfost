@@ -65,6 +65,169 @@ MODULE getlambda
   RETURN
   END SUBROUTINE Read_wavelengths_table
   
+  SUBROUTINE write_lines_grid()
+  ! -------------------------------------------------------- !
+  ! write individual lines grid in the format read by 
+  ! write_wavelength_table
+  ! for all atoms
+  !
+  ! This version writes the individual grid of each line
+  ! after they have been created before, creating the wavelength
+  ! grid of the transfer
+  ! -------------------------------------------------------- !
+   type (AtomType), pointer :: atom
+   type (AtomicLine) :: line
+   real(kind=dp), dimension(:,:), allocatable :: lambda_table
+   character(len=12) :: line_waves = "line_waves.s"
+   character(len=MAX_LENGTH) :: inputline, FormatLine
+   integer :: Nl, k, la, na, maxL
+   integer, dimension(1000) :: Nl2
+   !cound lines
+   Nl = 0 !total lines of all atoms
+   maxL = 0
+   
+  if (.not.allocated(atmos%Atoms(1)%ptr_atom%lines(1)%lambda)) then
+   write(*,*) " Error, lambda grid of lines may not been allocated yet or anymore"
+   stop
+  endif
+   
+   do na=1, atmos%Natom!NActiveatoms
+    atom => atmos%atoms(na)%ptr_atom!atmos%Activeatoms(na)%ptr_atom
+    do k=1, atom%Nline
+     Nl = Nl + 1
+     if (Nl>1000) then
+      write(*,*) " too many lines in write_Wavelengths_table"
+      stop
+     endif
+     Nl2(Nl) = atom%lines(k)%Nlambda
+     maxL = max(Nl2(Nl), maxL)
+    enddo
+    atom=>NULL()
+   enddo
+   !write(*,*) maxL, Nl, Nl2(1:Nl)
+   
+   allocate(lambda_table(Nl, maxL))
+   write(FormatLine,'("(1"A,I3")")') "A", 256
+   
+   Nl = 0
+   do na=1, atmos%Natom!NActiveatoms
+    atom => atmos%atoms(na)%ptr_atom!atmos%Activeatoms(na)%ptr_atom
+    do k=1, atom%Nline
+     Nl = Nl + 1
+    lambda_table(Nl,1:Nl2(Nl)) = atom%lines(k)%lambda
+
+    enddo
+    atom => NULL()
+   enddo
+
+   open(unit=1, file=TRIM(line_waves), status='unknown')
+   write(1,"(I)") Nl
+   !write(*,*) Nl
+      
+   do k=1,Nl
+    write(1,"(I)") Nl2(Nl)
+    !write(*,*) Nl2(Nl)
+   end do
+ 
+   Nl = 0
+   do na=1, atmos%Natom!NActiveatoms
+    atom => atmos%atoms(na)%ptr_atom!atmos%Activeatoms(na)%ptr_atom
+    do k=1, atom%Nline
+     Nl = Nl + 1
+      do la=1, Nl2(Nl)
+       write(1,'(F)') lambda_table(Nl, la)
+       !write(*,*) Nl, NL2(Nl), lambda_table(Nl, la)
+      enddo
+    enddo
+    atom=>NULL()
+   enddo
+   
+   close(1)
+   deallocate(lambda_table)
+
+  RETURN
+  END SUBROUTINE write_lines_grid
+  
+  SUBROUTINE write_wavelengths_table_NLTE_lines(waves)
+  ! -------------------------------------------------------- !
+  ! write individual lines grid in the format read by 
+  ! write_wavelength_table
+  ! for all atoms
+  !
+  ! This version if for the line grid taken on the final 
+  ! waves grid
+  ! -------------------------------------------------------- !
+   type (AtomType), pointer :: atom
+   real(kind=dp), dimension(:), intent(in) :: waves
+   type (AtomicLine) :: line
+   real(kind=dp), dimension(:,:), allocatable :: lambda_table
+   character(len=12) :: line_waves = "line_waves.s"
+   character(len=MAX_LENGTH) :: inputline, FormatLine
+   integer :: Nl, k, la, na, maxL
+   integer, dimension(1000) :: Nl2
+   
+   if (atmos%NactiveAtoms==0) then
+    write(*,*) " NLTE lines wavelength table not written, N active atoms = ", atmos%NactiveAtoms
+    return
+   endif
+   
+   !cound lines
+   Nl = 0 !total lines of all atoms
+   maxL = 0
+   do na=1, atmos%NActiveatoms
+    atom => atmos%Activeatoms(na)%ptr_atom
+    do k=1, atom%Nline
+     Nl = Nl + 1
+     if (Nl>1000) then
+      write(*,*) " too many lines in write_Wavelengths_table"
+      stop
+     endif
+     Nl2(Nl) = atom%lines(k)%Nlambda
+     maxL = max(Nl2(Nl), maxL)
+    enddo
+    atom=>NULL()
+   enddo
+   
+   allocate(lambda_table(Nl, maxL))
+   write(FormatLine,'("(1"A,I3")")') "A", 256
+   
+   Nl = 0
+   do na=1, atmos%NActiveatoms
+    atom => atmos%Activeatoms(na)%ptr_atom
+    do k=1, atom%Nline
+     Nl = Nl + 1
+    lambda_table(k,1:Nl2(Nl)) = waves(atom%lines(k)%Nblue:atom%lines(k)%Nred)
+
+    enddo
+    atom => NULL()
+   enddo
+
+   open(unit=1, file=TRIM(line_waves), status='unknown')
+   write(1,*) Nl
+      
+   do k=1,Nl
+    write(1,*) Nl2(Nl)
+   end do
+ 
+  Nl = 0
+   do na=1, atmos%NActiveatoms
+    atom => atmos%Activeatoms(na)%ptr_atom
+    do k=1, atom%Nline
+     Nl = Nl + 1
+      do la=1, Nl2(Nl)
+       write(1,'(1F)') lambda_table(Nl, la)
+      enddo
+    enddo
+    atom=>NULL()
+   enddo
+   
+   close(1)
+   
+   deallocate(lambda_table)
+
+  RETURN
+  END SUBROUTINE write_wavelengths_table_NLTE_lines
+  
   SUBROUTINE make_sub_wavelength_grid_cont(cont, lambdamin)
   ! ----------------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicContinuum cont.
