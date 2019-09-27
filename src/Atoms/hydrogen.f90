@@ -141,15 +141,29 @@ MODULE hydrogen_opacities
  ! Hubeny & Mihalas eq. 7.100 (from cgs to SI)
  ! takes place at LTE because it is collisional
   integer, intent(in) :: icell
-  double precision, dimension(NLTEspec%Nwaves), intent(out) :: chi
-  double precision :: stim(NLTEspec%Nwaves), np
+  integer :: la
+  real(kind=dp), dimension(NLTEspec%Nwaves), intent(out) :: chi
+  real(kind=dp) :: stim(NLTEspec%Nwaves), np, arg_exp, exp_val
 
   np = Hydrogen%n(Hydrogen%Nlevel,icell) !nH+=Nion H
-  stim = 1.-dexp(-hc_k/NLTEspec%lambda/atmos%T(icell))
+  
+  if (atmos%ne(icell) == 0d0) then
+   chi(:) = 0d0
+   return
+  endif
 
-  chi =  H_ff_Xsection(1, atmos%T(icell), NLTEspec%lambda) / &
-    dsqrt(atmos%T(icell)) * atmos%ne(icell) * np * stim
-
+  do la=1,NLTEspec%Nwaves
+  
+   arg_exp = min(600d0, hc_k/NLTEspec%lambda(la)/atmos%T(icell)) !min is 1e-260
+   exp_val = dexp(-arg_exp)
+   if (exp_val < tiny_dp) exp_val = 0d0
+   stim(la) = 1.-exp_val
+  
+   chi(la) =  H_ff_Xsection(1, atmos%T(icell), NLTEspec%lambda(la)) / &
+    dsqrt(atmos%T(icell)) * atmos%ne(icell) * np * stim(la)
+    
+  enddo
+  
  RETURN
  END SUBROUTINE Hydrogen_ff
  
@@ -160,9 +174,9 @@ MODULE hydrogen_opacities
  !should work with Hydrogen
   integer, intent(in) :: icell
   type (AtomicContinuum), intent(in) :: cont
-  double precision, dimension(NLTEspec%Nwaves), intent(out) :: chi
-  double precision :: stim(NLTEspec%Nwaves), nion
-  integer :: ic, Z
+  real(kind=dp), dimension(NLTEspec%Nwaves), intent(out) :: chi
+  real(kind=dp) :: stim(NLTEspec%Nwaves), nion, arg_exp, exp_val
+  integer :: ic, Z, la
 
 
   !ic = find_continuum(cont%atom, cont%i)
@@ -170,10 +184,23 @@ MODULE hydrogen_opacities
   Z = cont%atom%stage(cont%i) + 1  
 
   nion = cont%atom%n(ic, icell)
-  stim = 1.-dexp(-hc_k/NLTEspec%lambda/atmos%T(icell))
 
-  chi =  H_ff_Xsection(Z, atmos%T(icell), NLTEspec%lambda) / &
-    dsqrt(atmos%T(icell)) * atmos%ne(icell) * nion * stim
+  
+  if (atmos%ne(icell)==0d0) then
+   chi(:) = 0d0
+   return
+  endif
+
+  do la=1, NLTEspec%Nwaves
+   arg_exp = min(600d0, hc_k/NLTEspec%lambda(la)/atmos%T(icell))
+   exp_val = dexp(-arg_exp)
+   if (exp_val < tiny_dp) exp_val = 0d0
+   stim(la) = 1.- exp_val
+   
+   chi(la) =  H_ff_Xsection(Z, atmos%T(icell), NLTEspec%lambda(la)) / &
+    dsqrt(atmos%T(icell)) * atmos%ne(icell) * nion * stim(la)
+    
+  enddo
 
  RETURN
  END SUBROUTINE atom_ff_transitions
@@ -182,7 +209,7 @@ MODULE hydrogen_opacities
 !   ! Computes LTE hydrogen bound-free opacity
 !   ! See Hubeny & Mihalas 2014, chap. 7
 !   integer, intent(in) :: icell
-!   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi, eta
+!   real(kind=dp), intent(out), dimension(NLTEspec%Nwaves) :: chi, eta
 !   type (AtomicContinuum) :: cont
 !   integer :: i, kr, k, nc, Nred, Nblue, kc
 !   real(kind=dp) :: lambdaEdge, n_eff, npstar, np
@@ -216,7 +243,11 @@ MODULE hydrogen_opacities
 !     np = Hydrogen%n(Hydrogen%Nlevel,icell)
 !     twohnu3_c2 = twohc / NLTEspec%lambda(Nblue:Nred)**3
 !      
-!     ! -> prevents dividing by zero
+!
+!     
+!     write(*,*) "Change that part to compute only absorption no emisson !!!!"
+!	 !see metal_bf
+!	  stop
 !     if ((Hydrogen%n(i,icell) <= tiny_dp).or.(npstar <= tiny_dp)) then
 !        write(*,*) "(Hydrogen_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
 !        if (npstar <= 0) then
@@ -271,6 +302,7 @@ MODULE hydrogen_opacities
    integer, intent(in) :: icell
    real(kind=dp) :: lambda, lambda0, K, alpha, sigma, flambda, Cn(6), diff, stm,funit, cte
    integer :: la,n
+   real(kind=dp) :: arg_exp
    real(kind=dp), dimension(NLTEspec%Nwaves), intent(inout) :: chi, eta
    
    Cn(:) = (/152.519d0,49.534d0,-118.858d0,92.536d0,-34.194d0,4.982d0/)
@@ -278,7 +310,7 @@ MODULE hydrogen_opacities
    alpha = hc_k / MICRON_TO_NM ! hc_k = hc/k/nm_to_m
    cte = 1d-18 * 0.750 * atmos%T(icell)**(-5d0/2d0)
    lambda0 = 1.6419d0 !micron, photo detachement threshold
-   K = cte * dexp(alpha/(lambda0 * atmos%T(icell)))
+   K = cte * dexp(min(600d0,alpha/(lambda0 * atmos%T(icell))))
    
    !1dyne/cm2 = 1Pa
    !cm4/dyne = cm4/(Pa*cm2) = cm2/Pa
@@ -291,7 +323,11 @@ MODULE hydrogen_opacities
    do la=1, NLTEspec%Nwaves
     lambda = NLTEspec%lambda(la) / MICRON_TO_NM
     diff = 1d0/lambda - 1d0/lambda0
-    stm = dexp(-alpha/(lambda * atmos%T(icell)))
+    
+    arg_exp = min(600d0, alpha/(lambda * atmos%T(icell)))
+    stm = dexp(-arg_exp)
+    if (stm < tiny_dp) stm = 0d0
+    
     if (NLTEspec%lambda(la) < 125d0 .or. lambda > lambda0) cycle
     
     flambda = Cn(1)
@@ -299,8 +335,8 @@ MODULE hydrogen_opacities
      flambda = flambda + Cn(n) * diff**((n-1)/2d0)
     enddo
     sigma = lambda**3d0 * diff**(1.5d0) * flambda
-    chi(la) = K * (1d0 - stm) * sigma * funit * atmos%nHtot(icell)
-    eta(la) = K * twohc/NLTEspec%lambda(la)**3 * stm * sigma * funit *atmos%nHtot(icell)!m^-3
+    chi(la) = K * (1d0 - stm) * sigma * funit * hydrogen%n(1,icell)!atmos%nHtot(icell)
+    eta(la) = K * twohc/NLTEspec%lambda(la)**3 * stm * sigma * funit * hydrogen%n(1,icell)!atmos%nHtot(icell)!m^-3
     
    enddo
 
@@ -344,6 +380,11 @@ MODULE hydrogen_opacities
     
     funit = 1d-8 !cm4/dyne to m2/Pa
     K = 1d-29 * funit * atmos%ne(icell) * KBOLTZMANN * atmos%T(icell)
+    
+    if (atmos%ne(icell)==0d0) then
+     chi(:) = 0d0
+     return
+    endif
       
     chi = 0d0
     do la=1, NLTEspec%Nwaves
@@ -363,7 +404,7 @@ MODULE hydrogen_opacities
 	     	Dn(n)/lambda**2 + En(n)/lambda**3 + Fn(n)/lambda**4)
 	    enddo
 	  endif
-	  chi(la) = kappa * K * atmos%nHtot(icell)
+	  chi(la) = kappa * K * Hydrogen%n(1,icell)!atmos%nHtot(icell)
 	enddo
  
  RETURN
@@ -377,11 +418,11 @@ MODULE hydrogen_opacities
 !  ! K. A. Berrington (1987), J. Phys. B 20, 801-806.
 !   integer :: k, n
 !   integer, intent(in) :: icell
-!   double precision, intent(inout), dimension(NLTEspec%Nwaves) :: chi
-!   double precision, dimension(NJOHN) :: AJ, BJ, CJ, DJ, EJ, FJ
-!   double precision, dimension(NJOHN,NLTEspec%Nwaves) :: Clam
-!   double precision, dimension(NLTEspec%Nwaves) :: lambda_mu, lambda_inv
-!   double precision :: sqrt_theta, theta_n, CK
+!   real(kind=dp), intent(inout), dimension(NLTEspec%Nwaves) :: chi
+!   real(kind=dp), dimension(NJOHN) :: AJ, BJ, CJ, DJ, EJ, FJ
+!   real(kind=dp), dimension(NJOHN,NLTEspec%Nwaves) :: Clam
+!   real(kind=dp), dimension(NLTEspec%Nwaves) :: lambda_mu, lambda_inv
+!   real(kind=dp) :: sqrt_theta, theta_n, CK
 ! 
 !   data AJ / 0.000,  2483.346, -3449.889,  2200.040, -696.271, 88.283   /
 !   data BJ / 0.000,   285.827, -1158.382,  2427.719,-1841.400, 444.517  /
@@ -419,12 +460,12 @@ MODULE hydrogen_opacities
 !  ! Hminus free-free coefficients in 1d-29 m^5/J
 !  ! see Stilley and Callaway 1970 ApJ 160
 !   integer, intent(in) :: icell
-!   double precision, intent(out), dimension(NLTEspec%Nwaves) :: chi
+!   real(kind=dp), intent(out), dimension(NLTEspec%Nwaves) :: chi
 !   integer :: k, index, index2
-!   double precision :: lambdaFF(NFF), thetaFF(NTHETA)
-!   double precision, dimension(NFF*NTHETA) :: kappaFF_flat
-!   double precision :: theta(1), pe, kappa(1, NLTEspec%Nwaves)
-!   double precision, dimension(NTHETA,NFF) :: kappaFF
+!   real(kind=dp) :: lambdaFF(NFF), thetaFF(NTHETA)
+!   real(kind=dp), dimension(NFF*NTHETA) :: kappaFF_flat
+!   real(kind=dp) :: theta(1), pe, kappa(1, NLTEspec%Nwaves)
+!   real(kind=dp), dimension(NTHETA,NFF) :: kappaFF
 !   data lambdaFF / 0.0, 303.8, 455.6, 506.3, 569.5, 650.9, &
 !                   759.4, 911.3, 1013.0, 1139.0, 1302.0,   &
 !                   1519.0, 1823.0, 2278.0, 3038.0, 4556.0, &
@@ -529,10 +570,10 @@ MODULE hydrogen_opacities
 !  ! Mihalas Stellar atmospheres
 !   logical :: res
 !   integer :: icell
-!   double precision, intent(out), dimension(NLTEspec%Nwaves) :: &
+!   real(kind=dp), intent(out), dimension(NLTEspec%Nwaves) :: &
 !    chi, eta
-!   double precision, dimension(NBF) :: lambdaBF, alphaBF
-!   double precision, dimension(NLTEspec%Nwaves) :: hc_kla, stimEmis, twohnu3_c2, alpha
+!   real(kind=dp), dimension(NBF) :: lambdaBF, alphaBF
+!   real(kind=dp), dimension(NLTEspec%Nwaves) :: hc_kla, stimEmis, twohnu3_c2, alpha
 ! 
 !   data lambdaBF / 0.0, 50.0, 100.0, 150.0, 200.0, 250.0,  &
 !                  300.0, 350.0, 400.0, 450.0, 500.0, 550.0,&

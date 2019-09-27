@@ -33,10 +33,12 @@ MODULE solvene
 
  IMPLICIT NONE
 
- real(kind=dp), parameter :: MAX_ELECTRON_ERROR=1e-6
+ real(kind=dp), parameter :: MAX_ELECTRON_ERROR=1d-6
  integer, parameter :: N_MAX_ELECTRON_ITERATIONS=50
  integer, parameter :: N_MAX_ELEMENT=26 !100 is the max
-
+ real(kind=dp), parameter :: ne_min_limit = 1d-50 !if ne < ne_min_limt, ne = 0
+											!tiny_dp
+											!if this limit is to low, f*1/ne could create nan or infinity
  CONTAINS
 
  ! ----------------------------------------------------------------------!
@@ -62,8 +64,11 @@ MODULE solvene
   phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ptr_elem%ionpot(1))
 
   !if no free e-, Nt = NH + NH+ with NH+=ne
-  ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
-
+  if (phiH>0) then
+   ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
+  else
+   ne = 0d0
+  endif
 
  RETURN
  END SUBROUTINE ne_Hionisation0
@@ -87,7 +92,11 @@ MODULE solvene
   !if no free e-, Nt = NH + NH+ with NH+=ne
   !ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
   !if free e-, Nt=Nhot + NH+ + ne
-  ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
+  if (phiH>0) then
+   ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
+  else
+   ne = 0d0
+  endif
 
  RETURN
  END SUBROUTINE ne_Hionisation
@@ -105,8 +114,13 @@ MODULE solvene
 
   phiM = phi_jl(k, U0, U1, chi)
   alphaM = A ! relative to H, for instance 1.-6 etc
-  ne = (sqrt(alphaM*atmos%nHtot(k)*phiM +0.25*(1+alphaM)**2)&
-     - 0.5*(1+alphaM) ) / phiM
+  
+  if (phiM > 0) then
+   ne = (sqrt(alphaM*atmos%nHtot(k)*phiM +0.25*(1+alphaM)**2) - 0.5*(1+alphaM) ) / phiM
+  else
+   ne = 0d0
+  endif
+  
  RETURN
  END SUBROUTINE ne_Metal
 
@@ -158,6 +172,9 @@ END FUNCTION getPartitionFunctionk
      exit atom_loop
    end if
   end do atom_loop
+  
+  fjk(:) = 0d0
+  dfjk(:) = 0d0
 
   !may be active without NLTEpops or passive with read NLTE pops
   if (has_nlte_pops) then
@@ -192,14 +209,32 @@ END FUNCTION getPartitionFunctionk
     !  --> Nj/N0 / (1+Nj/N0) = Nj/(N0*(1+Nj/N0)) = Nj / (N0 + Nj) = fj
     fjk(j) = Sahaeq(k,fjk(j-1),Ukp1,Uk,elem%ionpot(j-1),ne)
     !write(*,*) "j=",j," fjk=",fjk(j)
-    dfjk(j) = -(j-1)*fjk(j)/ne
-    !write(*,*) "j=",j," dfjk=",dfjk(j)
+    !write(*,*) fjk(j-1), fjk(j), fjk(j)/(ne+tiny_dp)
+    
+    !why without this I have nan ???
+    if (ne>0) then
+    dfjk(j) = -(j-1)*fjk(j)/ne  !-> fjk(j) should be 0 if ne = 0
+     			     			 !see Saheq.
+     !dfjk(j) = -(j-1) * fjk(j) * min(huge_dp,1/ne)
+    else
+     dfjk(j) = 0d0
+    endif
+    
     sum1 = sum1 + fjk(j)
     sum2 = sum2 + dfjk(j)
+    
+    !write(*,*) "j=",j," dfjk=",dfjk(j), "fjk=", fjk(j), sum1, sum2
+
+
     Uk = Ukp1
    end do
    fjk(:)=fjk(:)/sum1
    dfjk(:)=(dfjk(:)-fjk(:)*sum2)/sum1
+   
+   if (any_nan_infinity_vector(dfjk)>0) then
+       write(*,*) "j=",j," dfjk=",dfjk(j), "fjk=", fjk(j), ne, atmos%T(k), sum1, sum2
+   stop
+   endif
   end if
 
  RETURN
@@ -304,6 +339,13 @@ END FUNCTION getPartitionFunctionk
     !if Abund << 1. and chiM << chiH then
     ! ne (H+M) = ne(H) + ne(M)
     ne_old = ne_old + ne_oldM
+    
+    !!!!Check here !!!
+    !to avoid having very low values, between say tiny_dp and 1e-100
+    !just set to 0 if < 0: crude ?
+    if (ne_oldM < ne_min_limit) ne_oldM = 0d0
+    if (ne_old < ne_min_limit) ne_old = 0d0
+    !!!!!!!!!!!!!!!!!
    end if
 
    atmos%ne(k) = ne_old
@@ -330,20 +372,24 @@ END FUNCTION getPartitionFunctionk
       akj = atmos%elements(n)%ptr_elem%Abund*(j-1) !because j starts at 1
       error = error -akj*fjk(j)
       sum = sum + akj*dfjk(j)
-      !write(*,*) n-1, j-1, akj, error, sum
+      !write(*,*) n-1, j-1, akj, error, sum, dfjk(j)
      end do
     end do !loop over elem
+
     atmos%ne(k) = ne_old - atmos%nHtot(k)*error /&
           (1.-atmos%nHtot(k)*sum)
-    dne = dabs((atmos%ne(k)-ne_old)/ne_old)
+    dne = dabs((atmos%ne(k)-ne_old)/(ne_old+tiny_dp))
     ne_old = atmos%ne(k)
     
-!     write(*,*) "icell=",k," T=",atmos%T(k)," nH=",atmos%nHtot(k), &
-!               "dne = ",dne, " ne=",atmos%ne(k)    
-    
+    if (is_nan_infinity(atmos%ne(k))>0) then
+    write(*,*) niter, "icell=",k," T=",atmos%T(k)," nH=",atmos%nHtot(k), &
+              "dne = ",dne, " ne=",atmos%ne(k), " nedag = ", ne_old, sum
+    stop
+    endif
     niter = niter + 1
     if (dne <= MAX_ELECTRON_ERROR) then
-      !write(*,*) "icell=",k," T=",atmos%T(k)," ne=",atmos%ne(k)
+      !write(*,*) niter, "icell=",k," T=",atmos%T(k)," ne=",atmos%ne(k), " dne=", dne
+      if (atmos%ne(k) < ne_min_limit) atmos%ne(k) = 0d0 !tiny_dp or < tiny_dp
      exit
     else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
       if (dne >= 1) then !shows the warning only if dne is actually greater than 1
@@ -351,7 +397,7 @@ END FUNCTION getPartitionFunctionk
           write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, &
           "ne=",atmos%ne(k), "T=",atmos%T(k)," nH=",atmos%nHtot(k)
           !set articially ne to some value ?
-          atmos%ne(k) = ne_oldM
+          atmos%ne(k) = ne_oldM !already tested if < ne_min_limit
           write(*,*) "Setting ne to ionisation of ", atmos%elements(ZM)%ptr_elem%ID, ne_oldM
 !       else
 !           write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, &
@@ -374,8 +420,8 @@ END FUNCTION getPartitionFunctionk
   do k=2, nb_proc
    unconverged_cells(1) = unconverged_cells(1) + unconverged_cells(k)
   end do
-  if (unconverged_cells(1) > 0) write(*,*) "Found ", unconverged_cells(1)," unconverged cells:", &
-  													real(unconverged_Cells(1))/real(atmos%Nspace)
+  if (unconverged_cells(1) > 0) write(*,*) "Found ", unconverged_cells(1)," unconverged cells (%):", &
+  													100*real(unconverged_Cells(1))/real(atmos%Nspace)
   
  RETURN
  END SUBROUTINE SolveElectronDensity

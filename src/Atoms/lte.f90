@@ -20,6 +20,8 @@ MODULE lte
 
  IMPLICIT NONE
 
+ real(kind=dp), parameter :: phi_min_limit = 1d-50 !tiny_dp
+
  CONTAINS
 
  FUNCTION phi_jl(k, Ujl, Uj1l, ionpot) result(phi)
@@ -38,15 +40,25 @@ MODULE lte
   ! NH = NH+ * ne * phi_jl
   ! -------------------------------------------------------------- !
   integer :: k
-  double precision :: ionpot, C1, phi
-  double precision :: Ujl, Uj1l, arg_exp
+  real(kind=dp) :: ionpot, C1, phi
+  real(kind=dp) :: Ujl, Uj1l, expo
   C1 = 0.5*(HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
   !!ionpot = ionpot * 100.*HPLANCK*CLIGHT !cm1->J
   !! -> avoiding dividing by big numbers causing overflow.
   !!maximum argument is 600, exp(600) = 3.77e260
-  arg_exp = min(600d0,ionpot/(KBOLTZMANN*atmos%T(k)))
-  phi = C1 * (Ujl / Uj1l) * dexp(arg_exp) / (atmos%T(k)**1.5)
-  if (phi < tiny_dp) phi = tiny_dp !
+  expo = dexp(min(600d0,ionpot/(KBOLTZMANN*atmos%T(k)))) 
+  if (ionpot/(KBOLTZMANN*atmos%T(k)) >= 600d0) expo = huge_dp
+  
+  !if dexp(300) it means phi is "infinity", exp(300) == 2e130 so that's enough
+  phi = C1 * (Ujl / Uj1l) * expo / (atmos%T(k)**1.5 + tiny_dp)
+  if (phi < phi_min_limit) phi = 0d0 !tiny_dp ! or phi = 0d0 should be more correct ?
+  								   ! but test to not divide by 0
+  								   
+  if (is_nan_infinity(phi)>0) then
+   write(*,*) "error, phi_jl", k, phi
+   stop
+  endif
+  
   RETURN
   END FUNCTION phi_jl
 
@@ -69,7 +81,7 @@ MODULE lte
    ! ni population of level i belonging to NI
   ! -------------------------------------------------------------- !
 
-   double precision :: Ei, gi, Ui, ni_NI, kT
+   real(kind=dp) :: Ei, gi, Ui, ni_NI, kT
    integer :: k
 
    !Ei = Ei * 100.*HPLANCK*CLIGHT
@@ -93,8 +105,8 @@ MODULE lte
    ! ni population of level i belonging to NI
   ! -------------------------------------------------------------- !
 
-  double precision :: Ei,ni1_ni, kT
-  double precision ::  gi, gi1
+  real(kind=dp) :: Ei,ni1_ni, kT
+  real(kind=dp) ::  gi, gi1
   integer :: k
 
   kT = KBOLTZMANN * atmos%T(k)
@@ -115,16 +127,27 @@ MODULE lte
   ! in the stage I, I+1
   ! -------------------------------------------------------------- !
    integer :: k
-   double precision :: NI, UI1, UI, chi, ne, phi, NI1
+   real(kind=dp) :: NI, UI1, UI, chi, ne, phi, NI1
    phi = phi_jl(k, UI, UI1, chi) ! chi in J
-   NI1 = NI/(phi*ne)
+   
+    !phi should be between phi_min_limit and dexp(600)
+    !and ne between ne_limit and nemax, so never nan nor infinity
+    !further in General, a larg phi implies a ne close to 0, so the product remains small
+    
+   if ((ne > 0).and.(is_nan_infinity(ne)==0)) then !is this correct or if phi/ne nan or infinty ?
+    NI1 = NI/(phi*ne)
+   else !all in ground state, phi->infinity if T->0 and phi->0 if T->infinty
+   		!AND IF	ne -> 0, T likely goes to 0, all in neutral states
+   		!meaning if ne->0 phi goes to infinity
+    NI1 = 0d0
+   endif
 
   RETURN
   END FUNCTION SahaEq
 
   SUBROUTINE calc_nHmin()
    integer :: k, j
-   double precision :: phiHmin
+   real(kind=dp) :: phiHmin
    write(*,*) " BEWARE, nHMIN NOT USED anymore. WAITING FOR CHEMECHIL SOLVER"
    return
    !$omp parallel &
@@ -143,7 +166,8 @@ MODULE lte
     !number density. Remember:
     ! -> Njl = Nj1l * ne * phi_jl with j the ionisation state
     !j = -1 for Hminus (l=element=H)
-    atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
+    atmos%nHmin = atmos%ne(k) * PhiHmin * Hydrogen%n(1,k)
+    !atmos%nHmin(k) = sum(Hydrogen%n(1:Hydrogen%Nlevel-1,k)) * atmos%ne(k)*PhiHmin!faster?
     !! Estimation
    end do !over depth points
    !$omp end do
@@ -162,7 +186,7 @@ MODULE lte
   ! -------------------------------------------------------------- !
   type (Atomtype), intent(inout) :: atom
   logical, intent(in) :: debeye
-  double precision :: dEion, dE, sum, c2, phik, phiHmin
+  real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
   integer :: Z, dZ, k, i, m
   integer, allocatable, dimension(:) :: nDebeye
 
@@ -244,7 +268,11 @@ MODULE lte
      ! if dZ = 1, dZ+1=2 -> another (next) ion, one div by phik = Saha
      ! if dZ = 2, dZ+1=3 -> the next next ion, two div by phik ...
      do m=2,dZ+1
-      atom%nstar(i,k)=atom%nstar(i,k)/phik
+      if (atmos%ne(k)>0) then
+       atom%nstar(i,k)=atom%nstar(i,k)/phik !if phik -> means large n(i) ??
+      else
+       atom%nstar(i,k) = 0d0
+      endif
      end do
 
      ! by doing so we avoid the easiest case of using
@@ -272,10 +300,15 @@ MODULE lte
 !     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
 !     write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%Abund*atmos%nHtot(k)/sum
-    if (atom%nstar(1,k) <= tiny_dp) then
-       write(*,*) "Warning too small ground state population ", atom%ID, atom%nstar(1,k)
-       write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%ne(k)
-        atom%nstar(1,k) = tiny_dp    
+    
+    !test positivity, can be 0
+    if (atom%nstar(1,k) < 0) then !<= tiny_dp) then
+       write(*,*) " ************************************* "
+       write(*,*) "Warning too small ground state population ", atom%ID, "n0=", atom%nstar(1,k)
+       write(*,*) "cell=",k, atom%ID, "dark?=",atmos%icompute_atomRT(k), "T=",atmos%T(k), "nH=",atmos%nHtot(k), "ne=",atmos%ne(k)
+        !atom%nstar(1,k) = tiny_dp    
+       write(*,*) " ************************************* "
+       stop !only if we test >= 0
     end if
     !write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
     do i=2,atom%Nlevel !debug
@@ -284,20 +317,25 @@ MODULE lte
       !if (atom%nstar(i,k) < 1d-30) atom%nstar(i,k) = 1d-30
       !write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
       
-      !! Assuming than atom%nstar(1,k), the ground state, cannot be lower than tiny_dp or negative.
-      !! by the way it will certainly produce error here
-      if (atom%nstar(i,k) <= tiny_dp) then
-       write(*,*) "Warning population of atom ", atom%ID, i, atom%nstar(i,k), " lower than", &
-        " tiny_dp. Replacing by tiny_dp"
-       write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%ne(k)
-        atom%nstar(i,k) = tiny_dp
+      !! check positivity. Can be 0 now, see above and phik and phi_jl
+      if (atom%nstar(i,k) < 0) then !<= tiny_dp) then
+       write(*,*) " ************************************* "
+       write(*,*) "Warning population of atom ", atom%ID, "lvl=", i, "nstar=",atom%nstar(i,k), " lower than", &
+        " tiny_dp."! Replacing by tiny_dp"
+       write(*,*) "cell=",k, atom%ID, "dark?=",atmos%icompute_atomRT(k), "T=",atmos%T(k), "nH=",atmos%nHtot(k), "ne=",atmos%ne(k), &
+       			  " n0=", atom%nstar(1,k)
+        !atom%nstar(i,k) = tiny_dp
+       write(*,*) " ************************************* "
+      stop !only if we test >= 0
       end if
     end do
     
     if (maxval(atom%nstar(:,k)) >= huge_dp) then
+    write(*,*) " ************************************* "
      write(*,*) "ERROR, populations of atom larger than huge_dp"
-     write(*,*) "cell=",k, atom%ID, atmos%icompute_atomRT(k), atmos%T(k), atmos%nHtot(k), atmos%ne(k)
-     write(*,*) atom%nstar(:,k)
+     write(*,*) "cell=",k, atom%ID, "dark?=",atmos%icompute_atomRT(k), "T=",atmos%T(k), "nH=",atmos%nHtot(k), "ne=",atmos%ne(k)
+     write(*,*) "nstar=",atom%nstar(:,k)
+     write(*,*) " ************************************* "
      stop
     end if
     
@@ -323,7 +361,7 @@ MODULE lte
   ! -------------------------------------------------------------- !
   integer n, k, j
   logical :: debeye=.true.
-  double precision :: PhiHmin
+  real(kind=dp) :: PhiHmin
 
   write(*,*) "Setting LTE populations..."
   do n=1,atmos%Natom

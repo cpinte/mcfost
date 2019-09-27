@@ -232,22 +232,34 @@ MODULE Opacity
           Nred = line%Nred;Nblue = line%Nblue
           i = line%i;j = line%j
     
-    if ((aatom%n(j,icell) < tiny_dp).or.(aatom%n(i,icell) < tiny_dp)) then !no transition
-        write(*,*) id, icell, loc(aatom), loc(line)
-    	write(*,*) tiny_dp, aatom%n(j, icell), aatom%n(i,icell)
-        write(*,*) aatom%n(:,icell)
-        
+    if ((aatom%n(j,icell) < tiny_dp).or.(aatom%n(i,icell) < tiny_dp)) then !no transition    
+        !probably False sharing
         if (aatom%n(j,icell)==0d0 .or. aatom%n(i,icell)==0d0) then
+         write(*,*) " ***************************** "
+     	 CALL WARNING("False sharing")
+!          write(*,*) icell, iray, id, aatom%ID, aatom%Nlevel, kc, shape(aatom%n)
+!          write(*,*) i, line%i, j, line%j
+!          write(*,*) aatom%n(:,icell)
+!          write(*,*) aatom%n(i,icell), aatom%n(j,icell), aatom%n(line%i,icell), aatom%n(line%j,icell)
+!          write(*,*) "1", aatom%n(1,icell), "2", aatom%n(2,icell), "3", aatom%n(3,icell),"4", aatom%n(4,icell)
+         !stop
+         write(*,*) " ***************************** "
+     	 cycle tr_loop !go to next transitions without computing opac
+        else
+         write(*,*) " ***************************** "
+     	 CALL WARNING("too small line populations")
          write(*,*) icell, iray, id, aatom%ID, aatom%Nlevel, kc, shape(aatom%n)
          write(*,*) i, line%i, j, line%j
          write(*,*) aatom%n(:,icell)
          write(*,*) aatom%n(i,icell), aatom%n(j,icell), aatom%n(line%i,icell), aatom%n(line%j,icell)
          write(*,*) "1", aatom%n(1,icell), "2", aatom%n(2,icell), "3", aatom%n(3,icell),"4", aatom%n(4,icell)
-         stop
-        end if
-     	CALL WARNING("too small line populations")
-     	aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
-     	aatom%n(i,icell) = max(tiny_dp, aatom%n(i,icell))
+         write(*,*) " ***************************** "
+     	endif
+     	!treating problem in LTE ?
+!          aatom%n(j,icell) = aatom%nstar(j,icell)
+!      	 aatom%n(i,icell) = aatom%nstar(i,icell)
+!          aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
+!      	 aatom%n(i,icell) = max(tiny_dp, aatom%n(i,icell))
     end if 
 
         gij = line%Bji / line%Bij
@@ -312,27 +324,37 @@ MODULE Opacity
     	  Nred = cont%Nred;Nblue = cont%Nblue    	
     	  i = cont%i;j = cont%j
         
-    	  if (aatom%n(j,icell) < tiny_dp .or. aatom%n(i,icell) < tiny_dp) then !test
-    	   write(*,*) id, icell, loc(aatom), loc(cont)
-    	   write(*,*) tiny_dp, aatom%n(j,icell), aatom%n(i,icell)
-    	   write(*,*) aatom%n(:,icell)
-    	 
-          if (aatom%n(j,icell)==0d0 .or. aatom%n(i,icell)==0d0) then
+    	  if (aatom%n(j,icell) < tiny_dp .or. aatom%n(i,icell) < tiny_dp) then !test  
+           if (aatom%n(j,icell)==0d0 .or. aatom%n(i,icell)==0d0) then
+            write(*,*) " ***************************** "
+     	    CALL WARNING("False sharing")
+!             write(*,*) icell, iray, id, aatom%ID, aatom%Nlevel, kc, shape(aatom%n)
+!             write(*,*) i, cont%i, j, cont%j
+!             write(*,*) aatom%n(:,icell)
+!             write(*,*) aatom%n(i,icell), aatom%n(j,icell), aatom%n(cont%i,icell), aatom%n(cont%j,icell)
+!             write(*,*) "1", aatom%n(1,icell), "2", aatom%n(2,icell), "3", aatom%n(3,icell),"4", aatom%n(4,icell)
+            write(*,*) " ***************************** "
+     	    cycle tr_loop !go to next transition
+           else
+           write(*,*) " ***************************** "
+     	   CALL WARNING("too small cont populations")
            write(*,*) icell, iray, id, aatom%ID, aatom%Nlevel, kc, shape(aatom%n)
            write(*,*) i, cont%i, j, cont%j
            write(*,*) aatom%n(:,icell)
            write(*,*) aatom%n(i,icell), aatom%n(j,icell), aatom%n(cont%i,icell), aatom%n(cont%j,icell)
            write(*,*) "1", aatom%n(1,icell), "2", aatom%n(2,icell), "3", aatom%n(3,icell),"4", aatom%n(4,icell)
-           stop
-          end if    	 
-    	 
-     	  CALL WARNING("too small cont populations")
-     	  aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
-     	  aatom%n(i,icell) = max(tiny_dp, aatom%n(i,icell))
+           write(*,*) " ***************************** "
+     	   endif 	 
+     	  !treating pb in LTE ?
+!      	  aatom%n(j,icell) = aatom%nstar(j,icell)
+!      	  aatom%n(i,icell) = aatom%nstar(i,icell)
+!      	  aatom%n(j,icell) = max(tiny_dp, aatom%n(j,icell))
+!      	  aatom%n(i,icell) = max(tiny_dp, aatom%n(i,icell))
     	  end if !end test
     	  
-      	  allocate(gijk(cont%Nlambda))
-          gijk(:) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+      	  allocate(gijk(cont%Nlambda)); gijk(:) = 0d0
+      	  if (aatom%nstar(j,icell)>0) &
+          	gijk(:) = aatom%nstar(i, icell)/aatom%nstar(j,icell) * dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
       
          !allocate Vij, to avoid computing bound_free_Xsection(cont) 3 times for a continuum
 	     allocate(Vij(cont%Nlambda), twohnu3_c2k(cont%Nlambda))
@@ -346,12 +368,12 @@ MODULE Opacity
          
          !I don't know how to handle negative chi due to stimulated emission...
          !Problem of physics (model) or code ?
-         do la=1,cont%Nlambda
+         check_stm : do la=1,cont%Nlambda
           if (gijk(la)*aatom%n(j,icell) > aatom%n(i,icell)) then 
             stm = 0d0 
-            exit
+            exit check_stm
           endif
-         enddo         
+         enddo check_stm   
          Vij(:) = Vij(:) * (aatom%n(i,icell) - stm * gijk(:)*aatom%n(j,icell)) !chi
 
          !keep copy of continuum only

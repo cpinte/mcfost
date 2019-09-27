@@ -13,7 +13,7 @@ MODULE metal
 
  use atmos_type, only                : atmos, Hydrogen, Helium, B_project, vbroad_atom
  use constant
- use math, only                      : bezier3_interp, cent_deriv
+ use math, only                      : bezier3_interp, cent_deriv, any_nan_infinity_vector
  use atom_type
  use spectrum_type, only			 : NLTEspec, initAtomOpac
  use hydrogen_opacities
@@ -100,40 +100,43 @@ MODULE metal
      lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
                ! associated to the minimal frquency needed
                ! to unbound an electron
+               
+               
+    !futur ndeprecation, if the photoionized level is too low, just neglect emission
 
-    ! -> prevents dividing by zero
-     ! even if lcompute_atomRT(icell) it is still possible to not have a continuum transition
-     ! between the level i and j, but not for the others.
-!	  if (metal%nstar(j,icell) <= tiny_dp .or. metal%nstar(i,icell)<=tiny_dp) CYCLE
-    if (metal%n(j,icell) < tiny_dp) then
-        write(*,*) "(Metal_bf) Warning at icell=", icell," T(K)=", atmos%T(icell)
-        write(*,*) metal%ID,"%n(j) density <= tiny dp for j=", j, metal%n(j,icell), i, metal%n(i,icell)
-        write(*,*) "skipping this level"
-        write(*,*) "nstar=", metal%n(:,icell)
-       CYCLE
+   if (metal%n(j,icell) < tiny_dp) then !==0, but < tiny_dp is okay also
+        if ((metal%n(j,icell) < 0) .or. (metal%n(i,icell) < 0)) then
+        !-> Futur deprecation of this test, psoitivity is tested when populations are set
+         write(*,*) "(Metal_bf) Warning at icell, negative pops", icell," T(K)=", atmos%T(icell), "ne=", atmos%ne(icell)
+         write(*,*) metal%ID, j, metal%n(j,icell), i, metal%n(i,icell)
+         write(*,*) "nstar=", metal%n(:,icell)
+         write(*,*) " cycling"
+         deallocate(gijk, twohnu3_c2, Vij)
+         cycle
+        end if
+        gijk(:) = 0d0
+        
+    else
+      if (metal%n(i,icell) < 0) then
+        !-> Futur deprecation of this test, psoitivity is tested when populations are set
+        write(*,*) metal%ID, icell, i, " negative pops =", metal%n(i,icell)
+        deallocate(gijk, twohnu3_c2, Vij)
+        write(*,*) " cycling"
+        cycle        
+      endif
+        gijk(:) = metal%nstar(i,icell)/metal%nstar(j,icell) *  &
+     			dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))
+    
     end if
 
-     
-     gijk(:) = metal%nstar(i,icell)/metal%nstar(j,icell) *  &
-     			dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))
 
-!      write(*,*)
-!       write(*,*) maxval(metal%n(i,icell)*(1.-expla(Nblue:Nred))), &
-!       	maxval(metal%n(i,icell)-gijk(Nblue:Nred)*metal%n(i,icell))
-!      stop
-     if (lstore_opac) then !we don't care about proc id id
-!       NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) = NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) + &
-!        				continuum%alpha(Nblue:Nred) * &
-!        				(1.-expla(Nblue:Nred))*metal%n(i,icell)
+     if (lstore_opac) then 
       NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) = NLTEspec%AtomOpac%Kc(icell,Nblue:Nred,1) + &
        				Vij(:) * (metal%n(i,icell)-gijk(:)*metal%n(j,icell))
        				
       NLTEspec%AtomOpac%jc(icell,Nblue:Nred) = NLTEspec%AtomOpac%jc(icell,Nblue:Nred) + &
        				twohnu3_c2(:) * gijk(:) * Vij(:)*metal%n(j,icell)
-     else !proc id is important
-!       NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-!        				continuum%alpha(Nblue:Nred) * &
-!        				(1.-expla(Nblue:Nred))*metal%n(i,icell) !-->ETL only
+     else 
       NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
        				Vij(:) * (metal%n(i,icell)-gijk(:)*metal%n(j,icell))
 
@@ -184,22 +187,21 @@ MODULE metal
      !!if (.not.atom%at(kr)%lcontrib_to_opac) CYCLE !avoid lines not defined on the grid
      allocate(Vij(line%Nlambda))
 
-!     if ((atom%n(j,icell) <=0).or.(atom%n(i,icell) <=0)) CYCLE !"no contrib to opac"
-     ! -> prevents dividing by zero
-     ! even if lcompute_atomRT(icell) it is still possible to not have a transition
-     ! between the levels i and j, but not for the others.
 
-     if ((atom%n(j,icell) <tiny_dp).or.(atom%n(i,icell) <tiny_dp)) then !no transition
+     !Still compute emission even if low, but neglect stm ???
+     !if ((atom%n(j,icell) <tiny_dp).or.(atom%n(i,icell) <tiny_dp)) then !no transition
        !!but show the message only if pops is negative
-      !if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
+!-> Futur deprecation of this test, psoitivity is tested when populations are set
+      if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
         write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
         write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
         write(*,*) "skipping this level"
         write(*,*) "nstar=", atom%nstar(:,icell)
         write(*,*) "n = ", atom%n(:,icell)
-      !!end if
-      CYCLE
-     end if
+        CYCLE
+      endif
+      !CYCLE
+     !end if
 
      !allocate(Vij(line%Nlambda)); Vij = 0d0
      gij = line%Bji / line%Bij ! = gi/gj
@@ -523,6 +525,7 @@ MODULE metal
    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
    NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + chi * Bpnu
 
+    !I treat H bound-free in metal_bf. I'll change the name of the subroutine later
 !    if (.not.Hydrogen%active) then !passive bound-free !do not enter if active !!!
 !     CALL Hydrogen_bf(icell, chi, eta)
 !     NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
@@ -541,8 +544,7 @@ MODULE metal
    !keep pure continuum opacities now
    if (MINVAL(NLTEspec%AtomOpac%eta_p(:,id))<0 .or. &
     MINVAL(NLTEspec%AtomOpac%chi_p(:,id)) < 0) then
-    write(*,*) "err, negative opac"
-    stop
+    write(*,*) "Beware, negative contopac"
    end if
    NLTEspec%AtomOpac%eta_c(:,id) = NLTEspec%AtomOpac%eta_p(:,id)
    NLTEspec%AtomOpac%chi_c(:,id) = NLTEspec%AtomOpac%chi_p(:,id)
