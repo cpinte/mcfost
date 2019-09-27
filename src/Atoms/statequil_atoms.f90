@@ -5,7 +5,7 @@ MODULE statequil_atoms
  use spectrum_type, only : NLTEspec
  use constant
  use opacity
- use math, only : locate, any_nan_infinity_matrix
+ use math, only : locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity
  use utils, only : GaussSlv
  use parametres
  use accelerate
@@ -33,7 +33,7 @@ MODULE statequil_atoms
      
      if (any_nan_infinity_matrix(atom%Gamma(:,:,id))>0) then
     	write(*,*) atom%Gamma(:,:,id)
-    	write(*,*) "Big at init", id, icell, atom%ID, atom%n(:,icell)
+    	write(*,*) "Bug at init", id, icell, atom%ID, atom%n(:,icell)
     	stop
   	 endif
   
@@ -180,6 +180,13 @@ MODULE statequil_atoms
          
              
        atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*line%Bji*Ieff
+       
+      if ((is_nan_infinity(atom%Gamma(i,j,id))>0).or.(is_nan_infinity(atom%Gamma(j, i, id))>0)) then
+       write(*,*) "line", id, icell, j, i, iray, NLTEspec%lambda(Nblue+l-1), NLTEspec%I(Nblue+l-1,iray,id), &
+         NLTEspec%Psi(Nblue+l-1,iray,id), atom%eta(Nblue+l-1,iray,id), NLTEspec%dtau(Nblue+l-1,iray,id), &
+         line%phi(l, iray, id), weight(l)
+       stop
+      endif
 
       enddo
      enddo
@@ -192,9 +199,10 @@ MODULE statequil_atoms
      Nblue = cont%Nblue; Nred = cont%Nred
     
      allocate(weight(cont%Nlambda), gijk(cont%Nlambda))
-    
+     gijk(:) = 0d0
      !nstar(i)/nstar(j)*exp(-hnu/kT)
-     gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell)* &
+     if (atom%nstar(j, icell) >0) &
+     	gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell)* &
     		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
     
      weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
@@ -218,6 +226,13 @@ MODULE statequil_atoms
       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu*weight(l)
       atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu+twohnu3_c2)*gijk(l)*weight(l)
       
+      if ((is_nan_infinity(atom%Gamma(i,j,id))>0).or.(is_nan_infinity(atom%Gamma(j, i, id))>0)) then
+       write(*,*) "cont", id, icell, j, i, iray, NLTEspec%lambda(Nblue+l-1), NLTEspec%I(Nblue+l-1,iray,id), &
+         NLTEspec%Psi(Nblue+l-1,iray,id), atom%eta(Nblue+l-1,iray,id), NLTEspec%dtau(Nblue+l-1,iray,id), &
+         gijk(l), twohnu3_c2, weight(l)
+       stop
+      endif
+      
      enddo
     
      deallocate(weight, gijk)
@@ -239,14 +254,14 @@ MODULE statequil_atoms
   if (atmos%include_xcoupling) then
    ! Only for the transition with itself of the moment
    CALL Xcoupling_rates_atom(id, icell, n_rayons, atom)
-   atom%Gamma(:,:,id) = atom%Gamma(:,:,id) + atom%Xc(:,:,id)
+   atom%Gamma(:,:,id) = atom%Gamma(:,:,id) - atom%Xc(:,:,id)
   end if
 
   
  RETURN
  END SUBROUTINE FillGamma_atom
  
- 
+!check opac
 !I need to handle overlap otherwise will be complicated to multiply Psi * U * chi of differet trans
 !and Psi index should also be consistent with the product
  SUBROUTINE Xcoupling_rates_atom(id, icell, n_rayons, atom)
@@ -257,7 +272,7 @@ MODULE statequil_atoms
    type (AtomicContinuum) :: cont, cont_p
    real(kind=dp) :: Psim, U_ji, chi_ij, U_iip ! I mean, transition j->i (Uj->i and ch_ji = -chi_ij)
    real(kind=dp), dimension(:), allocatable :: weight, overlap, alpha_nu
-   real(kind=dp) :: norm
+   real(kind=dp) :: norm, gij
    
    !       l',l
    atom%Xc(:,:,id) = 0d0 !Zero cross-coupling
@@ -277,11 +292,13 @@ MODULE statequil_atoms
       enddo
       weight(:) = weight(:)/norm
       
+      gij = line%Bji/line%Bij
+      
       do iray=1,n_rayons
        do la=1,line%Nlambda
         U_ji = line%phi(la,iray,id)*hc_4PI*line%Aji * NLTEspec%Psi(line%Nblue+la-1,iray,id)
         !and which psi index?
-        chi_ij = line%phi(la,iray,id)*hc_4PI*line%Bij*atom%n(line%i,icell) 
+        chi_ij = line%phi(la,iray,id)*hc_4PI*line%Bij*(atom%n(line%i,icell) - gij * atom%n(line%j,icell))
         
 !         need to check that by wrting at hand
 !Sum over transition for which line%i is an upper level
@@ -304,8 +321,8 @@ MODULE statequil_atoms
 !           call error("bug xc")
 !          end if
 !         end do
-        !atom%Xc(line%i,line%j,id) = atom%Xc(line%i, line%j, id) + chi_ij * U_iip
-        atom%Xc(line%j, line%i, id) = atom%Xc(line%j, line%i, id) - chi_ij * U_ji
+        !atom%Xc(line%i,line%j,id) = atom%Xc(line%i, line%j, id) - chi_ij * U_iip
+        atom%Xc(line%j, line%i, id) = atom%Xc(line%j, line%i, id) + chi_ij * U_ji
         
        enddo
       enddo
@@ -322,14 +339,19 @@ MODULE statequil_atoms
      !explicit do loop
       do la=1,cont%Nlambda
         Psim = 0d0
+        gij = 0d0
+        if (atom%nstar(cont%j,icell)>0) & 
+        	gij = atom%nstar(cont%i, icell)/atom%nstar(cont%j,icell)* &
+    		 dexp(-hc_k / (NLTEspec%lambda(cont%Nblue-1+la) * atmos%T(icell)))
+    		 
         do iray=1, n_rayons
          Psim = Psim + NLTEspec%Psi(cont%Nblue+la-1,iray,id)/n_rayons
         enddo
-        U_ji  = alpha_nu(la) * Psim * twohc / NLTEspec%lambda(cont%Nblue-1+la)**(3d0)
-        chi_ij = weight(la) * atom%n(line%i,icell)
+        U_ji  = alpha_nu(la) * Psim * gij * twohc / NLTEspec%lambda(cont%Nblue-1+la)**(3d0)
+        chi_ij = weight(la) * (atom%n(cont%i,icell)-atom%n(cont%j,icell)*gij)
         
         
-        atom%Xc(cont%j, cont%i, id) = atom%Xc(cont%j, cont%i, id) - chi_ij * U_ji
+        atom%Xc(cont%j, cont%i, id) = atom%Xc(cont%j, cont%i, id) + chi_ij * U_ji
 
       enddo
     
