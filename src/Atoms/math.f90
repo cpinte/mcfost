@@ -1,6 +1,7 @@
 MODULE math
 
   use mcfost_env, only : dp
+  use constantes, only : tiny_dp, huge_dp
 
   IMPLICIT NONE
 
@@ -33,8 +34,25 @@ MODULE math
   END FUNCTION overlapping_transitions
   
   
+   FUNCTION is_nan_infinity(y) result(val)
+    real(kind=dp) :: y, val
+    
+     val = 0
+    if (y /= y) then
+     write(*,*) "(Nan):", y
+     val = 1
+     return
+    else if (y > 0 .and. (y==y*10)) then
+     write(*,*) "(infinity):", y
+     val = 2
+     return
+    end if      
+
+   RETURN
+   END FUNCTION is_nan_infinity
+  
    FUNCTION any_nan_infinity_matrix(y) result(val)
-    double precision :: y(:,:)
+    real(kind=dp) :: y(:,:)
     integer :: val, i, j
     
      val = 0
@@ -44,7 +62,7 @@ MODULE math
         write(*,*) "(Nan):", y(i,j)
         val = 1
         return
-       else if (y(i,j)==y(i,j)+1) then
+       else if (y(i,j) > 0 .and. (y(i,j)==y(i,j)*10)) then
         write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1)
         val = 2
         return
@@ -55,7 +73,7 @@ MODULE math
    END FUNCTION any_nan_infinity_matrix
 
    FUNCTION any_nan_infinity_vector(y) result(val)
-    double precision :: y(:)
+    real(kind=dp) :: y(:)
     integer :: val, i
     
      val = 0
@@ -64,7 +82,7 @@ MODULE math
         write(*,*) "(Nan):", y(i)
         val = 1
         return
-       else if (y(i)==y(i)+1) then
+       else if (y(i)>0 .and. (y(i)==y(i)*10)) then
         write(*,*) "(infinity):", y(i), y(i)*(1+0.1)
         val = 2
         return
@@ -75,8 +93,8 @@ MODULE math
   
    FUNCTION Integrate_x(N, x, y) result(integ)
     integer :: N
-    double precision, dimension(N) :: x, y
-    double precision :: integ
+    real(kind=dp), dimension(N) :: x, y
+    real(kind=dp) :: integ
     integer  :: k
     
     integ = 0.5 * dabs(x(2)-x(1)) * y(1)
@@ -89,8 +107,8 @@ MODULE math
    
    FUNCTION Integrate_dx(N, dx, y) result(integ)
     integer :: N
-    double precision, dimension(N) :: dx, y
-    double precision :: integ
+    real(kind=dp), dimension(N) :: dx, y
+    real(kind=dp) :: integ
     integer  :: k
     
     integ = 0.5 * dx(1) * y(1)
@@ -102,14 +120,14 @@ MODULE math
    END FUNCTION Integrate_dx
 
    FUNCTION SQ(x) result(y)
-    double precision :: x, y
+    real(kind=dp) :: x, y
     y = x*x
    RETURN
    END FUNCTION SQ
 
 
    FUNCTION CUBE(x) result(y)
-    double precision :: x, y
+    real(kind=dp) :: x, y
     y = x*x*x
    RETURN
    END FUNCTION CUBE
@@ -117,9 +135,9 @@ MODULE math
 
    FUNCTION dPOW(x,a) result(y)
     ! ------------------------------
-    ! double precision pow function
+    ! real(kind=dp) pow function
     ! ------------------------------
-    double precision :: x, a, y
+    real(kind=dp) :: x, a, y
     integer :: i, one
     i = 1
     y = 1.0
@@ -148,7 +166,7 @@ MODULE math
    !First exponential integral
    real, dimension(6) :: a6
    real, dimension(4) :: a4, b4
-   real(8) :: y, x
+   real(kind=dp) :: y, x
 
    data a6  /-0.57721566,  0.99999193, -0.24991055,&
              0.05519968, -0.00976004,  0.00107857 /
@@ -180,7 +198,7 @@ MODULE math
   FUNCTION E2(x) result (y)
   ! second exponential integral, using recurrence relation
   ! En+1 = 1/n * ( exp(-x) -xEn(x))
-   real(8) :: x, y
+   real(kind=dp) :: x, y
 
    if (x.le.0.) then
     write(*,*) "Arg of Exponential integral has to be > 0"
@@ -197,9 +215,9 @@ MODULE math
 
   SUBROUTINE cent_deriv(n,x,y,yp)
   integer :: n, k
-  Real(8) :: x(n), y(n)
-  real(8), dimension(n), intent(out) ::  yp
-  real(8) :: der, der1, lambda, dx , dx1
+  real(kind=dp) :: x(n), y(n)
+  real(kind=dp), dimension(n), intent(out) ::  yp
+  real(kind=dp) :: der, der1, lambda, dx , dx1
 
   do k = 2, n - 1
   dx = x(k) - x(k-1)
@@ -229,10 +247,10 @@ MODULE math
  ! POINTS OUTSIDE THE DOMAIN ARE ATTRIBUTED TO THE OUTER INTIAL VALUES
  Implicit None
  Integer :: n, np, k
- Real(8), dimension(n), intent(in) :: x, y
- Real(8), dimension(np), intent(in) :: xp
- Real(8), dimension(np), intent(out) :: yp
- Real(8) :: cntrl, dx, yprime(n), lambda, u(np)
+ real(kind=dp), dimension(n), intent(in) :: x, y
+ real(kind=dp), dimension(np), intent(in) :: xp
+ real(kind=dp), dimension(np), intent(out) :: yp
+ real(kind=dp) :: cntrl, dx, yprime(n), lambda, u(np)
 
 
  !
@@ -270,10 +288,10 @@ MODULE math
 
  SUBROUTINE bezier3_interp(n, x, y, np, xp, yp)
   Integer :: n, np, k
-  Real(8), dimension(n), intent(in) :: x, y
-  Real(8), dimension(np), intent(in) :: xp
-  Real(8), dimension(np), intent(out) :: yp
-  Real(8) :: c1, c2, yprime(n), dx, u(np), mmi, mma
+  real(kind=dp), dimension(n), intent(in) :: x, y
+  real(kind=dp), dimension(np), intent(in) :: xp
+  real(kind=dp), dimension(np), intent(out) :: yp
+  real(kind=dp) :: c1, c2, yprime(n), dx, u(np), mmi, mma
 
 
   c1 = 0
@@ -318,10 +336,10 @@ MODULE math
   !One point Bezier interpolation, wrapper around BezierN_interp
   ! return scallar
   FUNCTION interp1D(x1a,ya,x1) result(y)
-   REAL(8), dimension(:), intent(in) :: x1a, ya
-   REAL(8), intent(in) :: x1
-   REAL(8) :: y
-   real(8), dimension(1) :: tmp1, tmp3
+   real(kind=dp), dimension(:), intent(in) :: x1a, ya
+   real(kind=dp), intent(in) :: x1
+   real(kind=dp) :: y
+   real(kind=dp), dimension(1) :: tmp1, tmp3
 
    tmp1(1) = x1
    call bezier3_interp(size(x1a),x1a,ya,1, tmp1,tmp3)
@@ -333,8 +351,8 @@ MODULE math
   END FUNCTION
 
   FUNCTION interp1Darr(x1a,ya,x1) result(y)
-   REAL(8), dimension(:), intent(in) :: x1a, ya, x1
-   REAL(8), dimension(size(x1)) :: y
+   real(kind=dp), dimension(:), intent(in) :: x1a, ya, x1
+   real(kind=dp), dimension(size(x1)) :: y
 
    call bezier3_interp(size(x1a),x1a,ya,size(x1), x1,y)
    !call bezier2_interp(size(x1a),x1a,ya,1, tmp1,tmp3)
@@ -348,15 +366,15 @@ MODULE math
    ! special case for Barklem data.
    ! Using 2 x 1D Bezier cubic splines (in the x and y direction)
    ! return scalar
-   REAL(8), dimension(:), intent(in) :: x1a, x2a
-   REAL(8), DIMENSION(:,:), intent(in) :: ya
-   REAL(8), intent(in) :: x1,x2
-   REAL(8) :: y
-   real(8), dimension(1) :: tmp1, tmp2, tmp3
+   real(kind=dp), dimension(:), intent(in) :: x1a, x2a
+   real(kind=dp), DIMENSION(:,:), intent(in) :: ya
+   real(kind=dp), intent(in) :: x1,x2
+   real(kind=dp) :: y
+   real(kind=dp), dimension(1) :: tmp1, tmp2, tmp3
 
    INTEGER :: j
-   REAL(8), DIMENSION(size(x1a)) :: ymtmp
-   real(8), dimension(size(x2a)) :: yb
+   real(kind=dp), DIMENSION(size(x1a)) :: ymtmp
+   real(kind=dp), dimension(size(x2a)) :: yb
 
    tmp1(1) = x1
    tmp2(1) = x2
@@ -375,10 +393,10 @@ MODULE math
 
   FUNCTION interp2Darr(N1a, x1a, N2a, x2a,ya,N1, x1, N2, x2) result(y)
    integer, intent(in) :: N1a, N2a, N1, N2
-   double precision, intent(in) :: x1a(N1a), x2a(N2a)
-   double precision, intent(in) :: x1(N1), x2(N2)
-   double precision, DIMENSION(N1a,N2a), intent(in) :: ya
-   double precision  :: y(N1,N2)
+   real(kind=dp), intent(in) :: x1a(N1a), x2a(N2a)
+   real(kind=dp), intent(in) :: x1(N1), x2(N2)
+   real(kind=dp), DIMENSION(N1a,N2a), intent(in) :: ya
+   real(kind=dp)  :: y(N1,N2)
    integer :: i, j
    
    do i=1,N1
@@ -393,11 +411,11 @@ MODULE math
   FUNCTION gammln(xx)
    IMPLICIT NONE
    INTEGER :: i
-   REAl(8), INTENT(IN) :: xx
-   REAL(8) :: gammln
-   REAL(8) :: ser,tmp,x,y
-   REAL(8) :: stp = 2.5066282746310005
-   REAL(8), DIMENSION(6) :: coef = &
+   real(kind=dp), INTENT(IN) :: xx
+   real(kind=dp) :: gammln
+   real(kind=dp) :: ser,tmp,x,y
+   real(kind=dp) :: stp = 2.5066282746310005
+   real(kind=dp), DIMENSION(6) :: coef = &
       (/76.18009172947146,&
        -86.50532032941677,24.01409824083091,&
        -1.231739572450155,0.1208650973866179e-2,&
@@ -417,8 +435,8 @@ MODULE math
   
   FUNCTION locate(xx,x,mask) result(y)
 
-  double precision, dimension(:), intent(in) :: xx
-  double precision, intent(in) :: x
+  real(kind=dp), dimension(:), intent(in) :: xx
+  real(kind=dp), intent(in) :: x
   logical, intent(in), dimension(:), optional :: mask
   integer :: y
 
@@ -435,7 +453,7 @@ MODULE math
 
   FUNCTION fact(N) result (f)
    integer :: i, N
-   double precision :: f
+   real(kind=dp) :: f
    f = 1d0
    if (N.eq.0) RETURN
    do i=1,N
@@ -455,7 +473,7 @@ MODULE math
   FUNCTION w3js(j1,j2,j3,m1,m2,m3)
    integer :: m1, m2, m3, j1, j2, j3
    integer :: ia, ib, ic, id, ie, im, ig, ih, z, zmin, zmax, jsum
-   double precision :: w3js, cc, denom, cc1, cc2
+   real(kind=dp) :: w3js, cc, denom, cc1, cc2
 
 
    w3js = 0.d0
