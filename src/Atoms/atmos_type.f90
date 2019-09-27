@@ -15,6 +15,8 @@ MODULE atmos_type
                                       ! to mcfost's environnement folders.
   use parametres
   use utils, only : appel_syst
+  use fits_utils, only : print_error
+
   
   IMPLICIT NONE
 
@@ -645,7 +647,8 @@ MODULE atmos_type
    atmos%Npf = 0
    atmos%calc_ne = .false.
    atmos%T(:) = 0d0
-
+   atmos%v_char = 0d0
+   atmos%B_char = 0d0
 
    if (.not.allocated(atmos%nHtot)) allocate(atmos%nHtot(atmos%Nspace))
    !if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(atmos%Nspace))
@@ -921,6 +924,61 @@ MODULE atmos_type
   RETURN
   END SUBROUTINE writeVfield
   
+ SUBROUTINE writeTemperature()
+ ! ------------------------------------ !
+ ! T in K
+ ! ------------------------------------ !
+  integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+  logical :: extend, simple
+  integer :: nelements
+  
+  !get unique unit number
+  CALL ftgiou(unit,EOF)
+
+  blocksize=1
+  CALL ftinit(unit,"Temperature.fits.gz",blocksize,EOF)
+  !  Initialize parameters about the FITS image
+  simple = .true. !Standard fits
+  group = 1 !??
+  fpixel = 1
+  extend = .false. !??
+  bitpix = -64  
+
+  if (lVoronoi) then
+   naxis = 1
+   naxes(1) = atmos%Nspace ! equivalent n_cells
+   nelements = naxes(1)
+  else
+   if (l3D) then
+    naxis = 3
+    naxes(1) = n_rad
+    naxes(2) = 2*nz
+    naxes(3) = n_az
+    nelements = naxes(1) * naxes(2) * naxes(3) ! != n_cells ? should be
+   else
+    naxis = 2
+    naxes(1) = n_rad
+    naxes(2) = nz
+    nelements = naxes(1) * naxes(2) ! should be n_cells also
+   end if
+  end if
+  ! write(*,*) 'yoyo2', n_rad, nz, n_cells, atmos%Nspace
+  !  Write the required header keywords.
+
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  ! Additional optional keywords
+  CALL ftpkys(unit, "UNIT", "K", ' ', EOF)
+  !write data
+  CALL ftpprd(unit,group,fpixel,nelements,atmos%T,EOF)
+  
+  CALL ftclos(unit, EOF)
+  CALL ftfiou(unit, EOF)
+  
+  if (EOF > 0) CALL print_error(EOF)
+ 
+ RETURN
+ END SUBROUTINE writeTemperature
+  
 
   SUBROUTINE readAtmos_ascii(filename)
   ! ------------------------------------------- !
@@ -944,7 +1002,7 @@ MODULE atmos_type
    real, parameter :: Lextent = 1.5 !vchar=Lextent * vchar
    real(kind=dp), dimension(n_cells) :: rr, zz, pp
    logical :: is_not_dark
-   real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic, VRz
+   real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic, Vmod
    
    lmagnetoaccr = .false.
    lVoronoi = .false.
@@ -1092,10 +1150,10 @@ MODULE atmos_type
    end if !thetai-thetao /= 0
    write(*,*) "Mean molecular weight", atmos%avgWeight
 
-
+   Vmod = maxval(dsqrt(atmos%Vxyz(:,1)**2+atmos%Vxyz(:,2)**2+atmos%Vxyz(:,3)**2))
    if (.not.lstatic) then
-    atmos%v_char = atmos%v_char + maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
-    	   dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
+    atmos%v_char = atmos%v_char + Vmod!maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)),&
+    	   !dim=1,mask=sum(atmos%Vxyz**2,dim=2)>0)
    end if
    
    if (atmos%magnetized) then
@@ -1125,7 +1183,7 @@ MODULE atmos_type
     	1e-3*minval(dsqrt(atmos%Vxyz(:,3)**2),mask=atmos%icompute_atomRT>0)
     
    end if
-   write(*,*) "Typical line extent (km/s):"
+   write(*,*) "Typical line extent due to V fields (km/s):"
    atmos%v_char = Lextent * atmos%v_char
    write(*,*) atmos%v_char/1d3
 
