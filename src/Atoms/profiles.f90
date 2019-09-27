@@ -26,18 +26,18 @@ MODULE PROFILES
  SUBROUTINE Iprofile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, phi, psi)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
   integer, intent(in) 							            :: icell
-  double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
+  real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
   type (AtomicLine), intent(in)								:: line
-  double precision, dimension(line%Nlambda)					:: vvoigt, vv!,F
+  real(kind=dp), dimension(line%Nlambda)					:: vvoigt, vv!,F
   integer, parameter										:: NvspaceMax = 101
-  double precision, dimension(NvspaceMax)					:: omegav
+  real(kind=dp), dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv, Nred, Nblue, i, j
-  double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
+  real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
   															   v0, v1, dv, vbroad
-  double precision, intent(out), dimension(:)               :: P
-  double precision, intent(out), dimension(:,:), optional   :: phi, psi
+  real(kind=dp), intent(out), dimension(:)               :: P
+  real(kind=dp), intent(out), dimension(:,:), optional   :: phi, psi
 
   ! v_proj in m/s at point icell
   omegav = 0d0
@@ -112,21 +112,21 @@ MODULE PROFILES
  
  SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, phi, psi)
   integer, intent(in) 							            :: icell
-  double precision, intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
+  real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
   type (AtomicLine), intent(in)								:: line
-  double precision, dimension(line%Nlambda)                 :: vvoigt, vv, F, LV, vvoigt_b
+  real(kind=dp), dimension(line%Nlambda)                 :: vvoigt, vv, F, LV, vvoigt_b
   integer, parameter										:: NvspaceMax = 101, NbspaceMax=101
-  double precision, dimension(NvspaceMax)					:: omegav
-  double precision, dimension(NbspaceMax)					:: omegaB, gamma, chi
+  real(kind=dp), dimension(NvspaceMax)					:: omegav
+  real(kind=dp), dimension(NbspaceMax)					:: omegaB, gamma, chi
   integer													:: Nvspace, nv, Nred, Nblue, nc, &
   															   Nbspace, nb, Nzc, i, j,qz
-  double precision 											:: delta_vol_phi, xphi, yphi, zphi,&
+  real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
   															   v0, v1, dv, b0, b1,g1,c1,dB,vbroad
-  double precision, intent(out), dimension(:)               :: P
-  double precision, intent(out), dimension(:,:) 		    :: phi, psi !eta_QUV; rho_QUV
-  double precision, dimension(3,line%Nlambda) 				:: phi_zc, psi_zc!Sigma_b, PI, sigma_r
+  real(kind=dp), intent(out), dimension(:)               :: P
+  real(kind=dp), intent(out), dimension(:,:) 		    :: phi, psi !eta_QUV; rho_QUV
+  real(kind=dp), dimension(3,line%Nlambda) 				:: phi_zc, psi_zc!Sigma_b, PI, sigma_r
   logical 													:: B_flag = .true.
   !or allocate deallocate only on Nlambda. Lower arrays dimension but took time to allocate
 
