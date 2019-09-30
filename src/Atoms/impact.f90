@@ -314,7 +314,7 @@ MODULE IMPACT
    !Hydrogen level are ordered by n increasing, except for the continuum level
    !n = 1., but stops before Nlevel
    
-   do i=1, Nl-2 !collision from neutral states to the ground state of H+
+   do i=1, Nl-1 !collision from neutral states to the ground state of H+
     n = real(i,kind=dp)
     if (i==1) then !n=i
      rn = 0.45
@@ -375,7 +375,7 @@ MODULE IMPACT
    !Hydrogen level are ordered by n increasing, except for the continuum level
    !n = 1., but stops before Nlevel
    
-   do i=1, Nl-2 !collision between neutral states, n to n'
+   do i=1, Nl-1 !collision between neutral states, n to n'
     n = real(i,kind=dp)
     if (i==1) then !n=i
      rn = 0.45
@@ -385,7 +385,7 @@ MODULE IMPACT
      bn = 1d0/n * (4. - 18.63/n + 36.24/n/n - 28.09/n/n/n)
     end if
     
-    do j=i+1, Nl-2
+    do j=i+1, Nl-1
      np = dble(j)!n'
      x = 1d0 - (n/np)**2 ! = Enn'/Rdybg
      !Gauntfactor * 32./3./dsqrt(3.)/pi * n/np**3 /x**3
