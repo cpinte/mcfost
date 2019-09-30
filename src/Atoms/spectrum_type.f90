@@ -603,9 +603,15 @@ MODULE spectrum_type
 
   !  Write the array to the FITS file.
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Flux,status)
+  if (status > 0) then
+     CALL print_error(status)
+  endif
 
   ! create new hdu for continuum
   CALL ftcrhd(unit, status)
+  if (status > 0) then
+     CALL print_error(status)
+  endif
 
   !  Write the required header keywords.
   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -650,6 +656,11 @@ MODULE spectrum_type
   
   ! create new hdu for wavelength grid
   CALL ftcrhd(unit, status)
+  
+  if (status > 0) then
+     CALL print_error(status)
+  endif
+  
    if (NLTEspec%vacuum_to_air) then
      comment="AIR"
      lambda_vac = NLTEspec%lambda
