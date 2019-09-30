@@ -74,6 +74,7 @@ subroutine set_default_variables()
   lpluto_file = .false.
   lmodel_ascii = .false.
   lmagnetic_field = .true.
+  lforce_lte = .false.
   lxcoupling=.false.
   ! AL-RT
   lpuffed_rim = .false.
@@ -723,6 +724,9 @@ subroutine initialisation_mcfost()
      case("-x_coupling")
         i_arg = i_arg + 1
         lxcoupling=.true.
+     case("-see_lte")
+        i_arg = i_arg + 1
+        lforce_lte=.true.
      case("-tab_wavelength_image")
         i_arg = i_arg + 1
         ltab_wavelength_image = .true.
@@ -1611,6 +1615,7 @@ subroutine display_help()
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -x_coupling : Add (partial) cross coupling terms to SEE"
+  write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
   write(*,*) "        : -coherent_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "
