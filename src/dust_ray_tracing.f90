@@ -703,8 +703,11 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
 
   real :: Q, U
 
-  if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
-  if (lmono0) write(*,'(a33, $)') " Scattered specific intensity ..."
+  if (lmono0) then
+     write(*,*) "i=", tab_RT_incl(ibin)
+     write(*,*) "Vector to observer =", real(tab_u_rt(ibin,1)),real(tab_v_rt(ibin,1)),real(tab_w_rt(ibin))
+     write(*,*) "Scattered specific intensity ..."
+  endif
 
   I_sca2 = 0.0_dp
   eps_dust2_star = 0.0_dp
