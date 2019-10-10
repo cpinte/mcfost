@@ -94,6 +94,9 @@ contains
     ! Voronoi tesselation
     call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
 
+    ! Deleting particles in Hill-sphere of planets
+    if (ldelete_Hill_sphere) call delete_Hill_sphere()
+
     deallocate(massgas,rho)
     if (allocated(rhodust)) deallocate(rhodust,massdust)
 
@@ -533,6 +536,51 @@ contains
     return
 
   end subroutine compute_stellar_parameters
+
+  !*********************************************************
+
+  subroutine delete_Hill_sphere()
+
+    use Voronoi_grid
+    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
+
+    integer :: istar, icell, n_delete
+    real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz
+
+    ! We assume that the central star is the actual star
+    ! and following sink particles are planets
+    do istar=2, n_etoiles
+       n_delete = 0
+
+       d2 = (etoile(istar)%x - etoile(1)%x)**2 + (etoile(istar)%y - etoile(1)%y)**2 + (etoile(istar)%y - etoile(1)%y)**2
+       r_Hill2 = d2 * (etoile(istar)%m / (3*etoile(1)%m))**(2./3)
+       r_Hill = sqrt(r_Hill2)
+
+       cell_loop : do icell=1, n_cells
+          if (icell == istar) cycle cell_loop
+          dx = Voronoi(icell)%xyz(1) - etoile(istar)%x
+          if (dx > r_Hill) cycle cell_loop
+          dy = Voronoi(icell)%xyz(2) - etoile(istar)%y
+          if (dy > r_Hill) cycle cell_loop
+          dz = Voronoi(icell)%xyz(3) - etoile(istar)%z
+          if (dz > r_Hill) cycle cell_loop
+
+          d2 = dx**2 + dy**2 + dz**2
+          if (d2 < r_Hill2) then ! particle is in Hill sphere
+             masse_gaz(icell)    = 0.
+             densite_gaz(icell) = 0.
+             masse(icell) = 0.
+             densite_pouss(:,icell) = 0.
+             n_delete = n_delete + 1
+          endif
+       enddo cell_loop
+
+       write(*,*) "Deleting", n_delete, "particles in Hill sphere of sink particle #", istar
+    enddo
+
+    return
+
+  end subroutine delete_Hill_sphere
 
   !*********************************************************
 

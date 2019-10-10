@@ -112,7 +112,7 @@ module parametres
   logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface
 
   ! Phantom
-  logical :: ldudt_implicit, lscale_units, lignore_dust
+  logical :: ldudt_implicit, lscale_units, lignore_dust, ldelete_Hill_sphere
   real(kind=dp) :: ufac_implicit,scale_units_factor,correct_density_factor_elongated_cells, SPH_amin, SPH_amax, fluffyness
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy
 

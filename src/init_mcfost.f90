@@ -126,7 +126,6 @@ subroutine set_default_variables()
   lcasa=.false.
   lplanet_az = .false.
   which_planet = 0
-
   lML = .false.
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
@@ -137,6 +136,7 @@ subroutine set_default_variables()
   lno_vz = .false.
   lvphi_Kep = .false.
   lfluffy = .false.
+  ldelete_hill_sphere = .false.
   tmp_dir = "./"
 
   ! Geometrie Grille
@@ -1035,6 +1035,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) fluffyness
         i_arg = i_arg + 1
+     case("-delete_Hill_sphere")
+        i_arg = i_arg + 1
+        ldelete_Hill_sphere = .true.
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1505,6 +1508,7 @@ subroutine display_help()
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
   write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
+  write(*,*) "        : -delete_Hill_sphere : delete SPH particles inside Hill spheres of planets"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)
