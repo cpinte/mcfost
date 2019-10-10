@@ -126,7 +126,7 @@ subroutine set_default_variables()
   lcasa=.false.
   lplanet_az = .false.
   which_planet = 0
-  lscale_SPH = .false.
+
   lML = .false.
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
@@ -992,12 +992,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) which_planet
         write(*,*) "PLANET", which_planet, "AZ=", planet_az
-        i_arg = i_arg + 1
-     case("-scale_SPH")
-        lscale_SPH = .true.
-        i_arg = i_arg + 1
-        call get_command_argument(i_arg,s)
-        read(s,*) scale_SPH
         i_arg = i_arg + 1
      case("-correct_density_elongated_cells")
         i_arg = i_arg+1

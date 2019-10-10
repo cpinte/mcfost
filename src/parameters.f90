@@ -156,8 +156,8 @@ module parametres
   real :: z_warp, tilt_angle
 
   ! SPH
-  real :: SPH_keep_particles, planet_az, scale_SPH
-  logical :: lplanet_az, lscale_SPH, lfix_star, lcorrect_density_elongated_cells
+  real :: SPH_keep_particles, planet_az
+  logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells
   integer :: which_planet
 
   logical :: lgap_Gaussian

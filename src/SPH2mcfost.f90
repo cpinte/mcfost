@@ -88,14 +88,6 @@ contains
 
     if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
 
-    if (lscale_SPH) then
-       write(*,*) "**************************************************"
-       write(*,*) "WARNING : rescaling SPH simulation by:", scale_SPH
-       write(*,*) "**************************************************"
-       x = x * scale_SPH ; y = y * scale_SPH ; z = z * scale_SPH
-       etoile(:)%x = etoile(:)%x * scale_SPH ; etoile(:)%y = etoile(:)%y * scale_SPH ; etoile(:)%z = etoile(:)%z * scale_SPH
-    endif
-
     ! Model limits
     call read_SPH_limits_file(SPH_limits_file, SPH_limits)
 
