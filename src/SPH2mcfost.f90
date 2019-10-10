@@ -556,6 +556,8 @@ contains
        r_Hill2 = d2 * (etoile(istar)%m / (3*etoile(1)%m))**(2./3)
        r_Hill = sqrt(r_Hill2)
 
+       write(*,*) "Sink particle #", istar, "Hill radius =", r_Hill, "au"
+
        cell_loop : do icell=1, n_cells
           if (icell == istar) cycle cell_loop
           dx = Voronoi(icell)%xyz(1) - etoile(istar)%x
