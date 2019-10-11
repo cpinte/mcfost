@@ -52,7 +52,6 @@ contains
           read_phantom_files => read_phantom_bin_files
        endif
 
-
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
 
@@ -142,8 +141,8 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(in) :: x,y,z,h,rho,massgas
-    real(dp), dimension(:), allocatable, intent(in) :: vx,vy,vz ! dimension n_SPH or 0
+    real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,rho,massgas
+    real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
@@ -245,6 +244,8 @@ contains
     write(*,*) "y =", limits(3), limits(4)
     write(*,*) "z =", limits(5), limits(6)
 
+    ! Randomize azimuth : (needs to be done before tesselation)
+    if (lrandomize_azimuth) call randomize_azimuth(n_SPH, x,y,vx,vy)
 
     !*******************************
     ! Voronoi tesselation
@@ -585,6 +586,49 @@ contains
   end subroutine delete_Hill_sphere
 
   !*********************************************************
+
+  subroutine randomize_azimuth(n_points, x,y, vx,vy)
+
+    use naleat, only : seed, stream, gtype
+#include "sprng_f.h"
+
+
+    integer, intent(in) :: n_points
+    real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
+
+    integer, parameter :: nb_proc = 1
+    integer :: i, id
+
+    real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
+
+    particle_loop : do i=1, n_points
+       ! We do not touch the sink particles
+       do istar=1, n_stars
+          if (i == star(istar)%icell) cycle paricle_loop
+       enddo
+
+       call random_number(phi)
+       cos_phi = cos(phi) ; sin_phi = sin(phi)
+
+       !-- position
+       x_tmp = x(i) * cos_phi + y(i) * sin_phi
+       y_tmp = -x(i) * sin_phi + y(i) * cos_phi
+       x(i) = x_tmp ; y(i) = y_tmp
+
+
+       !-- velocities
+       x_tmp = vx(i) * cos_phi + vy(i) * sin_phi
+       y_tmp = -vx(i) * sin_phi + vy(i) * cos_phi
+       vx(i) = x_tmp ; vy(i) = y_tmp
+
+    enddo particle_loop
+
+    return
+
+  end subroutine randomize_azimuth
+
+  !*********************************************************
+
 
   subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
 

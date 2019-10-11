@@ -137,6 +137,7 @@ subroutine set_default_variables()
   lvphi_Kep = .false.
   lfluffy = .false.
   ldelete_hill_sphere = .false.
+  lrandomize_azimuth = .false.
   tmp_dir = "./"
 
   ! Geometrie Grille
@@ -1038,6 +1039,9 @@ subroutine initialisation_mcfost()
      case("-delete_Hill_sphere")
         i_arg = i_arg + 1
         ldelete_Hill_sphere = .true.
+     case("-random_az")
+        i_arg = i_arg + 1
+        lrandomize_azimuth = .true.
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"

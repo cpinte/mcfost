@@ -553,6 +553,7 @@ module Voronoi_grid
     real(kind=dp), dimension(6) :: limits_saved
 
     lcompute = .true.
+    if (lrandomize_azimuth) return
 
     call get_voronoi_sha1(density_files(1), voronoi_sha1)
 
