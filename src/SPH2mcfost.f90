@@ -93,11 +93,11 @@ contains
     ! Voronoi tesselation
     call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
 
+    deallocate(x,y,z,h,vx,vy,v,massgas,rho)
+    if (allocated(rhodust)) deallocate(rhodust,massdust)
+
     ! Deleting particles in Hill-sphere of planets
     if (ldelete_Hill_sphere) call delete_Hill_sphere()
-
-    deallocate(massgas,rho)
-    if (allocated(rhodust)) deallocate(rhodust,massdust)
 
     return
 
