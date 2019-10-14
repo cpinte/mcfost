@@ -697,7 +697,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  if (lscale_units) then
     write(*,*) 'Lengths are rescaled by ', scale_units_factor
     udist_scaled = udist * scale_units_factor
-    umass_scaled = umass * scale_units_factor**3
+    umass_scaled = umass
  else
     udist_scaled = udist
     umass_scaled = umass
