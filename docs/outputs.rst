@@ -32,6 +32,8 @@ Output SED files typically are 4 dimensional. The dimensions are
 1; for instance typically the azimuth axis has only 1 value for the case
 of axisymmetric models.
 
+Corresponding wavelengths (in microns) are found in the second HDU of ``sed_rt.fits.gz``.
+
 An additional ``.sed_th.fits.gz`` is also created in the ``data_th``
 directory. It records the SED produced by the Bjorkman & Wood algorithm
 during the calculation of the temperature. This file is generally noisy

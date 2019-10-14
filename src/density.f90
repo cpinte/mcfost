@@ -1144,7 +1144,7 @@ subroutine read_density_file()
   else
      call error("cannot read bitpix in fits file")
   endif
-
+  if (minval(sph_dens) < 0) call error("Negative density found")
   write(*,*) "Dust density range:", minval(sph_dens), maxval(sph_dens)
 
   ! Au cas ou : on elimine les valeurs a 0
