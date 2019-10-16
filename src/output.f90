@@ -940,6 +940,9 @@ subroutine ecriture_map_ray_tracing()
      call ftppre(unit,group,fpixel,nelements,image,status)
   endif
 
+  ! extra hdu with star positions
+  call write_star_position(unit,status)
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -3232,6 +3235,9 @@ subroutine ecriture_spectre(imol)
      call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt),status)
   endif ! lcasa
 
+  ! extra hdu with star positions
+  call write_star_position(unit,status)
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -3318,6 +3324,45 @@ subroutine write_temperature_for_phantom(n_SPH)
   return
 
 end subroutine write_temperature_for_phantom
+
+!**********************************************************************
+
+subroutine write_star_position(unit,status)
+  ! Create an extra hdu with the position of the star
+
+  use dust_ray_tracing, only : star_position
+
+  integer, intent(in) :: unit
+  integer, intent(inout) :: status
+
+  integer :: bitpix,naxis
+  integer, dimension(4) :: naxes
+  integer :: group,fpixel,nelements
+  logical :: simple, extend
+
+  group=1
+  fpixel=1
+
+  bitpix=-32
+  naxis = 4
+  naxes(1) = n_etoiles
+  naxes(2)= RT_n_incl
+  naxes(3)= RT_n_az
+  naxes(4)= 2
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+  ! create new hdu
+  call ftcrhd(unit, status)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  !  Write the array to the FITS file.
+  call ftppre(unit,group,fpixel,nelements,star_position,status)
+
+  return
+
+end subroutine write_star_position
 
 !**********************************************************************
 

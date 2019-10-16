@@ -1315,7 +1315,7 @@ subroutine dust_map(lambda,ibin,iaz)
   endif ! method
 
   ! Adding stellar contribution
-  call compute_stars_map(lambda, u,v,w, taille_pix,dx,dy, lresolved)
+  call compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix,dx,dy, lresolved)
 
   id = 1 ! We add the map on the first cpu id
   Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map(:,:,1)
@@ -1336,12 +1336,13 @@ end subroutine dust_map
 
 !***********************************************************
 
-subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolved)
+subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_map, lresolved)
   ! Make a ray-traced map of the stars
+  ! Also save the projected location of the stars in the map (in units of pixels)
 
   use utils, only : interp
 
-  integer, intent(in) :: lambda
+  integer, intent(in) :: lambda, ibin, iaz
   real(kind=dp), intent(in) :: u,v,w, taille_pix
   real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map ! normalized to taille_pix
   logical, intent(in) :: lresolved
@@ -1349,10 +1350,10 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
   integer, parameter :: n_ray_star_SED = 1024
 
   real(kind=dp), dimension(4) :: Stokes
-  real(kind=dp), dimension(3) :: dx_screen, dy_screen, vec
+  real(kind=dp), dimension(3) :: dx_screen, dy_screen, vec, xyz
   real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg
   real(kind=dp) :: delta, norm_screen2, offset_x, offset_y, fx, fy
-  real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
+  real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi, factor_pix
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
   logical :: in_map, lpola
@@ -1366,6 +1367,8 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
 
   stars_map(:,:,:) = 0.0
   if (n_etoiles < 1) return
+
+  factor_pix = 1.0 / taille_pix**2
 
   alloc_status = 0
   allocate(map_1star(npix_x,npix_y,nb_proc),stat=alloc_status)
@@ -1566,6 +1569,14 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
         tau_avg = tau_avg/n_ray_star(istar)
         write(*,fmt='(" Optical depth from star #", i2, " is ", E12.5)') istar, tau_avg
      endif
+
+     !---  Projected position of centres of each star
+     xyz(1) = etoile(istar)%x ; xyz(2) = etoile(istar)%y ; xyz(3) = etoile(istar)%z
+
+     ! Offset from map center in units of pixel size
+     star_position(istar,ibin,iaz,1) = dot_product(xyz, dx_map) * factor_pix
+     star_position(istar,ibin,iaz,2) = dot_product(xyz, dy_map) * factor_pix
+
   enddo ! n_stars
 
   deallocate(map_1star)

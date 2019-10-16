@@ -53,6 +53,7 @@ module dust_ray_tracing
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing_star, omega_ray_tracing_star ! nang_ray_tracing, 2 (+z et -z), nb_proc
 
   real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
+  real, dimension(:,:,:,:), allocatable :: star_position ! n_stars, RT_n_incl, RT_n_az, 2
 
   real, dimension(:,:,:,:,:,:), allocatable :: tau_surface ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
   real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
@@ -126,6 +127,9 @@ subroutine alloc_ray_tracing()
   endif
   if (alloc_status > 0) call error('Allocation error Stokes_ray_tracing')
   Stokes_ray_tracing = 0.0 ; stars_map = 0.0
+
+  allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error star_position')
 
   if (ltau1_surface) then
      allocate(tau_surface(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
