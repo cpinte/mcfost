@@ -1338,7 +1338,7 @@ end subroutine dust_map
 
 subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_map, lresolved)
   ! Make a ray-traced map of the stars
-  ! Also save the projected location of the stars in the map (in units of pixels)
+  ! Also save the projected location of the stars in the map (in arcsec)
 
   use utils, only : interp
 
@@ -1368,7 +1368,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   stars_map(:,:,:) = 0.0
   if (n_etoiles < 1) return
 
-  factor_pix = 1.0 / taille_pix**2
+  factor_pix = 1.0 / (taille_pix*distance)
 
   alloc_status = 0
   allocate(map_1star(npix_x,npix_y,nb_proc),stat=alloc_status)
@@ -1573,7 +1573,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
      !---  Projected position of centres of each star
      xyz(1) = etoile(istar)%x ; xyz(2) = etoile(istar)%y ; xyz(3) = etoile(istar)%z
 
-     ! Offset from map center in units of pixel size
+     ! Offset from map center in arcsec
      star_position(istar,ibin,iaz,1) = dot_product(xyz, dx_map) * factor_pix
      star_position(istar,ibin,iaz,2) = dot_product(xyz, dy_map) * factor_pix
 

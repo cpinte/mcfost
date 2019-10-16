@@ -128,9 +128,6 @@ subroutine alloc_ray_tracing()
   if (alloc_status > 0) call error('Allocation error Stokes_ray_tracing')
   Stokes_ray_tracing = 0.0 ; stars_map = 0.0
 
-  allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error star_position')
-
   if (ltau1_surface) then
      allocate(tau_surface(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tau_surface')
@@ -233,7 +230,9 @@ subroutine init_directions_ray_tracing()
   ! 09/09/08
 
   real(kind=dp) :: cos_min, cos_max
-  integer :: ibin, iaz
+  integer :: ibin, iaz, alloc_status
+
+  alloc_status = 0
 
   if (.not.allocated(tab_RT_incl)) then
      allocate(tab_RT_incl(RT_n_incl),tab_RT_az(RT_n_az), tab_uv_rt(RT_n_incl), &
@@ -279,6 +278,9 @@ subroutine init_directions_ray_tracing()
         tab_v_rt(ibin,iaz) =   - tab_uv_rt(ibin) * cos(tab_RT_az(iaz)*deg_to_rad)
      enddo
   enddo
+
+  allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error star_position')
 
   return
 

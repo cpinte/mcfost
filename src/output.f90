@@ -3357,6 +3357,8 @@ subroutine write_star_position(unit,status)
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
+  call ftpkys(unit,'UNIT',"arcsec",'',status)
+
   !  Write the array to the FITS file.
   call ftppre(unit,group,fpixel,nelements,star_position,status)
 
