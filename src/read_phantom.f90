@@ -688,8 +688,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   integer  :: i,j,k,itypei,alloc_status,i_etoiles, n_etoiles_old, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udist_scaled, umass_scaled, udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
-  real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, tmp1, tmp2
-  real(dp), dimension(2) ::  v, r, U_r, U_phi
+  real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph
 
   logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
 
@@ -885,70 +884,25 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     endif
 
     if (lVphi_kep) then
-       tmp1 = 0
-       tmp2 = 0
        do i=1, n_SPH
           r_cyl2 = x(i)**2 + y(i)**2
           r_cyl = sqrt(r_cyl2)
           cos_phi = x(i)/r_cyl ; sin_phi = y(i)/r_cyl
           r_sph = sqrt(r_cyl2 + z(i)**2)
 
-          U_r = (/ x(i)/r_cyl, y(i)/r_cyl /)
-          U_phi = (/ -y(i)/r_cyl, x(i)/r_cyl /)
+          !U_r = (/ x(i)/r_cyl, y(i)/r_cyl /)
+          !U_phi = (/ -y(i)/r_cyl, x(i)/r_cyl /)
+          !v = (/vx(i), vy(i)/)
 
-          !normV = sqrt(vx(i)**2 + vy(i)**2)
-          v = (/vx(i), vy(i)/)
-
-!          vr =
-
-
-          vr  =  vx(i) * cos_phi   + vy(i) * sin_phi
-          vphi = - vx(i) * sin_phi + vy(i) * cos_phi
-
-
-
-
-
-          !write(*,*) dot_product(v,U_r), dot_product(v,U_phi)
+          vr = vx(i) * cos_phi   + vy(i) * sin_phi
+          !vphi = - vx(i) * sin_phi + vy(i) * cos_phi
 
           ! Keplerian vphi
-          !vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
-          !write(*,*) vphi, - vx(i) * sin_phi + vy(i) * cos_phi
-          !vphi = 0
+          vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
 
-
-
-
-          if  ((x(i) - xyzmh_ptmass(1,3))**2 + (y(i) - xyzmh_ptmass(2,3))**2 + (z(i) - xyzmh_ptmass(3,3))**2 < 30**2) then
-             tmp1 = tmp1 + 1
-             tmp2 = tmp2 + abs(vr / (vphi - sqrt(Ggrav * xyzmh_ptmass(4,1) * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )))
-
-             !write(*,*) i,
-             write(*,*) sqrt(x(i)**2 + y(i)**2)
-
-          endif
-
-          V = vr * U_r + vphi * U_phi
-          V = sqrt(vr**2 + vphi**2) * U_r
-
-
-
-
-          !vx(i) = vr * cos_phi - vphi * sin_phi
-          !vy(i) = vr * sin_phi + vphi * cos_phi
-
-          vx(i) = vr * x(i)/r_cyl
-          vy(i) = vr * y(i)/r_cyl
-
-          !write(*,*) V(1), vx(i)
-
-          vx(i) = V(1)
-          vy(i) = V(2)
-
+          vx(i) = vr * cos_phi - vphi * sin_phi
+          vy(i) = vr * sin_phi + vphi * cos_phi
        enddo
-       write(*,*) tmp1, tmp2/tmp1
-
-       stop
     endif
  endif
 
