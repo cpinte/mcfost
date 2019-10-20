@@ -1336,9 +1336,9 @@ end subroutine calc_optical_depth_map
 
 
 subroutine write_column_density()
-  ! Only works if the star in in 0, 0, 0 at the moment
+  ! WARNING: Only works if the star in in 0, 0, 0 at the moment
 
-  use density, only : compute_CD
+  use density, only : compute_column_density
 
   integer, parameter :: n_directions = 4
 
@@ -1350,7 +1350,7 @@ subroutine write_column_density()
   logical :: simple, extend
   character(len=512) :: filename
 
-  call compute_CD(CD)
+  call compute_column_density(CD)
 
   filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
 
@@ -1407,9 +1407,7 @@ subroutine write_column_density()
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
@@ -1471,7 +1469,7 @@ end subroutine reemission_stats
 
 !********************************************************************************
 
-subroutine write_disk_struct(lparticle_density)
+subroutine write_disk_struct(lparticle_density,lcolumn_density)
 ! Ecrit les table de densite du gaz en g/cm^3
 ! de la poussiere en g/cm^3 et en particules
 ! + coordonnees r et z en AU
@@ -1481,7 +1479,7 @@ subroutine write_disk_struct(lparticle_density)
 
   implicit none
 
-  logical, intent(in) :: lparticle_density
+  logical, intent(in) :: lparticle_density, lcolumn_density
 
   integer :: i, j, k, icell, jj
 
@@ -2021,7 +2019,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! Wrting the column density
-  !call write_column_density()
+  if (lcolumn_density) call write_column_density()
 
   if (lstop_after_init) then
      write(*,*) "Exiting"
