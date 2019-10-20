@@ -279,8 +279,10 @@ subroutine init_directions_ray_tracing()
      enddo
   enddo
 
-  allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error star_position')
+  if (.not. allocated(star_position)) then
+     allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error star_position')
+  endif
 
   return
 
