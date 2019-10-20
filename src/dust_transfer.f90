@@ -1574,7 +1574,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
      xyz(1) = etoile(istar)%x ; xyz(2) = etoile(istar)%y ; xyz(3) = etoile(istar)%z
 
      ! Offset from map center in arcsec
-     star_position(istar,ibin,iaz,1) = dot_product(xyz, dx_map) * factor_pix
+     star_position(istar,ibin,iaz,1) = - dot_product(xyz, dx_map) * factor_pix ! RA negative axis
      star_position(istar,ibin,iaz,2) = dot_product(xyz, dy_map) * factor_pix
 
   enddo ! n_stars
