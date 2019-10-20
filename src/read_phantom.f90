@@ -925,7 +925,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
  if (lfix_star) then
     write(*,*) ""
-    write(*,*) "Stellar parameters will not be updated, only the star positions"
+    write(*,*) "Stellar parameters will not be updated, only the star positions and masses"
     if (n_etoiles > n_etoiles_old) then
        write(*,*) "WARNING: sink with id >", n_etoiles_old, "will be ignored in the RT"
        n_etoiles = n_etoiles_old
@@ -934,6 +934,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        etoile(i_etoiles)%x = xyzmh_ptmass(1,i_etoiles) * ulength_au
        etoile(i_etoiles)%y = xyzmh_ptmass(2,i_etoiles) * ulength_au
        etoile(i_etoiles)%z = xyzmh_ptmass(3,i_etoiles) * ulength_au
+       etoile(i_etoiles)%M = xyzmh_ptmass(4,i_etoiles) * usolarmass
     enddo
  else
     write(*,*) ""
