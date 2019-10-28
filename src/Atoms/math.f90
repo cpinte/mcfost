@@ -8,7 +8,7 @@ MODULE math
 
   CONTAINS
   
-  
+  !building
   FUNCTION overlapping_transitions(lambda, Nl, Nblue, Nl2, Nblue2) result(overlap)
   !Find where lambda(Nblue:Nblue+Nl-1)==lambda(Nblue2:Nblue2+Nl2-1)
   !meaning where two transitions overlap.
@@ -33,6 +33,32 @@ MODULE math
   RETURN
   END FUNCTION overlapping_transitions
   
+  
+  FUNCTION flatten(n1, n2, M)
+   integer :: n1, n2, i, j
+   real(kind=dp) :: flatten(n1*n2), M(n1,n2)
+   
+   do i=1, n1
+    do j=1, n2
+     flatten(n2*(i-1)+j) = M(i,j)
+    enddo
+   enddo
+   
+  RETURN
+  END FUNCTION flatten
+  
+  FUNCTION reform(n1, n2, F)
+   integer :: n1, n2, i, j
+   real(kind=dp) :: F(n1*n2), reform(n1,n2)
+   
+   do i=1, n1
+    do j=1, n2
+     reform(i,j) = F(n2*(i-1)+j)
+    enddo
+   enddo
+   
+  RETURN
+  END FUNCTION reform
   
    FUNCTION is_nan_infinity(y) result(val)
     real(kind=dp) :: y, val
@@ -104,6 +130,27 @@ MODULE math
    
    RETURN
    END FUNCTION Integrate_x
+   
+   FUNCTION Integrate_nu(N, x, y)
+    integer :: N
+    real(kind=dp), dimension(N) :: x, y
+    real(kind=dp) :: Integrate_nu, sum1, sum2
+    integer  :: k
+    
+    Integrate_nu = y(1) + y(N)
+    sum1 = 0d0; sum2 = 0d0
+    do k=2,N-1
+     if (mod(k,2) /= 0) then 
+      sum1 = sum1 + y(k)
+     else
+      sum2 = sum2 + y(k)
+     endif
+    end do
+    
+    Integrate_nu = (Integrate_nu + 4*sum1 + 2*sum2) * (x(N)-x(1))/(N*3.)
+   
+   RETURN
+   END FUNCTION Integrate_nu
    
    FUNCTION Integrate_dx(N, dx, y) result(integ)
     integer :: N

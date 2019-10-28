@@ -4,6 +4,7 @@ MODULE accelerate
   ! Implements Ng structure similar to RH for convergence
   ! acceleration
   
+  use mcfost_env, only : dp
   use utils, only :  GaussSlv
 
   IMPLICIT NONE
@@ -13,8 +14,8 @@ MODULE accelerate
 
 
   TYPE Ng
-   integer :: N, Ndelay, Norder, Nperiod, count
-   real(8), allocatable, dimension(:) :: b, theStorage
+   integer :: N, N2, Ndelay, Norder, Nperiod, i
+   real(8), allocatable, dimension(:) :: b
    real(8), allocatable, dimension(:,:) :: previous, A
   END TYPE Ng
 
@@ -22,149 +23,99 @@ MODULE accelerate
   
   
 
-  SUBROUTINE initNg(N, Ndelay, Norder, Nperiod, solution, Ngs)
+  SUBROUTINE initNg(N, Ndelay, Norder, Nperiod, Ngs)!solution, 
    integer, intent(in) :: N, Ndelay, Norder, Nperiod
-   integer :: k
-   real(8), dimension(N), intent(in) :: solution
+   !real(kind=dp), dimension(N), intent(in) :: solution
    type (Ng), intent(inout) :: Ngs
 
    Ngs%N = N
-   Ngs%Norder = Norder
-   Ngs%Nperiod = Nperiod
-   Ngs%Ndelay = MAX(Ndelay, Norder+2)
+   Ngs%Norder = Norder !number of previous iterations kept
+   Ngs%Nperiod = Nperiod !number of time we wait before a new acceleration
+   !Because if Norder is 1, Ndelay should be at least 3
+   Ngs%Ndelay = MAX(Ndelay, Norder+1) !number of time we wait until the first acceleration
 
-   if (Norder.gt.0) then
+   !We test outside that Ngorder > 0, and if it is not, we never enter here
+   if (Norder > 0) then
     allocate(Ngs%A(Norder,Norder))
     allocate(Ngs%b(Norder))
+    allocate(Ngs%previous(Norder+2,N)) !need to store Norder + 2 iterations
+    Ngs%i= 0
    end if
 
-   allocate(Ngs%previous(Norder+2,N))
-   Ngs%theStorage = Ngs%previous(1,:)
-
-   do k=1,N
-    Ngs%previous(1,k)=solution(k)
-   end do
-   Ngs%count = 1
 
   RETURN
   END SUBROUTINE initNg
+  
+  FUNCTION Acceleration(Ngs, solution)
+   logical :: acceleration
+   type(Ng), intent(inout) :: Ngs
+   real(kind=dp), intent(inout), dimension(Ngs%N) :: solution!
+   integer :: i, j, k
+   real(kind=dp) :: weight, delta, di, dj!, Aij(Ngs%Norder, Ngs%Norder)
+   
+    acceleration = .false.
+    !! at the moment
+    !We test outside that Ngorder > 0
+    !and outside that we start after the Ndelay
+    !Again, we test outside the Nperiod
+    !!
+   
+    !init a at 0
+    Ngs%i = Ngs%i + 1
+    Ngs%previous(Ngs%i,:) = solution(:)
+    if (Ngs%i < Ngs%Norder+2) return
+    
+    acceleration = .true.
+    
+    write(*,*) Ngs%Norder, Ngs%i," accumulated solutions, extrapolating..."
 
-  SUBROUTINE NgAcceleration(Ngs, solution, accel)
-   !Ngs already initialised
-   integer :: i, j, k, ip, ipp, i0
-   logical, intent(inout) :: accel
-   real(8), allocatable, dimension(:) :: weight
-   real(8), allocatable, dimension(:,:) ::  delta
-   type (Ng), intent(inout) :: Ngs
-   real(8), dimension(Ngs%N), intent(inout) :: solution
-   !logical :: improve_sol = .true.
+    Ngs%A(:,:) = 0d0
+    Ngs%b(:) = 0d0
+    
+    do k=1, Ngs%N
+    	if (solution(k)==0d0) cycle !anyway the residual should be 0 if the cell is empty
+    	weight = 1d0 / (dabs(solution(k))) !never be zero
+    	!delta(i==1) = latest stored solution
+    	delta = Ngs%previous(Ngs%i,k) - Ngs%previous(Ngs%i-1,k) !r_ip+m
+    	do i=1, Ngs%Norder
+    	    !at Norder; we are at i=1, the first stored solution
+        	di = Ngs%previous(Ngs%i-i,k) - Ngs%previous(Ngs%i-i-1,k)
+        	Ngs%b(i) = Ngs%b(i) + weight * delta * (di - delta)
+        	do j=1,Ngs%Norder
+         		dj = Ngs%previous(Ngs%i,k) - Ngs%previous(Ngs%i-j-1,k)
+         		Ngs%A(i,j) = Ngs%A(i,j) + weight * (di-delta)*(dj-delta)
+        	enddo
+        
+      	enddo
+      
+    	enddo !end loop over space
 
-   i = MOD(Ngs%count, (Ngs%Norder+2))+1
-   do k=1,Ngs%N
-    Ngs%previous(i,k) = solution(k)
-   end do
-   Ngs%count = Ngs%count + 1 !increament for next iteration
-
-   if ((Ngs%Norder.gt.0).and.(Ngs%count.ge.Ngs%Ndelay) &
-       .and.(MOD(Ngs%count - Ngs%Ndelay, Ngs%Nperiod).gt.0) ) then
-
-      allocate(Delta(Ngs%Norder+1,Ngs%N))
-      allocate(weight(Ngs%N))
-
-      do i=1,Ngs%Norder
-       ip = MOD(Ngs%count -1 -i, Ngs%Norder+2) + 1
-       ipp = MOD(Ngs%count - 2 -i, Ngs%Norder+2) + 1
-       do k=1,Ngs%N
-         Delta(i,k) = Ngs%previous(ip,k) - Ngs%previous(ipp,k)
-       end do
-      end do
-
-      do k=1,Ngs%N
-       weight(k) = 1/dabs(solution(k))
-      end do
-      do i=1,Ngs%Norder
-       Ngs%b(i) = 0.
-       do j=1,Ngs%Norder
-        Ngs%A(i,j) = 0.
-       end do
-      end do
-
-
-     do j=1,Ngs%Norder
-       do k=1,Ngs%N
-        Ngs%b(j) = Ngs%b(j) + weight(k) * Delta(1,k)* &
-                      (Delta(1,k) - Delta(j+1,k))
-       end do
-       do i=1,Ngs%Norder
-        do k=1,Ngs%N
-         Ngs%A(i,j) = Ngs%A(i,j) + weight(k)*&
-                     (Delta(j+1,k) - Delta(1,k)) * &
-                     (Delta(i+1,k) - Delta(1,k))
-        end do
-       end do
-     end do
-     !Ngs%A = transpose(Ngs%A)
-     !bourrin !Probably a transpose here
-     CALL  GaussSlv(Ngs%A, Ngs%b, Ngs%Norder)
-
-     i0 = MOD(Ngs%count -1, Ngs%Norder+2) + 1
-     do i=1,Ngs%Norder
-      ip = MOD(Ngs%count-2-i, Ngs%Norder+2) + 1
-      do k=1,Ngs%N
-       solution(k) = solution(k) + Ngs%b(i) * &
-             (Ngs%previous(ip,k) - Ngs%previous(i0,k))
-      end do
-     end do
-
-     do k=1,Ngs%N
-      Ngs%previous(i0,k) = solution(k)
-     end do
-
-     accel = .true.
-
-     deallocate(Delta)
-     deallocate(weight)
-   else
-     accel = .false.
-   end if
-
+    !maybe a transpose here
+!     Aij = transpose(Ngs%A)
+    CALL  GaussSlv(Ngs%A, Ngs%b, Ngs%Norder)
+    
+    do i=1, Ngs%Norder
+     solution(:) = solution(:) - Ngs%b(i) * (Ngs%previous(Ngs%i,:) - Ngs%previous(Ngs%i-i,:))
+    enddo
+    
+!     write(*,*) maxval(solution), minval(solution)
+! stop
+    !reset counter for next block of iterations
+    Ngs%i = 0
+   
   RETURN
-  END SUBROUTINE NgAcceleration
+  END FUNCTION Acceleration
+
 
   SUBROUTINE freeNg(Ngs)
     type (Ng), intent(inout) :: Ngs
-    if (Ngs%Norder.gt.0) then
-    deallocate(Ngs%A)
-    deallocate(Ngs%b)
+    if (Ngs%Norder > 0) then
+     deallocate(Ngs%A)
+     deallocate(Ngs%b)
+     deallocate(Ngs%previous)
     end if
   RETURN
   END SUBROUTINE freeNg
-
-  SUBROUTINE MaxChange(Ngs, text, verbose, dM)
-    ! Compare with some few previous iterations
-    type(Ng), intent(in) :: Ngs
-    logical, intent(in) :: verbose
-    character(len=*), intent(in) :: text
-    real(8), intent(out) :: dM
-    integer :: k
-    real(8), dimension(Ngs%N) :: old, new
-    dM = 0.
-
-    old(:) = Ngs%previous(MOD(Ngs%count-2+1,Ngs%Norder+2+1),:)
-    new(:) = Ngs%previous(MOD(Ngs%count-1+1,Ngs%Norder+2+1),:)
-
-    do k=1,Ngs%N
-     if (new(k).gt.0.) then
-      dM = MAX(dM, dabs((new(k)-old(k))/new(k)))
-     end if
-    end do
-
-    if (verbose) then
-     write(*,*) text," delta = ", dM
-    end if
-
-  RETURN
-  END SUBROUTINE MaxChange
 
 
 END MODULE accelerate

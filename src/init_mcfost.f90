@@ -77,6 +77,12 @@ subroutine set_default_variables()
   lforce_lte = .false.
   lxcoupling=.false.
   ! AL-RT
+  ! Ng's acceleration
+  lNg_acceleration= .false.
+  iNg_Norder = 0
+  iNg_Ndelay = 6
+  iNg_Nperiod = 3
+  !
   lpuffed_rim = .false.
   lno_backup = .false.
   loutput_UV_field = .false.
@@ -724,6 +730,30 @@ subroutine initialisation_mcfost()
      case("-x_coupling")
         i_arg = i_arg + 1
         lxcoupling=.true.
+     case("-Ng_accel")
+        i_arg = i_arg + 1
+        lNg_acceleration=.true.
+        if (i_arg > nbr_arg) call error("Ng Norder needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) iNg_Norder
+        if (iNg_Norder<=0) then 
+         lNg_acceleration=.false.
+         call warning("Ng's acceleration deactivated for Nperiod<=0")
+        endif
+        i_arg= i_arg+1
+     case("-Ng_Ndelay")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) iNg_Ndelay
+        i_arg= i_arg+1
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) iNg_Nperiod
+        i_arg= i_arg+1
+        if (iNg_Nperiod*iNg_Ndelay <=0) then 
+         call warning("Bad values for Ng Ndelay and Nperiod, setting to 6 and 3")
+         iNg_Nperiod = 3
+         iNg_Ndelay = 6
+        endif      
      case("-see_lte")
         i_arg = i_arg + 1
         lforce_lte=.true.
@@ -1614,7 +1644,9 @@ subroutine display_help()
   write(*,*) "        : -store_atom_opac: keep in memory background continuum opacities"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
-  write(*,*) "        : -x_coupling : Add (partial) cross coupling terms to SEE"
+  write(*,*) "        : -Ng_accel <Norder> : Turn on Ng's acceleration with order Norder"
+  write(*,*) "        : -Ng_Ndelay <Ndelay> <Nperiod> : # of normal iterations before acceleration. # of relaxation before new acceleration"
+  write(*,*) "        : -x_coupling : Using MALI scheme for solving the SEE"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
   write(*,*) "        : -coherent_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
