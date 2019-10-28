@@ -185,8 +185,8 @@ END FUNCTION getPartitionFunctionk
    !fj = Nj/Ntot
    !first, Nj = Sum_i nij
    do i = 1, atom%Nlevel
-    fjk(atom%stage(i)+1) = fjk(atom%stage(i)+1)+(atom%stage(i)+1)*atom%n(i,k)
-   end do
+    fjk(atom%stage(i)+1) = fjk(atom%stage(i)+1)+(atom%stage(i))*atom%n(i,k)
+   end do                                          !is there a + 1 here so that fjk(1)=1*atom%n(1)/Ntot
    !Divide by Ntotal and retrieve fj = Nj/N for all j
    fjk(:) = fjk(:)/(atmos%nHtot(k)*atom%Abund)
    !et la dérivée ? dfjk

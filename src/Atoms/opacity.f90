@@ -12,7 +12,7 @@ MODULE Opacity
  use profiles, only : Profile
  use metal, only : bound_free_Xsection, Background, BackgroundLines
  !!use molecular_emission, only : v_proj
- use math, only : locate, integrate_dx
+ use math, only : locate, integrate_dx, integrate_nu, integrate_x
  use grid, only : cross_cell, test_exit_grid
  use mcfost_env, only : dp
  use stars, only : intersect_stars
@@ -22,27 +22,31 @@ MODULE Opacity
 
  CONTAINS
  
-  SUBROUTINE add_to_psi_operator(id, icell, iray, chi, dtau, tau)
+  SUBROUTINE calc_psi_operator(id, icell, iray, chi, dtau)
   ! ----------------------------------------------------------- !
    ! Computes Psi and Ieff at the cell icell, for the thread id
    ! in the direction iray, using ds path length of the ray.
   ! ----------------------------------------------------------- !
    integer, intent(in) :: iray, id, icell
    real(kind=dp), dimension(NLTEspec%Nwaves), intent(in) :: chi, dtau
-   real(kind=dp), dimension(NLTEspec%Nwaves), intent(in), optional :: tau
-   !tau is present only for xcoupling
+   
+   NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-dtau)) / (chi + tiny_dp)
+   
+   if (.not.atmos%include_xcoupling) & 
+   									NLTEspec%tau(:,iray,id) = dtau
 
-   if (atmos%include_xcoupling) then
-     NLTEspec%Psi(:,iray,id) = dexp(-tau)*(1d0 - dexp(-dtau)) / (chi + tiny_dp)
-   else
-     NLTEspec%dtau(:,iray,id) = dtau !only allocated for .not.lxcoupling
-     NLTEspec%Psi(:,iray,id) = ((1d0 - dexp(-NLTEspec%dtau(:,iray,id))))/(chi+tiny_dp)
-   end if
+
+!     NLTEspec%dtau(:,iray,id) = dtau !only allocated for .not.lxcoupling
+!    if (atmos%include_xcoupling) then
+!      NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-dtau)) / (chi + tiny_dp) * exp(-tau)
+!    else
+!      NLTEspec%dtau(:,iray,id) = dtau !only allocated for .not.lxcoupling
+!      NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-dtau))/(chi+tiny_dp)
+!    end if
 
 
   RETURN
-  END SUBROUTINE add_to_psi_operator
-  
+  END SUBROUTINE calc_psi_operator
 
  SUBROUTINE init_local_field_atom(id, icell, iray, x0, y0, z0, u0, v0, w0)
   ! ------------------------------------------------------------------------- !
@@ -50,6 +54,7 @@ MODULE Opacity
    ! in case of sub-iterations are turned on.
    ! The local radiation field is proportional to Snu = eta / chi, for each
    ! atom, for each cell and thread.
+   !
   ! ------------------------------------------------------------------------- !  
   
   real(kind=dp), intent(in) :: x0, y0, z0, u0, v0, w0
@@ -67,13 +72,16 @@ MODULE Opacity
 !   NLTEspec%AtomOpac%eta(:,id) = 0d0
   !We need to recompute LTE opacities for this cell and ray
   CALL initAtomOpac(id)
-  CALL init_psi_operator(id, iray)
+  CALL init_psi_operator(id, iray) !and xoupling and eta
 !   NLTEspec%Psi(:,iray,id) = 0d0; NLTEspec%dtau(:,iray,id) = 0d0
   !set atom%eta to zero also
   !NOTE Zeeman opacities are not re set to zero and are accumulated
   !change that or always use FIELD_FREE
   !is equivalent to P(icell,id, iray) ?
   !Compute opacity, eta and chi for this cell in the direction u0, v0, w0
+  !profile here and ds should be the same as the ds and line%phi for this id (or cell)
+  !for this ray
+  !--> To check
   CALL NLTEOpacity(id, icell, iray, x0, y0, z0, x1, x2, x3, u0, v0, w0, l_dum, .true.)
   if (lstore_opac) then
       CALL BackgroundLines(id, icell, x0, y0, z0, x1, x2, x3, u0, v0, w0, l_dum)
@@ -86,12 +94,95 @@ MODULE Opacity
 
   ds = l_dum * AU_to_m
   dtau = chi*ds
-  !recompute Psi and eventually Ieff.
-  CALL add_to_psi_operator(id, icell, iray, chi, dtau)
-  
+  !recompute Psi
+  CALL calc_psi_operator(id, icell, iray, chi, dtau)
+
+
  RETURN
- END SUBROUTINE init_local_field_atom 
+ END SUBROUTINE init_local_field_atom
+ 
+
+ !renorm if not exactly 1 for phi, and integrate the 1/nrays factor.
+ !The line and cont weights could eventually be stored on memory to avoid recompute them
+ !at each step
+ SUBROUTINE compute_integral_weight(id, icell, iray, n_rayons, x0, y0, z0, u0, v0, w0)
+  integer, intent(in) :: id, n_rayons, icell, iray
+  real(kind=dp), intent(in) :: x0, y0, z0, u0, v0, w0
+  real(kind=dp) :: x1, y1, z1, l
+  real(kind=dp) :: l_c_dum, l_v_dum
+  integer 		   :: n_c_dum
+  type (AtomType) :: atom
+  type (AtomicLine) :: line
+  type (AtomicContinuum) :: cont
+  type (AtomicTransition) :: at
+  real(kind=dp), allocatable, dimension(:) ::weight
+  integer :: nact, k, la
+ 
+  CALL cross_cell(x0,y0,z0, u0,v0,w0, icell, &
+       						n_c_dum, x1,y1,z1, n_c_dum, l, l_c_dum, l_v_dum)
   
+   do nact=1, atmos%Nactiveatoms
+   
+    do k=1, atmos%ActiveAtoms(nact)%ptr_atom%Ntr
+     
+     at = atmos%ActiveAtoms(nact)%ptr_atom%at(k)
+     SELECT CASE (at%trtype)
+      CASE ("ATOMIC_LINE")
+       line = atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)       
+      ! allocate(weight(line%Nlambda)); weight = (NLTEspec%lambda(line%Nblue:line%Nred)-line%lambda0)*CLIGHT/line%lambda0
+       if (iray==1) atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)%wphi(id) = 0d0
+       
+       if (line%voigt) CALL Damping(icell, atmos%ActiveAtoms(nact)%ptr_atom, at%ik, line%adamp)
+       CALL Profile(line,icell,x0,y0,z0,x1,y1,z1,u0,v0,w0,l,line%phi(:,iray,id))
+       !test
+!        if (line%j==3 .and. line%i==2) then
+!         write(*,*) id, iray, line%phi(:,iray,id)
+!        endif
+
+       !line is not an alias
+!        atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)%wphi(id) = &
+!        		atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)%wphi(id) + &
+!        			Integrate_x(line%Nlambda, weight, line%phi(:,iray,id))
+       atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)%wphi(id) = &
+       		atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)%wphi(id) + &
+       			sum(line_wlam(line)*line%phi(:,iray,id))
+       
+!        write(*,*) iray, atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)%wphi
+!        open(1, file="toto", status="old")
+!        do la=1, line%Nlambda
+!        write(1, '(3F)') weight(la), NLTEspec%lambda(line%Nblue+la-1), line%phi(la,iray,id)
+!        enddo
+!        stop
+       
+       if (iray==n_rayons) then
+        !should be close to n_rayons, since the integral is done n_rayons times
+        !write(*,*) atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)%wphi(id)
+        atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)%wphi(id) = 1d0/atmos%ActiveAtoms(nact)%ptr_atom%lines(at%ik)%wphi(id)
+       endif
+       !deallocate(weight)
+       
+        
+      CASE ("ATOMIC_CONTINUUM") !ray integration weight is 1/nrayons
+       cont = atmos%ActiveAtoms(nact)%ptr_atom%continua(at%ik)
+       
+       if (iray==1) atmos%ActiveAtoms(nact)%ptr_atom%continua(at%ik)%wmu(id) = 0d0
+       atmos%ActiveAtoms(nact)%ptr_atom%continua(at%ik)%wmu(id) = &
+        atmos%ActiveAtoms(nact)%ptr_atom%continua(at%ik)%wmu(id) + 1d0 !should be n_rayons at the end
+       if (iray==n_rayons) then 
+        if (atmos%ActiveAtoms(nact)%ptr_atom%continua(at%ik)%wmu(id) /= real(n_rayons,kind=dp)) CALL Error("error in cont weight")
+        atmos%ActiveAtoms(nact)%ptr_atom%continua(at%ik)%wmu(id) = 1d0/atmos%ActiveAtoms(nact)%ptr_atom%continua(at%ik)%wmu(id)
+       endif
+      CASE DEFAULT
+       call error ("unknown, type", at%trtype)
+     END SELECT
+    enddo
+   enddo
+ 
+ RETURN
+ END SUBROUTINE compute_integral_weight
+  
+ !the factor 0.5 is here because dw is computed as w(k+1) - w(k-1) / 2.
+ !and int(f) = sum(dw_k*f_k)
  FUNCTION line_wlam(line) result(wlam)
  ! --------------------------------------------------------- !
   ! gives dv/c = dlambda/lambda = dnu/nu
@@ -107,6 +198,7 @@ MODULE Opacity
   type(AtomicLine), intent(in) :: line
   real(kind=dp), dimension(line%Nlambda) :: wlam
   integer :: la, Nblue, Nred, la_start, la_end, la0
+  real :: factor = 0.5
   real(kind=dp) :: norm !beware this is not the result of the integral 
   						   ! just a factor to convert dv/c from dlambda/lambda
    !la0: index of wavelengths on the frequency grid (size Nwaves). 
@@ -115,19 +207,19 @@ MODULE Opacity
    !la=1 <=> la0=Nblue; la=Nlambda <=> la0 = Nred = Nblue - 1 + Nlambda
    !dlambda = (lambda(la0 + 1) - lambda(la0 - 1)) * 0.5 <=> mean value.
 
-  norm = 5d-1 / line%lambda0 * CLIGHT !because we want dv
+                   !should be line%lambda instead of lambda0 ??
+  norm = CLIGHT / line%lambda0 !because we want dv
   Nblue = line%Nblue; Nred = line%Nred
   la_start = 1; la_end = line%Nlambda
 
-
-  wlam(1) = (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) * norm
+  wlam(1) = factor * (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) * norm
   
-  wlam(line%Nlambda) = (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) * norm
+  wlam(line%Nlambda) = factor * (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) * norm
   !write(*,*) 1, wlam(1)
   do la=2,line%Nlambda-1
 
    la0 = Nblue - 1 + la
-   wlam(la) = (NLTEspec%lambda(la0 + 1)-NLTEspec%lambda(la0 - 1)) * norm
+   wlam(la) = factor*(NLTEspec%lambda(la0 + 1)-NLTEspec%lambda(la0 - 1)) * norm
    !write(*,*) la, wlam(la)
   end do
   !write(*,*) line%Nlambda, wlam(line%Nlambda)
@@ -146,21 +238,22 @@ MODULE Opacity
   type(AtomicContinuum), intent(in) :: cont
   real(kind=dp), dimension(cont%Nlambda) :: wlam
   integer :: la, Nblue, Nred, la_start, la_end , la0
+  real :: factor = 0.5
 
   !Nblue = cont%Nblue; Nred = cont%Nred
   Nblue = 1; Nred = NLTEspec%Nwaves !---> Because ATM cont are kept on the whole grid
   la_start = 1; la_end = cont%Nlambda
 
-  wlam(1) = 5d-1 * &
+  wlam(1) = factor * &
   	(NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue)
   	
-  wlam(cont%Nlambda) = 5d-1 * & 
+  wlam(cont%Nlambda) = factor * & 
   	(NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred)
   	
   do la=2,cont%Nlambda-1
   
    la0 = Nblue - 1 + la
-   wlam(la) = 5d-1 * &
+   wlam(la) = factor * &
    	(NLTEspec%lambda(la0+1)-NLTEspec%lambda(la0-1)) / NLTEspec%lambda(la0)
    	
   end do
@@ -202,15 +295,13 @@ MODULE Opacity
   type(AtomicLine) :: line
   type(AtomicContinuum) :: cont
   type(AtomType), pointer :: aatom
-  real(kind=dp) :: gij, twohnu3_c2, stm
+  real(kind=dp) :: gij, twohnu3_c2, stm, wphi
   real(kind=dp), dimension(:), allocatable :: Vij, gijk, twohnu3_c2k
   real(kind=dp), allocatable :: phiZ(:,:), psiZ(:,:)
   
   
   atom_loop : do nact = 1, atmos%Nactiveatoms
    aatom => atmos%ActiveAtoms(nact)%ptr_atom
-   
-   if (iterate) aatom%eta(:,iray,id) = 0d0
    
    	tr_loop : do kr = 1, aatom%Ntr
    	
@@ -245,6 +336,9 @@ MODULE Opacity
          !stop
          write(*,*) " ***************************** "
      	 cycle tr_loop !go to next transitions without computing opac
+     	else if (aatom%n(j,icell) < 0 .or. aatom%n(i,icell) < 0) then
+     	 CALL WARNING("False sharing ? negative pops")
+     	 cycle tr_loop
         else
          write(*,*) " ***************************** "
      	 CALL WARNING("too small line populations")
@@ -277,7 +371,13 @@ MODULE Opacity
         CALL Profile(line, icell,x,y,z,x1,y1,z1,u,v,w,l,Vij,phiZ,psiZ)!, phi, phiZ, psiZ)
 
         if (iterate) aatom%lines(kc)%phi(:,iray,id) = Vij(:)!phi(:)
-         Vij(:) = hc_4PI * line%Bij * Vij(:)!phi(:) !normalized in Profile()
+!attention, line ne pointe pas vers Vij, car line est une instance de atom%lines(kc) pas un pointeur
+!        if (line%j==3 .and. line%i==2) then
+!         write(*,*) Vij
+!        stop
+!        endif        
+        
+         Vij(:) = hc_fourPI * line%Bij * Vij(:)!phi(:) !normalized in Profile()
                                                              ! / (SQRTPI * VBROAD_atom(icell,aatom)) 
             !write(*,*) 'bb', icell, id, iray, maxval(Vij), minval(Vij)
             
@@ -295,6 +395,14 @@ MODULE Opacity
         if (iterate) then
            aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
               twohnu3_c2 * gij * Vij(:) * aatom%n(j,icell)
+              
+           if (atmos%include_xcoupling) then
+            aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + twohnu3_c2 * gij * Vij(:)
+            aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + &
+            	Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell)) * fourPI_hc * line%wphi(id) * line_wlam(line) 
+            aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + &
+            	Vij(:) * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell)) * fourPI_hc * line%wphi(id) * line_wlam(line) 
+           end if
         end if	
 
     
@@ -303,13 +411,13 @@ MODULE Opacity
          do nk = 1, 3
           !magneto-optical
           NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
-           hc_4PI * line%Bij * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell)) * psiZ(nk,:)
+           hc_fourPI * line%Bij * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell)) * psiZ(nk,:)
           !dichroism
           NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) + &
-           hc_4PI * line%Bij * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell)) * psiZ(nk,:)
+           hc_fourPI * line%Bij * (aatom%n(i,icell) - stm * gij*aatom%n(j,icell)) * psiZ(nk,:)
           !emissivity
           NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) + &
-          twohnu3_c2 * gij * hc_4PI * line%Bij * aatom%n(j,icell) * phiZ(nk,:)
+          twohnu3_c2 * gij * hc_fourPI * line%Bij * aatom%n(j,icell) * phiZ(nk,:)
          end do 
         end if
      
@@ -335,6 +443,9 @@ MODULE Opacity
 !             write(*,*) "1", aatom%n(1,icell), "2", aatom%n(2,icell), "3", aatom%n(3,icell),"4", aatom%n(4,icell)
             write(*,*) " ***************************** "
      	    cycle tr_loop !go to next transition
+     	   else if (aatom%n(j,icell) < 0 .or. aatom%n(i,icell) < 0) then
+     	    CALL WARNING("False sharing ? negative pops")
+     	    cycle tr_loop
            else
            write(*,*) " ***************************** "
      	   CALL WARNING("too small cont populations")
@@ -387,6 +498,11 @@ MODULE Opacity
     	
     	 if (iterate) then
     	   aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + twohnu3_c2k(:)
+           if (atmos%include_xcoupling) then
+            aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + twohnu3_c2k(:)/aatom%n(j,icell) !U
+            aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + Vij(:) * fourPI_h *cont_wlam(cont)*cont%wmu(id)
+            aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + Vij(:) *fourPI_h *cont_wlam(cont)*cont%wmu(id)!chi
+           end if
          end if			
    
         deallocate(Vij, gijk, twohnu3_c2k)

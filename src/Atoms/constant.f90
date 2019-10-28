@@ -44,7 +44,8 @@ MODULE constant
                                        (dsqrt(M_ELECTRON)*CLIGHT)))**4.d0 !Thomson cross-section
   real(kind=dp), parameter    :: hc = HPLANCK * CLIGHT
   real(kind=dp), parameter    :: fourPI = 4d0*PI
-  real(kind=dp), parameter    :: hc_4PI = hc/fourPI
+  real(kind=dp), parameter    :: hc_fourPI = hc/fourPI
+  real(kind=dp), parameter    :: fourPI_hc = fourPI/hc
   real(kind=dp), parameter    :: twohc = (2.*HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
   real(kind=dp), parameter    :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
   real(kind=dp), parameter    :: fourPI_h = fourPI / HPLANCK

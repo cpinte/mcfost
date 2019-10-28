@@ -5,7 +5,7 @@ MODULE statequil_atoms
  use spectrum_type, only : NLTEspec
  use constant
  use opacity
- use math, only : locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity
+ use math, only : locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, integrate_dx
  use utils, only : GaussSlv
  use parametres
  use accelerate
@@ -17,6 +17,10 @@ MODULE statequil_atoms
  use constantes, only : tiny_dp
 
  IMPLICIT NONE
+ 
+ PROCEDURE(FillGamma_atom_hogerheijde), pointer :: FillGamma_atom => NULL()
+ PROCEDURE(FillGamma_atom_mali_mu), pointer :: FillGamma_atom_mu => NULL()
+
 
  CONTAINS
  
@@ -89,7 +93,6 @@ MODULE statequil_atoms
 !       atom%Gamma(:,:,id) = CollisionRate(icell, atom) 
 !      end if
      !write(*,*) id, icell, 'max,min Cul for atom', atom%ID, maxval(atom%Gamma(:,:,id)), minval(atom%Gamma(:,:,id))
-     
 ! close(12)
    NULLIFY(atom)
   end do
@@ -123,22 +126,30 @@ MODULE statequil_atoms
  RETURN
  END SUBROUTINE fillGamma
   
- !need cross coupling + Ieff from MALI not hogereijde
- SUBROUTINE FillGamma_atom(id, icell, atom, n_rayons, switch_to_lte)
- !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-dtau) + Psi * eta
- ! "Hogereijde-like". There is no expansion of eta in S_jS_i Uji * nj, hence no Xcoupling yet
- ! to do: Xcoupling
+ !check xcc
+ SUBROUTINE FillGamma_atom_mali(id, icell, atom, n_rayons, switch_to_lte)
+
   integer, intent(in) :: icell, id, n_rayons 
   type (AtomType), intent(inout), pointer :: atom
   logical, optional, intent(in) :: switch_to_lte
-  integer :: kr, kc, i, j, Nblue, Nred, l, iray
-  type (AtomicLine) :: line
-  type (AtomicContinuum) :: cont
+  integer :: kr, kc, i, j, Nblue, Nred, l, la, lap, iray, lp, ip, jp, iray2
+  type (AtomicLine) :: line, other_line
+  type (AtomicContinuum) :: cont, other_cont
   real(kind=dp), dimension(:), allocatable :: weight, gijk
-  real(kind=dp) :: factor, gij, twohnu3_c2, Vij, norm, Jnu, Ieff
+  real(kind=dp) :: factor, gij, twohnu3_c2, Vij, Jnu, Ieff
 
   if (present(switch_to_lte)) then
-   if (switch_to_lte) RETURN !Gamma initialized to Cul
+   if (switch_to_lte) then
+    !Remove therm in delta(l,l')
+     do l = 1, atom%Nlevel
+      atom%Gamma(l,l,id) = 0d0
+      write(*,*) l, -sum(atom%Gamma(l,:,id))
+      atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+     enddo
+      write(*,*) atom%Gamma(:,:,id)
+     stop
+     RETURN !Gamma initialized to Cul
+   endif
   end if 
   
   tr_loop : do kr=1, atom%Ntr
@@ -155,38 +166,205 @@ MODULE statequil_atoms
 
      twohnu3_c2 = line%Aji / line%Bji 
 
-     norm = 0d0
-     do iray=1, n_rayons
-      norm = norm + sum(line%phi(:,iray,id)*line_wlam(line))!/n_rayons !angle and frequency integrated
-     enddo
-    !the n_rayons simplify
-     weight(:) =  line_wlam(line) / norm! / factor
 
+    !the n_rayons simplify
+     weight(:) =  line_wlam(line) * line%wphi(id)
+    
+     gij = line%Bji/line%Bij
+
+     atom%Gamma(j,i,id) = line%Aji
+     do iray=1, n_rayons
+     
+      do l=1,line%Nlambda
+      	la = Nblue + l -1
+
+          Ieff = NLTEspec%I(la,iray,id) - NLTEspec%Psi(la,iray,id) * atom%eta(la,iray,id)
+
+          atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*weight(l)*Ieff    
+          atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*line%Bji*Ieff
+       
+         atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - NLTEspec%Psi(la,iray,id)*&
+         		atom%Uji_down(j,la,iray,id)*atom%chi_up(i,la,iray,id) !j>l
+         		
+!          write(*,*) "j->i", line%lambda0, j, i, NLTEspec%lambda(la)
+!          write(*,*) "Gji=", line%phi(l, iray, id)*weight(l)*line%Bji*Ieff, "Xc(j->i)=",NLTEspec%Psi(la,iray,id)*&
+!           	atom%Uji_down(j,la,iray,id)*atom%chi_up(i,la,iray,id) / norm
+         		
+         inner_tr_loop : do lp=1, atom%Ntr
+          SELECT CASE (atom%at(lp)%trtype)
+           CASE ("ATOMIC_LINE")
+            other_line = atom%lines(atom%at(lp)%ik)
+            ip = other_line%i
+            jp = other_line%j
+           CASE ("ATOMIC_CONTINUUM")
+            other_cont = atom%continua(atom%at(lp)%ik)
+            ip = other_cont%i
+            jp = other_cont%j
+          END SELECT
+          !Only if the lower level of j->i is an upper level of another transition
+          if (jp==i) then
+!             lap = overlap(l) !index on the global grid where they overlap
+!             if (lap <= 0) cycle inner_tr_loop
+			lap = la
+! 			write(*,*) "....>", atom%at(lp)%trtype,  "i->lower",i, ip
+             atom%Gamma(i,j,id) = atom%Gamma(i,j,id) +  NLTEspec%Psi(lap,iray,id)*&
+             	atom%Uji_down(i,lap,iray,id)*atom%chi_down(j, lap, iray, id) !j<l
+!             	
+!         write(*,*) "Xc(i->j)=", NLTEspec%Psi(lap,iray,id)*&
+!             	atom%Uji_down(i,lap,iray,id)*atom%chi_down(j, lap, iray, id) / norm2  
+          endif
+         enddo inner_tr_loop
+
+
+
+      enddo
+     enddo
+
+!      if (atmos%include_xcoupling) deallocate(overlap)
+     deallocate(weight)
+        
+    CASE ("ATOMIC_CONTINUUM")
+     cont = atom%continua(kc)
+     i = cont%i; j = cont%j
+     Nblue = cont%Nblue; Nred = cont%Nred
+    
+     allocate(weight(cont%Nlambda), gijk(cont%Nlambda))
+
+     gijk(:) = 0d0 !avoids to check at each lambda the condition on n(j)
+     !nstar(i)/nstar(j)*exp(-hnu/kT)
+     if (atom%nstar(j, icell) >0) &
+     	gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell)* &
+    		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+    
+     weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
+     
+     ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
+
+     !explicit do loop
+     do l=1,cont%Nlambda
+      twohnu3_c2 = twohc / NLTEspec%lambda(Nblue-1+l)**(3d0)
+      Jnu = 0d0
+      la = Nblue + l -1
+      do iray=1, n_rayons
+      
+           Jnu = Jnu + NLTEspec%I(la,iray,id) - NLTEspec%Psi(la,iray,id) * atom%eta(la,iray,id)        
+
+      enddo
+      Jnu = Jnu * cont%wmu(id)
+
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu*weight(l)
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu+twohnu3_c2)*gijk(l)*weight(l)
+      
+
+       do iray=1,n_rayons
+        atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - atom%Uji_down(j,la,iray,id)*atom%chi_up(i,la,iray,id)*&
+        		NLTEspec%Psi(la,iray,id)
+       enddo
+       
+         inner_tr_loop2 : do lp=1, atom%Ntr
+          SELECT CASE (atom%at(lp)%trtype)
+           CASE ("ATOMIC_LINE")
+            other_line = atom%lines(atom%at(lp)%ik)
+            ip = other_line%i
+            jp = other_line%j
+           CASE ("ATOMIC_CONTINUUM")
+            other_cont = atom%continua(atom%at(lp)%ik)
+            ip = other_cont%i
+            jp = other_cont%j
+          END SELECT
+          if (jp==i) then
+          	do iray=1,n_rayons
+			 lap = la
+             atom%Gamma(i,j,id) = atom%Gamma(i,j,id) +  NLTEspec%Psi(lap,iray,id)*&
+            	atom%Uji_down(i,lap,iray,id)*atom%chi_down(j, lap, iray, id)
+            enddo
+          endif
+          
+         enddo inner_tr_loop2
+
+      
+     enddo
+
+!      if (atmos%include_xcoupling) deallocate(overlap)
+     deallocate(weight, gijk)
+ 
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+  
+  !Remove therm in delta(l,l')
+  !But cross-coupling are in ?? and should not
+  do l = 1, atom%Nlevel
+    atom%Gamma(l,l,id) = 0d0
+    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+  end do
+ 
+ RETURN
+ END SUBROUTINE FillGamma_atom_mali
+ 
+ !--> some discrepancies with Hogereheijde not mu, should be resolved the problem was in I*exp(-tau) + Psi*eta, a minus was here before the +
+ SUBROUTINE FillGamma_atom_hogerheijde(id, icell, atom, n_rayons, switch_to_lte)
+
+  integer, intent(in) :: icell, id, n_rayons 
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: kr, kc, i, j, Nblue, Nred, l, la, lap, iray, lp, ip, jp, iray2
+  type (AtomicLine) :: line, other_line
+  type (AtomicContinuum) :: cont, other_cont
+  real(kind=dp), dimension(:), allocatable :: weight, gijk
+  real(kind=dp) :: factor, gij, twohnu3_c2, Vij, Jnu, Ieff
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) then
+    !Remove therm in delta(l,l')
+     do l = 1, atom%Nlevel
+      atom%Gamma(l,l,id) = 0d0
+      write(*,*) l, -sum(atom%Gamma(l,:,id))
+      atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+     enddo
+      write(*,*) atom%Gamma(:,:,id)
+     stop
+     RETURN !Gamma initialized to Cul
+   endif
+  end if 
+  
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     line = atom%lines(kc)
+     i = line%i; j = line%j
+     Nblue = line%Nblue; Nred = line%Nred
+    
+     allocate(weight(line%Nlambda))
+
+     twohnu3_c2 = line%Aji / line%Bji 
+
+
+    !the n_rayons simplify
+     weight(:) =  line_wlam(line) * line%wphi(id)
     
      gij = line%Bji/line%Bij
 
      atom%Gamma(j,i,id) = line%Aji !init
      do iray=1, n_rayons
+     
       do l=1,line%Nlambda
-        if (atmos%include_xcoupling) then
-           Ieff = NLTEspec%I(Nblue+l-1,iray,id) - \
-             NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
-        else
-           Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%dtau(Nblue+l-1,iray,id)) + \
-             NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
-		endif
+      	la = Nblue + l -1
 
-       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*weight(l)*Ieff
-         
-             
+       Ieff = NLTEspec%I(la,iray,id)*dexp(-NLTEspec%tau(la,iray,id)) + &
+             NLTEspec%Psi(la,iray,id) * atom%eta(la,iray,id)
+
+
+       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*weight(l)*Ieff    
        atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*line%Bji*Ieff
-       
-      if ((is_nan_infinity(atom%Gamma(i,j,id))>0).or.(is_nan_infinity(atom%Gamma(j, i, id))>0)) then
-       write(*,*) "line", id, icell, j, i, iray, NLTEspec%lambda(Nblue+l-1), NLTEspec%I(Nblue+l-1,iray,id), &
-         NLTEspec%Psi(Nblue+l-1,iray,id), atom%eta(Nblue+l-1,iray,id), NLTEspec%dtau(Nblue+l-1,iray,id), &
-         line%phi(l, iray, id), weight(l)
-       stop
-      endif
+
 
       enddo
      enddo
@@ -199,6 +377,7 @@ MODULE statequil_atoms
      Nblue = cont%Nblue; Nred = cont%Nred
     
      allocate(weight(cont%Nlambda), gijk(cont%Nlambda))
+
      gijk(:) = 0d0
      !nstar(i)/nstar(j)*exp(-hnu/kT)
      if (atom%nstar(j, icell) >0) &
@@ -206,35 +385,28 @@ MODULE statequil_atoms
     		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
     
      weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
+     
      ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
 
      !explicit do loop
      do l=1,cont%Nlambda
       twohnu3_c2 = twohc / NLTEspec%lambda(Nblue-1+l)**(3d0)
       Jnu = 0d0
+      la = Nblue + l -1
       do iray=1, n_rayons
-        if (atmos%include_xcoupling) then
-           Jnu = Jnu + NLTEspec%I(Nblue+l-1,iray,id) - \
-             NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)        
-        else
-           Jnu = Jnu + NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%dtau(Nblue+l-1,iray,id)) + \
+
+        Jnu = Jnu + NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%tau(Nblue+l-1,iray,id)) + &
              NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
-        endif
+
       enddo
-      Jnu = Jnu / n_rayons
+      Jnu = Jnu * cont%wmu(id)
 
       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu*weight(l)
       atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu+twohnu3_c2)*gijk(l)*weight(l)
       
-      if ((is_nan_infinity(atom%Gamma(i,j,id))>0).or.(is_nan_infinity(atom%Gamma(j, i, id))>0)) then
-       write(*,*) "cont", id, icell, j, i, iray, NLTEspec%lambda(Nblue+l-1), NLTEspec%I(Nblue+l-1,iray,id), &
-         NLTEspec%Psi(Nblue+l-1,iray,id), atom%eta(Nblue+l-1,iray,id), NLTEspec%dtau(Nblue+l-1,iray,id), &
-         gijk(l), twohnu3_c2, weight(l)
-       stop
-      endif
-      
      enddo
-    
+
+!      if (atmos%include_xcoupling) deallocate(overlap)
      deallocate(weight, gijk)
  
     CASE DEFAULT
@@ -244,131 +416,789 @@ MODULE statequil_atoms
    END SELECT
   
   end do tr_loop
-    
-  !Remove therm in delta(l,l')
+
   do l = 1, atom%Nlevel
     atom%Gamma(l,l,id) = 0d0
     atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
   end do
+ 
+ RETURN
+ END SUBROUTINE FillGamma_atom_hogerheijde
+ 
+ SUBROUTINE fillGamma_mu(id, icell, iray, n_rayons, switch_to_lte)
+  ! ------------------------------------------------------------------------- !
+   ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
+   ! of transition from level l' to l.
+   ! At initialisation, Gamma(l',l) = C(J,I), the collisional rates from upper
+   ! level j to lower level i.
+   !
+   !
+   ! The Sum_l" represents a sommation over each column for the lth row.
+   !
+  ! ------------------------------------------------------------------------- !
 
-  if (atmos%include_xcoupling) then
-   ! Only for the transition with itself of the moment
-   CALL Xcoupling_rates_atom(id, icell, n_rayons, atom)
-   atom%Gamma(:,:,id) = atom%Gamma(:,:,id) - atom%Xc(:,:,id)
-  end if
-
+  integer, intent(in) :: id, n_rayons, icell, iray !here for debug not used
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact
+  type (AtomType), pointer :: atom
   
+
+  do nact=1, atmos%NactiveAtoms
+   atom=>atmos%ActiveAtoms(nact)%ptr_atom
+   CALL FillGamma_atom_mu(id, icell, iray, atom, n_rayons, switch_to_lte)
+   atom=>NULL()
+  enddo
+
  RETURN
- END SUBROUTINE FillGamma_atom
- 
-!check opac
-!I need to handle overlap otherwise will be complicated to multiply Psi * U * chi of differet trans
-!and Psi index should also be consistent with the product
- SUBROUTINE Xcoupling_rates_atom(id, icell, n_rayons, atom)
-   integer, intent(in) :: id, icell, n_rayons
-   type (AtomType), intent(inout) :: atom
-   integer :: kr, kc, la, iray, krr
-   type (AtomicLine) :: line, line_p
-   type (AtomicContinuum) :: cont, cont_p
-   real(kind=dp) :: Psim, U_ji, chi_ij, U_iip ! I mean, transition j->i (Uj->i and ch_ji = -chi_ij)
-   real(kind=dp), dimension(:), allocatable :: weight, overlap, alpha_nu
-   real(kind=dp) :: norm, gij
+ END SUBROUTINE fillGamma_mu
+  
+ SUBROUTINE FillGamma_atom_mali_mu(id, icell, iray, atom, n_rayons, switch_to_lte)
+
+  integer, intent(in) :: icell, id, n_rayons, iray
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: kr, kc, i, j, l, Nblue, Nred, ip, jp, Nl2, Nb2, Nr2, lp
+  type (AtomicLine) :: line, other_line
+  type (AtomicContinuum) :: cont, other_cont
+  real(kind=dp), dimension(:), allocatable :: gijk, integ, lambda
+  real(kind=dp) :: factor, gij, twohnu3_c2, Vij, Jnu, Ieff, Jeff
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) then
+    !Remove therm in delta(l,l')
+     do l = 1, atom%Nlevel
+      atom%Gamma(l,l,id) = 0d0
+      write(*,*) l, -sum(atom%Gamma(l,:,id))
+      atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+     enddo
+      write(*,*) atom%Gamma(:,:,id)
+     stop
+     RETURN !Gamma initialized to Cul
+   endif
+  end if 
+  
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
    
-   !       l',l
-   atom%Xc(:,:,id) = 0d0 !Zero cross-coupling
+   SELECT CASE (atom%at(kr)%trtype)
    
-   do kr=1,atom%Ntr
-   
-    kc = atom%at(kr)%ik
+    CASE ("ATOMIC_LINE")
+     line = atom%lines(kc)
+     i = line%i; j = line%j
+     Nblue = line%Nblue; Nred = line%Nred
     
-    select case (atom%at(kr)%trtype)
+     allocate(integ(line%Nlambda), lambda(line%Nlambda))
+     !lambda = (NLTEspec%lambda(Nblue:Nred)-line%lambda0)*Clight/line%lambda0
+     lambda = line_wlam(line)
+
+     twohnu3_c2 = line%Aji / line%Bji 
     
-     case ("ATOMIC_LINE")
-      line = atom%lines(kc)
-      allocate(weight(line%Nlambda), overlap(line%Nlambda))
-      norm = 0d0; weight(:) = line_wlam(line)
-      do iray=1,n_rayons
-       norm = norm + sum(line%phi(:,iray,id)*weight(:))
-      enddo
-      weight(:) = weight(:)/norm
-      
-      gij = line%Bji/line%Bij
-      
-      do iray=1,n_rayons
-       do la=1,line%Nlambda
-        U_ji = line%phi(la,iray,id)*hc_4PI*line%Aji * NLTEspec%Psi(line%Nblue+la-1,iray,id)
-        !and which psi index?
-        chi_ij = line%phi(la,iray,id)*hc_4PI*line%Bij*(atom%n(line%i,icell) - gij * atom%n(line%j,icell))
-        
-!         need to check that by wrting at hand
-!Sum over transition for which line%i is an upper level
-!         U_iip = 0.
-!         do krr=1,atom%Ntr
-!          ip = 0
-!          if (atom%at(krr)%trtype=='ATOMIC_LINE') then
-!           if (atom%lines(atom%at(krr)%ik)%j == line%i) then
-!            ip = atom%lines(atom%at(krr)%ik)%i; line_p=atom%lines(atom%at(krr)%ik)
-!            overlap(:) = overlapping_transitions(&
-!				NLTEspec%lambda, line%Nlambda, line%Nblue, line_p%Nlambda, line_p%Nblue)
-!            U_iip = U_iip + line_p%phi(la,iray,id)*hc_4PI*line_p%Aji
-!           end if
-!          else if (atom%at(krr)%trtype=="ATOMIC_CONTINUUM") then
-!           if (atom%continua(atom%at(krr)%ik)%j == line%i) then
-!            ip = atom%continua(atom%at(krr)%ik)%i; cont_p=atom%continua(atom%at(krr)%ik)
-!            U_iip = U_iip + 0 'alpha * 2hnu3/c2 * nistar/njstar exp(-hnu/kT)'
-!           end if
-!          else
-!           call error("bug xc")
-!          end if
-!         end do
-        !atom%Xc(line%i,line%j,id) = atom%Xc(line%i, line%j, id) - chi_ij * U_iip
-        atom%Xc(line%j, line%i, id) = atom%Xc(line%j, line%i, id) + chi_ij * U_ji
-        
-       enddo
-      enddo
+     gij = line%Bji/line%Bij
+
+
+     integ(:) = (NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) * line%phi(:, iray,id)
+
+     !Jeff = Integrate_x(line%Nlambda, lambda, integ) / n_rayons
+     Jeff = sum(integ*lambda)*line%wphi(id) !include also 1/1/n_rayons factor
+     									    !that compensate with the 1/nrayns that should appear here
+
+     !if (iray == 1) atom%Gamma(j,i,id) = line%Aji
+
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff*line%Bji + line%Aji/n_rayons
+     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff*line%Bij
      
-      deallocate(weight, overlap)
-     case ("ATOMIC_CONTINUUM")
-      cont = atom%continua(kc)
-      allocate(weight(cont%Nlambda), overlap(cont%Nlambda), alpha_nu(cont%Nlambda))
+     integ(:) = 0d0
+     !include weights
+     !integ = NLTEspec%Psi(Nblue:Nred,iray,id)*&
+     !    		atom%Uji_down(j,Nblue:Nred,iray,id)*atom%chi_up(i,Nblue:Nred,iray,id)
+     !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - sum(integ)!Integrate_x(line%Nlambda, lambda, integ) / n_rayons !j>l
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - &
+     	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(j,:,iray,id)*atom%chi_up(i,:,iray,id))
+         		
+         inner_tr_loop : do lp=1, atom%Ntr
+          SELECT CASE (atom%at(lp)%trtype)
+           CASE ("ATOMIC_LINE")
+            other_line = atom%lines(atom%at(lp)%ik)
+            ip = other_line%i
+            jp = other_line%j
+            Nb2 = other_line%Nblue
+            Nr2 = other_line%Nred
+            Nl2 = other_line%Nlambda
+            !deallocate(lambda)
+			!allocate(lambda(Nl2)); lambda = (NLTEspec%lambda(Nb2:Nr2)-other_line%lambda0)*CLIGHT/other_line%lambda0
+           CASE ("ATOMIC_CONTINUUM")
+            other_cont = atom%continua(atom%at(lp)%ik)
+            ip = other_cont%i
+            jp = other_cont%j
+            Nb2 = other_cont%Nblue
+            Nr2 = other_cont%Nred
+            Nl2 = other_cont%Nlambda
+            !deallocate(lambda)
+			!allocate(lambda(Nl2)); lambda = NLTEspec%lambda(Nb2:Nr2)
 
-      alpha_nu(:) = bound_free_Xsection(cont)
-      weight(:) = fourPI_h * cont_wlam(cont) * alpha_nu(:)
-     ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
+          END SELECT
+          !Only if the lower level of j->i is an upper level of another transition
+          if (jp==i) then              
+          	 integ = 0d0
+          	 !integ = NLTEspec%Psi(Nblue:Nred,iray,id)*&
+             !	atom%Uji_down(i,Nblue:Nred,iray,id)*atom%chi_down(j,Nblue:Nred, iray, id)
+             !atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + sum(integ)!Integrate_x(Nl2, lambda, integ) / n_rayons  !j<l
+             atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + &
+             	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(i,:,iray,id)*atom%chi_down(j,:, iray, id))
+          endif
+         enddo inner_tr_loop
 
-     !explicit do loop
-      do la=1,cont%Nlambda
-        Psim = 0d0
-        gij = 0d0
-        if (atom%nstar(cont%j,icell)>0) & 
-        	gij = atom%nstar(cont%i, icell)/atom%nstar(cont%j,icell)* &
-    		 dexp(-hc_k / (NLTEspec%lambda(cont%Nblue-1+la) * atmos%T(icell)))
-    		 
-        do iray=1, n_rayons
-         Psim = Psim + NLTEspec%Psi(cont%Nblue+la-1,iray,id)/n_rayons
-        enddo
-        U_ji  = alpha_nu(la) * Psim * gij * twohc / NLTEspec%lambda(cont%Nblue-1+la)**(3d0)
-        chi_ij = weight(la) * (atom%n(cont%i,icell)-atom%n(cont%j,icell)*gij)
+     deallocate(integ, lambda)
         
-        
-        atom%Xc(cont%j, cont%i, id) = atom%Xc(cont%j, cont%i, id) + chi_ij * U_ji
-
-      enddo
+    CASE ("ATOMIC_CONTINUUM")
+     cont = atom%continua(kc)
+     i = cont%i; j = cont%j
+     Nblue = cont%Nblue; Nred = cont%Nred
     
-      deallocate(weight, overlap, alpha_nu)
+     allocate(gijk(cont%Nlambda), integ(cont%Nlambda), lambda(cont%Nlambda))
+     lambda = cont_wlam(cont) !NLTEspec%lambda(Nblue:Nred)
+
+
+     gijk(:) = 0d0
+     !nstar(i)/nstar(j)*exp(-hnu/kT)
+     if (atom%nstar(j, icell) >0) &
+     	gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell)* &
+    		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+    
+     
+      
+      integ(:) = (NLTEspec%I(Nblue:Nred,iray,id)  - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id))*bound_free_Xsection(cont)
+      
+      Jnu = sum(lambda*integ)*cont%wmu(id)!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons !Jbarcont
+      
+      integ(:) = ( (NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) + &
+       twohc / NLTEspec%lambda(Nblue:Nred)**(3d0))*gijk*bound_free_Xsection(cont)
+       
+      Jeff = sum(lambda*integ)*cont%wmu(id)!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons
+
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu * fourPI_h
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff * fourPI_h
+      
+      !integ(:) = atom%Uji_down(j,Nblue:Nred,iray,id)*atom%chi_up(i,Nblue:Nred,iray,id)*&
+      !  		NLTEspec%Psi(Nblue:Nred,iray,id)
+      !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - sum(integ)!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - &
+      	sum(atom%Uji_down(j,:,iray,id)*atom%chi_up(i,:,iray,id)*NLTEspec%Psi(:,iray,id))
+       
+         inner_tr_loop2 : do lp=1, atom%Ntr
+          SELECT CASE (atom%at(lp)%trtype)
+           CASE ("ATOMIC_LINE")
+            other_line = atom%lines(atom%at(lp)%ik)
+            ip = other_line%i
+            jp = other_line%j
+            Nb2 = other_line%Nblue
+            Nr2 = other_line%Nred
+            Nl2 = other_line%Nlambda
+             !deallocate(lambda)
+             !allocate(lambda(Nl2)); lambda = (NLTEspec%lambda(Nb2:Nr2)-other_line%lambda0)*CLIGHT/other_line%lambda0
+           CASE ("ATOMIC_CONTINUUM")
+            other_cont = atom%continua(atom%at(lp)%ik)
+            ip = other_cont%i
+            jp = other_cont%j
+            Nb2 = other_cont%Nblue
+            Nr2 = other_cont%Nred
+            Nl2 = other_cont%Nlambda
+            ! deallocate(lambda)
+            ! allocate(lambda(Nl2)); lambda = NLTEspec%lambda(Nb2:Nr2)
+          END SELECT
+          if (jp==i) then
+          	 integ(:) = 0d0
+			 !integ(:) = NLTEspec%Psi(Nblue:Nred,iray,id)*&
+             !	atom%Uji_down(i,Nblue:Nred,iray,id)*atom%chi_down(j,Nblue:Nred, iray, id)
+             !atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + sum(integ)!Integrate_x(Nl2, lambda, integ) / n_rayons
+             atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + &
+             	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(i,:,iray,id)*atom%chi_down(j,:, iray, id))
+          endif
           
-     case default
-      call error("Transition type unkown", atom%at(kr)%trtype)
-     end select
-   
-   enddo !over transitions
+         enddo inner_tr_loop2
+
+     deallocate(gijk, integ, lambda)
+ 
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+  
+  !Remove therm in delta(l,l')
+  !But cross-coupling are in ?? and should not
+  do l = 1, atom%Nlevel
+    atom%Gamma(l,l,id) = 0d0
+    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+  end do
  
  RETURN
- END SUBROUTINE Xcoupling_rates_atom
+ END SUBROUTINE FillGamma_atom_mali_mu
+ 
+!  SUBROUTINE FillGamma_atom_mali_mu2(id, icell, iray, atom, n_rayons, switch_to_lte)
+! 
+!   integer, intent(in) :: icell, id, n_rayons, iray
+!   type (AtomType), intent(inout), pointer :: atom
+!   logical, optional, intent(in) :: switch_to_lte
+!   integer :: kr, kc, i, j, l, Nblue, Nred, ip, jp, Nl2, Nb2, Nr2, lp
+!   type (AtomicLine) :: line, other_line
+!   type (AtomicContinuum) :: cont, other_cont
+!   real(kind=dp), dimension(:), allocatable :: gijk, integ, lambda
+!   real(kind=dp) :: factor, gij, twohnu3_c2, Vij, Jnu, Ieff, Jeff
+! 
+!   if (present(switch_to_lte)) then
+!    if (switch_to_lte) then
+!     !Remove therm in delta(l,l')
+!      do l = 1, atom%Nlevel
+!       atom%Gamma(l,l,id) = 0d0
+!       write(*,*) l, -sum(atom%Gamma(l,:,id))
+!       atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+!      enddo
+!       write(*,*) atom%Gamma(:,:,id)
+!      stop
+!      RETURN !Gamma initialized to Cul
+!    endif
+!   end if 
+!   
+!   tr_loop : do kr=1, atom%Ntr
+!    kc = atom%at(kr)%ik
+!    
+!    SELECT CASE (atom%at(kr)%trtype)
+!    
+!     CASE ("ATOMIC_LINE")
+!      line = atom%lines(kc)
+!      i = line%i; j = line%j
+!      Nblue = line%Nblue; Nred = line%Nred
+!     
+!      allocate(integ(line%Nlambda), lambda(line%Nlambda))
+!      !lambda = (NLTEspec%lambda(Nblue:Nred)-line%lambda0)*Clight/line%lambda0
+!      lambda = line_wlam(line)
+! 
+!      twohnu3_c2 = line%Aji / line%Bji 
+!     
+!      gij = line%Bji/line%Bij
+! 
+! 
+!      integ(:) = (NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) * line%phi(:, iray,id)
+!        
+!      !Jeff = Integrate_x(line%Nlambda, lambda, integ) / n_rayons
+!      Jeff = sum(integ*lambda)*line%wphi(id) !include also 1/1/n_rayons factor
+!      									    !that compensate with the 1/nrayns that should appear here
+! 
+!      !if (iray == 1) atom%Gamma(j,i,id) = line%Aji
+! 
+!      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff*line%Bji + line%Aji/n_rayons
+!      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff*line%Bij
+! 
+!      deallocate(integ, lambda)
+!         
+!     CASE ("ATOMIC_CONTINUUM")
+!      cont = atom%continua(kc)
+!      i = cont%i; j = cont%j
+!      Nblue = cont%Nblue; Nred = cont%Nred
+!     
+!      allocate(gijk(cont%Nlambda), integ(cont%Nlambda), lambda(cont%Nlambda))
+!      lambda = cont_wlam(cont) !NLTEspec%lambda(Nblue:Nred)
+! 
+! 
+!      gijk(:) = 0d0
+!      !nstar(i)/nstar(j)*exp(-hnu/kT)
+!      if (atom%nstar(j, icell) >0) &
+!      	gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell)* &
+!     		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+!     
+!      
+!       
+!       integ(:) = (NLTEspec%I(Nblue:Nred,iray,id)  - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id))*bound_free_Xsection(cont)
+!       
+!       Jnu = sum(lambda*integ)*cont%wmu(id)!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons !Jbarcont
+!       
+!       integ(:) = ( (NLTEspec%I(Nblue:Nred,iray,id)  - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) + &
+!        twohc / NLTEspec%lambda(Nblue:Nred)**(3d0))*gijk*bound_free_Xsection(cont)
+!        
+!       Jeff = sum(lambda*integ)*cont%wmu(id)!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons
+! 
+!       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu * fourPI_h
+!       atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff * fourPI_h
+! 
+!      deallocate(gijk, integ, lambda)
+!  
+!     CASE DEFAULT
+!     
+!      CALL Error("Unkown transition type", atom%at(kr)%trtype)
+!      
+!    END SELECT
+!   
+!   end do tr_loop
+!   
+!   !Remove therm in delta(l,l')
+!   !But cross-coupling are in ?? and should not
+!   do l = 1, atom%Nlevel
+!     atom%Gamma(l,l,id) = 0d0
+!     atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+!   end do
+!   
+!   CALL xcc_mali_mu(id,iray,atom) !add xcc
+!  
+!  RETURN
+!  END SUBROUTINE FillGamma_atom_mali_mu2
+!  
+!  
+!  SUBROUTINE xcc_mali_mu(id, iray, atom)
+! 
+!   integer, intent(in) :: id, iray
+!   type (AtomType), intent(inout), pointer :: atom
+!   integer :: kr, kc, i, j, l, Nblue, Nred, ip, jp, Nl2, Nb2, Nr2, lp
+!   type (AtomicLine) :: line, other_line
+!   type (AtomicContinuum) :: cont, other_cont
+!   real(kind=dp), dimension(:), allocatable :: integ, lambda
+! 
+!   
+!   tr_loop : do kr=1, atom%Ntr
+!    kc = atom%at(kr)%ik
+!    
+!    SELECT CASE (atom%at(kr)%trtype)
+!    
+!     CASE ("ATOMIC_LINE")
+!      line = atom%lines(kc)
+!      i = line%i; j = line%j
+!      Nblue = line%Nblue; Nred = line%Nred
+!     
+!      allocate(integ(line%Nlambda), lambda(line%Nlambda))
+!      !lambda = (NLTEspec%lambda(Nblue:Nred)-line%lambda0)*Clight/line%lambda0
+!      lambda = line_wlam(line)
+! 
+!  
+!      integ(:) = 0d0
+!      !include weights
+!      !integ = NLTEspec%Psi(Nblue:Nred,iray,id)*&
+!      !    		atom%Uji_down(j,Nblue:Nred,iray,id)*atom%chi_up(i,Nblue:Nred,iray,id)
+!      !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - sum(integ)!Integrate_x(line%Nlambda, lambda, integ) / n_rayons !j>l
+!      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - &
+!      	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(j,:,iray,id)*atom%chi_up(i,:,iray,id))
+!          		
+!          inner_tr_loop : do lp=1, atom%Ntr
+!           SELECT CASE (atom%at(lp)%trtype)
+!            CASE ("ATOMIC_LINE")
+!             other_line = atom%lines(atom%at(lp)%ik)
+!             ip = other_line%i
+!             jp = other_line%j
+!             Nb2 = other_line%Nblue
+!             Nr2 = other_line%Nred
+!             Nl2 = other_line%Nlambda
+!             !deallocate(lambda)
+! 			!allocate(lambda(Nl2)); lambda = (NLTEspec%lambda(Nb2:Nr2)-other_line%lambda0)*CLIGHT/other_line%lambda0
+!            CASE ("ATOMIC_CONTINUUM")
+!             other_cont = atom%continua(atom%at(lp)%ik)
+!             ip = other_cont%i
+!             jp = other_cont%j
+!             Nb2 = other_cont%Nblue
+!             Nr2 = other_cont%Nred
+!             Nl2 = other_cont%Nlambda
+!             !deallocate(lambda)
+! 			!allocate(lambda(Nl2)); lambda = NLTEspec%lambda(Nb2:Nr2)
+! 
+!           END SELECT
+!           !Only if the lower level of j->i is an upper level of another transition
+!           if (jp==i) then              
+!           	 integ = 0d0
+!           	 !integ = NLTEspec%Psi(Nblue:Nred,iray,id)*&
+!              !	atom%Uji_down(i,Nblue:Nred,iray,id)*atom%chi_down(j,Nblue:Nred, iray, id)
+!              !atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + sum(integ)!Integrate_x(Nl2, lambda, integ) / n_rayons  !j<l
+!              atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + &
+!              	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(i,:,iray,id)*atom%chi_down(j,:, iray, id))
+!           endif
+!          enddo inner_tr_loop
+! 
+!      deallocate(integ, lambda)
+!         
+!     CASE ("ATOMIC_CONTINUUM")
+!      cont = atom%continua(kc)
+!      i = cont%i; j = cont%j
+!      Nblue = cont%Nblue; Nred = cont%Nred
+!     
+!      allocate(integ(cont%Nlambda), lambda(cont%Nlambda))
+!      lambda = cont_wlam(cont) !NLTEspec%lambda(Nblue:Nred)
+!       
+!       !integ(:) = atom%Uji_down(j,Nblue:Nred,iray,id)*atom%chi_up(i,Nblue:Nred,iray,id)*&
+!       !  		NLTEspec%Psi(Nblue:Nred,iray,id)
+!       !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - sum(integ)!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons
+!       atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - &
+!       	sum(atom%Uji_down(j,:,iray,id)*atom%chi_up(i,:,iray,id)*NLTEspec%Psi(:,iray,id))
+!        
+!          inner_tr_loop2 : do lp=1, atom%Ntr
+!           SELECT CASE (atom%at(lp)%trtype)
+!            CASE ("ATOMIC_LINE")
+!             other_line = atom%lines(atom%at(lp)%ik)
+!             ip = other_line%i
+!             jp = other_line%j
+!             Nb2 = other_line%Nblue
+!             Nr2 = other_line%Nred
+!             Nl2 = other_line%Nlambda
+!              !deallocate(lambda)
+!              !allocate(lambda(Nl2)); lambda = (NLTEspec%lambda(Nb2:Nr2)-other_line%lambda0)*CLIGHT/other_line%lambda0
+!            CASE ("ATOMIC_CONTINUUM")
+!             other_cont = atom%continua(atom%at(lp)%ik)
+!             ip = other_cont%i
+!             jp = other_cont%j
+!             Nb2 = other_cont%Nblue
+!             Nr2 = other_cont%Nred
+!             Nl2 = other_cont%Nlambda
+!             ! deallocate(lambda)
+!             ! allocate(lambda(Nl2)); lambda = NLTEspec%lambda(Nb2:Nr2)
+!           END SELECT
+!           if (jp==i) then
+!           	 integ(:) = 0d0
+! 			 !integ(:) = NLTEspec%Psi(Nblue:Nred,iray,id)*&
+!              !	atom%Uji_down(i,Nblue:Nred,iray,id)*atom%chi_down(j,Nblue:Nred, iray, id)
+!              !atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + sum(integ)!Integrate_x(Nl2, lambda, integ) / n_rayons
+!              atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + &
+!              	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(i,:,iray,id)*atom%chi_down(j,:, iray, id))
+!           endif
+!           
+!          enddo inner_tr_loop2
+! 
+!      deallocate(integ, lambda)
+!  
+!     CASE DEFAULT
+!     
+!      CALL Error("Unkown transition type", atom%at(kr)%trtype)
+!      
+!    END SELECT
+!   
+!   end do tr_loop
+! 
+!  
+!  RETURN
+!  END SUBROUTINE xcc_mali_mu
+ 
+
+ SUBROUTINE FillGamma_atom_hogerheijde_mu(id, icell, iray, atom, n_rayons, switch_to_lte)
+
+  integer, intent(in) :: icell, id, n_rayons, iray
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: kr, kc, i, j, l, Nblue, Nred, ip, jp, Nl2, Nb2, Nr2, lp
+  type (AtomicLine) :: line, other_line
+  type (AtomicContinuum) :: cont, other_cont
+  real(kind=dp), dimension(:), allocatable :: gijk, integ, lambda
+  real(kind=dp) :: factor, gij, twohnu3_c2, Vij, Jnu, Ieff, Jeff
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) then
+    !Remove therm in delta(l,l')
+     do l = 1, atom%Nlevel
+      atom%Gamma(l,l,id) = 0d0
+      write(*,*) l, -sum(atom%Gamma(l,:,id))
+      atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+     enddo
+      write(*,*) atom%Gamma(:,:,id)
+     stop
+     RETURN !Gamma initialized to Cul
+   endif
+  end if 
+  
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     line = atom%lines(kc)
+     i = line%i; j = line%j
+     Nblue = line%Nblue; Nred = line%Nred
+    
+     allocate(integ(line%Nlambda), lambda(line%Nlambda))
+     lambda = line_wlam(line)
+
+
+     twohnu3_c2 = line%Aji / line%Bji 
+    
+     gij = line%Bji/line%Bij
+
+     integ(:) = (NLTEspec%I(Nblue:Nred,iray,id)*dexp(-NLTEspec%tau(Nblue:Nred,iray,id)) + NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) * &
+       line%phi(:, iray,id)
+       
+     Jeff = sum(integ*lambda*line%wphi(id))!Integrate_x(line%Nlambda, lambda, integ) / n_rayons
+
+
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff*line%Bji + line%Aji/n_rayons
+     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff*line%Bij
+    
+
+     deallocate(integ, lambda)
+        
+    CASE ("ATOMIC_CONTINUUM")
+     cont = atom%continua(kc)
+     i = cont%i; j = cont%j
+     Nblue = cont%Nblue; Nred = cont%Nred
+    
+     allocate(gijk(cont%Nlambda), integ(cont%Nlambda), lambda(cont%Nlambda))
+     lambda = cont_wlam(cont)!NLTEspec%lambda(Nblue:Nred)
+
+
+     gijk(:) = 0d0
+     !nstar(i)/nstar(j)*exp(-hnu/kT)
+     if (atom%nstar(j, icell) >0) &
+     	gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell)* &
+    		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+    
+     
+      
+      integ(:) = (NLTEspec%I(Nblue:Nred,iray,id)*dexp(-NLTEspec%tau(Nblue:Nred,iray,id)) + NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id))*bound_free_Xsection(cont)
+      
+      Jnu = sum(lambda*integ)*cont%wmu(id)!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons !Jbarcont
+      
+      
+      integ(:) = ( (NLTEspec%I(Nblue:Nred,iray,id)*dexp(-NLTEspec%tau(Nblue:Nred,iray,id)) + NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) + &
+       twohc / NLTEspec%lambda(Nblue:Nred)**(3d0))*gijk*bound_free_Xsection(cont)
+      Jeff = sum(lambda*integ)*cont%wmu(id) !Integrate_x(cont%Nlambda, lambda, integ) / n_rayons
+
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu * fourPI_h
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff * fourPI_h
+      
+     deallocate(gijk, integ, lambda)
+ 
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+  
+  !Remove therm in delta(l,l')
+  !But cross-coupling are in ?? and should not
+  do l = 1, atom%Nlevel
+    atom%Gamma(l,l,id) = 0d0
+    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+  end do
+ 
+ RETURN
+ END SUBROUTINE FillGamma_atom_hogerheijde_mu 
 
  
+ !cannot build it ray by ray because I first need to compute the line normalisation weight
+ !which is sum(rays)(sum(vel)) dv(vel)*phi(vel,ray)
+ !difficult to store if ray are random, cannot be computed before for each cell?
+!  SUBROUTINE FillGamma_atom(id, icell, atom, n_rayons, switch_to_lte)
+! 
+!   integer, intent(in) :: icell, id, n_rayons 
+!   type (AtomType), intent(inout), pointer :: atom
+!   logical, optional, intent(in) :: switch_to_lte
+!   integer :: kr, kc, i, j, Nblue, Nred, l, la, lap, iray, lp, ip, jp, iray2
+!   type (AtomicLine) :: line, other_line
+!   type (AtomicContinuum) :: cont, other_cont
+!   real(kind=dp), dimension(:), allocatable :: weight, gijk
+!   real(kind=dp) :: factor, gij, twohnu3_c2, Vij, norm, Jnu, Ieff, norm2
+! 
+!   if (present(switch_to_lte)) then
+!    if (switch_to_lte) then
+!     !Remove therm in delta(l,l')
+!      do l = 1, atom%Nlevel
+!       atom%Gamma(l,l,id) = 0d0
+!       write(*,*) l, -sum(atom%Gamma(l,:,id))
+!       atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+!      enddo
+!       write(*,*) atom%Gamma(:,:,id)
+!      stop
+!      RETURN !Gamma initialized to Cul
+!    endif
+!   end if 
+!   
+!   tr_loop : do kr=1, atom%Ntr
+!    kc = atom%at(kr)%ik
+!    
+!    SELECT CASE (atom%at(kr)%trtype)
+!    
+!     CASE ("ATOMIC_LINE")
+!      line = atom%lines(kc)
+!      i = line%i; j = line%j
+!      Nblue = line%Nblue; Nred = line%Nred
+!     
+!      allocate(weight(line%Nlambda))
+! 
+!      twohnu3_c2 = line%Aji / line%Bji 
+! 
+!      norm = 0d0
+!      do iray=1, n_rayons
+!       norm = norm + sum(line%phi(:,iray,id)*line_wlam(line))!/n_rayons !angle and frequency integrated
+!      enddo
+!     !the n_rayons simplify
+!      weight(:) =  line_wlam(line) / norm! / factor
+! 
+!     
+!      gij = line%Bji/line%Bij
+! 
+!      atom%Gamma(j,i,id) = line%Aji !init
+!      do iray=1, n_rayons
+!       do l=1,line%Nlambda
+!       	la = Nblue + l -1
+!         if (atmos%include_xcoupling) then
+!            Ieff = NLTEspec%I(la,iray,id) - NLTEspec%Psi(la,iray,id) * atom%eta(la,iray,id)
+!         else
+!            Ieff = NLTEspec%I(la,iray,id)*dexp(-NLTEspec%tau(la,iray,id)) + &
+!              NLTEspec%Psi(la,iray,id) * atom%eta(lap,iray,id)
+! 		endif
+! 
+!        atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*weight(l)*Ieff    
+!        atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + line%phi(l, iray, id)*weight(l)*line%Bji*Ieff
+!        
+!        if (atmos%include_xcoupling) then
+!          atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - NLTEspec%Psi(la,iray,id)*&
+!          		atom%Uji_down(j,la,iray,id)*atom%chi_up(i,la,iray,id) / norm !j>l
+!          		
+! !          write(*,*) "j->i", line%lambda0, j, i, NLTEspec%lambda(la)
+! !          write(*,*) "Gji=", line%phi(l, iray, id)*weight(l)*line%Bji*Ieff, "Xc(j->i)=",NLTEspec%Psi(la,iray,id)*&
+! !           	atom%Uji_down(j,la,iray,id)*atom%chi_up(i,la,iray,id) / norm
+!          		
+!          inner_tr_loop : do lp=1, atom%Ntr
+!           SELECT CASE (atom%at(lp)%trtype)
+!            CASE ("ATOMIC_LINE")
+!             other_line = atom%lines(atom%at(lp)%ik)
+!             ip = other_line%i
+!             jp = other_line%j
+!      		norm2 = 0d0
+!      		!okay so I need to compute the wphi for cont and line before so that would be easier
+!      		do iray2=1, n_rayons
+!       			norm2 = norm2 + sum(other_line%phi(:,iray2,id)*line_wlam(other_line))!/n_rayons !angle and frequency integrated
+!      		enddo
+!            CASE ("ATOMIC_CONTINUUM")
+!             other_cont = atom%continua(atom%at(lp)%ik)
+!             ip = other_cont%i
+!             jp = other_cont%j
+!             norm2 = n_rayons
+!           END SELECT
+!           !Only if the lower level of j->i is an upper level of another transition
+!           if (jp==i) then
+! !             lap = overlap(l) !index on the global grid where they overlap
+! !             if (lap <= 0) cycle inner_tr_loop
+! 			lap = la
+! ! 			write(*,*) "....>", atom%at(lp)%trtype,  "i->lower",i, ip
+!              atom%Gamma(i,j,id) = atom%Gamma(i,j,id) +  NLTEspec%Psi(lap,iray,id)*&
+!              	atom%Uji_down(i,lap,iray,id)*atom%chi_down(j, lap, iray, id) / norm2 !j<l
+! !             	
+! !         write(*,*) "Xc(i->j)=", NLTEspec%Psi(lap,iray,id)*&
+! !             	atom%Uji_down(i,lap,iray,id)*atom%chi_down(j, lap, iray, id) / norm2  
+!           endif
+!          enddo inner_tr_loop
+!          
+!        endif
+!        
+! !       if ((is_nan_infinity(atom%Gamma(i,j,id))>0).or.(is_nan_infinity(atom%Gamma(j, i, id))>0)) then
+! !        write(*,*) "line", id, icell, j, i, iray, NLTEspec%lambda(Nblue+l-1), NLTEspec%I(Nblue+l-1,iray,id), &
+! !          NLTEspec%Psi(Nblue+l-1,iray,id), atom%eta(Nblue+l-1,iray,id), NLTEspec%tau(Nblue+l-1,iray,id), &
+! !          line%phi(l, iray, id), weight(l)
+! !        stop
+! !       endif
+! 
+!       enddo
+!      enddo
+! 
+! !      if (atmos%include_xcoupling) deallocate(overlap)
+!      deallocate(weight)
+!         
+!     CASE ("ATOMIC_CONTINUUM")
+!      cont = atom%continua(kc)
+!      i = cont%i; j = cont%j
+!      Nblue = cont%Nblue; Nred = cont%Nred
+!     
+!      allocate(weight(cont%Nlambda), gijk(cont%Nlambda))
+! 
+!      gijk(:) = 0d0
+!      !nstar(i)/nstar(j)*exp(-hnu/kT)
+!      if (atom%nstar(j, icell) >0) &
+!      	gijk(:) = atom%nstar(i, icell)/atom%nstar(j,icell)* &
+!     		 dexp(-hc_k / (NLTEspec%lambda(Nblue:Nred) * atmos%T(icell)))
+!     
+!      weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
+!      
+!      ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
+! 
+!      !explicit do loop
+!      do l=1,cont%Nlambda
+!       twohnu3_c2 = twohc / NLTEspec%lambda(Nblue-1+l)**(3d0)
+!       Jnu = 0d0
+!       la = Nblue + l -1
+!       do iray=1, n_rayons
+!         if (atmos%include_xcoupling) then
+!            Jnu = Jnu + NLTEspec%I(la,iray,id) - NLTEspec%Psi(la,iray,id) * atom%eta(la,iray,id)        
+!         else
+!            Jnu = Jnu + NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%tau(Nblue+l-1,iray,id)) + &
+!              NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+!         endif
+!       enddo
+!       Jnu = Jnu / n_rayons
+! 
+!       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu*weight(l)
+!       atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + (Jnu+twohnu3_c2)*gijk(l)*weight(l)
+!       
+!       if (atmos%include_xcoupling) then
+!        do iray=1,n_rayons
+!         atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - atom%Uji_down(j,la,iray,id)*atom%chi_up(i,la,iray,id)*&
+!         		NLTEspec%Psi(la,iray,id) / n_rayons
+!        enddo
+!        
+!          inner_tr_loop2 : do lp=1, atom%Ntr
+!           SELECT CASE (atom%at(lp)%trtype)
+!            CASE ("ATOMIC_LINE")
+!             other_line = atom%lines(atom%at(lp)%ik)
+!             ip = other_line%i
+!             jp = other_line%j
+!      		norm2 = 0d0
+!      		do iray=1, n_rayons
+!       			norm2 = norm2 + sum(other_line%phi(:,iray,id)*line_wlam(other_line))!/n_rayons !angle and frequency integrated
+!      		enddo
+!            CASE ("ATOMIC_CONTINUUM")
+!             other_cont = atom%continua(atom%at(lp)%ik)
+!             ip = other_cont%i
+!             jp = other_cont%j
+!             norm2 = n_rayons
+!           END SELECT
+!           if (jp==i) then
+!           	do iray=1,n_rayons
+! 			 lap = la
+!              atom%Gamma(i,j,id) = atom%Gamma(i,j,id) +  NLTEspec%Psi(lap,iray,id)*&
+!             	atom%Uji_down(i,lap,iray,id)*atom%chi_down(j, lap, iray, id)/norm2
+!             enddo
+!           endif
+!           
+!          enddo inner_tr_loop2
+!       endif
+!       
+! !       if ((is_nan_infinity(atom%Gamma(i,j,id))>0).or.(is_nan_infinity(atom%Gamma(j, i, id))>0)) then
+! !        write(*,*) "cont", id, icell, j, i, iray, NLTEspec%lambda(Nblue+l-1), NLTEspec%I(Nblue+l-1,iray,id), &
+! !          NLTEspec%Psi(Nblue+l-1,iray,id), atom%eta(Nblue+l-1,iray,id), NLTEspec%tau(Nblue+l-1,iray,id), &
+! !          gijk(l), twohnu3_c2, weight(l)
+! !        stop
+! !       endif
+!       
+!      enddo
+! 
+! !      if (atmos%include_xcoupling) deallocate(overlap)
+!      deallocate(weight, gijk)
+!  
+!     CASE DEFAULT
+!     
+!      CALL Error("Unkown transition type", atom%at(kr)%trtype)
+!      
+!    END SELECT
+!   
+!   end do tr_loop
+!   
+!   !Remove therm in delta(l,l')
+!   !But cross-coupling are in ?? and should not
+!   do l = 1, atom%Nlevel
+!     atom%Gamma(l,l,id) = 0d0
+!     atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+!   end do
+!  
+!  RETURN
+!  END SUBROUTINE FillGamma_atom
  SUBROUTINE FillGamma_atom_zero_radiation(id, icell, atom)
- !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-dtau) + Psi * eta
+ !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-tau) + Psi * eta
  ! "Hogereijde-like". There is no expansion of eta in S_jS_i Uji * nj, hence no Xcoupling yet
  ! to do: Xcoupling
   integer, intent(in) :: icell, id
@@ -470,7 +1300,7 @@ MODULE statequil_atoms
   type(AtomType), intent(inout) :: atom
   integer :: lp, imaxpop, l
   real(kind=dp), dimension(atom%Nlevel, atom%Nlevel) :: Aij
-
+  
   imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
   !write(*,*) "imaxpop", imaxpop, atom%n(imaxpop,icell)
   atom%n(:,icell) = 0d0
@@ -485,12 +1315,17 @@ MODULE statequil_atoms
   !Y a peut être un transpose ici  par rapport à MCFOST, atom%Gamma.T ?
 
   Aij = transpose(atom%Gamma(:,:,id))
-  !!Aij = atom%Gamma(:,:,id)
+  !Aij = atom%Gamma(:,:,id)
+! write(*,*) id, icell
+! write(*,*) "nafter=",atom%n(:,icell)
+! write(*,*) "Aij-Gamma(id)", Aij-transpose(atom%Gamma(:,:,id))
   CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
   !!atom%n(:,icell) = atom%n(:,icell) * nTotal_atom(icell, atom)
-  if (any_nan_infinity_matrix(Aij)>0) then
+  if ((any_nan_infinity_matrix(atom%Gamma(:,:,id))>0).or.&
+  				(any_nan_infinity_vector(atom%n(:,icell))>0)) then
     write(*,*) atom%Gamma(:,:,id)
     write(*,*) id, icell, atom%n(:,icell)
+    write(*,*) Aij
     stop
   end if
 
@@ -656,7 +1491,7 @@ MODULE statequil_atoms
  END SUBROUTINE fillGamma_1
  
  SUBROUTINE FillGamma_bb_hjde(id, icell, atom, n_rayons, switch_to_lte)
- !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-dtau) + Psi * eta
+ !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-tau) + Psi * eta
  ! "Hogereijde-like"
   integer, intent(in) :: icell, id, n_rayons !icell is not need, except if we introduce Xcoupling terms here
   type (AtomType), intent(inout), pointer :: atom
@@ -695,7 +1530,7 @@ MODULE statequil_atoms
      !write(*,*) "id=",id, iray, maxval(atom%eta(Nblue:Nred,iray,id))
      do l=1,line%Nlambda
 
-      Ieff = NLTEspec%I(Nblue-1+l,iray,id)*dexp(-NLTEspec%dtau(Nblue-1+l,iray,id)) + \
+      Ieff = NLTEspec%I(Nblue-1+l,iray,id)*dexp(-NLTEspec%tau(Nblue-1+l,iray,id)) + \
              NLTEspec%Psi(Nblue-1+l,iray,id) * atom%eta(Nblue-1+l,iray,id)
      !write(*,*) icell, id, iray, l, Ieff(l), line%Bij, line%phi(l, iray, id), weight(l)
       atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + line%Bij*line%phi(l, iray,id)*Ieff*weight(l)
@@ -751,7 +1586,7 @@ MODULE statequil_atoms
       twohnu3_c2 = twohc / NLTEspec%lambda(Nblue-1+l)**(3d0)
       Jnu = 0d0
       do iray=1,n_rayons
-       Jnu = Jnu + NLTEspec%I(Nblue-1+l,iray,id)*dexp(-NLTEspec%dtau(Nblue-1+l,iray,id)) + \
+       Jnu = Jnu + NLTEspec%I(Nblue-1+l,iray,id)*dexp(-NLTEspec%tau(Nblue-1+l,iray,id)) + \
              NLTEspec%Psi(Nblue-1+l,iray,id) * atom%eta(Nblue-1+l,iray,id)
       enddo
       Jnu = Jnu / n_rayons
@@ -845,7 +1680,7 @@ MODULE statequil_atoms
 
    enddo !over lines
    !NULLIFY(atom)
-  !end do !loop over atoms    
+  !end do !loop over atoms   
   
  RETURN 
  END SUBROUTINE FillGamma_bb_zero_radiation

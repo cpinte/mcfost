@@ -151,11 +151,14 @@ MODULE atmos_type
     end if
 !     if (allocated(atom%gij)) deallocate(atom%gij)
 !     if (allocated(atom%Vij)) deallocate(atom%Vij)
-    if (allocated(atom%Xc)) deallocate(atom%Xc)
+	if (atmos%include_xcoupling) then
+	!deallocate(atom%Xc)
 
-    !if (allocated(atom%chi_up)) deallocate(atom%chi_up)
-    !if (allocated(atom%chi_down)) deallocate(atom%chi_down)
-    !if (allocated(atom%Uji_down)) deallocate(atom%Uji_down)
+    !if (allocated(atom%chi_up)) 
+    	deallocate(atom%chi_up)
+    	deallocate(atom%chi_down)
+    	deallocate(atom%Uji_down)
+    endif
     if (allocated(atom%eta)) deallocate(atom%eta)
 
 !!!     for this atom, free lines if allocated
@@ -175,7 +178,7 @@ MODULE atmos_type
       if (allocated(line%CoolRates_ij)) deallocate(line%CoolRates_ij)
 !       if (allocated(line%Rij)) deallocate(line%Rij)
 !       if (allocated(line%Rji)) deallocate(line%Rji)
-      !if (allocated(line%wlam)) deallocate(line%wlam) !over frequencies and angles and proc
+      if (allocated(line%wphi)) deallocate(line%wphi) !over frequencies and angles and proc
       !if (allocated(line%Qelast)) deallocate(line%Qelast)
       !if (allocated(line%c_shift)) deallocate(line%c_shift)
       !if (allocated(line%c_fraction)) deallocate(line%c_fraction)
@@ -199,7 +202,7 @@ MODULE atmos_type
       if (allocated(cont%lambda)) deallocate(cont%lambda)
       if (allocated(cont%alpha)) deallocate(cont%alpha)
       if (allocated(cont%CoolRates_ij)) deallocate(cont%CoolRates_ij)
-      !if (allocated(cont%wlam)) deallocate(cont%wlam)
+      if (allocated(cont%wmu)) deallocate(cont%wmu)
       !if (allocated(cont%gij)) deallocate(cont%gij)
       !if (allocated(cont%Vij)) deallocate(cont%Vij)
 !       if (allocated(cont%chi_up)) deallocate(cont%chi_up)
@@ -560,7 +563,7 @@ MODULE atmos_type
 
 !     write(*,*) "Element ", atmos%Elements(n)%ptr_elem%ID," has an abundance of A=",&
 !               atmos%Elements(n)%ptr_elem%abund," and a weight of w=",&
-!               atmos%Elements(n)%ptr_elem%weight
+!                atmos%Elements(n)%ptr_elem%weight
 !     stop
     if (n.gt.1 .and. atmos%metallicity.gt.0.) then
      atmos%Elements(n)%ptr_elem%abund = atmos%Elements(n)%ptr_elem%abund * &

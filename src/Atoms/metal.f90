@@ -221,7 +221,7 @@ MODULE metal
      !write(*,*) allocated(phiZ), allocated(psiZ), line%polarizable, PRT_SOLUTION
 
      !Sum up all contributions for this line with the other
-     Vij(:) = hc_4PI * line%Bij * phi(:)!already normalized / (SQRTPI * VBROAD_atom(icell,atom))
+     Vij(:) = hc_fourPI * line%Bij * phi(:)!already normalized / (SQRTPI * VBROAD_atom(icell,atom))
       
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + Vij(:) * (atom%n(i,icell)-gij*atom%n(j,icell))
@@ -238,13 +238,13 @@ MODULE metal
        do nk = 1, 3
          !magneto-optical
          NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
-           hc_4PI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * psiZ(nk,:)
+           hc_fourPI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * psiZ(nk,:)
          !dichroism
          NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) + &
-           hc_4PI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * psiZ(nk,:)
+           hc_fourPI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * psiZ(nk,:)
          !emissivity
          NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) + &
-          twohnu3_c2 * gij * hc_4PI * line%Bij * atom%n(j,icell) * phiZ(nk,:)
+          twohnu3_c2 * gij * hc_fourPI * line%Bij * atom%n(j,icell) * phiZ(nk,:)
        end do 
      end if
      
@@ -268,7 +268,7 @@ MODULE metal
   double precision, dimension(1)                            :: phi, vvoigt, phiPol, phip, &
  															   Vij, vv
   double precision 											:: twohnu3_c2, hc, fourPI, &
-      														   hc_4PI, gij
+      														   hc_fourPI, gij
   integer, parameter										:: NvspaceMax = 101
   double precision, dimension(NvspaceMax)					:: omegav
   integer													:: Nvspace, nv
@@ -279,7 +279,7 @@ MODULE metal
 
   hc = HPLANCK * CLIGHT
   fourPI = 4.*PI
-  hc_4PI = hc/fourPI
+  hc_fourPI = hc/fourPI
 
   !check that NLTEspec%AtomOpac%eta_p(id,:) = 0d0 here
 
@@ -367,7 +367,7 @@ MODULE metal
      end if !line%voigt
     
 
-     Vij(1) = hc_4PI * line%Bij * phi(1) / (SQRTPI * VBROAD_atom(icell,atom))
+     Vij(1) = hc_fourPI * line%Bij * phi(1) / (SQRTPI * VBROAD_atom(icell,atom))
      NLTEspec%AtomOpac%chi_p(la,id) = NLTEspec%AtomOpac%chi_p(la,id) +&
      								  Vij(1) * (atom%n(i,icell)-gij*atom%n(j,icell))
      NLTEspec%AtomOpac%eta_p(la,id) = NLTEspec%AtomOpac%eta_p(la,id) +&

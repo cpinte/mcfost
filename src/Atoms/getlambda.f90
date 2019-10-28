@@ -12,7 +12,7 @@ MODULE getlambda
   IMPLICIT NONE
   
   !Number of points for each transition
-  integer, parameter :: Nlambda_cont = 20, &
+  integer, parameter :: Nlambda_cont = 101, &
   						Nlambda_line_w = 9, Nlambda_line_c = 101
   						!Nwing from -vchar to vcore; Ncore from vcore to 0
 
@@ -228,6 +228,33 @@ MODULE getlambda
   RETURN
   END SUBROUTINE write_wavelengths_table_NLTE_lines
   
+  !building
+  !Could be make logarithmic ?? If from the threshold,alpha_nu decreases in 1/nu**3
+  SUBROUTINE make_sub_wavelength_grid_cont_log(cont, lambdamin)
+  ! ----------------------------------------------------------------- !
+   ! Make an individual wavelength grid for the AtomicContinuum cont.
+   ! The resolution is constant in nm. Logarithmic sampling.
+   ! lambda must be lower that lambda0 and lambda(Nlambda)=lambda0.
+   ! Allocate cont%lambda.
+   ! cont%alpha (cross-section of photoionisation) is not used.
+  ! ----------------------------------------------------------------- !
+   type (AtomicContinuum), intent(inout) :: cont
+   real(kind=dp), intent(in) :: lambdamin
+   real(kind=dp) :: l0, l1
+   
+   !write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
+
+   l1 = cont%lambda0 !cannot be larger than lambda0 ! minimum frequency for photoionisation
+   l0 = lambdamin
+   cont%Nlambda = Nlambda_cont
+   allocate(cont%lambda(cont%Nlambda))
+   
+   cont%lambda = real(spanl(real(l0), real(l1), cont%Nlambda),kind=dp)
+   
+   !does not allocate cross-section, here
+  RETURN
+  END SUBROUTINE make_sub_wavelength_grid_cont_log
+  
   SUBROUTINE make_sub_wavelength_grid_cont(cont, lambdamin)
   ! ----------------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicContinuum cont.
@@ -259,6 +286,84 @@ MODULE getlambda
    !does not allocate cross-section, here
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_cont
+  
+  !building
+  SUBROUTINE make_sub_wavelength_grid_asymm(line, vD)
+  ! ------------------------------------------------------- !
+   ! Make an individual wavelength grid for the AtomicLine
+   ! line with constant resolution in km/s. When dlambda 
+   ! is lower than vsub, the resolution is increased.
+   ! Allocate line%lambda.
+  ! ------------------------------------------------------- !
+   type (AtomicLine), intent(inout) :: line
+   real(kind=dp), intent(in) :: vD !maximum thermal width of the atom in m
+   real(kind=dp) :: v_char, vB, adamp_char
+   real(kind=dp), parameter :: R = 4.6d0 !km/s
+   real(kind=dp) :: subresol, vsub !km/s
+   integer :: la, Nlambda, Nmid
+   integer, parameter :: NlambdaMax = 1000
+   real, parameter :: L = 1.01, core_to_wing = 0.5
+   real(kind=dp) :: lam_grid(NlambdaMax), dlambda, l0, l1 !nm
+   lam_grid = 0d0
+   !the line domain falls in [l0*(1+resol), l1*(1+resol)] with, 
+   !l0 = (lambda0 - lambda0*v_char/c - vWing) and l1 = (lambda0 + lambda0*v_char/c + vWing).
+   adamp_char = 1d3 * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
+   vB = 0d0
+   if (line%polarizable) vB =  &
+   				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
+   								 
+   v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line   resol = R !km/s
+   dlambda = v_char /CLIGHT * line%lambda0
+
+   vsub = core_to_wing * (R + vD * 1d-3)!km/s
+   subresol = 1d-2 * R
+   l1 = (line%lambda0 + dlambda) * (1 + 1d3 * R/CLIGHT)
+   l0 = (line%lambda0 - dlambda) * (1 - 1d3 * R/CLIGHT)
+
+   
+   Nlambda = 2
+   lam_grid(1) = l0!!line%lambda0 !not lambda0 if not vel
+   infinie : do ! from lambda0 to l1
+      lam_grid(Nlambda) = lam_grid(Nlambda - 1) * (1d0 + 1d3 * R / CLIGHT)
+    ! increase resolution in the line core
+
+      if (CLIGHT * dabs(lam_grid(Nlambda) - line%lambda0)/line%lambda0 <= 1d3 * vsub) then
+       sub_infinie : do
+        lam_grid(Nlambda) = lam_grid(Nlambda-1) * (1d0 + 1d3 * subresol/CLIGHT)
+
+
+        if ((Nlambda > NlambdaMax).or.(lam_grid(Nlambda)>l1)) &
+        	exit infinie
+        if (CLIGHT * dabs(lam_grid(Nlambda) - line%lambda0)/line%lambda0 > 1d3 * vsub) &
+        	exit sub_infinie
+
+        Nlambda = Nlambda + 1
+       enddo sub_infinie
+      endif
+	
+      if ((Nlambda > NlambdaMax).or.(lam_grid(Nlambda)>l1)) exit infinie
+      Nlambda = Nlambda + 1
+   enddo infinie
+
+  ! Nlambda = 2 * Nlambda
+   line%Nlambda = size(pack(lam_grid, mask=lam_grid>0)) !or > -v0 if in vel not in lambda
+  ! Nmid = Nlambda/2
+   allocate(line%lambda(line%Nlambda))   
+   line%lambda = lam_grid
+! -> nm sampling not vel
+!    do la=Nmid, Nlambda
+!     line%lambda(la) = lam_grid(la)
+!     line%lambda(Nlambda - la + 1) = lam_grid(la) - line%lambda0
+!    enddo
+
+   
+!    do la=1, line%Nlambda
+!     write(*,*) la, line%lambda(la), l0, l1, line%lambda0
+!    enddo
+!    stop
+   
+  RETURN
+  END SUBROUTINE make_sub_wavelength_grid_asymm
   
   !Probleme passe pas part lambda0
   SUBROUTINE make_sub_wavelength_grid_line_lin(line, vD)
@@ -352,23 +457,12 @@ MODULE getlambda
    dvw = (v_char-vcore)/real(Nlambda_line_w-1,kind=dp) !(L * v_char-vcore)/real(Nw-1,kind=dp), old
    dvc = vcore/real(Nlambda_line_c-1,kind=dp)
    
-!! Linear wing
-   !vel(1:Nw) = -real(span(real(v1), real(vcore), Nw),kind=dp)
-   !vel(1) = v0 !half wing
-   !!write(*,*) 1, vel(1), v0, L*v_char/1d3
-   !wing loop
-!    do la=2, Nw
-!     vel(la) = vel(la-1) + dvw
-!    !!write(*,*) la, vel(la)
-!    end do
+
 !! Log wing
    !should be log from vcore to v0 not the opposite
    !v0 is < 0 but spanl takes the abs
 !   vel(1:Nw) = -real(spanl(real(v0), real(vcore), Nw),kind=dp)
    vel(Nlambda_line_w:1:-1) = -real(spanl(real(vcore), real(v0), Nlambda_line_w),kind=dp)
-!    do la=1,Nw
-!     write(*,*) la, vel(la)/1000., vcore, -v_char, adamp_char*vD / 1000.
-!    end do
 !! end scale of wing points
 !   vel(Nw:Nw-1+Nc) = -real(span(real(vcore), real(0.), Nc+1),kind=dp) 
 !   write(*,*) Nw, vel(Nw), vcore
@@ -402,13 +496,6 @@ MODULE getlambda
    line%lambda(Nmid+1:Nlambda) = line%lambda0*(1d0 -vel(Nmid-1:1:-1)/CLIGHT)
 
    if (line%lambda(Nmid) /= line%lambda0) write(*,*) 'Lambda(Nlambda/2+1) should be lambda0'
-   
-!    if (line%j==3 .and. line%i==2) then
-!    do la=1,Nlambda
-!     write(*,*) la, line%lambda(la), line%lambda0
-!    end do
-!    !stop
-!    end if
 
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_line  

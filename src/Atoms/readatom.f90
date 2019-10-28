@@ -65,7 +65,6 @@ MODULE readatom
     IDread(2:2) = to_lower(IDread(2:2))
     atom%ID = IDread
     write(*,*) "Reading atomic model of atom ", atom%ID
-
     match = .false.
     do nll=1,Nelem
      if (atmos%Elements(nll)%ptr_elem%ID.eq.atom%ID) then
@@ -150,12 +149,13 @@ MODULE readatom
     !allocate(atom%ntotal(atmos%Nspace))
     !allocate(atom%vbroad(atmos%Nspace))
     !write(*,*)
-    VDoppler = 2.*KBOLTZMANN/(AMU * atom%weight) !m/s
+    VDoppler = KBOLTZMANN/(AMU * atom%weight) * 8d0/PI !* 2d0!m/s
+    !        = vtherm/atom%weight
 
-    !atom%vbroad = dsqrt(vtherm*atmos%T + atmos%vturb**2) !vturb in m/s
+    !atom%vbroad = dsqrt(vtherm/atom%weight * atmos%T + atmos%vturb**2) !vturb in m/s
     !atom%ntotal = atom%Abund * atmos%nHtot
 
-    Vdoppler = dsqrt(Vdoppler*maxval(atmos%T))! + maxval(atmos%vturb)**2)
+    VDoppler = dsqrt(Vdoppler*maxval(atmos%T))! + maxval(atmos%vturb)**2)
 !     write(*,*) Vdoppler, dsqrt(Vtherm*maxval(atmos%T)/atom%weight + maxval(atmos%vturb)**2)
     !Now read all bound-bound transitions
     allocate(atom%lines(atom%Nline))
@@ -539,6 +539,7 @@ MODULE readatom
      !This is because the Number of core/wing points are fixed.
      !CALL make_sub_wavelength_grid_line(atom%lines(kr),Vdoppler) !MAXVAL(atom%vbroad)
      CALL make_sub_wavelength_grid_line_lin(atom%lines(kr),Vdoppler)
+     !CALL make_sub_wavelength_grid_asymm(atom%lines(kr),Vdoppler)
   end do
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.
@@ -572,8 +573,13 @@ MODULE readatom
     atom%n = 0d0
     atom%NLTEpops = .false.
 	if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+	   write(*,*) " -> Reading populations from file..."
        CALL readPops(atom)
        atom%NLTEpops = .true.
+       write(*,*) " min/max pops for each level:"
+       do kr=1,atom%Nlevel
+        write(*,*) "    ", kr, ">>", minval(atom%n(kr,:)), maxval(atom%n(kr,:))
+       enddo 
     end if
    else !not active
     if (atom%dataFile.ne."" & .and. atom%initial_solution .eq. "OLD_POPULATIONS") then

@@ -9,21 +9,19 @@ MODULE spectrum_type
   use fits_utils, only : print_error
   use parametres
   use input
+  !use hdf5
 
   IMPLICIT NONE
 
    real, parameter :: VACUUM_TO_AIR_LIMIT=200.0000
    real, parameter :: AIR_TO_VACUUM_LIMIT=199.9352
-   character(len=*), parameter :: WAVES_FILE="nLTE_waves_grid.fits.gz"
+   character(len=*), parameter :: WAVES_FILE="atom_transfer_waves_grid.fits.gz"
    ! not that FLUX_FILE is 1D only if one pixel, otherwise it is a map.
    ! F(x,y,0,lambda) in several directions.
-   character(len=*), parameter :: FLUX_FILE="flux.fits.gz"
-   ! I(x,y,0,lambda,imu), not used yet
-   !character(len=*), parameter :: SPEC_FILE="spectrum.fits.gz"
-   character(len=*), parameter :: OPAC_CONTRIB_FILE="opacities.fits.gz"
-   logical :: lcompute_continuum !if false, do not allocate cont only opacities (save memory)
-   								 !if lcontrib_function, set it to true, before computing contrib function
-  
+   character(len=*), parameter :: FLUX_FILE="flux.fits.gz", CF_FILE="cntrb.fits.gz"
+   character(len=*), parameter :: FLUX_FILE_H5="flux.h5", CF_FILE_H5="cntrb.h5"
+   
+
   !! Store S, Sc, Slte, Sclte, and jc and Kc, to save memory ???
   TYPE AtomicOpacity
    !active opacities
@@ -62,10 +60,10 @@ MODULE spectrum_type
    double precision, allocatable, dimension(:,:,:,:,:,:) :: F_QUV
    !!double precision, allocatable, dimension(:,:) :: S_QUV
    !Contribution function
-   !Nlambda, npix, npixy, N_INCL, N_AZ, NCELLS
-   double precision, allocatable, dimension(:,:,:,:,:,:) :: Ksi 
+   !Nlambda,N_INCL, N_AZ, NCELLS
+   double precision, allocatable, dimension(:,:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
-   double precision, allocatable, dimension(:,:,:) :: Psi, dtau !for cell icell in direction iray, thread id
+   double precision, allocatable, dimension(:,:,:) :: Psi, tau !for cell icell in direction iray, thread id
    !size of Psi could change during the devlopment
    type (AtomicOpacity) :: AtomOpac
    character:: Jfile, J20file
@@ -226,9 +224,9 @@ MODULE spectrum_type
    !except polarization which are (de)allocated in adjustStokesMode
    if (NLTEspec%Nact > 0 .and.allocated(NLTEspec%PSI)) then 
     deallocate(NLTEspec%Psi)
-    if (allocated(NLTEspec%dtau)) deallocate(NLTEspec%dtau)
+    if (allocated(NLTEspec%tau)) deallocate(NLTEspec%tau)
    	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
-   	allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
+   	allocate(NLTEspec%tau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
    end if 
     
    !Could be also LTE opac if line are kept in memory ?
@@ -301,12 +299,13 @@ MODULE spectrum_type
    
     if (NLTEspec%atmos%coherent_scattering) CALL alloc_J_coherent()
    
+    !do not allocate if lxcoupling but no NLTE effects
     if (lxcoupling) NLTEspec%atmos%include_xcoupling = .true.
      
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     
-    if (.not.lxcoupling) &
-       allocate(NLTEspec%dtau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
+    if (.not.lxcoupling) & !not for MALI
+       allocate(NLTEspec%tau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
 
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
@@ -314,9 +313,17 @@ MODULE spectrum_type
      !Now the waves and angle integraed X coupling terms for each atom and for all transitions
      !(Sum over all active transitions for each transition) is kept.
      if (NLTEspec%atmos%include_xcoupling) then 
-       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Xc&
-       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,&
-       NLTEspec%Nproc))
+!        allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Xc&
+!        (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,&
+!        NLTEspec%Nproc))
+       
+       !for testing
+       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Uji_down& ! U j->down
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves, NLTEspec%atmos%Nrays,NLTEspec%Nproc))
+       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_down& !chi j->down
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves, NLTEspec%atmos%Nrays,NLTEspec%Nproc))
+       allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%chi_up& ! i->up
+       (NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%Nlevel,NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%Nproc))
       !loop over atom%at if %U and %chi are stored for each transitions
      end if
 
@@ -341,16 +348,18 @@ MODULE spectrum_type
    if (lcontrib_function .and. ltab_wavelength_image) then !the tab is here to prevent allocating a large array
 		!hence ksi should be computed for small waves intervals.
 	 !because otherwise, it is allocated with the alloc spectrum before initSpectrumImage()
+!       write(*,*) "Trying to allocate",real(NLTEspec%atmos%Nspace)/1024. * real(NLTEspec%Nwaves)/1024. * &
+!       	real(RT_N_INCL*RT_N_AZ)*real(npix_x*npix_y)/1024., " GB for ksi"  
+!       allocate(NLTEspec%Ksi(NLTEspec%atmos%Nspace,NLTEspec%Nwaves,npix_x, npix_y, RT_N_INCL,RT_N_AZ),stat=alloc_status)
       write(*,*) "Trying to allocate",real(NLTEspec%atmos%Nspace)/1024. * real(NLTEspec%Nwaves)/1024. * &
-      	real(RT_N_INCL*RT_N_AZ)*real(npix_x*npix_y)/1024., " GB for ksi"  
-
-      allocate(NLTEspec%Ksi(NLTEspec%atmos%Nspace,NLTEspec%Nwaves,npix_x, npix_y, RT_N_INCL,RT_N_AZ),stat=alloc_status)
+      	real(RT_N_INCL*RT_N_AZ)/1024., " GB for ksi"  
+      allocate(NLTEspec%Ksi(NLTEspec%atmos%Nspace,NLTEspec%Nwaves,RT_N_INCL,RT_N_AZ),stat=alloc_status)
       if (alloc_status > 0) then
        call ERROR('Cannot allocate ksi')
        lcontrib_function = .false.
       end if
 
-      NLTEspec%Ksi(:,:,:,:,:,:) = 0d0
+      NLTEspec%Ksi(:,:,:,:) = 0d0
    else if (lcontrib_function .and. .not.ltab_wavelength_image) then
     CALL Warning(" Contribution function not taken into account. Use a wavelength table.")
     lcontrib_function = .false.
@@ -381,7 +390,7 @@ MODULE spectrum_type
    deallocate(NLTEspec%AtomOpac%etac_nlte, NLTEspec%AtomOpac%chic_nlte)
    if (allocated(NLTEspec%Psi)) then
     deallocate(NLTEspec%Psi)
-    if (allocated(NLTEspec%dtau)) deallocate(NLTEspec%dtau)!, NLTEspec%AtomOpac%initialized)
+    if (allocated(NLTEspec%tau)) deallocate(NLTEspec%tau)!, NLTEspec%AtomOpac%initialized)
    end if
 
    !passive
@@ -470,22 +479,23 @@ MODULE spectrum_type
   
   SUBROUTINE init_psi_operator(id, iray)
     integer, intent(in) :: iray, id
+    integer :: nact
     
    	NLTEspec%Psi(:,iray,id) = 0d0
-   	if (.not.lxcoupling) NLTEspec%dtau(:,iray,id) = 0d0
+   	if (.not.lxcoupling) & 
+   		NLTEspec%tau(:,iray,id) = 0d0
+   	
+   	do nact=1,NLTEspec%atmos%NactiveAtoms
+   		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%eta(:,iray,id) = 0d0
+   		if (lxcoupling) then
+    		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,iray,id) = 0d0 
+    		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,iray,id) = 0d0  	 
+    		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,iray,id) = 0d0	 
+   		endif
+   	enddo
   
   RETURN
   END SUBROUTINE init_psi_operator
-  
-!   SUBROUTINE init_nlte_eta(id)
-!    integer :: n
-!   
-!    do n=1, NLTEspec%atmos%NActiveatoms
-!     NLTEspec%atmos%ActiveAtoms(n)%ptr_atom%eta(:,:,id) = 0d0   
-!    end do
-!   
-!   RETURN
-!   END SUBROUTINE init_nlte_eta
   
   SUBROUTINE alloc_phi_lambda()
   ! --------------------------------------------------- !
@@ -504,6 +514,44 @@ MODULE spectrum_type
  
   RETURN
   END SUBROUTINE alloc_phi_lambda
+  
+  SUBROUTINE alloc_weights()
+  ! --------------------------------------------------- !
+   ! 
+  ! --------------------------------------------------- !
+   use atmos_type, only : atmos
+   integer :: kr, nact
+   
+   do nact=1,atmos%Nactiveatoms
+    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
+       allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wphi(NLTEspec%Nproc))
+    end do
+    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
+       allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%wmu(NLTEspec%Nproc))
+    end do
+   end do
+ 
+  RETURN
+  END SUBROUTINE alloc_weights
+  
+  SUBROUTINE dealloc_weights()
+  ! --------------------------------------------------- !
+   ! 
+  ! --------------------------------------------------- !
+   use atmos_type, only : atmos
+   integer :: kr, nact
+   
+   do nact=1,atmos%Nactiveatoms
+    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
+       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wphi)
+    end do
+    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
+       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%wmu)
+    end do
+   end do
+ 
+  RETURN
+  END SUBROUTINE dealloc_weights
   
   SUBROUTINE dealloc_phi_lambda()
   ! --------------------------------------------------- !
@@ -574,6 +622,9 @@ MODULE spectrum_type
 
   !  Write the required header keywords.
   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  if (status > 0) then
+     CALL print_error(status)
+  endif
 
    !!RAC, DEC, reference pixel & pixel scale en degres
   CALL ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
@@ -633,14 +684,21 @@ MODULE spectrum_type
    do i=xcenter+1,npix_x
     NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
    end do
-  end if ! l_sym_image  
+  end if ! l_sym_image
+    
   CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
+  if (status > 0) then
+     CALL print_error(status)
+  endif
   ! write polarized flux if any. Atmosphere magnetic does not necessarily
   								!means we compute polarization
   if ((NLTEspec%atmos%magnetized) .and. (PRT_SOLUTION /= "NO_STOKES") &
                .and. (RT_line_method /= 1)) then
    write(*,*) " -> Writing polarization"
    CALL ftcrhd(unit, status)
+   if (status > 0) then
+     CALL print_error(status)
+   endif
    naxis = 6
    naxes(1) = 3 !Q, U, V
    naxes(2)=NLTEspec%Nwaves
@@ -652,6 +710,9 @@ MODULE spectrum_type
    CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
    CALL ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'Polarised Flux (Q, U, V)',status)
    CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%F_QUV,status)
+   if (status > 0) then
+     CALL print_error(status)
+   endif
   end if
   
   ! create new hdu for wavelength grid
@@ -672,6 +733,9 @@ MODULE spectrum_type
    CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
    CALL ftpkys(unit, "UNIT", "nm", comment, status)
    CALL ftpprd(unit,group,fpixel,naxes(1),NLTEspec%lambda,status)
+   if (status > 0) then
+     CALL print_error(status)
+   endif
 
   !  Close the file and free the unit number.
   CALL ftclos(unit, status)
@@ -790,7 +854,7 @@ MODULE spectrum_type
 
    !  Create the new empty FITS file.
    blocksize=1
-   CALL ftinit(unit,"cntrb.fits.gz",blocksize,status)
+   CALL ftinit(unit,TRIM(CF_FILE),blocksize,status)
 
    simple=.true.
    extend=.true.
@@ -800,36 +864,30 @@ MODULE spectrum_type
    bitpix=-64
 
   if (lVoronoi) then   
-   naxis = 6
+   naxis = 4
    naxes(1) = NLTEspec%atmos%Nspace ! equivalent n_cells
    naxes(2) = NLTEspec%Nwaves
-   naxes(3) = npix_x
-   naxes(4) = npix_y
-   naxes(5) = RT_n_incl
-   naxes(6) = RT_n_az
-   nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) * naxes(6)
+   naxes(3) = RT_n_incl
+   naxes(4) = RT_n_az
+   nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
   else
    if (l3D) then
-    naxis = 8
+    naxis = 6
     naxes(1) = n_rad
     naxes(2) = 2*nz
     naxes(3) = n_az
     naxes(4) = NLTEspec%Nwaves
-    naxes(5) = npix_x
-    naxes(6) = npix_y
-    naxes(7) = RT_n_incl
-    naxes(8) = RT_n_az
-    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) * naxes(6) * naxes(7) * naxes(8)
+    naxes(5) = RT_n_incl
+    naxes(6) = RT_n_az
+    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) * naxes(6)
    else
-    naxis = 7
+    naxis = 5
     naxes(1) = n_rad
     naxes(2) = nz
     naxes(3) = NLTEspec%Nwaves
-    naxes(4) = npix_x
-    naxes(5) = npix_y
-    naxes(6) = RT_n_incl
-    naxes(7) = RT_n_az
-    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) * naxes(6) * naxes(7)
+    naxes(4) = RT_n_incl
+    naxes(5) = RT_n_az
+    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5)
    end if
   end if
 

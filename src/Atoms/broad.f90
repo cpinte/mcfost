@@ -321,8 +321,12 @@ MODULE broad
   end if
   !write(*,*) "Grad=", line%Grad * cDop/VBROAD_atom(icell,atom), cDop/VBROAD_atom(icell,atom)
   adamp = (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
-
-
+!   if (line%atom%g(line%j)==18 .and.line%atom%g(line%i)==8) then
+!    write(*,*) " Halpha", adamp
+!    CALL Broad_Kurosawa(icell, atom, kr, adamp)
+!    adamp = adamp * Cdop/ VBROAD_atom(icell,atom)
+!    write(*,*) adamp
+!   endif
  RETURN
  END SUBROUTINE Damping
 

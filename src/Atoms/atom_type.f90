@@ -9,7 +9,7 @@ MODULE atom_type
 
    integer, parameter :: ATOM_LABEL_WIDTH=20
    integer, parameter :: ATOM_ID_WIDTH=2, MAX_LENGTH=512
-!    real(8), parameter :: BRK=4.0
+!    real(kind=dp), parameter :: BRK=4.0
 !    integer, parameter :: MSHELL=5
 !    character(len=20), dimension(16) :: col_recipes !16 recipes for collision rates
 !    data col_recipes / "OMEGA", "CE", "CI", "CP", "CH0", "CH+", "CH", "CR",&
@@ -20,7 +20,7 @@ MODULE atom_type
   TYPE ZeemanType
    integer :: Ncomponent
    integer, allocatable, dimension(:)  :: q
-   double precision, allocatable, dimension(:)  :: shift, strength
+   real(kind=dp), allocatable, dimension(:)  :: shift, strength
   END TYPE ZeemanType
   
   !Sets at reading: First LINES THEN CONTINUA
@@ -39,22 +39,22 @@ MODULE atom_type
    character(len=20) :: trtype="ATOMIC_LINE", Coupling="LS"
    ! i, j start at 1 (not 0 like in C)
    integer :: i, j, Nlambda, Nblue=0, Nxrd=0, Nred = 0, Nmid=0
-   real(8) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
-   real(8) :: qcore, qwing, glande_i, glande_j
-   real(8), dimension(4) :: cvdWaals
+   real(kind=dp) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
+   real(kind=dp) :: qcore, qwing, glande_i, glande_j
+   real(kind=dp), dimension(4) :: cvdWaals
    !Nlambda,Nproc
    !for one direction and one cell
-   real(8), allocatable, dimension(:,:,:)  :: phi!, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
+   real(kind=dp), allocatable, dimension(:,:,:)  :: phi!, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
    !wlam is the integration wavelenght weigh = phi
-   double precision, allocatable, dimension(:)  :: lambda, CoolRates_ij
-   double precision :: Qelast, adamp, Rij, Rji
-   real(8), allocatable, dimension(:,:) :: rho_pfr
+   real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, wphi
+   real(kind=dp) :: Qelast, adamp, Rij, Rji ! at a cell
+   real(kind=dp), allocatable, dimension(:,:) :: rho_pfr
    !!Nlevel, wavelength and proc
    !!Stores the information for that atom only, necessary to  construct the Gamma matrix
    !!and to compute the cross-coupling terms. We need to know for each wavelength and each
    !!proc what are the active transitions involved in the Gamma matrix.
    !!Nlambda, Nray, Nproc
-   !!double precision, allocatable, dimension(:,:,:)  :: U, chi
+   !!real(kind=dp), allocatable, dimension(:,:,:)  :: U, chi
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
    integer :: ZeemanPattern! 0 = WF, -1=EFFECTIVEE TRIPLET, 1=FULL
    type (AtomType), pointer :: atom => NULL()
@@ -64,13 +64,13 @@ MODULE atom_type
   TYPE AtomicContinuum
    logical :: hydrogenic!!, lcontrib_to_opac
    integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
-   real(8) :: lambda0, isotope_Frac, alpha0, lambdamin !continuum maximum frequency > frequency photoionisation
-   real(8), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij
-   double precision :: Rji, Rij
+   real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin !continuum maximum frequency > frequency photoionisation
+   real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij, wmu
+   real(kind=dp) :: Rji, Rij
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
    !!Nlambda, Nray, Nproc
-   !!double precision, allocatable, dimension(:,:)  :: U, chi
+   !!real(kind=dp), allocatable, dimension(:,:)  :: U, chi
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 
@@ -90,29 +90,23 @@ MODULE atom_type
    ! ions etc ...
    integer, allocatable, dimension(:)  :: stage, Lorbit
    integer(8)            :: offset_coll, colunit
-   real(8)                :: Abund, weight
-   real(8), allocatable, dimension(:) :: g, E!, vbroad, ntotal
-   real(8), allocatable, dimension(:) :: qS, qJ
+   real(kind=dp)                :: Abund, weight
+   real(kind=dp), allocatable, dimension(:) :: g, E!, vbroad, ntotal
+   real(kind=dp), allocatable, dimension(:) :: qS, qJ
    ! allocated in readatom.f90, freed with freeAtoms()
    character(len=MAX_LENGTH), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
-   !!real(8), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
-   double precision, dimension(:,:,:), allocatable :: Gamma 
-   real(8), dimension(:,:), pointer :: n, nstar
+   !!real(kind=dp), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
+   real(kind=dp), dimension(:,:,:), allocatable :: Gamma 
+   real(kind=dp), dimension(:,:), pointer :: n, nstar
    ! arrays of lines, continua containing different line, continuum each
    type (AtomicLine), allocatable, dimension(:)         :: lines
    type (AtomicContinuum) , allocatable, dimension(:)   :: continua
    type (AtomicTransition), allocatable, dimension(:)   :: at !Atomic transition, lines first in readatom
    !one emissivity per atom, used in the construction of the gamma matrix
    !where I have to distinguish between atom own opac and overlapping transitions
-   double precision, allocatable, dimension(:,:,:) :: eta !Nwaves, Nrays, Nproc
-   !size(Gamma)
-   real(kind=dp), allocatable, dimension(:,:,:) :: Xc !Xcoupling term, integrated over angle and waves
-   !the sum over chi(i,j) * U(j,i) is done before adding Xc to the rate matrix, and after total opacity
-   !for this atom has been computed
-   !Nlevel, Nlam_max, Nrays, Nproc
-   !!double precision, allocatable, dimension(:,:,:,:) :: chi_up, chi_down, Uji_down
-   !!double precision, allocatable, dimension(:,:,:,:,:) :: Vij, Uji
-   !!double precision, allocatable, dimension(:,:,:,:) :: gij
+   real(kind=dp), allocatable, dimension(:,:,:) :: eta !Nwaves, Nrays, Nproc
+!	_down = from j (upper) to l (lower); _up from i (lower) to lp (upper)
+   real(kind=dp), allocatable, dimension(:,:,:,:) :: Uji_down, chi_up, chi_down
    type (Ng) :: Ngs
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -127,9 +121,9 @@ MODULE atom_type
    logical :: abundance_set
    integer :: Nstage, Nmolecule ! umber of Molecules having an element
    integer, allocatable, dimension(:)  :: mol_index !track molecules in which Element is present
-   real(8) :: weight, abund
-   real(8), allocatable, dimension(:)  :: ionpot
-   real(8), allocatable, dimension(:,:)  :: pf, n !LTE populations, not used nor allocated anymore
+   real(kind=dp) :: weight, abund
+   real(kind=dp), allocatable, dimension(:)  :: ionpot
+   real(kind=dp), allocatable, dimension(:,:)  :: pf, n !LTE populations, not used nor allocated anymore
    !n is the population for each stage at a given grid point
    type (AtomType), pointer :: model => NULL()
  END TYPE Element
@@ -247,7 +241,7 @@ MODULE atom_type
   ! max len of quantum number n is 2!
    logical :: determined
    character(len=ATOM_LABEL_WIDTH) :: label
-   real(8), intent(out) :: n
+   real(kind=dp), intent(out) :: n
    integer :: err, st
    determined=.false.
    !           n principal
@@ -304,8 +298,8 @@ MODULE atom_type
   ! get principal quantum number from label
    logical, intent(out) :: determined
    integer, intent(out) :: L
-   real(8), intent(out) :: S, J
-   real(8), intent(in) :: g
+   real(kind=dp), intent(out) :: S, J
+   real(kind=dp), intent(in) :: g
    character(len=ATOM_LABEL_WIDTH), intent(in) :: label
    character(len=ATOM_LABEL_WIDTH+1) :: multiplet
    character(len=1) :: orbit
