@@ -127,7 +127,7 @@ module parametres
   logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface
 
   ! Phantom
-  logical :: ldudt_implicit, lscale_units, lignore_dust
+  logical :: ldudt_implicit, lscale_units, lignore_dust, ldelete_Hill_sphere, lrandomize_azimuth
   real(kind=dp) :: ufac_implicit,scale_units_factor,correct_density_factor_elongated_cells, SPH_amin, SPH_amax, fluffyness
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy
 
@@ -171,8 +171,8 @@ module parametres
   real :: z_warp, tilt_angle
 
   ! SPH
-  real :: SPH_keep_particles, planet_az, scale_SPH
-  logical :: lplanet_az, lscale_SPH, lfix_star, lcorrect_density_elongated_cells
+  real :: SPH_keep_particles, planet_az
+  logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells
   integer :: which_planet
 
   logical :: lgap_Gaussian

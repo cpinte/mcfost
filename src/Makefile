@@ -129,35 +129,9 @@ ifeq ($(IPO), yes)
 endif
 
 #------------------------------------------------------------------------------#
-# HDF5 libraries
-# Will use the version compiled by install.sh by default but you can use
-# the system one if prefered
-#
-# In that case, it requires two directories:
-#   - include for Fortran .mod files
-#   - lib for the shared library .so files
-#
-# Often both directories are under one root,
-# e.g. HDF5ROOT= /usr/local/opt/hdf5
-# In this case just set HDF5ROOT for your machine.
-#
-# However, sometimes these directories are separate,
-# then you must set both HDF5INCLUDE and HDF5LIB.
-#
-ifeq (X$(HDF5ROOT), X)
-    HDF5ROOT=$(MCFOST_INSTALL)/hdf5/$(SYSTEM)
-endif
-ifeq (X$(HDF5INCLUDE), X)
-    HDF5INCLUDE= $(HDF5ROOT)/include
-endif
-ifeq (X$(HDF5LIB), X)
-    HDF5LIB= $(HDF5ROOT)/lib
-endif
-
-#------------------------------------------------------------------------------#
 # Library flags
-INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(HDF5INCLUDE)
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit -L$(HDF5LIB) -lhdf5_fortran -lhdf5 -lz
+INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(MCFOST_INSTALL)/include/hdf5 -I$(MCFOST_INSTALL)/include/$(SYSTEM)
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit -lhdf5_fortran -lhdf5 -lz
 
 
 #------------------------------------------------------------------------------#
@@ -208,17 +182,13 @@ mcfost :  $(OBJECTS) voro++_wrapper.o  xgboost_wrapper.o mcfost.o
 	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o xgboost_wrapper.o mcfost.o $(LDFLAGS)
 
 libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
-	rm -rf libtmp
-	mkdir -p libtmp
-	cp $(LIBS)/libcfitsio.a $(LIBS)/libsprng.a $(LIBS)/libvoro++.a libtmp
-	cd libtmp; ar x libcfitsio.a; ar x libsprng.a; ar x libvoro++.a
-	rm -f mcfost.o libtmp/pmlcg.o libmcfost.a
-	ar vr libmcfost.a *.o libtmp/*.o
+	rm -f mcfost.o libmcfost.a
+	ar vr libmcfost.a *.o
 	ranlib libmcfost.a
 
 mcfost_env.o : .make_lastsystem mcfost_env.f90
-	rm -rf ../utils/Version ; grep required_utils_version mcfost_env.f90 | awk \
-		'{print $$6}' > ../utils/Version
+	mkdir -p ../utils ; rm -rf ../utils/Version ;
+	grep required_utils_version mcfost_env.f90 | awk '{print $$6}' > ../utils/Version
 	${MAKE} checkmcfost
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 mcfost_env.f90 $(INCLUDE)
 
@@ -269,6 +239,7 @@ release : clean main
 	git tag release
 	git push github
 	git push github --tags --force
+	mkdir -p $(MCFOST_INSTALL)/bin/
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
 	rm -rf web
 	mkdir web web/linux web/mac
@@ -282,11 +253,8 @@ release : clean main
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release mcfost_env.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"dmz\/master, phare\/master, github\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
-	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
-	cp -r yorick web/
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	ssh horus "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
-	rm -rf yorick web
 	pushd . ; cd ../docs ; make html ; cd _build ; tar czf html.tgz html ; scp -r html.tgz horus:/user/publicdir/pintec/mcfost/docs ; ssh horus "cd /user/publicdir/pintec/mcfost/docs ; tar xzf html.tgz ; rm -f html.tgz" ; popd
 
 release_mac : main
@@ -300,11 +268,8 @@ release_mac : main
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release mcfost_env.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
-	mkdir -p yorick ; cp ~/yorick/init/mcfost_struct.i ~/yorick/init/mcfost_utils.i yorick/
-	cp -r yorick web/
 	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost
 	ssh horus "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
-	rm -rf yorick web
 
 release_utils :
 	tar czvf mcfost_utils.tgz -C../utils .

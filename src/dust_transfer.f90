@@ -648,7 +648,7 @@ subroutine transfert_poussiere()
 
                     time_1 = time_2
                     call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
-                    if (ltau1_surface) call tau_surface_map(lambda,1.0_dp, ibin,iaz)
+                    if (ltau1_surface) call tau_surface_map(lambda,1.0, ibin,iaz)
                     call system_clock(time_2)
                     time_RT = time_RT + (time_2 - time_1)
                  enddo
@@ -661,7 +661,7 @@ subroutine transfert_poussiere()
 
                  time_1 = time_2
                  call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
-                 if (ltau1_surface) call tau_surface_map(lambda,1.0_dp, ibin,iaz)
+                 if (ltau1_surface) call tau_surface_map(lambda,1.0, ibin,iaz)
                  call system_clock(time_2)
                  time_RT = time_RT + (time_2 - time_1)
               endif
@@ -1543,12 +1543,12 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
              + tau_screen(i+1,j)   * fx * (1-fy) &
              + tau_screen(i,j+1)   * (1-fx) * fy &
              + tau_screen(i+1,j+1) * fx * fy
-             
+
         if (lemission_atom) then
         tau_c =  tau_screen_c(i,j)     * (1-fx) * (1-fy) &
              + tau_screen_c(i+1,j)   * fx * (1-fy) &
              + tau_screen_c(i,j+1)   * (1-fx) * fy &
-             + tau_screen_c(i+1,j+1) * fx * fy        
+             + tau_screen_c(i+1,j+1) * fx * fy
         end if
 
         ! Average optical depth to the star
@@ -1764,7 +1764,7 @@ end subroutine intensite_pixel_dust
 
 subroutine tau_surface_map(lambda,tau, ibin,iaz)
 
-  real(dp), intent(in) :: tau
+  real, intent(in) :: tau
   integer, intent(in) :: lambda, ibin, iaz
   real(kind=dp) :: u,v,w
 
@@ -1773,7 +1773,7 @@ subroutine tau_surface_map(lambda,tau, ibin,iaz)
 
   integer :: i,j, id, p_lambda, icell
 
-  real :: extrin, ltot
+  real :: ltot
   real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0
   logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
 

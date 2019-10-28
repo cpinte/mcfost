@@ -52,7 +52,6 @@ contains
           read_phantom_files => read_phantom_bin_files
        endif
 
-
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
             particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
 
@@ -88,22 +87,17 @@ contains
 
     if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
 
-    if (lscale_SPH) then
-       write(*,*) "**************************************************"
-       write(*,*) "WARNING : rescaling SPH simulation by:", scale_SPH
-       write(*,*) "**************************************************"
-       x = x * scale_SPH ; y = y * scale_SPH ; z = z * scale_SPH
-       etoile(:)%x = etoile(:)%x * scale_SPH ; etoile(:)%y = etoile(:)%y * scale_SPH ; etoile(:)%z = etoile(:)%z * scale_SPH
-    endif
-
     ! Model limits
     call read_SPH_limits_file(SPH_limits_file, SPH_limits)
 
     ! Voronoi tesselation
     call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
 
-    deallocate(massgas,rho)
+    deallocate(x,y,z,h,vx,vy,v,massgas,rho)
     if (allocated(rhodust)) deallocate(rhodust,massdust)
+
+    ! Deleting particles in Hill-sphere of planets
+    if (ldelete_Hill_sphere) call delete_Hill_sphere()
 
     return
 
@@ -145,8 +139,8 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(in) :: x,y,z,h,rho,massgas
-    real(dp), dimension(:), allocatable, intent(in) :: vx,vy,vz ! dimension n_SPH or 0
+    real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,rho,massgas
+    real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
@@ -248,6 +242,8 @@ contains
     write(*,*) "y =", limits(3), limits(4)
     write(*,*) "z =", limits(5), limits(6)
 
+    ! Randomize azimuth : (needs to be done before tesselation)
+    if (lrandomize_azimuth) call randomize_azimuth(n_SPH, x,y,vx,vy)
 
     !*******************************
     ! Voronoi tesselation
@@ -738,6 +734,96 @@ contains
   end subroutine compute_stellar_parameters
 
   !*********************************************************
+
+  subroutine delete_Hill_sphere()
+
+    use Voronoi_grid
+    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
+
+    integer :: istar, icell, n_delete
+    real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz
+
+    ! We assume that the central star is the actual star
+    ! and following sink particles are planets
+    do istar=2, n_etoiles
+       n_delete = 0
+
+       d2 = (etoile(istar)%x - etoile(1)%x)**2 + (etoile(istar)%y - etoile(1)%y)**2 + (etoile(istar)%y - etoile(1)%y)**2
+       r_Hill2 = d2 * (etoile(istar)%m / (3*etoile(1)%m))**(2./3)
+       r_Hill = sqrt(r_Hill2)
+
+       write(*,*) "Sink particle #", istar, "Hill radius =", r_Hill, "au"
+
+       cell_loop : do icell=1, n_cells
+          if (icell == istar) cycle cell_loop
+          dx = Voronoi(icell)%xyz(1) - etoile(istar)%x
+          if (dx > r_Hill) cycle cell_loop
+          dy = Voronoi(icell)%xyz(2) - etoile(istar)%y
+          if (dy > r_Hill) cycle cell_loop
+          dz = Voronoi(icell)%xyz(3) - etoile(istar)%z
+          if (dz > r_Hill) cycle cell_loop
+
+          d2 = dx**2 + dy**2 + dz**2
+          if (d2 < r_Hill2) then ! particle is in Hill sphere
+             masse_gaz(icell)    = 0.
+             densite_gaz(icell) = 0.
+             masse(icell) = 0.
+             densite_pouss(:,icell) = 0.
+             n_delete = n_delete + 1
+          endif
+       enddo cell_loop
+
+       write(*,*) "Deleting", n_delete, "particles in Hill sphere of sink particle #", istar
+    enddo
+
+    return
+
+  end subroutine delete_Hill_sphere
+
+  !*********************************************************
+
+  subroutine randomize_azimuth(n_points, x,y, vx,vy)
+
+    use naleat, only : seed, stream, gtype
+#include "sprng_f.h"
+
+
+    integer, intent(in) :: n_points
+    real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
+
+    integer, parameter :: nb_proc = 1
+    integer :: i, id
+
+    real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
+
+    particle_loop : do i=1, n_points
+       ! We do not touch the sink particles
+       do istar=1, n_stars
+          if (i == star(istar)%icell) cycle paricle_loop
+       enddo
+
+       call random_number(phi)
+       cos_phi = cos(phi) ; sin_phi = sin(phi)
+
+       !-- position
+       x_tmp = x(i) * cos_phi + y(i) * sin_phi
+       y_tmp = -x(i) * sin_phi + y(i) * cos_phi
+       x(i) = x_tmp ; y(i) = y_tmp
+
+
+       !-- velocities
+       x_tmp = vx(i) * cos_phi + vy(i) * sin_phi
+       y_tmp = -vx(i) * sin_phi + vy(i) * cos_phi
+       vx(i) = x_tmp ; vy(i) = y_tmp
+
+    enddo particle_loop
+
+    return
+
+  end subroutine randomize_azimuth
+
+  !*********************************************************
+
 
   subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
 
