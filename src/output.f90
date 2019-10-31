@@ -1344,13 +1344,14 @@ subroutine write_column_density()
 
   real, dimension(n_cells,n_directions) :: CD
 
-
   integer :: status,unit,blocksize,bitpix,naxis,group,fpixel,nelements
   integer, dimension(4) :: naxes
   logical :: simple, extend
   character(len=512) :: filename
 
   call compute_column_density(CD)
+
+  write(*,*) "Writing column density"
 
   filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
 

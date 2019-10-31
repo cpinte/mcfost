@@ -1102,6 +1102,8 @@ subroutine initialisation_mcfost()
      endif
   endif
 
+  if ( lwrite_column_density .and. .not. ldisk_struct) call error("-cd option requires - or +disk_struct option")
+
   write(*,*) 'Input file read successfully'
 
   ! Correction sur les valeurs du .para
