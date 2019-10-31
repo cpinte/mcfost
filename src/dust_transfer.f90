@@ -137,7 +137,7 @@ subroutine transfert_poussiere()
   if ((ldisk_struct).and.(.not. ldust_sublimation)) then
      ! We write it later if there is sublimation
      if (lastrochem) then
-        call write_disk_struct(.true.,.false.)
+        call write_disk_struct(.true.,.true.)
      else
         if (n_cells <= 1000000) then
            call write_disk_struct(.true.,lwrite_column_density)
