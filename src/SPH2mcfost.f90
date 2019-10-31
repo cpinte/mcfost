@@ -46,8 +46,12 @@ contains
 
        ! Are we reading phantom binary or HDF5 files ?
        ilen = index(density_files(1),'.',back=.true.) ! last position of the '.' character
-       if (density_files(1)(ilen:ilen+3) == ".h5") then
-          read_phantom_files => read_phantom_hdf_files
+       if (ilen > 0) then
+          if (density_files(1)(ilen:ilen+3) == ".h5") then
+             read_phantom_files => read_phantom_hdf_files
+          else
+             read_phantom_files => read_phantom_bin_files
+          endif
        else
           read_phantom_files => read_phantom_bin_files
        endif

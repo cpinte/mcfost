@@ -8,6 +8,7 @@ module Voronoi_grid
   use cylindrical_grid, only : volume
   use kdtree2_module
   use messages
+  use os
 
   implicit none
   save
@@ -329,6 +330,10 @@ module Voronoi_grid
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
+    if (operating_system == "Darwin" .and. (n_cells > 2e6)) then
+       call warning("Voronoi tesselation will likely crash with that many particle on a Mac. Switch to linux")
+    endif
+
     if (check_previous_tesselation) then
        call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
             lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,delta_edge,delta_centroid,was_cell_cut)
