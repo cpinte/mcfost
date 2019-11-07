@@ -143,12 +143,12 @@ subroutine transfert_poussiere()
   if ((ldisk_struct).and.(.not. ldust_sublimation)) then
      ! We write it later if there is sublimation
      if (lastrochem) then
-        call write_disk_struct(.true.)
+        call write_disk_struct(.true.,.true.)
      else
         if (n_cells <= 1000000) then
-           call write_disk_struct(.true.)
+           call write_disk_struct(.true.,lwrite_column_density)
         else ! We do not write the density as the file is big
-           call write_disk_struct(.false.)
+           call write_disk_struct(.false.,lwrite_column_density)
         endif
      endif
   endif
@@ -283,7 +283,7 @@ subroutine transfert_poussiere()
            call define_grid()
            call define_dust_density()
 
-           if (ldisk_struct) call write_disk_struct(.false.) ! We do now in cases where we computed the dust submination radius
+           if (ldisk_struct) call write_disk_struct(.false.,lwrite_column_density) ! We do now in cases where we computed the dust submination radius
 
            do lambda=1,n_lambda
               ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
@@ -1322,7 +1322,7 @@ subroutine dust_map(lambda,ibin,iaz)
   endif ! method
 
   ! Adding stellar contribution
-  call compute_stars_map(lambda, u,v,w, taille_pix,dx,dy, lresolved)
+  call compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix,dx,dy, lresolved)
 
   id = 1 ! We add the map on the first cpu id
   Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) = Stokes_ray_tracing(lambda,:,:,ibin,iaz,1,id) + stars_map(:,:,1)
@@ -1343,13 +1343,14 @@ end subroutine dust_map
 
 !***********************************************************
 
-subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolved)
+subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_map, lresolved)
   ! Make a ray-traced map of the stars
+  ! Also save the projected location of the stars in the map (in arcsec)
 
   use utils, only : interp
   use spectrum_type, only : NLTEspec
 
-  integer, intent(in) :: lambda
+  integer, intent(in) :: lambda, ibin, iaz
   real(kind=dp), intent(in) :: u,v,w, taille_pix
   real(kind=dp), dimension(3), intent(in) :: dx_map, dy_map ! normalized to taille_pix
   logical, intent(in) :: lresolved
@@ -1357,10 +1358,10 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
   integer, parameter :: n_ray_star_SED = 1024
 
   real(kind=dp), dimension(4) :: Stokes
-  real(kind=dp), dimension(3) :: dx_screen, dy_screen, vec
+  real(kind=dp), dimension(3) :: dx_screen, dy_screen, vec, xyz
   real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg
-  real(kind=dp) :: delta, norm_screen2, offset_x, offset_y, fx, fy, tau_c
-  real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi
+  real(kind=dp) :: delta, norm_screen2, offset_x, offset_y, fx, fy
+  real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi, factor_pix, tau_c
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
   logical :: in_map, lpola
@@ -1377,6 +1378,8 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
 
   stars_map(:,:,:) = 0.0
   if (n_etoiles < 1) return
+
+  factor_pix = 1.0 / (taille_pix*distance)
 
   alloc_status = 0
   allocate(map_1star(npix_x,npix_y,nb_proc),stat=alloc_status)
@@ -1545,11 +1548,11 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
              + tau_screen(i+1,j+1) * fx * fy
 
         if (lemission_atom) then
-        tau_c =  tau_screen_c(i,j)     * (1-fx) * (1-fy) &
-             + tau_screen_c(i+1,j)   * fx * (1-fy) &
-             + tau_screen_c(i,j+1)   * (1-fx) * fy &
-             + tau_screen_c(i+1,j+1) * fx * fy
-        end if
+           tau_c =  tau_screen_c(i,j)     * (1-fx) * (1-fy) &
+                + tau_screen_c(i+1,j)   * fx * (1-fy) &
+                + tau_screen_c(i,j+1)   * (1-fx) * fy &
+                + tau_screen_c(i+1,j+1) * fx * fy
+        endif
 
         ! Average optical depth to the star
         if (lmono0) tau_avg = tau_avg + tau
@@ -1600,6 +1603,14 @@ subroutine compute_stars_map(lambda, u,v,w, taille_pix, dx_map, dy_map, lresolve
         tau_avg = tau_avg/n_ray_star(istar)
         write(*,fmt='(" Optical depth from star #", i2, " is ", E12.5)') istar, tau_avg
      endif
+
+     !---  Projected position of centres of each star
+     xyz(1) = etoile(istar)%x ; xyz(2) = etoile(istar)%y ; xyz(3) = etoile(istar)%z
+
+     ! Offset from map center in arcsec
+     star_position(istar,ibin,iaz,1) = - dot_product(xyz, dx_map) * factor_pix ! RA negative axis
+     star_position(istar,ibin,iaz,2) = dot_product(xyz, dy_map) * factor_pix
+
   enddo ! n_stars
 
   deallocate(map_1star)
@@ -1822,8 +1833,8 @@ subroutine tau_surface_map(lambda,tau, ibin,iaz)
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,Stokes,icell,lintersect,x0,y0,z0,u0,v0,w0) &
-  !$omp private(flag_star,flag_direct_star,extrin,ltot,flag_sortie,lpacket_alive) &
-  !$omp shared(Icorner,lambda,P_lambda,pixelcenter,dx,dy,u,v,w) &
+  !$omp private(flag_star,flag_direct_star,ltot,flag_sortie,lpacket_alive) &
+  !$omp shared(tau,Icorner,lambda,P_lambda,pixelcenter,dx,dy,u,v,w) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface,move_to_grid)
   id = 1 ! pour code sequentiel
 
@@ -1846,7 +1857,7 @@ subroutine tau_surface_map(lambda,tau, ibin,iaz)
 
         if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
            call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
-                flag_star,flag_direct_star,extrin,ltot,flag_sortie,lpacket_alive)
+                flag_star,flag_direct_star,tau,ltot,flag_sortie,lpacket_alive)
            if (flag_sortie) then ! We do not reach the surface tau=1
               tau_surface(i,j,ibin,iaz,:,id) = 0.0
            else

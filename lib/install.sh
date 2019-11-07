@@ -20,7 +20,7 @@
 set -eu
 
 #-- Preliminary checks
-for comm in svn make tar git-lfs
+for comm in svn make tar
 do
     command -v $comm
     if [ $? != 0 ] ; then echo "error: $comm command not found"; exit 1; fi

@@ -19,7 +19,7 @@ module density
 
   public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file, normalize_dust_density, &
-       reduce_density, compute_CD
+       reduce_density, compute_column_density
 
   private
 
@@ -1982,7 +1982,7 @@ end subroutine reduce_density
 
 !************************************************************
 
-subroutine compute_CD(CD)
+subroutine compute_column_density(CD)
 
   !$ use omp_lib
 
@@ -2012,7 +2012,7 @@ subroutine compute_CD(CD)
            z1 = z_grid(icell)
         endif
 
-        if (direction == 1) then ! to star : test needs to be updated for Voronoi
+        if (direction == 1) then ! to star (assumed to in 0,0,0 for now + only 1 star)
            norme = 1./sqrt(x1*x1 + y1*y1 + z1*z1)
            u  = -x1 * norme ; v = -y1 * norme ; w = -z1 * norme
         else if (direction == 2) then ! vertical +z
@@ -2028,8 +2028,6 @@ subroutine compute_CD(CD)
         next_cell = icell
         icell0 = 0
 
-        ! Voronoi : next_cell > 1 (not a wall) and Voronoi(icell)%is_star == .false, (not a star)
-        ! Cylindrical : next_cell <= n_cells
         ltest = .true.
         do while(ltest)
            previous_cell = icell0
@@ -2038,6 +2036,9 @@ subroutine compute_CD(CD)
            call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
            CD(icell,direction) = CD(icell,direction) + (l_contrib * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
 
+           ! Do we continue to integrate ?
+           ! Voronoi : next_cell > 1 (not a wall) and Voronoi(icell)%is_star == .false (not a star)
+           ! Cylindrical : next_cell <= n_cells
            if (lVoronoi) then
               if (next_cell > 0) then
                  ltest = (.not.Voronoi(next_cell)%is_star)
@@ -2056,7 +2057,7 @@ subroutine compute_CD(CD)
 
   return
 
-end subroutine compute_CD
+end subroutine compute_column_density
 
 !***********************************************************
 
