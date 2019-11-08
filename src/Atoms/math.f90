@@ -35,12 +35,21 @@ MODULE math
   
   
   FUNCTION flatten(n1, n2, M)
+  !for each i in n1 write the n2 values of n1(i,:)
+     		     !In the flattened array, there are:
+     		     ! ilvl=1
+     		     !    icell=1->ncells
+     		     !                   ilvl=2
+     		     !                   icell=1->Ncells
    integer :: n1, n2, i, j
    real(kind=dp) :: flatten(n1*n2), M(n1,n2)
    
    do i=1, n1
+    !write(*,*) i
     do j=1, n2
+    !write(*,*) j, n2*(i-1)+j, n2
      flatten(n2*(i-1)+j) = M(i,j)
+     !n2 values per i
     enddo
    enddo
    
@@ -48,6 +57,7 @@ MODULE math
   END FUNCTION flatten
   
   FUNCTION reform(n1, n2, F)
+  !reform the (n1, n2) matrix from flatten(n1,n2,F)
    integer :: n1, n2, i, j
    real(kind=dp) :: F(n1*n2), reform(n1,n2)
    
@@ -59,6 +69,42 @@ MODULE math
    
   RETURN
   END FUNCTION reform
+  
+  FUNCTION flatten2(n1, n2, M)
+  !for each j in n2 write the n1 values of n1(:,j)
+     		     !In the flattened array, there are:
+     		     ! icell=1
+     		     !    ilvl=1->Nl
+     		     !               icell=2
+     		     !                   ilvl=1->Nl
+   integer :: n1, n2, i, j
+   real(kind=dp) :: flatten2(n1*n2), M(n1,n2)
+   
+   do i=1, n1 !Nlevel
+    !write(*,*) i 
+    do j=1, n2 !Ncells
+     !write(*,*) j, n1*(j-1)+i, n2
+     flatten2(n1*(j-1)+i) = M(i,j)
+     !n1 values per j
+    enddo
+   enddo
+   
+  RETURN
+  END FUNCTION flatten2
+  
+  FUNCTION reform2(n1, n2, F)
+  !reform the (n1, n2) matrix from flatten2(n1,n2,F)
+   integer :: n1, n2, i, j
+   real(kind=dp) :: F(n1*n2), reform2(n1,n2)
+   
+   do i=1, n1
+    do j=1, n2
+     reform2(i,j) = F(n1*(j-1)+i)
+    enddo
+   enddo
+   
+  RETURN
+  END FUNCTION reform2
   
    FUNCTION is_nan_infinity(y) result(val)
     real(kind=dp) :: y, val

@@ -32,7 +32,7 @@ MODULE accelerate
    Ngs%Norder = Norder !number of previous iterations kept
    Ngs%Nperiod = Nperiod !number of time we wait before a new acceleration
    !Because if Norder is 1, Ndelay should be at least 3
-   Ngs%Ndelay = MAX(Ndelay, Norder+1) !number of time we wait until the first acceleration
+   Ngs%Ndelay = MAX(Ndelay, Norder+2) !number of time we wait until the first acceleration
 
    !We test outside that Ngorder > 0, and if it is not, we never enter here
    if (Norder > 0) then
@@ -67,7 +67,7 @@ MODULE accelerate
     
     acceleration = .true.
     
-    write(*,*) Ngs%Norder, Ngs%i," accumulated solutions, extrapolating..."
+    !write(*,*) Ngs%Norder, Ngs%i," accumulated solutions, extrapolating..."
 
     Ngs%A(:,:) = 0d0
     Ngs%b(:) = 0d0
@@ -105,8 +105,7 @@ MODULE accelerate
    
   RETURN
   END FUNCTION Acceleration
-
-
+  
   SUBROUTINE freeNg(Ngs)
     type (Ng), intent(inout) :: Ngs
     if (Ngs%Norder > 0) then

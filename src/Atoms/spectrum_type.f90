@@ -9,6 +9,7 @@ MODULE spectrum_type
   use fits_utils, only : print_error
   use parametres
   use input
+  use mcfost_env, only : dp
   !use hdf5
 
   IMPLICIT NONE
@@ -25,19 +26,19 @@ MODULE spectrum_type
   !! Store S, Sc, Slte, Sclte, and jc and Kc, to save memory ???
   TYPE AtomicOpacity
    !active opacities
-   double precision, allocatable, dimension(:,:)   :: chi, eta
-   double precision, dimension(:,:), allocatable :: chic_nlte, etac_nlte
+   real(kind=dp), allocatable, dimension(:,:)   :: chi, eta
+   real(kind=dp), dimension(:,:), allocatable :: chic_nlte, etac_nlte
    ! NLTE magneto-optical elements and dichroism are stored in the background _p arrays.
    ! Mainly because we do not use them in SEE, even if etaQUV can be added to the total
    ! emissivity. But in case, etaQUV has to be atom dependent, so now we can store the LTE
    ! and NLTE is the same variable
    !passive opacities
-   double precision, allocatable, dimension(:,:)   :: eta_p, chi_p
-   double precision, allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
-   !separate polarised opacities. Or regroud in one array with Nsize, or pointers ?
-   double precision, allocatable, dimension(:,:,:)   :: rho_p, chiQUV_p, etaQUV_p
-   double precision, allocatable, dimension(:,:)   :: jc
-   double precision, allocatable, dimension(:,:,:) :: Kc
+   real(kind=dp), allocatable, dimension(:,:)   :: eta_p, chi_p
+   real(kind=dp), allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
+   real(kind=dp), allocatable, dimension(:,:,:)   :: rho_p, chiQUV_p, etaQUV_p
+   real(kind=dp), allocatable, dimension(:,:)   :: jc
+   real(kind=dp), allocatable, dimension(:,:,:) :: Kc
+   !!real(kind=dp), allocatable, dimension(:,:) :: chil_bg, etal_bg
    !!logical, dimension(:), allocatable :: initialized
    									     !set to .true. for each cell, when iray=1.
    									     !.false. otherwise.
@@ -49,21 +50,21 @@ MODULE spectrum_type
    type  (GridType), pointer :: atmos
    logical :: vacuum_to_air=.false., updateJ, write_wavelength_grid=.false.
    integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1
-   double precision :: wavelength_ref=0.d0 !nm optionnal
-   double precision, allocatable, dimension(:) :: lambda
+   real(kind=dp) :: wavelength_ref=0.d0 !nm optionnal
+   real(kind=dp), allocatable, dimension(:) :: lambda
    !nlambda, nrays, nproc
-   double precision, allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
+   real(kind=dp), allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
    !nlambda, nproc
-   double precision, allocatable, dimension(:,:) :: J, Jc, J20
+   real(kind=dp), allocatable, dimension(:,:) :: J, Jc, J20
    !Nlambda, xpix, ypix, Nincl, Naz
-   double precision, allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
-   double precision, allocatable, dimension(:,:,:,:,:,:) :: F_QUV
-   !!double precision, allocatable, dimension(:,:) :: S_QUV
+   real(kind=dp), allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
+   real(kind=dp), allocatable, dimension(:,:,:,:,:,:) :: F_QUV
+   !!real(kind=dp), allocatable, dimension(:,:) :: S_QUV
    !Contribution function
    !Nlambda,N_INCL, N_AZ, NCELLS
-   double precision, allocatable, dimension(:,:,:,:) :: Ksi 
+   real(kind=dp), allocatable, dimension(:,:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
-   double precision, allocatable, dimension(:,:,:) :: Psi, tau !for cell icell in direction iray, thread id
+   real(kind=dp), allocatable, dimension(:,:,:) :: Psi, tau !for cell icell in direction iray, thread id
    !size of Psi could change during the devlopment
    type (AtomicOpacity) :: AtomOpac
    character:: Jfile, J20file
@@ -81,7 +82,7 @@ MODULE spectrum_type
 
    !integer, intent(in) :: NPROC
    integer :: kr, nat
-   double precision, optional :: lam0
+   real(kind=dp), optional :: lam0
    logical, optional :: vacuum_to_air
    logical :: alloc_nlte_vars, alloc_image_vars
     
@@ -119,7 +120,7 @@ MODULE spectrum_type
    ! This allows to solve for the RT equation only for a specific line.
    ! This fasten LTE calculation in case of 1 line.
   ! -------------------------------------------------------------------- !
-   double precision, dimension(NLTEspec%Nwaves) :: old_grid
+   real(kind=dp), dimension(NLTEspec%Nwaves) :: old_grid
    integer, dimension(:), allocatable :: Nlam_R
    integer :: nat, kr, Ntrans_new, kp, kc
    
@@ -584,7 +585,7 @@ MODULE spectrum_type
   integer :: la, Nred, Nblue, kr, kc, m, Nmid
   logical :: simple, extend
   character(len=6) :: comment="VACUUM"
-  double precision :: lambda_vac(NLTEspec%Nwaves)
+  real(kind=dp) :: lambda_vac(NLTEspec%Nwaves)
   real :: pixel_scale_x, pixel_scale_y 
   
   write(*,*) "Writing Flux-map"
@@ -760,7 +761,7 @@ MODULE spectrum_type
    integer :: unit, EOF = 0, blocksize, naxes(1), naxis,group, bitpix, fpixel
    logical :: extend, simple
    character(len=6) :: comment="VACUUM"
-   double precision :: lambda_vac(NLTEspec%Nwaves)
+   real(kind=dp) :: lambda_vac(NLTEspec%Nwaves)
    
    if (.not.allocated(NLTEspec%lambda).or.&
        .not.NLTEspec%write_wavelength_grid) RETURN !
@@ -797,9 +798,9 @@ MODULE spectrum_type
   FUNCTION vacuum2air(Nlambda, lambda_vac) result(lambda_air)
    !wavelength in nm
    integer, intent(in) :: Nlambda
-   double precision, dimension(:), intent(in) :: lambda_vac
-   double precision, dimension(Nlambda) :: lambda_air
-   double precision, dimension(Nlambda) :: sqwave, reduction
+   real(kind=dp), dimension(:), intent(in) :: lambda_vac
+   real(kind=dp), dimension(Nlambda) :: lambda_air
+   real(kind=dp), dimension(Nlambda) :: sqwave, reduction
 
    where (lambda_vac.ge.VACUUM_TO_AIR_LIMIT) 
      sqwave = 1./(lambda_vac**2)
@@ -817,9 +818,9 @@ MODULE spectrum_type
   FUNCTION air2vacuum(Nlambda, lambda_air) result(lambda_vac)
   !wavelength in nm
   integer, intent(in) :: Nlambda
-  double precision, dimension(:), intent(in) :: lambda_air
-  double precision, dimension(Nlambda) :: lambda_vac
-  double precision, dimension(Nlambda) :: sqwave, increase
+  real(kind=dp), dimension(:), intent(in) :: lambda_air
+  real(kind=dp), dimension(Nlambda) :: lambda_vac
+  real(kind=dp), dimension(Nlambda) :: sqwave, increase
 
    where (lambda_air.ge.AIR_TO_VACUUM_LIMIT)
     sqwave = (1.0e+7 / lambda_air)**2

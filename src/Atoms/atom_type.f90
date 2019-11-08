@@ -39,7 +39,7 @@ MODULE atom_type
    character(len=20) :: trtype="ATOMIC_LINE", Coupling="LS"
    ! i, j start at 1 (not 0 like in C)
    integer :: i, j, Nlambda, Nblue=0, Nxrd=0, Nred = 0, Nmid=0
-   real(kind=dp) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
+   real(kind=dp) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc, gij
    real(kind=dp) :: qcore, qwing, glande_i, glande_j
    real(kind=dp), dimension(4) :: cvdWaals
    !Nlambda,Nproc
@@ -53,8 +53,8 @@ MODULE atom_type
    !!Stores the information for that atom only, necessary to  construct the Gamma matrix
    !!and to compute the cross-coupling terms. We need to know for each wavelength and each
    !!proc what are the active transitions involved in the Gamma matrix.
-   !!Nlambda, Nray, Nproc
-   !!real(kind=dp), allocatable, dimension(:,:,:)  :: U, chi
+   !!Nlambda, Ndep
+   !!real(kind=dp), allocatable, dimension(:,:,:)  :: U, V
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
    integer :: ZeemanPattern! 0 = WF, -1=EFFECTIVEE TRIPLET, 1=FULL
    type (AtomType), pointer :: atom => NULL()
@@ -69,8 +69,8 @@ MODULE atom_type
    real(kind=dp) :: Rji, Rij
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
-   !!Nlambda, Nray, Nproc
-   !!real(kind=dp), allocatable, dimension(:,:)  :: U, chi
+   !!Nlambda, Ndep
+   !!real(kind=dp), allocatable, dimension(:,:)  :: U, V, gij
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 

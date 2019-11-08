@@ -30,17 +30,17 @@ MODULE Opacity
    integer, intent(in) :: iray, id, icell
    real(kind=dp), dimension(NLTEspec%Nwaves), intent(in) :: chi, dtau
    
+   !build from all value
    NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-dtau)) / (chi + tiny_dp)
    
    if (.not.atmos%include_xcoupling) & 
    									NLTEspec%tau(:,iray,id) = dtau
 
 
-!     NLTEspec%dtau(:,iray,id) = dtau !only allocated for .not.lxcoupling
 !    if (atmos%include_xcoupling) then
-!      NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-dtau)) / (chi + tiny_dp) * exp(-tau)
+!      NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-dtau)) / (chi + tiny_dp) * dexp(-tau+dtau)
 !    else
-!      NLTEspec%dtau(:,iray,id) = dtau !only allocated for .not.lxcoupling
+!      NLTEspec%tau(:,iray,id) = dtau !only allocated for .not.lxcoupling
 !      NLTEspec%Psi(:,iray,id) = (1d0 - dexp(-dtau))/(chi+tiny_dp)
 !    end if
 
@@ -360,7 +360,7 @@ MODULE Opacity
 
         twohnu3_c2 = line%Aji / line%Bji
         if (line%voigt)  CALL Damping(icell, aatom, kc, line%adamp)
-        if (line%adamp>5.) write(*,*) " large damping for line", line%j, line%i, line%atom%ID, line%adamp
+        !if (line%adamp>5.) write(*,*) " large damping for line", line%j, line%i, line%atom%ID, line%adamp
     
         !allocate(phi(line%Nlambda),Vij(line%Nlambda))
         allocate(Vij(line%Nlambda))

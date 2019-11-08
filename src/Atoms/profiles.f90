@@ -110,6 +110,68 @@ MODULE PROFILES
  RETURN
  END SUBROUTINE IProfile
  
+!  FUNCTION cmf_to_observer(line,icell,x,y,z,x1,y1,z1,u,v,w,l) result(P)
+!   integer, intent(in) 							            :: icell
+!   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
+!                                 				               x1,y1,z1, &      ! velocity field and magnetic field
+!                                 				               l !physical length of the cell
+!   type (AtomicLine), intent(in)								:: line
+!   real(kind=dp), dimension(line%Nlambda)					:: vvoigt, vv!,F
+!   integer, parameter										:: NvspaceMax = 101
+!   real(kind=dp), dimension(NvspaceMax)					:: omegav
+!   integer													:: Nvspace, nv, Nred, Nblue, i, j
+!   real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
+!   															   v0, v1, dv, vbroad
+!   real(kind=dp), dimension(line%Nlambda)               :: P
+! 
+!   ! v_proj in m/s at point icell
+!   omegav = 0d0
+!   Nvspace = 1
+!   if (.not.lstatic) then
+!    v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
+!    omegav(1) = v0
+!   end if
+!   !!write(*,*) "v0", v0/1d3
+!   vbroad = VBROAD_atom(icell,line%atom)
+!   if (.not.lstatic .and. .not.lVoronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
+!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
+!      dv = dabs(v1-v0)
+!      Nvspace = max(2,nint(20*dv/vbroad))
+!      Nvspace = min(Nvspace,NvspaceMax)
+!      omegav(Nvspace) = v1
+!     do nv=2,Nvspace-1
+!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+!       xphi=x+delta_vol_phi*u
+!       yphi=y+delta_vol_phi*v
+!       zphi=z+delta_vol_phi*w
+!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+!       !!write(*,*) "v=", omegav(nv)/1d3
+!     end do 
+!   end if
+!  !!write(*,*) "v1", v1/1d3
+! 
+!   i = line%i; j = line%j
+!   Nred = line%Nred; Nblue = line%Nblue
+! 
+!   P = 0d0
+!   !allocate(vv(line%Nlambda), F(line%Nlambda), vvoigt(line%Nlambda))
+!   vv = 0d0
+!   vv(:) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
+!            CLIGHT / (line%lambda0 * vbroad)
+! 
+! 
+!  
+!  do nv=1, Nvspace 
+!        
+!           vvoigt(:) = vv(:) - omegav(nv) / vbroad
+! 
+!           P(:) = P(:) + interp_dp(line%phi(icell,:), vv(:), vvoigt(:)) / Nvspace
+! 
+!  enddo
+! 
+!  RETURN
+!  END FUNCTION cmf_to_observer
+ 
  SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, phi, psi)
   integer, intent(in) 							            :: icell
   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
