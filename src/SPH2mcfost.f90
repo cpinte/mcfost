@@ -93,7 +93,7 @@ contains
     ! Voronoi tesselation
     call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
 
-    deallocate(x,y,z,h,vx,vy,v,massgas,rho)
+    deallocate(x,y,z,h,vx,vy,vz,massgas,rho)
     if (allocated(rhodust)) deallocate(rhodust,massdust)
 
     ! Deleting particles in Hill-sphere of planets
@@ -785,6 +785,7 @@ contains
   subroutine randomize_azimuth(n_points, x,y, vx,vy)
 
     use naleat, only : seed, stream, gtype
+    use stars
 #include "sprng_f.h"
 
 
@@ -792,14 +793,14 @@ contains
     real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
 
     integer, parameter :: nb_proc = 1
-    integer :: i, id
+    integer :: i, id, istar, n_stars=1
 
     real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
 
     particle_loop : do i=1, n_points
        ! We do not touch the sink particles
        do istar=1, n_stars
-          if (i == star(istar)%icell) cycle paricle_loop
+          if (i == etoile(istar)%icell) cycle particle_loop
        enddo
 
        call random_number(phi)

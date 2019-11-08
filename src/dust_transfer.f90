@@ -1773,7 +1773,7 @@ subroutine tau_surface_map(lambda,tau, ibin,iaz)
 
   integer :: i,j, id, p_lambda, icell
 
-  real :: ltot
+  real :: ltot, extrin
   real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0
   logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
 
