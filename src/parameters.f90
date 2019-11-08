@@ -62,6 +62,10 @@ module parametres
   !Ng's acceleration
   logical :: lNg_acceleration
   integer :: iNg_Norder, iNg_Ndelay, iNg_Nperiod
+  
+  !Convergence relative errors
+  real :: dpops_max_error, dpops_sub_max_error
+  
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image
   logical :: ltab_wavelength_image

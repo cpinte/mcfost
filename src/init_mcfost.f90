@@ -80,8 +80,12 @@ subroutine set_default_variables()
   ! Ng's acceleration
   lNg_acceleration= .false.
   iNg_Norder = 0
-  iNg_Ndelay = 6
-  iNg_Nperiod = 3
+  iNg_Ndelay = 15
+  iNg_Nperiod = 6
+  !
+  ! Max relative error in transfer. ATM only atomic line transfer
+  dpops_max_error = 1e-4
+  dpops_sub_max_error = 1e-3
   !
   lpuffed_rim = .false.
   lno_backup = .false.
@@ -754,7 +758,25 @@ subroutine initialisation_mcfost()
          call warning("Bad values for Ng Ndelay and Nperiod, setting to 6 and 3")
          iNg_Nperiod = 3
          iNg_Ndelay = 6
-        endif      
+        endif 
+     case("-max_err")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("relative error needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) dpops_max_error
+        i_arg= i_arg+1
+        if (dpops_max_error <= 0) then
+         call error ("MAx relative error has to be > 0") 
+        endif
+     case("-max_err_sub")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("relative error sub needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) dpops_sub_max_error
+        i_arg= i_arg+1
+        if (dpops_sub_max_error <= 0) then
+         call error ("Max sub relative error has to be > 0") 
+        endif  
      case("-see_lte")
         i_arg = i_arg + 1
         lforce_lte=.true.
@@ -1657,6 +1679,9 @@ subroutine display_help()
   write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE, NO_STOKES (DEFAULT)"
   write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
+!-> this one could also be use for mol tranfer, like Ng or tab_wavelength
+  write(*,*) "        : -max_err <max_err> : max relative error"
+  write(*,*) "        : -max_err_sub <max_err_sub> : max relative error for sub-iterations"
   write(*,*) " "
   write(*,*) " Options related to phantom"
   write(*,*) "        : -fix_star"
