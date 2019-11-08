@@ -1,7 +1,7 @@
 Requirements and Installation
 =============================
 
-MCFOST is written in Fortran 90 (with a few function in C++) and parallelized with the Open MP
+MCFOST is written in Fortran 90 (with a few functions in C++) and parallelized with the Open MP
 protocol, i.e. it can use several processors and/or cores on a single
 machine. For simplicity, we provide pre-compiled binaries which are statically linked and do not
 have any dependencies. Source code is available on github and acces can also be provided if needed.
@@ -80,16 +80,6 @@ mcfost source code is hosted on github (as a private directory, public release w
 
 
 1. Clone the repository (ask Christophe for access).
-
-.. important::
-   ``git-lfs`` is required to clone the repository. If you have never used git-lfs, you need to run::
-
-     $ git lfs install
-
-
-  If your git installation is too old, you will get an error message.
-  In this case, please update or ask your system admin to update your copy of git
-
 
 2. Set the following environment variables::
 

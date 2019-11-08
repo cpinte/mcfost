@@ -940,6 +940,9 @@ subroutine ecriture_map_ray_tracing()
      call ftppre(unit,group,fpixel,nelements,image,status)
   endif
 
+  ! extra hdu with star positions
+  call write_star_position(unit,status)
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -1333,21 +1336,22 @@ end subroutine calc_optical_depth_map
 
 
 subroutine write_column_density()
-  ! Only works if the star in in 0, 0, 0 at the moment
+  ! WARNING: Only works if the star in in 0, 0, 0 at the moment
 
-  use density, only : compute_CD
+  use density, only : compute_column_density
 
   integer, parameter :: n_directions = 4
 
   real, dimension(n_cells,n_directions) :: CD
-
 
   integer :: status,unit,blocksize,bitpix,naxis,group,fpixel,nelements
   integer, dimension(4) :: naxes
   logical :: simple, extend
   character(len=512) :: filename
 
-  call compute_CD(CD)
+  call compute_column_density(CD)
+
+  write(*,*) "Writing column density"
 
   filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
 
@@ -1404,9 +1408,7 @@ subroutine write_column_density()
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
@@ -1468,7 +1470,7 @@ end subroutine reemission_stats
 
 !********************************************************************************
 
-subroutine write_disk_struct(lparticle_density)
+subroutine write_disk_struct(lparticle_density,lcolumn_density)
 ! Ecrit les table de densite du gaz en g/cm^3
 ! de la poussiere en g/cm^3 et en particules
 ! + coordonnees r et z en AU
@@ -1478,7 +1480,7 @@ subroutine write_disk_struct(lparticle_density)
 
   implicit none
 
-  logical, intent(in) :: lparticle_density
+  logical, intent(in) :: lparticle_density, lcolumn_density
 
   integer :: i, j, k, icell, jj
 
@@ -2018,7 +2020,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! Wrting the column density
-  !call write_column_density()
+  if (lcolumn_density) call write_column_density()
 
   if (lstop_after_init) then
      write(*,*) "Exiting"
@@ -3232,6 +3234,9 @@ subroutine ecriture_spectre(imol)
      call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt),status)
   endif ! lcasa
 
+  ! extra hdu with star positions
+  call write_star_position(unit,status)
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -3318,6 +3323,47 @@ subroutine write_temperature_for_phantom(n_SPH)
   return
 
 end subroutine write_temperature_for_phantom
+
+!**********************************************************************
+
+subroutine write_star_position(unit,status)
+  ! Create an extra hdu with the position of the star
+
+  use dust_ray_tracing, only : star_position
+
+  integer, intent(in) :: unit
+  integer, intent(inout) :: status
+
+  integer :: bitpix,naxis
+  integer, dimension(4) :: naxes
+  integer :: group,fpixel,nelements
+  logical :: simple, extend
+
+  group=1
+  fpixel=1
+
+  bitpix=-32
+  naxis = 4
+  naxes(1) = n_etoiles
+  naxes(2)= RT_n_incl
+  naxes(3)= RT_n_az
+  naxes(4)= 2
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+  ! create new hdu
+  call ftcrhd(unit, status)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  call ftpkys(unit,'UNIT',"arcsec",'',status)
+
+  !  Write the array to the FITS file.
+  call ftppre(unit,group,fpixel,nelements,star_position,status)
+
+  return
+
+end subroutine write_star_position
 
 !**********************************************************************
 

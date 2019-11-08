@@ -46,8 +46,12 @@ contains
 
        ! Are we reading phantom binary or HDF5 files ?
        ilen = index(density_files(1),'.',back=.true.) ! last position of the '.' character
-       if (density_files(1)(ilen:ilen+3) == ".h5") then
-          read_phantom_files => read_phantom_hdf_files
+       if (ilen > 0) then
+          if (density_files(1)(ilen:ilen+3) == ".h5") then
+             read_phantom_files => read_phantom_hdf_files
+          else
+             read_phantom_files => read_phantom_bin_files
+          endif
        else
           read_phantom_files => read_phantom_bin_files
        endif
@@ -793,13 +797,21 @@ contains
     real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
 
     integer, parameter :: nb_proc = 1
-    integer :: i, id, istar, n_stars=1
+! <<<<<<< HEAD
+!     integer :: i, id, istar, n_stars=1
+! =======
+    integer :: i, id, istar
+! >>>>>>> 7787440361dbfc7e8819a9f8120bad695c70c893
 
     real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
 
     particle_loop : do i=1, n_points
        ! We do not touch the sink particles
+! <<<<<<< HEAD
        do istar=1, n_stars
+! =======
+!        do istar=1, n_etoiles
+! >>>>>>> 7787440361dbfc7e8819a9f8120bad695c70c893
           if (i == etoile(istar)%icell) cycle particle_loop
        enddo
 
@@ -816,7 +828,6 @@ contains
        x_tmp = vx(i) * cos_phi + vy(i) * sin_phi
        y_tmp = -vx(i) * sin_phi + vy(i) * cos_phi
        vx(i) = x_tmp ; vy(i) = y_tmp
-
     enddo particle_loop
 
     return

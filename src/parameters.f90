@@ -128,7 +128,7 @@ module parametres
   logical, parameter :: ltest_rt4 = .false.  ! marche pas non plus
 
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM
-  logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface
+  logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface, lwrite_column_density
 
   ! Phantom
   logical :: ldudt_implicit, lscale_units, lignore_dust, ldelete_Hill_sphere, lrandomize_azimuth

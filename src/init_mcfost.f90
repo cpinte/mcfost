@@ -167,6 +167,8 @@ subroutine set_default_variables()
   lfluffy = .false.
   ldelete_hill_sphere = .false.
   lrandomize_azimuth = .false.
+  lwrite_column_density = .false.
+
   tmp_dir = "./"
 
   ! Geometrie Grille
@@ -1184,6 +1186,9 @@ subroutine initialisation_mcfost()
      case("-random_az")
         i_arg = i_arg + 1
         lrandomize_azimuth = .true.
+     case("-cd","-column_density")
+        i_arg = i_arg + 1
+        lwrite_column_density = .true.
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1240,6 +1245,8 @@ subroutine initialisation_mcfost()
         N_type_flux = 1
      endif
   endif
+
+  if ( lwrite_column_density .and. .not. ldisk_struct) call error("-cd option requires - or +disk_struct option")
 
   write(*,*) 'Input file read successfully'
 
@@ -1624,6 +1631,7 @@ subroutine display_help()
   write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) "        : -z_scaling_env <scaling_factor> : scale a spherical envelope along the z-axis"
   write(*,*) "        : -correct_density_elongated_cells <factor> : apply a density correction to elongated Voronoi cells"
+  write(*,*) "        : -column_density or -cd : generates a fits file with the column densities from each cell"
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
