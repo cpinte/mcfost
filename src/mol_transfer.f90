@@ -144,7 +144,6 @@ subroutine NLTE_mol_line_transfer(imol)
 #include "sprng_f.h"
 
   integer, intent(in) :: imol
-
   integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 10
@@ -180,7 +179,7 @@ subroutine NLTE_mol_line_transfer(imol)
   n_level_comp = min(mol(imol)%iLevel_max,nLevels)
 
   do i=1, nTrans_tot
-     tab_Trans(i) = 1 ! we use all the transitions here
+     tab_Trans(i) = i ! we use all the transitions here
   enddo
 
   if (n_level_comp < 2) call error("n_level_comp must be > 2")
@@ -236,7 +235,7 @@ subroutine NLTE_mol_line_transfer(imol)
      else if (etape==3) then
         lfixed_Rays = .false.;  ispeed(1) = 1 ; ispeed(2) = 1
         n_rayons = n_rayons_start2
-        fac_etape = 1.
+        fac_etape = 1.0
         lprevious_converged = .false.
 
         ! On passe en mode mono-frequence
