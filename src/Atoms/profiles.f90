@@ -61,7 +61,7 @@ MODULE PROFILES
       zphi=z+delta_vol_phi*w
       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
       !!write(*,*) "v=", omegav(nv)/1d3
-    end do 
+    end do
   end if
  !!write(*,*) "v1", v1/1d3
 
@@ -75,12 +75,12 @@ MODULE PROFILES
            CLIGHT / (line%lambda0 * vbroad)
 
   if (line%voigt) then
-  !Now we have a pointer to atom in line. atom(n)%lines(kr)%atom => atom(n) 
+  !Now we have a pointer to atom in line. atom(n)%lines(kr)%atom => atom(n)
   !Computed before or change damping to use only line
   !CALL Damping(icell, line%atom, kr, line%adamp)       ! init for this line of this atom accounting for Velocity fields
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
-                        !                 2) Voronoi grid is used                 
-                        
+                        !                 2) Voronoi grid is used
+
           vvoigt(:) = vv(:) - omegav(nv) / vbroad
 !           write(*,*) nv, "0loc=", locate(vvoigt, 0d0)
 !           write(*,*) maxval(vvoigt), vbroad
@@ -90,10 +90,10 @@ MODULE PROFILES
       end do
   else !Gaussian !only for checking
       do nv=1, Nvspace
-      
+
          vvoigt(:) = vv(:) - omegav(nv) / vbroad
-         P(:) = P(:) + dexp(-(vvoigt(:))**2) / Nvspace 
-         
+         P(:) = P(:) + dexp(-(vvoigt(:))**2) / Nvspace
+
       end do
  end if !line%voigt
  P(:) = P(:) / (SQRTPI * vbroad)
@@ -109,7 +109,7 @@ MODULE PROFILES
  !deallocate(vv, vvoigt, F)
  RETURN
  END SUBROUTINE IProfile
- 
+
 !  FUNCTION cmf_to_observer(line,icell,x,y,z,x1,y1,z1,u,v,w,l) result(P)
 !   integer, intent(in) 							            :: icell
 !   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
@@ -123,7 +123,7 @@ MODULE PROFILES
 !   real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
 !   															   v0, v1, dv, vbroad
 !   real(kind=dp), dimension(line%Nlambda)               :: P
-! 
+!
 !   ! v_proj in m/s at point icell
 !   omegav = 0d0
 !   Nvspace = 1
@@ -146,32 +146,32 @@ MODULE PROFILES
 !       zphi=z+delta_vol_phi*w
 !       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
 !       !!write(*,*) "v=", omegav(nv)/1d3
-!     end do 
+!     end do
 !   end if
 !  !!write(*,*) "v1", v1/1d3
-! 
+!
 !   i = line%i; j = line%j
 !   Nred = line%Nred; Nblue = line%Nblue
-! 
+!
 !   P = 0d0
 !   !allocate(vv(line%Nlambda), F(line%Nlambda), vvoigt(line%Nlambda))
 !   vv = 0d0
 !   vv(:) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
 !            CLIGHT / (line%lambda0 * vbroad)
-! 
-! 
-!  
-!  do nv=1, Nvspace 
-!        
+!
+!
+!
+!  do nv=1, Nvspace
+!
 !           vvoigt(:) = vv(:) - omegav(nv) / vbroad
-! 
+!
 !           P(:) = P(:) + interp_dp(line%phi(icell,:), vv(:), vvoigt(:)) / Nvspace
-! 
+!
 !  enddo
-! 
+!
 !  RETURN
 !  END FUNCTION cmf_to_observer
- 
+
  SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, phi, psi)
   integer, intent(in) 							            :: icell
   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
@@ -187,7 +187,7 @@ MODULE PROFILES
   real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
   															   v0, v1, dv, b0, b1,g1,c1,dB,vbroad
   real(kind=dp), intent(out), dimension(:)               :: P
-  real(kind=dp), intent(out), dimension(:,:) 		    :: phi, psi !eta_QUV; rho_QUV
+  real(kind=dp), intent(out), dimension(:,:), optional 		    :: phi, psi !eta_QUV; rho_QUV
   real(kind=dp), dimension(3,line%Nlambda) 				:: phi_zc, psi_zc!Sigma_b, PI, sigma_r
   logical 													:: B_flag = .true.
   !or allocate deallocate only on Nlambda. Lower arrays dimension but took time to allocate
@@ -200,7 +200,7 @@ MODULE PROFILES
    v0 = v_proj(icell,x,y,z,u,v,w)
    omegav(1) = v0
   end if
-  
+
   vbroad = VBROAD_atom(icell,line%atom)
 
   b0 = B_project(icell,x,y,z,u,v,w,g1,c1)
@@ -208,10 +208,10 @@ MODULE PROFILES
   gamma(1) = g1; chi(1)=c1
 
   if (maxval(abs(atmos%Bxyz(icell,:))) == 0d0) B_flag = .false.
-   
+
   if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-     dv = dabs(v1-v0) 
+     dv = dabs(v1-v0)
      Nvspace = max(2,nint(20*dv/vbroad))
      Nvspace = min(Nvspace,NvspaceMax)
      omegav(Nvspace) = v1
@@ -221,7 +221,7 @@ MODULE PROFILES
       yphi=y+delta_vol_phi*v
       zphi=z+delta_vol_phi*w
       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-    end do 
+    end do
   end if
 
 
@@ -242,13 +242,13 @@ MODULE PROFILES
        zphi=z+delta_vol_phi*w
        omegaB(nv) = B_project(icell,xphi,yphi,zphi,u,v,w,g1,c1)
        gamma(nv) = g1; chi(nv)=c1
-      end do      
+      end do
   end if
 
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
   P = 0d0
-  
+
   !allocate(vv(line%Nlambda), vvoigt(line%Nlambda))
 
   vv(:) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
@@ -257,7 +257,7 @@ MODULE PROFILES
   Nzc = line%zm%Ncomponent
   if (.not.line%voigt) then !unpolarised line assumed even if line%polarizable
       do nv=1, Nvspace
-      
+
          vvoigt(:) = vv(:) - omegav(nv) / vbroad
          P(:) = P(:) + dexp(-(vvoigt(:))**2) / Nvspace
       !derivative of Gaussian:
@@ -271,7 +271,7 @@ MODULE PROFILES
       !deallocate(vv, vvoigt)
       RETURN
   end if
-     
+
   !Computed before or change damping to use only line
   !CALL Damping(icell, line%atom, kr, line%adamp)
 
@@ -283,10 +283,10 @@ MODULE PROFILES
   !Should work also for unpolarised voigt line because Ncz=1,S=0,q=0,shift=0
        ! init for this line of this atom accounting for Velocity fields
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
-                        !                 2) Voronoi grid is used                 
-                        
+                        !                 2) Voronoi grid is used
+
         vvoigt(:) = vv(:) - omegav(nv) / vbroad
-        
+
          do nb=1,Nbspace !Nbspace=1 if Voronoi, or magnetic field is 0d0.But present
 
           do nc=1,Nzc
@@ -316,14 +316,14 @@ MODULE PROFILES
               		line%zm%strength(nc) * LV(:) / (SQRTPI * vbroad * Nbspace*Nvspace)
              LV(:) = 0d0; F(:) = 0d0
              !write(*,*) Nzc, qz, line%zm%q(nc), vvoigt_b(line%Nlambda/2+1), line%zm%shift(nc), line%zm%strength(nc), omegab(nb)
-          end do !components 
+          end do !components
           !the output, for the other we store chi_pol/chi_I, rho_pol/chi_I etc
           !write(*,*) dsin(gamma(nb)), dcos(gamma(nb)), dsin(2*chi(nb)), dcos(2*chi(nb))
           P(:) = P(:) + 5d-1 *(phi_zc(2,:) * dsin(gamma(nb))*dsin(gamma(nb)) + \
             5d-1 *(1d0+dcos(gamma(nb))*dcos(gamma(nb))) * (phi_zc(1,:)+phi_zc(3,:))) ! profile in chiI, etaI
           !rhoQ/chiI
 !           psi(1,:) = psi(1,:) + &
-!           		0.5*(real(psi_zc(2,:))-0.5*real(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2	
+!           		0.5*(real(psi_zc(2,:))-0.5*real(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
 !           !rhoU/chiI
 !           psi(2,:) = psi(2,:) + &
 !           		0.5*(real(psi_zc(2,:))-0.5*real(psi_zc(1,:)+psi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
@@ -339,7 +339,7 @@ MODULE PROFILES
 !           phi(3,:) = phi(3,:) + 0.5*(real(phi_zc(3,:))-real(phi_zc(1,:)))*cos(gamma(nb))
           !rhoQ/chiI
           psi(1,:) = psi(1,:) + &
-          		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2	
+          		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
           !rhoU/chiI
           psi(2,:) = psi(2,:) + &
           		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
@@ -353,13 +353,13 @@ MODULE PROFILES
           		0.5*(phi_zc(2,:)-0.5*(phi_zc(1,:)+phi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
           !chiV/chiI
           phi(3,:) = phi(3,:) + 0.5*(phi_zc(3,:)-phi_zc(1,:))*cos(gamma(nb))
-        end do !magnetic field     
-        
+        end do !magnetic field
+
        end do !velocity
        !check that if line is not polarised the Zeeman components are 0
        !write(*,*) "tpt", allocated(psi_zc),allocated(phi_zc), allocated(LV), allocated(F), &
        ! allocated(vv), allocated(vvoigt)
-  !deallocate(psi_zc, phi_zc, LV, F, vv, vvoigt) 
+  !deallocate(psi_zc, phi_zc, LV, F, vv, vvoigt)
  RETURN
  END SUBROUTINE ZProfile
 
