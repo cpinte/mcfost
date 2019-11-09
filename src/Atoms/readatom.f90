@@ -9,6 +9,7 @@ MODULE readatom
   use getline
   use barklem, only : getBarklem
   use writeatom, only : readPops, create_pops_file
+  use collision, only : read_collisions
 
   !$ use omp_lib
 
@@ -36,7 +37,7 @@ MODULE readatom
    ! are allocated as 1 dim (flattened) arrays
    !!!
     integer, intent(in) :: atomunit
-    integer :: kr, k, la, ftell !ftell here for ifort ??
+    integer :: kr, k, la
     type (AtomType), intent(inout), target :: atom
     character(len=*), intent(in) :: atom_file
     character(len=MAX_LENGTH) :: inputline, FormatLine
@@ -563,10 +564,12 @@ MODULE readatom
                 "not implemented yet."
     end if
 
+    ! reading collision rates
+    call read_collisions(atomunit, atom)
+
     ! allocate some space
-    atom%offset_coll = ftell(atomunit)
     atom%colunit = atom%periodic_table*2 + 1
-    write(*,*) "offset file for reading collision", atom%offset_coll, "unit = ", atom%colunit
+
     !!allocate(atom%C(atom%Nlevel*atom%Nlevel,atmos%Nspace))
     !!now Collision matrix is constructed cell by cell, therefore allocated elsewhere
     allocate(atom%n(atom%Nlevel,atmos%Nspace))

@@ -11,11 +11,10 @@ MODULE lte
  use atmos_type, only : atmos, Hydrogen, Helium, ntotal_atom
  use constant
  use math
- use collision, only : CollisionRate, openCollisionFile
  use writeatom, only : writeHydrogenMinusDensity
- 
+
  use constantes, only : tiny_dp, huge_dp
- 
+
  !$ use omp_lib
 
  IMPLICIT NONE
@@ -46,19 +45,19 @@ MODULE lte
   !!ionpot = ionpot * 100.*HPLANCK*CLIGHT !cm1->J
   !! -> avoiding dividing by big numbers causing overflow.
   !!maximum argument is 600, exp(600) = 3.77e260
-  expo = dexp(min(600d0,ionpot/(KBOLTZMANN*atmos%T(k)))) 
+  expo = dexp(min(600d0,ionpot/(KBOLTZMANN*atmos%T(k))))
   if (ionpot/(KBOLTZMANN*atmos%T(k)) >= 600d0) expo = huge_dp
-  
+
   !if dexp(300) it means phi is "infinity", exp(300) == 2e130 so that's enough
   phi = C1 * (Ujl / Uj1l) * expo / (atmos%T(k)**1.5 + tiny_dp)
   if (phi < phi_min_limit) phi = 0d0 !tiny_dp ! or phi = 0d0 should be more correct ?
   								   ! but test to not divide by 0
-  								   
+
   if (is_nan_infinity(phi)>0) then
    write(*,*) "error, phi_jl", k, phi
    stop
   endif
-  
+
   RETURN
   END FUNCTION phi_jl
 
@@ -129,11 +128,11 @@ MODULE lte
    integer :: k
    real(kind=dp) :: NI, UI1, UI, chi, ne, phi, NI1
    phi = phi_jl(k, UI, UI1, chi) ! chi in J
-   
+
     !phi should be between phi_min_limit and dexp(600)
     !and ne between ne_limit and nemax, so never nan nor infinity
     !further in General, a larg phi implies a ne close to 0, so the product remains small
-    
+
    if ((ne > 0).and.(is_nan_infinity(ne)==0)) then !is this correct or if phi/ne nan or infinty ?
     NI1 = NI/(phi*ne)
    else !all in ground state, phi->infinity if T->0 and phi->0 if T->infinty
@@ -176,7 +175,7 @@ MODULE lte
    write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%icompute_atomRT > 0)
   RETURN
   END SUBROUTINE calc_nHmin
-  
+
  SUBROUTINE LTEpops(atom, debeye)
   ! -------------------------------------------------------------- !
    ! Computes LTE populations of each level of the atom.
@@ -239,7 +238,7 @@ MODULE lte
      if (Debeye) dE = dE - nDebeye(i)*dEion !J
 
      ! --------- Boltzmann equation ------------------------------------------- !
-     ! relative to ni=n1, the populations 
+     ! relative to ni=n1, the populations
      ! of the ground state in stage stage(1).
 
      atom%nstar(i,k)=BoltzmannEq4dot20b(k, dE, atom%g(1), atom%g(i))
@@ -253,7 +252,7 @@ MODULE lte
      ! we can express all pops nij in specific ion stage j
      ! wrt the groud state and ionisation stage of the ground state
      ! namely n1j=1. Remembering that E0j+1-E0j = chiIj->j+1 = ionpot
-     
+
      ! for this level i in stage stage(i),
      ! we have dZ +1 ion stages from the
      ! level 1 in stage stage(1).
@@ -289,7 +288,7 @@ MODULE lte
 !      end do
 !      sum = sum + atmos%nHmin(k)
 !     end if
-    
+
      ! now we have, 1 + n2/n1 + ni/n1 = sum over all levels
      ! and each stage for each level,
      ! wrt the first population of the first level
@@ -300,13 +299,13 @@ MODULE lte
 !     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
 !     write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%Abund*atmos%nHtot(k)/sum
-    
+
     !test positivity, can be 0
     if (atom%nstar(1,k) < 0) then !<= tiny_dp) then
        write(*,*) " ************************************* "
        write(*,*) "Warning too small ground state population ", atom%ID, "n0=", atom%nstar(1,k)
        write(*,*) "cell=",k, atom%ID, "dark?=",atmos%icompute_atomRT(k), "T=",atmos%T(k), "nH=",atmos%nHtot(k), "ne=",atmos%ne(k)
-        !atom%nstar(1,k) = tiny_dp    
+        !atom%nstar(1,k) = tiny_dp
        write(*,*) " ************************************* "
        stop !only if we test >= 0
     end if
@@ -316,7 +315,7 @@ MODULE lte
       !to avoid very low populations in calculations
       !if (atom%nstar(i,k) < 1d-30) atom%nstar(i,k) = 1d-30
       !write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
-      
+
       !! check positivity. Can be 0 now, see above and phik and phi_jl
       if (atom%nstar(i,k) < 0) then !<= tiny_dp) then
        write(*,*) " ************************************* "
@@ -329,7 +328,7 @@ MODULE lte
       stop !only if we test >= 0
       end if
     end do
-    
+
     if (maxval(atom%nstar(:,k)) >= huge_dp) then
     write(*,*) " ************************************* "
      write(*,*) "ERROR, populations of atom larger than huge_dp"
@@ -338,8 +337,8 @@ MODULE lte
      write(*,*) " ************************************* "
      stop
     end if
-    
-    !faster ? 
+
+    !faster ?
 !    atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k) * atom%nstar(1,k)
 	!!Incorpore Hminus
 !     if (atom%ID=="H") atmos%nHmin(k) = atmos%nHmin(k) * atom%nstar(1,k)
@@ -367,20 +366,20 @@ MODULE lte
   do n=1,atmos%Natom
 
    ! fill lte populations for each atom, active or not
-   CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
+   CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel
 
   end do
-  
+
   !!This is in case H is NLTE but has not converged pops yet, or not read from file
   !!because we need this in opacity routines for H b-f, f-f, H- b-f, H- f-f ect
   !!%NLTEpops is true only if %n /= 0 or after NLTE loop, or if pops are read from file.
   !! otherwise it is FALSE, even at the begening of NLTE.
-  if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar 
-                                            !for background Hydrogen and Hminus                                            
+  if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar
+                                            !for background Hydrogen and Hminus
   CALL calc_nHmin()
-  
+
  RETURN
  END SUBROUTINE setLTEcoefficients
- 
+
 
 END MODULE lte
