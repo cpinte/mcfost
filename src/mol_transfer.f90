@@ -19,12 +19,12 @@ module mol_transfer
   use grid
   use mem
   use output
-  
+
   use accelerate
   use math, only : flatten, reform
 
   implicit none
-  
+
   type (Ng) :: Ngmol
 
   contains
@@ -36,7 +36,7 @@ subroutine mol_line_transfer()
   integer :: imol, ibin, iaz
 
   if (lProDiMo2mcfost) ldust_mol = .true.
-  
+
   !Default case for molecules and dust
   optical_length_tot => dust_and_mol_optical_length_tot
 
@@ -152,7 +152,6 @@ subroutine NLTE_mol_line_transfer(imol)
 #include "sprng_f.h"
 
   integer, intent(in) :: imol
-                                         
   integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 10
@@ -179,7 +178,7 @@ subroutine NLTE_mol_line_transfer(imol)
   real(kind=dp), dimension(:,:), allocatable :: tab_speed
 
   integer, dimension(nTrans_tot) :: tab_Trans
-  
+
   !Ng'acceleration
   logical :: accelerated, ng_rest
   integer :: iorder, i0_rest, n_iter_accel
@@ -188,10 +187,10 @@ subroutine NLTE_mol_line_transfer(imol)
   labs = .true.
 
   id = 1
-  
+
   n_speed = mol(imol)%n_speed_rt ! j'utilise le meme maintenant
   n_level_comp = min(mol(imol)%iLevel_max,nLevels)
-  
+
   if (lNg_acceleration) then
    write(*,*) " *********** "
     write(*,*) "Ng acceleration not tested for molecules yet"
@@ -208,7 +207,7 @@ subroutine NLTE_mol_line_transfer(imol)
   endif
 
   do i=1, nTrans_tot
-     tab_Trans(i) = 1 ! we use all the transitions here
+     tab_Trans(i) = i ! we use all the transitions here
   enddo
 
   if (n_level_comp < 2) call error("n_level_comp must be > 2")
@@ -264,7 +263,7 @@ subroutine NLTE_mol_line_transfer(imol)
      else if (etape==3) then
         lfixed_Rays = .false.;  ispeed(1) = 1 ; ispeed(2) = 1
         n_rayons = n_rayons_start2
-        fac_etape = 1.
+        fac_etape = 1.0
         lprevious_converged = .false.
 
         ! On passe en mode mono-frequence
@@ -436,14 +435,14 @@ subroutine NLTE_mol_line_transfer(imol)
         enddo ! icell
         !$omp end do
         !$omp end parallel
-        
+
      	!not parallel yet
      	accelerated=.false.
      	!to be compatible with atomictransfer routines
      	popsT = transpose(tab_nLevel(:,1:n_level_comp))
      	if (lNg_acceleration .and. (n_iter > iNg_Ndelay)) then
      		  iorder = n_iter - iNg_Ndelay !local number of iterations accumulated
-     		  if (ng_rest) then 
+     		  if (ng_rest) then
      		    write(*,*) iorder-i0_rest, " Acceleration relaxes for ", iNg_Nperiod
      		    if (iorder - i0_rest == iNg_Nperiod) ng_rest = .false.
      		  else
@@ -456,7 +455,7 @@ subroutine NLTE_mol_line_transfer(imol)
      		     !                   icell=1->Ncells
      		     flatpops=flatten(n_level_comp,n_cells,popsT)
      		     accelerated = Acceleration(Ngmol, flatpops)
-     		     if (accelerated) then 
+     		     if (accelerated) then
      		      popsT = reform(n_level_comp,n_cells, flatpops)
                   n_iter_accel = n_iter_accel + 1 !True number of accelerated iter
                   ng_rest = .true.
@@ -513,8 +512,8 @@ subroutine NLTE_mol_line_transfer(imol)
   enddo ! etape
 
   deallocate(ds, Doppler_P_x_freq, I0, I0c)
-  
-  if (lNg_acceleration) then 
+
+  if (lNg_acceleration) then
    CALL freeNg(Ngmol)
    deallocate(flatpops,popsT)
   endif

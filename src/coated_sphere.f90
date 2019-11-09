@@ -3,7 +3,7 @@ module coated_sphere
   use parametres
   use constantes
   use grains
-  use utils, only : gauleg
+  use utils, only : Gauss_Legendre_quadrature
   use messages
   use wavelengths
 
@@ -180,7 +180,7 @@ contains
     ipop = grain(taille_grain)%pop
 
     ! Calcul des poids pour integration de Gauss-Legendre
-    call GauLeg(0.0_dp,real(dust_pop(ipop)%dhs_maxf,kind=dp),f,wf,N_vf) ; wf = wf/sum(wf)
+    call Gauss_Legendre_quadrature(0.0_dp,real(dust_pop(ipop)%dhs_maxf,kind=dp),N_vf, f, wf) ; wf = wf/sum(wf)
     ! todo : a ne faire que pour 1 taille de grain et 1 lambda, sauf si n_vf change
 
     Cext=0 ; Csca=0 ; gsca=0 ; s1=0 ; s2=0
