@@ -4,20 +4,20 @@ MODULE getlambda
   use atmos_type, only : atmos, atomPointerArray
   use constant
   use getline, only : getnextline, MAX_LENGTH
-  
+
   use parametres
   use utils, only : span, spanl, bubble_sort
   use messages
-  
+
   IMPLICIT NONE
-  
+
   !Number of points for each transition
   integer, parameter :: Nlambda_cont = 101, &
   						Nlambda_line_w = 9, Nlambda_line_c = 101
   						!Nwing from -vchar to vcore; Ncore from vcore to 0
 
   CONTAINS
-  
+
   SUBROUTINE Read_wavelengths_table(lambda_table, Nlam_I)
   ! -------------------------------------------------------- !
   ! Read a wavelenth table of the form:
@@ -35,9 +35,9 @@ MODULE getlambda
    integer, dimension(:), allocatable, intent(out) :: Nlam_I
    character(len=MAX_LENGTH) :: inputline, FormatLine
    integer :: Nread = 0, Nl, k, Nr, Nt
-   
+
    if (.not.ltab_wavelength_image) RETURN
-   
+
    if (allocated(lambda_table)) deallocate(lambda_table) !should not happen
    write(FormatLine,'("(1"A,I3")")') "A", 256
 
@@ -45,29 +45,29 @@ MODULE getlambda
    CALL getnextline(1, "#", FormatLine, inputline, Nread)
    read(inputline,*) Nl
    allocate(Nlam_I(Nl)) !wavelength per regions
-   
+
    do k=1,Nl
     CALL getnextline(1, "#", FormatLine, inputline, Nread)
     read(inputline,*) Nr
     Nlam_I(k) = Nr
    end do
    Nt = sum(Nlam_I)
- 
+
    !read wavelengths
    allocate(lambda_table(Nt))
    do k=1,Nt
       CALL getnextline(1, "#", FormatLine, inputline, Nread)
       read(inputline,*) lambda_table(k)
    end do
-   
+
    close(1)
-   
+
   RETURN
   END SUBROUTINE Read_wavelengths_table
-  
+
   SUBROUTINE write_lines_grid()
   ! -------------------------------------------------------- !
-  ! write individual lines grid in the format read by 
+  ! write individual lines grid in the format read by
   ! write_wavelength_table
   ! for all atoms
   !
@@ -85,12 +85,12 @@ MODULE getlambda
    !cound lines
    Nl = 0 !total lines of all atoms
    maxL = 0
-   
+
   if (.not.allocated(atmos%Atoms(1)%ptr_atom%lines(1)%lambda)) then
    write(*,*) " Error, lambda grid of lines may not been allocated yet or anymore"
    stop
   endif
-   
+
    do na=1, atmos%Natom!NActiveatoms
     atom => atmos%atoms(na)%ptr_atom!atmos%Activeatoms(na)%ptr_atom
     do k=1, atom%Nline
@@ -105,10 +105,10 @@ MODULE getlambda
     atom=>NULL()
    enddo
    !write(*,*) maxL, Nl, Nl2(1:Nl)
-   
+
    allocate(lambda_table(Nl, maxL))
    write(FormatLine,'("(1"A,I3")")') "A", 256
-   
+
    Nl = 0
    do na=1, atmos%Natom!NActiveatoms
     atom => atmos%atoms(na)%ptr_atom!atmos%Activeatoms(na)%ptr_atom
@@ -121,40 +121,40 @@ MODULE getlambda
    enddo
 
    open(unit=1, file=TRIM(line_waves), status='unknown')
-   write(1,"(I)") Nl
+   write(1,"(I6)") Nl
    !write(*,*) Nl
-      
+
    do k=1,Nl
-    write(1,"(I)") Nl2(Nl)
+    write(1,"(I6)") Nl2(Nl)
     !write(*,*) Nl2(Nl)
    end do
- 
+
    Nl = 0
    do na=1, atmos%Natom!NActiveatoms
     atom => atmos%atoms(na)%ptr_atom!atmos%Activeatoms(na)%ptr_atom
     do k=1, atom%Nline
      Nl = Nl + 1
       do la=1, Nl2(Nl)
-       write(1,'(F)') lambda_table(Nl, la)
+       write(1,'(F6.3)') lambda_table(Nl, la)
        !write(*,*) Nl, NL2(Nl), lambda_table(Nl, la)
       enddo
     enddo
     atom=>NULL()
    enddo
-   
+
    close(1)
    deallocate(lambda_table)
 
   RETURN
   END SUBROUTINE write_lines_grid
-  
+
   SUBROUTINE write_wavelengths_table_NLTE_lines(waves)
   ! -------------------------------------------------------- !
-  ! write individual lines grid in the format read by 
+  ! write individual lines grid in the format read by
   ! write_wavelength_table
   ! for all atoms
   !
-  ! This version if for the line grid taken on the final 
+  ! This version if for the line grid taken on the final
   ! waves grid
   ! -------------------------------------------------------- !
    type (AtomType), pointer :: atom
@@ -165,12 +165,12 @@ MODULE getlambda
    character(len=MAX_LENGTH) :: inputline, FormatLine
    integer :: Nl, k, la, na, maxL
    integer, dimension(1000) :: Nl2
-   
+
    if (atmos%NactiveAtoms==0) then
     write(*,*) " NLTE lines wavelength table not written, N active atoms = ", atmos%NactiveAtoms
     return
    endif
-   
+
    !cound lines
    Nl = 0 !total lines of all atoms
    maxL = 0
@@ -187,10 +187,10 @@ MODULE getlambda
     enddo
     atom=>NULL()
    enddo
-   
+
    allocate(lambda_table(Nl, maxL))
    write(FormatLine,'("(1"A,I3")")') "A", 256
-   
+
    Nl = 0
    do na=1, atmos%NActiveatoms
     atom => atmos%Activeatoms(na)%ptr_atom
@@ -204,30 +204,30 @@ MODULE getlambda
 
    open(unit=1, file=TRIM(line_waves), status='unknown')
    write(1,*) Nl
-      
+
    do k=1,Nl
     write(1,*) Nl2(Nl)
    end do
- 
+
   Nl = 0
    do na=1, atmos%NActiveatoms
     atom => atmos%Activeatoms(na)%ptr_atom
     do k=1, atom%Nline
      Nl = Nl + 1
       do la=1, Nl2(Nl)
-       write(1,'(1F)') lambda_table(Nl, la)
+       write(1,'(1F6.3)') lambda_table(Nl, la)
       enddo
     enddo
     atom=>NULL()
    enddo
-   
+
    close(1)
-   
+
    deallocate(lambda_table)
 
   RETURN
   END SUBROUTINE write_wavelengths_table_NLTE_lines
-  
+
   !building
   !Could be make logarithmic ?? If from the threshold,alpha_nu decreases in 1/nu**3
   SUBROUTINE make_sub_wavelength_grid_cont_log(cont, lambdamin)
@@ -241,20 +241,20 @@ MODULE getlambda
    type (AtomicContinuum), intent(inout) :: cont
    real(kind=dp), intent(in) :: lambdamin
    real(kind=dp) :: l0, l1
-   
+
    !write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
 
    l1 = cont%lambda0 !cannot be larger than lambda0 ! minimum frequency for photoionisation
    l0 = lambdamin
    cont%Nlambda = Nlambda_cont
    allocate(cont%lambda(cont%Nlambda))
-   
+
    cont%lambda = real(spanl(real(l0), real(l1), cont%Nlambda),kind=dp)
-   
+
    !does not allocate cross-section, here
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_cont_log
-  
+
   SUBROUTINE make_sub_wavelength_grid_cont(cont, lambdamin)
   ! ----------------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicContinuum cont.
@@ -268,7 +268,7 @@ MODULE getlambda
    real(kind=dp) :: resol
    integer :: la
    real(kind=dp) :: l0, l1
-   
+
    !write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
 
    l1 = cont%lambda0 !cannot be larger than lambda0 ! minimum frequency for photoionisation
@@ -277,8 +277,8 @@ MODULE getlambda
    allocate(cont%lambda(cont%Nlambda))
    resol = (l1 - l0) / real(cont%Nlambda - 1, kind=dp)
 !    write(*,*) "Continuum:", cont%lambda0, cont%j,"->",cont%i, &
-!               " Resolution (nm):", resol, " lambdamin =", lambdamin  
-   
+!               " Resolution (nm):", resol, " lambdamin =", lambdamin
+
    cont%lambda(1) = l0
    do la=2,cont%Nlambda
     cont%lambda(la) = cont%lambda(la-1) + resol
@@ -286,12 +286,12 @@ MODULE getlambda
    !does not allocate cross-section, here
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_cont
-  
+
   !building
   SUBROUTINE make_sub_wavelength_grid_asymm(line, vD)
   ! ------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicLine
-   ! line with constant resolution in km/s. When dlambda 
+   ! line with constant resolution in km/s. When dlambda
    ! is lower than vsub, the resolution is increased.
    ! Allocate line%lambda.
   ! ------------------------------------------------------- !
@@ -305,13 +305,13 @@ MODULE getlambda
    real, parameter :: L = 1.01, core_to_wing = 0.5
    real(kind=dp) :: lam_grid(NlambdaMax), dlambda, l0, l1 !nm
    lam_grid = 0d0
-   !the line domain falls in [l0*(1+resol), l1*(1+resol)] with, 
+   !the line domain falls in [l0*(1+resol), l1*(1+resol)] with,
    !l0 = (lambda0 - lambda0*v_char/c - vWing) and l1 = (lambda0 + lambda0*v_char/c + vWing).
    adamp_char = 1d3 * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
    vB = 0d0
    if (line%polarizable) vB =  &
    				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
-   								 
+
    v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line   resol = R !km/s
    dlambda = v_char /CLIGHT * line%lambda0
 
@@ -320,7 +320,7 @@ MODULE getlambda
    l1 = (line%lambda0 + dlambda) * (1 + 1d3 * R/CLIGHT)
    l0 = (line%lambda0 - dlambda) * (1 - 1d3 * R/CLIGHT)
 
-   
+
    Nlambda = 2
    lam_grid(1) = l0!!line%lambda0 !not lambda0 if not vel
    infinie : do ! from lambda0 to l1
@@ -340,7 +340,7 @@ MODULE getlambda
         Nlambda = Nlambda + 1
        enddo sub_infinie
       endif
-	
+
       if ((Nlambda > NlambdaMax).or.(lam_grid(Nlambda)>l1)) exit infinie
       Nlambda = Nlambda + 1
    enddo infinie
@@ -348,7 +348,7 @@ MODULE getlambda
   ! Nlambda = 2 * Nlambda
    line%Nlambda = size(pack(lam_grid, mask=lam_grid>0)) !or > -v0 if in vel not in lambda
   ! Nmid = Nlambda/2
-   allocate(line%lambda(line%Nlambda))   
+   allocate(line%lambda(line%Nlambda))
    line%lambda = lam_grid
 ! -> nm sampling not vel
 !    do la=Nmid, Nlambda
@@ -356,15 +356,15 @@ MODULE getlambda
 !     line%lambda(Nlambda - la + 1) = lam_grid(la) - line%lambda0
 !    enddo
 
-   
+
 !    do la=1, line%Nlambda
 !     write(*,*) la, line%lambda(la), l0, l1, line%lambda0
 !    enddo
 !    stop
-   
+
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_asymm
-  
+
   !Probleme passe pas part lambda0
   SUBROUTINE make_sub_wavelength_grid_line_lin(line, vD)
   ! ------------------------------------------------------------ !
@@ -387,7 +387,7 @@ MODULE getlambda
    vB = 0d0
    if (line%polarizable) vB =  &
    				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
-   								 
+
    v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
 
    xlam = 0d0
@@ -396,12 +396,12 @@ MODULE getlambda
 
    !if (dabs(vel(Nlambda_line_w+Nlambda_line_c-1)) /= 0d0) vel(Nlambda_line_w+Nlambda_line_c-1) = 0d0
    !if (vel(Nlambda_line_w+Nlambda_line_c-1) /= 0) write(*,*) 'Vel(Nw+Nc-1) should be 0.0'
-   
-   Nlambda = Nlambda_line_c!2 * (Nlambda_line_w + Nlambda_line_c - 1) - 1 
+
+   Nlambda = Nlambda_line_c!2 * (Nlambda_line_w + Nlambda_line_c - 1) - 1
    line%Nlambda = Nlambda
    if (mod(line%Nlambda,2)==0) line%Nlambda = line%Nlambda + 1
    !Nmid = Nlambda/2 + 1 !As Nlambda is odd '1--2--3', Nmid = N/2 + 1 = 2, because 3/2 = 1
-   !						!because the division of too integers is the real part. 
+   !						!because the division of too integers is the real part.
    allocate(line%lambda(line%Nlambda))
    line%lambda(1) = lam0
    dlam = (lam1-lam0) / (real(line%Nlambda-1))
@@ -416,7 +416,7 @@ MODULE getlambda
 
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_line_lin
-  
+
   SUBROUTINE make_sub_wavelength_grid_line(line, vD)
   ! ------------------------------------------------------------ !
    ! Make an individual wavelength grid for the AtomicLine line.
@@ -442,7 +442,7 @@ MODULE getlambda
    vB = 0d0
    if (line%polarizable) vB =  &
    				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
-   								 
+
    v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
    vcore = (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) * wing_to_core
    !transition between wing and core in velocity
@@ -456,7 +456,7 @@ MODULE getlambda
    !from -v_char to 0
    dvw = (v_char-vcore)/real(Nlambda_line_w-1,kind=dp) !(L * v_char-vcore)/real(Nw-1,kind=dp), old
    dvc = vcore/real(Nlambda_line_c-1,kind=dp)
-   
+
 
 !! Log wing
    !should be log from vcore to v0 not the opposite
@@ -464,9 +464,9 @@ MODULE getlambda
 !   vel(1:Nw) = -real(spanl(real(v0), real(vcore), Nw),kind=dp)
    vel(Nlambda_line_w:1:-1) = -real(spanl(real(vcore), real(v0), Nlambda_line_w),kind=dp)
 !! end scale of wing points
-!   vel(Nw:Nw-1+Nc) = -real(span(real(vcore), real(0.), Nc+1),kind=dp) 
+!   vel(Nw:Nw-1+Nc) = -real(span(real(vcore), real(0.), Nc+1),kind=dp)
 !   write(*,*) Nw, vel(Nw), vcore
-   !vel(Nw) = -vcore!should be okey at the numerical precision 
+   !vel(Nw) = -vcore!should be okey at the numerical precision
    !la goes from 1 to Nw + Nc -1 total number of points.
    !if Nc=101 and Nw =11, 111 velocity points,because the point vel(11) of the wing grid
    !is shared with the point vel(1) of the core grid.
@@ -474,8 +474,8 @@ MODULE getlambda
     vel(la) = vel(la-1) + dvc
     !write(*,*) la-Nw+1,la, vel(la) !relative index of core grid starts at 2 because vel(Nw)
     							   ! is the first point.
-   end do   
-   
+   end do
+
    !! Just a check here, maybe forcing the mid point to be zero is brutal
    !! but by construction it should be zero !
    !if (dabs(vel(Nw+Nc-1)) <= 1d-7) vel(Nw+Nc-1) = 0d0
@@ -486,10 +486,10 @@ MODULE getlambda
   ! 2 times vcore which is shared by the wing (upper boundary) and core (lower boundary) grid.
   ! Total number of points is 2*(Nw+Nc-1) but here we count 2 times lambda0., therefore
   ! we remove 1 point.
-   Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c - 1) - 1 
+   Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c - 1) - 1
    line%Nlambda = Nlambda
    Nmid = Nlambda/2 + 1 !As Nlambda is odd '1--2--3', Nmid = N/2 + 1 = 2, because 3/2 = 1
-   						!because the division of too integers is the real part. 
+   						!because the division of too integers is the real part.
    allocate(line%lambda(line%Nlambda))
 
    line%lambda(1:Nmid) = line%lambda0*(1d0 + vel(1:Nmid)/CLIGHT)
@@ -498,17 +498,17 @@ MODULE getlambda
    if (line%lambda(Nmid) /= line%lambda0) write(*,*) 'Lambda(Nlambda/2+1) should be lambda0'
 
   RETURN
-  END SUBROUTINE make_sub_wavelength_grid_line  
+  END SUBROUTINE make_sub_wavelength_grid_line
 
   SUBROUTINE make_wavelength_grid(Natom, Atoms, inoutgrid, Ntrans, wl_ref)
   use math, only : locate
   ! --------------------------------------------------------------------------- !
    ! construct and sort a wavelength grid for atomic line radiative transfer.
    ! Computes also the edge of a line profile: Nblue and Nred.
-   ! The grid is built by merging the individual wavelength grids of each 
+   ! The grid is built by merging the individual wavelength grids of each
    ! transitions. Duplicates are removed and therefore changes the value of
    ! line%Nlambda and continuum%Nlambda.
-   ! line%lambda and continuum%lambda are useless now. Except that 
+   ! line%lambda and continuum%lambda are useless now. Except that
    ! continuu%lambda is still used in .not.continuum%Hydrogenic !!
   ! --------------------------------------------------------------------------- !
    type (atomPointerArray), intent(inout), dimension(Natom) :: Atoms
@@ -525,9 +525,10 @@ MODULE getlambda
    integer :: kr, kc, n, Nspect, Nwaves, Nlinetot, Nctot
    integer :: la, nn, nnn !counters: wavelength, number of wavelengths, line wavelength
    integer :: Nred, Nblue, Nlambda_original!read from model
-   real(kind=dp), allocatable, dimension(:) :: tempgrid, sorted_indexes
+   real(kind=dp), allocatable, dimension(:) :: tempgrid
+   integer, allocatable, dimension(:) :: sorted_indexes
    real(kind=dp) :: l0, l1 !ref wavelength of each transitions
-   
+
    write(*,*) ' Defining the nLTE wavelength grid, using ', Nlambda_cont,' points for each continuum, and ', &
     2*(Nlambda_line_w+Nlambda_line_c-1)-1, " points for each line."
 
@@ -594,7 +595,7 @@ MODULE getlambda
   ! start adding continua and lines wavelength grid
   nnn = 0!it is just an indicative counter
   		 ! because nn is dependent on wl_ref and on the inoutgrid
-  		 ! it is filled. 
+  		 ! it is filled.
   do kc=1,Nctot
    do la=1,allcont(kc)%Nlambda
     nn = nn + 1
@@ -633,7 +634,7 @@ MODULE getlambda
    end if
   end do
   Nwaves = Nwaves-1 ! I don't understand yet but it works
-  					! Maybe, if only 1 wavelength, Nwaves = 2 - 1 = 1 (and not 2 as it 
+  					! Maybe, if only 1 wavelength, Nwaves = 2 - 1 = 1 (and not 2 as it
   					! is implied by the above algorithm...)
   					! or if 2 wavelengths, Nwaves = 2 = 3 - 1 (not 3 again etc)
   					! and so on, actually I have 1 wavelength more than I should have.
@@ -675,8 +676,8 @@ MODULE getlambda
     Atoms(n)%ptr_atom%continua(kc)%Nlambda = Atoms(n)%ptr_atom%continua(kc)%Nred - &
                                     Atoms(n)%ptr_atom%continua(kc)%Nblue + 1
 !      write(*,*) Atoms(n)%ID, " continuum:",kr, " Nlam_ori:", Nlambda_original, &
-!      " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%continua(kc)%Nred, & 
-!        " Nblue:", Atoms(n)%continua(kc)%Nblue, " Nlambda:", Atoms(n)%continua(kc)%Nlambda, & 
+!      " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%continua(kc)%Nred, &
+!        " Nblue:", Atoms(n)%continua(kc)%Nblue, " Nlambda:", Atoms(n)%continua(kc)%Nlambda, &
 !        " Nblue+Nlambda-1:", Atoms(n)%continua(kc)%Nblue + Atoms(n)%continua(kc)%Nlambda - 1
 !! For continuum transitions, lambda0 is at Nred, check definition of the wavelength grid
 !! which means that cont%Nmid = locate(inoutgrid, lam(Nred)+lam(Nb)/(Nlambda))
@@ -686,8 +687,8 @@ MODULE getlambda
 !!deprecated
 !     CALL fillPhotoionisationCrossSection(Atoms(n)%ptr_atom, kc, &
 !     	Atoms(n)%ptr_atom%continua(kc)%lambda,Nwaves, inoutgrid)
-!     	
-!     !TEST 
+!
+!     !TEST
 !     Atoms(n)%ptr_atom%continua(kc)%Nlambda = size( Atoms(n)%ptr_atom%continua(kc)%alpha)
       !!-> also deallocates cont%lambda which is the original lambda read from file
     !allocate(Atoms(n)%continua(kc)%lambda(Atoms(n)%continua(kc)%Nlambda))
@@ -711,8 +712,8 @@ MODULE getlambda
     Atoms(n)%ptr_atom%lines(kr)%Nlambda = Atoms(n)%ptr_atom%lines(kr)%Nred - &
                                  Atoms(n)%ptr_atom%lines(kr)%Nblue + 1
 !     write(*,*) Atoms(n)%ID, " line:",kr, " Nlam_ori:", Nlambda_original, &
-!     " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%lines(kr)%Nred, & 
-!       " Nblue:", Atoms(n)%lines(kr)%Nblue, " Nlambda:", Atoms(n)%lines(kr)%Nlambda, & 
+!     " l0:", l0, " l1:", l1, " Nred:",  Atoms(n)%lines(kr)%Nred, &
+!       " Nblue:", Atoms(n)%lines(kr)%Nblue, " Nlambda:", Atoms(n)%lines(kr)%Nlambda, &
 !       " Nblue+Nlambda-1:", Atoms(n)%lines(kr)%Nblue + Atoms(n)%lines(kr)%Nlambda - 1
     Atoms(n)%ptr_atom%lines(kr)%Nmid = locate(inoutgrid,Atoms(n)%ptr_atom%lines(kr)%lambda0)
     deallocate(Atoms(n)%ptr_atom%lines(kr)%lambda) !does not correpond to the new grid, indexes might be wrong
@@ -726,7 +727,7 @@ MODULE getlambda
    end do
 !     write(*,*) " ------------------------------------------------------------------ "
   end do !over atoms
-  
+
   RETURN
   END SUBROUTINE make_wavelength_grid
 
@@ -766,9 +767,9 @@ MODULE getlambda
    !is not the sum of the individual grid, some transitions can be neglected because
    !they are out of range
    do n=1,Natom
-       
+
     allocate(trans_contribute(atoms(n)%ptr_atom%Ntr)); trans_contribute(:)=.true.!by default
-    
+
     do kc=1,Atoms(n)%ptr_atom%Ncont
      !on the old_Grid (i.e., the grid for NLTE which is built using all transitions)
      Nlambda_original = Atoms(n)%ptr_atom%continua(kc)%Nlambda !on the old_grid
@@ -800,13 +801,13 @@ MODULE getlambda
       Atoms(n)%ptr_atom%continua(kc)%Nblue = -99
      end if
 
-     
+
      Nblue = Atoms(n)%ptr_atom%continua(kc)%Nblue; Nred = Atoms(n)%ptr_atom%continua(kc)%Nred
      if (Nred==-99.and.Nblue==-99) then
       Atoms(n)%ptr_atom%continua(kc)%Nlambda = -99
 
       Atoms(n)%ptr_atom%continua(kc)%Nmid = -99
-      
+
       !!Atoms(n)%ptr_atom%continua(kc)%lcontrib_to_opac=.false.
       trans_contribute(atoms(n)%ptr_atom%Nline+kc) = .false.
       Atoms(n)%ptr_atom%at(atoms(n)%ptr_atom%Nline+kc)%lcontrib_to_opac=.false.
@@ -818,7 +819,7 @@ MODULE getlambda
 
       Atoms(n)%ptr_atom%continua(kc)%Nmid = locate(lambda,lambda(Atoms(n)%ptr_atom%continua(kc)%Nlambda)/2+1)
 
-     end if                          
+     end if
     end do
 
     !then bound-bound transitions
@@ -855,7 +856,7 @@ MODULE getlambda
       Atoms(n)%ptr_atom%lines(kr)%Nblue = -99
       Atoms(n)%ptr_atom%lines(kr)%Nred = -99
      end if
-     
+
      Nblue = Atoms(n)%ptr_atom%lines(kr)%Nblue; Nred = Atoms(n)%ptr_atom%lines(kr)%Nred
      if (Nred==-99.and.Nblue==-99) then
       Atoms(n)%ptr_atom%lines(kr)%Nlambda = -99
@@ -872,11 +873,11 @@ MODULE getlambda
                                  Atoms(n)%ptr_atom%lines(kr)%Nblue + 1
 
       Atoms(n)%ptr_atom%lines(kr)%Nmid = locate(lambda,Atoms(n)%ptr_atom%lines(kr)%lambda0)
-     end if                               
+     end if
     if (allocated(Atoms(n)%ptr_atom%lines(kr)%lambda)) &
     	deallocate(Atoms(n)%ptr_atom%lines(kr)%lambda)
     end do
-    
+
      CALL realloc_transitions(Atoms(n)%ptr_atom, count(trans_contribute), trans_contribute)
      deallocate(trans_contribute)
    end do !over atoms

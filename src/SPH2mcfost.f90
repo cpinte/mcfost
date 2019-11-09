@@ -493,7 +493,7 @@ contains
     else
      CALL error("PLUTO HDF5 file expected !")
     end if
-    
+
     !lfix_star = .true. only, yet
     if ((.not.lfix_star).and.(lpluto_file)) then
      write(*,*) "Error, lfix_star has to be .true. using pluto models !"
@@ -508,7 +508,7 @@ contains
     CALL pluto_to_Voronoi(Nmod, x,y,z,h,rho,vx,vy,vz,.false.)
 
     deallocate(vx,vy,vz,rho,h,x,y,z) !right?
-   
+
    RETURN
 
    END SUBROUTINE setup_pluto_to_mcfost
@@ -556,7 +556,7 @@ contains
     write(*,*) "x =", limits(1)/etoile(1)%r, limits(2)/etoile(1)%r
     write(*,*) "y =", limits(3)/etoile(1)%r, limits(4)/etoile(1)%r
     write(*,*) "z =", limits(5)/etoile(1)%r, limits(6)/etoile(1)%r
-       
+
     write(*,*) "Found", Nmod, " mesh points "
 
     !*******************************
@@ -564,7 +564,7 @@ contains
     !*******************************
     call Voronoi_tesselation(Nmod, x,y,z,h, limits, check_previous_tesselation)
     write(*,*) "Using n_cells =", n_cells
-    
+
     !*******************************
     ! Fill atmos structure
     !*******************************
@@ -574,12 +574,12 @@ contains
      write(*,*) "Error in array size"
      stop
     end if
-    
+
     !*************************
     ! Densities
     !*************************
     !mcfost, dust and molecular RT densities arrays
-    !allocated to avoid errors    
+    !allocated to avoid errors
     CALL allocate_densities(n_cells_max=Nmod+n_etoiles)
     ! I need to work with masses, as Voronoi and Pluto volume could be different
     !Note that a very low density, due to high volume for instance, might create some
@@ -645,7 +645,7 @@ contains
        	density_factor, "in", n_force_empty, "cells surrounding the model, ie", &
        	(1.0*n_force_empty)/n_cells * 100, "% of cells"
     endif
-    
+
     !Temperature
    CALL TTauri_Temperature(2.2d0, 3d0, 1d-7)
 
@@ -653,7 +653,7 @@ contains
    !After nHtot (m^-3) and T are known
    !allocate lcompute_atomRT
    CALL define_atomRT_domain(itiny_nH=1d3)
-  
+
    write(*,*) "Maximum/minimum velocities in the model (km/s):"
    write(*,*) Vcharb/1d3, Vchar/1d3
    write(*,*) "Typical velocity in the model (km/s):"
@@ -662,11 +662,11 @@ contains
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)!==.true.)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0)!==.true.) 
- 
+   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0)!==.true.)
+
   RETURN
 
-  END SUBROUTINE pluto_to_Voronoi 
+  END SUBROUTINE pluto_to_Voronoi
   !*********************************************************
 
   subroutine compute_stellar_parameters()
@@ -797,21 +797,13 @@ contains
     real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
 
     integer, parameter :: nb_proc = 1
-! <<<<<<< HEAD
-!     integer :: i, id, istar, n_stars=1
-! =======
     integer :: i, id, istar
-! >>>>>>> 7787440361dbfc7e8819a9f8120bad695c70c893
 
     real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
 
     particle_loop : do i=1, n_points
        ! We do not touch the sink particles
-! <<<<<<< HEAD
-       do istar=1, n_stars
-! =======
-!        do istar=1, n_etoiles
-! >>>>>>> 7787440361dbfc7e8819a9f8120bad695c70c893
+       do istar=1, n_etoiles
           if (i == etoile(istar)%icell) cycle particle_loop
        enddo
 
