@@ -14,7 +14,6 @@ MODULE collision
  use math, only : E1, E2, bezier3_interp, SQ, CUBE, dPOW, interp1D
  use constant
  use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol, atomZnumber
- use readatom,only : path_to_atoms
  use atmos_type, only : atmos, Hydrogen, Helium
  use getline
  use mcfost_env
