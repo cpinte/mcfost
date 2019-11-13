@@ -39,15 +39,22 @@ MODULE atom_type
    character(len=20) :: trtype="ATOMIC_LINE", Coupling="LS"
    ! i, j start at 1 (not 0 like in C)
    integer :: i, j, Nlambda, Nblue=0, Nxrd=0, Nred = 0, Nmid=0
-   real(kind=dp) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc, gij
+   real(kind=dp) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
+   real(kind=dp) :: twohnu3_c2, gij
    real(kind=dp) :: qcore, qwing, glande_i, glande_j
    real(kind=dp), dimension(4) :: cvdWaals
    !Nlambda,Nproc
-   !for one direction and one cell
-   real(kind=dp), allocatable, dimension(:,:,:)  :: phi!, phi_Q, phi_U, phi_V, psi_Q, psi_U, psi_V
-   !wlam is the integration wavelenght weigh = phi
-   real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, wphi
-   real(kind=dp) :: Qelast, adamp, Rij, Rji ! at a cell
+   !for one cell
+   real(kind=dp), allocatable, dimension(:,:)  :: phi, phi_loc !in a specific direction
+   !used for wavelength integration
+   real(kind=dp), allocatable, dimension(:,:,:) :: phi_ray !for one cell Nlambda, Nray, Nproc
+   real(kind=dp), allocatable, dimension(:,:,:) :: phiZ, psi !3, Nlambda, Nray
+   !wlam is the integration wavelenght weight = phi
+   real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam
+   real(kind=dp) :: wphi
+   real(kind=dp) :: Qelast, Rij, Rji, adamp ! at a cell
+   !keep CLIGHT * (nu0 - nu)/nu0 for lines
+   real(kind=dp), dimension(:), allocatable :: u, a !damping for all cells, 
    real(kind=dp), allocatable, dimension(:,:) :: rho_pfr
    !!Nlevel, wavelength and proc
    !!Stores the information for that atom only, necessary to  construct the Gamma matrix
@@ -65,12 +72,14 @@ MODULE atom_type
    logical :: hydrogenic!!, lcontrib_to_opac
    integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
    real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin !continuum maximum frequency > frequency photoionisation
-   real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, CoolRates_ij, wmu
+   real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2, CoolRates_ij, w_lam
+   real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file
+   real(kind=dp) :: wmu
    real(kind=dp) :: Rji, Rij
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
    !!Nlambda, Ndep
-   !!real(kind=dp), allocatable, dimension(:,:)  :: U, V, gij
+   real(kind=dp), allocatable, dimension(:,:)  :: gij
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 
@@ -91,12 +100,14 @@ MODULE atom_type
    integer, allocatable, dimension(:)  :: stage, Lorbit
    integer(8)            :: offset_coll, colunit
    real(kind=dp)                :: Abund, weight
-   real(kind=dp), allocatable, dimension(:) :: g, E!, vbroad, ntotal
+   real(kind=dp), allocatable, dimension(:) :: g, E, vbroad!, ntotal
    real(kind=dp), allocatable, dimension(:) :: qS, qJ
    ! allocated in readatom.f90, freed with freeAtoms()
+   
+   !futur deprecation, because I will stop using RH routine
    character(len=MAX_LENGTH), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
-   !!real(kind=dp), dimension(:,:), allocatable :: Ckij !Nlevel*Nlevel
-   real(kind=dp), dimension(:,:,:), allocatable :: Gamma 
+   !Nlevel * Nlevel * Nproc
+   real(kind=dp), dimension(:,:,:), allocatable :: Gamma, C
    real(kind=dp), dimension(:,:), pointer :: n, nstar
    ! arrays of lines, continua containing different line, continuum each
    type (AtomicLine), allocatable, dimension(:)         :: lines
@@ -104,7 +115,7 @@ MODULE atom_type
    type (AtomicTransition), allocatable, dimension(:)   :: at !Atomic transition, lines first in readatom
    !one emissivity per atom, used in the construction of the gamma matrix
    !where I have to distinguish between atom own opac and overlapping transitions
-   real(kind=dp), allocatable, dimension(:,:,:) :: eta !Nwaves, Nrays, Nproc
+   real(kind=dp), allocatable, dimension(:,:,:) :: eta !Nwaves, Nproc
 !	_down = from j (upper) to l (lower); _up from i (lower) to lp (upper)
    real(kind=dp), allocatable, dimension(:,:,:,:) :: Uji_down, chi_up, chi_down
    type (Ng) :: Ngs

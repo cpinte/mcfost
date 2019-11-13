@@ -57,6 +57,7 @@ module parametres
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
 
   ! Atomic line radiative transfer
+  !!lstore_opac futur deprecation
   logical :: lemission_atom, lstore_opac, lsolve_for_ne, lcoherent_scattering, lvacuum_to_air, lstatic, &
        lcontrib_function, lmagnetoaccr, lxcoupling, lforce_lte, lwind_rotation
   !Ng's acceleration

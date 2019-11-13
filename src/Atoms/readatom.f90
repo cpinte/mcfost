@@ -36,7 +36,7 @@ MODULE readatom
    ! are allocated as 1 dim (flattened) arrays
    !!!
     integer, intent(in) :: atomunit
-    integer :: kr, k, la, ftell !ftell here for ifort ??
+    integer :: kr, k, la, alloc_status, ftell !ftell here for ifort ??
     type (AtomType), intent(inout), target :: atom
     character(len=*), intent(in) :: atom_file
     character(len=MAX_LENGTH) :: inputline, FormatLine
@@ -107,6 +107,7 @@ MODULE readatom
     allocate(parse_label(atom%Nlevel))
     allocate(atom%nstar(atom%Nlevel,atmos%Nspace))
     
+    
     atom%Ntr = atom%Nline + atom%Ncont
     allocate(atom%at(atom%Ntr))
 
@@ -147,12 +148,12 @@ MODULE readatom
 
     !deprecation, they are now computed cell by cell for saving memory
     !allocate(atom%ntotal(atmos%Nspace))
-    !allocate(atom%vbroad(atmos%Nspace))
+    allocate(atom%vbroad(atmos%Nspace))
     !write(*,*)
     VDoppler = KBOLTZMANN/(AMU * atom%weight) * 8d0/PI !* 2d0!m/s
     !        = vtherm/atom%weight
 
-    !atom%vbroad = dsqrt(vtherm/atom%weight * atmos%T + atmos%vturb**2) !vturb in m/s
+    atom%vbroad = dsqrt(vtherm/atom%weight * atmos%T)! + atmos%vturb**2) !vturb in m/s
     !atom%ntotal = atom%Abund * atmos%nHtot
 
     VDoppler = dsqrt(Vdoppler*maxval(atmos%T))! + maxval(atmos%vturb)**2)
@@ -309,6 +310,10 @@ MODULE readatom
       atom%lines(kr)%Bij = (atom%g(j) / atom%g(i)) * atom%lines(kr)%Bji
       atom%lines(kr)%lambda0 = lambdaji / NM_TO_M
       
+      
+      atom%lines(kr)%gij = atom%lines(kr)%Bji / atom%lines(kr)%Bij !gi/gj
+      atom%lines(kr)%twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji
+      
  
       write(*,*) " ->", " Aji (1e7 s^-1) = ", atom%lines(kr)%Aji/1d7,&
         "Grad (1e7 s^-1) = ", atom%lines(kr)%Grad/1d7, &
@@ -368,6 +373,9 @@ MODULE readatom
         !atom%lines(kr)%c_shift(1) = 0.0
         !atom%lines(kr)%c_fraction(1) = 1.
      end if
+     
+ !!force Gaussian for test
+     !atom%lines(kr)%Voigt = .false.
 
      !Now parse Broedening recipe
      if (trim(vdWChar).eq."PARAMTR") then
@@ -471,8 +479,8 @@ MODULE readatom
 
      if (trim(nuDepChar).eq."EXPLICIT") then
       ! Nlambda set in atomic file
-      allocate(atom%continua(kr)%alpha(atom%continua(kr)%Nlambda))
-      !->alpha allocated latter in case of Hydrogenic continua
+      allocate(atom%continua(kr)%alpha_file(atom%continua(kr)%Nlambda))
+      allocate(atom%continua(kr)%lambda_file(atom%continua(kr)%Nlambda))
       allocate(atom%continua(kr)%lambda(atom%continua(kr)%Nlambda))
       atom%continua(kr)%hydrogenic=.false.
       ! rearanging them in increasing order
@@ -481,15 +489,16 @@ MODULE readatom
       do la=atom%continua(kr)%Nlambda,1,-1
        CALL getnextline(atomunit, COMMENT_CHAR, &
              FormatLine, inputline, Nread)
-       read(inputline,*) atom%continua(kr)%lambda(la), &
-          atom%continua(kr)%alpha(la)
+       read(inputline,*) atom%continua(kr)%lambda_file(la), &
+          atom%continua(kr)%alpha_file(la)
        ! though they are printed in decreasing order
        !write(*,*) "l = ",atom%continua(kr)%lambda(la), &
        !    " a = ", atom%continua(kr)%alpha(la)
       end do
+      atom%continua(kr)%lambda(:) = atom%continua(kr)%lambda_file(:)
       do la=2,atom%continua(kr)%Nlambda
-        if (atom%continua(kr)%lambda(la).lt.&
-           atom%continua(kr)%lambda(la-1)) then
+        if (atom%continua(kr)%lambda_file(la).lt.&
+           atom%continua(kr)%lambda_file(la-1)) then
           write(*,*) "continuum wavelength not monotonous"
           write(*,*) "exiting..."
           stop
@@ -706,7 +715,7 @@ MODULE readatom
 
   ! Alias to the most importent one
   Hydrogen=>atmos%Atoms(1)%ptr_atom
-  if (.not.associated(Hydrogen, atmos%Atoms(1)%ptr_atom)) CALL Warning(" Hydrogen alias not associated to atomic model!")
+  if (.not.associated(Hydrogen, atmos%Atoms(1)%ptr_atom)) CALL Error(" Hydrogen alias not associated to atomic model!")
 
   ! Aliases to active atoms
   nact = 0; npass = 0
@@ -716,7 +725,7 @@ MODULE readatom
   if (atmos%Natom - atmos%Nactiveatoms == atmos%Npassiveatoms) then
    allocate(atmos%PassiveAtoms(atmos%Npassiveatoms))
   else
-   write(*,*) "Error, number of passive atoms is not N-Nactive"
+   write(*,*) "Error, number of passive atoms is not N Nactive"
    stop
   end if
 

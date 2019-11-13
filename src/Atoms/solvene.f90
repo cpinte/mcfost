@@ -26,7 +26,7 @@ MODULE solvene
  use lte
  !use accelerate, only : initNg, freeNg, NgAcceleration
  use messages, only : Error, Warning
- use input
+ use input, only : nb_proc
  use mcfost_env, only : dp
  use constantes, only : tiny_dp, huge_dp
  !$ use omp_lib

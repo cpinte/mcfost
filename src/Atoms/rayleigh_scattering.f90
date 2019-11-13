@@ -34,7 +34,7 @@ MODULE rayleigh_scattering
   end where
 
   if (lstore_opac) then
-   NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + &
+   NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
    									 scatt * sigma_e * Hydrogen%n(1,icell)!atmos%nHtot(icell) !m^-1
   else
    NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
@@ -68,7 +68,7 @@ MODULE rayleigh_scattering
   end where
 
   if (lstore_opac) then
-   NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + &
+   NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
    									 scatt * sigma_e * Helium%n(1,icell) !m^-1
   else
    NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
@@ -78,6 +78,8 @@ MODULE rayleigh_scattering
  RETURN
  END SUBROUTINE HeI_Rayleigh
  
+ !Not working properly if we remove some lines
+ !because some would have indexes of -99 meaning they are removed
  SUBROUTINE Rayleigh(id, icell, atom)
  ! ------------------------------------------------------------- !
   ! Rayleigh scattering by transitions from the ground state of
@@ -159,7 +161,7 @@ MODULE rayleigh_scattering
   if ((MAXVAL(scatt) > 0))  res = .true.
   
   if (res .and. lstore_opac) then
-     NLTEspec%AtomOpac%Kc(icell,:,1) = NLTEspec%AtomOpac%Kc(icell,:,1) + scatt
+     NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + scatt
   else if (res .and. .not.lstore_opac) then
      NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + scatt
   end if

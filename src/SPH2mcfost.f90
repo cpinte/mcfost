@@ -797,21 +797,15 @@ contains
     real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
 
     integer, parameter :: nb_proc = 1
-! <<<<<<< HEAD
-!     integer :: i, id, istar, n_stars=1
-! =======
-    integer :: i, id, istar
-! >>>>>>> 7787440361dbfc7e8819a9f8120bad695c70c893
+    integer :: i, id, istar, n_stars=1
 
     real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
 
     particle_loop : do i=1, n_points
        ! We do not touch the sink particles
-! <<<<<<< HEAD
-       do istar=1, n_stars
-! =======
-!        do istar=1, n_etoiles
-! >>>>>>> 7787440361dbfc7e8819a9f8120bad695c70c893
+
+
+       do istar=1, n_etoiles
           if (i == etoile(istar)%icell) cycle particle_loop
        enddo
 

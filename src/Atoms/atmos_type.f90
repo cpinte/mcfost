@@ -178,7 +178,8 @@ MODULE atmos_type
       if (allocated(line%CoolRates_ij)) deallocate(line%CoolRates_ij)
 !       if (allocated(line%Rij)) deallocate(line%Rij)
 !       if (allocated(line%Rji)) deallocate(line%Rji)
-      if (allocated(line%wphi)) deallocate(line%wphi) !over frequencies and angles and proc
+	  if (allocated(line%u)) deallocate(line%u)
+      if (allocated(line%w_lam)) deallocate(line%w_lam) !over frequencies and angles and proc
       !if (allocated(line%Qelast)) deallocate(line%Qelast)
       !if (allocated(line%c_shift)) deallocate(line%c_shift)
       !if (allocated(line%c_fraction)) deallocate(line%c_fraction)
@@ -202,8 +203,9 @@ MODULE atmos_type
       if (allocated(cont%lambda)) deallocate(cont%lambda)
       if (allocated(cont%alpha)) deallocate(cont%alpha)
       if (allocated(cont%CoolRates_ij)) deallocate(cont%CoolRates_ij)
-      if (allocated(cont%wmu)) deallocate(cont%wmu)
-      !if (allocated(cont%gij)) deallocate(cont%gij)
+      if (allocated(cont%w_lam)) deallocate(cont%w_lam)
+      if (allocated(cont%gij)) deallocate(cont%gij)
+      if (allocated(cont%twohnu3_c2)) deallocate(cont%twohnu3_c2)
       !if (allocated(cont%Vij)) deallocate(cont%Vij)
 !       if (allocated(cont%chi_up)) deallocate(cont%chi_up)
        !if (allocated(cont%chi)) deallocate(cont%chi)

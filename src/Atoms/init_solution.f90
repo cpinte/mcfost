@@ -1,25 +1,110 @@
 MODULE init_solution
 
- use statequil_atoms, only : FillGamma_atom_zero_radiation, initGamma_atom, SEE_atom, &
- 						     FillGamma_atom_mali, FillGamma_Atom, FillGamma_atom_hogerheijde, &
+ use statequil_atoms, only : FillGamma_atom_zero_radiation, collision_matrix_atom, initGamma_atom, SEE_atom, &
  						     FillGamma_atom_mu, FillGamma_atom_mali_mu, FillGamma_atom_hogerheijde_mu
  use atmos_type, only : atmos
- use atom_type, only : AtomType
- use spectrum_type, only : alloc_phi_lambda, NLTEspec, dealloc_phi_lambda, alloc_weights, dealloc_weights
+ use atom_type, only : AtomType, AtomicLine, AtomicContinuum
+ use spectrum_type, only : NLTEspec, alloc_weights, dealloc_weights
  use mcfost_env, only : dp
  use collision, only : openCollisionFile, closeCollisionFile, keep_collision_lines
  use accelerate
  use messages
  use parametres
  use math
+ use opacity, only : chi_loc!, ds
+ use constant, only : CLIGHT
+ use input, only : ds
  
  IMPLICIT NONE
  
  real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, pop_old
  real(kind=dp), dimension(:), allocatable :: flatpops
  
+ 
   
  CONTAINS
+ 
+  
+ !the factor 0.5 is here because dw is computed as w(k+1) - w(k-1) / 2.
+ !and int(f) = sum(dw_k*f_k)
+ FUNCTION line_wlam(line) result(wlam)
+ ! --------------------------------------------------------- !
+  ! gives dv/c = dlambda/lambda = dnu/nu
+  ! times c: dv.
+  ! the integral of the radiative rates is
+  ! integ (domega) * integ(dv/ch)
+  !
+  ! Vij = hnu/4pi * Bij * phi if integral is over dnu/hnu
+  ! and Vij = hc/4pi * Bij * phi if integral is over (dv/hc).
+  !
+  ! phi in s in the former case, and phi in s/m in the later.
+ ! --------------------------------------------------------- !
+  type(AtomicLine), intent(in) :: line
+  real(kind=dp), dimension(line%Nlambda) :: wlam
+  integer :: la, Nblue, Nred, la_start, la_end, la0
+  real :: factor = 0.5
+  real(kind=dp) :: norm !beware this is not the result of the integral 
+  						   ! just a factor to convert dv/c from dlambda/lambda
+   !la0: index of wavelengths on the frequency grid (size Nwaves). 
+   !la:  index of wavelengths on the lambda grid of the line (size Nlambda).
+   !la0 = Nblue - 1 + la; line expands from Nblue to Nred on the frequency grid.
+   !la=1 <=> la0=Nblue; la=Nlambda <=> la0 = Nred = Nblue - 1 + Nlambda
+   !dlambda = (lambda(la0 + 1) - lambda(la0 - 1)) * 0.5 <=> mean value.
+
+                   !should be line%lambda instead of lambda0 ??
+  norm = CLIGHT / line%lambda0 !because we want dv
+  Nblue = line%Nblue; Nred = line%Nred
+  la_start = 1; la_end = line%Nlambda
+
+  wlam(1) = factor * (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) * norm
+  
+  wlam(line%Nlambda) = factor * (NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) * norm
+  !write(*,*) 1, wlam(1)
+  do la=2,line%Nlambda-1
+
+   la0 = Nblue - 1 + la
+   wlam(la) = factor*(NLTEspec%lambda(la0 + 1)-NLTEspec%lambda(la0 - 1)) * norm
+   !write(*,*) la, wlam(la)
+  end do
+  !write(*,*) line%Nlambda, wlam(line%Nlambda)
+
+ RETURN
+ END FUNCTION line_wlam
+ 
+ FUNCTION cont_wlam(cont) result(wlam)
+ ! --------------------------------------------------------- !
+  ! computes dlam/lam for a continnum 
+  ! dnu/nu = dlam/lam
+  ! the integral of the radiative rates is
+  ! integ (domega) * integ(dlam/hlam)
+  ! a 1/h is missing
+ ! --------------------------------------------------------- !
+  type(AtomicContinuum), intent(in) :: cont
+  real(kind=dp), dimension(cont%Nlambda) :: wlam
+  integer :: la, Nblue, Nred, la_start, la_end , la0
+  real :: factor = 0.5
+
+  !Nblue = cont%Nblue; Nred = cont%Nred
+  Nblue = 1; Nred = NLTEspec%Nwaves !---> Because ATM cont are kept on the whole grid
+  la_start = 1; la_end = cont%Nlambda
+
+  wlam(1) = factor * &
+  	(NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue)) / NLTEspec%lambda(Nblue)
+  	
+  wlam(cont%Nlambda) = factor * & 
+  	(NLTEspec%lambda(Nred)-NLTEspec%lambda(Nred-1)) / NLTEspec%lambda(Nred)
+  	
+  do la=2,cont%Nlambda-1
+  
+   la0 = Nblue - 1 + la
+   wlam(la) = factor * &
+   	(NLTEspec%lambda(la0+1)-NLTEspec%lambda(la0-1)) / NLTEspec%lambda(la0)
+   	
+  end do
+
+ RETURN
+ END FUNCTION cont_wlam
+ 
  
  SUBROUTINE Init_NLTE(sub_iterations_enabled)
  ! ---------------------------------------------------- !
@@ -28,11 +113,27 @@ MODULE init_solution
  ! ---------------------------------------------------- !
   type (AtomType), pointer :: atom
   logical, intent(in), optional :: sub_iterations_enabled
-  integer :: nact, Nmaxlevel, icell
+  integer :: nact, Nmaxlevel, icell, kr
    
-   !alloc space for line profiles for each line: line%phi(line%Nlambda, Nrays, Nproc)
-   CALL alloc_phi_lambda()
-   CALL alloc_weights()
+  CALL alloc_weights() !and phi_ray
+  write(*,*) " Setting up wavelength integration weights for all transitions..."
+  do nact=1,atmos%Nactiveatoms
+   do kr=1, atmos%ActiveAtoms(nact)%ptr_atom%Nline
+   
+    atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%w_lam(:) = line_wlam(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr))
+ 
+   enddo
+   do kr=1, atmos%ActiveAtoms(nact)%ptr_atom%Ncont
+   
+    atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%w_lam(:) = cont_wlam(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr))
+
+   
+   enddo  
+  enddo
+  
+  allocate(chi_loc(NLTEspec%Nwaves, atmos%Nrays, NLTEspec%Nproc))
+  if (allocated(ds)) deallocate(ds)
+  allocate(ds(atmos%Nrays, NLTEspec%Nproc))
    
   if (lNg_acceleration) CALL Warning("Acceleration enabled", "Allocating space for Structure")
   ! if OLD_POPULATIONS, the init is done at the reading
@@ -42,6 +143,8 @@ MODULE init_solution
    do nact=1,atmos%Nactiveatoms
      atom => atmos%ActiveAtoms(nact)%ptr_atom
      allocate(atom%Gamma(atom%Nlevel,atom%Nlevel,NLTEspec%NPROC))
+     allocate(atom%C(atom%Nlevel,atom%Nlevel,NLTEspec%NPROC))     
+     
      !Now we can set it to .true. The new background pops or the new ne pops
      !will used the H%n
      !!Force it
@@ -57,7 +160,8 @@ MODULE init_solution
         do icell=1,atmos%Nspace
          if (atmos%icompute_atomRT(icell)>0) then
            !atom level version of initGamma and FillGamma and updatePopulations
-           CALL initGamma_atom(1, icell, atom)
+           CALL collision_matrix_atom(1,icell,atom)
+           CALL initGamma_atom(1, atom) !for this cell or id
            !no rays integration here
            !!CALL FillGamma_bf_zero_radiation(1, icell, atom, 1)
            !the next one is cell independent but we init Gamma at each cell
@@ -104,11 +208,11 @@ MODULE init_solution
 
   if (atmos%include_xcoupling) then
    write(*,*) "Using MALI"
-    FillGamma_atom => FillGamma_atom_mali
+    !FillGamma_atom => FillGamma_atom_mali
     FillGamma_atom_mu => FillGamma_atom_mali_mu
   else
    write(*,*) "Using Hogerheijde"
-    FillGamma_atom => FillGamma_atom_hogerheijde
+    !FillGamma_atom => FillGamma_atom_hogerheijde
     FillGamma_atom_mu => FillGamma_atom_hogerheijde_mu
   end if! 
 
@@ -129,8 +233,9 @@ MODULE init_solution
    !if (allocated(pop)) deallocate(pop)
    if (allocated(pop_old)) deallocate(pop_old)
   endif
-  CALL dealloc_phi_lambda() !do not deallocate if kept in profile
-  CALL dealloc_weights()
+  
+  CALL dealloc_weights() !and phi_ray
+  deallocate(chi_loc, ds)
   
   do nact=1,atmos%Nactiveatoms
    atom  => atmos%ActiveAtoms(nact)%ptr_atom

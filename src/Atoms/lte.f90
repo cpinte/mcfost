@@ -359,15 +359,16 @@ MODULE lte
    ! For each atom, fills LTE populations and
    ! fill collisional matrix if it is active.
   ! -------------------------------------------------------------- !
-  integer n, k, j
+  integer n, k
   logical :: debeye=.true.
-  real(kind=dp) :: PhiHmin
+    
 
   write(*,*) "Setting LTE populations..."
   do n=1,atmos%Natom
 
    ! fill lte populations for each atom, active or not
    CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
+   
 
   end do
   
@@ -377,7 +378,7 @@ MODULE lte
   !! otherwise it is FALSE, even at the begening of NLTE.
   if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar 
                                             !for background Hydrogen and Hminus                                            
-  CALL calc_nHmin()
+  !CALL calc_nHmin()
   
  RETURN
  END SUBROUTINE setLTEcoefficients

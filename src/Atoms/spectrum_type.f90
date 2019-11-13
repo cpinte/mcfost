@@ -1,14 +1,13 @@
 MODULE spectrum_type
 
-  use atom_type
+  use atom_type, only : AtomicLine, AtomicContinuum, AtomType
   use atmos_type, only : GridType, atmos
   use getlambda, only  : make_wavelength_grid, adjust_wavelength_grid, Read_wavelengths_table!,&
-  ! 						Nred_array, Nmid_array, Nblue_array
-  
+  ! 						Nred_array, Nmid_array, Nblue_array  
   !MCFOST's original modules
   use fits_utils, only : print_error
   use parametres
-  use input
+  use input!, only : nb_proc
   use mcfost_env, only : dp
   !use hdf5
 
@@ -54,6 +53,7 @@ MODULE spectrum_type
    real(kind=dp), allocatable, dimension(:) :: lambda
    !nlambda, nrays, nproc
    real(kind=dp), allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
+   real(kind=dp), allocatable, dimension(:,:) :: Istar
    !nlambda, nproc
    real(kind=dp), allocatable, dimension(:,:) :: J, Jc, J20
    !Nlambda, xpix, ypix, Nincl, Naz
@@ -215,11 +215,27 @@ MODULE spectrum_type
   
   SUBROUTINE reallocate_rays_arrays(newNray)
    integer, intent(in) :: newNray
+   integer :: kr, nat, alloc_status
   
    NLTEspec%atmos%Nrays = newNray
    
    if ((NLTEspec%atmos%Nrays) /= newNray .or. (newNray /=1 )) &
    	 CALL Warning("  Beware, check the number of rays for the ray-traced map!")
+   	 
+   !reallocate phi_ray for NLTEloop only
+   
+!--> do not reallocate because it is used only during NLTEloop.
+!    if we are here it means we are doing an image
+
+!    do nat=1,atmos%Natom
+!     do kr=1,atmos%Atoms(nat)%ptr_atom%Nline
+!      deallocate(atmos%Atoms(nat)%ptr_atom%lines(kr)%phi_ray)
+!      !only one ray and one proc need for images or LTE spectrum
+!      allocate(atmos%Atoms(nat)%ptr_atom%lines(kr)%phi_ray(&
+!      atmos%Atoms(nat)%ptr_atom%lines(kr)%Nlambda, newNray, NLTEspec%NPROC),stat=alloc_status)
+!      if (alloc_status > 0) CALL ERROR("Allocation error line%phi_ray(:,newNray,id)")
+!     enddo
+!    enddo
    
    deallocate(NLTEspec%I, NLTEspec%Ic)
    !except polarization which are (de)allocated in adjustStokesMode
@@ -240,7 +256,7 @@ MODULE spectrum_type
 
   SUBROUTINE allocSpectrum(alloc_atom_nlte)
    !Polarized quantities allocated in adjustStokesMode
-   integer :: nat, k, Nlambda_max, alloc_status
+   integer :: nat, k, Nlambda_max, alloc_status, istar
    type (AtomicContinuum) :: cont
    type (AtomicLine) 	  :: line
    logical, intent(in)    :: alloc_atom_nlte
@@ -250,11 +266,8 @@ MODULE spectrum_type
     stop
    end if
    
-   !stellar radiation; without LD
-   !not included yet. Should be the stellar spectrum or
-   !should be a BB at a ref T, so that we only need to multiply
-   !by a correction depending on the real T of the star i_star
-   !if (allocated(NLTEspec%Istar)) allocate(NLTEspec%Istar(NLTEspec%NWAVES))
+
+   allocate(NLTEspec%Istar(NLTEspec%NWAVES,n_etoiles)); NLTEspec%Istar(:,:) = 0d0
    
    allocate(NLTEspec%I(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC))
    allocate(NLTEspec%Ic(NLTEspec%NWAVES, NLTEspec%atmos%NRAYS,NLTEspec%NPROC))
@@ -265,8 +278,8 @@ MODULE spectrum_type
    !Now opacities
    if (lstore_opac) then !keep continuum LTE opacities in memory
      !sca_c = Kc(:,:,2), chi_c = Kc(:,:,1), eta_c = jc
-     allocate(NLTEspec%AtomOpac%Kc(NLTEspec%atmos%Nspace,NLTEspec%Nwaves,2), &
-       NLTEspec%AtomOpac%jc(NLTEspec%atmos%Nspace,NLTEspec%Nwaves))
+     allocate(NLTEspec%AtomOpac%Kc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace,2), &
+       NLTEspec%AtomOpac%jc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))
      NLTEspec%AtomOpac%Kc = 0d0
      NLTEspec%AtomOpac%jc = 0d0
    else
@@ -346,6 +359,13 @@ MODULE spectrum_type
     NLTEspec%Fluxc = 0.0
     
    !Contribution function
+   
+   if (lcontrib_function) then
+    write(*,*) " CF not working ATM ... "
+    lcontrib_function = .false.
+    RETURN
+   endif
+   
    if (lcontrib_function .and. ltab_wavelength_image) then !the tab is here to prevent allocating a large array
 		!hence ksi should be computed for small waves intervals.
 	 !because otherwise, it is allocated with the alloc spectrum before initSpectrumImage()
@@ -373,7 +393,7 @@ MODULE spectrum_type
   SUBROUTINE freeSpectrum() 
   
    deallocate(NLTEspec%lambda)
-   deallocate(NLTEspec%Ic, NLTEspec%I)
+   deallocate(NLTEspec%Ic, NLTEspec%I, NLTEspec%Istar)
     if (allocated(NLTEspec%Flux)) deallocate(NLTEspec%Flux, NLTEspec%Fluxc)
 
    if (NLTEspec%atmos%Magnetized) then 
@@ -418,40 +438,82 @@ MODULE spectrum_type
     integer, intent(in) :: id
     !logical, intent(in) :: eval_operator !: evaluate operator psi
     
-    if (id <= 0) then
-     write(*,*) "(initAtomOpac) thread id has to be >= 1!"
-     stop
-    end if
-    
-    NLTEspec%AtomOpac%chi(:,id) = 0d0
-    NLTEspec%AtomOpac%eta(:,id) = 0d0
-    NLTEspec%AtomOpac%chic_nlte(:,id) = 0d0 !ray indep
-    NLTEspec%AtomOpac%etac_nlte(:,id) = 0d0
-    if (.not.lstore_opac) then
+    !need to be sure that id is > 0
+!     if (id <= 0) then
+!      write(*,*) "(initAtomOpac) thread id has to be >= 1!"
+!      stop
+!     end if
+
+    !Should consider to allocate only if Nact now if I test
+!     if (NLTEspec%Nact > 0) then !otherwise always 0
+!      NLTEspec%AtomOpac%chi(:,id) = 0d0
+!      NLTEspec%AtomOpac%eta(:,id) = 0d0
+!      NLTEspec%AtomOpac%chic_nlte(:,id) = 0d0 !ray indep
+!      NLTEspec%AtomOpac%etac_nlte(:,id) = 0d0
+!     endif
+    if (.not.lstore_opac) then !future remove
       NLTEspec%AtomOpac%chi_c(:,id) = 0d0
       NLTEspec%AtomOpac%eta_c(:,id) = 0d0
       NLTEspec%AtomOpac%sca_c(:,id) = 0d0
     end if !else thay are not allocated
     NLTEspec%AtomOpac%chi_p(:,id) = 0d0
     NLTEspec%AtomOpac%eta_p(:,id) = 0d0
+
+    
+  RETURN
+  END SUBROUTINE initAtomOpac
+  
+  SUBROUTINE initAtomOpac_nlte(id)!, eval_operator)
+    ! set opacities to 0d0 for thread id
+    integer, intent(in) :: id
+    !logical, intent(in) :: eval_operator !: evaluate operator psi
+    
+    !need to be sure that id is > 0
+!     if (id <= 0) then
+!      write(*,*) "(initAtomOpac) thread id has to be >= 1!"
+!      stop
+!     end if
+
+    NLTEspec%AtomOpac%chi(:,id) = 0d0
+    NLTEspec%AtomOpac%eta(:,id) = 0d0
+    NLTEspec%AtomOpac%chic_nlte(:,id) = 0d0 !ray indep
+    NLTEspec%AtomOpac%etac_nlte(:,id) = 0d0
+
+
+    
+  RETURN
+  END SUBROUTINE initAtomOpac_nlte
+  
+  SUBROUTINE initAtomOpac_zeeman(id)!, eval_operator)
+    ! set opacities to 0d0 for thread id
+    integer, intent(in) :: id
+    !logical, intent(in) :: eval_operator !: evaluate operator psi
+    
+    !need to be sure that id is > 0
+!     if (id <= 0) then
+!      write(*,*) "(initAtomOpac) thread id has to be >= 1!"
+!      stop
+!     end if
+
+
     
     !Currently LTE or NLTE Zeeman opac are not stored on memory. They change with 
     !direction. BUT the star is assumed to not emit polarised photons (from ZeemanEffect)
     !So we do not take into account this opac in Metal_lambda and futur NLTEOpacity_lambda
-    if (NLTEspec%atmos%magnetized .and. PRT_SOLUTION == "FULL_STOKES") then
+    !if (NLTEspec%atmos%magnetized .and. PRT_SOLUTION == "FULL_STOKES") then
     !check allocation because even if magnetized, due to the FIELD_FREE solution or WF
     !they might be not allocated !if (allocated(NLTEspec%AtomOpac%rho_p)) 
-     NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
-     NLTEspec%AtomOpac%etaQUV_p(:,:,id) = 0d0
-     NLTEspec%AtomOpac%chiQUV_p(:,:,id) = 0d0
+    NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
+    NLTEspec%AtomOpac%etaQUV_p(:,:,id) = 0d0
+    NLTEspec%AtomOpac%chiQUV_p(:,:,id) = 0d0
      !both NLTE and LTE actually.
      !If one want to add them in SEE, it has to be atom (atom%eta) dependent for emissivity.
      !adding the off diagonal elements in SEE results in solving for the whole
      !density matrix, WEEEEEEELLLLL beyond our purpose.
-    end if
+    !end if
     
   RETURN
-  END SUBROUTINE initAtomOpac
+  END SUBROUTINE initAtomOpac_zeeman
   
   SUBROUTINE alloc_J_coherent()
   
@@ -497,24 +559,7 @@ MODULE spectrum_type
   
   RETURN
   END SUBROUTINE init_psi_operator
-  
-  SUBROUTINE alloc_phi_lambda()
-  ! --------------------------------------------------- !
-   ! line%phi(line%Nlambda, atmos%Nrays, Nb_proc)
-  ! --------------------------------------------------- !
-   use atmos_type, only : atmos
-   integer :: kr, nact
-   
-   do nact=1,atmos%Nactiveatoms
-    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-       !!if I keep phi, I should condiser using it everywhere in Profile() !! ??
-       allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%&
-       		phi(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%Nlambda,atmos%Nrays,NLTEspec%Nproc))
-    end do
-   end do
- 
-  RETURN
-  END SUBROUTINE alloc_phi_lambda
+
   
   SUBROUTINE alloc_weights()
   ! --------------------------------------------------- !
@@ -522,13 +567,21 @@ MODULE spectrum_type
   ! --------------------------------------------------- !
    use atmos_type, only : atmos
    integer :: kr, nact
+   type(AtomicLine) :: line
+   type(AtomicContinuum) :: cont
    
    do nact=1,atmos%Nactiveatoms
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-       allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wphi(NLTEspec%Nproc))
+       line = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)
+       !allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wphi(NLTEspec%Nproc))
+       allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%w_lam(line%Nlambda))
+       allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%phi_ray(line%Nlambda,NLTEspec%atmos%Nrays, NLTEspec%NPROC))
+
     end do
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
-       allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%wmu(NLTEspec%Nproc))
+       cont = atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)
+       allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%w_lam(cont%Nlambda))
+       !allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%wmu(NLTEspec%Nproc))
     end do
    end do
  
@@ -544,33 +597,17 @@ MODULE spectrum_type
    
    do nact=1,atmos%Nactiveatoms
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wphi)
+       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%w_lam)!wphi)
+       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%phi_ray)
     end do
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
-       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%wmu)
+       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%w_lam)!%wmu)
     end do
    end do
  
   RETURN
   END SUBROUTINE dealloc_weights
-  
-  SUBROUTINE dealloc_phi_lambda()
-  ! --------------------------------------------------- !
-   !
-  ! --------------------------------------------------- !
-   use atmos_type, only : atmos
-   integer :: kr, nact
-   
-   do nact=1,atmos%Nactiveatoms
-    do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-       		
-       !!if I keep phi, I should condiser using it everywhere in Profile() !! ??
-       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%phi)
-    end do
-   end do
- 
-  RETURN
-  END SUBROUTINE dealloc_phi_lambda
+
 
 
  SUBROUTINE WRITE_FLUX()
@@ -579,6 +616,7 @@ MODULE spectrum_type
   ! FLUX map:
   ! NLTEspec%Flux total and NLTEspec%Flux continuum
  ! --------------------------------------------------- !
+  use input
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(6) :: naxes
   integer :: group,fpixel,nelements, i, xcenter
@@ -758,6 +796,7 @@ MODULE spectrum_type
    ! Write for each transition of each atom the part of the grid
    ! associated to this transition.
   ! --------------------------------------------------------------- !
+  use input
    integer :: unit, EOF = 0, blocksize, naxes(1), naxis,group, bitpix, fpixel
    logical :: extend, simple
    character(len=6) :: comment="VACUUM"
@@ -840,6 +879,7 @@ MODULE spectrum_type
  ! -------------------------------------------------- !
   ! Write contribution function to disk.
  ! --------------------------------------------------- !
+ use input
   integer :: status,unit,blocksize,bitpix,naxis, naxis2
   integer, dimension(8) :: naxes, naxes2
   integer :: group,fpixel,nelements, nelements2
