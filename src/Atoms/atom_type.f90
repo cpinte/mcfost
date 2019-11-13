@@ -307,7 +307,8 @@ MODULE atom_type
   SUBROUTINE determinate(label, g, S, L,J, determined)
   ! get principal quantum number from label
    logical, intent(out) :: determined
-   integer, intent(out) :: L, J
+   integer, intent(out) :: L!, J
+   real(kind=dp) :: J
    real(kind=dp), intent(out) :: S
    real(kind=dp), intent(in) :: g
    character(len=ATOM_LABEL_WIDTH), intent(in) :: label

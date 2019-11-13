@@ -4,14 +4,16 @@ MODULE zeeman
  use atmos_type, only : atmos
  use messages
  use parametres
+ 
+ use mcfost_env, only : dp
 
  IMPLICIT NONE
  CONTAINS
 
  FUNCTION Lande(S, L, J) result(g)
-  real(8) :: S
-  integer :: L, J
-  real(8) :: g
+  real(kind=dp) :: S
+  integer :: L!, J
+  real(kind=dp) :: g, J
 
   if (J .eq. 0.0) then
     g = 0.0
@@ -26,7 +28,7 @@ MODULE zeeman
    type (AtomType), intent(inout) :: atom
    integer :: kr
    integer :: i, j
-   real(8) g, gi, gj
+   real(kind=dp) g, gi, gj
 
    i = atom%lines(kr)%i
    j = atom%lines(kr)%j
@@ -52,8 +54,9 @@ MODULE zeeman
 
  FUNCTION ZeemanStrength(Ji, Mi, Jj, Mj)
   use math, only : w3js
-  double precision :: ZeemanStrength, dM
-  integer, intent(in) :: Ji, Jj, Mi, Mj
+  real(kind=dp) :: ZeemanStrength, dM
+!   integer, intent(in) :: Ji, Jj, Mi, Mj
+  real(kind=dp), intent(in) :: Ji, Jj, Mi, Mj
   integer :: q
 
   !q = -1 = sB, 0 spi, +1 sr
@@ -73,7 +76,8 @@ MODULE zeeman
 
  SUBROUTINE ZeemanMultiplet(line) !Called only once per line
   type(AtomicLine), intent(inout) :: line
-  integer :: nc, i1, i2, Mi, Mj
+  integer :: nc, i1, i2
+  real(kind=dp) :: Mi, Mj
   !, norm(3) !sum of -1, 0 and +1 components
   !not need, j-symbols normalised
 
