@@ -14,7 +14,7 @@ module optical_depth
 
   implicit none
 
-  procedure(dust_and_mol_optical_length_tot), pointer :: optical_length_tot => null()
+  !!procedure(dust_and_mol_optical_length_tot), pointer :: optical_length_tot => null()
 
   contains
 
@@ -234,7 +234,7 @@ end subroutine integ_tau
 
 !***********************************************************
 
-subroutine dust_and_mol_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
+subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
 ! Integration par calcul de la position de l'interface entre cellules
 ! de l'opacite totale dans une direction donnée
 ! Grille a geometrie cylindrique
@@ -304,111 +304,111 @@ subroutine dust_and_mol_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w
   write(*,*) "BUG"
   return
 
-end subroutine dust_and_mol_optical_length_tot
+end subroutine optical_length_tot
 
 !***********************************************************
 
 !--> dprecated
-subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
-  ! ------------------------------------------------------------------ !
-  ! special for atomic line RT.
-  ! ------------------------------------------------------------------ !
-
-  use metal, only                         : Background, BackgroundLines, BackgroundLines_lambda, Backgroundcontinua
-  use spectrum_type, only                 : NLTEspec, initAtomOpac
-  use opacity, only						  : NLTEOpacity!, NLTEOpacity_lambda
-
-  integer, intent(in)                    :: id, lambda, icell
-  real(kind=dp),dimension(4), intent(in) :: Stokes
-  real(kind=dp), intent(in)              :: u,v,w
-  real(kind=dp), intent(in)              :: xi,yi,zi
-  real, intent(out)                      :: tau_tot_out
-  real(kind=dp), intent(out)             :: lmin,lmax
-
-  real(kind=dp)                          :: x0, y0, z0, x1, y1, z1, l,   &
-                                            ltot, tau, opacite, tau_tot, &
-                                            correct_plus, correct_moins, &
-                                            l_contrib, l_void_before, kappa_c, &
-                                            tau_tot_cont
-
-  integer                                :: icell0, previous_cell, next_cell
-
-  correct_plus = 1.0_dp + prec_grille
-  correct_moins = 1.0_dp - prec_grille
-
-  x1=xi;y1=yi;z1=zi
-
-  tau_tot=0.0_dp
-  tau_tot_cont=0.0_dp
-
-  lmin=0.0_dp
-  ltot=0.0_dp
-
-  next_cell = icell
-  icell0 = 0 ! for previous_cell, just for Voronoi
-
-  ! Boucle infinie sur les cellules
-  do ! Boucle infinie
-     ! Indice de la cellule
-     previous_cell = icell0
-     icell0 = next_cell
-     x0=x1;y0=y1;z0=z1
-
-     ! Test sortie
-     if (test_exit_grid(icell0, x0, y0, z0)) then
-        tau_tot_out=tau_tot
-        lmax=ltot
-        NLTEspec%atmos%tau = tau_tot_cont
-        return
-     end if
-
-     ! Calcul longeur de vol et profondeur optique dans la cellule
-     call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, &
-          next_cell, l, l_contrib, l_void_before)
-
-     if (icell0<=n_cells) then
-        if (NLTEspec%Atmos%icompute_atomRT(icell0)>0) then
-           call initAtomOpac(id) !set opac to zero for this cell and thread.
-           if (lstore_opac) then !LTE continua are kept in memory
-                                             !Fast but memory expensive
-              !call NLTEOPACity_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
-              call NLTEOPACity(id, icell0, 1, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
-              call BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
-              opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
-                   NLTEspec%AtomOpac%chi_p(lambda,id) + &
-                   NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
-              kappa_c = NLTEspec%AtomOpac%Kc(icell0,lambda,1) * AU_to_m
-           else !on the fly calculations, slow but cheap in memory
-              call NLTEOPACity(id, icell0, 1, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
-              call Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
-              opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
-                   NLTEspec%AtomOpac%chi_p(lambda,id)) * AU_to_m
-              kappa_c = NLTEspec%AtomOpac%chi_c(lambda,id) * AU_to_m
-           end if
-        else
-           opacite = 0d0
-           kappa_c = 0d0
-        end if !lcompute_atomRT
-     else
-        opacite = 0d0 !cell is empty
-        kappa_c = 0d0
-     end if !
-
-     tau=l_contrib*opacite ! opacite constante dans la cellule
-     tau_tot_cont = tau_tot_cont + l_contrib*kappa_c
-
-     tau_tot = tau_tot + tau
-     ltot= ltot + l
-
-     if (tau_tot < tiny_real) lmin=ltot
-
-  end do ! boucle infinie
-
-  write(*,*) "BUG"
-
-  return
-
-end subroutine atom_optical_length_tot
+! subroutine atom_optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
+!   ! ------------------------------------------------------------------ !
+!   ! special for atomic line RT.
+!   ! ------------------------------------------------------------------ !
+! 
+!   use metal, only                         : Background, BackgroundLines, BackgroundLines_lambda, Backgroundcontinua
+!   use spectrum_type, only                 : NLTEspec, initAtomOpac
+!   use opacity, only						  : NLTEOpacity!, NLTEOpacity_lambda
+! 
+!   integer, intent(in)                    :: id, lambda, icell
+!   real(kind=dp),dimension(4), intent(in) :: Stokes
+!   real(kind=dp), intent(in)              :: u,v,w
+!   real(kind=dp), intent(in)              :: xi,yi,zi
+!   real, intent(out)                      :: tau_tot_out
+!   real(kind=dp), intent(out)             :: lmin,lmax
+! 
+!   real(kind=dp)                          :: x0, y0, z0, x1, y1, z1, l,   &
+!                                             ltot, tau, opacite, tau_tot, &
+!                                             correct_plus, correct_moins, &
+!                                             l_contrib, l_void_before, kappa_c, &
+!                                             tau_tot_cont
+! 
+!   integer                                :: icell0, previous_cell, next_cell
+! 
+!   correct_plus = 1.0_dp + prec_grille
+!   correct_moins = 1.0_dp - prec_grille
+! 
+!   x1=xi;y1=yi;z1=zi
+! 
+!   tau_tot=0.0_dp
+!   tau_tot_cont=0.0_dp
+! 
+!   lmin=0.0_dp
+!   ltot=0.0_dp
+! 
+!   next_cell = icell
+!   icell0 = 0 ! for previous_cell, just for Voronoi
+! 
+!   ! Boucle infinie sur les cellules
+!   do ! Boucle infinie
+!      ! Indice de la cellule
+!      previous_cell = icell0
+!      icell0 = next_cell
+!      x0=x1;y0=y1;z0=z1
+! 
+!      ! Test sortie
+!      if (test_exit_grid(icell0, x0, y0, z0)) then
+!         tau_tot_out=tau_tot
+!         lmax=ltot
+!         NLTEspec%atmos%tau = tau_tot_cont
+!         return
+!      end if
+! 
+!      ! Calcul longeur de vol et profondeur optique dans la cellule
+!      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, &
+!           next_cell, l, l_contrib, l_void_before)
+! 
+!      if (icell0<=n_cells) then
+!         if (NLTEspec%Atmos%icompute_atomRT(icell0)>0) then
+!            call initAtomOpac(id) !set opac to zero for this cell and thread.
+!            if (lstore_opac) then !LTE continua are kept in memory
+!                                              !Fast but memory expensive
+!               !call NLTEOPACity_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+!               call NLTEOPACity(id, icell0, 1, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
+!               call BackgroundLines_lambda(lambda, id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l)
+!               opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
+!                    NLTEspec%AtomOpac%chi_p(lambda,id) + &
+!                    NLTEspec%AtomOpac%Kc(icell0,lambda,1)) *  AU_to_m !m/AU * m^-1
+!               kappa_c = NLTEspec%AtomOpac%Kc(icell0,lambda,1) * AU_to_m
+!            else !on the fly calculations, slow but cheap in memory
+!               call NLTEOPACity(id, icell0, 1, x0, y0, z0, x1, y1, z1, u, v, w, l,.false.)
+!               call Background(id, icell0, x0, y0, z0, x1, y1, z1, u, v, w, l) !+line
+!               opacite = (NLTEspec%AtomOpac%chi(lambda,id) + &
+!                    NLTEspec%AtomOpac%chi_p(lambda,id)) * AU_to_m
+!               kappa_c = NLTEspec%AtomOpac%chi_c(lambda,id) * AU_to_m
+!            end if
+!         else
+!            opacite = 0d0
+!            kappa_c = 0d0
+!         end if !lcompute_atomRT
+!      else
+!         opacite = 0d0 !cell is empty
+!         kappa_c = 0d0
+!      end if !
+! 
+!      tau=l_contrib*opacite ! opacite constante dans la cellule
+!      tau_tot_cont = tau_tot_cont + l_contrib*kappa_c
+! 
+!      tau_tot = tau_tot + tau
+!      ltot= ltot + l
+! 
+!      if (tau_tot < tiny_real) lmin=ltot
+! 
+!   end do ! boucle infinie
+! 
+!   write(*,*) "BUG"
+! 
+!   return
+! 
+! end subroutine atom_optical_length_tot
 
 !***********************************************************
 

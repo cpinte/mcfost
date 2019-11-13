@@ -37,8 +37,8 @@ subroutine mol_line_transfer()
 
   if (lProDiMo2mcfost) ldust_mol = .true.
   
-  !Default case for molecules and dust
-  optical_length_tot => dust_and_mol_optical_length_tot
+!   Default case for molecules and dust
+!   optical_length_tot => dust_and_mol_optical_length_tot
 
   ! Liberation memoire
   call deallocate_em_th_mol()
