@@ -108,12 +108,7 @@ MODULE readatom
     allocate(determined(atom%Nlevel))
     allocate(parse_label(atom%Nlevel))
     allocate(atom%nstar(atom%Nlevel,atmos%Nspace))
-<<<<<<< HEAD
-    
-    
-=======
 
->>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
     atom%Ntr = atom%Nline + atom%Ncont
     allocate(atom%at(atom%Ntr))
 
@@ -315,17 +310,11 @@ MODULE readatom
                           *atom%lines(kr)%Aji
       atom%lines(kr)%Bij = (atom%g(j) / atom%g(i)) * atom%lines(kr)%Bji
       atom%lines(kr)%lambda0 = lambdaji / NM_TO_M
-<<<<<<< HEAD
       
       
       atom%lines(kr)%gij = atom%lines(kr)%Bji / atom%lines(kr)%Bij !gi/gj
       atom%lines(kr)%twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji
-      
- 
-=======
 
-
->>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
       write(*,*) " ->", " Aji (1e7 s^-1) = ", atom%lines(kr)%Aji/1d7,&
         "Grad (1e7 s^-1) = ", atom%lines(kr)%Grad/1d7, &
         "gj = ", atom%g(j)," gi = ",  atom%g(i)

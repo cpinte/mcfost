@@ -228,34 +228,6 @@ MODULE getlambda
   RETURN
   END SUBROUTINE write_wavelengths_table_NLTE_lines
 
-  !building
-  !Could be make logarithmic ?? If from the threshold,alpha_nu decreases in 1/nu**3
-  SUBROUTINE make_sub_wavelength_grid_cont_log(cont, lambdamin)
-  ! ----------------------------------------------------------------- !
-   ! Make an individual wavelength grid for the AtomicContinuum cont.
-   ! The resolution is constant in nm. Logarithmic sampling.
-   ! lambda must be lower that lambda0 and lambda(Nlambda)=lambda0.
-   ! Allocate cont%lambda.
-   ! cont%alpha (cross-section of photoionisation) is not used.
-  ! ----------------------------------------------------------------- !
-   type (AtomicContinuum), intent(inout) :: cont
-   real(kind=dp), intent(in) :: lambdamin
-   real(kind=dp) :: l0, l1
-
-   !write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
-
-   l1 = cont%lambda0 !cannot be larger than lambda0 ! minimum frequency for photoionisation
-   l0 = lambdamin
-   cont%Nlambda = Nlambda_cont
-   allocate(cont%lambda(cont%Nlambda))
-
-   cont%lambda = real(spanl(real(l0), real(l1), cont%Nlambda),kind=dp)
-
-   !does not allocate cross-section, here
-  RETURN
-  END SUBROUTINE make_sub_wavelength_grid_cont_log
-
->>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
   SUBROUTINE make_sub_wavelength_grid_cont(cont, lambdamin)
   ! ----------------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicContinuum cont.

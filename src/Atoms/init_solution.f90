@@ -105,12 +105,6 @@ MODULE init_solution
 
  RETURN
  END FUNCTION cont_wlam
- 
- 
-
-
-
- CONTAINS
 
  SUBROUTINE Init_NLTE(sub_iterations_enabled)
  ! ---------------------------------------------------- !
