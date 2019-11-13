@@ -136,7 +136,8 @@ MODULE barklem
    TYPE (BarklemType) :: bs
    logical, intent(out) :: res
    logical :: determined
-   real(8) :: Si, Sj, Jj, Ji
+   real(8) :: Si, Sj
+   integer :: Jj, Ji
    real(8) :: neff1, neff2, nefftmp
    real(8) :: findex1, findex2, reducemass, meanvelocity
    real(8) :: crossmean, E_Rydberg2, deltaEi, deltaEj

@@ -9,6 +9,7 @@ MODULE readatom
   use getline
   use barklem, only : getBarklem
   use writeatom, only : readPops, create_pops_file
+  use collision, only : read_collisions
 
   !$ use omp_lib
 
@@ -36,7 +37,8 @@ MODULE readatom
    ! are allocated as 1 dim (flattened) arrays
    !!!
     integer, intent(in) :: atomunit
-    integer :: kr, k, la, alloc_status, ftell !ftell here for ifort ??
+
+    integer :: kr, k, la, alloc_status
     type (AtomType), intent(inout), target :: atom
     character(len=*), intent(in) :: atom_file
     character(len=MAX_LENGTH) :: inputline, FormatLine
@@ -106,8 +108,12 @@ MODULE readatom
     allocate(determined(atom%Nlevel))
     allocate(parse_label(atom%Nlevel))
     allocate(atom%nstar(atom%Nlevel,atmos%Nspace))
+<<<<<<< HEAD
     
     
+=======
+
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
     atom%Ntr = atom%Nline + atom%Ncont
     allocate(atom%at(atom%Ntr))
 
@@ -166,7 +172,7 @@ MODULE readatom
      !!atom%lines(kr)%lcontrib_to_opac=.true. !init
      atom%at(kr)%trtype = atom%lines(kr)%trtype; atom%at(kr)%ik=kr
      atom%at(kr)%lcontrib_to_opac=.true.; atom%Ntr_line = atom%Nline
-     
+
      atom%lines(kr)%isotope_frac = 1.
      atom%lines(kr)%g_lande_eff = -99.0
      atom%lines(kr)%glande_i = -99; atom%lines(kr)%glande_j = -99
@@ -194,7 +200,7 @@ MODULE readatom
        atom%lines(kr)%cvdWaals(1), atom%lines(kr)%cvdWaals(2), &
        atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
        atom%lines(kr)%Grad, atom%lines(kr)%cStark, &
-       atom%lines(kr)%g_Lande_eff, atom%lines(kr)%glande_j, atom%lines(kr)%glande_i 
+       atom%lines(kr)%g_Lande_eff, atom%lines(kr)%glande_j, atom%lines(kr)%glande_i
        !if glande_eff given, we need to read a value for gi and gj even if it is 0.
        !if glane is <= -99, gi, and gj and geff are computed eventually.
        !landé upper / lower levels in case the coupling scheme is not accurate
@@ -210,14 +216,14 @@ MODULE readatom
      end if
       i = i + 1
       j = j + 1 !because in C, indexing starts at 0, but starts at 1 in fortran
-      
+
      write(*,*) "Reading line #", kr, 1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), 'nm'
 
       !therefore, the first level is 1 (C=0), the second 2 (C=1) etc
       !Lymann series: 2->1, 3->1
       atom%lines(kr)%i = min(i,j)
       atom%lines(kr)%j = max(i,j)
-      
+
 !       write(*,*)  j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
 !       symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
 !       atom%lines(kr)%cvdWaals(1), atom%lines(kr)%cvdWaals(2), &
@@ -263,7 +269,7 @@ MODULE readatom
       !end if
       !write(*,'("S="(1F2.2)", L="(1I2)", J="(1F2.2))') &
       !  atom%qS(i), atom%Lorbit(i), atom%qJ(i)
-      !!      			
+      !!
       !If Selection rule is OK and g_lande_eff not given from file and atomic label
       !correctly determined
       if ((abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.) .and. &
@@ -309,12 +315,17 @@ MODULE readatom
                           *atom%lines(kr)%Aji
       atom%lines(kr)%Bij = (atom%g(j) / atom%g(i)) * atom%lines(kr)%Bji
       atom%lines(kr)%lambda0 = lambdaji / NM_TO_M
+<<<<<<< HEAD
       
       
       atom%lines(kr)%gij = atom%lines(kr)%Bji / atom%lines(kr)%Bij !gi/gj
       atom%lines(kr)%twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji
       
  
+=======
+
+
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
       write(*,*) " ->", " Aji (1e7 s^-1) = ", atom%lines(kr)%Aji/1d7,&
         "Grad (1e7 s^-1) = ", atom%lines(kr)%Grad/1d7, &
         "gj = ", atom%g(j)," gi = ",  atom%g(i)
@@ -424,7 +435,7 @@ MODULE readatom
 !           determined(atom%lines(kr)%j).and. &
 !           abs(atom%qJ(atom%lines(kr)%i) - &
 !            atom%qJ(atom%lines(kr)%j)).le.1.) then
-! 
+!
 ! !        if (atom%lines(kr)%Ncomponent.gt.1) then
 ! !            !write(*,*) &
 ! !            !"Cannot treat composite line with polar"
@@ -572,10 +583,12 @@ MODULE readatom
                 "not implemented yet."
     end if
 
+    ! reading collision rates
+    call read_collisions(atomunit, atom)
+
     ! allocate some space
-    atom%offset_coll = ftell(atomunit)
     atom%colunit = atom%periodic_table*2 + 1
-    write(*,*) "offset file for reading collision", atom%offset_coll, "unit = ", atom%colunit
+
     !!allocate(atom%C(atom%Nlevel*atom%Nlevel,atmos%Nspace))
     !!now Collision matrix is constructed cell by cell, therefore allocated elsewhere
     allocate(atom%n(atom%Nlevel,atmos%Nspace))
@@ -588,10 +601,10 @@ MODULE readatom
        write(*,*) " min/max pops for each level:"
        do kr=1,atom%Nlevel
         write(*,*) "    ", kr, ">>", minval(atom%n(kr,:)), maxval(atom%n(kr,:))
-       enddo 
+       enddo
     end if
    else !not active
-    if (atom%dataFile.ne."" & .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+    if (atom%dataFile.ne.""  .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
        allocate(atom%n(atom%Nlevel,atmos%Nspace)) !not allocated if passive, n->nstar
        CALL readPops(atom)
        atom%NLTEpops = .true.
@@ -645,13 +658,13 @@ MODULE readatom
    CALL getnextline(unit, COMMENT_CHAR, FormatLine, inputline, Nread)
 
    allocate(atmos%Atoms(nmet)%ptr_atom)
-  
+
    read(inputline,'(1A28, 1A7, 1A22, 1A20)') filename, actionKey, popsKey, popsFile
    !write(*,*) ".",trim(filename),"."
    !write(*,*) ".",adjustl(actionKey),"."
    !write(*,*) ".",adjustl(popsKey),"."
    !write(*,*) ".",trim(popsFile),"."
-   
+
    atmos%Atoms(nmet)%ptr_atom%initial_solution=adjustl(popsKey)
    atmos%Atoms(nmet)%ptr_atom%inputFile=trim(filename)
 
@@ -749,7 +762,7 @@ MODULE readatom
       CALL Warning(" Helium alias not associated to atomic model!")
    end if
    if (allocated(atmos%ActiveAtoms)) then
-     if (atmos%Atoms(nmet)%ptr_atom%active) then 
+     if (atmos%Atoms(nmet)%ptr_atom%active) then
       nact = nact + 1 !got the next index of active atoms
       atmos%ActiveAtoms(nact)%ptr_atom => atmos%Atoms(nmet)%ptr_atom
       atmos%Atoms(nmet)%ptr_atom%activeindex = nact
@@ -766,11 +779,11 @@ MODULE readatom
      end if
    end if
   end do
-  
+
 !   write(*,*) atmos%Atoms(1)%ptr_Atom%ID,atmos%ActiveAtoms(1)%ptr_Atom%ID
 !   write(*,*) Hydrogen%ID, atmos%elements(1)%ptr_elem%model%ID
 !   stop
-    
+
 !  NULLIFY(atom, atom2)
 
 !   do nmet=1, atmos%Npassiveatoms

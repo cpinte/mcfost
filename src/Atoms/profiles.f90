@@ -47,6 +47,7 @@ MODULE PROFILES
    v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
    omegav(1) = v0
   end if
+
   Nvspace = 1 !no loop now
 !   if (.not.lstatic .and. .not.lVoronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
 !      v1 = v_proj(icell,x1,y1,z1,u,v,w)
@@ -65,6 +66,7 @@ MODULE PROFILES
 !   end if
 
 
+
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
   
@@ -72,13 +74,15 @@ MODULE PROFILES
   !line_profiles(:,kr,id) = 0d0
 
   if (line%voigt) then
-  !Now we have a pointer to atom in line. atom(n)%lines(kr)%atom => atom(n) 
+  !Now we have a pointer to atom in line. atom(n)%lines(kr)%atom => atom(n)
   !Computed before or change damping to use only line
   !CALL Damping(icell, line%atom, kr, line%adamp)       ! init for this line of this atom accounting for Velocity fields
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
-                        !                 2) Voronoi grid is used                 
+            !                 2) Voronoi grid is used                 
                         
           vvoigt(:) = ( line%u(:) - omegav(nv) ) / line%atom%vbroad(icell)
+
+
 !           write(*,*) nv, "0loc=", locate(vvoigt, 0d0)
 !           write(*,*) maxval(vvoigt), vbroad
           line%phi_loc(:,id) = line%phi_loc(:,id) + Voigt(line%Nlambda, line%a(icell),vvoigt(:)) / Nvspace
@@ -89,7 +93,7 @@ MODULE PROFILES
       
          vvoigt(:) = ( line%u(:) - omegav(nv) ) / line%atom%vbroad(icell)
          line%phi_loc(:,id) = line%phi_loc(:,id) + dexp(-(vvoigt(:))**2) / Nvspace 
-         
+
       end do
  end if !line%voigt
  line%phi_loc(:,id) = line%phi_loc(:,id) / (SQRTPI * line%atom%vbroad(icell))
@@ -108,6 +112,7 @@ MODULE PROFILES
  !deallocate(vv, vvoigt, F)
  RETURN
  END SUBROUTINE IProfile
+<<<<<<< HEAD
  
  SUBROUTINE IProfile_cmf_to_obs(line,icell,x,y,z,x1,y1,z1,u,v,w,l, id)!, iray)
   integer, intent(in) 							            :: icell
@@ -131,6 +136,32 @@ MODULE PROFILES
   end if
   Nvspace = 1
   
+=======
+
+!  FUNCTION cmf_to_observer(line,icell,x,y,z,x1,y1,z1,u,v,w,l) result(P)
+!   integer, intent(in) 							            :: icell
+!   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
+!                                 				               x1,y1,z1, &      ! velocity field and magnetic field
+!                                 				               l !physical length of the cell
+!   type (AtomicLine), intent(in)								:: line
+!   real(kind=dp), dimension(line%Nlambda)					:: vvoigt, vv!,F
+!   integer, parameter										:: NvspaceMax = 101
+!   real(kind=dp), dimension(NvspaceMax)					:: omegav
+!   integer													:: Nvspace, nv, Nred, Nblue, i, j
+!   real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
+!   															   v0, v1, dv, vbroad
+!   real(kind=dp), dimension(line%Nlambda)               :: P
+!
+!   ! v_proj in m/s at point icell
+!   omegav = 0d0
+!   Nvspace = 1
+!   if (.not.lstatic) then
+!    v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
+!    omegav(1) = v0
+!   end if
+!   !!write(*,*) "v0", v0/1d3
+!   vbroad = VBROAD_atom(icell,line%atom)
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
 !   if (.not.lstatic .and. .not.lVoronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
 !      v1 = v_proj(icell,x1,y1,z1,u,v,w)
 !      dv = dabs(v1-v0)
@@ -143,6 +174,7 @@ MODULE PROFILES
 !       yphi=y+delta_vol_phi*v
 !       zphi=z+delta_vol_phi*w
 !       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+<<<<<<< HEAD
 !     end do 
 !   end if
 
@@ -180,6 +212,37 @@ MODULE PROFILES
  SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l,id)
   integer, intent(in) 							            :: icell,id
   integer :: iray = 1 !futur deprecation
+=======
+!       !!write(*,*) "v=", omegav(nv)/1d3
+!     end do
+!   end if
+!  !!write(*,*) "v1", v1/1d3
+!
+!   i = line%i; j = line%j
+!   Nred = line%Nred; Nblue = line%Nblue
+!
+!   P = 0d0
+!   !allocate(vv(line%Nlambda), F(line%Nlambda), vvoigt(line%Nlambda))
+!   vv = 0d0
+!   vv(:) = (NLTEspec%lambda(Nblue:Nred)-line%lambda0) * &
+!            CLIGHT / (line%lambda0 * vbroad)
+!
+!
+!
+!  do nv=1, Nvspace
+!
+!           vvoigt(:) = vv(:) - omegav(nv) / vbroad
+!
+!           P(:) = P(:) + interp_dp(line%phi(icell,:), vv(:), vvoigt(:)) / Nvspace
+!
+!  enddo
+!
+!  RETURN
+!  END FUNCTION cmf_to_observer
+
+ SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l, P, phi, psi)
+  integer, intent(in) 							            :: icell
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
@@ -192,6 +255,11 @@ MODULE PROFILES
   															   Nbspace, nb, Nzc, i, j,qz
   real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
   															   v0, v1, dv, b0, b1,g1,c1,dB,vbroad
+<<<<<<< HEAD
+=======
+  real(kind=dp), intent(out), dimension(:)               :: P
+  real(kind=dp), intent(out), dimension(:,:), optional 		    :: phi, psi !eta_QUV; rho_QUV
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
   real(kind=dp), dimension(3,line%Nlambda) 				:: phi_zc, psi_zc!Sigma_b, PI, sigma_r
   logical 													:: B_flag = .true.
   !or allocate deallocate only on Nlambda. Lower arrays dimension but took time to allocate
@@ -204,9 +272,14 @@ MODULE PROFILES
    v0 = v_proj(icell,x,y,z,u,v,w)
    omegav(1) = v0
   end if
+<<<<<<< HEAD
   Nvspace = 1
   
   vbroad = line%atom%vbroad(icell)
+=======
+
+  vbroad = VBROAD_atom(icell,line%atom)
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
 
   b0 = B_project(icell,x,y,z,u,v,w,g1,c1)
   omegaB(1) = b0; Nbspace = 1
@@ -214,6 +287,7 @@ MODULE PROFILES
   Nbspace = 1
   
 
+<<<<<<< HEAD
 !  if (maxval(abs(atmos%Bxyz(icell,:))) == 0d0) B_flag = .false.
    
 !   if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
@@ -256,15 +330,65 @@ MODULE PROFILES
   Nred = line%Nred; Nblue = line%Nblue
   line%phi_loc(:,id) = 0d0
   
+=======
+  if (maxval(abs(atmos%Bxyz(icell,:))) == 0d0) B_flag = .false.
+
+  if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
+     v1 = v_proj(icell,x1,y1,z1,u,v,w)
+     dv = dabs(v1-v0)
+     Nvspace = max(2,nint(20*dv/vbroad))
+     Nvspace = min(Nvspace,NvspaceMax)
+     omegav(Nvspace) = v1
+    do nv=2,Nvspace-1
+      delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+      xphi=x+delta_vol_phi*u
+      yphi=y+delta_vol_phi*v
+      zphi=z+delta_vol_phi*w
+      omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+    end do
+  end if
+
+
+  if (.not.lvoronoi .and. B_flag) then
+      b1 = B_project(icell,x1,y1,z1,u,v,w,g1,c1)
+      !Nbspace = NbspaceMax
+      dB = (b1-b0)
+      dB = dabs(dB * line%g_lande_eff) * LARMOR * line%lambda0 * NM_TO_M
+      Nbspace = max(2,nint(20*dB/vbroad))
+      Nbspace = min(Nbspace,NbspaceMax)
+      !write(*,*) Nbspace, b1*1e4, b0*1e4, dB
+      omegaB(Nbspace) = b1
+      gamma(Nbspace) = g1; chi(Nbspace)=c1
+      do nv=2,Nbspace-1
+       delta_vol_phi = (real(nv,kind=dp))/(real(Nbspace,kind=dp)) * l
+       xphi=x+delta_vol_phi*u
+       yphi=y+delta_vol_phi*v
+       zphi=z+delta_vol_phi*w
+       omegaB(nv) = B_project(icell,xphi,yphi,zphi,u,v,w,g1,c1)
+       gamma(nv) = g1; chi(nv)=c1
+      end do
+  end if
+
+  i = line%i; j = line%j
+  Nred = line%Nred; Nblue = line%Nblue
+  P = 0d0
+
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
   !allocate(vv(line%Nlambda), vvoigt(line%Nlambda))
 
 
   Nzc = line%zm%Ncomponent
   if (.not.line%voigt) then !unpolarised line assumed even if line%polarizable
       do nv=1, Nvspace
+<<<<<<< HEAD
       
          vvoigt(:) = (line%u - omegav(nv)) / vbroad
          line%phi_loc(:,id) = line%phi_loc(:,id) + dexp(-(vvoigt(:))**2) / Nvspace
+=======
+
+         vvoigt(:) = vv(:) - omegav(nv) / vbroad
+         P(:) = P(:) + dexp(-(vvoigt(:))**2) / Nvspace
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
       !derivative of Gaussian:
 !          F(Nblue:Nred) = F(Nblue:Nred) - &
 !            2d0 * dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace * &
@@ -276,7 +400,7 @@ MODULE PROFILES
       !deallocate(vv, vvoigt)
       RETURN
   end if
-     
+
   !Computed before or change damping to use only line
   !CALL Damping(icell, line%atom, kr, line%adamp)
 
@@ -288,10 +412,17 @@ MODULE PROFILES
   !Should work also for unpolarised voigt line because Ncz=1,S=0,q=0,shift=0
        ! init for this line of this atom accounting for Velocity fields
        do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
+<<<<<<< HEAD
                         !                 2) Voronoi grid is used                 
                         
         vvoigt(:) = (line%u - omegav(nv)) / vbroad
         
+=======
+                        !                 2) Voronoi grid is used
+
+        vvoigt(:) = vv(:) - omegav(nv) / vbroad
+
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
          do nb=1,Nbspace !Nbspace=1 if Voronoi, or magnetic field is 0d0.But present
 
           do nc=1,Nzc
@@ -321,14 +452,14 @@ MODULE PROFILES
               		line%zm%strength(nc) * LV(:) / (SQRTPI * vbroad * Nbspace*Nvspace)
              LV(:) = 0d0; F(:) = 0d0
              !write(*,*) Nzc, qz, line%zm%q(nc), vvoigt_b(line%Nlambda/2+1), line%zm%shift(nc), line%zm%strength(nc), omegab(nb)
-          end do !components 
+          end do !components
           !the output, for the other we store chi_pol/chi_I, rho_pol/chi_I etc
           !write(*,*) dsin(gamma(nb)), dcos(gamma(nb)), dsin(2*chi(nb)), dcos(2*chi(nb))
           line%phi_loc(:,id) = line%phi_loc(:,id) + 5d-1 *(phi_zc(2,:) * dsin(gamma(nb))*dsin(gamma(nb)) + \
             5d-1 *(1d0+dcos(gamma(nb))*dcos(gamma(nb))) * (phi_zc(1,:)+phi_zc(3,:))) ! profile in chiI, etaI
           !rhoQ/chiI
 !           psi(1,:) = psi(1,:) + &
-!           		0.5*(real(psi_zc(2,:))-0.5*real(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2	
+!           		0.5*(real(psi_zc(2,:))-0.5*real(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
 !           !rhoU/chiI
 !           psi(2,:) = psi(2,:) + &
 !           		0.5*(real(psi_zc(2,:))-0.5*real(psi_zc(1,:)+psi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
@@ -343,11 +474,16 @@ MODULE PROFILES
 !           !chiV/chiI
 !           phi(3,:) = phi(3,:) + 0.5*(real(phi_zc(3,:))-real(phi_zc(1,:)))*cos(gamma(nb))
           !rhoQ/chiI
+<<<<<<< HEAD
           
 !! Should be wore like psi(Nlambda, ncompo, id) because we do not care about keeping it for every direction
 
           line%psi(1,:,iray) = line%psi(1,:,iray) + &
           		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2	
+=======
+          psi(1,:) = psi(1,:) + &
+          		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*cos(2*chi(nb))*sin(gamma(nb))**2
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
           !rhoU/chiI
           line%psi(2,:,iray) = line%psi(2,:,iray) + &
           		0.5*(psi_zc(2,:)-0.5*(psi_zc(1,:)+psi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
@@ -360,14 +496,20 @@ MODULE PROFILES
           line%phiZ(2,:,iray) = line%phiZ(2,:,iray) + &
           		0.5*(phi_zc(2,:)-0.5*(phi_zc(1,:)+phi_zc(3,:)))*sin(2*chi(nb))*sin(gamma(nb))**2
           !chiV/chiI
+<<<<<<< HEAD
           line%phiZ(3,:,iray) = line%phiZ(3,:,iray) + 0.5*(phi_zc(3,:)-phi_zc(1,:))*cos(gamma(nb))
         end do !magnetic field     
         
+=======
+          phi(3,:) = phi(3,:) + 0.5*(phi_zc(3,:)-phi_zc(1,:))*cos(gamma(nb))
+        end do !magnetic field
+
+>>>>>>> 68a204916fef36638d1d809daf070fa83d90e78e
        end do !velocity
        !check that if line is not polarised the Zeeman components are 0
        !write(*,*) "tpt", allocated(psi_zc),allocated(phi_zc), allocated(LV), allocated(F), &
        ! allocated(vv), allocated(vvoigt)
-  !deallocate(psi_zc, phi_zc, LV, F, vv, vvoigt) 
+  !deallocate(psi_zc, phi_zc, LV, F, vv, vvoigt)
  RETURN
  END SUBROUTINE ZProfile
 

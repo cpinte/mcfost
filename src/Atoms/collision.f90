@@ -14,7 +14,6 @@ MODULE collision
  use math, only : E1, E2, bezier3_interp, SQ, CUBE, dPOW, interp1D
  use constant
  use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol, atomZnumber
- use readatom,only : path_to_atoms
  use atmos_type, only : atmos, Hydrogen, Helium
  use getline
  use mcfost_env
@@ -29,16 +28,16 @@ MODULE collision
 
 
  CONTAINS
- 
+
 !  FUNCTION Collision_Hydrogen(icell) result(Cji)
 !   integer :: icell, i, j
 !   double precision :: Cji(Hydrogen%Nlevel, Hydrogen%Nlevel)
 !   double precision :: nr_ji, CI(Hydrogen%Nlevel,Hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)
-!   
-!    Cji(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0 
+!
+!    Cji(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
 !    CALL Johnson_CI(icell, CI(:,Hydrogen%Nlevel)) !bound-free i->Nlevel
 !    CALL Johnson_CE(icell, CE) !among all levels
-! 
+!
 !    do j=1,Hydrogen%Nlevel
 !     do i=1,Hydrogen%Nlevel
 !      nr_ji = Hydrogen%nstar(i,icell)/Hydrogen%nstar(j,icell)
@@ -47,15 +46,15 @@ MODULE collision
 !     end do
 !    end do
 !    Cji(:,:) = Cji(:,:) * atmos%ne(icell)
-! 
+!
 !  RETURN
 !  END FUNCTION Collision_Hydrogen
-! 
+!
 !  SUBROUTINE Johnson_CI(icell, Cje)
 !  ! --------------------------------------------------- !
 !   ! Ionisation rate coefficient for
 !   ! Hydrogen atom, from
-!   ! L.C Johnson 
+!   ! L.C Johnson
 !   ! ApJ 74:227-236, 1972 May 15; eq. 39
 !   !
 !   ! ne factorised
@@ -67,36 +66,36 @@ MODULE collision
 !    integer :: i, j, Nl
 !    double precision :: C0, pia0sq, rn, bn, n, An, En, yn, zn, S, Bnp
 !    type (AtomType) :: atom
-!    
+!
 !    atom = atmos%Atoms(1)%ptr_atom
-! 
+!
 !    C0 = dsqrt(8.*KBOLTZMANN*atmos%T(icell) / pi / M_ELECTRON)
 !    pia0sq = 2d0 * pi * RBOHR**2
-!    
+!
 !    Nl = atom%Nlevel
 !    !Hydrogen level are ordered by n increasing, except for the continuum level
 !    !n = 1., but stops before Nlevel
-!    
+!
 !    do i=1, Nl-1 !collision from neutral states to the ground state of H+
 !     n = real(i,kind=dp)
 !     if (i==1) then !n=i
 !      rn = 0.45
 !      bn = -0.603
-!     else 
+!     else
 !      rn = 1.94*n**(-1.57)
 !      bn = 1d0/n * (4. - 18.63/n + 36.24/n/n - 28.09/n/n/n)
 !     end if
-! 
+!
 !     ! in Joules
 !     En = E_RYDBERG / n / n !energie of level with different quantum number in 13.6eV: En = 13.6/n**2
 !     yn = En / KBOLTZMANN / atmos%T(icell)
 !     An = 32. / 3. / dsqrt(3d0) / pi * n  * (g0(n)/3. + g1(n)/4. + g2(n)/5.)
 !     Bnp = 2./3. * n*n * (5. + bn)
 !     zn = rn + yn
-! 
+!
 !     S = C0 * pia0sq * (n*yn)**2 * (An*(E1(yn)/yn - E1(zn)/zn) + &
 !    			(Bnp - An*log(2*n*n))*(ksi_johnson(yn)-ksi_johnson(zn)))
-!    	!!write(*,*) i-1, Nl-1, "S=", S, S*dexp(yn)/dsqrt(atmos%T(icell)) 
+!    	!!write(*,*) i-1, Nl-1, "S=", S, S*dexp(yn)/dsqrt(atmos%T(icell))
 !     !check that otherwise multiply by dexp(yn)
 !     Cje(i) = S !RH -> dexp(yn) / dsqrt(atmos%T(icell)) !per ne
 !     		   !we compute it at icell so in fact we could avoid / sqrt(atmos%icell)
@@ -107,8 +106,8 @@ MODULE collision
 !    end do
 !  RETURN
 !  END SUBROUTINE Johnson_CI
-! 
-!  
+!
+!
 !  SUBROUTINE Johnson_CE(icell, Cje)
 !  ! ----------------------------------------------------- !
 !   ! Excitation rate coefficient for
@@ -116,7 +115,7 @@ MODULE collision
 !   ! ApJ 74:227-236, 1972 May 15; eq. 36
 !   !
 !   ! CE = S = C(i,j) all transitions from j, i and i, j
-!   ! 
+!   !
 !   ! ( -> transform C(i,j) to specifically C(j,i)
 !   ! S * dexp(y) * atom%g(i)/atom%g(j)
 !   ! = C(i,j) * exp(hnu/kt)*gi/gj = C(i,j) * ni/nj = C(j,i)
@@ -128,26 +127,26 @@ MODULE collision
 !    double precision :: C0, pia0sq, rn, bn, n, Ennp, y, z, S, Bnnp, En
 !    double precision :: np, x, fnnp, rnnp, Annp, Gaunt_bf
 !    type (AtomType) :: atom
-!    
+!
 !    atom = atmos%Atoms(1)%ptr_atom
-! 
+!
 !    C0 = dsqrt(8.*KBOLTZMANN*atmos%T(icell) / pi / M_ELECTRON)
 !    pia0sq = 2d0 * pi * RBOHR**2
-!    
+!
 !    Nl = atom%Nlevel
 !    !Hydrogen level are ordered by n increasing, except for the continuum level
 !    !n = 1., but stops before Nlevel
-!    
+!
 !    do i=1, Nl-1 !collision between neutral states, n to n'
 !     n = real(i,kind=dp)
 !     if (i==1) then !n=i
 !      rn = 0.45
 !      bn = -0.603
-!     else 
+!     else
 !      rn = 1.94*n**(-1.57)
 !      bn = 1d0/n * (4. - 18.63/n + 36.24/n/n - 28.09/n/n/n)
 !     end if
-!     
+!
 !     do j=i+1, Nl-1
 !      np = dble(j)!n'
 !      x = 1d0 - (n/np)**2 ! = Enn'/Rdybg
@@ -161,30 +160,30 @@ MODULE collision
 !      y = x * En / KBOLTZMANN / atmos%T(icell) !x = ratio of E/En
 !      Bnnp = 4d0 * (n**4)/(np**3) / x / x * (1. + 4./3. /x + bn/x/x)
 !      z = rnnp + y
-!    
+!
 !      S = C0 * pia0sq * n*n*y*y/x * (Annp*((1./y + 0.5)*E1(y)-(1./z + 0.5)*E1(z))+&
 !      	(Bnnp-Annp*dlog(2*n*n/x))*(E2(y)/y - E2(z)/z))
-!      
+!
 !      Cje(j,i) = S * dexp(y) * atom%g(i)/atom%g(j)
 !      !!Cje(i,j) = S
 !      !write(*,*) atom%E(j) - atom%E(i), En*x !because x = deltaE/En
 !     end do !over np
 !    end do  !over n
-! 
+!
 !  RETURN
 !  END SUBROUTINE Johnson_CE
-!  
+!
 !  FUNCTION ksi_johnson(t) result(y)
 !   double precision :: t, y
 !   !E0
 !   y = dexp(-t)/t - 2d0*E1(t) + E2(t)
-!    
+!
 !  RETURN
 !  END FUNCTION ksi_johnson
-!  
+!
 !  FUNCTION g0 (n) result(g)
 !   double precision :: g, n
-!   
+!
 !   SELECT CASE (int(n))
 !   CASE (1)
 !    g = 1.1330
@@ -193,13 +192,13 @@ MODULE collision
 !   CASE DEFAULT
 !    g = 0.9935 + 0.2328/n - 0.1296 / n / n
 !   END SELECT
-!  
+!
 !  RETURN
 !  END FUNCTION g0
-!  
+!
 !  FUNCTION g1 (n) result(g)
 !   double precision :: g, n
-!   
+!
 !   SELECT CASE (int(n))
 !   CASE (1)
 !    g = -0.4059
@@ -207,14 +206,14 @@ MODULE collision
 !    g = -0.2319
 !   CASE DEFAULT
 !    g = -1d0/n * (0.6282 - 0.5598/n + 0.5299 / n / n)
-!   END SELECT  
-!  
+!   END SELECT
+!
 !  RETURN
 !  END FUNCTION g1
-!  
+!
 !  FUNCTION g2 (n) result(g)
 !   double precision :: g, n
-!  
+!
 !   SELECT CASE (int(n))
 !   CASE (1)
 !    g = 0.07014
@@ -222,83 +221,42 @@ MODULE collision
 !    g = 0.02947
 !   CASE DEFAULT
 !    g = 1d0/n/n * (0.3887 - 1.181 / n + 1.470 /n / n)
-!   END SELECT  
-!  
+!   END SELECT
+!
 !  RETURN
 !  END FUNCTION g2
- 
- SUBROUTINE openCollisionFile(atom)
-  type (AtomType), intent(in) :: atom
-  integer :: checkfseek, fseek
-  
-   !re-open atomic model, but set the cursor at the position
-   !of collisional data.
-  write(*,*) "Openning collision file for atom ", atom%ID
-  open(unit=atom%colunit,file=trim(mcfost_utils)//path_to_atoms//trim(atom%inputFile),status="old")
-  write(*,*) "Warning in CollisionRate "&
-    ": fseek is different in gfortran and ifort"
-  !gfortran ->
-  !!CALL FSEEK(colunit, atom%offset_coll,0,checkfseek)
-  !ifort ->
-  checkfseek = fseek(atom%colunit,atom%offset_coll, 0)
-  if (checkfseek.gt. 0 ) then 
-    write(*,*) 'fseek error'
-    stop 
-  end if
-  return
- END SUBROUTINE
- 
- SUBROUTINE closeCollisionFile(atom)
-  type (AtomType), intent(in) :: atom
-  write(*,*) "Closing collision file for atom ", atom%ID, atom%colunit
-  close(atom%colunit)
-  return
- END SUBROUTINE closeCollisionFile
- 
- SUBROUTINE Keep_collision_lines(atom)
-  type (AtomType), intent(inout) :: atom
-  integer, parameter :: Nmax_lines = 10000 !change that if too many lines for collision in file
-  character(len=MAX_LENGTH), dimension(Nmax_lines) :: lines_in_file !check len char matches the one in atom%
-  integer :: N !real number of lines
-  integer :: Nread, colunit, checkfseek, fseek
-  character(len=8) :: END_OF_FILE="END     ", key
-  character(len=MAX_LENGTH) :: inputline, FormatLine
-  
-  N = 0
-  
-  open(unit=atom%colunit,file=trim(mcfost_utils)//path_to_atoms//trim(atom%inputFile),status="old")
-  checkfseek = fseek(atom%colunit,atom%offset_coll, 0)
-  
-  
-  if (checkfseek.gt. 0 ) then 
-    write(*,*) 'fseek error'
-    stop 
-  end if
 
-  colunit = atom%colunit 
-  write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
-  key="        "
 
-  !it is still important to read en END in the file
-  do while(key.ne.END_OF_FILE)
-   N = N + 1
-   CALL getnextline(colunit, COMMENT_CHAR, FormatLine, inputline, Nread) 
-   lines_in_file(N) = inputline(1:Nread)
-!    write(*,*) N, lines_in_file(N)
-   key = adjustl(inputline(1:len(key)))
-  end do
-  
-  allocate(atom%collision_lines(N))
-  atom%collision_lines(:) = lines_in_file(1:N)
-  
- checkfseek = fseek(atom%colunit,atom%offset_coll, 0)
- if (checkfseek.gt. 0 ) then 
-   write(*,*) 'fseek error'
-   stop 
- end if  
- 
- RETURN
- END SUBROUTINE keep_collision_lines
+   subroutine read_collisions(unit, atom)
+
+     integer, intent(in) :: unit
+     type (AtomType), intent(inout) :: atom
+
+     integer, parameter :: Nmax_lines = 10000 !change that if too many lines for collision in file
+     character(len=MAX_LENGTH), dimension(Nmax_lines) :: lines_in_file !check len char matches the one in atom%
+     integer :: N !real number of lines
+     integer :: Nread, checkfseek, fseek
+     character(len=8) :: END_OF_FILE="END     ", key
+     character(len=MAX_LENGTH) :: inputline, FormatLine
+
+     n = 0
+
+     write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
+     key="        "
+
+     !it is still important to read an END in the file
+     do while(key /= END_OF_FILE)
+        n = n + 1
+        call getnextline(unit, COMMENT_CHAR, FormatLine, inputline, Nread)
+        lines_in_file(n) = inputline(1:Nread)
+        key = adjustl(inputline(1:len(key)))
+     enddo
+
+     allocate(atom%collision_lines(N))
+     atom%collision_lines(:) = lines_in_file(1:N)
+
+     return
+   end subroutine read_collisions
 
  FUNCTION fone(x) result(y)
  ! --------------------------------------------
@@ -597,7 +555,7 @@ MODULE collision
   type (AtomType), intent(inout) :: atom
   integer, intent(in) :: icell
   double precision, dimension(atom%Nlevel,atom%Nlevel) :: C
-  integer :: ij, k, Nread, countline=0, colunit, checkfseek, fseek
+  integer :: ij, k, Nread, countline=0, colunit
   integer :: NTMP, n, m, ii, Nitem, i1, i2, i, j, ji, Nitem2
   character(len=8) :: END_OF_FILE="END     ", key
   real(8), dimension(:), allocatable :: TGRID, coeff
@@ -622,9 +580,9 @@ MODULE collision
   ! file is already opened, and will be close at the end of the RT run
   colunit = atom%colunit
   !write(*,*) "Collision()->colunit = ", colunit, atom%colunit
- 
+
   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
-  
+
   C0 = ((E_RYDBERG/sqrt(M_ELECTRON)) * PI*SQ(RBOHR)) * sqrt(8.0/(PI*KBOLTZMANN))
 
   ! -- Initialise the collisional matrix at each cell--
@@ -1048,19 +1006,12 @@ MODULE collision
    end if
   end do !loop over (remaining) lines (of the atomic model)
 
-
-!  checkfseek = fseek(atom%colunit,atom%offset_coll, 0)
-!  if (checkfseek.gt. 0 ) then 
-!    write(*,*) 'fseek error'
-!    stop 
-!  end if
-
  deallocate(TGRID)
  deallocate(coeff)
 
  RETURN
  END FUNCTION CollisionRate
- 
+
 !-> Futur deprecation, will be computed on the fly, but his routine will be kept
 !-> Or data should be kept in memory but seems diffcult to handle all cases
 !  SUBROUTINE CollisionRate_File(icell, atom)
@@ -1076,8 +1027,8 @@ MODULE collision
 !  ! (1) atomic file is opened with openCollisionFile at the
 !  ! atom%offset_coll position in the file. Before leaving
 !  ! the subroutine, the cursor is reset to atom%offset_coll position
-!  ! for next cell point. 
-!  ! The file is closed at the end of the simulation. 
+!  ! for next cell point.
+!  ! The file is closed at the end of the simulation.
 !  ! This trick avoid closing/reopening the file at each cell point.
 !  ! --------------------------------------------------
 !   type (AtomType), intent(inout) :: atom
@@ -1095,7 +1046,7 @@ MODULE collision
 !   real(8) :: t0sh, t1sh, summrs, tg, cdn, ccup
 !   real(8) :: ar85t1, ar85t2, ar85a, ar85b, ar85c, ar85d, t4
 !   real(8) :: de,zz,betab,cbar,dekt,dekti,wlog,wb,sumscl=0.0
-! 
+!
 !   ! -- Nitem2 is here to check
 !   ! that Nitem (read) is equals to the acutla number
 !   ! of item read Nitem2
@@ -1103,30 +1054,30 @@ MODULE collision
 !   ! because it reads in an array of size Nitem, so
 !   ! Nitem are expected to be read and an error will be
 !   ! raise otherwise.
-! 
+!
 !   ! file is already opened, and will be close at the end of the RT run
 !   colunit = atom%colunit
 !   !write(*,*) "Collision()->colunit = ", colunit, atom%colunit
-!  
+!
 !   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
-!   
+!
 !   C0 = ((E_RYDBERG/sqrt(M_ELECTRON)) * PI*SQ(RBOHR)) * sqrt(8.0/(PI*KBOLTZMANN))
-! 
+!
 !   ! -- Initialise the collisional matrix at each cell--
 !   C(:) = 0d0
 !   !temporary
 !   atom%Ckij(icell,:) = 0d0 !C j->i = C(j,i)
-! 
-! 
-! 
+!
+!
+!
 !   key="        "
 !   ! -- Go throught the remaining lines in the file --
 !   ! read collisional data depending the cases of recipes.
-! 
+!
 !   do while(key.ne.END_OF_FILE)
 !    countline = countline + 1
 !    CALL getnextline(colunit, COMMENT_CHAR, FormatLine, inputline, Nread)
-! 
+!
 !    ! do not go further, because after there is
 !    ! the number of grid points, which is in general
 !    ! one or two digits.
@@ -1134,7 +1085,7 @@ MODULE collision
 !    ! for the interpolation of the coefficients
 !    ! you have to modify the file to flush right
 !    ! everything after the TEMP keyword.
-! 
+!
 !    key = adjustl(inputline(1:len(key)))
 !    !write(*,*) trim(inputline)
 !    !write(*,*) "Line = ", countline, " key=",key,"."
@@ -1145,17 +1096,17 @@ MODULE collision
 !     allocate(TGRID(NTMP))
 !     ! Nread is len(NTMP) in string format, offset
 !     ! inputline to read TGRID only, after NTMP.
-! 
+!
 !     read(inputline(len(key)+3:Nread),*) (TGRID(k), k=1,NTMP)
 !     !write(*,*) (TGRID(k), k=1,NTMP)
 !     Nitem = NTMP
 !     Nitem2 = size(TGRID)
-! 
+!
 !    else if ((key.eq."OMEGA") .or. (key.eq."CE") .or.&
 !         (key.eq."CI") .or. (key.eq."CP") .or. &
 !         (key.eq."CH0") .or. (key.eq."CH+") .or. &
 !         (key.eq."CH") .or. (key.eq."CR")) then
-! 
+!
 !     ! -- read level indices and collision coefficients --
 !     Nitem = NTMP
 !     if (allocated(coeff)) deallocate(coeff)
@@ -1165,9 +1116,9 @@ MODULE collision
 !     !write(*,*) key, inputline(len(key)+1:)
 !     read(inputline(len(key)+1:),*) i1, i2, &
 !          (coeff(k),k=1,Nitem)
-! 
+!
 !     Nitem2 = size(coeff)
-! 
+!
 !     i = MIN(i1,i2) + 1
 !     j = MAX(i1,i2) + 1 !from 1 to Nlevel (in C, 0 to Nlevel-1)
 !     ij = (i-1)*atom%Nlevel + j!j->i
@@ -1176,7 +1127,7 @@ MODULE collision
 !     ! Cf = C(Nlevel,Nlevel).flatten, of size Nlevel*Nlevel
 !     ! C(i,j) = Cf(ij) = Cf(i*Nlevel + j)
 !     ! C(1,1) = Cf(1) -> i*Nlevel +j = 1 -> i=i-1
-! 
+!
 !    else if ((key.eq."AR85-CHP").or.(key.eq."AR85-CHH")) then
 !     Nitem = 6
 !     if (allocated(coeff)) deallocate(coeff)
@@ -1184,46 +1135,46 @@ MODULE collision
 !     read(inputline(len(key)+1:),*) i1, i2, &
 !         (coeff(k),k=1,Nitem)
 !     !write(*,*) inputline(len(key)+1:)
-! 
+!
 !     Nitem2 = size(coeff)
-! 
+!
 !     i = MIN(i1,i2) + 1
 !     j = MAX(i1,i2) + 1
 !     ij = (i-1)*atom%Nlevel + j
 !     ji = (j-1)*atom%Nlevel + i
-! 
+!
 !    else if ((key.eq.'AR85-CEA').or.(key.eq."BURGESS")) then
 !      Nitem = 1
 !      if (allocated(coeff)) deallocate(coeff)
 !      allocate(coeff(Nitem))
-! 
+!
 !      read(inputline(len(key)+1:),*) i1, i2, coeff(1)
 !      i = MIN(i1,i2) + 1
 !      j = MAX(i1,i2) + 1
 !      ij = (i-1)*atom%Nlevel + j
 !      ji = (j-1)*atom%Nlevel + i
-! 
+!
 !      Nitem2 = size(coeff)
 !      !write(*,*) "CEA or BURGESS", i1, i2, i, ij
-! 
+!
 !    else if (key.eq."SHULL82") then
 !      Nitem = 8
 !      if (allocated(coeff)) deallocate(coeff)
 !      allocate(coeff(Nitem))
-! 
+!
 !      read(inputline(len(key)+1:),*) i1, i2,&
 !          (coeff(k),k=1,Nitem)
 !      i = MIN(i1,i2) + 1
 !      j = MAX(i1,i2) + 1
 !      ij = (i-1)*atom%Nlevel+j
 !      ji = (j-1)*atom%Nlevel +i
-! 
+!
 !      Nitem2 = size(coeff)
-! 
-! 
+!
+!
 !    else if (key.eq."BADNELL") then
 !     ! -- BADNELL formula for dielectronic recombination --
-! 
+!
 !     !write(*,*) inputline, Nread
 !     read(inputline(len(key)+1:),*) i1, i2, Ncoef
 !     Nrow = 2
@@ -1241,9 +1192,9 @@ MODULE collision
 !     j = MAX(i1,i2) + 1
 !     ij = atom%Nlevel*(i-1) + j
 !     ji = atom%Nlevel*(j-1) + i
-! 
+!
 !     Nitem2 = size(badi(1,:)) * size(badi(:,1))
-! 
+!
 !    else if (key.eq."SUMMERS") then
 !     ! -- Switch for density dependent DR coefficient
 !     !
@@ -1251,15 +1202,15 @@ MODULE collision
 !     ! density dependence of dielectronic recombination:
 !     ! sumscl = 0. -> no density dependence
 !     ! sumscl = 1. -> full density dependence
-! 
+!
 !     Nitem = 1
 !     read(inputline(len(key)+1:), *) sumscl
-! 
+!
 !     Nitem2 = 1
-! 
+!
 !    else if (key.eq."AR85-CDI") then
 !     read(inputline(len(key)+1:),*) i1, i2, Nrow
-! 
+!
 !     if (Nrow.gt.MSHELL) then
 !      write(*,*) "Nrow is greater than MSHELL, exiting..."
 !      stop
@@ -1271,14 +1222,14 @@ MODULE collision
 !        FormatLine, inputline, Nread)
 !       read(inputline,*) (cdi(m,k),k=1,MSHELL)
 !     end do
-! 
+!
 !     Nitem2 = size(cdi(1,:)) * size(cdi(:,1))
-! 
+!
 !     i = MIN(i1,i2) + 1
 !     j = MAX(i1,i2) + 1
 !     ij = (i-1)*atom%Nlevel +j
 !     ji = (j-1)*atom%Nlevel +i
-! 
+!
 !    else if (key.eq.END_OF_FILE) then
 !     exit
 !    else
@@ -1286,7 +1237,7 @@ MODULE collision
 !     write(*,*) "exiting..."
 !     stop
 !    end if ! end over possible cases key
-! 
+!
 !    if (Nitem2 .ne. Nitem) then
 !     ! -- Actually, the error should be in the reading.
 !     write(*,*) "Error, read ", Nitem2," items->expected ", &
@@ -1295,22 +1246,22 @@ MODULE collision
 !     write(*,*) "Exiting..."
 !     stop
 !    end if
-! 
+!
 !    ! -- END of reading, filling now ...
-! 
+!
 !    if ((key.eq."OMEGA") .or. (key.eq."CE") .or. &
 !        (key.eq."CI") .or. (key.eq."CP") .or. &
 !        (key.eq."CH0") .or. (key.eq."CH+") .or. &
 !        (key.eq."CH") .or. (key.eq."CR") ) then
-! 
-! 
+!
+!
 !                       !here Nitem is NTMP !!
 !     CC = interp_dp(coeff, TGRID, atmos%T(icell))
-! 
+!
 !    end if
 !    if (key.eq."OMEGA") then
 !     ! -- Collisional excitation of ions
-! 
+!
 !     !!do k=1, atmos%Nspace !! cell by cell
 !      !! C is a constant, replace by C(k) if for all grid at once
 !      !! and C(ij) by C(ij,k)
@@ -1412,7 +1363,7 @@ MODULE collision
 !     ! First line coefficients are energies in K (from Chianti)
 !     ! Second line coefficients are coefficients (from Chianti)
 !     ! See Badnell 2006 for more details
-! 
+!
 !     !!do k =1,atmos%Nspace
 !      summrs = sumscl*summers(i,j,atmos%ne(icell),atom) + &
 !        (1.-sumscl)
@@ -1426,9 +1377,9 @@ MODULE collision
 !      ! -- convert from cm3/s to m3/s
 !      cdn = cdn *atmos%ne(icell) * summrs * CUBE(CM_TO_M)
 !      cup = cdn * atom%nstar(j,icell)/atom%nstar(i,icell)
-! 
+!
 !      cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
-! 
+!
 !      C(ij) = C(ij) + cdn
 !      C(ji) = C(ji) + cup
 !      !write(*,*) "BADNELL", cdn, cup
@@ -1535,21 +1486,21 @@ MODULE collision
 !     !!end do
 !    end if
 !   end do !loop over (remaining) lines (of the atomic model)
-! 
-!  
+!
+!
 !  !!close(colunit) !! closed latter
 !  !! reset the cursor for next cell point !!
 !  checkfseek = fseek(atom%colunit,atom%offset_coll, 0)
-!  if (checkfseek.gt. 0 ) then 
+!  if (checkfseek.gt. 0 ) then
 !    write(*,*) 'fseek error'
-!    stop 
+!    stop
 !  end if
-! 
+!
 !  atom%Ckij(icell,:) = C(:)
 !  deallocate(TGRID)
 !  !!deallocate(C) !! not an array anymore
 !  deallocate(coeff)
-! 
+!
 !  RETURN
 !  END SUBROUTINE CollisionRate_File
 

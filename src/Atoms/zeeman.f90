@@ -9,8 +9,8 @@ MODULE zeeman
  CONTAINS
 
  FUNCTION Lande(S, L, J) result(g)
-  real(8) :: S, J
-  integer :: L
+  real(8) :: S
+  integer :: L, J
   real(8) :: g
 
   if (J .eq. 0.0) then
@@ -53,9 +53,9 @@ MODULE zeeman
  FUNCTION ZeemanStrength(Ji, Mi, Jj, Mj)
   use math, only : w3js
   double precision :: ZeemanStrength, dM
-  double precision, intent(in) :: Ji, Jj, Mi, Mj
+  integer, intent(in) :: Ji, Jj, Mi, Mj
   integer :: q
-  
+
   !q = -1 = sB, 0 spi, +1 sr
   !dM = 1 -> sr; dM = +1 sb
   dM = Mj - Mi
@@ -65,17 +65,17 @@ MODULE zeeman
     ZeemanStrength = 0d0
     RETURN !should not happen
   end if
-  
+
   ZeemanStrength = 3d0 * w3js(int(2*Jj),int(2*Ji),2,&
                               -int(2*Mj),int(2*Mi),-2*q)**2
  RETURN
  END FUNCTION ZeemanStrength
 
  SUBROUTINE ZeemanMultiplet(line) !Called only once per line
-  type(AtomicLine), intent(inout) :: line  
-  integer :: nc, i1, i2
-  double precision :: Mi, Mj!, norm(3) !sum of -1, 0 and +1 components
-  							!not need, j-symbols normalised
+  type(AtomicLine), intent(inout) :: line
+  integer :: nc, i1, i2, Mi, Mj
+  !, norm(3) !sum of -1, 0 and +1 components
+  !not need, j-symbols normalised
 
   if (line%ZeemanPattern == -1 .and. line%polarizable) then
    line%zm%Ncomponent = 3
@@ -88,7 +88,7 @@ MODULE zeeman
 !    write(*,*) line%zm%q
 !    write(*,*) line%zm%shift
 !    write(*,*) line%zm%strength
-   			  
+
   else if (line%ZeemanPattern == 1 .and. line%polarizable) then
    !Strength relative of all components
    !First count number of components
@@ -102,11 +102,11 @@ MODULE zeeman
      if (abs(Mi-Mj) <= 1) line%zm%Ncomponent = line%zm%Ncomponent + 1
     end do
    end do
-   
+
    allocate(line%zm%q(line%zm%Ncomponent), &
             line%zm%strength(line%zm%Ncomponent), &
             line%zm%shift(line%zm%Ncomponent))
-  
+
    write(*,*) "  Line ", line%j,"->",line%i," has", line%zm%Ncomponent,&
    			  " Zeeman components, geff=", line%g_lande_eff
    write(*,*) "J' = ", line%atom%qJ(line%j), " J = ", line%atom%qJ(line%i)
@@ -117,20 +117,19 @@ MODULE zeeman
       nc = nc + 1
       line%zm%q(nc) = -int(Mj - Mi)
       line%zm%shift(nc) = line%glande_i * Mi - line%glande_j * Mj
-      line%zm%strength(nc) = ZeemanStrength(line%atom%qJ(line%i),Mi,&
-      						                line%atom%qJ(line%j), Mj)
-      write(*,*) line%zm%q(nc), line%zm%shift(nc), "Strength = ",line%zm%strength(nc) 
+      line%zm%strength(nc) = ZeemanStrength(line%atom%qJ(line%i),Mi,line%atom%qJ(line%j), Mj)
+      write(*,*) line%zm%q(nc), line%zm%shift(nc), "Strength = ",line%zm%strength(nc)
      end if
     end do
    end do
 
   else if (.not.line%polarizable) then !unpolarized line
-   allocate(line%zm%q(1), line%zm%strength(1), line%zm%shift(1)) 
+   allocate(line%zm%q(1), line%zm%strength(1), line%zm%shift(1))
    line%zm%Ncomponent = 1
    line%zm%q = 0d0
    line%zm%strength = 0d0 !not used in this case.
    line%zm%shift = 0d0
-   
+
   else
     CALL Error("Zeeman components Recipe unknown!")
   end if

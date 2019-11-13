@@ -6,7 +6,6 @@ MODULE init_solution
  use atom_type, only : AtomType, AtomicLine, AtomicContinuum
  use spectrum_type, only : NLTEspec, alloc_weights, dealloc_weights
  use mcfost_env, only : dp
- use collision, only : openCollisionFile, closeCollisionFile, keep_collision_lines
  use accelerate
  use messages
  use parametres
@@ -15,10 +14,12 @@ MODULE init_solution
  use constant, only : CLIGHT
  use input, only : ds
  
+
  IMPLICIT NONE
- 
+
  real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, pop_old
  real(kind=dp), dimension(:), allocatable :: flatpops
+
  
  
   
@@ -106,6 +107,11 @@ MODULE init_solution
  END FUNCTION cont_wlam
  
  
+
+
+
+ CONTAINS
+
  SUBROUTINE Init_NLTE(sub_iterations_enabled)
  ! ---------------------------------------------------- !
   ! Initialize quantities for NLTE atomic line transfer
@@ -135,10 +141,11 @@ MODULE init_solution
   if (allocated(ds)) deallocate(ds)
   allocate(ds(atmos%Nrays, NLTEspec%Nproc))
    
+
   if (lNg_acceleration) CALL Warning("Acceleration enabled", "Allocating space for Structure")
   ! if OLD_POPULATIONS, the init is done at the reading
   ! Or this subroutine should be invoked after readatom, because we need pops for ne
-  
+
    NmaxLevel = 0
    do nact=1,atmos%Nactiveatoms
      atom => atmos%ActiveAtoms(nact)%ptr_atom
@@ -155,7 +162,7 @@ MODULE init_solution
      SELECT CASE (atom%initial_solution)
       CASE ("LTE_POPULATIONS")
         atom%n(:,:) = atom%nstar(:,:)
-        
+
       CASE ("ZERO_RADIATION")
         do icell=1,atmos%Nspace
          if (atmos%icompute_atomRT(icell)>0) then
@@ -177,12 +184,8 @@ MODULE init_solution
      !CASE ("ITERATIONS")
      !CASE ("SOBOLEV")
      CASE DEFAULT
-      CALL Error("Initial solution unkown or not implemented", atom%initial_solution) 
-     END SELECT 
-
-     CALL openCollisionFile(atom) !closed at the end of the NLTE, it is not nice to do that
-       								!but cheap in memory. Cause problem if parallel or
-       								!run on a machine. Extra I/O overhead expected
+      CALL Error("Initial solution unkown or not implemented", atom%initial_solution)
+     END SELECT
 
      !CALL allocNetCoolingRates(atmos%ActiveAtoms(nact)%ptr_atom)
      if (lNg_acceleration) then !Nord >0 already tested
@@ -190,14 +193,11 @@ MODULE init_solution
       CALL initNg(atmos%Nspace*atom%Nlevel, iNg_Ndelay, iNg_Norder , iNg_Nperiod, atom%Ngs)
      endif
 
-	 CALL Keep_collision_lines(atom) !an array containing the lines in file read from atom%offset_col to END
-	 !it avoids reading in the file, instead it reads an array (small)
-	 CALL closeCollisionFile(atom)
-    !!CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom) !to move elsewhere
-  	 !deallocate(atom%C) !not used anymore if stored on RAM
+     !!CALL writeAtomData(atmos%ActiveAtoms(nact)%ptr_atom) !to move elsewhere
+     !deallocate(atom%C) !not used anymore if stored on RAM
      atom => NULL()
    enddo
-   
+
    if (present(sub_iterations_enabled)) then
     if (sub_iterations_enabled) then
       Write(*,*) " Allocating space for sub-iterations populations"
@@ -214,32 +214,34 @@ MODULE init_solution
    write(*,*) "Using Hogerheijde"
     !FillGamma_atom => FillGamma_atom_hogerheijde
     FillGamma_atom_mu => FillGamma_atom_hogerheijde_mu
-  end if! 
+  end if!
 
-   
+
  RETURN
  END SUBROUTINE init_nlte
- 
+
  SUBROUTINE free_nlte_sol(sub_iterations_enabled)
   logical, intent(in) :: sub_iterations_enabled
   type (AtomType), pointer :: atom
   integer :: nact
-  
+
 !   FillGamma_bb => NULL()
 !   FillGamma_bf => NULL() !not needed anymore at the end of the NLTE
- 
+
   deallocate(gpop_old)
   if (sub_iterations_enabled) then
    !if (allocated(pop)) deallocate(pop)
    if (allocated(pop_old)) deallocate(pop_old)
   endif
+
   
   CALL dealloc_weights() !and phi_ray
   deallocate(chi_loc, ds)
-  
+
+
   do nact=1,atmos%Nactiveatoms
    atom  => atmos%ActiveAtoms(nact)%ptr_atom
-   !!!!CALL closeCollisionFile(atom) 
+   !!!!CALL closeCollisionFile(atom)
    if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%gamma)) & !otherwise we have never enter the loop
      deallocate(atmos%ActiveAtoms(nact)%ptr_atom%gamma)
    !!if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)) deallocate(atmos%ActiveAtoms(nact)%ptr_atom%Ckij)
@@ -249,5 +251,5 @@ MODULE init_solution
 
  RETURN
  END SUBROUTINE free_nlte_sol
- 
+
 END MODULE init_solution

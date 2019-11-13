@@ -22,7 +22,7 @@ MODULE atom_type
    integer, allocatable, dimension(:)  :: q
    real(kind=dp), allocatable, dimension(:)  :: shift, strength
   END TYPE ZeemanType
-  
+
   !Sets at reading: First LINES THEN CONTINUA
   !line, 1->Nl, continuum, Nl+1->Nc+Nl
   TYPE AtomicTransition
@@ -30,7 +30,7 @@ MODULE atom_type
    integer :: ik
    logical :: lcontrib_to_opac =.true.
   END TYPE AtomicTransition
- 
+
   TYPE AtomicLine
    logical           :: symmetric, polarizable!!, lcontrib_to_opac !default is yes, set at reading
    logical           :: Voigt=.true., PFR=.false.,&
@@ -103,7 +103,6 @@ MODULE atom_type
    real(kind=dp), allocatable, dimension(:) :: g, E, vbroad!, ntotal
    real(kind=dp), allocatable, dimension(:) :: qS, qJ
    ! allocated in readatom.f90, freed with freeAtoms()
-   
    !futur deprecation, because I will stop using RH routine
    character(len=MAX_LENGTH), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
    !Nlevel * Nlevel * Nproc
@@ -142,17 +141,17 @@ MODULE atom_type
  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
  CONTAINS
- 
+
  !for lines only, for continuum it is simply cont%j
  FUNCTION find_continuum(atom, l)
   integer :: l, find_continuum
   type (AtomType) :: atom
-  
+
   find_continuum = l + 1
   do while ((atom%stage(find_continuum) < atom%stage(l)+1).and.(find_continuum <= atom%Nlevel))
    find_continuum = find_continuum + 1
   end do
-  
+
   if (atom%stage(find_continuum) == atom%stage(l)+1) then
      return !continuum level reach
  else
@@ -160,10 +159,10 @@ MODULE atom_type
      find_continuum = 0
      return
  end if
-  
+
  RETURN
  END FUNCTION find_continuum
- 
+
 
  FUNCTION atomic_orbital_radius(n, l, Z)
  !return atomic orbital radius wrt the Bohr radius
@@ -171,26 +170,26 @@ MODULE atom_type
   real(kind=dp) :: n ! quantum principal number
   integer :: l ! orbital quantum number
   integer :: Z ! charge ?
-  
+
   atomic_orbital_radius = n*n/real(Z) * (1d0 + 0.5*(1d0 - real(l)*(real(l)+1)/n/n))
-  
+
   RETURN
  END FUNCTION atomic_orbital_radius
- 
+
  FUNCTION atomic_orbital_sqradius(n, l, Z)
- !Bates-Damguard mean suare radius 
+ !Bates-Damguard mean suare radius
   real(kind=dp) :: atomic_orbital_sqradius
   !in a0**2 units
   real(kind=dp) :: n ! quantum principal number
   integer :: l ! orbital quantum number
   integer :: Z ! charge ?
-  
+
   atomic_orbital_sqradius = 0.5*n*n/real(Z*Z) * (5.*n*n + 1 - 3.*real(l)*(real(l)+1))
-  
-  
+
+
   RETURN
  END FUNCTION atomic_orbital_sqradius
- 
+
 
  FUNCTION getOrbital(orbit) result (L)
   integer :: L
@@ -308,8 +307,8 @@ MODULE atom_type
   SUBROUTINE determinate(label, g, S, L,J, determined)
   ! get principal quantum number from label
    logical, intent(out) :: determined
-   integer, intent(out) :: L
-   real(kind=dp), intent(out) :: S, J
+   integer, intent(out) :: L, J
+   real(kind=dp), intent(out) :: S
    real(kind=dp), intent(in) :: g
    character(len=ATOM_LABEL_WIDTH), intent(in) :: label
    character(len=ATOM_LABEL_WIDTH+1) :: multiplet
@@ -380,7 +379,7 @@ MODULE atom_type
    !WK = wKul**2
   RETURN
   END FUNCTION wKul
-  
+
    FUNCTION atomZnumber(atom)
    ! --------------------------------------
    ! return the atomic number of an atom
@@ -389,7 +388,7 @@ MODULE atom_type
    ! --------------------------------------
     type (AtomType), intent(in) :: atom
     integer :: atomZnumber
-    
+
     atomZnumber = atom%periodic_table
 
    RETURN

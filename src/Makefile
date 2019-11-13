@@ -158,8 +158,8 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90      
           mem.f90 init_mcfost.f90 $(Atom_dir)/ttauri_module.f90 io_phantom_infiles.f90 \
 	  io_phantom_utils.f90 utils_hdf5.f90 read_phantom.f90 read_gadget2.f90  \
 	  SPH2mcfost.f90 $(Atom_dir)/spectrum_type.f90 $(Atom_dir)/barklem.f90   \
-	  $(Atom_dir)/writeatom.f90 $(Atom_dir)/readatom.f90                     \
-	  $(Atom_dir)/collision.f90 $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90  \
+	  $(Atom_dir)/writeatom.f90 $(Atom_dir)/collision.f90 $(Atom_dir)/readatom.f90 \
+	  $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90  \
 	  $(Atom_dir)/voigtfunctions.f90 $(Atom_dir)/profiles.f90                \
 	  $(Atom_dir)/rayleigh_scattering.f90 $(Atom_dir)/thomson_scattering.f90 \
 	  $(Atom_dir)/hydrogen.f90 $(Atom_dir)/planck.f90 $(Atom_dir)/metal.f90 \
