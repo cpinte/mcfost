@@ -162,6 +162,55 @@ MODULE math
      end do
    RETURN
    END FUNCTION any_nan_infinity_vector
+   
+   !c'est bourrin, il n y a pas de test
+   FUNCTION linear_1D(N,x,y,Np,xp)
+    real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
+    integer :: N, Np, i, j
+    
+
+    do i=1,N-1
+     
+     do j=1,Np
+     !where (xp >= x(i) .and. xp <= x(i+1))
+      ! linear_1D = (1.0_dp - (xp - x(i)) / (x(i+1)-x(i))) * y(i)  + (xp(j) - x(i)) / (x(i+1)-x(i)) * y(i+1)
+     !endwhere
+      if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
+       t = (xp(j) - x(i)) / (x(i+1)-x(i))
+       linear_1D(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
+      endif
+     
+     enddo
+    
+    enddo
+   
+   
+   RETURN
+   END FUNCTION linear_1D
+   !c'est bourrin, il n y a pas de test
+   !same as linear_1D but N = Np
+   FUNCTION linear_1D_mf(N,x,y,xp)
+    real(kind=dp) :: x(N),y(N),linear_1D_mf(N), xp(N), t
+    integer :: N, Np, i, j
+    
+    
+    linear_1D_mf(:) = 0.0_dp
+    j = 0
+    do i=1,N-1
+
+     
+      if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
+       t = (xp(j) - x(i)) / (x(i+1)-x(i))
+       linear_1D_mf(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
+     
+      endif
+    
+    enddo
+   
+   
+   RETURN
+   END FUNCTION linear_1D_mf
+   
   
    FUNCTION Integrate_x(N, x, y) result(integ)
     integer :: N
