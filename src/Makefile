@@ -46,6 +46,10 @@ ifeq ($(DEBUGP), yes)
     OPENMP=yes
 endif
 
+ifeq ($(profiling), yes)
+    PROFILING=yes
+endif
+
 #------------------------------------------------------------------------------#
 # System dependent compiler flags
 
@@ -114,6 +118,11 @@ ifeq ($(DEBUG), yes)
     FFLAGS+= ${DEBUGFLAG}
     FFLAGS:= $(FFLAGS:-O3=-O0)
 endif
+
+ifeq ($(PROFILING), yes)
+    FFLAGS+= -g
+endif
+
 
 ifeq ($(DEV), yes)
    FFLAGS:= $(FFLAGS:-O3=-O1)
