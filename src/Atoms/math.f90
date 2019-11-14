@@ -7,7 +7,7 @@ MODULE math
 
 
   CONTAINS
-  
+
   !building
   FUNCTION overlapping_transitions(lambda, Nl, Nblue, Nl2, Nblue2) result(overlap)
   !Find where lambda(Nblue:Nblue+Nl-1)==lambda(Nblue2:Nblue2+Nl2-1)
@@ -16,8 +16,8 @@ MODULE math
   !for the same index. But they have differents Nblue, Nl
    integer :: Nblue, Nl, Nl2, Nblue2, overlap(Nl)
    real(kind=dp) :: lambda(:)
-   integer :: i, j 
-  
+   integer :: i, j
+
    overlap(:) = 0
 
    i_loop : do i=1,Nl
@@ -26,14 +26,14 @@ MODULE math
        overlap(i) = Nblue+i-1 !index on lambda grid
        cycle i_loop
      end if
-    
+
     enddo
    enddo i_loop
-  
+
   RETURN
   END FUNCTION overlapping_transitions
-  
-  
+
+
   FUNCTION flatten(n1, n2, M)
   !for each i in n1 write the n2 values of n1(i,:)
      		     !In the flattened array, there are:
@@ -43,7 +43,7 @@ MODULE math
      		     !                   icell=1->Ncells
    integer :: n1, n2, i, j
    real(kind=dp) :: flatten(n1*n2), M(n1,n2)
-   
+
    do i=1, n1
     !write(*,*) i
     do j=1, n2
@@ -52,24 +52,24 @@ MODULE math
      !n2 values per i
     enddo
    enddo
-   
+
   RETURN
   END FUNCTION flatten
-  
+
   FUNCTION reform(n1, n2, F)
   !reform the (n1, n2) matrix from flatten(n1,n2,F)
    integer :: n1, n2, i, j
    real(kind=dp) :: F(n1*n2), reform(n1,n2)
-   
+
    do i=1, n1
     do j=1, n2
      reform(i,j) = F(n2*(i-1)+j)
     enddo
    enddo
-   
+
   RETURN
   END FUNCTION reform
-  
+
   FUNCTION flatten2(n1, n2, M)
   !for each j in n2 write the n1 values of n1(:,j)
      		     !In the flattened array, there are:
@@ -79,36 +79,36 @@ MODULE math
      		     !                   ilvl=1->Nl
    integer :: n1, n2, i, j
    real(kind=dp) :: flatten2(n1*n2), M(n1,n2)
-   
+
    do i=1, n1 !Nlevel
-    !write(*,*) i 
+    !write(*,*) i
     do j=1, n2 !Ncells
      !write(*,*) j, n1*(j-1)+i, n2
      flatten2(n1*(j-1)+i) = M(i,j)
      !n1 values per j
     enddo
    enddo
-   
+
   RETURN
   END FUNCTION flatten2
-  
+
   FUNCTION reform2(n1, n2, F)
   !reform the (n1, n2) matrix from flatten2(n1,n2,F)
    integer :: n1, n2, i, j
    real(kind=dp) :: F(n1*n2), reform2(n1,n2)
-   
+
    do i=1, n1
     do j=1, n2
      reform2(i,j) = F(n1*(j-1)+i)
     enddo
    enddo
-   
+
   RETURN
   END FUNCTION reform2
-  
+
    FUNCTION is_nan_infinity(y) result(val)
     real(kind=dp) :: y, val
-    
+
      val = 0
     if (y /= y) then
      write(*,*) "(Nan):", y
@@ -118,15 +118,15 @@ MODULE math
      write(*,*) "(infinity):", y
      val = 2
      return
-    end if      
+    end if
 
    RETURN
    END FUNCTION is_nan_infinity
-  
+
    FUNCTION any_nan_infinity_matrix(y) result(val)
     real(kind=dp) :: y(:,:)
     integer :: val, i, j
-    
+
      val = 0
      do i=1,size(y(:,1))
       do j=1, size(y(1,:))
@@ -138,7 +138,7 @@ MODULE math
         write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1)
         val = 2
         return
-       end if      
+       end if
       end do
      end do
    RETURN
@@ -147,7 +147,7 @@ MODULE math
    FUNCTION any_nan_infinity_vector(y) result(val)
     real(kind=dp) :: y(:)
     integer :: val, i
-    
+
      val = 0
      do i=1,size(y)
        if (y(i) /= y(i)) then
@@ -158,106 +158,132 @@ MODULE math
         write(*,*) "(infinity):", y(i), y(i)*(1+0.1)
         val = 2
         return
-       end if      
+       end if
      end do
    RETURN
    END FUNCTION any_nan_infinity_vector
-   
-   !c'est bourrin, il n y a pas de test
-   FUNCTION linear_1D(N,x,y,Np,xp)
-    real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
-    integer :: N, Np, i, j
-    
 
-    do i=1,N-1
-     
-     do j=1,Np
-     !where (xp >= x(i) .and. xp <= x(i+1))
-      ! linear_1D = (1.0_dp - (xp - x(i)) / (x(i+1)-x(i))) * y(i)  + (xp(j) - x(i)) / (x(i+1)-x(i)) * y(i+1)
-     !endwhere
-      if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
-       t = (xp(j) - x(i)) / (x(i+1)-x(i))
-       linear_1D(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
-      endif
-     
+   !c'est bourrin, il n y a pas de test
+   function linear_1D(N,x,y,Np,xp)
+     real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
+     integer :: N, Np, i, j
+
+     do i=1,N-1
+        do j=1,Np
+           !where (xp >= x(i) .and. xp <= x(i+1))
+           ! linear_1D = (1.0_dp - (xp - x(i)) / (x(i+1)-x(i))) * y(i)  + (xp(j) - x(i)) / (x(i+1)-x(i)) * y(i+1)
+           !endwhere
+           if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
+              t = (xp(j) - x(i)) / (x(i+1)-x(i))
+              linear_1D(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
+           endif
+        enddo
      enddo
-    
-    enddo
-   
-   
-   RETURN
-   END FUNCTION linear_1D
+
+     return
+
+   end function linear_1D
+
+   function linear_1D_sorted(n,x,y, np,xp)
+     ! assumes that both x and xp are in increasing order
+     ! We only loop once over the initial array, and we only perform 1 test per element
+
+     integer, intent(in)                      :: n, np
+     real(kind=dp), dimension(n),  intent(in) :: x,y
+     real(kind=dp), dimension(np), intent(in) :: xp
+     real(kind=dp), dimension(np)             :: linear_1D_sorted
+
+     real(kind=dp) :: t
+     integer :: i, j, i0
+
+     do j=1, np
+        i0 = 2
+        loop_i : do i=i0, n
+           if (x(i) > xp(j)) then
+              t = (xp(j) - x(i-1)) / (x(i)-x(i-1))
+              linear_1D_sorted(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
+              i0 = i
+              exit loop_i
+           endif
+        enddo loop_i
+     enddo
+
+     return
+
+   end function linear_1D_sorted
+
+
    !c'est bourrin, il n y a pas de test
    !same as linear_1D but N = Np
    FUNCTION linear_1D_mf(N,x,y,xp)
     real(kind=dp) :: x(N),y(N),linear_1D_mf(N), xp(N), t
     integer :: N, Np, i, j
-    
-    
+
+
     linear_1D_mf(:) = 0.0_dp
     j = 0
     do i=1,N-1
 
-     
+
       if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
        t = (xp(j) - x(i)) / (x(i+1)-x(i))
        linear_1D_mf(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
-     
+
       endif
-    
+
     enddo
-   
-   
+
+
    RETURN
    END FUNCTION linear_1D_mf
-   
-  
+
+
    FUNCTION Integrate_x(N, x, y) result(integ)
     integer :: N
     real(kind=dp), dimension(N) :: x, y
     real(kind=dp) :: integ
     integer  :: k
-    
+
     integ = 0.5 * dabs(x(2)-x(1)) * y(1)
     do k=2,N
      integ = integ + dabs(x(k)-x(k-1)) * 0.5 * (y(k)+y(k-1))
     end do
-   
+
    RETURN
    END FUNCTION Integrate_x
-   
+
    FUNCTION Integrate_nu(N, x, y)
     integer :: N
     real(kind=dp), dimension(N) :: x, y
     real(kind=dp) :: Integrate_nu, sum1, sum2
     integer  :: k
-    
+
     Integrate_nu = y(1) + y(N)
     sum1 = 0d0; sum2 = 0d0
     do k=2,N-1
-     if (mod(k,2) /= 0) then 
+     if (mod(k,2) /= 0) then
       sum1 = sum1 + y(k)
      else
       sum2 = sum2 + y(k)
      endif
     end do
-    
+
     Integrate_nu = (Integrate_nu + 4*sum1 + 2*sum2) * (x(N)-x(1))/(N*3.)
-   
+
    RETURN
    END FUNCTION Integrate_nu
-   
+
    FUNCTION Integrate_dx(N, dx, y) result(integ)
     integer :: N
     real(kind=dp), dimension(N) :: dx, y
     real(kind=dp) :: integ
     integer  :: k
-    
+
     integ = 0.5 * dx(1) * y(1)
     do k=2,N
      integ = integ + dx(k) * 0.5 * (y(k)+y(k-1))
     end do
-   
+
    RETURN
    END FUNCTION Integrate_dx
 
@@ -540,13 +566,13 @@ MODULE math
    real(kind=dp), DIMENSION(N1a,N2a), intent(in) :: ya
    real(kind=dp)  :: y(N1,N2)
    integer :: i, j
-   
+
    do i=1,N1
     do j=1,N2
      y(i,j) = Interp2D(x1a, x2a, ya,x1(i),x2(j))
     end do
    end do
-   
+
    RETURN
   END FUNCTION interp2Darr
 
@@ -574,7 +600,7 @@ MODULE math
    gammln=tmp+log(stp*ser/x)
   RETURN
   END FUNCTION gammln
-  
+
   FUNCTION locate(xx,x,mask) result(y)
 
   real(kind=dp), dimension(:), intent(in) :: xx
@@ -588,7 +614,7 @@ MODULE math
   ! 1D array
    y = minloc((xx-x)**2,1) !(xx(:)-x)*(xx(:)-x)
   end if
-  
+
   RETURN
   END FUNCTION locate
 
