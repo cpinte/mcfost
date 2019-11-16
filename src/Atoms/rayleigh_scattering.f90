@@ -5,10 +5,12 @@ MODULE rayleigh_scattering
  use spectrum_type, only   : NLTEspec
  use constant
  use parametres
+ 
+ use mcfost_env, only : dp
 
  IMPLICIT NONE
 
- double precision, parameter :: LONG_RAYLEIGH_WAVE=1.d6 !nm
+ real(kind=dp), parameter :: LONG_RAYLEIGH_WAVE=1.d6 !nm
 
  CONTAINS
  
@@ -20,8 +22,8 @@ MODULE rayleigh_scattering
  ! ------------------------------------------------------------- !
   !type (AtomType), intent(in)                               :: atom
   integer, intent(in)                                       :: icell, id
-  double precision 											:: lambda_limit!, sigma_e
-  double precision, dimension(NLTEspec%Nwaves) 				:: scatt
+  real(kind=dp) 											:: lambda_limit!, sigma_e
+  real(kind=dp), dimension(NLTEspec%Nwaves) 				:: scatt
   
   !if (atom%ID /= "H") RETURN
   
@@ -35,7 +37,9 @@ MODULE rayleigh_scattering
 
   if (lstore_opac) then
    NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
-   									 scatt * sigma_e * Hydrogen%n(1,icell)!atmos%nHtot(icell) !m^-1
+   									 scatt * sigma_e * sum(Hydrogen%n(1:Hydrogen%Nlevel-1,icell))
+!    NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
+!    									 scatt * sigma_e * Hydrogen%n(1,icell)!atmos%nHtot(icell) !m^-1
   else
    NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
    									 scatt * sigma_e * Hydrogen%n(1,icell)
@@ -52,14 +56,23 @@ MODULE rayleigh_scattering
  ! ------------------------------------------------------------- !
   !type (AtomType), intent(in)                               :: atom
   integer, intent(in)                                       :: icell, id
-  double precision 											:: lambda_limit!, sigma_e
-  double precision, dimension(NLTEspec%Nwaves) 				:: scatt
+  real(kind=dp) 											:: lambda_limit!, sigma_e
+  real(kind=dp), dimension(NLTEspec%Nwaves) 				:: scatt
+  integer													:: Neutr_index, l
   
   !if (atom%ID /= "He") RETURN
   if (.not.associated(Helium)) RETURN
   
   lambda_limit = 121.6d0 !which one for helium?
   scatt = 0d0
+  
+  l = 1
+  do while (Helium%stage(l)==0)
+   l = l+1
+  enddo
+  Neutr_index = l - 1
+  !write(*,*) "Helium last Neutral level", Neutr_index
+  !stop
 
 
   where(NLTEspec%lambda >= lambda_limit)
@@ -69,7 +82,9 @@ MODULE rayleigh_scattering
 
   if (lstore_opac) then
    NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
-   									 scatt * sigma_e * Helium%n(1,icell) !m^-1
+   									 scatt * sigma_e * sum(Helium%n(1:Neutr_index,icell)) !m^-1
+!    NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
+!    									 scatt * sigma_e * Helium%n(1,icell) !m^-1
   else
    NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
    									 scatt * sigma_e * Helium%n(1,icell)
@@ -101,9 +116,9 @@ MODULE rayleigh_scattering
   integer, intent(in)                                       :: icell, id
   logical                                                   :: res
   integer                                                   :: kr, k, la
-  double precision                                          :: lambda_red, lambda_limit!, &
+  real(kind=dp)                                          :: lambda_red, lambda_limit!, &
    															   !sigma_e
-  double precision, dimension(NLTEspec%Nwaves) 				:: fomega, lambda2, scatt
+  real(kind=dp), dimension(NLTEspec%Nwaves) 				:: fomega, lambda2, scatt
   
   lambda_limit = LONG_RAYLEIGH_WAVE
 !   sigma_e = 8.0*PI/3.0 * &
