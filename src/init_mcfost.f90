@@ -64,7 +64,7 @@ subroutine set_default_variables()
   ! Atomic lines Radiative Transfer (AL-RT)
   lemission_atom = .false.
   lstore_opac = .false.
-  lcoherent_scattering = .false.
+  lelectron_scattering = .false.
   lsolve_for_ne = .false.
   n_iterate_ne = 0
   lstatic = .false.
@@ -613,9 +613,9 @@ subroutine initialisation_mcfost()
      case("-contrib_function")
         i_arg = i_arg + 1
         lcontrib_function = .true.
-     case("-coherent_scatt") !force solving ne density even if provided in the model
+     case("-electron_scatt") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
-        lcoherent_scattering = .true.
+        lelectron_scattering = .true.
      case("-solve_ne") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
         lsolve_for_ne = .true.
@@ -1679,7 +1679,7 @@ subroutine display_help()
   write(*,*) "        : -Ng_Ndelay <Ndelay> <Nperiod> : # of normal iterations before acceleration. # of relaxation before new acceleration"
   write(*,*) "        : -x_coupling : Using MALI scheme for solving the SEE"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
-  write(*,*) "        : -coherent_scatt : Lambda-iterate the mean intensity with SEE"
+  write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "
   write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."
