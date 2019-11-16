@@ -170,9 +170,6 @@ MODULE math
 
      do i=1,N-1
         do j=1,Np
-           !where (xp >= x(i) .and. xp <= x(i+1))
-           ! linear_1D = (1.0_dp - (xp - x(i)) / (x(i+1)-x(i))) * y(i)  + (xp(j) - x(i)) / (x(i+1)-x(i)) * y(i+1)
-           !endwhere
            if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
               t = (xp(j) - x(i)) / (x(i+1)-x(i))
               linear_1D(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
@@ -204,6 +201,9 @@ MODULE math
               linear_1D_sorted(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
               i0 = i
               exit loop_i
+           else
+              linear_1D_sorted(j) = 0d0
+              exit loop_i
            endif
         enddo loop_i
      enddo
@@ -211,31 +211,6 @@ MODULE math
      return
 
    end function linear_1D_sorted
-
-
-   !c'est bourrin, il n y a pas de test
-   !same as linear_1D but N = Np
-   FUNCTION linear_1D_mf(N,x,y,xp)
-    real(kind=dp) :: x(N),y(N),linear_1D_mf(N), xp(N), t
-    integer :: N, Np, i, j
-
-
-    linear_1D_mf(:) = 0.0_dp
-    j = 0
-    do i=1,N-1
-
-
-      if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
-       t = (xp(j) - x(i)) / (x(i+1)-x(i))
-       linear_1D_mf(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
-
-      endif
-
-    enddo
-
-
-   RETURN
-   END FUNCTION linear_1D_mf
 
 
    FUNCTION Integrate_x(N, x, y) result(integ)
