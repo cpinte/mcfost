@@ -125,7 +125,8 @@ MODULE metal
           !Damping value
           !no need for it if we do keep the profile on cell
           if (line%voigt) then
-           deallocate(atom%lines(kc)%a)
+           deallocate(atom%lines(kc)%a) !futur deprec depending of the choice of Voigt
+           deallocate(atom%lines(kc)%aeff)
           endif
           !line profile for v = 0
           deallocate(atom%lines(kc)%phi)
@@ -178,14 +179,22 @@ MODULE metal
         CASE ('ATOMIC_LINE')
           line = atom%lines(kc)
           
+          !some memory can be saved depending of the choice of the profile
+          ! I have to do it for large simu
+          
           !Damping value
           !no need for it if we do keep the profile on cell
+          !except if updated, but if we chose thomson method it is need along to line%aeff
           if (line%voigt) then
            allocate(atom%lines(kc)%a(atmos%Nspace), stat=alloc_status)
            if (alloc_status > 0) CALL ERROR("Allocation error line%adamp")
            atom%lines(kc)%a(:) = 0d0
+           allocate(atom%lines(kc)%aeff(atmos%Nspace), stat=alloc_status)
+           if (alloc_status > 0) CALL ERROR("Allocation error line%eff")
+           atom%lines(kc)%aeff(:) = 0d0
           endif
           !line profile for v = 0
+          !no need to keep it if not interp, no shift. No need also if Thomson
           allocate(atom%lines(kc)%phi(line%Nlambda, atmos%Nspace), stat=alloc_status)
           if (alloc_status > 0) CALL ERROR("Allocation error line%phi")
           atom%lines(kc)%phi(:,:) = 0d0
@@ -254,8 +263,10 @@ MODULE metal
     integer, intent(in) :: icell
     type(AtomType), pointer :: atom
     integer :: n, k, kc, alloc_status, i, j
-    type(AtomicContinuum) :: cont
-    type(AtomicLine) :: line
+    real(kind=dp) :: vbroad, aL
+    type(AtomicContinuum) :: cont !takes time to allocate these cont and line
+    type(AtomicLine) :: line      ! but we do it beforehand, before the actual transfer
+    							  !so that's okay
     
     
     do n=1,atmos%Natom
@@ -268,18 +279,27 @@ MODULE metal
         
         CASE ('ATOMIC_LINE')
          line = atom%lines(kc)
-        
+         vbroad = atom%vbroad(icell)
          
          if (line%voigt) then
           CALL Damping(icell, atom, kc, line%adamp)
-          !no need to keep it if we keep the profile
+          !no need to keep it if we keep the profile for shift or interp
           atom%lines(kc)%a(icell) = line%adamp
-          atom%lines(kc)%phi(:,icell) = Voigt(line%Nlambda, line%adamp, line%u(:)/atom%vbroad(icell))
+          !line%u(:) = atom%lines(kc)%u / atom%vbroad(icell)
+          !                             if full profile to be interpolated or shifter.
+          !                             if we use another approx for Voigt, it is computed on the fly, not shifted nor interp
+          atom%lines(kc)%phi(:,icell) = Voigt(line%Nlambda, line%adamp, line%u(:)/vbroad)!/atom%vbroad(icell))
           !write(*,*) "d = ", line%adamp
           !write(*,*) maxval(atom%lines(kc)%phi(:,icell)), minval(atom%lines(kc)%phi(:,icell))
+          !Thomson method effective damping for all cells
+          aL = line%adamp * vbroad !(m/s), adamp in doppler units
+          atom%lines(kc)%aeff(icell) = (vbroad**5. + 2.69269*vbroad**4. * aL + 2.42843*vbroad**3. * aL**2. + &
+          		4.47163*vbroad**2.*aL**3. + 0.07842*vbroad*aL**4. + aL**5.)**(0.2) !1/5
          else !Gaussian
+          !no need if no interp nor shift or if we use Thomson (but keep adamp for thomson)
           atom%lines(kc)%phi(:,icell) = dexp(-(line%u(:)/atom%vbroad(icell))**2)
          endif
+         !futur test to see if we keep it or not depending on the method of calculation of profiles
          atom%lines(kc)%phi(:,icell) = atom%lines(kc)%phi(:,icell) / (SQRTPI * atom%vbroad(icell))
         
         CASE ("ATOMIC_CONTINUUM")
@@ -287,7 +307,7 @@ MODULE metal
          cont = atom%continua(kc)
          i=cont%i; j=cont%j
    
-         if (atom%nstar(j,icell) <= tiny_dp .or. atom%nstar(i,icell) < tiny_dp) then
+         if (atom%nstar(j,icell) < tiny_dp .or. atom%nstar(i,icell) < tiny_dp) then
           atom%continua(kc)%gij(:,icell) = 0d0
          else
           atom%continua(kc)%gij(:, icell) = atom%nstar(i,icell)/atom%nstar(j,icell) *  &
@@ -316,10 +336,8 @@ MODULE metal
  !being zero below it because the threshold energy is the required minimum. Think the
   ! inverse in terms of wavelengths
   integer, intent(in)							            :: icell
-  logical 										            :: obtained_n
-  integer                                                   :: m, kr, kc, i, j, Z, nc, Nblue, Nred
-  type (AtomType)                                           :: metal
-  type (AtomicContinuum)                                    :: continuum
+  integer                                                   :: m, kr, kc, i, j, Nblue, Nred
+  type (AtomType), pointer                                  :: metal
 
   ! Go throught all bound-free transitions of each PASSIVE
   ! metal and add the opacity and emissivity if lambda
@@ -330,32 +348,32 @@ MODULE metal
 
   do m=1,atmos%Npassiveatoms
   ! run over all passive atoms
-   metal = atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
+   metal => atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
    !if (metal%ID == "H ") CYCLE !H cont is treated in Hydrogen_bf()
     do kc=metal%Ntr_line+1,metal%Ntr
      kr = metal%at(kc)%ik 
     !do kr=1,metal%Ncont
-     continuum = metal%continua(kr)
-     i = continuum%i
-     j = continuum%j !+1 wrt C indexing
-     Nblue = continuum%Nblue; Nred = continuum%Nred
+     i = metal%continua(kr)%i
+     j = metal%continua(kr)%j 
+     Nblue = metal%continua(kr)%Nblue; Nred = metal%continua(kr)%Nred
 
 
 
-
-      NLTEspec%AtomOpac%Kc(Nblue:Nred,icell,1) = NLTEspec%AtomOpac%Kc(Nblue:Nred,icell,1) + &
-       				continuum%alpha(:) * (metal%n(i,icell)-continuum%gij(:,icell)*metal%n(j,icell))
+     NLTEspec%AtomOpac%Kc(Nblue:Nred,icell,1) = NLTEspec%AtomOpac%Kc(Nblue:Nred,icell,1) + &
+       				metal%continua(kr)%alpha(:) * (metal%n(i,icell)-metal%continua(kr)%gij(:,icell)*metal%n(j,icell))
        				
-      NLTEspec%AtomOpac%jc(Nblue:Nred,icell) = NLTEspec%AtomOpac%jc(Nblue:Nred,icell) + &
-       				continuum%twohnu3_c2(:) * continuum%gij(:,icell) * continuum%alpha(:) * metal%n(j,icell)
+     NLTEspec%AtomOpac%jc(Nblue:Nred,icell) = NLTEspec%AtomOpac%jc(Nblue:Nred,icell) + &
+       				metal%continua(kr)%twohnu3_c2(:) * metal%continua(kr)%gij(:,icell) * metal%continua(kr)%alpha(:) * metal%n(j,icell)
 
 
     end do ! loop over Ncont
+    metal => NULL()
   end do !loop over metals
 
  RETURN
  END SUBROUTINE Metal_bf_new
 
+!->futur deprec
  !I try to compute H_bf here also
  SUBROUTINE Metal_bf(id, icell)
  !cross-section in cm2 per particle is given by Kramers’ formula
@@ -473,12 +491,20 @@ MODULE metal
 
 
      CALL Profile(atom%lines(kr),icell,x,y,z,x1,y1,z1,u,v,w,l,id)
+     
+!      write(*,*) maxval(atom%lines(kr)%phi_loc(:,id)), 1./(atom%vbroad(icell)*SQRTPI), atom%lines(kr)%twohnu3_c2, atom%lines(kr)%Bij
+!      write(*,*) atom%lines(kr)%j, atom%lines(kr)%i, atom%n(j,icell), atom%n(i,icell), atom%vbroad(icell)
 
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
      	 hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%phi_loc(:,id) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell))
 
      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
      	atom%lines(kr)%twohnu3_c2 * atom%lines(kr)%gij * hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%phi_loc(:,id) * atom%n(j,icell)
+!      write(*,*) "line ", j,i, " opac = ",hc_fourPI * atom%lines(kr)%Bij /(atom%vbroad(icell)*SQRTPI) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell))
+!      write(*,*) "line ", j,i, " eta = ",atom%lines(kr)%twohnu3_c2 * atom%lines(kr)%gij * hc_fourPI * atom%lines(kr)%Bij /(atom%vbroad(icell)*SQRTPI) * atom%n(j,icell)
+!      write(*,*) "line ", j,i, " tauloc = ",hc_fourPI * atom%lines(kr)%Bij /(atom%vbroad(icell)*SQRTPI) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell)) * l
+
+
 !      do kc=1,atmos%PassiveAtoms(m)%ptr_atom%Ntr_line
 ! 
 !      kr = atmos%PassiveAtoms(m)%ptr_atom%at(kc)%ik
@@ -521,6 +547,7 @@ MODULE metal
  RETURN
  END SUBROUTINE Metal_bb_new
 
+!->futur deprec
  SUBROUTINE Metal_bb (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
   ! Computes the emissivity and extinction of passive lines.
   ! i.e., Atoms with detailed atomic structures read but
@@ -619,26 +646,31 @@ MODULE metal
  
  SUBROUTINE compute_opacities()
  !$ use omp_lib
-  integer :: icell, id
-
+  integer :: icell, id, icell0
+   icell0 = 1
 
    !$omp parallel &
    !$omp default(none) &
-   !$omp private(icell,id) &
+   !$omp private(icell,id,icell0) &
    !$omp shared(atmos)
    !$omp do schedule(dynamic,1)
-   do icell=1,atmos%Nspace
+   do icell=1, atmos%Nspace
     !$ id = omp_get_thread_num() + 1
     if (atmos%icompute_atomRT(icell) > 0) then
      CALL compute_atom_quantities(icell) !need for BackgroundContinua
     									!and lines 
      CALL BackgroundContinua(icell)
+          
     !lines profiles projected after
     endif
    end do
    !$omp end do
    !$omp end parallel
-
+!    CALL Metal_bb_new(1, icell0, 0d0,0d0,0d0 ,0d0, 0d0, 0d0, 0d0, 0D0, 0d0, 566893968.924461_dp)
+!    write(*,*) maxval(NLTEspec%AtomOpac%Kc(:,icell0,1)), maxval(NLTEspec%AtomOpac%jc(:,icell0)), maxval(NLTEspec%AtomOpac%Kc(:,icell0,2))
+!    write(*,*) maxval(NLTEspec%AtomOpac%chi_p(:,1)), maxval(NLTEspec%AtomOpac%eta_p(:,1))
+!   stop
+  
  RETURN
  END SUBROUTINE compute_opacities
  
@@ -646,23 +678,21 @@ MODULE metal
   integer, intent(in) :: icell
   real(kind=dp), dimension(NLTEspec%Nwaves) :: chi, eta, Bpnu!,sca
 
- !test already done
-  !if (atmos%icompute_atomRT(icell)<1) RETURN
-  
+   Bpnu = 0d0
    CALL Bplanck(atmos%T(icell), Bpnu)
 
    chi = 0d0
    eta = 0d0
 
-  NLTEspec%AtomOpac%Kc(:,icell,1) = Thomson(icell)
+   NLTEspec%AtomOpac%Kc(:,icell,1) = atmos%ne(icell) * sigma_e !Thomson(icell)
 
-   !Not working properly if frequencies are removed
+!    !Not working properly if frequencies are removed
    !CALL Rayleigh(1, icell, Hydrogen)
    !if (associated(Helium)) CALL Rayleigh(1, icell, Helium)
    CALL HI_Rayleigh(1, icell)
    if (associated(Helium)) CALL HeI_Rayleigh(1, icell)
 
-
+! 
    NLTEspec%AtomOpac%Kc(:,icell,2) = NLTEspec%AtomOpac%Kc(:,icell,1)
 
    CALL Hydrogen_ff(icell, chi)
@@ -730,7 +760,7 @@ MODULE metal
    chip = 0d0
 
 
-   NLTEspec%AtomOpac%sca_c(:,id) = Thomson(icell) !init then update
+   NLTEspec%AtomOpac%sca_c(:,id) = atmos%ne(icell) * sigma_e
    CALL HI_Rayleigh(id, icell)
    !CALL Rayleigh(id, icell, Hydrogen)
    !if (associated(Helium)) CALL Rayleigh(id, icell, Helium)

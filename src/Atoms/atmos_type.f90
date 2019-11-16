@@ -66,7 +66,7 @@ MODULE atmos_type
    double precision, dimension(:), allocatable :: nHtot, ne, Tpf, T!, vturb
    double precision, dimension(:), allocatable :: nHmin !Hminus populations
    double precision :: B_char = 0d0, v_char=0d0
-   logical :: include_xcoupling = .false., coherent_scattering =.false.
+   logical :: include_xcoupling = .false., electron_scattering =.false.
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
    logical :: Magnetized = .false., XRD=.false., calc_ne
    !dark zone are in lcompute_atomRT->icompute_atomRT == -1
@@ -1196,7 +1196,14 @@ MODULE atmos_type
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
    write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0)
-
+   
+!    do icell=1,atmos%Nspace
+!    
+!     write(*,*) icell, dsqrt(rr(icell)**2+zz(icell)**2)/etoile(1)%r, atmos%T(icell), atmos%ne(icell)/1e21, atmos%nHtot(icell)/rho_to_nH*1e11, &
+!     	dsqrt(atmos%Vxyz(icell,1)**2+atmos%Vxyz(icell,2)**2)/1000.
+!    
+!    enddo
+! stop
   RETURN
   END SUBROUTINE readAtmos_ascii
 

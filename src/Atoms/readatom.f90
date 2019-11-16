@@ -8,7 +8,7 @@ MODULE readatom
   use uplow
   use getline
   use barklem, only : getBarklem
-  use writeatom, only : readPops, create_pops_file
+  use writeatom, only : readPops
   use collision, only : read_collisions
 
   !$ use omp_lib
@@ -407,8 +407,9 @@ MODULE readatom
        stop
      end if
 
-     if (trim(symmChar).eq."ASYMM") then !futur deprecation, but atmosphere will always move
-      !write(*,*) "Line has an asymmetric profile."
+     !symmetric without magnetic field, means that we can compute locally a line profile
+     !only for half of the profile. 
+     if (trim(symmChar).eq."ASYMM") then
       atom%lines(kr)%symmetric = .false.
      else
       atom%lines(kr)%symmetric = .true.
@@ -553,13 +554,13 @@ MODULE readatom
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.
     if (atom%ID(2:2) .eq." ") then
-      atom%dataFile = atom%ID(1:1)//".fits"
+      atom%dataFile = atom%ID(1:1)//".fits.gz" !.fits to be updated, .gz not
     else
-      atom%dataFile = atom%ID(1:2)//".fits"
+      atom%dataFile = atom%ID(1:2)//".fits.gz"
     end if
-    CALL create_pops_file(atom)
-
-    write(*,*) "Populations file for writing: .",trim(atom%dataFile),"."
+    !! done at writing if we do not store them by iterations, but only at the end of the NLTE loop
+    !!CALL create_pops_file(atom)
+    !!write(*,*) "Populations file for writing: .",trim(atom%dataFile),"."
 
    if (atom%active) then
 
@@ -779,9 +780,9 @@ MODULE readatom
 !    write(*,*) nmet, atmos%Atoms(nmet)%ptr_atom%ID, atmos%PassiveAtoms(nmet)%ptr_atom%ID
 !   end do
 
-  write(*,*) "  -> writing lines individual wavelength grid"
-  !write lines grid
-  CALL write_lines_grid()
+!   write(*,*) "  -> writing lines individual wavelength grid"
+!   !write lines grid
+!   CALL write_lines_grid()
 
   RETURN
   END SUBROUTINE readAtomicModels

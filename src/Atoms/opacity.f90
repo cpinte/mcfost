@@ -52,18 +52,24 @@ MODULE Opacity
   RETURN
   END SUBROUTINE calc_psi_operator
   
-!  FUNCTION opacity_atom_loc(id, icell, iray) !update eta and psi
-!   ! ------------------------------------------------------------------------- !
-!   ! ------------------------------------------------------------------------- !  
+
+!  !split loop over cont, since we need them only for iray==1
+!  SUBROUTINE init_eta_atom_loc(id, icell, iray) !update eta and psi
+!   ------------------------------------------------------------------------- !
+!   ------------------------------------------------------------------------- !  
 !   
 !   integer, intent(in) :: id, icell, iray
 !   real(kind=dp) :: stm
 !   integer :: kr, kc, i, j, Nred, Nblue, la, nact
-!   real(kind=dp), dimension(NLTEspec%Nwaves) :: opacity_atom_loc
+!   real(kind=dp), dimension(NLTEspec%Nwaves) :: dtau, chi
+!   type (AtomType), pointer :: aatom
 ! 
+! 
+!   CALL initAtomOpac(id)
+!   CALL initAtomOpac_nlte(id) !not need
+!   CALL init_psi_operator(id,iray) !init also eta
 !   
-! 
-!   opacity_atom_loc(:) = 0.0_dp
+!   chi(:) = 0.0_dp
 !   
 !   atom_loop : do nact = 1, atmos%Nactiveatoms
 !    aatom => atmos%ActiveAtoms(nact)%ptr_atom
@@ -78,15 +84,15 @@ MODULE Opacity
 !         SELECT CASE (aatom%at(kr)%trtype)
 !         
 !          CASE ('ATOMIC_LINE')
-!          !line = aatom%lines(kc)
+!          line = aatom%lines(kc)
 !           Nred = aatom%lines(kc)%Nred;Nblue = aatom%lines(kc)%Nblue
 !           i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
 ! 
-!             
+!           !  Inversion pop, what to do ?
 !           if (aatom%lines(kc)%gij*aatom%n(j,icell) > aatom%n(i,icell)) stm = 0d0
 ! 
-!          !opacity total
-!           opacity_atom_loc(Nblue:Nred) = opacity_atom_loc(Nblue:Nred) + &
+!          opacity total
+!           chi(Nblue:Nred) = chi(Nblue:Nred) + &
 !        		hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell))
 !          
 ! 
@@ -94,13 +100,13 @@ MODULE Opacity
 !            aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
 !               aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * aatom%n(j,icell)
 !               
-! !            if (atmos%include_xcoupling) then
-! !             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id)
-! !             aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + &
-! !             	hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
-! !             aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + &
-! !                 hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
-! !            end if
+!            if (atmos%include_xcoupling) then
+!             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id)
+!             aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + &
+!             	hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
+!             aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + &
+!                 hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
+!            end if
 ! 
 !         
 !         CASE ('ATOMIC_CONTINUUM')
@@ -118,17 +124,17 @@ MODULE Opacity
 !           endif
 !          enddo check_stm   
 ! 
-!          !gather total NLTE
-!          opacity_atom_loc(Nblue:Nred) = opacity_atom_loc(Nblue:Nred) + &
+!          gather total NLTE
+!          chi(Nblue:Nred) = chi(Nblue:Nred) + &
 !          aatom%continua(kc)%alpha(:) * (aatom%n(i,icell) - stm * aatom%continua(kc)%gij(:,icell)*aatom%n(j,icell))
 ! 
 !     	   aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
 !     	   	aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
-! !            if (atmos%include_xcoupling) then
-! !             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) !U
-! !             aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * fourPI_h * aatom%continua(kc)%w_lam(:)
-! !             aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + aatom%continua(kc)%alpha(:) *fourPI_h * aatom%continua(kc)%w_lam(:)
-! !            end if
+!            if (atmos%include_xcoupling) then
+!             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) !U
+!             aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * fourPI_h * aatom%continua(kc)%w_lam(:)
+!             aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + aatom%continua(kc)%alpha(:) *fourPI_h * aatom%continua(kc)%w_lam(:)
+!            end if
 !    
 !     
 !     CASE DEFAULT
@@ -140,10 +146,165 @@ MODULE Opacity
 !    aatom => NULL()
 !   end do atom_loop
 ! 
+!   dtau = ( chi_loc(:,iray,id) + chi(:) ) * ds(iray,id)
+!   if (iray==1) then 
+!    write(*,*) ds
+!    stop
+!   endif
+!   recompute Psi
+!   CALL calc_psi_operator(id, icell, iray, chi, dtau)
+! 
 ! 
 !  RETURN
-!  END SUBROUTINE opacity_atom_loc
+!  END SUBROUTINE init_eta_atom_loc
+
+
+ !not updated after NLTEloop. Not computed if no ActiveAtoms
+ !used for images if computed, even if a wavelength_table is input
+ SUBROUTINE calc_Jnu(id, icell, n_rayons)
+  integer, intent(in) :: id, icell, n_rayons
+  
+  NLTEspec%J(:,icell) = sum(NLTEspec%I(:,1:n_rayons,id),dim=2) / n_rayons
+  NLTEspec%Jc(:,icell) = sum(NLTEspec%Ic(:,1:n_rayons,id),dim=2) / n_rayons
+
+!   write(*,*) maxval(NLTEspec%J(:,icell)), maxval(NLTEspec%I(:,:,id))
+!   write(*,*) maxval(NLTEspec%Jc(:,icell)), maxval(NLTEspec%Ic(:,:,id))
+! 
+! stop
+ RETURN
+ END SUBROUTINE calc_Jnu
+   !if enable, the mean radiation field for electron scattering should be resample if
+   !we have a wavelength table
+   !new frequency grid exist
+   
+   
+!  SUBROUTINE init_bound_free_nlte()
+!   integer :: nact
+!   
+!   NLTEspec%AtomOpac%kc_nlte(:,:) = 0d0
+!   NLTEspec%AtomOpac%jc_nlte(:,:) = 0d0
+!   
+!   do nact=1, atmos%Nactiveatoms
+!    atmos%ActiveAtoms(nact)%ptr_atom%etac(:,:) = 0d0
+!   enddo
+!  
+!  RETURN
+!  END SUBROUTINE
  
+   
+   
+ SUBROUTINE NLTE_bound_free(icell, iterate)
+  integer, intent(in) :: icell!,id!, iray
+  logical, intent(in) :: iterate
+  integer :: nact, Nred, Nblue, kc, kr, i, j, nk, la
+  type(AtomType), pointer :: aatom
+  real(kind=dp) :: stm
+  
+  NLTEspec%AtomOpac%Kc_nlte(:,icell) = 0d0
+  NLTEspec%AtomOpac%jc_nlte(:,icell) = 0d0
+
+  atom_loop : do nact = 1, atmos%Nactiveatoms
+   aatom => atmos%ActiveAtoms(nact)%ptr_atom
+   
+   aatom%etac(:,icell) = 0d0
+   
+    !loop only on continua
+   	tr_loop : do kr = aatom%Ntr_line+1,aatom%Ntr
+
+   	
+        stm = 1d0 !reset for each transition.
+        kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
+
+
+
+    	  Nred = aatom%continua(kc)%Nred; Nblue = aatom%continua(kc)%Nblue    	
+    	  i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
+    	
+         !I don't know how to handle negative chi due to stimulated emission...
+         !Problem of physics (model) or code ?
+!          check_stm : do la=1,aatom%continua(kc)%Nlambda
+!           if (aatom%continua(kc)%gij(la,icell)*aatom%n(j,icell) > aatom%n(i,icell)) then 
+!             stm = 0d0 
+!             exit check_stm
+!           endif
+!          enddo check_stm   
+
+        !continuum only
+
+
+        if (iterate) then
+        
+         aatom%etac(Nblue:Nred,icell) = aatom%etac(Nblue:Nred,icell) + &
+            aatom%continua(kc)%alpha(:)*aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
+        
+        endif
+    	          
+        NLTEspec%AtomOpac%jc_nlte(Nblue:Nred,icell) = NLTEspec%AtomOpac%jc_nlte(Nblue:Nred,icell) + &
+            aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
+
+         NLTEspec%AtomOpac%Kc_nlte(Nblue:Nred,icell) = NLTEspec%AtomOpac%Kc_nlte(Nblue:Nred,icell) + &
+            aatom%continua(kc)%alpha(:) * (aatom%n(i,icell) - stm * aatom%continua(kc)%gij(:,icell)*aatom%n(j,icell))
+            
+
+   end do tr_loop
+   
+
+
+   aatom => NULL()
+  end do atom_loop
+	
+ 
+ RETURN
+ END SUBROUTINE NLTE_bound_free
+ 
+ SUBROUTINE compute_nlte_bound_free
+ !$ use omp_lib
+  integer :: icell,id
+
+
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(icell,id) &
+   !$omp shared(atmos)
+   !$omp do schedule(dynamic,1)
+   do icell=1,atmos%Nspace
+    !$ id = omp_get_thread_num() + 1
+    if (atmos%icompute_atomRT(icell) > 0) then
+     CALL NLTE_bound_free(icell, .false.)
+    endif
+   end do
+   !$omp end do
+   !$omp end parallel
+ 
+ RETURN
+ END SUBROUTINE compute_nlte_bound_free
+ 
+!  SUBROUTINE init_etac_atom_loc(icell)
+!   integer, intent(in) :: icell
+!   integer :: nact, kc
+!   type(AtomType), pointer :: aatom
+!   
+!   do nact=1, atmos%NActiveatoms
+!     aatom => atmos%ActiveAtoms(nact)%ptr_atom
+!     do kc=1,aatom%Ncont
+!      	 aatom%etac(aatom%continua(kc)%Nblue:aatom%continua(kc)%Nred,icell) = atom%etac(aatom%continua(kc)%Nblue:aatom%continua(kc)%Nred,icell) + &
+!     	 	      aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(aatom%continua(kc)%j,icell)
+!     	 	      
+! !            if (atmos%include_xcoupling) then
+! !             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id)
+! !             aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + &
+! !             	hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
+! !             aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + &
+! !                 hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
+! !            end if
+!     enddo
+!     aatom => Null()
+!   enddo
+! 
+!  RETURN
+!  END SUBROUTINE init_etac_atom_loc
+ 
+ !split loop over cont, since we need them only for iray==1
  SUBROUTINE init_eta_atom_loc(id, icell, iray) !update eta and psi
   ! ------------------------------------------------------------------------- !
   ! ------------------------------------------------------------------------- !  
@@ -157,29 +318,25 @@ MODULE Opacity
 
   !CALL initAtomOpac(id)
   !CALL initAtomOpac_nlte(id) !not need
-  CALL init_psi_operator(id,iray) !init also eta
+  !CALL init_psi_operator(id,iray) !init also eta
   
-  chi(:) = 0.0_dp
+  chi(:) = NLTEspec%AtomOpac%Kc_nlte(:,icell)
   
   atom_loop : do nact = 1, atmos%Nactiveatoms
    aatom => atmos%ActiveAtoms(nact)%ptr_atom
    
-   	tr_loop : do kr = 1, aatom%Ntr
+   	tr_loop : do kr = 1, aatom%Ntr_line
 
    	
         stm = 1d0 !reset for each transition.
         kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
 
-        
-        SELECT CASE (aatom%at(kr)%trtype)
-        
-         CASE ('ATOMIC_LINE')
          !line = aatom%lines(kc)
           Nred = aatom%lines(kc)%Nred;Nblue = aatom%lines(kc)%Nblue
           i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
 
-            
-          if (aatom%lines(kc)%gij*aatom%n(j,icell) > aatom%n(i,icell)) stm = 0d0
+!           !  Inversion pop, what to do ?
+!           if (aatom%lines(kc)%gij*aatom%n(j,icell) > aatom%n(i,icell)) stm = 0d0
 
          !opacity total
           chi(Nblue:Nred) = chi(Nblue:Nred) + &
@@ -188,7 +345,8 @@ MODULE Opacity
 
          
            aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
-              aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * aatom%n(j,icell)
+              aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * aatom%n(j,icell) + &
+              aatom%etac(Nblue:Nred,icell)
               
 !            if (atmos%include_xcoupling) then
 !             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id)
@@ -198,38 +356,6 @@ MODULE Opacity
 !                 hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_ray(:,iray,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
 !            end if
 
-        
-        CASE ('ATOMIC_CONTINUUM')
-
-
-    	  Nred = aatom%continua(kc)%Nred;Nblue = aatom%continua(kc)%Nblue    	
-    	  i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
-    	
-         !I don't know how to handle negative chi due to stimulated emission...
-         !Problem of physics (model) or code ?
-         check_stm : do la=1,aatom%continua(kc)%Nlambda
-          if (aatom%continua(kc)%gij(la,icell)*aatom%n(j,icell) > aatom%n(i,icell)) then 
-            stm = 0d0 
-            exit check_stm
-          endif
-         enddo check_stm   
-
-         !gather total NLTE
-         chi(Nblue:Nred) = chi(Nblue:Nred) + &
-         aatom%continua(kc)%alpha(:) * (aatom%n(i,icell) - stm * aatom%continua(kc)%gij(:,icell)*aatom%n(j,icell))
-
-    	   aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
-    	   	aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
-!            if (atmos%include_xcoupling) then
-!             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) !U
-!             aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * fourPI_h * aatom%continua(kc)%w_lam(:)
-!             aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + aatom%continua(kc)%alpha(:) *fourPI_h * aatom%continua(kc)%w_lam(:)
-!            end if
-   
-    
-    CASE DEFAULT
-     CALL Error("Transition type unknown", aatom%at(kr)%trtype)
-    END SELECT
     
    end do tr_loop
 
@@ -247,21 +373,9 @@ MODULE Opacity
 
  RETURN
  END SUBROUTINE init_eta_atom_loc
-
-
- SUBROUTINE calc_J_coherent(id, icell, n_rayons)
-  integer, intent(in) :: id, icell, n_rayons
-  
-  NLTEspec%J(:,icell) = sum(NLTEspec%I(:,1:n_rayons,id),dim=2) / n_rayons
-  NLTEspec%Jc(:,icell) = sum(NLTEspec%Ic(:,1:n_rayons,id),dim=2) / n_rayons
-
- 
- RETURN
- END SUBROUTINE calc_J_coherent
  
  
- !beware not test yet on populations
- SUBROUTINE NLTEOpacity(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
+ SUBROUTINE NLTE_bound_bound(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
   !
   !
   ! chi = Vij * (ni - gij * nj) = ni * Vij - nj * Vji
@@ -281,26 +395,19 @@ MODULE Opacity
   real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
   logical, intent(in) :: iterate
   integer :: nact, Nred, Nblue, kc, kr, i, j, nk, la
-!too much time needed for that
-!   type(AtomicLine) :: line
-!   type(AtomicContinuum) :: cont
   type(AtomType), pointer :: aatom
   real(kind=dp) :: stm
   
   
   atom_loop : do nact = 1, atmos%Nactiveatoms
    aatom => atmos%ActiveAtoms(nact)%ptr_atom
-   
-   	tr_loop : do kr = 1, aatom%Ntr
+
+   	tr_loop : do kr = 1, aatom%Ntr_line
 
    	
         stm = 1d0 !reset for each transition.
         kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
 
-        
-        SELECT CASE (aatom%at(kr)%trtype)
-        
-         CASE ('ATOMIC_LINE')
          !line = aatom%lines(kc)
           Nred = aatom%lines(kc)%Nred;Nblue = aatom%lines(kc)%Nblue
           i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
@@ -308,7 +415,7 @@ MODULE Opacity
           CALL Profile(aatom%lines(kc),icell,x,y,z,x1,y1,z1,u,v,w,l, id)
           !fill line%phi_loc(:,id)
             
-          if (aatom%lines(kc)%gij*aatom%n(j,icell) > aatom%n(i,icell)) stm = 0d0
+!           if (aatom%lines(kc)%gij*aatom%n(j,icell) > aatom%n(i,icell)) stm = 0d0
 
          !opacity total
          NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
@@ -324,63 +431,18 @@ MODULE Opacity
            aatom%lines(kc)%phi_ray(:,iray,id) = aatom%lines(kc)%phi_loc(:,id)
          
            aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
-              aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * aatom%n(j,icell)
+               aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * aatom%n(j,icell) + &
+               aatom%etac(Nblue:Nred,icell)
               
-           if (atmos%include_xcoupling) then
-            aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id)
-            aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + &
-            	hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
-            aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + &
-                hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
-           end if
-         end if	
+!            if (atmos%include_xcoupling) then
+!             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id)
+!             aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + &
+!             	hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
+!             aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + &
+!                 hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
+!            end if
+        end if	
 
-        
-        CASE ('ATOMIC_CONTINUUM')
-!write(*,*) "cont loc", loc(cont)
-    	  !cont = aatom%continua(kc)
-    	  !!if (.not.cont%lcontrib_to_opac) CYCLE tr_loop
-
-    	  Nred = aatom%continua(kc)%Nred;Nblue = aatom%continua(kc)%Nblue    	
-    	  i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
-    	
-         !I don't know how to handle negative chi due to stimulated emission...
-         !Problem of physics (model) or code ?
-         check_stm : do la=1,aatom%continua(kc)%Nlambda
-          if (aatom%continua(kc)%gij(la,icell)*aatom%n(j,icell) > aatom%n(i,icell)) then 
-            stm = 0d0 
-            exit check_stm
-          endif
-         enddo check_stm   
-
-         !keep copy of continuum only
-    	 NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) + &
-    	          aatom%continua(kc)%alpha(:) * (aatom%n(i,icell) - stm * aatom%continua(kc)%gij(:,icell)*aatom%n(j,icell))
-
-    	 NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) + &
-    	 	      aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
-
-         !gather total NLTE
-         NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
-         aatom%continua(kc)%alpha(:) * (aatom%n(i,icell) - stm * aatom%continua(kc)%gij(:,icell)*aatom%n(j,icell))
-       		
-         NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
-         aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
-    	
-    	 if (iterate) then
-    	   aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
-    	   	aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
-           if (atmos%include_xcoupling) then
-            aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) !U
-            aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * fourPI_h * aatom%continua(kc)%w_lam(:)
-            aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + aatom%continua(kc)%alpha(:) *fourPI_h * aatom%continua(kc)%w_lam(:)
-           end if
-         end if			
-   
-    
-    CASE DEFAULT
-     CALL Error("Transition type unknown", aatom%at(kr)%trtype)
-    END SELECT
     
    end do tr_loop
      !write(*,*) icell, id, "eta=", maxval(aatom%eta(:,iray,id)), minval(aatom%eta(:,iray,id))
@@ -390,7 +452,142 @@ MODULE Opacity
   end do atom_loop
 
  RETURN
- END SUBROUTINE NLTEOpacity
+ END SUBROUTINE NLTE_bound_bound
+ 
+ 
+!  
+!  SUBROUTINE NLTEOpacity(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
+!   !
+!   !
+!   ! chi = Vij * (ni - gij * nj) = ni * Vij - nj * Vji
+!   ! eta = twohnu3_c2 * gij * Vij * nj = Uji * nj = 2hnu3/c2 * Vji * nj
+!   ! Continuum:
+!   ! Vij = alpha
+!   ! gij = nstari/nstarj * exp(-hc/kT/lamba)
+!   ! Lines:
+!   ! twoHnu3/c2 = Aji/Bji
+!   ! gij = Bji/Bij (*rho if exists)
+!   ! Vij = Bij * hc/4PI * phi
+!   !
+!   ! if iterate, compute lines weight for this cell icell and rays and eta, Vij gij for that atom.
+!   ! if not iterate means that atom%gij atom%vij atom%eta are not allocated (after NLTE for image for instance)
+!   !
+!   integer, intent(in) :: id, icell, iray
+!   real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
+!   logical, intent(in) :: iterate
+!   integer :: nact, Nred, Nblue, kc, kr, i, j, nk, la
+! !too much time needed for that
+! !   type(AtomicLine) :: line
+! !   type(AtomicContinuum) :: cont
+!   type(AtomType), pointer :: aatom
+!   real(kind=dp) :: stm
+!   
+!   
+!   atom_loop : do nact = 1, atmos%Nactiveatoms
+!    aatom => atmos%ActiveAtoms(nact)%ptr_atom
+!    
+!     !Ntr_loop = aatom%Ntr
+!     !if (iray > 1) Ntr_loop = aatom%Ntr_line
+!    	tr_loop : do kr = 1, aatom%Ntr
+! 
+!    	
+!         stm = 1d0 !reset for each transition.
+!         kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
+! 
+!         
+!         SELECT CASE (aatom%at(kr)%trtype)
+!         
+!          CASE ('ATOMIC_LINE')
+!          !line = aatom%lines(kc)
+!           Nred = aatom%lines(kc)%Nred;Nblue = aatom%lines(kc)%Nblue
+!           i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
+! 
+!           CALL Profile(aatom%lines(kc),icell,x,y,z,x1,y1,z1,u,v,w,l, id)
+!           !fill line%phi_loc(:,id)
+!             
+! !           if (aatom%lines(kc)%gij*aatom%n(j,icell) > aatom%n(i,icell)) stm = 0d0
+! 
+!          !opacity total
+!          NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
+!        		hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell))
+!        		
+!          NLTEspec%AtomOpac%eta(Nblue:Nred,id)= NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
+!        		aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * aatom%n(j,icell)
+!       
+!          if (iterate) then
+!          
+!            !keep line profile over directions for this cell (threds) 
+!            !for sub iterations and fillGamma()
+!            aatom%lines(kc)%phi_ray(:,iray,id) = aatom%lines(kc)%phi_loc(:,id)
+!          
+!            aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
+!               aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * aatom%n(j,icell)
+!               
+!            if (atmos%include_xcoupling) then
+!             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id)
+!             aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + &
+!             	hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
+!             aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + &
+!                 hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(:,id) * (aatom%n(i,icell) - stm * aatom%lines(kc)%gij*aatom%n(j,icell)) * fourPI_hc * aatom%lines(kc)%w_lam(:)
+!            end if
+!          end if	
+! 
+!         
+!         CASE ('ATOMIC_CONTINUUM')
+! !write(*,*) "cont loc", loc(cont)
+!     	  !cont = aatom%continua(kc)
+!     	  !!if (.not.cont%lcontrib_to_opac) CYCLE tr_loop
+! 
+!     	  Nred = aatom%continua(kc)%Nred;Nblue = aatom%continua(kc)%Nblue    	
+!     	  i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
+!     	
+!          !I don't know how to handle negative chi due to stimulated emission...
+!          !Problem of physics (model) or code ?
+! !          check_stm : do la=1,aatom%continua(kc)%Nlambda
+! !           if (aatom%continua(kc)%gij(la,icell)*aatom%n(j,icell) > aatom%n(i,icell)) then 
+! !             stm = 0d0 
+! !             exit check_stm
+! !           endif
+! !          enddo check_stm   
+!
+!          !keep copy of continuum only
+!     	 NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%chic_nlte(Nblue:Nred, id) + &
+!     	          aatom%continua(kc)%alpha(:) * (aatom%n(i,icell) - stm * aatom%continua(kc)%gij(:,icell)*aatom%n(j,icell))
+! 
+!     	 NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) = NLTEspec%AtomOpac%etac_nlte(Nblue:Nred, id) + &
+!     	 	      atom%continua(kc)%alpha(:)*aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
+! 
+!          !gather total NLTE
+!          NLTEspec%AtomOpac%chi(Nblue:Nred,id) = NLTEspec%AtomOpac%chi(Nblue:Nred,id) + &
+!          aatom%continua(kc)%alpha(:) * (aatom%n(i,icell) - stm * aatom%continua(kc)%gij(:,icell)*aatom%n(j,icell))
+!        		
+!          NLTEspec%AtomOpac%eta(Nblue:Nred,id) = NLTEspec%AtomOpac%eta(Nblue:Nred,id) + &
+!          aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
+!     	
+!     	 if (iterate) then
+!     	   aatom%eta(Nblue:Nred,iray,id) = aatom%eta(Nblue:Nred,iray,id) + &
+!     	   	aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) * aatom%n(j,icell)
+!            if (atmos%include_xcoupling) then
+!             aatom%Uji_down(j,Nblue:Nred, iray, id) = aatom%Uji_down(j,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * aatom%continua(kc)%twohnu3_c2(:) * aatom%continua(kc)%gij(:,icell) !U
+!             aatom%chi_up(i,Nblue:Nred, iray, id) = aatom%chi_up(i,Nblue:Nred, iray, id) + aatom%continua(kc)%alpha(:) * fourPI_h * aatom%continua(kc)%w_lam(:)
+!             aatom%chi_down(j,Nblue:Nred,iray,id) = aatom%chi_down(j,Nblue:Nred,iray,id) + aatom%continua(kc)%alpha(:) *fourPI_h * aatom%continua(kc)%w_lam(:)
+!            end if
+!          end if			
+!    
+!     
+!     CASE DEFAULT
+!      CALL Error("Transition type unknown", aatom%at(kr)%trtype)
+!     END SELECT
+!     
+!    end do tr_loop
+!      !write(*,*) icell, id, "eta=", maxval(aatom%eta(:,iray,id)), minval(aatom%eta(:,iray,id))
+! 
+!    aatom => NULL()
+!    !stop
+!   end do atom_loop
+! 
+!  RETURN
+!  END SUBROUTINE NLTEOpacity
 
 END MODULE Opacity
 
