@@ -697,7 +697,7 @@ MODULE readatom
    IDread(2:2) = to_lower(IDread(2:2))
    do mmet = 1,nmet-1 !compare the actual (IDread) with previous
     !write(*,*) mmet, nmet
-    if (atmos%Atoms(nmet)%ptr_atom%ID.eq.IDread) then
+    if (atmos%Atoms(mmet)%ptr_atom%ID.eq.IDread) then
      write(*,*) "Already read a model for this atom ", IDread
      write(*,*) "exiting..."
      stop
