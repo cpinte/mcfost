@@ -53,8 +53,8 @@ MODULE atom_type
    real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam
    real(kind=dp) :: wphi
    real(kind=dp) :: Qelast, Rij, Rji, adamp ! at a cell
-   !keep CLIGHT * (nu0 - nu)/nu0 for lines
-   real(kind=dp), dimension(:), allocatable :: u, a !damping for all cells, 
+   !keep CLIGHT * (nu0 - nu)/nu0 for lines												(method for Voigt)
+   real(kind=dp), dimension(:), allocatable :: u, a, aeff !damping for all cells(a) and Thomson effective damping (eff)
    real(kind=dp), allocatable, dimension(:,:) :: rho_pfr
    !!Nlevel, wavelength and proc
    !!Stores the information for that atom only, necessary to  construct the Gamma matrix
@@ -114,7 +114,8 @@ MODULE atom_type
    type (AtomicTransition), allocatable, dimension(:)   :: at !Atomic transition, lines first in readatom
    !one emissivity per atom, used in the construction of the gamma matrix
    !where I have to distinguish between atom own opac and overlapping transitions
-   real(kind=dp), allocatable, dimension(:,:,:) :: eta !Nwaves, Nproc
+   real(kind=dp), allocatable, dimension(:,:) :: etac
+   real(kind=dp), allocatable, dimension(:,:,:) :: eta !Nwaves, Nrays, Nproc
 !	_down = from j (upper) to l (lower); _up from i (lower) to lp (upper)
    real(kind=dp), allocatable, dimension(:,:,:,:) :: Uji_down, chi_up, chi_down
    type (Ng) :: Ngs

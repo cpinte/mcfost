@@ -335,8 +335,11 @@ MODULE hydrogen_opacities
      flambda = flambda + Cn(n) * diff**((n-1)/2d0)
     enddo
     sigma = lambda**3d0 * diff**(1.5d0) * flambda
-    chi(la) = K * (1d0 - stm) * sigma * funit * hydrogen%n(1,icell)!atmos%nHtot(icell)
-    eta(la) = K * twohc/NLTEspec%lambda(la)**3 * stm * sigma * funit * hydrogen%n(1,icell)!atmos%nHtot(icell)!m^-3
+    chi(la) = K * (1d0 - stm) * sigma * funit * hydrogen%n(1,icell)
+    eta(la) = K * twohc/NLTEspec%lambda(la)**3 * stm * sigma * funit * hydrogen%n(1,icell)
+    !chi(la) = K * (1d0 - stm) * sigma * funit * atmos%nHtot(icell)
+    !eta(la) = K * twohc/NLTEspec%lambda(la)**3 * stm * sigma * funit * atmos%nHtot(icell)!m^-3
+
     
    enddo
 
@@ -404,7 +407,8 @@ MODULE hydrogen_opacities
 	     	Dn(n)/lambda**2 + En(n)/lambda**3 + Fn(n)/lambda**4)
 	    enddo
 	  endif
-	  chi(la) = kappa * K * Hydrogen%n(1,icell)!atmos%nHtot(icell)
+	  chi(la) = kappa * K * Hydrogen%n(1,icell)
+	  !chi(la) = kappa * K * atmos%nHtot(icell)
 	enddo
  
  RETURN

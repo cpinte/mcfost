@@ -12,13 +12,14 @@ MODULE init_solution
  use math
  use opacity, only : chi_loc!, ds
  use constant, only : CLIGHT
- use input, only : ds
+ use input!, only : ds, nb_proc
  
 
  IMPLICIT NONE
 
  real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, pop_old
  real(kind=dp), dimension(:), allocatable :: flatpops
+ logical, dimension(:), allocatable :: lcell_converged
 
  
  
@@ -113,7 +114,7 @@ MODULE init_solution
  ! ---------------------------------------------------- !
   type (AtomType), pointer :: atom
   logical, intent(in), optional :: sub_iterations_enabled
-  integer :: nact, Nmaxlevel, icell, kr
+  integer :: nact, Nmaxlevel, icell, kr, alloc_status
    
   CALL alloc_weights() !and phi_ray
   write(*,*) " Setting up wavelength integration weights for all transitions..."
@@ -144,7 +145,7 @@ MODULE init_solution
    do nact=1,atmos%Nactiveatoms
      atom => atmos%ActiveAtoms(nact)%ptr_atom
      allocate(atom%Gamma(atom%Nlevel,atom%Nlevel,NLTEspec%NPROC))
-     allocate(atom%C(atom%Nlevel,atom%Nlevel,NLTEspec%NPROC))     
+     allocate(atom%C(atom%Nlevel,atom%Nlevel,NLTEspec%NPROC)) 
      
      !Now we can set it to .true. The new background pops or the new ne pops
      !will used the H%n
@@ -191,6 +192,10 @@ MODULE init_solution
      !deallocate(atom%C) !not used anymore if stored on RAM
      atom => NULL()
    enddo
+   
+   allocate(lcell_converged(atmos%Nspace),stat=alloc_status)
+   if (alloc_status > 0) call error("Allocation error lcell_converged")
+   lcell_converged(:) = .false.
 
    if (present(sub_iterations_enabled)) then
     if (sub_iterations_enabled) then

@@ -1,15 +1,17 @@
 ! ---------------------------------------------------------------------- !
-! This module writes to separate files the contribution of each atom.
+! This module writes to separate files the populations of each atom.
 ! - n
-! - eta and chi (only for cheking)
-! -> Only if the atom is ACTIVE:
-! - Rij and Rji
-! - rho = psi/phi (only for cheking)
+! - nHtot
+! - nH-
+!
+! TO DO:  
+!      - check points
+!      - read electrons density
 !
 ! Atomic data are written to atom%dataFile
 ! Electronic density is also written in a separate file
 ! ---------------------------------------------------------------------- !
-MODULE writeatom !Futur write....
+MODULE writeatom !Futur write_atomic_pops
 
  use atmos_type, only : atmos
  use atom_type
@@ -236,140 +238,30 @@ MODULE writeatom !Futur write....
  RETURN
  END SUBROUTINE writeHydrogenMinusDensity
 
- SUBROUTINE create_pops_file(atom)
- ! Create file to write populations
- !
-  type (AtomType), intent(inout) :: atom
-  logical :: lte_only
-  character(len=MAX_LENGTH) :: popsF, comment, iter_number
-  integer :: unit, EOF = 0, blocksize, naxes(5), naxis,group, bitpix, fpixel, i
-  logical :: extend, simple
-  integer :: nelements, syst_status, Nplus, N0
-  real(kind=dp), dimension(:), allocatable :: zero_arr
-
-!    if (popsF(len(popsF)-3:len(popsF))==".gz") then
-!     CALL Warning("Atomic pops file cannot be compressed fits.")
-!     write(*,*) popsF, popsF(len(popsF)-3:len(popsF))
-!     atom%dataFile = popsF(1:len(popsF)-3)
-!     write(*,*) atom%dataFile
-!    end if
-
-  lte_only = .not.atom%active
-
-  !get unique unit number
-  CALL ftgiou(unit,EOF)
-
-  blocksize=1
-  simple = .true. !Standard fits
-  group = 1
-  fpixel = 1
-  extend = .true.
-  bitpix = -64
-
-  naxes(1) = atom%Nlevel
-  Nplus = 2 !lte + NLTE
-  if (lte_only) Nplus = 1
-
-  N0 = max(1,Nmax_kept_iter) !at mini LTE, NLTE and last iteration atm
-  if (lte_only) N0 = 0
-
-  if (lVoronoi) then
-   naxis = 2
-   naxes(2) = atmos%Nspace ! equivalent n_cells
-   nelements = naxes(1)*naxes(2)
-  else
-   if (l3D) then
-    naxis = 4
-    naxes(2) = n_rad
-    naxes(3) = 2*nz
-    naxes(4) = n_az
-    nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
-   else
-    naxis = 3
-    naxes(2) = n_rad
-    naxes(3) = nz
-    nelements = naxes(1) * naxes(2) * naxes(3)
-   end if
-  end if
-
-  allocate(zero_arr(nelements)); zero_arr=0d0
-
-  CALL appel_syst('mkdir -p '//trim(atom%ID),syst_status) !create a dir for populations
-  CALL ftinit(unit,trim(atom%ID)//"/"//trim(atom%dataFile),blocksize,EOF)
-
-  do i=1, N0 + Nplus
-
-    write(iter_number, '(A10,I6,A1)') "(Iteration", i,")"
-
-   	CALL ftcrhd(unit, EOF)
-   	CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
-
-   	COMMENT = trim(iter_number)
-   	if (lte_only) COMMENT = "(LTE)"
-   	if (i==Nmax_kept_iter+1) then
-   	 COMMENT = "(NLTE)"
-   	else if (i==Nmax_kept_iter+2) then
-   	 COMMENT = "(LTE)"
-   	end if
-  	CALL ftpkys(unit, "UNIT", "m^-3", COMMENT, EOF)
-    CALL ftpprd(unit,group,fpixel,nelements,zero_arr,EOF)
-
-  end do
-
-  deallocate(zero_arr)
-
-  CALL ftclos(unit, EOF) !close
-  CALL ftfiou(unit, EOF) !free
-
-  if (EOF > 0) CALL print_error(EOF)
- RETURN
- END SUBROUTINE create_pops_file
-
- SUBROUTINE writePops(atom, count)
+ 
+ SUBROUTINE writePops(atom)
  ! ----------------------------------------------------------------- !
  ! write Atom populations. The file for writing exists already
  ! First, NLTE populations, then LTE populations.
- ! It is not a compressed file (.fits only)
- ! so that populations after ith iteration can be
- ! append to the file.
- ! Keep in memory the three latest iterations
- ! and overwrite them. At the end write the final
- ! NLTE pops and then the LTE pops.
- !
- ! Contains:
- !   1st oldest iter among the three last iter: count = 3
- !   2nd 									  : count = 2
- !   3rd youngest iter among the three last iter : count = 1
- !      count = 0
- !   atom%n converged (can be equal to atom%n(iter==3)
- !   atom%nstar
- !
- !  count is decreasing
  ! ----------------------------------------------------------------- !
-  type (AtomType), intent(inout) :: atom
-  integer, intent(in) :: count
+  type (AtomType), intent(in) :: atom
   integer :: unit, EOF = 0, blocksize, naxes(5), naxis,group, bitpix, fpixel
   logical :: extend, simple, lte_only
-  integer :: nelements, syst_status, hdutype
+  integer :: nelements, hdutype, status
   character(len=20) :: popsF
 
   lte_only = .not.atom%active
-  if (count < 0) lte_only = .true. !force it in case it is active
-
-  if (count > Nmax_kept_iter) RETURN
-
+  
   !get unique unit number
   CALL ftgiou(unit,EOF)
-  CALL ftopen(unit, TRIM(atom%dataFile), 1, blocksize, EOF) !1 stends for read and write
-
   blocksize=1
-
-  !  Initialize parameters about the FITS image
   simple = .true. !Standard fits
-  group = 1
+  group = 1 !??
   fpixel = 1
   extend = .true.
   bitpix = -64
+  
+  CALL ftinit(unit, TRIM(atom%dataFile), blocksize, EOF)
 
   naxes(1) = atom%Nlevel
 
@@ -391,23 +283,35 @@ MODULE writeatom !Futur write....
     nelements = naxes(1) * naxes(2) * naxes(3)
    end if
   end if
+  
 
-  if (count>0) then !iterations
-    if (count <= Nmax_kept_iter) then
-    CALL FTMAHD(unit,count,hdutype,EOF)
-  	CALL ftpprd(unit,group,fpixel,nelements,atom%n,EOF)
-  	endif
-  else if (count<=0) then !final solutions + LTE
+
    if (lte_only) then
-    CALL FTMAHD(unit,1,hdutype,EOF) !only one if lte_only
-  	CALL ftpprd(unit,group,fpixel,nelements,atom%nstar,EOF)
-   else !at least two
-    CALL FTMAHD(unit,Nmax_kept_iter+1,hdutype,EOF)
-  	CALL ftpprd(unit,group,fpixel,nelements,atom%n,EOF)
-    CALL FTMAHD(unit,Nmax_kept_iter+2,hdutype,EOF)
-  	CALL ftpprd(unit,group,fpixel,nelements,atom%nstar,EOF)
-   end if
-  end if
+  
+    CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+    ! Additional optional keywords
+    CALL ftpkys(unit, "UNIT", "m^-3", "(LTE)", EOF)
+    !write data
+    CALL ftpprd(unit,group,fpixel,nelements,atom%nstar,EOF)
+   else !NLTE + LTE
+    CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+    ! Additional optional keywords
+    CALL ftpkys(unit, "UNIT", "m^-3", "(NLTE)", EOF)
+    !write data
+    CALL ftpprd(unit,group,fpixel,nelements,atom%n,EOF)
+    
+    CALL ftcrhd(unit, status)
+    if (status > 0) CALL print_error(status)
+
+  
+    CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+    ! Additional optional keywords
+    CALL ftpkys(unit, "UNIT", "m^-3", "(LTE)", EOF)
+    !write data
+    CALL ftpprd(unit,group,fpixel,nelements,atom%nstar,EOF)
+  	
+   end if  
+
 
   CALL ftclos(unit, EOF) !close
   CALL ftfiou(unit, EOF) !free
@@ -416,6 +320,188 @@ MODULE writeatom !Futur write....
 
  RETURN
  END SUBROUTINE writePops
+
+ !---> need a debug
+!  SUBROUTINE create_pops_file(atom)
+!  ! Create file to write populations
+!  !
+!   type (AtomType), intent(inout) :: atom
+!   logical :: lte_only
+!   character(len=MAX_LENGTH) :: popsF, comment, iter_number
+!   integer :: unit, EOF = 0, blocksize, naxes(5), naxis,group, bitpix, fpixel, i
+!   logical :: extend, simple
+!   integer :: nelements, syst_status, Nplus, N0
+!   real(kind=dp), dimension(:), allocatable :: zero_arr
+! 
+! !    if (popsF(len(popsF)-3:len(popsF))==".gz") then
+! !     CALL Warning("Atomic pops file cannot be compressed fits.")
+! !     write(*,*) popsF, popsF(len(popsF)-3:len(popsF))
+! !     atom%dataFile = popsF(1:len(popsF)-3)
+! !     write(*,*) atom%dataFile
+! !    end if
+! 
+!   lte_only = .not.atom%active
+! 
+!   !get unique unit number
+!   CALL ftgiou(unit,EOF)
+! 
+!   blocksize=1
+!   simple = .true. !Standard fits
+!   group = 1
+!   fpixel = 1
+!   extend = .true.
+!   bitpix = -64
+! 
+!   naxes(1) = atom%Nlevel
+!   Nplus = 2 !lte + NLTE
+!   if (lte_only) Nplus = 1
+! 
+!   N0 = max(1,Nmax_kept_iter) !at mini LTE, NLTE and last iteration atm
+!   if (lte_only) N0 = 0
+! 
+!   if (lVoronoi) then
+!    naxis = 2
+!    naxes(2) = atmos%Nspace ! equivalent n_cells
+!    nelements = naxes(1)*naxes(2)
+!   else
+!    if (l3D) then
+!     naxis = 4
+!     naxes(2) = n_rad
+!     naxes(3) = 2*nz
+!     naxes(4) = n_az
+!     nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+!    else
+!     naxis = 3
+!     naxes(2) = n_rad
+!     naxes(3) = nz
+!     nelements = naxes(1) * naxes(2) * naxes(3)
+!    end if
+!   end if
+! 
+!   allocate(zero_arr(nelements)); zero_arr=0d0
+! 
+!   CALL appel_syst('mkdir -p '//trim(atom%ID),syst_status) !create a dir for populations
+!   CALL ftinit(unit,trim(atom%ID)//"/"//trim(atom%dataFile),blocksize,EOF)
+! 
+!   do i=1, N0 + Nplus
+! 
+!     write(iter_number, '(A10,I6,A1)') "(Iteration", i,")"
+! 
+!    	CALL ftcrhd(unit, EOF)
+!    	CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+! 
+!    	COMMENT = trim(iter_number)
+!    	if (lte_only) COMMENT = "(LTE)"
+!    	if (i==Nmax_kept_iter+1) then
+!    	 COMMENT = "(NLTE)"
+!    	else if (i==Nmax_kept_iter+2) then
+!    	 COMMENT = "(LTE)"
+!    	end if
+!   	CALL ftpkys(unit, "UNIT", "m^-3", COMMENT, EOF)
+!     CALL ftpprd(unit,group,fpixel,nelements,zero_arr,EOF)
+! 
+!   end do
+! 
+!   deallocate(zero_arr)
+! 
+!   CALL ftclos(unit, EOF) !close
+!   CALL ftfiou(unit, EOF) !free
+! 
+!   if (EOF > 0) CALL print_error(EOF)
+!  RETURN
+!  END SUBROUTINE create_pops_file
+!  SUBROUTINE writePops(atom, count)
+!  ! ----------------------------------------------------------------- !
+!  ! write Atom populations. The file for writing exists already
+!  ! First, NLTE populations, then LTE populations.
+!  ! It is not a compressed file (.fits only)
+!  ! so that populations after ith iteration can be
+!  ! append to the file.
+!  ! Keep in memory the three latest iterations
+!  ! and overwrite them. At the end write the final
+!  ! NLTE pops and then the LTE pops.
+!  !
+!  ! Contains:
+!  !   1st oldest iter among the three last iter: count = 3
+!  !   2nd 									  : count = 2
+!  !   3rd youngest iter among the three last iter : count = 1
+!  !      count = 0
+!  !   atom%n converged (can be equal to atom%n(iter==3)
+!  !   atom%nstar
+!  !
+!  !  count is decreasing
+!  ! ----------------------------------------------------------------- !
+!   type (AtomType), intent(inout) :: atom
+!   integer, intent(in) :: count
+!   integer :: unit, EOF = 0, blocksize, naxes(5), naxis,group, bitpix, fpixel
+!   logical :: extend, simple, lte_only
+!   integer :: nelements, syst_status, hdutype
+!   character(len=20) :: popsF
+! 
+!   lte_only = .not.atom%active
+!   if (count < 0) lte_only = .true. !force it in case it is active
+! 
+!   if (count > Nmax_kept_iter) RETURN
+! 
+!   !get unique unit number
+!   CALL ftgiou(unit,EOF)
+!   CALL ftopen(unit, TRIM(atom%dataFile), 1, blocksize, EOF) !1 stends for read and write
+! 
+!   blocksize=1
+! 
+!   !  Initialize parameters about the FITS image
+!   simple = .true. !Standard fits
+!   group = 1
+!   fpixel = 1
+!   extend = .true.
+!   bitpix = -64
+! 
+!   naxes(1) = atom%Nlevel
+! 
+!   if (lVoronoi) then
+!    naxis = 2
+!    naxes(2) = atmos%Nspace ! equivalent n_cells
+!    nelements = naxes(1)*naxes(2)
+!   else
+!    if (l3D) then
+!     naxis = 4
+!     naxes(2) = n_rad
+!     naxes(3) = 2*nz
+!     naxes(4) = n_az
+!     nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+!    else
+!     naxis = 3
+!     naxes(2) = n_rad
+!     naxes(3) = nz
+!     nelements = naxes(1) * naxes(2) * naxes(3)
+!    end if
+!   end if
+! 
+!   if (count>0) then !iterations
+!     if (count <= Nmax_kept_iter) then
+!     CALL FTMAHD(unit,count,hdutype,EOF)
+!   	CALL ftpprd(unit,group,fpixel,nelements,atom%n,EOF)
+!   	endif
+!   else if (count<=0) then !final solutions + LTE
+!    if (lte_only) then
+!     CALL FTMAHD(unit,1,hdutype,EOF) !only one if lte_only
+!   	CALL ftpprd(unit,group,fpixel,nelements,atom%nstar,EOF)
+!    else !at least two
+!     CALL FTMAHD(unit,Nmax_kept_iter+1,hdutype,EOF)
+!   	CALL ftpprd(unit,group,fpixel,nelements,atom%n,EOF)
+!     CALL FTMAHD(unit,Nmax_kept_iter+2,hdutype,EOF)
+!   	CALL ftpprd(unit,group,fpixel,nelements,atom%nstar,EOF)
+!    end if
+!   end if
+! 
+!   CALL ftclos(unit, EOF) !close
+!   CALL ftfiou(unit, EOF) !free
+! 
+!   if (EOF > 0) CALL print_error(EOF)
+! 
+!  RETURN
+!  END SUBROUTINE writePops
+!-> debug needed above
 
  SUBROUTINE readPops(atom)
  ! -------------------------------------------- !
@@ -494,81 +580,6 @@ MODULE writeatom !Futur write....
  RETURN
  END SUBROUTINE readPops
 
- !!!!!!!!!! BUILDING !!!!!!!!!!!!!!!
- SUBROUTINE writeAtomData(atom)
- ! ------------------------------------ !
- ! write AtomType atom to atom%dataFile
- ! ------------------------------------ !
-  type (AtomType), intent(in) :: atom
-  integer :: unit, EOF = 0, blocksize, naxes(6), naxis,group, bitpix, fpixel
-  logical :: extend, simple
-  integer :: nelements, Nlevel2
-
-  !get unique unit number
-  CALL ftgiou(unit,EOF)
-
-  CALL Warning("writeAtomData, not implemented yet")
-  RETURN
-
-  blocksize=1
-  CALL ftinit(unit,trim(atom%dataFile),blocksize,EOF)
-  !  Initialize parameters about the FITS image
-  simple = .true.
-  group = 1
-  fpixel = 1
-  extend = .true.
-
-  bitpix = -64
-  if (lVoronoi) then
-   naxis = 1
-   naxes(1) = atmos%Nspace ! equivalent n_cells
-   nelements = naxes(1)
-  else
-   if (l3D) then
-    naxis = 3
-    naxes(1) = n_rad
-    naxes(2) = 2*nz
-    naxes(3) = n_az
-    nelements = naxes(1) * naxes(2) * naxes(3) ! != n_cells ? should be
-   else
-    naxis = 2
-    naxes(1) = n_rad
-    naxes(2) = nz
-    nelements = naxes(1) * naxes(2) ! should be n_cells also
-   end if
-  end if
-
-  !temporary
-  Nlevel2 = atom%Nlevel*atom%Nlevel
-  ! First write collision
-  !add 1 axis for ij
-  if (lVoronoi) then
-   naxes(2) = Nlevel2
-  else
-   if (l3D) then
-    naxes(4) = Nlevel2
-   else
-    naxes(3) = Nlevel2
-   end if
-  end if
-  CALL ftphpr(unit,simple,bitpix,naxis+1,naxes,0,1,extend,EOF)
-  ! Additional optional keywords
-  CALL ftpkys(unit, "UNIT", "m^-3", ' ', EOF)
-  !write data
-  !CALL ftpprd(unit,group,fpixel,nelements*Nlevel2,atom%.....,EOF)
-  !write Collision
-  ! create new hdu
-  !CALL ftcrhd(unit, status)
-  !  Write the required header keywords.
-  !CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-
-  CALL ftclos(unit, EOF)
-  CALL ftfiou(unit, EOF)
-
-  if (EOF > 0) CALL print_error(EOF)
-
- RETURN
- END SUBROUTINE writeAtomData
 
  !!!!!!!!!! BUILDING !!!!!!!!!!!!!!!
  SUBROUTINE readElectron(fileNe)
@@ -618,21 +629,5 @@ MODULE writeatom !Futur write....
   if (EOF > 0) CALL print_error(EOF)
  RETURN
  END SUBROUTINE readElectron
-
-
- !!!!!!!!!! BUILDING !!!!!!!!!!!!!!!
- SUBROUTINE readAtomData(atom)
- ! ------------------------------------ !
- ! reads and fills atomic data from
- ! atomic file atom%dataFile.
- !
- ! Note that is that case, atom is filled
- ! with quantum data and with the name of
- ! the file to read populations from.
- ! ------------------------------------ !
-  type (AtomType), intent(inout) :: atom
-
- RETURN
- END SUBROUTINE readAtomData
 
 END MODULE writeatom

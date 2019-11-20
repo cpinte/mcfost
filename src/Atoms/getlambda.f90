@@ -65,6 +65,7 @@ MODULE getlambda
   RETURN
   END SUBROUTINE Read_wavelengths_table
 
+! - > bug format write, same for write_wavelengths_table_NLTE_lines
   SUBROUTINE write_lines_grid()
   ! -------------------------------------------------------- !
   ! write individual lines grid in the format read by
@@ -121,11 +122,11 @@ MODULE getlambda
    enddo
 
    open(unit=1, file=TRIM(line_waves), status='unknown')
-   write(1,"(I6)") Nl
+   write(1,*) Nl
    !write(*,*) Nl
 
    do k=1,Nl
-    write(1,"(I6)") Nl2(Nl)
+    write(1,*) Nl2(Nl)
     !write(*,*) Nl2(Nl)
    end do
 
@@ -135,7 +136,7 @@ MODULE getlambda
     do k=1, atom%Nline
      Nl = Nl + 1
       do la=1, Nl2(Nl)
-       write(1,'(F6.3)') lambda_table(Nl, la)
+       write(1,'(1F6.3)') lambda_table(Nl, la)
        !write(*,*) Nl, NL2(Nl), lambda_table(Nl, la)
       enddo
     enddo

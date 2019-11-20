@@ -4,6 +4,7 @@ MODULE spectrum_type
   use atmos_type, only : GridType, atmos
   use getlambda, only  : make_wavelength_grid, adjust_wavelength_grid, Read_wavelengths_table!,&
   ! 						Nred_array, Nmid_array, Nblue_array  
+  use math, only : linear_1D
   !MCFOST's original modules
   use fits_utils, only : print_error
   use parametres
@@ -25,8 +26,7 @@ MODULE spectrum_type
   !! Store S, Sc, Slte, Sclte, and jc and Kc, to save memory ???
   TYPE AtomicOpacity
    !active opacities
-   real(kind=dp), allocatable, dimension(:,:)   :: chi, eta
-   real(kind=dp), dimension(:,:), allocatable :: chic_nlte, etac_nlte
+   real(kind=dp), allocatable, dimension(:,:)   :: chi, eta!, chic_nlte, etac_nlte
    ! NLTE magneto-optical elements and dichroism are stored in the background _p arrays.
    ! Mainly because we do not use them in SEE, even if etaQUV can be added to the total
    ! emissivity. But in case, etaQUV has to be atom dependent, so now we can store the LTE
@@ -35,9 +35,8 @@ MODULE spectrum_type
    real(kind=dp), allocatable, dimension(:,:)   :: eta_p, chi_p
    real(kind=dp), allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
    real(kind=dp), allocatable, dimension(:,:,:)   :: rho_p, chiQUV_p, etaQUV_p
-   real(kind=dp), allocatable, dimension(:,:)   :: jc
+   real(kind=dp), allocatable, dimension(:,:)   :: jc, jc_nlte, Kc_nlte
    real(kind=dp), allocatable, dimension(:,:,:) :: Kc
-   !!real(kind=dp), allocatable, dimension(:,:) :: chil_bg, etal_bg
    !!logical, dimension(:), allocatable :: initialized
    									     !set to .true. for each cell, when iray=1.
    									     !.false. otherwise.
@@ -47,7 +46,7 @@ MODULE spectrum_type
   TYPE Spectrum
    !n_proc should be the last index
    type  (GridType), pointer :: atmos
-   logical :: vacuum_to_air=.false., updateJ, write_wavelength_grid=.false.
+   logical :: vacuum_to_air=.false., write_wavelength_grid=.false.
    integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1
    real(kind=dp) :: wavelength_ref=0.d0 !nm optionnal
    real(kind=dp), allocatable, dimension(:) :: lambda
@@ -123,6 +122,10 @@ MODULE spectrum_type
    real(kind=dp), dimension(NLTEspec%Nwaves) :: old_grid
    integer, dimension(:), allocatable :: Nlam_R
    integer :: nat, kr, Ntrans_new, kp, kc
+   !for Jnu
+   integer :: icell, alloc_status, Nwaves_old
+   real(kind=dp), dimension(:,:), allocatable :: Jnu, Jnuc
+
    
    old_grid = NLTEspec%lambda
    write(*,*) " -> Redefining a wavelength grid for image.."
@@ -141,9 +144,9 @@ MODULE spectrum_type
    CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, Nlam_R, NLTEspec%atmos%Atoms)
    deallocate(Nlam_R) !not used anymore
    
-   !Reallocate J and Jc keeping their value if coherent_scattering
+   !Reallocate J and Jc keeping their value if electron_scattering
    !NB: the spatial grid is the same
-   !if (NLTEspec%atmos%coherent_scattering) then
+   !if (NLTEspec%atmos%electron_scattering) then
    ! Jold = J; Joldc = Jc
    ! dealloc(J, Jc)
    ! allocate(J, Jc)
@@ -210,6 +213,39 @@ MODULE spectrum_type
    CALL allocSpectrum(.false.) !do not realloc NLTE atom%chi;%eta;%Xcoupling
    							   !even if NLTEpops are present
    							   !NLTE eval_opartor condition never reached for images.
+   							   
+   !resample Jnu if any
+!-> can be para if needed, but only once calc is needed
+   if (NLTEspec%Nact > 0 .and. NLTEspec%atmos%electron_scattering) then
+    write(*,*)  " -> Resample mean radiation field for isotropic scattering..." 
+
+    Nwaves_old = size(old_grid)
+    allocate(Jnu(Nwaves_old, NLTEspec%atmos%Nspace))
+    Jnu(:,:) = NLTEspec%J(:,:)
+    allocate(Jnuc(Nwaves_old, NLTEspec%atmos%Nspace))
+    Jnuc(:,:) = NLTEspec%Jc(:,:)
+   
+    deallocate(NLTEspec%J, NLTEspec%Jc)
+    !add  J20, J20c here
+   
+    !new freq grid
+    allocate(NLTEspec%J(NLTEspec%Nwaves, atmos%Nspace),stat=alloc_status)
+    if (alloc_status>0) call error("Allocation error, resample J")
+    allocate(NLTEspec%Jc(NLTEspec%Nwaves, atmos%Nspace),stat=alloc_status)
+    if (alloc_status>0) call error("Allocation error, resample Jc")
+
+    NLTEspec%J(:,:) = 0d0
+    NLTEspec%Jc(:,:) = 0d0
+    do icell=1, atmos%Nspace
+     if (NLTEspec%atmos%icompute_atomRT(icell)>0) then
+       NLTEspec%J(:,icell) = Linear_1D(Nwaves_old, old_grid,Jnu,NLTEspec%Nwaves,NLTEspec%lambda)
+       NLTEspec%Jc(:,icell) = Linear_1D(Nwaves_old, old_grid,Jnuc,NLTEspec%Nwaves,NLTEspec%lambda)
+     endif
+    enddo  
+   endif !resample Jnu
+    write(*,*)  " ...Done!" 
+
+   
   RETURN
   END SUBROUTINE initSpectrumImage
   
@@ -290,28 +326,33 @@ MODULE spectrum_type
     NLTEspec%AtomOpac%eta_c = 0.
     NLTEspec%AtomOpac%sca_c = 0.
    end if
-   
-   allocate(NLTEspec%AtomOpac%chi(NLTEspec%Nwaves ,NLTEspec%NPROC))
-   allocate(NLTEspec%AtomOpac%eta(NLTEspec%Nwaves ,NLTEspec%NPROC))
-   ! if pol allocate AtomOpac%rho
-   NLTEspec%AtomOpac%chi = 0.
-   NLTEspec%AtomOpac%eta = 0.
-   allocate(NLTEspec%AtomOpac%chic_nlte(NLTEspec%Nwaves, NLTEspec%NPROC),&
-      NLTEspec%AtomOpac%etac_nlte(NLTEspec%Nwaves,NLTEspec%NPROC))
-   NLTEspec%AtomOpac%chic_nlte = 0d0; NLTEspec%AtomOpac%etac_nlte = 0d0
+
+   !allocate(NLTEspec%AtomOpac%chic_nlte(NLTEspec%Nwaves, NLTEspec%NPROC),&
+   !   NLTEspec%AtomOpac%etac_nlte(NLTEspec%Nwaves,NLTEspec%NPROC))
+   !NLTEspec%AtomOpac%chic_nlte = 0.; NLTEspec%AtomOpac%etac_nlte = 0.
 
    allocate(NLTEspec%AtomOpac%eta_p(NLTEspec%Nwaves ,NLTEspec%NPROC))
    allocate(NLTEspec%AtomOpac%chi_p(NLTEspec%Nwaves ,NLTEspec%NPROC))
 
    NLTEspec%AtomOpac%chi_p = 0.
    NLTEspec%AtomOpac%eta_p = 0.
-   
+      
    !do not try to realloc after non-LTE for image.
    !Fursther, with labs=.false. for images, we do not enter in eval_operator condition
    !in NLTEOpacity()
    if (alloc_atom_nlte) then !NLTE loop activated
-   
-    if (NLTEspec%atmos%coherent_scattering) CALL alloc_J_coherent()
+     allocate(NLTEspec%AtomOpac%chi(NLTEspec%Nwaves ,NLTEspec%NPROC))
+     allocate(NLTEspec%AtomOpac%eta(NLTEspec%Nwaves ,NLTEspec%NPROC))
+     NLTEspec%AtomOpac%chi = 0.
+     NLTEspec%AtomOpac%eta = 0.
+     allocate(NLTEspec%AtomOpac%Kc_nlte(NLTEspec%Nwaves,atmos%Nspace),stat=alloc_status)
+     if (alloc_status >0) call error("Allocation error Kc_nlte")
+     allocate(NLTEspec%AtomOpac%jc_nlte(NLTEspec%Nwaves,atmos%Nspace),stat=alloc_status)
+     if (alloc_status >0) call error("Allocation error jc_nlte")
+     NLTEspec%AtomOpac%Kc_nlte = 0.
+     NLTEspec%AtomOpac%jc_nlte = 0.
+          
+    if (NLTEspec%atmos%electron_scattering) CALL alloc_Jnu()
    
     !do not allocate if lxcoupling but no NLTE effects
     if (lxcoupling) NLTEspec%atmos%include_xcoupling = .true.
@@ -323,6 +364,8 @@ MODULE spectrum_type
 
     do nat=1,NLTEspec%atmos%Nactiveatoms
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%etac(NLTEspec%Nwaves,atmos%Nspace),stat=alloc_status)
+     if (alloc_status >0) call error("Allocation error atom%etac")
 
      !Now the waves and angle integraed X coupling terms for each atom and for all transitions
      !(Sum over all active transitions for each transition) is kept.
@@ -406,9 +449,8 @@ MODULE spectrum_type
    end if
    
    !active
-   deallocate(NLTEspec%AtomOpac%chi)
-   deallocate(NLTEspec%AtomOpac%eta)
-   deallocate(NLTEspec%AtomOpac%etac_nlte, NLTEspec%AtomOpac%chic_nlte)
+   if (allocated(NLTEspec%AtomOpac%chi)) deallocate(NLTEspec%AtomOpac%chi,NLTEspec%AtomOpac%eta)
+   !deallocate(NLTEspec%AtomOpac%etac_nlte, NLTEspec%AtomOpac%chic_nlte)
    if (allocated(NLTEspec%Psi)) then
     deallocate(NLTEspec%Psi)
     if (allocated(NLTEspec%tau)) deallocate(NLTEspec%tau)!, NLTEspec%AtomOpac%initialized)
@@ -425,6 +467,9 @@ MODULE spectrum_type
     deallocate(NLTEspec%AtomOpac%chi_c)
     deallocate(NLTEspec%AtomOpac%sca_c)
    end if
+   !elsewhere
+   !if (NLTEspec%Nact > 0) deallocate(NLTEspec%AtomOpac%Kc_nlte, NLTEspec%AtomOpac%jc_nlte)
+
    NULLIFY(NLTEspec%atmos)
 
    if (allocated(NLTEspec%Ksi)) deallocate(NLTEspec%ksi)
@@ -476,8 +521,9 @@ MODULE spectrum_type
 
     NLTEspec%AtomOpac%chi(:,id) = 0d0
     NLTEspec%AtomOpac%eta(:,id) = 0d0
-    NLTEspec%AtomOpac%chic_nlte(:,id) = 0d0 !ray indep
-    NLTEspec%AtomOpac%etac_nlte(:,id) = 0d0
+    
+!     NLTEspec%AtomOpac%chic_nlte(:,id) = 0d0 
+!     NLTEspec%AtomOpac%etac_nlte(:,id) = 0d0
 
 
     
@@ -515,7 +561,7 @@ MODULE spectrum_type
   RETURN
   END SUBROUTINE initAtomOpac_zeeman
   
-  SUBROUTINE alloc_J_coherent()
+  SUBROUTINE alloc_Jnu()
   
      allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))!%NPROC))
      allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))
@@ -527,18 +573,16 @@ MODULE spectrum_type
 
    
   RETURN
-  END SUBROUTINE alloc_J_coherent
+  END SUBROUTINE alloc_Jnu
   
-  SUBROUTINE freeJ()
+  SUBROUTINE dealloc_Jnu()
     
-   !if (NLTEspec%atmos%coherent_scattering) then
     if (allocated(NLTEspec%J)) deallocate(NLTEspec%J)
     if (allocated(NLTEspec%Jc)) deallocate(NLTEspec%Jc)
     if (allocated(NLTEspec%J20)) deallocate(NLTEspec%J20)
-   !end if
-   
+
   RETURN 
-  END SUBROUTINE freeJ
+  END SUBROUTINE dealloc_Jnu
   
   SUBROUTINE init_psi_operator(id, iray)
     integer, intent(in) :: iray, id
@@ -559,6 +603,27 @@ MODULE spectrum_type
   
   RETURN
   END SUBROUTINE init_psi_operator
+  
+  SUBROUTINE init_psi_operator_new(id)
+    !for one cell
+    integer, intent(in) :: id
+    integer :: nact
+    
+   	NLTEspec%Psi(:,:,id) = 0d0
+   	if (.not.lxcoupling) & 
+   		NLTEspec%tau(:,:,id) = 0d0
+   	
+   	do nact=1,NLTEspec%atmos%NactiveAtoms
+   		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%eta(:,:,id) = 0d0
+   		if (lxcoupling) then
+    		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%Uji_down(:,:,:,id) = 0d0 
+    		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%chi_down(:,:,:,id) = 0d0  	 
+    		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%chi_up(:,:,:,id) = 0d0	 
+   		endif
+   	enddo
+  
+  RETURN
+  END SUBROUTINE init_psi_operator_new
 
   
   SUBROUTINE alloc_weights()
@@ -791,10 +856,6 @@ MODULE spectrum_type
   SUBROUTINE writeWavelength()
   ! --------------------------------------------------------------- !
    ! Write wavelength grid build with each transition of each atom
-   !
-   ! To.Do: 
-   ! Write for each transition of each atom the part of the grid
-   ! associated to this transition.
   ! --------------------------------------------------------------- !
   use input
    integer :: unit, EOF = 0, blocksize, naxes(1), naxis,group, bitpix, fpixel
@@ -874,7 +935,7 @@ MODULE spectrum_type
   RETURN
   END FUNCTION air2vacuum
   
- !building 
+ !building , move to write_opacity.f90
  SUBROUTINE WRITE_CNTRB_FUNC_PIX()
  ! -------------------------------------------------- !
   ! Write contribution function to disk.
