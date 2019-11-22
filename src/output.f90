@@ -1107,11 +1107,12 @@ subroutine ecriture_sed_ray_tracing()
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
   sed_rt = 0.0_dp
+
   if (RT_sed_method == 1) then
      sed_rt(:,:,:,:) = sum(Stokes_ray_tracing(:,1,1,:,:,:,:),dim=5)
   else
-     do i=1,npix_x
-        do j=1,npix_y
+     do j=1,npix_y
+        do i=1,npix_x
            sed_rt(:,:,:,:) = sed_rt(:,:,:,:) + sum(Stokes_ray_tracing(:,i,j,:,:,:,:),dim=5)
         enddo
      enddo
