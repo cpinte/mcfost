@@ -176,7 +176,7 @@ module parametres
   ! Stars
   type star_type
      real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
-     real(kind=dp) :: x,y,z
+     real(kind=dp) :: x,y,z, vx,vy,vz
      logical :: lb_body, out_model
      character(len=512) :: spectre
      integer :: icell

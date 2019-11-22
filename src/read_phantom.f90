@@ -38,7 +38,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
  real(4),  allocatable, dimension(:) :: tmp
  real(dp), allocatable, dimension(:) :: grainsize, graindens
  real(dp), allocatable, dimension(:) :: dudt, tmp_dp
- real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu
  type(dump_h) :: hdr
  logical :: got_h,got_dustfrac,got_itype,tagged,matched
 
@@ -284,27 +284,31 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
                 !elseif (j==1 .and. number8(j)==nptmass) then
                 elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
                    nptmass = number8(j) ! HACK
-                   if (.not.allocated(xyzmh_ptmass)) allocate(xyzmh_ptmass(5,nptmass)) !HACK
+                   if (.not.allocated(xyzmh_ptmass)) allocate(xyzmh_ptmass(5,nptmass), vxyz_ptmass(3,nptmass)) !HACK
 
                    read(iunit,iostat=ierr) tag
                    matched = .true.
                    if (i==i_real .or. i==i_real8) then
-                      ipos = 0
                       select case(trim(tag))
                       case('x')
-                         ipos = 1
+                         read(iunit,iostat=ierr) xyzmh_ptmass(1,1:nptmass)
                       case('y')
-                         ipos = 2
+                         read(iunit,iostat=ierr) xyzmh_ptmass(2,1:nptmass)
                       case('z')
-                         ipos = 3
+                         read(iunit,iostat=ierr) xyzmh_ptmass(3,1:nptmass)
                       case('m')
-                         ipos = 4
+                         read(iunit,iostat=ierr) xyzmh_ptmass(4,1:nptmass)
                       case('h')
-                         ipos = 5
+                         read(iunit,iostat=ierr) xyzmh_ptmass(5,1:nptmass)
+                      case('vx')
+                         read(iunit,iostat=ierr) vxyz_ptmass(1,1:nptmass)
+                      case('vy')
+                         read(iunit,iostat=ierr) vxyz_ptmass(2,1:nptmass)
+                      case('vz')
+                         read(iunit,iostat=ierr) vxyz_ptmass(3,1:nptmass)
                       case default
                          matched = .false.
                       end select
-                      if (ipos > 0) read(iunit,iostat=ierr) xyzmh_ptmass(ipos,1:nptmass)
                    else
                       matched = .false.
                       read(iunit,iostat=ierr)
@@ -351,7 +355,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
 
  if (got_h) then
     call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,dustfluidtype,xyzh,&
-         vxyzu,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,&
+         vxyzu,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,&
          hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles, &
          n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
@@ -363,7 +367,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
 
  write(*,*) "Phantom dump file processed ok"
  deallocate(xyzh,itype,vxyzu)
- if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
+ if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass,vxyz_ptmass)
 
 end subroutine read_phantom_bin_files
 
@@ -408,7 +412,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
  real(4),  allocatable, dimension(:)   :: tmp, tmp_header
  real(dp), allocatable, dimension(:)   :: dudt, tmp_dp
  real(dp), allocatable, dimension(:)   :: grainsize, graindens
- real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu
  integer, allocatable, dimension(:) :: npartoftype
  real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
  real(dp) :: hfact,umass,utime,udist
@@ -588,10 +592,11 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
     endif
 
     ! read sinks
-    allocate(xyzmh_ptmass(5,nptmass))
+    allocate(xyzmh_ptmass(5,nptmass), vxyz_ptmass(3,nptmass))
     call read_from_hdf5(xyzmh_ptmass(1:3,:),'xyz',hdf5_group_id,got,error)
     call read_from_hdf5(xyzmh_ptmass(4,:),'m',hdf5_group_id,got,error)
     call read_from_hdf5(xyzmh_ptmass(5,:),'h',hdf5_group_id,got,error)
+    call read_from_hdf5(vxyz_ptmass(:,:),'vxyz',hdf5_group_id,got,error)
 
     if (error /= 0) then
        write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF sinks group ***'
@@ -632,7 +637,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
 
   call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,      &
                         dustfluidtype,xyzh,vxyzu,itype,grainsize,dustfrac, &
-                        massoftype,xyzmh_ptmass,hfact,umass,       &
+                        massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
                         utime,udist,graindens,ndudt,dudt,ifiles,   &
                         n_SPH,x,y,z,h,vx,vy,vz,particle_id,SPH_grainsizes,     &
                         massgas,massdust,rhogas,rhodust,extra_heating)
@@ -642,14 +647,14 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
   write(*,*) "Phantom dump file processed ok"
   ierr = 0
   deallocate(xyzh,itype,vxyzu)
-  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
+  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass,vxyz_ptmass)
 
 end subroutine read_phantom_hdf_files
 
 !*************************************************************************
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh, &
-     vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass, &
+     vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
      utime, udist,graindens,ndudt,dudt,ifiles, &
      n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
      SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating,T_to_u)
@@ -671,7 +676,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   real(dp), dimension(ndusttypes),    intent(in) :: graindens
   real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
-  real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
+  real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
@@ -934,6 +939,11 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        etoile(i_etoiles)%x = xyzmh_ptmass(1,i_etoiles) * ulength_au
        etoile(i_etoiles)%y = xyzmh_ptmass(2,i_etoiles) * ulength_au
        etoile(i_etoiles)%z = xyzmh_ptmass(3,i_etoiles) * ulength_au
+
+       etoile(i_etoiles)%vx = vxyz_ptmass(1,i_etoiles) * uvelocity
+       etoile(i_etoiles)%vy = vxyz_ptmass(2,i_etoiles) * uvelocity
+       etoile(i_etoiles)%vz = vxyz_ptmass(3,i_etoiles) * uvelocity
+
        etoile(i_etoiles)%M = xyzmh_ptmass(4,i_etoiles) * usolarmass
     enddo
  else
@@ -946,6 +956,11 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
     etoile(:)%y = xyzmh_ptmass(2,:) * ulength_au
     etoile(:)%z = xyzmh_ptmass(3,:) * ulength_au
+
+    etoile(:)%vx = vxyz_ptmass(1,:) * uvelocity
+    etoile(:)%vy = vxyz_ptmass(2,:) * uvelocity
+    etoile(:)%vz = vxyz_ptmass(3,:) * uvelocity
+
     etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
  endif
 
