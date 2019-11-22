@@ -476,6 +476,7 @@ contains
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -863,6 +864,7 @@ contains
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -1228,6 +1230,7 @@ contains
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -1580,6 +1583,7 @@ contains
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -1929,6 +1933,7 @@ contains
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -2282,6 +2287,7 @@ contains
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -2625,6 +2631,7 @@ contains
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -2966,6 +2973,7 @@ end subroutine read_para215
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -3305,6 +3313,7 @@ end subroutine read_para215
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -3623,6 +3632,7 @@ end subroutine read_para215
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 
@@ -3951,6 +3961,7 @@ end subroutine read_para215
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
     enddo
+    etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
 
     close(unit=1)
 

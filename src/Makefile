@@ -120,7 +120,7 @@ ifeq ($(DEBUG), yes)
 endif
 
 ifeq ($(PROFILING), yes)
-    FFLAGS+= -g
+    FFLAGS+= -g3
 endif
 
 
