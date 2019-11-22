@@ -54,6 +54,7 @@ module dust_ray_tracing
 
   real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
   real, dimension(:,:,:,:), allocatable :: star_position ! n_stars, RT_n_incl, RT_n_az, 2
+  real, dimension(:,:,:), allocatable :: star_vr
 
   real, dimension(:,:,:,:,:,:), allocatable :: tau_surface ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
   real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
@@ -280,7 +281,7 @@ subroutine init_directions_ray_tracing()
   enddo
 
   if (.not. allocated(star_position)) then
-     allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), stat=alloc_status)
+     allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), star_vr(n_etoiles,RT_n_incl,RT_n_az), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error star_position')
   endif
 

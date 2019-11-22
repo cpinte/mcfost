@@ -941,7 +941,7 @@ subroutine ecriture_map_ray_tracing()
   endif
 
   ! extra hdu with star positions
-  call write_star_position(unit,status)
+  call write_star_position_vr(unit,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -3235,7 +3235,7 @@ subroutine ecriture_spectre(imol)
   endif ! lcasa
 
   ! extra hdu with star positions
-  call write_star_position(unit,status)
+  call write_star_position_vr(unit,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -3326,10 +3326,12 @@ end subroutine write_temperature_for_phantom
 
 !**********************************************************************
 
-subroutine write_star_position(unit,status)
-  ! Create an extra hdu with the position of the star
+subroutine write_star_position_vr(unit,status)
+  ! Create 2 extra hdu with :
+  ! - the position of the star
+  ! - the radial velocity of the star
 
-  use dust_ray_tracing, only : star_position
+  use dust_ray_tracing, only : star_position, star_vr
 
   integer, intent(in) :: unit
   integer, intent(inout) :: status
@@ -3341,8 +3343,8 @@ subroutine write_star_position(unit,status)
 
   group=1
   fpixel=1
-
   bitpix=-32
+
   naxis = 4
   naxes(1) = n_etoiles
   naxes(2)= RT_n_incl
@@ -3361,9 +3363,29 @@ subroutine write_star_position(unit,status)
   !  Write the array to the FITS file.
   call ftppre(unit,group,fpixel,nelements,star_position,status)
 
+  !------------------------
+  ! radial velocities
+  !------------------------
+  naxis = 3
+  naxes(1) = n_etoiles
+  naxes(2)= RT_n_incl
+  naxes(3)= RT_n_az
+  nelements=naxes(1)*naxes(2)*naxes(3)
+
+  ! create new hdu
+  call ftcrhd(unit, status)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  call ftpkys(unit,'UNIT',"m/s",'',status)
+
+  !  Write the array to the FITS file.
+  call ftppre(unit,group,fpixel,nelements,star_vr,status)
+
   return
 
-end subroutine write_star_position
+end subroutine write_star_position_vr
 
 !**********************************************************************
 
