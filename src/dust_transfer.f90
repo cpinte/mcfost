@@ -1611,6 +1611,9 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
      star_position(istar,ibin,iaz,1) = - dot_product(xyz, dx_map) * factor_pix ! RA negative axis
      star_position(istar,ibin,iaz,2) = dot_product(xyz, dy_map) * factor_pix
 
+     ! Radial velocities
+     star_vr(istar,ibin,iaz) = etoile(istar)%vx * u + etoile(istar)%vy * v + etoile(istar)%vz * w
+
   enddo ! n_stars
 
   deallocate(map_1star)
