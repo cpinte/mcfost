@@ -68,8 +68,8 @@ module parametres
   real :: dpops_max_error, dpops_sub_max_error
   
   !Wavelength table for spectrally resolved images and spectra
-  character(len=50) :: tab_wavelength_image
-  logical :: ltab_wavelength_image
+  character(len=50) :: tab_wavelength_image, jnu_atom_file
+  logical :: ltab_wavelength_image, lread_jnu_atom
   !Magnetic Polarized RT equation
   character(len=20) :: prt_solution
   ! PLUTO / MHD / ascii_model

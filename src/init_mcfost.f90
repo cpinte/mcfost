@@ -76,6 +76,7 @@ subroutine set_default_variables()
   lmagnetic_field = .true.
   lforce_lte = .false.
   lxcoupling=.false.
+  lread_jnu_atom=.false.
   ! AL-RT
   ! Ng's acceleration
   lNg_acceleration= .false.
@@ -628,6 +629,9 @@ subroutine initialisation_mcfost()
      case("-vacuum_to_air")
         i_arg = i_arg + 1
         lvacuum_to_air = .true.
+     case("-read_jnu_atom")
+     	i_arg = i_arg + 1
+     	lread_jnu_atom = .true.
      case("-puffed_up_rim")
         lpuffed_rim = .true.
         if (i_arg + 3 > nbr_arg) call error("rim parameters needed")
@@ -1686,6 +1690,8 @@ subroutine display_help()
   write(*,*) "        : -prt_solution <sol> : Solution for the polarised RT equation "
   write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE, NO_STOKES (DEFAULT)"
   write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
+  write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
+  write(*,*) "        : -read_jnu_atom : Read old Jnu values from file "
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
 !-> this one could also be use for mol tranfer, like Ng or tab_wavelength
   write(*,*) "        : -max_err <max_err> : max relative error"
