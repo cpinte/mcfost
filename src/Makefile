@@ -171,7 +171,7 @@ all : mcfost libmcfost.a
 mcfost :  $(OBJECTS) voro++_wrapper.o  xgboost_wrapper.o mcfost.o
 	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o xgboost_wrapper.o mcfost.o $(LDFLAGS)
 
-libmcfost.a : $(OBJECTS) voro++_wrapper.o mcfost2phantom.o
+libmcfost.a : $(OBJECTS) voro++_wrapper.o xgboost_wrapper.o mcfost2phantom.o
 	rm -f mcfost.o libmcfost.a
 	ar vr libmcfost.a *.o
 	ranlib libmcfost.a
