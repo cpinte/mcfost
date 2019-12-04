@@ -677,7 +677,7 @@ function v_proj(icell,x,y,z,u,v,w) !
   integer, intent(in) :: icell
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
-  real(kind=dp) :: vitesse, vx, vy, vz, norme, r,  vr
+  real(kind=dp) :: vitesse, vx, vy, vz, norme, r, r2, norme2
 
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)
@@ -724,47 +724,43 @@ function v_proj(icell,x,y,z,u,v,w) !
               v_proj = 0.0_dp
            endif
         else if (lmagnetoaccr) then
-        
-           r = sqrt(x*x+y*y)
-           vr = sqrt(atmos%Vxyz(icell,1)**2 + atmos%Vxyz(icell,2)**2) !Vr=sqrt(Vz**2+VR**2)	
-           			 
-           vx = 0_dp; vy = 0_dp; vz = 0_dp
+           r = sqrt(x*x+y*y)           			 
+           vx = 0_dp; vy = 0_dp!; vz = 0_dp
+           vz = atmos%vz(icell)
+                         !only if z strictly positive (2D)
+           if ( (.not.l3D) .and. (z < 0_dp) ) vz = -vz
+
            if (r > tiny_dp) then !rotational + wind, should work also with
            						 !spherical wind of stars
               norme = 1.0_dp/r
-              !rotational velocity changes with z, but lies only in the (x,y) plane
-              ! -> e_phi on (e_x, e_y)
-              vx = -y * norme * atmos%Vxyz(icell,3)  !Vphi proj_x
-              vy =  x * norme * atmos%Vxyz(icell,3)  !Vphi proj_y
-              !equatorial velocity lies in x, y plane, x*norme=x/r=cos(phi); y*norme=sin(phi)
-              ! -> e_R on (e_x, e_y)
-           else
-              vx = 0.0
-              vy = 0.0
-           endif
-           
-           r = sqrt(x*x+y*y+z*z)
-           if ( r > tiny_dp) then
-           	  norme = 1.0_dp / r
-              vx = vx + x * norme * vr
-              vy = vy + y * norme * vr
-              vz = z * norme * vr
+              
+              vx = atmos%vR(icell) * x * norme - atmos%vphi(icell) * y * norme
+              vy = atmos%vR(icell) * y * norme + atmos%vphi(icell) * x * norme
+ 
+              v_proj = vx*u + vy*v + vz*w
           else
-              vz = 0.
+          	  v_proj = vz*w!0.0_dp
           endif
-              
-              
-!               vx = vx + x*norme*atmos%Vxyz(icell, 1) !VR proj_x
-!               vy = vy + y*norme*atmos%Vxyz(icell, 1) !VR proj_y
-!               vz = atmos%Vxyz(icell, 2) !Vz
-!               !and z is paralel to e_z
-!               !! -> but this doesn't work if vz is already negative in 3D models
-!               if (z < 0_dp) vz = -vz !symmetrical change
-!               !if (z < 0_dp .and. vz > 0) vz = -vz
-!               !change vz in -vz only if z < 0 and vz >0 == 2D model (with theta = 0 to pi/2)
-!               !otherwise, vz is < 0 for < 0 in 3D models (wuth theta=0 to pi)
-         v_proj = vx*u + vy*v + vz*w
-
+		else if (lspherical_velocity) then
+			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
+			vx = 0.; vy = 0.; vz = 0.;
+			norme2 = 0.0_dp
+			if (r>tiny_dp) then
+				norme = 1.0_dp / r
+				if (r2 > tiny_dp) norme2 = 1.0_dp / r2
+				
+				vx = atmos%vr(icell) * x * norme + norme2 * (z * norme * x * atmos%vtheta(icell) - y * atmos%vphi(icell))
+				vy = atmos%vr(icell) * y * norme + norme2 * (z * norme * y * atmos%vtheta(icell) + x * atmos%vphi(icell))
+				vz = atmos%vr(icell) * z * norme - r2 / r * atmos%vtheta(icell)
+				
+				if (.not.l3D .and. z < 0._dp) vz = -z
+								
+				v_proj = vx * u + vy * v + vz * w
+			else
+				v_proj = 0.0
+			endif
+		 write(*,*) icell, "vel (icell)", atmos%vr(icell)/1d3, atmos%vtheta(icell)/1d3, atmos%vphi(icell)/1d3
+         write(*,*) "vproj1=", v_proj/1d3, "vx=",vx/1d3, "vy=",vy/1d3, "vz=", vz/1d3			
 		else
            call error("velocity field not defined")
         endif
