@@ -5,8 +5,7 @@ MODULE statequil_atoms
  use spectrum_type, only : NLTEspec
  use constant
  use opacity
- use math, only : locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, integrate_dx
- use utils, only : GaussSlv
+ use math, only : locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, integrate_x
  use parametres
  use accelerate
  use collision, only : CollisionRate !future deprecation
@@ -20,9 +19,13 @@ MODULE statequil_atoms
  
 !  PROCEDURE(FillGamma_atom_hogerheijde), pointer :: FillGamma_atom => NULL()
  PROCEDURE(FillGamma_atom_mali_mu), pointer :: FillGamma_atom_mu => NULL()
+ real(kind=dp), parameter :: prec_pops = 1d-100 !1d-8
 
+ !tmp
+ real(kind=dp), dimension(100), private :: diag, diag2
 
  CONTAINS
+
  
  SUBROUTINE fill_collision_matrix(id, icell)
   integer, intent(in) :: icell, id
@@ -40,6 +43,7 @@ MODULE statequil_atoms
   RETURN 
  END SUBROUTINE fill_collision_matrix
  
+ !The matrix itself could kept in memory, and we would just have to multiply it by ne
  SUBROUTINE collision_matrix_atom(id, icell, atom)
   integer, intent(in) :: icell, id
   type (AtomType), pointer, intent(inout) :: atom
@@ -50,6 +54,8 @@ MODULE statequil_atoms
 	if (atom%ID=="H") then
 	  atom%C(:,:,id) = Collision_Hydrogen(icell)
 	else
+	  write(*,*) "Collision RH not set for large atoms"
+	  stop
       atom%C(:,:,id) = CollisionRate(icell, atom)
     end if
      
@@ -66,6 +72,7 @@ MODULE statequil_atoms
  SUBROUTINE initGamma_atom(id, atom)
   integer, intent(in) :: id
   type (AtomType), pointer, intent(inout) :: atom
+  integer :: kc
   
    atom%Gamma(:,:,id) = atom%C(:,:,id)
   
@@ -102,6 +109,1033 @@ MODULE statequil_atoms
   end do
  RETURN
  END SUBROUTINE initGamma
+
+ SUBROUTINE fillGamma_mu(id, icell, iray, n_rayons, switch_to_lte)
+  ! ------------------------------------------------------------------------- !
+   ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
+   ! of transition from level l' to l.
+   ! At initialisation, Gamma(l',l) = C(J,I), the collisional rates from upper
+   ! level j to lower level i.
+   !
+   !
+   ! The Sum_l" represents a sommation over each column for the lth row.
+   !
+  ! ------------------------------------------------------------------------- !
+
+  integer, intent(in) :: id, n_rayons, icell, iray !here for debug not used
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact
+  type (AtomType), pointer :: atom
+  write(*,*) " Missing radiative Aji for Gamma!"
+  stop
+
+  do nact=1, atmos%NactiveAtoms
+   atom=>atmos%ActiveAtoms(nact)%ptr_atom
+   CALL FillGamma_atom_mu(id, icell, iray, atom, n_rayons, switch_to_lte)
+   atom=>NULL()
+  enddo
+
+ RETURN
+ END SUBROUTINE fillGamma_mu
+  
+ SUBROUTINE FillGamma_atom_mali_mu(id, icell, iray, atom, n_rayons, switch_to_lte)
+
+  integer, intent(in) :: icell, id, n_rayons, iray
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: kr, kc, i, j, l, Nblue, Nred, ip, jp, Nl2, Nb2, Nr2, lp
+  real(kind=dp), dimension(:), allocatable :: integ, lambda
+  real(kind=dp) :: factor, Vij, Jnu, Ieff, Jeff
+  !to test
+  real(kind=dp) :: GammaRad(atom%Nlevel,atom%Nlevel)
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) RETURN !Gamma initialized to Cul
+  end if 
+  
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     i = atom%lines(kc)%i; j = atom%lines(kc)%j
+     Nblue = atom%lines(kc)%Nblue; Nred = atom%lines(kc)%Nred
+    
+     allocate(integ(atom%lines(kc)%Nlambda))!, lambda(line%Nlambda))
+     !lambda = (NLTEspec%lambda(Nblue:Nred)-line%lambda0)*Clight/line%lambda0
+
+    
+     integ(:) = (NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) * atom%lines(kc)%phi_ray(:, iray,id)
+
+     !Jeff = Integrate_x(line%Nlambda, lambda, integ) / n_rayons
+     Jeff = sum(integ*atom%lines(kc)%w_lam(:))/n_rayons
+
+     !if (iray == 1) atom%Gamma(j,i,id) = line%Aji
+
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff*atom%lines(kc)%Bji! + atom%lines(kc)%Aji/n_rayons
+     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff*atom%lines(kc)%Bij
+     
+     integ(:) = 0d0
+     !include weights
+     !integ = NLTEspec%Psi(Nblue:Nred,iray,id)*&
+     !    		atom%Uji_down(j,Nblue:Nred,iray,id)*atom%chi_up(i,Nblue:Nred,iray,id)
+     !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - sum(integ)!Integrate_x(line%Nlambda, lambda, integ) / n_rayons !j>l
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - &
+     	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(j,:,iray,id)*atom%chi_up(i,:,iray,id)) / n_rayons
+         		
+         inner_tr_loop : do lp=1, atom%Ntr
+          SELECT CASE (atom%at(lp)%trtype)
+           CASE ("ATOMIC_LINE")
+            ip = atom%lines(atom%at(lp)%ik)%i
+            jp = atom%lines(atom%at(lp)%ik)%j
+            Nb2 = atom%lines(atom%at(lp)%ik)%Nblue
+            Nr2 = atom%lines(atom%at(lp)%ik)%Nred
+            Nl2 = atom%lines(atom%at(lp)%ik)%Nlambda
+            !deallocate(lambda)
+			!allocate(lambda(Nl2)); lambda = (NLTEspec%lambda(Nb2:Nr2)-other_line%lambda0)*CLIGHT/other_line%lambda0
+           CASE ("ATOMIC_CONTINUUM")
+            ip = atom%continua(atom%at(lp)%ik)%i
+            jp = atom%continua(atom%at(lp)%ik)%j
+            Nb2 = atom%continua(atom%at(lp)%ik)%Nblue
+            Nr2 = atom%continua(atom%at(lp)%ik)%Nred
+            Nl2 = atom%continua(atom%at(lp)%ik)%Nlambda
+            !deallocate(lambda)
+			!allocate(lambda(Nl2)); lambda = NLTEspec%lambda(Nb2:Nr2)
+
+          END SELECT
+          !Only if the lower level of j->i is an upper level of another transition
+          if (jp==i) then              
+          	 integ = 0d0
+          	 !integ = NLTEspec%Psi(Nblue:Nred,iray,id)*&
+             !	atom%Uji_down(i,Nblue:Nred,iray,id)*atom%chi_down(j,Nblue:Nred, iray, id)
+             !atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + sum(integ)!Integrate_x(Nl2, lambda, integ) / n_rayons  !j<l
+             atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + &
+             	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(i,:,iray,id)*atom%chi_down(j,:, iray, id))/n_rayons
+          endif
+         enddo inner_tr_loop
+
+     deallocate(integ)!, lambda)
+        
+    CASE ("ATOMIC_CONTINUUM")
+     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+    
+     allocate(integ(atom%continua(kc)%Nlambda))!, lambda(cont%Nlambda))
+     !lambda = cont_wlam(cont) !NLTEspec%lambda(Nblue:Nred)
+
+    
+     
+      
+      integ(:) = (NLTEspec%I(Nblue:Nred,iray,id)  - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id))*atom%continua(kc)%alpha(:)
+      
+      Jnu = sum(atom%continua(kc)%w_lam(:)*integ)/n_rayons!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons !Jbarcont
+      
+      integ(:) = ( (NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) + &
+       atom%continua(kc)%twohnu3_c2(:))*atom%continua(kc)%gij(:,icell)*atom%continua(kc)%alpha(:)
+       
+      Jeff = sum(atom%continua(kc)%w_lam(:)*integ)/n_rayons!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons
+
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu * fourPI_h
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff * fourPI_h
+      
+      !integ(:) = atom%Uji_down(j,Nblue:Nred,iray,id)*atom%chi_up(i,Nblue:Nred,iray,id)*&
+      !  		NLTEspec%Psi(Nblue:Nred,iray,id)
+      !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - sum(integ)!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - &
+      	sum(atom%Uji_down(j,:,iray,id)*atom%chi_up(i,:,iray,id)*NLTEspec%Psi(:,iray,id))/n_rayons
+       
+         inner_tr_loop2 : do lp=1, atom%Ntr
+          SELECT CASE (atom%at(lp)%trtype)
+           CASE ("ATOMIC_LINE")
+            ip = atom%lines(atom%at(lp)%ik)%i
+            jp = atom%lines(atom%at(lp)%ik)%j
+            Nb2 = atom%lines(atom%at(lp)%ik)%Nblue
+            Nr2 = atom%lines(atom%at(lp)%ik)%Nred
+            Nl2 = atom%lines(atom%at(lp)%ik)%Nlambda
+             !deallocate(lambda)
+             !allocate(lambda(Nl2)); lambda = (NLTEspec%lambda(Nb2:Nr2)-other_line%lambda0)*CLIGHT/other_line%lambda0
+           CASE ("ATOMIC_CONTINUUM")
+            ip = atom%continua(atom%at(lp)%ik)%i
+            jp = atom%continua(atom%at(lp)%ik)%j
+            Nb2 = atom%continua(atom%at(lp)%ik)%Nblue
+            Nr2 = atom%continua(atom%at(lp)%ik)%Nred
+            Nl2 = atom%continua(atom%at(lp)%ik)%Nlambda
+            ! deallocate(lambda)
+            ! allocate(lambda(Nl2)); lambda = NLTEspec%lambda(Nb2:Nr2)
+          END SELECT
+          if (jp==i) then
+          	 integ(:) = 0d0
+			 !integ(:) = NLTEspec%Psi(Nblue:Nred,iray,id)*&
+             !	atom%Uji_down(i,Nblue:Nred,iray,id)*atom%chi_down(j,Nblue:Nred, iray, id)
+             !atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + sum(integ)!Integrate_x(Nl2, lambda, integ) / n_rayons
+             atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + &
+             	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(i,:,iray,id)*atom%chi_down(j,:, iray, id))/n_rayons
+          endif
+          
+         enddo inner_tr_loop2
+
+     deallocate(integ)!, lambda)
+ 
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+  
+  !invoked in SEE to avoid the term delta ??
+  !CALL xcc_mali_mu(id, iray, atom)
+ 
+ RETURN
+ END SUBROUTINE FillGamma_atom_mali_mu
+
+ SUBROUTINE FillGamma_atom_hogerheijde_mu(id, icell, iray, atom, n_rayons, switch_to_lte)
+
+  integer, intent(in) :: icell, id, n_rayons, iray
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: kr, kc, i, j, l, Nblue, Nred, Nl
+  real(kind=dp) :: nu, Ieff, Jeff, Jeffp
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) then
+     RETURN !Gamma initialized to Cul
+   endif
+  end if 
+  
+  if (iray==1) then
+   diag = 0.0_dp
+   diag2 = 0.0_dp
+  endif
+  
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     i = atom%lines(kc)%i; j = atom%lines(kc)%j
+     Nblue = atom%lines(kc)%Nblue; Nred = atom%lines(kc)%Nred
+     Nl = atom%lines(kc)%Nlambda
+!      write(*,*) " line", i, j, Nl, Nblue, Nred, Nblue+Nl - 1
+
+       
+     Jeff = 0.0_dp
+     do l=1, Nl
+!       Ieff = NLTEspec%I(Nblue+l-1,iray,id)*NLTEspec%etau(Nblue+l-1,iray,id) + &
+!       		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+      Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%tau(Nblue+l-1,iray,id)) + &
+       		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+      		 
+      Jeff = Jeff + Ieff * atom%lines(kc)%phi_ray(l,iray,id)*atom%lines(kc)%w_lam(l)   
+     enddo
+
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff*atom%lines(kc)%Bji/n_rayons! + atom%lines(kc)%Aji/n_rayons, at init
+     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff*atom%lines(kc)%Bij/n_rayons
+     
+     diag(i) = diag(i) + Jeff*atom%lines(kc)%Bij/n_rayons+atom%C(i,j,id)/n_rayons
+     diag(j) = diag(j) + Jeff*atom%lines(kc)%Bji/n_rayons +atom%C(j,i,id)/n_rayons +atom%lines(kc)%Aji/n_rayons 
+        
+    CASE ("ATOMIC_CONTINUUM")
+     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+     Nl = atom%continua(kc)%Nlambda
+
+
+     Jeff = 0.0_dp
+     Jeffp = 0.0_dp
+!      write(*,*) " cont", i, j, Nl, Nblue, Nred, Nblue+Nl - 1
+     do l=1, Nl
+!       Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%tau(Nblue+l-1,iray,id)) + &
+!       		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+!       		 
+!       Jeff = Jeff + Ieff * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+!       Jeffp = Jeffp + (Ieff + atom%continua(kc)%twohnu3_c2(l)) * &
+!                atom%continua(kc)%gij(l,icell) * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+      Ieff = NLTEspec%I(Nblue+l-1,iray,id)*NLTEspec%etau(Nblue+l-1,iray,id) + &
+      		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+      		 
+!       Jeff = Jeff + Ieff * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+!       Jeffp = Jeffp + (Ieff + atom%continua(kc)%twohnu3_c2(l)) * &
+!                atom%continua(kc)%gij(l,icell) * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+
+      Jeff = Jeff + Ieff * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+      Jeffp = Jeffp + (Ieff + &
+      				   atom%continua(kc)%twohnu3_c2(l)) * &
+                       atom%continua(kc)%Vji(l,id) * atom%continua(kc)%w_lam(l)
+
+     enddo
+      
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff * fourPI_h / n_rayons
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeffp * fourPI_h / n_rayons
+      
+      diag(i) = diag(i) + Jeff * fourPI_h / n_rayons + atom%C(i,j,id)/n_rayons
+      diag(j) = diag(j) + Jeffp * fourPI_h / n_rayons + atom%C(j,i,id)/n_rayons
+       
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+  
+  
+  if (iray==n_rayons) then
+  do l = 1, atom%Nlevel
+    diag2(l) = sum(atom%Gamma(l,:,id)) !sum over rows for this column
+  end do
+!    write(*,*) "diag1", diag(1:atom%Nlevel)
+!    write(*,*) "diag2", diag2(1:atom%Nlevel) 
+!    stop
+  endif
+ 
+ RETURN
+ END SUBROUTINE FillGamma_atom_hogerheijde_mu 
+ 
+ SUBROUTINE remove_delta(id, atom)
+  !Remove therm in delta(l,l')
+  !need to be done once Gamma is know, so not in FillGamma_mu which is the 
+  ! wavelength-ray building of Gamma.
+  !But cross-coupling are in ?? and should not, no ?
+  integer, intent(in) :: id
+  type (AtomType), intent(inout) :: atom
+  integer :: l
+  
+  do l = 1, atom%Nlevel
+    atom%Gamma(l,l,id) = 0.0_dp
+    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+  end do
+  
+ RETURN
+ END SUBROUTINE remove_delta
+ 
+ SUBROUTINE FillGamma_part1(id, icell, iray, n_rayons, switch_to_lte)
+
+  integer, intent(in) :: id, n_rayons, icell, iray
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact
+  type (AtomType), pointer :: atom
+
+  if (switch_to_lte) return
+
+  do nact=1, atmos%NactiveAtoms
+   atom=>atmos%ActiveAtoms(nact)%ptr_atom
+   CALL FillGamma_atom_part1(id, icell, iray, atom, n_rayons)
+   atom=>NULL()
+  enddo 
+ 
+ RETURN
+ END SUBROUTINE FillGamma_part1
+ 
+ SUBROUTINE FillGamma_part2(id, icell, switch_to_lte)
+ 
+  integer, intent(in) :: id, icell
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: nact
+  type (AtomType), pointer :: atom
+  
+  if (switch_to_lte) return
+
+  do nact=1, atmos%NactiveAtoms
+   atom=>atmos%ActiveAtoms(nact)%ptr_atom
+   CALL FillGamma_atom_part2(id, icell, atom)
+   atom=>NULL()
+  enddo 
+ 
+ RETURN
+ END SUBROUTINE FillGamma_part2
+ 
+ SUBROUTINE FillGamma_atom_part1(id, icell, iray, atom, n_rayons)
+
+  integer, intent(in) :: icell, id, n_rayons, iray
+  type (AtomType), intent(inout), pointer :: atom
+  integer :: kr, kc, i, j, l, Nblue, Nred, Nl
+  real(kind=dp) :: nu, Ieff, Jeff, Jeffp
+  
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     i = atom%lines(kc)%i; j = atom%lines(kc)%j
+     Nblue = atom%lines(kc)%Nblue; Nred = atom%lines(kc)%Nred
+     Nl = atom%lines(kc)%Nlambda
+       
+     Jeff = 0.0_dp
+     do l=1, Nl
+!       Ieff = NLTEspec%I(Nblue+l-1,iray,id)*NLTEspec%etau(Nblue+l-1,iray,id) + &
+!       		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+      Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%tau(Nblue+l-1,iray,id)) + &
+       		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+      		 
+      Jeff = Jeff + Ieff * atom%lines(kc)%phi_ray(l,iray,id)*atom%lines(kc)%w_lam(l)
+     enddo
+     
+
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + ( atom%lines(kc)%Aji + Jeff*atom%lines(kc)%Bji )/ n_rayons
+     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff*atom%lines(kc)%Bij/n_rayons
+ 
+   if ((any_nan_infinity_vector(NLTEspec%I(Nblue:NRed,iray,id)*dexp(-NLTEspec%tau(Nblue:Nred,iray,id)))>0)) then
+    write(*,*) "line", id, icell, kc
+    write(*,*) "I", NLTEspec%I(Nblue:NRed,iray,id)
+    write(*,*) "etau", NLTEspec%tau(Nblue:Nred,iray,id)
+    stop
+  end if   
+        
+    CASE ("ATOMIC_CONTINUUM")
+     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+     Nl = atom%continua(kc)%Nlambda
+
+
+    do l=1, Nl
+     atom%continua(kc)%Jnu(l,id) = atom%continua(kc)%Jnu(l,id) + &
+      ( NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%tau(Nblue+l-1,iray,id)) + &
+      		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id) ) / n_rayons
+    enddo
+    
+   if (any_nan_infinity_vector(atom%continua(kc)%Jnu(:,id))>0) then
+    write(*,*) "cont (Jnu part1)", id, icell, kc, iray
+    write(*,*) "I", NLTEspec%I(Nblue:NRed,iray,id)
+    write(*,*) "tau", NLTEspec%tau(Nblue:Nred,iray,id)
+    write(*,*) "etau", NLTEspec%etau(Nblue:Nred,iray,id)
+    write(*,*) "psi", NLTEspec%psi(Nblue:Nred,iray,id)
+    write(*,*) "eta", atom%eta(Nblue:Nred,iray,id)
+    stop
+  end if 
+
+       
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+
+ 
+ RETURN
+ END SUBROUTINE FillGamma_atom_part1
+ 
+  SUBROUTINE FillGamma_atom_part2(id, icell, atom)
+
+  integer, intent(in) :: icell, id
+  type (AtomType), intent(inout), pointer :: atom
+  integer :: kr, kc, i, j, l, Nblue, Nred, Nl
+  real(kind=dp) :: nu, Ieff, Jeff, Jeffp
+
+  tr_loop : do kr=atom%Ntr_line+1, atom%Ntr !over continua only
+   kc = atom%at(kr)%ik
+
+
+     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+     Nl = atom%continua(kc)%Nlambda
+
+
+     Jeff = 0.0_dp
+     Jeffp = 0.0_dp
+     do l=1, Nl
+
+      		 
+!       Jeff = Jeff + Ieff * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+!       Jeffp = Jeffp + (Ieff + atom%continua(kc)%twohnu3_c2(l)) * &
+!                atom%continua(kc)%gij(l,icell) * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+
+      Jeff = Jeff + atom%continua(kc)%Jnu(l,id) * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+      Jeffp = Jeffp + (atom%continua(kc)%Jnu(l,id) + &
+      				   atom%continua(kc)%twohnu3_c2(l)) * &
+                       atom%continua(kc)%gij(l,icell) * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+
+     enddo
+
+  if ((any_nan_infinity_vector(atom%continua(kc)%Jnu(:,id))>0)) then
+    write(*,*) "cont", id, icell, kc
+    write(*,*) Jeff
+    write(*,*) "Jnu", atom%continua(kc)%Jnu(:,id)
+    stop
+  end if
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff * fourPI_h
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeffp * fourPI_h
+       
+
+  
+  end do tr_loop
+  
+
+ 
+ RETURN
+ END SUBROUTINE FillGamma_atom_part2 
+ 
+ 
+  SUBROUTINE calc_J_atom(id, icell, iray, atom, n_rayons)
+
+  integer, intent(in) :: icell, id, n_rayons, iray
+  type (AtomType), intent(inout), pointer :: atom
+  integer :: kr, kc, i, j, l, Nblue, Nred, Nl
+  real(kind=dp) :: nu, Ieff
+
+  
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     i = atom%lines(kc)%i; j = atom%lines(kc)%j
+     Nblue = atom%lines(kc)%Nblue; Nred = atom%lines(kc)%Nred
+     Nl = atom%lines(kc)%Nlambda
+       
+     do l=1, Nl
+
+      Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%tau(Nblue+l-1,iray,id)) + &
+       		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
+      		 
+      atom%lines(kc)%Jbar = atom%lines(kc)%Jbar + Ieff * atom%lines(kc)%phi_ray(l,iray,id)*atom%lines(kc)%w_lam(l)
+     enddo
+     
+      !try integration of integrate_x(line%u, line%phi)
+      write(*,*) atom%lines(kc)%Jbar(id)/n_rayons, integrate_x(atom%lines(kc)%Nlambda, atom%lines(kc)%u,atom%lines(kc)%phi_ray(l,iray,id))
+stop
+     atom%lines(kc)%Jbar(id) = atom%lines(kc)%Jbar(id)/n_rayons
+
+        
+    CASE ("ATOMIC_CONTINUUM")
+     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+     Nl = atom%continua(kc)%Nlambda
+
+    do l=1, Nl
+     atom%continua(kc)%Jnu(l,id) = atom%continua(kc)%Jnu(l,id) + &
+      ( NLTEspec%I(Nblue+l-1,iray,id)*NLTEspec%etau(Nblue+l-1,iray,id) + &
+      		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id) ) / n_rayons
+    enddo
+
+       
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+
+ 
+ RETURN
+ END SUBROUTINE calc_J_atom
+ 
+ !fill diagonal here also explicitely
+ SUBROUTINE rate_matrix_atom(id, icell, atom, switch_to_lte)
+
+  integer, intent(in) :: icell, id
+  type (AtomType), intent(inout), pointer :: atom
+  logical, optional, intent(in) :: switch_to_lte
+  integer :: kr, kc, i, j, l, Nblue, Nred, Nl
+  real(kind=dp) :: nu, Ieff, Jeff, Jeffp
+
+  if (present(switch_to_lte)) then
+   if (switch_to_lte) return
+  end if 
+  
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     i = atom%lines(kc)%i; j = atom%lines(kc)%j
+
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + atom%lines(kc)%Aji + atom%lines(kc)%Jbar(id)*atom%lines(kc)%Bji
+     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + atom%lines(kc)%Jbar(id)*atom%lines(kc)%Bij
+        
+    CASE ("ATOMIC_CONTINUUM")
+
+
+     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+     Nl = atom%continua(kc)%Nlambda
+
+
+     Jeff = 0.0_dp
+     Jeffp = 0.0_dp
+     do l=1, Nl
+
+      Jeff = Jeff + atom%continua(kc)%Jnu(l,id) * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+      Jeffp = Jeffp + (atom%continua(kc)%Jnu(l,id) + &
+      				   atom%continua(kc)%twohnu3_c2(l)) * &
+                       atom%continua(kc)%gij(l,icell) * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l)
+
+     enddo
+
+      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff * fourPI_h
+      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeffp * fourPI_h
+
+       
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+
+ 
+ RETURN
+ END SUBROUTINE rate_matrix_atom
+
+!test integration 
+ SUBROUTINE FillGamma_atom_zero_radiation(id, icell, atom)
+ !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-tau) + Psi * eta
+ ! "Hogereijde-like". There is no expansion of eta in S_jS_i Uji * nj, hence no Xcoupling yet
+ ! to do: Xcoupling
+  integer, intent(in) :: icell, id
+  type (AtomType), intent(inout), pointer :: atom
+  integer :: kr, kc, i, j, Nblue, Nred, l, iray
+  real(kind=dp) :: Rji, norm, norm2
+  !no too much memory needed for that
+  !type (AtomicLine) :: line
+  !type (AtomicContinuum) :: cont
+
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     !line = atom%lines(kc)
+     i = atom%lines(kc)%i; j = atom%lines(kc)%j
+     Nblue = atom%lines(kc)%Nblue; Nred = atom%lines(kc)%Nred
+
+
+     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + atom%lines(kc)%Aji
+
+        
+    CASE ("ATOMIC_CONTINUUM")
+     !cont = atom%continua(kc)
+     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+    
+
+     !weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
+     ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
+
+!     norm = atom%continua(kc)%alpha(1)*atom%continua(kc)%twohnu3_c2(1)*atom%continua(kc)%gij(1,icell) * 0.5 * (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue))
+      norm = 0!( NLTEspec%lambda(Nblue)**-3 )* 0.5 * (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue))
+      norm2 = 0.
+     do l=2,atom%continua(kc)%Nlambda
+      norm = norm + 0.5*(NLTEspec%lambda(Nblue+l-1)-NLTEspec%lambda(Nblue+l-2))*&
+      (NLTEspec%lambda(Nblue+l-1)**-3 + NLTEspec%lambda(Nblue+l-2)**-3)
+ !      norm = norm +  0.5*(NLTEspec%lambda(Nblue+l-1)-NLTEspec%lambda(Nblue+l-2))*( atom%continua(kc)%alpha(l+1)*atom%continua(kc)%twohnu3_c2(l+1)*atom%continua(kc)%gij(l+1,icell) + &
+!        atom%continua(kc)%alpha(l)*atom%continua(kc)%twohnu3_c2(l)*atom%continua(kc)%gij(l,icell) )
+     enddo
+!      
+!      
+     do l=1, atom%continua(kc)%Nlambda !also integrate 1/lambda3, there is a 1/lambda in w_lam
+           norm2 = norm2 + NLTEspec%lambda(Nblue+l-1)**-2 *atom%continua(kc)%w_lam(l)
+     enddo!-0.5/91.1763**2 + 0.5/22.794**2
+  write(*,*) norm, -0.5/atom%continua(kc)%lambda0**2 + 0.5/atom%continua(kc)%lambdamin**2, norm2, &
+  Integrate_x(atom%continua(kc)%Nlambda, NLTEspec%lambda(Nblue:Nred), NLTEspec%lambda(Nblue:Nred)**-3)
+! 
+stop
+    norm = 0.!atom%continua(kc)%alpha(1)*atom%continua(kc)%twohnu3_c2(1)*atom%continua(kc)%gij(1,icell) * 0.5 * (NLTEspec%lambda(Nblue+1)-NLTEspec%lambda(Nblue))
+     do l=2,atom%continua(kc)%Nlambda
+       norm = norm +  0.5*(NLTEspec%lambda(Nblue+l-1)-NLTEspec%lambda(Nblue+l-2))*( atom%continua(kc)%alpha(l)*atom%continua(kc)%twohnu3_c2(l)*atom%continua(kc)%gij(l,icell)/NLTEspec%lambda(Nblue+l-1) + &
+        atom%continua(kc)%alpha(l-1)*atom%continua(kc)%twohnu3_c2(l-1)*atom%continua(kc)%gij(l-1,icell)/NLTEspec%lambda(Nblue+l-2) )
+     enddo
+     
+      !integrate 4pi/h int_0^lambda0 (alpha(lambda) * (ni/ni)exp(-hnu/kt) * 2hnu3/c2  dlambda/lambda
+       !Rji = fourPI_h * integrate_x(atom%continua(kc)%Nlambda, NLTEspec%lambda(Nblue:Nred), atom%continua(kc)%alpha(:)*atom%continua(kc)%twohnu3_c2(:)*atom%continua(kc)%gij(:,icell)/NLTEspec%lambda(Nblue:Nred))
+     Rji = 0.
+     do l=1,atom%continua(kc)%Nlambda
+      Rji = Rji + &
+       fourPI_h * atom%continua(kc)%alpha(l)*atom%continua(kc)%twohnu3_c2(l)*atom%continua(kc)%gij(l,icell)*atom%continua(kc)%w_lam(l)!/NLTEspec%lambda(Nblue+l-1)
+     enddo
+     
+! write(*,*) fourpi_h * integrate_x(atom%continua(kc)%Nlambda, NLTEspec%lambda(Nblue:Nred),atom%continua(kc)%alpha(:)*atom%continua(kc)%twohnu3_c2(:)*atom%continua(kc)%gij(:,icell)/NLTEspec%lambda(Nblue:Nred)), &
+! norm*fourpi_h, " Rji = ", Rji, atom%C(j,i,id), atom%lines(kc)%Aji
+! stop
+    atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Rji
+ 
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+
+  
+ RETURN
+ END SUBROUTINE FillGamma_atom_zero_radiation
+ 
+ !also remove delta term. Has to be done after Gamma is known 
+ !after wavelength-ray integration
+ SUBROUTINE SEE_atom(id, icell,atom, dM)
+ ! --------------------------------------------------------------------!
+  ! For atom atom solves for the Statistical Equilibrium Equations (SEE) 
+  !
+  ! We solve for :
+  !  Sum_l' Gamma_l'l n_l' = 0 (m^-3 s^-1)
+  !
+  ! which is equivalent in matrix notation to:
+  !
+  ! GG(l,l') dot n_l' = 0 with l' is on the columns and l on the rows
+  !
+  ! In particular for a 2-level atom the two equations are:
+  !
+  ! n1*G_11 + n2*G_21 = 0
+  ! n1*G12 + n2*G22 = 0,
+  ! with one of these equations has to be replaced by
+  ! n1 + n2 = N
+  !
+  ! For numerical stability, the row with the largest populations is 
+  ! removed (i.e., it is replaced by the mass conservation law).
+  !
+  ! This matrix Gamma for atoms (or later molecules) is compared to 
+  ! molecules A matrix in mcfost:
+  ! diag(Gamma) = -diag(A); offdiag(Gamma) = -offdiag(A)
+  ! A = transpose(Gamma)
+ ! --------------------------------------------------------------------!
+  
+  integer, intent(in) :: icell, id
+  type(AtomType), intent(inout) :: atom
+  integer :: lp, imaxpop, l
+  real(kind=dp), intent(out) :: dM
+  real(kind=dp), dimension(atom%Nlevel) :: ndag
+  real(kind=dp), dimension(atom%Nlevel, atom%Nlevel) :: Aij
+  
+
+  !Gamma is known = wavelength and ray integrated
+  CALL remove_delta(id, atom)
+  !store old populations
+  ndag(:) = atom%n(:,icell) / ntotal_atom(icell,atom)
+  
+  imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
+  !imaxpop = atom%Nlevel
+  
+  atom%n(:,icell) = 0d0
+  !use normalised now
+  atom%n(imaxpop,icell) = 1d0 !nTotal_atom(icell, atom)
+  
+  !Sum_l'_imaxpop * n_l' = N
+  atom%Gamma(:,imaxpop,id) = 1d0 !all columns of the last row for instance
+  !(G11 G21)  (n1)  (0)
+  !(       ) .(  ) =( )
+  !(1    1 )  (n2)  (N)
+  
+  !Y a peut être un transpose ici  par rapport à MCFOST, atom%Gamma.T ?
+  Aij = transpose(atom%Gamma(:,:,id))
+
+  if ((any_nan_infinity_matrix(atom%Gamma(:,:,id))>0)) then
+    write(*,*) "BUG Gamma", id, icell 
+    write(*,*) atom%Gamma(:,:,id)
+    stop
+  end if
+  !write(*,*) atom%ID, " Rate matrix (G.T)", Aij
+  CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
+  if ((any_nan_infinity_vector(atom%n(:,icell))>0)) then
+    write(*,*) "BUG pops", id, icell, atom%n(:,icell)
+    stop
+  end if
+  
+  dM = 0.0_dp
+  do l=1,atom%Nlevel
+   !if (atom%n(l,icell) < prec_pops) then
+   if (atom%n(l,icell)/maxval(atom%n(:,icell)) < prec_pops) then
+    !n(l)/ntot < prec_pops
+    write(*,*) icell, atom%n(l,icell), " minor populations level ", l, " of atom ", atom%ID
+    atom%n(l,icell) = 0.0_dp
+   else !denormalise
+    dM = max(dM, dabs(atom%n(l,icell) - ndag(l))/atom%n(l,icell))
+    atom%n(l,icell) = atom%n(l,icell) * ntotal_atom(icell,atom)
+   endif
+  enddo
+  
+!   write(*,*) " ***** Inverted pops *****"
+!   write(*,*) id, icell, atom%ID
+!   write(*,*) (atom%n(l,icell)/ntotal_atom(icell,atom) ,l=1,atom%Nlevel)
+!   write(*,*) (atom%n(l,icell),l=1,atom%Nlevel)
+!   write(*,*) " ***** ************* *****"
+
+ RETURN
+ END SUBROUTINE SEE_atom
+ 
+ SUBROUTINE calc_delta_Tex_atom(icell, atom, dT)
+  integer, intent(in) :: icell
+  type(AtomType), intent(inout) :: atom
+  real(kind=dp), intent(out) :: dT
+  integer :: nact, kr, kc, i, j
+  real(kind=dp) :: deltaE_k, ratio, Tdag, gij, dT_loc, njgij_ni, njgij, ni
+  
+  dT = 0.0_dp !for all transitions of one atom
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     i = atom%lines(kc)%i; j = atom%lines(kc)%j
+
+     !if (atom%n(i,icell) > 0 .and. atom%n(j,icell) > 0) then
+      Tdag = atom%lines(kc)%Tex(icell)
+      !should be de = hnu0
+      deltaE_k = (atom%E(j)-atom%E(i)) / KBOLTZMANN
+      ni = atom%n(i,icell); njgij = atom%n(j,icell)*atom%lines(kc)%gij
+      njgij_ni = atom%n(j,icell)*atom%lines(kc)%gij/atom%n(i,icell)
+                
+      
+      if (ni > njgij) then
+       !write(*,*) ni, njgij, -ni+njgij, njgij_ni, (ni-njgij)/ni
+       ratio = dlog(atom%n(j,icell)*atom%g(i)) - dlog(atom%n(i,icell)*atom%g(j))
+       !write(*,*) "ratio = ", ratio, dexp(ratio)
+       if (abs(ratio) < 1d-8) ratio = 0. 
+      endif
+      
+      if (abs(ratio) > 0) then
+       atom%lines(kc)%Tex(icell) = -deltaE_k / ratio
+       
+       if (atom%lines(kc)%Tex(icell) < 0) then
+        write(*,*) "Tex negative", atom%n(j,icell)*atom%g(i)/ntotal_atom(icell,atom), &
+        	atom%n(i,icell)*atom%g(j)/ntotal_atom(icell,atom)
+        stop
+       endif
+       
+       dT_loc = dabs(Tdag-atom%lines(kc)%Tex(icell))/atom%lines(kc)%Tex(icell)
+       dT = max(dT, dT_loc)
+       
+       ! write(*,*) deltaE_k, ratio, dlog( njgij_ni ), j, i
+       ! write(*,*) atmos%T(icell), "Tdag ", Tdag, " Tex new ", atom%lines(kc)%Tex(icell)
+       ! write(*,*) njgij_ni / ntotal_atom(icell,atom), njgij_ni, atom%n(j,icell)*atom%lines(kc)%gij, atom%n(i,icell)
+        
+!        if (atom%lines(kc)%Tex(icell)>10*maxval(atmos%T)) then
+!         write(*,*) dT
+!        stop
+!        endif
+      endif
+	  !write(*,*) atom%ID, "line ", i, j, dT_loc, Tdag, atom%lines(kc)%Tex(icell)
+     !endif
+
+        
+    CASE ("ATOMIC_CONTINUUM")
+     !cont = atom%continua(kc)
+     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+     
+     
+     if (atom%n(i,icell) > 0 .and. atom%n(j,icell) > 0) then
+      
+      Tdag = atom%continua(kc)%Tex(icell)
+      !at threshold
+      deltaE_k = HPLANCK * CLIGHT / NM_TO_M / atom%continua(kc)%lambda0 / KBOLTZMANN
+      if (atom%nstar(i,icell) >0 .and. atom%nstar(j,icell) > 0) then
+       gij = atom%nstar(i,icell)/atom%nstar(j,icell) * dexp(-hc_k/atom%continua(kc)%lambda0/atmos%T(icell))
+       ratio = log( atom%n(i,icell)  / ( atom%n(j,icell) * gij ) )
+       !ionisation temperature
+       atom%continua(kc)%Tex(icell) = deltaE_k / ratio
+       dT_loc = dabs(Tdag-atom%continua(kc)%Tex(icell))/atom%continua(kc)%Tex(icell)
+       dT = max(dT, dT_loc)
+	   !write(*,*) atom%ID, "cont ", i, j, dT_loc, Tdag, atom%continua(kc)%Tex(icell)
+      endif
+     endif
+    
+ 
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+ 
+ RETURN
+ END SUBROUTINE calc_delta_Tex_atom
+ 
+ SUBROUTINE calc_Tex_atom(icell, atom)
+ !
+ ! n(j)gij / n(i) = exp(-dE / kTex)
+ !
+ ! -> Tex = log(n(i)/n(j)gij) dE/k
+ !
+ ! can compute it only  if n(i) and n(j) > 0
+ !
+ !
+ ! For continua I define %Tex = Tion = hnu/k * 1 / log(2hnu3/c2/Snu_cont + 1), 
+ ! the ionisation temperature. If Tion=Tle, Snu_cont(T=Tlte) = Bnu(Tlte) (gij = f(Tlte))
+ !
+  integer, intent(in) :: icell
+  type(AtomType), intent(inout) :: atom
+  integer :: nact, kr, kc, i, j
+  real(kind=dp) :: deltaE_k, ratio, Tex, gij
+  
+  tr_loop : do kr=1, atom%Ntr
+   kc = atom%at(kr)%ik
+   
+   SELECT CASE (atom%at(kr)%trtype)
+   
+    CASE ("ATOMIC_LINE")
+     i = atom%lines(kc)%i; j = atom%lines(kc)%j
+
+     if (atom%n(i,icell) > 0 .and. atom%n(j,icell) > 0) then
+      !should be de = hnu0
+      deltaE_k = (atom%E(j)-atom%E(i)) / KBOLTZMANN
+      !ratio = dlog(atom%n(j,icell)*atom%g(i)) - dlog(atom%n(i,icell)*atom%g(j))
+      ratio = dlog(( atom%n(j,icell)*atom%g(i) ) / ( atom%n(i,icell)*atom%g(j) ))
+      atom%lines(kc)%Tex(icell) = -deltaE_k / ratio
+     endif
+    
+     write(*,*) "line ", atom%ID, icell, i, j, atmos%T(icell), atom%lines(kc)%Tex(icell)
+
+        
+    CASE ("ATOMIC_CONTINUUM")
+     !cont = atom%continua(kc)
+     i = atom%continua(kc)%i; j = atom%continua(kc)%j
+     
+     
+     if (atom%n(i,icell) > 0 .and. atom%n(j,icell) > 0) then
+      !should be de = hnu(ionis)
+      deltaE_k = (atom%E(j)-atom%E(i)) / KBOLTZMANN
+      ratio = dlog(( atom%n(j,icell)*atom%g(i) ) / ( atom%n(i,icell)*atom%g(j) ))
+      Tex = -deltaE_k / ratio
+      
+      !at threshold
+      deltaE_k = HPLANCK * CLIGHT / NM_TO_M / atom%continua(kc)%lambda0 / KBOLTZMANN
+      if (atom%nstar(i,icell) >0 .and. atom%nstar(j,icell) > 0) then
+       gij = atom%nstar(i,icell)/atom%nstar(j,icell) * dexp(-hc_k/atom%continua(kc)%lambda0/atmos%T(icell))
+       ratio = log( atom%n(i,icell)  / ( atom%n(j,icell) * gij ) )
+       !ionisation temperature
+       atom%continua(kc)%Tex(icell) = deltaE_k / ratio
+      endif
+     endif
+     write(*,*) "cont ", atom%ID, icell, i, j, atmos%T(icell), atom%lines(kc)%Tex(icell)
+
+    
+ 
+    CASE DEFAULT
+    
+     CALL Error("Unkown transition type", atom%at(kr)%trtype)
+     
+   END SELECT
+  
+  end do tr_loop
+
+ 
+ RETURN
+ END SUBROUTINE calc_Tex_atom
+ 
+ SUBROUTINE calc_Tex(icell) !for alla toms
+  integer, intent(in) :: icell
+  type(AtomType), pointer :: atom
+  integer :: nact
+  
+  do nact=1, atmos%NactiveAtoms
+   atom => atmos%ActiveAtoms(nact)%ptr_atom
+   
+   CALL calc_Tex_atom(icell, atom)
+  
+   atom => NULL()
+  enddo
+ 
+ RETURN
+ END SUBROUTINE calc_Tex
+ 
+ SUBROUTINE updatePopulations(id, icell, delta,verbose)
+ ! --------------------------------------------------------------------!
+  ! Performs a solution of SEE for each atom.
+  !
+  ! to do: implements Ng's acceleration iteration here 
+ ! --------------------------------------------------------------------!
+
+  integer, intent(in) :: id, icell
+  logical, intent(in) :: verbose
+  type(AtomType), pointer :: atom
+  integer :: nat, nati, natf
+  logical :: accelerate = .false.
+  real(kind=dp) :: dM, dT, dTex, dpop
+  real(kind=dp), intent(out) :: delta
+  
+  dpop = 0.0_dp
+  dTex = 0.0_dp
+
+  nati = 1; natf = atmos%Nactiveatoms
+  do nat=nati,natf !loop over each active atoms
+  
+   atom => atmos%ActiveAtoms(nat)%ptr_atom
+   CALL SEE_atom(id, icell, atom, dM)
+   !compute dTex and new values of Tex
+   !CALL calc_delta_Tex_atom(icell, atom, dT)
+   dT = 0.0
+   
+   
+   if (verbose) write(*,*) atom%ID, " -> dM = ", real(dM), " -> dT = ", real(dT)
+   
+   !max for all atoms
+   dpop = max(dpop, dM)
+   ! and all transitions...
+   dTex = max(dTex, dT)
+   
+   atom => NULL()
+  end do
+  
+  !delta = dTex
+  delta = dM
+  
+  if (verbose) write(*,*) icell, "    >> max(dpops) = ", real(delta), real(dpop), real(dTex)
+ 
+ RETURN
+ END SUBROUTINE updatePopulations
+ 
+ SUBROUTINE Gamma_LTE(id,icell)
+  ! ------------------------------------------------------------------------- !
+   ! Fill the rate matrix Gamma, whose elements are Gamma(lp,l) is the rate
+   ! of transition from level lp to l.
+   ! At initialisation, Gamma(lp,l) = C(J,I), the collisional rates from upper
+   ! level j to lower level i.
+   !
+   ! This is the LTE case where Gamma(l',l) = C(l'l)
+   ! Gamma(l',l) = Cl'l - delta(l,l')Sum_l" (Cll").
+   !
+   ! This Gamma is frequency and angle independent. 
+   ! FOR ALL ATOMS
+  ! ------------------------------------------------------------------------- !
+  integer, intent(in) :: id, icell
+  integer :: nact, kr, l, lp, nati, natf
+  type (AtomType), pointer :: atom
+
+  !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
+  !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
+  nati = 1; natf = atmos%Nactiveatoms
+  do nact=nati,natf !loop over each active atoms
+   atom => atmos%ActiveAtoms(nact)%ptr_atom
+!    do l=1,atom%Nlevel
+!     do lp=1,atom%Nlevel   
+!       atom%Gamma(lp, l) = atom%Ckij(icell, (l-1)*atom%Nlevel+lp) !lp->l; C_kij = C(j->i)
+!     end do
+!   end do
+
+   !fill the diagonal here, delta(l',l)
+   !because for each G(i,i); Cii, Rii is 0.
+   !and Gii = -Sum_j Cij + Rij = -sum_j Gamma(i,j)
+   !diagonal of Gamma, Gamma(col,col) is sum_row Gamma(col,row)
+   !G(1,1) = - (G12 + G13 + G14 ...)
+   !G(2,2) = - (G21 + G23 + G24 ..) first index is for column and second row
+   
+   !wavelength and ray indep can remove it now
+   do l = 1, atom%Nlevel
+    atom%Gamma(l,l,id) = 0d0
+    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
+   end do
+
+   
+   NULLIFY(atom)
+  end do !loop over atoms
+
+ RETURN
+ END SUBROUTINE Gamma_LTE
+
+END MODULE statequil_atoms
  
 !  SUBROUTINE initGamma_atom(id, icell, atom)
 !   integer, intent(in) :: icell, id
@@ -505,201 +1539,6 @@ MODULE statequil_atoms
 !  RETURN
 !  END SUBROUTINE FillGamma_atom_hogerheijde
  
- SUBROUTINE fillGamma_mu(id, icell, iray, n_rayons, switch_to_lte)
-  ! ------------------------------------------------------------------------- !
-   ! Fill the rate matrix Gamma, whose elements are Gamma(l',l) is the rate
-   ! of transition from level l' to l.
-   ! At initialisation, Gamma(l',l) = C(J,I), the collisional rates from upper
-   ! level j to lower level i.
-   !
-   !
-   ! The Sum_l" represents a sommation over each column for the lth row.
-   !
-  ! ------------------------------------------------------------------------- !
-
-  integer, intent(in) :: id, n_rayons, icell, iray !here for debug not used
-  logical, optional, intent(in) :: switch_to_lte
-  integer :: nact
-  type (AtomType), pointer :: atom
-  
-
-  do nact=1, atmos%NactiveAtoms
-   atom=>atmos%ActiveAtoms(nact)%ptr_atom
-   CALL FillGamma_atom_mu(id, icell, iray, atom, n_rayons, switch_to_lte)
-   atom=>NULL()
-  enddo
-
- RETURN
- END SUBROUTINE fillGamma_mu
-  
- SUBROUTINE FillGamma_atom_mali_mu(id, icell, iray, atom, n_rayons, switch_to_lte)
-
-  integer, intent(in) :: icell, id, n_rayons, iray
-  type (AtomType), intent(inout), pointer :: atom
-  logical, optional, intent(in) :: switch_to_lte
-  integer :: kr, kc, i, j, l, Nblue, Nred, ip, jp, Nl2, Nb2, Nr2, lp
-  real(kind=dp), dimension(:), allocatable :: integ, lambda
-  real(kind=dp) :: factor, Vij, Jnu, Ieff, Jeff
-  !to test
-  real(kind=dp) :: GammaRad(atom%Nlevel,atom%Nlevel)
-
-  if (present(switch_to_lte)) then
-   if (switch_to_lte) then
-    !Remove therm in delta(l,l')
-     do l = 1, atom%Nlevel
-      atom%Gamma(l,l,id) = 0d0
-      write(*,*) l, -sum(atom%Gamma(l,:,id))
-      atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
-     enddo
-     RETURN !Gamma initialized to Cul
-   endif
-  end if 
-  
-  tr_loop : do kr=1, atom%Ntr
-   kc = atom%at(kr)%ik
-   
-   SELECT CASE (atom%at(kr)%trtype)
-   
-    CASE ("ATOMIC_LINE")
-     i = atom%lines(kc)%i; j = atom%lines(kc)%j
-     Nblue = atom%lines(kc)%Nblue; Nred = atom%lines(kc)%Nred
-    
-     allocate(integ(atom%lines(kc)%Nlambda))!, lambda(line%Nlambda))
-     !lambda = (NLTEspec%lambda(Nblue:Nred)-line%lambda0)*Clight/line%lambda0
-
-    
-     integ(:) = (NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) * atom%lines(kc)%phi_ray(:, iray,id)
-
-     !Jeff = Integrate_x(line%Nlambda, lambda, integ) / n_rayons
-     Jeff = sum(integ*atom%lines(kc)%w_lam(:))/n_rayons
-
-     !if (iray == 1) atom%Gamma(j,i,id) = line%Aji
-
-     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff*atom%lines(kc)%Bji + atom%lines(kc)%Aji/n_rayons
-     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff*atom%lines(kc)%Bij
-     
-     integ(:) = 0d0
-     !include weights
-     !integ = NLTEspec%Psi(Nblue:Nred,iray,id)*&
-     !    		atom%Uji_down(j,Nblue:Nred,iray,id)*atom%chi_up(i,Nblue:Nred,iray,id)
-     !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - sum(integ)!Integrate_x(line%Nlambda, lambda, integ) / n_rayons !j>l
-     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - &
-     	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(j,:,iray,id)*atom%chi_up(i,:,iray,id)) / n_rayons
-         		
-         inner_tr_loop : do lp=1, atom%Ntr
-          SELECT CASE (atom%at(lp)%trtype)
-           CASE ("ATOMIC_LINE")
-            ip = atom%lines(atom%at(lp)%ik)%i
-            jp = atom%lines(atom%at(lp)%ik)%j
-            Nb2 = atom%lines(atom%at(lp)%ik)%Nblue
-            Nr2 = atom%lines(atom%at(lp)%ik)%Nred
-            Nl2 = atom%lines(atom%at(lp)%ik)%Nlambda
-            !deallocate(lambda)
-			!allocate(lambda(Nl2)); lambda = (NLTEspec%lambda(Nb2:Nr2)-other_line%lambda0)*CLIGHT/other_line%lambda0
-           CASE ("ATOMIC_CONTINUUM")
-            ip = atom%continua(atom%at(lp)%ik)%i
-            jp = atom%continua(atom%at(lp)%ik)%j
-            Nb2 = atom%continua(atom%at(lp)%ik)%Nblue
-            Nr2 = atom%continua(atom%at(lp)%ik)%Nred
-            Nl2 = atom%continua(atom%at(lp)%ik)%Nlambda
-            !deallocate(lambda)
-			!allocate(lambda(Nl2)); lambda = NLTEspec%lambda(Nb2:Nr2)
-
-          END SELECT
-          !Only if the lower level of j->i is an upper level of another transition
-          if (jp==i) then              
-          	 integ = 0d0
-          	 !integ = NLTEspec%Psi(Nblue:Nred,iray,id)*&
-             !	atom%Uji_down(i,Nblue:Nred,iray,id)*atom%chi_down(j,Nblue:Nred, iray, id)
-             !atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + sum(integ)!Integrate_x(Nl2, lambda, integ) / n_rayons  !j<l
-             atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + &
-             	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(i,:,iray,id)*atom%chi_down(j,:, iray, id))/n_rayons
-          endif
-         enddo inner_tr_loop
-
-     deallocate(integ)!, lambda)
-        
-    CASE ("ATOMIC_CONTINUUM")
-     i = atom%continua(kc)%i; j = atom%continua(kc)%j
-     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
-    
-     allocate(integ(atom%continua(kc)%Nlambda))!, lambda(cont%Nlambda))
-     !lambda = cont_wlam(cont) !NLTEspec%lambda(Nblue:Nred)
-
-    
-     
-      
-      integ(:) = (NLTEspec%I(Nblue:Nred,iray,id)  - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id))*atom%continua(kc)%alpha(:)
-      
-      Jnu = sum(atom%continua(kc)%w_lam(:)*integ)/n_rayons!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons !Jbarcont
-      
-      integ(:) = ( (NLTEspec%I(Nblue:Nred,iray,id) - NLTEspec%Psi(Nblue:Nred,iray,id) * atom%eta(Nblue:Nred,iray,id)) + &
-       atom%continua(kc)%twohnu3_c2(:))*atom%continua(kc)%gij(:,icell)*atom%continua(kc)%alpha(:)
-       
-      Jeff = sum(atom%continua(kc)%w_lam(:)*integ)/n_rayons!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons
-
-      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jnu * fourPI_h
-      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff * fourPI_h
-      
-      !integ(:) = atom%Uji_down(j,Nblue:Nred,iray,id)*atom%chi_up(i,Nblue:Nred,iray,id)*&
-      !  		NLTEspec%Psi(Nblue:Nred,iray,id)
-      !atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - sum(integ)!Integrate_x(cont%Nlambda, lambda, integ) / n_rayons
-      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - &
-      	sum(atom%Uji_down(j,:,iray,id)*atom%chi_up(i,:,iray,id)*NLTEspec%Psi(:,iray,id))/n_rayons
-       
-         inner_tr_loop2 : do lp=1, atom%Ntr
-          SELECT CASE (atom%at(lp)%trtype)
-           CASE ("ATOMIC_LINE")
-            ip = atom%lines(atom%at(lp)%ik)%i
-            jp = atom%lines(atom%at(lp)%ik)%j
-            Nb2 = atom%lines(atom%at(lp)%ik)%Nblue
-            Nr2 = atom%lines(atom%at(lp)%ik)%Nred
-            Nl2 = atom%lines(atom%at(lp)%ik)%Nlambda
-             !deallocate(lambda)
-             !allocate(lambda(Nl2)); lambda = (NLTEspec%lambda(Nb2:Nr2)-other_line%lambda0)*CLIGHT/other_line%lambda0
-           CASE ("ATOMIC_CONTINUUM")
-            ip = atom%continua(atom%at(lp)%ik)%i
-            jp = atom%continua(atom%at(lp)%ik)%j
-            Nb2 = atom%continua(atom%at(lp)%ik)%Nblue
-            Nr2 = atom%continua(atom%at(lp)%ik)%Nred
-            Nl2 = atom%continua(atom%at(lp)%ik)%Nlambda
-            ! deallocate(lambda)
-            ! allocate(lambda(Nl2)); lambda = NLTEspec%lambda(Nb2:Nr2)
-          END SELECT
-          if (jp==i) then
-          	 integ(:) = 0d0
-			 !integ(:) = NLTEspec%Psi(Nblue:Nred,iray,id)*&
-             !	atom%Uji_down(i,Nblue:Nred,iray,id)*atom%chi_down(j,Nblue:Nred, iray, id)
-             !atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + sum(integ)!Integrate_x(Nl2, lambda, integ) / n_rayons
-             atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + &
-             	sum(NLTEspec%Psi(:,iray,id)*atom%Uji_down(i,:,iray,id)*atom%chi_down(j,:, iray, id))/n_rayons
-          endif
-          
-         enddo inner_tr_loop2
-
-     deallocate(integ)!, lambda)
- 
-    CASE DEFAULT
-    
-     CALL Error("Unkown transition type", atom%at(kr)%trtype)
-     
-   END SELECT
-  
-  end do tr_loop
-  
-  !Remove therm in delta(l,l')
-  !But cross-coupling are in ?? and should not
-  do l = 1, atom%Nlevel
-    atom%Gamma(l,l,id) = 0d0
-    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
-  end do
-  
-  !invoked here to avoid the term delta
-  !CALL xcc_mali_mu(id, iray, atom)
- 
- RETURN
- END SUBROUTINE FillGamma_atom_mali_mu
- 
  
 !  SUBROUTINE xcc_mali_mu(id, iray, atom)
 ! 
@@ -899,287 +1738,7 @@ MODULE statequil_atoms
 !   end do
 !  
 !  RETURN
-!  END SUBROUTINE FillGamma_atom_hogerheijde_mu 
-
- SUBROUTINE FillGamma_atom_hogerheijde_mu(id, icell, iray, atom, n_rayons, switch_to_lte)
-
-  integer, intent(in) :: icell, id, n_rayons, iray
-  type (AtomType), intent(inout), pointer :: atom
-  logical, optional, intent(in) :: switch_to_lte
-  integer :: kr, kc, i, j, l, Nblue, Nred, Nl
-  real(kind=dp) :: nu, Ieff, Jeff, Jeffp
-
-  if (present(switch_to_lte)) then
-   if (switch_to_lte) then
-    !Remove therm in delta(l,l')
-     do l = 1, atom%Nlevel
-      atom%Gamma(l,l,id) = 0d0
-      !write(*,*) l, -sum(atom%Gamma(l,:,id))
-      atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
-     enddo
-     RETURN !Gamma initialized to Cul
-   endif
-  end if 
-  
-  tr_loop : do kr=1, atom%Ntr
-   kc = atom%at(kr)%ik
-   
-   SELECT CASE (atom%at(kr)%trtype)
-   
-    CASE ("ATOMIC_LINE")
-     i = atom%lines(kc)%i; j = atom%lines(kc)%j
-     Nblue = atom%lines(kc)%Nblue; Nred = atom%lines(kc)%Nred
-     Nl = atom%lines(kc)%Nlambda
-
-       
-     Jeff = 0.0_dp
-     do l=1, Nl
-      Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%tau(Nblue+l-1,iray,id)) + &
-      		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
-      		 
-      Jeff = Jeff + Ieff * atom%lines(kc)%phi_ray(l,iray,id)*atom%lines(kc)%w_lam(l) / n_rayons      
-     enddo
-
-     atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeff*atom%lines(kc)%Bji + atom%lines(kc)%Aji/n_rayons
-     atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff*atom%lines(kc)%Bij
-    
-        
-    CASE ("ATOMIC_CONTINUUM")
-     i = atom%continua(kc)%i; j = atom%continua(kc)%j
-     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
-     Nl = atom%continua(kc)%Nlambda
-
-
-     Jeff = 0.0_dp
-     Jeffp = 0.0_dp
-     do l=1, Nl
-      Ieff = NLTEspec%I(Nblue+l-1,iray,id)*dexp(-NLTEspec%tau(Nblue+l-1,iray,id)) + &
-      		 NLTEspec%Psi(Nblue+l-1,iray,id) * atom%eta(Nblue+l-1,iray,id)
-      		 
-      Jeff = Jeff + Ieff * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l) / n_rayons
-      Jeffp = Jeffp + (Ieff + atom%continua(kc)%twohnu3_c2(l)) * &
-              atom%continua(kc)%gij(l,icell) * atom%continua(kc)%alpha(l) * atom%continua(kc)%w_lam(l) / n_rayons
-     enddo
-      
-      atom%Gamma(i,j,id) = atom%Gamma(i,j,id) + Jeff * fourPI_h
-      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + Jeffp * fourPI_h
-       
-    CASE DEFAULT
-    
-     CALL Error("Unkown transition type", atom%at(kr)%trtype)
-     
-   END SELECT
-  
-  end do tr_loop
-  
-  !Remove therm in delta(l,l')
-  !But cross-coupling are in ?? and should not
-  do l = 1, atom%Nlevel
-    atom%Gamma(l,l,id) = 0.0_dp
-    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
-  end do
- 
- RETURN
- END SUBROUTINE FillGamma_atom_hogerheijde_mu 
-
-
- SUBROUTINE FillGamma_atom_zero_radiation(id, icell, atom)
- !here, I develop eq. 21 of Uitenbroek 2001, and I substitue I with I*dexp(-tau) + Psi * eta
- ! "Hogereijde-like". There is no expansion of eta in S_jS_i Uji * nj, hence no Xcoupling yet
- ! to do: Xcoupling
-  integer, intent(in) :: icell, id
-  type (AtomType), intent(inout), pointer :: atom
-  integer :: kr, kc, i, j, Nblue, Nred, l, iray
-  !no too much memory needed for that
-  !type (AtomicLine) :: line
-  !type (AtomicContinuum) :: cont
-
-  tr_loop : do kr=1, atom%Ntr
-   kc = atom%at(kr)%ik
-   
-   SELECT CASE (atom%at(kr)%trtype)
-   
-    CASE ("ATOMIC_LINE")
-     !line = atom%lines(kc)
-     i = atom%lines(kc)%i; j = atom%lines(kc)%j
-     Nblue = atom%lines(kc)%Nblue; Nred = atom%lines(kc)%Nred
-
-
-     atom%Gamma(j,i,id) = atom%lines(kc)%Aji !init
-
-        
-    CASE ("ATOMIC_CONTINUUM")
-     !cont = atom%continua(kc)
-     i = atom%continua(kc)%i; j = atom%continua(kc)%j
-     Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
-    
-     !allocate(weight(cont%Nlambda), gijk(cont%Nlambda))
-    
-     !weight(:) = fourPI_h * cont_wlam(cont) * bound_free_Xsection(cont)
-     ! alpha_nu * 4pi / h * dnu / nu = domega dnu/hnu alpha_nu
-
-     !explicit do loop
-     do l=1,atom%continua(kc)%Nlambda
-
-      atom%Gamma(j,i,id) = atom%Gamma(j,i,id) + &
-       fourPI_h * atom%continua(kc)%alpha(l)*atom%continua(kc)%twohnu3_c2(l)*atom%continua(kc)%gij(l,icell)*atom%continua(kc)%w_lam(l)
-         
-     enddo
-    
- 
-    CASE DEFAULT
-    
-     CALL Error("Unkown transition type", atom%at(kr)%trtype)
-     
-   END SELECT
-  
-  end do tr_loop
-  
-  do l = 1, atom%Nlevel
-    atom%Gamma(l,l,id) = 0d0
-    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
-  end do
-
-  
- RETURN
- END SUBROUTINE FillGamma_atom_zero_radiation
- 
- 
- !This version assumes, that the term in delta(l,l') has already been removed
- SUBROUTINE SEE_atom(id, icell,atom)
- ! --------------------------------------------------------------------!
-  ! For atom atom solves for the Statistical Equilibrium Equations (SEE) 
-  !
-  ! We solve for :
-  !  Sum_l' Gamma_l'l n_l' = 0 (m^-3 s^-1)
-  !
-  ! which is equivalent in matrix notation to:
-  !
-  ! GG(l,l') dot n_l' = 0 with l' is on the columns and l on the rows
-  !
-  ! In particular for a 2-level atom the two equations are:
-  !
-  ! n1*G_11 + n2*G_21 = 0
-  ! n1*G12 + n2*G22 = 0,
-  ! with one of these equations has to be replaced by
-  ! n1 + n2 = N
-  !
-  ! For numerical stability, the row with the largest populations is 
-  ! removed (i.e., it is replaced by the mass conservation law).
-  !
-  ! This matrix Gamma for atoms (or later molecules) is compared to 
-  ! molecules A matrix in mcfost:
-  ! diag(Gamma) = -diag(A); offdiag(Gamma) = -offdiag(A)
-  ! A = transpose(Gamma)
- ! --------------------------------------------------------------------!
-  
-  integer, intent(in) :: icell, id
-  type(AtomType), intent(inout) :: atom
-  integer :: lp, imaxpop, l
-  real(kind=dp), dimension(atom%Nlevel, atom%Nlevel) :: Aij
-  
-  imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
-  !write(*,*) "imaxpop", imaxpop, atom%n(imaxpop,icell)
-  atom%n(:,icell) = 0d0
-  atom%n(imaxpop,icell) = nTotal_atom(icell, atom)
-  
-  !Sum_l'_imaxpop * n_l' = N
-  atom%Gamma(:,imaxpop,id) = 1d0 !all columns of the last row for instance
-  !(G11 G21)  (n1)  (0)
-  !(       ) .(  ) =( )
-  !(1    1 )  (n2)  (N)
-  
-  !Y a peut être un transpose ici  par rapport à MCFOST, atom%Gamma.T ?
-
-  Aij = transpose(atom%Gamma(:,:,id))
-  !Aij = atom%Gamma(:,:,id)
-! write(*,*) id, icell
-! write(*,*) "nafter=",atom%n(:,icell)
-! write(*,*) "Aij-Gamma(id)", Aij-transpose(atom%Gamma(:,:,id))
-  CALL GaussSlv(Aij, atom%n(:,icell),atom%Nlevel)
-  !!atom%n(:,icell) = atom%n(:,icell) * nTotal_atom(icell, atom)
-  if ((any_nan_infinity_matrix(atom%Gamma(:,:,id))>0).or.&
-  				(any_nan_infinity_vector(atom%n(:,icell))>0)) then
-    write(*,*) atom%Gamma(:,:,id)
-    write(*,*) id, icell, atom%n(:,icell)
-    write(*,*) Aij
-    stop
-  end if
-
- RETURN
- END SUBROUTINE SEE_atom
- 
- SUBROUTINE updatePopulations(id, icell)
- ! --------------------------------------------------------------------!
-  ! Performs a solution of SEE for each atom.
-  !
-  ! to do: implements Ng's acceleration iteration. 
- ! --------------------------------------------------------------------!
-
-  integer, intent(in) :: id, icell
-  type(AtomType), pointer :: atom
-  integer :: nat, nati, natf
-  logical :: accelerate = .false.
-  real(kind=dp) :: dM
-  
-  !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
-  !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
-  nati = 1; natf = atmos%Nactiveatoms
-  do nat=nati,natf !loop over each active atoms
-   atom => atmos%ActiveAtoms(nat)%ptr_atom
-   CALL SEE_atom(id, icell, atom)
-   atom => NULL()
-  end do
- 
- RETURN
- END SUBROUTINE updatePopulations
- 
- SUBROUTINE Gamma_LTE(id,icell)
-  ! ------------------------------------------------------------------------- !
-   ! Fill the rate matrix Gamma, whose elements are Gamma(lp,l) is the rate
-   ! of transition from level lp to l.
-   ! At initialisation, Gamma(lp,l) = C(J,I), the collisional rates from upper
-   ! level j to lower level i.
-   !
-   ! This is the LTE case where Gamma(l',l) = C(l'l)
-   ! Gamma(l',l) = Cl'l - delta(l,l')Sum_l" (Cll").
-   !
-   ! This Gamma is frequency and angle independent. 
-   ! FOR ALL ATOMS
-  ! ------------------------------------------------------------------------- !
-  integer, intent(in) :: id, icell
-  integer :: nact, kr, l, lp, nati, natf
-  type (AtomType), pointer :: atom
-
-  !nati = (1. * (id-1)) / NLTEspec%NPROC * atmos%Nactiveatoms + 1
-  !natf = (1. * id) / NLTEspec%NPROC * atmos%Nactiveatoms
-  nati = 1; natf = atmos%Nactiveatoms
-  do nact=nati,natf !loop over each active atoms
-   atom => atmos%ActiveAtoms(nact)%ptr_atom
-!    do l=1,atom%Nlevel
-!     do lp=1,atom%Nlevel   
-!       atom%Gamma(lp, l) = atom%Ckij(icell, (l-1)*atom%Nlevel+lp) !lp->l; C_kij = C(j->i)
-!     end do
-!   end do
-
-   !fill the diagonal here, delta(l',l)
-   !because for each G(i,i); Cii, Rii is 0.
-   !and Gii = -Sum_j Cij + Rij = -sum_j Gamma(i,j)
-   !diagonal of Gamma, Gamma(col,col) is sum_row Gamma(col,row)
-   !G(1,1) = - (G12 + G13 + G14 ...)
-   !G(2,2) = - (G21 + G23 + G24 ..) first index is for column and second row
-   do l = 1, atom%Nlevel
-    atom%Gamma(l,l,id) = 0d0
-    atom%Gamma(l,l,id) = -sum(atom%Gamma(l,:,id)) !sum over rows for this column
-   end do
-
-   
-   NULLIFY(atom)
-  end do !loop over atoms
-
- RETURN
- END SUBROUTINE Gamma_LTE
- 
+!  END SUBROUTINE FillGamma_atom_hogerheijde_mu  
 
 !! --> OLD VERSIONS 
  !futur deprecation, FillGamma will direclty compute the full matrix for lines and continua
@@ -1500,4 +2059,3 @@ MODULE statequil_atoms
 !  RETURN
 !  END SUBROUTINE updatePopulations_1
 
-END MODULE statequil_atoms

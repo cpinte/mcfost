@@ -22,6 +22,26 @@ MODULE lte
  real(kind=dp), parameter :: phi_min_limit = 1d-50 !tiny_dp
 
  CONTAINS
+ 
+ FUNCTION getPartitionFunctionk(elem, stage, k) result (Uk)
+ ! ----------------------------------------------------------------------!
+  ! Interpolate the partition function of Element elem in ionisation stage
+  ! stage at cell point k.
+ ! ----------------------------------------------------------------------!
+
+  type(Element) :: elem
+  integer, intent(in) :: stage, k
+  real(kind=dp) :: Uk, part_func(atmos%Npf)
+  
+  part_func = elem%pf(stage,:)
+  Uk = Interp1D(atmos%Tpf,part_func,atmos%T(k))
+       !do not forget that Uk is base 10 logarithm !!
+       ! note that in RH, natural (base e) logarithm
+       ! is used instead
+  Uk = (10.d0)**(Uk)
+
+ RETURN
+END FUNCTION getPartitionFunctionk
 
  FUNCTION phi_jl(k, Ujl, Uj1l, ionpot) result(phi)
   ! -------------------------------------------------------------- !
@@ -42,6 +62,8 @@ MODULE lte
   real(kind=dp) :: ionpot, C1, phi
   real(kind=dp) :: Ujl, Uj1l, expo
   C1 = 0.5*(HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
+  !C1 = (HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
+
   !!ionpot = ionpot * 100.*HPLANCK*CLIGHT !cm1->J
   !! -> avoiding dividing by big numbers causing overflow.
   !!maximum argument is 600, exp(600) = 3.77e260
@@ -175,6 +197,46 @@ MODULE lte
    write(*,*) MAXVAL(atmos%nHmin), MINVAL(atmos%nHmin,mask=atmos%icompute_atomRT > 0)
   RETURN
   END SUBROUTINE calc_nHmin
+  
+  FUNCTION nH_minus(icell)
+   integer :: icell
+   real(kind=dp) :: nH_minus
+   !PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
+
+   nH_minus =  atmos%ne(icell) * phi_jl(icell, 1d0, 2d0, E_ION_HMIN) * Hydrogen%n(1,icell)
+  
+  RETURN
+  END FUNCTION nH_minus
+  
+  
+  SUBROUTINE LTEpops_new(k, atom)
+   integer, intent(in) :: k
+   type (AtomType), intent(inout) :: atom
+   integer :: l, dZ, n, I
+   real(kind=dp) :: dE_kT, C1, gi, gp
+   
+   C1 = 2.07d-16 * 1d-6 + atmos%T(k)**(-1.5) * atmos%ne(k)
+   n = atom%periodic_table
+   atom%nstar(atom%Nlevel, k) = 1.
+   
+   !starting from the ground level of the last ion (H+ if H)
+   I = 1
+   gp = atom%g(atom%Nlevel)
+   do l=atom%Nlevel-1, 1, -1
+   
+    dE_kT = ( atmos%Elements(n)%ptr_elem%ionpot(I) - atom%E(l) ) / KBOLTZMANN / atmos%T(k)
+   	gi = atom%g(l)
+   	atom%nstar(l,k) = gi/gp * C1 * dexp(-dE_kT)
+
+   enddo
+   
+
+   
+	atom%nstar(:,k) = atom%nstar(:,k) * atmos%nHtot(k) / sum(atom%nstar(:,k))
+    write(*,*) "(1)", atom%nstar(:,k)
+
+  RETURN
+  END SUBROUTINE LTEpops_new
 
  SUBROUTINE LTEpops(atom, debeye)
   ! -------------------------------------------------------------- !
@@ -266,7 +328,7 @@ MODULE lte
      ! if dZ = 0, same ion, no division, only Boltzmann eq.
      ! if dZ = 1, dZ+1=2 -> another (next) ion, one div by phik = Saha
      ! if dZ = 2, dZ+1=3 -> the next next ion, two div by phik ...
-     do m=2,dZ+1
+     do m=1,dZ
       if (atmos%ne(k)>0) then
        atom%nstar(i,k)=atom%nstar(i,k)/phik !if phik -> means large n(i) ??
       else
@@ -297,7 +359,7 @@ MODULE lte
      ! Therefore n1 = atom%ntotal/sum
 !     write(*,*) "-------------------"
 !     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
-!     write(*,*) "ntot", atom%ntotal(k), " nHtot=",atmos%nHtot(k)
+!     write(*,*) "ntot", ntotal_atom(k,atom), " nHtot=",atmos%nHtot(k)
     atom%nstar(1,k) = atom%Abund*atmos%nHtot(k)/sum
 
     !test positivity, can be 0
@@ -309,12 +371,12 @@ MODULE lte
        write(*,*) " ************************************* "
        stop !only if we test >= 0
     end if
-    !write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
+!     write(*,*) "depth index=",k, "level=", 1, " n(1,k)=",atom%nstar(1,k)
     do i=2,atom%Nlevel !debug
       atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
       !to avoid very low populations in calculations
       !if (atom%nstar(i,k) < 1d-30) atom%nstar(i,k) = 1d-30
-      !write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
+!       write(*,*) "depth index=",k, "level=", i, " n(i,k)=",atom%nstar(i,k)
 
       !! check positivity. Can be 0 now, see above and phik and phi_jl
       if (atom%nstar(i,k) < 0) then !<= tiny_dp) then
@@ -362,19 +424,37 @@ MODULE lte
   logical :: debeye=.true.
     
 
-  write(*,*) "Setting LTE populations..."
   do n=1,atmos%Natom
-
-   ! fill lte populations for each atom, active or not
-   CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
+   ! fill lte populations for each atom, active or not, only if not read from file
+   if (atmos%Atoms(n)%ptr_atom%set_ltepops) then
    
-  end do
+     write(*,*) "Setting LTE populations for atom ", atmos%Atoms(n)%ptr_atom%ID
+
+     CALL LTEpops(atmos%Atoms(n)%ptr_atom,debeye) !it is parralel 
+     
+   endif
+   
+   !even if we read LTE pops from file, we can still compute n as b*nstar
+   if (allocated(atmos%Atoms(n)%ptr_atom%b)) then
+     write(*,*) " -> using departure coefficients to set NLTE populations for atom ", atmos%Atoms(n)%ptr_atom%ID
+     atmos%Atoms(n)%ptr_atom%n(:,:) = atmos%Atoms(n)%ptr_atom%nstar(:,:) * atmos%Atoms(n)%ptr_atom%b(:,:)
+   endif
+   
+  enddo
+
+! do k=1, atmos%Nspace
+! write(*,*) k, atmos%T(k), atmos%ne(k), atmos%nHtot(k)
+! write(*,*) (hydrogen%nstar(n,k), n=1,hydrogen%Nlevel)
+! 
+! CALL LTEpops_new(k, hydrogen)
+! enddo
+!CALL LTEpops_new(atmos%Nspace, hydrogen)
+!stop
 
   !!This is in case H is NLTE but has not converged pops yet, or not read from file
   !!because we need this in opacity routines for H b-f, f-f, H- b-f, H- f-f ect
   !!%NLTEpops is true only if %n /= 0 or after NLTE loop, or if pops are read from file.
   !! otherwise it is FALSE, even at the begening of NLTE.
-
   if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar 
                                             !for background Hydrogen and Hminus                                            
   !CALL calc_nHmin()

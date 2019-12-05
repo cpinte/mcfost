@@ -115,6 +115,21 @@ MODULE accelerate
     end if
   RETURN
   END SUBROUTINE freeNg
+  
+  
+!   FUNCTION NG_acceleration( N, Norder, y, yy, iacc)
+!    logical :: NG_acceleration
+!    integer, intent(in) :: N, Norder, iacc
+!    real(kind=dp), intent(inout) :: y(N), yy(:,N)
+!    
+!    NG_acceleration = .false.
+!    if (norder < 1 .or. norder > 5) return !max order
+!    yy(iacc,N) = y
+!    if (iacc <= Norder+1) return
+!    
+!    
+!  RETURN
+!  END FUNCTION NG_acceleration
 
 
 END MODULE accelerate

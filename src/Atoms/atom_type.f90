@@ -3,6 +3,7 @@ MODULE atom_type
   use math, only : w6js
   use accelerate, only : Ng
   use mcfost_env, only : dp
+  use constant, only : M_ELECTRON, AMU, E_RYDBERG
 
   IMPLICIT NONE
 
@@ -32,7 +33,7 @@ MODULE atom_type
   END TYPE AtomicTransition
 
   TYPE AtomicLine
-   logical           :: symmetric, polarizable!!, lcontrib_to_opac !default is yes, set at reading
+   logical           :: symmetric, polarizable, neg_opac
    logical           :: Voigt=.true., PFR=.false.,&
       damping_initialized=.false. !true if we store the damping on the whole grid for all lines.
    character(len=17) :: vdWaals
@@ -50,11 +51,14 @@ MODULE atom_type
    real(kind=dp), allocatable, dimension(:,:,:) :: phi_ray !for one cell Nlambda, Nray, Nproc
    real(kind=dp), allocatable, dimension(:,:,:) :: phiZ, psi !3, Nlambda, Nray
    !wlam is the integration wavelenght weight = phi
-   real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam
+   real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam, Jbar
+   !real(kind=dp), allocatable, dimension(:) :: fomega !for Rayleigh scattering
    real(kind=dp) :: wphi
    real(kind=dp) :: Qelast, Rij, Rji, adamp ! at a cell
+   real(kind=dp), dimension(:), allocatable :: Tex
    !keep CLIGHT * (nu0 - nu)/nu0 for lines												(method for Voigt)
-   real(kind=dp), dimension(:), allocatable :: u, a, aeff !damping for all cells(a) and Thomson effective damping (eff)
+   real(kind=dp), dimension(:), allocatable :: u, a, aeff, r, r1
+   !damping for all cells(a) and Thomson effective damping (eff)
    real(kind=dp), allocatable, dimension(:,:) :: rho_pfr
    !!Nlevel, wavelength and proc
    !!Stores the information for that atom only, necessary to  construct the Gamma matrix
@@ -69,17 +73,18 @@ MODULE atom_type
   END TYPE AtomicLine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicContinuum
-   logical :: hydrogenic!!, lcontrib_to_opac
+   logical :: hydrogenic, neg_opac
    integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
    real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin !continuum maximum frequency > frequency photoionisation
    real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2, CoolRates_ij, w_lam
    real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file
    real(kind=dp) :: wmu
    real(kind=dp) :: Rji, Rij
+   real(kind=dp), dimension(:), allocatable :: Tex
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
-   !!Nlambda, Ndep
-   real(kind=dp), allocatable, dimension(:,:)  :: gij
+   !!(Nlambda, Ndep) and (Nlambda Nproc), (Nlam, Nproc) Vji or Jnu would be remove, do not know which one yet
+   real(kind=dp), allocatable, dimension(:,:)  :: gij, Vji, Jnu
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 
@@ -88,7 +93,7 @@ MODULE atom_type
    character (len=15)             :: dataFile!popsinFile, popsoutFile
    character(len=28) :: inputFile
    character(len=ATOM_LABEL_WIDTH), allocatable, dimension(:)  :: label
-   logical                :: NLTEpops, active
+   logical                :: NLTEpops, active, set_ltepops
    ! atom can be passive but NLTEpops true. This is the case of
    ! populations read from previous run
    character(len=15)      :: initial_solution
@@ -99,7 +104,8 @@ MODULE atom_type
    ! ions etc ...
    integer, allocatable, dimension(:)  :: stage, Lorbit
    integer(8)            :: offset_coll, colunit
-   real(kind=dp)                :: Abund, weight
+   real(kind=dp) :: scatt_limit !minimum wavelength for Rayleigh scattering
+   real(kind=dp)                :: Abund, weight, massf !mass fraction
    real(kind=dp), allocatable, dimension(:) :: g, E, vbroad!, ntotal
    real(kind=dp), allocatable, dimension(:) :: qS, qJ
    ! allocated in readatom.f90, freed with freeAtoms()
@@ -108,6 +114,7 @@ MODULE atom_type
    !Nlevel * Nlevel * Nproc
    real(kind=dp), dimension(:,:,:), allocatable :: Gamma, C
    real(kind=dp), dimension(:,:), pointer :: n, nstar
+   real(kind=dp), dimension(:,:), allocatable :: b !not a pointer this one
    ! arrays of lines, continua containing different line, continuum each
    type (AtomicLine), allocatable, dimension(:)         :: lines
    type (AtomicContinuum) , allocatable, dimension(:)   :: continua
@@ -132,7 +139,7 @@ MODULE atom_type
    logical :: abundance_set
    integer :: Nstage, Nmolecule ! umber of Molecules having an element
    integer, allocatable, dimension(:)  :: mol_index !track molecules in which Element is present
-   real(kind=dp) :: weight, abund
+   real(kind=dp) :: weight, abund, massf
    real(kind=dp), allocatable, dimension(:)  :: ionpot
    real(kind=dp), allocatable, dimension(:,:)  :: pf, n !LTE populations, not used nor allocated anymore
    !n is the population for each stage at a given grid point
@@ -142,6 +149,16 @@ MODULE atom_type
  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
  CONTAINS
+ 
+ FUNCTION rydberg_atom(atom)!correct from electron mass
+  type (AtomType), intent(in) :: atom
+  real(kind=dp) :: rydberg_atom, deltam
+  
+   deltam = 1. + M_ELECTRON / (atom%weight * AMU)
+ 
+   rydberg_atom = E_RYDBERG / deltam !in joules
+ RETURN 
+ END FUNCTION rydberg_atom
 
  !for lines only, for continuum it is simply cont%j
  FUNCTION find_continuum(atom, l)
@@ -192,9 +209,15 @@ MODULE atom_type
  END FUNCTION atomic_orbital_sqradius
 
 
- FUNCTION getOrbital(orbit) result (L)
+ FUNCTION getOrbital(orbit, unknown_orbital) result (L)
   integer :: L
   character(len=1), intent(in) :: orbit
+  logical, intent(out) :: unknown_orbital
+  
+  unknown_orbital = .false. 
+  
+  L = -1
+  
   SELECT CASE (orbit)
    CASE ('S')
     L = 0
@@ -238,8 +261,7 @@ MODULE atom_type
     L = 19
    CASE DEFAULT
     write(*,'("Orbit " (1A1) "unknown")') orbit
-    write(*,*) "exiting..."
-    stop
+    unknown_orbital = .true.
    END SELECT
 
   END FUNCTION getOrbital
@@ -309,6 +331,7 @@ MODULE atom_type
   ! get principal quantum number from label
    logical, intent(out) :: determined
    integer, intent(out) :: L!, J
+   logical :: unknown_orbital
    real(kind=dp) :: J
    real(kind=dp), intent(out) :: S
    real(kind=dp), intent(in) :: g
@@ -348,7 +371,12 @@ MODULE atom_type
   end if
 
   S = (real(S,kind=8) - 1.)/2.
-  L = getOrbital(orbit)
+  L = getOrbital(orbit, unknown_orbital)
+  if (unknown_orbital) then
+   determined = .false.
+   return
+  endif
+   
   J = L + S!(g-1.)/2.
   if (J>(L+S)) then
    determined = .false.

@@ -65,6 +65,7 @@ subroutine set_default_variables()
   lemission_atom = .false.
   lstore_opac = .false.
   lelectron_scattering = .false.
+  lstop_after_jnu = .false.
   lsolve_for_ne = .false.
   n_iterate_ne = 0
   lstatic = .false.
@@ -632,6 +633,9 @@ subroutine initialisation_mcfost()
      case("-read_jnu_atom")
      	i_arg = i_arg + 1
      	lread_jnu_atom = .true.
+     case("-calc_jnu_atom")
+     	i_arg = i_arg + 1
+     	lstop_after_jnu = .true.
      case("-puffed_up_rim")
         lpuffed_rim = .true.
         if (i_arg + 3 > nbr_arg) call error("rim parameters needed")
@@ -1692,7 +1696,7 @@ subroutine display_help()
   write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
   write(*,*) "        : -read_jnu_atom : Read old Jnu values from file "
-  write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
+  write(*,*) "        : -calc_jnu_atom : Stop the code after Jnu_scattering has been computed and written. "
 !-> this one could also be use for mol tranfer, like Ng or tab_wavelength
   write(*,*) "        : -max_err <max_err> : max relative error"
   write(*,*) "        : -max_err_sub <max_err_sub> : max relative error for sub-iterations"

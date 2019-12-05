@@ -219,9 +219,9 @@ MODULE math
     real(kind=dp) :: integ
     integer  :: k
 
-    integ = 0.5 * dabs(x(2)-x(1)) * y(1)
+    integ = y(1) !0.5 * ( x(2)-x(1) ) * y(1)
     do k=2,N
-     integ = integ + dabs(x(k)-x(k-1)) * 0.5 * (y(k)+y(k-1))
+     integ = integ + (x(k)-x(k-1)) * 0.5 * (y(k)+y(k-1))
     end do
 
    RETURN
@@ -248,19 +248,6 @@ MODULE math
    RETURN
    END FUNCTION Integrate_nu
 
-   FUNCTION Integrate_dx(N, dx, y) result(integ)
-    integer :: N
-    real(kind=dp), dimension(N) :: dx, y
-    real(kind=dp) :: integ
-    integer  :: k
-
-    integ = 0.5 * dx(1) * y(1)
-    do k=2,N
-     integ = integ + dx(k) * 0.5 * (y(k)+y(k-1))
-    end do
-
-   RETURN
-   END FUNCTION Integrate_dx
 
    FUNCTION SQ(x) result(y)
     real(kind=dp) :: x, y

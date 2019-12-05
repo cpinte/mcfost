@@ -57,7 +57,11 @@ MODULE constant
 
   !here I have a problem if I try to compute sigma0_H_ff using 7.100 of Hubeny Mihalas with SI units value
   !So I Take the cgs result and turn it to SI ...
-  real(kind=dp), parameter    :: sigma0_H_ff = 3.6923284d8 * 1d-10 ! cm^5 K^1/2 Hz^3 -> m^5 K^1/2 Hz^3
+  !we multiply sigma0_H_ff by nion (m^-3) * ne(m^-3) to have chi in 1d-10 m^5 * m-3 * m^-3 in m^-1
+  real(kind=dp), parameter    :: sigma0_H_ff = 3.6923284d8 * 1d-10 ! cm^5 K^1/2 Hz^-3 -> m^5 K^1/2 Hz^3
+   !K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / dsqrt(M_ELECTRON)
+   !K0 = (K0**3) * 4./3. * dsqrt(2*pi/3./KBOLTZMANN) / HPLANCK / CLIGHT
+   !sigma0_H_ff = K0
           
  ! --- Mathematical constants ---
   !double precision, parameter ::  PI  =3.14159265358979
@@ -79,7 +83,7 @@ MODULE constant
   real(8), parameter ::  E_ION_HMIN = 0.754 * EV
   real(8), parameter, private :: factor1D = 2d0, factor3D = 8d0/PI
   !previously: Vtherm = 2*KBOLTZMANN/AMU and v=sqrt(Vtherm * T / m + xit**2)
-  real(8), parameter :: Vtherm = KBOLTZMANN/AMU * factor3D !m^2/s^2/K
+  real(8), parameter :: Vtherm = KBOLTZMANN/AMU * factor1D !m^2/s^2/K
   
   real(8), dimension(NELEM_WEIGHTS) :: atomic_weights
   !starts at 1 for H, ends at NELEM_WEIGHTS

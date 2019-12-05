@@ -125,25 +125,25 @@ MODULE solvene
  END SUBROUTINE ne_Metal
 
 
- FUNCTION getPartitionFunctionk(elem, stage, k) result (Uk)
- ! ----------------------------------------------------------------------!
-  ! Interpolate the partition function of Element elem in ionisation stage
-  ! stage at cell point k.
- ! ----------------------------------------------------------------------!
-
-  type(Element) :: elem
-  integer, intent(in) :: stage, k
-  real(kind=dp) :: Uk, part_func(atmos%Npf)
-  
-  part_func = elem%pf(stage,:)
-  Uk = Interp1D(atmos%Tpf,part_func,atmos%T(k))
-       !do not forget that Uk is base 10 logarithm !!
-       ! note that in RH, natural (base e) logarithm
-       ! is used instead
-  Uk = (10.d0)**(Uk)
-
- RETURN
-END FUNCTION getPartitionFunctionk
+!  FUNCTION getPartitionFunctionk(elem, stage, k) result (Uk)
+!  ! ----------------------------------------------------------------------!
+!   ! Interpolate the partition function of Element elem in ionisation stage
+!   ! stage at cell point k.
+!  ! ----------------------------------------------------------------------!
+! 
+!   type(Element) :: elem
+!   integer, intent(in) :: stage, k
+!   real(kind=dp) :: Uk, part_func(atmos%Npf)
+!   
+!   part_func = elem%pf(stage,:)
+!   Uk = Interp1D(atmos%Tpf,part_func,atmos%T(k))
+!        !do not forget that Uk is base 10 logarithm !!
+!        ! note that in RH, natural (base e) logarithm
+!        ! is used instead
+!   Uk = (10.d0)**(Uk)
+! 
+!  RETURN
+! END FUNCTION getPartitionFunctionk
 
 
 
@@ -293,12 +293,13 @@ END FUNCTION getPartitionFunctionk
 
 !   if (initial.eq."N_PROTON") &
 !      np=Hydrogen%n(Hydrogen%Nlevel,:)
+write(*,*) "Test Nelem",Nelem
 
   !$omp parallel &
   !$omp default(none) &
   !$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
   !$omp private(dne, akj, id, ninit, nfini) &
-  !$omp shared(atmos, initial,Hydrogen, ZM, unconverged_cells)
+  !$omp shared(atmos, initial,Hydrogen, ZM, unconverged_cells, Nelem)
   !$omp do
   do k=1,atmos%Nspace
    !$ id = omp_get_thread_num() + 1

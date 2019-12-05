@@ -20,26 +20,22 @@ MODULE rayleigh_scattering
   ! Baschek & Scholz 1982
 
  ! ------------------------------------------------------------- !
-  !type (AtomType), intent(in)                               :: atom
   integer, intent(in)                                       :: icell, id
   real(kind=dp) 											:: lambda_limit!, sigma_e
   real(kind=dp), dimension(NLTEspec%Nwaves) 				:: scatt
-  
-  !if (atom%ID /= "H") RETURN
-  
-  lambda_limit = 121.6d0
+  integer :: k
+    
+  lambda_limit = 102.6!121.6d0
   scatt = 0d0
 
-  where(NLTEspec%lambda >= lambda_limit)
+  where(NLTEspec%lambda > lambda_limit)
    scatt = (1d0 + (156.6d0/NLTEspec%lambda)**2.d0 + &
    			(148.d0/NLTEspec%lambda)**4d0)*(96.6d0/NLTEspec%lambda)**4d0
   end where
 
   if (lstore_opac) then
-   NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
-   									 scatt * sigma_e * sum(Hydrogen%n(1:Hydrogen%Nlevel-1,icell))
-!    NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
-!    									 scatt * sigma_e * Hydrogen%n(1,icell)!atmos%nHtot(icell) !m^-1
+   NLTEspec%AtomOpac%Kc(:,icell,2) = NLTEspec%AtomOpac%Kc(:,icell,2) + &
+   									 scatt * sigma_e * Hydrogen%n(1,icell)
   else
    NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
    									 scatt * sigma_e * Hydrogen%n(1,icell)
@@ -59,11 +55,10 @@ MODULE rayleigh_scattering
   real(kind=dp) 											:: lambda_limit!, sigma_e
   real(kind=dp), dimension(NLTEspec%Nwaves) 				:: scatt
   integer													:: Neutr_index, l
-  
-  !if (atom%ID /= "He") RETURN
+ 
   if (.not.associated(Helium)) RETURN
   
-  lambda_limit = 121.6d0 !which one for helium?
+  lambda_limit = helium%scatt_limit 
   scatt = 0d0
   
   l = 1
@@ -71,20 +66,17 @@ MODULE rayleigh_scattering
    l = l+1
   enddo
   Neutr_index = l - 1
-  !write(*,*) "Helium last Neutral level", Neutr_index
-  !stop
 
 
-  where(NLTEspec%lambda >= lambda_limit)
+  where(NLTEspec%lambda > lambda_limit)
    scatt = 4d0 * (1d0 + (66.9d0/NLTEspec%lambda)**2.d0 + &
    			(64.1d0/NLTEspec%lambda)**4d0)*(37.9d0/NLTEspec%lambda)**4d0
   end where
 
   if (lstore_opac) then
-   NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
-   									 scatt * sigma_e * sum(Helium%n(1:Neutr_index,icell)) !m^-1
-!    NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
-!    									 scatt * sigma_e * Helium%n(1,icell) !m^-1
+   NLTEspec%AtomOpac%Kc(:,icell,2) = NLTEspec%AtomOpac%Kc(:,icell,2) + &
+   									 scatt * sigma_e * Helium%n(1,icell)!sum(Helium%n(1:Neutr_index,icell)) !m^-1
+
   else
    NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
    									 scatt * sigma_e * Helium%n(1,icell)
@@ -176,7 +168,7 @@ MODULE rayleigh_scattering
   if ((MAXVAL(scatt) > 0))  res = .true.
   
   if (res .and. lstore_opac) then
-     NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + scatt
+     NLTEspec%AtomOpac%Kc(:,icell,2) = NLTEspec%AtomOpac%Kc(:,icell,2) + scatt
   else if (res .and. .not.lstore_opac) then
      NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + scatt
   end if

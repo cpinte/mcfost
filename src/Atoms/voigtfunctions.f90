@@ -5,6 +5,7 @@ MODULE voigtfunctions
 
  use constant
  use mcfost_env, only : dp
+ use math, only : locate
 
  IMPLICIT NONE
  
@@ -56,6 +57,19 @@ MODULE voigtfunctions
 
   RETURN
   END FUNCTION VoigtHumlicek
+  
+  FUNCTION dirac_line(N, a, v, F) result(L)
+	real(kind=dp) :: a
+	real(kind=dp) :: v(N), L(N)
+	real(kind=dp), intent(out), optional :: F(N)
+	integer :: i, N
+	
+	L(:) = 0d0
+	i = locate(v, 0d0)
+	L(i) = 1d0
+
+  RETURN
+  END FUNCTION dirac_line
   
   FUNCTION VoigtXXXX(N, a, v, F) result(L) !for unpolarised profile
 	real(kind=dp) :: a

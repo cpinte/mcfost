@@ -1,7 +1,7 @@
 MODULE spectrum_type
 
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType
-  use atmos_type, only : GridType, atmos
+  use atmos_type, only : GridType, atmos, helium, hydrogen
   use getlambda, only  : make_wavelength_grid, adjust_wavelength_grid, Read_wavelengths_table!,&
   ! 						Nred_array, Nmid_array, Nblue_array  
   use math, only : linear_1D
@@ -63,7 +63,7 @@ MODULE spectrum_type
    !Nlambda,N_INCL, N_AZ, NCELLS
    real(kind=dp), allocatable, dimension(:,:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
-   real(kind=dp), allocatable, dimension(:,:,:) :: Psi, tau !for cell icell in direction iray, thread id
+   real(kind=dp), allocatable, dimension(:,:,:) :: Psi, etau, tau !for cell icell in direction iray, thread id
    !size of Psi could change during the devlopment
    type (AtomicOpacity) :: AtomOpac
    character:: Jfile, J20file
@@ -72,6 +72,27 @@ MODULE spectrum_type
   type (Spectrum) :: NLTEspec
 
   CONTAINS
+  
+ 
+ FUNCTION getlambda_limit(atom)
+ !reddest wavelength of the sortest b-b transition in the ground state
+  real(kind=dp) :: getlambda_limit
+  type(AtomType) :: atom
+  integer :: kr
+  
+  do kr=1, atom%Nline
+
+   if (atom%lines(kr)%i==1) then !transition to the ground state
+    getlambda_limit = min(1d6, NLTEspec%lambda(atom%lines(kr)%Nred))
+   endif
+  
+  enddo
+  
+  !avoid problem
+  getlambda_limit = max(NLTEspec%lambda(1), getlambda_limit)
+  
+ RETURN
+ END FUNCTION getlambda_limit
 
   SUBROUTINE initSpectrum(lam0, vacuum_to_air)
    ! ------------------------------------------- !
@@ -103,7 +124,10 @@ MODULE spectrum_type
    CALL make_wavelength_grid(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, & 
                         NLTEspec%lambda, NLTEspec%Ntrans, NLTEspec%wavelength_ref)
    NLTEspec%Nwaves = size(NLTEspec%lambda)
-
+   
+   !only for H and He atm, not changed for image even if we remove lines
+   hydrogen%scatt_limit = getlambda_limit(hydrogen)
+   if (associated(helium)) helium%scatt_limit = getlambda_limit(helium)
    
    CALL writeWavelength()
    CALL allocSpectrum(alloc_nlte_vars)!.true. => alloc atom%eta, %chi, %Xcoupling if NLTE
@@ -216,7 +240,9 @@ MODULE spectrum_type
    							   
    !resample Jnu if any
 !-> can be para if needed, but only once calc is needed
-   if (NLTEspec%Nact > 0 .and. NLTEspec%atmos%electron_scattering) then
+!   if (NLTEspec%Nact > 0 .and. NLTEspec%atmos%electron_scattering) then
+
+   if (NLTEspec%atmos%electron_scattering) then
     write(*,*)  " -> Resample mean radiation field for isotropic scattering..." 
 
     Nwaves_old = size(old_grid)
@@ -277,6 +303,7 @@ MODULE spectrum_type
    !except polarization which are (de)allocated in adjustStokesMode
    if (NLTEspec%Nact > 0 .and.allocated(NLTEspec%PSI)) then 
     deallocate(NLTEspec%Psi)
+    if (allocated(NLTEspec%etau)) deallocate(NLTEspec%etau)
     if (allocated(NLTEspec%tau)) deallocate(NLTEspec%tau)
    	allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
    	allocate(NLTEspec%tau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))  
@@ -336,6 +363,7 @@ MODULE spectrum_type
 
    NLTEspec%AtomOpac%chi_p = 0.
    NLTEspec%AtomOpac%eta_p = 0.
+   
       
    !do not try to realloc after non-LTE for image.
    !Fursther, with labs=.false. for images, we do not enter in eval_operator condition
@@ -352,20 +380,23 @@ MODULE spectrum_type
      NLTEspec%AtomOpac%Kc_nlte = 0.
      NLTEspec%AtomOpac%jc_nlte = 0.
           
-    if (NLTEspec%atmos%electron_scattering) CALL alloc_Jnu()
+    !if (NLTEspec%atmos%electron_scattering) CALL alloc_Jnu()
    
     !do not allocate if lxcoupling but no NLTE effects
     if (lxcoupling) NLTEspec%atmos%include_xcoupling = .true.
      
     allocate(NLTEspec%Psi(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))
     
-    if (.not.lxcoupling) & !not for MALI
-       allocate(NLTEspec%tau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC))   
+    if (.not.lxcoupling) then !not for MALI
+       allocate(NLTEspec%tau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC)) 
+       allocate(NLTEspec%etau(NLTEspec%Nwaves, NLTEspec%atmos%Nrays, NLTEspec%NPROC)) 
+    endif  
 
     do nat=1,NLTEspec%atmos%Nactiveatoms
+     !these are local to a cell, used to fill the Gamma matrix at a specific point: one cell per atom
      allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%eta(NLTEspec%Nwaves,NLTEspec%atmos%Nrays,NLTEspec%NPROC))
-     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%etac(NLTEspec%Nwaves,atmos%Nspace),stat=alloc_status)
-     if (alloc_status >0) call error("Allocation error atom%etac")
+     allocate(NLTEspec%atmos%ActiveAtoms(nat)%ptr_atom%etac(NLTEspec%Nwaves,NLTEspec%NPROC),stat=alloc_status)
+     if (alloc_status >0) call error("Allocation error atom%etac")!atmos%Nspace
 
      !Now the waves and angle integraed X coupling terms for each atom and for all transitions
      !(Sum over all active transitions for each transition) is kept.
@@ -394,9 +425,19 @@ MODULE spectrum_type
    !allocated at the end only, to save memory
    !alloc also contribution function at the moment
    integer :: alloc_status
+   real :: mem_alloc
+   
+   mem_alloc = real(npix_x*npix_y*rt_n_incl*rt_n_az*NLTEspec%Nwaves)/1024./1024.
+   if (2*mem_alloc > 1e3) then
+    write(*,*) " allocating ", 2 * mem_alloc/1024., " GB for flux arrays.."
+   else
+    write(*,*) " allocating ", 2 * mem_alloc, " MB for flux arrays.."  
+   endif
 
-    allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ))
-    allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
+    allocate(NLTEspec%Flux(NLTEspec%Nwaves,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ), stat=alloc_status)
+    if (alloc_Status > 0) CALL ERROR ("Cannot allocate Flux")
+    allocate(NLTEspec%Fluxc(NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ), stat=alloc_status)
+    if (alloc_Status > 0) CALL ERROR ("Cannot allocate Flux continuum")
 
     NLTEspec%Flux = 0.0
     NLTEspec%Fluxc = 0.0
@@ -562,13 +603,14 @@ MODULE spectrum_type
   END SUBROUTINE initAtomOpac_zeeman
   
   SUBROUTINE alloc_Jnu()
+   !only allocate Jc for the moment and use it even for lines
   
-     allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))!%NPROC))
+     !allocate(NLTEspec%J(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))!%NPROC))
      allocate(NLTEspec%Jc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))
    !Just to try
    !CALL Warning("(allocSpectrum()) J20 allocated")
    !allocate(NLTEspec%J20(NLTEspec%Nwaves,NLTEspec%NPROC)); NLTEspec%J20 = 0d0
-     NLTEspec%J = 0.0
+   !  NLTEspec%J = 0.0
      NLTEspec%Jc = 0.0
 
    
@@ -589,8 +631,11 @@ MODULE spectrum_type
     integer :: nact
     
    	NLTEspec%Psi(:,iray,id) = 0d0
-   	if (.not.lxcoupling) & 
+   	if (.not.lxcoupling) then
    		NLTEspec%tau(:,iray,id) = 0d0
+   		NLTEspec%etau(:,iray,id) = 0d0 !keep only exp(-dtau), dtau itself not needed,
+   									   !avoid te recompute the expo each time
+   	endif
    	
    	do nact=1,NLTEspec%atmos%NactiveAtoms
    		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%eta(:,iray,id) = 0d0
@@ -610,8 +655,10 @@ MODULE spectrum_type
     integer :: nact
     
    	NLTEspec%Psi(:,:,id) = 0d0
-   	if (.not.lxcoupling) & 
-   		NLTEspec%tau(:,:,id) = 0d0
+   	if (.not.lxcoupling) then
+   	 NLTEspec%tau(:,:,id) = 0d0
+   	 NLTEspec%etau(:,:,id) = 0d0
+   	endif
    	
    	do nact=1,NLTEspec%atmos%NactiveAtoms
    		NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%eta(:,:,id) = 0d0
@@ -688,7 +735,7 @@ MODULE spectrum_type
   integer :: la, Nred, Nblue, kr, kc, m, Nmid
   logical :: simple, extend
   character(len=6) :: comment="VACUUM"
-  real(kind=dp) :: lambda_vac(NLTEspec%Nwaves)
+  real(kind=dp) :: lambda_vac(NLTEspec%Nwaves), Fnu
   real :: pixel_scale_x, pixel_scale_y 
   
   write(*,*) "Writing Flux-map"
@@ -852,6 +899,40 @@ MODULE spectrum_type
 
  RETURN
  END SUBROUTINE WRITE_FLUX
+ 
+ SUBROUTINE WRITE_FLUX_ASCII()
+ ! -------------------------------------------------- !
+  ! written only for the first inclination / azimuth
+ ! --------------------------------------------------- !
+  use input
+  integer :: status,unit
+  integer :: la, j, i
+  real(kind=dp), dimension(:), allocatable :: Fnu, Fnuc
+  
+  
+   !  Get an unused Logical Unit Number to use to open the FITS file.
+   status=0
+   unit = 10
+   allocate(Fnu(NLTEspec%Nwaves), Fnuc(NLTEspec%Nwaves))
+   Fnu = 0.
+   Fnuc = 0.
+   do i=1, npix_x
+    do j=1, npix_y
+     Fnu = Fnu + NLTEspec%Flux(:,i,j,1,1)
+     Fnuc = Fnuc + NLTEspec%Fluxc(:,i,j,1,1)
+    enddo
+   enddo
+   
+   open(unit,file="flux.s", status='unknown', iostat=status)
+    do la=1, NLTEspec%Nwaves
+      write(unit, *) NLTEspec%lambda(la), Fnu(la), fnuc(la)
+    enddo
+   close(unit)
+   
+   deallocate(Fnu, Fnuc)
+
+ RETURN
+ END SUBROUTINE WRITE_FLUX_ASCII
   
   SUBROUTINE writeWavelength()
   ! --------------------------------------------------------------- !

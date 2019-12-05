@@ -24,46 +24,17 @@ MODULE PROFILES
  
 
 
- SUBROUTINE Iprofile (line,icell,x,y,z,x1,y1,z1,u,v,w,l,id)
+ SUBROUTINE Iprofile (line,icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
-  integer, intent(in) 							            :: icell, id
+  integer, intent(in) 							            :: icell, id, Nvspace
   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
+  real(kind=dp), intent(in) 								:: Omegav(:)
   type (AtomicLine), intent(inout)								:: line
   real(kind=dp), dimension(line%Nlambda)					:: vvoigt
-  integer, parameter										:: NvspaceMax = 101
-  real(kind=dp), dimension(NvspaceMax)					:: omegav
-  integer													:: Nvspace, nv, Nred, Nblue, i, j
-  real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
-  															   v0, v1, dv, norm
-
-
-  ! v_proj in m/s at point icell
-  omegav = 0d0
-  Nvspace = 1
-  if (.not.lstatic) then
-   v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
-   omegav(1) = v0
-  end if
-
-  Nvspace = 1 !no loop now
-!   if (.not.lstatic .and. .not.lVoronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
-!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-!      dv = dabs(v1-v0)
-!      Nvspace = max(2,nint(20*dv/line%atom%vbroad(icell)))
-!      Nvspace = min(Nvspace,NvspaceMax)
-!      omegav(Nvspace) = v1
-!     do nv=2,Nvspace-1
-!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-!       xphi=x+delta_vol_phi*u
-!       yphi=y+delta_vol_phi*v
-!       zphi=z+delta_vol_phi*w
-!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-!       !!write(*,*) "v=", omegav(nv)/1d3
-!     end do 
-!   end if
-
+  integer													::  Nred, Nblue, i, j, nv
+  real(kind=dp)												:: norm
 
 
   i = line%i; j = line%j
@@ -92,7 +63,7 @@ MODULE PROFILES
       end do
   else !Gaussian !only for checking
       do nv=1, Nvspace
-      
+
          vvoigt(:) = ( line%u(:) - omegav(nv) ) / line%atom%vbroad(icell)
          line%phi_loc(:,id) = line%phi_loc(:,id) + dexp(-(vvoigt(:))**2) !/ Nvspace 
 
@@ -110,35 +81,22 @@ MODULE PROFILES
 !   stop
 !  end if
 
- !deallocate(vv, vvoigt, F)
  RETURN
  END SUBROUTINE IProfile
  
  !-> TO be included as a Voigt procedure
- SUBROUTINE Iprofile_thomson (line,icell,x,y,z,x1,y1,z1,u,v,w,l,id)
+ SUBROUTINE Iprofile_thomson (line,icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
-  integer, intent(in) 							            :: icell, id
+  integer, intent(in) 							            :: icell, id, Nvspace
   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
+  real(kind=dp), intent(in) 								:: Omegav(:)
   type (AtomicLine), intent(inout)								:: line
   real(kind=dp), dimension(line%Nlambda)					:: vvoigt
-  integer, parameter										:: NvspaceMax = 101
-  real(kind=dp), dimension(NvspaceMax)					:: omegav
-  integer													:: Nvspace, nv, Nred, Nblue, i, j
-  real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
-  															   v0, v1, dv, eta, r
+  integer													::  Nred, Nblue, i, j, nv
 
-
-  ! v_proj in m/s at point icell
-  omegav = 0d0
-  Nvspace = 1
-  if (.not.lstatic) then
-   v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
-   omegav(1) = v0
-  end if
-
-  nv = Nvspace 
+  nv = 1 !=Nvspace
 
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
@@ -146,61 +104,33 @@ MODULE PROFILES
   line%phi_loc(:,id) = 0d0
   !line_profiles(:,kr,id) = 0d0
   
-  r = line%atom%vbroad(icell)*line%a(icell)/line%aeff(icell)
-  eta = 1.36603*r - 0.47719*r*r + 0.11116*r*r*r
-
-  vvoigt(:) = line%u(:) - omegav(nv)
+!   r = line%atom%vbroad(icell)*line%a(icell)/line%aeff(icell)
+!   eta = 1.36603*r - 0.47719*r*r + 0.11116*r*r*r
 
   !normed
-  line%phi_loc(:,id) = eta*(line%aeff(icell) / (vvoigt(:)**2.+line%aeff(icell)**2.) / pi) &
-                       + (1-eta)*dexp(-(vvoigt(:)/line%aeff(icell))**2)/SQRTPI/line%aeff(icell)
+!   line%phi_loc(:,id) = eta*(line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) / pi) &
+!                        + (1-eta)*dexp(-(vvoigt(:)/line%aeff(icell))**2)/SQRTPI/line%aeff(icell)
+                       
+  line%phi_loc(:,id) = line%r(icell)*line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) &
+                       + line%r1(icell)*dexp(-(line%u(:)/line%aeff(icell))**2)
 
- if (any_nan_infinity_vector(line%phi_loc(:,id))>0 .or. minval(line%phi_loc(:,id)) < 0) then
-  write(*,*) line%Nlambda, icell, id
-  write(*,*) "Err profile", line%phi_loc(:,id)
-  stop
- end if
 
  RETURN
  END SUBROUTINE IProfile_thomson
 
  !interpolation or shifting, building
- SUBROUTINE IProfile_cmf_to_obs(line,icell,x,y,z,x1,y1,z1,u,v,w,l, id)!, iray)
-  integer, intent(in) 							            :: icell
-  integer, intent(in)                                       :: id!, iray
+ SUBROUTINE IProfile_cmf_to_obs(line,icell,x,y,z,x1,y1,z1,u,v,w,l, id, Nvspace, Omegav)
+ ! phi = Voigt / sqrt(pi) / vbroad(icell)
+  integer, intent(in) 							            :: icell, id, Nvspace
   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
+  real(kind=dp), intent(in) 								:: Omegav(:)
   type (AtomicLine), intent(inout)								:: line
-  integer, parameter										:: NvspaceMax = 101
-  real(kind=dp), dimension(NvspaceMax)						:: omegav
-  integer													:: Nvspace, nv, Nred, Nblue, i, j
-  real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
-  															   v0, v1, dv
+  real(kind=dp), dimension(line%Nlambda)					:: vvoigt
+  integer													::  Nred, Nblue, i, j, nv
   real(kind=dp), dimension(line%Nlambda)                    :: u1, u1p
-  ! v_proj in m/s at point icell
-  omegav = 0d0
-  Nvspace = 1
-  if (.not.lstatic) then
-   v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
-   omegav(1) = v0
-  end if
-  Nvspace = 1
-
-!   if (.not.lstatic .and. .not.lVoronoi .and.lmagnetoaccr) then ! velocity is varying across the cell
-!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-!      dv = dabs(v1-v0)
-!      Nvspace = max(2,nint(20*dv/line%atom%vbroad(icell)))
-!      Nvspace = min(Nvspace,NvspaceMax)
-!      omegav(Nvspace) = v1
-!     do nv=2,Nvspace-1
-!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-!       xphi=x+delta_vol_phi*u
-!       yphi=y+delta_vol_phi*v
-!       zphi=z+delta_vol_phi*w
-!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-!     end do 
-!   end if
+ 
 
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
@@ -215,74 +145,47 @@ MODULE PROFILES
          u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
              
          line%phi_loc(:,id) = line%phi_loc(:,id) + &
-                 linear_1D_sorted(line%Nlambda,u1,line%phi(:,icell),line%Nlambda,u1p) / Nvspace
+                 linear_1D_sorted(line%Nlambda,u1,line%phi(:,icell),line%Nlambda,u1p) / Nvspace /sqrtpi / line%atom%vbroad(icell)
          	
 
  enddo
  
-!  if (any_nan_infinity_vector(line%phi_loc(:,id))>0 .or. minval(line%phi_loc(:,id)) < 0) then
-!   write(*,*) line%Nlambda, icell, id
-!   if (line%voigt) write(*,*) "Damping = ", line%a(icell)
-!   write(*,*) "vv=",minval(u1p(:)), maxval(u1p)
-!   write(*,*) "vv2(km/s)=", minval(u1p) * line%atom%vbroad(icell)*1d-3, maxval(u1p)* line%atom%vbroad(icell)*1d-3
-!   write(*,*) " Error with Profile"
-!   write(*,*) minval(line%phi_loc(:,id)), maxval(line%phi_loc(:,id))
-!   stop
-!  end if
+
 
  RETURN
  END SUBROUTINE IProfile_cmf_to_obs
  
- SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l,id)
-  integer, intent(in) 							            :: icell,id
-  integer :: iray = 1 !futur deprecation
+ SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
+ ! phi = Voigt / sqrt(pi) / vbroad(icell)
+!->>>>>>
+integer :: iray = 1 !futur deprecation
+!<<<<<<-
+  integer, intent(in) 							            :: icell, id, Nvspace
   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
                                 				               x1,y1,z1, &      ! velocity field and magnetic field
                                 				               l !physical length of the cell
+  real(kind=dp), intent(in) 								:: Omegav(:)
   type (AtomicLine), intent(inout)								:: line
   real(kind=dp), dimension(line%Nlambda)                 :: vvoigt, F, LV, vvoigt_b
-  integer, parameter										:: NvspaceMax = 101, NbspaceMax=101
-  real(kind=dp), dimension(NvspaceMax)					:: omegav
+  integer, parameter										:: NbspaceMax=101
   real(kind=dp), dimension(NbspaceMax)					:: omegaB, gamma, chi
-  integer													:: Nvspace, nv, Nred, Nblue, nc, &
+  integer													:: nv, Nred, Nblue, nc, &
   															   Nbspace, nb, Nzc, i, j,qz
-  real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
-  															   v0, v1, dv, b0, b1,g1,c1,dB,norm
+  real(kind=dp) 											:: b0, b1,g1,c1,dB,norm
 
   real(kind=dp), dimension(3,line%Nlambda) 				:: phi_zc, psi_zc!Sigma_b, PI, sigma_r
   logical 													:: B_flag = .true.
   !or allocate deallocate only on Nlambda. Lower arrays dimension but took time to allocate
 
   omegaB = 0d0
-  ! v_proj in m/s at point icell
-  omegav = 0d0
-  Nvspace = 1
-  if (.not.lstatic) then
-   v0 = v_proj(icell,x,y,z,u,v,w)
-   omegav(1) = v0
-  end if
+  
+  CALL error("Do the  projection of B in metal_bb or NLTE_bound_bound line v_proj")
 
   b0 = B_project(icell,x,y,z,u,v,w,g1,c1)
   omegaB(1) = b0; Nbspace = 1
   gamma(1) = g1; chi(1)=c1
   Nbspace = 1
 
-!  if (maxval(abs(atmos%Bxyz(icell,:))) == 0d0) B_flag = .false.
-   
-!   if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
-!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-!      dv = dabs(v1-v0) 
-!      Nvspace = max(2,nint(20*dv/vbroad))
-!      Nvspace = min(Nvspace,NvspaceMax)
-!      omegav(Nvspace) = v1
-!     do nv=2,Nvspace-1
-!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-!       xphi=x+delta_vol_phi*u
-!       yphi=y+delta_vol_phi*v
-!       zphi=z+delta_vol_phi*w
-!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-!     end do 
-!   end if
 
 
 !   if (.not.lvoronoi .and. B_flag) then

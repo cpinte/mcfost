@@ -677,8 +677,8 @@ function v_proj(icell,x,y,z,u,v,w) !
   integer, intent(in) :: icell
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
-  real(kind=dp) :: vitesse, vx, vy, vz, norme, r, r2, norme2
-
+  real(kind=dp) :: vitesse, vx, vy, vz, norme, r, r2, norme2, sign
+  
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)
      vy = Voronoi(icell)%vxyz(2)
@@ -690,7 +690,8 @@ function v_proj(icell,x,y,z,u,v,w) !
         vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
         v_proj = vx * u + vy * v + vz * w
      else ! Using analytical velocity field
-        if (.not.lmagnetoaccr.and.(lkeplerian.or.linfall)) vitesse = vfield(icell)
+        if ((.not.lmagnetoaccr.and..not.lspherical_velocity).and.&
+        	(lkeplerian.or.linfall)) vitesse = vfield(icell)
 
         if (lkeplerian) then
            r = sqrt(x*x+y*y)
@@ -745,22 +746,22 @@ function v_proj(icell,x,y,z,u,v,w) !
 			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
 			vx = 0.; vy = 0.; vz = 0.;
 			norme2 = 0.0_dp
+			
+			sign = 1_dp
+		    if ( (.not.l3D) .and. (z < 0_dp) ) sign = -1_dp
+
 			if (r>tiny_dp) then
 				norme = 1.0_dp / r
 				if (r2 > tiny_dp) norme2 = 1.0_dp / r2
 				
-				vx = atmos%vr(icell) * x * norme + norme2 * (z * norme * x * atmos%vtheta(icell) - y * atmos%vphi(icell))
-				vy = atmos%vr(icell) * y * norme + norme2 * (z * norme * y * atmos%vtheta(icell) + x * atmos%vphi(icell))
-				vz = atmos%vr(icell) * z * norme - r2 / r * atmos%vtheta(icell)
-				
-				if (.not.l3D .and. z < 0._dp) vz = -z
-								
+				vx = atmos%vr(icell) * x * norme !+ norme2 * (z * norme * x * atmos%vtheta(icell) - y * atmos%vphi(icell))
+				vy = atmos%vr(icell) * y * norme !+ norme2 * (z * norme * y * atmos%vtheta(icell) + x * atmos%vphi(icell))
+				vz = atmos%vr(icell) * z * norme !- sign * r2 / r * atmos%vtheta(icell)
+												
 				v_proj = vx * u + vy * v + vz * w
 			else
 				v_proj = 0.0
-			endif
-		 write(*,*) icell, "vel (icell)", atmos%vr(icell)/1d3, atmos%vtheta(icell)/1d3, atmos%vphi(icell)/1d3
-         write(*,*) "vproj1=", v_proj/1d3, "vx=",vx/1d3, "vy=",vy/1d3, "vz=", vz/1d3			
+			endif		
 		else
            call error("velocity field not defined")
         endif

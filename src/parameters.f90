@@ -59,7 +59,7 @@ module parametres
   ! Atomic line radiative transfer
   !!lstore_opac futur deprecation
   logical :: lemission_atom, lstore_opac, lsolve_for_ne, lelectron_scattering, lvacuum_to_air, lstatic, &
-       lcontrib_function, lmagnetoaccr, lxcoupling, lforce_lte, lwind_rotation
+       lcontrib_function, lmagnetoaccr, lxcoupling, lforce_lte, lspherical_velocity, lstop_after_jnu
   !Ng's acceleration
   logical :: lNg_acceleration
   integer :: iNg_Norder, iNg_Ndelay, iNg_Nperiod

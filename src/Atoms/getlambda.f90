@@ -12,7 +12,7 @@ MODULE getlambda
   IMPLICIT NONE
 
   !Number of points for each transition
-  integer, parameter :: Nlambda_cont = 101, &
+  integer, parameter :: Nlambda_cont = 31, Nlambda_cont_log = 71, &
   						Nlambda_line_w = 9, Nlambda_line_c = 101
   						!Nwing from -vchar to vcore; Ncore from vcore to 0
 
@@ -228,6 +228,41 @@ MODULE getlambda
 
   RETURN
   END SUBROUTINE write_wavelengths_table_NLTE_lines
+  
+  SUBROUTINE make_sub_wavelength_grid_cont_log(cont, lambdamin)
+  ! ----------------------------------------------------------------- !
+   ! Make an individual wavelength grid for the AtomicContinuum cont.
+   ! The resolution is constant in nm.
+   ! lambda must be lower that lambda0 and lambda(Nlambda)=lambda0.
+   ! Allocate cont%lambda.
+   ! cont%alpha (cross-section of photoionisation) is not used.
+  ! ----------------------------------------------------------------- !
+   type (AtomicContinuum), intent(inout) :: cont
+   real(kind=dp), intent(in) :: lambdamin
+   real(kind=dp) :: resol
+   real(kind=dp), allocatable, dimension(:) :: nu
+   integer :: la
+   real :: l0, l1, nu0, numax
+
+
+   l1 = real(cont%lambda0)
+   l0 = real(lambdamin)
+   
+   nu0 = CLIGHT/l1 / NM_TO_M
+   numax = CLIGHT/l0 / NM_TO_M !Hz
+   
+   cont%Nlambda = Nlambda_cont_log
+   allocate(cont%lambda(cont%Nlambda), nu(cont%Nlambda))
+
+   !cont%lambda(:) = real(spanl(l0, l1, cont%Nlambda),kind=dp)
+   nu(:) = real(spanl(nu0, numax, cont%Nlambda),kind=dp)
+   
+   cont%lambda(:) = CLIGHT / nu(cont%Nlambda:1:-1) / NM_TO_M
+   
+   deallocate(nu)
+
+  RETURN
+  END SUBROUTINE make_sub_wavelength_grid_cont_log
 
   SUBROUTINE make_sub_wavelength_grid_cont(cont, lambdamin)
   ! ----------------------------------------------------------------- !
@@ -245,7 +280,7 @@ MODULE getlambda
 
    !write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
 
-   l1 = cont%lambda0 !cannot be larger than lambda0 ! minimum frequency for photoionisation
+   l1 = cont%lambda0 !cannot be larger than lambda0 ! frequency for photoionisation
    l0 = lambdamin
    cont%Nlambda = Nlambda_cont
    allocate(cont%lambda(cont%Nlambda))
@@ -257,6 +292,7 @@ MODULE getlambda
    do la=2,cont%Nlambda
     cont%lambda(la) = cont%lambda(la-1) + resol
    end do
+
    !does not allocate cross-section, here
   RETURN
   END SUBROUTINE make_sub_wavelength_grid_cont
@@ -362,7 +398,8 @@ MODULE getlambda
    if (line%polarizable) vB =  &
    				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
 
-   v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
+   !v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
+   v_char = L*atmos%v_char + 5*vD
 
    xlam = 0d0
    lam0 = line%lambda0*(1-v_char/CLIGHT)

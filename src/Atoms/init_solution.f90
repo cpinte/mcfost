@@ -4,7 +4,7 @@ MODULE init_solution
  						     FillGamma_atom_mu, FillGamma_atom_mali_mu, FillGamma_atom_hogerheijde_mu
  use atmos_type, only : atmos
  use atom_type, only : AtomType, AtomicLine, AtomicContinuum
- use spectrum_type, only : NLTEspec, alloc_weights, dealloc_weights
+ use spectrum_type, only : NLTEspec, alloc_weights, dealloc_weights, alloc_Jnu
  use mcfost_env, only : dp
  use accelerate
  use messages
@@ -17,7 +17,7 @@ MODULE init_solution
 
  IMPLICIT NONE
 
- real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, pop_old
+ real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, pop_old, pops
  real(kind=dp), dimension(:), allocatable :: flatpops
  logical, dimension(:), allocatable :: lcell_converged
 
@@ -79,15 +79,14 @@ MODULE init_solution
   ! dnu/nu = dlam/lam
   ! the integral of the radiative rates is
   ! integ (domega) * integ(dlam/hlam)
-  ! a 1/h is missing
+  ! a 1 / h is missing
  ! --------------------------------------------------------- !
   type(AtomicContinuum), intent(in) :: cont
   real(kind=dp), dimension(cont%Nlambda) :: wlam
   integer :: la, Nblue, Nred, la_start, la_end , la0
   real :: factor = 0.5
 
-  !Nblue = cont%Nblue; Nred = cont%Nred
-  Nblue = 1; Nred = NLTEspec%Nwaves !---> Because ATM cont are kept on the whole grid
+  Nblue = cont%Nblue; Nred = cont%Nred
   la_start = 1; la_end = cont%Nlambda
 
   wlam(1) = factor * &
@@ -114,7 +113,8 @@ MODULE init_solution
  ! ---------------------------------------------------- !
   type (AtomType), pointer :: atom
   logical, intent(in), optional :: sub_iterations_enabled
-  integer :: nact, Nmaxlevel, icell, kr, alloc_status
+  integer :: nact, Nmaxlevel, icell, kr, alloc_status, l
+  real(kind=dp) :: dM, dpop
    
   CALL alloc_weights() !and phi_ray
   write(*,*) " Setting up wavelength integration weights for all transitions..."
@@ -131,6 +131,9 @@ MODULE init_solution
    
    enddo  
   enddo
+  
+  if (atmos%electron_scattering) CALL alloc_Jnu()
+
   
   allocate(chi_loc(NLTEspec%Nwaves, atmos%Nrays, NLTEspec%Nproc))
   if (allocated(ds)) deallocate(ds)
@@ -159,6 +162,7 @@ MODULE init_solution
         atom%n(:,:) = atom%nstar(:,:)
 
       CASE ("ZERO_RADIATION")
+        dpop = 0.0_dp
         do icell=1,atmos%Nspace
          if (atmos%icompute_atomRT(icell)>0) then
            !atom level version of initGamma and FillGamma and updatePopulations
@@ -170,12 +174,19 @@ MODULE init_solution
            !even if the cell index appears, it is just here for consistance with the others FillGamma_bb_XXXX
            !!CALL FillGamma_bb_zero_radiation(1, icell, atom, 1) !no parallèle yet
            CALL FillGamma_atom_zero_radiation(1, icell, atom)
-           CALL SEE_atom(1, icell,atom)
-!            write(*,*) "n(zerR)", atmos%ActiveAtoms(1)%ptr_atom%n(:,icell)
-!            write(*,*) "nstar", atmos%ActiveAtoms(1)%ptr_atom%nstar(:,icell)
+           CALL SEE_atom(1, icell,atom, dM)
+!            write(*,*) "***"
+!            write(*,*) atmos%nHtot(icell), sum(atom%nstar(:,icell)), sum(atom%n(:,icell))
+!            write(*,*) "nstar", (atom%nstar(l,icell),l=1,atom%Nlevel)
+!            write(*,*) "n", (atom%n(l,icell),l=1,atom%Nlevel)
+!            write(*,*) "***"
+
+           dpop = max(dM, dpop)
          end if
         enddo
-     !CASE ("OLD_POPULATIONS")
+!stop
+     CASE ("OLD_POPULATIONS")
+      CALL Warning("OLD_POPULATIONS handled in readatom.f90 A.T.M")
      !CASE ("ITERATIONS")
      !CASE ("SOBOLEV")
      CASE DEFAULT
@@ -197,10 +208,12 @@ MODULE init_solution
    if (alloc_status > 0) call error("Allocation error lcell_converged")
    lcell_converged(:) = .false.
 
+   write(*,*) " ** Number max of levels among all atoms:", Nmaxlevel
    if (present(sub_iterations_enabled)) then
     if (sub_iterations_enabled) then
       Write(*,*) " Allocating space for sub-iterations populations"
       allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pop_old = 0d0
+      !allocate(pop_old(atmos%NactiveAtoms, NmaxLevel, NLTEspec%NPROC)); pops = 0d0
     endif
    endif
    allocate(gpop_old(atmos%NactiveAtoms, Nmaxlevel,atmos%Nspace)); gpop_old = 0d0
@@ -236,6 +249,7 @@ MODULE init_solution
   
   CALL dealloc_weights() !and phi_ray
   deallocate(chi_loc, ds)
+  deallocate(lcell_converged)
 
 
   do nact=1,atmos%Nactiveatoms

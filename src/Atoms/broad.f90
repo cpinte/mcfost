@@ -31,37 +31,31 @@ MODULE broad
   !will be divided by 4PI later
  RETURN
  END SUBROUTINE Broad_Kurosawa
-
- !Building
- SUBROUTINE RadiativeDamping(icell, atom, kr, Grad)
+ 
+ 
+ SUBROUTINE Radiative_Damping(atom, line, Grad)
  ! -------------------------------------------------------------------------- !
   ! Radiative damping of a line transition j->i,
   ! assuming the radiation field is given by a Planck function, and psi=phi
   !
   ! Grad = Sum_l<m Aml + Bml * int2(psiml*I*dv) + Sum_n>m mn int2(phimn*Idv)
  ! -------------------------------------------------------------------------- !
-  integer, intent(in) :: icell, kr
   type (AtomType), intent(in) :: atom
+  type (AtomicLine), intent(in) :: line
   real(kind=dp), intent(out) :: Grad
   integer :: kp,l,n
-  real(kind=dp) :: hc_lakT, gamma_j, gamma_i
-  type (AtomicLine) :: other_line, line
-  !Remove radiation field to compare with RH
+  real(kind=dp) :: gamma_j, gamma_i
   
-  hc_lakT = hc_k / atmos%T(icell) !nm factor
-  line = atom%lines(kr)
   Grad = 0d0
-  gamma_j = 0d0; gamma_i = 0d0
+  gamma_j = 0d0
+  
+  !it also adds line%Aji for the current line if l  = line%i == the same line
   
   do kp=1,atom%Nline
-    other_line = atom%lines(kp)
-    l = other_line%i; n = other_line%j
+
+    l = atom%lines(kp)%i; n = atom%lines(kp)%j
     if (n==line%j) then !our upper level is also the upper level of another transition
-     gamma_j = gamma_j + other_line%Aji/(1d0 - dexp(-hc_lakT/other_line%lambda0))
-    elseif (l==line%j) then !our upper level is a lower level of another transition
-     gamma_j = gamma_j + other_line%Bji/other_line%Bij * other_line%Aji / (dexp(hc_lakT/other_line%lambda0)-1d0)
-!     elseif (l==line%i) then !our lower level is zn upper level
-!      gamma_i = gamma_i + ohter
+     gamma_j = gamma_j + atom%lines(kp)%Aji
     endif
   
   enddo
@@ -69,7 +63,8 @@ MODULE broad
   Grad = gamma_j + gamma_i
 
  RETURN
- END SUBROUTINE RadiativeDamping
+ END SUBROUTINE Radiative_Damping
+
 
  SUBROUTINE VanderWaals(icell, atom, kr, GvdW)
  ! Compute van der Waals broadening in Lindholm theory with

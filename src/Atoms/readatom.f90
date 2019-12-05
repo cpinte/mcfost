@@ -8,8 +8,9 @@ MODULE readatom
   use uplow
   use getline
   use barklem, only : getBarklem
-  use writeatom, only : readPops
+  use writeatom, only : readPops, read_departure_bfactor
   use collision, only : read_collisions
+  use broad, only : Radiative_Damping
 
   !$ use omp_lib
 
@@ -46,10 +47,11 @@ MODULE readatom
     real, allocatable, dimension(:) :: levelNumber
     logical :: Debeye, match, res=.false.
     logical, dimension(:), allocatable :: determined, parse_label
+    real(kind=dp), dimension(:), allocatable :: old_nHtot
     character(len=20) :: shapeChar, symmChar, optionChar, vdWChar, nuDepChar
     character(len=2) :: IDread
-    real(8) :: C1, vDoppler, f, lambdaji
-    real(8) :: lambdamin, geff!, c_sum
+    real(kind=dp) :: C1, vDoppler, f, lambdaji
+    real(kind=dp) :: lambdamin, geff!, c_sum
     EOF = 0
     !write(*,*) "Atom is part of the active atoms ?", atom%active
 
@@ -70,8 +72,10 @@ MODULE readatom
     match = .false.
     do nll=1,Nelem
      if (atmos%Elements(nll)%ptr_elem%ID.eq.atom%ID) then
-      write(*,*) "Abundance of atom ",atom%ID,": A =",atmos%Elements(nll)%ptr_elem%Abund
-      if (atmos%Elements(nll)%ptr_elem%abundance_set.eqv..true.) then
+      atom%massf = atmos%Elements(nll)%ptr_elem%massf
+      write(*,*) "Abundance of atom ",atom%ID,": A =",atmos%Elements(nll)%ptr_elem%Abund, &
+       " mass fraction (%) = ", 100.*real(atom%massf)
+      if (atmos%Elements(nll)%ptr_elem%abundance_set) then
         atom%periodic_table=nll
         atom%Abund=atmos%Elements(nll)%ptr_elem%Abund
         atom%weight=atmos%Elements(nll)%ptr_elem%weight
@@ -119,7 +123,7 @@ MODULE readatom
      read(inputline,*) atom%E(i), atom%g(i), atom%label(i), &
                        atom%stage(i), levelNumber(i)
      atom%E(i) = atom%E(i) * HPLANCK*CLIGHT / (CM_TO_M)
-!      write(*,*) "E(cm^-1) = ", atom%E(i) * JOULE_TO_EV, &
+!      write(*,*) "E(eV) = ", atom%E(i) * JOULE_TO_EV, &
 !                "g = ", atom%g(i), "label = ", atom%label(i), &
 !                "stage = ", atom%stage(i)
 
@@ -151,20 +155,19 @@ MODULE readatom
     !allocate(atom%ntotal(atmos%Nspace))
     allocate(atom%vbroad(atmos%Nspace))
     !write(*,*)
-    VDoppler = KBOLTZMANN/(AMU * atom%weight) * 8d0/PI !* 2d0!m/s
-    !        = vtherm/atom%weight
+    !VDoppler = KBOLTZMANN/(AMU * atom%weight) * 8d0/PI !* 2d0!m/s
 
-    atom%vbroad = dsqrt(vtherm/atom%weight * atmos%T)! + atmos%vturb**2) !vturb in m/s
+    atom%vbroad = dsqrt(vtherm/atom%weight * atmos%T + atmos%vturb**2) !vturb in m/s
     !atom%ntotal = atom%Abund * atmos%nHtot
 
-    VDoppler = dsqrt(Vdoppler*maxval(atmos%T))! + maxval(atmos%vturb)**2)
+    VDoppler = dsqrt(vtherm/atom%weight * maxval(atmos%T) + maxval(atmos%vturb)**2)
 !     write(*,*) Vdoppler, dsqrt(Vtherm*maxval(atmos%T)/atom%weight + maxval(atmos%vturb)**2)
     !Now read all bound-bound transitions
     allocate(atom%lines(atom%Nline))
 
     do kr=1,atom%Nline
      atom%lines(kr)%atom => atom
-     !!atom%lines(kr)%lcontrib_to_opac=.true. !init
+     atom%lines(kr)%neg_opac=.false. !init
      atom%at(kr)%trtype = atom%lines(kr)%trtype; atom%at(kr)%ik=kr
      atom%at(kr)%lcontrib_to_opac=.true.; atom%Ntr_line = atom%Nline
 
@@ -212,7 +215,7 @@ MODULE readatom
       i = i + 1
       j = j + 1 !because in C, indexing starts at 0, but starts at 1 in fortran
 
-     write(*,*) "Reading line #", kr, 1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), 'nm'
+!      write(*,*) "Reading line #", kr, 1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), 'nm'
 
       !therefore, the first level is 1 (C=0), the second 2 (C=1) etc
       !Lymann series: 2->1, 3->1
@@ -311,13 +314,14 @@ MODULE readatom
       atom%lines(kr)%Bij = (atom%g(j) / atom%g(i)) * atom%lines(kr)%Bji
       atom%lines(kr)%lambda0 = lambdaji / NM_TO_M
       
-      
+      !gi * Bij = gj * Bji
+      !gi/gj = Bji/Bij so that niBij - njBji = Bij (ni - gij nj)
       atom%lines(kr)%gij = atom%lines(kr)%Bji / atom%lines(kr)%Bij !gi/gj
       atom%lines(kr)%twohnu3_c2 = atom%lines(kr)%Aji / atom%lines(kr)%Bji
 
-      write(*,*) " ->", " Aji (1e7 s^-1) = ", atom%lines(kr)%Aji/1d7,&
-        "Grad (1e7 s^-1) = ", atom%lines(kr)%Grad/1d7, &
-        "gj = ", atom%g(j)," gi = ",  atom%g(i)
+!       write(*,*) " ->", " Aji (1e7 s^-1) = ", atom%lines(kr)%Aji/1d7,&
+!         "Grad (1e7 s^-1) = ", atom%lines(kr)%Grad/1d7, &
+!         "gj = ", atom%g(j)," gi = ",  atom%g(i)
 
       !write(*,*) "line ", atom%lines(kr)%j,'->',atom%lines(kr)%i, " @",&
       !           lambdaji/NM_TO_M," nm : Aji = ", &
@@ -374,8 +378,9 @@ MODULE readatom
         !atom%lines(kr)%c_fraction(1) = 1.
      end if
      
- !!force Gaussian for test
-     !atom%lines(kr)%Voigt = .false.
+ !force Gaussian for test
+CALL Warning("USING GAUSSIAN LINE PROFILES")
+     atom%lines(kr)%Voigt = .false.
 
      !Now parse Broedening recipe
      if (trim(vdWChar).eq."PARAMTR") then
@@ -442,6 +447,13 @@ MODULE readatom
 !      end if !not mag
 !     end if ! end loop over active b-b transitions of atom
    end do !end loop over bound-bound transitions
+   
+   !Try to compute a better estimate of line%Grad once Aji is known for all lines?
+   do kr=1, atom%Nline
+    CALL Radiative_Damping(atom, atom%lines(kr), atom%lines(kr)%adamp)
+    write(*,*) kr, "line:", atom%lines(kr)%Grad, atom%lines(kr)%adamp
+   enddo
+stop
 
     ! ----------------------------------------- !
     !starts reading bound-free transitions
@@ -450,7 +462,7 @@ MODULE readatom
     do kr=1,atom%Ncont
      atom%continua(kr)%isotope_frac=1.
      atom%continua(kr)%atom => atom
-     !!atom%continua(kr)%lcontrib_to_opac=.true.
+     atom%continua(kr)%neg_opac=.false.
      atom%at(kr)%lcontrib_to_opac=.true.
      atom%at(atom%Nline+kr)%trtype = atom%continua(kr)%trtype; atom%at(kr+atom%Nline)%ik=kr
 
@@ -460,8 +472,8 @@ MODULE readatom
       atom%continua(kr)%Nlambda, nuDepChar, atom%continua(kr)%lambdamin
      j = j + 1
      i = i + 1
-     write(*,*) "Reading continuum #", kr, atom%continua(kr)%lambdamin, "nm", &
-     					1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), "nm"
+!      write(*,*) "Reading continuum #", kr, atom%continua(kr)%lambdamin, "nm", &
+!      					1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), "nm"
 
      !because in C indexing starts at 0, but starts at 1 in fortran
      atom%continua(kr)%j = max(i,j)
@@ -508,18 +520,16 @@ MODULE readatom
      else if (trim(nuDepChar).eq."HYDROGENIC") then
        atom%continua(kr)%hydrogenic=.true.
        if (atom%continua(kr)%lambdamin>=atom%continua(kr)%lambda0) then
-        write(*,*) "Minimum wavelength for continuum is "&
-          "larger than continuum edge."
+        write(*,*) "Minimum wavelength for continuum is larger than continuum edge."
+        write(*,*) kr, atom%continua(kr)%lambda0, atom%continua(kr)%lambdamin
         write(*,*) "exiting..."
         stop
        end if
-       !input and fill wavelength grid for HYRDROGENIC
-       ! Matters only when the complete wavelength dependence
-       ! is not read from file (HYDROGENIC).
+       
        ! %lambda allocated inside the routines.
+       !CALL make_sub_wavelength_grid_cont_log(atom%continua(kr), atom%continua(kr)%lambdamin)
        CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin)
-       !write(*,*) "lambdacontmin = ", atom%continua(kr)%lambda(1), &
-       !" lambdacontmax = ", atom%continua(kr)%lambda(atom%continua(kr)%Nlambda)
+
      else
       write(*,*) "Invalid value for continuum chromatic ",&
          "dependence."
@@ -562,6 +572,10 @@ MODULE readatom
     !!CALL create_pops_file(atom)
     !!write(*,*) "Populations file for writing: .",trim(atom%dataFile),"."
 
+
+   atom%set_ltepops = .true. !by default compute lte populations
+   atom%NLTEpops = .false.
+
    if (atom%active) then
 
     !Not implemented, futur removal in atomic file
@@ -573,8 +587,8 @@ MODULE readatom
                 "not implemented yet."
     end if
 
-    ! reading collision rates
-    call read_collisions(atomunit, atom)
+    ! reading collision rates of RH
+    !!call read_collisions(atomunit, atom)
 
     ! allocate some space
     atom%colunit = atom%periodic_table*2 + 1
@@ -583,27 +597,71 @@ MODULE readatom
     !!now Collision matrix is constructed cell by cell, therefore allocated elsewhere
     allocate(atom%n(atom%Nlevel,atmos%Nspace))
     atom%n = 0d0
-    atom%NLTEpops = .false.
 	if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
 	   write(*,*) " -> Reading populations from file..."
        CALL readPops(atom)
        atom%NLTEpops = .true.
+       atom%set_ltepops = .false. !read also LTE populations
+       write(*,*) " min/max pops for each level:"
+       do kr=1,atom%Nlevel
+        write(*,*) "   nLTE ", kr, ">>", minval(atom%n(kr,:)), maxval(atom%n(kr,:))
+        write(*,*) "   LTE ", kr, ">>", minval(atom%nstar(kr,:)), maxval(atom%nstar(kr,:))
+       enddo
+    else if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "DEPARTURE") then
+     allocate(atom%b(atom%Nlevel, atmos%Nspace))
+     CALL error ("Implement deprature coeffs for NLTE stars")
+    end if
+   else !not active = PASSIVE
+     if (atom%dataFile.ne.""  .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+       allocate(atom%n(atom%Nlevel,atmos%Nspace)) !not allocated if passive, n->nstar
+	   write(*,*) " -> Reading populations from file..."
+       CALL readPops(atom)
+       atom%NLTEpops = .true.
+       atom%set_ltepops = .false.
        write(*,*) " min/max pops for each level:"
        do kr=1,atom%Nlevel
         write(*,*) "    ", kr, ">>", minval(atom%n(kr,:)), maxval(atom%n(kr,:))
        enddo
-    end if
-   else !not active
-    if (atom%dataFile.ne.""  .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
-       allocate(atom%n(atom%Nlevel,atmos%Nspace)) !not allocated if passive, n->nstar
-       CALL readPops(atom)
-       atom%NLTEpops = .true.
-    else !pure passive without nlte pops from previous run
-     atom%NLTEpops=.false.
-     atom%n => atom%nstar !initialised to zero
+       atom%NLTEpops = .true. !read from file so
+     else if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "DEPARTURE") then
+       allocate(atom%b(atom%Nlevel, atmos%Nspace), atom%n(atom%Nlevel, atmos%Nspace))
+       atom%NLTEpops=.false. !electron evalutaed at LTE if no NLTE pops read, and atom%n
+       atom%set_ltepops = .true.
+       !is computed with respect to that using the atom%b
+	   write(*,*) " -> Reading departure coefficients from file..."
+       CALL read_departure_bfactor(atom)
+       !atom%NLTEpops = .false. still false at this point as we need pops to do electron densities
+     else !pure passive without nlte pops from previous run
+!        atom%NLTEpops=.false.  !-> default values
+!        atom%set_ltepops = .true.
+       atom%n => atom%nstar !initialised to zero
      !atom%n is an alias for nstar in this case
-    end if
+     end if
    end if !end is active
+   
+   if (atom%NLTEpops .and. atom%ID=='H') then !NLTE pops is false if departure coefficients
+    write(*,*) "Using NLTE populations for total H density"
+    allocate(old_nHtot(atmos%Nspace)); old_nHtot = 0.0
+    old_nHtot = atmos%nHtot
+    write(*,*) " -> old max/min nHtot (m^-3)", maxval(atmos%nHtot), minval(atmos%nHtot)
+    atmos%nHtot = 0.
+
+    atmos%nHtot = sum(atom%n,dim=1)
+    
+    write(*,*) " -> new max/min nHtot (m^-3)", maxval(atmos%nHtot), minval(atmos%nHtot)
+    write(*,*) "    :: max/min ratio", maxval(atmos%nHtot)/maxval(old_nHtot,mask=old_nHtot>0), &
+      minval(atmos%nHtot,mask=atmos%nHtot>0)/minval(old_nHtot,mask=old_nHtot > 0)
+    deallocate(old_nHtot)
+   endif
+   
+   !atmos%nHtot = atmos%nHtot * 0.718843892668734
+!    atom%n = 0.
+!    atom%n => atom%nstar
+!    atom%NLTEpops = .false.
+!    atom%set_ltepops = .false.
+!    if (loc(atom%n) /= loc(atom%nstar)) then
+!     call error ("pointers error")
+!    endif
 
   deallocate(levelNumber)
   deallocate(determined)
@@ -663,7 +721,7 @@ MODULE readatom
    if (atmos%Atoms(nmet)%ptr_atom%initial_solution.ne."OLD_POPULATIONS" &
       .and.atmos%Atoms(nmet)%ptr_atom%initial_solution.ne."LTE_POPULATIONS"&
       .and.atmos%Atoms(nmet)%ptr_atom%initial_solution.ne."ZERO_RADIATION"&
-       .and.atmos%Atoms(nmet)%ptr_atom%initial_solution.ne."SOBOLEV") then
+       .and.atmos%Atoms(nmet)%ptr_atom%initial_solution.ne."DEPARTURE") then
      write(*,*) "Initial solution ", atmos%Atoms(nmet)%ptr_atom%initial_solution,&
       " unkown!"
      write(*,*) "Exiting..."
