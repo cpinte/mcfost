@@ -449,11 +449,11 @@ CALL Warning("USING GAUSSIAN LINE PROFILES")
    end do !end loop over bound-bound transitions
    
    !Try to compute a better estimate of line%Grad once Aji is known for all lines?
-   do kr=1, atom%Nline
-    CALL Radiative_Damping(atom, atom%lines(kr), atom%lines(kr)%adamp)
-    write(*,*) kr, "line:", atom%lines(kr)%Grad, atom%lines(kr)%adamp
-   enddo
-stop
+!    do kr=1, atom%Nline
+!     CALL Radiative_Damping(atom, atom%lines(kr), atom%lines(kr)%adamp)
+!     write(*,*) kr, "line:", atom%lines(kr)%Grad, atom%lines(kr)%adamp
+!    enddo
+
 
     ! ----------------------------------------- !
     !starts reading bound-free transitions
