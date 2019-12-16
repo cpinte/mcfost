@@ -32,7 +32,7 @@ MODULE metal
  use constantes, only				 : tiny_dp, huge_dp
 
  IMPLICIT NONE
-
+ 
  CONTAINS
  
  !futur deprecation
@@ -134,6 +134,8 @@ MODULE metal
           
           deallocate(atom%lines(kc)%u)
 
+!tests
+		  if (allocated(line%negative_opacity)) deallocate(line%negative_opacity)
         
         CASE ('ATOMIC_CONTINUUM')
      
@@ -146,7 +148,9 @@ MODULE metal
           deallocate(atom%continua(kc)%alpha)
 		  deallocate(atom%continua(kc)%Vji, atom%continua(kc)%Jnu)
 
- 
+!tests
+		  if (allocated(cont%negative_opacity)) deallocate(cont%negative_opacity)
+		   
          !enddo
        CASE DEFAULT
         CALL Error("Transition type unknown", atom%at(k)%trtype)
@@ -222,7 +226,11 @@ MODULE metal
           allocate(atom%lines(kc)%Jbar(NLTEspec%NPROC), stat=alloc_status)
           if (alloc_status > 0) CALL ERROR("Allocation error line%Jbar")
           atom%lines(kc)%Jbar(:) = 0d0
-        
+          
+!tests
+allocate(atom%lines(kc)%negative_opacity(n_cells))
+atom%lines(kc)%negative_opacity(:) = .false.
+                  
         CASE ('ATOMIC_CONTINUUM')
      
          !do kc=1, atom%Ncont !loop over continua
@@ -272,6 +280,10 @@ MODULE metal
 !      	atom%continua(kc)%Nlambda, NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred), atom%continua(kc)%alpha) !interpolation grid
 
       		endif
+
+!tests
+allocate(atom%continua(kc)%negative_opacity(n_cells))
+atom%continua(kc)%negative_opacity(:) = .false.
  
          !enddo
        CASE DEFAULT
@@ -289,7 +301,7 @@ MODULE metal
    ! for each contiuum of each atom
     integer, intent(in) :: icell
     type(AtomType), pointer :: atom
-    integer :: n, k, kc, alloc_status, i, j, Nblue, Nred
+    integer :: n, k, kc, alloc_status, i, j, Nblue, Nred, la
     real(kind=dp) :: vbroad, aL, cte, cte2, adamp
     
     
@@ -345,6 +357,8 @@ MODULE metal
           CALL warning ("background line: ni < njgij")
           atom%lines(kc)%neg_opac = .true. !should be an icell function ???
           									! to remove only on specific position
+!tests
+		 atom%lines(kc)%negative_opacity(icell) = .true.
           									
          endif
     
@@ -365,7 +379,8 @@ MODULE metal
 ! write(*,*) atom%n(i,icell) - atom%n(j, icell)*minval(atom%continua(kc)%gij(:, icell))
 ! write(*,*) atom%n(i,icell), atom%n(j, icell)*atom%nstar(i, icell)/atom%nstar(j,icell)
 
-         if (atom%n(i,icell) - atom%n(j, icell)*minval(atom%continua(kc)%gij(:, icell)) <= 0 ) then
+		 do la=1, atom%continua(kc)%Nlambda
+         if (atom%n(i,icell) - atom%n(j, icell)*atom%continua(kc)%gij(la, icell) <= 0 ) then
          !if (1d0 - minval(dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))) <= 0 ) then
           !write(*,*) i, j, atom%n(i,icell), atom%n(j, icell), minval(atom%continua(kc)%gij(:, icell)), atom%nstar(i,icell), atom%nstar(j,icell)
           !write(*,*) atom%n(i,icell) - atom%n(j, icell)*minval(atom%continua(kc)%gij(:, icell))
@@ -373,7 +388,12 @@ MODULE metal
           write(*,*) " lambda+ (nm)", atom%continua(kc)%lambda0
           CALL warning ("background cont: ni < njgij")
           atom%continua(kc)%neg_opac = .true.
+!tests
+		  atom%continua(kc)%negative_opacity(icell) = .true.
+		  !should be frequency dependent?
+         exit
          endif
+         enddo
 ! write(*,*) "endtest"        
         
         CASE DEFAULT
@@ -420,27 +440,29 @@ MODULE metal
      i = atom%continua(kr)%i
      j = atom%continua(kr)%j 
      Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
-     
+  
+     !if (atom%continua(kr)%neg_opac) cycle 
+     if (atom%continua(kr)%negative_opacity(icell)) cycle  
 
      !inner wavelength loop to allow to handle negative continuum opacity
-     do la=1, atom%continua(kr)%Nlambda
-        if (atom%n(i,icell) - atom%n(j,icell)*atom%continua(kr)%gij(la,icell) < 0) cycle
-        
-		!if (atom%n(i,icell) - atom%n(j,icell)*atom%continua(kr)%gij(la,icell) >= 0.) then
-    		 NLTEspec%AtomOpac%Kc(Nblue+la-1,icell,1) = NLTEspec%AtomOpac%Kc(Nblue+la-1,icell,1) + &
-       	atom%continua(kr)%alpha(la) * (atom%n(i,icell)-atom%continua(kr)%gij(la,icell)*atom%n(j,icell))
-        !endif
-
-     	NLTEspec%AtomOpac%jc(Nblue+la-1,icell) = NLTEspec%AtomOpac%jc(Nblue+la-1,icell) + &
-       	atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * atom%continua(kr)%gij(la,icell) * atom%n(j,icell)
-     
-     enddo
-
-!      NLTEspec%AtomOpac%Kc(Nblue:Nred,icell,1) = NLTEspec%AtomOpac%Kc(Nblue:Nred,icell,1) + &
-!        	kappa_neg * atom%continua(kr)%alpha(:) * (atom%n(i,icell)-atom%continua(kr)%gij(:,icell)*atom%n(j,icell))
+!      do la=1, atom%continua(kr)%Nlambda
+!         if (atom%n(i,icell) - atom%n(j,icell)*atom%continua(kr)%gij(la,icell) < 0) cycle
+!         
+! 		!if (atom%n(i,icell) - atom%n(j,icell)*atom%continua(kr)%gij(la,icell) >= 0.) then
+!     		 NLTEspec%AtomOpac%Kc(Nblue+la-1,icell,1) = NLTEspec%AtomOpac%Kc(Nblue+la-1,icell,1) + &
+!        	atom%continua(kr)%alpha(la) * (atom%n(i,icell)-atom%continua(kr)%gij(la,icell)*atom%n(j,icell))
+!         !endif
 ! 
-!      NLTEspec%AtomOpac%jc(Nblue:Nred,icell) = NLTEspec%AtomOpac%jc(Nblue:Nred,icell) + &
-!        	atom%continua(kr)%alpha(:) * atom%continua(kr)%twohnu3_c2(:) * atom%continua(kr)%gij(:,icell) * atom%n(j,icell)
+!      	NLTEspec%AtomOpac%jc(Nblue+la-1,icell) = NLTEspec%AtomOpac%jc(Nblue+la-1,icell) + &
+!        	atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * atom%continua(kr)%gij(la,icell) * atom%n(j,icell)
+!      
+!      enddo
+
+     NLTEspec%AtomOpac%Kc(Nblue:Nred,icell) = NLTEspec%AtomOpac%Kc(Nblue:Nred,icell) + &
+        atom%continua(kr)%alpha(:) * (atom%n(i,icell)-atom%continua(kr)%gij(:,icell)*atom%n(j,icell))
+
+     NLTEspec%AtomOpac%jc(Nblue:Nred,icell) = NLTEspec%AtomOpac%jc(Nblue:Nred,icell) + &
+       	atom%continua(kr)%alpha(:) * atom%continua(kr)%twohnu3_c2(:) * atom%continua(kr)%gij(:,icell) * atom%n(j,icell)
 
     end do ! loop over Ncont
     atom => NULL()
@@ -448,100 +470,100 @@ MODULE metal
   
  RETURN
  END SUBROUTINE Metal_bf_new
-
-!->futur deprec
- !I try to compute H_bf here also
- SUBROUTINE Metal_bf(id, icell)
- !cross-section in cm2 per particle is given by Kramers’ formula
-  !with n the principal quantum number of the level i from
- !which the atom or ion is ionized, Z the ion charge, ν in Hz and gbf the dimensionless
- !Gaunt factor, a quantummechanical correction factor of order unity.
- !The Kramers cross-section decays ∼ ν−3 above the threshold (“edge”) frequency ν0,
- !being zero below it because the threshold energy is the required minimum. Think the
-  ! inverse in terms of wavelengths
-  integer, intent(in)							            :: icell, id
-  logical 										            :: obtained_n
-  integer                                                   :: m, kr, kc, i, j, Z, nc, Nblue, Nred
-  type (AtomType)                                           :: metal
-  type (AtomicContinuum)                                    :: continuum
-  real(kind=dp)                                          :: lambdaEdge
-  real(kind=dp), dimension(:), allocatable               :: twohnu3_c2, gijk, Vij
-   !obtained_n = .false. !true if the routine to read principal quantum number is fine
-   
-   !if (atmos%Npassiveatoms==1 .and. atmos%PassiveAtoms(1)%ptr_atom%ID == "H ") RETURN
-
-
-  ! Go throught all bound-free transitions of each PASSIVE
-  ! metal and add the opacity and emissivity if lambda
-  ! is lower (greater) than the wavelength threshold lambdaEdge
-  ! (the frequency threshold) and if greater (lower) than
-  ! wavelength min (frequency max). See Hydrogen b-f for more
-  ! informations, and Hubeny & Mihalas chap. 7
-
-  do m=1,atmos%Npassiveatoms
-  ! run over all passive atoms
-   metal = atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
-   !if (metal%ID == "H ") CYCLE !H cont is treated in Hydrogen_bf()
-    do kc=metal%Ntr_line+1,metal%Ntr
-     kr = metal%at(kc)%ik 
-    !do kr=1,metal%Ncont
-     continuum = metal%continua(kr)
-     i = continuum%i
-     j = continuum%j !+1 wrt C indexing
-     Nblue = continuum%Nblue; Nred = continuum%Nred
-     !!if (.not.metal%at(metal%Nline+kr)%lcontrib_to_opac) CYCLE !avoid continua not defined on the grid
-     
-     allocate(twohnu3_c2(continuum%Nlambda), gijk(continuum%Nlambda), Vij(continuum%Nlambda))
-     !hc_kla = hc_k/NLTEspec%lambda(Nblue:Nred) !factor 1/NM_TO_M in hc_k
-     twohnu3_c2 = twohc / NLTEspec%lambda(Nblue:Nred)**3
-     Vij(:) = bound_free_Xsection(continuum)
-
-     lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
-               ! associated to the minimal frquency needed
-               ! to unbound an electron
-               
-               
-    !futur ndeprecation, if the photoionized level is too low, just neglect emission
-   if (metal%n(j,icell) < tiny_dp) then !==0, but < tiny_dp is okay also
-        if ((metal%n(j,icell) < 0) .or. (metal%n(i,icell) < 0)) then
-        !-> Futur deprecation of this test, psoitivity is tested when populations are set
-         write(*,*) "(Metal_bf) Warning at icell, negative pops", icell," T(K)=", atmos%T(icell), "ne=", atmos%ne(icell)
-         write(*,*) metal%ID, j, metal%n(j,icell), i, metal%n(i,icell)
-         write(*,*) "nstar=", metal%n(:,icell)
-         write(*,*) " cycling"
-         deallocate(gijk, twohnu3_c2, Vij)
-         cycle
-        end if
-        gijk(:) = 0d0
-        
-    else
-      if (metal%n(i,icell) < 0) then
-        !-> Futur deprecation of this test, psoitivity is tested when populations are set
-        write(*,*) metal%ID, icell, i, " negative pops =", metal%n(i,icell)
-        deallocate(gijk, twohnu3_c2, Vij)
-        write(*,*) " cycling"
-        cycle        
-      endif
-        gijk(:) = metal%nstar(i,icell)/metal%nstar(j,icell) *  &
-     			dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))
-    
-    end if
-
-
-!not storeopac here now
-      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-       				Vij(:) * (metal%n(i,icell)-gijk(:)*metal%n(j,icell))
-
-      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-      				twohnu3_c2(:) * gijk(:) * Vij(:)*metal%n(j,icell)
-  
-
-     deallocate(gijk, twohnu3_c2, Vij)
-    end do ! loop over Ncont
-  end do !loop over metals
-
- RETURN
- END SUBROUTINE Metal_bf
+! 
+! !->futur deprec
+!  !I try to compute H_bf here also
+!  SUBROUTINE Metal_bf(id, icell)
+!  !cross-section in cm2 per particle is given by Kramers’ formula
+!   !with n the principal quantum number of the level i from
+!  !which the atom or ion is ionized, Z the ion charge, ν in Hz and gbf the dimensionless
+!  !Gaunt factor, a quantummechanical correction factor of order unity.
+!  !The Kramers cross-section decays ∼ ν−3 above the threshold (“edge”) frequency ν0,
+!  !being zero below it because the threshold energy is the required minimum. Think the
+!   ! inverse in terms of wavelengths
+!   integer, intent(in)							            :: icell, id
+!   logical 										            :: obtained_n
+!   integer                                                   :: m, kr, kc, i, j, Z, nc, Nblue, Nred
+!   type (AtomType)                                           :: metal
+!   type (AtomicContinuum)                                    :: continuum
+!   real(kind=dp)                                          :: lambdaEdge
+!   real(kind=dp), dimension(:), allocatable               :: twohnu3_c2, gijk, Vij
+!    !obtained_n = .false. !true if the routine to read principal quantum number is fine
+!    
+!    !if (atmos%Npassiveatoms==1 .and. atmos%PassiveAtoms(1)%ptr_atom%ID == "H ") RETURN
+! 
+! 
+!   ! Go throught all bound-free transitions of each PASSIVE
+!   ! metal and add the opacity and emissivity if lambda
+!   ! is lower (greater) than the wavelength threshold lambdaEdge
+!   ! (the frequency threshold) and if greater (lower) than
+!   ! wavelength min (frequency max). See Hydrogen b-f for more
+!   ! informations, and Hubeny & Mihalas chap. 7
+! 
+!   do m=1,atmos%Npassiveatoms
+!   ! run over all passive atoms
+!    metal = atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
+!    !if (metal%ID == "H ") CYCLE !H cont is treated in Hydrogen_bf()
+!     do kc=metal%Ntr_line+1,metal%Ntr
+!      kr = metal%at(kc)%ik 
+!     !do kr=1,metal%Ncont
+!      continuum = metal%continua(kr)
+!      i = continuum%i
+!      j = continuum%j !+1 wrt C indexing
+!      Nblue = continuum%Nblue; Nred = continuum%Nred
+!      !!if (.not.metal%at(metal%Nline+kr)%lcontrib_to_opac) CYCLE !avoid continua not defined on the grid
+!      
+!      allocate(twohnu3_c2(continuum%Nlambda), gijk(continuum%Nlambda), Vij(continuum%Nlambda))
+!      !hc_kla = hc_k/NLTEspec%lambda(Nblue:Nred) !factor 1/NM_TO_M in hc_k
+!      twohnu3_c2 = twohc / NLTEspec%lambda(Nblue:Nred)**3
+!      Vij(:) = bound_free_Xsection(continuum)
+! 
+!      lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
+!                ! associated to the minimal frquency needed
+!                ! to unbound an electron
+!                
+!                
+!     !futur ndeprecation, if the photoionized level is too low, just neglect emission
+!    if (metal%n(j,icell) < tiny_dp) then !==0, but < tiny_dp is okay also
+!         if ((metal%n(j,icell) < 0) .or. (metal%n(i,icell) < 0)) then
+!         !-> Futur deprecation of this test, psoitivity is tested when populations are set
+!          write(*,*) "(Metal_bf) Warning at icell, negative pops", icell," T(K)=", atmos%T(icell), "ne=", atmos%ne(icell)
+!          write(*,*) metal%ID, j, metal%n(j,icell), i, metal%n(i,icell)
+!          write(*,*) "nstar=", metal%n(:,icell)
+!          write(*,*) " cycling"
+!          deallocate(gijk, twohnu3_c2, Vij)
+!          cycle
+!         end if
+!         gijk(:) = 0d0
+!         
+!     else
+!       if (metal%n(i,icell) < 0) then
+!         !-> Futur deprecation of this test, psoitivity is tested when populations are set
+!         write(*,*) metal%ID, icell, i, " negative pops =", metal%n(i,icell)
+!         deallocate(gijk, twohnu3_c2, Vij)
+!         write(*,*) " cycling"
+!         cycle        
+!       endif
+!         gijk(:) = metal%nstar(i,icell)/metal%nstar(j,icell) *  &
+!      			dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))
+!     
+!     end if
+! 
+! 
+! !not storeopac here now
+!       NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
+!        				Vij(:) * (metal%n(i,icell)-gijk(:)*metal%n(j,icell))
+! 
+!       NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
+!       				twohnu3_c2(:) * gijk(:) * Vij(:)*metal%n(j,icell)
+!   
+! 
+!      deallocate(gijk, twohnu3_c2, Vij)
+!     end do ! loop over Ncont
+!   end do !loop over metals
+! 
+!  RETURN
+!  END SUBROUTINE Metal_bf
 
  !kept in memory, profile are computed at the centre of the cell for a 0 velocity
  !interpolation turns the CMF profile to the observer's frame profile
@@ -602,7 +624,9 @@ MODULE metal
 
      !correction factor for negative opacity
      kappa_neg = 1.0 !inner wavelength loop not needed
-     if (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell) < 0.) kappa_neg = 0.
+     !if (atom%lines(kr)%neg_opac) cycle
+     if (atom%lines(kr)%negative_opacity(icell)) cycle
+     !if (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell) < 0.) kappa_neg = 0.
      
 
      CALL Profile(atom%lines(kr),icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
@@ -616,11 +640,17 @@ MODULE metal
 !      write(*,*) maxval(atom%lines(kr)%phi_loc(:,id)), 1./(atom%vbroad(icell)*SQRTPI), atom%lines(kr)%twohnu3_c2, atom%lines(kr)%Bij
 !      write(*,*) atom%lines(kr)%j, atom%lines(kr)%i, atom%n(j,icell), atom%n(i,icell), atom%vbroad(icell)
 
+!      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
+!      	 kappa_neg * hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%phi_loc(:,id) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell))
+     	 
      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-     	 kappa_neg * hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%phi_loc(:,id) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell))
+     	 kappa_neg * hc_fourPI * atom%lines(kr)%phi_loc(:,id) * ( atom%lines(kr)%Bij*atom%n(i,icell)-atom%lines(kr)%Bji*atom%n(j,icell) )
      
+!      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
+!      	kappa_neg * atom%lines(kr)%twohnu3_c2 * atom%lines(kr)%gij * hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%phi_loc(:,id) * atom%n(j,icell)
      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-     	kappa_neg * atom%lines(kr)%twohnu3_c2 * atom%lines(kr)%gij * hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%phi_loc(:,id) * atom%n(j,icell)
+     	kappa_neg * hc_fourPI * atom%lines(kr)%Aji * atom%lines(kr)%phi_loc(:,id) * atom%n(j,icell)
+
 !      write(*,*) "line ", j,i, " opac = ",hc_fourPI * atom%lines(kr)%Bij /(atom%vbroad(icell)*SQRTPI) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell))
 !      write(*,*) "line ", j,i, " eta = ",atom%lines(kr)%twohnu3_c2 * atom%lines(kr)%gij * hc_fourPI * atom%lines(kr)%Bij /(atom%vbroad(icell)*SQRTPI) * atom%n(j,icell)
 !      write(*,*) "line ", j,i, " tauloc = ",hc_fourPI * atom%lines(kr)%Bij /(atom%vbroad(icell)*SQRTPI) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell)) * l
@@ -667,105 +697,105 @@ MODULE metal
 
  RETURN
  END SUBROUTINE Metal_bb_new
-
-!->futur deprec
- SUBROUTINE Metal_bb (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
-  ! Computes the emissivity and extinction of passive lines.
-  ! i.e., Atoms with detailed atomic structures read but
-  ! not treated in NLTE.
-  ! Because damping is wavelength independent and depend only on
-  ! the grid (cell) points, here, if line%damping_initialized
-  ! do not CALL Damping()
-  ! the x,y,z and u,v,w quantities are used to compute the projected velocities at the
-  ! cell point we are computing the opacities.
-  ! Chip is only computed in Stokes transfer and contains the magneto-optical elements.
-  integer 													:: kr, m, i, j, nk, kc
-  integer, intent(in) 							            :: icell, id
-  real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
-                                				               x1,y1,z1, &      ! velocity field and magnetic field
-                                				               l !physical length of the cell
-  real(kind=dp) 											:: twohnu3_c2, gij
-  integer													:: Nred, Nblue, Nvspace, nv
-  type (AtomicLine)										    :: line
-  type (AtomType)											:: atom
-  integer, parameter 										:: NvspaceMax = 1
-  real(kind=dp), dimension(NvspaceMax)						:: Omegav
-
-write(*,*) "Omegav not fill"
-stop
-
-  do m=1,atmos%Npassiveatoms
-   atom = atmos%PassiveAtoms(m)%ptr_atom
-     do kc=1,atom%Ntr_line
-    !do kr=1,atom%Nline ! for this atom go over all transitions
-                       ! bound-bound
-     kr = atom%at(kc)%ik
-     line = atom%lines(kr)
-     i = line%i; j = line%j
-     Nred = line%Nred; Nblue = line%Nblue
-     !!if (.not.atom%at(kr)%lcontrib_to_opac) CYCLE !avoid lines not defined on the grid
-
-
-     !Still compute emission even if low, but neglect stm ???
-     !if ((atom%n(j,icell) <tiny_dp).or.(atom%n(i,icell) <tiny_dp)) then !no transition
-       !!but show the message only if pops is negative
-!-> Futur deprecation of this test, psoitivity is tested when populations are set
-      if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
-        write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
-        write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
-        write(*,*) "skipping this level"
-        write(*,*) "nstar=", atom%nstar(:,icell)
-        write(*,*) "n = ", atom%n(:,icell)
-        CYCLE
-      endif
-      !CYCLE
-     !end if
-
-     !allocate(Vij(line%Nlambda)); Vij = 0d0
-     gij = line%Bji / line%Bij ! = gi/gj
-     twohnu3_c2 = line%Aji / line%Bji
-     
-     !before it was afyer allocate phi
-     if (line%voigt) CALL Damping(icell, atom, kr, line%adamp)
-
-     CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
-
-
-     !write(*,*) allocated(phiZ), allocated(psiZ), line%polarizable, PRT_SOLUTION
-
-     !Sum up all contributions for this line with the other
-     !Vij(:) = hc_fourPI * line%Bij * phi(:)!already normalized / (SQRTPI * VBROAD_atom(icell,atom))
-      
-     NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
-     		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + hc_fourPI * line%Bij * line%phi_loc(:,id) * (atom%n(i,icell)-gij*atom%n(j,icell))
-
-     NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = &
-     		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + twohnu3_c2 * gij * hc_fourPI * line%Bij * line%phi_loc(:,id) * atom%n(j,icell)
-
-!          write(*,*) "check"
-!          write(*,*) gij,  atom%g(i)/atom%g(j)
-!          write(*,*) atom%g(i)/atom%g(j)*atom%n(j,icell)/atom%n(i,icell), exp(-hc/KBOLTZMANN/atmos%T(icell)/NM_TO_M/line%lambda0)
-!          stop
-
-     if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
-       do nk = 1, 3
-         !magneto-optical
-         NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
-           hc_fourPI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * line%psi(nk,:,1)
-         !dichroism
-         NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) + &
-           hc_fourPI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * line%psi(nk,:,1)
-         !emissivity
-         NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) + &
-          twohnu3_c2 * gij * hc_fourPI * line%Bij * atom%n(j,icell) * line%phiZ(nk,:,1)
-       end do 
-     end if
-     
-    end do !end loop on lines for this atom
-  end do !end loop over Natom
-
- RETURN
- END SUBROUTINE Metal_bb
+! 
+! !->futur deprec
+!  SUBROUTINE Metal_bb (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
+!   ! Computes the emissivity and extinction of passive lines.
+!   ! i.e., Atoms with detailed atomic structures read but
+!   ! not treated in NLTE.
+!   ! Because damping is wavelength independent and depend only on
+!   ! the grid (cell) points, here, if line%damping_initialized
+!   ! do not CALL Damping()
+!   ! the x,y,z and u,v,w quantities are used to compute the projected velocities at the
+!   ! cell point we are computing the opacities.
+!   ! Chip is only computed in Stokes transfer and contains the magneto-optical elements.
+!   integer 													:: kr, m, i, j, nk, kc
+!   integer, intent(in) 							            :: icell, id
+!   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
+!                                 				               x1,y1,z1, &      ! velocity field and magnetic field
+!                                 				               l !physical length of the cell
+!   real(kind=dp) 											:: twohnu3_c2, gij
+!   integer													:: Nred, Nblue, Nvspace, nv
+!   type (AtomicLine)										    :: line
+!   type (AtomType)											:: atom
+!   integer, parameter 										:: NvspaceMax = 1
+!   real(kind=dp), dimension(NvspaceMax)						:: Omegav
+! 
+! write(*,*) "Omegav not fill"
+! stop
+! 
+!   do m=1,atmos%Npassiveatoms
+!    atom = atmos%PassiveAtoms(m)%ptr_atom
+!      do kc=1,atom%Ntr_line
+!     !do kr=1,atom%Nline ! for this atom go over all transitions
+!                        ! bound-bound
+!      kr = atom%at(kc)%ik
+!      line = atom%lines(kr)
+!      i = line%i; j = line%j
+!      Nred = line%Nred; Nblue = line%Nblue
+!      !!if (.not.atom%at(kr)%lcontrib_to_opac) CYCLE !avoid lines not defined on the grid
+! 
+! 
+!      !Still compute emission even if low, but neglect stm ???
+!      !if ((atom%n(j,icell) <tiny_dp).or.(atom%n(i,icell) <tiny_dp)) then !no transition
+!        !!but show the message only if pops is negative
+! !-> Futur deprecation of this test, psoitivity is tested when populations are set
+!       if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
+!         write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
+!         write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
+!         write(*,*) "skipping this level"
+!         write(*,*) "nstar=", atom%nstar(:,icell)
+!         write(*,*) "n = ", atom%n(:,icell)
+!         CYCLE
+!       endif
+!       !CYCLE
+!      !end if
+! 
+!      !allocate(Vij(line%Nlambda)); Vij = 0d0
+!      gij = line%Bji / line%Bij ! = gi/gj
+!      twohnu3_c2 = line%Aji / line%Bji
+!      
+!      !before it was afyer allocate phi
+!      if (line%voigt) CALL Damping(icell, atom, kr, line%adamp)
+! 
+!      CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
+! 
+! 
+!      !write(*,*) allocated(phiZ), allocated(psiZ), line%polarizable, PRT_SOLUTION
+! 
+!      !Sum up all contributions for this line with the other
+!      !Vij(:) = hc_fourPI * line%Bij * phi(:)!already normalized / (SQRTPI * VBROAD_atom(icell,atom))
+!       
+!      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
+!      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + hc_fourPI * line%Bij * line%phi_loc(:,id) * (atom%n(i,icell)-gij*atom%n(j,icell))
+! 
+!      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = &
+!      		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + twohnu3_c2 * gij * hc_fourPI * line%Bij * line%phi_loc(:,id) * atom%n(j,icell)
+! 
+! !          write(*,*) "check"
+! !          write(*,*) gij,  atom%g(i)/atom%g(j)
+! !          write(*,*) atom%g(i)/atom%g(j)*atom%n(j,icell)/atom%n(i,icell), exp(-hc/KBOLTZMANN/atmos%T(icell)/NM_TO_M/line%lambda0)
+! !          stop
+! 
+!      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
+!        do nk = 1, 3
+!          !magneto-optical
+!          NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
+!            hc_fourPI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * line%psi(nk,:,1)
+!          !dichroism
+!          NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) + &
+!            hc_fourPI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * line%psi(nk,:,1)
+!          !emissivity
+!          NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) + &
+!           twohnu3_c2 * gij * hc_fourPI * line%Bij * atom%n(j,icell) * line%phiZ(nk,:,1)
+!        end do 
+!      end if
+!      
+!     end do !end loop on lines for this atom
+!   end do !end loop over Natom
+! 
+!  RETURN
+!  END SUBROUTINE Metal_bb
 
  
  SUBROUTINE compute_opacities()
@@ -804,40 +834,44 @@ stop
 
    chi = 0d0
    eta = 0d0
-   NLTEspec%AtomOpac%Kc(:,icell,:) = 0.0_dp
+   NLTEspec%AtomOpac%Kc(:,icell) = 0.0_dp
    NLTEspec%AtomOpac%jc(:,icell) = 0.0_dp
+   NLTEspec%AtomOpac%sca_c(:,icell) = 0.0_dp
    
    CALL Hminus_bf(icell, chi,eta)
-   NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + chi
+   NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + chi
    NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + eta
 
    CALL Hminus_ff(icell, chi)
-   NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + chi
+   NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + chi
    NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + chi * Bpnu
   
    CALL Hydrogen_ff(icell, chi)
-   NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + chi
+   NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + chi
    NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + chi * Bpnu
  
 
-   if (associated(Helium)) then
-    CALL atom_ff_transitions(Helium, icell, chi)
-    NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + chi
-    NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + chi * Bpnu
-   endif
+!    if (associated(Helium)) then
+!     CALL atom_ff_transitions(Helium, icell, chi)
+!     NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + chi
+!     NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + chi * Bpnu
+!    endif
 
    if (atmos%Npassiveatoms > 0) CALL Metal_bf_new(icell)
    
 
-   NLTEspec%AtomOpac%Kc(:,icell,2) = Thomson(icell)
- 
+   NLTEspec%AtomOpac%sca_c(:,icell) = Thomson(icell)
+    
    CALL HI_Rayleigh(1, icell)
-   !!CALL Rayleigh(1, icell, hydrogen)
-   if (associated(Helium)) CALL HeI_Rayleigh(1, icell)
+   !CALL Rayleigh(1, icell, hydrogen)
+   if (associated(Helium)) then
+    write(*,*) " Rayleigh on neutral helium"
+    CALL HeI_Rayleigh(1, icell)
+   endif
    
    !Total opac once source functions are known
-   NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + &
-                                     NLTEspec%AtomOpac%Kc(:,icell,2)
+   NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + &
+                                     NLTEspec%AtomOpac%sca_c(:,icell)
 
 
  RETURN
@@ -861,81 +895,81 @@ stop
  
 
 !futur deprecation
- SUBROUTINE Background(id,icell,x,y,z,x1,y1,z1,u,v,w,l)
-  integer, intent(in) :: icell, id
-  real(kind=dp), intent(in) :: x, y, z, u, v, w, &
-                                  x1, y1, z1, l!only relevant for b-b when vector fields are present
-  real(kind=dp), dimension(NLTEspec%Nwaves) :: chi, eta, Bpnu, chip!, sca
-
-  !test already done
-  !if (atmos%icompute_atomRT(icell)<1) RETURN !nH <= tiny_nH or T <= tiny_T == empty cell
-  ! all opac are zero, return.
-
-!   if ((atmos%nHtot(icell)==0d0).or.(atmos%T(icell)==0d0)) &
-!     RETURN ! stoping for this cell,
-            ! it is free of (significant) gas
-            ! so no emission/absorption. Coefficients set to 0d0 for all wavelengths
-  !Do not forget that it is still possible however, that lcompute_atomRT is TRUE,
-  !but that the temperature is too low to have all the levels non zero.
-  !The compute_atomRT ensures that at least one level has non-zero populations,
-  !to avoid division by zero.
-
-   CALL Bplanck(atmos%T(icell), Bpnu)
-
-   chi = 0d0
-   eta = 0d0
-   chip = 0d0
-
-
-   NLTEspec%AtomOpac%sca_c(:,id) = atmos%ne(icell) * sigma_e
-   CALL HI_Rayleigh(id, icell)
-   !CALL Rayleigh(id, icell, Hydrogen)
-   !if (associated(Helium)) CALL Rayleigh(id, icell, Helium)
-
-
-   NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%sca_c(:,id)
-
-   CALL Hydrogen_ff(icell, chi)
-   NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
-   NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + chi * Bpnu
-
-   CALL Hminus_bf(icell, chi, eta)
-   NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
-   NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + eta
-
-   CALL Hminus_ff(icell, chi)
-   NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
-   NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + chi * Bpnu
-
-    !I treat H bound-free in metal_bf. I'll change the name of the subroutine later
-!    if (.not.Hydrogen%active) then !passive bound-free !do not enter if active !!!
-!     CALL Hydrogen_bf(icell, chi, eta)
-!     NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
-!     NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + eta
+!  SUBROUTINE Background(id,icell,x,y,z,x1,y1,z1,u,v,w,l)
+!   integer, intent(in) :: icell, id
+!   real(kind=dp), intent(in) :: x, y, z, u, v, w, &
+!                                   x1, y1, z1, l!only relevant for b-b when vector fields are present
+!   real(kind=dp), dimension(NLTEspec%Nwaves) :: chi, eta, Bpnu, chip!, sca
+! 
+!   !test already done
+!   !if (atmos%icompute_atomRT(icell)<1) RETURN !nH <= tiny_nH or T <= tiny_T == empty cell
+!   ! all opac are zero, return.
+! 
+! !   if ((atmos%nHtot(icell)==0d0).or.(atmos%T(icell)==0d0)) &
+! !     RETURN ! stoping for this cell,
+!             ! it is free of (significant) gas
+!             ! so no emission/absorption. Coefficients set to 0d0 for all wavelengths
+!   !Do not forget that it is still possible however, that lcompute_atomRT is TRUE,
+!   !but that the temperature is too low to have all the levels non zero.
+!   !The compute_atomRT ensures that at least one level has non-zero populations,
+!   !to avoid division by zero.
+! 
+!    CALL Bplanck(atmos%T(icell), Bpnu)
+! 
+!    chi = 0d0
+!    eta = 0d0
+!    chip = 0d0
+! 
+! 
+!    NLTEspec%AtomOpac%sca_c(:,id) = atmos%ne(icell) * sigma_e
+!    CALL HI_Rayleigh(id, icell)
+!    !CALL Rayleigh(id, icell, Hydrogen)
+!    !if (associated(Helium)) CALL Rayleigh(id, icell, Helium)
+! 
+! 
+!    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%sca_c(:,id)
+! 
+!    CALL Hydrogen_ff(icell, chi)
+!    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
+!    NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + chi * Bpnu
+! 
+!    CALL Hminus_bf(icell, chi, eta)
+!    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
+!    NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + eta
+! 
+!    CALL Hminus_ff(icell, chi)
+!    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
+!    NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + chi * Bpnu
+! 
+!     !I treat H bound-free in metal_bf. I'll change the name of the subroutine later
+! !    if (.not.Hydrogen%active) then !passive bound-free !do not enter if active !!!
+! !     CALL Hydrogen_bf(icell, chi, eta)
+! !     NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
+! !     NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + eta
+! !    end if
+!    
+!    if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
+! 
+!    						
+!    !--> at this point, eta_p and chi_p are 0 because of initAtomOpac(id), therefore
+!    !after metal_bf they only points to continuum bound-free.
+!     CALL Metal_bf(id, icell) !Return if Npassive=1 and PassiveAtoms(1)==" H"
+! !!     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
+! !!     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
+! 
+!    !keep pure continuum opacities now
+!    if (MINVAL(NLTEspec%AtomOpac%eta_p(:,id))<0 .or. &
+!     MINVAL(NLTEspec%AtomOpac%chi_p(:,id)) < 0) then
+!     write(*,*) "Beware, negative contopac"
 !    end if
-   
-   if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
-
-   						
-   !--> at this point, eta_p and chi_p are 0 because of initAtomOpac(id), therefore
-   !after metal_bf they only points to continuum bound-free.
-    CALL Metal_bf(id, icell) !Return if Npassive=1 and PassiveAtoms(1)==" H"
-!!     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
-!!     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
-
-   !keep pure continuum opacities now
-   if (MINVAL(NLTEspec%AtomOpac%eta_p(:,id))<0 .or. &
-    MINVAL(NLTEspec%AtomOpac%chi_p(:,id)) < 0) then
-    write(*,*) "Beware, negative contopac"
-   end if
-   NLTEspec%AtomOpac%eta_c(:,id) = NLTEspec%AtomOpac%eta_p(:,id)
-   NLTEspec%AtomOpac%chi_c(:,id) = NLTEspec%AtomOpac%chi_p(:,id)
-
-   ! we already RETURNs if no passive transitions (H included)
-   CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
-
-
- RETURN
- END SUBROUTINE Background
+!    NLTEspec%AtomOpac%eta_c(:,id) = NLTEspec%AtomOpac%eta_p(:,id)
+!    NLTEspec%AtomOpac%chi_c(:,id) = NLTEspec%AtomOpac%chi_p(:,id)
+! 
+!    ! we already RETURNs if no passive transitions (H included)
+!    CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
+! 
+! 
+!  RETURN
+!  END SUBROUTINE Background
 
 END MODULE metal

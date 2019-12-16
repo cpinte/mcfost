@@ -1132,10 +1132,10 @@ MODULE atmos_type
    real, parameter :: Lextent = 1.1!1.05
    real(kind=dp), dimension(n_cells) :: rr, zz, pp, V2
    real(kind=dp), dimension(:), allocatable :: B2
-   logical :: is_not_dark, xit
+   logical :: is_not_dark!, xit
    real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic, Vmod, Vinf
 
-   xit = .true.
+   !xit = .true.
    lmagnetoaccr = .false.
    lspherical_velocity = .false.
    lVoronoi = .false.
@@ -1148,7 +1148,8 @@ MODULE atmos_type
     allocate(B2(n_cells)) !only to read either Bz or Btheta depending on velocity law
    endif
 
-   rho_to_nH = 1d3 /masseH /atmos%avgWeight !density kg/m3 -> nHtot m^-3
+write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but check for other"
+   rho_to_nH = 1d3 /masseH / 1.79!/atmos%avgWeight !density kg/m3 -> nHtot m^-3
    !rho_to_nH = 1d3/masseH * atmos%Elements(1)%ptr_elem%massf 
 
    write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
@@ -1216,13 +1217,20 @@ MODULE atmos_type
      write(*,*) "Magnetic atmos not ready yet"
      stop
      CALL getnextline(1, "#", FormatLine, inputline, Nread)
+!      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), &
+!          atmos%vR(icell), V2(icell), atmos%Vphi(icell), &
+!          atmos%BR(icell), B2(icell), atmos%Bphi(icell), atmos%icompute_atomRT(icell)
      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), &
-         atmos%vR(icell), V2(icell), atmos%Vphi(icell), &
+         atmos%vR(icell), V2(icell), atmos%Vphi(icell), atmos%vturb(icell), &
          atmos%BR(icell), B2(icell), atmos%Bphi(icell), atmos%icompute_atomRT(icell)
     else
      CALL getnextLine(1, "#", FormatLine, inputline, Nread)
      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), &
-         atmos%vR(icell), V2(icell), atmos%vphi(icell), atmos%icompute_atomRT(icell)
+         atmos%vR(icell), V2(icell), atmos%vphi(icell), atmos%vturb(icell), atmos%icompute_atomRT(icell)
+         
+!      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), &
+!          atmos%vR(icell), V2(icell), atmos%vphi(icell), atmos%icompute_atomRT(icell)
+
     end if
      end do
     end do
@@ -1357,22 +1365,22 @@ MODULE atmos_type
 
    end if
    
-   if (xit .and. lspherical_velocity) then
-     Vinf = maxval(atmos%vr)!900d3 !m/s
-     !law here                                                        = Vr
-     !atmos%vturb(:) = 1d3 * ( 10. + (100.-10.) * atmos%vr(:) / Vinf   ) !m/s
-     atmos%vturb(:) = 10d3 !km/s
-   endif 
+!    if (xit .and. lspherical_velocity) then
+!      Vinf = maxval(atmos%vr)!900d3 !m/s
+!      !law here                                                        = Vr
+!      !atmos%vturb(:) = 1d3 * ( 10. + (100.-10.) * atmos%vr(:) / Vinf   ) !m/s
+!      atmos%vturb(:) = 10d3 !km/s
+!    endif 
 
    
    write(*,*) "Typical line extent due to V fields (km/s):"
    atmos%v_char = Lextent * atmos%v_char
    write(*,*) atmos%v_char/1d3
    
-   if (xit) then
+   !if (xit) then
    write(*,*) "Maximum/minimum turbulent velocity (km/s):"
    write(*,*) maxval(atmos%vturb)/1d3, minval(atmos%vturb, mask=atmos%icompute_atomRT>0)/1d3
-   endif
+   !endif
 
    write(*,*) "Maximum/minimum Temperature in the model (K):"
    write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)

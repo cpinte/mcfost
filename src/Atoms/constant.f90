@@ -12,31 +12,31 @@ MODULE constant
 
   ! --- Physical constants ---
 
-  double precision, parameter ::  CLIGHT=2.99792458d8 ! Speed of light [m/s]
-  double precision, parameter ::  HPLANCK=6.6260755d-34 !Planck's constant [Js]
-  double precision, parameter ::  KBOLTZMANN=1.380658d-23  !Boltzman's constant [J/K]
-  double precision, parameter ::  AMU=1.6605402d-27 !Atomic mass unit [kg]
-  double precision, parameter ::  M_ELECTRON=9.1093897d-31 !Electron mass [kg]
-  double precision, parameter ::  Q_ELECTRON=1.60217733d-19  !Electron charge [C]
-  double precision, parameter ::  EPSILON_0=8.854187817d-12  !Vacuum permittivity [F/m]
-  !double precision, parameter ::  MU_0=1.2566370614d-6  !Magnetic induct. of vac.
-  double precision, parameter ::  RBOHR=5.29177349d-11  !Bohr radius [m]
-  double precision, parameter ::  E_RYDBERG=2.1798741d-18 !Ion. pot. Hydrogen [J]
-  double precision, parameter ::  EV =1.60217733d-19 ! One electronVolt [J]
-  double precision, parameter ::  THETA0 =5.03974756d+3!log10(e) * eV/k [K^-1]
-  double precision, parameter ::  ABARH=7.42d-41 !polarizabilty of Hydrogen in [Fm^2]
+  real(kind=dp), parameter ::  CLIGHT=2.99792458d8 ! Speed of light [m/s]
+  real(kind=dp), parameter ::  HPLANCK=6.6260755d-34 !Planck's constant [Js]
+  real(kind=dp), parameter ::  KBOLTZMANN=1.380658d-23  !Boltzman's constant [J/K]
+  real(kind=dp), parameter ::  AMU=1.6605402d-27 !Atomic mass unit [kg]
+  real(kind=dp), parameter ::  M_ELECTRON=9.1093897d-31 !Electron mass [kg]
+  real(kind=dp), parameter ::  Q_ELECTRON=1.60217733d-19  !Electron charge [C]
+  real(kind=dp), parameter ::  EPSILON_0=8.854187817d-12  !Vacuum permittivity [F/m]
+  !real(kind=dp), parameter ::  MU_0=1.2566370614d-6  !Magnetic induct. of vac.
+  real(kind=dp), parameter ::  RBOHR=5.29177349d-11  !Bohr radius [m]
+  real(kind=dp), parameter ::  E_RYDBERG=2.1798741d-18 !Ion. pot. Hydrogen [J]
+  real(kind=dp), parameter ::  EV =1.60217733d-19 ! One electronVolt [J]
+  real(kind=dp), parameter ::  THETA0 =5.03974756d+3!log10(e) * eV/k [K^-1]
+  real(kind=dp), parameter ::  ABARH=7.42d-41 !polarizabilty of Hydrogen in [Fm^2]
   real(kind=dp), parameter    ::  pia0squarex2 = PI * 2d0 * RBOHR**2 !constant for collision Cross-sections
 
  ! --- Unit conversions ---
 
-  double precision, parameter ::  NM_TO_M =1.0d-9
-  double precision, parameter ::  CM_TO_M=1.0d-02
-  !double precision, parameter ::  KM_TO_M =1.0d+03
-  double precision, parameter ::  ERG_TO_JOULE=1.0d-07
-  double precision, parameter ::  JOULE_TO_EV=1/EV!6.241506363094028e+18
-  double precision, parameter ::  JOULE_TO_CM1=5.040963080525957d+22
-  double precision, parameter ::  G_TO_KG=1.0d-03
-  double precision, parameter ::  MICRON_TO_NM=1.0d+03
+  real(kind=dp), parameter ::  NM_TO_M =1.0d-9
+  real(kind=dp), parameter ::  CM_TO_M=1.0d-02
+  !real(kind=dp), parameter ::  KM_TO_M =1.0d+03
+  real(kind=dp), parameter ::  ERG_TO_JOULE=1.0d-07
+  real(kind=dp), parameter ::  JOULE_TO_EV=1/EV!6.241506363094028e+18
+  real(kind=dp), parameter ::  JOULE_TO_CM1=5.040963080525957d+22
+  real(kind=dp), parameter ::  G_TO_KG=1.0d-03
+  real(kind=dp), parameter ::  MICRON_TO_NM=1.0d+03
 
   
   ! ------- Useful RT constants --------- !
@@ -64,8 +64,8 @@ MODULE constant
    !sigma0_H_ff = K0
           
  ! --- Mathematical constants ---
-  !double precision, parameter ::  PI  =3.14159265358979
-  double precision, parameter ::  SQRTPI=dsqrt(pi)!1.77245385090551
+  !real(kind=dp), parameter ::  PI  =3.14159265358979
+  real(kind=dp), parameter ::  SQRTPI=dsqrt(pi)!1.77245385090551
 
 
   ! --- 1/(2sqrt(2)), needed for anisotropy of radiation ---
@@ -73,7 +73,7 @@ MODULE constant
   real(8), parameter ::  TWOSQRTTWO = 0.35355339059327
 
   !there is an error in LL04
-  double precision, parameter ::  LARMOR = (Q_ELECTRON / (4.0*PI*M_ELECTRON)) !s^-1 / T
+  real(kind=dp), parameter ::  LARMOR = (Q_ELECTRON / (4.0*PI*M_ELECTRON)) !s^-1 / T
   !LamB = nuL/nu0 * lambda0 = nuL/(c/lambda0) * lambda0 = nuL/c * lambda0**2
   !lamD = lambda0 * vbroad/c --> vB = lamB/lamD = nuL/c * lambda0**2 * c / lambda0 / vbroad
   !vB = nuL * lambda0 / vbroad in T^-1

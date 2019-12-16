@@ -33,10 +33,11 @@ MODULE spectrum_type
    ! and NLTE is the same variable
    !passive opacities
    real(kind=dp), allocatable, dimension(:,:)   :: eta_p, chi_p
-   real(kind=dp), allocatable, dimension(:,:)   :: eta_c, chi_c, sca_c
+   real(kind=dp), allocatable, dimension(:,:)   :: eta_c, chi_c!, sca_c
    real(kind=dp), allocatable, dimension(:,:,:)   :: rho_p, chiQUV_p, etaQUV_p
    real(kind=dp), allocatable, dimension(:,:)   :: jc, jc_nlte, Kc_nlte
-   real(kind=dp), allocatable, dimension(:,:,:) :: Kc
+   !real(kind=dp), allocatable, dimension(:,:,:) :: Kc
+   real(kind=dp), allocatable, dimension(:,:) :: Kc, sca_c
    !!logical, dimension(:), allocatable :: initialized
    									     !set to .true. for each cell, when iray=1.
    									     !.false. otherwise.
@@ -262,6 +263,7 @@ MODULE spectrum_type
 
     NLTEspec%J(:,:) = 0d0
     NLTEspec%Jc(:,:) = 0d0
+    !use better interpolation ??
     do icell=1, atmos%Nspace
      if (NLTEspec%atmos%icompute_atomRT(icell)>0) then
        NLTEspec%J(:,icell) = Linear_1D(Nwaves_old, old_grid,Jnu,NLTEspec%Nwaves,NLTEspec%lambda)
@@ -274,6 +276,40 @@ MODULE spectrum_type
    
   RETURN
   END SUBROUTINE initSpectrumImage
+  
+  !building
+  SUBROUTINE initSpectrum_jnu(Nlambda,l0,l1)
+  ! -------------------------------------------------------------------- !
+   ! Allocate a special wavelength grid for Jnu calculation
+  ! -------------------------------------------------------------------- !
+   real(kind=dp), dimension(NLTEspec%Nwaves) :: old_grid
+   integer, dimension(1) :: Nlam_R
+   integer, intent(in) :: Nlambda
+   real, intent(in) :: l0, l1
+   integer :: la
+   
+   old_grid = NLTEspec%lambda
+   write(*,*) " -> Defining a wavelength grid for Jnu.."
+   CALL freeSpectrum() !first free waves arrays
+   NLTEspec%atmos => atmos
+
+   allocate(NLTEspec%lambda(Nlambda))
+   NLTEspec%lambda(1) = l0
+   do la=2, Nlambda
+   	NLTEspec%lambda(la) = NLTEspec%lambda(la-1) + (l1-l0)/real(Nlambda-1)
+   enddo
+   
+   Nlam_R(1) = Nlambda!Only one region with Nlambda points
+   NLTEspec%Nwaves = size(NLTEspec%lambda)
+
+   CALL adjust_wavelength_grid(old_grid, NLTEspec%lambda, Nlam_R, NLTEspec%atmos%Atoms)
+ 
+   CALL allocSpectrum(.false.)
+   							
+   write(*,*) " -> done.."
+
+  RETURN
+  END SUBROUTINE initSpectrum_jnu
   
   SUBROUTINE reallocate_rays_arrays(newNray)
    integer, intent(in) :: newNray
@@ -341,17 +377,18 @@ MODULE spectrum_type
    !Now opacities
    if (lstore_opac) then !keep continuum LTE opacities in memory
      !sca_c = Kc(:,:,2), chi_c = Kc(:,:,1), eta_c = jc
-     allocate(NLTEspec%AtomOpac%Kc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace,2), &
-       NLTEspec%AtomOpac%jc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))
+     allocate(NLTEspec%AtomOpac%Kc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace), &
+       NLTEspec%AtomOpac%jc(NLTEspec%Nwaves,NLTEspec%atmos%Nspace),NLTEspec%AtomOpac%sca_c(NLTEspec%Nwaves,NLTEspec%atmos%Nspace))
      NLTEspec%AtomOpac%Kc = 0d0
      NLTEspec%AtomOpac%jc = 0d0
+     NLTEspec%AtomOpac%sca_c = 0.0_dp
    else
     allocate(NLTEspec%AtomOpac%eta_c(NLTEspec%Nwaves ,NLTEspec%NPROC))
     allocate(NLTEspec%AtomOpac%chi_c(NLTEspec%Nwaves ,NLTEspec%NPROC))
-    allocate(NLTEspec%AtomOpac%sca_c(NLTEspec%Nwaves,NLTEspec%NPROC))
+    !allocate(NLTEspec%AtomOpac%sca_c(NLTEspec%Nwaves,NLTEspec%NPROC))
     NLTEspec%AtomOpac%chi_c = 0.
     NLTEspec%AtomOpac%eta_c = 0.
-    NLTEspec%AtomOpac%sca_c = 0.
+    !NLTEspec%AtomOpac%sca_c = 0.
    end if
 
    !allocate(NLTEspec%AtomOpac%chic_nlte(NLTEspec%Nwaves, NLTEspec%NPROC),&
@@ -502,11 +539,11 @@ MODULE spectrum_type
    deallocate(NLTEspec%AtomOpac%chi_p)
    !deallocate(NLTEspec%AtomOpac%rho_p)
    if (lstore_opac) then !keep continuum LTE opacities in memory
-     deallocate(NLTEspec%AtomOpac%Kc,  NLTEspec%AtomOpac%jc)
+     deallocate(NLTEspec%AtomOpac%Kc,  NLTEspec%AtomOpac%jc, NLTEspec%AtomOpac%sca_c)
    else !they are not allocated if we store background continua on ram
     deallocate(NLTEspec%AtomOpac%eta_c)
     deallocate(NLTEspec%AtomOpac%chi_c)
-    deallocate(NLTEspec%AtomOpac%sca_c)
+    !deallocate(NLTEspec%AtomOpac%sca_c)
    end if
    !elsewhere
    !if (NLTEspec%Nact > 0) deallocate(NLTEspec%AtomOpac%Kc_nlte, NLTEspec%AtomOpac%jc_nlte)
@@ -540,7 +577,7 @@ MODULE spectrum_type
     if (.not.lstore_opac) then !future remove
       NLTEspec%AtomOpac%chi_c(:,id) = 0d0
       NLTEspec%AtomOpac%eta_c(:,id) = 0d0
-      NLTEspec%AtomOpac%sca_c(:,id) = 0d0
+      !NLTEspec%AtomOpac%sca_c(:,id) = 0d0
     end if !else thay are not allocated
     NLTEspec%AtomOpac%chi_p(:,id) = 0d0
     NLTEspec%AtomOpac%eta_p(:,id) = 0d0

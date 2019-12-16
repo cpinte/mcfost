@@ -22,7 +22,7 @@ MODULE PROFILES
 
  CONTAINS
  
-
+!if projection done before, we do not need x,y,z,l ect
 
  SUBROUTINE Iprofile (line,icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)

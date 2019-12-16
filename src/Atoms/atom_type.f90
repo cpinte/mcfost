@@ -34,6 +34,7 @@ MODULE atom_type
 
   TYPE AtomicLine
    logical           :: symmetric, polarizable, neg_opac
+   logical, dimension(:), allocatable :: negative_opacity
    logical           :: Voigt=.true., PFR=.false.,&
       damping_initialized=.false. !true if we store the damping on the whole grid for all lines.
    character(len=17) :: vdWaals
@@ -74,6 +75,7 @@ MODULE atom_type
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicContinuum
    logical :: hydrogenic, neg_opac
+   logical, dimension(:), allocatable :: negative_opacity
    integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
    real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin !continuum maximum frequency > frequency photoionisation
    real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2, CoolRates_ij, w_lam

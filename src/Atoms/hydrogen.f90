@@ -39,20 +39,6 @@ MODULE hydrogen_opacities
 
  RETURN
  END FUNCTION Gaunt_bf
- 
- !not tested yet
- ELEMENTAL FUNCTION Gaunt_bf_2(lambda, n_eff)
-
-  real(kind=dp), intent(in) :: n_eff,  lambda 
-  real(kind=dp) :: Gaunt_bf_2, u
-  
-  u = lambda*NM_TO_M/HPLANCK/CLIGHT * E_RYDBERG
-  
-  Gaunt_bf_2 = 1d0 - 0.3456/u**3 * (u/n_eff**2 - 0.5)
-             
-
- RETURN
- END FUNCTION Gaunt_bf_2
   
 
  Elemental FUNCTION Gaunt_ff(lambda, Z, T)
@@ -95,8 +81,9 @@ MODULE hydrogen_opacities
     g_bf = Gaunt_bf(u, n_eff)
     g_bf0 = Gaunt_bf(u0, n_eff)
     
-    alpha = cont%alpha0 * (lambda/cont%lambda0)**3  * g_bf / g_bf0 
- 	! = alpha = 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLIGHT)**3
+    !There is a factor n_eff/Z**2 absorbed in alpha0 beware
+    !alpha = cont%alpha0 * (lambda/cont%lambda0)**3  * g_bf / g_bf0 
+ 	alpha = 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLIGHT)**3
 
  RETURN
  END FUNCTION H_bf_Xsection!_lambda
@@ -177,10 +164,12 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
    stim = 1. - dexp(-hc_k/NLTEspec%lambda(la)/atmos%T(icell))
    
    ! = alpha0 /nu**3 / sqrt(T) = m^5
-   alpha = H_ff_Xsection(1, atmos%T(icell), NLTEspec%lambda(la))
+   !I now consider ne as part of the cross-sections to be in the same units as
+   !the bound-free cross-sections
+   alpha = H_ff_Xsection(1, atmos%T(icell), NLTEspec%lambda(la)) * atmos%ne(icell)
    
-   chi(la) =  alpha * atmos%ne(icell) * np * stim
-   !chi(la) = alpha * 1.38985d21 * 1.37901d21 * stim
+   chi(la) =  alpha * np * stim
+   !chi(la) = alpha * 1.38985d21 * 1.37901d21 * stim / atmos%ne(icell)
    !write(*,*) NLTEspec%lambda(la), chi(la), atmos%ne(icell), np, stim
 
   enddo

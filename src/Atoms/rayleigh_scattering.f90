@@ -33,13 +33,13 @@ MODULE rayleigh_scattering
    			(148.d0/NLTEspec%lambda)**4d0)*(96.6d0/NLTEspec%lambda)**4d0
   end where
 
-  if (lstore_opac) then
-   NLTEspec%AtomOpac%Kc(:,icell,2) = NLTEspec%AtomOpac%Kc(:,icell,2) + &
-   									 scatt * sigma_e * Hydrogen%n(1,icell)
-  else
-   NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
-   									 scatt * sigma_e * Hydrogen%n(1,icell)
-  end if
+!   if (lstore_opac) then
+   NLTEspec%AtomOpac%sca_c(:,icell) =  NLTEspec%AtomOpac%sca_c(:,icell) + &
+   									 scatt * sigma_e * sum(Hydrogen%n(1:Hydrogen%Nlevel-1,icell))
+!   else
+!    NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
+!    									 scatt * sigma_e * Hydrogen%n(1,icell)
+!   end if
    
  RETURN
  END SUBROUTINE HI_Rayleigh
@@ -73,15 +73,15 @@ MODULE rayleigh_scattering
    			(64.1d0/NLTEspec%lambda)**4d0)*(37.9d0/NLTEspec%lambda)**4d0
   end where
 
-  if (lstore_opac) then
-   NLTEspec%AtomOpac%Kc(:,icell,2) = NLTEspec%AtomOpac%Kc(:,icell,2) + &
-   									 scatt * sigma_e * Helium%n(1,icell)!sum(Helium%n(1:Neutr_index,icell)) !m^-1
-
-  else
-   NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
-   									 scatt * sigma_e * Helium%n(1,icell)
-  end if
-   
+!   if (lstore_opac) then
+   NLTEspec%AtomOpac%sca_c(:,icell) = NLTEspec%AtomOpac%sca_c(:,icell) + &
+   									 scatt * sigma_e * sum(Helium%n(1:Neutr_index,icell)) !m^-1
+! 
+!   else
+!    NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + &
+!    									 scatt * sigma_e * Helium%n(1,icell)
+!   end if
+!    
  RETURN
  END SUBROUTINE HeI_Rayleigh
  
@@ -107,7 +107,7 @@ MODULE rayleigh_scattering
   type (AtomType), intent(in)                               :: atom
   integer, intent(in)                                       :: icell, id
   logical                                                   :: res
-  integer                                                   :: kr, k, la
+  integer                                                   :: kr, k, la, l, Neutr_index
   real(kind=dp)                                          :: lambda_red, lambda_limit!, &
    															   !sigma_e
   real(kind=dp), dimension(NLTEspec%Nwaves) 				:: fomega, lambda2, scatt
@@ -163,15 +163,18 @@ MODULE rayleigh_scattering
  end do
 
   !at worst we add zero and res=.false.
-  scatt = sigma_e * fomega * atom%n(1,icell) !m^-1 = m^2 * m^-3
+  l = 1
+  do while (atom%stage(l)==0)
+   l = l+1
+  enddo
+  Neutr_index = l - 1
+  !write(*,*) atom%ID, " neutral index=", Neutr_index
   
-  if ((MAXVAL(scatt) > 0))  res = .true.
-  
-  if (res .and. lstore_opac) then
-     NLTEspec%AtomOpac%Kc(:,icell,2) = NLTEspec%AtomOpac%Kc(:,icell,2) + scatt
-  else if (res .and. .not.lstore_opac) then
-     NLTEspec%AtomOpac%sca_c(:,id) = NLTEspec%AtomOpac%sca_c(:,id) + scatt
-  end if
+  scatt = sigma_e * fomega * sum(atom%n(1:Neutr_index,icell))!atom%n(1,icell) !m^-1 = m^2 * m^-3
+    
+  NLTEspec%AtomOpac%sca_c(:,icell) = NLTEspec%AtomOpac%sca_c(:,icell) + scatt
+
+  res = .true.
 
  RETURN
  END SUBROUTINE Rayleigh

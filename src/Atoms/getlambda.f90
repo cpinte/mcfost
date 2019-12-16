@@ -12,7 +12,7 @@ MODULE getlambda
   IMPLICIT NONE
 
   !Number of points for each transition
-  integer, parameter :: Nlambda_cont = 31, Nlambda_cont_log = 71, &
+  integer, parameter :: Nlambda_cont = 101, Nlambda_cont_log = 71, &
   						Nlambda_line_w = 9, Nlambda_line_c = 101
   						!Nwing from -vchar to vcore; Ncore from vcore to 0
 
@@ -392,14 +392,15 @@ MODULE getlambda
    real(kind=dp) :: adamp_char = 0d0
    real, parameter :: L = 1.01 ! L% of max extent contains the line
    real(kind=dp), dimension(Nlambda_line_c) :: xlam !dimension(2*(Nlambda_line_c+Nlambda_line_w-1)-1)
+  
+   !!adamp_char = line%Grad * (NM_TO_M*line%lambda0) / 4d0 / pi / vD
 
-   adamp_char = 1d3 * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
    vB = 0d0
    if (line%polarizable) vB =  &
-   				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
+   				atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
 
-   !v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
-   v_char = L*atmos%v_char + 5*vD
+   !!v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
+   v_char = L * (atmos%v_char + vB) + 10. * vD
 
    xlam = 0d0
    lam0 = line%lambda0*(1-v_char/CLIGHT)
@@ -440,7 +441,6 @@ MODULE getlambda
    real(kind=dp) :: v_char, dvc, dvw
    real(kind=dp) :: vcore, vB, v0, v1!km/s
    integer :: la, Nlambda, Nmid
-   real(kind=dp) :: adamp_char = 0d0
    real, parameter :: wing_to_core = 0.5, L = 2. !only if velocity field
    		!if it is the max, then L is close to 1, if it is the min, L >> 1, if it is the mean etc..
    !!integer, parameter :: Nc = 51, Nw = 7 !ntotal = 2*(Nc + Nw - 1) - 1
@@ -448,14 +448,15 @@ MODULE getlambda
    !!real(kind=dp), dimension(2*(Nc+Nw-1)-1) :: vel !Size should be 2*(Nc+Nw-1)-1
    													 !if error try, 2*(Nc+Nw)
 
-   adamp_char = 1d3 * line%Grad/ (4d0 * PI) * (NM_TO_M*line%lambda0) / vD
    !write(*,*) adamp_char*vD/1000.
    vB = 0d0
    if (line%polarizable) vB =  &
-   				2d0*atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
+   				atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
 
-   v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
-   vcore = (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) * wing_to_core
+   !v_char = L * (atmos%v_char + 2d0*vD*(1. + adamp_char) + vB) !=maximum extension of a line
+   v_char = L * (atmos%v_char + vB)  + vD * 5d0
+   
+   vcore = v_char * wing_to_core
    !transition between wing and core in velocity
    !!vcore = L * v_char * wing_to_core ! == fraction of line extent
    vcore = v_char * wing_to_core !with *L if velocity field

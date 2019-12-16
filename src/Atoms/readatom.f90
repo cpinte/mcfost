@@ -379,8 +379,8 @@ MODULE readatom
      end if
      
  !force Gaussian for test
-CALL Warning("USING GAUSSIAN LINE PROFILES")
-     atom%lines(kr)%Voigt = .false.
+! CALL Warning("USING GAUSSIAN LINE PROFILES")
+!      atom%lines(kr)%Voigt = .false.
 
      !Now parse Broedening recipe
      if (trim(vdWChar).eq."PARAMTR") then
@@ -639,22 +639,21 @@ CALL Warning("USING GAUSSIAN LINE PROFILES")
      end if
    end if !end is active
    
-   if (atom%NLTEpops .and. atom%ID=='H') then !NLTE pops is false if departure coefficients
-    write(*,*) "Using NLTE populations for total H density"
-    allocate(old_nHtot(atmos%Nspace)); old_nHtot = 0.0
-    old_nHtot = atmos%nHtot
-    write(*,*) " -> old max/min nHtot (m^-3)", maxval(atmos%nHtot), minval(atmos%nHtot)
-    atmos%nHtot = 0.
-
-    atmos%nHtot = sum(atom%n,dim=1)
-    
-    write(*,*) " -> new max/min nHtot (m^-3)", maxval(atmos%nHtot), minval(atmos%nHtot)
-    write(*,*) "    :: max/min ratio", maxval(atmos%nHtot)/maxval(old_nHtot,mask=old_nHtot>0), &
-      minval(atmos%nHtot,mask=atmos%nHtot>0)/minval(old_nHtot,mask=old_nHtot > 0)
-    deallocate(old_nHtot)
-   endif
+   !check nHtot if we read NLTE populations
+!    if (atom%NLTEpops .and. atom%ID=='H') then !NLTE pops is false if departure coefficients
+!     write(*,*) "Using NLTE populations for total H density"
+!     allocate(old_nHtot(atmos%Nspace)); old_nHtot = 0.0
+!     old_nHtot = atmos%nHtot
+!     write(*,*) " -> old max/min nHtot (m^-3)", maxval(atmos%nHtot), minval(atmos%nHtot)
+!     !atmos%nHtot = 0.
+!     !atmos%nHtot = sum(atom%n,dim=1)
+!     
+!     write(*,*) " -> new max/min nHtot (m^-3)", maxval(atmos%nHtot), minval(atmos%nHtot)
+!     write(*,*) "    :: max/min ratio", maxval(atmos%nHtot)/maxval(old_nHtot,mask=old_nHtot>0), &
+!       minval(atmos%nHtot,mask=atmos%nHtot>0)/minval(old_nHtot,mask=old_nHtot > 0)
+!     deallocate(old_nHtot)
+!    endif
    
-   !atmos%nHtot = atmos%nHtot * 0.718843892668734
 !    atom%n = 0.
 !    atom%n => atom%nstar
 !    atom%NLTEpops = .false.
