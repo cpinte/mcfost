@@ -60,7 +60,7 @@ ifeq ($(SYSTEM), ifort)
         ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512 -static
     endif
     FC= ifort
-    FFLAGS= -g3 -fpp -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
+    FFLAGS= -fpp -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
     DBLFLAG= -r8
     DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
                -warn uninitialized -warn unused -warn truncated_source
