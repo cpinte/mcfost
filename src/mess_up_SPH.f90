@@ -6,7 +6,9 @@ module mess_up_SPH
 
   private
 
+  integer, parameter :: i_star = 1
   integer, parameter :: dp = selected_real_kind(p=13,r=200)
+  real(dp), parameter :: pi = 4._dp*atan(1._dp)
 
 contains
 
@@ -60,6 +62,20 @@ contains
   end subroutine mask_Hill_sphere
 
   !*********************************************************
+  ! Compute the square of distance between star and sink particle i_planet
+
+  function d2_from_star(nptmass, xyzmh_ptmass, i_planet) result(d2)
+    integer, intent(in) :: nptmass, i_planet
+    real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
+    real(kind=dp) :: d2
+
+    d2 = (xyzmh_ptmass(1,i_planet) - xyzmh_ptmass(1,i_star))**2 + &
+         (xyzmh_ptmass(2,i_planet) - xyzmh_ptmass(2,i_star))**2 + &
+         (xyzmh_ptmass(3,i_planet) - xyzmh_ptmass(3,i_star))**2
+
+  end function d2_from_star
+
+  !*********************************************************
 
   function Hill_radius2(nptmass, xyzmh_ptmass, i_planet)
     ! Compute the square of the Hill radius for sink particle i_planet
@@ -68,15 +84,9 @@ contains
 
     integer, intent(in) :: nptmass, i_planet
     real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
-
-    integer, parameter :: i_star = 1
-
     real(kind=dp) :: d2, Hill_radius2
 
-    d2 = (xyzmh_ptmass(1,i_planet) - xyzmh_ptmass(1,i_star))**2 + &
-         (xyzmh_ptmass(2,i_planet) - xyzmh_ptmass(2,i_star))**2 + &
-         (xyzmh_ptmass(3,i_planet) - xyzmh_ptmass(3,I_star))**2
-
+    d2 = d2_from_star(nptmass,xyzmh_ptmass,i_planet)
     Hill_radius2 = d2 * (xyzmh_ptmass(4,i_planet) / (3*xyzmh_ptmass(4,i_star)))**(2./3)
 
     return
@@ -100,6 +110,7 @@ contains
           if (.not.mask(i)) cycle particle_loop
        endif
        call random_number(phi)
+       phi = 2.*pi*phi
        cos_phi = cos(phi) ; sin_phi = sin(phi)
 
        !-- position
@@ -141,12 +152,13 @@ contains
        r_Hill = sqrt(r_Hill2)
        write(*,*) "Sink particle #", i_planet, "Hill radius =", r_Hill * udist, "au"
 
-       r_planet = sqrt(xyzmh_ptmass(1,1)**2 + xyzmh_ptmass(1,2)**2)
-       r_plus2 = (r_planet + r_Hill)**2
-       r_minus2 = (r_planet - r_Hill)**2
+       r_planet = sqrt((xyzmh_ptmass(1,i_planet) - xyzmh_ptmass(1,i_star))**2 + &
+                       (xyzmh_ptmass(2,i_planet) - xyzmh_ptmass(2,i_star))**2)
+       r_plus2 = (r_planet + 3.*r_Hill)**2
+       r_minus2 = (r_planet - 3.*r_Hill)**2
 
        particle_loop : do i=1, np
-          r2 = xyzh(1,i)**2 + xyzh(2,i)**2
+          r2 = (xyzh(1,i)-xyzmh_ptmass(1,i_star))**2 + (xyzh(2,i)-xyzmh_ptmass(2,i_star))**2
 
           if (r2 < r_plus2) then
              if (r2 > r_minus2) then
