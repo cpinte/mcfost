@@ -17,7 +17,7 @@ contains
 
     integer, intent(in) :: np, nptmass
     real(kind=dp), dimension(4,np), intent(in) :: xyzh
-    real(kind=dp), dimension(5,nptmass), intent(in) :: xyzmh_ptmass
+    real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: udist
 
     logical, dimension(np), intent(out) :: mask
@@ -67,7 +67,7 @@ contains
     ! Units : [length code units**2]
 
     integer, intent(in) :: nptmass, i_planet
-    real(kind=dp), dimension(5,nptmass), intent(in) :: xyzmh_ptmass
+    real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
 
     integer, parameter :: i_star = 1
 
@@ -90,21 +90,15 @@ contains
     ! Only rotates particles that are masked (ie where mask == .true.)
 
     integer, intent(in) :: np
-    real(kind=dp), dimension(np,4), intent(inout) :: xyzh, vxyzu
-    logical, dimension(np), optional :: mask
-
-    logical, dimension(np) :: local_mask
+    real(kind=dp), dimension(4,np), intent(inout) :: xyzh, vxyzu
+    logical, dimension(np), intent(in), optional :: mask
     real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
     integer :: i
 
-
-    if (present(mask)) then
-       local_mask(:) = mask(:)
-    else
-       local_mask(:) = .true.
-    endif
-
     particle_loop : do i=1, np
+       if (present(mask)) then
+          if (.not.mask(i)) cycle particle_loop
+       endif
        call random_number(phi)
        cos_phi = cos(phi) ; sin_phi = sin(phi)
 
@@ -129,13 +123,13 @@ contains
 
     integer, intent(in) :: np, nptmass
     real(kind=dp), dimension(4,np), intent(inout) :: xyzh, vxyzu
-    real(kind=dp), dimension(5,nptmass), intent(in) :: xyzmh_ptmass
+    real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: udist
 
     logical, dimension(np) :: mask ! true for the particles in the gaps
 
     integer :: i_planet, i, n_delete
-    real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz, r_planet, r_minus2, r_plus2, r2
+    real(kind=dp) :: r_Hill2, r_hill, r_planet, r_minus2, r_plus2, r2
 
     ! We assume that the 1st sink particle is the actual star
     ! and the following sink particles are planets
@@ -157,6 +151,7 @@ contains
           if (r2 < r_plus2) then
              if (r2 > r_minus2) then
                 mask(i) = .true.
+                n_delete = n_delete + 1
              endif
           end if
        enddo particle_loop
