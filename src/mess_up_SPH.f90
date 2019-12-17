@@ -156,7 +156,7 @@ contains
           end if
        enddo particle_loop
 
-       write(*,*) "Deleting", n_delete, "particles in Hill sphere of sink particle #", i_planet
+       write(*,*) "Randomizing", n_delete, "particles in gap of sink particle #", i_planet
     enddo
 
     call randomize_azimuth(np, xyzh, vxyzu, mask)
