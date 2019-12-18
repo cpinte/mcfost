@@ -18,7 +18,7 @@ contains
     ! mask is set to True is particle is inside the Hill sphere
 
     integer, intent(in) :: np, nptmass
-    real(kind=dp), dimension(4,np), intent(in) :: xyzh
+    real(kind=dp), dimension(:,:), intent(in) :: xyzh
     real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: udist
 
@@ -100,7 +100,7 @@ contains
     ! Only rotates particles that are masked (ie where mask == .true.)
 
     integer, intent(in) :: np
-    real(kind=dp), dimension(4,np), intent(inout) :: xyzh, vxyzu
+    real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
     logical, dimension(np), intent(in), optional :: mask
     real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
     integer :: i
@@ -133,7 +133,7 @@ contains
   subroutine randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist)
 
     integer, intent(in) :: np, nptmass
-    real(kind=dp), dimension(4,np), intent(inout) :: xyzh, vxyzu
+    real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
     real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: udist
 
@@ -172,7 +172,6 @@ contains
     enddo
 
     call randomize_azimuth(np, xyzh, vxyzu, mask)
-
     return
 
   end subroutine randomize_gap
