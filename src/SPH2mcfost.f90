@@ -677,49 +677,49 @@ contains
 
   !*********************************************************
 
-  subroutine read_Judith_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
-
-    !The 3D cube is 20 cells in  colatitude direction, 215 radially, and 680 azimuthally.
-    ! So when you read in the 1D  columns of arrays, you should maybe reform the arrays as [20,215,680] to get the 3D cube again
-
-    integer,               intent(in) :: iunit
-    character(len=*),      intent(in) :: filename
-    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas
-    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
-    integer, intent(out) :: ndusttypes, n_SPH,ierr
-
-    integer :: syst_status, alloc_status, ios, i
-    character(len=512) :: cmd
-
-    ierr = 0
-
-    cmd = "wc -l "//trim(filename)//" > ntest.txt"
-    call appel_syst(cmd,syst_status)
-    open(unit=1,file="ntest.txt",status="old")
-    read(1,*) n_SPH
-    n_SPH = n_SPH - 1 ! removing 1 line of comments
-    close(unit=1)
-    ndusttypes =1
-
-    write(*,*) "n_SPH = ", n_SPH
-
-    alloc_status = 0
-    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
-    if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
-
-    open(unit=1, file=filename, status='old', iostat=ios)
-    do i=1, n_SPH
-       read(1,*) x(i), y(i), z(i), rhogas(i), T(i), vx(i), vy(i), vz(i)
-    enddo
-
-    ! Correcting units : positions in au and velocities in m/s
-    x(:) = x(:) * cm_to_au ; y(:) = y(:) * cm_to_au ; z(:) = z(:) * cm_to_au
-    vx(:) = vx(:) * cm_to_m ; vy(:) = vy(:) * cm_to_m ; vz(:) = vz(:) * cm_to_m
-
-    write(*,*) "Using stars from mcfost parameter file"
-
-    return
-
-  end subroutine read_Judith_file
+!  subroutine read_Judith_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
+!
+!    !The 3D cube is 20 cells in  colatitude direction, 215 radially, and 680 azimuthally.
+!    ! So when you read in the 1D  columns of arrays, you should maybe reform the arrays as [20,215,680] to get the 3D cube again
+!
+!    integer,               intent(in) :: iunit
+!    character(len=*),      intent(in) :: filename
+!    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas
+!    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
+!    integer, intent(out) :: ndusttypes, n_SPH,ierr
+!
+!    integer :: syst_status, alloc_status, ios, i
+!    character(len=512) :: cmd
+!
+!    ierr = 0
+!
+!    cmd = "wc -l "//trim(filename)//" > ntest.txt"
+!    call appel_syst(cmd,syst_status)
+!    open(unit=1,file="ntest.txt",status="old")
+!    read(1,*) n_SPH
+!    n_SPH = n_SPH - 1 ! removing 1 line of comments
+!    close(unit=1)
+!    ndusttypes =1
+!
+!    write(*,*) "n_SPH = ", n_SPH
+!
+!    alloc_status = 0
+!    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
+!    if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
+!
+!    open(unit=1, file=filename, status='old', iostat=ios)
+!    do i=1, n_SPH
+!       read(1,*) x(i), y(i), z(i), rhogas(i), T(i), vx(i), vy(i), vz(i)
+!    enddo
+!
+!    ! Correcting units : positions in au and velocities in m/s
+!    x(:) = x(:) * cm_to_au ; y(:) = y(:) * cm_to_au ; z(:) = z(:) * cm_to_au
+!    vx(:) = vx(:) * cm_to_m ; vy(:) = vy(:) * cm_to_m ; vz(:) = vz(:) * cm_to_m
+!
+!    write(*,*) "Using stars from mcfost parameter file"
+!
+!    return
+!
+!  end subroutine read_Judith_file
 
 end module SPH2mcfost
