@@ -62,9 +62,11 @@ contains
   end subroutine mask_Hill_sphere
 
   !*********************************************************
-  ! Compute the square of distance between star and sink particle i_planet
 
   function d2_from_star(nptmass, xyzmh_ptmass, i_planet) result(d2)
+    ! Compute the square of distance between star and sink particle i_planet
+    ! Units : [length code units**2]
+
     integer, intent(in) :: nptmass, i_planet
     real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     real(kind=dp) :: d2

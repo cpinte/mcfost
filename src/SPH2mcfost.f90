@@ -27,6 +27,7 @@ contains
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
+    logical, allocatable, dimension(:) :: mask
 
     real(dp), dimension(6) :: SPH_limits
     real :: factor
@@ -57,7 +58,8 @@ contains
        endif
 
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
-            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
+            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,&
+            SPH_grainsizes,mask,n_SPH,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
           factor = 1.0/n_phantom_files
@@ -95,15 +97,15 @@ contains
     call read_SPH_limits_file(SPH_limits_file, SPH_limits)
 
     ! Voronoi tesselation
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, mask, .true.)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
     deallocate(massgas,rho)
     if (allocated(rhodust)) deallocate(rhodust,massdust)
 
-    ! Deleting particles in Hill-sphere of planets
-    if (ldelete_Hill_sphere) call delete_Hill_sphere()
+    ! Deleting partcles/cells in masked arreas (Hill sphere, etc)
+    if (allocated(mask)) call delete_masked_particles()
 
     return
 
@@ -138,7 +140,7 @@ contains
   !*********************************************************
 
   subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, &
-       SPH_limits, check_previous_tesselation)
+       SPH_limits, mask, check_previous_tesselation)
 
     use Voronoi_grid
     use density, only : densite_gaz, masse_gaz, densite_pouss, masse
@@ -153,6 +155,7 @@ contains
     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
+    logical, dimension(:), allocatable, intent(in) :: mask
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
@@ -249,9 +252,6 @@ contains
     write(*,*) "x =", limits(1), limits(2)
     write(*,*) "y =", limits(3), limits(4)
     write(*,*) "z =", limits(5), limits(6)
-
-    ! Randomize azimuth : (needs to be done before tesselation)
-    if (lrandomize_azimuth) call randomize_azimuth(n_SPH, x,y,vx,vy)
 
     !*******************************
     ! Voronoi tesselation
@@ -429,6 +429,24 @@ contains
        enddo
     endif
 
+    !*************************
+    ! Mask
+    !*************************
+    if (allocated(mask)) then
+       do icell=1,n_cells
+          iSPH = Voronoi(icell)%id
+          if (iSPH > 0) then
+             Voronoi(icell)%masked = mask(iSPH)
+          else
+             Voronoi(icell)%masked = .false.
+          endif
+       enddo
+    else
+       do icell=1,n_cells
+          Voronoi(icell)%masked = .false.
+       enddo
+    endif
+
     ! We eventually reduce density to avoid artefacts: superseeded by cell cutting
     if (density_factor < 1.-1e-6) then
        ! Removing cells at the "surface" of the SPH model:
@@ -543,6 +561,28 @@ contains
     return
 
   end subroutine compute_stellar_parameters
+
+  !*********************************************************
+
+  subroutine delete_masked_particles()
+
+    use Voronoi_grid
+    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
+
+    integer :: icell
+
+    do icell=1, n_cells
+       if (Voronoi(icell)%masked) then
+          masse_gaz(icell)    = 0.
+          densite_gaz(icell) = 0.
+          masse(icell) = 0.
+          densite_pouss(:,icell) = 0.
+       endif
+    enddo
+
+    return
+
+  end subroutine delete_masked_particles
 
   !*********************************************************
 

@@ -729,7 +729,7 @@ end function v_proj
 
 !***********************************************************
 
-real(kind=dp) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w) !
+real(kind=dp) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w)
   ! Differentiel de vitesse projete entre 2 points
   ! au sein d'une cellule
   ! C. Pinte

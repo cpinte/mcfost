@@ -4,20 +4,21 @@ module read_phantom
   use dump_utils
   use messages
   use constantes
+  use mess_up_SPH
 
   implicit none
 
   contains
 
 subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
-      rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
+      rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ierr)
 
  integer,               intent(in) :: iunit, n_files
  character(len=*),dimension(n_files), intent(in) :: filenames
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,SPH_grainsizes
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
-
+ logical, dimension(:), allocatable, intent(out) :: mask
  real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
 
@@ -354,6 +355,8 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
+    call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
+
     call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,dustfluidtype,xyzh,&
          vxyzu,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,&
          hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles, &
@@ -376,7 +379,7 @@ end subroutine read_phantom_bin_files
 subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
                                   particle_id,massgas,massdust,rhogas,rhodust, &
                                   extra_heating,ndusttypes,SPH_grainsizes,     &
-                                  n_SPH,ierr)
+                                  mask,n_SPH,ierr)
 
  use utils_hdf5, only:open_hdf5file,    &
                       close_hdf5file,   &
@@ -393,7 +396,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
                                                        SPH_grainsizes
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
-
+ logical, dimension(:), allocatable, intent(out) :: mask
  real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
 
@@ -635,6 +638,8 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
 
   write(*,*) "Found", nptmass, "point masses in the phantom file"
 
+  call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
+
   call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,      &
                         dustfluidtype,xyzh,vxyzu,itype,grainsize,dustfrac, &
                         massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
@@ -652,6 +657,32 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
 end subroutine read_phantom_hdf_files
 
 !*************************************************************************
+
+subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
+
+  integer, intent(in) :: np, nptmass
+  real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
+  real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
+  real(kind=dp), intent(in) :: udist
+
+  logical, dimension(:), allocatable, intent(out) :: mask
+
+  mask(:) = .false.
+
+  ! Modifying SPH dump
+  if (ldelete_Hill_sphere) then
+     allocate(mask(np))
+     call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,udist,mask)
+  endif
+  if (lrandomize_azimuth)  call randomize_azimuth(np, xyzh, vxyzu, mask)
+  if (lrandomize_gap)      call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist)
+
+  return
+
+end subroutine modify_dump
+
+!*************************************************************************
+
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh, &
      vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &

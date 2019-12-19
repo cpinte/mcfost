@@ -138,6 +138,7 @@ subroutine set_default_variables()
   lfluffy = .false.
   ldelete_hill_sphere = .false.
   lrandomize_azimuth = .false.
+  lrandomize_gap = .false.
   lwrite_column_density = .false.
 
   tmp_dir = "./"
@@ -1044,6 +1045,9 @@ subroutine initialisation_mcfost()
      case("-random_az")
         i_arg = i_arg + 1
         lrandomize_azimuth = .true.
+     case("-random_gap")
+        i_arg = i_arg + 1
+        lrandomize_gap = .true.
      case("-cd","-column_density")
         i_arg = i_arg + 1
         lwrite_column_density = .true.
