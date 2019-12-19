@@ -9,6 +9,7 @@ module mess_up_SPH
   integer, parameter :: i_star = 1
   integer, parameter :: dp = selected_real_kind(p=13,r=200)
   real(dp), parameter :: pi = 4._dp*atan(1._dp)
+  real(kind=dp), parameter :: au_to_cm = 149597870700._dp * 100 ! IAU 2012 definition
 
 contains
 
@@ -27,6 +28,8 @@ contains
     integer :: i_planet, i, n_delete
     real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz
 
+    write(*,*) "masking Hill sphere"
+
     ! We assume that the 1st sink particle is the actual star
     ! and the following sink particles are planets
     mask(:) = .false.
@@ -35,7 +38,7 @@ contains
 
        r_Hill2 = Hill_radius2(nptmass, xyzmh_ptmass, i_planet)
        r_Hill = sqrt(r_Hill2)
-       write(*,*) "Sink particle #", i_planet, "Hill radius =", r_Hill * udist, "au"
+       write(*,*) "Sink particle #", i_planet, "Hill radius =", r_Hill * udist / au_to_cm, "au"
 
        particle_loop : do i=1, np
           ! We first exlude particles that are not with a cube around the sink particle
@@ -132,12 +135,15 @@ contains
 
   !*********************************************************
 
-  subroutine randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist)
+  subroutine randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass ,udist, factor)
+    ! Randomly rotate all the particles in cylinder +/- factor * r_Hill of the planet
+    ! around the z axis
+    ! Only rotates particles that are masked (ie where mask == .true.)
 
     integer, intent(in) :: np, nptmass
     real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
     real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
-    real(kind=dp), intent(in) :: udist
+    real(kind=dp), intent(in) :: udist, factor
 
     logical, dimension(np) :: mask ! true for the particles in the gaps
 
@@ -152,12 +158,12 @@ contains
 
        r_Hill2 = Hill_radius2(nptmass, xyzmh_ptmass, i_planet)
        r_Hill = sqrt(r_Hill2)
-       write(*,*) "Sink particle #", i_planet, "Hill radius =", r_Hill * udist, "au"
+       write(*,*) "Sink particle #", i_planet, "Hill radius =", r_Hill * udist / au_to_cm, "au"
 
        r_planet = sqrt((xyzmh_ptmass(1,i_planet) - xyzmh_ptmass(1,i_star))**2 + &
                        (xyzmh_ptmass(2,i_planet) - xyzmh_ptmass(2,i_star))**2)
-       r_plus2 = (r_planet + 3.*r_Hill)**2
-       r_minus2 = (r_planet - 3.*r_Hill)**2
+       r_plus2  = (r_planet + factor*r_Hill)**2
+       r_minus2 = (r_planet - factor*r_Hill)**2
 
        particle_loop : do i=1, np
           r2 = (xyzh(1,i)-xyzmh_ptmass(1,i_star))**2 + (xyzh(2,i)-xyzmh_ptmass(2,i_star))**2

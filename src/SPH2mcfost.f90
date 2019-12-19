@@ -58,7 +58,7 @@ contains
        endif
 
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
-            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,&
+            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
             SPH_grainsizes,mask,n_SPH,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
@@ -569,16 +569,20 @@ contains
     use Voronoi_grid
     use density, only : densite_gaz, masse_gaz, densite_pouss, masse
 
-    integer :: icell
+    integer :: icell, k
 
+    k=0
     do icell=1, n_cells
        if (Voronoi(icell)%masked) then
+          k=k+1
           masse_gaz(icell)    = 0.
           densite_gaz(icell) = 0.
           masse(icell) = 0.
           densite_pouss(:,icell) = 0.
        endif
     enddo
+
+    write(*,*) k, "masked cells have been made transparent"
 
     return
 

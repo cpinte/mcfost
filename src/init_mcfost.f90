@@ -1048,6 +1048,9 @@ subroutine initialisation_mcfost()
      case("-random_gap")
         i_arg = i_arg + 1
         lrandomize_gap = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) gap_factor
+         i_arg = i_arg + 1
      case("-cd","-column_density")
         i_arg = i_arg + 1
         lwrite_column_density = .true.

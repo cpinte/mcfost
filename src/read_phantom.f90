@@ -667,15 +667,14 @@ subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
 
   logical, dimension(:), allocatable, intent(out) :: mask
 
-  mask(:) = .false.
-
   ! Modifying SPH dump
   if (ldelete_Hill_sphere) then
      allocate(mask(np))
+     mask(:) = .false.
      call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,udist,mask)
   endif
   if (lrandomize_azimuth)  call randomize_azimuth(np, xyzh, vxyzu, mask)
-  if (lrandomize_gap)      call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist)
+  if (lrandomize_gap)      call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor)
 
   return
 
