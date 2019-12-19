@@ -673,8 +673,9 @@ subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
      mask(:) = .false.
      call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,udist,mask)
   endif
-  if (lrandomize_azimuth)  call randomize_azimuth(np, xyzh, vxyzu, mask)
-  if (lrandomize_gap)      call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor)
+  if (lrandomize_azimuth)     call randomize_azimuth(np, xyzh, vxyzu, mask)
+  if (lrandomize_gap)         call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor, .true.)
+  if (lrandomize_outside_gap) call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor, .false.)
 
   return
 

@@ -135,26 +135,28 @@ contains
 
   !*********************************************************
 
-  subroutine randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass ,udist, factor)
-    ! Randomly rotate all the particles in cylinder +/- factor * r_Hill of the planet
-    ! around the z axis
+  subroutine randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass ,udist, factor, inside)
+    ! Randomly rotate all the particles inside or outside cylinder
+    ! a width +/- factor * r_Hill of the planet
+    ! Rotation is performed around the z axis
     ! Only rotates particles that are masked (ie where mask == .true.)
 
     integer, intent(in) :: np, nptmass
     real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
     real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: udist, factor
+    logical, intent(in) :: inside
 
     logical, dimension(np) :: mask ! true for the particles in the gaps
 
-    integer :: i_planet, i, n_delete
+    integer :: i_planet, i, n_inside
     real(kind=dp) :: r_Hill2, r_hill, r_planet, r_minus2, r_plus2, r2
 
     ! We assume that the 1st sink particle is the actual star
     ! and the following sink particles are planets
     mask(:) = .false.
     do i_planet=2, nptmass
-       n_delete = 0
+       n_inside = 0
 
        r_Hill2 = Hill_radius2(nptmass, xyzmh_ptmass, i_planet)
        r_Hill = sqrt(r_Hill2)
@@ -171,13 +173,17 @@ contains
           if (r2 < r_plus2) then
              if (r2 > r_minus2) then
                 mask(i) = .true.
-                n_delete = n_delete + 1
+                n_inside = n_inside + 1
              endif
           end if
        enddo particle_loop
 
-       write(*,*) "Randomizing", n_delete, "particles in gap of sink particle #", i_planet
+       write(*,*) n_inside, "particles inside gap of sink particle #", i_planet
     enddo
+
+    if (.not.inside) then
+       mask(:) = .not.mask(:)
+    endif
 
     call randomize_azimuth(np, xyzh, vxyzu, mask)
     return
