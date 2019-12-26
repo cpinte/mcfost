@@ -603,7 +603,9 @@ contains
     do istar=2, n_etoiles
        n_delete = 0
 
-       d2 = (etoile(istar)%x - etoile(1)%x)**2 + (etoile(istar)%y - etoile(1)%y)**2 + (etoile(istar)%y - etoile(1)%y)**2
+       d2 = (etoile(istar)%x - etoile(1)%x)**2 + &
+            (etoile(istar)%y - etoile(1)%y)**2 + &
+            (etoile(istar)%z - etoile(1)%z)**2
        r_Hill2 = d2 * (etoile(istar)%m / (3*etoile(1)%m))**(2./3)
        r_Hill = sqrt(r_Hill2)
 
