@@ -12,13 +12,13 @@ module density
   save
 
   ! Suppresion de grains
-  integer, public :: specie_removed
+  integer, public :: species_removed
   real, public :: T_rm
 
   public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, densite_pouss, masse, icell_not_empty
 
   public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
-       densite_seb_charnoz2, densite_seb_charnoz, remove_specie, read_sigma_file, normalize_dust_density, &
+       densite_seb_charnoz2, densite_seb_charnoz, remove_species, read_sigma_file, normalize_dust_density, &
        reduce_density, compute_column_density
 
   private
@@ -1934,18 +1934,18 @@ end subroutine densite_Seb_Charnoz2
 
 !**********************************************************************
 
-subroutine remove_specie()
+subroutine remove_species()
 
   implicit none
 
   integer :: k, icell
   real :: mass
 
-  write(*,*) "Removing specie", specie_removed, "where T >", T_rm
+  write(*,*) "Removing species", species_removed, "where T >", T_rm
 
   do icell=1,n_cells
      do k=1,n_grains_tot
-        if (grain(k)%pop==specie_removed) then
+        if (grain(k)%pop==species_removed) then
            if (Tdust(icell) > T_rm) densite_pouss(k,icell) = 0.0
         endif
      enddo
@@ -1963,7 +1963,7 @@ subroutine remove_specie()
 
   return
 
-end subroutine remove_specie
+end subroutine remove_species
 
 !************************************************************
 
