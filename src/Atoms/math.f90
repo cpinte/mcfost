@@ -162,6 +162,34 @@ MODULE math
      end do
    RETURN
    END FUNCTION any_nan_infinity_vector
+   
+   
+   function cmf_to_of (Nx, y, dk)
+   !Shift a function y, centered at 0 in the velocity space
+   !by a delta in index of dk.
+   !dk is an integer positive or negative.
+   !The function y has to be linearly spaced such that y(1) = y(0 + dk)
+   ! dk is int(dv * di) + 1
+   ! with di = (index(y[1]) - index(y[0]))/(y[1]-y[0]) and dv a velocity shift.
+    integer, intent(in) :: Nx, dk
+    real(kind=dp), intent(in), dimension(Nx) :: y
+    real(kind=dp), dimension(Nx) :: cmf_to_of
+    integer :: j
+    
+    do j=1, Nx
+    
+     if ( (j + dk < 1) .or. (j + dk > Nx) ) then
+     	cmf_to_of(j) = 0.0
+     else
+     	cmf_to_of(j) = y(j+dk)
+     endif
+    
+    enddo
+    
+   
+   return
+   end function cmf_to_of
+   
 
    !c'est bourrin, il n y a pas de test
    function linear_1D(N,x,y,Np,xp)

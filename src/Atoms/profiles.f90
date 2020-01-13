@@ -118,7 +118,8 @@ MODULE PROFILES
  RETURN
  END SUBROUTINE IProfile_thomson
 
- !interpolation or shifting, building
+ !-> Relaxing some degree of accuracy on the velocity, profiles are projected by
+ ! index shifting.
  SUBROUTINE IProfile_cmf_to_obs(line,icell,x,y,z,x1,y1,z1,u,v,w,l, id, Nvspace, Omegav)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
   integer, intent(in) 							            :: icell, id, Nvspace
@@ -127,9 +128,9 @@ MODULE PROFILES
                                 				               l !physical length of the cell
   real(kind=dp), intent(in) 								:: Omegav(:)
   type (AtomicLine), intent(inout)								:: line
-  real(kind=dp), dimension(line%Nlambda)					:: vvoigt
-  integer													::  Nred, Nblue, i, j, nv
-  real(kind=dp), dimension(line%Nlambda)                    :: u1, u1p
+  !!real(kind=dp), dimension(line%Nlambda)					:: vvoigt
+  integer													::  Nred, Nblue, i, j, nv, dom
+  !!real(kind=dp), dimension(line%Nlambda)                    :: u
  
 
   i = line%i; j = line%j
@@ -138,16 +139,19 @@ MODULE PROFILES
   !temporary here
   line%phi_loc(:,id) = 0d0
  
-  u1(:) = line%u(:)/line%atom%vbroad(icell)
+  !!u1(:) = line%u(:)/line%atom%vbroad(icell)
 
  do nv=1, Nvspace 
  
-         u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
-             
-         line%phi_loc(:,id) = line%phi_loc(:,id) + &
-                 linear_1D_sorted(line%Nlambda,u1,line%phi(:,icell),line%Nlambda,u1p) / Nvspace /sqrtpi / line%atom%vbroad(icell)
+         !!u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
+         
+         dom = 1 + nint(omegav(nv) / (line%u(line%Nmid+1) - line%u(line%Nmid)) )
+         write(*,*) nv, icell, dom
+         write(*,*) omegav(nv), line%u(line%Nmid+1),line%u(line%Nmid)
+         !!line%phi_loc(:,id) = line%phi_loc(:,id) + &
+                 !!linear_1D_sorted(line%Nlambda,u1,line%phi(:,icell),line%Nlambda,u1p) / Nvspace /sqrtpi / line%atom%vbroad(icell)
          	
-
+         line%phi_loc(:,id) = line%phi_loc(:,id) + cmf_to_of (line%Nlambda, line%phi(:,icell), dom) / Nvspace
  enddo
  
 
