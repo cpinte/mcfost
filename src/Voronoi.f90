@@ -14,7 +14,7 @@ module Voronoi_grid
   save
 
   integer, parameter :: max_wall_neighbours = 100000
-  integer, parameter :: n_saved_neighbours = 30
+  integer, parameter :: n_saved_neighbours = 40 ! 30 is fine when there is not randomization of particles
   real(kind=dp), parameter :: prec = 1.e-6_dp
 
   type Voronoi_cell
