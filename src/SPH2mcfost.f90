@@ -97,7 +97,7 @@ contains
     call read_SPH_limits_file(SPH_limits_file, SPH_limits)
 
     ! Voronoi tesselation
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, mask, .true.)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true., mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -140,7 +140,7 @@ contains
   !*********************************************************
 
   subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, &
-       SPH_limits, mask, check_previous_tesselation)
+       SPH_limits, check_previous_tesselation, mask)
 
     use Voronoi_grid
     use density, only : densite_gaz, masse_gaz, densite_pouss, masse
@@ -155,7 +155,7 @@ contains
     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
-    logical, dimension(:), allocatable, intent(in) :: mask
+    logical, dimension(:), allocatable, intent(in), optional, value :: mask
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
@@ -165,6 +165,7 @@ contains
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n
 
     real(dp), dimension(6) :: limits
+
 
     if (lcorrect_density_elongated_cells) then
        density_factor = correct_density_factor_elongated_cells
@@ -258,6 +259,7 @@ contains
     !*******************************
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
     !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits)
+
     call Voronoi_tesselation(n_SPH, x,y,z,h, limits, check_previous_tesselation)
     !deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
@@ -432,7 +434,7 @@ contains
     !*************************
     ! Mask
     !*************************
-    if (allocated(mask)) then
+    if (present(mask)) then
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
           if (iSPH > 0) then
