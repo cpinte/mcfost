@@ -155,7 +155,7 @@ contains
     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
-    logical, dimension(:), allocatable, intent(in), optional, value :: mask
+    logical, dimension(:), allocatable, intent(in), optional :: mask
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
