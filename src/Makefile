@@ -140,7 +140,7 @@ endif
 #------------------------------------------------------------------------------#
 # Library flags
 INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(MCFOST_INSTALL)/include/hdf5 -I$(MCFOST_INSTALL)/include/$(SYSTEM)
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit -lhdf5_fortran -lhdf5 -lz
+LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit -lhdf5_fortran -lhdf5 -lz -ldl
 
 #------------------------------------------------------------------------------#
 # Sources and objects
