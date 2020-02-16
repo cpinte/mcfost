@@ -710,10 +710,10 @@ MODULE AtomicTransfer
   CALL readAtomicModels(atomunit)
   
   if (atmos%NactiveAtoms > 0) then 
-   atmos%Nrays = 100!0
+   atmos%Nrays = Nrays_atom_transfer!100!0
   else
    atmos%Nrays = Nrayone
-   if (lelectron_scattering) atmos%Nrays = 2000 !here before I is allocated
+   if (lelectron_scattering) atmos%Nrays = 2000 !here before I is allocated and fixed !
   endif
 
   !compute first guess of electron density ??
@@ -787,9 +787,9 @@ MODULE AtomicTransfer
   !! alternatively, could be invoked earlier, if the system send a message to stop the code
   !! before convergence, so that we restart with these pops.
   !! Or define a function to store pops every N iter.
-  !!do icell=1,atmos%Natom
-   !CALL writePops(atmos%Atoms(icell)%ptr_atom)
-  !!end do
+  do icell=1,atmos%Natom
+   CALL writePops(atmos%Atoms(icell)%ptr_atom)
+  end do
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------------------- MAKE IMAGES ------------------------------------ !
@@ -1011,7 +1011,7 @@ MODULE AtomicTransfer
 
 			else if (etape==2) then 
 				lfixed_rays = .true.
-				n_rayons = min(n_rayons_max,n_rayons_start)
+				n_rayons = n_rayons_max!min(n_rayons_max,n_rayons_start)
 				iray_start = 1
 				lprevious_converged = .false.
 
@@ -1942,7 +1942,7 @@ endif
 		write(*,*) " Using ", n_rayons, " rays for Jnu."
       else if (etape==2) then 
   		lfixed_rays = .true.
-  		n_rayons = min(n_rayons_max,n_rayons_start)
+  		n_rayons = n_rayons_max!min(n_rayons_max,n_rayons_start)
   		iray_start = 1
   		lprevious_converged = .false.
 		write(*,*) " Using ", n_rayons, " rays for Jnu."

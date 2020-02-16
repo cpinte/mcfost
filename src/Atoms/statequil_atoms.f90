@@ -17,6 +17,7 @@ MODULE statequil_atoms
 	IMPLICIT NONE
  
 	real(kind=dp), parameter :: prec_pops = 1d-100 !1d-8
+	character(len=15), parameter :: invpop_file = "inversion_populations.txt"
 
 	CONTAINS
 

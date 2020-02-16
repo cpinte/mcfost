@@ -82,6 +82,7 @@ subroutine set_default_variables()
   iNg_Norder = 0
   iNg_Ndelay = 15
   iNg_Nperiod = 6
+  Nrays_atom_transfer = 100
   !
   ! Max relative error in transfer. ATM only atomic line transfer
   dpops_max_error = 1e-2
@@ -758,6 +759,15 @@ subroutine initialisation_mcfost()
          iNg_Nperiod = 3
          iNg_Ndelay = 6
         endif 
+     case("-Nray_atom")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Number of rays needed with -Nray_atom !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) Nrays_atom_transfer
+        i_arg= i_arg+1
+        if (Nrays_atom_transfer <= 0) then
+         call error ("Nray must be > 0") 
+        endif
      case("-max_err")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("relative error needed")
@@ -1677,6 +1687,7 @@ subroutine display_help()
   write(*,*) "        : -Ng_Ndelay <Ndelay> <Nperiod> : # of normal iterations before acceleration. # of relaxation before new acceleration"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
+  write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "
