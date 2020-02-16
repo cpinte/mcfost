@@ -410,7 +410,7 @@ MODULE atom_type
   do while (i.ne.1)
    if (multiplet(i:i).eq."O" .or. multiplet(i:i).eq."E") then
     if (multiplet(i+2:i+2).eq."1" .or. multiplet(i+2:i+2).eq."0" &
-   .or. multiplet(i+2:i+2).eq."2" .or. multiplet(i+2:i+2).eq."3") then
+   .or. multiplet(i+2:i+2).eq."2" .or. multiplet(i+2:i+2).eq."3" .or. multiplet(i+2:i+2).eq."3") then
      read(multiplet(i+2:i+2),*) parity
      !write(*,'("Parity: " (1I1))') parity
     end if
