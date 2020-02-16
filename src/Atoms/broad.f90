@@ -3,13 +3,14 @@ MODULE broad
 
  use constant
  use atom_type
- use atmos_type, only : atmos, Hydrogen, VBROAD_atom !, Helium !alias to ptr_atom of Helium, which might not exist
+ use atmos_type, only : atmos, Hydrogen, Helium !alias to ptr_atom of Helium, which might not exist
  
  use messages, only : error, warning
+ use mcfost_env, only : dp
 
  IMPLICIT NONE
 
- real(8), parameter :: AVERAGE_ATOMIC_WEIGHT = 28.0
+ real, parameter :: AVERAGE_ATOMIC_WEIGHT = 28.0
 
  CONTAINS
 
@@ -17,8 +18,8 @@ MODULE broad
  ! For testing, implementing the broadening for H alpha used by some people
   type (AtomType), intent(in) :: atom
   integer, intent(in) :: kr, icell
-  double precision, intent(out) :: adamp
-  double precision :: Crad, Cvdw, Cstark, G
+  real(kind=dp), intent(out) :: adamp
+  real(kind=dp) :: Crad, Cvdw, Cstark, G
   
   !AA
   Crad = 6.5d-4; CvdW = 4.4d-4; Cstark = 1.17d-3
@@ -33,57 +34,121 @@ MODULE broad
  END SUBROUTINE Broad_Kurosawa
  
  
- SUBROUTINE Radiative_Damping(atom, line, Grad)
+ SUBROUTINE Radiative_Damping(atom, line, gamma_j, gamma_i)
  ! -------------------------------------------------------------------------- !
-  ! Radiative damping of a line transition j->i,
-  ! assuming the radiation field is given by a Planck function, and psi=phi
-  !
-  ! Grad = Sum_l<m Aml + Bml * int2(psiml*I*dv) + Sum_n>m mn int2(phimn*Idv)
+  ! Radiative damping of a line transition j->i
+  ! Already included in model atom.
+  ! check on H
+  ! need a check on other atoms, like Na and Ca.
+  ! Do not use if the model atom is small, because the damping would be underestimated
+  ! even by an order of magnitude
  ! -------------------------------------------------------------------------- !
   type (AtomType), intent(in) :: atom
   type (AtomicLine), intent(in) :: line
-  real(kind=dp), intent(out) :: Grad
+  real(kind=dp) :: Grad
   integer :: kp,l,n
-  real(kind=dp) :: gamma_j, gamma_i
+  real(kind=dp), intent(out) :: gamma_j, gamma_i
   
   Grad = 0d0
   gamma_j = 0d0
+  gamma_i = 0.0_dp
   
   !it also adds line%Aji for the current line if l  = line%i == the same line
+!   write(*,*) "Radiative damping for line ", line%j, line%i
   
-  do kp=1,atom%Nline
+  do kp=1,atom%Nline !sum over all lines
 
     l = atom%lines(kp)%i; n = atom%lines(kp)%j
+    !write(*,*) "------"
+    !write(*,*) "l=",l, "u=",n
+    !write(*,*) line%i, line%j
+    !write(*,*) "------"
     if (n==line%j) then !our upper level is also the upper level of another transition
+!      write(*,*) "j is upper level of ", line%j, n, l
      gamma_j = gamma_j + atom%lines(kp)%Aji
+    endif
+    
+    if (n==line%i) then !our lower level is also the upper level of other transitions
+!      write(*,*) "i is upper level of ", line%i, n, l
+     gamma_i = gamma_i + atom%lines(kp)%Aji
     endif
   
   enddo
   
   Grad = gamma_j + gamma_i
+!   write(*,*) "Grad=", Grad/1d8, gamma_j/1d8, gamma_i/1d8
 
  RETURN
  END SUBROUTINE Radiative_Damping
+ 
+ SUBROUTINE VanderWaals_new(icell, atom, kr, GvdW)
+ ! Compute van der Waals broadening in Lindholm theory with
+ !Unsold's approximation for the interaction coefficient C_6.
+ !
+ !Gamma = 8.08 * vrel^3/5 * C_6^2/5 * nH(1)
+ !
+ ! vrel is the maxwellian velocity of the perturber
+ !
+  real(kind=dp), intent(out) :: GvdW
+  integer, intent(in) :: icell
+  type (AtomType), intent(in) :: atom
+  type (Element), pointer :: Helium
+  integer, intent(in) :: kr
+  integer :: i, j, ic, Z
+  real(kind=dp) :: vrel35_H, vrel35_He, deltaR
+  real(kind=dp) :: C625, mu, mub, nH, nHe, alpha
+  
+  alpha = ABARH / fourpi / EPSILON_0!polarizability of H in m^3
+
+  nH = hydrogen%n(1,icell)
+  if (associated(helium)) then
+   nHe = helium%n(1,icell)
+   !if helium is a perturber
+   mub = atom%weight * helium%weight / (atom%weight + helium%weight)
+   vrel35_He =(vtherm/mub * atmos%T(icell))**(0.3)
+  else
+   nHe = 0.0
+   vrel35_He = 0.0
+  endif
+    
+  j = atom%lines(kr)%j
+  i = atom%lines(kr)%i
+
+  Z = atom%stage(j)+1
+  ic = find_continuum(atom, j)
+
+  !reduce mass for mean velocity
+  mu = atom%weight * hydrogen%weight / (atom%weight + hydrogen%weight)
+  
+  !square
+  !in total there is a 2 square factor
+  deltaR = RBOHR**2 * 2.5 / Z / Z * (n_eff(atom%Rydberg, atom%E(ic), atom%E(j), Z)**4 - &
+  									n_eff(atom%Rydberg, atom%E(ic), atom%E(i), Z)**4)
+  									
+  C625 = (2.0*pi/fourpi/EPSILON_0)**(0.4) * (Q_ELECTRON*Q_ELECTRON/HPLANCK * alpha * deltaR)**(0.4) 
+  vrel35_H = (vtherm/mu * atmos%T(icell))**(0.3) !sqvel**0.3 = vel**(3./5.)
+
+  !enhancement 
+  !*atom%lines(kr)%cvdWaals(1), * atom%lines(kr)%cvdWaals(3)
+  Gvdw = 8.08 * (nH * vrel35_H + nHe * vrel35_He) * C625 
+  
+  !GvdW = 10**(6.33 + 0.4 * log10(n_eff(atom%Rydberg, atom%E(ic), atom%E(j), Z)**4 - &
+  !			n_eff(atom%Rydberg, atom%E(ic), atom%E(i), Z)**4) -0.7*log10(atmos%T(icell)) + &
+  !			log10(atmos%nHtot(icell)*KBOLTZMANN*atmos%T(icell)*0.1))
+
+
+ RETURN
+ END SUBROUTINE VanderWaals_new
 
 
  SUBROUTINE VanderWaals(icell, atom, kr, GvdW)
  ! Compute van der Waals broadening in Lindholm theory with
  !Unsold's approximation for the interaction coefficient C_6.
  !
- ! See: Traving 1960, "Uber die Theorie der Druckverbreiterung
- ! von Spektrallinien", p 91-97
- !
- !  -- Mihalas 1978, p. 282ff, and Table 9-1.
- !
- ! --->
- !  -- Hubeny & Mihalas 2014, chap 8, sect. 8.3
- ! and table 8.1
- ! --->
- !
- !Gamma = 8.08 * vrel^3/5 * C_6^2/5 * atmos.H.ntotal_neutral
+ !Gamma = 8.08 * vrel^3/5 * C_6^2/5 * nH(1)
  !
  !
- ! Or with the Anstee, Barklem & O'Mara formalism.
+ ! Or with the Anstee, Barklem & O'Mara formalism (not yet)
  !
  ! See: Anstee & O'Mara 1995, MNRAS 276, 859-866
  ! Barklem & O'Mara 1998, MNRAS 300, 863-871
@@ -91,62 +156,58 @@ MODULE broad
  ! Gamma =
  ! (4/pi)^(alpha/2) * &
  !     Gam((4-alpha)/2) v_0 sigma(v_0)(vmean/v_0)^(1-alpha)
-  double precision, intent(out) :: GvdW
+ !
+  real(kind=dp), intent(out) :: GvdW
   integer, intent(in) :: icell
   type (AtomType), intent(in) :: atom
-  type (AtomicLine) :: line
-  type (Element), pointer :: Helium
+  type (Element), pointer :: Helium_elem
   integer, intent(in) :: kr
   integer :: i, j, ic, Z, k
-  double precision :: vrel35_H, vrel35_He, fourPIeps0, deltaR
-  double precision :: cross, gammaCorrH, gammaCorrHe, C625
+  real(kind=dp) :: vrel35_H, vrel35_He, fourPIeps0, deltaR
+  real(kind=dp) :: cross, gammaCorrH, gammaCorrHe, C625
 
-  Helium => atmos%Elements(2)%ptr_elem ! Helium basic informations
-  line = atom%lines(kr)
 
-  ! here, starts a 1 because it is j saved in line%j, which
-  ! is corrected by +1 wrt the j read in the atomic file
-  j = line%j
-  i = line%i
+  Helium_elem => atmos%Elements(2)%ptr_elem ! Helium basic informations
+
+
+  j = atom%lines(kr)%j
+  i = atom%lines(kr)%i
 
   !could be nice to keep vrel35 for each atom ? as it depends only on the weight
 
   fourPIeps0 = 4.*PI*EPSILON_0
-   !write(*,*) atom%weight, Helium%weight, Hydrogen%weight, atmos%Elements(2)%ptr_elem%weight
-  vrel35_He = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Helium%weight))**0.3
+  vrel35_He = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Helium_elem%weight))**0.3
 
   Z = atom%stage(j)+1
-  ic = find_Continuum(line%atom, j)
+  ic = find_continuum(atom%lines(kr)%atom, j)
 
-  deltaR = (E_RYDBERG/(atom%E(ic)-atom%E(j)))**2. - (E_RYDBERG/(atom%E(ic)-atom%E(i)))**2.
+  deltaR = (atom%Rydberg/(atom%E(ic)-atom%E(j)))**2. - (atom%Rydberg/(atom%E(ic)-atom%E(i)))**2.
   C625 = (2.5*((Q_ELECTRON)**2./fourPIeps0)*(ABARH/fourPIeps0) * 2.*PI*(Z*RBOHR)**2./HPLANCK * deltaR)**(4d-1)
 
 
-  SELECT CASE (line%vdWaals)
+  SELECT CASE (atom%lines(kr)%vdWaals)
   CASE ("UNSOLD")
    ! Relative velocity of radiator and perturber with Maxwellian
    ! velocity distributions
    vrel35_H = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Hydrogen%weight))**(3d-1)
-   cross = 8.08 * (line%cvdWaals(1)*vrel35_H+line%cvdWaals(3)*Helium%abund*vrel35_He)*C625
-   !write(*,*) Helium%abund, C625
+   cross = 8.08 * (atom%lines(kr)%cvdWaals(1)*vrel35_H+atom%lines(kr)%cvdWaals(3)*Helium_elem%abund*vrel35_He)*C625
    GvdW = cross * atmos%T(icell)**(3d-1)
+   
   CASE ("BARKLEM")
    write(*,*) "Warning-> vdWaals broadening following BARKLEM ",&
      "not tested yet!"
    ! UNSOLD for Helium
-   cross = 8.08 * line%cvdWaals(3)*Helium%abund*vrel35_He*C625
-    GvdW = line%cvdWaals(1) * atmos%T(icell)**(real(1.-&
-          line%cvdWaals(2),kind=8)/2.) + cross*atmos%T(icell)**(3d-1)
+   cross = 8.08 * atom%lines(kr)%cvdWaals(3)*Helium_elem%abund*vrel35_He*C625
+    GvdW = atom%lines(kr)%cvdWaals(1) * atmos%T(icell)**(real(1.-&
+          atom%lines(kr)%cvdWaals(2),kind=8)/2.) + cross*atmos%T(icell)**(3d-1)
   CASE DEFAULT
    write(*,*) "Method for van der Waals broadening unknown"
    write(*,*) "exiting..."
    stop
   END SELECT
 
-   !write(*,*) "GvdW=", GvdW(k)
-   GvdW = GvdW * atmos%nHtot(icell)
-   !GvdW = GvdW * Hydrogen%n(1,icell) !ground level pops
-   !GvdW = GvdW * sum(Hydrogen%n(1:Hydrogen%Nlevel-1,icell)) !total nH_I pops
+
+   GvdW = GvdW * Hydrogen%n(1,icell) !total nH_I in the ground state
 
  RETURN
  END SUBROUTINE VanderWaals
@@ -170,19 +231,19 @@ MODULE broad
  !
  ! if (line%cStark .lt.0) then Gamma = abs(line%cStark) * ne
  !
-  double precision, intent(out) :: GStark
+  real(kind=dp), intent(out) :: GStark
   integer, intent(in) :: icell
   type (AtomType), intent(in) :: atom
   type (AtomicLine) :: line
   integer, intent(in) :: kr
   integer :: k, ic, Z
-  double precision :: C4, C, Cm, melONamu, cStark23, cStark
-  double precision :: neff_u, neff_l, vrel, ERYDBERG
+  real(kind=dp) :: C4, C, Cm, melONamu, cStark23, cStark
+  real(kind=dp) :: neff_u, neff_l, vrel, ERYDBERG
 
   melONamu = M_ELECTRON / AMU
   line = atom%lines(kr)
 
-  if (line%cStark .lt. 0.) then
+  if (line%cStark < 0.) then
    cStark = dabs(real(line%cStark,kind=dp))
     GStark = cStark * atmos%ne(icell)
   else
@@ -224,104 +285,134 @@ MODULE broad
  ! GStark = a_1 * &
  !       [0.60 * (n_u^2 - n_l^2) * (N_e)^(2/3) * CM_TO_M^2] !s^-1, with N_e here in cm^-3
  !
-  double precision, intent(out) :: GStark
+ ! This is highly inaccurate for lines with n > 2
+ !
+  real(kind=dp), intent(out) :: GStark
   integer, intent(in) :: icell
   type (AtomType), intent(in) :: atom
-  type (AtomicLine) :: line
   integer, intent(in) :: kr
-  double precision :: n_upper, n_lower
-  integer :: k
-  double precision :: a1, C
+  real(kind=dp) :: n_upper, n_lower, Gstark2
+  real :: Z, K, dn, a1, gs
+  real(kind=dp) :: C, nelectric
+  
+  Z = 1.0 + atom%stage(atom%lines(kr)%i)
+  
+  nelectric = 1d-6 * (atmos%ne(icell) + hydrogen%n(hydrogen%Nlevel,icell)) !cm^-3
 
-  line = atom%lines(kr)
+  n_lower = dsqrt(atom%g(atom%lines(kr)%i)/2.)
+  n_upper = dsqrt(atom%g(atom%lines(kr)%j)/2.) !works because stark linear only for Hydrogen.
+  									 !at the moment. otherwise use n_eff, wich works for H
+  									 
+  dn = real(n_upper - n_lower)
 
-  ! or n_lower = dsqrt(atom%g(i)/2.) !with g the statistical weight
-  n_lower = dsqrt(atom%g(line%i)/2.)
-  n_upper = dsqrt(atom%g(line%j)/2.) !works because stark only for Hydrogen.
-!   if (.not.getPrincipal(atom%label(line%i),n_lower)) then
-!    write(*,*) "Cannot find principal quantum number for label ", &
-!     atom%label(line%i), " exiting..."
-!    stop
-!   end if
-!   if (.not.getPrincipal(atom%label(line%j),n_upper)) then
-!    write(*,*) "Cannot find principal quantum number for label ", &
-!    atom%label(line%j), " exiting..."
-!    stop
-!   end if
-
-  if ((n_upper-n_lower).eq.1) then !first line of the serie, dn=1
+  if (dn == 1.0) then !first line of the serie, dn=1
    a1 = 0.642
   else
-   a1 = 1.
+   a1 = 1.0
   end if
-  C = a1 * 0.6 * (n_upper*n_upper-n_lower*n_lower) * (CM_TO_M)**2.
+  
+  !Sutton recommends to multiply dz with gs=0.425 if to be used with a dispersion profile
+  !but since it is very inaccurate and we miss broadening 
+  gs = 1.0 !
 
-   GStark = C*atmos%ne(icell)**(2d0/3d0)
+  GStark = gs * a1 * 0.6 * (n_upper*n_upper-n_lower*n_lower) * &
+           ( nelectric**(2./3.) )
+
+
 
  RETURN
  END SUBROUTINE StarkLinear
-
- SUBROUTINE Damping(icell, atom, kr, adamp)
- ! I need to change something here, only a line from Atom%lines is needed since,
- !line%atom point to atom
- ! Beware here, because if I remove some transitions for images, but I need to do the calculations of
- !broadening by summing over transitions..
+ 
+ !building
+ subroutine resonance_broadening(icell, atom, kr, adamp)
   integer, intent(in) :: icell
   type (AtomType), intent(in) :: atom
-  type (AtomicLine) :: line
+  integer, intent(in) :: kr
+  real(kind=dp), intent(out) :: adamp
+  real(kind=dp) :: gr, nu1j, a1, a2, f1j, np
+  integer :: ic, i, j
+  
+  i = atom%lines(kr)%i
+  j = atom%lines(kr)%j
+  
+  a1 = 0.0
+  a2 = 0.0
+  
+  np = 1.0
+  ic = find_continuum(atom, i)
+  
+  if (i==1) then !transition between ground state and excited levels
+   gr = atom%g(atom%lines(kr)%i)/atom%g(atom%lines(kr)%j)
+   nu1j = M_TO_NM * CLIGHT / atom%lines(kr)%lambda0 !ground state is i
+   a1 = dsqrt(gr) * atom%lines(kr)%fosc / nu1j
+  else !transition between two exited states
+  	   !only one is resonance boradened
+   nu1j = (atom%E(i) - atom%E(1)) / HPLANCK
+   gr = atom%g(1) / atom%g(i)
+   np = n_eff(atom%rydberg, atom%E(ic),atom%E(i), atom%stage(ic))
+   f1j = line_oscillator_strength(1.0_dp, np)
+   a1 = f1j * dsqrt(gr)/nu1j
+!    nu1j = (atom%E(atom%lines(kr)%j) - atom%E(1)) / HPLANCK
+!    gr = atom%g(1) / atom%g(atom%lines(kr)%j)
+!    np = n_eff(atom%rydberg, atom%E(ic),atom%E(atom%lines(kr)%j), atom%stage(atom%lines(kr)%j)+1)
+!    f1j = line_oscillator_strength(1.0_dp, np)   
+!    a2 = f1j * dsqrt(gr)/nu1j
+  endif
+
+  adamp = 5.48 * pi * Q_ELECTRON**2  * max(0.0, max(a1,a2)) * atom%n(1,icell) / M_ELECTRON!/ fourpi
+ 
+ return
+ end subroutine resonance_broadening
+
+ SUBROUTINE Damping(icell, atom, kr, adamp)
+
+  integer, intent(in) :: icell
+  type (AtomType), intent(in) :: atom
   integer, intent(in) :: kr
   integer :: k
-  double precision :: cDop
-  double precision, intent(out) :: adamp
-  double precision :: Qelast, Gj
+  real(kind=dp) :: cDop
+  real(kind=dp), intent(out) :: adamp
+  real(kind=dp) :: Qelast, Gj
 
-  Qelast = 0.0
+  Qelast = 0.0 !used for PFR
+  !stored everything that is not radiative
 
-  line=atom%lines(kr)
-  !write(*,*) "Computing damping for line ",line%j,"-",line%i
-
-!   if (atom%g(line%j)==18.and.atom%g(line%i)==8) then
-!   CALL RadiativeDamping(icell, atom, kr, Gj)
-!   write(*,*) "Grad compare:", line%Grad, Gj
-!   
-!   stop
-!   endif
-
-  cDop = (NM_TO_M*line%lambda0) / (4.*PI)
+  !conversion factor from gamma in sr / s^-1 to Gamma in m/s
+  !and then to adamp as Gamma / vrboad
+  cDop = (NM_TO_M*atom%lines(kr)%lambda0) / (4.*PI)
+  
+  
   ! van der Waals broadening
-  if ((line%cvdWaals(1).gt.0).or.(line%cvdWaals(3).gt.0)) then
+  !interaction with neutral H and neutral He
+  !Not for H and He ?
+  if ((atom%lines(kr)%cvdWaals(1) > 0).or.(atom%lines(kr)%cvdWaals(3) > 0)) then
    CALL VanderWaals(icell, atom, kr, adamp)
+   !CALL VanderWaals_new(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
-    !write(*,*) " Van der Waals:", adamp
-    !write(*,*),"vdW", adamp* cDop/VBROAD_atom(icell,atom)
   end if
+  
   ! Quadratic Stark broadening
-  if (line%cStark > 0.) then
+  !Interaction with charged particles
+  !-> for H cStark is 0
+  if (atom%lines(kr)%cStark /= 0.0) then
    CALL Stark(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
-    !write(*,*) " Stark qu:", adamp
-    !write(*,*),"Stark2", adamp* cDop/VBROAD_atom(icell,atom)
   end if
+  
   ! Linear Stark broadening only for Hydrogen
-  if (atom%ID.eq."H ") then
+  !Approximate treatment at the moment
+  if (atom%ID == "H") then
    CALL StarkLinear(icell, atom,kr, adamp)
     Qelast = Qelast + adamp
-    !write(*,*) " Stark linear:", adamp
-    !write(*,*),"Stark1", adamp* cDop/VBROAD_atom(icell,atom)
+!    call resonance_broadening(icell, atom, kr, adamp)
+!     Qelast = Qelast + adamp
   end if
-  ! Store Qelast, total rate of elastic collisions, if PFR only
-  if (line%PFR) then
-   write(*,*) "PFR not handled yet, avoiding"
-   ! line%Qelast = Qelast
-  end if
-  !write(*,*) "Grad=", line%Grad * cDop/VBROAD_atom(icell,atom), cDop/VBROAD_atom(icell,atom)
-  adamp = (line%Grad + Qelast)*cDop / VBROAD_atom(icell,atom)
-!   if (line%atom%g(line%j)==18 .and.line%atom%g(line%i)==8) then
-!    write(*,*) " Halpha", adamp
-!    CALL Broad_Kurosawa(icell, atom, kr, adamp)
-!    adamp = adamp * Cdop/ VBROAD_atom(icell,atom)
-!    write(*,*) adamp
-!   endif
+  
+  adamp = (atom%lines(kr)%Grad + Qelast)*cDop / atom%vbroad(icell)
+!   write(*,*) atom%ID, atom%lines(kr)%j, atom%lines(kr)%i, atom%vbroad(icell)/1e3
+!   write(*,*) atmos%T(icell), "a=", adamp, "Grad", atom%lines(kr)%Grad
+
+
  RETURN
  END SUBROUTINE Damping
 

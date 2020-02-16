@@ -7,318 +7,217 @@
 
 MODULE AtomicTransfer
 
- use metal, only                        : metal_bb_new, compute_opacities, alloc_atom_quantities, dealloc_Atom_quantities
- use opacity
- use Planck, only 						: bplanck
- use Profiles, only 					: Iprofile, Iprofile_thomson, Iprofile_cmf_to_obs, Zprofile
- !use broad, only 						: Damping, RadiativeDamping !for tests
- use spectrum_type
- use atmos_type
- use readatom
- use lte
- use constant, only 					: MICRON_TO_NM
- use collision, only					: CollisionRate !future deprecation
- use impact
- use solvene
- use statequil_atoms
- use init_solution, only 			: Init_NLTE, free_NLTE_sol, gpop_old, pop_old, flatpops, lcell_converged
- use accelerate
- use voigtfunctions
- use writeatom, only 					: writePops, writeelectron, writehydrogendensity
- use write_opacity!, only 				: write_Jnu, write_taur, write_atom_xsections_bf_ff
- use math
- !$ use omp_lib
+	use metal, only				: metal_bb_new, compute_opacities, alloc_atom_quantities, dealloc_Atom_quantities
+	use opacity
+	use Planck, only			: bplanck
+	use Profiles, only			: Iprofile, Iprofile_thomson, Iprofile_cmf_to_obs, Zprofile, write_profiles_ascii
+	use spectrum_type
+	use atmos_type
+	use readatom
+	use lte
+	use constant, only			: MICRON_TO_NM
+	use collision, only			: CollisionRate !future deprecation
+	use impact
+	use solvene
+	use statequil_atoms
+	use init_solution, only		: Init_NLTE, free_NLTE_sol, gpop_old, Tex_old, flatpops, lcell_converged
+	use accelerate
+	use voigtfunctions
+	use writeatom, only			: writePops, writeelectron, writehydrogendensity
+	use write_opacity!, only 				: write_Jnu, write_taur, write_atom_xsections_bf_ff
+	use math
+	!$ use omp_lib
 
  !MCFOST's original modules
- use input, only 						: lkeplerian, linfall, RT_line_method
- use parametres
- use grid
- !use dust_prop
- use dust_transfer, only 				: compute_stars_map
- use dust_ray_tracing, only 			: init_directions_ray_tracing ,            &
+	use input, only				: lkeplerian, linfall, RT_line_method
+	use parametres
+	use grid
+	use dust_transfer, only		: compute_stars_map
+	use dust_ray_tracing, only	: init_directions_ray_tracing ,            &
                               			  tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az, &
                               			  tab_RT_incl, stars_map, kappa, stars_map_cont
- use stars
- use wavelengths
- !use density
- use mcfost_env, only : dp
- use constantes, only : tiny_dp, huge_dp
+	use stars
+	use wavelengths
+	use mcfost_env, only		: dp
+	use constantes, only		: tiny_dp, huge_dp
 
- IMPLICIT NONE
+	IMPLICIT NONE
  
- real(kind=dp), parameter :: tiny_chi = 1d-50
+	real(kind=dp), parameter :: tiny_chi = 1d-50
  !Pointer to formal solver
- PROCEDURE(INTEG_RAY_LINE_I), pointer :: INTEG_RAY_LINE => NULL()
+	PROCEDURE(INTEG_RAY_LINE_I), pointer :: INTEG_RAY_LINE => NULL()
  !Temporary variable for Zeeman calculations
- real(kind=dp), dimension(:,:), allocatable :: QUV
+	real(kind=dp), dimension(:,:), allocatable :: QUV
  !Temporary variables for Contribution functions
- real(kind=dp), allocatable :: S_contrib(:,:,:), S_contrib2(:,:), chil(:), Sl(:)
+	real(kind=dp), allocatable :: S_contrib(:,:,:), S_contrib2(:,:), mean_formation_depth
 
  CONTAINS
 
- SUBROUTINE INTEG_RAY_LINE_I_NLTE(id,icell_in,x,y,z,u,v,w,iray,labs)
- ! ------------------------------------------------------------------------------- !
-  ! This routine performs integration of the transfer equation along a ray
-  ! co continuum
- ! ------------------------------------------------------------------------------- !
-
-  integer, intent(in) :: id, icell_in, iray
-  real(kind=dp), intent(in) :: u,v,w
-  real(kind=dp), intent(in) :: x,y,z
-  logical, intent(in) :: labs
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, etau, edtau
-  real(kind=dp), dimension(NLTEspec%Nwaves) :: Snu, chiI, LimbD
-  real(kind=dp), dimension(NLTEspec%Nwaves) :: tau, dtau, dtau_ds
-  integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
-  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, eval_operator
-
-  x1=x;y1=y;z1=z
-  x0=x;y0=y;z0=z
-  next_cell = icell_in
-  nbr_cell = 0
-
-  tau(:) = 0.0_dp
-  chiI(:) = 0.0_dp
-  NLTEspec%I(:,iray,id) = 0d0
-
-  ! -------------------------------------------------------------- !
-  !*** propagation dans la grille ***!
-  ! -------------------------------------------------------------- !
-  ! Will the ray intersect a star
-  call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-
-  ! Boucle infinie sur les cellules
-  infinie : do ! Boucle infinie
-    ! Indice de la cellule
-    icell = next_cell
-    x0=x1 ; y0=y1 ; z0=z1
-
-    if (icell <= n_cells) then
-     lcellule_non_vide = (atmos%icompute_atomRT(icell) > 0)
-     if (atmos%icompute_atomRT(icell) < 0) RETURN !-1 if dark
-    else
-     lcellule_non_vide=.false.
-    endif
-    
-    
-    ! Test sortie ! "The ray has reach the end of the grid"
-    if (test_exit_grid(icell, x0, y0, z0)) RETURN
-
-    if (lintersect_stars) then
-      if (icell == icell_star) then
-       call calc_stellar_surface_brightness(NLTEspec%Nwaves,NLTEspec%lambda,i_star, x0, y0, z0, u,v,w,LimbD)
-       !CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x0, y0, z0, u,v,w,LimbD)
-       NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + LimbD(:) * NLTEspec%Istar(:,i_star)*dexp(-tau)
-       RETURN
-      end if
-    endif
-
-    nbr_cell = nbr_cell + 1
-
-    ! Calcul longeur de vol et profondeur optique dans la cellule
-    previous_cell = 0 ! unused, just for Voronoi
-    call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-
-
-    !count opacity only if the cell is filled, else go to next cell
-    if (lcellule_non_vide) then
-     lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
-     ! opacities in m^-1
-     l_contrib = l_contrib * AU_to_m !l_contrib in m
-     if ((nbr_cell == 1).and.labs) ds(iray,id) = l * AU_to_m
-
-     eval_operator = (labs .and. (nbr_cell == 1)) 
-     
-     !init bound-bound eta and chi
-     CALL initAtomOpac(id)
-     !compute LTE bound-bound opacity
-      if (atmos%NpassiveAtoms>0) CALL Metal_bb_new(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
-
-      chiI(:)  = NLTEspec%AtomOpac%chi_p(:,id) + NLTEspec%AtomOpac%Kc(:,icell) + tiny_chi
-      Snu(:) = 0d0 !for this cell
-
-      if (atmos%NactiveAtoms>0) then 
-       !init NLTE bound-bound
-       CALL initAtomOpac_nlte(id)
-       CALL NLTE_bound_bound(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
-       if (eval_operator) then
-        chi_loc(:,iray,id) = chiI(:) !for this cell, for computing eta_Atom_loc = chi_loc+chi_nlte
-       endif
-
-       !add NLTE bound-bound and bound-free opacities
-       chiI(:) = chiI(:) + NLTEspec%AtomOpac%chi(:,id) +  NLTEspec%AtomOpac%Kc_nlte(:,icell) 
-       
-       !Source function
-       Snu = Snu + (NLTEspec%AtomOpac%eta(:,id) + NLTEspec%AtomOpac%jc_nlte(:,icell)) / chiI(:)
-      
-        if (atmos%electron_scattering) then !coherent scattering approximation
-         Snu = Snu + NLTEspec%Jc(:,icell) * NLTEspec%AtomOpac%sca_c(:,icell) / chiI(:)
-        endif
-      endif !active atoms
-                    
-      dtau(:)   = l_contrib * chiI(:)
-
-      !add LTE part of the source function
-      Snu = Snu + ( NLTEspec%AtomOpac%jc(:,icell) + NLTEspec%AtomOpac%eta_p(:,id) ) / chiI(:)
-      
-      !compute intensity at this point of the propagation
-      
-      NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + dexp(-tau) * (1.0_dp - dexp(-dtau)) * Snu
-     
-     !Compute (1-exp(-dtau*chi))
-     if (eval_operator) then
-       dtau_ds = ds(iray,id) * chiI(:) !could be avoid id ds = l_contrib, it is simply dtau
-       CALL calc_psi_operator(id, icell, iray, chiI, dtau_ds)
-     end if
-
-     tau = tau + dtau
-
-    end if 
-  end do infinie
-  ! -------------------------------------------------------------- !
-  ! -------------------------------------------------------------- !
-  RETURN
-  END SUBROUTINE INTEG_RAY_LINE_I_NLTE
   
- SUBROUTINE INTEG_RAY_LINE_I(id,icell_in,x,y,z,u,v,w,iray,labs)
- ! ------------------------------------------------------------------------------- !
-  ! This routine performs integration of the transfer equation along a ray
-  ! crossing different cells.
-  ! --> Atomic Lines case.
- ! ------------------------------------------------------------------------------- !
+	SUBROUTINE INTEG_RAY_LINE_I(id,icell_in,x,y,z,u,v,w,iray,labs)
+	! ------------------------------------------------------------------------------- !
+	! This routine performs integration of the transfer equation along a ray
+	! crossing different cells.
+	! --> Atomic Lines case.
+	! ------------------------------------------------------------------------------- !
 
-  integer, intent(in) :: id, icell_in, iray
-  real(kind=dp), intent(in) :: u,v,w
-  real(kind=dp), intent(in) :: x,y,z
-  logical, intent(in) :: labs !used in NLTE but why?
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, etau, edtau, etauc, edtauc
-  real(kind=dp), dimension(NLTEspec%Nwaves) :: Snu, Snu_c, chiI, LimbD, chiIc
-  real(kind=dp), dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, dtau_ds
-  integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
-  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, eval_operator
+		integer, intent(in) :: id, icell_in, iray
+		real(kind=dp), intent(in) :: u,v,w
+		real(kind=dp), intent(in) :: x,y,z
+		logical, intent(in) :: labs !used in NLTE but why?
+		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
+		real(kind=dp), dimension(NLTEspec%Nwaves) :: Snu, Snu_c, chiI, LimbD, chiIc
+		real(kind=dp), dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau
+		real(kind=dp) :: etau, edtau, etau_c, edtau_c
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, eval_operator
 
-  x1=x;y1=y;z1=z
-  x0=x;y0=y;z0=z
-  next_cell = icell_in
-  nbr_cell = 0
+		x1=x;y1=y;z1=z
+		x0=x;y0=y;z0=z
+		next_cell = icell_in
+		nbr_cell = 0
 
-  tau(:) = 0.0_dp
-  tau_c(:) = 0.0_dp
-  chiI(:) = 0.0_dp
-  chiIc(:) = 0.0_dp
+		tau(:) = 0.0_dp
+		tau_c(:) = 0.0_dp
+		chiI(:) = 0.0_dp
+		chiIc(:) = 0.0_dp
 
 
-  NLTEspec%I(:,iray,id) = 0d0
-  NLTEspec%Ic(:,iray,id) = 0d0
+		NLTEspec%I(:,iray,id) = 0d0
+		NLTEspec%Ic(:,iray,id) = 0d0
 
-    ! write(*,*) "Before propagating", "x=",x,"y=",y,"z=",z,"x1=",x1,"y1=",y1,"z1=",z1
 
   ! -------------------------------------------------------------- !
   !*** propagation dans la grille ***!
   ! -------------------------------------------------------------- !
   ! Will the ray intersect a star
-  call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
   ! Boucle infinie sur les cellules
-  infinie : do ! Boucle infinie
+		infinie : do ! Boucle infinie
     ! Indice de la cellule
-    icell = next_cell
-    x0=x1 ; y0=y1 ; z0=z1
+			icell = next_cell
+			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
 
-    if (icell <= n_cells) then
-     !lcellule_non_vide=.true.
-     !atmos%nHtot(icell)>0
-     lcellule_non_vide = (atmos%icompute_atomRT(icell) > 0)
-     if (atmos%icompute_atomRT(icell) < 0) RETURN !-1 if dark
-    else
-     lcellule_non_vide=.false.
-    endif
+			if (icell <= n_cells) then
+				lcellule_non_vide = (atmos%icompute_atomRT(icell) > 0)
+				if (atmos%icompute_atomRT(icell) < 0) RETURN !-1 if dark
+			else
+				lcellule_non_vide=.false.
+			endif
     
     ! Test sortie ! "The ray has reach the end of the grid"
 
-    if (test_exit_grid(icell, x0, y0, z0)) RETURN
+			if (test_exit_grid(icell, x0, y0, z0)) RETURN
 
-    if (lintersect_stars) then
-      if (icell == icell_star) then
+			if (lintersect_stars) then
+				if (icell == icell_star) then
        !AT the moment the stellar Flux is only a BB
-       call calc_stellar_surface_brightness(NLTEspec%Nwaves,NLTEspec%lambda,i_star, x0, y0, z0, u,v,w,LimbD)
+					call calc_stellar_surface_brightness(NLTEspec%Nwaves,NLTEspec%lambda,i_star, x0, y0, z0, u,v,w,LimbD)
+       !if (maxval(limbD == 0.0_dp)) return
        !CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x0, y0, z0, u,v,w,LimbD)
-       NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + LimbD(:) * NLTEspec%Istar(:,i_star)*dexp(-tau)
-       NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + LimbD(:) * NLTEspec%Istar(:,i_star)*dexp(-tau_c)
-       RETURN
-      end if
-    endif
+					NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + LimbD(:) * NLTEspec%Istar(:,i_star)*dexp(-tau)
+       				NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + LimbD(:) * NLTEspec%Istar(:,i_star)*dexp(-tau_c)
+       				RETURN
+      			end if
+   			 endif
 
-    nbr_cell = nbr_cell + 1
+			nbr_cell = nbr_cell + 1
 
     ! Calcul longeur de vol et profondeur optique dans la cellule
-    previous_cell = 0 ! unused, just for Voronoi
-     !write(*,*) "in integ_ray_line before X-cell:", icell, "x=",x0,"y=",y0,"z=",z0,"x1=",x1,"y1=",y1,"z1=",z1
-    call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-     !write(*,*) "in integ_ray_line after X-cell:", icell, "x=",x0,"y=",y0,"z=",z0,"x1=",x1,"y1=",y1,"z1=",z1
+			previous_cell = 0 ! unused, just for Voronoi
+			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
 
 
     !count opacity only if the cell is filled, else go to next cell
-    if (lcellule_non_vide) then
-     lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
+			if (lcellule_non_vide) then
+				lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
      ! opacities in m^-1
-     l_contrib = l_contrib * AU_to_m !l_contrib in m
-     if ((nbr_cell == 1).and.labs) ds(iray,id) = l * AU_to_m
+				l_contrib = l_contrib * AU_to_m !l_contrib in m
+				if ((nbr_cell == 1).and.labs) ds(iray,id) = l * AU_to_m
 
-     eval_operator = (labs .and. (nbr_cell == 1)) !labs if false for images
+				eval_operator = (labs .and. (nbr_cell == 1)) !labs if false for images
      											  !so no pb if Nact>0 and we use a different grid
-     CALL initAtomOpac(id) !in principle, if lstore_opac is the only mode, this init could be in 
-     						!the condition below.
- 	!write(*,*) "Taille cellule", r_lim(icell)
-      if (atmos%NpassiveAtoms>0) CALL Metal_bb_new(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
+				CALL initAtomOpac(id)
+				if (atmos%NpassiveAtoms>0) &
+					CALL Metal_bb_new(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
 
-      chiIc(:) = NLTEspec%AtomOpac%Kc(:,icell) + tiny_chi 
-      chiI(:)  = NLTEspec%AtomOpac%chi_p(:,id) + chiIc(:)
+				chiIc(:) = NLTEspec%AtomOpac%Kc(:,icell) + tiny_chi 
+				chiI(:)  = NLTEspec%AtomOpac%chi_p(:,id) + chiIc(:)
 
-      if (atmos%NactiveAtoms>0) then 
-       CALL initAtomOpac_nlte(id)
+				if (atmos%NactiveAtoms>0) then 
+					!(line+continuum) LTE opacities, not updated during the local sub iterations.
+					if (eval_operator) then 
+						chi_loc(:,iray,id) = chiI(:)
+						eta_loc(:,iray,id) = NLTEspec%AtomOpac%jc(:,icell) + NLTEspec%AtomOpac%eta_p(:,id) + &
+						NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell)
+						!Do not updated the scattering emissivity for local iterations ?? better ??
+						
+						!Because Kc_nlte is the total nlte b-f, stored on the whole grid
+						!if (iray==1) call calc_etac_atom_loc(id, icell)
+						!-> needed only if MALI ? since Stot is computed with Psi or locally 
+					endif
+					
+					CALL initAtomOpac_nlte(id)
       
-       CALL NLTE_bound_bound(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
+					CALL NLTE_bound_bound(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, eval_operator)
+					
+					!NLTE bound-free computed before propagation on the whole grid.
+					!Or Before each iterations
+					chiIc(:) = chiIc(:) + NLTEspec%AtomOpac%Kc_nlte(:,icell)
 
-       chiIc(:) = chiIc(:) + NLTEspec%AtomOpac%Kc_nlte(:,icell)
+					chiI(:) = chiI(:) + NLTEspec%AtomOpac%chi(:,id) +  NLTEspec%AtomOpac%Kc_nlte(:,icell)
+				endif !active atoms
 
-       chiI(:) = chiI(:) + NLTEspec%AtomOpac%chi(:,id) +  NLTEspec%AtomOpac%Kc_nlte(:,icell)
-      endif !active atoms
-
-      dtau(:)   = l_contrib * chiI(:)
-      dtau_c(:) = l_contrib * chiIc(:)
+				dtau(:)   = l_contrib * chiI(:)
+				dtau_c(:) = l_contrib * chiIc(:)
             
-      Snu = ( NLTEspec%AtomOpac%jc(:,icell) + NLTEspec%AtomOpac%eta_p(:,id) ) / chiI(:)
-      Snu_c = NLTEspec%AtomOpac%jc(:,icell) / chiIc(:)
+				Snu = ( NLTEspec%AtomOpac%jc(:,icell) + NLTEspec%AtomOpac%eta_p(:,id) ) / chiI(:)
+				Snu_c = NLTEspec%AtomOpac%jc(:,icell) / chiIc(:)
       
-      if (atmos%Nactiveatoms>0) then 
-        Snu = Snu + ( NLTEspec%AtomOpac%eta(:,id) + NLTEspec%AtomOpac%jc_nlte(:,icell) ) / chiI(:)
-        Snu_c = Snu_c + NLTEspec%AtomOpac%jc_nlte(:,icell) / chiIc(:)
-      endif
-      if (atmos%electron_scattering) then
-         Snu = Snu + NLTEspec%Jc(:,icell) * NLTEspec%AtomOpac%sca_c(:,icell) / chiI(:)
-         Snu_c = Snu_c + NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) / chiIc(:)
-      endif
+      			!Always include electron scattering if NLTE loop.
+      			!But ATM, uses %Jc even for lines.
+				if (atmos%Nactiveatoms>0) then 
+					Snu = Snu + ( NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) + NLTEspec%AtomOpac%eta(:,id) + NLTEspec%AtomOpac%jc_nlte(:,icell) ) / chiI(:)
+					Snu_c = Snu_c + ( NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) + &
+					NLTEspec%AtomOpac%jc_nlte(:,icell) )/ chiIc(:)
 
-      NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + dexp(-tau) * (1.0_dp - dexp(-dtau)) * Snu
-      NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + dexp(-tau_c) * (1.0_dp - dexp(-dtau_c)) * Snu_c
+				else if ((atmos%electron_scattering).and.(atmos%NactiveAtoms==0)) then
+					Snu = Snu + NLTEspec%Jc(:,icell) * NLTEspec%AtomOpac%sca_c(:,icell) / chiI(:)
+					Snu_c = Snu_c + NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) / chiIc(:)
+				endif
+
+
+! 				NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + dexp(-tau) * (1.0_dp - dexp(-dtau)) * Snu
+! 				NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + dexp(-tau_c) * (1.0_dp - dexp(-dtau_c)) * Snu_c
+				do la=1, NLTEspec%Nwaves
+! 					if (tau(la) < ..) then
+! 						etau = 1 + tau(la) ? 
+! 					...
+				
+					NLTEspec%I(la,iray,id) = NLTEspec%I(la,iray,id) + dexp(-tau(la)) * (1.0_dp - dexp(-dtau(la))) * Snu(la)
+					NLTEspec%Ic(la,iray,id) = NLTEspec%Ic(la,iray,id) + dexp(-tau_c(la)) * (1.0_dp - dexp(-dtau_c(la))) * Snu_c(la) 
+				
+				enddo
      
-     if (eval_operator) then
-       dtau_ds = ds(iray,id) * chiI(:)
-       CALL calc_psi_operator(id, icell, iray, chiI, dtau_ds)
-     end if
+				if (eval_operator) then
+					!!dtau_ds = ds(iray,id) * chiI(:)
+					!!CALL calc_psi_operator(id, icell, iray, chiI,ds(iray,id) * chiI(:),Snu)
+					NLTEspec%S(:,iray,id) = Snu(:)
+					NLTEspec%chi(:,iray,id) = chiI(:)
+				end if
      
-     tau = tau + dtau
-     tau_c = tau_c + dtau_c
+				tau = tau + dtau
+				tau_c = tau_c + dtau_c
 
-    end if  ! lcellule_non_vide
-  end do infinie
-  ! -------------------------------------------------------------- !
-  ! -------------------------------------------------------------- !
-  RETURN
-  END SUBROUTINE INTEG_RAY_LINE_I
+			end if  ! lcellule_non_vide
+		end do infinie
 
+	RETURN
+	END SUBROUTINE INTEG_RAY_LINE_I
+
+ !building and ACTIVE opacities
  SUBROUTINE INTEG_RAY_LINE_Z(id,icell_in,x,y,z,u,v,w,iray,labs)
  ! ------------------------------------------------------------------------------- !
   ! This routine is "LTE", although NLTE pops can be used
@@ -411,15 +310,16 @@ MODULE AtomicTransfer
       Snu = ( NLTEspec%AtomOpac%jc(:,icell) + NLTEspec%AtomOpac%eta_p(:,id) ) / chiI(:)
       Snu_c = NLTEspec%AtomOpac%jc(:,icell) / chiIc(:)
       
-      !add only if non zero,; this should be fater to do than adding a large 0 array
-      if (atmos%Nactiveatoms>0) then 
-        Snu = Snu + (NLTEspec%AtomOpac%eta(:,id) + NLTEspec%AtomOpac%jc_nlte(:,icell)) / chiI(:)
-        Snu_c = Snu_c + NLTEspec%AtomOpac%jc_nlte(:,icell) / chiIc(:)
-      endif
-       if (atmos%electron_scattering) then !if pure LTE J computed before emission_line_map.
-         Snu = Snu + NLTEspec%Jc(:,icell) * NLTEspec%AtomOpac%sca_c(:,icell) / chiI(:)
-         Snu_c = Snu_c + NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) / chiIc(:)
-       endif
+      			!Always include electron scattering if NLTE loop.
+      			!But ATM, uses %Jc even for lines.
+				if (atmos%Nactiveatoms>0) then 
+					Snu = Snu + ( NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) + NLTEspec%AtomOpac%eta(:,id) + NLTEspec%AtomOpac%jc_nlte(:,icell) ) / chiI(:)
+					Snu_c = Snu_c + ( NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) + &
+					NLTEspec%AtomOpac%jc_nlte(:,icell) )/ chiIc(:)
+				else if ((atmos%electron_scattering).and.(atmos%NactiveAtoms==0)) then
+					Snu = Snu + NLTEspec%Jc(:,icell) * NLTEspec%AtomOpac%sca_c(:,icell) / chiI(:)
+					Snu_c = Snu_c + NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) / chiIc(:)
+				endif
 
     !continuum not affected by polarisation yet
      NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
@@ -502,7 +402,7 @@ MODULE AtomicTransfer
      I0 = 0d0
      I0c = 0d0
      if (atmos%magnetized.and. PRT_SOLUTION == "FULL_STOKES") QUV(:,:) = 0d0 !move outside
-     !if (lcontrib_function) S_contrib2(:,:) = 0d0
+     if (lcontrib_function) S_contrib2(:,:) = 0d0
 
      ! Vecteurs definissant les sous-pixels
      sdx(:) = dx(:) / real(subpixels,kind=dp)
@@ -535,7 +435,8 @@ MODULE AtomicTransfer
              	QUV(1,:) = QUV(1,:) + NLTEspec%STokesQ(:,iray,id)
              	QUV(2,:) = QUV(2,:) + NLTEspec%STokesU(:,iray,id)
              end if
-             !if (lcontrib_function) S_contrib2(:,:) = S_contrib2(:,:) + S_contrib(:,:,id)
+             !loop over all directions for each cell-frequency
+             if (lcontrib_function) S_contrib2(:,:) = S_contrib2(:,:) + S_contrib(:,:,id)
 
            !else !Outside the grid, no radiation flux
            endif
@@ -593,8 +494,8 @@ MODULE AtomicTransfer
      NLTEspec%F_QUV(3,:,ipix,jpix,ibin,iaz) = QUV(3,:) * normF !V
     end if
   end if
-  !if (lcontrib_function) NLTEspec%Ksi(:,:,ibin,iaz) = &
-  !                       NLTEspec%Ksi(:,:,ibin,iaz) + S_contrib2(:,:) * (pixelsize*au_to_m)**2 !In W/Hz
+  if (lcontrib_function) NLTEspec%Ksi(:,:,ibin,iaz) = &
+                         NLTEspec%Ksi(:,:,ibin,iaz) + S_contrib2(:,:)
 
 
   RETURN
@@ -771,8 +672,9 @@ MODULE AtomicTransfer
   !Profile => Iprofile_cmf_to_obs
   Profile => IProfile
   !Profile => Iprofile_thomson
+  INTEG_RAY_LINE => INTEG_RAY_LINE_I
 
-  lstore_opac = .true. !futur deprecation always true but ATM needed
+
 
   if (npix_x_save > 1) then
    RT_line_method = 2 ! creation d'une carte avec pixels carres
@@ -799,8 +701,6 @@ MODULE AtomicTransfer
   if (.not.lpluto_file) then
    if (lmodel_ascii) then
     CALL readAtmos_ascii(density_file)
-    !CALL writeHydrogenDensity()
-    !CALL writeTemperature()
    end if
   end if
         !! --------------------------------------------------------- !!
@@ -810,14 +710,10 @@ MODULE AtomicTransfer
   CALL readAtomicModels(atomunit)
   
   if (atmos%NactiveAtoms > 0) then 
-   atmos%Nrays = 200
-   !save time by not computing continuum flux, just needed for image
-   !INTEG_RAY_LINE => INTEG_RAY_LINE_I_NLTE
-   INTEG_RAY_LINE => INTEG_RAY_LINE_I
+   atmos%Nrays = 100!0
   else
    atmos%Nrays = Nrayone
-   if (lelectron_scattering) atmos%Nrays = 600 !here before I is allocated
-   INTEG_RAY_LINE => INTEG_RAY_LINE_I
+   if (lelectron_scattering) atmos%Nrays = 2000 !here before I is allocated
   endif
 
   !compute first guess of electron density ??
@@ -843,7 +739,8 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
   atmos%electron_scattering=lelectron_scattering !but also H and He, futur deprec of atmos
   if (ltab_wavelength_image) NLTEspec%write_wavelength_grid = .true.
-  CALL initSpectrum(vacuum_to_air=lvacuum_to_air)
+  !call set_up_sub_wavelengths_grid()
+  CALL initSpectrum(lam0=500d0,vacuum_to_air=lvacuum_to_air)
 
   if ((atmos%NactiveAtoms>0) .or. .not.(ltab_wavelength_image)) then
    if (n_etoiles > 0) CALL init_stellar_disk !for all wavelengths, all stars at disk centre
@@ -862,7 +759,7 @@ MODULE AtomicTransfer
    !IF NLTE loop we should also be able to read or compute an estimate of Jcont by the way...
    ! -> TBD
    if (atmos%NactiveAtoms == 0 .and. lelectron_scattering) then
-    call alloc_jnu()
+    call alloc_jnu(.false.)
 !    if (.not.lread_jnu_atom) then
 	if (lread_jnu_atom) then
 		call read_jnu_ascii
@@ -883,11 +780,6 @@ MODULE AtomicTransfer
  ! ----------------------------------- NLTE LOOP -------------------------------------- !
   if (atmos%Nactiveatoms > 0) then
      CALL NLTEloop()
-     !free not useful quantities
-     do icell=1,atmos%Nactiveatoms
-      deallocate(atmos%ActiveAtoms(icell)%ptr_atom%etac)
-      !Collision etc
-     enddo
   endif
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------- WRITE CONVERGED POPULATIONS ------------------------------ !
@@ -958,14 +850,15 @@ MODULE AtomicTransfer
   write(*,*) "Computing emission flux map..."
 
   !Use converged NLTEOpac
-!   if (lcontrib_function) then
-!    write(*,*) "   -> including contribution functions."
-!    allocate(S_contrib(NLTEspec%Nwaves,atmos%Nspace,NLTEspec%NPROC))
-!    allocate(chil(NLTEspec%Nwaves), Sl(NLTEspec%Nwaves),S_contrib2(NLTEspec%Nwaves,n_cells))
-!    S_contrib(:,:,:) = 0d0; S_contrib2(:,:) = 0d0
-!    INTEG_RAY_LINE => NULL()
-!    INTEG_RAY_LINE => INTEG_RAY_LINE_I_CNTRB !same as INTEG_RAY_LINE_I, without nlte (but %n is known)
-!   end if
+  if (lcontrib_function) then
+   write(*,*) "   >>> including contribution function Ksi..."
+   allocate(S_contrib(NLTEspec%Nwaves,n_cells,NLTEspec%NPROC))
+   allocate(S_contrib2(NLTEspec%Nwaves,n_cells))
+   !allocate(mean_formation_depth(npix_x, npix_y))
+   S_contrib(:,:,:) = 0d0; S_contrib2(:,:) = 0d0
+   INTEG_RAY_LINE => NULL()
+   INTEG_RAY_LINE => INTEG_RAY_LINE_I_CNTRB
+  end if
 
   !Actual flux calculation
   do ibin=1,RT_n_incl
@@ -979,32 +872,35 @@ MODULE AtomicTransfer
  ! ------------------------------------------------------------------------------------ !
   write(*,*) "Writing result to file..."
   call WRITE_FLUX_ASCII() !for testing
-  if (2*size(NLTEspec%Flux)/(1024.**3) <= 6.) call WRITE_FLUX
+  if (3*size(NLTEspec%Flux)/(1024.**3) <= 6.) call WRITE_FLUX
   deallocate(NLTEspec%Flux, NLTEspec%Fluxc) !free here to release a bit of memory
+  if (lcontrib_function) then
+   CALL WRITE_CNTRB_FUNC_pix()
+   deallocate(S_contrib, S_contrib2, NLTEspec%Ksi)
+ end if
     
-	call write_contrib_lambda_ascii(654.0_dp,0.0_dp,0.0_dp,1.0_dp)
-	call write_contrib_lambda_ascii(1083.0_dp,0.0_dp,0.0_dp,1.0_dp)
-	call write_taur(500._dp,0._dp,0._dp,1.0_dp)
+  !call write_contrib_lambda_ascii(654.0_dp,0.0_dp,0.0_dp,1.0_dp)
+  !call write_contrib_lambda_ascii(1083.0_dp,0.0_dp,0.0_dp,1.0_dp)
+!   call write_contrib_lambda_ascii(500.0_dp,0.0_dp,0.0_dp,1.0_dp)
+!   call write_taur(500._dp,0._dp,0._dp,1.0_dp)
 !-> building
 !  call write_contrib_lambda(654.0_dp,0.0_dp,0.0_dp,1.0_dp)
 !   call write_contrib_lambda(1080._dp,0._dp,0._dp,0._dp,0._dp,0._dp,0._dp)
 
   !write it after because sca_c (and maybe %Kc, %jc, %Kc_nlte, %Jc_nlte) is modified !!
-  do icell=1, atmos%Natom
-    CALL write_cont_opac_ascii(atmos%Atoms(icell)%ptr_atom)
-    !!CALL write_cont_opac(atmos%Atoms(icell)%ptr_atom) !-> building
-    CALL write_atom_xsections_bf_ff(atmos%Atoms(icell)%ptr_atom)
-  enddo
+!   do icell=1, atmos%Natom
+!     CALL write_cont_opac_ascii(atmos%Atoms(icell)%ptr_atom)
+!     !!CALL write_cont_opac(atmos%Atoms(icell)%ptr_atom) !-> building
+!     CALL write_atom_xsections_bf_ff(atmos%Atoms(icell)%ptr_atom)
+!     CALL write_profiles_ascii(52, atmos%Atoms(icell)%ptr_atom, 1)
+!   enddo
 
   if (atmos%electron_scattering) then
    !Jnu is written to ascii file if read
    if ((atmos%NactiveAtoms > 0).or.(atmos%NactiveAtoms==0.and.lread_jnu_atom)) call write_Jnu
    CALL dealloc_Jnu()
   endif
-!   if (lcontrib_function) then
-!    CALL WRITE_CNTRB_FUNC_pix()
-!    deallocate(S_contrib, chil, Sl, S_contrib2)
-!  end if
+
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! -------------------------------- CLEANING ------------------------------------------ !
@@ -1024,457 +920,519 @@ MODULE AtomicTransfer
  END SUBROUTINE
  ! ------------------------------------------------------------------------------------ !
 
- SUBROUTINE NLTEloop() !for all active atoms
- ! -------------------------------------------------------- !
-  ! Descriptor here
- ! -------------------------------------------------------- !
+	SUBROUTINE NLTEloop() !for all active atoms
+	! -------------------------------------------------------- !
+	! Descriptor here
+	! -------------------------------------------------------- !
 #include "sprng_f.h"
 
 
-  integer, parameter :: n_rayons_start = 100 
-  integer, parameter :: n_rayons_start2 = 100
-  integer :: n_rayons_max
-  integer :: etape, etape_start, etape_end, iray, n_rayons
-  integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, la
-  integer, dimension(nb_proc) :: max_n_iter_loc
-  logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
-  real :: rand, rand2, rand3
-  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt
-  real(kind=dp) :: diff, norme, dT_max, dN, dN1, dJ, lambda_max
-  real(kind=dp), allocatable :: dM(:), Jold(:,:), taub(:,:,:)
-                                   !futur global flag
-  logical :: labs, disable_subit, iterate_ne = .false., accelerated, ng_rest, l_unconverged
-  integer :: nact, maxIter, imax
-  integer :: icell, iorder, i0_rest, n_iter_accel
-  integer :: Nlevel_total = 0, NmaxLevel, ilevel, max_sub_iter
-  character(len=20) :: ne_start_sol = "NE_MODEL"
-  real(kind=dp), dimension(3, atmos%Nrays, nb_proc) :: xyz0, uvw0
-  type (AtomType), pointer :: atom
+		integer, parameter :: n_rayons_start = 1000 
+		integer, parameter :: n_rayons_start2 = 1000
+		integer :: n_rayons_max
+		integer :: etape, etape_start, etape_end, iray, n_rayons
+		integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, la, kr
+		integer, dimension(nb_proc) :: max_n_iter_loc
+		logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
+		real :: rand, rand2, rand3
+		real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt
+		real(kind=dp) :: diff, norme, dT_max, dN, dN1, dJ, lambda_max
+		real(kind=dp) :: dT, dN2, dN3, diff_old
+		real(kind=dp), allocatable :: dM(:), Jold(:,:), dTM(:), Tion_ref(:), Tex_ref(:)
+                                 !futur global flag
+		logical :: labs, disable_subit, iterate_ne = .false., accelerated, ng_rest
+		logical :: verbose, l_unconverged
+		integer :: nact, maxIter, imax, icell_max
+		integer :: icell, iorder, i0_rest, n_iter_accel
+		integer :: Nlevel_total = 0, NmaxLevel, ilevel, max_sub_iter
+		character(len=20) :: ne_start_sol = "NE_MODEL"
+! 		real(kind=dp), dimension(3, atmos%Nrays, nb_proc) :: xyz0, uvw0
+		type (AtomType), pointer :: atom
 
 
-  write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
-  write(*,*) " Max error : ", dpops_max_error, dpops_sub_max_error
+		write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
+		write(*,*) " Max error : ", dpops_max_error, dpops_sub_max_error
   
-  if (atmos%include_xcoupling) CALL ERROR("MALI SCHEME NOT IMPLEMENTED YET")
+		verbose = .true.
 
-  ds = 0.0_dp !meters
-  chi_loc = 0.0_dp
+		ds = 0.0_dp !meters
+		chi_loc = 0.0_dp
 
   !move to initSol
-  allocate(dM(atmos%Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
-  if (atmos%electron_scattering) then
-   allocate(Jold(NLTEspec%Nwaves, atmos%Nspace))!move to initsol
-   if (lread_jnu_atom) CALL read_Jnu() !initial solution from previous run or fix it ??
-  endif
+		allocate(dM(atmos%Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
+		allocate(dTM(atmos%Nactiveatoms)); dM=0d0 !keep tracks of Tex for all cells for each atom
+		allocate(Jold(NLTEspec%Nwaves, atmos%Nspace))!move to initsol
+		allocate(Tex_ref(atmos%Nactiveatoms)); dM=0d0 !keep tracks of max Tex for all cells for each line of each atom
+		allocate(Tion_ref(atmos%Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
+		diff_old = 0.0_dp
 
+		n_rayons_max = atmos%Nrays
+! 		xyz0(:,:,:) = 0d0
+! 		uvw0(:,:,:) = 0d0
 
-  n_rayons_max = atmos%Nrays
-  xyz0(:,:,:) = 0d0
-  uvw0(:,:,:) = 0d0
+		labs = .true. !to have ds at cell icell = eval_operator
+		id = 1
+		etape_start = 2
+		etape_end = 2
+		if (etape_start==1) then
+			write(*,*) "Warn: etape 1 not accurate"
+		endif
 
-  labs = .true. !to have ds at cell icell = eval_operator
-  id = 1
-  etape_start = 2
-  etape_end = 2
-  if (etape_start==1) then
-   write(*,*) "Warn: etape 1 not accurate"
-  endif
+!   disable_subit = .false.
 
-  disable_subit = .false.
+		accelerated  = .false.
+!   if (lNg_acceleration) then
+!    CALL error("+Ng no tested yet")
+!    n_iter_accel = 0
+!    i0_rest = 0
+!    ng_rest = .false.
+!   endif
 
-  accelerated  = .false.
-  if (lNg_acceleration) then
-   CALL error("+Ng no tested yet")
-   n_iter_accel = 0
-   i0_rest = 0
-   ng_rest = .false.
-  endif
+		iterate_ne = (n_iterate_ne>0)
+		if (iterate_ne) then
+			write(*,*) " before iterate ne I need te recompute gij for continua !!"
+		endif
 
-  iterate_ne = (n_iterate_ne>0)
-  if (iterate_ne) then
-   write(*,*) " before iterate ne I need te recompute gij for continua !!"
-  endif
+!   if (lforce_lte) disable_subit = .true.
 
-  if (lforce_lte) disable_subit = .true.
+		max_sub_iter = 1000
+		maxIter = 1000
+	! ----------------------------  INITIAL POPS------------------------------------------ !
+		CALL Init_NLTE(sub_iterations_enabled=.true.)!.not.disable_subit)
+	!  ------------------------------------------------------------------------------------ !
 
-  max_sub_iter = 1000
-  maxIter = 1000
- ! ----------------------------  INITIAL POPS------------------------------------------ !
-   CALL Init_NLTE(sub_iterations_enabled=.not.disable_subit)
- !  ------------------------------------------------------------------------------------ !
+		do etape=etape_start, etape_end
 
-     do etape=etape_start, etape_end
+			if (etape==1) then !two rays, not accurate
+				lfixed_rays=.true.
+				n_rayons = 2
+				iray_start = 1
+				lprevious_converged = .false.
 
-      if (etape==1) then !two rays, not accurate
-        lfixed_rays=.true.
-        n_rayons = 2
-        iray_start = 1
-        lprevious_converged = .false.
+			else if (etape==2) then 
+				lfixed_rays = .true.
+				n_rayons = min(n_rayons_max,n_rayons_start)
+				iray_start = 1
+				lprevious_converged = .false.
 
-      else if (etape==2) then 
-  		lfixed_rays = .true.
-  		n_rayons = min(n_rayons_max,n_rayons_start2)
-  		iray_start = 1
-  		lprevious_converged = .false.
-
-  	  else
-  	    CALL ERROR("etape unkown")
-  	  end if
+			else
+				CALL ERROR("etape unkown")
+			end if
   	  
-  	  write(*,*)  "-> Using ", n_rayons, ' rays for step', etape
+			write(*,*)  "-> Using ", n_rayons, ' rays for step', etape
 
-  		lnotfixed_rays = .not.lfixed_rays
-  		lconverged = .false.
-  		n_iter = 0
+			lnotfixed_rays = .not.lfixed_rays
+			lconverged = .false.
+			n_iter = 0
 
-        do while (.not.lconverged)
+			do while (.not.lconverged)
 
-        	n_iter = n_iter + 1
-        	if (n_iter > maxIter) exit !change step
-            write(*,*) " -> Iteration #", n_iter, " Step #", etape
+				n_iter = n_iter + 1
+				if (n_iter > maxIter) exit !change step
+				write(*,*) " -> Iteration #", n_iter, " Step #", etape
 
-  			if (lfixed_rays) then
-    			stream = 0.0
-    			do i=1,nb_proc
-     				stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-    			end do
-    			
-    			!compute Profile(:,iray,id) for each line ??, it doesn't change for sub-iter
- 			 end if
+				if (lfixed_rays) then
+					stream = 0.0
+					do i=1,nb_proc
+						stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+					end do		
+				end if
 
-            max_n_iter_loc = 0
-            dT_max = 0.
+				max_n_iter_loc = 0
+				dT_max = 0.
             
+            
+				!Initialize some quantities that change from one iteration to another,
+				!but which are constant for sub iterations
 
- 			!$omp parallel &
-            !$omp default(none) &
-            !$omp private(icell, id, atom,nact) &
-            !$omp shared(gpop_old,atmos)
-            !$omp do schedule(static,1)
-            do icell=1, atmos%Nspace
-   				!$ id = omp_get_thread_num() + 1
-   				if (atmos%icompute_atomRT(icell)>0) then
-            	do nact=1, atmos%NactiveAtoms
-            	    atom => atmos%ActiveAtoms(nact)%ptr_atom
-             		gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
-             		atom => NULL()
-            	end do
-            	end if
-            end do
-        	!$omp end do
-        	!$omp end parallel
+				!$omp parallel &
+				!$omp default(none) &
+				!$omp private(icell, id, atom,nact) &
+				!$omp shared(gpop_old,Tex_old, atmos) &
+				!$omp shared (Jold, NLTEspec)
+				!$omp do schedule(static,1)
+				do icell=1, atmos%Nspace
+					!$ id = omp_get_thread_num() + 1
+					if (atmos%icompute_atomRT(icell)>0) then
+						!For the propagation we need this opacity at all cells
+						!It doesn't change with rays. Will ne updated cell by cell for local iterations
+						call NLTE_bound_free(icell) !takes the new populations, after sub it eventually 
+						do nact=1, atmos%NactiveAtoms
+							atom => atmos%ActiveAtoms(nact)%ptr_atom
+							gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
+							do kr=1,atom%Nline
+								Tex_old(nact, kr, icell) = atom%lines(kr)%Tex(icell)
+							enddo
+							do kr=1, atom%Ncont
+								Tex_old(nact, kr+Atom%Nline,icell) = atom%continua(kr)%Tex(icell)
+							enddo
+							atom => NULL()
+             		!!Recompute Profiles if needed here
+						end do
+					end if
+					!-> Would be replaced later, when I'll know what to do for electron scattering
+					Jold(:,icell) = NLTEspec%Jc(:,icell)
+				end do
+				!$omp end do
+				!$omp end parallel
         	
-        	!0 or another start value
-        	if (atmos%electron_scattering) Jold = NLTEspec%Jc
+				!$omp parallel &
+				!$omp default(none) &
+				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,dT_max)&
+				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_unconverged) &
+				!$omp shared(atmos,NLTEspec, dpops_sub_max_error, verbose,lkeplerian,n_iter) & !!xyz0, uvw0 & !before nact was shared
+				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter,lcell_converged) &
+				!$omp shared(n_cells, disable_subit, gpop_old,lforce_lte) &
+				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
+				!$omp do schedule(static,1)
+				do icell=1, n_cells
+					!$ id = omp_get_thread_num() + 1
+					if (atmos%icompute_atomRT(icell)>0) then
 
- 			!$omp parallel &
-            !$omp default(none) &
-            !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,dT_max)&
-            !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_unconverged) &
-            !$omp shared(atmos,NLTEspec, taub,dpops_sub_max_error) &
-            !$omp shared(xyz0, uvw0, lkeplerian,n_iter) & !before nact was shared
-            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter,lcell_converged) &
-            !$omp shared(n_cells, pop_old, disable_subit, gpop_old,lforce_lte) & !dN, dN1,!pop
-            !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
-            !$omp do schedule(static,1)
-  			do icell=1, n_cells
-   			    !$ id = omp_get_thread_num() + 1
-   				!l_unconverged = (atmos%icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-   				!if (l_unconverged) then
-   				if (atmos%icompute_atomRT(icell)>0) then
+						CALL fill_Collision_matrix(id, icell) !Gamma(i,j) = C(i,j) before computing rates
 
-					CALL fill_Collision_matrix(id, icell)
-	                CALL NLTE_bound_free(id, icell, .true.) !also fill etac for the (this )iterate cell and set to 0 for this cell
-					!for all atoms, set atom%Gamma to atom%C. atom%C is not updated until
-					!next cell point. Gamma is initialized at each sub-iterations if any
-  			        CALL initGamma(id)
+                    	!Psi, exp(-dtau) and eta_line(lambda,ray,proc) and eta_cont(lambda, proc)
+						!!CALL init_psi_operator(id)
                     
-                    CALL init_psi_operator_new(id)
-                    
-					do iray=iray_start, iray_start-1+n_rayons
-    					if (etape==1) then
+						do iray=iray_start, iray_start-1+n_rayons
+							if (etape==1) then
         					! Position = milieu de la cellule
-        					x0 = r_grid(icell)
-        					y0 = 0.0_dp
-        					z0 = z_grid(icell)
-        					if (lkeplerian) then
+								x0 = r_grid(icell)
+								y0 = 0.0_dp
+								z0 = z_grid(icell)
+								if (lkeplerian) then
                        		! Direction verticale "z"
-        						if (iray==1) then
-            						w0=1.0_dp !nz
-       							else
-            						w0=-1.0_dp
-        						endif
-            					u0 = 0.0_dp !nx
-            					v0 = 0.0_dp !ny
-        					else
-           						norme = sqrt(x0*x0 + y0*y0 + z0*z0)
-       							if (iray==1) then
-            						u0 = x0/norme !sin(theta)sin(phi) = nx
-            						v0 = y0/norme !ny
-            						w0 = z0/norme !nz = mu = cos(theta)
-        						else
-            						u0 = -x0/norme !-1  backward
-            						v0 = -y0/norme
-           							w0 = -z0/norme
-           						endif
-        					endif !lkeplerian
+									if (iray==1) then
+										w0=1.0_dp !nz
+									else
+										w0=-1.0_dp
+									endif
+									u0 = 0.0_dp !nx
+									v0 = 0.0_dp !ny
+								else
+									norme = sqrt(x0*x0 + y0*y0 + z0*z0)
+									if (iray==1) then
+										u0 = x0/norme !sin(theta)sin(phi) = nx
+										v0 = y0/norme !ny
+										w0 = z0/norme !nz = mu = cos(theta)
+									else
+										u0 = -x0/norme !-1  backward
+										v0 = -y0/norme
+										w0 = -z0/norme
+									endif
+								endif !lkeplerian
 
-      	 				else !etape 2
+							else !etape 2
                    	    ! Position aleatoire dans la cellule
-         					rand  = sprng(stream(id))
-            				rand2 = sprng(stream(id))
-            				rand3 = sprng(stream(id))
+								rand  = sprng(stream(id))
+								rand2 = sprng(stream(id))
+								rand3 = sprng(stream(id))
 
-            				CALL  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+								CALL  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
 
                         ! Direction de propagation aleatoire
-            				rand = sprng(stream(id))
-           					 W0 = 2.0_dp * rand - 1.0_dp !nz
-            					W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
-            				SRW02 = sqrt(W02)
-            				rand = sprng(stream(id))
-            				ARGMT = PI * (2.0_dp * rand - 1.0_dp)
-            				U0 = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
-            				V0 = SRW02 * sin(ARGMT) !ny = sin(theta) * sin(phi)
-		 				end if !etape
+								rand = sprng(stream(id))
+								W0 = 2.0_dp * rand - 1.0_dp !nz
+								W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
+								SRW02 = sqrt(W02)
+								rand = sprng(stream(id))
+								ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+								U0 = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
+								V0 = SRW02 * sin(ARGMT) !ny = sin(theta) * sin(phi)
+							end if !etape
 
 						!keep them for subiterations or keep phi(:,iray,id)
-		 				xyz0(1,iray,id) = x0; xyz0(2,iray,id) = y0; xyz0(3,iray,id) = z0
-		 				uvw0(1,iray,id) = U0; uvw0(2,iray,id) = V0; uvw0(3,iray,id) = W0					
-					
-					
-					
-						CALL INTEG_RAY_LINE(id, icell, xyz0(1,iray,id),xyz0(2,iray,id), xyz0(3,iray,id), &
-											uvw0(1,iray,id), uvw0(2,iray,id), uvw0(3,iray,id), iray, labs)
+						!Because the shift is what matters now, I don't need them ?
+		
+! 							xyz0(1,iray,id) = x0; xyz0(2,iray,id) = y0; xyz0(3,iray,id) = z0
+! 							uvw0(1,iray,id) = U0; uvw0(2,iray,id) = V0; uvw0(3,iray,id) = W0					
+! 							
+! 							CALL INTEG_RAY_LINE(id, icell, xyz0(1,iray,id),xyz0(2,iray,id), xyz0(3,iray,id), &
+! 											uvw0(1,iray,id), uvw0(2,iray,id), uvw0(3,iray,id), iray, labs)
+
+							CALL INTEG_RAY_LINE(id, icell, x0,y0, z0, u0, v0, w0, iray, labs)
 											
-                        !CALL FillGamma_mu(id, icell, iray, n_rayons, lforce_lte) !ray by ray since wphi is known
-                        CALL FillGamma_part1(id, icell, iray, n_rayons, lforce_lte) !lambda+ray integ line, compute Jnu cont
-      			    enddo !iray
-      			    CALL FillGamma_part2(id, icell, lforce_lte)
-      				if (atmos%electron_scattering) CALL calc_Jnu(id, icell, n_rayons)
+						enddo !iray
+						!always in NLTEloop, although %J is not used ATM.
+						!Done here, otherwise, J is change in integration
+						!Pb: What if the transfer converges before J ?
+						!if force_lte, J is not updated because there is only one iteration.
+						CALL calc_Jnu(id, icell, n_rayons)
+						!Is it this one for continua radiative rates ?
 
-    		     	n_iter_loc = 0
-    				if (disable_subit) then
-    				 !if lforce_lte, FillGamma_mu is returned after entered
-    				 !and atom%Gamma = atom%C. delta term removed in SEE
-    				 CALL updatePopulations(id, icell, dN,.false.)
-    				 dT_max = max(dT_max, dN)
-    				 lconverged_loc = .true.
-    				else
-    				 lconverged_loc = .false.
-    				end if
+						if (lforce_lte) then
+							call initGamma(id) !because we do not enter the local sub iterations
+							!so Gamma need to be initialized to the collision matrix.
+							call update_populations(id, icell, diff, verbose,n_iter)
+							lconverged_loc = .true.
+						else
+							lconverged_loc = .false.
+							!Will start at LTE, since radiative rates are added in the sub iterations.
+						endif
 
-
+						n_iter_loc = 0
      				!!only iterate on cells which are not converged
-     				do while (.not.lconverged_loc)
-       					n_iter_loc = n_iter_loc + 1
+						do while (.not.lconverged_loc)
+							n_iter_loc = n_iter_loc + 1
                         
-                        !obtain for all lines and continua of atoms, the line%Jbar and cont%jnu
-                        !with Hogerheijde method
-                        do nact=1, atmos%Nactiveatoms
-                        	atom => atmos%Activeatoms(nact)%ptr_atom
-                        	do iray=iray_start, iray_start-1+n_rayons
-                         		CALL calc_J_atom(id, icell, iray, atom, n_rayons)
-                        	enddo
-                        	atom => NULL()
-                        enddo
+						!Computes Radiative rates
+						!if Jnu is used instead of J accelerated for continua, can be spread in two.
+							do nact=1, atmos%Nactiveatoms
+								atom => atmos%Activeatoms(nact)%ptr_atom
+								call initGamma_atom(id, atom)
+								call init_rates_atom(id, atom) !init to 0 before accumulate
+															   !except line%Rji = line%Aji
+								do iray=iray_start, iray_start-1+n_rayons
+									CALL calc_rates_atom(id, icell, iray, atom, n_rayons)
+								enddo
+								atom => NULL()
+							enddo
 
-                        do nact=1, atmos%Nactiveatoms
-                         atom => atmos%Activeatoms(nact)%ptr_atom
-                         CALL rate_matrix_atom(id, icell, atom, lforce_lte)
-                         atom => NULL()
-                        enddo
+							do nact=1, atmos%Nactiveatoms
+								atom => atmos%Activeatoms(nact)%ptr_atom
+                         !fill rate matrix with radiative rates
+								CALL rate_matrix_atom(id, icell, atom, lforce_lte)
+								atom => NULL()
+							enddo
                         
-						CALL updatePopulations(id, icell, diff,.false.)
+                        !Solve populations and remove delta(l,l')
+							if (mod(n_iter_loc,max(1,max_sub_iter/10))==0) then
+								write(*,*) " -- Global iteration #", n_iter, " step #", etape, "eps: ", dpops_sub_max_error
+							endif
+							CALL update_Populations(id, icell, diff,(mod(n_iter_loc,max(1,max_sub_iter/10))==0),n_iter_loc)
+							if (mod(n_iter_loc,max(1,max_sub_iter/10))==0) write(*,*) " --------------------------------------------------------------- "
 
                         !for this icell (id) and local iteration
-       					if (diff < dpops_sub_max_error) then!precision_sub
-       						lconverged_loc = .true.
+							if (diff < dpops_sub_max_error) then!precision_sub
+								lconverged_loc = .true.
      					    !write(*,*) "converged", id, icell, "dpops(sub) = ", diff
-       					else
-       						!for this cell (or these threads) set atom%Gamma to atom%C, and add Aji to Gamma(j,i)
-       						!for each atom. atom%C is computed for this cell at the start of the loop
-  			        		CALL initGamma(id)
-  			        		CALL init_psi_operator_new(id)
-  			        		!re-update, and compute etac(:,id), Vji(:,id) to be use in FillGamma_mu
-  			        		CALL NLTE_bound_free(id, icell,.true.)
+							else
+								!!CALL init_psi_operator(id) !init also NLTEspec%S
+
+								!etac is now updated in calc_eta_atom_loc if iray==1.
+  			        			!and chi = chi(LTE) + chiline_nlte (new) + chic_nlte (new)
+  			        			!At the start of the next iteration, NLTE_bound_free is recomputed
+  			        			!and saved for the whole grid.
+  			        			!chic_nlte is stored for each id, to be added for each rays, even
+  			        			!if computed at iray==1. It is reset each time iray ==1 (for an id/icell)
   			        		
-  			        		
- 							do iray=iray_start, iray_start-1+n_rayons
+								do iray=iray_start, iray_start-1+n_rayons
       							!I unchanged
       							
       							
-      							!does not recompute profile phi(:,iray,id) and chi_loc(:,iray,id)
-      							!wich is computed in integ_ray_line() above
-      						    CALL init_eta_atom_loc(id,icell,iray)
-      						    !iterate always true in there
+      							!also adds chi_loc, which is takes LTE opacities, that do not change
+      							!Also compute atom%etac and chic if iray==1
+      							!These are then added to atom%eta and chitot for each ray
+									!CALL calc_eta_atom_loc(id,icell,iray, (iray==1))
+									
+									CALL calc_total_source_loc(id,icell,iray, (iray==1))
+      						    
 
-      						enddo !iray
+								enddo !iray
 
-       					end if
-       					if (n_iter_loc >= max_sub_iter) then 
+							end if
+							if (n_iter_loc >= max_sub_iter) then 
 
-       					  lconverged_loc = .true.
+								lconverged_loc = .true.
 
-       					end if
+							end if
 
-     				end do !local sub iteration
-     	            if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
+						end do !local sub iteration
+						if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
      	            
-     			end if !icompute_atomRT
-     		end do !icell
-        	!$omp end do
-        	!$omp end parallel
+					end if !icompute_atomRT
+				end do !icell
+				!$omp end do
+				!$omp end parallel
         	
-     		
+     		!Global convergence Tests
 
             !should be para
-            dM(:) = 0d0
-        	diff = 0d0
-        	dJ = 0.0
-  			cell_loop2 : do icell=1, atmos%Nspace
-  				if (atmos%icompute_atomRT(icell)>0) then
+				dM(:) = 0d0
+				diff = 0d0
+				dJ = 0.0
+				dT = 0.0
+				dTM(:) = 0.0
+				Tex_ref(:) = 0.0
+				Tion_ref(:) = 0.0
+				cell_loop2 : do icell=1, atmos%Nspace
+					if (atmos%icompute_atomRT(icell)>0) then
 						dN = 0d0 !for all levels of all atoms of this cell
-     					do nact=1,atmos%NactiveAtoms
-     					    atom => atmos%ActiveAtoms(nact)%ptr_atom
-     					    
-     					    !CALL calc_delta_Tex_atom(icell, atom, dN1)
-     					    !dN = max(dN, dN1) !all atoms for this cell
-     					    
-     						do ilevel=1,atom%Nlevel
+						dN2 = 0.0
+						do nact=1,atmos%NactiveAtoms
+							atom => atmos%ActiveAtoms(nact)%ptr_atom
+     					         					    
+							do ilevel=1,atom%Nlevel
      						
 								if (atom%n(ilevel,icell) >= prec_pops) then
-     				    		 dN1 = dabs(1d0-gpop_old(nact,ilevel,icell)/atom%n(ilevel,icell))
+									dN1 = dabs(1d0-gpop_old(nact,ilevel,icell)/atom%n(ilevel,icell))
      				    		 !dabs(atom%n(l,icell) - ndag(l))/atom%n(l,icell)
-     				    		 dN = max(dN1, dN) !compare with all atoms and levels
+									dN = max(dN1, dN) !compare with all atoms and levels
      				    						  !for this cell
-     				    		 dM(nact) = max(dM(nact), dN1) !compare for one atom
+									dM(nact) = max(dM(nact), dN1) !compare for one atom
      				    		 							   !for all cells
-     				    		endif
-     						end do !over ilevel
-     						atom => NULL()
-     					end do !over atoms
-     					diff = max(diff, dN) !compare for all atoms and all cells
+								endif
+							end do !over ilevel
+							do kr=1, atom%Nline
+							
+								dN3 = dabs(1.0 - Tex_old(nact, kr, icell) / atom%lines(kr)%Tex(icell))
+								dN2 = max(dN3, dN2)
+								!dTM(nact) = max(dTM(nact), dN3)
+								if (dN3 > dTM(nact)) then
+									dTM(nact) = dN3
+									Tex_ref(nact) = atom%lines(kr)%Tex(icell)
+									icell_max = icell
+								endif
+							enddo
+							do kr=1, atom%Ncont
+								dN3 = dabs(1.0 - Tex_old(nact, kr+atom%Nline, icell) / atom%continua(kr)%Tex(icell))
+								dN2 = max(dN3, dN2)
+								!dTM(nact) = max(dTM(nact), dN3)
+								if (dN3 > dTM(nact)) then
+									dTM(nact) = dN3
+									Tion_ref(nact) = atom%continua(kr)%Tex(icell)
+									icell_max = icell
+								endif
+							enddo
+							atom => NULL()
+						end do !over atoms
+						!compare for all atoms and all cells
+						!diff = max(diff, dN) ! pops
+						diff = max(diff, dN2) ! Tex
      					
-     					if (atmos%electron_scattering) then !local dJ
-     					    dN1 = dabs(1d0 - maxval(Jold(:,icell)/(tiny_dp + NLTEspec%Jc(:,icell))))
-     					    if (dN1 > dJ) then
-     						   dJ = dN1
-     						   imax = locate(dabs(1d0 - Jold(:,icell)/(tiny_dp + NLTEspec%Jc(:,icell))), dJ)
-     						   lambda_max = NLTEspec%lambda(imax)
-     						 endif
-     					     lcell_converged(icell) = (real(dJ) < dpops_max_error)
-
-     					else
-     					     lcell_converged(icell) = (real(diff) < dpops_max_error)
-     					     !lcell_converged(icell) = (real(dT_max) < dpops_max_error)								
-     					endif
+						dN1 = dabs(1d0 - maxval(Jold(:,icell)/(tiny_dp + NLTEspec%Jc(:,icell))))
+						if (dN1 > dJ) then
+							dJ = dN1
+							imax = locate(dabs(1d0 - Jold(:,icell)/(tiny_dp + NLTEspec%Jc(:,icell))), dJ)
+							lambda_max = NLTEspec%lambda(imax)
+						endif
+						!lcell_converged(icell) = (real(diff) < dpops_max_error)
+						!diff = max(diff, dJ) ! ? to have bother converged
      					
-     			end if
-     		end do cell_loop2 !icell
+					end if
+				end do cell_loop2 !icell
      		
+				write(*,*) " --------------------------------------------------------------- "
+				do nact=1,atmos%NactiveAtoms
+					write(*,*) "   >>> ", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dT = ", dTM(nact)
+					if (Tion_ref(nact) /= 0.0) write(*,*) "       <::>  Tion (K) = ", Tion_ref(nact),  " Te (K) = ", atmos%T(icell_max)
+					if (Tex_ref(nact) /= 0.0) write(*,*) "       <::>  Tex (K) = ", Tex_ref(nact),  " Te (K) = ", atmos%T(icell_max)
+					if (accelerated) then
+						write(*,*) "   >>> ", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dM = ", dM(nact)," (Accelerated)"
+					else
+						write(*,*) "   >>> ", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dM = ", dM(nact)
+					endif
+				enddo
+				write(*,*) " -> diff =", diff, " old = ", diff_old !at the end of the loop over n_cells
+				write(*,*) " -> dJ = ", dJ, " @ ", lambda_max, " nm"
+				write(*,*) maxval(max_n_iter_loc), "sub-iterations"
+				write(*,*) " --------------------------------------------------------------- "
+				diff_old = diff
 
-         	if (.not.disable_subit)	write(*,*) maxval(max_n_iter_loc), "sub-iterations"
-         	if (atmos%electron_scattering) then 
-         	 write(*,*) " -> dJ = ", dJ, " @ ", lambda_max, " nm"
-         	endif
-         	do nact=1,atmos%NactiveAtoms
-         	 if (accelerated) then
-         	  write(*,*) "   >>> ", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dM = ", dM(nact)," (Accelerated)"
-         	 else
-         	  write(*,*) "   >>> ", atmos%ActiveAtoms(nact)%ptr_atom%ID, " dM = ", dM(nact)
-         	 endif
-         	enddo
-         	write(*,*) "dpops =", diff !at the end of the loop over n_cells
+				!Not used if the next is not commented out
+				lconverged = (real(diff) < dpops_max_error) !global convergence for all iterations
 
-			if (atmos%electron_scattering) diff = dJ
-
-        	lconverged = (real(diff) < dpops_max_error) !global convergence for all iterations
-
-        	if (real(diff) < dpops_max_error) then !precision
-           		if (lprevious_converged) then
-            	  lconverged = .true.
-           		else
-            	  lprevious_converged = .true.
-          	    endif
-        	else
-           		lprevious_converged = .false.
-           		if (.not.lfixed_rays) then
-              		n_rayons = n_rayons * 2
-              		write(*,*) ' -- Increasing number of rays'
-             		if (n_rayons > n_rayons_max) then
-              			if (n_iter >= maxIter) then
-             		 		write(*,*) "Warning : not enough rays to converge !!"
+				if (real(diff) < dpops_max_error) then !precision
+           			if (lprevious_converged) then
+            	  		lconverged = .true.
+           			else
+            	  		lprevious_converged = .true.
+          	    	endif
+        		else
+           			lprevious_converged = .false.
+           			if (.not.lfixed_rays) then
+              			n_rayons = n_rayons * 2
+              			write(*,*) ' -- Increasing number of rays'
+             			if (n_rayons > n_rayons_max) then
+              				if (n_iter >= maxIter) then
+             		 			write(*,*) "Warning : not enough rays to converge !!"
                  			lconverged = .true.
+              				end if
               			end if
-              		end if
 
               ! On continue en calculant 2 fois plus de rayons
               ! On les ajoute a l'ensemble de ceux calcules precedemment
 !              iray_start = iray_start + n_rayons
 
-          	   end if
-        	end if
-        									
-        	!Only if specified
-        	!if (disable_subit) then
-        		if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
-        			write(*,*) " Solve ne Global iteration:", n_iter
-        	 		write(*,*) " --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
-        	 		CALL SolveElectronDensity(ne_start_sol)
-        	 !Recompute LTE pops used in continua radiative rates
-        	 !for Activeatoms only ?
-        	 		do nact=1,atmos%NactiveAtoms !if over Active only, should recompute for passive also
-        	 							  !but this preserve the constant background opac
-        	 							  !as passiveatoms%n = passiveatoms%nstar with ne init.
-               			atom => atmos%ActiveAtoms(nact)%ptr_atom
-               			CALL LTEpops(atom,.true.)
-               			atom => Null()
-             		end do
+          	   		end if
         		end if
-        	!endif
+        									
+			!Not optimal, but fast relatively
+			!must be parra
+				if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
+					write(*,*) " Solve ne Global iteration:", n_iter
+					write(*,*) " --> old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+					do icell=1, n_cells
+						if (atmos%icompute_atomRT(icell) > 0) then
+							NLTEspec%AtomOpac%sca_c(:,icell) = NLTEspec%AtomOpac%sca_c(:,icell) - sigma_e * atmos%ne(icell)
+							do nact=1,atmos%NactiveAtoms
+								atom => atmos%ActiveAtoms(nact)%ptr_atom
+								do kr=1, atom%Ncont
+									atom%continua(kr)%gij(:,icell) = atom%continua(kr)%gij(:,icell) / atmos%ne(icell)
+								enddo
+								atom => Null()
+							end do
+						endif
+					enddo
+					CALL SolveElectronDensity(ne_start_sol)
+					do icell=1, n_cells
+						if (atmos%icompute_atomRT(icell) > 0) then
+							NLTEspec%AtomOpac%sca_c(:,icell) = NLTEspec%AtomOpac%sca_c(:,icell) + sigma_e * atmos%ne(icell)
 
-	    end do !while
-        write(*,*) etape, "Threshold =", dpops_max_error
-	  end do !over etapes
+							do nact=1,atmos%NactiveAtoms
+								atom => atmos%ActiveAtoms(nact)%ptr_atom
+								do kr=1, atom%Ncont
+									atom%continua(kr)%gij(:,icell) = atom%continua(kr)%gij(:,icell) * atmos%ne(icell)
+								enddo
+								atom => Null()
+							end do
+						endif
+					enddo
+				end if
 
-  !LTE opacities NOT updated if not ltab_Wavelength_grid
-  !Force to compute a new value of electron density after convergence
-  !and new lte populations for all atoms
-  if (n_iterate_ne < 0) then
-   write(*,*) "END LOOP: old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
-   CALL SolveElectronDensity(ne_start_sol)
-   !Recompute for all atoms the LTE pops
-   write(*,*) "   recompute LTE pops for all atoms"
-   do nact=1,atmos%NAtom
-      atom => atmos%Atoms(nact)%ptr_atom
-      CALL LTEpops(atom,.true.)
-      atom => Null()
-   end do
-  else if (iterate_ne) then
-   write(*,*) "END LOOP: recompute LTE pops of passive atoms"
-   !Recompute for all passive atoms the LTE pops
-   !because the lte pops of active atoms only is updated with iterate_ne
-   do nact=1,atmos%NpassiveAtoms
-      atom => atmos%Atoms(nact)%ptr_atom
-      CALL LTEpops(atom,.true.)
-      atom => Null()
-   end do
-  end if
 
-  if (iterate_ne .or. (n_iterate_ne < 0)) CALL writeElectron(.true.) !the .true. means append, to compare with initial solution.
- ! -------------------------------- CLEANING ------------------------------------------ !
-  !to move inside free_nlte_sol
-  deallocate(dM)
-  if (allocated(Jold)) deallocate(Jold)
-  CALL free_nlte_sol(disable_subit)
-  !!if (atmos%include_xcoupling) deallocate(taub)
+			end do !while
+			write(*,*) "step: ", etape, "Threshold: ", dpops_max_error
 
- ! ------------------------------------------------------------------------------------ !
- RETURN
- END SUBROUTINE NLTEloop
- ! ------------------------------------------------------------------------------------ !
+		end do !over etapes
 
+
+		!I recompute for all even for active atoms, for consistency. 
+		!Because, only gij for active continua and ne are updated, not %nstar
+		if (n_iterate_ne < 0) then
+			write(*,*) "END LOOP: old max/min ne", maxval(atmos%ne), minval(atmos%ne,mask=atmos%ne>0)
+			CALL SolveElectronDensity(ne_start_sol)
+			!Recompute for all atoms the LTE pops
+			write(*,*) "   recompute LTE pops for all atoms"
+			do nact=1,atmos%NAtom
+				atom => atmos%Atoms(nact)%ptr_atom
+				if (atom%ID=="H") then
+					call LTEpops_H()
+				else
+					CALL LTEpops(atom,.true.)
+				endif
+				atom => Null()
+			end do
+		endif
+
+		if (iterate_ne .or. (n_iterate_ne < 0)) then
+			CALL writeElectron(.true.) !the .true. means append, to compare with initial solution.
+			!Recompute Background  + NLTE bound free.
+			!Check it is not done after
+			write(*,*) "Check the consistency of NLTE b-f and background opac with iterate_ne"
+		endif
+! -------------------------------- CLEANING ------------------------------------------ !
+		!to move inside free_nlte_sol
+		deallocate(dM, dTM, Tex_ref, Tion_ref)
+		if (allocated(Jold)) deallocate(Jold)
+		CALL free_nlte_sol(disable_subit)
+
+! ------------------------------------------------------------------------------------ !
+	RETURN
+	END SUBROUTINE NLTEloop
+! ------------------------------------------------------------------------------------ !
+
+ !building
  SUBROUTINE adjustStokesMode(Solution)
  !
  !
@@ -1641,63 +1599,18 @@ stop
    write(*,*) " Computing Istar(mu=1) for each star..."
    !move elsewhere if we read a file, but normally should well fit with MCFOST routines
    do i_star=1, n_etoiles
-    CALL Bplanck(etoile(i_star)%T*1d0, NLTEspec%Istar(:,i_star))
+    if (etoile(i_star)%T <= 1e-6) then
+     call warning("Setting stellar radiation to 0: T* < 1e-6 K")
+     NLTEspec%Istar(:,i_star) = 0._dp
+    else
+     CALL Bplanck(etoile(i_star)%T*1d0, NLTEspec%Istar(:,i_star))
+    endif
    enddo
    write(*,*) " ..done"
  
  RETURN
  END SUBROUTINE init_stellar_disk
- 
-!  futur move to stars.f90 and merging with mcfost generator of stellar radiation
-!  SUBROUTINE calc_stellar_radiation(N,i_star,x,y,z,u,v,w,gamma)
-!  ---------------------------------------------------------------!
-!   Compute the stellar radiation field and in Istar:
-!   Radiation emerging from the star (at the surface), corrected
-!   by limb darkening.
-!   
-!   tab_lambda has to be defined and repartition_energie_etoiles()
-!  -------------------------------------------------------------- !
-!   use input, only : limb_darkening, mu_limb_darkening
-!   use Planck, only : uLD, Bplanck
-!   integer, intent(in) :: N, i_star
-!   real(kind=dp), dimension(N), intent(out) :: gamma
-!   real(kind=dp), intent(in) :: u, v, w, x, y, z
-!   real(kind=dp) :: energie(N)
-!   real(kind=dp) :: mu, ulimb, LimbDarkening, surface, HC
-!   integer :: ns
-!   logical :: lintersect_spot
-! 
-!    gamma(:) = 1d0
-!    cos(theta) = dot(r,n)/module(r)/module(n)
-!    mu = abs(x*u + y*v + z*w)/dsqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
-!    if (real(mu)>1d0) then !to avoid perecision error
-!     write(*,*) "mu=",mu, x, y, z, u, v, w
-!     CALL Error(" mu limb > 1!")
-!    end if
-!    
-!    1) Compute stellar flux from mcfost 
-! 
-!    2) Correct with the contrast gamma of a hotter/cooler region if any
-!    CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
-!    if (lintersect_spot) then
-!      gamma(:) = (dexp(hc_k/NLTEspec%lambda(:)/real(etoile(i_star)%T,kind=dp))-1)/&
-!      			(dexp(hc_k/NLTEspec%lambda(:)/etoile(i_star)%SurfB(ns)%T)-1)
-!      so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
-!    end if
-! 
-!    3) Apply Limb darkening
-!    if (llimb_darkening) then
-!      CALL ERROR("option for reading limb darkening not implemented")
-!    else
-!      write(*,*) maxval(uLD(real(etoile(i_star)%T,kind=dp))), minval(uLD(real(etoile(i_star)%T,kind=dp)))
-!      ulimb = 0.0 ! could use BB slope
-!      LimbDarkening = 1d0 - ulimb*(1d0-mu)
-!    end if
-!    Istar(:) = energie(:) * LimbDarkening * gamma(:)
-!    gamma(:) = LimbDarkening * gamma(:)
-! 
-!  RETURN
-!  END SUBROUTINE calc_stellar_radiation
+
  
  SUBROUTINE calc_stellar_surface_brightness(N,lambda,i_star,x,y,z,u,v,w,gamma)
  ! ---------------------------------------------------------------!
@@ -1718,7 +1631,13 @@ stop
   integer :: ns
   logical :: lintersect_spot
 
-   gamma(:) = 1d0
+   if (etoile(i_star)%T <= 1e-6) then
+    gamma(:) = 0.0_dp
+    return
+   else
+    gamma(:) = 1d0
+   endif
+   
    !cos(theta) = dot(r,n)/module(r)/module(n)
    mu = abs(x*u + y*v + z*w)/dsqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
    if (real(mu)>1d0) then !to avoid perecision error
@@ -1727,7 +1646,8 @@ stop
    end if
    
    !1) Compute stellar flux from mcfost 
-
+   ! .... 
+   
    !2) Correct with the contrast gamma of a hotter/cooler region if any
    CALL intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
    if (lintersect_spot) then
@@ -1831,6 +1751,15 @@ stop
 
       Ic(:,id) = Ic(:,id) + dexp(-tau_c) * (1.0_dp - dexp(-l_contrib * kappa_tot(:,icell))) * Snu(:,icell)
 
+!    	  if (any_nan_infinity_vector(dexp(-tau_c) * (1.0_dp - dexp(-l_contrib * kappa_tot(:,icell))) * Snu(:,icell)) > 0) then
+!    	   write(*,*) " Error inconsistant values found in I(icell)"
+!    	   write(*,*) "icell=", icell, 	l_contrib, atmos%t(icell), atmos%nhtot(icell), atmos%ne(icell)
+!    	   write(*,*) "tau=",tau_c
+!    	   write(*,*) "K=",kappa_tot(:,icell)
+!    	   write(*,*) "Snu=",Snu(:,icell)
+! 	   write(*,*) "l*kappa=", l_contrib * kappa_tot(:,icell)
+! 	   stop
+!    	  endif
      
      if ((nbr_cell == 1).and.labs) then 
       ds(iray,id) = l * AU_to_m
@@ -1856,7 +1785,7 @@ stop
  ! -------------------------------------------------------- !
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 200, Nlambda = 350, maxIter = 1000
+  integer, parameter :: n_rayons_start = 2000, Nlambda = 350, maxIter = 1000
   integer :: n_rayons_max
   real, parameter :: precision = 1e-2
   real, parameter :: lambda_min = 5., lambda_max0 = 100000
@@ -1865,8 +1794,8 @@ stop
   logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lprevious_converged, write_convergence_file
 
   real :: rand, rand2, rand3, a1, a0, a2, a3!, fac_etape
-
-  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dN, dJ, diffs, dSo
+  real(kind=dp) :: dSource, dN
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dJ, diffs
   real(kind=dp), allocatable :: Jold(:,:), Jflat(:), lambda(:), Jnew(:,:), lambda_1(:,:), Jnew_l(:,:), Jold_l(:,:)
   real(kind=dp), allocatable :: Snew(:,:), Kappa_tot(:,:), beta(:,:), Istar(:), Ic(:,:)
   real(kind=dp), allocatable :: lambda_star(:,:), Sth(:,:), Sold(:,:), Sline(:,:)
@@ -1920,35 +1849,63 @@ stop
   write(*,*) "  -> interpolating contopac on Jnu grid for each frequency.."
   write(*,*) "       lambda (min, max in nm):", minval(lambda), maxval(lambda)
   do icell=1, atmos%Nspace
-   if (atmos%icompute_atomRT(icell) /= 0.) then
+   if (atmos%icompute_atomRT(icell) > 0) then
     
     !LTE at start ?
-    !Jold(:,icell) = bpnu(atmos%T(icell), lambda)
+    Jold(:,icell) = 0.0!bpnu(atmos%T(icell), lambda)
     
    					
    	CALL bezier2_interp(NLTEspec%Nwaves,NLTEspec%lambda,&
    					NLTEspec%AtomOpac%Kc(:,icell),Nlambda, lambda, kappa_tot(:,icell))
+   	if (any_nan_infinity_vector(kappa_tot(:,icell)) > 0) then
+   	 write(*,*) " Error inconsistant values found in kappa_tot after interpolation.."
+   	 write(*,*) "icell=", icell, "kappa=",kappa_tot(:,icell)
+   	 write(*,*) "Kc=", NLTEspec%AtomOpac%Kc(:,icell)
+   	endif
    					
    					
    	CALL bezier2_interp(NLTEspec%Nwaves,NLTEspec%lambda,&
    					NLTEspec%AtomOpac%sca_c(:,icell),Nlambda, lambda, beta(:,icell))
    	beta(:,icell) = beta(:,icell) / kappa_tot(:,icell)
-   					
+   	
+   	if (any_nan_infinity_vector(beta(:,icell)) > 0) then
+   	 write(*,*) " Error inconsistant values found in beta after interpolation.."
+   	 write(*,*) "icell=", icell, "beta=",beta(:,icell)
+   	 write(*,*) "sigma=", NLTEspec%AtomOpac%sca_c(:,icell)
+   	endif   					
 
    	CALL bezier2_interp(NLTEspec%Nwaves,NLTEspec%lambda,&
    					NLTEspec%AtomOpac%jc(:,icell),Nlambda, lambda, Sth(:,icell))
-   	Sth(:,icell) = Sth(:,icell) / ( kappa_tot(:,icell) * (1.-beta(:,icell)))
-   	
    					
-    Sold(:,icell) = (1.-beta(:,icell))*Sth(:,icell) + beta(:,icell) * Jold(:,icell) 
+   	if (any_nan_infinity_vector(Sth(:,icell)) > 0) then
+   	 write(*,*) " Error inconsistant values found in Sth after interpolation.."
+   	 write(*,*) "icell=", icell, "eta_th=",Sth(:,icell)
+   	 write(*,*) "eta=", NLTEspec%AtomOpac%jc(:,icell)
+   	endif   
+   	
+   	Sth(:,icell) = Sth(:,icell) / ( kappa_tot(:,icell) * (1.-beta(:,icell)) + 1e-30)
+
+   	if (any_nan_infinity_vector(Sth(:,icell)) > 0) then
+   	 write(*,*) " Error inconsistant values found in Sth after interpolation.."
+   	 write(*,*) "icell=", icell, "Sth=",Sth(:,icell)
+   	 write(*,*) "kappa_abs=", ( kappa_tot(:,icell) * (1.-beta(:,icell)) + 1e-30)
+   	endif     	
+   					
+    Sold(:,icell) = (1.-beta(:,icell))*Sth(:,icell) + beta(:,icell) * Jold(:,icell)
+    
+   	if (any_nan_infinity_vector(Sold(:,icell)) > 0) then
+   	 write(*,*) " Error inconsistant values found in Sold after interpolation.."
+   	 write(*,*) "icell=", icell, "Sold=",Sold(:,icell)
+   	 write(*,*) "Jold=", Jold(:,icell)
+   	endif  
 
    endif
   enddo
-  write(*,*) "Sold (max,min)", maxval(Sold), minval(Sold)
-  write(*,*) "Sth (max,min)", maxval(STh), minval(Sth)
-  write(*,*) "Jold (max,min)", maxval(Jold), minval(Jold)
-  write(*,*) "beta (max,min)", maxval(beta), minval(beta)
-  write(*,*) "kappa (max,min)", maxval(kappa_tot), minval(kappa_tot)
+  write(*,*) "Sold (max,min)", maxval(Sold), minval(Sold,mask=Sold>0)
+  write(*,*) "Sth (max,min)", maxval(STh), minval(Sth,mask=Sold>0)
+  write(*,*) "Jold (max,min)", maxval(Jold), minval(Jold,mask=Sold>0)
+  write(*,*) "beta (max,min)", maxval(beta), minval(beta,mask=Sold>0)
+  write(*,*) "kappa (max,min)", maxval(kappa_tot), minval(kappa_tot,mask=Sold>0)
   write(*,*) "  ->..done"
 
 
@@ -2112,8 +2069,12 @@ if (write_convergence_file ) write(20,*) " -> Iteration #", n_iter
 
             !should be para
         	diff = 0d0
+        	dSource = 0.0_dp
   			cell_loop2 : do icell=1, atmos%Nspace
   				if (atmos%icompute_atomRT(icell)>0) then
+  					
+  						dN = dabs(1.0 - maxval(Sold(:,icell) / Snew(:,icell)))
+  						dSource = max(dSource, dN)
 
 						dJ = 0.0_dp
 						do la=1, Nlambda
@@ -2139,7 +2100,8 @@ if (write_convergence_file ) write(20,*) icell, " ::> dJ(icell)", real(dJ), " Jm
 !      		Jold(:,:) = Jnew(:,:)
 !      		Sold(:,:) = Snew(:,:)
 
-     		
+     		write(*,*) " >>> dS = ", dSource
+if (write_convergence_file ) write(20,*) " >>> dS = ", dSource
          	if (accelerated) then
          	  write(*,*) "   >>> ", icell_max, lambda(imax)," dJ = ", diff," (Accelerated)"
 if (write_convergence_file ) write(20,*) "   >>> ", icell_max, lambda(imax)," dJ = ", diff," (Accelerated)"
@@ -2147,7 +2109,7 @@ if (write_convergence_file ) write(20,*) "   >>> ", icell_max, lambda(imax)," dJ
          	  write(*,*) "   >>> ", icell_max, lambda(imax)," dJ = ", diff
 if (write_convergence_file ) write(20,*) "   >>> ", icell_max, lambda(imax)," dJ = ", diff
          	endif
-         	write(*,*) "   >>> ", "Jmax/min (icell_max):", maxval(Jnew(:,icell_max)), minval(Jnew(:,icell_max))
+         	write(*,*) "   >>> ", "Jmax/min (icell_max):", maxval(Jnew(:,icell_max)), minval(Jnew(:,icell_max)), "T=",atmos%T(icell_max), "ne=", atmos%ne(icell_max)
          	write(*,*) "   >>> ", "Jmax/min (all):", maxval(Jnew(:,:)), minval(Jnew(:,:))
 if (write_convergence_file ) write(20,*) "   >>> ", "Jmax/min (icell_max):", maxval(Jnew(:,icell_max)), minval(Jnew(:,icell_max))
 if (write_convergence_file ) write(20,*) "   >>> ", "Jmax/min (all):", maxval(Jnew(:,:)), minval(Jnew(:,:))
@@ -2229,224 +2191,158 @@ if (write_convergence_file ) close(20)
  RETURN
  END SUBROUTINE Iterate_Jnu
  
- SUBROUTINE INTEG_RAY_LINE_I_CNTRB(id,icell_in,x,y,z,u,v,w,iray,labs)
- ! ------------------------------------------------------------------------------- !
-  ! Not Working yet
- ! ------------------------------------------------------------------------------- !
-  integer, intent(in) :: id, icell_in, iray
-  real(kind=dp), intent(in) :: u,v,w
-  real(kind=dp), intent(in) :: x,y,z
-  logical, intent(in) :: labs !used in NLTE but why?
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-  real(kind=dp), dimension(NLTEspec%Nwaves) :: Snu, Snu_c, chiI, LimbD, chiIc
-  real(kind=dp), dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, dtau_ds
-  integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
-  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, eval_operator
+
+	SUBROUTINE INTEG_RAY_LINE_I_CNTRB(id,icell_in,x,y,z,u,v,w,iray,labs)
+	! ------------------------------------------------------------------------------- !
+	! Computes the contribution functions along to the Intensities using converged
+	! populations
+	! ------------------------------------------------------------------------------- !
+		integer, intent(in) :: id, icell_in, iray
+		real(kind=dp), intent(in) :: u,v,w
+		real(kind=dp), intent(in) :: x,y,z
+		logical, intent(in) :: labs !used in NLTE but why?
+		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
+		real(kind=dp), dimension(NLTEspec%Nwaves) :: Snu, Snu_c, chiI, LimbD, chiIc
+		real(kind=dp), dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, chil, etal
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
+		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+		integer :: la
 
 
-  RETURN
-  END SUBROUTINE INTEG_RAY_LINE_I_CNTRB
+		x1=x;y1=y;z1=z
+		x0=x;y0=y;z0=z
+		next_cell = icell_in
+		nbr_cell = 0
+
+		tau(:) = 0.0_dp
+		tau_c(:) = 0.0_dp
+		chiI(:) = 0.0_dp
+		chiIc(:) = 0.0_dp
+
+
+		NLTEspec%I(:,iray,id) = 0d0
+		NLTEspec%Ic(:,iray,id) = 0d0
+
+		!S_contrib(:,icell,id) = 0.0_dp
+
+  ! -------------------------------------------------------------- !
+  !*** propagation dans la grille ***!
+  ! -------------------------------------------------------------- !
+  ! Will the ray intersect a star
+		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+
+  ! Boucle infinie sur les cellules
+		infinie : do ! Boucle infinie
+    ! Indice de la cellule
+			icell = next_cell
+			x0=x1 ; y0=y1 ; z0=z1
+
+
+			if (icell <= n_cells) then
+				lcellule_non_vide = (atmos%icompute_atomRT(icell) > 0)
+				if (atmos%icompute_atomRT(icell) < 0) RETURN !-1 if dark
+			else
+				lcellule_non_vide=.false.
+			endif
+    
+    ! Test sortie ! "The ray has reach the end of the grid"
+
+			if (test_exit_grid(icell, x0, y0, z0)) RETURN
+
+			if (lintersect_stars) then
+				if (icell == icell_star) then
+
+					call calc_stellar_surface_brightness(NLTEspec%Nwaves,NLTEspec%lambda,i_star, x0, y0, z0, u,v,w,LimbD)
+
+					NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + LimbD(:) * NLTEspec%Istar(:,i_star)*dexp(-tau)
+       				NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + LimbD(:) * NLTEspec%Istar(:,i_star)*dexp(-tau_c)
+       				RETURN
+      			end if
+   			 endif
+
+			nbr_cell = nbr_cell + 1
+
+
+			previous_cell = 0 ! unused, just for Voronoi
+			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+
+
+			if (lcellule_non_vide) then
+				lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
+     ! opacities in m^-1
+				l_contrib = l_contrib * AU_to_m !l_contrib in m
+				if ((nbr_cell == 1).and.labs) ds(iray,id) = l * AU_to_m
+
+
+				CALL initAtomOpac(id)
+				if (atmos%NpassiveAtoms>0) &
+					CALL Metal_bb_new(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
+					
+				chil(:) = NLTEspec%AtomOpac%chi_p(:,id)
+				etal(:) = NLTEspec%AtomOpac%eta_p(:,id)
+
+				chiIc(:) = NLTEspec%AtomOpac%Kc(:,icell) + tiny_chi 
+				chiI(:)  = NLTEspec%AtomOpac%chi_p(:,id) + chiIc(:)
+
+				if (atmos%NactiveAtoms>0) then 
+					
+					CALL initAtomOpac_nlte(id)
+      
+					CALL NLTE_bound_bound(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, .false.)
+					
+					chil(:) = chil(:) + NLTEspec%ATomOpac%chi(:,id)
+					etal(:) = etal(:) + NLTEspec%AtomOpac%eta(:,id)
+					
+					chiIc(:) = chiIc(:) + NLTEspec%AtomOpac%Kc_nlte(:,icell)
+
+					chiI(:) = chiI(:) + NLTEspec%AtomOpac%chi(:,id) +  NLTEspec%AtomOpac%Kc_nlte(:,icell)
+				endif !active atoms
+
+				dtau(:)   = l_contrib * chiI(:)
+				dtau_c(:) = l_contrib * chiIc(:)
+            
+				Snu = ( NLTEspec%AtomOpac%jc(:,icell) + NLTEspec%AtomOpac%eta_p(:,id) ) / chiI(:)
+				Snu_c = NLTEspec%AtomOpac%jc(:,icell) / chiIc(:)
+      
+      			!Always include electron scattering if NLTE loop.
+      			!But ATM, uses %Jc even for lines.
+				if (atmos%Nactiveatoms>0) then 
+					Snu = Snu + ( NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) + NLTEspec%AtomOpac%eta(:,id) + NLTEspec%AtomOpac%jc_nlte(:,icell) ) / chiI(:)
+					Snu_c = Snu_c + ( NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) + &
+					NLTEspec%AtomOpac%jc_nlte(:,icell) )/ chiIc(:)
+
+				else if ((atmos%electron_scattering).and.(atmos%NactiveAtoms==0)) then
+					Snu = Snu + NLTEspec%Jc(:,icell) * NLTEspec%AtomOpac%sca_c(:,icell) / chiI(:)
+					Snu_c = Snu_c + NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) / chiIc(:)
+				endif
+
+
+! 				NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + dexp(-tau) * (1.0_dp - dexp(-dtau)) * Snu
+! 				NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + dexp(-tau_c) * (1.0_dp - dexp(-dtau_c)) * Snu_c
+				do la=1, NLTEspec%Nwaves
+				
+					!!Seems that chil * Ic << etal / chiI even for absorption lines	
+					!S_contrib(la,icell,id) =  chil(la) * ( NLTEspec%Ic(la,iray,id) - etal(la) / chiI(la) ) * dexp(-tau(la))
+										
+					NLTEspec%I(la,iray,id) = NLTEspec%I(la,iray,id) + dexp(-tau(la)) * (1.0_dp - dexp(-dtau(la))) * Snu(la)
+					NLTEspec%Ic(la,iray,id) = NLTEspec%Ic(la,iray,id) + dexp(-tau_c(la)) * (1.0_dp - dexp(-dtau_c(la))) * Snu_c(la) 
+					
+					S_contrib(la,icell,id) =  (etal(la) / chiI(la)) * dexp(-tau(la)-dtau(la))
+					!S_contrib(la,icell,id) = Snu(la) * dexp(-tau(la))
+					!S_contrib(la,icell,id) = ( etal(la)/chiI(la) ) * (1.0_dp - dexp(-dtau(la))) * dexp(-tau(la))
+
+				enddo
+     
+
+     
+				tau = tau + dtau
+				tau_c = tau_c + dtau_c
+
+			end if  ! lcellule_non_vide
+		end do infinie
+	RETURN
+	END SUBROUTINE INTEG_RAY_LINE_I_CNTRB
   
 
 END MODULE AtomicTransfer
-
-!  SUBROUTINE integrate_tau_bound(id,icell_in,x,y,z,u,v,w,iray,to_obs, tau)
-!  ! ------------------------------------------------------------------------------- !
-!  ! ------------------------------------------------------------------------------- !
-! 
-!   integer, intent(in) :: id, icell_in, iray, to_obs
-!   real(kind=dp), intent(in) :: u,v,w
-!   real(kind=dp), intent(in) :: x,y,z
-!   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-!   real(kind=dp), dimension(NLTEspec%Nwaves) :: dtau, chiI
-!   real(kind=dp), intent(out), dimension(NLTEspec%NWaves,atmos%Nrays, NLTEspec%Nproc) :: tau
-!   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
-!   logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
-! 
-!   x1=x;y1=y;z1=z
-!   x0=x;y0=y;z0=z
-!   next_cell = icell_in
-!   nbr_cell = 0
-! 
-!   tau(:,iray,id) = 0d0
-!   !!write(*,*) " vector direction times ", to_obs, u,v,w
-! 
-!   call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-! 
-!   ! Boucle infinie sur les cellules
-!   infinie : do ! Boucle infinie
-!     ! Indice de la cellule
-!     icell = next_cell
-!     x0=x1 ; y0=y1 ; z0=z1
-! 
-!     if (icell <= n_cells) then
-!      lcellule_non_vide = (atmos%icompute_atomRT(icell) > 0)
-!      if (atmos%icompute_atomRT(icell) < 0) RETURN !-1 if dark
-!     else
-!      lcellule_non_vide=.false.
-!     endif
-! 
-!     ! Test sortie ! "The ray has reach the end of the grid"
-!     if (test_exit_grid(icell, x0, y0, z0)) RETURN
-! 
-! 
-!     if (lintersect_stars) then
-!       if (icell == icell_star) RETURN
-!     endif
-! 
-!     nbr_cell = nbr_cell + 1
-! 
-!     previous_cell = 0
-! 
-!     call cross_cell(x0,y0,z0, u,v,w, icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-! !     if (l_contrib /= l) then
-! !       write(*,*) "l_contrib, l"
-! ! 	  write(*,*) l_contrib/ etoile(1)%r, l / etoile(1)%r
-! ! 	endif
-!     if (lcellule_non_vide) then
-! 
-! 
-!      l_contrib = l_contrib * AU_to_m !l_contrib in AU
-! 
-!      
-!      CALL initAtomOpac(id) !set opac to 0 for this cell and thread id
-!      
-!       if (atmos%NpassiveAtoms>0) CALL Metal_bb_new(id, icell, x0, y0, z0, x1, y1, z1, u, v, w, l)
-!       
-!       chiI(:) = NLTEspec%AtomOpac%chi_p(:,id) + NLTEspec%AtomOpac%Kc(:,icell,1) + tiny_chi
-! 
-!       !add only if non zero,; this should be fater to do than adding a large 0 array
-!       if (atmos%NactiveAtoms>0) then 
-!        CALL initAtomOpac_nlte(id)
-!        CALL NLTE_bound_bound(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l, .false.)
-!        chiI(:) = chiI(:) + NLTEspec%AtomOpac%chi(:,id) + NLTEspec%AtomOpac%Kc_nlte(:,icell)
-!       endif
-!                     
-!       dtau(:)   = l_contrib * chiI(:)
-! 
-! 
-! 	 !do not take into account dtau of the cell if we integrate tau in the same direction of propagation
-! 	 !but in opposite direction yes.
-! 	 if (to_obs == 1) then !going in the same direction as the ray
-! 	   !do not take into account the path in the cell for this case as we want tau at the edge
-!        if (nbr_cell > 1) tau(:,iray,id) = tau(:,iray,id) + dtau
-!      else if (to_obs==-1) then !opposite direction, count the travel path in the cell
-!        tau(:,iray,id) = tau(:,iray,id) + dtau
-!      else
-!       write(*,*) to_obs
-!       CALL ERROR("unknown value for to_obs")
-!      endif
-! 
-!     end if
-!   end do infinie
-!   ! -------------------------------------------------------------- !
-!   ! -------------------------------------------------------------- !
-!   RETURN
-!   END SUBROUTINE integrate_tau_bound
-
-! 						CALL INTEG_RAY_JNU_ALI(id, icell, xyz0(1,iray,id),xyz0(2,iray,id), xyz0(3,iray,id), &
-! 											uvw0(1,iray,id), uvw0(2,iray,id), uvw0(3,iray,id), iray, labs, &
-! 											kappa_tot, Sold, Istar, lambda_star(:,id), Ic(:,id))
-! 											
-! 						J_FS(:,icell) = J_FS(:,icell) + Ic(:,id) / n_rayons						
-! 						lambda_star_j(:,id) = lambda_star_j(:,id) + lambda_star(:,id) / n_rayons
-						
-!       			    S_FS(:,id) = Sth(:,icell) * (1.-beta(:,icell)) + beta(:,icell) * J_FS(:,icell)
-!       			    Snew(:,icell) = (S_FS(:,id) - beta(:,icell) * lambda_star_j(:,id) * Sold(:,icell)) / (1.-beta(:,icell)*lambda_star_j(:,id))
-!       			    Jnew(:,icell) = J_FS(:,id)
-!    SUBROUTINE INTEG_RAY_JNU_ALI(id,icell_in,x,y,z,u,v,w,iray,labs, kappa_tot, Sny, Istar, psi, Ic)
-!  ! ------------------------------------------------------------------------------- !
-!   ! This routine performs integration of the transfer equation along a ray to
-!   ! compute coherent Jnu in the continuum
-!  ! ------------------------------------------------------------------------------- !
-! 
-!   integer, intent(in) :: id, icell_in, iray
-!   real(kind=dp), intent(in) :: u,v,w
-!   real(kind=dp), intent(in) :: x,y,z
-!   real(kind=dp), intent(in), dimension(:,:) :: kappa_tot, Sny
-!   real(kind=dp), intent(in), dimension(:) :: Istar
-!   real(kind=dp), intent(out) :: Ic(:), psi(:)
-!   logical, intent(in) :: labs
-!   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-!   real(kind=dp), dimension(size(Ic)) :: LimbD!, Snu_c
-!   real(kind=dp), dimension(size(Ic)) :: tau_c!, dtau_c, chiIc
-!   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
-!   logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, eval_operator
-! 
-!   x1=x;y1=y;z1=z
-!   x0=x;y0=y;z0=z
-!   next_cell = icell_in
-!   nbr_cell = 0
-! 
-!   !tau(:) = 0.0_dp !go from surface down to the star
-!   tau_c(:) = 0.0_dp
-! 
-!   Ic(:) = 0.0
-!   psi(:) = 0.0
-!   
-!   eval_operator = .false.
-!   ! -------------------------------------------------------------- !
-!   !*** propagation dans la grille ***!
-!   ! -------------------------------------------------------------- !
-!   ! Will the ray intersect a star
-!   call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-! 
-!   ! Boucle infinie sur les cellules
-!   infinie : do ! Boucle infinie
-!     ! Indice de la cellule
-!     icell = next_cell
-!     x0=x1 ; y0=y1 ; z0=z1
-! 
-!     if (icell <= n_cells) then
-!      !lcellule_non_vide=.true.
-!      !atmos%nHtot(icell)>0
-!      lcellule_non_vide = (atmos%icompute_atomRT(icell) > 0)
-!      if (atmos%icompute_atomRT(icell) < 0) RETURN !-1 if dark
-!     else
-!      lcellule_non_vide=.false.
-!     endif
-!     
-!     if (minval(tau_c) > 20.) return
-!     
-!     ! Test sortie ! "The ray has reach the end of the grid"
-!     if (test_exit_grid(icell, x0, y0, z0)) RETURN
-! 
-!     if (lintersect_stars) then
-!       if (icell == icell_star) then
-!        !CALL calc_stellar_radiation(NLTEspec%Nwaves,i_star, x0, y0, z0, u,v,w,LimbD)
-!        Ic(:) =  Ic(:) + Istar(:) * dexp(-tau_c)
-!        RETURN
-!       end if
-!     endif
-! 
-!     nbr_cell = nbr_cell + 1
-! 
-!     ! Calcul longeur de vol et profondeur optique dans la cellule
-!     previous_cell = 0 ! unused, just for Voronoi
-!     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-! 
-! 
-!     !count opacity only if the cell is filled, else go to next cell
-!     if (lcellule_non_vide) then
-!      lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
-!      ! opacities in m^-1
-!      l_contrib = l_contrib * AU_to_m !l_contrib in m    
-! 
-!       Ic(:) = Ic(:) + dexp(-tau_c) * (1.0_dp - dexp(-l_contrib * kappa_tot(:,icell))) * Sny(:,icell)
-! 
-!      
-!      if ((nbr_cell == 1).and.labs) then 
-!       ds(iray,id) = l * AU_to_m
-!       psi(:) = (1d0 - exp(-ds(iray,id)*kappa_tot(:,icell))) * dexp(-tau_c)!in this direction
-!      endif
-! 
-! 
-!      !tau = tau + dtau
-!      tau_c = tau_c + l_contrib * kappa_tot(:,icell)
-! 
-!     end if  ! lcellule_non_vide
-!   end do infinie
-!   ! -------------------------------------------------------------- !
-!   ! -------------------------------------------------------------- !
-!   RETURN
-!   END SUBROUTINE INTEG_RAY_JNU_ALI

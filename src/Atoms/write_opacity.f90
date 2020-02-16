@@ -12,6 +12,7 @@ MODULE write_opacity
  use constant
  use Planck
  use hydrogen_opacities
+ use occupation_probability, only : D_i
  use rayleigh_scattering
 
  !MCFOST's original modules
@@ -613,6 +614,8 @@ MODULE write_opacity
   integer :: nelements
 
   if (.not.atmos%electron_scattering) return
+  write(*,*) " Writing mean intensity... "
+
   !get unique unit number
   CALL ftgiou(unit,status)
   blocksize=1
@@ -685,6 +688,7 @@ MODULE write_opacity
   integer :: kc, kr, i, j, Nblue, Nred, Z, icell, iend, istart, la, Nwrite
   real(kind=dp), dimension(:), allocatable :: Bpnu, chi, eta
   real(kind=dp), dimension(:,:,:), allocatable :: big_tab
+  real(kind=dp) :: n_eff, chi0
   character(len=100) :: filename
   
   allocate(Bpnu(NLTEspec%Nwaves),chi(NLTEspec%Nwaves),eta(NLTEspec%Nwaves))
@@ -699,6 +703,7 @@ MODULE write_opacity
 
   unit = 1
   
+  write(*,*) " Writing opacities for atom ", atom%ID
 
   filename = trim(atom%ID)//'_contopac.s'
   
@@ -713,6 +718,7 @@ MODULE write_opacity
   allocate(big_tab(Nwrite, NLTEspec%Nwaves, n_cells))
   big_tab = 0.0
   !free free for other atom not included yet
+  !if phi not allocated bound-bound will be zero
 
   open(unit, file=filename, status="unknown")
   
@@ -732,8 +738,9 @@ MODULE write_opacity
   if (atom%ID=="H") then
    NLTEspec%AtomOpac%sca_c(:,:) = 0.0_dp
    do icell=1,n_cells
-       !CALL HI_Rayleigh(1, icell)
-       CALL Rayleigh(1, icell, hydrogen)
+		if (atmos%icompute_atomRT(icell) <= 0) cycle	
+       CALL HI_Rayleigh(1, icell)
+       !CALL Rayleigh(1, icell, hydrogen)
        big_tab(1,:,icell) = atmos%ne(icell) * sigma_e
        big_tab(2,:,icell) = NLTEspec%AtomOpac%sca_c(:,icell) / atom%n(1,icell) /sigma_e!ground state pops, sigT*sigH
    enddo
@@ -742,6 +749,7 @@ MODULE write_opacity
    istart = 1
    NLTEspec%AtomOpac%sca_c(:,:) = 0.0_dp !set to zero, we only want He
    do icell=1,n_cells
+       if (atmos%icompute_atomRT(icell) <= 0) cycle
        CALL HeI_Rayleigh(1, icell) !for helium starts at 1
        big_tab(1,:,icell) = NLTEspec%AtomOpac%sca_c(:,icell) / atom%n(1,icell) /sigma_e!ground state pops, sigT*sigH
    enddo
@@ -756,6 +764,7 @@ MODULE write_opacity
   !write Hminus bf and ff if He
   if (atom%ID=='H') then
    do icell=1,n_cells
+    if (atmos%icompute_atomRT(icell) <= 0) cycle
     CALL Hminus_bf(icell, chi, eta)
     big_tab(3,:,icell) = chi
     big_tab(4,:,icell) = eta
@@ -776,16 +785,21 @@ MODULE write_opacity
    enddo
    
    deallocate(Bpnu)
-   istart = 8 + istart ! + 0 if H
+   istart = 8!! + istart ! + 0 if H
   else
    write(*,*) " metal f-f not written yet"
-   istart = 1 + istart ! = 2 if He because of Rayleigh
+   if (atom%ID=="He") then
+    istart = 1
+   else
+    istart = 0 !1 + istart ! = 2 if He because of Rayleigh
+   endif
   endif
   
 
 !now bound-free
   
   do icell=1, n_cells
+    if (atmos%icompute_atomRT(icell) <= 0) cycle
     chi = 0.0_dp
     eta = 0.0_dp
     do kc=atom%Ntr_line+1,atom%Ntr !sum for this cell opac of all cont
@@ -793,14 +807,20 @@ MODULE write_opacity
      i = atom%continua(kr)%i
      j = atom%continua(kr)%j 
      Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
-
+     n_eff = atom%stage(j) * dsqrt(atom%Rydberg/(atom%E(j)-atom%E(i)))
+     chi0 = atom%E(j) - atom%E(1)
    
-     chi(Nblue:Nred) = chi(Nblue:Nred) + atom%continua(kr)%alpha(:) * &
-      (atom%n(i,icell)-atom%continua(kr)%gij(:,icell)*atom%n(j,icell))
+     do la=1, atom%continua(kr)%nlambda
+      chi(Nblue+la-1) = chi(Nblue+la-1) + atom%continua(kr)%alpha(la) * &
+      (atom%n(i,icell)-atom%continua(kr)%gij(la,icell)*atom%n(j,icell))* \
+      D_i(icell, n_eff, real(atom%stage(i)), &
+         real(atom%stage(j)), NLTEspec%lambda(Nblue+la-1), atom%continua(kr)%lambda0, chi0)
       
-     eta(Nblue:Nred) = eta(Nblue:Nred) + atom%continua(kr)%alpha(:) * &
-      atom%continua(kr)%twohnu3_c2(:) * atom%continua(kr)%gij(:,icell) * atom%n(j,icell)
-
+      eta(Nblue+la-1) = eta(Nblue+la-1) + atom%continua(kr)%alpha(la) * &
+      atom%continua(kr)%twohnu3_c2(la) * atom%continua(kr)%gij(la,icell) * atom%n(j,icell)* \
+      D_i(icell, n_eff, real(atom%stage(i)), &
+         real(atom%stage(j)), NLTEspec%lambda(Nblue+la-1), atom%continua(kr)%lambda0, chi0)
+     enddo
 
     end do ! loop over Ncont
     big_tab(istart+1,:,icell) = chi
@@ -810,10 +830,11 @@ MODULE write_opacity
  !now bound bound in the zero-velocity
  !Assume that profile are already computed
  if (.not.allocated(atom%lines(1)%phi)) then
-  call error("Cannot write bound bound, phi not allocated")
- endif 
+  call warning("Cannot write bound bound, phi not allocated")
+ else
   
   do icell=1, n_cells
+    if (atmos%icompute_atomRT(icell) <= 0) cycle
     chi = 0.0_dp
     eta = 0.0_dp
     do kc=1,atom%Ntr_line
@@ -833,6 +854,7 @@ MODULE write_opacity
     big_tab(istart+3,:,icell) = chi
     big_tab(istart+4,:,icell) = eta
   enddo
+ endif !write b-b
   
   !assumes no free free other than for H, and no rayleigh other than H, He
   if (atom%ID=='H') then
@@ -873,7 +895,7 @@ MODULE write_opacity
  END SUBROUTINE write_cont_opac_ascii
 
 !building
-!works only if lstore_opac, which will be default mode and option deprecated
+!try with big_tab(:) like the ascii version, maybe it's better
  SUBROUTINE write_cont_opac(atom)
  ! ----------------------------------------------------------- !
  ! write separate total continuum opacities for atom
@@ -883,10 +905,11 @@ MODULE write_opacity
   integer :: naxis, nelements
   integer(8) :: blocksize, naxes(10), group, bitpix, fpixel
   logical :: extend, simple
-  integer :: kc, kr, i, j, Nblue, Nred, Z, icell, iend, istart
+  integer :: kc, kr, i, j, Nblue, Nred, Z, icell, iend, istart, la
   real(kind=dp), dimension(:,:), allocatable :: chi_bf, eta_bf, sca
   real(kind=dp), dimension(:,:), allocatable ::chi_ff, eta_ff,chi_bb, eta_bb
   real(kind=dp), dimension(:), allocatable :: Bpnu, chi, eta
+  real(kind=dp) :: n_eff, chi0
   character(len=100) :: filename
   
   allocate(Bpnu(NLTEspec%Nwaves),chi(NLTEspec%Nwaves),eta(NLTEspec%Nwaves))
@@ -1232,15 +1255,21 @@ MODULE write_opacity
      i = atom%continua(kr)%i
      j = atom%continua(kr)%j 
      Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
-
+     n_eff = atom%stage(j) * dsqrt(atom%Rydberg / (atom%E(i)-atom%E(j)))
+     chi0 = atom%E(j)-atom%E(1)
    
-     chi(Nblue:Nred) = chi(Nblue:Nred) + atom%continua(kr)%alpha(:) * &
-      (atom%n(i,icell)-atom%continua(kr)%gij(:,icell)*atom%n(j,icell))
+     do la=1, atom%continua(kr)%Nlambda
+      chi(Nblue+la-1) = chi(Nblue+la-1) + atom%continua(kr)%alpha(la) * &
+      (atom%n(i,icell)-atom%continua(kr)%gij(la,icell)*atom%n(j,icell)) * \
+      D_i(icell, n_eff, real(atom%stage(i)), &
+         real(atom%stage(j)), NLTEspec%lambda(Nblue+la-1), atom%continua(kr)%lambda0, chi0)
       
-     eta(Nblue:Nred) = eta(Nblue:Nred) + atom%continua(kr)%alpha(:) * &
-      atom%continua(kr)%twohnu3_c2(:) * atom%continua(kr)%gij(:,icell) * atom%n(j,icell)
-
-
+      eta(Nblue+la-1) = eta(Nblue+la-1) + atom%continua(kr)%alpha(la) * &
+      atom%continua(kr)%twohnu3_c2(la) * atom%continua(kr)%gij(la,icell) * atom%n(j,icell)* \
+      D_i(icell, n_eff, real(atom%stage(i)), &
+         real(atom%stage(j)), NLTEspec%lambda(Nblue+la-1), atom%continua(kr)%lambda0, chi0)
+     enddo
+   
     end do ! loop over Ncont
     chi_bf(:,icell) = chi
     eta_bf(:,icell) = eta
@@ -1387,16 +1416,21 @@ MODULE write_opacity
  ! absorption of ne, T and nion)
  ! ----------------------------------------------------------- !
   type(AtomType), intent(in) :: atom
-  integer :: unit, status = 0, blocksize, naxes(5), naxis,group, bitpix, fpixel, icell
+  integer :: unit, status = 0, blocksize, naxes(6), naxis,group, bitpix, fpixel, icell
   logical :: extend, simple
   integer :: nelements, kc, kr, i, j, Nblue, Nred, Z, la
-  real(kind=dp), allocatable :: alpha_ff(:,:), alpha_bf(:)
+  real(kind=dp), allocatable :: alpha_ff(:,:,:), alpha_bf(:,:), dissolve(:,:,:)
+  real(kind=dp) :: n_eff, chi0
   character(len=50) :: filename
   
-  allocate(alpha_ff(NLTEspec%Nwaves, n_cells))
-  allocate(alpha_bf(NLTEspec%Nwaves))
-  alpha_ff(:,:) = 0.0_dp
-  alpha_bf(:) = 0.0_dp
+  write(*,*) " Writing continuum cross-sections for atom ", atom%ID
+  
+  allocate(alpha_ff(NLTEspec%Nwaves, n_cells,atom%Ncont), dissolve(NLTEspec%Nwaves, n_cells, atom%Ncont))
+  allocate(alpha_bf(NLTEspec%Nwaves,atom%Ncont))
+  alpha_ff(:,:,:) = 0.0_dp
+  alpha_bf(:,:) = 0.0_dp
+  dissolve(:,:,:) = 0.0_dp !in practive dissolve fraction is only important for hydrogenic continua
+  						   ! at the moment. Explicit continua not extrapolated
 
     do kc=atom%Ntr_line+1,atom%Ntr
      kr = atom%at(kc)%ik 
@@ -1408,7 +1442,13 @@ MODULE write_opacity
      Z = atom%stage(j) !1 if H
        				
     !in m2
-     alpha_bf(Nblue:Nred) = alpha_bf(Nblue:Nred) + atom%continua(kr)%alpha(:)
+    !If extrapolated, the bound free cross-section would not be zero beyond the edge
+    !Dissolved fraction is written separately
+    !Numerically, the un-extrapolated cross-section is simply alpha[lambda <= lambda0]
+    !not lambdamax.
+!      alpha_bf(Nblue:Nred) = alpha_bf(Nblue:Nred) + atom%continua(kr)%alpha(:)
+    alpha_bf(Nblue:Nred,kr) = atom%continua(kr)%alpha(:)
+
 
 
     end do ! loop over Ncont
@@ -1429,9 +1469,10 @@ MODULE write_opacity
   bitpix = -64
 
 
-  naxis = 1
+  naxis = 2
   naxes(1) = NLTEspec%Nwaves
-  nelements = naxes(1)
+  naxes(2) = atom%Ncont
+  nelements = naxes(1) * naxes(2)
   
 
   CALL ftinit(unit,trim(filename),blocksize,status)
@@ -1442,25 +1483,30 @@ MODULE write_opacity
   !write data
   CALL ftpprd(unit,group,fpixel,nelements,alpha_bf,status)
   
+  deallocate(alpha_bf)
+  
   if (lVoronoi) then
-   	naxis = 2
+   	naxis = 3
    	naxes(1) = NLTEspec%Nwaves
    	naxes(2) = atmos%Nspace
-   	nelements = naxes(2)*naxes(1)
+   	naxes(3) = atom%Ncont
+   	nelements = naxes(2)*naxes(1)*naxes(3)
   else
    	if (l3D) then
-    	naxis = 4
+    	naxis = 5
     	naxes(1) =  NLTEspec%Nwaves
     	naxes(2) = n_rad
    	 	naxes(3) = 2*nz
     	naxes(4) = n_az
-    	nelements = naxes(2) * naxes(3) * naxes(4) * naxes(1)
+    	naxes(5) = atom%Ncont
+    	nelements = naxes(2) * naxes(3) * naxes(4) * naxes(1) * naxes(5)
    	else
-    	naxis = 3
+    	naxis = 4
     	naxes(1) =  NLTEspec%Nwaves
     	naxes(2) = n_rad
     	naxes(3) = nz
-    	nelements = naxes(2) * naxes(3) * naxes(1)
+    	naxes(4) = atom%Ncont
+    	nelements = naxes(2) * naxes(3) * naxes(1) * naxes(4)
    	end if
   end if
   
@@ -1469,16 +1515,20 @@ MODULE write_opacity
      kr = atom%at(kc)%ik 
      i = atom%continua(kr)%i
      j = atom%continua(kr)%j 
-     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
-
-   
+     Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred   
      Z = atom%stage(j) !1 if H
+     n_eff = Z * dsqrt(atom%Rydberg / (atom%E(j)-atom%E(i)))
+     chi0 = atom%E(j) - atom%E(1)
        				
     !in m2
             !per gaunt_ff which is about 1 anyway; alpha_ff (m^5 H^3 K^1/2 * ne(m^-3) in m^2 Hz^3 K^1/2 ) given per unit electron density
     !and per nu**3					so alpha_ff in m^-2 K^1/2
      do la=1, atom%continua(kr)%Nlambda
-      alpha_ff(Nblue+la-1,icell) = alpha_ff(Nblue+la-1,icell) + atmos%ne(icell) * H_ff_Xsection(Z, atmos%T(icell), NLTEspec%lambda(Nblue+la-1))
+!       alpha_ff(Nblue+la-1,icell) = alpha_ff(Nblue+la-1,icell) + atmos%ne(icell) * H_ff_Xsection(Z, atmos%T(icell), NLTEspec%lambda(Nblue+la-1))
+      alpha_ff(Nblue+la-1,icell,kr) = atmos%ne(icell) * H_ff_Xsection(Z, atmos%T(icell), NLTEspec%lambda(Nblue+la-1))
+
+      dissolve(Nblue+la-1,icell,kr) = D_i(icell, n_eff, real(atom%stage(i)), &
+         real(atom%stage(j)), NLTEspec%lambda(Nblue+la-1), atom%continua(kr)%lambda0, chi0)
 	 enddo
 
 
@@ -1486,13 +1536,23 @@ MODULE write_opacity
     end do ! loop over Ncont
  enddo
   
+  
   CALL ftcrhd(unit, status)
   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   CALL ftpkys(unit, "alpha_ff", "(m^2)", ' ', status)
   CALL ftpprd(unit,group,fpixel,nelements,alpha_ff,status)
+  
+  deallocate(alpha_ff)
 
+  CALL ftcrhd(unit, status)
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  CALL ftpkys(unit, "Dissolve fraction", " ", ' ', status)
+  CALL ftpprd(unit,group,fpixel,nelements,dissolve,status)
 
-  deallocate(alpha_bf, alpha_ff)
+  deallocate(dissolve)
+  
+  !now write dissolve fraction ?
+  
   CALL ftclos(unit, status)
   CALL ftfiou(unit, status)
 

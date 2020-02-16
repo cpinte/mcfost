@@ -33,40 +33,36 @@ MODULE atom_type
   END TYPE AtomicTransition
 
   TYPE AtomicLine
-   logical           :: symmetric, polarizable, neg_opac
-   logical, dimension(:), allocatable :: negative_opacity
+   logical           :: symmetric, polarizable
+   !logical, dimension(:), allocatable :: negative_opacity
    logical           :: Voigt=.true., PFR=.false.,&
       damping_initialized=.false. !true if we store the damping on the whole grid for all lines.
    character(len=17) :: vdWaals
    character(len=20) :: trtype="ATOMIC_LINE", Coupling="LS"
    ! i, j start at 1 (not 0 like in C)
-   integer :: i, j, Nlambda, Nblue=0, Nxrd=0, Nred = 0, Nmid=0
-   real(kind=dp) :: lambda0, isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
+   integer :: i, j, Nxrd=0
+   integer :: Nlambda ! Number of wavelength points between Nblue and Nred = Nred-Nblue + 1
+   integer :: Nblue=0, Nred = 0, Nmid=0 !Index of the line on the whole grid in the absence of velocity shifts or magnetic fields
+   real(kind=dp) :: lambda0, lambdamin, lambdamax ! boundary of the line in absence of velocity shifts or magnetic fields
+   real(kind=dp) :: isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
    real(kind=dp) :: twohnu3_c2, gij
    real(kind=dp) :: qcore, qwing, glande_i, glande_j
    real(kind=dp), dimension(4) :: cvdWaals
-   !Nlambda,Nproc
-   !for one cell
-   real(kind=dp), allocatable, dimension(:,:)  :: phi, phi_loc !in a specific direction
+   integer, allocatable, dimension(:,:) :: dk!size (Nray, id) = index displacement of a line due to velocity
+   !Nlambda,(Nproc or Nspace, depends on the choice For flux calculations. Always Nlambda, Nspace for NLTE
+   real(kind=dp), allocatable, dimension(:,:)  :: phi
    !used for wavelength integration
-   real(kind=dp), allocatable, dimension(:,:,:) :: phi_ray !for one cell Nlambda, Nray, Nproc
    real(kind=dp), allocatable, dimension(:,:,:) :: phiZ, psi !3, Nlambda, Nray
    !wlam is the integration wavelenght weight = phi
-   real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam, Jbar
+   real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam, Rij, Rji!, Jbar
    !real(kind=dp), allocatable, dimension(:) :: fomega !for Rayleigh scattering
    real(kind=dp) :: wphi
-   real(kind=dp) :: Qelast, Rij, Rji, adamp ! at a cell
-   real(kind=dp), dimension(:), allocatable :: Tex
+   real(kind=dp) :: Qelast, adamp ! at a cell
+   real(kind=dp), dimension(:), allocatable :: Tex, deta !differentiel of source function
    !keep CLIGHT * (nu0 - nu)/nu0 for lines												(method for Voigt)
    real(kind=dp), dimension(:), allocatable :: u, a, aeff, r, r1
    !damping for all cells(a) and Thomson effective damping (eff)
    real(kind=dp), allocatable, dimension(:,:) :: rho_pfr
-   !!Nlevel, wavelength and proc
-   !!Stores the information for that atom only, necessary to  construct the Gamma matrix
-   !!and to compute the cross-coupling terms. We need to know for each wavelength and each
-   !!proc what are the active transitions involved in the Gamma matrix.
-   !!Nlambda, Ndep
-   !!real(kind=dp), allocatable, dimension(:,:,:)  :: U, V
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
    integer :: ZeemanPattern! 0 = WF, -1=EFFECTIVEE TRIPLET, 1=FULL
    type (AtomType), pointer :: atom => NULL()
@@ -74,19 +70,18 @@ MODULE atom_type
   END TYPE AtomicLine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE AtomicContinuum
-   logical :: hydrogenic, neg_opac
-   logical, dimension(:), allocatable :: negative_opacity
-   integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0
-   real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin !continuum maximum frequency > frequency photoionisation
+   logical :: hydrogenic
+   !logical, dimension(:), allocatable :: negative_opacity
+   integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0, N0 = 0
+   real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionisation
    real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2, CoolRates_ij, w_lam
    real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file
    real(kind=dp) :: wmu
-   real(kind=dp) :: Rji, Rij
    real(kind=dp), dimension(:), allocatable :: Tex
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
-   !!(Nlambda, Ndep) and (Nlambda Nproc), (Nlam, Nproc) Vji or Jnu would be remove, do not know which one yet
-   real(kind=dp), allocatable, dimension(:,:)  :: gij, Vji, Jnu
+   real(kind=dp), allocatable, dimension(:) :: Rji, Rij
+   real(kind=dp), allocatable, dimension(:,:)  :: gij!no need anymore, compute Jnu for all once, Jnu
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 
@@ -106,7 +101,7 @@ MODULE atom_type
    ! ions etc ...
    integer, allocatable, dimension(:)  :: stage, Lorbit
    integer(8)            :: offset_coll, colunit
-   real(kind=dp) :: scatt_limit !minimum wavelength for Rayleigh scattering
+   real(kind=dp) :: Rydberg, scatt_limit !minimum wavelength for Rayleigh scattering
    real(kind=dp)                :: Abund, weight, massf !mass fraction
    real(kind=dp), allocatable, dimension(:) :: g, E, vbroad!, ntotal
    real(kind=dp), allocatable, dimension(:) :: qS, qJ
@@ -123,10 +118,8 @@ MODULE atom_type
    type (AtomicTransition), allocatable, dimension(:)   :: at !Atomic transition, lines first in readatom
    !one emissivity per atom, used in the construction of the gamma matrix
    !where I have to distinguish between atom own opac and overlapping transitions
-   real(kind=dp), allocatable, dimension(:,:) :: etac
+   real(kind=dp), allocatable, dimension(:,:) :: etac, chic
    real(kind=dp), allocatable, dimension(:,:,:) :: eta !Nwaves, Nrays, Nproc
-!	_down = from j (upper) to l (lower); _up from i (lower) to lp (upper)
-   real(kind=dp), allocatable, dimension(:,:,:,:) :: Uji_down, chi_up, chi_down
    type (Ng) :: Ngs
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -161,6 +154,46 @@ MODULE atom_type
    rydberg_atom = E_RYDBERG / deltam !in joules
  RETURN 
  END FUNCTION rydberg_atom
+ 
+ !only for Hydrogen or approximate for n = n_eff
+ function line_oscillator_strength(n, np)
+ !From Johnson 1972
+  real(kind=dp), intent(in) :: n, np !n_lower and n_upper
+  real(kind=dp) :: line_oscillator_strength
+  real(kind=dp) :: x, g
+  
+  x = 1.0 - (n/np)**2
+  
+  if (n < 2.0) then !1 if n integer
+   g = 1.1330 + -0.4059 / x + 0.07014 / x / x
+  else if (n >= 2.0 .and. n < 3.0) then ! 2 if n integer
+   g = 1.0785 - 0.2319 / x + 0.02947 / x / x
+  else !n>=3
+   g = 0.9935 + 0.2328 / n - 0.1296 / n / n - &
+    1./n * (0.6282 - 0.5598 / n + 0.5299 / n / n) / x + &
+    1./n/n * (0.3887 - 1.181 /n + 1.470 /n / n) / x / x
+  endif
+  
+  !32/3/sqrt(3.)/pi
+  line_oscillator_strength = 1.9603 * n * g / (np * x)**3.
+ 
+ return
+ end function line_oscillator_strength
+ 
+ function n_eff(Erydb, Ej, Ei, Z)
+  !effective (hydrogenic) quantum number n*
+  !Ei is the energy of the level for which we compute n*
+  !and Ej is the energy of the next continuum.
+  !In case of a line beware, Ej is not E(line%j) but E(next_Contiuum(line%i))
+  real(kind=dp) :: n_eff
+  real(kind=dp), intent(in) :: Erydb, Ej, Ei
+  integer, intent(in) :: Z
+    
+  n_eff = Z * dsqrt(Erydb / (Ej-Ei) )
+ 
+ return
+ end function n_eff
+
 
  !for lines only, for continuum it is simply cont%j
  FUNCTION find_continuum(atom, l)
@@ -182,14 +215,37 @@ MODULE atom_type
 
  RETURN
  END FUNCTION find_continuum
-
+ 
+ FUNCTION find_ground_state_ion(Nlevel, stage, Nstage)
+  !Search the index of each ground state of each ionic stage
+  integer, intent(in) :: Nlevel, Nstage
+  integer, intent(in), dimension(Nlevel) :: stage
+  integer :: find_ground_state_ion(Nstage)
+  integer :: k, j, m
+  
+  j = stage(1) !first stage to start, then the next index is necessarily at least j+1
+  m = 1
+  do k=1, Nlevel
+  
+   if (stage(k)==j) then
+    !write(*,*) "k=", k, j, m
+    find_ground_state_ion(m) = k
+    j = j + 1
+    m = m + 1 !index should start at 1, not at j if j > 1
+   endif
+  
+  enddo
+ 
+ 
+ RETURN
+ END FUNCTION find_ground_state_ion
 
  FUNCTION atomic_orbital_radius(n, l, Z)
  !return atomic orbital radius wrt the Bohr radius
   real(kind=dp) :: atomic_orbital_radius
   real(kind=dp) :: n ! quantum principal number
   integer :: l ! orbital quantum number
-  integer :: Z ! charge ?
+  integer :: Z
 
   atomic_orbital_radius = n*n/real(Z) * (1d0 + 0.5*(1d0 - real(l)*(real(l)+1)/n/n))
 
@@ -197,12 +253,12 @@ MODULE atom_type
  END FUNCTION atomic_orbital_radius
 
  FUNCTION atomic_orbital_sqradius(n, l, Z)
- !Bates-Damguard mean suare radius
+ !Bates-Damguard mean square radius
   real(kind=dp) :: atomic_orbital_sqradius
   !in a0**2 units
   real(kind=dp) :: n ! quantum principal number
   integer :: l ! orbital quantum number
-  integer :: Z ! charge ?
+  integer :: Z ! charge : Z = 1 for H I
 
   atomic_orbital_sqradius = 0.5*n*n/real(Z*Z) * (5.*n*n + 1 - 3.*real(l)*(real(l)+1))
 

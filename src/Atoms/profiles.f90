@@ -1,26 +1,58 @@
 MODULE PROFILES
 
- use atmos_type, only                : atmos, B_project, VBROAD_atom
- use constant
- use atom_type
- use spectrum_type, only			 : NLTEspec
- use voigtfunctions, only 			 : Voigt
- use broad, only 					 : Damping
- use math
+	use atmos_type, only				: atmos, B_project, VBROAD_atom
+	use constant
+	use atom_type
+	use spectrum_type, only				: NLTEspec
+	use voigtfunctions, only			: Voigt
+	use broad, only						: Damping
+	use math
+	use getlambda, only 				: hv
 
  ! MCFOST's original
- use mcfost_env, only : dp
- use molecular_emission, only		 : v_proj
- use parametres
- use input
- use constantes, only				 : tiny_dp, huge_dp
+	use mcfost_env, only				: dp
+	use molecular_emission, only		: v_proj
+	use parametres
+	use input
+	use constantes, only				: tiny_dp, huge_dp
 
- IMPLICIT NONE
+	IMPLICIT NONE
 
- PROCEDURE(Iprofile), pointer :: Profile => null()
- !real(kind=dp), dimension(:,:,:) :: line_profiles
+	PROCEDURE(Iprofile), pointer :: Profile => null()
 
- CONTAINS
+	CONTAINS
+ 
+	SUBROUTINE compute_shift_index(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l)!, Nvspace, Omegav)
+		integer, intent(in) :: id, icell, iray
+		real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
+		!integer, optional, intent(in) :: Nvspace
+		!real(kind=dp), intent(inout), optional :: Omegav(Nvspace)
+		integer :: kr, nact
+		real(kind=dp) :: v0
+		
+! 		if (present(Nvsapce)) then
+! 		
+! 			....
+! 		
+! 		endif
+
+		v0 = v_proj(icell,(x+x1)*0.5,(y+y1)*0.5,(z+z1)*0.5,u,v,w)
+
+
+		do nact=1,atmos%NactiveAtoms
+		
+			do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
+			
+				atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%dk(iray,id) = nint(1e-3 * v0 / hv)
+			
+			enddo
+		
+		enddo
+		
+	
+	
+	RETURN
+	END SUBROUTINE compute_shift_index
  
 !if projection done before, we do not need x,y,z,l ect
 
@@ -40,16 +72,35 @@ MODULE PROFILES
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
   
-  line%phi_loc(:,id) = 0d0
+  line%phi(:,id) = 0d0
   !line_profiles(:,kr,id) = 0d0
   
   norm =  SQRTPI * line%atom%vbroad(icell) * Nvspace
+  
+  !project magnetic field if any
+  
+
+!   if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
+!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
+!      dv = dabs(v1-v0)
+!      Nvspace = max(2,nint(20*dv/line%atom%vbroad(icell)))
+!      Nvspace = min(Nvspace,NvspaceMax)
+!      omegav(Nvspace) = v1
+!     do nv=2,Nvspace-1
+!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+!       xphi=x+delta_vol_phi*u
+!       yphi=y+delta_vol_phi*v
+!       zphi=z+delta_vol_phi*w
+!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+!     end do 
+!   end if
+! write(*,*) "Nvspace=", Nvspace
 
   if (line%voigt) then
   !Now we have a pointer to atom in line. atom(n)%lines(kr)%atom => atom(n)
   !Computed before or change damping to use only line
   !CALL Damping(icell, line%atom, kr, line%adamp)       ! init for this line of this atom accounting for Velocity fields
-       do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
+       do nv=1, Nvspace !one iteration if 1) No velocity fields
             !                 2) Voronoi grid is used                 
                         
           vvoigt(:) = ( line%u(:) - omegav(nv) ) / line%atom%vbroad(icell)
@@ -57,7 +108,7 @@ MODULE PROFILES
 
 !           write(*,*) nv, "0loc=", locate(vvoigt, 0d0)
 !           write(*,*) maxval(vvoigt), vbroad
-          line%phi_loc(:,id) = line%phi_loc(:,id) + &
+          line%phi(:,id) = line%phi(:,id) + &
           						Voigt(line%Nlambda, line%a(icell),vvoigt(:)) !/ Nvspace
 
       end do
@@ -65,26 +116,19 @@ MODULE PROFILES
       do nv=1, Nvspace
 
          vvoigt(:) = ( line%u(:) - omegav(nv) ) / line%atom%vbroad(icell)
-         line%phi_loc(:,id) = line%phi_loc(:,id) + dexp(-(vvoigt(:))**2) !/ Nvspace 
+         line%phi(:,id) = line%phi(:,id) + dexp(-(vvoigt(:))**2) !/ Nvspace 
 
       end do
  end if !line%voigt
- line%phi_loc(:,id) = line%phi_loc(:,id) / norm !/ (SQRTPI * line%atom%vbroad(icell))
+ line%phi(:,id) = line%phi(:,id) / norm !/ (SQRTPI * line%atom%vbroad(icell))
 
-!  if (any_nan_infinity_vector(line%phi_loc(:,id))>0 .or. minval(line%phi_loc(:,id)) < 0) then
-!   write(*,*) line%Nlambda, icell, id
-!   if (line%voigt) write(*,*) "Damping = ", line%a(icell)
-!   write(*,*) "vv=",vvoigt !unitless
-!   write(*,*) "vv2(km/s)=", vvoigt(:) * line%atom%vbroad(icell)*1d-3
-!   write(*,*) " Error with Profile"
-!   write(*,*) line%phi_loc(:,id)
-!   stop
-!  end if
 
  RETURN
  END SUBROUTINE IProfile
  
  !-> TO be included as a Voigt procedure
+ !Missing velocity shift here
+ !building
  SUBROUTINE Iprofile_thomson (line,icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
   integer, intent(in) 							            :: icell, id, Nvspace
@@ -101,25 +145,24 @@ MODULE PROFILES
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
   
-  line%phi_loc(:,id) = 0d0
+  line%phi(:,id) = 0d0
   !line_profiles(:,kr,id) = 0d0
   
 !   r = line%atom%vbroad(icell)*line%a(icell)/line%aeff(icell)
 !   eta = 1.36603*r - 0.47719*r*r + 0.11116*r*r*r
 
   !normed
-!   line%phi_loc(:,id) = eta*(line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) / pi) &
+!   line%phi(:,id) = eta*(line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) / pi) &
 !                        + (1-eta)*dexp(-(vvoigt(:)/line%aeff(icell))**2)/SQRTPI/line%aeff(icell)
                        
-  line%phi_loc(:,id) = line%r(icell)*line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) &
+  line%phi(:,id) = line%r(icell)*line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) &
                        + line%r1(icell)*dexp(-(line%u(:)/line%aeff(icell))**2)
 
 
  RETURN
  END SUBROUTINE IProfile_thomson
 
- !-> Relaxing some degree of accuracy on the velocity, profiles are projected by
- ! index shifting.
+
  SUBROUTINE IProfile_cmf_to_obs(line,icell,x,y,z,x1,y1,z1,u,v,w,l, id, Nvspace, Omegav)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
   integer, intent(in) 							            :: icell, id, Nvspace
@@ -128,37 +171,41 @@ MODULE PROFILES
                                 				               l !physical length of the cell
   real(kind=dp), intent(in) 								:: Omegav(:)
   type (AtomicLine), intent(inout)								:: line
-  !!real(kind=dp), dimension(line%Nlambda)					:: vvoigt
-  integer													::  Nred, Nblue, i, j, nv, dom
-  !!real(kind=dp), dimension(line%Nlambda)                    :: u
+  integer													::  Nred, Nblue, i, j, nv
+  real(kind=dp), dimension(line%Nlambda)                    :: u1, u1p, phi0
  
 
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
 
   !temporary here
-  line%phi_loc(:,id) = 0d0
- 
-  !!u1(:) = line%u(:)/line%atom%vbroad(icell)
+  phi0 = 0d0
+ write(*,*) " Interp not ready for profile"
+ stop
+ u1(:) = line%u(:)/line%atom%vbroad(icell)
 
  do nv=1, Nvspace 
  
-         !!u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
+         u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
          
-         dom = 1 + nint(omegav(nv) / (line%u(line%Nmid+1) - line%u(line%Nmid)) )
-         write(*,*) nv, icell, dom
-         write(*,*) omegav(nv), line%u(line%Nmid+1),line%u(line%Nmid)
-         !!line%phi_loc(:,id) = line%phi_loc(:,id) + &
-                 !!linear_1D_sorted(line%Nlambda,u1,line%phi(:,icell),line%Nlambda,u1p) / Nvspace /sqrtpi / line%atom%vbroad(icell)
+         if (omegav(nv) == 0.0) then
+         
+          phi0 = phi0 + line%phi(:,icell)
+         else
+
+          phi0 = phi0 + &
+               linear_1D_sorted(line%Nlambda,u1,line%phi(:,icell),line%Nlambda,u1p)
+         endif
          	
-         line%phi_loc(:,id) = line%phi_loc(:,id) + cmf_to_of (line%Nlambda, line%phi(:,icell), dom) / Nvspace
  enddo
  
+ phi0 = phi0 / Nvspace /sqrtpi / line%atom%vbroad(icell)
 
 
  RETURN
  END SUBROUTINE IProfile_cmf_to_obs
  
+ !building
  SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
  ! phi = Voigt / sqrt(pi) / vbroad(icell)
 !->>>>>>
@@ -214,7 +261,7 @@ integer :: iray = 1 !futur deprecation
 
   i = line%i; j = line%j
   Nred = line%Nred; Nblue = line%Nblue
-  line%phi_loc(:,id) = 0d0
+  line%phi(:,id) = 0d0
   
   !allocate(vv(line%Nlambda), vvoigt(line%Nlambda))
 
@@ -226,7 +273,7 @@ integer :: iray = 1 !futur deprecation
       do nv=1, Nvspace
       
          vvoigt(:) = (line%u - omegav(nv)) / line%atom%vbroad(icell)
-         line%phi_loc(:,id) = line%phi_loc(:,id) + dexp(-(vvoigt(:))**2) !/ Nvspace
+         line%phi(:,id) = line%phi(:,id) + dexp(-(vvoigt(:))**2) !/ Nvspace
 
       !derivative of Gaussian:
 !          F(Nblue:Nred) = F(Nblue:Nred) - &
@@ -234,7 +281,7 @@ integer :: iray = 1 !futur deprecation
 !            NLTEspec%lambda(Nblue:Nred) * CLIGHT / (line%atom%vbroad(icell) * line%lambda0)
 
       end do
-      line%phi_loc(:,id) = line%phi_loc(:,id) / norm !/ (SQRTPI * vbroad)
+      line%phi(:,id) = line%phi(:,id) / norm !/ (SQRTPI * vbroad)
 !       F(Nblue:Nred) = F(Nblue:Nred) / (SQRTPI * line%atom%vbroad(icell))
       !deallocate(vv, vvoigt)
       RETURN
@@ -251,7 +298,7 @@ integer :: iray = 1 !futur deprecation
   line%psi(:,:,iray) = 0d0; line%phiZ(:,iray,id) = 0d0
   !Should work also for unpolarised voigt line because Ncz=1,S=0,q=0,shift=0
        ! init for this line of this atom accounting for Velocity fields
-       do nv=1, Nvspace !one iteration if 1) No velocity fields or lstatic
+       do nv=1, Nvspace !one iteration if 1) No velocity fields
       
         vvoigt(:) = (line%u - omegav(nv)) / line%atom%vbroad(icell)
 
@@ -287,7 +334,7 @@ integer :: iray = 1 !futur deprecation
           end do !components
           !the output, for the other we store chi_pol/chi_I, rho_pol/chi_I etc
           !write(*,*) dsin(gamma(nb)), dcos(gamma(nb)), dsin(2*chi(nb)), dcos(2*chi(nb))
-          line%phi_loc(:,id) = line%phi_loc(:,id) + 5d-1 *(phi_zc(2,:) * dsin(gamma(nb))*dsin(gamma(nb)) + \
+          line%phi(:,id) = line%phi(:,id) + 5d-1 *(phi_zc(2,:) * dsin(gamma(nb))*dsin(gamma(nb)) + \
             5d-1 *(1d0+dcos(gamma(nb))*dcos(gamma(nb))) * (phi_zc(1,:)+phi_zc(3,:))) ! profile in chiI, etaI
           !rhoQ/chiI
 !           psi(1,:) = psi(1,:) + &
@@ -334,6 +381,54 @@ integer :: iray = 1 !futur deprecation
   !deallocate(psi_zc, phi_zc, LV, F, vv, vvoigt)
  RETURN
  END SUBROUTINE ZProfile
+ 
+ SUBROUTINE write_profiles_ascii(unit, atom, delta_k)
+  type(AtomType), intent(in) :: atom
+  integer, intent(in) :: unit
+  integer, intent(in), optional :: delta_k
+  integer :: dk, kr, l, la, icell, Np
+  type(AtomType), pointer :: HH
+  
+  write(*,*)  " Writing profiles for atom ", atom%ID
+  HH => atmos%Atoms(1)%ptr_atom
+  
+  if (present(delta_k)) then
+   dk = delta_k
+   if (dk <= 0 .or. dk > atmos%Nspace) then
+    dk = 1
+    write(*,*) "delta_k cannot be out bound!"
+   endif
+  else
+   dk = 1
+  endif
+  
+  Np = n_cells
+  Np = int((n_cells-1)/dk + 1)
+  if (Np /= n_cells) then
+   write(*,*) " Effective number of depth points written:", Np, n_cells
+  endif
+  
+  open(unit, file=trim(atom%ID)//"_profiles.txt", status="unknown")
+  write(unit,*) Np, atom%Nline
+  do icell=1, n_cells, dk
+   if (atmos%icompute_atomRT(icell) > 0) then
+     write(unit,*) icell, atmos%T(icell), atmos%ne(icell), HH%n(1,icell), HH%n(HH%Nlevel,icell)
+     write(unit,*) atom%vbroad(icell)*1e-3
+     do kr=1, atom%Nline
+      write(unit, *) kr, atom%lines(kr)%Nlambda, atom%lines(kr)%a(icell)
+      write(unit, *) atom%lines(kr)%lambdamin, atom%lines(kr)%lambda0, atom%lines(kr)%lambdamax
+      do la=1, atom%lines(kr)%Nlambda
+       l = atom%lines(kr)%Nblue - 1 + la
+       write(unit,*) NLTEspec%lambda(l), atom%lines(kr)%phi(la,icell)
+      enddo
+     enddo
+   endif
+  enddo
+
+  close(unit)
+ 
+ RETURN
+ END SUBROUTINE write_profiles_ascii
 
 
 END MODULE PROFILES

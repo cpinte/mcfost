@@ -11,179 +11,131 @@
 ! chi in m^-1, eta in J/m3/s/Hz/sr
 MODULE metal
 
- use atmos_type, only                : atmos, Hydrogen, Helium, B_project, vbroad_atom, ntotal_atom
- use constant
- use math, only                      : bezier3_interp, cent_deriv, any_nan_infinity_vector, linear_1D
- use atom_type
- use spectrum_type, only			 : NLTEspec, initAtomOpac
- use hydrogen_opacities
- use voigtfunctions, only 			 : Voigt
- use Profiles, only					 : Profile !, line_profiles
- use broad, only 					 : Damping
- use thomson_scattering
- use Rayleigh_scattering
- use Planck
+	use atmos_type, only				: atmos, Hydrogen, Helium, B_project, vbroad_atom, ntotal_atom
+	use constant
+	use math, only 						: bezier3_interp, cent_deriv, any_nan_infinity_vector, linear_1D
+	use atom_type
+	use spectrum_type, only				: NLTEspec, initAtomOpac
+	use hydrogen_opacities
+	use voigtfunctions, only			: Voigt
+	use Profiles!, only					 : Profile
+	use broad, only 					: Damping
+	use stark, only						: Stark_profile
+	use thomson_scattering
+	use Rayleigh_scattering
+	use Planck
+	use getlambda, only					: hv
+	use occupation_probability, only	: wocc_n, D_i
 
- ! MCFOST's original
- use mcfost_env, only : dp
- use molecular_emission, only		 : v_proj
- use parametres
- use input
- use constantes, only				 : tiny_dp, huge_dp
+	! MCFOST's original
+	use mcfost_env, only				: dp
+	use molecular_emission, only		: v_proj
+	use parametres
+	use input
+	use constantes, only				: tiny_dp, huge_dp
 
- IMPLICIT NONE
+	IMPLICIT NONE
  
- CONTAINS
+	CONTAINS
  
- !futur deprecation
- FUNCTION bound_free_Xsection(cont) result(alpha)
-  type (AtomicContinuum) :: cont
-  real(kind=dp) :: alpha(cont%Nlambda) 
-  									 
-   if (cont%Hydrogenic) then !Kramer's formula with quantum mechanical correction
-     alpha = H_bf_Xsection(cont, NLTEspec%lambda(cont%Nblue:cont%Nred))
-   else !interpolation of the read Cross-section
-    !alpha = interp_dp(cont%alpha, cont%lambda, NLTEspec%lambda(cont%Nblue:cont%Nred))
-    CALL bezier3_interp(size(cont%alpha), cont%lambda, cont%alpha, & !read values
-     	cont%Nlambda, NLTEspec%lambda(cont%Nblue:cont%Nred), alpha) !interpolation grid
 
-   endif
- 
- RETURN
- END FUNCTION bound_free_Xsection
- 
+
+	SUBROUTINE dealloc_atom_quantities
   
-!   SUBROUTINE compute_photoionisation_xsections()
-!    ! Computes and stores the photo-ionisation cross sections + cont%gij
-!    ! for each contiuum of each atom
-!     type(AtomType), pointer :: atom
-!     integer :: n, kc, k, alloc_status
-!     type(AtomicContinuum) :: cont
-! !     real(kind=dp), allocatable :: dumm_alpha(:)
-!     
-!     do n=1,atmos%Natom
-!      atom => atmos%Atoms(n)%ptr_atom
-!      
-!      !only over continua counted in opacities
-!      do kr=atom%Ntr_line+1, atom%Ntr!1, atom%Ncont !loop over continua
-!       kc = atom%at(kr)%ik 
-!       cont = atom%continua(kc)
-! 
-!       if (cont%Hydrogenic) then !Kramer's formula with quantum mechanical correction
-!         allocate(atom%continua(kc)%alpha(cont%Nlambda), stat=alloc_status)
-!         if (alloc_status > 0) CALL ERROR("Allocation error cont%alpha")
-!         
-!         atom%continua(kc)%alpha(:) = 0d0
-!         !computes only where it is not zero
-!         atom%continua(kc)%alpha(cont%Nblue:cont%Nred) = & 
-!         	H_bf_Xsection(cont, NLTEspec%lambda(cont%Nblue:cont%Nred))
-!         	
-!       else !interpolation of the read Cross-section
-! !         allocate(dumm_alpha(size(cont%lambda)),stat=alloc_status)
-! !         if (alloc_status > 0) CALL ERROR("Allocation error dumm_alpha")
-! !         dumm_alpha(:) = cont%alpha(:)
-! !       cont is not an alias but a copy of contiua(kc), so cont%alpha not deallocated
-! 		deallocate(atom%continua(kc)%alpha)
-!         allocate(atom%continua(kc)%alpha(cont%Nlambda), stat=alloc_status)
-!         if (alloc_status > 0) CALL ERROR("Allocation error cont%alpha")
-!         !alpha = interp_dp(cont%alpha, cont%lambda, NLTEspec%lambda(cont%Nblue:cont%Nred))
-!         
-!         CALL bezier3_interp(size(cont%alpha), cont%lambda, cont%alpha, & !read values
-!      	cont%Nlambda, NLTEspec%lambda(cont%Nblue:cont%Nred), atom%continua(kc)%alpha) !interpolation grid
-!      	!the real Nlambda from Nblue to Nred
-!      	!deallocate(dumm_alpha)
-!         deallocate(atom%continua(kc)%lambda) !not used anymore, we kept in memory the interpolated data
-!       endif
-!      enddo
-!      atom => NULL()
-!     enddo
-!   
-!   
-!   RETURN
-!   END SUBROUTINE compute_photoionisation_xsections
-
-  SUBROUTINE dealloc_atom_quantities
-  
-    type(AtomType), pointer :: atom
-    integer :: n, k, kc, j, alloc_status
-    type(AtomicContinuum) :: cont
-    type(AtomicLine) :: line
+		type(AtomType), pointer :: atom
+		integer :: n, k, kc, j, alloc_status
 
     
-    do n=1,atmos%Natom
-     atom => atmos%Atoms(n)%ptr_atom
+		do n=1,atmos%Natom
+			atom => atmos%Atoms(n)%ptr_atom
         
-     do k = 1, atom%Ntr   
+			do k = 1, atom%Ntr   
      
-       kc = atom%at(k)%ik 
+				kc = atom%at(k)%ik 
         
-       SELECT CASE (atom%at(k)%trtype)
+				SELECT CASE (atom%at(k)%trtype)
         
-        CASE ('ATOMIC_LINE')
-          line = atom%lines(kc)
-          
+					CASE ('ATOMIC_LINE')
+						          
           !Damping value
           !no need for it if we do keep the profile on cell
-          if (line%voigt) then
-           deallocate(atom%lines(kc)%a) !futur deprec depending of the choice of Voigt
-           deallocate(atom%lines(kc)%aeff,atom%lines(kc)%r,atom%lines(kc)%r1)
-          endif
+						
+						!tmp, need better version of Voigt, but the idea is here
+						
+						if (atom%lines(kc)%voigt) then !constant for thomson
+							if (associated(Profile,Iprofile_thomson)) then
+								deallocate(atom%lines(kc)%aeff,atom%lines(kc)%r,atom%lines(kc)%r1)
+							endif
           !line profile for v = 0
-          deallocate(atom%lines(kc)%phi)
-          deallocate(atom%lines(kc)%phi_loc)
+
+!           deallocate(atom%lines(kc)%phi_loc)
           
-          deallocate(atom%lines(kc)%u)
+							!Used by all if not kept in memory
+							if (allocated(atom%lines(kc)%a)) deallocate(atom%lines(kc)%a) !futur deprec depending of the choice of Voigt
 
-!tests
-		  if (allocated(line%negative_opacity)) deallocate(line%negative_opacity)
-        
-        CASE ('ATOMIC_CONTINUUM')
+							if (allocated(atom%lines(kc)%u)) deallocate(atom%lines(kc)%u)
+						endif
+						deallocate(atom%lines(kc)%phi)
+						
+! 						if (allocated(atom%lines(kc)%Jbar)) deallocate(atom%lines(kc)%Jbar)
+						if (allocated(atom%lines(kc)%Rij)) then
+							deallocate(atom%lines(kc)%Rij,atom%lines(kc)%Rji)
+						endif
+						
+						if (allocated(atom%lines(kc)%Tex)) deallocate(atom%lines(kc)%Tex)
+
+
+ 
+					CASE ('ATOMIC_CONTINUUM')
      
-         !do kc=1, atom%Ncont !loop over continua
-          cont = atom%continua(kc)
-      
+         !do kc=1, atom%Ncont !loop over continua      
           !gij for bound-free transitions
-          deallocate(atom%continua(kc)%gij)
-          deallocate(atom%continua(kc)%twohnu3_c2)
-          deallocate(atom%continua(kc)%alpha)
-		  deallocate(atom%continua(kc)%Vji, atom%continua(kc)%Jnu)
+						deallocate(atom%continua(kc)%gij)
+						deallocate(atom%continua(kc)%twohnu3_c2)
+						deallocate(atom%continua(kc)%alpha)
+							
+						if (allocated(atom%continua(kc)%Rij)) then
+							deallocate(atom%continua(kc)%Rij)
+							deallocate(atom%continua(kc)%Rji)
+						endif
+							
+						if (allocated(atom%continua(kc)%Tex)) deallocate(atom%continua(kc)%Tex)
 
-!tests
-		  if (allocated(cont%negative_opacity)) deallocate(cont%negative_opacity)
-		   
-         !enddo
-       CASE DEFAULT
-        CALL Error("Transition type unknown", atom%at(k)%trtype)
-       END SELECT
-     enddo
-     atom => NULL()
-    enddo  
+
+					CASE DEFAULT
+						CALL Error("Transition type unknown", atom%at(k)%trtype)
+					END SELECT
+				enddo
+				atom => NULL()
+			enddo  
   
-  RETURN
-  END SUBROUTINE dealloc_atom_quantities
+	RETURN
+	END SUBROUTINE dealloc_atom_quantities
   
-  SUBROUTINE alloc_atom_quantities
+	SUBROUTINE alloc_atom_quantities
   
-    type(AtomType), pointer :: atom
-    integer :: n, k, kc, j, alloc_status, la
-!     real(kind=dp), allocatable :: dumm_alpha(:)
+		type(AtomType), pointer :: atom
+		integer :: n, k, kc, j, alloc_status, la
+		real(kind=dp) :: n_eff, u
 
     
-    do n=1,atmos%Natom
-     atom => atmos%Atoms(n)%ptr_atom
+		do n=1,atmos%Natom
+			atom => atmos%Atoms(n)%ptr_atom
         
-     do k = 1, atom%Ntr   
+			do k = 1, atom%Ntr   
      
-       kc = atom%at(k)%ik 
+			kc = atom%at(k)%ik 
         
-       SELECT CASE (atom%at(k)%trtype)
+				SELECT CASE (atom%at(k)%trtype)
         
-        CASE ('ATOMIC_LINE')          
+				CASE ('ATOMIC_LINE')     
+     
           !Tex
-          allocate(atom%lines(kc)%Tex(atmos%Nspace), stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error line%Tex")
-          !alloc at LTE
-          atom%lines(kc)%Tex(:) = atmos%T(:) !0.0_dp          
+          !Can be NPROC instead of Nspace ? 
+					allocate(atom%lines(kc)%Tex(atmos%Nspace), stat=alloc_status)
+					if (alloc_status > 0) CALL ERROR("Allocation error line%Tex")
+					atom%lines(kc)%Tex(:) = atmos%T(:)
+
           
           !some memory can be saved depending of the choice of the profile
           ! I have to do it for large simu
@@ -191,221 +143,247 @@ MODULE metal
           !Damping value
           !no need for it if we do keep the profile on cell
           !except if updated, but if we chose thomson method it is need along to line%aeff
-          if (atom%lines(kc)%voigt) then
-           allocate(atom%lines(kc)%a(atmos%Nspace), stat=alloc_status)
-           if (alloc_status > 0) CALL ERROR("Allocation error line%adamp")
-           atom%lines(kc)%a(:) = 0d0
-           allocate(atom%lines(kc)%aeff(atmos%Nspace), stat=alloc_status)
-           if (alloc_status > 0) CALL ERROR("Allocation error line%eff")
-           atom%lines(kc)%aeff(:) = 0d0
-           allocate(atom%lines(kc)%r(atmos%Nspace), stat=alloc_status)
-           if (alloc_status > 0) CALL ERROR("Allocation error line%r")
-           atom%lines(kc)%r(:) = 0d0
-           allocate(atom%lines(kc)%r1(atmos%Nspace), stat=alloc_status)
-           if (alloc_status > 0) CALL ERROR("Allocation error line%r1")
-           atom%lines(kc)%r1(:) = 0d0
-          endif
+					if (atom%lines(kc)%voigt) then
+						if (associated(Profile, Iprofile_cmf_to_obs))then
+							allocate(atom%lines(kc)%a(atmos%Nspace), stat=alloc_status)
+							if (alloc_status > 0) CALL ERROR("Allocation error line%adamp")
+							atom%lines(kc)%a(:) = 0d0
+						else if (associated(Profile, Iprofile_thomson)) then
+						
+							allocate(atom%lines(kc)%aeff(atmos%Nspace), stat=alloc_status)
+							if (alloc_status > 0) CALL ERROR("Allocation error line%eff")
+							atom%lines(kc)%aeff(:) = 0d0
+							allocate(atom%lines(kc)%r(atmos%Nspace), stat=alloc_status)
+							if (alloc_status > 0) CALL ERROR("Allocation error line%r")
+							atom%lines(kc)%r(:) = 0d0
+							allocate(atom%lines(kc)%r1(atmos%Nspace), stat=alloc_status)
+							if (alloc_status > 0) CALL ERROR("Allocation error line%r1")
+							atom%lines(kc)%r1(:) = 0d0
+						endif
+					endif
           !line profile for v = 0
-          !no need to keep it if not interp, no shift. No need also if Thomson
-          allocate(atom%lines(kc)%phi(atom%lines(kc)%Nlambda, atmos%Nspace), stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error line%phi")
-          atom%lines(kc)%phi(:,:) = 0d0
-          !-> use in NLTEloop only now
-          !allocate(atom%lines(kc)%phi_ray(line%Nlambda, atmos%Nrays, NLTEspec%NPROC), stat=alloc_status)
-          !if (alloc_status > 0) CALL ERROR("Allocation error line%phi_ray")
-          allocate(atom%lines(kc)%phi_loc(atom%lines(kc)%Nlambda, NLTEspec%NPROC), stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error line%phi_loc")
+          !no need to keep it if not interp, no shift. No need also if Thomson (approx), or Iprofile (exact)
+!Keep it anyway, as ATM, dk is the default mode even at LTE
+! 					if (associated(Voigt, Iprofile_cmf_to_obs).or.atmos%NactiveAtom>0) then
+						allocate(atom%lines(kc)%phi(atom%lines(kc)%Nlambda, atmos%Nspace), stat=alloc_status)
+						if (alloc_status > 0) CALL ERROR("Allocation error line%phi")
+						atom%lines(kc)%phi(:,:) = 0d0
+!same
+						allocate(atom%lines(kc)%u(atom%lines(kc)%Nlambda), stat=alloc_status)
+						if (alloc_status > 0) CALL ERROR("Allocation error line%u")
+						!so that argument of profile is line%u / vbroad(icell)
+						atom%lines(kc)%u(:) = (NLTEspec%lambda(atom%lines(kc)%Nblue:atom%lines(kc)%Nred)-atom%lines(kc)%lambda0) * &
+						CLIGHT / atom%lines(kc)%lambda0 !m/s
+! 					endif
           
+          !line displacement on the global frequency arrays due to velocity fields.
+          !Function of direction, and stored only once per proc if not sequencial 
+          !(Other wise, integration of SEE is done cell by cell for all rays)
+          !dk is actually compute for each cell during the propagation, but it needs
+          !to be stored only for the cell we are solving for the SEE.
+! 					if () then
+						allocate(atom%lines(kc)%dk(atmos%Nrays, NLTEspec%Nproc), stat=alloc_status)
+						if (alloc_status > 0) CALL error ("Allocation error line%dk")
+						atom%lines(kc)%dk(:,:) = 0 !no shift
+! 					endif
+ 
+!->NO, dk is the default mode. Otherwise an interpolation should be used for accurate results
+!But at this point I do not allow to compute exact or approximative (Thomson) Voigt functions
+! for NLTE. Interp > Voigt for the same accuracy. Thomson is faster but less accurate. So dk is prefered.
+!Can change relatively easily, especially if the profile varies across the cell due to velocity.         
+!           allocate(atom%lines(kc)%phi_loc(atom%lines(kc)%Nlambda, NLTEspec%NPROC), stat=alloc_status)
+!           if (alloc_status > 0) CALL ERROR("Allocation error line%phi_loc")
           
-          allocate(atom%lines(kc)%u(atom%lines(kc)%Nlambda), stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error line%u")
-          !so that argument of profile is line%u / vbroad(icell)
-          atom%lines(kc)%u(:) = (NLTEspec%lambda(atom%lines(kc)%Nblue:atom%lines(kc)%Nred)-atom%lines(kc)%lambda0) * &
-           CLIGHT / atom%lines(kc)%lambda0 !m/s
-           
-          allocate(atom%lines(kc)%Jbar(NLTEspec%NPROC), stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error line%Jbar")
-          atom%lines(kc)%Jbar(:) = 0d0
-          
-!tests
-allocate(atom%lines(kc)%negative_opacity(n_cells))
-atom%lines(kc)%negative_opacity(:) = .false.
+!-> Redundant with Rij: Rij = Jbar/Bij           
+! 					allocate(atom%lines(kc)%Jbar(NLTEspec%NPROC), stat=alloc_status)
+! 					if (alloc_status > 0) CALL ERROR("Allocation error line%Jbar")
+! 					atom%lines(kc)%Jbar(:) = 0d0
+					
+					allocate(atom%lines(kc)%Rij(NLTEspec%NPROC), stat=alloc_status)
+					if (alloc_status > 0) CALL ERROR("Allocation error line%Rij")
+					atom%lines(kc)%Rij(:) = 0d0
+					allocate(atom%lines(kc)%Rji(NLTEspec%NPROC), stat=alloc_status)
+					if (alloc_status > 0) CALL ERROR("Allocation error line%Rji")
+					atom%lines(kc)%Rji(:) = 0d0
+
                   
-        CASE ('ATOMIC_CONTINUUM')
-     
-         !do kc=1, atom%Ncont !loop over continua
-          
+				CASE ('ATOMIC_CONTINUUM')
+
           !Tex
-          allocate(atom%continua(kc)%Tex(atmos%Nspace), stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error cont%Tex")
-          !first LTE
-          atom%continua(kc)%Tex(:) = atmos%T(:)
+					allocate(atom%continua(kc)%Tex(atmos%Nspace), stat=alloc_status)
+					if (alloc_status > 0) CALL ERROR("Allocation error cont%Tex")
+					atom%continua(kc)%Tex(:) = atmos%T(:)
       
           !gij for bound-free transitions
-          allocate(atom%continua(kc)%gij(atom%continua(kc)%Nlambda, atmos%Nspace), stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error cont%gij")
-          atom%continua(kc)%gij(:,:) = 0d0
-!either Vji or Jnu will be remove eventually 
-          !gij * Vij(=alpha) = Vji
-          allocate(atom%continua(kc)%Vji(atom%continua(kc)%Nlambda, NLTEspec%NPROC), stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error cont%Vji")
-          atom%continua(kc)%Vji(:,:) = 0d0
+					allocate(atom%continua(kc)%gij(atom%continua(kc)%Nlambda, atmos%Nspace), stat=alloc_status)
+					if (alloc_status > 0) CALL ERROR("Allocation error cont%gij")
+					atom%continua(kc)%gij(:,:) = 0d0
           
-          allocate(atom%continua(kc)%Jnu(atom%continua(kc)%Nlambda, NLTEspec%NPROC), stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error cont%Jnu")
-          atom%continua(kc)%Jnu(:,:) = 0d0
+					allocate(atom%continua(kc)%Rij(NLTEspec%NPROC), stat=alloc_status)
+					if (alloc_status > 0) CALL ERROR("Allocation error cont%Rij")
+					atom%continua(kc)%Rij(:) = 0d0
+					allocate(atom%continua(kc)%Rji(NLTEspec%NPROC), stat=alloc_status)
+					if (alloc_status > 0) CALL ERROR("Allocation error cont%Rji")
+					atom%continua(kc)%Rji(:) = 0d0
 
           !twohnu3_c2 for continuum waves
-          allocate(atom%continua(kc)%twohnu3_c2(atom%continua(kc)%Nlambda),stat=alloc_status)
-          if (alloc_status > 0) CALL ERROR("Allocation error cont%twohnu3_c2")
-          atom%continua(kc)%twohnu3_c2(:) = twohc / NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred)**3.
+					allocate(atom%continua(kc)%twohnu3_c2(atom%continua(kc)%Nlambda),stat=alloc_status)
+					if (alloc_status > 0) CALL ERROR("Allocation error cont%twohnu3_c2")
+					atom%continua(kc)%twohnu3_c2(:) = twohc / NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred)**3.
           
           !special for bound-free cross-sections who do not depend on cell
-    		if (atom%continua(kc)%Hydrogenic) then !Kramer's formula with quantum mechanical correction
-        		allocate(atom%continua(kc)%alpha(atom%continua(kc)%Nlambda), stat=alloc_status)
-        		if (alloc_status > 0) CALL ERROR("Allocation error cont%alpha")
+					if (atom%continua(kc)%Hydrogenic) then !Kramer's formula with quantum mechanical correction
+						allocate(atom%continua(kc)%alpha(atom%continua(kc)%Nlambda), stat=alloc_status)
+						if (alloc_status > 0) CALL ERROR("Allocation error cont%alpha")
 
-        		atom%continua(kc)%alpha(:) = 0d0
+						atom%continua(kc)%alpha(:) = 0d0
         		!computes only where it is not zero
-        		atom%continua(kc)%alpha(:) = H_bf_Xsection(atom%continua(kc), NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred))
+						atom%continua(kc)%alpha(:) = H_bf_Xsection(atom%continua(kc), NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred))
+						n_eff = atom%stage(atom%continua(kc)%j)*dsqrt(atom%Rydberg/(atom%E(atom%continua(kc)%j)-atom%E(atom%continua(kc)%i)))
 
-      		else !interpolation of the read Cross-section
+					else !interpolation of the read Cross-section
 !       cont is not an alias but a copy of contiua(kc), so cont%alpha not deallocated
-        		allocate(atom%continua(kc)%alpha(atom%continua(kc)%Nlambda), stat=alloc_status)
-        		if (alloc_status > 0) CALL ERROR("Allocation error cont%alpha")
+        				allocate(atom%continua(kc)%alpha(atom%continua(kc)%Nlambda), stat=alloc_status)
+        				if (alloc_status > 0) CALL ERROR("Allocation error cont%alpha")
          
-         atom%continua(kc)%alpha(:) = linear_1D(size(atom%continua(kc)%lambda_file),atom%continua(kc)%lambda_file,&
-            atom%continua(kc)%alpha_file, atom%continua(kc)%Nlambda,NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred))
-!         		CALL bezier3_interp(size(atom%continua(kc)%lambda_file), atom%continua(kc)%lambda_file, atom%continua(kc)%alpha_file, & !read values
-!      	atom%continua(kc)%Nlambda, NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred), atom%continua(kc)%alpha) !interpolation grid
+!          atom%continua(kc)%alpha(:) = linear_1D(size(atom%continua(kc)%lambda_file),atom%continua(kc)%lambda_file,&
+!             atom%continua(kc)%alpha_file, atom%continua(kc)%Nlambda,NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred))
+						CALL bezier3_interp(size(atom%continua(kc)%lambda_file), atom%continua(kc)%lambda_file, atom%continua(kc)%alpha_file, & !read values
+     	atom%continua(kc)%Nlambda, NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred), atom%continua(kc)%alpha) !interpolation grid
 
-      		endif
+					endif
 
 !tests
-allocate(atom%continua(kc)%negative_opacity(n_cells))
-atom%continua(kc)%negative_opacity(:) = .false.
+!allocate(atom%continua(kc)%negative_opacity(n_cells))
+!atom%continua(kc)%negative_opacity(:) = .false.
  
          !enddo
-       CASE DEFAULT
-        CALL Error("Transition type unknown", atom%at(k)%trtype)
-       END SELECT
-     enddo
-     atom => NULL()
-    enddo  
+				CASE DEFAULT
+					CALL Error("Transition type unknown", atom%at(k)%trtype)
+				END SELECT
+			enddo
+			atom => NULL()
+		enddo
 
-  RETURN
-  END SUBROUTINE alloc_atom_quantities
+	RETURN
+	END SUBROUTINE alloc_atom_quantities
   
-  SUBROUTINE compute_atom_quantities(icell) !those quantities are to be updated, most likely during iterations
+	SUBROUTINE compute_atom_quantities(icell) !those quantities are to be updated, most likely during iterations
    ! Computes and stores the photo-ionisation cross sections + cont%gij
    ! for each contiuum of each atom
-    integer, intent(in) :: icell
-    type(AtomType), pointer :: atom
-    integer :: n, k, kc, alloc_status, i, j, Nblue, Nred, la
-    real(kind=dp) :: vbroad, aL, cte, cte2, adamp
+		integer, intent(in) :: icell
+		type(AtomType), pointer :: atom
+		integer :: n, k, kc, alloc_status, i, j, Nblue, Nred, la
+		real(kind=dp) :: vbroad, aL, cte, cte2, adamp, wi, wj
     
     
-    do n=1,atmos%Natom
-     atom => atmos%Atoms(n)%ptr_atom
-     do k = 1, atom%Ntr   
+		do n=1,atmos%Natom
+			atom => atmos%Atoms(n)%ptr_atom
+			do k = 1, atom%Ntr   
      
-       kc = atom%at(k)%ik 
+				kc = atom%at(k)%ik 
         
-       SELECT CASE (atom%at(k)%trtype)
+				SELECT CASE (atom%at(k)%trtype)
         
-        CASE ('ATOMIC_LINE')
-         vbroad = atom%vbroad(icell)
+				CASE ('ATOMIC_LINE')
+					vbroad = atom%vbroad(icell)
          
-         i=atom%lines(kc)%i; j=atom%lines(kc)%j
+					i=atom%lines(kc)%i; j=atom%lines(kc)%j
+					wj = 1.0; wi = 1.0
+					if (ldissolve) then
+						if (atom%ID=="H") then! .or. atom%ID=="He") then
+							wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j))+1.0)
+							wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i))+1.0)
+						endif
+					endif
 
-         
-         if (atom%lines(kc)%voigt) then
-          CALL Damping(icell, atom, kc, adamp)
+ !There are duplicates space array to remove. We do not need aeff if not Thomson profile        
+					if (atom%lines(kc)%voigt) then
+
+						CALL Damping(icell, atom, kc, adamp)
           !no need to keep it if we keep the profile for shift or interp
-          atom%lines(kc)%a(icell) = adamp
+          !But damping can depend on populations of atom and electrons so ...
+						if (associated(Profile, Iprofile_cmf_to_obs)) atom%lines(kc)%a(icell) = adamp
           !line%u(:) = atom%lines(kc)%u / atom%vbroad(icell)
           !                             if full profile to be interpolated or shifter.
           !                             if we use another approx for Voigt, it is computed on the fly, not shifted nor interp
-          atom%lines(kc)%phi(:,icell) = Voigt(atom%lines(kc)%Nlambda, adamp, atom%lines(kc)%u(:)/vbroad)
+!keep it at the moment for all case
+						atom%lines(kc)%phi(:,icell) = Voigt(atom%lines(kc)%Nlambda, adamp, atom%lines(kc)%u(:)/vbroad)
+!-> do nothing at the moment, but write the futur profile
+CALL Stark_profile(icell, atom%lines(kc))
           !write(*,*) "d = ", line%adamp
           !write(*,*) maxval(atom%lines(kc)%phi(:,icell)), minval(atom%lines(kc)%phi(:,icell))
           !Thomson method effective damping for all cells
-          aL = adamp * vbroad !(m/s), adamp in doppler units
-          atom%lines(kc)%aeff(icell) = (vbroad**5. + 2.69269*vbroad**4. * aL + 2.42843*vbroad**3. * aL**2. + &
-          		4.47163*vbroad**2.*aL**3. + 0.07842*vbroad*aL**4. + aL**5.)**(0.2) !1/5
+						aL = adamp * vbroad !(m/s), adamp in doppler units
+						if (associated(Profile, Iprofile_thomson)) then
+							atom%lines(kc)%aeff(icell) = (vbroad**5. + 2.69269*vbroad**4. * aL + 2.42843*vbroad**3. * aL**2. + &
+					4.47163*vbroad**2.*aL**3. + 0.07842*vbroad*aL**4. + aL**5.)**(0.2) !1/5
           		
           !!there should have simplification here
           !!r = line%atom%vbroad(icell)*line%a(icell)/line%aeff(icell)
           !!eta = 1.36603*r - 0.47719*r*r + 0.11116*r*r*r
-          cte = vbroad*adamp/atom%lines(kc)%aeff(icell)
-          cte2 = 1.36603*cte - 0.47719*cte*cte + 0.11116*cte*cte*cte
-          atom%lines(kc)%r(icell) = cte2/pi
+							cte = vbroad*adamp/atom%lines(kc)%aeff(icell)
+							cte2 = 1.36603*cte - 0.47719*cte*cte + 0.11116*cte*cte*cte
+							atom%lines(kc)%r(icell) = cte2/pi
           !for the lorentzian it is eta/pi and for the gaussian it is (1-eta)/sqrtpi/aeff
-          atom%lines(kc)%r1(icell) = (1. - cte2)/sqrtpi/atom%lines(kc)%aeff(icell)
-         else !Gaussian
-          !no need if no interp nor shift or if we use Thomson (but keep adamp for thomson)
-          atom%lines(kc)%phi(:,icell) = dexp(-(atom%lines(kc)%u(:)/atom%vbroad(icell))**2)
-         endif
-         !futur test to see if we keep it or not depending on the method of calculation of profiles
-         atom%lines(kc)%phi(:,icell) = atom%lines(kc)%phi(:,icell) / (SQRTPI * atom%vbroad(icell))
+							atom%lines(kc)%r1(icell) = (1. - cte2)/sqrtpi/atom%lines(kc)%aeff(icell)
+						endif
+					else !Gaussian
+!no need if no interp nor shift or if we use Thomson (but keep adamp for thomson)
+						atom%lines(kc)%phi(:,icell) = dexp(-(atom%lines(kc)%u(:)/atom%vbroad(icell))**2)
+					endif
+!futur test to see if we keep it or not depending on the method of calculation of profiles
+					atom%lines(kc)%phi(:,icell) = atom%lines(kc)%phi(:,icell) / (SQRTPI * atom%vbroad(icell))
 
-         if ((atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
-          !write(*,*) i, j, atom%n(i,icell), atom%n(j, icell), atom%lines(kc)%gij
-          !write(*,*) atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij
-          write(*,*) atom%ID, " nuij (10^15 Hz)", 1d-6 * CLIGHT / atom%lines(kc)%lambda0, " icell=", icell
-          write(*,*) " lambdaij (nm)", atom%lines(kc)%lambda0 
-          CALL warning ("background line: ni < njgij")
-          atom%lines(kc)%neg_opac = .true. !should be an icell function ???
-          									! to remove only on specific position
-!tests
-		 atom%lines(kc)%negative_opacity(icell) = .true.
+!Include occupa ?
+					if ((atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
+						write(*,*) atom%ID, " nuij (10^15 Hz)", 1d-6 * CLIGHT / atom%lines(kc)%lambda0, " icell=", icell
+						write(*,*) " lambdaij (nm)", atom%lines(kc)%lambda0 
+						CALL warning ("background line: ni < njgij")
           									
-         endif
+					endif
     
-        CASE ("ATOMIC_CONTINUUM")
+				CASE ("ATOMIC_CONTINUUM")
         
-         i=atom%continua(kc)%i; j=atom%continua(kc)%j
-         Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+					i=atom%continua(kc)%i; j=atom%continua(kc)%j
+					Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
+
+					wj = 1.0; wi = 1.0
+					if (ldissolve) then
+						if (atom%ID=="H") then! .or. atom%ID=="He") then
+							wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(j)))
+						endif
+					endif
    
-         if (atom%nstar(j,icell) < tiny_dp .or. atom%nstar(i,icell) < tiny_dp) then
-          atom%continua(kc)%gij(:,icell) = 0d0
-         else
-          atom%continua(kc)%gij(:, icell) = atom%nstar(i,icell)/atom%nstar(j,icell) *  &
+					if (atom%nstar(j,icell) < tiny_dp .or. atom%nstar(i,icell) < tiny_dp) then
+						atom%continua(kc)%gij(:,icell) = 0d0
+					else
+						atom%continua(kc)%gij(:, icell) = atom%nstar(i,icell)/atom%nstar(j,icell) *  &
      			dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))
      			
-         endif
-! write(*,*) "test"        
-! write(*,*) icell, atmos%T(icell), atom%nstar(j, icell), atom%n(j, icell), atom%nstar(j, icell)/atom%n(j,icell) , minval(dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))), maxval(dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell)))
-! write(*,*) atom%n(i,icell) - atom%n(j, icell)*minval(atom%continua(kc)%gij(:, icell))
-! write(*,*) atom%n(i,icell), atom%n(j, icell)*atom%nstar(i, icell)/atom%nstar(j,icell)
+					endif
 
-		 do la=1, atom%continua(kc)%Nlambda
-         if (atom%n(i,icell) - atom%n(j, icell)*atom%continua(kc)%gij(la, icell) <= 0 ) then
-         !if (1d0 - minval(dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))) <= 0 ) then
-          !write(*,*) i, j, atom%n(i,icell), atom%n(j, icell), minval(atom%continua(kc)%gij(:, icell)), atom%nstar(i,icell), atom%nstar(j,icell)
-          !write(*,*) atom%n(i,icell) - atom%n(j, icell)*minval(atom%continua(kc)%gij(:, icell))
-          write(*,*) atom%ID, " nu+ (10^15 Hz)", 1d-6 * CLIGHT / atom%continua(kc)%lambda0, " icell=", icell
-          write(*,*) " lambda+ (nm)", atom%continua(kc)%lambda0
-          CALL warning ("background cont: ni < njgij")
-          atom%continua(kc)%neg_opac = .true.
-!tests
-		  atom%continua(kc)%negative_opacity(icell) = .true.
-		  !should be frequency dependent?
-         exit
-         endif
-         enddo
-! write(*,*) "endtest"        
-        
-        CASE DEFAULT
-         CALL Error("Transition type unknown", atom%at(k)%trtype)
-       END SELECT
-     enddo
-     atom => NULL()
-    enddo  
+					do la=1, atom%continua(kc)%Nlambda
+
+						if (atom%n(i,icell) - atom%n(j, icell)*atom%continua(kc)%gij(la, icell) <= 0 ) then
+
+							write(*,*) atom%ID, " nu+ (10^15 Hz)", 1d-6 * CLIGHT / atom%continua(kc)%lambda0, " icell=", icell
+							write(*,*) " lambda+ (nm)", atom%continua(kc)%lambda0
+							CALL warning ("background cont: ni < njgij")
+
+							exit
+						endif
+					enddo
+				CASE DEFAULT
+					CALL Error("Transition type unknown", atom%at(k)%trtype)
+				END SELECT
+			enddo
+			atom => NULL()
+		enddo  
   
   
-  RETURN
-  END SUBROUTINE compute_atom_quantities
+	RETURN
+	END SUBROUTINE compute_atom_quantities
   
  !for each cell. Done and kept in memory, recomputed if LTE populations and electrons changed
  SUBROUTINE Metal_bf_new(icell)
@@ -416,9 +394,15 @@ atom%continua(kc)%negative_opacity(:) = .false.
  !The Kramers cross-section decays ∼ ν−3 above the threshold (“edge”) frequency ν0,
  !being zero below it because the threshold energy is the required minimum. Think the
   ! inverse in terms of wavelengths
+
+	 !compute the dissolve fraction for pseudo -continua only in hydrogenic case.
+	 !Actually, for explicit continua, because lambda <= lambda0, the dissolve fraction
+	 !is  one. For hydrogenic with lambda > lambda0 it is < 1
   integer, intent(in)							            :: icell
   integer                                                   :: m, kr, kc, i, j, Nblue, Nred, la
   type (AtomType), pointer                                  :: atom
+  real(kind=dp)                                             :: n_eff, wj, wi, chi
+  real(kind=dp)                                             :: Diss, chi_ion
   
   ! Go throught all bound-free transitions of each PASSIVE
   ! metal and add the opacity and emissivity if lambda
@@ -434,182 +418,97 @@ atom%continua(kc)%negative_opacity(:) = .false.
    !if (metal%ID == "H ") CYCLE !H cont is treated in Hydrogen_bf()
    
     do kc=atom%Ntr_line+1,atom%Ntr
+!     do kc=atom%Ntr_line+5,atom%Ntr_line+5
      kr = atom%at(kc)%ik 
-    !do kr=1,atomx%Ncont
-    
+     
+    !do kr=1,atom%Ncont
      i = atom%continua(kr)%i
      j = atom%continua(kr)%j 
+! write(*,*)"lam0=", atom%continua(kr)%lambda0, "chi0=",(atom%E(j) - atom%E(i))/EV
+! write(*,*) atmos%T(icell), atom%n(i,icell), atom%n(j,icell)*atom%nstar(i,icell)/atom%nstar(j,icell)
+
      Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
-  
-     !if (atom%continua(kr)%neg_opac) cycle 
-     if (atom%continua(kr)%negative_opacity(icell)) cycle  
+     n_eff = real(atom%stage(j)) * dsqrt(atom%Rydberg/(atom%E(j)-atom%E(i)))
 
-     !inner wavelength loop to allow to handle negative continuum opacity
-!      do la=1, atom%continua(kr)%Nlambda
-!         if (atom%n(i,icell) - atom%n(j,icell)*atom%continua(kr)%gij(la,icell) < 0) cycle
-!         
-! 		!if (atom%n(i,icell) - atom%n(j,icell)*atom%continua(kr)%gij(la,icell) >= 0.) then
-!     		 NLTEspec%AtomOpac%Kc(Nblue+la-1,icell,1) = NLTEspec%AtomOpac%Kc(Nblue+la-1,icell,1) + &
-!        	atom%continua(kr)%alpha(la) * (atom%n(i,icell)-atom%continua(kr)%gij(la,icell)*atom%n(j,icell))
-!         !endif
-! 
-!      	NLTEspec%AtomOpac%jc(Nblue+la-1,icell) = NLTEspec%AtomOpac%jc(Nblue+la-1,icell) + &
-!        	atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * atom%continua(kr)%gij(la,icell) * atom%n(j,icell)
+			wj = 1.0; wi = 1.0
+			if (ldissolve) then
+				if (atom%ID=="H") then! .or. atom%ID=="He") then
+												!n_eff
+							wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(j)))
+				endif
+			endif
+     
+     !get the ionisation potential for the ion ot be use in the dissolve fraction
+     chi_ion = atmos%Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(i)+1)
+
+    !explicit do loop to avoid a internal loop in D_i. Should be similar to the implicit do loop 
+    do la=1, atom%continua(kr)%nlambda
+! write(*,*) "lam=", NLTEspec%lambda(Nblue+la-1)
+     if ( (atom%n(i,icell) - atom%n(j,icell) * wi * atom%continua(kr)%gij(la,icell)) <= 0.0) cycle
+     
+     Diss = D_i(icell, n_eff, real(atom%stage(i)), &
+       		   1.0, NLTEspec%lambda(Nblue+la-1), atom%continua(kr)%lambda0, chi_ion)
+
+! write(*,*) "np=", atom%n(j,icell), "sigma=", atom%continua(kr)%alpha(la), "gijk=", atom%continua(kr)%gij(la,icell), &
+! "ni=", atom%n(i, icell), "2hnu3_c2=", atom%continua(kr)%twohnu3_c2(la)
+! write(*,*) "icell=", icell, "chi=",      Diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - wi * atom%continua(kr)%gij(la,icell)*atom%n(j,icell)) , &
+!  "eta=", Diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * atom%continua(kr)%gij(la,icell) * atom%n(j,icell) * wi				
 !      
-!      enddo
+     NLTEspec%AtomOpac%Kc(Nblue+la-1,icell) = NLTEspec%AtomOpac%Kc(Nblue+la-1,icell) + &
+        Diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - wi * atom%continua(kr)%gij(la,icell)*atom%n(j,icell)) 
+       				
+     NLTEspec%AtomOpac%jc(Nblue+la-1,icell) = NLTEspec%AtomOpac%jc(Nblue+la-1,icell) + &
+       Diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * atom%continua(kr)%gij(la,icell) * atom%n(j,icell) * wi
+!      NLTEspec%AtomOpac%jc(Nblue+la-1,icell) = NLTEspec%AtomOpac%jc(Nblue+la-1,icell) + &
+!        atom%n(i,icell) * Diss * atom%continua(kr)%alpha(la) * bpnu(atmos%T(icell), NLTEspec%lambda(Nblue+la-1))
+ 
+!     NLTEspec%AtomOpac%Kc(Nblue+la-1,icell) = NLTEspec%AtomOpac%Kc(Nblue+la-1,icell) + &
+!        1d-22 * atom%n(i,icell)	
+! 		
+!      NLTEspec%AtomOpac%jc(Nblue+la-1,icell) = NLTEspec%AtomOpac%jc(Nblue+la-1,icell) + &
+!        bpnu(atmos%T(icell), NLTEspec%lambda(Nblue+la-1))*1d-22 * atom%n(i,icell)
+! if (icell==atmos%nspace-2) then
+!     write(*,*) atmos%T(icell), atmos%ne(icell), atom%nstar(i,icell)
+!     write(*,*) "n=", kr, "lambda=", NLTEspec%lambda(Nblue+la-1), "chi=", 1d-22 * atom%n(i,icell)
+!     write(*,*) "chib=", atom%continua(kr)%alpha(la) * (atom%n(i,icell) - wi * atom%continua(kr)%gij(la,icell)*atom%n(j,icell))
+!     write(*,*) "Xs=", atom%continua(kr)%alpha(la), "stm=",atom%nstar(j,icell)/atom%nstar(i,icell)*atom%continua(kr)%gij(la,icell), &
+!     "stm2=", dexp(-hc_k/atmos%T(icell)/NLTEspec%lambda(Nblue+la-1))
+! endif    				
+    enddo
 
-     NLTEspec%AtomOpac%Kc(Nblue:Nred,icell) = NLTEspec%AtomOpac%Kc(Nblue:Nred,icell) + &
-        atom%continua(kr)%alpha(:) * (atom%n(i,icell)-atom%continua(kr)%gij(:,icell)*atom%n(j,icell))
-
-     NLTEspec%AtomOpac%jc(Nblue:Nred,icell) = NLTEspec%AtomOpac%jc(Nblue:Nred,icell) + &
-       	atom%continua(kr)%alpha(:) * atom%continua(kr)%twohnu3_c2(:) * atom%continua(kr)%gij(:,icell) * atom%n(j,icell)
-
+! if (icell==atmos%nspace-2) stop
     end do ! loop over Ncont
     atom => NULL()
   end do !loop over metals
-  
+
  RETURN
  END SUBROUTINE Metal_bf_new
-! 
-! !->futur deprec
-!  !I try to compute H_bf here also
-!  SUBROUTINE Metal_bf(id, icell)
-!  !cross-section in cm2 per particle is given by Kramers’ formula
-!   !with n the principal quantum number of the level i from
-!  !which the atom or ion is ionized, Z the ion charge, ν in Hz and gbf the dimensionless
-!  !Gaunt factor, a quantummechanical correction factor of order unity.
-!  !The Kramers cross-section decays ∼ ν−3 above the threshold (“edge”) frequency ν0,
-!  !being zero below it because the threshold energy is the required minimum. Think the
-!   ! inverse in terms of wavelengths
-!   integer, intent(in)							            :: icell, id
-!   logical 										            :: obtained_n
-!   integer                                                   :: m, kr, kc, i, j, Z, nc, Nblue, Nred
-!   type (AtomType)                                           :: metal
-!   type (AtomicContinuum)                                    :: continuum
-!   real(kind=dp)                                          :: lambdaEdge
-!   real(kind=dp), dimension(:), allocatable               :: twohnu3_c2, gijk, Vij
-!    !obtained_n = .false. !true if the routine to read principal quantum number is fine
-!    
-!    !if (atmos%Npassiveatoms==1 .and. atmos%PassiveAtoms(1)%ptr_atom%ID == "H ") RETURN
-! 
-! 
-!   ! Go throught all bound-free transitions of each PASSIVE
-!   ! metal and add the opacity and emissivity if lambda
-!   ! is lower (greater) than the wavelength threshold lambdaEdge
-!   ! (the frequency threshold) and if greater (lower) than
-!   ! wavelength min (frequency max). See Hydrogen b-f for more
-!   ! informations, and Hubeny & Mihalas chap. 7
-! 
-!   do m=1,atmos%Npassiveatoms
-!   ! run over all passive atoms
-!    metal = atmos%PassiveAtoms(m)%ptr_atom!atmos%Atoms(m)
-!    !if (metal%ID == "H ") CYCLE !H cont is treated in Hydrogen_bf()
-!     do kc=metal%Ntr_line+1,metal%Ntr
-!      kr = metal%at(kc)%ik 
-!     !do kr=1,metal%Ncont
-!      continuum = metal%continua(kr)
-!      i = continuum%i
-!      j = continuum%j !+1 wrt C indexing
-!      Nblue = continuum%Nblue; Nred = continuum%Nred
-!      !!if (.not.metal%at(metal%Nline+kr)%lcontrib_to_opac) CYCLE !avoid continua not defined on the grid
-!      
-!      allocate(twohnu3_c2(continuum%Nlambda), gijk(continuum%Nlambda), Vij(continuum%Nlambda))
-!      !hc_kla = hc_k/NLTEspec%lambda(Nblue:Nred) !factor 1/NM_TO_M in hc_k
-!      twohnu3_c2 = twohc / NLTEspec%lambda(Nblue:Nred)**3
-!      Vij(:) = bound_free_Xsection(continuum)
-! 
-!      lambdaEdge = continuum%lambda0! or ionisation wavelength or wavelength
-!                ! associated to the minimal frquency needed
-!                ! to unbound an electron
-!                
-!                
-!     !futur ndeprecation, if the photoionized level is too low, just neglect emission
-!    if (metal%n(j,icell) < tiny_dp) then !==0, but < tiny_dp is okay also
-!         if ((metal%n(j,icell) < 0) .or. (metal%n(i,icell) < 0)) then
-!         !-> Futur deprecation of this test, psoitivity is tested when populations are set
-!          write(*,*) "(Metal_bf) Warning at icell, negative pops", icell," T(K)=", atmos%T(icell), "ne=", atmos%ne(icell)
-!          write(*,*) metal%ID, j, metal%n(j,icell), i, metal%n(i,icell)
-!          write(*,*) "nstar=", metal%n(:,icell)
-!          write(*,*) " cycling"
-!          deallocate(gijk, twohnu3_c2, Vij)
-!          cycle
-!         end if
-!         gijk(:) = 0d0
-!         
-!     else
-!       if (metal%n(i,icell) < 0) then
-!         !-> Futur deprecation of this test, psoitivity is tested when populations are set
-!         write(*,*) metal%ID, icell, i, " negative pops =", metal%n(i,icell)
-!         deallocate(gijk, twohnu3_c2, Vij)
-!         write(*,*) " cycling"
-!         cycle        
-!       endif
-!         gijk(:) = metal%nstar(i,icell)/metal%nstar(j,icell) *  &
-!      			dexp(-hc_k/NLTEspec%lambda(Nblue:Nred)/atmos%T(icell))
-!     
-!     end if
-! 
-! 
-! !not storeopac here now
-!       NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-!        				Vij(:) * (metal%n(i,icell)-gijk(:)*metal%n(j,icell))
-! 
-!       NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-!       				twohnu3_c2(:) * gijk(:) * Vij(:)*metal%n(j,icell)
-!   
-! 
-!      deallocate(gijk, twohnu3_c2, Vij)
-!     end do ! loop over Ncont
-!   end do !loop over metals
-! 
-!  RETURN
-!  END SUBROUTINE Metal_bf
 
- !kept in memory, profile are computed at the centre of the cell for a 0 velocity
- !interpolation turns the CMF profile to the observer's frame profile
- !Zeeman polarisation not included yet
  SUBROUTINE Metal_bb_new (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& 
                                 				               x1,y1,z1,l
   integer, intent(in) 							            :: icell, id
   integer													:: Nred, Nblue, Nvspace, nv
-  integer 													:: kr, m, i, j, nk, kc, la
+  integer 													:: kr, m, i, j, nk, kc, la, dk
   type (AtomType), pointer									:: atom
   integer, parameter 										:: NvspaceMax = 1
   real(kind=dp), dimension(NvspaceMax)						:: Omegav
 !   real(kind=dp) 											:: delta_vol_phi, xphi, yphi, zphi,&
 !   															   v0, v1, dv
-  real														:: kappa_neg
-  
-  
-  
+  real(kind=dp)												:: n_eff, wi, wj, phi
+
   !In principle Nvspace should depend on atom because of atom%vbroad(icell)
   ! v_proj in m/s at point icell
   Omegav = 0d0
   Nvspace = 1
-  if (.not.lstatic) then
-   !v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
-   omegav(1) = v_proj(icell,(x+x1)*0.5,(y+y1)*0.5,(z+z1)*0.5,u,v,w)
-  end if
-  
-  !project magnetic field if any
-  
+  dk = 0
 
-!   if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
-!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-!      dv = dabs(v1-v0)
-!      Nvspace = max(2,nint(20*dv/line%atom%vbroad(icell)))
-!      Nvspace = min(Nvspace,NvspaceMax)
-!      omegav(Nvspace) = v1
-!     do nv=2,Nvspace-1
-!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-!       xphi=x+delta_vol_phi*u
-!       yphi=y+delta_vol_phi*v
-!       zphi=z+delta_vol_phi*w
-!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-!     end do 
-!   end if
-! write(*,*) "Nvspace=", Nvspace
+  !v0 = v_proj(icell,x,y,z,u,v,w) !can be lVoronoi here; for projection
+  omegav(1) = v_proj(icell,(x+x1)*0.5,(y+y1)*0.5,(z+z1)*0.5,u,v,w)
+
+  
+  dk = nint(1e-3 * omegav(1) / hv)
+
 
   do m=1,atmos%Npassiveatoms
   
@@ -618,78 +517,53 @@ atom%continua(kc)%negative_opacity(:) = .false.
      do kc=1,atom%Ntr_line
 
      kr = atom%at(kc)%ik
+     
+     !check that dk is the good one for SEE calculation, needed to integrate
+     !I(Nblue-dk:Nred+dk)*phi(:)
+     !atom%lines(kr)%dk(1,id) = dk !there should be rays or not useful in dk ?? since integration is ray by ray
+     
      !line = atom%lines(kr) tà slow to copy an entire struct
      i = atom%lines(kr)%i; j = atom%lines(kr)%j
      Nred = atom%lines(kr)%Nred; Nblue = atom%lines(kr)%Nblue
 
-     !correction factor for negative opacity
-     kappa_neg = 1.0 !inner wavelength loop not needed
-     !if (atom%lines(kr)%neg_opac) cycle
-     if (atom%lines(kr)%negative_opacity(icell)) cycle
-     !if (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell) < 0.) kappa_neg = 0.
-     
+			wj = 1.0; wi = 1.0
+			if (ldissolve) then
+				if (atom%ID=="H") then! .or. atom%ID=="He") then
+												!n_eff
+					wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j))+1.0)
+					wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i))+1.0)	
+				endif
+			endif
 
-     CALL Profile(atom%lines(kr),icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
-
-     
-!         if (atom%lines(kr)%gij*atom%n(j,icell) > atom%n(i,icell)) then 
-!            write(*,*) 'line', atom%n(i,icell)/ntotal_atom(icell,atom), &
-!            atom%n(j,icell)*atom%lines(kc)%gij/ntotal_atom(icell,atom), atom%lines(kc)%gij
-!         endif
-     
-!      write(*,*) maxval(atom%lines(kr)%phi_loc(:,id)), 1./(atom%vbroad(icell)*SQRTPI), atom%lines(kr)%twohnu3_c2, atom%lines(kr)%Bij
-!      write(*,*) atom%lines(kr)%j, atom%lines(kr)%i, atom%n(j,icell), atom%n(i,icell), atom%vbroad(icell)
-
-!      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-!      	 kappa_neg * hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%phi_loc(:,id) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell))
-     	 
-     NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-     	 kappa_neg * hc_fourPI * atom%lines(kr)%phi_loc(:,id) * ( atom%lines(kr)%Bij*atom%n(i,icell)-atom%lines(kr)%Bji*atom%n(j,icell) )
-     
-!      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-!      	kappa_neg * atom%lines(kr)%twohnu3_c2 * atom%lines(kr)%gij * hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%phi_loc(:,id) * atom%n(j,icell)
-     NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-     	kappa_neg * hc_fourPI * atom%lines(kr)%Aji * atom%lines(kr)%phi_loc(:,id) * atom%n(j,icell)
-
-!      write(*,*) "line ", j,i, " opac = ",hc_fourPI * atom%lines(kr)%Bij /(atom%vbroad(icell)*SQRTPI) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell))
-!      write(*,*) "line ", j,i, " eta = ",atom%lines(kr)%twohnu3_c2 * atom%lines(kr)%gij * hc_fourPI * atom%lines(kr)%Bij /(atom%vbroad(icell)*SQRTPI) * atom%n(j,icell)
-!      write(*,*) "line ", j,i, " tauloc = ",hc_fourPI * atom%lines(kr)%Bij /(atom%vbroad(icell)*SQRTPI) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell)) * l
+     if ( (wj*atom%n(i,icell) - wi*atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0 ) cycle
 
 
-!      do kc=1,atmos%PassiveAtoms(m)%ptr_atom%Ntr_line
-! 
-!      kr = atmos%PassiveAtoms(m)%ptr_atom%at(kc)%ik
-!      !line = atom%lines(kr) tà slow to copy an entire struct
-!      i = atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%i
-!      j = atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%j
-!      Nred = atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%Nred
-!      Nblue = atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%Nblue
-! 
-! 
-!      !CALL cmf_to_observer(line,icell,x,y,z,x1,y1,z1,u,v,w,l,id,1)
-!      CALL Profile(atmos%PassiveAtoms(m)%ptr_atom%lines(kr),icell,x,y,z,x1,y1,z1,u,v,w,l,id,1)
-! 
-!      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
-!      	 hc_fourPI * atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%Bij * & 
-!      	 atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%%phi_loc(:,id) * &
-!      	 (atmos%PassiveAtoms(m)%ptr_atom%n(i,icell)-&
-!      	 atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%gij*atmos%PassiveAtoms(m)%ptr_atom%n(j,icell))
-! 
-!      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
-!      	atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%twohnu3_c2 * &
-!      	atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%gij * hc_fourPI * &
-!      	atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%Bij * &
-!      	atmos%PassiveAtoms(m)%ptr_atom%lines(kr)%%phi_loc(:,id) * atmos%PassiveAtoms(m)%ptr_atom%n(j,icell)
- 
-      
+!      CALL Profile(atom%lines(kr),icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
+
+!!      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + &
+!!      	 hc_fourPI * atom%lines(kr)%phi_loc(:,id) * atom%lines(kr)%Bij * (atom%n(i,icell)-wi*atom%lines(kr)%gij*atom%n(j,icell) ) 
+!!      
+!!      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + &
+!!      	 hc_fourPI * atom%lines(kr)%Aji * atom%lines(kr)%phi_loc(:,id) * atom%n(j,icell) * wi
+
 !      do la=1, atom%lines(kr)%Nlambda
-!       NLTEspec%AtomOpac%chi_p(Nblue+la-1,id) = NLTEspec%AtomOpac%chi_p(Nblue+la-1,id) + &
-!      	 hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%%phi_loc(la,id) * (atom%n(i,icell)-atom%lines(kr)%gij*atom%n(j,icell))
-! 
-!       NLTEspec%AtomOpac%eta_p(Nblue+la-1,id) = NLTEspec%AtomOpac%eta_p(Nblue+la-1,id) + &
-!      	atom%lines(kr)%twohnu3_c2 * atom%lines(kr)%gij * hc_fourPI * atom%lines(kr)%Bij * atom%lines(kr)%%phi_loc(la,id) * atom%n(j,icell)
+!        NLTEspec%AtomOpac%chi_p(Nblue+la-1,id) = NLTEspec%AtomOpac%chi_p(Nblue+la-1,id) + &
+!      	 hc_fourPI * atom%lines(kr)%phi_loc(la,id) * atom%lines(kr)%Bij * (wj * atom%n(i,icell)- wi * atom%lines(kr)%gij*atom%n(j,icell) ) 
+!      
+!        NLTEspec%AtomOpac%eta_p(Nblue+la-1,id) = NLTEspec%AtomOpac%eta_p(Nblue+la-1,id) + &
+!      	hc_fourPI * atom%lines(kr)%Aji * atom%lines(kr)%phi_loc(la,id) * atom%n(j,icell) * wi
 !      enddo
      
+     do la=1, atom%lines(kr)%Nlambda
+     
+       NLTEspec%AtomOpac%chi_p(Nblue+la-1-dk,id) = NLTEspec%AtomOpac%chi_p(Nblue+la-1-dk,id) + &
+     	hc_fourPI * atom%lines(kr)%phi(la,icell) * atom%lines(kr)%Bij * (wj * atom%n(i,icell)- wi * atom%lines(kr)%gij*atom%n(j,icell) ) 
+     
+       NLTEspec%AtomOpac%eta_p(Nblue+la-1-dk,id) = NLTEspec%AtomOpac%eta_p(Nblue+la-1-dk,id) + &
+     	hc_fourPI * atom%lines(kr)%Aji * atom%lines(kr)%phi(la,icell) * atom%n(j,icell) * wi
+
+     enddo
+
 
     end do !end loop on lines for this atom
     atom => NULL()
@@ -697,105 +571,7 @@ atom%continua(kc)%negative_opacity(:) = .false.
 
  RETURN
  END SUBROUTINE Metal_bb_new
-! 
-! !->futur deprec
-!  SUBROUTINE Metal_bb (id, icell,x,y,z,x1,y1,z1,u,v,w,l)
-!   ! Computes the emissivity and extinction of passive lines.
-!   ! i.e., Atoms with detailed atomic structures read but
-!   ! not treated in NLTE.
-!   ! Because damping is wavelength independent and depend only on
-!   ! the grid (cell) points, here, if line%damping_initialized
-!   ! do not CALL Damping()
-!   ! the x,y,z and u,v,w quantities are used to compute the projected velocities at the
-!   ! cell point we are computing the opacities.
-!   ! Chip is only computed in Stokes transfer and contains the magneto-optical elements.
-!   integer 													:: kr, m, i, j, nk, kc
-!   integer, intent(in) 							            :: icell, id
-!   real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
-!                                 				               x1,y1,z1, &      ! velocity field and magnetic field
-!                                 				               l !physical length of the cell
-!   real(kind=dp) 											:: twohnu3_c2, gij
-!   integer													:: Nred, Nblue, Nvspace, nv
-!   type (AtomicLine)										    :: line
-!   type (AtomType)											:: atom
-!   integer, parameter 										:: NvspaceMax = 1
-!   real(kind=dp), dimension(NvspaceMax)						:: Omegav
-! 
-! write(*,*) "Omegav not fill"
-! stop
-! 
-!   do m=1,atmos%Npassiveatoms
-!    atom = atmos%PassiveAtoms(m)%ptr_atom
-!      do kc=1,atom%Ntr_line
-!     !do kr=1,atom%Nline ! for this atom go over all transitions
-!                        ! bound-bound
-!      kr = atom%at(kc)%ik
-!      line = atom%lines(kr)
-!      i = line%i; j = line%j
-!      Nred = line%Nred; Nblue = line%Nblue
-!      !!if (.not.atom%at(kr)%lcontrib_to_opac) CYCLE !avoid lines not defined on the grid
-! 
-! 
-!      !Still compute emission even if low, but neglect stm ???
-!      !if ((atom%n(j,icell) <tiny_dp).or.(atom%n(i,icell) <tiny_dp)) then !no transition
-!        !!but show the message only if pops is negative
-! !-> Futur deprecation of this test, psoitivity is tested when populations are set
-!       if ((atom%n(j,icell) < 0 ).or.(atom%n(i,icell) < 0)) then
-!         write(*,*) "(Metal_bb) Warning at icell=", icell," T(K)=", atmos%T(icell)
-!         write(*,*) atom%ID," density <= tiny dp ", i, j, line%lambda0, atom%n(i,icell), atom%n(j,icell)
-!         write(*,*) "skipping this level"
-!         write(*,*) "nstar=", atom%nstar(:,icell)
-!         write(*,*) "n = ", atom%n(:,icell)
-!         CYCLE
-!       endif
-!       !CYCLE
-!      !end if
-! 
-!      !allocate(Vij(line%Nlambda)); Vij = 0d0
-!      gij = line%Bji / line%Bij ! = gi/gj
-!      twohnu3_c2 = line%Aji / line%Bji
-!      
-!      !before it was afyer allocate phi
-!      if (line%voigt) CALL Damping(icell, atom, kr, line%adamp)
-! 
-!      CALL Profile (line, icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
-! 
-! 
-!      !write(*,*) allocated(phiZ), allocated(psiZ), line%polarizable, PRT_SOLUTION
-! 
-!      !Sum up all contributions for this line with the other
-!      !Vij(:) = hc_fourPI * line%Bij * phi(:)!already normalized / (SQRTPI * VBROAD_atom(icell,atom))
-!       
-!      NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) = &
-!      		NLTEspec%AtomOpac%chi_p(Nblue:Nred,id) + hc_fourPI * line%Bij * line%phi_loc(:,id) * (atom%n(i,icell)-gij*atom%n(j,icell))
-! 
-!      NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) = &
-!      		NLTEspec%AtomOpac%eta_p(Nblue:Nred,id) + twohnu3_c2 * gij * hc_fourPI * line%Bij * line%phi_loc(:,id) * atom%n(j,icell)
-! 
-! !          write(*,*) "check"
-! !          write(*,*) gij,  atom%g(i)/atom%g(j)
-! !          write(*,*) atom%g(i)/atom%g(j)*atom%n(j,icell)/atom%n(i,icell), exp(-hc/KBOLTZMANN/atmos%T(icell)/NM_TO_M/line%lambda0)
-! !          stop
-! 
-!      if (line%polarizable .and. PRT_SOLUTION == "FULL_STOKES") then
-!        do nk = 1, 3
-!          !magneto-optical
-!          NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%rho_p(Nblue:Nred,nk,id) + &
-!            hc_fourPI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * line%psi(nk,:,1)
-!          !dichroism
-!          NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%chiQUV_p(Nblue:Nred,nk,id) + &
-!            hc_fourPI * line%Bij * (atom%n(i,icell)-gij*atom%n(j,icell)) * line%psi(nk,:,1)
-!          !emissivity
-!          NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) = NLTEspec%AtomOpac%etaQUV_p(Nblue:Nred,nk,id) + &
-!           twohnu3_c2 * gij * hc_fourPI * line%Bij * atom%n(j,icell) * line%phiZ(nk,:,1)
-!        end do 
-!      end if
-!      
-!     end do !end loop on lines for this atom
-!   end do !end loop over Natom
-! 
-!  RETURN
-!  END SUBROUTINE Metal_bb
+
 
  
  SUBROUTINE compute_opacities()
@@ -824,152 +600,50 @@ atom%continua(kc)%negative_opacity(:) = .false.
  RETURN
  END SUBROUTINE compute_opacities
  
- SUBROUTINE BackgroundContinua (icell)
-  integer, intent(in) :: icell
-  integer :: la
-  real(kind=dp), dimension(NLTEspec%Nwaves) :: chi, eta, Bpnu!,sca
+	SUBROUTINE BackgroundContinua (icell)
+		integer, intent(in) :: icell
+		integer :: la, nat
+		real(kind=dp), dimension(NLTEspec%Nwaves) :: chi, eta, Bpnu!,sca
 
-   Bpnu = 0d0
-   CALL Bplanck(atmos%T(icell), Bpnu)
+		Bpnu = 0d0
+		CALL Bplanck(atmos%T(icell), Bpnu)
 
-   chi = 0d0
-   eta = 0d0
-   NLTEspec%AtomOpac%Kc(:,icell) = 0.0_dp
-   NLTEspec%AtomOpac%jc(:,icell) = 0.0_dp
-   NLTEspec%AtomOpac%sca_c(:,icell) = 0.0_dp
+		chi = 0d0
+		eta = 0d0
+		NLTEspec%AtomOpac%Kc(:,icell) = 0.0_dp
+		NLTEspec%AtomOpac%jc(:,icell) = 0.0_dp
+		NLTEspec%AtomOpac%sca_c(:,icell) = 0.0_dp
    
-   CALL Hminus_bf(icell, chi,eta)
-   NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + chi
-   NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + eta
+		CALL Hminus_bf_wishart(icell, chi,eta)
+		NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + chi
+		NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + eta
 
-   CALL Hminus_ff(icell, chi)
-   NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + chi
-   NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + chi * Bpnu
-  
-   CALL Hydrogen_ff(icell, chi)
-   NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + chi
-   NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + chi * Bpnu
- 
+		CALL Hminus_ff_bell_berr(icell, chi)
+		NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + chi
+		NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + chi * Bpnu
 
+		CALL Hydrogen_ff(icell, chi)
+		NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + chi
+		NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + chi * Bpnu
+
+		if (atmos%Npassiveatoms > 0) CALL Metal_bf_new(icell)
+
+		NLTEspec%AtomOpac%sca_c(:,icell) = Thomson(icell)
+
+!    CALL HI_Rayleigh(1, icell)
+!    !CALL Rayleigh(1, icell, hydrogen)
 !    if (associated(Helium)) then
-!     CALL atom_ff_transitions(Helium, icell, chi)
-!     NLTEspec%AtomOpac%Kc(:,icell,1) = NLTEspec%AtomOpac%Kc(:,icell,1) + chi
-!     NLTEspec%AtomOpac%jc(:,icell) = NLTEspec%AtomOpac%jc(:,icell) + chi * Bpnu
+!     !write(*,*) " Rayleigh on neutral helium"
+!     CALL HeI_Rayleigh(1, icell)
 !    endif
-
-   if (atmos%Npassiveatoms > 0) CALL Metal_bf_new(icell)
    
-
-   NLTEspec%AtomOpac%sca_c(:,icell) = Thomson(icell)
-    
-   CALL HI_Rayleigh(1, icell)
-   !CALL Rayleigh(1, icell, hydrogen)
-   if (associated(Helium)) then
-    write(*,*) " Rayleigh on neutral helium"
-    CALL HeI_Rayleigh(1, icell)
-   endif
-   
-   !Total opac once source functions are known
-   NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + &
+		!Total opac once source functions are known
+		NLTEspec%AtomOpac%Kc(:,icell) = NLTEspec%AtomOpac%Kc(:,icell) + &
                                      NLTEspec%AtomOpac%sca_c(:,icell)
 
 
- RETURN
- END SUBROUTINE BackgroundContinua
+	RETURN
+	END SUBROUTINE BackgroundContinua
  
-!  SUBROUTINE BackgroundLines(id,icell, x, y, z, u, v, w, &
-!                                   x1, y1, z1, l)
-!   integer, intent(in) :: icell, id
-!   real(kind=dp), intent(in) :: x, y, z, u, v, w, &
-!                                   x1, y1, z1, l
-! 
-!    !no need to test, already done
-!    !if (atmos%icompute_atomRT(icell)<1) RETURN 
-! 
-!    !if (atmos%Npassiveatoms == 0) RETURN !tested oustide now
-!    CALL Metal_bb_new(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
-! 
-! 
-!  RETURN
-!  END SUBROUTINE BackgroundLines
- 
-
-!futur deprecation
-!  SUBROUTINE Background(id,icell,x,y,z,x1,y1,z1,u,v,w,l)
-!   integer, intent(in) :: icell, id
-!   real(kind=dp), intent(in) :: x, y, z, u, v, w, &
-!                                   x1, y1, z1, l!only relevant for b-b when vector fields are present
-!   real(kind=dp), dimension(NLTEspec%Nwaves) :: chi, eta, Bpnu, chip!, sca
-! 
-!   !test already done
-!   !if (atmos%icompute_atomRT(icell)<1) RETURN !nH <= tiny_nH or T <= tiny_T == empty cell
-!   ! all opac are zero, return.
-! 
-! !   if ((atmos%nHtot(icell)==0d0).or.(atmos%T(icell)==0d0)) &
-! !     RETURN ! stoping for this cell,
-!             ! it is free of (significant) gas
-!             ! so no emission/absorption. Coefficients set to 0d0 for all wavelengths
-!   !Do not forget that it is still possible however, that lcompute_atomRT is TRUE,
-!   !but that the temperature is too low to have all the levels non zero.
-!   !The compute_atomRT ensures that at least one level has non-zero populations,
-!   !to avoid division by zero.
-! 
-!    CALL Bplanck(atmos%T(icell), Bpnu)
-! 
-!    chi = 0d0
-!    eta = 0d0
-!    chip = 0d0
-! 
-! 
-!    NLTEspec%AtomOpac%sca_c(:,id) = atmos%ne(icell) * sigma_e
-!    CALL HI_Rayleigh(id, icell)
-!    !CALL Rayleigh(id, icell, Hydrogen)
-!    !if (associated(Helium)) CALL Rayleigh(id, icell, Helium)
-! 
-! 
-!    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%sca_c(:,id)
-! 
-!    CALL Hydrogen_ff(icell, chi)
-!    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
-!    NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + chi * Bpnu
-! 
-!    CALL Hminus_bf(icell, chi, eta)
-!    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
-!    NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + eta
-! 
-!    CALL Hminus_ff(icell, chi)
-!    NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
-!    NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + chi * Bpnu
-! 
-!     !I treat H bound-free in metal_bf. I'll change the name of the subroutine later
-! !    if (.not.Hydrogen%active) then !passive bound-free !do not enter if active !!!
-! !     CALL Hydrogen_bf(icell, chi, eta)
-! !     NLTEspec%AtomOpac%chi_p(:,id) = NLTEspec%AtomOpac%chi_p(:,id) + chi
-! !     NLTEspec%AtomOpac%eta_p(:,id) = NLTEspec%AtomOpac%eta_p(:,id) + eta
-! !    end if
-!    
-!    if (atmos%Npassiveatoms == 0) RETURN !no passive bound-bound and bound-free
-! 
-!    						
-!    !--> at this point, eta_p and chi_p are 0 because of initAtomOpac(id), therefore
-!    !after metal_bf they only points to continuum bound-free.
-!     CALL Metal_bf(id, icell) !Return if Npassive=1 and PassiveAtoms(1)==" H"
-! !!     NLTEspec%AtomOpac%chi_p(id,:) = NLTEspec%AtomOpac%chi_p(id,:) + chi
-! !!     NLTEspec%AtomOpac%eta_p(id,:) = NLTEspec%AtomOpac%eta_p(id,:) + eta
-! 
-!    !keep pure continuum opacities now
-!    if (MINVAL(NLTEspec%AtomOpac%eta_p(:,id))<0 .or. &
-!     MINVAL(NLTEspec%AtomOpac%chi_p(:,id)) < 0) then
-!     write(*,*) "Beware, negative contopac"
-!    end if
-!    NLTEspec%AtomOpac%eta_c(:,id) = NLTEspec%AtomOpac%eta_p(:,id)
-!    NLTEspec%AtomOpac%chi_c(:,id) = NLTEspec%AtomOpac%chi_p(:,id)
-! 
-!    ! we already RETURNs if no passive transitions (H included)
-!    CALL Metal_bb(id, icell, x, y, z, x1, y1, z1, u, v, w, l)
-! 
-! 
-!  RETURN
-!  END SUBROUTINE Background
 
 END MODULE metal

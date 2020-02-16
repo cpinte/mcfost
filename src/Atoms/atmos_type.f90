@@ -149,15 +149,11 @@ MODULE atmos_type
     if (allocated(atom%b)) deallocate(atom%b)
 !     if (allocated(atom%gij)) deallocate(atom%gij)
 !     if (allocated(atom%Vij)) deallocate(atom%Vij)
-	if (atmos%include_xcoupling) then
-	!deallocate(atom%Xc)
 
-    !if (allocated(atom%chi_up))
-    	deallocate(atom%chi_up)
-    	deallocate(atom%chi_down)
-    	deallocate(atom%Uji_down)
-    endif
     if (allocated(atom%eta)) deallocate(atom%eta)
+    if (allocated(atom%etac)) deallocate(atom%etac)
+    if (allocated(atom%chic)) deallocate(atom%chic)
+
 
 !!!     for this atom, free lines if allocated
      if (allocated(atom%lines)) then
@@ -424,7 +420,8 @@ MODULE atmos_type
      do i=1,Nstage
       do j=2,Npf+1
        !!if (code.eq.1) write(*,*) 'pf=', data_krz(j,i)
-       pf(i,j-1) = LOG10(data_krz(j,i))
+       !!!pf(i,j-1) = LOG10(data_krz(j,i)) !29/12/2019, using neperien log
+       pf(i,j-1) = LOG(data_krz(j,i))
        !!if (code.eq.1) write(*,*) 'pf10powLog=', 10**(pf(i,j-1))
       end do
      end do
@@ -769,7 +766,7 @@ MODULE atmos_type
    !!-> allocated in fill elements, as Nelem is read from file now
    !!if (.not.allocated(atmos%Elements)) allocate(atmos%Elements(Nelem))
 
-   if (.not.lstatic.and..not.lvoronoi) then
+   if (.not.lvoronoi) then
     !allocate(atmos%Vxyz(atmos%Nspace,3))
     !atmos%Vxyz(:,:) = 0d0
     call warning("Futur deprecation of atmos%vz, spherical vector use disntead")
@@ -1129,7 +1126,7 @@ MODULE atmos_type
    character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
    logical :: accretion_spots
    real :: south
-   real, parameter :: Lextent = 1.1!1.05
+   real, parameter :: Lextent = 1.0!1.1
    real(kind=dp), dimension(n_cells) :: rr, zz, pp, V2
    real(kind=dp), dimension(:), allocatable :: B2
    logical :: is_not_dark!, xit
@@ -1149,8 +1146,13 @@ MODULE atmos_type
    endif
 
 write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but check for other"
-   rho_to_nH = 1d3 /masseH / 1.79!/atmos%avgWeight !density kg/m3 -> nHtot m^-3
-   !rho_to_nH = 1d3/masseH * atmos%Elements(1)%ptr_elem%massf 
+!for av83 try rho_to_nH = 1d3 /masseH / 1.79
+
+   !change mean molecular weight in atom weight mean and mean molecular weight as mu*(1-ne/nTot) Hubeny pa 792
+   rho_to_nH = 1d3 /masseH / atmos%wght_per_H!atmos%avgWeight !density kg/m3 -> nHtot m^-3
+   !rho/avgWeight = Ngas total, see rutten page 143 eq 7.3
+!or use rho and for each element use the masse fraction to define its total number ?
+!should be the same as using Abund wrt to nHtot
 
    write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
 
@@ -1174,7 +1176,7 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
    CALL getnextline(1, "#", FormatLine, inputline, Nread)
    read(inputline(1:Nread),*) rotation_law
 
-   if (.not.lstatic) then
+
     SELECT CASE (rotation_law)
      CASE ("magneto-accretion")
      	lmagnetoaccr = .true.
@@ -1190,7 +1192,7 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
         write(*,*) " Velocity law ", rotation_law," not handled yet"
         stop
     END SELECT
-   end if
+
 
    !read T shock and if accretion spots
    CALL getnextline(1, "#", FormatLine, inputline, Nread)
@@ -1231,11 +1233,12 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
 !      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), &
 !          atmos%vR(icell), V2(icell), atmos%vphi(icell), atmos%icompute_atomRT(icell)
 
-    end if
+    end if !magnetized
+!     write(*,*) icell,"rho=",atmos%nHtot(icell)," nH=",atmos%nHtot(icell)*rho_to_nH,' T=', atmos%T(icell),' ne=', atmos%ne(icell)," mu=",atmos%avgWeight
      end do
     end do
    end do
-
+   
    if (lspherical_velocity) then
     atmos%vtheta(:) = V2(:)
     if (atmos%magnetized) then 
@@ -1321,9 +1324,9 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
     Vmod = maxval(dsqrt(atmos%vR**2+atmos%vtheta(:)**2+atmos%vphi(:)**2))
    endif
    
-   if (.not.lstatic) then
+
     atmos%v_char = atmos%v_char + Vmod
-   end if
+
 
    if (atmos%magnetized) then
    	if (lmagnetoaccr) then
@@ -1344,7 +1347,7 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
   !no need if we do not the dark_zones from input file.
    CALL write_atmos_domain() !but for consistency with the plot functions in python
 
-   if (.not.lstatic) then
+
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
 
     if (lspherical_velocity) then
@@ -1363,7 +1366,6 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
     write(*,*) " Vphi = ",  1e-3 * maxval(abs(atmos%vphi)), &
     	1e-3*minval(abs(atmos%vphi),mask=atmos%icompute_atomRT>0)
 
-   end if
    
 !    if (xit .and. lspherical_velocity) then
 !      Vinf = maxval(atmos%vr)!900d3 !m/s

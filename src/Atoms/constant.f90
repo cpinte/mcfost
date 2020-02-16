@@ -30,6 +30,7 @@ MODULE constant
  ! --- Unit conversions ---
 
   real(kind=dp), parameter ::  NM_TO_M =1.0d-9
+  real(kind=dp), parameter ::  M_TO_NM =1.0d9
   real(kind=dp), parameter ::  CM_TO_M=1.0d-02
   !real(kind=dp), parameter ::  KM_TO_M =1.0d+03
   real(kind=dp), parameter ::  ERG_TO_JOULE=1.0d-07
@@ -80,6 +81,7 @@ MODULE constant
 
 
   ! --- Ionization energy Hmin in [J] ---
+  !-> we call it affinity
   real(8), parameter ::  E_ION_HMIN = 0.754 * EV
   real(8), parameter, private :: factor1D = 2d0, factor3D = 8d0/PI
   !previously: Vtherm = 2*KBOLTZMANN/AMU and v=sqrt(Vtherm * T / m + xit**2)

@@ -63,12 +63,10 @@ subroutine set_default_variables()
   prt_solution = "NO_STOKES"
   ! Atomic lines Radiative Transfer (AL-RT)
   lemission_atom = .false.
-  lstore_opac = .false.
   lelectron_scattering = .false.
   lstop_after_jnu = .false.
   lsolve_for_ne = .false.
   n_iterate_ne = 0
-  lstatic = .false.
   lvacuum_to_air = .false.
   lcontrib_function = .false.
   lmagnetoaccr = .false.
@@ -76,8 +74,8 @@ subroutine set_default_variables()
   lmodel_ascii = .false.
   lmagnetic_field = .true.
   lforce_lte = .false.
-  lxcoupling=.false.
   lread_jnu_atom=.false.
+  ldissolve = .false.
   ! AL-RT
   ! Ng's acceleration
   lNg_acceleration= .false.
@@ -86,8 +84,8 @@ subroutine set_default_variables()
   iNg_Nperiod = 6
   !
   ! Max relative error in transfer. ATM only atomic line transfer
-  dpops_max_error = 1e-4
-  dpops_sub_max_error = 1e-3
+  dpops_max_error = 1e-2
+  dpops_sub_max_error = 1e-4
   !
   lpuffed_rim = .false.
   lno_backup = .false.
@@ -602,16 +600,10 @@ subroutine initialisation_mcfost()
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
         lemission_atom=.true.
-     case("-static_model")
-        i_arg = i_arg + 1
-        lstatic = .true.!futur deprecation
      case("-prt_solution")
         i_arg = i_arg + 1
         call get_command_argument(i_arg,prt_solution)
         i_arg = i_arg + 1
-     case("-store_atom_opac")
-        i_arg = i_arg + 1
-        lstore_opac = .true.
      case("-contrib_function")
         i_arg = i_arg + 1
         lcontrib_function = .true.
@@ -742,9 +734,6 @@ subroutine initialisation_mcfost()
      case("-no_magnetic_field")
         i_arg = i_arg + 1
         lmagnetic_field=.false.
-     case("-x_coupling")
-        i_arg = i_arg + 1
-        lxcoupling=.true.
      case("-Ng_accel")
         i_arg = i_arg + 1
         lNg_acceleration=.true.
@@ -790,6 +779,9 @@ subroutine initialisation_mcfost()
      case("-see_lte")
         i_arg = i_arg + 1
         lforce_lte=.true.
+     case("-level_dissolution")
+        i_arg = i_arg + 1
+        ldissolve =.true.
      case("-tab_wavelength_image")
         i_arg = i_arg + 1
         ltab_wavelength_image = .true.
@@ -1679,14 +1671,12 @@ subroutine display_help()
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
-  write(*,*) "        : -static_model : force the model to be static, and neglect velocity field"
-  write(*,*) "        : -store_atom_opac: keep in memory background continuum opacities"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -Ng_accel <Norder> : Turn on Ng's acceleration with order Norder"
   write(*,*) "        : -Ng_Ndelay <Ndelay> <Nperiod> : # of normal iterations before acceleration. # of relaxation before new acceleration"
-  write(*,*) "        : -x_coupling : Using MALI scheme for solving the SEE"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
+  write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "

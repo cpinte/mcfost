@@ -604,7 +604,7 @@ contains
     !*************************
     ! Velocities
     !*************************
-    if (lemission_atom.and..not.lstatic) then
+    if (lemission_atom) then
        do icell=1,n_cells
           voroindex = Voronoi(icell)%id
           if (voroindex > 0) then

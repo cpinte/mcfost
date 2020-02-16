@@ -137,11 +137,8 @@ MODULE solvene
 !   
 !   part_func = elem%pf(stage,:)
 !   Uk = Interp1D(atmos%Tpf,part_func,atmos%T(k))
-!        !do not forget that Uk is base 10 logarithm !!
-!        ! note that in RH, natural (base e) logarithm
-!        ! is used instead
-!   Uk = (10.d0)**(Uk)
-! 
+!   !!Uk = (10.d0)**(Uk) !! 29/12/2019 changed log10 in log
+!   Uk = dexp(Uk)
 !  RETURN
 ! END FUNCTION getPartitionFunctionk
 
@@ -207,6 +204,7 @@ MODULE solvene
     ! -> sum up = 1 + N1/N0 + Nj/N0
     ! -> divide Nj/N0 by this sum and retrive Nj/N for all j
     !  --> Nj/N0 / (1+Nj/N0) = Nj/(N0*(1+Nj/N0)) = Nj / (N0 + Nj) = fj
+!-> Check that again
     fjk(j) = Sahaeq(k,fjk(j-1),Ukp1,Uk,elem%ionpot(j-1),ne)
     !write(*,*) "j=",j," fjk=",fjk(j)
     !write(*,*) fjk(j-1), fjk(j), fjk(j)/(ne+tiny_dp)
@@ -363,6 +361,7 @@ write(*,*) "Test Nelem",Nelem
      CALL getfjk(atmos%Elements(n)%ptr_elem,ne_old,k,fjk,dfjk)!
 
      if (n.eq.1)  then ! H minus for H
+       !2 = partition function of HI, should be replace by getPartitionFunctionk(atmos%elements(1)%ptr_elem, 1, icell)
        PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
        ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
        error = error + ne_old*fjk(1)*PhiHmin

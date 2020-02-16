@@ -8,30 +8,30 @@ MODULE math
 
   CONTAINS
 
-  !building
-  FUNCTION overlapping_transitions(lambda, Nl, Nblue, Nl2, Nblue2) result(overlap)
-  !Find where lambda(Nblue:Nblue+Nl-1)==lambda(Nblue2:Nblue2+Nl2-1)
-  !meaning where two transitions overlap.
-  !All transitions share the same wavelength grid, so they have the same value of lambda
-  !for the same index. But they have differents Nblue, Nl
-   integer :: Nblue, Nl, Nl2, Nblue2, overlap(Nl)
-   real(kind=dp) :: lambda(:)
-   integer :: i, j
-
-   overlap(:) = 0
-
-   i_loop : do i=1,Nl
-    do j=1,Nl2
-     if (lambda(Nblue+i-1) == lambda(Nblue2+j-1)) then
-       overlap(i) = Nblue+i-1 !index on lambda grid
-       cycle i_loop
-     end if
-
-    enddo
-   enddo i_loop
-
-  RETURN
-  END FUNCTION overlapping_transitions
+!   building
+!   FUNCTION overlapping_transitions(lambda, Nl, Nblue, Nl2, Nblue2) result(overlap)
+!   Find where lambda(Nblue:Nblue+Nl-1)==lambda(Nblue2:Nblue2+Nl2-1)
+!   meaning where two transitions overlap.
+!   All transitions share the same wavelength grid, so they have the same value of lambda
+!   for the same index. But they have differents Nblue, Nl
+!    integer :: Nblue, Nl, Nl2, Nblue2, overlap(Nl)
+!    real(kind=dp) :: lambda(:)
+!    integer :: i, j
+! 
+!    overlap(:) = 0
+! 
+!    i_loop : do i=1,Nl
+!     do j=1,Nl2
+!      if (lambda(Nblue+i-1) == lambda(Nblue2+j-1)) then
+!        overlap(i) = Nblue+i-1 !index on lambda grid
+!        cycle i_loop
+!      end if
+! 
+!     enddo
+!    enddo i_loop
+! 
+!   RETURN
+!   END FUNCTION overlapping_transitions
 
 
   FUNCTION flatten(n1, n2, M)
@@ -168,8 +168,9 @@ MODULE math
    !Shift a function y, centered at 0 in the velocity space
    !by a delta in index of dk.
    !dk is an integer positive or negative.
-   !The function y has to be linearly spaced such that y(1) = y(0 + dk)
-   ! dk is int(dv * di) + 1
+   !The function y has to be linearly spaced such that y'(1) = y(1 + dk)
+   !where y' is the function projected onto the observer's frame.
+   ! dk is int(dv * di)
    ! with di = (index(y[1]) - index(y[0]))/(y[1]-y[0]) and dv a velocity shift.
     integer, intent(in) :: Nx, dk
     real(kind=dp), intent(in), dimension(Nx) :: y
@@ -239,7 +240,39 @@ MODULE math
      return
 
    end function linear_1D_sorted
+   
+   function convolve(x, y, K)
+   !x, y, and K have the same dimension
+   !using trapezoidal rule
+    real(kind=dp), intent(in) :: x(:), y(:), K(:)
+    real(kind=dp) :: convolve(size(x)), dx
+    integer :: i, j, Nx, shift
+    
+    Nx = size(x)
+    convolve(:) = 0.0_dp
+    
 
+    do j=1,Nx
+    	if (j==1) then
+    		dx = dabs(x(j+1)-x(j))
+    	else
+    		dx = dabs(x(j)-x(j-1))
+    	endif
+    	
+    	do i=1,Nx-1 !Should not happen but here. Work in python because negative index exists
+    		if (j-i < 1 .or. j-(i+1) < 1) then
+    			convolve(i) = 0.0
+    		else
+    			convolve(i) = convolve(i) + 0.5 * dx * (y(i)*K(j-i) + y(i+1)*K(j-(i+1)))
+			endif    	
+    	enddo
+    
+    
+    enddo
+
+
+  return
+  end function convolve
 
    FUNCTION Integrate_x(N, x, y) result(integ)
     integer :: N
@@ -539,10 +572,10 @@ MODULE math
 
    do j=1,size(x1a) !y-axis interpolation
     yb = ya(j,:)
-    call bezier3_interp(size(x2a),x2a,yb,1, tmp2, tmp3)
+    call bezier2_interp(size(x2a),x2a,yb,1, tmp2, tmp3)
     ymtmp(j) = tmp3(1) !tmp3 needed to extract the scalar value
    end do
-   call bezier3_interp(size(x1a), x1a, ymtmp, 1, tmp1, tmp3)
+   call bezier2_interp(size(x1a), x1a, ymtmp, 1, tmp1, tmp3)
 
    y = tmp3(1)
 

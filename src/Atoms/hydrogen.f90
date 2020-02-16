@@ -13,14 +13,16 @@ MODULE hydrogen_opacities
  use atmos_type, only : atmos, Hydrogen, Helium
  use constant
  use spectrum_type, only : NLTEspec
- use math, only : bezier3_interp, interp2Darr
- use lte, only : nH_minus
+ use math, only : bezier3_interp, interp2Darr, interp1D, interp2D
+!  use lte, only : nH_minus
+ use planck, only : bpnu
  
  use constantes, only : tiny_dp
  use mcfost_env, only : dp
 
  IMPLICIT NONE
 
+ !RH version
  integer, parameter :: NBF=34, NJOHN=6, NFF=17, NTHETA=16
 
  CONTAINS
@@ -33,9 +35,13 @@ MODULE hydrogen_opacities
   Gaunt_bf = 1d0 + 0.1728 * (n_eff**(-2./3.)) * (u+1d0)**(-2./3.) * (u-1d0) &
              - 0.0496*(n_eff**(-4./3.)) * (u+1d0)**(-4./3.) * (u*u + 4./3. * u + 1d0)
              
-  if (Gaunt_bf <= 0d0 .or. Gaunt_bf > 2d0) then
-   Gaunt_bf = 1d0
-  end if
+!   if (Gaunt_bf <= 0d0 .or. Gaunt_bf > 2d0) then
+!    Gaunt_bf = 1d0
+!   end if
+
+  ! need a proper extrapolation for when it is negative
+  if (Gaunt_bf < 0.0) Gaunt_bf = 0.0
+  if (Gaunt_bf > 2.0) Gaunt_bf = 1.0
 
  RETURN
  END FUNCTION Gaunt_bf
@@ -68,7 +74,7 @@ MODULE hydrogen_opacities
  ELEMENTAL FUNCTION  H_bf_Xsection(cont, lambda) result(alpha) !_lambda
   Type (AtomicContinuum), intent(in) :: cont
   real(kind=dp), intent(in) :: lambda
-  real(kind=dp) :: n_eff, g_bf, u, Z, u0, g_bf0, alpha
+  real(kind=dp) :: n_eff, g_bf, u, Z, u0, g_bf0, alpha, u1
   
   
    Z = real(cont%atom%stage(cont%i) + 1,kind=dp)
@@ -81,9 +87,16 @@ MODULE hydrogen_opacities
     g_bf = Gaunt_bf(u, n_eff)
     g_bf0 = Gaunt_bf(u0, n_eff)
     
+!     if (lambda > cont%lambda0) then !linear  extrapolation of g_bf
+!       u1 = n_eff**2 * HPLANCK*CLIGHT / (NM_TO_M * 0.8 * cont%lambda0 ) / Z*Z / E_RYDBERG - 1
+!       g_bf = g_bf0 + (u - u1) / (u0 - u1) * (g_bf0 -  Gaunt_bf(u1, n_eff))
+!     endif
+    
     !There is a factor n_eff/Z**2 absorbed in alpha0 beware
     !alpha = cont%alpha0 * (lambda/cont%lambda0)**3  * g_bf / g_bf0 
- 	alpha = 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLIGHT)**3
+    !alpha = n_eff/Z**2 * cont%alpha0 * (lambda/cont%lambda0)**3  * g_bf / g_bf0 
+    !1d-4* 2.815d29
+ 	alpha = 2.815d25 * (Z**4) * g_bf / n_eff**5 * (NM_TO_M*lambda/CLIGHT)**3
 
  RETURN
  END FUNCTION H_bf_Xsection!_lambda
@@ -116,8 +129,8 @@ MODULE hydrogen_opacities
     alpha = cont%alpha0 * (lambda/cont%lambda0)**3  * g_bf / g_bf0
     !alpha0 = 1d-4*2.815d29 * Z**4 * g_bf0 / n**5
  	!alpha =1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLIGHT)**3
-write(*,*) lambda, cont%lambda0, g_bf, g_bf0, n_eff
-write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLIGHT)**3
+    write(*,*) lambda, cont%lambda0, g_bf, g_bf0, n_eff
+    write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLIGHT)**3
  RETURN
  END SUBROUTINE test_bf_xs
  
@@ -127,8 +140,8 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
   real(kind=dp) :: g_ff, nu3, alpha, K0
   integer, intent(in) :: Z
   
-   !K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / dsqrt(M_ELECTRON)
-   !K0 = (K0**3) * 4./3. * dsqrt(2*pi/3./KBOLTZMANN) / HPLANCK / CLIGHT
+!    K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / dsqrt(M_ELECTRON)
+!    K0 = (K0**3) * 4./3. * dsqrt(2*pi/3./KBOLTZMANN) / HPLANCK / CLIGHT
    !sigma0_H_ff = K0
   
    nu3 = (NM_TO_M * lambda / CLIGHT)**3 ! = 1 / nu**3
@@ -142,7 +155,43 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
  RETURN
  END FUNCTION H_ff_Xsection
 
-
+!!!! Landi Degl'Innocenti 1976, A&ASS, 25, 379
+! 	elemental function hydrogen_ff_bf(icell,T, lambda_in) result(hydro) !m^2, lambda_in in AA
+! 	integer, intent(in) :: icell
+! 	real(kind=8) :: hydro
+! 	real(kind=8), intent(in) :: T, lambda_in
+! 	real(kind=8) :: r, c1, c2, cte, theta1, theta2, theta3, sum, gff
+! 	integer :: i, n0
+! 		
+! 		r = 1.096776d-3
+! 		c1 = 1.5777216d5
+! 		c2 = 1.438668d8
+! 		cte = 1.045d-26
+! 		
+! 		theta1 = c1 / T
+! 		theta2 = c2 / (lambda_in * T)
+! 		theta3 = 2.d0*theta1
+! 		
+! Lowest level which can be photoionized
+! 		n0 = 1 + floor(sqrt(r*lambda_in))
+! 		
+! Sum over states that can be photoionized
+! 		if (n0 <= 8) then
+! 			sum = exp(theta1 / n0**2) / n0**3
+! 			do i = n0+1, 8
+! 				sum = sum + exp(theta1 / i**2) / i**3
+! 			enddo
+! 			sum = sum + (0.117d0 + exp(theta1/81.d0)) / theta3
+! 		else
+! 			sum = (0.117d0 + exp(theta1/n0**2)) / theta3
+! 		endif
+! 	
+! Approximate the value of the Gaunt factor G_ff from Mihalas Eq (80) @ theta=1, x=0.5
+! 		gff = (1.d0-exp(-theta2)) * exp(-theta1) * lambda_in**3
+! 		
+! 		hydro = cte * gff * sum * 1e-4 * atmos%nHtot(icell)!m^2
+! 		
+! 	end function hydrogen_ff_bf
 
  SUBROUTINE Hydrogen_ff(icell, chi)
  ! Hubeny & Mihalas eq. 7.100 (from cgs to SI)
@@ -168,9 +217,8 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
    !the bound-free cross-sections
    alpha = H_ff_Xsection(1, atmos%T(icell), NLTEspec%lambda(la)) * atmos%ne(icell)
    
+
    chi(la) =  alpha * np * stim
-   !chi(la) = alpha * 1.38985d21 * 1.37901d21 * stim / atmos%ne(icell)
-   !write(*,*) NLTEspec%lambda(la), chi(la), atmos%ne(icell), np, stim
 
   enddo
 
@@ -178,113 +226,53 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
  RETURN
  END SUBROUTINE Hydrogen_ff
  
-!building
- SUBROUTINE atom_ff_transitions(atom, icell, chi)
- ! Hubeny & Mihalas eq. 7.100 (from cgs to SI)
- ! takes place at LTE because it is collisional
- !should work with Hydrogen
-  integer, intent(in) :: icell
-  type (AtomType), intent(in) :: atom
-  real(kind=dp), dimension(NLTEspec%Nwaves), intent(out) :: chi
-  real(kind=dp) :: stim, nion, arg_exp, exp_val
-  integer :: ic, Z, la
-
- chi(:) = 0d0
- if (atmos%ne(icell)==0d0) return
-
- ic = atom%Nlevel 
- Z = atom%stage(ic)
-
- nion = atom%n(ic, icell)
-
- do la=1,NLTEspec%Nwaves
-
-    stim = 1.- dexp(-hc_k/NLTEspec%lambda(la)/atmos%T(icell))
-   
-    chi(la) = H_ff_Xsection(Z, atmos%T(icell), NLTEspec%lambda(la)) * atmos%ne(icell) * nion * stim
-
- enddo
-  
-
- RETURN
- END SUBROUTINE atom_ff_transitions
- 
- SUBROUTINE atom_ff_transitions_old(atom, icell, chi)
- ! Hubeny & Mihalas eq. 7.100 (from cgs to SI)
- ! takes place at LTE because it is collisional
- !should work with Hydrogen
-  integer, intent(in) :: icell
-  type (AtomType), intent(in) :: atom
-  real(kind=dp), dimension(NLTEspec%Nwaves), intent(out) :: chi
-  real(kind=dp) :: stim, nion, arg_exp, exp_val
-  integer :: ic, Z, la, kr, kc
-
- chi(:) = 0d0
- if (atmos%ne(icell)==0d0) return
-
- 
-  do kr=atom%Ntr_line+1,atom%Ntr
-   kc = atom%at(kr)%ik
-   ic = atom%continua(kc)%j
-
-   Z = atom%stage(ic)! = cont%atom%stage(cont%i) + 1  
-
-   nion = atom%n(ic, icell)
-
-   do la=1,NLTEspec%Nwaves
-
-    stim = 1.- dexp(-hc_k/NLTEspec%lambda(la)/atmos%T(icell))
-   
-    chi(la) =  chi(la) + H_ff_Xsection(Z, atmos%T(icell), NLTEspec%lambda(la)) &
-     * atmos%ne(icell) * nion * stim
-
-   enddo
-  
-  enddo !over continua
-
- RETURN
- END SUBROUTINE atom_ff_transitions_old
- 
-!  SUBROUTINE Hminus_bf_ff(icell, chi, eta)
-!    integer, intent(in) :: icell
-!    real(kind=dp) :: lambda, theta, Pe_cgs, fact
-!    real(kind=dp), dimension(NLTEspec%Nwaves), intent(inout) :: chi, eta, alpha
+!! building
+!  SUBROUTINE atom_ff_transitions(atom, icell, chi)
+!  Hubeny & Mihalas eq. 7.100 (from cgs to SI)
+!  takes place at LTE because it is collisional
+!  should work with Hydrogen
+!   integer, intent(in) :: icell
+!   type (AtomType), intent(in) :: atom
+!   real(kind=dp), dimension(NLTEspec%Nwaves), intent(out) :: chi
+!   real(kind=dp) :: stim, nion, arg_exp, exp_val
+!   integer :: ic, Z, la
+! 
+!  chi(:) = 0d0
+!  if (atmos%ne(icell)==0d0) return
+! 
+!  ic = atom%Nlevel 
+!  Z = atom%stage(ic)
+! 
+!  nion = atom%n(ic, icell)
+! 
+!  do la=1,NLTEspec%Nwaves
+! 
+!     stim = 1.- dexp(-hc_k/NLTEspec%lambda(la)/atmos%T(icell))
 !    
-!    chi(:) = 0.0_dp
-!    eta(:) = 0.0_dp
-!    
-!    !1e-18 cm2/H-
-!    alpha(:) = 1.99654 - 1.18267d-5*(NLTEspec%lambda(:)*10) + &
-!               2.64243e-6d-6 * (NLTEspec%lambda * 10)**2 + &
-!               -4.40524d-10 * (NLTEspec%lambda*10)**3 + &
-!               3.23992d-14 * (NLTEspec%lambda*10)**4 + &
-!               -1.39568d-18 * (NLTEspec%lambda*10)**5 + &
-!               2.78701d-23 * (NLTEspec%lambda*10)**6
-!    !cm2/HI -> m^-1   
-!    fact = 1d-4 * sum(Hydrogen%n(1:hydrogen%Nlevel-1,icell))
-!      
-!    theta = 5040./atmos%T(icell)
-!    Pe_cgs = 1d7 * KBOLTZMANN * atmos%ne(icell) * 1d-6 * atmos%T(icell)  
-!    !b-f   
-!    chi(:) = fact * 4.158d-10 * alpha(:) * Pe_cgs * theta**(2.5) * 10**(0.754*theta)
-!    
-!    eta(:) = alpha(:) * (twohc/NLTEspec%lambda**3) * 
-!  
+!     chi(la) = H_ff_Xsection(Z, atmos%T(icell), NLTEspec%lambda(la)) * nion * stim * atmos%ne(icell)
+! 
+!  enddo
+!   
+! 
 !  RETURN
-!  END SUBROUTINE Hminus_bf_ff
+!  END SUBROUTINE atom_ff_transitions
  
-!fit
+
+ 
+
  SUBROUTINE Hminus_bf(icell, chi, eta)
  !-----------------------------------------------------------------
- ! Calculates the negative hydrogen (H-) bound-free continuum absorption coefficient per
- ! hydrogen atom
+ ! Calculates the negative hydrogen (H-) bound-free continuum
+ ! absorption coefficient per
+ ! hydrogen atom in the ground state from 
  !  John 1988 A&A 193, 189
- !		lambda: wavelength greater than 125 nm
+ ! Includes stimulated emission
  !-----------------------------------------------------------------
    integer, intent(in) :: icell
-   real(kind=dp) :: lambda, lambda0, K, alpha, sigma, flambda, Cn(6), diff, stm,funit, cte, Keta
+   real(kind=dp) :: lambda, lambda0, alpha, sigma, flambda, Cn(6)
+   real(kind=dp) :: diff, stm, funit, cte, pe
    integer :: la,n
-   real(kind=dp) :: arg_exp, nHmin
+   real(kind=dp) :: arg_exp, nH
    real(kind=dp), dimension(NLTEspec%Nwaves), intent(inout) :: chi, eta
    
    chi(:) = 0.0_dp
@@ -296,24 +284,26 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
    !cm4/dyne = 10 * cm2 / Pa
    !cm4/dyne = 10 * (1e-2)**2 m2/Pa = 1e-3 * m2/Pa
    !m2/Pa = cm4/dyne  * 1e3
-   funit = 1d-3 !cm4/dyn -> m2/Pa
+   funit = 1d-3 !m2/Pa -> cm2/dyn
+   
+   pe = atmos%ne(icell) * KBOLTZMANN * atmos%T(icell) !nkT in Pa
    
    Cn(:) = (/152.519d0,49.534d0,-118.858d0,92.536d0,-34.194d0,4.982d0/)
 
    alpha = hc_k / MICRON_TO_NM ! hc_k = hc/k/nm_to_m
+   lambda0 = 1.6419 !micron, photo detachement threshold
+
+   nH = hydrogen%n(1,icell)
 
    !alpha = hc_k / micron_to_nm * nm_to_m
-   cte = 1d-18 * 0.75 * atmos%T(icell)**(-2.5) * KBOLTZMANN * atmos%T(icell) * atmos%ne(icell)
-   lambda0 = 1.6419 !micron, photo detachement threshold
-   K = funit * cte * dexp(alpha/lambda0/atmos%T(icell)) * Hydrogen%n(1,icell)
-   Keta = 1d-18 * 1d-4 * atmos%ne(icell) * Hydrogen%n(1,icell)
-
-  nHmin = nH_minus(icell)
+   cte = 0.75d-18 * atmos%T(icell)**(-2.5) * dexp(alpha/lambda0/atmos%T(icell)) * pe * funit * nH
+   	
 
    do la=1, NLTEspec%Nwaves
    
     lambda = NLTEspec%lambda(la) / MICRON_TO_NM !nm->micron
-    if (NLTEspec%lambda(la) > 125. .and. lambda < lambda0) then
+    !if (lambda > 0.125 .and. lambda < lambda0) then
+    if (lambda <= lambda0) then 
 
      diff = (1d0/lambda - 1d0/lambda0)
     
@@ -321,42 +311,166 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
         
      flambda = Cn(1) + Cn(2) * diff**(0.5) + Cn(3) * diff + Cn(4) * diff**(1.5) + &
               Cn(5)*diff**(2.) + Cn(6) * diff**(2.5)
-    
-     sigma = lambda**3d0 * diff**(1.5) * flambda
-     !chi(la) = K * stm * sigma
-     chi(la) = 1d-18 * 1d-4 * sigma * nHmin * stm !nHmin is ni and nj hydrogen%n(1)
-     !eta(la) = Keta * twohc/NLTEspec%lambda(la)**3 * sigma * (1.-stm)
-     eta(la) = twohc/NLTEspec%lambda(la)**3 * 1d-18 * 1d-4 * sigma * nHmin * (1-stm)
-    endif   !remember: at LTE eta = nj * nistar/njstar exp(-de/kt) = nistar * exp(-de/kT) 
+                  
+     sigma = lambda**3d0 * diff**(1.5) * flambda !cm2
+     chi(la) = cte * stm * sigma! m^-1
+     !exp(-hnu/kt) * 2hnu3/c2 = Bp * (1.-exp(-hnu/kt))
+     eta(la) = cte * (1.-stm) * sigma * twohc/NLTEspec%lambda(la)**3
+     !write(*,*) lambda, 
+    endif
+ 
    enddo
 
-
+   
 
  RETURN
  END SUBROUTINE Hminus_bf
+ 
+ 
+ SUBROUTINE Hminus_bf_geltman(icell, chi, eta)
+ !-----------------------------------------------------------------
+ ! Calculates the negative hydrogen (H-) bound-free continuum
+ ! absorption coefficient per
+ ! H minus atom from Geltman 1962, ApJ 136, 935-945
+ ! Stimulated emission included
+ !-----------------------------------------------------------------
+  integer :: icell, la
+  real(kind=dp), intent(out), dimension(NLTEspec%Nwaves) :: &
+   chi, eta
+  real(kind=dp), dimension(NBF) :: lambdaBF, alphaBF
+  real(kind=dp) :: lambda, stm, twohnu3_c2, alpha
+
+  !in 1e-21
+  data lambdaBF / 0.0, 50.0, 100.0, 150.0, 200.0, 250.0,  &
+                 300.0, 350.0, 400.0, 450.0, 500.0, 550.0,&
+                 600.0, 650.0, 700.0, 750.0, 800.0, 850.0,&
+                 900.0, 950.0, 1000.0, 1050.0, 1100.0,    &
+                 1150.0, 1200.0, 1250.0, 1300.0, 1350.0,  &
+                 1400.0, 1450.0, 1500.0, 1550.0, 1600.0,  &
+                 1641.9 /
+
+  data alphaBF / 0.0,  0.15, 0.33, 0.57, 0.85, 1.17, 1.52,&
+                 1.89, 2.23, 2.55, 2.84, 3.11, 3.35, 3.56,&
+                 3.71, 3.83, 3.92, 3.95, 3.93, 3.85, 3.73,&
+                 3.58, 3.38, 3.14, 2.85, 2.54, 2.20, 1.83,&
+                 1.46, 1.06, 0.71, 0.40, 0.17, 0.0 /
+
+  chi = 0d0
+  eta = 0d0
+  
+  do la=1, NLTEspec%Nwaves
+    lambda = NLTEspec%lambda(la)
+    !do not test negativity of lambda
+    if (lambda >= lambdaBF(NBF)) exit
+    
+    stm = dexp(-hc_k/atmos%T(icell)/lambda)
+    twohnu3_c2 = twohc / lambda**3.
+    
+    alpha = 1d-21 * interp1D(lambdaBF*1d0, alphaBF*1d0, lambda)  !1e-17 cm^2 to m^2
+    
+    chi(la) = atmos%nHmin(icell) * (1.-stm) * alpha
+    eta(la) = atmos%nHmin(icell) * twohnu3_c2 * stm * alpha
+
+  enddo
+
+
+ RETURN
+ END SUBROUTINE Hminus_bf_geltman
+
+ SUBROUTINE Hminus_bf_Wishart(icell, chi, eta)
+  !The one use in Turbospectrum, number 1 in opacity
+ !-----------------------------------------------------------------
+ ! Calculates the negative hydrogen (H-) bound-free continuum
+ ! absorption coefficient per
+ ! H minus atom from Wishart A.W., 1979, MNRAS 187, 59P
+ !-----------------------------------------------------------------
+   integer, intent(in) :: icell
+   integer :: la
+   real(kind=dp), dimension(NLTEspec%Nwaves), intent(inout) :: chi, eta
+!    real, dimension(36) :: lambda, alpha
+   real, dimension(63) :: lambda, alpha
+   real(kind=dp) :: lam, stm, sigma
+   
+   chi(:) = 0.0_dp
+   eta(:) = 0.0_dp 
+
+!    data lambda / 0.00,1250.00 ,  1750.00  , 2250.70  , 2750.81  , 3250.94,&
+!    3751.07  , 4251.20  , 4751.33   ,5251.46 ,  5751.59 ,  6251.73, &
+!    6751.86  , 7252.00  , 7752.13  , 8252.27  , 8752.40   ,9252.54,&
+!    9752.67 ,  10252.81  ,10752.95 , 11253.08 , 11753.22 , 12253.35,&
+!   12753.49  ,13253.62 , 13753.76 , 14253.90 , 14754.03  ,15254.17,&
+!   15504.24 , 15754.30  ,16004.37 , 16104.40 , 16204.43 , 16304.45 /
+  
+  !1d-18 cm^2 * (1d-2)**2 for m^2 = 1d-22
+!   data alpha /0.0  ,     5.431 ,    7.918    , 11.08  ,   14.46   ,  17.92, &
+!      21.35 ,    24.65   ,  27.77  ,   30.62   ,  33.17   ,  35.37,&
+!      37.17  ,   38.54  ,   39.48  ,   39.95   ,  39.95 ,    39.48,&
+!      38.53  ,   37.13 ,   35.28  ,   33.01 ,    30.34     ,27.33,&
+!      24.02  ,   20.46   ,  16.74   ,  12.95  ,   9.211   ,  5.677,&
+!      4.052 ,    2.575 ,    1.302   ,  .8697    , .4974   ,  .1989 / 
+     
+  data lambda / 250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750,      &
+                4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000, 6250, 6500,     &
+                6750, 7000, 7250, 7500, 7750, 8000, 8250, 8500, 8750, 9000, 9250,     &
+                9500, 9750, 10000, 10250, 10500, 10750, 11000, 11250, 11500, 11750,   &
+                12000, 12250, 12500, 12750, 13000, 13250, 13500, 13750, 14000,        &
+                14250, 14500, 14750, 15000, 15250, 15500, 15750, 16000, 16100, 16200, &
+                16300 / 
+
+  data alpha / 5.431, 6.512, 7.918, 9.453, 11.08,12.75,14.46,16.19,17.92,19.65,21.35,   &
+               23.02,24.65,26.24, 27.77, 29.23,30.62,31.94,33.17,34.32, 35.37,36.32,    &
+               37.17,37.91,38.54,39.07,39.48,39.77,39.95, 40.01, 39.95, 39.77, 39.48,   &
+               39.06,38.53,37.89,37.13,36.25,35.28,34.19,33.01,31.72,30.34,28.87,       &
+               27.33,25.71,24.02,22.26,20.46,18.62,16.74,14.85,12.95,11.07,9.211,7.407, &
+               5.677,4.052,2.575,1.302,0.8697,0.4974, 0.1989 /
+     
+   freq_loop : do la=1, NLTEspec%Nwaves
+    lam = NLTEspec%lambda(la) * 10. !AA
+    !stm = 0.0
+    stm = dexp(-hc_k / atmos%T(icell) / NLTEspec%lambda(la))
+!     if (lam >= lambda(1) .and. lam <= lambda(36)) then
+	if (lam < minval(lambda)) then
+	 cycle
+	else if (lam > maxval(lambda)) then
+	 exit freq_loop
+	else
+   
+      sigma = 1d-22 * interp1D(lambda*1d0, alpha*1d0, lam) * atmos%nHmin(icell)
+      chi(la) = sigma * (1.0 - stm)
+      eta(la) = sigma * twohc/NLTEspec%lambda(la)**3  * stm   
+
+    endif
+   enddo freq_loop
 
  
-!fit to the best data
- SUBROUTINE Hminus_ff(icell, chi)
-!-----------------------------------------------------------------
-! Calculates the negative hydrogen (H-) free-free continuum absorption coefficient per
-! hydrogen atom (cm^2)
-!  REF: John 1989 A&A 193, 189
-!  INPUT:
-!		T : temperature in K (1400 < T < 100080)
-!		wavelength greater than 188 nm
-!-----------------------------------------------------------------
+ RETURN
+ END SUBROUTINE 
+ 
+! !fit to the best data
+! produce a spurious pik close to 188nm
+ FUNCTION Hminus_ff_john(icell, lambda) result(chi)
+ !-----------------------------------------------------------------
+ ! Calculates the negative hydrogen (H-) free-free continuum
+ ! absorption coefficient per
+ ! hydrogen atom in the ground state from John 1988
+ !-----------------------------------------------------------------
    integer, intent(in) :: icell
+   real(kind=dp), intent(in) :: lambda
    !tab. 3a, lambda > 0.3645micron
-   real(kind=dp), dimension(6) :: An, Bn, Cn, Dn, En, Fn, com1
+   real(kind=dp), dimension(6) :: An, Bn, Cn, Dn, En, Fn
    !tab 3b, lambda > 0.1823 micron and < 0.3645 micron, size of 4 isntead 5, because the last two rows are 0
-   real(kind=dp), dimension(4) :: An2, Bn2, Cn2, Dn2, En2, Fn2, com2
+   real(kind=dp), dimension(4) :: An2, Bn2, Cn2, Dn2, En2, Fn2
    real(kind=dp) :: funit, K, kappa
    integer :: la, n
-   real(kind=dp), dimension(NLTEspec%Nwaves), intent(inout) :: chi
-   real(kind=dp) :: lambda, theta
+   real(kind=dp) :: chi
+   real(kind=dp) :: lam, theta, nH
 	
-   chi(:) = 0.0_dp
+   chi = 0.0   
+   theta = 5040d0 / atmos%T(icell) 
+   lam = lambda / MICRON_TO_NM
+
+   if (theta < 0.5 .or. theta > 3.6) return
+   if (lam <= 0.1823) return
 	
 	An = (/0.d0,2483.346d0,-3449.889d0,2200.04d0,-696.271d0,88.283d0/)
 	Bn = (/0.d0,285.827d0,-1158.382d0,2427.719d0,-1841.4d0,444.517d0/)
@@ -372,40 +486,165 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
     Fn2 = (/-6.4285d0,12.36d0,-7.0571d0,1.5097d0/)
     
     funit = 1d-3 !cm4/dyne to m2/Pa
-    K = 1d-29 * funit * atmos%ne(icell) * KBOLTZMANN * atmos%T(icell) * Hydrogen%n(1,icell)
-    
-    if (atmos%ne(icell)==0d0) return
+    nH = hydrogen%n(1,icell) 
+
+    K = 1d-29 * funit * atmos%ne(icell) * KBOLTZMANN * atmos%T(icell) * nH
+
       
-    do la=1, NLTEspec%Nwaves
-      lambda = NLTEspec%lambda(la) / MICRON_TO_NM
-      if (lambda < 0.1823) cycle
-      
-      theta = 5040d0 / atmos%T(icell) 
-	  if (lambda < 0.3645) then
-	    kappa = 0d0
+	kappa = 0.0_dp      
+	if (lam < 0.3645) then
 	    do n=1,4
-	     kappa = kappa + theta**((n+1)/2d0) * (lambda**2 * An2(n) + Bn2(n) + Cn2(n)/lambda + &
-	     	Dn2(n)/lambda**2 + En2(n)/lambda**3 + Fn2(n)/lambda**4)
+	     kappa = kappa + theta**((n+1)/2d0) * (lam**2 * An2(n) + Bn2(n) + Cn2(n)/lam + &
+	     	Dn2(n)/lam**2 + En2(n)/lam**3 + Fn2(n)/lam**4)
 	    enddo
-	  else
-	    kappa = 0D0
+	else! if (lambda > 0.3645) then
 	    do n=1,6
-	     kappa = kappa + theta**((n+1)/2d0) * (lambda**2 * An(n) + Bn(n) + Cn(n)/lambda + &
-	     	Dn(n)/lambda**2 + En(n)/lambda**3 + Fn(n)/lambda**4)
+	     kappa = kappa + theta**((n+1)/2d0) * (lam**2 * An(n) + Bn(n) + Cn(n)/lam + &
+	     	Dn(n)/lam**2 + En(n)/lam**3 + Fn(n)/lam**4)
 	    enddo
 	  endif
-	  chi(la) = kappa * K
+	chi = kappa * K
+
+ 
+ RETURN
+ END FUNCTION Hminus_ff_John
+
+! !fit to the best data
+! produce a spurious pik close to 188nm
+ SUBROUTINE Hminus_ff(icell, chi)
+ !-----------------------------------------------------------------
+ ! Wrapper around Hminus_ff_john
+ !-----------------------------------------------------------------
+   integer, intent(in) :: icell
+   integer :: la
+   real(kind=dp), dimension(NLTEspec%Nwaves), intent(inout) :: chi
+   real(kind=dp) :: lambda, theta!, nH
+	
+   chi(:) = 0.0_dp
+   
+   theta = 5040d0 / atmos%T(icell) 
+
+   if (theta < 0.5 .or. theta > 3.6) return
+               
+    do la=1, NLTEspec%Nwaves
+	  chi(la) = Hminus_ff_john(icell, NLTEspec%lambda(la))
 	enddo
  
  RETURN
  END SUBROUTINE Hminus_ff
 
-!Interpolation to the best data
+ SUBROUTINE Hminus_ff_bell_berr(icell, chi)
+ !-----------------------------------------------------------------
+ ! Calculates the negative hydrogen (H-) free-free continuum
+ ! absorption coefficient per
+ ! hydrogen atom in the ground state from
+ ! Bell & Berrington 1986, J. Phys. B 20, 801
+ !
+ ! at long wavelength Hminus_ff_john is used.
+ !
+ !-----------------------------------------------------------------
+ !number 19 in turbospectrum opacities
+ !stm is already included
+
+   integer, intent(in) :: icell
+   integer :: la
+   real(kind=dp), dimension(NLTEspec%Nwaves), intent(inout) :: chi
+   real, dimension(:) :: lambda(24), theta(10)
+   real, dimension(24,10) :: alpha
+   real :: inter
+   real(kind=dp) :: lam, stm, sigma, t, pe, nH
+
+   chi(:) = 0.0_dp
+   t = 5040. / atmos%T(icell)
+   
+   if (t < 0.5 .or. t > 2.) return
+
+   !AA
+   data lambda  /0.00,   1823.00,   2278.70 ,  2604.78 ,  3038.88,   3646.04, &
+     4558.28 ,  5064.41 ,  5697.58 ,  6511.80 ,  7597.09  , 9115.50, &
+  10128.78,  11395.12 , 13022.56 , 15193.15 , 18231.98 , 22790.22,&
+  30386.29 , 45579.43 , 91158.84, 151931.41,  320000.0, 2100000.0 /
+  
+   data theta / 0.5  , 0.6  , 0.7  ,0.8 , 1.0 ,1.2, 1.4  ,1.6,1.8,2.0 /       
+  
+  !1d-26 cm^4/dyn = 1d-26 * 1d-3 m^2 / Pa = 1d-29 m^2/Pa
+   data alpha(:,1) /0.0 ,.0178 ,.0228,.0277,.0364,.0520, &
+     .0791 ,.0965    , 0.121     ,0.154     ,0.208  ,   0.293,&
+     0.358  ,   0.448  ,   0.579   ,  0.781    ,  1.11    ,  1.73,&
+      3.04  ,    6.79  ,    27.0    ,  75.1  ,  333.15  ,14347.73 /
+             
+   data alpha(:,2) /     0.0    ,   .0222  ,   .0280  ,   .0342   ,  .0447   ,  .0633,&
+     .0959  ,   0.117,     0.146 ,    0.188   ,  0.250  ,   0.354,&
+     0.432 ,    0.539  ,   0.699  ,   0.940  ,    1.34   ,   2.08,&
+      3.65   ,   8.16  ,    32.4   ,   90.0  ,  399.25 , 17194.76 /
+      
+   data alpha(:,3) / 0.0,.0265 ,.0334 ,.0409 , .0532 ,.0746 ,&
+     .112,.137 ,.171 ,.219 , .291 ,   .411 ,&  
+     .502 ,.625,.812 ,1.09, 1.56, 2.41 ,& 
+     4.23,9.43, 37.5, 104. ,461.36, 19869.04/
+
+   data alpha(:,4) / 0.0 ,.0308 ,.0388,.0476, .0616,.0859 ,&
+     0.129,0.157,0.195 , 0.249, 0.332,0.468 ,&
+     0.572 ,0.711, 0.924   ,   1.24  ,    1.77   ,   2.74 ,&
+      4.80  ,   10.7   ,   42.6   ,   118.    ,523.46 , 22543.71/
+
+   data alpha(:,5) /  0.0    ,   .0402   ,  .0499   ,  .0615    , .0789   ,  0.108 ,&
+     0.161   ,  0.195   ,  0.241   ,  0.309  ,   0.409    , 0.576 ,&
+     0.702  ,   0.871    ,  1.13    ,  1.52    ,  2.17     , 3.37 ,&
+      5.86  ,    13.1    ,  51.9    ,  144.  ,  638.80 , 27510.95/
+
+   data alpha(:,6) / 0.0   ,    .0498   ,  .0614    , .0760 ,    .0966 ,    0.131 ,&
+     0.194  ,   0.234 ,    0.288   ,  0.367 ,    0.484  ,   0.677 ,&
+     0.825   ,   1.02   ,   1.33    ,  1.78 ,     2.53   ,   3.90 ,&
+      6.86   ,   15.3   ,   60.7    ,  168.   , 745.27 , 32096.12/
+
+   data alpha(:,7) /  0.0    ,   .0596    , .0732 ,    .0908  ,   0.114   ,  0.154 ,&
+     0.227   ,  0.272   ,  0.334   ,  0.424 ,    0.557 ,    0.777 ,&
+     0.943 ,     1.16  ,    1.51    ,  2.02   ,   2.87  ,    4.50 ,&
+      7.79   ,   17.4 ,     68.9   ,   191.   , 847.30  ,36490.24/
+
+   data alpha(:,8) / 0.0    ,   .0695    , .0851   ,  0.105  ,   0.132  ,   0.178 ,&
+     0.260   ,  0.311 ,    0.381   ,  0.482     ,0.630   ,  0.874 ,&
+      1.06  ,    1.29 ,     1.69  ,    2.26   ,   3.20  ,    5.01 ,&
+      8.67    ,  19.4    ,  76.8  ,    212.   , 940.46 , 40502.25/
+
+   data alpha(:,9) /0.0    ,   .0795  ,  .0972   ,  0.121    , 0.150   ,  0.201 ,&
+     0.293   ,  0.351 ,    0.428   ,  0.539  ,   0.702    , 0.969 ,&
+      1.17 ,     1.43   ,   1.86    ,  2.48  ,    3.51    ,  5.50 ,&
+      9.50   ,   21.2  ,   84.2    ,  234.  , 1038.05 , 44705.31/
+      
+   data alpha(:,10) /0.0   ,    .0896  ,   0.110 ,    0.136   ,  0.169   ,  0.225 ,&
+     0.327   ,  0.390  ,   0.475 ,    0.597 ,    0.774     , 1.06 ,&
+      1.28   ,   1.57  ,    2.02     , 2.69    ,  3.80    ,  5.95 ,&
+      10.3  ,    23.0    ,  91.4    ,  253. ,  1122.34 , 48335.22/
+      
+      
+   pe = atmos%ne(icell) * KBOLTZMANN * atmos%T(icell)
+   nH = hydrogen%n(1,icell)
+
+   do la=1, NLTEspec%nwaves
+     lam = NLTEspec%lambda(la) * 10.
+     if (lam > lambda(24)) then
+      chi(la) = Hminus_ff_john(icell,NLTEspec%lambda(la))
+     else
+      stm = dexp(-hc_k/atmos%T(icell)/NLTEspec%lambda(la))
+      sigma = 1d-29 * interp2D(lambda*1d0,theta*1d0,1d0*alpha,lam,t) !m^2/Pa
+      chi(la) = 1e0 * sigma * pe * nH !m^-1
+     endif
+
+   enddo
+
+ RETURN
+ END SUBROUTINE 
+
+
+END MODULE hydrogen_opacities
+! Interpolation to the best data
 !  SUBROUTINE Hminus_ff_longwavelength(icell, chi)
-!  ! H- free-free opacity for wavelength beyond 9113.0 nm
-!  ! see: T. L. John (1988), A&A 193, 189-192 (see table 3a).
-!  ! His results are based on calculations by K. L. Bell and
-!  ! K. A. Berrington (1987), J. Phys. B 20, 801-806.
+!  H- free-free opacity for wavelength beyond 9113.0 nm
+!  see: T. L. John (1988), A&A 193, 189-192 (see table 3a).
+!  His results are based on calculations by K. L. Bell and
+!  K. A. Berrington (1987), J. Phys. B 20, 801-806.
 !   integer :: k, n
 !   integer, intent(in) :: icell
 !   real(kind=dp), intent(inout), dimension(NLTEspec%Nwaves) :: chi
@@ -445,10 +684,10 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
 !  RETURN
 !  END SUBROUTINE Hminus_ff_longwavelength
 ! 
-!  SUBROUTINE Hminus_ff(icell, chi)
-!  ! from RH
-!  ! Hminus free-free coefficients in 1d-29 m^5/J
-!  ! see Stilley and Callaway 1970 ApJ 160
+!  SUBROUTINE Hminus_ff_RH(icell, chi)
+!  from RH
+!  Hminus free-free coefficients in 1d-29 m^5/J
+!  see Stilley and Callaway 1970 ApJ 160
 !   integer, intent(in) :: icell
 !   real(kind=dp), intent(out), dimension(NLTEspec%Nwaves) :: chi
 !   integer :: k, index, index2
@@ -461,7 +700,7 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
 !                   1519.0, 1823.0, 2278.0, 3038.0, 4556.0, &
 !                   9113.0 /
 ! 
-!   !theta = 5040. K / T
+!   theta = 5040. K / T
 !   data thetaFF / 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2,&
 !                  1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0 /
 ! 
@@ -521,29 +760,29 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
 !   chi = 0d0
 ! 
 !   pe = atmos%ne(icell) * KBOLTZMANN * atmos%T(icell)
-!   ! 2-dimensionalize kappaFF_flat for interp2D
+!   2-dimensionalize kappaFF_flat for interp2D
 !   kappaFF = RESHAPE(kappaFF_flat,(/NTHETA, NFF/))
-!   !!write(*,*) "Check reshape + interp2D"
-!   !do index=1,NFF
-!   ! do index2=1,NTHETA
-!   !  kappaFF(index,index2) = &
-!   !     kappaFF_flat(NTHETA*(index-1)+index2)
-!   ! end do
-!   !end do
+!   !write(*,*) "Check reshape + interp2D"
+!   do index=1,NFF
+!   do index2=1,NTHETA
+!    kappaFF(index,index2) = &
+!       kappaFF_flat(NTHETA*(index-1)+index2)
+!   end do
+!   end do
 !   
-!   ! for long wavelengths
-!   ! Can do more efficiently !! that computing for all wavelength
-!   ! as it was all long wavelength and then computing
-!   ! only where it is below for the other wavelengths
+!   for long wavelengths
+!   Can do more efficiently !! that computing for all wavelength
+!   as it was all long wavelength and then computing
+!   only where it is below for the other wavelengths
 !   if ((MAXVAL(NLTEspec%lambda) >= lambdaFF(NFF)) .or. &
 !        (MINVAL(NLTEspec%lambda) >= lambdaFF(NFF))) then !if at least one
 !    CALL Hminus_ff_longwavelength(icell, chi)
-!    !!RETURN
+!    !RETURN
 !   end if
 ! 
 !    theta(1:1) = THETA0 /  atmos%T(icell)
-!    ! interpolate kappaFF at theta and lambda using
-!    ! 2x 1D cubic Bezier splines
+!    interpolate kappaFF at theta and lambda using
+!    2x 1D cubic Bezier splines
 !    kappa = interp2Darr(NTHETA, thetaFF,NFF,lambdaFF,kappaFF,&
 !                   1,theta,NLTEspec%Nwaves, NLTEspec%lambda)
 !    where(NLTEspec%lambda < lambdaFF(NFF))
@@ -552,60 +791,5 @@ write(*,*) alpha, 1d-4* 2.815d29 * (Z**4) * g_bf /n_eff**5 * (NM_TO_M*lambda/CLI
 ! 
 ! 
 !  RETURN
-!  END SUBROUTINE Hminus_ff
-!  SUBROUTINE Hminus_bf(icell, chi, eta)
-!  ! H minus bound-free coefficients from RH
-!  ! in units of 1e-21 m^2
-!  ! See: Geltman 1962, ApJ 136, 935-945 and
-!  ! Mihalas Stellar atmospheres
-!   logical :: res
-!   integer :: icell
-!   real(kind=dp), intent(out), dimension(NLTEspec%Nwaves) :: &
-!    chi, eta
-!   real(kind=dp), dimension(NBF) :: lambdaBF, alphaBF
-!   real(kind=dp), dimension(NLTEspec%Nwaves) :: hc_kla, stimEmis, twohnu3_c2, alpha
-! 
-!   data lambdaBF / 0.0, 50.0, 100.0, 150.0, 200.0, 250.0,  &
-!                  300.0, 350.0, 400.0, 450.0, 500.0, 550.0,&
-!                  600.0, 650.0, 700.0, 750.0, 800.0, 850.0,&
-!                  900.0, 950.0, 1000.0, 1050.0, 1100.0,    &
-!                  1150.0, 1200.0, 1250.0, 1300.0, 1350.0,  &
-!                  1400.0, 1450.0, 1500.0, 1550.0, 1600.0,  &
-!                  1641.9 /
-! 
-!   data alphaBF / 0.0,  0.15, 0.33, 0.57, 0.85, 1.17, 1.52,&
-!                  1.89, 2.23, 2.55, 2.84, 3.11, 3.35, 3.56,&
-!                  3.71, 3.83, 3.92, 3.95, 3.93, 3.85, 3.73,&
-!                  3.58, 3.38, 3.14, 2.85, 2.54, 2.20, 1.83,&
-!                  1.46, 1.06, 0.71, 0.40, 0.17, 0.0 /
-! 
-!   chi = 0d0
-!   eta = 0d0
-! 
-! 
-!   ! interpolate cross-section at lambda
-!   !!alpha = 1e-21 * interp1D(lambdaBF,alphaBF,lambda) !m^2
-!   CALL bezier3_interp(NBF, lambdaBF, alphaBF, NLTEspec%Nwaves, NLTEspec%lambda, alpha)
-!   alpha = alpha * 1d-21
-!   
-!   ! hnu/kB
-!   hc_kla = (HPLANCK*CLIGHT) / (KBOLTZMANN*NLTEspec%lambda*NM_TO_M)
-!   twohnu3_c2 = (2.*HPLANCK*CLIGHT) / (NM_TO_M*NLTEspec%lambda)**3
-!   stimEmis = dexp(-hc_kla/atmos%T(icell))
-!   
-!   !non zero only in this region
-!   where((NLTEspec%lambda > lambdaBF(1)).and.(NLTEspec%lambda < lambdaBF(NBF)))
-!    ! note that nhmin is deduced from hydrogen nTotal = A*nHtot
-!    ! which is the total number of hydrogen in neutral and
-!    ! ionised form (H and H+).
-!    ! nHtot is the total number of Hydrogen present in
-!    ! all form = HI, HII, H-, H2, CH etc etc
-!    chi = nH_minus(icell) * (1.-stimEmis) * alpha
-!    eta = nH_minus(icell) * twohnu3_c2 * stimEmis * alpha
-!   end where
-! 
-!  RETURN
-!  END SUBROUTINE Hminus_bf
-!  
-
-END MODULE hydrogen_opacities
+!  END SUBROUTINE Hminus_ff_RH
+ 

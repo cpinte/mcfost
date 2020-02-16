@@ -173,7 +173,6 @@ MODULE writeatom !Futur write_atomic_pops
  RETURN
  END SUBROUTINE writeHydrogenDensity
 
- !building, atmos%nHmin not kept has to be computed
  SUBROUTINE writeHydrogenMinusDensity(write_nHmin_nlte)
  ! ------------------------------------ !
  ! write H- density.
@@ -182,6 +181,13 @@ MODULE writeatom !Futur write_atomic_pops
   logical :: extend, simple, already_exists = .false.
   logical, optional :: write_nHmin_nlte
   integer :: nelements, nfirst
+  
+  if (.not.allocated(atmos%nHmin)) then
+  
+   write(*,*) " Hminus not allocated"
+   return
+  
+  endif
 
   if (present(write_nHmin_nlte)) already_exists = write_nHmin_nlte !append the file
   !get unique unit number

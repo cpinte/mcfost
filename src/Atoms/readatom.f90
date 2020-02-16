@@ -1,6 +1,7 @@
 MODULE readatom
 
-  use atom_type, only : AtomicLine, AtomicContinuum, AtomType, Element, determinate
+  use atom_type, only : AtomicLine, AtomicContinuum, AtomType, Element, determinate, rydberg_atom, &
+  						n_eff, find_continuum
   use atmos_type, only : atmos, Nelem, Hydrogen, Helium
   use zeeman, only : Lande_eff, ZeemanMultiplet
   use getlambda
@@ -10,7 +11,7 @@ MODULE readatom
   use barklem, only : getBarklem
   use writeatom, only : readPops, read_departure_bfactor
   use collision, only : read_collisions
-  use broad, only : Radiative_Damping
+  use broad, only : Radiative_Damping, Damping
 
   !$ use omp_lib
 
@@ -25,7 +26,11 @@ MODULE readatom
   character(len=*), parameter :: ATOMS_INPUT = "./atoms.input"!"/Atoms/atoms.input"
   character(len=*), parameter :: path_to_atoms = "/Atoms/"
   !real, parameter :: MAX_ABUND_ERROR=0.001
-
+  
+  !Until an extrapolation routine is found, the lambdamax is found where Gaunt(lambda) < 0
+  real, parameter :: fact_pseudo_cont = 100.0 ! the hydrogenic bound-free will be extrapolated
+  						!beyond the edge limit (lambda0) up to lambda0 * fact_pseudo_cont
+  						!if it is 1.0, no extrapolation i.e., lambdamax=lambda0
 
   CONTAINS
 
@@ -51,11 +56,12 @@ MODULE readatom
     character(len=20) :: shapeChar, symmChar, optionChar, vdWChar, nuDepChar
     character(len=2) :: IDread
     real(kind=dp) :: C1, vDoppler, f, lambdaji
-    real(kind=dp) :: lambdamin, geff!, c_sum
+    real(kind=dp) :: lambdamin, geff, gamma_j, gamma_i
     EOF = 0
     !write(*,*) "Atom is part of the active atoms ?", atom%active
 
-    C1 = 2.*PI * (Q_ELECTRON/EPSILON_0) * (Q_ELECTRON/M_ELECTRON / CLIGHT)
+    !for Aji
+    C1 = 2.*PI * (Q_ELECTRON/EPSILON_0) * (Q_ELECTRON/M_ELECTRON / CLIGHT)    
 
     open(unit=atomunit,file=atom_file,status="old")
     !FormatLine = "(1A<MAX_LENGTH>)" !not working with ifort
@@ -73,12 +79,17 @@ MODULE readatom
     do nll=1,Nelem
      if (atmos%Elements(nll)%ptr_elem%ID.eq.atom%ID) then
       atom%massf = atmos%Elements(nll)%ptr_elem%massf
-      write(*,*) "Abundance of atom ",atom%ID,": A =",atmos%Elements(nll)%ptr_elem%Abund, &
-       " mass fraction (%) = ", 100.*real(atom%massf)
+      write(*,*) "Abundance of atom ",atom%ID,": A =",atmos%Elements(nll)%ptr_elem%Abund
+      if (atom%ID=="H" .or. atom%ID=="He") then 
+       write(*,*), " -> mass fraction (%) = ", 100.*real(atom%massf)
+      else
+       write(*,*), " -> mass fraction (m/m(Fe) %) = ", 100.*real(atom%massf/atmos%Elements(26)%ptr_elem%massf)
+      endif
       if (atmos%Elements(nll)%ptr_elem%abundance_set) then
         atom%periodic_table=nll
         atom%Abund=atmos%Elements(nll)%ptr_elem%Abund
         atom%weight=atmos%Elements(nll)%ptr_elem%weight
+        atom%Rydberg = rydberg_atom(atom)
         match=.true.
       end if
       exit
@@ -159,15 +170,21 @@ MODULE readatom
 
     atom%vbroad = dsqrt(vtherm/atom%weight * atmos%T + atmos%vturb**2) !vturb in m/s
     !atom%ntotal = atom%Abund * atmos%nHtot
+    !note: for Hydrogen, ntotal is actually (atmos%nHtot - nHmin)
 
     VDoppler = dsqrt(vtherm/atom%weight * maxval(atmos%T) + maxval(atmos%vturb)**2)
 !     write(*,*) Vdoppler, dsqrt(Vtherm*maxval(atmos%T)/atom%weight + maxval(atmos%vturb)**2)
+! 	do k=atmos%Nspace, 1, -1
+! 	 if (atmos%icompute_atomRT(k)>0) then
+! 	  write(*,*) k, atmos%T(k), atom%ID, atom%vbroad(k)/1e3, vtherm/atom%weight / 1e3, atmos%vturb(k)/1e3
+! 	 endif
+! 	enddo
+
     !Now read all bound-bound transitions
     allocate(atom%lines(atom%Nline))
 
     do kr=1,atom%Nline
      atom%lines(kr)%atom => atom
-     atom%lines(kr)%neg_opac=.false. !init
      atom%at(kr)%trtype = atom%lines(kr)%trtype; atom%at(kr)%ik=kr
      atom%at(kr)%lcontrib_to_opac=.true.; atom%Ntr_line = atom%Nline
 
@@ -313,7 +330,7 @@ MODULE readatom
                           *atom%lines(kr)%Aji
       atom%lines(kr)%Bij = (atom%g(j) / atom%g(i)) * atom%lines(kr)%Bji
       atom%lines(kr)%lambda0 = lambdaji / NM_TO_M
-      
+
       !gi * Bij = gj * Bji
       !gi/gj = Bji/Bij so that niBij - njBji = Bij (ni - gij nj)
       atom%lines(kr)%gij = atom%lines(kr)%Bji / atom%lines(kr)%Bij !gi/gj
@@ -448,21 +465,15 @@ MODULE readatom
 !     end if ! end loop over active b-b transitions of atom
    end do !end loop over bound-bound transitions
    
-   !Try to compute a better estimate of line%Grad once Aji is known for all lines?
-!    do kr=1, atom%Nline
-!     CALL Radiative_Damping(atom, atom%lines(kr), atom%lines(kr)%adamp)
-!     write(*,*) kr, "line:", atom%lines(kr)%Grad, atom%lines(kr)%adamp
-!    enddo
-
-
     ! ----------------------------------------- !
     !starts reading bound-free transitions
+    ! cross-sections allocated once the final
+    ! wavelength grid is known.
     ! ----------------------------------------- !
     allocate(atom%continua(atom%Ncont))
     do kr=1,atom%Ncont
      atom%continua(kr)%isotope_frac=1.
      atom%continua(kr)%atom => atom
-     atom%continua(kr)%neg_opac=.false.
      atom%at(kr)%lcontrib_to_opac=.true.
      atom%at(atom%Nline+kr)%trtype = atom%continua(kr)%trtype; atom%at(kr+atom%Nline)%ik=kr
 
@@ -480,7 +491,9 @@ MODULE readatom
      atom%continua(kr)%i = min(i,j)
      lambdaji = (HPLANCK*CLIGHT)/ (atom%E(j)-atom%E(i))
      atom%continua(kr)%lambda0 = lambdaji/NM_TO_M !nm
-     !lambdamin=atom%continua(kr)%lambdamin
+     atom%continua(kr)%lambdamax = atom%continua(kr)%lambda0
+     !wavelength max for extrapolated bound-free cross-section
+     !used only if continuum is hydrogenic
 
      !write(*,*) "continuum ", atom%continua(kr)%j,&
      !    '->',atom%continua(kr)%i, " @",&
@@ -517,22 +530,38 @@ MODULE readatom
           stop
         end if
       end do
+      !not extrapolated if explicit ?
+      !should consider neglecting occupation probability for that case
+      atom%continua(kr)%lambdamax = maxval(atom%continua(kr)%lambda_file)
      else if (trim(nuDepChar).eq."HYDROGENIC") then
        atom%continua(kr)%hydrogenic=.true.
+       !!tmp
+       atom%continua(kr)%lambdamin = 1.0_dp
+       write(*,*) "Temporary set lambdamin = 1.0 nm for all hydrogenic continua"
+       !!tmp
        if (atom%continua(kr)%lambdamin>=atom%continua(kr)%lambda0) then
         write(*,*) "Minimum wavelength for continuum is larger than continuum edge."
         write(*,*) kr, atom%continua(kr)%lambda0, atom%continua(kr)%lambdamin
         write(*,*) "exiting..."
         stop
        end if
-       
+       !used to extrapolate the b-f cross-section for level dissolution
+       !if I go to far in lambda0 actually g_bf is < 0 and atm I set g_bf = 0 if g_bf < 0.
+       !to go further in lambda (i.e. for lambda with g_bf(lambda)->0), I need to properly extrapolated g_bf.
+       !!atom%continua(kr)%lambdamax = atom%continua(kr)%lambda0 * fact_pseudo_cont!7
+       !Meanwhile, I search the lambda for which g_bf is < 0 (then 0)
+       if (ldissolve) then !only if we actually want to extrapolate
+       	if (atom%ID=="H" .or. atom%ID=="He") then
+        	CALL search_cont_lambdamax (atom%continua(kr), atom%Rydberg, atom%stage(i)+1,atom%E(j),atom%E(i))        
+       	endif
+       endif
        ! %lambda allocated inside the routines.
-       !CALL make_sub_wavelength_grid_cont_log(atom%continua(kr), atom%continua(kr)%lambdamin)
-       CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin)
-
+!        !CALL make_sub_wavelength_grid_cont_old(atom%continua(kr), atom%continua(kr)%lambdamin)
+!        CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+       CALL make_sub_wavelength_grid_cont_log(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+	   !Can be done elsewhere, with atomic lines ? But unlike some lines grid, this does not depend on the local condition ATM
      else
-      write(*,*) "Invalid value for continuum chromatic ",&
-         "dependence."
+      write(*,*) "Invalid continuum type : ", trim(nuDepChar)
       write(*,*) "exiting..."
       stop
      end if
@@ -550,17 +579,8 @@ MODULE readatom
      stop
     end if !end reading fixed trans
 
-    !now compute wavelengths grid for
-    ! each line
-    !Unlike RH, I do it even for passive atoms
-  do kr=1,atom%Nline !line%lambda allocated inside
-     !-> Actually with this grid, all lines of an atom have the same grid
-     !because it depends only on vD and v_char which depends on the atom and on the model.
-     !This is because the Number of core/wing points are fixed.
-     !CALL make_sub_wavelength_grid_line(atom%lines(kr),Vdoppler) !MAXVAL(atom%vbroad)
-     CALL make_sub_wavelength_grid_line_lin(atom%lines(kr),Vdoppler)
-     !CALL make_sub_wavelength_grid_asymm(atom%lines(kr),Vdoppler)
-  end do
+    !now compute wavelengths grid for each line done elsewhere
+
    !Now even for passive atoms we write atomic data.
    ! Unlike RH, all data are in the same fits file.
     if (atom%ID(2:2) .eq." ") then
@@ -675,19 +695,31 @@ MODULE readatom
   !Read all atomic files present in atoms.input file
   !successive call of readModelAtom()
   integer :: EOF=0,Nread, nmet, mmet, nblancks, nact, npass
+  integer :: kr, k, imax, ic
+  real, parameter :: epsilon = 5e-3
+  real :: eps
+  real(kind=dp) :: epsilon_l_max !if epsilon > 1/pi/adamp, the value of xwing_lorentz is negative
+  real(kind=dp) :: max_adamp, adamp, maxvel, vel
   integer, intent(in) :: unit
   character(len=MAX_LENGTH) :: inputline
   character(len=15) :: FormatLine
   character(len=MAX_LENGTH) :: popsfile, filename
   character(len=MAX_KEYWORD_SIZE) :: actionKey, popsKey
   character(len=2) :: IDread
-!   type (AtomType), target :: atom
+  type (AtomType), pointer :: atom
 
   !create formatline
   !FormatLine = "(1A<MAX_LENGTH>)" !not working with ifort
   !write(FormatLine,'("("I3,A")")') MAX_LENGTH,"A"
   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
 
+!   if (fact_pseudo_cont <= 0.0) then
+!    write(*,*) "fact_pseudo_cont=", fact_pseudo_cont
+!    call error("Wrong value for fact_pseudo_cont!")
+!   endif
+!   if (fact_pseudo_cont > 1.0) then
+!    Write(*,*) " Hydrogenic continua extrapolated up to lambda0 x ", fact_pseudo_cont
+!   endif
 
   atmos%Nactiveatoms = 0
   atmos%Npassiveatoms = 0
@@ -798,8 +830,7 @@ MODULE readatom
    ! create alias in atmos%Elements for elements that have
    ! a model atom. It means all elements here.
    !atom => atmos%Atoms(nmet)
-   atmos%Elements(atmos%Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model &
-         => atmos%Atoms(nmet)%ptr_atom
+   atmos%Elements(atmos%Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model => atmos%Atoms(nmet)%ptr_atom
    if (.not.associated(atmos%Elements(atmos%Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model, &
     atmos%Atoms(nmet)%ptr_atom)) CALL Warning(" Elemental model not associated to atomic model!")
    if (atmos%Atoms(nmet)%ptr_atom%periodic_table.eq.2)  then
@@ -826,6 +857,83 @@ MODULE readatom
      end if
    end if
   end do
+  
+  !Move after LTEpops for first estimates of damping
+  !line wave grid define here to have the max damping
+  write(*,*) " Generating sub wavelength grid and lines boundary for all atoms..."
+  do nmet=1, atmos%Natom
+  
+   !!write(*,*) "ID:", atmos%Atoms(nmet)%ptr_atom%ID
+   do kr=1, atmos%Atoms(nmet)%ptr_atom%Nline
+   
+     atom => atmos%Atoms(nmet)%ptr_atom
+     ic = find_continuum(atom,atom%lines(kr)%i)
+          
+     max_adamp = 1d100
+     maxvel = 0
+     adamp = 0.0
+     imax = 1
+     !!write(*,*) " line @ ", atmos%Atoms(nmet)%ptr_atom%lines(kr)%lambda0,'nm'
+     do k=1, atmos%Nspace
+       if (atmos%icompute_atomRT(k)>0) then
+       
+        vel = atmos%Atoms(nmet)%ptr_atom%vbroad(k)
+
+        if (atmos%Atoms(nmet)%ptr_atom%lines(kr)%voigt) then 
+         !no damping if Gaussian
+         CALL Damping(k, atmos%Atoms(nmet)%ptr_atom, kr, adamp)
+         !-> LTE populations not known, we cannot use damping here
+         !Because some of the damping are zero if prop to populations
+         !Typically there are only Stark and Natural depending on electrons and lines.
+         !If only Adamp its to short
+         !adamp = atom%lines(kr)%Aji * (NM_TO_M*atom%lines(kr)%lambda0) / (4.*pi) / atom%vbroad(k)
+         !max_adamp = max(max_adamp, adamp)
+         max_adamp = min(max_adamp, adamp) ! min actually
+         
+         epsilon_l_max = 1.0/pi/adamp
+
+         if (n_eff(atom%Rydberg, atom%E(ic), atom%E(atom%lines(kr)%i), atom%stage(ic)) <= 3.0) then 
+          eps = 1e-4
+         else
+          eps = epsilon
+         endif
+!-> with vD         
+!         maxvel = max(maxvel, &
+!          vel * sqrt(abs(-log(epsilon))), vel * sqrt(min(adamp, 0.9*1.0/pi/epsilon)/pi/min(0.9*epsilon_l_max, epsilon) - min(adamp,0.9*1.0/pi/epsilon)**2) )
+!-> only from damping
+		 maxvel = max(maxvel, vel * sqrt(min(adamp, 0.9*1.0/pi/eps)/pi/min(0.9*epsilon_l_max, eps) - min(adamp,0.9*1.0/pi/eps)**2))	 
+		else
+		 !-> exact
+		 maxvel = max(maxvel, vel * sqrt(abs(-log(eps))))
+        endif
+        
+!         write(*,*) "icell=", k, "eps_max=", epsilon_l_max, " va = ", 1e-3*vel*sqrt(min(adamp,0.9*1.0/pi/epsilon)/pi/min(epsilon_l_max, epsilon) - min(adamp,0.9*1.0/pi/epsilon)**2)
+!         write(*,*) "vd  = ", vel*1e-3, " vg = ", 1e-3*vel * sqrt(abs(-log(epsilon)))
+
+       endif
+       
+     enddo
+     maxvel = 300e3
+!      write(*,*) "Maxvel = ", maxvel*1e-3
+!      stop
+     !!if (atmos%Atoms(nmet)%ptr_atom%ID=="Ca" .and. (kr==1 .or. kr==2)) maxvel = 1000e3
+     
+     !!-> group of lines, linear in v
+     CALL compute_line_bound( atmos%Atoms(nmet)%ptr_atom%lines(kr), maxvel )
+    
+     !!-> linear
+!      CALL make_sub_wavelength_grid_line_lin(atmos%Atoms(nmet)%ptr_atom%lines(kr),&
+!                                         maxval(atmos%Atoms(nmet)%ptr_atom%vbroad), max_adamp)  
+     !!-> logarithmic
+!      CALL make_sub_wavelength_grid_line(atmos%Atoms(nmet)%ptr_atom%lines(kr),&
+!                                         maxval(atmos%Atoms(nmet)%ptr_atom%vbroad), max_adamp)
+
+   
+   enddo
+  
+  enddo
+  write(*,*) "..done"
+
 
 !   write(*,*) atmos%Atoms(1)%ptr_Atom%ID,atmos%ActiveAtoms(1)%ptr_Atom%ID
 !   write(*,*) Hydrogen%ID, atmos%elements(1)%ptr_elem%model%ID
@@ -843,6 +951,43 @@ MODULE readatom
 
   RETURN
   END SUBROUTINE readAtomicModels
+  
+ SUBROUTINE search_cont_lambdamax (cont, Rinf, Z, Ej, Ei)
+ !Search the lambdamax = first lambda for which Gaunt < 0
+ !Because I do not have an extrapolation routine, there is no need to extrapolate beyond
+ !lambdamax if gaunt is negative.
+ 
+ !See Gaunt_bf in Hydrogen.f90
+  real(kind=dp), intent(in) :: Ej, Ei, Rinf
+  integer, intent(in) :: Z
+  type (AtomicContinuum), intent(inout) :: cont
+  real, parameter :: l1 = 1e3, dlam = 1.0 !nm !0.01
+  real(kind=dp) :: n_eff,  u ! = n_Eff**2 * eps = hnu/Z/Z/E_RYDBERG - 1
+  real(kind=dp) :: Gaunt_bf, x
+  
+  x = l1 * cont%lambda0
+  cont%lambdamax = cont%lambda0
+  n_eff = Z * dsqrt(Rinf / (Ej-Ei))
+  Gaunt_bf = 1.0_dp
+  do while(cont%lambdamax < x)
+               
+   u = n_eff**2 * HPLANCK*CLIGHT / (NM_TO_M * cont%lambdamax) / Z*Z / E_RYDBERG - 1
+  
+   Gaunt_bf = 1d0 + 0.1728 * (n_eff**(-2./3.)) * (u+1d0)**(-2./3.) * (u-1d0) &
+             - 0.0496*(n_eff**(-4./3.)) * (u+1d0)**(-4./3.) * (u*u + 4./3. * u + 1d0)
+
+   if (Gaunt_bf < 0) exit
+
+   cont%lambdamax = cont%lambdamax + dlam
+
+  enddo
+
+  write(*,*) cont%atom%ID, " cont, n=",real(n_eff), cont%j, cont%i, real(cont%lambda0),"nm"
+  write(*,*) " -> pseudo-continuum: ", real(cont%lambdamax), " nm: frac=", real(cont%lambdamax/cont%lambda0)
+             
+
+ RETURN
+ END SUBROUTINE search_cont_lambdamax
 
 
 END MODULE readatom
