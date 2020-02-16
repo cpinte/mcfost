@@ -22,6 +22,9 @@ MODULE readatom
 
   IMPLICIT NONE
 
+  !-> Futur parameter or define in the model atom for each line ?
+  real(kind=dp), parameter :: maxvel_atom_transfer = 600.0 !in km/s
+  
   character, parameter :: COMMENT_CHAR="#"
   character(len=*), parameter :: ATOMS_INPUT = "./atoms.input"!"/Atoms/atoms.input"
   character(len=*), parameter :: path_to_atoms = "/Atoms/"
@@ -916,7 +919,7 @@ MODULE readatom
        endif
        
      enddo
-     maxvel = 300e3
+     maxvel = maxvel_atom_transfer * 1e3
 !      write(*,*) "Maxvel = ", maxvel*1e-3
 !      stop
      !!if (atmos%Atoms(nmet)%ptr_atom%ID=="Ca" .and. (kr==1 .or. kr==2)) maxvel = 1000e3
