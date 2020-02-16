@@ -734,6 +734,7 @@ MODULE AtomicTransfer
 
   CALL setLTEcoefficients () !write pops at the end because we probably have NLTE pops also
 
+
  ! ------------------------------------------------------------------------------------ !
  ! ---------- INITIALIZE WAVELNGTH, BACKGROUND OPAC AND ATOMC QUANTITIES -------------- !
  ! ------------------------------------------------------------------------------------ !
@@ -741,11 +742,19 @@ MODULE AtomicTransfer
   if (ltab_wavelength_image) NLTEspec%write_wavelength_grid = .true.
   !call set_up_sub_wavelengths_grid()
   CALL initSpectrum(lam0=500d0,vacuum_to_air=lvacuum_to_air)
+  
+ ! ----------------------------  INITIAL POPS------------------------------------------ !
+  if (atmos%NactiveAtoms > 0) then
+  		!Allows to have atom%n init which is needed in compute_atom_quantities() (compute_opacities)
+		CALL Init_NLTE(sub_iterations_enabled=.true.)
+		!free at the end of NLTEloop()
+  endif
+ !  ------------------------------------------------------------------------------------ !
 
   if ((atmos%NactiveAtoms>0) .or. .not.(ltab_wavelength_image)) then
    if (n_etoiles > 0) CALL init_stellar_disk !for all wavelengths, all stars at disk centre
    write(*,*) " Computing background opacities..."
-   CALL alloc_atom_quantities
+   CALL alloc_atom_quantities !call compute_atom_quantities(icell) for each cell
    CALL compute_opacities
    write(*,*) " ..done"
   endif
@@ -940,7 +949,7 @@ MODULE AtomicTransfer
 		real(kind=dp) :: dT, dN2, dN3, diff_old
 		real(kind=dp), allocatable :: dM(:), Jold(:,:), dTM(:), Tion_ref(:), Tex_ref(:)
                                  !futur global flag
-		logical :: labs, disable_subit, iterate_ne = .false., accelerated, ng_rest
+		logical :: labs, iterate_ne = .false., accelerated, ng_rest
 		logical :: verbose, l_unconverged
 		integer :: nact, maxIter, imax, icell_max
 		integer :: icell, iorder, i0_rest, n_iter_accel
@@ -978,8 +987,6 @@ MODULE AtomicTransfer
 			write(*,*) "Warn: etape 1 not accurate"
 		endif
 
-!   disable_subit = .false.
-
 		accelerated  = .false.
 !   if (lNg_acceleration) then
 !    CALL error("+Ng no tested yet")
@@ -993,13 +1000,14 @@ MODULE AtomicTransfer
 			write(*,*) " before iterate ne I need te recompute gij for continua !!"
 		endif
 
-!   if (lforce_lte) disable_subit = .true.
 
 		max_sub_iter = 1000
 		maxIter = 1000
-	! ----------------------------  INITIAL POPS------------------------------------------ !
-		CALL Init_NLTE(sub_iterations_enabled=.true.)!.not.disable_subit)
-	!  ------------------------------------------------------------------------------------ !
+		
+!-> move after LTE pops
+! 	----------------------------  INITIAL POPS------------------------------------------ !
+! 		CALL Init_NLTE(sub_iterations_enabled=.true.)
+! 	 ------------------------------------------------------------------------------------ !
 
 		do etape=etape_start, etape_end
 
@@ -1056,6 +1064,8 @@ MODULE AtomicTransfer
 					if (atmos%icompute_atomRT(icell)>0) then
 						!For the propagation we need this opacity at all cells
 						!It doesn't change with rays. Will ne updated cell by cell for local iterations
+						!call compute_atom_quantities(icell) ? update, gij with new nstar and ne
+						!update profiles and adamp
 						call NLTE_bound_free(icell) !takes the new populations, after sub it eventually 
 						do nact=1, atmos%NactiveAtoms
 							atom => atmos%ActiveAtoms(nact)%ptr_atom
@@ -1082,7 +1092,7 @@ MODULE AtomicTransfer
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_unconverged) &
 				!$omp shared(atmos,NLTEspec, dpops_sub_max_error, verbose,lkeplerian,n_iter) & !!xyz0, uvw0 & !before nact was shared
 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter,lcell_converged) &
-				!$omp shared(n_cells, disable_subit, gpop_old,lforce_lte) &
+				!$omp shared(n_cells, gpop_old,lforce_lte) &
 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
 				!$omp do schedule(static,1)
 				do icell=1, n_cells
@@ -1425,7 +1435,7 @@ MODULE AtomicTransfer
 		!to move inside free_nlte_sol
 		deallocate(dM, dTM, Tex_ref, Tion_ref)
 		if (allocated(Jold)) deallocate(Jold)
-		CALL free_nlte_sol(disable_subit)
+		CALL free_nlte_sol(.false.)
 
 ! ------------------------------------------------------------------------------------ !
 	RETURN

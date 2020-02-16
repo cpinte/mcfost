@@ -340,7 +340,9 @@ CALL Stark_profile(icell, atom%lines(kc))
 						write(*,*) atom%ID, " nuij (10^15 Hz)", 1d-6 * CLIGHT / atom%lines(kc)%lambda0, " icell=", icell
 						write(*,*) " lambdaij (nm)", atom%lines(kc)%lambda0 
 						CALL warning ("background line: ni < njgij")
-          									
+          				write(*,*) atom%n(i,icell), atom%n(j,icell), atom%lines(kc)%gij
+          	          				write(*,*) atom%nstar(i,icell), atom%nstar(j,icell), atom%lines(kc)%gij					
+					
 					endif
     
 				CASE ("ATOMIC_CONTINUUM")
