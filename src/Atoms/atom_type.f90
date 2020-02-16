@@ -100,7 +100,7 @@ MODULE atom_type
    ! BY CONVENTION, stage=0 for neutrals, 1 for singly ionised
    ! ions etc ...
    integer, allocatable, dimension(:)  :: stage, Lorbit
-   integer(8)            :: offset_coll, colunit
+   !integer(8)            :: offset_coll, colunit
    real(kind=dp) :: Rydberg, scatt_limit !minimum wavelength for Rayleigh scattering
    real(kind=dp)                :: Abund, weight, massf !mass fraction
    real(kind=dp), allocatable, dimension(:) :: g, E, vbroad!, ntotal

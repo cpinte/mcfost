@@ -608,10 +608,13 @@ MODULE readatom
     end if
 
     ! reading collision rates of RH
-    !!call read_collisions(atomunit, atom)
+    if (atom%ID /= "H") then
+    	write(*,*) "  -> Reading collision data from RH for atom ", atom%ID
+! 		atom%colunit = atom%periodic_table*2 + 1
+     call read_collisions(atomunit, atom)
+    endif
 
     ! allocate some space
-    atom%colunit = atom%periodic_table*2 + 1
 
     !!allocate(atom%C(atom%Nlevel*atom%Nlevel,atmos%Nspace))
     !!now Collision matrix is constructed cell by cell, therefore allocated elsewhere

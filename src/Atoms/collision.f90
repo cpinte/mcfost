@@ -577,10 +577,6 @@ MODULE collision
   ! Nitem are expected to be read and an error will be
   ! raise otherwise.
 
-  ! file is already opened, and will be close at the end of the RT run
-  colunit = atom%colunit
-  !write(*,*) "Collision()->colunit = ", colunit, atom%colunit
-
   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
 
   C0 = ((E_RYDBERG/sqrt(M_ELECTRON)) * PI*SQ(RBOHR)) * sqrt(8.0/(PI*KBOLTZMANN))
@@ -703,8 +699,7 @@ MODULE collision
     ! they are two lines of Nitem elements to read
     !write(*,*) i1, i2, Ncoef
     do m=1,Nrow
-      CALL getnextline(colunit, COMMENT_CHAR, &
-             FormatLine, inputline, Nread)
+      inputline = atom%collision_lines(k1+m)
       !write(*,*) 'row=',m, inputline, Nread
       read(inputline,*) (badi(m,k),k=1,Ncoef)
     end do
@@ -738,8 +733,8 @@ MODULE collision
     Nitem = Nrow*MSHELL
     allocate(cdi(Nrow, MSHELL))
     do m=1,Nrow
-      CALL getnextline(colunit, COMMENT_CHAR, &
-       FormatLine, inputline, Nread)
+      inputline = atom%collision_lines(k1+m)
+
       read(inputline,*) (cdi(m,k),k=1,MSHELL)
     end do
 

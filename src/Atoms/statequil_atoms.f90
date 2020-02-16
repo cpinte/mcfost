@@ -51,8 +51,9 @@ MODULE statequil_atoms
 		if (atom%ID=="H") then
 			atom%C(:,:,id) = Collision_Hydrogen(icell)
 		else
-			write(*,*) "Collision RH not set for large atoms"
-			stop
+! 			write(*,*) "Collision RH not set for large atoms"
+! 			stop
+! 			if (id==1) write(*,*) " Using RH routine for collision atom ", atom%ID
 			atom%C(:,:,id) = CollisionRate(icell, atom)
 		end if
      
