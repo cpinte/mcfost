@@ -476,7 +476,8 @@ MODULE statequil_atoms
 					Tex_loc = atom%lines(kc)%Tex(icell)
        
 					if (atom%lines(kc)%Tex(icell) < 0) then
-						write(*,*) ratio, "Tex negative ( njgij > ni) ", wi * atom%n(j,icell) * atom%lines(kc)%gij, atom%n(i,icell)*wj
+						write(*,*) "Tex negative ( njgij > ni) ", wi * atom%n(j,icell) * atom%lines(kc)%gij, atom%n(i,icell)*wj
+						write(*,*) "ratio = ", ratio, " diff = ", (atom%n(i,icell) - atom%n(j,icell) * atom%lines(kc)%gij)/(1d-50 + atom%n(i,icell))
 						write(*,*) "icell = ", icell, " :: Te = ", atmos%T(icell)
 						write(*,*) " --> Setting to old value", Tdag, atom%ID, " line (i,j) = ", i, j
 						atom%lines(kc)%Tex(icell) = Tdag
@@ -515,7 +516,8 @@ MODULE statequil_atoms
 					Tion_loc = atom%continua(kc)%Tex(icell)
 					
 					if (atom%lines(kc)%Tex(icell) < 0) then
-						write(*,*) ratio, "Tion negative (njgij > ni) ", wi * atom%n(j,icell) * gij, atom%n(i,icell)*wj
+						write(*,*) "Tion negative (njgij > ni) ", wi * atom%n(j,icell) * gij, atom%n(i,icell)*wj
+						write(*,*) "ratio = ", ratio, " diff = ", (atom%n(i,icell) - atom%n(j,icell) * gij)/(1d-50 + atom%n(i,icell))
 						write(*,*) "icell = ", icell, " :: Te = ", atmos%T(icell)
 						write(*,*) " --> Setting to old value", Tdag, atom%ID, " cont (i,j) = ", i, j
 						atom%continua(kc)%Tex(icell) = Tdag
