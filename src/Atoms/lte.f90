@@ -15,6 +15,7 @@ MODULE lte
  use writeatom, only : writeHydrogenMinusDensity
 
  use constantes, only : tiny_dp, huge_dp
+ use parametres, only : ldissolve
 
  !$ use omp_lib
 
@@ -667,6 +668,11 @@ END FUNCTION get_logPartitionFunctionk
      else
       CALL LTEpops(atmos%Atoms(n)%ptr_atom,debye) !it is parralel 
      endif
+     
+    !Write only if set_ltepops i.e., if not read from file.
+	CALL write_ltepops_file(52, atmos%Atoms(n)%ptr_atom)
+
+
    endif
 
    !even if we read LTE pops from file, we can still compute n as b*nstar
@@ -775,7 +781,7 @@ CALL write_ltepops_file(52, hydrogen)
           ip = i
           cycle stage_loop 
          endif
-         write(unit,*) 'ilevel=',i, 'nstar=', hydrogen%nstar(i, k)*1d-6
+         write(unit,*) 'ilevel=',i, 'nstar=', atom%nstar(i, k)*1d-6
         enddo level_loop
      enddo stage_loop
    endif
