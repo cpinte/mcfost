@@ -689,7 +689,6 @@ MODULE spectrum_type
    do nact=1,atmos%Nactiveatoms
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
        line = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)
-       !allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%wphi(NLTEspec%Nproc))
        allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%w_lam(line%Nlambda))
 !        allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%phi_ray(line%Nlambda,NLTEspec%atmos%Nrays, NLTEspec%NPROC))
 
@@ -697,7 +696,6 @@ MODULE spectrum_type
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
        cont = atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)
        allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%w_lam(cont%Nlambda))
-       !allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%wmu(NLTEspec%Nproc))
     end do
    end do
  
@@ -713,11 +711,11 @@ MODULE spectrum_type
    
    do nact=1,atmos%Nactiveatoms
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%w_lam)!wphi)
+       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%w_lam)
 !        deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%phi_ray)
     end do
     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
-       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%w_lam)!%wmu)
+       deallocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%w_lam)
     end do
    end do
  

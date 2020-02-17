@@ -29,6 +29,8 @@ MODULE init_solution
   
  !the factor 0.5 is here because dw is computed as w(k+1) - w(k-1) / 2.
  !and int(f) = sum(dw_k*f_k)
+ !-> Is this function still needed for lines if we use a constant spacing in velocity
+ ! to sample line profiles ?? 
 	FUNCTION line_wlam(line) result(wlam)
 	! --------------------------------------------------------- !
 	! gives dv/c = dlambda/lambda = dnu/nu

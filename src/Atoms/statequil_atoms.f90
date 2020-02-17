@@ -10,6 +10,7 @@ MODULE statequil_atoms
 	use accelerate
 	use collision, only						: CollisionRate !future deprecation
 	use impact, only						: Collision_Hydrogen
+	use getlambda, only						: hv
  
 	use mcfost_env, only					: dp
 	use constantes, only					: tiny_dp
@@ -169,7 +170,7 @@ MODULE statequil_atoms
 		integer, intent(in) :: icell, id, n_rayons, iray
 		type (AtomType), intent(inout) :: atom
 		integer :: kr, kc, i, j, l, Nblue, Nred, Nl
-		real(kind=dp) :: Ieff, Jnu_ray, aJnu_ray, etau
+		real(kind=dp) :: Ieff, Jnu_ray, aJnu_ray, etau, wphi
 		integer :: dk
 		integer, parameter :: dl = 5 !Do continuum integral dl by dl bins 
 
@@ -185,10 +186,19 @@ MODULE statequil_atoms
 				Nl = atom%lines(kc)%Nlambda
 				dk = atom%lines(kc)%dk(iray,id)
 				
-				!Integration over frequencies for thi direction
+				!Integration over frequencies for this direction
+				!Trapezoidal rule ? Here included in the weight, except if we use hv
+				!and in this case we integrate I*phi*dv (rectangle)
 				
 				Jnu_ray = 0.0
+				wphi = 0.0
+				!Do we need line%w_lam, since the line is linearly sampled in dv ?
 				do l=1, Nl !Fast relatively
+				
+					wphi = wphi + atom%lines(kc)%phi(l,icell)*1e3*hv!*atom%lines(kc)%w_lam(l)
+					
+					!-> to check
+					!write(*,*) "wl = ", atom%lines(kc)%w_lam(l)*1e-3
 
 !-> Only for MALI scheme
 ! 					Ieff = NLTEspec%I(Nblue+l-1-dk,iray,id)*NLTEspec%etau(Nblue+l-1-dk,iray,id) + &
@@ -201,11 +211,17 @@ MODULE statequil_atoms
 					etau = dexp(-ds(iray,id) * NLTEspec%chi(Nblue+l-1-dk,iray,id))
        		 		Ieff = NLTEspec%I(Nblue+l-1-dk,iray,id) * etau  + (1.0_dp - etau) * NLTEspec%S(Nblue+l-1-dk,iray,id)
       		 
-					Jnu_ray = Jnu_ray + Ieff * atom%lines(kc)%phi(l,icell)*atom%lines(kc)%w_lam(l)
+					Jnu_ray = Jnu_ray + Ieff * atom%lines(kc)%phi(l,icell)*(1e3 * hv)!*atom%lines(kc)%w_lam(l)
 					
 				enddo
-     			Jnu_ray = Jnu_ray / n_rayons
-				
+				!Renormalise profile ?
+! 				write(*,*) wphi
+				if (wphi < 0.95) then
+					write(*,*) "icell = ", icell, " id = ", id
+					write(*,*) " --> Beware, profile not well normalized for line ", i, j, " area = ", wphi
+				endif
+     			Jnu_ray = Jnu_ray / n_rayons / wphi
+
 				!Integration over directions
 				
 				!atom%lines(kc)%Jbar(id) = atom%lines(kc)%Jbar(id) + Jnu_ray
@@ -225,7 +241,10 @@ MODULE statequil_atoms
 ! if (i==1 .and. j==4) &
 ! 				write(*,*) "Nlambda = ", Nl, " iray = ", iray
 				
-				!Integration over frequencies for thi direction
+				!Integration over frequencies for this direction
+				!Trapezoidal rule, in the weight definition.
+				
+				
 				Jnu_ray = 0.0
 				aJnu_ray = 0.0
 				do l=1, Nl !Can takes time

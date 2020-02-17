@@ -2338,8 +2338,10 @@ if (write_convergence_file ) close(20)
 					NLTEspec%I(la,iray,id) = NLTEspec%I(la,iray,id) + dexp(-tau(la)) * (1.0_dp - dexp(-dtau(la))) * Snu(la)
 					NLTEspec%Ic(la,iray,id) = NLTEspec%Ic(la,iray,id) + dexp(-tau_c(la)) * (1.0_dp - dexp(-dtau_c(la))) * Snu_c(la) 
 					
-					S_contrib(la,icell,id) =  (etal(la) / chiI(la)) * dexp(-tau(la)-dtau(la))
-					!S_contrib(la,icell,id) = Snu(la) * dexp(-tau(la))
+					S_contrib(la,icell,id) =  (etal(la) / chiI(la)) * dexp(-tau(la))
+					!S_contrib(la,icell,id) =  etal(la) * dexp(-tau(la))			
+			
+					!->Flow chart
 					!S_contrib(la,icell,id) = ( etal(la)/chiI(la) ) * (1.0_dp - dexp(-dtau(la))) * dexp(-tau(la))
 
 				enddo

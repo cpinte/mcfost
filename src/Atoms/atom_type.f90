@@ -56,7 +56,6 @@ MODULE atom_type
    !wlam is the integration wavelenght weight = phi
    real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam, Rij, Rji!, Jbar
    !real(kind=dp), allocatable, dimension(:) :: fomega !for Rayleigh scattering
-   real(kind=dp) :: wphi
    real(kind=dp) :: Qelast, adamp ! at a cell
    real(kind=dp), dimension(:), allocatable :: Tex, deta !differentiel of source function
    !keep CLIGHT * (nu0 - nu)/nu0 for lines												(method for Voigt)
@@ -76,7 +75,6 @@ MODULE atom_type
    real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionisation
    real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2, CoolRates_ij, w_lam
    real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file
-   real(kind=dp) :: wmu
    real(kind=dp), dimension(:), allocatable :: Tex
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
