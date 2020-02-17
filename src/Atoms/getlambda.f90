@@ -457,7 +457,7 @@ MODULE getlambda
 			atmos%B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
 
 
-		v_char =  min(L * vD * (1.0 + aD**-1) + L * vB,3e5)
+		v_char =  min(L * vD * (1.0 + aD**(-1.0)) + L * vB,3e5)
 
 
 		xlam = 0d0
@@ -521,8 +521,8 @@ MODULE getlambda
    !transition between wing and core in velocity
    !!vcore = L * v_char * wing_to_core ! == fraction of line extent
 
-   vcore = 20 * (vD + aD**-1) 
-   v_char = max(atmos%v_char + L * vD * (1.0 + aD**-1) + vB, 2000e3)
+   vcore = 20 * (vD + aD**(-1.0)) 
+   v_char = max(atmos%v_char + L * vD * (1.0 + aD**(-1.0)) + vB, 2000e3)
    !!vcore = v_char * wing_to_core
 
    !for compatibiliy

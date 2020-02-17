@@ -725,10 +725,10 @@ CALL write_ltepops_file(52, hydrogen)
       do i=1, atom%Nlevel-1
        wocc = wocc_n(k, real(i,kind=dp), real(atom%stage(i)),real(atom%stage(i)+1))
        !if (wocc < 0.95) then
-        write(unit,"(1X, 1I, 1E, 1E, 1E)") i, wocc, atom%nstar(i,k)/wocc * 1d-6, atom%nstar(i,k)*1d-6
+        write(unit,"(1X, 1E5.5, 1E5.5, 1E5.5, 1E5.5)") i, wocc, atom%nstar(i,k)/wocc * 1d-6, atom%nstar(i,k)*1d-6
        !endif
       enddo
-      write(unit,"(1I, 1E, 1E, 1E)") atom%Nlevel, wocc, atom%nstar(atom%Nlevel,k)/wocc * 1d-6, atom%nstar(atom%Nlevel,k)*1d-6
+      write(unit,"(1I, 1E5.5, 1E5.5, 1E5.5)") atom%Nlevel, wocc, atom%nstar(atom%Nlevel,k)/wocc * 1d-6, atom%nstar(atom%Nlevel,k)*1d-6
     endif
    
   enddo

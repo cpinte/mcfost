@@ -163,7 +163,7 @@ MODULE atom_type
   x = 1.0 - (n/np)**2
   
   if (n < 2.0) then !1 if n integer
-   g = 1.1330 + -0.4059 / x + 0.07014 / x / x
+   g = 1.1330 -0.4059 / x + 0.07014 / x / x
   else if (n >= 2.0 .and. n < 3.0) then ! 2 if n integer
    g = 1.0785 - 0.2319 / x + 0.02947 / x / x
   else !n>=3

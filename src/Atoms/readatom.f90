@@ -84,9 +84,9 @@ MODULE readatom
       atom%massf = atmos%Elements(nll)%ptr_elem%massf
       write(*,*) "Abundance of atom ",atom%ID,": A =",atmos%Elements(nll)%ptr_elem%Abund
       if (atom%ID=="H" .or. atom%ID=="He") then 
-       write(*,*), " -> mass fraction (%) = ", 100.*real(atom%massf)
+       write(*,*) " -> mass fraction (%) = ", 100.*real(atom%massf)
       else
-       write(*,*), " -> mass fraction (m/m(Fe) %) = ", 100.*real(atom%massf/atmos%Elements(26)%ptr_elem%massf)
+       write(*,*) " -> mass fraction (m/m(Fe) %) = ", 100.*real(atom%massf/atmos%Elements(26)%ptr_elem%massf)
       endif
       if (atmos%Elements(nll)%ptr_elem%abundance_set) then
         atom%periodic_table=nll
