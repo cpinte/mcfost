@@ -420,10 +420,10 @@ END FUNCTION get_logPartitionFunctionk
       do i=1, hydrogen%Nlevel-1
        wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1))
        !if (wocc < 0.95) then
-        write(52,"(1X, 1I, 1E, 1E, 1E)") i, wocc, hydrogen%nstar(i,k)/wocc * 1d-6, hydrogen%nstar(i,k)*1d-6
+        write(52,"(1X, 1E5.5, 1E5.5, 1E5.5, 1E5.5)") i, wocc, hydrogen%nstar(i,k)/wocc * 1d-6, hydrogen%nstar(i,k)*1d-6
        !endif
       enddo
-      write(52,"(1I, 1E, 1E, 1E)") hydrogen%Nlevel, wocc, hydrogen%nstar(hydrogen%Nlevel,k)/wocc * 1d-6, hydrogen%nstar(hydrogen%Nlevel,k)*1d-6
+      write(52,"(1I, 1E5.5, 1E5.5, 1E5.5)") hydrogen%Nlevel, wocc, hydrogen%nstar(hydrogen%Nlevel,k)/wocc * 1d-6, hydrogen%nstar(hydrogen%Nlevel,k)*1d-6
     endif
    
    enddo
