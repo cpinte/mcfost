@@ -1092,7 +1092,7 @@ MODULE AtomicTransfer
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_unconverged) &
 				!$omp shared(atmos,NLTEspec, dpops_sub_max_error, verbose,lkeplerian,n_iter) & !!xyz0, uvw0 & !before nact was shared
 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter,lcell_converged) &
-				!$omp shared(n_cells, gpop_old,lforce_lte) &
+				!$omp shared(n_cells, gpop_old,lforce_lte, INTEG_RAY_LINE) &
 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule)
 				!$omp do schedule(static,1)
 				do icell=1, n_cells
