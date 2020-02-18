@@ -173,6 +173,7 @@ MODULE statequil_atoms
 		real(kind=dp) :: Ieff, Jnu_ray, aJnu_ray, etau, wphi
 		integer :: dk
 		integer, parameter :: dl = 5 !Do continuum integral dl by dl bins 
+								!In this case, integrate from 1, Nl+dl,dl to take the last point !
 
   
 		tr_loop : do kr=1, atom%Ntr
