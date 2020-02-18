@@ -1131,7 +1131,7 @@ MODULE getlambda
 		if (alloc_status > 0) call error("Allocation error cont_grid")
 		cont_grid(:) = cont_waves(:)
 !-> Main drawback is that, we possibly not cover all transitions, so when Jnu will be interpolated
-!it might be wrong. Better to construct this, from outgrid
+!it might be wrong. Better to construct this, from outgrid, with lesser resolution still...
 
 		allocate(all_lamin(Nlam), all_lamax(Nlam), sorted_indexes(Nlam),stat=alloc_status)
 		if (alloc_status > 0) then
@@ -1302,20 +1302,6 @@ MODULE getlambda
 		outgrid = pack(outgrid, outgrid > 0)
 !-> very nasty
 
-		!Fill continuum grid from outgrid, but with less resolution
-		!ATM, only used for Jnu if no Non-lte atoms ! 
-! 		Nwaves_cont = (Nwaves + nint(delta_lambda_cont) - 1) / nint(delta_lambda_cont) + 1
-! 		write(*,*) " Nwaves for cont grid:", Nwaves_cont, nint(delta_lambda_cont)
-! 		allocate(cont_grid(Nwaves_cont),stat=alloc_status)
-! 		if (alloc_status > 0) call error("Allocation error cont_grid")
-! 		lac = 1
-! 		do la=1, Nwaves+nint(delta_lambda_cont), nint(delta_lambda_cont)+1
-! 			cont_grid(lac) = outgrid(la)
-! 			lac = lac + 1
-! 			write(*,*) lac, Nwaves_cont, la, Nwaves
-! 			if (lac > Nwaves_cont) exit
-! 		enddo
-! stop
 		deallocate(tmp_grid)
 
 		write(*,*) Nwaves, " unique wavelengths" !they are no eliminated lines
