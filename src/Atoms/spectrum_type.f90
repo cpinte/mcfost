@@ -512,6 +512,8 @@ MODULE spectrum_type
   SUBROUTINE freeSpectrum() 
   
    deallocate(NLTEspec%lambda)
+   if (allocated(NLTEspec%lambda_cont)) deallocate(NLTEspec%lambda_cont)
+
    deallocate(NLTEspec%Ic, NLTEspec%I, NLTEspec%Istar)
    	!can be deallocated before to save memory 
     if (allocated(NLTEspec%Flux)) deallocate(NLTEspec%Flux, NLTEspec%Fluxc)
