@@ -411,23 +411,24 @@ END FUNCTION get_logPartitionFunctionk
 
   !only for testing purpose, no openmp for clarity
   if (locupa_prob) then
-   open(52, file=trim(hydrogen%ID)//"_wi.txt", status="unknown")
-   do k=1, atmos%Nspace
-    if (atmos%icompute_atomRT(k)>0) then
-      write(52,*) k
-      write(52,*) "T=",real(atmos%T(k)), "ne(/cc)=", real(atmos%ne(k))*1e-6
-      write(52,*) "   i      w(i)     n(i;wi=1.0) (/cc)   n(i) (/cc)"
-      do i=1, hydrogen%Nlevel-1
-       wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1))
-       !if (wocc < 0.95) then
-        write(52,"(1X, 1E5.5, 1E5.5, 1E5.5, 1E5.5)") i, wocc, hydrogen%nstar(i,k)/wocc * 1d-6, hydrogen%nstar(i,k)*1d-6
-       !endif
-      enddo
-      write(52,"(1I, 1E5.5, 1E5.5, 1E5.5)") hydrogen%Nlevel, wocc, hydrogen%nstar(hydrogen%Nlevel,k)/wocc * 1d-6, hydrogen%nstar(hydrogen%Nlevel,k)*1d-6
-    endif
-   
-   enddo
-   close(52)
+	call write_occupation_file(52, hydrogen, 1)
+!    open(52, file=trim(hydrogen%ID)//"_wi.txt", status="unknown")
+!    do k=1, atmos%Nspace
+!     if (atmos%icompute_atomRT(k)>0) then
+!       write(52,*) k
+!       write(52,*) "T=",real(atmos%T(k)), "ne(/cc)=", real(atmos%ne(k))*1e-6
+!       write(52,*) "   i      w(i)     n(i;wi=1.0) (/cc)   n(i) (/cc)"
+!       do i=1, hydrogen%Nlevel-1
+!        wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1))
+!        !if (wocc < 0.95) then
+!         write(52,"(1I3, 1E5.5, 1E5.5, 1E5.5, 1E5.5)") i, wocc, hydrogen%nstar(i,k)/wocc * 1d-6, hydrogen%nstar(i,k)*1d-6
+!        !endif
+!       enddo
+!       write(52,"(1I3, 1E5.5, 1E5.5, 1E5.5)") hydrogen%Nlevel, wocc, hydrogen%nstar(hydrogen%Nlevel,k)/wocc * 1d-6, hydrogen%nstar(hydrogen%Nlevel,k)*1d-6
+!     endif
+!    
+!    enddo
+!    close(52)
   endif !if locupa_prob
 
 
@@ -725,15 +726,15 @@ CALL write_ltepops_file(52, hydrogen)
       do i=1, atom%Nlevel-1
        wocc = wocc_n(k, real(i,kind=dp), real(atom%stage(i)),real(atom%stage(i)+1))
        !if (wocc < 0.95) then
-        write(unit,"(1X, 1E5.5, 1E5.5, 1E5.5, 1E5.5)") i, wocc, atom%nstar(i,k)/wocc * 1d-6, atom%nstar(i,k)*1d-6
+        write(unit,"(1I3, 3E14.7)") i, wocc, atom%nstar(i,k)/wocc * 1d-6, atom%nstar(i,k)*1d-6
        !endif
       enddo
-      write(unit,"(1I, 1E5.5, 1E5.5, 1E5.5)") atom%Nlevel, wocc, atom%nstar(atom%Nlevel,k)/wocc * 1d-6, atom%nstar(atom%Nlevel,k)*1d-6
+      write(unit,"(1I3, 1E14.7, 1E14.7, 1E14.7)") atom%Nlevel, wocc, atom%nstar(atom%Nlevel,k)/wocc * 1d-6, atom%nstar(atom%Nlevel,k)*1d-6
     endif
    
   enddo
   close(unit)  
- 
+
  RETURN
  END SUBROUTINE write_occupation_file
  
