@@ -2086,9 +2086,7 @@ if (write_convergence_file ) write(20,*) " -> Iteration #", n_iter
   			cell_loop2 : do icell=1, atmos%Nspace
   				if (atmos%icompute_atomRT(icell)>0) then
   					
-  						!Changes in dS are slower if beta about 1., 
-  						!Changes are larger in J 
-  						dN = dabs(1.0 - maxval(Snew(:,icell) / Sold(:,icell)))
+  						dN = dabs(1.0 - maxval(Sold(:,icell) / Snew(:,icell)))
   						dSource = max(dSource, dN)
 
 						dJ = 0.0_dp
@@ -2197,7 +2195,7 @@ if (write_convergence_file ) close(20)
   write(20,*) n_cells, Nlambda
   do icell=1, n_cells
   do la=1, Nlambda
-    write(20,'(6E14.7)') lambda(la), Jnew(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
+    write(20,'(1F12.5,5E20.7E3)') lambda(la), Jnew(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
    enddo
   enddo
   close(20)
