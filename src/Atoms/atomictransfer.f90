@@ -2083,7 +2083,9 @@ if (write_convergence_file ) write(20,*) " -> Iteration #", n_iter
   			cell_loop2 : do icell=1, atmos%Nspace
   				if (atmos%icompute_atomRT(icell)>0) then
   					
-  						dN = dabs(1.0 - maxval(Sold(:,icell) / Snew(:,icell)))
+  						!Changes in dS are slower if beta about 1., 
+  						!Changes are larger in J 
+  						dN = dabs(1.0 - maxval(Snew(:,icell) / Sold(:,icell)))
   						dSource = max(dSource, dN)
 
 						dJ = 0.0_dp
