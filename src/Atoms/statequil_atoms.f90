@@ -536,7 +536,7 @@ MODULE statequil_atoms
 					atom%continua(kc)%Tex(icell) = deltaE_k / ratio
 					Tion_loc = atom%continua(kc)%Tex(icell)
 					
-					if (atom%lines(kc)%Tex(icell) < 0) then
+					if (atom%continua(kc)%Tex(icell) < 0) then
 						write(*,*) "Tion negative (njgij > ni) ", wi * atom%n(j,icell) * gij, atom%n(i,icell)*wj
 						write(*,*) "ratio = ", ratio, " diff = ", (atom%n(i,icell) - atom%n(j,icell) * gij)/(1d-50 + atom%n(i,icell))
 						write(*,*) "icell = ", icell, " :: Te = ", atmos%T(icell)
