@@ -1093,7 +1093,7 @@ MODULE AtomicTransfer
 				!$omp shared(atmos,NLTEspec, dpops_sub_max_error, verbose,lkeplerian,n_iter) & !!xyz0, uvw0 & !before nact was shared
 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,max_sub_iter,lcell_converged) &
 				!$omp shared(n_cells, gpop_old,lforce_lte) &
-				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape)
+				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule)
 				!$omp do schedule(static,1)
 				do icell=1, n_cells
 					!$ id = omp_get_thread_num() + 1
@@ -1795,8 +1795,9 @@ stop
  ! -------------------------------------------------------- !
 #include "sprng_f.h"
 
-  integer, parameter :: n_rayons_start = 2000, Nlambda = 350, maxIter = 1000
-  integer :: n_rayons_max
+  integer, parameter :: n_rayons_start = 2000, maxIter = 1000
+  !integer, parameter :: Nlambda = 350
+  integer :: n_rayons_max, Nlambda
   real, parameter :: precision = 1e-2
   real, parameter :: lambda_min = 5., lambda_max0 = 100000
   integer :: etape, etape_start, etape_end, iray, n_rayons
@@ -1815,6 +1816,7 @@ stop
   real(kind=dp) :: lambda_max
   type(Ng) :: NgJ
   
+	Nlambda = size(NLTEspec%lambda_cont)
   write(*,*) "   --> Lambda iterating Jnu with Nlambda ", Nlambda
   write_convergence_file = .false.
   
@@ -1837,22 +1839,23 @@ stop
   allocate(Kappa_tot(Nlambda, atmos%Nspace)); Kappa_tot = 0.
   allocate(beta(Nlambda, atmos%Nspace)); beta = 0.
     
-  !sampling lambda for Jnu, at the end interpolated on the NLTE grid
-  allocate(lambda(Nlambda))
-  a1 = real(NLTEspec%lambda(1)) !max(lambda_min, real(NLTEspec%lambda(1)))
-  a2 = min(lambda_max0, real(NLTEspec%lambda(NLTEspec%Nwaves)))
-  a0 = 368.
-  a3 = 91.
-  !evaluate opacities on the exact same grid, better than interpolate
-  lambda(1:20) = span(a1, a3-0.1, 20)
-  lambda(21:50) = span(a3, a3+2, 30)
-  lambda(51:51+249) = span(a3+2+0.1, a0, 250)
-  lambda(301:350) = spanl(a0+10, a2, 50)
+!   sampling lambda for Jnu, at the end interpolated on the NLTE grid
+!   allocate(lambda(Nlambda))
+!   a1 = real(NLTEspec%lambda(1)) !max(lambda_min, real(NLTEspec%lambda(1)))
+!   a2 = min(lambda_max0, real(NLTEspec%lambda(NLTEspec%Nwaves)))
+!   a0 = 368.
+!   a3 = 91.
+!   evaluate opacities on the exact same grid, better than interpolate
+!   lambda(1:20) = span(a1, a3-0.1, 20)
+!   lambda(21:50) = span(a3, a3+2, 30)
+!   lambda(51:51+249) = span(a3+2+0.1, a0, 250)
+!   lambda(301:350) = spanl(a0+10, a2, 50)
 !   lambda(1:20) = span(a1, a3-0.1, 20)
 !   lambda(21:20+150) = span(a3, a3+2, 150)
 !   lambda(171:170+300) = span(a3+2+0.1, a0, 300)
 !   lambda(471:470+530) = spanl(a0+10, a2, 530)
 
+	lambda = NLTEspec%lambda_cont
   
   Istar(:) = Bpnu (real(etoile(1)%T,kind=dp), lambda)
 
@@ -1993,7 +1996,7 @@ if (write_convergence_file ) write(20,*) " -> Iteration #", n_iter
             !$omp shared(lkeplerian,n_iter) &
             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged) &
             !$omp shared(n_cells,ds, Jold, Jnew, beta, kappa_tot, Ic) &
-            !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape)
+            !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule)
             !$omp do schedule(static,1)
   			do icell=1, n_cells
    			    !$ id = omp_get_thread_num() + 1
