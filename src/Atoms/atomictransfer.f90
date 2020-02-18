@@ -768,7 +768,7 @@ MODULE AtomicTransfer
    !IF NLTE loop we should also be able to read or compute an estimate of Jcont by the way...
    ! -> TBD
    if (atmos%NactiveAtoms == 0 .and. lelectron_scattering) then
-    call alloc_jnu(.false.)
+!    call alloc_jnu(.false.) -> already allocated in alloc_spectrum
 !    if (.not.lread_jnu_atom) then
 	if (lread_jnu_atom) then
 		call read_jnu_ascii
@@ -2123,10 +2123,15 @@ if (write_convergence_file ) write(20,*) "   >>> ", icell_max, lambda(imax)," dJ
          	write(*,*) "   >>> ", "Jmax/min (all):", maxval(Jnew(:,:)), minval(Jnew(:,:))
 if (write_convergence_file ) write(20,*) "   >>> ", "Jmax/min (icell_max):", maxval(Jnew(:,icell_max)), minval(Jnew(:,icell_max))
 if (write_convergence_file ) write(20,*) "   >>> ", "Jmax/min (all):", maxval(Jnew(:,:)), minval(Jnew(:,:))
-	        write(*,*) " <-> # unconverged cells : ", size(pack(lcell_converged,mask=lcell_converged==.false.)), &
-	          100.*real(size(pack(lcell_converged,mask=lcell_converged==.false.)))/real(n_cells), "%"
-if (write_convergence_file ) write(20,*) " <-> # unconverged cells : ", size(pack(lcell_converged,mask=lcell_converged==.false.)), &
-	          100.*real(size(pack(lcell_converged,mask=lcell_converged==.false.)))/real(n_cells), "%"
+	        write(*,*) " <-> # unconverged cells : ", size(pack(lcell_converged,mask=lcell_converged.eqv..false.)), &
+	          100.*real(size(pack(lcell_converged,mask=lcell_converged.eqv..false.)))/real(n_cells), "%"
+if (write_convergence_file ) write(20,*) " <-> # unconverged cells : ", size(pack(lcell_converged,mask=lcell_converged.eqv..false.)), &
+	          100.*real(size(pack(lcell_converged,mask=lcell_converged.eqv..false.)))/real(n_cells), "%"
+!-> gfortran does not like to compare logical with ==
+! 	        write(*,*) " <-> # unconverged cells : ", size(pack(lcell_converged,mask=lcell_converged==.false.)), &
+! 	          100.*real(size(pack(lcell_converged,mask=lcell_converged==.false.)))/real(n_cells), "%"
+! if (write_convergence_file ) write(20,*) " <-> # unconverged cells : ", size(pack(lcell_converged,mask=lcell_converged==.false.)), &
+! 	          100.*real(size(pack(lcell_converged,mask=lcell_converged==.false.)))/real(n_cells), "%"
 
         	!!lconverged = (real(diff) < precision)
 
@@ -2187,7 +2192,7 @@ if (write_convergence_file ) close(20)
   write(20,*) n_cells, Nlambda
   do icell=1, n_cells
   do la=1, Nlambda
-    write(20,'(6E)') lambda(la), Jnew(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
+    write(20,'(6E14.7)') lambda(la), Jnew(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
    enddo
   enddo
   close(20)
