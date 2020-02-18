@@ -890,19 +890,19 @@ MODULE AtomicTransfer
     
   !call write_contrib_lambda_ascii(654.0_dp,0.0_dp,0.0_dp,1.0_dp)
   !call write_contrib_lambda_ascii(1083.0_dp,0.0_dp,0.0_dp,1.0_dp)
-!   call write_contrib_lambda_ascii(500.0_dp,0.0_dp,0.0_dp,1.0_dp)
+  call write_contrib_lambda_ascii(500.0_dp,0.0_dp,0.0_dp,1.0_dp)
 !   call write_taur(500._dp,0._dp,0._dp,1.0_dp)
 !-> building
 !  call write_contrib_lambda(654.0_dp,0.0_dp,0.0_dp,1.0_dp)
 !   call write_contrib_lambda(1080._dp,0._dp,0._dp,0._dp,0._dp,0._dp,0._dp)
 
   !write it after because sca_c (and maybe %Kc, %jc, %Kc_nlte, %Jc_nlte) is modified !!
-!   do icell=1, atmos%Natom
-!     CALL write_cont_opac_ascii(atmos%Atoms(icell)%ptr_atom)
-!     !!CALL write_cont_opac(atmos%Atoms(icell)%ptr_atom) !-> building
-!     CALL write_atom_xsections_bf_ff(atmos%Atoms(icell)%ptr_atom)
-!     CALL write_profiles_ascii(52, atmos%Atoms(icell)%ptr_atom, 1)
-!   enddo
+  do icell=1, atmos%Natom
+    CALL write_cont_opac_ascii(atmos%Atoms(icell)%ptr_atom)
+    !!CALL write_cont_opac(atmos%Atoms(icell)%ptr_atom) !-> building
+    !!CALL write_atom_xsections_bf_ff(atmos%Atoms(icell)%ptr_atom)
+    !!CALL write_profiles_ascii(52, atmos%Atoms(icell)%ptr_atom, 1)
+  enddo
 
   if (atmos%electron_scattering) then
    !Jnu is written to ascii file if read

@@ -218,7 +218,7 @@ MODULE write_opacity
   real(kind=dp), dimension(:,:), allocatable :: chibb, etabb, tau
   character(len=50) :: filename
   
-  write(filename, "(1I)") nint(lam)
+  write(filename, "(1I4)") nint(lam)
   filename = "contrib_at"//trim(adjustl(filename))//"_nm.s"
   
   ilam = locate(NLTEspec%lambda, lam)
@@ -284,7 +284,7 @@ MODULE write_opacity
   write(1,*) " header"
   
   do icell=1, n_cells !how to read integer then float ?
-   write(1,"(8E)") real(icell), taul(icell), chil(icell), etal(icell), etac(icell), chic(icell), etasc(icell), sigmac(icell)
+   write(1,"(8E14.7)") real(icell), taul(icell), chil(icell), etal(icell), etac(icell), chic(icell), etasc(icell), sigmac(icell)
   enddo
   
   close(1)
@@ -871,12 +871,12 @@ MODULE write_opacity
    do la=1, NLTEspec%Nwaves
   
     if (Nwrite == 12) then
-    write(unit, "(12E)") (big_tab(i,la,icell), i=1, 12)
+    write(unit, "(12E14.7)") (big_tab(i,la,icell), i=1, 12)
     
     else if (Nwrite==5) then
-    write(unit, "(5E)") (big_tab(i,la,icell), i=1, 5)
+    write(unit, "(5E14.7)") (big_tab(i,la,icell), i=1, 5)
     else
-    write(unit, "(4E)") (big_tab(i,la,icell), i=1, 4)
+    write(unit, "(4E14.7)") (big_tab(i,la,icell), i=1, 4)
     endif
    enddo
   enddo
