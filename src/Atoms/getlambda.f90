@@ -999,8 +999,7 @@ MODULE getlambda
   RETURN
   END SUBROUTINE adjust_wavelength_grid
   
-  
-	SUBROUTINE make_wavelength_grid_new(Natom, Atoms, wl_ref, dvmax, outgrid, Ntrans)
+	SUBROUTINE make_wavelength_grid_new(Natom, Atoms, wl_ref, dvmax, outgrid, Ntrans, cont_grid)
 		use math, only : locate
  
 		! Create a wavelength grid around group of lines (at least 1 line in a group)
@@ -1015,7 +1014,7 @@ MODULE getlambda
 		integer, intent(in) :: Natom
 		real(kind=dp), intent(in) :: wl_ref, dvmax
 		integer, intent(out) :: Ntrans
-		real(kind=dp), allocatable, dimension(:), intent(out) :: outgrid
+		real(kind=dp), allocatable, dimension(:), intent(out) :: outgrid, cont_grid
 		real(kind=dp), dimension(:), allocatable :: cont_waves, line_waves
 		integer, parameter :: MAX_GROUP_OF_LINES = 1000
 		integer :: Nwaves !total
@@ -1023,7 +1022,7 @@ MODULE getlambda
 		real(kind=dp), dimension(MAX_GROUP_OF_LINES) :: group_blue, group_red
 		real(kind=dp), dimension(:), allocatable :: all_lamin, all_lamax, tmp_grid
 		integer, dimension(:), allocatable :: sorted_indexes, Nlambda_per_group
-		integer :: Nspec_cont, Nspec_line, Nremoved
+		integer :: Nspec_cont, Nspec_line, Nremoved, Nwaves_cont
 		integer :: n, kr, la, lac, shift, alloc_status
 		real(kind=dp) :: lambda_max, lambda_min, l0, l1
 		type (AtomType), pointer :: atom
@@ -1125,6 +1124,11 @@ MODULE getlambda
 		deallocate(tmp_grid)
 
 		Nlambda_cont = Nlambda_cont - Nremoved
+		
+		!Keep, sorted, unique, sole continuum wavelengths
+		allocate(cont_grid(Nlambda_cont),stat=alloc_status)
+		if (alloc_status > 0) call error("Allocation error cont_grid")
+		cont_grid(:) = cont_waves(:)
 
 		allocate(all_lamin(Nlam), all_lamax(Nlam), sorted_indexes(Nlam),stat=alloc_status)
 		if (alloc_status > 0) then
@@ -1294,6 +1298,8 @@ MODULE getlambda
 		Nwaves = la
 		outgrid = pack(outgrid, outgrid > 0)
 !-> very nasty
+
+		Nwaves_cont = (maxval(outgrid)-minval(outgrid)) / 1.0 + 1
 
 		deallocate(tmp_grid)
 

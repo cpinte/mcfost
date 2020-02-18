@@ -50,7 +50,7 @@ MODULE spectrum_type
    logical :: vacuum_to_air=.false., write_wavelength_grid=.false.
    integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1
    real(kind=dp) :: wavelength_ref=0.d0 !nm optionnal
-   real(kind=dp), allocatable, dimension(:) :: lambda
+   real(kind=dp), allocatable, dimension(:) :: lambda, lambda_cont
    !nlambda, nrays, nproc
    real(kind=dp), allocatable, dimension(:,:,:) :: I, StokesQ, StokesU, StokesV, Ic
    real(kind=dp), allocatable, dimension(:,:) :: Istar
@@ -127,7 +127,7 @@ MODULE spectrum_type
 !                         NLTEspec%lambda, NLTEspec%Ntrans, NLTEspec%wavelength_ref)
                         
    CALL make_wavelength_grid_new(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, NLTEspec%wavelength_ref, &
-   NLTEspec%atmos%v_char, NLTEspec%lambda,NLTEspec%Ntrans)
+   NLTEspec%atmos%v_char, NLTEspec%lambda,NLTEspec%Ntrans, NLTEspec%lambda_cont)
 
 
    NLTEspec%Nwaves = size(NLTEspec%lambda)
