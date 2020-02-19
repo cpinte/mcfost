@@ -168,6 +168,8 @@ subroutine set_default_variables()
   lfluffy = .false.
   ldelete_hill_sphere = .false.
   lrandomize_azimuth = .false.
+  lrandomize_gap = .false.
+  lrandomize_outside_gap = .false.
   lwrite_column_density = .false.
 
   tmp_dir = "./"
@@ -1196,6 +1198,18 @@ subroutine initialisation_mcfost()
      case("-random_az")
         i_arg = i_arg + 1
         lrandomize_azimuth = .true.
+     case("-random_gap")
+        i_arg = i_arg + 1
+        lrandomize_gap = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) gap_factor
+        i_arg = i_arg + 1
+     case("-random_outside_gap")
+        i_arg = i_arg + 1
+        lrandomize_outside_gap = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) gap_factor
+        i_arg = i_arg + 1
      case("-cd","-column_density")
         i_arg = i_arg + 1
         lwrite_column_density = .true.
@@ -1678,7 +1692,7 @@ subroutine display_help()
   write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
-  write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
+  write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity independent of z"
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
   write(*,*) "        : -solve_ne : force the calculation of electron density"

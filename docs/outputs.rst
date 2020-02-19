@@ -163,28 +163,37 @@ containing only a copy of the parameter file.
 Optical depth maps
 ^^^^^^^^^^^^^^^^^^
 
-tbw
+Using the option ``-optical_depth_map`` or ``-od`` (in combination with ``-img``), mcfost will generate a fits file ``optical_depth_map.fits.gz`` of dimensions (n_rad, nz, n_az, 2) giving for the each cell the optical depth at the selected wavelentgh from the centre of the cell to r=0 and z=+infinity. When used in SED mode, the optical depth map will be computed at the wavelength closest to I band (e.g. 0.81 micron).
+
+Note that this option does not work yet when using a Voronoi mesh, the current implmentation only works for the rgular grids.
+
+Column density
+^^^^^^^^^^^^^^
+Option ``-cd`` generates a fits file ``column_density.fits.gz`` with the column density in each cells, in 4 directions: to the star, to z = + infinity, to z = - infinity, and to r = sqrt(x2 + y2) = infinity.
 
 tau=1 surface
 ^^^^^^^^^^^^^
 
-tbw
+Generates a fits file ``tau=1_surface.fits.gz`` giving for each pixel the coordinates x,y,z of the tau=1 surface.
 
 Tracking origin of packets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-tbw
+Option ``-origin`` or ``-o`` creates a fits file ``origin.fits.gz``, which fraction of the energy received by the observer has been generated in that cell, i.e. it basically traces the 3D emitting regions for a given system orientation.
+
 
 Radiation field
 ^^^^^^^^^^^^^^^
-tbw
+Option ``-output_J`` generates a fits file ``J.fits`` with the radiation field in each cell and at each wavelength in W/m2.
+Option ``-output_UV_field`` generates a fits file ``UV_field.fits`` with, for each cell,  the integrated radiation field between 912 and 200 angstroems (in Habing units).
 
 Files for ProDiMo
 ^^^^^^^^^^^^^^^^^
 
-tbw
+Option ``-prodimo`` will generate a single fits file ``forProDiMo.fits.gz`` which all the quantities required by ProDiMo to compute a thermo-chemical model.
+mcfost can then be used with the option ``-p2m`` to compute the corresponding data cube, based on the ProDiMo temperature structure and level populations.
 
 Files for Astochem
 ^^^^^^^^^^^^^^^^^^
 
-tbw
+Option ``-astrochem`` will generate all the files required to run a ``astrochem`` model.

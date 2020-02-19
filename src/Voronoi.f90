@@ -14,7 +14,7 @@ module Voronoi_grid
   save
 
   integer, parameter :: max_wall_neighbours = 100000
-  integer, parameter :: n_saved_neighbours = 30
+  integer, parameter :: n_saved_neighbours = 40 ! 30 is fine when there is not randomization of particles
   real(kind=dp), parameter :: prec = 1.e-6_dp
 
   type Voronoi_cell
@@ -23,6 +23,7 @@ module Voronoi_grid
      real(kind=dp) :: delta_edge, delta_centroid
      integer :: id, first_neighbour, last_neighbour
      logical(kind=lp) :: exist, is_star, was_cut
+     logical :: masked
   end type Voronoi_cell
 
   type Voronoi_wall
@@ -195,7 +196,7 @@ module Voronoi_grid
     real(kind=dp), dimension(6), intent(in) :: limits
     logical, intent(in) :: check_previous_tesselation
 
-    integer, parameter :: max_neighbours = 20  ! maximum number of neighbours per cell (to build neighbours list)
+    integer, parameter :: max_neighbours = 25  ! maximum number of neighbours per cell (to build neighbours list)
 
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
     integer, dimension(:), allocatable :: SPH_id
