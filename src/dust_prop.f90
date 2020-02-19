@@ -963,7 +963,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
 
      if (lstop_after_init) then
         write(*,*) "Exiting"
-        call exit(1)
+        call exit(0)
      else
         ! Re-Normalisation S11
         ! la normalisation n'a pas eu lieu dans le cas ldust_prop pour sauver S11 dans le fichier fits
