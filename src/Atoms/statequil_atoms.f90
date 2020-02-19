@@ -13,12 +13,15 @@ MODULE statequil_atoms
 	use getlambda, only						: hv
  
 	use mcfost_env, only					: dp
-	use constantes, only					: tiny_dp
+	use constantes, only					: tiny_dp, sigma
 
 	IMPLICIT NONE
- 
+
+	real(kind=dp), parameter :: Tmax = 100d6
+	real(kind=dp), parameter :: Imax = 2 * sigma * Tmax**4 / pi
 	real(kind=dp), parameter :: prec_pops = 1d-100 !1d-8
 	character(len=15), parameter :: invpop_file = "inversion_populations.txt"
+	integer, parameter :: unit_invfile = 20
 
 	CONTAINS
 
@@ -196,7 +199,8 @@ MODULE statequil_atoms
 				!Do we need line%w_lam, since the line is linearly sampled in dv ?
 				do l=1, Nl !Fast relatively
 				
-					wphi = wphi + atom%lines(kc)%phi(l,icell)*1e3*hv!*atom%lines(kc)%w_lam(l)
+					!wphi = wphi + atom%lines(kc)%phi(l,icell)*1e3*hv
+					wphi = wphi + atom%lines(kc)%phi(l,icell)*atom%lines(kc)%w_lam(l)
 					
 					!-> to check
 					!write(*,*) "wl = ", atom%lines(kc)%w_lam(l)*1e-3
@@ -212,7 +216,7 @@ MODULE statequil_atoms
 					etau = dexp(-ds(iray,id) * NLTEspec%chi(Nblue+l-1-dk,iray,id))
        		 		Ieff = NLTEspec%I(Nblue+l-1-dk,iray,id) * etau  + (1.0_dp - etau) * NLTEspec%S(Nblue+l-1-dk,iray,id)
       		 
-					Jnu_ray = Jnu_ray + Ieff * atom%lines(kc)%phi(l,icell)*(1e3 * hv)!*atom%lines(kc)%w_lam(l)
+					Jnu_ray = Jnu_ray + Ieff * atom%lines(kc)%phi(l,icell)*atom%lines(kc)%w_lam(l)
 					
 				enddo
 				!Renormalise profile ?
@@ -461,7 +465,6 @@ MODULE statequil_atoms
 		integer :: nact, kr, kc, i, j
 		real(kind=dp) :: deltaE_k, ratio, Tdag, gij, dT_loc, Tion_loc, Tex_loc
 		real(kind=dp) :: wi, wj
-		real :: sign
 		
   
 		dT = 0.0_dp !for all transitions of one atom
@@ -489,28 +492,33 @@ MODULE statequil_atoms
                 
 				ratio = dlog(wi * atom%n(j,icell) * atom%lines(kc)%gij / (atom%n(i,icell)*wj))
 				
-
-				if (ratio /= 0.0) then
-					sign = real(ratio / dabs(ratio))
+				if (ratio < 0.0_dp) then
       
 					atom%lines(kc)%Tex(icell) = -deltaE_k / ratio
 					Tex_loc = atom%lines(kc)%Tex(icell)
        
-					if (atom%lines(kc)%Tex(icell) < 0) then
-						write(*,*) "Tex negative ( njgij > ni) ", wi * atom%n(j,icell) * atom%lines(kc)%gij, atom%n(i,icell)*wj
-						write(*,*) "ratio = ", ratio, " diff = ", (atom%n(i,icell) - atom%n(j,icell) * atom%lines(kc)%gij)/(1d-50 + atom%n(i,icell))
-						write(*,*) "icell = ", icell, " :: Te = ", atmos%T(icell)
-						write(*,*) " --> Setting to old value", Tdag, atom%ID, " line (i,j) = ", i, j
-						atom%lines(kc)%Tex(icell) = Tdag
-						cycle tr_loop !do not count this line for max relative change
-        				!stop
-       				endif
-       
-       				dT_loc = dabs(Tdag-Tex_loc)/(1d-50 + Tex_loc)
-       				dT = max(dT, dT_loc)
-       				Tex = max(Tex, Tex_loc)
+				else
+					write(*,*) "Warn: Tex <=0 ( njgij > ni) ", wi * atom%n(j,icell) * atom%lines(kc)%gij, atom%n(i,icell)*wj
+					write(*,*) "ratio (log) = ", ratio, " ratio = ", dexp(ratio), " diff = ", (atom%n(i,icell) - atom%n(j,icell) * atom%lines(kc)%gij)/(1d-50 + atom%n(i,icell))
+					write(*,*) "icell = ", icell, " :: Te = ", atmos%T(icell)
+					
+					
+					atom%lines(kc)%Tex(icell) = Tmax!min(-deltaE_k / (ratio + 1d-50), Tmax)
+					Tex_loc = atom%lines(kc)%Tex(icell)
+					
+					write(*,*) " --> ", atom%lines(kc)%Tex(icell), atom%ID, " line (i,j) = ", i, j
+write(unit_invfile,*) "-------------------------------------------------------------------------------"				
+write(unit_invfile,"('icell = '(1I9), 'atom '(1A2))") icell, atom%ID
+write(unit_invfile,*) "ratio : n(j) gij / n(i))"
+write(unit_invfile, '(" -> line "(1I2)"  ->  "(1I2), (3E14.7) )') i, j, atom%n(i,icell)*wj, wi * atom%n(j,icell) * atom%lines(kc)%gij, atom%lines(kc)%Tex(icell)
+write(unit_invfile, "('log(ratio) = '(1E14.7), 'ratio = '(1E14.7) )"), ratio, dexp(ratio)
+write(unit_invfile,*) "-------------------------------------------------------------------------------"				
 
-     			 endif
+     			endif
+     			
+       			dT_loc = dabs(Tdag-Tex_loc)/(1d-50 + Tex_loc)
+       			dT = max(dT, dT_loc)
+       			Tex = max(Tex, Tex_loc)
 
 
         
@@ -518,6 +526,7 @@ MODULE statequil_atoms
 
      			i = atom%continua(kc)%i; j = atom%continua(kc)%j
 				wi = 1.0
+				wj = 1.0
            
       			Tdag = atom%continua(kc)%Tex(icell)
 
@@ -530,27 +539,36 @@ MODULE statequil_atoms
 				gij = atom%nstar(i,icell)/(1d-50 + atom%nstar(j,icell) ) * dexp(-hc_k/atom%continua(kc)%lambda0/atmos%T(icell))
 				ratio = log( atom%n(i,icell)  / ( atom%n(j,icell) * gij ) )
 					
-				if (ratio /= 0.0) then
-					sign = real(ratio / dabs(ratio))
+				if (ratio > 0.0_dp) then
+				
 					!ionisation temperature
 					atom%continua(kc)%Tex(icell) = deltaE_k / ratio
 					Tion_loc = atom%continua(kc)%Tex(icell)
 					
-					if (atom%continua(kc)%Tex(icell) < 0) then
-						write(*,*) "Tion negative (njgij > ni) ", wi * atom%n(j,icell) * gij, atom%n(i,icell)*wj
-						write(*,*) "ratio = ", ratio, " diff = ", (atom%n(i,icell) - atom%n(j,icell) * gij)/(1d-50 + atom%n(i,icell))
-						write(*,*) "icell = ", icell, " :: Te = ", atmos%T(icell)
-						write(*,*) " --> Setting to old value", Tdag, atom%ID, " cont (i,j) = ", i, j
-						atom%continua(kc)%Tex(icell) = Tdag
-						cycle tr_loop !do not count this cont for max relative change
-        				!stop
-       				endif
-       				
-       				dT_loc = dabs(Tdag-Tion_loc)/(Tion_loc + 1d-50)
-       				dT = max(dT, dT_loc)		
-       				Tion = max(Tion_loc, Tion)			
+				else
+					write(*,*) "Tion <=0 (njgij > ni) ", wi * atom%n(j,icell) * gij, atom%n(i,icell)*wj
+					write(*,*) "ratio (log) = ", ratio, " ratio = ", dexp(ratio), " diff = ", (atom%n(i,icell) - atom%n(j,icell) * gij)/(1d-50 + gij * atom%n(j,icell))
+					write(*,*) "icell = ", icell, " :: Te = ", atmos%T(icell)
+					
+					atom%continua(kc)%Tex(icell) = Tmax!min(deltaE_k / ratio, Tmax)
+					Tion_loc = atom%continua(kc)%Tex(icell)
+
+					write(*,*) " --> ", atom%continua(kc)%Tex(icell), atom%ID, " cont (i,j) = ", i, j
+					atom%continua(kc)%Tex(icell) = dabs(atom%continua(kc)%Tex(icell))	
+						
+write(unit_invfile,*) "-------------------------------------------------------------------------------"				
+write(unit_invfile,"('icell = '(1I9), ' atom '(1A2))") icell, atom%ID
+write(unit_invfile,*) "ratio : n(i) / (n(j) gij)"
+write(unit_invfile, "(' -> cont '(1I2)' -> '(1I2), (3E14.7) )") i, j, atom%n(i,icell)*wj, wi * atom%n(j,icell) * gij, atom%lines(kc)%Tex(icell)
+write(unit_invfile, "('log(ratio) = '(1E14.7), ' ratio = '(1E14.7) )"), ratio, dexp(ratio)
+write(unit_invfile,*) "-------------------------------------------------------------------------------"				
 
 				endif
+				
+       				
+       			dT_loc = dabs(Tdag-Tion_loc)/(Tion_loc + 1d-50)
+       			dT = max(dT, dT_loc)		
+       			Tion = max(Tion_loc, Tion)	
     
  
     		CASE DEFAULT
@@ -606,8 +624,6 @@ MODULE statequil_atoms
 					if (atom%lines(kc)%Tex(icell) < 0) then
 						write(*,*) ratio, "Tex negative (njgij > ni) ", wi * atom%n(j,icell) * atom%lines(kc)%gij, atom%n(i,icell)*wj
 						write(*,*) "icell = ", icell, " :: Te = ", atmos%T(icell)
-						write(*,*) " --> Setting to abs()", atom%ID, " line (i,j) = ", i, j
-						atom%lines(kc)%Tex(icell) = abs(atom%lines(kc)%Tex(icell))
        				endif
 				endif
         
@@ -631,8 +647,6 @@ MODULE statequil_atoms
 					if (atom%lines(kc)%Tex(icell) < 0) then
 						write(*,*) ratio, "Tion negative (njgij > ni) ", wi * atom%n(j,icell) * gij, atom%n(i,icell)*wj
 						write(*,*) "icell = ", icell, " :: Te = ", atmos%T(icell)
-						write(*,*) " --> Setting to abs()", atom%ID, " cont (i,j) = ", i, j
-						atom%continua(kc)%Tex(icell) = abs(atom%continua(kc)%Tex(icell))
        				endif
 				endif
     
