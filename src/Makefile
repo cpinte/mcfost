@@ -60,7 +60,7 @@ ifeq ($(SYSTEM), ifort)
         ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512 -static
     endif
     FC= ifort
-    FFLAGS= -g3 -fpp -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
+    FFLAGS= -fpp -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
     DBLFLAG= -r8
     DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
                -warn uninitialized -warn unused -warn truncated_source
@@ -158,7 +158,6 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90      
 	  $(Atom_dir)/atom_type.f90 $(Atom_dir)/getline.f90                      \
           $(Atom_dir)/uplow.f90 density.f90 read_opacity.f90 scattering.f90      \
           coated_sphere.f90 dust_prop.f90 $(Atom_dir)/atmos_type.f90             \
-          $(Atom_dir)/impact.f90 \
           molecular_emission.f90 PAH.f90 $(Atom_dir)/read_pluto.f90              \
           $(Atom_dir)/zeeman.f90 input.f90 $(Atom_dir)/broad.f90                 \
           $(Atom_dir)/getlambda.f90 benchmarks.f90 read_param.f90                \
@@ -167,8 +166,9 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90      
           mem.f90 init_mcfost.f90 $(Atom_dir)/ttauri_module.f90 io_phantom_infiles.f90 \
 	  io_phantom_utils.f90 utils_hdf5.f90 mess_up_SPH.f90 read_phantom.f90 read_gadget2.f90  \
 	  SPH2mcfost.f90 $(Atom_dir)/spectrum_type.f90 $(Atom_dir)/barklem.f90   \
+	  $(Atom_dir)/occupation_probability.f90 $(Atom_dir)/impact.f90 \
 	  $(Atom_dir)/writeatom.f90 $(Atom_dir)/collision.f90 $(Atom_dir)/readatom.f90 \
-	  $(Atom_dir)/occupation_probability.f90 $(Atom_dir)/stark.f90\
+	  $(Atom_dir)/stark.f90\
 	  $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90 \
 	  $(Atom_dir)/voigtfunctions.f90 $(Atom_dir)/profiles.f90                \
 	  $(Atom_dir)/rayleigh_scattering.f90 $(Atom_dir)/thomson_scattering.f90 \
