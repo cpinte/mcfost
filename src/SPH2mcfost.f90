@@ -435,14 +435,20 @@ contains
     ! Mask
     !*************************
     if (present(mask)) then
-       do icell=1,n_cells
-          iSPH = Voronoi(icell)%id
-          if (iSPH > 0) then
-             Voronoi(icell)%masked = mask(iSPH)
-          else
+       if (allocated(mask)) then
+          do icell=1,n_cells
+             iSPH = Voronoi(icell)%id
+             if (iSPH > 0) then
+                Voronoi(icell)%masked = mask(iSPH)
+             else
+                Voronoi(icell)%masked = .false.
+             endif
+          enddo
+       else
+          do icell=1,n_cells
              Voronoi(icell)%masked = .false.
-          endif
-       enddo
+          enddo
+       endif
     else
        do icell=1,n_cells
           Voronoi(icell)%masked = .false.
