@@ -331,6 +331,8 @@ module Voronoi_grid
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
+    write(*,*) "mcfost will require ~", n_cells * (5*2 + 1) * 4 / 1024**3, "GB of temporary memory for the tesselation" ! 5 double + 2 int arrays
+
     if (operating_system == "Darwin" .and. (n_cells > 2e6)) then
        call warning("Voronoi tesselation will likely crash with that many particle on a Mac. Switch to linux")
     endif
