@@ -254,7 +254,7 @@ subroutine define_cylindrical_grid()
   ! end allocation
 
 	lread_1D_grid = .false.
-	if ((n_cells == n_rad).and.(n_regions==1).and.(n_rad_in /= 0.0)) lread_1D_grid = .true.
+	if ((n_cells == n_rad).and.(n_regions==1).and.(n_rad_in == 0.0)) lread_1D_grid = .true.
 	if (lread_1D_grid) then
 		write(*,*) 'Reading 1D radius grid from file'
 		open(15, file=file_tab_r_1D, status='old')
@@ -275,7 +275,7 @@ subroutine define_cylindrical_grid()
 			etoile(1)%r = etoile(1)%r*(1.-0.001)
 		endif
 		if (n_rad_1D -1 /= n_cells) then
-			write(*,*) " Error, the grid of radius read should be n_cells-1"
+			write(*,*) " Error, the grid of radius read should be n_cells + 1"
 			lread_1D_grid = .false.
 		endif
 	endif
