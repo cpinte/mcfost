@@ -16,6 +16,11 @@ module cylindrical_grid
 
   private
 
+  character(len=11), parameter :: file_tab_r_1D = 'grid_1D.txt'
+  real(kind=dp), dimension(:), allocatable :: tab_r_1D_tmp
+  integer :: n_rad_1D
+  logical :: lread_1D_grid
+
   real(kind=dp) :: zmaxmax
 
   integer, dimension(:), allocatable :: lexit_cell
@@ -113,7 +118,6 @@ contains
             msg2="I am missing some real cells")
        ! write(*,*) icell, ntot
     endif
-
 
     ! Virtual cell indices for when the packets are just around the grid
 
@@ -249,6 +253,33 @@ subroutine define_cylindrical_grid()
   endif
   ! end allocation
 
+	lread_1D_grid = .false.
+	if ((n_cells == n_rad).and.(n_regions==1).and.(n_rad_in /= 0.0)) lread_1D_grid = .true.
+	if (lread_1D_grid) then
+		write(*,*) 'Reading 1D radius grid from file'
+		open(15, file=file_tab_r_1D, status='old')
+		read(15,*) n_rad_1D
+		allocate(tab_r_1D_tmp(n_rad_1D), stat=alloc_status)
+		if (alloc_status > 0) call error('allocation error tab_r_1D_tmp')
+		do k=1, n_rad_1D
+			read(15,*) tab_r_1D_tmp(k)
+			!write(*,*) 'r=',tab_r_1D_tmp(k),tab_r_1D_tmp(k)*etoile(1)%r 
+		enddo
+		close(15)
+		!write(*,*) ' Old Rmax/Rmin', Rmax, Rmin
+		Rmin = tab_r_1D_tmp(1)*etoile(1)%r
+		Rmax = tab_r_1D_tmp(n_rad_1D)*etoile(1)%r
+		!write(*,*) ' New Rmax, Rmin', Rmax, Rmin
+		if (etoile(1)%r>Rmin) then
+			call warning('Rstar=>Rmin')
+			etoile(1)%r = etoile(1)%r*(1.-0.001)
+		endif
+		if (n_rad_1D -1 /= n_cells) then
+			write(*,*) " Error, the grid of radius read should be n_cells-1"
+			lread_1D_grid = .false.
+		endif
+	endif
+
   Rmax2 = Rmax*Rmax
 
   n_rad_in = max(n_rad_in,1) ! in case n_rad_in is set to 0 by user
@@ -352,6 +383,32 @@ subroutine define_cylindrical_grid()
 
      istart = n_cells_tmp+1
   enddo ! ir
+
+	if (lread_1D_grid) then
+		istart = 1
+		n_cells_tmp = 0
+		tab_r = 0.0
+		tab_r2 = 0.0
+		tab_r3 = 0.0
+		tab_r(istart) = Rmin
+		tab_r2(istart) = tab_r(istart) * tab_r(istart)
+		tab_r3(istart) = tab_r2(istart) * tab_r(istart)
+
+		write(*,*) istart, n_rad_region, n_empty
+		write(*,*) ' Redefining grid to match model'
+		do i=istart + 1, istart+n_rad_region
+			tab_r(i) = tab_r_1D_tmp(i)*etoile(1)%r
+			tab_r2(i) = tab_r(i) * tab_r(i)
+			tab_r3(i) = tab_r2(i) * tab_r(i)
+			!write(*,*) i, tab_r(i), tab_r(i)/etoile(1)%r, tab_r(i-1)/etoile(1)%r
+		enddo
+		!write(*,*) "Rmax = ", rmax/etoile(1)%r
+		!stop
+		if (maxval(tab_r)-maxval(tab_r_1D_tmp*etoile(1)%r) /= 0.0) call error("read grid doesn't match the grid")
+		!write(*,*) 'n_rad_region=', n_rad_region, ' n_cells = ', n_cells
+		n_cells_tmp = istart+n_rad_region
+		istart = n_cells_tmp + 1
+	endif
 
   r_lim(0)= rmin
   r_lim_2(0)= rmin**2
@@ -512,6 +569,7 @@ subroutine define_cylindrical_grid()
      phi_grid(icell) = phi_grid_tmp(k)
   enddo
 
+	if(lread_1D_grid) deallocate(tab_r_1D_tmp)
 
   ! Pour Sebastien Charnoz
   if (lSeb_Charnoz) then
