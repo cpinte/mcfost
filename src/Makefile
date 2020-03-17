@@ -164,7 +164,7 @@ OBJECTS= $(SOURCES:.f90=.o)
 # Compile
 main : mcfost
 
-include .depend
+#include .depend
 
 all : mcfost libmcfost.a
 

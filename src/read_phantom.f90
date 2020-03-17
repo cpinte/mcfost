@@ -670,8 +670,7 @@ subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
   ! Modifying SPH dump
   if (ldelete_Hill_sphere) then
      allocate(mask(np))
-     mask(:) = .false.
-     call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,udist,mask)
+     call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,udist, mask)
   endif
   if (lrandomize_azimuth)     call randomize_azimuth(np, xyzh, vxyzu, mask)
   if (lrandomize_gap)         call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor, .true.)
@@ -791,7 +790,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
  j = 0
  do i=1,np
-     ifile = ifiles(i)
+    ifile = ifiles(i)
 
     xi = xyzh(1,i)
     yi = xyzh(2,i)
