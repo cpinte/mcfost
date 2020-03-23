@@ -13,7 +13,7 @@ module mess_up_SPH
 
 contains
 
-  subroutine mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,udist,mask)
+  subroutine mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,udist, mask)
     ! Create and return a mask with the particles that are not within the Hill spheres
     ! of all the planets in a dump
     ! mask is set to True is particle is inside the Hill sphere
@@ -41,7 +41,10 @@ contains
        write(*,*) "Sink particle #", i_planet, "Hill radius =", r_Hill * udist / au_to_cm, "au"
 
        particle_loop : do i=1, np
-          ! We first exlude particles that are not with a cube around the sink particle
+          ! We ignore dead particles, as they will be filtered out later
+          if (xyzh(4,i) < 0) cycle particle_loop
+
+          ! We exlude particles that are not with a cube around the sink particle
           dx = xyzh(1,i) - xyzmh_ptmass(1,i_planet)
           if (dx > r_Hill) cycle particle_loop
           dy = xyzh(2,i) - xyzmh_ptmass(2,i_planet)

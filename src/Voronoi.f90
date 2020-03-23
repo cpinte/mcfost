@@ -185,22 +185,24 @@ module Voronoi_grid
 
     !************************************************************************
 
-  subroutine Voronoi_tesselation(n_points, x,y,z,h, limits, check_previous_tesselation)
+  subroutine Voronoi_tesselation(n_points, particle_id, x,y,z,h, vx,vy,vz, limits, check_previous_tesselation)
 
     use iso_fortran_env
     use, intrinsic :: iso_c_binding, only : c_bool
     !$ use omp_lib
 
     integer, intent(in) :: n_points
-    real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h
+    real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h, vx,vy,vz
+    integer, dimension(n_points), intent(in) :: particle_id
     real(kind=dp), dimension(6), intent(in) :: limits
     logical, intent(in) :: check_previous_tesselation
+
 
     integer, parameter :: max_neighbours = 25  ! maximum number of neighbours per cell (to build neighbours list)
 
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
-    integer, dimension(:), allocatable :: SPH_id
-    real :: time
+    integer, dimension(:), allocatable :: SPH_id, i_tmp
+    real :: time, mem
     integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
     real(kind=dp), dimension(:), allocatable :: delta_edge, delta_centroid
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
@@ -216,6 +218,7 @@ module Voronoi_grid
     integer :: icell_start, icell_end, id, row, l
 
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
+    character(len=2) :: unit
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
@@ -228,7 +231,7 @@ module Voronoi_grid
     Rmax = sqrt( (limits(2)-limits(1))**2 + (limits(4)-limits(3))**2 + (limits(6)-limits(5))**2 )
 
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
-         SPH_id(n_points+n_etoiles),  stat=alloc_status)
+         SPH_id(n_points+n_etoiles), i_tmp(n_points+n_etoiles), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
 
     do istar=1, n_etoiles
@@ -239,6 +242,7 @@ module Voronoi_grid
     icell = 0
     n_sublimate = 0
     do i=1, n_points
+
        ! We test if the point is in the model volume
        if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
           if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
@@ -264,8 +268,8 @@ module Voronoi_grid
 
                 if (is_outside_stars) then
                    icell = icell + 1
-                   SPH_id(icell) = i
-                   x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(icell) = h(i)
+                   i_tmp(icell) = i
+                   SPH_id(icell) = particle_id(i)
                 endif
              endif
           endif
@@ -317,13 +321,26 @@ module Voronoi_grid
     neighbours_list = 0 ; neighbours_list_loc = 0
 
     do icell=1, n_cells
-       Voronoi(icell)%xyz(1) = x_tmp(icell)
-       Voronoi(icell)%xyz(2) = y_tmp(icell)
-       Voronoi(icell)%xyz(3) = z_tmp(icell)
+       i = i_tmp(icell)
+       Voronoi(icell)%xyz(1) = x(i)
+       Voronoi(icell)%xyz(2) = y(i)
+       Voronoi(icell)%xyz(3) = z(i)
+       Voronoi(icell)%h      = h(i)
        Voronoi_xyz(:,icell) = Voronoi(icell)%xyz(:)
-       Voronoi(icell)%h      = h_tmp(icell)
        Voronoi(icell)%id     = SPH_id(icell)
     enddo
+
+    !*************************
+    ! Velocities
+    !*************************
+    if (lemission_mol) then
+       do icell=1,n_cells
+          i = i_tmp(icell)
+          Voronoi(icell)%vxyz(1) = vx(i)
+          Voronoi(icell)%vxyz(2) = vy(i)
+          Voronoi(icell)%vxyz(3) = vz(i)
+       enddo
+    endif
 
     do i=1, n_etoiles
        Voronoi(etoile(i)%icell)%is_star = .true.
@@ -331,6 +348,17 @@ module Voronoi_grid
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
+    mem =  n_cells * (5*2 + 1) * 4
+    if (mem > 1e9) then
+       mem = mem / 1024**3
+       unit = "GB"
+    else
+       mem = mem / 1024**2
+       unit = "MB"
+    endif
+    write(*,*) "mcfost will require ~", mem, unit//" of temporary memory for the tesselation" ! 5 double + 2 int arrays
+
+
     if (operating_system == "Darwin" .and. (n_cells > 2e6)) then
        call warning("Voronoi tesselation will likely crash with that many particle on a Mac. Switch to linux")
     endif
