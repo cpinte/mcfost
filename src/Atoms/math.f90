@@ -224,7 +224,7 @@ MODULE math
 
      linear_1D_sorted(:) = 0._dp
 
-     ! We do a first pass, tu find the 1 inndex to interpolate
+     ! We do a first pass, to find the 1st index to interpolate
      ! Below x(1), we keep the values to 0 (ie no extrapolation)
      j0=np+1
      do j=1, np
@@ -234,11 +234,13 @@ MODULE math
         endif
      enddo
 
+     ! We perform the 2nd pass where we do the actual interpolation
+     ! For points larger than x(n), value will stay at 0
      i0 = 2
      do j=j0, np
         loop_i : do i=i0, n
            if (x(i) > xp(j)) then
-              t = (xp(j) - x(i-1)) / (x(i)-x(i-1))
+              t = (xp(j) - x(i-1)) / (x(i) - x(i-1))
               linear_1D_sorted(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
               i0 = i
               exit loop_i
