@@ -10,6 +10,7 @@ MODULE Opacity
 	use parametres
 	use profiles, only									: Profile
 	use getlambda, only									: hv
+	use planck, only 									: bpnu
 
 	use math, only										: locate, integrate_nu, integrate_x
 	use mcfost_env, only								: dp
@@ -111,13 +112,22 @@ MODULE Opacity
           
          		do la=1,aatom%continua(kc)%Nlambda
 
-					if ((aatom%n(i,icell) - aatom%n(j,icell) * aatom%continua(kc)%gij(la,icell)) > 0.0) then
+					if ((aatom%n(i,icell) - aatom%n(j,icell) * aatom%continua(kc)%gij(la,icell)) > 0.0_dp) then
 					
 						NLTEspec%AtomOpac%Kc_nlte(Nblue+la-1,icell) = NLTEspec%AtomOpac%Kc_nlte(Nblue+la-1,icell) + &
             aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - aatom%continua(kc)%gij(la,icell)*aatom%n(j,icell))
             
 						NLTEspec%AtomOpac%jc_nlte(Nblue+la-1,icell) = NLTEspec%AtomOpac%jc_nlte(Nblue+la-1,icell) + &
             aatom%continua(kc)%alpha(la) * aatom%continua(kc)%twohnu3_c2(la) * aatom%continua(kc)%gij(la,icell) * aatom%n(j,icell)
+            
+					else !neg or null
+					
+						NLTEspec%AtomOpac%Kc_nlte(Nblue+la-1,icell) = NLTEspec%AtomOpac%Kc_nlte(Nblue+la-1,icell) + &
+						aatom%continua(kc)%alpha(la) * aatom%n(i,icell) * (1.0_dp - dexp(-hc_k/NLTEspec%lambda(Nblue+la-1)/aatom%continua(kc)%Tex(icell)))
+            
+						NLTEspec%AtomOpac%jc_nlte(Nblue+la-1,icell) = NLTEspec%AtomOpac%jc_nlte(Nblue+la-1,icell) + &
+						aatom%continua(kc)%alpha(la) * aatom%n(i,icell) * (1.0_dp - dexp(-hc_k/NLTEspec%lambda(Nblue+la-1)/aatom%continua(kc)%Tex(icell))) * &
+						bpnu(aatom%continua(kc)%Tex(icell), NLTEspec%lambda(Nblue+la-1))
             
 					endif
           
@@ -159,6 +169,7 @@ MODULE Opacity
 	RETURN
 	END SUBROUTINE compute_nlte_bound_free
 	
+	!Not up to date, check with calc_total_source_loc
 	!Done in the propagation, to have it at id (icell) for iray==1
 	SUBROUTINE calc_etac_atom_loc(id, icell)
 	!Store the continuous emissivity for the running cell, for all atoms
@@ -205,6 +216,7 @@ MODULE Opacity
 	END SUBROUTINE calc_etac_atom_loc
 
  
+	!Not up to date, check with calc_total_source_loc
 	SUBROUTINE calc_eta_atom_loc(id, icell, iray, initialize) !update eta and psi, iterate always true
 	! ------------------------------------------------------------------------- !
 	! ------------------------------------------------------------------------- !  
@@ -332,13 +344,22 @@ MODULE Opacity
           
          			do la=1,aatom%continua(kc)%Nlambda
 
-						if ((aatom%n(i,icell) - aatom%n(j,icell) * aatom%continua(kc)%gij(la,icell)) > 0.0) then
+						if ((aatom%n(i,icell) - aatom%n(j,icell) * aatom%continua(kc)%gij(la,icell)) > 0.0_dp) then
 
 							!aatom%chic(Nblue+la-1,id) = aatom%chic(Nblue+la-1,id)+  aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - aatom%continua(kc)%gij(la,icell)*aatom%n(j,icell))
 							!aatom%etac(Nblue+la-1,id) = aatom%etac(Nblue+la-1, id) + aatom%continua(kc)%alpha(la) * aatom%continua(kc)%twohnu3_c2(la) * aatom%continua(kc)%gij(la,icell) * aatom%n(j,icell)
 							NLTEspec%chi(Nblue+la-1,iray,id) = NLTEspec%chi(Nblue+la-1,iray,id) + aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - aatom%continua(kc)%gij(la,icell) * aatom%n(j,icell))
 							NLTEspec%S(Nblue+la-1,iray,id) = NLTEspec%S(Nblue+la-1,iray,id) + aatom%continua(kc)%alpha(la) * aatom%n(j,icell) * aatom%continua(kc)%twohnu3_c2(la) * aatom%continua(kc)%gij(la,icell)
-						
+							
+						else !negative or null
+
+							NLTEspec%chi(Nblue+la-1,iray,id) = NLTEspec%chi(Nblue+la-1,iray,id) + &
+							aatom%continua(kc)%alpha(la) * aatom%n(i,icell) * (1.0_dp - dexp(-hc_k/NLTEspec%lambda(Nblue+la-1)/aatom%continua(kc)%Tex(icell)))
+							
+							NLTEspec%S(Nblue+la-1,iray,id) = NLTEspec%S(Nblue+la-1,iray,id) + &
+							aatom%continua(kc)%alpha(la) * aatom%n(i,icell) * (1.0_dp - dexp(-hc_k/NLTEspec%lambda(Nblue+la-1)/aatom%continua(kc)%Tex(icell))) * &
+							bpnu(aatom%continua(kc)%Tex(icell), NLTEspec%lambda(Nblue+la-1))
+													
 						endif
             
           
@@ -361,16 +382,27 @@ MODULE Opacity
 				i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
 				dk = aatom%lines(kr)%dk(iray,id)
 
-				if ((aatom%n(i,icell) - aatom%n(j,icell)*aatom%lines(kc)%gij) <= 0.0) cycle
+				!if ((aatom%n(i,icell) - aatom%n(j,icell)*aatom%lines(kc)%gij) <= 0.0) cycle
 
          		!NLTE subroutine. uses dk instead of a profile
 				do la=1, aatom%lines(kc)%Nlambda
+				
+					if ((aatom%n(i,icell) - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
 
-					NLTEspec%chi(Nblue+la-1-dk,iray,id) = NLTEspec%chi(Nblue+la-1-dk,iray,id) + &
-					hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell) * (aatom%n(i,icell) - aatom%lines(kc)%gij*aatom%n(j,icell))
+						NLTEspec%chi(Nblue+la-1-dk,iray,id) = NLTEspec%chi(Nblue+la-1-dk,iray,id) + &
+						hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell) * (aatom%n(i,icell) - aatom%lines(kc)%gij*aatom%n(j,icell))
          
-					NLTEspec%S(Nblue+la-1-dk,iray,id) = NLTEspec%S(Nblue+la-1-dk,iray,id) + &
-					aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell) * aatom%n(j,icell)
+						NLTEspec%S(Nblue+la-1-dk,iray,id) = NLTEspec%S(Nblue+la-1-dk,iray,id) + &
+						aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell) * aatom%n(j,icell)
+					else !negative or null
+	
+						NLTEspec%chi(Nblue+la-1-dk,iray,id) = NLTEspec%chi(Nblue+la-1-dk,iray,id) + &
+						hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell) * aatom%n(i,icell) * (1.0_dp - dexp(-hc_k/aatom%lines(kc)%lambda0/aatom%lines(kc)%Tex(icell)))
+         
+						NLTEspec%S(Nblue+la-1-dk,iray,id) = NLTEspec%S(Nblue+la-1-dk,iray,id) + &
+						aatom%lines(kc)%twohnu3_c2 * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell) * aatom%n(i,icell) * dexp(-hc_k/aatom%lines(kc)%lambda0/aatom%lines(kc)%Tex(icell))				
+					
+					endif
 
 				enddo
     
@@ -446,16 +478,30 @@ MODULE Opacity
 				i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
 				aatom%lines(kc)%dk(iray,id) = dk
 
-				if ((aatom%n(i,icell) - aatom%n(j,icell)*aatom%lines(kc)%gij) <= 0.0) cycle
+				!if ((aatom%n(i,icell) - aatom%n(j,icell)*aatom%lines(kc)%gij) <= 0.0) cycle
 
 
 				do la=1, aatom%lines(kc)%Nlambda
+				
+					if ((aatom%n(i,icell) - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
+
         
-					NLTEspec%AtomOpac%chi(Nblue+la-1-dk,id) = NLTEspec%AtomOpac%chi(Nblue+la-1-dk,id) + &
+						NLTEspec%AtomOpac%chi(Nblue+la-1-dk,id) = NLTEspec%AtomOpac%chi(Nblue+la-1-dk,id) + &
 				hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell) * (aatom%n(i,icell) - aatom%lines(kc)%gij*aatom%n(j,icell))
        	 
-					NLTEspec%AtomOpac%eta(Nblue+la-1-dk,id)= NLTEspec%AtomOpac%eta(Nblue+la-1-dk,id) + &
+						NLTEspec%AtomOpac%eta(Nblue+la-1-dk,id)= NLTEspec%AtomOpac%eta(Nblue+la-1-dk,id) + &
 				aatom%lines(kc)%twohnu3_c2 * aatom%lines(kc)%gij * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell) * aatom%n(j,icell)
+				
+					else !neg or null
+					
+						NLTEspec%AtomOpac%chi(Nblue+la-1-dk,id) = NLTEspec%AtomOpac%chi(Nblue+la-1-dk,id) + &
+				aatom%n(i,icell) * (1._dp - dexp(-hc_k/aatom%lines(kc)%lambda0/aatom%lines(kc)%Tex(icell))) * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell)
+       	 
+						NLTEspec%AtomOpac%eta(Nblue+la-1-dk,id)= NLTEspec%AtomOpac%eta(Nblue+la-1-dk,id) + &
+				aatom%lines(kc)%twohnu3_c2 * aatom%n(i,icell) * dexp(-hc_k/aatom%lines(kc)%lambda0/aatom%lines(kc)%Tex(icell)) * hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell)
+				
+				
+					endif
 
 		
 ! 					if (iterate) then

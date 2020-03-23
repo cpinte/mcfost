@@ -961,6 +961,11 @@ MODULE AtomicTransfer
 
 		write(*,*) "   -> Solving for kinetic equations for ", atmos%Nactiveatoms, " atoms"
 		write(*,*) " Max error : ", dpops_max_error, dpops_sub_max_error
+		
+
+open(unit=unit_invfile, file=invpop_file, status="unknown")
+write(unit_invfile,*) n_cells
+
   
 		verbose = .true.
 
@@ -1436,7 +1441,8 @@ MODULE AtomicTransfer
 		deallocate(dM, dTM, Tex_ref, Tion_ref)
 		if (allocated(Jold)) deallocate(Jold)
 		CALL free_nlte_sol(.false.)
-
+		
+close(unit=unit_invfile)
 ! ------------------------------------------------------------------------------------ !
 	RETURN
 	END SUBROUTINE NLTEloop
