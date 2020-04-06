@@ -269,6 +269,7 @@ module Voronoi_grid
                 if (is_outside_stars) then
                    icell = icell + 1
                    i_tmp(icell) = i
+                   x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(icell) = h(i)
                    SPH_id(icell) = particle_id(i)
                 endif
              endif
