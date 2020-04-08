@@ -1253,6 +1253,7 @@ end subroutine write_column_density
 
 subroutine write_column(type, filename, lambda)
   ! WARNING: Only works if the star in in 0, 0, 0 at the moment
+  ! 0 = to the star, 1 = towards +z, 2 = towards -z and 3 = towards + x (or +r in 2D
 
   use optical_depth, only : compute_column
 
