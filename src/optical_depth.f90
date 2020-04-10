@@ -308,7 +308,7 @@ subroutine compute_column(type, column, lambda)
   integer :: icell, icell0, next_cell, previous_cell, direction
   logical :: ltest
 
-  real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w, l_contrib, l_void_before, CD_units, factor
+  real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w, l_contrib, l_void_before, CD_units, factor, sum
 
   CD_units = AU_to_m * masse_mol_gaz / (m_to_cm)**2 ! g/cm^-2 and AU_to_m factor as l_contrib is in AU
 
@@ -316,15 +316,9 @@ subroutine compute_column(type, column, lambda)
   do direction = 1, n_directions
      !$omp parallel default(none) &
      !$omp shared(densite_gaz,lVoronoi,Voronoi,direction,column,r_grid,z_grid,phi_grid,n_cells,cross_cell,CD_units,kappa,lambda,type) &
-     !$omp private(icell,previous_cell,next_cell,icell0,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,ltest,factor)
+     !$omp private(icell,previous_cell,next_cell,icell0,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,ltest,factor,sum)
      !$omp do
      do icell=1,n_cells
-        if (type==1) then
-           factor = CD_units * densite_gaz(icell) ! column density
-        else
-           factor = kappa(icell,lambda) ! optical depth
-        endif
-
         if (lVoronoi) then
            x1 = Voronoi(icell)%xyz(1)
            y1 = Voronoi(icell)%xyz(2)
@@ -351,27 +345,25 @@ subroutine compute_column(type, column, lambda)
         next_cell = icell
         icell0 = 0
 
-        ltest = .true.
-        do while(ltest)
+!        ltest = .true.
+        sum = 0.
+        inf_loop: do !while(ltest)
            previous_cell = icell0
            icell0 = next_cell
            x0 = x1 ; y0 = y1 ; z0 = z1
-           call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
-           column(icell,direction) = column(icell,direction) + l_contrib * factor
 
-           ! Do we continue to integrate ?
-           ! Voronoi : next_cell > 1 (not a wall) and Voronoi(icell)%is_star == .false (not a star)
-           ! Cylindrical : next_cell <= n_cells
-           if (lVoronoi) then
-              if (next_cell > 0) then
-                 ltest = (.not.Voronoi(next_cell)%is_star)
-              else
-                 ltest = .false.
-              endif
+           ! Test sortie
+           if (test_exit_grid(icell0, x0, y0, z0)) exit inf_loop
+
+           call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
+           if (type==1) then
+              factor = CD_units * densite_gaz(icell0) ! column density
            else
-              ltest = (next_cell <= n_cells)
+              factor = kappa(icell0,lambda) ! optical depth
            endif
-        enddo
+           sum = sum + l_contrib * factor
+        enddo inf_loop
+        column(icell,direction) = sum
      enddo ! icell
      !$omp enddo
      !$omp end parallel

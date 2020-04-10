@@ -1228,7 +1228,6 @@ subroutine write_optical_depth_map(lambda)
   write(*,*) "Writing optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sp), "microns"
   filename = "!optical_depth_map.fits.gz"
   call write_column(2, filename, lambda)
-
   write(*,*) "Done"
   call exit(0)
 
@@ -1309,7 +1308,7 @@ subroutine write_column(type, filename, lambda)
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-  call ftpkys(unit,'BUNIT',"g.cm-2",' ',status)
+  if (type==1) call ftpkys(unit,'BUNIT',"g.cm-2",' ',status)
 
   !  Write the array to the FITS file.
   group=1
