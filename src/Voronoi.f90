@@ -1170,7 +1170,7 @@ pure logical function test_exit_grid_Voronoi(icell, x,y,z)
   if (icell < 0) then
      test_exit_grid_Voronoi = .true.
   else
-     test_exit_grid_Voronoi = .false.
+     test_exit_grid_Voronoi = .false. ! .not.Voronoi(next_cell)%is_star
   endif
 
   return

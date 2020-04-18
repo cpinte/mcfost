@@ -141,6 +141,7 @@ subroutine set_default_variables()
   lrandomize_gap = .false.
   lrandomize_outside_gap = .false.
   lwrite_column_density = .false.
+  lwrite_mol_column_density = .false.
 
   tmp_dir = "./"
 
@@ -1061,6 +1062,9 @@ subroutine initialisation_mcfost()
      case("-cd","-column_density")
         i_arg = i_arg + 1
         lwrite_column_density = .true.
+     case("-mol_cd","-mol_column_density")
+        i_arg = i_arg + 1
+        lwrite_mol_column_density = .true.
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"

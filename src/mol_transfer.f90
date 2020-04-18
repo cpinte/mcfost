@@ -98,6 +98,8 @@ subroutine mol_line_transfer()
      call opacite_mol(imol)
      call integ_tau_mol(imol)
 
+     if (lwrite_mol_column_density) call write_mol_column_density(imol)
+
      ! Resolution population des niveaux nLTE
      if (.not.lmol_LTE) then
         call NLTE_mol_line_transfer(imol)

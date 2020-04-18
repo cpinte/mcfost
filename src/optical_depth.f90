@@ -296,7 +296,6 @@ end subroutine optical_length_tot
 subroutine compute_column(type, column, lambda)
 
   use density, only : densite_gaz
-
   !$ use omp_lib
 
   integer, intent(in) ::type ! 1 = column_density, 2 = optical_depth
@@ -306,17 +305,20 @@ subroutine compute_column(type, column, lambda)
   real, dimension(n_cells,n_directions), intent(out) :: column
 
   integer :: icell, icell0, next_cell, previous_cell, direction
-  logical :: ltest
 
   real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w, l_contrib, l_void_before, CD_units, factor, sum
 
-  CD_units = AU_to_m * masse_mol_gaz / (m_to_cm)**2 ! g/cm^-2 and AU_to_m factor as l_contrib is in AU
+  if (type==1) then
+     CD_units = AU_to_m * masse_mol_gaz / (m_to_cm)**2 ! g/cm^-2 and AU_to_m factor as l_contrib is in AU
+  else if (type==3) then
+     CD_units = AU_to_m / (m_to_cm)**2 ! particle/cm^-2 and AU_to_m factor as l_contrib is in AU
+  endif
 
   column(:,:) = 0.0
   do direction = 1, n_directions
      !$omp parallel default(none) &
-     !$omp shared(densite_gaz,lVoronoi,Voronoi,direction,column,r_grid,z_grid,phi_grid,n_cells,cross_cell,CD_units,kappa,lambda,type) &
-     !$omp private(icell,previous_cell,next_cell,icell0,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,ltest,factor,sum)
+     !$omp shared(densite_gaz,tab_abundance,lVoronoi,Voronoi,direction,column,r_grid,z_grid,phi_grid,n_cells,cross_cell,CD_units,kappa,lambda,type) &
+     !$omp private(icell,previous_cell,next_cell,icell0,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,factor,sum)
      !$omp do
      do icell=1,n_cells
         if (lVoronoi) then
@@ -345,7 +347,6 @@ subroutine compute_column(type, column, lambda)
         next_cell = icell
         icell0 = 0
 
-!        ltest = .true.
         sum = 0.
         inf_loop: do !while(ltest)
            previous_cell = icell0
@@ -358,8 +359,10 @@ subroutine compute_column(type, column, lambda)
            call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
            if (type==1) then
               factor = CD_units * densite_gaz(icell0) ! column density
+           else if (type==2) then
+              factor = kappa(icell0,lambda) ! optical depth, kappa in AU^-1
            else
-              factor = kappa(icell0,lambda) ! optical depth
+              factor = CD_units * densite_gaz(icell0) * tab_abundance(icell0) ! molecular column density
            endif
            sum = sum + l_contrib * factor
         enddo inf_loop

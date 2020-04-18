@@ -1249,10 +1249,25 @@ end subroutine write_column_density
 
 !***********************************************************
 
+subroutine write_mol_column_density(imol)
+
+  integer, intent(in) :: imol
+  character(len=512) :: filename
+
+  write(*,*) "Writing molecular column density"
+  filename = trim(data_dir2(imol))//"/column_density.fits.gz"
+  call write_column(3, filename)
+
+  return
+
+end subroutine write_mol_column_density
+
+!***********************************************************
+
 
 subroutine write_column(type, filename, lambda)
   ! WARNING: Only works if the star in in 0, 0, 0 at the moment
-  ! 0 = to the star, 1 = towards +z, 2 = towards -z and 3 = towards + x (or +r in 2D
+  ! 0 = towards the star, 1 = towards +z, 2 = towards -z and 3 = towards + r
 
   use optical_depth, only : compute_column
 
@@ -1309,6 +1324,7 @@ subroutine write_column(type, filename, lambda)
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
   if (type==1) call ftpkys(unit,'BUNIT',"g.cm-2",' ',status)
+  if (type==3) call ftpkys(unit,'BUNIT',"particle.cm-2",' ',status)
 
   !  Write the array to the FITS file.
   group=1
