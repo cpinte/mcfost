@@ -318,7 +318,7 @@ subroutine compute_column(type, column, lambda)
   do direction = 1, n_directions
      !$omp parallel default(none) &
      !$omp shared(densite_gaz,tab_abundance,lVoronoi,Voronoi,direction,column,r_grid,z_grid,phi_grid,n_cells,cross_cell,CD_units,kappa,lambda,type) &
-     !$omp private(icell,previous_cell,next_cell,icell0,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,factor,sum)
+     !$omp private(icell,previous_cell,next_cell,icell0,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,factor,sum,test_exit_grid)
      !$omp do
      do icell=1,n_cells
         if (lVoronoi) then
@@ -348,7 +348,7 @@ subroutine compute_column(type, column, lambda)
         icell0 = 0
 
         sum = 0.
-        inf_loop: do !while(ltest)
+        inf_loop: do
            previous_cell = icell0
            icell0 = next_cell
            x0 = x1 ; y0 = y1 ; z0 = z1
