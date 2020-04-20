@@ -1219,142 +1219,70 @@ end subroutine write_origin
 
 !**********************************************************************
 
-subroutine calc_optical_depth_map(lambda)
+subroutine write_optical_depth_map(lambda)
 
-  implicit none
+  integer, intent(in) :: lambda
 
-  integer :: lambda
-
-  integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(5) :: naxes
-  integer :: i,j,k, group,fpixel,nelements
-
-  character(len = 512) :: filename
-  logical :: simple, extend, lmilieu
-
-  real, dimension(n_rad,nz,n_az,2) :: optical_depth_map
-
-  lmilieu = .true. ! opacite au milieu ou a la "fin" de la cellule
-
-  if (lmilieu) then
-     ! Opacite radiale
-     do k=1, n_az
-        do j=1, nz
-           i=1 ; optical_depth_map(i,j,k,1) = kappa(cell_map(i,j,k),lambda)* 0.5 * (r_lim(i)-r_lim(i-1))
-           do i=2, n_rad
-              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) + &
-                   0.5 * kappa(cell_map(i-1,j,k),lambda)*(r_lim(i-1)-r_lim(i-2)) + &
-                   0.5 * kappa(cell_map(i,j,k),lambda)*(r_lim(i)-r_lim(i-1))
-           enddo
-        enddo
-     enddo
-
-     ! Opacite verticale
-     do i=1, n_rad
-        do k=1, n_az
-           j=nz ; optical_depth_map(i,j,k,2) = kappa(cell_map(i,j,k),lambda)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
-           do j=nz-1,1,-1
-              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + &
-                   0.5 * kappa(cell_map(i,j+1,k),lambda)*(z_lim(i,j+2)-z_lim(i,j+1)) + &
-                   0.5 * kappa(cell_map(i,j,k),lambda)*(z_lim(i,j+1)-z_lim(i,j))
-           enddo
-        enddo
-     enddo
-
-  else
-     ! Opacite radiale
-     do k=1, n_az
-        do j=1, nz
-           i=1 ; optical_depth_map(i,j,k,1) = kappa(cell_map(i,j,k),lambda)*(r_lim(i)-r_lim(i-1))
-           do i=2, n_rad
-              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) +kappa(cell_map(i,j,k),lambda)*(r_lim(i)-r_lim(i-1))
-           enddo
-        enddo
-     enddo
-
-     ! Opacite verticale
-     do i=1, n_rad
-        do k=1, n_az
-           j=nz ; optical_depth_map(i,j,k,2) = kappa(cell_map(i,j,k),lambda)*(z_lim(i,j+1)-z_lim(i,j))
-           do j=nz-1,1,-1
-              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + kappa(cell_map(i,j,k),lambda)*(z_lim(i,j+1)-z_lim(i,j))
-           enddo
-        enddo
-     enddo
-  endif
+  character(len=512) :: filename
 
   write(*,*) "Writing optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sp), "microns"
   filename = "!optical_depth_map.fits.gz"
-
-  status=0
-  !  Get an unused Logical Unit Number to use to open the FITS file.
-  call ftgiou(unit,status)
-
-  !  Create the new empty FITS file.
-  blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
-
-  !  Initialize parameters about the FITS image
-  simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
-  bitpix=-32
-  naxis=4
-  naxes(1)=n_rad
-  naxes(2)=nz
-  naxes(3)=n_az
-  naxes(4)=2
-
-  extend=.true.
-
-  !  Write the required header keywords.
-  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-  !  Write the array to the FITS file.
-  group=1
-  fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-
-  ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,optical_depth_map,status)
-
-  !  Close the file and free the unit number.
-  call ftclos(unit, status)
-
-  call ftfiou(unit, status)
-
-  !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
-
+  call write_column(2, filename, lambda)
   write(*,*) "Done"
   call exit(0)
 
-end subroutine calc_optical_depth_map
+end subroutine write_optical_depth_map
+
+!***********************************************************
+
+subroutine write_column_density()
+
+  character(len=512) :: filename
+
+  write(*,*) "Writing column density"
+  filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
+  call write_column(1, filename)
+
+  return
+
+end subroutine write_column_density
+
+!***********************************************************
+
+subroutine write_mol_column_density(imol)
+
+  integer, intent(in) :: imol
+  character(len=512) :: filename
+
+  write(*,*) "Writing molecular column density"
+  filename = trim(data_dir2(imol))//"/column_density.fits.gz"
+  call write_column(3, filename)
+
+  return
+
+end subroutine write_mol_column_density
 
 !***********************************************************
 
 
-subroutine write_column_density()
+subroutine write_column(type, filename, lambda)
   ! WARNING: Only works if the star in in 0, 0, 0 at the moment
+  ! 0 = towards the star, 1 = towards +z, 2 = towards -z and 3 = towards + r
 
-  use density, only : compute_column_density
+  use optical_depth, only : compute_column
+
+  integer, intent(in) :: type
+  character(len=512), intent(in) :: filename
+  integer, intent(in), optional :: lambda
 
   integer, parameter :: n_directions = 4
-
-  real, dimension(n_cells,n_directions) :: CD
+  real, dimension(n_cells,n_directions) :: column
 
   integer :: status,unit,blocksize,bitpix,naxis,group,fpixel,nelements
   integer, dimension(4) :: naxes
   logical :: simple, extend
-  character(len=512) :: filename
 
-  call compute_column_density(CD)
-
-  write(*,*) "Writing column density"
-
-  filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
+  call compute_column(type, column, lambda)
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1395,14 +1323,15 @@ subroutine write_column_density()
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-  call ftpkys(unit,'BUNIT',"g.cm-2",' ',status)
+  if (type==1) call ftpkys(unit,'BUNIT',"g.cm-2",' ',status)
+  if (type==3) call ftpkys(unit,'BUNIT',"particle.cm-2",' ',status)
 
   !  Write the array to the FITS file.
   group=1
   fpixel=1
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,CD,status)
+  call ftppre(unit,group,fpixel,nelements,column,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -1413,7 +1342,7 @@ subroutine write_column_density()
 
   return
 
-end subroutine write_column_density
+end subroutine write_column
 
 !***********************************************************
 

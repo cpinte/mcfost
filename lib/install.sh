@@ -135,8 +135,9 @@ cd xgboost
 git checkout v0.90
 #-- we remove the test for the moment even if this works for gfortran
 #if [ "$SYSTEM" = "ifort" ] ; then
-    \cp ../ifort/xgboost/base.h include/xgboost/base.h
+\cp ../ifort/xgboost/base.h include/xgboost/base.h
 #fi
+\cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ was hard-coded in the Mekefile
 make -j
 \cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
 \cp -r dmlc-core/include/dmlc rabit/include/rabit include/xgboost ../include

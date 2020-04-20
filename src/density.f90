@@ -19,7 +19,8 @@ module density
 
   public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_species, read_sigma_file, normalize_dust_density, &
-       reduce_density, compute_column_density
+       reduce_density
+
 
   private
 
@@ -1981,86 +1982,6 @@ subroutine reduce_density(icell, factor)
 
 end subroutine reduce_density
 
-!************************************************************
-
-subroutine compute_column_density(CD)
-
-  !$ use omp_lib
-
-  integer, parameter :: n_directions = 4
-  real, dimension(n_cells,n_directions), intent(out) :: CD
-
-  integer :: icell, icell0, next_cell, previous_cell, direction
-  logical :: ltest
-
-  real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w, l_contrib, l_void_before
-
-  CD(:,:) = 0.0
-  do direction = 1, n_directions
-     !$omp parallel default(none) &
-     !$omp shared(densite_gaz,lVoronoi,Voronoi,direction,CD,r_grid,z_grid,phi_grid,n_cells,cross_cell) &
-     !$omp private(icell,previous_cell,next_cell,icell0,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,ltest)
-     !$omp do
-     do icell=1,n_cells
-
-        if (lVoronoi) then
-           x1 = Voronoi(icell)%xyz(1)
-           y1 = Voronoi(icell)%xyz(2)
-           z1 = Voronoi(icell)%xyz(3)
-        else
-           x1 = r_grid(icell) * cos(phi_grid(icell))
-           y1 = r_grid(icell) * sin(phi_grid(icell))
-           z1 = z_grid(icell)
-        endif
-
-        if (direction == 1) then ! to star (assumed to in 0,0,0 for now + only 1 star)
-           norme = 1./sqrt(x1*x1 + y1*y1 + z1*z1)
-           u  = -x1 * norme ; v = -y1 * norme ; w = -z1 * norme
-        else if (direction == 2) then ! vertical +z
-           u = 0.0 ; v = 0.0 ; w = 1.0
-        else if (direction == 3) then ! vertical -z
-           u = 0.0 ; v = 0.0 ; w = -1.0
-        else ! radial
-           u = x1 ; v = y1 ; w = 0
-           norme = 1./sqrt(u**2 + v**2)
-           u = u * norme ; v = v* norme
-        endif
-
-        next_cell = icell
-        icell0 = 0
-
-        ltest = .true.
-        do while(ltest)
-           previous_cell = icell0
-           icell0 = next_cell
-           x0 = x1 ; y0 = y1 ; z0 = z1
-           call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
-           CD(icell,direction) = CD(icell,direction) + (l_contrib * AU_to_m) * densite_gaz(icell) * masse_mol_gaz
-
-           ! Do we continue to integrate ?
-           ! Voronoi : next_cell > 1 (not a wall) and Voronoi(icell)%is_star == .false (not a star)
-           ! Cylindrical : next_cell <= n_cells
-           if (lVoronoi) then
-              if (next_cell > 0) then
-                 ltest = (.not.Voronoi(next_cell)%is_star)
-              else
-                 ltest = .false.
-              endif
-           else
-              ltest = (next_cell <= n_cells)
-           endif
-        enddo
-     enddo ! icell
-     !$omp enddo
-     !$omp end parallel
-  end do ! direction
-  CD(:,:) = CD(:,:) / (m_to_cm)**2 ! g/cm^-2
-
-  return
-
-end subroutine compute_column_density
-
 !***********************************************************
-
 
 end module density

@@ -180,7 +180,7 @@ subroutine transfert_poussiere()
      call opacite(1,1)
      call integ_tau(1) !TODO
 
-     if (loptical_depth_map) call calc_optical_depth_map(1)
+     if (loptical_depth_map) call write_optical_depth_map(1)
 
      write(*,*) ""
      write(*,*) "Dust properties in cell #", icell_ref
@@ -294,7 +294,7 @@ subroutine transfert_poussiere()
         enddo test_tau
         write(*,*) "lambda =", tab_lambda(lambda_seuil)
         call integ_tau(lambda_seuil)
-        if (loptical_depth_map) call calc_optical_depth_map(lambda_seuil)
+        if (loptical_depth_map) call write_optical_depth_map(lambda_seuil)
 
         if (lspherical.or.l3D) then
            write(*,*) "No dark zone"

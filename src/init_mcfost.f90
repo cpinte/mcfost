@@ -139,7 +139,9 @@ subroutine set_default_variables()
   ldelete_hill_sphere = .false.
   lrandomize_azimuth = .false.
   lrandomize_gap = .false.
+  lrandomize_outside_gap = .false.
   lwrite_column_density = .false.
+  lwrite_mol_column_density = .false.
 
   tmp_dir = "./"
 
@@ -1050,10 +1052,19 @@ subroutine initialisation_mcfost()
         lrandomize_gap = .true.
         call get_command_argument(i_arg,s)
         read(s,*) gap_factor
-         i_arg = i_arg + 1
+        i_arg = i_arg + 1
+     case("-random_outside_gap")
+        i_arg = i_arg + 1
+        lrandomize_outside_gap = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) gap_factor
+        i_arg = i_arg + 1
      case("-cd","-column_density")
         i_arg = i_arg + 1
         lwrite_column_density = .true.
+     case("-mol_cd","-mol_column_density")
+        i_arg = i_arg + 1
+        lwrite_mol_column_density = .true.
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1517,7 +1528,7 @@ subroutine display_help()
   write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
-  write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
+  write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity independent of z"
   write(*,*) " "
   write(*,*) " Options related to phantom"
   write(*,*) "        : -fix_star"

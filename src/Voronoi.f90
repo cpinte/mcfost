@@ -14,14 +14,14 @@ module Voronoi_grid
   save
 
   integer, parameter :: max_wall_neighbours = 100000
-  integer, parameter :: n_saved_neighbours = 30
+  integer, parameter :: n_saved_neighbours = 40 ! 30 is fine when there is not randomization of particles
   real(kind=dp), parameter :: prec = 1.e-6_dp
 
   type Voronoi_cell
      real(kind=dp), dimension(3) :: xyz, vxyz
      real(kind=dp) :: h ! SPH smoothing lengths
      real(kind=dp) :: delta_edge, delta_centroid
-     integer :: id, first_neighbour, last_neighbour
+     integer :: id, original_id, first_neighbour, last_neighbour
      logical(kind=lp) :: exist, is_star, was_cut
      logical :: masked
   end type Voronoi_cell
@@ -185,22 +185,24 @@ module Voronoi_grid
 
     !************************************************************************
 
-  subroutine Voronoi_tesselation(n_points, x,y,z,h, limits, check_previous_tesselation)
+  subroutine Voronoi_tesselation(n_points, particle_id, x,y,z,h, vx,vy,vz, limits, check_previous_tesselation)
 
     use iso_fortran_env
     use, intrinsic :: iso_c_binding, only : c_bool
     !$ use omp_lib
 
     integer, intent(in) :: n_points
-    real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h
+    real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h, vx,vy,vz
+    integer, dimension(n_points), intent(in) :: particle_id
     real(kind=dp), dimension(6), intent(in) :: limits
     logical, intent(in) :: check_previous_tesselation
+
 
     integer, parameter :: max_neighbours = 25  ! maximum number of neighbours per cell (to build neighbours list)
 
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
-    integer, dimension(:), allocatable :: SPH_id
-    real :: time
+    integer, dimension(:), allocatable :: SPH_id, SPH_original_id
+    real :: time, mem
     integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
     real(kind=dp), dimension(:), allocatable :: delta_edge, delta_centroid
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
@@ -213,9 +215,10 @@ module Voronoi_grid
     real(kind=dp), dimension(n_etoiles) :: deuxr2_star
     real(kind=dp) :: dx, dy, dz, dist2
 
-    integer :: icell_start, icell_end, id, row, l
+    integer :: icell_start, icell_end, id, row, l, n_cells_before_stars
 
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
+    character(len=2) :: unit
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
@@ -228,7 +231,7 @@ module Voronoi_grid
     Rmax = sqrt( (limits(2)-limits(1))**2 + (limits(4)-limits(3))**2 + (limits(6)-limits(5))**2 )
 
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
-         SPH_id(n_points+n_etoiles),  stat=alloc_status)
+         SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
 
     do istar=1, n_etoiles
@@ -239,6 +242,7 @@ module Voronoi_grid
     icell = 0
     n_sublimate = 0
     do i=1, n_points
+
        ! We test if the point is in the model volume
        if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
           if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
@@ -264,13 +268,14 @@ module Voronoi_grid
 
                 if (is_outside_stars) then
                    icell = icell + 1
-                   SPH_id(icell) = i
+                   SPH_id(icell) = i ; SPH_original_id(icell) = particle_id(i)
                    x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(icell) = h(i)
                 endif
              endif
           endif
        endif
     enddo
+    n_cells_before_stars = icell
 
     if (n_sublimate > 0) then
        write(*,*) n_sublimate, "particles have been sublimated"
@@ -286,10 +291,10 @@ module Voronoi_grid
           if ((etoile(i)%y > limits(3)).and.(etoile(i)%y < limits(4))) then
              if ((etoile(i)%z > limits(5)).and.(etoile(i)%z < limits(6))) then
                 icell = icell + 1
+                SPH_id(icell) = 0 ; SPH_original_id(icell) = 0
                 x_tmp(icell) = etoile(i)%x ; y_tmp(icell) = etoile(i)%y ; z_tmp(icell) = etoile(i)%z ; h_tmp(icell) = huge_real ;
                 etoile(i)%out_model = .false.
                 etoile(i)%icell = icell
-                SPH_id(icell) = 0
              endif
           endif
        endif
@@ -320,10 +325,23 @@ module Voronoi_grid
        Voronoi(icell)%xyz(1) = x_tmp(icell)
        Voronoi(icell)%xyz(2) = y_tmp(icell)
        Voronoi(icell)%xyz(3) = z_tmp(icell)
-       Voronoi_xyz(:,icell) = Voronoi(icell)%xyz(:)
        Voronoi(icell)%h      = h_tmp(icell)
+       Voronoi_xyz(:,icell)  = Voronoi(icell)%xyz(:)
        Voronoi(icell)%id     = SPH_id(icell)
+       Voronoi(icell)%original_id = SPH_original_id(icell)
     enddo
+
+    !*************************
+    ! Velocities
+    !*************************
+    if (lemission_mol) then
+       do icell=1,n_cells_before_stars
+          i = SPH_id(icell)
+          Voronoi(icell)%vxyz(1) = vx(i)
+          Voronoi(icell)%vxyz(2) = vy(i)
+          Voronoi(icell)%vxyz(3) = vz(i)
+       enddo
+    endif
 
     do i=1, n_etoiles
        Voronoi(etoile(i)%icell)%is_star = .true.
@@ -331,6 +349,17 @@ module Voronoi_grid
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
+    mem =  n_cells * (5*2 + 1) * 4
+    if (mem > 1e9) then
+       mem = mem / 1024**3
+       unit = "GB"
+    else
+       mem = mem / 1024**2
+       unit = "MB"
+    endif
+    write(*,*) "mcfost will require ~", mem, unit//" of temporary memory for the tesselation" ! 5 double + 2 int arrays
+
+
     if (operating_system == "Darwin" .and. (n_cells > 2e6)) then
        call warning("Voronoi tesselation will likely crash with that many particle on a Mac. Switch to linux")
     endif
@@ -1141,7 +1170,7 @@ pure logical function test_exit_grid_Voronoi(icell, x,y,z)
   if (icell < 0) then
      test_exit_grid_Voronoi = .true.
   else
-     test_exit_grid_Voronoi = .false.
+     test_exit_grid_Voronoi = .false. ! .not.Voronoi(next_cell)%is_star
   endif
 
   return
