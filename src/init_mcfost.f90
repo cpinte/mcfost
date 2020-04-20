@@ -3,7 +3,7 @@ module init_mcfost
   use parametres
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use density, only : specie_removed, T_rm
+  use density, only : species_removed, T_rm
   use molecular_emission
   !$ use omp_lib
   use benchmarks
@@ -458,9 +458,9 @@ subroutine initialisation_mcfost()
      case("-rs")
         lremove=.true.
         i_arg= i_arg+1
-        if (i_arg > nbr_arg) call error("specie number needed")
+        if (i_arg > nbr_arg) call error("species number needed")
         call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) specie_removed
+        read(s,*,iostat=ios) species_removed
         i_arg= i_arg+1
         if (i_arg > nbr_arg) call error("Temperature needed")
         call get_command_argument(i_arg,s)
@@ -1459,7 +1459,7 @@ subroutine display_help()
   write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
   write(*,*) "        : -tau_dark_zone_eq_th <tau_dark_zone> (default : 1500)"
   write(*,*) "        : -origin : save origin of packets received the interest bin"
-  write(*,*) "        : -rs (remove specie) <specie_number> <Temperature>"
+  write(*,*) "        : -rs (remove species) <species_number> <Temperature>"
   write(*,*) "        : -reemission_stats"
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
