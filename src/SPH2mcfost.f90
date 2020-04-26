@@ -548,7 +548,8 @@ contains
     real :: f, density_factor
     integer :: icell, k, i, id_n, voroindex, n_force_empty
     real(dp) :: Vchar, Vcharb
-
+	write(*,*) "pluto_to_Voronoi not ready"
+	stop
     density_factor = 1e-30
     Vchar = 1d99 !default = minimum
     Vcharb = 0d0 !default = maximum, inverse case of Vchar
@@ -578,7 +579,7 @@ contains
     !*******************************
     ! Voronoi tesselation
     !*******************************
-    call Voronoi_tesselation(Nmod, x,y,z,h, limits, check_previous_tesselation)
+    !!call Voronoi_tesselation(Nmod, x,y,z,h, limits, check_previous_tesselation)
     write(*,*) "Using n_cells =", n_cells
 
     !*******************************
