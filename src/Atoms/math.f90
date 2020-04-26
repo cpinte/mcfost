@@ -131,11 +131,11 @@ MODULE math
      do i=1,size(y(:,1))
       do j=1, size(y(1,:))
        if (y(i,j) /= y(i,j)) then
-        write(*,*) "(Nan):", y(i,j)
+        write(*,*) "(Nan):", y(i,j), " i=", i, " j=",j 
         val = 1
         return
        else if (y(i,j) > 0 .and. (y(i,j)==y(i,j)*10)) then
-        write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1)
+        write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1), " i=", i, " j=",j 
         val = 2
         return
        end if
@@ -151,11 +151,11 @@ MODULE math
      val = 0
      do i=1,size(y)
        if (y(i) /= y(i)) then
-        write(*,*) "(Nan):", y(i)
+        write(*,*) "(Nan):", y(i), " i=", i, y(i)/=y(i)
         val = 1
         return
        else if (y(i)>0 .and. (y(i)==y(i)*10)) then
-        write(*,*) "(infinity):", y(i), y(i)*(1+0.1)
+        write(*,*) "(infinity):", y(i), y(i)*(1+0.1), " i=", i, (y(i)==y(i)*10)
         val = 2
         return
        end if
@@ -164,42 +164,33 @@ MODULE math
    END FUNCTION any_nan_infinity_vector
    
    
-   function cmf_to_of (Nx, y, dk)
-   !Shift a function y, centered at 0 in the velocity space
-   !by a delta in index of dk.
-   !dk is an integer positive or negative.
-   !The function y has to be linearly spaced such that y'(1) = y(1 + dk)
-   !where y' is the function projected onto the observer's frame.
-   ! dk is int(dv * di)
-   ! with di = (index(y[1]) - index(y[0]))/(y[1]-y[0]) and dv a velocity shift.
-    integer, intent(in) :: Nx, dk
-    real(kind=dp), intent(in), dimension(Nx) :: y
-    real(kind=dp), dimension(Nx) :: cmf_to_of
-    integer :: j
-    
-    do j=1, Nx
-    
-     if ( (j + dk < 1) .or. (j + dk > Nx) ) then
-     	cmf_to_of(j) = 0.0
-     else
-     	cmf_to_of(j) = y(j+dk)
-     endif
-    
-    enddo
-    
-   
-   return
-   end function cmf_to_of
-   
 
    !c'est bourrin, il n y a pas de test
+!    function linear_1D(N,x,y,Np,xp)
+!      real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
+!      integer :: N, Np, i, j
+! 
+! 	linear_1D(:) = 0.0_dp
+!      do i=1,N-1
+!         do j=1,Np
+!            if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
+!               t = (xp(j) - x(i)) / (x(i+1)-x(i))
+!               linear_1D(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
+!            endif
+!         enddo
+!      enddo
+! 
+!      return
+! 
+!    end function linear_1D
    function linear_1D(N,x,y,Np,xp)
      real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
      integer :: N, Np, i, j
 
-     do i=1,N-1
-        do j=1,Np
-           if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
+	linear_1D(:) = 0.0_dp
+     do j=1,Np
+        do i=1,N-1
+           if (xp(j)>x(i) .and. xp(j)<=x(i+1)) then
               t = (xp(j) - x(i)) / (x(i+1)-x(i))
               linear_1D(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
            endif
@@ -209,7 +200,7 @@ MODULE math
      return
 
    end function linear_1D
-
+   
    function linear_1D_sorted(n,x,y, np,xp)
      ! assumes that both x and xp are in increasing order
      ! We only loop once over the initial array, and we only perform 1 test per element
@@ -222,13 +213,15 @@ MODULE math
      real(kind=dp) :: t
      integer :: i, j, i0
 
+	 i0 = 2
      do j=1, np
-        i0 = 2
+        !i0 = 2
         loop_i : do i=i0, n
-           if (x(i) > xp(j)) then
+           if ((x(i) > xp(j))) then
               t = (xp(j) - x(i-1)) / (x(i)-x(i-1))
               linear_1D_sorted(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
-              i0 = i
+              !i0 = i !? + 1
+              i0 = i + 1
               exit loop_i
            else
               linear_1D_sorted(j) = 0d0
@@ -241,6 +234,40 @@ MODULE math
 
    end function linear_1D_sorted
    
+   function linear_1D_dx(dx,n,x,y,np,xp)
+     ! assumes that both x and xp are in increasing order
+     ! We only loop once over the initial array, and we only perform 1 test per element
+
+     integer, intent(in)                      :: n, np
+     real(kind=dp), dimension(n),  intent(in) :: x,y
+     real(kind=dp), dimension(np), intent(in) :: xp
+     real(kind=dp), dimension(np)             :: linear_1D_dx
+     real, intent(in) 						  :: dx
+
+     real(kind=dp) :: t
+     integer :: i, j, i0, j0
+
+	 i0 = 2
+     do j=1, np
+        loop_i : do i=i0, n
+!            if ((x(i) > xp(j))) then
+           if ((xp(j) > x(i-1))) then
+              t = (xp(j) - x(i-1)) / dx
+              linear_1D_dx(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
+              i0 = i + 1
+              exit loop_i
+           else
+              linear_1D_dx(j) = 0d0
+              exit loop_i
+           endif
+        enddo loop_i
+     enddo
+
+     return
+
+   end function linear_1D_dx
+   
+   !building
    function convolve(x, y, K)
    !x, y, and K have the same dimension
    !using trapezoidal rule

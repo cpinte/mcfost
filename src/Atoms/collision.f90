@@ -14,7 +14,7 @@ MODULE collision
  use math, only : E1, E2, bezier3_interp, SQ, CUBE, dPOW, interp1D
  use constant
  use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol, atomZnumber
- use atmos_type, only : atmos, Hydrogen, Helium
+ use atmos_type, only : Hydrogen, Helium, ne, Atoms, T, Elements
  use getline
  use mcfost_env
  use messages
@@ -45,7 +45,7 @@ MODULE collision
 !      Cji(i,j) = CE(j,i)/nr_ji + CI(i,j)
 !     end do
 !    end do
-!    Cji(:,:) = Cji(:,:) * atmos%ne(icell)
+!    Cji(:,:) = Cji(:,:) * ne(icell)
 !
 !  RETURN
 !  END FUNCTION Collision_Hydrogen
@@ -67,9 +67,9 @@ MODULE collision
 !    double precision :: C0, pia0sq, rn, bn, n, An, En, yn, zn, S, Bnp
 !    type (AtomType) :: atom
 !
-!    atom = atmos%Atoms(1)%ptr_atom
+!    atom = Atoms(1)%ptr_atom
 !
-!    C0 = dsqrt(8.*KBOLTZMANN*atmos%T(icell) / pi / M_ELECTRON)
+!    C0 = sqrt(8.*KBOLTZMANN*T(icell) / pi / M_ELECTRON)
 !    pia0sq = 2d0 * pi * RBOHR**2
 !
 !    Nl = atom%Nlevel
@@ -88,17 +88,17 @@ MODULE collision
 !
 !     ! in Joules
 !     En = E_RYDBERG / n / n !energie of level with different quantum number in 13.6eV: En = 13.6/n**2
-!     yn = En / KBOLTZMANN / atmos%T(icell)
-!     An = 32. / 3. / dsqrt(3d0) / pi * n  * (g0(n)/3. + g1(n)/4. + g2(n)/5.)
+!     yn = En / KBOLTZMANN / T(icell)
+!     An = 32. / 3. / sqrt(3d0) / pi * n  * (g0(n)/3. + g1(n)/4. + g2(n)/5.)
 !     Bnp = 2./3. * n*n * (5. + bn)
 !     zn = rn + yn
 !
 !     S = C0 * pia0sq * (n*yn)**2 * (An*(E1(yn)/yn - E1(zn)/zn) + &
 !    			(Bnp - An*log(2*n*n))*(ksi_johnson(yn)-ksi_johnson(zn)))
-!    	!!write(*,*) i-1, Nl-1, "S=", S, S*dexp(yn)/dsqrt(atmos%T(icell))
-!     !check that otherwise multiply by dexp(yn)
-!     Cje(i) = S !RH -> dexp(yn) / dsqrt(atmos%T(icell)) !per ne
-!     		   !we compute it at icell so in fact we could avoid / sqrt(atmos%icell)
+!    	!!write(*,*) i-1, Nl-1, "S=", S, S*exp(yn)/sqrt(T(icell))
+!     !check that otherwise multiply by exp(yn)
+!     Cje(i) = S !RH -> exp(yn) / sqrt(T(icell)) !per ne
+!     		   !we compute it at icell so in fact we could avoid / sqrt(icell)
 !     		   !as col = Cje * sqrt(T) * exp(-de). Normally dE == En/kT=y so
 !     		   !it is not useful to multiply except to take into account the slightly diff
 !     		   !between En and (atom%E(Nl)-atom%E(i))
@@ -117,7 +117,7 @@ MODULE collision
 !   ! CE = S = C(i,j) all transitions from j, i and i, j
 !   !
 !   ! ( -> transform C(i,j) to specifically C(j,i)
-!   ! S * dexp(y) * atom%g(i)/atom%g(j)
+!   ! S * exp(y) * atom%g(i)/atom%g(j)
 !   ! = C(i,j) * exp(hnu/kt)*gi/gj = C(i,j) * ni/nj = C(j,i)
 !   ! at LTE: (gi/gj * nj/ni)  = exp(-hnu/kT) )
 !  ! ----------------------------------------------------- !
@@ -128,9 +128,9 @@ MODULE collision
 !    double precision :: np, x, fnnp, rnnp, Annp, Gaunt_bf
 !    type (AtomType) :: atom
 !
-!    atom = atmos%Atoms(1)%ptr_atom
+!    atom = Atoms(1)%ptr_atom
 !
-!    C0 = dsqrt(8.*KBOLTZMANN*atmos%T(icell) / pi / M_ELECTRON)
+!    C0 = sqrt(8.*KBOLTZMANN*T(icell) / pi / M_ELECTRON)
 !    pia0sq = 2d0 * pi * RBOHR**2
 !
 !    Nl = atom%Nlevel
@@ -150,21 +150,21 @@ MODULE collision
 !     do j=i+1, Nl-1
 !      np = dble(j)!n'
 !      x = 1d0 - (n/np)**2 ! = Enn'/Rdybg
-!      !Gauntfactor * 32./3./dsqrt(3.)/pi * n/np**3 /x**3
+!      !Gauntfactor * 32./3./sqrt(3.)/pi * n/np**3 /x**3
 !      Gaunt_bf = g0(n) + g1(n)/x + g2(n)/x/x
-!      fnnp = Gaunt_bf * 32./3./dsqrt(3d0)/pi * n / np / np /np / x / x / x
+!      fnnp = Gaunt_bf * 32./3./sqrt(3d0)/pi * n / np / np /np / x / x / x
 !      rnnp = rn * x
 !      Annp = 2d0 * n*n*fnnp/x
 !     ! in Joules
 !      En = E_RYDBERG / n / n !energie of level with different quantum number in 13.6eV = ionisation E of n
-!      y = x * En / KBOLTZMANN / atmos%T(icell) !x = ratio of E/En
+!      y = x * En / KBOLTZMANN / T(icell) !x = ratio of E/En
 !      Bnnp = 4d0 * (n**4)/(np**3) / x / x * (1. + 4./3. /x + bn/x/x)
 !      z = rnnp + y
 !
 !      S = C0 * pia0sq * n*n*y*y/x * (Annp*((1./y + 0.5)*E1(y)-(1./z + 0.5)*E1(z))+&
 !      	(Bnnp-Annp*dlog(2*n*n/x))*(E2(y)/y - E2(z)/z))
 !
-!      Cje(j,i) = S * dexp(y) * atom%g(i)/atom%g(j)
+!      Cje(j,i) = S * exp(y) * atom%g(i)/atom%g(j)
 !      !!Cje(i,j) = S
 !      !write(*,*) atom%E(j) - atom%E(i), En*x !because x = deltaE/En
 !     end do !over np
@@ -176,7 +176,7 @@ MODULE collision
 !  FUNCTION ksi_johnson(t) result(y)
 !   double precision :: t, y
 !   !E0
-!   y = dexp(-t)/t - 2d0*E1(t) + E2(t)
+!   y = exp(-t)/t - 2d0*E1(t) + E2(t)
 !
 !  RETURN
 !  END FUNCTION ksi_johnson
@@ -379,12 +379,12 @@ MODULE collision
   ! -- get iso-electronic sequence --
   ichrge = atom%stage(i) !stages from 0 for neutrals to N-1
   isoseq = iz-ichrge
-  if (isoseq.lt.29) cseq = atmos%Elements(isoseq)%ptr_elem%ID
+  if (isoseq.lt.29) cseq = Elements(isoseq)%ptr_elem%ID
 
   ! -- Temperature in eV --
-  bkt = KBOLTZMANN * atmos%T(k) / EV
+  bkt = KBOLTZMANN * T(k) / EV
 
-  ! All ID in atmos%Elements are of the form Xx
+  ! All ID in Elements are of the form Xx
   ! just as in atom%ID
   ! -- Lithium sequence --
   if (cseq.eq."Li") then
@@ -397,7 +397,7 @@ MODULE collision
    g = 2.22*f1y + 0.67*(1.-y*f1y)+0.49*y*f1y + &
      1.2*y*(1.-y*f1y)
    cup = (1.6d-7 * 1.2*b) / (dpow(zeff,2.d0)*&
-      dsqrt(bkt)) * exp(-y)*g
+      sqrt(bkt)) * exp(-y)*g
    if (atom%ID.eq."C ") then
     ! -- C IV, app A ar85 --
     cup = cup*0.6
@@ -415,14 +415,14 @@ MODULE collision
     a = 2.9d-17 * dpow(zz-11.,-7d-1)
     y = iea/bkt
     f1y = fone(y)
-    cup = 6.69d7 * a * iea / dsqrt(bkt) * &
+    cup = 6.69d7 * a * iea / sqrt(bkt) * &
          exp(-y) * (1.-y*f1y)
    else if (iz.ge.18 .and. iz.le.28) then
     iea = 11.*(zz-10.)*sqrt(zz-10.)
     a = 1.4e-14 * dpow(zz-10., -3.73d0)
     y = iea/bkt
     f1y = fone(y)
-    cup = 6.69d7 * a * iea/dsqrt(bkt)  * exp(-y) * &
+    cup = 6.69d7 * a * iea/sqrt(bkt)  * exp(-y) * &
        (1.-0.5*(y-SQ(y)+SQ(y)*y*f1y))
    else
     cup = 0.
@@ -442,7 +442,7 @@ MODULE collision
    a = 4.d-13 / (SQ(zz)*iea)
    y = iea/bkt
    f1y = fone(y)
-   cup = 6.69d7 *a*iea / dsqrt(bkt) * exp(-y) * &
+   cup = 6.69d7 *a*iea / sqrt(bkt) * exp(-y) * &
      (1.-0.5*(y-SQ(y)+SQ(y)*y*f1y))
 
   end if
@@ -451,25 +451,25 @@ MODULE collision
    iea = 25.
    a = 9.8d-17
    b = 1.12
-   cup = 6.69d7 * a * iea / dsqrt(bkt) * exp(-y) * &
+   cup = 6.69d7 * a * iea / sqrt(bkt) * exp(-y) * &
     (1. + b*f1y)
   else if ((atom%ID.eq."Ca").and.(ichrge.eq.1)) then
    iea = 25.0
    a = 6.0d-17
    b = 1.12
-   cup = 6.69d7 * a * iea / dsqrt(bkt) * exp(-y) * &
+   cup = 6.69d7 * a * iea / sqrt(bkt) * exp(-y) * &
     (1. + b*f1y)
   else if ((atom%ID.eq."Fe").and.(ichrge.eq.3)) then
    a = 1.8d-17
    iea = 60.0
    b = 1.0
-   cup = 6.69d7 * a * iea / dsqrt(bkt) * exp(-y) * &
+   cup = 6.69d7 * a * iea / sqrt(bkt) * exp(-y) * &
     (1. + b*f1y)
   else if ((atom%ID.eq."Fe").and.(ichrge.eq.4)) then
    a = 5.d-17
    iea = 73.
    b = 1.
-   cup = 6.69d7 * a * iea / dsqrt(bkt) * exp(-y) * &
+   cup = 6.69d7 * a * iea / sqrt(bkt) * exp(-y) * &
     (1.+b*f1y)
   end if
 
@@ -503,7 +503,7 @@ MODULE collision
   ! -- charge of recombining ion --
   zz = atom%stage(j)
   isoseq = iz - atom%stage(i)
-  if (isoseq.lt.29) cseq = atmos%Elements(isoseq)%ptr_elem%ID
+  if (isoseq.lt.29) cseq = Elements(isoseq)%ptr_elem%ID
 
   !write(*,*) i, j, zz, isoseq, cseq
 
@@ -771,14 +771,14 @@ MODULE collision
 
 
                       !here Nitem is NTMP !!
-    !CC = interp1D(TGRID, coeff, atmos%T(icell))
-    CC = interp_dp(coeff, TGRID, atmos%T(icell))
+    !CC = interp1D(TGRID, coeff, T(icell))
+    CC = interp_dp(coeff, TGRID, T(icell))
 
    end if
    if (key.eq."OMEGA") then
     ! -- Collisional excitation of ions
-     Cdown = C0 * atmos%ne(icell) * CC / &
-      (atom%g(j)*dsqrt(atmos%T(icell)))
+     Cdown = C0 * ne(icell) * CC / &
+      (atom%g(j)*sqrt(T(icell)))
      C(j,i) = C(j,i) + Cdown
      ! remember the relation between Cij and Cji
      ! which takes place at LTE.
@@ -788,12 +788,12 @@ MODULE collision
    else if (key.eq."CE") then
     ! -- Collisional excitation of neutrals
     gij = atom%g(i)/atom%g(j)
-    !!do k=1,atmos%Nspace
-    !write(*,*) CC * gij * dsqrt(atmos%T(icell))
+    !!do k=1,Nspace
+    !write(*,*) CC * gij * sqrt(T(icell))
     																	  !exp(de/kT)
-     Cdown = CC * atmos%ne(icell) * gij * dsqrt(atmos%T(icell)) !CE(RH)=CE*gj/gi*ni/nj / sqrt(T)=CC
+     Cdown = CC * ne(icell) * gij * sqrt(T(icell)) !CE(RH)=CE*gj/gi*ni/nj / sqrt(T)=CC
      !write(*,*) key, "k=",k, "Cdown = ", Cdown, C(k)
-     !write(*,*) "ne=",atmos%ne(k), gij, "sqrt(T)=",dsqrt(atmos%T(k))
+     !write(*,*) "ne=",ne(k), gij, "sqrt(T)=",sqrt(T(k))
      C(j,i) = C(j,i) + Cdown
      C(i,j) = C(i,j) + Cdown * &
       atom%nstar(j,icell)/atom%nstar(i,icell)
@@ -801,26 +801,26 @@ MODULE collision
    else if (key.eq."CI") then
     ! -- Collisional ionisation
     deltaE = atom%E(j) - atom%E(i)
-    !!do k=1,atmos%Nspace
-     Cup = CC * atmos%ne(icell) * &
-       exp(-deltaE/(KBOLTZMANN*atmos%T(icell))) *dsqrt(atmos%T(icell))
+    !!do k=1,Nspace
+     Cup = CC * ne(icell) * &
+       exp(-deltaE/(KBOLTZMANN*T(icell))) *sqrt(T(icell))
      !write(*,*) key, "k=",k, "Cup = ", Cup, C(k)
-     !write(*,*) "dE=",deltaE," exp()=",exp(-deltaE/(KBOLTZMANN*atmos%T(k)))
+     !write(*,*) "dE=",deltaE," exp()=",exp(-deltaE/(KBOLTZMANN*T(k)))
      C(i,j) = C(i,j) + Cup
      C(j,i) = C(j,i) + Cup * &
       atom%nstar(i,icell)/atom%nstar(j,icell)
     !!end do
    else if (key.eq."CR") then
     ! -- Collisional de-excitation by electrons
-    !!do k=1,atmos%Nspace
-     Cdown = atmos%ne(icell) * CC
+    !!do k=1,Nspace
+     Cdown = ne(icell) * CC
      C(j,i) = C(j,i) + Cdown
     !!end do
    else if (key.eq."CP") then
     ! -- collisions with protons
     ! protons are the last level of Hydrogen atoms
     np = Hydrogen%n(Hydrogen%Nlevel,icell)
-    !!do k=1,atmos%Nspace
+    !!do k=1,Nspace
      Cdown = np * CC
      C(j,i) = C(j,i) + Cdown
      C(i,j) = C(i,j) + Cdown * &
@@ -828,7 +828,7 @@ MODULE collision
     !!end do
    else if (key.eq."CH") then
     ! -- Collisions with neutral hydrogen
-    !!do k=1,atmos%Nspace
+    !!do k=1,Nspace
      Cup = Hydrogen%n(1,icell) * CC
      C(i,j) = C(i,j) + Cup
      C(j,i) = C(j,i) + Cup * &
@@ -836,13 +836,13 @@ MODULE collision
    !! end do
    else if (key.eq."CH0") then
     ! -- Charge exchange with neutral hydrogen
-    !!do k=1,atmos%Nspace
+    !!do k=1,Nspace
      C(j,i) = C(j,i) + Hydrogen%n(1,icell)*CC
     !!end do
    else if (key.eq."CH+") then
     ! -- charge exchange with protons
     np = Hydrogen%n(Hydrogen%Nlevel,icell)
-    !!do k=1,atmos%Nspace
+    !!do k=1,Nspace
      C(i,j) = C(i,j) + np*CC
     !!end do
    else if (key.eq."SHULL82") then
@@ -854,18 +854,18 @@ MODULE collision
     bdish = coeff(6)
     t0sh = coeff(7)
     t1sh = coeff(8)
-    !!do k=1,atmos%Nspace
-     summrs = sumscl*summers(i,j,atmos%ne(icell),atom)
+    !!do k=1,Nspace
+     summrs = sumscl*summers(i,j,ne(icell),atom)
      summrs = summrs + (1.-sumscl)
-     tg = atmos%T(icell)
+     tg = T(icell)
      cdn = aradsh * dpow(tg/1.d4, -xradsh) + &
-       summrs*adish / tg / dsqrt(tg) * exp(-t0sh/tg) * &
+       summrs*adish / tg / sqrt(tg) * exp(-t0sh/tg) * &
        (1. + (bdish*exp(-t1sh/tg)))
-     cup = acolsh * dsqrt(tg) * exp(-tcolsh/tg) / &
+     cup = acolsh * sqrt(tg) * exp(-tcolsh/tg) / &
       (1. + 0.1*tg/tcolsh)
      ! -- convert from cm3 /s to m3/s
-     cdn = cdn * atmos%ne(icell) * CUBE(CM_TO_M)
-     cup = cup*atmos%ne(icell)*CUBE(CM_TO_M)
+     cdn = cdn * ne(icell) * CUBE(CM_TO_M)
+     cup = cup*ne(icell)*CUBE(CM_TO_M)
      ! -- 3-body recombination (high density limit)
      cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
      !write(*,*) "k=",k, " cdn = ", cdn
@@ -878,10 +878,10 @@ MODULE collision
     ! Second line coefficients are coefficients (from Chianti)
     ! See Badnell 2006 for more details
 
-    !!do k =1,atmos%Nspace
-     summrs = sumscl*summers(i,j,atmos%ne(icell),atom) + &
+    !!do k =1,Nspace
+     summrs = sumscl*summers(i,j,ne(icell),atom) + &
        (1.-sumscl)
-     tg = atmos%T(icell)
+     tg = T(icell)
      cdn = 0.
      do ii=1,Ncoef
       cdn = cdn + badi(2,ii) * exp(-badi(1,ii)/tg)
@@ -889,7 +889,7 @@ MODULE collision
      cdn = cdn * dpow(tg, -1.5d0)
      !write(*,*) "k=",k, " cdn = ", cdn, " summrs = ",summrs, "cdn=", cdn
      ! -- convert from cm3/s to m3/s
-     cdn = cdn *atmos%ne(icell) * summrs * CUBE(CM_TO_M)
+     cdn = cdn *ne(icell) * summrs * CUBE(CM_TO_M)
      cup = cdn * atom%nstar(j,icell)/atom%nstar(i,icell)
 
      cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
@@ -901,12 +901,12 @@ MODULE collision
     deallocate(badi)
    else if (key.eq."AR85-CDI") then
     ! -- Direct collisional ionisation
-    !!do k=1,atmos%Nspace
+    !!do k=1,Nspace
      cup = 0.
-     tg = atmos%T(icell)
+     tg = T(icell)
      do m=1,Nrow
       xj = cdi(m,1) * EV/ (KBOLTZMANN*tg)
-      fac = exp(-xj) * dsqrt(xj)
+      fac = exp(-xj) * sqrt(xj)
       fxj = cdi(m,2) + cdi(m,3) * (1.+xj) + &
        (cdi(m,4) - xj*(cdi(m,2)+cdi(m,3)*(2.+xj)))*&
         fone(xj) + cdi(m,5)*xj*ftwo(xj)
@@ -916,7 +916,7 @@ MODULE collision
       cup = cup + fac*fxj*CUBE(CM_TO_M)
      end do
      if (cup.lt.0.) cup = 0.
-     cup = cup * atmos%ne(icell)
+     cup = cup * ne(icell)
      cdn = cup * atom%nstar(i,icell)/atom%nstar(j,icell)
      C(j,i) = C(j,i) + cdn
      C(i,j) = C(i,j) + cup
@@ -927,10 +927,10 @@ MODULE collision
     deallocate(cdi)
    else if (key.eq."AR85-CEA") then
     ! -- Autoionisation
-    !!do k=1,atmos%Nspace
+    !!do k=1,Nspace
      fac = ar85cea(i,j,icell,atom)
      !write(*,*) "fac=", fac
-     cup = coeff(1)*fac*atmos%ne(icell)
+     cup = coeff(1)*fac*ne(icell)
      C(i,j) = C(i,j) + cup
      !write(*,*) "AR85-CEA, cup=", cup
      !write(*,*) "CEA: line=",countline,ij, k, " C[ij,k]=",C(ij,k), &
@@ -944,13 +944,13 @@ MODULE collision
     ar85b = coeff(4)
     ar85c = coeff(5)
     ar85d = coeff(6)
-    !!do k =1,atmos%Nspace
-     if ((atmos%T(icell).ge.ar85t1).and.&
-          (atmos%T(icell).le.ar85t2)) then
-      t4 = atmos%T(icell)/1d4
+    !!do k =1,Nspace
+     if ((T(icell).ge.ar85t1).and.&
+          (T(icell).le.ar85t2)) then
+      t4 = T(icell)/1d4
       cup = ar85a * 1d-9 * dpow(t4,ar85b) * &
         exp(-ar85c*t4) * &
-        exp(-ar85d*EV/KBOLTZMANN/atmos%T(icell)) * &
+        exp(-ar85d*EV/KBOLTZMANN/T(icell)) * &
         Hydrogen%n(Hydrogen%Nlevel,icell) * &
         CUBE(CM_TO_M)
       C(i,j) = C(i,j) + cup
@@ -964,10 +964,10 @@ MODULE collision
     ar85b = coeff(4)
     ar85c = coeff(5)
     ar85d = coeff(6)
-    !!do k=1,atmos%Nspace
-     if ((atmos%T(icell).ge.ar85t1).and.&
-         (atmos%T(icell).le.ar85t2)) then
-      t4 = atmos%T(icell)/1d4
+    !!do k=1,Nspace
+     if ((T(icell).ge.ar85t1).and.&
+         (T(icell).le.ar85t2)) then
+      t4 = T(icell)/1d4
       cdn = ar85a * 1d-9 * dpow(t4, ar85b) * &
        (1. + ar85c*exp(ar85d*t4)) * &
        Hydrogen%n(1,icell) * CUBE(CM_TO_M)
@@ -980,16 +980,16 @@ MODULE collision
     ! 1983, MNRAS, 203, 1269-1280
     de = (atom%E(j)-atom%E(i))/EV
     zz = atom%stage(i) !0 for neutrals
-    betab = 0.25*(dsqrt((100.*zz+91)/(4.*zz+3.))-5.)
+    betab = 0.25*(sqrt((100.*zz+91)/(4.*zz+3.))-5.)
     cbar = 2.3
-    !!do k=1,atmos%Nspace
-     dekt = de*EV / (KBOLTZMANN*atmos%T(k))
+    !!do k=1,Nspace
+     dekt = de*EV / (KBOLTZMANN*T(k))
      dekt = MIN(500., dekt)
      dekti = 1./dekt
      wlog = log(1.+dekti)
      wb = dpow(wlog, betab/(1.+dekti))
      cup = 2.1715d-8 * cbar * dpow(13.6/de, 1.5d0) * &
-         dsqrt(dekt) * E1(dekt) * wb * atmos%ne(icell) * &
+         sqrt(dekt) * E1(dekt) * wb * ne(icell) * &
          CUBE(CM_TO_M)
      ! -- Fudge factor
      cup = cup * coeff(1)
@@ -1251,17 +1251,17 @@ MODULE collision
 !
 !
 !                       !here Nitem is NTMP !!
-!     CC = interp_dp(coeff, TGRID, atmos%T(icell))
+!     CC = interp_dp(coeff, TGRID, T(icell))
 !
 !    end if
 !    if (key.eq."OMEGA") then
 !     ! -- Collisional excitation of ions
 !
-!     !!do k=1, atmos%Nspace !! cell by cell
+!     !!do k=1, Nspace !! cell by cell
 !      !! C is a constant, replace by C(k) if for all grid at once
 !      !! and C(ij) by C(ij,k)
-!      Cdown = C0 * atmos%ne(icell) * CC / &
-!       (atom%g(j)*dsqrt(atmos%T(icell)))
+!      Cdown = C0 * ne(icell) * CC / &
+!       (atom%g(j)*sqrt(T(icell)))
 !      C(ij) = C(ij) + Cdown
 !      ! remember the relation between Cij and Cji
 !      ! which takes place at LTE.
@@ -1271,10 +1271,10 @@ MODULE collision
 !    else if (key.eq."CE") then
 !     ! -- Collisional excitation of neutrals
 !     gij = atom%g(i)/atom%g(j)
-!     !!do k=1,atmos%Nspace
-!      Cdown = CC * atmos%ne(icell) * gij * dsqrt(atmos%T(icell))
+!     !!do k=1,Nspace
+!      Cdown = CC * ne(icell) * gij * sqrt(T(icell))
 !      !write(*,*) key, "k=",k, "Cdown = ", Cdown, C(k)
-!      !write(*,*) "ne=",atmos%ne(k), gij, "sqrt(T)=",dsqrt(atmos%T(k))
+!      !write(*,*) "ne=",ne(k), gij, "sqrt(T)=",sqrt(T(k))
 !      C(ij) = C(ij) + Cdown
 !      C(ji) = C(ji) + Cdown * &
 !       atom%nstar(j,icell)/atom%nstar(i,icell)
@@ -1282,26 +1282,26 @@ MODULE collision
 !    else if (key.eq."CI") then
 !     ! -- Collisional ionisation
 !     deltaE = atom%E(j) - atom%E(i)
-!     !!do k=1,atmos%Nspace
-!      Cup = CC * atmos%ne(icell) * &
-!        exp(-deltaE/(KBOLTZMANN*atmos%T(icell))) *dsqrt(atmos%T(icell))
+!     !!do k=1,Nspace
+!      Cup = CC * ne(icell) * &
+!        exp(-deltaE/(KBOLTZMANN*T(icell))) *sqrt(T(icell))
 !      !write(*,*) key, "k=",k, "Cup = ", Cup, C(k)
-!      !write(*,*) "dE=",deltaE," exp()=",exp(-deltaE/(KBOLTZMANN*atmos%T(k)))
+!      !write(*,*) "dE=",deltaE," exp()=",exp(-deltaE/(KBOLTZMANN*T(k)))
 !      C(ji) = C(ji) + Cup
 !      C(ij) = C(ij) + Cup * &
 !       atom%nstar(i,icell)/atom%nstar(j,icell)
 !     !!end do
 !    else if (key.eq."CR") then
 !     ! -- Collisional de-excitation by electrons
-!     !!do k=1,atmos%Nspace
-!      Cdown = atmos%ne(icell) * CC
+!     !!do k=1,Nspace
+!      Cdown = ne(icell) * CC
 !      C(ij) = C(ij) + Cdown
 !     !!end do
 !    else if (key.eq."CP") then
 !     ! -- collisions with protons
 !     ! protons are the last level of Hydrogen atoms
 !     np = Hydrogen%n(Hydrogen%Nlevel,icell)
-!     !!do k=1,atmos%Nspace
+!     !!do k=1,Nspace
 !      Cdown = np * CC
 !      C(ij) = C(ij) + Cdown
 !      C(ji) = C(ji) + Cdown * &
@@ -1309,7 +1309,7 @@ MODULE collision
 !     !!end do
 !    else if (key.eq."CH") then
 !     ! -- Collisions with neutral hydrogen
-!     !!do k=1,atmos%Nspace
+!     !!do k=1,Nspace
 !      Cup = Hydrogen%n(1,icell) * CC
 !      C(ji) = C(ji) + Cup
 !      C(ij) = C(ij) + Cup * &
@@ -1317,13 +1317,13 @@ MODULE collision
 !    !! end do
 !    else if (key.eq."CH0") then
 !     ! -- Charge exchange with neutral hydrogen
-!     !!do k=1,atmos%Nspace
+!     !!do k=1,Nspace
 !      C(ij) = C(ij) + Hydrogen%n(1,icell)*CC
 !     !!end do
 !    else if (key.eq."CH+") then
 !     ! -- charge exchange with protons
 !     np = Hydrogen%n(Hydrogen%Nlevel,icell)
-!     !!do k=1,atmos%Nspace
+!     !!do k=1,Nspace
 !      C(ji) = C(ji) + np*CC
 !     !!end do
 !    else if (key.eq."SHULL82") then
@@ -1335,18 +1335,18 @@ MODULE collision
 !     bdish = coeff(6)
 !     t0sh = coeff(7)
 !     t1sh = coeff(8)
-!     !!do k=1,atmos%Nspace
-!      summrs = sumscl*summers(i,j,atmos%ne(icell),atom)
+!     !!do k=1,Nspace
+!      summrs = sumscl*summers(i,j,ne(icell),atom)
 !      summrs = summrs + (1.-sumscl)
-!      tg = atmos%T(icell)
+!      tg = T(icell)
 !      cdn = aradsh * dpow(tg/1.d4, -xradsh) + &
-!        summrs*adish / tg / dsqrt(tg) * exp(-t0sh/tg) * &
+!        summrs*adish / tg / sqrt(tg) * exp(-t0sh/tg) * &
 !        (1. + (bdish*exp(-t1sh/tg)))
-!      cup = acolsh * dsqrt(tg) * exp(-tcolsh/tg) / &
+!      cup = acolsh * sqrt(tg) * exp(-tcolsh/tg) / &
 !       (1. + 0.1*tg/tcolsh)
 !      ! -- convert from cm3 /s to m3/s
-!      cdn = cdn * atmos%ne(icell) * CUBE(CM_TO_M)
-!      cup = cup*atmos%ne(icell)*CUBE(CM_TO_M)
+!      cdn = cdn * ne(icell) * CUBE(CM_TO_M)
+!      cup = cup*ne(icell)*CUBE(CM_TO_M)
 !      ! -- 3-body recombination (high density limit)
 !      cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
 !      !write(*,*) "k=",k, " cdn = ", cdn
@@ -1359,10 +1359,10 @@ MODULE collision
 !     ! Second line coefficients are coefficients (from Chianti)
 !     ! See Badnell 2006 for more details
 !
-!     !!do k =1,atmos%Nspace
-!      summrs = sumscl*summers(i,j,atmos%ne(icell),atom) + &
+!     !!do k =1,Nspace
+!      summrs = sumscl*summers(i,j,ne(icell),atom) + &
 !        (1.-sumscl)
-!      tg = atmos%T(icell)
+!      tg = T(icell)
 !      cdn = 0.
 !      do ii=1,Ncoef
 !       cdn = cdn + badi(2,ii) * exp(-badi(1,ii)/tg)
@@ -1370,7 +1370,7 @@ MODULE collision
 !      cdn = cdn * dpow(tg, -1.5d0)
 !      !write(*,*) "k=",k, " cdn = ", cdn, " summrs = ",summrs, "cdn=", cdn
 !      ! -- convert from cm3/s to m3/s
-!      cdn = cdn *atmos%ne(icell) * summrs * CUBE(CM_TO_M)
+!      cdn = cdn *ne(icell) * summrs * CUBE(CM_TO_M)
 !      cup = cdn * atom%nstar(j,icell)/atom%nstar(i,icell)
 !
 !      cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
@@ -1382,12 +1382,12 @@ MODULE collision
 !     deallocate(badi)
 !    else if (key.eq."AR85-CDI") then
 !     ! -- Direct collisional ionisation
-!     !!do k=1,atmos%Nspace
+!     !!do k=1,Nspace
 !      cup = 0.
-!      tg = atmos%T(icell)
+!      tg = T(icell)
 !      do m=1,Nrow
 !       xj = cdi(m,1) * EV/ (KBOLTZMANN*tg)
-!       fac = exp(-xj) * dsqrt(xj)
+!       fac = exp(-xj) * sqrt(xj)
 !       fxj = cdi(m,2) + cdi(m,3) * (1.+xj) + &
 !        (cdi(m,4) - xj*(cdi(m,2)+cdi(m,3)*(2.+xj)))*&
 !         fone(xj) + cdi(m,5)*xj*ftwo(xj)
@@ -1397,7 +1397,7 @@ MODULE collision
 !       cup = cup + fac*fxj*CUBE(CM_TO_M)
 !      end do
 !      if (cup.lt.0.) cup = 0.
-!      cup = cup * atmos%ne(icell)
+!      cup = cup * ne(icell)
 !      cdn = cup * atom%nstar(i,icell)/atom%nstar(j,icell)
 !      C(ij) = C(ij) + cdn
 !      C(ji) = C(ji) + cup
@@ -1408,10 +1408,10 @@ MODULE collision
 !     deallocate(cdi)
 !    else if (key.eq."AR85-CEA") then
 !     ! -- Autoionisation
-!     !!do k=1,atmos%Nspace
+!     !!do k=1,Nspace
 !      fac = ar85cea(i,j,icell,atom)
 !      !write(*,*) "fac=", fac
-!      cup = coeff(1)*fac*atmos%ne(icell)
+!      cup = coeff(1)*fac*ne(icell)
 !      C(ji) = C(ji) + cup
 !      !write(*,*) "AR85-CEA, cup=", cup
 !      !write(*,*) "CEA: line=",countline,ij, k, " C[ij,k]=",C(ij,k), &
@@ -1425,13 +1425,13 @@ MODULE collision
 !     ar85b = coeff(4)
 !     ar85c = coeff(5)
 !     ar85d = coeff(6)
-!     !!do k =1,atmos%Nspace
-!      if ((atmos%T(icell).ge.ar85t1).and.&
-!           (atmos%T(icell).le.ar85t2)) then
-!       t4 = atmos%T(icell)/1d4
+!     !!do k =1,Nspace
+!      if ((T(icell).ge.ar85t1).and.&
+!           (T(icell).le.ar85t2)) then
+!       t4 = T(icell)/1d4
 !       cup = ar85a * 1d-9 * dpow(t4,ar85b) * &
 !         exp(-ar85c*t4) * &
-!         exp(-ar85d*EV/KBOLTZMANN/atmos%T(icell)) * &
+!         exp(-ar85d*EV/KBOLTZMANN/T(icell)) * &
 !         Hydrogen%n(Hydrogen%Nlevel,icell) * &
 !         CUBE(CM_TO_M)
 !       C(ji) = C(ji) + cup
@@ -1445,10 +1445,10 @@ MODULE collision
 !     ar85b = coeff(4)
 !     ar85c = coeff(5)
 !     ar85d = coeff(6)
-!     !!do k=1,atmos%Nspace
-!      if ((atmos%T(icell).ge.ar85t1).and.&
-!          (atmos%T(icell).le.ar85t2)) then
-!       t4 = atmos%T(icell)/1d4
+!     !!do k=1,Nspace
+!      if ((T(icell).ge.ar85t1).and.&
+!          (T(icell).le.ar85t2)) then
+!       t4 = T(icell)/1d4
 !       cdn = ar85a * 1d-9 * dpow(t4, ar85b) * &
 !        (1. + ar85c*exp(ar85d*t4)) * &
 !        Hydrogen%n(1,icell) * CUBE(CM_TO_M)
@@ -1461,16 +1461,16 @@ MODULE collision
 !     ! 1983, MNRAS, 203, 1269-1280
 !     de = (atom%E(j)-atom%E(i))/EV
 !     zz = atom%stage(i) !0 for neutrals
-!     betab = 0.25*(dsqrt((100.*zz+91)/(4.*zz+3.))-5.)
+!     betab = 0.25*(sqrt((100.*zz+91)/(4.*zz+3.))-5.)
 !     cbar = 2.3
-!     !!do k=1,atmos%Nspace
-!      dekt = de*EV / (KBOLTZMANN*atmos%T(k))
+!     !!do k=1,Nspace
+!      dekt = de*EV / (KBOLTZMANN*T(k))
 !      dekt = MIN(500., dekt)
 !      dekti = 1./dekt
 !      wlog = log(1.+dekti)
 !      wb = dpow(wlog, betab/(1.+dekti))
 !      cup = 2.1715d-8 * cbar * dpow(13.6/de, 1.5d0) * &
-!          dsqrt(dekt) * E1(dekt) * wb * atmos%ne(icell) * &
+!          sqrt(dekt) * E1(dekt) * wb * ne(icell) * &
 !          CUBE(CM_TO_M)
 !      ! -- Fudge factor
 !      cup = cup * coeff(1)

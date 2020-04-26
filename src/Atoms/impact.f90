@@ -29,7 +29,7 @@ MODULE IMPACT
  ! TODO: Integration of the cross-section itself.
 ! ------------------------------------------------------------------------------------- !
 
- use atmos_type, only : atmos, Hydrogen
+ use atmos_type, only : ne, T, Atoms, Natom, Hydrogen
  use atom_type!, only : AtomicLine, AtomicContinuum, AtomType
  use mcfost_env, only : dp
  use constant
@@ -37,6 +37,8 @@ MODULE IMPACT
  use math
  use utils, only : interp_sp
  use messages, only : error, warning
+ use parametres, only : ldissolve
+ use occupation_probability, only : wocc_n
 
  IMPLICIT NONE
 
@@ -101,7 +103,7 @@ MODULE IMPACT
    C(:,:) = 0d0
 
    do i=1,atom%Nlevel !between pair of levels resulting in a b-b transition
-    Wi = atmos%T(icell) * KBOLTZMANN
+    Wi = T(icell) * KBOLTZMANN
     do j=i+1,atom%Nlevel
 
       dE = (atom%E(j) - atom%E(i)) / Wi !Joules I hope
@@ -124,7 +126,7 @@ MODULE IMPACT
 
         if (forbidden) then !Modified Van Regemorter with correct.
 
-            C(i,j) = correct * C2_neutrals * atmos%T(icell)**(-1.5) * dexp(-dE) * line%fosc * &
+            C(i,j) = correct * C2_neutrals * T(icell)**(-1.5) * exp(-dE) * line%fosc * &
                          dE**(-1.68) !power of 1+xneutrals
           else !optically allowed: could also use Van Regemorter with correct = 1.
           ! Seaton Impact Paramater approximations !
@@ -132,7 +134,7 @@ MODULE IMPACT
 
             ic = find_continuum(atom, i)
 		    if (ic==0) CALL Error ("Impact")
-            neff = (atom%stage(i)+1) * dsqrt(E_RYDBERG/deltam / (atom%E(ic)-atom%E(i)))
+            neff = (atom%stage(i)+1) * sqrt(E_RYDBERG/deltam / (atom%E(ic)-atom%E(i)))
             write(*,*) "(n,l,Z)", neff, atom%Lorbit(i), atom%stage(i)+1
             ri = atomic_orbital_radius(neff, atom%Lorbit(i),atom%stage(i)+1)
 !             ic = locate(atom%stage*1d0, 1d0*atom%stage(j)+1d0)
@@ -141,12 +143,12 @@ MODULE IMPACT
 !             end if
 		    ic = find_continuum(atom, j)
 		    if (ic==0) CALL Error ("Impact")
-            neff = (atom%stage(j)+1) * dsqrt(E_RYDBERG/deltam / (atom%E(ic)-atom%E(j)))
+            neff = (atom%stage(j)+1) * sqrt(E_RYDBERG/deltam / (atom%E(ic)-atom%E(j)))
             write(*,*) "(n,l,Z)", neff, atom%Lorbit(j), atom%stage(j)+1
             ri = atomic_orbital_radius(neff, atom%Lorbit(j),atom%stage(j)+1)
             R0 = min(ri, rj)
             !! or neff = min(neff_i, neff_u) and R0 = 5*neff*2 + 1 / 4.
-            beta0 = R0 * dsqrt(Wi*deltam/E_RYDBERG) * dE
+            beta0 = R0 * sqrt(Wi*deltam/E_RYDBERG) * dE
             write(*,*) "R0 (a0) = ", R0," beta0 = ", real(beta0), beta0
             !in the weak coupling
             Qij = 4d0 * pia0squarex2 * E_RYDBERG**2 * &
@@ -158,7 +160,7 @@ MODULE IMPACT
 
           end if !forbidden neutral stage
        else !ions !Van Regemorter
-          C(i,j) = correct * C2_ions * atmos%T(icell)**(-1.5) * dexp(-dE) * line%fosc * dE
+          C(i,j) = correct * C2_ions * T(icell)**(-1.5) * exp(-dE) * line%fosc * dE
        endif
 
       endif !eq. 34
@@ -171,7 +173,7 @@ MODULE IMPACT
    do kr=1,atom%Ncont !only over continua
     cont = atom%continua(kr)
     i = cont%i; j = cont%j
-    dE = (atom%E(j) - atom%E(i)) / (KBOLTZMANN * atmos%T(icell))
+    dE = (atom%E(j) - atom%E(i)) / (KBOLTZMANN * T(icell))
 
     select case (atom%stage(i))
      case (0)
@@ -182,7 +184,7 @@ MODULE IMPACT
       gbar_i = 0.3 ! Z > 2
     end select
 
-    C(i,j) = C_bf * atmos%T(icell)**(-0.5) * cont%alpha0 * gbar_i * dexp(-dE) / dE
+    C(i,j) = C_bf * T(icell)**(-0.5) * cont%alpha0 * gbar_i * exp(-dE) / dE
 
    enddo
 
@@ -192,7 +194,7 @@ MODULE IMPACT
  FUNCTION Psi_Drawin(u)
   real(kind=dp) :: Psi_Drawin, u
 
-  Psi_Drawin = dexp(-u) / (1d0 + 2d0/u)
+  Psi_Drawin = exp(-u) / (1d0 + 2d0/u)
 
  RETURN
  END FUNCTION Psi_Drawin
@@ -200,7 +202,7 @@ MODULE IMPACT
  FUNCTION Psi_Drawin_ionisation(u)
   real(kind=dp) :: Psi_Drawin_ionisation, u
 
-  Psi_Drawin_ionisation = (1d0 + 2d0/u) * dexp(-u)
+  Psi_Drawin_ionisation = (1d0 + 2d0/u) * exp(-u)
   Psi_drawin_ionisation = Psi_drawin_ionisation / &
      1d0 + 2d0 * M_ELECTRON / (u * (M_ELECTRON + Hydrogen%weight*AMU))
 
@@ -222,7 +224,7 @@ MODULE IMPACT
   !    (atomic_weights(atom%periodic_table) + atomic_weights(1))
   mu = atom%weight * Hydrogen%weight / (atom%weight + Hydrogen%weight)
   deltam = 1. + M_ELECTRON/ (atom%weight * AMU) !correction to E_RYDBERG = Rinf
-  C0 = 8* pia0squarex2 * (2d0 * KBOLTZMANN * atmos%T(icell) / PI / mu)**(0.5)
+  C0 = 8* pia0squarex2 * (2d0 * KBOLTZMANN * T(icell) / PI / mu)**(0.5)
         !16 * pi * RBHOR**2
   do kr=1, atom%Ntr
 
@@ -232,7 +234,7 @@ MODULE IMPACT
      line = atom%lines(atom%at(kr)%ik)
      i = line%i; j = line%j
      dE = atom%E(j) - atom%E(i)
-     u0 = dE / KBOLTZMANN / atmos%T(icell)
+     u0 = dE / KBOLTZMANN / T(icell)
      f = line%fosc
      psi = Psi_drawin(u0)
 
@@ -241,7 +243,7 @@ MODULE IMPACT
      i = cont%i; j = cont%j
      dE = atom%E(j) - atom%E(i)
      f = real(i)/2. ! HERE IT IS NOT CORRECT
-     u0 = dE / KBOLTZMANN / atmos%T(icell)
+     u0 = dE / KBOLTZMANN / T(icell)
      psi = Psi_Drawin_ionisation(u0)
 
     case default
@@ -264,50 +266,84 @@ MODULE IMPACT
  RETURN
  END SUBROUTINE Charge_transfer_with_H
 
- FUNCTION Collision_Hydrogen(icell) result(Cji)
+ FUNCTION Collision_Hydrogen(icell) result(Cij)
+  !Matrix containing the collision rates of hydrogen C(i,j) = collrate from i->j
+  !This is not the collision rate matrix!
   integer :: icell, i, j
-  real(kind=dp) :: Cji(Hydrogen%Nlevel, Hydrogen%Nlevel)
-  real(kind=dp) :: nr_ji, CI(Hydrogen%Nlevel,Hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)
+  real(kind=dp) :: Cij(Hydrogen%Nlevel, Hydrogen%Nlevel)
+  real(kind=dp) :: nr_ji, CI(hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)!, CI(Hydrogen%Nlevel,Hydrogen%Nlevel)
 
-   Cji(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
-   CALL Johnson_CI(icell, CI(:,Hydrogen%Nlevel)) !bound-free i->Nlevel
+   Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
+!    CALL Johnson_CI(icell, CI(:,Hydrogen%Nlevel)) !bound-free i->Nlevel
+!    CALL Johnson_CE(icell, CE) !among all levels
+! 
+!    do j=1,Hydrogen%Nlevel
+!     do i=1,Hydrogen%Nlevel
+! !      if (ldissolve) then
+! !    		wj = wocc_n(icell, real(j,kind=dp), 1.0, 1.0)
+! !    		wi = wocc_n(icell, real(i,kind=dp), 1.0, 1.0)
+! !    	 else
+! !    	    wj = 1.0
+! !    	    wi = 1.0 
+! !      endif
+!      nr_ji = Hydrogen%nstar(i,icell)/Hydrogen%nstar(j,icell)
+!      Cij(j,i) = CE(j,i) +  CI(i,j)  * nr_ji * wj/wi
+!      Cij(i,j) = CE(j,i)/nr_ji + CI(i,j)
+!     end do
+!    end do
+   CALL Johnson_CI(icell, CI) !bound-free i->Nlevel
    CALL Johnson_CE(icell, CE) !among all levels
-
-   do j=1,Hydrogen%Nlevel
-    do i=1,Hydrogen%Nlevel
-     nr_ji = Hydrogen%nstar(i,icell)/Hydrogen%nstar(j,icell)
-     Cji(j,i) = CE(j,i) +  CI(i,j)  * nr_ji
-     Cji(i,j) = CE(j,i)/nr_ji + CI(i,j)
+   
+   do i=1,Hydrogen%Nlevel
+    Cij(i,hydrogen%Nlevel) = CI(i)
+    Cij(hydrogen%Nlevel,i) = CI(i) * hydrogen%nstar(i,icell) / hydrogen%nstar(hydrogen%Nlevel,icell)
+    do j=i+1,Hydrogen%Nlevel-1
+    	!write(*,*), i, j, CE(i,j),CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell)
+ 		Cij(i,j) = Cij(i,j) + CE(i,j)
+ 		Cij(j,i) = Cij(j,i) + CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell)
     end do
    end do
-   Cji(:,:) = Cji(:,:) * atmos%ne(icell)
+
+   Cij(:,:) = Cij(:,:) * ne(icell)
+   
+!    if (icell==1) then
+!    	do i=1, hydrogen%nlevel
+!    		write(*,*) "****",i, "****"
+!    		write(*,*) (j, Cij(i,j), j=1,hydrogen%nlevel)
+!    	enddo
+!    	stop
+!    endif
 
  RETURN
  END FUNCTION Collision_Hydrogen
 
- SUBROUTINE Johnson_CI(icell, Cje)
+
+ SUBROUTINE Johnson_CI(icell, Cik)
  ! --------------------------------------------------- !
-  ! Ionisation rate coefficient for
-  ! Hydrogen atom, from
-  ! L.C Johnson
+  ! Ionisation rate coefficient for Hydrogen atom
+  ! from lower level i to the continuum level k
+  ! C(i,k) = C_{i->k}
+  !
+  ! from L.C Johnson
   ! ApJ 74:227-236, 1972 May 15; eq. 39
   !
   ! ne factorised
   !
-  ! return C(i,j) with j = Nlevel (bound-free)
+  ! return C(i,k) with k = Nlevel (bound-free)
  ! --------------------------------------------------- !
    integer, intent(in) :: icell
-   real(kind=dp), intent(out), dimension(:) :: Cje
+   real(kind=dp), intent(out), dimension(:) :: Cik
    integer :: i, j, Nl
+   !real(kind=dp) :: x0 = 1 - (n/n0)**2 with n0 -> infinity
    real(kind=dp) :: C0, rn, bn, n, An, En, yn, zn, S, Bnp, deltaM
-   type (AtomType) :: atom
 
-   atom = atmos%Atoms(1)%ptr_atom
-   deltam = 1. + M_ELECTRON/ (atom%weight * AMU)
+   deltam = 1. + M_ELECTRON/ (hydrogen%weight * AMU)
 
-   C0 = dsqrt(8.*KBOLTZMANN*atmos%T(icell) / pi / M_ELECTRON)
+   C0 = sqrt(8.*KBOLTZMANN*T(icell) / pi / M_ELECTRON)
+   
+   Cik(:) = 0.0_dp
 
-   Nl = atom%Nlevel
+   Nl = hydrogen%Nlevel
    !Hydrogen level are ordered by n increasing, except for the continuum level
    !n = 1., but stops before Nlevel
 
@@ -323,52 +359,45 @@ MODULE IMPACT
 
     ! in Joules
     En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV: En = 13.6/n**2
-    yn = En / KBOLTZMANN / atmos%T(icell)
-    An = 32. / 3. / dsqrt(3d0) / pi * n  * (g0(n)/3. + g1(n)/4. + g2(n)/5.)
+    yn = En / KBOLTZMANN / T(icell)
+!     An = 32. / 3. / sqrt(3d0) / pi * n  * (g0(n)/3. + g1(n)/4. + g2(n)/5.)
+    An = 32. / 3. / sqrt(3d0) / pi * n  * (g0(i)/3. + g1(i)/4. + g2(i)/5.)
     Bnp = 2./3. * n*n * (5. + bn)
     zn = rn + yn
 
     S = C0 * pia0squarex2 * (n*yn)**2 * (An*(E1(yn)/yn - E1(zn)/zn) + &
    			(Bnp - An*log(2*n*n))*(ksi_johnson(yn)-ksi_johnson(zn)))
-   	!!write(*,*) i-1, Nl-1, "S=", S, S*dexp(yn)/dsqrt(atmos%T(icell))
-    !check that otherwise multiply by dexp(yn)
-    Cje(i) = S !RH -> dexp(yn) / dsqrt(atmos%T(icell)) !per ne
-    		   !we compute it at icell so in fact we could avoid / sqrt(atmos%icell)
+   	!write(*,*) icell, i, "S=", S
+    !check that otherwise multiply by exp(yn)
+    Cik(i) = S !RH -> exp(yn) / sqrt(T(icell)) !per ne
+    		   !we compute it at icell so in fact we could avoid / sqrt(icell)
     		   !as col = Cje * sqrt(T) * exp(-de). Normally dE == En/kT=y so
     		   !it is not useful to multiply except to take into account the slightly diff
-    		   !between En and (atom%E(Nl)-atom%E(i))
-    !!write(*,*) En, (atom%E(Nl)-atom%E(i)) !Should be similar, because E(j)=13.6/j**2
+    		   !between En and (hydrogen%E(Nl)-hydrogen%E(i))
+    !!write(*,*) En, (hydrogen%E(Nl)-hydrogen%E(i)) !Should be similar, because E(j)=13.6/j**2
    end do
+
  RETURN
  END SUBROUTINE Johnson_CI
 
 
- SUBROUTINE Johnson_CE(icell, Cje)
+ SUBROUTINE Johnson_CE(icell, Cij)
  ! ----------------------------------------------------- !
   ! Excitation rate coefficient for
   ! Hydrogen atom, from
   ! ApJ 74:227-236, 1972 May 15; eq. 36
-  !
-  ! CE = S = C(i,j) all transitions from j, i and i, j
-  !
-  ! ( -> transform C(i,j) to specifically C(j,i)
-  ! S * dexp(y) * atom%g(i)/atom%g(j)
-  ! = C(i,j) * exp(hnu/kt)*gi/gj = C(i,j) * ni/nj = C(j,i)
-  ! at LTE: (gi/gj * nj/ni)  = exp(-hnu/kT) )
  ! ----------------------------------------------------- !
    integer, intent(in) :: icell
-   real(kind=dp), intent(out), dimension(:,:) :: Cje
+   real(kind=dp), intent(out), dimension(:,:) :: Cij
    integer :: i, j, Nl
    real(kind=dp) :: C0, rn, bn, n, Ennp, y, z, S, Bnnp, En
    real(kind=dp) :: np, x, fnnp, rnnp, Annp, Gaunt_bf, deltam
-   type (AtomType) :: atom
 
-   atom = atmos%Atoms(1)%ptr_atom
-   deltam = 1. + M_ELECTRON/ (atom%weight * AMU)
+   deltam = 1. + M_ELECTRON/ (hydrogen%weight * AMU)
 
-   C0 = dsqrt(8.*KBOLTZMANN*atmos%T(icell) / pi / M_ELECTRON)
+   C0 = sqrt(8.*KBOLTZMANN*T(icell) / pi / M_ELECTRON)
 
-   Nl = atom%Nlevel
+   Nl = hydrogen%Nlevel
    !Hydrogen level are ordered by n increasing, except for the continuum level
    !n = 1., but stops before Nlevel
 
@@ -378,30 +407,33 @@ MODULE IMPACT
      rn = 0.45
      bn = -0.603
     else
-     rn = 1.94*n**(-1.57)
-     bn = 1d0/n * (4. - 18.63/n + 36.24/n/n - 28.09/n/n/n)
+     rn = 1.94/(i**1.57)
+     bn = (1.0/n) * (4.0 - 18.63/n + 36.24/n/n - 28.09/n/n/n)
     end if
 
     do j=i+1, Nl-1
-     np = dble(j)!n'
+     np = real(j,kind=dp)!n'
      x = 1d0 - (n/np)**2 ! = Enn'/Rdybg
-     !Gauntfactor * 32./3./dsqrt(3.)/pi * n/np**3 /x**3
-     Gaunt_bf = g0(n) + g1(n)/x + g2(n)/x/x
-     fnnp = Gaunt_bf * 32./3./dsqrt(3d0)/pi * n / np / np /np / x / x / x
+!      Gaunt_bf = g0(n) + g1(n)/x + g2(n)/x/x
+     Gaunt_bf = g0(i) + g1(i)/x + g2(i)/x/x
+
+     fnnp = Gaunt_bf * 32.0/ (3.0 * sqrt(3d0) * pi) * n / np / np /np / x / x / x
      rnnp = rn * x
-     Annp = 2d0 * n*n*fnnp/x
+     Annp = 2.0 * n*n*fnnp/x
     ! in Joules
      En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV = ionisation E of n
-     y = x * En / KBOLTZMANN / atmos%T(icell) !x = ratio of E/En
-     Bnnp = 4d0 * (n**4)/(np**3) / x / x * (1. + 4./3. /x + bn/x/x)
+     y = x * En / KBOLTZMANN / T(icell) !x = ratio of E/En
+     Bnnp = 4d0 * (n**4)/(np**3) / x / x * (1. + 4./(3.0 * x) + bn/x/x)
      z = rnnp + y
 
      S = C0 * pia0squarex2 * n*n*y*y/x * (Annp*((1./y + 0.5)*E1(y)-(1./z + 0.5)*E1(z))+&
      	(Bnnp-Annp*dlog(2*n*n/x))*(E2(y)/y - E2(z)/z))
 
-     Cje(j,i) = S * dexp(y) * atom%g(i)/atom%g(j)
-     !!Cje(i,j) = S
-     !write(*,*) atom%E(j) - atom%E(i), En*x !because x = deltaE/En
+     Cij(i,j) = S
+!      if (T(icell)==9140) then
+!      	write(*,*) i, j
+!      	write(*,*) n, np, S
+!      endif
     end do !over np
    end do  !over n
 
@@ -411,15 +443,16 @@ MODULE IMPACT
  FUNCTION ksi_johnson(t) result(y)
   double precision :: t, y
   !E0
-  y = dexp(-t)/t - 2d0*E1(t) + E2(t)
+  y = exp(-t)/t - 2d0*E1(t) + E2(t)
 
  RETURN
  END FUNCTION ksi_johnson
 
  FUNCTION g0 (n) result(g)
-  real(kind=dp) :: g, n
+  real(kind=dp) :: g
+  integer :: n
 
-  SELECT CASE (int(n))
+  SELECT CASE (n)
   CASE (1)
    g = 1.1330
   CASE (2)
@@ -432,9 +465,10 @@ MODULE IMPACT
  END FUNCTION g0
 
  FUNCTION g1 (n) result(g)
-  real(kind=dp) :: g, n
+  real(kind=dp) :: g
+  integer :: n
 
-  SELECT CASE (int(n))
+  SELECT CASE (n)
   CASE (1)
    g = -0.4059
   CASE (2)
@@ -447,15 +481,16 @@ MODULE IMPACT
  END FUNCTION g1
 
  FUNCTION g2 (n) result(g)
-  real(kind=dp) :: g, n
+  real(kind=dp) :: g
+  integer :: n
 
-  SELECT CASE (int(n))
+  SELECT CASE (n)
   CASE (1)
    g = 0.07014
   CASE (2)
    g = 0.02947
   CASE DEFAULT
-   g = 1d0/n/n * (0.3887 - 1.181 / n + 1.470 /n / n)
+   g = 1.0/(n*n) * (0.3887 - 1.181 / n + 1.470 / n / n)
   END SELECT
 
  RETURN
@@ -468,25 +503,25 @@ MODULE IMPACT
 
   real(kind=dp) :: gamma_1s_2s, gamma_1s_2p, Omega_2s, Omega_2p
   real(kind=dp) :: b(8), cc(6), x, dE_kT
-  real(kind=dp), parameter :: expdE = dexp(-7.5d-1), gi = 2d0 !g value for ground-state of Hydrogen is 2
+  real(kind=dp), parameter :: expdE = exp(-7.5d-1), gi = 2d0 !g value for ground-state of Hydrogen is 2
 
-  if (atmos%T(icell) < 5d3 .or. atmos%T(icell) > 5d5) RETURN
+  if (T(icell) < 5d3 .or. T(icell) > 5d5) RETURN
 
   data b / 4.5168d-02,  2.8056d+01,  7.2945d+00, 2.4805d-01,  1.0044d-01, -1.1143d-02,  &
           -1.3432d-03,  3.7570d-04  /
 
   data cc / 3.6177d-01,  1.3891d+00,  5.0866d-01, -3.8011d-01,  1.0158d-01, -1.0072d-02 /
 
-  x = (KBOLTZMANN * atmos%T(icell)) / E_RYDBERG / (1d0 + M_ELECTRON/hydrogen%weight*AMU)
+  x = (KBOLTZMANN * T(icell)) / E_RYDBERG / (1d0 + M_ELECTRON/hydrogen%weight*AMU)
   dE_kT = E_RYDBERG
   !natural log
-  gamma_1s_2s = b(1) * log(b(2)*x) * dexp(-b(3)*x) + b(4) + b(5)*x + b(6)*x*x * &
+  gamma_1s_2s = b(1) * log(b(2)*x) * exp(-b(3)*x) + b(4) + b(5)*x + b(6)*x*x * &
   				b(7)*x*x*x + b(8)*x*x*x*x
   				 !c0   !c1*x     !c2*x**3   !c3*x**3      !c4*x**4        !c5*x**5
   gamma_1s_2p = cc(1) + cc(2)*x + cc(3)*x*x + cc(4)*x*x*x + cc(5)*x*x*x*x + cc(6)*x*x*x*x*x
 
-  Omega_2s = 8.63d-6 * gamma_1s_2s * expdE / gi / dsqrt(atmos%T(icell))
-  Omega_2p = 8.63d-6 * gamma_1s_2p * expdE / gi / dsqrt(atmos%T(icell))
+  Omega_2s = 8.63d-6 * gamma_1s_2s * expdE / gi / sqrt(T(icell))
+  Omega_2p = 8.63d-6 * gamma_1s_2p * expdE / gi / sqrt(T(icell))
 
 
  RETURN

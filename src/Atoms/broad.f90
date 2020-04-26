@@ -3,7 +3,7 @@ MODULE broad
 
  use constant
  use atom_type
- use atmos_type, only : atmos, Hydrogen, Helium !alias to ptr_atom of Helium, which might not exist
+ use atmos_type, only : T, ne, elements, Hydrogen, Helium !alias to ptr_atom of Helium, which might not exist
  
  use messages, only : error, warning
  use mcfost_env, only : dp
@@ -24,8 +24,8 @@ MODULE broad
   !AA
   Crad = 6.5d-4; CvdW = 4.4d-4; Cstark = 1.17d-3
   !in AA
-  G = Crad + Cvdw * (1d-6 * sum(atom%n(1:atom%Nlevel-1,icell))/1d16) * (atmos%T(icell)/5d3)**(0.3) + &
-      Cstark * (atmos%ne(icell)/1d12)**(2./3.) * 1d-4 !conversion from 12cm^-3 ^ 2/3 to 12m^-3 ^ 2/3
+  G = Crad + Cvdw * (1d-6 * sum(atom%n(1:atom%Nlevel-1,icell))/1d16) * (T(icell)/5d3)**(0.3) + &
+      Cstark * (ne(icell)/1d12)**(2./3.) * 1d-4 !conversion from 12cm^-3 ^ 2/3 to 12m^-3 ^ 2/3
   G = G * 1d-10 !in m
   !conversion in s^-1 -> G(m) = G(s^-1) * lambda**2 / c : G(s^-1)/nu = G(m)/lambda -> G(m)*nu/lambda
   adamp  = G * CLIGHT / atom%lines(kr)%lambda0**2 * 1d18!s^-1
@@ -105,7 +105,7 @@ MODULE broad
    nHe = helium%n(1,icell)
    !if helium is a perturber
    mub = atom%weight * helium%weight / (atom%weight + helium%weight)
-   vrel35_He =(vtherm/mub * atmos%T(icell))**(0.3)
+   vrel35_He =(vtherm/mub * T(icell))**(0.3)
   else
    nHe = 0.0
    vrel35_He = 0.0
@@ -126,15 +126,15 @@ MODULE broad
   									n_eff(atom%Rydberg, atom%E(ic), atom%E(i), Z)**4)
   									
   C625 = (2.0*pi/fourpi/EPSILON_0)**(0.4) * (Q_ELECTRON*Q_ELECTRON/HPLANCK * alpha * deltaR)**(0.4) 
-  vrel35_H = (vtherm/mu * atmos%T(icell))**(0.3) !sqvel**0.3 = vel**(3./5.)
+  vrel35_H = (vtherm/mu * T(icell))**(0.3) !sqvel**0.3 = vel**(3./5.)
 
   !enhancement 
   !*atom%lines(kr)%cvdWaals(1), * atom%lines(kr)%cvdWaals(3)
   Gvdw = 8.08 * (nH * vrel35_H + nHe * vrel35_He) * C625 
   
   !GvdW = 10**(6.33 + 0.4 * log10(n_eff(atom%Rydberg, atom%E(ic), atom%E(j), Z)**4 - &
-  !			n_eff(atom%Rydberg, atom%E(ic), atom%E(i), Z)**4) -0.7*log10(atmos%T(icell)) + &
-  !			log10(atmos%nHtot(icell)*KBOLTZMANN*atmos%T(icell)*0.1))
+  !			n_eff(atom%Rydberg, atom%E(ic), atom%E(i), Z)**4) -0.7*log10(T(icell)) + &
+  !			log10(nHtot(icell)*KBOLTZMANN*T(icell)*0.1))
 
 
  RETURN
@@ -167,7 +167,7 @@ MODULE broad
   real(kind=dp) :: cross, gammaCorrH, gammaCorrHe, C625
 
 
-  Helium_elem => atmos%Elements(2)%ptr_elem ! Helium basic informations
+  Helium_elem => Elements(2)%ptr_elem ! Helium basic informations
 
 
   j = atom%lines(kr)%j
@@ -191,15 +191,15 @@ MODULE broad
    ! velocity distributions
    vrel35_H = (8.*KBOLTZMANN/(PI*AMU*atom%weight) * (1.+atom%weight/Hydrogen%weight))**(3d-1)
    cross = 8.08 * (atom%lines(kr)%cvdWaals(1)*vrel35_H+atom%lines(kr)%cvdWaals(3)*Helium_elem%abund*vrel35_He)*C625
-   GvdW = cross * atmos%T(icell)**(3d-1)
+   GvdW = cross * T(icell)**(3d-1)
    
   CASE ("BARKLEM")
    write(*,*) "Warning-> vdWaals broadening following BARKLEM ",&
      "not tested yet!"
    ! UNSOLD for Helium
    cross = 8.08 * atom%lines(kr)%cvdWaals(3)*Helium_elem%abund*vrel35_He*C625
-    GvdW = atom%lines(kr)%cvdWaals(1) * atmos%T(icell)**(real(1.-&
-          atom%lines(kr)%cvdWaals(2),kind=8)/2.) + cross*atmos%T(icell)**(3d-1)
+    GvdW = atom%lines(kr)%cvdWaals(1) * T(icell)**(real(1.-&
+          atom%lines(kr)%cvdWaals(2),kind=8)/2.) + cross*T(icell)**(3d-1)
   CASE DEFAULT
    write(*,*) "Method for van der Waals broadening unknown"
    write(*,*) "exiting..."
@@ -234,18 +234,16 @@ MODULE broad
   real(kind=dp), intent(out) :: GStark
   integer, intent(in) :: icell
   type (AtomType), intent(in) :: atom
-  type (AtomicLine) :: line
   integer, intent(in) :: kr
   integer :: k, ic, Z
   real(kind=dp) :: C4, C, Cm, melONamu, cStark23, cStark
   real(kind=dp) :: neff_u, neff_l, vrel, ERYDBERG
 
   melONamu = M_ELECTRON / AMU
-  line = atom%lines(kr)
-
-  if (line%cStark < 0.) then
-   cStark = dabs(real(line%cStark,kind=dp))
-    GStark = cStark * atmos%ne(icell)
+  
+  if ( atom%lines(kr)%cStark < 0.) then
+   cStark = dabs(real( atom%lines(kr)%cStark,kind=dp))
+    GStark = cStark * ne(icell)
   else
    ! Constants for relative velocity. Assume that nion = ne
    ! and that the average atomic weight of ionic pertubers is
@@ -257,21 +255,21 @@ MODULE broad
 
    ! Find core charge Z and effective quantumer numbers neff_u
    ! and neff_l for upper and lower level
-   Z = atom%stage(line%i) + 1 !physical, not index
-   ic = find_continuum(line%atom, line%i)
+   Z = atom%stage( atom%lines(kr)%i) + 1 !physical, not index
+   ic = find_continuum(atom, atom%lines(kr)%i)
    
    ERYDBERG = E_RYDBERG / (1.+M_ELECTRON / (atom%weight*AMU)) !corection
-   neff_l = Z*dsqrt(ERYDBERG/(atom%E(ic)-atom%E(line%i)))
-   neff_u = Z*dsqrt(ERYDBERG/(atom%E(ic)-atom%E(line%j)))
+   neff_l = Z*sqrt(ERYDBERG/(atom%E(ic)-atom%E( atom%lines(kr)%i)))
+   neff_u = Z*sqrt(ERYDBERG/(atom%E(ic)-atom%E( atom%lines(kr)%j)))
    
     C4 = ((Q_ELECTRON)**2./(4.*PI*EPSILON_0))*RBOHR *   &
      (2.*PI*RBOHR**2./HPLANCK) / (18.*Z*Z*Z*Z) * &
      ((neff_u*(5.0*(neff_u)**2. + 1.0))**2. - (neff_l*(5.0*(neff_l)**2. + 1.0))**2.)
      
-    cStark23 = 11.37 * (line%cStark * C4)**(6.6666667d-1)
+    cStark23 = 11.37 * ( atom%lines(kr)%cStark * C4)**(6.6666667d-1)
 
-    vrel = (C*atmos%T(icell))**(1.6666667d-1) * Cm
-    GStark = cStark23 * vrel * atmos%ne(icell)
+    vrel = (C*T(icell))**(1.6666667d-1) * Cm
+    GStark = cStark23 * vrel * ne(icell)
   end if
 
  RETURN
@@ -297,10 +295,11 @@ MODULE broad
   
   Z = 1.0 + atom%stage(atom%lines(kr)%i)
   
-  nelectric = 1d-6 * (atmos%ne(icell) + hydrogen%n(hydrogen%Nlevel,icell)) !cm^-3
+  !include proton ?
+  nelectric = 1d-6 * (ne(icell) + 0.0 * hydrogen%n(hydrogen%Nlevel,icell)) !cm^-3
 
-  n_lower = dsqrt(atom%g(atom%lines(kr)%i)/2.)
-  n_upper = dsqrt(atom%g(atom%lines(kr)%j)/2.) !works because stark linear only for Hydrogen.
+  n_lower = sqrt(atom%g(atom%lines(kr)%i)/2.)
+  n_upper = sqrt(atom%g(atom%lines(kr)%j)/2.) !works because stark linear only for Hydrogen.
   									 !at the moment. otherwise use n_eff, wich works for H
   									 
   dn = real(n_upper - n_lower)
@@ -315,8 +314,7 @@ MODULE broad
   !but since it is very inaccurate and we miss broadening 
   gs = 1.0 !
 
-  GStark = gs * a1 * 0.6 * (n_upper*n_upper-n_lower*n_lower) * &
-           ( nelectric**(2./3.) )
+  GStark = gs * a1 * 0.6 * (n_upper*n_upper-n_lower*n_lower) * ( nelectric**(2./3.) )
 
 
 
@@ -344,19 +342,19 @@ MODULE broad
   if (i==1) then !transition between ground state and excited levels
    gr = atom%g(atom%lines(kr)%i)/atom%g(atom%lines(kr)%j)
    nu1j = M_TO_NM * CLIGHT / atom%lines(kr)%lambda0 !ground state is i
-   a1 = dsqrt(gr) * atom%lines(kr)%fosc / nu1j
+   a1 = sqrt(gr) * atom%lines(kr)%fosc / nu1j
   else !transition between two exited states
   	   !only one is resonance boradened
    nu1j = (atom%E(i) - atom%E(1)) / HPLANCK
    gr = atom%g(1) / atom%g(i)
    np = n_eff(atom%rydberg, atom%E(ic),atom%E(i), atom%stage(ic))
    f1j = line_oscillator_strength(1.0_dp, np)
-   a1 = f1j * dsqrt(gr)/nu1j
+   a1 = f1j * sqrt(gr)/nu1j
 !    nu1j = (atom%E(atom%lines(kr)%j) - atom%E(1)) / HPLANCK
 !    gr = atom%g(1) / atom%g(atom%lines(kr)%j)
 !    np = n_eff(atom%rydberg, atom%E(ic),atom%E(atom%lines(kr)%j), atom%stage(atom%lines(kr)%j)+1)
 !    f1j = line_oscillator_strength(1.0_dp, np)   
-!    a2 = f1j * dsqrt(gr)/nu1j
+!    a2 = f1j * sqrt(gr)/nu1j
   endif
 
   adamp = 5.48 * pi * Q_ELECTRON**2  * max(0.0, max(a1,a2)) * atom%n(1,icell) / M_ELECTRON!/ fourpi
@@ -381,7 +379,7 @@ MODULE broad
   !and then to adamp as Gamma / vrboad
   cDop = (NM_TO_M*atom%lines(kr)%lambda0) / (4.*PI)
   
-  
+
   ! van der Waals broadening
   !interaction with neutral H and neutral He
   !Not for H and He ?
@@ -390,7 +388,7 @@ MODULE broad
    !CALL VanderWaals_new(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
   end if
-  
+
   ! Quadratic Stark broadening
   !Interaction with charged particles
   !-> for H cStark is 0
@@ -398,7 +396,7 @@ MODULE broad
    CALL Stark(icell, atom, kr, adamp)
     Qelast = Qelast + adamp
   end if
-  
+
   ! Linear Stark broadening only for Hydrogen
   !Approximate treatment at the moment
   if (atom%ID == "H") then
@@ -410,7 +408,7 @@ MODULE broad
   
   adamp = (atom%lines(kr)%Grad + Qelast)*cDop / atom%vbroad(icell)
 !   write(*,*) atom%ID, atom%lines(kr)%j, atom%lines(kr)%i, atom%vbroad(icell)/1e3
-!   write(*,*) atmos%T(icell), "a=", adamp, "Grad", atom%lines(kr)%Grad
+!   write(*,*) T(icell), "a=", adamp, "Grad", atom%lines(kr)%Grad
 
 
  RETURN

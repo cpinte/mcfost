@@ -6,7 +6,7 @@
 !
 !
 ! If ne_intial_slution is "NEMODEL" then first guess is computed using 
-! the value stored in atmos%ne as first guess.
+! the value stored in ne as first guess.
 ! This allows to iterate the electron density through the NLTE scheme.
 !
 ! See: Hubeny & Mihalas (2014)
@@ -19,7 +19,7 @@
 
 MODULE solvene
 
- use atmos_type, only : atmos, Nelem !in atmos%Elements
+ use atmos_type, only : Nelem, Elements, Atoms, Natom, nHtot, ne, T, icompute_atomRT
  use atom_type, only : Element, AtomType
  use math, only : interp1D
  use constant
@@ -29,6 +29,7 @@ MODULE solvene
  use input, only : nb_proc
  use mcfost_env, only : dp
  use constantes, only : tiny_dp, huge_dp
+ use parametres, only : n_cells
  !$ use omp_lib
 
  IMPLICIT NONE
@@ -61,11 +62,11 @@ MODULE solvene
   real(kind=dp), intent(in) :: U0, U1
   real(kind=dp) :: phiH
   real(kind=dp), intent(out) :: ne
-  phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ptr_elem%ionpot(1))
+  phiH = phi_jl(k, U0, U1, Elements(1)%ptr_elem%ionpot(1))
 
   !if no free e-, Nt = NH + NH+ with NH+=ne
   if (phiH>0) then
-   ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
+   ne = (sqrt(nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
   else
    ne = 0d0
   endif
@@ -87,13 +88,14 @@ MODULE solvene
   real(kind=dp), intent(in) :: U0, U1
   real(kind=dp) :: phiH
   real(kind=dp), intent(out) :: ne
-  phiH = phi_jl(k, U0, U1, atmos%Elements(1)%ptr_elem%ionpot(1))
+  
+  phiH = phi_jl(k, U0, U1, Elements(1)%ptr_elem%ionpot(1))
 
   !if no free e-, Nt = NH + NH+ with NH+=ne
-  !ne = (sqrt(atmos%nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
+  !ne = (sqrt(nHtot(k)*phiH*4. + 1)-1)/(2.*phiH) !without H minus
   !if free e-, Nt=Nhot + NH+ + ne
   if (phiH>0) then
-   ne = (sqrt(atmos%nHtot(k)*phiH + 1)-1)/(phiH)
+   ne = (sqrt(nHtot(k)*phiH + 1)-1)/(phiH)
   else
    ne = 0d0
   endif
@@ -116,7 +118,7 @@ MODULE solvene
   alphaM = A ! relative to H, for instance 1.-6 etc
   
   if (phiM > 0) then
-   ne = (sqrt(alphaM*atmos%nHtot(k)*phiM +0.25*(1+alphaM)**2) - 0.5*(1+alphaM) ) / phiM
+   ne = (sqrt(alphaM*nHtot(k)*phiM +0.25*(1+alphaM)**2) - 0.5*(1+alphaM) ) / phiM
   else
    ne = 0d0
   endif
@@ -133,12 +135,12 @@ MODULE solvene
 ! 
 !   type(Element) :: elem
 !   integer, intent(in) :: stage, k
-!   real(kind=dp) :: Uk, part_func(atmos%Npf)
+!   real(kind=dp) :: Uk, part_func(Npf)
 !   
 !   part_func = elem%pf(stage,:)
-!   Uk = Interp1D(atmos%Tpf,part_func,atmos%T(k))
+!   Uk = Interp1D(Tpf,part_func,T(k))
 !   !!Uk = (10.d0)**(Uk) !! 29/12/2019 changed log10 in log
-!   Uk = dexp(Uk)
+!   Uk = exp(Uk)
 !  RETURN
 ! END FUNCTION getPartitionFunctionk
 
@@ -162,9 +164,9 @@ MODULE solvene
   integer :: nll, j, i
 
   ! check if the element as an atomic model and it is active
-  atom_loop : do nll=1,atmos%Natom
+  atom_loop : do nll=1,Natom
 
-   if (atmos%Atoms(nll)%ptr_atom%NLTEpops) then
+   if (Atoms(nll)%ptr_atom%NLTEpops) then
      has_nlte_pops=.true.
      exit atom_loop
    end if
@@ -175,7 +177,7 @@ MODULE solvene
 
   !may be active without NLTEpops or passive with read NLTE pops
   if (has_nlte_pops) then
-   atom => atmos%Atoms(nll)%ptr_atom
+   atom => Atoms(nll)%ptr_atom
    fjk = 0d0
    dfjk = 0d0
    !For Nlevel, Nlevel stages
@@ -185,7 +187,7 @@ MODULE solvene
     fjk(atom%stage(i)+1) = fjk(atom%stage(i)+1)+(atom%stage(i))*atom%n(i,k)
    end do                                          !is there a + 1 here so that fjk(1)=1*atom%n(1)/Ntot
    !Divide by Ntotal and retrieve fj = Nj/N for all j
-   fjk(:) = fjk(:)/(atmos%nHtot(k)*atom%Abund)
+   fjk(:) = fjk(:)/(nHtot(k)*atom%Abund)
    !et la dérivée ? dfjk
    atom => NULL()
   else !not active or active but first iteration of the NLTEloop so that
@@ -230,7 +232,7 @@ MODULE solvene
    dfjk(:)=(dfjk(:)-fjk(:)*sum2)/sum1
    
    if (any_nan_infinity_vector(dfjk)>0) then
-       write(*,*) "j=",j," dfjk=",dfjk(j), "fjk=", fjk(j), ne, atmos%T(k), sum1, sum2
+       write(*,*) "j=",j," dfjk=",dfjk(j), "fjk=", fjk(j), ne, T(k), sum1, sum2
    stop
    endif
   end if
@@ -238,10 +240,10 @@ MODULE solvene
  RETURN
  END SUBROUTINE getfjk
 
- SUBROUTINE SolveElectronDensity(ne_initial_solution)
+ SUBROUTINE Solve_Electron_Density(ne_initial_solution)
  ! ----------------------------------------------------------------------!
   ! Solve for electron density for a set of elements
-  ! stored in atmos%Elements. Elements up to N_MAX_ELEMENT are
+  ! stored in Elements. Elements up to N_MAX_ELEMENT are
   ! used. If an element has also an atomic model, and if for
   ! this element NLTE populations are known these pops are
   ! used to compute the electron density. Otherwise, LTE is used.
@@ -258,7 +260,7 @@ MODULE solvene
   character(len=20) :: initial
   real(kind=dp) :: error, ne_old, akj, sum, Uk, dne, Ukp1
   real(kind=dp):: ne_oldM, UkM, PhiHmin
-!   real(kind=dp), dimension(atmos%Nspace) :: np
+!   real(kind=dp), dimension(n_cells) :: np
   real(kind=dp), dimension(:), allocatable :: fjk, dfjk
   integer :: Nmaxstage=0, n, k, niter, j, ZM, id, ninit, nfini
   integer :: unconverged_cells(nb_proc)
@@ -276,7 +278,7 @@ MODULE solvene
   unconverged_cells(:) = 0
   id = 1
   do n=1,Nelem
-   Nmaxstage=max(Nmaxstage,atmos%Elements(n)%ptr_elem%Nstage)
+   Nmaxstage=max(Nmaxstage,Elements(n)%ptr_elem%Nstage)
   end do
   allocate(fjk(Nmaxstage))
   allocate(dfjk(Nmaxstage))
@@ -297,22 +299,24 @@ write(*,*) "Test Nelem",Nelem
   !$omp default(none) &
   !$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
   !$omp private(dne, akj, id, ninit, nfini) &
-  !$omp shared(atmos, initial,Hydrogen, ZM, unconverged_cells, Nelem)
+  !$omp shared(n_cells, Elements, initial,Hydrogen, ZM, unconverged_cells, Nelem) &
+  !$omp shared(ne, T, icompute_atomRT, nHtot)
   !$omp do
-  do k=1,atmos%Nspace
+  do k=1,n_cells
    !$ id = omp_get_thread_num() + 1
-   if (atmos%icompute_atomRT(k) <= 0) CYCLE !transparent or dark
+   if (icompute_atomRT(k) <= 0) CYCLE !transparent or dark
+
 
    !write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k
    if (initial.eq."N_PROTON") then
     ne_old = Hydrogen%n(Hydrogen%Nlevel,k)!np(k)
    else if (initial.eq."NE_MODEL") then
-    ne_old = atmos%ne(k)
+    ne_old = ne(k)
    else !"H_IONISATION" or unkown
    
     !Initial solution ionisation of H
-    Uk = getPartitionFunctionk(atmos%Elements(1)%ptr_elem, 1, k)
-    Ukp1 = getPartitionFunctionk(atmos%Elements(1)%ptr_elem, 2, k)
+    Uk = getPartitionFunctionk(Elements(1)%ptr_elem, 1, k)
+    Ukp1 = getPartitionFunctionk(Elements(1)%ptr_elem, 2, k)
 
     if (Ukp1 /= 1d0) then 
      CALL Warning("Partition function of H+ should be 1")
@@ -321,19 +325,19 @@ write(*,*) "Test Nelem",Nelem
     end if
     CALL ne_Hionisation (k, Uk, Ukp1, ne_old)
 
-    if (atmos%T(k) >= 20d3) then
+
+    if (T(k) >= 20d3) then
       ZM = 2 !He
-    !else if (atmos%T(k) <= 1000d0) then
+    !else if (T(k) <= 1000d0) then
     else
       ZM = 11 ! Na !trade off between higher A and lower ionpot
     !else
     !  ZM = 26 ! Fe
     end if    
     !add Metal
-    Uk = getPartitionFunctionk(atmos%Elements(ZM)%ptr_elem, 1, k)
-    Ukp1 = getPartitionFunctionk(atmos%Elements(ZM)%ptr_elem, 2, k)
-    CALL ne_Metal(k, Uk, Ukp1, atmos%elements(ZM)%ptr_elem%ionpot(1), &
-         atmos%elements(ZM)%ptr_elem%Abund, ne_oldM)
+    Uk = getPartitionFunctionk(Elements(ZM)%ptr_elem, 1, k)
+    Ukp1 = getPartitionFunctionk(Elements(ZM)%ptr_elem, 2, k)
+    CALL ne_Metal(k, Uk, Ukp1, elements(ZM)%ptr_elem%ionpot(1),elements(ZM)%ptr_elem%Abund, ne_oldM)
     !write(*,*) "neMetal=",ne_oldM
     !if Abund << 1. and chiM << chiH then
     ! ne (H+M) = ne(H) + ne(M)
@@ -347,10 +351,10 @@ write(*,*) "Test Nelem",Nelem
     !!!!!!!!!!!!!!!!!
    end if
 
-   atmos%ne(k) = ne_old
+   ne(k) = ne_old
    niter=0
    do while (niter < N_MAX_ELECTRON_ITERATIONS)
-    error = ne_old/atmos%nHtot(k)
+    error = ne_old/nHtot(k)
     sum = 0.
 
     !ninit = (1. * (id-1)) / nb_proc * Nelem + 1
@@ -358,50 +362,50 @@ write(*,*) "Test Nelem",Nelem
     do n=1,Nelem
      if (n > N_MAX_ELEMENT) exit
 
-     CALL getfjk(atmos%Elements(n)%ptr_elem,ne_old,k,fjk,dfjk)!
+     CALL getfjk(Elements(n)%ptr_elem,ne_old,k,fjk,dfjk)!
 
      if (n.eq.1)  then ! H minus for H
-       !2 = partition function of HI, should be replace by getPartitionFunctionk(atmos%elements(1)%ptr_elem, 1, icell)
+       !2 = partition function of HI, should be replace by getPartitionFunctionk(elements(1)%ptr_elem, 1, icell)
        PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
        ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
        error = error + ne_old*fjk(1)*PhiHmin
        sum = sum-(fjk(1)+ne_old*dfjk(1))*PhiHmin
        !write(*,*) "phiHmin=",PhiHmin,error, sum
      end if
-     do j=2,atmos%elements(n)%ptr_elem%Nstage
-      akj = atmos%elements(n)%ptr_elem%Abund*(j-1) !because j starts at 1
+     do j=2,elements(n)%ptr_elem%Nstage
+      akj = elements(n)%ptr_elem%Abund*(j-1) !because j starts at 1
       error = error -akj*fjk(j)
       sum = sum + akj*dfjk(j)
       !write(*,*) n-1, j-1, akj, error, sum, dfjk(j)
      end do
     end do !loop over elem
 
-    atmos%ne(k) = ne_old - atmos%nHtot(k)*error /&
-          (1.-atmos%nHtot(k)*sum)
-    dne = dabs((atmos%ne(k)-ne_old)/(ne_old+tiny_dp))
-    ne_old = atmos%ne(k)
+    ne(k) = ne_old - nHtot(k)*error /&
+          (1.-nHtot(k)*sum)
+    dne = dabs((ne(k)-ne_old)/(ne_old+tiny_dp))
+    ne_old = ne(k)
     
-    if (is_nan_infinity(atmos%ne(k))>0) then
-    write(*,*) niter, "icell=",k," T=",atmos%T(k)," nH=",atmos%nHtot(k), &
-              "dne = ",dne, " ne=",atmos%ne(k), " nedag = ", ne_old, sum
+    if (is_nan_infinity(ne(k))>0) then
+    write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), &
+              "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, sum
     stop
     endif
     niter = niter + 1
     if (dne <= MAX_ELECTRON_ERROR) then
-      !write(*,*) niter, "icell=",k," T=",atmos%T(k)," ne=",atmos%ne(k), " dne=", dne
-      if (atmos%ne(k) < ne_min_limit) atmos%ne(k) = 0d0 !tiny_dp or < tiny_dp
+      !write(*,*) niter, "icell=",k," T=",T(k)," ne=",ne(k), " dne=", dne
+      if (ne(k) < ne_min_limit) ne(k) = 0d0 !tiny_dp or < tiny_dp
      exit
     else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
       if (dne >= 1) then !shows the warning only if dne is actually greater than 1
           CALL Warning("Electron density has not converged for this cell")
           write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, &
-          "ne=",atmos%ne(k), "T=",atmos%T(k)," nH=",atmos%nHtot(k)
+          "ne=",ne(k), "T=",T(k)," nH=",nHtot(k)
           !set articially ne to some value ?
-          atmos%ne(k) = ne_oldM !already tested if < ne_min_limit
-          write(*,*) "Setting ne to ionisation of ", atmos%elements(ZM)%ptr_elem%ID, ne_oldM
+          ne(k) = ne_oldM !already tested if < ne_min_limit
+          write(*,*) "Setting ne to ionisation of ", elements(ZM)%ptr_elem%ID, ne_oldM
 !       else
 !           write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, &
-!           "ne=",atmos%ne(k), "T=",atmos%T(k)," nH=",atmos%nHtot(k)
+!           "ne=",ne(k), "T=",T(k)," nH=",nHtot(k)
       end if
       unconverged_cells(id) = unconverged_cells(id) + 1 !but count each cell for with dne > MAX_ELECTRON_ERROR
     end if !convergence test
@@ -414,16 +418,16 @@ write(*,*) "Test Nelem",Nelem
   deallocate(fjk, dfjk)
   
   write(*,*) "Maximum/minimum Electron density in the model (m^-3):"
-  write(*,*) MAXVAL(atmos%ne),MINVAL(atmos%ne,mask=atmos%icompute_atomRT>0)
+  write(*,*) MAXVAL(ne),MINVAL(ne,mask=icompute_atomRT>0)
   
   !that's because I use the sum as a variable so the function doesn't exist.
   do k=2, nb_proc
    unconverged_cells(1) = unconverged_cells(1) + unconverged_cells(k)
   end do
   if (unconverged_cells(1) > 0) write(*,*) "Found ", unconverged_cells(1)," unconverged cells (%):", &
-  													100*real(unconverged_Cells(1))/real(atmos%Nspace)
+  													100*real(unconverged_Cells(1))/real(n_cells)
   
  RETURN
- END SUBROUTINE SolveElectronDensity
+ END SUBROUTINE Solve_Electron_Density
 
 END MODULE solvene

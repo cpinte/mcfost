@@ -1,10 +1,10 @@
-
+!building
 MODULE stark
 
  use atom_type, only : AtomicContinuum, find_continuum, AtomType, AtomicLine
- use atmos_type, only : atmos, Hydrogen, Helium
+ use atmos_type, only : Hydrogen, Helium, ne, T
  use constant
- use spectrum_type, only : NLTEspec
+ use spectrum_type, only : lambda
  use math, only : bezier3_interp, interp2Darr, interp1D, interp2D, convolve
  
  use constantes, only : tiny_dp
@@ -41,70 +41,70 @@ MODULE stark
 	!Stark broadening not included in line%phi for these series
 		type (AtomicLine), intent(inout) :: line
 		integer, intent(in) :: icell
-		integer :: t
-		character(len=3) :: itxt, jtxt
-		real(kind=dp) :: S(line%Nlambda), test_prof(line%Nlambda)
-		
-		!line%lstark_profile = .false.
-
-return
-		if ((atmos%ne(icell) < 1d20) .or. (atmos%ne(icell) > 1e23)) then
-			return
-		else
-			if (line%i==1) then
-				CALL Stark_lyman(icell, line, S)
-				!line%lstark_profile = .true.
-			else if (line%i==2) then
-				CALL Stark_balmer(icell, line, S)
-				!line%lstark_profile = .true.
-			else
-				!just leave for other series
-				return
-			endif
-		endif
-  
-  
-  !do convolution now
-  !It is S(nu) convolved with phi(v) ??
-!   line%phi(:,icell) = convolve(NLTEspec%lambda(line%Nblue:line%Nred), S(:), line%phi(:,icell))
-  
-  test_prof(:) = convolve(NLTEspec%lambda(line%Nblue:line%Nred), S(:), line%phi(:,icell))
-
-  !find last icell to show to remove !!!!!
-!   do t=atmos%Nspace, 1, -1
-!    if (atmos%icompute_atomRT(t)>0) exit
-!   enddo
+! 		integer :: t
+! 		character(len=3) :: itxt, jtxt
+! 		real(kind=dp) :: S(line%Nlambda), test_prof(line%Nlambda)
+! 		
+! 		!line%lstark_profile = .false.
 ! 
-!  if (icell == t) then
-!  write(itxt,'(I3)') line%i
-!  write(jtxt,'(I3)') line%j
-!  write(*,*) itxt, jtxt
-!  open(80, file=trim(itxt)//trim("->")//trim(jtxt)//"_starkprof.txt", status='unknown')
-!  do t=1,line%Nlambda
-!   write(80,"(4E)") NLTEspec%lambda(line%Nblue+t-1), test_prof(t), S(t), line%phi(t,icell)
-!  enddo
-!  close(80)
-!  endif
- 
+! return
+! 		if ((ne(icell) < 1d20) .or. (ne(icell) > 1e23)) then
+! 			return
+! 		else
+! 			if (line%i==1) then
+! 				CALL Stark_lyman(icell, line, S)
+! 				!line%lstark_profile = .true.
+! 			else if (line%i==2) then
+! 				CALL Stark_balmer(icell, line, S)
+! 				!line%lstark_profile = .true.
+! 			else
+! 				!just leave for other series
+! 				return
+! 			endif
+! 		endif
+!   
+!   
+!   !do convolution now
+!   !It is S(nu) convolved with phi(v) ??
+! !   line%phi(:,icell) = convolve(lambda(line%Nblue:line%Nred), S(:), line%phi(:,icell))
+!   
+!   test_prof(:) = convolve(lambda(line%Nblue:line%Nred), S(:), line%phi(:,icell))
+! 
+!   !find last icell to show to remove !!!!!
+! !   do t=n_cells, 1, -1
+! !    if (icompute_atomRT(t)>0) exit
+! !   enddo
+! ! 
+! !  if (icell == t) then
+! !  write(itxt,'(I3)') line%i
+! !  write(jtxt,'(I3)') line%j
+! !  write(*,*) itxt, jtxt
+! !  open(80, file=trim(itxt)//trim("->")//trim(jtxt)//"_starkprof.txt", status='unknown')
+! !  do t=1,line%Nlambda
+! !   write(80,"(4E)") lambda(line%Nblue+t-1), test_prof(t), S(t), line%phi(t,icell)
+! !  enddo
+! !  close(80)
+! !  endif
+!  
  return
  end subroutine Stark_profile
  
  subroutine Stark_Lyman(icell,line, Snu)
   integer, intent(in) :: icell
   type (AtomicLine), intent(in) :: line
-  real(kind=dp) :: delta_nus, S0, dnu, ne, T, logne, logT
+  real(kind=dp) :: delta_nus, S0, dnu, ne0, T0, logne, logT
   real(kind=dp), intent(out) :: Snu(line%Nlambda)
   real :: A, alp, B, c, bb
   integer :: np, n, la
   
   n = 1 !LYmann
   
-  T = atmos%T(icell)
-  ne = atmos%ne(icell)*1d-6 !cm^-3
-  logne = log10(ne)
-  logT = log10(T)
+  T0 = T(icell)
+  ne0 = ne(icell)*1d-6 !cm^-3
+  logne = log10(ne0)
+  logT = log10(T0)
   
-  np = int(dsqrt(line%atom%g(line%j)/2.))
+  np = int(sqrt(line%atom%g(line%j)/2.))
   
   alp = 2.5
   
@@ -119,7 +119,7 @@ return
    A = -0.499
   endif
   
-  delta_nus = 10**(A) * ( ne )**(0.688) * real(np)**(2.257)
+  delta_nus = 10**(A) * ( ne0 )**(0.688) * real(np)**(2.257)
     
   if (np == 2) then !A is in log
    B = -0.23
@@ -146,7 +146,7 @@ return
   c = alp/bb
   
   do la=1, line%Nlambda
-   dnu = abs( M_TO_NM * (NLTEspec%lambda(line%Nblue+la-1) - line%lambda0) * CLIGHT / line%lambda0**2 ) / delta_nus
+   dnu = abs( M_TO_NM * (lambda(line%Nblue+la-1) - line%lambda0) * CLIGHT / line%lambda0**2 ) / delta_nus
    Snu(la) = S0 / (1.0 + dnu**b )**c  
   enddo
  
@@ -156,19 +156,19 @@ return
  subroutine Stark_balmer(icell,line, Snu)
   integer, intent(in) :: icell
   type (AtomicLine), intent(in) :: line
-  real(kind=dp) :: delta_nus, S0, dnu, ne, T, logne, logT
+  real(kind=dp) :: delta_nus, S0, dnu, ne0, T0, logne, logT
   real(kind=dp), intent(out) :: Snu(line%Nlambda)
   real :: A, alp, B, c, bb
   integer :: np, n, la
   
   n = 2 !Balmer
   
-  T = atmos%T(icell)
-  ne = atmos%ne(icell)*1d-6 !cm^-3
-  logne = log10(ne)
-  logT = log10(T)
+  T0 = T(icell)
+  ne0 = ne(icell)*1d-6 !cm^-3
+  logne = log10(ne0)
+  logT = log10(T0)
   
-  np = int(dsqrt(line%atom%g(line%j)/2.))
+  np = int(sqrt(line%atom%g(line%j)/2.))
   
   alp = 2.5
   
@@ -184,7 +184,7 @@ return
    A = -0.656
   endif
   
-  delta_nus = 10**(A) * ( ne )**(0.69) * real(np)**(2.377)
+  delta_nus = 10**(A) * ( ne0 )**(0.69) * real(np)**(2.377)
     
   if (np == 3) then !A is in log
    B = -0.21
@@ -211,7 +211,7 @@ return
   c = alp/bb
   
   do la=1, line%Nlambda
-   dnu = abs( M_TO_NM * (NLTEspec%lambda(line%Nblue+la-1) - line%lambda0) * CLIGHT / line%lambda0**2) / delta_nus
+   dnu = abs( M_TO_NM * (lambda(line%Nblue+la-1) - line%lambda0) * CLIGHT / line%lambda0**2) / delta_nus
    Snu(la) = S0 / (1.0 + dnu**bb )**c  
   enddo
  
@@ -244,13 +244,13 @@ return
   
 !   A = real(j*j*j*j*j + i*i*i*i*i) / real(j*j - i*i)
 !   
-!   electron_damping = ( 5.6e-6 * ne**(1./3.) / real(Z) / dsqrt(T) ) * &
-!     ( dlog10( 4d6 * T * Z / real(j*j) / dsqrt(ne) ) - 0.125 ) * A
+!   electron_damping = ( 5.6e-6 * ne**(1./3.) / real(Z) / sqrt(T) ) * &
+!     ( dlog10( 4d6 * T * Z / real(j*j) / sqrt(ne) ) - 0.125 ) * A
 
   A = real(j*j*j*j - 3*i*j*j) / real(j*j - i*i)
   
-  electron_damping = ( 3.78e-5 * (1e-6*ne)**(1./3.) / real(Z) / dsqrt(T) ) * &
-    dlog10( 4d6 * T * Z / real(j*j) / dsqrt(1e-6*ne) )  * A
+  electron_damping = ( 3.78e-5 * (1e-6*ne)**(1./3.) / real(Z) / sqrt(T) ) * &
+    dlog10( 4d6 * T * Z / real(j*j) / sqrt(1e-6*ne) )  * A
   
  
  RETURN

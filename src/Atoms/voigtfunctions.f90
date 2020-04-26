@@ -49,10 +49,10 @@ MODULE voigtfunctions
 					u*(1.320522d0-u*0.56419d0))))))
 			v4 = (32066.6d0-u*(24322.84d0-u*(9022.228d0-u*(2186.181d0-u*(364.2191d0-&
 					u*(61.57037d0-u*(1.841439d0-u)))))))
-			w4 = cdexp(u) - w4/v4
+			w4 = exp(u) - w4/v4 !cdexp
 		endif
-			L(i) = dble(w4)
-			if (present(F)) F(i) = aimag(w4)
+			L(i) = w4%re!real(w4,kind=dp)!dble(w4)
+			if (present(F)) F(i) = w4%im!aimag(w4)
 	enddo  
 
   RETURN

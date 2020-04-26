@@ -1,7 +1,6 @@
 MODULE atom_type
 
   use math, only : w6js
-  use accelerate, only : Ng
   use mcfost_env, only : dp
   use constant, only : M_ELECTRON, AMU, E_RYDBERG
 
@@ -48,15 +47,16 @@ MODULE atom_type
    real(kind=dp) :: twohnu3_c2, gij
    real(kind=dp) :: qcore, qwing, glande_i, glande_j
    real(kind=dp), dimension(4) :: cvdWaals
-   integer, allocatable, dimension(:,:) :: dk!size (Nray, id) = index displacement of a line due to velocity
+   !!integer, allocatable, dimension(:,:) :: dk!size (Nray, id) = index displacement of a line due to velocity
    !Nlambda,(Nproc or Nspace, depends on the choice For flux calculations. Always Nlambda, Nspace for NLTE
    real(kind=dp), allocatable, dimension(:,:)  :: phi
+   real(kind=dp), allocatable, dimension(:,:,:) :: eta
    !used for wavelength integration
-   real(kind=dp), allocatable, dimension(:,:,:) :: phiZ, psi !3, Nlambda, Nray
+   real(kind=dp), allocatable, dimension(:,:,:) :: phi_loc, phiZ, psi !3, Nlambda, Nray
    !wlam is the integration wavelenght weight = phi
-   real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam, Rij, Rji!, Jbar
+   real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam, Rij, Rji, Jbar
    !real(kind=dp), allocatable, dimension(:) :: fomega !for Rayleigh scattering
-   real(kind=dp) :: Qelast, adamp ! at a cell
+   real(kind=dp) :: Qelast, adamp!, chi0, eta0 ! at a cell
    real(kind=dp), dimension(:), allocatable :: Tex, deta !differentiel of source function
    !keep CLIGHT * (nu0 - nu)/nu0 for lines												(method for Voigt)
    real(kind=dp), dimension(:), allocatable :: u, a, aeff, r, r1
@@ -71,15 +71,15 @@ MODULE atom_type
   TYPE AtomicContinuum
    logical :: hydrogenic
    !logical, dimension(:), allocatable :: negative_opacity
-   integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0, N0 = 0
+   integer :: i, j, Nlambda, Nblue = 0, Nred = 0, Nmid = 0, N0 = 0, Nb, Nr
    real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionisation
-   real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2, CoolRates_ij, w_lam
+   real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2, CoolRates_ij, w_lam, ehnukt
    real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file
    real(kind=dp), dimension(:), allocatable :: Tex
    character(len=ATOM_LABEL_WIDTH) :: name !read in the atomic file
    type (AtomType), pointer :: atom => NULL()
    real(kind=dp), allocatable, dimension(:) :: Rji, Rij
-   real(kind=dp), allocatable, dimension(:,:)  :: gij!no need anymore, compute Jnu for all once, Jnu
+   real(kind=dp), allocatable, dimension(:,:)  :: gij, Jnu, alpha_nu
    character(len=20) :: trtype="ATOMIC_CONTINUUM"
   END TYPE AtomicContinuum
 
@@ -107,7 +107,7 @@ MODULE atom_type
    !futur deprecation, because I will stop using RH routine
    character(len=MAX_LENGTH), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
    !Nlevel * Nlevel * Nproc
-   real(kind=dp), dimension(:,:,:), allocatable :: Gamma, C
+   real(kind=dp), dimension(:,:,:), allocatable :: Gamma, C!, Rij
    real(kind=dp), dimension(:,:), pointer :: n, nstar
    real(kind=dp), dimension(:,:), allocatable :: b !not a pointer this one
    ! arrays of lines, continua containing different line, continuum each
@@ -118,7 +118,6 @@ MODULE atom_type
    !where I have to distinguish between atom own opac and overlapping transitions
    real(kind=dp), allocatable, dimension(:,:) :: etac, chic
    real(kind=dp), allocatable, dimension(:,:,:) :: eta !Nwaves, Nrays, Nproc
-   type (Ng) :: Ngs
   END TYPE AtomType
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   TYPE Element
@@ -187,7 +186,7 @@ MODULE atom_type
   real(kind=dp), intent(in) :: Erydb, Ej, Ei
   integer, intent(in) :: Z
     
-  n_eff = Z * dsqrt(Erydb / (Ej-Ei) )
+  n_eff = Z * sqrt(Erydb / (Ej-Ei) )
  
  return
  end function n_eff
@@ -195,8 +194,10 @@ MODULE atom_type
 
  !for lines only, for continuum it is simply cont%j
  FUNCTION find_continuum(atom, l)
-  integer :: l, find_continuum
+  integer :: l, find_continuum, l0
   type (AtomType) :: atom
+  
+  l0 = l
 
   find_continuum = l + 1
   do while ((atom%stage(find_continuum) < atom%stage(l)+1).and.(find_continuum <= atom%Nlevel))
@@ -206,8 +207,9 @@ MODULE atom_type
   if (atom%stage(find_continuum) == atom%stage(l)+1) then
      return !continuum level reach
  else
-     write(*,*) "Coundn't find continuum level for level ", l, find_continuum, atom%Nlevel
+     write(*,*) "Coundn't find continuum level for level ", l0, find_continuum, atom%Nlevel
      find_continuum = 0
+     write(*,*) atom%ID, atom%stage(l), l0
      return
  end if
 

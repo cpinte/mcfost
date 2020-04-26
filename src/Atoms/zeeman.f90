@@ -1,7 +1,7 @@
 MODULE zeeman
  ! see LL04
  use atom_type, only : AtomType, ZeemanType, determinate, getorbital, AtomicLine
- use atmos_type, only : atmos
+ use atmos_type, only : lmagnetized
  use messages
  use parametres
  
@@ -46,7 +46,7 @@ MODULE zeeman
    atom%lines(kr)%g_lande_eff = g
    atom%lines(kr)%glande_i = gi
    atom%lines(kr)%glande_j = gj
-   if (atmos%magnetized) & !otherwise we don't care seeing that
+   if (lmagnetized) & !otherwise we don't care seeing that
    	write(*,*) " -> line gi = ", gi, " line gj = ", gj!," line geff = ", g
 
  RETURN

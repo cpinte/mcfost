@@ -1,9 +1,9 @@
 MODULE PROFILES
 
-	use atmos_type, only				: atmos, B_project, VBROAD_atom
+	use atmos_type, only				: B_project, VBROAD_atom
 	use constant
 	use atom_type
-	use spectrum_type, only				: NLTEspec
+	use spectrum_type, only				: lambda
 	use voigtfunctions, only			: Voigt
 	use broad, only						: Damping
 	use math
@@ -21,38 +21,7 @@ MODULE PROFILES
 	PROCEDURE(Iprofile), pointer :: Profile => null()
 
 	CONTAINS
- 
-	SUBROUTINE compute_shift_index(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l)!, Nvspace, Omegav)
-		integer, intent(in) :: id, icell, iray
-		real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
-		!integer, optional, intent(in) :: Nvspace
-		!real(kind=dp), intent(inout), optional :: Omegav(Nvspace)
-		integer :: kr, nact
-		real(kind=dp) :: v0
-		
-! 		if (present(Nvsapce)) then
-! 		
-! 			....
-! 		
-! 		endif
 
-		v0 = v_proj(icell,(x+x1)*0.5,(y+y1)*0.5,(z+z1)*0.5,u,v,w)
-
-
-		do nact=1,atmos%NactiveAtoms
-		
-			do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-			
-				atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%dk(iray,id) = nint(1e-3 * v0 / hv)
-			
-			enddo
-		
-		enddo
-		
-	
-	
-	RETURN
-	END SUBROUTINE compute_shift_index
  
 !if projection done before, we do not need x,y,z,l ect
 
@@ -116,7 +85,7 @@ MODULE PROFILES
       do nv=1, Nvspace
 
          vvoigt(:) = ( line%u(:) - omegav(nv) ) / line%atom%vbroad(icell)
-         line%phi(:,id) = line%phi(:,id) + dexp(-(vvoigt(:))**2) !/ Nvspace 
+         line%phi(:,id) = line%phi(:,id) + exp(-(vvoigt(:))**2) !/ Nvspace 
 
       end do
  end if !line%voigt
@@ -125,6 +94,64 @@ MODULE PROFILES
 
  RETURN
  END SUBROUTINE IProfile
+ 
+	function local_profile_i(line,icell,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell, N
+		real(kind=dp), dimension(N)									:: lambda
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		integer, parameter											:: NvspaceMax = 2
+		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
+		real(kind=dp) 												:: norm
+		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi
+		type (AtomicLine), intent(in)								:: line
+		integer														:: Nred, Nblue, i, j, nv
+		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_i
+ 
+
+		Nvspace = NvspaceMax
+		i = line%i; j = line%j
+		Nred = line%Nred; Nblue = line%Nblue
+
+		local_profile_i = 0d0
+		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight/line%atom%vbroad(icell)
+		
+		Omegav = 0d0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		omegav(1) = v0
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+		omegav(Nvspace) = v1
+		do nv=2, Nvspace-1
+      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			xphi=x+delta_vol_phi*u
+			yphi=y+delta_vol_phi*v
+			zphi=z+delta_vol_phi*w
+			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+		enddo
+
+! 		omegav(nv) = v_proj(icell,(x+x1)/2.,(y+y1)/2.,(z+z1)/2.,u,v,w)
+
+		norm = Nvspace * line%atom%vbroad(icell) * sqrtpi
+		
+		do nv=1, Nvspace
+ 
+			u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
+         
+         	if (line%voigt) then
+				local_profile_i(:) = local_profile_i(:) + Voigt(N, line%a(icell), u1p)
+			else
+				local_profile_i(:) = local_profile_i(:) + exp(-u1p**2)
+			endif
+			
+		enddo
+
+		local_profile_i(:) = local_profile_i(:) / norm
+
+	return
+	end function local_profile_i
  
  !-> TO be included as a Voigt procedure
  !Missing velocity shift here
@@ -153,57 +180,185 @@ MODULE PROFILES
 
   !normed
 !   line%phi(:,id) = eta*(line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) / pi) &
-!                        + (1-eta)*dexp(-(vvoigt(:)/line%aeff(icell))**2)/SQRTPI/line%aeff(icell)
+!                        + (1-eta)*exp(-(vvoigt(:)/line%aeff(icell))**2)/SQRTPI/line%aeff(icell)
                        
   line%phi(:,id) = line%r(icell)*line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) &
-                       + line%r1(icell)*dexp(-(line%u(:)/line%aeff(icell))**2)
+                       + line%r1(icell)*exp(-(line%u(:)/line%aeff(icell))**2)
 
 
  RETURN
  END SUBROUTINE IProfile_thomson
-
-
- SUBROUTINE IProfile_cmf_to_obs(line,icell,x,y,z,x1,y1,z1,u,v,w,l, id, Nvspace, Omegav)
- ! phi = Voigt / sqrt(pi) / vbroad(icell)
-  integer, intent(in) 							            :: icell, id, Nvspace
-  real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
-                                				               x1,y1,z1, &      ! velocity field and magnetic field
-                                				               l !physical length of the cell
-  real(kind=dp), intent(in) 								:: Omegav(:)
-  type (AtomicLine), intent(inout)								:: line
-  integer													::  Nred, Nblue, i, j, nv
-  real(kind=dp), dimension(line%Nlambda)                    :: u1, u1p, phi0
+ 
+	function local_profile_thomson(line,icell,N, lambda, x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell, N
+		real(kind=dp), dimension(N)									:: lambda
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		integer, parameter											:: NvspaceMax = 2
+		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
+		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi, aeff, r , cte, cte2, aL, vb, r1
+		type (AtomicLine), intent(in)								:: line
+		integer														::  Nred, Nblue, i, j, nv
+		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_thomson
  
 
-  i = line%i; j = line%j
-  Nred = line%Nred; Nblue = line%Nblue
+		Nvspace = NvspaceMax
+		i = line%i; j = line%j
+		Nred = line%Nred; Nblue = line%Nblue
 
-  !temporary here
-  phi0 = 0d0
- write(*,*) " Interp not ready for profile"
- stop
- u1(:) = line%u(:)/line%atom%vbroad(icell)
+		local_profile_thomson = 0d0
+		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight !/line%atom%vbroad(icell)
+		
+		Omegav = 0d0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		omegav(1) = v0
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+		omegav(Nvspace) = v1
+		do nv=2, Nvspace-1
+      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			xphi=x+delta_vol_phi*u
+			yphi=y+delta_vol_phi*v
+			zphi=z+delta_vol_phi*w
+			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+		enddo
+		
+		aL = line%a(icell) * line%atom%vbroad(icell) !(m/s), adamp in doppler units
+		vb = line%atom%vbroad(icell)
+		
+		aeff = (vb**5. + 2.69269*vb**4. * aL + 2.42843*vb**3. * aL**2. + &
+					4.47163*vb**2.*aL**3. + 0.07842*vb*aL**4. + aL**5.)**(0.2) !1/5
+          		
+          !!there should have simplification here
+          !!r = line%atom%vbroad(icell)*line%a(icell)/line%aeff(icell)
+          !!eta = 1.36603*r - 0.47719*r*r + 0.11116*r*r*r
+		cte = aL/aeff
+		cte2 = 1.36603*cte - 0.47719*cte*cte + 0.11116*cte*cte*cte
+		r = cte2/pi
+          !for the lorentzian it is eta/pi and for the gaussian it is (1-eta)/sqrtpi/aeff
+		r1 = (1. - cte2)/sqrtpi/aeff
 
- do nv=1, Nvspace 
+		do nv=1, Nvspace
  
-         u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
+			u1p(:) = u1(:) - omegav(nv)
          
-         if (omegav(nv) == 0.0) then
-         
-          phi0 = phi0 + line%phi(:,icell)
-         else
+			local_profile_thomson(:) = local_profile_thomson(:) + r*aeff / ( u1p(:)**2.+aeff**2. ) + r1*exp(-(u1p(:)/aeff)**2)
 
-          phi0 = phi0 + &
-               linear_1D_sorted(line%Nlambda,u1,line%phi(:,icell),line%Nlambda,u1p)
-         endif
          	
- enddo
+		enddo
  
- phi0 = phi0 / Nvspace /sqrtpi / line%atom%vbroad(icell)
+		local_profile_thomson = local_profile_thomson / Nvspace /sqrtpi / line%atom%vbroad(icell)
 
 
- RETURN
- END SUBROUTINE IProfile_cmf_to_obs
+	return
+	end function local_profile_thomson
+
+
+	SUBROUTINE IProfile_cmf_to_obs(line,icell,x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		real(kind=dp), dimension(100) 								:: Omegav
+		type (AtomicLine), intent(inout)							:: line
+		integer														::  Nred, Nblue, i, j, nv
+		real(kind=dp), dimension(line%Nlambda)                    	:: u1, u1p, phi0
+ 
+
+		i = line%i; j = line%j
+		Nred = line%Nred; Nblue = line%Nblue
+
+		phi0 = 0d0
+		write(*,*) " Interp not ready for profile"
+		stop
+		u1(:) = line%u(:)/line%atom%vbroad(icell)
+
+		do nv=1, Nvspace 
+ 
+			u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
+         
+			if (omegav(nv) == 0.0) then
+         
+				phi0 = phi0 + line%phi(:,icell)
+			else
+
+				phi0 = phi0 + linear_1D_sorted(line%Nlambda,u1,line%phi(:,icell),line%Nlambda,u1p)
+			endif
+         	
+		enddo
+ 
+		phi0 = phi0 / Nvspace /sqrtpi / line%atom%vbroad(icell)
+
+
+	RETURN
+	END SUBROUTINE IProfile_cmf_to_obs
+	
+	function local_profile_interp(line,icell,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell, N
+		real(kind=dp), dimension(N)									:: lambda
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		integer, parameter											:: NvspaceMax = 2
+		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
+		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi
+		type (AtomicLine), intent(in)								:: line
+		integer														::  Nred, Nblue, i, j, nv, la
+		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_interp
+ 
+
+		Nvspace = NvspaceMax
+		i = line%i; j = line%j
+		Nred = line%Nred; Nblue = line%Nblue
+
+		local_profile_interp = 0d0
+		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight/line%atom%vbroad(icell)
+		
+		Omegav = 0d0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		omegav(1) = v0
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+		omegav(Nvspace) = v1
+		do nv=2, Nvspace-1
+      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			xphi=x+delta_vol_phi*u
+			yphi=y+delta_vol_phi*v
+			zphi=z+delta_vol_phi*w
+			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+		enddo
+		
+! open(10, file="toto.s", status="unknown")
+! do nv=1,line%Nlambda
+! write(10,*) line%u(nv)/line%atom%vbroad(icell), line%phi(nv,icell)
+! enddo
+! close(10)
+! open(10, file="toto2.s", status="unknown")
+! do nv=1,N
+! write(10,*) u1(nv) - 100.0/line%atom%vbroad(icell)
+! enddo
+! close(10)
+! stop
+
+		do nv=1, Nvspace
+ 
+			u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
+         
+! 			local_profile_interp = local_profile_interp + linear_1D_sorted(line%Nlambda,line%u/line%atom%vbroad(icell),line%phi(:,icell),N,u1p)
+			local_profile_interp = local_profile_interp + linear_1D_dx(hv, line%Nlambda,line%u/line%atom%vbroad(icell),line%phi(:,icell),N,u1p)
+
+		enddo
+ 
+		local_profile_interp = local_profile_interp / Nvspace
+
+
+	return
+	end function local_profile_interp
  
  !building
  SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
@@ -273,12 +428,7 @@ integer :: iray = 1 !futur deprecation
       do nv=1, Nvspace
       
          vvoigt(:) = (line%u - omegav(nv)) / line%atom%vbroad(icell)
-         line%phi(:,id) = line%phi(:,id) + dexp(-(vvoigt(:))**2) !/ Nvspace
-
-      !derivative of Gaussian:
-!          F(Nblue:Nred) = F(Nblue:Nred) - &
-!            2d0 * dexp(-(vvoigt(Nblue:Nred))**2) / Nvspace * &
-!            NLTEspec%lambda(Nblue:Nred) * CLIGHT / (line%atom%vbroad(icell) * line%lambda0)
+         line%phi(:,id) = line%phi(:,id) + exp(-(vvoigt(:))**2) !/ Nvspace
 
       end do
       line%phi(:,id) = line%phi(:,id) / norm !/ (SQRTPI * vbroad)
@@ -382,53 +532,74 @@ integer :: iray = 1 !futur deprecation
  RETURN
  END SUBROUTINE ZProfile
  
- SUBROUTINE write_profiles_ascii(unit, atom, delta_k)
-  type(AtomType), intent(in) :: atom
-  integer, intent(in) :: unit
-  integer, intent(in), optional :: delta_k
-  integer :: dk, kr, l, la, icell, Np
-  type(AtomType), pointer :: HH
-  
-  write(*,*)  " Writing profiles for atom ", atom%ID
-  HH => atmos%Atoms(1)%ptr_atom
-  
-  if (present(delta_k)) then
-   dk = delta_k
-   if (dk <= 0 .or. dk > atmos%Nspace) then
-    dk = 1
-    write(*,*) "delta_k cannot be out bound!"
-   endif
-  else
-   dk = 1
-  endif
-  
-  Np = n_cells
-  Np = int((n_cells-1)/dk + 1)
-  if (Np /= n_cells) then
-   write(*,*) " Effective number of depth points written:", Np, n_cells
-  endif
-  
-  open(unit, file=trim(atom%ID)//"_profiles.txt", status="unknown")
-  write(unit,*) Np, atom%Nline
-  do icell=1, n_cells, dk
-   if (atmos%icompute_atomRT(icell) > 0) then
-     write(unit,*) icell, atmos%T(icell), atmos%ne(icell), HH%n(1,icell), HH%n(HH%Nlevel,icell)
-     write(unit,*) atom%vbroad(icell)*1e-3
-     do kr=1, atom%Nline
-      write(unit, *) kr, atom%lines(kr)%Nlambda, atom%lines(kr)%a(icell)
-      write(unit, *) atom%lines(kr)%lambdamin, atom%lines(kr)%lambda0, atom%lines(kr)%lambdamax
-      do la=1, atom%lines(kr)%Nlambda
-       l = atom%lines(kr)%Nblue - 1 + la
-       write(unit,*) NLTEspec%lambda(l), atom%lines(kr)%phi(la,icell)
-      enddo
-     enddo
-   endif
-  enddo
-
-  close(unit)
+ SUBROUTINE write_profile(unit, icell, line, kc, wphi)
+ 	integer, intent(in) :: unit, icell, kc
+ 	type (AtomicLine), intent(in) :: line
+ 	real(kind=dp), intent(in) :: wphi
+ 	real(kind=dp) :: damp
+ 	!!CALL Damping(icell, line%atom, kc, damp)
+ 	!damp not computed, to much time ?
+ 	write(unit, *) " icell = ", icell, " atom = ", line%atom%ID, " vbroad = ", line%atom%vbroad(icell)
+ 	write(unit, *) " l0 = ", line%lambda0, " lmin = ", line%lambdamin, " lmax = ", line%lambdamax
+ 	write(unit, *) " resol (nm) = ", lambda(line%Nblue+1)-lambda(line%Nblue), " resol(km/s) = ",1d-3 * clight*(lambda(line%Nblue+1)-lambda(line%Nblue))/lambda(line%Nblue)
+ 	if (allocated(line%a)) then
+ 		write(unit, *) " Area = ", wphi," damping = ", line%a(icell)
+ 	else
+  		write(unit, *) " Area = ", wphi," damping = ", line%a(icell)
+	endif
+ 	!!write(unit,*) " Vd (km/s) = ", 1e-3*line%atom%vbroad(icell),  " a = ", damp
  
  RETURN
- END SUBROUTINE write_profiles_ascii
+ END SUBROUTINE 
+ 
+!  SUBROUTINE write_profiles_ascii(unit, atom, delta_k)
+!	use atmos, only : ....
+!   type(AtomType), intent(in) :: atom
+!   integer, intent(in) :: unit
+!   integer, intent(in), optional :: delta_k
+!   integer :: dk, kr, l, la, icell, Np
+!   type(AtomType), pointer :: HH
+!   
+!   write(*,*)  " Writing profiles for atom ", atom%ID
+!   HH => atmos%Atoms(1)%ptr_atom
+!   
+!   if (present(delta_k)) then
+!    dk = delta_k
+!    if (dk <= 0 .or. dk > atmos%Nspace) then
+!     dk = 1
+!     write(*,*) "delta_k cannot be out bound!"
+!    endif
+!   else
+!    dk = 1
+!   endif
+!   
+!   Np = n_cells
+!   Np = int((n_cells-1)/dk + 1)
+!   if (Np /= n_cells) then
+!    write(*,*) " Effective number of depth points written:", Np, n_cells
+!   endif
+!   
+!   open(unit, file=trim(atom%ID)//"_profiles.txt", status="unknown")
+!   write(unit,*) Np, atom%Nline
+!   do icell=1, n_cells, dk
+!    if (atmos%icompute_atomRT(icell) > 0) then
+!      write(unit,*) icell, atmos%T(icell), atmos%ne(icell), HH%n(1,icell), HH%n(HH%Nlevel,icell)
+!      write(unit,*) atom%vbroad(icell)*1e-3
+!      do kr=1, atom%Nline
+!       write(unit, *) kr, atom%lines(kr)%Nlambda, atom%lines(kr)%a(icell)
+!       write(unit, *) atom%lines(kr)%lambdamin, atom%lines(kr)%lambda0, atom%lines(kr)%lambdamax
+!       do la=1, atom%lines(kr)%Nlambda
+!        l = atom%lines(kr)%Nblue - 1 + la
+!        write(unit,*) NLTEspec%lambda(l), atom%lines(kr)%phi(la,icell)
+!       enddo
+!      enddo
+!    endif
+!   enddo
+! 
+!   close(unit)
+!  
+!  RETURN
+!  END SUBROUTINE write_profiles_ascii
 
 
 END MODULE PROFILES

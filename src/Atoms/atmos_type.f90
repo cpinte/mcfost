@@ -1,114 +1,127 @@
-MODULE atmos_type
+module atmos_type
 
-  use atom_type, only : AtomType, Element, ATOM_ID_WIDTH, &
-    AtomicLine, AtomicContinuum, AtomicTransition
-  use uplow
-  use getline!, only : getnextline
-  use constant
-  use messages
-  use constantes, only : tiny_dp
+	use atom_type, only : AtomType, Element, ATOM_ID_WIDTH, AtomicLine, AtomicContinuum, AtomicTransition
+	use uplow
+	use getline!, only : getnextline
+	use constant
+	use messages
+	use constantes, only : tiny_dp
 
 
-  !$ use omp_lib
+	!$ use omp_lib
 
   !MCFOST's originals
-  use mcfost_env, only : mcfost_utils ! convert from the relative location of atomic data
+	use mcfost_env, only : mcfost_utils ! convert from the relative location of atomic data
                                       ! to mcfost's environnement folders.
-  use parametres
-  use utils, only : appel_syst
-  use fits_utils, only : print_error
+	use parametres
+	use utils, only : appel_syst
+	use fits_utils, only : print_error
 
 
-  IMPLICIT NONE
+	implicit none
 
 
   !!integer, parameter :: Nelem=99
-  integer :: Nelem !set a reading abundance file now
+	integer :: Nelem !set a reading abundance file now
 
   ! relative location in mcfost/utils/ specified by the mcfost environnement
   ! variables.
-  character(len=50), parameter :: ABUNDANCE_FILE="./abundance.input"!"/Atoms/abundance.input"
-  character(len=50), parameter :: KURUCZ_PF_FILE="/Atoms/pf_Kurucz.fits.gz"
+	character(len=50), parameter :: ABUNDANCE_FILE="./abundance.input"!"/Atoms/abundance.input"
+	character(len=50), parameter :: KURUCZ_PF_FILE="/Atoms/pf_Kurucz.fits.gz"
   !path to your partition function data
 
   !Wrappers to create arrays of Pointers
 !!-> move then to Atom_type.f90
-  TYPE atomPointerArray
-   type(AtomType), pointer :: ptr_atom => NULL()
-  END TYPE atomPointerArray
+	type atomPointerArray
+		type(AtomType), pointer :: ptr_atom => NULL()
+	end type atomPointerArray
 
   !Is this one really needed ? and why it doesn't work in solvene ?
-  TYPE elemPointerArray
-   type(Element), pointer :: ptr_elem => NULL()
-  END TYPE elemPointerArray
-
-  ! Initialized only once at the begening of the main iteration loop !
-  TYPE GridType
-   ! Nspace is the number of cells, n_cells meaning that all quantities are computed
-   ! for each cell starting from 1 to n_cells
-   integer :: Nspace, Npf, Nactiveatoms, Npassiveatoms, Natom, Nrays = 1
-   real(kind=dp) :: metallicity, totalAbund, avgWeight, wght_per_H
-
-   !! will be deprecated as I do not need optical_length_tot for stellar map. Only for checking
-   real(kind=dp) :: tau !a variable used to sum up contribution of opacities along a ray
-   !!
-   real(kind=dp), allocatable, dimension(:) :: vR, vz, vphi, BR, Bz, Bphi, vtheta, Btheta
-   real(kind=dp), allocatable, dimension(:,:) :: Vxyz, Bxyz !futur deprecation
-   !type (Element), dimension(:), allocatable :: Elements
-   type (elemPointerArray), dimension(:), allocatable :: Elements
-   !!type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms
-   !type (AtomType), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
-   type (atomPointerArray), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
-   !type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
-   real(kind=dp), dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
-   real(kind=dp), dimension(:), allocatable :: nHmin !Hminus populations
-   real(kind=dp) :: B_char = 0d0, v_char=0d0
-   logical :: include_xcoupling = .false., electron_scattering =.false.
+	type elemPointerArray
+		type(Element), pointer :: ptr_elem => NULL()
+	end type elemPointerArray
+	
+	real(kind=dp), dimension(:,:), allocatable :: ds
+  
+	integer :: Npf, NactiveAtoms, Npassiveatoms, Natom
+	real(kind=dp) :: metallicity, totalAbund, avgWeight, wght_per_H, tau
+	real(kind=dp), allocatable, dimension(:) :: vR, v_z, vphi, BR, Bz, Bphi, vtheta, Btheta
+	type (elemPointerArray), dimension(:), allocatable :: Elements
+	type (atomPointerArray), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
+	real(kind=dp), dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
+	real(kind=dp), dimension(:), allocatable :: nHmin !Hminus populations
+	real(kind=dp) :: B_char = 0d0, v_char=0d0
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
-   logical :: Magnetized = .false., XRD=.false., calc_ne
-   !dark zone are in lcompute_atomRT->icompute_atomRT == -1
-   integer, allocatable, dimension(:) :: icompute_atomRT!, ldark_zone!where line RT is taken into account on the grid
-   !logical, allocatable, dimension(:) :: lcompute_atomRT!, ldark_zone!where line RT is taken into account on the grid
-  END TYPE GridType
+	logical :: lMagnetized = .false., calc_ne
+	integer, allocatable, dimension(:) :: icompute_atomRT!
+
+!   Initialized only once at the begening of the main iteration loop !
+!   type GridType
+!    Nspace is the number of cells, n_cells meaning that all quantities are computed
+!    for each cell starting from 1 to n_cells
+!    integer :: Nspace, Npf, Nactiveatoms, Npassiveatoms, Natom, Nrays = 1
+!    real(kind=dp) :: metallicity, totalAbund, avgWeight, wght_per_H
+! 
+!    ! will be deprecated as I do not need optical_length_tot for stellar map. Only for checking
+!    real(kind=dp) :: tau !a variable used to sum up contribution of opacities along a ray
+!    !
+!    real(kind=dp), allocatable, dimension(:) :: vR, v_z, vphi, BR, Bz, Bphi, vtheta, Btheta
+!    real(kind=dp), allocatable, dimension(:,:) :: Vxyz, Bxyz !futur deprecation
+!    type (Element), dimension(:), allocatable :: Elements
+!    type (elemPointerArray), dimension(:), allocatable :: Elements
+!    !type (AtomType), pointer, dimension(:) :: Atoms, ActiveAtoms, PassiveAtoms
+!    type (AtomType), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
+!    type (atomPointerArray), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
+!    type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
+!    real(kind=dp), dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
+!    real(kind=dp), dimension(:), allocatable :: nHmin !Hminus populations
+!    real(kind=dp) :: B_char = 0d0, v_char=0d0
+!    logical :: include_xcoupling = .false., electron_scattering =.false.
+!            B_char in Tesla and v_char in m/s, default 0T and 1km/s
+!    logical :: Magnetized = .false., XRD=.false., calc_ne
+!    dark zone are in lcompute_atomRT->icompute_atomRT == -1
+!    integer, allocatable, dimension(:) :: icompute_atomRT!, ldark_zone!where line RT is taken into account on the grid
+!    logical, allocatable, dimension(:) :: lcompute_atomRT!, ldark_zone!where line RT is taken into account on the grid
+!   end type GridType
 
 
-  TYPE (GridType), target :: atmos
-  TYPE (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
+!   type (GridType), target :: atmos
+  type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
 
 
-  CONTAINS
+  contains
 
- FUNCTION VBROAD_atom(icell, atom) result(vD)
+ function VBROAD_atom(icell, atom) result(vD)
   real(kind=dp) :: vD
   integer :: icell
   type (AtomType) :: atom
 
-   vD = dsqrt( Vtherm*atmos%T(icell)/atom%weight + atmos%vturb(icell)**2 )
+   vD = sqrt( Vtherm*T(icell)/atom%weight + vturb(icell)**2 )
 
- RETURN
- END FUNCTION VBROAD_atom
+ return
+ end function VBROAD_atom
 
- FUNCTION nTotal_atom(icell, atom) result(ntotal)
+ function nTotal_atom(icell, atom) result(ntotal)
   real(kind=dp) :: ntotal
   integer :: icell
   type (AtomType) :: atom
 
-   ntotal =  atom%Abund * atmos%nHtot(icell)
+   ntotal =  atom%Abund * nHtot(icell)
 
- RETURN
- END FUNCTION nTotal_atom
+ return
+ end function nTotal_atom
 
-  SUBROUTINE freeZeemanMultiplet(line)
+  subroutine freeZeemanMultiplet(line)
    type(AtomicLine), intent(inout) :: line
 
    if (allocated(line%zm%strength)) deallocate(line%zm%strength)
    if (allocated(line%zm%q)) deallocate(line%zm%q)
    if (allocated(line%zm%shift)) deallocate(line%zm%shift)
 
-  RETURN
-  END SUBROUTINE freeZeemanMultiplet
+  return
+  end subroutine freeZeemanMultiplet
 
-  SUBROUTINE freeAtom(atom)
+  subroutine freeAtom(atom)
   ! This subroutine free atmos%atoms properly including lines
   ! and continua.
 
@@ -186,7 +199,7 @@ MODULE atmos_type
        !if (allocated(line%U)) deallocate(line%U)
       !!if (allocated(line%Jbar)) deallocate(line%Jbar)
       if (associated(line%atom)) NULLIFY(line%atom)
-      CALL freeZeemanMultiplet(line)
+      call freeZeemanMultiplet(line)
      end do
       deallocate(atom%lines)
      end if
@@ -210,11 +223,11 @@ MODULE atmos_type
       deallocate(atom%continua)
      end if
 
-  RETURN
-  END SUBROUTINE freeAtom
+  return
+  end subroutine freeAtom
 
 
-  SUBROUTINE realloc_transitions(atom, Nt, mask)
+  subroutine realloc_transitions(atom, Nt, mask)
   !Only kept indexes in atom%at if line contribute to opac
    integer, intent(in) :: Nt
    type (AtomType), intent(inout) :: atom
@@ -252,11 +265,11 @@ MODULE atmos_type
 
     !write(*,*) atom%Ntr_line, atom%Ntr, size(trans), size(atom%lines), size(atom%continua)
    k1 = 0
-  RETURN
-  END SUBROUTINE realloc_transitions
+  return
+  end subroutine realloc_transitions
 
 
-  SUBROUTINE realloc_line_transitions_deprec(atom, Nl_new, mask)
+  subroutine realloc_line_transitions_deprec(atom, Nl_new, mask)
   !basicazlly does what PAck does
    integer, intent(in) :: Nl_new
    type (AtomType), intent(inout) :: atom
@@ -289,7 +302,7 @@ MODULE atmos_type
       	!!deallocate(atom%lines(k)%Jbar)
       if (associated(atom%lines(k)%atom)) &
       	NULLIFY(atom%lines(k)%atom)
-      CALL freeZeemanMultiplet(atom%lines(k))
+      call freeZeemanMultiplet(atom%lines(k))
      end do
     !Pack the transitions
     deallocate(atom%lines)
@@ -303,10 +316,10 @@ MODULE atmos_type
     end do
     deallocate(lines)
 
-  RETURN
-  END SUBROUTINE realloc_line_transitions_deprec
+  return
+  end subroutine realloc_line_transitions_deprec
 
-  SUBROUTINE realloc_continuum_transitions_deprec(atom, Nc_new, mask)
+  subroutine realloc_continuum_transitions_deprec(atom, Nc_new, mask)
    integer, intent(in) :: Nc_new
    logical, intent(in), dimension(:) :: mask
    type (AtomType), intent(inout) :: atom
@@ -347,10 +360,10 @@ MODULE atmos_type
     end do
     deallocate(conta)
 
-  RETURN
-  END SUBROUTINE realloc_continuum_transitions_deprec
+  return
+  end subroutine realloc_continuum_transitions_deprec
 
-  SUBROUTINE readKurucz_pf(code, Npf, Nstage, ionpot, pf)
+  subroutine readKurucz_pf(code, Npf, Nstage, ionpot, pf)
    !return pf function for atom with Z = code
    ! there is an HDU for each element (+one for T grid already read)
    integer :: unit, EOF, blocksize, i, j
@@ -366,29 +379,29 @@ MODULE atmos_type
 
    EOF = 0
    !get unique unit number
-   CALL ftgiou(unit,EOF)
+   call ftgiou(unit,EOF)
    ! open fits file in readmode'
-   CALL ftopen(unit, TRIM(mcfost_utils)//TRIM(KURUCZ_PF_FILE), 0, blocksize, EOF)
+   call ftopen(unit, TRIM(mcfost_utils)//TRIM(KURUCZ_PF_FILE), 0, blocksize, EOF)
 
     !move to nexthdu, 1=Primary, already read
     !Hydrogen = 2 = code+1
-    CALL FTMAHD(unit,code+1,hdutype,EOF)
+    call FTMAHD(unit,code+1,hdutype,EOF)
     if (EOF.ne.0) then
      write(*,*) "error reading partition function"
      write(*,*) "error to change HDU at ", code+1
      write(*,*) "exiting..."
      stop
     end if
-    CALL ftgkyj(unit, "NSTAGE", Nstage, some_comments, EOF) !replace j with d if read double instead of int
-    CALL ftgkyj(unit, "Z", Z, some_comments, EOF)
+    call ftgkyj(unit, "NSTAGE", Nstage, some_comments, EOF) !replace j with d if read double instead of int
+    call ftgkyj(unit, "Z", Z, some_comments, EOF)
     !j'arrive pas a lire ce string, but it is not necessary
     !but should asks christophe to know how to do
-    !CALL ftgkyj(unit, "ELEM", AtomID, commentfits, EOF)
+    !call ftgkyj(unit, "ELEM", AtomID, commentfits, EOF)
 
     !write(*,*) "Nstage", Nstage, "Z=", Z, "for elem:", elemental_ID(code)
     !write(*,*) "Npf points = ", Npf
     !now read partition function
-    CALL ftgknj(unit, 'NAXIS', 1, 2, NAXISPF, naxis_found, EOF)
+    call ftgknj(unit, 'NAXIS', 1, 2, NAXISPF, naxis_found, EOF)
     if (NAXISPF(1).ne.Npf.and.NAXISPF(2).ne.Nstage) then
       write(*,*) "error reading partition function"
       write(*,*) "NAXISPF(len=2)=",NAXISPF," NPOINTS=", &
@@ -406,7 +419,7 @@ MODULE atmos_type
     !e = real*4
     !d = real*8            !shape(data_krz)
     shape_pf(1) = Npf+1; shape_pf(2) = Nstage
-    CALL FTG2Dd(unit,1,-999,shape_pf,Npf+1,Nstage,data_krz,anynull,EOF)
+    call FTG2Dd(unit,1,-999,shape_pf,Npf+1,Nstage,data_krz,anynull,EOF)
     !do i=1,Nstage
     ! write(*,*) "potential in cm-1 for elem ", elemental_ID(code),":", &
     !            data_krz(1,i)
@@ -435,77 +448,79 @@ MODULE atmos_type
     ! free the unit number
     call ftfiou(unit, EOF)
     deallocate(data_krz)
-  RETURN
-  END SUBROUTINE readKurucz_pf
+  return
+  end subroutine readKurucz_pf
 
-  SUBROUTINE free_atomic_atmos()
+  subroutine dealloc_atomic_atmos()
   integer :: n
+  
+  if (allocated(ds)) deallocate(ds)
 
-  if (allocated(atmos%Elements)) then
+  if (allocated(Elements)) then
     do n=1,Nelem
-     if (allocated(atmos%Elements(n)%ptr_elem%mol_index)) deallocate (atmos%Elements(n)%ptr_elem%mol_index)
-     if (allocated(atmos%Elements(n)%ptr_elem%ionpot)) deallocate (atmos%Elements(n)%ptr_elem%ionpot)
-     if (allocated(atmos%Elements(n)%ptr_elem%pf)) deallocate (atmos%Elements(n)%ptr_elem%pf)
-     if (allocated(atmos%Elements(n)%ptr_elem%n))  deallocate (atmos%Elements(n)%ptr_elem%n)
+     if (allocated(Elements(n)%ptr_elem%mol_index)) deallocate (Elements(n)%ptr_elem%mol_index)
+     if (allocated(Elements(n)%ptr_elem%ionpot)) deallocate (Elements(n)%ptr_elem%ionpot)
+     if (allocated(Elements(n)%ptr_elem%pf)) deallocate (Elements(n)%ptr_elem%pf)
+     if (allocated(Elements(n)%ptr_elem%n))  deallocate (Elements(n)%ptr_elem%n)
      !if alias exist for this element free it.
-     if (associated(atmos%Elements(n)%ptr_elem%model)) NULLIFY(atmos%Elements(n)%ptr_elem%model)
-!       ! de-alias %model to the proper atmos%Atoms(nmet), atmos%Atoms will be freed after.
+     if (associated(Elements(n)%ptr_elem%model)) NULLIFY(Elements(n)%ptr_elem%model)
+!       ! de-alias %model to the proper Atoms(nmet), Atoms will be freed after.
     end do
-   deallocate(atmos%Elements) !here it works
+   deallocate(Elements) !here it works
   end if
 
-  if (allocated(atmos%nHtot)) deallocate(atmos%nHtot)
-  if (allocated(atmos%ne)) deallocate(atmos%ne)
-  if (allocated(atmos%Tpf)) deallocate(atmos%Tpf)
-  if (allocated(atmos%T)) deallocate(atmos%T)
-  if (allocated(atmos%vturb)) deallocate(atmos%vturb)
-  if (allocated(atmos%nHmin)) deallocate(atmos%nHmin)
-  if (allocated(atmos%icompute_atomRT)) deallocate(atmos%icompute_atomRT)
-!   if (allocated(atmos%lcompute_atomRT)) deallocate(atmos%lcompute_atomRT)
-!   if (allocated(atmos%ldark_zone)) deallocate(atmos%ldark_zone)
-  if (allocated(atmos%Vxyz)) deallocate(atmos%Vxyz)
-  if (allocated(atmos%vR)) deallocate(atmos%vR)
-  if (allocated(atmos%vz)) deallocate(atmos%vz)
-  if (allocated(atmos%vphi)) deallocate(atmos%vphi)
+  if (allocated(nHtot)) deallocate(nHtot)
+  if (allocated(ne)) deallocate(ne)
+  if (allocated(Tpf)) deallocate(Tpf)
+  if (allocated(T)) deallocate(T)
+  if (allocated(vturb)) deallocate(vturb)
+  if (allocated(nHmin)) deallocate(nHmin)
+  if (allocated(icompute_atomRT)) deallocate(icompute_atomRT)
+!   if (allocated(lcompute_atomRT)) deallocate(lcompute_atomRT)
+!   if (allocated(ldark_zone)) deallocate(ldark_zone)
+!   if (allocated(Vxyz)) deallocate(Vxyz)
+  if (allocated(vR)) deallocate(vR)
+  if (allocated(v_z)) deallocate(v_z)
+  if (allocated(vphi)) deallocate(vphi)
 
-  if (allocated(atmos%BR)) deallocate(atmos%BR)
-  if (allocated(atmos%Bz)) deallocate(atmos%Bz)
-  if (allocated(atmos%Bphi)) deallocate(atmos%Bphi)
-  if (allocated(atmos%Bxyz)) deallocate(atmos%Bxyz)
+  if (allocated(BR)) deallocate(BR)
+  if (allocated(Bz)) deallocate(Bz)
+  if (allocated(Bphi)) deallocate(Bphi)
+!   if (allocated(Bxyz)) deallocate(Bxyz)
 
   !write(*,*) "Free Atoms"
   ! start freeing Atoms if previously allocated
   ! in readAtom()
-   !if (allocated(atmos%Atoms)) then
-  do n=1,atmos%Npassiveatoms
-   if (associated(atmos%PassiveAtoms(n)%ptr_atom)) NULLIFY(atmos%PassiveAtoms(n)%ptr_atom)
+   !if (allocated(Atoms)) then
+  do n=1,Npassiveatoms
+   if (associated(PassiveAtoms(n)%ptr_atom)) NULLIFY(PassiveAtoms(n)%ptr_atom)
   end do
-  if (allocated(atmos%PassiveAtoms)) deallocate(atmos%PassiveAtoms)
-  do n=1,atmos%Nactiveatoms
-   if (associated(atmos%ActiveAtoms(n)%ptr_atom)) NULLIFY(atmos%ActiveAtoms(n)%ptr_atom)
+  if (allocated(PassiveAtoms)) deallocate(PassiveAtoms)
+  do n=1,Nactiveatoms
+   if (associated(ActiveAtoms(n)%ptr_atom)) NULLIFY(ActiveAtoms(n)%ptr_atom)
   end do
-  if (allocated(atmos%ActiveAtoms)) deallocate(atmos%ActiveAtoms)
-  do n=1,atmos%Natom
-   if (associated(atmos%Atoms(n)%ptr_atom)) then !now c'est un pointeur array
+  if (allocated(ActiveAtoms)) deallocate(ActiveAtoms)
+  do n=1,Natom
+   if (associated(Atoms(n)%ptr_atom)) then !now c'est un pointeur array
 !    ! H is alway presents as it is required !
 !    ! but He exists only if a model atom is given and so
 !    ! Helium is allocated only if He exists i.e., if
-!    ! atmos%Atoms(n)%periodic_tabel.eq.2 with n a number.
+!    ! Atoms(n)%periodic_tabel.eq.2 with n a number.
     if (associated(Hydrogen)) NULLIFY(Hydrogen) ! Hydrogen is always associated
     if (associated(Helium)) NULLIFY(Helium)
-!    do n=1,atmos%Natom
-     CALL freeAtom(atmos%Atoms(n)%ptr_atom)
+!    do n=1,Natom
+     call freeAtom(Atoms(n)%ptr_atom)
 !    end do
-!    if (associated(atmos%ActiveAtoms)) deallocate(atmos%ActiveAtoms)
-!   deallocate(atmos%Atoms)
-    NULLIFY(atmos%Atoms(n)%ptr_atom)
+!    if (associated(ActiveAtoms)) deallocate(ActiveAtoms)
+!   deallocate(Atoms)
+    NULLIFY(Atoms(n)%ptr_atom)
    end if
   end do
-  deallocate(atmos%Atoms)
-  RETURN
-  END SUBROUTINE free_atomic_atmos
+  deallocate(Atoms)
+  return
+  end subroutine dealloc_atomic_atmos
 
-!   SUBROUTINE fillElements()
+!   subroutine fillElements()
 !   !This routine read the abundance of elements listed in the
 !   ! abundance.input file, and keep the log partition function values
 !   ! for each elements in atmos%Elements
@@ -522,14 +537,14 @@ MODULE atmos_type
 !   EOF = 0
 !   !Start reading partition function by first reading the grid
 !   !get unique unit number
-!   CALL ftgiou(unit,EOF)
+!   call ftgiou(unit,EOF)
 !   ! open fits file in readmode'
-!   CALL ftopen(unit, TRIM(mcfost_utils)//TRIM(KURUCZ_PF_FILE), 0, blocksize, EOF)
+!   call ftopen(unit, TRIM(mcfost_utils)//TRIM(KURUCZ_PF_FILE), 0, blocksize, EOF)
 !   !some check about the first axis!
 !   !get first axis
-!   CALL ftgknj(unit, 'NAXIS', 1, 1, NAXIST, naxis_found, EOF)
+!   call ftgknj(unit, 'NAXIS', 1, 1, NAXIST, naxis_found, EOF)
 !   !read dimension of partition function table
-!   CALL ftgkyj(unit, "NPOINTS", atmos%Npf, some_comments, EOF)
+!   call ftgkyj(unit, "NPOINTS", atmos%Npf, some_comments, EOF)
 !   if (NAXIST.ne.atmos%Npf) then
 !    write(*,*) "Error in reading pf data !"
 !    write(*,*) "NAXIST=",NAXIST," NPOINTS=", atmos%Npf
@@ -540,7 +555,7 @@ MODULE atmos_type
 ! 
 !   allocate(atmos%Tpf(atmos%Npf))
 !   !now read temperature grid
-!   CALL ftgpvd(unit,1,1,atmos%Npf,-999,atmos%Tpf,anynull,EOF) !d because double !!
+!   call ftgpvd(unit,1,1,atmos%Npf,-999,atmos%Tpf,anynull,EOF) !d because double !!
 ! !   do k=1,atmos%Npf
 ! !    write(*,*) "T=", atmos%Tpf(k), "K"
 ! !   end do
@@ -583,7 +598,7 @@ MODULE atmos_type
 !     !attribute partition function to each element
 !     !the temperature grid is shared and saved in atmos%Tpf
 !     !write(*,*) "Fill partition function for element ", atmos%Elements(n)%ID
-!     CALL readKurucz_pf(n, atmos%Npf, &
+!     call readKurucz_pf(n, atmos%Npf, &
 !               atmos%Elements(n)%ptr_elem%Nstage, atmos%Elements(n)%ptr_elem%ionpot, &
 !               atmos%Elements(n)%ptr_elem%pf)
 !     !do i=1,atmos%Elements(n)%Nstage !convert from J->eV
@@ -615,10 +630,10 @@ MODULE atmos_type
 !   stop
 !   close(unit=1)
 ! 
-!   RETURN
-!   END SUBROUTINE fillElements
+!   return
+!   end subroutine fillElements
 
-  SUBROUTINE fillElements()
+  subroutine fillElements()
   !This routine read the abundance of elements listed in the
   ! abundance.input file, and keep the log partition function values
   ! for each elements in atmos%Elements
@@ -636,34 +651,34 @@ MODULE atmos_type
   EOF = 0
   !Start reading partition function by first reading the grid
   !get unique unit number
-  CALL ftgiou(unit,EOF)
+  call ftgiou(unit,EOF)
   ! open fits file in readmode'
-  CALL ftopen(unit, TRIM(mcfost_utils)//TRIM(KURUCZ_PF_FILE), 0, blocksize, EOF)
+  call ftopen(unit, TRIM(mcfost_utils)//TRIM(KURUCZ_PF_FILE), 0, blocksize, EOF)
   !some check about the first axis!
   !get first axis
-  CALL ftgknj(unit, 'NAXIS', 1, 1, NAXIST, naxis_found, EOF)
+  call ftgknj(unit, 'NAXIS', 1, 1, NAXIST, naxis_found, EOF)
   !read dimension of partition function table
-  CALL ftgkyj(unit, "NPOINTS", atmos%Npf, some_comments, EOF)
-  if (NAXIST.ne.atmos%Npf) then
+  call ftgkyj(unit, "NPOINTS", Npf, some_comments, EOF)
+  if (NAXIST.ne.Npf) then
    write(*,*) "Error in reading pf data !"
-   write(*,*) "NAXIST=",NAXIST," NPOINTS=", atmos%Npf
+   write(*,*) "NAXIST=",NAXIST," NPOINTS=", Npf
    write(*,*) "exiting... !"
    stop
   end if
-  !write(*,*) NAXIST, atmos%Npf
+  !write(*,*) NAXIST, Npf
 
-  allocate(atmos%Tpf(atmos%Npf))
+  allocate(Tpf(Npf))
   !now read temperature grid
-  CALL ftgpvd(unit,1,1,atmos%Npf,-999,atmos%Tpf,anynull,EOF) !d because double !!
-!   do k=1,atmos%Npf
-!    write(*,*) "T=", atmos%Tpf(k), "K"
+  call ftgpvd(unit,1,1,Npf,-999,Tpf,anynull,EOF) !d because double !!
+!   do k=1,Npf
+!    write(*,*) "T=", Tpf(k), "K"
 !   end do
   !close file
   call ftclos(unit, EOF)
   ! free the unit number
   call ftfiou(unit, EOF)
 
-  !write(*,*) "Metallicity = ", atmos%metallicity
+  !write(*,*) "Metallicity = ", metallicity
 
   !read abundances
   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
@@ -678,138 +693,137 @@ MODULE atmos_type
   if (Nelem < 3) write(*,*) " WARNING:, not that using Nelem < 3 will cause problem", &
   		" in solvene.f90 or other functions assuming abundances of metal of to 26 are known!!"
   
-  if (.not.allocated(atmos%Elements)) allocate(atmos%Elements(Nelem))
+  if (.not.allocated(Elements)) allocate(Elements(Nelem))
   
   open(unit=1, file=TRIM(ABUNDANCE_FILE),status="old")
   !Read Number of elements
   !-> need to modify the file format to include if at the biginning
-  !CALL getnextline(1, "#", FormatLine, inputline, Nread)
+  !call getnextline(1, "#", FormatLine, inputline, Nread)
   !read(inputline,*) Nelem
 
   do n=1, Nelem !H is first, then He ect
   
-    CALL getnextline(1, "#", FormatLine, inputline, Nread)
+    call getnextline(1, "#", FormatLine, inputline, Nread)
     read(inputline,*) charID, A
     
-    allocate(atmos%Elements(n)%ptr_elem)
-    atmos%Elements(n)%ptr_elem%weight=atomic_weights(n)
-    atmos%Elements(n)%ptr_elem%ID = charID(1:2) !supposed to be lowercases!!!!!
-    atmos%Elements(n)%ptr_elem%abund = 10.**(A-12.0)
+    allocate(Elements(n)%ptr_elem)
+    Elements(n)%ptr_elem%weight=atomic_weights(n)
+    Elements(n)%ptr_elem%ID = charID(1:2) !supposed to be lowercases!!!!!
+    Elements(n)%ptr_elem%abund = 10.**(A-12.0)
 
-    if (A <= -99) atmos%Elements(n)%ptr_elem%abund = 0d0
+    if (A <= -99) Elements(n)%ptr_elem%abund = 0d0
 
-!     write(*,*) n, "Element ", atmos%Elements(n)%ptr_elem%ID," has an abundance of A=",&
-!               atmos%Elements(n)%ptr_elem%abund,A," and a weight of w=",&
-!                atmos%Elements(n)%ptr_elem%weight
+!     write(*,*) n, "Element ", Elements(n)%ptr_elem%ID," has an abundance of A=",&
+!               Elements(n)%ptr_elem%abund,A," and a weight of w=",&
+!                Elements(n)%ptr_elem%weight
                
-    atmos%Elements(n)%ptr_elem%abundance_set = .true.
+    Elements(n)%ptr_elem%abundance_set = .true.
 !
-!     if (n.gt.1 .and. atmos%metallicity.gt.0.) then
-!      atmos%Elements(n)%ptr_elem%abund = &
-!                      atmos%Elements(n)%ptr_elem%abund*10.**(atmos%metallicity)
+!     if (n.gt.1 .and. metallicity.gt.0.) then
+!      Elements(n)%ptr_elem%abund = &
+!                      Elements(n)%ptr_elem%abund*10.**(metallicity)
 !     end if
-    atmos%totalAbund = atmos%totalAbund+atmos%Elements(n)%ptr_elem%abund
-    atmos%avgWeight = atmos%avgWeight+atmos%Elements(n)%ptr_elem%abund* &
-                     atmos%Elements(n)%ptr_elem%weight
-    !write(*,*) "updating total Abundance = ",atmos%totalAbund
-    !write(*,*) "updating average weight = ", atmos%avgWeight
+    totalAbund = totalAbund+Elements(n)%ptr_elem%abund
+    avgWeight = avgWeight+Elements(n)%ptr_elem%abund* &
+                     Elements(n)%ptr_elem%weight
+    !write(*,*) "updating total Abundance = ",totalAbund
+    !write(*,*) "updating average weight = ", avgWeight
 
     !attribute partition function to each element
-    !the temperature grid is shared and saved in atmos%Tpf
-    !write(*,*) "Fill partition function for element ", atmos%Elements(n)%ID
-    CALL readKurucz_pf(n, atmos%Npf, &
-              atmos%Elements(n)%ptr_elem%Nstage, atmos%Elements(n)%ptr_elem%ionpot, &
-              atmos%Elements(n)%ptr_elem%pf)
-    !do i=1,atmos%Elements(n)%Nstage !convert from J->eV
+    !the temperature grid is shared and saved in Tpf
+    !write(*,*) "Fill partition function for element ", Elements(n)%ID
+    call readKurucz_pf(n, Npf, &
+              Elements(n)%ptr_elem%Nstage, Elements(n)%ptr_elem%ionpot, &
+              Elements(n)%ptr_elem%pf)
+    !do i=1,Elements(n)%Nstage !convert from J->eV
     ! write(*,*) "Inpot for stage ", i, &
-    !            atmos%Elements(n)%ionpot(i)*JOULE_TO_EV, " eV"
+    !            Elements(n)%ionpot(i)*JOULE_TO_EV, " eV"
     !end do
     !! allocate space for futur populations of each stage
-    !!allocate(atmos%Elements(n)%n(atmos%Elements(n)%Nstage, atmos%Nspace))
+    !!allocate(Elements(n)%n(Elements(n)%Nstage, Nspace))
     !write(*,*) "Elem pop" !BEWARE of n index and Elements(n)%n
     ! there is a conflict
 !     do ni=1,Nelem
-!      atmos%Elements(n)%n(:,:)=0d0
+!      Elements(n)%n(:,:)=0d0
 !     end do
 
     !write(*,*) "************************************"
   end do !over elem read
   close(unit=1)
 
-  atmos%wght_per_H = atmos%avgWeight
-  atmos%avgWeight = atmos%avgWeight/atmos%totalAbund
-  write(*,*) "Total Abundance in the atmosphere = ", atmos%totalAbund
-  write(*,*) "Total average weight = ", atmos%avgWeight
-  write(*,*) "Weight per Hydrogen = ", atmos%wght_per_H !i.e., per AMU = total mass
+  wght_per_H = avgWeight
+  avgWeight = avgWeight/totalAbund
+  write(*,*) "Total Abundance in the atmosphere = ", totalAbund
+  write(*,*) "Total average weight = ", avgWeight
+  write(*,*) "Weight per Hydrogen = ", wght_per_H !i.e., per AMU = total mass
   write(*,*) ""
   
   !store also the mass fraction of each element
   do n=1, Nelem
-   atmos%Elements(n)%ptr_elem%massf = atmos%Elements(n)%ptr_elem%weight*atmos%Elements(n)%ptr_elem%Abund/atmos%wght_per_H
+   Elements(n)%ptr_elem%massf = Elements(n)%ptr_elem%weight*Elements(n)%ptr_elem%Abund/wght_per_H
   enddo
 
 
-  RETURN
-  END SUBROUTINE fillElements
+  return
+  end subroutine fillElements
 
-  SUBROUTINE init_atomic_atmos()!(Nspace)
+  subroutine alloc_atomic_atmos()!(Nspace)
    !integer, intent(in) :: Nspace
-   atmos%Nspace = n_cells
 
-   if (allocated(atmos%T).or.(allocated(atmos%nHtot)) &
-       .or.(allocated(atmos%ne))) then
+   if (allocated(T).or.(allocated(nHtot)) &
+       .or.(allocated(ne))) then
     write(*,*) "A atomic atmosphere is already allocated, exiting..."
     stop
    end if
 
-   if (.not.allocated(atmos%T)) allocate(atmos%T(atmos%Nspace))
+   if (.not.allocated(T)) allocate(T(n_cells))
    !!-> allocated in fill elements, as Nelem is read from file now
-   !!if (.not.allocated(atmos%Elements)) allocate(atmos%Elements(Nelem))
+   !!if (.not.allocated(Elements)) allocate(Elements(Nelem))
 
    if (.not.lvoronoi) then
-    !allocate(atmos%Vxyz(atmos%Nspace,3))
-    !atmos%Vxyz(:,:) = 0d0
-    call warning("Futur deprecation of atmos%vz, spherical vector use disntead")
-    allocate(atmos%vR(atmos%Nspace)); atmos%vR = 0.0_dp
-    allocate(atmos%vtheta(atmos%Nspace))
-    allocate(atmos%vz(atmos%Nspace)); atmos%vz = 0.0_dp
-    allocate(atmos%vphi(atmos%Nspace)); atmos%vphi = 0.0_dp
+    !allocate(Vxyz(Nspace,3))
+    !Vxyz(:,:) = 0d0
+    call warning("Futur deprecation of v_z, spherical vector use disntead")
+    allocate(vR(n_cells)); vR = 0.0_dp
+    allocate(vtheta(n_cells))
+    allocate(v_z(n_cells)); v_z = 0.0_dp
+    allocate(vphi(n_cells)); vphi = 0.0_dp
    end if
 
-   atmos%Natom = 0
-   atmos%Nactiveatoms = 0
-   atmos%totalAbund=0
-   atmos%avgWeight=0
-   atmos%wght_per_H=0
-   atmos%metallicity = 0. !not used yet
-   atmos%Npf = 0
-   atmos%calc_ne = .false.
-   atmos%T(:) = 0d0
-   atmos%v_char = 0d0
-   atmos%B_char = 0d0
+   Natom = 0
+   Nactiveatoms = 0
+   totalAbund=0
+   avgWeight=0
+   wght_per_H=0
+   metallicity = 0. !not used yet
+   Npf = 0
+   calc_ne = .false.
+   T(:) = 0d0
+   v_char = 0d0
+   B_char = 0d0
 
-   if (.not.allocated(atmos%nHtot)) allocate(atmos%nHtot(atmos%Nspace))
-   if (.not.allocated(atmos%vturb)) allocate(atmos%vturb(atmos%Nspace))
-   if (.not.allocated(atmos%ne)) allocate(atmos%ne(atmos%Nspace))
-   !if (.not.allocated(atmos%nHmin)) allocate(atmos%nHmin(atmos%Nspace)) temporary
+   if (.not.allocated(nHtot)) allocate(nHtot(n_cells))
+   if (.not.allocated(vturb)) allocate(vturb(n_cells))
+   if (.not.allocated(ne)) allocate(ne(n_cells))
+   !if (.not.allocated(nHmin)) allocate(nHmin(Nspace)) temporary
 
 
-   atmos%ne(:) = 0d0
-   !atmos%nHmin(:) = 0d0 !temporary
-   atmos%nHtot(:) = 0d0
-   atmos%vturb(:) = 0d0 !m/s
+   ne(:) = 0d0
+   !nHmin(:) = 0d0 !temporary
+   nHtot(:) = 0d0
+   vturb(:) = 0d0 !m/s
 
-   CALL fillElements()
+   call fillElements()
 
-!    allocate(atmos%lcompute_atomRT(atmos%Nspace))
-   allocate(atmos%icompute_atomRT(atmos%Nspace))
-   atmos%icompute_atomRT(:) = 0 !everything transparent at init.
+!    allocate(lcompute_atomRT(Nspace))
+   allocate(icompute_atomRT(n_cells))
+   icompute_atomRT(:) = 0 !everything transparent at init.
 
-   RETURN
-   END SUBROUTINE init_atomic_atmos
+   return
+   end subroutine alloc_atomic_atmos
 
-!to do, this routine should change according to mcfost denity array
-   SUBROUTINE define_atomRT_domain(itiny_T, itiny_nH)
+!to do, this routine should change according to mcfost density array
+   subroutine define_atomRT_domain(itiny_T, itiny_nH)
    ! Set where to solve for the RT equation: where a cell is not
    ! transparent = where there is a significant density and temperature.
    ! Determines also if we have to force electron density calculation
@@ -835,7 +849,7 @@ MODULE atmos_type
      tiny_nH = itiny_nH !m^-3
     end if
 
-    if (maxval(atmos%ne) == 0d0) atmos%calc_ne = .true.
+    if (maxval(ne) == 0d0) calc_ne = .true.
 
     if (tiny_T <= 0) then
      write(*,*) "changing the value of tiny_T = ", tiny_T," to", 2d2
@@ -846,10 +860,14 @@ MODULE atmos_type
      tiny_nH = 1d0
     end if
 
+write(*,*) nHtot
+write(*,*) "*"
+write(*,*) T
+stop
     !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T)
     ! atmos%icompute_atomRT(:) = 0 !transparent !already init
-    where((atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T))
-    	atmos%icompute_atomRT = 1
+    where((nHtot > tiny_nH) .and. (T > tiny_T))
+    	icompute_atomRT = 1
     end where
 !     do icell=1,atmos%Nspace
 ! !      atmos%lcompute_atomRT(icell) = &
@@ -858,29 +876,29 @@ MODULE atmos_type
 !      	atmos%icompute_atomRT(icell) = 1 !filled
 !     end do
 
-   RETURN
-   END SUBROUTINE define_atomRT_domain
+   return
+   end subroutine define_atomRT_domain
 
-   SUBROUTINE init_magnetic_field()
+   subroutine alloc_magnetic_field()
    ! ----------------------------------------- !
    ! Allocate space for magnetic field
    ! ----------------------------------------- !
-    !if (.not.atmos%magnetized) RETURN
+    !if (.not.atmos%magnetized) return
     !allocate(atmos%Bxyz(atmos%Nspace, 3))
     !atmos%Bxyz = 0.0
-    allocate(atmos%BR(atmos%Nspace)); atmos%BR = 0.0_dp
-    allocate(atmos%Bphi(atmos%Nspace)); atmos%Bphi = 0.0_dp
+    allocate(BR(n_cells)); BR = 0.0_dp
+    allocate(Bphi(n_cells)); Bphi = 0.0_dp
     
-    allocate(atmos%Btheta(atmos%Nspace)); atmos%Btheta = 0.0_dp
+    allocate(Btheta(n_cells)); Btheta = 0.0_dp
     !allocate(atmos%Bz(atmos%Nspace)); atmos%Bz = 0.0_dp
 
 
-   RETURN
-   END SUBROUTINE init_magnetic_field
+   return
+   end subroutine alloc_magnetic_field
 
 
 !building
-   FUNCTION B_project(icell, x,y,z,u,v,w, gamma, chi) result(Bmodule)
+   function B_project(icell, x,y,z,u,v,w, gamma, chi) result(Bmodule)
    ! ------------------------------------------- !
    ! Returned the module of the magnetic field at
    ! one point of the model icell and the angles
@@ -904,11 +922,11 @@ MODULE atmos_type
       write(*,*) "*"
      end if
 
-    RETURN
-   END FUNCTION B_project
+    return
+   end function B_project
 
 !    !!should be moved in Atom_type
-!    FUNCTION atomZnumber_old(atomID) result(Z)
+!    function atomZnumber_old(atomID) result(Z)
 !    --------------------------------------
 !    return the atomic number of an atom
 !    with ID = atomID.
@@ -927,10 +945,10 @@ MODULE atmos_type
 !      Z=Z+1
 !     end do
 !
-!    RETURN
-!    END FUNCTION atomZnumber_old
+!    return
+!    end function atomZnumber_old
 
-  SUBROUTINE write_atmos_domain()
+  subroutine write_atmos_domain()
  ! ------------------------------------ !
  ! ------------------------------------ !
   use fits_utils, only : print_error
@@ -939,11 +957,11 @@ MODULE atmos_type
   integer :: nelements
 
   !get unique unit number
-  CALL ftgiou(unit,EOF)
+  call ftgiou(unit,EOF)
 
   blocksize=1
 
-  CALL ftinit(unit,"atomRT_domain.fits.gz",blocksize,EOF)
+  call ftinit(unit,"atomRT_domain.fits.gz",blocksize,EOF)
   !  Initialize parameters about the FITS image
   simple = .true. !Standard fits
   group = 1
@@ -953,7 +971,7 @@ MODULE atmos_type
 
   if (lVoronoi) then
    naxis = 1
-   naxes(1) = atmos%Nspace
+   naxes(1) = n_cells
    nelements = naxes(1)
   else
    if (l3D) then
@@ -970,23 +988,23 @@ MODULE atmos_type
    end if
   end if
 
-  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
   ! Additional optional keywords
-  CALL ftpkys(unit, "integer", "0=empty,1=filled;-1=dark", ' ', EOF)
+  call ftpkys(unit, "integer", "0=empty,1=filled;-1=dark", ' ', EOF)
   !write data
-  CALL ftpprj(unit,group,fpixel,nelements,atmos%icompute_atomRT,EOF)
+  call ftpprj(unit,group,fpixel,nelements,icompute_atomRT,EOF)
 
-  CALL ftclos(unit, EOF)
-  CALL ftfiou(unit, EOF)
+  call ftclos(unit, EOF)
+  call ftfiou(unit, EOF)
 
-  if (EOF > 0) CALL print_error(EOF)
+  if (EOF > 0) call print_error(EOF)
 
 
-  RETURN
-  END SUBROUTINE write_atmos_domain
+  return
+  end subroutine write_atmos_domain
 
 !building
-!   SUBROUTINE writeVfield()
+!   subroutine writeVfield()
 !  ! ------------------------------------ !
 !  ! ------------------------------------ !
 !   use fits_utils, only : print_error
@@ -996,10 +1014,10 @@ MODULE atmos_type
 !   real(kind=dp), dimension(:,:), allocatable :: V
 ! 
 !   !get unique unit number
-!   CALL ftgiou(unit,EOF)
+!   call ftgiou(unit,EOF)
 ! 
 !   blocksize=1
-!   CALL ftinit(unit,"Vfield.fits.gz",blocksize,EOF)
+!   call ftinit(unit,"Vfield.fits.gz",blocksize,EOF)
 !   !  Initialize parameters about the FITS image
 !   simple = .true. !Standard fits
 !   group = 1
@@ -1031,27 +1049,27 @@ MODULE atmos_type
 !   
 !   allocate(V(3, atmos%Nspace)); V = 0.0_dp
 !   V(1,:) = atmos%vR(:)
-!   V(2,:) = atmos%vZ(:)
+!   V(2,:) = atmos%v_z(:)
 !   if (allocated(atmos%vphi)) V(3,:) = atmos%vphi(:)
 ! 
-!   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+!   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
 !   ! Additional optional keywords
-!   CALL ftpkys(unit, "UNIT", "m.s^-1", ' ', EOF)
+!   call ftpkys(unit, "UNIT", "m.s^-1", ' ', EOF)
 !   !write data
-!   CALL ftpprd(unit,group,fpixel,nelements,V,EOF)
+!   call ftpprd(unit,group,fpixel,nelements,V,EOF)
 !   
 !   deallocate(V)
 ! 
-!   CALL ftclos(unit, EOF)
-!   CALL ftfiou(unit, EOF)
+!   call ftclos(unit, EOF)
+!   call ftfiou(unit, EOF)
 ! 
-!   if (EOF > 0) CALL print_error(EOF)
+!   if (EOF > 0) call print_error(EOF)
 ! 
 ! 
-!   RETURN
-!   END SUBROUTINE writeVfield
+!   return
+!   end subroutine writeVfield
 
- SUBROUTINE writeTemperature()
+ subroutine writeTemperature()
  ! ------------------------------------ !
  ! T in K
  ! ------------------------------------ !
@@ -1060,10 +1078,10 @@ MODULE atmos_type
   integer :: nelements
 
   !get unique unit number
-  CALL ftgiou(unit,EOF)
+  call ftgiou(unit,EOF)
 
   blocksize=1
-  CALL ftinit(unit,"Temperature.fits.gz",blocksize,EOF)
+  call ftinit(unit,"Temperature.fits.gz",blocksize,EOF)
   !  Initialize parameters about the FITS image
   simple = .true. !Standard fits
   group = 1 !??
@@ -1073,7 +1091,7 @@ MODULE atmos_type
 
   if (lVoronoi) then
    naxis = 1
-   naxes(1) = atmos%Nspace ! equivalent n_cells
+   naxes(1) = n_cells ! equivalent n_cells
    nelements = naxes(1)
   else
    if (l3D) then
@@ -1092,22 +1110,22 @@ MODULE atmos_type
   ! write(*,*) 'yoyo2', n_rad, nz, n_cells, atmos%Nspace
   !  Write the required header keywords.
 
-  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
   ! Additional optional keywords
-  CALL ftpkys(unit, "UNIT", "K", ' ', EOF)
+  call ftpkys(unit, "UNIT", "K", ' ', EOF)
   !write data
-  CALL ftpprd(unit,group,fpixel,nelements,atmos%T,EOF)
+  call ftpprd(unit,group,fpixel,nelements,T,EOF)
 
-  CALL ftclos(unit, EOF)
-  CALL ftfiou(unit, EOF)
+  call ftclos(unit, EOF)
+  call ftfiou(unit, EOF)
 
-  if (EOF > 0) CALL print_error(EOF)
+  if (EOF > 0) call print_error(EOF)
 
- RETURN
- END SUBROUTINE writeTemperature
+ return
+ end subroutine writeTemperature
 
 
-  SUBROUTINE readAtmos_ascii(filename)
+  subroutine readAtmos_ascii(filename)
   ! ------------------------------------------- !
    ! Read from ascii file a model to be used
    ! with the spherical grid of mcfost.
@@ -1137,22 +1155,24 @@ MODULE atmos_type
    lspherical_velocity = .false.
    lVoronoi = .false.
    !read from file the velocity law if any
-   CALL init_atomic_atmos()
+   call alloc_atomic_atmos()
    !For now we do not necessarily need to compute B if no polarization at all
-   atmos%magnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
-   if (atmos%magnetized) then 
-    CALL init_magnetic_field()
+   lmagnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
+   if (lmagnetized) then 
+    call alloc_magnetic_field()
     allocate(B2(n_cells)) !only to read either Bz or Btheta depending on velocity law
    endif
 
-write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but check for other"
 !for av83 try rho_to_nH = 1d3 /masseH / 1.79
 
    !change mean molecular weight in atom weight mean and mean molecular weight as mu*(1-ne/nTot) Hubeny pa 792
-   rho_to_nH = 1d3 /masseH / atmos%wght_per_H!atmos%avgWeight !density kg/m3 -> nHtot m^-3
+   rho_to_nH = 1d3 /masseH / wght_per_H!atmos%avgWeight !density kg/m3 -> nHtot m^-3
    !rho/avgWeight = Ngas total, see rutten page 143 eq 7.3
 !or use rho and for each element use the masse fraction to define its total number ?
 !should be the same as using Abund wrt to nHtot
+
+!    rho_to_nH = 1d0
+!    write(*,*) " Special case for av83"
 
    write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
 
@@ -1173,7 +1193,7 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
    end if
 
    open(unit=1,file=filename, status="old")
-   CALL getnextline(1, "#", FormatLine, inputline, Nread)
+   call getnextline(1, "#", FormatLine, inputline, Nread)
    read(inputline(1:Nread),*) rotation_law
 
 
@@ -1191,16 +1211,16 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
      CASE DEFAULT
         write(*,*) " Velocity law ", rotation_law," not handled yet"
         stop
-    END SELECT
+    end SELECT
 
 
    !read T shock and if accretion spots
-   CALL getnextline(1, "#", FormatLine, inputline, Nread)
+   call getnextline(1, "#", FormatLine, inputline, Nread)
    read(inputline(1:Nread),*) Tshk, acspot
    accretion_spots = .false.
    if (acspot==1) accretion_spots = .true.
    !now read thetao and thetai
-   CALL getnextline(1, "#", FormatLine, inputline, Nread)
+   call getnextline(1, "#", FormatLine, inputline, Nread)
    read(inputline(1:Nread),*) thetai, thetao
    thetai = thetai * pi/180.
    thetao = thetao * pi/180.
@@ -1215,55 +1235,57 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
          icell = cell_map(i,j,k)
        end if
     Nread = 0
-    if (atmos%magnetized) then
+    if (lmagnetized) then
      write(*,*) "Magnetic atmos not ready yet"
      stop
-     CALL getnextline(1, "#", FormatLine, inputline, Nread)
-!      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), &
-!          atmos%vR(icell), V2(icell), atmos%Vphi(icell), &
-!          atmos%BR(icell), B2(icell), atmos%Bphi(icell), atmos%icompute_atomRT(icell)
-     read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), &
-         atmos%vR(icell), V2(icell), atmos%Vphi(icell), atmos%vturb(icell), &
-         atmos%BR(icell), B2(icell), atmos%Bphi(icell), atmos%icompute_atomRT(icell)
+     call getnextline(1, "#", FormatLine, inputline, Nread)
+!      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
+!          vR(icell), V2(icell), Vphi(icell), &
+!          BR(icell), B2(icell), Bphi(icell), icompute_atomRT(icell)
+     read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
+         vR(icell), V2(icell), Vphi(icell), vturb(icell), &
+         BR(icell), B2(icell), Bphi(icell), icompute_atomRT(icell)
     else
-     CALL getnextLine(1, "#", FormatLine, inputline, Nread)
-     read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), &
-         atmos%vR(icell), V2(icell), atmos%vphi(icell), atmos%vturb(icell), atmos%icompute_atomRT(icell)
+     call getnextLine(1, "#", FormatLine, inputline, Nread)
+     read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
+         vR(icell), V2(icell), vphi(icell), vturb(icell), icompute_atomRT(icell)
          
-!      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), atmos%T(icell), atmos%nHtot(icell), atmos%ne(icell), &
-!          atmos%vR(icell), V2(icell), atmos%vphi(icell), atmos%icompute_atomRT(icell)
+!      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
+!          vR(icell), V2(icell), vphi(icell), icompute_atomRT(icell)
+!     vturb(icell) = 0.0
 
     end if !magnetized
-!     write(*,*) icell,"rho=",atmos%nHtot(icell)," nH=",atmos%nHtot(icell)*rho_to_nH,' T=', atmos%T(icell),' ne=', atmos%ne(icell)," mu=",atmos%avgWeight
      end do
     end do
    end do
-   
+
+!    vR = 0.0
+!    v2 = 0.0
+!    vphi = 0.0
+
    if (lspherical_velocity) then
-    atmos%vtheta(:) = V2(:)
-    if (atmos%magnetized) then 
-     atmos%Btheta(:) = B2(:)
+    vtheta(:) = V2(:)
+    if (lmagnetized) then 
+     Btheta(:) = B2(:)
      deallocate(B2)
     endif
    else if (lmagnetoaccr) then
-    atmos%vz(:) = V2(:)
-    if (atmos%magnetized) then 
-     atmos%Bz(:) = B2(:)
+    v_z(:) = V2(:)
+    if (lmagnetized) then 
+     Bz(:) = B2(:)
      deallocate(B2)
     endif
    else
     call error ("Wrong velocity law")
    endif
 
-   
    !rho -> nH
-   atmos%nHtot = atmos%nHtot * rho_to_nH
+   nHtot = nHtot * rho_to_nH
    close(unit=1)
    
-   
-   write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT>0)), " density zones"
-   write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT==0)), " transparent zones"
-   write(*,*) "Read ", size(pack(atmos%icompute_atomRT,mask=atmos%icompute_atomRT<0)), " dark zones"
+   write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
+   write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
+   write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
 
    if (thetai-thetao /= 0.) then
    rmi = 1d0 / sin(thetai)**2
@@ -1271,13 +1293,13 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
 !    if ((present(Oi)) .and. (present(Oo))) then
 !     rmi = 1d0 / sin(Oi * PI/180.)**2
 !     rmo = 1d0 / sin(Oo * PI/180.)**2
-!     thetai = Oi * PI/180.!asin(dsqrt(1d0/rmi))
-!     thetao = Oo * PI/180 !asin(dsqrt(1d0/rmo))
+!     thetai = Oi * PI/180.!asin(sqrt(1d0/rmi))
+!     thetao = Oo * PI/180 !asin(sqrt(1d0/rmo))
 !    else
 !     rmi = 2d0
 !     rmo = 3d0
-!     thetai = asin(dsqrt(1d0/2d0))
-!     thetao = asin(dsqrt(1d0/3d0))
+!     thetai = asin(sqrt(1d0/2d0))
+!     thetao = asin(sqrt(1d0/3d0))
 !    end if
     Lr = Ggrav * etoile(1)%M * Msun_to_kg * Mdot / (etoile(1)%r*au_to_m) * (1. - 2./(rmi + rmo))
 
@@ -1319,83 +1341,83 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
    end if !thetai-thetao /= 0
 
    if (lmagnetoaccr) then
-    Vmod = maxval(dsqrt(atmos%vR**2+atmos%vz(:)**2+atmos%vphi(:)**2))
+    Vmod = maxval(sqrt(vR**2+v_z(:)**2+vphi(:)**2))
    else if (lspherical_velocity) then
-    Vmod = maxval(dsqrt(atmos%vR**2+atmos%vtheta(:)**2+atmos%vphi(:)**2))
+    Vmod = maxval(sqrt(vR**2+vtheta(:)**2+vphi(:)**2))
    endif
    
 
-    atmos%v_char = atmos%v_char + Vmod
+    v_char = v_char + Vmod
 
 
-   if (atmos%magnetized) then
+   if (lmagnetized) then
    	if (lmagnetoaccr) then
-     atmos%B_char = maxval(dsqrt(atmos%BR**2+atmos%Bz(:)**2+atmos%Bphi(:)**2))
+     B_char = maxval(sqrt(BR**2+Bz(:)**2+Bphi(:)**2))
     else if (lspherical_velocity) then
-     atmos%B_char = maxval(dsqrt(atmos%BR**2+atmos%Btheta(:)**2+atmos%Bphi(:)**2))
+     B_char = maxval(sqrt(BR**2+Btheta(:)**2+Bphi(:)**2))
     endif
-    write(*,*)  "Typical Magnetic field modulus (G)", atmos%B_char * 1d4
+    write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
    end if
 
    !!here not used, done by model
-  !!CALL define_atomRT_domain() !can be defined earlier so that we avoid create a dark_zone array?
+  !!call define_atomRT_domain() !can be defined earlier so that we avoid create a dark_zone array?
   							  !for instance, cell by cell init of icompute_atomRT, when density
   							  !is computed
   !but this one is needed
-   if (maxval(atmos%ne) == 0d0) atmos%calc_ne = .true.
+   if (maxval(ne) == 0d0) calc_ne = .true.
 
   !no need if we do not the dark_zones from input file.
-   CALL write_atmos_domain() !but for consistency with the plot functions in python
+   call write_atmos_domain() !but for consistency with the plot functions in python
 
 
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
 
     if (lspherical_velocity) then
-     write(*,*) " Vr = ", 1e-3 * maxval(abs(atmos%vR)), &
-    	1e-3*minval(abs(atmos%vr),mask=atmos%icompute_atomRT>0)
-     write(*,*) " Vtheta = ",  1e-3 * maxval(abs(atmos%vtheta)), &
-    	1e-3*minval(abs(atmos%vtheta),mask=atmos%icompute_atomRT>0)    
+     write(*,*) " Vr = ", 1e-3 * maxval(abs(vR)), &
+    	1e-3*minval(abs(vr),mask=icompute_atomRT>0)
+     write(*,*) " Vtheta = ",  1e-3 * maxval(abs(vtheta)), &
+    	1e-3*minval(abs(vtheta),mask=icompute_atomRT>0)    
     else if (lmagnetoaccr) then
-     write(*,*) " VRz = ", 1e-3 * maxval(dsqrt(atmos%VR(:)**2 + atmos%Vz(:)**2)), &
-    	1e-3*minval(dsqrt(atmos%VR(:)**2 + atmos%Vz(:)**2),mask=atmos%icompute_atomRT>0)
-     write(*,*) " VR = ", 1e-3 * maxval(abs(atmos%vR)), &
-    	1e-3*minval(abs(atmos%vR),mask=atmos%icompute_atomRT>0)
-     write(*,*) " Vz = ",  1e-3 * maxval(abs(atmos%vz)), &
-    	1e-3*minval(abs(atmos%vz),mask=atmos%icompute_atomRT>0)
+     write(*,*) " VRz = ", 1e-3 * maxval(sqrt(VR(:)**2 + v_z(:)**2)), &
+    	1e-3*minval(sqrt(VR(:)**2 + v_z(:)**2),mask=icompute_atomRT>0)
+     write(*,*) " VR = ", 1e-3 * maxval(abs(vR)), &
+    	1e-3*minval(abs(vR),mask=icompute_atomRT>0)
+     write(*,*) " v_z = ",  1e-3 * maxval(abs(v_z)), &
+    	1e-3*minval(abs(v_z),mask=icompute_atomRT>0)
     endif
-    write(*,*) " Vphi = ",  1e-3 * maxval(abs(atmos%vphi)), &
-    	1e-3*minval(abs(atmos%vphi),mask=atmos%icompute_atomRT>0)
+    write(*,*) " Vphi = ",  1e-3 * maxval(abs(vphi)), &
+    	1e-3*minval(abs(vphi),mask=icompute_atomRT>0)
 
    
 !    if (xit .and. lspherical_velocity) then
-!      Vinf = maxval(atmos%vr)!900d3 !m/s
+!      Vinf = maxval(vr)!900d3 !m/s
 !      !law here                                                        = Vr
-!      !atmos%vturb(:) = 1d3 * ( 10. + (100.-10.) * atmos%vr(:) / Vinf   ) !m/s
-!      atmos%vturb(:) = 10d3 !km/s
+!      !vturb(:) = 1d3 * ( 10. + (100.-10.) * vr(:) / Vinf   ) !m/s
+!      vturb(:) = 10d3 !km/s
 !    endif 
 
    
    write(*,*) "Typical line extent due to V fields (km/s):"
-   atmos%v_char = Lextent * atmos%v_char
-   write(*,*) atmos%v_char/1d3
+   v_char = Lextent * v_char
+   write(*,*) v_char/1d3
    
    !if (xit) then
    write(*,*) "Maximum/minimum turbulent velocity (km/s):"
-   write(*,*) maxval(atmos%vturb)/1d3, minval(atmos%vturb, mask=atmos%icompute_atomRT>0)/1d3
+   write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
    !endif
 
    write(*,*) "Maximum/minimum Temperature in the model (K):"
-   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)
+   write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0)
+   write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)
 
 
-  RETURN
-  END SUBROUTINE readAtmos_ascii
+  return
+  end subroutine readAtmos_ascii
   
 !! Futur deprecation
 ! 
-!   SUBROUTINE writeAtmos_ascii()
+!   subroutine writeAtmos_ascii()
 !   ! ------------------------------------- !
 !    ! Write GridType atmos to ascii file.
 !    ! ultimately this model will be mapped
@@ -1429,10 +1451,10 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
 !        z = z_grid(icell)/z_scaling_env
 !       end if
 !       phi = phi_grid(icell)
-!       r = dsqrt(z**2 + rcyl**2)
+!       r = sqrt(z**2 + rcyl**2)
 !       fact = 1d0
 !       if (z<0) fact = -1
-!       sinTheta = fact*dsqrt(1.-(z/r)**2)
+!       sinTheta = fact*sqrt(1.-(z/r)**2)
 !       !XX(icell) = rcyl*cos(phi)*AU_to_m!r*cos(phi)*sinTheta * AU_to_m
 !       !YY(icell) = rcyl*sin(phi)*AU_to_m!r*sin(phi)*sinTheta * AU_to_m
 !        XX(icell) = r*cos(phi)*sinTheta * AU_to_m
@@ -1461,7 +1483,7 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
 !      smooth_scale = 5. * Rmax * AU_to_m
 !      if (min(dx,dy,dz) < 2*etoile(1)%r*AU_to_m) then
 !       if ((dx**2+dy**2+dz**2) < (2*etoile(1)%r*AU_to_m)**2) then
-!          smooth_scale = dsqrt(dx**2+dy**2+dz**2)/3. * AU_to_m
+!          smooth_scale = sqrt(dx**2+dy**2+dz**2)/3. * AU_to_m
 !          !=etoile(1)%r*AU_to_m!etoile(1)%r/3. * AU_to_m!m
 !       end if
 !      end if
@@ -1474,12 +1496,12 @@ write(*,*) "CHECK rho_to_nH, it is now written to be consistent with av83.s but 
 !    write(*,*) maxval(atmos%nHtot)*Msun_to_kg, &
 !    				minval(atmos%nHtot,mask=atmos%icompute_atomRT>0)*Msun_to_kg
 !    write(*,*) "Maximum/minimum velocities in the model (km/s):"
-!    write(*,*) maxval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
-!      		  minval(dsqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
+!    write(*,*) maxval(sqrt(sum(atmos%Vxyz**2,dim=2)), dim=1)*1d-3,  &
+!      		  minval(sqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
 !      		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
 !    close(unit=1)
 ! 
-!   RETURN
-!   END SUBROUTINE writeAtmos_ascii
+!   return
+!   end subroutine writeAtmos_ascii
 
-END MODULE atmos_type
+end module atmos_type

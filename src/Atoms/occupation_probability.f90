@@ -3,8 +3,7 @@
 MODULE occupation_probability
 
  use atom_type, only : AtomType, element, atomic_orbital_sqradius
- use atmos_type, only : atmos, Hydrogen, Helium, ntotal_atom
- use spectrum_type, only : nltespec
+ use atmos_type, only : T, ne, Hydrogen, Helium, ntotal_atom
  use constant
 
  use constantes, only : tiny_dp, huge_dp
@@ -48,24 +47,24 @@ MODULE occupation_probability
    a0fourpi_three = (4./3.) * pi * RBOHR*RBOHR*RBOHR
    
                                        !n=1, l=0, Z=1 ground state of H I
-   rp1 = dsqrt(atomic_orbital_sqradius(1.0_dp, 0, 1)) ! about 1.74 a0
+   rp1 = sqrt(atomic_orbital_sqradius(1.0_dp, 0, 1)) ! about 1.74 a0
                                        !n=1, l=0, Z=1 ? ground state of He I
-   rp2 = dsqrt(atomic_orbital_sqradius(1.0_dp, 0, 2)) !about 0.87 a0
+   rp2 = sqrt(atomic_orbital_sqradius(1.0_dp, 0, 2)) !about 0.87 a0
    
    nl = 0. !need to be extracted from label 
    nZ = int(Zr) + 1!?
    !or
    !nZ = 2 for He, 1 for H etc
-   r1  = dsqrt(atomic_orbital_sqradius(n, nl, nZ))
+   r1  = sqrt(atomic_orbital_sqradius(n, nl, nZ))
    
    npop1 = hydrogen%n(1,icell)
    npop2 = 0.0_dp
    if (associated(helium)) npop2 = helium%n(1,icell)
    
    !init at 1 because wocc is the product of the two probabilities
-   w_neutr = dexp( -a0fourpi_three * (npop1*(r1+rp1)**3 + npop2*(r1+rp2)**3))
+   w_neutr = exp( -a0fourpi_three * (npop1*(r1+rp1)**3 + npop2*(r1+rp2)**3))
    !write(*,*) a0fourpi_three, r1, rp1, rp2
-   !write(*,*) "neutr=",w_neutr, npop1*1d-6,atmos%ne(icell)*1d-6,npop2*1d-6, n, atmos%T(icell)
+   !write(*,*) "neutr=",w_neutr, npop1*1d-6,ne(icell)*1d-6,npop2*1d-6, n, T(icell)
    !!w_neutr = 1.0
    
    !eq. 4.71 Hummer & Mihalas 1988
@@ -73,12 +72,12 @@ MODULE occupation_probability
    !see also Hubeny & Hummer & Lanz 1994
    
    !1d4 = ne*-2/3. with ne in m^-3 to cm^-3
-   betac  = 1d4 * 8.3d14 * atmos%ne(icell)**(-2./3.) * Zp*Zp*Zp * keq9dot70(n) / n / n / n / n !unitless it is a ratio
+   betac  = 1d4 * 8.3d14 * ne(icell)**(-2./3.) * Zp*Zp*Zp * keq9dot70(n) / n / n / n / n !unitless it is a ratio
    
    !1d-1 convert ne m^-3 to ne cm^-3
-   a = 1d-1 * 0.09 * atmos%ne(icell)**(1./6.) / dsqrt(atmos%T(icell))
+   a = 1d-1 * 0.09 * ne(icell)**(1./6.) / sqrt(T(icell))
    x = (1.0_dp + a)**(3.15)
-   f = c1 * (x + 4.0 * Zr * a*a*a)*betac*betac*betac / (1.0 + c2*x*dsqrt(betac*betac*betac))
+   f = c1 * (x + 4.0 * Zr * a*a*a)*betac*betac*betac / (1.0 + c2*x*sqrt(betac*betac*betac))
    
    w_ion = f / (1.0_dp + f)
    
@@ -109,7 +108,7 @@ MODULE occupation_probability
       D_i = 1.0_dp
      else
       if (m > 0) then
-       m = 1.0/dsqrt(m)
+       m = 1.0/sqrt(m)
        D_i = 1. - wocc_n(icell, m, Zr, Zp)/wocc_n(icell, real(i,kind=dp), Zr, Zp)
       else
        D_i = 1.0_dp
@@ -147,50 +146,50 @@ MODULE occupation_probability
   END FUNCTION D_i_b
   
   !still building but they suggest to use the DAM version anyway
-  FUNCTION D_i_hhl(icell, kc, Zr, Zp, atom)
-   !Hubeny, Hummer & Lanz A&A, 282, 151, 1994
-   !dissolve fraction
-   integer, intent(in) :: icell, kc
-   type(AtomType), intent(in) :: atom
-   real(kind=dp) :: D_i_hhl(atom%continua(kc)%Nlambda) !?
-   real, intent(in) :: Zr, Zp
-   integer :: la, Nl, Nb, Nr, kr, idl, lal
-   real(kind=dp) :: w, j, lambda, l0, l1
-   
-   D_i_hhl(:) = 0.0_dp
-   Nb = atom%continua(kc)%Nblue
-   Nr = atom%continua(kc)%Nred
-   Nl = atom%continua(kc)%Nlambda
-   
-   do la=1, Nl
-    idl = la+Nb-1
-    lambda = nltespec%lambda(idl)
-    
-    if (lambda <= atom%continua(kc)%lambda0) then
-    
-     D_i_hhl(la) = 1.0_dp !no extrapolation
-     
-    else
-     do kr=1, atom%Nline
-      l0 = nltespec%lambda(atom%lines(kr)%Nblue)
-      l1 = nltespec%lambda(atom%lines(kr)%Nred)
-      if (l0 >= lambda .and. lambda <= l1) then
-        
-        lal = idl + 1 - nltespec%lambda(atom%lines(kr)%Nblue)
-        w = wocc_n(icell, real(atom%lines(kr)%j,kind=dp), Zr, Zp)
-        D_i_hhl(la) = D_i_hhl(la) + (1.-w) * atom%lines(kr)%fosc * atom%lines(kr)%phi(lal,icell)
-    
-      endif
-      
-     enddo
-     D_i_hhl(la) = D_i_hhl(la) / atom%continua(kc)%alpha(la)
-      
-    endif
-   
-   enddo
-  
-  RETURN
-  END FUNCTION D_i_hhl
+!   FUNCTION D_i_hhl(icell, kc, Zr, Zp, atom)
+!    !Hubeny, Hummer & Lanz A&A, 282, 151, 1994
+!    !dissolve fraction
+!    integer, intent(in) :: icell, kc
+!    type(AtomType), intent(in) :: atom
+!    real(kind=dp) :: D_i_hhl(atom%continua(kc)%Nlambda) !?
+!    real, intent(in) :: Zr, Zp
+!    integer :: la, Nl, Nb, Nr, kr, idl, lal
+!    real(kind=dp) :: w, j, lambda, l0, l1
+!    
+!    D_i_hhl(:) = 0.0_dp
+!    Nb = atom%continua(kc)%Nblue
+!    Nr = atom%continua(kc)%Nred
+!    Nl = atom%continua(kc)%Nlambda
+!    
+!    do la=1, Nl
+!     idl = la+Nb-1
+!     lambda = nltespec%lambda(idl)
+!     
+!     if (lambda <= atom%continua(kc)%lambda0) then
+!     
+!      D_i_hhl(la) = 1.0_dp !no extrapolation
+!      
+!     else
+!      do kr=1, atom%Nline
+!       l0 = nltespec%lambda(atom%lines(kr)%Nblue)
+!       l1 = nltespec%lambda(atom%lines(kr)%Nred)
+!       if (l0 >= lambda .and. lambda <= l1) then
+!         
+!         lal = idl + 1 - nltespec%lambda(atom%lines(kr)%Nblue)
+!         w = wocc_n(icell, real(atom%lines(kr)%j,kind=dp), Zr, Zp)
+!         D_i_hhl(la) = D_i_hhl(la) + (1.-w) * atom%lines(kr)%fosc * atom%lines(kr)%phi(lal,icell)
+!     
+!       endif
+!       
+!      enddo
+!      D_i_hhl(la) = D_i_hhl(la) / atom%continua(kc)%alpha(la)
+!       
+!     endif
+!    
+!    enddo
+!   
+!   RETURN
+!   END FUNCTION D_i_hhl
   
  
 END MODULE occupation_probability

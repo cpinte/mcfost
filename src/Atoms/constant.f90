@@ -5,24 +5,24 @@ MODULE constant
    ! MCFOST and takes what it needs.
   ! ----------------------------------------------------------------- !
 
-  use constantes, only : PI, KM_TO_M! MCFOST
+  use constantes, only : PI, KM_TO_M, masseH, c_light, hp, kb, cst_th, electron_charge
   use mcfost_env, only : dp
 
   integer, parameter :: NELEM_WEIGHTS = 99
 
   ! --- Physical constants ---
 
-  real(kind=dp), parameter ::  CLIGHT=2.99792458d8 ! Speed of light [m/s]
-  real(kind=dp), parameter ::  HPLANCK=6.6260755d-34 !Planck's constant [Js]
-  real(kind=dp), parameter ::  KBOLTZMANN=1.380658d-23  !Boltzman's constant [J/K]
-  real(kind=dp), parameter ::  AMU=1.6605402d-27 !Atomic mass unit [kg]
+  real(kind=dp), parameter ::  CLIGHT=c_light!2.99792458d8 ! Speed of light [m/s]
+  real(kind=dp), parameter ::  HPLANCK=hp!6.6260755d-34 !Planck's constant [Js]
+  real(kind=dp), parameter ::  KBOLTZMANN=kb!1.380658d-23  !Boltzman's constant [J/K]
+  real(kind=dp), parameter ::  AMU= masseH * 1d-3!1.6605402d-27 !Atomic mass unit [kg]
   real(kind=dp), parameter ::  M_ELECTRON=9.1093897d-31 !Electron mass [kg]
-  real(kind=dp), parameter ::  Q_ELECTRON=1.60217733d-19  !Electron charge [C]
+  real(kind=dp), parameter ::  Q_ELECTRON=electron_charge!1.60217733d-19  !Electron charge [C]
   real(kind=dp), parameter ::  EPSILON_0=8.854187817d-12  !Vacuum permittivity [F/m]
   !real(kind=dp), parameter ::  MU_0=1.2566370614d-6  !Magnetic induct. of vac.
   real(kind=dp), parameter ::  RBOHR=5.29177349d-11  !Bohr radius [m]
   real(kind=dp), parameter ::  E_RYDBERG=2.1798741d-18 !Ion. pot. Hydrogen [J]
-  real(kind=dp), parameter ::  EV =1.60217733d-19 ! One electronVolt [J]
+  real(kind=dp), parameter ::  EV = electron_charge!1.60217733d-19 ! One electronVolt [J]
   real(kind=dp), parameter ::  THETA0 =5.03974756d+3!log10(e) * eV/k [K^-1]
   real(kind=dp), parameter ::  ABARH=7.42d-41 !polarizabilty of Hydrogen in [Fm^2]
   real(kind=dp), parameter    ::  pia0squarex2 = PI * 2d0 * RBOHR**2 !constant for collision Cross-sections
@@ -41,32 +41,31 @@ MODULE constant
 
   
   ! ------- Useful RT constants --------- !
-  real(kind=dp), parameter :: sigma_e = 8.0*PI/3.0 * (Q_ELECTRON/(dsqrt(4.0*PI*EPSILON_0) *&
-                                       (dsqrt(M_ELECTRON)*CLIGHT)))**4.d0 !Thomson cross-section
+  real(kind=dp), parameter :: sigma_e = 8.0*PI/3.0 * (Q_ELECTRON/(sqrt(4.0*PI*EPSILON_0) *&
+                                       (sqrt(M_ELECTRON)*CLIGHT)))**4.d0 !Thomson cross-section
 
   real(kind=dp), parameter    :: hc = HPLANCK * CLIGHT
   real(kind=dp), parameter    :: fourPI = 4d0*PI
   real(kind=dp), parameter    :: hc_fourPI = hc/fourPI
   real(kind=dp), parameter    :: fourPI_hc = fourPI/hc
   real(kind=dp), parameter    :: twohc = (2.*HPLANCK * CLIGHT) / (NM_TO_M)**(3d0)
-  real(kind=dp), parameter    :: hc_k = (HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
+  real(kind=dp), parameter    :: hc_k = cst_th / NM_TO_M!(HPLANCK * CLIGHT) / (KBOLTZMANN * NM_TO_M)
   real(kind=dp), parameter    :: fourPI_h = fourPI / HPLANCK
   !Photoionisation Xsection of Hydrogen, at nu0, alpha0 = sigma0_H * g_bg(0) * neff / Z/Z
   !Note an error in Hubeny Mihalas eq. 7.92. unit should be cm2 not cm^-2 !
-  real(kind=dp), parameter    :: sigma0_H = (32d0)/(PI*3.*dsqrt(3d0)) * EPSILON_0 * &
+  real(kind=dp), parameter    :: sigma0_H = (32d0)/(PI*3.*sqrt(3d0)) * EPSILON_0 * &
           (HPLANCK**(3d0)) / (CLIGHT * (M_ELECTRON*Q_ELECTRON)**(2d0)) ! 7.904e-22 m^2
 
   !here I have a problem if I try to compute sigma0_H_ff using 7.100 of Hubeny Mihalas with SI units value
   !So I Take the cgs result and turn it to SI ...
   !we multiply sigma0_H_ff by nion (m^-3) * ne(m^-3) to have chi in 1d-10 m^5 * m-3 * m^-3 in m^-1
   real(kind=dp), parameter    :: sigma0_H_ff = 3.6923284d8 * 1d-10 ! cm^5 K^1/2 Hz^-3 -> m^5 K^1/2 Hz^3
-   !K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / dsqrt(M_ELECTRON)
-   !K0 = (K0**3) * 4./3. * dsqrt(2*pi/3./KBOLTZMANN) / HPLANCK / CLIGHT
+   !K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / sqrt(M_ELECTRON)
+   !K0 = (K0**3) * 4./3. * sqrt(2*pi/3./KBOLTZMANN) / HPLANCK / CLIGHT
    !sigma0_H_ff = K0
           
  ! --- Mathematical constants ---
-  !real(kind=dp), parameter ::  PI  =3.14159265358979
-  real(kind=dp), parameter ::  SQRTPI=dsqrt(pi)!1.77245385090551
+  real(kind=dp), parameter ::  SQRTPI=sqrt(pi)!1.77245385090551
 
 
   ! --- 1/(2sqrt(2)), needed for anisotropy of radiation ---
