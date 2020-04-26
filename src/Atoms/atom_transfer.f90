@@ -681,8 +681,7 @@ module atom_transfer
   end if
 
   	call set_LTE_populations !write pops at the end because we probably have NLTE pops also
-  
-  	
+
 	if (NactiveAtoms > 0) then
 
 		n_rayons_start = Nrays_atom_transfer
@@ -1334,7 +1333,7 @@ module atom_transfer
 					write(*,*) " ------------------------------------------------ "
 				enddo
 				write(*,'(" <<->> diff="(1ES14.5E3)," old="(1ES14.5E3))') diff, diff_old !at the end of the loop over n_cells
-	        	write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')"), size(pack(lcell_converged,mask=lcell_converged.eqv..false.)), 100.*real(size(pack(lcell_converged,mask=lcell_converged.eqv..false.)))/real(n_cells)
+	        	write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") size(pack(lcell_converged,mask=lcell_converged.eqv..false.)), 100.*real(size(pack(lcell_converged,mask=lcell_converged.eqv..false.)))/real(n_cells)
 				write(*,*) " *************************************************************** "
 				diff_old = diff
 				!Not used if the next is not commented out
@@ -2087,8 +2086,8 @@ if (write_convergence_file ) write(20,*) " -> Iteration #", n_iter
 						 endif 
 						enddo
 						!if (mod(icell,10)==0)
-						write(*,'((1I)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
-if (write_convergence_file ) write(20,'((1I)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
+						write(*,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
+if (write_convergence_file ) write(20,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
 						if (dJ > diff) then
 						  diff = dJ
 						  icell_max = icell
@@ -2109,11 +2108,11 @@ if (write_convergence_file ) write(20,'("  -- beta="(1ES14.5E3))') beta(imax,ice
 if (write_convergence_file ) write(20,'(" >>> icell_max "(I1)," lambda="(1F14.7)" nm"," dJ="(1ES14.5E3))') icell_max, lambda(imax), diff
 
          	
-         	write(*,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )'), maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
-         	write(*,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )'), maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
-if (write_convergence_file ) write(20,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )'), maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
-if (write_convergence_file ) write(20,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )'), maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
-	        write(*,"('# unconverged cells :'(1I5), '('(1F12.3)' %)')"), size(pack(lcell_converged,mask=lcell_converged.eqv..false.)), &
+         	write(*,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
+         	write(*,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
+if (write_convergence_file ) write(20,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
+if (write_convergence_file ) write(20,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
+	        write(*,"('# unconverged cells :'(1I5), '('(1F12.3)' %)')") size(pack(lcell_converged,mask=lcell_converged.eqv..false.)), &
 	          100.*real(size(pack(lcell_converged,mask=lcell_converged.eqv..false.)))/real(n_cells)
 if (write_convergence_file ) write(20,"('# unconverged cells : '(1I5), '('(1F12.3)' %)')") size(pack(lcell_converged,mask=lcell_converged.eqv..false.)), &
 	          100.*real(size(pack(lcell_converged,mask=lcell_converged.eqv..false.)))/real(n_cells)
