@@ -367,14 +367,14 @@ MODULE io_opacity
 	open (unit,file=trim(atom%ID)//"_collrate.txt",status="unknown")
 	write(unit,'(1I4, 1I3)') n_cells, atom%Nlevel
 	do icell=1, n_cells
-		write(unit,"(1I4)"), icell
-		write(unit,'(<atom%Nlevel>I14)') (l, l=1, atom%Nlevel)
+		write(unit,"(1I4)") icell
+		write(unit,'(*(I14))') (l, l=1, atom%Nlevel)
 		if (icompute_atomRT(icell) > 0) then
 			call collision_matrix_atom(1, icell, atom)
 		endif
 		do l=1, atom%Nlevel
 		
-			write(unit, '(1I3, <atom%Nlevel>ES14.5E3)') l, (atom%C(l,lp,1), lp=1, atom%Nlevel)
+			write(unit, '(1I3, *(ES14.5E3))') l, (atom%C(l,lp,1), lp=1, atom%Nlevel)
 		
 		enddo
 	
