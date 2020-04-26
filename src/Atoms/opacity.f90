@@ -350,7 +350,6 @@ module Opacity
 						write(*,*) "w(i) = ", wi, " w(j) = ", wj
           				write(*,*) "ni=", atom%n(i,icell), " nj=", atom%n(j,icell), " gij=", atom%lines(kc)%gij
           				write(*,*) "nstari=", atom%n(i,icell), " njstar=", atom%n(j,icell)
-          				stop				
 					endif
     
 				case ("ATOMIC_CONTINUUM")
