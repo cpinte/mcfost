@@ -58,7 +58,7 @@ contains
        endif
 
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
-            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
+            particle_id, massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
             SPH_grainsizes,mask,n_SPH,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
@@ -97,7 +97,7 @@ contains
     call read_SPH_limits_file(SPH_limits_file, SPH_limits)
 
     ! Voronoi tesselation
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true., mask=mask)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true., mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -137,8 +137,10 @@ contains
 
   end subroutine read_SPH_limits_file
 
-  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, &
-       SPH_limits, check_previous_tesselation, mask)
+  !*********************************************************
+
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,&
+       SPH_grainsizes, SPH_limits, check_previous_tesselation, mask)
 
     use Voronoi_grid
     use density, only : densite_gaz, masse_gaz, densite_pouss, masse
@@ -149,6 +151,7 @@ contains
     integer, intent(in) :: n_SPH, ndusttypes
     real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,rho,massgas
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
+    integer,  allocatable, dimension(:), intent(in) :: particle_id
     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
@@ -258,9 +261,10 @@ contains
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
     !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits)
 
-    call Voronoi_tesselation(n_SPH, x,y,z,h, limits, check_previous_tesselation)
+    call Voronoi_tesselation(n_SPH, particle_id, x,y,z,h,vx,vy,vz, limits, check_previous_tesselation)
     !deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
+
 
     !*************************
     ! Densities
@@ -414,33 +418,24 @@ contains
        masse(:) = masse(:) * f
     endif ! ndusttypes == 0
 
-
-    !*************************
-    ! Velocities
-    !*************************
-    if (lemission_mol) then
-       do icell=1,n_cells
-          iSPH = Voronoi(icell)%id
-          if (iSPH > 0) then
-             Voronoi(icell)%vxyz(1) = vx(iSPH)
-             Voronoi(icell)%vxyz(2) = vy(iSPH)
-             Voronoi(icell)%vxyz(3) = vz(iSPH)
-          endif
-       enddo
-    endif
-
     !*************************
     ! Mask
     !*************************
     if (present(mask)) then
-       do icell=1,n_cells
-          iSPH = Voronoi(icell)%id
-          if (iSPH > 0) then
-             Voronoi(icell)%masked = mask(iSPH)
-          else
+       if (allocated(mask)) then
+          do icell=1,n_cells
+             iSPH = Voronoi(icell)%id
+             if (iSPH > 0) then
+                Voronoi(icell)%masked = mask(iSPH)
+             else
+                Voronoi(icell)%masked = .false.
+             endif
+          enddo
+       else
+          do icell=1,n_cells
              Voronoi(icell)%masked = .false.
-          endif
-       enddo
+          enddo
+       endif
     else
        do icell=1,n_cells
           Voronoi(icell)%masked = .false.
@@ -773,9 +768,9 @@ contains
     do icell=1, n_cells
        if (Voronoi(icell)%masked) then
           k=k+1
-          masse_gaz(icell)    = 0.
-          densite_gaz(icell) = 0.
-          masse(icell) = 0.
+          masse_gaz(icell)       = 0.
+          densite_gaz(icell)     = 0.
+          masse(icell)           = 0.
           densite_pouss(:,icell) = 0.
        endif
     enddo

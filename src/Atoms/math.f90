@@ -8,30 +8,6 @@ MODULE math
 
   CONTAINS
 
-!   building
-!   FUNCTION overlapping_transitions(lambda, Nl, Nblue, Nl2, Nblue2) result(overlap)
-!   Find where lambda(Nblue:Nblue+Nl-1)==lambda(Nblue2:Nblue2+Nl2-1)
-!   meaning where two transitions overlap.
-!   All transitions share the same wavelength grid, so they have the same value of lambda
-!   for the same index. But they have differents Nblue, Nl
-!    integer :: Nblue, Nl, Nl2, Nblue2, overlap(Nl)
-!    real(kind=dp) :: lambda(:)
-!    integer :: i, j
-! 
-!    overlap(:) = 0
-! 
-!    i_loop : do i=1,Nl
-!     do j=1,Nl2
-!      if (lambda(Nblue+i-1) == lambda(Nblue2+j-1)) then
-!        overlap(i) = Nblue+i-1 !index on lambda grid
-!        cycle i_loop
-!      end if
-! 
-!     enddo
-!    enddo i_loop
-! 
-!   RETURN
-!   END FUNCTION overlapping_transitions
 
 
   FUNCTION flatten(n1, n2, M)
@@ -162,8 +138,36 @@ MODULE math
      end do
    RETURN
    END FUNCTION any_nan_infinity_vector
-   
-   
+
+
+
+   function cmf_to_of (Nx, y, dk)
+   !Shift a function y, centered at 0 in the velocity space
+   !by a delta in index of dk.
+   !dk is an integer positive or negative.
+   !The function y has to be linearly spaced such that y'(1) = y(1 + dk)
+   !where y' is the function projected onto the observer's frame.
+   ! dk is int(dv * di)
+   ! with di = (index(y[1]) - index(y[0]))/(y[1]-y[0]) and dv a velocity shift.
+    integer, intent(in) :: Nx, dk
+    real(kind=dp), intent(in), dimension(Nx) :: y
+    real(kind=dp), dimension(Nx) :: cmf_to_of
+    integer :: j
+
+    do j=1, Nx
+
+     if ( (j + dk < 1) .or. (j + dk > Nx) ) then
+     	cmf_to_of(j) = 0.0
+     else
+     	cmf_to_of(j) = y(j+dk)
+     endif
+
+    enddo
+
+
+   return
+   end function cmf_to_of
+
 
    !c'est bourrin, il n y a pas de test
 !    function linear_1D(N,x,y,Np,xp)
@@ -211,20 +215,38 @@ MODULE math
      real(kind=dp), dimension(np)             :: linear_1D_sorted
 
      real(kind=dp) :: t
-     integer :: i, j, i0
+     integer :: i, j, i0, j0
 
-	 i0 = 2
+     linear_1D_sorted(:) = 0._dp
+
+! 
+! 	 i0 = 2
+!      do j=1, np
+!         !i0 = 2
+!         loop_i : do i=i0, n
+!            if ((x(i) > xp(j))) then
+!               t = (xp(j) - x(i-1)) / (x(i)-x(i-1))
+! =======
+     ! We do a first pass, to find the 1st index to interpolate
+     ! Below x(1), we keep the values to 0 (ie no extrapolation)
+     j0=np+1
      do j=1, np
-        !i0 = 2
+        if (xp(j) > x(1)) then
+           j0 = j
+           exit
+        endif
+     enddo
+
+     ! We perform the 2nd pass where we do the actual interpolation
+     ! For points larger than x(n), value will stay at 0
+     i0 = 2
+     do j=j0, np
         loop_i : do i=i0, n
-           if ((x(i) > xp(j))) then
-              t = (xp(j) - x(i-1)) / (x(i)-x(i-1))
+           if (x(i) > xp(j)) then
+              t = (xp(j) - x(i-1)) / (x(i) - x(i-1))
               linear_1D_sorted(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
               !i0 = i !? + 1
               i0 = i + 1
-              exit loop_i
-           else
-              linear_1D_sorted(j) = 0d0
               exit loop_i
            endif
         enddo loop_i
@@ -233,6 +255,7 @@ MODULE math
      return
 
    end function linear_1D_sorted
+
    
    function linear_1D_dx(dx,n,x,y,np,xp)
      ! assumes that both x and xp are in increasing order
@@ -266,18 +289,18 @@ MODULE math
      return
 
    end function linear_1D_dx
-   
-   !building
+
+
    function convolve(x, y, K)
    !x, y, and K have the same dimension
    !using trapezoidal rule
     real(kind=dp), intent(in) :: x(:), y(:), K(:)
     real(kind=dp) :: convolve(size(x)), dx
     integer :: i, j, Nx, shift
-    
+
     Nx = size(x)
     convolve(:) = 0.0_dp
-    
+
 
     do j=1,Nx
     	if (j==1) then
@@ -285,16 +308,16 @@ MODULE math
     	else
     		dx = dabs(x(j)-x(j-1))
     	endif
-    	
+
     	do i=1,Nx-1 !Should not happen but here. Work in python because negative index exists
     		if (j-i < 1 .or. j-(i+1) < 1) then
     			convolve(i) = 0.0
     		else
     			convolve(i) = convolve(i) + 0.5 * dx * (y(i)*K(j-i) + y(i+1)*K(j-(i+1)))
-			endif    	
+			endif
     	enddo
-    
-    
+
+
     enddo
 
 
