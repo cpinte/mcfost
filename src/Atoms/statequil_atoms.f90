@@ -431,7 +431,7 @@ write(unit_invfile,*) "---------------------------------------------------------
 write(unit_invfile,"('icell = '(1I9), ' atom '(1A2))") icell, atom%ID
 write(unit_invfile,*) "ratio : n(j) gij / n(i))"
 write(unit_invfile, '(" -> line "(1I2)"  ->  "(1I2), (3E20.7E3) )') i, j, atom%n(i,icell)*wj/wi, atom%n(j,icell) * atom%lines(kc)%gij, atom%lines(kc)%Tex(icell)
-write(unit_invfile, "('log(ratio) = '(1E20.7E3), ' ratio = '(1E20.7E3) )"), ratio, exp(ratio)
+write(unit_invfile, "('log(ratio) = '(1E20.7E3), ' ratio = '(1E20.7E3) )") ratio, exp(ratio)
 write(unit_invfile,"( 'w(i)='(1E20.7E3), ' w(j)='(1E20.7E3) )") wi, wj
 write(unit_invfile,"( 'n(i)='(1E20.7E3), ' n(j)='(1E20.7E3) )") atom%n(i,icell), atom%n(j,icell)
 write(unit_invfile,"( 'n*(i)='(1E20.7E3), ' n*(j)='(1E20.7E3) )") atom%nstar(i,icell), atom%nstar(j,icell)
@@ -497,7 +497,7 @@ write(unit_invfile,*) "---------------------------------------------------------
 write(unit_invfile,"('icell = '(1I9), ' atom '(1A2))") icell, atom%ID
 write(unit_invfile,*) "ratio : n(i) / (n(j) gij)"
 write(unit_invfile, "(' -> cont '(1I2)' -> '(1I2), (3ES20.7E3) )") i, j, atom%n(i,icell), atom%n(j,icell) * gij, atom%lines(kc)%Tex(icell)
-write(unit_invfile, "('log(ratio) = '(1ES20.7E3), ' ratio = '(1ES20.7E3) )"), ratio, exp(ratio)
+write(unit_invfile, "('log(ratio) = '(1ES20.7E3), ' ratio = '(1ES20.7E3) )") ratio, exp(ratio)
 write(unit_invfile,"( 'w(i)='(1ES14.7), ' w(j)='(1ES20.7E3) )") wi, wj
 write(unit_invfile,"( 'n(i)='(1ES14.7), ' n(j)='(1ES20.7E3) )") atom%n(i,icell), atom%n(j,icell)
 write(unit_invfile,"( 'n*(i)='(1ES20.7E3), ' n*(j)='(1ES20.7E3) )") atom%nstar(i,icell), atom%nstar(j,icell)
@@ -732,13 +732,13 @@ endif
 		
 		if ((any_nan_infinity_vector(atom%n(:,icell))>0)) then
 			write(*,*) "BUG pops", " id=",id, " icell=",icell
-			write(*,'("ilevel: "<atom%Nlevel>I14)') (l, l=1, atom%Nlevel)
-			write(*,'("n: "<atom%Nlevel>ES14.5E3)') (atom%n(l,icell),l=1,atom%Nlevel)
-			write(*,'("ndag: "<atom%Nlevel>ES14.5E3)') (ndag(l),l=1,atom%Nlevel)
+			write(*,'("ilevel: "*(I14))') (l, l=1, atom%Nlevel)
+			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
+			write(*,'("ndag: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)
 			write(*,*) "Gamma:"
-			write(*,'(<atom%Nlevel>I14)') (l, l=1, atom%Nlevel)
+			write(*,'(*(I14))') (l, l=1, atom%Nlevel)
 			do l=1, atom%Nlevel
-				write(*, '(1I3, <atom%Nlevel>ES14.5E3)') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
+				write(*, '(1I3, *(ES14.5E3))') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
 			enddo
 			write(*,*) "Radiative rates"
 			do l=1, atom%Nline
