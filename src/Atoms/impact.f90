@@ -33,6 +33,7 @@ MODULE IMPACT
  use atom_type!, only : AtomicLine, AtomicContinuum, AtomType
  use mcfost_env, only : dp
  use constant
+ !!use special_functions
  use math
  use utils, only : interp_sp
  use messages, only : error, warning
@@ -44,11 +45,11 @@ MODULE IMPACT
  !abscissa and weights for Gauss Laguerre integration of function int_0^inf f(x)*exp(-x) dx
  real(kind=dp), dimension(8) :: x_laguerre, w_laguerre
  !integ = sum(y(x_laguerre)*w_laguerre) with y = f(x)*exp(-x)
-!  data x_laguerre / 0.170279632305d0,  0.903701776799d0,  2.251086629866d0,  4.266700170288d0, &
-!                    7.045905402393d0, 10.758516010181d0, 15.740678641278d0, 22.863131736889d0 /
-! 
-!  data w_laguerre / 3.69188589342d-01, 4.18786780814d-01, 1.75794986637d-01, 3.33434922612d-02, &
-!                    2.79453623523d-03, 9.07650877336d-05, 8.48574671627d-07, 1.04800117487d-09 /
+ data x_laguerre / 0.170279632305d0,  0.903701776799d0,  2.251086629866d0,  4.266700170288d0, &
+                   7.045905402393d0, 10.758516010181d0, 15.740678641278d0, 22.863131736889d0 /
+
+ data w_laguerre / 3.69188589342d-01, 4.18786780814d-01, 1.75794986637d-01, 3.33434922612d-02, &
+                   2.79453623523d-03, 9.07650877336d-05, 8.48574671627d-07, 1.04800117487d-09 /
 
  !Impact Parameter approximation of Seaton 1962 vol 72
  real, dimension(24) :: beta, zeta, phi
@@ -265,6 +266,57 @@ MODULE IMPACT
  RETURN
  END SUBROUTINE Charge_transfer_with_H
 
+ FUNCTION Collision_Hydrogen(icell) result(Cij)
+  !Matrix containing the collision rates of hydrogen C(i,j) = collrate from i->j
+  !This is not the collision rate matrix!
+  integer :: icell, i, j
+  real(kind=dp) :: Cij(Hydrogen%Nlevel, Hydrogen%Nlevel)
+  real(kind=dp) :: nr_ji, CI(hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)!, CI(Hydrogen%Nlevel,Hydrogen%Nlevel)
+
+   Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
+!    CALL Johnson_CI(icell, CI(:,Hydrogen%Nlevel)) !bound-free i->Nlevel
+!    CALL Johnson_CE(icell, CE) !among all levels
+! 
+!    do j=1,Hydrogen%Nlevel
+!     do i=1,Hydrogen%Nlevel
+! !      if (ldissolve) then
+! !    		wj = wocc_n(icell, real(j,kind=dp), 1.0, 1.0)
+! !    		wi = wocc_n(icell, real(i,kind=dp), 1.0, 1.0)
+! !    	 else
+! !    	    wj = 1.0
+! !    	    wi = 1.0 
+! !      endif
+!      nr_ji = Hydrogen%nstar(i,icell)/Hydrogen%nstar(j,icell)
+!      Cij(j,i) = CE(j,i) +  CI(i,j)  * nr_ji * wj/wi
+!      Cij(i,j) = CE(j,i)/nr_ji + CI(i,j)
+!     end do
+!    end do
+   CALL Johnson_CI(icell, CI) !bound-free i->Nlevel
+   CALL Johnson_CE(icell, CE) !among all levels
+   
+   do i=1,Hydrogen%Nlevel
+    Cij(i,hydrogen%Nlevel) = CI(i)
+    Cij(hydrogen%Nlevel,i) = CI(i) * hydrogen%nstar(i,icell) / hydrogen%nstar(hydrogen%Nlevel,icell)
+    do j=i+1,Hydrogen%Nlevel-1
+    	!write(*,*), i, j, CE(i,j),CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell)
+ 		Cij(i,j) = Cij(i,j) + CE(i,j)
+ 		Cij(j,i) = Cij(j,i) + CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell)
+    end do
+   end do
+
+   Cij(:,:) = Cij(:,:) * ne(icell)
+   
+!    if (icell==1) then
+!    	do i=1, hydrogen%nlevel
+!    		write(*,*) "****",i, "****"
+!    		write(*,*) (j, Cij(i,j), j=1,hydrogen%nlevel)
+!    	enddo
+!    	stop
+!    endif
+
+ RETURN
+ END FUNCTION Collision_Hydrogen
+
 
  SUBROUTINE Johnson_CI(icell, Cik)
  ! --------------------------------------------------- !
@@ -443,88 +495,37 @@ MODULE IMPACT
 
  RETURN
  END FUNCTION g2
- 
- FUNCTION Collision_Hydrogen(icell) result(Cij)
-  !Matrix containing the collision rates of hydrogen C(i,j) = collrate from i->j
-  !This is not the collision rate matrix!
-  integer :: icell, i, j
-  real(kind=dp) :: Cij(Hydrogen%Nlevel, Hydrogen%Nlevel)
-  real(kind=dp) :: nr_ji, CI(hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)!, CI(Hydrogen%Nlevel,Hydrogen%Nlevel)
 
-   Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
-!    CALL Johnson_CI(icell, CI(:,Hydrogen%Nlevel)) !bound-free i->Nlevel
-!    CALL Johnson_CE(icell, CE) !among all levels
-! 
-!    do j=1,Hydrogen%Nlevel
-!     do i=1,Hydrogen%Nlevel
-! !      if (ldissolve) then
-! !    		wj = wocc_n(icell, real(j,kind=dp), 1.0, 1.0)
-! !    		wi = wocc_n(icell, real(i,kind=dp), 1.0, 1.0)
-! !    	 else
-! !    	    wj = 1.0
-! !    	    wi = 1.0 
-! !      endif
-!      nr_ji = Hydrogen%nstar(i,icell)/Hydrogen%nstar(j,icell)
-!      Cij(j,i) = CE(j,i) +  CI(i,j)  * nr_ji * wj/wi
-!      Cij(i,j) = CE(j,i)/nr_ji + CI(i,j)
-!     end do
-!    end do
-   CALL Johnson_CI(icell, CI) !bound-free i->Nlevel
-   CALL Johnson_CE(icell, CE) !among all levels
-   
-   do i=1,Hydrogen%Nlevel
-    Cij(i,hydrogen%Nlevel) = CI(i)
-    Cij(hydrogen%Nlevel,i) = CI(i) * hydrogen%nstar(i,icell) / hydrogen%nstar(hydrogen%Nlevel,icell)
-    do j=i+1,Hydrogen%Nlevel-1
-    	!write(*,*), i, j, CE(i,j),CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell)
- 		Cij(i,j) = Cij(i,j) + CE(i,j)
- 		Cij(j,i) = Cij(j,i) + CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell)
-    end do
-   end do
+ SUBROUTINE Scholz_et_al(icell, C)
+  !define the output, and check results
+  integer, intent(in) :: icell
+  real(kind=dp), intent(inout) :: C !to define
 
-   Cij(:,:) = Cij(:,:) * ne(icell)
-   
-!    if (icell==1) then
-!    	do i=1, hydrogen%nlevel
-!    		write(*,*) "****",i, "****"
-!    		write(*,*) (j, Cij(i,j), j=1,hydrogen%nlevel)
-!    	enddo
-!    	stop
-!    endif
+  real(kind=dp) :: gamma_1s_2s, gamma_1s_2p, Omega_2s, Omega_2p
+  real(kind=dp) :: b(8), cc(6), x, dE_kT
+  real(kind=dp), parameter :: expdE = exp(-7.5d-1), gi = 2d0 !g value for ground-state of Hydrogen is 2
+
+  if (T(icell) < 5d3 .or. T(icell) > 5d5) RETURN
+
+  data b / 4.5168d-02,  2.8056d+01,  7.2945d+00, 2.4805d-01,  1.0044d-01, -1.1143d-02,  &
+          -1.3432d-03,  3.7570d-04  /
+
+  data cc / 3.6177d-01,  1.3891d+00,  5.0866d-01, -3.8011d-01,  1.0158d-01, -1.0072d-02 /
+
+  x = (KBOLTZMANN * T(icell)) / E_RYDBERG / (1d0 + M_ELECTRON/hydrogen%weight*AMU)
+  dE_kT = E_RYDBERG
+  !natural log
+  gamma_1s_2s = b(1) * log(b(2)*x) * exp(-b(3)*x) + b(4) + b(5)*x + b(6)*x*x * &
+  				b(7)*x*x*x + b(8)*x*x*x*x
+  				 !c0   !c1*x     !c2*x**3   !c3*x**3      !c4*x**4        !c5*x**5
+  gamma_1s_2p = cc(1) + cc(2)*x + cc(3)*x*x + cc(4)*x*x*x + cc(5)*x*x*x*x + cc(6)*x*x*x*x*x
+
+  Omega_2s = 8.63d-6 * gamma_1s_2s * expdE / gi / sqrt(T(icell))
+  Omega_2p = 8.63d-6 * gamma_1s_2p * expdE / gi / sqrt(T(icell))
+
 
  RETURN
- END FUNCTION Collision_Hydrogen
-
-!  SUBROUTINE Scholz_et_al(icell, C)
-!   !define the output, and check results
-!   integer, intent(in) :: icell
-!   real(kind=dp), intent(inout) :: C !to define
-! 
-!   real(kind=dp) :: gamma_1s_2s, gamma_1s_2p, Omega_2s, Omega_2p
-!   real(kind=dp) :: b(8), cc(6), x, dE_kT
-!   real(kind=dp), parameter :: expdE = exp(-7.5d-1), gi = 2d0 !g value for ground-state of Hydrogen is 2
-! 
-!   if (T(icell) < 5d3 .or. T(icell) > 5d5) RETURN
-! 
-!   data b / 4.5168d-02,  2.8056d+01,  7.2945d+00, 2.4805d-01,  1.0044d-01, -1.1143d-02,  &
-!           -1.3432d-03,  3.7570d-04  /
-! 
-!   data cc / 3.6177d-01,  1.3891d+00,  5.0866d-01, -3.8011d-01,  1.0158d-01, -1.0072d-02 /
-! 
-!   x = (KBOLTZMANN * T(icell)) / E_RYDBERG / (1d0 + M_ELECTRON/hydrogen%weight*AMU)
-!   dE_kT = E_RYDBERG
-!   !natural log
-!   gamma_1s_2s = b(1) * log(b(2)*x) * exp(-b(3)*x) + b(4) + b(5)*x + b(6)*x*x * &
-!   				b(7)*x*x*x + b(8)*x*x*x*x
-!   				 !c0   !c1*x     !c2*x**3   !c3*x**3      !c4*x**4        !c5*x**5
-!   gamma_1s_2p = cc(1) + cc(2)*x + cc(3)*x*x + cc(4)*x*x*x + cc(5)*x*x*x*x + cc(6)*x*x*x*x*x
-! 
-!   Omega_2s = 8.63d-6 * gamma_1s_2s * expdE / gi / sqrt(T(icell))
-!   Omega_2p = 8.63d-6 * gamma_1s_2p * expdE / gi / sqrt(T(icell))
-! 
-! 
-!  RETURN
-!  END SUBROUTINE Scholz_et_al
+ END SUBROUTINE Scholz_et_al
 
 
 END MODULE IMPACT

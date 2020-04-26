@@ -172,7 +172,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90      
 	  $(Atom_dir)/voigtfunctions.f90 $(Atom_dir)/profiles.f90                \
 	  $(Atom_dir)/planck.f90 $(Atom_dir)/background_opacity.f90\
 	  optical_depth.f90 dust_transfer.f90 $(Atom_dir)/opacity.f90            \
-	  $(Atom_dir)/impact.f90 $(Atom_dir)/statequil_atoms.f90 \
+	  $(Atom_dir)/statequil_atoms.f90 \
 	  $(Atom_dir)/io_opacity.f90 \
 	  mol_transfer.f90 $(Atom_dir)/atom_transfer.f90
 
