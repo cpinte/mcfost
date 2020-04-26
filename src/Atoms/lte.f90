@@ -669,7 +669,7 @@ END FUNCTION get_logPartitionFunctionk
       CALL LTEpops_H()
 
    		do k=1,n_cells
-   			if (icompute_atomRT(k)) nHmin(k) = nH_minus(k)
+   			if (icompute_atomRT(k) > 0) nHmin(k) = nH_minus(k)
    		enddo
    		call write_Hminus()
    		!nHmin(k) = 1d10
