@@ -702,7 +702,8 @@ endif
 				
 		if ((any_nan_infinity_matrix(atom%Gamma(:,:,id))>0)) then
 			write(*,*) "BUG Gamma", " id=",id, " icell=",icell
-			write(*,'("ilevel: "<atom%Nlevel>I14)') (l, l=1, atom%Nlevel)
+! 			write(*,'("ilevel: "<atom%Nlevel>I14)') (l, l=1, atom%Nlevel)
+			write(*,'("ilevel: "*(I14))') (l, l=1, atom%Nlevel)
 			write(*,'("n: "<atom%Nlevel>ES14.5E3)') (atom%n(l,icell),l=1,atom%Nlevel)
 			write(*,'("ndag: "<atom%Nlevel>ES14.5E3)') (ndag(l),l=1,atom%Nlevel)
 			write(*,*) "Gamma:"
