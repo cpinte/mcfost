@@ -51,8 +51,8 @@ MODULE voigtfunctions
 					u*(61.57037d0-u*(1.841439d0-u)))))))
 			w4 = exp(u) - w4/v4 !cdexp
 		endif
-			L(i) = w4%re!real(w4,kind=dp)!dble(w4)
-			if (present(F)) F(i) = w4%im!aimag(w4)
+			L(i) = real(w4,kind=dp)!w4%re!!dble(w4)
+			if (present(F)) F(i) = aimag(w4)!w4%im!
 	enddo  
 
   RETURN
