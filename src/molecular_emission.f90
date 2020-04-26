@@ -661,14 +661,11 @@ end subroutine J_mol_loc
 !***********************************************************
 
 function v_proj(icell,x,y,z,u,v,w) !
-  use atmos_type, only : atmos
+  use atmos_type, only : vr, vtheta, vphi, v_z
   ! Vitesse projete en 1 point d'une cellule
   ! C. Pinte
   ! 13/07/07
-  ! Added projection for magnetospheric accretion, i.e., velocity is
-  ! a combination of Vpoloidal (VRcyl, Vz, 0) and rotational (0,0,Vphi) +
-  ! eventually keplerian (0, 0, Vphi). Using atmos%Vxyz defined in
-  ! Atoms/atmos_type.f90
+  ! Added projection for magnetospheric accretion and spherical vector
   ! 21/02/19; B. Tessore
 
   implicit none
@@ -727,7 +724,7 @@ function v_proj(icell,x,y,z,u,v,w) !
         else if (lmagnetoaccr) then
            r = sqrt(x*x+y*y)           			 
            vx = 0_dp; vy = 0_dp!; vz = 0_dp
-           vz = atmos%vz(icell)
+           vz = v_z(icell)
                          !only if z strictly positive (2D)
            if ( (.not.l3D) .and. (z < 0_dp) ) vz = -vz
 
@@ -735,8 +732,8 @@ function v_proj(icell,x,y,z,u,v,w) !
            						 !spherical wind of stars
               norme = 1.0_dp/r
               
-              vx = atmos%vR(icell) * x * norme - atmos%vphi(icell) * y * norme
-              vy = atmos%vR(icell) * y * norme + atmos%vphi(icell) * x * norme
+              vx = vR(icell) * x * norme - vphi(icell) * y * norme
+              vy = vR(icell) * y * norme + vphi(icell) * x * norme
  
               v_proj = vx*u + vy*v + vz*w
           else
@@ -754,9 +751,9 @@ function v_proj(icell,x,y,z,u,v,w) !
 				norme = 1.0_dp / r
 				if (r2 > tiny_dp) norme2 = 1.0_dp / r2
 				
-				vx = atmos%vr(icell) * x * norme + norme2 * (z * norme * x * atmos%vtheta(icell) - y * atmos%vphi(icell))
-				vy = atmos%vr(icell) * y * norme + norme2 * (z * norme * y * atmos%vtheta(icell) + x * atmos%vphi(icell))
-				vz = atmos%vr(icell) * z * norme - sign * r2 / r * atmos%vtheta(icell)
+				vx = vr(icell) * x * norme! + norme2 * (z * norme * x * vtheta(icell) - y * vphi(icell))
+				vy = vr(icell) * y * norme! + norme2 * (z * norme * y * vtheta(icell) + x * vphi(icell))
+				vz = vr(icell) * z * norme! - sign * r2 / r * vtheta(icell)
 							
 				v_proj = vx * u + vy * v + vz * w
 			else

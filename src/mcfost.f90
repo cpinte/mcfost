@@ -14,7 +14,7 @@ program BIGCRUNCH
   use init_mcfost
   use dust_transfer
   use mol_transfer
-  use AtomicTransfer
+  use atom_transfer, only : atom_line_transfer
 
   implicit none
 
@@ -47,7 +47,7 @@ program BIGCRUNCH
      write(*,*) '*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*'
      write(*,*) '* Solving for the radiative transfer equation for atomic lines. *'
      write(*,*) '*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*'
-     call Atomic_Transfer()
+     call atom_line_transfer
   endif
 
   ! Temps d'execution

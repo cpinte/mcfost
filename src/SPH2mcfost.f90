@@ -543,8 +543,7 @@ contains
     use grains, only : n_grains_tot, M_grain
     use Voronoi_grid
     use mem
-    use atmos_type, only : atmos, init_atomic_atmos, define_atomRT_domain
-    use ttauri_module, only : TTauri_Temperature
+    use atmos_type, only : T, nHtot, alloc_atomic_atmos, define_atomRT_domain, avgWeight, v_char, icompute_atomRT
 
     integer, intent(in) :: Nmod
     real(dp), dimension(Nmod), intent(in) :: x,y,z, h
@@ -590,9 +589,9 @@ contains
     !*******************************
     ! Fill atmos structure
     !*******************************
-    !Atmos%Vxyz is not allocated, condition is .not.Voronoi
-    CALL init_atomic_atmos()
-    if (size(atmos%nHtot) /= n_cells) then
+    !Vxyz is not allocated, condition is .not.Voronoi
+    CALL alloc_atomic_atmos()
+    if (size(nHtot) /= n_cells) then
      write(*,*) "Error in array size"
      stop
     end if
@@ -611,14 +610,14 @@ contains
     do icell=1,n_cells
        voroindex = Voronoi(icell)%id
        if (voroindex > 0) then
-          atmos%nHtot(icell)  = Msun_to_kg * rho(icell) /  (volume(icell) * AU3_to_m3) &
-            * 1d3 / masseH / atmos%avgWeight !m^-3
+          nHtot(icell)  = Msun_to_kg * rho(icell) /  (volume(icell) * AU3_to_m3) &
+            * 1d3 / masseH / avgWeight !m^-3
        else ! star
-          atmos%nHtot(icell) = 0d0
+          nHtot(icell) = 0d0
       endif
     end do
     !!--> Might also be a problem with PLUTO. Get the masses instead of the densities ??
-    !atmos%nHtot = rho * 1d3 / masseH / atmos%avgWeight !expecting to read rho from
+    !nHtot = rho * 1d3 / masseH / avgWeight !expecting to read rho from
    															  !PLUTO instead of nHtot
 
     !*************************
@@ -636,7 +635,7 @@ contains
              Vcharb = max(Vcharb, dsqrt(sum(Voronoi(icell)%vxyz**2)))
           endif
        end do
-       atmos%v_char = atmos%v_char + Vchar
+       v_char = v_char + Vchar
     endif
 
     ! We eventually reduce density to avoid artefacts: superseeded by cell cutting
@@ -649,7 +648,7 @@ contains
           ! We reduce the density on cells that are very elongated
           if (Voronoi(icell)%delta_edge > 3 * Voronoi(icell)%h) then
              n_force_empty = n_force_empty + 1
-             atmos%nHtot(icell) = density_factor * atmos%nHtot(icell)
+             nHtot(icell) = density_factor * nHtot(icell)
              cycle cell_loop
           endif
 
@@ -658,7 +657,7 @@ contains
              id_n = neighbours_list(i) ! id du voisin
              if (id_n < 0) then
                 n_force_empty = n_force_empty + 1
-                atmos%nHtot(icell) = density_factor * atmos%nHtot(icell)
+                nHtot(icell) = density_factor * nHtot(icell)
                 cycle cell_loop
              endif
           enddo
@@ -669,7 +668,9 @@ contains
     endif
 
     !Temperature
-   CALL TTauri_Temperature(2.2d0, 3d0, 1d-7)
+    T = 6000d0
+    write(*,*) " Temperature not set"
+   !CALL TTauri_Temperature(2.2d0, 3d0, 1d-7)
 
    !Temperature and electron densities could be moved here, or later
    !After nHtot (m^-3) and T are known
@@ -679,12 +680,12 @@ contains
    write(*,*) "Maximum/minimum velocities in the model (km/s):"
    write(*,*) Vcharb/1d3, Vchar/1d3
    write(*,*) "Typical velocity in the model (km/s):"
-   write(*,*) atmos%v_char/1d3
+   write(*,*) v_char/1d3
 
    write(*,*) "Maximum/minimum Temperature in the model (K):"
-   write(*,*) MAXVAL(atmos%T), MINVAL(atmos%T,mask=atmos%icompute_atomRT>0)!==.true.)
+   write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)!==.true.)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-   write(*,*) MAXVAL(atmos%nHtot), MINVAL(atmos%nHtot,mask=atmos%icompute_atomRT>0)!==.true.)
+   write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)!==.true.)
 
   RETURN
 

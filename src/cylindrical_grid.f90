@@ -254,7 +254,7 @@ subroutine define_cylindrical_grid()
   ! end allocation
 
 	lread_1D_grid = .false.
-	if ((n_cells == n_rad).and.(n_regions==1).and.(n_rad_in == 1)) lread_1D_grid = .true.
+	if ((n_cells == n_rad).and.(n_regions==1).and.(n_rad_in == 1.0)) lread_1D_grid = .true.
 	if (lread_1D_grid) then
 		write(*,*) 'Reading 1D radius grid from file'
 		open(15, file=file_tab_r_1D, status='old')
@@ -267,12 +267,12 @@ subroutine define_cylindrical_grid()
 		enddo
 		close(15)
 		!write(*,*) ' Old Rmax/Rmin', Rmax, Rmin
+
 		Rmin = tab_r_1D_tmp(1)*etoile(1)%r
 		Rmax = tab_r_1D_tmp(n_rad_1D)*etoile(1)%r
 		!write(*,*) ' New Rmax, Rmin', Rmax, Rmin
 		if (etoile(1)%r>Rmin) then
 			call warning('Rstar=>Rmin')
-			etoile(1)%r = etoile(1)%r*(1.-0.001)
 		endif
 		if (n_rad_1D -1 /= n_cells) then
 			write(*,*) " Error, the grid of radius read should be n_cells + 1"
@@ -397,6 +397,7 @@ subroutine define_cylindrical_grid()
 		write(*,*) istart, n_rad_region, n_empty
 		write(*,*) ' Redefining grid to match model'
 		do i=istart + 1, istart+n_rad_region
+		!!do i=istart, istart+n_rad_region-1
 			tab_r(i) = tab_r_1D_tmp(i)*etoile(1)%r
 			tab_r2(i) = tab_r(i) * tab_r(i)
 			tab_r3(i) = tab_r2(i) * tab_r(i)

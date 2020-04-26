@@ -77,15 +77,11 @@ subroutine set_default_variables()
   lread_jnu_atom=.false.
   ldissolve = .false.
   ! AL-RT
-  ! Ng's acceleration
-  lNg_acceleration= .false.
-  iNg_Norder = 0
-  iNg_Ndelay = 15
-  iNg_Nperiod = 6
+  laccurate_integ = .false.
   Nrays_atom_transfer = 100
   !
   ! Max relative error in transfer. ATM only atomic line transfer
-  dpops_max_error = 1e-2
+  dpops_max_error = 1e-1
   dpops_sub_max_error = 1e-4
   !
   lpuffed_rim = .false.
@@ -737,30 +733,9 @@ subroutine initialisation_mcfost()
      case("-no_magnetic_field")
         i_arg = i_arg + 1
         lmagnetic_field=.false.
-     case("-Ng_accel")
+     case("-accurate_integ")
         i_arg = i_arg + 1
-        lNg_acceleration=.true.
-        if (i_arg > nbr_arg) call error("Ng Norder needed")
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) iNg_Norder
-        if (iNg_Norder<=0) then 
-         lNg_acceleration=.false.
-         call warning("Ng's acceleration deactivated for Nperiod<=0")
-        endif
-        i_arg= i_arg+1
-     case("-Ng_Ndelay")
-        i_arg = i_arg + 1
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) iNg_Ndelay
-        i_arg= i_arg+1
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) iNg_Nperiod
-        i_arg= i_arg+1
-        if (iNg_Nperiod*iNg_Ndelay <=0) then 
-         call warning("Bad values for Ng Ndelay and Nperiod, setting to 6 and 3")
-         iNg_Nperiod = 3
-         iNg_Ndelay = 6
-        endif 
+        laccurate_integ = .true.
      case("-Nray_atom")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Number of rays needed with -Nray_atom !")
@@ -1697,10 +1672,9 @@ subroutine display_help()
   write(*,*) " Options related to atomic lines emission"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
-  write(*,*) "        : -Ng_accel <Norder> : Turn on Ng's acceleration with order Norder"
-  write(*,*) "        : -Ng_Ndelay <Ndelay> <Nperiod> : # of normal iterations before acceleration. # of relaxation before new acceleration"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
+  write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
   write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"

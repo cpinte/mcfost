@@ -20,12 +20,7 @@ module mol_transfer
   use mem
   use output
 
-  use accelerate
-  use math, only : flatten, reform
-
   implicit none
-
-  type (Ng) :: Ngmol
 
   contains
 
@@ -180,32 +175,12 @@ subroutine NLTE_mol_line_transfer(imol)
 
   integer, dimension(nTrans_tot) :: tab_Trans
 
-  !Ng'acceleration
-  logical :: accelerated, ng_rest
-  integer :: iorder, i0_rest, n_iter_accel
-  real(kind=dp), allocatable, dimension(:) :: flatpops, popsT(:,:)
-
   labs = .true.
 
   id = 1
 
   n_speed = mol(imol)%n_speed_rt ! j'utilise le meme maintenant
   n_level_comp = min(mol(imol)%iLevel_max,nLevels)
-
-  if (lNg_acceleration) then
-   write(*,*) " *********** "
-    write(*,*) "Ng acceleration not tested for molecules yet"
-   write(*,*) " *********** "
-  endif
-  if (lNg_acceleration) then !Nord >0 already tested
-    Write(*,*) " Allocating space for Ng structure"
-    CALL initNg(n_cells*n_level_comp,iNg_Ndelay, iNg_Norder, iNg_Nperiod, Ngmol)
-    n_iter_accel = 0
-    i0_rest = 0
-    ng_rest = .false.
-    allocate(flatpops(n_cells*n_level_comp))
-    allocate(popsT(n_level_comp, n_cells)); popsT = 0d0
-  endif
 
   do i=1, nTrans_tot
      tab_Trans(i) = i ! we use all the transitions here
@@ -437,34 +412,6 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp end do
         !$omp end parallel
 
-     	!not parallel yet
-     	accelerated=.false.
-     	!to be compatible with atomictransfer routines
-     	popsT = transpose(tab_nLevel(:,1:n_level_comp))
-     	if (lNg_acceleration .and. (n_iter > iNg_Ndelay)) then
-     		  iorder = n_iter - iNg_Ndelay !local number of iterations accumulated
-     		  if (ng_rest) then
-     		    write(*,*) iorder-i0_rest, " Acceleration relaxes for ", iNg_Nperiod
-     		    if (iorder - i0_rest == iNg_Nperiod) ng_rest = .false.
-     		  else
-     		    i0_rest = iorder
-                 write(*,*) " Ng iorder=",iorder, " Ndelay=", iNg_Ndelay, " Nper=", iNg_Nperiod
-     		     !In the flattened array, there are:
-     		     ! ilvl=1
-     		     !    icell=1->ncells
-     		     !                   ilvl=2
-     		     !                   icell=1->Ncells
-     		     flatpops=flatten(n_level_comp,n_cells,popsT)
-     		     accelerated = Acceleration(Ngmol, flatpops)
-     		     if (accelerated) then
-     		      popsT = reform(n_level_comp,n_cells, flatpops)
-                  n_iter_accel = n_iter_accel + 1 !True number of accelerated iter
-                  ng_rest = .true.
-     		     endif
-
-             endif
-     		endif
-        tab_nLevel(:,1:n_level_comp) = transpose(popsT)
         ! Critere de convergence totale
         maxdiff = 0.0
         do icell = 1, n_cells
@@ -476,11 +423,8 @@ subroutine NLTE_mol_line_transfer(imol)
         enddo ! icell
 
         write(*,*) maxval(max_n_iter_loc), "sub-iterations"
-        if (accelerated) then
-         write(*,*) "Relative difference =", real(maxdiff), " (Accelerated)"
-        else
-         write(*,*) "Relative difference =", real(maxdiff)
-        endif
+        write(*,*) "Relative difference =", real(maxdiff)
+
         write(*,*) "Threshold =", precision*fac_etape
 
         if (maxdiff < precision*fac_etape) then
@@ -513,11 +457,6 @@ subroutine NLTE_mol_line_transfer(imol)
   enddo ! etape
 
   deallocate(ds, Doppler_P_x_freq, I0, I0c)
-
-  if (lNg_acceleration) then
-   CALL freeNg(Ngmol)
-   deallocate(flatpops,popsT)
-  endif
 
   return
 

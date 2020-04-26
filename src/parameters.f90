@@ -60,11 +60,8 @@ module parametres
   !!lstore_opac futur deprecation
   logical :: lemission_atom, lsolve_for_ne, lelectron_scattering, lvacuum_to_air, &
        lcontrib_function, lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
-       ldissolve
-	integer :: Nrays_atom_transfer
-  !Ng's acceleration
-  logical :: lNg_acceleration
-  integer :: iNg_Norder, iNg_Ndelay, iNg_Nperiod
+       ldissolve, laccurate_integ
+  integer :: Nrays_atom_transfer
   
   !Convergence relative errors
   real :: dpops_max_error, dpops_sub_max_error

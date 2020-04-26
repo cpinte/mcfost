@@ -1346,7 +1346,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   ! Also save the projected location of the stars in the map (in arcsec)
 
   use utils, only : interp
-  use spectrum_type, only : NLTEspec
+  !!!!use spectrum_type, only : NLTEspec
 
   integer, intent(in) :: lambda, ibin, iaz
   real(kind=dp), intent(in) :: u,v,w, taille_pix
@@ -1359,20 +1359,20 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   real(kind=dp), dimension(3) :: dx_screen, dy_screen, vec, xyz
   real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg
   real(kind=dp) :: delta, norm_screen2, offset_x, offset_y, fx, fy
-  real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi, factor_pix, tau_c
+  real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi, factor_pix!!!!, tau_c
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
   logical :: in_map, lpola
 
   integer, parameter :: nx_screen = 10
   real(kind=dp), dimension(-nx_screen:nx_screen,-nx_screen:nx_screen) :: tau_screen
-  real(kind=dp), dimension(-nx_screen:nx_screen,-nx_screen:nx_screen) :: tau_screen_c
+  !!!!real(kind=dp), dimension(-nx_screen:nx_screen,-nx_screen:nx_screen) :: tau_screen_c
 
   ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
   ! allacatable array as it can be big and not fit in stack memory
   real, dimension(:,:,:), allocatable :: map_1star, Q_1star, U_1star
   !for lemission_atom only. Polarization of the stellar continuum not included yet
-  real, dimension(:,:,:), allocatable :: mapc_1star!, Qc_1star, Uc_1star
+  !!!!real, dimension(:,:,:), allocatable :: mapc_1star!, Qc_1star, Uc_1star
 
   stars_map(:,:,:) = 0.0
   if (n_etoiles < 1) return
@@ -1384,11 +1384,11 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   map_1star = 0.0
 
   alloc_status = 0
-  if (lemission_atom) then
-   stars_map_cont(:,:,:) = 0.0
-   allocate(mapc_1star(npix_x,npix_y,nb_proc),stat=alloc_status)!)
-   mapc_1star = 0.0
-  end if
+!   if (lemission_atom) then
+!    stars_map_cont(:,:,:) = 0.0
+!    allocate(mapc_1star(npix_x,npix_y,nb_proc),stat=alloc_status)!)
+!    mapc_1star = 0.0
+!   end if
 
   lpola = .false.
   if (lsepar_pola.and.llimb_darkening) then
@@ -1448,12 +1448,12 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
            call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
 
            tau_screen(i,j) = tau
-           if (lemission_atom) tau_screen_c(i,j) = NLTEspec%atmos%tau
+!            if (lemission_atom) tau_screen_c(i,j) = NLTEspec%atmos%tau
         enddo ! j
      enddo ! i
 
      map_1star(:,:,:) = 0.0
-     if (lemission_atom) mapc_1star(:,:,:) = 0.0
+!      if (lemission_atom) mapc_1star(:,:,:) = 0.0
      if (lpola) then
         Q_1star(:,:,:) = 0.0
         U_1star(:,:,:) = 0.0
@@ -1475,8 +1475,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
      !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola,lmono0) &
      !$omp shared(x_center,y_center,taille_pix,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star,lresolved) &
-     !$omp shared(tau_screen,dx_screen,dy_screen,norm_screen2) &
-     !$omp shared(mapc_1star, lemission_atom, tau_screen_c, tau_c) &
+     !$omp shared(tau_screen,dx_screen,dy_screen,norm_screen2) &!!!$omp shared(mapc_1star, lemission_atom, tau_screen_c, tau_c) &
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,Stokes,fx,fy,offset_x,offset_y,vec) &
      !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi) &
      !$omp reduction(+:norme,tau_avg)
@@ -1545,12 +1544,12 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
              + tau_screen(i,j+1)   * (1-fx) * fy &
              + tau_screen(i+1,j+1) * fx * fy
 
-        if (lemission_atom) then
-           tau_c =  tau_screen_c(i,j)     * (1-fx) * (1-fy) &
-                + tau_screen_c(i+1,j)   * fx * (1-fy) &
-                + tau_screen_c(i,j+1)   * (1-fx) * fy &
-                + tau_screen_c(i+1,j+1) * fx * fy
-        endif
+!         if (lemission_atom) then
+!            tau_c =  tau_screen_c(i,j)     * (1-fx) * (1-fy) &
+!                 + tau_screen_c(i+1,j)   * fx * (1-fy) &
+!                 + tau_screen_c(i,j+1)   * (1-fx) * fy &
+!                 + tau_screen_c(i+1,j+1) * fx * fy
+!         endif
 
         ! Average optical depth to the star
         if (lmono0) tau_avg = tau_avg + tau
@@ -1564,8 +1563,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
 
         if (in_map) then
            map_1star(i,j,id) = map_1star(i,j,id) + exp(-tau) * cos_thet * LimbDarkening
-           if (lemission_atom) &
-           	   mapc_1star(i,j,id) = mapc_1star(i,j,id) + exp(-tau_c) * cos_thet * LimbDarkening
+!            if (lemission_atom) mapc_1star(i,j,id) = mapc_1star(i,j,id) + exp(-tau_c) * cos_thet * LimbDarkening
            if (lpola) then ! Average polarisation in the pixel
               P = exp(-tau) * cos_thet * LimbDarkening * Pola_LimbDarkening
 
@@ -1587,8 +1585,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
 
      do id=1, nb_proc
         stars_map(:,:,1) = stars_map(:,:,1) + map_1star(:,:,id) * facteur2
-        if (lemission_atom) &
-        	stars_map_cont(:,:,1) = stars_map_cont(:,:,1) + mapc_1star(:,:,id) * facteur2
+!         if (lemission_atom) stars_map_cont(:,:,1) = stars_map_cont(:,:,1) + mapc_1star(:,:,id) * facteur2
      enddo
 
      if (lpola) then
@@ -1616,9 +1613,9 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
 
   deallocate(map_1star)
   if (lpola) deallocate(Q_1star, U_1star)
-  if (lemission_atom) then
-   deallocate(mapc_1star)
-  end if
+!   if (lemission_atom) then
+!    deallocate(mapc_1star)
+!   end if
 
   return
 

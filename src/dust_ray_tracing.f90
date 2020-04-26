@@ -57,7 +57,7 @@ module dust_ray_tracing
   real, dimension(:,:,:), allocatable :: star_vr
 
   real, dimension(:,:,:,:,:,:), allocatable :: tau_surface ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
-  real, dimension(:,:,:), allocatable :: stars_map, stars_map_cont ! nx, ny, 4
+  real, dimension(:,:,:), allocatable :: stars_map!!!!, stars_map_cont ! nx, ny, 4
   !stellar continuum map only for lemission_atom
 
 
