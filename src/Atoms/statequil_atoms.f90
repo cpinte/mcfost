@@ -702,14 +702,15 @@ endif
 				
 		if ((any_nan_infinity_matrix(atom%Gamma(:,:,id))>0)) then
 			write(*,*) "BUG Gamma", " id=",id, " icell=",icell
+			!-> replace <Nlevel> by *(fmt) for gfotran
 ! 			write(*,'("ilevel: "<atom%Nlevel>I14)') (l, l=1, atom%Nlevel)
 			write(*,'("ilevel: "*(I14))') (l, l=1, atom%Nlevel)
-			write(*,'("n: "<atom%Nlevel>ES14.5E3)') (atom%n(l,icell),l=1,atom%Nlevel)
-			write(*,'("ndag: "<atom%Nlevel>ES14.5E3)') (ndag(l),l=1,atom%Nlevel)
+			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
+			write(*,'("ndag: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)
 			write(*,*) "Gamma:"
-			write(*,'(<atom%Nlevel>I14)') (l, l=1, atom%Nlevel)
+			write(*,'(*(I14))') (l, l=1, atom%Nlevel)
 			do l=1, atom%Nlevel
-				write(*, '(1I3, <atom%Nlevel>ES14.5E3)') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
+				write(*, '(1I3, *(ES14.5E3))') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
 			enddo
 			write(*,*) "Radiative rates"
 			do l=1, atom%Nline
@@ -1109,9 +1110,18 @@ endif
 				aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + JJ * aatom%lines(kc)%Bji
 				aatom%lines(kc)%Rij(id) = aatom%lines(kc)%Rij(id) + JJ * aatom%lines(kc)%Bij
 				
-				if ((any_nan_infinity_vector(aatom%lines(kc)%Rji) /= 0.0).or.(any_nan_infinity_vector(aatom%lines(kc)%Rij))) then
+				if (any_nan_infinity_vector(aatom%lines(kc)%Rij) /= 0.0) then
 					write(*,*) "icell=",icell," id=",id," nb_proc=", nb_proc, aatom%lines(kc)%Rij(id)
-					write(*,*) "Rji=",aatom%lines(kc)%Rji, " Rij=", aatom%lines(kc)%Rij
+					write(*,*) "Rij=", aatom%lines(kc)%Rij
+					write(*,*) "I=",Itot(:,iray,id)
+					write(*,*) "chi0_bb=",chi0_bb(:,icell)
+					write(*,*) "eta0_bb=",eta0_bb(:,icell)
+					write(*,*) "phi(iray)=", aatom%lines(kc)%phi_loc(:,iray,id)
+					stop
+				endif
+				if (any_nan_infinity_vector(aatom%lines(kc)%Rji) /= 0.0) then
+					write(*,*) "icell=",icell," id=",id," nb_proc=", nb_proc, aatom%lines(kc)%Rji(id)
+					write(*,*) "Rji=",aatom%lines(kc)%Rji
 					write(*,*) "I=",Itot(:,iray,id)
 					write(*,*) "chi0_bb=",chi0_bb(:,icell)
 					write(*,*) "eta0_bb=",eta0_bb(:,icell)
