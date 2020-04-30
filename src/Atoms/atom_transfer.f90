@@ -38,7 +38,7 @@ module atom_transfer
 	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, prt_solution, lcontrib_function, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
-									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte
+									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
 	use dust_transfer, only		: compute_stars_map
@@ -744,14 +744,14 @@ module atom_transfer
 		!allocate(pops(NactiveAtoms, NmaxLevel, nb_proc)); pops = 0d0
 		
 		!remove some arrays in depth to save memory, like vbroad per atom not needed, it is fast to compute locally
-		!if (loutput_radiative_rates) then
-		allocate(Rij_all(NactiveAtoms,NmaxTr,n_cells),Rji_all(NactiveAtoms,NmaxTr,n_cells),stat=alloc_status)
-		if (alloc_status > 0) call error("Allocation error Rij/Rji _all")
-		Rij_all(:,:,:) = 0.0_dp; Rji_all(:,:,:) = 0.0_dp
-		allocate(Gammaij_all(NactiveAtoms,Nmaxlevel,Nmaxlevel,n_cells),stat=alloc_status)
-		if (alloc_status > 0) call error("Allocation error Gammij_all")
-		Gammaij_all(:,:,:,:) = 0.0_dp
-		!endif
+		if (loutput_rates) then
+			allocate(Rij_all(NactiveAtoms,NmaxTr,n_cells),Rji_all(NactiveAtoms,NmaxTr,n_cells),stat=alloc_status)
+			if (alloc_status > 0) call error("Allocation error Rij/Rji _all")
+			Rij_all(:,:,:) = 0.0_dp; Rji_all(:,:,:) = 0.0_dp
+			allocate(Gammaij_all(NactiveAtoms,Nmaxlevel,Nmaxlevel,n_cells),stat=alloc_status)
+			if (alloc_status > 0) call error("Allocation error Gammij_all")
+			Gammaij_all(:,:,:,:) = 0.0_dp
+		endif
 
 		write(*,*) " ** Number max of levels among all atoms:", Nmaxlevel
 		write(*,*) " ** Number max of transitions among all atoms:", NmaxTr
@@ -765,6 +765,7 @@ module atom_transfer
 		write(*,*) " Max error : ", dpops_max_error, dpops_sub_max_error
 				
 		call NLTEloop(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter,.true.)
+
 		
 		deallocate(lcell_converged, gpop_old, Tex_old)
 		if (allocated(dk)) deallocate(dk)
@@ -777,10 +778,10 @@ module atom_transfer
 			if (atom%active) then
 				if (allocated(atom%Gamma)) deallocate(atom%Gamma)
 				if (allocated(atom%C)) deallocate(atom%C)
-				!if (loutput_radiative_rates) then
-				call write_radiative_rates_atom(atom, Rij_all(nact,1:atom%Ntr,:), Rji_all(nact,1:atom%Ntr,:))
-				call write_rate_matrix_atom(atom, Gammaij_all(nact,1:atom%Nlevel,1:atom%Nlevel,:))
-				!endif
+				if (loutput_rates) then
+					call write_radiative_rates_atom(atom, Rij_all(nact,1:atom%Ntr,:), Rji_all(nact,1:atom%Ntr,:))
+					call write_rate_matrix_atom(atom, Gammaij_all(nact,1:atom%Nlevel,1:atom%Nlevel,:))
+				endif
 			endif
 			if (associated(hydrogen,atom)) call write_collision_matrix_atom(hydrogen)
 			do m=1, atom%Nline
@@ -788,8 +789,7 @@ module atom_transfer
 			enddo
 			atom => NULL()
 		enddo
-		!if (loutput_radiative_rates) &
-		deallocate(Rij_all,Rji_all,Gammaij_all)
+		if (loutput_rates) deallocate(Rij_all,Rji_all,Gammaij_all)
 		
 		call write_Jnu
 		!recompute some opacities ?
@@ -908,11 +908,14 @@ module atom_transfer
 ! 		deallocate(S_contrib, S_contrib2, Ksi)
 ! 	end if
     
-	call write_cont_opac_ascii(hydrogen)
- 	!chi0_bb and eta0_bb not modified
-	call write_contrib_lambda_ascii(654.0_dp,0.0_dp,0.0_dp,1.0_dp,.true.)
-
-	call write_taur(500._dp,0._dp,0._dp,1.0_dp)
+    !ascii files can be large !
+    if (loutput_rates) then
+		call write_cont_opac_ascii(hydrogen)
+ 		!chi0_bb and eta0_bb not modified
+		call write_contrib_lambda_ascii(654.0_dp,0.0_dp,0.0_dp,1.0_dp,.true.)
+		
+		call write_taur(500._dp,0._dp,0._dp,1.0_dp)
+	endif
 
 	if (lelectron_scattering.and.(NactiveAtoms==0)) then !otherwise if active, written even if not included in emissivity
 		!Jnu is written to ascii file if read
@@ -1031,7 +1034,7 @@ module atom_transfer
   				iray_start = 1
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
-				precision = dpops_max_error !1e-1
+				precision = 1e-1 !dpops_max_error
 				precision_sub = dpops_sub_max_error
 			else
 				call ERROR("etape unkown")
@@ -1070,11 +1073,11 @@ module atom_transfer
 				!$omp do schedule(static,1)
 				do icell=1, n_cells
 					!$ id = omp_get_thread_num() + 1
-					if (lfixed_rays) then
+! 					if (lfixed_rays) then
    						l_iterate = (icompute_atomRT(icell)>0)
-					else
-   						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-					endif							
+! 					else
+!    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
+! 					endif							
    					if (l_iterate) then
 						do nact=1, NactiveAtoms
 							atom => ActiveAtoms(nact)%ptr_atom
@@ -1103,7 +1106,7 @@ module atom_transfer
 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,dT_max)&
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate) &
 				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,n_iter,precision_sub) &
-				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged) &
+				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged,loutput_rates) &
 				!$omp shared(n_cells, gpop_old,lforce_lte, integ_ray_line, Itot, Icont, Jnu_cont, eta_es) &
 				!$omp shared(Jnew, Jnew_cont, Jold, lelectron_scattering,chi0_bb, etA0_bb) &
 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
@@ -1111,11 +1114,11 @@ module atom_transfer
 				!$omp do schedule(static,1)
 				do icell=1, n_cells
 					!$ id = omp_get_thread_num() + 1
-					if (lfixed_rays) then
+! 					if (lfixed_rays) then
    						l_iterate = (icompute_atomRT(icell)>0)
-					else
-   						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-					endif				
+! 					else
+!    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
+! 					endif				
    					if (l_iterate) then
    						Jnew(:,icell) = 0.0
    						Jnew_cont(:,icell) = 0.0
@@ -1162,9 +1165,8 @@ module atom_transfer
 							eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
 						!!endif
 		
-						!if (loutput_radiative_Rates) then
-						call store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell), Jnew(:,icell))
-						!endif
+						if (loutput_Rates) &
+							call store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell), Jnew(:,icell))
 
 						if (lforce_lte) then
 							call update_populations(id, icell, diff, .false., n_iter)
@@ -1175,8 +1177,8 @@ module atom_transfer
 								call calc_rates(id, icell, iray, n_rayons)
 							enddo
 							call calc_rate_matrix(id, icell, lforce_lte)
-							!!call update_populations(id, icell, diff, .false., n_iter)
-							!!lconverged_loc = .true.
+! 							call update_populations(id, icell, diff, .false., n_iter)
+! 							lconverged_loc = .true.
 						endif
 
 						n_iter_loc = 0
@@ -1223,11 +1225,10 @@ module atom_transfer
 
 						end do !local sub iteration
 						if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
-						!if (loutput_radiative_Rates)
-						call store_rate_matrices(id,icell,Nmaxlevel,Gammaij_all(:,:,:,icell))
+						if (loutput_Rates) &
+							call store_rate_matrices(id,icell,Nmaxlevel,Gammaij_all(:,:,:,icell))
 	
 					end if !icompute_atomRT
-
 				end do !icell
 				!$omp end do
 				!$omp end parallel
@@ -1245,11 +1246,11 @@ module atom_transfer
    				icell_max = 1
    				icell_max_2 = 1
 				cell_loop2 : do icell=1,n_cells
-					if (lfixed_rays) then
+! 					if (lfixed_rays) then
    						l_iterate = (icompute_atomRT(icell)>0)
-					else
-   						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-					endif				
+! 					else
+!    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
+! 					endif				
    					if (l_iterate) then
 						dN = 0.0 !for all levels of all atoms of this cell
 						dN2 = 0.0
@@ -1297,8 +1298,8 @@ module atom_transfer
 							atom => NULL()
 						end do !over atoms
 						!compare for all atoms and all cells
-						!diff = max(diff, dN) ! pops
-						diff = max(diff, dN2) ! Tex
+						diff = max(diff, dN) ! pops
+						!diff = max(diff, dN2) ! Tex
 						
 						dN1 = abs(1d0 - maxval(Jold(:,icell)/(tiny_dp + Jnew(:,icell))))
 						!dN1 = maxval(abs(Jold(:,icell)-Jnew(:,icell))/(1d-30 + Jold(:,icell)))
@@ -1354,7 +1355,7 @@ module atom_transfer
              			if (n_rayons > n_rayons_max) then
               				if (n_iter >= maxIter) then
              		 			write(*,*) "Warning : not enough rays to converge !!"
-                 			lconverged = .true.
+                 				lconverged = .true.
               				end if
               			end if
           	   		end if
@@ -1405,6 +1406,14 @@ module atom_transfer
 			write(*,*) "step: ", etape, "Threshold: ", precision!dpops_max_error
 
 		end do !over etapes
+		
+! 				do icell=1, n_cells
+!    					if (icompute_atomRT(icell)>0) then
+! 						call NLTE_bound_free(icell)
+! 						call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+! 					end if
+! 				end do
+
 
 ! 		do icell=1,n_cells
 ! 			if (icompute_atomRT(icell) > 0) then

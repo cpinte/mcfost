@@ -16,7 +16,7 @@ MODULE lte
  use io_atomic_pops, only : write_Hminus
 
  use constantes, only : tiny_dp, huge_dp
- use parametres, only : ldissolve, n_cells
+ use parametres, only : ldissolve, n_cells, loutput_rates
  !$ use omp_lib
 
  IMPLICIT NONE
@@ -310,7 +310,7 @@ END FUNCTION get_logPartitionFunctionk
 
 
   if (ldissolve) then
-   call write_occupation_file(52, hydrogen, 1)
+   if (loutput_rates) call write_occupation_file(52, hydrogen, 1)
    do k=1, n_cells
     if (icompute_atomRT(k)>0) then
       do i=1, hydrogen%Nlevel-1 !only for bound-levels ?
@@ -429,7 +429,7 @@ END FUNCTION get_logPartitionFunctionk
 
 
   if (ldissolve) then
-   call write_occupation_file(52, hydrogen, 1)
+   if (loutput_rates) call write_occupation_file(52, hydrogen, 1)
    do k=1, n_cells
     if (icompute_atomRT(k)>0) then
       do i=1, hydrogen%Nlevel-1 !only for bound-levels ?
@@ -629,7 +629,7 @@ END FUNCTION get_logPartitionFunctionk
 
   !! Write for all grid points, no parallel
   if (locupa_prob) then
-    CALL write_occupation_file(52, atom, 1)
+    if (loutput_rates) CALL write_occupation_file(52, atom, 1)
     do k=1, n_cells
     	if (icompute_atomRT(k)>0) then
     		do i=1, atom%Nlevel-1
@@ -711,7 +711,7 @@ END FUNCTION get_logPartitionFunctionk
 		if (Atoms(n)%ptr_atom%initial_solution=="LTE_POPULATIONS") Atoms(n)%ptr_atom%n(:,:) = Atoms(n)%ptr_atom%nstar(:,:)
 	endif
 	
-	call write_ltepops_file(52, Atoms(n)%ptr_atom)
+	if (loutput_rates) call write_ltepops_file(52, Atoms(n)%ptr_atom)
 
    
   enddo

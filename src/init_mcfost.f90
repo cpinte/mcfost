@@ -79,6 +79,7 @@ subroutine set_default_variables()
   ! AL-RT
   laccurate_integ = .false.
   Nrays_atom_transfer = 100
+  loutput_rates = .false.
   !
   ! Max relative error in transfer. ATM only atomic line transfer
   dpops_max_error = 1e-1
@@ -606,6 +607,9 @@ subroutine initialisation_mcfost()
      case("-contrib_function")
         i_arg = i_arg + 1
         lcontrib_function = .true.
+     case("-output_rates")
+        i_arg = i_arg + 1
+        loutput_rates = .true.
      case("-electron_scatt") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
         lelectron_scattering = .true.
@@ -1676,6 +1680,7 @@ subroutine display_help()
   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
   write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
+  write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "

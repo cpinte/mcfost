@@ -60,7 +60,7 @@ module parametres
   !!lstore_opac futur deprecation
   logical :: lemission_atom, lsolve_for_ne, lelectron_scattering, lvacuum_to_air, &
        lcontrib_function, lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
-       ldissolve, laccurate_integ
+       ldissolve, laccurate_integ, loutput_rates
   integer :: Nrays_atom_transfer
   
   !Convergence relative errors
