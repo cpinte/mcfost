@@ -274,8 +274,7 @@ MODULE io_opacity
    if (NactiveAtoms>0) then
   	etac(icell) = etac(icell) + interp_dp(eta_c_nlte(:,icell), lambda_cont, lam)!NLTEspec%AtomOpac%jc_nlte(ilam,icell)!interp_dp(NLTEspec%AtomOpac%jc_nlte(:,icell), NLTEspec%lambda, lam)
   	chic(icell) = chic(icell) + interp_dp(chi_c_nlte(:,icell), lambda_cont, lam)!NLTEspec%AtomOpac%Kc_nlte(ilam,icell)!interp_dp(NLTEspec%AtomOpac%Kc_nlte(:,icell), NLTEspec%lambda, lam)
-   endif
-     		
+   endif	
   enddo !over cells
 
   if (lintersect) then
@@ -301,7 +300,7 @@ MODULE io_opacity
   
   
   do icell=1, n_cells !how to read integer then float ?
-   write(1,"(8ES14.5E3)") real(icell), taul(icell), chil(icell), etal(icell), etac(icell), chic(icell), etasc(icell), sigmac(icell)
+   write(1,"(8ES20.10E3)") real(icell), taul(icell), chil(icell), etal(icell), etac(icell), chic(icell), etasc(icell), sigmac(icell)
   enddo
   
   close(1)
