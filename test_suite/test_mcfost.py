@@ -6,8 +6,7 @@ import shutil
 import glob
 import os
 
-# Reference tests are computed with v3.0.28
-
+# Reference tests are computed with db94244c41cad9c1517363b1607f8596af1c55c0
 _mcfost_bin = "../src/mcfost"
 
 model_list = glob.glob1("test_data/","*")

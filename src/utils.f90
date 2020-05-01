@@ -802,10 +802,8 @@ subroutine mcfost_v()
   integer ::  syst_status, line_number, ios
   character(len=128) :: sline_number
 
-!  write(*,*) "This is MCFOST version: ", mcfost_release
-!  write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
-!  write(*,*) "Git SHA  = ", sha_id
-  !write(*,*) 1.0/0.0 , __LINE__, __FILE__
+  syst_status = 0
+
   write(*,*) "Binary compiled the ",__DATE__," at ",__TIME__
 #if defined (__INTEL_COMPILER)
   write(*,fmt='(" with INTEL compiler version ",i4)')  __INTEL_COMPILER
@@ -818,20 +816,17 @@ subroutine mcfost_v()
 #endif
   write(*,*) " "
 
-
   ! Last version
   write(*,*) "Checking last version ..."
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
-
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) call error("Cannot get MCFOST last version number (Error 1)")
+  if (syst_status/=0) call error("Cannot get MCFOST last version number (Error 1)","'"//trim(cmd)//"' did not run as expected.")
+
   open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
 
-  if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
-     call error("Cannot get MCFOST last version number (Error 2)")
-  endif
+  if ((ios/=0) .or. (.not.is_digit(last_version(1:1)))) call error("Cannot get MCFOST last version number (Error 2)","Cannot read new version file")
 
   ! Do we have the last version ?
   if (last_version == mcfost_release) then

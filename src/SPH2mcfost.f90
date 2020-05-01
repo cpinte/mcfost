@@ -27,7 +27,7 @@ contains
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
-    logical, allocatable, dimension(:) :: mask
+    logical, allocatable, dimension(:) :: mask ! size == np, not n_SPH, index is original SPH id
 
     real(dp), dimension(6) :: SPH_limits
     real :: factor
@@ -424,7 +424,7 @@ contains
     if (present(mask)) then
        if (allocated(mask)) then
           do icell=1,n_cells
-             iSPH = Voronoi(icell)%id
+             iSPH = Voronoi(icell)%original_id
              if (iSPH > 0) then
                 Voronoi(icell)%masked = mask(iSPH)
              else

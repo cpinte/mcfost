@@ -148,7 +148,8 @@ contains
   subroutine xgb_compute_features()
 
     use grains, only : grain, r_grain, n_grains_tot
-    use density, only : compute_column_density, densite_pouss
+    use optical_depth, only : compute_column
+    use density, only : densite_pouss
     use cylindrical_grid, only : r_grid, z_grid
     use molecular_emission, only : densite_gaz, Tcin
     use temperature, only : Tdust
@@ -184,7 +185,7 @@ contains
     if (n_features == 51) then
        !--- Column density
        write(*,'(a31, $)') "Computing column densities ..."
-       call compute_column_density(CD)
+       call compute_column(1, CD)
        write(*,*) " Done"
 
        if (lVoronoi) then

@@ -161,7 +161,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90      
           $(Atom_dir)/zeeman.f90 input.f90 $(Atom_dir)/broad.f90                 \
           $(Atom_dir)/getlambda.f90 benchmarks.f90 read_param.f90                \
           dust_ray_tracing.f90 radiation_field.f90 thermal_emission.f90          \
-          diffusion.f90 io_prodimo.f90 disk_physics.f90 output.f90 ML_prodimo.f90\
+          diffusion.f90 io_prodimo.f90 disk_physics.f90 optical_depth.f90 ML_prodimo.f90 output.f90\
           mem.f90 init_mcfost.f90 io_phantom_infiles.f90 \
 	  io_phantom_utils.f90 utils_hdf5.f90 mess_up_SPH.f90 read_phantom.f90 read_gadget2.f90  \
 	  SPH2mcfost.f90 $(Atom_dir)/spectrum_type.f90 $(Atom_dir)/barklem.f90   \
@@ -171,7 +171,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90      
 	  $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90 \
 	  $(Atom_dir)/voigtfunctions.f90 $(Atom_dir)/profiles.f90                \
 	  $(Atom_dir)/planck.f90 $(Atom_dir)/background_opacity.f90\
-	  optical_depth.f90 dust_transfer.f90 $(Atom_dir)/opacity.f90            \
+	  dust_transfer.f90 $(Atom_dir)/opacity.f90            \
 	  $(Atom_dir)/statequil_atoms.f90 \
 	  $(Atom_dir)/io_opacity.f90 \
 	  mol_transfer.f90 $(Atom_dir)/atom_transfer.f90
