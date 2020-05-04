@@ -54,6 +54,12 @@ else
     echo "Unknown system to build mcfost: "$SYSTEM"\nPlease choose ifort or gfortran\ninstall.sh <system>\nExiting" ; exit 1
 fi
 
+
+#--- test for xgboost
+if [$MCFOST_NO_XGBOOST = "yes"] ; then
+    skip_xgboost=yes
+fi
+
 #-- Clean previous files if any
 rm -rf lib include sprng2.0 cfitsio voro xgboost
 mkdir lib include
@@ -68,8 +74,9 @@ if [ skip_hdf5 != "yes" ] ; then
     wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
 fi
 svn checkout --username anonsvn --password anonsvn https://code.lbl.gov/svn/voro/trunk voro
-git clone --recursive https://github.com/dmlc/xgboost
-
+if [ skip_xgboost != "yes" ] ; then
+    git clone --recursive https://github.com/dmlc/xgboost
+fi
 
 #-------------------------------------------
 # SPRNG
@@ -130,23 +137,24 @@ echo "Done"
 #-------------------------------------------
 # xgboost
 #-------------------------------------------
-echo "Compiling xgboost ..."
-cd xgboost
-git checkout v0.90
-#-- we remove the test for the moment even if this works for gfortran
-#if [ "$SYSTEM" = "ifort" ] ; then
-\cp ../ifort/xgboost/base.h include/xgboost/base.h
-#fi
-\cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ was hard-coded in the Mekefile
-make -j
-\cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
-\cp -r dmlc-core/include/dmlc rabit/include/rabit include/xgboost ../include
-#We will need the .h file when linking mcfost, the path is hard-coded in the the xgboost files
-mkdir -p  $MCFOST_INSTALL/src/common
-\cp -r src/common/*.h $MCFOST_INSTALL/src/common
-cd ~1
-echo "Done"
-
+if [ skip_xgboost = "yes"] ; then
+    echo "Compiling xgboost ..."
+    cd xgboost
+    git checkout v0.90
+    #-- we remove the test for the moment even if this works for gfortran
+    #if [ "$SYSTEM" = "ifort" ] ; then
+    \cp ../ifort/xgboost/base.h include/xgboost/base.h
+    #fi
+    \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ was hard-coded in the Mekefile
+    make -j
+    \cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
+    \cp -r dmlc-core/include/dmlc rabit/include/rabit include/xgboost ../include
+    #We will need the .h file when linking mcfost, the path is hard-coded in the the xgboost files
+    mkdir -p  $MCFOST_INSTALL/src/common
+    \cp -r src/common/*.h $MCFOST_INSTALL/src/common
+    cd ~1
+    echo "Done"
+fi
 
 #---------------------------------------------
 # hdf5 : you can skip hdf5 (slow to compile)
