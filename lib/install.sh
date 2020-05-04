@@ -56,9 +56,10 @@ fi
 
 
 #--- test for xgboost
-if [$MCFOST_NO_XGBOOST = "yes"] ; then
-    skip_xgboost=yes
-fi
+if [ -z ${MCFOST_NO_XGBOOST+x} ]; then MCFOST_NO_XGBOOST="no" ; else echo "MCFOST_NO_XGBOOST is set to '$MCFOST_NO_XGBOOST'"; fi
+if [ $MCFOST_NO_XGBOOST = "yes" ] ; then skip_xgboost=yes ; fi
+
+export skip_hdf5="no"
 
 #-- Clean previous files if any
 rm -rf lib include sprng2.0 cfitsio voro xgboost
@@ -70,13 +71,9 @@ pushd .
 #-- Downloading libraries
 wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
 wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-3.47.tar.gz
-if [ skip_hdf5 != "yes" ] ; then
-    wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
-fi
+if [ $skip_hdf5 != "yes" ] ; then wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2 ; fi
 svn checkout --username anonsvn --password anonsvn https://code.lbl.gov/svn/voro/trunk voro
-if [ skip_xgboost != "yes" ] ; then
-    git clone --recursive https://github.com/dmlc/xgboost
-fi
+if [ $skip_xgboost != "yes" ] ; then git clone --recursive https://github.com/dmlc/xgboost ; fi
 
 #-------------------------------------------
 # SPRNG
