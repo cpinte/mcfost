@@ -154,6 +154,9 @@ mcfost source code is hosted on github (as a private directory, public release w
       $ mcfost -setup
 
 
+.. note:: mcfost uses the xgboost machine learning library to predict chemical abundances. This features is experimental and xgboost is sometimes tricky to compile with the intel compiler. You can turn the feature off by seting the environement variable `MCFOST_NO_XGBOOST` to yes.
+
+
 MCFOST_UTILS Environment variable
 ----------------------------------
 
