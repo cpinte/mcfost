@@ -118,7 +118,7 @@ ifeq ($(SYSTEM), gfortran)
     COMPFLAGS= -fopenmp
     LIBCXX= -lstdc++
     ifneq ($(shell $(CC) -v 2>&1 | grep -c "clang"), 0)
-	LIBCXX= -lc++
+        LIBCXX= -lc++
     endif
     LIBS= $(LIB)/gfortran
 endif
@@ -158,10 +158,26 @@ else
     XGBOOST_WRAPPER = no_xgboost_wrapper
 endif
 
+#-- HDF5 library
+ifndef HDF5_DIR
+    HDF5_LIB= $(LIBS)
+    HDF5_INC= $(MCFOST_INSTALL)/include/hdf5
+endif
+ifdef HDF5_DIR
+    HDF5_LIB= $(HDF5_DIR)/lib
+    HDF5_INC= $(HDF5_DIR)/include
+endif
+
 #------------------------------------------------------------------------------#
 # Library flags
-INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(MCFOST_INSTALL)/include/hdf5 -I$(MCFOST_INSTALL)/include/$(SYSTEM)
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lhdf5_fortran -lhdf5 -lz -ldl $(LXGBOOST)
+
+INCLUDE+= -I$(MCFOST_INSTALL)/include \
+          -I$(MCFOST_INSTALL)/include/voro++ \
+          -I$(MCFOST_INSTALL)/include/$(SYSTEM) \
+          -I$(HDF5_DIR)/include
+LDFLAGS+= -L$(LIBS) -L$(HDF5_DIR)/lib \
+          $(LIBCXX) -lz -ldl -lcfitsio -lvoro++ -lsprng $(LXGBOOST) \
+          -lhdf5_fortran -lhdf5
 
 #------------------------------------------------------------------------------#
 # Sources and objects
@@ -176,8 +192,8 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90     \
           radiation_field.f90 thermal_emission.f90 diffusion.f90               \
           io_prodimo.f90 disk_physics.f90 optical_depth.f90 ML_prodimo.f90     \
           output.f90 mem.f90  init_mcfost.f90 io_phantom_infiles.f90           \
-	  io_phantom_utils.f90  utils_hdf5.f90 mess_up_SPH.f90 read_phantom.f90\
-	  read_gadget2.f90 SPH2mcfost.f90 dust_transfer.f90 mol_transfer.f90
+          io_phantom_utils.f90  utils_hdf5.f90 mess_up_SPH.f90 read_phantom.f90\
+          read_gadget2.f90 SPH2mcfost.f90 dust_transfer.f90 mol_transfer.f90
 
 OBJECTS= $(SOURCES:.f90=.o)
 
