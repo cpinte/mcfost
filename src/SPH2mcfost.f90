@@ -27,6 +27,7 @@ contains
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
+    logical, allocatable, dimension(:) :: mask ! size == np, not n_SPH, index is original SPH id
 
     real(dp), dimension(6) :: SPH_limits
     real :: factor
@@ -46,15 +47,19 @@ contains
 
        ! Are we reading phantom binary or HDF5 files ?
        ilen = index(density_files(1),'.',back=.true.) ! last position of the '.' character
-       if (density_files(1)(ilen:ilen+3) == ".h5") then
-          read_phantom_files => read_phantom_hdf_files
+       if (ilen > 0) then
+          if (density_files(1)(ilen:ilen+3) == ".h5") then
+             read_phantom_files => read_phantom_hdf_files
+          else
+             read_phantom_files => read_phantom_bin_files
+          endif
        else
           read_phantom_files => read_phantom_bin_files
        endif
 
-
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
-            particle_id,massgas,massdust,rho,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
+            particle_id, massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
+            SPH_grainsizes,mask,n_SPH,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
           factor = 1.0/n_phantom_files
@@ -88,22 +93,19 @@ contains
 
     if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
 
-    if (lscale_SPH) then
-       write(*,*) "**************************************************"
-       write(*,*) "WARNING : rescaling SPH simulation by:", scale_SPH
-       write(*,*) "**************************************************"
-       x = x * scale_SPH ; y = y * scale_SPH ; z = z * scale_SPH
-       etoile(:)%x = etoile(:)%x * scale_SPH ; etoile(:)%y = etoile(:)%y * scale_SPH ; etoile(:)%z = etoile(:)%z * scale_SPH
-    endif
-
     ! Model limits
     call read_SPH_limits_file(SPH_limits_file, SPH_limits)
 
     ! Voronoi tesselation
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true.)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true., mask=mask)
 
+    deallocate(x,y,z,h)
+    if (allocated(vx)) deallocate(vx,vy,vz)
     deallocate(massgas,rho)
     if (allocated(rhodust)) deallocate(rhodust,massdust)
+
+    ! Deleting partcles/cells in masked arreas (Hill sphere, etc)
+    if (allocated(mask)) call delete_masked_particles()
 
     return
 
@@ -137,8 +139,8 @@ contains
 
   !*********************************************************
 
-  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, &
-       SPH_limits, check_previous_tesselation)
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,&
+       SPH_grainsizes, SPH_limits, check_previous_tesselation, mask)
 
     use Voronoi_grid
     use density, only : densite_gaz, masse_gaz, densite_pouss, masse
@@ -147,12 +149,14 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(in) :: x,y,z,h,rho,massgas
-    real(dp), dimension(:), allocatable, intent(in) :: vx,vy,vz ! dimension n_SPH or 0
+    real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,rho,massgas
+    real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
+    integer,  allocatable, dimension(:), intent(in) :: particle_id
     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
+    logical, dimension(:), allocatable, intent(in), optional :: mask
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
@@ -162,6 +166,7 @@ contains
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n
 
     real(dp), dimension(6) :: limits
+
 
     if (lcorrect_density_elongated_cells) then
        density_factor = correct_density_factor_elongated_cells
@@ -250,15 +255,16 @@ contains
     write(*,*) "y =", limits(3), limits(4)
     write(*,*) "z =", limits(5), limits(6)
 
-
     !*******************************
     ! Voronoi tesselation
     !*******************************
     ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
     !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits)
-    call Voronoi_tesselation(n_SPH, x,y,z,h, limits, check_previous_tesselation)
+
+    call Voronoi_tesselation(n_SPH, particle_id, x,y,z,h,vx,vy,vz, limits, check_previous_tesselation)
     !deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
+
 
     !*************************
     ! Densities
@@ -412,18 +418,27 @@ contains
        masse(:) = masse(:) * f
     endif ! ndusttypes == 0
 
-
     !*************************
-    ! Velocities
+    ! Mask
     !*************************
-    if (lemission_mol) then
+    if (present(mask)) then
+       if (allocated(mask)) then
+          do icell=1,n_cells
+             iSPH = Voronoi(icell)%original_id
+             if (iSPH > 0) then
+                Voronoi(icell)%masked = mask(iSPH)
+             else
+                Voronoi(icell)%masked = .false.
+             endif
+          enddo
+       else
+          do icell=1,n_cells
+             Voronoi(icell)%masked = .false.
+          enddo
+       endif
+    else
        do icell=1,n_cells
-          iSPH = Voronoi(icell)%id
-          if (iSPH > 0) then
-             Voronoi(icell)%vxyz(1) = vx(iSPH)
-             Voronoi(icell)%vxyz(2) = vy(iSPH)
-             Voronoi(icell)%vxyz(3) = vz(iSPH)
-          endif
+          Voronoi(icell)%masked = .false.
        enddo
     endif
 
@@ -544,6 +559,123 @@ contains
 
   !*********************************************************
 
+  subroutine delete_masked_particles()
+
+    use Voronoi_grid
+    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
+
+    integer :: icell, k
+
+    k=0
+    do icell=1, n_cells
+       if (Voronoi(icell)%masked) then
+          k=k+1
+          masse_gaz(icell)       = 0.
+          densite_gaz(icell)     = 0.
+          masse(icell)           = 0.
+          densite_pouss(:,icell) = 0.
+       endif
+    enddo
+
+    write(*,*) k, "masked cells have been made transparent"
+
+    return
+
+  end subroutine delete_masked_particles
+
+  !*********************************************************
+
+  subroutine delete_Hill_sphere()
+
+    use Voronoi_grid
+    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
+
+    integer :: istar, icell, n_delete
+    real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz
+
+    ! We assume that the central star is the actual star
+    ! and following sink particles are planets
+    do istar=2, n_etoiles
+       n_delete = 0
+
+       d2 = (etoile(istar)%x - etoile(1)%x)**2 + &
+            (etoile(istar)%y - etoile(1)%y)**2 + &
+            (etoile(istar)%z - etoile(1)%z)**2
+       r_Hill2 = d2 * (etoile(istar)%m / (3*etoile(1)%m))**(2./3)
+       r_Hill = sqrt(r_Hill2)
+
+       write(*,*) "Sink particle #", istar, "Hill radius =", r_Hill, "au"
+
+       cell_loop : do icell=1, n_cells
+          if (icell == istar) cycle cell_loop
+          dx = Voronoi(icell)%xyz(1) - etoile(istar)%x
+          if (dx > r_Hill) cycle cell_loop
+          dy = Voronoi(icell)%xyz(2) - etoile(istar)%y
+          if (dy > r_Hill) cycle cell_loop
+          dz = Voronoi(icell)%xyz(3) - etoile(istar)%z
+          if (dz > r_Hill) cycle cell_loop
+
+          d2 = dx**2 + dy**2 + dz**2
+          if (d2 < r_Hill2) then ! particle is in Hill sphere
+             masse_gaz(icell)    = 0.
+             densite_gaz(icell) = 0.
+             masse(icell) = 0.
+             densite_pouss(:,icell) = 0.
+             n_delete = n_delete + 1
+          endif
+       enddo cell_loop
+
+       write(*,*) "Deleting", n_delete, "particles in Hill sphere of sink particle #", istar
+    enddo
+
+    return
+
+  end subroutine delete_Hill_sphere
+
+  !*********************************************************
+
+  subroutine randomize_azimuth(n_points, x,y, vx,vy)
+
+    use naleat, only : seed, stream, gtype
+#include "sprng_f.h"
+
+
+    integer, intent(in) :: n_points
+    real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
+
+    integer, parameter :: nb_proc = 1
+    integer :: i, id, istar
+
+    real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
+
+    particle_loop : do i=1, n_points
+       ! We do not touch the sink particles
+       do istar=1, n_etoiles
+          if (i == etoile(istar)%icell) cycle particle_loop
+       enddo
+
+       call random_number(phi)
+       phi = 2*pi*phi
+       cos_phi = cos(phi) ; sin_phi = sin(phi)
+
+       !-- position
+       x_tmp = x(i) * cos_phi + y(i) * sin_phi
+       y_tmp = -x(i) * sin_phi + y(i) * cos_phi
+       x(i) = x_tmp ; y(i) = y_tmp
+
+
+       !-- velocities
+       x_tmp = vx(i) * cos_phi + vy(i) * sin_phi
+       y_tmp = -vx(i) * sin_phi + vy(i) * cos_phi
+       vx(i) = x_tmp ; vy(i) = y_tmp
+    enddo particle_loop
+
+    return
+
+  end subroutine randomize_azimuth
+
+  !*********************************************************
+
   subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
 
     integer,               intent(in) :: iunit
@@ -583,5 +715,52 @@ contains
     return
 
   end subroutine read_ascii_SPH_file
+
+  !*********************************************************
+
+!  subroutine read_Judith_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
+!
+!    !The 3D cube is 20 cells in  colatitude direction, 215 radially, and 680 azimuthally.
+!    ! So when you read in the 1D  columns of arrays, you should maybe reform the arrays as [20,215,680] to get the 3D cube again
+!
+!    integer,               intent(in) :: iunit
+!    character(len=*),      intent(in) :: filename
+!    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas
+!    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
+!    integer, intent(out) :: ndusttypes, n_SPH,ierr
+!
+!    integer :: syst_status, alloc_status, ios, i
+!    character(len=512) :: cmd
+!
+!    ierr = 0
+!
+!    cmd = "wc -l "//trim(filename)//" > ntest.txt"
+!    call appel_syst(cmd,syst_status)
+!    open(unit=1,file="ntest.txt",status="old")
+!    read(1,*) n_SPH
+!    n_SPH = n_SPH - 1 ! removing 1 line of comments
+!    close(unit=1)
+!    ndusttypes =1
+!
+!    write(*,*) "n_SPH = ", n_SPH
+!
+!    alloc_status = 0
+!    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
+!    if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
+!
+!    open(unit=1, file=filename, status='old', iostat=ios)
+!    do i=1, n_SPH
+!       read(1,*) x(i), y(i), z(i), rhogas(i), T(i), vx(i), vy(i), vz(i)
+!    enddo
+!
+!    ! Correcting units : positions in au and velocities in m/s
+!    x(:) = x(:) * cm_to_au ; y(:) = y(:) * cm_to_au ; z(:) = z(:) * cm_to_au
+!    vx(:) = vx(:) * cm_to_m ; vy(:) = vy(:) * cm_to_m ; vz(:) = vz(:) * cm_to_m
+!
+!    write(*,*) "Using stars from mcfost parameter file"
+!
+!    return
+!
+!  end subroutine read_Judith_file
 
 end module SPH2mcfost

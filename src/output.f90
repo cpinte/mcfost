@@ -940,6 +940,9 @@ subroutine ecriture_map_ray_tracing()
      call ftppre(unit,group,fpixel,nelements,image,status)
   endif
 
+  ! extra hdu with star positions
+  call write_star_position_vr(unit,status)
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -1104,11 +1107,12 @@ subroutine ecriture_sed_ray_tracing()
   !call ftphps(unit,simple,bitpix,naxis,naxes,status)
 
   sed_rt = 0.0_dp
+
   if (RT_sed_method == 1) then
      sed_rt(:,:,:,:) = sum(Stokes_ray_tracing(:,1,1,:,:,:,:),dim=5)
   else
-     do i=1,npix_x
-        do j=1,npix_y
+     do j=1,npix_y
+        do i=1,npix_x
            sed_rt(:,:,:,:) = sed_rt(:,:,:,:) + sum(Stokes_ray_tracing(:,i,j,:,:,:,:),dim=5)
         enddo
      enddo
@@ -1215,141 +1219,70 @@ end subroutine write_origin
 
 !**********************************************************************
 
-subroutine calc_optical_depth_map(lambda)
+subroutine write_optical_depth_map(lambda)
 
-  implicit none
+  integer, intent(in) :: lambda
 
-  integer :: lambda
-
-  integer :: status,unit,blocksize,bitpix,naxis
-  integer, dimension(5) :: naxes
-  integer :: i,j,k, group,fpixel,nelements
-
-  character(len = 512) :: filename
-  logical :: simple, extend, lmilieu
-
-  real, dimension(n_rad,nz,n_az,2) :: optical_depth_map
-
-  lmilieu = .true. ! opacite au milieu ou a la "fin" de la cellule
-
-  if (lmilieu) then
-     ! Opacite radiale
-     do k=1, n_az
-        do j=1, nz
-           i=1 ; optical_depth_map(i,j,k,1) = kappa(cell_map(i,j,k),lambda)* 0.5 * (r_lim(i)-r_lim(i-1))
-           do i=2, n_rad
-              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) + &
-                   0.5 * kappa(cell_map(i-1,j,k),lambda)*(r_lim(i-1)-r_lim(i-2)) + &
-                   0.5 * kappa(cell_map(i,j,k),lambda)*(r_lim(i)-r_lim(i-1))
-           enddo
-        enddo
-     enddo
-
-     ! Opacite verticale
-     do i=1, n_rad
-        do k=1, n_az
-           j=nz ; optical_depth_map(i,j,k,2) = kappa(cell_map(i,j,k),lambda)* 0.5 * (z_lim(i,j+1)-z_lim(i,j))
-           do j=nz-1,1,-1
-              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + &
-                   0.5 * kappa(cell_map(i,j+1,k),lambda)*(z_lim(i,j+2)-z_lim(i,j+1)) + &
-                   0.5 * kappa(cell_map(i,j,k),lambda)*(z_lim(i,j+1)-z_lim(i,j))
-           enddo
-        enddo
-     enddo
-
-  else
-     ! Opacite radiale
-     do k=1, n_az
-        do j=1, nz
-           i=1 ; optical_depth_map(i,j,k,1) = kappa(cell_map(i,j,k),lambda)*(r_lim(i)-r_lim(i-1))
-           do i=2, n_rad
-              optical_depth_map(i,j,k,1) = optical_depth_map(i-1,j,k,1) +kappa(cell_map(i,j,k),lambda)*(r_lim(i)-r_lim(i-1))
-           enddo
-        enddo
-     enddo
-
-     ! Opacite verticale
-     do i=1, n_rad
-        do k=1, n_az
-           j=nz ; optical_depth_map(i,j,k,2) = kappa(cell_map(i,j,k),lambda)*(z_lim(i,j+1)-z_lim(i,j))
-           do j=nz-1,1,-1
-              optical_depth_map(i,j,k,2) = optical_depth_map(i,j+1,k,2) + kappa(cell_map(i,j,k),lambda)*(z_lim(i,j+1)-z_lim(i,j))
-           enddo
-        enddo
-     enddo
-  endif
+  character(len=512) :: filename
 
   write(*,*) "Writing optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sp), "microns"
   filename = "!optical_depth_map.fits.gz"
-
-  status=0
-  !  Get an unused Logical Unit Number to use to open the FITS file.
-  call ftgiou(unit,status)
-
-  !  Create the new empty FITS file.
-  blocksize=1
-  call ftinit(unit,trim(filename),blocksize,status)
-
-  !  Initialize parameters about the FITS image
-  simple=.true.
-  ! le signe - signifie que l'on ecrit des reels dans le fits
-  bitpix=-32
-  naxis=4
-  naxes(1)=n_rad
-  naxes(2)=nz
-  naxes(3)=n_az
-  naxes(4)=2
-
-  extend=.true.
-
-  !  Write the required header keywords.
-  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
-
-  !  Write the array to the FITS file.
-  group=1
-  fpixel=1
-  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-
-  ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,optical_depth_map,status)
-
-  !  Close the file and free the unit number.
-  call ftclos(unit, status)
-
-  call ftfiou(unit, status)
-
-  !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
-
+  call write_column(2, filename, lambda)
   write(*,*) "Done"
   call exit(0)
 
-end subroutine calc_optical_depth_map
+end subroutine write_optical_depth_map
+
+!***********************************************************
+
+subroutine write_column_density()
+
+  character(len=512) :: filename
+
+  write(*,*) "Writing column density"
+  filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
+  call write_column(1, filename)
+
+  return
+
+end subroutine write_column_density
+
+!***********************************************************
+
+subroutine write_mol_column_density(imol)
+
+  integer, intent(in) :: imol
+  character(len=512) :: filename
+
+  write(*,*) "Writing molecular column density"
+  filename = trim(data_dir2(imol))//"/column_density.fits.gz"
+  call write_column(3, filename)
+
+  return
+
+end subroutine write_mol_column_density
 
 !***********************************************************
 
 
-subroutine write_column_density()
-  ! Only works if the star in in 0, 0, 0 at the moment
+subroutine write_column(type, filename, lambda)
+  ! WARNING: Only works if the star in in 0, 0, 0 at the moment
+  ! 0 = towards the star, 1 = towards +z, 2 = towards -z and 3 = towards + r
 
-  use density, only : compute_CD
+  use optical_depth, only : compute_column
+
+  integer, intent(in) :: type
+  character(len=512), intent(in) :: filename
+  integer, intent(in), optional :: lambda
 
   integer, parameter :: n_directions = 4
-
-  real, dimension(n_cells,n_directions) :: CD
-
+  real, dimension(n_cells,n_directions) :: column
 
   integer :: status,unit,blocksize,bitpix,naxis,group,fpixel,nelements
   integer, dimension(4) :: naxes
   logical :: simple, extend
-  character(len=512) :: filename
 
-  call compute_CD(CD)
-
-  filename = trim(root_dir)//"/data_disk/column_density.fits.gz"
+  call compute_column(type, column, lambda)
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -1390,27 +1323,26 @@ subroutine write_column_density()
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-  call ftpkys(unit,'BUNIT',"g.cm-2",' ',status)
+  if (type==1) call ftpkys(unit,'BUNIT',"g.cm-2",' ',status)
+  if (type==3) call ftpkys(unit,'BUNIT',"particle.cm-2",' ',status)
 
   !  Write the array to the FITS file.
   group=1
   fpixel=1
 
   ! le e signifie real*4
-  call ftppre(unit,group,fpixel,nelements,CD,status)
+  call ftppre(unit,group,fpixel,nelements,column,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
-end subroutine write_column_density
+end subroutine write_column
 
 !***********************************************************
 
@@ -1468,7 +1400,7 @@ end subroutine reemission_stats
 
 !********************************************************************************
 
-subroutine write_disk_struct(lparticle_density)
+subroutine write_disk_struct(lparticle_density,lcolumn_density)
 ! Ecrit les table de densite du gaz en g/cm^3
 ! de la poussiere en g/cm^3 et en particules
 ! + coordonnees r et z en AU
@@ -1478,7 +1410,7 @@ subroutine write_disk_struct(lparticle_density)
 
   implicit none
 
-  logical, intent(in) :: lparticle_density
+  logical, intent(in) :: lparticle_density, lcolumn_density
 
   integer :: i, j, k, icell, jj
 
@@ -2018,7 +1950,7 @@ subroutine write_disk_struct(lparticle_density)
   end if
 
   ! Wrting the column density
-  !call write_column_density()
+  if (lcolumn_density) call write_column_density()
 
   if (lstop_after_init) then
      write(*,*) "Exiting"
@@ -3232,6 +3164,9 @@ subroutine ecriture_spectre(imol)
      call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt),status)
   endif ! lcasa
 
+  ! extra hdu with star positions
+  call write_star_position_vr(unit,status)
+
   !  Close the file and free the unit number.
   call ftclos(unit, status)
   call ftfiou(unit, status)
@@ -3298,26 +3233,66 @@ end subroutine ecriture_spectre
 
 !**********************************************************************
 
-subroutine write_temperature_for_phantom(n_SPH)
+subroutine write_star_position_vr(unit,status)
+  ! Create 2 extra hdu with :
+  ! - the position of the star
+  ! - the radial velocity of the star
 
-  integer, intent(in) :: n_SPH
-  integer :: i_SPH, icell
-  real, dimension(n_SPH) :: T_SPH
+  use dust_ray_tracing, only : star_position, star_vr
 
-  T_SPH = -1.0 ;
+  integer, intent(in) :: unit
+  integer, intent(inout) :: status
 
-  do icell=1, n_cells
-     i_SPH = Voronoi(icell)%id
-     if (i_SPH > 0) T_SPH(i_SPH) = Tdust(icell)
-  enddo
+  integer :: bitpix,naxis
+  integer, dimension(4) :: naxes
+  integer :: group,fpixel,nelements
+  logical :: simple, extend
 
-  open(1,file="T_for_phantom.tmp",status='replace',form='unformatted')
-  write(1) T_SPH
-  close(unit=1)
+  group=1
+  fpixel=1
+  bitpix=-32
+
+  naxis = 4
+  naxes(1) = n_etoiles
+  naxes(2)= RT_n_incl
+  naxes(3)= RT_n_az
+  naxes(4)= 2
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+  ! create new hdu
+  call ftcrhd(unit, status)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  call ftpkys(unit,'UNIT',"arcsec",'',status)
+
+  !  Write the array to the FITS file.
+  call ftppre(unit,group,fpixel,nelements,star_position,status)
+
+  !------------------------
+  ! radial velocities
+  !------------------------
+  naxis = 3
+  naxes(1) = n_etoiles
+  naxes(2)= RT_n_incl
+  naxes(3)= RT_n_az
+  nelements=naxes(1)*naxes(2)*naxes(3)
+
+  ! create new hdu
+  call ftcrhd(unit, status)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  call ftpkys(unit,'UNIT',"m/s",'',status)
+
+  !  Write the array to the FITS file.
+  call ftppre(unit,group,fpixel,nelements,star_vr,status)
 
   return
 
-end subroutine write_temperature_for_phantom
+end subroutine write_star_position_vr
 
 !**********************************************************************
 

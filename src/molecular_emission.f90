@@ -729,7 +729,7 @@ end function v_proj
 
 !***********************************************************
 
-real(kind=dp) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w) !
+real(kind=dp) function dv_proj(icell,x0,y0,z0,x1,y1,z1,u,v,w)
   ! Differentiel de vitesse projete entre 2 points
   ! au sein d'une cellule
   ! C. Pinte
@@ -832,7 +832,7 @@ subroutine photo_dissociation()
   ! It makes sense only for constant dust --> needs to be updated
   real, parameter :: photo_dissocation_depletion = 1.e-6
 
-  write (*,*) "Photo-dissociating molecules"!, threshold_CD
+  write (*,*) "Photo-dissociating molecules ..."!, threshold_CD
 
   do icell=1, n_cells
      CD = compute_vertical_CD(icell)
@@ -840,6 +840,8 @@ subroutine photo_dissociation()
         tab_abundance(icell) = tab_abundance(icell) * photo_dissocation_depletion
      endif
   enddo ! icell
+
+  write(*,*) "Done"
 
   return
 

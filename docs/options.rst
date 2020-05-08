@@ -89,7 +89,7 @@ Options related to images
 ``-n_MC_bins <n_inclinations> <n_azimuth>`` (default : 10 1)
 
 ``-planet_az <angle>`` [deg]: adjust the model azimuth so that the planet is at
-desired azimuth in the map
+desired azimuth in the map. 0 means the planet will be along the model x axis. Positive values from x axis to y axis.
 
 Options related to temperature equilibrium
 ``-no_T``: skip temperature calculations, force ltemp to F
@@ -173,6 +173,8 @@ The updated scale height is
 
 ``-z_scaling_env <scaling_factor>``: scale a spherical envelope along the z-axis
 
+``-column_density or -cd``: outputs the column densities from any cell in 4 directions: to the star, to +z, to -z, and +x.
+
 
 Stellar Properties
 -------------------
@@ -205,13 +207,13 @@ specified wavelength and stops
 
 ``-aggregate <GMM_input_file> <GMM_output_file>``
 
-``-optical_depth_map``, ``-od``: generates a map of integrated optical depth
-along radial and vertical directions and stops;
-results stored in ``optical_depth_map.fits.gz``
+``-optical_depth_map``, ``-od``: generates a map of integrated optical depths from the centre of each cell.
+4 directions are considered. In order: towards the star, +z, -z and +x.
+Results are stored in ``optical_depth_map.fits.gz``
 
 ``-average_grain_size``: computes average grain size in each cell,
 weighted by their geometrical cross-section;
-results stored in ``average_grain_size.fits.gz``
+Results are stored in ``average_grain_size.fits.gz``
 
 ``-HG``: uses an Heynyey-Greenstein function
 

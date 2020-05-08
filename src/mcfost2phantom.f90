@@ -139,7 +139,7 @@ contains
     np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,maxirad,&
     xyzh,vxyzu,radiation,ivorcl,&
     iphase,grainsize,graindens,dustfrac,massoftype,&
-    xyzmh_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
+    xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
     Tphantom,n_packets,mu_gas,ierr,write_T_files,ISM,T_to_u)
 
     use parametres
@@ -175,7 +175,7 @@ contains
     real(dp), dimension(ndusttypes), intent(in) :: grainsize, graindens
     real(dp), dimension(ntypes), intent(in) :: massoftype
     real(dp), intent(in) :: hfact, umass, utime, udist, T_to_u
-    real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
+    real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
     integer, parameter :: n_files = 1 ! the library only works on 1 set of phantom particles
     integer(kind=1), dimension(np) :: ifiles
@@ -234,7 +234,7 @@ contains
     mu_gas = mu ! Molecular weight
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
-         vxyzu,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,hfact,&
+         vxyzu,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,vxyz_ptmass,hfact,&
          umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)
@@ -242,7 +242,7 @@ contains
     if (.not.lfix_star) call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
-    call SPH_to_Voronoi(n_SPH, ndusttypes, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH, &
+    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH, &
          massgas,massdust,rhogas,rhodust,SPH_grainsizes, SPH_limits, .false.)
 
     call setup_grid()
@@ -489,7 +489,7 @@ contains
     call ecriture_temperature(1)
 
     call appel_syst("rm -rf data_disk ; mkdir -p data_disk", syst_status)
-    call write_disk_struct(.false.)
+    call write_disk_struct(.false., .false.)
     call appel_syst("mv data_disk/grid.fits.gz "//trim(data_dir), syst_status)
 
     return

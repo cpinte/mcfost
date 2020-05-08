@@ -53,6 +53,8 @@ module dust_ray_tracing
   real, dimension(:,:,:), allocatable ::  cos_thet_ray_tracing_star, omega_ray_tracing_star ! nang_ray_tracing, 2 (+z et -z), nb_proc
 
   real, dimension(:,:,:,:,:,:,:), allocatable :: Stokes_ray_tracing ! n_lambda, nx, ny, RT_n_incl, RT_n_az, n_type_flux, ncpus
+  real, dimension(:,:,:,:), allocatable :: star_position ! n_stars, RT_n_incl, RT_n_az, 2
+  real, dimension(:,:,:), allocatable :: star_vr
 
   real, dimension(:,:,:,:,:,:), allocatable :: tau_surface ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
   real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
@@ -229,7 +231,9 @@ subroutine init_directions_ray_tracing()
   ! 09/09/08
 
   real(kind=dp) :: cos_min, cos_max
-  integer :: ibin, iaz
+  integer :: ibin, iaz, alloc_status
+
+  alloc_status = 0
 
   if (.not.allocated(tab_RT_incl)) then
      allocate(tab_RT_incl(RT_n_incl),tab_RT_az(RT_n_az), tab_uv_rt(RT_n_incl), &
@@ -275,6 +279,11 @@ subroutine init_directions_ray_tracing()
         tab_v_rt(ibin,iaz) =   - tab_uv_rt(ibin) * cos(tab_RT_az(iaz)*deg_to_rad)
      enddo
   enddo
+
+  if (.not. allocated(star_position)) then
+     allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), star_vr(n_etoiles,RT_n_incl,RT_n_az), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error star_position')
+  endif
 
   return
 
@@ -703,8 +712,11 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
 
   real :: Q, U
 
-  if (lmono0) write(*,*) "i=", tab_RT_incl(ibin)
-  if (lmono0) write(*,'(a33, $)') " Scattered specific intensity ..."
+  if (lmono0) then
+     write(*,*) "i=", tab_RT_incl(ibin)
+     write(*,*) "Vector to observer =", real(tab_u_rt(ibin,1)),real(tab_v_rt(ibin,1)),real(tab_w_rt(ibin))
+     write(*,*) "Scattered specific intensity ..."
+  endif
 
   I_sca2 = 0.0_dp
   eps_dust2_star = 0.0_dp

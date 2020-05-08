@@ -3,7 +3,7 @@ module init_mcfost
   use parametres
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use density, only : specie_removed, T_rm
+  use density, only : species_removed, T_rm
   use molecular_emission
   !$ use omp_lib
   use benchmarks
@@ -126,7 +126,6 @@ subroutine set_default_variables()
   lcasa=.false.
   lplanet_az = .false.
   which_planet = 0
-  lscale_SPH = .false.
   lML = .false.
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
@@ -137,6 +136,13 @@ subroutine set_default_variables()
   lno_vz = .false.
   lvphi_Kep = .false.
   lfluffy = .false.
+  ldelete_hill_sphere = .false.
+  lrandomize_azimuth = .false.
+  lrandomize_gap = .false.
+  lrandomize_outside_gap = .false.
+  lwrite_column_density = .false.
+  lwrite_mol_column_density = .false.
+
   tmp_dir = "./"
 
   ! Geometrie Grille
@@ -452,9 +458,9 @@ subroutine initialisation_mcfost()
      case("-rs")
         lremove=.true.
         i_arg= i_arg+1
-        if (i_arg > nbr_arg) call error("specie number needed")
+        if (i_arg > nbr_arg) call error("species number needed")
         call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) specie_removed
+        read(s,*,iostat=ios) species_removed
         i_arg= i_arg+1
         if (i_arg > nbr_arg) call error("Temperature needed")
         call get_command_argument(i_arg,s)
@@ -993,12 +999,6 @@ subroutine initialisation_mcfost()
         read(s,*) which_planet
         write(*,*) "PLANET", which_planet, "AZ=", planet_az
         i_arg = i_arg + 1
-     case("-scale_SPH")
-        lscale_SPH = .true.
-        i_arg = i_arg + 1
-        call get_command_argument(i_arg,s)
-        read(s,*) scale_SPH
-        i_arg = i_arg + 1
      case("-correct_density_elongated_cells")
         i_arg = i_arg+1
         lcorrect_density_elongated_cells=.true.
@@ -1041,6 +1041,30 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) fluffyness
         i_arg = i_arg + 1
+     case("-delete_Hill_sphere")
+        i_arg = i_arg + 1
+        ldelete_Hill_sphere = .true.
+     case("-random_az")
+        i_arg = i_arg + 1
+        lrandomize_azimuth = .true.
+     case("-random_gap")
+        i_arg = i_arg + 1
+        lrandomize_gap = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) gap_factor
+        i_arg = i_arg + 1
+     case("-random_outside_gap")
+        i_arg = i_arg + 1
+        lrandomize_outside_gap = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) gap_factor
+        i_arg = i_arg + 1
+     case("-cd","-column_density")
+        i_arg = i_arg + 1
+        lwrite_column_density = .true.
+     case("-mol_cd","-mol_column_density")
+        i_arg = i_arg + 1
+        lwrite_mol_column_density = .true.
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1095,6 +1119,8 @@ subroutine initialisation_mcfost()
         N_type_flux = 1
      endif
   endif
+
+  if ( lwrite_column_density .and. .not. ldisk_struct) call error("-cd option requires - or +disk_struct option")
 
   write(*,*) 'Input file read successfully'
 
@@ -1433,7 +1459,7 @@ subroutine display_help()
   write(*,*) "        : -tau_dark_zone_obs <tau_dark_zone> (default : 100)"
   write(*,*) "        : -tau_dark_zone_eq_th <tau_dark_zone> (default : 1500)"
   write(*,*) "        : -origin : save origin of packets received the interest bin"
-  write(*,*) "        : -rs (remove specie) <specie_number> <Temperature>"
+  write(*,*) "        : -rs (remove species) <species_number> <Temperature>"
   write(*,*) "        : -reemission_stats"
   write(*,*) "        : -weight_emission  : weight emission towards disk surface"
   write(*,*) "        : -force_PAH_equilibrium : mainly for testing purposes"
@@ -1465,6 +1491,7 @@ subroutine display_help()
   write(*,*) "        : -nz : overwrite value in parameter file"
   write(*,*) "        : -z_scaling_env <scaling_factor> : scale a spherical envelope along the z-axis"
   write(*,*) "        : -correct_density_elongated_cells <factor> : apply a density correction to elongated Voronoi cells"
+  write(*,*) "        : -column_density or -cd : generates a fits file with the column densities from each cell"
   write(*,*) " "
   write(*,*) " Options related to star properties"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
@@ -1501,7 +1528,7 @@ subroutine display_help()
   write(*,*) "        : -only_bottom : molecular emssion from the bottom half of the disk"
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
-  write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity of independent of z"
+  write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity independent of z"
   write(*,*) " "
   write(*,*) " Options related to phantom"
   write(*,*) "        : -fix_star"
@@ -1511,6 +1538,7 @@ subroutine display_help()
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
   write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
+  write(*,*) "        : -delete_Hill_sphere : delete SPH particles inside Hill spheres of planets"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

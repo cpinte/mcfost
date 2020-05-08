@@ -109,11 +109,11 @@ module parametres
   logical, parameter :: ltest_rt4 = .false.  ! marche pas non plus
 
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM
-  logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface
+  logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface, lwrite_column_density, lwrite_mol_column_density
 
   ! Phantom
-  logical :: ldudt_implicit, lscale_units, lignore_dust
-  real(kind=dp) :: ufac_implicit,scale_units_factor,correct_density_factor_elongated_cells, SPH_amin, SPH_amax, fluffyness
+  logical :: ldudt_implicit, lscale_units, lignore_dust, ldelete_Hill_sphere, lrandomize_azimuth, lrandomize_gap, lrandomize_outside_gap
+  real(kind=dp) :: ufac_implicit,scale_units_factor,correct_density_factor_elongated_cells, SPH_amin, SPH_amax, fluffyness, gap_factor
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy
 
   ! Disk parameters
@@ -156,8 +156,8 @@ module parametres
   real :: z_warp, tilt_angle
 
   ! SPH
-  real :: SPH_keep_particles, planet_az, scale_SPH
-  logical :: lplanet_az, lscale_SPH, lfix_star, lcorrect_density_elongated_cells
+  real :: SPH_keep_particles, planet_az
+  logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells
   integer :: which_planet
 
   logical :: lgap_Gaussian
@@ -176,7 +176,7 @@ module parametres
   ! Stars
   type star_type
      real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
-     real(kind=dp) :: x,y,z
+     real(kind=dp) :: x,y,z, vx,vy,vz
      logical :: lb_body, out_model
      character(len=512) :: spectre
      integer :: icell

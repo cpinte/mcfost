@@ -26,7 +26,7 @@
   0	                  0=auto, 1=grain prop, 2=cell prop
   1	                  1=exact phase function, 2=hg function with same g (2 implies the loss of polarizarion)
 
-#Symetries
+#Symmetries
   T	                  image symmetry
   T	                  central symmetry
   T	                  axial symmetry (important only if N_phi > 1)

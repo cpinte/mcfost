@@ -802,10 +802,8 @@ subroutine mcfost_v()
   integer ::  syst_status, line_number, ios
   character(len=128) :: sline_number
 
-!  write(*,*) "This is MCFOST version: ", mcfost_release
-!  write(*,fmt="(A24, F5.2)") "Parameter file version ", mcfost_version
-!  write(*,*) "Git SHA  = ", sha_id
-  !write(*,*) 1.0/0.0 , __LINE__, __FILE__
+  syst_status = 0
+
   write(*,*) "Binary compiled the ",__DATE__," at ",__TIME__
 #if defined (__INTEL_COMPILER)
   write(*,fmt='(" with INTEL compiler version ",i4)')  __INTEL_COMPILER
@@ -818,20 +816,17 @@ subroutine mcfost_v()
 #endif
   write(*,*) " "
 
-
   ! Last version
   write(*,*) "Checking last version ..."
   cmd = "curl "//trim(webpage)//"version.txt -O -s"
-
   call appel_syst(cmd, syst_status)
-  if (syst_status/=0) call error("Cannot get MCFOST last version number (Error 1)")
+  if (syst_status/=0) call error("Cannot get MCFOST last version number (Error 1)","'"//trim(cmd)//"' did not run as expected.")
+
   open(unit=1, file="version.txt", status='old',iostat=ios)
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
 
-  if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
-     call error("Cannot get MCFOST last version number (Error 2)")
-  endif
+  if ((ios/=0) .or. (.not.is_digit(last_version(1:1)))) call error("Cannot get MCFOST last version number (Error 2)","Cannot read new version file")
 
   ! Do we have the last version ?
   if (last_version == mcfost_release) then
@@ -1195,16 +1190,18 @@ end subroutine appel_syst
 
 !************************************************************
 
-subroutine GauLeg(x1,x2,x,w,n)
-  ! Given the lower and upper limits of integration x1 and x2,
-  ! and given n, this routine returns arrays x(1:1) and w(1:w)
-  ! of length n, containing the abscissas and weights of the
+subroutine Gauss_Legendre_quadrature(x1,x2,n, x,w)
+  ! Computes the abscissas and weights of the
   ! Gauss-Legendre n-point quadrature formula.
+  !
+  ! Inputs :
+  ! - x1 and x2 are the lower and upper limits of integration,
+  ! - n is the number of points
+  !
+  ! Outputs :
+  !  - arrays x and w of length n, containing abscissas and weights
 
-  ! Revision history:
-  ! - Original subroutine: gauleg.for (C) copr. 1986-92 copr. 1986-92
-  ! numerical recipes software &145i..
-  ! - modified: 20.06.05 by RGA.
+  ! - 20/06/05 by RGA.
   ! - modified 31/01/13 by C. Pinte
 
   implicit none
@@ -1215,7 +1212,7 @@ subroutine GauLeg(x1,x2,x,w,n)
   real(kind=dp), dimension(n), intent(out) :: x, w ! abscissas and weights
 
   real(kind=dp), parameter :: eps = 3.0d-14
-  real(kind=dp) :: dj, p1, p2, p3, pp, xl, xm, z, z1
+  real(kind=dp) :: dn, dj, p1, p2, p3, pp, xl, xm, z, z1
   integer :: i, j, m
   logical :: conv
 
@@ -1224,14 +1221,15 @@ subroutine GauLeg(x1,x2,x,w,n)
   xm = 0.5_dp * (x2+x1)
   xl = 0.5_dp * (x2-x1)
 
+  dn = real(n,kind=dp)
+
   do i=1,m ! Loop over the desired roots
-     z = cos(pi*(real(i,kind=dp)-0.25_dp)/(real(n,kind=dp)+0.5_dp))
+     z = cos(pi*(real(i,kind=dp)-0.25_dp)/(dn+0.5_dp))
      ! Starting with the above approximation to the ith root, we
      ! enter the main loop of refinement by Newton's method
      conv = .false.
      do while (.not.conv)
-        p1 = 1.0_dp
-        p2 = 0.0_dp
+        p1 = 1.0_dp ; p2 = 0.0_dp
 
         !Loop up the recurrence relation to get the Legendre polynomial evaluated at z
         do j = 1, n
@@ -1244,7 +1242,7 @@ subroutine GauLeg(x1,x2,x,w,n)
         ! p1 is now the desired Legendre polynomial. We next compute pp, its
         ! derivative, by a standard relation involving also p2, the
         ! polynomial of one lower order.
-        pp = real(n,kind=dp) * (z * p1 - p2) / (z * z - 1.0_dp)
+        pp = dn * (z * p1 - p2) / (z * z - 1.0_dp)
 
         ! Newton's method.
         z1 = z
@@ -1263,7 +1261,7 @@ subroutine GauLeg(x1,x2,x,w,n)
 
   return
 
-end subroutine GauLeg
+end subroutine Gauss_Legendre_quadrature
 
 !************************************************************
 

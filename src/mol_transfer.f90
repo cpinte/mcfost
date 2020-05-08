@@ -98,6 +98,8 @@ subroutine mol_line_transfer()
      call opacite_mol(imol)
      call integ_tau_mol(imol)
 
+     if (lwrite_mol_column_density) call write_mol_column_density(imol)
+
      ! Resolution population des niveaux nLTE
      if (.not.lmol_LTE) then
         call NLTE_mol_line_transfer(imol)
@@ -144,7 +146,6 @@ subroutine NLTE_mol_line_transfer(imol)
 #include "sprng_f.h"
 
   integer, intent(in) :: imol
-
   integer, parameter :: n_rayons_start = 100 ! l'augmenter permet de reduire le tps de l'etape 2 qui est la plus longue
   integer, parameter :: n_rayons_start2 = 100
   integer, parameter :: n_iter2_max = 10
@@ -180,7 +181,7 @@ subroutine NLTE_mol_line_transfer(imol)
   n_level_comp = min(mol(imol)%iLevel_max,nLevels)
 
   do i=1, nTrans_tot
-     tab_Trans(i) = 1 ! we use all the transitions here
+     tab_Trans(i) = i ! we use all the transitions here
   enddo
 
   if (n_level_comp < 2) call error("n_level_comp must be > 2")
@@ -236,7 +237,7 @@ subroutine NLTE_mol_line_transfer(imol)
      else if (etape==3) then
         lfixed_Rays = .false.;  ispeed(1) = 1 ; ispeed(2) = 1
         n_rayons = n_rayons_start2
-        fac_etape = 1.
+        fac_etape = 1.0
         lprevious_converged = .false.
 
         ! On passe en mode mono-frequence
@@ -653,7 +654,7 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! --------------------------
   do i = 1, mol(imol)%nTrans_raytracing
      lambda =  mol(imol)%indice_Trans_raytracing(i) ! == iTrans
-     call compute_stars_map(lambda, u, v, w, taille_pix, dx, dy, lresolved)
+     call compute_stars_map(lambda, ibin, iaz, u, v, w, taille_pix, dx, dy, lresolved)
 
      do iv =  -n_speed_rt, n_speed_rt
         spectre(:,:,iv,i,ibin,iaz) = spectre(:,:,iv,i,ibin,iaz) + stars_map(:,:,1)

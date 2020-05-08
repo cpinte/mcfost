@@ -4,20 +4,21 @@ module read_phantom
   use dump_utils
   use messages
   use constantes
+  use mess_up_SPH
 
   implicit none
 
   contains
 
 subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
-      rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,n_SPH,ierr)
+      rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ierr)
 
  integer,               intent(in) :: iunit, n_files
  character(len=*),dimension(n_files), intent(in) :: filenames
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,SPH_grainsizes
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
-
+ logical, dimension(:), allocatable, intent(out) :: mask
  real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
 
@@ -38,7 +39,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
  real(4),  allocatable, dimension(:) :: tmp
  real(dp), allocatable, dimension(:) :: grainsize, graindens
  real(dp), allocatable, dimension(:) :: dudt, tmp_dp
- real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu
  type(dump_h) :: hdr
  logical :: got_h,got_dustfrac,got_itype,tagged,matched
 
@@ -284,27 +285,31 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
                 !elseif (j==1 .and. number8(j)==nptmass) then
                 elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
                    nptmass = number8(j) ! HACK
-                   if (.not.allocated(xyzmh_ptmass)) allocate(xyzmh_ptmass(5,nptmass)) !HACK
+                   if (.not.allocated(xyzmh_ptmass)) allocate(xyzmh_ptmass(5,nptmass), vxyz_ptmass(3,nptmass)) !HACK
 
                    read(iunit,iostat=ierr) tag
                    matched = .true.
                    if (i==i_real .or. i==i_real8) then
-                      ipos = 0
                       select case(trim(tag))
                       case('x')
-                         ipos = 1
+                         read(iunit,iostat=ierr) xyzmh_ptmass(1,1:nptmass)
                       case('y')
-                         ipos = 2
+                         read(iunit,iostat=ierr) xyzmh_ptmass(2,1:nptmass)
                       case('z')
-                         ipos = 3
+                         read(iunit,iostat=ierr) xyzmh_ptmass(3,1:nptmass)
                       case('m')
-                         ipos = 4
+                         read(iunit,iostat=ierr) xyzmh_ptmass(4,1:nptmass)
                       case('h')
-                         ipos = 5
+                         read(iunit,iostat=ierr) xyzmh_ptmass(5,1:nptmass)
+                      case('vx')
+                         read(iunit,iostat=ierr) vxyz_ptmass(1,1:nptmass)
+                      case('vy')
+                         read(iunit,iostat=ierr) vxyz_ptmass(2,1:nptmass)
+                      case('vz')
+                         read(iunit,iostat=ierr) vxyz_ptmass(3,1:nptmass)
                       case default
                          matched = .false.
                       end select
-                      if (ipos > 0) read(iunit,iostat=ierr) xyzmh_ptmass(ipos,1:nptmass)
                    else
                       matched = .false.
                       read(iunit,iostat=ierr)
@@ -350,8 +355,10 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
+    call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
+
     call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,dustfluidtype,xyzh,&
-         vxyzu,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,&
+         vxyzu,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,&
          hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles, &
          n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
@@ -363,7 +370,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
 
  write(*,*) "Phantom dump file processed ok"
  deallocate(xyzh,itype,vxyzu)
- if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
+ if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass,vxyz_ptmass)
 
 end subroutine read_phantom_bin_files
 
@@ -372,7 +379,7 @@ end subroutine read_phantom_bin_files
 subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
                                   particle_id,massgas,massdust,rhogas,rhodust, &
                                   extra_heating,ndusttypes,SPH_grainsizes,     &
-                                  n_SPH,ierr)
+                                  mask,n_SPH,ierr)
 
  use utils_hdf5, only:open_hdf5file,    &
                       close_hdf5file,   &
@@ -389,7 +396,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
                                                        SPH_grainsizes
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
-
+ logical, dimension(:), allocatable, intent(out) :: mask
  real, intent(out), dimension(:), allocatable :: extra_heating
  integer, intent(out) :: ndusttypes,n_SPH,ierr
 
@@ -408,7 +415,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
  real(4),  allocatable, dimension(:)   :: tmp, tmp_header
  real(dp), allocatable, dimension(:)   :: dudt, tmp_dp
  real(dp), allocatable, dimension(:)   :: grainsize, graindens
- real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,dustfrac,vxyzu
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu
  integer, allocatable, dimension(:) :: npartoftype
  real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
  real(dp) :: hfact,umass,utime,udist
@@ -588,10 +595,11 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
     endif
 
     ! read sinks
-    allocate(xyzmh_ptmass(5,nptmass))
+    allocate(xyzmh_ptmass(5,nptmass), vxyz_ptmass(3,nptmass))
     call read_from_hdf5(xyzmh_ptmass(1:3,:),'xyz',hdf5_group_id,got,error)
     call read_from_hdf5(xyzmh_ptmass(4,:),'m',hdf5_group_id,got,error)
     call read_from_hdf5(xyzmh_ptmass(5,:),'h',hdf5_group_id,got,error)
+    call read_from_hdf5(vxyz_ptmass(:,:),'vxyz',hdf5_group_id,got,error)
 
     if (error /= 0) then
        write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF sinks group ***'
@@ -630,9 +638,11 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
 
   write(*,*) "Found", nptmass, "point masses in the phantom file"
 
+  call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
+
   call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,      &
                         dustfluidtype,xyzh,vxyzu,itype,grainsize,dustfrac, &
-                        massoftype,xyzmh_ptmass,hfact,umass,       &
+                        massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
                         utime,udist,graindens,ndudt,dudt,ifiles,   &
                         n_SPH,x,y,z,h,vx,vy,vz,particle_id,SPH_grainsizes,     &
                         massgas,massdust,rhogas,rhodust,extra_heating)
@@ -642,14 +652,39 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
   write(*,*) "Phantom dump file processed ok"
   ierr = 0
   deallocate(xyzh,itype,vxyzu)
-  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
+  if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass,vxyz_ptmass)
 
 end subroutine read_phantom_hdf_files
 
 !*************************************************************************
 
+subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
+
+  integer, intent(in) :: np, nptmass
+  real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
+  real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
+  real(kind=dp), intent(in) :: udist
+
+  logical, dimension(:), allocatable, intent(out) :: mask
+
+  ! Modifying SPH dump
+  if (ldelete_Hill_sphere) then
+     allocate(mask(np))
+     call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,udist, mask)
+  endif
+  if (lrandomize_azimuth)     call randomize_azimuth(np, xyzh, vxyzu, mask)
+  if (lrandomize_gap)         call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor, .true.)
+  if (lrandomize_outside_gap) call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor, .false.)
+
+  return
+
+end subroutine modify_dump
+
+!*************************************************************************
+
+
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh, &
-     vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,hfact,umass, &
+     vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
      utime, udist,graindens,ndudt,dudt,ifiles, &
      n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
      SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating,T_to_u)
@@ -671,7 +706,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   real(dp), dimension(ndusttypes),    intent(in) :: graindens
   real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
-  real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass
+  real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
@@ -688,8 +723,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   integer  :: i,j,k,itypei,alloc_status,i_etoiles, n_etoiles_old, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udist_scaled, umass_scaled, udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
-  real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, tmp1, tmp2
-  real(dp), dimension(2) ::  v, r, U_r, U_phi
+  real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph
 
   logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
 
@@ -697,7 +731,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  if (lscale_units) then
     write(*,*) 'Lengths are rescaled by ', scale_units_factor
     udist_scaled = udist * scale_units_factor
-    umass_scaled = umass * scale_units_factor**3
+    umass_scaled = umass
  else
     udist_scaled = udist
     umass_scaled = umass
@@ -756,7 +790,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
  j = 0
  do i=1,np
-     ifile = ifiles(i)
+    ifile = ifiles(i)
 
     xi = xyzh(1,i)
     yi = xyzh(2,i)
@@ -885,70 +919,25 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     endif
 
     if (lVphi_kep) then
-       tmp1 = 0
-       tmp2 = 0
        do i=1, n_SPH
           r_cyl2 = x(i)**2 + y(i)**2
           r_cyl = sqrt(r_cyl2)
           cos_phi = x(i)/r_cyl ; sin_phi = y(i)/r_cyl
           r_sph = sqrt(r_cyl2 + z(i)**2)
 
-          U_r = (/ x(i)/r_cyl, y(i)/r_cyl /)
-          U_phi = (/ -y(i)/r_cyl, x(i)/r_cyl /)
+          !U_r = (/ x(i)/r_cyl, y(i)/r_cyl /)
+          !U_phi = (/ -y(i)/r_cyl, x(i)/r_cyl /)
+          !v = (/vx(i), vy(i)/)
 
-          !normV = sqrt(vx(i)**2 + vy(i)**2)
-          v = (/vx(i), vy(i)/)
-
-!          vr =
-
-
-          vr  =  vx(i) * cos_phi   + vy(i) * sin_phi
-          vphi = - vx(i) * sin_phi + vy(i) * cos_phi
-
-
-
-
-
-          !write(*,*) dot_product(v,U_r), dot_product(v,U_phi)
+          vr = vx(i) * cos_phi   + vy(i) * sin_phi
+          !vphi = - vx(i) * sin_phi + vy(i) * cos_phi
 
           ! Keplerian vphi
-          !vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
-          !write(*,*) vphi, - vx(i) * sin_phi + vy(i) * cos_phi
-          !vphi = 0
+          vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
 
-
-
-
-          if  ((x(i) - xyzmh_ptmass(1,3))**2 + (y(i) - xyzmh_ptmass(2,3))**2 + (z(i) - xyzmh_ptmass(3,3))**2 < 30**2) then
-             tmp1 = tmp1 + 1
-             tmp2 = tmp2 + abs(vr / (vphi - sqrt(Ggrav * xyzmh_ptmass(4,1) * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )))
-
-             !write(*,*) i,
-             write(*,*) sqrt(x(i)**2 + y(i)**2)
-
-          endif
-
-          V = vr * U_r + vphi * U_phi
-          V = sqrt(vr**2 + vphi**2) * U_r
-
-
-
-
-          !vx(i) = vr * cos_phi - vphi * sin_phi
-          !vy(i) = vr * sin_phi + vphi * cos_phi
-
-          vx(i) = vr * x(i)/r_cyl
-          vy(i) = vr * y(i)/r_cyl
-
-          !write(*,*) V(1), vx(i)
-
-          vx(i) = V(1)
-          vy(i) = V(2)
-
+          vx(i) = vr * cos_phi - vphi * sin_phi
+          vy(i) = vr * sin_phi + vphi * cos_phi
        enddo
-       write(*,*) tmp1, tmp2/tmp1
-
-       stop
     endif
  endif
 
@@ -971,7 +960,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
  if (lfix_star) then
     write(*,*) ""
-    write(*,*) "Stellar parameters will not be updated, only the star positions"
+    write(*,*) "Stellar parameters will not be updated, only the star positions and masses"
     if (n_etoiles > n_etoiles_old) then
        write(*,*) "WARNING: sink with id >", n_etoiles_old, "will be ignored in the RT"
        n_etoiles = n_etoiles_old
@@ -980,6 +969,12 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        etoile(i_etoiles)%x = xyzmh_ptmass(1,i_etoiles) * ulength_au
        etoile(i_etoiles)%y = xyzmh_ptmass(2,i_etoiles) * ulength_au
        etoile(i_etoiles)%z = xyzmh_ptmass(3,i_etoiles) * ulength_au
+
+       etoile(i_etoiles)%vx = vxyz_ptmass(1,i_etoiles) * uvelocity
+       etoile(i_etoiles)%vy = vxyz_ptmass(2,i_etoiles) * uvelocity
+       etoile(i_etoiles)%vz = vxyz_ptmass(3,i_etoiles) * uvelocity
+
+       etoile(i_etoiles)%M = xyzmh_ptmass(4,i_etoiles) * usolarmass
     enddo
  else
     write(*,*) ""
@@ -991,6 +986,11 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
     etoile(:)%y = xyzmh_ptmass(2,:) * ulength_au
     etoile(:)%z = xyzmh_ptmass(3,:) * ulength_au
+
+    etoile(:)%vx = vxyz_ptmass(1,:) * uvelocity
+    etoile(:)%vy = vxyz_ptmass(2,:) * uvelocity
+    etoile(:)%vz = vxyz_ptmass(3,:) * uvelocity
+
     etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
  endif
 

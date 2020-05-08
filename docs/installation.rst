@@ -1,7 +1,7 @@
 Requirements and Installation
 =============================
 
-MCFOST is written in Fortran 90 (with a few function in C++) and parallelized with the Open MP
+MCFOST is written in Fortran 90 (with a few functions in C++) and parallelized with the Open MP
 protocol, i.e. it can use several processors and/or cores on a single
 machine. For simplicity, we provide pre-compiled binaries which are statically linked and do not
 have any dependencies. Source code is available on github and acces can also be provided if needed.
@@ -23,14 +23,17 @@ Unless you need to dig into the source, this is the recommended installation
 procedure. The binaries have been compiled with the Intel compiler and should
 be optmized for most architectures. The binary also updates itself regularly (unless this options is truened off) making sure you have an up-to-date version.
 
-Email Christophe to ask for permission, and a link to download the tar ball with MCFOST.
+1. Download the tar ball with the pre-compiled binary:
 
-1. Extract the file and make it executable::
+http://ipag.osug.fr/public/pintec/mcfost/linux/mcfost.tgz
+http://ipag.osug.fr/public/pintec/mcfost/mac/mcfost.tgz
+
+2. Extract the file and make it executable::
 
      $ tar -xvzf mcfost.tgz
      $ chmod +x mcfost
 
-2. Make a directory where you move mcfost (or move mcfost in any directory defined in your shell path)::
+3. Make a directory where you move mcfost (or move mcfost in any directory defined in your shell path)::
 
      $ mkdir -p ~/mcfost/bin
      $ mv mcfost ~/mcfost/bin
@@ -45,7 +48,7 @@ Email Christophe to ask for permission, and a link to download the tar ball with
 
    for bash or bash-like shell.
 
-3. Set the environment variable ``MCFOST_UTILS`` to point to a directory
+4. Set the environment variable ``MCFOST_UTILS`` to point to a directory
    where you want mcfost to store its data files.
    E.g. edit your shell startup files to include either::
 
@@ -57,14 +60,14 @@ Email Christophe to ask for permission, and a link to download the tar ball with
 
    for bash or bash-like shell.
 
-4. You should now be able to run::
+5. You should now be able to run::
 
      $ mcfost --help
 
 
  to get a short list of the available options.
 
-5. Download mcfost data files, current reference parameter files with::
+6. Download mcfost data files, current reference parameter files with::
 
       $ mcfost -setup
 
@@ -77,16 +80,6 @@ mcfost source code is hosted on github (as a private directory, public release w
 
 
 1. Clone the repository (ask Christophe for access).
-
-.. important::
-   ``git-lfs`` is required to clone the repository. If you have never used git-lfs, you need to run::
-
-     $ git lfs install
-
-
-  If your git installation is too old, you will get an error message.
-  In this case, please update or ask your system admin to update your copy of git
-
 
 2. Set the following environment variables::
 
@@ -159,6 +152,9 @@ mcfost source code is hosted on github (as a private directory, public release w
 9. Download mcfost data files with::
 
       $ mcfost -setup
+
+
+.. note:: mcfost uses the xgboost machine learning library to predict chemical abundances. This features is experimental and xgboost is sometimes tricky to compile with the intel compiler. You can turn the feature off by seting the environement variable `MCFOST_NO_XGBOOST` to yes.
 
 
 MCFOST_UTILS Environment variable
