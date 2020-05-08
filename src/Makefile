@@ -50,6 +50,18 @@ ifeq ($(profiling), yes)
     PROFILING=yes
 endif
 
+ifdef xgboost
+    XGBOOST=$(xgboost)
+endif
+
+ifndef XGBOOST
+    ifeq ($(MCFOST_NO_XGBOOST), yes)
+        XGBOOST = no
+    else
+        XGBOOST = yes
+    endif
+endif
+
 #------------------------------------------------------------------------------#
 # System dependent compiler flags
 
@@ -106,7 +118,7 @@ ifeq ($(SYSTEM), gfortran)
     COMPFLAGS= -fopenmp
     LIBCXX= -lstdc++
     ifneq ($(shell $(CC) -v 2>&1 | grep -c "clang"), 0)
-	LIBCXX= -lc++
+        LIBCXX= -lc++
     endif
     LIBS= $(LIB)/gfortran
 endif
@@ -137,10 +149,35 @@ ifeq ($(IPO), yes)
     CCFLAGS+= ${IPOFLAGS}
 endif
 
+
+#-- optional compilation with xgboost, as there are some issues on some systems
+ifeq ($(XGBOOST), yes)
+    XGBOOST_WRAPPER = xgboost_wrapper
+    LXGBOOST= -lxgboost -ldmlc -lrabit
+else
+    XGBOOST_WRAPPER = no_xgboost_wrapper
+endif
+
+#-- HDF5 library
+ifndef HDF5_DIR
+    HDF5_LIB= $(LIBS)
+    HDF5_INC= $(MCFOST_INSTALL)/include/hdf5
+endif
+ifdef HDF5_DIR
+    HDF5_LIB= $(HDF5_DIR)/lib
+    HDF5_INC= $(HDF5_DIR)/include
+endif
+
 #------------------------------------------------------------------------------#
 # Library flags
-INCLUDE+= -I$(MCFOST_INSTALL)/include -I$(MCFOST_INSTALL)/include/voro++ -I$(MCFOST_INSTALL)/include/hdf5 -I$(MCFOST_INSTALL)/include/$(SYSTEM)
-LDFLAGS+= -L$(LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng -lxgboost -ldmlc -lrabit -lhdf5_fortran -lhdf5 -lz -ldl
+
+INCLUDE+= -I$(MCFOST_INSTALL)/include \
+          -I$(MCFOST_INSTALL)/include/voro++ \
+          -I$(MCFOST_INSTALL)/include/$(SYSTEM) \
+          -I$(HDF5_DIR)/include
+LDFLAGS+= -L$(LIBS) -L$(HDF5_LIB) \
+          $(LIBCXX) -lz -ldl -lcfitsio -lvoro++ -lsprng $(LXGBOOST) \
+          -lhdf5_fortran -lhdf5
 
 
 #------------------------------------------------------------------------------#
@@ -186,10 +223,10 @@ main : mcfost
 
 all : mcfost libmcfost.a
 
-mcfost :  $(OBJECTS) voro++_wrapper.o  xgboost_wrapper.o mcfost.o
-	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o xgboost_wrapper.o mcfost.o $(LDFLAGS)
+mcfost :  $(OBJECTS) voro++_wrapper.o  $(XGBOOST_WRAPPER).o mcfost.o
+	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o $(XGBOOST_WRAPPER).o mcfost.o $(LDFLAGS)
 
-libmcfost.a : $(OBJECTS) voro++_wrapper.o xgboost_wrapper.o mcfost2phantom.o
+libmcfost.a : $(OBJECTS) voro++_wrapper.o $(XGBOOST_WRAPPER).o mcfost2phantom.o
 	rm -f mcfost.o libmcfost.a
 	ar vr libmcfost.a *.o
 	ranlib libmcfost.a
@@ -206,8 +243,8 @@ io_phantom_utils.o :  io_phantom_utils.f90
 voro++_wrapper.o :  voro++_wrapper.cpp
 	$(CXX) $(CCFLAGS) -c voro++_wrapper.cpp -I$(MCFOST_INSTALL)/include
 
-xgboost_wrapper.o :  xgboost_wrapper.cpp
-	$(CXX) $(CCFLAGS) $(COMPFLAGS) -c xgboost_wrapper.cpp -I$(MCFOST_INSTALL)/include
+$(XGBOOST_WRAPPER).o :  $(XGBOOST_WRAPPER).cpp
+	$(CXX) $(CCFLAGS) $(COMPFLAGS) -c $(XGBOOST_WRAPPER).cpp -I$(MCFOST_INSTALL)/include
 
 %.o : %.f90
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 $< -o $@ $(INCLUDE)

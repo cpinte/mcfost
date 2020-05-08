@@ -56,7 +56,7 @@ subroutine setDiffusion_coeff(i)
               endif
               somme = somme + dB_dT/kappa(icell,lambda) * delta_wl
            enddo
-           !kappa_R = 4.*sigma * Temp**3 / (pi * somme)
+           ! kappa_R = 4.*sigma * Temp**3 / (pi * somme)
            ! Dcoeff = c_light/(3kappa_R) car kappa volumique
            Dcoeff(i,j,k) =  cst_Dcoeff * somme/Temp**3
         endif

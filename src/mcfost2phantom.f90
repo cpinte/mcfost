@@ -135,22 +135,24 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,&
-    npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
+  subroutine run_mcfost_phantom(&
+    np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,maxirad,&
+    xyzh,vxyzu,radiation,ivorcl,&
+    iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-    Tphantom,Frad,n_packets,mu_gas,ierr,write_T_files,ISM,T_to_u)
+    Tphantom,n_packets,mu_gas,ierr,write_T_files,ISM,T_to_u)
 
     use parametres
     use constantes, only : mu
     use read_phantom
     use stars, only : E_ISM
-    use radiation_field, only : reset_radiation_field, xN_abs
+    use radiation_field, only : xN_abs
     use thermal_emission, only : select_wl_em, repartition_energie, init_reemission, &
-         temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature, reset_temperature, E_abs_nRE
-    use mem, only : alloc_dynamique, deallocate_densities
+         temp_finale, temp_finale_nlte, repartition_wl_em, set_min_temperature, E_abs_nRE
+    use mem, only : alloc_dynamique
     use naleat, only : seed, stream, gtype
     use SPH2mcfost, only : SPH_to_Voronoi, compute_stellar_parameters
-    use Voronoi_grid, only : Voronoi, deallocate_Voronoi
+    use Voronoi_grid, only : Voronoi
     use dust_transfer, only : emit_packet, propagate_packet
     use utils, only : progress_bar
     use stars, only : repartition_energie_etoiles, repartition_energie_ISM
@@ -164,8 +166,10 @@ contains
 
 #include "sprng_f.h"
 
-    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype
+    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype,&
+       maxirad,ivorcl
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
+    real(dp), dimension(maxirad,np), intent(inout) :: radiation
     integer(kind=1), dimension(np), intent(in) :: iphase
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize, graindens
@@ -173,7 +177,6 @@ contains
     real(dp), intent(in) :: hfact, umass, utime, udist, T_to_u
     real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
-
     integer, parameter :: n_files = 1 ! the library only works on 1 set of phantom particles
     integer(kind=1), dimension(np) :: ifiles
 
@@ -189,7 +192,6 @@ contains
 
     real(sp), dimension(np), intent(out) :: Tphantom ! mcfost stores Tdust as real, not dp
     real(sp), dimension(np), intent(out) :: n_packets ! number of packets that crossed the cell
-    real(sp), dimension(3,ndusttypes,np), intent(out) :: Frad
     real(dp), intent(out) :: mu_gas
     integer, intent(out) :: ierr
 
@@ -230,7 +232,6 @@ contains
 
     ierr = 0
     mu_gas = mu ! Molecular weight
-    Frad = 0.
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
          vxyzu,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,vxyz_ptmass,hfact,&
@@ -298,8 +299,8 @@ contains
 
     call repartition_wl_em()
 
-    letape_th = .true.
-    laffichage=.true.
+    letape_th  = .true.
+    laffichage = .true.
     nbre_phot2 = nbre_photons_eq_th
 
     test_tau : do lambda=1,n_lambda
@@ -345,8 +346,10 @@ contains
           lpacket_alive = .true.
 
           ! Propagation du packet
-          if (lintersect) call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes, &
-               flag_star,flag_ISM,flag_scatt,lpacket_alive)
+          if (lintersect) then
+             call propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,&
+                flag_star,flag_ISM,flag_scatt,lpacket_alive)
+          endif
        enddo photon !nnfot2
 
        ! Progress bar
@@ -377,34 +380,30 @@ contains
 
 
     call set_min_Temperature(Tmin)
-    Tphantom = -1.0 ;
 
     if (present(write_T_files)) then
        if (write_T_files) call write_mcfost2phantom_temperature()
     endif
-
+    ! SPH particles ignored by mcfost
+    Tphantom = -1.
+    ! Remapping to phantom indices
+    radiation(ivorcl,:) = -1.
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%id
        if (i_SPH > 0) then
           i_Phantom = particle_id(i_SPH)
-          Tphantom(i_Phantom) = Tdust(icell)
+          Tphantom(i_Phantom)  = Tdust(icell)
           n_packets(i_Phantom) = sum(xN_abs(icell,1,:))
+          radiation(ivorcl,i_Phantom) = icell
        endif
     enddo
-
-    call deallocate_Voronoi()
-    call deallocate_densities()
-
-    ! reset energy and temperature arrays
-    call reset_radiation_field()
-    call reset_temperature()
 
     ! Temps d'execution
     call system_clock(time_end)
     if (time_end < time_begin) then
-       time=(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
+       time = (time_end + (1.0 * time_max)- time_begin)/real(time_tick)
     else
-       time=(time_end - time_begin)/real(time_tick)
+       time = (time_end - time_begin)/real(time_tick)
     endif
     if (time > 60) then
        itime = real(time)
@@ -443,6 +442,24 @@ contains
 
   end subroutine run_mcfost_phantom
 
+  subroutine deinit_mcfost_phantom()
+    use Voronoi_grid,     only:deallocate_Voronoi
+    use mem,              only:deallocate_densities
+    use radiation_field,  only:reset_radiation_field
+    use thermal_emission, only:reset_temperature
+
+    call deallocate_Voronoi()
+    call deallocate_densities()
+    ! reset energy and temperature arrays
+    call reset_radiation_field()
+    call reset_temperature()
+    write(*,*)
+    write(*,*) "------------------------------"
+    write(*,*) "MCFOST: Reset State"
+    write(*,*) "------------------------------"
+    write(*,*)
+  end subroutine deinit_mcfost_phantom
+
 !*************************************************************************
 
   subroutine write_mcfost2phantom_temperature()
@@ -479,4 +496,54 @@ contains
 
   end subroutine write_mcfost2phantom_temperature
 
+  !*************************************************************************
+
+  subroutine diffusion_opacity(temp,icell,kappa_diffusion)
+    ! Compute current Planck reciprocal mean opacity for all cells
+    ! (note : diffusion coefficient needs to be defined with Rosseland opacity in B&W mode)
+    ! Diffusion coefficient is D = 1/(rho * opacity)
+    ! This opacity/diffusion coefficient includes scattering
+    ! See Min et al 2009 and Robitaille et al 2010
+    use parametres
+    use constantes
+    use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
+    use Temperature, only : Tdust
+    use dust_prop, only : kappa
+    use cylindrical_grid, only : volume
+    use density, only : masse_gaz, densite_gaz
+
+    real(dp), intent(in)  :: temp
+    integer,  intent(in)  :: icell
+    real(dp), intent(out) :: kappa_diffusion ! cm2/g (ie per gram of gas)
+
+    integer :: lambda
+    real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl
+
+    if (temp > 1) then
+       somme  = 0.0_dp
+       somme2 = 0.0_dp
+       cst    = cst_th/temp
+       do lambda = 1,n_lambda
+          ! longueur d'onde en metre
+          wl       = tab_lambda(lambda)*1.e-6
+          delta_wl = tab_delta_lambda(lambda)*1.e-6
+          cst_wl   = cst/wl
+          if (cst_wl < 200.0) then
+             coeff_exp = exp(cst_wl)
+             B = 1.0_dp/((wl**5)*(coeff_exp-1.0))*delta_wl
+             !dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
+          else
+             B = 0.0_dp
+             !dB_dT = 0.0_dp
+          endif
+          somme  = somme  + B/kappa(icell,lambda)*delta_wl
+          somme2 = somme2 + B*delta_wl
+       enddo
+       kappa_diffusion = somme2/somme&
+          *cm_to_AU/(densite_gaz(icell)*masse_mol_gaz*(cm_to_m)**3) ! cm^2/g
+       ! check : somme2/somme * cm_to_AU /(masse_gaz(icell)/(volume(icell)*AU_to_cm**3))
+    else
+       kappa_diffusion = 0.
+    endif
+  end subroutine diffusion_opacity
 end module mcfost2phantom
