@@ -1354,7 +1354,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi, factor_pix
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
-  logical :: in_map, lpola
+  logical :: in_map, lpola, is_in_image
 
   integer, parameter :: nx_screen = 10
   real(kind=dp), dimension(-nx_screen:nx_screen,-nx_screen:nx_screen) :: tau_screen
@@ -1404,7 +1404,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   endif
 
   do istar=1, n_etoiles
-     if (etoile(istar)%icell == 0) cycle ! star is not in the grid
+     ! if (etoile(istar)%icell == 0) cycle ! star is not in the grid ! We don't need to skip those stars anymore
 
      ! Compute optical depth screen in front of the star at limited resolution, e.g. 10x10
      delta = etoile(istar)%r / nx_screen
@@ -1455,7 +1455,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
      !$omp shared(x_center,y_center,taille_pix,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star,lresolved) &
      !$omp shared(tau_screen,dx_screen,dy_screen,norm_screen2) &
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,Stokes,fx,fy,offset_x,offset_y,vec) &
-     !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi) &
+     !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi,is_in_image) &
      !$omp reduction(+:norme,tau_avg)
      in_map = .true. ! for SED
      LimbDarkening = 1.0
@@ -1498,29 +1498,21 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
 
         ! Interpolation of optical depth : bilinear interpolation on the precomputed screen
         ! offset in in # of screen pixels (dx_screen is propto delta, so there is a delta**2 normlization)
+        is_in_image = .true.
         offset_x = dot_product(vec,dx_screen) * norm_screen2 ; i = floor(offset_x) ; fx = offset_x - i
-        if (i < -nx_screen) then
-           i = -nx_screen
-           fx = 0._dp
-        else if (i >= nx_screen) then
-           i = nx_screen -1
-           fx = 1._dp
-        endif
+        if ((i < -nx_screen).or.(i >= nx_screen)) is_in_image = .false.
 
         offset_y = dot_product(vec,dy_screen) * norm_screen2 ; j = floor(offset_y) ; fy = offset_y - j
-        if (j < -nx_screen) then
-           j = -nx_screen
-           fy = 0._dp
-        else if (j >= nx_screen) then
-           j = nx_screen -1
-           fy = 1._dp
+        if ((j < -nx_screen).or.(j >= nx_screen)) is_in_image = .false.
+
+        if (is_in_image) then
+           tau =  tau_screen(i,j)     * (1-fx) * (1-fy) &
+                + tau_screen(i+1,j)   * fx * (1-fy) &
+                + tau_screen(i,j+1)   * (1-fx) * fy &
+                + tau_screen(i+1,j+1) * fx * fy
+        else
+           tau = 0.0_dp
         endif
-
-
-        tau =  tau_screen(i,j)     * (1-fx) * (1-fy) &
-             + tau_screen(i+1,j)   * fx * (1-fy) &
-             + tau_screen(i,j+1)   * (1-fx) * fy &
-             + tau_screen(i+1,j+1) * fx * fy
 
         ! Average optical depth to the star
         if (lmono0) tau_avg = tau_avg + tau
@@ -1567,6 +1559,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
         tau_avg = tau_avg/n_ray_star(istar)
         write(*,fmt='(" Optical depth from star #", i2, " is ", E12.5)') istar, tau_avg
      endif
+
 
      !---  Projected position of centres of each star
      xyz(1) = etoile(istar)%x ; xyz(2) = etoile(istar)%y ; xyz(3) = etoile(istar)%z
