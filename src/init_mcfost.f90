@@ -137,6 +137,7 @@ subroutine set_default_variables()
   lvphi_Kep = .false.
   lfluffy = .false.
   ldelete_hill_sphere = .false.
+  lrandomize_Voronoi = .false.
   lrandomize_azimuth = .false.
   lrandomize_gap = .false.
   lrandomize_outside_gap = .false.
@@ -1047,15 +1048,18 @@ subroutine initialisation_mcfost()
      case("-random_az")
         i_arg = i_arg + 1
         lrandomize_azimuth = .true.
+        lrandomize_Voronoi = .true.
      case("-random_gap")
         i_arg = i_arg + 1
         lrandomize_gap = .true.
+        lrandomize_Voronoi = .true.
         call get_command_argument(i_arg,s)
         read(s,*) gap_factor
         i_arg = i_arg + 1
      case("-random_outside_gap")
         i_arg = i_arg + 1
         lrandomize_outside_gap = .true.
+        lrandomize_Voronoi = .true.
         call get_command_argument(i_arg,s)
         read(s,*) gap_factor
         i_arg = i_arg + 1
