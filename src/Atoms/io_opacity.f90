@@ -264,11 +264,11 @@ MODULE io_opacity
 
   do icell=1, n_cells !should be zero if icompute_atomRT < 1
   	chic(icell) = interp_dp(chi_c(:,icell), lambda_cont, lam)!NLTEspec%AtomOpac%Kc(ilam,icell)!interp_dp(NLTEspec%AtomOpac%Kc(:,icell), NLTEspec%lambda, lam)
-	sigmac(icell) = interp_dp(sca_c(:,icell), lambda_cont, lam)!NLTEspec%AtomOpac%sca_c(ilam,icell)!interp_dp(NLTEspec%AtomOpac%sca_c(:,icell), NLTEspec%lambda, lam)
+	sigmac(icell) = thomson(icell)!interp_dp(sca_c(:,icell), lambda_cont, lam)!NLTEspec%AtomOpac%sca_c(ilam,icell)!interp_dp(NLTEspec%AtomOpac%sca_c(:,icell), NLTEspec%lambda, lam)
   	etac(icell) = interp_dp(eta_c(:,icell), lambda_cont, lam)!NLTEspec%AtomOpac%jc(ilam,icell)!interp_dp(NLTEspec%AtomOpac%jc(:,icell),NLTEspec%lambda, lam)
   	
    if ( lelectron_scattering) then 
-  	etasc(icell) = interp_dp(sca_c(:,icell)*Jnu_cont(:,icell), lambda_cont, lam)!NLTEspec%AtomOpac%sca_c(ilam,icell) * NLTEspec%Jc(ilam,icell)!interp_dp(NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell), NLTEspec%lambda, lam)
+  	etasc(icell) = interp_dp(thomson(icell)*Jnu_cont(:,icell), lambda_cont, lam)!NLTEspec%AtomOpac%sca_c(ilam,icell) * NLTEspec%Jc(ilam,icell)!interp_dp(NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell), NLTEspec%lambda, lam)
   	etac(icell) = etac(icell) + etasc(icell)
    endif
    if (NactiveAtoms>0) then
@@ -1141,7 +1141,7 @@ end subroutine write_radiative_rates_atom
 !H Rayleigh or He Rayleigh  not written at the moment
 !  First scattering opacities only for H and He presently
   if (atom%ID=="H") then
-   sca_c(:,:) = 0.0_dp
+   !!sca_c(:,:) = 0.0_dp
    do icell=1,n_cells
 		if (icompute_atomRT(icell) <= 0) cycle	
        !CALL HI_Rayleigh(1, icell)
@@ -1170,13 +1170,16 @@ end subroutine write_radiative_rates_atom
   if (atom%ID=='H') then
    do icell=1,n_cells
     if (icompute_atomRT(icell) <= 0) cycle
-    call Hminus_bf_wishart(icell, Nlambda_cont, lambda_cont, chi, eta)
+!     if (icell==1) write(*,*) "using Wishart for H- bf"
+!     call Hminus_bf_wishart(icell, Nlambda_cont, lambda_cont, chi, eta)
+    if (icell==1) write(*,*) "using Geltman for H- bf"
+    call Hminus_bf_geltman(icell, Nlambda_cont, lambda_cont, chi, eta)
     big_tab(3,:,icell) = chi
     big_tab(4,:,icell) = eta
     
     chi = 0.0
     eta = 0.
-    Bp = Bpnu(T(icell), lambda)
+    Bp = Bpnu(T(icell), lambda_cont)
     call Hminus_ff_bell_berr(icell, Nlambda_cont, lambda_cont, chi)
     big_tab(5,:,icell) = chi
     big_tab(6,:,icell) = chi * Bp

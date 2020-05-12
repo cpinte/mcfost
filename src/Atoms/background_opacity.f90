@@ -53,7 +53,7 @@ module background_opacity
   integer, intent(in)                                       :: icell, id, N
   real(kind=dp), dimension(N), intent(in) 					:: lambda
   real(kind=dp) 											:: lambda_limit
-  real(kind=dp), dimension(N), intent(inout) 				:: scatt
+  real(kind=dp), dimension(N), intent(out) 				:: scatt
   integer :: k
     
   lambda_limit = hydrogen%scatt_limit!102.6
@@ -81,7 +81,7 @@ module background_opacity
   integer, intent(in)                                       :: icell, id, N
   real(kind=dp) 											:: lambda_limit!, sigma_e
   real(kind=dp), dimension(N), intent(in)					:: lambda
-  real(kind=dp), dimension(N), intent(inout) 				:: scatt
+  real(kind=dp), dimension(N), intent(out) 				:: scatt
   integer													:: Neutr_index, l
  
   if (.not.associated(Helium)) return
@@ -223,7 +223,7 @@ module background_opacity
 	subroutine lte_bound_free(icell, N, lambda, chi, eta)
 		integer, intent(in)											:: icell, N
 		real(kind=dp), intent(in), dimension(N)						:: lambda
-		real(kind=dp), intent(inout), dimension(N)					:: chi, eta
+		real(kind=dp), intent(out), dimension(N)					:: chi, eta
 		integer														:: m, kr, kc, i, j, Nblue, Nred, la, Nf
 		type (AtomType), pointer									:: atom
 		real(kind=dp)												:: wj, wi, l_min, l_max, twohnu3_c2, n_eff
@@ -264,12 +264,14 @@ module background_opacity
 				do la=1, N
 					if ((lambda(la) < l_min).or.(lambda(la)>l_max)) cycle
 					
-! 					if (atom%continua(kr)%hydrogenic) then
-! 						alpha = H_bf_Xsection(atom%continua(kr), lambda(la))
-! 					else
-! 						alpha = interp(atom%continua(kr)%alpha_file, atom%continua(kr)%lambda_file, lambda(la))
-! 					endif
-					alpha = atom%continua(kr)%alpha(la)
+					!can be long depending on n_cells and N; but avoid storing 
+					!this on memory and it is computed only once.
+					if (atom%continua(kr)%hydrogenic) then
+						alpha = H_bf_Xsection(atom%continua(kr), lambda(la))
+					else
+						alpha = interp(atom%continua(kr)%alpha_file, atom%continua(kr)%lambda_file, lambda(la))
+					endif
+					!!alpha = atom%continua(kr)%alpha(la)
 
 					!1 if lambda <= lambda0
 					Diss = D_i(icell, real(i,kind=dp), real(atom%stage(i)),1.0, lambda(la), atom%continua(kr)%lambda0, chi_ion)
@@ -282,7 +284,7 @@ module background_opacity
 						chi(la) = chi(la) + Diss * alpha * ni_njgij
        				
 						eta(la) = eta(la) + Diss * alpha * twohnu3_c2 * gij * atom%n(j,icell)
-						
+												
 					else
 					write(*,*) " check inversion popul in background bf"
 						eta(la) = eta(la) + Diss * alpha * twohnu3_c2 * gij * atom%n(j,icell) 
@@ -438,7 +440,7 @@ module background_opacity
    real(kind=dp) :: diff, stm, funit, cte, pe
    integer :: la
    real(kind=dp) :: arg_exp, nH
-   real(kind=dp), dimension(N), intent(inout) :: chi, eta
+   real(kind=dp), dimension(N), intent(out) :: chi, eta
    
    chi(:) = 0.0_dp
    eta(:) = 0.0_dp
@@ -554,7 +556,7 @@ module background_opacity
    integer, intent(in) :: icell, N
    integer :: la
    real(kind=dp), dimension(N), intent(in)	:: lambda
-   real(kind=dp), dimension(N), intent(inout) :: chi, eta
+   real(kind=dp), dimension(N), intent(out) :: chi, eta
 !    real, dimension(36) :: lambda, alpha
    real, dimension(63) :: lambdai, alphai
    real(kind=dp) :: lam, stm, sigma, chi_extr(1), eta_extr(1), lambda_extr(1)
@@ -694,7 +696,7 @@ module background_opacity
    integer, intent(in) :: icell, N
    real(kind=dp), dimension(N), intent(in) :: lambda
    integer :: la
-   real(kind=dp), dimension(N), intent(inout) :: chi
+   real(kind=dp), dimension(N), intent(out) :: chi
    real(kind=dp) :: lam, theta!, nH
 	
    chi(:) = 0.0_dp
@@ -726,7 +728,7 @@ module background_opacity
    integer, intent(in) :: icell, N
    real(kind=dp), dimension(N), intent(in) :: lambda
    integer :: la
-   real(kind=dp), dimension(N), intent(inout) :: chi
+   real(kind=dp), dimension(N), intent(out) :: chi
    real, dimension(:) :: lambdai(24), thetai(10)
    real, dimension(24,10) :: alphai
    real :: inter

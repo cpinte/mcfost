@@ -325,14 +325,17 @@ call error("initSpectrumImage not modified!!")
 		!allocate(dk(Nray, nb_proc))
 		!if (alloc_status > 0) call error("Allocation error dk")
 
-		allocate(chi_c(Nlambda_cont,n_cells), eta_c(Nlambda_cont,n_cells), sca_c(Nlambda_cont,n_cells), stat=alloc_status)
+		allocate(chi_c(Nlambda_cont,n_cells), eta_c(Nlambda_cont,n_cells), stat=alloc_status)
+		!-> At the moment not needed because only Thomson scattering included
+		!allocate(sca_c(Nlambda_cont,n_cells), stat=alloc_status)
+
 		if (alloc_status > 0) then
 			write(*,*) " mem = ", real(3 * n_cells * Nlambda_cont), " GB"
 			call error("Allocation error, continuum opacities")
 		endif
 		chi_c = 0.0_dp
 		eta_c = 0.0_dp
-		sca_c = 0.0_dp
+		if (allocated(sca_c)) sca_c = 0.0_dp
 
 
 		allocate(eta(Nlambda ,nb_proc))
@@ -457,7 +460,8 @@ call error("initSpectrumImage not modified!!")
 		if (allocated(stot)) deallocate(Stot)
 		if (allocated(chitot)) deallocate(chitot)
 
-		deallocate(chi_c,  eta_c, sca_c)
+		deallocate(chi_c,  eta_c)
+		if (allocated(sca_c)) deallocate(sca_c)
 		deallocate(chi, eta)
 		deallocate(chi0_bb, eta0_bb)
 
