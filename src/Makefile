@@ -176,8 +176,8 @@ INCLUDE+= -I$(MCFOST_INSTALL)/include \
           -I$(MCFOST_INSTALL)/include/$(SYSTEM) \
           -I$(HDF5_DIR)/include
 LDFLAGS+= -L$(LIBS) -L$(HDF5_LIB) \
-          $(LIBCXX) -lz -ldl -lcfitsio -lvoro++ -lsprng $(LXGBOOST) \
-          -lhdf5_fortran -lhdf5
+          $(LIBCXX) -ldl -lcfitsio -lvoro++ -lsprng $(LXGBOOST) \
+          -lhdf5_fortran -lhdf5 -lz
 
 #------------------------------------------------------------------------------#
 # Sources and objects
