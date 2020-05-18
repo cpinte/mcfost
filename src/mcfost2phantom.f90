@@ -135,9 +135,8 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(&
-    np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,maxirad,&
-    xyzh,vxyzu,radiation,ivorcl,&
+  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,&!maxirad,
+       xyzh,vxyzu,&!radiation,ivorcl,
     iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
     Tphantom,n_packets,mu_gas,ierr,write_T_files,ISM,T_to_u)
@@ -166,10 +165,9 @@ contains
 
 #include "sprng_f.h"
 
-    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype,&
-       maxirad,ivorcl
+    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype!,maxirad,ivorcl
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
-    real(dp), dimension(maxirad,np), intent(inout) :: radiation
+!    real(dp), dimension(maxirad,np), intent(inout) :: radiation
     integer(kind=1), dimension(np), intent(in) :: iphase
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize, graindens
@@ -387,14 +385,14 @@ contains
     ! SPH particles ignored by mcfost
     Tphantom = -1.
     ! Remapping to phantom indices
-    radiation(ivorcl,:) = -1.
+    !radiation(ivorcl,:) = -1.
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%id
        if (i_SPH > 0) then
           i_Phantom = particle_id(i_SPH)
           Tphantom(i_Phantom)  = Tdust(icell)
           n_packets(i_Phantom) = sum(xN_abs(icell,1,:))
-          radiation(ivorcl,i_Phantom) = icell
+     !     radiation(ivorcl,i_Phantom) = icell
        endif
     enddo
 
@@ -441,6 +439,9 @@ contains
     return
 
   end subroutine run_mcfost_phantom
+
+!*************************************************************************
+
 
   subroutine deinit_mcfost_phantom()
     use Voronoi_grid,     only:deallocate_Voronoi
