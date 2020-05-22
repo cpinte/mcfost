@@ -282,6 +282,8 @@ release : clean main
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"dmz\/master, phare\/master, github\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
 	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
 	ssh horus "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
+
+release_doc:
 	pushd . ; cd ../docs ; make html ; cd _build ; tar czf html.tgz html ; scp -r html.tgz horus:/user/publicdir/pintec/mcfost/docs ; ssh horus "cd /user/publicdir/pintec/mcfost/docs ; tar xzf html.tgz ; rm -f html.tgz" ; popd
 
 release_mac : main
