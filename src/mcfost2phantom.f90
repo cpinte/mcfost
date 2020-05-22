@@ -385,7 +385,7 @@ contains
     ! Remapping to phantom indices
     !radiation(ivorcl,:) = -1.
     do icell=1, n_cells
-       i_SPH = Voronoi(icell)%id
+       i_SPH = Voronoi(icell)%original_id ! this is the particle id number in phantom
        if (i_SPH > 0) then
           i_Phantom = particle_id(i_SPH)
           Tphantom(i_Phantom)  = Tdust(icell)
