@@ -375,8 +375,6 @@ contains
        ! TBD
     endif
 
-
-
     call set_min_Temperature(Tmin)
 
     if (present(write_T_files)) then
@@ -442,24 +440,24 @@ contains
 
 !*************************************************************************
 
+  subroutine reset_mcfost_phantom()
 
-  subroutine deinit_mcfost_phantom()
     use Voronoi_grid,     only:deallocate_Voronoi
     use mem,              only:deallocate_densities
     use radiation_field,  only:reset_radiation_field
     use thermal_emission, only:reset_temperature
 
+    ! Freeing memory : todo : can we avoid to do that to speed things up
     call deallocate_Voronoi()
     call deallocate_densities()
+
     ! reset energy and temperature arrays
     call reset_radiation_field()
     call reset_temperature()
-    write(*,*)
-    write(*,*) "------------------------------"
-    write(*,*) "MCFOST: Reset State"
-    write(*,*) "------------------------------"
-    write(*,*)
-  end subroutine deinit_mcfost_phantom
+
+    return
+
+  end subroutine reset_mcfost_phantom
 
 !*************************************************************************
 
