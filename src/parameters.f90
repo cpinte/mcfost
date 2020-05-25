@@ -112,9 +112,10 @@ module parametres
   logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface, lwrite_column_density, lwrite_mol_column_density
 
   ! Phantom
-  logical :: ldudt_implicit, lscale_units, lignore_dust, ldelete_Hill_sphere, lrandomize_Voronoi, lrandomize_azimuth, lrandomize_gap, lrandomize_outside_gap
+  logical :: ldudt_implicit, lscale_units, lignore_dust, ldelete_Hill_sphere, lrandomize_Voronoi, lrandomize_azimuth, lrandomize_gap, lrandomize_outside_gap, lcentre_on_sink
   real(kind=dp) :: ufac_implicit,scale_units_factor,correct_density_factor_elongated_cells, SPH_amin, SPH_amax, fluffyness, gap_factor
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy
+  integer :: isink_centre
 
   ! Disk parameters
   real :: distance ! Distance du disque en pc

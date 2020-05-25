@@ -141,6 +141,7 @@ subroutine set_default_variables()
   lrandomize_azimuth = .false.
   lrandomize_gap = .false.
   lrandomize_outside_gap = .false.
+  lcentre_on_sink = .false.
   lwrite_column_density = .false.
   lwrite_mol_column_density = .false.
 
@@ -1069,6 +1070,12 @@ subroutine initialisation_mcfost()
      case("-mol_cd","-mol_column_density")
         i_arg = i_arg + 1
         lwrite_mol_column_density = .true.
+     case("-centre_on_sink")
+        i_arg = i_arg + 1
+        lcentre_on_sink = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) isink_centre
+        i_arg = i_arg + 1
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1543,6 +1550,7 @@ subroutine display_help()
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
   write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
   write(*,*) "        : -delete_Hill_sphere : delete SPH particles inside Hill spheres of planets"
+  write(*,*) "        : -centre_on_sink <number> : centre the model on the sink particle"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

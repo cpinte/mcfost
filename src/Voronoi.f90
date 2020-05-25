@@ -327,8 +327,8 @@ module Voronoi_grid
        Voronoi(icell)%xyz(3) = z_tmp(icell)
        Voronoi(icell)%h      = h_tmp(icell)
        Voronoi_xyz(:,icell)  = Voronoi(icell)%xyz(:)
-       Voronoi(icell)%id     = SPH_id(icell)
-       Voronoi(icell)%original_id = SPH_original_id(icell)
+       Voronoi(icell)%id     = SPH_id(icell) ! this is the id of the particles passed to mcfost
+       Voronoi(icell)%original_id = SPH_original_id(icell) ! this is the particle id in phantom
     enddo
 
     !*************************

@@ -524,7 +524,7 @@ contains
     close(unit=1)
 
     ! interpoler L et T, les fonctions sont plus smooth
-    write(*,*) "New stellar parameters (assuming a BB):", minM, maxM
+    write(*,*) "New stellar parameters (assuming a BB):"
     do i=1, n_etoiles
        if (etoile(i)%M < minM)  then
           write(*,*) " "

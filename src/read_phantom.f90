@@ -662,10 +662,14 @@ subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
 
   integer, intent(in) :: np, nptmass
   real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
-  real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
+  real(kind=dp), dimension(:,:), intent(inout) :: xyzmh_ptmass
   real(kind=dp), intent(in) :: udist
 
+  real(kind=dp), dimension(3) :: centre
+
   logical, dimension(:), allocatable, intent(out) :: mask
+
+  integer :: i
 
   ! Modifying SPH dump
   if (ldelete_Hill_sphere) then
@@ -675,6 +679,17 @@ subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
   if (lrandomize_azimuth)     call randomize_azimuth(np, xyzh, vxyzu, mask)
   if (lrandomize_gap)         call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor, .true.)
   if (lrandomize_outside_gap) call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor, .false.)
+
+  if (lcentre_on_sink) then
+     write(*,*) "Recentering on sink #", isink_centre, nptmass, np
+     centre = xyzmh_ptmass(1:3,isink_centre)
+     do i=1,nptmass
+        xyzmh_ptmass(1:3,i) = xyzmh_ptmass(1:3,i) - centre(:)
+     enddo
+     do i=1, np
+        xyzh(1:3,i) = xyzh(1:3,i) - centre(:)
+     enddo
+  endif
 
   return
 
@@ -887,9 +902,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     endif
  endif
 
-
  write(*,*) "# Sink particles:"
-
  n_etoiles_old = n_etoiles
  n_etoiles = 0
  do i=1,nptmass
