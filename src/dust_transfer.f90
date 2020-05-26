@@ -1175,8 +1175,6 @@ subroutine dust_map(lambda,ibin,iaz)
   real(kind=dp) :: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   logical :: lresolved
 
-  if (lmono0) write(*,*) "Ray-tracing ..."
-
   ! Direction de visee pour le ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
   uvw = (/u,v,w/)
@@ -1196,6 +1194,15 @@ subroutine dust_map(lambda,ibin,iaz)
 
   ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
   y_plan_image = -cross_product(x_plan_image, uvw)
+
+
+  if (lmono0) then
+     write(*,*) "Ray-tracing ..."
+     write(*,*) "i=", tab_RT_incl(ibin), "az=", tab_RT_az(iaz)
+     write(*,*) "Vector to observer =", real(u),real(v),real(w)
+     write(*,*) "x-image =           ", real(x_plan_image(:))
+     write(*,*) "y-image =           ", real(y_plan_image(:))
+  endif
 
   ! position initiale hors modele (du cote de l'observateur)
   ! = centre de l'image
