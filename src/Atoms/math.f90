@@ -8,6 +8,39 @@ MODULE math
 
   CONTAINS
 
+	subroutine solve_lin(A, b, N, minimized)
+		use utils, only : GaussSlv
+		!wrapper around GaussSlv with minimisation of the residual 
+		integer, intent(in) :: N
+		logical, intent(in) :: minimized
+		real(kind=dp), intent(inout) :: A(N,N), b(N)
+		real(kind=dp) :: Adag(N,N), bdag(N), res(N)
+		integer :: i, j
+		
+		if (minimized) then
+			bdag = b
+			Adag = A
+		endif
+		
+		call GaussSlv(A, b, n)
+
+
+		if (minimized) then
+			res(:) = bdag(:)
+			
+			do i=1,N
+				do j=1,N
+					res(i) = res(i) - Adag(i,j)*b(j)
+				enddo
+			enddo
+			
+			call Gaussslv(Adag, res, N)
+
+			b(:) = b(:) + res(:)
+		endif
+	
+	return
+	end subroutine solve_lin
 
 
   FUNCTION flatten(n1, n2, M)
