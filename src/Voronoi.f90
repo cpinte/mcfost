@@ -444,6 +444,10 @@ module Voronoi_grid
           l = l+1
           if (l <= n_saved_neighbours) then
              j = neighbours_list(k)
+             if (j> n_cells) then
+                write(*,*) "icell =", icell, "k=", k, "j=", j, "n_cells=", n_cells
+                call error("Voronoi neighbour list index is invalid")
+             endif
              if (j>0) Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)
           endif
        enddo
