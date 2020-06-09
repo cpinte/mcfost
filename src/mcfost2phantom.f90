@@ -394,6 +394,20 @@ contains
        endif
     enddo
 
+    ! Resetting memory state for next call
+    call reset_mcfost_phantom()
+
+    ! Verifications et codes d'erreur
+    if (maxval(Tphantom) < 0.) then
+       write(*,*) "***********************************************"
+       write(*,*) "ERROR : PB setting T_DUST", n_cells
+       write(*,*)  minval(Tphantom), maxval(Tphantom)
+       write(*,*) "***********************************************"
+
+       ierr = 1
+       return
+    endif
+    
     ! Temps d'execution
     call system_clock(time_end)
     if (time_end < time_begin) then
@@ -416,18 +430,6 @@ contains
     else
        write (*,'(" CPU time used          ", F5.2, "s")')  time
     endif
-
-    ! Verifications et codes d'erreur
-    if (maxval(Tphantom) < 0.) then
-       write(*,*) "***********************************************"
-       write(*,*) "ERROR : PB setting T_DUST", n_cells
-       write(*,*)  minval(Tphantom), maxval(Tphantom)
-       write(*,*) "***********************************************"
-
-       ierr = 1
-       return
-    endif
-
     write(*,*)
     write(*,*) "------------------------------"
     write(*,*) "End of MCFOST run"
@@ -451,7 +453,7 @@ contains
     call deallocate_Voronoi()
     call deallocate_densities()
 
-    ! reset energy and temperature arrays
+    ! Reset energy and temperature arrays
     call reset_radiation_field()
     call reset_temperature()
 
@@ -545,4 +547,5 @@ contains
        kappa_diffusion = 0.
     endif
   end subroutine diffusion_opacity
+  
 end module mcfost2phantom
