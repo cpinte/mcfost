@@ -174,10 +174,9 @@ endif
 INCLUDE+= -I$(MCFOST_INSTALL)/include \
           -I$(MCFOST_INSTALL)/include/voro++ \
           -I$(MCFOST_INSTALL)/include/$(SYSTEM) \
-          -I$(HDF5_DIR)/include
-LDFLAGS+= -L$(LIBS) -L$(HDF5_LIB) \
-          $(LIBCXX) -ldl -lcfitsio -lvoro++ -lsprng $(LXGBOOST) \
-          -lhdf5_fortran -lhdf5 -lz
+          -I$(HDF5_INC)
+LDFLAGS+= -L$(LIBS) -L$(HDF5_LIB) $(LIBCXX) -lcfitsio -lvoro++ \
+          -lsprng $(LXGBOOST) -lhdf5_fortran -lhdf5 -lz -ldl
 
 #------------------------------------------------------------------------------#
 # Sources and objects

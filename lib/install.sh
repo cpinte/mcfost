@@ -209,15 +209,14 @@ if [ "$SKIP_HDF5" != "yes" ]; then
     wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
     echo "Compiling HDF5 ..."
     tar xjvf hdf5-1.10.5.tar.bz2
-    mv hdf5-1.10.5 hdf5
+    cd hdf5-1.10.5
     mkdir -p "$HOME/hdf5_install_tmp"
-    cd hdf5
     ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
     make -j install
     cd ~1
     \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" lib/
-    \cp "$HOME/hdf5_install_tmp/include/*.h" include/hdf5/
-    \cp "$HOME/hdf5_install_tmp/include/*.mod" "include/$SYSTEM"
+    \cp "$HOME"/hdf5_install_tmp/include/*.h include/hdf5/
+    \cp "$HOME"/hdf5_install_tmp/include/*.mod "include/$SYSTEM"
     echo "Done"
 else
     echo "Skipping HDF5 ..."
