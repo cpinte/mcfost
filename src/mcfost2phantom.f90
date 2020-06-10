@@ -44,9 +44,12 @@ contains
        write(*,*) "WARNING: updating SPH_keep_particles to" , SPH_keep_particles
     endif
 
+    lfix_star = .false.
     if (present(fix_star)) then
-       lfix_star = .true.
-       write(*,*) "WARNING: using mcfost parameters for the stars"
+       if (fix_star) then
+          lfix_star = .true.
+          write(*,*) "WARNING: using mcfost parameters for the stars"
+       endif
     endif
 
     ! Model limits
