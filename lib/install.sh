@@ -75,6 +75,7 @@ if [ "$SYSTEM" = "ifort" ]; then
     export CC=icc
     export FC=ifort
     export CXX=icpc
+    export CFLAGS=""
 elif [ "$SYSTEM" = "gfortran" ]; then
     echo "Building MCFOST's libraries with gfortran"
     export CC=gcc
@@ -189,6 +190,18 @@ if [ "$SKIP_XGBOOST" != "yes" ]; then
     \cp ../ifort/xgboost/base.h include/xgboost/base.h
     #fi
     \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ was hard-coded in the Mekefile
+
+    # compiling with gfortran for now as there are some issues with ifort 2020 on linux
+    CC_old=$CC
+    FC_old=$FC
+    CXX_old=$CXX
+    CFLAGS_old=$CFLAGS
+
+    export CC=gcc
+    export FC=gfortran
+    export CXX=g++
+    export CFLAGS="-m64"
+
     make -j
     \cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
     \cp -r dmlc-core/include/dmlc rabit/include/rabit include/xgboost ../include
@@ -197,6 +210,12 @@ if [ "$SKIP_XGBOOST" != "yes" ]; then
     \cp -r src/common/*.h "$MCFOST_INSTALL/src/common"
     cd ~1
     echo "Done"
+
+    # Restoring flags
+    export CC=$CC_old
+    export FC=$FC_old
+    export CXX=$CXX_old
+    export CFLAGS=$CFLAGS_old
 else
     echo "Skipping XGBoost ..."
     echo "Make sure to set MCFOST_NO_XGBOOST=yes when compiling MCFOST"
