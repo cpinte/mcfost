@@ -213,7 +213,6 @@ contains
 
     logical, save :: lfirst_time = .true.
 
-    integer :: i_Phantom
 
     ! We use the phantom_2_mcfost interface with 1 file
     ifiles(:) = 1 ; massoftype2(1,:) = massoftype(:)
@@ -387,10 +386,9 @@ contains
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%original_id ! this is the particle id number in phantom
        if (i_SPH > 0) then
-          i_Phantom = particle_id(i_SPH)
-          Tphantom(i_Phantom)  = Tdust(icell)
-          n_packets(i_Phantom) = sum(xN_abs(icell,1,:))
-     !     radiation(ivorcl,i_Phantom) = icell
+          Tphantom(i_SPH)  = Tdust(icell)
+          n_packets(i_SPH) = sum(xN_abs(icell,1,:))
+          !radiation(ivorcl,i_SPH) = icell
        endif
     enddo
 
