@@ -452,7 +452,7 @@ contains
     ! Freeing memory : todo : can we avoid to do that to speed things up
     call deallocate_Voronoi()
     call deallocate_densities()
-
+    
     ! Reset energy and temperature arrays
     call reset_radiation_field()
     call reset_temperature()
