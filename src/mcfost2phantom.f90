@@ -17,6 +17,8 @@ contains
     use mem, only : alloc_dust_prop
     use SPH2mcfost, only : read_SPH_limits_file
     use messages, only : error
+    use sha, only: sha_id
+    use mcfost_env, only : mcfost_release
 
     character(len=*), intent(in) :: mcfost_para_filename, SPH_limits_file
     integer, intent(in) :: ndusttypes
@@ -34,7 +36,9 @@ contains
     write(*,*) "Initializing MCFOST library"
     write(*,*) "------------------------------"
     write(*,*)
-
+    write(*,*) "You are running MCFOST "//trim(mcfost_release)
+    write(*,*) "Git SHA = ", sha_id
+    
     ! Global logical variables
     call set_default_variables()
     lmcfost_lib = .true.
