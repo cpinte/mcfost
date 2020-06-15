@@ -488,7 +488,9 @@ module Voronoi_grid
        ! We check first that there is no issue in the tesselation
        if (volume(icell) < tiny_real) then
           n_missing_cells = n_missing_cells + 1
-          write(*,*) "WARNING: cell #", icell, "is missing", x_tmp(icell), y_tmp(icell), z_tmp(icell)
+          write(*,*) "WARNING: cell #", icell, "is missing"
+          write(*,*) "xyz=", x_tmp(icell), y_tmp(icell), z_tmp(icell)
+          write(*,*) "volume =", volume(icell)
        endif
 
        ! todo : find the cells touching the walls
@@ -510,10 +512,13 @@ module Voronoi_grid
 
     if (n_missing_cells > 0) then
        write(*,*) "*******************************************"
-       write(*,*) "WARNING:", n_missing_cells, "cells are missing"
+       if (n_missing_cells == 1) then
+           write(*,*) "WARNING: 1 cell is missing"
+       else
+          write(*,*) "WARNING:", n_missing_cells, "cells are missing"
+       endif
        write(*,*) "*******************************************"
     endif
-    !
 
     write(*,*) "Building the kd-trees for the model walls"
     call build_wall_kdtrees()
@@ -528,8 +533,12 @@ module Voronoi_grid
     endif
     write(*,*) "Found", n_in, "cells"
 
-    if (n_in /= n_cells) call error("some particles are not in the mesh")
-
+    if (n_in /= n_cells) then
+       write(*,*) "n_cells =", n_cells
+       write(*,*) "n in tesselation =", n_in 
+       call error("some particles are not in the mesh")
+    endif
+       
     write(*,*) "Neighbours list size =", n_neighbours_tot
     write(*,*) "Average number of neighbours =", real(n_neighbours_tot)/n_cells
     write(*,*) "Voronoi volume =", sum(volume)
