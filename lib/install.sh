@@ -231,7 +231,7 @@ if [ "$SKIP_HDF5" != "yes" ]; then
     cd hdf5-1.10.5
     mkdir -p "$HOME/hdf5_install_tmp"
     ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
-    make -j install
+    make install
     cd ~1
     \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" lib/
     \cp "$HOME"/hdf5_install_tmp/include/*.h include/hdf5/
