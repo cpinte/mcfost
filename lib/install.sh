@@ -27,7 +27,7 @@
 # the environment in which it is run.
 #
 # SYSTEM         : the compiler system. Options are
-#                  "ifort", "gfortran", or "xeon-phi".
+#                  "ifort" or "gfortran".
 #
 # MCFOST_INSTALL : the git repository directory for
 #                  MCFOST. The libraries will be
@@ -61,7 +61,7 @@ if [ ! $# = 0 ]; then SYSTEM=$1; fi
 
 set +u # personalized error messages
 if [ -z "$SYSTEM" ]; then
-    echo "error: SYSTEM need to be set (choose: ifort, gfortran or xeon-phi)."
+    echo "error: SYSTEM need to be set (choose: ifort or gfortran)."
     exit 1
 fi
 if [ -z "$MCFOST_INSTALL" ]; then
@@ -82,12 +82,6 @@ elif [ "$SYSTEM" = "gfortran" ]; then
     export FC=gfortran
     export CXX=g++
     export CFLAGS="-m64"
-elif [ "$SYSTEM" = "xeon-phi" ]; then
-    echo "Building MCFOST's libraries with ifort for Xeon-Phi"
-    export CC=icc
-    export FC=ifort
-    export CXX=icpc
-    export CFLAGS=-mmic
 else
     echo "Unknown system to build MCFOST: $SYSTEM"
     echo "Please choose ifort or gfortran"
@@ -147,11 +141,6 @@ mv cfitsio-3.47 cfitsio
 cd cfitsio
 ./configure --enable-ssse3 --disable-curl
 
-#--- Tweaking Makefile
-if [ "$SYSTEM" = "xeon-phi" ]; then
-    \cp -f ../Makefile_cfitsio.xeon_phi Makefile
-fi
-
 make
 \cp libcfitsio.a ../lib
 cd ~1
@@ -163,8 +152,6 @@ echo "Done"
 echo "Compiling Voro++ ..."
 if [ "$SYSTEM" = "ifort" ]; then
     \cp -f ifort/config.mk voro
-elif [ "$SYSTEM" = "xeon-phi" ]; then
-    \cp -f ifort/config.mk voro # To be tested
 elif [ "$SYSTEM" = "gfortran" ]; then
     \cp -f gfortran/config.mk voro
 fi

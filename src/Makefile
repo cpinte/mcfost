@@ -87,23 +87,6 @@ ifeq ($(SYSTEM), ifort)
     LIBS= $(LIB)/ifort
 endif
 
-ifeq ($(SYSTEM), xeonphi)
-    FC= ifort
-    FFLAGS= -fpp -O3 -no-prec-div -traceback -mmic -static-intel
-    DBLFLAG= -r8
-    DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
-               -warn uninitialized -warn unused -warn truncated_source
-    KNOWN_SYSTEM= yes
-    FOMPFLAGS= -qopenmp
-    IPOFLAGS= -ipo
-    CC= icc
-    CXX=icpc -std=c++11
-    CCFLAGS= -O3 -no-prev-div -traceback -mmic
-    COMPFLAGS= -qopenmp
-    LIBCXX= -cxxlib
-    LIBS= $(LIB)/xeon-phi
-endif
-
 ifeq ($(SYSTEM), gfortran)
     FC= gfortran
     FFLAGS+= -m64 -cpp -O3 -funroll-loops -ffinite-math-only \
