@@ -2,9 +2,9 @@
 # Makefile for Monte Carlo radiative transfer code MCFOST
 #------------------------------------------------------------------------------#
 # Linux compiling server
-LINUX_SERVER= ozstar
+LINUX_SERVER=ozstar
 
-KNOWN_SYSTEM= no
+KNOWN_SYSTEM=no
 
 LIB= $(MCFOST_INSTALL)/lib
 
@@ -19,6 +19,10 @@ endif
 ifndef OPENMP
     OPENMP= yes
 endif
+
+# Forcing static flags when compiling the releases
+release : LDFLAGS+= $(STATIC_FLAGS)
+release_mac : LDFLAGS+= $(STATIC_FLAGS)
 
 # faster compilation
 ifeq ($(dev), yes)
@@ -50,6 +54,10 @@ ifeq ($(profiling), yes)
     PROFILING=yes
 endif
 
+ifeq ($(static), yes)
+    STATIC=yes
+endif
+
 ifdef xgboost
     XGBOOST=$(xgboost)
 endif
@@ -67,9 +75,11 @@ endif
 
 ifeq ($(SYSTEM), ifort)
     ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
-        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.12 -mdynamic-no-pic -static-intel -qopenmp-link static
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.12 -mdynamic-no-pic
+	STATIC_FLAGS= -static-intel -qopenmp-link static
     else
-        ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512 -static
+        ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512
+	STATIC_FLAGS= -static
     endif
     FC= ifort
     FFLAGS= -fpp -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
@@ -89,8 +99,9 @@ endif
 
 ifeq ($(SYSTEM), gfortran)
     FC= gfortran
-    FFLAGS+= -m64 -cpp -O3 -funroll-loops -ffinite-math-only \
-             -fno-trapping-math -ffree-line-length-none -fbacktrace  -static-libgcc -static-libstdc++
+    FFLAGS+= -m64 -cpp -O3 -funroll-loops -ffinite-math-only -fno-trapping-math \
+	     -ffree-line-length-none -fbacktrace
+    STATIC_FLAGS= -static-libgcc -static-libstdc++
     DBLFLAG= -fdefault-real-8 -fdefault-double-8
     DEBUGFLAG= -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -fbacktrace
     KNOWN_SYSTEM= yes
@@ -160,6 +171,9 @@ INCLUDE+= -I$(MCFOST_INSTALL)/include \
           -I$(HDF5_INC)
 LDFLAGS+= -L$(LIBS) -L$(HDF5_LIB) $(LIBCXX) -lcfitsio -lvoro++ \
           -lsprng $(LXGBOOST) -lhdf5_fortran -lhdf5 -lz -ldl
+ifeq ($(STATIC), yes)
+    LDFLAGS+= $(STATIC_FLAGS)
+endif
 
 #------------------------------------------------------------------------------#
 # Sources and objects
@@ -174,7 +188,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90     \
           radiation_field.f90 thermal_emission.f90 diffusion.f90               \
           io_prodimo.f90 disk_physics.f90 optical_depth.f90 ML_prodimo.f90     \
           output.f90 mem.f90  init_mcfost.f90 io_phantom_infiles.f90           \
-          io_phantom_utils.f90  utils_hdf5.f90 mess_up_SPH.f90 read_phantom.f90\
+          io_phantom_utils.f90 utils_hdf5.f90 mess_up_SPH.f90 read_phantom.f90 \
           read_gadget2.f90 SPH2mcfost.f90 dust_transfer.f90 mol_transfer.f90
 
 OBJECTS= $(SOURCES:.f90=.o)
@@ -188,7 +202,8 @@ main : mcfost
 all : mcfost libmcfost.a
 
 mcfost :  $(OBJECTS) voro++_wrapper.o  $(XGBOOST_WRAPPER).o mcfost.o
-	$(FC) $(FFLAGS) $(FOMPFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o $(XGBOOST_WRAPPER).o mcfost.o $(LDFLAGS)
+	echo $(STATIC) $(LDFLAGS)
+	$(FC) $(FFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o $(XGBOOST_WRAPPER).o mcfost.o $(LDFLAGS)
 
 libmcfost.a : $(OBJECTS) voro++_wrapper.o $(XGBOOST_WRAPPER).o mcfost2phantom.o
 	rm -f mcfost.o libmcfost.a
@@ -256,7 +271,7 @@ release : clean main
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/mac/mcfost.sha1
 	mv mcfost_bin.tgz web/mac/
-	ssh $(LINUX_SERVER) "cd mcfost/src && git pull origin master && git fetch --tags && git checkout release && export MCFOST_GIT=1 && export MAKEFLAGS= && make clean mcfost && git checkout master && \cp -f mcfost ~/mcfost_cigri && \cp -f mcfost mcfost_update && rm -f mcfost.sha1 && tar czf mcfost_bin.tgz mcfost_update --remove-files && sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
+	ssh $(LINUX_SERVER) "cd mcfost/src && git pull origin master && git fetch --tags && git checkout release && export MCFOST_GIT=1 && export MAKEFLAGS= && make clean mcfost static=yes && git checkout master && \cp -f mcfost ~/mcfost_cigri && \cp -f mcfost mcfost_update && rm -f mcfost.sha1 && tar czf mcfost_bin.tgz mcfost_update --remove-files && sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
 	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
