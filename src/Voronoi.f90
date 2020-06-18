@@ -530,6 +530,7 @@ module Voronoi_grid
        if (volume(icell) < tiny_real) then
           n_missing_cells = n_missing_cells + 1
           write(*,*) "WARNING: cell #", icell, "is missing"
+          write(*,*) "original id =", SPH_original_id(icell)
           write(*,*) "xyz=", x_tmp(icell), y_tmp(icell), z_tmp(icell)
           write(*,*) "volume =", volume(icell)
        endif
