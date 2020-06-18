@@ -1546,4 +1546,26 @@ end subroutine read_comments
 
 !***************************************************
 
+subroutine Knuth_shuffle(a)
+
+  integer, intent(inout) :: a(:)
+
+  integer :: seed_size=1
+  integer, dimension(1) :: seed=42
+  integer :: i, randpos, temp
+  real :: r
+
+  call random_seed(size=seed_size)
+  call random_seed(put=seed)
+
+  do i = size(a), 2, -1
+     call random_number(r)
+     randpos = int(r * i) + 1
+     temp = a(randpos)
+     a(randpos) = a(i)
+     a(i) = temp
+  enddo
+
+end subroutine Knuth_Shuffle
+
 end module utils

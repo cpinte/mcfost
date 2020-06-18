@@ -3,7 +3,7 @@ module Voronoi_grid
   use constantes
   use mcfost_env
   use parametres
-  use utils, only : bubble_sort, appel_syst
+  use utils, only : bubble_sort, appel_syst, Knuth_shuffle
   use naleat, only : seed, stream, gtype
   use cylindrical_grid, only : volume
   use kdtree2_module
@@ -14,7 +14,9 @@ module Voronoi_grid
   save
 
   integer, parameter :: max_wall_neighbours = 100000
-  integer, parameter :: n_saved_neighbours = 40 ! 30 is fine when there is not randomization of particles
+  ! n_saved_neighbours = 30 is fine when there is no randomization of particles in mess_up_SPH, otherwise 40.
+  ! Todo:  0 does not change speed ... we probably do not even need it
+  integer, parameter :: n_saved_neighbours = 0
   real(kind=dp), parameter :: prec = 1.e-6_dp
 
   type Voronoi_cell
@@ -220,6 +222,10 @@ module Voronoi_grid
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     character(len=2) :: unit
 
+    logical, parameter :: lrandom = .true.
+    integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
+    real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
+
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
 
@@ -300,6 +306,40 @@ module Voronoi_grid
        endif
     enddo
     n_cells = icell
+
+
+    ! Randomizing particles
+    if (lrandom) then
+       allocate(x_tmp2(n_cells), y_tmp2(n_cells), z_tmp2(n_cells), h_tmp2(n_cells), &
+            SPH_id2(n_cells), SPH_original_id2(n_cells), order(n_cells), stat=alloc_status)
+       if (alloc_status /=0) call error("Allocation error Voronoi temp2 arrays")
+
+       order=[(i,i=1,n_cells)]
+       call Knuth_shuffle(order)
+
+       do icell=1, n_cells
+          i = order(icell)
+          x_tmp2(icell) = x_tmp(i)
+          y_tmp2(icell) = y_tmp(i)
+          z_tmp2(icell) = z_tmp(i)
+          h_tmp2(icell) = h_tmp(i)
+          SPH_id2(icell) = SPH_id(i)
+          SPH_original_id2(icell) = SPH_original_id(i)
+
+          ! Updating the star indices
+          if (SPH_id2(icell) == 0) then ! star
+             do k=1, n_etoiles
+                if (etoile(k)%icell == i) then
+                   etoile(k)%icell = icell
+                endif
+             end do
+          endif
+       enddo
+
+       x_tmp = x_tmp2 ; y_tmp = y_tmp2 ; z_tmp = z_tmp2 ; h_tmp = h_tmp2
+       SPH_id = SPH_id2 ; SPH_original_id = SPH_original_id
+       deallocate(order,x_tmp2,y_tmp2,z_tmp2,h_tmp2,SPH_id2,SPH_original_id2)
+    endif
 
     alloc_status = 0
     allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
@@ -437,6 +477,7 @@ module Voronoi_grid
     deallocate(delta_edge, delta_centroid,was_cell_cut)
 
     ! Saving position of the first neighbours to save time on memory access
+    ! Warning this seems to cost a fair bit of time
     allocate(Voronoi_neighbour_xyz(3,n_saved_neighbours,n_cells)) ! tried 4 to align vectors, does not help
     do icell=1, n_cells
        l=0
@@ -448,7 +489,7 @@ module Voronoi_grid
                 write(*,*) "icell =", icell, "k=", k, "j=", j, "n_cells=", n_cells
                 call error("Voronoi neighbour list index is invalid")
              endif
-             if (j>0) Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)
+             if (j>0) Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)  ! this is slow
           endif
        enddo
     enddo
@@ -535,10 +576,10 @@ module Voronoi_grid
 
     if (n_in /= n_cells) then
        write(*,*) "n_cells =", n_cells
-       write(*,*) "n in tesselation =", n_in 
+       write(*,*) "n in tesselation =", n_in
        call error("some particles are not in the mesh")
     endif
-       
+
     write(*,*) "Neighbours list size =", n_neighbours_tot
     write(*,*) "Average number of neighbours =", real(n_neighbours_tot)/n_cells
     write(*,*) "Voronoi volume =", sum(volume)
