@@ -345,7 +345,7 @@ module Voronoi_grid
     allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
          delta_edge(n_cells), delta_centroid(n_cells), was_cell_cut(n_cells), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi structure")
-    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; delta_edge(:) = 0.0 ; delta_centroid(:) = 0.
+    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; delta_edge(:) = 0.0 ; delta_centroid(:) = 0. ; was_cell_cut(:) = .false.
     Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
     Voronoi(:)%first_neighbour = 0
     Voronoi(:)%last_neighbour = 0
@@ -399,7 +399,6 @@ module Voronoi_grid
     endif
     write(*,*) "mcfost will require ~", mem, unit//" of temporary memory for the tesselation" ! 5 double + 2 int arrays
 
-
     if (operating_system == "Darwin" .and. (n_cells > 2e6)) then
        call warning("Voronoi tesselation will likely crash with that many particle on a Mac. Switch to linux")
     endif
@@ -413,12 +412,12 @@ module Voronoi_grid
 
     if (lcompute) then
        ! We initialize arrays at 0 as we have a reduction + clause
-       volume = 0. ; n_in = 0 ; n_neighbours_tot = 0 ; delta_edge = 0. ; delta_centroid = 0. ; was_cell_cut = .false.
+       n_in = 0
        !$omp parallel default(none) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
        !$omp private(id,icell_start,icell_end,ierr) &
-       !$omp reduction(+:volume,n_in,n_neighbours_tot,delta_edge,delta_centroid) &
+       !$omp reduction(+:volume,n_in,delta_edge,delta_centroid) &
        !$omp reduction(.or.:was_cell_cut)
        id = 1
        !$ id = omp_get_thread_num() + 1
