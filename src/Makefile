@@ -202,7 +202,6 @@ main : mcfost
 all : mcfost libmcfost.a
 
 mcfost :  $(OBJECTS) voro++_wrapper.o  $(XGBOOST_WRAPPER).o mcfost.o
-	echo $(STATIC) $(LDFLAGS)
 	$(FC) $(FFLAGS) -o $@ $(OBJECTS) voro++_wrapper.o $(XGBOOST_WRAPPER).o mcfost.o $(LDFLAGS)
 
 libmcfost.a : $(OBJECTS) voro++_wrapper.o $(XGBOOST_WRAPPER).o mcfost2phantom.o
