@@ -545,7 +545,7 @@ integer :: iray = 1 !futur deprecation
  	if (allocated(line%a)) then
  		write(unit, *) " Area = ", wphi," damping = ", line%a(icell)
  	else
-  		write(unit, *) " Area = ", wphi," damping = ", line%a(icell)
+  		write(unit, *) " Area = ", wphi
 	endif
  	!!write(unit,*) " Vd (km/s) = ", 1e-3*line%atom%vbroad(icell),  " a = ", damp
  

@@ -13,7 +13,7 @@
 ! ---------------------------------------------------------------------- !
 MODULE io_atomic_pops
 
- use atmos_type, only : ne, nHmin, nHtot, hydrogen
+ use atmos_type, only : ne, nHmin, nHtot, hydrogen, ntotal_atom
  use atom_type
  use spectrum_type
 
@@ -247,7 +247,7 @@ MODULE io_atomic_pops
   type (AtomType), intent(in) :: atom
   integer :: unit, blocksize, naxes(5), naxis,group, bitpix, fpixel
   logical :: extend, simple, lte_only
-  integer :: nelements, hdutype, status
+  integer :: nelements, hdutype, status, k
   character(len=20) :: popsF
 
   lte_only = .not.atom%active
@@ -323,6 +323,9 @@ MODULE io_atomic_pops
       CALL print_error(status)
     endif
     !write data
+!     do k=1,n_cells
+!     	if (icompute_atomRT(k)>0) atom%n(:,k) = atom%n(:,k) / ntotal_atom(k,atom)
+!     enddo
     CALL ftpprd(unit,group,fpixel,nelements,atom%n,status)
     if (status > 0) then
       write(*,*) "Error writing nLTE pops to file (3)"

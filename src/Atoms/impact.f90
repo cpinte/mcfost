@@ -305,11 +305,14 @@ MODULE IMPACT
    end do
 
    Cij(:,:) = Cij(:,:) * ne(icell)
-   
-!    if (icell==1) then
+
+!    if (T(icell)==T(55)) then
 !    	do i=1, hydrogen%nlevel
 !    		write(*,*) "****",i, "****"
-!    		write(*,*) (j, Cij(i,j), j=1,hydrogen%nlevel)
+!    		!write(*,*) (j, Cij(i,j), j=1,hydrogen%nlevel)
+!    		do j=i+1, hydrogen%nlevel-1
+!    			write(*,*) i,j, CE(i,j)
+!    		enddo
 !    	enddo
 !    	stop
 !    endif
@@ -430,9 +433,10 @@ MODULE IMPACT
      	(Bnnp-Annp*dlog(2*n*n/x))*(E2(y)/y - E2(z)/z))
 
      Cij(i,j) = S
-!      if (T(icell)==9140) then
+!      if (T(icell)==T(55)) then
 !      	write(*,*) i, j
 !      	write(*,*) n, np, S
+!      	stop
 !      endif
     end do !over np
    end do  !over n
