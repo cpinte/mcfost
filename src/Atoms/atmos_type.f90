@@ -14,7 +14,7 @@ module atmos_type
 	use mcfost_env, only : mcfost_utils ! convert from the relative location of atomic data
                                       ! to mcfost's environnement folders.
 	use parametres
-	use utils, only : appel_syst
+	use utils, only : appel_syst, Gauss_Legendre_quadrature
 	use fits_utils, only : print_error
 
 
@@ -54,6 +54,12 @@ module atmos_type
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
 	logical :: lMagnetized = .false., calc_ne
 	integer, allocatable, dimension(:) :: icompute_atomRT!
+	
+	real(kind=dp), dimension(:), allocatable :: xphi, wmu_phi
+	real(kind=dp), dimension(:), allocatable :: xmu, wmu
+	!removed the depency in rays of some quantity (like phi_loc or I) since rate matrix
+	!is built ray by ray, with is not the case for hogerheijde
+    logical :: lmali_scheme, lhogerheijde_scheme !tmp
 
 !   Initialized only once at the begening of the main iteration loop !
 !   type GridType
@@ -90,6 +96,43 @@ module atmos_type
 
 
   contains
+  
+  subroutine compute_angular_integration_weights(Nmu,Nphi)
+	integer, intent(in) :: Nmu, Nphi
+	integer :: iphi,imu, alloc_status
+	real(kind=dp) :: norm
+	
+	allocate(xmu(nmu),wmu(nmu),stat=alloc_status)
+	if (alloc_status > 0) call error("allocation error xmu and wmu")
+	allocate(xphi(nphi),wmu_phi(nphi),stat=alloc_status)
+	if (alloc_status > 0) call error("allocation error xphi and wmu_phi")
+	
+	call Gauss_Legendre_quadrature(-1.0_dp,1.0_dp,nmu,xmu,wmu)
+	call Gauss_Legendre_quadrature(-1.0_dp,1.0_dp,nphi,xphi,wmu_phi)
+	xphi(:) = xphi(:) * pi + pi !int from 0 to 2pi
+	!xphi(:) = xphi(:) * pi !from -pi to pi
+	!!wmu(:) = 0.5 * wmu(:)
+	!!wmu_phi(:) = wmu_phi(:) * 0.5
+
+!   	write(*,*) "xmu", xmu
+!   	write(*,*) "wmu", wmu!*2
+!   	write(*,*) "xphi", xphi
+!   	write(*,*) "wmu_phi", wmu_phi!*2
+!   	!Normalized weights to 4pi
+!   	write(*,*) "sum weights:",  sum(wmu), pi*sum(wmu_phi), " domega/4pi:",0.25*sum(wmu)*sum(wmu_phi)
+!   	norm = 0.0
+!   	do imu=1,size(xmu)
+!   		!!write(*,*) imu, xmu(imu), "costheta",xmu(imu)," sintheta", sqrt(1.0-xmu(imu)**2)
+!   		do iphi=1,size(xphi)
+!   			norm = norm + wmu(imu)*wmu_phi(iphi)
+!   			!!write(*,*) iphi, xphi(iphi), "cosphi", cos(xphi(iphi)), " sinphi", sin(xphi(iphi))
+!   		enddo
+!   	enddo
+! 	write(*,*) "norm=", norm, " 4pi=", 0.25*fourpi * norm !=fourpi because norm is 1
+! 	STOP
+! 	
+  return
+  end subroutine compute_angular_integration_weights
 
  function VBROAD_atom(icell, atom) result(vD)
   real(kind=dp) :: vD
@@ -455,6 +498,8 @@ module atmos_type
   integer :: n
   
   if (allocated(ds)) deallocate(ds)
+  if (allocated(xmu)) deallocate(xmu, wmu)
+  if (allocated(xphi)) deallocate(xphi, wmu_phi)
 
   if (allocated(Elements)) then
     do n=1,Nelem
@@ -1171,8 +1216,6 @@ stop
 !or use rho and for each element use the masse fraction to define its total number ?
 !should be the same as using Abund wrt to nHtot
 
-!    rho_to_nH = 1d0
-!    write(*,*) " Special case for av83"
 
    write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
 
