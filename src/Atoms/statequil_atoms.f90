@@ -1,13 +1,14 @@
 MODULE statequil_atoms
 
-	use atmos_type, only					: ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements
+	use atmos_type, only					: ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements, &
+												wmu, wmu_phi
 	use atom_type
 	use spectrum_type, only					: lambda, Nlambda, Nlambda_cont, lambda_cont, Jnu_cont, Itot, dk, dk_min, dk_max, &
 												eta_es, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb
 	use constant
-	use opacity, only 						: continuum_line
+	use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc
 	use math, only							: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, &
-												linear_1D
+												linear_1D, solve_lin
 	use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte
 	use collision, only						: CollisionRate !future deprecation
 	use impact, only						: Collision_Hydrogen
@@ -22,12 +23,15 @@ MODULE statequil_atoms
 	use input, only 						: nb_proc
 
 	IMPLICIT NONE
-
+	!Nlambda,  Nproc not stored for all ray since no sub it and ray-ray building of rate matrix
+	real(kind=dp), allocatable :: psi(:,:)
 	real(kind=dp), parameter :: Tmax = 1d10
 	real(kind=dp), parameter :: prec_pops = 1d-100
+	real(kind=dp), allocatable :: n_new(:,:,:)
 	character(len=50), parameter :: invpop_file = "inversion_populations.txt"
 	character(len=50), parameter :: profiles_file = "line_profile.txt"
-	integer, parameter :: unit_invfile = 20, unit_profiles = 25
+	character(len=50), parameter :: convergence_file = "thresh.txt", sub_convergence_file = "subthresh.txt"
+	integer, parameter :: unit_invfile = 20, unit_profiles = 25, unit_conver = 30, unit_subconver = 35
 
 	CONTAINS
 
@@ -84,12 +88,26 @@ MODULE statequil_atoms
 
 		integer, intent(in) :: id
 		type (AtomType), intent(inout) :: atom!, pointer
-		integer :: kc
+		integer :: l,lp
+! 		real(kind=dp) :: Ctest(atom%Nlevel,atom%nlevel)
   
   									!because atom%C(i,j) is the collision rate from state i to j
   									!but rate matrix A(i,j) = -C(j,i)
   		atom%Gamma(:,:,id) = 0.0_dp
-		atom%Gamma(:,:,id) = -1.0_dp * transpose(atom%C(:,:,id))
+		!atom%Gamma(:,:,id) = -1.0_dp * transpose(atom%C(:,:,id))
+		do l=1,atom%Nlevel-1
+			do lp=l+1,atom%Nlevel
+				atom%Gamma(l,lp,id) = -atom%C(lp,l,id)
+				atom%Gamma(lp,l,id) = -atom%C(l,lp,id)
+			enddo
+		enddo
+! 		Ctest = -transpose(atom%C(:,:,id))
+! 		do l=1,atom%nlevel
+! 			write(*,*) (atom%Gamma(l,lp,id),lp=1,atom%nlevel)
+! 			write(*,*) (atom%C(l,lp,id),lp=1,atom%nlevel)	
+! 			write(*,*) (Ctest(l,lp),lp=1,atom%Nlevel)
+! 		enddo
+! 		stop
   
 	RETURN 
 	END SUBROUTINE initGamma_atom
@@ -177,25 +195,29 @@ MODULE statequil_atoms
 	RETURN
 	END SUBROUTINE init_bb_rates_atom
 	
+	!building inclued n_new, new wave integ
 	subroutine calc_rates(id, icell, iray, n_rayons)
 		integer, intent(in) :: id, icell, iray, n_rayons
+		integer :: iray_p
 		real(kind=dp) :: chicont, etacont
 		real(kind=dp), dimension(Nlambda) :: chi_tot, eta_tot, Ieff
-		integer :: nact, Nred, Nblue, kc, kr, i, j, l, a0, Nl, icell_d
+		integer :: nact, Nred, Nblue, kc, kr, i, j, l, a0, Nl, icell_d, imu, iphi
 		real(kind=dp) :: etau, wphi, JJ, JJb, j1, j2, I1, I2, ehnukt, twohnu3_c2
 		real(kind=dp) :: wl, a1, a2
 		type(AtomType), pointer :: aatom, atom
 
 		real(kind=dp) :: wi, wj, nn, dk0
 
-		!only with lines, continuum added during integration
-		chi_tot(:) = chi0_bb(:,icell) + tiny_dp
+		!should also contains lines
+		chi_tot(:) = chi0_bb(:,icell)
+		!add continuum in 
 		eta_tot(:) = eta0_bb(:,icell)
 		
 
 		if (lelectron_scattering) then
-			eta_tot(:) = eta_es(:,icell)
+			eta_tot(:) = eta_tot(:) + eta_es(:,icell)
 		endif
+
   
 		atom_loop : do nact = 1, Natom
 			atom => Atoms(nact)%ptr_atom
@@ -217,25 +239,29 @@ MODULE statequil_atoms
 					endif
 				endif 
 				
-				if ((atom%n(i,icell)*wj/wi - atom%n(j,icell)*atom%lines(kc)%gij) > 0.0_dp) then
-				
+				!if ((atom%n(i,icell)*wj/wi - atom%n(j,icell)*atom%lines(kc)%gij) > 0.0_dp) then
+				if (n_new(atom%activeindex,i,icell)*wj/wi - n_new(atom%activeindex,j,icell)*atom%lines(kc)%gij > 0.0_dp) then
         
 					chi_tot(Nblue+dk_min:Nred+dk_max) = chi_tot(Nblue+dk_min:Nred+dk_max) + &
-						hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * (atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
+						hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * ( n_new(atom%activeindex,i,icell)*wj/wi - n_new(atom%activeindex,j,icell)*atom%lines(kc)%gij )
+						!(atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
        	 
 					eta_tot(Nblue+dk_min:Nred+dk_max)= eta_tot(Nblue+dk_min:Nred+dk_max) + &
-						atom%lines(kc)%twohnu3_c2 * atom%lines(kc)%gij * hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * atom%n(j,icell) 
+						 hc_fourPI * atom%lines(kc)%Aji * atom%lines(kc)%phi_loc(:,iray,id) * n_new(atom%activeindex,j,icell)
+						 !atom%n(j,icell) 
 
 				
 				else !neg or null
 				
-! 					eta_tot(Nblue+dk_min:Nred+dk_max)= eta_tot(Nblue+dk_min:Nred+dk_max) + &
-! 						atom%lines(kc)%twohnu3_c2 * atom%lines(kc)%gij * hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * atom%n(j,icell) 
-					eta_tot(Nblue+dk_min:Nred+dk_max)= eta_tot(Nblue+dk_min:Nred+dk_max) + 0.0_dp
+					eta_tot(Nblue+dk_min:Nred+dk_max)= eta_tot(Nblue+dk_min:Nred+dk_max) + &
+						atom%lines(kc)%Aji * hc_fourPI * atom%lines(kc)%phi_loc(:,iray,id) * n_new(atom%activeindex,j,icell)
+						!atom%n(j,icell) 
+! 					eta_tot(Nblue+dk_min:Nred+dk_max)= eta_tot(Nblue+dk_min:Nred+dk_max) + 0.0_dp
 					chi_tot(Nblue+dk_min:Nred+dk_max) = chi_tot(Nblue+dk_min:Nred+dk_max) - &
-						hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * (atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
-       	 
-
+						hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * ( n_new(atom%activeindex,i,icell)*wj/wi - n_new(atom%activeindex,j,icell)*atom%lines(kc)%gij )
+						!(atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
+!        	 
+! 
 				endif
 				
 			    
@@ -244,8 +270,7 @@ MODULE statequil_atoms
 			atom => NULL()
 
 		end do atom_loop
-		
-		Ieff = ( Itot(:,iray,id) * exp(-ds(iray,id)*chi_tot(:)) + (eta_tot(:)/chi_tot(:)) * (1.0_dp -  exp(-ds(iray,id)*chi_tot(:))) ) / n_rayons
+		Ieff = ( Itot(:,iray,id) * exp(-ds(iray,id)*chi_tot(:)) + (eta_tot(:)/chi_tot(:)) * (1.0_dp -  exp(-ds(iray,id)*chi_tot(:))) )
 		if (any_nan_infinity_vector(Ieff) /= 0.0) then
 			write(*,*) " Ieff", Ieff, " Ieff"
 			write(*,*) " chi0_bb", chi0_bb(:,icell), 'chi0_bb'
@@ -276,13 +301,13 @@ MODULE statequil_atoms
 					
 					J1 = Ieff(a0+l) * aatom%lines(kc)%phi_loc(l,iray,id)
 					J2 = Ieff(a0+l-1) * aatom%lines(kc)%phi_loc(l-1,iray,id)
- 
+					 
  					JJ = JJ + 0.5 * (J1 + J2) * hv * 1d3
  					!write(*,*) iray, l, J1, J2, wphi
 
 				enddo
 
-				JJ = JJ / wphi
+				JJ = JJ / wphi / n_rayons
 
 				if ((wphi < 0.7) .or. (wphi > 1.1)) then
 					call write_profile(unit_profiles, icell, aatom%lines(kc), kc, wphi)
@@ -337,19 +362,19 @@ MODULE statequil_atoms
 					JJ = JJ + 0.5 * (J1 + J2) * wl
 										
 					ehnukt = exp(-hc_k/T(icell)/lambda(Nblue+l-1))
-					twohnu3_c2 = ( twohc/lambda(Nblue+l-1)**3 ) / n_rayons !because Ieff = Ieff/n_rayons
+					twohnu3_c2 = twohc/lambda(Nblue+l-1)**3 
 					J1 = ( Ieff(Nblue+l-1) + twohnu3_c2 ) * ehnukt * a1 / lambda(Nblue+l-1)
 					
 					ehnukt = exp(-hc_k/T(icell)/lambda(Nblue+l-2))
-					twohnu3_c2 = ( twohc/lambda(Nblue+l-2)**3 ) / n_rayons
+					twohnu3_c2 = twohc/lambda(Nblue+l-2)**3 
 					J2 = ( Ieff(Nblue+l-2) + twohnu3_c2 ) * ehnukt * a2 / lambda(Nblue+l-2)
 										
 					JJb = JJb + 0.5 * (J1 + J2) * wl
 
 				enddo
 
-				aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + fourpi_h * JJ
-				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + fourpi_h * JJb * aatom%nstar(i,icell)/aatom%nstar(j,icell)
+				aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + fourpi_h * ( JJ / n_rayons )
+				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + fourpi_h * ( JJb / n_rayons) * ( aatom%nstar(i,icell)/aatom%nstar(j,icell) )
 				
 
 			end do atrc_loop
@@ -357,6 +382,7 @@ MODULE statequil_atoms
 			aatom => NULL()
 
 		end do aatom_loop
+
 
 	return
 	end subroutine calc_rates
@@ -386,6 +412,7 @@ MODULE statequil_atoms
 			SELECT CASE (atom%at(kr)%trtype)
    
 			CASE ("ATOMIC_LINE")
+
 				i = atom%lines(kc)%i; j = atom%lines(kc)%j
 				wj = 1.0; wi = 1.0
 ! 				if (ldissolve) then
@@ -440,8 +467,8 @@ endif
      			endif
      			!write(*,*) "loc, line:", T(icell), Tex_loc
      			
-       			!dT_loc = abs(Tdag-Tex_loc)/(tiny_dp + Tex_loc)
-       			 dT_loc = abs(Tdag-Tex_loc)/(tiny_dp + Tdag)
+       			dT_loc = abs(Tdag-Tex_loc)/(tiny_dp + Tex_loc)
+!        			dT_loc = abs(Tdag-Tex_loc)/(tiny_dp + Tdag)
        			dT = max(dT, dT_loc)
        			Tex = max(Tex, Tex_loc)
 
@@ -496,7 +523,7 @@ if (write_neg_tex) then
 write(unit_invfile,*) "-------------------------------------------------------------------------------"				
 write(unit_invfile,"('icell = '(1I9), ' atom '(1A2))") icell, atom%ID
 write(unit_invfile,*) "ratio : n(i) / (n(j) gij)"
-write(unit_invfile, "(' -> cont '(1I2)' -> '(1I2), (3ES20.7E3) )") i, j, atom%n(i,icell), atom%n(j,icell) * gij, atom%lines(kc)%Tex(icell)
+write(unit_invfile, "(' -> cont '(1I2)' -> '(1I2), (3ES20.7E3) )") i, j, atom%n(i,icell), atom%n(j,icell) * gij, atom%continua(kc)%Tex(icell)
 write(unit_invfile, "('log(ratio) = '(1ES20.7E3), ' ratio = '(1ES20.7E3) )") ratio, exp(ratio)
 write(unit_invfile,"( 'w(i)='(1ES14.7), ' w(j)='(1ES20.7E3) )") wi, wj
 write(unit_invfile,"( 'n(i)='(1ES14.7), ' n(j)='(1ES20.7E3) )") atom%n(i,icell), atom%n(j,icell)
@@ -506,8 +533,8 @@ endif
 				endif
      			!write(*,*) "loc, cont:", T(icell), Tion_loc
 					
-       			!dT_loc = abs(Tdag-Tion_loc)/(Tion_loc + tiny_dp)
-       			dT_loc = abs(Tdag-Tion_loc)/(Tdag + tiny_dp)
+       			dT_loc = abs(Tdag-Tion_loc)/(Tion_loc + tiny_dp)
+!        			dT_loc = abs(Tdag-Tion_loc)/(Tdag + tiny_dp)
        			dT = max(dT, dT_loc)		
        			Tion = max(Tion_loc, Tion)	
     
@@ -611,12 +638,9 @@ endif
 
 					endif
 				endif
-
 				
 				atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - atom%lines(kc)%Rij(id) * wj/wi
 				atom%Gamma(i,j,id) = atom%Gamma(i,j,id) - atom%lines(kc)%Rji(id)
-				!!write(*,*) " line ", i, j, " Rij=", atom%lines(kc)%Rij(id)," Rji=",atom%lines(kc)%Rji(id)
-				!!write(*,*) "  -> col ", " Cij=",atom%C(i,j,id)," Cji=",atom%C(j,i,id)
 
 				     
         
@@ -638,10 +662,6 @@ endif
 
 				atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - atom%continua(kc)%Rij(id) * wj/wi
 				atom%Gamma(i,j,id) = atom%Gamma(i,j,id) - atom%continua(kc)%Rji(id)
-
-				!!write(*,*) " cont ", i, j, " Rij=", atom%continua(kc)%Rij(id)," Rji=",atom%continua(kc)%Rji(id)
-				!!write(*,*) "  -> col ", " Cij=",atom%C(i,j,id)," Cji=",atom%C(j,i,id)
-
        
 			CASE DEFAULT
     
@@ -675,7 +695,7 @@ endif
 		integer :: lp, imaxpop, l
 		real(kind=dp), intent(out) :: dM
 		real(kind=dp), dimension(atom%Nlevel) :: ndag
-		real(kind=dp) :: n0 = 0.0_dp, ntotal
+		real(kind=dp) :: n0 = 0.0_dp, ntotal, Gamma_dag(atom%Nlevel,atom%Nlevel) !debug
 		
 		if (n0 /= 0.0_dp) call error("n0 should be zero at the moment !")
 		ntotal = ( ntotal_atom(icell,atom) - n0 )
@@ -684,73 +704,81 @@ endif
 		imaxpop = locate(atom%n(:,icell), maxval(atom%n(:,icell)))
 		!imaxpop = atom%Nlevel
 
+		Gamma_dag = atom%Gamma(:,:,id)
 		call eliminate_delta(id, atom)
-		
-! 		if (icell==66) then
-! 			write(*,*)  "T=", T(icell), " imax=",imaxpop
-! 			do l=1, atom%Nlevel
-! 				do lp=1, atom%Nlevel
-! 					write(*,*) "G", l, lp, atom%gamma(l,lp,id)
-! 				enddo
-! 			enddo
-! ! 			stop
-! 		endif
 
 		atom%n(:,icell) = 0d0  
 		atom%n(imaxpop,icell) = 1.0_dp
-		atom%Gamma(imaxpop,:,id) = 1.0_dp
+! 		!atom%Gamma(imaxpop,:,id) = 1.0_dp
 				
-		if ((any_nan_infinity_matrix(atom%Gamma(:,:,id))>0)) then
-			write(*,*) "BUG Gamma", " id=",id, " icell=",icell
-			!-> replace <Nlevel> by *(fmt) for gfotran
-! 			write(*,'("ilevel: "<atom%Nlevel>I14)') (l, l=1, atom%Nlevel)
-			write(*,'("ilevel: "*(I14))') (l, l=1, atom%Nlevel)
-			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
-			write(*,'("ndag: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)
-			write(*,*) "Gamma:"
-			write(*,'(*(I14))') (l, l=1, atom%Nlevel)
-			do l=1, atom%Nlevel
-				write(*, '(1I3, *(ES14.5E3))') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
-			enddo
-			write(*,*) "Radiative rates"
-			do l=1, atom%Nline
-				write(*,*) " line ", atom%lines(l)%i, atom%lines(l)%j
-				write(*,*) "-> Rij=",atom%lines(l)%Rij(id)," Rji=",atom%lines(l)%Rji(id)
-			enddo
-			do l=1, atom%Ncont
-				write(*,*) " cont ", atom%continua(l)%i, atom%continua(l)%j
-				write(*,*) "-> Rij=",atom%continua(l)%Rij(id)," Rji=",atom%continua(l)%Rji(id)
-			enddo
-			stop
-		end if
-		
-		CALL GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
-! 		if (icell==66)then
-! 			write(*,*) icell, "nnew=", atom%n(:,icell) * ntotal
+! 		if ((any_nan_infinity_matrix(atom%Gamma(:,:,id))>0)) then
+! 			write(*,*) "BUG Gamma", " id=",id, " icell=",icell
+! 			!-> replace <Nlevel> by *(fmt) for gfotran
+! ! 			write(*,'("ilevel: "<atom%Nlevel>I14)') (l, l=1, atom%Nlevel)
+! 			write(*,'("ilevel: "*(I14))') (l, l=1, atom%Nlevel)
+! 			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
+! 			write(*,'("ndag: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)
+! 			write(*,*) "Gamma:"
+! 			write(*,'(*(I14))') (l, l=1, atom%Nlevel)
+! 			do l=1, atom%Nlevel
+! 				write(*, '(1I3, *(ES14.5E3))') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
+! 			enddo
+! 			write(*,*) "Radiative rates"
+! 			do l=1, atom%Nline
+! 				write(*,*) " line ", atom%lines(l)%i, atom%lines(l)%j
+! 				write(*,*) "-> Rij=",atom%lines(l)%Rij(id)," Rji=",atom%lines(l)%Rji(id)
+! 			enddo
+! 			do l=1, atom%Ncont
+! 				write(*,*) " cont ", atom%continua(l)%i, atom%continua(l)%j
+! 				write(*,*) "-> Rij=",atom%continua(l)%Rij(id)," Rji=",atom%continua(l)%Rji(id)
+! 			enddo
 ! 			stop
-! 		endif
+! 		end if
 		
-		if ((any_nan_infinity_vector(atom%n(:,icell))>0)) then
-			write(*,*) "BUG pops", " id=",id, " icell=",icell
-			write(*,'("ilevel: "*(I14))') (l, l=1, atom%Nlevel)
-			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
-			write(*,'("ndag: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)
-			write(*,*) "Gamma:"
-			write(*,'(*(I14))') (l, l=1, atom%Nlevel)
-			do l=1, atom%Nlevel
-				write(*, '(1I3, *(ES14.5E3))') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
-			enddo
-			write(*,*) "Radiative rates"
-			do l=1, atom%Nline
-				write(*,*) " line ", atom%lines(l)%i, atom%lines(l)%j
-				write(*,*) "-> Rij=",atom%lines(l)%Rij(id)," Rji=",atom%lines(l)%Rji(id)
-			enddo
-			do l=1, atom%Ncont
-				write(*,*) " cont ", atom%continua(l)%i, atom%continua(l)%j
-				write(*,*) "-> Rij=",atom%continua(l)%Rij(id)," Rji=",atom%continua(l)%Rji(id)
-			enddo
-			stop
-		end if
+! 		if (T(icell)==6370.0) then
+! 		if (T(icell)==27970.0) then
+! 		if (T(icell)==T(55))then! .or. T(icell)==T(6)) then
+! ! 		if (T(icell)==6740. .or. T(icell)==6370. .or. T(icell)==7410. .or. T(icell)==8635.) then !4500
+! 			write(*,*) icell, T(icell)
+! 			write(*,'("nstar: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel) !*ntotal
+! 			do l=1, atom%Nlevel
+! 				write(*, '(1I3, *(ES14.5E3))') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
+! 			enddo
+! 		endif
+		atom%Gamma(imaxpop,:,id) = 1.0_dp
+		call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
+		!call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel, .true.)
+! 		if (T(icell)==6370.0) then
+! 		if (T(icell)==27970.0) then
+! 		if (T(icell)==T(55))then! .or. T(icell)==T(6)) then
+! ! 		if (T(icell)==6740. .or. T(icell)==6370. .or. T(icell)==7410. .or. T(icell)==8635.) then !4500
+! 			write(*,*) icell, T(icell)
+! 			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel) !*ntotal
+! 			!!stop
+! 		endif
+
+! 		if ((any_nan_infinity_vector(atom%n(:,icell))>0)) then
+! 			write(*,*) "BUG pops", " id=",id, " icell=",icell
+! 			write(*,'("ilevel: "*(I14))') (l, l=1, atom%Nlevel)
+! 			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
+! 			write(*,'("ndag: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)
+! 			write(*,*) "Gamma:"
+! 			write(*,'(*(I14))') (l, l=1, atom%Nlevel)
+! 			do l=1, atom%Nlevel
+! 				write(*, '(1I3, *(ES14.5E3))') l, (Gamma_dag(l,lp), lp=1, atom%Nlevel)	
+! 				write(*, '(1I3, "out:", *(ES14.5E3))') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
+! 			enddo
+! 			write(*,*) "Radiative rates"
+! 			do l=1, atom%Nline
+! 				write(*,*) " line ", atom%lines(l)%i, atom%lines(l)%j
+! 				write(*,*) "-> Rij=",atom%lines(l)%Rij(id)," Rji=",atom%lines(l)%Rji(id)
+! 			enddo
+! 			do l=1, atom%Ncont
+! 				write(*,*) " cont ", atom%continua(l)%i, atom%continua(l)%j
+! 				write(*,*) "-> Rij=",atom%continua(l)%Rij(id)," Rji=",atom%continua(l)%Rji(id)
+! 			enddo
+! 			stop
+! 		end if
   
 		dM = 0.0_dp
 		ndag = ndag * ntotal
@@ -761,14 +789,20 @@ endif
 ! 			if (atom%n(l,icell) <= prec_pops) then !relative to ntotal
 ! 				atom%n(l,icell) = 0.0_dp
 ! 			else !denormalise
-				!dM = max(dM, abs(atom%n(l,icell) - ndag(l))/atom%n(l,icell))
-				dM = max(dM, abs(atom%n(l,icell)-ndag(l))/ndag(l))
+				dM = max(dM, abs(1.0_dp - ndag(l)/atom%n(l,icell)))
+! 				dM = max(dM, abs(atom%n(l,icell)-ndag(l))/ndag(l))
 ! 				atom%n(l,icell) = atom%n(l,icell) * ntotal
 ! 			endif
 
 		enddo
 	!write(*,*) "n=", atom%n(:,icell)
 	!stop
+	if (allocated(n_new)) then
+	
+		n_new(atom%activeindex,1:atom%Nlevel,icell) = atom%n(:,icell)
+		atom%n(:,icell) = ndag
+	
+	endif
 
 	return
 	end subroutine see_atom
@@ -815,31 +849,342 @@ endif
 			dTex = max(dTex, dT)
 			   
 			atom => NULL()
+			
 		enddo
   
 		!flag the one with a "*"
-		delta = dTex
-		!delta = dM
+		!delta = dTex
+		delta = dM
 
 		!Compare all atoms
 		if (verbose) then
-			write(*,*) icell, "    >> *max(dT) = ", real(dTex)
-			write(*,*) icell, "    >> max(dpops) = ", real(dpop)
+			write(*,*) icell, "    >> max(dT) = ", real(dTex)
+			write(*,*) icell, "    >> *max(dpops) = ", real(dpop)
 		endif
  
 	RETURN
 	END SUBROUTINE update_populations
 	
+
+	subroutine calc_rates_mali(id, icell, iray, waq)
+		integer, intent(in) :: id, icell, iray
+		real(kind=dp), intent(in) :: waq
+		real(kind=dp) :: chicont, etacont
+		real(kind=dp), dimension(Nlambda) :: chi_tot, eta_tot, Ieff
+		integer :: nact, Nred, Nblue, kc, kcc, kr, krr, i, j, ip, jp, l, a0, Nl, icell_d
+		integer :: N1, N2
+		real(kind=dp) :: etau, wphi, JJ, JJb, j1, j2, I1, I2, ehnukt, twohnu3_c2
+		real(kind=dp) :: wl, a1, a2
+		type(AtomType), pointer :: aatom, atom
+		real(kind=dp) :: wi, wj, nn, dk0, xcc_ij, xcc_ji
+
+		aatom_loop : do nact = 1, Nactiveatoms
+			aatom => ActiveAtoms(nact)%ptr_atom
+
+			Ieff = Itot(:,iray,id) - Psi(:,id) * eta_atoms(:,nact,id)
+! 			do l=1,Nlambda
+! 				Ieff(l) = Itot(l,iray,id) - Psi(l,iray,id) * eta_atoms(l,nact,id)
+! 				if (Ieff(l) < 0.0) Ieff(l) = Itot(l,iray,id) - eta_atoms(l,nact,id)
+! 			enddo
+! 			if(minval(Ieff) < 0) then
+! 				ip = locate(Ieff, minval(Ieff))
+! 				write(*,*) iray, lambda(ip), Ieff(ip), Itot(ip,iray,id), Psi(ip,iray,id), eta_atoms(ip,nact,id)
+! 				stop
+! 			endif
+
+			atr_loop : do kr = 1, aatom%Ntr_line
+
+				kc = aatom%at(kr)%ik
+
+				Nred = aatom%lines(kc)%Nred;Nblue = aatom%lines(kc)%Nblue
+				i = aatom%lines(kc)%i
+				j = aatom%lines(kc)%j
+				
+				Nl = Nred-dk_min+dk_max-Nblue+1
+				a0 = Nblue+dk_min-1
+				
+				JJ = 0.0
+				wphi = 0.0
+				xcc_ji = 0.0
+
+! 				enddo
+				do l=1,Nl
+					if (l==1) then
+						wl = 0.5*(1d3*hv)
+						!wl = 0.5*(lambda(a0+l+1)-lambda(a0+l)) * clight / aatom%lines(kc)%lambda0
+					elseif (l==Nl) then
+						wl = 0.5*(1d3*hv)
+						!wl = 0.5*(lambda(a0+l)-lambda(a0+l-1)) * clight / aatom%lines(kc)%lambda0
+					else
+						wl = 1d3*hv
+						!wl = 0.5*(lambda(a0+l+1)-lambda(a0+l-1)) * clight / aatom%lines(kc)%lambda0
+					endif
+
+					JJ = JJ + wl * Ieff(a0+l) * aatom%lines(kc)%phi_loc(l,iray,id)
+					wphi = wphi + wl * aatom%lines(kc)%phi_loc(l,iray,id)
+					xcc_ji = xcc_ji + chi_up(a0+l,i,nact,id)*psi(a0+l,id)*Uji_down(a0+l,j,nact,id)
+					
+				enddo
+
+				JJ = waq * JJ / wphi
+
+				if ((wphi < 0.7) .or. (wphi > 1.1)) then
+					call write_profile(unit_profiles, icell, aatom%lines(kc), kc, wphi)
+				endif
+
+				!init at Aji
+				aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + JJ * aatom%lines(kc)%Bji
+				aatom%lines(kc)%Rij(id) = aatom%lines(kc)%Rij(id) + JJ * aatom%lines(kc)%Bij
+				
+				!cross-coupling terms
+				xcc_ij = 0.0_dp! 
+					sub_atr_loop : do krr=1, aatom%Ntr
+				
+						kcc = aatom%at(krr)%ik
+					
+						select case (aatom%at(krr)%trtype)
+					
+						case ("ATOMIC_LINE")
+							ip = aatom%lines(kcc)%i
+							jp = aatom%lines(kcc)%j
+							N1 = aatom%lines(kcc)%Nblue+dk_min
+							N2 = aatom%lines(kcc)%Nred+dk_max
+							if (jp==i) then !i upper level of another transitions
+								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,id)*Uji_down(N1:N2,i,nact,id))
+							endif
+					
+						case ("ATOMIC_CONTINUUM")
+							ip = aatom%continua(kcc)%i
+							jp = aatom%continua(kcc)%j
+							N1 = aatom%continua(kcc)%Nb
+							N2 = aatom%continua(kcc)%Nr
+							if (jp==i) then !i upper level of another transitions
+								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,id)*Uji_down(N1:N2,i,nact,id))
+							endif
+					
+						case default
+							call error("Transition type unknown cross-coupling (line)", aatom%at(krr)%trtype)
+						end select
+				
+				
+					enddo sub_atr_loop
+
+				aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) - xcc_ji * waq
+				aatom%lines(kc)%Rij(id) = aatom%lines(kc)%Rij(id) + xcc_ij * waq
+
+			end do atr_loop
+			
+			atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
+			
+	 			kc = aatom%at(kr)%ik
+
+				i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
+! 				chi_ion = Elements(aatom%periodic_table)%ptr_elem%ionpot(aatom%stage(j))
+! 				neff = aatom%stage(j) * sqrt(aatom%Rydberg / (aatom%E(j) - aatom%E(i)) )
+
+				
+				Nblue = aatom%continua(kc)%Nb; Nred = aatom%continua(kc)%Nr
+				Nl = Nred-Nblue + 1
+								
+				JJ = 0.0
+				JJb = 0.0
+				xcc_ji = 0.0
+				
+				icell_d = 1
+				if (ldissolve) then
+					if (aatom%ID=="H") icell_d = icell
+				endif
+				
+				do l=1, Nl
+					if (l==1) then
+						wl = 0.5*(lambda(Nblue+l)-lambda(Nblue)) / lambda(Nblue)
+					elseif (l==Nl) then
+						wl = 0.5*(lambda(Nred)-lambda(Nred-1))  / lambda(Nred)
+					else
+						wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-2)) / lambda(Nblue+l-1)
+					endif
+
+					a1 = aatom%continua(kc)%alpha_nu(l,icell_d)
+
+					JJ = JJ + wl  * a1 * Ieff(Nblue+l-1)
+															
+					ehnukt = exp(-hc_k/T(icell)/lambda(Nblue+l-1))
+					twohnu3_c2 = twohc/lambda(Nblue+l-1)**3 
+					JJb = JJb + wl * ( Ieff(Nblue+l-1) + twohnu3_c2 ) * ehnukt * a1
+					
+					xcc_ji = xcc_ji + chi_up(Nblue+l-1,i,nact,id)*Uji_down(Nblue+l-1,j,nact,id)*psi(Nblue+l-1,id)
+
+				enddo
+
+				aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + waq*fourpi_h * JJ
+				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + waq*fourpi_h * JJb * ( aatom%nstar(i,icell)/aatom%nstar(j,icell) )
+					
+				xcc_ij = 0.0_dp
+					sub_atrc_loop : do krr=1, aatom%Ntr
+				
+						kcc = aatom%at(krr)%ik
+					
+						select case (aatom%at(krr)%trtype)
+						case ("ATOMIC_LINE")
+							ip = aatom%lines(kcc)%i
+							jp = aatom%lines(kcc)%j
+							N1 = aatom%lines(kcc)%Nblue+dk_min
+							N2 = aatom%lines(kcc)%Nred+dk_max
+							if (jp==i) then !i upper level of another transitions
+								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,id)*Uji_down(N1:N2,i,nact,id))
+							endif
+						case ("ATOMIC_CONTINUUM")
+							ip = aatom%continua(kcc)%i
+							jp = aatom%continua(kcc)%j
+							N1 = aatom%continua(kcc)%Nb
+							N2 = aatom%continua(kcc)%Nr
+							if (jp==i) then !i upper level of another transitions
+								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,id)*Uji_down(N1:N2,i,nact,id))
+							endif
+					
+						case default
+							call error("Transition type unknown cross-coupling (line)", aatom%at(krr)%trtype)
+						end select
+				
+				
+					enddo sub_atrc_loop
+
+				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) - xcc_ji * waq
+				aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + xcc_ij * waq
+
+
+			end do atrc_loop
+
+			aatom => NULL()
+
+		end do aatom_loop
+
+	return
+	end subroutine calc_rates_mali
+	
+	
+	subroutine store_radiative_rates_mali(id, icell, iray, waq, Nmaxtr, Rij, Rji)
+	!continua radiative rates computed also with total I
+		integer, intent(in) :: icell, Nmaxtr, id, iray
+		real(kind=dp), intent(in) :: waq
+		real(kind=dp), dimension(NactiveAtoms, Nmaxtr), intent(inout) :: Rij, Rji
+		integer :: kc, kr, nact, l, imu,iphi,iray_p
+		integer :: i, j, Nl, Nblue, Nred, a0, icell_d
+		real(kind=dp) :: a1, JJb, a2, di1, di2, ehnukt, twohnu3_c2, wl
+		real(kind=dp) :: chi_ion, neff, Ieff1, Ieff2, JJ, wphi, J1, J2
+		type (AtomType), pointer :: atom
+	
+		if (iray==1) then
+			Rij(:,:) = 0.0_dp
+			Rji(:,:) = 0.0_dp
+		endif
+		
+		do nact=1, NactiveAtoms
+		
+			atom => Activeatoms(nact)%ptr_atom
+		
+			do kc=1, atom%Ntr
+		
+				kr = atom%at(kc)%ik
+			
+				select case (atom%at(kc)%trtype)
+			
+				case ("ATOMIC_LINE")
+	
+					Nred = atom%lines(kr)%Nred
+					Nblue = atom%lines(kr)%Nblue
+					i = atom%lines(kr)%i
+					j = atom%lines(kr)%j
+				
+					Nl = Nred-dk_min+dk_max-Nblue+1
+					a0 = Nblue+dk_min-1
+					if (iray==1) Rji(nact,kc) = atom%lines(kr)%Aji 
+
+						JJ = 0.0
+						wphi = 0.0
+						
+						do l=1,Nl
+										
+							if (l==1) then
+								wl = 0.5*(lambda(a0+l+1)-lambda(a0+l)) * clight / atom%lines(kr)%lambda0
+							elseif (l==Nl) then
+								wl = 0.5*(lambda(a0+l)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
+							else
+								wl = 0.5*(lambda(a0+l+1)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
+							endif
+					
+							JJ = JJ + wl * Itot(a0+l,1,id) * atom%lines(kr)%phi_loc(l,1,id)
+							wphi = wphi + wl * atom%lines(kr)%phi_loc(l,1,id)
+					
+						enddo
+								!init at Aji
+						Rji(nact,kc) = Rji(nact,kc) + atom%lines(kr)%Bji * JJ * waq / wphi
+						Rij(nact,kc) = Rij(nact,kc) + atom%lines(kr)%Bij * JJ * waq / wphi
+
+					
+
+				case ("ATOMIC_CONTINUUM")
+				
+				
+					i = atom%continua(kr)%i; j = atom%continua(kr)%j
+					chi_ion = Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(j))
+					neff = atom%stage(j) * sqrt(atom%Rydberg / (atom%E(j) - atom%E(i)) )
+
+				
+					Nblue = atom%continua(kr)%Nb; Nred = atom%continua(kr)%Nr
+					Nl = Nred-Nblue + 1
+	
+					icell_d = 1
+					if (ldissolve) then
+						if (atom%ID=="H") icell_d = icell
+					endif
+													
+					JJ = 0.0
+					JJb = 0.0
+					do l=1, Nl
+					
+						if (l==1) then
+							wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-1)) / lambda(Nblue+l-1)
+						elseif (l==Nl) then
+							wl = 0.5*(lambda(Nblue+l-1)-lambda(Nblue+l-2))  / lambda(Nblue+l-1)
+						else
+							wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-2)) / lambda(Nblue+l-1)
+						endif
+						
+						a1 = atom%continua(kr)%alpha_nu(l,icell_d)
+
+						JJ = JJ + wl * Itot(Nblue+l-1,1,id) * a1
+						JJb = JJb + wl * a1 * exp(-hc_k/T(icell)/lambda(Nblue+l-1)) * &
+							(twohc/lambda(Nblue+l-1)**3 + Itot(Nblue+l-1,1,id))
+					enddo
+
+
+					Rij(nact,kc) = Rij(nact,kc) + waq*fourpi_h * JJ
+					Rji(nact,kc) = Rji(nact,kc) + waq*fourpi_h * JJb * atom%nstar(i,icell)/atom%nstar(j,icell)			
+			
+				case default
+					call error("transition type unknown", atom%at(l)%trtype)
+					
+				end select
+				
+			enddo
+		
+			atom => NULL()
+		enddo
+		
+	return
+	end subroutine store_radiative_rates_mali
 	
 	!used only to write radiative rates computed with the converged radiation field
 	!not used in the iterative scheme
-	subroutine store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij, Rji, Jr)
+	subroutine store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij, Rji, Jr, angle_quad)
 	!continua radiative rates computed also with total I
 		integer, intent(in) :: icell, n_rayons, Nmaxtr, id
+		logical, intent(in) :: angle_quad
 		real(kind=dp), dimension(NactiveAtoms, Nmaxtr), intent(inout) :: Rij, Rji
 		real(kind=dp), dimension(Nlambda) :: Jr
-		integer :: kc, kr, nact, l, iray
-		integer :: i, j, Nl, Nblue, Nred, a0
+		integer :: kc, kr, nact, l, iray,imu,iphi,iray_p
+		integer :: i, j, Nl, Nblue, Nred, a0, icell_d
 		real(kind=dp) :: a1, JJb, a2, di1, di2, ehnukt, twohnu3_c2, wl
 		real(kind=dp) :: chi_ion, neff, Ieff1, Ieff2, JJ, wphi, J1, J2
 		type (AtomType), pointer :: atom
@@ -866,34 +1211,41 @@ endif
 				
 					Nl = Nred-dk_min+dk_max-Nblue+1
 					a0 = Nblue+dk_min-1
-					
 					Rji(nact,kc) = atom%lines(kr)%Aji 
 
-					do iray=1, n_rayons
-				
-						JJ = 0.0
-						wphi = 0.0
 					
-						do l=2, Nl
-
-							wphi = wphi + 0.5 * (atom%lines(kr)%phi_loc(l,iray,id)+atom%lines(kr)%phi_loc(l-1,iray,id)) * 1e3*hv
+					if (angle_quad) then
+						write(*,*) " Angle_quad not implemented yet"
+						!check iray if lmali
+						stop					
+						
+						else !pure mc
+							do iray=1, n_rayons
+								JJ = 0.0
+								wphi = 0.0
+						
+								do l=1,Nl
+										
+									if (l==1) then
+										wl = 0.5*(lambda(a0+l+1)-lambda(a0+l)) * clight / atom%lines(kr)%lambda0
+									elseif (l==Nl) then
+										wl = 0.5*(lambda(a0+l)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
+									else
+										wl = 0.5*(lambda(a0+l+1)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
+									endif
 					
-							Ieff1 = Itot(a0+l,iray,id)
+									JJ = JJ + wl * Itot(a0+l,iray,id) * atom%lines(kr)%phi_loc(l,iray,id)
+									wphi = wphi + wl * atom%lines(kr)%phi_loc(l,iray,id)
 					
-							Ieff2 = Itot(a0+l-1,iray,id)
+								enddo
+								!init at Aji
+								Rji(nact,kc) = Rji(nact,kc) + atom%lines(kr)%Bji * JJ / n_rayons / wphi
+								Rij(nact,kc) = Rij(nact,kc) + atom%lines(kr)%Bij * JJ / n_rayons / wphi
 
-							J1 = Ieff1 * atom%lines(kr)%phi_loc(l,iray,id)
-							J2 = Ieff2 * atom%lines(kr)%phi_loc(l-1,iray,id)
-
- 							JJ = JJ + 0.5 * (J1 + J2) * hv * 1d3
- 					
-
-						enddo
-				
-						!init at Aji
-						Rji(nact,kc) = Rji(nact,kc) + JJ * atom%lines(kr)%Bji / n_rayons / wphi
-						Rij(nact,kc) = Rij(nact,kc) + JJ * atom%lines(kr)%Bij / n_rayons / wphi
-					enddo
+							enddo						
+						
+						endif !over angle_quad
+					
 
 				case ("ATOMIC_CONTINUUM")
 				
@@ -905,33 +1257,32 @@ endif
 				
 					Nblue = atom%continua(kr)%Nb; Nred = atom%continua(kr)%Nr
 					Nl = Nred-Nblue + 1
-
+	
+					icell_d = 1
+					if (ldissolve) then
+						if (atom%ID=="H") icell_d = icell
+					endif
 								
 					JJ = 0.0
 					JJb = 0.0
-				
-					do l=2, Nl
-						wl = ( lambda(Nblue+l-1) - lambda(Nblue+l-2) )
-						di1 = D_i(icell, neff, real(atom%stage(i)), 1.0, lambda(Nblue+l-1), atom%continua(kr)%lambda0, chi_ion)
-						di2 = D_i(icell, neff, real(atom%stage(i)), 1.0, lambda(Nblue+l-2), atom%continua(kr)%lambda0, chi_ion)
-						a1 = interp(atom%continua(kr)%alpha,lambda_cont(atom%continua(kr)%Nblue:atom%continua(kr)%Nred), lambda(Nblue+l-1))
-						a2 = interp(atom%continua(kr)%alpha,lambda_cont(atom%continua(kr)%Nblue:atom%continua(kr)%Nred), lambda(Nblue+l-2))
+					
+					do l=1, Nl
+					
+						if (l==1) then
+							wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-1)) / lambda(Nblue+l-1)
+						elseif (l==Nl) then
+							wl = 0.5*(lambda(Nblue+l-1)-lambda(Nblue+l-2))  / lambda(Nblue+l-1)
+						else
+							wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-2)) / lambda(Nblue+l-1)
+						endif
+						
+						a1 = atom%continua(kr)%alpha_nu(l,icell_d)
 
-						J1 = Jr(Nblue+l-1) * di1 * a1 / lambda(Nblue+l-1)
-						J2 = Jr(Nblue+l-2) * di2 * a2 / lambda(Nblue+l-2)
-					
-						JJ = JJ + 0.5 * (J1 + J2) * wl
-										
-						ehnukt = exp(-hc_k/T(icell)/lambda(Nblue+l-1))
-						twohnu3_c2 = twohc/lambda(Nblue+l-1)**3
-						J1 = ( Jr(Nblue+l-1) + twohnu3_c2 ) * ehnukt * di1 * a1 / lambda(Nblue+l-1)
-					
-						ehnukt = exp(-hc_k/T(icell)/lambda(Nblue+l-2))
-						twohnu3_c2 = twohc/lambda(Nblue+l-2)**3
-						J2 = ( Jr(Nblue+l-2) + twohnu3_c2 ) * ehnukt * di2 * a2 / lambda(Nblue+l-2)
-										
-						JJb = JJb + 0.5 * (J1 + J2) * wl
+						JJ = JJ + wl * Jr (Nblue+l-1) * a1
+						JJb = JJb + wl * a1 * exp(-hc_k/T(icell)/lambda(Nblue+l-1)) * &
+							(twohc/lambda(Nblue+l-1)**3 + Jr(Nblue+l-1))
 					enddo
+
 
 					Rij(nact,kc) = fourpi_h * JJ
 					Rji(nact,kc) = fourpi_h * JJb * atom%nstar(i,icell)/atom%nstar(j,icell)			
@@ -949,6 +1300,7 @@ endif
 	return
 	end subroutine store_radiative_rates
 	
+
 	
 	subroutine store_rate_matrices(id, icell, Nmaxlevel, Aij)
 	!atom%Gamma should be filled with the value before exciting subiterations
