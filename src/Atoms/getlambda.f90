@@ -16,7 +16,7 @@ module getlambda
   integer, parameter :: Nlambda_cont_log = 91 !71continuum log scaled
   integer, parameter :: Nlambda_line_w = 14, Nlambda_line_c_log = 51
   integer, parameter :: Nlambda_line_c = 71!line linear1
-  real, parameter    :: hvel_nlte = 3!for line in km/s
+  real, parameter    :: hvel_nlte = 10.0!for line in km/s, 1-3 for static models
   real, parameter	 :: delta_lambda_cont = 5.0 !nm
   real               :: hv = hvel_nlte !can change due to image grid
   		
@@ -880,7 +880,7 @@ module getlambda
    sorted_indexes = bubble_sort(lambda)
    lambda(:) = lambda(sorted_indexes)
    x0 = minval(lambda); x1 = maxval(lambda)
-   hv = 1e3
+   hv = 1e3 !m/s
    do ll=2, Nwaves
    	hv = min(hv, real((lambda(ll) - lambda(ll-1)) / lambda(ll-1) * clight) * 1e-3)
    enddo
@@ -1057,7 +1057,7 @@ module getlambda
 			deallocate(outgrid)
 		endif
 		Ntrans = 0
-		delta_v = dvmax + hv * 1e3
+		delta_v = dvmax + hv * 1e3 !m/s
 		max_shift = nint(1e-3*dvmax/hv)
 
 		!maximum and minimum wavelength for only lines, including max velocity field
@@ -1420,6 +1420,7 @@ module getlambda
 		write(*,*) Nspec_line, " line wavelengths"
 		write(*,*) Nspec_cont, " continuum wavelengths"
 ! 		write(*,*) Nwaves - Nspec_line, " continuum wavelengths"
+		write(*,*) "Width of lines (km/s)", dvmax * 1e-3
 		write(*,*) "Mean number of lines per group:", real(sum(Nline_per_group))/real(Ngroup)
 		write(*,*) "Mean number of wavelengths per group:", real(Nspec_line)/real(Ngroup)
 		write(*,*) "Mean number of wavelengths per line:", real(Nspec_line)/real(Ntrans-Ncont)
