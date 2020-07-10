@@ -44,7 +44,8 @@ module spectrum_type
 	real(kind=dp), allocatable, dimension(:,:,:,:,:,:) :: F_QUV
 	real(kind=dp), allocatable, dimension(:,:,:,:) :: Ksi 
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
-	real(kind=dp), allocatable, dimension(:,:,:) :: Psi, Stot, chitot
+   
+!! 	real(kind=dp), allocatable, dimension(:,:,:) :: Psi, Stot, chitot
 	
 !   TYPE AtomicOpacity
 !    !active opacities
@@ -456,9 +457,9 @@ call error("initSpectrumImage not modified!!")
 			deallocate(chiQUV_p)
 		endif
    
-		if (allocated(psi)) deallocate(Psi)
-		if (allocated(stot)) deallocate(Stot)
-		if (allocated(chitot)) deallocate(chitot)
+! 		if (allocated(psi)) deallocate(Psi)
+! 		if (allocated(stot)) deallocate(Stot)
+! 		if (allocated(chitot)) deallocate(chitot)
 
 		deallocate(chi_c,  eta_c)
 		if (allocated(sca_c)) deallocate(sca_c)
