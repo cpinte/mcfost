@@ -647,7 +647,7 @@ MODULE readatom
        enddo
     else if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "DEPARTURE") then
      allocate(atom%b(atom%Nlevel, n_cells))
-     CALL error ("Implement deprature coeffs for NLTE stars")
+     CALL error ("Implement departure coeffs for NLTE stars")
     end if
    else !not active = PASSIVE
      if (atom%dataFile.ne.""  .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
@@ -932,7 +932,7 @@ MODULE readatom
      enddo
      maxvel = maxvel_atom_transfer * 1e3 * ( 1e-3 * vel/1.0)
 
-	maxvel = 15.0 * maxval(atom%vbroad)
+	maxvel = 30.0 * maxval(atom%vbroad)
      
      !!-> group of lines, linear in v
      CALL compute_line_bound( Atoms(nmet)%ptr_atom%lines(kr), maxvel )
