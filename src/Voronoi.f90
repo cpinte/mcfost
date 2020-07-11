@@ -282,31 +282,7 @@ module Voronoi_grid
        endif
     enddo
     n_cells_before_stars = icell
-
-    if (n_sublimate > 0) then
-       write(*,*) n_sublimate, "particles have been sublimated"
-       write(*,*) "Not implemented yet : MCFOST will probably crash !!!!"
-    endif
-
-    ! Filtering stars outside the limits
-    etoile(:)%out_model = .true.
-    etoile(:)%icell = 0
-    do i=1, n_etoiles
-       ! We test is the star is in the model
-       if ((etoile(i)%x > limits(1)).and.(etoile(i)%x < limits(2))) then
-          if ((etoile(i)%y > limits(3)).and.(etoile(i)%y < limits(4))) then
-             if ((etoile(i)%z > limits(5)).and.(etoile(i)%z < limits(6))) then
-                icell = icell + 1
-                SPH_id(icell) = 0 ; SPH_original_id(icell) = 0
-                x_tmp(icell) = etoile(i)%x ; y_tmp(icell) = etoile(i)%y ; z_tmp(icell) = etoile(i)%z ; h_tmp(icell) = huge_real ;
-                etoile(i)%out_model = .false.
-                etoile(i)%icell = icell
-             endif
-          endif
-       endif
-    enddo
     n_cells = icell
-
 
     ! Randomizing particles
     if (lrandom) then
@@ -325,21 +301,37 @@ module Voronoi_grid
           h_tmp2(icell) = h_tmp(i)
           SPH_id2(icell) = SPH_id(i)
           SPH_original_id2(icell) = SPH_original_id(i)
-
-          ! Updating the star indices
-          if (SPH_id2(icell) == 0) then ! star
-             do k=1, n_etoiles
-                if (etoile(k)%icell == i) then
-                   etoile(k)%icell = icell
-                endif
-             end do
-          endif
        enddo
 
        x_tmp = x_tmp2 ; y_tmp = y_tmp2 ; z_tmp = z_tmp2 ; h_tmp = h_tmp2
        SPH_id = SPH_id2 ; SPH_original_id = SPH_original_id
        deallocate(order,x_tmp2,y_tmp2,z_tmp2,h_tmp2,SPH_id2,SPH_original_id2)
     endif
+
+    if (n_sublimate > 0) then
+       write(*,*) n_sublimate, "particles have been sublimated"
+       write(*,*) "Not implemented yet : MCFOST will probably crash !!!!"
+    endif
+
+    ! Filtering stars outside the limits
+    etoile(:)%out_model = .true.
+    etoile(:)%icell = 0
+    icell = n_cells_before_stars
+    do i=1, n_etoiles
+       ! We test is the star is in the model
+       if ((etoile(i)%x > limits(1)).and.(etoile(i)%x < limits(2))) then
+          if ((etoile(i)%y > limits(3)).and.(etoile(i)%y < limits(4))) then
+             if ((etoile(i)%z > limits(5)).and.(etoile(i)%z < limits(6))) then
+                icell = icell + 1
+                SPH_id(icell) = 0 ; SPH_original_id(icell) = 0
+                x_tmp(icell) = etoile(i)%x ; y_tmp(icell) = etoile(i)%y ; z_tmp(icell) = etoile(i)%z ; h_tmp(icell) = huge_real ;
+                etoile(i)%out_model = .false.
+                etoile(i)%icell = icell
+             endif
+          endif
+       endif
+    enddo
+    n_cells = icell
 
     alloc_status = 0
     allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
@@ -384,7 +376,7 @@ module Voronoi_grid
     endif
 
     do i=1, n_etoiles
-       Voronoi(etoile(i)%icell)%is_star = .true.
+       if (etoile(i)%icell > 0) Voronoi(etoile(i)%icell)%is_star = .true.
     enddo
 
     call system_clock(time1)

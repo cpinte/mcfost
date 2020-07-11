@@ -1550,14 +1550,14 @@ subroutine Knuth_shuffle(a)
 
   integer, intent(inout) :: a(:)
 
-  integer :: seed_size=1
+  integer :: seed_size
   integer, dimension(:), allocatable :: seed
   integer :: i, randpos, temp
   real :: r
 
+  call random_seed(size=seed_size)
   allocate(seed(seed_size))
   seed(:) = 42
-  call random_seed(size=seed_size)
   call random_seed(put=seed)
 
   do i = size(a), 2, -1
@@ -1567,6 +1567,8 @@ subroutine Knuth_shuffle(a)
      a(randpos) = a(i)
      a(i) = temp
   enddo
+
+  return
 
 end subroutine Knuth_Shuffle
 
