@@ -1216,7 +1216,7 @@ endif
 					if (angle_quad) then
 						write(*,*) " Angle_quad not implemented yet"
 						!check iray if lmali
-						stop					
+						stop " mali"				
 						
 						else !pure mc
 							do iray=1, n_rayons
