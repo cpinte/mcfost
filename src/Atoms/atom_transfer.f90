@@ -1652,7 +1652,7 @@ write(unit_profiles,*) "************************************************"
 								endif							
 								
 							elseif (etape==1) then	
-								stop						
+								stop "step 1 not implemented"					
 							end if !etape
 
 						enddo !iray
