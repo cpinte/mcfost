@@ -4,7 +4,7 @@ MODULE PROFILES
 	use constant
 	use atom_type
 	use spectrum_type, only				: lambda
-	use voigtfunctions, only			: Voigt
+	use voigtfunctions, only			: Voigt, dirac_line
 	use broad, only						: Damping
 	use math
 	use getlambda, only 				: hv
@@ -95,18 +95,82 @@ MODULE PROFILES
  RETURN
  END SUBROUTINE IProfile
  
-	function local_profile_i(line,icell,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+
+
+	function local_profile_dk(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+	!comoving (local) profile is shifted on the observed grid depending on the velocity.
+	!The profile is defined on a N size grid which encompass the maximum possible displacement
+	!due to the velocity, but the local profile is shifted only from i1:i2 (Nblue and Nred on this
+	!lambda(N) grid)
 		! phi = Voigt / sqrt(pi) / vbroad(icell)
 		integer, intent(in) 							            :: icell, N
+		logical, intent(in)											:: lsubstract_avg
 		real(kind=dp), dimension(N)									:: lambda
 		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
                                 				               			x1,y1,z1, &      ! velocity field and magnetic field
                                 				               			l !physical length of the cell
 		integer 													:: Nvspace
-		integer, parameter											:: NvspaceMax = 2
+		integer, parameter											:: NvspaceMax = 500
+		real(kind=dp) 												:: norm
+		real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
+																		dv
+		type (AtomicLine), intent(in)								:: line
+		integer														:: i1, i2, i, j, nv, dk_mean, dk(NvspaceMax)
+		real(kind=dp), dimension(N)			                    	:: local_profile_dk
+ 
+		Nvspace = NvspaceMax
+		i = line%i; j = line%j
+		i1 = locate(lambda, line%lambdamin)
+		i2 = locate(lambda, line%lambdamax)
+
+		local_profile_dk = 0d0
+		
+		dk = 0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		dk(1) = nint(1e-3 * v0/hv)
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+
+		dv = abs(v1-v0)
+		Nvspace = min(max(2,nint(dv/line%atom%vbroad(icell)*20.)),NvspaceMax)
+		!!write(*,*) "Nv = ", max(2,nint(dv/line%atom%vbroad(icell)*20.))
+		do nv=2, Nvspace-1
+      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			xphi=x+delta_vol_phi*u
+			yphi=y+delta_vol_phi*v
+			zphi=z+delta_vol_phi*w
+			dk(nv) = nint(1e-3*v_proj(icell,xphi,yphi,zphi,u,v,w)/hv)
+			!!write(*,*) nv, dk(nv), v_proj(icell,xphi,yphi,zphi,u,v,w)*1e-3
+		enddo
+		dk(Nvspace) = nint(1e-3*v1/hv)
+		dk_mean = 0
+		!!if (lsubstract_avg) dk_mean = sum(dk(1:Nvspace))/Nvspace
+
+		norm = Nvspace * line%atom%vbroad(icell) * sqrtpi
+
+		do nv=1, Nvspace
+			!!write(*,*) N, i1, i2, dk(nv), line%Nblue, size(line%phi(:,icell))
+			local_profile_dk(i1+dk(nv):i2+dk(nv)) = local_profile_dk(i1+dk(nv):i2+dk(nv)) + line%phi(:,icell)
+		enddo
+
+		local_profile_dk(:) = local_profile_dk(:) / norm
+
+	return
+	end function local_profile_dk
+ 
+	function local_profile_i(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell, N
+		logical, intent(in)											:: lsubstract_avg
+		real(kind=dp), dimension(N)									:: lambda
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		integer, parameter											:: NvspaceMax = 500
 		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
 		real(kind=dp) 												:: norm
-		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi
+		real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
+																		dv, omegav_mean
 		type (AtomicLine), intent(in)								:: line
 		integer														:: Nred, Nblue, i, j, nv
 		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_i
@@ -123,7 +187,10 @@ MODULE PROFILES
 		v0 = v_proj(icell,x,y,z,u,v,w)
 		omegav(1) = v0
 		v1 = v_proj(icell,x1,y1,z1,u,v,w)
-		omegav(Nvspace) = v1
+
+		dv = abs(v1-v0)
+		Nvspace = min(max(2,nint(dv/line%atom%vbroad(icell)*20.)),NvspaceMax)
+		!!write(*,*) "Nv = ", max(2,nint(dv/line%atom%vbroad(icell)*20.))
 		do nv=2, Nvspace-1
       		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
 			xphi=x+delta_vol_phi*u
@@ -131,14 +198,15 @@ MODULE PROFILES
 			zphi=z+delta_vol_phi*w
 			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
 		enddo
-
-! 		omegav(nv) = v_proj(icell,(x+x1)/2.,(y+y1)/2.,(z+z1)/2.,u,v,w)
+		omegav(Nvspace) = v1
+		omegav_mean = 0.0_dp
+		!!if (lsubstract_avg) omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
 
 		norm = Nvspace * line%atom%vbroad(icell) * sqrtpi
 		
 		do nv=1, Nvspace
  
-			u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
+			u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
          
          	if (line%voigt) then
 				local_profile_i(:) = local_profile_i(:) + Voigt(N, line%a(icell), u1p)

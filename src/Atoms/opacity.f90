@@ -342,7 +342,7 @@ module Opacity
 					endif
 !futur test to see if we keep it or not depending on the method of calculation of profiles
 					!!atom%lines(kc)%phi(:,icell) = atom%lines(kc)%phi(:,icell) / (SQRTPI * atom%vbroad(icell))
-					atom%lines(kc)%phi(:,icell) = local_profile_i(atom%lines(kc),icell,atom%lines(kc)%Nlambda,lambda(atom%lines(kc)%Nblue:atom%lines(kc)%Nred), &
+					atom%lines(kc)%phi(:,icell) = local_profile_i(atom%lines(kc),icell,.false.,atom%lines(kc)%Nlambda,lambda(atom%lines(kc)%Nblue:atom%lines(kc)%Nred), &
 																							0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp)
 
 !Include occupa, cannot be lower, since ni =  niwi and nj = njwj
@@ -844,41 +844,13 @@ module Opacity
 		real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
 		integer :: nact, Nred, Nblue, kc, kr, i, j, nk, la, Nvspace
 		type(AtomType), pointer :: aatom
-! 		integer :: nv
-! 		integer, parameter 										:: NvspaceMax = 1
-! 		real(kind=dp), dimension(NvspaceMax)					:: Omegav, dkv
-! 		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi
 		integer :: dk0
 		real(kind=dp) :: wi, wj, nn, v0
 		!tmp
 		real(kind=dp), dimension(Nlambda) :: phi0
 
-!-> chi and eta contains already chi_c, chi_c_nlte and eta_c, eta_c_nlte
+		!-> chi and eta contains already chi_c, chi_c_nlte and eta_c, eta_c_nlte
 
-!-> using dk instead of a full profile ATM
-  
-!   In principle Nvspace should depend on atom because of atom%vbroad(icell)
-!   v_proj in m/s at point icell
-! 		Omegav = 0d0
-! 		Nvspace = 1
-! 		v0 = v_proj(icell,x,y,z,u,v,w)
-! 		dkv(1) = nint(1e-3 * v0 / hv)
-! 		omegav(1) = v_proj(icell,(x+x1)*0.5,(y+y1)*0.5,(z+z1)*0.5,u,v,w)
-! 		v1 = v_proj(icell,x1,y1,z1,u,v,w)
-! 		dkv(NvspaceMax) = nint(1e-3 * v1 / hv)
-! 		dk0 = nint(1e-3 * v_proj(icell,(x+x1)*0.5,(y+y1)*0.5,(z+z1)*0.5,u,v,w) / hv)
-!		dk0 = dk(iray,id)
-! 		write(*,*) 1, 1e-3 * v0, hv, nint(1e-3 * v0 / hv)
-! 		do nv=2, NvspaceMax-1
-!       		delta_vol_phi = (real(nv,kind=dp))/(real(NvspaceMax,kind=dp)) * l
-! 			xphi=x+delta_vol_phi*u
-! 			yphi=y+delta_vol_phi*v
-! 			zphi=z+delta_vol_phi*w
-! 			write(*,*) nv, 1e-3 * v_proj(icell,xphi,yphi,zphi,u,v,w), hv, nint(1e-3 * v_proj(icell,xphi,yphi,zphi,u,v,w) / hv)
-! 			dkv(nv) = nint(1e-3 * v_proj(icell,xphi,yphi,zphi,u,v,w) / hv)
-! 		enddo
-! 		write(*,*) NvspaceMax, 1e-3 * v1, hv, nint(1e-3 * v1 / hv)
-! 		stop
   
 		atom_loop : do nact = 1, Natom!Nactiveatoms
 			aatom => Atoms(nact)%ptr_atom!ActiveAtoms(nact)%ptr_atom
@@ -898,33 +870,10 @@ module Opacity
 						wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1))
 					endif
 				endif 
-				
-! 				write(*,*) aatom%n(i,icell), aatom%n(j,icell), aatom%lines(kc)%gij
-! 				write(*,*) aatom%lines(kc)%Aji, aatom%lines(kc)%Bij
-! 				write(*,*) Nblue, Nred, Nblue+dk_min, Nred+dk_max
-! 				write(*,*) lambda(Nblue), lambda(Nred), lambda(Nblue+dk_min), lambda(Nred+dk_max)
-				
-				!->not needed because phi is define only on its bound in local_profile_i
-				!phi0(:) = 0.0_dp
-							
-! if (v0 <= hv) then
-				phi0(Nblue+dk_min:Nred+dk_max) = local_profile_i(aatom%lines(kc),icell,Nred+dk_max-dk_min-Nblue+1,lambda(Nblue+dk_min:Nred+dk_max), x,y,z,x1,y1,z1,u,v,w,l)
-! 				phi0(Nblue+dk_min:Nred+dk_max) = local_profile_interp(aatom%lines(kc),icell,Nred+dk_max-dk_min-Nblue+1,lambda(Nblue+dk_min:Nred+dk_max), x,y,z,x1,y1,z1,u,v,w,l)
-! write(*,*) phi0(Nblue), phi0(Nred), phi0(Nblue+dk_min), phi0(Nred+dk_max)
-! stop
-! if (maxval(phi0) <= 0.0) then
-! write(*,*) "line", kc, id, icell, Nred+dk_max-dk_min-Nblue+1, l
-! write(*,*) "phi=", phi0(Nblue+dk_min:Nred+dk_max)
-! write(*,*) "lam=", lambda(Nblue+dk_min:Nred+dk_max)
-! stop
-! endif
-! 			if (icell==26) then
-! 				do la=1,Nred+2*dk_max-Nblue+1
-! 				!write(*,*) T(icell), lambda(Nblue+dk_min-1+la), phi0(Nblue+dk_min-1+la)
-! 				if (phi0(Nblue+dk_min-1+la) < 1d-17) phi0(Nblue+dk_min-1+la) = 0.0
-! 				enddo
-! 				stop
-! 			endif
+
+				phi0(Nblue+dk_min:Nred+dk_max) = local_profile_i(aatom%lines(kc),icell,iterate,Nred+dk_max-dk_min-Nblue+1,lambda(Nblue+dk_min:Nred+dk_max), x,y,z,x1,y1,z1,u,v,w,l)
+! 				phi0(Nblue+dk_min:Nred+dk_max) = local_profile_dk(aatom%lines(kc),icell,iterate,Nred+dk_max-dk_min-Nblue+1,lambda(Nblue+dk_min:Nred+dk_max), x,y,z,x1,y1,z1,u,v,w,l)
+
 
 				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
 
@@ -934,15 +883,7 @@ module Opacity
 
 					eta(Nblue+dk_min:Nred+dk_max,id)= eta(Nblue+dk_min:Nred+dk_max,id) + &
 						hc_fourPI * aatom%lines(kc)%Aji * phi0(Nblue+dk_min:Nred+dk_max) * aatom%n(j,icell)
-! else
-! 					chi(Nblue+dk0:Nred+dk0,id) = chi(Nblue+dk0:Nred+dk0,id) + &
-! 					hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell)) * &
-! 					aatom%lines(kc)%phi(:,icell)
-! 					       	 
-! 					eta(Nblue+dk0:Nred+dk0,id)= eta(Nblue+dk0:Nred+dk0,id) + &
-! 					hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell) * &
-! 					aatom%lines(kc)%phi(:,icell)
-! endif
+
 				else !neg or null
 					eta(Nblue+dk_min:Nred+dk_max,id)= eta(Nblue+dk_min:Nred+dk_max,id) + &
 						hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell) * phi0(Nblue+dk_min:Nred+dk_max)
@@ -963,26 +904,7 @@ module Opacity
 			aatom => NULL()
 
 		end do atom_loop
-		
-! 					do la=1, aatom%lines(kc)%Nlambda
-! 						chi(Nblue+la-1+dk0,id) = chi(Nblue+la-1+dk0,id) + &
-! 						hc_fourPI * aatom%lines(kc)%Bij * aatom%lines(kc)%phi(la,icell) * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
-!        	 
-! 						eta(Nblue+la-1+dk0,id)= eta(Nblue+la-1+dk0,id) + &
-! 						hc_fourPI * aatom%lines(kc)%Aji * aatom%lines(kc)%phi(la,icell) * aatom%n(j,icell)
-! 														
-! 					enddo 
-! 		if (any_nan_infinity_vector(eta(:,id)) /= 0) then
-! 				write(*,*) eta(:,id)
-! 				call error("nan.infinity error in opacity_atom_loc (eta)")
-! 		endif
-! 		if (any_nan_infinity_vector(chi(:,id)) /= 0) then
-! 				write(*,*) chi(:,id)
-! 				call error("nan.infinity error in opacity_atom_loc (chi)")
-! 		endif
-! 		write(*,*) "e=",eta(:,id)
-! 		write(*,*) "c=",chi(:,id)
-! 		stop
+
 
 	return
 	end subroutine opacity_atom_loc

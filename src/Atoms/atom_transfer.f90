@@ -18,8 +18,8 @@ module atom_transfer
 									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, Ksi, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, eta_es, alloc_flux_image, &
 									dealloc_jnu, write_image, write_flux_ascii, reallocate_rays_arrays
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, &
-									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, &
-									compute_angular_integration_weights, xmu, xphi, wmu, wmu_phi, lmali_scheme, lhogerheijde_scheme
+									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
+									compute_angular_integration_weights, wmu, wmu_phi, xmu, xphi
 	use readatom, only			: readAtomicModels
 	use lte, only				: set_LTE_populations, nH_minus
 	use constant, only			: MICRON_TO_NM, hc_k, sigma_e
@@ -151,7 +151,7 @@ module atom_transfer
 			
     !count opacity only if the cell is filled, else go to next cell
 			if (lcellule_non_vide) then
-				lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
+				lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet same as iterate?
      ! opacities in m^-1
 
 				l_contrib = l_contrib * AU_to_m !l_contrib in m
@@ -160,8 +160,6 @@ module atom_transfer
 					ds(iray,id) = l * AU_to_m
 				endif
 ! 				dk(iray,id) = nint(1e-3/hv * v_proj(icell,(x0+x1)*0.5,(y0+y1)*0.5,(z0+z1)*0.5,u,v,w))
-! 				dk(iray,id) = nint(1e-3/hv * 0.5 * (v_proj(icell,x0,y0,z0,u,v,w)+v_proj(icell,x1,y1,z1,u,v,w)))
-
      									
 				!total bound-bound + bound-free + background opacities lte + nlte
 				chi(:,id) = chi0_bb(:,icell)
@@ -467,6 +465,7 @@ module atom_transfer
   ! if only one pixel it gives the total Flux.
   ! See: emission_line_map in mol_transfer.f90
  ! -------------------------------------------------------------- !
+  use utils, only : gauss_legendre_quadrature
   integer, intent(in) :: ibin, iaz !define the direction in which the map is computed
   real(kind=dp) :: x0,y0,z0,l,u,v,w
 
@@ -475,11 +474,12 @@ module atom_transfer
   real(kind=dp):: taille_pix, nu
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
-  integer, parameter :: n_rad_RT = 1200, n_phi_RT = 600 !(100, 36)
+  integer, parameter :: n_rad_RT = 500, n_phi_RT = 1000 !(100, 36)
   real(kind=dp), dimension(n_rad_RT) :: tab_r
   real(kind=dp):: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
-  integer :: ri_RT, phi_RT, lambda!, lM, lR, lB, ll
+  integer :: ri_RT, phi_RT, lambda
   logical :: lresolved
+  real(kind=dp) :: area_ring(n_rad_RT), wmu(n_rad_RT), xmu(n_rad_RT)!!, area(n_rad_RT,n_phi_RT), wphi(n_phi_RT), xphi(n_phi_RT)
 
   write(*,*) "Vector to observer =", real(tab_u_rt(ibin,iaz)),real(tab_v_rt(ibin,iaz)),real(tab_w_rt(ibin))
   write(*,*) "i=", real(tab_RT_incl(ibin)), "az=", real(tab_RT_az(iaz))
@@ -515,7 +515,7 @@ module atom_transfer
   if (RT_line_method==1) then !log pixels
     n_iter_min = 1
     n_iter_max = 1
-
+    
     ! dx and dy are only required for stellar map here
     taille_pix = (map_size/zoom)  ! en AU
     dx(:) = x_plan_image * taille_pix
@@ -525,24 +525,55 @@ module atom_transfer
     j = 1
     lresolved = .false.
 
-    rmin_RT = max(w*0.9_dp,0.05_dp) * Rmin
-    rmax_RT = Rmax * 2.0_dp
+!     rmin_RT = max(w*0.9_dp,0.05_dp) * Rmin
+!     rmax_RT = Rmax * 2.0_dp
+! 
+!     tab_r(1) = rmin_RT
+!     fact_r = exp( (1.0_dp/(real(n_rad_RT,kind=dp) -1))*log(rmax_RT/rmin_RT) )
+!     
+!     do ri_RT = 2, n_rad_RT
+!       tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
+!     enddo
+! 
+!     fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
+
+	call gauss_legendre_quadrature(-1.0_dp, 0.0_dp, n_rad_RT, xmu, wmu)
+
+    rmin_RT = 2*Rmax * sqrt(1.0 - xmu(1)**2)
+    rmax_RT = 2*Rmax * sqrt(1.0 - xmu(n_rad_RT)**2)
 
     tab_r(1) = rmin_RT
-    fact_r = exp( (1.0_dp/(real(n_rad_RT,kind=dp) -1))*log(rmax_RT/rmin_RT) )
-    
+    tab_r(n_rad_RT) = rmax_RT
+    area_ring(1) = 0.0_dp
     do ri_RT = 2, n_rad_RT
-      tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
+      tab_r(ri_RT) = 2*Rmax * sqrt(1.0 - xmu(ri_RT)**2)
+      area_ring(ri_RT) = sqrt( (pi/n_phi_RT) * (tab_r(ri_RT)**2 - tab_r(ri_RT-1)**2) )
     enddo
 
-    fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
+    do ri_RT = 2, n_rad_RT
+      tab_r(ri_RT) = Rmax * ( sqrt(1.0-xmu(ri_RT)**2) + sqrt(1.0-xmu(ri_RT-1)**2) )
+    enddo
+    
+
+!     rmin_RT = 0.0
+!     rmax_RT = 2*Rmax
+!     tab_r(1) = rmin_RT
+!     do ri_RT = 2, n_rad_RT
+!       tab_r(ri_RT) = tab_r(ri_RT-1) + (rmax_RT - rmin_RT) / real(n_rad_RT-1,kind=dp)
+!     enddo
+! 
+!     area_ring(n_rad_RT) = 0.0
+!     do ri_RT = 1, n_rad_RT-1
+!     	area_ring(ri_RT) = sqrt(pi/n_phi_RT * (tab_r(ri_RT+1)**2 - tab_r(ri_RT)**2))
+!     enddo
+
 
     ! Boucle sur les rayons d'echantillonnage
     !$omp parallel &
     !$omp default(none) &
     !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
     !$omp shared(tab_r,fact_A,x,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
-    !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz,etoile)
+    !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz,etoile, area_ring)
     id = 1 ! pour code sequentiel
 
     if (l_sym_ima) then
@@ -555,12 +586,13 @@ module atom_transfer
      do ri_RT=1, n_rad_RT
         !$ id = omp_get_thread_num() + 1
         r = tab_r(ri_RT)
-		!!write(*,*) "r = ", r / etoile(1)%r
-        taille_pix =  fact_A * r ! racine carree de l'aire du pixel
+			
+        !taille_pix =  fact_A * r ! racine carree de l'aire du pixel
+        taille_pix = area_ring(ri_RT)
 
-        do phi_RT=1,n_phi_RT ! de 0 a pi
+        do phi_RT=1,n_phi_RT ! de 0 + eps à 2pi - eps (eps = pi/n_phi_RT)
            phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
-           !!write(*,*) " phi = ", phi * rad_to_deg
+			
            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image
             ! C'est le centre en fait car dx = dy = 0.
            call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max, i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
@@ -625,7 +657,7 @@ module atom_transfer
   integer :: ibin, iaz
   integer :: n_rayons_start
   !!integer, parameter :: n_rayons_start = 100
-  integer, parameter :: n_rayons_start2 = 1000, maxIter = 11
+  integer, parameter :: n_rayons_start2 = 100, maxIter = 15
   integer :: n_rayons_max = n_rayons_start2 * (2**(maxIter-1))
   integer, parameter :: Nrayone = 1
   character(len=20) :: ne_start_sol = "H_IONISATION"
@@ -947,6 +979,8 @@ module atom_transfer
 ! 		call WRITE_CNTRB_FUNC_pix()
 ! 		deallocate(S_contrib, S_contrib2, Ksi)
 ! 	end if
+
+	!!call compute_Imu()
     
     !ascii files can be large !
     if (loutput_rates) then
@@ -1095,7 +1129,7 @@ module atom_transfer
 				!$omp default(none) &
 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi, smu)&
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate) &
-				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,n_iter,precision_sub,wmu, wmu_phi, xphi, xmu,threeKminusJ,stest_tot) &
+				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,n_iter,precision_sub,threeKminusJ,stest_tot) &
 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged,loutput_rates,xyz_pos,uvw_pos, gtype, seed, nb_proc) &
 				!$omp shared(n_cells, gpop_old,lforce_lte, integ_ray_line, Itot, Icont, Jnu_cont, eta_es) &
 				!$omp shared(Jnew, Jnew_cont, Jold, lelectron_scattering,chi0_bb, etA0_bb, activeatoms,n_new) &
@@ -1420,7 +1454,6 @@ module atom_transfer
 		integer :: etape, etape_start, etape_end, iray, n_rayons, iray_p
 		integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, la, kr
 		integer, dimension(nb_proc) :: max_n_iter_loc
-		integer :: 	Nmu_angle_quad = 1, Nphi_angle_quad = 1
 		logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
 		real :: rand, rand2, rand3, precision, precision_sub
 		real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, smu
@@ -1548,8 +1581,8 @@ write(unit_profiles,*) "************************************************"
 				!$omp default(none) &
 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi, smu)&
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate) &
-				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,lforce_lte,n_iter,precision_sub,wmu, wmu_phi, xphi, xmu,threeKminusJ,psi_mean, psi, chi_loc) &
-				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged,loutput_rates,Nphi_angle_quad, Nmu_angle_quad) &
+				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,lforce_lte,n_iter,precision_sub, threeKminusJ,psi_mean, psi, chi_loc) &
+				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged,loutput_rates) &
 				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, inv_nrayons) &
 				!$omp shared(Jnew, Jnew_cont, Jold, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms) &
 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
@@ -1558,11 +1591,11 @@ write(unit_profiles,*) "************************************************"
 				do icell=1, n_cells
 					!$ id = omp_get_thread_num() + 1
    					l_iterate = (icompute_atomRT(icell)>0)
-					if (lfixed_rays) then
-   						l_iterate = (icompute_atomRT(icell)>0)
-					else
-   						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-					endif	
+! 					if (lfixed_rays) then
+!    						l_iterate = (icompute_atomRT(icell)>0)
+! 					else
+!    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
+! 					endif	
 			
    					if (l_iterate) then
    						Jnew(:,icell) = 0.0
@@ -1628,11 +1661,14 @@ write(unit_profiles,*) "************************************************"
 						threeKminusJ(:,icell) = threeKminusJ(:,icell) * inv_nrayons
 						psi_mean(:,icell) = psi_mean(:,icell) * inv_nrayons
 						
-						!!if (lelectron_scattering) then
-						!!always allocated if nlte ?, need to change that but remember we need
-						!! in the nlte loop, to write the full mean intensity to fits file.
-							eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
-						!!endif
+						!!always allocated if nlte ? need to store mean intensity. If
+						!!electron scatt it is used in the emissivity otherwise it is just computed 
+						!!for informations.
+						!!if (.not.lelectron_scattering) & !try to used the continuum only obtained with iterate_jnu mean intensity 
+						!instead of updating it here with lines
+						eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
+						!call bezier2_interp(Nlambda_cont, lambda_cont, thomson(icell)*Jnu_cont(:,icell), Nlambda, lambda, eta_es(:,icell))
+
 
 						call calc_rate_matrix(id, icell, lforce_lte)
 						call update_populations(id, icell, diff, .false., n_iter)
@@ -1667,11 +1703,11 @@ write(unit_profiles,*) "************************************************"
    				icell_max_2 = 1
 				cell_loop2 : do icell=1,n_cells
    					l_iterate = (icompute_atomRT(icell)>0)
-					if (lfixed_rays) then
-   						l_iterate = (icompute_atomRT(icell)>0)
-					else
-   						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-					endif	
+! 					if (lfixed_rays) then
+!    						l_iterate = (icompute_atomRT(icell)>0)
+! 					else
+!    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
+! 					endif	
 			
    					if (l_iterate) then
 						dN = 0.0 !for all levels of all atoms of this cell
@@ -2020,7 +2056,7 @@ write(unit_profiles,*) "************************************************"
  return
  end subroutine calc_stellar_surface_brightness
 
-   subroutine INTEG_RAY_JNU(id,icell_in,x,y,z,u,v,w,iray,labs, kappa_tot, Snu, Istar, Ic, tau_tot)
+   subroutine INTEG_RAY_JNU(id,icell_in,x,y,z,u,v,w,iray,labs, kappa_tot, Snu, Istar, Ic)
  ! ------------------------------------------------------------------------------- !
   ! This routine performs integration of the transfer equation along a ray to
   ! compute coherent Jnu in the continuum
@@ -2031,7 +2067,7 @@ write(unit_profiles,*) "************************************************"
   real(kind=dp), intent(in) :: x,y,z
   real(kind=dp), intent(in), dimension(:,:) :: kappa_tot, Snu
   real(kind=dp), intent(in), dimension(:) :: Istar
-  real(kind=dp), intent(out) :: Ic(:,:), tau_tot(:,:)
+  real(kind=dp), intent(out) :: Ic(:,:)
   logical, intent(in) :: labs
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
   real(kind=dp), dimension(size(Ic(:,1))) :: LimbD
@@ -2048,7 +2084,6 @@ write(unit_profiles,*) "************************************************"
   tau_c(:) = 0.0_dp
 
   Ic(:,id) = 0.0
-  tau_tot(:,id) = 0.0
   
   eval_operator = .false.
   ! -------------------------------------------------------------- !
@@ -2105,7 +2140,6 @@ write(unit_profiles,*) "************************************************"
 
      !tau = tau + dtau
      tau_c = tau_c + l_contrib * kappa_tot(:,icell)
-     if ((nbr_cell) > 1) tau_tot(:,id) = tau_tot(:,id) + l_contrib * kappa_tot(:,icell)
 
     end if  ! lcellule_non_vide
   end do infinie
@@ -2122,7 +2156,7 @@ write(unit_profiles,*) "************************************************"
  ! -------------------------------------------------------- !
 #include "sprng_f.h"
 
-  integer, parameter :: maxIter = 11, n_rayons_start2 = 100
+  integer, parameter :: maxIter = 15, n_rayons_start2 = 100
   integer :: n_rayons_start
   integer, parameter :: n_rayons_max = n_rayons_start2 * (2**(maxIter-1))
   real :: precision = 1e-1!, parameter
@@ -2138,7 +2172,7 @@ write(unit_profiles,*) "************************************************"
   real(kind=dp), allocatable :: Snew(:,:), Kappa_tot(:,:), beta(:,:), Istar(:), Ic(:,:)
   real(kind=dp), allocatable :: lambda_star(:,:), Sth(:,:), Sold(:,:), Sline(:,:), delta_J(:)
                                    
-  logical :: labs, l_iterate
+  logical :: labs
   integer :: la, icell, imax, icell_max, icell_max_s, imax_s
   integer :: imu, iphi, iray_p
   real(kind=dp) :: lambda_max
@@ -2160,7 +2194,6 @@ write(unit_profiles,*) "************************************************"
   !only one star
   allocate(Istar(Nlambda_cont), Ic(Nlambda_cont, nb_proc), lambda_star(Nlambda_cont,nb_proc), delta_J(Nlambda_cont))
   Ic = 0.0_dp; Istar = 0.0_dp; lambda_star = 0.0_dp; delta_J = 0.0
-  allocate(tau_tot(Nlambda_cont, nb_proc)); tau_tot = 0.0
 
   allocate(Jold(Nlambda_cont, n_cells))!, Jnew(Nlambda_cont, n_cells))
   Jold = 0d0!; Jnew(:,:) = 0.0_dp
@@ -2199,7 +2232,6 @@ write(unit_profiles,*) "************************************************"
    	 write(*,*) "sigma=", thomson(icell)
    	endif   					
 
-! 	Sth(:,icell) = eta_c(:,icell) / (tiny_dp + chi_c(:,icell)-thomson(icell))
    	Sth(:,icell) = eta_c(:,icell) / ( tiny_dp + kappa_tot(:,icell) * (1.-beta(:,icell)))
 
    	if (any_nan_infinity_vector(Sth(:,icell)) > 0) then
@@ -2248,7 +2280,13 @@ write(unit_profiles,*) "************************************************"
      do etape=etape_start, etape_end
 
       if (etape==1) then 
-      	call error("no step 1 implemented")
+      	!call error("no step 1 implemented")
+		call compute_angular_integration_weights(30,100)
+      	lfixed_rays = .true.
+      	n_rayons = 1 !not used
+      	iray_start = 1
+      	lprevious_converged = .false.
+      	lcell_converged(:) = .false.
       else if (etape==2) then 
   		lfixed_rays = .true.
   		n_rayons = n_rayons_start
@@ -2263,6 +2301,7 @@ write(unit_profiles,*) "************************************************"
   		iray_start = 1
   		lprevious_converged = .false.
 		lcell_converged(:) = .false.
+		precision = 0.1
 	  else 
 	  	call error("step unknown")
   	  end if
@@ -2277,7 +2316,7 @@ write(unit_profiles,*) "************************************************"
         do while (.not.lconverged)
 
         	n_iter = n_iter + 1
-        	!if (n_iter > 100 * maxIter)  exit
+
             write(*,*) " -> Iteration #", n_iter, " Step #", etape
 
 			if (lfixed_rays) then
@@ -2294,29 +2333,25 @@ write(unit_profiles,*) "************************************************"
  			!$omp parallel &
             !$omp default(none) &
             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,iphi,imu,smu) &
-            !$omp private(argmt,norme, icell, l_iterate, delta_J,iray_p) &
-            !$omp shared(lambda_cont, lambda_star, Snew, Sold, Sth, Istar, tau_tot) &
+            !$omp private(argmt,norme, icell, delta_J,iray_p) &
+            !$omp shared(lambda_cont, lambda_star, Snew, Sold, Sth, Istar, xmu, xphi, wmu, wmu_phi) &
             !$omp shared(lkeplerian,n_iter, xyz_pos,uvw_pos,gtype, nb_proc,seed) &
             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged) &
             !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, kappa_tot, Ic,icompute_atomRT) &
-            !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,xmu, xphi,wmu,wmu_phi)
+            !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule)
             !$omp do schedule(static,1)
   			do icell=1, n_cells
    			    !$ id = omp_get_thread_num() + 1
-				if (lnotfixed_rays) then
-   					l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-				else
-   					l_iterate = (icompute_atomRT(icell)>0)
-				endif				
-   				if (l_iterate) then
+
+   				if (icompute_atomRT(icell)>0) then
    				   Jnu_cont(:,icell) = 0.0_dp
            		   Snew(:,icell) = 0.0_dp
            		   lambda_star(:,id) = 0.0_dp                  		   		            		
            		
+      	 			if (etape==2 .or. etape==3) then
 
-					do iray=iray_start, iray_start-1+n_rayons
+						do iray=iray_start, iray_start-1+n_rayons
 					
-      	 				if (etape==2 .or. etape==3) then
                    	    ! Position aleatoire dans la cellule
          					rand  = sprng(stream(id))
             				rand2 = sprng(stream(id))
@@ -2335,22 +2370,48 @@ write(unit_profiles,*) "************************************************"
             				V0 = SRW02 * sin(ARGMT)
 
             				
-							call INTEG_RAY_JNU(id, icell, x0, y0, z0, u0, v0, w0, 1, labs, kappa_tot, Sold, Istar, Ic, tau_tot)
+							call INTEG_RAY_JNU(id, icell, x0, y0, z0, u0, v0, w0, 1, labs, kappa_tot, Sold, Istar, Ic)
 			
 							!LI
 		                	Jnu_cont(:,icell) = Jnu_cont(:,icell) + Ic(:,id)
 		                	!ALI
-		                	lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*kappa_tot(:,icell))) / n_rayons
+		                	lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*kappa_tot(:,icell)))! / n_rayons
+		                  		                 					
+      			   		enddo !iray
+		             else if (etape==1) then
+		             
+		                do imu=1, size(xmu)
+		                	do iphi = 1, size(xphi)
+		                		x0 = r_grid(icell)
+		                		y0 = 0.0_dp
+		                		z0 = z_grid(icell)
+		                		
+		                		u0 = cos(xphi(iphi)) * sqrt(1.0-xmu(imu)**2)
+		                		v0 = sin(xphi(iphi)) * sqrt(1.0-xmu(imu)**2)
+		                		w0 = xmu(imu)
+		                		
+								call INTEG_RAY_JNU(id, icell, x0, y0, z0, u0, v0, w0, 1, labs, kappa_tot, Sold, Istar, Ic)
+			
+								!LI
+		                		Jnu_cont(:,icell) = Jnu_cont(:,icell) + 0.25*wmu(imu) * wmu_phi(iphi) * Ic(:,id)
+		                		!ALI
+		                		lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*kappa_tot(:,icell))) * wmu_phi(imu) * wmu_phi(iphi) * 0.25
+		                	enddo
+		                enddo
+		                	
+		            else
+						call error("step unknown!")
+		 			end if !etape
 
-		 				end if !etape
-  		                 					
-      			    enddo !iray
       			    Jnu_cont(:,icell) = Jnu_cont(:,icell) / n_rayons
+      			    Lambda_star(:,id) = Lambda_star(:,id) / n_rayons
 
       		   endif !icompute_AtomRT
 
+				!ALI
 			   delta_J(:) = Jnu_cont(:,icell) - Lambda_star(:,id) * Sold(:,icell)
 			   Snew(:,icell) = (beta(:,icell)*delta_J(:) + (1.0-beta(:,icell))*Sth(:,icell))/(1.0-beta(:,icell)*Lambda_star(:,id))
+			   !LI
         	   !Snew(:,icell) = Sth(:,icell) * (1.0_dp - beta(:,icell)) + Jnu_cont(:,icell) * beta(:,icell)
 
      		end do !icell
@@ -2361,12 +2422,8 @@ write(unit_profiles,*) "************************************************"
         	diff = 0d0
         	dSource = 0.0_dp
   			cell_loop2 : do icell=1, n_cells
-				if (lnotfixed_rays) then
-   					l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-				else
-   					l_iterate = (icompute_atomRT(icell)>0)
-				endif
-  				if (l_iterate) then
+
+     			if (icompute_atomRT(icell)>0) then
   					
   						dN = maxval(abs(Snew(:,icell) - Sold(:,icell))/Snew(:,icell))
   						dSource = max(dSource, dN)
@@ -2468,7 +2525,7 @@ write(unit_profiles,*) "************************************************"
   close(20)
 
   deallocate(ds, lcell_converged)
-  deallocate(Jold, Sth, kappa_tot, beta, Istar, Ic, Sold, lambda_star, Snew, delta_J, tau_tot)
+  deallocate(Jold, Sth, kappa_tot, beta, Istar, Ic, Sold, lambda_star, Snew, delta_J)
 
  ! ------------------------------------------------------------------------------------ !
  return
@@ -2885,43 +2942,4 @@ write(unit_profiles,*) "************************************************"
 ! 	return
 ! 	end subroutine INTEG_RAY_LINE_I_CNTRB
   
-!   
-! 				!Initialize some quantities that change from one iteration to another,
-! 				!but which are constant for sub iterations
-! 				!$omp parallel &
-! 				!$omp default(none) &
-! 				!$omp private(icell, id, atom,nact) &
-! 				!$omp shared(gpop_old,Tex_old, lcell_converged, chi0_bb, eta0_bb, lnotfixed_Rays, lfixed_rays) &
-! 				!$omp shared (n_cells,icompute_atomRT, NactiveAtoms, l_iterate, lelectron_scattering, eta_es, Jnu_cont) &
-! 				!$omp shared(ActiveAtoms)
-! 				!$omp do schedule(static,1)
-! 				do icell=1, n_cells
-! 					!$ id = omp_get_thread_num() + 1
-! ! 					if (lfixed_rays) then
-!    						l_iterate = (icompute_atomRT(icell)>0)
-! ! 					else
-! !    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-! ! 					endif							
-!    					if (l_iterate) then
-! 						do nact=1, NactiveAtoms
-! 							atom => ActiveAtoms(nact)%ptr_atom
-! 							gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
-! 							do kr=1,atom%Nline
-! 								Tex_old(nact, kr, icell) = atom%lines(kr)%Tex(icell)
-! 							enddo
-! 							do kr=1, atom%Ncont
-! 								Tex_old(nact, kr+Atom%Nline,icell) = atom%continua(kr)%Tex(icell)
-! 							enddo
-! 							atom => NULL()
-!              				!!Recompute Profiles if needed here
-! 						end do
-! 						!but also update din sub it ? so we repeat calculation here
-! 						call NLTE_bound_free(icell)
-! 						!chi_c, sca_c and eta_c unchanged except if ne has changed during iteration and updated
-! 						!at the end, only nlte changed 
-! 						call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
-! 					end if
-! 				end do
-! 				!$omp end do
-! 				!$omp end parallel
 end module atom_transfer

@@ -1296,7 +1296,6 @@ stop
 !      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
 !          vR(icell), V2(icell), vphi(icell), icompute_atomRT(icell)
 !     vturb(icell) = 0.0
-
     end if !magnetized
      end do
     end do
@@ -1388,8 +1387,8 @@ stop
    else if (lspherical_velocity) then
     Vmod = maxval(sqrt(vR**2+vtheta(:)**2+vphi(:)**2))
    endif
-   
 
+	v_char = maxval(vturb)
     v_char = v_char + Vmod
 
 
