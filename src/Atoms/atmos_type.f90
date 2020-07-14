@@ -108,18 +108,24 @@ module atmos_type
 	if (alloc_status > 0) call error("allocation error xphi and wmu_phi")
 	
 	call Gauss_Legendre_quadrature(-1.0_dp,1.0_dp,nmu,xmu,wmu)
-	call Gauss_Legendre_quadrature(-1.0_dp,1.0_dp,nphi,xphi,wmu_phi)
-	xphi(:) = xphi(:) * pi + pi !int from 0 to 2pi
+	wmu(:) = 0.5 * wmu(:)
+	!call Gauss_Legendre_quadrature(-1.0_dp,1.0_dp,nphi,xphi,wmu_phi)
+	!xphi(:) = xphi(:) * pi + pi !int from 0 to 2pi
 	!xphi(:) = xphi(:) * pi !from -pi to pi
-	!!wmu(:) = 0.5 * wmu(:)
-	!!wmu_phi(:) = wmu_phi(:) * 0.5
+	xphi(1) = -pi
+	do iphi=2, Nphi
+		xphi(iphi) = xphi(iphi-1) + 2.0_dp*pi/real(Nphi - 1,kind=dp)
+		!!write(*,*) iphi, xphi(iphi)
+	enddo
+	wmu_phi(1) = 0.5 * (xphi(2)-xphi(1))
+	wmu_phi(Nphi) = 0.5 * (xphi(Nphi)-xphi(Nphi-1))
+	do iphi=2, Nphi-1
+		wmu_phi(iphi) = 0.5 * (xphi(iphi+1) - xphi(iphi-1))
+	enddo
+	wmu_phi(:) = wmu_phi(:) / (2.0*pi) !normed
 
-!   	write(*,*) "xmu", xmu
-!   	write(*,*) "wmu", wmu!*2
-!   	write(*,*) "xphi", xphi
-!   	write(*,*) "wmu_phi", wmu_phi!*2
-!   	!Normalized weights to 4pi
-!   	write(*,*) "sum weights:",  sum(wmu), pi*sum(wmu_phi), " domega/4pi:",0.25*sum(wmu)*sum(wmu_phi)
+  	!Normalized weights to 4pi
+!   	write(*,*) "sum weights:",  sum(wmu), sum(wmu_phi), " domega/4pi:", sum(wmu)*sum(wmu_phi)
 !   	norm = 0.0
 !   	do imu=1,size(xmu)
 !   		!!write(*,*) imu, xmu(imu), "costheta",xmu(imu)," sintheta", sqrt(1.0-xmu(imu)**2)
@@ -128,7 +134,7 @@ module atmos_type
 !   			!!write(*,*) iphi, xphi(iphi), "cosphi", cos(xphi(iphi)), " sinphi", sin(xphi(iphi))
 !   		enddo
 !   	enddo
-! 	write(*,*) "norm=", norm, " 4pi=", 0.25*fourpi * norm !=fourpi because norm is 1
+! 	write(*,*) "norm=", norm, " 4pi=", fourpi * norm !=fourpi because norm is 1
 ! 	STOP
 ! 	
   return

@@ -657,7 +657,7 @@ module atom_transfer
   integer :: ibin, iaz
   integer :: n_rayons_start
   !!integer, parameter :: n_rayons_start = 100
-  integer, parameter :: n_rayons_start2 = 100, maxIter = 15
+  integer, parameter :: n_rayons_start2 = 1000, maxIter = 11
   integer :: n_rayons_max = n_rayons_start2 * (2**(maxIter-1))
   integer, parameter :: Nrayone = 1
   character(len=20) :: ne_start_sol = "H_IONISATION"
@@ -1094,7 +1094,6 @@ module atom_transfer
 			else if (etape==3) then
 		  		lfixed_rays = .false.
   				n_rayons = n_rayons_2
-  				iray_start = 1
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				precision = 1e-1 !dpops_max_error
@@ -1470,8 +1469,8 @@ module atom_transfer
 
 		open(unit=unit_invfile, file=trim(invpop_file), status="unknown")
 		write(unit_invfile,*) n_cells
-		open(unit=unit_profiles, file=trim(profiles_file), status="unknown")	
-		write(unit_profiles,*) n_cells
+! 		open(unit=unit_profiles, file=trim(profiles_file), status="unknown")	
+! 		write(unit_profiles,*) n_cells
   
 		allocate(dM(Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
 		allocate(dTM(Nactiveatoms)); dM=0d0 !keep tracks of Tex for all cells for each atom
@@ -1539,7 +1538,6 @@ module atom_transfer
 			else if (etape==3) then
 		  		lfixed_rays = .false.
   				n_rayons = n_rayons_2
-  				iray_start = 1
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				precision = 0.1!dpops_max_error
@@ -1561,9 +1559,9 @@ module atom_transfer
 write(unit_invfile,*) "************************************************"
 write(unit_invfile,*) "step ", etape, ' iter ', n_iter
 write(unit_invfile,*) "************************************************"
-write(unit_profiles,*) "************************************************"
-write(unit_profiles,*) "step ", etape, ' iter ', n_iter
-write(unit_profiles,*) "************************************************"
+! write(unit_profiles,*) "************************************************"
+! write(unit_profiles,*) "step ", etape, ' iter ', n_iter
+! write(unit_profiles,*) "************************************************"
 
 				if (lfixed_rays) then
 					stream = 0.0
@@ -1896,7 +1894,7 @@ write(unit_profiles,*) "************************************************"
 		deallocate(stream)
 	
 		close(unit=unit_invfile)
-		close(unit=unit_profiles)
+! 		close(unit=unit_profiles)
 	return
 	end subroutine NLTEloop_mali
 	
@@ -2156,7 +2154,7 @@ write(unit_profiles,*) "************************************************"
  ! -------------------------------------------------------- !
 #include "sprng_f.h"
 
-  integer, parameter :: maxIter = 15, n_rayons_start2 = 100
+  integer, parameter :: maxIter = 11, n_rayons_start2 = 1000
   integer :: n_rayons_start
   integer, parameter :: n_rayons_max = n_rayons_start2 * (2**(maxIter-1))
   real :: precision = 1e-1!, parameter
@@ -2172,9 +2170,9 @@ write(unit_profiles,*) "************************************************"
   real(kind=dp), allocatable :: Snew(:,:), Kappa_tot(:,:), beta(:,:), Istar(:), Ic(:,:)
   real(kind=dp), allocatable :: lambda_star(:,:), Sth(:,:), Sold(:,:), Sline(:,:), delta_J(:)
                                    
-  logical :: labs
+  logical :: labs, l_iterate
   integer :: la, icell, imax, icell_max, icell_max_s, imax_s
-  integer :: imu, iphi, iray_p
+  integer :: imu, iphi
   real(kind=dp) :: lambda_max
   
   n_rayons_start = Nrays_atom_transfer
@@ -2281,9 +2279,9 @@ write(unit_profiles,*) "************************************************"
 
       if (etape==1) then 
       	!call error("no step 1 implemented")
-		call compute_angular_integration_weights(30,100)
+		call compute_angular_integration_weights(11,100)
       	lfixed_rays = .true.
-      	n_rayons = 1 !not used
+      	n_rayons = n_rayons_start!1 !not used
       	iray_start = 1
       	lprevious_converged = .false.
       	lcell_converged(:) = .false.
@@ -2298,7 +2296,7 @@ write(unit_profiles,*) "************************************************"
   		write(*,*) "Step 3: max_rayons =  ", n_rayons_max, " n_rayons_start = ", n_rayons_start2
   		lfixed_rays = .false.
   		n_rayons = n_rayons_start2
-  		iray_start = 1
+  		!iray_start = 1
   		lprevious_converged = .false.
 		lcell_converged(:) = .false.
 		precision = 0.1
@@ -2333,7 +2331,7 @@ write(unit_profiles,*) "************************************************"
  			!$omp parallel &
             !$omp default(none) &
             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,iphi,imu,smu) &
-            !$omp private(argmt,norme, icell, delta_J,iray_p) &
+            !$omp private(argmt,norme, icell, delta_J) &
             !$omp shared(lambda_cont, lambda_star, Snew, Sold, Sth, Istar, xmu, xphi, wmu, wmu_phi) &
             !$omp shared(lkeplerian,n_iter, xyz_pos,uvw_pos,gtype, nb_proc,seed) &
             !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged) &
@@ -2380,22 +2378,29 @@ write(unit_profiles,*) "************************************************"
       			   		enddo !iray
 		             else if (etape==1) then
 		             
-		                do imu=1, size(xmu)
-		                	do iphi = 1, size(xphi)
-		                		x0 = r_grid(icell)
-		                		y0 = 0.0_dp
-		                		z0 = z_grid(icell)
+		             	do iray=iray_start, iray_start-1+n_rayons
+		                	do imu=1, size(xmu)
+		                		do iphi = 1, size(xphi)
+! 		                			x0 = r_grid(icell)
+! 		                			y0 = 0.0_dp
+! 		                			z0 = z_grid(icell)
+         							rand  = sprng(stream(id))
+            						rand2 = sprng(stream(id))
+            						rand3 = sprng(stream(id))
+
+            						call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
 		                		
-		                		u0 = cos(xphi(iphi)) * sqrt(1.0-xmu(imu)**2)
-		                		v0 = sin(xphi(iphi)) * sqrt(1.0-xmu(imu)**2)
-		                		w0 = xmu(imu)
+		                			u0 = cos(xphi(iphi)) * sqrt(1.0-xmu(imu)**2)
+		                			v0 = sin(xphi(iphi)) * sqrt(1.0-xmu(imu)**2)
+		                			w0 = xmu(imu)
 		                		
-								call INTEG_RAY_JNU(id, icell, x0, y0, z0, u0, v0, w0, 1, labs, kappa_tot, Sold, Istar, Ic)
+									call INTEG_RAY_JNU(id, icell, x0, y0, z0, u0, v0, w0, 1, labs, kappa_tot, Sold, Istar, Ic)
 			
 								!LI
-		                		Jnu_cont(:,icell) = Jnu_cont(:,icell) + 0.25*wmu(imu) * wmu_phi(iphi) * Ic(:,id)
+		                			Jnu_cont(:,icell) = Jnu_cont(:,icell) + wmu(imu) * wmu_phi(iphi) * Ic(:,id)
 		                		!ALI
-		                		lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*kappa_tot(:,icell))) * wmu_phi(imu) * wmu_phi(iphi) * 0.25
+		                			lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*kappa_tot(:,icell))) * wmu_phi(imu) * wmu_phi(iphi)
+		                		enddo
 		                	enddo
 		                enddo
 		                	

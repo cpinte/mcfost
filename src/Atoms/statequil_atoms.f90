@@ -308,9 +308,9 @@ MODULE statequil_atoms
 
 				JJ = JJ / wphi / n_rayons
 
-				if ((wphi < 0.7) .or. (wphi > 1.1)) then
-					call write_profile(unit_profiles, icell, aatom%lines(kc), kc, wphi)
-				endif
+! 				if ((wphi < 0.7) .or. (wphi > 1.1)) then
+! 					call write_profile(unit_profiles, icell, aatom%lines(kc), kc, wphi)
+! 				endif
 				
 				!init at Aji
 				aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + JJ * aatom%lines(kc)%Bji
@@ -927,9 +927,9 @@ endif
 
 				JJ = waq * JJ / wphi
 
-				if ((wphi < 0.7) .or. (wphi > 1.1)) then
-					call write_profile(unit_profiles, icell, aatom%lines(kc), kc, wphi)
-				endif
+! 				if ((wphi < 0.7) .or. (wphi > 1.1)) then
+! 					call write_profile(unit_profiles, icell, aatom%lines(kc), kc, wphi)
+! 				endif
 
 				!init at Aji
 				aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + JJ * aatom%lines(kc)%Bji

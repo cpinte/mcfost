@@ -110,7 +110,7 @@ MODULE PROFILES
                                 				               			x1,y1,z1, &      ! velocity field and magnetic field
                                 				               			l !physical length of the cell
 		integer 													:: Nvspace
-		integer, parameter											:: NvspaceMax = 500
+		integer, parameter											:: NvspaceMax = 2!500
 		real(kind=dp) 												:: norm
 		real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
 																		dv
@@ -166,7 +166,7 @@ MODULE PROFILES
                                 				               			x1,y1,z1, &      ! velocity field and magnetic field
                                 				               			l !physical length of the cell
 		integer 													:: Nvspace
-		integer, parameter											:: NvspaceMax = 500
+		integer, parameter											:: NvspaceMax = 2!500
 		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
 		real(kind=dp) 												:: norm
 		real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
