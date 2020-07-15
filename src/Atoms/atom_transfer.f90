@@ -748,7 +748,7 @@ module atom_transfer
 
 
 		!use the same rays as nlteloop
-		!if (lelectron_scattering) call iterate_Jnu
+		if (lelectron_scattering) call iterate_Jnu
 		
 		if (allocated(ds)) deallocate(ds)
 		if (lmali_scheme) then
