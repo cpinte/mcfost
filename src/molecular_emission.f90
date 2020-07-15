@@ -751,9 +751,9 @@ function v_proj(icell,x,y,z,u,v,w) !
 				norme = 1.0_dp / r
 				if (r2 > tiny_dp) norme2 = 1.0_dp / r2
 				
-				vx = vr(icell) * x * norme! + norme2 * (z * norme * x * vtheta(icell) - y * vphi(icell))
-				vy = vr(icell) * y * norme! + norme2 * (z * norme * y * vtheta(icell) + x * vphi(icell))
-				vz = vr(icell) * z * norme! - sign * r2 / r * vtheta(icell)
+				vx = vr(icell) * x * norme + norme2 * (z * norme * x * vtheta(icell) - y * vphi(icell))
+				vy = vr(icell) * y * norme + norme2 * (z * norme * y * vtheta(icell) + x * vphi(icell))
+				vz = vr(icell) * z * norme - sign * r2 / r * vtheta(icell)
 							
 				v_proj = vx * u + vy * v + vz * w
 			else
