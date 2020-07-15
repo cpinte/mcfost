@@ -858,9 +858,9 @@ end subroutine write_radiative_rates_atom
  ! -------------------------------------------- !
  ! read Jnu from previous calculations
  ! ATM assumes:
- !    1) that only Jc is written
- !    2) Jnu is on the exact same wavelength grid
- !       and spatial grid as NLTEspec%I
+ !    1) Jnu is on the exact same wavelength grid
+ !       and spatial grid as Itot
+ ! eta_es is set to Jnu read * thomson
  ! -------------------------------------------- !
   integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
   logical :: extend, simple, anynull
@@ -885,13 +885,6 @@ end subroutine write_radiative_rates_atom
   extend = .true.
   bitpix = -64
   
-
-!   CALL FTMAHD(unit,1,hdutype,status)
-!    if (status > 0) then
-!       write(*,*) "Readpops cannot move to first HDU "
-!       CALL print_error(status)
-!   endif 
-
 
   if (lVoronoi) then
    CALL error("read_Jnu: Voronoi not supported yet")
@@ -965,19 +958,23 @@ end subroutine write_radiative_rates_atom
     nelements = nelements * naxis_found * Nl
    endif !l3D
   end if
-!      allocate(Jtmp(Nl, n_cells),stat=status)
-!     if (status > 0)
-!      Call error("Cannot allocate Jtmp read_Jnu")
-!     endif
 
-	if (Nl /= Nlambda_cont) then
+
+	if (Nl /= Nlambda) then
 	 CALL Warning("Jnu size does not match actual grid")
 	endif
 
-    CALL FTG2Dd(unit,1,-999,shape(Jnu_cont),Nl,n_Cells,Jnu_cont,anynull,status)
+    CALL FTG2Dd(unit,1,-999,shape(Jnu_cont),Nl,n_Cells,Jnu,anynull,status)
     if (status > 0) then
       write(*,*) "Read_Jnu cannot read Jnu "
       CALL print_error(status)
+    endif
+    
+    if (lelectron_scattering) then
+    	write(*,*) "-> Initialize electron scattering emissivity"
+    	do l=1, n_cells
+    		eta_es(:,l) = thomson(l)
+    	enddo
     endif
 
 

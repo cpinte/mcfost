@@ -29,7 +29,7 @@ module atom_transfer
 	use profiles, only			: Iprofile, Profile
 	use broad, only 			: damping
 	use io_atomic_pops, only	: write_pops, write_electron, write_hydrogen, write_Hminus
-	use io_opacity, only 		: write_Jnu, write_taur, write_contrib_lambda_ascii, read_jnu_ascii, Jnu_File_ascii, &
+	use io_opacity, only 		: write_Jnu, write_taur, write_contrib_lambda_ascii, read_jnu_ascii, Jnu_File_ascii, read_Jnu, &
 									write_collision_matrix_atom, write_collision_matrix_atom_ascii, &
 									write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii
 	use math
@@ -55,7 +55,7 @@ module atom_transfer
 	
 	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, prec_pops, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, fill_collision_matrix, &
 									init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates,store_radiative_rates_mali,calc_rates, store_rate_matrices, &
-									psi, calc_rates_mali, n_new
+									psi, calc_rates_mali, n_new, cswitch
 	use collision, only			: CollisionRate !future deprecation
 	use impact, only			: collision_hydrogen
 
@@ -72,6 +72,7 @@ module atom_transfer
  !Temporary variables for Contribution functions
 	real(kind=dp), allocatable :: S_contrib(:,:,:), S_contrib2(:,:), mean_formation_depth
  !NLTE
+	logical :: cswitch_enabled = .false.
 	logical, allocatable :: lcell_converged(:)
 	real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, Tex_old, local_pops
 	real(kind=dp), allocatable :: Gammaij_all(:,:,:,:), Rij_all(:,:,:), Rji_all(:,:,:) !need a flag to output it
@@ -669,6 +670,11 @@ module atom_transfer
   lhogerheijde_scheme = .false. !not ready yet 
   lmali_scheme = (.not.lhogerheijde_scheme)
   
+  !building
+  cswitch = 1.0!1d15
+  if (cswitch > 1.0_dp) cswitch_enabled = .true.
+
+  
  ! -------------------------------INITIALIZE AL-RT ------------------------------------ !
   !only one available yet, I need one unpolarised, faster and more accurate.
   Voigt => VoigtHumlicek
@@ -748,7 +754,7 @@ module atom_transfer
 
 
 		!use the same rays as nlteloop
-		if (lelectron_scattering) call iterate_Jnu
+		!if (lelectron_scattering) call iterate_Jnu
 		
 		if (allocated(ds)) deallocate(ds)
 		if (lmali_scheme) then
@@ -913,8 +919,9 @@ module atom_transfer
 !    call alloc_jnu(.false.) -> already allocated in alloc_spectrum
 !    if (.not.lread_jnu_atom) then
 				if (lread_jnu_atom) then
-					call read_jnu_ascii
-					lread_jnu_ascii = .true.
+					!call read_jnu_ascii
+					!lread_jnu_ascii = .true.
+					call read_jnu
 ! 		call read_jnu() !I now write Jnu in ascii file to be interpolated if lread_jnu_atom
 !	   the interpolated version of Jnu is written at the end in write_jnu()
 				else
@@ -1814,8 +1821,8 @@ write(unit_invfile,*) "************************************************"
 				diff_old = diff
 				!Not used if the next is not commented out
 				!lconverged = (real(diff) < precision) !global convergence for all iterations
-
-				if (real(diff) < precision) then
+				
+				if ((real(diff) < precision).and.(cswitch <= 1)) then
            			if (lprevious_converged) then
             	  		lconverged = .true.
            			else
@@ -1823,6 +1830,10 @@ write(unit_invfile,*) "************************************************"
           	    	endif
         		else !continue to iterate even if n_rayons max is reached ?
            			lprevious_converged = .false.
+           			if ((cswitch_enabled).and.(cswitch>1.0)) then
+           				cswitch = cswitch * 0.2
+						write(*,*) " cswitch for next iteration:", cswitch	
+					endif
            			if (.not.lfixed_rays) then
               			n_rayons = n_rayons * 2
               			write(*,*) ' -- Increasing number of rays :', n_rayons
@@ -1834,6 +1845,26 @@ write(unit_invfile,*) "************************************************"
               			end if
           	   		end if
         		end if
+        		
+! 				if (real(diff) < precision) then
+!            			if (lprevious_converged) then
+!             	  		lconverged = .true.
+!            			else
+!             	  		lprevious_converged = .true.
+!           	    	endif
+!         		else !continue to iterate even if n_rayons max is reached ?
+!            			lprevious_converged = .false.
+!            			if (.not.lfixed_rays) then
+!               			n_rayons = n_rayons * 2
+!               			write(*,*) ' -- Increasing number of rays :', n_rayons
+!              			if (n_rayons > n_rayons_max) then
+!               				if (n_iter >= maxIter) then
+!              		 			write(*,*) "Warning : not enough rays to converge !!"
+!                  				lconverged = .true.
+!               				end if
+!               			end if
+!           	   		end if
+!         		end if
         									
 
 				if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then

@@ -25,7 +25,8 @@ MODULE statequil_atoms
 	!Nlambda,  Nproc not stored for all ray since no sub it and ray-ray building of rate matrix
 	real(kind=dp), allocatable :: psi(:,:)
 	real(kind=dp), parameter :: Tmax = 1d10
-	real(kind=dp), parameter :: prec_pops = 1d-100
+	real(kind=dp), parameter :: prec_pops = 1d-100, impure_factor = 1d-10
+	real(kind=dp) :: cswitch = 1.0_dp
 	real(kind=dp), allocatable :: n_new(:,:,:)
 	character(len=50), parameter :: invpop_file = "inversion_populations.txt"
 	character(len=50), parameter :: profiles_file = "line_profile.txt"
@@ -62,11 +63,12 @@ MODULE statequil_atoms
 		atom%C(:,:,id) = 0d0
 		if (atom%ID=="H") then
 			atom%C(:,:,id) = Collision_Hydrogen(icell)
+			if (cswitch > 1.0) atom%C(:,:,id) = atom%C(:,:,id) * cswitch
 		else
 ! 			write(*,*) "Collision RH not set for large atoms"
 ! 			stop
 ! 			if (id==1) write(*,*) " Using RH routine for collision atom ", atom%ID
-			write(*,*) "First test it to retrive lte results !"
+			write(*,*) "First test it to retrive lte results and compare with RH!"
 			stop
 			atom%C(:,:,id) = CollisionRate(icell, atom)
 		end if

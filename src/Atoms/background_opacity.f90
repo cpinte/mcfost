@@ -284,9 +284,10 @@ module background_opacity
        				
 						eta(la) = eta(la) + Diss * alpha * twohnu3_c2 * gij * atom%n(j,icell)
 												
-					else
-					write(*,*) " check inversion popul in background bf"
-						eta(la) = eta(la) + Diss * alpha * twohnu3_c2 * gij * atom%n(j,icell) 
+					else !small inversions
+					
+						eta(la) = eta(la) + Diss * alpha * twohnu3_c2 * gij * atom%n(j,icell)
+						chi(la) = chi(la) - diss*alpha*ni_njgij
 
 					endif
 				enddo
