@@ -454,17 +454,18 @@ MODULE statequil_atoms
 						Tex_loc = atom%lines(kc)%Tex(icell)
 					endif						
 					
-if (write_neg_tex) then
-write(unit_invfile,*) "-------------------------------------------------------------------------------"				
-write(unit_invfile,"('icell = '(1I9), ' atom '(1A2))") icell, atom%ID
-write(unit_invfile,*) "ratio : n(j) gij / n(i))"
-write(unit_invfile, '(" -> line "(1I2)"  ->  "(1I2), (3E20.7E3) )') i, j, atom%n(i,icell)*wj/wi, atom%n(j,icell) * atom%lines(kc)%gij, atom%lines(kc)%Tex(icell)
-write(unit_invfile, "('log(ratio) = '(1E20.7E3), ' ratio = '(1E20.7E3) )") ratio, exp(ratio)
-write(unit_invfile,"( 'w(i)='(1E20.7E3), ' w(j)='(1E20.7E3) )") wi, wj
-write(unit_invfile,"( 'n(i)='(1E20.7E3), ' n(j)='(1E20.7E3) )") atom%n(i,icell), atom%n(j,icell)
-write(unit_invfile,"( 'n*(i)='(1E20.7E3), ' n*(j)='(1E20.7E3) )") atom%nstar(i,icell), atom%nstar(j,icell)
-write(unit_invfile,*) "-------------------------------------------------------------------------------"				
-endif
+					if (write_neg_tex) then
+					write(unit_invfile,*) "-------------------------------------------------------------------------------"				
+					write(unit_invfile,"('icell = '(1I9), ' atom '(1A2), ' T='(1F12.5))") icell, atom%ID, T(icell)
+					write(unit_invfile, "(' -> line '(1I2)' -> '(1I2), ' d(ni-njxgij)/ni='(1ES20.7E3) )") i, j, (atom%n(i,icell)*wi/wj - atom%n(j,icell) * gij)/atom%n(j,icell)
+					write(unit_invfile,"(' Tex='(1ES20.7E3) )") Tex_loc
+					write(unit_invfile, "('log(ratio) = '(1ES20.7E3), ' ratio = '(1ES20.7E3) )") ratio, exp(ratio)
+					write(unit_invfile,"( 'w(i)='(1ES14.7), ' w(j)='(1ES20.7E3) )") wi, wj
+					write(unit_invfile,"( 'n(i)='(1ES14.7), ' n(j)='(1ES20.7E3), ' n(j)xgij='(1ES20.7E3) )") atom%n(i,icell), atom%n(j,icell), atom%n(j,icell) * gij
+					write(unit_invfile,"( 'n*(i)='(1ES20.7E3), ' n*(j)='(1ES20.7E3) )") atom%nstar(i,icell), atom%nstar(j,icell)
+					write(unit_invfile,"( 'ne='(1ES20.7E3), ' ntotal='(1ES20.7E3) )") ne(icell), ntotal_atom(icell,atom)
+					write(unit_invfile,*) "-------------------------------------------------------------------------------"					
+					endif
      			endif
      			!write(*,*) "loc, line:", T(icell), Tex_loc
      			
@@ -520,17 +521,18 @@ endif
 						Tion_loc = atom%continua(kc)%Tex(icell)					
 					endif
 
-if (write_neg_tex) then				
-write(unit_invfile,*) "-------------------------------------------------------------------------------"				
-write(unit_invfile,"('icell = '(1I9), ' atom '(1A2))") icell, atom%ID
-write(unit_invfile,*) "ratio : n(i) / (n(j) gij)"
-write(unit_invfile, "(' -> cont '(1I2)' -> '(1I2), (3ES20.7E3) )") i, j, atom%n(i,icell), atom%n(j,icell) * gij, atom%continua(kc)%Tex(icell)
-write(unit_invfile, "('log(ratio) = '(1ES20.7E3), ' ratio = '(1ES20.7E3) )") ratio, exp(ratio)
-write(unit_invfile,"( 'w(i)='(1ES14.7), ' w(j)='(1ES20.7E3) )") wi, wj
-write(unit_invfile,"( 'n(i)='(1ES14.7), ' n(j)='(1ES20.7E3) )") atom%n(i,icell), atom%n(j,icell)
-write(unit_invfile,"( 'n*(i)='(1ES20.7E3), ' n*(j)='(1ES20.7E3) )") atom%nstar(i,icell), atom%nstar(j,icell)
-write(unit_invfile,*) "-------------------------------------------------------------------------------"				
-endif
+					if (write_neg_tex) then				
+					write(unit_invfile,*) "-------------------------------------------------------------------------------"				
+					write(unit_invfile,"('icell = '(1I9), ' atom '(1A2), ' T='(1F12.5)) ") icell, atom%ID, T(icell)
+					write(unit_invfile, "(' -> cont '(1I2)' -> '(1I2), ' d(ni-njxgij)/ni='(1ES20.7E3) )") i, j, (atom%n(i,icell)*wi/wj - atom%n(j,icell) * gij)/atom%n(j,icell)
+					write(unit_invfile,"(' Tion='(1ES20.7E3) )") Tion_loc
+					write(unit_invfile, "('log(ratio) = '(1ES20.7E3), ' ratio = '(1ES20.7E3) )") ratio, exp(ratio)
+					write(unit_invfile,"( 'w(i)='(1ES14.7), ' w(j)='(1ES20.7E3) )") wi, wj
+					write(unit_invfile,"( 'n(i)='(1ES14.7), ' n(j)='(1ES20.7E3), ' n(j)xgij='(1ES20.7E3) )") atom%n(i,icell), atom%n(j,icell), atom%n(j,icell) * gij
+					write(unit_invfile,"( 'n*(i)='(1ES20.7E3), ' n*(j)='(1ES20.7E3) )") atom%nstar(i,icell), atom%nstar(j,icell)
+					write(unit_invfile,"( 'ne='(1ES20.7E3), ' ntotal='(1ES20.7E3) )") ne(icell), ntotal_atom(icell,atom)
+					write(unit_invfile,*) "-------------------------------------------------------------------------------"				
+					endif
 				endif
      			!write(*,*) "loc, cont:", T(icell), Tion_loc
 					
@@ -697,6 +699,7 @@ endif
 		real(kind=dp), intent(out) :: dM
 		real(kind=dp), dimension(atom%Nlevel) :: ndag
 		real(kind=dp) :: n0 = 0.0_dp, ntotal, Gamma_dag(atom%Nlevel,atom%Nlevel) !debug
+		real(kind=dp) :: dn_n
 		
 		if (n0 /= 0.0_dp) call error("n0 should be zero at the moment !")
 		ntotal = ( ntotal_atom(icell,atom) - n0 )
@@ -738,8 +741,7 @@ endif
 		
 ! 		if (T(icell)==6370.0) then
 ! 		if (T(icell)==27970.0) then
-! 		if (T(icell)==T(55))then! .or. T(icell)==T(6)) then
-! ! 		if (T(icell)==6740. .or. T(icell)==6370. .or. T(icell)==7410. .or. T(icell)==8635.) then !4500
+! 		if (T(icell)==T(49)) then
 ! 			write(*,*) icell, T(icell)
 ! 			write(*,'("nstar: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel) !*ntotal
 ! 			do l=1, atom%Nlevel
@@ -751,8 +753,7 @@ endif
 		!call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel, .true.)
 ! 		if (T(icell)==6370.0) then
 ! 		if (T(icell)==27970.0) then
-! 		if (T(icell)==T(55))then! .or. T(icell)==T(6)) then
-! ! 		if (T(icell)==6740. .or. T(icell)==6370. .or. T(icell)==7410. .or. T(icell)==8635.) then !4500
+! 		if (T(icell)==T(49))then
 ! 			write(*,*) icell, T(icell)
 ! 			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel) !*ntotal
 ! 			!!stop
@@ -783,6 +784,7 @@ endif
   
 		dM = 0.0_dp
 		ndag = ndag * ntotal
+
 		do l=1,atom%Nlevel
 		atom%n(l,icell) = atom%n(l,icell) * ntotal
 
@@ -790,12 +792,14 @@ endif
 ! 			if (atom%n(l,icell) <= prec_pops) then !relative to ntotal
 ! 				atom%n(l,icell) = 0.0_dp
 ! 			else !denormalise
+				dn_n = (1.0_dp - ndag(l))/atom%n(l,icell)
 				dM = max(dM, abs(1.0_dp - ndag(l)/atom%n(l,icell)))
 ! 				dM = max(dM, abs(atom%n(l,icell)-ndag(l))/ndag(l))
 ! 				atom%n(l,icell) = atom%n(l,icell) * ntotal
 ! 			endif
 
 		enddo
+
 	!write(*,*) "n=", atom%n(:,icell)
 	!stop
 	if (allocated(n_new)) then

@@ -173,7 +173,6 @@ module atom_transfer
 				
 				if ((nbr_cell == 1).and.labs) then
 					if (lmali_scheme) then
-						!!psi(:,iray,id) = (1.0 - exp(-0.001))/chi(:,id) !to test cell 64 20420
 						psi(:,id) = ( 1.0_dp - exp( -ds(iray,id)*chi(:,id) ) ) / chi(:,id)
 						chi_loc(:,id)  = chi(:,id)! + 1d-100
 					endif
@@ -1563,9 +1562,9 @@ module atom_transfer
 
 				n_iter = n_iter + 1
 				write(*,*) " -> Iteration #", n_iter, " Step #", etape
-write(unit_invfile,*) "************************************************"
-write(unit_invfile,*) "step ", etape, ' iter ', n_iter
-write(unit_invfile,*) "************************************************"
+				write(unit_invfile,*) "************************************************"
+				write(unit_invfile,*) "step ", etape, ' iter ', n_iter
+				write(unit_invfile,*) "************************************************"
 ! write(unit_profiles,*) "************************************************"
 ! write(unit_profiles,*) "step ", etape, ' iter ', n_iter
 ! write(unit_profiles,*) "************************************************"
@@ -1587,7 +1586,7 @@ write(unit_invfile,*) "************************************************"
 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi, smu)&
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate) &
 				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,lforce_lte,n_iter,precision_sub, threeKminusJ,psi_mean, psi, chi_loc) &
-				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged,loutput_rates) &
+				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
 				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, inv_nrayons) &
 				!$omp shared(Jnew, Jnew_cont, Jold, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms) &
 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
@@ -1672,8 +1671,8 @@ write(unit_invfile,*) "************************************************"
 						!!if (.not.lelectron_scattering) & !try to used the continuum only obtained with iterate_jnu mean intensity 
 						!instead of updating it here with lines
 						eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
-						!call bezier2_interp(Nlambda_cont, lambda_cont, thomson(icell)*Jnu_cont(:,icell), Nlambda, lambda, eta_es(:,icell))
-
+						!call bezier2_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnew(:,icell))
+						!eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
 
 						call calc_rate_matrix(id, icell, lforce_lte)
 						call update_populations(id, icell, diff, .false., n_iter)
@@ -1820,7 +1819,8 @@ write(unit_invfile,*) "************************************************"
 				write(*,*) " *************************************************************** "
 				diff_old = diff
 				!Not used if the next is not commented out
-				!lconverged = (real(diff) < precision) !global convergence for all iterations
+! diff = -1.0
+! 				lconverged = (real(diff) < precision) !global convergence for all iterations
 				
 				if ((real(diff) < precision).and.(cswitch <= 1)) then
            			if (lprevious_converged) then
