@@ -726,7 +726,7 @@ module Opacity
             			Diss * aatom%continua(kc)%alpha(la) * aatom%continua(kc)%twohnu3_c2(la) * gij * aatom%n(j,icell)
  			
 					!assuming small inversions
-						chi_c_nlte(Nblue+la-1,icell) = chi_c_nlte(Nblue+la-1,icell) - Diss * aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - gij * aatom%n(j,icell))
+						!chi_c_nlte(Nblue+la-1,icell) = chi_c_nlte(Nblue+la-1,icell) - Diss * aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - gij * aatom%n(j,icell))
 !  
 					endif
           
@@ -889,8 +889,8 @@ module Opacity
 						hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell) * phi0(Nblue+dk_min:Nred+dk_max)
 				!small inversions
 					!eta(Nblue+dk_min:Nred+dk_max,id)= eta(Nblue+dk_min:Nred+dk_max,id) + 0.0_dp
-					chi(Nblue+dk_min:Nred+dk_max,id) = chi(Nblue+dk_min:Nred+dk_max,id) - &
-					hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell)) * phi0(Nblue+dk_min:Nred+dk_max)
+					!chi(Nblue+dk_min:Nred+dk_max,id) = chi(Nblue+dk_min:Nred+dk_max,id) - &
+					!hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell)) * phi0(Nblue+dk_min:Nred+dk_max)
 				endif
 				
 				if (iterate) then  !only for active atoms ? if not hogerheijde only
@@ -911,6 +911,7 @@ module Opacity
 	
 	!no level dissolution yet
 	!fills also eta_atoms
+	!check conditions on negative opac
 	subroutine cross_coupling_terms(id, icell, iray)
 		integer, intent(in) :: id, icell, iray
 		integer :: nact, j, i, kr, kc, Nb, Nr, la, Nl, icell_d
@@ -954,7 +955,9 @@ module Opacity
 						gij = aatom%nstar(i,icell)/aatom%nstar(j,icell) * exp(-hc_k/T(icell)/lambda(Nb+la-1))							
  	
  						!small inversions
-						chicc = wl * fourpi_h * aatom%continua(kc)%alpha_nu(la,icell_d) * abs(aatom%n(i,icell) - gij*aatom%n(j,icell))
+						!chicc = wl * fourpi_h * aatom%continua(kc)%alpha_nu(la,icell_d) * abs(aatom%n(i,icell) - gij*aatom%n(j,icell))
+						chicc = wl * fourpi_h * aatom%continua(kc)%alpha_nu(la,icell_d) * (aatom%n(i,icell) - gij*aatom%n(j,icell))
+						if (chicc < 0.0) chicc = 0.0_dp
 
 						Uji_down(Nb+la-1,j,nact,id) = Uji_down(Nb+la-1,j,nact,id) + &
 							aatom%continua(kc)%alpha_nu(la,icell_d) * (twohc/lambda(Nb+la-1)**3) * gij
@@ -962,7 +965,8 @@ module Opacity
 						chi_down(Nb+la-1,j,nact,id) = chi_down(Nb+la-1,j,nact,id) + chicc
 							
 						chi_up(Nb+la-1,i,nact,id) = chi_up(Nb+la-1,i,nact,id) + chicc
-
+!check consistency with nlte b-f and how negative opac is handled 
+						!if (chicc > 0.0_dp) &
 						eta_atoms(Nb+la-1,nact,id) = eta_atoms(Nb+la-1,nact,id) + &
 							aatom%continua(kc)%alpha_nu(la,icell_d) * (twohc/lambda(Nb+la-1)**3)  * gij * aatom%n(j,icell)
 					enddo
@@ -994,19 +998,26 @@ module Opacity
 						!wl = 0.5*(lambda(Nb+la+1)-lambda(Nb+la-1)) * clight / aatom%lines(kc)%lambda0
 					endif
 						
+					
 					Uji_down(Nb+dk_min-1+la,j,nact,id) = Uji_down(Nb+dk_min-1+la,j,nact,id) + &
 						hc_fourPI * aatom%lines(kc)%Aji * aatom%lines(kc)%phi_loc(la,iray,id)
 					
 					!small inversions
+					if (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell) >= 0.0_dp) then
+					
 					chi_down(Nb+dk_min-1+la,j,nact,id) = chi_down(Nb+dk_min-1+la,j,nact,id) + &
 						wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * abs(aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
 					
 					chi_up(Nb+dk_min-1+la,i,nact,id) = chi_up(Nb+dk_min-1+la,i,nact,id) + &
 						wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * abs(aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
-					
+
+						
+					endif
+										
 					eta_atoms(Nb+dk_min-1+la,nact,id) = eta_atoms(Nb+dk_min-1+la,nact,id) + &
 						hc_fourPI * aatom%lines(kc)%Aji * aatom%lines(kc)%phi_loc(la,iray,id) * aatom%n(j,icell)
-			
+
+					
 					wphi = wphi + wl * aatom%lines(kc)%phi_loc(la,iray,id)
 				enddo
 

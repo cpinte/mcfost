@@ -1058,7 +1058,7 @@ module getlambda
 		endif
 		Ntrans = 0
 		delta_v = dvmax + hv * 1e3 !m/s
-		max_shift = nint(1e-3*dvmax/hv)
+		max_shift = nint(1e-3 * delta_v  / hv)!int(1e-3*dvmax/hv)
 
 		!maximum and minimum wavelength for only lines, including max velocity field
 		!Count Number of transitions and number of lines
@@ -1420,7 +1420,7 @@ module getlambda
 		write(*,*) Nspec_line, " line wavelengths"
 		write(*,*) Nspec_cont, " continuum wavelengths"
 ! 		write(*,*) Nwaves - Nspec_line, " continuum wavelengths"
-		write(*,*) "Width of lines (km/s)", dvmax * 1e-3
+		write(*,*) "Width of lines is 30*max(vDoppler) + delta_v, delta_v = ", 1e-3 * delta_v
 		write(*,*) "Mean number of lines per group:", real(sum(Nline_per_group))/real(Ngroup)
 		write(*,*) "Mean number of wavelengths per group:", real(Nspec_line)/real(Ngroup)
 		write(*,*) "Mean number of wavelengths per line:", real(Nspec_line)/real(Ntrans-Ncont)
