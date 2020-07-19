@@ -1327,9 +1327,7 @@ module atom_transfer
 						!replace old value by new
 						Jold(:,icell) = Jnew(:,icell)
 						Jnu_cont(:,icell) = Jnew_cont(:,icell)
-! 						if (lelectron_scattering) then
-						!diff = max(diff,dJ)
-! 						endif
+
 						lcell_converged(icell) = (real(diff) < precision) !(real(diff) < dpops_max_error)
 						
 						!Re init for next iteration if any
@@ -1665,14 +1663,6 @@ module atom_transfer
 						threeKminusJ(:,icell) = threeKminusJ(:,icell) * inv_nrayons
 						psi_mean(:,icell) = psi_mean(:,icell) * inv_nrayons
 						
-						!!always allocated if nlte ? need to store mean intensity. If
-						!!electron scatt it is used in the emissivity otherwise it is just computed 
-						!!for informations.
-						!!if (.not.lelectron_scattering) & !try to used the continuum only obtained with iterate_jnu mean intensity 
-						!instead of updating it here with lines
-						eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
-						!call bezier2_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnew(:,icell))
-						!eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
 
 						call calc_rate_matrix(id, icell, lforce_lte)
 						call update_populations(id, icell, diff, .false., n_iter)
@@ -1764,20 +1754,24 @@ module atom_transfer
 						diff = max(diff, dN) ! pops
 						!diff = max(diff, dN2) ! Tex
 						
-						dN1 = abs(1d0 - maxval(Jold(:,icell)/(tiny_dp + Jnew(:,icell))))
-						!dN1 = maxval(abs(Jold(:,icell)-Jnew(:,icell))/(1d-30 + Jold(:,icell)))
-						if (dN1 > dJ) then
-							dJ = dN1
-							imax = locate(abs(1d0 - Jold(:,icell)/(tiny_dp + Jnew(:,icell))), dJ)
-							!imax = locate(abs(Jold(:,icell)-Jnew(:,icell))/(tiny_dp + Jold(:,icell)),dJ)
-							lambda_max = lambda(imax)
-						endif
-						!replace old value by new
-						Jold(:,icell) = Jnew(:,icell)
 						Jnu_cont(:,icell) = Jnew_cont(:,icell)
-! 						if (lelectron_scattering) then
-						!diff = max(diff,dJ)
-! 						endif
+						do la=1, Nlambda
+							dN1 = abs( 1.0_dp - Jold(la,icell)/Jnew(la,icell) )
+							if (dN1 > dJ) then
+								dJ = dN1
+								lambda_max = lambda(la)
+							endif
+							Jold(la,icell) = Jnew(la,icell)
+						enddo
+						!!diff = max(diff,dJ)
+						!!always allocated if nlte ? need to store mean intensity. If
+						!!electron scatt it is used in the emissivity otherwise it is just computed 
+						!!for informations.
+						!!if (.not.lelectron_scattering) & !try to used the continuum only obtained with iterate_jnu mean intensity 
+						!instead of updating it here with lines
+						eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
+						!call bezier2_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnew(:,icell))
+						
 						lcell_converged(icell) = (real(diff) < precision) !(real(diff) < dpops_max_error)
 						
 						!Re init for next iteration if any
@@ -2444,7 +2438,7 @@ module atom_transfer
 
       		   endif !icompute_AtomRT
 
-				!ALI
+			   !ALI
 			   delta_J(:) = Jnu_cont(:,icell) - Lambda_star(:,id) * Sold(:,icell)
 			   Snew(:,icell) = (beta(:,icell)*delta_J(:) + (1.0-beta(:,icell))*Sth(:,icell))/(1.0-beta(:,icell)*Lambda_star(:,id))
 			   !LI
