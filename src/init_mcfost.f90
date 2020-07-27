@@ -663,7 +663,7 @@ subroutine initialisation_mcfost()
         density_files(1) = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-phantom-multi","-phantom-add","-phantom-avg")
+     case("-phantom-multi","phantom_multi","-phantom-add","-phantom-avg")
         if (s == "-phantom-avg") lphantom_avg = .true.
         i_arg = i_arg + 1
         lphantom_file=.true.
