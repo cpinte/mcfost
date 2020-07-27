@@ -158,6 +158,8 @@ fi
 
 cd voro
 svn up -r604
+# Allowing for up to 1e8 particles (1e7 by default)
+\cp -f ../voro++/config.hh src/
 make
 \cp src/libvoro++.a ../lib
 mkdir -p ../include/voro++
