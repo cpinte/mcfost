@@ -46,7 +46,7 @@ end subroutine allocate_densities
 
 subroutine deallocate_densities
 
-  deallocate(masse, densite_pouss, densite_gaz, densite_gaz_midplane, masse_gaz)
+  if (allocated(masse)) deallocate(masse,densite_pouss,densite_gaz,densite_gaz_midplane,masse_gaz)
 
   return
 

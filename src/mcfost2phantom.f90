@@ -17,6 +17,8 @@ contains
     use mem, only : alloc_dust_prop
     use SPH2mcfost, only : read_SPH_limits_file
     use messages, only : error
+    use sha, only: sha_id
+    use mcfost_env, only : mcfost_release
 
     character(len=*), intent(in) :: mcfost_para_filename, SPH_limits_file
     integer, intent(in) :: ndusttypes
@@ -34,7 +36,9 @@ contains
     write(*,*) "Initializing MCFOST library"
     write(*,*) "------------------------------"
     write(*,*)
-
+    write(*,*) "You are running MCFOST "//trim(mcfost_release)
+    write(*,*) "Git SHA = ", sha_id
+    
     ! Global logical variables
     call set_default_variables()
     lmcfost_lib = .true.
@@ -44,9 +48,12 @@ contains
        write(*,*) "WARNING: updating SPH_keep_particles to" , SPH_keep_particles
     endif
 
+    lfix_star = .false.
     if (present(fix_star)) then
-       lfix_star = .true.
-       write(*,*) "WARNING: using mcfost parameters for the stars"
+       if (fix_star) then
+          lfix_star = .true.
+          write(*,*) "WARNING: using mcfost parameters for the stars"
+       endif
     endif
 
     ! Model limits
@@ -135,9 +142,8 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(&
-    np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,maxirad,&
-    xyzh,vxyzu,radiation,ivorcl,&
+  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,&!maxirad,
+       xyzh,vxyzu,&!radiation,ivorcl,
     iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
     Tphantom,n_packets,mu_gas,ierr,write_T_files,ISM,T_to_u)
@@ -166,10 +172,9 @@ contains
 
 #include "sprng_f.h"
 
-    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype,&
-       maxirad,ivorcl
+    integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype!,maxirad,ivorcl
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
-    real(dp), dimension(maxirad,np), intent(inout) :: radiation
+!    real(dp), dimension(maxirad,np), intent(inout) :: radiation
     integer(kind=1), dimension(np), intent(in) :: iphase
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize, graindens
@@ -215,7 +220,6 @@ contains
 
     logical, save :: lfirst_time = .true.
 
-    integer :: i_Phantom
 
     ! We use the phantom_2_mcfost interface with 1 file
     ifiles(:) = 1 ; massoftype2(1,:) = massoftype(:)
@@ -377,8 +381,6 @@ contains
        ! TBD
     endif
 
-
-
     call set_min_Temperature(Tmin)
 
     if (present(write_T_files)) then
@@ -387,17 +389,30 @@ contains
     ! SPH particles ignored by mcfost
     Tphantom = -1.
     ! Remapping to phantom indices
-    radiation(ivorcl,:) = -1.
+    !radiation(ivorcl,:) = -1.
     do icell=1, n_cells
-       i_SPH = Voronoi(icell)%id
+       i_SPH = Voronoi(icell)%original_id ! this is the particle id number in phantom
        if (i_SPH > 0) then
-          i_Phantom = particle_id(i_SPH)
-          Tphantom(i_Phantom)  = Tdust(icell)
-          n_packets(i_Phantom) = sum(xN_abs(icell,1,:))
-          radiation(ivorcl,i_Phantom) = icell
+          Tphantom(i_SPH)  = Tdust(icell)
+          n_packets(i_SPH) = sum(xN_abs(icell,1,:))
+          !radiation(ivorcl,i_SPH) = icell
        endif
     enddo
 
+    ! Resetting memory state for next call
+    call reset_mcfost_phantom()
+
+    ! Verifications et codes d'erreur
+    if (maxval(Tphantom) < 0.) then
+       write(*,*) "***********************************************"
+       write(*,*) "ERROR : PB setting T_DUST", n_cells
+       write(*,*)  minval(Tphantom), maxval(Tphantom)
+       write(*,*) "***********************************************"
+
+       ierr = 1
+       return
+    endif
+    
     ! Temps d'execution
     call system_clock(time_end)
     if (time_end < time_begin) then
@@ -420,18 +435,6 @@ contains
     else
        write (*,'(" CPU time used          ", F5.2, "s")')  time
     endif
-
-    ! Verifications et codes d'erreur
-    if (maxval(Tphantom) < 0.) then
-       write(*,*) "***********************************************"
-       write(*,*) "ERROR : PB setting T_DUST", n_cells
-       write(*,*)  minval(Tphantom), maxval(Tphantom)
-       write(*,*) "***********************************************"
-
-       ierr = 1
-       return
-    endif
-
     write(*,*)
     write(*,*) "------------------------------"
     write(*,*) "End of MCFOST run"
@@ -442,23 +445,26 @@ contains
 
   end subroutine run_mcfost_phantom
 
-  subroutine deinit_mcfost_phantom()
+!*************************************************************************
+
+  subroutine reset_mcfost_phantom()
+
     use Voronoi_grid,     only:deallocate_Voronoi
     use mem,              only:deallocate_densities
     use radiation_field,  only:reset_radiation_field
     use thermal_emission, only:reset_temperature
 
+    ! Freeing memory : todo : can we avoid to do that to speed things up
     call deallocate_Voronoi()
     call deallocate_densities()
-    ! reset energy and temperature arrays
+    
+    ! Reset energy and temperature arrays
     call reset_radiation_field()
     call reset_temperature()
-    write(*,*)
-    write(*,*) "------------------------------"
-    write(*,*) "MCFOST: Reset State"
-    write(*,*) "------------------------------"
-    write(*,*)
-  end subroutine deinit_mcfost_phantom
+
+    return
+
+  end subroutine reset_mcfost_phantom
 
 !*************************************************************************
 
@@ -546,4 +552,5 @@ contains
        kappa_diffusion = 0.
     endif
   end subroutine diffusion_opacity
+  
 end module mcfost2phantom

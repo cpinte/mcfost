@@ -3,7 +3,7 @@ module Voronoi_grid
   use constantes
   use mcfost_env
   use parametres
-  use utils, only : bubble_sort, appel_syst
+  use utils, only : bubble_sort, appel_syst, Knuth_shuffle
   use naleat, only : seed, stream, gtype
   use cylindrical_grid, only : volume
   use kdtree2_module
@@ -14,7 +14,9 @@ module Voronoi_grid
   save
 
   integer, parameter :: max_wall_neighbours = 100000
-  integer, parameter :: n_saved_neighbours = 40 ! 30 is fine when there is not randomization of particles
+  ! n_saved_neighbours = 30 is fine when there is no randomization of particles in mess_up_SPH, otherwise 40.
+  ! Todo:  0 does not change speed ... we probably do not even need it
+  integer, parameter :: n_saved_neighbours = 0
   real(kind=dp), parameter :: prec = 1.e-6_dp
 
   type Voronoi_cell
@@ -198,7 +200,7 @@ module Voronoi_grid
     logical, intent(in) :: check_previous_tesselation
 
 
-    integer, parameter :: max_neighbours = 25  ! maximum number of neighbours per cell (to build neighbours list)
+    integer, parameter :: max_neighbours = 40  ! maximum number of neighbours per cell (to build neighbours list)
 
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
     integer, dimension(:), allocatable :: SPH_id, SPH_original_id
@@ -219,6 +221,10 @@ module Voronoi_grid
 
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     character(len=2) :: unit
+
+    logical, parameter :: lrandom = .true.
+    integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
+    real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
@@ -276,6 +282,31 @@ module Voronoi_grid
        endif
     enddo
     n_cells_before_stars = icell
+    n_cells = icell
+
+    ! Randomizing particles
+    if (lrandom) then
+       allocate(x_tmp2(n_cells), y_tmp2(n_cells), z_tmp2(n_cells), h_tmp2(n_cells), &
+            SPH_id2(n_cells), SPH_original_id2(n_cells), order(n_cells), stat=alloc_status)
+       if (alloc_status /=0) call error("Allocation error Voronoi temp2 arrays")
+
+       order=[(i,i=1,n_cells)]
+       call Knuth_shuffle(order)
+
+       do icell=1, n_cells
+          i = order(icell)
+          x_tmp2(icell) = x_tmp(i)
+          y_tmp2(icell) = y_tmp(i)
+          z_tmp2(icell) = z_tmp(i)
+          h_tmp2(icell) = h_tmp(i)
+          SPH_id2(icell) = SPH_id(i)
+          SPH_original_id2(icell) = SPH_original_id(i)
+       enddo
+
+       x_tmp = x_tmp2 ; y_tmp = y_tmp2 ; z_tmp = z_tmp2 ; h_tmp = h_tmp2
+       SPH_id = SPH_id2 ; SPH_original_id = SPH_original_id
+       deallocate(order,x_tmp2,y_tmp2,z_tmp2,h_tmp2,SPH_id2,SPH_original_id2)
+    endif
 
     if (n_sublimate > 0) then
        write(*,*) n_sublimate, "particles have been sublimated"
@@ -285,6 +316,7 @@ module Voronoi_grid
     ! Filtering stars outside the limits
     etoile(:)%out_model = .true.
     etoile(:)%icell = 0
+    icell = n_cells_before_stars
     do i=1, n_etoiles
        ! We test is the star is in the model
        if ((etoile(i)%x > limits(1)).and.(etoile(i)%x < limits(2))) then
@@ -305,7 +337,7 @@ module Voronoi_grid
     allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
          delta_edge(n_cells), delta_centroid(n_cells), was_cell_cut(n_cells), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi structure")
-    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; delta_edge(:) = 0.0 ; delta_centroid(:) = 0.
+    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; delta_edge(:) = 0.0 ; delta_centroid(:) = 0. ; was_cell_cut(:) = .false.
     Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
     Voronoi(:)%first_neighbour = 0
     Voronoi(:)%last_neighbour = 0
@@ -327,8 +359,8 @@ module Voronoi_grid
        Voronoi(icell)%xyz(3) = z_tmp(icell)
        Voronoi(icell)%h      = h_tmp(icell)
        Voronoi_xyz(:,icell)  = Voronoi(icell)%xyz(:)
-       Voronoi(icell)%id     = SPH_id(icell)
-       Voronoi(icell)%original_id = SPH_original_id(icell)
+       Voronoi(icell)%id     = SPH_id(icell) ! this is the id of the particles passed to mcfost
+       Voronoi(icell)%original_id = SPH_original_id(icell) ! this is the particle id in phantom
     enddo
 
     !*************************
@@ -344,7 +376,7 @@ module Voronoi_grid
     endif
 
     do i=1, n_etoiles
-       Voronoi(etoile(i)%icell)%is_star = .true.
+       if (etoile(i)%icell > 0) Voronoi(etoile(i)%icell)%is_star = .true.
     enddo
 
     call system_clock(time1)
@@ -359,7 +391,6 @@ module Voronoi_grid
     endif
     write(*,*) "mcfost will require ~", mem, unit//" of temporary memory for the tesselation" ! 5 double + 2 int arrays
 
-
     if (operating_system == "Darwin" .and. (n_cells > 2e6)) then
        call warning("Voronoi tesselation will likely crash with that many particle on a Mac. Switch to linux")
     endif
@@ -373,12 +404,12 @@ module Voronoi_grid
 
     if (lcompute) then
        ! We initialize arrays at 0 as we have a reduction + clause
-       volume = 0. ; n_in = 0 ; n_neighbours_tot = 0 ; delta_edge = 0. ; delta_centroid = 0. ; was_cell_cut = .false.
+       n_in = 0
        !$omp parallel default(none) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
        !$omp private(id,icell_start,icell_end,ierr) &
-       !$omp reduction(+:volume,n_in,n_neighbours_tot,delta_edge,delta_centroid) &
+       !$omp reduction(+:volume,n_in,delta_edge,delta_centroid) &
        !$omp reduction(.or.:was_cell_cut)
        id = 1
        !$ id = omp_get_thread_num() + 1
@@ -437,6 +468,7 @@ module Voronoi_grid
     deallocate(delta_edge, delta_centroid,was_cell_cut)
 
     ! Saving position of the first neighbours to save time on memory access
+    ! Warning this seems to cost a fair bit of time
     allocate(Voronoi_neighbour_xyz(3,n_saved_neighbours,n_cells)) ! tried 4 to align vectors, does not help
     do icell=1, n_cells
        l=0
@@ -444,7 +476,11 @@ module Voronoi_grid
           l = l+1
           if (l <= n_saved_neighbours) then
              j = neighbours_list(k)
-             if (j>0) Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)
+             if (j> n_cells) then
+                write(*,*) "icell =", icell, "k=", k, "j=", j, "n_cells=", n_cells
+                call error("Voronoi neighbour list index is invalid")
+             endif
+             if (j>0) Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)  ! this is slow
           endif
        enddo
     enddo
@@ -484,7 +520,10 @@ module Voronoi_grid
        ! We check first that there is no issue in the tesselation
        if (volume(icell) < tiny_real) then
           n_missing_cells = n_missing_cells + 1
-          write(*,*) "WARNING: cell #", icell, "is missing", x_tmp(icell), y_tmp(icell), z_tmp(icell)
+          write(*,*) "WARNING: cell #", icell, "is missing"
+          write(*,*) "original id =", SPH_original_id(icell)
+          write(*,*) "xyz=", x_tmp(icell), y_tmp(icell), z_tmp(icell)
+          write(*,*) "volume =", volume(icell)
        endif
 
        ! todo : find the cells touching the walls
@@ -506,10 +545,13 @@ module Voronoi_grid
 
     if (n_missing_cells > 0) then
        write(*,*) "*******************************************"
-       write(*,*) "WARNING:", n_missing_cells, "cells are missing"
+       if (n_missing_cells == 1) then
+           write(*,*) "WARNING: 1 cell is missing"
+       else
+          write(*,*) "WARNING:", n_missing_cells, "cells are missing"
+       endif
        write(*,*) "*******************************************"
     endif
-    !
 
     write(*,*) "Building the kd-trees for the model walls"
     call build_wall_kdtrees()
@@ -524,7 +566,11 @@ module Voronoi_grid
     endif
     write(*,*) "Found", n_in, "cells"
 
-    if (n_in /= n_cells) call error("some particles are not in the mesh")
+    if (n_in /= n_cells) then
+       write(*,*) "n_cells =", n_cells
+       write(*,*) "n in tesselation =", n_in
+       call error("some particles are not in the mesh")
+    endif
 
     write(*,*) "Neighbours list size =", n_neighbours_tot
     write(*,*) "Average number of neighbours =", real(n_neighbours_tot)/n_cells
