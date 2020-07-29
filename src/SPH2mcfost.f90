@@ -33,6 +33,7 @@ contains
     real :: factor
     integer :: ndusttypes, ierr, i, ilen
     character(len=100) :: line_buffer
+    logical :: check_previous_tesselation
 
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
@@ -97,7 +98,8 @@ contains
     call read_SPH_limits_file(SPH_limits_file, SPH_limits)
 
     ! Voronoi tesselation
-    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, .true., mask=mask)
+    check_previous_tesselation = (.not. lrandomize_Voronoi)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -721,7 +723,7 @@ contains
     close(unit=1)
 
     ! interpoler L et T, les fonctions sont plus smooth
-    write(*,*) "New stellar parameters (assuming a BB):", minM, maxM
+    write(*,*) "New stellar parameters (assuming a BB):"
     do i=1, n_etoiles
        if (etoile(i)%M < minM)  then
           write(*,*) " "

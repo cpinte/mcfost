@@ -941,7 +941,7 @@ subroutine ecriture_map_ray_tracing()
   endif
 
   ! extra hdu with star positions
-  call write_star_position_vr(unit,status)
+  call write_star_properties(unit,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -3165,7 +3165,7 @@ subroutine ecriture_spectre(imol)
   endif ! lcasa
 
   ! extra hdu with star positions
-  call write_star_position_vr(unit,status)
+  call write_star_properties(unit,status)
 
   !  Close the file and free the unit number.
   call ftclos(unit, status)
@@ -3233,12 +3233,14 @@ end subroutine ecriture_spectre
 
 !**********************************************************************
 
-subroutine write_star_position_vr(unit,status)
-  ! Create 2 extra hdu with :
-  ! - the position of the star
-  ! - the radial velocity of the star
+subroutine write_star_properties(unit,status)
+  ! Create 3 extra hdu with :
+  ! - the position of the stars
+  ! - the radial velocity of the stars
+  ! - the mass, Teff and radius of the stars
 
   use dust_ray_tracing, only : star_position, star_vr
+  use parametres, only : etoile
 
   integer, intent(in) :: unit
   integer, intent(inout) :: status
@@ -3247,6 +3249,8 @@ subroutine write_star_position_vr(unit,status)
   integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements
   logical :: simple, extend
+
+  real, dimension(3,n_etoiles) :: star_prop
 
   group=1
   fpixel=1
@@ -3290,9 +3294,32 @@ subroutine write_star_position_vr(unit,status)
   !  Write the array to the FITS file.
   call ftppre(unit,group,fpixel,nelements,star_vr,status)
 
+  !---------------------------------
+  ! Setllar properties : M, Teff, r
+  !---------------------------------
+  naxis = 2
+  naxes(1) = 3
+  naxes(2) = n_etoiles
+  nelements=naxes(1)*naxes(2)
+
+  ! create new hdu
+  call ftcrhd(unit, status)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+  call ftpkys(unit,'UNIT',"Msun, K, Rsun",'',status)
+
+  star_prop(1,:) = etoile(1:n_etoiles)%M
+  star_prop(2,:) = etoile(1:n_etoiles)%T
+  star_prop(3,:) = etoile(1:n_etoiles)%r / Rsun_to_AU
+
+  !  Write the array to the FITS file.
+  call ftppre(unit,group,fpixel,nelements,star_prop,status)
+
   return
 
-end subroutine write_star_position_vr
+end subroutine write_star_properties
 
 !**********************************************************************
 

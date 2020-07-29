@@ -164,9 +164,11 @@ subroutine set_default_variables()
   lvphi_Kep = .false.
   lfluffy = .false.
   ldelete_hill_sphere = .false.
+  lrandomize_Voronoi = .false.
   lrandomize_azimuth = .false.
   lrandomize_gap = .false.
   lrandomize_outside_gap = .false.
+  lcentre_on_sink = .false.
   lwrite_column_density = .false.
   lwrite_mol_column_density = .false.
 
@@ -792,7 +794,7 @@ subroutine initialisation_mcfost()
         density_files(1) = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-phantom-multi","-phantom-add","-phantom-avg")
+     case("-phantom-multi","phantom_multi","-phantom-add","-phantom-avg")
         if (s == "-phantom-avg") lphantom_avg = .true.
         i_arg = i_arg + 1
         lphantom_file=.true.
@@ -1178,15 +1180,18 @@ subroutine initialisation_mcfost()
      case("-random_az")
         i_arg = i_arg + 1
         lrandomize_azimuth = .true.
+        lrandomize_Voronoi = .true.
      case("-random_gap")
         i_arg = i_arg + 1
         lrandomize_gap = .true.
+        lrandomize_Voronoi = .true.
         call get_command_argument(i_arg,s)
         read(s,*) gap_factor
         i_arg = i_arg + 1
      case("-random_outside_gap")
         i_arg = i_arg + 1
         lrandomize_outside_gap = .true.
+        lrandomize_Voronoi = .true.
         call get_command_argument(i_arg,s)
         read(s,*) gap_factor
         i_arg = i_arg + 1
@@ -1196,6 +1201,12 @@ subroutine initialisation_mcfost()
      case("-mol_cd","-mol_column_density")
         i_arg = i_arg + 1
         lwrite_mol_column_density = .true.
+     case("-centre_on_sink")
+        i_arg = i_arg + 1
+        lcentre_on_sink = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) isink_centre
+        i_arg = i_arg + 1
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1708,6 +1719,7 @@ subroutine display_help()
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
   write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
   write(*,*) "        : -delete_Hill_sphere : delete SPH particles inside Hill spheres of planets"
+  write(*,*) "        : -centre_on_sink <number> : centre the model on the sink particle"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

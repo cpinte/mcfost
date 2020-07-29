@@ -27,7 +27,7 @@
 # the environment in which it is run.
 #
 # SYSTEM         : the compiler system. Options are
-#                  "ifort", "gfortran", or "xeon-phi".
+#                  "ifort" or "gfortran".
 #
 # MCFOST_INSTALL : the git repository directory for
 #                  MCFOST. The libraries will be
@@ -61,7 +61,7 @@ if [ ! $# = 0 ]; then SYSTEM=$1; fi
 
 set +u # personalized error messages
 if [ -z "$SYSTEM" ]; then
-    echo "error: SYSTEM need to be set (choose: ifort, gfortran or xeon-phi)."
+    echo "error: SYSTEM need to be set (choose: ifort or gfortran)."
     exit 1
 fi
 if [ -z "$MCFOST_INSTALL" ]; then
@@ -75,18 +75,13 @@ if [ "$SYSTEM" = "ifort" ]; then
     export CC=icc
     export FC=ifort
     export CXX=icpc
+    export CFLAGS=""
 elif [ "$SYSTEM" = "gfortran" ]; then
     echo "Building MCFOST's libraries with gfortran"
     export CC=gcc
     export FC=gfortran
     export CXX=g++
     export CFLAGS="-m64"
-elif [ "$SYSTEM" = "xeon-phi" ]; then
-    echo "Building MCFOST's libraries with ifort for Xeon-Phi"
-    export CC=icc
-    export FC=ifort
-    export CXX=icpc
-    export CFLAGS=-mmic
 else
     echo "Unknown system to build MCFOST: $SYSTEM"
     echo "Please choose ifort or gfortran"
@@ -146,11 +141,6 @@ mv cfitsio-3.47 cfitsio
 cd cfitsio
 ./configure --enable-ssse3 --disable-curl
 
-#--- Tweaking Makefile
-if [ "$SYSTEM" = "xeon-phi" ]; then
-    \cp -f ../Makefile_cfitsio.xeon_phi Makefile
-fi
-
 make
 \cp libcfitsio.a ../lib
 cd ~1
@@ -162,14 +152,14 @@ echo "Done"
 echo "Compiling Voro++ ..."
 if [ "$SYSTEM" = "ifort" ]; then
     \cp -f ifort/config.mk voro
-elif [ "$SYSTEM" = "xeon-phi" ]; then
-    \cp -f ifort/config.mk voro # To be tested
 elif [ "$SYSTEM" = "gfortran" ]; then
     \cp -f gfortran/config.mk voro
 fi
 
 cd voro
 svn up -r604
+# Allowing for up to 1e8 particles (1e7 by default)
+\cp -f ../voro++/config.hh src/
 make
 \cp src/libvoro++.a ../lib
 mkdir -p ../include/voro++
@@ -189,6 +179,18 @@ if [ "$SKIP_XGBOOST" != "yes" ]; then
     \cp ../ifort/xgboost/base.h include/xgboost/base.h
     #fi
     \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ was hard-coded in the Mekefile
+
+    # compiling with gfortran for now as there are some issues with ifort 2020 on linux
+    CC_old=$CC
+    FC_old=$FC
+    CXX_old=$CXX
+    CFLAGS_old=$CFLAGS
+
+    export CC=gcc
+    export FC=gfortran
+    export CXX=g++
+    export CFLAGS="-m64"
+
     make -j
     \cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
     \cp -r dmlc-core/include/dmlc rabit/include/rabit include/xgboost ../include
@@ -197,6 +199,12 @@ if [ "$SKIP_XGBOOST" != "yes" ]; then
     \cp -r src/common/*.h "$MCFOST_INSTALL/src/common"
     cd ~1
     echo "Done"
+
+    # Restoring flags
+    export CC=$CC_old
+    export FC=$FC_old
+    export CXX=$CXX_old
+    export CFLAGS=$CFLAGS_old
 else
     echo "Skipping XGBoost ..."
     echo "Make sure to set MCFOST_NO_XGBOOST=yes when compiling MCFOST"
@@ -209,15 +217,14 @@ if [ "$SKIP_HDF5" != "yes" ]; then
     wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
     echo "Compiling HDF5 ..."
     tar xjvf hdf5-1.10.5.tar.bz2
-    mv hdf5-1.10.5 hdf5
+    cd hdf5-1.10.5
     mkdir -p "$HOME/hdf5_install_tmp"
-    cd hdf5
     ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
-    make -j install
+    make install
     cd ~1
     \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" lib/
-    \cp "$HOME/hdf5_install_tmp/include/*.h" include/hdf5/
-    \cp "$HOME/hdf5_install_tmp/include/*.mod" "include/$SYSTEM"
+    \cp "$HOME"/hdf5_install_tmp/include/*.h include/hdf5/
+    \cp "$HOME"/hdf5_install_tmp/include/*.mod "include/$SYSTEM"
     echo "Done"
 else
     echo "Skipping HDF5 ..."
