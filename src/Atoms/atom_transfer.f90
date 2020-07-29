@@ -80,6 +80,7 @@ module atom_transfer
 
  	contains
 
+
   	subroutine integ_ray_line_i(id,icell_in,x,y,z,u,v,w,iray,labs)
 	! ------------------------------------------------------------------------------- !
 	!
@@ -467,7 +468,6 @@ module atom_transfer
   ! if only one pixel it gives the total Flux.
   ! See: emission_line_map in mol_transfer.f90
  ! -------------------------------------------------------------- !
-  use utils, only : gauss_legendre_quadrature
   integer, intent(in) :: ibin, iaz !define the direction in which the map is computed
   real(kind=dp) :: x0,y0,z0,l,u,v,w
 
@@ -476,11 +476,12 @@ module atom_transfer
   real(kind=dp):: taille_pix, nu
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
-  integer, parameter :: n_rad_RT = 500, n_phi_RT = 500 !(100, 36)
+  integer, parameter :: n_rad_RT = 450, n_phi_RT = 100 !(100, 36)
   real(kind=dp), dimension(n_rad_RT) :: tab_r
   real(kind=dp):: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda
   logical :: lresolved
+  real(kind=dp) :: aphi(n_phi_RT), ap(n_rad_RT)
 
   write(*,*) "Vector to observer =", real(tab_u_rt(ibin,iaz)),real(tab_v_rt(ibin,iaz)),real(tab_w_rt(ibin))
   write(*,*) "i=", real(tab_RT_incl(ibin)), "az=", real(tab_RT_az(iaz))
@@ -514,54 +515,86 @@ module atom_transfer
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
     
   if (RT_line_method==1) then !log pixels
-    n_iter_min = 1
-    n_iter_max = 1
-    
-    ! dx and dy are only required for stellar map here
-    taille_pix = (map_size/zoom)  ! en AU
-    dx(:) = x_plan_image * taille_pix
-    dy(:) = y_plan_image * taille_pix
+  !-> at the moment it is like rt_line_method==2 but with explicit integration over the map
+!     n_iter_min = 1
+!     n_iter_max = 1
+!     
+!     ! dx and dy are only required for stellar map here
+!     taille_pix = (map_size/zoom)  ! en AU
+!     dx(:) = x_plan_image * taille_pix
+!     dy(:) = y_plan_image * taille_pix
+! 
+!     i = 1
+!     j = 1
+!     lresolved = .false.
+! 
+!     rmin_RT = max(w*0.9_dp,0.05_dp) * Rmin
+!     rmax_RT = Rmax * 2.0_dp
+! 
+!     tab_r(1) = rmin_RT
+!     fact_r = exp( (1.0_dp/(real(n_rad_RT,kind=dp) -1))*log(rmax_RT/rmin_RT) )
+!     do ri_RT = 2, n_rad_RT
+!       tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
+!     enddo
+! 
+!     fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
+! 
+! 
+!     ! Boucle sur les rayons d'echantillonnage
+!     !$omp parallel &
+!     !$omp default(none) &
+!     !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
+!     !$omp shared(tab_r,fact_A,x,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
+!     !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz,fact_r)
+!     id = 1 ! pour code sequentiel
+! 
+!     if (l_sym_ima) then
+!       cst_phi = pi  / real(n_phi_RT,kind=dp)
+!     else
+!       cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
+!     endif
+! 
+!      !$omp do schedule(dynamic,1)
+!      do ri_RT=1, n_rad_RT
+!         !$ id = omp_get_thread_num() + 1
+!         r = tab_r(ri_RT)
+! 		
+!         taille_pix =  fact_A * r ! racine carree de l'aire du pixel
+! 
+!         do phi_RT=1,n_phi_RT ! de 0 + eps à 2pi - eps (eps = pi/n_phi_RT)
+!            phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
+! 			
+!            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image
+!             ! C'est le centre en fait car dx = dy = 0.
+!            call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max, i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+!         end do !j
+!      end do !i
+!      !$omp end do
+!      !$omp end parallel
 
-    i = 1
-    j = 1
-    lresolved = .false.
+     ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
+     taille_pix = (map_size/zoom) / real(n_rad_RT,kind=dp) ! en AU
+     lresolved = .false.
 
-    rmin_RT = 0.05_dp * Rmin!max(w*0.9_dp,0.05_dp) * Rmin
-    rmax_RT = Rmax * 2.0_dp
+     dx(:) = x_plan_image * taille_pix
+     dy(:) = y_plan_image * taille_pix
 
-    tab_r(1) = rmin_RT
-    fact_r = exp( (1.0_dp/(real(n_rad_RT,kind=dp) -1))*log(rmax_RT/rmin_RT) )
-    do ri_RT = 2, n_rad_RT
-      tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
-    enddo
+     !$omp parallel &
+     !$omp default(none) &
+     !$omp private(i,j,id) &
+     !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y) &
+     !$omp shared(n_iter_min,n_iter_max,ibin,iaz)
 
-    ! Boucle sur les rayons d'echantillonnage
-    !$omp parallel &
-    !$omp default(none) &
-    !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
-    !$omp shared(tab_r,fact_A,x,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
-    !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz)
-    id = 1 ! pour code sequentiel
-
-    if (l_sym_ima) then
-      cst_phi = pi  / real(n_phi_RT,kind=dp)
-    else
-      cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
-    endif
-
+     ! loop on pixels
+     id = 1 ! pour code sequentiel
+     n_iter_min = 1 !1 !3
+     n_iter_max = 1 !1 !6
      !$omp do schedule(dynamic,1)
-     do ri_RT=1, n_rad_RT
+     do i = 1,n_rad_RT
         !$ id = omp_get_thread_num() + 1
-        r = tab_r(ri_RT)
-			
-        taille_pix =  fact_A * r ! racine carree de l'aire du pixel
-
-        do phi_RT=1,n_phi_RT ! de 0 + eps à 2pi - eps (eps = pi/n_phi_RT)
-           phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
-			
-           pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image
-            ! C'est le centre en fait car dx = dy = 0.
-           call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max, i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+        do j = 1,n_rad_RT
+           pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
+           call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max,1,1,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         end do !j
      end do !i
      !$omp end do

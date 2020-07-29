@@ -23,7 +23,7 @@ MODULE statequil_atoms
 
 	IMPLICIT NONE
 	!Nlambda,  Nproc not stored for all ray since no sub it and ray-ray building of rate matrix
-	real(kind=dp), allocatable :: psi(:,:)
+	real(kind=dp), allocatable :: psi(:,:,:)
 	real(kind=dp), parameter :: Tmax = 1d10
 	real(kind=dp), parameter :: prec_pops = 1d-100, impure_factor = 1d-10
 	real(kind=dp) :: cswitch = 1.0_dp
@@ -68,8 +68,8 @@ MODULE statequil_atoms
 ! 			write(*,*) "Collision RH not set for large atoms"
 ! 			stop
 ! 			if (id==1) write(*,*) " Using RH routine for collision atom ", atom%ID
-			write(*,*) "First test it to retrive lte results and compare with RH!"
-			stop
+			!write(*,*) "First test it to retrive lte results and compare with RH!"
+			!stop
 			atom%C(:,:,id) = CollisionRate(icell, atom)
 		end if
      
@@ -425,7 +425,8 @@ MODULE statequil_atoms
 ! 					endif
 ! 				endif
 
-				if (atom%n(i,icell) <= prec_pops ) cycle tr_loop
+										!prec_pops
+				if (atom%n(i,icell) <= impure_factor * ne(icell) ) cycle tr_loop
 
 				Tdag = atom%lines(kc)%Tex(icell)
 				deltaE_k = (atom%E(j)-atom%E(i)) / KBOLTZMANN
@@ -486,8 +487,9 @@ MODULE statequil_atoms
 
 					endif
 				endif
-				
-				if (atom%n(i,icell) <= prec_pops ) cycle tr_loop
+										!prec_pops
+				if (atom%n(i,icell) <= impure_factor * ne(icell) ) cycle tr_loop
+
            
       			Tdag = atom%continua(kc)%Tex(icell)
 
@@ -789,9 +791,11 @@ MODULE statequil_atoms
 		atom%n(l,icell) = atom%n(l,icell) * ntotal
 
 
-! 			if (atom%n(l,icell) <= prec_pops) then !relative to ntotal
-! 				atom%n(l,icell) = 0.0_dp
-! 			else !denormalise
+! 			if (atom%n(l,icell) <= impure_factor * ne(icell)/ntotal) then !relative to ntotal
+! 				!still keep it but does not count for convergence
+! 				atom%n(l,icell) = atom%n(l,icell) * ntotal !0.0_dp
+! 				write(*,*) icell, atom%ID, l, atom%n(l,icell)/(impure_factor * ne(icell))
+! 			else 
 				dn_n = (1.0_dp - ndag(l))/atom%n(l,icell)
 				dM = max(dM, abs(1.0_dp - ndag(l)/atom%n(l,icell)))
 ! 				dM = max(dM, abs(atom%n(l,icell)-ndag(l))/ndag(l))
@@ -886,7 +890,7 @@ MODULE statequil_atoms
 		aatom_loop : do nact = 1, Nactiveatoms
 			aatom => ActiveAtoms(nact)%ptr_atom
 
-			Ieff = Itot(:,iray,id) - Psi(:,id) * eta_atoms(:,nact,id)
+			Ieff = Itot(:,iray,id) - Psi(:,iray,id) * eta_atoms(:,nact,id)
 ! 			do l=1,Nlambda
 ! 				Ieff(l) = Itot(l,iray,id) - Psi(l,iray,id) * eta_atoms(l,nact,id)
 ! 				if (Ieff(l) < 0.0) Ieff(l) = Itot(l,iray,id) - eta_atoms(l,nact,id)
@@ -927,7 +931,7 @@ MODULE statequil_atoms
 
 					JJ = JJ + wl * Ieff(a0+l) * aatom%lines(kc)%phi_loc(l,iray,id)
 					wphi = wphi + wl * aatom%lines(kc)%phi_loc(l,iray,id)
-					xcc_ji = xcc_ji + chi_up(a0+l,i,nact,id)*psi(a0+l,id)*Uji_down(a0+l,j,nact,id)
+					xcc_ji = xcc_ji + chi_up(a0+l,i,nact,id)*psi(a0+l,iray,id)*Uji_down(a0+l,j,nact,id)
 					
 				enddo
 
@@ -955,7 +959,7 @@ MODULE statequil_atoms
 							N1 = aatom%lines(kcc)%Nblue+dk_min
 							N2 = aatom%lines(kcc)%Nred+dk_max
 							if (jp==i) then !i upper level of another transitions
-								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,id)*Uji_down(N1:N2,i,nact,id))
+								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
 							endif
 					
 						case ("ATOMIC_CONTINUUM")
@@ -964,7 +968,7 @@ MODULE statequil_atoms
 							N1 = aatom%continua(kcc)%Nb
 							N2 = aatom%continua(kcc)%Nr
 							if (jp==i) then !i upper level of another transitions
-								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,id)*Uji_down(N1:N2,i,nact,id))
+								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
 							endif
 					
 						case default
@@ -1017,7 +1021,7 @@ MODULE statequil_atoms
 					twohnu3_c2 = twohc/lambda(Nblue+l-1)**3 
 					JJb = JJb + wl * ( Ieff(Nblue+l-1) + twohnu3_c2 ) * ehnukt * a1
 					
-					xcc_ji = xcc_ji + chi_up(Nblue+l-1,i,nact,id)*Uji_down(Nblue+l-1,j,nact,id)*psi(Nblue+l-1,id)
+					xcc_ji = xcc_ji + chi_up(Nblue+l-1,i,nact,id)*Uji_down(Nblue+l-1,j,nact,id)*psi(Nblue+l-1,iray,id)
 
 				enddo
 
@@ -1036,7 +1040,7 @@ MODULE statequil_atoms
 							N1 = aatom%lines(kcc)%Nblue+dk_min
 							N2 = aatom%lines(kcc)%Nred+dk_max
 							if (jp==i) then !i upper level of another transitions
-								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,id)*Uji_down(N1:N2,i,nact,id))
+								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
 							endif
 						case ("ATOMIC_CONTINUUM")
 							ip = aatom%continua(kcc)%i
@@ -1044,7 +1048,7 @@ MODULE statequil_atoms
 							N1 = aatom%continua(kcc)%Nb
 							N2 = aatom%continua(kcc)%Nr
 							if (jp==i) then !i upper level of another transitions
-								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,id)*Uji_down(N1:N2,i,nact,id))
+								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
 							endif
 					
 						case default

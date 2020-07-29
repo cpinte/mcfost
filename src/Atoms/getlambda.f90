@@ -16,7 +16,7 @@ module getlambda
   integer, parameter :: Nlambda_cont_log = 91 !71continuum log scaled
   integer, parameter :: Nlambda_line_w = 14, Nlambda_line_c_log = 51
   integer, parameter :: Nlambda_line_c = 71!line linear1
-  real, parameter    :: hvel_nlte = 8.0!for line in km/s, 1-3 for static models
+  real, parameter    :: hvel_nlte = 9.5!for line in km/s, 1-3 for static models
   real, parameter	 :: delta_lambda_cont = 5.0 !nm
   real               :: hv = hvel_nlte !can change due to image grid
   		

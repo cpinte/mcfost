@@ -31,7 +31,7 @@ module spectrum_type
 	integer :: Nlambda, Ntrans, Nlambda_cont
 	real(kind=dp) :: wavelength_ref = 0d0
 	real(kind=dp), dimension(:,:), allocatable :: chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, chi0_bb, eta0_bb
-	real(kind=dp), dimension(:,:), allocatable :: Icont
+	real(kind=dp), dimension(:,:,:), allocatable :: Icont
 	real(kind=dp), dimension(:), allocatable :: lambda, lambda_cont
 	real(kind=dp), dimension(:,:), allocatable :: Jnu, Jnu_cont, eta_es
 	real(kind=dp), dimension(:,:), allocatable :: Istar_tot, Istar_cont
@@ -292,7 +292,7 @@ call error("initSpectrumImage not modified!!")
 		deallocate(Itot, Icont)
     
 		allocate(Itot(Nlambda, newNray, nb_proc))
-		allocate(Icont(Nlambda_cont, nb_proc))
+		allocate(Icont(Nlambda_cont, newNray, nb_proc))
 		Itot = 0.0_dp; Icont = 0.0_dp
   
 	return
@@ -319,7 +319,7 @@ call error("initSpectrumImage not modified!!")
 
 		allocate(Itot(Nlambda, Nray, nb_proc),stat=alloc_status)
 		if (alloc_status > 0) call error("Allocation error Itot")
-		allocate(Icont(Nlambda_cont, nb_proc))
+		allocate(Icont(Nlambda_cont, Nray, nb_proc))
 		Itot = 0.0_dp
 		Icont = 0.0_dp
 	
