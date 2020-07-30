@@ -457,7 +457,7 @@ MODULE statequil_atoms
 					
 					if (write_neg_tex) then
 					write(unit_invfile,*) "-------------------------------------------------------------------------------"				
-					write(unit_invfile,"('icell = '(1I9), ' atom '(1A2), ' T='(1F12.5))") icell, atom%ID, T(icell)
+					write(unit_invfile,"('icell = '(1I9), ' atom '(1A2), ' T='(1F12.5), ' lam='(1F12.5)' nm' )") icell, atom%ID, T(icell), atom%lines(kc)%lambda0
 					write(unit_invfile, "(' -> line '(1I2)' -> '(1I2), ' d(ni-njxgij)/ni='(1ES20.7E3) )") i, j, (atom%n(i,icell)*wi/wj - atom%n(j,icell) * gij)/atom%n(j,icell)
 					write(unit_invfile,"(' Tex='(1ES20.7E3) )") Tex_loc
 					write(unit_invfile, "('log(ratio) = '(1ES20.7E3), ' ratio = '(1ES20.7E3) )") ratio, exp(ratio)
@@ -525,7 +525,7 @@ MODULE statequil_atoms
 
 					if (write_neg_tex) then				
 					write(unit_invfile,*) "-------------------------------------------------------------------------------"				
-					write(unit_invfile,"('icell = '(1I9), ' atom '(1A2), ' T='(1F12.5)) ") icell, atom%ID, T(icell)
+					write(unit_invfile,"('icell = '(1I9), ' atom '(1A2), ' T='(1F12.5), ' lam='(1F12.5)' nm' ) ") icell, atom%ID, T(icell), atom%continua(kc)%lambda0
 					write(unit_invfile, "(' -> cont '(1I2)' -> '(1I2), ' d(ni-njxgij)/ni='(1ES20.7E3) )") i, j, (atom%n(i,icell)*wi/wj - atom%n(j,icell) * gij)/atom%n(j,icell)
 					write(unit_invfile,"(' Tion='(1ES20.7E3) )") Tion_loc
 					write(unit_invfile, "('log(ratio) = '(1ES20.7E3), ' ratio = '(1ES20.7E3) )") ratio, exp(ratio)
