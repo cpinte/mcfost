@@ -709,9 +709,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   ! rhodust & rhogas are in g/cm3
   ! extra_heating is in W
 
-  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad
+  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad, Ggrav
   use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az
-  use parametres, only : lscale_units,scale_units_factor
+  use parametres, only : lscale_length_units,scale_length_units_factor,lscale_mass_units,scale_mass_units_factor
 
   integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype, n_files
   real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
@@ -737,26 +737,37 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
   integer  :: i,j,k,itypei,alloc_status,i_etoiles, n_etoiles_old, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
-  real(dp) :: udist_scaled, umass_scaled, udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
-  real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph
+  real(dp) :: udist_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
+  real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
 
   logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
 
 
- if (lscale_units) then
-    write(*,*) 'Lengths are rescaled by ', scale_units_factor
-    udist_scaled = udist * scale_units_factor
-    umass_scaled = umass
- else
-    udist_scaled = udist
-    umass_scaled = umass
- endif
+  ! We check the units by recomputing G
+  G_phantom = udist**3 / (utime**2 * umass)
+  if (abs(G_phantom - Ggrav*1e3) > 1e-2 * G_phantom) call error("Phatom units are not consistent")
+
+  udist_scaled = udist
+  umass_scaled = umass
+  if (lscale_length_units) then
+     write(*,*) 'Lengths are rescaled by ', scale_length_units_factor
+     udist_scaled = udist * scale_length_units_factor
+  else
+     scale_length_units_factor = 1.0
+  endif
+  if (lscale_mass_units) then
+     write(*,*) 'Mass are rescaled by ', scale_mass_units_factor
+     umass_scaled = umass * scale_mass_units_factor
+  else
+     scale_mass_units_factor = 1.0
+  endif
+  utime_scaled = sqrt(udist_scaled**3/(G_phantom*umass_scaled))
 
   udens = umass_scaled/udist_scaled**3
-  uerg_per_s = umass_scaled*udist_scaled**2/utime**3
+  uerg_per_s = umass_scaled*udist_scaled**2/utime_scaled**3
   uWatt = uerg_per_s * erg_to_J
   ulength_au = udist_scaled/ (au_to_cm)
-  uvelocity =  udist_scaled / (m_to_cm) / utime ! m/s
+  uvelocity =  udist_scaled / (m_to_cm) / utime_scaled ! m/s
   usolarmass = umass_scaled / Msun_to_g
 
  if (dustfluidtype == 1) then
@@ -908,11 +919,11 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  do i=1,nptmass
     n_etoiles = n_etoiles + 1
     if (real(xyzmh_ptmass(4,i)) > 0.013) then
-       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)), "Msun"
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)) * scale_length_units_factor, "au, M=", real(xyzmh_ptmass(4,i)) * scale_mass_units_factor, "Msun"
     else
-       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)), "au, M=", real(xyzmh_ptmass(4,i)) * GxMsun/GxMjup, "Mjup"
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)) * scale_length_units_factor, "au, M=", real(xyzmh_ptmass(4,i)) * GxMsun/GxMjup * scale_mass_units_factor, "Mjup"
     endif
-    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))), "au"
+    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))) * scale_length_units_factor, "au"
  enddo
 
 
@@ -946,7 +957,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
           !vphi = - vx(i) * sin_phi + vy(i) * cos_phi
 
           ! Keplerian vphi
-          vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
+          vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * scale_mass_units_factor * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
 
           vx(i) = vr * cos_phi - vphi * sin_phi
           vy(i) = vr * sin_phi + vphi * cos_phi
