@@ -240,6 +240,9 @@ avoid this, include those commeand in your ``.bashrc`` or equivalent::
 $ export OMP_STACKSIZE=512M
 $ ulimit -s unlimited
 
+If the last command does not work on MacOS, you can try:
+
+$ ulimit -s hard
 
 Upgrading to New Versions
 -------------------------
