@@ -716,7 +716,7 @@ MODULE readatom
   real, parameter :: epsilon = 5e-3
   real :: eps
   real(kind=dp) :: epsilon_l_max !if epsilon > 1/pi/adamp, the value of xwing_lorentz is negative
-  real(kind=dp) :: max_adamp, adamp, maxvel, vel
+  real(kind=dp) :: max_adamp, adamp, maxvel, vel, min_resol
   integer, intent(in) :: unit
   character(len=MAX_LENGTH) :: inputline
   character(len=15) :: FormatLine
@@ -875,6 +875,13 @@ MODULE readatom
    end if
   end do
   
+  min_Resol = 1d30
+  do nmet=1,Natom
+  	min_resol = min(minval(Atoms(nmet)%ptr_atom%vbroad), min_resol)
+  enddo
+  !write(*,*) "resol(km/s)", 0.4*real(min_resol)*1e-3, min_resol * 1d-3
+  hv = 0.55 * real(min_resol) * 1e-3
+
   !Move after LTEpops for first estimates of damping
   !line wave grid define here to have the max damping
   write(*,*) " Generating sub wavelength grid and lines boundary for all atoms..."

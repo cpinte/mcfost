@@ -1420,7 +1420,7 @@ module getlambda
 		write(*,*) Nspec_line, " line wavelengths"
 		write(*,*) Nspec_cont, " continuum wavelengths"
 ! 		write(*,*) Nwaves - Nspec_line, " continuum wavelengths"
-		write(*,*) "Width of lines is 30*max(vDoppler) + delta_v, delta_v = ", 1e-3 * delta_v
+! 		write(*,*) "Width of lines is 30*max(vDoppler) + delta_v, delta_v = ", 1e-3 * delta_v
 		write(*,*) "Mean number of lines per group:", real(sum(Nline_per_group))/real(Ngroup)
 		write(*,*) "Mean number of wavelengths per group:", real(Nspec_line)/real(Ngroup)
 		write(*,*) "Mean number of wavelengths per line:", real(Nspec_line)/real(Ntrans-Ncont)
