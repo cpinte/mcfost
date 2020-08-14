@@ -1635,7 +1635,7 @@ subroutine find_pixel(x,y,z,taille_pix, dx_map,dy_map, i, j, in_map)
 
   xyz(1) = x ; xyz(2) = y ; xyz(3) = z
 
-  factor = 1.0 / taille_pix**2
+  factor = 1.0 / taille_pix**2 ! dx_map length is taille_pix and we want the p[rojection in unit of taille_pix
 
   ! Offset from map center in units of pixel size
   x_map = dot_product(xyz, dx_map) * factor !/ taille_pix**2
@@ -1649,7 +1649,7 @@ subroutine find_pixel(x,y,z,taille_pix, dx_map,dy_map, i, j, in_map)
   if (modulo(npix_y,2) == 1) then
      j = nint(y_map) + npix_y/2 + 1
   else
-     j = nint(y_map + 0.5) + npix_y/2 + 1
+     j = nint(y_map + 0.5) + npix_y/2
   endif
 
   if ((i<1).or.(i>npix_x).or.(j<1).or.(j>npix_y)) then

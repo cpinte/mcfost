@@ -156,7 +156,8 @@ subroutine set_default_variables()
   lML = .false.
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
-  lscale_units = .false.
+  lscale_length_units = .false.
+  lscale_mass_units = .false.
   lignore_dust = .false.
   lupdate_velocities = .false.
   lno_vr = .false.
@@ -750,7 +751,7 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) Nrays_atom_transfer
         i_arg= i_arg+1
         if (Nrays_atom_transfer <= 0) then
-         call error ("Nray must be > 0") 
+         call error ("Nray must be > 0")
         endif
      case("-max_err")
         i_arg = i_arg + 1
@@ -759,7 +760,7 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) dpops_max_error
         i_arg= i_arg+1
         if (dpops_max_error <= 0) then
-         call error ("MAx relative error has to be > 0") 
+         call error ("MAx relative error has to be > 0")
         endif
      case("-max_err_sub")
         i_arg = i_arg + 1
@@ -768,8 +769,8 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) dpops_sub_max_error
         i_arg= i_arg+1
         if (dpops_sub_max_error <= 0) then
-         call error ("Max sub relative error has to be > 0") 
-        endif  
+         call error ("Max sub relative error has to be > 0")
+        endif
      case("-see_lte")
         i_arg = i_arg + 1
         lforce_lte=.true.
@@ -1147,11 +1148,17 @@ subroutine initialisation_mcfost()
      case("-fix_star")
         i_arg = i_arg + 1
         lfix_star=.true.
-     case("-scale_units")
-        lscale_units = .true.
+     case("-scale_length_units")
+        lscale_length_units = .true.
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
-        read(s,*) scale_units_factor
+        read(s,*) scale_length_units_factor
+        i_arg = i_arg + 1
+     case("-scale_mass_units")
+        lscale_mass_units = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) scale_mass_units_factor
         i_arg = i_arg + 1
      case("-ignore_dust")
         i_arg = i_arg + 1
@@ -1570,18 +1577,9 @@ subroutine display_help()
   write(*,*) "        : -astrochem : creates the files for astrochem"
   write(*,*) "        : -phantom : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
-  write(*,*) "        : -limits_file or limits <limit-file> : x,y,z values used for the Voronoi tesselation"
-  write(*,*) "        : -keep_particles <fraction> : fraction of SPH particles to keep for"
-  write(*,*) "                                       the Voronoi tesselation (default : 0.99)"
-  write(*,*) "        : -ignore_dust : ignore the dust fraction in a phantom dump"
-  write(*,*) "        : -age <age> : age used to compute stellar parameters from mass of sink particles"
-  write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
-  write(*,*) "        : -scale_units <scaling_factor> : over-ride the units read in by this factor"
   write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
   write(*,*) "        : -no_magnetic_field : Force magnetic field to be zero."
-
-
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -1711,14 +1709,19 @@ subroutine display_help()
   write(*,*) "        : -max_err_sub <max_err_sub> : max relative error for sub-iterations"
   write(*,*) " "
   write(*,*) " Options related to phantom"
-  write(*,*) "        : -fix_star"
-  write(*,*) "        : -scale_units"
-  write(*,*) "        : -ignore_dust"
+  write(*,*) "        : -limits_file or limits <limit-file> : x,y,z values used for the Voronoi tesselation"
+  write(*,*) "        : -keep_particles <fraction> : fraction of SPH particles to keep for"
+  write(*,*) "                                       the Voronoi tesselation (default : 0.99)"
+  write(*,*) "        : -ignore_dust : ignore the dust fraction in a phantom dump"
+  write(*,*) "        : -age <age> : age used to compute stellar parameters from mass of sink particles"
+  write(*,*) "        : -fix_star : do not compute stellar parameters from sink particle, use values in para file"
+  write(*,*) "        : -scale_length_units <scaling_factor> : over-ride the length units read in by this factor"
+  write(*,*) "        : -scale_mass_units <scaling_factor> : over-ride the mass units read in by this factor"
+  write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
+  write(*,*) "        : -delete_Hill_sphere : delete SPH particles inside Hill spheres of planets"
   write(*,*) "        : -no_vr : force the radial velocities to be 0"
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
-  write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
-  write(*,*) "        : -delete_Hill_sphere : delete SPH particles inside Hill spheres of planets"
   write(*,*) "        : -centre_on_sink <number> : centre the model on the sink particle"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
