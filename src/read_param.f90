@@ -180,6 +180,7 @@ contains
 
     read(1,*) RT_imin, RT_imax, RT_n_incl, lRT_i_centered
     read(1,*) RT_az_min, RT_az_max, RT_n_az
+    if ((RT_n_incl < 1).or.(RT_n_az < 1)) call error("The number of inclination and azimuth must be >= 1")
     read(1,*) distance
     read(1,*) ang_disque
 
