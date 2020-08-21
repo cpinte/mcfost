@@ -742,23 +742,23 @@ function v_proj(icell,x,y,z,u,v,w) !
 		else if (lspherical_velocity) then
 			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
 			vx = 0.; vy = 0.; vz = 0.;
-			norme2 = 0.0_dp
 			
-			sign = 1_dp
-		    if ( (.not.l3D) .and. (z < 0_dp) ) sign = -1_dp
-
-			if (r>tiny_dp) then
+			if (r2 > tiny_dp) then
+				norme2 = 1.0_dp / r2
+			else
+				norme2 = 0.0_dp
+			endif
+			
+			if (r > tiny_dp) then
 				norme = 1.0_dp / r
-				if (r2 > tiny_dp) norme2 = 1.0_dp / r2
-				
-				vx = vr(icell) * x * norme + norme2 * (z * norme * x * vtheta(icell) - y * vphi(icell))
-				vy = vr(icell) * y * norme + norme2 * (z * norme * y * vtheta(icell) + x * vphi(icell))
-				vz = vr(icell) * z * norme - sign * r2 / r * vtheta(icell)
-							
+				vx = vr(icell) * x * norme - y * norme2 * vphi(icell)
+				vy = vr(icell) * y * norme + x * norme2 * vphi(icell)
+				vz = vr(icell) * z * norme
 				v_proj = vx * u + vy * v + vz * w
 			else
-				v_proj = 0.0
-			endif		
+				v_proj = 0.0_dp
+			endif
+				
 		else
            call error("velocity field not defined")
         endif
