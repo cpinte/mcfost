@@ -1038,7 +1038,7 @@ module getlambda
 		real(kind=dp), allocatable, dimension(:), intent(out) :: outgrid, cont_grid
 		real(kind=dp), dimension(:), allocatable :: cont_waves, line_waves
 		integer, parameter :: MAX_GROUP_OF_LINES = 1000
-		integer :: Nwaves, max_shift !total
+		integer :: Nwaves
 		integer :: Ngroup, Nlam, Nlambda_cont, Ncont, Nline_per_group(MAX_GROUP_OF_LINES)
 		real(kind=dp), dimension(MAX_GROUP_OF_LINES) :: group_blue, group_red
 		real(kind=dp), dimension(:), allocatable :: all_lamin, all_lamax, tmp_grid, delta_lam
@@ -1057,8 +1057,8 @@ module getlambda
 			deallocate(outgrid)
 		endif
 		Ntrans = 0
-		delta_v = dvmax + hv * 1e3 !m/s
-		max_shift = nint(1e-3 * delta_v  / hv)!int(1e-3*dvmax/hv)
+		!maximum extent of lines with or without dvmax (i.e., in rest frame)
+		delta_v = dvmax + 1.5*hv * 1e3 !m/s
 
 		!maximum and minimum wavelength for only lines, including max velocity field
 		!Count Number of transitions and number of lines
@@ -1176,6 +1176,7 @@ module getlambda
 			enddo
 
 		enddo
+		
 		
 		allocate(sorted_indexes(Nlam),stat=alloc_status)
 		if (alloc_status > 0) then
@@ -1419,8 +1420,6 @@ module getlambda
 		write(*,*) Nwaves, " unique wavelengths" !they are no eliminated lines
 		write(*,*) Nspec_line, " line wavelengths"
 		write(*,*) Nspec_cont, " continuum wavelengths"
-! 		write(*,*) Nwaves - Nspec_line, " continuum wavelengths"
-! 		write(*,*) "Width of lines is 30*max(vDoppler) + delta_v, delta_v = ", 1e-3 * delta_v
 		write(*,*) "Mean number of lines per group:", real(sum(Nline_per_group))/real(Ngroup)
 		write(*,*) "Mean number of wavelengths per group:", real(Nspec_line)/real(Ngroup)
 		write(*,*) "Mean number of wavelengths per line:", real(Nspec_line)/real(Ntrans-Ncont)
@@ -1432,9 +1431,9 @@ module getlambda
 		if (l1 > 1500.) then
 			l1 = l1 *1e-4
 			lam_unit = "mum"
-! 		else if (l1 > 1e6) then
-! 			l1 = 10000000./l1
-! 			lam_unit = "cm^-1"
+		else if (l1 > 1e6) then
+			l1 = 10000000./l1
+			lam_unit = "cm^-1"
 		else if (l1 > 1e6) then
 			l1 = l1 * 1e-9 * 1e3
 			lam_unit = "mm"

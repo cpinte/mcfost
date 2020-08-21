@@ -143,10 +143,15 @@ module spectrum_type
 !    										atmos%v_char, lambda, Ntrans, lambda_cont)
 		call make_wavelength_grid_new(wavelength_ref, v_char, lambda, Ntrans, lambda_cont)
 
-		dk_max = nint(1e-3 * v_char / hv)
+		!for each line
+		dk_max = sign(1.0, v_char) * int( 1e-3 * abs(v_char) / hv + 0.5 ) !nint( (1e-3 * v_char) / hv)
 		dk_min = -dk_max
-		write(*,*) "Maximum shift in index:", dk_max, 1e-3 * v_char / hv
-		
+		write(*,*) "Maximum shift in index:", dk_max, (1e-3 * v_char + hv) / hv - 1.0
+		if (dk_max * hv > v_char*1e-3 + hv) then
+			call warning("Beware, maximum shift might be beyond the grid !")
+		endif
+! 		write(*,*) dk_max * hv, v_char*1e-3, v_char*1e-3 + hv
+! 		stop
 		Nlambda_cont = size(lambda_cont)
 		Nlambda = size(lambda)
    !Futur deprecation, rayleigh scattering will undergo a revamp, and some informations

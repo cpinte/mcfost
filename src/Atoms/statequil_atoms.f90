@@ -426,7 +426,7 @@ MODULE statequil_atoms
 ! 				endif
 
 										!prec_pops
-				if (atom%n(i,icell) <= impure_factor * ne(icell) ) cycle tr_loop
+				!!if (atom%n(i,icell) <= impure_factor * ne(icell) ) cycle tr_loop
 
 				Tdag = atom%lines(kc)%Tex(icell)
 				deltaE_k = (atom%E(j)-atom%E(i)) / KBOLTZMANN
@@ -488,7 +488,7 @@ MODULE statequil_atoms
 					endif
 				endif
 										!prec_pops
-				if (atom%n(i,icell) <= impure_factor * ne(icell) ) cycle tr_loop
+				!!if (atom%n(i,icell) <= impure_factor * ne(icell) ) cycle tr_loop
 
            
       			Tdag = atom%continua(kc)%Tex(icell)

@@ -179,6 +179,7 @@ MODULE readatom
     !note: for Hydrogen, ntotal is actually (nHtot - nHmin)
 
     VDoppler = sqrt(vtherm/atom%weight * maxval(T) + maxval(vturb)**2)
+    
 
 !     write(*,*) Vdoppler, sqrt(Vtherm*maxval(T)/atom%weight + maxval(vturb)**2)
 ! 	do k=n_cells, 1, -1
@@ -186,7 +187,7 @@ MODULE readatom
 ! 	  write(*,*) k, T(k), atom%ID, atom%vbroad(k)/1e3, vtherm/atom%weight / 1e3, vturb(k)/1e3
 ! 	 endif
 ! 	enddo
-
+! stop
     !Now read all bound-bound transitions
     allocate(atom%lines(atom%Nline))
 
@@ -877,10 +878,14 @@ MODULE readatom
   
   min_Resol = 1d30
   do nmet=1,Natom
-  	min_resol = min(minval(Atoms(nmet)%ptr_atom%vbroad), min_resol)
+  	do k=1,n_cells
+  		if (icompute_atomRT(k)>0) then
+  			min_resol = min(Atoms(nmet)%ptr_atom%vbroad(k), min_resol)
+  		endif
+  	enddo
   enddo
-  !write(*,*) "resol(km/s)", 0.4*real(min_resol)*1e-3, min_resol * 1d-3
-  hv = 0.55 * real(min_resol) * 1e-3
+  write(*,*) "resol(km/s)", 0.6*real(min_resol)*1e-3, " min(vD) (km/s) = ", min_resol * 1d-3
+  hv = 0.6 * real(min_resol) * 1e-3
 
   !Move after LTEpops for first estimates of damping
   !line wave grid define here to have the max damping

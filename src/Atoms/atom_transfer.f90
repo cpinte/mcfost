@@ -19,7 +19,7 @@ module atom_transfer
 									dealloc_jnu, write_image, write_flux_ascii, reallocate_rays_arrays
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
-									compute_angular_integration_weights, wmu, xmu, xmux, xmuy
+									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char
 	use readatom, only			: readAtomicModels
 	use lte, only				: set_LTE_populations, nH_minus
 	use constant, only			: MICRON_TO_NM, hc_k, sigma_e
@@ -72,6 +72,8 @@ module atom_transfer
  !Temporary variables for Contribution functions
 	real(kind=dp), allocatable :: S_contrib(:,:,:), S_contrib2(:,:), mean_formation_depth
  !NLTE
+ 	real :: cswitch_factor = 10.0
+ 	real(kind=dp) :: cswitch_mag = 1d10
 	logical :: cswitch_enabled = .false.
 	logical, allocatable :: lcell_converged(:)
 	real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, Tex_old, local_pops
@@ -476,7 +478,7 @@ module atom_transfer
   real(kind=dp):: taille_pix, nu
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
-  integer, parameter :: n_rad_RT = 450, n_phi_RT = 100 !(100, 36)
+  integer, parameter :: n_rad_RT = 451, n_phi_RT = 100 !(100, 36)
   real(kind=dp), dimension(n_rad_RT) :: tab_r
   real(kind=dp):: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda
@@ -668,12 +670,8 @@ module atom_transfer
   
   lhogerheijde_scheme = .false. !not ready yet 
   lmali_scheme = (.not.lhogerheijde_scheme)
-  
-  !building
-  cswitch = 1.0!1d15
-  if (cswitch > 1.0_dp) cswitch_enabled = .true.
 
-  
+
  ! -------------------------------INITIALIZE AL-RT ------------------------------------ !
   !only one available yet, I need one unpolarised, faster and more accurate.
   Voigt => VoigtHumlicek
@@ -712,6 +710,12 @@ module atom_transfer
         !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------- READATOM and INITIZALIZE POPS ------------------------------ !
+  cswitch = 1.0
+  !if (abs(v_char) > 0.0) cswitch = cswitch_mag
+  if (cswitch > 1.0_dp) then
+  	cswitch_enabled = .true.
+  	write(*,*) " ****** Warning Collisional radiative switching enabled! ***** "
+  endif
 
   call readAtomicModels(atomunit)
 
@@ -759,7 +763,7 @@ module atom_transfer
 
 
 		!use the same rays as nlteloop
-		!if (lelectron_scattering) call iterate_Jnu
+! 		if (lelectron_scattering) call iterate_Jnu
 		
 		if (allocated(ds)) deallocate(ds)
 ! 		if (lmali_scheme) then !not use full here
@@ -988,7 +992,9 @@ module atom_transfer
 ! 		deallocate(S_contrib, S_contrib2, Ksi)
 ! 	end if
 
-	!!call compute_Imu()
+! 	write(*,*) " Computing limb darkening.."
+! 	call compute_Imu()
+! 	write(*,*) "..done"
     
     !ascii files can be large !
     if (loutput_rates) then
@@ -1485,6 +1491,13 @@ module atom_transfer
 		allocate(Tion_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
 		diff_old = 0.0_dp
 		
+!if we iterate before !
+! 		if (lelectron_scattering) then !first value from previous calculation
+! 			do icell=1,n_cells
+! 				Jold(:,icell) = eta_es(:,icell) / thomson(icell)
+! 			enddo
+! 		endif
+		
 		deallocate(stream)
 		allocate(stream(nb_proc),stat=alloc_status)
 		if (alloc_status > 0) call error("Allocation error stream")
@@ -1527,7 +1540,7 @@ module atom_transfer
 		do etape=etape_start, etape_end
 
 			if (etape==1) then
-      			call compute_angular_integration_weights(method="carlson_A8")
+      			call compute_angular_integration_weights(method="stepan2020")
   				lfixed_rays = .true.
   				n_rayons = 1 + ( n_rayons_1 - 1)
   				write(*,*) " Using step 1 with ", size(xmu)*n_rayons, " rays"
@@ -1537,7 +1550,7 @@ module atom_transfer
 				lcell_converged(:) = .false.
 				precision = dpops_max_error
 				precision_sub = dpops_sub_max_error
-  				allocate(xyz_pos(3,n_rayons,2),uvw_pos(3,size(xmu),1))
+  				!allocate(xyz_pos(3,n_rayons,2),uvw_pos(3,size(xmu),1))
 				if (n_rayons > 1) then
   					stream(1) = init_sprng(gtype,0,1,seed,SPRNG_DEFAULT)
   					allocate(randz(n_rayons-1,3))
@@ -1724,14 +1737,13 @@ module atom_transfer
 ! 						!-> the same for all cells and proc
 									call  pos_em_cellule(icell ,randz(iray-1,1),randz(iray-1,2),randz(iray-1,3),x0,y0,z0)
 								endif
-								if (n_iter==1) then
-									if (icell==1) then
-										xyz_pos(:,iray,1) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
-									else if (icell==n_cells) then
-										xyz_pos(:,iray,2) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
-									endif
-								endif
-
+! 								if (n_iter==1) then
+! 									if (icell==1) then
+! 										xyz_pos(:,iray,1) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
+! 									else if (icell==n_cells) then
+! 										xyz_pos(:,iray,2) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
+! 									endif
+! 								endif
   		         				do imu=1, size(xmu)
   		         					w0 = xmu(imu)
 									u0 = xmux(imu); v0 = xmuy(imu)
@@ -1916,7 +1928,8 @@ module atom_transfer
         		else !continue to iterate even if n_rayons max is reached ?
            			lprevious_converged = .false.
            			if ((cswitch_enabled).and.(cswitch>1.0)) then
-           				cswitch = cswitch * 0.15
+           				cswitch = cswitch / cswitch_factor
+           				if (cswitch < 1.0) cswitch = 1.0
 						write(*,*) " cswitch for next iteration:", cswitch	
 					endif
            			if (.not.lfixed_rays) then
@@ -1999,6 +2012,7 @@ module atom_transfer
   			close(20)
   			
 		endif
+		
 
 		deallocate(dM, dTM, Tex_ref, Tion_ref)
 		if (allocated(Jnew)) deallocate(Jnew)
@@ -2326,7 +2340,7 @@ module atom_transfer
       if (etape==1) then 
       	!!call error("no step 1 implemented")
       	!call compute_angular_integration_weights(method="gauss_legendre",Nmu=100,Nphi=100)
-      	call compute_angular_integration_weights(method="carlson_A8")
+      	call compute_angular_integration_weights(method="carlson_A8")!"carlson_A8")
   		lfixed_rays = .true.
   		n_rayons = 1 + (n_rayons_start-1)
   		iray_start = 1
@@ -2336,7 +2350,7 @@ module atom_transfer
   		!only one star
   		allocate(Ic(Nlambda_cont, 1, nb_proc))
   		Ic = 0.0_dp
-    	allocate(xyz_pos(3,n_rayons,2),uvw_pos(3,size(xmu),1))
+    	!allocate(xyz_pos(3,n_rayons,2),uvw_pos(3,size(xmu),1))
 		if (n_rayons > 1) then
   			stream(1) = init_sprng(gtype,0,1,seed,SPRNG_DEFAULT)
   			allocate(randz(n_rayons-1,3))
@@ -2502,13 +2516,13 @@ module atom_transfer
 ! 						!-> the same for all cells and proc
 								call  pos_em_cellule(icell ,randz(iray-1,1),randz(iray-1,2),randz(iray-1,3),x0,y0,z0)
 							endif
-							if (n_iter==1) then
-								if (icell==1) then
-									xyz_pos(:,iray,1) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
-								else if (icell==n_cells) then
-									xyz_pos(:,iray,2) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
-								endif
-							endif
+! 							if (n_iter==1) then
+! 								if (icell==1) then
+! 									xyz_pos(:,iray,1) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
+! 								else if (icell==n_cells) then
+! 									xyz_pos(:,iray,2) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
+! 								endif
+! 							endif
 
 
   		         			do imu=1, size(xmu)
@@ -2525,7 +2539,7 @@ module atom_transfer
 		                	!ALI
 		                		lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*kappa_tot(:,icell))) * weight
 	
-								if (n_iter==1 .and. icell==1) uvw_pos(:,imu,1) = (/u0,v0,w0/)
+! 								if (n_iter==1 .and. icell==1) uvw_pos(:,imu,1) = (/u0,v0,w0/)
 
       			   			enddo !imu	
       			   		enddo !pos / iray		         
@@ -2670,27 +2684,32 @@ module atom_transfer
   			enddo
   			close(20)
   			
+  			deallocate(threeKminusJ)
+  			
 		endif
 
-  if (allocated(xyz_pos)) then
-  	open(unit=20,file="xyz_pos.txt",status="unknown")
-  	!first cell then last cell
-  	write(20,*) 2, n_rayons
-  	do iray=1,n_rayons
-  		write(20,*) (xyz_pos(i,iray,1),i=1,3)
-  	enddo
-  	do iray=1,n_rayons
-  		write(20,*) (xyz_pos(i,iray,2),i=1,3)
-  	enddo
-  	close(20)
-  	open(unit=20,file="uvw_pos.txt",status="unknown")
-  	!only one cell to test step1
-  	write(20,*) 1, size(xmu), size(xmu)/8
-  	do imu=1,size(xmu)
-  		write(20,*) (uvw_pos(i,imu,1),i=1,3)
-  	enddo
-  	close(20)
-  endif
+!   if (allocated(xyz_pos)) then
+!   	open(unit=20,file="xyz_pos.txt",status="unknown")
+!   	!first cell then last cell
+!   	write(20,*) 2, n_rayons
+!   	do iray=1,n_rayons
+!   		write(20,*) (xyz_pos(i,iray,1),i=1,3)
+!   	enddo
+!   	do iray=1,n_rayons
+!   		write(20,*) (xyz_pos(i,iray,2),i=1,3)
+!   	enddo
+!   	close(20)
+!   	open(unit=20,file="uvw_pos.txt",status="unknown")
+!   	!only one cell to test step1
+!   	write(20,*) 1, size(xmu), size(xmu)/8
+!   	do imu=1,size(xmu)
+!   		write(20,*) (uvw_pos(i,imu,1),i=1,3)
+!   	enddo
+!   	close(20)
+!   endif
+  
+  
+  if (allocated(xmu)) deallocate(xmu,wmu,xmux,xmuy) !in case we call nlte_loop after
 
   if (allocated(randz)) deallocate(randz)
   if (allocated(J20_cont)) deallocate(J20_cont)
@@ -2899,142 +2918,142 @@ module atom_transfer
 ! 	return
 ! 	end subroutine integrate_i_icell
 !  
-!   subroutine compute_Imu()
-!    use utils, only: Gauss_Legendre_quadrature, span
-!    use constantes, only : Au_to_Rsun
-!    
-!    integer, parameter :: Nmu = 500
-!    real(kind=dp) :: u, v, w, uvw(3), x(3), y(3)
-!    integer :: id, icell0, icell, i, j, iray, alloc_status
-!    real(kind=dp), dimension(:), allocatable :: weight_mu, cos_theta, p
-!    integer, parameter :: maxSubPixels = 32
-!    real(kind=dp) :: x0,y0,z0,u0,v0,w0, r0, r1, rr, phi
-!    real(kind=dp), dimension(:,:,:), allocatable :: Imu, Imuc
-!    real(kind=dp):: normF
-!    logical :: lintersect, labs
-! 
-!    allocate(weight_mu(Nmu), cos_theta(Nmu), p(Nmu), stat=alloc_status)
-!    if (alloc_status > 0) call error(" Allocation error cos_theta(Nmu)")
-! !    allocate(Imu(Nlambda,Nmu,n_cells), Imuc(Nlambda_cont,Nmu,n_cells), stat=alloc_status)
-! !    if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
-!    allocate(Imu(Nlambda,Nmu,1), Imuc(Nlambda_cont,Nmu,1), stat=alloc_status)
+  subroutine compute_Imu()
+   use utils, only: Gauss_Legendre_quadrature, span
+   use constantes, only : Au_to_Rsun
+   
+   integer, parameter :: Nmu = 500
+   real(kind=dp) :: u, v, w, uvw(3), x(3), y(3)
+   integer :: id, icell0, icell, i, j, iray, alloc_status
+   real(kind=dp), dimension(:), allocatable :: weight_mu, cos_theta, p
+   integer, parameter :: maxSubPixels = 32
+   real(kind=dp) :: x0,y0,z0,u0,v0,w0, r0, r1, rr, phi
+   real(kind=dp), dimension(:,:,:), allocatable :: Imu, Imuc
+   real(kind=dp):: normF
+   logical :: lintersect, labs
+
+   allocate(weight_mu(Nmu), cos_theta(Nmu), p(Nmu), stat=alloc_status)
+   if (alloc_status > 0) call error(" Allocation error cos_theta(Nmu)")
+!    allocate(Imu(Nlambda,Nmu,n_cells), Imuc(Nlambda_cont,Nmu,n_cells), stat=alloc_status)
 !    if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
-! 
-! 
-!    Imu(:,:,:) = 0.0_dp
-!    Imuc(:,:,:) = 0.0_dp
-!    labs = .false.
-!    id = 1
-!    iray = 1
-!    phi = pi
-! 
-!    !look parallel to z
-!    u = 0.0_dp
-!    v = -1.745d-22!0.0_dp
-!    w = 1.0_dp 
-! 
-!    uvw = (/u,v,w/) !vector position
-!    x = (/1.0_dp,0.0_dp,0.0_dp/)
-!    y = -cross_product(x, uvw)
-! 
-!    ! Ray tracing : on se propage dans l'autre sens
-!    u0 = -u ; v0 = -v ; w0 = -w
-!    
-! 
-!    !r0 = 1d-5
-!    !r1 = Rmax * 1.005
-!    !q = span(real(r0),real(r1), Nmu)
-!    
-!    call gauss_legendre_quadrature(0.0_dp, 1.0_dp, Nmu, cos_theta, weight_mu)
-! 
-!   !!!$omp parallel &
-!   !!!$omp default(none) &
-!   !!!$omp private(j,i,id,u0,v0,w0,lintersect,icell0) &
-!   !!!$omp shared(Imu, Imuc, u,v,w,Rmax,iray,labs,Itot, Icont)
-!    do j=1,Nmu
-!    !!!$ id = omp_get_thread_num() + 1
-! 
-!     rr = Rmax * sqrt(1.0 - cos_theta(j)**2)
-!     !!write(*,*) "rr=", rr, " q=", q(j)
-!    
-!     x0 = 10.0*Rmax*u + rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
-!     y0 = 10.0*Rmax*v + rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
-!     z0 = 10.0*Rmax*w + rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
-!     
-!     !!write(*,*) "x'=",rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
-!     !!write(*,*) "y'=",rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
-!     !!write(*,*) "z'=",rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
-! 
-! 
-!     call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
-!     
-!     !cos_theta(j)  = abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
-!     p(j) = rr*AU_to_rsun
-!     !!write(*,*) "mu=", cos_theta(j), abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
-! 
-! 	!!write(*,*) "x0=",x0, " y0=",y0, " z0=",z0
-! 
-! 	if (cos_theta(j) < 0.05) then
-! 		if( (icell0 > n_cells).or.(icell0 < 1) ) then
-! 			call warning("for this cos(theta) the ray is put in the star! check prec grid")
-! 			write(*,*) "cos(theta)=",cos_theta(j), " icell=", icell0, " intersect?:", lintersect
-! 			cycle !because of prec grid ??
-! 		endif
-! 	endif
-! 
-!      if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
-!      	call integ_ray_line(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs)
-!         Imu(:,j,1) = Itot(:,iray,id)
-!         Imuc(:,j,1) = Icont(:,id)
-! ! 		call integrate_i_icell(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs, Imu(:,j,:), Imuc(:,j,:))
-! 
-!      endif
-!    enddo
-!    !!!$omp end do
-!    !!!$omp end parallel
-! 
+   allocate(Imu(Nlambda,Nmu,1), Imuc(Nlambda_cont,Nmu,1), stat=alloc_status)
+   if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
+
+
+   Imu(:,:,:) = 0.0_dp
+   Imuc(:,:,:) = 0.0_dp
+   labs = .false.
+   id = 1
+   iray = 1
+   phi = pi
+
+   !look parallel to z
+   u = 0.0_dp
+   v = -1.745d-22!0.0_dp
+   w = 1.0_dp 
+
+   uvw = (/u,v,w/) !vector position
+   x = (/1.0_dp,0.0_dp,0.0_dp/)
+   y = -cross_product(x, uvw)
+
+   ! Ray tracing : on se propage dans l'autre sens
+   u0 = -u ; v0 = -v ; w0 = -w
+   
+
+   !r0 = 1d-5
+   !r1 = Rmax * 1.005
+   !q = span(real(r0),real(r1), Nmu)
+   
+   call gauss_legendre_quadrature(0.0_dp, 1.0_dp, Nmu, cos_theta, weight_mu)
+
+  !!!$omp parallel &
+  !!!$omp default(none) &
+  !!!$omp private(j,i,id,u0,v0,w0,lintersect,icell0) &
+  !!!$omp shared(Imu, Imuc, u,v,w,Rmax,iray,labs,Itot, Icont)
+   do j=1,Nmu
+   !!!$ id = omp_get_thread_num() + 1
+
+    rr = Rmax * sqrt(1.0 - cos_theta(j)**2)
+    !!write(*,*) "rr=", rr, " q=", q(j)
+   
+    x0 = 10.0*Rmax*u + rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
+    y0 = 10.0*Rmax*v + rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
+    z0 = 10.0*Rmax*w + rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
+    
+    !!write(*,*) "x'=",rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
+    !!write(*,*) "y'=",rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
+    !!write(*,*) "z'=",rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
+
+
+    call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
+    
+    !cos_theta(j)  = abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
+    p(j) = rr*AU_to_rsun
+    !!write(*,*) "mu=", cos_theta(j), abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
+
+	!!write(*,*) "x0=",x0, " y0=",y0, " z0=",z0
+
+	if (cos_theta(j) < 0.05) then
+		if( (icell0 > n_cells).or.(icell0 < 1) ) then
+			call warning("for this cos(theta) the ray is put in the star! check prec grid")
+			write(*,*) "cos(theta)=",cos_theta(j), " icell=", icell0, " intersect?:", lintersect
+			cycle !because of prec grid ??
+		endif
+	endif
+
+     if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+     	call integ_ray_line(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs)
+        Imu(:,j,1) = Itot(:,iray,id)
+        Imuc(:,j,1) = Icont(:,iray,id)
+! 		call integrate_i_icell(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs, Imu(:,j,:), Imuc(:,j,:))
+
+     endif
+   enddo
+   !!!$omp end do
+   !!!$omp end parallel
+
+   open(unit=14,file="Imu.s",status="unknown")
+   open(unit=15,file="Imuc.s",status="unknown")
+   write(14,*) Nlambda, Nmu, 1
+   write(15,*) Nlambda_cont, Nmu, 1
+   write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
+   write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
+   write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
+   write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
+   do i=1,Nlambda
+    write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,1),  j=1,Nmu)
+   enddo
+   do i=1,Nlambda_cont
+    write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,1),  j=1,Nmu)
+   enddo
+   close(14)
+   close(15)
+
 !    open(unit=14,file="Imu.s",status="unknown")
 !    open(unit=15,file="Imuc.s",status="unknown")
-!    write(14,*) Nlambda, Nmu, 1
-!    write(15,*) Nlambda_cont, Nmu, 1
+!    write(14,*) Nlambda, Nmu, n_cells
+!    write(15,*) Nlambda_cont, Nmu, n_cells
 !    write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
 !    write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
 !    write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
 !    write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-!    do i=1,Nlambda
-!     write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,1),  j=1,Nmu)
+!    do icell=1, n_cells
+!    	do i=1,Nlambda
+!     	write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,icell),  j=1,Nmu)
+!   	enddo
 !    enddo
-!    do i=1,Nlambda_cont
-!     write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,1),  j=1,Nmu)
+!    do icell=1, n_cells
+!    	do i=1,Nlambda_cont
+!     	write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,icell),  j=1,Nmu)
+!    	enddo
 !    enddo
 !    close(14)
 !    close(15)
-! 
-! !    open(unit=14,file="Imu.s",status="unknown")
-! !    open(unit=15,file="Imuc.s",status="unknown")
-! !    write(14,*) Nlambda, Nmu, n_cells
-! !    write(15,*) Nlambda_cont, Nmu, n_cells
-! !    write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
-! !    write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
-! !    write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-! !    write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-! !    do icell=1, n_cells
-! !    	do i=1,Nlambda
-! !     	write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,icell),  j=1,Nmu)
-! !   	enddo
-! !    enddo
-! !    do icell=1, n_cells
-! !    	do i=1,Nlambda_cont
-! !     	write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,icell),  j=1,Nmu)
-! !    	enddo
-! !    enddo
-! !    close(14)
-! !    close(15)
-!    
-!    deallocate(weight_mu, cos_theta, p, Imu, Imuc)
-!    
-!   return
-!   end subroutine compute_Imu
+   
+   deallocate(weight_mu, cos_theta, p, Imu, Imuc)
+   
+  return
+  end subroutine compute_Imu
   
 ! 	subroutine INTEG_RAY_LINE_I_CNTRB(id,icell_in,x,y,z,u,v,w,iray,labs)
 ! 	! ------------------------------------------------------------------------------- !

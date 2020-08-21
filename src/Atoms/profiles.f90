@@ -110,7 +110,7 @@ MODULE PROFILES
                                 				               			x1,y1,z1, &      ! velocity field and magnetic field
                                 				               			l !physical length of the cell
 		integer 													:: Nvspace
-		integer, parameter											:: NvspaceMax = 2!500
+		integer, parameter											:: NvspaceMax = 500
 		real(kind=dp) 												:: norm
 		real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
 																		dv
@@ -166,7 +166,7 @@ MODULE PROFILES
                                 				               			x1,y1,z1, &      ! velocity field and magnetic field
                                 				               			l !physical length of the cell
 		integer 													:: Nvspace
-		integer, parameter											:: NvspaceMax = 2!500
+		integer, parameter											:: NvspaceMax = 151
 		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
 		real(kind=dp) 												:: norm
 		real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
@@ -181,7 +181,7 @@ MODULE PROFILES
 		Nred = line%Nred; Nblue = line%Nblue
 
 		local_profile_i = 0d0
-		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight/line%atom%vbroad(icell)
+		u1(:) = ( (lambda - line%lambda0)/line%lambda0 ) * ( clight/line%atom%vbroad(icell) )
 		
 		Omegav = 0d0
 		v0 = v_proj(icell,x,y,z,u,v,w)
@@ -192,29 +192,39 @@ MODULE PROFILES
 		Nvspace = min(max(2,nint(dv/line%atom%vbroad(icell)*20.)),NvspaceMax)
 		!!write(*,*) "Nv = ", max(2,nint(dv/line%atom%vbroad(icell)*20.))
 		do nv=2, Nvspace-1
-      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
 			xphi=x+delta_vol_phi*u
 			yphi=y+delta_vol_phi*v
 			zphi=z+delta_vol_phi*w
 			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+! 			omegav(nv)  = v0 + real(nv-1)/real(Nvspace-1) * (v1-v0)
 		enddo
 		omegav(Nvspace) = v1
+
 		omegav_mean = 0.0_dp
 		!!if (lsubstract_avg) omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
 
 		norm = Nvspace * line%atom%vbroad(icell) * sqrtpi
 		
-		do nv=1, Nvspace
+        if (line%voigt) then
+
+			do nv=1, Nvspace
  
-			u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
+				u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
          
-         	if (line%voigt) then
 				local_profile_i(:) = local_profile_i(:) + Voigt(N, line%a(icell), u1p)
-			else
-				local_profile_i(:) = local_profile_i(:) + exp(-u1p**2)
-			endif
+			enddo
 			
-		enddo
+		else
+			do nv=1, Nvspace
+			
+				u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
+
+				local_profile_i(:) = local_profile_i(:) + exp(-u1p**2)
+				
+			enddo
+		endif
+			
 
 		local_profile_i(:) = local_profile_i(:) / norm
 
@@ -322,7 +332,6 @@ MODULE PROFILES
 
 	return
 	end function local_profile_thomson
-
 
 	SUBROUTINE IProfile_cmf_to_obs(line,icell,x,y,z,x1,y1,z1,u,v,w,l)
 		! phi = Voigt / sqrt(pi) / vbroad(icell)
