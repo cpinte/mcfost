@@ -144,7 +144,7 @@ module spectrum_type
 		call make_wavelength_grid_new(wavelength_ref, v_char, lambda, Ntrans, lambda_cont)
 
 		!for each line
-		dk_max = sign(1.0, v_char) * int( 1e-3 * abs(v_char) / hv + 0.5 ) !nint( (1e-3 * v_char) / hv)
+		dk_max = sign(1.0_dp, v_char) * int( 1e-3 * abs(v_char) / hv + 0.5 ) !nint( (1e-3 * v_char) / hv)
 		dk_min = -dk_max
 		write(*,*) "Maximum shift in index:", dk_max, (1e-3 * v_char + hv) / hv - 1.0
 		if (dk_max * hv > v_char*1e-3 + hv) then
