@@ -512,6 +512,8 @@ subroutine define_cylindrical_grid()
      do i=1, n_rad
         !rsph = 0.5*(r_lim(i) +r_lim(i-1))
         rsph = sqrt(r_lim(i) * r_lim(i-1))
+        !Ben
+        !if (lread_1D_grid) rsph = r_lim(i)
 
         do j=1,nz
            w = (real(j,kind=dp)-0.5_dp)/real(nz,kind=dp)
