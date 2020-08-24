@@ -200,7 +200,8 @@ END FUNCTION get_logPartitionFunctionk
       
   RETURN
   END FUNCTION nH_minus
-
+  
+!-> Check dissolve too
  SUBROUTINE LTEpops_H_and_Hmin()
   ! -------------------------------------------------------------- !
    ! Take H- in the equation
@@ -227,7 +228,7 @@ END FUNCTION get_logPartitionFunctionk
 
     if (icompute_atomRT(k) /= 1) CYCLE
 
-    sum = 1. * wocc0
+    sum = 1.0
     phik = ne(k)*phi_jl(k,1.d0,1.d0,0.d0)
     !a constant of the temperature and electron density
 
@@ -339,6 +340,9 @@ END FUNCTION get_logPartitionFunctionk
  SUBROUTINE LTEpops_H()
   ! -------------------------------------------------------------- !
    ! computed wrt the ground state of H I
+   ! Check occupation prob.
+   ! Beware cannot determine ground state of nH to be use in w
+   ! if computed before lte pops without w are known.
   ! -------------------------------------------------------------- !
   logical :: locupa_prob
   real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
@@ -347,12 +351,18 @@ END FUNCTION get_logPartitionFunctionk
    
    E00 = 1.0 * 3e-11 * EV ! Joules
    Egs = hydrogen%E(1)
+   
+!    if (ldissolve) then
+!    	wocc0 = wocc_n(k, real(1,kind=dp), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1))
+!    else
+!    	wocc0 = 1.0_dp
+!    endif
 
    !$omp parallel &
    !$omp default(none) &
    !$omp private(k, phik, dEion,i,dZ,dE,m,sum,phiHmin,wocc, n_eff, chi0, E) &
    !$omp shared(n_cells, icompute_atomRT, Elements, Hydrogen,c2,locupa_prob,wocc0, E00) &
-   !$omp shared(ne, nHmin, nHtot, T, Egs)
+   !$omp shared(ne, nHmin, nHtot, T, Egs, ldissolve)
    !$omp do
    do k=1,n_cells
 
@@ -370,10 +380,20 @@ END FUNCTION get_logPartitionFunctionk
      dZ = hydrogen%stage(i) - hydrogen%stage(1)
 
      chi0 = Elements(hydrogen%periodic_table)%ptr_elem%ionpot(1+hydrogen%stage(i))
+     
+!      if (ldissolve) then
+!      	if (i==hydrogen%Nlevel) then
+!      		wocc = 1.0_dp
+!      	else
+!      		wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1))
+!      	endif
+!      else
+!      	wocc = 1.0_dp
+!      endif
 
      ! --------- Boltzmann equation ------------------------------------------- !
 
-     hydrogen%nstar(i,k)=BoltzmannEq4dot20b(k, dE, hydrogen%g(1), hydrogen%g(i))! * wocc 
+     hydrogen%nstar(i,k)=BoltzmannEq4dot20b(k, dE, hydrogen%g(1), hydrogen%g(i))
 
      ! ---------- Saha equation ------------------------------------------------ !
 
@@ -390,9 +410,9 @@ END FUNCTION get_logPartitionFunctionk
     end do
 
 	hydrogen%nstar(1,k) = hydrogen%Abund*nHtot(k)/sum
-  
+
     !test positivity, can be 0
-    if (hydrogen%nstar(1,k) < 0) then !<= tiny_dp) then
+    if ((hydrogen%nstar(1,k) < 0)) then !<= tiny_dp) then
        write(*,*) " ************************************* "
        write(*,*) "Warning too small gs pop", hydrogen%ID, hydrogen%nstar(i,k)
        write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -431,17 +451,25 @@ END FUNCTION get_logPartitionFunctionk
   if (ldissolve) then
    if (loutput_rates) call write_occupation_file(52, hydrogen, 1)
    do k=1, n_cells
+    sum = 0.0
     if (icompute_atomRT(k)>0) then
       do i=1, hydrogen%Nlevel-1 !only for bound-levels ?
-       wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1))
+      
+      	wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1))
+      	
+      	!added to the continuum
+		sum = sum + hydrogen%nstar(i,k) * (1.0 - wocc)
+		
+		!remains b-b
 		hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
+				
       enddo
+      hydrogen%nstar(hydrogen%Nlevel,k) = hydrogen%nstar(hydrogen%Nlevel,k) + sum
     endif
    
    enddo
 
   endif !if locupa_prob
-
 
  RETURN
  END SUBROUTINE LTEpops_H

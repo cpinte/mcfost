@@ -272,25 +272,20 @@ MODULE IMPACT
   integer :: icell, i, j
   real(kind=dp) :: Cij(Hydrogen%Nlevel, Hydrogen%Nlevel)
   real(kind=dp) :: nr_ji, CI(hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)!, CI(Hydrogen%Nlevel,Hydrogen%Nlevel)
+  real(kind=dp) :: wi, wj
 
    Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
-!    CALL Johnson_CI(icell, CI(:,Hydrogen%Nlevel)) !bound-free i->Nlevel
-!    CALL Johnson_CE(icell, CE) !among all levels
-! 
-!    do j=1,Hydrogen%Nlevel
-!     do i=1,Hydrogen%Nlevel
-! !      if (ldissolve) then
-! !    		wj = wocc_n(icell, real(j,kind=dp), 1.0, 1.0)
-! !    		wi = wocc_n(icell, real(i,kind=dp), 1.0, 1.0)
-! !    	 else
-! !    	    wj = 1.0
-! !    	    wi = 1.0 
-! !      endif
-!      nr_ji = Hydrogen%nstar(i,icell)/Hydrogen%nstar(j,icell)
-!      Cij(j,i) = CE(j,i) +  CI(i,j)  * nr_ji * wj/wi
-!      Cij(i,j) = CE(j,i)/nr_ji + CI(i,j)
-!     end do
-!    end do
+	wj = 1.0
+	wi = 1.0
+! 	if (ldissolve) then
+! 		if (atom%ID=="H") then
+! 												!nn
+! 			wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1))
+! 			wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1))
+! 			
+! 		endif
+! 	endif
+	
    CALL Johnson_CI(icell, CI) !bound-free i->Nlevel
    CALL Johnson_CE(icell, CE) !among all levels
    

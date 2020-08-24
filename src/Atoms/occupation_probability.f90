@@ -3,7 +3,7 @@
 MODULE occupation_probability
 
  use atom_type, only : AtomType, element, atomic_orbital_sqradius
- use atmos_type, only : T, ne, Hydrogen, Helium, ntotal_atom
+ use atmos_type, only : T, ne, Hydrogen, Helium, ntotal_atom, nHtot
  use constant
 
  use constantes, only : tiny_dp, huge_dp
@@ -56,7 +56,8 @@ MODULE occupation_probability
    !or
    !nZ = 2 for He, 1 for H etc
    r1  = sqrt(atomic_orbital_sqradius(n, nl, nZ))
-   
+   write(*,*) hydrogen%n(1,icell), hydrogen%nstar(1,icell)
+   stop
    npop1 = hydrogen%n(1,icell)
    npop2 = 0.0_dp
    if (associated(helium)) npop2 = helium%n(1,icell)

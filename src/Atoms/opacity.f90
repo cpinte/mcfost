@@ -354,6 +354,16 @@ module Opacity
 						write(*,*) "w(i) = ", wi, " w(j) = ", wj
           				write(*,*) "ni=", atom%n(i,icell), " nj=", atom%n(j,icell), " gij=", atom%lines(kc)%gij
           				write(*,*) "nstari=", atom%n(i,icell), " njstar=", atom%n(j,icell)
+!           				stop
+!           			else if (i==6 .and. j==10) then
+! 						write(*,*) atom%ID, " nuij (10^15 Hz)", 1d-6 * CLIGHT / atom%lines(kc)%lambda0, " icell=", icell
+! 						write(*,*) " lambdaij (nm)", atom%lines(kc)%lambda0 
+! 						call warning ("background line: ni < njgij")
+! 						write(*,*) "i = ", i, " j = ", j
+! 						write(*,*) "w(i) = ", wi, " w(j) = ", wj
+!           				write(*,*) "ni=", atom%n(i,icell), " nj=", atom%n(j,icell), " gij=", atom%lines(kc)%gij
+!           				write(*,*) "nstari=", atom%n(i,icell), " njstar=", atom%n(j,icell)
+!           				stop
 					endif
     
 				case ("ATOMIC_CONTINUUM")
@@ -402,7 +412,7 @@ module Opacity
 							if (atom%n(i,icell) - atom%n(j,icell) * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) <=0 ) then
 
 								write(*,*) atom%ID, " nu+ (10^15 Hz)", 1d-6 * CLIGHT / atom%continua(kc)%lambda0, " icell=", icell
-								write(*,*) " lambda+ (nm)", atom%continua(kc)%lambda0
+								write(*,*) " lambda+ (nm)", atom%continua(kc)%lambda0, " la=",la, " lambda = ", lambda_cont(Nblue+la-1)
 								call warning ("background cont: ni < njgij")
 								write(*,*) "i = ", i, " j = ", j
 								write(*,*) "w(i) = ", wi, " w(j) = ", wj
@@ -872,7 +882,6 @@ module Opacity
 				endif 
 
 				phi0(Nblue+dk_min:Nred+dk_max) = local_profile_i(aatom%lines(kc),icell,iterate,Nred+dk_max-dk_min-Nblue+1,lambda(Nblue+dk_min:Nred+dk_max), x,y,z,x1,y1,z1,u,v,w,l)
-! 				phi0(Nblue+dk_min:Nred+dk_max) = local_profile_dk(aatom%lines(kc),icell,iterate,Nred+dk_max-dk_min-Nblue+1,lambda(Nblue+dk_min:Nred+dk_max), x,y,z,x1,y1,z1,u,v,w,l)
 
 
 				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
@@ -975,6 +984,13 @@ module Opacity
 			
 			!for each line eventually 
 			wi = 1.0; wj = 1.0
+			if (ldissolve) then
+				if (aatom%ID=="H") then
+												!nn
+					wj = wocc_n(icell, real(j,kind=dp), real(aatom%stage(j)), real(aatom%stage(j)+1)) !1 for H
+					wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1))
+				endif
+			endif 
 
 			do kr = 1, aatom%Ntr_line
 			

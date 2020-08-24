@@ -1540,7 +1540,7 @@ module atom_transfer
 		do etape=etape_start, etape_end
 
 			if (etape==1) then
-      			call compute_angular_integration_weights(method="stepan2020")
+      			call compute_angular_integration_weights(method="carlson_A8")
   				lfixed_rays = .true.
   				n_rayons = 1 + ( n_rayons_1 - 1)
   				write(*,*) " Using step 1 with ", size(xmu)*n_rayons, " rays"
