@@ -26,7 +26,7 @@ MODULE occupation_probability
   RETURN
   END FUNCTION keq9dot70
   
-  FUNCTION wocc_n(icell, n, Zr, Zp)
+  FUNCTION wocc_n(icell, n, Zr, Zp, nH1)
      !neglecting neutral at the moment: need nZ, and nL for the neutral radiator considered
      !with principal quantum number n (n_eff if hydrogenic like)
     
@@ -38,6 +38,7 @@ MODULE occupation_probability
    real, intent(in)    :: Zr ! radiator charge
    real, intent(in)    :: Zp ! perturber (ions) charge
    real(kind=dp), intent(in) :: n !principal quantum number
+   real(kind=dp), intent(in) :: nH1 !ground state neutral H
    real(kind=dp) :: wocc_n
    real(kind=dp) :: w_neutr, r1, rp1, rp2, npop1, npop2, a0fourpi_three
    real(kind=dp) :: w_ion, f, x, a , betac
@@ -56,11 +57,13 @@ MODULE occupation_probability
    !or
    !nZ = 2 for He, 1 for H etc
    r1  = sqrt(atomic_orbital_sqradius(n, nl, nZ))
-   write(*,*) hydrogen%n(1,icell), hydrogen%nstar(1,icell)
-   stop
-   npop1 = hydrogen%n(1,icell)
+
+   npop1 = nH1!hydrogen%n(1,icell)
    npop2 = 0.0_dp
-   if (associated(helium)) npop2 = helium%n(1,icell)
+   if (associated(helium)) then
+   	write(*,*) "Check occupation probab with helium"
+   	npop2 = helium%n(1,icell)
+   endif
    
    !init at 1 because wocc is the product of the two probabilities
    w_neutr = exp( -a0fourpi_three * (npop1*(r1+rp1)**3 + npop2*(r1+rp2)**3))
@@ -110,7 +113,7 @@ MODULE occupation_probability
      else
       if (m > 0) then
        m = 1.0/sqrt(m)
-       D_i = 1. - wocc_n(icell, m, Zr, Zp)/wocc_n(icell, real(i,kind=dp), Zr, Zp)
+       D_i = 1. - wocc_n(icell, m, Zr, Zp,hydrogen%n(1,icell))/wocc_n(icell, real(i,kind=dp), Zr, Zp,hydrogen%n(1,icell))
       else
        D_i = 1.0_dp
       endif
@@ -137,7 +140,7 @@ MODULE occupation_probability
       D_i_b = 1.0_dp
      else
       if (m > 2*(Zr+1)) then
-       D_i_b = 1. - wocc_n(icell, m, Zr, Zp)
+       D_i_b = 1. - wocc_n(icell, m, Zr, Zp,hydrogen%n(1,icell))
       else
        D_i_b = 0.0_dp
       endif

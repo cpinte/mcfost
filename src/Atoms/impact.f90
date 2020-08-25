@@ -280,8 +280,8 @@ MODULE IMPACT
 ! 	if (ldissolve) then
 ! 		if (atom%ID=="H") then
 ! 												!nn
-! 			wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1))
-! 			wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1))
+! 			wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1),hydrogen%n(1,icell))
+! 			wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1),hydrogen%n(1,icell))
 ! 			
 ! 		endif
 ! 	endif

@@ -315,7 +315,7 @@ END FUNCTION get_logPartitionFunctionk
    do k=1, n_cells
     if (icompute_atomRT(k)>0) then
       do i=1, hydrogen%Nlevel-1 !only for bound-levels ?
-       wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1))
+       wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1),hydrogen%nstar(1,k))
 		hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
       enddo
     endif
@@ -451,20 +451,20 @@ END FUNCTION get_logPartitionFunctionk
   if (ldissolve) then
    if (loutput_rates) call write_occupation_file(52, hydrogen, 1)
    do k=1, n_cells
-    sum = 0.0
+    !!sum = 0.0
     if (icompute_atomRT(k)>0) then
       do i=1, hydrogen%Nlevel-1 !only for bound-levels ?
       
-      	wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1))
+      	wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1), hydrogen%nstar(1,k))
       	
       	!added to the continuum
-		sum = sum + hydrogen%nstar(i,k) * (1.0 - wocc)
+		!!sum = sum + hydrogen%nstar(i,k) * (1.0 - wocc)
 		
 		!remains b-b
 		hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
 				
       enddo
-      hydrogen%nstar(hydrogen%Nlevel,k) = hydrogen%nstar(hydrogen%Nlevel,k) + sum
+      !!hydrogen%nstar(hydrogen%Nlevel,k) = hydrogen%nstar(hydrogen%Nlevel,k) + sum
     endif
    
    enddo
@@ -662,7 +662,7 @@ END FUNCTION get_logPartitionFunctionk
     	if (icompute_atomRT(k)>0) then
     		do i=1, atom%Nlevel-1
     			n_eff = (atom%stage(i)+1) * sqrt(atom%Rydberg / (atom%E(atom%Nlevel) - atom%E(i)))
-    			wocc = wocc_n(k, n_eff, real(atom%stage(i)),real(atom%stage(i)+1))
+    			wocc = wocc_n(k, n_eff, real(atom%stage(i)),real(atom%stage(i)+1), hydrogen%nstar(1,k))
     			atom%nstar(i,k) = atom%nstar(i,k) * wocc
     		enddo
     	endif
@@ -782,7 +782,7 @@ END FUNCTION get_logPartitionFunctionk
       write(unit,*) "T=",real(T(k)), "ne(/cc)=", real(ne(k))*1e-6
       write(unit,*) "   i      w(i)     nstar(i;wi=1.0) (/cc)   nstar(i) (/cc)    g(i)"
       do i=1, atom%Nlevel-1
-       wocc = wocc_n(k, real(i,kind=dp), real(atom%stage(i)),real(atom%stage(i)+1))
+       wocc = wocc_n(k, real(i,kind=dp), real(atom%stage(i)),real(atom%stage(i)+1),hydrogen%nstar(1,k))
        !if (wocc < 0.95) then
         write(unit,"(1I3, 3E14.7, 1F14.7)") i, wocc, atom%nstar(i,k)/wocc * 1d-6, atom%nstar(i,k)*1d-6, atom%g(i)
        !endif

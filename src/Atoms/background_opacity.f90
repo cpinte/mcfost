@@ -251,7 +251,7 @@ module background_opacity
 				if (ldissolve) then
 					if (atom%ID=="H") then
 						n_eff = real(i,kind=dp)
-						wi = wocc_n(icell, n_eff, real(atom%stage(i)), real(atom%stage(j)))
+						wi = wocc_n(icell, n_eff, real(atom%stage(i)), real(atom%stage(j)), hydrogen%n(1,icell))
 					else
 						n_eff = atom%stage(j)*sqrt(atom%Rydberg/(atom%E(j)-atom%E(i)))
 					endif

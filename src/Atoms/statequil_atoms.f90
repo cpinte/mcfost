@@ -1,6 +1,6 @@
 MODULE statequil_atoms
 
-	use atmos_type, only					: ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements
+	use atmos_type, only					: ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements, hydrogen, helium
 	use atom_type
 	use spectrum_type, only					: lambda, Nlambda, Nlambda_cont, lambda_cont, Jnu_cont, Itot, dk, dk_min, dk_max, &
 												eta_es, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb
@@ -235,8 +235,9 @@ MODULE statequil_atoms
 				if (ldissolve) then
 					if (atom%ID=="H") then
 												!nn
-						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1)) !1 for H
-						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1))
+
+						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1),hydrogen%n(1,icell)) !1 for H
+						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1),hydrogen%n(1,icell))
 					endif
 				endif 
 				
@@ -483,7 +484,7 @@ MODULE statequil_atoms
 				if (ldissolve) then
 					if (atom%ID=="H") then
 												!nn
-						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(j)))
+						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(j)),hydrogen%n(1,icell))
 
 					endif
 				endif
@@ -635,8 +636,8 @@ MODULE statequil_atoms
 				if (ldissolve) then
 					if (atom%ID=="H") then
 												!nn
-						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1))
-						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1))
+						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1),hydrogen%n(1,icell))
+						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1),hydrogen%n(1,icell))
 ! 					else 
 ! 					
 ! 						!neff = (atom%stage(i)+1) * sqrt(atom%Rydberg / (atom%E(find_continuum(atom,j)) - atom%E(i)) )
@@ -656,8 +657,8 @@ MODULE statequil_atoms
 				if (ldissolve) then
 					if (atom%ID=="H") then
 												!nn
-						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1))
-						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1))
+						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1),hydrogen%n(1,icell))
+						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1),hydrogen%n(1,icell))
 ! 					else 
 ! 					
 ! 						!neff = (atom%stage(i)+1) * sqrt(atom%Rydberg / (atom%E(find_continuum(atom,j)) - atom%E(i)) )
@@ -1369,8 +1370,8 @@ MODULE statequil_atoms
 				if (ldissolve) then
 					if (atom%ID=="H") then
 												!nn
-						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1)) !1 for H
-						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1))
+						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1),hydrogen%n(1,icell)) !1 for H
+						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1),hydrogen%n(1,icell))
 					endif
 				endif 
 				
@@ -1670,8 +1671,8 @@ MODULE statequil_atoms
 					if (atom%ID=="H") then
 												!nn
 						!neff = (atom%stage(i)+1) * sqrt(atom%Rydberg / (atom%E(find_continuum(atom,j)) - atom%E(i)) )
-						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1))
-						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1))
+						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1),hydrogen%n(1,icell))
+						wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1),hydrogen%n(1,icell))
 
 					endif
 				endif
@@ -1690,7 +1691,7 @@ MODULE statequil_atoms
 					if (atom%ID=="H") then
 												!nn
 						!neff = (atom%stage(i)+1) * sqrt(atom%Rydberg / (atom%E(find_continuum(atom,j)) - atom%E(i)) )
-						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1))
+						wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1),hydrogen%n(1,icell))
 					endif
 				endif
 

@@ -299,8 +299,8 @@ module Opacity
 					wj = 1.0; wi = 1.0
 					if (ldissolve) then
 						if (atom%ID=="H") then! .or. atom%ID=="He") then
-							wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1.0))
-							wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1.0))
+							wj = wocc_n(icell, real(j,kind=dp), real(atom%stage(j)), real(atom%stage(j)+1.0),hydrogen%n(1,icell))
+							wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(i)+1.0),hydrogen%n(1,icell))
 						endif
 					endif
 
@@ -377,7 +377,7 @@ module Opacity
 					wj = 1.0; wi = 1.0
 					if (ldissolve) then
 						if (atom%ID=="H") then! .or. atom%ID=="He") then
-							wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(j)))
+							wi = wocc_n(icell, real(i,kind=dp), real(atom%stage(i)), real(atom%stage(j)),hydrogen%n(1,icell))
 							icell_d = icell
 						endif
 						if (atom%active) then
@@ -460,7 +460,7 @@ module Opacity
 				if (ldissolve) then
 					if (atom%ID=="H") then
 						n_eff = real(i,kind=dp)
-						wi = wocc_n(icell, n_eff, real(atom%stage(i)), real(atom%stage(j)))
+						wi = wocc_n(icell, n_eff, real(atom%stage(i)), real(atom%stage(j)),hydrogen%n(1,icell))
 					else
 						n_eff = atom%stage(j)*sqrt(atom%Rydberg/(atom%E(j)-atom%E(i)))
 					endif
@@ -710,7 +710,7 @@ module Opacity
 				if (ldissolve) then
 					if (aatom%ID=="H") then
 												!nn
-						wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(j)))
+						wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(j)),hydrogen%n(1,icell))
 					endif
 				endif
      
@@ -876,8 +876,8 @@ module Opacity
 				if (ldissolve) then
 					if (aatom%ID=="H") then
 												!nn
-						wj = wocc_n(icell, real(j,kind=dp), real(aatom%stage(j)), real(aatom%stage(j)+1)) !1 for H
-						wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1))
+						wj = wocc_n(icell, real(j,kind=dp), real(aatom%stage(j)), real(aatom%stage(j)+1),hydrogen%n(1,icell)) !1 for H
+						wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1),hydrogen%n(1,icell))
 					endif
 				endif 
 
@@ -987,8 +987,8 @@ module Opacity
 			if (ldissolve) then
 				if (aatom%ID=="H") then
 												!nn
-					wj = wocc_n(icell, real(j,kind=dp), real(aatom%stage(j)), real(aatom%stage(j)+1)) !1 for H
-					wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1))
+					wj = wocc_n(icell, real(j,kind=dp), real(aatom%stage(j)), real(aatom%stage(j)+1),hydrogen%n(1,icell))!1 for H
+					wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1),hydrogen%n(1,icell))
 				endif
 			endif 
 
