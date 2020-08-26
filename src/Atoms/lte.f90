@@ -212,7 +212,7 @@ END FUNCTION get_logPartitionFunctionk
   real(kind=dp) :: n_eff, wocc, chi0, wocc0, E00, E
   integer :: Z, dZ, k, i, m
 
-   locupa_prob = .false.!ldissolve
+
    !Take the occupation probability only once the population of each level is known ? 
    wocc0 = 1.0 !H- not hydrogenic
    
@@ -247,16 +247,10 @@ END FUNCTION get_logPartitionFunctionk
 
      chi0 = Elements(hydrogen%periodic_table)%ptr_elem%ionpot(1+hydrogen%stage(i))
 
-!      if  (locupa_prob .and. i < hydrogen%Nlevel) then 
-!       wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),1.0) !real(hydrogen%stage(i)+1)
-!      else
-!       wocc = 1.0_dp
-!      endif
-
 
      ! --------- Boltzmann equation ------------------------------------------- !
 
-     hydrogen%nstar(i,k)=BoltzmannEq4dot20b(k, dE, 1.0_dp, hydrogen%g(i))! * wocc 
+     hydrogen%nstar(i,k)=BoltzmannEq4dot20b(k, dE, 1.0_dp, hydrogen%g(i)) 
 
      ! ---------- Saha equation ------------------------------------------------ !
 
@@ -314,7 +308,7 @@ END FUNCTION get_logPartitionFunctionk
    if (loutput_rates) call write_occupation_file(52, hydrogen, 1)
    do k=1, n_cells
     if (icompute_atomRT(k)>0) then
-      do i=1, hydrogen%Nlevel-1 !only for bound-levels ?
+      do i=hydrogen%Nlevel-1,1,-1  !only for bound-levels ?
        wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1),hydrogen%nstar(1,k))
 		hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
       enddo
@@ -340,9 +334,17 @@ END FUNCTION get_logPartitionFunctionk
  SUBROUTINE LTEpops_H()
   ! -------------------------------------------------------------- !
    ! computed wrt the ground state of H I
-   ! Check occupation prob.
+   ! ########Check occupation prob.#########
    ! Beware cannot determine ground state of nH to be use in w
    ! if computed before lte pops without w are known.
+   !
+   ! Diss Should be okay here.
+   ! In turbospectrum nHI and nHII are known by chemical equi.
+   ! before computing n(i) with occupation proba, which should be
+   ! similar to mine since n(i) (so implicitely nHI) are computed
+   ! with no dissolution and then dissolution is taken for bound
+   ! levels.
+   !
   ! -------------------------------------------------------------- !
   logical :: locupa_prob
   real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
@@ -351,12 +353,6 @@ END FUNCTION get_logPartitionFunctionk
    
    E00 = 1.0 * 3e-11 * EV ! Joules
    Egs = hydrogen%E(1)
-   
-!    if (ldissolve) then
-!    	wocc0 = wocc_n(k, real(1,kind=dp), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1))
-!    else
-!    	wocc0 = 1.0_dp
-!    endif
 
    !$omp parallel &
    !$omp default(none) &
@@ -380,16 +376,6 @@ END FUNCTION get_logPartitionFunctionk
      dZ = hydrogen%stage(i) - hydrogen%stage(1)
 
      chi0 = Elements(hydrogen%periodic_table)%ptr_elem%ionpot(1+hydrogen%stage(i))
-     
-!      if (ldissolve) then
-!      	if (i==hydrogen%Nlevel) then
-!      		wocc = 1.0_dp
-!      	else
-!      		wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1))
-!      	endif
-!      else
-!      	wocc = 1.0_dp
-!      endif
 
      ! --------- Boltzmann equation ------------------------------------------- !
 
@@ -448,12 +434,13 @@ END FUNCTION get_logPartitionFunctionk
    !$omp  end parallel
 
 
+
   if (ldissolve) then
    if (loutput_rates) call write_occupation_file(52, hydrogen, 1)
    do k=1, n_cells
     !!sum = 0.0
     if (icompute_atomRT(k)>0) then
-      do i=1, hydrogen%Nlevel-1 !only for bound-levels ?
+      do i=2, hydrogen%Nlevel-1 !only for bound-levels ?
       
       	wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1), hydrogen%nstar(1,k))
       	
@@ -464,6 +451,10 @@ END FUNCTION get_logPartitionFunctionk
 		hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
 				
       enddo
+   	  wocc = wocc_n(k, real(1,kind=dp), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1), hydrogen%nstar(1,k))
+      hydrogen%nstar(1,k) = hydrogen%nstar(1,k) * wocc
+
+
       !!hydrogen%nstar(hydrogen%Nlevel,k) = hydrogen%nstar(hydrogen%Nlevel,k) + sum
     endif
    
@@ -692,8 +683,7 @@ END FUNCTION get_logPartitionFunctionk
 
       write(*,*) "Setting LTE populations for hydrogen"
       
-      !CALL LTEpops_H_and_Hmin()
-      
+      !Use a routine that includes H minus also ? use at is it ? use chemequil to determine nH- ??      
       CALL LTEpops_H()
 
    		do k=1,n_cells
