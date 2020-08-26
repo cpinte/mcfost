@@ -74,9 +74,11 @@ module atom_transfer
  !NLTE
  	real :: cswitch_factor = 10.0
  	real(kind=dp) :: cswitch_mag = 1d10
-	logical :: cswitch_enabled = .false.
+	logical :: cswitch_enabled = .false., lNg_acceleration = .true.
+	integer :: iNg_Norder=2, iNg_ndelay=5, iNg_Nperiod=5
+	real(kind=dp), allocatable :: ng_cur(:)
 	logical, allocatable :: lcell_converged(:)
-	real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, Tex_old, local_pops
+	real(kind=dp), dimension(:,:,:), allocatable :: gpop_old, Tex_old, ngpop
 	real(kind=dp), allocatable :: Gammaij_all(:,:,:,:), Rij_all(:,:,:), Rji_all(:,:,:) !need a flag to output it
 	integer :: NmaxLevel, NmaxTr
 
@@ -667,10 +669,11 @@ module atom_transfer
   logical :: lread_jnu_ascii = .false.
   type (AtomType), pointer :: atom
   integer :: alloc_status
+  logical :: test
+  real(kind=dp) :: test1(3), test2(3,10)
   
   lhogerheijde_scheme = .false. !not ready yet 
   lmali_scheme = (.not.lhogerheijde_scheme)
-
 
  ! -------------------------------INITIALIZE AL-RT ------------------------------------ !
   !only one available yet, I need one unpolarised, faster and more accurate.
@@ -1473,6 +1476,8 @@ module atom_transfer
 		real(kind=dp), allocatable :: Jnew(:,:), Jold(:,:), Jnew_cont(:,:)
 		logical :: labs, iterate_ne = .false.
 		logical :: l_iterate
+		logical :: accelerated, ng_rest
+		integer :: iorder, i0_rest, n_iter_accel
 		integer :: nact, imax, icell_max, icell_max_2
 		integer :: icell, ilevel, imu, iphi
 		character(len=20) :: ne_start_sol = "NE_MODEL"
@@ -1490,6 +1495,16 @@ module atom_transfer
 		allocate(Tex_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tex for all cells for each line of each atom
 		allocate(Tion_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
 		diff_old = 0.0_dp
+		
+		if (lNg_acceleration) then 
+			n_iter_accel = 0
+			i0_rest = 0
+			ng_rest = .false.
+			allocate(ngpop(n_cells * NmaxLevel, iNg_Norder+2, NactiveAtoms), stat=alloc_status)
+			if (alloc_status > 0) then
+				call error("Cannot allocate Ng table !")
+			endif
+		endif
 		
 !if we iterate before !
 ! 		if (lelectron_scattering) then !first value from previous calculation
@@ -1789,11 +1804,39 @@ module atom_transfer
 				end do !icell
 				!$omp end do
 				!$omp end parallel
+				
+				!Ng acceleration
+   				accelerated = .false.
+   				if (lNg_acceleration .and. (n_iter > iNg_Ndelay)) then
+   					iorder = n_iter - iNg_Ndelay
+   					if (ng_rest) then
+   						write(*,*) " -> Acceleration relaxes", iorder-i0_rest
+   						if (iorder-i0_rest == iNg_Nperiod) ng_rest = .false.
+   					else
+   						!Still, all atoms run at the same speed
+   						i0_rest = iorder
+   						do nact=1,NactiveAtoms
+   							atom => ActiveAtoms(nact)%ptr_atom
+   							allocate(ng_cur(n_cells * atom%Nlevel))
+   							!or flatten2, reform2 ?
+   							ng_cur = flatten(atom%Nlevel, n_cells,n_new(nact,1:atom%Nlevel,:))
+   								!has to be parallel in the future
+   							accelerated = ng_accelerate(ng_cur, n_cells * atom%Nlevel, iNg_Norder, ngpop(1:atom%Nlevel*n_cells,:,nact))
+   							if (accelerated) then
+                  				n_iter_accel = n_iter_accel + 1 !True number of accelerated iter
+                  				write(*,*) "    ++> ", atom%id, "accelerated iteration #", n_iter_accel
+                  				ng_rest = .true.
+                  				n_new(nact, 1:atom%Nlevel,:) = reform(atom%Nlevel, n_cells, ng_cur)						
+   							endif
+   							deallocate(ng_cur)
+   							atom => NULL()
+   						enddo
+   					endif
+   				endif
+   		
 
      		!Global convergence Tests
-     		
      			id = 1
-
             !should be para
 				dM(:) = 0.0
 				diff = 0.0
@@ -1905,7 +1948,11 @@ module atom_transfer
 				write(*,*) " ------------------------------------------------ "
 				do nact=1,NactiveAtoms
 					write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%ptr_atom%ID
-					write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
+					if (accelerated) then
+						write(*,'("   >>> dpop="(1ES17.8E3)" (Accelerated)")') dM(nact)
+					else
+						write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
+					endif
 					write(*,'("   >>>   dT="(1ES17.8E3))') dTM(nact)
 					write(*,'("   >>> Te(icell_max2)="(1F14.4)" K", " Tion="(1F14.4)" K")') T(icell_max_2), Tion_ref(nact)
 					write(*,'("   >>> Te(icell_max1)="(1F14.4)" K", " Texi="(1F14.4)" K")') T(icell_max), Tex_ref(nact)
@@ -1976,6 +2023,7 @@ module atom_transfer
 		end do !over etapes
 
 ! -------------------------------- CLEANING ------------------------------------------ !
+		if (lNg_acceleration) deallocate(ngpop)
 
 		!Always written in nlte
 		!if (lelectron_scattering) then

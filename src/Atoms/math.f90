@@ -41,7 +41,101 @@ MODULE math
 	
 	return
 	end subroutine solve_lin
+	
+	
+	function Ng_accelerate(solution, m, n, lasts)
+		use utils, only : GaussSlv
+		integer, intent(in) :: m, n !Nlevel * n_cells; Norder
+		logical :: Ng_accelerate
+		real(kind=dp), intent(inout) :: lasts(m,*), solution(m)
+		integer :: i, j, k
+		real(kind=dp) :: A(n, n), b(n), w, dy, di
+		integer, save :: niter
+		data niter /0/
+		
+		niter = niter + 1
 
+		lasts(:,niter) = solution(:)
+		ng_accelerate = .false.
+		if (niter <= n+1) return
+
+		A(:,:) = 0.0_dp; b(:) = 0.0_dp
+		
+		do k=1, m
+			if (solution(k) > 0.0) then !handle empty cells
+				w = 1.0 / ( abs(solution(k)) )
+				dy = lasts(k,niter-1) - lasts(k,niter)
+				do i=1, n
+					di = w * (dy + lasts(k,niter-i) - lasts(k,niter-i-1))
+					b(i) = b(i) + di*dy
+					do j=1, n
+						A(i,j) = A(i,j) + di * (dy + lasts(k,niter-j) - lasts(k,niter-j-1))
+					enddo
+				enddo
+			endif
+		enddo
+		
+		!!call solve_lin(A,b,n, .true.)
+		call Gaussslv(A, b, n)
+		
+		do i=1,n
+			solution(:) = solution(:) + b(i) * ( lasts(:,niter-i) - lasts(:,niter) )
+		enddo
+		
+		ng_accelerate = .true.
+		niter = 0
+
+	return
+	end function ng_accelerate
+		
+!-> Building only a simple workaround just for the visibility in atom_transfer.f90. Not crucial.
+! 	subroutine accelerate(n_iter, Nord, Ndelay, Nperiod, N, current_sol, previous_sols, accel)
+! 		logical, intent(out) :: accel
+! 		integer, intent(in) :: n_iter, N, Nord, Ndelay, Nperiod
+! 		real(kind=dp), intent(inout) :: current_sol(N), previous_sols(N,Nord+2)
+! 		logical, save :: ng_rest
+! 		integer, save :: n_iter_accel = 0
+! 		integer :: i0_rest, iorder
+! 
+! 					
+! 		accel = .false.
+! 		if (n_iter > Ndelay) then
+! 			iorder = n_iter - Ndelay
+! 			if (ng_rest) then
+! 				if (iorder-i0_rest == Nperiod) ng_rest = .false.
+! 			else
+! 				accel = ng_accelerate(current_sol, N, Nord, previous_sols)
+!    				if (accel) then
+!                 	n_iter_accel = n_iter_accel + 1 !True number of accelerated iter
+!                 	write(*,*) "    ++> accelerated iteration #", n_iter_accel
+!                 	ng_rest = .true.
+!    				endif
+! 			endif
+! 		else
+! 			ng_rest = .false.
+! 			i0_rest = 0
+! 			return
+! 		endif 
+! 				
+! 	return
+! 	end subroutine
+
+	function test(i)
+	!test(3) return 3, test2(3) return 9.
+	!Only need to use test (use math, only : test)
+	!to have access to both
+		real(kind=dp) :: test, test2
+		integer, intent(in) :: i
+		
+		test = real(i,kind=dp)
+		return
+		
+		entry test2(i)
+			test2 = real(i,kind=dp)**2
+		return
+	
+	return
+	end function
 
   FUNCTION flatten(n1, n2, M)
   !for each i in n1 write the n2 values of n1(i,:)
