@@ -74,7 +74,7 @@ module atom_transfer
  !NLTE
  	real :: cswitch_factor = 10.0
  	real(kind=dp) :: cswitch_mag = 1d10
-	logical :: cswitch_enabled = .false., lNg_acceleration = .true.
+	logical :: cswitch_enabled = .false., lNg_acceleration = .true., lfixed_J = .true. !Option to compute J assuming LTE and keep this value for NLTE transfer. eta_es = ne * Jcont in that case
 	integer :: iNg_Norder=2, iNg_ndelay=5, iNg_Nperiod=5
 	real(kind=dp), allocatable :: ng_cur(:)
 	logical, allocatable :: lcell_converged(:)
@@ -766,7 +766,10 @@ module atom_transfer
 
 
 		!use the same rays as nlteloop
-! 		if (lelectron_scattering) call iterate_Jnu
+		if (lelectron_scattering) then
+			!otherwise, J = 0 at init for nlte loop
+			if (lfixed_J) call iterate_Jnu
+		endif
 		
 		if (allocated(ds)) deallocate(ds)
 ! 		if (lmali_scheme) then !not use full here
@@ -1477,7 +1480,7 @@ module atom_transfer
 		logical :: labs, iterate_ne = .false.
 		logical :: l_iterate
 		logical :: accelerated, ng_rest
-		integer :: iorder, i0_rest, n_iter_accel
+		integer :: iorder, i0_rest, n_iter_accel, iacc
 		integer :: nact, imax, icell_max, icell_max_2
 		integer :: icell, ilevel, imu, iphi
 		character(len=20) :: ne_start_sol = "NE_MODEL"
@@ -1485,6 +1488,8 @@ module atom_transfer
 
 		open(unit=unit_invfile, file=trim(invpop_file), status="unknown")
 		write(unit_invfile,*) n_cells
+		
+		!If lfixed_J, Jnew, Jold and Jnew_cont will not be allocated and computed
 
   
 		allocate(dM(Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
@@ -1500,18 +1505,19 @@ module atom_transfer
 			n_iter_accel = 0
 			i0_rest = 0
 			ng_rest = .false.
+			iacc = 0
 			allocate(ngpop(n_cells * NmaxLevel, iNg_Norder+2, NactiveAtoms), stat=alloc_status)
 			if (alloc_status > 0) then
 				call error("Cannot allocate Ng table !")
 			endif
 		endif
 		
-!if we iterate before !
-! 		if (lelectron_scattering) then !first value from previous calculation
-! 			do icell=1,n_cells
-! 				Jold(:,icell) = eta_es(:,icell) / thomson(icell)
-! 			enddo
-! 		endif
+		!only if lfixed J presently
+		if (lelectron_scattering .and. lfixed_J) then
+			do icell=1,n_cells
+				Jold(:,icell) = eta_es(:,icell) / thomson(icell)
+			enddo
+		endif
 		
 		deallocate(stream)
 		allocate(stream(nb_proc),stat=alloc_status)
@@ -1810,23 +1816,26 @@ module atom_transfer
    				if (lNg_acceleration .and. (n_iter > iNg_Ndelay)) then
    					iorder = n_iter - iNg_Ndelay
    					if (ng_rest) then
-   						write(*,*) " -> Acceleration relaxes", iorder-i0_rest
+						write(*,'(" -> Acceleration relaxes... "(1I2)" /"(1I2))') iorder-i0_rest, iNg_Nperiod
    						if (iorder-i0_rest == iNg_Nperiod) ng_rest = .false.
    					else
    						!Still, all atoms run at the same speed
    						i0_rest = iorder
+            	        iacc = iacc + 1
+            	        write(*,'(" -> Accumulate solutions... "(1I2)" /"(1I2))') iacc, iNg_Norder+2
    						do nact=1,NactiveAtoms
    							atom => ActiveAtoms(nact)%ptr_atom
    							allocate(ng_cur(n_cells * atom%Nlevel))
    							!or flatten2, reform2 ?
-   							ng_cur = flatten(atom%Nlevel, n_cells,n_new(nact,1:atom%Nlevel,:))
+   							ng_cur = flatten2(atom%Nlevel, n_cells,n_new(nact,1:atom%Nlevel,:))
    								!has to be parallel in the future
    							accelerated = ng_accelerate(ng_cur, n_cells * atom%Nlevel, iNg_Norder, ngpop(1:atom%Nlevel*n_cells,:,nact))
    							if (accelerated) then
                   				n_iter_accel = n_iter_accel + 1 !True number of accelerated iter
-                  				write(*,*) "    ++> ", atom%id, "accelerated iteration #", n_iter_accel
+            					write(*,'("     ++> accelerated iteration #"(1I4))') n_iter_accel
                   				ng_rest = .true.
-                  				n_new(nact, 1:atom%Nlevel,:) = reform(atom%Nlevel, n_cells, ng_cur)						
+                  				n_new(nact, 1:atom%Nlevel,:) = reform2(atom%Nlevel, n_cells, ng_cur)
+                  				iacc = 0				
    							endif
    							deallocate(ng_cur)
    							atom => NULL()
@@ -1900,24 +1909,28 @@ module atom_transfer
 						diff = max(diff, dN) ! pops
 						!diff = max(diff, dN2) ! Tex
 						
-						Jnu_cont(:,icell) = Jnew_cont(:,icell)
-						do la=1, Nlambda
-							dN1 = abs( 1.0_dp - Jold(la,icell)/Jnew(la,icell) )
-							if (dN1 > dJ) then
-								dJ = dN1
-								lambda_max = lambda(la)
-							endif
-							Jold(la,icell) = Jnew(la,icell)
-						enddo
+						!do not update if not lfixed_J
+						if (.not.lfixed_J) then
+							Jnu_cont(:,icell) = Jnew_cont(:,icell)
+							do la=1, Nlambda
+								dN1 = abs( 1.0_dp - Jold(la,icell)/Jnew(la,icell) )
+								if (dN1 > dJ) then
+									dJ = dN1
+									lambda_max = lambda(la)
+								endif
+								Jold(la,icell) = Jnew(la,icell)
+							enddo
 						!!diff = max(diff,dJ)
 						!!always allocated if nlte ? need to store mean intensity. If
 						!!electron scatt it is used in the emissivity otherwise it is just computed 
-						!!for informations.
+						!!for informations. ?? Or remove for memory if not electron scatt
 						!!if (.not.lelectron_scattering) & !try to used the continuum only obtained with iterate_jnu mean intensity 
 						!instead of updating it here with lines
-						eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
-						!call bezier2_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnew(:,icell))
 						
+						
+							eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
+						endif
+												
 						lcell_converged(icell) = (real(diff) < precision) !(real(diff) < dpops_max_error)
 						
 						!Re init for next iteration if any
@@ -2023,7 +2036,10 @@ module atom_transfer
 		end do !over etapes
 
 ! -------------------------------- CLEANING ------------------------------------------ !
-		if (lNg_acceleration) deallocate(ngpop)
+		if (lNg_acceleration) then
+			deallocate(ngpop)
+			if (allocated(ng_cur)) deallocate(ng_cur)
+		endif
 
 		!Always written in nlte
 		!if (lelectron_scattering) then
@@ -2275,6 +2291,23 @@ module atom_transfer
   integer :: la, icell, imax, icell_max, icell_max_s, imax_s
   integer :: imu, iphi
   real(kind=dp) :: lambda_max, weight
+  
+  integer :: iorder, i0_rest, n_iter_accel, iacc
+  logical :: ng_rest, accelerated
+  real(kind=dp), dimension(:), allocatable :: ng_cur
+  real(kind=dp), dimension(:,:), allocatable :: ngJ
+  
+	if (lNg_acceleration) then 
+		n_iter_accel = 0
+		i0_rest = 0
+		ng_rest = .false.
+		iacc = 0
+		allocate(ngJ(n_cells * Nlambda_cont, iNg_Norder+2), stat=alloc_status)
+		if (alloc_status > 0) then
+			call error("Cannot allocate Ng table !")
+		endif
+	endif
+   		
   
   n_rayons_start = Nrays_atom_transfer
   n_rayons_max = n_rayons_start
@@ -2607,6 +2640,36 @@ module atom_transfer
      		end do !icell
         	!$omp end do
         	!$omp end parallel
+        	
+				!Ng acceleration, testing
+	accelerated = .false.
+	if (lNg_acceleration .and. (n_iter > iNg_Ndelay)) then
+		iorder = n_iter - iNg_Ndelay
+		if (ng_rest) then
+			write(*,'(" -> Acceleration relaxes... "(1I2)" /"(1I2))') iorder-i0_rest, iNg_Nperiod
+			if (write_convergence_file ) write(20,'(" -> Acceleration relaxes "(1I2)" /"(1I2))') iorder-i0_rest, iNg_Nperiod
+			if (iorder-i0_rest == iNg_Nperiod) ng_rest = .false.
+		else
+			i0_rest = iorder
+			iacc = iacc + 1
+            write(*,'(" -> Accumulate solutions... "(1I2)" /"(1I2))') iacc, iNg_Norder+2
+			if (write_convergence_file ) write(20,'(" -> Acceleration relaxes "(1I2)" /"(1I2))') iacc, iNg_Norder+2	
+			allocate(ng_cur(n_cells * Nlambda_cont))
+   							!or flatten2, reform2 ?
+   			ng_cur = flatten2(Nlambda_cont, n_cells,Jnu_cont)
+   								!has to be parallel in the future
+   			accelerated = ng_accelerate(ng_cur, n_cells * Nlambda_cont, iNg_Norder, ngJ(:,:))
+   			if (accelerated) then
+            	n_iter_accel = n_iter_accel + 1 !True number of accelerated iter
+            	write(*,'("     ++> accelerated iteration #"(1I4))') n_iter_accel
+				if (write_convergence_file ) write(20,'("++> accelerated iteration #"(1I4))') n_iter_accel
+                ng_rest = .true.
+                Jnu_cont(:,:) = reform2(Nlambda_cont, n_cells, ng_cur)
+                iacc = 0 
+   			endif
+   			deallocate(ng_cur)
+   		endif
+   	endif
 
             !should be para
         	diff = 0d0
@@ -2623,14 +2686,21 @@ module atom_transfer
   					
   						dN = maxval(abs(Snew(:,icell) - Sold(:,icell))/Snew(:,icell))
   						dSource = max(dSource, dN)
-
+						
+! 						dN = 0.0_dp
 						dJ = 0.0_dp
 						do la=1, Nlambda_cont
-						 if (Jnu_cont(la, icell) > 0) then 
-						  dJ = max(dJ,abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
-						  imax = locate(abs(1.-Jold(:,icell)/Jnu_cont(:,icell)),abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
-						 endif 
+! 							if (Snew(la,icell) > 0) then
+! 								dN = max(dN, abs(1.0 - Sold(la,icell) / Snew(la,icell)))
+! 								imax = locate(abs(1.0 - Sold(:,icell) / Snew(:,icell)), dN)
+! 							endif
+						
+						 	if (Jnu_cont(la, icell) > 0) then 
+						  		dJ = max(dJ,abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
+						  		imax = locate(abs(1.-Jold(:,icell)/Jnu_cont(:,icell)),abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
+							 endif 
 						enddo
+						
 						!if (mod(icell,10)==0)
 ! 						write(*,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
 						if (write_convergence_file ) write(20,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
@@ -2639,9 +2709,15 @@ module atom_transfer
 						  icell_max = icell
 						endif
      					lcell_converged(icell) = (real(dJ) < precision)		
+! 						if (dN > diff) then
+! 						  diff = dN
+! 						  icell_max = icell
+! 						  dSource = diff
+! 						endif
+!      					lcell_converged(icell) = (real(dN) < precision)	
+
      			end if
-!      			Jold(:,icell) = Jnu_cont(:,icell)
-!      			Sold(:,icell) = Snew(:,icell)
+
      		end do cell_loop2 !icell
      		Sold(:,:) = Snew(:,:)
      		Jold(:,:) = Jnu_cont(:,:)
@@ -2690,7 +2766,11 @@ module atom_transfer
         write(*,*) etape, "Threshold =", precision
 	  end do !over etapes
 	if (write_convergence_file ) close(20)
-	
+
+		if (lNg_acceleration) then
+			deallocate(ngJ)
+			if (allocated(ng_cur)) deallocate(ng_cur)
+		endif	
   
   if (.not.lstop_after_jnu) then
     do icell=1, n_cells
