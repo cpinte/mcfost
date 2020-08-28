@@ -1622,15 +1622,15 @@ stop
     	co2c = 2.0 * ( bx / sqrt(bx*bx + by*by) )
     	
     else
-    	Bmodule = 0.0
-    	cog = 0.0
-    	co2c = 2.0
+
         if (lmagnetoaccr) then
            r = sqrt(x*x+y*y)           			 
            Bx = 0_dp; By = 0_dp
            Bz = 0.0_dp!B_z(icell)
            !only if z strictly positive (2D)
            if ( (.not.l3D) .and. (z < 0_dp) ) Bz = -Bz
+           
+           Bmodule = sqrt(Bx * Bx + By*By + Bz * Bz)
 
            if (r > tiny_dp) then
               norme = 1.0_dp/r
@@ -1638,7 +1638,7 @@ stop
               Bx = BR(icell) * x * norme - Bphi(icell) * y * norme
               By = BR(icell) * y * norme + Bphi(icell) * x * norme
               
-              Bmodule = sqrt(Bx * Bx + By*By + Bz * Bz)
+!               Bmodule = sqrt(Bx * Bx + By*By + Bz * Bz)
  
               cog = (Bx*u + By*v + Bz*w) / Bmodule
               co2c = 2.0 * ( Bx / sqrt(Bx*Bx + By * By) )
@@ -1650,9 +1650,9 @@ stop
 			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
 			Bx = 0.; by = 0.; bz = 0.;
 			
-			sign = 1_dp
+			sign = 1.0
 			!because theta only from 0 to pi/2 if 2D. But B is negative in z < 0
-		    if ( (.not.l3D) .and. (z < 0_dp) ) sign = -1_dp
+		    if ( (.not.l3D) .and. (z < 0_dp) ) sign = -1.0
 			
 			if (r2 > tiny_dp) then
 				norme2 = 1.0_dp / r2
@@ -1669,6 +1669,7 @@ stop
 				cog = (Bx * u + By * v + Bz * w) / Bmodule
 				co2c = 2.0 * sqrt( Bx / sqrt(bx*bx + by*by) )
 			else
+				Bmodule = 0.0_dp
 				cog = 0.0_dp
 				co2c = 0.0_dp
 			endif
