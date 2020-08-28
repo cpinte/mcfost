@@ -739,9 +739,13 @@ function v_proj(icell,x,y,z,u,v,w) !
           else
           	  v_proj = vz*w!0.0_dp
           endif
-		else if (lspherical_velocity) then
+		else if (lspherical_velocity) then !missing theta projection
 			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
 			vx = 0.; vy = 0.; vz = 0.;
+			
+			sign = 1_dp
+			!because theta only from 0 to pi/2 if 2D. But velocity is negative in z < 0
+		    if ( (.not.l3D) .and. (z < 0_dp) ) sign = -1_dp
 			
 			if (r2 > tiny_dp) then
 				norme2 = 1.0_dp / r2
@@ -751,9 +755,9 @@ function v_proj(icell,x,y,z,u,v,w) !
 			
 			if (r > tiny_dp) then
 				norme = 1.0_dp / r
-				vx = vr(icell) * x * norme - y * norme2 * vphi(icell)
-				vy = vr(icell) * y * norme + x * norme2 * vphi(icell)
-				vz = vr(icell) * z * norme
+				vx = vr(icell) * x * norme - y * norme2 * vphi(icell) + norme2 * ( z * norme * x * vtheta(icell) )
+				vy = vr(icell) * y * norme + x * norme2 * vphi(icell) + norme2 * ( z * norme * y * vtheta(icell) )
+				vz = vr(icell) * z * norme - sign * r2 / r * vtheta(icell)
 				v_proj = vx * u + vy * v + vz * w
 			else
 				v_proj = 0.0_dp
