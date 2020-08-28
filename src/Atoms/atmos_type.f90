@@ -1598,29 +1598,85 @@ stop
 
 
 !building
-   function B_project(icell, x,y,z,u,v,w, gamma, chi) result(Bmodule)
+   function B_project(icell, x,y,z,u,v,w, cog, co2c) result(Bmodule)
    ! ------------------------------------------- !
    ! Returned the module of the magnetic field at
-   ! one point of the model icell and the angles
-   ! gamma and chi.
+   ! one point of the model icell and the cosine of the angles
+   ! gamma and 2*chi.
    ! Gamma is the angle between B and the los
    ! chi is the angle between Bperp and ex
    ! Bperp is the projection of B onto a plane
    ! perpendicular to the los
    ! ------------------------------------------- !
     integer :: icell
-    real(kind=dp) :: x, y, z, u, v, w, bproj, Bmodule
-    real(kind=dp) :: r, bx, by, bz
-    real(kind=dp), intent(inout) :: gamma, chi
-       call error("Magnetic field projection not ready")
+    real(kind=dp) :: x, y, z, u, v, w, Bmodule
+    real(kind=dp) :: bx, by, bz, r, norme, r2, norme2
+    real(kind=dp), intent(inout) :: cog, co2c
+    real :: sign
+    
+    if (lvoronoi) then
+    	call error('not yet')
+    	Bmodule = sqrt(bx*bx + by*by + bz*bz)
+    	!bx = ; by = ; bz = 
+    	cog = (bx*u + by*v + bz*w) / Bmodule
+    	co2c = 2.0 * ( bx / sqrt(bx*bx + by*by) )
+    	
+    else
+    	Bmodule = 0.0
+    	cog = 0.0
+    	co2c = 2.0
+        if (lmagnetoaccr) then
+           r = sqrt(x*x+y*y)           			 
+           Bx = 0_dp; By = 0_dp
+           Bz = 0.0_dp!B_z(icell)
+           !only if z strictly positive (2D)
+           if ( (.not.l3D) .and. (z < 0_dp) ) Bz = -Bz
 
-     bproj = 0d0
-     Bmodule = 0d0!Module of B.
-     gamma = 0d0; chi = 0d0
-     if (lVoronoi) then
-     else
-      write(*,*) "*"
-     end if
+           if (r > tiny_dp) then
+              norme = 1.0_dp/r
+              
+              Bx = BR(icell) * x * norme - Bphi(icell) * y * norme
+              By = BR(icell) * y * norme + Bphi(icell) * x * norme
+              
+              Bmodule = sqrt(Bx * Bx + By*By + Bz * Bz)
+ 
+              cog = (Bx*u + By*v + Bz*w) / Bmodule
+              co2c = 2.0 * ( Bx / sqrt(Bx*Bx + By * By) )
+          else
+          	  cog = Bz*w / Bmodule
+          	  co2c = 0.0
+          endif
+		else if (lspherical_velocity) then
+			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
+			Bx = 0.; by = 0.; bz = 0.;
+			
+			sign = 1_dp
+			!because theta only from 0 to pi/2 if 2D. But B is negative in z < 0
+		    if ( (.not.l3D) .and. (z < 0_dp) ) sign = -1_dp
+			
+			if (r2 > tiny_dp) then
+				norme2 = 1.0_dp / r2
+			else
+				norme2 = 0.0_dp
+			endif
+			!missing Btheta
+			if (r > tiny_dp) then
+				norme = 1.0_dp / r
+				Bx = Br(icell) * x * norme - y * norme2 * Bphi(icell) !+ norme2 * ( z * norme * x * vtheta(icell) )
+				By = Br(icell) * y * norme + x * norme2 * Bphi(icell) !++ norme2 * ( z * norme * y * vtheta(icell) )
+				Bz = Br(icell) * z * norme !- sign * r2 / r * vtheta(icell)
+				Bmodule = sqrt(Bx*Bx + By*By + Bz*Bz)
+				cog = (Bx * u + By * v + Bz * w) / Bmodule
+				co2c = 2.0 * sqrt( Bx / sqrt(bx*bx + by*by) )
+			else
+				cog = 0.0_dp
+				co2c = 0.0_dp
+			endif
+				
+		else
+           call error("magnetic field geometry not defined")
+        endif
+    endif !lvoronoi
 
     return
    end function B_project
