@@ -1073,9 +1073,10 @@ MODULE statequil_atoms
 	end subroutine calc_rates_mali
 	
 	
-	subroutine store_radiative_rates_mali(id, icell, iray, waq, Nmaxtr, Rij, Rji)
+	subroutine store_radiative_rates_mali(id, icell, init, waq, Nmaxtr, Rij, Rji)
 	!continua radiative rates computed also with total I
-		integer, intent(in) :: icell, Nmaxtr, id, iray
+		integer, intent(in) :: icell, Nmaxtr, id
+		logical, intent(in) :: init
 		real(kind=dp), intent(in) :: waq
 		real(kind=dp), dimension(NactiveAtoms, Nmaxtr), intent(inout) :: Rij, Rji
 		integer :: kc, kr, nact, l, imu,iphi,iray_p
@@ -1084,7 +1085,7 @@ MODULE statequil_atoms
 		real(kind=dp) :: chi_ion, neff, Ieff1, Ieff2, JJ, wphi, J1, J2
 		type (AtomType), pointer :: atom
 	
-		if (iray==1) then
+		if (init) then
 			Rij(:,:) = 0.0_dp
 			Rji(:,:) = 0.0_dp
 		endif
@@ -1108,19 +1109,21 @@ MODULE statequil_atoms
 				
 					Nl = Nred-dk_min+dk_max-Nblue+1
 					a0 = Nblue+dk_min-1
-					if (iray==1) Rji(nact,kc) = atom%lines(kr)%Aji 
+					if (init) Rji(nact,kc) = atom%lines(kr)%Aji 
 
 						JJ = 0.0
 						wphi = 0.0
 						
 						do l=1,Nl
-										
 							if (l==1) then
-								wl = 0.5*(lambda(a0+l+1)-lambda(a0+l)) * clight / atom%lines(kr)%lambda0
+								wl = 0.5*(1d3*hv)
+								!wl = 0.5*(lambda(a0+l+1)-lambda(a0+l)) * clight / atom%lines(kr)%lambda0
 							elseif (l==Nl) then
-								wl = 0.5*(lambda(a0+l)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
+								!wl = 0.5*(lambda(a0+l)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
+								wl = 0.5*(1d3*hv)
 							else
-								wl = 0.5*(lambda(a0+l+1)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
+								wl = 1d3*hv
+								!wl = 0.5*(lambda(a0+l+1)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
 							endif
 					
 							JJ = JJ + wl * Itot(a0+l,1,id) * atom%lines(kr)%phi_loc(l,1,id)
@@ -1167,7 +1170,6 @@ MODULE statequil_atoms
 						JJb = JJb + wl * a1 * exp(-hc_k/T(icell)/lambda(Nblue+l-1)) * &
 							(twohc/lambda(Nblue+l-1)**3 + Itot(Nblue+l-1,1,id))
 					enddo
-
 
 					Rij(nact,kc) = Rij(nact,kc) + waq*fourpi_h * JJ
 					Rji(nact,kc) = Rji(nact,kc) + waq*fourpi_h * JJb * atom%nstar(i,icell)/atom%nstar(j,icell)			

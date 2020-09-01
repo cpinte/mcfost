@@ -74,7 +74,7 @@ module atom_transfer
  !NLTE
  	real :: cswitch_factor = 10.0
  	real(kind=dp) :: cswitch_mag = 1d10
-	logical :: cswitch_enabled = .false., lNg_acceleration = .true., lfixed_J = .true. !Option to compute J assuming LTE and keep this value for NLTE transfer. eta_es = ne * Jcont in that case
+	logical :: cswitch_enabled = .false., lNg_acceleration = .true., lfixed_J = .false. !Option to compute J assuming LTE and keep this value for NLTE transfer. eta_es = ne * Jcont in that case
 	integer :: iNg_Norder=2, iNg_ndelay=5, iNg_Nperiod=5
 	real(kind=dp), allocatable :: ng_cur(:)
 	logical, allocatable :: lcell_converged(:)
@@ -1693,7 +1693,7 @@ module atom_transfer
 								
 								if (loutput_Rates) then
 									!need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-									call store_radiative_rates_mali(id, icell, iray, weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+									call store_radiative_rates_mali(id, icell,(iray==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
 								endif	
 
 
@@ -1743,7 +1743,7 @@ module atom_transfer
 								
 								!might not work cause profile of iray==1 alwaus used
 								if (loutput_Rates) then
-									call store_radiative_rates_mali(id, icell, iray, weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+									call store_radiative_rates_mali(id, icell, (iray==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
 								endif	
 							enddo			
 								
@@ -1785,7 +1785,7 @@ module atom_transfer
 								
 									if (loutput_Rates) then
 									!need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-										call store_radiative_rates_mali(id, icell, iray, weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+										call store_radiative_rates_mali(id, icell, (iray==1 .and. imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
 									endif	
 
 
@@ -1825,16 +1825,16 @@ module atom_transfer
             	        write(*,'(" -> Accumulate solutions... "(1I2)" /"(1I2))') iacc, iNg_Norder+2
    						do nact=1,NactiveAtoms
    							atom => ActiveAtoms(nact)%ptr_atom
-   							allocate(ng_cur(n_cells * atom%Nlevel))
+   							allocate(ng_cur(n_cells * atom%Nlevel)); ng_cur(:) = 0.0_dp
    							!or flatten2, reform2 ?
-   							ng_cur = flatten2(atom%Nlevel, n_cells,n_new(nact,1:atom%Nlevel,:))
+   							ng_cur = flatten(atom%Nlevel, n_cells,n_new(nact,1:atom%Nlevel,:))
    								!has to be parallel in the future
    							accelerated = ng_accelerate(ng_cur, n_cells * atom%Nlevel, iNg_Norder, ngpop(1:atom%Nlevel*n_cells,:,nact))
    							if (accelerated) then
                   				n_iter_accel = n_iter_accel + 1 !True number of accelerated iter
             					write(*,'("     ++> accelerated iteration #"(1I4))') n_iter_accel
                   				ng_rest = .true.
-                  				n_new(nact, 1:atom%Nlevel,:) = reform2(atom%Nlevel, n_cells, ng_cur)
+                  				n_new(nact, 1:atom%Nlevel,:) = reform(atom%Nlevel, n_cells, ng_cur)
                   				iacc = 0				
    							endif
    							deallocate(ng_cur)
@@ -1909,7 +1909,7 @@ module atom_transfer
 						diff = max(diff, dN) ! pops
 						!diff = max(diff, dN2) ! Tex
 						
-						!do not update if not lfixed_J
+						!do not update if lfixed_J
 						if (.not.lfixed_J) then
 							Jnu_cont(:,icell) = Jnew_cont(:,icell)
 							do la=1, Nlambda
@@ -1957,7 +1957,7 @@ module atom_transfer
 
 				write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
 				write(*,'(" -> icell_max1 #"(1I6)," icell_max2 #"(1I6))') icell_max, icell_max_2
-				write(*,'(" -> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
+				if( .not. lfixed_J)	write(*,'(" -> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
 				write(*,*) " ------------------------------------------------ "
 				do nact=1,NactiveAtoms
 					write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%ptr_atom%ID
@@ -2297,11 +2297,13 @@ module atom_transfer
   real(kind=dp), dimension(:), allocatable :: ng_cur
   real(kind=dp), dimension(:,:), allocatable :: ngJ
   
+  	lNg_acceleration = .false.!no acceleration for continuum
+  	
 	if (lNg_acceleration) then 
 		n_iter_accel = 0
 		i0_rest = 0
 		ng_rest = .false.
-		iacc = 0
+		iacc = 0										!+1 or +2
 		allocate(ngJ(n_cells * Nlambda_cont, iNg_Norder+2), stat=alloc_status)
 		if (alloc_status > 0) then
 			call error("Cannot allocate Ng table !")
@@ -2643,7 +2645,7 @@ module atom_transfer
         	
 				!Ng acceleration, testing
 	accelerated = .false.
-	if (lNg_acceleration .and. (n_iter > iNg_Ndelay)) then
+	if ((lNg_acceleration) .and. (n_iter > iNg_Ndelay)) then
 		iorder = n_iter - iNg_Ndelay
 		if (ng_rest) then
 			write(*,'(" -> Acceleration relaxes... "(1I2)" /"(1I2))') iorder-i0_rest, iNg_Nperiod
@@ -2767,10 +2769,10 @@ module atom_transfer
 	  end do !over etapes
 	if (write_convergence_file ) close(20)
 
-		if (lNg_acceleration) then
-			deallocate(ngJ)
-			if (allocated(ng_cur)) deallocate(ng_cur)
-		endif	
+	if (lNg_acceleration) then
+		deallocate(ngJ)
+		if (allocated(ng_cur)) deallocate(ng_cur)
+	endif	
   
   if (.not.lstop_after_jnu) then
     do icell=1, n_cells
