@@ -46,9 +46,6 @@ MODULE io_opacity
   real(kind=dp) :: l_contrib, l_void_before, lmin, lmax
   logical :: lcellule_non_vide, lintersect_stars
   
-  
-
-
   x1=xi;y1=yi;z1=zi
 
   next_cell = icell_in

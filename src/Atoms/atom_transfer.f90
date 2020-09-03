@@ -15,8 +15,8 @@ module atom_transfer
 	use Planck, only			: bpnu
 	use Profiles, only			: Iprofile, Iprofile_thomson, Iprofile_cmf_to_obs, Zprofile
 	use spectrum_type, only     : dk, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, &
-									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, Ksi, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, eta_es, alloc_flux_image, &
-									dealloc_jnu, write_image, write_flux_ascii, reallocate_rays_arrays
+									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, cntrb_i, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, eta_es, alloc_flux_image, &
+									dealloc_jnu, write_image, write_flux_ascii, reallocate_rays_arrays, write_contribution_function
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
 									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char
@@ -69,8 +69,6 @@ module atom_transfer
 	procedure(integ_ray_line_i), pointer :: integ_ray_line => NULL()
  !Temporary variable for Zeeman calculations
 	real(kind=dp), dimension(:,:), allocatable :: QUV
- !Temporary variables for Contribution functions
-	real(kind=dp), allocatable :: S_contrib(:,:,:), S_contrib2(:,:), mean_formation_depth
  !NLTE
  	real :: cswitch_factor = 10.0
  	real(kind=dp) :: cswitch_mag = 1d10
@@ -170,6 +168,7 @@ module atom_transfer
 				!total bound-bound + bound-free + background opacities lte + nlte
 				chi(:,id) = chi0_bb(:,icell)
 				eta(:,id) = eta0_bb(:,icell)
+				!rename it chi0_bckgr etc
 
 				!includes a loop over all bound-bound, passive and active
 				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
@@ -367,8 +366,6 @@ module atom_transfer
      I0 = 0d0
      I0c = 0d0
      if (lmagnetized.and. PRT_SOLUTION == "FULL_STOKES") QUV(:,:) = 0d0 !move outside
-     if (lcontrib_function) S_contrib2(:,:) = 0d0
-
      ! Vecteurs definissant les sous-pixels
      sdx(:) = dx(:) / real(subpixels,kind=dp)
      sdy(:) = dy(:) / real(subpixels,kind=dp)
@@ -400,8 +397,6 @@ module atom_transfer
              	QUV(1,:) = QUV(1,:) + Stokes_Q(:,id)
              	QUV(2,:) = QUV(2,:) + Stokes_U(:,id)
              end if
-             !loop over all directions for each cell-frequency
-             if (lcontrib_function) S_contrib2(:,:) = S_contrib2(:,:) + S_contrib(:,:,id)
 
            !else !Outside the grid, no radiation flux
            endif
@@ -459,7 +454,6 @@ module atom_transfer
      F_QUV(3,:,ipix,jpix,ibin,iaz) = QUV(3,:) * normF !V
     end if
   end if
-  if (lcontrib_function) Ksi(:,:,ibin,iaz) = Ksi(:,:,ibin,iaz) + S_contrib2(:,:)
 
 
   return
@@ -969,16 +963,6 @@ module atom_transfer
 	call alloc_flux_image()
 	write(*,*) "Computing emission flux map..."
 
-! 	if (lcontrib_function) then
-! 		write(*,*) "   >>> including contribution function Ksi..."
-! 		allocate(S_contrib(Nlambda,n_cells,nb_proc))
-! 		allocate(S_contrib2(Nlambda,n_cells))
-! 		!allocate(mean_formation_depth(npix_x, npix_y))
-! 		S_contrib(:,:,:) = 0d0; S_contrib2(:,:) = 0d0
-! 		INTEG_RAY_LINE => NULL()
-! 		INTEG_RAY_LINE => INTEG_RAY_LINE_I_CNTRB
-! 	end if
-
   !Actual flux calculation
 	call init_directions_ray_tracing()
 	do ibin=1,RT_n_incl
@@ -993,14 +977,11 @@ module atom_transfer
 
 	if (3*size(Flux)/(1024.**3) <= 6.) call write_image
 	deallocate(Flux, Fluxc) !free here to release a bit of memory
-! 	if (lcontrib_function) then
-! 		call WRITE_CNTRB_FUNC_pix()
-! 		deallocate(S_contrib, S_contrib2, Ksi)
-! 	end if
-
-! 	write(*,*) " Computing limb darkening.."
-! 	call compute_Imu()
-! 	write(*,*) "..done"
+	if (lcontrib_function) then
+		call compute_contribution_functions_uvw(0.0_dp,0.0_dp,1.0_dp)
+		call write_contribution_function()
+		deallocate(cntrb_i)
+	end if
     
     !ascii files can be large !
     if (loutput_rates) then
@@ -1037,427 +1018,6 @@ module atom_transfer
 	end subroutine atom_line_transfer
 ! ------------------------------------------------------------------------------------ !
 
-	!building
-	subroutine NLTEloop(n_rayons_max,n_rayons_1,n_rayons_2,maxIter,verbose)
-	! -------------------------------------------------------- !
-	! Descriptor here
-	! -------------------------------------------------------- !
-#include "sprng_f.h"
-		integer, intent(in) :: n_rayons_1, n_rayons_2, maxIter, n_rayons_max
-		logical, intent(in) :: verbose
-! 		integer, parameter :: max_sub_iter = 10000, max_global_iter = 1000
-! 		integer :: etape, etape_start, etape_end, iray, n_rayons, iray_p
-! 		integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, la, kr
-! 		integer, dimension(nb_proc) :: max_n_iter_loc
-! 		logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
-! 		real :: rand, rand2, rand3, precision, precision_sub
-! 		real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, smu
-! 		real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
-! 		real(kind=dp) :: dT, dN2, dN3, diff_old
-! 		real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
-! 		real(kind=dp), allocatable :: Jnew(:,:), Jold(:,:), Jnew_cont(:,:)
-! 		logical :: labs, iterate_ne = .false.
-! 		logical :: l_iterate
-! 		integer :: nact, imax, icell_max, icell_max_2
-! 		integer :: icell, ilevel, imu, iphi
-! 		character(len=20) :: ne_start_sol = "NE_MODEL"
-! 		type (AtomType), pointer :: atom
-! 
-! 		open(unit=unit_invfile, file=trim(invpop_file), status="unknown")
-! 		write(unit_invfile,*) n_cells
-! 		open(unit=unit_profiles, file=trim(profiles_file), status="unknown")	
-!   
-! 		allocate(n_new(NactiveAtoms,Nmaxlevel,n_cells),stat=alloc_status)
-! 		if (alloc_status > 0) call error("Allocation error n_new")
-! 		n_new(:,:,:) = 0.0_dp
-! 		allocate(dM(Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
-! 		allocate(dTM(Nactiveatoms)); dM=0d0 !keep tracks of Tex for all cells for each atom
-! 		allocate(Jnew(Nlambda, n_cells)); Jnew = 0.0
-! 		allocate(Jold(Nlambda, n_cells)); Jold = 0.0
-! 		allocate(Jnew_cont(Nlambda_cont, n_cells)); Jnew_cont = 0.0
-! 		allocate(Tex_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tex for all cells for each line of each atom
-! 		allocate(Tion_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
-! 		diff_old = 0.0_dp
-! 
-! 
-! 		labs = .true. !to have ds at cell icell = eval_operator
-! 		id = 1
-! 		etape_start = 2
-! 		if (laccurate_integ) then
-! 			write(*,*) " Using step 3 with ", n_rayons_max, " nrays max"
-! 			etape_end = 3
-! 		else
-! 			etape_end = 2
-! 		endif
-!  
-! 
-! 		iterate_ne = (n_iterate_ne>0)
-! 		if (iterate_ne) then
-! 			write(*,*) " before iterate ne I need te recompute gij for continua !!"
-! 		endif
-! 
-! 		do etape=etape_start, etape_end
-! 
-! 			if (etape==1) then
-! 				write(*,*) " step 1 not implemented"
-! 				stop
-! 			else if (etape==2) then 
-! 				lfixed_rays = .true.
-! 				n_rayons = n_rayons_1
-! 				iray_start = 1
-! 				lprevious_converged = .false.
-! 				lcell_converged(:) = .false.
-! 				precision = dpops_max_error
-! 				precision_sub = dpops_sub_max_error
-! 			else if (etape==3) then
-! 		  		lfixed_rays = .false.
-!   				n_rayons = n_rayons_2
-!   				lprevious_converged = .false.
-! 				lcell_converged(:) = .false.
-! 				precision = 1e-1 !dpops_max_error
-! 				precision_sub = dpops_sub_max_error
-! 			else
-! 				call ERROR("etape unkown")
-! 			end if
-!   	  
-! 			write(*,*)  "-> Using ", n_rayons, ' rays for step', etape
-! 
-! 			lnotfixed_rays = .not.lfixed_rays
-! 			lconverged = .false.
-! 			n_iter = 0
-! 
-! 			do while (.not.lconverged)
-! 
-! 				n_iter = n_iter + 1
-! 				!if (n_iter > max_global_iter) exit !change step !maxIter
-! 				write(*,*) " -> Iteration #", n_iter, " Step #", etape
-! 
-! 				if (lfixed_rays) then
-! 					stream = 0.0
-! 					do i=1,nb_proc
-! 						stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-! 					end do		
-! 				end if
-! 
-! 				max_n_iter_loc = 0
-! 
-!         	
-! 				!$omp parallel &
-! 				!$omp default(none) &
-! 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi, smu)&
-! 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate) &
-! 				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,n_iter,precision_sub,threeKminusJ,stest_tot) &
-! 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged,loutput_rates,xyz_pos,uvw_pos, gtype, seed, nb_proc) &
-! 				!$omp shared(n_cells, gpop_old,lforce_lte, integ_ray_line, Itot, Icont, Jnu_cont, eta_es) &
-! 				!$omp shared(Jnew, Jnew_cont, Jold, lelectron_scattering,chi0_bb, etA0_bb, activeatoms,n_new) &
-! 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
-! 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms)
-! 				!$omp do schedule(static,1)
-! 				do icell=1, n_cells
-! 					!$ id = omp_get_thread_num() + 1
-! ! 					if (lfixed_rays) then
-!    						l_iterate = (icompute_atomRT(icell)>0)
-! ! 					else
-! !    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-! ! 					endif				
-!    					if (l_iterate) then
-!    						Jnew(:,icell) = 0.0
-!    						Jnew_cont(:,icell) = 0.0
-!    						threeKminusJ(:,icell) = 0.0
-! 					!!if (atmos%icompute_atomRT(icell)>0) then
-! 
-! 						call fill_Collision_matrix(id, icell) !computes = C(i,j) before computing rates
-! 						call initGamma(id) !init Gamma to C and init radiative rates
-!                     
-! 						do iray=iray_start, iray_start-1+n_rayons
-! 						
-! 							if ( (etape==2).or.(etape==3) ) then
-!                    	    ! Position aleatoire dans la cellule
-! 
-! 								rand  = sprng(stream(id))
-! 								rand2 = sprng(stream(id))
-! 								rand3 = sprng(stream(id))
-!  
-! 								call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
-! 
-!                         ! Direction de propagation aleatoire
-! 								rand = sprng(stream(id))
-! 								W0 = 2.0_dp * rand - 1.0_dp !nz
-! 								W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
-! 								SRW02 = sqrt(W02)
-! 								rand = sprng(stream(id))
-! 								ARGMT = PI * (2.0_dp * rand - 1.0_dp)
-! 								U0 = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
-! 								V0 = SRW02 * sin(ARGMT) !ny = sin(theta)*sin(phi)
-! 								
-! 								call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
-! 								Jnew(:,icell) = Jnew(:,icell) + Itot(:,iray,id)
-! 								Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,id)
-! 								threeKminusJ(:,icell) = threeKminusJ(:,icell) + (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,iray,id)
-! 
-! 							elseif (etape==1) then	
-! 								stop
-! 							end if !etape
-! 
-! 						enddo !iray
-! 						Jnew(:,icell) = Jnew(:,icell) / n_rayons
-! 						Jnew_cont(:,icell) = Jnew_cont(:,icell) / n_rayons
-! 						threeKminusJ(:,icell) = threeKminusJ(:,icell) / n_rayons
-! 						!!if (lelectron_scattering) then
-! 						!!always allocated if nlte ?, need to change that but remember we need
-! 						!! in the nlte loop, to write the full mean intensity to fits file.
-! 							eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
-! 						!!endif
-! 		
-! 						if (loutput_Rates) &
-! 							call store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell), Jnew(:,icell),.false.)
-! 
-! 						if (lforce_lte) then
-! 							call update_populations(id, icell, diff, .false., n_iter)
-! 							lconverged_loc = .true.
-! 						else
-! 							lconverged_loc = .false.
-! 							do iray=1,n_rayons !-> including n_new
-! 								call calc_rates(id, icell, iray, n_rayons)
-! 							enddo
-! 							call calc_rate_matrix(id, icell, lforce_lte)
-! 						endif
-! 
-! 						n_iter_loc = 0
-!      				!!only iterate on cells which are not converged
-! 						do while (.not.lconverged_loc)
-! 							n_iter_loc = n_iter_loc + 1
-! 
-! 							if ((mod(n_iter_loc,max(1,1000))==0)) then
-! 								write(*,*) " -- Global iteration #", n_iter, " step #", etape, "eps: ", dpops_sub_max_error
-! 							endif!(mod(n_iter_loc,max(1,max_sub_iter/10))==0)
-! 							call update_Populations(id, icell, diff,(mod(n_iter_loc,max(1,1000))==0),n_iter_loc)
-! 							if ((mod(n_iter_loc,max(1,1000))==0)) write(*,*) " --------------------------------------------------------------- "
-! 
-! 
-!                         !for this icell (id) and local iteration
-! 							if (diff < precision_sub) then
-! 								lconverged_loc = .true.
-!      					    !write(*,*) "converged", id, icell, "dpops(sub) = ", diff
-! 							else
-! !need to include cont nlte
-! 								call initGamma(id)
-! ! 								call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
-! 								do iray=1,n_rayons
-! 									call calc_rates(id, icell, iray, n_rayons)
-! 								enddo
-! 								
-! 								call calc_rate_matrix(id, icell, lforce_lte)
-! 
-! 							end if
-! 
-! 						end do !local sub iteration
-! 						if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
-! 						if (loutput_Rates) &
-! 							call store_rate_matrices(id,icell,Nmaxlevel,Gammaij_all(:,:,:,icell))
-! 					end if !icompute_atomRT
-! 				end do !icell
-! 				!$omp end do
-! 				!$omp end parallel
-! 
-!      		!Global convergence Tests
-! 
-!             !should be para
-! 				dM(:) = 0.0
-! 				diff = 0.0
-! 				dJ = 0.0
-! 				dT = 0.0
-! 				dTM(:) = 0.0
-! 				Tex_ref(:) = 0.0
-! 				Tion_ref(:) = 0.0
-!    				icell_max = 1
-!    				icell_max_2 = 1
-! 				cell_loop2 : do icell=1,n_cells
-! ! 					if (lfixed_rays) then
-!    						l_iterate = (icompute_atomRT(icell)>0)
-! ! 					else
-! !    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
-! ! 					endif				
-!    					if (l_iterate) then
-! 						dN = 0.0 !for all levels of all atoms of this cell
-! 						dN2 = 0.0
-! 						do nact=1,NactiveAtoms
-! 							atom => ActiveAtoms(nact)%ptr_atom
-! 
-! 							do ilevel=1,atom%Nlevel
-! 								!if (atom%n(ilevel,icell) > 0) then
-! 								dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
-! ! 								dN1 = abs(1d0-gpop_old(nact,ilevel,icell)/atom%n(ilevel,icell))
-!      				    		!dN1 = abs(atom%n(ilevel,icell)-gpop_old(nact,ilevel,icell))/(gpop_old(nact,ilevel,icell)+tiny_dp)
-! 								dN = max(dN1, dN) !compare with all atoms and levels
-!      				    						  !for this cell
-! 								dM(nact) = max(dM(nact), dN1) !compare for one atom
-!      				    		 							   !for all cells
-! 								!endif
-! 								!!write(*,*) "pops", dN1,gpop_old(nact,ilevel,icell),atom%n(ilevel,icell)
-! 							end do !over ilevel
-! 							do kr=1, atom%Nline
-! 							
-! 								dN3 = abs(1.0 - Tex_old(nact, kr, icell) / ( atom%lines(kr)%Tex(icell) + tiny_dp ) )
-! 								!dN3 = abs(atom%lines(kr)%Tex(icell) - Tex_old(nact, kr, icell)) / ( Tex_old(nact, kr, icell) + tiny_dp ) 
-! 								dN2 = max(dN3, dN2)
-! 								!!write(*,*) "line", icell, T(icell), Tex_old(nact, kr, icell),atom%lines(kr)%Tex(icell), dN2, dN3
-! 								!dTM(nact) = max(dTM(nact), dN3)
-! 								if (dN3 >= dTM(nact)) then
-! 									dTM(nact) = dN3
-! 									Tex_ref(nact) = atom%lines(kr)%Tex(icell)
-! 									icell_max = icell
-! 								endif
-! 							enddo
-! 							
-! 							do kr=1, atom%Ncont
-! 								dN3 = abs(1.0 - Tex_old(nact, kr+atom%Nline, icell) / ( atom%continua(kr)%Tex(icell) + tiny_dp ))
-! 								!dN3 = abs(atom%continua(kr)%Tex(icell) - Tex_old(nact, kr+atom%Nline, icell)) / ( Tex_old(nact, kr+atom%Nline, icell) + tiny_dp )
-! 								dN2 = max(dN3, dN2)
-! 								!!write(*,*) "cont", kr, " icell=",icell, " T=", T(icell), " Told=",Tex_old(nact, kr+atom%Nline, icell)," Tex=",atom%continua(kr)%Tex(icell), dN2, dN3
-! 								!dTM(nact) = max(dTM(nact), dN3)
-! 								if (dN3 >= dTM(nact)) then
-! 									dTM(nact) = dN3
-! 									Tion_ref(nact) = atom%continua(kr)%Tex(icell)
-! 									icell_max_2 = icell
-! 								endif
-! 							enddo
-! 							atom => NULL()
-! 						end do !over atoms
-! 						!compare for all atoms and all cells
-! 						diff = max(diff, dN) ! pops
-! ! 						diff = max(diff, dN2) ! Tex
-! 						
-! 						dN1 = abs(1d0 - maxval(Jold(:,icell)/(tiny_dp + Jnew(:,icell))))
-! 						!dN1 = maxval(abs(Jold(:,icell)-Jnew(:,icell))/(1d-30 + Jold(:,icell)))
-! 						if (dN1 > dJ) then
-! 							dJ = dN1
-! 							imax = locate(abs(1d0 - Jold(:,icell)/(tiny_dp + Jnew(:,icell))), dJ)
-! 							!imax = locate(abs(Jold(:,icell)-Jnew(:,icell))/(tiny_dp + Jold(:,icell)),dJ)
-! 							lambda_max = lambda(imax)
-! 						endif
-! 						!replace old value by new
-! 						Jold(:,icell) = Jnew(:,icell)
-! 						Jnu_cont(:,icell) = Jnew_cont(:,icell)
-! 
-! 						lcell_converged(icell) = (real(diff) < precision) !(real(diff) < dpops_max_error)
-! 						
-! 						!Re init for next iteration if any
-! 						do nact=1, NactiveAtoms
-! 							atom => ActiveAtoms(nact)%ptr_atom
-! 							!!gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
-! 							atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
-! 							do kr=1,atom%Nline
-! 								Tex_old(nact, kr, icell) = atom%lines(kr)%Tex(icell)
-! 							enddo
-! 							do kr=1, atom%Ncont
-! 								Tex_old(nact, kr+Atom%Nline,icell) = atom%continua(kr)%Tex(icell)
-! 							enddo
-! 							atom => NULL()
-!              				!!Recompute Profiles if needed here
-! 						end do
-! 						call NLTE_bound_free(icell)
-! 						!because of opac nlte changed
-! 						call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
-! 						!end init
-! 						
-! 					end if
-! 				end do cell_loop2 !icell
-! 
-! 				write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
-! 				write(*,'(" -> icell_max1 #"(1I6)," icell_max2 #"(1I6))') icell_max, icell_max_2
-! 				write(*,'(" -> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
-! 				write(*,*) " ------------------------------------------------ "
-! 				do nact=1,NactiveAtoms
-! 					write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%ptr_atom%ID
-! 					write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
-! 					write(*,'("   >>>   dT="(1ES17.8E3))') dTM(nact)
-! 					write(*,'("   >>> Te(icell_max2)="(1F14.4)" K", " Tion="(1F14.4)" K")') T(icell_max_2), Tion_ref(nact)
-! 					write(*,'("   >>> Te(icell_max1)="(1F14.4)" K", " Texi="(1F14.4)" K")') T(icell_max), Tex_ref(nact)
-! 					!if (Tion_ref(nact) /= 0.0)
-! 					!if (Tex_ref(nact) /= 0.0)
-! 					write(*,*) " ------------------------------------------------ "
-! 				enddo
-! 				write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
-! 	        	write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") size(pack(lcell_converged,mask=lcell_converged.eqv..false.)), 100.*real(size(pack(lcell_converged,mask=lcell_converged.eqv..false.)))/real(n_cells)
-! 				write(*,*) " *************************************************************** "
-! 				diff_old = diff
-! 				!Not used if the next is not commented out
-! ! 				lconverged = (real(diff) < dpops_max_error) !global convergence for all iterations
-! 
-! 				if (real(diff) < precision) then
-!            			if (lprevious_converged) then
-!             	  		lconverged = .true.
-!            			else
-!             	  		lprevious_converged = .true.
-!           	    	endif
-!         		else !continue to iterate even if n_rayons max is reached ?
-!            			lprevious_converged = .false.
-!            			if (.not.lfixed_rays) then
-!               			n_rayons = n_rayons * 2
-!               			write(*,*) ' -- Increasing number of rays :', n_rayons
-!              			if (n_rayons > n_rayons_max) then
-!               				if (n_iter >= maxIter) then
-!              		 			write(*,*) "Warning : not enough rays to converge !!"
-!                  				lconverged = .true.
-!               				end if
-!               			end if
-!           	   		end if
-!         		end if
-!         									
-! 			!Not optimal, but fast relatively
-! 			!must be parra
-! 				if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
-! 				write(*,*) "Recompute lte opacities"
-! 				write(*,*) " not yet"
-! 					stop
-! 	
-! 				end if
-! 
-! 
-! 			end do !while
-! 			write(*,*) "step: ", etape, "Threshold: ", precision!dpops_max_error
-! 
-! 		end do !over etapes
-! 
-! ! -------------------------------- CLEANING ------------------------------------------ !
-! 
-! 		!Always written in nlte
-! 		!if (lelectron_scattering) then
-!   		open(unit=20, file=Jnu_File_ascii, status="unknown")
-!   		write(20,*) n_cells, Nlambda_cont
-!   		do icell=1, n_cells
-!   			do la=1, Nlambda_cont
-!     			write(20,'(1F12.5,5E20.7E3)') lambda_cont(la), Jnu_cont(la,icell), 0.0, thomson(icell)/(chi_c(la,icell)+chi_c_nlte(la,icell)), 0.0, 0.0
-!    			enddo
-!   		enddo
-!   		close(20)
-!   		!endif
-!   	
-! 		if (allocated(threeKminusJ)) then
-! 	
-!   			open(unit=20, file="anis_ascii.txt", status="unknown")
-!   			write(20,*) n_cells, Nlambda
-!   			do icell=1, n_cells
-!   				do la=1, Nlambda
-!     				write(20,'(1F12.5,5E20.7E3)') lambda(la), 0.5*threeKminusJ(la,icell)/Jnew(la,icell), 0.0, 0.0, 0.0, 0.0
-!    				enddo
-!   			enddo
-!   			close(20)
-!   			
-! 		endif
-! 
-! 		deallocate(dM, dTM, Tex_ref, Tion_ref)
-! 		if (allocated(Jnew)) deallocate(Jnew)
-! 		if (allocated(Jnew_cont)) deallocate(Jnew_cont)
-! 		if (allocated(Jold)) deallocate(Jold)
-! 		if (allocated(n_new)) deallocate(n_new)
-! 	
-! 		close(unit=unit_invfile)
-! 		close(unit=unit_profiles)
-	return
-	end subroutine NLTEloop
-! ------------------------------------------------------------------------------------ !
 	subroutine NLTEloop_mali(n_rayons_max,n_rayons_1,n_rayons_2,maxIter,verbose)
 	! ----------------------------------------------------------------------- !
 	! removed all dependency on nrayons since everything is ray by ray built
@@ -2928,7 +2488,545 @@ module atom_transfer
 !  end subroutine adjustStokesMode
  ! ------------------------------------------------------------------------------------ !
 
- 
+   
+
+	subroutine compute_contribution_functions_uvw(u,v,w)
+   !not para yet
+		real(kind=dp), intent(in) :: u, v, w
+		integer :: id, icell0, icell, iray
+		real(kind=dp) :: x0,y0,z0,u0,v0,w0
+		logical :: lintersect, labs
+	
+		id = 1
+		labs = .false.
+		iray = 1
+		write(*,*) "   Computing contribution function at centre of the image..."
+
+		! Ray tracing : on se propage dans l'autre sens
+		u0 = -u ; v0 = -v ; w0 = -w
+		x0 = 10*Rmax*u; y0 = 10*Rmax*v; z0 = 10*Rmax*w
+
+
+		call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
+
+
+		if (lintersect) then
+			call integ_ray_line_i_cntrb(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs)
+		else
+			write(*,*) "Nothing in this direction, cntrb_i = 0"
+			return
+		endif   
+   
+  return
+  end subroutine compute_contribution_functions_uvw
+  
+  	subroutine integ_ray_line_i_cntrb(id,icell_in,x,y,z,u,v,w,iray,labs)
+	! ------------------------------------------------------------------------------- !
+	!
+	! ------------------------------------------------------------------------------- !
+
+		integer, intent(in) :: id, icell_in, iray
+		real(kind=dp), intent(in) :: u,v,w
+		real(kind=dp), intent(in) :: x,y,z
+		logical, intent(in) :: labs
+		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
+		real(kind=dp), dimension(Nlambda) :: tau, dtau!,etal, chil
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+
+		x1=x;y1=y;z1=z
+		x0=x;y0=y;z0=z
+		next_cell = icell_in
+		nbr_cell = 0
+
+		tau(:) = 0.0_dp
+
+
+		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+
+
+		infinie : do
+
+			icell = next_cell
+			x0=x1 ; y0=y1 ; z0=z1
+
+			if (icell <= n_cells) then
+				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+				if (icompute_atomRT(icell) < 0) return !-1 if dark
+			else
+				lcellule_non_vide=.false.
+			endif
+    
+
+			if (test_exit_grid(icell, x0, y0, z0)) return
+
+			if (lintersect_stars) then
+				if (icell == icell_star) return
+   			 endif
+
+			nbr_cell = nbr_cell + 1
+
+			previous_cell = 0 
+			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+			
+			if (lcellule_non_vide) then
+				lsubtract_avg = ((nbr_cell == 1).and.labs)
+
+				l_contrib = l_contrib * AU_to_m
+
+				!Total source fonction or set eta to 0 to have only line emissivity
+				chi(:,id) = chi0_bb(:,icell)
+				eta(:,id) = eta0_bb(:,icell)
+
+				!includes a loop over all bound-bound, passive and active
+				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,.false.) 
+							
+				dtau(:) = l_contrib * chi(:,id)
+				            
+				if (lelectron_scattering) then
+					eta(:,id) = eta(:,id) + eta_es(:,icell)
+				endif
+
+				!Use etal only ?  here I plot dI/dr integrated over directions
+				!S_contrib(:,icell,id) =  eta(:,id) * exp(-tau(:)) !or S * -dtau/dr = S * dtau/l_contrib
+				do la=1, Nlambda
+					if (tau(la) > 0) cntrb_i(la,icell) = eta(la,id) * E2(tau(la)+dtau(la))!exp(-tau(:))
+					!->Flow chart
+					!cntrb_i(la,icell) = ( eta(la,id)/chi(la,id) ) * (1.0_dp - exp(-dtau(la))) * exp(-tau(la))
+				enddo
+				
+
+				tau = tau + dtau
+
+			end if
+		end do infinie
+
+	return
+	end subroutine integ_ray_line_i_Cntrb
+
+	!building
+	subroutine NLTEloop(n_rayons_max,n_rayons_1,n_rayons_2,maxIter,verbose)
+	! -------------------------------------------------------- !
+	! Descriptor here
+	! -------------------------------------------------------- !
+#include "sprng_f.h"
+		integer, intent(in) :: n_rayons_1, n_rayons_2, maxIter, n_rayons_max
+		logical, intent(in) :: verbose
+! 		integer, parameter :: max_sub_iter = 10000, max_global_iter = 1000
+! 		integer :: etape, etape_start, etape_end, iray, n_rayons, iray_p
+! 		integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, la, kr
+! 		integer, dimension(nb_proc) :: max_n_iter_loc
+! 		logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
+! 		real :: rand, rand2, rand3, precision, precision_sub
+! 		real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, smu
+! 		real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
+! 		real(kind=dp) :: dT, dN2, dN3, diff_old
+! 		real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
+! 		real(kind=dp), allocatable :: Jnew(:,:), Jold(:,:), Jnew_cont(:,:)
+! 		logical :: labs, iterate_ne = .false.
+! 		logical :: l_iterate
+! 		integer :: nact, imax, icell_max, icell_max_2
+! 		integer :: icell, ilevel, imu, iphi
+! 		character(len=20) :: ne_start_sol = "NE_MODEL"
+! 		type (AtomType), pointer :: atom
+! 
+! 		open(unit=unit_invfile, file=trim(invpop_file), status="unknown")
+! 		write(unit_invfile,*) n_cells
+! 		open(unit=unit_profiles, file=trim(profiles_file), status="unknown")	
+!   
+! 		allocate(n_new(NactiveAtoms,Nmaxlevel,n_cells),stat=alloc_status)
+! 		if (alloc_status > 0) call error("Allocation error n_new")
+! 		n_new(:,:,:) = 0.0_dp
+! 		allocate(dM(Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
+! 		allocate(dTM(Nactiveatoms)); dM=0d0 !keep tracks of Tex for all cells for each atom
+! 		allocate(Jnew(Nlambda, n_cells)); Jnew = 0.0
+! 		allocate(Jold(Nlambda, n_cells)); Jold = 0.0
+! 		allocate(Jnew_cont(Nlambda_cont, n_cells)); Jnew_cont = 0.0
+! 		allocate(Tex_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tex for all cells for each line of each atom
+! 		allocate(Tion_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
+! 		diff_old = 0.0_dp
+! 
+! 
+! 		labs = .true. !to have ds at cell icell = eval_operator
+! 		id = 1
+! 		etape_start = 2
+! 		if (laccurate_integ) then
+! 			write(*,*) " Using step 3 with ", n_rayons_max, " nrays max"
+! 			etape_end = 3
+! 		else
+! 			etape_end = 2
+! 		endif
+!  
+! 
+! 		iterate_ne = (n_iterate_ne>0)
+! 		if (iterate_ne) then
+! 			write(*,*) " before iterate ne I need te recompute gij for continua !!"
+! 		endif
+! 
+! 		do etape=etape_start, etape_end
+! 
+! 			if (etape==1) then
+! 				write(*,*) " step 1 not implemented"
+! 				stop
+! 			else if (etape==2) then 
+! 				lfixed_rays = .true.
+! 				n_rayons = n_rayons_1
+! 				iray_start = 1
+! 				lprevious_converged = .false.
+! 				lcell_converged(:) = .false.
+! 				precision = dpops_max_error
+! 				precision_sub = dpops_sub_max_error
+! 			else if (etape==3) then
+! 		  		lfixed_rays = .false.
+!   				n_rayons = n_rayons_2
+!   				lprevious_converged = .false.
+! 				lcell_converged(:) = .false.
+! 				precision = 1e-1 !dpops_max_error
+! 				precision_sub = dpops_sub_max_error
+! 			else
+! 				call ERROR("etape unkown")
+! 			end if
+!   	  
+! 			write(*,*)  "-> Using ", n_rayons, ' rays for step', etape
+! 
+! 			lnotfixed_rays = .not.lfixed_rays
+! 			lconverged = .false.
+! 			n_iter = 0
+! 
+! 			do while (.not.lconverged)
+! 
+! 				n_iter = n_iter + 1
+! 				!if (n_iter > max_global_iter) exit !change step !maxIter
+! 				write(*,*) " -> Iteration #", n_iter, " Step #", etape
+! 
+! 				if (lfixed_rays) then
+! 					stream = 0.0
+! 					do i=1,nb_proc
+! 						stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+! 					end do		
+! 				end if
+! 
+! 				max_n_iter_loc = 0
+! 
+!         	
+! 				!$omp parallel &
+! 				!$omp default(none) &
+! 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi, smu)&
+! 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate) &
+! 				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,n_iter,precision_sub,threeKminusJ,stest_tot) &
+! 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged,loutput_rates,xyz_pos,uvw_pos, gtype, seed, nb_proc) &
+! 				!$omp shared(n_cells, gpop_old,lforce_lte, integ_ray_line, Itot, Icont, Jnu_cont, eta_es) &
+! 				!$omp shared(Jnew, Jnew_cont, Jold, lelectron_scattering,chi0_bb, etA0_bb, activeatoms,n_new) &
+! 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
+! 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms)
+! 				!$omp do schedule(static,1)
+! 				do icell=1, n_cells
+! 					!$ id = omp_get_thread_num() + 1
+! ! 					if (lfixed_rays) then
+!    						l_iterate = (icompute_atomRT(icell)>0)
+! ! 					else
+! !    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
+! ! 					endif				
+!    					if (l_iterate) then
+!    						Jnew(:,icell) = 0.0
+!    						Jnew_cont(:,icell) = 0.0
+!    						threeKminusJ(:,icell) = 0.0
+! 					!!if (atmos%icompute_atomRT(icell)>0) then
+! 
+! 						call fill_Collision_matrix(id, icell) !computes = C(i,j) before computing rates
+! 						call initGamma(id) !init Gamma to C and init radiative rates
+!                     
+! 						do iray=iray_start, iray_start-1+n_rayons
+! 						
+! 							if ( (etape==2).or.(etape==3) ) then
+!                    	    ! Position aleatoire dans la cellule
+! 
+! 								rand  = sprng(stream(id))
+! 								rand2 = sprng(stream(id))
+! 								rand3 = sprng(stream(id))
+!  
+! 								call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+! 
+!                         ! Direction de propagation aleatoire
+! 								rand = sprng(stream(id))
+! 								W0 = 2.0_dp * rand - 1.0_dp !nz
+! 								W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
+! 								SRW02 = sqrt(W02)
+! 								rand = sprng(stream(id))
+! 								ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+! 								U0 = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
+! 								V0 = SRW02 * sin(ARGMT) !ny = sin(theta)*sin(phi)
+! 								
+! 								call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
+! 								Jnew(:,icell) = Jnew(:,icell) + Itot(:,iray,id)
+! 								Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,id)
+! 								threeKminusJ(:,icell) = threeKminusJ(:,icell) + (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,iray,id)
+! 
+! 							elseif (etape==1) then	
+! 								stop
+! 							end if !etape
+! 
+! 						enddo !iray
+! 						Jnew(:,icell) = Jnew(:,icell) / n_rayons
+! 						Jnew_cont(:,icell) = Jnew_cont(:,icell) / n_rayons
+! 						threeKminusJ(:,icell) = threeKminusJ(:,icell) / n_rayons
+! 						!!if (lelectron_scattering) then
+! 						!!always allocated if nlte ?, need to change that but remember we need
+! 						!! in the nlte loop, to write the full mean intensity to fits file.
+! 							eta_es(:,icell) = Jnew(:,icell) * thomson(icell)
+! 						!!endif
+! 		
+! 						if (loutput_Rates) &
+! 							call store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell), Jnew(:,icell),.false.)
+! 
+! 						if (lforce_lte) then
+! 							call update_populations(id, icell, diff, .false., n_iter)
+! 							lconverged_loc = .true.
+! 						else
+! 							lconverged_loc = .false.
+! 							do iray=1,n_rayons !-> including n_new
+! 								call calc_rates(id, icell, iray, n_rayons)
+! 							enddo
+! 							call calc_rate_matrix(id, icell, lforce_lte)
+! 						endif
+! 
+! 						n_iter_loc = 0
+!      				!!only iterate on cells which are not converged
+! 						do while (.not.lconverged_loc)
+! 							n_iter_loc = n_iter_loc + 1
+! 
+! 							if ((mod(n_iter_loc,max(1,1000))==0)) then
+! 								write(*,*) " -- Global iteration #", n_iter, " step #", etape, "eps: ", dpops_sub_max_error
+! 							endif!(mod(n_iter_loc,max(1,max_sub_iter/10))==0)
+! 							call update_Populations(id, icell, diff,(mod(n_iter_loc,max(1,1000))==0),n_iter_loc)
+! 							if ((mod(n_iter_loc,max(1,1000))==0)) write(*,*) " --------------------------------------------------------------- "
+! 
+! 
+!                         !for this icell (id) and local iteration
+! 							if (diff < precision_sub) then
+! 								lconverged_loc = .true.
+!      					    !write(*,*) "converged", id, icell, "dpops(sub) = ", diff
+! 							else
+! !need to include cont nlte
+! 								call initGamma(id)
+! ! 								call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+! 								do iray=1,n_rayons
+! 									call calc_rates(id, icell, iray, n_rayons)
+! 								enddo
+! 								
+! 								call calc_rate_matrix(id, icell, lforce_lte)
+! 
+! 							end if
+! 
+! 						end do !local sub iteration
+! 						if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
+! 						if (loutput_Rates) &
+! 							call store_rate_matrices(id,icell,Nmaxlevel,Gammaij_all(:,:,:,icell))
+! 					end if !icompute_atomRT
+! 				end do !icell
+! 				!$omp end do
+! 				!$omp end parallel
+! 
+!      		!Global convergence Tests
+! 
+!             !should be para
+! 				dM(:) = 0.0
+! 				diff = 0.0
+! 				dJ = 0.0
+! 				dT = 0.0
+! 				dTM(:) = 0.0
+! 				Tex_ref(:) = 0.0
+! 				Tion_ref(:) = 0.0
+!    				icell_max = 1
+!    				icell_max_2 = 1
+! 				cell_loop2 : do icell=1,n_cells
+! ! 					if (lfixed_rays) then
+!    						l_iterate = (icompute_atomRT(icell)>0)
+! ! 					else
+! !    						l_iterate = (icompute_atomRT(icell)>0).and.(.not.lcell_converged(icell))
+! ! 					endif				
+!    					if (l_iterate) then
+! 						dN = 0.0 !for all levels of all atoms of this cell
+! 						dN2 = 0.0
+! 						do nact=1,NactiveAtoms
+! 							atom => ActiveAtoms(nact)%ptr_atom
+! 
+! 							do ilevel=1,atom%Nlevel
+! 								!if (atom%n(ilevel,icell) > 0) then
+! 								dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
+! ! 								dN1 = abs(1d0-gpop_old(nact,ilevel,icell)/atom%n(ilevel,icell))
+!      				    		!dN1 = abs(atom%n(ilevel,icell)-gpop_old(nact,ilevel,icell))/(gpop_old(nact,ilevel,icell)+tiny_dp)
+! 								dN = max(dN1, dN) !compare with all atoms and levels
+!      				    						  !for this cell
+! 								dM(nact) = max(dM(nact), dN1) !compare for one atom
+!      				    		 							   !for all cells
+! 								!endif
+! 								!!write(*,*) "pops", dN1,gpop_old(nact,ilevel,icell),atom%n(ilevel,icell)
+! 							end do !over ilevel
+! 							do kr=1, atom%Nline
+! 							
+! 								dN3 = abs(1.0 - Tex_old(nact, kr, icell) / ( atom%lines(kr)%Tex(icell) + tiny_dp ) )
+! 								!dN3 = abs(atom%lines(kr)%Tex(icell) - Tex_old(nact, kr, icell)) / ( Tex_old(nact, kr, icell) + tiny_dp ) 
+! 								dN2 = max(dN3, dN2)
+! 								!!write(*,*) "line", icell, T(icell), Tex_old(nact, kr, icell),atom%lines(kr)%Tex(icell), dN2, dN3
+! 								!dTM(nact) = max(dTM(nact), dN3)
+! 								if (dN3 >= dTM(nact)) then
+! 									dTM(nact) = dN3
+! 									Tex_ref(nact) = atom%lines(kr)%Tex(icell)
+! 									icell_max = icell
+! 								endif
+! 							enddo
+! 							
+! 							do kr=1, atom%Ncont
+! 								dN3 = abs(1.0 - Tex_old(nact, kr+atom%Nline, icell) / ( atom%continua(kr)%Tex(icell) + tiny_dp ))
+! 								!dN3 = abs(atom%continua(kr)%Tex(icell) - Tex_old(nact, kr+atom%Nline, icell)) / ( Tex_old(nact, kr+atom%Nline, icell) + tiny_dp )
+! 								dN2 = max(dN3, dN2)
+! 								!!write(*,*) "cont", kr, " icell=",icell, " T=", T(icell), " Told=",Tex_old(nact, kr+atom%Nline, icell)," Tex=",atom%continua(kr)%Tex(icell), dN2, dN3
+! 								!dTM(nact) = max(dTM(nact), dN3)
+! 								if (dN3 >= dTM(nact)) then
+! 									dTM(nact) = dN3
+! 									Tion_ref(nact) = atom%continua(kr)%Tex(icell)
+! 									icell_max_2 = icell
+! 								endif
+! 							enddo
+! 							atom => NULL()
+! 						end do !over atoms
+! 						!compare for all atoms and all cells
+! 						diff = max(diff, dN) ! pops
+! ! 						diff = max(diff, dN2) ! Tex
+! 						
+! 						dN1 = abs(1d0 - maxval(Jold(:,icell)/(tiny_dp + Jnew(:,icell))))
+! 						!dN1 = maxval(abs(Jold(:,icell)-Jnew(:,icell))/(1d-30 + Jold(:,icell)))
+! 						if (dN1 > dJ) then
+! 							dJ = dN1
+! 							imax = locate(abs(1d0 - Jold(:,icell)/(tiny_dp + Jnew(:,icell))), dJ)
+! 							!imax = locate(abs(Jold(:,icell)-Jnew(:,icell))/(tiny_dp + Jold(:,icell)),dJ)
+! 							lambda_max = lambda(imax)
+! 						endif
+! 						!replace old value by new
+! 						Jold(:,icell) = Jnew(:,icell)
+! 						Jnu_cont(:,icell) = Jnew_cont(:,icell)
+! 
+! 						lcell_converged(icell) = (real(diff) < precision) !(real(diff) < dpops_max_error)
+! 						
+! 						!Re init for next iteration if any
+! 						do nact=1, NactiveAtoms
+! 							atom => ActiveAtoms(nact)%ptr_atom
+! 							!!gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
+! 							atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
+! 							do kr=1,atom%Nline
+! 								Tex_old(nact, kr, icell) = atom%lines(kr)%Tex(icell)
+! 							enddo
+! 							do kr=1, atom%Ncont
+! 								Tex_old(nact, kr+Atom%Nline,icell) = atom%continua(kr)%Tex(icell)
+! 							enddo
+! 							atom => NULL()
+!              				!!Recompute Profiles if needed here
+! 						end do
+! 						call NLTE_bound_free(icell)
+! 						!because of opac nlte changed
+! 						call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+! 						!end init
+! 						
+! 					end if
+! 				end do cell_loop2 !icell
+! 
+! 				write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
+! 				write(*,'(" -> icell_max1 #"(1I6)," icell_max2 #"(1I6))') icell_max, icell_max_2
+! 				write(*,'(" -> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
+! 				write(*,*) " ------------------------------------------------ "
+! 				do nact=1,NactiveAtoms
+! 					write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%ptr_atom%ID
+! 					write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
+! 					write(*,'("   >>>   dT="(1ES17.8E3))') dTM(nact)
+! 					write(*,'("   >>> Te(icell_max2)="(1F14.4)" K", " Tion="(1F14.4)" K")') T(icell_max_2), Tion_ref(nact)
+! 					write(*,'("   >>> Te(icell_max1)="(1F14.4)" K", " Texi="(1F14.4)" K")') T(icell_max), Tex_ref(nact)
+! 					!if (Tion_ref(nact) /= 0.0)
+! 					!if (Tex_ref(nact) /= 0.0)
+! 					write(*,*) " ------------------------------------------------ "
+! 				enddo
+! 				write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
+! 	        	write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") size(pack(lcell_converged,mask=lcell_converged.eqv..false.)), 100.*real(size(pack(lcell_converged,mask=lcell_converged.eqv..false.)))/real(n_cells)
+! 				write(*,*) " *************************************************************** "
+! 				diff_old = diff
+! 				!Not used if the next is not commented out
+! ! 				lconverged = (real(diff) < dpops_max_error) !global convergence for all iterations
+! 
+! 				if (real(diff) < precision) then
+!            			if (lprevious_converged) then
+!             	  		lconverged = .true.
+!            			else
+!             	  		lprevious_converged = .true.
+!           	    	endif
+!         		else !continue to iterate even if n_rayons max is reached ?
+!            			lprevious_converged = .false.
+!            			if (.not.lfixed_rays) then
+!               			n_rayons = n_rayons * 2
+!               			write(*,*) ' -- Increasing number of rays :', n_rayons
+!              			if (n_rayons > n_rayons_max) then
+!               				if (n_iter >= maxIter) then
+!              		 			write(*,*) "Warning : not enough rays to converge !!"
+!                  				lconverged = .true.
+!               				end if
+!               			end if
+!           	   		end if
+!         		end if
+!         									
+! 			!Not optimal, but fast relatively
+! 			!must be parra
+! 				if (iterate_ne .and. (mod(n_iter,n_iterate_ne)==0))  then
+! 				write(*,*) "Recompute lte opacities"
+! 				write(*,*) " not yet"
+! 					stop
+! 	
+! 				end if
+! 
+! 
+! 			end do !while
+! 			write(*,*) "step: ", etape, "Threshold: ", precision!dpops_max_error
+! 
+! 		end do !over etapes
+! 
+! ! -------------------------------- CLEANING ------------------------------------------ !
+! 
+! 		!Always written in nlte
+! 		!if (lelectron_scattering) then
+!   		open(unit=20, file=Jnu_File_ascii, status="unknown")
+!   		write(20,*) n_cells, Nlambda_cont
+!   		do icell=1, n_cells
+!   			do la=1, Nlambda_cont
+!     			write(20,'(1F12.5,5E20.7E3)') lambda_cont(la), Jnu_cont(la,icell), 0.0, thomson(icell)/(chi_c(la,icell)+chi_c_nlte(la,icell)), 0.0, 0.0
+!    			enddo
+!   		enddo
+!   		close(20)
+!   		!endif
+!   	
+! 		if (allocated(threeKminusJ)) then
+! 	
+!   			open(unit=20, file="anis_ascii.txt", status="unknown")
+!   			write(20,*) n_cells, Nlambda
+!   			do icell=1, n_cells
+!   				do la=1, Nlambda
+!     				write(20,'(1F12.5,5E20.7E3)') lambda(la), 0.5*threeKminusJ(la,icell)/Jnew(la,icell), 0.0, 0.0, 0.0, 0.0
+!    				enddo
+!   			enddo
+!   			close(20)
+!   			
+! 		endif
+! 
+! 		deallocate(dM, dTM, Tex_ref, Tion_ref)
+! 		if (allocated(Jnew)) deallocate(Jnew)
+! 		if (allocated(Jnew_cont)) deallocate(Jnew_cont)
+! 		if (allocated(Jold)) deallocate(Jold)
+! 		if (allocated(n_new)) deallocate(n_new)
+! 	
+! 		close(unit=unit_invfile)
+! 		close(unit=unit_profiles)
+	return
+	end subroutine NLTEloop
+! ------------------------------------------------------------------------------------ !  
+  
+end module atom_transfer
 !   	subroutine integrate_i_icell(id,icell_in,x,y,z,u,v,w,iray,labs, I, Ic)
 ! 	! ------------------------------------------------------------------------------- !
 ! 	!
@@ -3048,296 +3146,139 @@ module atom_transfer
 ! 	return
 ! 	end subroutine integrate_i_icell
 !  
-  subroutine compute_Imu()
-   use utils, only: Gauss_Legendre_quadrature, span
-   use constantes, only : Au_to_Rsun
-   
-   integer, parameter :: Nmu = 500
-   real(kind=dp) :: u, v, w, uvw(3), x(3), y(3)
-   integer :: id, icell0, icell, i, j, iray, alloc_status
-   real(kind=dp), dimension(:), allocatable :: weight_mu, cos_theta, p
-   integer, parameter :: maxSubPixels = 32
-   real(kind=dp) :: x0,y0,z0,u0,v0,w0, r0, r1, rr, phi
-   real(kind=dp), dimension(:,:,:), allocatable :: Imu, Imuc
-   real(kind=dp):: normF
-   logical :: lintersect, labs
-
-   allocate(weight_mu(Nmu), cos_theta(Nmu), p(Nmu), stat=alloc_status)
-   if (alloc_status > 0) call error(" Allocation error cos_theta(Nmu)")
-!    allocate(Imu(Nlambda,Nmu,n_cells), Imuc(Nlambda_cont,Nmu,n_cells), stat=alloc_status)
+!   subroutine compute_Imu()
+!    use utils, only: Gauss_Legendre_quadrature, span
+!    use constantes, only : Au_to_Rsun
+!    
+!    integer, parameter :: Nmu = 500
+!    real(kind=dp) :: u, v, w, uvw(3), x(3), y(3)
+!    integer :: id, icell0, icell, i, j, iray, alloc_status
+!    real(kind=dp), dimension(:), allocatable :: weight_mu, cos_theta, p
+!    integer, parameter :: maxSubPixels = 32
+!    real(kind=dp) :: x0,y0,z0,u0,v0,w0, r0, r1, rr, phi
+!    real(kind=dp), dimension(:,:,:), allocatable :: Imu, Imuc
+!    real(kind=dp):: normF
+!    logical :: lintersect, labs
+! 
+!    allocate(weight_mu(Nmu), cos_theta(Nmu), p(Nmu), stat=alloc_status)
+!    if (alloc_status > 0) call error(" Allocation error cos_theta(Nmu)")
+! !    allocate(Imu(Nlambda,Nmu,n_cells), Imuc(Nlambda_cont,Nmu,n_cells), stat=alloc_status)
+! !    if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
+!    allocate(Imu(Nlambda,Nmu,1), Imuc(Nlambda_cont,Nmu,1), stat=alloc_status)
 !    if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
-   allocate(Imu(Nlambda,Nmu,1), Imuc(Nlambda_cont,Nmu,1), stat=alloc_status)
-   if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
-
-
-   Imu(:,:,:) = 0.0_dp
-   Imuc(:,:,:) = 0.0_dp
-   labs = .false.
-   id = 1
-   iray = 1
-   phi = pi
-
-   !look parallel to z
-   u = 0.0_dp
-   v = -1.745d-22!0.0_dp
-   w = 1.0_dp 
-
-   uvw = (/u,v,w/) !vector position
-   x = (/1.0_dp,0.0_dp,0.0_dp/)
-   y = -cross_product(x, uvw)
-
-   ! Ray tracing : on se propage dans l'autre sens
-   u0 = -u ; v0 = -v ; w0 = -w
-   
-
-   !r0 = 1d-5
-   !r1 = Rmax * 1.005
-   !q = span(real(r0),real(r1), Nmu)
-   
-   call gauss_legendre_quadrature(0.0_dp, 1.0_dp, Nmu, cos_theta, weight_mu)
-
-  !!!$omp parallel &
-  !!!$omp default(none) &
-  !!!$omp private(j,i,id,u0,v0,w0,lintersect,icell0) &
-  !!!$omp shared(Imu, Imuc, u,v,w,Rmax,iray,labs,Itot, Icont)
-   do j=1,Nmu
-   !!!$ id = omp_get_thread_num() + 1
-
-    rr = Rmax * sqrt(1.0 - cos_theta(j)**2)
-    !!write(*,*) "rr=", rr, " q=", q(j)
-   
-    x0 = 10.0*Rmax*u + rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
-    y0 = 10.0*Rmax*v + rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
-    z0 = 10.0*Rmax*w + rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
-    
-    !!write(*,*) "x'=",rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
-    !!write(*,*) "y'=",rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
-    !!write(*,*) "z'=",rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
-
-
-    call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
-    
-    !cos_theta(j)  = abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
-    p(j) = rr*AU_to_rsun
-    !!write(*,*) "mu=", cos_theta(j), abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
-
-	!!write(*,*) "x0=",x0, " y0=",y0, " z0=",z0
-
-	if (cos_theta(j) < 0.05) then
-		if( (icell0 > n_cells).or.(icell0 < 1) ) then
-			call warning("for this cos(theta) the ray is put in the star! check prec grid")
-			write(*,*) "cos(theta)=",cos_theta(j), " icell=", icell0, " intersect?:", lintersect
-			cycle !because of prec grid ??
-		endif
-	endif
-
-     if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
-     	call integ_ray_line(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs)
-        Imu(:,j,1) = Itot(:,iray,id)
-        Imuc(:,j,1) = Icont(:,iray,id)
-! 		call integrate_i_icell(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs, Imu(:,j,:), Imuc(:,j,:))
-
-     endif
-   enddo
-   !!!$omp end do
-   !!!$omp end parallel
-
-   open(unit=14,file="Imu.s",status="unknown")
-   open(unit=15,file="Imuc.s",status="unknown")
-   write(14,*) Nlambda, Nmu, 1
-   write(15,*) Nlambda_cont, Nmu, 1
-   write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
-   write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
-   write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-   write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-   do i=1,Nlambda
-    write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,1),  j=1,Nmu)
-   enddo
-   do i=1,Nlambda_cont
-    write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,1),  j=1,Nmu)
-   enddo
-   close(14)
-   close(15)
-
+! 
+! 
+!    Imu(:,:,:) = 0.0_dp
+!    Imuc(:,:,:) = 0.0_dp
+!    labs = .false.
+!    id = 1
+!    iray = 1
+!    phi = pi
+! 
+!    !look parallel to z
+!    u = 0.0_dp
+!    v = -1.745d-22!0.0_dp
+!    w = 1.0_dp 
+! 
+!    uvw = (/u,v,w/) !vector position
+!    x = (/1.0_dp,0.0_dp,0.0_dp/)
+!    y = -cross_product(x, uvw)
+! 
+!    ! Ray tracing : on se propage dans l'autre sens
+!    u0 = -u ; v0 = -v ; w0 = -w
+!    
+! 
+!    !r0 = 1d-5
+!    !r1 = Rmax * 1.005
+!    !q = span(real(r0),real(r1), Nmu)
+!    
+!    call gauss_legendre_quadrature(0.0_dp, 1.0_dp, Nmu, cos_theta, weight_mu)
+! 
+!   !!!$omp parallel &
+!   !!!$omp default(none) &
+!   !!!$omp private(j,i,id,u0,v0,w0,lintersect,icell0) &
+!   !!!$omp shared(Imu, Imuc, u,v,w,Rmax,iray,labs,Itot, Icont)
+!    do j=1,Nmu
+!    !!!$ id = omp_get_thread_num() + 1
+! 
+!     rr = Rmax * sqrt(1.0 - cos_theta(j)**2)
+!     !!write(*,*) "rr=", rr, " q=", q(j)
+!    
+!     x0 = 10.0*Rmax*u + rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
+!     y0 = 10.0*Rmax*v + rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
+!     z0 = 10.0*Rmax*w + rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
+!     
+!     !!write(*,*) "x'=",rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
+!     !!write(*,*) "y'=",rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
+!     !!write(*,*) "z'=",rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
+! 
+! 
+!     call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
+!     
+!     !cos_theta(j)  = abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
+!     p(j) = rr*AU_to_rsun
+!     !!write(*,*) "mu=", cos_theta(j), abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
+! 
+! 	!!write(*,*) "x0=",x0, " y0=",y0, " z0=",z0
+! 
+! 	if (cos_theta(j) < 0.05) then
+! 		if( (icell0 > n_cells).or.(icell0 < 1) ) then
+! 			call warning("for this cos(theta) the ray is put in the star! check prec grid")
+! 			write(*,*) "cos(theta)=",cos_theta(j), " icell=", icell0, " intersect?:", lintersect
+! 			cycle !because of prec grid ??
+! 		endif
+! 	endif
+! 
+!      if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+!      	call integ_ray_line(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs)
+!         Imu(:,j,1) = Itot(:,iray,id)
+!         Imuc(:,j,1) = Icont(:,iray,id)
+! ! 		call integrate_i_icell(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs, Imu(:,j,:), Imuc(:,j,:))
+! 
+!      endif
+!    enddo
+!    !!!$omp end do
+!    !!!$omp end parallel
+! 
 !    open(unit=14,file="Imu.s",status="unknown")
 !    open(unit=15,file="Imuc.s",status="unknown")
-!    write(14,*) Nlambda, Nmu, n_cells
-!    write(15,*) Nlambda_cont, Nmu, n_cells
+!    write(14,*) Nlambda, Nmu, 1
+!    write(15,*) Nlambda_cont, Nmu, 1
 !    write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
 !    write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
 !    write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
 !    write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-!    do icell=1, n_cells
-!    	do i=1,Nlambda
-!     	write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,icell),  j=1,Nmu)
-!   	enddo
+!    do i=1,Nlambda
+!     write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,1),  j=1,Nmu)
 !    enddo
-!    do icell=1, n_cells
-!    	do i=1,Nlambda_cont
-!     	write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,icell),  j=1,Nmu)
-!    	enddo
+!    do i=1,Nlambda_cont
+!     write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,1),  j=1,Nmu)
 !    enddo
 !    close(14)
 !    close(15)
-   
-   deallocate(weight_mu, cos_theta, p, Imu, Imuc)
-   
-  return
-  end subroutine compute_Imu
-  
-! 	subroutine INTEG_RAY_LINE_I_CNTRB(id,icell_in,x,y,z,u,v,w,iray,labs)
-! 	! ------------------------------------------------------------------------------- !
-! 	! Computes the contribution functions along to the Intensities using converged
-! 	! populations
-! 	! ------------------------------------------------------------------------------- !
-! 		integer, intent(in) :: id, icell_in, iray
-! 		real(kind=dp), intent(in) :: u,v,w
-! 		real(kind=dp), intent(in) :: x,y,z
-! 		logical, intent(in) :: labs !used in NLTE but why?
-! 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-! 		real(kind=dp), dimension(NLTEspec%Nwaves) :: Snu, Snu_c, chiI, LimbD, chiIc
-! 		real(kind=dp), dimension(NLTEspec%Nwaves) :: tau, tau_c, dtau_c, dtau, chil, etal
-! 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
-! 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
-! 		integer :: la
 ! 
-! 
-! 		x1=x;y1=y;z1=z
-! 		x0=x;y0=y;z0=z
-! 		next_cell = icell_in
-! 		nbr_cell = 0
-! 
-! 		tau(:) = 0.0_dp
-! 		tau_c(:) = 0.0_dp
-! 		chiI(:) = 0.0_dp
-! 		chiIc(:) = 0.0_dp
-! 
-! 
-! 		NLTEspec%I(:,iray,id) = 0d0
-! 		NLTEspec%Ic(:,iray,id) = 0d0
-! 
-! 		!S_contrib(:,icell,id) = 0.0_dp
-! 
-!   ! -------------------------------------------------------------- !
-!   !*** propagation dans la grille ***!
-!   ! -------------------------------------------------------------- !
-!   ! Will the ray intersect a star
-! 		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-! 
-!   ! Boucle infinie sur les cellules
-! 		infinie : do ! Boucle infinie
-!     ! Indice de la cellule
-! 			icell = next_cell
-! 			x0=x1 ; y0=y1 ; z0=z1
-! 
-! 
-! 			if (icell <= n_cells) then
-! 				lcellule_non_vide = (atmos%icompute_atomRT(icell) > 0)
-! 				if (atmos%icompute_atomRT(icell) < 0) return !-1 if dark
-! 			else
-! 				lcellule_non_vide=.false.
-! 			endif
-!     
-!     ! Test sortie ! "The ray has reach the end of the grid"
-! 
-! 			if (test_exit_grid(icell, x0, y0, z0)) return
-! 
-! 			if (lintersect_stars) then
-! 				if (icell == icell_star) then
-! 
-! 					call calc_stellar_surface_brightness(NLTEspec%Nwaves,NLTEspec%lambda,i_star, x0, y0, z0, u,v,w,LimbD)
-! 
-! 					NLTEspec%I(:,iray, id) =  NLTEspec%I(:,iray, id) + LimbD(:) * NLTEspec%Istar(:,i_star)*exp(-tau)
-!        				NLTEspec%Ic(:,iray, id) =  NLTEspec%Ic(:,iray, id) + LimbD(:) * NLTEspec%Istar(:,i_star)*exp(-tau_c)
-!        				return
-!       			end if
-!    			 endif
-! 
-! 			nbr_cell = nbr_cell + 1
-! 
-! 
-! 			previous_cell = 0 ! unused, just for Voronoi
-! 			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-! 
-! 
-! 
-! 			if (lcellule_non_vide) then
-! 				lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
-!      ! opacities in m^-1
-! 				l_contrib = l_contrib * AU_to_m !l_contrib in m
-! 				if ((nbr_cell == 1).and.labs) ds(iray,id) = l * AU_to_m
-! 
-! 
-! 				call initAtomOpac(id)
-! 				if (atmos%NpassiveAtoms>0) &
-! 					call metal_bb(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l)
-! 					
-! 				chil(:) = NLTEspec%AtomOpac%chi_p(:,id)
-! 				etal(:) = NLTEspec%AtomOpac%eta_p(:,id)
-! 
-! 				chiIc(:) = NLTEspec%AtomOpac%Kc(:,icell) + tiny_dp 
-! 				chiI(:)  = NLTEspec%AtomOpac%chi_p(:,id) + chiIc(:)
-! 
-! 				if (atmos%NactiveAtoms>0) then 
-! 					
-! 					call initAtomOpac_nlte(id)
-!       
-! 					call NLTE_bound_bound(id, icell, iray, x0, y0, z0, x1, y1, z1, u, v, w, l)
-! 					
-! 					chil(:) = chil(:) + NLTEspec%ATomOpac%chi(:,id)
-! 					etal(:) = etal(:) + NLTEspec%AtomOpac%eta(:,id)
-! 					
-! 					chiIc(:) = chiIc(:) + NLTEspec%AtomOpac%Kc_nlte(:,icell)
-! 
-! 					chiI(:) = chiI(:) + NLTEspec%AtomOpac%chi(:,id) +  NLTEspec%AtomOpac%Kc_nlte(:,icell)
-! 				endif !active atoms
-! 
-! 				dtau(:)   = l_contrib * chiI(:)
-! 				dtau_c(:) = l_contrib * chiIc(:)
-!             
-! 				Snu = ( NLTEspec%AtomOpac%jc(:,icell) + NLTEspec%AtomOpac%eta_p(:,id) ) / chiI(:)
-! 				Snu_c = NLTEspec%AtomOpac%jc(:,icell) / chiIc(:)
-!       
-!       			!Always include electron scattering if NLTE loop.
-!       			!But ATM, uses %Jc even for lines.
-! 				if (atmos%Nactiveatoms>0) then 
-! 					Snu = Snu + ( NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) + NLTEspec%AtomOpac%eta(:,id) + NLTEspec%AtomOpac%jc_nlte(:,icell) ) / chiI(:)
-! 					Snu_c = Snu_c + ( NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) + &
-! 					NLTEspec%AtomOpac%jc_nlte(:,icell) )/ chiIc(:)
-! 
-! 				else if ((atmos%electron_scattering).and.(atmos%NactiveAtoms==0)) then
-! 					Snu = Snu + NLTEspec%Jc(:,icell) * NLTEspec%AtomOpac%sca_c(:,icell) / chiI(:)
-! 					Snu_c = Snu_c + NLTEspec%AtomOpac%sca_c(:,icell) * NLTEspec%Jc(:,icell) / chiIc(:)
-! 				endif
-! 
-! 
-! ! 				NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
-! ! 				NLTEspec%Ic(:,iray,id) = NLTEspec%Ic(:,iray,id) + exp(-tau_c) * (1.0_dp - exp(-dtau_c)) * Snu_c
-! 
-! 				do la=1, NLTEspec%Nwaves
-! 				
-! 					!!Seems that chil * Ic << etal / chiI even for absorption lines	
-! 					!S_contrib(la,icell,id) =  chil(la) * ( NLTEspec%Ic(la,iray,id) - etal(la) / chiI(la) ) * exp(-tau(la))
-! 										
-! 					NLTEspec%I(la,iray,id) = NLTEspec%I(la,iray,id) + exp(-tau(la)) * (1.0_dp - exp(-dtau(la))) * Snu(la)
-! 					NLTEspec%Ic(la,iray,id) = NLTEspec%Ic(la,iray,id) + exp(-tau_c(la)) * (1.0_dp - exp(-dtau_c(la))) * Snu_c(la) 
-! 					
-! 					S_contrib(la,icell,id) =  (etal(la) / chiI(la)) * exp(-tau(la))
-! 					!S_contrib(la,icell,id) =  etal(la) * exp(-tau(la))			
-! 			
-! 					!->Flow chart
-! 					!S_contrib(la,icell,id) = ( etal(la)/chiI(la) ) * (1.0_dp - exp(-dtau(la))) * exp(-tau(la))
-! 
-! 				enddo
-!      
-! 
-!      
-! 				tau = tau + dtau
-! 				tau_c = tau_c + dtau_c
-! 
-! 			end if  ! lcellule_non_vide
-! 		end do infinie
-! 	return
-! 	end subroutine INTEG_RAY_LINE_I_CNTRB
-  
-end module atom_transfer
+! !    open(unit=14,file="Imu.s",status="unknown")
+! !    open(unit=15,file="Imuc.s",status="unknown")
+! !    write(14,*) Nlambda, Nmu, n_cells
+! !    write(15,*) Nlambda_cont, Nmu, n_cells
+! !    write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
+! !    write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
+! !    write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
+! !    write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
+! !    do icell=1, n_cells
+! !    	do i=1,Nlambda
+! !     	write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,icell),  j=1,Nmu)
+! !   	enddo
+! !    enddo
+! !    do icell=1, n_cells
+! !    	do i=1,Nlambda_cont
+! !     	write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,icell),  j=1,Nmu)
+! !    	enddo
+! !    enddo
+! !    close(14)
+! !    close(15)
+!    
+!    deallocate(weight_mu, cos_theta, p, Imu, Imuc)
+!    
+!   return
+!   end subroutine compute_Imu

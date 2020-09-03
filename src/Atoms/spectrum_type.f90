@@ -42,7 +42,8 @@ module spectrum_type
 	real(kind=dp), dimension(:,:,:), allocatable :: rho_p, chiQUV_p, etaQUV_p
 	real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
 	real(kind=dp), allocatable, dimension(:,:,:,:,:,:) :: F_QUV
-	real(kind=dp), allocatable, dimension(:,:,:,:) :: Ksi 
+	!in only one direction for one point ! 'centre of the model in this direction'
+	real(kind=dp), allocatable, dimension(:,:) :: cntrb_i
    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
    
 !! 	real(kind=dp), allocatable, dimension(:,:,:) :: Psi, Stot, chitot
@@ -412,8 +413,7 @@ call error("initSpectrumImage not modified!!")
    
 		if (lcontrib_function) then
 
-			mem_alloc = real(n_cells,kind=dp)/1024. * real(Nlambda,kind=dp)/1024. * &
-						real(RT_N_INCL*RT_N_AZ,kind=dp) !in MB
+			mem_alloc = real(n_cells,kind=dp)/1024. * real(Nlambda,kind=dp)/1024!in MB
 	 
 			if (mem_alloc > 1d3) then
 				write(*,*) " allocating ", mem_alloc, " GB for contribution function.."
@@ -422,16 +422,16 @@ call error("initSpectrumImage not modified!!")
 			endif 
       
 			if (mem_alloc >= 2.1d3) then !2.1 GB
-				call Warning(" To large Ksi array. Use a wavelength table instead..")
+				call Warning(" To large cntrb_i array. Use a wavelength table instead..")
 				lcontrib_function = .false.
 			else
       
-				allocate(Ksi(Nlambda,n_cells,RT_N_INCL,RT_N_AZ),stat=alloc_status)
+				allocate(cntrb_i(Nlambda,n_cells),stat=alloc_status)
 				if (alloc_status > 0) then
-					call ERROR('Cannot allocate ksi')
+					call ERROR('Cannot allocate cntrb_i')
 					lcontrib_function = .false.
 				else
-					Ksi(:,:,:,:) = 0d0
+					cntrb_i(:,:) = 0.0_dp
 				endif
 
 			end if
@@ -476,7 +476,7 @@ call error("initSpectrumImage not modified!!")
 
 
 	!Can be deallocated before to save memory
-		if (allocated(ksi)) deallocate(ksi)
+		if (allocated(cntrb_i)) deallocate(cntrb_i)
 
 
 	return
@@ -1005,7 +1005,7 @@ call error("initSpectrumImage not modified!!")
 	return
 	end function air2vacuum
   
-	subroutine WRITE_CNTRB_FUNC_PIX()
+	subroutine WRITE_CONTRIBUTION_FUNCTION()
 	! -------------------------------------------------- !
 	! Write contribution function to disk.
 	! --------------------------------------------------- !
@@ -1034,39 +1034,33 @@ call error("initSpectrumImage not modified!!")
 		bitpix=-64
 
 		if (lVoronoi) then   
-			naxis = 4
+			naxis = 2
 			naxes(1) = Nlambda
 			naxes(2) = n_cells
-			naxes(3) = RT_n_incl
-			naxes(4) = RT_n_az
-			nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+			nelements = naxes(1) * naxes(2)
 		else
 			if (l3D) then
-				naxis = 6
+				naxis = 4
 				naxes(1) = Nlambda
 				naxes(2) = n_rad
 				naxes(3) = 2*nz
 				naxes(4) = n_az
-				naxes(5) = RT_n_incl
-				naxes(6) = RT_n_az
-				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5) * naxes(6)
+				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
 			else
-				naxis = 5
+				naxis = 3
 				naxes(1) = Nlambda
 				naxes(2) = n_rad
 				naxes(3) = nz
-				naxes(4) = RT_n_incl
-				naxes(5) = RT_n_az
-				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4) * naxes(5)
+				nelements = naxes(1) * naxes(2) * naxes(3)
 			end if
 		end if
 
   !  Write the required header keywords.
 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.pixel-1",'Ksi',status)
+		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.sr-1",'cntrb I',status)
   !  Write line CF to fits
-		write(*,*) "Max,min abs(Ksi)=",maxval(dabs(Ksi)), minval(dabs(Ksi),mask=dabs(Ksi)>0)
-		call ftpprd(unit,group,fpixel,nelements,ksi,status)
+		write(*,*) "Max,min abs(cntrb)=",maxval(dabs(cntrb_i)), minval(dabs(cntrb_i),mask=dabs(cntrb_i)>0)
+		call ftpprd(unit,group,fpixel,nelements,cntrb_i,status)
 
 
   !  Close the file and free the unit number.
@@ -1079,7 +1073,7 @@ call error("initSpectrumImage not modified!!")
 		endif
 
 	return
-	end subroutine WRITE_CNTRB_FUNC_PIX
+	end subroutine WRITE_CONTRIBUTION_FUNCTION
 
 end module spectrum_type
 
