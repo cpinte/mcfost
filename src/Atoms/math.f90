@@ -62,7 +62,7 @@ MODULE math
 		A(:,:) = 0.0_dp; b(:) = 0.0_dp
 		
 		do k=1, m
-			if (solution(k) > 0.0) then !handle empty cells
+			!if (solution(k) > 0.0) then !handle empty cells
 				w = 1.0 / ( abs(solution(k)) )
 				dy = lasts(k,niter-1) - lasts(k,niter)
 				do i=1, n
@@ -72,7 +72,7 @@ MODULE math
 						A(i,j) = A(i,j) + di * (dy + lasts(k,niter-j) - lasts(k,niter-j-1))
 					enddo
 				enddo
-			endif
+			!endif
 		enddo
 		
 		!!call solve_lin(A,b,n, .true.)
