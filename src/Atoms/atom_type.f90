@@ -45,7 +45,10 @@ MODULE atom_type
    real(kind=dp) :: lambda0, lambdamin, lambdamax ! boundary of the line in absence of velocity shifts or magnetic fields
    real(kind=dp) :: isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
    real(kind=dp) :: twohnu3_c2, gij
-   real(kind=dp) :: qcore, qwing, glande_i, glande_j
+   !qcore is not used yet: size of the line "core" if non uniform grid (for interp)
+   !qwing is used to compute the maximum extension of the line: Vmax = qwing * max(vD)
+   real :: qcore, qwing
+   real(kind=dp) :: glande_i, glande_j
    real(kind=dp), dimension(4) :: cvdWaals
    !!integer, allocatable, dimension(:,:) :: dk!size (Nray, id) = index displacement of a line due to velocity
    !Nlambda,(Nproc or Nspace, depends on the choice For flux calculations. Always Nlambda, Nspace for NLTE

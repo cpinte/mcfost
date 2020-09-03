@@ -24,7 +24,7 @@ MODULE readatom
   IMPLICIT NONE
 
   !-> Futur parameter or define in the model atom for each line ?
-  real(kind=dp), parameter :: maxvel_atom_transfer = 50.0 !in km/s
+  !real(kind=dp), parameter :: maxvel_atom_transfer = 50.0 !in km/s
   
   character, parameter :: COMMENT_CHAR="#"
   character(len=*), parameter :: ATOMS_INPUT = "./atoms.input"!"/Atoms/atoms.input"
@@ -246,6 +246,14 @@ MODULE readatom
       !Lymann series: 2->1, 3->1
       atom%lines(kr)%i = min(i,j)
       atom%lines(kr)%j = max(i,j)
+      
+      if (atom%lines(kr)%qwing < 2.0) then
+      
+      	call Warning("qwing for line lower than 2! setting to 2")
+      	atom%lines(kr)%qwing = 2.0
+      	
+      endif
+
 
 !       write(*,*)  j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
 !       symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
@@ -890,65 +898,67 @@ MODULE readatom
   !Move after LTEpops for first estimates of damping
   !line wave grid define here to have the max damping
   write(*,*) " Generating sub wavelength grid and lines boundary for all atoms..."
-  do nmet=1, Natom
-  
+  do nmet=1, Natom  
+	atom => Atoms(nmet)%ptr_atom
    !!write(*,*) "ID:", Atoms(nmet)%ptr_atom%ID
    do kr=1, Atoms(nmet)%ptr_atom%Nline
-   
-     atom => Atoms(nmet)%ptr_atom
-     ic = find_continuum(atom,atom%lines(kr)%i)
 
-     max_adamp = 1d100
-     maxvel = 0
-     adamp = 0.0
-     imax = 1
-     !!write(*,*) " line @ ", Atoms(nmet)%ptr_atom%lines(kr)%lambda0,'nm'
-     do k=1, n_cells
-       if (icompute_atomRT(k)>0) then
-       
-        vel = Atoms(nmet)%ptr_atom%vbroad(k)
+		maxvel = Atoms(nmet)%ptr_atom%lines(kr)%qwing * maxval(atom%vbroad)
 
-        if (Atoms(nmet)%ptr_atom%lines(kr)%voigt) then 
-         !no damping if Gaussian
-         CALL Damping(k, Atoms(nmet)%ptr_atom, kr, adamp)
-         !-> LTE populations not known, we cannot use damping here
-         !Because some of the damping are zero if prop to populations
-         !Typically there are only Stark and Natural depending on electrons and lines.
-         !If only Adamp its to short
-         !adamp = atom%lines(kr)%Aji * (NM_TO_M*atom%lines(kr)%lambda0) / (4.*pi) / atom%vbroad(k)
-         !max_adamp = max(max_adamp, adamp)
-         max_adamp = min(max_adamp, adamp) ! min actually
-         
-         epsilon_l_max = 1.0/pi/adamp
+!      ic = find_continuum(atom,atom%lines(kr)%i)
+! 
+!      max_adamp = 1d100
+!      maxvel = 0
+!      adamp = 0.0
+!      imax = 1
+!      !!write(*,*) " line @ ", Atoms(nmet)%ptr_atom%lines(kr)%lambda0,'nm'
+!      do k=1, n_cells
+!        if (icompute_atomRT(k)>0) then
+!        
+!         vel = Atoms(nmet)%ptr_atom%vbroad(k)
+! 
+!         if (Atoms(nmet)%ptr_atom%lines(kr)%voigt) then 
+!          !no damping if Gaussian
+!          CALL Damping(k, Atoms(nmet)%ptr_atom, kr, adamp)
+!          !-> LTE populations not known, we cannot use damping here
+!          !Because some of the damping are zero if prop to populations
+!          !Typically there are only Stark and Natural depending on electrons and lines.
+!          !If only Adamp its to short
+!          !adamp = atom%lines(kr)%Aji * (NM_TO_M*atom%lines(kr)%lambda0) / (4.*pi) / atom%vbroad(k)
+!          !max_adamp = max(max_adamp, adamp)
+!          max_adamp = min(max_adamp, adamp) ! min actually
+!          
+!          epsilon_l_max = 1.0/pi/adamp
+! 
+!          if (n_eff(atom%Rydberg, atom%E(ic), atom%E(atom%lines(kr)%i), atom%stage(ic)) <= 3.0) then 
+!           eps = 1e-4
+!          else
+!           eps = epsilon
+!          endif
+! !-> with vD         
+! !         maxvel = max(maxvel, &
+! !          vel * sqrt(abs(-log(epsilon))), vel * sqrt(min(adamp, 0.9*1.0/pi/epsilon)/pi/min(0.9*epsilon_l_max, epsilon) - min(adamp,0.9*1.0/pi/epsilon)**2) )
+! !-> only from damping
+! ! 		 maxvel = max(maxvel, vel * sqrt(min(adamp, 0.9*1.0/pi/eps)/pi/min(0.9*epsilon_l_max, eps) - min(adamp,0.9*1.0/pi/eps)**2))	 
+! 		else
+! 		 !-> exact
+! ! 		 maxvel = max(maxvel, vel * sqrt(abs(-log(eps))))
+!         endif
+!   		
+!   		maxvel = max(maxvel, vel)      
+! 
+! 
+!        endif
+!        
+!      enddo
+    !! maxvel = maxvel_atom_transfer * 1e3 * ( 1e-3 * vel/1.0)
 
-         if (n_eff(atom%Rydberg, atom%E(ic), atom%E(atom%lines(kr)%i), atom%stage(ic)) <= 3.0) then 
-          eps = 1e-4
-         else
-          eps = epsilon
-         endif
-!-> with vD         
-!         maxvel = max(maxvel, &
-!          vel * sqrt(abs(-log(epsilon))), vel * sqrt(min(adamp, 0.9*1.0/pi/epsilon)/pi/min(0.9*epsilon_l_max, epsilon) - min(adamp,0.9*1.0/pi/epsilon)**2) )
-!-> only from damping
-! 		 maxvel = max(maxvel, vel * sqrt(min(adamp, 0.9*1.0/pi/eps)/pi/min(0.9*epsilon_l_max, eps) - min(adamp,0.9*1.0/pi/eps)**2))	 
-		else
-		 !-> exact
-! 		 maxvel = max(maxvel, vel * sqrt(abs(-log(eps))))
-        endif
-  		
-  		maxvel = max(maxvel, vel)      
-
-
-       endif
-       
-     enddo
-     maxvel = maxvel_atom_transfer * 1e3 * ( 1e-3 * vel/1.0)
-
-	maxvel = 30.0 * maxval(atom%vbroad)
-     
+! 	 maxvel = maxval(atom%vbroad)
+     write(*,*) "maxvel for line ", kr, maxvel * 1e-3
      !!-> group of lines, linear in v
      CALL compute_line_bound( Atoms(nmet)%ptr_atom%lines(kr), maxvel )
-    
+ 
+ !-> depends if we interpolate profile on finer grid !   
      !!-> linear
 !      CALL make_sub_wavelength_grid_line_lin(Atoms(nmet)%ptr_atom%lines(kr),&
 !                                         maxval(Atoms(nmet)%ptr_atom%vbroad), max_adamp)  
@@ -957,9 +967,9 @@ MODULE readatom
 !                                         maxval(Atoms(nmet)%ptr_atom%vbroad), max_adamp)
 
    
-   enddo
+   enddo !over lines
   
-  enddo
+  enddo !over atoms
   write(*,*) "..done"
 
 
