@@ -872,6 +872,7 @@ module atmos_type
      do l=1,atom%Nline
       line = atom%lines(l)
       if (allocated(line%phi)) deallocate(line%phi)
+      if (allocated(line%map)) deallocate(line%map)
 !       if (allocated(line%phi_Q)) deallocate(line%phi_Q)
 !       if (allocated(line%phi_U)) deallocate(line%phi_U)
 !       if (allocated(line%phi_V)) deallocate(line%phi_V)

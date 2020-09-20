@@ -34,7 +34,7 @@ MODULE atom_type
   TYPE AtomicLine
    logical           :: symmetric, polarizable
    !logical, dimension(:), allocatable :: negative_opacity
-   logical           :: Voigt=.true., PFR=.false.,&
+   logical           :: Voigt=.true., write_flux_map=.false., PFR=.false.,&
       damping_initialized=.false. !true if we store the damping on the whole grid for all lines.
    character(len=17) :: vdWaals
    character(len=20) :: trtype="ATOMIC_LINE", Coupling="LS"
@@ -53,7 +53,8 @@ MODULE atom_type
    !!integer, allocatable, dimension(:,:) :: dk!size (Nray, id) = index displacement of a line due to velocity
    !Nlambda,(Nproc or Nspace, depends on the choice For flux calculations. Always Nlambda, Nspace for NLTE
    real(kind=dp), allocatable, dimension(:,:)  :: phi
-   real(kind=dp), allocatable, dimension(:,:,:) :: eta
+   !!real(kind=dp), allocatable, dimension(:,:,:) :: eta
+   real(kind=dp), allocatable, dimension(:,:,:,:,:) :: map, cntrb !line flux to be stored
    !used for wavelength integration
    real(kind=dp), allocatable, dimension(:,:,:) :: phi_loc, phiZ, psi !3, Nlambda, Nray
    !wlam is the integration wavelenght weight = phi

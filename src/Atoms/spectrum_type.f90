@@ -10,6 +10,7 @@ module spectrum_type
 							lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D
 	use input, only : nb_proc, RT_line_method,lkeplerian, linfall, l_sym_ima
 	use constantes, only : arcsec_to_deg
+	use constant, only : clight
 	use mcfost_env, only : dp
 	use messages, only : error, warning
 	!use hdf5
@@ -36,8 +37,10 @@ module spectrum_type
 	real(kind=dp), dimension(:,:), allocatable :: Jnu, Jnu_cont, eta_es
 	real(kind=dp), dimension(:,:), allocatable :: Istar_tot, Istar_cont
 	real(kind=dp), dimension(:,:,:), allocatable :: Itot
-	real(kind=dp), allocatable, dimension(:,:,:,:,:) :: Flux !incl,az, npix,npix, lambda, Fluxc
-	real(kind=dp), allocatable, dimension(:,:,:,:,:) :: Fluxc
+	real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux !incl, az, lambda
+	real(kind=dp), allocatable, dimension(:,:,:,:) :: Fluxc
+! 	real(kind=dp), allocatable, dimension(:,:,:,:,:) :: Flux !incl,az, npix,npix, lambda, Fluxc
+! 	real(kind=dp), allocatable, dimension(:,:,:,:,:) :: Fluxc
 														!If stored for each trans in a file, store Fluxc only at lambda0   
 	real(kind=dp), dimension(:,:,:), allocatable :: rho_p, chiQUV_p, etaQUV_p
 	real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
@@ -386,58 +389,179 @@ call error("initSpectrumImage not modified!!")
 	return
 	end subroutine alloc_Spectrum
 	
+! 	subroutine alloc_flux_image
+! 		integer :: alloc_status
+! 		real :: mem_alloc, mem_cont
+!    
+!    		!Continuum image and continuum wavelengths not written atm but still computed for debug
+!    		mem_cont = real(npix_x*npix_y)*real(rt_n_incl*rt_n_az)*real(Nlambda_cont)/1024./1024. + real(Nlambda_cont)/1024./1024.
+! 		mem_alloc = real(npix_x*npix_y)*real(rt_n_incl*rt_n_az)*real(Nlambda)/1024./1024. + real(Nlambda)/1024./1024.
+! 		!Flux  + Flux cont + lines grid
+! 		if (mem_alloc + mem_cont > 1d3) then !in MB
+! 			write(*,*) " allocating ",( mem_alloc + mem_cont )/1024., " GB for flux arrays.."
+! 		else
+! 			write(*,*) " allocating ", mem_alloc + mem_cont, " MB for flux arrays.."  
+! 		endif
+! 		write(*,*) "  -> ", mem_alloc, " MB for fits file"
+! 
+! 		allocate(Flux(Nlambda,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ), stat=alloc_status)
+! 		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux")
+! 		allocate(Fluxc(Nlambda_cont,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ), stat=alloc_status)
+! 		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux continuum")
+! 
+! 		Flux = 0.0_dp
+! 		Fluxc = 0.0_dp
+!     
+! 		!Contribution function
+!    
+! 		if (lcontrib_function) then
+! 
+! 			mem_alloc = real(n_cells,kind=dp)/1024. * real(Nlambda,kind=dp)/1024!in MB
+! 	 
+! 			if (mem_alloc > 1d3) then
+! 				write(*,*) " allocating ", mem_alloc, " GB for contribution function.."
+! 			else
+! 				write(*,*) " allocating ", mem_alloc, " MB for contribution function.."
+! 			endif 
+!       
+! 			if (mem_alloc >= 2.1d3) then !2.1 GB
+! 				call Warning(" To large cntrb_i array. Use a wavelength table instead..")
+! 				lcontrib_function = .false.
+! 			else
+!       
+! 				allocate(cntrb_i(Nlambda,n_cells),stat=alloc_status)
+! 				if (alloc_status > 0) then
+! 					call ERROR('Cannot allocate cntrb_i')
+! 					lcontrib_function = .false.
+! 				else
+! 					cntrb_i(:,:) = 0.0_dp
+! 				endif
+! 
+! 			end if
+! 
+! 		end if
+! 
+!    
+! 	return
+! 	end subroutine alloc_flux_image
+	
 	subroutine alloc_flux_image
-		integer :: alloc_status
-		real :: mem_alloc, mem_cont
-   
-   		!Continuum image and continuum wavelengths not written atm but still computed for debug
-   		mem_cont = real(npix_x*npix_y)*real(rt_n_incl*rt_n_az)*real(Nlambda_cont)/1024./1024. + real(Nlambda_cont)/1024./1024.
-		mem_alloc = real(npix_x*npix_y)*real(rt_n_incl*rt_n_az)*real(Nlambda)/1024./1024. + real(Nlambda)/1024./1024.
-		!Flux  + Flux cont + lines grid
-		if (mem_alloc + mem_cont > 1d3) then !in MB
-			write(*,*) " allocating ",( mem_alloc + mem_cont )/1024., " GB for flux arrays.."
-		else
-			write(*,*) " allocating ", mem_alloc + mem_cont, " MB for flux arrays.."  
+		!Store total flux and flux maps for selected lines
+		integer :: alloc_status, kr, nat
+		real :: mem_alloc, mem_flux, mem_cont
+		real, dimension(:), allocatable :: mem_per_file
+		integer :: Nlam, Ntrans, N1, N2
+		
+		allocate(mem_per_file(Natom))
+		
+		Ntrans = 0
+		Nlam = 0
+		do nat=1, Natom
+		
+			N1 = 0
+			N2 = 0
+			do kr=1,atoms(nat)%ptr_atom%Nline
+			
+				if (atoms(nat)%ptr_atom%lines(kr)%write_flux_map) then
+				
+					N2 = N2 + 1
+					
+					N1 = N1 + (atoms(nat)%ptr_atom%lines(kr)%Nred-dk_min+dk_max- & 
+						atoms(nat)%ptr_atom%lines(kr)%Nblue+1)
+				endif
+				
+
+			enddo
+			Nlam = Nlam + N1
+			Ntrans = Ntrans + N2
+			!one per atol
+			mem_per_file(nat) = real(N1*N2)*real(npix_x*npix_y)*real(rt_n_incl)*real(rt_n_az)/real(1024*1024)
+		
+		enddo
+
+		if (maxval(mem_per_file)/1024 > 2.5) then
+			call warning("Size of fits file to store flux map might be large")
+			write(*,*) "change the number of lines you want to keep"
 		endif
-		write(*,*) "  -> ", mem_alloc, " MB for fits file"
+		
+		!total flux and total cont  +  their wavelength grid  
+   		mem_cont = real(Nlambda_cont)/1024./1024. + real(Nlambda_cont*rt_n_incl*rt_n_az*nb_proc)/1024/1024.
+		mem_flux = real(Nlambda)/1024./1024. + real(Nlambda*rt_n_incl*rt_n_az*nb_proc)/1024/1024.
+		
+		if (Ntrans > 0) then
+		!total space for flux map + space for lines wavelength grid + space for single continuum map at nu0
+			mem_alloc = ( real(Nlam)*real(npix_x)*real(npix_y)*real(rt_n_incl)*real(rt_n_az) + &
+			real(Nlam) + real(npix_x)*real(npix_y)*real(rt_n_incl)*real(rt_n_az) ) / real(1024*1024)
+		else
+			mem_alloc = 0.0
+		endif
+		
+		
+		!Flux  + Flux cont + lines grid
+		if (mem_flux + mem_cont > 1d3) then !in MB
+			write(*,*) " allocating ",( mem_flux + mem_cont )/1024., " GB for total flux arrays.."
+		else
+			write(*,*) " allocating ", mem_flux + mem_cont, " MB for total flux arrays.."  
+		endif
+		
+		!otherwise there is not flux map stored
+		if (Ntrans > 0) then
+		
+			if (mem_alloc > 1d3) then
+				write(*,*) " allocating ",mem_alloc / 1024., " GB for flux map for selected lines!"
+			else
+				write(*,*) " allocating ",mem_alloc, " MB for flux map for selected lines!"			
+			endif
+		
+		endif
+		
+		write(*,*) "  -> ", mem_alloc+mem_flux+mem_cont, " MB in total"
 
-		allocate(Flux(Nlambda,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ), stat=alloc_status)
+		!remove the pixel dimension
+		allocate(Flux(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
 		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux")
-		allocate(Fluxc(Nlambda_cont,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ), stat=alloc_status)
+		allocate(Fluxc(Nlambda_cont,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
 		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux continuum")
-
-		Flux = 0.0_dp
-		Fluxc = 0.0_dp
+		Flux(:,:,:,:) = 0.0_dp
+		Fluxc(:,:,:,:) = 0.0_dp
+		
+		!now for the lines 
+		do nat=1, Natom
+		
+			do kr=1,atoms(nat)%ptr_atom%Nline
+			
+				if (atoms(nat)%ptr_atom%lines(kr)%write_flux_map) then
+				
+					Nlam = (atoms(nat)%ptr_atom%lines(kr)%Nred-dk_min+dk_max- & 
+						atoms(nat)%ptr_atom%lines(kr)%Nblue+1)
+						
+					allocate(atoms(nat)%ptr_atom%lines(kr)%map(Nlam, npix_x, npix_y, rt_n_incl, rt_n_az),stat=alloc_status)
+					if (alloc_status > 0) then
+						write(*,*) atoms(nat)%ptr_atom%ID,atoms(nat)%ptr_atom%lines(kr)%j, atoms(nat)%ptr_atom%lines(kr)%i
+						write(*,*) atoms(nat)%ptr_atom%g(atoms(nat)%ptr_atom%lines(kr)%j), &
+							atoms(nat)%ptr_atom%g(atoms(nat)%ptr_atom%lines(kr)%i)
+						call error("Cannot allocate map for this line !")
+					endif
+					atoms(nat)%ptr_atom%lines(kr)%map(:,:,:,:,:) = 0.0_dp
+				
+				endif
+				
+			
+			enddo
+		
+		enddo
     
 		!Contribution function
    
 		if (lcontrib_function) then
 
-			mem_alloc = real(n_cells,kind=dp)/1024. * real(Nlambda,kind=dp)/1024!in MB
-	 
-			if (mem_alloc > 1d3) then
-				write(*,*) " allocating ", mem_alloc, " GB for contribution function.."
-			else
-				write(*,*) " allocating ", mem_alloc, " MB for contribution function.."
-			endif 
-      
-			if (mem_alloc >= 2.1d3) then !2.1 GB
-				call Warning(" To large cntrb_i array. Use a wavelength table instead..")
-				lcontrib_function = .false.
-			else
-      
-				allocate(cntrb_i(Nlambda,n_cells),stat=alloc_status)
-				if (alloc_status > 0) then
-					call ERROR('Cannot allocate cntrb_i')
-					lcontrib_function = .false.
-				else
-					cntrb_i(:,:) = 0.0_dp
-				endif
-
-			end if
+			write(*,*) " Contribution functions not implemented with the new outputs"
+			write(*,*) "store CF for selected lines only"
+			lcontrib_function = .false.
 
 		end if
 
+		deallocate(mem_per_file)
    
 	return
 	end subroutine alloc_flux_image
@@ -675,255 +799,539 @@ call error("initSpectrumImage not modified!!")
 !   return
 !   end subroutine dealloc_weights
 
-
-
-	subroutine write_image()
-	! -------------------------------------------------- !
-	! Write the spectral Flux map on disk.
-	! FLUX map:
-	! NLTEspec%Flux total and NLTEspec%Flux continuum
-	! --------------------------------------------------- !
-  !!use input
+	subroutine write_flux()
+	!
+	!write flux total and flux map for lines
+	!
 	integer :: status,unit,blocksize,bitpix,naxis
 	integer, dimension(6) :: naxes
-	integer :: group,fpixel,nelements, i, xcenter
-	integer :: la, Nred, Nblue, kr, kc, m, Nmid
+	integer :: group,fpixel,nelements
+	integer :: la, Nred, Nblue, kr, m, n, i, j
 	logical :: simple, extend
 	character(len=6) :: comment="VACUUM"
 	real(kind=dp) :: lambda_vac(Nlambda), Fnu, lambdac_vac(Nlambda_cont)
 	real :: pixel_scale_x, pixel_scale_y 
+	type (AtomType), pointer :: atom
+	logical, dimension(Natom) :: write_map
   
-	write(*,*) "Writing Flux-map"
-	write(*,*) "npix_x = ", npix_x, " npix_y = ", npix_y, ' RT method:', RT_line_method
-	write(*,*) "Wavelength points:", Nlambda
+	write(*,*) "Writing Flux"
+	
+	blocksize=1
+	simple=.true.
+	extend=.false.
+	group=1
+	fpixel=1
+	bitpix=-64
   
    !  Get an unused Logical Unit Number to use to open the FITS file.
 	status=0
 	call ftgiou (unit,status)
 
    !  Create the new empty FITS file.
-	blocksize=1
+
 	call ftinit(unit,trim(FLUX_FILE),blocksize,status)
 
-	simple=.true.
-	extend=.true.
-	group=1
-	fpixel=1
-
-	bitpix=-64
-	naxis=5
-	naxes(1)=Nlambda!1!1 if only one wavelength
-
-	if (RT_line_method==1) then
-		naxes(2)=1
-		naxes(3)=1
-	else
-		naxes(2)=npix_x
-		naxes(3)=npix_y
-	endif
-	naxes(4)=RT_n_incl
-	naxes(5)=RT_n_az
-	nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-  ! write(*,*) (naxes(i), i=1,naxis)
+	naxis = 3
+	naxes(1) = Nlambda
+	naxes(2) = RT_n_incl
+	naxes(3) = RT_n_az
+	
+	nelements = naxes(1)*naxes(2)*naxes(3)
 
   !  Write the required header keywords.
 	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 	if (status > 0) then
 		call print_error(status)
 	endif
-
-   !!RAC, DEC, reference pixel & pixel scale en degres
-	call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-	call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
-	call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
-	pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-	call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
- 
-	call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-	call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
-	call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
-	pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
-	call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
-
 	call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
 
-	if ((lkeplerian .or. linfall .or. lmagnetoaccr).and.(l_sym_ima)) &
-		write(*,*) "Warning, image symmetry might be wrong."
-		if (l_sym_ima.and.RT_line_method == 2) then 
-			xcenter = npix_x/2 + modulo(npix_x,2)
-			do i=xcenter+1,npix_x
-				Flux(:,i,:,:,:) = Flux(:,npix_x-i+1,:,:,:)
-			end do
-	end if ! l_sym_image
-
+	
 	!  Write the array to the FITS file.
-	call ftpprd(unit,group,fpixel,nelements,Flux,status)
+	call ftpprd(unit,group,fpixel,nelements,Flux(:,:,:,1),status)
 	if (status > 0) then
 		call print_error(status)
 	endif
 
-!-> Continuum map not written ATM.
-  ! create new hdu for continuum
-!   call ftcrhd(unit, status)
-!   if (status > 0) then
-!      call print_error(status)
-!   endif
-! 
-!   !naxis(1) = NLTEspec%Nwaves_cont
-!   !nelements = naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-! 
-!   !  Write the required header keywords.
-!   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-!   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-!   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
-!   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
-!   pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-!   call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
-!  
-!   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-!   call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
-!   call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
-!   pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
-!   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
-!   call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
-!   
-!   if (l_sym_ima.and.(RT_line_method == 2)) then
-!    xcenter = npix_x/2 + modulo(npix_x,2)
-!    do i=xcenter+1,npix_x
-!     NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
-!    end do
-!   end if ! l_sym_image
-!     
-!
-!	write continuum wavelengths
-!
-!
-!   call ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
-!   if (status > 0) then
-!      call print_error(status)
-!   endif
-!   
   
-  ! write polarized flux if any. Atmosphere magnetic does not necessarily
-  								!means we compute polarization
-	if ((lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES") .and. (RT_line_method == 2)) then
-		write(*,*) " -> Writing polarization"
-		call ftcrhd(unit, status)
-		if (status > 0) then
-			call print_error(status)
-		endif
-		naxis = 6
-		naxes(1) = 3 !Q, U, V
-		naxes(2)=Nlambda
-		naxes(3)=npix_x
-		naxes(4)=npix_y
-		naxes(5)=RT_n_incl
-		naxes(6)=RT_n_az
-		nelements = naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5) * naxes(6)
-		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-		call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'Polarised Flux (Q, U, V)',status)
-		call ftpprd(unit,group,fpixel,nelements,F_QUV,status)
-		if (status > 0) then
-			call print_error(status)
-		endif
-	end if
-  
-  ! create new hdu for wavelength grid
+	! create new hdu for wavelength grid
 	call ftcrhd(unit, status)
   
 	if (status > 0) then
 		call print_error(status)
 	endif
+
   
 	if (lvacuum_to_air) then
 		comment="AIR"
 		lambda_vac = lambda
-     	lambda = vacuum2air(Nlambda, lambda)
+     	lambda = vacuum2air(Nlambda, lambda_vac)
 	end if 
-   
 	naxis = 1
 	naxes(1) = Nlambda
-	write(*,*) " (debug) writing lambda to image.."
 	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 	call ftpkys(unit, "UNIT", "nm", comment, status)
 	call ftpprd(unit,group,fpixel,Nlambda,lambda,status)
 	if (status > 0) then
 		call print_error(status)
 	endif
+	
+	!now continuum flux
+	call ftcrhd(unit, status)
+  
+	if (status > 0) then
+		call print_error(status)
+	endif
+	
+	naxis = 3
+	naxes(1) = Nlambda_cont
+	naxes(2) = RT_n_incl
+	naxes(3) = RT_n_az
+	
+	nelements = naxes(1)*naxes(2)*naxes(3)
+
+  !  Write the required header keywords.
+	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+	if (status > 0) then
+		call print_error(status)
+	endif
+	call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+
+
+	!  Write the array to the FITS file.
+	call ftpprd(unit,group,fpixel,nelements,Fluxc(:,:,:,1),status)
+	if (status > 0) then
+		call print_error(status)
+	endif
+
+  
+	! create new hdu for cont wavelength grid
+	call ftcrhd(unit, status)
+  
+	if (status > 0) then
+		call print_error(status)
+	endif
+
+  
+	if (lvacuum_to_air) then
+		comment="AIR"
+		lambdac_vac = lambda_cont
+     	lambda_cont = vacuum2air(Nlambda_cont, lambdac_vac)
+	end if 
+	
+	naxis = 1
+	naxes(1) = Nlambda_cont
+	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+	call ftpkys(unit, "UNIT", "nm", comment, status)
+	call ftpprd(unit,group,fpixel,Nlambda_cont,lambda_cont,status)
+	if (status > 0) then
+		call print_error(status)
+	endif
+	
+	
+	if ((lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")) then
+		write(*,*) " Flux polarized not yet handled"
+	end if
+
 
   !  Close the file and free the unit number.
 	call ftclos(unit, status)
 	if (status > 0) then
-		write(*,*) "error at closing"
 		call print_error(status)
 	endif
+	
 	call ftfiou(unit, status)
 	if (status > 0) then
-		write(*,*) "error at free unit"
 		call print_error(status)
 	endif
-
-  !  Check for any error, and if so print out error messages
-	if (status > 0) then
-		call print_error(status)
-	endif
-	write(*,*) " (debug) done."
-
-
-	return
-	end subroutine write_image
- 
-	subroutine write_flux_ascii
-	! -------------------------------------------------- !
-	! written only for the first inclination / azimuth
-	! --------------------------------------------------- !
-  		integer :: status,unit
-		integer :: la, j, i
-		real(kind=dp), dimension(:), allocatable :: Fnu, Fnuc
-  
-  
-   !  Get an unused Logical Unit Number to use to open the FITS file.
-		status=0
-		unit = 10
-		allocate(Fnu(Nlambda), Fnuc(Nlambda_cont))
-		Fnu = 0.
-		Fnuc = 0.
-		if (RT_line_method==2) then
-			do i=1, npix_x
-				do j=1, npix_y
-					Fnu = Fnu + Flux(:,i,j,1,1)
-				enddo
-			enddo
-			do i=1, npix_x
-				do j=1, npix_y
-					Fnuc = Fnuc + Fluxc(:,i,j,1,1)
-				enddo
-			enddo
-		else if (RT_line_method==1) then
-		
-			Fnu(:) = Flux(:,1,1,1,1)
-			Fnuc(:) = Fluxc(:,1,1,1,1)
-		else
-			call error("RT_method unknown, write_flux_ascii")
-		endif
-   	
-		open(unit,file="flux.s", status='unknown', iostat=status)
-		do la=1, Nlambda
-			write(unit, *) lambda(la), Fnu(la)
-		enddo
-		close(unit)
 	
-		open(unit,file="fluxc.s", status='unknown', iostat=status)
-		do la=1, Nlambda_cont
-			write(unit, *) lambda_cont(la), fnuc(la)
-		enddo
-		close(unit)
+	
+	blocksize=1
+	simple=.true.
+	extend=.true.
+	group=1
+	fpixel=1
+	bitpix=-64
 
-   
-		deallocate(Fnu, Fnuc)
+	!do we need to write line map ? for what atoms
+	write_map(:) = .false.
+	atm_loop : do n=1, Natom
+		atom => atoms(n)%ptr_atom
+		
+		line_loop : do kr=1,atom%nline
+			if (atom%lines(kr)%write_flux_map) then
+			
+				write_map(n) = .true.
+				exit line_loop
+			
+			endif
+		enddo line_loop
+		
+		atom => NULL()
+	enddo atm_loop
+
+	!Now write the individual files for each atom lines map
+	!write also N1 and N2, the index of the line on the wavelength grid
+	!write the resolution of grid
+	do n=1, Natom
+		atom => atoms(n)%ptr_atom
+		if (.not.write_map(n)) cycle
+
+		!Get an unused Logical Unit Number to use to open the FITS file.
+		status=0
+		call ftgiou (unit,status)
+
+		call ftinit(unit,trim(atom%ID)//"_lines.fits.gz",blocksize,status)	
+		
+		naxis=5
+		naxes(2)=npix_x
+		naxes(3)=npix_y
+		naxes(4)=RT_n_incl
+		naxes(5)=RT_n_az
+	
+		naxes(1)=size(atom%lines(1)%map(:,1,1,1,1))
+		nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+		
+		!if we enter here there is necessarily at least one map!
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		if (status > 0) call print_error(status)
+		i = atom%lines(1)%i
+		j = atom%lines(1)%j
+		call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+		call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+		call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+		pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+		call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+ 
+		call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+		call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+		call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+		pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+		call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+	
+		call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+		call ftpkyj(unit,'ib',atom%lines(1)%Nblue+dk_min,'index blue',status)
+		call ftpkyj(unit,'ir',atom%lines(1)%Nred+dk_max,'index red',status)
+		call ftpkyj(unit,'i',i,'',status)
+		call ftpkyj(unit,'j',j,'',status)
+		call ftpkyd(unit,'gi',atom%g(i),-7,'',status)
+		call ftpkyd(unit,'gj',atom%g(j),-7,'',status)
+		call ftpkye(unit,'dv',hv,-7,'km.s^-1',status)
+		call ftpkyd(unit,'lambda0',atom%lines(1)%lambda0,-7,'nm',status)
+		call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(1)%lambda0,-7,'1e15 Hz',status)
+
+
+		!Write the array to the FITS file.
+		call ftpprd(unit,group,fpixel,nelements,atom%lines(1)%map,status)
+		if (status > 0) call print_error(status)
+		
+		!are they other map for the other lines ?
+		do kr=2,atom%Nline
+			if (.not.atom%lines(kr)%write_flux_map) cycle
+			
+			naxes(1)=size(atom%lines(kr)%map(:,1,1,1,1))
+			nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+
+			! create new hdu for cont wavelength grid
+			call ftcrhd(unit, status)
+			if (status > 0) call print_error(status)
+
+			call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+			if (status > 0) call print_error(status)
+			i = atom%lines(kr)%i
+			j = atom%lines(kr)%j
+			call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+			call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+			call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+			pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+			call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+ 
+			call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+			call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+			call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+			pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+			call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+	
+			call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+			call ftpkyj(unit,'ib',atom%lines(kr)%Nblue+dk_min,'index blue',status)
+			call ftpkyj(unit,'ir',atom%lines(kr)%Nred+dk_max,'index red',status)
+			call ftpkyj(unit,'i',i,'',status)
+			call ftpkyj(unit,'j',j,'',status)
+			call ftpkyd(unit,'gi',atom%g(i),-7,'',status)
+			call ftpkyd(unit,'gj',atom%g(j),-7,'',status)
+			call ftpkye(unit,'dv',hv,-7,'km.s^-1',status)
+			call ftpkyd(unit,'lambda0',atom%lines(kr)%lambda0,-7,'nm',status)
+			call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(kr)%lambda0,-7,'1e15 Hz',status)
+
+			!Write the array to the FITS file.
+			call ftpprd(unit,group,fpixel,nelements,atom%lines(kr)%map,status)
+			if (status > 0) call print_error(status)
+
+		enddo
+	
+		atom => NULL()
+  		!  Close the file and free the unit number.
+		call ftclos(unit, status)
+		if (status > 0) then
+			call print_error(status)
+		endif
+		call ftfiou(unit, status)
+		if (status > 0) then
+			call print_error(status)
+		endif
+	enddo ! over atoms
+
 
 	return
-	end subroutine write_flux_ascii
+	end subroutine write_flux
+
+
+! 	subroutine write_image()
+! 	! -------------------------------------------------- !
+! 	! Write the spectral Flux map on disk.
+! 	! FLUX map:
+! 	! NLTEspec%Flux total and NLTEspec%Flux continuum
+! 	! --------------------------------------------------- !
+!   !!use input
+! 	integer :: status,unit,blocksize,bitpix,naxis
+! 	integer, dimension(6) :: naxes
+! 	integer :: group,fpixel,nelements, i, xcenter
+! 	integer :: la, Nred, Nblue, kr, kc, m, Nmid
+! 	logical :: simple, extend
+! 	character(len=6) :: comment="VACUUM"
+! 	real(kind=dp) :: lambda_vac(Nlambda), Fnu, lambdac_vac(Nlambda_cont)
+! 	real :: pixel_scale_x, pixel_scale_y 
+!   
+! 	write(*,*) "Writing Flux-map"
+! 	write(*,*) "npix_x = ", npix_x, " npix_y = ", npix_y, ' RT method:', RT_line_method
+! 	write(*,*) "Wavelength points:", Nlambda
+!   
+!    !  Get an unused Logical Unit Number to use to open the FITS file.
+! 	status=0
+! 	call ftgiou (unit,status)
+! 
+!    !  Create the new empty FITS file.
+! 	blocksize=1
+! 	call ftinit(unit,trim(FLUX_FILE),blocksize,status)
+! 
+! 	simple=.true.
+! 	extend=.true.
+! 	group=1
+! 	fpixel=1
+! 
+! 	bitpix=-64
+! 	naxis=5
+! 	naxes(1)=Nlambda!1!1 if only one wavelength
+! 
+! 	if (RT_line_method==1) then
+! 		naxes(2)=1
+! 		naxes(3)=1
+! 	else
+! 		naxes(2)=npix_x
+! 		naxes(3)=npix_y
+! 	endif
+! 	naxes(4)=RT_n_incl
+! 	naxes(5)=RT_n_az
+! 	nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+!   ! write(*,*) (naxes(i), i=1,naxis)
+! 
+!   !  Write the required header keywords.
+! 	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! 	if (status > 0) then
+! 		call print_error(status)
+! 	endif
+! 
+!    !!RAC, DEC, reference pixel & pixel scale en degres
+! 	call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+! 	call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+! 	call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+! 	pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+! 	call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+!  
+! 	call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+! 	call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+! 	call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+! 	pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+! 	call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+! 
+! 	call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+! 
+! 	if ((lkeplerian .or. linfall .or. lmagnetoaccr).and.(l_sym_ima)) &
+! 		write(*,*) "Warning, image symmetry might be wrong."
+! 		if (l_sym_ima.and.RT_line_method == 2) then 
+! 			xcenter = npix_x/2 + modulo(npix_x,2)
+! 			do i=xcenter+1,npix_x
+! 				Flux(:,i,:,:,:) = Flux(:,npix_x-i+1,:,:,:)
+! 			end do
+! 	end if ! l_sym_image
+! 
+! 	!  Write the array to the FITS file.
+! 	call ftpprd(unit,group,fpixel,nelements,Flux,status)
+! 	if (status > 0) then
+! 		call print_error(status)
+! 	endif
+! 
+! !-> Continuum map not written ATM.
+!   ! create new hdu for continuum
+! !   call ftcrhd(unit, status)
+! !   if (status > 0) then
+! !      call print_error(status)
+! !   endif
+! ! 
+! !   !naxis(1) = NLTEspec%Nwaves_cont
+! !   !nelements = naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+! ! 
+! !   !  Write the required header keywords.
+! !   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! !   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+! !   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+! !   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+! !   pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+! !   call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+! !  
+! !   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+! !   call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+! !   call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+! !   pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+! !   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+! !   call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+! !   
+! !   if (l_sym_ima.and.(RT_line_method == 2)) then
+! !    xcenter = npix_x/2 + modulo(npix_x,2)
+! !    do i=xcenter+1,npix_x
+! !     NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
+! !    end do
+! !   end if ! l_sym_image
+! !     
+! !
+! !	write continuum wavelengths
+! !
+! !
+! !   call ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
+! !   if (status > 0) then
+! !      call print_error(status)
+! !   endif
+! !   
+!   
+!   ! write polarized flux if any. Atmosphere magnetic does not necessarily
+!   								!means we compute polarization
+! 	if ((lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES") .and. (RT_line_method == 2)) then
+! 		write(*,*) " -> Writing polarization"
+! 		call ftcrhd(unit, status)
+! 		if (status > 0) then
+! 			call print_error(status)
+! 		endif
+! 		naxis = 6
+! 		naxes(1) = 3 !Q, U, V
+! 		naxes(2)=Nlambda
+! 		naxes(3)=npix_x
+! 		naxes(4)=npix_y
+! 		naxes(5)=RT_n_incl
+! 		naxes(6)=RT_n_az
+! 		nelements = naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5) * naxes(6)
+! 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! 		call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'Polarised Flux (Q, U, V)',status)
+! 		call ftpprd(unit,group,fpixel,nelements,F_QUV,status)
+! 		if (status > 0) then
+! 			call print_error(status)
+! 		endif
+! 	end if
+!   
+!   ! create new hdu for wavelength grid
+! 	call ftcrhd(unit, status)
+!   
+! 	if (status > 0) then
+! 		call print_error(status)
+! 	endif
+!   
+! 	if (lvacuum_to_air) then
+! 		comment="AIR"
+! 		lambda_vac = lambda
+!      	lambda = vacuum2air(Nlambda, lambda)
+! 	end if 
+!    
+! 	naxis = 1
+! 	naxes(1) = Nlambda
+! 	write(*,*) " (debug) writing lambda to image.."
+! 	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! 	call ftpkys(unit, "UNIT", "nm", comment, status)
+! 	call ftpprd(unit,group,fpixel,Nlambda,lambda,status)
+! 	if (status > 0) then
+! 		call print_error(status)
+! 	endif
+! 
+!   !  Close the file and free the unit number.
+! 	call ftclos(unit, status)
+! 	if (status > 0) then
+! 		write(*,*) "error at closing"
+! 		call print_error(status)
+! 	endif
+! 	call ftfiou(unit, status)
+! 	if (status > 0) then
+! 		write(*,*) "error at free unit"
+! 		call print_error(status)
+! 	endif
+! 
+!   !  Check for any error, and if so print out error messages
+! 	if (status > 0) then
+! 		call print_error(status)
+! 	endif
+! 	write(*,*) " (debug) done."
+! 
+! 
+! 	return
+! 	end subroutine write_image
+ 
+! 	subroutine write_flux_ascii
+! 	! -------------------------------------------------- !
+! 	! written only for the first inclination / azimuth
+! 	! --------------------------------------------------- !
+!   		integer :: status,unit
+! 		integer :: la, j, i
+! 		real(kind=dp), dimension(:), allocatable :: Fnu, Fnuc
+!   
+!   
+!    !  Get an unused Logical Unit Number to use to open the FITS file.
+! 		status=0
+! 		unit = 10
+! 		allocate(Fnu(Nlambda), Fnuc(Nlambda_cont))
+! 		Fnu = 0.
+! 		Fnuc = 0.
+! 		if (RT_line_method==2) then
+! 			do i=1, npix_x
+! 				do j=1, npix_y
+! 					Fnu = Fnu + Flux(:,i,j,1,1)
+! 				enddo
+! 			enddo
+! 			do i=1, npix_x
+! 				do j=1, npix_y
+! 					Fnuc = Fnuc + Fluxc(:,i,j,1,1)
+! 				enddo
+! 			enddo
+! 		else if (RT_line_method==1) then
+! 		
+! 			Fnu(:) = Flux(:,1,1,1,1)
+! 			Fnuc(:) = Fluxc(:,1,1,1,1)
+! 		else
+! 			call error("RT_method unknown, write_flux_ascii")
+! 		endif
+!    	
+! 		open(unit,file="flux.s", status='unknown', iostat=status)
+! 		do la=1, Nlambda
+! 			write(unit, *) lambda(la), Fnu(la)
+! 		enddo
+! 		close(unit)
+! 	
+! 		open(unit,file="fluxc.s", status='unknown', iostat=status)
+! 		do la=1, Nlambda_cont
+! 			write(unit, *) lambda_cont(la), fnuc(la)
+! 		enddo
+! 		close(unit)
+! 
+!    
+! 		deallocate(Fnu, Fnuc)
+! 
+! 	return
+! 	end subroutine write_flux_ascii
   
 	subroutine writeWavelength()
 	! --------------------------------------------------------------- !

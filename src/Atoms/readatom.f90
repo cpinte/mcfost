@@ -240,12 +240,21 @@ MODULE readatom
       i = i + 1
       j = j + 1 !because in C, indexing starts at 0, but starts at 1 in fortran
 
+
 !      write(*,*) "Reading line #", kr, 1d9 * (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i)), 'nm'
 
       !therefore, the first level is 1 (C=0), the second 2 (C=1) etc
       !Lymann series: 2->1, 3->1
       atom%lines(kr)%i = min(i,j)
       atom%lines(kr)%j = max(i,j)
+         
+      !tmp
+      if (atom%ID=="H") then
+      
+      	if (atom%g(i)==8 .and. atom%g(j)==18) atom%lines(kr)%write_flux_map=.true.
+      	if (atom%g(i)==2 .and. atom%g(j)==8) atom%lines(kr)%write_flux_map =.true. 
+      
+      endif
       
       if (atom%lines(kr)%qwing < 2.0) then
       
