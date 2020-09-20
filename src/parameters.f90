@@ -66,6 +66,14 @@ module parametres
   !Convergence relative errors
   real :: dpops_max_error, dpops_sub_max_error
   
+  !Ng's acceleration
+  logical :: lng_acceleration
+  integer :: iNg_Norder, iNg_ndelay, iNg_Nperiod
+  
+  !Collisonnal radiative switching
+  !real(kind=dp) :: d_cswitch
+  !logical :: l_cswitch (before csiwtch_enabled)
+  
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image, jnu_atom_file
   logical :: ltab_wavelength_image, lread_jnu_atom

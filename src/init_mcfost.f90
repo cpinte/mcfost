@@ -76,6 +76,10 @@ subroutine set_default_variables()
   lforce_lte = .false.
   lread_jnu_atom=.false.
   ldissolve = .false.
+  lng_acceleration = .false.
+  iNg_Norder = 0
+  iNg_ndelay = 5
+  iNg_Nperiod = 5
   ! AL-RT
   laccurate_integ = .false.
   Nrays_atom_transfer = 100
@@ -744,6 +748,39 @@ subroutine initialisation_mcfost()
      case("-accurate_integ")
         i_arg = i_arg + 1
         laccurate_integ = .true.
+     case("-Ng_Norder")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ng'acc order needed with -Ng_Norder !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) iNg_Norder
+        i_arg= i_arg+1
+        if (iNg_Norder <= 1) then
+         call warning ("Ng Norder <= 1, turning off Ng'acceleration!")
+         lng_acceleration = .false.
+        else
+         lng_acceleration = .true.
+         write(*,*) " Ng's acceleration activated"
+        endif
+     case("-Ng_Ndelay")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ng'acc delay needed with -Ng_Ndelay !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) iNg_Ndelay
+        i_arg= i_arg+1
+        if (iNg_Norder <= 0) then
+         call warning ("Ng Ndelay <= 0 setting to 5!")
+         iNg_Ndelay = 5
+        endif
+     case("-Ng_Nperiod")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ng'acc period needed with -Ng_Nperiod !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) iNg_Nperiod
+        i_arg= i_arg+1
+        if (iNg_Nperiod <= 0) then
+         call warning ("Ng Nperiod <= 0 setting to 5!")
+         iNg_Nperiod = 5
+        endif
      case("-Nray_atom")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Number of rays needed with -Nray_atom !")
@@ -1707,6 +1744,10 @@ subroutine display_help()
 !-> this one could also be use for mol tranfer, like Ng or tab_wavelength
   write(*,*) "        : -max_err <max_err> : max relative error"
   write(*,*) "        : -max_err_sub <max_err_sub> : max relative error for sub-iterations"
+  write(*,*) "        : -Ng_Norder <Norder> : Order of Ng's acceleration"
+  write(*,*) "        : -Ng_Ndelay <Ndelay> : Delay before first Ng's acceleration"
+  write(*,*) "        : -Ng_Nperiod <Nperiod> : Cycle of Ng's iteration"
+
   write(*,*) " "
   write(*,*) " Options related to phantom"
   write(*,*) "        : -limits_file or limits <limit-file> : x,y,z values used for the Voronoi tesselation"

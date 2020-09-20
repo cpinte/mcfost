@@ -8,6 +8,7 @@ MODULE math
 
   CONTAINS
 
+	!a verifier. Not useful with Ng ?
 	subroutine solve_lin(A, b, N, minimized)
 		use utils, only : GaussSlv
 		!wrapper around GaussSlv with minimisation of the residual 
@@ -22,18 +23,20 @@ MODULE math
 			Adag = A
 		endif
 		
+		!get new solutions from A
 		call GaussSlv(A, b, n)
 
 
 		if (minimized) then
 			res(:) = bdag(:)
-			
+			!compute difference between new solution and old one
 			do i=1,N
 				do j=1,N
 					res(i) = res(i) - Adag(i,j)*b(j)
 				enddo
 			enddo
 			
+			!solve for the residual
 			call Gaussslv(Adag, res, N)
 
 			b(:) = b(:) + res(:)
@@ -43,8 +46,10 @@ MODULE math
 	end subroutine solve_lin
 	
 	
-	function Ng_accelerate(solution, m, n, lasts)
+	function Ng_accelerate(solution, m, n, lasts, check_negative_pops)
+		!Extra overheads if check_negative_pops is true
 		use utils, only : GaussSlv
+		logical, optional, intent(in) :: check_negative_pops
 		integer, intent(in) :: m, n !Nlevel * n_cells; Norder
 		logical :: Ng_accelerate
 		real(kind=dp), intent(inout) :: lasts(m,*), solution(m)
@@ -62,25 +67,52 @@ MODULE math
 		A(:,:) = 0.0_dp; b(:) = 0.0_dp
 		
 		do k=1, m
-			!if (solution(k) > 0.0) then !handle empty cells
+			!what is faster ?
+			if (solution(k) > 0.0) then!fast to check, than doing operations with dy and di zero for all i,j?
 				w = 1.0 / ( abs(solution(k)) )
+! 				w = 1.0 / ( 1.0_dp + abs(solution(k)) ) !if we don't test
+				!!write(*,*) "k",k, " w=", w,  " sol",solution(k)
 				dy = lasts(k,niter-1) - lasts(k,niter)
+				!!write(*,*) "dy", dy
 				do i=1, n
 					di = w * (dy + lasts(k,niter-i) - lasts(k,niter-i-1))
+					!!write(*,*) "di", di
 					b(i) = b(i) + di*dy
 					do j=1, n
 						A(i,j) = A(i,j) + di * (dy + lasts(k,niter-j) - lasts(k,niter-j-1))
 					enddo
 				enddo
-			!endif
+			endif
 		enddo
 		
-		!!call solve_lin(A,b,n, .true.)
 		call Gaussslv(A, b, n)
+		!-> no imroved here since the routine is already doing that ?
+		!call solve_lin(A, b, n, .true.)
 		
+		!!write(*,*) "b",(b(i), i=1,n)
 		do i=1,n
 			solution(:) = solution(:) + b(i) * ( lasts(:,niter-i) - lasts(:,niter) )
 		enddo
+		
+		if (present(check_negative_pops)) then
+		
+			if (check_negative_pops) then
+				pop_loop : do k=1,m
+					if (solution(k) < 0) then
+						write(*,*) "Warning negative pops sol in Ng's acceleration"
+						write(*,*) " This is likely to be a bug !"
+						write(*,*) k, "sol:", solution(k)
+						!can't do that easility
+						!ng_accelerate = .false.
+						!niter = 0
+						!return
+						solution(:) = lasts(:,niter) !big loop over m inside loop over m. But we exist right after
+						exit pop_loop
+					endif
+				enddo pop_loop	
+			endif
+			
+		endif
 		
 		ng_accelerate = .true.
 		niter = 0
