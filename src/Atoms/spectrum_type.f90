@@ -552,14 +552,34 @@ call error("initSpectrumImage not modified!!")
 		enddo
     
 		!Contribution function
-   
+   		!Future: contribution function for selected lines only !
 		if (lcontrib_function) then
 
-			write(*,*) " Contribution functions not implemented with the new outputs"
-			write(*,*) "store CF for selected lines only"
-			lcontrib_function = .false.
+			mem_alloc = real(n_cells,kind=dp)/1024. * real(Nlambda,kind=dp)/1024!in MB
+	 
+			if (mem_alloc > 1d3) then
+				write(*,*) " allocating ", mem_alloc, " GB for contribution function.."
+			else
+				write(*,*) " allocating ", mem_alloc, " MB for contribution function.."
+			endif 
+      
+			if (mem_alloc >= 2.1d3) then !2.1 GB
+				call Warning(" To large cntrb_i array. Use a wavelength table instead..")
+				lcontrib_function = .false.
+			else
+      
+				allocate(cntrb_i(Nlambda,n_cells),stat=alloc_status)
+				if (alloc_status > 0) then
+					call ERROR('Cannot allocate cntrb_i')
+					lcontrib_function = .false.
+				else
+					cntrb_i(:,:) = 0.0_dp
+				endif
+
+			end if
 
 		end if
+
 
 		deallocate(mem_per_file)
    
