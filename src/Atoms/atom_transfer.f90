@@ -446,6 +446,7 @@ module atom_transfer
   end if
   
   !Flux map for lines
+  !adding a map for the continuum point too ?
   if (RT_line_method==1) then
   !summation over pixels
   	do nat=1,Natom
@@ -638,7 +639,7 @@ module atom_transfer
         !$ id = omp_get_thread_num() + 1
         do j = 1,n_rad_RT
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
-           call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+           call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max,1,1,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         end do !j
      end do !i
      !$omp end do
@@ -690,6 +691,7 @@ module atom_transfer
   
   !recombine for all proc
   flux(:,ibin,iaz,1) = sum(flux(:,ibin,iaz,:),dim=2)
+  fluxc(:,ibin,iaz,1) = sum(fluxc(:,ibin,iaz,:),dim=2)
 
  return
  end subroutine emission_line_map

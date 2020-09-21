@@ -813,6 +813,9 @@ call error("initSpectrumImage not modified!!")
 	real :: pixel_scale_x, pixel_scale_y 
 	type (AtomType), pointer :: atom
 	logical, dimension(Natom) :: write_map
+	real(kind=dp), allocatable :: g_i(:), g_j(:), maps(:,:,:,:,:,:), nu_trans(:), lam_trans(:), waves(:,:)
+	integer, allocatable :: i_level(:), j_level(:)
+	integer :: Ntrans, Nlam
   
 	write(*,*) "Writing Flux"
 	
@@ -970,32 +973,63 @@ call error("initSpectrumImage not modified!!")
 	enddo atm_loop
 
 	!Now write the individual files for each atom lines map
-	!write also N1 and N2, the index of the line on the wavelength grid
+	!Continuum map not written yet
 	!write the resolution of grid
 	do n=1, Natom
 		atom => atoms(n)%ptr_atom
 		if (.not.write_map(n)) cycle
-
+		
+		!count transition and max frequency for this atom
+		Nlam = 0
+		Ntrans = 0
+		do kr=1, atom%Nline
+			if (atom%lines(kr)%write_flux_map) then
+				Ntrans = Ntrans + 1
+				Nlam = max(Nlam, size(atom%lines(kr)%map(:,1,1,1,1)))
+			endif		
+		enddo
+		!allocate temporary variables for storage
+		allocate(i_level(Ntrans), j_level(Ntrans), g_i(Ntrans), g_j(Ntrans), maps(Nlam,npix_x,npix_y,rt_n_incl,rt_n_az,Ntrans), &
+				nu_trans(Ntrans), lam_trans(Ntrans), waves(Nlam,Ntrans))
+		
+		waves = 0.0_dp
+		maps = 0.0_dp
+		j = 0
+		do kr=1, atom%Nline
+			if (atom%lines(kr)%write_flux_map) then
+				j = j + 1
+				i_level(j) = atom%lines(kr)%i
+				j_level(j) = atom%lines(kr)%j
+				g_i(j) = atom%g(i_level(j))
+				g_j(j) = atom%g(j_level(j))
+				lam_trans(j) = atom%lines(kr)%lambda0
+				nu_trans(j) = 1d9 * clight / lam_trans(j)
+				Nred = atom%lines(kr)%Nred+dk_max
+				Nblue = atom%lines(kr)%Nblue+dk_min
+				waves(1:Nred-Nblue+1,j) = lambda(Nblue:Nred)
+				maps(1:Nred-Nblue+1,:,:,:,:,j) = atom%lines(kr)%map(:,:,:,:,:)
+			endif		
+		enddo				
+		
 		!Get an unused Logical Unit Number to use to open the FITS file.
 		status=0
 		call ftgiou (unit,status)
 
 		call ftinit(unit,trim(atom%ID)//"_lines.fits.gz",blocksize,status)	
 		
-		naxis=5
+		naxis=6
+		naxes(6)=Ntrans
 		naxes(2)=npix_x
 		naxes(3)=npix_y
 		naxes(4)=RT_n_incl
 		naxes(5)=RT_n_az
 	
-		naxes(1)=size(atom%lines(1)%map(:,1,1,1,1))
-		nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+		naxes(1)=Nlam
+		nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)*naxes(6)
 		
 		!if we enter here there is necessarily at least one map!
 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 		if (status > 0) call print_error(status)
-		i = atom%lines(1)%i
-		j = atom%lines(1)%j
 		call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
 		call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
 		call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
@@ -1009,64 +1043,171 @@ call error("initSpectrumImage not modified!!")
 		call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 	
 		call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
-		call ftpkyj(unit,'ib',atom%lines(1)%Nblue+dk_min,'index blue',status)
-		call ftpkyj(unit,'ir',atom%lines(1)%Nred+dk_max,'index red',status)
-		call ftpkyj(unit,'i',i,'',status)
-		call ftpkyj(unit,'j',j,'',status)
-		call ftpkyd(unit,'gi',atom%g(i),-7,'',status)
-		call ftpkyd(unit,'gj',atom%g(j),-7,'',status)
 		call ftpkye(unit,'dv',hv,-7,'km.s^-1',status)
-		call ftpkyd(unit,'lambda0',atom%lines(1)%lambda0,-7,'nm',status)
-		call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(1)%lambda0,-7,'1e15 Hz',status)
-
 
 		!Write the array to the FITS file.
-		call ftpprd(unit,group,fpixel,nelements,atom%lines(1)%map,status)
+		call ftpprd(unit,group,fpixel,nelements,maps,status)
 		if (status > 0) call print_error(status)
 		
-		!are they other map for the other lines ?
-		do kr=2,atom%Nline
-			if (.not.atom%lines(kr)%write_flux_map) cycle
-			
-			naxes(1)=size(atom%lines(kr)%map(:,1,1,1,1))
-			nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+		!create new hdu for cont wavelength grid
+		naxis=2
+		naxes(2)=Ntrans
+		naxes(1)=Nlam
+		nelements = naxes(1)*naxes(2)
+		call ftcrhd(unit, status)
+		if (status > 0) call print_error(status)
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		if (status > 0) call print_error(status)
+		call ftpprd(unit,group,fpixel,nelements,waves,status)
+		
 
-			! create new hdu for cont wavelength grid
-			call ftcrhd(unit, status)
-			if (status > 0) call print_error(status)
+		!create new hdu for nu and lam
+		naxis=1
+		naxes(1)=Ntrans
+		nelements = naxes(1)
+		call ftcrhd(unit, status)
+		if (status > 0) call print_error(status)
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		if (status > 0) call print_error(status)
+		call ftpprd(unit,group,fpixel,nelements,nu_trans,status)
+		naxis=1
+		naxes(1)=Ntrans
+		nelements = naxes(1)
+		call ftcrhd(unit, status)
+		if (status > 0) call print_error(status)
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		if (status > 0) call print_error(status)
+		call ftpprd(unit,group,fpixel,nelements,lam_trans,status)
+		
+		!create new hdu for i and j
+		naxis=1
+		naxes(1)=Ntrans
+		nelements = naxes(1)
+		call ftcrhd(unit, status)
+		if (status > 0) call print_error(status)
+		call ftphpr(unit,simple,8,naxis,naxes,0,1,extend,status)
+		if (status > 0) call print_error(status)
+		call ftpprj(unit,group,fpixel,nelements,i_level,status)
+		naxis=1
+		naxes(1)=Ntrans
+		nelements = naxes(1)
+		call ftcrhd(unit, status)
+		if (status > 0) call print_error(status)
+		call ftphpr(unit,simple,8,naxis,naxes,0,1,extend,status)
+		if (status > 0) call print_error(status)
+		call ftpprj(unit,group,fpixel,nelements,j_level,status)
+		
+		!create new hdu for gi and gj
+		naxis=1
+		naxes(1)=Ntrans
+		nelements = naxes(1)
+		call ftcrhd(unit, status)
+		if (status > 0) call print_error(status)
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		if (status > 0) call print_error(status)
+		call ftpprd(unit,group,fpixel,nelements,g_i,status)
+		naxis=1
+		naxes(1)=Ntrans
+		nelements = naxes(1)
+		call ftcrhd(unit, status)
+		if (status > 0) call print_error(status)
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		if (status > 0) call print_error(status)
+		call ftpprd(unit,group,fpixel,nelements,g_j,status)
+				
+		deallocate(i_level, j_level, g_i, g_j, maps, nu_trans, lam_trans, waves)
 
-			call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-			if (status > 0) call print_error(status)
-			i = atom%lines(kr)%i
-			j = atom%lines(kr)%j
-			call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-			call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
-			call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
-			pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-			call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
- 
-			call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-			call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
-			call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
-			pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
-			call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
-	
-			call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
-			call ftpkyj(unit,'ib',atom%lines(kr)%Nblue+dk_min,'index blue',status)
-			call ftpkyj(unit,'ir',atom%lines(kr)%Nred+dk_max,'index red',status)
-			call ftpkyj(unit,'i',i,'',status)
-			call ftpkyj(unit,'j',j,'',status)
-			call ftpkyd(unit,'gi',atom%g(i),-7,'',status)
-			call ftpkyd(unit,'gj',atom%g(j),-7,'',status)
-			call ftpkye(unit,'dv',hv,-7,'km.s^-1',status)
-			call ftpkyd(unit,'lambda0',atom%lines(kr)%lambda0,-7,'nm',status)
-			call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(kr)%lambda0,-7,'1e15 Hz',status)
-
-			!Write the array to the FITS file.
-			call ftpprd(unit,group,fpixel,nelements,atom%lines(kr)%map,status)
-			if (status > 0) call print_error(status)
-
-		enddo
+! 		Get an unused Logical Unit Number to use to open the FITS file.
+! 		status=0
+! 		call ftgiou (unit,status)
+! 
+! 		call ftinit(unit,trim(atom%ID)//"_lines.fits.gz",blocksize,status)	
+! 		
+! 		naxis=5
+! 		naxes(2)=npix_x
+! 		naxes(3)=npix_y
+! 		naxes(4)=RT_n_incl
+! 		naxes(5)=RT_n_az
+! 	
+! 		naxes(1)=size(atom%lines(1)%map(:,1,1,1,1))
+! 		nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+! 		
+! 		if we enter here there is necessarily at least one map!
+! 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! 		if (status > 0) call print_error(status)
+! 		i = atom%lines(1)%i
+! 		j = atom%lines(1)%j
+! 		call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+! 		call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+! 		call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+! 		pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+! 		call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+!  
+! 		call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+! 		call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+! 		call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+! 		pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+! 		call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+! 	
+! 		call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+! 		call ftpkyj(unit,'ib',atom%lines(1)%Nblue+dk_min,'index blue',status)
+! 		call ftpkyj(unit,'ir',atom%lines(1)%Nred+dk_max,'index red',status)
+! 		call ftpkyj(unit,'i',i,'',status)
+! 		call ftpkyj(unit,'j',j,'',status)
+! 		call ftpkyd(unit,'gi',atom%g(i),-7,'',status)
+! 		call ftpkyd(unit,'gj',atom%g(j),-7,'',status)
+! 		call ftpkye(unit,'dv',hv,-7,'km.s^-1',status)
+! 		call ftpkyd(unit,'lambda0',atom%lines(1)%lambda0,-7,'nm',status)
+! 		call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(1)%lambda0,-7,'1e15 Hz',status)
+! 
+! 
+! 		Write the array to the FITS file.
+! 		call ftpprd(unit,group,fpixel,nelements,atom%lines(1)%map,status)
+! 		if (status > 0) call print_error(status)
+! 		
+! 		are they other map for the other lines ?
+! 		do kr=2,atom%Nline
+! 			if (.not.atom%lines(kr)%write_flux_map) cycle
+! 			
+! 			naxes(1)=size(atom%lines(kr)%map(:,1,1,1,1))
+! 			nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
+! 
+! 			create new hdu for cont wavelength grid
+! 			call ftcrhd(unit, status)
+! 			if (status > 0) call print_error(status)
+! 
+! 			call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! 			if (status > 0) call print_error(status)
+! 			i = atom%lines(kr)%i
+! 			j = atom%lines(kr)%j
+! 			call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+! 			call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+! 			call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+! 			pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+! 			call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+!  
+! 			call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+! 			call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+! 			call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+! 			pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+! 			call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+! 	
+! 			call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+! 			call ftpkyj(unit,'ib',atom%lines(kr)%Nblue+dk_min,'index blue',status)
+! 			call ftpkyj(unit,'ir',atom%lines(kr)%Nred+dk_max,'index red',status)
+! 			call ftpkyj(unit,'i',i,'',status)
+! 			call ftpkyj(unit,'j',j,'',status)
+! 			call ftpkyd(unit,'gi',atom%g(i),-7,'',status)
+! 			call ftpkyd(unit,'gj',atom%g(j),-7,'',status)
+! 			call ftpkye(unit,'dv',hv,-7,'km.s^-1',status)
+! 			call ftpkyd(unit,'lambda0',atom%lines(kr)%lambda0,-7,'nm',status)
+! 			call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(kr)%lambda0,-7,'1e15 Hz',status)
+! 
+! 			Write the array to the FITS file.
+! 			call ftpprd(unit,group,fpixel,nelements,atom%lines(kr)%map,status)
+! 			if (status > 0) call print_error(status)
+! 
+! 		enddo
 	
 		atom => NULL()
   		!  Close the file and free the unit number.
