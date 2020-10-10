@@ -40,31 +40,29 @@ extern "C" {
 
     //wall_list wl; // I am not adding extra walls yet
     bool xperiodic,yperiodic,zperiodic ;
-    pre_container *pcon=NULL; // pre-container pointer
 
     xperiodic = false ;
     yperiodic = false ;
     zperiodic = false ;
 
-    // Define a pre-container to determine the optimal block size
-    pcon=new pre_container(ax,bx,ay,by,az,bz,xperiodic,yperiodic,zperiodic);
-    for(i=0;i<n;i++) {
-      //std::cout << i << " " << x[i] << std::endl;
-      pcon->put(i,x[i],y[i],z[i]);
-    }
-    pcon->guess_optimal(nx,ny,nz);
+    // Makes a guess at the optimal grid of blocks to use, as in voro++ pre_container
+    double dx=bx-ax, dy=by-ay, dz=bz-az;
+    double optimal_particles = 5.6 ;
+    double ilscale=pow(n/(optimal_particles*dx*dy*dz),1/3.0);
+    nx=int(dx*ilscale+1);
+    ny=int(dy*ilscale+1);
+    nz=int(dz*ilscale+1);
 
-    // define the proper container and point the pre-containet toward it
-    particle_order vo;
+    // Define the container
+    particle_order po;
     container con(ax,bx,ay,by,az,bz,nx,ny,nz,xperiodic,yperiodic,zperiodic,init_mem);
-
-    //con.add_wall(wl);
-    pcon->setup(vo,con);
-    delete pcon;
-
-    c_loop_order vlo(con,vo);
+    for(i=0;i<n;i++) {
+      con.put(po,i,x[i],y[i],z[i]);
+    }
 
     // Perform the Voronoi tesselation
+    c_loop_order vlo(con,po);
+
     voronoicell_neighbor c(con);
     int pid ;
     std::vector<int> vi;
