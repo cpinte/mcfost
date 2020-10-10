@@ -559,7 +559,7 @@ contains
        open(unit=1,file=filename,status="old")
        Gcm_to_Rsun = 1e9 * cm_to_m/Rsun
        ! Skipping age block
-       do t=1,age-1
+       do k=1,age-1
           ! header
           do i=1,4
              read(1,*) line_buffer
@@ -591,18 +591,18 @@ contains
     write(*,*) ""
     write(*,*) "New stellar parameters (assuming a BB):"
     do i=1, n_etoiles
-       if (etoile(i)%M < minM_Allard)  then
+       if (etoile(i)%M < minM_Allard) then
           write(*,*) " "
           write(*,*) "*** WARNING : stellar object mass is below isochrone range", etoile(i)%M < minM_Allard
           write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
           write(*,*) "*** The object will not radiate"
           etoile(i)%T = 3.
           etoile(i)%r = 0.01
-       else if (etoile(i)%M < maxM_Allard)  then
+       else if (etoile(i)%M < maxM_Allard) then
           etoile(i)%T = exp(interp(logTeff_Allard(1:k), logM_Allard(1:k), log(etoile(i)%M)))
           etoile(i)%r = exp(interp(logR_Allard(1:k), logM_Allard(1:k), log(etoile(i)%M)))
        else ! using Siess' models
-          if (etoile(i)%M > maxM_Siess)  then
+          if (etoile(i)%M > maxM_Siess) then
              write(*,*) " "
              write(*,*) "*** WARNING : stellar object mass is above in isochrone range"
              write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
@@ -618,7 +618,6 @@ contains
 
        write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", etoile(i)%r, "Rsun"
     enddo
-    write(*,*) ""
 
     ! Passage rayon en AU
     etoile(:)%r = etoile(:)%r * Rsun_to_AU
