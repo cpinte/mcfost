@@ -303,8 +303,8 @@ module Voronoi_grid
           SPH_original_id2(icell) = SPH_original_id(i)
        enddo
 
-       x_tmp = x_tmp2 ; y_tmp = y_tmp2 ; z_tmp = z_tmp2 ; h_tmp = h_tmp2
-       SPH_id = SPH_id2 ; SPH_original_id = SPH_original_id
+       x_tmp(1:n_cells) = x_tmp2(1:n_cells) ; y_tmp(1:n_cells) = y_tmp2 ; z_tmp(1:n_cells) = z_tmp2 ; h_tmp(1:n_cells) = h_tmp2
+       SPH_id(1:n_cells) = SPH_id2(1:n_cells) ; SPH_original_id(1:n_cells) = SPH_original_id2
        deallocate(order,x_tmp2,y_tmp2,z_tmp2,h_tmp2,SPH_id2,SPH_original_id2)
     endif
 
