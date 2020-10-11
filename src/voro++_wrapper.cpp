@@ -33,7 +33,7 @@ extern "C" {
     ay = limits[2]; by = limits[3];
     az = limits[4]; bz = limits[5];
 
-    int i, k, nx,ny,nz,init_mem(8);
+    int i, k, nx,ny,nz,init_mem(16);
 
     int row = n_points_per_cpu * max_neighbours;
 
@@ -63,7 +63,7 @@ extern "C" {
     c_loop_order vlo(con,po);
 
     voronoicell_neighbor c(con);
-    int pid;
+    int pid, pid_loc;
     std::vector<int> vi;
 
     int n_neighbours_cell, first_neighbour, last_neighbour;
@@ -72,7 +72,6 @@ extern "C" {
 
     n_neighbours[cpu_id] = 0;
     last_neighbour = -1;
-    n_in = 0;
 
     float progress = 0.0;
     float progress_bar_step = 0.01;
@@ -85,15 +84,16 @@ extern "C" {
       exit(1);
     }
 
+    pid_loc = -1; // pid_loc is the cell index for this core, ie starting at 0
     do {
       pid = vlo.pid(); // id of the current cell in the c_loop
 
       if ((pid >= icell_start) && (pid <= icell_end)) { // We only compute a fraction of the cells in a given thread
         if (con.compute_cell(c,vlo)) { // return false if the cell was removed
-          n_in++;
+          pid_loc++;
 
           if (cpu_id == n_cpu-1) {
-            if (n_in > pb_threshold) {
+            if (pid_loc > pb_threshold) {
               progress  += progress_bar_step;
               pb_threshold += progress_bar_step*(1.*n)/n_cpu;
               progress_bar(progress);
@@ -119,14 +119,14 @@ extern "C" {
           }
 
           // Compute the maximum distance to a vertex and the distance to the centroid from the particule position
-          delta_edge[pid] = sqrt(c.max_radius_squared()); // does not cost anything
+          delta_edge[pid_loc] = sqrt(c.max_radius_squared()); // does not cost anything
 
           c.centroid(cx,cy,cz);
-          delta_centroid[pid] = sqrt(cx*cx + cy*cy + cz*cz);
+          delta_centroid[pid_loc] = sqrt(cx*cx + cy*cy + cz*cz);
 
           // If the Voronoi cell is elongated, we intersect it with a dodecahedron
-          was_cell_cut[pid] = false;
-          if (delta_edge[pid] > threshold * h[pid]) {
+          was_cell_cut[pid_loc] = false;
+          if (delta_edge[pid_loc] > threshold * h[pid]) {
             cutting_distance = cutting_distance_o_h * h[pid];
 
             // Adding the n-planes to cut the cell
@@ -134,13 +134,14 @@ extern "C" {
               // All the planes are a distance of 0.5 x vector length away from the center of the cell --> extra factor 2
               c.plane(cutting_vectors[k][0], cutting_vectors[k][1], cutting_vectors[k][2], 2*cutting_distance);
             }
-            was_cell_cut[pid] = true;
+            was_cell_cut[pid_loc] = true;
           }
           // Volume of the cell (computed after eventual cut)
-          volume[pid] = c.volume();
+          volume[pid_loc] = c.volume();
         }  // con.compute_cell
       } // pid test
     } while(vlo.inc()); //Finds the next particle to test
+    n_in = pid_loc+1;
 
     if (cpu_id == n_cpu-1) progress_bar(1.0);
   }

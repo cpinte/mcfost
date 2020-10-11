@@ -80,10 +80,10 @@ module Voronoi_grid
 
        integer(c_int), intent(out) :: n_in,  ierr
        integer(c_int), dimension(n_cpu), intent(out) ::  n_neighbours
-       real(c_double), dimension(n_points), intent(out) :: volume, delta_edge, delta_centroid
-       integer(c_int), dimension(n_points), intent(out) :: first_neighbours,last_neighbours
+       real(c_double), dimension(n_points_per_cpu), intent(out) :: volume, delta_edge, delta_centroid
+       integer(c_int), dimension(n_points_per_cpu), intent(out) :: first_neighbours,last_neighbours
        integer(c_int), dimension(n_points_per_cpu * max_neighbours * n_cpu), intent(out) :: neighbours_list
-       logical(c_bool), dimension(n_points), intent(out) :: was_cell_cut
+       logical(c_bool), dimension(n_points_per_cpu), intent(out) :: was_cell_cut
 
      end subroutine voro
   end interface
@@ -205,12 +205,12 @@ module Voronoi_grid
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
     integer, dimension(:), allocatable :: SPH_id, SPH_original_id
     real :: time, mem
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
-    real(kind=dp), dimension(:), allocatable :: delta_edge, delta_centroid
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, n, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
+    real(kind=dp), dimension(:), allocatable :: delta_edge, delta_centroid, delta_edge_tmp, delta_centroid_tmp, V_tmp
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
     integer, dimension(:), allocatable :: neighbours_list_loc
     integer, dimension(nb_proc) :: n_neighbours
-    logical(c_bool), dimension(:), allocatable :: was_cell_cut
+    logical(c_bool), dimension(:), allocatable :: was_cell_cut, was_cell_cut_tmp
 
     logical :: is_outside_stars, lcompute
 
@@ -222,7 +222,7 @@ module Voronoi_grid
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     character(len=2) :: unit
 
-    logical, parameter :: lrandom = .true.
+    logical, parameter :: lrandom = .false.
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
@@ -233,7 +233,7 @@ module Voronoi_grid
     write(*,*) "Finding ", n_walls, "walls"
     call init_Voronoi_walls(n_walls, limits)
 
-    ! For initial poistion of rays in ray-tracing mode
+    ! For initial position of rays in ray-tracing mode
     Rmax = sqrt( (limits(2)-limits(1))**2 + (limits(4)-limits(3))**2 + (limits(6)-limits(5))**2 )
 
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
@@ -402,27 +402,44 @@ module Voronoi_grid
        lcompute = .true.
     endif
 
+
     if (lcompute) then
        ! We initialize arrays at 0 as we have a reduction + clause
        n_in = 0
        !$omp parallel default(none) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
-       !$omp private(id,icell_start,icell_end,ierr) &
-       !$omp reduction(+:volume,n_in,delta_edge,delta_centroid) &
-       !$omp reduction(.or.:was_cell_cut)
+       !$omp private(id,n,icell_start,icell_end,ierr) &
+       !$omp private(V_tmp,delta_edge_tmp,delta_centroid_tmp,was_cell_cut_tmp,alloc_status) &
+       !$omp shared(volume,delta_edge,delta_centroid,was_cell_cut) &
+       !$omp reduction(+:n_in)
        id = 1
        !$ id = omp_get_thread_num() + 1
        icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
        icell_end = (1.0 * (id)) / nb_proc * n_cells
 
-       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, PS%vectors, PS%cutting_distance_o_h, icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
-            n_in,volume,delta_edge,delta_centroid,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut,ierr) ! icell & id shifted by 1 for C
+       ! Allocating results array
+       alloc_status = 0
+       allocate(V_tmp(n_cells_per_cpu), delta_edge_tmp(n_cells), delta_centroid_tmp(n_cells), was_cell_cut_tmp(n_cells), stat=alloc_status)
+       if (alloc_status /=0) call error("Allocation error before voro++ call")
+
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, PS%vectors, PS%cutting_distance_o_h, &
+            icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
+            n_in,V_tmp,delta_edge_tmp,delta_centroid_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
           call exit(1)
        endif
+
+       ! Merging outputs from various cores
+       n=icell_end-icell_start+1
+       volume(icell_start:icell_end) = V_tmp(1:n)
+       delta_edge(icell_start:icell_end) = delta_edge_tmp(1:n)
+       delta_centroid(icell_start:icell_end) = delta_centroid_tmp(1:n)
+       was_cell_cut(icell_start:icell_end) = was_cell_cut_tmp(1:n)
+
+       deallocate(V_tmp, delta_edge_tmp, delta_centroid_tmp, was_cell_cut_tmp)
        !$omp end parallel
 
        !-----------------------------------------------------------
