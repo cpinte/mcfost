@@ -452,7 +452,7 @@ contains
        n_force_empty = 0
        cell_loop : do icell=1,n_cells
           ! We reduce the density on cells that are very elongated
-          if (Voronoi(icell)%delta_edge > 3 * Voronoi(icell)%h) then
+          if (Voronoi(icell)%was_cut) then
              n_force_empty = n_force_empty + 1
              call reduce_density(icell, density_factor)
              cycle cell_loop

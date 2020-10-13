@@ -22,7 +22,6 @@ module Voronoi_grid
   type Voronoi_cell
      real(kind=dp), dimension(3) :: xyz, vxyz
      real(kind=dp) :: h ! SPH smoothing lengths
-     real(kind=dp) :: delta_edge, delta_centroid
      integer :: id, original_id, first_neighbour, last_neighbour
      logical(kind=lp) :: exist, is_star, was_cut
      logical :: masked
@@ -68,7 +67,7 @@ module Voronoi_grid
 
   interface
      subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
-          n_in, volume, delta_edge, delta_centroid, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, ierr) bind(C, name='voro_C')
+          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, n_vectors
@@ -80,7 +79,7 @@ module Voronoi_grid
 
        integer(c_int), intent(out) :: n_in,  ierr
        integer(c_int), dimension(n_cpu), intent(out) ::  n_neighbours
-       real(c_double), dimension(n_points_per_cpu), intent(out) :: volume, delta_edge, delta_centroid
+       real(c_double), dimension(n_points_per_cpu), intent(out) :: volume
        integer(c_int), dimension(n_points_per_cpu), intent(out) :: first_neighbours,last_neighbours
        integer(c_int), dimension(n_points_per_cpu * max_neighbours * n_cpu), intent(out) :: neighbours_list
        logical(c_bool), dimension(n_points_per_cpu), intent(out) :: was_cell_cut
@@ -206,7 +205,7 @@ module Voronoi_grid
     integer, dimension(:), allocatable :: SPH_id, SPH_original_id
     real :: time, mem
     integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, n, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
-    real(kind=dp), dimension(:), allocatable :: delta_edge, delta_centroid, delta_edge_tmp, delta_centroid_tmp, V_tmp
+    real(kind=dp), dimension(:), allocatable :: V_tmp
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
     integer, dimension(:), allocatable :: neighbours_list_loc
     integer, dimension(nb_proc) :: n_neighbours
@@ -222,7 +221,7 @@ module Voronoi_grid
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     character(len=2) :: unit
 
-    logical, parameter :: lrandom = .false.
+    logical, parameter :: lrandom = .true.
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
@@ -335,9 +334,9 @@ module Voronoi_grid
 
     alloc_status = 0
     allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
-         delta_edge(n_cells), delta_centroid(n_cells), was_cell_cut(n_cells), stat=alloc_status)
+         was_cell_cut(n_cells), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi structure")
-    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; delta_edge(:) = 0.0 ; delta_centroid(:) = 0. ; was_cell_cut(:) = .false.
+    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; was_cell_cut(:) = .false.
     Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
     Voronoi(:)%first_neighbour = 0
     Voronoi(:)%last_neighbour = 0
@@ -397,7 +396,7 @@ module Voronoi_grid
 
     if (check_previous_tesselation) then
        call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
-            lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,delta_edge,delta_centroid,was_cell_cut)
+            lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,was_cell_cut)
     else
        lcompute = .true.
     endif
@@ -410,8 +409,8 @@ module Voronoi_grid
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
        !$omp private(id,n,icell_start,icell_end,ierr) &
-       !$omp private(V_tmp,delta_edge_tmp,delta_centroid_tmp,was_cell_cut_tmp,alloc_status) &
-       !$omp shared(volume,delta_edge,delta_centroid,was_cell_cut) &
+       !$omp private(V_tmp,was_cell_cut_tmp,alloc_status) &
+       !$omp shared(volume,was_cell_cut) &
        !$omp reduction(+:n_in)
        id = 1
        !$ id = omp_get_thread_num() + 1
@@ -420,12 +419,12 @@ module Voronoi_grid
 
        ! Allocating results array
        alloc_status = 0
-       allocate(V_tmp(n_cells_per_cpu), delta_edge_tmp(n_cells), delta_centroid_tmp(n_cells), was_cell_cut_tmp(n_cells), stat=alloc_status)
+       allocate(V_tmp(n_cells_per_cpu), was_cell_cut_tmp(n_cells), stat=alloc_status)
        if (alloc_status /=0) call error("Allocation error before voro++ call")
 
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, PS%vectors, PS%cutting_distance_o_h, &
             icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
-            n_in,V_tmp,delta_edge_tmp,delta_centroid_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,ierr) ! icell & id shifted by 1 for C
+            n_in,V_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
@@ -435,11 +434,9 @@ module Voronoi_grid
        ! Merging outputs from various cores
        n=icell_end-icell_start+1
        volume(icell_start:icell_end) = V_tmp(1:n)
-       delta_edge(icell_start:icell_end) = delta_edge_tmp(1:n)
-       delta_centroid(icell_start:icell_end) = delta_centroid_tmp(1:n)
        was_cell_cut(icell_start:icell_end) = was_cell_cut_tmp(1:n)
 
-       deallocate(V_tmp, delta_edge_tmp, delta_centroid_tmp, was_cell_cut_tmp)
+       deallocate(V_tmp, was_cell_cut_tmp)
        !$omp end parallel
 
        !-----------------------------------------------------------
@@ -467,7 +464,7 @@ module Voronoi_grid
        n_neighbours_tot = sum(n_neighbours)
 
        if (check_previous_tesselation) then
-          call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list,delta_edge,delta_centroid,was_cell_cut)
+          call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list,was_cell_cut)
        endif
     else
        write(*,*) "Reading previous Voronoi tesselation"
@@ -479,10 +476,8 @@ module Voronoi_grid
     Voronoi(:)%last_neighbour = last_neighbours(:) + 1
     deallocate(first_neighbours,last_neighbours)
 
-    Voronoi(:)%delta_edge = delta_edge(:)
-    Voronoi(:)%delta_centroid = delta_centroid(:)
     Voronoi(:)%was_cut = was_cell_cut(:)
-    deallocate(delta_edge, delta_centroid,was_cell_cut)
+    deallocate(was_cell_cut)
 
     ! Saving position of the first neighbours to save time on memory access
     ! Warning this seems to cost a fair bit of time
@@ -501,35 +496,6 @@ module Voronoi_grid
           endif
        enddo
     enddo
-
-    ! We check if we get the same test between Fortran and C++
-!--    write(*,*) "TESTING TESSELATION"
-!--    do icell=1,n_cells
-!--       ! We reduce the density on cells that are very elongated
-!--       if (Voronoi(icell)%delta_edge > threshold * Voronoi(icell)%h) then
-!--          if (.not.Voronoi(icell)%was_cut) call error("There was an issue cutting cells 1 !!!")
-!--       else
-!--          !write(*,*) '-------------------------------'
-!--          !write(*,*) icell, Voronoi(icell)%was_cut, Voronoi(icell)%delta_edge,  threshold * Voronoi(icell)%h
-!--          if (Voronoi(icell)%was_cut) then
-!--             write(*,*) icell, Voronoi(icell)%was_cut, Voronoi(icell)%delta_edge,  threshold * Voronoi(icell)%h
-!--             call error("There was an issue cutting cells 2 !!!")
-!--          endif
-!--       end if
-!--    end do
-!--
-!--    do icell = 1, n_cells
-!--       if (Voronoi(icell)%was_cut) then
-!--          if ( Voronoi(icell)%delta_edge < threshold * Voronoi(icell)%h ) then
-!--             write(*,*) "was_cut", icell, Voronoi(icell)%delta_edge, threshold * Voronoi(icell)%h
-!--          endif
-!--       else
-!--          if ( Voronoi(icell)%delta_edge > threshold * Voronoi(icell)%h ) then
-!--             write(*,*) "was_not_cut", icell, Voronoi(icell)%delta_edge, threshold * Voronoi(icell)%h
-!--          endif
-!--       endif
-!--    enddo
-!--    write(*,*) "TESTING OK"
 
     ! Setting-up the walls
     n_missing_cells = 0
@@ -602,14 +568,13 @@ module Voronoi_grid
 
   !**********************************************************
 
-  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,neighbours_list,delta_edge,delta_centroid,was_cell_cut)
+  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,neighbours_list,was_cell_cut)
 
     use, intrinsic :: iso_c_binding, only : c_bool
 
     real(kind=dp), intent(in), dimension(6) :: limits
     integer, intent(in) :: n_in, n_neighbours_tot
     integer, dimension(:), intent(in) :: first_neighbours,last_neighbours, neighbours_list
-    real(kind=dp), dimension(:), intent(in) :: delta_edge, delta_centroid
     logical(c_bool), dimension(:), intent(in) :: was_cell_cut
     character(len=512) :: filename
     character(len=40) :: voronoi_sha1
@@ -619,7 +584,7 @@ module Voronoi_grid
     filename = trim(tmp_dir)//"_voronoi.tmp"
     open(1,file=filename,status='replace',form='unformatted')
     ! todo : add id for the SPH file : filename + sha1 ??  + limits !!
-    write(1) voronoi_sha1, limits, n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list, delta_edge, delta_centroid, was_cell_cut
+    write(1) voronoi_sha1, limits, n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut
     close(1)
 
     return
@@ -630,7 +595,7 @@ module Voronoi_grid
   !**********************************************************
 
   subroutine read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
-       lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,delta_edge, delta_centroid,was_cell_cut)
+       lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,was_cell_cut)
 
     use, intrinsic :: iso_c_binding, only : c_bool
 
@@ -641,7 +606,6 @@ module Voronoi_grid
     integer, intent(out) :: n_in, n_neighbours_tot
     integer, dimension(n_cells), intent(out) :: first_neighbours,last_neighbours
     integer, dimension(n_cells*max_neighbours), intent(out) :: neighbours_list
-    real(kind=dp), dimension(n_cells), intent(out) :: delta_edge, delta_centroid
     logical(c_bool), dimension(n_cells), intent(out) :: was_cell_cut
 
     character(len=512) :: filename
@@ -666,7 +630,7 @@ module Voronoi_grid
 
     ! read the saved Voronoi mesh
     read(1,iostat=ios) voronoi_sha1_saved, limits_saved, n_in, n_neighbours_tot, volume, &
-         first_neighbours,last_neighbours, neighbours_list, delta_edge, delta_centroid, was_cell_cut
+         first_neighbours,last_neighbours, neighbours_list, was_cell_cut
     close(unit=1)
     if (ios /= 0) then ! if some dimension changed
        return

@@ -24,7 +24,7 @@ void progress_bar(float progress) {
 
 extern "C" {
   void voro_C(int n, int max_neighbours, double limits[6], double x[], double y[], double z[], double h[],  double threshold, int n_vectors, double cutting_vectors[][3], double cutting_distance_o_h, int icell_start, int icell_end, int cpu_id, int n_cpu, int n_points_per_cpu,
-              int &n_in, double volume[], double delta_edge[], double delta_centroid[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], bool was_cell_cut[],int &ierr) {
+              int &n_in, double volume[], int first_neighbours[], int last_neighbours[], int n_neighbours[], int neighbours_list[], bool was_cell_cut[],int &ierr) {
 
     ierr = 0 ;
 
@@ -68,7 +68,7 @@ extern "C" {
 
     int n_neighbours_cell, first_neighbour, last_neighbour;
     int max_size_list = max_neighbours * n;
-    double cx, cy, cz, cutting_distance;
+    double cx, cy, cz, cutting_distance, delta_edge;
 
     n_neighbours[cpu_id] = 0;
     last_neighbour = -1;
@@ -118,15 +118,12 @@ extern "C" {
             }
           }
 
-          // Compute the maximum distance to a vertex and the distance to the centroid from the particule position
-          delta_edge[pid_loc] = sqrt(c.max_radius_squared()); // does not cost anything
-
-          c.centroid(cx,cy,cz);
-          delta_centroid[pid_loc] = sqrt(cx*cx + cy*cy + cz*cz);
+          // Compute the maximum distance to a vertex
+          delta_edge = sqrt(c.max_radius_squared()); // does not cost anything
 
           // If the Voronoi cell is elongated, we intersect it with a dodecahedron
           was_cell_cut[pid_loc] = false;
-          if (delta_edge[pid_loc] > threshold * h[pid]) {
+          if (delta_edge > threshold * h[pid]) {
             cutting_distance = cutting_distance_o_h * h[pid];
 
             // Adding the n-planes to cut the cell
