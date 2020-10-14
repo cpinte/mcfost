@@ -344,13 +344,21 @@ module Voronoi_grid
 
     n_cells_per_cpu = (1.0*n_cells) / nb_proc + 1
 
-    write(*,*) "Trying to allocate", 4*n_cells * max_neighbours/ 1024.**2 * 2, "MB for neighbours list"
-    allocate(neighbours_list(n_cells * max_neighbours), neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc), stat=alloc_status)
+    mem = 4. * n_cells * max_neighbours
+    if (mem > 1e9) then
+       mem = mem / 1024**3
+       unit = "GB"
+    else
+       mem = mem / 1024**2
+       unit = "MB"
+    endif
+    write(*,*) "Trying to allocate", mem, unit//" for temporary neighbours list"
+    allocate(neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc), stat=alloc_status)
     if (alloc_status /=0) then
        write(*,*) "Error when allocating neighbours list"
        write(*,*) "Exiting"
     endif
-    neighbours_list = 0 ; neighbours_list_loc = 0
+    neighbours_list_loc = 0
 
     do icell=1, n_cells
        Voronoi(icell)%xyz(1) = x_tmp(icell)
@@ -380,7 +388,7 @@ module Voronoi_grid
 
     call system_clock(time1)
     write(*,*) "Performing Voronoi tesselation on ", n_cells, "SPH particles"
-    mem =  n_cells * (5*2 + 1) * 4
+    mem =  (1.0*n_cells) * (5*2 + 1) * 4.
     if (mem > 1e9) then
        mem = mem / 1024**3
        unit = "GB"
@@ -452,16 +460,33 @@ module Voronoi_grid
           last_neighbours(icell_start:icell_end)  = last_neighbours(icell_start:icell_end)  + last_neighbours(icell_start-1) + 1
        enddo
 
+       ! Compacting neighbours list
+       n_neighbours_tot = sum(n_neighbours)
+       mem = 4. * n_neighbours_tot
+       if (mem > 1e9) then
+          mem = mem / 1024**3
+          unit = "GB"
+       else
+          mem = mem / 1024**2
+          unit = "MB"
+       endif
+       write(*,*) "Trying to allocate", mem, unit//" for neighbours list"
+       allocate(neighbours_list(n_neighbours_tot), stat=alloc_status)
+       if (alloc_status /=0) then
+          write(*,*) "Error when allocating neighbours list"
+          write(*,*) "Exiting"
+       endif
+
        row = n_cells_per_cpu * max_neighbours ;
        k = 0 ;
-
        do id=1, nb_proc
           do i=1, n_neighbours(id)
              k = k+1
              neighbours_list(k) = neighbours_list_loc(row * (id-1) + i)
           enddo
        enddo
-       n_neighbours_tot = sum(n_neighbours)
+       write(*,*) "Freeing temporary neighbours list"
+       deallocate(neighbours_list_loc)
 
        if (check_previous_tesselation) then
           call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list,was_cell_cut)
