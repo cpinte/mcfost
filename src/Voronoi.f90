@@ -199,7 +199,7 @@ module Voronoi_grid
     logical, intent(in) :: check_previous_tesselation
 
 
-    integer, parameter :: max_neighbours = 40  ! maximum number of neighbours per cell (to build neighbours list)
+    integer, parameter :: max_neighbours = 30  ! maximum number of neighbours per cell (to build temporary neighbours list)
 
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
     integer, dimension(:), allocatable :: SPH_id, SPH_original_id
@@ -344,22 +344,6 @@ module Voronoi_grid
 
     n_cells_per_cpu = (1.0*n_cells) / nb_proc + 1
 
-    mem = 4. * n_cells * max_neighbours
-    if (mem > 1e9) then
-       mem = mem / 1024**3
-       unit = "GB"
-    else
-       mem = mem / 1024**2
-       unit = "MB"
-    endif
-    write(*,*) "Trying to allocate", mem, unit//" for temporary neighbours list"
-    allocate(neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc), stat=alloc_status)
-    if (alloc_status /=0) then
-       write(*,*) "Error when allocating neighbours list"
-       write(*,*) "Exiting"
-    endif
-    neighbours_list_loc = 0
-
     do icell=1, n_cells
        Voronoi(icell)%xyz(1) = x_tmp(icell)
        Voronoi(icell)%xyz(2) = y_tmp(icell)
@@ -411,9 +395,26 @@ module Voronoi_grid
 
 
     if (lcompute) then
-       ! We initialize arrays at 0 as we have a reduction + clause
-       n_in = 0
-       !$omp parallel default(none) &
+       mem = 4. * n_cells * max_neighbours
+       if (mem > 1e9) then
+          mem = mem / 1024**3
+          unit = "GB"
+       else
+          mem = mem / 1024**2
+          unit = "MB"
+       endif
+       write(*,*) "Trying to allocate", mem, unit//" for temporary neighbours list"
+       allocate(neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc), stat=alloc_status)
+       if (alloc_status /=0) then
+          write(*,*) "Error when allocating neighbours list"
+          write(*,*) "Exiting"
+       endif
+       neighbours_list_loc = 0
+
+       if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
+
+       n_in = 0 ! We initialize value at 0 as we have a reduction + clause
+       !$omp parallel default(none) num_threads(min(16,nb_proc)) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
        !$omp private(id,n,icell_start,icell_end,ierr) &
@@ -491,7 +492,7 @@ module Voronoi_grid
        if (check_previous_tesselation) then
           call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list,was_cell_cut)
        endif
-    else
+    else !lcompute
        write(*,*) "Reading previous Voronoi tesselation"
     endif
     write(*,*) "Tesselation done"
@@ -609,7 +610,8 @@ module Voronoi_grid
     filename = trim(tmp_dir)//"_voronoi.tmp"
     open(1,file=filename,status='replace',form='unformatted')
     ! todo : add id for the SPH file : filename + sha1 ??  + limits !!
-    write(1) voronoi_sha1, limits, n_in, n_neighbours_tot, volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut
+    write(1) voronoi_sha1, limits, n_in, n_neighbours_tot
+    write(1) volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut
     close(1)
 
     return
@@ -630,14 +632,16 @@ module Voronoi_grid
     logical, intent(out) :: lcompute
     integer, intent(out) :: n_in, n_neighbours_tot
     integer, dimension(n_cells), intent(out) :: first_neighbours,last_neighbours
-    integer, dimension(n_cells*max_neighbours), intent(out) :: neighbours_list
+    integer, dimension(:), allocatable, intent(out) :: neighbours_list
     logical(c_bool), dimension(n_cells), intent(out) :: was_cell_cut
 
     character(len=512) :: filename
-    integer :: ios
+    integer :: ios, alloc_status
+    real :: mem
 
     character(len=40) :: voronoi_sha1, voronoi_sha1_saved
     real(kind=dp), dimension(6) :: limits_saved
+    character(len=2) :: unit
 
     lcompute = .true.
     if (lrandomize_azimuth) return
@@ -654,8 +658,22 @@ module Voronoi_grid
     endif
 
     ! read the saved Voronoi mesh
-    read(1,iostat=ios) voronoi_sha1_saved, limits_saved, n_in, n_neighbours_tot, volume, &
-         first_neighbours,last_neighbours, neighbours_list, was_cell_cut
+    read(1,iostat=ios) voronoi_sha1_saved, limits_saved, n_in, n_neighbours_tot
+    mem = 4. * n_neighbours_tot
+    if (mem > 1e9) then
+       mem = mem / 1024**3
+       unit = "GB"
+    else
+       mem = mem / 1024**2
+       unit = "MB"
+    endif
+    write(*,*) "Trying to allocate", mem, unit//" for neighbours list"
+    allocate(neighbours_list(n_neighbours_tot), stat=alloc_status)
+    if (alloc_status /=0) then
+       write(*,*) "Error when allocating neighbours list"
+       write(*,*) "Exiting"
+    endif
+    read(1,iostat=ios) volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut
     close(unit=1)
     if (ios /= 0) then ! if some dimension changed
        return
