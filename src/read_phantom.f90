@@ -919,11 +919,11 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  do i=1,nptmass
     n_etoiles = n_etoiles + 1
     if (real(xyzmh_ptmass(4,i)) > 0.013) then
-       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)) * scale_length_units_factor, "au, M=", real(xyzmh_ptmass(4,i)) * scale_mass_units_factor, "Msun"
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * scale_mass_units_factor), "Msun"
     else
-       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i)) * scale_length_units_factor, "au, M=", real(xyzmh_ptmass(4,i)) * GxMsun/GxMjup * scale_mass_units_factor, "Mjup"
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * scale_mass_units_factor), "Mjup"
     endif
-    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))) * scale_length_units_factor, "au"
+    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1)) * scale_length_units_factor), "au"
  enddo
 
 
