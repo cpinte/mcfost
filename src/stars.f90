@@ -12,7 +12,7 @@ module stars
   public :: spectre_etoiles, E_stars, ProDiMo_star_HR, R_ISM, E_ISM, prob_E_star
 
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
-       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices
+       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra
 
   private
 
@@ -816,5 +816,79 @@ integer function intersect_stars(x,y,z, u,v,w)
 
 end function intersect_stars
 
+!***********************************************************
+
+subroutine find_spectra()
+  ! Find an appropriate spectrum for all star based on the Teff, mass and radius (i.e. log(g))
+
+  real :: Teff, r, M, logg, min_logg, max_logg
+  integer :: delta_T, i_star
+
+  real, parameter :: delta_logg = 0.5
+
+  character(len=32) :: sTeff, slogg, type
+
+  write(*,*) "Trying to find appropriate stellar spectra ..."
+
+  do i_star = 1, n_etoiles
+     Teff = etoile(i_star)%T
+
+     r = etoile(i_star)%r / Rsun_to_AU
+     M = etoile(i_star)%M
+
+     if (M < tiny_real) then
+        call warning("Stellar mass is not set, forcing log(g) = 3.5")
+        logg = 3.5 ! stellar mass is not defined in the parameter file, we fix logg
+     else
+        logg = logg_Sun + log10(M/r**2)
+     endif
+
+     if (Teff < 100) then
+        call error("Teff below 100K needs to be implemented")
+     else if (Teff < 1500) then
+        type = "cond"
+        min_logg = 2.5
+        max_logg = 6
+        delta_T = 100
+     else if (Teff < 2700) then
+        type = "dusty"
+        min_logg = 3.5
+        max_logg = 6
+        delta_T = 100
+     else if (Teff < 10000) then
+        type = "NextGen"
+        min_logg = 3.5
+        max_logg = 5.5
+        if (Teff <= 4000) then
+           delta_T = 100
+        else
+           delta_T = 200
+        endif
+     else
+        call error("Teff above 10000K needs to be implemented")
+     endif
+
+     ! Rounding off at the nearest point in the grid of stellar atmospheres
+     Teff = nint(Teff/delta_T) * delta_T
+     logg = nint(logg/delta_logg) * delta_logg
+     logg = min(max(logg,min_logg), max_logg)
+
+     if (Teff < 1000) then
+        write(sTeff, "(I3)") int(Teff)
+     else
+        write(sTeff, "(I4)") int(Teff)
+     endif
+     write(slogg, "(F3.1)") logg
+
+     etoile(i_star)%spectre = "lte"//trim(sTeff)//"-"//trim(slogg)//"."//trim(type)//".fits.gz"
+
+     write(*,*) "Star #", i_star, " --> ", trim(etoile(i_star)%spectre)
+  end do
+
+  write(*,*) "Done"
+
+  return
+
+end subroutine find_spectra
 
 end module stars
