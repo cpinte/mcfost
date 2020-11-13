@@ -66,7 +66,7 @@ subroutine set_default_variables()
   lelectron_scattering = .false.
   lstop_after_jnu = .false.
   lsolve_for_ne = .false.
-  n_iterate_ne = 0
+  n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   lvacuum_to_air = .false.
   lcontrib_function = .false.
   lmagnetoaccr = .false.
@@ -88,6 +88,7 @@ subroutine set_default_variables()
   ! Max relative error in transfer. ATM only atomic line transfer
   dpops_max_error = 1e-1
   dpops_sub_max_error = 1e-4
+  art_hv = 0.0 !default is frac * min(vD)
   !
   lpuffed_rim = .false.
   lno_backup = .false.
@@ -748,6 +749,12 @@ subroutine initialisation_mcfost()
      case("-accurate_integ")
         i_arg = i_arg + 1
         laccurate_integ = .true.
+     case("-art_line_resol")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("resolution (km/s) needed with -art_line_resol !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) art_hv
+        i_arg= i_arg+1
      case("-Ng_Norder")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Ng'acc order needed with -Ng_Norder !")
@@ -767,9 +774,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) iNg_Ndelay
         i_arg= i_arg+1
-        if (iNg_Norder <= 0) then
-         call warning ("Ng Ndelay <= 0 setting to 5!")
-         iNg_Ndelay = 5
+        if (iNg_Ndelay < 0) then
+         call warning ("Ng Ndelay < 0 setting to abs!")
+         iNg_Ndelay = abs(iNg_Ndelay)
         endif
      case("-Ng_Nperiod")
         i_arg = i_arg + 1
@@ -777,9 +784,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) iNg_Nperiod
         i_arg= i_arg+1
-        if (iNg_Nperiod <= 0) then
-         call warning ("Ng Nperiod <= 0 setting to 5!")
-         iNg_Nperiod = 5
+        if (iNg_Nperiod < 0) then
+         call warning ("Ng Nperiod < 0 setting to abs!")
+         iNg_Nperiod = abs(iNg_Nperiod)
         endif
      case("-Nray_atom")
         i_arg = i_arg + 1
@@ -1729,6 +1736,7 @@ subroutine display_help()
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
+  write(*,*) "        : -art_line_resol <v> : resolution of the non-LTE grid of art in km/s"
   write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"

@@ -58,21 +58,21 @@ module parametres
 
   ! Atomic line radiative transfer
   !!lstore_opac futur deprecation
-  logical :: lemission_atom, lsolve_for_ne, lelectron_scattering, lvacuum_to_air, &
+  logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
        lcontrib_function, lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
-       ldissolve, laccurate_integ, loutput_rates
+       ldissolve, laccurate_integ, loutput_rates!, lorigin_atom
   integer :: Nrays_atom_transfer
   
   !Convergence relative errors
-  real :: dpops_max_error, dpops_sub_max_error
+  real :: dpops_max_error, dpops_sub_max_error, art_hv
   
   !Ng's acceleration
   logical :: lng_acceleration
   integer :: iNg_Norder, iNg_ndelay, iNg_Nperiod
   
-  !Collisonnal radiative switching
-  !real(kind=dp) :: d_cswitch
-  !logical :: l_cswitch (before csiwtch_enabled)
+  !electron density
+  logical :: lsolve_for_ne
+  integer :: n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
   
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image, jnu_atom_file
@@ -80,7 +80,7 @@ module parametres
   !Magnetic Polarized RT equation
   character(len=20) :: prt_solution
   ! PLUTO / MHD / ascii_model
-  integer :: n_pluto_files, n_iterate_ne
+  integer :: n_pluto_files
   logical :: lpluto_file, lmodel_ascii, lmagnetic_field
 
   ! Decomposition image
@@ -103,6 +103,9 @@ module parametres
   real :: angle_interet, zoom, tau_seuil, wl_seuil
 
   real  :: cutoff = 7.0
+  
+  !must be initialized to 0
+  integer(kind=8) :: mem_alloc_tot !total memory allocated dynamically or not in bytes
 
   ! Résolution de la grille de densité
   ! Nombre de cellules dans la direction r (echantillonage log)
