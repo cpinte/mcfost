@@ -37,6 +37,44 @@ function span(xmin,xmax,n)
 
 end function span
 
+function span_dp(xmin,xmax,n, dk)
+
+  implicit none
+  integer, intent(in) ::dk
+  real(kind=dp), intent(in) :: xmin, xmax
+  integer, intent(in) :: n
+  real(kind=dp), dimension(n) :: span_dp
+  real(kind=dp) :: x1, x2
+  integer :: istart, iend, i0
+
+  integer :: i
+  real(kind=dp) :: delta_x
+
+  delta_x = (xmax-xmin)/real(n-1,kind=dp)
+  
+  if (dk < 0) then
+  	x1 = xmax
+  	x2 = xmin
+  	istart = N-1
+  	iend = 1
+  	i0 = N
+  else
+  	x1 = xmin
+  	x2 = xmax
+  	istart = 2
+  	iend = n
+  	i0 = 1
+  endif
+  
+  span_dp(i0) = x1
+  do i=istart,iend,dk
+     span_dp(i) = span_dp(i-dk) + dk * delta_x
+  enddo
+
+  return
+
+end function span_dp
+
 !************************************************************
 
 function spanl(xmin,xmax,n)
@@ -50,6 +88,18 @@ function spanl(xmin,xmax,n)
   spanl = exp(span(log(abs(xmin)), log(abs(xmax)), n))
 
 end function spanl
+
+function spanl_dp(xmin,xmax,n,dk)
+
+  implicit none
+  integer, intent(in) :: dk
+  real(kind=dp), intent(in) :: xmin, xmax
+  integer, intent(in) :: n
+  real(kind=dp), dimension(n) :: spanl_dp
+
+  spanl_dp = exp(span_dp(log(abs(xmin)), log(abs(xmax)), n, dk))
+
+end function spanl_dp
 
 !************************************************************
 
