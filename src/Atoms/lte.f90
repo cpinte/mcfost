@@ -696,9 +696,9 @@ END FUNCTION get_logPartitionFunctionk
      else !other atoms
    
       if (debye) then
-     	 write(*,*) "Setting LTE populations for atom ", Atoms(n)%ptr_atom%ID, " (shielded)"
+     	 write(*,*) "Setting LTE populations for ", Atoms(n)%ptr_atom%ID, " atom (shielded)"
       else
-     	 write(*,*) "Setting LTE populations for atom ", Atoms(n)%ptr_atom%ID
+     	 write(*,*) "Setting LTE populations for ", Atoms(n)%ptr_atom%ID," atom "
       endif
       CALL LTEpops(Atoms(n)%ptr_atom,debye) !it is parralel 
      endif
@@ -711,22 +711,23 @@ END FUNCTION get_logPartitionFunctionk
     	write(*,*) " -> Setting H minus density from read Hydrogen populations..."
 		allocate(nHmin(n_cells))
    		do k=1,n_cells
-   	
-   			nHmin(k) = nH_minus(k)
-   	
+   			if (icompute_atomRT(k) > 0) nHmin(k) = nH_minus(k)
    		enddo
    		call write_Hminus()
    	endif
    endif !set_ltepops
 
-   !even if we read LTE pops from file, we can still compute n as b*nstar
-   if (allocated(Atoms(n)%ptr_atom%b)) then
-     write(*,*) " -> using departure coefficients to set NLTE populations for atom ", Atoms(n)%ptr_atom%ID
-     Atoms(n)%ptr_atom%n(:,:) = Atoms(n)%ptr_atom%nstar(:,:) * Atoms(n)%ptr_atom%b(:,:)
-   endif
-   
+   !If populations not read from file (that is with NLTEpops = .fals.) we need to set n=nstar
+   !as the first solution.
+   !If the atom initial solution is ZERO_RADIATION field, background opacities are evaluated with n=nstar
+   !and then for the loop with n = SEE(I=0)
 	if (Atoms(n)%ptr_atom%active .and. .not.Atoms(n)%ptr_atom%NLTEpops) then
-		if (Atoms(n)%ptr_atom%initial_solution=="LTE_POPULATIONS") Atoms(n)%ptr_atom%n(:,:) = Atoms(n)%ptr_atom%nstar(:,:)
+		if (Atoms(n)%ptr_atom%initial_solution=='OLD_POPULATIONS') then
+			write(*,*) "here in LTE, set n=nstar for bckgr cont only for LTE and ZERO rad initial sol"
+			stop
+		endif
+		!if (Atoms(n)%ptr_atom%initial_solution=="LTE_POPULATIONS") 
+		Atoms(n)%ptr_atom%n(:,:) = Atoms(n)%ptr_atom%nstar(:,:)
 	endif
 	
 	if (loutput_rates) call write_ltepops_file(52, Atoms(n)%ptr_atom)
