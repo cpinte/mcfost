@@ -61,7 +61,8 @@ MODULE occupation_probability
    npop1 = nH1!hydrogen%n(1,icell)
    npop2 = 0.0_dp
    if (associated(helium)) then
-   	write(*,*) "Check occupation probab with helium"
+   	!!write(*,*) "Check occupation probab with helium"
+   	!need to check though
    	npop2 = helium%n(1,icell)
    endif
    
