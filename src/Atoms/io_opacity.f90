@@ -1007,8 +1007,9 @@ end subroutine write_radiative_rates_atom
   allocate(J_to_write(Nlambda, n_cells), stat=alloc_status)
   if (alloc_status > 0) call error("Allocation error J_to_write")
   
+  J_to_write(:,:) = 0.0_dp
   do icell=1, n_cells
-  	J_to_write(:,icell) = eta_es(:,icell) / thomson(icell)
+  	if (icompute_atomRT(icell)>0) J_to_write(:,icell) = eta_es(:,icell) / thomson(icell)
   enddo
 
   !get unique unit number
