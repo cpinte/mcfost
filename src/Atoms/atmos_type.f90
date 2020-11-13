@@ -1162,7 +1162,7 @@ module atmos_type
      if (allocated(Elements(n)%ptr_elem%mol_index)) deallocate (Elements(n)%ptr_elem%mol_index)
      if (allocated(Elements(n)%ptr_elem%ionpot)) deallocate (Elements(n)%ptr_elem%ionpot)
      if (allocated(Elements(n)%ptr_elem%pf)) deallocate (Elements(n)%ptr_elem%pf)
-     if (allocated(Elements(n)%ptr_elem%n))  deallocate (Elements(n)%ptr_elem%n)
+!      if (allocated(Elements(n)%ptr_elem%n))  deallocate (Elements(n)%ptr_elem%n)
      !if alias exist for this element free it.
      if (associated(Elements(n)%ptr_elem%model)) NULLIFY(Elements(n)%ptr_elem%model)
 !       ! de-alias %model to the proper Atoms(nmet), Atoms will be freed after.
@@ -1469,7 +1469,7 @@ module atmos_type
   end subroutine fillElements
 
   subroutine alloc_atomic_atmos()!(Nspace)
-   !integer, intent(in) :: Nspace
+   integer(kind=8) :: mem_alloc_local = 0
 
    if (allocated(T).or.(allocated(nHtot)) &
        .or.(allocated(ne))) then
@@ -1519,64 +1519,70 @@ module atmos_type
 !    allocate(lcompute_atomRT(Nspace))
    allocate(icompute_atomRT(n_cells))
    icompute_atomRT(:) = 0 !everything transparent at init.
+   
+    mem_alloc_local = sizeof(icompute_atomRT) * 10
+   
+	mem_alloc_tot = mem_alloc_tot + mem_alloc_local
+	write(*,'("Total memory allocated in alloc_atomic_atmos:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
+	
 
    return
    end subroutine alloc_atomic_atmos
-
-!to do, this routine should change according to mcfost density array
+! 
+! !to do, this routine should change according to mcfost density array
    subroutine define_atomRT_domain(itiny_T, itiny_nH)
-   ! Set where to solve for the RT equation: where a cell is not
-   ! transparent = where there is a significant density and temperature.
-   ! Determines also if we have to force electron density calculation
-   ! Might be used to tell where we solve the atomic line RT in case of a wind, magnetospheric
-   !protoplanetary disk model.
-   ! It is also set dark zones.
-   ! icompute_atomRT = 0 -> transparent (rho, T <= tiny_H, tiny_T)
-   ! icompute_atomRT = 1 -> filled (rho, T > tiny_H, tiny_T)
-   ! icompute_atomRT = -1 -> dark (rho goes to infinity and T goes to 0)
-    integer :: icell
+!    ! Set where to solve for the RT equation: where a cell is not
+!    ! transparent = where there is a significant density and temperature.
+!    ! Determines also if we have to force electron density calculation
+!    ! Might be used to tell where we solve the atomic line RT in case of a wind, magnetospheric
+!    !protoplanetary disk model.
+!    ! It is also set dark zones.
+!    ! icompute_atomRT = 0 -> transparent (rho, T <= tiny_H, tiny_T)
+!    ! icompute_atomRT = 1 -> filled (rho, T > tiny_H, tiny_T)
+!    ! icompute_atomRT = -1 -> dark (rho goes to infinity and T goes to 0)
+!     integer :: icell
     real(kind=dp), optional :: itiny_nH, itiny_T
-    real(kind=dp) :: Vchar=0d0, tiny_nH=1d0, tiny_T=1d2
-    !with Very low value of densities or temperature it is possible to have
-    !nan or infinity in the populations calculations because of numerical precisions
-
-    if (present(itiny_T)) then
-     write(*,*) "changing the value of tiny_T (K) = ", tiny_T," to", itiny_T
-     tiny_T = itiny_T !K
-    end if
-
-    if (present(itiny_nH)) then
-     write(*,*) "changing the value of tiny_nH (m^-3) = ", tiny_nH," to", itiny_nH
-     tiny_nH = itiny_nH !m^-3
-    end if
-
-    if (maxval(ne) == 0d0) calc_ne = .true.
-
-    if (tiny_T <= 0) then
-     write(*,*) "changing the value of tiny_T = ", tiny_T," to", 2d2
-     tiny_T = 2d0
-    end if
-    if (tiny_nH <= 0) then
-     write(*,*) "changing the value of tiny_nH = ", tiny_nH," to", 1d0
-     tiny_nH = 1d0
-    end if
-
-write(*,*) nHtot
-write(*,*) "*"
-write(*,*) T
-stop
-    !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T)
-    ! atmos%icompute_atomRT(:) = 0 !transparent !already init
-    where((nHtot > tiny_nH) .and. (T > tiny_T))
-    	icompute_atomRT = 1
-    end where
-!     do icell=1,atmos%Nspace
-! !      atmos%lcompute_atomRT(icell) = &
-! !        (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
-!     if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) &
-!      	atmos%icompute_atomRT(icell) = 1 !filled
-!     end do
-
+!     real(kind=dp) :: Vchar=0d0, tiny_nH=1d0, tiny_T=1d2
+!     !with Very low value of densities or temperature it is possible to have
+!     !nan or infinity in the populations calculations because of numerical precisions
+! 
+!     if (present(itiny_T)) then
+!      write(*,*) "changing the value of tiny_T (K) = ", tiny_T," to", itiny_T
+!      tiny_T = itiny_T !K
+!     end if
+! 
+!     if (present(itiny_nH)) then
+!      write(*,*) "changing the value of tiny_nH (m^-3) = ", tiny_nH," to", itiny_nH
+!      tiny_nH = itiny_nH !m^-3
+!     end if
+! 
+!     if (maxval(ne) == 0d0) calc_ne = .true.
+! 
+!     if (tiny_T <= 0) then
+!      write(*,*) "changing the value of tiny_T = ", tiny_T," to", 2d2
+!      tiny_T = 2d0
+!     end if
+!     if (tiny_nH <= 0) then
+!      write(*,*) "changing the value of tiny_nH = ", tiny_nH," to", 1d0
+!      tiny_nH = 1d0
+!     end if
+! 
+! write(*,*) nHtot
+! write(*,*) "*"
+! write(*,*) T
+! stop
+!     !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T)
+!     ! atmos%icompute_atomRT(:) = 0 !transparent !already init
+!     where((nHtot > tiny_nH) .and. (T > tiny_T))
+!     	icompute_atomRT = 1
+!     end where
+! !     do icell=1,atmos%Nspace
+! ! !      atmos%lcompute_atomRT(icell) = &
+! ! !        (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
+! !     if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) &
+! !      	atmos%icompute_atomRT(icell) = 1 !filled
+! !     end do
+! 
    return
    end subroutine define_atomRT_domain
 
@@ -1612,6 +1618,7 @@ stop
     integer :: icell
     real(kind=dp) :: x, y, z, u, v, w, Bmodule
     real(kind=dp) :: bx, by, bz, r, norme, r2, norme2
+    real(kind=dp) :: sig, si2c
     real(kind=dp), intent(inout) :: cog, co2c
     real :: sign
     
@@ -1620,8 +1627,9 @@ stop
     	Bmodule = sqrt(bx*bx + by*by + bz*bz)
     	!bx = ; by = ; bz = 
     	cog = (bx*u + by*v + bz*w) / Bmodule
+    	sig = sqrt(1.0 - cog*cog)
     	co2c = 2.0 * ( bx / sqrt(bx*bx + by*by) )
-    	
+    	si2c = 2.0 * ( by / sqrt(bx*bx + by*by) )
     else
 
         if (lmagnetoaccr) then
@@ -1631,7 +1639,7 @@ stop
            !only if z strictly positive (2D)
            if ( (.not.l3D) .and. (z < 0_dp) ) Bz = -Bz
            
-           Bmodule = sqrt(Bx * Bx + By*By + Bz * Bz)
+           !Bmodule = sqrt(Bx * Bx + By*By + Bz * Bz)
 
            if (r > tiny_dp) then
               norme = 1.0_dp/r
@@ -1639,14 +1647,19 @@ stop
               Bx = BR(icell) * x * norme - Bphi(icell) * y * norme
               By = BR(icell) * y * norme + Bphi(icell) * x * norme
               
-!               Bmodule = sqrt(Bx * Bx + By*By + Bz * Bz)
+              Bmodule = sqrt(Bx * Bx + By * By + Bz * Bz)
  
               cog = (Bx*u + By*v + Bz*w) / Bmodule
+              sig = sqrt(1.0 - cog*cog)
               co2c = 2.0 * ( Bx / sqrt(Bx*Bx + By * By) )
+              si2c = 2.0 * ( By / sqrt(Bx*Bx + By * By) )
           else
           	  cog = Bz*w / Bmodule
-          	  co2c = 0.0
+          	  co2c = 1.0
+          	  si2c = 0.0
+          	  sig = 0.0
           endif
+          
 		else if (lspherical_velocity) then
 			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
 			Bx = 0.; by = 0.; bz = 0.;
@@ -1663,16 +1676,20 @@ stop
 			!missing Btheta
 			if (r > tiny_dp) then
 				norme = 1.0_dp / r
-				Bx = Br(icell) * x * norme - y * norme2 * Bphi(icell) !+ norme2 * ( z * norme * x * vtheta(icell) )
-				By = Br(icell) * y * norme + x * norme2 * Bphi(icell) !++ norme2 * ( z * norme * y * vtheta(icell) )
-				Bz = Br(icell) * z * norme !- sign * r2 / r * vtheta(icell)
+				Bx = Br(icell) * x * norme - y * norme2 * Bphi(icell) + norme2 * ( z * norme * x * Btheta(icell) )
+				By = Br(icell) * y * norme + x * norme2 * Bphi(icell) + norme2 * ( z * norme * y * Btheta(icell) )
+				Bz = Br(icell) * z * norme - sign * r2 / r * Btheta(icell)
 				Bmodule = sqrt(Bx*Bx + By*By + Bz*Bz)
 				cog = (Bx * u + By * v + Bz * w) / Bmodule
-				co2c = 2.0 * sqrt( Bx / sqrt(bx*bx + by*by) )
+				sig = sqrt(1.0 - cog*cog)
+				co2c = 2.0 * ( Bx / sqrt(bx*bx + by*by) )
+				si2c = 2.0 * ( By / sqrt(bx*bx + by*by) )
 			else
 				Bmodule = 0.0_dp
 				cog = 0.0_dp
+				sig = 0.0
 				co2c = 0.0_dp
+				si2c = 0.0
 			endif
 				
 		else
@@ -1760,72 +1777,6 @@ stop
 
   return
   end subroutine write_atmos_domain
-
-!building
-!   subroutine writeVfield()
-!  ! ------------------------------------ !
-!  ! ------------------------------------ !
-!   use fits_utils, only : print_error
-!   integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
-!   logical :: extend, simple
-!   integer :: nelements
-!   real(kind=dp), dimension(:,:), allocatable :: V
-! 
-!   !get unique unit number
-!   call ftgiou(unit,EOF)
-! 
-!   blocksize=1
-!   call ftinit(unit,"Vfield.fits.gz",blocksize,EOF)
-!   !  Initialize parameters about the FITS image
-!   simple = .true. !Standard fits
-!   group = 1
-!   fpixel = 1
-!   extend = .false.
-!   bitpix = -64
-! 
-!   if (lVoronoi) then
-!    naxis = 2
-!    naxes(1) = atmos%Nspace
-!    naxes(2) = 3
-!    nelements = naxes(1) * naxes(2)
-!   else
-!    if (l3D) then
-!     naxis = 4
-!     naxes(4) = 3
-!     naxes(1) = n_rad
-!     naxes(2) = 2*nz
-!     naxes(3) = n_az
-!     nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
-!    else
-!     naxis = 3 !2 + 1 for all compo
-!     naxes(3) = 3
-!     naxes(1) = n_rad
-!     naxes(2) = nz
-!     nelements = naxes(1) * naxes(2) * naxes(3)
-!    end if
-!   end if
-!   
-!   allocate(V(3, atmos%Nspace)); V = 0.0_dp
-!   V(1,:) = atmos%vR(:)
-!   V(2,:) = atmos%v_z(:)
-!   if (allocated(atmos%vphi)) V(3,:) = atmos%vphi(:)
-! 
-!   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
-!   ! Additional optional keywords
-!   call ftpkys(unit, "UNIT", "m.s^-1", ' ', EOF)
-!   !write data
-!   call ftpprd(unit,group,fpixel,nelements,V,EOF)
-!   
-!   deallocate(V)
-! 
-!   call ftclos(unit, EOF)
-!   call ftfiou(unit, EOF)
-! 
-!   if (EOF > 0) call print_error(EOF)
-! 
-! 
-!   return
-!   end subroutine writeVfield
 
  subroutine writeTemperature()
  ! ------------------------------------ !
@@ -2013,6 +1964,7 @@ stop
      end do
     end do
    end do
+   !!vR = vr/1d1; V2 = v2/1d3; vphi = vphi/1d1
 
    if (lspherical_velocity) then
     vtheta(:) = V2(:)
@@ -2097,7 +2049,7 @@ stop
     Vmod = maxval(sqrt(vR**2+vtheta(:)**2+vphi(:)**2))
    endif
 
-	!v_char = maxval(vturb)
+	
     v_char = v_char + Vmod
 
 
@@ -2124,20 +2076,20 @@ stop
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
 
     if (lspherical_velocity) then
-     write(*,*) " Vr = ", 1e-3 * maxval(abs(vR)), &
-    	1e-3*minval(abs(vr),mask=icompute_atomRT>0)
-     write(*,*) " Vtheta = ",  1e-3 * maxval(abs(vtheta)), &
-    	1e-3*minval(abs(vtheta),mask=icompute_atomRT>0)    
+     write(*,*) " Vr = ", 1d-3 * maxval(abs(vR)), &
+    	1d-3*minval(abs(vr),mask=icompute_atomRT>0)
+     write(*,*) " Vtheta = ",  1d-3 * maxval(abs(vtheta)), &
+    	1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)    
     else if (lmagnetoaccr) then
-     write(*,*) " VRz = ", 1e-3 * maxval(sqrt(VR(:)**2 + v_z(:)**2)), &
-    	1e-3*minval(sqrt(VR(:)**2 + v_z(:)**2),mask=icompute_atomRT>0)
-     write(*,*) " VR = ", 1e-3 * maxval(abs(vR)), &
-    	1e-3*minval(abs(vR),mask=icompute_atomRT>0)
-     write(*,*) " v_z = ",  1e-3 * maxval(abs(v_z)), &
-    	1e-3*minval(abs(v_z),mask=icompute_atomRT>0)
+     write(*,*) " VRz = ", 1d-3 * maxval(sqrt(VR(:)**2 + v_z(:)**2)), &
+    	1d-3*minval(sqrt(VR(:)**2 + v_z(:)**2),mask=icompute_atomRT>0)
+     write(*,*) " VR = ", 1d-3 * maxval(abs(vR)), &
+    	1d-3*minval(abs(vR),mask=icompute_atomRT>0)
+     write(*,*) " v_z = ",  1d-3 * maxval(abs(v_z)), &
+    	1d-3*minval(abs(v_z),mask=icompute_atomRT>0)
     endif
-    write(*,*) " Vphi = ",  1e-3 * maxval(abs(vphi)), &
-    	1e-3*minval(abs(vphi),mask=icompute_atomRT>0)
+    write(*,*) " Vphi = ",  1d-3 * maxval(abs(vphi)), &
+    	1d-3*minval(abs(vphi),mask=icompute_atomRT>0)
 
    
 !    if (xit .and. lspherical_velocity) then
@@ -2161,7 +2113,10 @@ stop
    write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)
    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
    write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)
-
+   if (.not.calc_ne) then
+   	write(*,*) "Maximum/minimum ne density in the model (m^-3):"
+   	write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
+   endif
 
   return
   end subroutine readAtmos_ascii
