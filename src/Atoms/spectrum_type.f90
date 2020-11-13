@@ -7,7 +7,7 @@ module spectrum_type
 	use fits_utils, only : print_error
 	use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
 							lcontrib_function, n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lmagnetic_field, prt_solution, &
-							lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D
+							lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot
 	use input, only : nb_proc, RT_line_method,lkeplerian, linfall, l_sym_ima
 	use constantes, only : arcsec_to_deg
 	use constant, only : clight
@@ -22,8 +22,8 @@ module spectrum_type
 	character(len=*), parameter :: WAVES_FILE="atom_transfer_waves_grid.fits.gz"
    ! not that FLUX_FILE is 1D only if one pixel, otherwise it is a map.
    ! F(x,y,0,lambda) in several directions.
-	character(len=*), parameter :: FLUX_FILE="flux.fits.gz", CF_FILE="cntrb.fits.gz"
-	character(len=*), parameter :: FLUX_FILE_H5="flux.h5", CF_FILE_H5="cntrb.h5"
+	character(len=*), parameter :: FLUX_FILE="flux.fits.gz"
+	character(len=*), parameter :: CF_FILE="cntrb.fits.gz", FLOW_FILE="flow.fits.gz"
 	
 	!shift in index of line profiles, function of iray and nb_proc
 	integer, dimension(:,:), allocatable :: dk
@@ -37,64 +37,14 @@ module spectrum_type
 	real(kind=dp), dimension(:,:), allocatable :: Jnu, Jnu_cont, eta_es
 	real(kind=dp), dimension(:,:), allocatable :: Istar_tot, Istar_cont
 	real(kind=dp), dimension(:,:,:), allocatable :: Itot
-	real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux !incl, az, lambda
+	real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux !incl, az, lambda, id ?
 	real(kind=dp), allocatable, dimension(:,:,:,:) :: Fluxc
-! 	real(kind=dp), allocatable, dimension(:,:,:,:,:) :: Flux !incl,az, npix,npix, lambda, Fluxc
-! 	real(kind=dp), allocatable, dimension(:,:,:,:,:) :: Fluxc
-														!If stored for each trans in a file, store Fluxc only at lambda0   
+
 	real(kind=dp), dimension(:,:,:), allocatable :: rho_p, chiQUV_p, etaQUV_p
 	real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
 	real(kind=dp), allocatable, dimension(:,:,:,:,:,:) :: F_QUV
 	!in only one direction for one point ! 'centre of the model in this direction'
-	real(kind=dp), allocatable, dimension(:,:) :: cntrb_i
-   ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
-   
-!! 	real(kind=dp), allocatable, dimension(:,:,:) :: Psi, Stot, chitot
-	
-!   TYPE AtomicOpacity
-!    !active opacities
-!    real(kind=dp), allocatable, dimension(:,:)   :: chi, eta!, chic_nlte, etac_nlte
-!    ! NLTE magneto-optical elements and dichroism are stored in the background _p arrays.
-!    ! Mainly because we do not use them in SEE, even if etaQUV can be added to the total
-!    ! emissivity. But in case, etaQUV has to be atom dependent, so now we can store the LTE
-!    ! and NLTE is the same variable
-!    !passive opacities
-!    real(kind=dp), allocatable, dimension(:,:)   :: eta_p, chi_p
-! !    real(kind=dp), allocatable, dimension(:,:)   :: eta_c, chi_c!, sca_c
-!    real(kind=dp), allocatable, dimension(:,:,:)   :: rho_p, chiQUV_p, etaQUV_p
-!    real(kind=dp), allocatable, dimension(:,:)   :: jc, jc_nlte, Kc_nlte
-!    real(kind=dp), allocatable, dimension(:,:) :: Kc, sca_c
-! 
-!   end TYPE AtomicOpacity
-! 
-!   TYPE Spectrum
-!    !n_proc should be the last index
-!    type  (GridType), pointer :: atmos
-!    logical :: vacuum_to_air=.false., write_wavelength_grid=.false.
-!    integer :: Nwaves, Nact, Npass, Ntrans, NPROC=1, Nwaves_cont
-!    real(kind=dp) :: wavelength_ref=0.d0 !nm optionnal
-!    real(kind=dp), allocatable, dimension(:) :: lambda, lambda_cont
-!    !nlambda, nrays, nproc
-!    real(kind=dp), allocatable, dimension(:,:,:) :: I, Ic, Stokes_Q, Stokes_U, Stokes_V
-!    real(kind=dp), allocatable, dimension(:,:) :: Istar
-!    !nlambda, nproc
-!    real(kind=dp), allocatable, dimension(:,:) :: J, Jc, J20
-!    !Nlambda, xpix, ypix, Nincl, Naz
-!    real(kind=dp), allocatable, dimension(:,:,:,:,:) :: Flux, Fluxc
-!    real(kind=dp), allocatable, dimension(:,:,:,:,:,:) :: F_QUV
-!    !!real(kind=dp), allocatable, dimension(:,:) :: S_QUV
-!    !Contribution function
-!    !Nlambda,N_INCL, N_AZ, NCELLS
-!    real(kind=dp), allocatable, dimension(:,:,:,:) :: Ksi 
-!    ! Flux is a map of Nlambda, xpix, ypix, nincl, nazimuth
-!    real(kind=dp), allocatable, dimension(:,:,:) :: Psi, etau, S, chi
-!    real(kind=dp), allocatable, dimension(:,:) :: Jext, Jloc
-!    !size of Psi could change during the devlopment
-!    type (AtomicOpacity) :: AtomOpac
-!    character:: Jfile, J20file
-!   end TYPE Spectrum
-! 
-!   type (Spectrum) :: NLTEspec
+	real(kind=dp), allocatable, dimension(:,:) :: cntrb_ray, cntrb, flow_chart !allocate 1 ray if only one direction!
 
 	contains
   
@@ -136,26 +86,16 @@ module spectrum_type
    
 		if (present(lam0)) wavelength_ref = lam0
   
-   ! Initialize the wavelength grid depending on the number of transitions PASSIVE/ACTIVE
-   ! and allocate NLTEspec%lambda
-   ! Set also Nblue and Nred for each transitions: extension of the transtion
-   ! in absolute indexes on the whole grid.
-!    call make_wavelength_grid(NLTEspec%atmos%Natom, NLTEspec%atmos%Atoms, & 
-!                         NLTEspec%lambda, NLTEspec%Ntrans, NLTEspec%wavelength_ref)
-                        
-! 		call make_wavelength_grid_new(atmos%Natom, atmos%Atoms, wavelength_ref, &
-!    										atmos%v_char, lambda, Ntrans, lambda_cont)
+
 		call make_wavelength_grid_new(wavelength_ref, v_char, lambda, Ntrans, lambda_cont)
+		
+		mem_alloc_tot = mem_alloc_tot + sizeof(lambda) + sizeof(lambda_cont)
 
 		!for each line
-		dk_max = sign(1.0_dp, v_char) * int( 1e-3 * abs(v_char) / hv + 0.5 ) !nint( (1e-3 * v_char) / hv)
+		dk_max = int( sign(1.0_dp, v_char) * ( 1e-3 * abs(v_char) / hv + 0.5 ) )!sign(1.0_dp, v_char) * int( 1e-3 * abs(v_char) / hv + 0.5 ) !nint( (1e-3 * v_char) / hv)
 		dk_min = -dk_max
 		write(*,*) "Maximum shift in index:", dk_max, (1e-3 * v_char + hv) / hv - 1.0
-		if (dk_max * hv > v_char*1e-3 + hv) then
-			call warning("Beware, maximum shift might be beyond the grid !")
-		endif
-! 		write(*,*) dk_max * hv, v_char*1e-3, v_char*1e-3 + hv
-! 		stop
+
 		Nlambda_cont = size(lambda_cont)
 		Nlambda = size(lambda)
    !Futur deprecation, rayleigh scattering will undergo a revamp, and some informations
@@ -165,8 +105,8 @@ module spectrum_type
 		if (associated(helium)) helium%scatt_limit = getlambda_limit(helium)
    
 		call writeWavelength()
+
 		call alloc_spectrum(alloc_nlte_vars, Nray)
-		
 
 	return
 	end subroutine init_Spectrum
@@ -310,9 +250,10 @@ call error("initSpectrumImage not modified!!")
 	subroutine alloc_Spectrum(alloc_atom_nlte, Nray)
 		!Polarized quantities allocated in adjustStokes_Mode
 		integer, intent(in) :: Nray
-		integer :: nat, k, Nlambda_max, alloc_status, istar
+		integer :: nat, k, Nlambda_max, alloc_status, istar, size_phi_loc_tot
 		type (AtomType), pointer :: atom
 		logical, intent(in)    :: alloc_atom_nlte
+		integer(kind=8) :: mem_alloc_local = 0
    
 		if (allocated(Itot)) then
 			write(*,*) "Error I already allocated"
@@ -325,28 +266,34 @@ call error("initSpectrumImage not modified!!")
 			allocate(Istar_cont(Nlambda_cont,n_etoiles))
 			Istar_cont(:,:) = 0.0_dp
 		endif
+		
+		mem_alloc_local = mem_alloc_local + sizeof(Istar_tot) + sizeof(Istar_cont)
 
 		allocate(Itot(Nlambda, Nray, nb_proc),stat=alloc_status)
 		if (alloc_status > 0) call error("Allocation error Itot")
 		allocate(Icont(Nlambda_cont, Nray, nb_proc))
 		Itot = 0.0_dp
 		Icont = 0.0_dp
-	
+		
+		mem_alloc_local = mem_alloc_local + sizeof(Itot)+sizeof(Icont) 
+		
 		!allocate(dk(Nray, nb_proc))
 		!if (alloc_status > 0) call error("Allocation error dk")
 
 		allocate(chi_c(Nlambda_cont,n_cells), eta_c(Nlambda_cont,n_cells), stat=alloc_status)
 		!-> At the moment not needed because only Thomson scattering included
 		!allocate(sca_c(Nlambda_cont,n_cells), stat=alloc_status)
+! 		write(*,*) " size chi_c/eta_c ", 2 * n_cells * Nlambda_cont/1024./1024., " MB"
+! 		write(*,*) " size chi_c/eta_c ", (size(chi_c)+size(eta_c))/1024./1024., " MB"
 
 		if (alloc_status > 0) then
-			write(*,*) " mem = ", real(3 * n_cells * Nlambda_cont), " GB"
 			call error("Allocation error, continuum opacities")
 		endif
 		chi_c = 0.0_dp
 		eta_c = 0.0_dp
 		if (allocated(sca_c)) sca_c = 0.0_dp
-
+		
+		mem_alloc_local = mem_alloc_local + sizeof(chi_c) * 2
 
 		allocate(eta(Nlambda ,nb_proc))
 		allocate(chi(Nlambda ,nb_proc))
@@ -361,8 +308,13 @@ call error("initSpectrumImage not modified!!")
 		eta0_bb = 0.0_dp
 		chi0_bb = 0.0_dp
 		
+		mem_alloc_local = mem_alloc_local + sizeof(eta0_bb) * 2
+		
 		!otherwise allocated bellow for nlte.
-		if ((lelectron_scattering).and.(.not.alloc_atom_nlte)) call alloc_jnu
+		if ((lelectron_scattering).and.(.not.alloc_atom_nlte)) then
+			call alloc_jnu
+			mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(eta_es) 
+		endif
 
 
 		if (alloc_atom_nlte) then !NLTE loop activated
@@ -372,83 +324,37 @@ call error("initSpectrumImage not modified!!")
 			if (alloc_status >0) call error("Allocation error eta_c_nlte")
 			chi_c_nlte = 0.0_dp
 			eta_c_nlte = 0.0_dp
+			mem_alloc_local = mem_alloc_local +  2 * sizeof(chi_c_nlte) 
 			
 			call alloc_jnu
+			mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(eta_es) 
                 			
 			! .....  add other NLTE opac
+			size_phi_loc_tot = 0
 			do nat=1, Natom
 				atom => Atoms(nat)%ptr_atom
 				do k=1, atom%Nline
 					allocate(atom%lines(k)%phi_loc(atom%lines(k)%Nred-dk_min+dk_max+1-atom%lines(k)%Nblue,Nray,nb_proc),stat=alloc_status)
 					if (alloc_status > 0) call error("Allocation error line%phi_loc for nlte loop")
+					size_phi_loc_tot = size_phi_loc_tot + sizeof(atom%lines(k)%phi_loc)
 				enddo
 			enddo
+			mem_alloc_local = mem_alloc_local + size_phi_loc_tot
 
 		endif
-
+		
+	mem_alloc_tot = mem_alloc_tot + mem_alloc_local
+	write(*,'("Total memory allocated in alloc_spectrum:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
+	
 	return
 	end subroutine alloc_Spectrum
-	
-! 	subroutine alloc_flux_image
-! 		integer :: alloc_status
-! 		real :: mem_alloc, mem_cont
-!    
-!    		!Continuum image and continuum wavelengths not written atm but still computed for debug
-!    		mem_cont = real(npix_x*npix_y)*real(rt_n_incl*rt_n_az)*real(Nlambda_cont)/1024./1024. + real(Nlambda_cont)/1024./1024.
-! 		mem_alloc = real(npix_x*npix_y)*real(rt_n_incl*rt_n_az)*real(Nlambda)/1024./1024. + real(Nlambda)/1024./1024.
-! 		!Flux  + Flux cont + lines grid
-! 		if (mem_alloc + mem_cont > 1d3) then !in MB
-! 			write(*,*) " allocating ",( mem_alloc + mem_cont )/1024., " GB for flux arrays.."
-! 		else
-! 			write(*,*) " allocating ", mem_alloc + mem_cont, " MB for flux arrays.."  
-! 		endif
-! 		write(*,*) "  -> ", mem_alloc, " MB for fits file"
-! 
-! 		allocate(Flux(Nlambda,NPIX_X, NPIX_Y,RT_N_INCL,RT_N_AZ), stat=alloc_status)
-! 		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux")
-! 		allocate(Fluxc(Nlambda_cont,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ), stat=alloc_status)
-! 		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux continuum")
-! 
-! 		Flux = 0.0_dp
-! 		Fluxc = 0.0_dp
-!     
-! 		!Contribution function
-!    
-! 		if (lcontrib_function) then
-! 
-! 			mem_alloc = real(n_cells,kind=dp)/1024. * real(Nlambda,kind=dp)/1024!in MB
-! 	 
-! 			if (mem_alloc > 1d3) then
-! 				write(*,*) " allocating ", mem_alloc, " GB for contribution function.."
-! 			else
-! 				write(*,*) " allocating ", mem_alloc, " MB for contribution function.."
-! 			endif 
-!       
-! 			if (mem_alloc >= 2.1d3) then !2.1 GB
-! 				call Warning(" To large cntrb_i array. Use a wavelength table instead..")
-! 				lcontrib_function = .false.
-! 			else
-!       
-! 				allocate(cntrb_i(Nlambda,n_cells),stat=alloc_status)
-! 				if (alloc_status > 0) then
-! 					call ERROR('Cannot allocate cntrb_i')
-! 					lcontrib_function = .false.
-! 				else
-! 					cntrb_i(:,:) = 0.0_dp
-! 				endif
-! 
-! 			end if
-! 
-! 		end if
-! 
-!    
-! 	return
-! 	end subroutine alloc_flux_image
+
 	
 	subroutine alloc_flux_image
 		!Store total flux and flux maps for selected lines
 		integer :: alloc_status, kr, nat
 		real :: mem_alloc, mem_flux, mem_cont
+		integer(kind=8) :: mem_alloc_local = 0
 		real, dimension(:), allocatable :: mem_per_file
 		integer :: Nlam, Ntrans, N1, N2
 		
@@ -468,6 +374,7 @@ call error("initSpectrumImage not modified!!")
 					
 					N1 = N1 + (atoms(nat)%ptr_atom%lines(kr)%Nred-dk_min+dk_max- & 
 						atoms(nat)%ptr_atom%lines(kr)%Nblue+1)
+	
 				endif
 				
 
@@ -475,27 +382,31 @@ call error("initSpectrumImage not modified!!")
 			Nlam = Nlam + N1
 			Ntrans = Ntrans + N2
 			!one per atol
-			mem_per_file(nat) = real(N1*N2)*real(npix_x*npix_y)*real(rt_n_incl)*real(rt_n_az)/real(1024*1024)
+			mem_per_file(nat) = sizeof(N1*N2*npix_x*npix_y * rt_n_incl* rt_n_az)
 		
 		enddo
+		mem_per_file(:) = mem_per_file /real(1024*1024)
 
-		if (maxval(mem_per_file)/1024 > 2.5) then
+		if (8*maxval(mem_per_file)/1024 > 2.5) then
 			call warning("Size of fits file to store flux map might be large")
 			write(*,*) "change the number of lines you want to keep"
 		endif
 		
 		!total flux and total cont  +  their wavelength grid  
-   		mem_cont = real(Nlambda_cont)/1024./1024. + real(Nlambda_cont*rt_n_incl*rt_n_az*nb_proc)/1024/1024.
-		mem_flux = real(Nlambda)/1024./1024. + real(Nlambda*rt_n_incl*rt_n_az*nb_proc)/1024/1024.
+   		mem_cont = Nlambda_cont + Nlambda_cont*rt_n_incl*rt_n_az*nb_proc
+		mem_flux = Nlambda + Nlambda*rt_n_incl*rt_n_az*nb_proc
+		
 		
 		if (Ntrans > 0) then
 		!total space for flux map + space for lines wavelength grid + space for single continuum map at nu0
-			mem_alloc = ( real(Nlam)*real(npix_x)*real(npix_y)*real(rt_n_incl)*real(rt_n_az) + &
-			real(Nlam) + real(npix_x)*real(npix_y)*real(rt_n_incl)*real(rt_n_az) ) / real(1024*1024)
+			mem_alloc = Nlam*npix_x*npix_y*rt_n_incl*rt_n_az + Nlam + npix_x*npix_y*rt_n_incl*rt_n_az
 		else
-			mem_alloc = 0.0
+			mem_alloc = 0
 		endif
-		
+				
+		mem_flux = 8 * mem_flux / 1024. / 1024.
+		mem_cont = 8 * mem_cont / 1024. / 1024.
+		mem_alloc = 8 * mem_alloc / 1024. / 1024.
 		
 		!Flux  + Flux cont + lines grid
 		if (mem_flux + mem_cont > 1d3) then !in MB
@@ -515,7 +426,7 @@ call error("initSpectrumImage not modified!!")
 		
 		endif
 		
-		write(*,*) "  -> ", mem_alloc+mem_flux+mem_cont, " MB in total"
+	    write(*,*) "  -> ", mem_alloc+mem_flux+mem_cont, " MB in total"
 
 		!remove the pixel dimension
 		allocate(Flux(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
@@ -524,6 +435,8 @@ call error("initSpectrumImage not modified!!")
 		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux continuum")
 		Flux(:,:,:,:) = 0.0_dp
 		Fluxc(:,:,:,:) = 0.0_dp
+		
+		mem_alloc_local = mem_alloc_local + sizeof(Flux)+sizeof(fluxc)
 		
 		!now for the lines 
 		do nat=1, Natom
@@ -543,6 +456,7 @@ call error("initSpectrumImage not modified!!")
 						call error("Cannot allocate map for this line !")
 					endif
 					atoms(nat)%ptr_atom%lines(kr)%map(:,:,:,:,:) = 0.0_dp
+					mem_alloc_local = mem_alloc_local + sizeof(atoms(nat)%ptr_atom%lines(kr)%map)
 				
 				endif
 				
@@ -551,40 +465,116 @@ call error("initSpectrumImage not modified!!")
 		
 		enddo
     
-		!Contribution function
+		!Contribution functions (for one ray it is allocated elsewhere)
    		!Future: contribution function for selected lines only !
 		if (lcontrib_function) then
-
-			mem_alloc = real(n_cells,kind=dp)/1024. * real(Nlambda,kind=dp)/1024!in MB
+		
+			mem_alloc = 8 * n_cells * Nlambda / 1024./ 1024.
 	 
 			if (mem_alloc > 1d3) then
-				write(*,*) " allocating ", mem_alloc, " GB for contribution function.."
+				write(*,*) " allocating ", mem_alloc/1024., " GB for contribution function.."
 			else
 				write(*,*) " allocating ", mem_alloc, " MB for contribution function.."
 			endif 
       
 			if (mem_alloc >= 2.1d3) then !2.1 GB
-				call Warning(" To large cntrb_i array. Use a wavelength table instead..")
+				call Warning(" To large cntrb array. Use a wavelength table instead..")
 				lcontrib_function = .false.
 			else
       
-				allocate(cntrb_i(Nlambda,n_cells),stat=alloc_status)
+				allocate(cntrb(Nlambda,n_cells),stat=alloc_status)
+				mem_alloc_local = mem_alloc_local + sizeof(cntrb)
 				if (alloc_status > 0) then
-					call ERROR('Cannot allocate cntrb_i')
+					call ERROR('Cannot allocate cntrb_ray')
 					lcontrib_function = .false.
 				else
-					cntrb_i(:,:) = 0.0_dp
+					cntrb(:,:) = 0.0_dp
 				endif
 
 			end if
 
 		end if
+		
+!		if (lorigin_atom) !not a global parameter yet but still allocated
+			mem_alloc = 8 * n_cells * Nlambda / 1024./ 1024.
+			if (mem_alloc > 1d3) then
+				write(*,*) " allocating ", mem_alloc/1024., " GB for local emission origin.."
+			else
+				write(*,*) " allocating ", mem_alloc, " MB for local emission origin.."
+			endif 
+      
+			if (mem_alloc >= 2.1d3) then !2.1 GB
+				call Warning(" To large flow_chart array. Use a wavelength table instead..")
+				!lorigin_atom = .false.
+			else
+      
+				allocate(flow_chart(Nlambda,n_cells),stat=alloc_status)
+				mem_alloc_local = mem_alloc_local + sizeof(flow_chart)
+				if (alloc_status > 0) then
+					call ERROR('Cannot allocate flow_chart')
+					!lorigin_atom = .false.
+				else
+					flow_chart(:,:) = 0.0_dp
+				endif
 
+			end if		
+! 		endif
+
+
+		mem_alloc_tot = mem_alloc_tot + mem_alloc_local
+		write(*,'("Total memory allocated in alloc_flux_image:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
+	
 
 		deallocate(mem_per_file)
    
 	return
 	end subroutine alloc_flux_image
+	
+! 	subroutine fill_map(ibin,iaz,ipix,jpix,method, I0)
+! 		real(kind=dp), intent(in) :: I0(Nlambda)!It's actually I0 * normF
+! 		integer, intent(in) :: ibin, iaz, ipix, jpix, method
+! 		integer :: nat, kr, nr, nb
+! 		type (AtomType), pointer :: atom
+! 		
+! 		if (method==1) then
+! 		!summation over pixels
+! 			do nat=1,Natom
+! 				atom => atoms(nat)%ptr_atom
+! 				do kr=1,atom%Nline
+!   		
+! 					if (atom%lines(kr)%write_flux_map) then
+! 						nr = atom%lines(kr)%Nred + dk_max
+! 						nb = atom%lines(kr)%Nblue + dk_min
+!   			
+!   						atom%lines(kr)%map(:,1,1,ibin,iaz) = &
+!   						atom%lines(kr)%map(:,1,1,ibin,iaz) + I0(nb:nr)
+!   				
+!   					endif
+!   		
+!   				enddo
+!   				atom => NULL()
+!   			enddo
+! 		else!2D maps
+! 			do nat=1,Natom
+!   				atom => atoms(nat)%ptr_atom
+!   				do kr=1,atom%Nline
+!   		
+!   					if (atom%lines(kr)%write_flux_map) then
+!   						nr = atom%lines(kr)%Nred + dk_max
+!   						nb = atom%lines(kr)%Nblue + dk_min
+!   			
+!   						atom%lines(kr)%map(:,ipix,jpix,ibin,iaz) = I0(nb:nr)
+!   				
+!   					endif
+!   		
+!   				enddo
+!   				atom => NULL()
+!   			enddo
+!   
+!   		endif
+! 	
+! 	return
+! 	end subroutine fill_map
 
 	subroutine dealloc_spectrum() 
   
@@ -605,91 +595,23 @@ call error("initSpectrumImage not modified!!")
 			deallocate(etaQUV_p)
 			deallocate(chiQUV_p)
 		endif
-   
-! 		if (allocated(psi)) deallocate(Psi)
-! 		if (allocated(stot)) deallocate(Stot)
-! 		if (allocated(chitot)) deallocate(chitot)
+
 
 		deallocate(chi_c,  eta_c)
 		if (allocated(sca_c)) deallocate(sca_c)
 		deallocate(chi, eta)
 		deallocate(chi0_bb, eta0_bb)
 
-   !elsewhere
-   !if (NLTEspec%Nact > 0) deallocate(NLTEspec%AtomOpac%Kc_nlte, NLTEspec%AtomOpac%jc_nlte)
 
-
-	!Can be deallocated before to save memory
-		if (allocated(cntrb_i)) deallocate(cntrb_i)
+		if (allocated(cntrb_ray)) deallocate(cntrb_ray)
+		if (allocated(cntrb)) deallocate(cntrb)
+		if (allocated(flow_chart)) deallocate(flow_chart)
 
 
 	return
 	end subroutine dealloc_Spectrum
 
-! 	subroutine initAtomOpac(id)
-! 		integer, intent(in) :: id
-!     
-! 
-! 		NLTEspec%AtomOpac%chi_p(:,id) = 0d0
-! 		NLTEspec%AtomOpac%eta_p(:,id) = 0d0
-! 
-!     
-! 	return
-! 	end subroutine initAtomOpac
-  
-!   subroutine initAtomOpac_nlte(id)!, eval_operator)
-!     ! set opacities to 0d0 for thread id
-!     integer, intent(in) :: id
-!     !logical, intent(in) :: eval_operator !: evaluate operator psi
-!     
-!     !need to be sure that id is > 0
-! !     if (id <= 0) then
-! !      write(*,*) "(initAtomOpac) thread id has to be >= 1!"
-! !      stop
-! !     end if
-! 
-!     NLTEspec%AtomOpac%chi(:,id) = 0d0
-!     NLTEspec%AtomOpac%eta(:,id) = 0d0
-!     
-! !     NLTEspec%AtomOpac%chic_nlte(:,id) = 0d0 
-! !     NLTEspec%AtomOpac%etac_nlte(:,id) = 0d0
-! 
-! 
-!     
-!   return
-!   end subroutine initAtomOpac_nlte
-  
-!   subroutine initAtomOpac_zeeman(id)!, eval_operator)
-!     ! set opacities to 0d0 for thread id
-!     integer, intent(in) :: id
-!     !logical, intent(in) :: eval_operator !: evaluate operator psi
-!     
-!     !need to be sure that id is > 0
-! !     if (id <= 0) then
-! !      write(*,*) "(initAtomOpac) thread id has to be >= 1!"
-! !      stop
-! !     end if
-! 
-! 
-!     
-!     !Currently LTE or NLTE Zeeman opac are not stored on memory. They change with 
-!     !direction. BUT the star is assumed to not emit polarised photons (from ZeemanEffect)
-!     !So we do not take into account this opac in Metal_lambda and futur NLTEOpacity_lambda
-!     !if (NLTEspec%atmos%magnetized .and. PRT_SOLUTION == "FULL_Stokes_") then
-!     !check allocation because even if magnetized, due to the FIELD_FREE solution or WF
-!     !they might be not allocated !if (allocated(NLTEspec%AtomOpac%rho_p)) 
-!     NLTEspec%AtomOpac%rho_p(:,:,id) = 0d0
-!     NLTEspec%AtomOpac%etaQUV_p(:,:,id) = 0d0
-!     NLTEspec%AtomOpac%chiQUV_p(:,:,id) = 0d0
-!      !both NLTE and LTE actually.
-!      !If one want to add them in SEE, it has to be atom (atom%eta) dependent for emissivity.
-!      !adding the off diagonal elements in SEE results in solving for the whole
-!      !density matrix, WEEEEEEELLLLL beyond our purpose.
-!     !end if
-!     
-!   return
-!   end subroutine initAtomOpac_zeeman
-  
+
 	subroutine alloc_Jnu()
   
 		!allocate(Jnu(Nlambda,n_cells))
@@ -713,111 +635,6 @@ call error("initSpectrumImage not modified!!")
 	return 
 	end subroutine dealloc_Jnu
   
-! 	subroutine init_psi_operator_m(id)!, iray)
-! 		integer, intent(in) :: id!, iray
-! 		integer :: nact
-!     
-! 		NLTEspec%Psi(:,:,id) = 0d0
-! 		NLTEspec%etau(:,:,id) = 0d0
-!    	
-! 		do nact=1,NLTEspec%atmos%NactiveAtoms
-! !works only for MALI
-! 			NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%eta(:,:,id) = 0d0
-! 			NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%etac(:,id) = 0d0
-! 			NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%chic(:,id) = 0d0
-! 		enddo
-!   
-! 	return
-! 	end subroutine init_psi_operator_m
-
-! 	subroutine init_psi_operator(id)
-! 		integer, intent(in) :: id
-! 		integer :: nact
-!     
-! 		NLTEspec%Psi(:,:,id) = 0d0
-! 		NLTEspec%etau(:,:,id) = 0d0
-! 		NLTEspec%S(:,:,id) = 0d0
-! 
-! !Only if for sub iterations, I compute the local nlte cont for iray==1 only.
-! !Or if it is not too costly I recompute them for each ray, even if ray indep..   	
-! ! 		do nact=1,NLTEspec%atmos%NactiveAtoms
-! ! 			NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%etac(:,id) = 0d0
-! ! 			NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%chic(:,id) = 0d0
-! ! 		enddo
-!   
-! 	return
-! 	end subroutine init_psi_operator
-	
-	
-! 	subroutine init_Iext_line(iray,id)
-! 		integer, intent(in) :: iray, id
-! 		integer :: nact, kr, Nb, Nr
-! 		real(kind=dp) :: dk
-! 		
-! 		do nact=1, NLTEspec%atmos%NActiveatoms
-! 		
-! 			do kr=1, NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%Nline
-! 				dk = NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%dk(iray,id)
-! 
-! 				Nb = NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%Nblue
-! 				Nr = NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%Nred
-! 				
-! 				NLTEspec%atmos%ActiveAtoms(nact)%ptr_atom%I_ij(:,iray,id) = &
-! 					NLTEspec%I(Nb+dk:Nr+dk,iray,id) !!* exp(-)
-! 			
-! 			enddo
-! 		
-! 		enddo
-! 	
-! 	return
-! 	end subroutine init_Iext_line
-
-  
-!   subroutine alloc_weights()
-!   ! --------------------------------------------------- !
-!    ! 
-!   ! --------------------------------------------------- !
-!    use atmos_type, only : atmos
-!    integer :: kr, nact
-!    type(AtomicLine) :: line
-!    type(AtomicContinuum) :: cont
-!    
-!    do nact=1,atmos%Nactiveatoms
-!     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-!        line = atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)
-!        allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%w_lam(line%Nlambda))
-! !        allocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%phi_ray(line%Nlambda,NLTEspec%atmos%Nrays, nb_proc))
-! 
-!     end do
-!     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
-!        cont = atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)
-!        allocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%w_lam(cont%Nlambda))
-!     end do
-!    end do
-!  
-!   return
-!   end subroutine alloc_weights
-  
-!   subroutine dealloc_weights()
-!   ! --------------------------------------------------- !
-!    ! 
-!   ! --------------------------------------------------- !
-!    use atmos_type, only : atmos
-!    integer :: kr, nact
-!    
-!    do nact=1,atmos%Nactiveatoms
-!     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Nline
-!        if (allocated(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%w_lam)) &
-!        	deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%w_lam)
-! !        deallocate(atmos%ActiveAtoms(nact)%ptr_atom%lines(kr)%phi_ray)
-!     end do
-!     do kr=1,atmos%ActiveAtoms(nact)%ptr_atom%Ncont
-!        deallocate(atmos%ActiveAtoms(nact)%ptr_atom%continua(kr)%w_lam)
-!     end do
-!    end do
-!  
-!   return
-!   end subroutine dealloc_weights
 
 	subroutine write_flux()
 	!
@@ -1245,254 +1062,30 @@ call error("initSpectrumImage not modified!!")
 	return
 	end subroutine write_flux
 
-
-! 	subroutine write_image()
-! 	! -------------------------------------------------- !
-! 	! Write the spectral Flux map on disk.
-! 	! FLUX map:
-! 	! NLTEspec%Flux total and NLTEspec%Flux continuum
-! 	! --------------------------------------------------- !
-!   !!use input
-! 	integer :: status,unit,blocksize,bitpix,naxis
-! 	integer, dimension(6) :: naxes
-! 	integer :: group,fpixel,nelements, i, xcenter
-! 	integer :: la, Nred, Nblue, kr, kc, m, Nmid
-! 	logical :: simple, extend
-! 	character(len=6) :: comment="VACUUM"
-! 	real(kind=dp) :: lambda_vac(Nlambda), Fnu, lambdac_vac(Nlambda_cont)
-! 	real :: pixel_scale_x, pixel_scale_y 
-!   
-! 	write(*,*) "Writing Flux-map"
-! 	write(*,*) "npix_x = ", npix_x, " npix_y = ", npix_y, ' RT method:', RT_line_method
-! 	write(*,*) "Wavelength points:", Nlambda
-!   
-!    !  Get an unused Logical Unit Number to use to open the FITS file.
-! 	status=0
-! 	call ftgiou (unit,status)
-! 
-!    !  Create the new empty FITS file.
-! 	blocksize=1
-! 	call ftinit(unit,trim(FLUX_FILE),blocksize,status)
-! 
-! 	simple=.true.
-! 	extend=.true.
-! 	group=1
-! 	fpixel=1
-! 
-! 	bitpix=-64
-! 	naxis=5
-! 	naxes(1)=Nlambda!1!1 if only one wavelength
-! 
-! 	if (RT_line_method==1) then
-! 		naxes(2)=1
-! 		naxes(3)=1
-! 	else
-! 		naxes(2)=npix_x
-! 		naxes(3)=npix_y
-! 	endif
-! 	naxes(4)=RT_n_incl
-! 	naxes(5)=RT_n_az
-! 	nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-!   ! write(*,*) (naxes(i), i=1,naxis)
-! 
-!   !  Write the required header keywords.
-! 	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-! 	if (status > 0) then
-! 		call print_error(status)
-! 	endif
-! 
-!    !!RAC, DEC, reference pixel & pixel scale en degres
-! 	call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-! 	call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
-! 	call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
-! 	pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-! 	call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
-!  
-! 	call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-! 	call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
-! 	call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
-! 	pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
-! 	call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
-! 
-! 	call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
-! 
-! 	if ((lkeplerian .or. linfall .or. lmagnetoaccr).and.(l_sym_ima)) &
-! 		write(*,*) "Warning, image symmetry might be wrong."
-! 		if (l_sym_ima.and.RT_line_method == 2) then 
-! 			xcenter = npix_x/2 + modulo(npix_x,2)
-! 			do i=xcenter+1,npix_x
-! 				Flux(:,i,:,:,:) = Flux(:,npix_x-i+1,:,:,:)
-! 			end do
-! 	end if ! l_sym_image
-! 
-! 	!  Write the array to the FITS file.
-! 	call ftpprd(unit,group,fpixel,nelements,Flux,status)
-! 	if (status > 0) then
-! 		call print_error(status)
-! 	endif
-! 
-! !-> Continuum map not written ATM.
-!   ! create new hdu for continuum
-! !   call ftcrhd(unit, status)
-! !   if (status > 0) then
-! !      call print_error(status)
-! !   endif
-! ! 
-! !   !naxis(1) = NLTEspec%Nwaves_cont
-! !   !nelements = naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5)
-! ! 
-! !   !  Write the required header keywords.
-! !   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-! !   call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-! !   call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
-! !   call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
-! !   pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-! !   call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
-! !  
-! !   call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-! !   call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
-! !   call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
-! !   pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
-! !   call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
-! !   call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
-! !   
-! !   if (l_sym_ima.and.(RT_line_method == 2)) then
-! !    xcenter = npix_x/2 + modulo(npix_x,2)
-! !    do i=xcenter+1,npix_x
-! !     NLTEspec%Fluxc(:,i,:,:,:) = NLTEspec%Fluxc(:,npix_x-i+1,:,:,:)
-! !    end do
-! !   end if ! l_sym_image
-! !     
-! !
-! !	write continuum wavelengths
-! !
-! !
-! !   call ftpprd(unit,group,fpixel,nelements,NLTEspec%Fluxc,status)
-! !   if (status > 0) then
-! !      call print_error(status)
-! !   endif
-! !   
-!   
-!   ! write polarized flux if any. Atmosphere magnetic does not necessarily
-!   								!means we compute polarization
-! 	if ((lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES") .and. (RT_line_method == 2)) then
-! 		write(*,*) " -> Writing polarization"
-! 		call ftcrhd(unit, status)
-! 		if (status > 0) then
-! 			call print_error(status)
-! 		endif
-! 		naxis = 6
-! 		naxes(1) = 3 !Q, U, V
-! 		naxes(2)=Nlambda
-! 		naxes(3)=npix_x
-! 		naxes(4)=npix_y
-! 		naxes(5)=RT_n_incl
-! 		naxes(6)=RT_n_az
-! 		nelements = naxes(1)*naxes(2)*naxes(3)*naxes(4)*naxes(5) * naxes(6)
-! 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-! 		call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'Polarised Flux (Q, U, V)',status)
-! 		call ftpprd(unit,group,fpixel,nelements,F_QUV,status)
-! 		if (status > 0) then
-! 			call print_error(status)
-! 		endif
-! 	end if
-!   
-!   ! create new hdu for wavelength grid
-! 	call ftcrhd(unit, status)
-!   
-! 	if (status > 0) then
-! 		call print_error(status)
-! 	endif
-!   
-! 	if (lvacuum_to_air) then
-! 		comment="AIR"
-! 		lambda_vac = lambda
-!      	lambda = vacuum2air(Nlambda, lambda)
-! 	end if 
-!    
-! 	naxis = 1
-! 	naxes(1) = Nlambda
-! 	write(*,*) " (debug) writing lambda to image.."
-! 	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-! 	call ftpkys(unit, "UNIT", "nm", comment, status)
-! 	call ftpprd(unit,group,fpixel,Nlambda,lambda,status)
-! 	if (status > 0) then
-! 		call print_error(status)
-! 	endif
-! 
-!   !  Close the file and free the unit number.
-! 	call ftclos(unit, status)
-! 	if (status > 0) then
-! 		write(*,*) "error at closing"
-! 		call print_error(status)
-! 	endif
-! 	call ftfiou(unit, status)
-! 	if (status > 0) then
-! 		write(*,*) "error at free unit"
-! 		call print_error(status)
-! 	endif
-! 
-!   !  Check for any error, and if so print out error messages
-! 	if (status > 0) then
-! 		call print_error(status)
-! 	endif
-! 	write(*,*) " (debug) done."
-! 
-! 
-! 	return
-! 	end subroutine write_image
  
-! 	subroutine write_flux_ascii
-! 	! -------------------------------------------------- !
-! 	! written only for the first inclination / azimuth
-! 	! --------------------------------------------------- !
-!   		integer :: status,unit
-! 		integer :: la, j, i
-! 		real(kind=dp), dimension(:), allocatable :: Fnu, Fnuc
-!   
-!   
-!    !  Get an unused Logical Unit Number to use to open the FITS file.
-! 		status=0
-! 		unit = 10
-! 		allocate(Fnu(Nlambda), Fnuc(Nlambda_cont))
-! 		Fnu = 0.
-! 		Fnuc = 0.
-! 		if (RT_line_method==2) then
-! 			do i=1, npix_x
-! 				do j=1, npix_y
-! 					Fnu = Fnu + Flux(:,i,j,1,1)
-! 				enddo
-! 			enddo
-! 			do i=1, npix_x
-! 				do j=1, npix_y
-! 					Fnuc = Fnuc + Fluxc(:,i,j,1,1)
-! 				enddo
-! 			enddo
-! 		else if (RT_line_method==1) then
-! 		
-! 			Fnu(:) = Flux(:,1,1,1,1)
-! 			Fnuc(:) = Fluxc(:,1,1,1,1)
-! 		else
-! 			call error("RT_method unknown, write_flux_ascii")
-! 		endif
-!    	
-! 		open(unit,file="flux.s", status='unknown', iostat=status)
-! 		do la=1, Nlambda
-! 			write(unit, *) lambda(la), Fnu(la)
-! 		enddo
-! 		close(unit)
-! 	
-! 		open(unit,file="fluxc.s", status='unknown', iostat=status)
-! 		do la=1, Nlambda_cont
-! 			write(unit, *) lambda_cont(la), fnuc(la)
-! 		enddo
-! 		close(unit)
-! 
-!    
-! 		deallocate(Fnu, Fnuc)
-! 
-! 	return
-! 	end subroutine write_flux_ascii
+	subroutine write_1D_arr_ascii(N, x, arr, filename)
+	! -------------------------------------------------- !
+	! write 2 table, x and arr (size(x)) to ascii file
+	! --------------------------------------------------- !
+		integer, intent(in) :: N
+		character(len=*), intent(in) :: filename
+		real(kind=dp), intent(in), dimension(N) :: x, arr
+  		integer :: status,unit
+		integer :: la, j, i
+  
+  
+   !  Get an unused Logical Unit Number to use to open the FITS file.
+		status=0
+		unit = 10
+
+		open(unit,file=trim(filename), status='unknown', iostat=status)
+		do la=1, N
+			write(unit, *) x(la), arr(la)
+		enddo
+		close(unit)
+
+	return
+	end subroutine write_1D_arr_ascii
   
 	subroutine writeWavelength()
 	! --------------------------------------------------------------- !
@@ -1573,19 +1166,21 @@ call error("initSpectrumImage not modified!!")
 
 	return
 	end function air2vacuum
-  
-	subroutine WRITE_CONTRIBUTION_FUNCTION()
+	
+	subroutine write_lambda_cell_array(A, filename)
 	! -------------------------------------------------- !
-	! Write contribution function to disk.
+	! Write array (Nlambda, n_cells) to disk
 	! --------------------------------------------------- !
+		real(kind=dp), dimension(Nlambda, n_cells) :: A
+		character(len=*), intent(in) :: filename
 		integer :: status,unit,blocksize,bitpix,naxis, naxis2
 		integer, dimension(8) :: naxes, naxes2
-		integer :: group,fpixel,nelements, nelements2
+		integer :: group,fpixel,nelements,la, icell
 		logical :: simple, extend
 		character(len=6) :: comment=""
 		real :: pixel_scale_x, pixel_scale_y
   
-		write(*,*)" -> writing contribution function..."
+		write(*,*)" -> writing ", trim(filename)
   
 		!  Get an unused Logical Unit Number to use to open the FITS file.
 		status=0
@@ -1593,7 +1188,76 @@ call error("initSpectrumImage not modified!!")
 
    !  Create the new empty FITS file.
 		blocksize=1
-		call ftinit(unit,TRIM(CF_FILE),blocksize,status)
+		call ftinit(unit,trim(filename),blocksize,status)
+
+		simple=.true.
+		extend=.true.
+		group=1
+		fpixel=1
+
+		bitpix=-64
+
+		if (lVoronoi) then   
+			naxis = 2
+			naxes(1) = Nlambda
+			naxes(2) = n_cells
+			nelements = naxes(1) * naxes(2)
+		else
+			if (l3D) then
+				naxis = 4
+				naxes(1) = Nlambda
+				naxes(2) = n_rad
+				naxes(3) = 2*nz
+				naxes(4) = n_az
+				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+			else
+				naxis = 3
+				naxes(1) = Nlambda
+				naxes(2) = n_rad
+				naxes(3) = nz
+				nelements = naxes(1) * naxes(2) * naxes(3)
+			end if
+		end if
+
+  !  Write the required header keywords.
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.sr-1",'',status)
+
+		call ftpprd(unit,group,fpixel,nelements,A,status)
+
+
+  !  Close the file and free the unit number.
+		call ftclos(unit, status)
+		call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+		if (status > 0) then
+			call print_error(status)
+		endif
+
+	return
+	end subroutine write_lambda_cell_array
+  
+	subroutine write_contribution_functions_ray()
+	! -------------------------------------------------- !
+	! Write contribution function to disk.
+	! --------------------------------------------------- !
+		integer :: status,unit,blocksize,bitpix,naxis, naxis2
+		integer, dimension(8) :: naxes, naxes2
+		integer :: group,fpixel,nelements,la, icell
+		logical :: simple, extend
+		character(len=6) :: comment=""
+		real :: pixel_scale_x, pixel_scale_y
+  
+		write(*,*)" -> writing contribution function for single ray ..."
+  
+		!  Get an unused Logical Unit Number to use to open the FITS file.
+		status=0
+		call ftgiou (unit,status)
+
+   !  Create the new empty FITS file.
+		blocksize=1
+		call ftinit(unit,"cntrb_ray.fits.gz",blocksize,status)
 
 		simple=.true.
 		extend=.true.
@@ -1628,8 +1292,9 @@ call error("initSpectrumImage not modified!!")
 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.sr-1",'cntrb I',status)
   !  Write line CF to fits
-		write(*,*) "Max,min abs(cntrb)=",maxval(dabs(cntrb_i)), minval(dabs(cntrb_i),mask=dabs(cntrb_i)>0)
-		call ftpprd(unit,group,fpixel,nelements,cntrb_i,status)
+		write(*,*) "Max,min abs(cntrb)=",maxval(abs(cntrb_ray)), minval(abs(cntrb_ray),mask=abs(cntrb_ray)>0)
+		write(*,*) size(cntrb_ray), sizeof(cntrb_ray), nelements, shape(cntrb_ray)
+		call ftpprd(unit,group,fpixel,nelements,cntrb_ray,status)
 
 
   !  Close the file and free the unit number.
@@ -1642,7 +1307,7 @@ call error("initSpectrumImage not modified!!")
 		endif
 
 	return
-	end subroutine WRITE_CONTRIBUTION_FUNCTION
+	end subroutine write_contribution_functions_ray
 
 end module spectrum_type
 

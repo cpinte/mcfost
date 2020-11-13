@@ -1,19 +1,19 @@
 module Opacity
 
 	use atmos_type, only								: hydrogen, ntotal_atom, T, ne, NactiveAtoms, Natom, Npassiveatoms, ActiveAtoms, PassiveAtoms, Atoms, Elements, &
-															icompute_atomRT, lmali_scheme, lhogerheijde_scheme
+															icompute_atomRT, lmali_scheme, lhogerheijde_scheme, nhtot
 	use atom_type
 	use spectrum_type, only								: Itot, Icont, lambda, nlambda, Nlambda_cont, lambda_cont, dk, dk_min, dk_max, &
 															chi0_bb, eta0_bb, chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, Jnu, Jnu_cont
 	use constant
 	use constantes, only								: tiny_dp, huge_dp, AU_to_m
 	use messages
-	use broad, only										: Damping
+	use broad, only										: Damping, line_damping
 	use parametres
 	use voigtfunctions, only							: Voigt
 	use stark, only										: Stark_profile
 	use profiles!, only									: Profile
-	use getlambda, only									: hv
+	use getlambda, only									: hv, Nlambda_max_line, define_local_profile_grid
 	use planck, only 									: bpnu
 	use occupation_probability, only					: wocc_n, D_i
 
@@ -53,11 +53,12 @@ module Opacity
 					case ('ATOMIC_LINE')
 						
 						if (atom%lines(kc)%voigt) then !constant for thomson
-							if (associated(Profile,Iprofile_thomson)) then
-								deallocate(atom%lines(kc)%aeff,atom%lines(kc)%r,atom%lines(kc)%r1)
-							endif
+!-> not allocated at the moment
+! 							if (associated(Profile,local_profile_thomson)) then
+! 								deallocate(atom%lines(kc)%eta)
+! 							endif
           
-							!Used by all if not kept in memory
+
 							if (allocated(atom%lines(kc)%a)) deallocate(atom%lines(kc)%a) !futur deprec depending of the choice of Voigt
 
 							if (allocated(atom%lines(kc)%u)) deallocate(atom%lines(kc)%u)
@@ -102,8 +103,9 @@ module Opacity
 	subroutine alloc_atom_quantities
   
 		type(AtomType), pointer :: atom
-		integer :: n, k, kc, j, alloc_status, la, n_cells_d, icell
+		integer :: n, k, kc, j, alloc_status, la, n_cells_d, icell, Nlam
 		real(kind=dp) :: n_eff, u
+		integer(kind=8) :: size_phi_all = 0, mem_alloc_local = 0
 
     
 		do n=1,Natom
@@ -121,78 +123,93 @@ module Opacity
 						allocate(atom%lines(kc)%Tex(n_cells), stat=alloc_status)
 						if (alloc_status > 0) call ERROR("Allocation error line%Tex")
 						atom%lines(kc)%Tex(:) = T(:)
-					endif
-          
-          !some memory can be saved depending of the choice of the profile
-          ! I have to do it for large simu
-          
-          !Damping value
-          !no need for it if we do keep the profile on cell
-          !except if updated, but if we chose thomson method it is need along to line%aeff
-					if (atom%lines(kc)%voigt) then
-							allocate(atom%lines(kc)%a(n_cells), stat=alloc_status)
-							if (alloc_status > 0) call ERROR("Allocation error line%adamp")
-							atom%lines(kc)%a(:) = 0d0
-						if (associated(Profile, Iprofile_thomson)) then
-! 						else if (associated(Profile, Iprofile_thomson)) then
-						
-							allocate(atom%lines(kc)%aeff(n_cells), stat=alloc_status)
-							if (alloc_status > 0) call ERROR("Allocation error line%eff")
-							atom%lines(kc)%aeff(:) = 0d0
-							allocate(atom%lines(kc)%r(n_cells), stat=alloc_status)
-							if (alloc_status > 0) call ERROR("Allocation error line%r")
-							atom%lines(kc)%r(:) = 0d0
-							allocate(atom%lines(kc)%r1(n_cells), stat=alloc_status)
-							if (alloc_status > 0) call ERROR("Allocation error line%r1")
-							atom%lines(kc)%r1(:) = 0d0
-						endif
-					endif
-					
-          !line profile for v = 0
-          !no need to keep it if not interp, no shift. No need also if Thomson (approx), or Iprofile (exact)
-!Keep it anyway, as ATM, dk is the default mode even at LTE
-! 					if (associated(Voigt, Iprofile_cmf_to_obs).or.atmos%NactiveAtom>0) then
-						allocate(atom%lines(kc)%phi(atom%lines(kc)%Nlambda, n_cells), stat=alloc_status)
-						if (alloc_status > 0) call ERROR("Allocation error line%phi")
-						atom%lines(kc)%phi(:,:) = 0d0
-!same
-						allocate(atom%lines(kc)%u(atom%lines(kc)%Nlambda), stat=alloc_status)
-						if (alloc_status > 0) call ERROR("Allocation error line%u")
-						!so that argument of profile is line%u / vbroad(icell)
-						atom%lines(kc)%u(:) = (lambda(atom%lines(kc)%Nblue:atom%lines(kc)%Nred)-atom%lines(kc)%lambda0) * &
-						CLIGHT / atom%lines(kc)%lambda0 !m/s
-! 					endif
-          
-          !line displacement on the global frequency arrays due to velocity fields.
-          !Function of direction, and stored only once per proc if not sequencial 
-          !(Other wise, integration of SEE is done cell by cell for all rays)
-          !dk is actually compute for each cell during the propagation, but it needs
-          !to be stored only for the cell we are solving for the SEE.
-! 					if () then
-! 						allocate(atom%lines(kc)%dk(atmos%Nrays, NLTEspec%Nproc), stat=alloc_status)
-! 						if (alloc_status > 0) call error ("Allocation error line%dk")
-! 						atom%lines(kc)%dk(:,:) = 0 !no shift
-! 					endif
- 
-!->NO, dk is the default mode. Otherwise an interpolation should be used for accurate results
-!But at this point I do not allow to compute exact or approximative (Thomson) Voigt functions
-! for NLTE. Interp > Voigt for the same accuracy. Thomson is faster but less accurate. So dk is prefered.
-!Can change relatively easily, especially if the profile varies across the cell due to velocity.         
-!           allocate(atom%lines(kc)%phi_loc(atom%lines(kc)%Nlambda, NLTEspec%NPROC), stat=alloc_status)
-!           if (alloc_status > 0) call ERROR("Allocation error line%phi_loc")
-          
-!-> Redundant with Rij: Rij = Jbar/Bij           
-! 					allocate(atom%lines(kc)%Jbar(NLTEspec%NPROC), stat=alloc_status)
-! 					if (alloc_status > 0) call ERROR("Allocation error line%Jbar")
-! 					atom%lines(kc)%Jbar(:) = 0d0
-					
-					if (atom%active) then
 						allocate(atom%lines(kc)%Rij(nb_proc), stat=alloc_status)
 						if (alloc_status > 0) call ERROR("Allocation error line%Rij")
 						atom%lines(kc)%Rij(:) = 0d0
 						allocate(atom%lines(kc)%Rji(nb_proc), stat=alloc_status)
 						if (alloc_status > 0) call ERROR("Allocation error line%Rji")
 						atom%lines(kc)%Rji(:) = 0d0
+					endif
+					
+					mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%Tex) + sizeof(atom%lines(kc)%Rij)*2
+          
+
+          
+			
+					if (atom%lines(kc)%voigt) then
+!-> do not keep adamp if profile is interpolated ! Profile are reevaluated					
+							if (associated(profile, local_profile_v)) then
+								allocate(atom%lines(kc)%a(n_cells), stat=alloc_status)
+								if (alloc_status > 0) call ERROR("Allocation error line%adamp")
+								atom%lines(kc)%a(:) = 0d0
+								mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%a(:))
+								if (allocated(atom%lines(kc)%u)) deallocate(atom%lines(kc)%u)
+								!-> it is allocated with the definition of the line bounds, but not needed if we don't interpolate the profile
+								
+							elseif (associated(profile,local_profile_interp)) then
+								allocate(atom%lines(kc)%phi(size(atom%lines(kc)%u), n_cells), stat=alloc_status)
+								if (alloc_status > 0) call ERROR("Allocation error line%phi")
+								atom%lines(kc)%phi(:,:) = 0d0
+								size_phi_all = size_phi_all + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
+								mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
+								
+							elseif (associated(profile,local_profile_dk)) then
+								!doesn't include the vel shift, just a local profile evaluated on the nlte grid.
+								Nlam = atom%lines(kc)%Nlambda
+								if (allocated(atom%lines(kc)%u)) deallocate(atom%lines(kc)%u)
+								if (allocated(atom%lines(kc)%u)) call error("line%u should not be allocated here!")
+
+								allocate(atom%lines(kc)%phi(Nlam, n_cells), stat=alloc_status)
+
+								if (alloc_status > 0) call ERROR("Allocation error line%phi")
+								atom%lines(kc)%phi(:,:) = 0d0
+								size_phi_all = size_phi_all + sizeof(atom%lines(kc)%phi(:,:))
+								mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%phi(:,:))
+							
+!-> not allocated anymore atm
+!but in case, allocate only eta(n_cells) and creates a function to recompute aeff just like damping are possibly re evaluated
+!if profile_v, we need to possibly re evaluate eta(n_cells; adamp).
+! 							elseif (associated(Profile, local_profile_thomson)) then
+! 								allocate(atom%lines(kc)%a(n_cells), stat=alloc_status)
+! 								if (alloc_status > 0) call ERROR("Allocation error line%adamp")
+! 								atom%lines(kc)%a(:) = 0d0
+! 								mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%a(:))
+! 							allocate(atom%lines(kc)%aeff(n_cells), stat=alloc_status)
+! 							if (alloc_status > 0) call ERROR("Allocation error line%eff")
+! 							atom%lines(kc)%aeff(:) = 0d0
+! 							allocate(atom%lines(kc)%r(n_cells), stat=alloc_status)
+! 							if (alloc_status > 0) call ERROR("Allocation error line%r")
+! 							atom%lines(kc)%r(:) = 0d0
+! 							allocate(atom%lines(kc)%r1(n_cells), stat=alloc_status)
+! 							if (alloc_status > 0) call ERROR("Allocation error line%r1")
+! 							atom%lines(kc)%r1(:) = 0d0
+! 							
+! 							mem_alloc_local = mem_alloc_local + 3*sizeof(atom%lines(kc)%aeff(n_cells))
+! 
+							endif
+					else !Gaussian
+						!local Gaussian profiles are also interpolated !
+						if (associated(profile,local_profile_interp)) then
+							allocate(atom%lines(kc)%phi(size(atom%lines(kc)%u), n_cells), stat=alloc_status)
+							if (alloc_status > 0) call ERROR("Allocation error line%phi")
+							atom%lines(kc)%phi(:,:) = 0d0
+							size_phi_all = size_phi_all + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
+							mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
+							
+						elseif (associated(profile,local_profile_dk)) then
+								!doesn't include the vel shift, just a local profile evaluated on the nlte grid.
+							Nlam = atom%lines(kc)%Nlambda
+							if (allocated(atom%lines(kc)%u)) deallocate(atom%lines(kc)%u)
+							if (allocated(atom%lines(kc)%u)) call error("line%u should not be allocated here!")
+
+							allocate(atom%lines(kc)%phi(Nlam, n_cells), stat=alloc_status)
+
+							if (alloc_status > 0) call ERROR("Allocation error line%phi")
+							atom%lines(kc)%phi(:,:) = 0d0
+							size_phi_all = size_phi_all + sizeof(atom%lines(kc)%phi(:,:))
+							mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%phi(:,:))
+						!else local_profile_thomson or local_profile_voigt and gaussians are computed explictely
+						endif
 					endif
 
                   
@@ -203,10 +220,8 @@ module Opacity
 						allocate(atom%continua(kc)%Tex(n_cells), stat=alloc_status)
 						if (alloc_status > 0) call ERROR("Allocation error cont%Tex")
 						atom%continua(kc)%Tex(:) = T(:)
-					endif
-      
-          !gij for bound-free transitions
-          			if (atom%active) then
+						mem_alloc_local = mem_alloc_local + sizeof(atom%continua(kc)%Tex(:))
+
 ! 						allocate(atom%continua(kc)%gij(atom%continua(kc)%Nlambda, n_cells), stat=alloc_status)
 ! 						if (alloc_status > 0) call ERROR("Allocation error cont%gij")
 ! 						atom%continua(kc)%gij(:,:) = 0d0
@@ -221,11 +236,13 @@ module Opacity
 						allocate(atom%continua(kc)%Rji(nb_proc), stat=alloc_status)
 						if (alloc_status > 0) call ERROR("Allocation error cont%Rji")
 						atom%continua(kc)%Rji(:) = 0d0
+						mem_alloc_local = mem_alloc_local + sizeof(atom%continua(kc)%Rij)*2
 
           !twohnu3_c2 for continuum waves (Not needed ?)
 						allocate(atom%continua(kc)%twohnu3_c2(atom%continua(kc)%Nlambda),stat=alloc_status)
 						if (alloc_status > 0) call ERROR("Allocation error cont%twohnu3_c2")
 						atom%continua(kc)%twohnu3_c2(:) = twohc / lambda_cont(atom%continua(kc)%Nblue:atom%continua(kc)%Nred)**3.
+						mem_alloc_local = mem_alloc_local + sizeof(atom%continua(kc)%twohnu3_c2(:))
           			endif
           			
           			
@@ -238,7 +255,7 @@ module Opacity
         		!computes only where it is not zero
 						atom%continua(kc)%alpha(:) = H_bf_Xsection(atom%continua(kc), lambda_cont(atom%continua(kc)%Nblue:atom%continua(kc)%Nred))
 						n_eff = atom%stage(atom%continua(kc)%j)*sqrt(atom%Rydberg/(atom%E(atom%continua(kc)%j)-atom%E(atom%continua(kc)%i)))
-
+						mem_alloc_local = mem_alloc_local + sizeof(atom%continua(kc)%alpha(:))
 					else !interpolation of the read Cross-section
 !       cont is not an alias but a copy of contiua(kc), so cont%alpha not deallocated
         				allocate(atom%continua(kc)%alpha(atom%continua(kc)%Nlambda), stat=alloc_status)
@@ -248,7 +265,7 @@ module Opacity
 !             atom%continua(kc)%alpha_file, atom%continua(kc)%Nlambda,NLTEspec%lambda(atom%continua(kc)%Nblue:atom%continua(kc)%Nred))
 						call bezier3_interp(size(atom%continua(kc)%lambda_file), atom%continua(kc)%lambda_file, atom%continua(kc)%alpha_file, & !read values
      	atom%continua(kc)%Nlambda, lambda_cont(atom%continua(kc)%Nblue:atom%continua(kc)%Nred), atom%continua(kc)%alpha) !interpolation grid
-
+						mem_alloc_local = mem_alloc_local + sizeof(atom%continua(kc)%alpha(:))
 					endif
 					
 					if (atom%active) then
@@ -263,7 +280,8 @@ module Opacity
 							call bezier3_interp(size(atom%continua(kc)%alpha), lambda_cont(atom%continua(kc)%Nblue:atom%continua(kc)%Nred), atom%continua(kc)%alpha, &
      						size(atom%continua(kc)%alpha_nu(:,icell)), lambda(atom%continua(kc)%Nb:atom%continua(kc)%Nr), atom%continua(kc)%alpha_nu(:,icell))						
 						enddo
-						
+						mem_alloc_local = mem_alloc_local + sizeof(atom%continua(kc)%alpha_nu(:,:))
+
 					endif
  
          !enddo
@@ -273,16 +291,21 @@ module Opacity
 			enddo
 			atom => NULL()
 		enddo
+		
+		write(*,*) " Size of all local profiles for interp:", size_phi_all/1024./1024., ' MB'
+		mem_alloc_tot = mem_alloc_tot + mem_alloc_local
+		write(*,'("Total memory allocated in alloc_atom_quantities:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
+	
 
 	RETURN
 	end SUBROUTINE alloc_atom_quantities
   
-	SUBROUTINE compute_atom_quantities(icell)
+	SUBROUTINE compute_atom_quantities(icell)!, iterate=.false. !optional ?
 		integer, intent(in) :: icell
 		type(AtomType), pointer :: atom
 		integer :: n, k, kc, alloc_status, i, j, Nblue, Nred, la, icell_d
 		real(kind=dp) :: vbroad, aL, cte, cte2, adamp, wi, wj, gij, neff, chi_ion
-    
+!     	real(kind=dp), dimension(:), allocatable :: test_phi
     
 		do n=1,Natom
 			atom => Atoms(n)%ptr_atom
@@ -296,6 +319,7 @@ module Opacity
 					vbroad = atom%vbroad(icell)
          
 					i=atom%lines(kc)%i; j=atom%lines(kc)%j
+					Nblue = atom%lines(kc)%Nblue; Nred = atom%lines(kc)%Nred
 					wj = 1.0; wi = 1.0
 					if (ldissolve) then
 						if (atom%ID=="H") then! .or. atom%ID=="He") then
@@ -304,46 +328,40 @@ module Opacity
 						endif
 					endif
 
- !There are duplicates space array to remove. We do not need aeff if not Thomson profile        
 					if (atom%lines(kc)%voigt) then
 
-						call Damping(icell, atom, kc, adamp)
-          !no need to keep it if we keep the profile for shift or interp
-          !But damping can depend on populations of atom and electrons so ...
-! 						if (associated(Profile, Iprofile_cmf_to_obs)) &
+						!call Damping(icell, atom, kc, adamp)
+						adamp = line_damping(icell, atom%lines(kc))
+						
+!-> if profile is interpolated, adamp is not stored! the profile is
 						if (allocated(atom%lines(kc)%a)) atom%lines(kc)%a(icell) = adamp
-          !line%u(:) = atom%lines(kc)%u / atom%vbroad(icell)
-          !                             if full profile to be interpolated or shifter.
-          !                             if we use another approx for Voigt, it is computed on the fly, not shifted nor interp
-!keep it at the moment for all case
-						!-> replaced by call of profile()
-						!!atom%lines(kc)%phi(:,icell) = Voigt(atom%lines(kc)%Nlambda, adamp, atom%lines(kc)%u(:)/vbroad)
 
-          !write(*,*) "d = ", line%adamp
-          !write(*,*) maxval(atom%lines(kc)%phi(:,icell)), minval(atom%lines(kc)%phi(:,icell))
-          !Thomson method effective damping for all cells
-						aL = adamp * vbroad !(m/s), adamp in doppler units
-						if (associated(Profile, Iprofile_thomson)) then
-							atom%lines(kc)%aeff(icell) = (vbroad**5. + 2.69269*vbroad**4. * aL + 2.42843*vbroad**3. * aL**2. + &
-					4.47163*vbroad**2.*aL**3. + 0.07842*vbroad*aL**4. + aL**5.)**(0.2) !1/5
-          		
-          !!there should have simplification here
-          !!r = line%atom%vbroad(icell)*line%a(icell)/line%aeff(icell)
-          !!eta = 1.36603*r - 0.47719*r*r + 0.11116*r*r*r
-							cte = vbroad*adamp/atom%lines(kc)%aeff(icell)
-							cte2 = 1.36603*cte - 0.47719*cte*cte + 0.11116*cte*cte*cte
-							atom%lines(kc)%r(icell) = cte2/pi
-          !for the lorentzian it is eta/pi and for the gaussian it is (1-eta)/sqrtpi/aeff
-							atom%lines(kc)%r1(icell) = (1. - cte2)/sqrtpi/atom%lines(kc)%aeff(icell)
+!-> if the profile is not interpolated, a is allocated and adamp is stored in it
+						if (associated(profile,local_profile_interp)) then
+							atom%lines(kc)%phi(:,icell) = Voigt(size(atom%lines(kc)%u), adamp, atom%lines(kc)%u(:)/vbroad) / (SQRTPI * vbroad)
+						elseif (associated(profile,local_profile_dk)) then !evaluated on the nlte grid
+							atom%lines(kc)%phi(:,icell) = Voigt(atom%lines(kc)%Nlambda, adamp, (lambda(Nblue:Nred)-atom%lines(kc)%lambda0)/atom%lines(kc)%lambda0 * clight/vbroad) / (SQRTPI * vbroad)								
+						
+!->these are not kept in memory anymore, only need to store eta(n_cells) but
+!need also a function that call line_damping and recompute eta from aeff and ratio if necessary! 
+! 						elseif (associated(Profile, local_profile_thomson)) then
+! 							aL = line%a(icell) * vbroad !(m/s), adamp in doppler units
+! 		
+! 							aeff = (vbroad**5. + 2.69269*vbroad**4. * aL + 2.42843*vbroad**3. * aL**2. + &
+! 									4.47163*vbroad**2. *aL**3. + 0.07842*vbroad*aL**4. + aL**5.)**(0.2)
+! 							ratio = aL/aeff
+! 							eta = 1.36603*ratio - 0.47719*(ratio*ratio) + 0.11116*(ratio*ratio*ratio)
+! 			
 						endif
-					!!else !Gaussian
-!no need if no interp nor shift or if we use Thomson (but keep adamp for thomson)
-						!!atom%lines(kc)%phi(:,icell) = exp(-(atom%lines(kc)%u(:)/atom%vbroad(icell))**2)
-					endif
-!futur test to see if we keep it or not depending on the method of calculation of profiles
-					!!atom%lines(kc)%phi(:,icell) = atom%lines(kc)%phi(:,icell) / (SQRTPI * atom%vbroad(icell))
-					atom%lines(kc)%phi(:,icell) = local_profile_i(atom%lines(kc),icell,.false.,atom%lines(kc)%Nlambda,lambda(atom%lines(kc)%Nblue:atom%lines(kc)%Nred), &
-																							0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp,0.0_dp)
+					else !Gaussian
+!-> gaussian profiles are interpolated in case of interpolation too.
+						if (associated(profile,local_profile_interp)) then
+							atom%lines(kc)%phi(:,icell) = exp(-(atom%lines(kc)%u(:)/atom%vbroad(icell))**2) / (SQRTPI *vbroad)
+						elseif (associated(profile,local_profile_dk)) then
+							atom%lines(kc)%phi(:,icell) = exp(-( (lambda(Nblue:Nred)-atom%lines(kc)%lambda0)/atom%lines(kc)%lambda0 * clight/vbroad )**2 )/ (SQRTPI * vbroad)								
+						endif
+					endif !line voigt
+					
 
 !Include occupa, cannot be lower, since ni =  niwi and nj = njwj
 					if ((wj/wi * atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
@@ -354,16 +372,8 @@ module Opacity
 						write(*,*) "w(i) = ", wi, " w(j) = ", wj
           				write(*,*) "ni=", atom%n(i,icell), " nj=", atom%n(j,icell), " gij=", atom%lines(kc)%gij
           				write(*,*) "nstari=", atom%n(i,icell), " njstar=", atom%n(j,icell)
-!           				stop
-!           			else if (i==6 .and. j==10) then
-! 						write(*,*) atom%ID, " nuij (10^15 Hz)", 1d-6 * CLIGHT / atom%lines(kc)%lambda0, " icell=", icell
-! 						write(*,*) " lambdaij (nm)", atom%lines(kc)%lambda0 
-! 						call warning ("background line: ni < njgij")
-! 						write(*,*) "i = ", i, " j = ", j
-! 						write(*,*) "w(i) = ", wi, " w(j) = ", wj
-!           				write(*,*) "ni=", atom%n(i,icell), " nj=", atom%n(j,icell), " gij=", atom%lines(kc)%gij
-!           				write(*,*) "nstari=", atom%n(i,icell), " njstar=", atom%n(j,icell)
-!           				stop
+          				write(*,*) "realitve = ", 100 * (wj/wi * atom%n(i,icell)-atom%n(j,icell)*atom%lines(kc)%gij)/atom%n(i,icell)
+          				write(*,*) " to nTot=", 100 * wj/wi * atom%n(i,icell) / nHtot(icell) / atom%abund, 100 * atom%lines(kc)%gij * atom%n(j,icell) / nHtot(icell) / atom%abund
 					endif
     
 				case ("ATOMIC_CONTINUUM")
@@ -418,6 +428,8 @@ module Opacity
 								write(*,*) "w(i) = ", wi, " w(j) = ", wj
           						write(*,*) atom%n(i,icell), wi*atom%n(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
           						write(*,*) atom%nstar(i,icell), wi*atom%nstar(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
+          						write(*,*) "realitve = ", 100 * (atom%n(i,icell)-wi*atom%n(j,icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)))/atom%n(i,icell)
+          						write(*,*) " to nTot=", 100 * atom%n(i,icell) / nHtot(icell) / atom%abund, 100 * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) * atom%n(j,icell) / nHtot(icell) / atom%abund
 								exit
 							endif
 						
@@ -712,35 +724,41 @@ module Opacity
 												!nn
 						wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(j)),hydrogen%n(1,icell))
 					endif
+! 				else
+! 					if (lambda_cont(Nred) > aatom%continua(kc)%lambda0) then
+! 						write(*,*)lambda_cont(Nred), lambda_cont(aatom%continua(kc)%Nlambda+Nblue-1),aatom%continua(kc)%lambda0
+! 						write(*,*) i, j, Nred, locate(lambda_cont, aatom%continua(kc)%lambda0), locate(lambda_cont, lambda_cont(Nred))
+! 						call error("lambda(Nred) can't be larger than lambda0!")
+! 					endif
 				endif
-     
+
 				!get the ionisation potential for the ion ot be use in the dissolve fraction
 				chi_ion = Elements(aatom%periodic_table)%ptr_elem%ionpot(aatom%stage(j))
 
-         		do la=1,aatom%continua(kc)%Nlambda
-				
+				freq_loop : do la=1,aatom%continua(kc)%Nlambda
+
+					!beware even without diss it appears that sometime lambda(Nred) = lambda0 + epsilon > lambda0
 					Diss = D_i(icell, nn, real(aatom%stage(i)), 1.0, lambda_cont(Nblue+la-1), aatom%continua(kc)%lambda0, chi_ion)
 					gij = aatom%nstar(i,icell)/aatom%nstar(j,icell) * exp(-hc_k/T(icell)/lambda_cont(Nblue+la-1))
+
 					if ((aatom%n(i,icell) - aatom%n(j,icell) * gij) > 0.0_dp) then
-					
+
 						chi_c_nlte(Nblue+la-1,icell) = chi_c_nlte(Nblue+la-1,icell) + &
             			Diss * aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - gij * aatom%n(j,icell))
-            
+
 						eta_c_nlte(Nblue+la-1,icell) = eta_c_nlte(Nblue+la-1,icell) + &
             			Diss * aatom%continua(kc)%alpha(la) * aatom%continua(kc)%twohnu3_c2(la) * gij * aatom%n(j,icell)
 
             
 					else !neg or null
-					
 						eta_c_nlte(Nblue+la-1,icell) = eta_c_nlte(Nblue+la-1,icell) + &
             			Diss * aatom%continua(kc)%alpha(la) * aatom%continua(kc)%twohnu3_c2(la) * gij * aatom%n(j,icell)
- 			
 					!assuming small inversions
 						!chi_c_nlte(Nblue+la-1,icell) = chi_c_nlte(Nblue+la-1,icell) - Diss * aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - gij * aatom%n(j,icell))
 !  
 					endif
-          
-				enddo   
+
+				enddo freq_loop
 
 			end do tr_loop
    
@@ -812,37 +830,7 @@ module Opacity
            		endif
         	enddo
      	enddo
-    	
-
-		!check test
-! 		do i=1, Nlambda
-! 			chii(i) = interp(chi0,lambda_cont, lambda(i))
-! 			etai(i) = interp(eta0, lambda_cont, lambda(i))
-! 		enddo
-
-!      j0=Nlambda+1
-!      do j=1, Nlambda
-!         if (lambda(j) > lambda_cont(1)) then
-!            j0 = j
-!            exit
-!         endif
-!      enddo
-! 
-!      ! We perform the 2nd pass where we do the actual interpolation
-!      ! For points larger than x(n), value will stay at 0
-!      i0 = 2
-!      do j=j0, Nlambda
-!         loop_i : do i=i0, Nlambda_cont
-!            if (lambda_cont(i) > lambda(j)) then
-!               u = (lambda(j) - lambda_cont(i-1)) / (lambda_cont(i) - lambda_cont(i-1))
-!               chii(j) = (1.0_dp - u) * chi0(i-1) + u * chi0(i)
-!               etai(j) = (1.0_dp - u) * eta0(i-1) + u * eta0(i)
-!               !i0 = i !? + 1
-!               i0 = i + 1
-!               exit loop_i
-!            endif
-!         enddo loop_i
-!      enddo
+ 
 
 	return
 	end subroutine interp_background_opacity
@@ -852,15 +840,24 @@ module Opacity
 		integer, intent(in) :: id, icell, iray
 		logical, intent(in) :: iterate
 		real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
-		integer :: nact, Nred, Nblue, kc, kr, i, j, nk, la, Nvspace
+		integer :: nact, Nred, Nblue, kc, kr, i, j
 		type(AtomType), pointer :: aatom
-		integer :: dk0
-		real(kind=dp) :: wi, wj, nn, v0
-		!tmp
-		real(kind=dp), dimension(Nlambda) :: phi0
+		integer :: dk0, dk1, Nlam
+		real(kind=dp) :: wi, wj, adamp, dv_dl
+		!if there is 40 points for the unperturbed profile for all lines, the size is 40. If there are velocity fields
+		!we add two times the shift. This is however, much lower than Nlambda !!
+		real(kind=dp), dimension(Nlambda_max_line+2*dk_max) :: phi0
+! 		real(kind=dp), dimension(Nlambda) :: phi0
 
 		!-> chi and eta contains already chi_c, chi_c_nlte and eta_c, eta_c_nlte
 
+! 		dv_dl = gradv(icell, x,y,z,x1,y1,z1,u,v,w,l,dk0)
+! 		if (dk0 >= 0) then
+! 			dk0 = min(dk_max, 6 * dk0)
+! 		else
+! 			dk0 = max(dk_min, 6 * dk0)
+! 		endif
+! 		dk0 = dk_max
   
 		atom_loop : do nact = 1, Natom!Nactiveatoms
 			aatom => Atoms(nact)%ptr_atom!ActiveAtoms(nact)%ptr_atom
@@ -871,6 +868,11 @@ module Opacity
 
 				Nred = aatom%lines(kc)%Nred; Nblue = aatom%lines(kc)%Nblue
 				i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
+
+							
+				Nblue = Nblue + dk_min
+				Nred = Nred + dk_max
+				Nlam = Nred - Nblue + 1
 				
  				wj = 1.0; wi = 1.0
 				if (ldissolve) then
@@ -881,30 +883,27 @@ module Opacity
 					endif
 				endif 
 
-				phi0(Nblue+dk_min:Nred+dk_max) = local_profile_i(aatom%lines(kc),icell,iterate,Nred+dk_max-dk_min-Nblue+1,lambda(Nblue+dk_min:Nred+dk_max), x,y,z,x1,y1,z1,u,v,w,l)
+
+				phi0(1:Nlam) = profile(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred), x,y,z,x1,y1,z1,u,v,w,l)
 
 
 				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
 
 
-					chi(Nblue+dk_min:Nred+dk_max,id) = chi(Nblue+dk_min:Nred+dk_max,id) + &
-						hc_fourPI * aatom%lines(kc)%Bij * phi0(Nblue+dk_min:Nred+dk_max) * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
+					chi(Nblue:Nred,id) = chi(Nblue:Nred,id) + &
+						hc_fourPI * aatom%lines(kc)%Bij * phi0(1:Nlam) * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
 
-					eta(Nblue+dk_min:Nred+dk_max,id)= eta(Nblue+dk_min:Nred+dk_max,id) + &
-						hc_fourPI * aatom%lines(kc)%Aji * phi0(Nblue+dk_min:Nred+dk_max) * aatom%n(j,icell)
+					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + &
+						hc_fourPI * aatom%lines(kc)%Aji * phi0(1:Nlam) * aatom%n(j,icell)
 
 				else !neg or null
-					eta(Nblue+dk_min:Nred+dk_max,id)= eta(Nblue+dk_min:Nred+dk_max,id) + &
-						hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell) * phi0(Nblue+dk_min:Nred+dk_max)
-				!small inversions
-					!eta(Nblue+dk_min:Nred+dk_max,id)= eta(Nblue+dk_min:Nred+dk_max,id) + 0.0_dp
-					!chi(Nblue+dk_min:Nred+dk_max,id) = chi(Nblue+dk_min:Nred+dk_max,id) - &
-					!hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell)) * phi0(Nblue+dk_min:Nred+dk_max)
+					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + &
+						hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell) * phi0(1:Nlam)
 				endif
 				
 				if (iterate) then  !only for active atoms ? if not hogerheijde only
 					!if (aatom%active) &
-					aatom%lines(kc)%phi_loc(:,iray,id) = phi0(Nblue+dk_min:Nred+dk_max)
+					aatom%lines(kc)%phi_loc(:,iray,id) = phi0(1:Nlam)
 				endif
 
     

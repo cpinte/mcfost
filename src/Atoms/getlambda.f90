@@ -6,19 +6,21 @@ module getlambda
   use getline, only : getnextline, MAX_LENGTH
 
   use parametres
-  use utils, only : span, spanl, bubble_sort
+  use utils, only : span, spanl, bubble_sort, spanl_dp, span_dp
   use messages
 
   implicit none
 
   !Number of points for each transition
-  integer, parameter :: Nlambda_cont = 141 !continuum, linear
-  integer, parameter :: Nlambda_cont_log = 91 !71continuum log scaled
-  integer, parameter :: Nlambda_line_w = 14, Nlambda_line_c_log = 51
-  integer, parameter :: Nlambda_line_c = 71!line linear1
+  !continuum wavelength double for level dissolution !
+  integer, parameter :: Nlambda_cont = 81! 141 !continuum, linear
+  integer, parameter :: Nlambda_cont_log = 51 !61, 91continuum log scaled
+  integer, parameter :: Nlambda_line_w = 12, Nlambda_line_c_log = 31
+  integer, parameter :: Nlambda_line_c = 51!line linear1
   real, parameter    :: hvel_nlte = 6.0!for line in km/s, 1-3 for static models
   real, parameter	 :: delta_lambda_cont = 5.0 !nm
   real               :: hv = hvel_nlte !can change due to image grid
+  integer 			 :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans !number max of lambda for all lines
   		
 
   contains
@@ -275,6 +277,7 @@ module getlambda
   end subroutine make_sub_wavelength_grid_cont_old
   
 
+ !-> preferred to be used without level dissolution
   subroutine make_sub_wavelength_grid_cont(cont, lambdamin, lambdamax)
   ! ----------------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicContinuum cont.
@@ -282,43 +285,43 @@ module getlambda
    ! level's dissolution, if lambdamax > lambda0
    !
    ! Allocate cont%lambda.
-   ! cont%alpha (cross-section of photoionisation) is not used.
    !linearly spaced to lambdamin, lambdamax from lambda0
   ! ----------------------------------------------------------------- !
    type (AtomicContinuum), intent(inout) :: cont
    real(kind=dp), intent(in) :: lambdamin, lambdamax
    real(kind=dp) :: resol
-   integer :: la, N1, N2
-   real :: l0, l1, dl
+   integer :: la, N1, N2, Nmid
+   real(kind=dp) :: l0, l1, dl
 
-   !write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
-
-   l1 = real(lambdamax)
-   l0 = real(lambdamin)
+   l1 = lambdamax
+   l0 = lambdamin
    
    if (lambdamax > cont%lambda0) then 
     N2 = Nlambda_cont + 1
     N1 = Nlambda_cont
+    Nmid = N1 + N2
    else
     N2 = 0
     N1 = Nlambda_cont
+    Nmid = N1
    endif
    cont%Nlambda = N1 + N2   
    allocate(cont%lambda(cont%Nlambda))   
 
-   
 !    cont%lambda(N1:1:-1) = (1e-15 * CLIGHT) / span(nu0,nu1,N1) * M_TO_NM
 !                                                                     !Because otherwise N1 and
 !                                                                     ! N1+1 points are the same
 !    if (N2>0) cont%lambda(N2+N1:N1+1:-1) = (1e-15 * CLIGHT) / span(nu2,nu0*(1-0.05),N2) * M_TO_NM
 !    !write(*,*) cont%lambda(N1+1:N2+N1)
 
-   cont%lambda(1:N1) = span(l0,real(cont%lambda0),N1)
-                                                                    !Because otherwise N1 and
-                                                                    ! N1+1 points are the same
+!   cont%lambda(1:N1) = span_dp(l0, cont%lambda0,N1,1)!from 1 to lam0
+   cont%lambda(1:N1) = span_dp(l0, cont%lambda0,N1,-1)!from lam0 to 1
+   !still result in lamin to lamax
+
+                                                     ! N1+1 points are the same
    if (N2>0) then
-	dl = abs(cont%lambda(2) - cont%lambda(1))
-	cont%lambda(N1+1:N2+N1) = span(real(cont%lambda0)+dl,l1,N2)
+	dl = abs(cont%lambda(N1) - cont%lambda(N1-1)) !2-1
+	cont%lambda(N1+1:N2+N1) = span_dp(cont%lambda0+dl,l1,N2,1)
    endif
 
    do la=1,cont%Nlambda
@@ -334,7 +337,62 @@ module getlambda
   return
   end subroutine make_sub_wavelength_grid_cont
 
-  subroutine make_sub_wavelength_grid_cont_log(cont, lambdamin, lambdamax)
+  !with level dissolution
+  !linear from 0 to lambda0 then log from lambda0 to lambdamax
+  subroutine make_sub_wavelength_grid_cont_linlog(cont, lambdamin, lambdamax)
+  ! ----------------------------------------------------------------- !
+   ! Make an individual wavelength grid for the AtomicContinuum cont.
+   !  -> cross-section is extrapolated beyond edge to be use with
+   ! level's dissolution, if lambdamax > lambda0
+   !
+   ! Allocate cont%lambda.
+   ! cont%alpha (cross-section of photoionisation) is not used.
+  ! ----------------------------------------------------------------- !
+   type (AtomicContinuum), intent(inout) :: cont
+   real(kind=dp), intent(in) :: lambdamin, lambdamax
+   real(kind=dp) :: resol
+   integer :: la, N1, N2
+   real(kind=dp) :: l0, l1, dl
+
+
+   l1 = lambdamax
+   l0 = lambdamin
+
+   if (lambdamax > cont%lambda0) then 
+    N2 = Nlambda_cont_log + 1
+    N1 =  Nlambda_cont
+   else
+    N2 = 0
+    N1 =  Nlambda_cont
+   endif
+   cont%Nlambda = N1 + N2   
+   allocate(cont%lambda(cont%Nlambda))
+
+  
+   cont%lambda(1:N1) = span_dp(l0, cont%lambda0,N1,-1)!from lam0 to 1
+
+   
+  if (N2 > 0) then
+   dl = abs(cont%lambda(N1)-cont%lambda(N1-1))
+   cont%lambda(1+N1:N2+N1) = spanl_dp(cont%lambda0+dl,l1,N2,1)
+  endif
+
+
+   do la=1,cont%Nlambda
+    if (cont%lambda(la) < 0) then
+     write(*,*) "Error, lambda negative"
+     write(*,*) "cont log"
+
+     stop
+    endif
+   end do
+
+  return
+  end subroutine make_sub_wavelength_grid_cont_linlog
+
+  !not working properly with level dissolution
+  !deprec
+  subroutine make_sub_wavelength_grid_cont_log_nu(cont, lambdamin, lambdamax)
   ! ----------------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicContinuum cont.
    !  -> cross-section is extrapolated beyond edge to be use with
@@ -349,7 +407,7 @@ module getlambda
    real(kind=dp) :: resol
    integer :: la, N1, N2
    real(kind=dp) :: l0, l1
-   real :: nu1, nu0, nu2, dnu
+   real(kind=dp) :: nu1, nu0, nu2, dnu
 
    !write(*,*) "Atom for which the continuum belongs to:", cont%atom%ID
 
@@ -367,22 +425,20 @@ module getlambda
    allocate(cont%lambda(cont%Nlambda))
 
    
-   nu0 = (M_TO_NM * CLIGHT / real(cont%lambda0))/1e15
-   nu1 = (M_TO_NM * CLIGHT / real(lambdamin))/1e15
-   nu2 = (M_TO_NM * CLIGHT / real(lambdamax))/1e15
+   nu0 = (M_TO_NM * CLIGHT / cont%lambda0)/1e15
+   nu1 = (M_TO_NM * CLIGHT / lambdamin)/1e15
+   nu2 = (M_TO_NM * CLIGHT / lambdamax)/1e15
 
 
   
-  cont%lambda(N1:1:-1) = 1e-15 * clight / spanl(nu0,nu1,N1) * m_to_nm
+  cont%lambda(N1:1:-1) = 1e-15 * clight / spanl_dp(nu0,nu1,N1,1) * m_to_nm
+   write(*,*) cont%lambda - cont%lambda0, cont%lambda(N1), cont%lambda0
+   stop
   if (N2 > 0) then
    dnu = abs(cont%lambda(N1)-cont%lambda(N1-1))
-   cont%lambda(N2+N1:N1+1:-1) = 1e-15 * clight / spanl(nu1+dnu,nu2,N2) * m_to_nm
+   cont%lambda(N2+N1:N1+1:-1) = 1e-15 * clight / spanl_dp(nu1+dnu,nu2,N2,1) * m_to_nm
   endif
-! write(*,*) N1, N2, size(cont%lambda)
-! do la=1,cont%Nlambda
-! 	write(*,*) cont%lambda(la)
-! enddo
-! stop
+
 
    do la=1,cont%Nlambda
     if (cont%lambda(la) < 0) then
@@ -395,7 +451,7 @@ module getlambda
 ! stop
    !does not allocate cross-section, here
   return
-  end subroutine make_sub_wavelength_grid_cont_log
+  end subroutine make_sub_wavelength_grid_cont_log_nu
 
 	subroutine compute_line_bound(line, maxV)
 	! ------------------------------------------------------------ !
@@ -436,12 +492,89 @@ module getlambda
 		!! This will be used to fine the index of the line on the global grid
 		line%lambdamin = line%lambda0*(1-v_char/CLIGHT)
 		line%lambdamax = line%lambda0*(1+v_char/CLIGHT)
+		write(*,*) line%lambdamin, line%lambdamax, line%Nlambda
 
-		!!write(*,*) "Nlam=", Nlam, line%Nlambda
-		!!write(*,*) "lambda0=", line%lambda0, "lamin/lamax", line%lambdamin, line%lambdamax
 
 	return
 	end subroutine compute_line_bound
+	
+	subroutine  define_local_profile_grid (line)
+		type (AtomicLine), intent(inout) :: line
+   		real(kind=dp), dimension(2*(Nlambda_line_c_log+Nlambda_line_w-1)-1) :: vel
+		real(kind=dp) ::  vcore, vwing, v0, v1, vbroad
+		integer :: Nlambda, la, Nmid
+		real, parameter :: wing_to_core = 0.3
+
+
+		vbroad = maxval(line%atom%vbroad)
+		vwing = line%qwing * vbroad
+		
+		!I compute the line bound up to qwing * vwing. But I expand the local profile
+		!farther
+		!This avoid allocating to much points when velocity are present
+		!while allowing a large range for the interpolation ?
+		line%lambdamin = line%lambda0*(1-vwing/CLIGHT)
+		line%lambdamax = line%lambda0*(1+vwing/CLIGHT)
+		line%Nlambda = nint(2 * ( 1e-3 * vwing / hv )  ) - 1
+
+		!leaving here to not allocate u in case the profile is not interpolated
+		!is impossible since we need to check the association profile, local_profile_interp
+		!which will raise a circular compiler erros.
+		!To Do: global parameter determining the type of profiles.
+
+		if (line%voigt) vwing = line%qwing * vbroad * 10
+		!otherwise for Gaussians not needed
+		vcore = 2.5 * vbroad!wing_to_core * vwing
+		!vcore = min(vcore, wing_to_core * vwing)
+
+		v0 = - vwing
+		v1 = + vwing
+		vel = 0.0_dp
+
+		!from -vwing to 0
+! 		dvw = (vwing-vcore)/real(Nlambda_line_w-1,kind=dp)
+! 		dvc = vcore/real(Nlambda_line_c_log-1,kind=dp)
+
+		vel(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
+! 		vel(Nlambda_line_w:1:-1) = -span_dp(vcore, vwing, Nlambda_line_w, -1)
+! 		write(*,*) v0*1e-3, -vcore*1e-3
+! 		write(*,*) vel(1:Nlambda_line_w)*1e-3
+! 		stop
+		vel(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
+! 		write(*,*) -vcore*1e-3, 0.0
+! 		write(*,*) vel*1e-3
+! 		stop		
+		
+		Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+
+   
+		Nmid = Nlambda/2 + 1
+		
+		allocate(line%u(Nlambda)); line%u = 0.0
+
+		line%u(1:Nmid) = vel(1:Nmid)
+		line%u(Nmid+1:Nlambda) = -vel(Nmid-1:1:-1)
+		
+		!!full linear with Nlambda from -vwing to vwing
+		!!line%u = span_dp(-vwing,vwing,Nlambda, 1)
+		
+! 		line%lambdamin = line%lambda0*(1+line%u(1)/CLIGHT)
+! 		line%lambdamax = line%lambda0*(1+line%u(Nlambda)/CLIGHT)
+		
+! 		write(*,*) "line bounds:", "Nlam_local=",Nlambda
+! 		write(*,*) line%lambdamin, line%lambdamax
+! 		write(*,*) line%u(1)*1e-3, line%u(Nlambda)*1e-3
+		
+! 		line%Nlambda = nint(2 * ( 1e-3 * vwing / hv )  ) - 1
+! 		write(*,*) " Nlam_grid=", line%Nlambda," maxv=", vwing*1e-3
+! 
+! 		do la=1,Nlambda
+! 			write(*,*) la, line%u(la), vel(la)
+! 		enddo
+! 		stop
+	
+	return
+	end subroutine define_local_profile_grid
 
 	subroutine make_sub_wavelength_grid_line_lin(line, vD, aD)
 	! ------------------------------------------------------------ !
@@ -1044,7 +1177,7 @@ module getlambda
 		real(kind=dp), dimension(:), allocatable :: all_lamin, all_lamax, tmp_grid, delta_lam
 		integer, dimension(:), allocatable :: sorted_indexes, Nlambda_per_group
 		integer :: Nspec_cont, Nspec_line, Nremoved, Nwaves_cont
-		integer :: n, kr, la, lac, shift, alloc_status, Nmore_cont_freq
+		integer :: n, kr, la, lac, shift, alloc_status, Nmore_cont_freq, check_new_freq
 		real(kind=dp) :: lambda_max, lambda_min, l0, l1, max_cont, delta_v
 		real(kind=dp) :: vmin, vmax
 		real(kind=dp), dimension(:), allocatable :: more_cont_waves, corr_hv
@@ -1058,7 +1191,7 @@ module getlambda
 		endif
 		Ntrans = 0
 		!maximum extent of lines with or without dvmax (i.e., in rest frame)
-		delta_v = dvmax + 1.5*hv * 1e3 !m/s
+		delta_v = dvmax +  0 * hv * 1e3 !m/s
 
 		!maximum and minimum wavelength for only lines, including max velocity field
 		!Count Number of transitions and number of lines
@@ -1136,6 +1269,7 @@ module getlambda
 				tmp_grid(la) = cont_waves(la)
 			else
 		 		Nremoved = Nremoved + 1
+		 		!!write(*,*) " Removing from the cont grid:", cont_waves(la)
 			endif
 		enddo
 
@@ -1283,11 +1417,13 @@ module getlambda
 !In case they are lines beyond the last continuum I add at least3 points per line for the continuum in this region			
 !->cont end		this is heavy for nothing but should work !
 		!finalise continuum here by reckoning how much freq we need
+		
+		!make the new points go farther than line_waves for interpolation.
 		Nmore_cont_freq = 0
 		do n=1, Ngroup
 
 			l0 = group_blue(n)
-			l1 = group_red(n)
+			l1 = l0 * (1.0 + 1d3 * hv / clight)**(Nlambda_per_group(n))!group_red(n)
 			if (l0 > max_cont) then
 				Nmore_cont_freq = Nmore_cont_freq + 1
 			endif
@@ -1299,6 +1435,7 @@ module getlambda
 			endif
 	
 		enddo
+		check_new_freq = Nmore_cont_freq
 		if (Nmore_cont_freq > 0) then
 			write(*,*) "Adding new wavelength points for lines beyond continuum max!"
 			write(*,*) "  -> Adding ", Nmore_cont_freq," points"
@@ -1309,30 +1446,36 @@ module getlambda
 			cont_waves(1:Nlambda_cont) = tmp_grid(:)
 			deallocate(tmp_grid)
 			allocate(tmp_grid(Nmore_cont_freq))
+			tmp_grid(:) = 0.0_dp
+	
+
 			Nmore_cont_freq = 0
 			do n=1, Ngroup
-
+! 				write(*,*) "n=",n
 				l0 = group_blue(n)
-				l1 = group_red(n)
+				l1 = l0 * (1.0 + 1d3 * hv / clight)**(Nlambda_per_group(n))!group_red(n)
 				if (l0 > max_cont) then
 					Nmore_cont_freq = Nmore_cont_freq + 1
 					tmp_grid(Nmore_cont_freq) = l0
-					!write(*,*) l0
-				endif
-				if (l1 > max_cont) then
-					Nmore_cont_freq = Nmore_cont_freq + 1
-					tmp_grid(Nmore_cont_freq) = l1
-					!write(*,*) l1
+! 					write(*,*) Nmore_cont_freq , "l0=",l0
 				endif
 				if (0.5*(l0+l1) > max_cont) then
 					Nmore_cont_freq = Nmore_cont_freq + 1
 					tmp_grid(Nmore_cont_freq) = 0.5 * (l0+l1)
-					!write(*,*) 0.5*(l0+l1)
+! 					write(*,*) Nmore_cont_freq , "lmid=", 0.5*(l0+l1)
+				endif
+				if (l1 > max_cont) then
+					Nmore_cont_freq = Nmore_cont_freq + 1
+					tmp_grid(Nmore_cont_freq) = l1
+! 					write(*,*) Nmore_cont_freq , "l1=",l1
 				endif
 	
 			enddo
 
-			write(*,*) "check", Nmore_cont_freq					
+			if (Nmore_cont_freq	/= check_new_freq) then
+				call Warning("There are probably some frequency missing!")
+				write(*,*) "Nmore_freq: ",check_new_freq," Nfreq_added: ", Nmore_cont_freq
+			endif				
 			allocate(sorted_indexes(Nmore_cont_freq))
 			sorted_indexes(:) = bubble_sort(tmp_grid)
 			tmp_grid(:) = tmp_grid(sorted_indexes)
@@ -1349,7 +1492,9 @@ module getlambda
 		endif
 !->cont end	
 
-		write(*,*) "bounds:", maxval(line_waves), maxval(group_red,mask=group_red>-1), maxval(cont_grid)
+		write(*,*) "bounds:"
+		write(*,*) "  -> max lam:", maxval(line_waves), " max_cont:", maxval(cont_grid)
+		! " max reddest line:", maxval(group_red,mask=group_red>-1),
 
 		!add lines + continua frequencies
 		Nspec_cont = size(cont_waves)
@@ -1444,6 +1589,9 @@ module getlambda
 		write(*,*) "Wavelength grid:", l0," nm", l1,lam_unit  
 			
 		!allocate indexes on the grid
+		Nlambda_max_line = 0
+		Nlambda_max_cont = 0
+		Nlambda_max_trans = 0
 		do n=1,Natom
 			atom => Atoms(n)%ptr_atom
 			do kr=1,atom%Ncont !only on the cont grid !
@@ -1453,10 +1601,35 @@ module getlambda
 
 				atom%continua(kr)%Nblue = locate(cont_grid, atom%continua(kr)%lambdamin)
 				atom%continua(kr)%Nred = locate(cont_grid, atom%continua(kr)%lambdamax)
-				atom%continua(kr)%Nmid = locate(cont_grid, 0.5*(atom%continua(kr)%lambdamin+&
-											atom%continua(kr)%lambdamax))
+				atom%continua(kr)%Nmid = locate(cont_grid, 0.5*(atom%continua(kr)%lambdamin+atom%continua(kr)%lambdamax))
 				atom%continua(kr)%N0 = locate(cont_grid, atom%continua(kr)%lambda0)
 				atom%continua(kr)%Nlambda = atom%continua(kr)%Nred - atom%continua(kr)%Nblue + 1
+				
+				!in any problem of grid resolution etc or locate approximation.
+				!We take Nred-1 to be sure than the lambda_cont(Nred) <= lambda0.
+				!Only if not dissolution.
+				!We just need to avoind having cont_lambda(Nred)>lambda0, since the cross section is in (lambda/lambda0)**3
+ 				if (cont_grid(atom%continua(kr)%N0) /= atom%continua(kr)%lambda0) then
+					!!write(*,*) " Beware, cont%lambda0 might not be on the grid", kr, atom%continua(kr)%i, atom%continua(kr)%j
+					if (.not.ldissolve) then
+						if (cont_grid(atom%continua(kr)%Nred) > atom%continua(kr)%lambda0) then
+							call Warning("continuum Nred larger than lambda0 !")
+							write(*,*) atom%continua(kr)%lambda0, cont_grid(atom%continua(kr)%Nred)
+							if (cont_grid(atom%continua(kr)%Nred-1) <= atom%continua(kr)%lambda0) then
+								write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0
+								!To do while until <= lambda0
+								atom%continua(kr)%Nred = atom%continua(kr)%Nred-1
+								atom%continua(kr)%N0 = atom%continua(kr)%Nred
+								atom%continua(kr)%Nlambda = atom%continua(kr)%Nred - atom%continua(kr)%Nblue + 1
+								atom%continua(kr)%Nr = locate(outgrid,cont_grid(atom%continua(kr)%Nred))
+								write(*,*) "new val at Nred:", outgrid(atom%continua(kr)%Nr), cont_grid(atom%continua(kr)%Nred)
+							endif
+						endif
+					endif
+				endif
+				!sur la grille totale
+				Nlambda_max_cont = max(Nlambda_max_cont,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1) 
+				
 			enddo
 			
 			do kr=1,atom%Nline
@@ -1477,10 +1650,21 @@ module getlambda
 					write(*,*) " -> sum :", atom%lines(kr)%Nred+nint(1e-3 * dvmax/hv)
 					stop
 				endif
+! 				write(*,*) "line", kr, " lam0=",atom%lines(kr)%lambda0, atom%lines(kr)%lambdamin, atom%lines(kr)%lambdamax
+! 				write(*,*) " -> bounds on the grid:", outgrid(atom%lines(kr)%Nblue), outgrid(atom%lines(kr)%Nred)
+! 				write(*,*) " -> max extent:", outgrid(atom%lines(kr)%Nblue)*(1.0 - delta_v/clight), outgrid(atom%lines(kr)%Nred)*(1.0 + delta_v/clight)
+				
+				!does not take the shift into account
+				Nlambda_max_line = max(Nlambda_max_line, atom%lines(kr)%Nlambda)
 			enddo
 
 			atom => NULL()
 		enddo
+		write(*,*) "Number of max freq points for all lines at this resolution :", Nlambda_max_line 
+		write(*,*) "Number of max freq points for all cont at this resolution :", Nlambda_max_cont
+		!takes the shift into account
+		Nlambda_max_trans = max(Nlambda_max_line+2*int( sign(1.0_dp, delta_v) * ( 1e-3 * abs(delta_v) / hv + 0.5 ) ),Nlambda_max_cont)
+		write(*,*) "Number of max freq points for all trans at this resolution :", Nlambda_max_trans
 
 	return
 	end subroutine make_wavelength_grid_new

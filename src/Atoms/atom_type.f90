@@ -55,7 +55,7 @@ MODULE atom_type
    real(kind=dp), allocatable, dimension(:,:)  :: phi
    !!real(kind=dp), allocatable, dimension(:,:,:) :: eta
    !map cont too ?
-   real(kind=dp), allocatable, dimension(:,:,:,:,:) :: map, cntrb !line flux to be stored
+   real(kind=dp), allocatable, dimension(:,:,:,:,:) :: map!line flux to be stored
    !used for wavelength integration
    real(kind=dp), allocatable, dimension(:,:,:) :: phi_loc, phiZ, psi !3, Nlambda, Nray
    !wlam is the integration wavelenght weight = phi
@@ -64,7 +64,7 @@ MODULE atom_type
    real(kind=dp) :: Qelast, adamp!, chi0, eta0 ! at a cell
    real(kind=dp), dimension(:), allocatable :: Tex, deta !differentiel of source function
    !keep CLIGHT * (nu0 - nu)/nu0 for lines												(method for Voigt)
-   real(kind=dp), dimension(:), allocatable :: u, a, aeff, r, r1
+   real(kind=dp), dimension(:), allocatable :: u, a, pvoigt_eta!aeff, r, r1
    !damping for all cells(a) and Thomson effective damping (eff)
    real(kind=dp), allocatable, dimension(:,:) :: rho_pfr
    character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
@@ -105,7 +105,7 @@ MODULE atom_type
    integer, allocatable, dimension(:)  :: stage, Lorbit
    !integer(8)            :: offset_coll, colunit
    real(kind=dp) :: Rydberg, scatt_limit !minimum wavelength for Rayleigh scattering
-   real(kind=dp)                :: Abund, weight, massf !mass fraction
+   real(kind=dp)                :: cswitch = 1.0_dp, Abund, weight, massf !mass fraction
    real(kind=dp), allocatable, dimension(:) :: g, E, vbroad!, ntotal
    real(kind=dp), allocatable, dimension(:) :: qS, qJ
    ! allocated in readatom.f90, freed with freeAtoms()
@@ -138,7 +138,7 @@ MODULE atom_type
    integer, allocatable, dimension(:)  :: mol_index !track molecules in which Element is present
    real(kind=dp) :: weight, abund, massf
    real(kind=dp), allocatable, dimension(:)  :: ionpot
-   real(kind=dp), allocatable, dimension(:,:)  :: pf, n !LTE populations, not used nor allocated anymore
+   real(kind=dp), allocatable, dimension(:,:)  :: pf!, n !LTE populations, not used nor allocated anymore
    !n is the population for each stage at a given grid point
    type (AtomType), pointer :: model => NULL()
  END TYPE Element
