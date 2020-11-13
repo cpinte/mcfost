@@ -10,9 +10,9 @@ MODULE readatom
   use uplow
   use getline
   use barklem, only : getBarklem
-  use io_atomic_pops, only	: write_pops, read_departure_bfactor, read_pops
+  use io_atomic_pops, only	: read_pops_atom
   use collision, only : read_collisions
-  use broad, only : Radiative_Damping, Damping
+  use broad, only : Damping
 
   !$ use omp_lib
 
@@ -20,6 +20,7 @@ MODULE readatom
   use messages
   use mcfost_env, only : mcfost_utils ! convert from the relative location of atomic data
                                       ! to mcfost's environnement folders.
+  use parametres, only : art_hv
 
   IMPLICIT NONE
 
@@ -30,6 +31,11 @@ MODULE readatom
   character(len=*), parameter :: ATOMS_INPUT = "./atoms.input"!"/Atoms/atoms.input"
   character(len=*), parameter :: path_to_atoms = "/Atoms/"
   !real, parameter :: MAX_ABUND_ERROR=0.001
+  
+  integer, parameter :: cwitch_niter = 12!nint(ceil(log(cswitch_val)/log(cswitch_down_scaling_factor)))
+  real(kind=dp), parameter :: cswitch_val = 1d12
+  real(kind=dp), parameter :: cswitch_down_scaling_factor = 10.0!ceil(exp(log(cswitch_val)/cswitch_niter))
+  logical :: cswitch_enabled = .false.
   
   !Until an extrapolation routine is found, the lambdamax is found where Gaunt(lambda) < 0
   real, parameter :: fact_pseudo_cont = 100.0 ! the hydrogenic bound-free will be extrapolated
@@ -70,7 +76,6 @@ MODULE readatom
     open(unit=atomunit,file=atom_file,status="old")
     !FormatLine = "(1A<MAX_LENGTH>)" !not working with ifort
     write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
-
 
     !Read ID and fill atom abundance and weight
     CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
@@ -114,6 +119,8 @@ MODULE readatom
 
     !read for each level, Energie (%E), statistical weight (%g), label,
     ! stage and levelNo
+    
+    atom%cswitch = 1.0_dp
 
     allocate(atom%label(atom%Nlevel))
     allocate(atom%E(atom%Nlevel))
@@ -168,8 +175,9 @@ MODULE readatom
     !! DO NOT USE i as a loop index here !!
 
     !deprecation, they are now computed cell by cell for saving memory
-    !allocate(atom%ntotal(n_cells))
-    allocate(atom%vbroad(n_cells))
+    !allocate(atom%ntotal(n_cells)) !-> but cheap in mem? so keep it ?
+!-> futur deprecation compute localy ??? or not
+    allocate(atom%vbroad(n_cells)) !-> if profile keep in memory needed ??
     !write(*,*)
     !VDoppler = KBOLTZMANN/(AMU * atom%weight) * 8d0/PI !* 2d0!m/s
 
@@ -251,9 +259,30 @@ MODULE readatom
       !tmp
       if (atom%ID=="H") then
       
-      	if (atom%g(i)==8 .and. atom%g(j)==18) atom%lines(kr)%write_flux_map=.true.
+      	!Ly alpha
       	if (atom%g(i)==2 .and. atom%g(j)==8) atom%lines(kr)%write_flux_map =.true. 
+      	!H alpha
+      	if (atom%g(i)==8 .and. atom%g(j)==18) atom%lines(kr)%write_flux_map=.true.
+      	!H beta
+      	if (atom%g(i)==8 .and. atom%g(j)==32) atom%lines(kr)%write_flux_map =.true. 
+      	!H gamma
+      	if (atom%g(i)==8 .and. atom%g(j)==50) atom%lines(kr)%write_flux_map =.true. 
+      	!Pa beta
+      	if (atom%g(i)==18 .and. atom%g(j)==50) atom%lines(kr)%write_flux_map =.true. 
+      	!Br gamma
+      	if (atom%g(i)==32 .and. atom%g(j)==98) atom%lines(kr)%write_flux_map =.true. 
+
+
+	  elseif (atom%ID=="He") then
+	  	if (kr >= 5 .and. kr <= 6) then
+	  		atom%lines(kr)%write_flux_map =.true. 
+	  	endif
+      else
       
+      	if (kr <= 4) then
+      		atom%lines(kr)%write_flux_map =.true. 
+      	endif
+
       endif
       
       if (atom%lines(kr)%qwing < 2.0) then
@@ -582,11 +611,19 @@ MODULE readatom
        !Meanwhile, I search the lambda for which g_bf is < 0 (then 0)
        if (ldissolve) then !only if we actually want to extrapolate
        	if (atom%ID=="H") then ! .or. atom%ID=="He") then
-        	CALL search_cont_lambdamax (atom%continua(kr), atom%Rydberg, atom%stage(i)+1,atom%E(j),atom%E(i))        
+        	CALL search_cont_lambdamax (atom%continua(kr), atom%Rydberg, atom%stage(i)+1,atom%E(j),atom%E(i)) 
+            CALL make_sub_wavelength_grid_cont_linlog(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+			!!CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)   
+		else
+			!there is dissolve but not for this atom, log cont
+            CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
        	endif
+       else !no dissolve
+			CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)   
        endif
        ! %lambda allocated inside the routines.
-       CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+!        CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+       !make it log if not occupation probability ?
 !        CALL make_sub_wavelength_grid_cont_log(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
 	   !Can be done elsewhere, with atomic lines ? But unlike some lines grid, this does not depend on the local condition ATM
      else
@@ -624,6 +661,14 @@ MODULE readatom
 
    atom%set_ltepops = .true. !by default compute lte populations
    atom%NLTEpops = .false.
+   
+    ! allocate some space
+    if (atom%initial_solution.eq."ZERO_RADIATION") then
+    	if (.not.atom%active) then
+    		write(*,*) atom%ID, " is passive! cannot use ZERO_RADIATION solution, set to LTE."
+    		atom%initial_solution="LTE_POPULATIONS"
+    	endif
+    endif
 
    if (atom%active) then
 
@@ -639,12 +684,6 @@ MODULE readatom
      call read_collisions(atomunit, atom)
     endif
 
-    ! allocate some space
-    if (atom%initial_solution.eq."ZERO_RADIATION") then
-    	write(*,*) " Zero radiation solution not implemented yet "
-    	atom%initial_solution="LTE_POPULATIONS"
-    endif
-
     !!allocate(atom%C(atom%Nlevel*atom%Nlevel,n_cells))
     !!now Collision matrix is constructed cell by cell, therefore allocated elsewhere
     allocate(atom%n(atom%Nlevel,n_cells))
@@ -653,38 +692,38 @@ MODULE readatom
     	atom%n = atom%nstar !still need to be computed
     	atom%set_ltepops = .true.
     	write(*,*) " -> Setting initial solution to LTE "
+    	
+    else if (atom%initial_solution .eq. "CSWITCH") then
+    	atom%n = atom%nstar !still need to be computed
+    	atom%set_ltepops = .true.
+    	if (.not. lforce_lte) then !otherwise cswitch is not LTE
+    		write(*,*) " -> Setting initial solution to LTE with CSWITCH "
+    		atom%cswitch = cswitch_val
+    		if (cswitch_enabled == .false.) cswitch_enabled = .true.!we need at least one
+    	endif
+    else if (atom%initial_solution .eq. "ZERO_RADIATION") then
+    
+    	atom%n = atom%nstar
+    	atom%set_ltepops = .true.
+    	!nlte pops is false
+    	    	
 	else if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+	
 	   write(*,*) " -> Reading populations from file..."
-       CALL read_Pops(atom)
+       CALL read_pops_atom(atom)
        atom%NLTEpops = .true.
        atom%set_ltepops = .false. !read also LTE populations
-       write(*,*) " min/max pops for each level:"
-       do kr=1,atom%Nlevel
-        write(*,*) "   nLTE ", kr, ">>", minval(atom%n(kr,:)), maxval(atom%n(kr,:))
-        write(*,*) "   LTE ", kr, ">>", minval(atom%nstar(kr,:)), maxval(atom%nstar(kr,:))
-       enddo
-    else if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "DEPARTURE") then
-     allocate(atom%b(atom%Nlevel, n_cells))
-     CALL error ("Implement departure coeffs for NLTE stars")
+
     end if
    else !not active = PASSIVE
      if (atom%dataFile.ne.""  .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+     
        allocate(atom%n(atom%Nlevel,n_cells)) !not allocated if passive, n->nstar
-	   write(*,*) " -> Reading populations from file..."
-       CALL read_Pops(atom)
+	   write(*,*) " -> Reading populations from file for passive atom..."
+       CALL read_pops_atom(atom)
        atom%NLTEpops = .true.
-       atom%set_ltepops = .true.
-       write(*,*) " min/max pops for each level:"
-       do kr=1,atom%Nlevel
-        write(*,*) "    ", kr, ">>", minval(atom%n(kr,:)), maxval(atom%n(kr,:))
-       enddo
-     else if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "DEPARTURE") then
-       allocate(atom%b(atom%Nlevel, n_cells), atom%n(atom%Nlevel, n_cells))
-       atom%NLTEpops=.false. !electron evalutaed at LTE if no NLTE pops read, and atom%n
-       atom%set_ltepops = .true.
-       !is computed with respect to that using the atom%b
-	   write(*,*) " -> Reading departure coefficients from file..."
-       CALL read_departure_bfactor(atom)
+       atom%set_ltepops = .false. !read also lte pops
+
        !atom%NLTEpops = .false. still false at this point as we need pops to do electron densities
      else !pure passive without nlte pops from previous run
 !        atom%NLTEpops=.false.  !-> default values
@@ -787,8 +826,8 @@ MODULE readatom
    if (Atoms(nmet)%ptr_atom%initial_solution.ne."OLD_POPULATIONS" &
       .and.Atoms(nmet)%ptr_atom%initial_solution.ne."LTE_POPULATIONS"&
       .and.Atoms(nmet)%ptr_atom%initial_solution.ne."ZERO_RADIATION"&
-       .and.Atoms(nmet)%ptr_atom%initial_solution.ne."DEPARTURE") then
-     write(*,*) "Initial solution ", Atoms(nmet)%ptr_atom%initial_solution,&
+		.and.Atoms(nmet)%ptr_atom%initial_solution.ne."CSWITCH")then
+	     write(*,*) "Initial solution ", Atoms(nmet)%ptr_atom%initial_solution,&
       " unkown!"
      write(*,*) "Exiting..."
      stop
@@ -866,14 +905,20 @@ MODULE readatom
    ! a model atom. It means all elements here.
    !atom => Atoms(nmet)
    Elements(Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model => Atoms(nmet)%ptr_atom
+
+   
    if (.not.associated(Elements(Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model, &
-    Atoms(nmet)%ptr_atom)) CALL Warning(" Elemental model not associated to atomic model!")
+    Atoms(nmet)%ptr_atom)) then
+    	CALL Warning(" Elemental model not associated to atomic model!")
+    endif
+    
    if (Atoms(nmet)%ptr_atom%periodic_table.eq.2)  then
            NULLIFY(Helium) !Because, it is associated to an Elem by default
            Helium => Atoms(nmet)%ptr_atom
      if (.not.associated(Helium,Atoms(nmet)%ptr_atom)) &
       CALL Warning(" Helium alias not associated to atomic model!")
    end if
+   
    if (allocated(ActiveAtoms)) then
      if (Atoms(nmet)%ptr_atom%active) then
       nact = nact + 1 !got the next index of active atoms
@@ -883,6 +928,7 @@ MODULE readatom
 !       atom2 = atom
      end if
    end if
+   
    if (allocated(PassiveAtoms)) then
      if (.not.Atoms(nmet)%ptr_atom%active) then
       npass = npass+1
@@ -901,8 +947,13 @@ MODULE readatom
   		endif
   	enddo
   enddo
-  write(*,*) "resol(km/s)", 0.6*real(min_resol)*1e-3, " min(vD) (km/s) = ", min_resol * 1d-3
-  hv = 0.6 * real(min_resol) * 1e-3
+  hv = 0.46 * real(min_resol) * 1e-3
+  
+  if (art_hv > 0.0) then
+	hv = art_hv
+  endif
+  write(*,*) "resol(km/s)", hv, " min(vD) (km/s) = ", min_resol * 1d-3
+
 
   !Move after LTEpops for first estimates of damping
   !line wave grid define here to have the max damping
@@ -963,9 +1014,10 @@ MODULE readatom
     !! maxvel = maxvel_atom_transfer * 1e3 * ( 1e-3 * vel/1.0)
 
 ! 	 maxvel = maxval(atom%vbroad)
-     write(*,*) "maxvel for line ", kr, maxvel * 1e-3
+     !write(*,*) "maxvel for line ", kr, maxvel * 1e-3
      !!-> group of lines, linear in v
-     CALL compute_line_bound( Atoms(nmet)%ptr_atom%lines(kr), maxvel )
+     call define_local_profile_grid (Atoms(nmet)%ptr_atom%lines(kr))
+
  
  !-> depends if we interpolate profile on finer grid !   
      !!-> linear
@@ -1029,6 +1081,7 @@ MODULE readatom
 
   enddo
 
+  cont%lambdamax = min(cont%lambdamax,1d5)
   write(*,*) cont%atom%ID, " cont, n=",real(n_eff), cont%j, cont%i, real(cont%lambda0),"nm"
   write(*,*) " -> pseudo-continuum: ", real(cont%lambdamax), " nm: frac=", real(cont%lambdamax/cont%lambda0)
              
@@ -1036,5 +1089,44 @@ MODULE readatom
  RETURN
  END SUBROUTINE search_cont_lambdamax
 
+ function maxval_cswitch_atoms ()
+ !for all atoms, check the maximum value of the cswitch
+ 	integer :: n
+ 	real(kind=dp) ::  maxval_cswitch_atoms
+ 	
+	maxval_cswitch_atoms = 1.0_dp
+ 	do n=1, Natom
+ 	
+ 		maxval_cswitch_atoms = max(maxval_cswitch_atoms, atoms(n)%ptr_atom%cswitch)
+ 	
+ 	enddo
+ 
+ return
+ end function maxval_cswitch_atoms
+ 
+ subroutine adjust_cswitch_atoms ()
+ !for all active atoms, decreases the cswitch value from cswitch_down_scaling_factor
+ 	integer :: n
+ 	logical :: print_message = .false.
+ 	real(kind=dp) :: new_cs
+ 	
+ 	print_message = .false.
+ 	
+ 	do n=1, NactiveAtoms
+ 	
+ 		if (activeatoms(n)%ptr_atom%cswitch > 1.0) then
+ 			activeatoms(n)%ptr_atom%cswitch = max(1.0_dp, min(activeatoms(n)%ptr_atom%cswitch, activeatoms(n)%ptr_atom%cswitch/cswitch_down_scaling_factor))
+ 			if (print_message == .false.) then
+ 				print_message = .true.
+ 				new_cs = activeatoms(n)%ptr_atom%cswitch
+ 			endif
+ 		endif
+ 	enddo
+ 	
+ 	if (print_message) write(*,'(" cswitch for next iteration: "(1ES17.8E3))') new_cs
+
+ 
+ return
+ end subroutine adjust_cswitch_atoms
 
 END MODULE readatom
