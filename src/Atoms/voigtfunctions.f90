@@ -22,13 +22,12 @@ MODULE voigtfunctions
 	real(kind=dp) :: a
 	real(kind=dp) :: v(N), L(N)
 	real(kind=dp), intent(out), optional :: F(N)
-	complex(kind=dp) :: w4, z, u, v4!,t
+	complex(kind=dp) :: w4, z, u, v4
 	real(kind=dp) :: s
 	integer :: i, N
 		
     do i = 1, n
-		!!!z = cmplx(v(i), a)
-		!t = cmplx(a, -v(i))
+
 		z = cmplx(a,-v(i))
 		s = dabs(v(i)) + a
 		u = z*z
@@ -42,108 +41,93 @@ MODULE voigtfunctions
 		elseif (a >= 0.195d0*dabs(v(i))-0.176d0) then
 		! Region III
 			w4 = (16.4955d0+z*(20.20933d0+z*(11.96482d0+z*(3.778987d0+z*0.5642236d0)))) / &
-					(16.4955d0+z*(38.82363d0+z*(39.27121d0+z*(21.69274d0+z*(6.699398d0+z)))))
+					(16.4955d0+z*(38.82363d0+z*(39.27121d0+z*(21.69274d0+z*(6.699398d0+z)))))				
 		else 
 		! Region IV
 			w4 = z*(36183.31d0-u*(3321.9905d0-u*(1540.787d0-u*(219.0313d0-u*(35.76683d0-&
 					u*(1.320522d0-u*0.56419d0))))))
 			v4 = (32066.6d0-u*(24322.84d0-u*(9022.228d0-u*(2186.181d0-u*(364.2191d0-&
 					u*(61.57037d0-u*(1.841439d0-u)))))))
-			w4 = exp(u) - w4/v4 !cdexp
+			w4 = exp(u) - w4/v4 !cdexp, can be optimized by splitting the exp on real and imag parts
 		endif
-			L(i) = real(w4,kind=dp)!w4%re!!dble(w4)
-			if (present(F)) F(i) = aimag(w4)!w4%im!
+		L(i) = real(w4,kind=dp)!w4%re!!dble(w4)
+		if (present(F)) F(i) = aimag(w4)!w4%im!
+		
 	enddo  
 
   RETURN
   END FUNCTION VoigtHumlicek
   
-  FUNCTION dirac_line(N, a, v, F) result(L)
-	real(kind=dp) :: a
-	real(kind=dp) :: v(N), L(N)
-	real(kind=dp), intent(out), optional :: F(N)
-	integer :: i, N
+  FUNCTION dirac_line(N, v) result(L)
+	real(kind=dp) :: v(N), L(N), minv = 1d20
+	integer :: i, N, i1
+
+! 	L(:) = 0.0_dp
+! 	i = locate(v, 0.0_dp)
+! 	L(i) = 1.0_dp
 	
-	L(:) = 0d0
-	i = locate(v, 0d0)
-	L(i) = 1d0
+	i1 = N
+	do i=1, N
+		minv = min(minv, abs(v(i)))
+		if (abs(v(i)) == minv) then
+			v(i) = 1.0
+			v(i1) = 0.0
+			i1 = i
+		else
+			v(i) = 0.0
+		endif
+	
+	enddo
+
 
   RETURN
   END FUNCTION dirac_line
   
-  FUNCTION VoigtXXXX(N, a, v, F) result(L) !for unpolarised profile
-	real(kind=dp) :: a
+  
+   FUNCTION gate_line(N, v, vlim) result(L)
+	real(kind=dp) :: vlim
 	real(kind=dp) :: v(N), L(N)
-	real(kind=dp), intent(out), optional :: F(N)
 	integer :: i, N
-  !TBD
+	
+	do i=1, N
+	
+		if (abs(v(i)) > vlim ) then
+			L(i) = 0.0_dp
+		else
+			L(i) = 1.0_dp
+		endif
+	
+	enddo
+
   RETURN
-  END FUNCTION VoigtXXXX
+  END FUNCTION gate_line 
+  
+  FUNCTION Voigt_thomson(N, a, vbroad, v) result(L) !for unpolarised profile
+	real(kind=dp) :: a, vbroad
+	real(kind=dp) :: v(N), L(N)
+	integer :: i, N
+	real(kind=dp) :: aeff, ratio, eta, al
+
+	al = a * vbroad
+		
+	aeff = (vbroad**5. + 2.69269*vbroad**4. * aL + 2.42843*vbroad**3. * aL**2. + &
+					4.47163*vbroad**2. *aL**3. + 0.07842*vbroad*aL**4. + aL**5.)**(0.2)
+          		
+
+          	
+	ratio = aL/aeff
+	eta = 1.36603*ratio - 0.47719*(ratio*ratio) + 0.11116*(ratio*ratio*ratio)
+			
+         
+	L(:) = eta * ( aeff/pi * (v**2 + aeff**2)**(-1.0) ) + &
+			(1.0_dp - eta) * exp(-(v/aeff)**2) / aeff / sqrtpi
+					
+
+  RETURN
+  END FUNCTION Voigt_thomson
 
 END MODULE voigtfunctions
 
-
-!  SUBROUTINE Humlicek(N, a, v, W)
-!   ! W = L + i*F
-!   integer, intent(in)              :: N
-!   double precision, intent(in)     :: a
-!   double precision, intent(in)     :: v(N)
-!   complex(kind=16), intent(out)    :: W(N)
-!   double precision                 :: s(N)
-!   complex(kind=16)                 :: z(N)
-!   complex(kind=16)                 :: u(N)
-! 
-!   z = cmplx(a,-v)
-!   s = abs(v) + a
-! 
-!   ! Approximation in region IV
-!   u = z * z
-!   W = exp(u) - (z*(36183.31 - u*(3321.99 - u*(1540.787 - &
-!    u*(219.031 - u*(35.7668 - u*(1.320522 - u*0.56419)))))) / &
-! (32066.6 - u*(24322.84 - u*(9022.228 - u*(2186.181 - &
-!    u*(364.2191 - u*(61.57037 - u*(1.841439 - u))))))))
-! 
-!   where(s >= 15)
-!    ! Approximation in region I
-!    W = (z * 0.5641896) / (0.5 + (z * z))
-!   else where (s >= 5.5)
-!    ! Approximation in region II
-!    u = z * z
-!    W = (z * (1.410474 + u*0.5641896)) / (0.75 + (u*(3.0 + u)))
-!   else where (a >= 0.195*abs(v) - 0.176)
-!   ! Approximation in region III
-!    W = (16.4955 + z*(20.20933 + z*(11.96482 + z*(3.778987 + &
-!    0.5642236*z)))) / &
-!    (16.4955 + z*(38.82363 + z*(39.27121 + z*(21.69274 + &
-!    z*(6.699398 + z)))))
-!   end where
-! 
-!  RETURN
-!  END SUBROUTINE Humlicek
-
-!  FUNCTION VoigtHumlicek(N, a,v, F) result(L)
-!  ! --------------------------------------------------------------------------- !
-!   ! Humlicek 1982, JQSRT 27, p. 437
-!   ! Relative accuracy 1.0E-04. Also calculates Faraday-Voigt
-!   ! function needed in Stokes radiative transfer.
-!   ! W = Voigt + i*Faraday-Voigt (dispersion profile)
-!   !
-!   ! Adapted from rh code (Uitenbroek 2001, ApJ 389-398)
-!  ! --------------------------------------------------------------------------- !
-!   integer, intent(in)           :: N
-!   double precision, intent(in)  :: a
-!   double precision, intent(in)  :: v(N)
-!   double precision              :: L(N)
-!   double precision, intent(out) :: F(N)
-!   complex(kind=16)              :: W(N)
-! 
-!   ! real of W is L, and imag is F
-!   CALL Humlicek(N, a, v, W)
-! 
-!   F = imag(W)
-!   L = real(W) !factor 2 here or not ?
-!  RETURN
-!  END FUNCTION VoigtHumlicek
 
   
 !  double precision, dimension(0:23) :: an
@@ -223,33 +207,3 @@ END MODULE voigtfunctions
 ! 
 !  RETURN
 !  END FUNCTION VoigtAbrarov
-
-!! Deprecated I use PROCEDURE NOW
-!  FUNCTION Voigt(N, a, v, F, VoigtAlgorithm) result (L)
-!  ! --------------------------------------------------------------------------- !
-!   ! RETURN THE VOIGT FUNCTION FOR A LINE PROFILE
-!   ! ACCORDING TO A DETERMINED ALGORITHM
-!   ! L-> Voigt function, F->Dispersion profile
-!   ! if desired (when polarisation is desired in fact)
-!   ! VoigtAlgorithm-> aglorithm for the voigt function
-!  ! --------------------------------------------------------------------------- !
-!   integer, intent(in)                       :: N !size of the final voigt
-!   double precision, intent(in)              :: a
-!   double precision, intent(in)				:: v(N)
-!   double precision, intent(out)				:: F(N)
-!   double precision			                :: L(N)
-!   character(len=*), optional    :: VoigtAlgorithm
-! 
-!   if (.not. present(VoigtAlgorithm)) VoigtAlgorithm="HUMLICEK"
-! 
-!   SELECT CASE (VoigtAlgorithm)
-!    CASE ("HUMLICEK")
-!     L = VoigtHumlicek(N, a, v, F)
-!    CASE ("ABRAROV")
-!     L = VoigtAbrarov(N, a, v, F)
-!    CASE DEFAULT
-!     L = VoigtHumlicek(N, a, v, F) !using Humlicek by default
-!  END SELECT
-! 
-!  RETURN
-!  END FUNCTION Voigt
