@@ -46,19 +46,19 @@ MODULE math
 	end subroutine solve_lin
 	
 	
-	function Ng_accelerate(solution, m, n, lasts, check_negative_pops)
+	function Ng_accelerate(niter, solution, m, n, lasts, check_negative_pops)
 		!Extra overheads if check_negative_pops is true
 		use utils, only : GaussSlv
 		logical, optional, intent(in) :: check_negative_pops
-		integer, intent(in) :: m, n !Nlevel * n_cells; Norder
+		integer, intent(in) :: niter, m, n !Nlevel * n_cells; Norder
 		logical :: Ng_accelerate
 		real(kind=dp), intent(inout) :: lasts(m,*), solution(m)
 		integer :: i, j, k
 		real(kind=dp) :: A(n, n), b(n), w, dy, di
-		integer, save :: niter
-		data niter /0/
+		!!integer, save :: niter
+		!!data niter /0/
 		
-		niter = niter + 1
+		!!niter = niter + 1
 
 		lasts(:,niter) = solution(:)
 		ng_accelerate = .false.
@@ -69,7 +69,8 @@ MODULE math
 		do k=1, m
 			!what is faster ?
 			if (solution(k) > 0.0) then!fast to check, than doing operations with dy and di zero for all i,j?
-				w = 1.0 / ( abs(solution(k)) )
+! 				w = 1.0 / ( abs(solution(k)) )
+				w = 1.0 / ( solution(k)**2 )
 ! 				w = 1.0 / ( 1.0_dp + abs(solution(k)) ) !if we don't test
 				!!write(*,*) "k",k, " w=", w,  " sol",solution(k)
 				dy = lasts(k,niter-1) - lasts(k,niter)
@@ -115,7 +116,7 @@ MODULE math
 		endif
 		
 		ng_accelerate = .true.
-		niter = 0
+		!!if (acc_iter) niter = 0
 
 	return
 	end function ng_accelerate
@@ -300,40 +301,11 @@ MODULE math
 
 
 
-   function cmf_to_of (Nx, y, dk)
-   !Shift a function y, centered at 0 in the velocity space
-   !by a delta in index of dk.
-   !dk is an integer positive or negative.
-   !The function y has to be linearly spaced such that y'(1) = y(1 + dk)
-   !where y' is the function projected onto the observer's frame.
-   ! dk is int(dv * di)
-   ! with di = (index(y[1]) - index(y[0]))/(y[1]-y[0]) and dv a velocity shift.
-    integer, intent(in) :: Nx, dk
-    real(kind=dp), intent(in), dimension(Nx) :: y
-    real(kind=dp), dimension(Nx) :: cmf_to_of
-    integer :: j
+   function linear_1D(N,x,y,Np,xp)
+     real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
+     integer :: N, Np, i, j
 
-    do j=1, Nx
-
-     if ( (j + dk < 1) .or. (j + dk > Nx) ) then
-     	cmf_to_of(j) = 0.0
-     else
-     	cmf_to_of(j) = y(j+dk)
-     endif
-
-    enddo
-
-
-   return
-   end function cmf_to_of
-
-
-   !c'est bourrin, il n y a pas de test
-!    function linear_1D(N,x,y,Np,xp)
-!      real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
-!      integer :: N, Np, i, j
-! 
-! 	linear_1D(:) = 0.0_dp
+	 linear_1D(:) = 0.0_dp
 !      do i=1,N-1
 !         do j=1,Np
 !            if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
@@ -342,15 +314,6 @@ MODULE math
 !            endif
 !         enddo
 !      enddo
-! 
-!      return
-! 
-!    end function linear_1D
-   function linear_1D(N,x,y,Np,xp)
-     real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
-     integer :: N, Np, i, j
-
-	linear_1D(:) = 0.0_dp
      do j=1,Np
         do i=1,N-1
            if (xp(j)>x(i) .and. xp(j)<=x(i+1)) then
@@ -376,18 +339,52 @@ MODULE math
      real(kind=dp) :: t
      integer :: i, j, i0, j0
 
-     linear_1D_sorted(:) = 0._dp
+     linear_1D_sorted(:) = 0.0_dp
 
-! 
-! 	 i0 = 2
-!      do j=1, np
-!         !i0 = 2
-!         loop_i : do i=i0, n
-!            if ((x(i) > xp(j))) then
-!               t = (xp(j) - x(i-1)) / (x(i)-x(i-1))
-! =======
-     ! We do a first pass, to find the 1st index to interpolate
-     ! Below x(1), we keep the values to 0 (ie no extrapolation)
+     j0=np+1
+     do j=1, np
+        if (xp(j) > x(1)) then
+           j0 = j
+           exit
+        endif
+     enddo
+     !write(*,*) "jstar=",j0, xp(j0), x(1)
+
+     ! We perform the 2nd pass where we do the actual interpolation
+     ! For points larger than x(n), value will stay at 0
+     i0 = 2
+     do j=j0, np
+        loop_i : do i=i0, n
+           if (x(i) > xp(j)) then
+              t = (xp(j) - x(i-1)) / (x(i) - x(i-1))
+			  !write(*,*) j,i, t
+              linear_1D_sorted(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
+              i0 = i
+              exit loop_i
+           endif
+        enddo loop_i
+     enddo
+
+
+     return
+   end function linear_1D_sorted
+
+ 
+  !not test yet
+   function quad_1D_sorted(n,x,y, np,xp)
+     ! assumes that both x and xp are in increasing order
+     ! We only loop once over the initial array, and we only perform 1 test per element
+
+     integer, intent(in)                      :: n, np
+     real(kind=dp), dimension(n),  intent(in) :: x,y
+     real(kind=dp), dimension(np), intent(in) :: xp
+     real(kind=dp), dimension(np)             :: quad_1D_sorted
+
+     real(kind=dp) :: t, t2, t3
+     integer :: i, j, i0, j0
+
+     quad_1D_sorted(:) = 0.0_dp
+
      j0=np+1
      do j=1, np
         if (xp(j) > x(1)) then
@@ -402,52 +399,25 @@ MODULE math
      do j=j0, np
         loop_i : do i=i0, n
            if (x(i) > xp(j)) then
-              t = (xp(j) - x(i-1)) / (x(i) - x(i-1))
-              linear_1D_sorted(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
-              !i0 = i !? + 1
-              i0 = i + 1
+			  if (i < n) then !quadratic correction
+			  	t = (xp(j) - x(i)) * (xp(j) - x(i+1)) / ((x(i-1) - x(i))*(x(i-1)-x(i+1)) )
+			  	t2 = (xp(j) - x(i-1)) * (xp(j) - x(i+1)) / ((x(i) - x(i-1))*(x(i)-x(i+1)) )
+			    t3 = (xp(j) - x(i-1)) * (xp(j) - x(i)) / ((x(i+1) - x(i-1))*(x(i+2)-x(i)) )
+			  	quad_1D_sorted(j) = quad_1D_sorted(j) + y(i-1)*t + y(i) * t2 + y(i+1) * t3  
+			  else
+              	t = (x(i) - xp(j)) / (x(i) - x(i-1))
+              	t2 = (xp(j) - x(i-1)) / (x(i) - x(i-1))
+			  	quad_1D_sorted(j) = y(i-1) * t + y(i) * t2
+              endif
+              i0 = i
               exit loop_i
            endif
         enddo loop_i
      enddo
 
-     return
-
-   end function linear_1D_sorted
-
-   
-   function linear_1D_dx(dx,n,x,y,np,xp)
-     ! assumes that both x and xp are in increasing order
-     ! We only loop once over the initial array, and we only perform 1 test per element
-
-     integer, intent(in)                      :: n, np
-     real(kind=dp), dimension(n),  intent(in) :: x,y
-     real(kind=dp), dimension(np), intent(in) :: xp
-     real(kind=dp), dimension(np)             :: linear_1D_dx
-     real, intent(in) 						  :: dx
-
-     real(kind=dp) :: t
-     integer :: i, j, i0, j0
-
-	 i0 = 2
-     do j=1, np
-        loop_i : do i=i0, n
-!            if ((x(i) > xp(j))) then
-           if ((xp(j) > x(i-1))) then
-              t = (xp(j) - x(i-1)) / dx
-              linear_1D_dx(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
-              i0 = i + 1
-              exit loop_i
-           else
-              linear_1D_dx(j) = 0d0
-              exit loop_i
-           endif
-        enddo loop_i
-     enddo
 
      return
-
-   end function linear_1D_dx
+   end function quad_1D_sorted
 
 
    function convolve(x, y, K)
@@ -561,6 +531,49 @@ MODULE math
 
    RETURN
    END FUNCTION dPOW
+   
+   !approximate exp(-x) = approx_exp_mx(x)
+   !x is positive !
+   !too slow atm
+   elemental function approx_exp_mx(x)
+   	real(kind=dp), intent(in) :: x
+   	real(kind=dp) :: approx_exp_mx
+   	integer :: m
+   
+   	if (x > 500.0) then
+   		approx_exp_mx = 0.0 !exp(-(x>650)) -> 0
+   	elseif (x < 1d-2) then !exp(-(x<1d-2)) -> taylor
+   		approx_exp_mx = 1.0 - x + x*x/2.0 - x*x*x/6.0 + x*x*x*x/24.0
+   	else
+   		approx_exp_mx = exp(-x)
+   	endif
+   	
+   return
+   end function approx_exp_mx
+   
+    !interpolation is to slow at the moment to be efficient
+	subroutine exp_lookup (N, argmin,argmax, x, table)
+	!stores a table of tau values (x) and their exp(-tau) (table)
+	!in ascending tau order, so decreasing exp(-tau)
+	!e.g.   call exp_lookup (N_etau_table, table_tau_min,table_tau_max, table_xtau, table_etau)
+		use utils, only : spanl
+		integer, intent(in) :: N
+   		real, intent(in) :: argmin, argmax
+   		real(kind=dp), dimension(N), intent(out) :: table
+   		real(kind=dp), intent(out) :: x(N)
+   		integer :: i
+   		
+   		x(1) = 0.0
+   		!include the spanl in a loop ?
+   		x(2:N) = spanl(1e-6, argmax, N-1)
+   		table(:) = exp(-x(:))
+!    		do i=1,N
+!    			write(*,*) i, x(i), table(i)
+!    		enddo
+! 	stop
+	return
+	end subroutine exp_lookup
+
 
   FUNCTION E1 (x) result (y)
    !First exponential integral
