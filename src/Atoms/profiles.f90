@@ -3,8 +3,8 @@ MODULE PROFILES
 	use atmos_type, only				: B_project, VBROAD_atom
 	use constant
 	use atom_type
-	use spectrum_type, only				: lambda
-	use voigtfunctions, only			: Voigt, dirac_line
+	use spectrum_type, only				: lambda, dk_min, dk_max
+	use voigtfunctions, only			: Voigt, dirac_line, gate_line
 	use broad, only						: Damping
 	use math
 	use getlambda, only 				: hv
@@ -18,84 +18,433 @@ MODULE PROFILES
 
 	IMPLICIT NONE
 
-	PROCEDURE(Iprofile), pointer :: Profile => null()
+	PROCEDURE(local_profile_v), pointer :: profile => null()
+	integer, parameter :: NvspaceMax = 3, NbspaceMax = 50
 
 	CONTAINS
+	
+	function gradv (icell, x,y,z,x1,y1,z1,u,v,w,l,dk)
+		real(kind=dp) :: gradv, v0, v1
+		real(kind=dp), intent(in) :: x,y,z,x1,y1,z1,u,v,w,l
+		integer, intent(in) :: icell
+		integer, intent(out) :: dk
+		
+		dk = 0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+		gradv = (v1-v0)/l
 
+		dk = int(1e-3 * max(v1,v0) / hv + 0.5)
+	
+	return
+	end function gradv
+
+	!-> subroutine to call different line profile for different lines
+	!more general and easier than having a line=> Voigt() or a line=>profile() ?
+
+! 	subroutine line_profile(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l, prof)
+! 		! phi = Voigt / sqrt(pi) / vbroad(icell)
+! 		integer, intent(in) 							            :: icell, N
+! 		logical, intent(in)											:: lsubstract_avg
+! 		real(kind=dp), dimension(N), intent(in)						:: lambda
+! 		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+!                                 				               			x1,y1,z1, &      ! velocity field and magnetic field
+!                                 				               			l !physical length of the cell
+! 		type (AtomicLine), intent(in)								:: line
+! 		real(kind=dp), intent(out) 									:: prof
+! 		
+! 		
+! 		if (line%voigt) then
+! 			prof = local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+! 		elseif (line%pvoigt) then
+! 			prof = local_profile_thomson(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+! 		elseif (line%voigt_interp .or. line%gauss_interp) then
+! 			prof = local_profile_interp(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+! 		else!only gauss
+! 			prof = local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+! 		endif
+! 			
+! 	return
+! 	end subroutine line_profile 
+
+ 	!Might be better because for all lines of an atom or even for all lines of all atoms should be equivalent
+	!if projection done before, we do not need x,y,z,l ect
  
-!if projection done before, we do not need x,y,z,l ect
-
- SUBROUTINE Iprofile (line,icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
- ! phi = Voigt / sqrt(pi) / vbroad(icell)
-  integer, intent(in) 							            :: icell, id, Nvspace
-  real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
-                                				               x1,y1,z1, &      ! velocity field and magnetic field
-                                				               l !physical length of the cell
-  real(kind=dp), intent(in) 								:: Omegav(:)
-  type (AtomicLine), intent(inout)								:: line
-  real(kind=dp), dimension(line%Nlambda)					:: vvoigt
-  integer													::  Nred, Nblue, i, j, nv
-  real(kind=dp)												:: norm
-
-
-  i = line%i; j = line%j
-  Nred = line%Nred; Nblue = line%Nblue
-  
-  line%phi(:,id) = 0d0
-  !line_profiles(:,kr,id) = 0d0
-  
-  norm =  SQRTPI * line%atom%vbroad(icell) * Nvspace
-  
-  !project magnetic field if any
-  
-
-!   if (.not.lstatic .and. .not.lVoronoi) then ! velocity is varying across the cell
-!      v1 = v_proj(icell,x1,y1,z1,u,v,w)
-!      dv = dabs(v1-v0)
-!      Nvspace = max(2,nint(20*dv/line%atom%vbroad(icell)))
-!      Nvspace = min(Nvspace,NvspaceMax)
-!      omegav(Nvspace) = v1
-!     do nv=2,Nvspace-1
-!       delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-!       xphi=x+delta_vol_phi*u
-!       yphi=y+delta_vol_phi*v
-!       zphi=z+delta_vol_phi*w
-!       omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-!     end do 
-!   end if
-! write(*,*) "Nvspace=", Nvspace
-
-  if (line%voigt) then
-  !Now we have a pointer to atom in line. atom(n)%lines(kr)%atom => atom(n)
-  !Computed before or change damping to use only line
-  !CALL Damping(icell, line%atom, kr, line%adamp)       ! init for this line of this atom accounting for Velocity fields
-       do nv=1, Nvspace !one iteration if 1) No velocity fields
-            !                 2) Voronoi grid is used                 
-                        
-          vvoigt(:) = ( line%u(:) - omegav(nv) ) / line%atom%vbroad(icell)
-
-
-!           write(*,*) nv, "0loc=", locate(vvoigt, 0d0)
-!           write(*,*) maxval(vvoigt), vbroad
-          line%phi(:,id) = line%phi(:,id) + &
-          						Voigt(line%Nlambda, line%a(icell),vvoigt(:)) !/ Nvspace
-
-      end do
-  else !Gaussian !only for checking
-      do nv=1, Nvspace
-
-         vvoigt(:) = ( line%u(:) - omegav(nv) ) / line%atom%vbroad(icell)
-         line%phi(:,id) = line%phi(:,id) + exp(-(vvoigt(:))**2) !/ Nvspace 
-
-      end do
- end if !line%voigt
- line%phi(:,id) = line%phi(:,id) / norm !/ (SQRTPI * line%atom%vbroad(icell))
-
-
- RETURN
- END SUBROUTINE IProfile
+ 
+	function local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell, N
+		logical, intent(in)											:: lsubstract_avg
+		real(kind=dp), dimension(N), intent(in)						:: lambda
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
+		real(kind=dp) 												:: norm
+		real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
+																		dv, omegav_mean
+		type (AtomicLine), intent(in)								:: line
+		integer														:: Nred, Nblue, i, j, nv
+		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_v
  
 
+		Nvspace = NvspaceMax
+		i = line%i; j = line%j
+		Nred = line%Nred; Nblue = line%Nblue
+
+		local_profile_v = 0d0
+		u1(:) = ( (lambda - line%lambda0)/line%lambda0 ) * ( clight/line%atom%vbroad(icell) )
+		
+		Omegav = 0d0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		omegav(1) = v0
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+
+		dv = abs(v1-v0)
+		Nvspace = min(max(2,nint(dv/line%atom%vbroad(icell)*20.)),NvspaceMax)
+
+		do nv=2, Nvspace-1
+			delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			xphi=x+delta_vol_phi*u
+			yphi=y+delta_vol_phi*v
+			zphi=z+delta_vol_phi*w
+			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+		enddo
+		omegav(Nvspace) = v1
+
+		omegav_mean = 0.0_dp
+		!!if (lsubstract_avg) omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
+
+		norm = Nvspace * line%atom%vbroad(icell) * sqrtpi
+		
+        if (line%voigt) then
+
+			do nv=1, Nvspace
+ 
+				u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
+         
+				local_profile_v(:) = local_profile_v(:) + Voigt(N, line%a(icell), u1p)
+			enddo
+			
+		else
+			do nv=1, Nvspace
+			
+				u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
+
+				local_profile_v(:) = local_profile_v(:) + exp(-u1p**2)
+				
+			enddo
+		endif
+			
+
+		local_profile_v(:) = local_profile_v(:) / norm
+
+	return
+	end function local_profile_v
+ 
+ 
+	function local_profile_thomson(line,icell,lsubstract_avg, N, lambda, x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell, N
+		logical, intent(in) 										:: lsubstract_avg
+		real(kind=dp), dimension(N), intent(in)						:: lambda
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
+		real(kind=dp) 												:: v0, v1, dv, delta_vol_phi, xphi, yphi, zphi, aeff, eta, ratio, aL, vbroad
+		type (AtomicLine), intent(in)								:: line
+		integer														::  Nred, Nblue, i, j, nv
+		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_thomson
+ 
+
+		Nvspace = NvspaceMax
+		i = line%i; j = line%j
+		Nred = line%Nred; Nblue = line%Nblue
+		vbroad = line%atom%vbroad(icell)
+
+
+		local_profile_thomson = 0d0
+		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight
+		
+		Omegav = 0d0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		omegav(1) = v0
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+
+		dv = abs(v1-v0)
+		Nvspace = min(max(2,nint(dv/vbroad*20.)),NvspaceMax)
+		
+		do nv=2, Nvspace-1
+      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			xphi=x+delta_vol_phi*u
+			yphi=y+delta_vol_phi*v
+			zphi=z+delta_vol_phi*w
+			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+		enddo
+		omegav(Nvspace) = v1
+
+		
+        if (line%voigt) then
+
+          	!to do optimize:
+          	!Can store them on the grid instead ! but it is fast to evaluate ?
+		
+			aL = line%a(icell) * vbroad !(m/s), adamp in doppler units
+		
+			aeff = (vbroad**5. + 2.69269*vbroad**4. * aL + 2.42843*vbroad**3. * aL**2. + &
+					4.47163*vbroad**2. *aL**3. + 0.07842*vbroad*aL**4. + aL**5.)**(0.2)
+          		
+          	
+			ratio = aL/aeff
+			eta = 1.36603*ratio - 0.47719*(ratio*ratio) + 0.11116*(ratio*ratio*ratio)
+			
+			do nv=1, Nvspace
+ 
+				u1p(:) = ( u1(:) - omegav(nv) ) 
+         
+				local_profile_thomson(:) = local_profile_thomson(:) + &
+					eta * ( aeff/pi * (u1p(:)**2 + aeff**2)**(-1.0) ) + &
+					(1.0_dp - eta) * exp(-(u1p(:)/aeff)**2) / aeff / sqrtpi
+					
+			enddo
+
+			local_profile_thomson(:) = local_profile_thomson(:) / Nvspace
+			
+		else !pure Gauss, no approximation
+			do nv=1, Nvspace
+			
+				u1p(:) = ( u1(:) - omegav(nv) ) / vbroad
+
+				local_profile_thomson(:) = local_profile_thomson(:) + exp(-u1p**2)
+				
+			enddo
+			local_profile_thomson(:) = local_profile_thomson(:) / Nvspace /sqrtpi / vbroad
+
+		endif
+ 
+
+	return
+	end function local_profile_thomson
+
+	!gaussian are also interpolated
+	function local_profile_interp(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell, N
+		logical, intent(in)											:: lsubstract_avg
+		real(kind=dp), intent(in), dimension(N)						:: lambda
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
+		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi, t, vbroad, dv
+		type (AtomicLine), intent(in)								:: line
+		integer														::  Nred, Nblue, i, j, nv, la, j0, i0
+		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_interp
+! 		real(kind=dp), dimension(N)									:: locprof
+ 
+
+		Nvspace = NvspaceMax
+		i = line%i; j = line%j
+		Nred = line%Nred; Nblue = line%Nblue
+		vbroad = line%atom%vbroad(icell)
+
+		local_profile_interp = 0d0
+		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight/vbroad
+		
+		Omegav = 0d0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		omegav(1) = v0 / vbroad
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+		dv = abs(v1-v0)
+		Nvspace = min(max(2,nint(dv/vbroad*20.)),NvspaceMax)
+! 		write(*,*) "Nv = ", max(2,nint(dv/line%atom%vbroad(icell)*20.))
+! 		write(*,*) v0/1e3, v1/1e3, dv/1e3, NvspaceMax
+		do nv=2, Nvspace-1
+      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			xphi=x+delta_vol_phi*u
+			yphi=y+delta_vol_phi*v
+			zphi=z+delta_vol_phi*w
+			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w) / vbroad
+		enddo
+		omegav(Nvspace) = v1 / vbroad
+
+
+!  					if (i==2 .and. j==3 .and. icell==n_cells .and. abs(v0) > 45d3 ) then
+!  						write(*,*) v0
+! 						open(unit=32, file="profile.txt",status="unknown")
+! 						do la=1, size(line%u)
+! 						
+! 							write(32,*) line%u(la), line%phi(la,icell)
+! 							
+! 						enddo
+! 						close(32)
+! 
+! 					endif
+
+! 		if (line%voigt) then !faster to interpolate ?
+!  						locprof = 0
+			do nv=1, Nvspace
+ 
+				u1p(:) = u1(:) - omegav(nv)
+
+
+				local_profile_interp(:) = local_profile_interp(:) + linear_1D_sorted(size(line%u),line%u/vbroad,line%phi(:,icell),N,u1p)
+! locprof = locprof + voigt(N, line%a(icell), u1p)/sqrtpi/vbroad/nvspace
+			enddo
+
+! 		else !gaussian, faster to evaluate in place
+! 			do nv=1, Nvspace
+!  
+! 				u1p(:) = u1(:) - omegav(nv)
+! 
+!               	local_profile_interp(:) = local_profile_interp(:) + exp(-u1p*u1p) / sqrtpi / vbroad
+!               	
+! 			enddo		
+! 		endif 
+ 
+		local_profile_interp(:) = local_profile_interp(:) / Nvspace
+
+
+!  					if (i==2 .and. j==3 .and. icell==n_cells .and. abs(v0) > 45d3) then
+! 
+! ! 						open(unit=32, file="profile_t.txt",status="unknown")
+! ! 						do la=1, N
+! ! 						
+! ! 							write(32,*) vbroad*u1(la), locprof(la)
+! ! 							
+! ! 						enddo
+! ! 						close(32)
+! 
+!  						write(*,*) line%a(icell), vbroad
+! 						open(unit=32, file="profile_i.txt",status="unknown")
+! 						do la=1, N
+! 						
+! 							write(32,*) vbroad*u1(la), local_profile_interp(la), u1p(la)
+! 							
+! 						enddo
+! 						close(32)
+! 						stop
+! 					endif
+
+	return
+	end function local_profile_interp
+	
+	function local_profile_dirac(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell, N
+		logical, intent(in)											:: lsubstract_avg
+		real(kind=dp), intent(in), dimension(N)						:: lambda
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
+		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi, t, vbroad, dv
+		type (AtomicLine), intent(in)								:: line
+		integer														::  Nred, Nblue, i, j, nv, la, j0, i0
+		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_dirac
+ 
+
+		Nvspace = NvspaceMax
+		i = line%i; j = line%j
+		Nred = line%Nred; Nblue = line%Nblue
+		vbroad = line%atom%vbroad(icell)
+
+		local_profile_dirac = 0d0
+		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight/vbroad
+		
+		Omegav = 0d0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		omegav(1) = v0 / vbroad
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+		dv = abs(v1-v0)
+		Nvspace = min(max(2,nint(dv/vbroad*20.)),NvspaceMax)
+
+		do nv=2, Nvspace-1
+      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			xphi=x+delta_vol_phi*u
+			yphi=y+delta_vol_phi*v
+			zphi=z+delta_vol_phi*w
+			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w) / vbroad
+		enddo
+		omegav(Nvspace) = v1 / vbroad
+
+
+			do nv=1, Nvspace
+ 
+				u1p(:) = u1(:) - omegav(nv)
+
+
+				local_profile_dirac(:) = local_profile_dirac(:) + dirac_line(N, u1p)
+			enddo
+
+ 
+		local_profile_dirac(:) = local_profile_dirac(:) / Nvspace / vbroad / sqrtpi
+
+
+	return
+	end function local_profile_dirac
+	
+	function local_profile_gate(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+		! phi = Voigt / sqrt(pi) / vbroad(icell)
+		integer, intent(in) 							            :: icell, N
+		logical, intent(in)											:: lsubstract_avg
+		real(kind=dp), intent(in), dimension(N)						:: lambda
+		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
+                                				               			x1,y1,z1, &      ! velocity field and magnetic field
+                                				               			l !physical length of the cell
+		integer 													:: Nvspace
+		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
+		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi, t, vbroad, dv, max_u
+		type (AtomicLine), intent(in)								:: line
+		integer														::  Nred, Nblue, i, j, nv, la, j0, i0
+		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_gate
+ 
+
+		Nvspace = NvspaceMax
+		i = line%i; j = line%j
+		Nred = line%Nred; Nblue = line%Nblue
+		vbroad = line%atom%vbroad(icell)
+
+		local_profile_gate = 0d0
+		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight/vbroad
+		max_u = (lambda(Nred) - line%lambda0) / line%lambda0 * clight / vbroad
+		
+		Omegav = 0d0
+		v0 = v_proj(icell,x,y,z,u,v,w)
+		omegav(1) = v0 / vbroad
+		v1 = v_proj(icell,x1,y1,z1,u,v,w)
+		dv = abs(v1-v0)
+		Nvspace = min(max(2,nint(dv/vbroad*20.)),NvspaceMax)
+
+		do nv=2, Nvspace-1
+      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+			xphi=x+delta_vol_phi*u
+			yphi=y+delta_vol_phi*v
+			zphi=z+delta_vol_phi*w
+			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w) / vbroad
+		enddo
+		omegav(Nvspace) = v1 / vbroad
+
+
+			do nv=1, Nvspace
+ 
+				u1p(:) = u1(:) - omegav(nv)
+
+
+				local_profile_gate(:) = local_profile_gate(:) + gate_line(N, u1p, max_u)
+			enddo
+
+ 
+		local_profile_gate(:) = local_profile_gate(:) / Nvspace / vbroad / sqrtpi
+
+
+	return
+	end function local_profile_gate
 
 	function local_profile_dk(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
 	!comoving (local) profile is shifted on the observed grid depending on the velocity.
@@ -105,13 +454,11 @@ MODULE PROFILES
 		! phi = Voigt / sqrt(pi) / vbroad(icell)
 		integer, intent(in) 							            :: icell, N
 		logical, intent(in)											:: lsubstract_avg
-		real(kind=dp), dimension(N)									:: lambda
+		real(kind=dp), dimension(N), intent(in)						:: lambda
 		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
                                 				               			x1,y1,z1, &      ! velocity field and magnetic field
                                 				               			l !physical length of the cell
 		integer 													:: Nvspace
-		integer, parameter											:: NvspaceMax = 500
-		real(kind=dp) 												:: norm
 		real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
 																		dv
 		type (AtomicLine), intent(in)								:: line
@@ -127,315 +474,44 @@ MODULE PROFILES
 		
 		dk = 0
 		v0 = v_proj(icell,x,y,z,u,v,w)
-		dk(1) = nint(1e-3 * v0/hv)
+		dk(1) = int(1e-3 * v0/hv + 0.5)
 		v1 = v_proj(icell,x1,y1,z1,u,v,w)
 
 		dv = abs(v1-v0)
 		Nvspace = min(max(2,nint(dv/line%atom%vbroad(icell)*20.)),NvspaceMax)
-		!!write(*,*) "Nv = ", max(2,nint(dv/line%atom%vbroad(icell)*20.))
 		do nv=2, Nvspace-1
       		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
 			xphi=x+delta_vol_phi*u
 			yphi=y+delta_vol_phi*v
 			zphi=z+delta_vol_phi*w
-			dk(nv) = nint(1e-3*v_proj(icell,xphi,yphi,zphi,u,v,w)/hv)
-			!!write(*,*) nv, dk(nv), v_proj(icell,xphi,yphi,zphi,u,v,w)*1e-3
+			dk(nv) = int(1e-3*v_proj(icell,xphi,yphi,zphi,u,v,w)/hv + 0.5)
 		enddo
-		dk(Nvspace) = nint(1e-3*v1/hv)
+		dk(Nvspace) = int(1e-3 * v1/hv + 0.5)
 		dk_mean = 0
 		!!if (lsubstract_avg) dk_mean = sum(dk(1:Nvspace))/Nvspace
 
-		norm = Nvspace * line%atom%vbroad(icell) * sqrtpi
-
 		do nv=1, Nvspace
-			!!write(*,*) N, i1, i2, dk(nv), line%Nblue, size(line%phi(:,icell))
 			local_profile_dk(i1+dk(nv):i2+dk(nv)) = local_profile_dk(i1+dk(nv):i2+dk(nv)) + line%phi(:,icell)
 		enddo
 
-		local_profile_dk(:) = local_profile_dk(:) / norm
+		local_profile_dk(:) = local_profile_dk(:) / Nvspace
 
 	return
 	end function local_profile_dk
- 
-	function local_profile_i(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
-		! phi = Voigt / sqrt(pi) / vbroad(icell)
-		integer, intent(in) 							            :: icell, N
-		logical, intent(in)											:: lsubstract_avg
-		real(kind=dp), dimension(N)									:: lambda
-		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
-                                				               			x1,y1,z1, &      ! velocity field and magnetic field
-                                				               			l !physical length of the cell
-		integer 													:: Nvspace
-		integer, parameter											:: NvspaceMax = 151
-		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
-		real(kind=dp) 												:: norm
-		real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
-																		dv, omegav_mean
-		type (AtomicLine), intent(in)								:: line
-		integer														:: Nred, Nblue, i, j, nv
-		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_i
- 
-
-		Nvspace = NvspaceMax
-		i = line%i; j = line%j
-		Nred = line%Nred; Nblue = line%Nblue
-
-		local_profile_i = 0d0
-		u1(:) = ( (lambda - line%lambda0)/line%lambda0 ) * ( clight/line%atom%vbroad(icell) )
-		
-		Omegav = 0d0
-		v0 = v_proj(icell,x,y,z,u,v,w)
-		omegav(1) = v0
-		v1 = v_proj(icell,x1,y1,z1,u,v,w)
-
-		dv = abs(v1-v0)
-		Nvspace = min(max(2,nint(dv/line%atom%vbroad(icell)*20.)),NvspaceMax)
-		!!write(*,*) "Nv = ", max(2,nint(dv/line%atom%vbroad(icell)*20.))
-		do nv=2, Nvspace-1
-			delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-			xphi=x+delta_vol_phi*u
-			yphi=y+delta_vol_phi*v
-			zphi=z+delta_vol_phi*w
-			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-! 			omegav(nv)  = v0 + real(nv-1)/real(Nvspace-1) * (v1-v0)
-		enddo
-		omegav(Nvspace) = v1
-
-		omegav_mean = 0.0_dp
-		!!if (lsubstract_avg) omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
-
-		norm = Nvspace * line%atom%vbroad(icell) * sqrtpi
-		
-        if (line%voigt) then
-
-			do nv=1, Nvspace
- 
-				u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
-         
-				local_profile_i(:) = local_profile_i(:) + Voigt(N, line%a(icell), u1p)
-			enddo
-			
-		else
-			do nv=1, Nvspace
-			
-				u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
-
-				local_profile_i(:) = local_profile_i(:) + exp(-u1p**2)
-				
-			enddo
-		endif
-			
-
-		local_profile_i(:) = local_profile_i(:) / norm
-
-	return
-	end function local_profile_i
- 
- !-> TO be included as a Voigt procedure
- !Missing velocity shift here
- !building
- SUBROUTINE Iprofile_thomson (line,icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
- ! phi = Voigt / sqrt(pi) / vbroad(icell)
-  integer, intent(in) 							            :: icell, id, Nvspace
-  real(kind=dp), intent(in) 					            :: x,y,z,u,v,w,& !positions and angles used to project
-                                				               x1,y1,z1, &      ! velocity field and magnetic field
-                                				               l !physical length of the cell
-  real(kind=dp), intent(in) 								:: Omegav(:)
-  type (AtomicLine), intent(inout)								:: line
-  real(kind=dp), dimension(line%Nlambda)					:: vvoigt
-  integer													::  Nred, Nblue, i, j, nv
-
-  nv = 1 !=Nvspace
-
-  i = line%i; j = line%j
-  Nred = line%Nred; Nblue = line%Nblue
-  
-  line%phi(:,id) = 0d0
-  !line_profiles(:,kr,id) = 0d0
-  
-!   r = line%atom%vbroad(icell)*line%a(icell)/line%aeff(icell)
-!   eta = 1.36603*r - 0.47719*r*r + 0.11116*r*r*r
-
-  !normed
-!   line%phi(:,id) = eta*(line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) / pi) &
-!                        + (1-eta)*exp(-(vvoigt(:)/line%aeff(icell))**2)/SQRTPI/line%aeff(icell)
-                       
-  line%phi(:,id) = line%r(icell)*line%aeff(icell) / ((line%u(:)-omegav(nv))**2.+line%aeff(icell)**2.) &
-                       + line%r1(icell)*exp(-(line%u(:)/line%aeff(icell))**2)
-
-
- RETURN
- END SUBROUTINE IProfile_thomson
- 
-	function local_profile_thomson(line,icell,N, lambda, x,y,z,x1,y1,z1,u,v,w,l)
-		! phi = Voigt / sqrt(pi) / vbroad(icell)
-		integer, intent(in) 							            :: icell, N
-		real(kind=dp), dimension(N)									:: lambda
-		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
-                                				               			x1,y1,z1, &      ! velocity field and magnetic field
-                                				               			l !physical length of the cell
-		integer 													:: Nvspace
-		integer, parameter											:: NvspaceMax = 2
-		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
-		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi, aeff, r , cte, cte2, aL, vb, r1
-		type (AtomicLine), intent(in)								:: line
-		integer														::  Nred, Nblue, i, j, nv
-		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_thomson
- 
-
-		Nvspace = NvspaceMax
-		i = line%i; j = line%j
-		Nred = line%Nred; Nblue = line%Nblue
-
-		local_profile_thomson = 0d0
-		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight !/line%atom%vbroad(icell)
-		
-		Omegav = 0d0
-		v0 = v_proj(icell,x,y,z,u,v,w)
-		omegav(1) = v0
-		v1 = v_proj(icell,x1,y1,z1,u,v,w)
-		omegav(Nvspace) = v1
-		do nv=2, Nvspace-1
-      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-			xphi=x+delta_vol_phi*u
-			yphi=y+delta_vol_phi*v
-			zphi=z+delta_vol_phi*w
-			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-		enddo
-		
-		aL = line%a(icell) * line%atom%vbroad(icell) !(m/s), adamp in doppler units
-		vb = line%atom%vbroad(icell)
-		
-		aeff = (vb**5. + 2.69269*vb**4. * aL + 2.42843*vb**3. * aL**2. + &
-					4.47163*vb**2.*aL**3. + 0.07842*vb*aL**4. + aL**5.)**(0.2) !1/5
-          		
-          !!there should have simplification here
-          !!r = line%atom%vbroad(icell)*line%a(icell)/line%aeff(icell)
-          !!eta = 1.36603*r - 0.47719*r*r + 0.11116*r*r*r
-		cte = aL/aeff
-		cte2 = 1.36603*cte - 0.47719*cte*cte + 0.11116*cte*cte*cte
-		r = cte2/pi
-          !for the lorentzian it is eta/pi and for the gaussian it is (1-eta)/sqrtpi/aeff
-		r1 = (1. - cte2)/sqrtpi/aeff
-
-		do nv=1, Nvspace
- 
-			u1p(:) = u1(:) - omegav(nv)
-         
-			local_profile_thomson(:) = local_profile_thomson(:) + r*aeff / ( u1p(:)**2.+aeff**2. ) + r1*exp(-(u1p(:)/aeff)**2)
-
-         	
-		enddo
- 
-		local_profile_thomson = local_profile_thomson / Nvspace /sqrtpi / line%atom%vbroad(icell)
-
-
-	return
-	end function local_profile_thomson
-
-	SUBROUTINE IProfile_cmf_to_obs(line,icell,x,y,z,x1,y1,z1,u,v,w,l)
-		! phi = Voigt / sqrt(pi) / vbroad(icell)
-		integer, intent(in) 							            :: icell
-		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
-                                				               			x1,y1,z1, &      ! velocity field and magnetic field
-                                				               			l !physical length of the cell
-		integer 													:: Nvspace
-		real(kind=dp), dimension(100) 								:: Omegav
-		type (AtomicLine), intent(inout)							:: line
-		integer														::  Nred, Nblue, i, j, nv
-		real(kind=dp), dimension(line%Nlambda)                    	:: u1, u1p, phi0
- 
-
-		i = line%i; j = line%j
-		Nred = line%Nred; Nblue = line%Nblue
-
-		phi0 = 0d0
-		write(*,*) " Interp not ready for profile"
-		stop
-		u1(:) = line%u(:)/line%atom%vbroad(icell)
-
-		do nv=1, Nvspace 
- 
-			u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
-         
-			if (omegav(nv) == 0.0) then
-         
-				phi0 = phi0 + line%phi(:,icell)
-			else
-
-				phi0 = phi0 + linear_1D_sorted(line%Nlambda,u1,line%phi(:,icell),line%Nlambda,u1p)
-			endif
-         	
-		enddo
- 
-		phi0 = phi0 / Nvspace /sqrtpi / line%atom%vbroad(icell)
-
-
-	RETURN
-	END SUBROUTINE IProfile_cmf_to_obs
 	
-	function local_profile_interp(line,icell,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
-		! phi = Voigt / sqrt(pi) / vbroad(icell)
-		integer, intent(in) 							            :: icell, N
-		real(kind=dp), dimension(N)									:: lambda
-		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
-                                				               			x1,y1,z1, &      ! velocity field and magnetic field
-                                				               			l !physical length of the cell
-		integer 													:: Nvspace
-		integer, parameter											:: NvspaceMax = 2
-		real(kind=dp), dimension(NvspaceMax) 						:: Omegav
-		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi
-		type (AtomicLine), intent(in)								:: line
-		integer														::  Nred, Nblue, i, j, nv, la
-		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_interp
- 
-
-		Nvspace = NvspaceMax
-		i = line%i; j = line%j
-		Nred = line%Nred; Nblue = line%Nblue
-
-		local_profile_interp = 0d0
-		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight/line%atom%vbroad(icell)
-		
-		Omegav = 0d0
-		v0 = v_proj(icell,x,y,z,u,v,w)
-		omegav(1) = v0
-		v1 = v_proj(icell,x1,y1,z1,u,v,w)
-		omegav(Nvspace) = v1
-		do nv=2, Nvspace-1
-      		delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
-			xphi=x+delta_vol_phi*u
-			yphi=y+delta_vol_phi*v
-			zphi=z+delta_vol_phi*w
-			omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-		enddo
-		
-! open(10, file="toto.s", status="unknown")
-! do nv=1,line%Nlambda
-! write(10,*) line%u(nv)/line%atom%vbroad(icell), line%phi(nv,icell)
-! enddo
-! close(10)
-! open(10, file="toto2.s", status="unknown")
-! do nv=1,N
-! write(10,*) u1(nv) - 100.0/line%atom%vbroad(icell)
-! enddo
-! close(10)
-! stop
-
-		do nv=1, Nvspace
- 
-			u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
-         
-! 			local_profile_interp = local_profile_interp + linear_1D_sorted(line%Nlambda,line%u/line%atom%vbroad(icell),line%phi(:,icell),N,u1p)
-			local_profile_interp = local_profile_interp + linear_1D_dx(hv, line%Nlambda,line%u/line%atom%vbroad(icell),line%phi(:,icell),N,u1p)
-
-		enddo
- 
-		local_profile_interp = local_profile_interp / Nvspace
-
-
-	return
-	end function local_profile_interp
+	
+! 	function local_zprofile_vd !voigt + dispersion profiles
+! 	
+! 	return
+! 	end function local_zprofile_vd
+! 	
+! 	function local_zprofile_thomson
+! 	return
+! 	end function local_zprofile_thomson
+! 	
+! 	function local_zprofile_interp
+! 	return
+! 	end function local_zprofile_interp
  
  !building
  SUBROUTINE ZProfile (line, icell,x,y,z,x1,y1,z1,u,v,w,l,id, Nvspace, Omegav)
@@ -450,7 +526,6 @@ integer :: iray = 1 !futur deprecation
   real(kind=dp), intent(in) 								:: Omegav(:)
   type (AtomicLine), intent(inout)								:: line
   real(kind=dp), dimension(line%Nlambda)                 :: vvoigt, F, LV, vvoigt_b
-  integer, parameter										:: NbspaceMax=101
   real(kind=dp), dimension(NbspaceMax)					:: omegaB, gamma, chi
   integer													:: nv, Nred, Nblue, nc, &
   															   Nbspace, nb, Nzc, i, j,qz
@@ -677,6 +752,7 @@ integer :: iray = 1 !futur deprecation
 !  
 !  RETURN
 !  END SUBROUTINE write_profiles_ascii
+
 
 
 END MODULE PROFILES
