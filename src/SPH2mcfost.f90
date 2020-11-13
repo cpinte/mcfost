@@ -452,7 +452,7 @@ contains
        n_force_empty = 0
        cell_loop : do icell=1,n_cells
           ! We reduce the density on cells that are very elongated
-          if (Voronoi(icell)%delta_edge > 3 * Voronoi(icell)%h) then
+          if (Voronoi(icell)%was_cut) then
              n_force_empty = n_force_empty + 1
              call reduce_density(icell, density_factor)
              cycle cell_loop
@@ -696,51 +696,119 @@ contains
 
     character(len=512) :: isochrone_file, filename
     character(len=100) :: line_buffer
+    character(len=1)   :: s_age
 
-    integer, parameter :: nSpT = 29
-    character(len=2), dimension(nSpT) :: SpT
-    real :: L, R, T, M, minM, maxM
-    real, dimension(nSpT) :: logL, logR, logTeff, logM
+    character(len=2) :: SpT
+    real :: L, R, T, M, minM, maxM, logg, minM_Allard, maxM_Allard, minM_Siess, maxM_Siess
+    real(kind=dp) :: Gcm_to_Rsun
+    integer :: age, k
+
+    logical :: lread_Siess, lread_Allard
+    integer, parameter :: nSpT_Siess = 29
+    real, dimension(nSpT_Siess) :: logR_Siess, logTeff_Siess, logM_Siess
+    integer, parameter :: nSpT_Allard = 50
+    real, dimension(nSpT_Allard) :: logR_Allard, logTeff_Allard, logM_Allard
 
     if (n_etoiles < 1) return
 
-    isochrone_file = "Siess/isochrone_"//trim(system_age)//".txt"
+    minM_Siess = 0.1
+    maxM_siess = 7.0
 
-    write(*,*) ""
-    write(*,*) "Reading isochrone file: "//trim(isochrone_file)
-    filename = trim(mcfost_utils)//"/Isochrones/"//trim(isochrone_file)
-    open(unit=1,file=filename,status="old")
-    do i=1,3
-       read(1,*) line_buffer
+    minM_Allard = 0.0005
+    maxM_Allard = minM_Siess
+
+    ! Which models do we need to read ?
+    lread_Siess = .False. ; lread_Allard = .False.
+    do i=1, n_etoiles
+       M = etoile(i)%M
+       if (M > minM_Siess)  then
+          lread_Siess = .True.
+       else
+          lread_Allard = .True.
+       endif
     enddo
-    minM = 1.e30 ; maxM = 0 ;
-    do i=1, nSpT
-       read(1,*) SpT(i), L, r, T, M
-       logL(i) = log(L) ; logR(i) = log(r) ; logTeff(i) = log(T) ; logM(i) = log(M)
-       if (M < minM) minM = M
-       if (M > maxM) maxM = M
-    enddo
-    close(unit=1)
+
+    if (lread_Siess) then
+       ! Siess models
+       isochrone_file = "Siess/isochrone_"//trim(system_age)//".txt"
+       write(*,*) "Reading isochrone file: "//trim(isochrone_file)
+       filename = trim(mcfost_utils)//"/Isochrones/"//trim(isochrone_file)
+
+       open(unit=1,file=filename,status="old")
+       do i=1,3
+          read(1,*) line_buffer
+       enddo
+       minM_Siess = 1.e30 ; maxM = 0 ;
+       do i=1, nSpT_Siess
+          read(1,*) SpT, L, r, T, M
+          logR_Siess(i) = log(r) ; logTeff_Siess(i) = log(T) ; logM_Siess(i) = log(M)
+       enddo
+       close(unit=1)
+    endif
+
+    if (lread_Allard) then
+       ! Allard models if mass < 0.1Msun
+       isochrone_file = "Allard/model.AMES-Cond-2000.M-0.0.2MASS.AB"
+       write(*,*) "Reading isochrone file: "//trim(isochrone_file)
+       filename = trim(mcfost_utils)//"/Isochrones/"//trim(isochrone_file)
+
+       s_age = system_age(1:1)
+       read(s_age,*) age ! age is an int with age in Myr
+
+       open(unit=1,file=filename,status="old")
+       Gcm_to_Rsun = 1e9 * cm_to_m/Rsun
+       ! Skipping age block
+       do k=1,age-1
+          ! header
+          do i=1,4
+             read(1,*) line_buffer
+          enddo
+          ! data
+          line_loop : do i=1,nSpT_Allard
+             read(1,'(A)') line_buffer
+             if (line_buffer(1:1) == "-") exit line_loop
+          enddo line_loop
+       enddo
+
+       ! header
+       do i=1,4
+          read(1,*) line_buffer
+       enddo
+       ! data
+       k=0
+       line_loop2 : do i=1,nSpT_Allard
+          read(1,'(A)') line_buffer
+          if (line_buffer(1:1) == "-") exit line_loop2
+          k = k+1
+          read(line_buffer,*) M, T, L, logg, R
+          logR_Allard(i) = log(r * Gcm_to_Rsun) ; logTeff_Allard(i) = log(T) ; logM_Allard(i) = log(M)
+       enddo line_loop2
+       close(unit=1)
+    endif
 
     ! interpoler L et T, les fonctions sont plus smooth
+    write(*,*) ""
     write(*,*) "New stellar parameters (assuming a BB):"
     do i=1, n_etoiles
-       if (etoile(i)%M < minM)  then
+       if (etoile(i)%M < minM_Allard) then
           write(*,*) " "
-          write(*,*) "*** WARNING : stellar object mass is below isochrone range", etoile(i)%M < minM
+          write(*,*) "*** WARNING : stellar object mass is below isochrone range", etoile(i)%M < minM_Allard
           write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
           write(*,*) "*** The object will not radiate"
           etoile(i)%T = 3.
           etoile(i)%r = 0.01
-       else
-          if (etoile(i)%M > maxM)  then
+       else if (etoile(i)%M < maxM_Allard) then
+          etoile(i)%T = exp(interp(logTeff_Allard(1:k), logM_Allard(1:k), log(etoile(i)%M)))
+          etoile(i)%r = exp(interp(logR_Allard(1:k), logM_Allard(1:k), log(etoile(i)%M)))
+       else ! using Siess' models
+          if (etoile(i)%M > maxM_Siess) then
              write(*,*) " "
              write(*,*) "*** WARNING : stellar object mass is above in isochrone range"
              write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
              write(*,*) "*** Stellar properties are extrapolated"
           endif
-          etoile(i)%T = exp(interp(logTeff, logM, log(etoile(i)%M)))
-          etoile(i)%r = exp(interp(logR, logM, log(etoile(i)%M)))
+          etoile(i)%T = exp(interp(logTeff_Siess, logM_Siess, log(etoile(i)%M)))
+          etoile(i)%r = exp(interp(logR_Siess, logM_Siess, log(etoile(i)%M)))
        endif
 
        ! Pas de fUV et pas de spectre stellaire pour le moment
@@ -749,7 +817,6 @@ contains
 
        write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", etoile(i)%r, "Rsun"
     enddo
-    write(*,*) ""
 
     ! Passage rayon en AU
     etoile(:)%r = etoile(:)%r * Rsun_to_AU
