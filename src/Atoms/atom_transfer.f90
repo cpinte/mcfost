@@ -1313,7 +1313,7 @@ module atom_transfer
 		integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, la, kr
 		integer, dimension(nb_proc) :: max_n_iter_loc
 		logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
-		real :: rand, rand2, rand3, precision!, precision_sub
+		real :: rand, rand2, rand3, precision, fac_etape!, precision_sub
 		real, allocatable :: randz(:,:)
 		real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
 		real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
@@ -1478,8 +1478,9 @@ module atom_transfer
 				iray_start = 1
 				lprevious_converged = .false.!!if .true. here, do not do another iteration after convergence
 				lcell_converged(:) = .false.
-! 				precision = 0.1 * 1.0 / sqrt(real(n_rayons))
-				precision = dpops_max_error
+				fac_etape = 1.0
+				precision = fac_etape * 1.0 / sqrt(real(n_rayons))
+				!precision = dpops_max_error
 				write(*,*) " threshold:", precision
 				
 				if (lNg_acceleration) then
@@ -1494,8 +1495,7 @@ module atom_transfer
   				n_rayons = n_rayons_2
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
-				precision = 0.1
-				!precision = dpops_max_error
+				precision = 0.1 !dpops_max_error
 			else
 				call ERROR("etape unkown")
 			end if
