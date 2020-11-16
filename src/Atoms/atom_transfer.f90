@@ -1775,6 +1775,9 @@ module atom_transfer
 					!call Solve_Electron_Density_old(ne_start_sol)
 					!dne = maxval(abs(1.0_dp - ne_old(:)/(ne(:)+tiny_dp)))
 				!might be correct to do nstar_new = nstar_old * ne_new/ne_old ?
+! -> If i update here, for the first iteration nold is not equal to the lte populations used for
+! the first solution, so the first test on the convergence is wrong. But,
+! after the first iteration it starts to  be consistent
 					do nact=1, Natom!see calc_ionisation_frac, for why we updated also passive atoms
 						!if evaluate background update passive atoms ?
 						if (Atoms(nact)%ptr_atom%ID=="H") then
@@ -1896,7 +1899,7 @@ module atom_transfer
 								Tex_old(nact, kr+Atom%Nline,icell) = atom%continua(kr)%Tex(icell)
 							enddo
 							!if (evaluate_background) then
-							!
+							! !evalute LTE here ??
 							!
 							! recompute profiles or damping
 							!
