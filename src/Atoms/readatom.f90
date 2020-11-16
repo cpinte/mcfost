@@ -274,7 +274,7 @@ MODULE readatom
 
 
 	  elseif (atom%ID=="He") then
-	  	if (kr >= 5 .and. kr <= 6) then
+	  	if (kr >= 4 .and. kr <= 6) then
 	  		atom%lines(kr)%write_flux_map =.true. 
 	  	endif
       else
