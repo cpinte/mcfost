@@ -373,7 +373,7 @@ module Opacity
           				write(*,*) "ni=", atom%n(i,icell), " nj=", atom%n(j,icell), " gij=", atom%lines(kc)%gij
           				write(*,*) "nstari=", atom%n(i,icell), " njstar=", atom%n(j,icell)
           				write(*,*) "realitve = ", 100 * (wj/wi * atom%n(i,icell)-atom%n(j,icell)*atom%lines(kc)%gij)/atom%n(i,icell)
-          				write(*,*) " to nTot=", 100 * wj/wi * atom%n(i,icell) / nHtot(icell) / atom%abund, 100 * atom%lines(kc)%gij * atom%n(j,icell) / nHtot(icell) / atom%abund
+          				write(*,*) " to nTot=", 100 * wj/wi * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * atom%lines(kc)%gij * atom%n(j,icell) / ntotal_atom(icell,atom)
 					endif
     
 				case ("ATOMIC_CONTINUUM")
@@ -429,7 +429,7 @@ module Opacity
           						write(*,*) atom%n(i,icell), wi*atom%n(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
           						write(*,*) atom%nstar(i,icell), wi*atom%nstar(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
           						write(*,*) "realitve = ", 100 * (atom%n(i,icell)-wi*atom%n(j,icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)))/atom%n(i,icell)
-          						write(*,*) " to nTot=", 100 * atom%n(i,icell) / nHtot(icell) / atom%abund, 100 * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) * atom%n(j,icell) / nHtot(icell) / atom%abund
+          						write(*,*) " to nTot=", 100 * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) * atom%n(j,icell) / ntotal_atom(icell,atom)
 								exit
 							endif
 						

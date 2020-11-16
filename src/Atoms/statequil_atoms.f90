@@ -704,6 +704,12 @@ MODULE statequil_atoms
 		integer :: i,j, l, lp
 		integer, intent(in) :: N, id, icell
 		real(kind=dp), intent(in) :: A(N,N)
+		real(kind=dp) :: diag = 0.0_dp
+		
+		do i=1,N
+			diag = diag + A(i,i)
+		enddo
+					
 		
 		do i=1,N
 			do j=1,N
@@ -723,7 +729,7 @@ MODULE statequil_atoms
 						do l=1, N
 							write(*,*) l
 							do lp=1,N
-								if (lp /= l) write(*,'(1ES17.8E3, 1X)', advance="no") A(l,lp)
+								if (lp /= l) write(*,'(2ES17.8E3, 1X)', advance="no") A(l,lp)
 							enddo
 						enddo						
 						call error("off-diagonal elements of the rate matrix should be negative")
@@ -841,7 +847,7 @@ MODULE statequil_atoms
 
 		call eliminate_delta(id, atom)
 		!check that diagonal is > 0 and off-diagonals < 0
-		call check_elements(id, icell, atom%Nlevel, atom%Gamma(:,:,id), "in see_atom")
+! 		call check_elements(id, icell, atom%Nlevel, atom%Gamma(:,:,id), "in see_atom: "//atom%ID)
 
 		atom%n(:,icell) = 0d0  
 		atom%n(imaxpop,icell) = 1.0_dp
