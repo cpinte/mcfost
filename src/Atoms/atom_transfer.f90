@@ -1912,8 +1912,8 @@ module atom_transfer
 							nHmin(icell) = nH_minus(icell)
 							!-> this evaluate profiles or damping but also continuum quantities not needed ???
 							!-> do not check ni-njgij < 0 because a non converged state can lead to inversion of populations
-							! so dangerous to call that subroutine here !!
-							call compute_atom_quantities(icell) !,iterate=.true.)
+							! modify it to update only nlte quantities ?
+							call compute_atom_quantities(icell,verbose=.false.)
 							call background_continua_lambda(icell, Nlambda_cont, lambda_cont, chi_c(:,icell), eta_c(:,icell))
 							!or just re evaluate ne in chi_c like chi_c -ne_old + ne_new
 						endif

@@ -300,12 +300,22 @@ module Opacity
 	RETURN
 	end SUBROUTINE alloc_atom_quantities
   
-	SUBROUTINE compute_atom_quantities(icell)!, iterate=.false. !optional ?
+	SUBROUTINE compute_atom_quantities(icell,verbose)
+	!To DO, do not updated things that are constant in nlte_loop
 		integer, intent(in) :: icell
+		logical, optional :: verbose
+		logical :: show_warnings
 		type(AtomType), pointer :: atom
 		integer :: n, k, kc, alloc_status, i, j, Nblue, Nred, la, icell_d
 		real(kind=dp) :: vbroad, aL, cte, cte2, adamp, wi, wj, gij, neff, chi_ion
 !     	real(kind=dp), dimension(:), allocatable :: test_phi
+
+		show_warnings = .false.
+		if (present(verbose)) then
+			if (verbose) show_warnings = .true.
+		else
+			show_warnings = .true. !default
+		endif
     
 		do n=1,Natom
 			atom => Atoms(n)%ptr_atom
@@ -364,16 +374,18 @@ module Opacity
 					
 
 !Include occupa, cannot be lower, since ni =  niwi and nj = njwj
-					if ((wj/wi * atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
-						write(*,*) atom%ID, " nuij (10^15 Hz)", 1d-6 * CLIGHT / atom%lines(kc)%lambda0, " icell=", icell
-						write(*,*) " lambdaij (nm)", atom%lines(kc)%lambda0 
-						call warning ("background line: ni < njgij")
-						write(*,*) "i = ", i, " j = ", j
-						write(*,*) "w(i) = ", wi, " w(j) = ", wj
-          				write(*,*) "ni=", atom%n(i,icell), " nj=", atom%n(j,icell), " gij=", atom%lines(kc)%gij
-          				write(*,*) "nstari=", atom%n(i,icell), " njstar=", atom%n(j,icell)
-          				write(*,*) "realitve = ", 100 * (wj/wi * atom%n(i,icell)-atom%n(j,icell)*atom%lines(kc)%gij)/atom%n(i,icell)
-          				write(*,*) " to nTot=", 100 * wj/wi * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * atom%lines(kc)%gij * atom%n(j,icell) / ntotal_atom(icell,atom)
+					if (show_warnings) then
+						if ((wj/wi * atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
+							write(*,*) atom%ID, " nuij (10^15 Hz)", 1d-6 * CLIGHT / atom%lines(kc)%lambda0, " icell=", icell
+							write(*,*) " lambdaij (nm)", atom%lines(kc)%lambda0 
+							call warning ("background line: ni < njgij")
+							write(*,*) "i = ", i, " j = ", j
+							write(*,*) "w(i) = ", wi, " w(j) = ", wj
+          					write(*,*) "ni=", atom%n(i,icell), " nj=", atom%n(j,icell), " gij=", atom%lines(kc)%gij
+          					write(*,*) "nstari=", atom%n(i,icell), " njstar=", atom%n(j,icell)
+          					write(*,*) "realitve = ", 100 * (wj/wi * atom%n(i,icell)-atom%n(j,icell)*atom%lines(kc)%gij)/atom%n(i,icell)
+          					write(*,*) " to nTot=", 100 * wj/wi * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * atom%lines(kc)%gij * atom%n(j,icell) / ntotal_atom(icell,atom)
+						endif
 					endif
     
 				case ("ATOMIC_CONTINUUM")
@@ -416,24 +428,27 @@ module Opacity
 						
 						gij = atom%nstar(i,icell)/atom%nstar(j,icell)
 					
-						do la=1, atom%continua(kc)%Nlambda
+						if (show_warnings) then
+							do la=1, atom%continua(kc)%Nlambda
 
 ! 							if (atom%n(i,icell) - atom%n(j, icell)*atom%continua(kc)%gij(la, icell) <= 0 ) then
-							if (atom%n(i,icell) - atom%n(j,icell) * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) <=0 ) then
+								if (atom%n(i,icell) - atom%n(j,icell) * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) <=0 ) then
 
-								write(*,*) atom%ID, " nu+ (10^15 Hz)", 1d-6 * CLIGHT / atom%continua(kc)%lambda0, " icell=", icell
-								write(*,*) " lambda+ (nm)", atom%continua(kc)%lambda0, " la=",la, " lambda = ", lambda_cont(Nblue+la-1)
-								call warning ("background cont: ni < njgij")
-								write(*,*) "i = ", i, " j = ", j
-								write(*,*) "w(i) = ", wi, " w(j) = ", wj
-          						write(*,*) atom%n(i,icell), wi*atom%n(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
-          						write(*,*) atom%nstar(i,icell), wi*atom%nstar(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
-          						write(*,*) "realitve = ", 100 * (atom%n(i,icell)-wi*atom%n(j,icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)))/atom%n(i,icell)
-          						write(*,*) " to nTot=", 100 * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) * atom%n(j,icell) / ntotal_atom(icell,atom)
-								exit
-							endif
+									write(*,*) atom%ID, " nu+ (10^15 Hz)", 1d-6 * CLIGHT / atom%continua(kc)%lambda0, " icell=", icell
+									write(*,*) " lambda+ (nm)", atom%continua(kc)%lambda0, " la=",la, " lambda = ", lambda_cont(Nblue+la-1)
+									call warning ("background cont: ni < njgij")
+									write(*,*) "i = ", i, " j = ", j
+									write(*,*) "w(i) = ", wi, " w(j) = ", wj
+          							write(*,*) atom%n(i,icell), wi*atom%n(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
+          							write(*,*) atom%nstar(i,icell), wi*atom%nstar(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
+          							write(*,*) "realitve = ", 100 * (atom%n(i,icell)-wi*atom%n(j,icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)))/atom%n(i,icell)
+          							write(*,*) " to nTot=", 100 * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) * atom%n(j,icell) / ntotal_atom(icell,atom)
+									exit
+								endif
 						
-						enddo
+							enddo
+						endif
+						
 					endif !active
 				case default
 					call Error("Transition type unknown", atom%at(k)%trtype)
@@ -601,7 +616,7 @@ module Opacity
 		do icell=1, n_cells
 			!$ id = omp_get_thread_num() + 1
 			if (icompute_atomRT(icell) > 0) then
-				call compute_atom_quantities(icell) 
+				call compute_atom_quantities(icell) !,verbose=.true.)
 				!!need for BackgroundContinua
     			!!and lines 
 				!!!!call background_continua(icell)	
