@@ -849,21 +849,22 @@ subroutine define_dust_density()
         enddo !icell
         mass =  mass * AU3_to_cm3 * g_to_Msun
 
-        if (mass < tiny_dp) call error("something went wrong, there is no dust in the disk")
-
-        facteur = d_p%masse / mass
-        do icell=1,n_cells
-           do l=d_p%ind_debut,d_p%ind_fin
-              densite_pouss(l,icell) = densite_pouss(l,icell) * facteur
-              masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
-           enddo !l
-        enddo ! icell
+        if (mass > tiny_dp) then
+           facteur = d_p%masse / mass
+           do icell=1,n_cells
+              do l=d_p%ind_debut,d_p%ind_fin
+                 densite_pouss(l,icell) = densite_pouss(l,icell) * facteur
+                 masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+              enddo !l
+           enddo ! icell
+        endif
 
      endif ! test wall
   enddo ! pop
 
   masse(:) = masse(:) * AU3_to_cm3
   write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+  if (sum(masse) < tiny_dp) call error("Something went wrong, there is no dust in the disk")
 
   if (lcorrect_density) then
      write(*,*) "Correcting density ..."
