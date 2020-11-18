@@ -6,7 +6,7 @@ module spectrum_type
 	use math, only : linear_1D
 	use fits_utils, only : print_error
 	use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
-							lcontrib_function, n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lmagnetic_field, prt_solution, &
+							lcontrib_function, lorigin_atom, n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
 							lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot
 	use input, only : nb_proc, RT_line_method,lkeplerian, linfall, l_sym_ima
 	use constantes, only : arcsec_to_deg
@@ -42,7 +42,7 @@ module spectrum_type
 
 	real(kind=dp), dimension(:,:,:), allocatable :: rho_p, chiQUV_p, etaQUV_p
 	real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
-	real(kind=dp), allocatable, dimension(:,:,:,:,:,:) :: F_QUV
+	real(kind=dp), allocatable, dimension(:,:,:,:) :: F_QUV
 	!in only one direction for one point ! 'centre of the model in this direction'
 	real(kind=dp), allocatable, dimension(:,:) :: cntrb_ray, cntrb, flow_chart !allocate 1 ray if only one direction!
 
@@ -464,7 +464,7 @@ call error("initSpectrumImage not modified!!")
 			enddo
 		
 		enddo
-    
+		    
 		!Contribution functions (for one ray it is allocated elsewhere)
    		!Future: contribution function for selected lines only !
 		if (lcontrib_function) then
@@ -495,7 +495,7 @@ call error("initSpectrumImage not modified!!")
 
 		end if
 		
-!		if (lorigin_atom) !not a global parameter yet but still allocated
+		if (lorigin_atom) then
 			mem_alloc = 8 * n_cells * Nlambda / 1024./ 1024.
 			if (mem_alloc > 1d3) then
 				write(*,*) " allocating ", mem_alloc/1024., " GB for local emission origin.."
@@ -518,7 +518,7 @@ call error("initSpectrumImage not modified!!")
 				endif
 
 			end if		
-! 		endif
+		endif
 
 
 		mem_alloc_tot = mem_alloc_tot + mem_alloc_local
@@ -529,6 +529,23 @@ call error("initSpectrumImage not modified!!")
    
 	return
 	end subroutine alloc_flux_image
+
+	subroutine allocate_stokes_quantities
+ ! only available for flux calculations
+ ! this routine is simplified there is only on solution, full_stokes!
+
+		allocate(Stokes_Q(Nlambda, nb_proc), Stokes_U(Nlambda, nb_proc), Stokes_V(Nlambda, nb_proc))
+		Stokes_Q = 0.0_dp
+		Stokes_U = 0.0_dp
+		Stokes_V = 0.0_dp
+
+		allocate(F_QUV(Nlambda,RT_N_INCL,RT_N_AZ,3)); F_QUV = 0.0_dp
+		allocate(rho_p(Nlambda, 3, nb_proc)); rho_p = 0.0_dp
+		allocate(etaQUV_p(Nlambda, 3, nb_proc)); etaQUV_p = 0.0_dp
+		allocate(chiQUV_p(Nlambda, 3, nb_proc)); chiQUV_p = 0.0_dp
+
+	return
+	end subroutine allocate_stokes_quantities
 	
 ! 	subroutine fill_map(ibin,iaz,ipix,jpix,method, I0)
 ! 		real(kind=dp), intent(in) :: I0(Nlambda)!It's actually I0 * normF
@@ -766,11 +783,6 @@ call error("initSpectrumImage not modified!!")
 	if (status > 0) then
 		call print_error(status)
 	endif
-	
-	
-	if ((lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")) then
-		write(*,*) " Flux polarized not yet handled"
-	end if
 
 
   !  Close the file and free the unit number.

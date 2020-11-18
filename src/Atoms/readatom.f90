@@ -215,7 +215,7 @@ MODULE readatom
            !
      !futur implement: line%name
      atom%lines(kr)%ZeemanPattern = 1 !should be read in file
-     if ((PRT_SOLUTION=="NO_STOKES").or.(.not.lmagnetized)) atom%lines(kr)%ZeemanPattern = 0
+     if (.not.lmagnetized) atom%lines(kr)%ZeemanPattern = 0
      ! -1 = effective triplet, +1
 !      write(*,*) "Reading line #", kr
      if (Nread.eq.112) then
@@ -364,8 +364,7 @@ MODULE readatom
       atom%lines(kr)%polarizable = .false. !check also deltaJ
       !write(*,*) "dJ=", abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j))
       atom%lines(kr)%polarizable = (lmagnetized) .and. &
-      								(atom%lines(kr)%g_lande_eff > -99) .and. &
-      			(abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.)
+      								(atom%lines(kr)%g_lande_eff > -99)! .and. (abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.)
        !not need to be determined here. Because geff can be read from file and be > -99
        !even if the levels are not determined. In this case deltaJ = 0 (-99+99).
        !Exception if one of the level is determined but not the other, in this case

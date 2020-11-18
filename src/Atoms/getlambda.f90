@@ -1386,7 +1386,8 @@ module getlambda
 			vmin = 1d-3 * clight*(group_blue(la)-l0)/l0  !km/s
 			vmax = 1d-3 * clight*(group_red(la)-l0)/l0
 			!equivalent
-			Nlambda_per_group(la) = 1 + nint( (vmax-vmin)/hv )
+			Nlambda_per_group(la) = 1 + nint( (vmax-vmin)/hv )!max(1 + nint( (vmax-vmin)/hv ), 2)
+! 			write(*,*) Nlambda_per_group(la)
 			corr_hv(la) = (vmax-vmin)/(Nlambda_per_group(la)-1) - hv
 		enddo
 

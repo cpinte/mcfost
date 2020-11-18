@@ -57,7 +57,7 @@ MODULE atom_type
    !map cont too ?
    real(kind=dp), allocatable, dimension(:,:,:,:,:) :: map!line flux to be stored
    !used for wavelength integration
-   real(kind=dp), allocatable, dimension(:,:,:) :: phi_loc, phiZ, psi !3, Nlambda, Nray
+   real(kind=dp), allocatable, dimension(:,:,:) :: phi_loc!, phiZ, psi !3, Nlambda, Nray
    !wlam is the integration wavelenght weight = phi
    real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam, Rij, Rji, Jbar
    !real(kind=dp), allocatable, dimension(:) :: fomega !for Rayleigh scattering

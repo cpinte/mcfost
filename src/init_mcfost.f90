@@ -59,8 +59,6 @@ subroutine set_default_variables()
   lHH30mol = .false.
   lemission_mol=.false.
   ltab_wavelength_image = .false.
-  !Polarised RTE in presence of magnetic field
-  prt_solution = "NO_STOKES"
   ! Atomic lines Radiative Transfer (AL-RT)
   lemission_atom = .false.
   lelectron_scattering = .false.
@@ -69,10 +67,11 @@ subroutine set_default_variables()
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   lvacuum_to_air = .false.
   lcontrib_function = .false.
+  lorigin_atom = .false.
   lmagnetoaccr = .false.
   lpluto_file = .false.
   lmodel_ascii = .false.
-  lmagnetic_field = .true.
+  lzeeman_polarisation = .false.
   lforce_lte = .false.
   lread_jnu_atom=.false.
   ldissolve = .false.
@@ -609,13 +608,12 @@ subroutine initialisation_mcfost()
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
         lemission_atom=.true.
-     case("-prt_solution")
-        i_arg = i_arg + 1
-        call get_command_argument(i_arg,prt_solution)
-        i_arg = i_arg + 1
      case("-contrib_function")
         i_arg = i_arg + 1
         lcontrib_function = .true.
+     case("-origin_atom")
+        i_arg = i_arg + 1
+        lorigin_atom = .true.
      case("-output_rates")
         i_arg = i_arg + 1
         loutput_rates = .true.
@@ -743,9 +741,9 @@ subroutine initialisation_mcfost()
         allocate(density_files(1))
         density_files(1) = density_file
         i_arg = i_arg + 1
-     case("-no_magnetic_field")
+     case("-zeeman_polarisation")
         i_arg = i_arg + 1
-        lmagnetic_field=.false.
+        lzeeman_polarisation=.true.
      case("-accurate_integ")
         i_arg = i_arg + 1
         laccurate_integ = .true.
@@ -1323,11 +1321,6 @@ subroutine initialisation_mcfost()
    call error("Cannot use Phantom and Pluto files at the same time presently.")
   end if
 
-  if ((prt_solution /= "FULL_STOKES").and.(prt_solution /= "NO_STOKES").and.&
-  	(prt_solution /= "FIELD_FREE")) then
-   call error("Solution", prt_solution,"unknown")
-  end if
-
   ! Correction sur les valeurs du .para
   if (lProDiMo) then
      if ((lsed_complete).or.(tab_wavelength(1:7) /= "ProDiMo")) then
@@ -1623,7 +1616,7 @@ subroutine display_help()
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
-  write(*,*) "        : -no_magnetic_field : Force magnetic field to be zero."
+  write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -1743,8 +1736,7 @@ subroutine display_help()
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
   write(*,*) "        : -contrib_function : Computes and stores the contribution function "
   write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."
-  write(*,*) "        : -prt_solution <sol> : Solution for the polarised RT equation "
-  write(*,*) "			if a magnetic field is present : FULL_STOKES, FIELD_FREE, NO_STOKES (DEFAULT)"
+  write(*,*) "        : -origin_atom : Computes and stores the emission of each cell"
   write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
   write(*,*) "        : -read_jnu_atom : Read old Jnu values from file "

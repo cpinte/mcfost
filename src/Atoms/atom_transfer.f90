@@ -10,11 +10,11 @@ module atom_transfer
 	use atom_type, only			: AtomType
 	use opacity, only			: dealloc_atom_quantities, alloc_atom_quantities, compute_atom_quantities, compute_background_continua, &
 									interp_background_opacity, opacity_atom_loc, interp_contopac, & !compute_nlte_bound_free, &
-									nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, background_continua_lambda
+									nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, background_continua_lambda, opacity_atom_zeeman_loc
 	use background_opacity, only: Thomson
 	use Planck, only			: bpnu
 	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, &
-									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, cntrb_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, eta_es, alloc_flux_image, &
+									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, cntrb_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, eta_es, alloc_flux_image, allocate_stokes_quantities, &
 									dealloc_jnu, reallocate_rays_arrays, write_contribution_functions_ray, write_flux, write_1D_arr_ascii, cntrb, flow_chart, write_lambda_cell_array, cf_file, flow_file
 									
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, &
@@ -26,7 +26,7 @@ module atom_transfer
 	use solvene, only			: solve_electron_density_old, solve_electron_density, solve_ne_nlte_loc
 	use getlambda, only			: hv
 	use voigtfunctions, only	: Voigt, VoigtHumlicek, dirac_line
-	use profiles, only			: profile, local_profile_v, local_profile_thomson, local_profile_interp, local_profile_dk, zprofile
+	use profiles, only			: profile, local_profile_v, local_profile_thomson, local_profile_interp, local_profile_dk
 	use io_atomic_pops, only	: write_pops_atom, write_electron, write_hydrogen, write_Hminus, write_convergence_map_atom, write_convergence_map_electron
 	use io_opacity, only 		: write_Jnu, write_taur, write_contrib_lambda_ascii, read_jnu_ascii, Jnu_File_ascii, read_Jnu, &
 									write_collision_matrix_atom, write_collision_matrix_atom_ascii, &
@@ -35,7 +35,7 @@ module atom_transfer
 	!$ use omp_lib
 	use molecular_emission, only: v_proj
 	use input, only				: lkeplerian, linfall, RT_line_method, nb_proc, RT_line_method, limb_darkening, mu_limb_darkening
-	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, prt_solution, lcontrib_function, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
+	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function, lorigin_atom, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
 									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot
@@ -76,7 +76,7 @@ module atom_transfer
 	real(kind=dp), dimension(:,:), allocatable :: QUV
  !NLTE
  	real(kind=dp) :: dne
-	logical :: lorigin_atom = .true., ljacobi_sor = .false., lfixed_J = .false. !Option to compute J assuming LTE and keep this value for NLTE transfer. eta_es = ne * Jcont in that case
+	logical :: ljacobi_sor = .false., lfixed_J = .false. !Option to compute J assuming LTE and keep this value for NLTE transfer. eta_es = ne * Jcont in that case
 ! 	logical :: lNg_acceleration = .true.
 ! 	integer :: iNg_Norder=2, iNg_ndelay=5, iNg_Nperiod=5
 	real(kind=dp), allocatable :: ng_cur(:)
@@ -384,54 +384,61 @@ module atom_transfer
 	return
 	end subroutine integ_ray_line_flow
 
+  	subroutine integ_ray_line_z(id,icell_in,x,y,z,u,v,w,iray,labs)
+	! ------------------------------------------------------------------------------- !
+	!
+	! ------------------------------------------------------------------------------- !
 
- !rebuilding
- subroutine integ_ray_line_z(id,icell_in,x,y,z,u,v,w,iray,labs)
- ! ------------------------------------------------------------------------------- !
-  ! This routine is "LTE", although NLTE pops can be used
- ! ------------------------------------------------------------------------------- !
-
-  integer, intent(in) :: id, icell_in, iray
-  real(kind=dp), intent(in) :: u,v,w
-  real(kind=dp), intent(in) :: x,y,z
-  logical, intent(in) :: labs
-  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau
+		integer, intent(in) :: id, icell_in, iray
+		real(kind=dp), intent(in) :: u,v,w
+		real(kind=dp), intent(in) :: x,y,z
+		logical, intent(in) :: labs
+		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
+		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau, S_Q, S_U, S_V
 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
-  integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
-  real(kind=dp) :: facteur_tau
-  logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
-  x1=x;y1=y;z1=z
-  x0=x;y0=y;z0=z
-  next_cell = icell_in
-  nbr_cell = 0
+		x1=x;y1=y;z1=z
+		x0=x;y0=y;z0=z
+		next_cell = icell_in
+		nbr_cell = 0
 
-  tau = 0.0_dp
-  tau_c = 0.0_dp
+		tau(:) = 0.0_dp
+		tau_c(:) = 0.0_dp
 
+		Itot(:,iray,id) = 0d0
+		Icont(:,iray,id) = 0d0
+		
+ 		Stokes_V(:,id) = 0d0
+  		Stokes_Q(:,id) = 0d0
+  		Stokes_U(:,id) = 0d0
+				
 
-  Itot(:,iray,id) = 0d0
-  Icont(:,iray,id) = 0d0
-  Stokes_V(:,id) = 0d0
-  Stokes_Q(:,id) = 0d0
-  Stokes_U(:,id) = 0d0
+  ! -------------------------------------------------------------- !
+  !*** propagation dans la grille ***!
+  ! -------------------------------------------------------------- !
+  ! Will the ray intersect a star
+		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
-  call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+  ! Boucle infinie sur les cellules
+		infinie : do ! Boucle infinie
+    ! Indice de la cellule
+			icell = next_cell
+			x0=x1 ; y0=y1 ; z0=z1
+    !write(*,*) "Boucle infinie, icell=", icell
 
-  infinie : do
-    icell = next_cell
-    x0=x1 ; y0=y1 ; z0=z1
-
-    if (icell <= n_cells) then
-     lcellule_non_vide = (icompute_atomRT(icell)>0)
-    else
-     lcellule_non_vide=.false.
-    endif
-
-
-    if (test_exit_grid(icell, x0, y0, z0)) return
+			if (icell <= n_cells) then
+				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+				if (icompute_atomRT(icell) < 0) return !-1 if dark
+			else
+				lcellule_non_vide=.false.
+			endif
     
+    ! Test sortie ! "The ray has reach the end of the grid"
+
+			if (test_exit_grid(icell, x0, y0, z0)) return
+
 			if (lintersect_stars) then
 				if (icell == icell_star) then
 					!can be done better
@@ -443,65 +450,91 @@ module atom_transfer
       			end if
    			 endif
 
-    nbr_cell = nbr_cell + 1
+			nbr_cell = nbr_cell + 1
 
-    previous_cell = 0
+    ! Calcul longeur de vol et profondeur optique dans la cellule
+			previous_cell = 0 ! unused, just for Voronoi
+			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+			
+    !count opacity only if the cell is filled, else go to next cell
+			if (lcellule_non_vide) then
+				lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet same as iterate?
+     ! opacities in m^-1
 
-    call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
+				l_contrib = l_contrib * AU_to_m !l_contrib in m
+			
+				!total bound-bound + bound-free + background opacities lte + nlte
+				chi(:,id) = chi0_bb(:,icell)
+				eta(:,id) = eta0_bb(:,icell)
+				!rename it chi0_bckgr etc
+
+				!includes a loop over all bound-bound, passive and active
+				call opacity_atom_zeeman_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
+				
+				dtau(:) = l_contrib * chi(:,id)
+
+				            
+				if (lelectron_scattering) then
+					Snu = ( eta(:,id) + eta_es(:,icell) ) / ( chi(:,id) + tiny_dp )
+					Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)
+				else
+					Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
+					Snu_c = eta_c(:,icell)
+				endif
+				
+				if (Nactiveatoms > 0) then
+					Snu_c = ( Snu_c + eta_c_nlte(:,icell) ) / ( chi_c(:,icell) + chi_c_nlte(:,icell) + tiny_dp)
+					dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell))
+				else
+					Snu_c = Snu_c / (chi_c(:,icell) + tiny_dp)
+					dtau_c(:) = l_contrib * chi_c(:,icell)
+				endif
+				
+    			!explicit product of Seff = S - (K/chiI - 1) * I
+    			!Is there a particular initialization to do for polarisation ?
+    			!because it will be zero at the first place
+     			Snu(:) = Snu(:) -chiQUV_p(:,1,id) / chi(:,id) * Stokes_Q(:,id) - &
+          					chiQUV_p(:,2,id) / chi(:,id) *  Stokes_U(:,id) - &
+          					chiQUV_p(:,3,id) / chi(:,id) *  Stokes_V(:,id)
 
 
+     			S_Q(:) = etaQUV_p(:,1,id) /chi(:,id) - &
+							chiQUV_p(:,1,id) / chi(:,id) * Itot(:,iray,id) - &
+							rho_p(:,3,id)/chi(:,id) * Stokes_U(:,id) + &
+							rho_p(:,2,id)/chi(:,id) * Stokes_V(:,id)
 
-    if (lcellule_non_vide) then
-     lsubtract_avg = ((nbr_cell == 1).and.labs)
-     l_contrib = l_contrib * AU_to_m
-     if ((nbr_cell == 1).and.labs)  ds(iray,id) = l * AU_to_m
-	 dk(iray,id) = nint(1e-3/hv * v_proj(icell,(x+x1)*0.5,(y+y1)*0.5,(z+z1)*0.5,u,v,w))
+     			S_U(:) = etaQUV_p(:,2,id) /chi(:,id) - &
+							chiQUV_p(:,2,id) / chi(:,id) * Itot(:,iray,id) + &
+							rho_p(:,3,id)/chi(:,id) * Stokes_Q(:,id) - &
+							rho_p(:,1,id)/chi(:,id) * Stokes_V(:,id)
 
-    !.....
+     			S_V(:) = etaQUV_p(:,3,id) /chi(:,id) - &
+     						chiQUV_p(:,3,id) / chi(:,id) * Itot(:,iray,id) - &
+							rho_p(:,2,id)/chi(:,id) * Stokes_Q(:,id) + &
+							rho_p(:,1,id)/chi(:,id) * Stokes_U(:,id)
 
-    !Correct line source fonction from polarisation
-    !explicit product of Seff = S - (K/chiI - 1) * I
-    !Is there a particular initialization to do for polarisation ?
-    !because it will be zero at the first place
-!      Snu(:) = Snu(:) -NLTEspec%AtomOpac%chiQUV_p(:,1,id) / chiI *  NLTEspec%Stokes_Q(:,iray,id) - &
-!           NLTEspec%AtomOpac%chiQUV_p(:,2,id) / chiI *  NLTEspec%Stokes_U(:,iray,id) - &
-!           NLTEspec%AtomOpac%chiQUV_p(:,3,id) / chiI *  NLTEspec%Stokes_V(:,iray,id)
-! 
-!      NLTEspec%I(:,iray,id) = NLTEspec%I(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
-! 
-!      NLTEspec%Stokes_Q(:,iray,id) = NLTEspec%Stokes_Q(:,iray,id) + &
-!                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-! 			NLTEspec%AtomOpac%etaQUV_p(:,1,id) /chiI - &
-! 			NLTEspec%AtomOpac%chiQUV_p(:,1,id) / chiI * NLTEspec%I(:,iray,id) - &
-! 			NLTEspec%AtomOpac%rho_p(:,3,id)/chiI * NLTEspec%Stokes_U(:,iray,id) + &
-! 			NLTEspec%AtomOpac%rho_p(:,2,id)/chiI * NLTEspec%Stokes_V(:,iray, id) &
-!      ) !end Snu_Q
-!      NLTEspec%Stokes_U(:,iray,id) = NLTEspec%Stokes_U(:,iray,id) + &
-!                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-! 			NLTEspec%AtomOpac%etaQUV_p(:,2,id) /chiI - &
-! 			NLTEspec%AtomOpac%chiQUV_p(:,2,id) / chiI * NLTEspec%I(:,iray,id) + &
-! 			NLTEspec%AtomOpac%rho_p(:,3,id)/chiI * NLTEspec%Stokes_Q(:,iray,id) - &
-! 			NLTEspec%AtomOpac%rho_p(:,1,id)/chiI * NLTEspec%Stokes_V(:,iray, id) &
-!      ) !end Snu_U
-!      NLTEspec%Stokes_V(:,iray,id) = NLTEspec%Stokes_V(:,iray,id) + &
-!                              exp(-tau) * (1.0_dp - exp(-dtau)) * (&
-! 			NLTEspec%AtomOpac%etaQUV_p(:,3,id) /chiI - &
-! 			NLTEspec%AtomOpac%chiQUV_p(:,3,id) / chiI * NLTEspec%I(:,iray,id) - &
-! 			NLTEspec%AtomOpac%rho_p(:,2,id)/chiI * NLTEspec%Stokes_Q(:,iray,id) + &
-! 			NLTEspec%AtomOpac%rho_p(:,1,id)/chiI * NLTEspec%Stokes_U(:,iray, id) &
-!      ) !end Snu_V
 
-!      facteur_tau = 1.0
-! 
-!      tau = tau + dtau * facteur_tau
-!      tau_c = tau_c + dtau_c
+				do la=1,Nlambda
+					Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
+					Stokes_Q(la,id) = Stokes_Q(la,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * S_Q(la)
+					Stokes_U(la,id) = Stokes_U(la,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * S_U(la)
+					Stokes_V(la,id) = Stokes_V(la,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * S_V(la)
 
-    end if
-  end do infinie
-  ! -------------------------------------------------------------- !
-  ! -------------------------------------------------------------- !
-  return
-  end subroutine integ_ray_line_z
+					tau(la) = tau(la) + dtau(la) !for next cell
+				enddo
+
+				do la=1, Nlambda_cont
+					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
+					tau_c(la) = tau_c(la) + dtau_c(la)
+				enddo
+
+
+			end if  ! lcellule_non_vide
+		end do infinie
+
+	return
+	end subroutine integ_ray_line_z
+
 
   subroutine flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
   ! -------------------------------------------------------------- !
@@ -538,8 +571,7 @@ module atom_transfer
      Iold = I0
      I0 = 0d0
      I0c = 0d0
-     !!if (allocated(rf_i)) I0_rf = 0.0
-     if (lmagnetized.and. PRT_SOLUTION == "FULL_STOKES") QUV(:,:) = 0d0 !move outside
+     if (lmagnetized) QUV(:,:) = 0d0 !move outside
      ! Vecteurs definissant les sous-pixels
      sdx(:) = dx(:) / real(subpixels,kind=dp)
      sdy(:) = dy(:) / real(subpixels,kind=dp)
@@ -563,15 +595,13 @@ module atom_transfer
            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
              call integ_ray_line(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
 
-             I0 = I0 + Itot(:,iray,id)! / npix2
-             I0c = I0c + Icont(:,iray,id)! / npix2
-             
-     		 !!if (allocated(rf_i)) I0_rf(:) = I0_rf(:) + Iray_rf(:,id)
-             
-             if (lmagnetized.and.PRT_SOLUTION == "FULL_STOKES") then
-             	QUV(3,:) = QUV(3,:) + Stokes_V(:,id) / npix2
-             	QUV(1,:) = QUV(1,:) + Stokes_Q(:,id) / npix2
-             	QUV(2,:) = QUV(2,:) + Stokes_U(:,id) / npix2
+             I0 = I0 + Itot(:,iray,id)
+             I0c = I0c + Icont(:,iray,id)
+                          
+             if (lmagnetized) then
+             	QUV(:,3) = QUV(:,3) + Stokes_V(:,id) / npix2
+             	QUV(:,2) = QUV(:,2) + Stokes_Q(:,id) / npix2
+             	QUV(:,1) = QUV(:,1) + Stokes_U(:,id) / npix2
              end if
 
            !else !Outside the grid, no radiation flux
@@ -614,10 +644,11 @@ module atom_transfer
   Flux(:,ibin,iaz,id) = Flux(:,ibin,iaz,id) + I0(:) * normF
   Fluxc(:,ibin,iaz,id) = Fluxc(:,ibin,iaz,id) + I0c(:) * normF
   
-  !!if (allocated(rf_i)) RF_i(:,ipix,jpix) = I0_rf(:) * normF / npix2
   
-  if (lmagnetized.and.PRT_SOLUTION == "FULL_STOKES") then
-	write(*,*) " Polarized flux not yet handled"
+  if (lmagnetized) then
+  	F_QUV(:,ibin,iaz,1) = F_QUV(:,ibin,iaz,1) + normF * QUV(:,1) / npix2
+  	F_QUV(:,ibin,iaz,2) = F_QUV(:,ibin,iaz,2) + normF * QUV(:,2) / npix2
+  	F_QUV(:,ibin,iaz,3) = F_QUV(:,ibin,iaz,3) + normF * QUV(:,3) / npix2
   end if
   
   
@@ -659,24 +690,6 @@ module atom_transfer
   	enddo
   
   endif
- 
-!   if (RT_line_method==1) then
-!     Flux(:,1,1,ibin,iaz) = Flux(:,1,1,ibin,iaz) + I0 * normF
-!     Fluxc(:,1,1,ibin,iaz) = Fluxc(:,1,1,ibin,iaz) + I0c * normF
-!     if (lmagnetized.and.PRT_SOLUTION == "FULL_STOKES") then
-!      F_QUV(1,:,1,1,ibin,iaz) = F_QUV(1,:,1,1,ibin,iaz)+QUV(1,:) * normF !U
-!      F_QUV(2,:,1,1,ibin,iaz) = F_QUV(2,:,1,1,ibin,iaz)+QUV(2,:) * normF !Q
-!      F_QUV(3,:,1,1,ibin,iaz) = F_QUV(3,:,1,1,ibin,iaz)+QUV(3,:) * normF !V
-!     end if
-!   else
-!     Flux(:,ipix,jpix,ibin,iaz) = I0 * normF
-!     Fluxc(:,ipix,jpix,ibin,iaz) = I0c * normF
-!     if (lmagnetized.and.PRT_SOLUTION == "FULL_STOKES") then
-!      F_QUV(1,:,ipix,jpix,ibin,iaz) = QUV(1,:) * normF !U
-!      F_QUV(2,:,ipix,jpix,ibin,iaz) = QUV(2,:) * normF !Q
-!      F_QUV(3,:,ipix,jpix,ibin,iaz) = QUV(3,:) * normF !V
-!     end if
-!   end if
 
 
   return
@@ -885,7 +898,7 @@ module atom_transfer
   integer, parameter :: n_rayons_start2 = 1000, maxIter = 11
   integer :: n_rayons_max = n_rayons_start2 * (2**(maxIter-1))
   integer, parameter :: Nrayone = 1
-  character(len=20)  :: newPRT_SOLUTION = "FULL_STOKES", ne_initial
+  character(len=20)  :: ne_initial
   logical :: lread_jnu_ascii = .false.
   type (AtomType), pointer :: atom
   integer :: alloc_status
@@ -901,9 +914,8 @@ module atom_transfer
  ! -------------------------------INITIALIZE AL-RT ------------------------------------ !
   !only one available yet, I need one unpolarised, faster and more accurate.
   Voigt => VoigtHumlicek
-  profile => local_profile_interp
-  
-  INTEG_RAY_LINE => INTEG_RAY_LINE_I
+  profile => local_profile_interp 
+  integ_ray_line => integ_ray_line_i
 
   if (npix_x_save > 1) then
    RT_line_method = 2 ! creation d'une carte avec pixels carres
@@ -912,15 +924,6 @@ module atom_transfer
    RT_line_method = 1 !pixels circulaires
   end if
 
-!   if (PRT_SOLUTION == "FULL_STOKES") then
-!    call Warning(" Full Stokes solution not allowed. Stokes polarization not handled in SEE yet.")
-!    PRT_SOLUTION = "FIELD_FREE"
-!   end if
-
-!   if (lmagnetized .and. PRT_SOLUTION /= "NO_STOKES") then
-!    if (PRT_SOLUTION == "FIELD_FREE") newPRT_SOLUTION = "FULL_STOKES"
-!    call adjustStokesMode(PRT_SOLUTION)
-!   end if
 
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
@@ -931,6 +934,12 @@ module atom_transfer
     call readAtmos_ascii(density_file)
    end if
   end if
+  
+  if (lmagnetized) then
+  	!or need to allocate line%adamp after or interpolate the dispersion profile
+  	write(*,*) "Cannot yet accomodate local_profile_interp with polarised calc"
+  	profile => local_profile_v
+  endif 
 
         !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
@@ -1147,24 +1156,7 @@ module atom_transfer
 		!->> Case of ltab or not and add chi_c_nlte and eta_c_nlte
 		!then if ltab_wavelength_image ...
 		if (ltab_wavelength_image) then
-!  I need to set up grid image without having defined the full image in the first place !
-!    	call initSpectrumImage() !deallocate waves arrays/ define a new grid also resample Jnu if any
-!    if (n_etoiles > 0) call init_stellar_disk 
-!    write(*,*) " Computing continuum opacities for image..."
-!    if (atmos%NactiveAtoms >0) call dealloc_atom_quantities
-!    call alloc_atom_quantities
-!    call compute_opacities !recompute background opac
-!    if (atmos%NactiveAtoms > 0) then
-!     call compute_nlte_bound_free
-!     !! can be added to Kc and jc to save memory for image
-!     !NLTEspec%AtomOpac%Kc(:,:,1) = NLTEspec%AtomOpac%Kc(:,:,1) + NLTEspec%AtomOpac%Kc_nlte(:,:)
-!     !NLTEspec%AtomOpac%jc(:,:,1) = NLTEspec%AtomOpac%jc(:,:,1) + NLTEspec%AtomOpac%jc_nlte(:,:)
-! 	!deallocate(NLTEspec%AtomOpac%Kc_nlte, NLTEspec%AtomOpac%jc_nlte)
-!    endif
-!    write(*,*) " ..done"
-!    !add NLTE contiuna
-!    !!call reallocate_mcfost_vars() !wavelength only?
-!    call reallocate_mcfost_wavelength_arrays()
+			call error("tab wavelength not implemented")
 		else
 			!just remove the Nrays dependencies
 			call reallocate_rays_arrays(nrayOne)
@@ -1174,7 +1166,8 @@ module atom_transfer
   
   		if (ltab_wavelength_image) then !atomic lines transfer with either lte or nlte populations
   									!using user defined grid
-  									
+  						
+  			call error("tab wavelength not implemented")			
   			!and electron scattering here ?
   	
   		else
@@ -1216,18 +1209,14 @@ module atom_transfer
 	do m=1,Natom
 		call write_pops_atom(Atoms(m)%ptr_atom)
 	end do
-	
-	!If we want to change the profile function here in case of Zeeman polarisation
-	!or in case of change in accuracy, we need to reallocate some line quantities:
-	!line%adamp is not allocated if profile_interp and line%phi is not allocated if
-	!profile_v or profile_thomson !
 
-! 	if (lmagnetized .and. PRT_SOLUTION /= "NO_STOKES") then
-! 		if (PRT_SOLUTION == "FIELD_FREE") PRT_SOLUTION = newPRT_SOLUTION
-! 		call adjustStokesMode(PRT_SOLUTION)
-! 		allocate(QUV(3, Nlambda))
-! 		QUV = 0d0
-! 	end if
+	if (lmagnetized) then
+		integ_ray_line => integ_ray_line_z
+		lorigin_atom = .false.
+		lcontrib_function = .false.
+ 		allocate(QUV(Nlambda,3))
+		call allocate_stokes_quantities
+	endif
 
 	call alloc_flux_image()
 	write(*,*) "Computing emission flux map..."
@@ -1244,6 +1233,14 @@ module atom_transfer
 		end do
 	end do
 	write(*,*) " ..done"
+	
+	if (lmagnetized) then
+		deallocate(QUV)
+		call write_1D_arr_ascii(Nlambda, lambda, F_QUV(:,1,1,3), "FV.s")
+		call write_1D_arr_ascii(Nlambda, lambda, F_QUV(:,1,1,1), "FQ.s")
+		call write_1D_arr_ascii(Nlambda, lambda, F_QUV(:,1,1,2), "FU.s")
+	endif
+
 
 	if (allocated(flow_chart)) then
 		call write_lambda_cell_array(flow_chart, flow_file)
@@ -1899,8 +1896,8 @@ module atom_transfer
 								Tex_old(nact, kr+Atom%Nline,icell) = atom%continua(kr)%Tex(icell)
 							enddo
 							!if (evaluate_background) then
-							! !evalute LTE here ??
-							!
+							! !evalute LTE here ?? if so, need a local version of lte pops.
+							! !or store the populations nstar in a new array?
 							! recompute profiles or damping
 							!
 							!endif
@@ -2840,87 +2837,7 @@ module atom_transfer
 
  ! ------------------------------------------------------------------------------------ !
  return
- end subroutine Iterate_Jnu
-
- !building
-!  subroutine adjustStokesMode(Solution)
-!  !
-!  !
-!    character(len=*), intent(in) :: Solution
-! 
-! 
-! write(*,*) "Note polarized profile not allocated yet, check that in profile and line%phiZ, line%psi"
-! write(*,*) "Magnetic profile not ready yet"
-! stop
-! 
-!     if (SOLUTION=="FIELD_FREE") then
-!       !if (associated(Profile)) Profile => NULL()
-!       !Profile => Iprofile !already init to that
-!       if (allocated(NLTEspec%AtomOpac%rho_p)) deallocate(NLTEspec%AtomOpac%rho_p)
-!       if (allocated(NLTEspec%AtomOpac%etaQUV_p)) deallocate(NLTEspec%AtomOpac%etaQUV_p)
-!       if (allocated(NLTEspec%AtomOpac%chiQUV_p)) deallocate(NLTEspec%AtomOpac%chiQUV_p)
-!       if (allocated(NLTEspec%F_QUV)) deallocate(NLTEspec%F_QUV)
-!       if (allocated(NLTEspec%StokesV)) deallocate(NLTEspec%StokesV, NLTEspec%StokesQ, &
-!       												NLTEspec%StokesU)
-!       write(*,*) " Using FIELD_FREE solution for the SEE!"
-!       call Warning("  Set PRT_SOLUTION to FULL_STOKES for images")
-! 
-!     else if (SOLUTION=="POLARIZATION_FREE") then
-!      call ERROR("POLARIZATION_FREE solution not implemented yet")
-!      !NLTE not implemented in integ_ray_line_z and Zprofile always compute the full
-!      !propagation dispersion matrix, but only the first row is needed
-!      if (associated(Profile)) Profile => NULL()
-!      Profile => Zprofile
-!      if (associated(INTEG_RAY_LINE)) INTEG_RAY_LINE => NULL()
-!      INTEG_RAY_LINE => INTEG_RAY_LINE_Z
-! 
-!      !if (associated(Voigt)) Voigt => NULL
-!      !Voigt => VoigtHumlicek !Already the algortihm used
-! 
-!      !beware, only I! polarization is neglected hence not allocated
-!       if (.not.allocated(NLTEspec%AtomOpac%rho_p)) then !same for all, dangerous.
-!       	allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-!         allocate(NLTEspec%AtomOpac%etaQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-!         allocate(NLTEspec%AtomOpac%chiQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-! 
-!         write(*,*) " Using POLARIZATION_FREE solution for the SEE!"
-!      end if
-! 
-!     else if (SOLUTION=="FULL_STOKES") then !Solution unchanged here
-!       if (associated(Profile)) Profile => NULL()
-!       Profile => Zprofile
-!       if (associated(INTEG_RAY_LINE)) INTEG_RAY_LINE => NULL()
-!       INTEG_RAY_LINE => INTEG_RAY_LINE_Z
-!      !if (associated(Voigt)) Voigt => NULL
-!      !Voigt => VoigtHumlicek !Already the algortihm used
-!       !allocate space for Zeeman polarisation
-!       !only LTE for now
-!        if (.not.allocated(NLTEspec%StokesQ)) & !all allocated, but dangerous ?
-!             allocate(NLTEspec%StokesQ(NLTEspec%NWAVES, atmos%NRAYS,NLTEspec%NPROC), &
-!              NLTEspec%StokesU(NLTEspec%NWAVES, atmos%NRAYS,NLTEspec%NPROC), &
-!              NLTEspec%StokesV(NLTEspec%NWAVES, atmos%NRAYS,NLTEspec%NPROC))!, &
-!              !!NLTEspec%S_QUV(3,NLTEspec%Nwaves))
-!       NLTEspec%StokesQ=0d0
-!       NLTEspec%StokesU=0d0
-!       NLTEspec%StokesV=0d0
-!       if (.not.allocated(NLTEspec%F_QUV)) &
-!       	allocate(NLTEspec%F_QUV(3,NLTEspec%Nwaves,NPIX_X,NPIX_Y,RT_N_INCL,RT_N_AZ))
-!       NLTEspec%F_QUV = 0d0
-!       if (.not.allocated(NLTEspec%AtomOpac%rho_p)) then !same for all, dangerous.
-!       	allocate(NLTEspec%AtomOpac%rho_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-!         allocate(NLTEspec%AtomOpac%etaQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-!         allocate(NLTEspec%AtomOpac%chiQUV_p(NLTEspec%Nwaves, 3, NLTEspec%NPROC))
-! 
-!         write(*,*) " Using FULL_STOKES solution for the SEE!"
-!       end if
-!     else
-!      call ERROR("Error in adjust StokesMode with solution=",Solution)
-!     end if
-!  return
-!  end subroutine adjustStokesMode
- ! ------------------------------------------------------------------------------------ !
-
-   
+ end subroutine Iterate_Jnu   
 
 	subroutine compute_contribution_functions!_uvw(u,v,w)
 	!for one ray at the centre of the image

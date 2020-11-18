@@ -69,7 +69,7 @@ MODULE zeeman
     RETURN !should not happen
   end if
 
-  ZeemanStrength = 3d0 * w3js(int(2*Jj),int(2*Ji),2,&
+  ZeemanStrength = 3.0 * w3js(int(2*Jj),int(2*Ji),2,&
                               -int(2*Mj),int(2*Mi),-2*q)**2
  RETURN
  END FUNCTION ZeemanStrength

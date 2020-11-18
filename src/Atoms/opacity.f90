@@ -4,7 +4,8 @@ module Opacity
 															icompute_atomRT, lmali_scheme, lhogerheijde_scheme, nhtot
 	use atom_type
 	use spectrum_type, only								: Itot, Icont, lambda, nlambda, Nlambda_cont, lambda_cont, dk, dk_min, dk_max, &
-															chi0_bb, eta0_bb, chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, Jnu, Jnu_cont
+															chi0_bb, eta0_bb, chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, Jnu, Jnu_cont, &
+															rho_p, etaQUV_p, chiQUV_p
 	use constant
 	use constantes, only								: tiny_dp, huge_dp, AU_to_m
 	use messages
@@ -1062,7 +1063,83 @@ module Opacity
 	return
 	end subroutine cross_coupling_terms
 
+	subroutine opacity_atom_zeeman_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
 
+		integer, intent(in) :: id, icell, iray
+		logical, intent(in) :: iterate
+		real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
+		integer :: nact, Nred, Nblue, kc, kr, i, j, m
+		type(AtomType), pointer :: aatom
+		integer :: dk0, dk1, Nlam
+		real(kind=dp) :: wi, wj, adamp, dv_dl, chil, etal
+		real(kind=dp), dimension(Nlambda_max_line+2*dk_max) :: phi0
+		real(kind=dp), dimension(Nlambda_max_line+2*dk_max,3) :: phiZ, psiZ
+
+ 		chiQUV_p(:,:,id) = 0.0_dp
+ 		etaQUV_p(:,:,id) = 0.0_dp
+ 		rho_p(:,:,id) = 0.0_dp
+  
+		atom_loop : do nact = 1, Natom
+			aatom => Atoms(nact)%ptr_atom
+
+			tr_loop : do kr = 1,aatom%Ntr_line
+
+				kc = aatom%at(kr)%ik
+
+				Nred = aatom%lines(kc)%Nred; Nblue = aatom%lines(kc)%Nblue
+				i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
+
+							
+				Nblue = Nblue + dk_min
+				Nred = Nred + dk_max
+				Nlam = Nred - Nblue + 1
+				
+ 				wj = 1.0; wi = 1.0
+				if (ldissolve) then
+					if (aatom%ID=="H") then
+												!nn
+						wj = wocc_n(icell, real(j,kind=dp), real(aatom%stage(j)), real(aatom%stage(j)+1),hydrogen%n(1,icell)) !1 for H
+						wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1),hydrogen%n(1,icell))
+					endif
+				endif 
+
+				!fixed at the moment
+				call local_profile_zv(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred),phi0,phiZ, psiZ, x,y,z,x1,y1,z1,u,v,w,l)
+
+				etal = hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell)
+				chil = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
+
+				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
+
+					
+					chi(Nblue:Nred,id) = chi(Nblue:Nred,id) + chil * phi0(1:Nlam)
+					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + etal * phi0(1:Nlam) 
+						
+					do m=1,3
+						chiQUV_p(Nblue:Nred,m,id) = chiQUV_p(Nblue:Nred,m,id) + chil * phiz(1:Nlam,m)
+						etaQUV_p(Nblue:Nred,m,id) = etaQUV_p(Nblue:Nred,m,id) + etal * phiz(1:Nlam,m)
+! 						rho_p(Nblue:Nred,m,id) = rho_p(Nblue:Nred,m,id) + chil * psiz(1:Nlam,m)
+					enddo
+
+				else !neg or null
+					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + etal * phi0(1:Nlam) 
+					do m=1,3
+! 						chiQUV_p(Nblue:Nred,m,id) = chiQUV_p(Nblue:Nred,m,id) + chil * phiz(1:Nlam,m)
+						etaQUV_p(Nblue:Nred,m,id) = etaQUV_p(Nblue:Nred,m,id) + etal * phiz(1:Nlam,m)
+! 						rho_p(Nblue:Nred,m,id) = rho_p(Nblue:Nred,m,id) + chil * psiz(1:Nlam,m)
+					enddo						
+				endif
+
+    
+			end do tr_loop
+
+			aatom => NULL()
+
+		end do atom_loop
+
+
+	return
+	end subroutine opacity_atom_zeeman_loc
 	
 end module Opacity
 

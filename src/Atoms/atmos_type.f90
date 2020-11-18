@@ -45,7 +45,7 @@ module atmos_type
   
 	integer :: Npf, NactiveAtoms, Npassiveatoms, Natom
 	real(kind=dp) :: metallicity, totalAbund, avgWeight, wght_per_H, tau
-	real(kind=dp), allocatable, dimension(:) :: vR, v_z, vphi, BR, Bz, Bphi, vtheta, Btheta
+	real(kind=dp), allocatable, dimension(:) :: vR, v_z, vphi, BR, B_z, Bphi, vtheta, Btheta
 	type (elemPointerArray), dimension(:), allocatable :: Elements
 	type (atomPointerArray), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
 	real(kind=dp), dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
@@ -1185,7 +1185,7 @@ module atmos_type
   if (allocated(vphi)) deallocate(vphi)
 
   if (allocated(BR)) deallocate(BR)
-  if (allocated(Bz)) deallocate(Bz)
+  if (allocated(B_z)) deallocate(B_z)
   if (allocated(Bphi)) deallocate(Bphi)
 !   if (allocated(Bxyz)) deallocate(Bxyz)
 
@@ -1590,22 +1590,18 @@ module atmos_type
    ! ----------------------------------------- !
    ! Allocate space for magnetic field
    ! ----------------------------------------- !
-    !if (.not.atmos%magnetized) return
-    !allocate(atmos%Bxyz(atmos%Nspace, 3))
-    !atmos%Bxyz = 0.0
+
     allocate(BR(n_cells)); BR = 0.0_dp
     allocate(Bphi(n_cells)); Bphi = 0.0_dp
     
     allocate(Btheta(n_cells)); Btheta = 0.0_dp
-    !allocate(atmos%Bz(atmos%Nspace)); atmos%Bz = 0.0_dp
+    allocate(B_z(n_cells)); B_z = 0.0_dp
 
 
    return
    end subroutine alloc_magnetic_field
 
-
-!building
-   function B_project(icell, x,y,z,u,v,w, cog, co2c) result(Bmodule)
+   function B_project(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
    ! ------------------------------------------- !
    ! Returned the module of the magnetic field at
    ! one point of the model icell and the cosine of the angles
@@ -1614,50 +1610,41 @@ module atmos_type
    ! chi is the angle between Bperp and ex
    ! Bperp is the projection of B onto a plane
    ! perpendicular to the los
+   !
+   ! cos(gamma) = n dot B
+   ! cos(2x) = cos(x)**2 - sin(x)**2
+   ! sin(2x) = 2*cos(x)*sin(x)
    ! ------------------------------------------- !
     integer :: icell
     real(kind=dp) :: x, y, z, u, v, w, Bmodule
     real(kind=dp) :: bx, by, bz, r, norme, r2, norme2
-    real(kind=dp) :: sig, si2c
-    real(kind=dp), intent(inout) :: cog, co2c
+    real(kind=dp) :: sig, bperp
+    real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
     real :: sign
     
     if (lvoronoi) then
     	call error('not yet')
     	Bmodule = sqrt(bx*bx + by*by + bz*bz)
-    	!bx = ; by = ; bz = 
-    	cog = (bx*u + by*v + bz*w) / Bmodule
-    	sig = sqrt(1.0 - cog*cog)
-    	co2c = 2.0 * ( bx / sqrt(bx*bx + by*by) )
-    	si2c = 2.0 * ( by / sqrt(bx*bx + by*by) )
+    	bperp = sqrt(bx*bx + by*by)
     else
 
         if (lmagnetoaccr) then
            r = sqrt(x*x+y*y)           			 
            Bx = 0_dp; By = 0_dp
-           Bz = 0.0_dp!B_z(icell)
+           Bz = B_z(icell)
            !only if z strictly positive (2D)
            if ( (.not.l3D) .and. (z < 0_dp) ) Bz = -Bz
            
-           !Bmodule = sqrt(Bx * Bx + By*By + Bz * Bz)
 
            if (r > tiny_dp) then
               norme = 1.0_dp/r
               
               Bx = BR(icell) * x * norme - Bphi(icell) * y * norme
               By = BR(icell) * y * norme + Bphi(icell) * x * norme
-              
-              Bmodule = sqrt(Bx * Bx + By * By + Bz * Bz)
- 
-              cog = (Bx*u + By*v + Bz*w) / Bmodule
-              sig = sqrt(1.0 - cog*cog)
-              co2c = 2.0 * ( Bx / sqrt(Bx*Bx + By * By) )
-              si2c = 2.0 * ( By / sqrt(Bx*Bx + By * By) )
+
           else
-          	  cog = Bz*w / Bmodule
-          	  co2c = 1.0
-          	  si2c = 0.0
-          	  sig = 0.0
+          	  bx = 0.0_dp
+          	  by = 0.0_dp
           endif
           
 		else if (lspherical_velocity) then
@@ -1679,23 +1666,24 @@ module atmos_type
 				Bx = Br(icell) * x * norme - y * norme2 * Bphi(icell) + norme2 * ( z * norme * x * Btheta(icell) )
 				By = Br(icell) * y * norme + x * norme2 * Bphi(icell) + norme2 * ( z * norme * y * Btheta(icell) )
 				Bz = Br(icell) * z * norme - sign * r2 / r * Btheta(icell)
-				Bmodule = sqrt(Bx*Bx + By*By + Bz*Bz)
-				cog = (Bx * u + By * v + Bz * w) / Bmodule
-				sig = sqrt(1.0 - cog*cog)
-				co2c = 2.0 * ( Bx / sqrt(bx*bx + by*by) )
-				si2c = 2.0 * ( By / sqrt(bx*bx + by*by) )
 			else
-				Bmodule = 0.0_dp
-				cog = 0.0_dp
-				sig = 0.0
-				co2c = 0.0_dp
-				si2c = 0.0
+				bx = 0.0_dp
+				by = 0.0_dp
+				bz = 0.0_dp
 			endif
 				
 		else
            call error("magnetic field geometry not defined")
         endif
     endif !lvoronoi
+
+	Bmodule = sqrt(bx*bx + by*by + bz*bz)
+
+    cog = (bx*u + by*v + bz*w) / ( Bmodule + tiny_dp)
+    sig = sqrt(1.0 - cog*cog)
+    co2c = (bx*bx - by*by) / (bx*bx + by*by)
+    si2c = 2.0 * bx * by / (bx*bx + by*by)
+	sigsq = sig*sig
 
     return
    end function B_project
@@ -1859,15 +1847,15 @@ module atmos_type
    logical :: is_not_dark!, xit
    real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic, Vmod, Vinf
 
-   !xit = .true.
    lmagnetoaccr = .false.
    lspherical_velocity = .false.
    lVoronoi = .false.
    !read from file the velocity law if any
    call alloc_atomic_atmos()
    !For now we do not necessarily need to compute B if no polarization at all
-   lmagnetized = (lmagnetic_field) .and. (PRT_SOLUTION /= "NO_STOKES")
+   lmagnetized = lzeeman_polarisation !if Zeeman polarisation read magnetic field!
    if (lmagnetized) then 
+   	write(*,*) " Allocating magnetic field array"
     call alloc_magnetic_field()
     allocate(B2(n_cells)) !only to read either Bz or Btheta depending on velocity law
    endif
@@ -1943,15 +1931,14 @@ module atmos_type
        end if
     Nread = 0
     if (lmagnetized) then
-     write(*,*) "Magnetic atmos not ready yet"
-     stop
+
      call getnextline(1, "#", FormatLine, inputline, Nread)
-!      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
-!          vR(icell), V2(icell), Vphi(icell), &
-!          BR(icell), B2(icell), Bphi(icell), icompute_atomRT(icell)
+
+	!In case of no polarisation, but magnetic field is present in the file, it is better to 
+	!read the mandatory variables and put the magnetic field at the end of the file
      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
-         vR(icell), V2(icell), Vphi(icell), vturb(icell), &
-         BR(icell), B2(icell), Bphi(icell), icompute_atomRT(icell)
+         vR(icell), V2(icell), Vphi(icell), vturb(icell), icompute_atomRT(icell), &
+         BR(icell), B2(icell), Bphi(icell)
     else
      call getnextLine(1, "#", FormatLine, inputline, Nread)
      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
@@ -1970,13 +1957,13 @@ module atmos_type
     vtheta(:) = V2(:)
     if (lmagnetized) then 
      Btheta(:) = B2(:)
-     deallocate(B2)
+     deallocate(B2, B_z)
     endif
    else if (lmagnetoaccr) then
     v_z(:) = V2(:)
     if (lmagnetized) then 
-     Bz(:) = B2(:)
-     deallocate(B2)
+     B_z(:) = B2(:)
+     deallocate(B2, Btheta)
     endif
    else
     call error ("Wrong velocity law")
@@ -2055,17 +2042,21 @@ module atmos_type
 
    if (lmagnetized) then
    	if (lmagnetoaccr) then
-     B_char = maxval(sqrt(BR**2+Bz(:)**2+Bphi(:)**2))
+     B_char = maxval(sqrt(BR**2+B_z(:)**2+Bphi(:)**2))
     else if (lspherical_velocity) then
      B_char = maxval(sqrt(BR**2+Btheta(:)**2+Bphi(:)**2))
     endif
     write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
-   end if
 
-   !!here not used, done by model
-  !!call define_atomRT_domain() !can be defined earlier so that we avoid create a dark_zone array?
-  							  !for instance, cell by cell init of icompute_atomRT, when density
-  							  !is computed
+   
+  	 if (B_char <= 0.0_dp) then
+   		deallocate(BR,Bphi)
+   		if (allocated(B_z)) deallocate(B_z)
+   		if (allocated(Btheta)) deallocate(Btheta)
+   		lmagnetized = .false.
+   	endif
+   endif
+
   !but this one is needed
    if (maxval(ne) == 0d0) calc_ne = .true.
 
