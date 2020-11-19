@@ -1890,6 +1890,9 @@ module atmos_type
    real(kind=dp), dimension(:), allocatable :: B2
    logical :: is_not_dark!, xit
    real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic, Vmod, Vinf
+   !real(kind=dp), parameter :: tilt = 30.0 * pi / 180.
+   real(kind=dp) :: tilt
+   real(kind=dp) :: sinthetap0sq, costheta0, sintheta0sq
 
    lmagnetoaccr = .false.
    lspherical_velocity = .false.
@@ -1959,9 +1962,10 @@ module atmos_type
    if (acspot==1) accretion_spots = .true.
    !now read thetao and thetai
    call getnextline(1, "#", FormatLine, inputline, Nread)
-   read(inputline(1:Nread),*) thetai, thetao
+   read(inputline(1:Nread),*) thetai, thetao, tilt
    thetai = thetai * pi/180.
    thetao = thetao * pi/180.
+   tilt = tilt * pi/180.
 
    do i=1, n_rad
      do j=j_start,nz !j_start = -nz in 3D
@@ -2039,6 +2043,7 @@ module atmos_type
     write(*,*) "Angles at stellar surface (deg)", thetao*rad_to_deg, thetai*rad_to_deg
     Tring = Lr / (4d0 * PI * (etoile(1)%r*au_to_m)**2 * sigma * abs(cos(thetai)-cos(thetao)))
     Tring = Tring**0.25
+    write(*,*) " Accretion spots tilt (deg)", tilt*180./pi
 
 
     if (Tshk > 0) Tring = Tshk
@@ -2057,15 +2062,28 @@ module atmos_type
    	  allocate(etoile(1)%SurfB(etoile(1)%Nr))
    	  do k=1,etoile(1)%Nr!should be 1 ring for testing
    	    south = 1.
-    	tc = 0d0 * PI/180 !center of vector position
+    	tc = tilt!0d0 * PI/180 !center of vector position
     	phic = 0d0 !vector position, pointing to the center of the spot
-    	if (k==2) south = -1. !for the ring in the southern hemisphere
+    	if (k==2) then
+    		south = -1. !for the ring in the southern hemisphere
+    		tc = tc + pi
+    	endif
     	etoile(1)%SurfB(k)%T = Tring
         !center of the spot
-   	    etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)
+   	    etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)! *cos(tilt) - sin(tc)*sin(tilt)
    	    etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
-   	    etoile(1)%SurfB(k)%r(3) = cos(tc)*south
-    	etoile(1)%SurfB(k)%muo = cos(thetao); etoile(1)%SurfB(k)%mui = cos(thetai)
+   	    etoile(1)%SurfB(k)%r(3) = cos(tc)!south*(cos(tc) * cos(tilt) + cos(phic)*sin(tc)*sin(tilt))
+   	    
+!     	sinthetap0sq = (1.0 + tan(tilt)**2 * cos(0.0)**2)**-1 
+!    	    sintheta0sq = sin(thetai)**2 * sinthetap0sq
+!       	costheta0 = sqrt(1.0 - sintheta0sq)
+		etoile(1)%SurfB(k)%mui = cos(thetai)
+
+!     	sinthetap0sq = (1.0 + tan(tilt)**2 * cos(2*PI)**2)**-1 
+!    	    sintheta0sq = sin(thetao)**2 * sinthetap0sq
+!       	costheta0 = sqrt(1.0 - sintheta0sq)
+    	etoile(1)%SurfB(k)%muo = cos(thetao)
+    	
     	etoile(1)%SurfB(k)%phio = 2*PI; etoile(1)%SurfB(k)%phii = 0d0
   	  end do
   	 endif
