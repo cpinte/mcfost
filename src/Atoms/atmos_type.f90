@@ -45,7 +45,8 @@ module atmos_type
   
 	integer :: Npf, NactiveAtoms, Npassiveatoms, Natom
 	real(kind=dp) :: metallicity, totalAbund, avgWeight, wght_per_H, tau
-	real(kind=dp), allocatable, dimension(:) :: vR, v_z, vphi, BR, B_z, Bphi, vtheta, Btheta
+	real(kind=dp), allocatable, dimension(:) :: vR, v_z, vphi
+	real(kind=dp), allocatable, dimension(:) :: BR, B_z, Bphi, vtheta, Btheta, gammab, chib, Bmag
 	type (elemPointerArray), dimension(:), allocatable :: Elements
 	type (atomPointerArray), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
 	real(kind=dp), dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
@@ -1187,8 +1188,9 @@ module atmos_type
   if (allocated(BR)) deallocate(BR)
   if (allocated(B_z)) deallocate(B_z)
   if (allocated(Bphi)) deallocate(Bphi)
-!   if (allocated(Bxyz)) deallocate(Bxyz)
-
+  if (allocated(Bmag)) deallocate(Bmag)
+  if (allocated(gammab)) deallocate(gammab)
+  if (allocated(chib)) deallocate(chib)
   !write(*,*) "Free Atoms"
   ! start freeing Atoms if previously allocated
   ! in readAtom()
@@ -1591,17 +1593,19 @@ module atmos_type
    ! Allocate space for magnetic field
    ! ----------------------------------------- !
 
-    allocate(BR(n_cells)); BR = 0.0_dp
-    allocate(Bphi(n_cells)); Bphi = 0.0_dp
-    
-    allocate(Btheta(n_cells)); Btheta = 0.0_dp
-    allocate(B_z(n_cells)); B_z = 0.0_dp
+!     allocate(BR(n_cells)); BR = 0.0_dp
+!     allocate(Bphi(n_cells)); Bphi = 0.0_dp
+!     allocate(Btheta(n_cells)); Btheta = 0.0_dp
+!     allocate(B_z(n_cells)); B_z = 0.0_dp
 
+    allocate(gammab(n_cells)); gammab = 0.0_dp
+    allocate(chib(n_cells)); chib = 0.0_dp
+    allocate(Bmag(n_cells)); Bmag = 0.0_dp
 
    return
    end subroutine alloc_magnetic_field
 
-   function B_project(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
+   function B_project_old(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
    ! ------------------------------------------- !
    ! Returned the module of the magnetic field at
    ! one point of the model icell and the cosine of the angles
@@ -1686,7 +1690,47 @@ module atmos_type
 	sigsq = sig*sig
 
     return
+   end function B_project_old
+   
+  function B_project(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
+   ! ------------------------------------------- !
+   ! Returned the module of the magnetic field at
+   ! one point of the model icell and the cosine of the angles
+   ! gamma and 2*chi.
+   ! Gamma is the angle between B and the los
+   ! chi is the angle between Bperp and ex
+   ! Bperp is the projection of B onto a plane
+   ! perpendicular to the los
+   !
+   ! cos(gamma) = n dot B
+   ! cos(2x) = cos(x)**2 - sin(x)**2
+   ! sin(2x) = 2*cos(x)*sin(x)
+   ! ------------------------------------------- !
+    integer :: icell
+    real(kind=dp) :: x, y, z, u, v, w, Bmodule
+    real(kind=dp) :: bx, by, bz, r, norme, r2, norme2
+    real(kind=dp) :: sig, bperp
+    real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
+    real :: sign
+
+
+	Bx = Bmag(icell) * cos(chiB(icell)) * sin(gammaB(icell))
+	By = Bmag(icell) * sin(chiB(icell)) * sin(gammaB(icell))
+	Bz = Bmag(icell) * cos(gammaB(icell))
+
+
+	Bmodule = Bmag(icell)
+    cog = (bx*u + by*v + bz*w) / ( Bmodule + tiny_dp)
+    sig = sqrt(1.0 - cog*cog)
+	sigsq = sig*sig
+	
+    co2c = (bx*bx - by*by) / (tiny_dp + bx*bx + by*by)
+    si2c = 2.0 * bx * by / (tiny_dp + bx*bx + by*by)
+! write(*,*) Bmodule*1e4, cog, co2c, si2c, bx, by, bz
+! stop
+    return
    end function B_project
+
 
 !    !!should be moved in Atom_type
 !    function atomZnumber_old(atomID) result(Z)
@@ -1857,10 +1901,9 @@ module atmos_type
    if (lmagnetized) then 
    	write(*,*) " Allocating magnetic field array"
     call alloc_magnetic_field()
-    allocate(B2(n_cells)) !only to read either Bz or Btheta depending on velocity law
+!     allocate(B2(n_cells))
+    !only to read either Bz or Btheta depending on velocity law
    endif
-
-!for av83 try rho_to_nH = 1d3 /masseH / 1.79
 
    !change mean molecular weight in atom weight mean and mean molecular weight as mu*(1-ne/nTot) Hubeny pa 792
    rho_to_nH = 1d3 /masseH / wght_per_H!atmos%avgWeight !density kg/m3 -> nHtot m^-3
@@ -1938,7 +1981,7 @@ module atmos_type
 	!read the mandatory variables and put the magnetic field at the end of the file
      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
          vR(icell), V2(icell), Vphi(icell), vturb(icell), icompute_atomRT(icell), &
-         BR(icell), B2(icell), Bphi(icell)
+         Bmag(icell), gammab(icell), chib(icell)!BR(icell), B2(icell), Bphi(icell)!
     else
      call getnextLine(1, "#", FormatLine, inputline, Nread)
      read(inputline(1:Nread),*) rr(icell), zz(icell), pp(icell), T(icell), nHtot(icell), ne(icell), &
@@ -1951,20 +1994,19 @@ module atmos_type
      end do
     end do
    end do
-   !!vR = vr/1d1; V2 = v2/1d3; vphi = vphi/1d1
 
    if (lspherical_velocity) then
     vtheta(:) = V2(:)
-    if (lmagnetized) then 
-     Btheta(:) = B2(:)
-     deallocate(B2, B_z)
-    endif
+!     if (lmagnetized) then 
+!      Btheta(:) = B2(:)
+!      deallocate(B2, B_z)
+!     endif
    else if (lmagnetoaccr) then
     v_z(:) = V2(:)
-    if (lmagnetized) then 
-     B_z(:) = B2(:)
-     deallocate(B2, Btheta)
-    endif
+!     if (lmagnetized) then 
+!      B_z(:) = B2(:)
+!      deallocate(B2, Btheta)
+!     endif
    else
     call error ("Wrong velocity law")
    endif
@@ -2041,18 +2083,22 @@ module atmos_type
 
 
    if (lmagnetized) then
-   	if (lmagnetoaccr) then
-     B_char = maxval(sqrt(BR**2+B_z(:)**2+Bphi(:)**2))
-    else if (lspherical_velocity) then
-     B_char = maxval(sqrt(BR**2+Btheta(:)**2+Bphi(:)**2))
-    endif
+!    	if (lmagnetoaccr) then
+!      B_char = maxval(sqrt(BR**2+B_z(:)**2+Bphi(:)**2))
+!     else if (lspherical_velocity) then
+!      B_char = maxval(sqrt(BR**2+Btheta(:)**2+Bphi(:)**2))
+!     endif
+	gammaB = gammab * pi / 180.0
+	chib = chib * pi / 180.0
+	B_char = maxval(Bmag)
     write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
 
    
   	 if (B_char <= 0.0_dp) then
-   		deallocate(BR,Bphi)
-   		if (allocated(B_z)) deallocate(B_z)
-   		if (allocated(Btheta)) deallocate(Btheta)
+!    		deallocate(BR,Bphi)
+!    		if (allocated(B_z)) deallocate(B_z)
+!    		if (allocated(Btheta)) deallocate(Btheta)
+		deallocate(Bmag, gammab,chib)
    		lmagnetized = .false.
    	endif
    endif
@@ -2081,14 +2127,6 @@ module atmos_type
     endif
     write(*,*) " Vphi = ",  1d-3 * maxval(abs(vphi)), &
     	1d-3*minval(abs(vphi),mask=icompute_atomRT>0)
-
-   
-!    if (xit .and. lspherical_velocity) then
-!      Vinf = maxval(vr)!900d3 !m/s
-!      !law here                                                        = Vr
-!      !vturb(:) = 1d3 * ( 10. + (100.-10.) * vr(:) / Vinf   ) !m/s
-!      vturb(:) = 10d3 !km/s
-!    endif 
 
    
    write(*,*) "Typical line extent due to V fields (km/s):"

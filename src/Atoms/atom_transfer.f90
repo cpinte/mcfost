@@ -1236,9 +1236,6 @@ module atom_transfer
 	
 	if (lmagnetized) then
 		deallocate(QUV)
-		call write_1D_arr_ascii(Nlambda, lambda, F_QUV(:,1,1,3), "FV.s")
-		call write_1D_arr_ascii(Nlambda, lambda, F_QUV(:,1,1,1), "FQ.s")
-		call write_1D_arr_ascii(Nlambda, lambda, F_QUV(:,1,1,2), "FU.s")
 	endif
 
 

@@ -1,7 +1,7 @@
 module spectrum_type
 
 	use atom_type, only : AtomicLine, AtomicContinuum, AtomType
-	use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, icompute_atomRT
+	use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, icompute_atomRT, lmagnetized
 	use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table, make_wavelength_grid_new!, make_wavelength_grid, 
 	use math, only : linear_1D
 	use fits_utils, only : print_error
@@ -356,9 +356,12 @@ call error("initSpectrumImage not modified!!")
 		real :: mem_alloc, mem_flux, mem_cont
 		integer(kind=8) :: mem_alloc_local = 0
 		real, dimension(:), allocatable :: mem_per_file
-		integer :: Nlam, Ntrans, N1, N2
+		integer :: Nlam, Ntrans, N1, N2, Nstokes
 		
 		allocate(mem_per_file(Natom))
+		
+		Nstokes = 1
+		if (lmagnetized) Nstokes = 4
 		
 		Ntrans = 0
 		Nlam = 0
@@ -395,7 +398,7 @@ call error("initSpectrumImage not modified!!")
 		!total flux and total cont  +  their wavelength grid  
    		mem_cont = Nlambda_cont + Nlambda_cont*rt_n_incl*rt_n_az*nb_proc
 		mem_flux = Nlambda + Nlambda*rt_n_incl*rt_n_az*nb_proc
-		
+		if (lmagnetized) mem_flux = mem_flux + 3 * Nlambda*rt_n_incl*rt_n_az
 		
 		if (Ntrans > 0) then
 		!total space for flux map + space for lines wavelength grid + space for single continuum map at nu0
@@ -437,6 +440,7 @@ call error("initSpectrumImage not modified!!")
 		Fluxc(:,:,:,:) = 0.0_dp
 		
 		mem_alloc_local = mem_alloc_local + sizeof(Flux)+sizeof(fluxc)
+		if (lmagnetized) mem_alloc_local = mem_alloc_local + 3*sizeof(flux)/nb_proc
 		
 		!now for the lines 
 		do nat=1, Natom
@@ -784,8 +788,37 @@ call error("initSpectrumImage not modified!!")
 		call print_error(status)
 	endif
 
+	if (lmagnetized) then
+	
+		call ftcrhd(unit, status)
+  		if (status > 0) then
+			call print_error(status)
+		endif
+		
+		naxis = 4
+		naxes(1) = Nlambda
+		naxes(2) = RT_n_incl
+		naxes(3) = RT_n_az
+		naxes(4) = 3 !Q,U,V
+	
+		nelements = naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
-  !  Close the file and free the unit number.
+		!  Write the required header keywords.
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		if (status > 0) then
+			call print_error(status)
+		endif
+		call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'X_nu',status)
+
+		!  Write the array to the FITS file.
+		call ftpprd(unit,group,fpixel,nelements,F_QUV,status)
+		if (status > 0) then
+			call print_error(status)
+		endif		
+	
+	endif
+
+   ! Close the file and free the unit number.
 	call ftclos(unit, status)
 	if (status > 0) then
 		call print_error(status)

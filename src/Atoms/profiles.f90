@@ -631,14 +631,14 @@ MODULE PROFILES
     !chiU/chiI
         phiZ(:,2) = 0.5*(phi(:,0)-0.5*(phi(:,-1)+phi(:,1)))*s2c*sigsq
     !chiV/chiI
-        phiZ(:,3) = 0.5*(phi(:,-1)-phi(:,1))*c2c
+        phiZ(:,3) = 0.5*(phi(:,-1)-phi(:,1))*cog
         
     !rhoQ/chiI
         psiz(:,1) = 0.5*(psi(:,0)-0.5*(psi(:,-1)+psi(:,1)))*c2c*sigsq	
     !rhoU/chiI
         psiz(:,2) = 0.5*(psi(:,0)-0.5*(psi(:,-1)+psi(:,1)))*s2c*sigsq
     !rhoV/chiI
-        psiz(:,3) = 0.5*(psi(:,-1)-psi(:,1))*c2c
+        psiz(:,3) = 0.5*(psi(:,-1)-psi(:,1))*cog
         
 !         if (line%i==1 .and. line%j==3) then
 !         	write(*,*) maxval(abs(psiz(:,1))), maxval(abs(psiz(:,2))), maxval(abs(psiz(:,3)))
