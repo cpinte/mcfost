@@ -1248,10 +1248,11 @@ subroutine read_density_file()
         tmp = sum(n_a_sph)
         write(*,*) "The following grain sizes were found in the fits file:"
         do i=1,n_a
-           write(*,*) i, a_sph(i), "microns, relative number density =", n_a_sph(i) / tmp
+           n_a_sph(i) = n_a_sph(i) / tmp
+           write(*,*) i, a_sph(i), "microns, relative number density =", n_a_sph(i)
            ! Checking values as we will take the log a bit later
            if (a_sph(i) < tiny_real) call error("grain sizes must be > 0")
-           if (n_a_sph(i) / tmp < tiny_real) call error("grain number density must be > 0")
+           if (n_a_sph(i) < tiny_real) call error("grain number density must be > 0")
         enddo
         write(*,*) "These densities will be used to set the integrated grain size distribution"
         write(*,*) "Densities will be interpolated on the grain sizes defined"
