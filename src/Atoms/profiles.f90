@@ -19,7 +19,7 @@ MODULE PROFILES
 	IMPLICIT NONE
 
 	PROCEDURE(local_profile_v), pointer :: profile => null()
-	integer, parameter :: NvspaceMax = 3, NbspaceMax = 50
+	integer, parameter :: NvspaceMax = 151, NbspaceMax = 1
 
 	CONTAINS
 	
