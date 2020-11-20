@@ -83,6 +83,7 @@ module constantes
   real(kind=dp), parameter :: kg_to_g = 1.0e3_dp
 
   real(kind=dp), parameter :: GxMsun   = 1.3271244e20_dp ! IAU 2015
+  real(kind=dp), parameter :: logg_Sun = log10(GxMsun/Rsun**2 * 100) ! Needs to be in cgs to match stellar atmosphere models
   real(kind=dp), parameter :: GxMearth = 3.986004e14_dp  ! IAU 2015
   real(kind=dp), parameter :: GxMJup   = 1.2668653e17_dp ! IAU 2015
 
