@@ -588,7 +588,7 @@ contains
 
     ! interpoler L et T, les fonctions sont plus smooth
     write(*,*) ""
-    write(*,*) "New stellar parameters (assuming a BB):"
+    write(*,*) "New stellar parameters:"
     do i=1, n_etoiles
        if (etoile(i)%M < minM_Allard) then
           write(*,*) " "
@@ -613,7 +613,8 @@ contains
 
        ! Pas de fUV et pas de spectre stellaire pour le moment
        etoile(i)%fUV = 0.0 ; etoile(i)%slope_UV = 0.0 ;
-       etoile(i)%lb_body = .true. ; etoile(i)%spectre = "None"
+       etoile(i)%lb_body = .false.
+       etoile(i)%spectre = "None"
 
        write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", etoile(i)%r, "Rsun"
     enddo

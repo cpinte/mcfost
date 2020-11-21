@@ -13,7 +13,7 @@ module stars
 
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
        repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, intersect_stars, &
-       intersect_spots
+       intersect_spots, find_spectra
 
   private
 
@@ -247,14 +247,15 @@ subroutine repartition_energie_etoiles()
   real(kind=dp), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
   character(len=512) :: filename, dir
 
-  integer :: lambda, i, n, n_lambda_spectre, l, ios
+  integer, dimension(n_etoiles) :: n_lambda_spectre, unit
+  integer :: lambda, i, n, l, ios, n_lambda_spectre_max, n_wl
   real(kind=dp) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0, Cst0
   real ::  L_etoile, wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV, fUV
   real(kind=dp) :: fact_sup, fact_inf, cst_spectre_etoiles
 
   real(kind=dp) :: wl_spectre_max, wl_spectre_min, wl_spectre_avg, wl_deviation
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, naxes1_ref
+  integer :: status, readwrite, blocksize,nfound,group,firstpix,nbuffer,npixels, naxes1_ref
   real :: nullval
   integer, dimension(2) :: naxes
   logical :: anynull
@@ -295,23 +296,25 @@ subroutine repartition_energie_etoiles()
      endif
   enddo
 
+  call find_spectra()
+
   if (etoile(1)%lb_body) then ! les étoiles sont des corps noirs
      ! Creation d'un corps a haute resolution en F_lambda
      ! R = 1Rsun et distance = 1pc
-     n_lambda_spectre = 1000
+     n_lambda_spectre(:) = 1000
 
      do i=1, n_etoiles
 
         if (i==1) then
-           allocate(tab_lambda_spectre(n_etoiles,n_lambda_spectre), &
-                tab_spectre(n_etoiles,n_lambda_spectre), tab_spectre0(n_etoiles,n_lambda_spectre), &
-                tab_bb(n_etoiles,n_lambda_spectre))
+           allocate(tab_lambda_spectre(n_etoiles,n_lambda_spectre(1)), &
+                tab_spectre(n_etoiles,n_lambda_spectre(1)), tab_spectre0(n_etoiles,n_lambda_spectre(1)), &
+                tab_bb(n_etoiles,n_lambda_spectre(1)))
            tab_lambda_spectre = 0.0 ; tab_spectre = 0.0 ;  tab_spectre0 = 0.0 ;  tab_bb = 0.0
-           allocate(log_spectre(n_lambda_spectre), log_spectre0(n_lambda_spectre), log_wl_spectre(n_lambda_spectre))
+           allocate(log_spectre(n_lambda_spectre(1)), log_spectre0(n_lambda_spectre(1)), log_wl_spectre(n_lambda_spectre(1)))
         endif
-        tab_lambda_spectre(i,:) = 1.0_dp * spanl(lambda_min, lambda_max, n_lambda_spectre)
+        tab_lambda_spectre(i,:) = 1.0_dp * spanl(lambda_min, lambda_max, n_lambda_spectre(1))
 
-        do l=1, n_lambda_spectre
+        do l=1, n_lambda_spectre(1)
            wl = tab_lambda_spectre(i,l) *1.e-6
            cst_wl=cst_th/(etoile(i)%T*wl)
            tab_spectre(i,l) = max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
@@ -324,6 +327,7 @@ subroutine repartition_energie_etoiles()
      ! - CDF_E_star : proba cumulee a lambda fixe d'emission en fonction de l'etoile
      ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
      ! Lecture des spectres
+     n_lambda_spectre_max = 0
      do i=1, n_etoiles
         ! --- Lecture du spectre stellaire
         ! --- Les flux sont normalises pour R=1 rayon solaire vu de 1 pc
@@ -342,71 +346,69 @@ subroutine repartition_energie_etoiles()
 
         status=0
         !  Get an unused Logical Unit Number to use to open the FITS file.
-        call ftgiou(unit,status)
+        call ftgiou(unit(i),status)
 
         readwrite=0
-        call ftopen(unit,filename,readwrite,blocksize,status)
+        call ftopen(unit(i),filename,readwrite,blocksize,status)
         if (status /= 0) call error("cannot open fits file "//trim(filename))
 
         !  determine the size of the image
-        call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+        call ftgknj(unit(i),'NAXIS',1,10,naxes,nfound,status)
         !  check that it found both NAXIS1 and NAXIS2 keywords
         if (nfound /= 2) call error("failed to read the NAXISn keywords in "//trim(filename))
 
         if (naxes(2) /= 3) call error(trim(filename)//" does not have the right shape")
 
-        ! check all spectra have same dimensions
-        if (i==1) then
-           naxes1_ref = naxes(1)
-        else
-           if (naxes1_ref /= naxes(1)) call error("all stellar spactra must have the same shape")
-        endif
+        ! We first read the length of the spectrum
+        n_lambda_spectre(i) = naxes(1)
+        if (naxes(1) > n_lambda_spectre_max) n_lambda_spectre_max = naxes(1)
+     enddo
+
+     ! We allocate the array to the maximum length
+     allocate(tab_lambda_spectre(n_etoiles,n_lambda_spectre_max), &
+          tab_spectre(n_etoiles,n_lambda_spectre_max), tab_spectre0(n_etoiles,n_lambda_spectre_max), &
+          tab_bb(n_etoiles,n_lambda_spectre_max))
+     tab_lambda_spectre = 0.0 ; tab_spectre = 0.0 ;  tab_spectre0 = 0.0 ;  tab_bb = 0.0
+
+     allocate(log_spectre(n_lambda_spectre_max), log_spectre0(n_lambda_spectre_max), log_wl_spectre(n_lambda_spectre_max))
+
+
+     do i=1, n_etoiles
+        n_wl = n_lambda_spectre(i)
+        ! We read again the dimensions
+        call ftgknj(unit(i),'NAXIS',1,10,naxes,nfound,status)
 
         !  initialize variables.
-        npixels=naxes(1)*naxes(2)
+        npixels=n_wl * 3
         group=1
         firstpix=1
         nullval=-999
         nbuffer=npixels
 
-        n_lambda_spectre = naxes(1);
-
-        ! Il faut que tous les spectres aient la meme dim sinon ca merde
-        if (i==1) allocate(spectre_tmp(n_lambda_spectre,3))
-
         ! read_image
-        call ftgpve(unit,group,firstpix,nbuffer,nullval,spectre_tmp,anynull,status)
+        allocate(spectre_tmp(n_wl,3))
+        call ftgpve(unit(i),group,firstpix,nbuffer,nullval,spectre_tmp,anynull,status)
 
-        if (i==1) then
-           allocate(tab_lambda_spectre(n_etoiles,n_lambda_spectre), &
-                tab_spectre(n_etoiles,n_lambda_spectre), tab_spectre0(n_etoiles,n_lambda_spectre), &
-           tab_bb(n_etoiles,n_lambda_spectre))
-           tab_lambda_spectre = 0.0 ; tab_spectre = 0.0 ;  tab_spectre0 = 0.0 ;  tab_bb = 0.0
+        tab_lambda_spectre(i,1:n_wl) = spectre_tmp(:,1)
+        tab_spectre(i,1:n_wl) = spectre_tmp(:,2)
+        tab_bb(i,1:n_wl) = spectre_tmp(:,3)
 
-           allocate(log_spectre(n_lambda_spectre), log_spectre0(n_lambda_spectre), log_wl_spectre(n_lambda_spectre))
-        endif
-
-        tab_lambda_spectre(i,:) = spectre_tmp(:,1)
-        tab_spectre(i,:) = spectre_tmp(:,2)
-        tab_bb(i,:) = spectre_tmp(:,3)
-        !tab_spectre(i,:) = tab_bb(i,:)
-
-        call ftclos(unit, status)
-        call ftfiou(unit, status)
-
-        if (i==n_etoiles) deallocate(spectre_tmp)
-
+        call ftclos(unit(i), status)
+        call ftfiou(unit(i), status)
+        deallocate(spectre_tmp)
      enddo ! n_etoiles
 
   endif ! bb
 
   ! Luminosite etoile integree sur le spectre
   L_star0(:) = 0.0
-  do l = 2, n_lambda_spectre
-     L_star0(:) = L_star0 + 0.5 * (tab_spectre(:,l) + tab_spectre(:,l-1)) &
-             * (tab_lambda_spectre(:,l) - tab_lambda_spectre(:,l-1))
+  do i=1, n_etoiles
+     do l = 2, n_lambda_spectre(i)
+        L_star0(i) = L_star0(i) + 0.5 * (tab_spectre(i,l) + tab_spectre(i,l-1)) &
+             * (tab_lambda_spectre(i,l) - tab_lambda_spectre(i,l-1))
+     enddo
   enddo
-  correct_Luminosity(:) = (sigma*(etoile(:)%T)**4 * (Rsun_to_AU/pc_to_AU)**2) / L_star0
+  correct_Luminosity(:) = (sigma*(etoile(:)%T)**4 * (Rsun_to_AU/pc_to_AU)**2) / L_star0(:)
 
   ! normalisation du spectre a la luminosite indique dans le fichier de para
   do i=1, n_etoiles
@@ -432,7 +434,7 @@ subroutine repartition_energie_etoiles()
      endif
 
      ! On ajoute l'UV que avant le pic de Wien
-     do l = 1, n_lambda_spectre
+     do l = 1, n_lambda_spectre(i)
         if (tab_lambda_spectre(i,l)  < 2898./etoile(i)%T ) then
            wl = tab_lambda_spectre(1,l) * 1e-6
            UV_ProDiMo =  cst_UV_ProDiMo * wl**p
@@ -457,16 +459,18 @@ subroutine repartition_energie_etoiles()
 
   log_lambda = log(tab_lambda(:))
   do i=1,n_etoiles
+     n_wl = n_lambda_spectre(i)
      surface=4*pi*(etoile(i)%r**2)
 
-     wl_spectre_max = maxval(tab_lambda_spectre(i,:))
-     wl_spectre_min = minval(tab_lambda_spectre(i,:))
+     wl_spectre_max = maxval(tab_lambda_spectre(i,1:n_wl))
+     wl_spectre_min = minval(tab_lambda_spectre(i,1:n_wl))
 
      log_spectre = log(tab_spectre(i,:) + 1e-30)
      log_spectre0 = log(tab_spectre0(i,:) + 1e-30)
      log_wl_spectre = log(tab_lambda_spectre(i,:))
 
      do lambda=1, n_lambda
+
         wl = tab_lambda(lambda)*1.e-6
         delta_wl=tab_delta_lambda(lambda)*1.e-6
         ! delta_wl est la largeur du bin d'intégration
@@ -479,7 +483,7 @@ subroutine repartition_energie_etoiles()
         terme = 0.0 ; terme0 = 0.0 ; N = 0
 
         wl_spectre_avg = 0.0
-        do l=1, n_lambda_spectre
+        do l=1, n_wl
            if ( (tab_lambda_spectre(i,l) > wl_inf).and.(tab_lambda_spectre(i,l) < wl_sup) ) then
               terme = terme + tab_spectre(i,l)
               terme0 = terme0 + tab_spectre0(i,l)
@@ -492,28 +496,28 @@ subroutine repartition_energie_etoiles()
         wl_deviation = wl_spectre_avg / tab_lambda(lambda) ! Deviation between bin center and averaged wl
 
         ! Correction eventuelles
-        if ((terme > tiny_dp) .and. (N>3) .and. (abs(wl_deviation-1.0) < 3e-2)) then
+        if ((terme > tiny_dp) .and. (N>3) .and. (abs(wl_deviation-1.0) < 0.1)) then
            terme = terme / N * (surface / Cst0)
            terme0 = terme0 / N * (surface / Cst0)
         else ! on est en dehors du spectre fournit
-           if (tab_lambda(lambda) < wl_spectre_min) then
-              cst_wl=cst_th/(etoile(i)%T*wl)
-              if (cst_wl < 500.) then
-                 terme =  surface/((wl**5)*(exp(cst_wl)-1.0))  ! BB faute de mieux
-              else
-                 terme = tiny_real
-              endif
-              terme0 = terme
-           else if (tab_lambda(lambda) > wl_spectre_max) then ! extrapolation loi de puissance -2 en lambda.F_lambda
-              ! Le corps noir ne marche pas car le niveau est plus eleve a cause du line-blanketing
-              ! Donc je fais une extrapolation en loi de puissance
-              terme = (surface / Cst0) * tab_spectre(i,n_lambda_spectre) * (tab_lambda(lambda) / wl_spectre_max)**(-4)
-              terme0 = (surface / Cst0) * tab_spectre0(i,n_lambda_spectre) * (tab_lambda(lambda) / wl_spectre_max)**(-4)
-           else
-              !write(*,*) log_spectre
-              terme = (surface / Cst0) * exp(interp(log_spectre, log_wl_spectre, log_lambda(lambda)))
-              terme0 = (surface / Cst0) * exp(interp(log_spectre0, log_wl_spectre, log_lambda(lambda)))
-           endif
+          if (tab_lambda(lambda) < wl_spectre_min) then
+             cst_wl=cst_th/(etoile(i)%T*wl)
+             if (cst_wl < 500.) then
+                terme =  surface/((wl**5)*(exp(cst_wl)-1.0))  ! BB faute de mieux
+             else
+                terme = tiny_real
+             endif
+             terme0 = terme
+          else if (tab_lambda(lambda) > wl_spectre_max) then ! extrapolation loi de puissance -2 en lambda.F_lambda
+            ! Le corps noir ne marche pas car le niveau est plus eleve a cause du line-blanketing
+            ! Donc je fais une extrapolation en loi de puissance
+            terme = (surface / Cst0) * tab_spectre(i,n_wl) * (tab_lambda(lambda) / wl_spectre_max)**(-4)
+            terme0 = (surface / Cst0) * tab_spectre0(i,n_wl) * (tab_lambda(lambda) / wl_spectre_max)**(-4)
+          else
+             !write(*,*) log_spectre
+             terme = (surface / Cst0) * exp(interp(log_spectre(1:n_wl), log_wl_spectre(1:n_wl), log_lambda(lambda)))
+             terme0 = (surface / Cst0) * exp(interp(log_spectre0(1:n_wl), log_wl_spectre(1:n_wl), log_lambda(lambda)))
+          endif
         endif ! Fin correction
 
         ! Pas de le delta_wl car il faut comparer a emission du disque
@@ -565,7 +569,7 @@ subroutine repartition_energie_etoiles()
   if ( (lProDiMo).and.(.not.allocated(ProDiMo_star_HR)) ) then
      ! 1 seule etoile en mode ProDiMo
      ! ProDiMo_star_HR est du lambda.Flambda (idem spectre_etoiles mais avec tab_lambda au lieu de tab_delta_lambda)
-     allocate(ProDiMo_star_HR(n_lambda_spectre,2))
+     allocate(ProDiMo_star_HR(n_lambda_spectre_max,2))
      ProDiMo_star_HR(:,1) = tab_lambda_spectre(1,:)
      ProDiMo_star_HR(:,2) = tab_spectre(1,:) * (surface / Cst0) * cst_spectre_etoiles  * tab_lambda_spectre(1,:) * 1e-6
   endif
@@ -831,44 +835,125 @@ subroutine intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
 end subroutine intersect_stars
 
-  SUBROUTINE intersect_spots(i_star,u,v,w,x,y,z,ispot,lintersect)
-  ! ------------------------------------------------------------ !
-   ! Knowing a ray/pack hits the star, will it hit a spot ?
-   ! suppose no spot overlap.
-  ! ------------------------------------------------------------ !
-   real(kind=dp), intent(in) :: x,y,z, u,v,w
-   logical, intent(out) :: lintersect
-   integer, intent(in) :: i_star
-   integer, intent(out) :: ispot
+!***********************************************************
 
-   real(kind=dp), dimension(3) :: r, k
-   real(kind=dp) :: mu, phi
-   integer :: i
-   
-   r(1) = x ; r(2) = y ; r(3) = z
-   k(1) = u ; k(2) = v ; k(3) = w
-   
-   ispot = 0
-   lintersect = .false.
-   spot_loop : do i = 1, etoile(i_star)%Nr
+subroutine intersect_spots(i_star,u,v,w,x,y,z,ispot,lintersect)
+  ! ------------------------------------------------------------ !
+  ! Knowing a ray/pack hits the star, will it hit a spot ?
+  ! suppose no spot overlap.
+  ! ------------------------------------------------------------ !
 
-	  !angle between a ray-direction and the spot position vector
-      mu = dot_product(r,etoile(i_star)%SurfB(i)%r)/dsqrt(x**2+y**2+z**2)
-      !azimuth of a ray on the stellar disk
-      phi = modulo(atan2(y,x),2*real(pi,kind=dp))
+  ! C. Pinte : I belive this duplicates code in emit_packet in dust_transfer.f90
+
+  real(kind=dp), intent(in) :: x,y,z, u,v,w
+  logical, intent(out) :: lintersect
+  integer, intent(in) :: i_star
+  integer, intent(out) :: ispot
+
+  real(kind=dp), dimension(3) :: r, k
+  real(kind=dp) :: mu, phi
+  integer :: i
+
+  r(1) = x ; r(2) = y ; r(3) = z
+  k(1) = u ; k(2) = v ; k(3) = w
+
+  ispot = 0
+  lintersect = .false.
+  spot_loop : do i = 1, etoile(i_star)%Nr
+     !angle between a ray-direction and the spot position vector
+     mu = dot_product(r,etoile(i_star)%SurfB(i)%r)/dsqrt(x**2+y**2+z**2)
+     !azimuth of a ray on the stellar disk
+     phi = modulo(atan2(y,x),2*real(pi,kind=dp))
 
      if ((mu<=etoile(i_star)%SurfB(i)%muo).and.&
-        (mu>=etoile(i_star)%SurfB(i)%mui).and.&
-        (phi>=etoile(i_star)%SurfB(i)%phii).and.&
-        (phi<=etoile(i_star)%SurfB(i)%phio)) then !inside the spot
+          (mu>=etoile(i_star)%SurfB(i)%mui).and.&
+          (phi>=etoile(i_star)%SurfB(i)%phii).and.&
+          (phi<=etoile(i_star)%SurfB(i)%phio)) then !inside the spot
 
-         ispot = i
-         lintersect = .true.
-         exit spot_loop
+        ispot = i
+        lintersect = .true.
+        exit spot_loop
      end if
-   end do spot_loop
+  end do spot_loop
 
-  RETURN
-  END SUBROUTINE intersect_spots
+  return
+
+end subroutine intersect_spots
+
+!***********************************************************
+
+subroutine find_spectra()
+  ! Find an appropriate spectrum for all star based on the Teff, mass and radius (i.e. log(g))
+
+  real :: Teff, r, M, logg, min_logg, max_logg
+  integer :: delta_T, i_star
+
+  real, parameter :: delta_logg = 0.5
+
+  character(len=32) :: sTeff, slogg, type
+
+  write(*,*) "Trying to find appropriate stellar spectra ..."
+
+  do i_star = 1, n_etoiles
+     Teff = etoile(i_star)%T
+
+     r = etoile(i_star)%r / Rsun_to_AU
+     M = etoile(i_star)%M
+
+     if (M < tiny_real) then
+        call warning("Stellar mass is not set, forcing log(g) = 3.5")
+        logg = 3.5 ! stellar mass is not defined in the parameter file, we fix logg
+     else
+        logg = logg_Sun + log10(M/r**2)
+     endif
+
+     if (Teff < 100) then
+        call error("Teff below 100K needs to be implemented")
+     else if (Teff < 1500) then
+        type = "cond"
+        min_logg = 2.5
+        max_logg = 6
+        delta_T = 100
+     else if (Teff < 2700) then
+        type = "dusty"
+        min_logg = 3.5
+        max_logg = 6
+        delta_T = 100
+     else if (Teff < 10000) then
+        type = "NextGen"
+        min_logg = 3.5
+        max_logg = 5.5
+        if (Teff <= 4000) then
+           delta_T = 100
+        else
+           delta_T = 200
+        endif
+     else
+        call error("Teff above 10000K needs to be implemented")
+     endif
+
+     ! Rounding off at the nearest point in the grid of stellar atmospheres
+     Teff = nint(Teff/delta_T) * delta_T
+     logg = nint(logg/delta_logg) * delta_logg
+     logg = min(max(logg,min_logg), max_logg)
+
+     if (Teff < 1000) then
+        write(sTeff, "(I3)") int(Teff)
+     else
+        write(sTeff, "(I4)") int(Teff)
+     endif
+     write(slogg, "(F3.1)") logg
+
+     etoile(i_star)%spectre = "lte"//trim(sTeff)//"-"//trim(slogg)//"."//trim(type)//".fits.gz"
+
+     write(*,*) "Star #", i_star, " --> ", trim(etoile(i_star)%spectre)
+  end do
+
+  write(*,*) "Done"
+
+  return
+
+end subroutine find_spectra
+>>>>>>> master
 
 end module stars

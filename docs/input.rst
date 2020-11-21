@@ -114,4 +114,5 @@ Wavelengths can be in ascending or descending order but must be ordered.
 Stellar Models
 --------------
 
-We should also add references for these.
+mcfost includes a database of stellar spectra, computed by the Lyon group (F. Allard, I. Baraffe), as well as as the models from R. Kurucz.
+Models are stored as fits files, each of them with 3 columns : wavelength in micron, flux F_lambda in W/m-2 / micron, and black-body flux at the same Teff.

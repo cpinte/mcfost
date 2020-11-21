@@ -1187,7 +1187,7 @@ subroutine initialisation_mcfost()
      case("-ML","-ml")
         i_arg = i_arg + 1
         lML=.true.
-     case("-fix_star")
+     case("-fix_star","-fix_stars")
         i_arg = i_arg + 1
         lfix_star=.true.
      case("-scale_length_units")
