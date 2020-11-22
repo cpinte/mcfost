@@ -954,6 +954,6 @@ subroutine find_spectra()
   return
 
 end subroutine find_spectra
->>>>>>> master
+
 
 end module stars
