@@ -1393,7 +1393,7 @@ module atom_transfer
 		allocate(stream(nb_proc),stat=alloc_status)
 		if (alloc_status > 0) call error("Allocation error stream")
 
-		write(*,*) " USING MALI METHOD FOR NLTE LOOP (IN PROGRESS)"
+		write(*,*) " USING MALI METHOD FOR NLTE LOOP"
 
 		labs = .true. !to have ds at cell icell = eval_operator
 		id = 1
@@ -1473,7 +1473,7 @@ module atom_transfer
 				lprevious_converged = .false.!!if .true. here, do not do another iteration after convergence
 				lcell_converged(:) = .false.
 				fac_etape = 1.0
-				precision = fac_etape * 1.0 / sqrt(real(n_rayons))
+				precision = 0.1!fac_etape * 1.0 / sqrt(real(n_rayons))
 				!precision = dpops_max_error
 				write(*,*) " threshold:", precision
 				
