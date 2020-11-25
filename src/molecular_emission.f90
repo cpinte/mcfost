@@ -674,7 +674,7 @@ function v_proj(icell,x,y,z,u,v,w) !
   integer, intent(in) :: icell
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
-  real(kind=dp) :: vitesse, vx, vy, vz, norme, r, r2, norme2, sign
+  real(kind=dp) :: vitesse, vx, vy, vz, norme, r, r2, norme2, sign1
   
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)
@@ -725,8 +725,9 @@ function v_proj(icell,x,y,z,u,v,w) !
            r = sqrt(x*x+y*y)           			 
            vx = 0_dp; vy = 0_dp!; vz = 0_dp
            vz = v_z(icell)
-                         !only if z strictly positive (2D)
+           !only if z strictly positive in the model (2D)
            if ( (.not.l3D) .and. (z < 0_dp) ) vz = -vz
+           !!vz = v_z(icell) * sign(1.0_dp,z), in 3D models, this change of sign is taken care (??)
 
            if (r > tiny_dp) then !rotational + wind, should work also with
            						 !spherical wind of stars
@@ -743,9 +744,9 @@ function v_proj(icell,x,y,z,u,v,w) !
 			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
 			vx = 0.; vy = 0.; vz = 0.;
 			
-			sign = 1_dp
+			sign1 = 1_dp
 			!because theta only from 0 to pi/2 if 2D. But velocity is negative in z < 0
-		    if ( (.not.l3D) .and. (z < 0_dp) ) sign = -1_dp
+		    if ( (.not.l3D) .and. (z < 0_dp) ) sign1 = -1_dp
 			
 			if (r2 > tiny_dp) then
 				norme2 = 1.0_dp / r2
@@ -757,7 +758,7 @@ function v_proj(icell,x,y,z,u,v,w) !
 				norme = 1.0_dp / r
 				vx = vr(icell) * x * norme - y * norme2 * vphi(icell) + norme2 * ( z * norme * x * vtheta(icell) )
 				vy = vr(icell) * y * norme + x * norme2 * vphi(icell) + norme2 * ( z * norme * y * vtheta(icell) )
-				vz = vr(icell) * z * norme - sign * r2 / r * vtheta(icell)
+				vz = vr(icell) * z * norme - sign1 * r2 / r * vtheta(icell)
 				v_proj = vx * u + vy * v + vz * w
 			else
 				v_proj = 0.0_dp
