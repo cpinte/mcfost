@@ -1465,11 +1465,11 @@ module atom_transfer
   				endif
 			else if (etape==2) then 
 			
-				if (iterate_ne) then
-					iterate_ne = .false. !no iteration in MC
-					n_iterate_ne = 0 !to recalc ne at the end of the SEE loop
-									  ! -1 is default and means do nothing					  
-				endif
+! 				if (iterate_ne) then
+! 					iterate_ne = .false. !no iteration in MC
+! 					n_iterate_ne = 0 !to recalc ne at the end of the SEE loop
+! 									  ! -1 is default and means do nothing					  
+! 				endif
 			
 				write(*,*) " Using step 2 with ", n_rayons_1, " rays"
 				lfixed_rays = .true.
@@ -1477,7 +1477,7 @@ module atom_transfer
 				iray_start = 1
 				lprevious_converged = .false.!!if .true. here, do not do another iteration after convergence
 				lcell_converged(:) = .false.
-				fac_etape = 1.0
+				fac_etape = 0.1
 				precision = fac_etape * 1.0 / sqrt(real(n_rayons))
 				!precision = dpops_max_error
 				write(*,*) " threshold:", precision
