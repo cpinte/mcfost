@@ -1665,6 +1665,7 @@ module atmos_type
     integer :: icell
     real(kind=dp) :: x, y, z, u, v, w, Bmodule
     real(kind=dp) :: bx, by, bz, b1, b2, csc_theta
+    real(kind=dp) :: co_2chi, si_2chi, co_chi, si_chi, gamm
     real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
     real :: sign
 
@@ -1673,16 +1674,35 @@ module atmos_type
 		cog = 0.0;co2c = 0.0;si2c = 0.0;sigsq = 0.0
 		return
 	endif
+	
+	gamm = gammaB(icell)
 
-	Bx = cos(chiB(icell)) * sin(gammaB(icell))
-	By = sin(chiB(icell)) * sin(gammaB(icell))
-	Bz = cos(gammaB(icell))
+	
+	if (lmagnetoaccr) then
+	
+		if (.not.l3d) then
+			if (z < 0.0_dp) gamm = gamm + pi
+			co_chi = x / sqrt(x*x+y*y)
+			si_chi = y / sqrt(y*y + x*x)
+			si_2chi = 2 * co_chi * si_chi
+			co_2chi = (co_chi**2 - si_chi**2)
+		endif
+	else
+		co_chi = cos(chiB(icell))
+		si_chi = sin(chiB(icell))
+		co_2chi = cos(2*chiB(icell))
+		si_2chi = sin(2*chiB(icell))
+	endif
+
+	Bx = co_chi * sin(gamm)
+	By = si_chi * sin(gamm)
+	Bz = cos(gamm)
 
 	if (abs(w) == 1.0) then
 		Bmodule = Bmag(icell)
 		cog = Bz
-		si2c = sin(2*chiB(icell))
-		co2c = cos(2*chiB(icell))
+		si2c = si_2chi
+		co2c = co_2chi
 		sigsq = 1.0 - cog*cog
 	else
 		csc_theta = 1.0 / sqrt(1.0 - w*w)
