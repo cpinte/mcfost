@@ -6,7 +6,7 @@ MODULE io_opacity
  use atmos_type, only : Hydrogen, Helium, icompute_atomRT, NactiveAtoms, ne, T
  use atom_type
  use spectrum_type, only : chi, eta, sca_c, lambda, lambda_cont, chi_c, eta_c, chi_c_nlte, eta_c_nlte, &
- 							Jnu, Jnu_cont, Nlambda, Nlambda_cont, eta0_bb, chi0_bb, eta_es
+ 							Jnu_cont, Nlambda, Nlambda_cont, eta0_bb, chi0_bb, eta_es
  use math, only : locate, Linear_1D, bezier2_interp, bezier3_interp
  use constant
  use Planck, only : bpnu
@@ -961,7 +961,7 @@ end subroutine write_radiative_rates_atom
 	 CALL Warning("Jnu size does not match actual grid")
 	endif
 
-    CALL FTG2Dd(unit,1,-999,shape(Jnu_cont),Nl,n_Cells,Jnu,anynull,status)
+    CALL FTG2Dd(unit,1,-999,shape(Jnu_cont),Nl,n_Cells,eta_es,anynull,status)
     if (status > 0) then
       write(*,*) "Read_Jnu cannot read Jnu "
       CALL print_error(status)
@@ -970,7 +970,7 @@ end subroutine write_radiative_rates_atom
     if (lelectron_scattering) then
     	write(*,*) "-> Initialize electron scattering emissivity"
     	do l=1, n_cells
-    		eta_es(:,l) = thomson(l)
+    		eta_es(:,l) = eta_es(:,l) * thomson(l)
     	enddo
     endif
 
@@ -1051,7 +1051,7 @@ end subroutine write_radiative_rates_atom
   !write data
   CALL ftpprd(unit,group,fpixel,nelements,J_to_write,status)
   
-  if (allocated(Jnu)) then
+  if (allocated(eta_es)) then
   	write(*,*) " Jnu with line not implemented (write_jnu)"
 !    CALL ftcrhd(unit, status)
 ! 

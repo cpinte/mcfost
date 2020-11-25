@@ -33,13 +33,15 @@ MODULE lte
 
   type(Element) :: elem
   integer, intent(in) :: stage, k
-  real(kind=dp) :: Uk, part_func(Npf)
+  real(kind=dp) :: Uk, part_func(Npf), Uka(1)
   
   part_func = elem%pf(stage,:)
-  Uk = Interp1D(Tpf,part_func,T(k))
-       
+!   Uk = Interp1D(Tpf,part_func,T(k))
+!->faster
+  Uka(:) = linear_1D_sorted(Npf, Tpf, part_func, 1, T(k))
+  Uk = exp(Uka(1))
   !Uk = (10.d0)**(Uk) !29/12/2019 -> part_func is ln(U)
-  Uk = exp(Uk)
+!   Uk = exp(Uk)
 
  RETURN
 END FUNCTION getPartitionFunctionk
@@ -52,10 +54,12 @@ END FUNCTION getPartitionFunctionk
 
   type(Element) :: elem
   integer, intent(in) :: stage, k
-  real(kind=dp) :: Uk, part_func(Npf)
+  real(kind=dp) :: Uk, part_func(Npf), Uka(1)
   
   part_func = elem%pf(stage,:)
-  Uk = Interp1D(Tpf,part_func,T(k)) !log(Uk)
+  !Uk = Interp1D(Tpf,part_func,T(k)) !log(Uk)
+  Uka(:) = linear_1D_sorted(Npf, Tpf, part_func, 1, T(k))
+  Uk = Uka(1)
        
  RETURN
 END FUNCTION get_logPartitionFunctionk

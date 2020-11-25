@@ -4,7 +4,7 @@ module Opacity
 															icompute_atomRT, lmali_scheme, lhogerheijde_scheme, nhtot
 	use atom_type
 	use spectrum_type, only								: Itot, Icont, lambda, nlambda, Nlambda_cont, lambda_cont, dk, dk_min, dk_max, &
-															chi0_bb, eta0_bb, chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, Jnu, Jnu_cont, &
+															chi0_bb, eta0_bb, chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, Jnu_cont, &
 															rho_p, etaQUV_p, chiQUV_p
 	use constant
 	use constantes, only								: tiny_dp, huge_dp, AU_to_m
@@ -627,7 +627,8 @@ module Opacity
 					call NLTE_bound_free(icell)
 				endif
 				
-				call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+				!not anymore ?
+				!!call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
 			!else
 				!Nothing to do here, opacity is zero		
 			endif
@@ -850,6 +851,73 @@ module Opacity
 
 	return
 	end subroutine interp_background_opacity
+	
+	subroutine interp_continuum_local(icell, chii, etai)
+		integer, intent(in) :: icell
+		integer :: i, j, i0,j0
+		!it seems I'm having an interpolation error at the first point, so just avoinding it..
+		real(kind=dp), dimension(Nlambda_cont) :: chi0, eta0
+		real(kind=dp), dimension(Nlambda), intent(out) :: chii, etai
+		real(kind=dp) :: u
+		
+		chii = 0.0_dp
+		etai = 0.0_dp
+     
+     	chi0 = chi_c(:,icell)
+     	eta0 = eta_c(:,icell)
+
+     	
+     	if (NactiveAtoms>0) then
+     		chi0 = chi0 + chi_c_nlte(:,icell)
+     		eta0 = eta0 + eta_c_nlte(:,icell)
+     	endif
+     	
+
+     	j0=Nlambda+1
+		do j=1, Nlambda
+        	if (lambda(j) > lambda_cont(1)) then!>=
+           		j0 = j
+           		exit
+        	endif
+     	enddo
+     	
+
+     	i0 = 2
+    	do j=j0,Nlambda
+        loop_i : do i=i0, Nlambda_cont
+        		if (lambda_cont(i) > lambda(j)) then
+            		u = (lambda(j) - lambda_cont(i-1)) / (lambda_cont(i) - lambda_cont(i-1))
+              		chii(j) = (1.0_dp - u) * chi0(i-1)  + u * chi0(i)
+                  	etai(j) = (1.0_dp - u) * eta0(i-1)  + u * eta0(i)
+              		i0 = i
+              		exit loop_i
+           		endif
+        	enddo loop_i
+    	 enddo
+    	 
+    	 
+    	 !in case the last and first wavelength are the same
+    	 if (lambda_cont(Nlambda_cont) == lambda(Nlambda)) then
+    	 	chii(Nlambda) = chi0(Nlambda_cont)
+    	 	etai(Nlambda) = eta0(Nlambda_cont)
+    	 endif
+    	 
+    	 if (lambda_cont(1) == lambda(1)) then
+    	 	chii(1) = chi0(1)
+    	 	etai(1) = eta0(1)
+    	 endif
+ 
+!  	write(*,*) j0
+!  	write(*,*) chii(Nlambda-3:Nlambda)
+!  	write(*,*) etai(Nlambda-3:Nlambda)
+!  	write(*,*) chi0(Nlambda_cont-3:Nlambda_cont)
+!  	write(*,*) eta0(Nlambda_cont-3:Nlambda_cont)
+!  	write(*,*) lambda(Nlambda-3:Nlambda)
+!  	write(*,*) lambda_cont(Nlambda_cont-3:Nlambda_cont)
+!  	stop
+
+	return
+	end subroutine interp_continuum_local
 
 	subroutine opacity_atom_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
 

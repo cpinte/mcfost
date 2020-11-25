@@ -15,7 +15,7 @@ module background_opacity
  use atom_type, only : AtomicContinuum, find_continuum, AtomType
  use atmos_type, only : Hydrogen, Helium, T, ne, Elements, nHmin, nHtot, PassiveAtoms, Npassiveatoms
  use constant
- use math, only : linear_1D, interp1D, interp2D
+ use math, only : linear_1D_sorted, interp1D, interp2D
  use occupation_probability, only : D_i, wocc_n
  use parametres, only : ldissolve
 
@@ -536,7 +536,7 @@ module background_opacity
     twohnu3_c2 = twohc / lam**3.
     
     alpha = 1d-21 * interp1D(lambdaBF*1d0, alphaBF*1d0, lam)  !1e-17 cm^2 to m^2
-    
+    !alpha(:) = linear_1D_sorted(NBF, lambdaBF*1.0_dp, alphaBF*1.0_dp,1,lam) ; * 1d-21 *alpha(1)
     chi(la) = nHmin(icell) * (1.-stm) * alpha
     eta(la) = nHmin(icell) * twohnu3_c2 * stm * alpha
 
@@ -614,6 +614,7 @@ module background_opacity
 	else
    
       sigma = 1d-22 * interp1D(lambdai*1d0, alphai*1d0, lam) * nHmin(icell)
+      !sigma(:) = linear_1D_Sorted(63,lambdai*1.0_dp,alphai*1.0_dp,1,lam) ;*1d-22*sigma(1)
       chi(la) = sigma * (1.0 - stm)
       eta(la) = sigma * twohc/lambda(la)**3  * stm   
 

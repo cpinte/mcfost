@@ -34,7 +34,7 @@ module spectrum_type
 	real(kind=dp), dimension(:,:), allocatable :: chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, chi0_bb, eta0_bb
 	real(kind=dp), dimension(:,:,:), allocatable :: Icont
 	real(kind=dp), dimension(:), allocatable :: lambda, lambda_cont
-	real(kind=dp), dimension(:,:), allocatable :: Jnu, Jnu_cont, eta_es
+	real(kind=dp), dimension(:,:), allocatable :: Jnu_cont, eta_es
 	real(kind=dp), dimension(:,:), allocatable :: Istar_tot, Istar_cont
 	real(kind=dp), dimension(:,:,:), allocatable :: Itot
 	real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux !incl, az, lambda, id ?
@@ -130,99 +130,99 @@ module spectrum_type
 
 call error("initSpectrumImage not modified!!")
    
-	old_grid = lambda
-	write(*,*) " -> Redefining a wavelength grid for image.."
-	call dealloc_spectrum() !first free waves arrays
-
-   !Reset the differents Nblue, Nred for atomic transitions
-   !and recompute photoionisation cross-section
-	call Read_wavelengths_table(lambda, Nlam_R)
-	Nlambda = size(lambda)
-   !Works for Active and Passive atoms alike.
-   !-> sort also the grid
-   !-> make sure to search for transitions in individual regions
-   ! and not in the total grid ! Otherwise, the transitions are kept if they fall
-   ! between lambda(min) and lambda(max)
-	call adjust_wavelength_grid(old_grid, lambda, Nlam_R)
-	deallocate(Nlam_R) !not used anymore
-	write(*,*) "check dkmin/max"
-	dk_max = 1
-	dk_min = 1
-   
-   !Reallocate J and Jc keeping their value if electron_scattering
-   !NB: the spatial grid is the same
-   !if (NLTEspec%atmos%electron_scattering) then
-   ! Jold = J; Joldc = Jc
-   ! dealloc(J, Jc)
-   ! allocate(J, Jc)
-   ! J = PACK(Jold, mask=NLTEspec%mlamba==old_grid) !may not work directly
-   !end if
-   
-	Ntrans_new = 0
-	write(*,*) " -> Using ", Nlambda," wavelengths for image and spectrum."
-!I do not removed transitions for the moment
-!so I count only transitions falling in the new wavelength. Thi summation is implicit
-!if transitions are removed.
-	do nat=1,Natom
-		write(*,*) "  --> Atom ", Atoms(nat)%ptr_atom%ID!, &
-!      NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline, "b-b", &
-!      NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont, "b-f"
-		kp = 0
-     
-     !do sum over transitions
-		do kr=1,atoms(nat)%ptr_Atom%Ntr
-			kc = atoms(nat)%ptr_Atom%at(kr)%ik
-			select case (atoms(nat)%ptr_Atom%at(kr)%trtype)
-      
-			case ("ATOMIC_LINE")
-				write(*,*) "    b-b #", kc, Atoms(nat)%ptr_atom%lines(kc)%lambda0,"nm"
-
-			case ("ATOMIC_CONTINUUM")
-				write(*,*) "    b-f #", kc, Atoms(nat)%ptr_atom%continua(kc)%lambdamin, &
-					"nm", Atoms(nat)%ptr_atom%continua(kc)%lambda0, "nm"       
-			case default
-				call error ("transition type unkown",atoms(nat)%ptr_Atom%at(kr)%trtype)
-			end select
-      
-		end do
-		Ntrans_new = Ntrans_new + atoms(nat)%ptr_atom%Ntr
-	end do
-
-	Ntrans = Ntrans_new
-
-	write(*,*) "  ** Total number of transitions for image:", Ntrans
-
-	call alloc_spectrum(.false., Nray)
-
-
-	if (lelectron_scattering) then
-		write(*,*)  " -> Resample mean radiation field for isotropic scattering..." 
-
-		Nwaves_old = size(old_grid)
-		allocate(Jnuo(Nwaves_old, n_cells))
-		Jnuo(:,:) = Jnu(:,:)
-		allocate(Jnuoc(Nwaves_old, n_cells))
-		Jnuoc(:,:) = Jnu_cont(:,:)
-   
-		deallocate(Jnu, Jnu_cont)
-   
-		!new freq grid
-		allocate(Jnu(Nlambda, n_cells),stat=alloc_status)
-		if (alloc_status>0) call error("Allocation error, resample J")
-		allocate(Jnu_cont(Nlambda_cont, n_cells),stat=alloc_status)
-		if (alloc_status>0) call error("Allocation error, resample Jc")
-
-		Jnu(:,:) = 0d0
-		Jnu_cont(:,:) = 0d0
-		!use better interpolation ??
-		do icell=1, n_cells
-			if (icompute_atomRT(icell)>0) then
-				Jnu(:,icell) = Linear_1D(Nwaves_old, old_grid,Jnuo(:,icell),Nlambda,lambda)
-				Jnu_cont(:,icell) = Linear_1D(Nwaves_old, old_grid,Jnuoc(:,icell),Nlambda_cont,lambda_cont)
-			endif
-		enddo  
-	endif !resample Jnu
-	write(*,*)  " ...Done!" 
+! 	old_grid = lambda
+! 	write(*,*) " -> Redefining a wavelength grid for image.."
+! 	call dealloc_spectrum() !first free waves arrays
+! 
+!    !Reset the differents Nblue, Nred for atomic transitions
+!    !and recompute photoionisation cross-section
+! 	call Read_wavelengths_table(lambda, Nlam_R)
+! 	Nlambda = size(lambda)
+!    !Works for Active and Passive atoms alike.
+!    !-> sort also the grid
+!    !-> make sure to search for transitions in individual regions
+!    ! and not in the total grid ! Otherwise, the transitions are kept if they fall
+!    ! between lambda(min) and lambda(max)
+! 	call adjust_wavelength_grid(old_grid, lambda, Nlam_R)
+! 	deallocate(Nlam_R) !not used anymore
+! 	write(*,*) "check dkmin/max"
+! 	dk_max = 1
+! 	dk_min = 1
+!    
+!    !Reallocate J and Jc keeping their value if electron_scattering
+!    !NB: the spatial grid is the same
+!    !if (NLTEspec%atmos%electron_scattering) then
+!    ! Jold = J; Joldc = Jc
+!    ! dealloc(J, Jc)
+!    ! allocate(J, Jc)
+!    ! J = PACK(Jold, mask=NLTEspec%mlamba==old_grid) !may not work directly
+!    !end if
+!    
+! 	Ntrans_new = 0
+! 	write(*,*) " -> Using ", Nlambda," wavelengths for image and spectrum."
+! !I do not removed transitions for the moment
+! !so I count only transitions falling in the new wavelength. Thi summation is implicit
+! !if transitions are removed.
+! 	do nat=1,Natom
+! 		write(*,*) "  --> Atom ", Atoms(nat)%ptr_atom%ID!, &
+! !      NLTEspec%atmos%Atoms(nat)%ptr_atom%Nline, "b-b", &
+! !      NLTEspec%atmos%Atoms(nat)%ptr_atom%Ncont, "b-f"
+! 		kp = 0
+!      
+!      !do sum over transitions
+! 		do kr=1,atoms(nat)%ptr_Atom%Ntr
+! 			kc = atoms(nat)%ptr_Atom%at(kr)%ik
+! 			select case (atoms(nat)%ptr_Atom%at(kr)%trtype)
+!       
+! 			case ("ATOMIC_LINE")
+! 				write(*,*) "    b-b #", kc, Atoms(nat)%ptr_atom%lines(kc)%lambda0,"nm"
+! 
+! 			case ("ATOMIC_CONTINUUM")
+! 				write(*,*) "    b-f #", kc, Atoms(nat)%ptr_atom%continua(kc)%lambdamin, &
+! 					"nm", Atoms(nat)%ptr_atom%continua(kc)%lambda0, "nm"       
+! 			case default
+! 				call error ("transition type unkown",atoms(nat)%ptr_Atom%at(kr)%trtype)
+! 			end select
+!       
+! 		end do
+! 		Ntrans_new = Ntrans_new + atoms(nat)%ptr_atom%Ntr
+! 	end do
+! 
+! 	Ntrans = Ntrans_new
+! 
+! 	write(*,*) "  ** Total number of transitions for image:", Ntrans
+! 
+! 	call alloc_spectrum(.false., Nray)
+! 
+! 
+! 	if (lelectron_scattering) then
+! 		write(*,*)  " -> Resample mean radiation field for isotropic scattering..." 
+! 
+! 		Nwaves_old = size(old_grid)
+! 		allocate(Jnuo(Nwaves_old, n_cells))
+! 		Jnuo(:,:) = Jnu(:,:)
+! 		allocate(Jnuoc(Nwaves_old, n_cells))
+! 		Jnuoc(:,:) = Jnu_cont(:,:)
+!    
+! 		deallocate(Jnu, Jnu_cont)
+!    
+! 		!new freq grid
+! 		allocate(Jnu(Nlambda, n_cells),stat=alloc_status)
+! 		if (alloc_status>0) call error("Allocation error, resample J")
+! 		allocate(Jnu_cont(Nlambda_cont, n_cells),stat=alloc_status)
+! 		if (alloc_status>0) call error("Allocation error, resample Jc")
+! 
+! 
+! 		Jnu_cont(:,:) = 0d0
+! 		!use better interpolation ??
+! 		do icell=1, n_cells
+! 			if (icompute_atomRT(icell)>0) then
+! 				Jnu(:,icell) = Linear_1D(Nwaves_old, old_grid,Jnuo(:,icell),Nlambda,lambda)
+! 				Jnu_cont(:,icell) = Linear_1D(Nwaves_old, old_grid,Jnuoc(:,icell),Nlambda_cont,lambda_cont)
+! 			endif
+! 		enddo  
+! 	endif !resample Jnu
+! 	write(*,*)  " ...Done!" 
 
    
 	return
@@ -291,7 +291,12 @@ call error("initSpectrumImage not modified!!")
 		endif
 		chi_c = 0.0_dp
 		eta_c = 0.0_dp
-		if (allocated(sca_c)) sca_c = 0.0_dp
+		if (allocated(sca_c)) then
+			sca_c = 0.0_dp
+			write(*,*) " ->contopac:", 3 * sizeof(chi_c) * 2/1024./1024.," MB"
+		else
+			write(*,*) " ->contopac:", 2 * sizeof(chi_c) * 2/1024./1024.," MB"
+		endif
 		
 		mem_alloc_local = mem_alloc_local + sizeof(chi_c) * 2
 
@@ -302,13 +307,13 @@ call error("initSpectrumImage not modified!!")
 		chi(:,:) = 0.0_dp
 		
 		!interpolated total continuum opacities on the lambda grid to be used with lines
-		allocate(eta0_bb(Nlambda , n_cells))
-		allocate(chi0_bb(Nlambda , n_cells))
-		
-		eta0_bb = 0.0_dp
-		chi0_bb = 0.0_dp
-		
-		mem_alloc_local = mem_alloc_local + sizeof(eta0_bb) * 2
+! 		allocate(eta0_bb(Nlambda , n_cells))
+! 		allocate(chi0_bb(Nlambda , n_cells))
+! 		eta0_bb = 0.0_dp
+! 		chi0_bb = 0.0_dp
+!		write(*,*) " ->contopac (line grid):", sizeof(chi0_bb) * 2," MB" 		
+! 		mem_alloc_local = mem_alloc_local + sizeof(eta0_bb) * 2
+!-> do not allocate that anymore, two much memory consuming for 3D models
 		
 		!otherwise allocated bellow for nlte.
 		if ((lelectron_scattering).and.(.not.alloc_atom_nlte)) then
@@ -326,8 +331,10 @@ call error("initSpectrumImage not modified!!")
 			eta_c_nlte = 0.0_dp
 			mem_alloc_local = mem_alloc_local +  2 * sizeof(chi_c_nlte) 
 			
-			call alloc_jnu
-			mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(eta_es) 
+			if (lelectron_scattering) then
+				call alloc_jnu
+				mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(eta_es) 
+			endif
                 			
 			! .....  add other NLTE opac
 			size_phi_loc_tot = 0
@@ -621,7 +628,10 @@ call error("initSpectrumImage not modified!!")
 		deallocate(chi_c,  eta_c)
 		if (allocated(sca_c)) deallocate(sca_c)
 		deallocate(chi, eta)
-		deallocate(chi0_bb, eta0_bb)
+		
+		if (allocated(chi0_bb)) then
+			deallocate(chi0_bb, eta0_bb)
+		endif
 
 
 		if (allocated(cntrb_ray)) deallocate(cntrb_ray)
@@ -635,8 +645,7 @@ call error("initSpectrumImage not modified!!")
 
 	subroutine alloc_Jnu()
   
-		!allocate(Jnu(Nlambda,n_cells))
-		!Jnu = 0.0
+
 		allocate(eta_es(Nlambda,n_cells))
 		eta_es = 0.0
 
@@ -649,7 +658,6 @@ call error("initSpectrumImage not modified!!")
   
 	subroutine dealloc_Jnu()
     
-		if (allocated(Jnu)) deallocate(Jnu)
 		if (allocated(Jnu_cont)) deallocate(Jnu_cont)
 		if (allocated(eta_es)) deallocate(eta_es)
 

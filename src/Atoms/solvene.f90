@@ -172,7 +172,9 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 		!otherwise, the first call (wihtout knowing ne at all)
 		!would not work since atom%n = 0.0 (or atom%nstar)
 		!.true. before the maxval
-		detailed_model = (maxval(elem%model%n)>0.0).and.(elem%model%active)
+		!detailed_model = (maxval(elem%model%n)>0.0).and.(elem%model%active)
+		!-> two much time to test n > 0 for large model
+		detailed_model = (elem%model%NLTEpops .and. elem%model%active)
 		!can add condition on active or not, but check bckgr opac and eval of lte pops after
 	endif
   
@@ -200,11 +202,13 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 			Ukp1 = getPartitionFunctionk(elem,j,k)
 			fjk(j) = Sahaeq(k,fjk(j-1),Ukp1,Uk,elem%ionpot(j-1),ne)
 
-			if (ne>0) then
-				dfjk(j) = -(j-1)*fjk(j)/ne
-			else
-				dfjk(j) = 0d0
-			endif
+! 			if (ne>0) then
+! 				dfjk(j) = -(j-1)*fjk(j)/ne
+! 			else
+! 				dfjk(j) = 0d0
+! 			endif
+			!-> fjk is zero if ne=0 in Sahaeq
+			dfjk(j) = -(j-1)*fjk(j)/( ne + tiny_dp)
     
 			sum1 = sum1 + fjk(j)
 			sum2 = sum2 + dfjk(j)
