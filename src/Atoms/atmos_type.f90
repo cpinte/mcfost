@@ -1596,14 +1596,14 @@ module atmos_type
    ! Allocate space for magnetic field
    ! ----------------------------------------- !
    
-   write(*,*) ""
-   call Warning("Allocate all arrays for magnetic field")
-   write(*,*) ""
+!    write(*,*) ""
+!    call Warning("Allocate all arrays for magnetic field")
+!    write(*,*) ""
 
-    allocate(BR(n_cells)); BR = 0.0_dp
-    allocate(Bphi(n_cells)); Bphi = 0.0_dp
-    allocate(Btheta(n_cells)); Btheta = 0.0_dp
-    allocate(B_z(n_cells)); B_z = 0.0_dp
+!     allocate(BR(n_cells)); BR = 0.0_dp
+!     allocate(Bphi(n_cells)); Bphi = 0.0_dp
+!     allocate(Btheta(n_cells)); Btheta = 0.0_dp
+!     allocate(B_z(n_cells)); B_z = 0.0_dp
 
     allocate(gammab(n_cells)); gammab = 0.0_dp
     allocate(chib(n_cells)); chib = 0.0_dp
@@ -1612,8 +1612,9 @@ module atmos_type
    return
    end subroutine alloc_magnetic_field
 
-   function B_project(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
+   function B_project_from_vc(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
    ! ------------------------------------------- !
+   ! Using the vector component
    ! Returned the module of the magnetic field at
    ! one point of the model icell and the cosine of the angles
    ! gamma and 2*chi.
@@ -1629,81 +1630,23 @@ module atmos_type
     integer :: icell
     real(kind=dp) :: x, y, z, u, v, w, Bmodule
     real(kind=dp) :: bx, by, bz, r, norme, r2, norme2
-    real(kind=dp) :: sig, gb, ctb, stb
+    real(kind=dp) :: sig, cgb, ctb, stb
     real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
     real :: sign
-    
-    if (lvoronoi) then
-    	call error('not yet')
-    else
-
-        if (lmagnetoaccr) then
-           r = sqrt(x*x+y*y)           			 
-           Bx = 0_dp; By = 0_dp
-           Bz = B_z(icell)
-           !only if z strictly positive (2D)
-           if ( (.not.l3D) .and. (z < 0_dp) ) Bz = -Bz
-           
-
-           if (r > tiny_dp) then
-              norme = 1.0_dp/r
-              
-              Bx = BR(icell) * x * norme - Bphi(icell) * y * norme
-              By = BR(icell) * y * norme + Bphi(icell) * x * norme
-
-          else
-          	  bx = 0.0_dp
-          	  by = 0.0_dp
-          endif
-                    
-		else if (lspherical_velocity) then
-			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
-			Bx = 0.; by = 0.; bz = 0.;
-			
-			sign = 1.0
-			!because theta only from 0 to pi/2 if 2D. But B is negative in z < 0
-		    if ( (.not.l3D) .and. (z < 0_dp) ) sign = -1.0
-			
-			if (r2 > tiny_dp) then
-				norme2 = 1.0_dp / r2
-			else
-				norme2 = 0.0_dp
-			endif
-			!missing Btheta
-			if (r > tiny_dp) then
-				norme = 1.0_dp / r
-				Bx = Br(icell) * x * norme - y * norme2 * Bphi(icell) + norme2 * ( z * norme * x * Btheta(icell) )
-				By = Br(icell) * y * norme + x * norme2 * Bphi(icell) + norme2 * ( z * norme * y * Btheta(icell) )
-				Bz = Br(icell) * z * norme - sign * r2 / r * Btheta(icell)
-			else
-				bx = 0.0_dp
-				by = 0.0_dp
-				bz = 0.0_dp
-			endif
-				
-		else
-           call error("magnetic field geometry not defined")
-        endif
-    endif !lvoronoi
+ 
+ 	call error("Not implemented")
 
 	Bmodule = sqrt(bx*bx + by*by + bz*bz)
-	
-    gb = Bz / sqrt(Bx*Bx+By*By+Bz*Bz)
-          
-    
-    ctb = bx / ( sqrt(Bx*Bx + By*By) + tiny_dp )
-    stb = by / ( sqrt(Bx*Bx + By*By) + tiny_dp )
-
     cog = (bx*u + by*v + bz*w) / ( Bmodule + tiny_dp )
     sig = sqrt(1.0 - cog*cog)
-    co2c = ctb*ctb - stb*stb
-    si2c = 2.0 * ctb * stb
 	sigsq = sig*sig
 	
-write(*,*) Bmodule*1e4, cog, stb, ctb, co2c, si2c
-stop
+	
+    co2c = ctb*ctb - stb*stb
+    si2c = 2.0 * ctb * stb
+
     return
-   end function B_project
+   end function B_project_From_vc
    
   function B_project_angles(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
    ! ------------------------------------------- !
@@ -1721,26 +1664,42 @@ stop
    ! ------------------------------------------- !
     integer :: icell
     real(kind=dp) :: x, y, z, u, v, w, Bmodule
-    real(kind=dp) :: bx, by, bz, r, norme, r2, norme2
-    real(kind=dp) :: sig, bperp
+    real(kind=dp) :: bx, by, bz, b1, b2, csc_theta
     real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
     real :: sign
 
+	if (Bmag(icell) == 0.0_dp) then
+		Bmodule = 0.0
+		cog = 0.0;co2c = 0.0;si2c = 0.0;sigsq = 0.0
+		return
+	endif
 
-	Bx = Bmag(icell) * cos(chiB(icell)) * sin(gammaB(icell))
-	By = Bmag(icell) * sin(chiB(icell)) * sin(gammaB(icell))
-	Bz = Bmag(icell) * cos(gammaB(icell))
+	Bx = cos(chiB(icell)) * sin(gammaB(icell))
+	By = sin(chiB(icell)) * sin(gammaB(icell))
+	Bz = cos(gammaB(icell))
 
+	if (abs(w) == 1.0) then
+		Bmodule = Bmag(icell)
+		cog = Bz
+		si2c = sin(2*chiB(icell))
+		co2c = cos(2*chiB(icell))
+		sigsq = 1.0 - cog*cog
+	else
+		csc_theta = 1.0 / sqrt(1.0 - w*w)
+		Bmodule = Bmag(icell)
+    	cog = (bx*u + by*v + bz*w)
+    	sigsq = 1.0 - cog*cog
 
-	Bmodule = Bmag(icell)
-    cog = (bx*u + by*v + bz*w) / ( Bmodule + tiny_dp)
-    sig = sqrt(1.0 - cog*cog)
-	sigsq = sig*sig
-	
-    co2c = (bx*bx - by*by) / (tiny_dp + bx*bx + by*by)
-    si2c = 2.0 * bx * by / (tiny_dp + bx*bx + by*by)
-! write(*,*) Bmodule*1e4, cog, co2c, si2c, bx, by, bz
-! stop
+		b1 = (Bz - w * cog) * csc_theta
+		b2 = (v*Bx - By*u) * csc_theta
+		
+
+    	co2c = (b1*b1 - b2*b2) / (1.0 - cog*cog)
+    	si2c = 2.0 * b1 * b2 / (1.0 - cog*cog)
+    	
+    endif
+! 	write(*,*) Bmodule*1e4, cog, co2c, si2c, bx, by, bz
+! 	stop
     return
    end function B_project_angles
 
@@ -1918,7 +1877,7 @@ stop
    if (lmagnetized) then 
    	write(*,*) " Allocating magnetic field array"
     call alloc_magnetic_field()
-    allocate(B2(n_cells))
+!     allocate(B2(n_cells))
     !only to read either Bz or Btheta depending on velocity law
    endif
 
@@ -1999,7 +1958,7 @@ stop
 	!read the mandatory variables and put the magnetic field at the end of the file
      read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
          vR(icell), V2(icell), Vphi(icell), vturb(icell), icompute_atomRT(icell), &
-         BR(icell), B2(icell), Bphi(icell)
+         Bmag(icell), gammab(icell), chib(icell)
          !BR(icell), B2(icell), Bphi(icell)
          !Bmag(icell), gammab(icell), chib(icell)
     else
@@ -2015,17 +1974,17 @@ stop
    if (lspherical_velocity) then
     vtheta(:) = V2(:)
     deallocate(V2)
-    if (lmagnetized) then 
-     Btheta(:) = B2(:)
-     deallocate(B2, B_z)
-    endif
+!     if (lmagnetized) then 
+!      Btheta(:) = B2(:)
+!      deallocate(B2, B_z)
+!     endif
    else if (lmagnetoaccr) then
     v_z(:) = V2(:)
     deallocate(V2)
-    if (lmagnetized) then 
-     B_z(:) = B2(:)
-     deallocate(B2, Btheta)
-    endif
+!     if (lmagnetized) then 
+!      B_z(:) = B2(:)
+!      deallocate(B2, Btheta)
+!     endif
    else
     call error ("Wrong velocity law")
    endif
@@ -2116,21 +2075,21 @@ stop
 
 
    if (lmagnetized) then
-   	if (lmagnetoaccr) then
-     B_char = maxval(sqrt(BR**2+B_z(:)**2+Bphi(:)**2))
-    else if (lspherical_velocity) then
-     B_char = maxval(sqrt(BR**2+Btheta(:)**2+Bphi(:)**2))
-    endif
-! 	gammaB = gammab * pi / 180.0
-! 	chib = chib * pi / 180.0
-! 	B_char = maxval(Bmag)
+!    	if (lmagnetoaccr) then
+!      B_char = maxval(sqrt(BR**2+B_z(:)**2+Bphi(:)**2))
+!     else if (lspherical_velocity) then
+!      B_char = maxval(sqrt(BR**2+Btheta(:)**2+Bphi(:)**2))
+!     endif
+	gammaB = gammaB * pi / 180.0
+	chiB = chiB * pi / 180.0
+	B_char = maxval(Bmag)
     write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
 
    
   	 if (B_char <= 0.0_dp) then
-   		deallocate(BR,Bphi)
-   		if (allocated(B_z)) deallocate(B_z)
-   		if (allocated(Btheta)) deallocate(Btheta)
+!    		deallocate(BR,Bphi)
+!    		if (allocated(B_z)) deallocate(B_z)
+!    		if (allocated(Btheta)) deallocate(Btheta)
 		deallocate(Bmag, gammab,chib)
    		lmagnetized = .false.
    	endif

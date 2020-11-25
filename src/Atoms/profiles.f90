@@ -1,6 +1,6 @@
 MODULE PROFILES
 
-	use atmos_type, only				: B_project, VBROAD_atom
+	use atmos_type, only				: B_project_from_vc, B_project_angles, VBROAD_atom
 	use constant
 	use atom_type
 	use spectrum_type, only				: lambda, dk_min, dk_max
@@ -533,8 +533,8 @@ MODULE PROFILES
 		real(kind=dp), intent(out)									:: phi0(N), phiZ(N,3), psiZ(N,3)
 		real(kind=dp)												:: H(N), F(N), psi(N,-1:1), phi(N,-1:1)
  
-		B = B_project(icell,x,y,z,u,v,w,cog,sigsq,c2c,s2c)
-		
+ 		B = B_project_angles(icell,x,y,z,u,v,w,cog,sigsq,c2c,s2c)
+ 				
 ! 		write(*,*) B*1e4, cog, sigsq, c2c, s2c
 ! 		stop
 
