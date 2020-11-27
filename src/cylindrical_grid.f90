@@ -1304,7 +1304,7 @@ end subroutine define_cylindrical_grid
 
     ! Position aleatoire dans cellule
     ! Position radiale
-    !  r=r_lim(ri-1)+aleat1*(r_lim(ri)-r_lim(ri-1))
+    ! r=r_lim(ri-1)+aleat1*(r_lim(ri)-r_lim(ri-1))
     !  r=sqrt(r_lim(ri-1)**2+aleat1*(r_lim(ri)**2-r_lim(ri-1)**2))
 
     r=sqrt(r_lim_2(ri-1)+aleat1*(r_lim_2(ri)-r_lim_2(ri-1)))

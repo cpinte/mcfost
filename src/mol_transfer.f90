@@ -321,8 +321,8 @@ subroutine NLTE_mol_line_transfer(imol)
 
                  if (etape==1) then
                     ! Position = milieu de la cellule
-                    x0 = r_grid(icell)
-                    y0 = 0.0_dp
+                    x0 = r_grid(icell) * cos(phi_grid(icell))
+                    y0 = r_grid(icell) * sin(phi_grid(icell))
                     z0 = z_grid(icell)
 
                     if (lkeplerian) then

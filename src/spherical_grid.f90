@@ -591,7 +591,6 @@ end subroutine indice_cellule_sph_theta
   ! Position theta
   if (l3D) then
      theta = theta_lim(abs(thetaj)-1)+aleat2*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1))
-     theta = 0.
      !if (thetaj < 0) theta = - theta
   else
      if (aleat2 > 0.5_dp) then
@@ -601,7 +600,6 @@ end subroutine indice_cellule_sph_theta
      endif
   endif
   ! BUG ??? : ca doit etre uniforme en w, non ??
-
 
   ! Position azimuthale
   phi = 2.0_dp*pi * (real(phik)-1.0_dp+aleat3)/real(n_az)
