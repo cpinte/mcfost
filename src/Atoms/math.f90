@@ -54,7 +54,7 @@ MODULE math
 		logical :: Ng_accelerate
 		real(kind=dp), intent(inout) :: lasts(m,*), solution(m)
 		integer :: i, j, k
-		real(kind=dp) :: A(n, n), b(n), w, dy, di
+		real(kind=dp) :: A(n, n), b(n), w, dy, di,max_sol
 		!!integer, save :: niter
 		!!data niter /0/
 		
@@ -95,6 +95,8 @@ MODULE math
 			solution(:) = solution(:) + b(i) * ( lasts(:,niter-i) - lasts(:,niter) )
 		enddo
 		
+		max_sol = maxval(solution)
+		
 		if (present(check_negative_pops)) then
 		
 			if (check_negative_pops) then
@@ -102,7 +104,7 @@ MODULE math
 					if (solution(k) < 0) then
 						write(*,*) "Warning negative pops sol in Ng's acceleration"
 						write(*,*) " This is likely to be a bug !"
-						write(*,*) k, "sol:", solution(k)
+						write(*,*) k, "sol:", solution(k), " relative:", solution(k)/max_sol
 						!can't do that easility
 						!ng_accelerate = .false.
 						!niter = 0
