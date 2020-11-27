@@ -187,6 +187,10 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 		dfjk = 0d0
 
 		do i = 1, elem%model%Nlevel
+			if (elem%model%n(i,k) < 0) then
+				write(*,*) elem%model%id, k, " level", i, elem%model%n(i,k)/(nHtot(k)*elem%model%Abund)
+				call error("Fractional population negative ! (in calc_ionisation_frac)")
+			endif
 			fjk(elem%model%stage(i)+1) = fjk(elem%model%stage(i)+1)+(elem%model%stage(i))*elem%model%n(i,k)
 		end do  
 		                                     
@@ -295,7 +299,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	character(len=20), intent(in) :: ne_initial_solution
 	logical, intent(in) :: verbose
 	real(kind=dp), intent(inout) :: epsilon !difference wrt the initial solution, not criterion of convergence (dne)
-	real(kind=dp) :: error, ne_old, akj, sum, Uk, Ukp1, dne, ne0
+	real(kind=dp) :: delta, ne_old, akj, sum, Uk, Ukp1, dne, ne0
 	real(kind=dp):: ne_oldM, UkM, PhiHmin
 	real(kind=dp), dimension(50) :: fjk, dfjk
 	integer :: n, k, niter, j, ZM, id
@@ -311,7 +315,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 
 	!$omp parallel &
 	!$omp default(none) &
-	!$omp private(k,n,j,fjk,dfjk,ne_old,niter,error,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
+	!$omp private(k,n,j,fjk,dfjk,ne_old,niter,delta,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
 	!$omp private(dne, akj, id, ne0, elem) &
 	!$omp shared(n_cells, Elements, ne_initial_solution,Hydrogen, ZM, unconverged_cells, Nelem) &
 	!$omp shared(ne, T, icompute_atomRT, nHtot, epsilon)
@@ -365,7 +369,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 		ne0 = ne_old
 		niter=0
 		do while (niter < N_MAX_ELECTRON_ITERATIONS)
-			error = ne_old/nHtot(k)
+			delta = ne_old/nHtot(k)
 			sum = 0.0
 
 			do n=1,Nelem
@@ -378,21 +382,21 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 					!2 = partition function of HI, should be replace by getPartitionFunctionk(elements(1)%ptr_elem, 1, icell)
 					PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
 					! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
-					error = error + ne_old*fjk(1)*PhiHmin
+					delta = delta + ne_old*fjk(1)*PhiHmin
 					sum = sum-(fjk(1)+ne_old*dfjk(1))*PhiHmin
 				end if
 				!neutrals do not contribute right
 				
 				do j=2, elem%Nstage
 					akj = elem%Abund*(j-1) !because j starts at 0 for neutrals, 1 for singly ionised etc
-					error = error -akj*fjk(j)
+					delta = delta -akj*fjk(j)
 					sum = sum + akj*dfjk(j)
 				end do
 				
 				elem => NULL()
 			end do !loop over elem
 
-			ne(k) = ne_old - nHtot(k)*error / (1.-nHtot(k)*sum)
+			ne(k) = ne_old - nHtot(k)*delta / (1.-nHtot(k)*sum)
 			!!dne = abs((ne(k)-ne_old)/(ne_old+tiny_dp))
 			dne = abs ( 1.0_dp - ne_old / ne(k) )
 			ne_old = ne(k)
@@ -401,12 +405,11 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 			epsilon = max(epsilon, abs(1.0_dp - ne0 / ne(k)))
     
 			if (is_nan_infinity(ne(k))>0) then
-				write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, sum
-				stop
+				write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, " sum=", sum
+				call error("electron density is nan or inf!")
 			else if (ne(k) <= 0.0) then
-				write(*,*) "ne <= 0"
 				write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, sum	
-				stop
+				call error("Negative electron density!")
 			endif
 			niter = niter + 1
 			if (dne <= MAX_ELECTRON_ERROR) then
