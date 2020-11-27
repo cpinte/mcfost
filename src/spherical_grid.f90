@@ -10,7 +10,7 @@ module spherical_grid
   implicit none
 
   public :: cross_spherical_cell, pos_em_cellule_sph, indice_cellule_sph, test_exit_grid_sph, &
-       move_to_grid_sph
+       move_to_grid_sph, subdivise_cellule_sph
 
 
   private
@@ -648,5 +648,55 @@ end subroutine indice_cellule_sph_theta
   return
 
 end subroutine pos_em_cellule_sph
+
+  !building
+  subroutine subdivise_cellule_sph(icell,N,x,y,z)
+  !check the preambule had to add it in the public list
+
+  implicit none
+
+  integer, intent(in) :: icell, N !number of subdivisions per coordinates N==3 means 27 cells (3r*3theta*3phi)
+  real(kind=dp), intent(out), dimension(N*N*N) :: x,y,z !positions of the N**3 cells
+
+  real(kind=dp) :: r((N+1)), theta((N+1)), phi((N+1)), r0, t0, p0
+  integer :: ri, thetaj, phik, k, ipos, i, j 
+
+  !Centre of the cell
+  ri = cell_map_i(icell)
+  thetaj = cell_map_j(icell)
+  phik = cell_map_k(icell)
+  
+  !vertex of the sub grid inside the cell
+  do k=1,N+1
+	phi(k) = 2.0_dp*pi * (real(phik)-1.0_dp+real(k)/real(N+1))/real(n_az)
+  	r(k) = (r_lim_3(ri-1)+(real(k)/real(N+1))*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
+ 	 if (l3D) then
+     	theta = 0.
+  	 else
+     	if (real(k)/real(N+1) > 0.5) then
+        	theta(k) = theta_lim(thetaj-1)+(2.0_dp*(real(k)/real(N+1)-0.5_dp))*(theta_lim(thetaj)-theta_lim(thetaj-1))
+     	else
+        	theta(k) = -(theta_lim(thetaj-1)+(2.0_dp*real(k)/real(N+1))*(theta_lim(thetaj)-theta_lim(thetaj-1)))
+     	endif
+ 	 endif
+  enddo
+  
+
+  ipos = 0
+  do k=1, N
+  	do j=1, N
+  		do i=1,N
+  			ipos = ipos + 1
+  			x(ipos) = 0.5 * ( r(i+1)*cos(theta(j+1))*cos(phi(k+1)) + r(i)*cos(theta(j))*cos(phi(k)) )
+  			y(ipos) = 0.5 * ( r(i+1)*cos(theta(j+1))*sin(phi(k+1)) + r(i)*cos(theta(j))*sin(phi(k)) )
+  			z(ipos) = 0.5 * ( r(i+1)*sin(theta(j+1)) + r(i)*sin(theta(j)) ) !why look at spherical grid, z should be rcos(theta)
+  		enddo
+  	enddo
+  enddo
+
+
+  return
+
+end subroutine subdivise_cellule_sph
 
 end module spherical_grid

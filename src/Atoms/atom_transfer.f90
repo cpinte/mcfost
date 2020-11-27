@@ -50,6 +50,7 @@ module atom_transfer
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
 	use cylindrical_grid, only	: r_grid, z_grid
+	use spherical_grid, only	: subdivise_cellule_sph
 	use messages, only 			: error, warning
 	
 	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, prec_pops, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, fill_collision_matrix, &
@@ -925,6 +926,50 @@ module atom_transfer
    RT_line_method = 1 !pixels circulaires
   end if
 
+
+!test subdivisions
+! allocate(xyz_pos(n_cells,5**3,3))!from 1->5 max
+! xyz_pos(:,:,:) = 0.0_dp
+! do icell=1, n_cells
+! 	call subdivise_cellule_sph(icell, 5, xyz_pos(icell,:,1), xyz_pos(icell,:,2), xyz_pos(icell,:,3))
+! enddo
+!   if (allocated(xyz_pos)) then
+!   	open(unit=20,file="xyz_pos.txt",status="unknown")
+!   	!first cell then last cell
+!   	write(20,*) n_cells, 5**3, 3
+!   	do icell=1,n_cells
+!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,1),ibin=1,5**3)
+!     	write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,2),ibin=1,5**3)
+!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,3),ibin=1,5**3)
+!   	enddo
+! 
+!   	close(20)
+! 
+!   endif
+! stop
+! allocate(xyz_pos(n_cells, 3, 3))
+! xyz_pos(:,:,:) = 0.0_dp
+! do icell=1, n_cells
+! 	call pos_em_cellule(icell, 0., 0., 0.,xyz_pos(icell,1,1),xyz_pos(icell,1,2),xyz_pos(icell,1,3))
+! 	call pos_em_cellule(icell, 0.5, 0.5, 0.5,xyz_pos(icell,2,1),xyz_pos(icell,2,2),xyz_pos(icell,2,3))
+! 	call pos_em_cellule(icell, 1., 1., 1.,xyz_pos(icell,3,1),xyz_pos(icell,3,2),xyz_pos(icell,3,3))
+! 
+! enddo
+!   if (allocated(xyz_pos)) then
+!   	open(unit=20,file="xyz_pos.txt",status="unknown")
+!   	!first cell then last cell
+!   	write(20,*) n_cells, 3, 3
+!   	do icell=1,n_cells
+!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,1),ibin=1,3)
+!     	write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,2),ibin=1,3)
+!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,3),ibin=1,3)
+!   	enddo
+! 
+!   	close(20)
+! 
+!   endif
+! stop
+!
 
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
