@@ -94,10 +94,10 @@ MODULE math
 		do i=1,n
 			solution(:) = solution(:) + b(i) * ( lasts(:,niter-i) - lasts(:,niter) )
 		enddo
-		
-		max_sol = maxval(solution)
-		
+				
 		if (present(check_negative_pops)) then
+
+			max_sol = maxval(solution)
 		
 			if (check_negative_pops) then
 				pop_loop : do k=1,m
