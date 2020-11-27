@@ -669,7 +669,7 @@ end subroutine pos_em_cellule_sph
 	phi(k) = 2.0_dp*pi * (real(phik)-1.0_dp+real(k)/real(N+1))/real(n_az)
   	r(k) = (r_lim_3(ri-1)+(real(k)/real(N+1))*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
  	 if (l3D) then
-     	theta = 0.
+     	theta = theta_lim(abs(thetaj)-1)+real(k)/real(N+1)*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1))
   	 else
      	if (real(k)/real(N+1) > 0.5) then
         	theta(k) = theta_lim(thetaj-1)+(2.0_dp*(real(k)/real(N+1)-0.5_dp))*(theta_lim(thetaj)-theta_lim(thetaj-1))
