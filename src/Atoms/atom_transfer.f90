@@ -1520,11 +1520,11 @@ module atom_transfer
   				
 			else if (etape==2) then 
 			
-! 				if (iterate_ne) then
-! 					iterate_ne = .false. !no iteration in MC
-! 					n_iterate_ne = 0 !to recalc ne at the end of the SEE loop
-! 									  ! -1 is default and means do nothing					  
-! 				endif
+				if (iterate_ne) then
+					iterate_ne = .false. !no iteration in MC
+					n_iterate_ne = 0 !to recalc ne at the end of the SEE loop
+									  ! -1 is default and means do nothing					  
+				endif
 			
 				write(*,*) " Using step 2 with ", n_rayons_1, " rays"
 				lfixed_rays = .true.
@@ -2545,7 +2545,7 @@ module atom_transfer
             !$omp private(argmt,norme, icell, delta_J, l_iterate,weight) &
             !$omp shared(lambda_cont, lambda_star, Snew, Sold, Sth, Istar, xmu,wmu, xmux, xmuy,randz) &
             !$omp shared(lkeplerian,n_iter,gtype, nb_proc,seed,xyz_pos,uvw_pos,etoile) &
-            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged) &
+            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
             !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, kappa_tot, Ic,icompute_atomRT,J20_cont) &
             !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule)
             !$omp do schedule(static,1)
@@ -2639,8 +2639,8 @@ module atom_transfer
   		         
   		         		do iray = 1,n_rayons
 							if (iray==1) then
-								x0 = r_grid(icell)
-								y0 = 0.0_dp
+								x0 = r_grid(icell)*cos(phi_grid(icell))
+								y0 = r_grid(icell)*sin(phi_grid(icell))
 								z0 = z_grid(icell)
 							else
 ! 						!-> the same for all cells and proc
