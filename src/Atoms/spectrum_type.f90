@@ -293,9 +293,9 @@ call error("initSpectrumImage not modified!!")
 		eta_c = 0.0_dp
 		if (allocated(sca_c)) then
 			sca_c = 0.0_dp
-			write(*,*) " ->contopac:", 3 * sizeof(chi_c) * 2/1024./1024.," MB"
+			write(*,*) " ->contopac:", 3 * sizeof(chi_c) /1024./1024.," MB"
 		else
-			write(*,*) " ->contopac:", 2 * sizeof(chi_c) * 2/1024./1024.," MB"
+			write(*,*) " ->contopac:", 2 * sizeof(chi_c) /1024./1024.," MB"
 		endif
 		
 		mem_alloc_local = mem_alloc_local + sizeof(chi_c) * 2
