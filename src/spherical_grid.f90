@@ -590,8 +590,9 @@ end subroutine indice_cellule_sph_theta
 
   ! Position theta
   if (l3D) then
-     theta = sign(1.0, real(thetaj)) * ( theta_lim(abs(thetaj)-1)+aleat2*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1)) )
-     !if (thetaj < 0) theta = - theta
+!      theta = sign(1.0, real(thetaj)) * ( theta_lim(abs(thetaj)-1)+aleat2*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1)) )
+     theta = theta_lim(abs(thetaj)-1)+aleat2*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1))
+     if (thetaj < 0) theta = - theta
   else
      if (aleat2 > 0.5_dp) then
         theta = theta_lim(thetaj-1)+(2.0_dp*(aleat2-0.5_dp))*(theta_lim(thetaj)-theta_lim(thetaj-1))
@@ -670,6 +671,7 @@ end subroutine pos_em_cellule_sph
   	r(k) = (r_lim_3(ri-1)+(real(k)/real(N+1))*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
  	 if (l3D) then
      	theta = theta_lim(abs(thetaj)-1)+real(k)/real(N+1)*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1))
+     	if (thetaj < 0) theta = -theta
   	 else
      	if (real(k)/real(N+1) > 0.5) then
         	theta(k) = theta_lim(thetaj-1)+(2.0_dp*(real(k)/real(N+1)-0.5_dp))*(theta_lim(thetaj)-theta_lim(thetaj-1))
