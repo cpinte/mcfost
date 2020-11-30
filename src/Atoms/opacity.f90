@@ -611,7 +611,7 @@ module Opacity
 		!$omp parallel &
 		!$omp default(none) &
 		!$omp private(icell,id,icell0) &
-		!$omp shared(Nlambda_cont, lambda_cont, chi_c, eta_c, Nlambda, lambda) & 
+		!$omp shared(llimit_mem,Nlambda_cont, lambda_cont, chi_c, eta_c, Nlambda, lambda) & 
 		!$omp shared(n_cells, icompute_atomRT, NactiveAtoms, chi0_bb, eta0_bb)
 		!$omp do schedule(dynamic,1)
 		do icell=1, n_cells
@@ -627,10 +627,10 @@ module Opacity
 					call NLTE_bound_free(icell)
 				endif
 				
-				!not anymore ?
-				!!call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
-			!else
-				!Nothing to do here, opacity is zero		
+				if (.not.llimit_mem) then
+					call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+				endif
+		
 			endif
 		end do
 		!$omp end do

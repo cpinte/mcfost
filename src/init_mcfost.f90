@@ -60,6 +60,7 @@ subroutine set_default_variables()
   lemission_mol=.false.
   ltab_wavelength_image = .false.
   ! Atomic lines Radiative Transfer (AL-RT)
+  llimit_mem = .false.
   lemission_atom = .false.
   lelectron_scattering = .false.
   lstop_after_jnu = .false.
@@ -605,6 +606,9 @@ subroutine initialisation_mcfost()
      case("-mol")
         i_arg = i_arg+1
         lemission_mol=.true.
+	 case("-limit_memory")
+	 	i_arg = i_arg + 1
+	 	llimit_mem = .true.
      case("-atom")
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
@@ -1731,6 +1735,7 @@ subroutine display_help()
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity independent of z"
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
+  write(*,*) "		  : -limit_memory : continuous opacity are interpolated locally"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"

@@ -7,7 +7,7 @@ module spectrum_type
 	use fits_utils, only : print_error
 	use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
 							lcontrib_function, lorigin_atom, n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
-							lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot
+							lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot, llimit_mem
 	use input, only : nb_proc, RT_line_method,lkeplerian, linfall, l_sym_ima
 	use constantes, only : arcsec_to_deg
 	use constant, only : clight
@@ -293,6 +293,7 @@ call error("initSpectrumImage not modified!!")
 		eta_c = 0.0_dp
 		if (allocated(sca_c)) then
 			sca_c = 0.0_dp
+			mem_alloc_local = mem_alloc_local + sizeof(chi_c)
 			write(*,*) " ->contopac:", 3 * sizeof(chi_c) /1024./1024.," MB"
 		else
 			write(*,*) " ->contopac:", 2 * sizeof(chi_c) /1024./1024.," MB"
@@ -307,13 +308,16 @@ call error("initSpectrumImage not modified!!")
 		chi(:,:) = 0.0_dp
 		
 		!interpolated total continuum opacities on the lambda grid to be used with lines
-! 		allocate(eta0_bb(Nlambda , n_cells))
-! 		allocate(chi0_bb(Nlambda , n_cells))
-! 		eta0_bb = 0.0_dp
-! 		chi0_bb = 0.0_dp
-!		write(*,*) " ->contopac (line grid):", sizeof(chi0_bb) * 2," MB" 		
-! 		mem_alloc_local = mem_alloc_local + sizeof(eta0_bb) * 2
-!-> do not allocate that anymore, two much memory consuming for 3D models
+		if (.not.llimit_mem) then
+			allocate(eta0_bb(Nlambda , n_cells))
+			allocate(chi0_bb(Nlambda , n_cells))
+			eta0_bb = 0.0_dp
+			chi0_bb = 0.0_dp
+			write(*,*) " ->contopac (line grid):", 2*sizeof(chi0_bb)/1024./1024.," MB" 		
+			mem_alloc_local = mem_alloc_local + sizeof(eta0_bb) * 2
+		else
+			write(*,*) " -> Reducing memory usage by interpolating continuous opacity!" 
+		endif
 		
 		!otherwise allocated bellow for nlte.
 		if ((lelectron_scattering).and.(.not.alloc_atom_nlte)) then

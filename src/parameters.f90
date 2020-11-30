@@ -62,7 +62,7 @@ module parametres
        lcontrib_function, lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
        ldissolve, laccurate_integ, loutput_rates, lorigin_atom
   integer :: Nrays_atom_transfer
-  
+  logical :: llimit_mem
   !Convergence relative errors
   real :: dpops_max_error, dpops_sub_max_error, art_hv
   

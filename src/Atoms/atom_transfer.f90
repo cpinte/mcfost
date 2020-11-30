@@ -38,7 +38,7 @@ module atom_transfer
 	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function, lorigin_atom, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
-									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne
+									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne, llimit_mem
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
 	use dust_transfer, only		: compute_stars_map
@@ -167,9 +167,12 @@ module atom_transfer
 				l_contrib = l_contrib * AU_to_m !l_contrib in m
 			
 				!total bound-bound + bound-free + background opacities lte + nlte
-! 				chi(:,id) = chi0_bb(:,icell)
-! 				eta(:,id) = eta0_bb(:,icell)
-				call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				if (llimit_mem) then
+					call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				else
+					chi(:,id) = chi0_bb(:,icell)
+					eta(:,id) = eta0_bb(:,icell)				
+				endif
 
 				!includes a loop over all bound-bound, passive and active
 				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
@@ -315,10 +318,13 @@ module atom_transfer
 				l_contrib = l_contrib * AU_to_m !l_contrib in m
 			
 				!total bound-bound + bound-free + background opacities lte + nlte
-! 				chi(:,id) = chi0_bb(:,icell)
-! 				eta(:,id) = eta0_bb(:,icell)
 ! 				!rename it chi0_bckgr etc
-				call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				if (llimit_mem) then
+					call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				else
+					chi(:,id) = chi0_bb(:,icell)
+					eta(:,id) = eta0_bb(:,icell)				
+				endif
 
 				!includes a loop over all bound-bound, passive and active
 				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
@@ -466,9 +472,12 @@ module atom_transfer
 				l_contrib = l_contrib * AU_to_m !l_contrib in m
 			
 				!total bound-bound + bound-free + background opacities lte + nlte
-! 				chi(:,id) = chi0_bb(:,icell)
-! 				eta(:,id) = eta0_bb(:,icell)
-				call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				if (llimit_mem) then
+					call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				else
+					chi(:,id) = chi0_bb(:,icell)
+					eta(:,id) = eta0_bb(:,icell)				
+				endif
 
 				!includes a loop over all bound-bound, passive and active
 				call opacity_atom_zeeman_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
@@ -905,6 +914,7 @@ module atom_transfer
   type (AtomType), pointer :: atom
   integer :: alloc_status
   logical :: test
+  real :: rand, rand2, rand3
   real(kind=dp) :: test1(3), test2(3,10)
   
   !init at 0
@@ -928,49 +938,35 @@ module atom_transfer
 
 
 !test subdivisions
-! allocate(xyz_pos(n_cells,5**3,3))!from 1->5 max
+! #include "sprng_f.h"
+! allocate(xyz_pos(n_cells,3**3,3))!from 1->5 max
 ! xyz_pos(:,:,:) = 0.0_dp
-! do icell=1, n_cells
-! 	call subdivise_cellule_sph(icell, 5, xyz_pos(icell,:,1), xyz_pos(icell,:,2), xyz_pos(icell,:,3))
+! deallocate(stream)
+! allocate(stream(1))
+! stream(1) = init_sprng(gtype, 0,1,seed,SPRNG_DEFAULT)
+! 
+! do icell=1, n_cells! 
+! 	call subdivise_cellule_sph(icell, 3, xyz_pos(icell,:,1), xyz_pos(icell,:,2), xyz_pos(icell,:,3))
+! ! 	rand  = sprng(stream(1))
+! ! 	rand2 = sprng(stream(1))
+! ! 	rand3 = sprng(stream(1))
+! !     call  pos_em_cellule(icell ,rand,rand2,rand3,xyz_pos(icell,1,1),xyz_pos(icell,1,2),xyz_pos(icell,1,3))
+! 
 ! enddo
 !   if (allocated(xyz_pos)) then
 !   	open(unit=20,file="xyz_pos.txt",status="unknown")
 !   	!first cell then last cell
-!   	write(20,*) n_cells, 5**3, 3
+!   	write(20,*) n_cells, 3**3, 3
 !   	do icell=1,n_cells
-!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,1),ibin=1,5**3)
-!     	write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,2),ibin=1,5**3)
-!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,3),ibin=1,5**3)
+!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,1),ibin=1,3**3)
+!     	write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,2),ibin=1,3**3)
+!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,3),ibin=1,3**3)
 !   	enddo
 ! 
 !   	close(20)
 ! 
 !   endif
 ! stop
-! allocate(xyz_pos(n_cells, 3, 3))
-! xyz_pos(:,:,:) = 0.0_dp
-! do icell=1, n_cells
-! 	call pos_em_cellule(icell, 0., 0., 0.,xyz_pos(icell,1,1),xyz_pos(icell,1,2),xyz_pos(icell,1,3))
-! 	call pos_em_cellule(icell, 0.5, 0.5, 0.5,xyz_pos(icell,2,1),xyz_pos(icell,2,2),xyz_pos(icell,2,3))
-! 	call pos_em_cellule(icell, 1., 1., 1.,xyz_pos(icell,3,1),xyz_pos(icell,3,2),xyz_pos(icell,3,3))
-! 
-! enddo
-!   if (allocated(xyz_pos)) then
-!   	open(unit=20,file="xyz_pos.txt",status="unknown")
-!   	!first cell then last cell
-!   	write(20,*) n_cells, 3, 3
-!   	do icell=1,n_cells
-!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,1),ibin=1,3)
-!     	write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,2),ibin=1,3)
-!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,3),ibin=1,3)
-!   	enddo
-! 
-!   	close(20)
-! 
-!   endif
-! stop
-!
-
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
         !! ----------------------- Read Model ---------------------- !!
@@ -1976,8 +1972,9 @@ module atom_transfer
 						call NLTE_bound_free(icell)
 
 						!because of opac nlte changed
-						!not anymore ?
-						!call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+						if (.not.llimit_mem) then
+							call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+						endif
 						!end init
 
 						
