@@ -38,7 +38,7 @@ module atom_transfer
 	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function, lorigin_atom, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
-									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot
+									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
 	use dust_transfer, only		: compute_stars_map
@@ -84,7 +84,7 @@ module atom_transfer
 	logical, allocatable :: lcell_converged(:)
 	real(kind=dp), allocatable :: gpop_old(:,:,:), Tex_old(:,:,:), ngpop(:,:,:), ne_old(:)
 	real(kind=dp), allocatable :: Gammaij_all(:,:,:,:), Rij_all(:,:,:), Rji_all(:,:,:) !need a flag to output it
-	integer :: NmaxLevel, NmaxTr, ne_niter_ndelay = 0!10
+	integer :: NmaxLevel, NmaxTr
 
  	contains
 
@@ -1826,7 +1826,7 @@ module atom_transfer
 			!still update chi_c if electron scatt ?
 				evaluate_background = .false.
 				dne = 0.0_dp											!diff_old < 1e-2
-				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)).and.(n_iter>ne_niter_ndelay)) then!.and..not.accelerated)  then
+				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)).and.(n_iter>ndelay_iterate_ne)) then!.and..not.accelerated)  then
 					!do not evaluate if accelerated. Do not evaluate if cswitch ?? Or do not care?
 					
 					!chic(:,:) = chi(:,:) - ne(:)

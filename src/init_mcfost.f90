@@ -65,6 +65,7 @@ subroutine set_default_variables()
   lstop_after_jnu = .false.
   lsolve_for_ne = .false.
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
+  ndelay_iterate_ne = 0
   lvacuum_to_air = .false.
   lcontrib_function = .false.
   lorigin_atom = .false.
@@ -628,6 +629,12 @@ subroutine initialisation_mcfost()
         if (i_arg > nbr_arg) call error("Ne period needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) n_iterate_ne
+        i_arg= i_arg+1
+     case("-Ndelay_iterate_ne")!number of iteration before solving for electron density
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ne delay needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) ndelay_iterate_ne
         i_arg= i_arg+1
      case("-vacuum_to_air")
         i_arg = i_arg + 1
@@ -1726,6 +1733,7 @@ subroutine display_help()
   write(*,*) " Options related to atomic lines emission"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
+  write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"

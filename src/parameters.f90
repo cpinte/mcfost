@@ -72,7 +72,7 @@ module parametres
   
   !electron density
   logical :: lsolve_for_ne
-  integer :: n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
+  integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
   
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image, jnu_atom_file
