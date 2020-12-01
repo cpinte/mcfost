@@ -1128,6 +1128,13 @@ module atom_transfer
 
 		call NLTEloop_mali(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter,.true.)
 		
+		!reevaluate here only if fixed during the loop but ne was iterated
+		!otherwise constant because 1) ne constant or 2), ne evaluated just after
+		if ((lfix_backgrnd_opac).and.(n_iterate_ne > 0)) then
+			write(*,*) " -> Re-evaluate background with n_iterate_ne > 0"
+			call compute_background_continua
+		endif
+		
 		!evaluate electron density once SEE is solved
 		if (n_iterate_ne == 0) then
 			write(*,*) "Evaluate Electron density from converged populations..."
@@ -1853,8 +1860,6 @@ module atom_transfer
 					evaluate_background = (.not.lfix_backgrnd_opac) !.true.
 					!convergence_map(:,1,NactiveAtoms+1,:) = dne
 				end if
-!    				evaluate_background = .false.
-
 
      		!Global convergence Tests
      			id = 1
