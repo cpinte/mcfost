@@ -61,6 +61,7 @@ subroutine set_default_variables()
   ltab_wavelength_image = .false.
   ! Atomic lines Radiative Transfer (AL-RT)
   llimit_mem = .false.
+  lfix_backgrnd_opac = .false.
   lemission_atom = .false.
   lelectron_scattering = .false.
   lstop_after_jnu = .false.
@@ -609,6 +610,9 @@ subroutine initialisation_mcfost()
 	 case("-limit_memory")
 	 	i_arg = i_arg + 1
 	 	llimit_mem = .true.
+	 case("-fix_background_opac")
+	 	i_arg = i_arg + 1
+	 	lfix_backgrnd_opac = .true.
      case("-atom")
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
@@ -1627,7 +1631,6 @@ subroutine display_help()
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
-  write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -1735,6 +1738,7 @@ subroutine display_help()
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity independent of z"
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
+  write(*,*) "		  : -fix_background_opac : (force) keep background opacities constant during non-LTE loop, if iterate_ne."
   write(*,*) "		  : -limit_memory : continuous opacity are interpolated locally"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
@@ -1760,6 +1764,7 @@ subroutine display_help()
   write(*,*) "        : -Ng_Norder <Norder> : Order of Ng's acceleration"
   write(*,*) "        : -Ng_Ndelay <Ndelay> : Delay before first Ng's acceleration"
   write(*,*) "        : -Ng_Nperiod <Nperiod> : Cycle of Ng's iteration"
+  write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
 
   write(*,*) " "
   write(*,*) " Options related to phantom"

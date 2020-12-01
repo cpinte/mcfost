@@ -38,7 +38,7 @@ module atom_transfer
 	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function, lorigin_atom, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
-									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne, llimit_mem
+									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
 	use dust_transfer, only		: compute_stars_map
@@ -1850,7 +1850,7 @@ module atom_transfer
 					write(*,*) ''
 					!chi_c(:,:) = chi_c(:,:) + ne(:)
 					!deallocate(ne_old)
-					evaluate_background = .true.
+					evaluate_background = (.not.lfix_backgrnd_opac) !.true.
 					!convergence_map(:,1,NactiveAtoms+1,:) = dne
 				end if
 !    				evaluate_background = .false.
