@@ -1131,7 +1131,6 @@ module atom_transfer
 		!reevaluate here only if fixed during the loop but ne was iterated
 		!otherwise constant because 1) ne constant or 2), ne evaluated just after
 		if ((lfix_backgrnd_opac).and.(n_iterate_ne > 0)) then
-			write(*,*) " -> Re-evaluate background with n_iterate_ne > 0"
 			call compute_background_continua
 		endif
 		
