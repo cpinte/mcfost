@@ -1535,7 +1535,7 @@ module atom_transfer
 				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				fac_etape = 1.0
-				precision = fac_etape * 0.1!1.0 / sqrt(real(n_rayons))
+				precision = fac_etape * 1.0 / sqrt(real(n_rayons)) !0.1
 				!precision = dpops_max_error
 				write(*,*) " threshold:", precision
 				
