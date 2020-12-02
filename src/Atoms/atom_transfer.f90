@@ -27,7 +27,7 @@ module atom_transfer
 	use getlambda, only			: hv
 	use voigtfunctions, only	: Voigt, VoigtHumlicek, dirac_line
 	use profiles, only			: profile, local_profile_v, local_profile_thomson, local_profile_interp, local_profile_dk
-	use io_atomic_pops, only	: write_pops_atom, write_electron, write_hydrogen, write_Hminus, write_convergence_map_atom, write_convergence_map_electron
+	use io_atomic_pops, only	: write_pops_atom, write_electron, write_hydrogen, write_Hminus, write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
 	use io_opacity, only 		: write_Jnu, write_taur, write_contrib_lambda_ascii, read_jnu_ascii, Jnu_File_ascii, read_Jnu, &
 									write_collision_matrix_atom, write_collision_matrix_atom_ascii, &
 									write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii
@@ -38,14 +38,15 @@ module atom_transfer
 	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function, lorigin_atom, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
-									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac
+									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, &
+									ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
 	use dust_transfer, only		: compute_stars_map
 	use dust_ray_tracing, only	: RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az,tab_RT_incl, stars_map, kappa
 	use stars, only				: intersect_spots, intersect_stars
 	!use wavelengths, only		:
-	use mcfost_env, only		: dp
+	use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
 	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
@@ -85,6 +86,9 @@ module atom_transfer
 	real(kind=dp), allocatable :: gpop_old(:,:,:), Tex_old(:,:,:), ngpop(:,:,:), ne_old(:)
 	real(kind=dp), allocatable :: Gammaij_all(:,:,:,:), Rij_all(:,:,:), Rji_all(:,:,:) !need a flag to output it
 	integer :: NmaxLevel, NmaxTr
+	!Check-pointing and stopping and timing
+	real :: time_iteration, time_nlte
+
 
  	contains
 
@@ -986,9 +990,14 @@ module atom_transfer
         !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------- READATOM and INITIZALIZE POPS ------------------------------ !
-  call readAtomicModels(atomunit)
+  call readAtomicModels(atomunit)!if old_pops not compatible with fixed background
+  								 !because of the electron density evaluated in non-LTE
+  								 !if background fixed, they will be computed with the current estimate of
+  								 !electron density and non-LTE pops !
  
-  if (calc_ne) then
+ !if checkpointing no need to re-read  elecontron pops. They are computed
+ !with non-LTE populations here!
+  if (calc_ne) then !eventually computed with the previous non-LTE pops ! 
   	ne_initial = "H_IONISATION"
 	write(*,*) "Solving for electron density from H+M ionisation"
 	call Solve_Electron_Density(ne_initial, .true., dne) 
@@ -1125,6 +1134,8 @@ module atom_transfer
 		!!allocate(chi_loc(nlambda, n_rayons_max, nb_proc)); chi_loc = 0.0
 
 		write(*,'("->Total memory allocated before NLTEloop:"(1ES17.8E3)" MB")') mem_alloc_tot/1024./1024.
+		
+		if (lcheckpoint) call prepare_check_pointing()
 
 		call NLTEloop_mali(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter,.true.)
 		
@@ -1260,6 +1271,11 @@ module atom_transfer
 	do m=1,Natom
 		call write_pops_atom(Atoms(m)%ptr_atom)
 	end do
+	
+	if (lsafe_stop) then
+		return
+		!free all data or because we leave after not needed
+	endif
 
 	if (lmagnetized) then
 		integ_ray_line => integ_ray_line_z
@@ -1363,7 +1379,7 @@ module atom_transfer
 		real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
 		real(kind=dp) :: dT, dN2, dN3, dN4, diff_old
 		real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
-		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:), Jloc(:,:), Jloc_old(:,:), dJmax_id(:)
+		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:)
 ! 		real(kind=dp), allocatable :: err_pop(:,:)
 		logical :: labs, iterate_ne = .false.
 		logical :: l_iterate
@@ -1375,9 +1391,15 @@ module atom_transfer
 		type (AtomType), pointer :: atom
 		integer(kind=8) :: mem_alloc_local = 0
 		integer, allocatable :: nrayons_per_cell(:)
-
+		
 		write(*,*) " USING MALI METHOD FOR NLTE LOOP"
 		
+		!time for individual steps + check the time from the checkpointing time if any
+		!and if it is set lconverged = .true. and .lprevious converged == true
+ 		call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
+		
+		!we are missing some information about dJ in the case lmean_intensity is .false.
+		!how to correct that without much overhead and without allocating Jnew, Jold (or eta_es new/old)
 		if (lelectron_scattering) lmean_intensity = .true.
 		
 		!If we iterate electron scattering with the SEE. if == 0, ONCE SEE is set.
@@ -1419,16 +1441,12 @@ module atom_transfer
 			write(*,*) "size Jcont:", 2*sizeof(Jnu_cont)/1024./1024.," MB"
 			mem_alloc_local = mem_alloc_local + 2*(sizeof(Jnew)+sizeof(Jnew_cont))
 		endif
-		allocate(Jloc(Nlambda,nb_proc),dJmax_id(nb_proc), Jloc_old(Nlambda,nb_proc))
-		Jloc = 0.0_dp
-		Jloc_old = 0.0_dp
-		write(*,*) "size Jloc:", 2*sizeof(Jloc)/1024./1024.," MB"
 		
 		allocate(Tex_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tex for all cells for each line of each atom
 		allocate(Tion_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
 		diff_old = 1.0_dp
 		
-		mem_alloc_local = mem_alloc_local + sizeof(Jloc) + sizeof(dM)+sizeof(dTm)+sizeof(Tex_ref)+sizeof(Tion_ref)
+		mem_alloc_local = mem_alloc_local + sizeof(dM)+sizeof(dTm)+sizeof(Tex_ref)+sizeof(Tion_ref)
 		
 		if (lNg_acceleration) then 
 			n_iter_accel = 0
@@ -1485,9 +1503,10 @@ module atom_transfer
 		write(*,'("Total memory allocated up to now:"(1ES17.8E3)" GB")') mem_alloc_tot / 1024./1024./1024.
 				
 
-		do etape=etape_start, etape_end
-
+		step_loop : do etape=etape_start, etape_end
+		
 			if (etape==1) then
+				time_iteration = 0
 				!Only one ray until a proper scheme for choosing positions inside the cell exist
       			call compute_angular_integration_weights()
   				lfixed_rays = .true.
@@ -1518,10 +1537,10 @@ module atom_transfer
 !   							randz(iray,i)  = sprng(stream(1))
 !   						enddo
 !   					enddo
-!   				endif
-  				
+!   				endif  		
 			else if (etape==2) then 
 			
+				time_iteration = 0
 				if (iterate_ne) then
 					iterate_ne = .false. !no iteration in MC
 					n_iterate_ne = 0 !to recalc ne at the end of the SEE loop
@@ -1535,7 +1554,7 @@ module atom_transfer
 				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				fac_etape = 1.0
-				precision = fac_etape * 1.0 / sqrt(real(n_rayons)) !0.1
+				precision = 1e-3!fac_etape * 1.0 / sqrt(real(n_rayons)) !0.1
 				!precision = dpops_max_error
 				write(*,*) " threshold:", precision
 				
@@ -1546,6 +1565,7 @@ module atom_transfer
 				endif
 				
 			else if (etape==3) then
+				time_iteration = 0
 				write(*,*) " Using step 3 with ", n_rayons_max, " nrays max"
 		  		lfixed_rays = .false.
   				n_rayons = n_rayons_2
@@ -1567,7 +1587,6 @@ module atom_transfer
 				!!write(unit_invfile,*) "************************************************"
 				!!write(unit_invfile,*) "step ", etape, ' iter ', n_iter
 				!!write(unit_invfile,*) "************************************************"
-   				dJmax_id(:) = 0.0
 
 				if (lfixed_rays) then
 					stream = 0.0
@@ -1587,7 +1606,7 @@ module atom_transfer
 				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,lforce_lte,n_iter, threeKminusJ,psi_mean, psi, chi_loc,nrayons_per_cell) &
 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
 				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,randz,xyz_pos,uvw_pos) &
-				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity,dJmax_id,Jloc,Jloc_old) &
+				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity) &
 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda)
 				!$omp do schedule(static,1)
@@ -1602,7 +1621,6 @@ module atom_transfer
    							!!threeKminusJ(:,icell) = 0.0
    							!!psi_mean(:,icell) = 0.0
    						endif
-   						Jloc(:,id) = 0.0_dp
 
 						call fill_Collision_matrix(id, icell) !computes = C(i,j) before computing rates
 						call initGamma(id) !init Gamma to C and init radiative rates
@@ -1637,7 +1655,6 @@ module atom_transfer
 									Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) / n_rayons
 									Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) / n_rayons
 								endif
-								Jloc(:,id) = Jloc(:,id) + Itot(:,1,id) / n_rayons 
 
 								!for one ray
 								if (.not.lforce_lte) then
@@ -1686,7 +1703,6 @@ module atom_transfer
 									Jnew(:,icell) = Jnew(:,icell) + Itot(:,iray,id) / n_rayons
 									Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,iray,id) / n_rayons
 								endif
-								Jloc(:,id) = Jloc(:,id) + Itot(:,iray,id) / n_rayons
 								
 								!for one ray
 								if (.not.lforce_lte) then
@@ -1725,7 +1741,6 @@ module atom_transfer
 										!!threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
 										!!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
 								endif
-								Jloc(:,id) = Jloc(:,id) + Itot(:,1,id) * weight 
 
 								!for one ray
 								if (.not.lforce_lte) then
@@ -1756,8 +1771,6 @@ module atom_transfer
 							!!call store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell), Jnew(:,icell), .false.)
 						endif
 	
-					dJmax_id(id) = max(dJmax_id(id), maxval(abs(1.0 - Jloc_old(:,id)/Jloc(:,id))))
-					Jloc_old(:,id) = Jloc(:,id)
 					end if !icompute_atomRT
 				end do !icell
 				!$omp end do
@@ -1822,6 +1835,12 @@ module atom_transfer
    					endif
    				endif
    				
+   				if ((mod(n_iter, checkpoint_period)==0).and.(lcheckpoint)) then
+   					do nact=1, NactiveAtoms
+						call write_pops_atom(ActiveAtoms(nact)%ptr_atom,iter=n_iter,step=etape)
+   					enddo
+   				endif
+   				
    				
 			!evaluate electron density with the ionisation fraction
 			!I have to evaluate background continua if I update all atoms lte pops ?
@@ -1865,8 +1884,8 @@ module atom_transfer
             !should be para
 				dM(:) = 0.0
 				diff = 0.0
-				dJ = maxval(dJmax_id)
-				lambda_max = lambda(locate(dJmax_id,dJ))
+				dJ = 0.0
+				lambda_max = 0.0
 				dT = 0.0
 				dTM(:) = 0.0
 				Tex_ref(:) = 0.0
@@ -2026,7 +2045,7 @@ module atom_transfer
 	        	write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), 100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))))/real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
 				write(*,*) " *************************************************************** "
 				diff_old = diff
-
+				
 				!Not used if the next is not commented out
 				
 				if ((real(diff) < precision).and.(maxval_cswitch_atoms() == 1.0_dp)) then
@@ -2052,11 +2071,48 @@ module atom_transfer
           	   		end if
         		end if
         		
+				!***********************************************************!
+				! ********** timing and checkpointing **********************!
+				
+				call system_clock(time_end,count_rate=time_tick,count_max=time_max)	
+  				if (time_end < time_begin) then
+     				time_nlte=real(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
+  				else
+     				time_nlte=real(time_end - time_begin)/real(time_tick)
+  				endif
+	
+        		if (n_iter <= 4) then
+        			time_iteration = time_iteration + time_nlte  * 0.25
+        			!if the problem converge in less than 4 iterations pb
+        		endif
+
+        		
+        		if (lsafe_stop) then
+
+					if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= 4)) then
+						lconverged = .true.
+						lprevious_converged = .true.
+						call warning("Time limit would be exceeded, leaving...")
+						write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
+						write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
+  						write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+  						write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
+						exit step_loop
+					endif
+
+				endif
+				!***********************************************************!
 
 			end do !while
 			write(*,*) "step: ", etape, "Threshold: ", precision!dpops_max_error
+			!real values are possible, not needed and would increase the amount
+			!of lign of codes.
+			if (n_iter >= 4) then
+				write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
+  				write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+  			endif
 
-		end do !over etapes
+		end do step_loop
 
 ! -------------------------------- CLEANING ------------------------------------------ !
 
@@ -2116,7 +2172,6 @@ module atom_transfer
 		if (allocated(Jnew)) deallocate(Jnew)
 		if (allocated(Jnew_cont)) deallocate(Jnew_cont)
 		if (allocated(randz)) deallocate(randz,nrayons_per_cell)
-		if (allocated(Jloc)) deallocate(Jloc,Jloc_old, dJmax_id)
 		deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms, n_new)
 		deallocate(stream)
 	

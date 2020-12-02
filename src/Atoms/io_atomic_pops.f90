@@ -300,58 +300,58 @@ subroutine write_convergence_map_atom(atom, nstep, conv_map)
 return
 end subroutine write_convergence_map_atom
  
-!not implemented
-subroutine read_electron
-	! ------------------------------------ !
-	! read Electron density from file
-	! ------------------------------------ !
-	integer :: EOF = 0, unit, blocksize, hdutype, anynull
-	integer :: naxis, naxes(4)
-
-  !get unique unit number
-	call ftgiou(unit,EOF)
-  ! open fits file in readmode'
-	call ftopen(unit, TRIM(nefile), 0, blocksize, EOF)
-
-	call FTMAHD(unit,1,hdutype,EOF) !only one, the electron density
-	if (lVoronoi) then
-		call ftgkyj(unit, "NAXIS1", naxes(1), " ", EOF)
-		if (naxes(1).ne.(n_cells)) then
-			write(*,*) "Cannot read electron density (1)"
-			return
-		end if
-		call error("read electron density not implemented with Voronoi")
-	else
-		if (l3D) then
-			call ftgkyj(unit, "NAXIS1", naxes(1), " ", EOF)
-			call ftgkyj(unit, "NAXIS2", naxes(2), " ", EOF)
-			call ftgkyj(unit, "NAXIS3", naxes(3), " ", EOF)
-			if ((naxes(1)*naxes(2)*naxes(3)).ne.(n_cells)) then
-				write(*,*) "Cannot read electron density (2)"
-				return
-			end if
-			call error("read electron density not implemented with Voronoi")
-		else
-			call ftgkyj(unit, "NAXIS1", naxes(1), " ", EOF)
-			call ftgkyj(unit, "NAXIS2", naxes(2), " ", EOF)
-			if ((naxes(1)*naxes(2)).ne.(n_cells)) then
-				write(*,*) "Cannot read electron density (3)"
-				return
-			end if
-		end if
-	end if
-	
-	
-	call FTG2Dd(unit,1,-999,shape(ne),naxes(1),naxes(2),ne,anynull,EOF)
-
-	
-	call ftclos(unit, EOF)
-	call ftfiou(unit, EOF)
-
-	if (EOF > 0) call print_error(EOF)
-
-return
-end subroutine read_electron
+!not implemented, not needed ?, self computed with non-LTE pops if read previous pops
+! subroutine read_electron
+! 	! ------------------------------------ !
+! 	! read Electron density from file
+! 	! ------------------------------------ !
+! 	integer :: EOF = 0, unit, blocksize, hdutype, anynull
+! 	integer :: naxis, naxes(4)
+! 
+!   !get unique unit number
+! 	call ftgiou(unit,EOF)
+!   ! open fits file in readmode'
+! 	call ftopen(unit, TRIM(nefile), 0, blocksize, EOF)
+! 
+! 	call FTMAHD(unit,1,hdutype,EOF) !only one, the electron density
+! 	if (lVoronoi) then
+! 		call ftgkyj(unit, "NAXIS1", naxes(1), " ", EOF)
+! 		if (naxes(1).ne.(n_cells)) then
+! 			write(*,*) "Cannot read electron density (1)"
+! 			return
+! 		end if
+! 		call error("read electron density not implemented with Voronoi")
+! 	else
+! 		if (l3D) then
+! 			call ftgkyj(unit, "NAXIS1", naxes(1), " ", EOF)
+! 			call ftgkyj(unit, "NAXIS2", naxes(2), " ", EOF)
+! 			call ftgkyj(unit, "NAXIS3", naxes(3), " ", EOF)
+! 			if ((naxes(1)*naxes(2)*naxes(3)).ne.(n_cells)) then
+! 				write(*,*) "Cannot read electron density (2)"
+! 				return
+! 			end if
+! 			call error("read electron density not implemented with Voronoi")
+! 		else
+! 			call ftgkyj(unit, "NAXIS1", naxes(1), " ", EOF)
+! 			call ftgkyj(unit, "NAXIS2", naxes(2), " ", EOF)
+! 			if ((naxes(1)*naxes(2)).ne.(n_cells)) then
+! 				write(*,*) "Cannot read electron density (3)"
+! 				return
+! 			end if
+! 		end if
+! 	end if
+! 	
+! 	
+! 	call FTG2Dd(unit,1,-999,shape(ne),naxes(1),naxes(2),ne,anynull,EOF)
+! 
+! 	
+! 	call ftclos(unit, EOF)
+! 	call ftfiou(unit, EOF)
+! 
+! 	if (EOF > 0) call print_error(EOF)
+! 
+! return
+! end subroutine read_electron
 
  subroutine write_Hydrogen()
  ! ------------------------------------ !
@@ -775,18 +775,32 @@ end subroutine read_electron
 ! 
 !  return
 !  end subroutine  read_departure_bfactor
+
+subroutine prepare_check_pointing()
+	integer :: sys_status
+	character(len=512) :: cmd
+	
+	cmd = "mkdir iterations"
+	call appel_syst(cmd, sys_status)
+	if (sys_status /= 0) then 
+		call error("Error cannot create iterations folder!")
+	endif
+
+return
+end subroutine
  
-subroutine write_pops_atom(atom)
+subroutine write_pops_atom(atom,iter,step)
 	! ----------------------------------------------------------------- !
 	! write Atom populations
 	! First, NLTE populations, then LTE populations.
 	! ----------------------------------------------------------------- !
 	type (AtomType), intent(in) :: atom
+	integer,  optional :: iter, step
 	integer :: unit, blocksize, naxes(5), naxis,group, bitpix, fpixel
 	logical :: extend, simple, lte_only
 	integer :: nelements, hdutype, status, k, sys_status
-	character(len=20) :: popsF
-	character(len=512) :: cmd
+	character(len=512) :: cmd, popsF
+	character(len=10000) :: step_c, iter_c
 
 	!lte_only = .not.atom%active
 	lte_only = (.not.atom%NLTEpops) !can be true if atom ACTIVE or INITIAL_SOLUTION==OLD_POPULATIONS
@@ -802,22 +816,35 @@ subroutine write_pops_atom(atom)
 	extend = .true.
 	bitpix = -64
 	
-	!check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
-	cmd = "ls "//trim(atom%ID)//".fits.gz"
-	call appel_syst(cmd, sys_status)
-	if (sys_status == 0) then !means the file exist
+	popsF = trim(atom%ID)//".fits.gz"
 	
-		cmd = "mv "//trim(atom%ID)//".fits.gz"//" "//trim(atom%ID)//"_oldpop.fits.gz"
-		call appel_syst(cmd, sys_status)
-		if (sys_status /= 0) then 
-			call error("Error in copying old pops!")
-		endif
+	
+	if (present(iter)) then
+	!suppose that the file does not exist
+		write(iter_c, '(i0)') iter
+		if (.not.present(step)) step=0
+		write(step_c, '(i0)') step
+		!folder iterations must exist
+		popsF = "iterations/"//trim(atom%ID)//'_iter'//trim(iter_c)//'_step'//trim(step_c)//'.fits.gz'
 		
+	else
+	!check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
+		cmd = "ls "//popsF!trim(atom%ID)//".fits.gz"
+		call appel_syst(cmd, sys_status)
+		if (sys_status == 0) then !means the file exist
+	
+			cmd = "mv "//trim(atom%ID)//".fits.gz"//" "//trim(atom%ID)//"_oldpop.fits.gz"
+			call appel_syst(cmd, sys_status)
+			if (sys_status /= 0) then 
+				call error("Error in copying old pops!")
+			endif
+		
+		endif
 	endif
   
-	call ftinit(unit, trim(root_dir)//"/"//TRIM(atom%dataFile), blocksize, status)
+	call ftinit(unit, trim(root_dir)//"/"//TRIM(popsF), blocksize, status)
 	if (status > 0) then
-      write(*,*) "Cannot create fits file ", atom%dataFile
+      write(*,*) "Cannot create fits file ", popsF
       call print_error(status)
 	endif
 	naxes(1) = atom%Nlevel
@@ -938,7 +965,7 @@ subroutine read_pops_atom(atom)
 
 	call ftopen(unit, TRIM(atom%dataFile), 0, blocksize, status)
 	if (status > 0) then
-		write(*,*) "Cznnot open file with populations! ", atom%id
+		write(*,*) "Cannot open file with populations! ", atom%id
 		call print_error(status)
 	endif
 

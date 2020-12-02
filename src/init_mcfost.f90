@@ -59,7 +59,11 @@ subroutine set_default_variables()
   lHH30mol = .false.
   lemission_mol=.false.
   ltab_wavelength_image = .false.
+  lcheckpoint = .false.
+  checkpoint_period = 15
   ! Atomic lines Radiative Transfer (AL-RT)
+  lsafe_stop = .false.
+  safe_stop_time = 155520.0!1.8days in seconds, default
   llimit_mem = .false.
   lfix_backgrnd_opac = .false.
   lemission_atom = .false.
@@ -606,7 +610,24 @@ subroutine initialisation_mcfost()
         lforce_diff_approx=.true.
      case("-mol")
         i_arg = i_arg+1
-        lemission_mol=.true.
+        lemission_mol=.true. 
+     case("-safe_stop")
+        i_arg = i_arg + 1
+        lsafe_stop = .true.
+     case("-safe_stop_time")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("time needed (safe_stop)")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) safe_stop_time
+        safe_stop_time = safe_stop_time * 86400.!convert in sec
+        i_arg= i_arg+1
+     case("-checkpoint")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Period needed for checkpoint!")
+        lcheckpoint = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) checkpoint_period !in iterations
+        i_arg= i_arg+1
 	 case("-limit_memory")
 	 	i_arg = i_arg + 1
 	 	llimit_mem = .true.
@@ -1738,6 +1759,7 @@ subroutine display_help()
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity independent of z"
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
+  write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
   write(*,*) "		  : -fix_background_opac : (force) keep background opacities constant during non-LTE loop, if iterate_ne."
   write(*,*) "		  : -limit_memory : continuous opacity are interpolated locally"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
@@ -1765,6 +1787,8 @@ subroutine display_help()
   write(*,*) "        : -Ng_Ndelay <Ndelay> : Delay before first Ng's acceleration"
   write(*,*) "        : -Ng_Nperiod <Nperiod> : Cycle of Ng's iteration"
   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
+  write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"
+  write(*,*) "        : -safe_stop_time <real> : calc_time_limit in days "
 
   write(*,*) " "
   write(*,*) " Options related to phantom"

@@ -63,8 +63,10 @@ module parametres
        ldissolve, laccurate_integ, loutput_rates, lorigin_atom
   integer :: Nrays_atom_transfer
   logical :: llimit_mem, lfix_backgrnd_opac
+  logical :: lcheckpoint, lsafe_stop
   !Convergence relative errors
-  real :: dpops_max_error, dpops_sub_max_error, art_hv
+  real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time
+  integer :: checkpoint_period
   
   !Ng's acceleration
   logical :: lng_acceleration

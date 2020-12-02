@@ -647,7 +647,6 @@ MODULE readatom
     !now compute wavelengths grid for each line done elsewhere
 
    !Now even for passive atoms we write atomic data.
-   ! Unlike RH, all data are in the same fits file.
     if (atom%ID(2:2) .eq." ") then
       atom%dataFile = atom%ID(1:1)//".fits.gz" !.fits to be updated, .gz not
     else
@@ -877,6 +876,16 @@ MODULE readatom
    !if (nmet>1) write(*,*) nmet-1, Atoms(nmet-1)%ptr_atom%ID
   end do
   close(unit)
+  
+  if (lfix_backgrnd_opac) then
+  	do nmet=1, Natom
+  		if (atoms(nmet)%ptr_atom%initial_solution.eq."OLD_POPULATIONS") then
+  			call warning(" Using previous NLTE populations with fixed bacgkrnd!!!!")
+  			write(*,*) " ----->n check consistency of the result"
+  			exit
+  		endif
+  	enddo
+  endif
 
   ! Alias to the most importent one
   Hydrogen=>Atoms(1)%ptr_atom
