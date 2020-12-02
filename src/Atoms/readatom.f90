@@ -647,15 +647,12 @@ MODULE readatom
     !now compute wavelengths grid for each line done elsewhere
 
    !Now even for passive atoms we write atomic data.
-    if (atom%ID(2:2) .eq." ") then
-      atom%dataFile = atom%ID(1:1)//".fits.gz" !.fits to be updated, .gz not
-    else
-      atom%dataFile = atom%ID(1:2)//".fits.gz"
-    end if
-    !! done at writing if we do not store them by iterations, but only at the end of the NLTE loop
-    !!CALL create_pops_file(atom)
-    !!write(*,*) "Populations file for writing: .",trim(atom%dataFile),"."
-
+!     if (atom%ID(2:2) .eq." ") then
+!       atom%dataFile = atom%ID(1:1)//".fits.gz" !.fits to be updated, .gz not
+!     else
+!       atom%dataFile = atom%ID(1:2)//".fits.gz"
+!     end if
+	
 
    atom%set_ltepops = .true. !by default compute lte populations
    atom%NLTEpops = .false.
@@ -705,7 +702,7 @@ MODULE readatom
     	atom%set_ltepops = .true.
     	!nlte pops is false
     	    	
-	else if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+	else if (atom%initial_solution .eq. "OLD_POPULATIONS") then
 	
 	   write(*,*) " -> Reading populations from file..."
        CALL read_pops_atom(atom)
@@ -714,7 +711,7 @@ MODULE readatom
 
     end if
    else !not active = PASSIVE
-     if (atom%dataFile.ne.""  .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+     if (atom%initial_solution .eq. "OLD_POPULATIONS") then
      
        allocate(atom%n(atom%Nlevel,n_cells)) !not allocated if passive, n->nstar
 	   write(*,*) " -> Reading populations from file for passive atom..."
@@ -830,7 +827,7 @@ MODULE readatom
      write(*,*) "Exiting..."
      stop
    end if
-   Atoms(nmet)%ptr_atom%dataFile = trim(popsFile) ! now the file atomID.fits.gz contains
+   !!Atoms(nmet)%ptr_atom%dataFile = trim(popsFile) ! now the file atomID.fits.gz contains
                                                ! all informations including populations.
 
    !Active atoms are treated in NLTE

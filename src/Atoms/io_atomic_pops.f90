@@ -485,95 +485,6 @@ end subroutine write_convergence_map_atom
 
 
 
- !---> need a debug
-!  subroutine create_pops_file(atom)
-!  ! Create file to write populations
-!  !
-!   type (AtomType), intent(inout) :: atom
-!   logical :: lte_only
-!   character(len=MAX_LENGTH) :: popsF, comment, iter_number
-!   integer :: unit, EOF = 0, blocksize, naxes(5), naxis,group, bitpix, fpixel, i
-!   logical :: extend, simple
-!   integer :: nelements, syst_status, Nplus, N0
-!   real(kind=dp), dimension(:), allocatable :: zero_arr
-! 
-! !    if (popsF(len(popsF)-3:len(popsF))==".gz") then
-! !     call Warning("Atomic pops file cannot be compressed fits.")
-! !     write(*,*) popsF, popsF(len(popsF)-3:len(popsF))
-! !     atom%dataFile = popsF(1:len(popsF)-3)
-! !     write(*,*) atom%dataFile
-! !    end if
-! 
-!   lte_only = .not.atom%active
-! 
-!   !get unique unit number
-!   call ftgiou(unit,EOF)
-! 
-!   blocksize=1
-!   simple = .true. !Standard fits
-!   group = 1
-!   fpixel = 1
-!   extend = .true.
-!   bitpix = -64
-! 
-!   naxes(1) = atom%Nlevel
-!   Nplus = 2 !lte + NLTE
-!   if (lte_only) Nplus = 1
-! 
-!   N0 = max(1,Nmax_kept_iter) !at mini LTE, NLTE and last iteration atm
-!   if (lte_only) N0 = 0
-! 
-!   if (lVoronoi) then
-!    naxis = 2
-!    naxes(2) = n_cells ! equivalent n_cells
-!    nelements = naxes(1)*naxes(2)
-!   else
-!    if (l3D) then
-!     naxis = 4
-!     naxes(2) = n_rad
-!     naxes(3) = 2*nz
-!     naxes(4) = n_az
-!     nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
-!    else
-!     naxis = 3
-!     naxes(2) = n_rad
-!     naxes(3) = nz
-!     nelements = naxes(1) * naxes(2) * naxes(3)
-!    end if
-!   end if
-! 
-!   allocate(zero_arr(nelements)); zero_arr=0d0
-! 
-!   call appel_syst('mkdir -p '//trim(atom%ID),syst_status) !create a dir for populations
-!   call ftinit(unit,trim(atom%ID)//"/"//trim(atom%dataFile),blocksize,EOF)
-! 
-!   do i=1, N0 + Nplus
-! 
-!     write(iter_number, '(A10,I6,A1)') "(Iteration", i,")"
-! 
-!    	call ftcrhd(unit, EOF)
-!    	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,EOF)
-! 
-!    	COMMENT = trim(iter_number)
-!    	if (lte_only) COMMENT = "(LTE)"
-!    	if (i==Nmax_kept_iter+1) then
-!    	 COMMENT = "(NLTE)"
-!    	else if (i==Nmax_kept_iter+2) then
-!    	 COMMENT = "(LTE)"
-!    	end if
-!   	call ftpkys(unit, "UNIT", "m^-3", COMMENT, EOF)
-!     call ftpprd(unit,group,fpixel,nelements,zero_arr,EOF)
-! 
-!   end do
-! 
-!   deallocate(zero_arr)
-! 
-!   call ftclos(unit, EOF) !close
-!   call ftfiou(unit, EOF) !free
-! 
-!   if (EOF > 0) call print_error(EOF)
-!  return
-!  end subroutine create_pops_file
 !  subroutine writePops(atom, count)
 !  ! ----------------------------------------------------------------- !
 !  ! write Atom populations. The file for writing exists already
@@ -958,12 +869,14 @@ subroutine read_pops_atom(atom)
 	integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
 	logical :: extend, simple, anynull
 	integer :: nelements, naxis2(4), Nl, naxis_found, hdutype, l, icell
-	character(len=256) :: some_comments
+	character(len=256) :: some_comments, popsF
   
 	status = 0
 	call ftgiou(unit,status)
+	
+	popsF = TRIM(atom%ID)//".fits.gz"
 
-	call ftopen(unit, TRIM(atom%dataFile), 0, blocksize, status)
+	call ftopen(unit, trim(popsF), 0, blocksize, status)
 	if (status > 0) then
 		write(*,*) "Cannot open file with populations! ", atom%id
 		call print_error(status)
@@ -1098,7 +1011,7 @@ subroutine read_pops_atom(atom)
 
 	call ftclos(unit, status) !close
 	if (status > 0) then
-		write(*,*) "error cannot close file in ", atom%datafile
+		write(*,*) "error cannot close file in ", trim(popsF)
 		call print_error(status)
 		stop
 	endif

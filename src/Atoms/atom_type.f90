@@ -90,7 +90,6 @@ MODULE atom_type
 
   TYPE AtomType
    character(len=ATOM_ID_WIDTH) :: ID
-   character (len=15)             :: dataFile!popsinFile, popsoutFile
    character(len=28) :: inputFile
    character(len=ATOM_LABEL_WIDTH), allocatable, dimension(:)  :: label
    logical                :: NLTEpops, active, set_ltepops
