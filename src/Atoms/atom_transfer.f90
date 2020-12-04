@@ -1205,10 +1205,7 @@ module atom_transfer
 		if (loutput_rates) deallocate(Rij_all,Rji_all,Gammaij_all)
 		
 		if (lelectron_scattering) call write_Jnu
-		!recompute some opacities ?
-! 		write(*,*) " re-computing background opacities..."
-! 		call compute_background_continua
-! 		write(*,*) " ..done"
+
 		
 		!-> I do not do that for nlte calc otherwise, Eta_es is thomson * Jnu_cont
 		!if (lelectron_scattering) call iterate_Jnu
@@ -1554,7 +1551,7 @@ module atom_transfer
 				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				fac_etape = 1.0
-				precision = 1e-3!fac_etape * 1.0 / sqrt(real(n_rayons)) !0.1
+				precision = 1e-2!fac_etape * 1.0 / sqrt(real(n_rayons)) !0.1
 				!precision = dpops_max_error
 				write(*,*) " threshold:", precision
 				
