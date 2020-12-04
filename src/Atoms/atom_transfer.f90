@@ -87,6 +87,7 @@ module atom_transfer
 	real(kind=dp), allocatable :: Gammaij_all(:,:,:,:), Rij_all(:,:,:), Rji_all(:,:,:) !need a flag to output it
 	integer :: NmaxLevel, NmaxTr
 	!Check-pointing and stopping and timing
+	logical :: lexit_after_nonlte_loop = .false.
 	real :: time_iteration, time_nlte
 
 
@@ -1196,7 +1197,8 @@ module atom_transfer
 					call write_rate_matrix_atom(atom, Gammaij_all(nact,1:atom%Nlevel,1:atom%Nlevel,:))
 				endif
 			endif
-			if (associated(hydrogen,atom)) call write_collision_matrix_atom(hydrogen)
+			!!if (associated(hydrogen,atom)) &
+			call write_collision_matrix_atom(hydrogen)
 			do m=1, atom%Nline
 				deallocate(atom%lines(m)%phi_loc)
 			enddo
@@ -1269,7 +1271,8 @@ module atom_transfer
 		call write_pops_atom(Atoms(m)%ptr_atom)
 	end do
 	
-	if (lsafe_stop) then
+
+	if (lexit_after_nonlte_loop) then
 		return
 		!free all data or because we leave after not needed
 	endif
@@ -2094,6 +2097,7 @@ module atom_transfer
 						write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
   						write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
   						write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
+  						lexit_after_nonlte_loop = .true. !lsafe_stop only would leave the code even if the time is below the walltime
 						exit step_loop
 					endif
 
