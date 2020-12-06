@@ -86,6 +86,7 @@ subroutine set_default_variables()
   iNg_Norder = 0
   iNg_ndelay = 5
   iNg_Nperiod = 5
+  istep_start = 1
   ! AL-RT
   laccurate_integ = .false.
   Nrays_atom_transfer = 100
@@ -754,6 +755,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
+     case("-start_step")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("1 or 2 needed for -start_step")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) istep_start
+        i_arg= i_arg+1
      case("-pluto")
         i_arg = i_arg + 1
         lpluto_file=.true.
@@ -1759,6 +1766,7 @@ subroutine display_help()
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity independent of z"
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
+  write(*,*) "        : -start_step <int> : Select the first step for non-LTE loop (default 1)"
   write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
   write(*,*) "		  : -fix_background_opac : (force) keep background opacities constant during non-LTE loop, if iterate_ne."
   write(*,*) "		  : -limit_memory : continuous opacity are interpolated locally"

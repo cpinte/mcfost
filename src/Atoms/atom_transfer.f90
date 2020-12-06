@@ -39,7 +39,7 @@ module atom_transfer
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
 									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, &
-									ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint
+									ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint, istep_start
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
 	use dust_transfer, only		: compute_stars_map
@@ -1467,11 +1467,15 @@ module atom_transfer
 
 		labs = .true. !to have ds at cell icell = eval_operator
 		id = 1
-		etape_start = 1
+		!make an option to start step2 only (with end step 2)
+		!In case we restart a calculation in the step 2
+		!beware if istep_start==2, electron density ONLY iterated after non-LTE loop...
+		etape_start = istep_start!1
 		if (laccurate_integ) then
 			etape_end = 2!3, step 3 not implemented yet
 		else
 			etape_end = 1
+			if (istep_start==2) etape_end = 2
 		endif
 
 		! ds is not used for this scheme at  the moment. Psi is used instead
