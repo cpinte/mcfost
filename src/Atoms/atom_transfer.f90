@@ -1197,8 +1197,8 @@ module atom_transfer
 					call write_rate_matrix_atom(atom, Gammaij_all(nact,1:atom%Nlevel,1:atom%Nlevel,:))
 				endif
 			endif
-			!!if (associated(hydrogen,atom)) &
-			call write_collision_matrix_atom(hydrogen)
+			!!if (associated(hydrogen,atom)) call write_collision_matrix_atom(hydrogen)
+			call write_collision_matrix_atom(atom)
 			do m=1, atom%Nline
 				deallocate(atom%lines(m)%phi_loc)
 			enddo
@@ -1511,6 +1511,7 @@ module atom_transfer
 		
 			if (etape==1) then
 				time_iteration = 0
+				
 				!Only one ray until a proper scheme for choosing positions inside the cell exist
       			call compute_angular_integration_weights()
   				lfixed_rays = .true.
@@ -1542,8 +1543,7 @@ module atom_transfer
 !   						enddo
 !   					enddo
 !   				endif  		
-			else if (etape==2) then 
-			
+			else if (etape==2) then 		
 				time_iteration = 0
 				
 				!-> no iteration in MC but after the solution ??
