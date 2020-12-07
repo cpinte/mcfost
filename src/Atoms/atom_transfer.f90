@@ -1545,11 +1545,14 @@ module atom_transfer
 			else if (etape==2) then 
 			
 				time_iteration = 0
-				if (iterate_ne) then
-					iterate_ne = .false. !no iteration in MC
-					n_iterate_ne = 0 !to recalc ne at the end of the SEE loop
-									  ! -1 is default and means do nothing					  
-				endif
+				
+				!-> no iteration in MC but after the solution ??
+! 				if (iterate_ne .and.. lno_ne_mc) then
+! 					if (iterate_ne) then
+! 						iterate_ne = .false.
+! 						n_iterate_ne = 0	
+! 					endif
+! 				endif
 			
 				write(*,*) " Using step 2 with ", n_rayons_1, " rays"
 				lfixed_rays = .true.
@@ -1850,7 +1853,8 @@ module atom_transfer
 			!I have to evaluate background continua if I update all atoms lte pops ?
 			!still update chi_c if electron scatt ?
 				evaluate_background = .false.
-				dne = 0.0_dp											!diff_old < 1e-2
+				dne = 0.0_dp											
+				!Updating for non Ng iterations ? add a condition on the dM < 1e-2 ? (better ndelay)
 				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)).and.(n_iter>ndelay_iterate_ne)) then!.and..not.accelerated)  then
 					!do not evaluate if accelerated. Do not evaluate if cswitch ?? Or do not care?
 					
@@ -2101,7 +2105,8 @@ module atom_transfer
 						write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
   						write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
   						write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
-  						lexit_after_nonlte_loop = .true. !lsafe_stop only would leave the code even if the time is below the walltime
+  						lexit_after_nonlte_loop = .true.
+  						!lsafe_stop only would leave the code even if the time is below the walltime
 						exit step_loop
 					endif
 
