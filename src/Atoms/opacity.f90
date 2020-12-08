@@ -305,7 +305,7 @@ module Opacity
 	!To DO, do not updated things that are constant in nlte_loop
 		integer, intent(in) :: icell
 		logical, optional :: verbose
-		logical :: show_warnings
+		logical :: show_warnings, show_warnings_full = .false. !set to .true. for full debug, but large output! better in noOpenmp
 		type(AtomType), pointer :: atom
 		integer :: n, k, kc, alloc_status, i, j, Nblue, Nred, la, icell_d
 		real(kind=dp) :: vbroad, aL, cte, cte2, adamp, wi, wj, gij, neff, chi_ion
@@ -377,6 +377,10 @@ module Opacity
 !Include occupa, cannot be lower, since ni =  niwi and nj = njwj
 					if (show_warnings) then
 						if ((wj/wi * atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
+							if (.not.show_warnings_full) then
+								call warning("Some (line) levels might have populations inversion!")
+								show_warnings = .false.
+							endif
 							write(*,*) atom%ID, " nuij (10^15 Hz)", 1d-6 * CLIGHT / atom%lines(kc)%lambda0, " icell=", icell
 							write(*,*) " lambdaij (nm)", atom%lines(kc)%lambda0 
 							call warning ("background line: ni < njgij")
@@ -434,7 +438,11 @@ module Opacity
 
 ! 							if (atom%n(i,icell) - atom%n(j, icell)*atom%continua(kc)%gij(la, icell) <= 0 ) then
 								if (atom%n(i,icell) - atom%n(j,icell) * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) <=0 ) then
-
+									if (.not.show_warnings_full) then
+									call warning("Some (cont) levels might have populations inversion!")
+									show_warnings = .false.
+									exit
+									endif
 									write(*,*) atom%ID, " nu+ (10^15 Hz)", 1d-6 * CLIGHT / atom%continua(kc)%lambda0, " icell=", icell
 									write(*,*) " lambda+ (nm)", atom%continua(kc)%lambda0, " la=",la, " lambda = ", lambda_cont(Nblue+la-1)
 									call warning ("background cont: ni < njgij")
