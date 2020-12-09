@@ -12,7 +12,7 @@ module Opacity
 	use broad, only										: Damping, line_damping
 	use parametres
 	use voigtfunctions, only							: Voigt
-	use stark, only										: Stark_profile
+! 	use stark, only										: Stark_profile
 	use profiles!, only									: Profile
 	use getlambda, only									: hv, Nlambda_max_line, define_local_profile_grid
 	use planck, only 									: bpnu
@@ -25,11 +25,8 @@ module Opacity
 	use molecular_emission, only						: v_proj
 
 
- 
-
-
 	implicit none
-
+	real(kind=dp), parameter :: prec_pops = 1d-100, frac_ne_limit = 1d-10
     !for one ray
 	real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:)
 	real(kind=dp), allocatable :: R_xcc(:,:,:,:)
@@ -304,19 +301,19 @@ module Opacity
 	SUBROUTINE compute_atom_quantities(icell,verbose)
 	!To DO, do not updated things that are constant in nlte_loop
 		integer, intent(in) :: icell
-		logical, optional :: verbose
-		logical :: show_warnings, show_warnings_full = .false. !set to .true. for full debug, but large output! better in noOpenmp
 		type(AtomType), pointer :: atom
+		integer, optional :: verbose
+		integer :: verbose_mode = 0
 		integer :: n, k, kc, alloc_status, i, j, Nblue, Nred, la, icell_d
 		real(kind=dp) :: vbroad, aL, cte, cte2, adamp, wi, wj, gij, neff, chi_ion
 !     	real(kind=dp), dimension(:), allocatable :: test_phi
 
-		show_warnings = .false.
 		if (present(verbose)) then
-			if (verbose) show_warnings = .true.
-		else
-			show_warnings = .true. !default
+		
+			if (verbose <= 3) verbose_mode = verbose
+		
 		endif
+
     
 		do n=1,Natom
 			atom => Atoms(n)%ptr_atom
@@ -375,21 +372,45 @@ module Opacity
 					
 
 !Include occupa, cannot be lower, since ni =  niwi and nj = njwj
-					if (show_warnings) then
-						if ((wj/wi * atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
-							if (.not.show_warnings_full) then
-								call warning("Some (line) levels might have populations inversion!")
-								show_warnings = .false.
+
+					if (verbose_mode > 0) then
+						if (verbose_mode == 2) then
+							if ((wj/wi * atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
+								call warning("Background line, population inversion!")
 							endif
-							write(*,*) atom%ID, " nuij (10^15 Hz)", 1d-6 * CLIGHT / atom%lines(kc)%lambda0, " icell=", icell
-							write(*,*) " lambdaij (nm)", atom%lines(kc)%lambda0 
-							call warning ("background line: ni < njgij")
-							write(*,*) "i = ", i, " j = ", j
-							write(*,*) "w(i) = ", wi, " w(j) = ", wj
-          					write(*,*) "ni=", atom%n(i,icell), " nj=", atom%n(j,icell), " gij=", atom%lines(kc)%gij
-          					write(*,*) "nstari=", atom%n(i,icell), " njstar=", atom%n(j,icell)
-          					write(*,*) "realitve = ", 100 * (wj/wi * atom%n(i,icell)-atom%n(j,icell)*atom%lines(kc)%gij)/atom%n(i,icell)
-          					write(*,*) " to nTot=", 100 * wj/wi * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * atom%lines(kc)%gij * atom%n(j,icell) / ntotal_atom(icell,atom)
+							write(*,"('at cell '(1I9), ' for atom '(1A2), ' line: '(1I3)' ->'(1I3) ) ") icell, atom%ID, i, j
+							write(*,"(' lambda0='(1F12.5)' nm')") atom%lines(kc)%lambda0
+							write(*,"('w(i)='(1ES20.7E3), '; w(j)='(1ES20.7E3))") wi, wj
+							write(*,"('n(i)='(1ES20.7E3)' m^-3;',' n(j)='(1ES20.7E3)' m^-3;', ' gij='(1ES20.7E3))") atom%n(i,icell), atom%n(j,icell), atom%lines(kc)%gij
+							write(*,"('nstar(i)='(1ES20.7E3)' m^-3;',' nstar(j)='(1ES20.7E3)' m^-3')") atom%nstar(i,icell), atom%nstar(j,icell)
+!           						write(*,*) atom%n(i,icell), wi*atom%n(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
+          					write(*,"('(n(i)-n(j)gij)/n(i)='(1ES20.7E3)' %;',' (n(i)-n(j)gij)/n(j)gij='(1ES20.7E3)' %')") 100 * (wj/wi * atom%n(i,icell)-atom%n(j,icell)*atom%lines(kc)%gij)/atom%n(i,icell), 100 * (wj/wi * atom%n(i,icell)-atom%n(j,icell)*atom%lines(kc)%gij)/(atom%n(j,icell)*atom%lines(kc)%gij)
+							write(*,"('n(i)/N='(1ES20.7E3)' %;', ' n(j)/N='(1ES20.7E3)' %')") 100 * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * atom%n(j,icell) / ntotal_atom(icell,atom)
+							write(*,"('nstar(i)/N='(1ES20.7E3)' %;', ' nstar(j)/N='(1ES20.7E3)' %')") 100 * atom%nstar(i,icell) / ntotal_atom(icell,atom), 100 * atom%nstar(j,icell) / ntotal_atom(icell,atom)
+							write(*,"('n(i)/ne='(1ES20.7E3)' %;', ' n(i)/ne < prec ='(1L1))") 100 * atom%n(i,icell) / ne(icell), ( atom%n(i,icell) / ne(icell) < frac_ne_limit)
+							write(*,"('n(j)/ne='(1ES20.7E3)' %;', ' n(j)/ne < prec ='(1L1))") 100 * atom%n(j,icell) / ne(icell), ( atom%n(j,icell) / ne(icell) < frac_ne_limit)
+						elseif (verbose_mode == 1) then
+							if ((wj/wi * atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
+								call warning("Background line, population inversion!")
+								write(*,"('at cell '(1I9), ' for atom '(1A2), ' line: '(1I3)' ->'(1I3) ) ") icell, atom%ID, i, j
+								write(*,"(' lambda0='(1F12.5)' nm')") atom%lines(kc)%lambda0
+								write(*,"('w(i)='(1ES20.7E3), '; w(j)='(1ES20.7E3))") wi, wj
+								write(*,"('n(i)='(1ES20.7E3)' m^-3;',' n(j)='(1ES20.7E3)' m^-3;', ' gij='(1ES20.7E3))") atom%n(i,icell), atom%n(j,icell), atom%lines(kc)%gij
+								write(*,"('nstar(i)='(1ES20.7E3)' m^-3;',' nstar(j)='(1ES20.7E3)' m^-3')") atom%nstar(i,icell), atom%nstar(j,icell)
+!           						write(*,*) atom%n(i,icell), wi*atom%n(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
+          						write(*,"('(n(i)-n(j)gij)/n(i)='(1ES20.7E3)' %;',' (n(i)-n(j)gij)/n(j)gij='(1ES20.7E3)' %')") 100 * (wj/wi * atom%n(i,icell)-atom%n(j,icell)*atom%lines(kc)%gij)/atom%n(i,icell), 100 * (wj/wi * atom%n(i,icell)-atom%n(j,icell)*atom%lines(kc)%gij)/(atom%n(j,icell)*atom%lines(kc)%gij)
+								write(*,"('n(i)/N='(1ES20.7E3)' %;', ' n(j)/N='(1ES20.7E3)' %')") 100 * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * atom%n(j,icell) / ntotal_atom(icell,atom)
+								write(*,"('nstar(i)/N='(1ES20.7E3)' %;', ' nstar(j)/N='(1ES20.7E3)' %')") 100 * atom%nstar(i,icell) / ntotal_atom(icell,atom), 100 * atom%nstar(j,icell) / ntotal_atom(icell,atom)
+								write(*,"('n(i)/ne='(1ES20.7E3)' %;', ' n(i)/ne < prec ='(1L1))") 100 * atom%n(i,icell) / ne(icell), ( atom%n(i,icell) / ne(icell) < frac_ne_limit)
+								write(*,"('n(j)/ne='(1ES20.7E3)' %;', ' n(j)/ne < prec ='(1L1))") 100 * atom%n(j,icell) / ne(icell), ( atom%n(j,icell) / ne(icell) < frac_ne_limit)
+		
+          					endif
+          				elseif (verbose_mode == 3) then
+							if ((wj/wi * atom%n(i,icell) - atom%n(j, icell)*atom%lines(kc)%gij) <= 0 ) then
+								call warning("Background line, population inversion!")
+								write(*,"(' => at cell '(1I9), ' for atom '(1A2), ' line: '(1I3)' ->'(1I3) ) ") icell, atom%ID, i, j
+								write(*,"('  -- n(i)/N='(1ES20.9E3)' m^-3;',' n(j)/N='(1ES20.7E3)' m^-3;', ' gij='(1ES20.9E3))") atom%n(i,icell)/ntotal_atom(icell,atom), atom%n(j,icell)/ntotal_atom(icell,atom), atom%lines(kc)%gij
+							endif
 						endif
 					endif
     
@@ -399,6 +420,7 @@ module Opacity
 					Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
 					chi_ion = Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(j))
 					neff = atom%stage(j) * sqrt(atom%Rydberg / (atom%E(j) - atom%E(i)) )
+					gij = atom%nstar(i,icell)/atom%nstar(j,icell)
 
 					icell_d = 1
 					wj = 1.0; wi = 1.0
@@ -417,7 +439,7 @@ module Opacity
 					endif
    
 					!if (atom%nstar(j,icell) < tiny_dp .or. atom%nstar(i,icell) < tiny_dp) then
-					if (atom%active) then
+!					if (atom%active) then
 ! 						if (atom%nstar(i,icell) < tiny_dp) then
 ! 							atom%continua(kc)%gij(:,icell) = 0d0
 ! 						else
@@ -430,35 +452,63 @@ module Opacity
 ! 								
 !      						enddo
 ! 						endif
+! 					endif
 						
-						gij = atom%nstar(i,icell)/atom%nstar(j,icell)
-					
-						if (show_warnings) then
-							do la=1, atom%continua(kc)%Nlambda
-
+			
+					if (verbose_mode > 0) then
+						if (verbose_mode == 2) then
+							!do la=1, atom%continua(kc)%Nlambda
+							la = atom%continua(kc)%Nlambda
 ! 							if (atom%n(i,icell) - atom%n(j, icell)*atom%continua(kc)%gij(la, icell) <= 0 ) then
 								if (atom%n(i,icell) - atom%n(j,icell) * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) <=0 ) then
-									if (.not.show_warnings_full) then
-									call warning("Some (cont) levels might have populations inversion!")
-									show_warnings = .false.
-									exit
-									endif
-									write(*,*) atom%ID, " nu+ (10^15 Hz)", 1d-6 * CLIGHT / atom%continua(kc)%lambda0, " icell=", icell
-									write(*,*) " lambda+ (nm)", atom%continua(kc)%lambda0, " la=",la, " lambda = ", lambda_cont(Nblue+la-1)
-									call warning ("background cont: ni < njgij")
-									write(*,*) "i = ", i, " j = ", j
-									write(*,*) "w(i) = ", wi, " w(j) = ", wj
-          							write(*,*) atom%n(i,icell), wi*atom%n(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
-          							write(*,*) atom%nstar(i,icell), wi*atom%nstar(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
-          							write(*,*) "realitve = ", 100 * (atom%n(i,icell)-wi*atom%n(j,icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)))/atom%n(i,icell)
-          							write(*,*) " to nTot=", 100 * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) * atom%n(j,icell) / ntotal_atom(icell,atom)
+									call Warning("Background continuum, population inversion !")
+								endif
+								write(*,"('at cell '(1I9), ' for atom '(1A2), ' cont: '(1I3)' ->'(1I3) ) ") icell, atom%ID, i, j
+								write(*,"(' lambda0='(1F12.5)' nm;', ' lambda='(1F12.5)' nm')") atom%continua(kc)%lambda0, lambda_cont(Nblue+la-1)
+								write(*,"('w(i)='(1ES20.7E3), '; w(j)='(1ES20.7E3))") wi, wj
+								write(*,"('n(i)='(1ES20.7E3)' m^-3;',' n(j)='(1ES20.7E3)' m^-3;', ' gij='(1ES20.7E3))") atom%n(i,icell), atom%n(j,icell), gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))
+								write(*,"('nstar(i)='(1ES20.7E3)' m^-3;',' nstar(j)='(1ES20.7E3)' m^-3')") atom%nstar(i,icell), atom%nstar(j,icell)
+!           						write(*,*) atom%n(i,icell), wi*atom%n(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
+          						write(*,"('(n(i)-n(j)gij)/n(i)='(1ES20.7E3)' %')") 100 * (atom%n(i,icell)-wi*atom%n(j,icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)))/atom%n(i,icell)
+								write(*,"('n(i)/N='(1ES20.7E3)' %;', ' n(j)/N='(1ES20.7E3)' %')") 100 * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * atom%n(j,icell) / ntotal_atom(icell,atom)
+								write(*,"('nstar(i)/N='(1ES20.7E3)' %;', ' nstar(j)/N='(1ES20.7E3)' %')") 100 * atom%nstar(i,icell) / ntotal_atom(icell,atom), 100 * atom%nstar(j,icell) / ntotal_atom(icell,atom)
+								write(*,"('n(i)/ne='(1ES20.7E3)' %;', ' n(i)/ne < prec ='(1L1))") 100 * atom%n(i,icell) / ne(icell), ( atom%n(i,icell) / ne(icell) < frac_ne_limit)
+								write(*,"('n(j)/ne='(1ES20.7E3)' %;', ' n(j)/ne < prec ='(1L1))") 100 * atom%n(j,icell) / ne(icell), ( atom%n(j,icell) / ne(icell) < frac_ne_limit)
+								!exit
+							!enddo
+						elseif( verbose_mode==1 ) then
+							do la=1, atom%continua(kc)%Nlambda
+! 							if (atom%n(i,icell) - atom%n(j, icell)*atom%continua(kc)%gij(la, icell) <= 0 ) then
+								if (atom%n(i,icell) - atom%n(j,icell) * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) <=0 ) then
+									call Warning("Background continuum, population inversion !")
+
+									write(*,"('at cell '(1I9), ' for atom '(1A2), ' cont: '(1I3)' ->'(1I3) ) ") icell, atom%ID, i, j
+									write(*,"(' lambda0='(1F12.5)' nm;', ' lambda='(1F12.5)' nm')") atom%continua(kc)%lambda0, lambda_cont(Nblue+la-1)
+									write(*,"('w(i)='(1ES20.7E3), '; w(j)='(1ES20.7E3))") wi, wj
+									write(*,"('n(i)='(1ES20.7E3)' m^-3;',' n(j)='(1ES20.7E3)' m^-3;', ' gij='(1ES20.7E3))") atom%n(i,icell), atom%n(j,icell), gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))
+									write(*,"('nstar(i)='(1ES20.7E3)' m^-3;',' nstar(j)='(1ES20.7E3)' m^-3')") atom%nstar(i,icell), atom%nstar(j,icell)
+!           						write(*,*) atom%n(i,icell), wi*atom%n(j, icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))!atom%continua(kc)%gij(la, icell)
+          							write(*,"('(n(i)-n(j)gij)/n(i)='(1ES20.7E3)' %')") 100 * (atom%n(i,icell)-wi*atom%n(j,icell)*gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)))/atom%n(i,icell)
+									write(*,"('n(i)/N='(1ES20.7E3)' %;', ' n(j)/N='(1ES20.7E3)' %')") 100 * atom%n(i,icell) / ntotal_atom(icell,atom), 100 * atom%n(j,icell) / ntotal_atom(icell,atom)
+									write(*,"('nstar(i)/N='(1ES20.7E3)' %;', ' nstar(j)/N='(1ES20.7E3)' %')") 100 * atom%nstar(i,icell) / ntotal_atom(icell,atom), 100 * atom%nstar(j,icell) / ntotal_atom(icell,atom)
+									write(*,"('n(i)/ne='(1ES20.7E3)' %;', ' n(i)/ne < prec ='(1L1))") 100 * atom%n(i,icell) / ne(icell), ( atom%n(i,icell) / ne(icell) < frac_ne_limit)
+									write(*,"('n(j)/ne='(1ES20.7E3)' %;', ' n(j)/ne < prec ='(1L1))") 100 * atom%n(j,icell) / ne(icell), ( atom%n(j,icell) / ne(icell) < frac_ne_limit)
 									exit
 								endif
-						
+							enddo
+          				elseif (verbose_mode == 3) then
+							do la=1, atom%continua(kc)%Nlambda
+! 							if (atom%n(i,icell) - atom%n(j, icell)*atom%continua(kc)%gij(la, icell) <= 0 ) then
+								if (atom%n(i,icell) - atom%n(j,icell) * gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell)) <=0 ) then
+									call Warning("Background continuum, population inversion !")
+									write(*,"(' => at cell '(1I9), ' for atom '(1A2), ' cont: '(1I3)' ->'(1I3) ) ") icell, atom%ID, i, j
+									write(*,"('  -- n(i)/N='(1ES20.9E3)' m^-3;',' n(j)/N='(1ES20.7E3)' m^-3;', ' gij='(1ES20.9E3))") atom%n(i,icell)/ntotal_atom(icell,atom), atom%n(j,icell)/ntotal_atom(icell,atom), gij * exp(-hc_k/lambda_cont(Nblue+la-1)/T(icell))
+									exit
+								endif
 							enddo
 						endif
-						
-					endif !active
+					endif
+
 				case default
 					call Error("Transition type unknown", atom%at(k)%trtype)
 				end select
@@ -625,7 +675,7 @@ module Opacity
 		do icell=1, n_cells
 			!$ id = omp_get_thread_num() + 1
 			if (icompute_atomRT(icell) > 0) then
-				call compute_atom_quantities(icell) !,verbose=.true.)
+				call compute_atom_quantities(icell,verbose=3)
 				!!need for BackgroundContinua
     			!!and lines 
 				!!!!call background_continua(icell)	

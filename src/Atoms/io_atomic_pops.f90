@@ -1027,7 +1027,13 @@ subroutine read_pops_atom(atom)
     do l=1,atom%Nlevel
     	write(*,*) "   non-LTE ", l, ">>", minval(atom%n(l,:),mask=(atom%n(l,:)>0)), maxval(atom%n(l,:))
     	write(*,*) "   LTE ", l, ">>", minval(atom%nstar(l,:),mask=(atom%nstar(l,:)>0)), maxval(atom%nstar(l,:))
+! 		do icell=1,n_cells
+! 			if (icompute_atomRT(icell)) then
+! 				if (atom%n(l,icell) / sum(atom%n(:,icell)) < 1d-5) atom%n(l,icell) = 0.0_dp
+! 			endif
+! 		enddo
 	enddo
+
 
 return
 end subroutine read_pops_atom

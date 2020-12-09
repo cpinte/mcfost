@@ -1094,6 +1094,8 @@ MODULE readatom
  RETURN
  END SUBROUTINE search_cont_lambdamax
 
+
+ !But why, a cswitch per atom ? It is going at the same speed for all atoms right ?
  function maxval_cswitch_atoms ()
  !for all atoms, check the maximum value of the cswitch
  	integer :: n
@@ -1109,6 +1111,7 @@ MODULE readatom
  return
  end function maxval_cswitch_atoms
  
+ !could be done for only one common parameter by the way
  subroutine adjust_cswitch_atoms ()
  !for all active atoms, decreases the cswitch value from cswitch_down_scaling_factor
  	integer :: n

@@ -995,6 +995,7 @@ module atom_transfer
   								 !because of the electron density evaluated in non-LTE
   								 !if background fixed, they will be computed with the current estimate of
   								 !electron density and non-LTE pops !
+
  
  !if checkpointing no need to re-read  elecontron pops. They are computed
  !with non-LTE populations here!
@@ -1138,7 +1139,7 @@ module atom_transfer
 		
 		if (lcheckpoint) call prepare_check_pointing()
 
-		call NLTEloop_mali(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter,.true.)
+		call NLTEloop_mali(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter)
 		
 		!reevaluate here only if fixed during the loop but ne was iterated
 		!otherwise constant because 1) ne constant or 2), ne evaluated just after
@@ -1362,13 +1363,12 @@ module atom_transfer
 	end subroutine atom_line_transfer
 ! ------------------------------------------------------------------------------------ !
 
-	subroutine NLTEloop_mali(n_rayons_max,n_rayons_1,n_rayons_2,maxIter,verbose)
+	subroutine NLTEloop_mali(n_rayons_max,n_rayons_1,n_rayons_2,maxIter)
 	! ----------------------------------------------------------------------- !
 	! removed all dependency on nrayons since everything is ray by ray built
 	! ----------------------------------------------------------------------- !
 #include "sprng_f.h"
 		integer, intent(in) :: n_rayons_1, n_rayons_2, maxIter, n_rayons_max
-		logical, intent(in) :: verbose
 		integer :: etape, etape_start, etape_end, iray, n_rayons, iray_p
 		integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, la, kr
 		integer, dimension(nb_proc) :: max_n_iter_loc
@@ -1610,7 +1610,7 @@ module atom_transfer
 				!$omp default(none) &
 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi)&
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight) &
-				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,lforce_lte,n_iter, threeKminusJ,psi_mean, psi, chi_loc,nrayons_per_cell) &
+				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ,psi_mean, psi, chi_loc,nrayons_per_cell) &
 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
 				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,randz,xyz_pos,uvw_pos) &
 				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity) &
@@ -1995,7 +1995,7 @@ module atom_transfer
 							!-> this evaluate profiles or damping but also continuum quantities not needed ???
 							!-> do not check ni-njgij < 0 because a non converged state can lead to inversion of populations
 							! modify it to update only nlte quantities ?
-							call compute_atom_quantities(icell,verbose=.false.)
+							call compute_atom_quantities(icell)
 							call background_continua_lambda(icell, Nlambda_cont, lambda_cont, chi_c(:,icell), eta_c(:,icell))
 							!or just re evaluate ne in chi_c like chi_c -ne_old + ne_new
 						endif
