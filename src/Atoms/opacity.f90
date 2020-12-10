@@ -298,6 +298,12 @@ module Opacity
 	RETURN
 	end SUBROUTINE alloc_atom_quantities
   
+    !to do: if verbose, store the warnings in an other file.
+    !For large atoms and large grid, he number of warnings
+    !can be overwhelming !
+    !The warning are here for debugging and informations,
+    !In general populations inversion are small and can be omitted in
+    !the opacity.
 	SUBROUTINE compute_atom_quantities(icell,verbose)
 	!To DO, do not updated things that are constant in nlte_loop
 		integer, intent(in) :: icell
@@ -675,7 +681,7 @@ module Opacity
 		do icell=1, n_cells
 			!$ id = omp_get_thread_num() + 1
 			if (icompute_atomRT(icell) > 0) then
-				call compute_atom_quantities(icell,verbose=3)
+				call compute_atom_quantities(icell,verbose=0)!1,2,3
 				!!need for BackgroundContinua
     			!!and lines 
 				!!!!call background_continua(icell)	
