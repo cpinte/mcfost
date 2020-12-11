@@ -243,17 +243,19 @@ MODULE PROFILES
 		real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi, t, vbroad, dv
 		type (AtomicLine), intent(in)								:: line
 		integer														::  Nred, Nblue, i, j, nv, la, j0, i0
-		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_interp
-! 		real(kind=dp), dimension(N)									:: locprof
+		real(kind=dp), dimension(N)			                    	:: u1, u1p, local_profile_interp!, locprof
+		real(kind=dp), dimension(size(line%u))						:: u0
  
 
 		Nvspace = NvspaceMax
 		i = line%i; j = line%j
 		Nred = line%Nred; Nblue = line%Nblue
 		vbroad = line%atom%vbroad(icell)
+		u0 = line%u / vbroad !avoind creating temporary array in interpolation
 
 		local_profile_interp = 0d0
 		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight/vbroad
+		
 		
 		Omegav = 0d0
 		v0 = v_proj(icell,x,y,z,u,v,w)
@@ -291,8 +293,8 @@ MODULE PROFILES
  
 				u1p(:) = u1(:) - omegav(nv)
 
-
-				local_profile_interp(:) = local_profile_interp(:) + linear_1D_sorted(size(line%u),line%u/vbroad,line%phi(:,icell),N,u1p)
+				!+ linear_1D_sorted(size(line%u),line%u/vbroad,line%phi(:,icell),N,u1p)
+				local_profile_interp(:) = local_profile_interp(:) + linear_1D_sorted(size(line%u),u0,line%phi(:,icell),N,u1p)
 ! locprof = locprof + voigt(N, line%a(icell), u1p)/sqrtpi/vbroad/nvspace
 			enddo
 
