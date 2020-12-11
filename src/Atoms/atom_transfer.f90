@@ -10,7 +10,8 @@ module atom_transfer
 	use atom_type, only			: AtomType
 	use opacity, only			: dealloc_atom_quantities, alloc_atom_quantities, compute_atom_quantities, compute_background_continua, &
 									interp_background_opacity, opacity_atom_loc, interp_contopac, interp_continuum_local, & !compute_nlte_bound_free, &
-									nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, background_continua_lambda, opacity_atom_zeeman_loc
+									nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, background_continua_lambda, opacity_atom_zeeman_loc, &
+									prec_pops, frac_ne_limit
 	use background_opacity, only: Thomson
 	use Planck, only			: bpnu
 	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, &
@@ -54,7 +55,7 @@ module atom_transfer
 	use spherical_grid, only	: subdivise_cellule_sph
 	use messages, only 			: error, warning
 	
-	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, prec_pops, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, fill_collision_matrix, &
+	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, fill_collision_matrix, &
 									init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates,store_radiative_rates_mali,calc_rates, store_rate_matrices, &
 									psi, calc_rates_mali, n_new, radiation_free_pops_atom, omega_sor_atom
 	use collision, only			: CollisionRate !future deprecation
@@ -1085,9 +1086,17 @@ module atom_transfer
 			NmaxTr = max(NmaxTr, atom%Ncont + atom%Nline)
 			
 			if (atom%initial_solution=="ZERO_RADIATION") then
-				write(*,*) atom%ID, " Initial solution at SEE with I = 0"
+				write(*,*) "-> Initial solution at SEE with I = 0 for atom ", atom%ID
+				!factorize in a new subroutine for all cells ?
 				do icell=1,n_cells
-					call radiation_free_pops_atom(1, icell, atom, .false.)
+					if (icompute_atomRT(icell) > 0) then
+						call radiation_free_pops_atom(1, icell, atom, .false.)
+					endif
+				enddo
+    			do m=1,atom%Nlevel
+    				write(*,"('Level #'(3I1))") m
+    				write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , minval(atom%n(m,:),mask=(atom%n(m,:)>0)), maxval(atom%n(m,:))
+    				write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  minval(atom%nstar(m,:),mask=(atom%nstar(m,:)>0)), maxval(atom%nstar(m,:))
 				enddo
 			endif
 			mem_alloc_tot = mem_alloc_tot + sizeof(atom%C) + sizeof(atom%Gamma)
@@ -1915,35 +1924,42 @@ module atom_transfer
 							atom => ActiveAtoms(nact)%ptr_atom
      					         					    
 							do ilevel=1,atom%Nlevel
-								!if (n_new(nact,ilevel,icell) > impure_factor * ne(icell)) then
+								if ( n_new(nact,ilevel,icell) >= frac_ne_limit * ne(icell) ) then
 									dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
 									dN = max(dN1, dN)
 									dM(nact) = max(dM(nact), dN1)
-								!endif
+								endif
 									!convergence_map(icell, ilevel, nact, etape) = dN1
 							end do !over ilevel
 
+							!I keep negative Temperatures for info.debug.
+							!hence the /= 0.0. But, some work should be done in update_pops and compute_Tex
 							do kr=1, atom%Nline
 							
-								dN3 = abs(1.0 - Tex_old(nact, kr, icell) / ( atom%lines(kr)%Tex(icell) + tiny_dp ) )
-								!dN3 = abs(atom%lines(kr)%Tex(icell) - Tex_old(nact, kr, icell)) / ( Tex_old(nact, kr, icell) + tiny_dp ) 
-								dN2 = max(dN3,dN2)
-								dTM(nact) = max(dTM(nact), dN3)
-								if (dN3 >= dN2) then
-									Tex_ref(nact) = atom%lines(kr)%Tex(icell)
-									icell_max = icell
+								if (atom%lines(kr)%Tex(icell) /= 0.0_dp) then 
+									dN3 = abs(1.0 - Tex_old(nact, kr, icell) /  atom%lines(kr)%Tex(icell) )!( atom%lines(kr)%Tex(icell) + tiny_dp ) )
+									dN2 = max(dN3,dN2)
+									dTM(nact) = max(dTM(nact), dN3)
+									if (dN3 >= dN2) then
+										Tex_ref(nact) = atom%lines(kr)%Tex(icell)
+										icell_max = icell
+									endif
 								endif
+								
 							enddo
 
 							do kr=1, atom%Ncont
-								dN3 = abs(1.0 - Tex_old(nact, kr+atom%Nline, icell) / ( atom%continua(kr)%Tex(icell) + tiny_dp ))
-								!dN3 = abs(atom%continua(kr)%Tex(icell) - Tex_old(nact, kr+atom%Nline, icell)) / ( Tex_old(nact, kr+atom%Nline, icell) + tiny_dp )
-								dN4 = max(dN3,dN4)
-								dTM(nact) = max(dTM(nact), dN3)
-								if (dN3 >= dN4) then
-									Tion_ref(nact) = atom%continua(kr)%Tex(icell)
-									icell_max_2 = icell
-								endif									
+							
+								if ( atom%continua(kr)%Tex(icell) /= 0.0_dp) then
+									dN3 = abs(1.0 - Tex_old(nact, kr+atom%Nline, icell) /  atom%continua(kr)%Tex(icell) )
+									dN4 = max(dN3,dN4)
+									dTM(nact) = max(dTM(nact), dN3)
+									if (dN3 >= dN4) then
+										Tion_ref(nact) = atom%continua(kr)%Tex(icell)
+										icell_max_2 = icell
+									endif
+								endif
+																	
 							enddo
 
 							atom => NULL()

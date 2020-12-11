@@ -1025,8 +1025,9 @@ subroutine read_pops_atom(atom)
 
     write(*,*) " min/max pops for each level:"
     do l=1,atom%Nlevel
-    	write(*,*) "   non-LTE ", l, ">>", minval(atom%n(l,:),mask=(atom%n(l,:)>0)), maxval(atom%n(l,:))
-    	write(*,*) "   LTE ", l, ">>", minval(atom%nstar(l,:),mask=(atom%nstar(l,:)>0)), maxval(atom%nstar(l,:))
+    	write(*,"('Level #'(3I1))") l
+    	write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , minval(atom%n(l,:),mask=(atom%n(l,:)>0)), maxval(atom%n(l,:))
+    	write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  minval(atom%nstar(l,:),mask=(atom%nstar(l,:)>0)), maxval(atom%nstar(l,:))
 ! 		do icell=1,n_cells
 ! 			if (icompute_atomRT(icell)) then
 ! 				if (atom%n(l,icell) / sum(atom%n(:,icell)) < 1d-5) atom%n(l,icell) = 0.0_dp
