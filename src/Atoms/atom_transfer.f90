@@ -1095,8 +1095,8 @@ module atom_transfer
 				enddo
     			do m=1,atom%Nlevel
     				write(*,"('Level #'(3I1))") m
-    				write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , minval(atom%n(m,:),mask=(atom%n(m,:)>0)), maxval(atom%n(m,:))
-    				write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  minval(atom%nstar(m,:),mask=(atom%nstar(m,:)>0)), maxval(atom%nstar(m,:))
+    				write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , minval(atom%n(m,:),mask=(icompute_atomRT>0)), maxval(atom%n(m,:))
+    				write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  minval(atom%nstar(m,:),mask=(icompute_atomRT>0)), maxval(atom%nstar(m,:))
 				enddo
 			endif
 			mem_alloc_tot = mem_alloc_tot + sizeof(atom%C) + sizeof(atom%Gamma)
