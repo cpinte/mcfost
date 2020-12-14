@@ -1169,7 +1169,7 @@ module atom_transfer
 			do icell=1,n_cells
 				if (icompute_atomRT(icell) > 0) then
 					if (lelectron_scattering) eta_es(:,icell) = eta_es(:,icell) * thomson(icell)
-					nHmin(icell) = nH_minus(icell) !beware here, or after new LTE?
+					nHmin(icell) = nH_minus(icell)
 				endif
 			enddo
 			do nact=1, Natom!see calc_ionisation_frac, for why we updated also passive atoms
@@ -2291,8 +2291,8 @@ module atom_transfer
    if (llimb_darkening) then
      call ERROR("option for reading limb darkening not implemented")
    else
-     ulimb = 0.6
-     LimbDarkening = 0.4 + 0.6 * mu!1.0_dp
+     !ulimb = 0.6
+     LimbDarkening = 1.0_dp!0.4 + 0.6 * mu!1.0_dp
    end if
    !Istar(:) = energie(:) * LimbDarkening * gamma(:)
    gamma(:) = LimbDarkening * gamma(:)
