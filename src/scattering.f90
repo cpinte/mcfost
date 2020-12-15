@@ -352,6 +352,7 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
   call bhmie(x,refrel,nang, s1,s2,qext,qsca,qback,gsca)
 
   if (lforce_HG) gsca = forced_g
+  if (lisotropic) gsca = 0.0
 
   ! Passage des valeurs dans les tableaux de mcfost
   if (aniso_method==1) then
