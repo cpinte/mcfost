@@ -694,7 +694,7 @@ subroutine prepare_check_pointing()
 	cmd = "mkdir iterations"
 	call appel_syst(cmd, sys_status)
 	if (sys_status /= 0) then 
-		call error("Error cannot create iterations folder!")
+		call Warning("Iterations folder already exists!!")
 	endif
 
 return
