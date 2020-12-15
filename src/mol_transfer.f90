@@ -295,7 +295,7 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
         !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell,factor) &
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
-        !$omp shared(deltaVmax,ispeed,r_grid,z_grid,lcompute_molRT,lkeplerian,n_cells) &
+        !$omp shared(deltaVmax,ispeed,r_grid,z_grid,phi_grid,lcompute_molRT,lkeplerian,n_cells) &
         !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule) &
         !$omp shared(nTrans_tot,tab_Trans)
         !$omp do schedule(static,1)
