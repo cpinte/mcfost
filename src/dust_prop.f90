@@ -1225,7 +1225,7 @@ subroutine write_dust_prop()
   use fits_utils, only : cfitsWrite
   use density, only : masse
 
-  integer :: icell, l
+  integer :: icell, l, p_icell
 
   real, dimension(:), allocatable :: kappa_lambda,albedo_lambda,g_lambda
   real, dimension(:,:), allocatable :: S11_lambda_theta, pol_lambda_theta, kappa_grain
@@ -1241,7 +1241,9 @@ subroutine write_dust_prop()
   allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
   allocate(kappa_grain(n_lambda,n_grains_tot))
 
-  icell = icell_ref
+  icell = icell_not_empty
+  p_icell = icell_ref
+
   kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)
 
@@ -1261,13 +1263,13 @@ subroutine write_dust_prop()
   call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
 
   do l=1, n_lambda
-     S11_lambda_theta(l,:)= tab_s11_pos(:,icell,l)
+     S11_lambda_theta(l,:)= tab_s11_pos(:,p_icell,l)
   enddo
   call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
   if (lsepar_pola) then
      do l=1, n_lambda
-        pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,icell,l) ! Deja normalise par S11
+        pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,p_icell,l) ! Deja normalise par S11
      enddo
      call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
   endif
