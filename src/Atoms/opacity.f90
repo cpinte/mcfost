@@ -186,15 +186,15 @@ module Opacity
 ! 
 							endif
 					else !Gaussian
-						!local Gaussian profiles are also interpolated !
-						if (associated(profile,local_profile_interp)) then
-							allocate(atom%lines(kc)%phi(size(atom%lines(kc)%u), n_cells), stat=alloc_status)
-							if (alloc_status > 0) call ERROR("Allocation error line%phi")
-							atom%lines(kc)%phi(:,:) = 0d0
-							size_phi_all = size_phi_all + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
-							mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
-							
-						elseif (associated(profile,local_profile_dk)) then
+						!local Gaussian profiles are also interpolated, no? if commented!
+! 						if (associated(profile,local_profile_interp)) then
+! 							allocate(atom%lines(kc)%phi(size(atom%lines(kc)%u), n_cells), stat=alloc_status)
+! 							if (alloc_status > 0) call ERROR("Allocation error line%phi")
+! 							atom%lines(kc)%phi(:,:) = 0d0
+! 							size_phi_all = size_phi_all + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
+! 							mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
+! 							!elseif
+						if (associated(profile,local_profile_dk)) then
 								!doesn't include the vel shift, just a local profile evaluated on the nlte grid.
 							Nlam = atom%lines(kc)%Nlambda
 							if (allocated(atom%lines(kc)%u)) deallocate(atom%lines(kc)%u)
@@ -206,6 +206,7 @@ module Opacity
 							atom%lines(kc)%phi(:,:) = 0d0
 							size_phi_all = size_phi_all + sizeof(atom%lines(kc)%phi(:,:))
 							mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%phi(:,:))
+							
 						!else local_profile_thomson or local_profile_voigt and gaussians are computed explictely
 						endif
 					endif
@@ -368,10 +369,11 @@ module Opacity
 ! 			
 						endif
 					else !Gaussian
-!-> gaussian profiles are interpolated in case of interpolation too.
-						if (associated(profile,local_profile_interp)) then
-							atom%lines(kc)%phi(:,icell) = exp(-(atom%lines(kc)%u(:)/atom%vbroad(icell))**2) / (SQRTPI *vbroad)
-						elseif (associated(profile,local_profile_dk)) then
+!-> gaussian profiles are interpolated in case of interpolation too.-> Not if commented!!! check profiles also
+! 						if (associated(profile,local_profile_interp)) then
+! 							atom%lines(kc)%phi(:,icell) = exp(-(atom%lines(kc)%u(:)/atom%vbroad(icell))**2) / (SQRTPI *vbroad)
+						!elseif
+						if (associated(profile,local_profile_dk)) then
 							atom%lines(kc)%phi(:,icell) = exp(-( (lambda(Nblue:Nred)-atom%lines(kc)%lambda0)/atom%lines(kc)%lambda0 * clight/vbroad )**2 )/ (SQRTPI * vbroad)								
 						endif
 					endif !line voigt

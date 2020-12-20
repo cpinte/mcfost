@@ -287,7 +287,7 @@ MODULE PROFILES
 ! 
 ! 					endif
 
-! 		if (line%voigt) then !faster to interpolate ?
+		if (line%voigt) then
 !  						locprof = 0
 			do nv=1, Nvspace
  
@@ -298,15 +298,15 @@ MODULE PROFILES
 ! locprof = locprof + voigt(N, line%a(icell), u1p)/sqrtpi/vbroad/nvspace
 			enddo
 
-! 		else !gaussian, faster to evaluate in place
-! 			do nv=1, Nvspace
-!  
-! 				u1p(:) = u1(:) - omegav(nv)
-! 
-!               	local_profile_interp(:) = local_profile_interp(:) + exp(-u1p*u1p) / sqrtpi / vbroad
-!               	
-! 			enddo		
-! 		endif 
+		else !gaussian, faster to evaluate in place, not sure ?
+			do nv=1, Nvspace
+ 
+				u1p(:) = u1(:) - omegav(nv)
+
+              	local_profile_interp(:) = local_profile_interp(:) + exp(-u1p*u1p) / sqrtpi / vbroad
+              	
+			enddo		
+		endif 
  
 		local_profile_interp(:) = local_profile_interp(:) / Nvspace
 
