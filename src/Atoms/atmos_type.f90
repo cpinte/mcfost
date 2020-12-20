@@ -1870,7 +1870,7 @@ module atmos_type
    use grid, only : cell_map
    character(len=*), intent(in)	:: filename
    real(kind=dp) Tshk!, Oi, Oo
-   real(kind=dp) :: Tring, thetai, thetao
+   real(kind=dp) :: Tring, thetai, thetao, tilt
    integer, parameter :: Nhead = 3 !Add more
    character(len=MAX_LENGTH) :: rotation_law
    integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
@@ -1882,9 +1882,6 @@ module atmos_type
    real(kind=dp), dimension(:), allocatable :: B2, V2
    logical :: is_not_dark!, xit
    real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic, Vmod, Vinf
-   !real(kind=dp), parameter :: tilt = 30.0 * pi / 180.
-   real(kind=dp) :: tilt
-   real(kind=dp) :: sinthetap0sq, costheta0, sintheta0sq
 
    lmagnetoaccr = .false.
    lspherical_velocity = .false.
@@ -2066,19 +2063,29 @@ module atmos_type
         !center of the spot
    	    etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)! *cos(tilt) - sin(tc)*sin(tilt)
    	    etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
-   	    etoile(1)%SurfB(k)%r(3) = cos(tc)!south*(cos(tc) * cos(tilt) + cos(phic)*sin(tc)*sin(tilt))
-   	    
-!     	sinthetap0sq = (1.0 + tan(tilt)**2 * cos(0.0)**2)**-1 
-!    	    sintheta0sq = sin(thetai)**2 * sinthetap0sq
-!       	costheta0 = sqrt(1.0 - sintheta0sq)
-		etoile(1)%SurfB(k)%mui = cos(thetai)
+   	    etoile(1)%SurfB(k)%r(3) = cos(tc)!south*(cos(tc) * cos(tilt) + cos(phic)*sin(tc)*sin(tilt))   	    
 
-!     	sinthetap0sq = (1.0 + tan(tilt)**2 * cos(2*PI)**2)**-1 
-!    	    sintheta0sq = sin(thetao)**2 * sinthetap0sq
-!       	costheta0 = sqrt(1.0 - sintheta0sq)
+		etoile(1)%SurfB(k)%mui = cos(thetai)
     	etoile(1)%SurfB(k)%muo = cos(thetao)
+!     	etoile(1)%SurfB(k)%phio = 2*PI; etoile(1)%SurfB(k)%phii = 0d0
+    	etoile(1)%SurfB(k)%phio = PI; etoile(1)%SurfB(k)%phii = -PI
+    	!with new location of spots in intersect_spots
+    	!should not change if no tilt i.e., (from 0 to 2pi)
+    	!In case of a tilt we should also take into account that the half ring turns into a point as the tilt goes to 90 degrees
+    	if (tilt>0) then 
+			etoile(1)%SurfB(k)%mui = sqrt(1. - sin(thetai)**2 * (1.0 - sin(tilt)) )
+    		etoile(1)%SurfB(k)%muo = sqrt(1. - sin(thetao)**2 * (1.0 - sin(tilt)) )
+
+			!or use the factor 1/sqrt(1 - sin(tilt)**2 * cos(phi)**2) that makes the spot circular at tilt=90
+   	    	if (etoile(1)%SurfB(k)%r(3) >= 0) then
+   	    		etoile(1)%SurfB(k)%phio = pi/2 * cos(tilt)**2!/ sqrt(1.0 - sin(tilt)**2)
+   	    		etoile(1)%SurfB(k)%phii = -pi/2 * cos(tilt)**2
+   	    	else
+   	    		etoile(1)%SurfB(k)%phio = -pi/2 * cos(tilt)**2
+   	    		etoile(1)%SurfB(k)%phii = pi/2 * cos(tilt)**2
+   	    	endif
+   	    endif 	
     	
-    	etoile(1)%SurfB(k)%phio = 2*PI; etoile(1)%SurfB(k)%phii = 0d0
   	  end do
   	 endif
 
