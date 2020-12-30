@@ -671,7 +671,7 @@ function v_proj(icell,x,y,z,u,v,w) !
   integer, intent(in) :: icell
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
-  real(kind=dp) :: vitesse, vx, vy, vz, norme, r
+  real(kind=dp) :: vitesse, vx, vy, vz, vr, vphi, norme, r, phi
 
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)
@@ -681,7 +681,15 @@ function v_proj(icell,x,y,z,u,v,w) !
      v_proj = vx * u + vy * v + vz * w
   else
      if (ldensity_file) then
-        vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
+        if (.not.(lvfield_cyl_coord)) then
+           vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
+        else
+           ! Convert the velocity field to Cartesian coordinates
+           vr = vfield_x(icell) ; vphi = vfield_y(icell) ;  vz = vfield_z(icell)
+           phi = atan2(y, x)
+           vx = cos(phi) * vr - sin(phi) * vphi
+           vy = sin(phi) * vr + cos(phi) * vphi
+        endif
         v_proj = vx * u + vy * v + vz * w
      else ! Using analytical velocity field
         vitesse = vfield(icell)

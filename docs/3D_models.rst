@@ -95,9 +95,13 @@ gas-to-dust mass ratio provided in the parameter file.
 .. note:: some parameters, such as ``read_gas_density`` are longer than 8 characters, which is the fits standard. They are however handled correctly by mcfost. In general, you can put a `HIERARCH` card in front of this parameter so that it respect fits standard. See for example `Astopy's documentation <http://docs.astropy.org/en/stable/io/fits/usage/headers.html#hierarch-cards>`_.
 
 
-The gas velocity field can also be passed by setting ``read_gas_velocity`` to 1. The fits file must have an extra HDU with 4
-dimensions: ``gas_velocity(1:n_rad, 1:nz, 1:n_az, 3)``. The last index correspond to ``v_x``, ``v_y``, ``v_z`` and the velocity is
-given in km/s.
+The gas velocity field, in Cartesian or cylindrical coordinates, can
+also be passed by setting ``read_gas_velocity`` to 1 (Cartesian
+coordinates) or 2 (cylindrical coordinates). The fits file must have
+an extra HDU with 4 dimensions: ``gas_velocity(1:n_rad, 1:nz, 1:n_az, 3)``.
+The last index correspond to ``v_x``, ``v_y``, ``v_z`` in Cartesian
+coordinates, or ``v_r``, ``v_phi``, ``v_z`` in cylindrical
+coordinates. The velocity is given in km/s.
 
 .. note:: If the velocity is not passed via the fits interface, mcfost will assume
           that the velocity field is Keplerian (unless modified by command line
