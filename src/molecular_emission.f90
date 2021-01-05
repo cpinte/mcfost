@@ -680,7 +680,7 @@ function v_proj(icell,x,y,z,u,v,w) !
 
      v_proj = vx * u + vy * v + vz * w
   else
-     if (ldensity_file) then
+     if (lvelocity_file) then
         if (.not.(lvfield_cyl_coord)) then
            vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
         else
