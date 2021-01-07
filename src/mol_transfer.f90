@@ -967,6 +967,10 @@ subroutine init_molecular_disk(imol)
   ldust_mol  = .true.
   lkeplerian = .true.
 
+  ! Turn image symmetry off if we read the velocity field from a file,
+  ! because the velocity field may not be symmetric.
+  if (lvelocity_file) l_sym_ima = .false.
+
   if (lfirst_time) then
      lfirst_time = .false.
      call init_Tgas()
