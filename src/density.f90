@@ -1065,7 +1065,8 @@ subroutine read_density_file()
   call ftgkyj(unit,"read_gas_velocity",read_gas_velocity,comment,status)
   if (status /=0) read_gas_velocity = 0
   write(*,*) "read_gas_velocity =", read_gas_velocity
-  lread_gas_velocity = (read_gas_velocity == 1)
+  lread_gas_velocity = (read_gas_velocity == 1).or.(read_gas_velocity == 2)
+  lvfield_cyl_coord = (read_gas_velocity == 2)
 
   status = 0
   group=1
@@ -1355,6 +1356,9 @@ subroutine read_density_file()
   !------------------------
   if (lread_gas_velocity) then
      write(*,*) "Reading gas velocity ..."
+     if (lvfield_cyl_coord) then
+        write(*,*) "Velocity field is in cylindrical coordinates."
+     endif
      lvelocity_file = .true.
 
      if (l3D_file) then
