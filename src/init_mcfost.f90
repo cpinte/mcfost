@@ -108,6 +108,7 @@ subroutine set_default_variables()
   loutput_mc=.false.
   ldensity_file=.false.
   lvelocity_file=.false.
+  lvfield_cyl_coord=.false.
   lphantom_file=.false.
   lphantom_multi = .false.
   lphantom_avg = .false.

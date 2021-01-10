@@ -822,16 +822,6 @@ subroutine define_dust_density()
      enddo
   endif
 
-  search_not_empty : do l=1,n_grains_tot
-     do icell=1,n_cells
-        if (densite_pouss(l,icell) > 0.0_sp) then
-           icell_not_empty = icell
-           exit search_not_empty
-        endif
-     enddo
-  enddo search_not_empty
-
-
   ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
   do pop=1, n_pop
      izone=dust_pop(pop)%zone
@@ -887,6 +877,13 @@ subroutine define_dust_density()
   ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
   ! Valable que dans le cas cylindrique mais pas de pb dans le cas spherique
   !if (lcylindrical) densite_pouss(:,nz+1,:,:) = densite_pouss(:,nz,:,:)
+
+  search_not_empty : do icell=1,n_cells
+     if (masse(icell) > 0.0_sp) then
+        icell_not_empty = icell
+        exit search_not_empty
+     endif
+  enddo search_not_empty
 
   return
 
@@ -1067,7 +1064,8 @@ subroutine read_density_file()
   call ftgkyj(unit,"read_gas_velocity",read_gas_velocity,comment,status)
   if (status /=0) read_gas_velocity = 0
   write(*,*) "read_gas_velocity =", read_gas_velocity
-  lread_gas_velocity = (read_gas_velocity == 1)
+  lread_gas_velocity = (read_gas_velocity == 1).or.(read_gas_velocity == 2)
+  lvfield_cyl_coord = (read_gas_velocity == 2)
 
   status = 0
   group=1
@@ -1357,6 +1355,9 @@ subroutine read_density_file()
   !------------------------
   if (lread_gas_velocity) then
      write(*,*) "Reading gas velocity ..."
+     if (lvfield_cyl_coord) then
+        write(*,*) "Velocity field is in cylindrical coordinates."
+     endif
      lvelocity_file = .true.
 
      if (l3D_file) then
@@ -1599,15 +1600,6 @@ subroutine normalize_dust_density(disk_dust_mass)
      densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
   enddo !l
 
-  search_not_empty : do l=1,n_grains_tot
-     do icell=1, n_cells
-        if (densite_pouss(l,icell) > 0.0_sp) then
-           icell_not_empty = icell
-           exit search_not_empty
-        endif
-     enddo !icell
-  enddo search_not_empty
-
   ! Normalisation : Calcul masse totale
   mass = 0.0
   do icell=1,n_cells
@@ -1624,6 +1616,13 @@ subroutine normalize_dust_density(disk_dust_mass)
      enddo !l
   enddo ! icell
   masse(:) = masse(:) * AU3_to_cm3
+
+  search_not_empty : do icell=1,n_cells
+     if (masse(icell) > 0.0_sp) then
+        icell_not_empty = icell
+        exit search_not_empty
+     endif
+  enddo search_not_empty
 
   return
 
@@ -1787,15 +1786,6 @@ subroutine densite_Seb_Charnoz()
   enddo !i
   write(*,*) "Dust mass from Seb's file :", real(Somme * g_to_Msun), "Msun"
 
-  search_not_empty : do l=1,n_grains_tot
-     do icell=1, n_cells
-        if (densite_pouss(l,icell) > 0.0_sp) then
-           icell_not_empty = icell
-           exit search_not_empty
-        endif
-     enddo
-  enddo search_not_empty
-
   ! Re-population du tableau de grains
   ! les methodes de chauffages etc, ne changent pas
 
@@ -1812,6 +1802,14 @@ subroutine densite_Seb_Charnoz()
   enddo ! icell
 
   masse(:) = masse(:) * AU3_to_cm3 * 1600./3500 ! TMP
+
+  search_not_empty : do icell=1,n_cells
+     if (masse(icell) > 0.0_sp) then
+        icell_not_empty = icell
+        exit search_not_empty
+     endif
+  enddo search_not_empty
+
 
   write(*,*) 'Total dust mass in model  :', real(sum(masse)*g_to_Msun),'Msun'
 
@@ -1907,16 +1905,6 @@ subroutine densite_Seb_Charnoz2()
   do l=1,n_grains_tot
      densite_pouss(l,:) = densite_pouss(l,:)*nbre_grains(l)
   enddo
-
-  search_not_empty : do l=1,n_grains_tot
-     do icell=1, n_cells
-        if (densite_pouss(l,icell) > 0.0_sp) then
-           icell_not_empty = icell
-           exit search_not_empty
-        endif
-     enddo !icell
-  enddo search_not_empty
-
   write(*,*) "Done"
 
   do icell=1,n_cells
@@ -1926,6 +1914,13 @@ subroutine densite_Seb_Charnoz2()
   enddo ! icell
 
   masse(:) = masse(:) * AU3_to_cm3
+
+  search_not_empty : do icell=1,n_cells
+     if (masse(icell) > 0.0_sp) then
+        icell_not_empty = icell
+        exit search_not_empty
+     endif
+  enddo search_not_empty
 
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
   write(*,*) "Density from Seb. Charnoz set up OK"
