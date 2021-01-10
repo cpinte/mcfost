@@ -1247,7 +1247,6 @@ subroutine write_dust_prop()
   kappa_lambda=real((kappa(icell,:)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)
 
-
   call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
   call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
   call cfitsWrite("!data_dust/albedo.fits.gz",albedo_lambda,shape(albedo_lambda))
