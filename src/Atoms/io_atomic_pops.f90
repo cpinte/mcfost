@@ -867,7 +867,7 @@ subroutine read_pops_atom(atom)
 	! ---------------------------------------------------------- !
 	type (AtomType), intent(inout) :: atom
 	integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
-	logical :: extend, simple, anynull
+	logical :: extend, simple, anynull, show_warning = .true.
 	integer :: nelements, naxis2(4), Nl, naxis_found, hdutype, l, icell
 	character(len=256) :: some_comments, popsF
   
@@ -1023,16 +1023,27 @@ subroutine read_pops_atom(atom)
 ! 		stop
 	endif
 
-    write(*,*) " min/max pops for each level:"
+!     write(*,*) " min/max pops for each level:"
     do l=1,atom%Nlevel
-    	write(*,"('Level #'(3I1))") l
+    	!-> correct edge effect due to interpolation?
+    	!pre-smoothing the data could help or a better interpolation.
+    	!This steps does not cost anything but it requires a careful knowledge about the data
+    	!and how this affects the flux.
+    	!Alternatively those region could be adressed in another way (interpolation, LTE values, non-LTE solution...)
+		do icell=1,n_cells
+			if (icompute_atomRT(icell)) then!if on the exact grid (computed) is not empty but the interpolations are, empty the grid point.
+				if ( (atom%n(l,icell) <= 0.0_dp) .or. (atom%nstar(l,icell) <= 0.0_dp)) then
+					icompute_atomRT(icell) = 0
+					if (show_warning) then
+						call warning(" ++ Accommodating grid to match interpolated data...")
+						show_warning = .false.
+					endif
+				endif
+			endif
+		enddo
+    	write(*,"('Level #'(1I3))") l
     	write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , minval(atom%n(l,:),mask=(icompute_atomRT>0)), maxval(atom%n(l,:))
     	write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  minval(atom%nstar(l,:),mask=(icompute_atomRT>0)), maxval(atom%nstar(l,:))
-! 		do icell=1,n_cells
-! 			if (icompute_atomRT(icell)) then
-! 				if (atom%n(l,icell) / sum(atom%n(:,icell)) < 1d-5) atom%n(l,icell) = 0.0_dp
-! 			endif
-! 		enddo
 	enddo
 
 
