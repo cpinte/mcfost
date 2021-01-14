@@ -13,8 +13,8 @@ module getlambda
 
   !Number of points for each transition
   !continuum wavelength double for level dissolution !
-  integer, parameter :: Nlambda_cont = 81! 141 !continuum, linear
-  integer, parameter :: Nlambda_cont_log = 51 !61, 91continuum log scaled
+  integer, parameter :: Nlambda_cont = 41!81! 141 !continuum, linear
+  integer, parameter :: Nlambda_cont_log = 31!51 !61, 91 continuum log scaled
   integer, parameter :: Nlambda_line_w = 12, Nlambda_line_c_log = 31
   integer, parameter :: Nlambda_line_c = 51!line linear1
   real, parameter    :: hvel_nlte = 6.0!for line in km/s, 1-3 for static models
@@ -391,7 +391,6 @@ module getlambda
   end subroutine make_sub_wavelength_grid_cont_linlog
 
   !not working properly with level dissolution
-  !deprec
   subroutine make_sub_wavelength_grid_cont_log_nu(cont, lambdamin, lambdamax)
   ! ----------------------------------------------------------------- !
    ! Make an individual wavelength grid for the AtomicContinuum cont.
@@ -432,8 +431,7 @@ module getlambda
 
   
   cont%lambda(N1:1:-1) = 1e-15 * clight / spanl_dp(nu0,nu1,N1,1) * m_to_nm
-   write(*,*) cont%lambda - cont%lambda0, cont%lambda(N1), cont%lambda0
-   stop
+
   if (N2 > 0) then
    dnu = abs(cont%lambda(N1)-cont%lambda(N1-1))
    cont%lambda(N2+N1:N1+1:-1) = 1e-15 * clight / spanl_dp(nu1+dnu,nu2,N2,1) * m_to_nm
