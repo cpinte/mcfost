@@ -18,9 +18,9 @@ module atom_transfer
 									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, cntrb_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, eta_es, alloc_flux_image, allocate_stokes_quantities, &
 									dealloc_jnu, reallocate_rays_arrays, write_contribution_functions_ray, write_flux, write_1D_arr_ascii, cntrb, flow_chart, write_lambda_cell_array, cf_file, flow_file
 									
-	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, &
+	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
-									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature
+									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock
 	use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
 	use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
 	use constant, only			: MICRON_TO_NM, hc_k, sigma_e
@@ -28,7 +28,7 @@ module atom_transfer
 	use getlambda, only			: hv
 	use voigtfunctions, only	: Voigt, VoigtHumlicek, dirac_line
 	use profiles, only			: profile, local_profile_v, local_profile_thomson, local_profile_interp, local_profile_dk
-	use io_atomic_pops, only	: write_pops_atom, write_electron, write_hydrogen, write_Hminus, write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
+	use io_atomic_pops, only	: write_pops_atom, write_electron, read_electron, write_hydrogen, write_Hminus, write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
 	use io_opacity, only 		: write_Jnu, write_taur, write_contrib_lambda_ascii, read_jnu_ascii, Jnu_File_ascii, read_Jnu, &
 									write_collision_matrix_atom, write_collision_matrix_atom_ascii, &
 									write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii
@@ -48,7 +48,7 @@ module atom_transfer
 	use stars, only				: intersect_spots, intersect_stars
 	!use wavelengths, only		:
 	use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
-	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg
+	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, sigma
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
 	use cylindrical_grid, only	: r_grid, z_grid, phi_grid
@@ -107,7 +107,7 @@ module atom_transfer
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
 		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau
 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
-		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
 		x1=x;y1=y;z1=z
@@ -133,6 +133,7 @@ module atom_transfer
   ! Boucle infinie sur les cellules
 		infinie : do ! Boucle infinie
     ! Indice de la cellule
+    		icell_prev = icell !duplicate with previous_cell, but this avoid problem with Voronoi grid here
 			icell = next_cell
 			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
@@ -151,9 +152,9 @@ module atom_transfer
 			if (lintersect_stars) then
 				if (icell == icell_star) then
 					!can be done better
-					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
+					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w,LDc)
        				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
+					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
        				return
       			end if
@@ -254,7 +255,7 @@ module atom_transfer
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
 		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau, chi_line, tau_line, Sline
 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
-		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
 		x1=x;y1=y;z1=z
@@ -284,6 +285,7 @@ module atom_transfer
   ! Boucle infinie sur les cellules
 		infinie : do ! Boucle infinie
     ! Indice de la cellule
+    		icell_prev = icell
 			icell = next_cell
 			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
@@ -302,9 +304,9 @@ module atom_transfer
 			if (lintersect_stars) then
 				if (icell == icell_star) then
 					!can be done better
-					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
+					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
        				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
+					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
        				return
       			end if
@@ -410,7 +412,7 @@ module atom_transfer
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
 		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau, S_Q, S_U, S_V
 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
-		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
 		x1=x;y1=y;z1=z
@@ -438,6 +440,7 @@ module atom_transfer
   ! Boucle infinie sur les cellules
 		infinie : do ! Boucle infinie
     ! Indice de la cellule
+    		icell_prev = icell
 			icell = next_cell
 			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
@@ -456,9 +459,9 @@ module atom_transfer
 			if (lintersect_stars) then
 				if (icell == icell_star) then
 					!can be done better
-					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
+					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
        				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
+					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
        				return
       			end if
@@ -916,7 +919,7 @@ module atom_transfer
   integer :: n_rayons_max = n_rayons_start2 * (2**(maxIter-1))
   integer, parameter :: Nrayone = 1
   character(len=20)  :: ne_initial
-  logical :: lread_jnu_ascii = .false.
+  logical :: lread_jnu_ascii = .false., lelectron_read
   type (AtomType), pointer :: atom
   integer :: alloc_status
   logical :: test
@@ -997,15 +1000,27 @@ module atom_transfer
   								 !if background fixed, they will be computed with the current estimate of
   								 !electron density and non-LTE pops !
 
- 
- !if checkpointing no need to re-read  elecontron pops. They are computed
- !with non-LTE populations here!
-  if (calc_ne) then !eventually computed with the previous non-LTE pops ! 
-  	ne_initial = "H_IONISATION"
+  !not in the model but fits file exists from previous run ?
+  call read_electron(lelectron_read)
+  if (lelectron_read) then
+  	ne_initial = "NE_MODEL"
+  	calc_ne = lsolve_for_ne !only if we force solving it. Otherwise it is read
+  	!from old values and eventually iterated during non-LTE loop. This way,
+  	!the iteration starts exactly where it stopped.
+  	!Forcing evaluation of ne (lsolve_for_ne == True) might smooth the solution.
+  else
+    ne_initial = "H_IONISATION"
 	write(*,*) "Solving for electron density from H+M ionisation"
+  endif	
+ 
+  !no electron density in the model nor previous fits file calc_ne == True.
+  !if a previous file is found (lelectron_read == True) and lsolve_for_ne, then
+  !calc_ne is set to .true. Electron density is re-evaluated using the populations
+  !in the fits files (H_Ionisation otherwise).
+  if (calc_ne) then !eventually computed with the previous non-LTE pops ! 
 	call Solve_Electron_Density(ne_initial, .true., dne) 
 ! 	call Solve_Electron_Density_old(ne_initial)
-	call write_Electron 
+	call write_Electron
   else
   	if (lsolve_for_ne) then
   		ne_initial = "NE_MODEL"
@@ -1555,6 +1570,9 @@ module atom_transfer
 			else if (etape==2) then 		
 				time_iteration = 0
 				
+				if (etape_start == 1) then
+					Ndelay_iterate_ne = 0
+				endif
 				!-> no iteration in MC but after the solution ??
 ! 				if (iterate_ne .and.. lno_ne_mc) then
 ! 					if (iterate_ne) then
@@ -1570,7 +1588,7 @@ module atom_transfer
 				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				fac_etape = 1.0
-				precision = 1e-2!fac_etape * 1.0 / sqrt(real(n_rayons)) !0.1
+				precision = 1e-3!fac_etape * 1.0 / sqrt(real(n_rayons)) !0.1
 				!precision = dpops_max_error
 				write(*,*) " threshold:", precision
 				
@@ -2215,6 +2233,7 @@ module atom_transfer
 
  subroutine init_stellar_disk
   integer :: i_star!, lam
+  !read stellar radiation here or compute from mcfsot
 
    write(*,*) " Computing Istar(mu=1) for each star..."
    !move elsewhere if we read a file, but normally should well fit with MCFOST routines
@@ -2235,29 +2254,42 @@ module atom_transfer
  end subroutine init_stellar_disk
 
  
- subroutine calc_stellar_surface_brightness(N,lambda,i_star,x,y,z,u,v,w,gamma)
+ subroutine calc_stellar_surface_brightness(N,lambda,i_star,icell_prev,x,y,z,u,v,w,gamma)
  ! ---------------------------------------------------------------!
   ! Compute the stellar radiation field surface brightness.
   ! Istar = B(x,y,z;mu) * Stellar spectrum or B * BlackBody
   ! return gamma, the brightness. For uniform disk, gamma is 1.
   !
-  ! For a point on the stellar disk, returns gamma * limbdarkenig
+  ! If there is a shock spot at the surface, gamma returned is :
+  ! gamma = 1 + ratio, such that the radiation from the star Istar is
+  ! Istar = I(photosphere) + Ishock, with Ishock = I(photosphere) * ratio.
+  ! (previously, Istar was Ishock, now it is the sum of the two contrib)
  ! -------------------------------------------------------------- !
-  integer, intent(in) :: N, i_star
+  integer, intent(in) :: N, i_star, icell_prev
   real(kind=dp), dimension(N), intent(in) :: lambda
   real(kind=dp), dimension(N), intent(out) :: gamma
   real(kind=dp), intent(in) :: u, v, w, x, y, z
-  real(kind=dp) :: energie(N)
+  real(kind=dp) :: energie(N), Tchoc
   real(kind=dp) :: mu, ulimb, LimbDarkening, surface, HC
   integer :: ns,la
-  logical :: lintersect_spot
+  logical :: lintersect = .false.
 
-   if (etoile(i_star)%T <= 1e-6) then
+   if (etoile(i_star)%T <= 1e-6) then !even with spots
     gamma(:) = 0.0_dp
-    return
-   else
-    gamma(:) = 1d0
+    return !no radiation from the starr
    endif
+   
+   gamma(:) = 1.0_dp !init
+   					 !if no spots (and no other sources like X rays, UV flux)
+   					 !it is the outvalue
+   
+   !if (ladd_xrays) then
+    !such that Ixray = Iphot * gamma and Istar = Iphot + Ixray = Iphot * (1 + gamma)
+!     gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
+!     where (lambda <= 50.)
+!         gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
+!     end where
+   !endif
    
    !cos(theta) = dot(r,n)/module(r)/module(n)
    mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
@@ -2266,28 +2298,42 @@ module atom_transfer
     call Error(" mu limb > 1!")
    end if
    
-   !1) Compute stellar flux from mcfost 
-   ! .... 
    
-   !2) Correct with the contrast gamma of a hotter/cooler region if any
-   call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
-   !avoid error with infinity for small lambda
-   if (lintersect_spot) then
-   		!Means that Fspot = Bp(Tspot) 
-		gamma(:) = (exp(hc_k/max(lambda,50.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,50.0)/etoile(i_star)%SurfB(ns)%T)-1)
-     !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
-     	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
-		!gamma = 1.0_dp + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
-   end if
-!    if (any_nan_infinity_vector(gamma) > 0) then
-!    	do la=1,size(gamma)
-! 		write(*,*) la, "lam=", lambda(la), " g=", gamma(la), hc_k/lambda(la)/etoile(i_star)%T, hc_k/lambda(la)/etoile(i_star)%SurfB(ns)%T
-! 	enddo
-! 	write(*,*) "Tspot=",etoile(i_star)%SurfB(ns)%T
-!    	call error("error in stellar spots")
-!    endif
+!   ! Correct with the contrast gamma of a hotter/cooler region if any
+!    call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect)
+!    !avoid error with infinity for small lambda
+!    if (lintersect) then
+!    		!Means that Ispot = Bp(Tspot) = gamma * Iphot  = Ispot
+!    		!gamma is initialized to one here.
+!    		!The +1 (i.e., the gamma = gamma + ...) means that Istar = Iphot + Ispot = Iphot * (1 + gamma)
+! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/etoile(i_star)%SurfB(ns)%T)-1)
+!      !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
+!      	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
+! 		gamma = 1.0_dp + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
+!    end if
+   
+   if ((laccretion_shock).and.(icell_prev<=n_cells)) then
+   	if (icompute_atomRT(icell_prev)) then
+   		if (vr(icell_prev) < 0.0_dp) then
+!    		write(*,*) "Accretion E (K):", (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+!    			lintersect = .true.
+   			if (Taccretion>0) then
+   				Tchoc = Taccretion
+   			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
+   				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+   			endif
+   			lintersect = (Tchoc > etoile(i_star)%T)
+   		endif
+	endif
+	if (lintersect) then
+! 		write(*,*) "intersect spot"
+		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
+	endif
 
-   !3) Apply Limb darkening
+   endif
+
+
+   !Apply Limb darkening
    if (llimb_darkening) then
      call ERROR("option for reading limb darkening not implemented")
    else
@@ -2323,6 +2369,7 @@ module atom_transfer
   x0=x;y0=y;z0=z
   next_cell = icell_in
   nbr_cell = 0
+  previous_cell = icell_in
 
   !tau(:) = 0.0_dp !go from surface down to the star
   tau_c(:) = 0.0_dp
@@ -2357,7 +2404,7 @@ module atom_transfer
 
     if (lintersect_stars) then
       if (icell == icell_star) then
-       !call calc_stellar_surface_brightness(size(Ic(:,1)),lambda,i_star,x0,y0,z0,u,v,w,LimbD)
+       !call calc_stellar_surface_brightness(size(Ic(:,1)),lambda,i_star,previous_cell,x0,y0,z0,u,v,w,LimbD)
        Ic(:,id) =  Ic(:,id) + Istar(:) * exp(-tau_c)
        return
       end if

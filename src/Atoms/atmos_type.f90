@@ -44,7 +44,7 @@ module atmos_type
 	real(kind=dp), dimension(:,:), allocatable :: ds
   
 	integer :: Npf, NactiveAtoms, Npassiveatoms, Natom
-	real(kind=dp) :: metallicity, totalAbund, avgWeight, wght_per_H, tau
+	real(kind=dp) :: metallicity, totalAbund, avgWeight, wght_per_H, tau, Taccretion
 	real(kind=dp), allocatable, dimension(:) :: vR, v_z, vphi
 	real(kind=dp), allocatable, dimension(:) :: BR, B_z, Bphi, vtheta, Btheta, gammab, chib, Bmag
 	type (elemPointerArray), dimension(:), allocatable :: Elements
@@ -53,7 +53,7 @@ module atmos_type
 	real(kind=dp), dimension(:), allocatable :: nHmin !Hminus populations
 	real(kind=dp) :: B_char = 0d0, v_char=0d0
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
-	logical :: lMagnetized = .false., calc_ne
+	logical :: lMagnetized = .false., calc_ne, laccretion_shock
 	integer, allocatable, dimension(:) :: icompute_atomRT!
 	
 	real(kind=dp), dimension(:), allocatable :: xmu, wmu, xmux, xmuy
@@ -1950,6 +1950,8 @@ module atmos_type
    read(inputline(1:Nread),*) Tshk, acspot
    accretion_spots = .false.
    if (acspot==1) accretion_spots = .true.
+   laccretion_shock = accretion_spots
+   Taccretion = Tshk !if <= 0, computed from the energy flow onto the star
    !now read thetao and thetai
    call getnextline(1, "#", FormatLine, inputline, Nread)
    read(inputline(1:Nread),*) thetai, thetao, tilt
