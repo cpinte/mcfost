@@ -1,15 +1,5 @@
 ! ---------------------------------------------------------------------- !
 ! This module writes to separate files the populations of each atom.
-! - n
-! - nHtot
-! - nH-
-!
-! TO DO:  
-!      - check points
-!      - read electrons density
-!
-! Atomic data are written to atom%dataFile
-! Electronic density is also written in a separate file
 ! ---------------------------------------------------------------------- !
 MODULE io_atomic_pops
 
@@ -181,6 +171,138 @@ subroutine write_Electron
 return
 end subroutine write_Electron
 
+subroutine read_electron(lelectron_read)
+	! ------------------------------------ !
+	! read Electron density from file
+	! ------------------------------------ !
+	logical, intent(out) :: lelectron_read
+	integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
+	logical :: extend, simple, anynull
+	integer :: nelements, naxis2(4), sys_status, naxis_found, hdutype
+	character(len=512) :: cmd, some_comments
+			
+	!check if data file already exist, otherwise lead and return .false.
+	cmd = "ls "//trim(nefile)
+	call appel_syst(cmd, sys_status)
+	if (sys_status == 0) then !means the file exist
+		write(*,*) " Reading electron density from previous calc."
+		lelectron_read = .true.
+	else
+		write(*,*) " found no electron density file. Evaluating from read populations."
+		lelectron_read = .false.
+		return
+	endif
+  
+	status = 0
+	call ftgiou(unit,status)
+	
+	call ftopen(unit, trim(nefile), 0, blocksize, status)
+	if (status > 0) then
+		write(*,*) "Cannot open electron file! ", nefile
+		call print_error(status)
+	endif
+
+
+	simple = .true. !Standard fits
+	group = 1
+	fpixel = 1
+	extend = .true.
+	bitpix = -64
+  
+
+	call ftmahd(unit,1,hdutype,status)
+	if (status > 0) then
+		write(*,*) "Cannot read ne! "
+		call print_error(status)
+		stop
+	endif 
+
+	if (lVoronoi) then
+		naxis = 1
+		call error("read_electron does not handled Voronoi grid yet!")
+	else
+
+		if (l3D) then
+			naxis = 3
+		else
+			naxis = 2
+		end if
+	
+		!Number of axis
+		call ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
+		if (status > 0) then
+			write(*,*) "error reading number of axis (naxis)"
+			call print_error(status)
+			stop
+		endif
+		
+		!R
+		call ftgkyj(unit, "NAXIS1", naxis_found, some_comments, status)
+		if (status > 0) then
+			write(*,*) "error reading nrad from file (naxis1)"
+			call print_error(status)
+			stop
+		endif
+		nelements = naxis_found
+		
+		!Z
+		call ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
+		if (status > 0) then
+			write(*,*) "error reading nz from file (naxis2)"
+			call print_error(status)
+			stop
+		endif
+		nelements = nelements * naxis_found
+		
+		
+		!phi axis ?
+		if (l3D) then
+			call ftgkyj(unit, "NAXIS3", naxis_found, some_comments, status)
+			if (status > 0) then
+				write(*,*) "error reading naz from file (naxis3)"
+				call print_error(status)
+				stop
+			endif
+			nelements = nelements * naxis_found
+		endif
+		
+		if (nelements /= n_cells) then
+			write(*,*) " read_electron does not do interpolation yet!"
+			call Error (" Model read does not match simulation box")
+		endif
+
+		call FTG2Dd(unit,group,-999,shape(ne),n_cells,1,ne,anynull,status)
+		!call ftgpvd(unit,group,1,n_cells,-999,ne,anynull,status)
+		
+		if (status > 0) then
+			write(*,*) "error reading ne density"
+			call print_error(status)
+			stop
+		endif
+
+	endif !lvoronoi
+
+	call ftclos(unit, status) !close
+	if (status > 0) then
+		write(*,*) "error cannot close file in ", trim(nefile)
+		call print_error(status)
+		stop
+	endif
+	
+	call ftfiou(unit, status) !free
+	if (status > 0) then
+		write(*,*) "error cannot free file unit!"
+		call print_error(status)
+! 		stop
+	endif	
+	
+	!call FTG2Dd(unit,1,-999,shape(ne),naxes(1),naxes(2),ne,anynull,EOF)
+
+    write(*,'("  -- min(ne)="(1ES20.7E3)" m^-3; max(ne)="(1ES20.7E3)" m^-3")') , minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
+
+return
+end subroutine read_electron
+
 subroutine write_convergence_map_electron(nstep, conv_map)
 	! ------------------------------------ !
 	! write convergence map for an atom atom
@@ -300,58 +422,6 @@ subroutine write_convergence_map_atom(atom, nstep, conv_map)
 return
 end subroutine write_convergence_map_atom
  
-!not implemented, not needed ?, self computed with non-LTE pops if read previous pops
-! subroutine read_electron
-! 	! ------------------------------------ !
-! 	! read Electron density from file
-! 	! ------------------------------------ !
-! 	integer :: EOF = 0, unit, blocksize, hdutype, anynull
-! 	integer :: naxis, naxes(4)
-! 
-!   !get unique unit number
-! 	call ftgiou(unit,EOF)
-!   ! open fits file in readmode'
-! 	call ftopen(unit, TRIM(nefile), 0, blocksize, EOF)
-! 
-! 	call FTMAHD(unit,1,hdutype,EOF) !only one, the electron density
-! 	if (lVoronoi) then
-! 		call ftgkyj(unit, "NAXIS1", naxes(1), " ", EOF)
-! 		if (naxes(1).ne.(n_cells)) then
-! 			write(*,*) "Cannot read electron density (1)"
-! 			return
-! 		end if
-! 		call error("read electron density not implemented with Voronoi")
-! 	else
-! 		if (l3D) then
-! 			call ftgkyj(unit, "NAXIS1", naxes(1), " ", EOF)
-! 			call ftgkyj(unit, "NAXIS2", naxes(2), " ", EOF)
-! 			call ftgkyj(unit, "NAXIS3", naxes(3), " ", EOF)
-! 			if ((naxes(1)*naxes(2)*naxes(3)).ne.(n_cells)) then
-! 				write(*,*) "Cannot read electron density (2)"
-! 				return
-! 			end if
-! 			call error("read electron density not implemented with Voronoi")
-! 		else
-! 			call ftgkyj(unit, "NAXIS1", naxes(1), " ", EOF)
-! 			call ftgkyj(unit, "NAXIS2", naxes(2), " ", EOF)
-! 			if ((naxes(1)*naxes(2)).ne.(n_cells)) then
-! 				write(*,*) "Cannot read electron density (3)"
-! 				return
-! 			end if
-! 		end if
-! 	end if
-! 	
-! 	
-! 	call FTG2Dd(unit,1,-999,shape(ne),naxes(1),naxes(2),ne,anynull,EOF)
-! 
-! 	
-! 	call ftclos(unit, EOF)
-! 	call ftfiou(unit, EOF)
-! 
-! 	if (EOF > 0) call print_error(EOF)
-! 
-! return
-! end subroutine read_electron
 
  subroutine write_Hydrogen()
  ! ------------------------------------ !
