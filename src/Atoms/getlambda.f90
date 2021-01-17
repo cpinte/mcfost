@@ -14,7 +14,7 @@ module getlambda
   !Number of points for each transition
   !continuum wavelength double for level dissolution !
   integer, parameter :: Nlambda_cont = 41!81! 141 !continuum, linear
-  integer, parameter :: Nlambda_cont_log = 31!51 !61, 91 continuum log scaled
+  integer, parameter :: Nlambda_cont_log = 61!31,51 !61, 91 continuum log scaled
   integer, parameter :: Nlambda_line_w = 12, Nlambda_line_c_log = 31
   integer, parameter :: Nlambda_line_c = 51!line linear1
   real, parameter    :: hvel_nlte = 6.0!for line in km/s, 1-3 for static models
