@@ -685,10 +685,10 @@ function v_proj(icell,x,y,z,u,v,w) !
            vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
         else
            ! Convert the velocity field to Cartesian coordinates
-           vr(icell) = vfield_x(icell) ; vphi = vfield_y(icell) ;  vz = vfield_z(icell)
+           vr = vfield_x(icell) ; vphi = vfield_y(icell) ;  vz = vfield_z(icell)
            phi = atan2(y, x)
-           vx = cos(phi) * vr(icell) - sin(phi) * vphi(icell)
-           vy = sin(phi) * vr(icell) + cos(phi) * vphi(icell)
+           vx = cos(phi) * vr - sin(phi) * vphi
+           vy = sin(phi) * vr + cos(phi) * vphi
            if ((l_sym_centrale).and.(z.lt.0)) vz = -vz
         endif
         v_proj = vx * u + vy * v + vz * w

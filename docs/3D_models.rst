@@ -101,7 +101,7 @@ coordinates) or 2 (cylindrical coordinates). The fits file must have
 an extra HDU with 4 dimensions: ``gas_velocity(1:n_rad, 1:nz, 1:n_az, 3)``.
 The last index correspond to ``v_x``, ``v_y``, ``v_z`` in Cartesian
 coordinates, or ``v_r``, ``v_phi``, ``v_z`` in cylindrical
-coordinates. The velocity is given in km/s.
+coordinates. The velocity is given in m/s.
 
 .. note:: If the velocity is not passed via the fits interface, mcfost will assume
           that the velocity field is Keplerian (unless modified by command line
