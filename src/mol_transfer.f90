@@ -155,7 +155,7 @@ subroutine NLTE_mol_line_transfer(imol)
   real, parameter :: precision = 1.0e-1
 
   integer :: etape, etape_start, etape_end, iray, n_rayons, icell
-  integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed
+  integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed, n_cells_done, ibar
   integer, dimension(nb_proc) :: max_n_iter_loc
 
   logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
@@ -166,7 +166,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
   real(kind=dp), dimension(nLevels,nb_proc)  :: pop, pop_old
 
-  logical :: labs
+  logical :: labs, laffichage
 
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(:,:), allocatable :: tab_speed
@@ -228,17 +228,20 @@ subroutine NLTE_mol_line_transfer(imol)
         iray_start=1
         fac_etape = 1.0
         lprevious_converged = .false.
+        laffichage = .false.
      else if (etape==2) then
         lfixed_Rays = .true. ;  ispeed(1) = -n_speed ; ispeed(2) = n_speed
         n_rayons = n_rayons_start
         iray_start=1
         fac_etape = 1.0
         lprevious_converged = .false.
+        laffichage = .true.
      else if (etape==3) then
         lfixed_Rays = .false.;  ispeed(1) = 1 ; ispeed(2) = 1
         n_rayons = n_rayons_start2
         fac_etape = 1.0
         lprevious_converged = .false.
+        laffichage = .true.
 
         ! On passe en mode mono-frequence
         deallocate(tab_speed,I0,I0c,ds,Doppler_P_x_freq)
@@ -290,6 +293,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
         ! Boucle sur les cellules
 
+        if (laffichage) call progress_bar(0)
         !$omp parallel &
         !$omp default(none) &
         !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
@@ -297,8 +301,8 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(deltaVmax,ispeed,r_grid,z_grid,phi_grid,lcompute_molRT,lkeplerian,n_cells) &
         !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule) &
-        !$omp shared(nTrans_tot,tab_Trans)
-        !$omp do schedule(static,1)
+        !$omp shared(nTrans_tot,tab_Trans,laffichage,n_cells_done,ibar)
+        !$omp do schedule(static)
         do icell=1, n_cells
            !$ id = omp_get_thread_num() + 1
 
@@ -406,9 +410,22 @@ subroutine NLTE_mol_line_transfer(imol)
               if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
            endif ! lcompute_molRT
 
+
+           ! Progress bar
+           if (laffichage) then
+              !$omp atomic
+              n_cells_done = n_cells_done + 1
+              if (real(n_cells_done) > 0.02*ibar*n_cells) then
+                 call progress_bar(ibar)
+                 !$omp atomic
+                 ibar = ibar+1
+              endif
+           endif
+
         enddo ! icell
         !$omp end do
         !$omp end parallel
+        if (laffichage) call progress_bar(50)
 
         ! Critere de convergence totale
         maxdiff = 0.0
