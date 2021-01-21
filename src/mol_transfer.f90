@@ -268,9 +268,8 @@ subroutine NLTE_mol_line_transfer(imol)
      lnotfixed_Rays = .not.lfixed_Rays
      lconverged = .false.
      n_iter = 0
-
-
-
+     n_cells_done = 0
+     ibar = 0
 
      do while (.not.lconverged)
         n_iter = n_iter + 1
@@ -409,7 +408,6 @@ subroutine NLTE_mol_line_transfer(imol)
               enddo ! while : convergence champ local
               if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
            endif ! lcompute_molRT
-
 
            ! Progress bar
            if (laffichage) then
