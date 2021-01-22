@@ -98,6 +98,7 @@ module Opacity
 	end subroutine dealloc_atom_quantities
   
    !I will not allocate twohnu3_c2, gij for lte bound free but allocate alpha for all at the moment
+   !To Do: Tex and Tion from populations instead of T(:). Allows to restard from previous calc
 	subroutine alloc_atom_quantities
   
 		type(AtomType), pointer :: atom
