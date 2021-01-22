@@ -185,10 +185,10 @@ subroutine read_electron(lelectron_read)
 	cmd = "ls "//trim(nefile)
 	call appel_syst(cmd, sys_status)
 	if (sys_status == 0) then !means the file exist
-		write(*,*) " Reading electron density from previous calc."
+		write(*,*) " Reading old ne.fits.gz file"
 		lelectron_read = .true.
 	else
-		write(*,*) " found no electron density file. Evaluating from read populations."
+		write(*,*) " found no ne.fits.gz"
 		lelectron_read = .false.
 		return
 	endif
