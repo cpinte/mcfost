@@ -105,8 +105,8 @@ module atom_transfer
 		real(kind=dp), intent(in) :: x,y,z
 		logical, intent(in) :: labs
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau
-		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
+		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau!, LD
+		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
@@ -151,11 +151,14 @@ module atom_transfer
 
 			if (lintersect_stars) then
 				if (icell == icell_star) then
-					!can be done better
-					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w,LDc)
-       				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
-					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+					!It is completely possible to merge Icont and Itot in the say function
+					!as the operation are similar
+					!!call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w,LDc)
+       				!!Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
+					!!call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
+					!!Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
        				return
       			end if
    			 endif
@@ -253,8 +256,8 @@ module atom_transfer
 		real(kind=dp), intent(in) :: x,y,z
 		logical, intent(in) :: labs
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau, chi_line, tau_line, Sline
-		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
+		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, chi_line, tau_line, Sline!, LD
+		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
@@ -304,10 +307,12 @@ module atom_transfer
 			if (lintersect_stars) then
 				if (icell == icell_star) then
 					!can be done better
-					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
-       				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
-					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
+!        			Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
+! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
+! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
        				return
       			end if
    			 endif
@@ -410,8 +415,8 @@ module atom_transfer
 		real(kind=dp), intent(in) :: x,y,z
 		logical, intent(in) :: labs
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau, S_Q, S_U, S_V
-		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
+		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, S_Q, S_U, S_V!, LD
+		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
@@ -458,11 +463,12 @@ module atom_transfer
 
 			if (lintersect_stars) then
 				if (icell == icell_star) then
-					!can be done better
-					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
-       				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
-					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
+!        				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
+! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
+! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
        				return
       			end if
    			 endif
@@ -1100,6 +1106,8 @@ module atom_transfer
 			NmaxLevel = max(NmaxLevel, atom%Nlevel)
 			NmaxTr = max(NmaxTr, atom%Ncont + atom%Nline)
 			
+			!calc_delta_Tex_atom
+			
 			if (atom%initial_solution=="ZERO_RADIATION") then
 				write(*,*) "-> Initial solution at SEE with I = 0 for atom ", atom%ID
 				!factorize in a new subroutine for all cells ?
@@ -1574,12 +1582,10 @@ module atom_transfer
 					Ndelay_iterate_ne = 0
 				endif
 				!-> no iteration in MC but after the solution ??
-! 				if (iterate_ne .and.. lno_ne_mc) then
-! 					if (iterate_ne) then
-! 						iterate_ne = .false.
-! 						n_iterate_ne = 0	
-! 					endif
-! 				endif
+				if (iterate_ne) then! .and.. lno_ne_mc) then
+					iterate_ne = .false.
+					n_iterate_ne = 0	
+				endif
 			
 				write(*,*) " Using step 2 with ", n_rayons_1, " rays"
 				lfixed_rays = .true.
@@ -1588,7 +1594,7 @@ module atom_transfer
 				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				fac_etape = 1.0
-				precision = 1e-3!fac_etape * 1.0 / sqrt(real(n_rayons)) !0.1
+				precision = 1e-1!1e-3, 1e-2, fac_etape * 1.0 / sqrt(real(n_rayons))
 				!precision = dpops_max_error
 				write(*,*) " threshold:", precision
 				
@@ -1917,16 +1923,19 @@ module atom_transfer
      		!Global convergence Tests
      			id = 1
             !should be para
-				dM(:) = 0.0
+				dM(:) = 0.0 !all pops
 				diff = 0.0
 				dJ = 0.0
 				lambda_max = 0.0
 				dT = 0.0
-				dTM(:) = 0.0
+				dTM(:) = 0.0 !all temperature (ion+line)
 				Tex_ref(:) = 0.0
 				Tion_ref(:) = 0.0
    				icell_max = 1
    				icell_max_2 = 1
+   				!for all cells
+				dN2 = 0.0 !among all Tex
+				dN4 = 0.0 !among all Tion
 				cell_loop2 : do icell=1,n_cells
 				
    					l_iterate = (icompute_atomRT(icell)>0)
@@ -1934,9 +1943,10 @@ module atom_transfer
 
    					if (l_iterate) then
    					
+   						!Local only 
 						dN = 0.0 !for all levels of all atoms of this cell
-						dN2 = 0.0 !among all Tex
-						dN4 = 0.0 !among all Tion
+! 						dN2 = 0.0 !among all Tex
+! 						dN4 = 0.0 !among all Tion
 							
 						do nact=1,NactiveAtoms
 							atom => ActiveAtoms(nact)%ptr_atom
@@ -1985,7 +1995,7 @@ module atom_transfer
 						
 						!compare for all atoms and all cells
 						diff = max(diff, dN) ! pops
-						!diff = max(diff, dN2) ! Tex
+
 						
 						!do not update if lfixed_J
 						if ((lmean_intensity).and..not.(lfixed_J)) then
@@ -2045,7 +2055,10 @@ module atom_transfer
 						
 					end if !if l_iterate
 				end do cell_loop2 !icell
-   				
+				!! test on the solar case
+				!! use dN2 when step == 2 ?
+				!! change how Tex are initialised (presenly with T, use pops instead)
+   				!!diff = dN2 !dT(line)
    				
 ! 				if ((ljacobi_sor).and..not.(lapply_sor_correction)) then
 ! 
@@ -2077,6 +2090,7 @@ module atom_transfer
 						write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
 					endif
 					write(*,'("   >>>   dT="(1ES17.8E3))') dTM(nact)
+					write(*,'("    --->   dT(line)="(1ES17.8E3), " dT(cont)="(1ES17.8E3))') dN2, dN4
 					write(*,'("    ->> Te(icell_max2)="(1F14.4)" K", " Tion="(1F14.4)" K")') T(icell_max_2), Tion_ref(nact)
 					write(*,'("    ->> Te(icell_max1)="(1F14.4)" K", " Texi="(1F14.4)" K")') T(icell_max), Tex_ref(nact)
 					write(*,*) " ------------------------------------------------ "
@@ -2231,28 +2245,93 @@ module atom_transfer
 	end subroutine NLTEloop_mali
 	
 
- subroutine init_stellar_disk
-  integer :: i_star!, lam
-  !read stellar radiation here or compute from mcfsot
+	subroutine init_stellar_disk
+		integer :: i_star!, lam
+		!read stellar radiation here or compute from mcfsot
 
-   write(*,*) " Computing Istar(mu=1) for each star..."
-   !move elsewhere if we read a file, but normally should well fit with MCFOST routines
-   do i_star=1, n_etoiles
-    if (etoile(i_star)%T <= 1e-6) then
-     call warning("Setting stellar radiation to 0: T* < 1e-6 K")
-     Istar_tot(:,i_star) = 0.0_dp
-     Istar_cont(:,i_star) = 0.0_dp
-    else
-     write(*,"( 'T(i_star='(1I1)') = '(1F14.7)' K' )") i_star, etoile(i_star)%T
-     Istar_tot(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda)
-     Istar_cont(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda_cont)
-    endif
-   enddo
-   write(*,*) " ..done"
+		write(*,*) " Computing Istar(mu=1) for each star..."
+		!move elsewhere if we read a file, but normally should well fit with MCFOST routines
+		do i_star=1, n_etoiles
+			if (etoile(i_star)%T <= 1e-6) then
+				call warning("Setting stellar radiation to 0: T* < 1e-6 K")
+				Istar_tot(:,i_star) = 0.0_dp
+				Istar_cont(:,i_star) = 0.0_dp
+			else
+				write(*,"( 'T(i_star='(1I1)') = '(1F14.7)' K' )") i_star, etoile(i_star)%T
+				Istar_tot(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda)
+				Istar_cont(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda_cont)
+			endif
+		enddo
+		write(*,*) " ..done"
  
- return
- end subroutine init_stellar_disk
+	return
+	end subroutine init_stellar_disk
 
+	function local_stellar_brigthness(N,lambda,i_star,icell_prev,x,y,z,u,v,w)
+	! ---------------------------------------------------------------!
+	!
+	! -------------------------------------------------------------- !
+  		integer, intent(in) :: N, i_star, icell_prev
+  		real(kind=dp), dimension(N), intent(in) :: lambda
+  		real(kind=dp), intent(in) :: u, v, w, x, y, z
+  		real(kind=dp), dimension(N) :: local_stellar_brigthness
+
+  		real(kind=dp) :: Tchoc
+  		real(kind=dp) :: mu, ulimb, LimbDarkening
+  		integer :: ns,la
+  		logical :: lintersect = .false.
+
+   		if (etoile(i_star)%T <= 1e-6) then !even with spots
+    		local_stellar_brigthness(:) = 0.0_dp !look at init_stellar_disk
+    		return !no radiation from the starr
+   		endif
+   
+  		local_stellar_brigthness = 1.0_dp
+  		!add X-rays, UV flux etc..
+   
+		!if (ladd_xrays) then
+		!	....
+		!endif
+   
+		!cos(theta) = dot(r,n)/module(r)/module(n)
+		if (llimb_darkening) then
+     		call ERROR("option for reading limb darkening not implemented")
+			mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
+			if (real(mu)>1d0) then !to avoid perecision error
+				write(*,*) "mu=",mu, x, y, z, u, v, w
+				call Error(" mu limb > 1!")
+			end if
+		else
+			LimbDarkening = 1.0_dp
+		end if
+
+   
+   		!better to store a map(1:n_cells) with all Tchoc
+   		!and if map(icell_prev) > 0 -> choc
+		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
+			if (icompute_atomRT(icell_prev)) then
+				if (vr(icell_prev) < 0.0_dp) then
+					if (Taccretion>0) then
+						Tchoc = Taccretion
+					else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
+						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * &
+							(0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+					endif
+					lintersect = (Tchoc > etoile(i_star)%T)
+				endif
+			endif
+			if (lintersect) then
+				local_stellar_brigthness(:) = local_stellar_brigthness(:) + &
+				(exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
+			endif
+
+   		endif
+
+
+		local_stellar_brigthness(:) = LimbDarkening * local_stellar_brigthness(:)
+
+	return
+	end function local_stellar_brigthness
  
  subroutine calc_stellar_surface_brightness(N,lambda,i_star,icell_prev,x,y,z,u,v,w,gamma)
  ! ---------------------------------------------------------------!
@@ -2299,7 +2378,7 @@ module atom_transfer
    end if
    
    
-!   ! Correct with the contrast gamma of a hotter/cooler region if any
+  ! Correct with the contrast gamma of a hotter/cooler region if any
 !    call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect)
 !    !avoid error with infinity for small lambda
 !    if (lintersect) then
@@ -2309,7 +2388,7 @@ module atom_transfer
 ! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/etoile(i_star)%SurfB(ns)%T)-1)
 !      !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
 !      	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
-! 		gamma = 1.0_dp + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
+!  		!gamma = gamma + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
 !    end if
    
    if ((laccretion_shock).and.(icell_prev<=n_cells)) then
@@ -2322,15 +2401,20 @@ module atom_transfer
    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
    			endif
+!    			if (Taccretion>0) then
+!    				Tchoc = Taccretion
+!    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
+!    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+!    			endif
    			lintersect = (Tchoc > etoile(i_star)%T)
    		endif
-	endif
+	endif !rho > 0
 	if (lintersect) then
 ! 		write(*,*) "intersect spot"
 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
 	endif
 
-   endif
+   endif!cells <= n_cells
 
 
    !Apply Limb darkening
@@ -3597,8 +3681,8 @@ end module atom_transfer
 ! 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
 ! 		real(kind=dp), dimension(Nlambda, n_cells), intent(out) :: I
 ! 		real(kind=dp), dimension(Nlambda_cont, n_cells), intent(out) :: Ic
-! 		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau
-! 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
+! 		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau
+! 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c
 ! 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_p
 ! 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 ! 
@@ -3641,10 +3725,8 @@ end module atom_transfer
 ! 			if (lintersect_stars) then
 ! 				if (icell == icell_star) then
 ! 					!can be done better
-! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
-!        				Ic(:,icell_p) =  Ic(:,icell_p) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
-! 					I(:,icell_p) =  I(:,icell_p) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+!       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+!					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
 !        				return
 !       			end if
 !    			 endif
@@ -3852,9 +3934,9 @@ end module atom_transfer
 ! 		real(kind=dp), intent(in) :: x,y,z
 ! 		logical, intent(in) :: labs
 ! 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-! 		real(kind=dp), dimension(Nlambda) :: LD, tau
+! 		real(kind=dp), dimension(Nlambda) :: tau
 ! 		real(kind=dp) :: Snu, dtau, Snu_c, dtau_c
-! 		real(kind=dp), dimension(Nlambda_cont) :: LDc, tau_c
+! 		real(kind=dp), dimension(Nlambda_cont) :: tau_c
 ! 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
 ! 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 ! 
@@ -3898,11 +3980,8 @@ end module atom_transfer
 ! 
 ! 			if (lintersect_stars) then
 ! 				if (icell == icell_star) then
-! 					!can be done better
-! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
-!        				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
-! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+!       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+!					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
 !        				return
 !       			end if
 !    			 endif
