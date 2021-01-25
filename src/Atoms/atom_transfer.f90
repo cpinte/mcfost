@@ -40,7 +40,7 @@ module atom_transfer
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
 									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, &
-									ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint, istep_start
+									ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint, istep_start, lno_iterate_ne_mc
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
 	use dust_transfer, only		: compute_stars_map
@@ -1578,13 +1578,17 @@ module atom_transfer
 			else if (etape==2) then 		
 				time_iteration = 0
 				
-				if (etape_start == 1) then
-					Ndelay_iterate_ne = 0
-				endif
+				!or no ? because we resample the radiation field
+! 				if (etape_start == 1) then
+! 					Ndelay_iterate_ne = 0
+! 				endif
+				
 				!-> no iteration in MC but after the solution ??
-				if (iterate_ne) then! .and.. lno_ne_mc) then
-					iterate_ne = .false.
-					n_iterate_ne = 0	
+				if (iterate_ne) then
+					if (lno_iterate_ne_mc) then
+						iterate_ne = .false.
+						n_iterate_ne = 0	
+					endif
 				endif
 			
 				write(*,*) " Using step 2 with ", n_rayons_1, " rays"

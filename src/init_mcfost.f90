@@ -70,6 +70,7 @@ subroutine set_default_variables()
   lelectron_scattering = .false.
   lstop_after_jnu = .false.
   lsolve_for_ne = .false.
+  lno_iterate_ne_mc = .true. !.true. means no iteration of electron during MC steps
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
   lvacuum_to_air = .false.
@@ -651,6 +652,9 @@ subroutine initialisation_mcfost()
      case("-electron_scatt") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
         lelectron_scattering = .true.
+     case("-iterate_ne_mc") !force solving ne density during MC steps.
+        i_arg = i_arg + 1
+        lno_iterate_ne_mc = .false.
      case("-solve_ne") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
         lsolve_for_ne = .true.
@@ -1771,6 +1775,7 @@ subroutine display_help()
   write(*,*) "		  : -fix_background_opac : (force) keep background opacities constant during non-LTE loop, if iterate_ne."
   write(*,*) "		  : -limit_memory : continuous opacity are interpolated locally"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
+  write(*,*) "        : -iterate_ne_mc : force the calculation of electron density during Monte Carlo steps."  
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
