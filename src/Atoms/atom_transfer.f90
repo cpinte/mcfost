@@ -1755,13 +1755,13 @@ module atom_transfer
 								y0 = r_grid(icell) * sin(phi_grid(icell))
 								z0 = z_grid(icell)
 							else
-								call  pos_em_cellule(icell ,frac_pos(iray-1,1),frac_pos(iray-1,1),frac_pos(iray-1,1),x0,y0,z0)
+								call  pos_em_cellule(icell,frac_pos(iray-1,1),frac_pos(iray-1,2),frac_pos(iray-1,3),x0,y0,z0)
 							endif
 
   		         			do imu=1, size(xmu)
   		         				w0 = xmu(imu)
 								u0 = xmux(imu); v0 = xmuy(imu)
-								weight = wmu(imu) / (Ncentre + 1)
+								weight = wmu(imu) / real(Ncentre + 1)
 									
 								call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
 
