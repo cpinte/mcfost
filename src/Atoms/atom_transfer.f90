@@ -20,7 +20,8 @@ module atom_transfer
 									
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
-									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom
+									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, &
+									Ncentre, frac_pos
 	use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
 	use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
 	use constant, only			: MICRON_TO_NM, hc_k, sigma_e
@@ -1406,7 +1407,6 @@ module atom_transfer
 		integer, dimension(nb_proc) :: max_n_iter_loc
 		logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
 		real :: rand, rand2, rand3, precision, fac_etape!, precision_sub
-		real, allocatable :: randz(:,:)
 		real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
 		real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
 		real(kind=dp) :: dT, dN2, dN3, dN4, diff_old
@@ -1546,33 +1546,17 @@ module atom_transfer
       			call compute_angular_integration_weights()
   				lfixed_rays = .true.
   				n_rayons = 1 !always			
-  				write(*,*) " Using step 1 with ", size(xmu)*n_rayons, " rays"
+  				write(*,*) " Using step 1 with ", size(xmu), " rays"
   				write(*,*) " -> ",size(xmu)/8," rays per octant."
+  				if (Ncentre + 1 > 0) then
+  					write(*,'("   --> using "(1I3)" ray centres.")') Ncentre + 1
+  		  			write(*,'("   --> a total of "(1I5)" elements.")')( Ncentre + 1 ) * size(xmu) 
+  				endif
   				iray_start = 1
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				precision = dpops_max_error
-  				
-!   				allocate(nrayons_per_cell(n_cells)); nrayons_per_cell = n_rayons
-!   				do icell=1, n_cells
-!   					if ((icompute_atomRT(icell)>0).and.(sqrt(r_grid(icell)*cos(phi_grid(icell))**2 + r_grid(icell)*sin(phi_grid(icell))**2 + z_grid(icell)**2) <= 1.5*etoile(1)%r)) then
-!   					
-!   						nrayons_per_cell(icell) = n_rayons_1
-!   					
-!   					endif
-!   				enddo
-!   				
-! 				if (maxval(nrayons_per_cell) > 1) then
-! 					write(*,*) " Using ", n_rayons_1," rays for those cells close to the star"
-! 					write(*,*) " -> ", size(pack(nrayons_per_cell,mask=(nrayons_per_cell > 1).and.(icompute_atomRT>0))), " Ncells, frac=", 100.*real(size(pack(nrayons_per_cell, mask=(nrayons_per_cell > 1).and.(icompute_atomRT>0))))/real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
-!   					stream(1) = init_sprng(gtype,0,1,seed,SPRNG_DEFAULT)
-!   					allocate(randz(n_rayons_1,3))
-!   					do iray=1,n_rayons_1
-!   						do i=1,3
-!   							randz(iray,i)  = sprng(stream(1))
-!   						enddo
-!   					enddo
-!   				endif  		
+  				 		
 			else if (etape==2) then 		
 				time_iteration = 0
 				
@@ -1652,7 +1636,7 @@ module atom_transfer
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight) &
 				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ,psi_mean, psi, chi_loc,nrayons_per_cell) &
 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
-				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,randz,xyz_pos,uvw_pos) &
+				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,frac_pos,Ncentre,xyz_pos,uvw_pos) &
 				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity) &
 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda)
@@ -1765,20 +1749,19 @@ module atom_transfer
 								
 						elseif (etape==1) then !ray-by-ray, n_rayons fixed
 
-!   		         			do iray = 1,n_rayons
-! 								if (iray==1) then
-							x0 = r_grid(icell) * cos(phi_grid(icell))
-							y0 = r_grid(icell) * sin(phi_grid(icell))
-							z0 = z_grid(icell)
-! 								else
-! ! 						!-> the same for all cells and proc
-! 									call  pos_em_cellule(icell ,randz(iray,1),randz(iray,2),randz(iray,3),x0,y0,z0)
-! 								endif
+  		         			do iray = 1,Ncentre+1
+							if (iray==1) then
+								x0 = r_grid(icell) * cos(phi_grid(icell))
+								y0 = r_grid(icell) * sin(phi_grid(icell))
+								z0 = z_grid(icell)
+							else
+								call  pos_em_cellule(icell ,frac_pos(iray-1,1),frac_pos(iray-1,1),frac_pos(iray-1,1),x0,y0,z0)
+							endif
 
   		         			do imu=1, size(xmu)
   		         				w0 = xmu(imu)
 								u0 = xmux(imu); v0 = xmuy(imu)
-								weight = wmu(imu)! / n_rayons
+								weight = wmu(imu) / (Ncentre + 1)
 									
 								call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
 
@@ -1802,7 +1785,7 @@ module atom_transfer
 
 
       			   			enddo !imu	
-!       			   			enddo !pos / iray	
+      			   			enddo !pos / iray	
 			
 						end if !etape
 						
@@ -2237,7 +2220,6 @@ module atom_transfer
 		deallocate(dM, dTM, Tex_ref, Tion_ref)
 		if (allocated(Jnew)) deallocate(Jnew)
 		if (allocated(Jnew_cont)) deallocate(Jnew_cont)
-		if (allocated(randz)) deallocate(randz,nrayons_per_cell)
 		deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms, n_new)
 		deallocate(stream)
 	
