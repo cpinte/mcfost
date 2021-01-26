@@ -11,7 +11,7 @@ module atom_transfer
 	use opacity, only			: dealloc_atom_quantities, alloc_atom_quantities, compute_atom_quantities, compute_background_continua, &
 									interp_background_opacity, opacity_atom_loc, interp_contopac, interp_continuum_local, & !compute_nlte_bound_free, &
 									nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, background_continua_lambda, opacity_atom_zeeman_loc, &
-									prec_pops, frac_ne_limit
+									prec_pops, frac_limit_pops
 	use background_opacity, only: Thomson
 	use Planck, only			: bpnu
 	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, &
@@ -20,7 +20,7 @@ module atom_transfer
 									
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
-									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock
+									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom
 	use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
 	use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
 	use constant, only			: MICRON_TO_NM, hc_k, sigma_e
@@ -1499,9 +1499,7 @@ module atom_transfer
 
 		labs = .true. !to have ds at cell icell = eval_operator
 		id = 1
-		!make an option to start step2 only (with end step 2)
 		!In case we restart a calculation in the step 2
-		!beware if istep_start==2, electron density ONLY iterated after non-LTE loop...
 		etape_start = istep_start!1
 		if (laccurate_integ) then
 			etape_end = 2!3, step 3 not implemented yet
@@ -1598,8 +1596,11 @@ module atom_transfer
 				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				fac_etape = 1.0
-				precision = 1e-1!1e-3, 1e-2, fac_etape * 1.0 / sqrt(real(n_rayons))
-				!precision = dpops_max_error
+				if (etape_start==1) then
+					precision = 1e-1!1e-3, 1e-2, fac_etape * 1.0 / sqrt(real(n_rayons))
+				else
+					precision = dpops_max_error				
+				endif
 				write(*,*) " threshold:", precision
 				
 				if (lNg_acceleration) then
@@ -1632,6 +1633,8 @@ module atom_transfer
 				!!write(unit_invfile,*) "step ", etape, ' iter ', n_iter
 				!!write(unit_invfile,*) "************************************************"
 
+				!in step 3 we use the same seed (same sets of random numbers) to add rays to
+				!the previously computed.
 				if (lfixed_rays) then
 					stream = 0.0
 					do i=1,nb_proc
@@ -1956,7 +1959,8 @@ module atom_transfer
 							atom => ActiveAtoms(nact)%ptr_atom
      					         					    
 							do ilevel=1,atom%Nlevel
-								if ( n_new(nact,ilevel,icell) >= frac_ne_limit * ne(icell) ) then
+! 								if ( n_new(nact,ilevel,icell) >= frac_ne_limit * ne(icell) ) then
+								if ( n_new(nact,ilevel,icell) >= frac_limit_pops * ntotal_atom(icell, atom) ) then
 									dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
 									dN = max(dN1, dN)
 									dM(nact) = max(dM(nact), dN1)
@@ -2095,8 +2099,8 @@ module atom_transfer
 					endif
 					write(*,'("   >>>   dT="(1ES17.8E3))') dTM(nact)
 					write(*,'("    --->   dT(line)="(1ES17.8E3), " dT(cont)="(1ES17.8E3))') dN2, dN4
-					write(*,'("    ->> Te(icell_max2)="(1F14.4)" K", " Tion="(1F14.4)" K")') T(icell_max_2), Tion_ref(nact)
-					write(*,'("    ->> Te(icell_max1)="(1F14.4)" K", " Texi="(1F14.4)" K")') T(icell_max), Tex_ref(nact)
+					write(*,'("    ->> Te(icell_max2)="(1F14.4)" K", " Tion="(1ES17.8E3)" K")') T(icell_max_2), Tion_ref(nact)
+					write(*,'("    ->> Te(icell_max1)="(1F14.4)" K", " Texi="(1ES17.8E3)" K")') T(icell_max), Tex_ref(nact)
 					write(*,*) " ------------------------------------------------ "
 				enddo
 				if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
