@@ -26,7 +26,7 @@ module Opacity
 
 
 	implicit none
-	real(kind=dp), parameter :: prec_pops = 1d-100, frac_ne_limit = 1d-10, frac_ntot_limit = 1d-15
+	real(kind=dp), parameter :: prec_pops = 1d-100, frac_ne_limit = 1d-10, frac_ntot_limit = 1d-30!1d-16
 	real(kind=dp) :: frac_limit_pops = frac_ntot_limit
     !for one ray
 	real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:)
