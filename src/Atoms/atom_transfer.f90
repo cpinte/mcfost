@@ -21,7 +21,7 @@ module atom_transfer
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
 									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, &
-									Ncentre, frac_pos
+									Ncentre, frac_pos, compute_anglequad_centres
 	use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
 	use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
 	use constant, only			: MICRON_TO_NM, hc_k, sigma_e
@@ -52,7 +52,7 @@ module atom_transfer
 	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, sigma
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
-	use cylindrical_grid, only	: r_grid, z_grid, phi_grid
+	use cylindrical_grid, only	: r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k
 	use spherical_grid, only	: subdivise_cellule_sph
 	use messages, only 			: error, warning
 	
@@ -953,21 +953,12 @@ module atom_transfer
   end if
 
 
-!test subdivisions
-! #include "sprng_f.h"
+!!test subdivisions
 ! allocate(xyz_pos(n_cells,3**3,3))!from 1->5 max
 ! xyz_pos(:,:,:) = 0.0_dp
-! deallocate(stream)
-! allocate(stream(1))
-! stream(1) = init_sprng(gtype, 0,1,seed,SPRNG_DEFAULT)
 ! 
 ! do icell=1, n_cells! 
 ! 	call subdivise_cellule_sph(icell, 3, xyz_pos(icell,:,1), xyz_pos(icell,:,2), xyz_pos(icell,:,3))
-! ! 	rand  = sprng(stream(1))
-! ! 	rand2 = sprng(stream(1))
-! ! 	rand3 = sprng(stream(1))
-! !     call  pos_em_cellule(icell ,rand,rand2,rand3,xyz_pos(icell,1,1),xyz_pos(icell,1,2),xyz_pos(icell,1,3))
-! 
 ! enddo
 !   if (allocated(xyz_pos)) then
 !   	open(unit=20,file="xyz_pos.txt",status="unknown")
@@ -1422,7 +1413,6 @@ module atom_transfer
 		character(len=20) :: ne_start_sol = "NE_MODEL"
 		type (AtomType), pointer :: atom
 		integer(kind=8) :: mem_alloc_local = 0
-		integer, allocatable :: nrayons_per_cell(:)
 		
 		write(*,*) " USING MALI METHOD FOR NLTE LOOP"
 		
@@ -1544,15 +1534,17 @@ module atom_transfer
 				
 				!Only one ray until a proper scheme for choosing positions inside the cell exist
       			call compute_angular_integration_weights()
+      			call compute_anglequad_centres()
   				lfixed_rays = .true.
   				n_rayons = 1 !always			
   				write(*,*) " Using step 1 with ", size(xmu), " rays"
-  				write(*,*) " -> ",size(xmu)/8," rays per octant."
+  				!!write(*,*) " -> ",size(xmu)/8," rays per octant."
+  				iray_start = 1
   				if (Ncentre + 1 > 0) then
   					write(*,'("   --> using "(1I3)" ray centres.")') Ncentre + 1
   		  			write(*,'("   --> a total of "(1I5)" elements.")')( Ncentre + 1 ) * size(xmu) 
+!   		  			if (Ncentre > 0) iray_start = 2 !exclude the centre of the cell ? 
   				endif
-  				iray_start = 1
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				precision = dpops_max_error
@@ -1634,7 +1626,7 @@ module atom_transfer
 				!$omp default(none) &
 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi)&
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight) &
-				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ,psi_mean, psi, chi_loc,nrayons_per_cell) &
+				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ,psi_mean, psi, chi_loc) &
 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
 				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,frac_pos,Ncentre,xyz_pos,uvw_pos) &
 				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity) &
@@ -1749,43 +1741,46 @@ module atom_transfer
 								
 						elseif (etape==1) then !ray-by-ray, n_rayons fixed
 
-  		         			do iray = 1,Ncentre+1
-							if (iray==1) then
-								x0 = r_grid(icell) * cos(phi_grid(icell))
-								y0 = r_grid(icell) * sin(phi_grid(icell))
-								z0 = z_grid(icell)
-							else
-								call  pos_em_cellule(icell,frac_pos(iray-1,1),frac_pos(iray-1,2),frac_pos(iray-1,3),x0,y0,z0)
-							endif
-
-  		         			do imu=1, size(xmu)
-  		         				w0 = xmu(imu)
-								u0 = xmux(imu); v0 = xmuy(imu)
-								weight = wmu(imu) / real(Ncentre + 1)
-									
-								call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
-
-								if (lmean_intensity) then
-									Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
-									Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
-										!!threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
-										!!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
+  		         			do iray = iray_start, Ncentre+1
+  		         			
+								if (iray==1) then
+									x0 = r_grid(icell) * cos(phi_grid(icell))
+									y0 = r_grid(icell) * sin(phi_grid(icell))
+									z0 = z_grid(icell)
+								else
+									call  pos_em_cellule(icell,frac_pos(iray-1,1),frac_pos(iray-1,2),frac_pos(iray-1,3),x0,y0,z0)
 								endif
 
+							
+  		         				do imu=1, size(xmu)
+  		         					w0 = xmu(imu)
+									u0 = xmux(imu); v0 = xmuy(imu)
+
+									weight = wmu(imu) / real(Ncentre + 2 - iray_start)
+									
+									call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
+
+									if (lmean_intensity) then
+										Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
+										Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
+										!!threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
+										!!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
+									endif
+
 								!for one ray
-								if (.not.lforce_lte) then
-									call cross_coupling_terms(id, icell, 1)
-									call calc_rates_mali(id, icell, 1, weight)
-								endif	
+									if (.not.lforce_lte) then
+										call cross_coupling_terms(id, icell, 1)
+										call calc_rates_mali(id, icell, 1, weight)
+									endif	
 								
-								if (loutput_Rates) then
+									if (loutput_Rates) then
 									!need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-									call store_radiative_rates_mali(id, icell, (iray==1 .and. imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
-								endif	
+										call store_radiative_rates_mali(id, icell, (iray==1 .and. imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+									endif	
 
 
-      			   			enddo !imu	
-      			   			enddo !pos / iray	
+      			   				enddo !imu	
+      			   			enddo !pos / iray
 			
 						end if !etape
 						
@@ -2182,6 +2177,25 @@ module atom_transfer
 !   		close(20)
 !   		write(*,*) "done"
   		!endif
+		if (allocated(xyz_pos)) then
+			open(unit=20,file="xyz_pos.txt",status="unknown")
+			write(20,*) 1, Ncentre+1
+			write(20,*) 1627, cell_map_i(1627), cell_map_j(1627), cell_map_k(1627)
+			do iray=1,Ncentre+1
+				write(20,'(*(1E20.7E3))') (xyz_pos(i,iray,1),i=1,3)
+			enddo
+! 			write(20,'(*(1E20.7E3))') (frac_pos(iray-1,i),i=1,3)
+			do iray=2,Ncentre+1
+				write(20,'(*(1E20.7E3))') (frac_pos(iray-1,i),i=1,3)
+			enddo
+			close(20)
+			open(unit=20,file="uvw_pos.txt",status="unknown")
+			write(20,*) 1, size(xmu), size(xmu)/8
+			do imu=1,size(xmu)
+				write(20,'(*(1E20.7E3))') (uvw_pos(i,imu,1),i=1,3)
+			enddo
+			close(20)
+		endif
   		
 		if (allocated(threeKminusJ)) then
 			write(*,*) " Writing J20 to ascii file..."
@@ -2323,102 +2337,102 @@ module atom_transfer
 	return
 	end function local_stellar_brigthness
  
- subroutine calc_stellar_surface_brightness(N,lambda,i_star,icell_prev,x,y,z,u,v,w,gamma)
- ! ---------------------------------------------------------------!
-  ! Compute the stellar radiation field surface brightness.
-  ! Istar = B(x,y,z;mu) * Stellar spectrum or B * BlackBody
-  ! return gamma, the brightness. For uniform disk, gamma is 1.
-  !
-  ! If there is a shock spot at the surface, gamma returned is :
-  ! gamma = 1 + ratio, such that the radiation from the star Istar is
-  ! Istar = I(photosphere) + Ishock, with Ishock = I(photosphere) * ratio.
-  ! (previously, Istar was Ishock, now it is the sum of the two contrib)
- ! -------------------------------------------------------------- !
-  integer, intent(in) :: N, i_star, icell_prev
-  real(kind=dp), dimension(N), intent(in) :: lambda
-  real(kind=dp), dimension(N), intent(out) :: gamma
-  real(kind=dp), intent(in) :: u, v, w, x, y, z
-  real(kind=dp) :: energie(N), Tchoc
-  real(kind=dp) :: mu, ulimb, LimbDarkening, surface, HC
-  integer :: ns,la
-  logical :: lintersect = .false.
-
-   if (etoile(i_star)%T <= 1e-6) then !even with spots
-    gamma(:) = 0.0_dp
-    return !no radiation from the starr
-   endif
-   
-   gamma(:) = 1.0_dp !init
-   					 !if no spots (and no other sources like X rays, UV flux)
-   					 !it is the outvalue
-   
-   !if (ladd_xrays) then
-    !such that Ixray = Iphot * gamma and Istar = Iphot + Ixray = Iphot * (1 + gamma)
-!     gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
-!     where (lambda <= 50.)
-!         gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
-!     end where
-   !endif
-   
-   !cos(theta) = dot(r,n)/module(r)/module(n)
-   mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
-   if (real(mu)>1d0) then !to avoid perecision error
-    write(*,*) "mu=",mu, x, y, z, u, v, w
-    call Error(" mu limb > 1!")
-   end if
-   
-   
-  ! Correct with the contrast gamma of a hotter/cooler region if any
-!    call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect)
-!    !avoid error with infinity for small lambda
-!    if (lintersect) then
-!    		!Means that Ispot = Bp(Tspot) = gamma * Iphot  = Ispot
-!    		!gamma is initialized to one here.
-!    		!The +1 (i.e., the gamma = gamma + ...) means that Istar = Iphot + Ispot = Iphot * (1 + gamma)
-! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/etoile(i_star)%SurfB(ns)%T)-1)
-!      !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
-!      	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
-!  		!gamma = gamma + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
+!  subroutine calc_stellar_surface_brightness(N,lambda,i_star,icell_prev,x,y,z,u,v,w,gamma)
+!  ! ---------------------------------------------------------------!
+!   ! Compute the stellar radiation field surface brightness.
+!   ! Istar = B(x,y,z;mu) * Stellar spectrum or B * BlackBody
+!   ! return gamma, the brightness. For uniform disk, gamma is 1.
+!   !
+!   ! If there is a shock spot at the surface, gamma returned is :
+!   ! gamma = 1 + ratio, such that the radiation from the star Istar is
+!   ! Istar = I(photosphere) + Ishock, with Ishock = I(photosphere) * ratio.
+!   ! (previously, Istar was Ishock, now it is the sum of the two contrib)
+!  ! -------------------------------------------------------------- !
+!   integer, intent(in) :: N, i_star, icell_prev
+!   real(kind=dp), dimension(N), intent(in) :: lambda
+!   real(kind=dp), dimension(N), intent(out) :: gamma
+!   real(kind=dp), intent(in) :: u, v, w, x, y, z
+!   real(kind=dp) :: energie(N), Tchoc
+!   real(kind=dp) :: mu, ulimb, LimbDarkening, surface, HC
+!   integer :: ns,la
+!   logical :: lintersect = .false.
+! 
+!    if (etoile(i_star)%T <= 1e-6) then !even with spots
+!     gamma(:) = 0.0_dp
+!     return !no radiation from the starr
+!    endif
+!    
+!    gamma(:) = 1.0_dp !init
+!    					 !if no spots (and no other sources like X rays, UV flux)
+!    					 !it is the outvalue
+!    
+!    !if (ladd_xrays) then
+!     !such that Ixray = Iphot * gamma and Istar = Iphot + Ixray = Iphot * (1 + gamma)
+! !     gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
+! !     where (lambda <= 50.)
+! !         gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
+! !     end where
+!    !endif
+!    
+!    !cos(theta) = dot(r,n)/module(r)/module(n)
+!    mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
+!    if (real(mu)>1d0) then !to avoid perecision error
+!     write(*,*) "mu=",mu, x, y, z, u, v, w
+!     call Error(" mu limb > 1!")
 !    end if
-   
-   if ((laccretion_shock).and.(icell_prev<=n_cells)) then
-   	if (icompute_atomRT(icell_prev)) then
-   		if (vr(icell_prev) < 0.0_dp) then
-!    		write(*,*) "Accretion E (K):", (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
-!    			lintersect = .true.
-   			if (Taccretion>0) then
-   				Tchoc = Taccretion
-   			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
-   				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
-   			endif
+!    
+!    
+!   ! Correct with the contrast gamma of a hotter/cooler region if any
+! !    call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect)
+! !    !avoid error with infinity for small lambda
+! !    if (lintersect) then
+! !    		!Means that Ispot = Bp(Tspot) = gamma * Iphot  = Ispot
+! !    		!gamma is initialized to one here.
+! !    		!The +1 (i.e., the gamma = gamma + ...) means that Istar = Iphot + Ispot = Iphot * (1 + gamma)
+! ! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/etoile(i_star)%SurfB(ns)%T)-1)
+! !      !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
+! !      	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
+! !  		!gamma = gamma + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
+! !    end if
+!    
+!    if ((laccretion_shock).and.(icell_prev<=n_cells)) then
+!    	if (icompute_atomRT(icell_prev)) then
+!    		if (vr(icell_prev) < 0.0_dp) then
+! !    		write(*,*) "Accretion E (K):", (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+! !    			lintersect = .true.
 !    			if (Taccretion>0) then
 !    				Tchoc = Taccretion
 !    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
 !    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
 !    			endif
-   			lintersect = (Tchoc > etoile(i_star)%T)
-   		endif
-	endif !rho > 0
-	if (lintersect) then
-! 		write(*,*) "intersect spot"
-		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
-	endif
-
-   endif!cells <= n_cells
-
-
-   !Apply Limb darkening
-   if (llimb_darkening) then
-     call ERROR("option for reading limb darkening not implemented")
-   else
-     !ulimb = 0.6
-     LimbDarkening = 1.0_dp!0.4 + 0.6 * mu!1.0_dp
-   end if
-   !Istar(:) = energie(:) * LimbDarkening * gamma(:)
-   gamma(:) = LimbDarkening * gamma(:)
-
- return
- end subroutine calc_stellar_surface_brightness
+! !    			if (Taccretion>0) then
+! !    				Tchoc = Taccretion
+! !    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
+! !    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+! !    			endif
+!    			lintersect = (Tchoc > etoile(i_star)%T)
+!    		endif
+! 	endif !rho > 0
+! 	if (lintersect) then
+! ! 		write(*,*) "intersect spot"
+! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
+! 	endif
+! 
+!    endif!cells <= n_cells
+! 
+! 
+!    !Apply Limb darkening
+!    if (llimb_darkening) then
+!      call ERROR("option for reading limb darkening not implemented")
+!    else
+!      !ulimb = 0.6
+!      LimbDarkening = 1.0_dp!0.4 + 0.6 * mu!1.0_dp
+!    end if
+!    !Istar(:) = energie(:) * LimbDarkening * gamma(:)
+!    gamma(:) = LimbDarkening * gamma(:)
+! 
+!  return
+!  end subroutine calc_stellar_surface_brightness
 
    subroutine INTEG_RAY_JNU(id,icell_in,x,y,z,u,v,w,iray,labs, kappa_tot, Snu, Istar, Ic)
  ! ------------------------------------------------------------------------------- !
