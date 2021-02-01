@@ -103,8 +103,6 @@ subroutine mol_line_transfer()
      ! Resolution population des niveaux nLTE
      if (.not.lmol_LTE) then
         call NLTE_mol_line_transfer(imol)
-        call ecriture_pops(imol)
-        call ecriture_Tex(imol)
      endif
 
      !--- Creation carte emission moleculaire : ray-tracing
@@ -172,6 +170,7 @@ subroutine NLTE_mol_line_transfer(imol)
   real(kind=dp), dimension(:,:), allocatable :: tab_speed
 
   integer, dimension(nTrans_tot) :: tab_Trans
+  character(len=32) :: step
 
   labs = .true.
 
@@ -228,20 +227,17 @@ subroutine NLTE_mol_line_transfer(imol)
         iray_start=1
         fac_etape = 1.0
         lprevious_converged = .false.
-        laffichage = .false.
      else if (etape==2) then
         lfixed_Rays = .true. ;  ispeed(1) = -n_speed ; ispeed(2) = n_speed
         n_rayons = n_rayons_start
         iray_start=1
         fac_etape = 1.0
         lprevious_converged = .false.
-        laffichage = .true.
      else if (etape==3) then
         lfixed_Rays = .false.;  ispeed(1) = 1 ; ispeed(2) = 1
         n_rayons = n_rayons_start2
         fac_etape = 1.0
         lprevious_converged = .false.
-        laffichage = .true.
 
         ! On passe en mode mono-frequence
         deallocate(tab_speed,I0,I0c,ds,Doppler_P_x_freq)
@@ -268,14 +264,14 @@ subroutine NLTE_mol_line_transfer(imol)
      lnotfixed_Rays = .not.lfixed_Rays
      lconverged = .false.
      n_iter = 0
-     n_cells_done = 0
-     ibar = 0
 
      do while (.not.lconverged)
         n_iter = n_iter + 1
-
         write(*,*) "--------------------------------------"
         write(*,*) "Step", etape, "Iteration", n_iter
+
+        n_cells_done = 0
+        ibar = 0
 
         if (lfixed_Rays) then
            ! On remet le generateur aleatoire a zero
@@ -285,14 +281,12 @@ subroutine NLTE_mol_line_transfer(imol)
            enddo
         endif
 
-
         ! Sauvegarde des populations globales
         tab_nLevel_old = tab_nLevel
         max_n_iter_loc = 0
 
         ! Boucle sur les cellules
-
-        if (laffichage) call progress_bar(0)
+        call progress_bar(0)
         !$omp parallel &
         !$omp default(none) &
         !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
@@ -300,7 +294,7 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(deltaVmax,ispeed,r_grid,z_grid,phi_grid,lcompute_molRT,lkeplerian,n_cells) &
         !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule) &
-        !$omp shared(nTrans_tot,tab_Trans,laffichage,n_cells_done,ibar)
+        !$omp shared(nTrans_tot,tab_Trans,n_cells_done,ibar)
         !$omp do schedule(static)
         do icell=1, n_cells
            !$ id = omp_get_thread_num() + 1
@@ -350,7 +344,7 @@ subroutine NLTE_mol_line_transfer(imol)
                     rand  = sprng(stream(id))
                     rand2 = sprng(stream(id))
                     rand3 = sprng(stream(id))
-                    call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+                    call pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
 
                     ! Direction de propagation aleatoire
                     rand = sprng(stream(id))
@@ -396,7 +390,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
                  ! Critere de convergence locale
                  diff = maxval( abs(pop(1:n_level_comp,id) - pop_old(1:n_level_comp,id)) &
-                      / (pop_old(1:n_level_comp,id) + 1e-30) )
+                      / (pop_old(1:n_level_comp,id) + 10*tiny_real) )
 
                  if (diff < precision_sub) then
                     lconverged_loc = .true.
@@ -410,27 +404,25 @@ subroutine NLTE_mol_line_transfer(imol)
            endif ! lcompute_molRT
 
            ! Progress bar
-           if (laffichage) then
+           !$omp atomic
+           n_cells_done = n_cells_done + 1
+           if (real(n_cells_done) > 0.02*ibar*n_cells) then
+              call progress_bar(ibar)
               !$omp atomic
-              n_cells_done = n_cells_done + 1
-              if (real(n_cells_done) > 0.02*ibar*n_cells) then
-                 call progress_bar(ibar)
-                 !$omp atomic
-                 ibar = ibar+1
-              endif
+              ibar = ibar+1
            endif
 
         enddo ! icell
         !$omp end do
         !$omp end parallel
-        if (laffichage) call progress_bar(50)
+        call progress_bar(50)
 
         ! Critere de convergence totale
         maxdiff = 0.0
         do icell = 1, n_cells
            if (lcompute_molRT(icell)) then
               diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(icell,1:n_level_comp) ) / &
-                   tab_nLevel_old(icell,1:n_level_comp) + 1e-300_dp)
+                   tab_nLevel_old(icell,1:n_level_comp) + 10*tiny_real)
               if (diff > maxdiff) maxdiff = diff
            endif
         enddo ! icell
@@ -462,10 +454,15 @@ subroutine NLTE_mol_line_transfer(imol)
            endif
         endif
 
-        write(*,*) "STAT", minval(tab_nLevel(:,1:n_level_comp)), maxval(tab_nLevel(:,1:n_level_comp))
+        !write(*,*) "STAT", minval(tab_nLevel(:,1:n_level_comp)), maxval(tab_nLevel(:,1:n_level_comp))
         call integ_tau_mol(imol)
 
      enddo ! while : convergence totale
+
+     write(step, "(A5, I1)") "_step", etape
+
+     call ecriture_pops(imol,step)
+     call ecriture_Tex(imol,step)
   enddo ! etape
 
   deallocate(ds, Doppler_P_x_freq, I0, I0c)

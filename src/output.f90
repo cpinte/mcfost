@@ -2536,11 +2536,12 @@ end subroutine ecriture_temperature
 
 !********************************************************************
 
-subroutine ecriture_Tex(imol)
+subroutine ecriture_Tex(imol,ext)
 
   implicit none
 
   integer, intent(in) :: imol
+  character(len=32), intent(in), optional :: ext
 
   integer :: iTrans, iUp, iLow, k, icell
   real(kind=dp) :: nUp, nLow, cst
@@ -2574,7 +2575,11 @@ subroutine ecriture_Tex(imol)
      enddo ! icell
   enddo !iTrans
 
-  filename = trim(data_dir2(imol))//"/Tex.fits.gz"
+  if (present(ext)) then
+     filename = trim(data_dir2(imol))//'/Tex'//trim(ext)//'.fits.gz'
+  else
+     filename = trim(data_dir2(imol))//'/Tex.fits.gz'
+  endif
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -2878,11 +2883,12 @@ end subroutine ecriture_sed
 
 !**********************************************************************
 
-subroutine ecriture_pops(imol)
+subroutine ecriture_pops(imol,ext)
 
   implicit none
 
   integer, intent(in) :: imol
+  character(len=32), intent(in), optional :: ext
 
   character(len=512) :: filename
   integer :: status,unit,blocksize,bitpix,naxis,icell
@@ -2890,7 +2896,11 @@ subroutine ecriture_pops(imol)
   integer :: group,fpixel,nelements
   logical :: simple, extend
 
-  filename = trim(data_dir2(imol))//'/populations.fits.gz'
+  if (present(ext)) then
+     filename = trim(data_dir2(imol))//'/populations'//trim(ext)//'.fits.gz'
+  else
+     filename = trim(data_dir2(imol))//'/populations.fits.gz'
+  endif
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
