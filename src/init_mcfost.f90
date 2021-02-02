@@ -61,6 +61,8 @@ subroutine set_default_variables()
   ltab_wavelength_image = .false.
   lcheckpoint = .false.
   checkpoint_period = 15
+  !HEALpix
+  healpix_lorder = 2
   ! Atomic lines Radiative Transfer (AL-RT)
   lsafe_stop = .false.
   safe_stop_time = 155520.0!1.8days in seconds, default
@@ -807,6 +809,18 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) art_hv
         i_arg= i_arg+1
+     case("-healpix_lorder")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("l value needed for healpix !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) healpix_lorder
+        i_arg= i_arg+1
+        if ( (healpix_lorder < 0).or.(healpix_lorder > 28) ) then
+         call error ("healpix l must be positive, below 28!")
+        endif
+        if ( (healpix_lorder > 7) ) then
+        	call warning("healpix l order > 7 resulting in a high number of rays!")
+        endif
      case("-Ng_Norder")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Ng'acc order needed with -Ng_Norder !")

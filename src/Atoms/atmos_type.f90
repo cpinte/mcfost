@@ -63,7 +63,6 @@ module atmos_type
 	!is built ray by ray, with is not the case for hogerheijde
     logical :: lmali_scheme, lhogerheijde_scheme !tmp
     character(len=50) :: angular_quadrature = "HEALpix"!"bestard2021_L15N45"
-	integer :: ihealpix_lorder = 2 !0 to 28
 	type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
 
 
@@ -84,7 +83,7 @@ module atmos_type
 	
 	case ("HEALpix")
 	
-		N1 = healpix_npix(ihealpix_lorder)
+		N1 = healpix_npix(healpix_lorder)
 		N2 = N1
 		allocate(xmu(N1),wmu(N1),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmu and wmu")
@@ -94,14 +93,14 @@ module atmos_type
 		!phi (rad) x2
 		allocate(x2(N1))
 		
-		call healpix_sphere(ihealpix_lorder,xmu,x2)
+		call healpix_sphere(healpix_lorder,xmu,x2)
 		
 		xmux(:) = sqrt(1.0 - xmu(:)*xmu(:)) * cos(x2(:))
 		xmuy(:) = sqrt(1.0 - xmu(:)*xmu(:)) * sin(x2(:))
-		wmu(:)  = healpix_weight(ihealpix_lorder) !a constant actually
+		wmu(:)  = healpix_weight(healpix_lorder) !a constant actually
 		
 		write(*,"('HEALpix #'(1I8)' pixels')") N1
-		write(*,'(" -> Angular resolution "(1F12.3)" deg" )') healpix_angular_resolution(ihealpix_lorder)
+		write(*,'(" -> Angular resolution "(1F12.3)" deg" )') healpix_angular_resolution(healpix_lorder)
 ! 		do iray=1,N1
 ! 			write(*,*) iray-1, xmux(iray), xmuy(iray), xmu(iray)
 ! 		enddo
