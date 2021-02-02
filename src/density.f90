@@ -368,7 +368,8 @@ subroutine define_dust_density()
 
   lwarning = .true.
 
-  densite_pouss = 0.0; masse = 0.0
+  densite_pouss = 0.0
+  masse = 0.0
 
   ! Coefficient de diffusion constant
   Dtilde = alpha / Sc
@@ -401,6 +402,7 @@ subroutine define_dust_density()
         endif
      end if
   enddo !i pop
+
 
   ! facteur multiplicatif pour passer en g/cm**3:
   cst=cst * Msun_to_g / AU3_to_cm3
@@ -823,68 +825,7 @@ subroutine define_dust_density()
      enddo
   endif
 
-  ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
-  do pop=1, n_pop
-     izone=dust_pop(pop)%zone
-     dz=disk_zone(izone)
-
-     if (dz%geometry /= 5) then ! pas de wall ici
-        d_p => dust_pop(pop)
-        mass = 0.0_dp
-
-        do icell=1,n_cells
-           do l=d_p%ind_debut,d_p%ind_fin
-              mass=mass + (densite_pouss(l,icell) *1.0_dp) * M_grain(l) * volume(icell)
-           enddo !l
-        enddo !icell
-        mass =  mass * AU3_to_cm3 * g_to_Msun
-
-        if (mass > tiny_dp) then
-           facteur = d_p%masse / mass
-           do icell=1,n_cells
-              do l=d_p%ind_debut,d_p%ind_fin
-                 densite_pouss(l,icell) = densite_pouss(l,icell) * facteur
-                 masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
-              enddo !l
-           enddo ! icell
-        endif
-
-     endif ! test wall
-  enddo ! pop
-
-  masse(:) = masse(:) * AU3_to_cm3
-  write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
-  if (sum(masse) < tiny_dp) call error("Something went wrong, there is no dust in the disk")
-
-  if (lcorrect_density) then
-     write(*,*) "Correcting density ..."
-     do i=1, n_rad
-        icell = cell_map(i,1,1)
-        if ((r_grid(icell) >= correct_density_Rin).and.(r_grid(icell) <= correct_density_Rout)) then
-           do j=j_start,nz
-              if (j==0) cycle
-              do k=1, n_az
-                 icell = cell_map(i,j,k)
-                 densite_pouss(:,icell) = densite_pouss(:,icell) * correct_density_factor
-                 masse(icell) = masse(icell) *  correct_density_factor
-              enddo !k
-           enddo ! j
-        endif
-     enddo
-
-      write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
-  endif
-
-  ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
-  ! Valable que dans le cas cylindrique mais pas de pb dans le cas spherique
-  !if (lcylindrical) densite_pouss(:,nz+1,:,:) = densite_pouss(:,nz,:,:)
-
-  search_not_empty : do icell=1,n_cells
-     if (masse(icell) > 0.0_sp) then
-        icell_not_empty = icell
-        exit search_not_empty
-     endif
-  enddo search_not_empty
+  call normalize_dust_density()
 
   return
 
@@ -1565,11 +1506,9 @@ subroutine read_density_file()
      enddo ! k
   endif  !lvariable_dust
 
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
   call normalize_dust_density()
   deallocate(sph_dens,a_sph)
-
-  write(*,*) 'Total  gas mass in model :', real(sum(masse_gaz) * g_to_Msun),' Msun'
-  write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
 
   return
 
@@ -1578,11 +1517,19 @@ end subroutine read_density_file
 !**********************************************************
 
 subroutine normalize_dust_density(disk_dust_mass)
+  ! Normalize the dust density to follow the slope in nbre_grains
+  ! and the mass in each dust population
+  !
+  ! Note : the slope nbre_grains is already present in define_dust_density but we redo it here
+  ! as it might not be the case when using density files
 
   real(kind=dp), intent(in), optional :: disk_dust_mass
-  integer :: icell, l
+  integer :: icell, l, k, i, j, izone, pop
 
   real(kind=dp) :: somme, mass, facteur, total_dust_mass
+
+  type(disk_zone_type) :: dz
+  type(dust_pop_type), pointer :: d_p
 
   if (present(disk_dust_mass)) then
      total_dust_mass = disk_dust_mass
@@ -1601,22 +1548,63 @@ subroutine normalize_dust_density(disk_dust_mass)
      densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
   enddo !l
 
-  ! Normalisation : Calcul masse totale
-  mass = 0.0
-  do icell=1,n_cells
-     do l=1,n_grains_tot
-        mass=mass + densite_pouss(l,icell) * M_grain(l) * (volume(icell) * AU3_to_cm3)
-     enddo !l
-  enddo !icell
-  mass =  mass/Msun_to_g
-  densite_pouss(:,:) = densite_pouss(:,:) * total_dust_mass/mass
+  ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
+  do pop=1, n_pop
+     izone=dust_pop(pop)%zone
+     dz=disk_zone(izone)
 
-  do icell=1,n_cells
-     do l=1,n_grains_tot
-        masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
-     enddo !l
-  enddo ! icell
+     if (dz%geometry /= 5) then ! pas de wall ici
+        d_p => dust_pop(pop)
+        mass = 0.0_dp
+
+        do icell=1,n_cells
+           do l=d_p%ind_debut,d_p%ind_fin
+              mass=mass + (densite_pouss(l,icell) *1.0_dp) * M_grain(l) * volume(icell)
+           enddo !l
+        enddo !icell
+        mass =  mass * AU3_to_cm3 * g_to_Msun
+
+        if (mass > tiny_dp) then
+           facteur = d_p%masse / mass
+
+           mass = 0.0_dp
+           do icell=1,n_cells
+              do l=d_p%ind_debut,d_p%ind_fin
+                 densite_pouss(l,icell) = densite_pouss(l,icell) * facteur
+                 masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+              enddo !l
+           enddo ! icell
+        endif
+     endif ! test wall
+  enddo ! pop
+
   masse(:) = masse(:) * AU3_to_cm3
+
+  write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+  if (sum(masse) < tiny_dp) call error("Something went wrong, there is no dust in the disk")
+
+  if (lcorrect_density) then
+     write(*,*) "Correcting density ..."
+     do i=1, n_rad
+        icell = cell_map(i,1,1)
+        if ((r_grid(icell) >= correct_density_Rin).and.(r_grid(icell) <= correct_density_Rout)) then
+           do j=j_start,nz
+              if (j==0) cycle
+              do k=1, n_az
+                 icell = cell_map(i,j,k)
+                 densite_pouss(:,icell) = densite_pouss(:,icell) * correct_density_factor
+                 masse(icell) = masse(icell) *  correct_density_factor
+              enddo !k
+           enddo ! j
+        endif
+     enddo
+
+     write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+  endif
+
+  ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
+  ! Valable que dans le cas cylindrique mais pas de pb dans le cas spherique
+  ! if (lcylindrical) densite_pouss(:,nz+1,:,:) = densite_pouss(:,nz,:,:)
 
   search_not_empty : do icell=1,n_cells
      if (masse(icell) > 0.0_sp) then
