@@ -25,7 +25,7 @@ module atom_transfer
 	use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
 	use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
 	use constant, only			: MICRON_TO_NM, hc_k, sigma_e
-	use solvene, only			: solve_electron_density_old, solve_electron_density, solve_ne_nlte_loc
+	use solvene, only			: solve_electron_density_old, solve_electron_density
 	use getlambda, only			: hv
 	use voigtfunctions, only	: Voigt, VoigtHumlicek, dirac_line
 	use profiles, only			: profile, local_profile_v, local_profile_thomson, local_profile_interp, local_profile_dk
@@ -52,7 +52,7 @@ module atom_transfer
 	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, sigma
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
-	use cylindrical_grid, only	: r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k
+	use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k
 	use spherical_grid, only	: subdivise_cellule_sph
 	use messages, only 			: error, warning
 	
@@ -239,6 +239,11 @@ module atom_transfer
 					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
+				
+! 				if (minval(tau) > 1000.) then
+! 					write(*,*) "taumin > 100 stopping propagation"
+! 					return
+! 				endif
 
 
 			end if  ! lcellule_non_vide
@@ -1155,7 +1160,6 @@ module atom_transfer
 		write(*,*) " Max error : ", dpops_max_error, dpops_sub_max_error
 
 
-		!!allocate(threeKminusJ(nlambda,n_cells)); threeKminusJ = 0.0	
 		!!allocate(psi_mean(nlambda, n_cells)); psi_mean = 0.0
 		!!allocate(chi_loc(nlambda, n_rayons_max, nb_proc)); chi_loc = 0.0
 
@@ -1369,10 +1373,7 @@ module atom_transfer
 		call dealloc_Jnu()
 	endif
 
-	
-	if (allocated(threeKminusJ)) deallocate(threeKminusJ) 
-	if (allocated(psi_mean)) deallocate(psi_mean, chi_loc) 			
-
+	if (allocated(psi_mean)) deallocate(psi_mean, chi_loc)
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! -------------------------------- CLEANING ------------------------------------------ !
@@ -1402,19 +1403,26 @@ module atom_transfer
 		real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
 		real(kind=dp) :: dT, dN2, dN3, dN4, diff_old
 		real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
-		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:)
+		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:), Jnu_loc(:,:)
 ! 		real(kind=dp), allocatable :: err_pop(:,:)
 		logical :: labs, iterate_ne = .false.
 		logical :: l_iterate
 		logical :: accelerated, ng_rest, evaluate_background, lmean_intensity = .false.!,lapply_sor_correction
 		integer :: iorder, i0_rest, n_iter_accel, iacc!, iter_sor
 		integer :: nact, imax, icell_max, icell_max_2
-		integer :: icell, ilevel, imu, iphi
+		integer :: icell, ilevel, imu, iphi, id_ref !for anisotropy
 		character(len=20) :: ne_start_sol = "NE_MODEL"
 		type (AtomType), pointer :: atom
 		integer(kind=8) :: mem_alloc_local = 0
 		
 		write(*,*) " USING MALI METHOD FOR NLTE LOOP"
+		
+		!only for step 1 at the moment
+		allocate(threeKminusJ(nlambda, n_cells))
+		!or (nlambda, nb_proc) if only used locally as a threshold
+		allocate(Jnu_loc(nlambda,nb_proc))
+		id_ref = locate(lambda, 300.0_dp)
+		!if used, we only need it locally or at one wavelenegth
 		
 		!time for individual steps + check the time from the checkpointing time if any
 		!and if it is set lconverged = .true. and .lprevious converged == true
@@ -1497,6 +1505,11 @@ module atom_transfer
 			etape_end = 1
 			if (istep_start==2) etape_end = 2
 		endif
+		
+		write(*,*) "---------------------------------------"
+		write(*,*) " step start ",etape_start, istep_start
+		write(*,*) " step end", etape_end
+		write(*,*) "---------------------------------------"
 
 		! ds is not used for this scheme at  the moment. Psi is used instead
 		!since there is no local subit needing recomputing psi
@@ -1571,9 +1584,9 @@ module atom_transfer
 				iray_start = 1
 				lprevious_converged = .false.
 				lcell_converged(:) = .false.
-				fac_etape = 1.0
+				fac_etape = 0.1
 				if (etape_start==1) then
-					precision = 1e-1!1e-3, 1e-2, fac_etape * 1.0 / sqrt(real(n_rayons))
+					precision = fac_etape * 1e-1!1e-1!1e-3, 1e-2, fac_etape * 1.0 / sqrt(real(n_rayons))
 				else
 					precision = dpops_max_error				
 				endif
@@ -1626,9 +1639,9 @@ module atom_transfer
 				!$omp default(none) &
 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi)&
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight) &
-				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ,psi_mean, psi, chi_loc) &
-				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
-				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,frac_pos,Ncentre,xyz_pos,uvw_pos) &
+				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ, psi_mean, psi, chi_loc, Jnu_loc) &
+				!$omp shared(stream,n_rayons,iray_start, volume, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
+				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,id_ref, frac_pos,Ncentre,xyz_pos,uvw_pos) &
 				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity) &
 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda)
@@ -1641,9 +1654,10 @@ module atom_transfer
    						if (lmean_intensity) then
    							Jnew(:,icell) = 0.0
    							Jnew_cont(:,icell) = 0.0
-   							!!threeKminusJ(:,icell) = 0.0
    							!!psi_mean(:,icell) = 0.0
    						endif
+   						threeKminusJ(:,icell) = 0.0
+   						Jnu_loc(:,id) = 0.0
 
 						call fill_Collision_matrix(id, icell) !computes = C(i,j) before computing rates
 						call initGamma(id) !init Gamma to C and init radiative rates
@@ -1763,9 +1777,11 @@ module atom_transfer
 									if (lmean_intensity) then
 										Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
 										Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
-										!!threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
 										!!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
 									endif
+									
+									threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
+									Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
 
 								!for one ray
 									if (.not.lforce_lte) then
@@ -1781,6 +1797,22 @@ module atom_transfer
 
       			   				enddo !imu	
       			   			enddo !pos / iray
+      			   			
+      			   			!copy etape 1 here
+!       			   			if (volume(icell) / maxval(volume) <= 0.04) then
+!       			   				healpix_resol = 4
+!       			   			else
+!       			   				healpix_resol = 1
+!       			   			endif
+!       			   			call calc_healpix ... 
+!       			   			
+!       			   			step1 here for this cell
+      			   			
+      			   			!if kept add for all steps
+      			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
+!       			   			write(*,*) id, icell, " Anis = ", 100*abs(threeKminusJ(id_ref,icell)), " T=",T(icell)," V=",volume(icell)/maxval(volume(:))
+      			   			
+      			   			
 			
 						end if !etape
 						
@@ -2198,17 +2230,18 @@ module atom_transfer
 		endif
   		
 		if (allocated(threeKminusJ)) then
-			write(*,*) " Writing J20 to ascii file..."
+			write(*,*) " Writing anisotropy to ascii file..."
 
   			open(unit=20, file="anis_ascii.txt", status="unknown")
   			write(20,*) n_cells, Nlambda
   			do icell=1, n_cells
   				do la=1, Nlambda
-    				write(20,'(1F12.5,5E20.7E3)') lambda(la), 0.5*threeKminusJ(la,icell)/Jnew(la,icell), 0.0, 0.0, 0.0, 0.0
+    				write(20,'(1F12.5,5E20.7E3)') lambda(la), threeKminusJ(la,icell), 0.0, 0.0, 0.0, 0.0
    				enddo
   			enddo
   			close(20)
-  			write(*,*) "done"  			
+  			write(*,*) "done" 
+  			deallocate(threeKminusJ) 			
 		endif
 		if (allocated(psi_mean)) then
 			write(*,*) " Writing <Psi> to ascii file..."	

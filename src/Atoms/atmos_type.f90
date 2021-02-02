@@ -62,8 +62,8 @@ module atmos_type
 	!removed the depency in rays of some quantity (like phi_loc or I) since rate matrix
 	!is built ray by ray, with is not the case for hogerheijde
     logical :: lmali_scheme, lhogerheijde_scheme !tmp
-    character(len=50) :: angular_quadrature = "bestard2021_L15N124"
-
+    character(len=50) :: angular_quadrature = "HEALpix"!"bestard2021_L15N45"
+	integer :: ihealpix_lorder = 2 !0 to 28
 	type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
 
 
@@ -82,6 +82,33 @@ module atmos_type
 
 	select case (angular_quadrature)
 	
+	case ("HEALpix")
+	
+		N1 = healpix_npix(ihealpix_lorder)
+		N2 = N1
+		allocate(xmu(N1),wmu(N1),stat=alloc_status)
+		if (alloc_status > 0) call error("allocation error xmu and wmu")
+		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
+		if (alloc_status > 0) call error("allocation error xmux, xmuy")
+		
+		!phi (rad) x2
+		allocate(x2(N1))
+		
+		call healpix_sphere(ihealpix_lorder,xmu,x2)
+		
+		xmux(:) = sqrt(1.0 - xmu(:)*xmu(:)) * cos(x2(:))
+		xmuy(:) = sqrt(1.0 - xmu(:)*xmu(:)) * sin(x2(:))
+		wmu(:)  = healpix_weight(ihealpix_lorder) !a constant actually
+		
+		write(*,"('HEALpix #'(1I8)' pixels')") N1
+		write(*,'(" -> Angular resolution "(1F12.3)" deg" )') healpix_angular_resolution(ihealpix_lorder)
+! 		do iray=1,N1
+! 			write(*,*) iray-1, xmux(iray), xmuy(iray), xmu(iray)
+! 		enddo
+		
+		deallocate(x2)
+
+		
 	case ("gauss_legendre")
 		if (present(Nmu)) then
 			N1 = Nmu
@@ -2410,6 +2437,139 @@ module atmos_type
 
   return
   end subroutine readAtmos_ascii
+  
+  !few healpix routines
+  
+  function largest_integer_small_than_x(x)
+  	real(kind=dp), intent(in) :: x
+  	integer(kind=8) largest_integer_small_than_x
+  	
+  	largest_integer_small_than_x = int(ceiling(x)) - 1
+  	
+  	return
+  end function largest_integer_small_than_x
+  
+
+  function healpix_npix(l)
+  	integer, intent(in) :: l
+  	integer(kind=8) :: healpix_npix
+  	
+  	!Npix = 12 * Nside**2
+  	!with Nside = 2**l, the resolution of the grid
+  	healpix_npix = 12 * 4**l
+  	
+  	return
+  end function healpix_npix
+  
+  function healpix_weight(l)
+  	integer, intent(in) :: l
+  	real(kind=dp) :: healpix_weight
+  	
+  	!weight = area/4pi
+  	!area is 4pi / Npix
+  	!Npix = 12 * Nside**2
+  	!Nside = 2**l
+  	!area = pi/3/Nside/Nside = pi/3/4**l
+  	!weight = (pi/3)/(4pi)/4**l
+  	!weight = (1./12.)/4**l
+  	healpix_weight = (1.0/12.0) / real(4**l,kind=dp)
+  	
+  	return
+  end function healpix_weight
+  
+  function healpix_angular_resolution(l)
+  	!in degrees
+  	integer, intent(in) :: l
+  	real(kind=dp) :: healpix_angular_resolution
+  	
+  	healpix_angular_resolution = 180.0 * 4.0 * healpix_weight(l)
+  	
+	return
+  end function healpix_angular_resolution
+    	  !lshift, rshift
+    	  
+  subroutine healpix_mu_and_phi(l, pix, mu, phi)
+  	integer, intent(in) :: l, pix
+  	integer :: p, i, j, pp
+  	real(kind=dp), intent(out) :: mu, phi !cos(theta) and azimuth from the north pole
+  	integer(kind=8) :: Npix, Nside, North_cap
+  	real(kind=dp) :: four_on_Npix, ph, fodd
+  	
+  	Npix = healpix_npix(l)
+  	Nside = 2**l
+  	North_cap = 2 * Nside * (Nside-1)
+  	
+  	!C index
+  	p = pix - 1
+  	
+  	!better to do that out of the subroutine if called many times
+  	!if pix in a do loop (do pix=1,Npix) should never happen
+  	if (pix > Npix) then
+  		write(*,*) pix, Npix, l
+  		call error("(Healpix_mu_and_phi) pixel index larger than Npix")
+  	endif
+  	
+  	four_on_Npix = 4.0 / real(Npix)
+  	
+  	if (p < North_cap) then !north
+  		ph = 0.5 * real(1 + p)
+  		
+  		! i = largest_integer_small_than_x(ph)
+  		i = rshift(int(1 + floor(sqrt(real(1+2*p)))),1)
+		  	
+		j = (p+1) - 2 * i * (i-1)
+		
+		mu = 1.0 - real(i*i) * four_on_Npix
+		phi = (real(j) - 0.5) * 0.5 * pi / real(i)
+		
+	elseif (p < (Npix - North_cap)) then !equator
+		pp = p - North_cap
+		i = pp/(4*Nside) + Nside !integer
+		j = mod(pp,4*Nside) + 1
+		
+		!1 if i+Nside odd, 0.5 otherwise
+		if (mod(i+Nside,2)==0) then
+			fodd = 0.5
+		else !odd
+			fodd = 1.0
+		endif
+		
+		!!see, it is simply 4/3
+		!!(2*Nside * 4.0 / Npix ) * (Nside <<1) = 4/3 whatever Nside
+		!!(4/Npix) * (Nside << 1) = 2/3/Nside whatever Nside
+		!mu = four_on_Npix * real( ( 2 * Nside - i) * lshift(Nside,1) )
+		mu = 4.0 / 3.0 - 2.0 * real(i) / real(3*Nside)
+		phi = (real(j) - fodd) * pi / real(2 * Nside)
+	
+	else !south 
+		pp = Npix - p
+		i = rshift(int(1 + floor(sqrt(real(2*pp-1)))),1)
+		j = 4 * i + 1 - (pp - 2*i*(i-1))
+		
+		mu = -1.0 + real(i*i) * four_on_Npix
+		phi = (real(j) - 0.5) * 0.5 * pi / real(i)
+	
+	endif
+  	
+  	return
+  end subroutine healpix_mu_and_phi
+  
+  subroutine healpix_sphere(l,mu,phi)
+  	integer, intent(in) :: l
+  	real(kind=dp), dimension(12*4**l), intent(out) :: mu, phi
+  	integer :: pix
+  	
+  	mu(:) = 0.0_dp
+  	phi(:) = 0.0_dp
+  	
+  	do pix=1,healpix_npix(l)
+  	
+  		call healpix_mu_and_phi(l,pix,mu(pix),phi(pix))
+  		
+  	enddo
+  	
+  	return
+  end subroutine healpix_sphere
   
   subroutine compute_anglequad_centres()
 
