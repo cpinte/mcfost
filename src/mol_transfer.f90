@@ -247,7 +247,7 @@ subroutine NLTE_mol_line_transfer(imol)
         tab_speed = 0.0_dp
 
         allocate(I0(ispeed(1):ispeed(2),nTrans_tot,n_rayons_max,nb_proc), &
-             I0c(nTrans_tot,n_rayons_start,nb_proc), stat=alloc_status)
+             I0c(nTrans_tot,n_rayons_max,nb_proc), stat=alloc_status)
         if (alloc_status > 0) call error('Allocation error I0')
         I0 = 0.0_dp
         I0c = 0.0_dp
