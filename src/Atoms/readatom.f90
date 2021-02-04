@@ -594,9 +594,12 @@ MODULE readatom
      else if (trim(nuDepChar).eq."HYDROGENIC") then
        atom%continua(kr)%hydrogenic=.true.
        !!tmp
-       atom%continua(kr)%lambdamin = 1.0_dp * 5.0
-       write(*,*) "Temporary set lambdamin = 5 nm for all hydrogenic continua"
+!        atom%continua(kr)%lambdamin = 1.0_dp * 5.0
+!        write(*,*) "Temporary set lambdamin = 5 nm for all hydrogenic continua"
        !!tmp
+       write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
+       write(*,'(" -> lower edge cut at "(1F12.5)" nm !")'), atom%continua(kr)%lambdamin       
+       
        if (atom%continua(kr)%lambdamin>=atom%continua(kr)%lambda0) then
         write(*,*) "Minimum wavelength for continuum is larger than continuum edge."
         write(*,*) kr, atom%continua(kr)%lambda0, atom%continua(kr)%lambdamin
@@ -614,11 +617,13 @@ MODULE readatom
             CALL make_sub_wavelength_grid_cont_linlog(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
 			!!CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)   
 		else
-			!there is dissolve but not for this atom, log cont
-            CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+			!there is dissolve but not for this atom
+!             CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
        	endif
        else !no dissolve
-			CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)   
+! 			CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)  
+			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
        endif
        ! %lambda allocated inside the routines.
 !        CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
@@ -647,16 +652,12 @@ MODULE readatom
     !now compute wavelengths grid for each line done elsewhere
 
    !Now even for passive atoms we write atomic data.
-   ! Unlike RH, all data are in the same fits file.
-    if (atom%ID(2:2) .eq." ") then
-      atom%dataFile = atom%ID(1:1)//".fits.gz" !.fits to be updated, .gz not
-    else
-      atom%dataFile = atom%ID(1:2)//".fits.gz"
-    end if
-    !! done at writing if we do not store them by iterations, but only at the end of the NLTE loop
-    !!CALL create_pops_file(atom)
-    !!write(*,*) "Populations file for writing: .",trim(atom%dataFile),"."
-
+!     if (atom%ID(2:2) .eq." ") then
+!       atom%dataFile = atom%ID(1:1)//".fits.gz" !.fits to be updated, .gz not
+!     else
+!       atom%dataFile = atom%ID(1:2)//".fits.gz"
+!     end if
+	
 
    atom%set_ltepops = .true. !by default compute lte populations
    atom%NLTEpops = .false.
@@ -706,22 +707,22 @@ MODULE readatom
     	atom%set_ltepops = .true.
     	!nlte pops is false
     	    	
-	else if (atom%dataFile.ne."" .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+	else if (atom%initial_solution .eq. "OLD_POPULATIONS") then
 	
-	   write(*,*) " -> Reading populations from file..."
+	   write(*,*) " -> Reading (non-LTE AND LTE) populations from file..."
        CALL read_pops_atom(atom)
        atom%NLTEpops = .true.
-       atom%set_ltepops = .false. !read also LTE populations
+       atom%set_ltepops = .false. !read and USE also LTE populations from file!!
 
     end if
    else !not active = PASSIVE
-     if (atom%dataFile.ne.""  .and. atom%initial_solution .eq. "OLD_POPULATIONS") then
+     if (atom%initial_solution .eq. "OLD_POPULATIONS") then
      
        allocate(atom%n(atom%Nlevel,n_cells)) !not allocated if passive, n->nstar
-	   write(*,*) " -> Reading populations from file for passive atom..."
+	   write(*,*) " -> Reading (non-LTE AND LTE) populations from file for passive atom..."
        CALL read_pops_atom(atom)
        atom%NLTEpops = .true.
-       atom%set_ltepops = .false. !read also lte pops
+       atom%set_ltepops = .false. !read and USE also LTE populations from file!!
 
        !atom%NLTEpops = .false. still false at this point as we need pops to do electron densities
      else !pure passive without nlte pops from previous run
@@ -831,7 +832,7 @@ MODULE readatom
      write(*,*) "Exiting..."
      stop
    end if
-   Atoms(nmet)%ptr_atom%dataFile = trim(popsFile) ! now the file atomID.fits.gz contains
+   !!Atoms(nmet)%ptr_atom%dataFile = trim(popsFile) ! now the file atomID.fits.gz contains
                                                ! all informations including populations.
 
    !Active atoms are treated in NLTE
@@ -877,6 +878,16 @@ MODULE readatom
    !if (nmet>1) write(*,*) nmet-1, Atoms(nmet-1)%ptr_atom%ID
   end do
   close(unit)
+  
+  if (lfix_backgrnd_opac) then
+  	do nmet=1, Natom
+  		if (atoms(nmet)%ptr_atom%initial_solution.eq."OLD_POPULATIONS") then
+  			call warning(" Using previous NLTE populations with fixed bacgkrnd!!!!")
+  			write(*,*) " ----->n check consistency of the result"
+  			exit
+  		endif
+  	enddo
+  endif
 
   ! Alias to the most importent one
   Hydrogen=>Atoms(1)%ptr_atom
@@ -1088,6 +1099,8 @@ MODULE readatom
  RETURN
  END SUBROUTINE search_cont_lambdamax
 
+
+ !But why, a cswitch per atom ? It is going at the same speed for all atoms right ?
  function maxval_cswitch_atoms ()
  !for all atoms, check the maximum value of the cswitch
  	integer :: n
@@ -1103,6 +1116,7 @@ MODULE readatom
  return
  end function maxval_cswitch_atoms
  
+ !could be done for only one common parameter by the way
  subroutine adjust_cswitch_atoms ()
  !for all active atoms, decreases the cswitch value from cswitch_down_scaling_factor
  	integer :: n

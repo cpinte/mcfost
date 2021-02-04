@@ -10,24 +10,26 @@ module atom_transfer
 	use atom_type, only			: AtomType
 	use opacity, only			: dealloc_atom_quantities, alloc_atom_quantities, compute_atom_quantities, compute_background_continua, &
 									interp_background_opacity, opacity_atom_loc, interp_contopac, interp_continuum_local, & !compute_nlte_bound_free, &
-									nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, background_continua_lambda, opacity_atom_zeeman_loc
+									nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, background_continua_lambda, opacity_atom_zeeman_loc, &
+									prec_pops, frac_limit_pops
 	use background_opacity, only: Thomson
 	use Planck, only			: bpnu
 	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, &
 									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, cntrb_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, eta_es, alloc_flux_image, allocate_stokes_quantities, &
 									dealloc_jnu, reallocate_rays_arrays, write_contribution_functions_ray, write_flux, write_1D_arr_ascii, cntrb, flow_chart, write_lambda_cell_array, cf_file, flow_file
 									
-	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, &
+	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
-									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature
+									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, &
+									Ncentre, frac_pos, compute_anglequad_centres
 	use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
 	use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
 	use constant, only			: MICRON_TO_NM, hc_k, sigma_e
-	use solvene, only			: solve_electron_density_old, solve_electron_density, solve_ne_nlte_loc
+	use solvene, only			: solve_electron_density_old, solve_electron_density
 	use getlambda, only			: hv
 	use voigtfunctions, only	: Voigt, VoigtHumlicek, dirac_line
 	use profiles, only			: profile, local_profile_v, local_profile_thomson, local_profile_interp, local_profile_dk
-	use io_atomic_pops, only	: write_pops_atom, write_electron, write_hydrogen, write_Hminus, write_convergence_map_atom, write_convergence_map_electron
+	use io_atomic_pops, only	: write_pops_atom, write_electron, read_electron, write_hydrogen, write_Hminus, write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
 	use io_opacity, only 		: write_Jnu, write_taur, write_contrib_lambda_ascii, read_jnu_ascii, Jnu_File_ascii, read_Jnu, &
 									write_collision_matrix_atom, write_collision_matrix_atom_ascii, &
 									write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii
@@ -38,22 +40,23 @@ module atom_transfer
 	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function, lorigin_atom, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
-									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot
+									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, &
+									ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint, istep_start, lno_iterate_ne_mc
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
 	use dust_transfer, only		: compute_stars_map
 	use dust_ray_tracing, only	: RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az,tab_RT_incl, stars_map, kappa
 	use stars, only				: intersect_spots, intersect_stars
 	!use wavelengths, only		:
-	use mcfost_env, only		: dp
-	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg
+	use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
+	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, sigma
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
-	use cylindrical_grid, only	: r_grid, z_grid
+	use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k
 	use spherical_grid, only	: subdivise_cellule_sph
 	use messages, only 			: error, warning
 	
-	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, prec_pops, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, fill_collision_matrix, &
+	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, fill_collision_matrix, &
 									init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates,store_radiative_rates_mali,calc_rates, store_rate_matrices, &
 									psi, calc_rates_mali, n_new, radiation_free_pops_atom, omega_sor_atom
 	use collision, only			: CollisionRate !future deprecation
@@ -84,7 +87,11 @@ module atom_transfer
 	logical, allocatable :: lcell_converged(:)
 	real(kind=dp), allocatable :: gpop_old(:,:,:), Tex_old(:,:,:), ngpop(:,:,:), ne_old(:)
 	real(kind=dp), allocatable :: Gammaij_all(:,:,:,:), Rij_all(:,:,:), Rji_all(:,:,:) !need a flag to output it
-	integer :: NmaxLevel, NmaxTr, ne_niter_ndelay = 0!10
+	integer :: NmaxLevel, NmaxTr
+	!Check-pointing and stopping and timing
+	logical :: lexit_after_nonlte_loop = .false.
+	real :: time_iteration, time_nlte
+
 
  	contains
 
@@ -99,9 +106,9 @@ module atom_transfer
 		real(kind=dp), intent(in) :: x,y,z
 		logical, intent(in) :: labs
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau
-		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
-		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau!, LD
+		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
 		x1=x;y1=y;z1=z
@@ -127,6 +134,7 @@ module atom_transfer
   ! Boucle infinie sur les cellules
 		infinie : do ! Boucle infinie
     ! Indice de la cellule
+    		icell_prev = icell !duplicate with previous_cell, but this avoid problem with Voronoi grid here
 			icell = next_cell
 			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
@@ -144,11 +152,14 @@ module atom_transfer
 
 			if (lintersect_stars) then
 				if (icell == icell_star) then
-					!can be done better
-					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
-       				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
-					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+					!It is completely possible to merge Icont and Itot in the say function
+					!as the operation are similar
+					!!call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w,LDc)
+       				!!Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
+					!!call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
+					!!Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
        				return
       			end if
    			 endif
@@ -167,9 +178,12 @@ module atom_transfer
 				l_contrib = l_contrib * AU_to_m !l_contrib in m
 			
 				!total bound-bound + bound-free + background opacities lte + nlte
-! 				chi(:,id) = chi0_bb(:,icell)
-! 				eta(:,id) = eta0_bb(:,icell)
-				call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				if (llimit_mem) then
+					call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				else
+					chi(:,id) = chi0_bb(:,icell)
+					eta(:,id) = eta0_bb(:,icell)				
+				endif
 
 				!includes a loop over all bound-bound, passive and active
 				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
@@ -225,6 +239,11 @@ module atom_transfer
 					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
+				
+! 				if (minval(tau) > 1000.) then
+! 					write(*,*) "taumin > 100 stopping propagation"
+! 					return
+! 				endif
 
 
 			end if  ! lcellule_non_vide
@@ -243,9 +262,9 @@ module atom_transfer
 		real(kind=dp), intent(in) :: x,y,z
 		logical, intent(in) :: labs
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau, chi_line, tau_line, Sline
-		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
-		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, chi_line, tau_line, Sline!, LD
+		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
 		x1=x;y1=y;z1=z
@@ -275,6 +294,7 @@ module atom_transfer
   ! Boucle infinie sur les cellules
 		infinie : do ! Boucle infinie
     ! Indice de la cellule
+    		icell_prev = icell
 			icell = next_cell
 			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
@@ -293,10 +313,12 @@ module atom_transfer
 			if (lintersect_stars) then
 				if (icell == icell_star) then
 					!can be done better
-					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
-       				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
-					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
+!        			Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
+! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
+! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
        				return
       			end if
    			 endif
@@ -315,10 +337,13 @@ module atom_transfer
 				l_contrib = l_contrib * AU_to_m !l_contrib in m
 			
 				!total bound-bound + bound-free + background opacities lte + nlte
-! 				chi(:,id) = chi0_bb(:,icell)
-! 				eta(:,id) = eta0_bb(:,icell)
 ! 				!rename it chi0_bckgr etc
-				call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				if (llimit_mem) then
+					call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				else
+					chi(:,id) = chi0_bb(:,icell)
+					eta(:,id) = eta0_bb(:,icell)				
+				endif
 
 				!includes a loop over all bound-bound, passive and active
 				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
@@ -396,9 +421,9 @@ module atom_transfer
 		real(kind=dp), intent(in) :: x,y,z
 		logical, intent(in) :: labs
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau, S_Q, S_U, S_V
-		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
-		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, S_Q, S_U, S_V!, LD
+		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
 		x1=x;y1=y;z1=z
@@ -426,6 +451,7 @@ module atom_transfer
   ! Boucle infinie sur les cellules
 		infinie : do ! Boucle infinie
     ! Indice de la cellule
+    		icell_prev = icell
 			icell = next_cell
 			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
@@ -443,11 +469,12 @@ module atom_transfer
 
 			if (lintersect_stars) then
 				if (icell == icell_star) then
-					!can be done better
-					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
-       				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
-					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
+!        				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
+! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
+! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
        				return
       			end if
    			 endif
@@ -466,9 +493,12 @@ module atom_transfer
 				l_contrib = l_contrib * AU_to_m !l_contrib in m
 			
 				!total bound-bound + bound-free + background opacities lte + nlte
-! 				chi(:,id) = chi0_bb(:,icell)
-! 				eta(:,id) = eta0_bb(:,icell)
-				call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				if (llimit_mem) then
+					call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				else
+					chi(:,id) = chi0_bb(:,icell)
+					eta(:,id) = eta0_bb(:,icell)				
+				endif
 
 				!includes a loop over all bound-bound, passive and active
 				call opacity_atom_zeeman_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
@@ -901,10 +931,11 @@ module atom_transfer
   integer :: n_rayons_max = n_rayons_start2 * (2**(maxIter-1))
   integer, parameter :: Nrayone = 1
   character(len=20)  :: ne_initial
-  logical :: lread_jnu_ascii = .false.
+  logical :: lread_jnu_ascii = .false., lelectron_read
   type (AtomType), pointer :: atom
   integer :: alloc_status
   logical :: test
+  real :: rand, rand2, rand3
   real(kind=dp) :: test1(3), test2(3,10)
   
   !init at 0
@@ -927,50 +958,27 @@ module atom_transfer
   end if
 
 
-!test subdivisions
-! allocate(xyz_pos(n_cells,5**3,3))!from 1->5 max
+!!test subdivisions
+! allocate(xyz_pos(n_cells,3**3,3))!from 1->5 max
 ! xyz_pos(:,:,:) = 0.0_dp
-! do icell=1, n_cells
-! 	call subdivise_cellule_sph(icell, 5, xyz_pos(icell,:,1), xyz_pos(icell,:,2), xyz_pos(icell,:,3))
+! 
+! do icell=1, n_cells! 
+! 	call subdivise_cellule_sph(icell, 3, xyz_pos(icell,:,1), xyz_pos(icell,:,2), xyz_pos(icell,:,3))
 ! enddo
 !   if (allocated(xyz_pos)) then
 !   	open(unit=20,file="xyz_pos.txt",status="unknown")
 !   	!first cell then last cell
-!   	write(20,*) n_cells, 5**3, 3
+!   	write(20,*) n_cells, 3**3, 3
 !   	do icell=1,n_cells
-!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,1),ibin=1,5**3)
-!     	write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,2),ibin=1,5**3)
-!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,3),ibin=1,5**3)
+!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,1),ibin=1,3**3)
+!     	write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,2),ibin=1,3**3)
+!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,3),ibin=1,3**3)
 !   	enddo
 ! 
 !   	close(20)
 ! 
 !   endif
 ! stop
-! allocate(xyz_pos(n_cells, 3, 3))
-! xyz_pos(:,:,:) = 0.0_dp
-! do icell=1, n_cells
-! 	call pos_em_cellule(icell, 0., 0., 0.,xyz_pos(icell,1,1),xyz_pos(icell,1,2),xyz_pos(icell,1,3))
-! 	call pos_em_cellule(icell, 0.5, 0.5, 0.5,xyz_pos(icell,2,1),xyz_pos(icell,2,2),xyz_pos(icell,2,3))
-! 	call pos_em_cellule(icell, 1., 1., 1.,xyz_pos(icell,3,1),xyz_pos(icell,3,2),xyz_pos(icell,3,3))
-! 
-! enddo
-!   if (allocated(xyz_pos)) then
-!   	open(unit=20,file="xyz_pos.txt",status="unknown")
-!   	!first cell then last cell
-!   	write(20,*) n_cells, 3, 3
-!   	do icell=1,n_cells
-!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,1),ibin=1,3)
-!     	write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,2),ibin=1,3)
-!   		write(20,"(*(ES14.5E3))") (xyz_pos(icell,ibin,3),ibin=1,3)
-!   	enddo
-! 
-!   	close(20)
-! 
-!   endif
-! stop
-!
-
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
         !! ----------------------- Read Model ---------------------- !!
@@ -990,14 +998,32 @@ module atom_transfer
         !! --------------------------------------------------------- !!
  ! ------------------------------------------------------------------------------------ !
  ! ----------------------- READATOM and INITIZALIZE POPS ------------------------------ !
-  call readAtomicModels(atomunit)
- 
-  if (calc_ne) then
-  	ne_initial = "H_IONISATION"
+  call readAtomicModels(atomunit)!if old_pops not compatible with fixed background
+  								 !because of the electron density evaluated in non-LTE
+  								 !if background fixed, they will be computed with the current estimate of
+  								 !electron density and non-LTE pops !
+
+  !not in the model but fits file exists from previous run ?
+  call read_electron(lelectron_read)
+  if (lelectron_read) then
+  	ne_initial = "NE_MODEL"
+  	calc_ne = lsolve_for_ne !only if we force solving it. Otherwise it is read
+  	!from old values and eventually iterated during non-LTE loop. This way,
+  	!the iteration starts exactly where it stopped.
+  	!Forcing evaluation of ne (lsolve_for_ne == True) might smooth the solution.
+  else
+    ne_initial = "H_IONISATION"
 	write(*,*) "Solving for electron density from H+M ionisation"
+  endif	
+ 
+  !no electron density in the model nor previous fits file calc_ne == True.
+  !if a previous file is found (lelectron_read == True) and lsolve_for_ne, then
+  !calc_ne is set to .true. Electron density is re-evaluated using the populations
+  !in the fits files (H_Ionisation otherwise).
+  if (calc_ne) then !eventually computed with the previous non-LTE pops ! 
 	call Solve_Electron_Density(ne_initial, .true., dne) 
 ! 	call Solve_Electron_Density_old(ne_initial)
-	call write_Electron 
+	call write_Electron
   else
   	if (lsolve_for_ne) then
   		ne_initial = "NE_MODEL"
@@ -1077,10 +1103,20 @@ module atom_transfer
 			NmaxLevel = max(NmaxLevel, atom%Nlevel)
 			NmaxTr = max(NmaxTr, atom%Ncont + atom%Nline)
 			
+			!calc_delta_Tex_atom
+			
 			if (atom%initial_solution=="ZERO_RADIATION") then
-				write(*,*) atom%ID, " Initial solution at SEE with I = 0"
+				write(*,*) "-> Initial solution at SEE with I = 0 for atom ", atom%ID
+				!factorize in a new subroutine for all cells ?
 				do icell=1,n_cells
-					call radiation_free_pops_atom(1, icell, atom, .false.)
+					if (icompute_atomRT(icell) > 0) then
+						call radiation_free_pops_atom(1, icell, atom, .false.)
+					endif
+				enddo
+    			do m=1,atom%Nlevel
+    				write(*,"('Level #'(3I1))") m
+    				write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , minval(atom%n(m,:),mask=(icompute_atomRT>0)), maxval(atom%n(m,:))
+    				write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  minval(atom%nstar(m,:),mask=(icompute_atomRT>0)), maxval(atom%nstar(m,:))
 				enddo
 			endif
 			mem_alloc_tot = mem_alloc_tot + sizeof(atom%C) + sizeof(atom%Gamma)
@@ -1124,13 +1160,20 @@ module atom_transfer
 		write(*,*) " Max error : ", dpops_max_error, dpops_sub_max_error
 
 
-		!!allocate(threeKminusJ(nlambda,n_cells)); threeKminusJ = 0.0	
 		!!allocate(psi_mean(nlambda, n_cells)); psi_mean = 0.0
 		!!allocate(chi_loc(nlambda, n_rayons_max, nb_proc)); chi_loc = 0.0
 
 		write(*,'("->Total memory allocated before NLTEloop:"(1ES17.8E3)" MB")') mem_alloc_tot/1024./1024.
+		
+		if (lcheckpoint) call prepare_check_pointing()
 
-		call NLTEloop_mali(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter,.true.)
+		call NLTEloop_mali(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter)
+		
+		!reevaluate here only if fixed during the loop but ne was iterated
+		!otherwise constant because 1) ne constant or 2), ne evaluated just after
+		if ((lfix_backgrnd_opac).and.(n_iterate_ne > 0)) then
+			call compute_background_continua
+		endif
 		
 		!evaluate electron density once SEE is solved
 		if (n_iterate_ne == 0) then
@@ -1145,7 +1188,7 @@ module atom_transfer
 			do icell=1,n_cells
 				if (icompute_atomRT(icell) > 0) then
 					if (lelectron_scattering) eta_es(:,icell) = eta_es(:,icell) * thomson(icell)
-					nHmin(icell) = nH_minus(icell) !beware here, or after new LTE?
+					nHmin(icell) = nH_minus(icell)
 				endif
 			enddo
 			do nact=1, Natom!see calc_ionisation_frac, for why we updated also passive atoms
@@ -1183,7 +1226,8 @@ module atom_transfer
 					call write_rate_matrix_atom(atom, Gammaij_all(nact,1:atom%Nlevel,1:atom%Nlevel,:))
 				endif
 			endif
-			if (associated(hydrogen,atom)) call write_collision_matrix_atom(hydrogen)
+			!!if (associated(hydrogen,atom)) call write_collision_matrix_atom(hydrogen)
+			call write_collision_matrix_atom(atom)
 			do m=1, atom%Nline
 				deallocate(atom%lines(m)%phi_loc)
 			enddo
@@ -1192,10 +1236,7 @@ module atom_transfer
 		if (loutput_rates) deallocate(Rij_all,Rji_all,Gammaij_all)
 		
 		if (lelectron_scattering) call write_Jnu
-		!recompute some opacities ?
-! 		write(*,*) " re-computing background opacities..."
-! 		call compute_background_continua
-! 		write(*,*) " ..done"
+
 		
 		!-> I do not do that for nlte calc otherwise, Eta_es is thomson * Jnu_cont
 		!if (lelectron_scattering) call iterate_Jnu
@@ -1258,6 +1299,12 @@ module atom_transfer
 	do m=1,Natom
 		call write_pops_atom(Atoms(m)%ptr_atom)
 	end do
+	
+
+	if (lexit_after_nonlte_loop) then
+		return
+		!free all data or because we leave after not needed
+	endif
 
 	if (lmagnetized) then
 		integ_ray_line => integ_ray_line_z
@@ -1326,10 +1373,7 @@ module atom_transfer
 		call dealloc_Jnu()
 	endif
 
-	
-	if (allocated(threeKminusJ)) deallocate(threeKminusJ) 
-	if (allocated(psi_mean)) deallocate(psi_mean, chi_loc) 			
-
+	if (allocated(psi_mean)) deallocate(psi_mean, chi_loc)
  ! ------------------------------------------------------------------------------------ !
  ! ------------------------------------------------------------------------------------ !
  ! -------------------------------- CLEANING ------------------------------------------ !
@@ -1344,36 +1388,48 @@ module atom_transfer
 	end subroutine atom_line_transfer
 ! ------------------------------------------------------------------------------------ !
 
-	subroutine NLTEloop_mali(n_rayons_max,n_rayons_1,n_rayons_2,maxIter,verbose)
+	subroutine NLTEloop_mali(n_rayons_max,n_rayons_1,n_rayons_2,maxIter)
 	! ----------------------------------------------------------------------- !
 	! removed all dependency on nrayons since everything is ray by ray built
 	! ----------------------------------------------------------------------- !
 #include "sprng_f.h"
 		integer, intent(in) :: n_rayons_1, n_rayons_2, maxIter, n_rayons_max
-		logical, intent(in) :: verbose
-		integer, parameter :: max_sub_iter = 10000, max_global_iter = 1000
 		integer :: etape, etape_start, etape_end, iray, n_rayons, iray_p
 		integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, la, kr
 		integer, dimension(nb_proc) :: max_n_iter_loc
 		logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
 		real :: rand, rand2, rand3, precision, fac_etape!, precision_sub
-		real, allocatable :: randz(:,:)
 		real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
 		real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
 		real(kind=dp) :: dT, dN2, dN3, dN4, diff_old
 		real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
-		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:), Jloc(:,:), Jloc_old(:,:), dJmax_id(:)
+		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:), Jnu_loc(:,:)
 ! 		real(kind=dp), allocatable :: err_pop(:,:)
 		logical :: labs, iterate_ne = .false.
 		logical :: l_iterate
 		logical :: accelerated, ng_rest, evaluate_background, lmean_intensity = .false.!,lapply_sor_correction
 		integer :: iorder, i0_rest, n_iter_accel, iacc!, iter_sor
 		integer :: nact, imax, icell_max, icell_max_2
-		integer :: icell, ilevel, imu, iphi
+		integer :: icell, ilevel, imu, iphi, id_ref !for anisotropy
 		character(len=20) :: ne_start_sol = "NE_MODEL"
 		type (AtomType), pointer :: atom
 		integer(kind=8) :: mem_alloc_local = 0
 		
+		write(*,*) " USING MALI METHOD FOR NLTE LOOP"
+		
+		!only for step 1 at the moment
+		allocate(threeKminusJ(nlambda, n_cells))
+		!or (nlambda, nb_proc) if only used locally as a threshold
+		allocate(Jnu_loc(nlambda,nb_proc))
+		id_ref = locate(lambda, 300.0_dp)
+		!if used, we only need it locally or at one wavelenegth
+		
+		!time for individual steps + check the time from the checkpointing time if any
+		!and if it is set lconverged = .true. and .lprevious converged == true
+ 		call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
+		
+		!we are missing some information about dJ in the case lmean_intensity is .false.
+		!how to correct that without much overhead and without allocating Jnew, Jold (or eta_es new/old)
 		if (lelectron_scattering) lmean_intensity = .true.
 		
 		!If we iterate electron scattering with the SEE. if == 0, ONCE SEE is set.
@@ -1415,16 +1471,12 @@ module atom_transfer
 			write(*,*) "size Jcont:", 2*sizeof(Jnu_cont)/1024./1024.," MB"
 			mem_alloc_local = mem_alloc_local + 2*(sizeof(Jnew)+sizeof(Jnew_cont))
 		endif
-		allocate(Jloc(Nlambda,nb_proc),dJmax_id(nb_proc), Jloc_old(Nlambda,nb_proc))
-		Jloc = 0.0_dp
-		Jloc_old = 0.0_dp
-		write(*,*) "size Jloc:", 2*sizeof(Jloc)/1024./1024.," MB"
 		
 		allocate(Tex_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tex for all cells for each line of each atom
 		allocate(Tion_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
 		diff_old = 1.0_dp
 		
-		mem_alloc_local = mem_alloc_local + sizeof(Jloc) + sizeof(dM)+sizeof(dTm)+sizeof(Tex_ref)+sizeof(Tion_ref)
+		mem_alloc_local = mem_alloc_local + sizeof(dM)+sizeof(dTm)+sizeof(Tex_ref)+sizeof(Tion_ref)
 		
 		if (lNg_acceleration) then 
 			n_iter_accel = 0
@@ -1443,16 +1495,21 @@ module atom_transfer
 		allocate(stream(nb_proc),stat=alloc_status)
 		if (alloc_status > 0) call error("Allocation error stream")
 
-		write(*,*) " USING MALI METHOD FOR NLTE LOOP"
-
 		labs = .true. !to have ds at cell icell = eval_operator
 		id = 1
-		etape_start = 1
+		!In case we restart a calculation in the step 2
+		etape_start = istep_start!1
 		if (laccurate_integ) then
 			etape_end = 2!3, step 3 not implemented yet
 		else
 			etape_end = 1
+			if (istep_start==2) etape_end = 2
 		endif
+		
+		write(*,*) "---------------------------------------"
+		write(*,*) " step start ",etape_start, istep_start
+		write(*,*) " step end", etape_end
+		write(*,*) "---------------------------------------"
 
 		! ds is not used for this scheme at  the moment. Psi is used instead
 		!since there is no local subit needing recomputing psi
@@ -1483,48 +1540,56 @@ module atom_transfer
 		write(*,'("Total memory allocated up to now:"(1ES17.8E3)" GB")') mem_alloc_tot / 1024./1024./1024.
 				
 
-		do etape=etape_start, etape_end
-
+		step_loop : do etape=etape_start, etape_end
+		
 			if (etape==1) then
+				time_iteration = 0
+				
+				!Only one ray until a proper scheme for choosing positions inside the cell exist
       			call compute_angular_integration_weights()
+      			call compute_anglequad_centres()
   				lfixed_rays = .true.
-  				n_rayons = 1 + ( n_rayons_1 - 1)
-  				
-  				if (laccurate_integ) n_rayons = 1 !use only cell centre
-  				
-  				write(*,*) " Using step 1 with ", size(xmu)*n_rayons, " rays"
-  				write(*,*) " -> ",size(xmu)/8," rays per octant."
+  				n_rayons = 1 !always			
+  				write(*,*) " Using step 1 with ", size(xmu), " rays"
+  				!!write(*,*) " -> ",size(xmu)/8," rays per octant."
   				iray_start = 1
+  				if (Ncentre + 1 > 0) then
+  					write(*,'("   --> using "(1I3)" ray centres.")') Ncentre + 1
+  		  			write(*,'("   --> a total of "(1I5)" elements.")')( Ncentre + 1 ) * size(xmu) 
+!   		  			if (Ncentre > 0) iray_start = 2 !exclude the centre of the cell ? 
+  				endif
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				precision = dpops_max_error
-  				!allocate(xyz_pos(3,n_rayons,2),uvw_pos(3,size(xmu),1))
-				if (n_rayons > 1) then
-  					stream(1) = init_sprng(gtype,0,1,seed,SPRNG_DEFAULT)
-  					allocate(randz(n_rayons-1,3))
-  					do iray=1,n_rayons-1
-  						do i=1,3
-  							randz(iray,i)  = sprng(stream(1))
-  						enddo
-  					enddo
-  				endif
-			else if (etape==2) then 
-			
-! 				if (iterate_ne) then
-! 					iterate_ne = .false. !no iteration in MC
-! 					n_iterate_ne = 0 !to recalc ne at the end of the SEE loop
-! 									  ! -1 is default and means do nothing					  
+  				 		
+			else if (etape==2) then 		
+				time_iteration = 0
+				
+				!or no ? because we resample the radiation field
+! 				if (etape_start == 1) then
+! 					Ndelay_iterate_ne = 0
 ! 				endif
+				
+				!-> no iteration in MC but after the solution ??
+				if (iterate_ne) then
+					if (lno_iterate_ne_mc) then
+						iterate_ne = .false.
+						n_iterate_ne = 0	
+					endif
+				endif
 			
 				write(*,*) " Using step 2 with ", n_rayons_1, " rays"
 				lfixed_rays = .true.
 				n_rayons = n_rayons_1
 				iray_start = 1
-				lprevious_converged = .false.!!if .true. here, do not do another iteration after convergence
+				lprevious_converged = .false.
 				lcell_converged(:) = .false.
-				fac_etape = 1.0
-				precision = fac_etape * 1.0 / sqrt(real(n_rayons))
-				!precision = dpops_max_error
+				fac_etape = 0.1
+				if (etape_start==1) then
+					precision = fac_etape * 1e-1!1e-1!1e-3, 1e-2, fac_etape * 1.0 / sqrt(real(n_rayons))
+				else
+					precision = dpops_max_error				
+				endif
 				write(*,*) " threshold:", precision
 				
 				if (lNg_acceleration) then
@@ -1534,6 +1599,7 @@ module atom_transfer
 				endif
 				
 			else if (etape==3) then
+				time_iteration = 0
 				write(*,*) " Using step 3 with ", n_rayons_max, " nrays max"
 		  		lfixed_rays = .false.
   				n_rayons = n_rayons_2
@@ -1555,8 +1621,9 @@ module atom_transfer
 				!!write(unit_invfile,*) "************************************************"
 				!!write(unit_invfile,*) "step ", etape, ' iter ', n_iter
 				!!write(unit_invfile,*) "************************************************"
-   				dJmax_id(:) = 0.0
 
+				!in step 3 we use the same seed (same sets of random numbers) to add rays to
+				!the previously computed.
 				if (lfixed_rays) then
 					stream = 0.0
 					do i=1,nb_proc
@@ -1572,10 +1639,10 @@ module atom_transfer
 				!$omp default(none) &
 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi)&
 				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight) &
-				!$omp shared(icompute_atomRT, dpops_sub_max_error, verbose,lkeplerian,lforce_lte,n_iter, threeKminusJ,psi_mean, psi, chi_loc) &
-				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
-				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,randz,xyz_pos,uvw_pos) &
-				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity,dJmax_id,Jloc,Jloc_old) &
+				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ, psi_mean, psi, chi_loc, Jnu_loc) &
+				!$omp shared(stream,n_rayons,iray_start, volume, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
+				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,id_ref, frac_pos,Ncentre,xyz_pos,uvw_pos) &
+				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity) &
 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda)
 				!$omp do schedule(static,1)
@@ -1587,10 +1654,10 @@ module atom_transfer
    						if (lmean_intensity) then
    							Jnew(:,icell) = 0.0
    							Jnew_cont(:,icell) = 0.0
-   							!!threeKminusJ(:,icell) = 0.0
    							!!psi_mean(:,icell) = 0.0
    						endif
-   						Jloc(:,id) = 0.0_dp
+   						threeKminusJ(:,icell) = 0.0
+   						Jnu_loc(:,id) = 0.0
 
 						call fill_Collision_matrix(id, icell) !computes = C(i,j) before computing rates
 						call initGamma(id) !init Gamma to C and init radiative rates
@@ -1625,7 +1692,6 @@ module atom_transfer
 									Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) / n_rayons
 									Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) / n_rayons
 								endif
-								Jloc(:,id) = Jloc(:,id) + Itot(:,1,id) / n_rayons 
 
 								!for one ray
 								if (.not.lforce_lte) then
@@ -1674,7 +1740,6 @@ module atom_transfer
 									Jnew(:,icell) = Jnew(:,icell) + Itot(:,iray,id) / n_rayons
 									Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,iray,id) / n_rayons
 								endif
-								Jloc(:,id) = Jloc(:,id) + Itot(:,iray,id) / n_rayons
 								
 								!for one ray
 								if (.not.lforce_lte) then
@@ -1690,36 +1755,33 @@ module atom_transfer
 								
 						elseif (etape==1) then !ray-by-ray, n_rayons fixed
 
-  		         			do iray = 1,n_rayons
+  		         			do iray = iray_start, Ncentre+1
+  		         			
 								if (iray==1) then
-									x0 = r_grid(icell)
-									y0 = 0.0_dp
+									x0 = r_grid(icell) * cos(phi_grid(icell))
+									y0 = r_grid(icell) * sin(phi_grid(icell))
 									z0 = z_grid(icell)
 								else
-! 						!-> the same for all cells and proc
-									call  pos_em_cellule(icell ,randz(iray-1,1),randz(iray-1,2),randz(iray-1,3),x0,y0,z0)
+									call  pos_em_cellule(icell,frac_pos(iray-1,1),frac_pos(iray-1,2),frac_pos(iray-1,3),x0,y0,z0)
 								endif
-! 								if (n_iter==1) then
-! 									if (icell==1) then
-! 										xyz_pos(:,iray,1) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
-! 									else if (icell==n_cells) then
-! 										xyz_pos(:,iray,2) = (/x0/etoile(1)%r,y0/etoile(1)%r,z0/etoile(1)%r/)
-! 									endif
-! 								endif
+
+							
   		         				do imu=1, size(xmu)
   		         					w0 = xmu(imu)
 									u0 = xmux(imu); v0 = xmuy(imu)
-									weight = wmu(imu) / n_rayons
+
+									weight = wmu(imu) / real(Ncentre + 2 - iray_start)
 									
 									call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
 
 									if (lmean_intensity) then
 										Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
 										Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
-										!!threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
 										!!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
 									endif
-									Jloc(:,id) = Jloc(:,id) + Itot(:,1,id) * weight 
+									
+									threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
+									Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
 
 								!for one ray
 									if (.not.lforce_lte) then
@@ -1734,7 +1796,23 @@ module atom_transfer
 
 
       			   				enddo !imu	
-      			   			enddo !pos / iray	
+      			   			enddo !pos / iray
+      			   			
+      			   			!copy etape 1 here
+!       			   			if (volume(icell) / maxval(volume) <= 0.04) then
+!       			   				healpix_resol = 4
+!       			   			else
+!       			   				healpix_resol = 1
+!       			   			endif
+!       			   			call calc_healpix ... 
+!       			   			
+!       			   			step1 here for this cell
+      			   			
+      			   			!if kept add for all steps
+      			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
+!       			   			write(*,*) id, icell, " Anis = ", 100*abs(threeKminusJ(id_ref,icell)), " T=",T(icell)," V=",volume(icell)/maxval(volume(:))
+      			   			
+      			   			
 			
 						end if !etape
 						
@@ -1750,8 +1828,6 @@ module atom_transfer
 							!!call store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell), Jnew(:,icell), .false.)
 						endif
 	
-					dJmax_id(id) = max(dJmax_id(id), maxval(abs(1.0 - Jloc_old(:,id)/Jloc(:,id))))
-					Jloc_old(:,id) = Jloc(:,id)
 					end if !icompute_atomRT
 				end do !icell
 				!$omp end do
@@ -1816,13 +1892,20 @@ module atom_transfer
    					endif
    				endif
    				
+   				if ((mod(n_iter, checkpoint_period)==0).and.(lcheckpoint)) then
+   					do nact=1, NactiveAtoms
+						call write_pops_atom(ActiveAtoms(nact)%ptr_atom,iter=n_iter,step=etape)
+   					enddo
+   				endif
+   				
    				
 			!evaluate electron density with the ionisation fraction
 			!I have to evaluate background continua if I update all atoms lte pops ?
 			!still update chi_c if electron scatt ?
 				evaluate_background = .false.
-				dne = 0.0_dp											!diff_old < 1e-2
-				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)).and.(n_iter>ne_niter_ndelay)) then!.and..not.accelerated)  then
+				dne = 0.0_dp											
+				!Updating for non Ng iterations ? add a condition on the dM < 1e-2 ? (better ndelay)
+				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)).and.(n_iter>ndelay_iterate_ne)) then!.and..not.accelerated)  then
 					!do not evaluate if accelerated. Do not evaluate if cswitch ?? Or do not care?
 					
 					!chic(:,:) = chi(:,:) - ne(:)
@@ -1850,25 +1933,26 @@ module atom_transfer
 					write(*,*) ''
 					!chi_c(:,:) = chi_c(:,:) + ne(:)
 					!deallocate(ne_old)
-					evaluate_background = .true.
+					evaluate_background = (.not.lfix_backgrnd_opac) !.true.
 					!convergence_map(:,1,NactiveAtoms+1,:) = dne
 				end if
-!    				evaluate_background = .false.
-
 
      		!Global convergence Tests
      			id = 1
             !should be para
-				dM(:) = 0.0
+				dM(:) = 0.0 !all pops
 				diff = 0.0
-				dJ = maxval(dJmax_id)
-				lambda_max = lambda(locate(dJmax_id,dJ))
+				dJ = 0.0
+				lambda_max = 0.0
 				dT = 0.0
-				dTM(:) = 0.0
+				dTM(:) = 0.0 !all temperature (ion+line)
 				Tex_ref(:) = 0.0
 				Tion_ref(:) = 0.0
    				icell_max = 1
    				icell_max_2 = 1
+   				!for all cells
+				dN2 = 0.0 !among all Tex
+				dN4 = 0.0 !among all Tion
 				cell_loop2 : do icell=1,n_cells
 				
    					l_iterate = (icompute_atomRT(icell)>0)
@@ -1876,43 +1960,52 @@ module atom_transfer
 
    					if (l_iterate) then
    					
+   						!Local only 
 						dN = 0.0 !for all levels of all atoms of this cell
-						dN2 = 0.0 !among all Tex
-						dN4 = 0.0 !among all Tion
+! 						dN2 = 0.0 !among all Tex
+! 						dN4 = 0.0 !among all Tion
 							
 						do nact=1,NactiveAtoms
 							atom => ActiveAtoms(nact)%ptr_atom
      					         					    
 							do ilevel=1,atom%Nlevel
-								!if (n_new(nact,ilevel,icell) > impure_factor * ne(icell)) then
+! 								if ( n_new(nact,ilevel,icell) >= frac_ne_limit * ne(icell) ) then
+								if ( n_new(nact,ilevel,icell) >= frac_limit_pops * ntotal_atom(icell, atom) ) then
 									dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
 									dN = max(dN1, dN)
 									dM(nact) = max(dM(nact), dN1)
-								!endif
+								endif
 									!convergence_map(icell, ilevel, nact, etape) = dN1
 							end do !over ilevel
 
+							!I keep negative Temperatures for info.debug.
+							!hence the /= 0.0. But, some work should be done in update_pops and compute_Tex
 							do kr=1, atom%Nline
 							
-								dN3 = abs(1.0 - Tex_old(nact, kr, icell) / ( atom%lines(kr)%Tex(icell) + tiny_dp ) )
-								!dN3 = abs(atom%lines(kr)%Tex(icell) - Tex_old(nact, kr, icell)) / ( Tex_old(nact, kr, icell) + tiny_dp ) 
-								dN2 = max(dN3,dN2)
-								dTM(nact) = max(dTM(nact), dN3)
-								if (dN3 >= dN2) then
-									Tex_ref(nact) = atom%lines(kr)%Tex(icell)
-									icell_max = icell
+								if (atom%lines(kr)%Tex(icell) /= 0.0_dp) then 
+									dN3 = abs(1.0 - Tex_old(nact, kr, icell) /  atom%lines(kr)%Tex(icell) )!( atom%lines(kr)%Tex(icell) + tiny_dp ) )
+									dN2 = max(dN3,dN2)
+									dTM(nact) = max(dTM(nact), dN3)
+									if (dN3 >= dN2) then
+										Tex_ref(nact) = atom%lines(kr)%Tex(icell)
+										icell_max = icell
+									endif
 								endif
+								
 							enddo
 
 							do kr=1, atom%Ncont
-								dN3 = abs(1.0 - Tex_old(nact, kr+atom%Nline, icell) / ( atom%continua(kr)%Tex(icell) + tiny_dp ))
-								!dN3 = abs(atom%continua(kr)%Tex(icell) - Tex_old(nact, kr+atom%Nline, icell)) / ( Tex_old(nact, kr+atom%Nline, icell) + tiny_dp )
-								dN4 = max(dN3,dN4)
-								dTM(nact) = max(dTM(nact), dN3)
-								if (dN3 >= dN4) then
-									Tion_ref(nact) = atom%continua(kr)%Tex(icell)
-									icell_max_2 = icell
-								endif									
+							
+								if ( atom%continua(kr)%Tex(icell) /= 0.0_dp) then
+									dN3 = abs(1.0 - Tex_old(nact, kr+atom%Nline, icell) /  atom%continua(kr)%Tex(icell) )
+									dN4 = max(dN3,dN4)
+									dTM(nact) = max(dTM(nact), dN3)
+									if (dN3 >= dN4) then
+										Tion_ref(nact) = atom%continua(kr)%Tex(icell)
+										icell_max_2 = icell
+									endif
+								endif
+																	
 							enddo
 
 							atom => NULL()
@@ -1920,7 +2013,7 @@ module atom_transfer
 						
 						!compare for all atoms and all cells
 						diff = max(diff, dN) ! pops
-						!diff = max(diff, dN2) ! Tex
+
 						
 						!do not update if lfixed_J
 						if ((lmean_intensity).and..not.(lfixed_J)) then
@@ -1964,7 +2057,7 @@ module atom_transfer
 							!-> this evaluate profiles or damping but also continuum quantities not needed ???
 							!-> do not check ni-njgij < 0 because a non converged state can lead to inversion of populations
 							! modify it to update only nlte quantities ?
-							call compute_atom_quantities(icell,verbose=.false.)
+							call compute_atom_quantities(icell)
 							call background_continua_lambda(icell, Nlambda_cont, lambda_cont, chi_c(:,icell), eta_c(:,icell))
 							!or just re evaluate ne in chi_c like chi_c -ne_old + ne_new
 						endif
@@ -1972,14 +2065,18 @@ module atom_transfer
 						call NLTE_bound_free(icell)
 
 						!because of opac nlte changed
-						!not anymore ?
-						!call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+						if (.not.llimit_mem) then
+							call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+						endif
 						!end init
 
 						
 					end if !if l_iterate
 				end do cell_loop2 !icell
-   				
+				!! test on the solar case
+				!! use dN2 when step == 2 ?
+				!! change how Tex are initialised (presenly with T, use pops instead)
+   				!!diff = dN2 !dT(line)
    				
 ! 				if ((ljacobi_sor).and..not.(lapply_sor_correction)) then
 ! 
@@ -2011,8 +2108,9 @@ module atom_transfer
 						write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
 					endif
 					write(*,'("   >>>   dT="(1ES17.8E3))') dTM(nact)
-					write(*,'("    ->> Te(icell_max2)="(1F14.4)" K", " Tion="(1F14.4)" K")') T(icell_max_2), Tion_ref(nact)
-					write(*,'("    ->> Te(icell_max1)="(1F14.4)" K", " Texi="(1F14.4)" K")') T(icell_max), Tex_ref(nact)
+					write(*,'("    --->   dT(line)="(1ES17.8E3), " dT(cont)="(1ES17.8E3))') dN2, dN4
+					write(*,'("    ->> Te(icell_max2)="(1F14.4)" K", " Tion="(1ES17.8E3)" K")') T(icell_max_2), Tion_ref(nact)
+					write(*,'("    ->> Te(icell_max1)="(1F14.4)" K", " Texi="(1ES17.8E3)" K")') T(icell_max), Tex_ref(nact)
 					write(*,*) " ------------------------------------------------ "
 				enddo
 				if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
@@ -2021,7 +2119,7 @@ module atom_transfer
 	        	write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), 100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))))/real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
 				write(*,*) " *************************************************************** "
 				diff_old = diff
-
+				
 				!Not used if the next is not commented out
 				
 				if ((real(diff) < precision).and.(maxval_cswitch_atoms() == 1.0_dp)) then
@@ -2047,11 +2145,50 @@ module atom_transfer
           	   		end if
         		end if
         		
+				!***********************************************************!
+				! ********** timing and checkpointing **********************!
+				
+				call system_clock(time_end,count_rate=time_tick,count_max=time_max)	
+  				if (time_end < time_begin) then
+     				time_nlte=real(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
+  				else
+     				time_nlte=real(time_end - time_begin)/real(time_tick)
+  				endif
+	
+        		if (n_iter <= 4) then
+        			time_iteration = time_iteration + time_nlte  * 0.25
+        			!if the problem converge in less than 4 iterations pb
+        		endif
+
+        		
+        		if (lsafe_stop) then
+
+					if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= 4)) then
+						lconverged = .true.
+						lprevious_converged = .true.
+						call warning("Time limit would be exceeded, leaving...")
+						write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
+						write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
+  						write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+  						write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
+  						lexit_after_nonlte_loop = .true.
+  						!lsafe_stop only would leave the code even if the time is below the walltime
+						exit step_loop
+					endif
+
+				endif
+				!***********************************************************!
 
 			end do !while
 			write(*,*) "step: ", etape, "Threshold: ", precision!dpops_max_error
+			!real values are possible, not needed and would increase the amount
+			!of lign of codes.
+			if (n_iter >= 4) then
+				write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
+  				write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+  			endif
 
-		end do !over etapes
+		end do step_loop
 
 ! -------------------------------- CLEANING ------------------------------------------ !
 
@@ -2072,19 +2209,39 @@ module atom_transfer
 !   		close(20)
 !   		write(*,*) "done"
   		!endif
+		if (allocated(xyz_pos)) then
+			open(unit=20,file="xyz_pos.txt",status="unknown")
+			write(20,*) 1, Ncentre+1
+			write(20,*) 1627, cell_map_i(1627), cell_map_j(1627), cell_map_k(1627)
+			do iray=1,Ncentre+1
+				write(20,'(*(1E20.7E3))') (xyz_pos(i,iray,1),i=1,3)
+			enddo
+! 			write(20,'(*(1E20.7E3))') (frac_pos(iray-1,i),i=1,3)
+			do iray=2,Ncentre+1
+				write(20,'(*(1E20.7E3))') (frac_pos(iray-1,i),i=1,3)
+			enddo
+			close(20)
+			open(unit=20,file="uvw_pos.txt",status="unknown")
+			write(20,*) 1, size(xmu), size(xmu)/8
+			do imu=1,size(xmu)
+				write(20,'(*(1E20.7E3))') (uvw_pos(i,imu,1),i=1,3)
+			enddo
+			close(20)
+		endif
   		
 		if (allocated(threeKminusJ)) then
-			write(*,*) " Writing J20 to ascii file..."
+			write(*,*) " Writing anisotropy to ascii file..."
 
   			open(unit=20, file="anis_ascii.txt", status="unknown")
   			write(20,*) n_cells, Nlambda
   			do icell=1, n_cells
   				do la=1, Nlambda
-    				write(20,'(1F12.5,5E20.7E3)') lambda(la), 0.5*threeKminusJ(la,icell)/Jnew(la,icell), 0.0, 0.0, 0.0, 0.0
+    				write(20,'(1F12.5,5E20.7E3)') lambda(la), threeKminusJ(la,icell), 0.0, 0.0, 0.0, 0.0
    				enddo
   			enddo
   			close(20)
-  			write(*,*) "done"  			
+  			write(*,*) "done" 
+  			deallocate(threeKminusJ) 			
 		endif
 		if (allocated(psi_mean)) then
 			write(*,*) " Writing <Psi> to ascii file..."	
@@ -2110,8 +2267,6 @@ module atom_transfer
 		deallocate(dM, dTM, Tex_ref, Tion_ref)
 		if (allocated(Jnew)) deallocate(Jnew)
 		if (allocated(Jnew_cont)) deallocate(Jnew_cont)
-		if (allocated(randz)) deallocate(randz)
-		if (allocated(Jloc)) deallocate(Jloc,Jloc_old, dJmax_id)
 		deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms, n_new)
 		deallocate(stream)
 	
@@ -2127,92 +2282,190 @@ module atom_transfer
 	end subroutine NLTEloop_mali
 	
 
- subroutine init_stellar_disk
-  integer :: i_star!, lam
+	subroutine init_stellar_disk
+		integer :: i_star!, lam
+		!read stellar radiation here or compute from mcfsot
 
-   write(*,*) " Computing Istar(mu=1) for each star..."
-   !move elsewhere if we read a file, but normally should well fit with MCFOST routines
-   do i_star=1, n_etoiles
-    if (etoile(i_star)%T <= 1e-6) then
-     call warning("Setting stellar radiation to 0: T* < 1e-6 K")
-     Istar_tot(:,i_star) = 0.0_dp
-     Istar_cont(:,i_star) = 0.0_dp
-    else
-     write(*,"( 'T(i_star='(1I1)') = '(1F14.7)' K' )") i_star, etoile(i_star)%T
-     Istar_tot(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda)
-     Istar_cont(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda_cont)
-    endif
-   enddo
-   write(*,*) " ..done"
+		write(*,*) " Computing Istar(mu=1) for each star..."
+		!move elsewhere if we read a file, but normally should well fit with MCFOST routines
+		do i_star=1, n_etoiles
+			if (etoile(i_star)%T <= 1e-6) then
+				call warning("Setting stellar radiation to 0: T* < 1e-6 K")
+				Istar_tot(:,i_star) = 0.0_dp
+				Istar_cont(:,i_star) = 0.0_dp
+			else
+				write(*,"( 'T(i_star='(1I1)') = '(1F14.7)' K' )") i_star, etoile(i_star)%T
+				Istar_tot(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda)
+				Istar_cont(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda_cont)
+			endif
+		enddo
+		write(*,*) " ..done"
  
- return
- end subroutine init_stellar_disk
+	return
+	end subroutine init_stellar_disk
 
+	function local_stellar_brigthness(N,lambda,i_star,icell_prev,x,y,z,u,v,w)
+	! ---------------------------------------------------------------!
+	!
+	! -------------------------------------------------------------- !
+  		integer, intent(in) :: N, i_star, icell_prev
+  		real(kind=dp), dimension(N), intent(in) :: lambda
+  		real(kind=dp), intent(in) :: u, v, w, x, y, z
+  		real(kind=dp), dimension(N) :: local_stellar_brigthness
+
+  		real(kind=dp) :: Tchoc
+  		real(kind=dp) :: mu, ulimb, LimbDarkening
+  		integer :: ns,la
+  		logical :: lintersect = .false.
+
+   		if (etoile(i_star)%T <= 1e-6) then !even with spots
+    		local_stellar_brigthness(:) = 0.0_dp !look at init_stellar_disk
+    		return !no radiation from the starr
+   		endif
+   
+  		local_stellar_brigthness = 1.0_dp
+  		!add X-rays, UV flux etc..
+   
+		!if (ladd_xrays) then
+		!	....
+		!endif
+   
+		!cos(theta) = dot(r,n)/module(r)/module(n)
+		if (llimb_darkening) then
+     		call ERROR("option for reading limb darkening not implemented")
+			mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
+			if (real(mu)>1d0) then !to avoid perecision error
+				write(*,*) "mu=",mu, x, y, z, u, v, w
+				call Error(" mu limb > 1!")
+			end if
+		else
+			LimbDarkening = 1.0_dp
+		end if
+
+   
+   		!better to store a map(1:n_cells) with all Tchoc
+   		!and if map(icell_prev) > 0 -> choc
+		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
+			if (icompute_atomRT(icell_prev)) then
+				if (vr(icell_prev) < 0.0_dp) then
+					if (Taccretion>0) then
+						Tchoc = Taccretion
+					else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
+						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * &
+							(0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+					endif
+					lintersect = (Tchoc > etoile(i_star)%T)
+				endif
+			endif
+			if (lintersect) then
+				local_stellar_brigthness(:) = local_stellar_brigthness(:) + &
+				(exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
+			endif
+
+   		endif
+
+
+		local_stellar_brigthness(:) = LimbDarkening * local_stellar_brigthness(:)
+
+	return
+	end function local_stellar_brigthness
  
- subroutine calc_stellar_surface_brightness(N,lambda,i_star,x,y,z,u,v,w,gamma)
- ! ---------------------------------------------------------------!
-  ! Compute the stellar radiation field surface brightness.
-  ! Istar = B(x,y,z;mu) * Stellar spectrum or B * BlackBody
-  ! return gamma, the brightness. For uniform disk, gamma is 1.
-  !
-  ! For a point on the stellar disk, returns gamma * limbdarkenig
- ! -------------------------------------------------------------- !
-  integer, intent(in) :: N, i_star
-  real(kind=dp), dimension(N), intent(in) :: lambda
-  real(kind=dp), dimension(N), intent(out) :: gamma
-  real(kind=dp), intent(in) :: u, v, w, x, y, z
-  real(kind=dp) :: energie(N)
-  real(kind=dp) :: mu, ulimb, LimbDarkening, surface, HC
-  integer :: ns,la
-  logical :: lintersect_spot
-
-   if (etoile(i_star)%T <= 1e-6) then
-    gamma(:) = 0.0_dp
-    return
-   else
-    gamma(:) = 1d0
-   endif
-   
-   !cos(theta) = dot(r,n)/module(r)/module(n)
-   mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
-   if (real(mu)>1d0) then !to avoid perecision error
-    write(*,*) "mu=",mu, x, y, z, u, v, w
-    call Error(" mu limb > 1!")
-   end if
-   
-   !1) Compute stellar flux from mcfost 
-   ! .... 
-   
-   !2) Correct with the contrast gamma of a hotter/cooler region if any
-   call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect_spot)
-   !avoid error with infinity for small lambda
-   if (lintersect_spot) then
-   		!Means that Fspot = Bp(Tspot) 
-		gamma(:) = (exp(hc_k/max(lambda,50.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,50.0)/etoile(i_star)%SurfB(ns)%T)-1)
-     !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
-     	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
-		!gamma = 1.0_dp + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
-   end if
-!    if (any_nan_infinity_vector(gamma) > 0) then
-!    	do la=1,size(gamma)
-! 		write(*,*) la, "lam=", lambda(la), " g=", gamma(la), hc_k/lambda(la)/etoile(i_star)%T, hc_k/lambda(la)/etoile(i_star)%SurfB(ns)%T
-! 	enddo
-! 	write(*,*) "Tspot=",etoile(i_star)%SurfB(ns)%T
-!    	call error("error in stellar spots")
+!  subroutine calc_stellar_surface_brightness(N,lambda,i_star,icell_prev,x,y,z,u,v,w,gamma)
+!  ! ---------------------------------------------------------------!
+!   ! Compute the stellar radiation field surface brightness.
+!   ! Istar = B(x,y,z;mu) * Stellar spectrum or B * BlackBody
+!   ! return gamma, the brightness. For uniform disk, gamma is 1.
+!   !
+!   ! If there is a shock spot at the surface, gamma returned is :
+!   ! gamma = 1 + ratio, such that the radiation from the star Istar is
+!   ! Istar = I(photosphere) + Ishock, with Ishock = I(photosphere) * ratio.
+!   ! (previously, Istar was Ishock, now it is the sum of the two contrib)
+!  ! -------------------------------------------------------------- !
+!   integer, intent(in) :: N, i_star, icell_prev
+!   real(kind=dp), dimension(N), intent(in) :: lambda
+!   real(kind=dp), dimension(N), intent(out) :: gamma
+!   real(kind=dp), intent(in) :: u, v, w, x, y, z
+!   real(kind=dp) :: energie(N), Tchoc
+!   real(kind=dp) :: mu, ulimb, LimbDarkening, surface, HC
+!   integer :: ns,la
+!   logical :: lintersect = .false.
+! 
+!    if (etoile(i_star)%T <= 1e-6) then !even with spots
+!     gamma(:) = 0.0_dp
+!     return !no radiation from the starr
 !    endif
-
-   !3) Apply Limb darkening
-   if (llimb_darkening) then
-     call ERROR("option for reading limb darkening not implemented")
-   else
-     ulimb = 0.6
-     LimbDarkening = 0.4 + 0.6 * mu!1.0_dp
-   end if
-   !Istar(:) = energie(:) * LimbDarkening * gamma(:)
-   gamma(:) = LimbDarkening * gamma(:)
-
- return
- end subroutine calc_stellar_surface_brightness
+!    
+!    gamma(:) = 1.0_dp !init
+!    					 !if no spots (and no other sources like X rays, UV flux)
+!    					 !it is the outvalue
+!    
+!    !if (ladd_xrays) then
+!     !such that Ixray = Iphot * gamma and Istar = Iphot + Ixray = Iphot * (1 + gamma)
+! !     gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
+! !     where (lambda <= 50.)
+! !         gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
+! !     end where
+!    !endif
+!    
+!    !cos(theta) = dot(r,n)/module(r)/module(n)
+!    mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
+!    if (real(mu)>1d0) then !to avoid perecision error
+!     write(*,*) "mu=",mu, x, y, z, u, v, w
+!     call Error(" mu limb > 1!")
+!    end if
+!    
+!    
+!   ! Correct with the contrast gamma of a hotter/cooler region if any
+! !    call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect)
+! !    !avoid error with infinity for small lambda
+! !    if (lintersect) then
+! !    		!Means that Ispot = Bp(Tspot) = gamma * Iphot  = Ispot
+! !    		!gamma is initialized to one here.
+! !    		!The +1 (i.e., the gamma = gamma + ...) means that Istar = Iphot + Ispot = Iphot * (1 + gamma)
+! ! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/etoile(i_star)%SurfB(ns)%T)-1)
+! !      !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
+! !      	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
+! !  		!gamma = gamma + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
+! !    end if
+!    
+!    if ((laccretion_shock).and.(icell_prev<=n_cells)) then
+!    	if (icompute_atomRT(icell_prev)) then
+!    		if (vr(icell_prev) < 0.0_dp) then
+! !    		write(*,*) "Accretion E (K):", (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+! !    			lintersect = .true.
+!    			if (Taccretion>0) then
+!    				Tchoc = Taccretion
+!    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
+!    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+!    			endif
+! !    			if (Taccretion>0) then
+! !    				Tchoc = Taccretion
+! !    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
+! !    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+! !    			endif
+!    			lintersect = (Tchoc > etoile(i_star)%T)
+!    		endif
+! 	endif !rho > 0
+! 	if (lintersect) then
+! ! 		write(*,*) "intersect spot"
+! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
+! 	endif
+! 
+!    endif!cells <= n_cells
+! 
+! 
+!    !Apply Limb darkening
+!    if (llimb_darkening) then
+!      call ERROR("option for reading limb darkening not implemented")
+!    else
+!      !ulimb = 0.6
+!      LimbDarkening = 1.0_dp!0.4 + 0.6 * mu!1.0_dp
+!    end if
+!    !Istar(:) = energie(:) * LimbDarkening * gamma(:)
+!    gamma(:) = LimbDarkening * gamma(:)
+! 
+!  return
+!  end subroutine calc_stellar_surface_brightness
 
    subroutine INTEG_RAY_JNU(id,icell_in,x,y,z,u,v,w,iray,labs, kappa_tot, Snu, Istar, Ic)
  ! ------------------------------------------------------------------------------- !
@@ -2237,6 +2490,7 @@ module atom_transfer
   x0=x;y0=y;z0=z
   next_cell = icell_in
   nbr_cell = 0
+  previous_cell = icell_in
 
   !tau(:) = 0.0_dp !go from surface down to the star
   tau_c(:) = 0.0_dp
@@ -2271,7 +2525,7 @@ module atom_transfer
 
     if (lintersect_stars) then
       if (icell == icell_star) then
-       !call calc_stellar_surface_brightness(size(Ic(:,1)),lambda,i_star,x0,y0,z0,u,v,w,LimbD)
+       !call calc_stellar_surface_brightness(size(Ic(:,1)),lambda,i_star,previous_cell,x0,y0,z0,u,v,w,LimbD)
        Ic(:,id) =  Ic(:,id) + Istar(:) * exp(-tau_c)
        return
       end if
@@ -2541,7 +2795,7 @@ module atom_transfer
             !$omp private(argmt,norme, icell, delta_J, l_iterate,weight) &
             !$omp shared(lambda_cont, lambda_star, Snew, Sold, Sth, Istar, xmu,wmu, xmux, xmuy,randz) &
             !$omp shared(lkeplerian,n_iter,gtype, nb_proc,seed,xyz_pos,uvw_pos,etoile) &
-            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid,lcell_converged) &
+            !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
             !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, kappa_tot, Ic,icompute_atomRT,J20_cont) &
             !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule)
             !$omp do schedule(static,1)
@@ -2635,8 +2889,8 @@ module atom_transfer
   		         
   		         		do iray = 1,n_rayons
 							if (iray==1) then
-								x0 = r_grid(icell)
-								y0 = 0.0_dp
+								x0 = r_grid(icell)*cos(phi_grid(icell))
+								y0 = r_grid(icell)*sin(phi_grid(icell))
 								z0 = z_grid(icell)
 							else
 ! 						!-> the same for all cells and proc
@@ -3464,8 +3718,8 @@ end module atom_transfer
 ! 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
 ! 		real(kind=dp), dimension(Nlambda, n_cells), intent(out) :: I
 ! 		real(kind=dp), dimension(Nlambda_cont, n_cells), intent(out) :: Ic
-! 		real(kind=dp), dimension(Nlambda) :: Snu, LD, tau, dtau
-! 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, LDc, dtau_c, tau_c
+! 		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau
+! 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c
 ! 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_p
 ! 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 ! 
@@ -3508,10 +3762,8 @@ end module atom_transfer
 ! 			if (lintersect_stars) then
 ! 				if (icell == icell_star) then
 ! 					!can be done better
-! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
-!        				Ic(:,icell_p) =  Ic(:,icell_p) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
-! 					I(:,icell_p) =  I(:,icell_p) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+!       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+!					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
 !        				return
 !       			end if
 !    			 endif
@@ -3719,9 +3971,9 @@ end module atom_transfer
 ! 		real(kind=dp), intent(in) :: x,y,z
 ! 		logical, intent(in) :: labs
 ! 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-! 		real(kind=dp), dimension(Nlambda) :: LD, tau
+! 		real(kind=dp), dimension(Nlambda) :: tau
 ! 		real(kind=dp) :: Snu, dtau, Snu_c, dtau_c
-! 		real(kind=dp), dimension(Nlambda_cont) :: LDc, tau_c
+! 		real(kind=dp), dimension(Nlambda_cont) :: tau_c
 ! 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
 ! 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 ! 
@@ -3765,11 +4017,8 @@ end module atom_transfer
 ! 
 ! 			if (lintersect_stars) then
 ! 				if (icell == icell_star) then
-! 					!can be done better
-! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, x0, y0, z0, u,v,w,LDc)
-!        				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, x0, y0, z0, u,v,w,LD)
-! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+!       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+!					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
 !        				return
 !       			end if
 !    			 endif

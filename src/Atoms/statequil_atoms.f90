@@ -14,6 +14,7 @@ MODULE statequil_atoms
 	use getlambda, only						: hv, Nlambda_max_trans
 	use occupation_probability, only 		: D_i, wocc_n
 	use profiles, only 						: write_profile
+	use opacity, only						: prec_pops, frac_limit_pops, frac_ne_limit
  
 	use mcfost_env, only					: dp
 	use constantes, only					: tiny_dp, sigma
@@ -24,8 +25,7 @@ MODULE statequil_atoms
 	IMPLICIT NONE
 	!Nlambda,  Nproc not stored for all ray since no sub it and ray-ray building of rate matrix
 	real(kind=dp), allocatable :: psi(:,:,:), omega_sor_atom(:)
-	real(kind=dp), parameter :: Tmax = 1d10
-	real(kind=dp), parameter :: prec_pops = 1d-100, impure_factor = 1d-10
+	real(kind=dp), parameter :: Tmax = 1d10 !value of temperature of transition if ni = nj*gij
 	real(kind=dp), allocatable :: n_new(:,:,:)
 	character(len=50), parameter :: invpop_file = "inversion_populations.txt"
 	character(len=50), parameter :: profiles_file = "line_profile.txt"
@@ -482,6 +482,8 @@ MODULE statequil_atoms
  	!even with inversion of pops.
  	!If negative Tex, T = Tmax, just like if ni = nj*gij
  	!Opacity is then 0 and only emissivity contributes.
+ 	!!!!!!! Can be zero if the conditions not met and lead to infinity !!!
+ 	!!!!!
 	SUBROUTINE calc_delta_Tex_atom(icell, atom, dT, Tex, Tion, write_neg_Tex)
 		integer, intent(in) :: icell
 		type(AtomType), intent(inout) :: atom
@@ -514,8 +516,15 @@ MODULE statequil_atoms
 ! 					endif
 ! 				endif
 
-										!prec_pops
-				!!if (atom%n(i,icell) <= impure_factor * ne(icell) ) cycle tr_loop
+				!Same goes for the continuum:
+				!I check populations inversions, and do not compute temperature in that case
+				!or if populations of one level is below a threshold I skip two.
+				!The latter does not prevent negative Tex and Tion
+				!The following check is similar to the one for computing opacities
+
+				!condition on values of individual populations ? (wrt a threshold)
+				if ((atom%n(i,icell) - atom%lines(kc)%gij * atom%n(j,icell)) <= 0.0 ) cycle tr_loop
+
 
 				Tdag = atom%lines(kc)%Tex(icell)
 				deltaE_k = (atom%E(j)-atom%E(i)) / KBOLTZMANN
@@ -576,8 +585,8 @@ MODULE statequil_atoms
 
 					endif
 				endif
-										!prec_pops
-				!!if (atom%n(i,icell) <= impure_factor * ne(icell) ) cycle tr_loop
+										
+				!condition on values of individual populations ? (wrt a threshold)
 
            
       			Tdag = atom%continua(kc)%Tex(icell)
@@ -588,6 +597,9 @@ MODULE statequil_atoms
 				!i.e., deltaE is hnu0
 				gij = atom%nstar(i,icell)/(atom%nstar(j,icell) ) * exp(-hc_k/atom%continua(kc)%lambda0/T(icell))
 				ratio = log( wj*atom%n(i,icell)  / ( wi * atom%n(j,icell) * gij ) )
+				
+				if ((atom%n(i,icell) - gij * atom%n(j,icell)) <= 0.0 ) cycle tr_loop
+
 
 				!write(*,*) "cont"
 				!write(*,*) "nstar:", atom%nstar(i,icell), atom%nstar(j,icell)
@@ -832,7 +844,8 @@ MODULE statequil_atoms
   
 		integer, intent(in) :: icell, id
 		type(AtomType), intent(inout) :: atom
-		integer :: lp, imaxpop, l
+		integer :: lp, imaxpop, l, Nsmall_pops, Nneg_or_null_pops
+		integer :: level_index(atom%Nlevel)
 		real(kind=dp), intent(out) :: dM
 		real(kind=dp), dimension(atom%Nlevel) :: ndag, delta
 		real(kind=dp) :: n0 = 0.0_dp, ntotal, Gamma_dag(atom%Nlevel,atom%Nlevel) !debug
@@ -865,7 +878,10 @@ MODULE statequil_atoms
 ! 		call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
 ! 		atom%n(:,icell) = ndag(:) + omega_sor_atom(atom%activeindex) * delta(:)
 
-		if ((maxval(atom%n(:,icell)) <= 0.0).or.(minval(atom%n(:,icell))<0.0)) then
+		if ((maxval(atom%n(:,icell)) < 0.0)) then
+		!raise warning or error if all populations are negative. Otherwise, handle
+		!the negative populations to not stop the calculations ??
+! 		if ((maxval(atom%n(:,icell)) <= 0.0).or.(minval(atom%n(:,icell))<0.0)) then
 			write(*,*) atom%ID, id, icell
 			write(*,'("nstar: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel) !*ntotal
 			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel) !*ntotal
@@ -873,13 +889,15 @@ MODULE statequil_atoms
 			do l=1, atom%Nlevel
 				write(*, '(1I3, *(ES14.5E3))') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)	
 			enddo
-			stop
+! 			call warning("Negative pops after SEE!")
+			call warning("All pops are negative after SEE!")
+			!or error ?
 		endif
 
 		if ((any_nan_infinity_vector(atom%n(:,icell))>0)) then
 			write(*,*) atom%ID
-			write(*,*) "BUG pops", " id=",id, " icell=",icell
-			write(*,'("ilevel: "*(I14))') (l, l=1, atom%Nlevel)
+			write(*,*) "(SEE) BUG pops", " id=",id, " icell=",icell
+			write(*,'("ilevel: "*(1I4))') (l, l=1, atom%Nlevel)
 			write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
 			write(*,'("ndag: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)
 			write(*,*) "Gamma:"
@@ -897,29 +915,50 @@ MODULE statequil_atoms
 				write(*,*) " cont ", atom%continua(l)%i, atom%continua(l)%j
 				write(*,*) "-> Rij=",atom%continua(l)%Rij(id)," Rji=",atom%continua(l)%Rji(id)
 			enddo
-			stop
+			call error("nan or infinity found in n after SEE!")
 		end if
   
 		dM = 0.0_dp
 		ndag = ndag * ntotal
 
+		!Handle negative pops and very small populations
+		Nsmall_pops = 0
+		Nneg_or_null_pops = 0
+		lp = 1
 		do l=1,atom%Nlevel
 			atom%n(l,icell) = atom%n(l,icell) * ntotal
 
-
-! 			if (atom%n(l,icell) <= impure_factor * ne(icell)/ntotal) then !relative to ntotal
-! 				!still keep it but does not count for convergence
-! 				atom%n(l,icell) = atom%n(l,icell) * ntotal !0.0_dp
-! 				write(*,*) icell, atom%ID, l, atom%n(l,icell)/(impure_factor * ne(icell))
-! 			else 
+			!Small populations are kept but not used in the convergence test
+			!and in Tex. Populations below prec_pops (including negative) are set
+			!to zero.
+! 			if (atom%n(l,icell) < frac_ne_limit * ne(icell)) then
+			if (atom%n(l,icell) < frac_limit_pops * ntotal) then
+				Nsmall_pops = Nsmall_pops + 1
+				level_index(lp) = l
+				lp = lp + 1
+				if (atom%n(l,icell) <= prec_pops * ntotal) then
+					atom%n(l,icell) = 0.0_dp
+					Nneg_or_null_pops = Nneg_or_null_pops + 1
+				endif
+			else 
 				dn_n = (1.0_dp - ndag(l))/atom%n(l,icell)
 				dM = max(dM, abs(1.0_dp - ndag(l)/atom%n(l,icell)))
 ! 				dM = max(dM, abs(atom%n(l,icell)-ndag(l))/ndag(l))
-! 				atom%n(l,icell) = atom%n(l,icell) * ntotal
-! 			endif
+			endif
 
 		enddo
-
+! 		if (Nsmall_pops >= 0.75*atom%Nlevel) then
+! 			write(*,*) "*************** Warning SEE ***************"
+! 			write(*,'("id #"(1I2)", cell #"(1I6)," ne "(ES14.5E3)" m^-3, nTot "(ES14.5E3)" m^-3")') id, icell, ne(icell), ntotal
+! 			write(*,'(" for atom "(1A2)" with "(1I3)" levels")') atom%ID, atom%Nlevel 
+! 			write(*,'("--> Found "(1I3)" impurity levels "(1F12.5)" %")') Nsmall_pops, 100.0*real(Nsmall_pops)/real(atom%Nlevel)
+! 			write(*,'(" --> with "(1I3)" below "(ES14.5E3)" m^-3")') Nneg_or_null_pops, prec_pops * ntotal
+! 			write(*,'("ilevel: "*(1I4))') (level_index(lp), lp=1, Nsmall_pops)
+! 			write(*,'("n: "*(ES14.5E3)" m^-3")') (atom%n(level_index(lp),icell), lp=1, Nsmall_pops)
+! 			write(*,'("n/nTot: "*(ES14.5E3)" m^-3")') (atom%n(level_index(lp),icell)/ntotal, lp=1, Nsmall_pops)
+! 			write(*,'("n/ne: "*(ES14.5E3)" m^-3")') (atom%n(level_index(lp),icell)/ne(icell), lp=1, Nsmall_pops)
+! 			write(*,*) "*************** *********** ***************"
+! 		endif
 
 		if (allocated(n_new)) then
 	

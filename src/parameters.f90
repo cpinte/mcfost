@@ -61,18 +61,24 @@ module parametres
   logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
        lcontrib_function, lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
        ldissolve, laccurate_integ, loutput_rates, lorigin_atom
-  integer :: Nrays_atom_transfer
+  integer :: Nrays_atom_transfer, istep_start, icentres !tests futur deprec
   
+  !HEALpix
+  integer :: healpix_lorder, healpix_lmin, healpix_lmax !lmin and lmax not yet (for local evaluation)
+  
+  logical :: llimit_mem, lfix_backgrnd_opac
+  logical :: lcheckpoint, lsafe_stop
   !Convergence relative errors
-  real :: dpops_max_error, dpops_sub_max_error, art_hv
+  real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time
+  integer :: checkpoint_period
   
   !Ng's acceleration
   logical :: lng_acceleration
   integer :: iNg_Norder, iNg_ndelay, iNg_Nperiod
   
   !electron density
-  logical :: lsolve_for_ne
-  integer :: n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
+  logical :: lsolve_for_ne, lno_iterate_ne_mc = .true. !.true.==no electron iteration during step 2
+  integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
   
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image, jnu_atom_file

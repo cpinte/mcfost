@@ -59,12 +59,22 @@ subroutine set_default_variables()
   lHH30mol = .false.
   lemission_mol=.false.
   ltab_wavelength_image = .false.
+  lcheckpoint = .false.
+  checkpoint_period = 15
+  !HEALpix
+  healpix_lorder = 2
   ! Atomic lines Radiative Transfer (AL-RT)
+  lsafe_stop = .false.
+  safe_stop_time = 155520.0!1.8days in seconds, default
+  llimit_mem = .false.
+  lfix_backgrnd_opac = .false.
   lemission_atom = .false.
   lelectron_scattering = .false.
   lstop_after_jnu = .false.
   lsolve_for_ne = .false.
+  lno_iterate_ne_mc = .true. !.true. means no iteration of electron during MC steps
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
+  ndelay_iterate_ne = 0
   lvacuum_to_air = .false.
   lcontrib_function = .false.
   lorigin_atom = .false.
@@ -79,6 +89,8 @@ subroutine set_default_variables()
   iNg_Norder = 0
   iNg_ndelay = 5
   iNg_Nperiod = 5
+  istep_start = 1
+  icentres = 0
   ! AL-RT
   laccurate_integ = .false.
   Nrays_atom_transfer = 100
@@ -604,7 +616,30 @@ subroutine initialisation_mcfost()
         lforce_diff_approx=.true.
      case("-mol")
         i_arg = i_arg+1
-        lemission_mol=.true.
+        lemission_mol=.true. 
+     case("-safe_stop")
+        i_arg = i_arg + 1
+        lsafe_stop = .true.
+     case("-safe_stop_time")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("time needed (safe_stop)")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) safe_stop_time
+        safe_stop_time = safe_stop_time * 86400.!convert in sec
+        i_arg= i_arg+1
+     case("-checkpoint")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Period needed for checkpoint!")
+        lcheckpoint = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) checkpoint_period !in iterations
+        i_arg= i_arg+1
+	 case("-limit_memory")
+	 	i_arg = i_arg + 1
+	 	llimit_mem = .true.
+	 case("-fix_background_opac")
+	 	i_arg = i_arg + 1
+	 	lfix_backgrnd_opac = .true.
      case("-atom")
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
@@ -621,6 +656,9 @@ subroutine initialisation_mcfost()
      case("-electron_scatt") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
         lelectron_scattering = .true.
+     case("-iterate_ne_mc") !force solving ne density during MC steps.
+        i_arg = i_arg + 1
+        lno_iterate_ne_mc = .false.
      case("-solve_ne") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
         lsolve_for_ne = .true.
@@ -629,6 +667,12 @@ subroutine initialisation_mcfost()
         if (i_arg > nbr_arg) call error("Ne period needed")
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) n_iterate_ne
+        i_arg= i_arg+1
+     case("-Ndelay_iterate_ne")!number of iteration before solving for electron density
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ne delay needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) ndelay_iterate_ne
         i_arg= i_arg+1
      case("-vacuum_to_air")
         i_arg = i_arg + 1
@@ -719,6 +763,18 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
+     case("-start_step")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("1 or 2 needed for -start_step")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) istep_start
+        i_arg= i_arg+1
+     case("-Ncentre_angle_quad")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("5, 10 or 100 needed for -Ncentre_angle_quad")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) icentres
+        i_arg= i_arg+1
      case("-pluto")
         i_arg = i_arg + 1
         lpluto_file=.true.
@@ -754,6 +810,18 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) art_hv
         i_arg= i_arg+1
+     case("-healpix_lorder")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("l value needed for healpix !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) healpix_lorder
+        i_arg= i_arg+1
+        if ( (healpix_lorder < 0).or.(healpix_lorder > 28) ) then
+         call error ("healpix l must be positive, below 28!")
+        endif
+        if ( (healpix_lorder > 7) ) then
+        	call warning("healpix l order > 7 resulting in a high number of rays!")
+        endif
      case("-Ng_Norder")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Ng'acc order needed with -Ng_Norder !")
@@ -1617,7 +1685,6 @@ subroutine display_help()
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
-  write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -1725,8 +1792,15 @@ subroutine display_help()
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity independent of z"
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
+  write(*,*) "        : -Ncentre_angle_quad <int> : Number of random positions for the angular quad. (5, 10, 100)"
+  write(*,*) "        : -start_step <int> : Select the first step for non-LTE loop (default 1)"
+  write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
+  write(*,*) "		  : -fix_background_opac : (force) keep background opacities constant during non-LTE loop, if iterate_ne."
+  write(*,*) "		  : -limit_memory : continuous opacity are interpolated locally"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
+  write(*,*) "        : -iterate_ne_mc : force the calculation of electron density during Monte Carlo steps."  
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
+  write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
@@ -1748,6 +1822,9 @@ subroutine display_help()
   write(*,*) "        : -Ng_Norder <Norder> : Order of Ng's acceleration"
   write(*,*) "        : -Ng_Ndelay <Ndelay> : Delay before first Ng's acceleration"
   write(*,*) "        : -Ng_Nperiod <Nperiod> : Cycle of Ng's iteration"
+  write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
+  write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"
+  write(*,*) "        : -safe_stop_time <real> : calc_time_limit in days "
 
   write(*,*) " "
   write(*,*) " Options related to phantom"

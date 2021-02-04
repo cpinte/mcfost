@@ -614,7 +614,8 @@ module background_opacity
 	else
    
       sigma = 1d-22 * interp1D(lambdai*1d0, alphai*1d0, lam) * nHmin(icell)
-      !sigma(:) = linear_1D_Sorted(63,lambdai*1.0_dp,alphai*1.0_dp,1,lam) ;*1d-22*sigma(1)
+      !beware linear_1D_sorted doesn't handle well the values out of bounds (y(xi>x) = 0 not y(x))
+      !!sigma(:) = linear_1D_Sorted(63,lambdai*1.0_dp,alphai*1.0_dp,1,lam) ;*1d-22*sigma(1)
       chi(la) = sigma * (1.0 - stm)
       eta(la) = sigma * twohc/lambda(la)**3  * stm   
 

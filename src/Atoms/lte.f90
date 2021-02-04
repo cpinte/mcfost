@@ -36,12 +36,15 @@ MODULE lte
   real(kind=dp) :: Uk, part_func(Npf), Uka(1)
   
   part_func = elem%pf(stage,:)
-!   Uk = Interp1D(Tpf,part_func,T(k))
-!->faster
-  Uka(:) = linear_1D_sorted(Npf, Tpf, part_func, 1, T(k))
-  Uk = exp(Uka(1))
+  Uk = exp( Interp1D(Tpf,part_func,T(k)) )
   !Uk = (10.d0)**(Uk) !29/12/2019 -> part_func is ln(U)
-!   Uk = exp(Uk)
+
+!->faster
+  !out of bound the function return 0 not the inner (outer) bound.
+!   Uka(:) = linear_1D_sorted(Npf, Tpf, part_func, 1, T(k))
+!   Uk = exp(Uka(1))
+!   if( T(k) < Tpf(1) ) Uk = exp(part_func(1))
+!   if (T(k) > Tpf(Npf)) Uk = exp(part_func(Npf))
 
  RETURN
 END FUNCTION getPartitionFunctionk
@@ -57,9 +60,12 @@ END FUNCTION getPartitionFunctionk
   real(kind=dp) :: Uk, part_func(Npf), Uka(1)
   
   part_func = elem%pf(stage,:)
-  !Uk = Interp1D(Tpf,part_func,T(k)) !log(Uk)
-  Uka(:) = linear_1D_sorted(Npf, Tpf, part_func, 1, T(k))
-  Uk = Uka(1)
+  Uk = Interp1D(Tpf,part_func,T(k)) !log(Uk)
+  !out of bound the function return 0 not the inner (outer) bound.
+!   Uka(:) = linear_1D_sorted(Npf, Tpf, part_func, 1, T(k))
+!   Uk = Uka(1)
+!   if( T(k) < Tpf(1) ) Uk = part_func(1)
+!   if (T(k) > Tpf(Npf)) Uk = part_func(Npf)
        
  RETURN
 END FUNCTION get_logPartitionFunctionk

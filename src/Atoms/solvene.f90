@@ -178,8 +178,8 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 		!can add condition on active or not, but check bckgr opac and eval of lte pops after
 	endif
   
-	fjk(:) = 0d0
-	dfjk(:) = 0d0
+	fjk(:) = 0.0_dp
+	dfjk(:) = 0.0_dp
 
 	if (detailed_model) then
 		if (.not.elem%model%active) call warning("Beware passive atoms used!")
@@ -228,50 +228,50 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 return
 end subroutine calc_ionisation_frac
 	
-subroutine solve_ne_nlte_loc(k, ne_initial_solution, dne)
-! for non-lte loop
-!there is no iteration on the electron donors at LTE
-	integer :: k
-	real(kind=dp), intent(inout) :: dne
-	integer, parameter :: Nmaxstage = 50
-	character(len=20) :: ne_initial_solution
-	real(kind=dp) :: ne_old, akj, ne_new
-	real(kind=dp):: PhiHmin
-	real(kind=dp), dimension(Nmaxstage) :: fjk, dfjk
-	integer :: n, j, i
-	type (Element), pointer :: elem
-
-	ne_old = ne(k)
-	ne_new = 0.0_dp
-	
-	do n=1, N_MAX_ELEMENT
-
-		elem => Elements(n)%ptr_elem
-		
-		call calc_ionisation_frac(elem, k, ne_old, fjk, dfjk)
-
-		if (n.eq.1)  then ! H minus for H
-			PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
-       ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
-			ne_new = ne_new + ne_old*fjk(1)*PhiHmin
-		end if
-		
-		do j=2,elem%Nstage
-			akj = elem%abund*(j-1) !(j=0 for neutrals, 1 for signly ionised etc..)
-			ne_new = ne_new + akj * fjk(j)
-		end do
-		
-		elem => NULL()
-	end do !loop over elem
-
-	ne_new = ne_new * nHtot(k)
-	dne = dabs(1.0_dp - ne_old/ne(k))
-	
-	!update for this cell
-	ne(k) = ne_new
-
-return
-end subroutine solve_ne_nlte_loc
+! subroutine solve_ne_nlte_loc(k, ne_initial_solution, dne)
+! ! for non-lte loop
+! !there is no iteration on the electron donors at LTE
+! 	integer :: k
+! 	real(kind=dp), intent(inout) :: dne
+! 	integer, parameter :: Nmaxstage = 50
+! 	character(len=20) :: ne_initial_solution
+! 	real(kind=dp) :: ne_old, akj, ne_new
+! 	real(kind=dp):: PhiHmin
+! 	real(kind=dp), dimension(Nmaxstage) :: fjk, dfjk
+! 	integer :: n, j, i
+! 	type (Element), pointer :: elem
+! 
+! 	ne_old = ne(k)
+! 	ne_new = 0.0_dp
+! 	
+! 	do n=1, N_MAX_ELEMENT
+! 
+! 		elem => Elements(n)%ptr_elem
+! 		
+! 		call calc_ionisation_frac(elem, k, ne_old, fjk, dfjk)
+! 
+! 		if (n.eq.1)  then ! H minus for H
+! 			PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
+!        ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
+! 			ne_new = ne_new + ne_old*fjk(1)*PhiHmin
+! 		end if
+! 		
+! 		do j=2,elem%Nstage
+! 			akj = elem%abund*(j-1) !(j=0 for neutrals, 1 for signly ionised etc..)
+! 			ne_new = ne_new + akj * fjk(j)
+! 		end do
+! 		
+! 		elem => NULL()
+! 	end do !loop over elem
+! 
+! 	ne_new = ne_new * nHtot(k)
+! 	dne = dabs(1.0_dp - ne_old/ne(k))
+! 	
+! 	!update for this cell
+! 	ne(k) = ne_new
+! 
+! return
+! end subroutine solve_ne_nlte_loc
 
 !try without para ! for epsilon
 subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
@@ -325,6 +325,14 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 		if (icompute_atomRT(k) <= 0) CYCLE !transparent or dark
 
 		!Initial solution for this cell
+		
+		!compute that value in any case of the starting solution
+		!Metal
+		Zm = 11
+		elem => Elements(ZM)%ptr_elem
+		Uk = getPartitionFunctionk(Elements(ZM)%ptr_elem, 1, k)
+		Ukp1 = getPartitionFunctionk(Elements(ZM)%ptr_elem, 2, k)
+		CALL ne_Metal(k, Uk, Ukp1, elements(ZM)%ptr_elem%ionpot(1),elements(ZM)%ptr_elem%Abund, ne_oldM)
 
 		if (ne_initial_solution.eq."N_PROTON") then
 			ne_old = Hydrogen%n(Hydrogen%Nlevel,k)!np(k)
@@ -345,25 +353,17 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 			end if
 			CALL ne_Hionisation (k, Uk, Ukp1, ne_old)
 
-			!Metal
-			Zm = 11
-			elem => Elements(ZM)%ptr_elem
-			Uk = getPartitionFunctionk(Elements(ZM)%ptr_elem, 1, k)
-			Ukp1 = getPartitionFunctionk(Elements(ZM)%ptr_elem, 2, k)
-			CALL ne_Metal(k, Uk, Ukp1, elements(ZM)%ptr_elem%ionpot(1),elements(ZM)%ptr_elem%Abund, ne_oldM)
-			!write(*,*) "neMetal=",ne_oldM
+				
 			!if Abund << 1. and chiM << chiH then
 			! ne (H+M) = ne(H) + ne(M)
 			ne_old = ne_old + ne_oldM
-    
-
 			!to avoid having very low values, between say tiny_dp and 1e-100
 			!just set to 0 if < 0: crude ?
-			if (ne_oldM < ne_min_limit) ne_oldM = 0d0
-			if (ne_old < ne_min_limit) ne_old = 0d0
+! 			if (ne_oldM < ne_min_limit) ne_oldM = 0d0
+			if (ne_old < ne_min_limit) ne_old = 0.0_dp
 			
 		end if
-
+		
 		!Loop starts
 		ne(k) = ne_old
 		ne0 = ne_old
@@ -395,33 +395,56 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 				
 				elem => NULL()
 			end do !loop over elem
+			
+! 			if (k==70) then
+! 			write(*,*) "****"
+! 			write(*,*) id, k, T(k), niter, nHtot(k), delta, sum
+! 			write(*,*) ne_oldM, ne_old, ne(k)
+! 			write(*,*) "****"
+! 			endif
 
 			ne(k) = ne_old - nHtot(k)*delta / (1.-nHtot(k)*sum)
+			
+! 			if (ne(k) == 0.0) then
+! 				write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, sum	
+! 				call Warning("electron density is 0 setting to metal value")
+! 				ne(k) = ne_oldM
+! 			endif			
+			
 			!!dne = abs((ne(k)-ne_old)/(ne_old+tiny_dp))
 			dne = abs ( 1.0_dp - ne_old / ne(k) )
 			ne_old = ne(k)
 			
 			!can I do that in parallel ? epsilon is shared
+			!compare to the initial solution (the previous solution in non-LTE)
 			epsilon = max(epsilon, abs(1.0_dp - ne0 / ne(k)))
+			
+! 			if (k==70) then
+! 				write(*,*) "dne=", dne, epsilon
+! 				write(*,*) ne_old, ne(k)
+! 			endif
     
 			if (is_nan_infinity(ne(k))>0) then
 				write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, " sum=", sum
 				call error("electron density is nan or inf!")
-			else if (ne(k) <= 0.0) then
+			else if (ne(k) < 0.0) then
 				write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, sum	
 				call error("Negative electron density!")
 			endif
+			
 			niter = niter + 1
 			if (dne <= MAX_ELECTRON_ERROR) then
 				if (ne(k) < ne_min_limit) ne(k) = 0d0 !tiny_dp or < tiny_dp
 				exit
 			else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
-				if (dne >= 1) then !shows the warning only if dne is actually greater than 1
+				if (dne >= 0.1) then !shows the warning only if dne is actually greater than 1
 					CALL Warning("Electron density has not converged for this cell")
 					write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, "ne=",ne(k), "T=",T(k)," nH=",nHtot(k)
 					!set articially ne to some value ?
-					ne(k) = ne_oldM !already tested if < ne_min_limit
-					write(*,*) "Setting ne to ionisation of ", elements(ZM)%ptr_elem%ID, ne_oldM
+					if (dne >= 1.0) then
+						ne(k) = ne_oldM !already tested if < ne_min_limit
+						write(*,*) " -> Setting ne to ionisation of ", elements(ZM)%ptr_elem%ID, ne_oldM
+					endif
 				end if
 				unconverged_cells(id) = unconverged_cells(id) + 1 !but count each cell for with dne > MAX_ELECTRON_ERROR
 			end if !convergence test
@@ -442,8 +465,9 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
   do k=2, nb_proc
    unconverged_cells(1) = unconverged_cells(1) + unconverged_cells(k)
   end do
-  if (unconverged_cells(1) > 0) write(*,*) "Found ", unconverged_cells(1)," unconverged cells (%):", &
-  													100*real(unconverged_Cells(1))/real(n_cells)
+  if (unconverged_cells(1) > 0) then
+  	write(*,*) "Found ", unconverged_cells(1)," unconverged cells (%):", 100*real(unconverged_Cells(1))/real(n_cells)
+  endif
   
 return
 end subroutine solve_electron_density

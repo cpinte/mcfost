@@ -852,6 +852,7 @@ subroutine intersect_spots(i_star,u,v,w,x,y,z,ispot,lintersect)
 
   real(kind=dp), dimension(3) :: r, k
   real(kind=dp) :: mu, phi
+  logical :: in_azimuth
   integer :: i
 
   r(1) = x ; r(2) = y ; r(3) = z
@@ -863,12 +864,27 @@ subroutine intersect_spots(i_star,u,v,w,x,y,z,ispot,lintersect)
      !angle between a ray-direction and the spot position vector
      mu = dot_product(r,etoile(i_star)%SurfB(i)%r)/dsqrt(x**2+y**2+z**2)
      !azimuth of a ray on the stellar disk
-     phi = modulo(atan2(y,x),2*real(pi,kind=dp))
+     !phi = modulo(atan2(y,x),2*real(pi,kind=dp))!phi spot from 0 to 2*pi
+     !->allows spots, cut azimuthally 
+     phi = atan2(y,x)!phi spot from -pi to pi
+     
+     if (z >= 0) then
+     	in_azimuth = (phi >= etoile(i_star)%SurfB(i)%phii).and.(phi <= etoile(i_star)%SurfB(i)%phio)
+     else
+     	if (phi >= 0) then
+     		in_azimuth = (phi >= etoile(i_star)%SurfB(i)%phii)
+     	else
+     		in_azimuth = (phi <= etoile(i_star)%SurfB(i)%phio) 
+     	endif
+     endif
+     
 
+!      if ((mu<=etoile(i_star)%SurfB(i)%muo).and.&
+!           (mu>=etoile(i_star)%SurfB(i)%mui).and.&
+!           (phi>=etoile(i_star)%SurfB(i)%phii).and.&
+!           (phi<=etoile(i_star)%SurfB(i)%phio)) then !inside the spot
      if ((mu<=etoile(i_star)%SurfB(i)%muo).and.&
-          (mu>=etoile(i_star)%SurfB(i)%mui).and.&
-          (phi>=etoile(i_star)%SurfB(i)%phii).and.&
-          (phi<=etoile(i_star)%SurfB(i)%phio)) then !inside the spot
+          (mu>=etoile(i_star)%SurfB(i)%mui).and.in_azimuth) then !inside the spot
 
         ispot = i
         lintersect = .true.
