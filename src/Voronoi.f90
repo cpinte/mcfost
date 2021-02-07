@@ -204,11 +204,11 @@ module Voronoi_grid
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
     integer, dimension(:), allocatable :: SPH_id, SPH_original_id
     real :: time, mem
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, n, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, n, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu, nb_proc_voro
     real(kind=dp), dimension(:), allocatable :: V_tmp
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
     integer, dimension(:), allocatable :: neighbours_list_loc
-    integer, dimension(nb_proc) :: n_neighbours
+    integer, dimension(:), allocatable :: n_neighbours ! nb_proc
     logical(c_bool), dimension(:), allocatable :: was_cell_cut, was_cell_cut_tmp
 
     logical :: is_outside_stars, lcompute
@@ -224,6 +224,11 @@ module Voronoi_grid
     logical, parameter :: lrandom = .true.
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
+
+    if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
+    nb_proc_voro = min(16,nb_proc)
+    allocate(n_neighbours(nb_proc_voro))
+    n_cells_per_cpu = (1.0*n_cells) / nb_proc_voro + 1
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
@@ -342,8 +347,6 @@ module Voronoi_grid
     Voronoi(:)%last_neighbour = 0
     Voronoi(:)%is_star = .false.
 
-    n_cells_per_cpu = (1.0*n_cells) / nb_proc + 1
-
     do icell=1, n_cells
        Voronoi(icell)%xyz(1) = x_tmp(icell)
        Voronoi(icell)%xyz(2) = y_tmp(icell)
@@ -404,18 +407,16 @@ module Voronoi_grid
           unit = "MB"
        endif
        write(*,*) "Trying to allocate", mem, unit//" for temporary neighbours list"
-       allocate(neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc), stat=alloc_status)
+       allocate(neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc_voro), stat=alloc_status)
        if (alloc_status /=0) then
           write(*,*) "Error when allocating neighbours list"
           write(*,*) "Exiting"
        endif
        neighbours_list_loc = 0
 
-       if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
-
        n_in = 0 ! We initialize value at 0 as we have a reduction + clause
-       !$omp parallel default(none) num_threads(min(16,nb_proc)) &
-       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc,n_cells_per_cpu) &
+       !$omp parallel default(none) num_threads(nb_proc_voro) &
+       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc_voro,n_cells_per_cpu) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
        !$omp private(id,n,icell_start,icell_end,ierr) &
        !$omp private(V_tmp,was_cell_cut_tmp,alloc_status) &
@@ -423,8 +424,8 @@ module Voronoi_grid
        !$omp reduction(+:n_in)
        id = 1
        !$ id = omp_get_thread_num() + 1
-       icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
-       icell_end = (1.0 * (id)) / nb_proc * n_cells
+       icell_start = (1.0 * (id-1)) / nb_proc_voro * n_cells + 1
+       icell_end = (1.0 * (id)) / nb_proc_voro * n_cells
 
        ! Allocating results array
        alloc_status = 0
@@ -432,7 +433,7 @@ module Voronoi_grid
        if (alloc_status /=0) call error("Allocation error before voro++ call")
 
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, PS%vectors, PS%cutting_distance_o_h, &
-            icell_start-1,icell_end-1, id-1,nb_proc,n_cells_per_cpu, &
+            icell_start-1,icell_end-1, id-1,nb_proc_voro,n_cells_per_cpu, &
             n_in,V_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
@@ -452,9 +453,9 @@ module Voronoi_grid
        ! Merging the neighbour arrays from the different threads
        !-----------------------------------------------------------
        ! We need to shift the indices of the neighbours
-       do id=2, nb_proc
-          icell_start = (1.0 * (id-1)) / nb_proc * n_cells + 1
-          icell_end = (1.0 * (id)) / nb_proc * n_cells
+       do id=2, nb_proc_voro
+          icell_start = (1.0 * (id-1)) / nb_proc_voro * n_cells + 1
+          icell_end = (1.0 * (id)) / nb_proc_voro * n_cells
 
           ! Pointers to the first and last neighbours of the cell
           first_neighbours(icell_start:icell_end) = first_neighbours(icell_start:icell_end) + last_neighbours(icell_start-1) + 1
@@ -480,7 +481,7 @@ module Voronoi_grid
 
        row = n_cells_per_cpu * max_neighbours ;
        k = 0 ;
-       do id=1, nb_proc
+       do id=1, nb_proc_voro
           do i=1, n_neighbours(id)
              k = k+1
              neighbours_list(k) = neighbours_list_loc(row * (id-1) + i)
