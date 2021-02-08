@@ -228,7 +228,6 @@ module Voronoi_grid
     if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
     nb_proc_voro = min(16,nb_proc)
     allocate(n_neighbours(nb_proc_voro))
-    n_cells_per_cpu = (1.0*n_cells) / nb_proc_voro + 1
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
@@ -287,6 +286,7 @@ module Voronoi_grid
     enddo
     n_cells_before_stars = icell
     n_cells = icell
+    n_cells_per_cpu = (1.0*n_cells) / nb_proc_voro + 1
 
     ! Randomizing particles
     if (lrandom) then
