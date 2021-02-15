@@ -1025,10 +1025,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
            rand2 = sprng(stream(id))
            if (lmethod_aniso1) then ! fonction de phase de Mie
               call angle_diff_theta(lambda,taille_grain,rand,rand2,itheta,cospsi)
-              if (lisotropic)  then ! Diffusion isotrope
-                 itheta=1
-                 cospsi=2.0*rand-1.0
-              endif
               rand = sprng(stream(id))
               !  call angle_diff_phi(l,Stokes(1),Stokes(2),Stokes(3),itheta,rand,phi)
               PHI = PI * ( 2.0 * rand - 1.0 )
