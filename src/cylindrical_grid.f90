@@ -10,16 +10,18 @@ module cylindrical_grid
        move_to_grid_cyl, define_cylindrical_grid, build_cylindrical_cell_mapping,  cell_map, cell_map_i, cell_map_j,&
        cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, &
        z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, volume, l_dark_zone, zmax, delta_cell_dark_zone, &
-       ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone
+       ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone, area
 
   real(kind=dp), parameter, public :: prec_grille=1.0e-14_dp
 
   private
 
+  !Ben, added aire in public
   character(len=11), parameter :: file_tab_r_1D = 'grid_1D.txt'
   real(kind=dp), dimension(:), allocatable :: tab_r_1D_tmp
   integer :: n_rad_1D
   logical :: lread_1D_grid
+  real(kind=dp), dimension(:), allocatable :: area !test, area of the cell in AU**2
 
   real(kind=dp) :: zmaxmax
 
@@ -201,7 +203,7 @@ subroutine define_cylindrical_grid()
   integer :: i,j,k, izone, ii, ii_min, ii_max, icell
 
   !tab en cylindrique ou spherique suivant grille
-  real(kind=dp), dimension(n_rad) :: V
+  real(kind=dp), dimension(n_rad) :: V, Aire !Ben added aire
   real(kind=dp), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
   real(kind=dp) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=dp) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
@@ -250,6 +252,10 @@ subroutine define_cylindrical_grid()
      allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error zmax, volume')
      zmax = 0.0 ; volume=0.0
+     
+     !Ben
+     allocate(area(n_cells), stat=alloc_status)
+     if (alloc_status > 0) call error("Allocation error area")
   endif
   ! end allocation
 
@@ -524,8 +530,10 @@ subroutine define_cylindrical_grid()
 
         if ((tab_r3(i+1)-tab_r3(i)) > 1.0e-6*tab_r3(i)) then
            V(i)=4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i)) /real(nz)
+           Aire(i) = 4.0 * pi * (tab_r2(i+1) - tab_r2(i)) / real(nz)!Ben
         else
            V(i)=4.0*pi*rsph**2*(tab_r(i+1)-tab_r(i)) /real(nz)
+           Aire(i) = 4.0 * pi * rsph * (tab_r(i+1)-tab_r(i)) /real(nz)!Ben
         endif
      enddo
 
@@ -544,6 +552,7 @@ subroutine define_cylindrical_grid()
      enddo !k
 
      V(:) = V(:) * 0.5 / real(n_az)
+     Aire(:) = Aire(:) * 0.5 / real(n_az)!Ben
 
      do j=1,nz
         r_grid_tmp(:,-j) = r_grid_tmp(:,j)
@@ -566,6 +575,8 @@ subroutine define_cylindrical_grid()
      j = cell_map_j(icell)
      k = cell_map_k(icell)
      volume(icell) = V(i)
+     !Ben
+     area(icell) = Aire(i) !only in spherical yet
 
      r_grid(icell) = r_grid_tmp(i,j)
      z_grid(icell) = z_grid_tmp(i,j)

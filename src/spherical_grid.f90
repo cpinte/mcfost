@@ -10,7 +10,7 @@ module spherical_grid
   implicit none
 
   public :: cross_spherical_cell, pos_em_cellule_sph, indice_cellule_sph, test_exit_grid_sph, &
-       move_to_grid_sph, subdivise_cellule_sph
+       move_to_grid_sph, solid_angle_cell_sph !Ben
 
 
   private
@@ -648,99 +648,19 @@ end subroutine indice_cellule_sph_theta
 
 end subroutine pos_em_cellule_sph
 
-!building
-subroutine subdivise_cellule_sph(icell,N,x,y,z)
-  !check the preambule had to add it in the public list
-
-  implicit none
-
-  integer, intent(in) :: icell, N !number of subdivisions per coordinates N==3 means 27 cells (3r*3theta*3phi)
-  real(kind=dp), intent(out), dimension(N*N*N) :: x,y,z !positions of the N**3 cells
-
-  real(kind=dp) :: xx((N+1)), yy((N+1)), zz((N+1))
-  real(kind=dp) :: rr(N*N*N), tt(N*N*N), pp(N*N*N)
-  real 			:: aleat
-!   real(kind=dp) :: z_min, z_max, x_min, x_max, y_min, y_max
-!   real(kind=dp) :: r_min, r_max, phi_min, phi_max, t_max, t_min, x0, y0, z0
-  integer :: ri, thetaj, phik, k, ipos, i, j
-
-  !Centre of the cell
-  ri = cell_map_i(icell)
-  thetaj = cell_map_j(icell)
-  phik = cell_map_k(icell)
-  
-  !x0 = R_grid(icell)*cos(phi_grid(icell))
-  !y0 = R_grid(icell)*sin(phi_grid(icell))
-  !z0 = z_grid(icell)
-  
-  ipos = 0
-  do k=1, N
-  	do j=1, N
-  		do i=1,N
-  			ipos = ipos + 1
-  			aleat = real(ipos)/real(N)
-  			rr(ipos) = (r_lim_3(ri-1)+aleat*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
-  			! Position theta
-			if (l3D) then
-				tt(ipos) = theta_lim(abs(thetaj)-1)+aleat*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1))
-				if (thetaj < 0) tt(ipos) = - tt(ipos)
-			else
-				if (aleat > 0.5_dp) then
-					tt(ipos) = theta_lim(thetaj-1)+(2.0_dp*(aleat-0.5_dp))*(theta_lim(thetaj)-theta_lim(thetaj-1))
-				else
-					tt(ipos) = -(theta_lim(thetaj-1)+(2.0_dp*aleat)*(theta_lim(thetaj)-theta_lim(thetaj-1)))
-				endif
-			endif
-			pp(ipos) = 2.0_dp*pi * (real(phik)-1.0_dp+aleat)/real(n_az)
-  		enddo
-  	enddo
-  enddo
-
-
-  ! x et y
-  z=rr*sin(tt)
-  x=rr*cos(tt)*cos(pp)
-  y=rr*cos(tt)*sin(pp)
-  
-!   Limits of the cell in each direction
-!   t_max = theta_lim(abs(thetaj))
-!   t_min = -theta_lim(abs(thetaj)-1)
-!   r_max = r_lim_3(ri)**un_tiers
-!   r_min = r_lim_3(ri-1)**un_tiers
-!   phi_min = 2.0_dp*pi * (real(phik)-1.0_dp)/real(n_az)
-!   phi_max = 2.0_dp*pi * (real(phik))/real(n_az)
-!   z_min = min(r_min * sin(t_min),r_max * sin(t_max))
-!   z_max = max(r_min * sin(t_min),r_max * sin(t_max))
-!   x_min = min(r_min * cos(t_min) * cos(phi_min), r_max * cos(t_max) * cos(phi_max))
-!   x_max = max(r_min * cos(t_min) * cos(phi_min), r_max * cos(t_max) * cos(phi_max))
-!   y_min = min(r_min * cos(t_min) * sin(phi_min),r_max * cos(t_max) * sin(phi_max))
-!   y_max = max(r_min * cos(t_min) * sin(phi_min),r_max * cos(t_max) * sin(phi_max))
-! 
-!   vertex of the sub grid inside the cell
-!   xx(1) = x_min
-!   yy(1) = y_min
-!   zz(1) = z_min
-!   do k=2,N+1
-! 	xx(k) = xx(k-1) + (x_max - x_min) / real(N) !+ x0
-! 	yy(k) = yy(k-1) + (y_max - y_min) / real(N) !+ y0
-! 	zz(k) = zz(k-1) + (z_max - z_min) / real(N) !+ z0
-!   enddo
-! 
-! 
-!   ipos = 0
-!   do k=1, N
-!   	do j=1, N
-!   		do i=1,N
-!   			ipos = ipos + 1
-!   			x(ipos) = 0.5 * ( xx(i+1) + xx(i) )
-!   			y(ipos) = 0.5 * ( yy(j+1) + yy(j) )
-!   			z(ipos) = 0.5 * ( zz(k+1) + zz(k) )
-!   		enddo
-!   	enddo
-!   enddo
-
-  return
-
-end subroutine subdivise_cellule_sph
+!Ben
+function solid_angle_cell_sph(icell)
+	integer, intent(in) :: icell
+	real(kind=dp) :: solid_angle_cell_sph, x0,y0
+	integer :: i,j,k
+	
+	i =  cell_map_i(icell)
+	x0 = r_grid(icell) * cos(phi_grid(icell))
+	y0 = r_grid(icell) * sin(phi_grid(icell))
+	solid_angle_cell_sph = ( abs(r_lim_3(i) - r_lim_3(i-1))**(1./3.) ) / sqrt(x0*x0+y0*y0+z_grid(icell)*z_grid(icell))
+	solid_angle_cell_sph = solid_angle_cell_sph**2
+	
+	return 
+end function solid_angle_cell_sph
 
 end module spherical_grid
