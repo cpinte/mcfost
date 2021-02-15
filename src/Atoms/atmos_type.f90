@@ -7,7 +7,6 @@ module atmos_type
 	use messages
 	use constantes, only : tiny_dp
 
-
 	!$ use omp_lib
 
   !MCFOST's originals
@@ -62,7 +61,7 @@ module atmos_type
 	!removed the depency in rays of some quantity (like phi_loc or I) since rate matrix
 	!is built ray by ray, with is not the case for hogerheijde
     logical :: lmali_scheme, lhogerheijde_scheme !tmp
-    character(len=50) :: angular_quadrature = "HEALpix"!"bestard2021_L15N45"
+    character(len=50) :: angular_quadrature = "HEALpix"!"HEALpix_adapt"
 	type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
 
 
@@ -106,7 +105,22 @@ module atmos_type
 ! 		enddo
 		
 		deallocate(x2)
-
+		
+		
+	case ("HEALpix_adapt")
+	
+		!not needed yet, computing on the fly
+		write(*,*) " Allocating space for healpix adapative scheme.."
+! 	
+! 		N1 = healpix_npix(healpix_lmax)
+! 		N2 = N1
+! 		allocate(xmu(N1),wmu(N1),stat=alloc_status)
+! 		if (alloc_status > 0) call error("allocation error xmu and wmu")
+! 		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
+! 		if (alloc_status > 0) call error("allocation error xmux, xmuy")
+		
+		!here we return
+		return
 		
 	case ("gauss_legendre")
 		if (present(Nmu)) then
@@ -2439,15 +2453,40 @@ module atmos_type
   
   !few healpix routines
   
-  function largest_integer_small_than_x(x)
+  function largest_integer_smaller_than_x(x)
   	real(kind=dp), intent(in) :: x
-  	integer(kind=8) largest_integer_small_than_x
+  	integer(kind=8) largest_integer_smaller_than_x
   	
-  	largest_integer_small_than_x = int(ceiling(x)) - 1
+  	largest_integer_smaller_than_x = int(ceiling(x)) - 1
   	
   	return
-  end function largest_integer_small_than_x
+  end function largest_integer_smaller_than_x
   
+  function healpix_children_nested_index(pix)
+  	!given the index of the parent pixel pix
+  	!computes the 4 children pixel indexes
+  	integer, parameter :: n_children = 4
+  	integer, intent(in) :: pix
+  	integer, dimension(n_children) :: healpix_children_nested_index
+  	integer :: n
+  	
+  	do n=0,n_children-1
+  		healpix_children_nested_index(n+1) = 4*pix + n
+  	enddo
+  	
+  	return
+  end function healpix_children_nested_index
+  
+  function healpix_parent_nested_index(m)
+  	integer, intent(in) :: m
+  	integer :: healpix_parent_nested_index
+  	
+  	!m=0,1,2,3 have the same parent
+  	!m=4,5,6,7 have the same parent...
+  	healpix_parent_nested_index = int(real(m)/4.0)
+  
+  	return 
+  end function healpix_parent_nested_index
 
   function healpix_npix(l)
   	integer, intent(in) :: l
@@ -2481,7 +2520,9 @@ module atmos_type
   	integer, intent(in) :: l
   	real(kind=dp) :: healpix_angular_resolution
   	
-  	healpix_angular_resolution = 180.0 * 4.0 * healpix_weight(l)
+  	!4pi * healpix_weight is actually the solid angle it's the "square" resolution
+  	!healpix_angular_resolution = 180.0 * sqrt( 4.0 * pi * healpix_weight(l) )/ pi
+	healpix_angular_resolution = 180.0 * sqrt(pi/real(3*4**l)) / pi
   	
 	return
   end function healpix_angular_resolution
@@ -2492,7 +2533,7 @@ module atmos_type
   	integer :: p, i, j, pp
   	real(kind=dp), intent(out) :: mu, phi !cos(theta) and azimuth from the north pole
   	integer(kind=8) :: Npix, Nside, North_cap
-  	real(kind=dp) :: four_on_Npix, ph, fodd
+  	real(kind=dp) :: four_on_Npix, ph, fodd, s
   	
   	Npix = healpix_npix(l)
   	Nside = 2**l
@@ -2532,6 +2573,8 @@ module atmos_type
 		else !odd
 			fodd = 1.0
 		endif
+		s = 0.5 * mod(i-Nside+1,2)
+		!fodd = s, should give the same result
 		
 		!!see, it is simply 4/3
 		!!(2*Nside * 4.0 / Npix ) * (Nside <<1) = 4/3 whatever Nside

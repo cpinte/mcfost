@@ -63,6 +63,8 @@ subroutine set_default_variables()
   checkpoint_period = 15
   !HEALpix
   healpix_lorder = 2
+  healpix_lmin = 1
+  healpix_lmax = 7 !6 !5
   ! Atomic lines Radiative Transfer (AL-RT)
   lsafe_stop = .false.
   safe_stop_time = 155520.0!1.8days in seconds, default
