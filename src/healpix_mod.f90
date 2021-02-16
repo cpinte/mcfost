@@ -1,6 +1,13 @@
 !
 ! Routine taken from HEALPix distribution or adapted for mcfost
-! 
+! Copyright (C) 1997-2013 Krzysztof M. Gorski, Eric Hivon,
+!                          Benjamin D. Wandelt, Anthony J. Banday, 
+!                          Matthias Bartelmann, Hans K. Eriksen, 
+!                          Frode K. Hansen, Martin Reinecke
+!
+! This routine does not do the mesh refinement of the pixels.
+! This is just a module with a couple of routines needed for pixellisation
+!
 !
 module healpix_mod
 
@@ -10,38 +17,97 @@ module healpix_mod
 
 	implicit none
 	
-	!for python only real(kind=8)
-	!for mcfost replace real(kind=8) by real(kind=dp)
+	!max amr is the maxium subdivision which is 4**(lmax - lstart)
+	!If lstart is 0 (or lmin) then N = 4**lmax is the limit
+	integer, private, parameter :: Nmax_amr = 10!4**lmax, don't forget to change
 	
-	!commented for mcfost
-! 	real(kind=8), parameter :: pi = 3.141592653589793238462643383279502884197
-! 	integer, parameter :: n_cells = 1
-	
-	integer, dimension(0:1023) :: pix2y, pix2x
-	integer, dimension(0:127) :: x2pix, y2pix
+	integer, private, dimension(0:1023) :: pix2y, pix2x
+	integer, private, dimension(0:127) :: x2pix, y2pix
 	
   ! coordinate of the lowest corner of each face
-	integer, parameter, dimension(0:11) :: jrll = (/ 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4 /) ! in unit of nside
-	integer, parameter, dimension(0:11) :: jpll = (/ 1, 3, 5, 7, 0, 2, 4, 6, 1, 3, 5, 7 /) ! in unit of nside/2
-! 	integer, dimension(0:11) :: jrll, jpll
-! 
-! 	data jrll / 2,2,2,2,3,3,3,3,4,4,4,4 /
-! 	data jpll / 1,3,5,7,0,2,4,6,1,3,5,7 /
-
-
-!!!WARNING!!!
-!!! F2PY does not handle derived types.
-!!! commented for python only
+	integer, private, parameter, dimension(0:11) :: jrll = (/ 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4 /) ! in unit of nside
+	integer, private, parameter, dimension(0:11) :: jpll = (/ 1, 3, 5, 7, 0, 2, 4, 6, 1, 3, 5, 7 /) ! in unit of nside/2
 
 	type healpix_map
 		integer, dimension(:), allocatable :: p
 		integer, dimension(:), allocatable :: l
+		integer :: npix !for this cell
 	end type healpix_map
 	
 	type (healpix_map), dimension(:), allocatable :: healpix_cell
 
 	contains
+	
+	!don't forget to init that
+	!call init_pix2xy_and_xy2pix
+	
+	!C indexes
+	!lend must be > lstart
+	subroutine healpix_pix_children(pix,lstart, lend, p_children)
+	!return the pixels indexes for lend resolution parameter, from pixel pix in
+	!resolution lstart.
+		integer, intent(in) :: pix, lstart, lend
+		integer, dimension(4) :: children
+		integer :: dl, npix, l, k, kpix, i
+		integer, dimension(:), intent(out) :: p_children
+		integer, dimension(Nmax_amr) :: pix_tmp
+		
+		dl = lend - lstart
+		!if (dl <= 0) then
+		!	write(*,*) " Error!"
+		!endif
 
+		Npix = 4**dl !number of heirs
+		!size(p_childre) >= Npix !!
+		
+		p_children(1:Npix) = -1
+		p_children(1) = pix
+		pix_tmp(1:Npix) = -1
+	
+		do l=lstart+1,lend
+			k = 1
+			infinity : do
+				kpix = p_children(k)
+				if (kpix == -1) exit infinity
+				
+				children(:) = healpix_children_nested_index(kpix)
+				
+				do i=1,4
+				
+					pix_tmp(i + (k-1) * 4) = children(i)
+				
+				enddo
+				
+				k = k + 1
+			
+			enddo infinity
+			
+			p_children(1:4*k) = pix_tmp(1:4*k)
+			pix_tmp(1:4*k) = -1
+			
+		enddo	
+	
+	return
+	end subroutine healpix_pix_children
+
+	function mean_number_of_pixels
+		integer :: npix_mean
+		integer :: icell, nn
+		real :: mean_number_of_pixels
+		
+		npix_mean = 0
+		nn = 0
+		do icell=1,n_cells
+			if (allocated(healpix_cell(icell)%p)) then
+				npix_mean = npix_mean + healpix_cell(icell)%npix
+				nn = nn + 1
+			endif
+		enddo
+		
+		mean_number_of_pixels = real(npix_mean) / real(nn)
+	
+	return
+	end function mean_number_of_pixels
 	
 	subroutine allocate_healpix_map_cell(Npix,hpm_cell)
 		integer, intent(in) :: Npix
@@ -445,14 +511,15 @@ module healpix_mod
 	return
 	end function int_pow
 
-	function largest_integer_smaller_than_x(x)
+	!largest_integer_smaller_than_x
+	function healpix_listx(x)!largest_integer_smaller_than_x(x)
   		real(kind=dp), intent(in) :: x
-  		integer(kind=8) largest_integer_smaller_than_x
+  		integer(kind=8) healpix_listx
   	
-  		largest_integer_smaller_than_x = int(ceiling(x)) - 1
+  		healpix_listx = int(ceiling(x)) - 1
   	
   	return
-	end function largest_integer_smaller_than_x
+	end function healpix_listx
   
 	function healpix_children_nested_index(pix)
   		!given the index of the parent pixel pix

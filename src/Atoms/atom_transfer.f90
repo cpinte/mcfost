@@ -21,7 +21,8 @@ module atom_transfer
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
 									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, &
-									Ncentre, frac_pos, compute_anglequad_centres, largest_integer_smaller_than_x, healpix_sphere, healpix_npix, healpix_weight, healpix_mu_and_phi
+									Ncentre, frac_pos, compute_anglequad_centres
+	use healpix_mod, only		: healpix_sphere, healpix_npix, healpix_weight, healpix_ring_mu_and_phi, healpix_listx
 									
 	use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
 	use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
@@ -1608,7 +1609,7 @@ module atom_transfer
 
     			write(*,*) " Using step 1 with adapatative healpix"
     			l_order = healpix_lorder !init
-    			write(*,*) " -> l_order max for cells:", max(min(largest_integer_smaller_than_x(log(etoile(1)%r**2 * critical_ratio*pi/3.0/minval(area))/log(4.0)),healpix_lmax),healpix_lmin)
+    			write(*,*) " -> l_order max for cells:", max(min(healpix_listx(log(etoile(1)%r**2 * critical_ratio*pi/3.0/minval(area))/log(4.0)),healpix_lmax),healpix_lmin)
 
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
@@ -1818,14 +1819,14 @@ module atom_transfer
 							domega = area(icell) / etoile(1)%r**2
 							!dOmega_cell / dOmega_healpix; dOmega_healpix = SQ(angular_resolution in rad) = pi/real(3*4**l_order)
 							!dOmega = area_choc / (x0**2+y0**2+z0**2) !area_choc == sum(area(cell touching the star which acreates))
-							l_order = max(min(largest_integer_smaller_than_x(log(critical_ratio*pi/3.0/domega)/log(4.0)),healpix_lmax),healpix_lmin)
+							l_order = max(min(healpix_listx(log(critical_ratio*pi/3.0/domega)/log(4.0)),healpix_lmax),healpix_lmin)
 							!if (n_iter==1) &
 							!write(*,*) icell, " lorder=", l_order, healpix_npix(l_order), sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
 
 							weight = healpix_weight(l_order)
 							
   		         			do imu=1, healpix_npix(l_order)
-  		         				call healpix_mu_and_phi(l_order,imu,w0,healpix_phi)
+  		         				call healpix_ring_mu_and_phi(l_order,imu,w0,healpix_phi)
 								u0 = sqrt(1.0 - w0*w0)*cos(healpix_phi)
 								v0 = sqrt(1.0 - w0*w0)*sin(healpix_phi)
 
@@ -2639,6 +2640,10 @@ module atom_transfer
   logical :: ng_rest, accelerated
   real(kind=dp), dimension(:), allocatable :: ng_cur
   real(kind=dp), dimension(:,:), allocatable :: ngJ
+  
+  
+  write(*,*) "NOT uptodate iterate_jnu, leaving"
+  return
   
   	lNg_acceleration = .false.!no acceleration for continuum
   	
