@@ -23,6 +23,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
  integer, intent(out) :: ndusttypes,n_SPH,ierr
 
  integer, parameter :: maxarraylengths = 12
+ integer, parameter :: nsinkproperties = 17
  integer(kind=8) :: number8(maxarraylengths)
  integer :: i,j,k,iblock,nums(ndatatypes,maxarraylengths)
  integer :: nblocks,narraylengths,nblockarrays,number,idust
@@ -285,7 +286,11 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
                 !elseif (j==1 .and. number8(j)==nptmass) then
                 elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
                    nptmass = number8(j) ! HACK
-                   if (.not.allocated(xyzmh_ptmass)) allocate(xyzmh_ptmass(5,nptmass), vxyz_ptmass(3,nptmass)) !HACK
+                   if (.not.allocated(xyzmh_ptmass)) then
+                      allocate(xyzmh_ptmass(nsinkproperties,nptmass), vxyz_ptmass(3,nptmass)) !HACK
+                      xyzmh_ptmass(:,:) = 0.
+                      vxyz_ptmass(:,:) = 0.
+                   endif
 
                    read(iunit,iostat=ierr) tag
                    matched = .true.
@@ -301,6 +306,8 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
                          read(iunit,iostat=ierr) xyzmh_ptmass(4,1:nptmass)
                       case('h')
                          read(iunit,iostat=ierr) xyzmh_ptmass(5,1:nptmass)
+                      case('mdotav')
+                         read(iunit,iostat=ierr) xyzmh_ptmass(16,1:nptmass)
                       case('vx')
                          read(iunit,iostat=ierr) vxyz_ptmass(1,1:nptmass)
                       case('vy')
@@ -409,7 +416,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
  integer :: error,ndustsmall,ndustlarge
 
  integer, parameter :: maxtypes = 100
- integer, parameter :: nsinkproperties = 11
+ integer, parameter :: nsinkproperties = 17
 
  integer(kind=1), allocatable, dimension(:) :: itype, ifiles
  real(4),  allocatable, dimension(:)   :: tmp, tmp_header
@@ -595,7 +602,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
     endif
 
     ! read sinks
-    allocate(xyzmh_ptmass(5,nptmass), vxyz_ptmass(3,nptmass))
+    allocate(xyzmh_ptmass(nsinkproperties,nptmass), vxyz_ptmass(3,nptmass))
     call read_from_hdf5(xyzmh_ptmass(1:3,:),'xyz',hdf5_group_id,got,error)
     call read_from_hdf5(xyzmh_ptmass(4,:),'m',hdf5_group_id,got,error)
     call read_from_hdf5(xyzmh_ptmass(5,:),'h',hdf5_group_id,got,error)
@@ -603,6 +610,12 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
 
     if (error /= 0) then
        write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF sinks group ***'
+    endif
+
+    call read_from_hdf5(xyzmh_ptmass(16,:),'mdotav',hdf5_group_id,got,error)
+    if (error /= 0) then
+       write(*,"(/,a,/)") ' *** WARNMING : mdotav not present'
+       error =0
     endif
 
     ! close the sinks group
