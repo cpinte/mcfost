@@ -93,6 +93,9 @@ module constantes
   real(kind=dp), parameter :: Msun_to_g = Msun_to_kg * kg_to_g
   real(kind=dp), parameter :: g_to_Msun = 1.0_dp/Msun_to_g
 
+  ! Time
+  real(kind=dp), parameter :: year_to_s = 31557600 ! 365.25 days
+
   ! Limites de precision numerique
   real, parameter :: tiny_real = tiny(0.0)
   real, parameter :: huge_real = huge(1.0)

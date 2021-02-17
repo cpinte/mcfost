@@ -1012,6 +1012,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        etoile(i_etoiles)%vz = vxyz_ptmass(3,i_etoiles) * uvelocity
 
        etoile(i_etoiles)%M = xyzmh_ptmass(4,i_etoiles) * usolarmass
+
+       etoile(i_etoiles)%Mdot = 0.
     enddo
  else
     write(*,*) ""
@@ -1029,6 +1031,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     etoile(:)%vz = vxyz_ptmass(3,:) * uvelocity
 
     etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
+
+    etoile(:)%Mdot = xyzmh_ptmass(16,:) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
  endif
 
  return

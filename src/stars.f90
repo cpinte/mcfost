@@ -288,6 +288,16 @@ subroutine repartition_energie_etoiles()
   ! L_etoile=r_etoile**2*sigma*T_etoile**4   ! tout en SI sauf R en AU
   L_etoile=sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 )  ! tout en SI sauf R en AU
 
+  ! Todo for accretion:
+  ! -------------------
+  ! - We only need to modify this subroutine
+  ! - we need to compute Lacc and Lacc_tot from Mdot
+  ! - We need to comvert Lacc to an Tacc (assuming an emitting surface, at the moment we will take the stellar surface)
+  ! - watch out for units as constants have been removed, we just need to be correct relative to the stellar Teff
+  ! - we need to find the best spectrum for the accretion luminosity (we can use a bb for now)
+  ! - the bb is hard coded everywhere, we should rewrite it to have a fast function instead (we should store constants and wavelenghts factors)
+  ! - The UV excess has to be somehow made compatible with the accretion luminosity (at least we should not use them together)
+
   do i=2, n_etoiles
      if (etoile(i)%lb_body .neqv. (etoile(1)%lb_body)) then
         call error("all stars must be black bodies or", &
