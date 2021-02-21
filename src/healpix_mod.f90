@@ -1,13 +1,20 @@
-!
-! Routine taken from HEALPix distribution or adapted for mcfost
+! Few routines taken from: (free)
 ! Copyright (C) 1997-2013 Krzysztof M. Gorski, Eric Hivon,
 !                          Benjamin D. Wandelt, Anthony J. Banday, 
 !                          Matthias Bartelmann, Hans K. Eriksen, 
 !                          Frode K. Hansen, Martin Reinecke
 !
-! This routine does not do the mesh refinement of the pixels.
-! This is just a module with a couple of routines needed for pixellisation
+! Routines adapted for mcfost (mostly from C distribution)
 !
+! This routine does not do the mesh refinement of the pixels.
+! This is just a module with a couple of routines needed for pixelisation.
+! It defines a structure healpix_map which contains the informations needed for the
+! pixelisation of the sphere with non-uniform pixel sizes (adaptive pixelisation).
+!
+!
+! It also provides routines to easy find the heirs of a pixel or to find the 
+! ancestor and the brothers and the parents of a pixel.
+! 
 !
 module healpix_mod
 
@@ -16,10 +23,6 @@ module healpix_mod
 	use parametres, only	: n_cells
 
 	implicit none
-	
-	!max amr is the maxium subdivision which is 4**(lmax - lstart)
-	!If lstart is 0 (or lmin) then N = 4**lmax is the limit
-	integer, private, parameter :: Nmax_amr = 10!4**lmax, don't forget to change
 	
 	integer, private, dimension(0:1023) :: pix2y, pix2x
 	integer, private, dimension(0:127) :: x2pix, y2pix
@@ -32,33 +35,39 @@ module healpix_mod
 		integer, dimension(:), allocatable :: p
 		integer, dimension(:), allocatable :: l
 		integer :: npix !for this cell
+		!npix is sum_{j=1,12*4**lbase} [ 4**(l(j) - lbase) ]
+		!if (l(j) == lbase) sum is 12*4**lbase
 	end type healpix_map
 	
 	type (healpix_map), dimension(:), allocatable :: healpix_cell
 
 	contains
 	
-	!don't forget to init that
-	!call init_pix2xy_and_xy2pix
+	!find common ancestor in resolution lend (< lstart) and siblings to a pixel 
+	!in resolution lstart.
+	!subroutine
+	!
+	!return
+	!end subroutine
 	
 	!C indexes
-	!lend must be > lstart
-	subroutine healpix_pix_children(pix,lstart, lend, p_children)
-	!return the pixels indexes for lend resolution parameter, from pixel pix in
-	!resolution lstart.
-		integer, intent(in) :: pix, lstart, lend
+	!lend must be > lstart and Nheirs = 4**(dl)
+	subroutine healpix_pix_heirs(Nheirs, pix, lstart, lend, p_children)
+	!For parent pixel pix in the resolution parameter lstart, gives p_children 
+	!heirs (Nheirs = 4**(lstart-lend)) in resolution lend (lend > lstart).
+	!(if dl=1 the heirs are the children)
+		integer, intent(in) :: pix, lstart, lend, Nheirs
 		integer, dimension(4) :: children
-		integer :: dl, npix, l, k, kpix, i
-		integer, dimension(:), intent(out) :: p_children
-		integer, dimension(Nmax_amr) :: pix_tmp
+		integer :: dl, Npix, l, k, kpix, i
+		integer, dimension(Nheirs), intent(out) :: p_children
+		integer, dimension(Nheirs) :: pix_tmp
 		
 		dl = lend - lstart
 		!if (dl <= 0) then
 		!	write(*,*) " Error!"
 		!endif
-
 		Npix = 4**dl !number of heirs
-		!size(p_childre) >= Npix !!
+		!Nheirs = Npix !!
 		
 		p_children(1:Npix) = -1
 		p_children(1) = pix
@@ -88,7 +97,49 @@ module healpix_mod
 		enddo	
 	
 	return
-	end subroutine healpix_pix_children
+	end subroutine healpix_pix_heirs
+	
+	subroutine healpix_pix_heirs_new(pix, lstart, lend, p_children)
+	!For parent pixel pix in the resolution parameter lstart, gives p_children 
+	!heirs (Nheirs = 4**(lstart-lend)) in resolution lend (lend > lstart).
+		integer, intent(in) :: pix, lstart, lend
+		integer :: Nheirs !number of children in the highest resolution for pix in the lowest resolution
+		integer, dimension(4) :: children
+		integer :: l, k, kpix, i
+		integer, dimension(4**(lstart - lend)), intent(out) :: p_children
+		integer, dimension(4**(lstart - lend)) :: pix_tmp
+		
+		Nheirs = 4**(lstart - lend)
+		
+		p_children(1:Nheirs) = -1
+		p_children(1) = pix
+		pix_tmp(1:Nheirs) = -1
+	
+		do l=lstart+1,lend
+			k = 1
+			infinity : do
+				kpix = p_children(k)
+				if (kpix == -1) exit infinity
+				
+				children(:) = healpix_children_nested_index(kpix)
+				
+				do i=1,4
+				
+					pix_tmp(i + (k-1) * 4) = children(i)
+				
+				enddo
+				
+				k = k + 1
+			
+			enddo infinity
+			
+			p_children(1:4*k) = pix_tmp(1:4*k)
+			pix_tmp(1:4*k) = -1
+			
+		enddo	
+	
+	return
+	end subroutine healpix_pix_heirs_new
 
 	function mean_number_of_pixels
 		integer :: npix_mean
@@ -109,12 +160,19 @@ module healpix_mod
 	return
 	end function mean_number_of_pixels
 	
-	subroutine allocate_healpix_map_cell(Npix,hpm_cell)
-		integer, intent(in) :: Npix
+	subroutine allocate_healpix_map_cell(l,hpm_cell)
+		integer, intent(in) :: l
 		type (healpix_map), intent(inout) :: hpm_cell
+		integer :: Npix, pp
 		
-		allocate(hpm_cell%p(Npix)); hpm_cell%p(:) = 0
-		allocate(hpm_cell%l(Npix)); hpm_cell%l(:) = 0
+		Npix = 12*4**l
+		
+		allocate(hpm_cell%p(Npix)); hpm_cell%p(:) = -1
+		do pp=1,Npix
+			hpm_cell%p(pp) = pp-1 !C indexes
+		enddo
+		allocate(hpm_cell%l(Npix)); hpm_cell%l(:) = l !same resolution
+		 hpm_cell%npix = 0 !computed after refinement
 		
 	return
 	end subroutine allocate_healpix_map_cell
@@ -126,23 +184,40 @@ module healpix_mod
 		if (allocated(hpm_cell%p)) then
 			deallocate(hpm_cell%p, hpm_cell%l)
 		endif
+		hpm_cell%npix = 0
 	
 	return
 	end subroutine deallocate_healpix_map_cell
 	
-	subroutine init_healpix_map(lmax) !latter, a parameter global
-		integer, intent(in) :: lmax
+	subroutine init_healpix_map(l,mask)
+		integer, intent(in) :: l
 		integer :: icell, Npix
+		logical, intent(in), optional :: mask(n_cells)
 		
 		
-		Npix = 12*4**lmax
+		Npix = 12*4**l
 		
 		allocate(healpix_cell(n_cells))
-		do icell=1,n_cells
-			!if not empty
-			call allocate_healpix_map_cell(Npix,healpix_cell(icell))
 		
-		enddo
+		if (present(mask)) then
+
+			do icell=1,n_cells
+			
+				if (mask(icell)) then
+					call allocate_healpix_map_cell(l,healpix_cell(icell))
+				endif
+		
+			enddo		
+		
+		else
+		
+			do icell=1,n_cells
+			
+				call allocate_healpix_map_cell(l,healpix_cell(icell))
+		
+			enddo
+		
+		endif
 	
 	return
 	end subroutine init_healpix_map
@@ -155,6 +230,9 @@ module healpix_mod
 			call deallocate_healpix_map_cell(healpix_cell(icell))
 	
 		enddo
+		
+		deallocate(healpix_cell)
+		
 	return
 	end subroutine deallocate_healpix_map
 	
