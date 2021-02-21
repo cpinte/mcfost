@@ -20,8 +20,7 @@ module atom_transfer
 									
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
-									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, &
-									Ncentre, frac_pos, compute_anglequad_centres
+									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom
 	use healpix_mod, only		: healpix_sphere, healpix_npix, healpix_weight, healpix_ring_mu_and_phi, healpix_listx
 									
 	use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
@@ -47,8 +46,8 @@ module atom_transfer
 									healpix_lorder, healpix_lmin, healpix_lmax
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
-	use dust_transfer, only		: compute_stars_map
-	use dust_ray_tracing, only	: RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az,tab_RT_incl, stars_map, kappa
+	!!use dust_transfer, only		: compute_stars_map
+	use dust_ray_tracing, only	: RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az,tab_RT_incl!!, stars_map, kappa
 	use stars, only				: intersect_spots, intersect_stars
 	!use wavelengths, only		:
 	use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
@@ -56,7 +55,6 @@ module atom_transfer
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
 	use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k, area
-	use spherical_grid, only	: solid_angle_cell_sph
 	use messages, only 			: error, warning
 	
 	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, fill_collision_matrix, &
@@ -1383,11 +1381,6 @@ module atom_transfer
 		real(kind=dp) :: dT, dN2, dN3, dN4, diff_old
 		real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
 		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:), Jnu_loc(:,:)
-		!healpix
-		integer :: l_order
-		real, parameter :: critical_ratio = 4 !12,4, dOmega*Npix/4pi < critical_ratio
-		real(kind=dp) :: domega, healpix_phi
-		!
 ! 		real(kind=dp), allocatable :: err_pop(:,:)
 		logical :: labs, iterate_ne = .false.
 		logical :: l_iterate
@@ -1491,11 +1484,6 @@ module atom_transfer
 			if (istep_start==2) etape_end = 2
 		endif
 		
-		if (angular_quadrature == "HEALpix_adapt") then
-			etape_start = 4
-			etape_end = 4
-		endif
-		
 		write(*,*) "---------------------------------------"
 		write(*,*) " step start ",etape_start, istep_start
 		write(*,*) " step end", etape_end
@@ -1535,20 +1523,14 @@ module atom_transfer
 			if (etape==1) then
 				time_iteration = 0
 				
-				!Only one ray until a proper scheme for choosing positions inside the cell exist
+				!Future deprecation with healpix
       			call compute_angular_integration_weights()
-      			call compute_anglequad_centres()
 
   				lfixed_rays = .true.
   				n_rayons = 1 !always
     			iray_start = 1
 
   				write(*,*) " Using step 1 with ", size(xmu), " rays"
-  				if (Ncentre + 1 > 0) then
-  					write(*,'("   --> using "(1I3)" ray centres.")') Ncentre + 1
-  		  			write(*,'("   --> a total of "(1I5)" elements.")')( Ncentre + 1 ) * size(xmu) 
-!   		  		if (Ncentre > 0) iray_start = 2 !exclude the centre of the cell ? 
-  				endif
 
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
@@ -1598,22 +1580,7 @@ module atom_transfer
   				lprevious_converged = .false.
 				lcell_converged(:) = .false.
 				precision = 0.1 !dpops_max_error
-				
-			else if (etape==4) then
-				time_iteration = 0
-				
-      			call compute_angular_integration_weights()
-  				lfixed_rays = .true.
-  				n_rayons = 1
-    			iray_start = 1
 
-    			write(*,*) " Using step 1 with adapatative healpix"
-    			l_order = healpix_lorder !init
-    			write(*,*) " -> l_order max for cells:", max(min(healpix_listx(log(etoile(1)%r**2 * critical_ratio*pi/3.0/minval(area))/log(4.0)),healpix_lmax),healpix_lmin)
-
-  				lprevious_converged = .false.
-				lcell_converged(:) = .false.
-				precision = dpops_max_error
 			else
 				call ERROR("etape unkown")
 			end if
@@ -1646,10 +1613,10 @@ module atom_transfer
 				!$omp parallel &
 				!$omp default(none) &
 				!$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi)&
-				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight, l_order, domega, healpix_phi) &
-				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ, psi_mean, psi, chi_loc, Jnu_loc,healpix_lorder,healpix_lmin, healpix_lmax) &
-				!$omp shared(stream,n_rayons,iray_start, area, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
-				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,id_ref, frac_pos,Ncentre,xyz_pos,uvw_pos) &
+				!$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight) &
+				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ, psi_mean, psi, chi_loc, Jnu_loc) &
+				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
+				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, eta_es, xmu, xmux, xmuy,wmu,etoile,id_ref, xyz_pos,uvw_pos) &
 				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity) &
 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda)
@@ -1763,21 +1730,18 @@ module atom_transfer
 								
 						elseif (etape==1) then !ray-by-ray, n_rayons fixed
 
-  		         			do iray = iray_start, Ncentre+1
+  		         			do iray = iray_start, n_rayons
   		         			
-								if (iray==1) then
-									x0 = r_grid(icell) * cos(phi_grid(icell))
-									y0 = r_grid(icell) * sin(phi_grid(icell))
-									z0 = z_grid(icell)
-								else
-									call  pos_em_cellule(icell,frac_pos(iray-1,1),frac_pos(iray-1,2),frac_pos(iray-1,3),x0,y0,z0)
-								endif
+								
+								x0 = r_grid(icell) * cos(phi_grid(icell))
+								y0 = r_grid(icell) * sin(phi_grid(icell))
+								z0 = z_grid(icell)
 							
   		         				do imu=1, size(xmu)
   		         					w0 = xmu(imu)
 									u0 = xmux(imu); v0 = xmuy(imu)
 
-									weight = wmu(imu) / real(Ncentre + 2 - iray_start)
+									weight = wmu(imu) !!/ real(Ncentre + 2 - iray_start)
 									
 									call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
 
@@ -1807,57 +1771,57 @@ module atom_transfer
       			   			
       			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
       			   		
-      			   		elseif (etape==4) then
-      			   		
-  		         			
-							x0 = r_grid(icell) * cos(phi_grid(icell))
-							y0 = r_grid(icell) * sin(phi_grid(icell))
-							z0 = z_grid(icell)
-
-								
-							!domega = solid_angle_cell_sph(icell) * (x0*x0+y0*y0+z0*z0)/etoile(1)%r**2
-							domega = area(icell) / etoile(1)%r**2
-							!dOmega_cell / dOmega_healpix; dOmega_healpix = SQ(angular_resolution in rad) = pi/real(3*4**l_order)
-							!dOmega = area_choc / (x0**2+y0**2+z0**2) !area_choc == sum(area(cell touching the star which acreates))
-							l_order = max(min(healpix_listx(log(critical_ratio*pi/3.0/domega)/log(4.0)),healpix_lmax),healpix_lmin)
-							!if (n_iter==1) &
-							!write(*,*) icell, " lorder=", l_order, healpix_npix(l_order), sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
-
-							weight = healpix_weight(l_order)
-							
-  		         			do imu=1, healpix_npix(l_order)
-  		         				call healpix_ring_mu_and_phi(l_order,imu,w0,healpix_phi)
-								u0 = sqrt(1.0 - w0*w0)*cos(healpix_phi)
-								v0 = sqrt(1.0 - w0*w0)*sin(healpix_phi)
-
-									
-								call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
-
-								if (lmean_intensity) then
-									Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
-									Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
-								endif
-									
-								threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
-								Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
-
-								!for one ray
-								if (.not.lforce_lte) then
-									call cross_coupling_terms(id, icell, 1)
-									call calc_rates_mali(id, icell, 1, weight)
-								endif	
-								
-								if (loutput_Rates) then
-									!need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-									call store_radiative_rates_mali(id, icell, (iray==1 .and. imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
-								endif	
-
-      			   			enddo !imu	
-      			   			
-      			   			!if kept add for all steps
-      			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
-!       			   			write(*,*) id, icell, " Anis = ", 100*abs(threeKminusJ(id_ref,icell)), " dOmega=", solid_angle_cell_sph(icell) * 3*(4**healpix_lorder)/pi      			   			
-			
+!       			   		elseif (etape==4) then
+!       			   		
+!   		         			
+! 							x0 = r_grid(icell) * cos(phi_grid(icell))
+! 							y0 = r_grid(icell) * sin(phi_grid(icell))
+! 							z0 = z_grid(icell)
+! 
+! 								
+! 							!domega = solid_angle_cell_sph(icell) * (x0*x0+y0*y0+z0*z0)/etoile(1)%r**2
+! 							domega = area(icell) / etoile(1)%r**2
+! 							!dOmega_cell / dOmega_healpix; dOmega_healpix = SQ(angular_resolution in rad) = pi/real(3*4**l_order)
+! 							!dOmega = area_choc / (x0**2+y0**2+z0**2) !area_choc == sum(area(cell touching the star which acreates))
+! 							l_order = max(min(healpix_listx(log(critical_ratio*pi/3.0/domega)/log(4.0)),healpix_lmax),healpix_lmin)
+! 							!if (n_iter==1) &
+! 							!write(*,*) icell, " lorder=", l_order, healpix_npix(l_order), sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
+! 
+! 							weight = healpix_weight(l_order)
+! 							
+!   		         			do imu=1, healpix_npix(l_order)
+!   		         				call healpix_ring_mu_and_phi(l_order,imu,w0,healpix_phi)
+! 								u0 = sqrt(1.0 - w0*w0)*cos(healpix_phi)
+! 								v0 = sqrt(1.0 - w0*w0)*sin(healpix_phi)
+! 
+! 									
+! 								call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
+! 
+! 								if (lmean_intensity) then
+! 									Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
+! 									Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
+! 								endif
+! 									
+! 								threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
+! 								Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
+! 
+! 								!for one ray
+! 								if (.not.lforce_lte) then
+! 									call cross_coupling_terms(id, icell, 1)
+! 									call calc_rates_mali(id, icell, 1, weight)
+! 								endif	
+! 								
+! 								if (loutput_Rates) then
+! 									!need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
+! 									call store_radiative_rates_mali(id, icell, (iray==1 .and. imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+! 								endif	
+! 
+!       			   			enddo !imu	
+!       			   			
+!       			   			!if kept add for all steps
+!       			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
+! !       			   			write(*,*) id, icell, " Anis = ", 100*abs(threeKminusJ(id_ref,icell)), " dOmega=", solid_angle_cell_sph(icell) * 3*(4**healpix_lorder)/pi      			   			
+! 			
 						end if !etape
 						
 						call calc_rate_matrix(id, icell, lforce_lte)
@@ -2254,23 +2218,19 @@ module atom_transfer
 !   		write(*,*) "done"
   		!endif
 		if (allocated(xyz_pos)) then
-			open(unit=20,file="xyz_pos.txt",status="unknown")
-			write(20,*) 1, Ncentre+1
-			write(20,*) 1627, cell_map_i(1627), cell_map_j(1627), cell_map_k(1627)
-			do iray=1,Ncentre+1
-				write(20,'(*(1E20.7E3))') (xyz_pos(i,iray,1),i=1,3)
-			enddo
-! 			write(20,'(*(1E20.7E3))') (frac_pos(iray-1,i),i=1,3)
-			do iray=2,Ncentre+1
-				write(20,'(*(1E20.7E3))') (frac_pos(iray-1,i),i=1,3)
-			enddo
-			close(20)
-			open(unit=20,file="uvw_pos.txt",status="unknown")
-			write(20,*) 1, size(xmu), size(xmu)/8
-			do imu=1,size(xmu)
-				write(20,'(*(1E20.7E3))') (uvw_pos(i,imu,1),i=1,3)
-			enddo
-			close(20)
+! 			open(unit=20,file="xyz_pos.txt",status="unknown")
+! 			write(20,*) 1, 1
+! 			write(20,*) 1627, cell_map_i(1627), cell_map_j(1627), cell_map_k(1627)
+! 			do iray=1,1
+! 				write(20,'(*(1E20.7E3))') (xyz_pos(i,iray,1),i=1,3)
+! 			enddo
+! 			close(20)
+! 			open(unit=20,file="uvw_pos.txt",status="unknown")
+! 			write(20,*) 1, size(xmu), size(xmu)/8
+! 			do imu=1,size(xmu)
+! 				write(20,'(*(1E20.7E3))') (uvw_pos(i,imu,1),i=1,3)
+! 			enddo
+! 			close(20)
 		endif
   		
 		if (allocated(threeKminusJ)) then

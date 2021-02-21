@@ -61,7 +61,7 @@ module parametres
   logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
        lcontrib_function, lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
        ldissolve, laccurate_integ, loutput_rates, lorigin_atom
-  integer :: Nrays_atom_transfer, istep_start, icentres !tests futur deprec
+  integer :: Nrays_atom_transfer, istep_start
   
   !HEALpix
   integer :: healpix_lorder, healpix_lmin, healpix_lmax !lmin and lmax not yet (for local evaluation)
