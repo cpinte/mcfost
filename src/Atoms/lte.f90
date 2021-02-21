@@ -21,7 +21,7 @@ MODULE lte
 
  IMPLICIT NONE
 
- real(kind=dp), parameter :: phi_min_limit = 1d-50 !tiny_dp
+ real(kind=dp), parameter :: phi_min_limit = 1d-100 !1d-50, tiny_dp
 
  CONTAINS
  

@@ -19,7 +19,7 @@
 
 MODULE solvene
 
- use atmos_type, only : Nelem, Elements, Atoms, Natom, nHtot, ne, T, icompute_atomRT, ntotal_atom
+ use atmos_type, only : Nelem, Elements, Atoms, Natom, nHtot, ne, T, icompute_atomRT
  use atom_type, only : Element, AtomType
  use math, only : interp1D
  use constant
@@ -34,13 +34,31 @@ MODULE solvene
 
  IMPLICIT NONE
 
+ integer :: Max_ionisation_stage
+ integer, parameter :: N_negative_ions = 0 !currently only H- at index 0
  real(kind=dp), parameter :: MAX_ELECTRON_ERROR=1d-6
  integer, parameter :: N_MAX_ELECTRON_ITERATIONS=50
- integer, parameter :: N_MAX_ELEMENT=26 !100 is the max
- real(kind=dp), parameter :: ne_min_limit = 1d-50 !if ne < ne_min_limt, ne = 0
+ integer, parameter :: N_MAX_ELEMENT=26 !100 is the max, corresponding the atomic number
+ real(kind=dp), parameter :: ne_min_limit = 1d-100!1d-50 !if ne < ne_min_limt, ne = 0
 											!tiny_dp
 											!if this limit is to low, f*1/ne could create nan or infinity
  CONTAINS
+
+ function get_max_nstage()
+ 	integer :: get_max_nstage
+ 	integer :: ell
+ 	
+ 	get_max_nstage = 0
+ 	do ell=1, Nelem
+ 	
+ 		get_max_nstage = max(get_max_nstage, elements(ell)%ptr_elem%Nstage)
+ 		
+ 	enddo
+ 	
+ 	write(*,*) " Maximum number of ionisation stages among all elements: ", get_max_nstage
+ 
+ return
+ end function get_max_nstage
 
  ! ----------------------------------------------------------------------!
  ! do not forget to use the good value of parition function and potential
@@ -144,6 +162,46 @@ MODULE solvene
 !  RETURN
 ! END FUNCTION getPartitionFunctionk
 
+subroutine show_electron_given_per_elem(k, max_fjk)
+	integer, intent(in) :: k
+	real(kind=dp), intent(in), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk
+	integer :: ell
+	integer, dimension(-N_negative_ions:9) :: list_elem!only six elements
+	
+	list_elem(1) = 1 !H
+	list_elem(2) = 2 !He
+	list_elem(3) = 3 !Li
+	list_elem(4) = 6 !C
+	list_elem(5) = 11 !Na
+	list_elem(6) = 12 !Mg
+	list_elem(7) = 13 !Al
+	list_elem(8) = 19 !K
+	list_elem(9) = 20 !Ca
+	
+	write(*,*) " -- Electron given for that cell --"
+	write(*,'("  -- cell #"(1I5)" T="(1F14.4)" K")') k, T(k)
+	
+	do ell=-N_negative_ions, 9
+	
+		if (ell==0) then
+	
+			write(*,'("  >> H- fjk="(1ES17.8E3))') max_fjk(ell)
+	
+		else
+		
+			write(*,'("  >> "(1A)" fjk="(1ES17.8E3))') elements(list_elem(ell))%ptr_elem%id, max_fjk(list_elem(ell))
+		
+		endif
+	enddo
+		
+		
+	!not working properly in term of display
+! 	write(*,'(" ID  :  ", (A,1x),*(A,1x))') "H-", (elements(ell)%ptr_elem%id, ell=1,11)!N_max_element)
+! 	write(*,'(" fjk :  ", (1ES17.8E3,1x),*(1ES17.8E3,1x))') max_fjk(0), (max_fjk(ell), ell=1,11)!N_max_element)
+
+return
+endsubroutine show_electron_given_per_elem
+
 subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 
 	! ------------------------------------------------------------------------!
@@ -164,7 +222,9 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 	real(kind=dp), dimension(:), intent(inout) :: fjk, dfjk
 	real(kind=dp) :: Uk, Ukp1, sum1, sum2
 	logical :: detailed_model
-	integer :: j, i
+	integer :: j, i, Nstage
+	
+	Nstage = elem%Nstage
 
 	detailed_model = .false.
 
@@ -194,10 +254,13 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 			fjk(elem%model%stage(i)+1) = fjk(elem%model%stage(i)+1)+(elem%model%stage(i))*elem%model%n(i,k)
 		end do  
 		                                     
-		fjk(:) = fjk(:)/(nHtot(k)*elem%model%Abund)
+		fjk(1:Nstage) = fjk(1:Nstage)/(nHtot(k)*elem%model%Abund)
+		
+! 		write(*,*) k, " max ionisation frac for elem ", elem%model%ID, " ntot=", (nHtot(k)*elem%model%Abund)
+! 		write(*,*)"  -> ", maxval(fjk(1:Nstage)), maxval(fjk(1:Nstage)) *  (nHtot(k)*elem%model%Abund)
 		
 	else !no model use LTE
-		fjk(1)=1.
+		fjk(1)=1. !means that for H, fjk(1) = 1 whereas, above fjk(1) = 0 (because of stage == 0)
 		dfjk(1)=0.
 		sum1 = 1.
 		sum2 = 0.
@@ -227,51 +290,6 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 
 return
 end subroutine calc_ionisation_frac
-	
-! subroutine solve_ne_nlte_loc(k, ne_initial_solution, dne)
-! ! for non-lte loop
-! !there is no iteration on the electron donors at LTE
-! 	integer :: k
-! 	real(kind=dp), intent(inout) :: dne
-! 	integer, parameter :: Nmaxstage = 50
-! 	character(len=20) :: ne_initial_solution
-! 	real(kind=dp) :: ne_old, akj, ne_new
-! 	real(kind=dp):: PhiHmin
-! 	real(kind=dp), dimension(Nmaxstage) :: fjk, dfjk
-! 	integer :: n, j, i
-! 	type (Element), pointer :: elem
-! 
-! 	ne_old = ne(k)
-! 	ne_new = 0.0_dp
-! 	
-! 	do n=1, N_MAX_ELEMENT
-! 
-! 		elem => Elements(n)%ptr_elem
-! 		
-! 		call calc_ionisation_frac(elem, k, ne_old, fjk, dfjk)
-! 
-! 		if (n.eq.1)  then ! H minus for H
-! 			PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
-!        ! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
-! 			ne_new = ne_new + ne_old*fjk(1)*PhiHmin
-! 		end if
-! 		
-! 		do j=2,elem%Nstage
-! 			akj = elem%abund*(j-1) !(j=0 for neutrals, 1 for signly ionised etc..)
-! 			ne_new = ne_new + akj * fjk(j)
-! 		end do
-! 		
-! 		elem => NULL()
-! 	end do !loop over elem
-! 
-! 	ne_new = ne_new * nHtot(k)
-! 	dne = dabs(1.0_dp - ne_old/ne(k))
-! 	
-! 	!update for this cell
-! 	ne(k) = ne_new
-! 
-! return
-! end subroutine solve_ne_nlte_loc
 
 !try without para ! for epsilon
 subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
@@ -301,7 +319,8 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	real(kind=dp), intent(inout) :: epsilon !difference wrt the initial solution, not criterion of convergence (dne)
 	real(kind=dp) :: delta, ne_old, akj, sum, Uk, Ukp1, dne, ne0
 	real(kind=dp):: ne_oldM, UkM, PhiHmin
-	real(kind=dp), dimension(50) :: fjk, dfjk
+	real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
+	real(kind=dp), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk, min_fjk !Negative ions from -N_neg to 0 (H-), then from 1 to Nelem positive ions
 	integer :: n, k, niter, j, ZM, id
 	type (Element), pointer :: elem
 	integer :: unconverged_cells(nb_proc)
@@ -316,7 +335,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	!$omp parallel &
 	!$omp default(none) &
 	!$omp private(k,n,j,fjk,dfjk,ne_old,niter,delta,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
-	!$omp private(dne, akj, id, ne0, elem) &
+	!$omp private(dne, akj, id, ne0, elem, max_fjk) &
 	!$omp shared(n_cells, Elements, ne_initial_solution,Hydrogen, ZM, unconverged_cells, Nelem) &
 	!$omp shared(ne, T, icompute_atomRT, nHtot, epsilon)
 	!$omp do
@@ -374,6 +393,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 
 			do n=1,Nelem
 				if (n > N_MAX_ELEMENT) exit
+			!do n=1, N_MAX_ELEMENT
 				elem => Elements(n)%ptr_elem
 
 				call calc_ionisation_frac(elem, k, ne_old, fjk, dfjk)
@@ -382,20 +402,28 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 					!2 = partition function of HI, should be replace by getPartitionFunctionk(elements(1)%ptr_elem, 1, icell)
 					PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
 					! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
-					delta = delta + ne_old*fjk(1)*PhiHmin
-					sum = sum-(fjk(1)+ne_old*dfjk(1))*PhiHmin
+					
+					!I have to do that otherwise in non-LTE the contribution from H- is always zero
+					!since fjk(1) = 0, whereas it should be (-1 * 1 * fjk(1))
+					
+					delta = delta + 1.0*ne_old*PhiHmin!*fjk(1) = 0 always for H ??
+					sum = sum-(1.0 + ne_old*dfjk(1))*PhiHmin ! 1 = fjk(1)
+					
+					max_fjk(0) = ne_old*PhiHmin!*fjk(1)
+					
 				end if
 				!neutrals do not contribute right
-				
+				max_fjk(n) = 0
 				do j=2, elem%Nstage
 					akj = elem%Abund*(j-1) !because j starts at 0 for neutrals, 1 for singly ionised etc
 					delta = delta -akj*fjk(j)
 					sum = sum + akj*dfjk(j)
+					max_fjk(n) = max(max_fjk(n), akj*fjk(j))
 				end do
 				
 				elem => NULL()
 			end do !loop over elem
-			
+						
 ! 			if (k==70) then
 ! 			write(*,*) "****"
 ! 			write(*,*) id, k, T(k), niter, nHtot(k), delta, sum
@@ -437,7 +465,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 				if (ne(k) < ne_min_limit) ne(k) = 0d0 !tiny_dp or < tiny_dp
 				exit
 			else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
-				if (dne >= 0.1) then !shows the warning only if dne is actually greater than 1
+				if (dne > 0.0) then !shows the warning only if dne is actually greater than 1
 					CALL Warning("Electron density has not converged for this cell")
 					write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, "ne=",ne(k), "T=",T(k)," nH=",nHtot(k)
 					!set articially ne to some value ?
@@ -450,6 +478,10 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 			end if !convergence test
     
 		end do !while loop
+		
+		!show after convergence of that cell
+		call show_electron_given_per_elem(k, max_fjk)
+
 	end do !loop over spatial points
 	!$omp end do
 	!$omp end parallel

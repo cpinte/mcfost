@@ -200,8 +200,8 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90      
 	  SPH2mcfost.f90 $(Atom_dir)/spectrum_type.f90 $(Atom_dir)/barklem.f90   \
 	  $(Atom_dir)/occupation_probability.f90 $(Atom_dir)/impact.f90 \
 	  $(Atom_dir)/io_atomic_pops.f90 $(Atom_dir)/collision.f90 \
-	  $(Atom_dir)/readatom.f90 $(Atom_dir)/stark.f90 \
 	  $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90 \
+	  $(Atom_dir)/readatom.f90 $(Atom_dir)/stark.f90 \
 	  $(Atom_dir)/voigtfunctions.f90 $(Atom_dir)/profiles.f90                \
 	  $(Atom_dir)/planck.f90 $(Atom_dir)/background_opacity.f90\
 	  dust_transfer.f90 $(Atom_dir)/opacity.f90            \

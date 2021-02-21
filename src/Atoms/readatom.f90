@@ -13,6 +13,7 @@ MODULE readatom
   use io_atomic_pops, only	: read_pops_atom
   use collision, only : read_collisions
   use broad, only : Damping
+  use solvene, only : Max_ionisation_stage, get_max_nstage
 
   !$ use omp_lib
 
@@ -915,18 +916,25 @@ MODULE readatom
    ! a model atom. It means all elements here.
    !atom => Atoms(nmet)
    Elements(Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model => Atoms(nmet)%ptr_atom
-
    
    if (.not.associated(Elements(Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%model, &
     Atoms(nmet)%ptr_atom)) then
-    	CALL Warning(" Elemental model not associated to atomic model!")
+		write(*,*) Atoms(nmet)%ptr_atom%id 
+    	CALL error(" Elemental model not associated to atomic model!")
     endif
+    
+	!Check Nstage
+	if (Elements(Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%Nstage /= maxval(Atoms(nmet)%ptr_atom%stage) + 1) then
+		write(*,*) Atoms(nmet)%ptr_atom%id, maxval(Atoms(nmet)%ptr_atom%stage) + 1
+		write(*,*) "Ns pf = ", Elements(Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%Nstage
+		call error("Model has more ionisation stages than the one in the partition function!")
+	endif
     
    if (Atoms(nmet)%ptr_atom%periodic_table.eq.2)  then
            NULLIFY(Helium) !Because, it is associated to an Elem by default
            Helium => Atoms(nmet)%ptr_atom
      if (.not.associated(Helium,Atoms(nmet)%ptr_atom)) &
-      CALL Warning(" Helium alias not associated to atomic model!")
+      CALL Warning(" Helium alias is not associated to an atomic model!")
    end if
    
    if (allocated(ActiveAtoms)) then
@@ -1042,6 +1050,7 @@ MODULE readatom
   
   enddo !over atoms
   write(*,*) "..done"
+  Max_ionisation_stage = get_max_nstage()
 
 
 !   write(*,*) Atoms(1)%ptr_Atom%ID,ActiveAtoms(1)%ptr_Atom%ID
