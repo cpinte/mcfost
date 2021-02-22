@@ -1863,27 +1863,17 @@ module atom_transfer
    								!has to be parallel in the future
    								
    							!for many atoms, increment niter only with the first one, as they go at the same speed.
-   							accelerated = ng_accelerate(iacc, ng_cur, n_cells * atom%Nlevel, iNg_Norder, ngpop(1:atom%Nlevel*n_cells,:,nact), check_negative_pops=.false.)
+   							accelerated = ng_accelerate(iacc, ng_cur, n_cells * atom%Nlevel, iNg_Norder, ngpop(1:atom%Nlevel*n_cells,:,nact), check_negative_pops=.true.)
    							
    							if (accelerated) then
-   								!handle negative pops by simpling cancel Ng's iteration ?
-   								!Extra overheads to do that. Might be better to raise an error since it can be
-   								!a bug that needs proper correction.
-!    							if (minval(ng_cur)<0) then
-!    								accelerated = .false.
-!    								write(*,*) "   --> avoiding acceleration"
-!    							else
-!                   				n_iter_accel = n_iter_accel + 1 !True number of accelerated iter
-!             					write(*,'("     ++> Ngs iteration #"(1I4))') n_iter_accel
+   								!handle negative pops by simpling cancel Ng's iteration ? or ??
+!    								if (minval(ng_cur)<0.0_dp) then
+!    									!error raised inside ng_accelerate at the moment
+! 									call error("Negative population after Ng!")
+!    								endif
 
 								!-> only reshape because we only print accelerated iteration for all atoms at once
-                  					n_new(nact, 1:atom%Nlevel,:) = reform2(atom%Nlevel, n_cells, ng_cur)
-!                   			endif
-! 
-! 								!after acceleration we rest for Nperiod iterations.
-! 								!But if iNg_Nperiod == 0 we accumulate directly the next solutions.
-!                   				ng_rest = (iNg_Nperiod > 0)!.true.
-!                   				iacc = 0	
+                  				n_new(nact, 1:atom%Nlevel,:) = reform2(atom%Nlevel, n_cells, ng_cur)
    							endif
    							
    							deallocate(ng_cur)

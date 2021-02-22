@@ -102,14 +102,15 @@ MODULE math
 			if (check_negative_pops) then
 				pop_loop : do k=1,m
 					if (solution(k) < 0) then
-						write(*,*) "Warning negative pops sol in Ng's acceleration"
+						write(*,*) "ERROR negative pops sol in Ng's acceleration"
 						write(*,*) " This is likely to be a bug !"
 						write(*,*) k, "sol:", solution(k), " relative:", solution(k)/max_sol
-						!can't do that easility
-						!ng_accelerate = .false.
-						!niter = 0
-						!return
-						solution(:) = lasts(:,niter) !big loop over m inside loop over m. But we exist right after
+						write(*,*) " leaving..!"
+						stop
+						!better handling ??
+						!! setting to last sol ? cancel acceleration ? impose delay ??
+						!!solution(:) = lasts(:,niter)
+						!big loop over m inside loop over m. But we exist right after
 						exit pop_loop
 					endif
 				enddo pop_loop	
