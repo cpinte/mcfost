@@ -19,12 +19,12 @@
 
 MODULE solvene
 
- use atmos_type, only : Nelem, Elements, Atoms, Natom, nHtot, ne, T, icompute_atomRT
+ use atmos_type, only : Nelem, Elements, Atoms, Natom, nHtot, ne, T, icompute_atomRT, nTotal_atom
  use atom_type, only : Element, AtomType
  use math, only : interp1D
  use constant
  use lte
- !use accelerate, only : initNg, freeNg, NgAcceleration
+ use opacity, only : frac_limit_pops
  use messages, only : Error, Warning
  use input, only : nb_proc
  use mcfost_env, only : dp
@@ -37,9 +37,9 @@ MODULE solvene
  integer :: Max_ionisation_stage
  integer, parameter :: N_negative_ions = 0 !currently only H- at index 0
  real(kind=dp), parameter :: MAX_ELECTRON_ERROR=1d-6
- integer, parameter :: N_MAX_ELECTRON_ITERATIONS=50
+ integer, parameter :: N_MAX_ELECTRON_ITERATIONS=100!50
  integer, parameter :: N_MAX_ELEMENT=26 !100 is the max, corresponding the atomic number
- real(kind=dp), parameter :: ne_min_limit = 1d-100!1d-50 !if ne < ne_min_limt, ne = 0
+ real(kind=dp), parameter :: ne_min_limit = tiny_dp!1d-100!1d-50 !if ne < ne_min_limt, ne = 0
 											!tiny_dp
 											!if this limit is to low, f*1/ne could create nan or infinity
  CONTAINS
@@ -162,8 +162,8 @@ MODULE solvene
 !  RETURN
 ! END FUNCTION getPartitionFunctionk
 
-subroutine show_electron_given_per_elem(k, max_fjk)
-	integer, intent(in) :: k
+subroutine show_electron_given_per_elem(id, k, max_fjk)
+	integer, intent(in) :: k, id
 	real(kind=dp), intent(in), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk
 	integer :: ell
 	integer, dimension(-N_negative_ions:9) :: list_elem!only six elements
@@ -179,14 +179,14 @@ subroutine show_electron_given_per_elem(k, max_fjk)
 	list_elem(9) = 20 !Ca
 	
 	write(*,*) " -- Electron given for that cell --"
-	write(*,'("  -- cell #"(1I5)" T="(1F14.4)" K")') k, T(k)
+	write(*,'("  -- cell #"(1I5)," id#"(1I2)" T="(1F14.4)" K")') k, id, T(k)
 	
 	do ell=-N_negative_ions, 9
 	
 		if (ell==0) then
 	
 			write(*,'("  >> H- fjk="(1ES17.8E3))') max_fjk(ell)
-	
+			!(1F18.1)" (x10^10)
 		else
 		
 			write(*,'("  >> "(1A)" fjk="(1ES17.8E3))') elements(list_elem(ell))%ptr_elem%id, max_fjk(list_elem(ell))
@@ -196,18 +196,18 @@ subroutine show_electron_given_per_elem(k, max_fjk)
 		
 		
 	!not working properly in term of display
-! 	write(*,'(" ID  :  ", (A,1x),*(A,1x))') "H-", (elements(ell)%ptr_elem%id, ell=1,11)!N_max_element)
-! 	write(*,'(" fjk :  ", (1ES17.8E3,1x),*(1ES17.8E3,1x))') max_fjk(0), (max_fjk(ell), ell=1,11)!N_max_element)
+! 	write(*,'(" Element          :  ", (A,1x),*(A,10x))') "H-", (elements(list_elem(ell))%ptr_elem%id, ell=1,9)!N_max_element)
+! 	write(*,'(" fjk (x10^10)     :  ", (1F14.1,1x),*(1F14.1,1x))') 1d10*max_fjk(0), (1d10*max_fjk(list_elem(ell)), ell=1,9)!N_max_element)
 
 return
-endsubroutine show_electron_given_per_elem
+end subroutine show_electron_given_per_elem
 
 subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 
 	! ------------------------------------------------------------------------!
 	! fractional population f_j(ne,T)=N_j/N for element Elem
 	! and its partial derivative with ne. If Elem is an element with
-	! detailed model and if NLTE populations for it exist, their are used
+	! detailed model and if NLTE populations for it exist, there are used
 	! instead of LTE.
 	!
 	! to test: If detailed_model is not applied only to active atoms
@@ -225,6 +225,8 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 	integer :: j, i, Nstage
 	
 	Nstage = elem%Nstage
+	fjk(:) = 0.0_dp
+	dfjk(:) = 0.0_dp 
 
 	detailed_model = .false.
 
@@ -237,29 +239,32 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 		detailed_model = (elem%model%NLTEpops .and. elem%model%active)
 		!can add condition on active or not, but check bckgr opac and eval of lte pops after
 	endif
-  
-	fjk(:) = 0.0_dp
-	dfjk(:) = 0.0_dp
+
 
 	if (detailed_model) then
 		if (.not.elem%model%active) call warning("Beware passive atoms used!")
-		fjk = 0d0
-		dfjk = 0d0
+! 		fjk = 0d0
+! 		dfjk = 0d0
+		!derivative is 0 = constant for subsequent iterations, for non-LTE loop.
 
 		do i = 1, elem%model%Nlevel
-			if (elem%model%n(i,k) < 0) then
-				write(*,*) elem%model%id, k, " level", i, elem%model%n(i,k)/(nHtot(k)*elem%model%Abund)
-				call error("Fractional population negative ! (in calc_ionisation_frac)")
+		
+		!-> Negative pops should be check in See_atom or after Ng's acceleration!
+! 			if (elem%model%n(i,k) < 0) then
+! 				write(*,*) elem%model%id, k, " level", i, elem%model%n(i,k)/nTotal_atom(k, elem%model)!(nHtot(k)*elem%model%Abund)
+! 				call error("Fractional population negative ! (in calc_ionisation_frac)")
+! 			endif
+			!contributes only if larger than the threshold for convergence ?
+			if (elem%model%n(i,k) >= frac_limit_pops * nTotal_atom(k, elem%model)) then
+				fjk(elem%model%stage(i)+1) = fjk(elem%model%stage(i)+1)+(elem%model%stage(i))*elem%model%n(i,k)
 			endif
-			fjk(elem%model%stage(i)+1) = fjk(elem%model%stage(i)+1)+(elem%model%stage(i))*elem%model%n(i,k)
+			
 		end do  
 		                                     
-		fjk(1:Nstage) = fjk(1:Nstage)/(nHtot(k)*elem%model%Abund)
-		
-! 		write(*,*) k, " max ionisation frac for elem ", elem%model%ID, " ntot=", (nHtot(k)*elem%model%Abund)
-! 		write(*,*)"  -> ", maxval(fjk(1:Nstage)), maxval(fjk(1:Nstage)) *  (nHtot(k)*elem%model%Abund)
-		
+		fjk(1:Nstage) = fjk(1:Nstage)/nTotal_atom(k, elem%model)!(nHtot(k)*elem%model%Abund)
+				
 	else !no model use LTE
+		!fjk(1) is N(1) / ntot !N(1) = sum_j=1 sum_i=1^N(j) n(i)
 		fjk(1)=1. !means that for H, fjk(1) = 1 whereas, above fjk(1) = 0 (because of stage == 0)
 		dfjk(1)=0.
 		sum1 = 1.
@@ -310,7 +315,8 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	! Also returns epsilon, the change in electron density from the intial guess
 	! to the converged values. THIS IS NOT the convergence threshold used inside
 	! the electron loop.
-	!
+	! Epsilon is used to check for the convergence of the electron density,
+	! between subsequent iterations of the non-LTE loop.
 	!
 	! epsilon is shared, thats' okay ?
 	! ----------------------------------------------------------------------!
@@ -406,16 +412,22 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 					!I have to do that otherwise in non-LTE the contribution from H- is always zero
 					!since fjk(1) = 0, whereas it should be (-1 * 1 * fjk(1))
 					
+					!in non-LTE Z * fjk is stored in fjk meaning 0 for fjk(1) !neutrals
+					
+					!negative contribution to the electron density
 					delta = delta + 1.0*ne_old*PhiHmin!*fjk(1) = 0 always for H ??
 					sum = sum-(1.0 + ne_old*dfjk(1))*PhiHmin ! 1 = fjk(1)
 					
 					max_fjk(0) = ne_old*PhiHmin!*fjk(1)
 					
 				end if
-				!neutrals do not contribute right
+				!neutrals do not contribute
+				!j-1 = 0 for neutrals
+				!j-1 = 1 for singly ionised ions.
 				max_fjk(n) = 0
 				do j=2, elem%Nstage
 					akj = elem%Abund*(j-1) !because j starts at 0 for neutrals, 1 for singly ionised etc
+					!positive contribution to the electron density
 					delta = delta -akj*fjk(j)
 					sum = sum + akj*dfjk(j)
 					max_fjk(n) = max(max_fjk(n), akj*fjk(j))
@@ -480,7 +492,8 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 		end do !while loop
 		
 		!show after convergence of that cell
-		call show_electron_given_per_elem(k, max_fjk)
+! 		if (id==1) call show_electron_given_per_elem(id, k, max_fjk)
+		!will only show for the first thread.
 
 	end do !loop over spatial points
 	!$omp end do

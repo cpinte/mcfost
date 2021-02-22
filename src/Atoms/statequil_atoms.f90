@@ -523,9 +523,9 @@ MODULE statequil_atoms
 				!The following check is similar to the one for computing opacities
 
 				!condition on values of individual populations ? (wrt a threshold)
-! 				if ((atom%n(i,icell) - atom%lines(kc)%gij * atom%n(j,icell)) <= 0.0 ) cycle tr_loop
+				if ((atom%n(i,icell) - atom%lines(kc)%gij * atom%n(j,icell)) <= 0.0 ) cycle tr_loop
 				
-				if ( (atom%n(i,icell) < frac_limit_pops) .or. (atom%n(j,icell) < frac_limit_pops) ) cycle tr_loop
+! 				if ( (atom%n(i,icell)/ntotal_atom(icell,atom) < frac_limit_pops) .or. (atom%n(j,icell)/ntotal_atom(icell,atom) < frac_limit_pops) ) cycle tr_loop
 
 
 				Tdag = atom%lines(kc)%Tex(icell)
@@ -600,8 +600,8 @@ MODULE statequil_atoms
 				gij = atom%nstar(i,icell)/(atom%nstar(j,icell) ) * exp(-hc_k/atom%continua(kc)%lambda0/T(icell))
 				ratio = log( wj*atom%n(i,icell)  / ( wi * atom%n(j,icell) * gij ) )
 				
-! 				if ((atom%n(i,icell) - gij * atom%n(j,icell)) <= 0.0 ) cycle tr_loop
-				if ( (atom%n(i,icell) < frac_limit_pops) .or. (atom%n(j,icell) < frac_limit_pops) ) cycle tr_loop
+				if ((atom%n(i,icell) - gij * atom%n(j,icell)) <= 0.0 ) cycle tr_loop
+! 				if ( (atom%n(i,icell)/ntotal_atom(icell,atom) < frac_limit_pops) .or. (atom%n(j,icell)/ntotal_atom(icell,atom) < frac_limit_pops) ) cycle tr_loop
 
 
 				!write(*,*) "cont"
