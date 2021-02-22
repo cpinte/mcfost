@@ -24,7 +24,6 @@ MODULE solvene
  use math, only : interp1D
  use constant
  use lte
- use opacity, only : frac_limit_pops
  use messages, only : Error, Warning
  use input, only : nb_proc
  use mcfost_env, only : dp
@@ -42,6 +41,7 @@ MODULE solvene
  real(kind=dp), parameter :: ne_min_limit = tiny_dp!1d-100!1d-50 !if ne < ne_min_limt, ne = 0
 											!tiny_dp
 											!if this limit is to low, f*1/ne could create nan or infinity
+ real(kind=dp), parameter :: fjk_lim = 1d-10
  CONTAINS
 
  function get_max_nstage()
@@ -255,7 +255,7 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 ! 				call error("Fractional population negative ! (in calc_ionisation_frac)")
 ! 			endif
 			!contributes only if larger than the threshold for convergence ?
-			if (elem%model%n(i,k) >= frac_limit_pops * nTotal_atom(k, elem%model)) then
+			if (elem%model%n(i,k) >= fjk_lim * nTotal_atom(k, elem%model)) then
 				fjk(elem%model%stage(i)+1) = fjk(elem%model%stage(i)+1)+(elem%model%stage(i))*elem%model%n(i,k)
 			endif
 			
