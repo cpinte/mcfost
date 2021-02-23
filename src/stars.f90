@@ -244,6 +244,7 @@ subroutine repartition_energie_etoiles()
   real(kind=dp), dimension(n_etoiles) :: Lacc, Lacc_tot, Tacc
 
   real, dimension(:,:), allocatable :: spectre_tmp, tab_lambda_spectre, tab_spectre, tab_spectre0, tab_bb
+  real, dimension(:,:), allocatable :: tab_spectre_acc
   real(kind=dp), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
   character(len=512) :: filename, dir
 
@@ -299,7 +300,7 @@ subroutine repartition_energie_etoiles()
   ! - the bb is hard coded everywhere, we should rewrite it to have a fast function instead (we should store constants and wavelenghts factors)
   ! - The UV excess has to be somehow made compatible with the accretion luminosity (at least we should not use them together)
 
-  etoile(:)%Mdot = 0.
+  !etoile(:)%Mdot = 0.
 
   ! luminosity from the accretion
   ! luminosity in au^2 W / m^2
@@ -312,8 +313,37 @@ subroutine repartition_energie_etoiles()
   ! converting Lacc to Tacc
   Tacc(:) = (Lacc_tot(:)/sigma/(etoile(:)%r**2))**0.25      
 
-  print*, 'Teff=', Tacc(:)
+  print*, 'Mdot=', etoile(:)%Mdot
+  print*, 'Tacc=', Tacc(:)
   print*, 'Tstar=', etoile(:)%T    
+
+  ! calculate spectrum of Tacc
+  n_lambda_spectre(:) = 1000
+
+  do i=1, n_etoiles
+
+     if (i==1) then
+        allocate(tab_lambda_spectre(n_etoiles,n_lambda_spectre(1)), &
+                 tab_spectre(n_etoiles,n_lambda_spectre(1)), tab_spectre0(n_etoiles,n_lambda_spectre(1)), &
+                 tab_bb(n_etoiles,n_lambda_spectre(1)))
+        tab_lambda_spectre = 0.0 ; tab_spectre = 0.0 ;  tab_spectre0 = 0.0 ;  tab_bb = 0.0
+        allocate(log_spectre(n_lambda_spectre(1)), log_spectre0(n_lambda_spectre(1)), log_wl_spectre(n_lambda_spectre(1)))
+     endif
+     tab_lambda_spectre(i,:) = 1.0_dp * spanl(lambda_min, lambda_max, n_lambda_spectre(1))
+     
+     if (Tacc(i) < tiny_real) then
+        tab_spectre_acc(:,:) = 0.0
+     else
+        do l=1, n_lambda_spectre(1)
+           wl = tab_lambda_spectre(i,l) *1.e-6
+           cst_wl=cst_th/(Tacc(i)*wl)
+           tab_spectre_acc(i,l) = max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
+        enddo ! l
+     endif
+
+  enddo !i
+
+
 
   do i=2, n_etoiles
      if (etoile(i)%lb_body .neqv. (etoile(1)%lb_body)) then
@@ -425,6 +455,9 @@ subroutine repartition_energie_etoiles()
      enddo ! n_etoiles
 
   endif ! bb
+
+  ! adding the accretion spectrum to the star spectrum
+  tab_spectre(:,:) = tab_spectre(:,:) + tab_spectre_acc(:,:)
 
   ! Luminosite etoile integree sur le spectre
   L_star0(:) = 0.0
