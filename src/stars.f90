@@ -241,6 +241,7 @@ subroutine repartition_energie_etoiles()
   real, dimension(n_lambda,n_etoiles) :: prob_E_star0
   real(kind=dp), dimension(n_lambda) :: log_lambda, spectre_etoiles0
   real(kind=dp), dimension(n_etoiles) ::  L_star0, correct_Luminosity
+  real(kind=dp), dimension(n_etoiles) :: Lacc, Lacc_tot, Tacc
 
   real, dimension(:,:), allocatable :: spectre_tmp, tab_lambda_spectre, tab_spectre, tab_spectre0, tab_bb
   real(kind=dp), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
@@ -286,7 +287,7 @@ subroutine repartition_energie_etoiles()
 
   ! Luminosite etoile (le facteur 4Pi a ete simplifie avec le 1/4pi de l'estimateur de Lucy 1999)
   ! L_etoile=r_etoile**2*sigma*T_etoile**4   ! tout en SI sauf R en AU
-  L_etoile=sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 )  ! tout en SI sauf R en AU
+  L_etoile = sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4)
 
   ! Todo for accretion:
   ! -------------------
@@ -297,6 +298,22 @@ subroutine repartition_energie_etoiles()
   ! - we need to find the best spectrum for the accretion luminosity (we can use a bb for now)
   ! - the bb is hard coded everywhere, we should rewrite it to have a fast function instead (we should store constants and wavelenghts factors)
   ! - The UV excess has to be somehow made compatible with the accretion luminosity (at least we should not use them together)
+
+  etoile(:)%Mdot = 0.
+
+  ! luminosity from the accretion
+  ! luminosity in au^2 W / m^2
+  Lacc(:) = Ggrav/AU3_to_m3 &                                        ! convert G to AU^3 / s^s / kg
+            *etoile(:)%M*Msun_to_kg &                                ! M in kg
+            *etoile(:)%Mdot*Msun_to_kg/year_to_s &                   ! Mdot in kg / s
+            /2./etoile(:)%r                                          ! R in AU
+  Lacc_tot(:) = sum(Lacc(:))                                            ! do not know what exactly is meant with Lacc_tot
+
+  ! converting Lacc to Tacc
+  Tacc(:) = (Lacc_tot(:)/sigma/(etoile(:)%r**2))**0.25      
+
+  print*, 'Teff=', Tacc(:)
+  print*, 'Tstar=', etoile(:)%T    
 
   do i=2, n_etoiles
      if (etoile(i)%lb_body .neqv. (etoile(1)%lb_body)) then
