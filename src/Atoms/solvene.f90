@@ -41,7 +41,7 @@ MODULE solvene
  real(kind=dp), parameter :: ne_min_limit = tiny_dp!1d-100!1d-50 !if ne < ne_min_limt, ne = 0
 											!tiny_dp
 											!if this limit is to low, f*1/ne could create nan or infinity
- real(kind=dp), parameter :: fjk_lim = 1d-10
+ real(kind=dp), parameter :: fjk_lim = 1d-15
  CONTAINS
 
  function get_max_nstage()
@@ -202,13 +202,18 @@ subroutine show_electron_given_per_elem(id, k, max_fjk)
 return
 end subroutine show_electron_given_per_elem
 
-subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
+subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
+!return j * Nj / Ntot and N0/Ntot
 
 	! ------------------------------------------------------------------------!
 	! fractional population f_j(ne,T)=N_j/N for element Elem
 	! and its partial derivative with ne. If Elem is an element with
 	! detailed model and if NLTE populations for it exist, there are used
 	! instead of LTE.
+	!
+	! ::new:: n0 is population of the lowest ionisation stage (like HI)
+	! Should in principle be a list for the calculation of ionisation from negative ions.
+	! currently only H-
 	!
 	! to test: If detailed_model is not applied only to active atoms
 	! it means that some atoms will contribute their LTE values, therefore
@@ -220,9 +225,10 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 	integer, intent(in) :: k
 	type (Element), intent(in) :: Elem
 	real(kind=dp), dimension(:), intent(inout) :: fjk, dfjk
+	real(kind=dp), intent(out) :: n0
 	real(kind=dp) :: Uk, Ukp1, sum1, sum2
 	logical :: detailed_model
-	integer :: j, i, Nstage
+	integer :: j, i, Nstage, min_j
 	
 	Nstage = elem%Nstage
 	fjk(:) = 0.0_dp
@@ -247,25 +253,34 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 ! 		dfjk = 0d0
 		!derivative is 0 = constant for subsequent iterations, for non-LTE loop.
 
+		n0 = 0.0_dp
+		min_j = minval(elem%model%stage)
+! 		n0 = sum(elem%model%n(:,k),mask=elem%model%stage==min_j)
+
 		do i = 1, elem%model%Nlevel
 		
-		!-> Negative pops should be check in See_atom or after Ng's acceleration!
-! 			if (elem%model%n(i,k) < 0) then
-! 				write(*,*) elem%model%id, k, " level", i, elem%model%n(i,k)/nTotal_atom(k, elem%model)!(nHtot(k)*elem%model%Abund)
-! 				call error("Fractional population negative ! (in calc_ionisation_frac)")
-! 			endif
-			!contributes only if larger than the threshold for convergence ?
-			if (elem%model%n(i,k) >= fjk_lim * nTotal_atom(k, elem%model)) then
-				fjk(elem%model%stage(i)+1) = fjk(elem%model%stage(i)+1)+(elem%model%stage(i))*elem%model%n(i,k)
-			endif
+
+			fjk(elem%model%stage(i)+1) = fjk(elem%model%stage(i)+1)+( elem%model%stage(i)*elem%model%n(i,k) )
+			if (elem%model%stage(i) == min_j) n0 = n0 + elem%model%n(i,k)
+			
 			
 		end do  
 		                                     
-		fjk(1:Nstage) = fjk(1:Nstage)/nTotal_atom(k, elem%model)!(nHtot(k)*elem%model%Abund)
+		fjk(1:Nstage) = fjk(1:Nstage)/nTotal_atom(k, elem%model)
+		n0 = n0 / ntotal_atom(k,elem%model)
+		
+		!check limit on ionisation fraction
+		do i=1,Nstage
+		
+			!if the ionisation fraction is lower than a limit set to zero.
+			!always zero neutrals
+			if (fjk(i) < fjk_lim) fjk(i) = 0.0_dp
+		
+		enddo
 				
 	else !no model use LTE
 		!fjk(1) is N(1) / ntot !N(1) = sum_j=1 sum_i=1^N(j) n(i)
-		fjk(1)=1. !means that for H, fjk(1) = 1 whereas, above fjk(1) = 0 (because of stage == 0)
+		fjk(1)=1.
 		dfjk(1)=0.
 		sum1 = 1.
 		sum2 = 0.
@@ -290,6 +305,16 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk)
 		
 		fjk(:)=fjk(:)/sum1
 		dfjk(:)=(dfjk(:)-fjk(:)*sum2)/sum1
+
+		n0 = fjk(1)
+		
+		!0 for neutrals => j==1 (elements which do not have a detailed model are ordered by neutral to ionised
+		!and fjk is Nj / Ntot
+		do j=1,elem%Nstage
+			fjk(j) = (j-1) * fjk(j)
+			dfjk(j) = (j-1) * dfjk(j)
+		enddo
+		
 
 	endif
 
@@ -324,7 +349,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	logical, intent(in) :: verbose
 	real(kind=dp), intent(inout) :: epsilon !difference wrt the initial solution, not criterion of convergence (dne)
 	real(kind=dp) :: delta, ne_old, akj, sum, Uk, Ukp1, dne, ne0
-	real(kind=dp):: ne_oldM, UkM, PhiHmin
+	real(kind=dp):: ne_oldM, UkM, PhiHmin, n0
 	real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
 	real(kind=dp), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk, min_fjk !Negative ions from -N_neg to 0 (H-), then from 1 to Nelem positive ions
 	integer :: n, k, niter, j, ZM, id
@@ -341,7 +366,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	!$omp parallel &
 	!$omp default(none) &
 	!$omp private(k,n,j,fjk,dfjk,ne_old,niter,delta,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
-	!$omp private(dne, akj, id, ne0, elem, max_fjk) &
+	!$omp private(dne, akj, id, ne0, elem, max_fjk, n0) &
 	!$omp shared(n_cells, Elements, ne_initial_solution,Hydrogen, ZM, unconverged_cells, Nelem) &
 	!$omp shared(ne, T, icompute_atomRT, nHtot, epsilon)
 	!$omp do
@@ -402,31 +427,49 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 			!do n=1, N_MAX_ELEMENT
 				elem => Elements(n)%ptr_elem
 
-				call calc_ionisation_frac(elem, k, ne_old, fjk, dfjk)
+				!times stage !!
+				call calc_ionisation_frac(elem, k, ne_old, fjk, dfjk, n0)
+			
 
 				if (n.eq.1)  then ! H minus for H
 					!2 = partition function of HI, should be replace by getPartitionFunctionk(elements(1)%ptr_elem, 1, icell)
 					PhiHmin = phi_jl(k, 1d0, 2d0, E_ION_HMIN)
 					! = 1/4 * (h^2/(2PI m_e kT))^3/2 exp(Ediss/kT)
 					
-					!I have to do that otherwise in non-LTE the contribution from H- is always zero
-					!since fjk(1) = 0, whereas it should be (-1 * 1 * fjk(1))
-					
 					!in non-LTE Z * fjk is stored in fjk meaning 0 for fjk(1) !neutrals
+					!How to deal with non-LTE populations with negative ions ?
+					!For instance, fjk(1) = 0 for Hydrogen during the non-LTE (stage * sum(n) / Ntot)
+					!but not at LTE.
 					
+					!H- must be multiply their by 1 or by sum(hydrogen%n(1:hydrogen%Nlevel-1))/nHtot
+					!! replace fjk(1) by n0, should be the same at LTE
 					!negative contribution to the electron density
-					delta = delta + 1.0*ne_old*PhiHmin!*fjk(1) = 0 always for H ??
-					sum = sum-(1.0 + ne_old*dfjk(1))*PhiHmin ! 1 = fjk(1)
+					delta = delta + ne_old*PhiHmin*n0!
+					sum = sum-(n0 + ne_old*dfjk(1))*PhiHmin ! (fjk(1) + ne_old*dfjk(1))
 					
-					max_fjk(0) = ne_old*PhiHmin!*fjk(1)
+					max_fjk(0) = ne_old*PhiHmin*n0
 					
 				end if
+				
 				!neutrals do not contribute
 				!j-1 = 0 for neutrals
 				!j-1 = 1 for singly ionised ions.
+
 				max_fjk(n) = 0
-				do j=2, elem%Nstage
-					akj = elem%Abund*(j-1) !because j starts at 0 for neutrals, 1 for singly ionised etc
+
+				!avoiding neutrals
+				!fjk are Nj / Not with Nj the total population in stage j evaluated at LTE
+! 				do j=2, elem%Nstage
+! 					akj = elem%Abund*(j-1) !because j starts at 0 for neutrals, 1 for singly ionised etc
+! 					!positive contribution to the electron density
+! 					delta = delta -akj*fjk(j)
+! 					sum = sum + akj*dfjk(j)
+! 					max_fjk(n) = max(max_fjk(n), akj*fjk(j))
+! 				end do
+				!new the term j-1 already included in fjk and dfjk
+				do j=1, elem%Nstage !start at 1 but fjk and dfjk are 0 if stage 1 = neutral
+									!this allows a better match with detailed models that can have ionised level for j=1 (like Ca II)
+					akj = elem%Abund
 					!positive contribution to the electron density
 					delta = delta -akj*fjk(j)
 					sum = sum + akj*dfjk(j)
@@ -435,13 +478,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 				
 				elem => NULL()
 			end do !loop over elem
-						
-! 			if (k==70) then
-! 			write(*,*) "****"
-! 			write(*,*) id, k, T(k), niter, nHtot(k), delta, sum
-! 			write(*,*) ne_oldM, ne_old, ne(k)
-! 			write(*,*) "****"
-! 			endif
+
 
 			ne(k) = ne_old - nHtot(k)*delta / (1.-nHtot(k)*sum)
 			
