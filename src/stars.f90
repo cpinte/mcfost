@@ -290,6 +290,7 @@ subroutine repartition_energie_etoiles()
              msg2="all stars must not be black bodies : you cannot mix")
      endif
   enddo
+  if (etoile(1)%lb_body) etoile(:)%find_spectrum = .false.
 
   call find_spectra()
 
@@ -446,29 +447,30 @@ subroutine repartition_energie_etoiles()
   !--------------------------------
   ! Calculate accretion spectrum
   !--------------------------------
-  ! Luminosity from the accretion [au^2 W / m^2]
-  Lacc(:) = Ggrav/AU3_to_m3 &                                        ! convert G to AU^3 / s^s / kg
-            * etoile(:)%M*Msun_to_kg &                               ! M in kg
-            * etoile(:)%Mdot*Msun_to_kg/year_to_s &                  ! Mdot in kg / s
-            / etoile(:)%r                                            ! R in AU
-  ! Converting Lacc to Tacc
-  Tacc(:) = (Lacc(:)/(quatre_pi * sigma * etoile(:)%r**2))**0.25
+  if (maxval(etoile(:)%Mdot) > tiny_real) then
+     ! Luminosity from the accretion [au^2 W / m^2]
+     Lacc(:) = Ggrav/AU3_to_m3 &                         ! convert G to AU^3 / s^s / kg
+          * etoile(:)%M*Msun_to_kg &                     ! M in kg
+          * etoile(:)%Mdot*Msun_to_kg/year_to_s &        ! Mdot in kg / s
+          / etoile(:)%r                                  ! R in AU
+     ! Converting Lacc to Tacc
+     Tacc(:) = (Lacc(:)/(quatre_pi * sigma * etoile(:)%r**2))**0.25
 
-  write(*,*) "Mdot=", etoile(:)%Mdot, "Msun/yr"
-  write(*,*) "Tacc=", Tacc(:), "K"
-  write(*,*) "Tstar=", etoile(:)%T, "K"
+     write(*,*) "Accretion onto stars: "
+     write(*,*) "Mdot=", etoile(:)%Mdot, "Msun/yr"
+     write(*,*) "Tacc=", Tacc(:), "K"
 
-  ! We add a black-body to the stellar spectrum
-  do i=1, n_etoiles
-     if (Tacc(i) > tiny_real) then
-        do l=1, n_lambda_spectre(i)
-           wl = tab_lambda_spectre(i,l) *1.e-6
-           cst_wl=cst_th/(Tacc(i)*wl)
-           tab_spectre(i,l) = tab_spectre(i,l) +  max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
-        enddo ! l
-     endif
-  enddo !i
-
+     ! We add a black-body to the stellar spectrum
+     do i=1, n_etoiles
+        if (Tacc(i) > tiny_real) then
+           do l=1, n_lambda_spectre(i)
+              wl = tab_lambda_spectre(i,l) *1.e-6
+              cst_wl=cst_th/(Tacc(i)*wl)
+              tab_spectre(i,l) = tab_spectre(i,l) +  max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
+           enddo ! l
+        endif
+     enddo !
+  endif
 
   !---------------------------------------------------------------------------
   ! On calcule 2 trucs en meme tps :
@@ -854,59 +856,67 @@ subroutine find_spectra()
   write(*,*) "Trying to find appropriate stellar spectra ..."
 
   do i_star = 1, n_etoiles
-     Teff = etoile(i_star)%T
+     if (etoile(i_star)%find_spectrum) then
+        Teff = etoile(i_star)%T
 
-     r = etoile(i_star)%r / Rsun_to_AU
-     M = etoile(i_star)%M
+        r = etoile(i_star)%r / Rsun_to_AU
+        M = etoile(i_star)%M
 
-     if (M < tiny_real) then
-        call warning("Stellar mass is not set, forcing log(g) = 3.5")
-        logg = 3.5 ! stellar mass is not defined in the parameter file, we fix logg
-     else
-        logg = logg_Sun + log10(M/r**2)
-     endif
-
-     if (Teff < 100) then
-        call error("Teff below 100K needs to be implemented")
-     else if (Teff < 1500) then
-        type = "cond"
-        min_logg = 2.5
-        max_logg = 6
-        delta_T = 100
-     else if (Teff < 2700) then
-        type = "dusty"
-        min_logg = 3.5
-        max_logg = 6
-        delta_T = 100
-     else if (Teff < 10000) then
-        type = "NextGen"
-        min_logg = 3.5
-        max_logg = 5.5
-        if (Teff <= 4000) then
-           delta_T = 100
+        if (M < tiny_real) then
+           call warning("Stellar mass is not set, forcing log(g) = 3.5")
+           logg = 3.5 ! stellar mass is not defined in the parameter file, we fix logg
         else
-           delta_T = 200
+           logg = logg_Sun + log10(M/r**2)
         endif
-     else
-        call error("Teff above 10000K needs to be implemented")
+
+        if (Teff < 100) then
+           call error("Teff below 100K needs to be implemented")
+        else if (Teff < 1500) then
+           type = "cond"
+           min_logg = 2.5
+           max_logg = 6
+           delta_T = 100
+        else if (Teff < 2700) then
+           type = "dusty"
+           min_logg = 3.5
+           max_logg = 6
+           delta_T = 100
+        else if (Teff < 10000) then
+           type = "NextGen"
+           min_logg = 3.5
+           max_logg = 5.5
+           if (Teff <= 4000) then
+              delta_T = 100
+           else
+              delta_T = 200
+           endif
+        else
+           call error("Teff above 10000K needs to be implemented")
+        endif
+
+        ! Rounding off at the nearest point in the grid of stellar atmospheres
+        Teff = nint(Teff/delta_T) * delta_T
+        logg = nint(logg/delta_logg) * delta_logg
+        logg = min(max(logg,min_logg), max_logg)
+
+        if (Teff < 1000) then
+           write(sTeff, "(I3)") int(Teff)
+        else
+           write(sTeff, "(I4)") int(Teff)
+        endif
+        write(slogg, "(F3.1)") logg
+
+        etoile(i_star)%spectre = "lte"//trim(sTeff)//"-"//trim(slogg)//"."//trim(type)//".fits.gz"
+
+        write(*,*) "Star #", i_star, " --> ", trim(etoile(i_star)%spectre)
+     else ! We do not update the spectrum
+        if (etoile(i_star)%lb_body) then
+           write(*,*) "Star #", i_star, " --> BB at T=", etoile(i_star)%T, "K"
+        else
+           write(*,*) "Star #", i_star, " --> ", trim(etoile(i_star)%spectre), " (forced)"
+        endif
      endif
-
-     ! Rounding off at the nearest point in the grid of stellar atmospheres
-     Teff = nint(Teff/delta_T) * delta_T
-     logg = nint(logg/delta_logg) * delta_logg
-     logg = min(max(logg,min_logg), max_logg)
-
-     if (Teff < 1000) then
-        write(sTeff, "(I3)") int(Teff)
-     else
-        write(sTeff, "(I4)") int(Teff)
-     endif
-     write(slogg, "(F3.1)") logg
-
-     etoile(i_star)%spectre = "lte"//trim(sTeff)//"-"//trim(slogg)//"."//trim(type)//".fits.gz"
-
-     write(*,*) "Star #", i_star, " --> ", trim(etoile(i_star)%spectre)
-  end do
+  enddo
 
   write(*,*) "Done"
 

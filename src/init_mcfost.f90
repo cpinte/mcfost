@@ -214,7 +214,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -233,6 +233,7 @@ subroutine initialisation_mcfost()
   lno_T = .false.
   lno_SED = .false.
   lpola = .false.
+  lstar_bb = .false.
 
   ! Global logical variables
   call set_default_variables()
@@ -1084,6 +1085,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) isink_centre
         i_arg = i_arg + 1
+     case("-star_bb")
+        i_arg = i_arg + 1
+        lstar_bb = .true.
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1140,6 +1144,8 @@ subroutine initialisation_mcfost()
   endif
 
   if ( lwrite_column_density .and. .not. ldisk_struct) call error("-cd option requires - or +disk_struct option")
+
+  if (lstar_bb) etoile(:)%lb_body = .true.
 
   write(*,*) 'Input file read successfully'
 
@@ -1505,6 +1511,7 @@ subroutine display_help()
   write(*,*) "        : -column_density or -cd : generates a fits file with the column densities from each cell"
   write(*,*) " "
   write(*,*) " Options related to star properties"
+  write(*,*) "        : -star_bb : forces a black-body for the stellar spectrum"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
   write(*,*) "        : -limb_darkening <filename>"
   write(*,*) " "

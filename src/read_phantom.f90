@@ -748,7 +748,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   real(dp), intent(in), optional :: T_to_u
 
 
-  integer  :: i,j,k,itypei,alloc_status,i_etoiles, n_etoiles_old, ifile
+  integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udist_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
   real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
@@ -1002,18 +1002,20 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        write(*,*) "WARNING: sink with id >", n_etoiles_old, "will be ignored in the RT"
        n_etoiles = n_etoiles_old
     endif
-    do i_etoiles = 1, n_etoiles
-       etoile(i_etoiles)%x = xyzmh_ptmass(1,i_etoiles) * ulength_au
-       etoile(i_etoiles)%y = xyzmh_ptmass(2,i_etoiles) * ulength_au
-       etoile(i_etoiles)%z = xyzmh_ptmass(3,i_etoiles) * ulength_au
+    do i_etoile = 1, n_etoiles
+       etoile(i_etoile)%x = xyzmh_ptmass(1,i_etoile) * ulength_au
+       etoile(i_etoile)%y = xyzmh_ptmass(2,i_etoile) * ulength_au
+       etoile(i_etoile)%z = xyzmh_ptmass(3,i_etoile) * ulength_au
 
-       etoile(i_etoiles)%vx = vxyz_ptmass(1,i_etoiles) * uvelocity
-       etoile(i_etoiles)%vy = vxyz_ptmass(2,i_etoiles) * uvelocity
-       etoile(i_etoiles)%vz = vxyz_ptmass(3,i_etoiles) * uvelocity
+       etoile(i_etoile)%vx = vxyz_ptmass(1,i_etoile) * uvelocity
+       etoile(i_etoile)%vy = vxyz_ptmass(2,i_etoile) * uvelocity
+       etoile(i_etoile)%vz = vxyz_ptmass(3,i_etoile) * uvelocity
 
-       etoile(i_etoiles)%M = xyzmh_ptmass(4,i_etoiles) * usolarmass
+       etoile(i_etoile)%M = xyzmh_ptmass(4,i_etoile) * usolarmass
 
-       etoile(i_etoiles)%Mdot = 0.
+       etoile(i_etoile)%Mdot = 0.
+
+       etoile(i_etoile)%find_spectrum = .false.
     enddo
  else
     write(*,*) ""
@@ -1033,6 +1035,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
 
     etoile(:)%Mdot = xyzmh_ptmass(16,:) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
+
+    etoile(:)%find_spectrum = .true.
  endif
 
  return
