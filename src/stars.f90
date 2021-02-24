@@ -241,18 +241,16 @@ subroutine repartition_energie_etoiles()
   real, dimension(n_lambda,n_etoiles) :: prob_E_star0
   real(kind=dp), dimension(n_lambda) :: log_lambda, spectre_etoiles0
   real(kind=dp), dimension(n_etoiles) ::  L_star0, correct_Luminosity
-  real(kind=dp), dimension(n_etoiles) :: Lacc, Lacc_tot, Tacc
+  real(kind=dp), dimension(n_etoiles) :: Lacc, Tacc
 
   real, dimension(:,:), allocatable :: spectre_tmp, tab_lambda_spectre, tab_spectre, tab_spectre0, tab_bb
-  real, dimension(:,:), allocatable :: tab_lambda_spectre_acc, tab_spectre_acc, tab_spectre0_acc, tab_bb_acc
   real(kind=dp), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
-  real(kind=dp), dimension(:), allocatable :: log_spectre_acc, log_spectre0_acc, log_wl_spectre_acc
   character(len=512) :: filename, dir
 
   integer, dimension(n_etoiles) :: n_lambda_spectre, unit
   integer :: lambda, i, n, l, ios, n_lambda_spectre_max, n_wl
   real(kind=dp) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0, Cst0
-  real ::  L_etoile, wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV, fUV
+  real ::  wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV, fUV
   real(kind=dp) :: fact_sup, fact_inf, cst_spectre_etoiles
 
   real(kind=dp) :: wl_spectre_max, wl_spectre_min, wl_spectre_avg, wl_deviation
@@ -285,66 +283,6 @@ subroutine repartition_energie_etoiles()
   ! Le corps noir est ici defini a une cst pres
   ! car on regarde en relatif par a ce qui est fait dans repartition_energie pour le disque
   ! En particulier, on a enleve un pi partout
-
-
-  ! Luminosite etoile (le facteur 4Pi a ete simplifie avec le 1/4pi de l'estimateur de Lucy 1999)
-  ! L_etoile=r_etoile**2*sigma*T_etoile**4   ! tout en SI sauf R en AU
-  L_etoile = sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4)
-
-  ! Todo for accretion:
-  ! -------------------
-  ! - We only need to modify this subroutine
-  ! - we need to compute Lacc and Lacc_tot from Mdot
-  ! - We need to comvert Lacc to an Tacc (assuming an emitting surface, at the moment we will take the stellar surface)
-  ! - watch out for units as constants have been removed, we just need to be correct relative to the stellar Teff
-  ! - we need to find the best spectrum for the accretion luminosity (we can use a bb for now)
-  ! - the bb is hard coded everywhere, we should rewrite it to have a fast function instead (we should store constants and wavelenghts factors)
-  ! - The UV excess has to be somehow made compatible with the accretion luminosity (at least we should not use them together)
-
-  !etoile(:)%Mdot = 0.
-
-  ! luminosity from the accretion
-  ! luminosity in au^2 W / m^2
-  Lacc(:) = Ggrav/AU3_to_m3 &                                        ! convert G to AU^3 / s^s / kg
-            *etoile(:)%M*Msun_to_kg &                                ! M in kg
-            *etoile(:)%Mdot*Msun_to_kg/year_to_s &                   ! Mdot in kg / s
-            /2./etoile(:)%r                                          ! R in AU
-  Lacc_tot(:) = sum(Lacc(:))                                            ! do not know what exactly is meant with Lacc_tot
-
-  ! converting Lacc to Tacc
-  Tacc(:) = (Lacc_tot(:)/sigma/(etoile(:)%r**2))**0.25      
-
-  print*, 'Mdot=', etoile(:)%Mdot
-  print*, 'Tacc=', Tacc(:)
-  print*, 'Tstar=', etoile(:)%T    
-
-  ! calculate spectrum of Tacc
-  n_lambda_spectre(:) = 1000
-
-  do i=1, n_etoiles
-
-     if (i==1) then
-        allocate(tab_lambda_spectre_acc(n_etoiles,n_lambda_spectre(1)), &
-                 tab_spectre_acc(n_etoiles,n_lambda_spectre(1)), tab_spectre0_acc(n_etoiles,n_lambda_spectre(1)), &
-                 tab_bb_acc(n_etoiles,n_lambda_spectre(1)))
-        tab_lambda_spectre_acc = 0.0 ; tab_spectre_acc = 0.0 ;  tab_spectre0_acc = 0.0 ;  tab_bb_acc = 0.0
-        allocate(log_spectre_acc(n_lambda_spectre(1)), log_spectre0_acc(n_lambda_spectre(1)), log_wl_spectre_acc(n_lambda_spectre(1)))
-     endif
-     tab_lambda_spectre_acc(i,:) = 1.0_dp * spanl(lambda_min, lambda_max, n_lambda_spectre(1))
-     
-     if (Tacc(i) < tiny_real) then
-        tab_spectre_acc(:,:) = 0.0
-     else
-        do l=1, n_lambda_spectre(1)
-           wl = tab_lambda_spectre_acc(i,l) *1.e-6
-           cst_wl=cst_th/(Tacc(i)*wl)
-           tab_spectre_acc(i,l) = max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
-        enddo ! l
-     endif
-
-  enddo !i
-
-
 
   do i=2, n_etoiles
      if (etoile(i)%lb_body .neqv. (etoile(1)%lb_body)) then
@@ -457,9 +395,6 @@ subroutine repartition_energie_etoiles()
 
   endif ! bb
 
-  ! adding the accretion spectrum to the star spectrum
-  tab_spectre(:,:) = tab_spectre(:,:) + tab_spectre_acc(:,:)
-
   ! Luminosite etoile integree sur le spectre
   L_star0(:) = 0.0
   do i=1, n_etoiles
@@ -478,31 +413,61 @@ subroutine repartition_energie_etoiles()
   ! Sauvegarde spectre stellaire avant d'ajouter UV
   tab_spectre0(:,:) = tab_spectre(:,:)
 
+
+  !--------------------------------
   ! Flux UV additionnel pour ProDiMo
+  !--------------------------------
   wl_inf = 91.2e-9 ; ! en m
   wl_sup = 250e-9 ; ! en m
 
   ! wl doit etre en microns ici
   do i=1, n_etoiles
      fUV = etoile(i)%fUV
-     p = etoile(i)%slope_UV
+     if (fUV > tiny_real) then
+        p = etoile(i)%slope_UV
 
-     if (abs(p+1.0) > 1.0e-5) then
-        cst_UV_ProDiMo =  fUV * L_star0(i) * (p+1) / (wl_sup**(p+1) - wl_inf**(p+1)) / 1e6 !/ (1e6)**(p+1)
-     else
-        cst_UV_ProDiMo =  fUV * L_star0(i) * log(wl_sup/wl_inf) / 1e6 !/ (1e6)**(p+1)
-     endif
-
-     ! On ajoute l'UV que avant le pic de Wien
-     do l = 1, n_lambda_spectre(i)
-        if (tab_lambda_spectre(i,l)  < 2898./etoile(i)%T ) then
-           wl = tab_lambda_spectre(1,l) * 1e-6
-           UV_ProDiMo =  cst_UV_ProDiMo * wl**p
-           if (UV_ProDiMo >  tab_spectre(i,l)) tab_spectre(i,l) = UV_ProDiMo
+        if (abs(p+1.0) > 1.0e-5) then
+           cst_UV_ProDiMo =  fUV * L_star0(i) * (p+1) / (wl_sup**(p+1) - wl_inf**(p+1)) / 1e6 !/ (1e6)**(p+1)
+        else
+           cst_UV_ProDiMo =  fUV * L_star0(i) * log(wl_sup/wl_inf) / 1e6 !/ (1e6)**(p+1)
         endif
-     enddo
 
+        ! On ajoute l'UV que avant le pic de Wien
+        do l = 1, n_lambda_spectre(i)
+           if (tab_lambda_spectre(i,l)  < 2898./etoile(i)%T ) then
+              wl = tab_lambda_spectre(1,l) * 1e-6
+              UV_ProDiMo =  cst_UV_ProDiMo * wl**p
+              if (UV_ProDiMo >  tab_spectre(i,l)) tab_spectre(i,l) = UV_ProDiMo
+           endif
+        enddo
+     endif
   enddo ! n_etoiles
+
+  !--------------------------------
+  ! Calculate accretion spectrum
+  !--------------------------------
+  ! Luminosity from the accretion [au^2 W / m^2]
+  Lacc(:) = Ggrav/AU3_to_m3 &                                        ! convert G to AU^3 / s^s / kg
+            * etoile(:)%M*Msun_to_kg &                               ! M in kg
+            * etoile(:)%Mdot*Msun_to_kg/year_to_s &                  ! Mdot in kg / s
+            / etoile(:)%r                                            ! R in AU
+  ! Converting Lacc to Tacc
+  Tacc(:) = (Lacc(:)/(quatre_pi * sigma * etoile(:)%r**2))**0.25
+
+  write(*,*) "Mdot=", etoile(:)%Mdot, "Msun/yr"
+  write(*,*) "Tacc=", Tacc(:), "K"
+  write(*,*) "Tstar=", etoile(:)%T, "K"
+
+  ! We add a black-body to the stellar spectrum
+  do i=1, n_etoiles
+     if (Tacc(i) > tiny_real) then
+        do l=1, n_lambda_spectre(i)
+           wl = tab_lambda_spectre(i,l) *1.e-6
+           cst_wl=cst_th/(Tacc(i)*wl)
+           tab_spectre(i,l) = tab_spectre(i,l) +  max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
+        enddo ! l
+     endif
+  enddo !i
 
 
   !---------------------------------------------------------------------------
@@ -633,13 +598,6 @@ subroutine repartition_energie_etoiles()
      ProDiMo_star_HR(:,1) = tab_lambda_spectre(1,:)
      ProDiMo_star_HR(:,2) = tab_spectre(1,:) * (surface / Cst0) * cst_spectre_etoiles  * tab_lambda_spectre(1,:) * 1e-6
   endif
-
-  !  TODO : L_etoile doit etre recalcule
-  ! L_etoile fixe le flux dans sed1
-  ! E_stars fixe le flux dans sed2
-  L_etoile = sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 ) * correct_UV  ! tout en SI sauf R en AU
-
-  !write(*,*) "Verif", real(L_star_spectre), real(sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2)  * correct_UV
 
   ! Proba cumulee
   if (n_lambda > 1) then

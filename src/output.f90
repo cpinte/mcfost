@@ -2783,7 +2783,6 @@ subroutine ecriture_sed(ised)
      call ftppre(unit,group,fpixel,nelements,sed1_io,status)
 
      L_bol1 = sum(sed) * E_photon1
-     !L_bol0 = L_etoile  / ((distance*pc_to_AU)**2) * real(N_thet)*real(N_phi) ! A comparer a L_bol1 OK par def
   else
      ! Energie totale emise a une distance emise egale au rayon stellaire
      ! on chosit cette distance pour calibrer le flux / pi*B(lambda)
