@@ -244,8 +244,9 @@ subroutine repartition_energie_etoiles()
   real(kind=dp), dimension(n_etoiles) :: Lacc, Lacc_tot, Tacc
 
   real, dimension(:,:), allocatable :: spectre_tmp, tab_lambda_spectre, tab_spectre, tab_spectre0, tab_bb
-  real, dimension(:,:), allocatable :: tab_spectre_acc
+  real, dimension(:,:), allocatable :: tab_lambda_spectre_acc, tab_spectre_acc, tab_spectre0_acc, tab_bb_acc
   real(kind=dp), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
+  real(kind=dp), dimension(:), allocatable :: log_spectre_acc, log_spectre0_acc, log_wl_spectre_acc
   character(len=512) :: filename, dir
 
   integer, dimension(n_etoiles) :: n_lambda_spectre, unit
@@ -323,19 +324,19 @@ subroutine repartition_energie_etoiles()
   do i=1, n_etoiles
 
      if (i==1) then
-        allocate(tab_lambda_spectre(n_etoiles,n_lambda_spectre(1)), &
-                 tab_spectre(n_etoiles,n_lambda_spectre(1)), tab_spectre0(n_etoiles,n_lambda_spectre(1)), &
-                 tab_bb(n_etoiles,n_lambda_spectre(1)))
-        tab_lambda_spectre = 0.0 ; tab_spectre = 0.0 ;  tab_spectre0 = 0.0 ;  tab_bb = 0.0
-        allocate(log_spectre(n_lambda_spectre(1)), log_spectre0(n_lambda_spectre(1)), log_wl_spectre(n_lambda_spectre(1)))
+        allocate(tab_lambda_spectre_acc(n_etoiles,n_lambda_spectre(1)), &
+                 tab_spectre_acc(n_etoiles,n_lambda_spectre(1)), tab_spectre0_acc(n_etoiles,n_lambda_spectre(1)), &
+                 tab_bb_acc(n_etoiles,n_lambda_spectre(1)))
+        tab_lambda_spectre_acc = 0.0 ; tab_spectre_acc = 0.0 ;  tab_spectre0_acc = 0.0 ;  tab_bb_acc = 0.0
+        allocate(log_spectre_acc(n_lambda_spectre(1)), log_spectre0_acc(n_lambda_spectre(1)), log_wl_spectre_acc(n_lambda_spectre(1)))
      endif
-     tab_lambda_spectre(i,:) = 1.0_dp * spanl(lambda_min, lambda_max, n_lambda_spectre(1))
+     tab_lambda_spectre_acc(i,:) = 1.0_dp * spanl(lambda_min, lambda_max, n_lambda_spectre(1))
      
      if (Tacc(i) < tiny_real) then
         tab_spectre_acc(:,:) = 0.0
      else
         do l=1, n_lambda_spectre(1)
-           wl = tab_lambda_spectre(i,l) *1.e-6
+           wl = tab_lambda_spectre_acc(i,l) *1.e-6
            cst_wl=cst_th/(Tacc(i)*wl)
            tab_spectre_acc(i,l) = max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
         enddo ! l
