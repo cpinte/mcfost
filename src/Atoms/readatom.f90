@@ -595,8 +595,9 @@ MODULE readatom
      else if (trim(nuDepChar).eq."HYDROGENIC") then
        atom%continua(kr)%hydrogenic=.true.
        !!tmp
-!        atom%continua(kr)%lambdamin = 1.0_dp * 5.0
-!        write(*,*) "Temporary set lambdamin = 5 nm for all hydrogenic continua"
+       atom%continua(kr)%lambdamin = 5.0_dp
+       !atom%continua(kr)%lambdamin = 0.05 * atom%continua(kr)%lambda0
+       !atom%continua(kr)%lambdamin = max(5.0_dp, 1d-3 * atom%continua(kr)%lambda0)
        !!tmp
        write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
        write(*,'(" -> lower edge cut at "(1F12.5)" nm !")'), atom%continua(kr)%lambdamin       
@@ -619,12 +620,12 @@ MODULE readatom
 			!!CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)   
 		else
 			!there is dissolve but not for this atom
-!             CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
-			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+            CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+! 			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
        	endif
        else !no dissolve
-! 			CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)  
-			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+			CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)  
+! 			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
        endif
        ! %lambda allocated inside the routines.
 !        CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)

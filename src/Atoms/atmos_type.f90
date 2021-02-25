@@ -60,7 +60,7 @@ module atmos_type
 	!removed the depency in rays of some quantity (like phi_loc or I) since rate matrix
 	!is built ray by ray, with is not the case for hogerheijde
     logical :: lmali_scheme, lhogerheijde_scheme !tmp
-    character(len=50) :: angular_quadrature = "HEALpix"!"HEALpix_adapt"
+    character(len=50) :: angular_quadrature = "HEALpix"!"HEALpix_adapt"'carlson_A8_rh'!
 	type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
 
 
@@ -2448,6 +2448,14 @@ module atmos_type
 
   return
   end subroutine readAtmos_ascii
+  
+!   subroutine shock_surface(shock_area)
+!   	!identify the cell close to the choc and sum their area.
+!   	real(kind=dp), intent(out) :: shock_area
+!   	
+!   return
+!   end subroutine
+  
   
   !building
   subroutine refine_healpix_sphere()

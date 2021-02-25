@@ -1398,7 +1398,7 @@ module atom_transfer
 		allocate(threeKminusJ(nlambda, n_cells))
 		!or (nlambda, nb_proc) if only used locally as a threshold
 		allocate(Jnu_loc(nlambda,nb_proc))
-		id_ref = locate(lambda, 300.0_dp)
+		id_ref = locate(lambda, 500.0_dp)
 		!write anisotropy at ref wavelength only otherwise too big file (in ascii, n_lambda * n_cells * 8 bits)
 		!if used, we only need it locally or at one wavelenegth
 		
@@ -1729,48 +1729,46 @@ module atom_transfer
 							enddo			
 								
 						elseif (etape==1) then !ray-by-ray, n_rayons fixed
-
-  		         			do iray = iray_start, n_rayons
   		         			
 								
-								x0 = r_grid(icell) * cos(phi_grid(icell))
-								y0 = r_grid(icell) * sin(phi_grid(icell))
-								z0 = z_grid(icell)
+							x0 = r_grid(icell) * cos(phi_grid(icell))
+							y0 = r_grid(icell) * sin(phi_grid(icell))
+							z0 = z_grid(icell)
 							
-  		         				do imu=1, size(xmu)
-  		         					w0 = xmu(imu)
-									u0 = xmux(imu); v0 = xmuy(imu)
+  		         			do imu=1, size(xmu)
+  		         				w0 = xmu(imu)
+								u0 = xmux(imu)
+								v0 = xmuy(imu)
 
-									weight = wmu(imu) !!/ real(Ncentre + 2 - iray_start)
+								weight = wmu(imu)
 									
-									call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
+								call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
 
-									if (lmean_intensity) then
-										Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
-										Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
-										!!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
-									endif
+								if (lmean_intensity) then
+									Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
+									Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
+									!!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
+								endif
 									
-									threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
-									Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
+								threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
+								Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
 
 								!for one ray
-									if (.not.lforce_lte) then
-										call cross_coupling_terms(id, icell, 1)
-										call calc_rates_mali(id, icell, 1, weight)
-									endif	
+								if (.not.lforce_lte) then
+									call cross_coupling_terms(id, icell, 1)
+									call calc_rates_mali(id, icell, 1, weight)
+								endif	
 								
-									if (loutput_Rates) then
+								if (loutput_Rates) then
 									!need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-										call store_radiative_rates_mali(id, icell, (iray==1 .and. imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
-									endif	
+									call store_radiative_rates_mali(id, icell, (iray==1 .and. imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+								endif	
 
 
-      			   				enddo !imu	
-      			   			enddo !pos / iray
+      			   			enddo !imu	
       			   			
       			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
-      			   		
+!       			   		
 !       			   		elseif (etape==4) then
 !       			   		
 !   		         			
@@ -1778,6 +1776,7 @@ module atom_transfer
 ! 							y0 = r_grid(icell) * sin(phi_grid(icell))
 ! 							z0 = z_grid(icell)
 ! 
+! 							!surface area of a spot seen at a distance r (position of the cel)
 ! 								
 ! 							!domega = solid_angle_cell_sph(icell) * (x0*x0+y0*y0+z0*z0)/etoile(1)%r**2
 ! 							domega = area(icell) / etoile(1)%r**2
@@ -1818,10 +1817,8 @@ module atom_transfer
 ! 
 !       			   			enddo !imu	
 !       			   			
-!       			   			!if kept add for all steps
 !       			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
-! !       			   			write(*,*) id, icell, " Anis = ", 100*abs(threeKminusJ(id_ref,icell)), " dOmega=", solid_angle_cell_sph(icell) * 3*(4**healpix_lorder)/pi      			   			
-! 			
+			
 						end if !etape
 						
 						call calc_rate_matrix(id, icell, lforce_lte)
