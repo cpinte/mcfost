@@ -166,7 +166,7 @@ module atom_transfer
    			 endif
 
 			nbr_cell = nbr_cell + 1
-
+			
     ! Calcul longeur de vol et profondeur optique dans la cellule
 			previous_cell = 0 ! unused, just for Voronoi
 			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
@@ -246,9 +246,10 @@ module atom_transfer
 ! 					return
 ! 				endif
 
+			end if  ! lcellule_non_vide
+			
     		icell_prev = icell !duplicate with previous_cell, but this avoid problem with Voronoi grid here
 
-			end if  ! lcellule_non_vide
 		end do infinie
 
 	return
@@ -405,10 +406,10 @@ module atom_transfer
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
 				
-    		icell_prev = icell
-
-
 			end if  ! lcellule_non_vide
+			
+    		icell_prev = icell			
+			
 		end do infinie
 
 	return
@@ -563,9 +564,10 @@ module atom_transfer
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
 
+			end if  ! lcellule_non_vide
+			
     		icell_prev = icell
 
-			end if  ! lcellule_non_vide
 		end do infinie
 
 	return
@@ -1079,11 +1081,10 @@ module atom_transfer
 				call error("Allocation error atom%C")
 			endif
 
-			atom%NLTEpops = .true.
 			NmaxLevel = max(NmaxLevel, atom%Nlevel)
 			NmaxTr = max(NmaxTr, atom%Ncont + atom%Nline)
 			
-			!calc_delta_Tex_atom
+!calc_delta_Tex_atom
 			
 			if (atom%initial_solution=="ZERO_RADIATION") then
 				write(*,*) "-> Initial solution at SEE with I = 0 for atom ", atom%ID
@@ -1385,7 +1386,7 @@ module atom_transfer
 		real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
 		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:), Jnu_loc(:,:)
 ! 		real(kind=dp), allocatable :: err_pop(:,:)
-		logical :: labs, iterate_ne = .false.
+		logical :: labs, iterate_ne
 		logical :: l_iterate
 		logical :: accelerated, ng_rest, evaluate_background, lmean_intensity = .false.!,lapply_sor_correction
 		integer :: iorder, i0_rest, n_iter_accel, iacc!, iter_sor
@@ -1739,6 +1740,7 @@ module atom_transfer
 							z0 = z_grid(icell)
 							
   		         			do imu=1, size(xmu)
+  		         			
   		         				w0 = xmu(imu)
 								u0 = xmux(imu)
 								v0 = xmuy(imu)
@@ -1764,63 +1766,14 @@ module atom_transfer
 								
 								if (loutput_Rates) then
 									!need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-									call store_radiative_rates_mali(id, icell, (iray==1 .and. imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+									call store_radiative_rates_mali(id, icell, (imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
 								endif	
 
 
       			   			enddo !imu	
       			   			
       			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
-!       			   		
-!       			   		elseif (etape==4) then
-!       			   		
-!   		         			
-! 							x0 = r_grid(icell) * cos(phi_grid(icell))
-! 							y0 = r_grid(icell) * sin(phi_grid(icell))
-! 							z0 = z_grid(icell)
-! 
-! 							!surface area of a spot seen at a distance r (position of the cel)
-! 								
-! 							!domega = solid_angle_cell_sph(icell) * (x0*x0+y0*y0+z0*z0)/etoile(1)%r**2
-! 							domega = area(icell) / etoile(1)%r**2
-! 							!dOmega_cell / dOmega_healpix; dOmega_healpix = SQ(angular_resolution in rad) = pi/real(3*4**l_order)
-! 							!dOmega = area_choc / (x0**2+y0**2+z0**2) !area_choc == sum(area(cell touching the star which acreates))
-! 							l_order = max(min(healpix_listx(log(critical_ratio*pi/3.0/domega)/log(4.0)),healpix_lmax),healpix_lmin)
-! 							!if (n_iter==1) &
-! 							!write(*,*) icell, " lorder=", l_order, healpix_npix(l_order), sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
-! 
-! 							weight = healpix_weight(l_order)
-! 							
-!   		         			do imu=1, healpix_npix(l_order)
-!   		         				call healpix_ring_mu_and_phi(l_order,imu,w0,healpix_phi)
-! 								u0 = sqrt(1.0 - w0*w0)*cos(healpix_phi)
-! 								v0 = sqrt(1.0 - w0*w0)*sin(healpix_phi)
-! 
-! 									
-! 								call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)			
-! 
-! 								if (lmean_intensity) then
-! 									Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
-! 									Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
-! 								endif
-! 									
-! 								threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
-! 								Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
-! 
-! 								!for one ray
-! 								if (.not.lforce_lte) then
-! 									call cross_coupling_terms(id, icell, 1)
-! 									call calc_rates_mali(id, icell, 1, weight)
-! 								endif	
-! 								
-! 								if (loutput_Rates) then
-! 									!need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-! 									call store_radiative_rates_mali(id, icell, (iray==1 .and. imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
-! 								endif	
-! 
-!       			   			enddo !imu	
-!       			   			
-!       			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
+
 			
 						end if !etape
 						
@@ -2312,7 +2265,7 @@ module atom_transfer
   		real(kind=dp) :: Tchoc
   		real(kind=dp) :: mu, ulimb, LimbDarkening
   		integer :: ns,la
-  		logical :: lintersect = .false.
+  		logical :: lintersect!=.false.! does not work here ?
 
    		if (etoile(i_star)%T <= 1e-6) then !even with spots
     		local_stellar_brigthness(:) = 0.0_dp !look at init_stellar_disk
@@ -2354,8 +2307,9 @@ module atom_transfer
    		!better to store a map(1:n_cells) with all Tchoc
    		!and if map(icell_prev) > 0 -> choc
 
+		lintersect = .false.
 		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
-			if (icompute_atomRT(icell_prev)) then
+			if (icompute_atomRT(icell_prev) > 0) then
 				if (vr(icell_prev) < 0.0_dp) then
 					if (Taccretion>0) then
 						Tchoc = Taccretion
@@ -2372,7 +2326,6 @@ module atom_transfer
 			endif
 
    		endif
-
 
 		local_stellar_brigthness(:) = LimbDarkening * local_stellar_brigthness(:)
 
