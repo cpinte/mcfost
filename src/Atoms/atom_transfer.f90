@@ -116,6 +116,7 @@ module atom_transfer
 		x0=x;y0=y;z0=z
 		next_cell = icell_in
 		nbr_cell = 0
+		icell_prev = icell_in
 
 		tau(:) = 0.0_dp
 		tau_c(:) = 0.0_dp
@@ -135,7 +136,6 @@ module atom_transfer
   ! Boucle infinie sur les cellules
 		infinie : do ! Boucle infinie
     ! Indice de la cellule
-    		icell_prev = icell !duplicate with previous_cell, but this avoid problem with Voronoi grid here
 			icell = next_cell
 			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
@@ -246,6 +246,7 @@ module atom_transfer
 ! 					return
 ! 				endif
 
+    		icell_prev = icell !duplicate with previous_cell, but this avoid problem with Voronoi grid here
 
 			end if  ! lcellule_non_vide
 		end do infinie
@@ -272,7 +273,7 @@ module atom_transfer
 		x0=x;y0=y;z0=z
 		next_cell = icell_in
 		nbr_cell = 0
-
+		icell_prev = icell_in
 		tau(:) = 0.0_dp
 		tau_c(:) = 0.0_dp
 
@@ -295,7 +296,6 @@ module atom_transfer
   ! Boucle infinie sur les cellules
 		infinie : do ! Boucle infinie
     ! Indice de la cellule
-    		icell_prev = icell
 			icell = next_cell
 			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
@@ -404,6 +404,8 @@ module atom_transfer
 					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
+				
+    		icell_prev = icell
 
 
 			end if  ! lcellule_non_vide
@@ -431,6 +433,7 @@ module atom_transfer
 		x0=x;y0=y;z0=z
 		next_cell = icell_in
 		nbr_cell = 0
+		icell_prev = icell_in
 
 		tau(:) = 0.0_dp
 		tau_c(:) = 0.0_dp
@@ -452,7 +455,6 @@ module atom_transfer
   ! Boucle infinie sur les cellules
 		infinie : do ! Boucle infinie
     ! Indice de la cellule
-    		icell_prev = icell
 			icell = next_cell
 			x0=x1 ; y0=y1 ; z0=z1
     !write(*,*) "Boucle infinie, icell=", icell
@@ -561,6 +563,7 @@ module atom_transfer
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
 
+    		icell_prev = icell
 
 			end if  ! lcellule_non_vide
 		end do infinie
@@ -1722,7 +1725,7 @@ module atom_transfer
 									call calc_rates_mali(id, icell, iray, 1.0_dp / real(n_rayons,kind=dp))
 								endif	
 								
-								!might not work cause profile of iray==1 alwaus used
+								!might not work cause profile of iray==1 always used
 								if (loutput_Rates) then
 									call store_radiative_rates_mali(id, icell, (iray==1), 1.0_dp / real(n_rayons,kind=dp), Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
 								endif	
@@ -2287,7 +2290,7 @@ module atom_transfer
 				Istar_tot(:,i_star) = 0.0_dp
 				Istar_cont(:,i_star) = 0.0_dp
 			else
-				write(*,"( 'T(i_star='(1I1)') = '(1F14.7)' K' )") i_star, etoile(i_star)%T
+				write(*,"( 'T*('(1I1)') = '(1F14.7)' K' )") i_star, etoile(i_star)%T
 				Istar_tot(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda)
 				Istar_cont(:,i_star) = Bpnu(etoile(i_star)%T*1d0, lambda_cont)
 			endif
@@ -2335,9 +2338,22 @@ module atom_transfer
 			LimbDarkening = 1.0_dp
 		end if
 
+!->oldie
+!    call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect)
+!    !avoid error with infinity for small lambda
+!    if (lintersect) then
+!    		!Means that Ispot = Bp(Tspot) = gamma * Iphot  = Ispot
+!    		!gamma is initialized to one here.
+!    		!The +1 (i.e., the gamma = gamma + ...) means that Istar = Iphot + Ispot = Iphot * (1 + gamma)
+! 		local_stellar_brigthness(:) = local_stellar_brigthness(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/etoile(i_star)%SurfB(ns)%T)-1)
+!      !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
+!      	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
+!  		!gamma = gamma + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
+!    end if
    
    		!better to store a map(1:n_cells) with all Tchoc
    		!and if map(icell_prev) > 0 -> choc
+
 		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
 			if (icompute_atomRT(icell_prev)) then
 				if (vr(icell_prev) < 0.0_dp) then
@@ -2478,6 +2494,8 @@ module atom_transfer
   real(kind=dp), dimension(size(Ic(:,1))) :: tau_c!, tau
   integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
   logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, eval_operator
+
+	write(*,*) " Need to handle new stellar brightness, integ_ray_jnu"
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
