@@ -714,12 +714,14 @@ MODULE statequil_atoms
 	
 	subroutine check_elements(id, icell, N,A,printed_out_message)
 	!check that digonal of A is >= 0 and the off diagonal are < 0
-		real :: sign = -1.0
+		real :: sign = -1.0 !save attribute but unchanged
 		character(len=*), intent(in) :: printed_out_message
 		integer :: i,j, l, lp
 		integer, intent(in) :: N, id, icell
 		real(kind=dp), intent(in) :: A(N,N)
-		real(kind=dp) :: diag = 0.0_dp
+		real(kind=dp) :: diag! = 0.0_dp !save attribute if initialized and changed !
+		
+		diag = 0.0_dp
 		
 		do i=1,N
 			diag = diag + A(i,i)
