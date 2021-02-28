@@ -1796,9 +1796,7 @@ module atom_transfer
 				
 				!Ng acceleration
    				accelerated = .false.
-   				!do not accelerate if lfprevious_converged ??.and.((cswitch==1.0_dp).and..not.lprevious_converged))
-   				if ( (lNg_acceleration .and. (n_iter > iNg_Ndelay)).and.(maxval_cswitch_atoms()==1.0_dp) ) then
-   					!remove also the cswtich iteration from the calculation or accumulate immediately after cswitch == 1?
+   				if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(diff_old < 1d-1))).and.(maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
    					iorder = n_iter - iNg_Ndelay
    					if (ng_rest) then
 						write(*,'(" -> Acceleration relaxes... "(1I2)" /"(1I2))') iorder-i0_rest, iNg_Nperiod
@@ -1856,8 +1854,8 @@ module atom_transfer
 				evaluate_background = .false.
 				dne = 0.0_dp											
 				!Updating for non Ng iterations ? add a condition on the dM < 1e-2 ? (better ndelay)
-				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)).and.(n_iter>ndelay_iterate_ne)) then!.and..not.accelerated)  then
-					!do not evaluate if accelerated. Do not evaluate if cswitch ?? Or do not care?
+				!cond on accelerate ?
+				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)).and.(n_iter>ndelay_iterate_ne)) then
 					
 					!chic(:,:) = chi(:,:) - ne(:)
 					!allocate(ne_old(n_cells))
