@@ -13,9 +13,9 @@ module getlambda
 
   !Number of points for each transition
   !continuum wavelength double for level dissolution !
-  integer, parameter :: Nlambda_cont = 61!41! 141 !continuum, linear
+  integer, parameter :: Nlambda_cont = 101!61!41! 141 !continuum, linear
   integer, parameter :: Nlambda_cont_log = 31!61!31!ontinuum log scaled
-  integer, parameter :: Nlambda_line_w = 12, Nlambda_line_c_log = 31
+  integer, parameter :: Nlambda_line_w = 24, Nlambda_line_c_log = 51 !12 et 31
   integer, parameter :: Nlambda_line_c = 51!line linear1
   real, parameter    :: hvel_nlte = 6.0!for line in km/s, 1-3 for static models
   real, parameter	 :: delta_lambda_cont = 5.0 !nm
@@ -501,7 +501,7 @@ module getlambda
    		real(kind=dp), dimension(2*(Nlambda_line_c_log+Nlambda_line_w-1)-1) :: vel
 		real(kind=dp) ::  vcore, vwing, v0, v1, vbroad
 		integer :: Nlambda, la, Nmid
-		real, parameter :: wing_to_core = 0.3
+		real, parameter :: wing_to_core = 0.6 !0.3
 
 
 		vbroad = maxval(line%atom%vbroad)
@@ -520,7 +520,7 @@ module getlambda
 		!which will raise a circular compiler erros.
 		!To Do: global parameter determining the type of profiles.
 
-		if (line%voigt) vwing = line%qwing * vbroad * 10
+! 		if (line%voigt) vwing = line%qwing * vbroad * 10
 		!otherwise for Gaussians not needed
 		vcore = 2.5 * vbroad!wing_to_core * vwing
 		!vcore = min(vcore, wing_to_core * vwing)

@@ -595,9 +595,9 @@ MODULE readatom
      else if (trim(nuDepChar).eq."HYDROGENIC") then
        atom%continua(kr)%hydrogenic=.true.
        !!tmp
-       atom%continua(kr)%lambdamin = 5.0_dp
-       !atom%continua(kr)%lambdamin = 0.05 * atom%continua(kr)%lambda0
-       !atom%continua(kr)%lambdamin = max(5.0_dp, 1d-3 * atom%continua(kr)%lambda0)
+!        atom%continua(kr)%lambdamin = 5.0_dp
+!        atom%continua(kr)%lambdamin = 0.05 * atom%continua(kr)%lambda0
+!        atom%continua(kr)%lambdamin = max(10.0_dp, 1d-2 * atom%continua(kr)%lambda0)
        !!tmp
        write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
        write(*,'(" -> lower edge cut at "(1F12.5)" nm !")'), atom%continua(kr)%lambdamin       
