@@ -36,12 +36,11 @@ MODULE solvene
  integer :: Max_ionisation_stage
  integer, parameter :: N_negative_ions = 0 !currently only H- at index 0
  real(kind=dp), parameter :: MAX_ELECTRON_ERROR=1d-6
- integer, parameter :: N_MAX_ELECTRON_ITERATIONS=100!50
+ integer, parameter :: N_MAX_ELECTRON_ITERATIONS=50!100!50
  integer, parameter :: N_MAX_ELEMENT=26 !100 is the max, corresponding the atomic number
- real(kind=dp), parameter :: ne_min_limit = tiny_dp!1d-100!1d-50 !if ne < ne_min_limt, ne = 0
+ real(kind=dp), parameter :: ne_min_limit = 1d-100!1d-100!1d-50 !if ne < ne_min_limt, ne = 0
 											!tiny_dp
-											!if this limit is to low, f*1/ne could create nan or infinity
- real(kind=dp), parameter :: fjk_lim = 1d-15
+ real(kind=dp), parameter :: fjk_lim = 1d-10
  CONTAINS
 
  function get_max_nstage()
@@ -179,7 +178,7 @@ subroutine show_electron_given_per_elem(id, k, max_fjk)
 	list_elem(9) = 20 !Ca
 	
 	write(*,*) " -- Electron given for that cell --"
-	write(*,'("  -- cell #"(1I5)," id#"(1I2)" T="(1F14.4)" K")') k, id, T(k)
+	write(*,'("  -- cell #"(1I5)," id#"(1I2)" T="(1F14.4)" K, nHtot="(1ES17.8E3)" m-3")') k, id, T(k), nHtot(k)
 	
 	do ell=-N_negative_ions, 9
 	
@@ -268,15 +267,15 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
 		                                     
 		fjk(1:Nstage) = fjk(1:Nstage)/nTotal_atom(k, elem%model)
 		n0 = n0 / ntotal_atom(k,elem%model)
-		
-		!check limit on ionisation fraction
-		do i=1,Nstage
-		
-			!if the ionisation fraction is lower than a limit set to zero.
-			!always zero neutrals
-			if (fjk(i) < fjk_lim) fjk(i) = 0.0_dp
-		
-		enddo
+				
+! 		!check limit on ionisation fraction
+! 		do i=1,Nstage
+! 		
+! 			!if the ionisation fraction is lower than a limit set to zero.
+! 			!always zero neutrals
+! 			if (fjk(i) < fjk_lim) fjk(i) = 0.0_dp
+! 		
+! 		enddo
 				
 	else !no model use LTE
 		!fjk(1) is N(1) / ntot !N(1) = sum_j=1 sum_i=1^N(j) n(i)
