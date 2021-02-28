@@ -336,6 +336,9 @@ module healpix_mod
 
 			ix = 1024*pix2x(ip_hi) + 32*pix2x(ip_med) + pix2x(ip_low)
 			iy = 1024*pix2y(ip_hi) + 32*pix2y(ip_med) + pix2y(ip_low)
+! 			write(*,*) "ix", ix, ip_hi, ip_med, ip_low
+! 			write(*,*) "iy", iy
+
 		else
 			ix = 0
 			iy = 0
@@ -647,7 +650,7 @@ module healpix_mod
   	!area = pi/3/Nside/Nside = pi/3/4**l
   	!weight = (pi/3)/(4pi)/4**l
   	!weight = (1./12.)/4**l
-		healpix_weight = (1.0/12.0) / real(4**l)
+		healpix_weight = (1.0_dp/12.0_dp) / real(4**l,kind=dp)
   	
 		return
 	end function healpix_weight
@@ -687,18 +690,18 @@ module healpix_mod
 			stop
 		endif
   	
-		four_on_Npix = 4.0 / real(Npix)
+		four_on_Npix = 4.0_dp / real(Npix,kind=dp)
   	
 		if (p < North_cap) then !north
-			ph = 0.5 * real(1 + p)
+			ph = 5d-1 * real(1 + p,kind=dp)
   		
   		! i = largest_integer_small_than_x(ph)
-  			i = rshift(int(1 + floor(sqrt(real(1+2*p)))),1)
+  			i = rshift(int(1 + floor(sqrt(real(1+2*p,kind=dp)))),1)
 		  	
 			j = (p+1) - 2 * i * (i-1)
 		
-			mu = 1.0 - real(i*i) * four_on_Npix
-			phi = (real(j) - 0.5) * 0.5 * pi / real(i)
+			mu = 1.0_dp - real(i*i,kind=dp) * four_on_Npix
+			phi = (real(j,kind=dp) - 0.5_dp) * 0.5_dp * pi / real(i,kind=dp)
 		
 		elseif (p < (Npix - North_cap)) then !equator
 			pp = p - North_cap
@@ -706,28 +709,30 @@ module healpix_mod
 			j = mod(pp,4*Nside) + 1
 		
 		!1 if i+Nside odd, 0.5 otherwise
-			if (mod(i+Nside,2)==0) then
+! 			if (mod(i+Nside,2)==0) then
+			if (iand(i+Nside,1)==0) then
 				fodd = 0.5
 			else !odd
 				fodd = 1.0
 			endif
 			s = 0.5 * mod(i-Nside+1,2)
-			!fodd = s, should give the same result
+! 			write(*,*) "fodd", fodd, s
+! 			fodd = s!, should give the same result
 		
 		!!see, it is simply 4/3
 		!!(2*Nside * 4.0 / Npix ) * (Nside <<1) = 4/3 whatever Nside
 		!!(4/Npix) * (Nside << 1) = 2/3/Nside whatever Nside
-		!mu = four_on_Npix * real( ( 2 * Nside - i) * lshift(Nside,1) )
-			mu = 4.0 / 3.0 - 2.0 * real(i) / real(3*Nside)
-			phi = (real(j) - fodd) * pi / real(2 * Nside)
+! 		mu = four_on_Npix * real( ( 2 * Nside - i) * lshift(Nside,1) )
+			mu = 4.0_dp / 3.0_dp - 2.0_dp * real(i,kind=dp) / real(3*Nside,kind=dp)
+			phi = (real(j,kind=dp) - fodd) * pi / real(2 * Nside,kind=dp)
 	
 		else !south 
 			pp = Npix - p
-			i = rshift(int(1 + floor(sqrt(real(2*pp-1)))),1)
+			i = rshift(int(1 + floor(sqrt(real(2*pp-1,kind=dp)))),1)
 			j = 4 * i + 1 - (pp - 2*i*(i-1))
 		
-			mu = -1.0 + real(i*i) * four_on_Npix
-			phi = (real(j) - 0.5) * 0.5 * pi / real(i)
+			mu = -1.0_dp + real(i*i,kind=dp) * four_on_Npix
+			phi = (real(j,kind=dp) - 0.5_dp) * 0.5_dp * pi / real(i,kind=dp)
 	
 		endif
   	
@@ -743,10 +748,11 @@ module healpix_mod
   		mu(:) = 0.0_dp
   		phi(:) = 0.0_dp
   	
+		call init_pix2xy_and_xy2pix
   		do pix=1,healpix_npix(l)
   	
-  			call healpix_ring_mu_and_phi(l,pix,mu(pix),phi(pix))
-!   			call healpix_nested_mu_and_phi (l, pix-1, mu(pix), phi(pix))
+!   			call healpix_ring_mu_and_phi(l,pix,mu(pix),phi(pix))
+  			call healpix_nested_mu_and_phi (l, pix-1, mu(pix), phi(pix))
   			
   		enddo
   	
