@@ -60,7 +60,7 @@ module atmos_type
 	!removed the depency in rays of some quantity (like phi_loc or I) since rate matrix
 	!is built ray by ray, with is not the case for hogerheijde
     logical :: lmali_scheme, lhogerheijde_scheme !tmp
-    character(len=50) :: angular_quadrature = "HEALpix"!"HEALpix_adapt"'carlson_A8_rh'!
+    character(len=50) :: angular_quadrature = "carlson_A8_rh"!"HEALpix"!"HEALpix_adapt"'carlson_A8_rh'!
 	type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
 
 
@@ -93,15 +93,21 @@ module atmos_type
 		
 		call healpix_sphere(healpix_lorder,xmu,x2)
 		
-		xmux(:) = sqrt(1.0 - xmu(:)*xmu(:)) * cos(x2(:))
-		xmuy(:) = sqrt(1.0 - xmu(:)*xmu(:)) * sin(x2(:))
+		xmux(:) = sqrt(1.0_dp - xmu(:)*xmu(:)) * cos(x2(:))
+		xmuy(:) = sqrt(1.0_dp - xmu(:)*xmu(:)) * sin(x2(:))
 		wmu(:)  = healpix_weight(healpix_lorder) !a constant actually
 		
-		write(*,"('HEALpix #'(1I8)' pixels')") N1
+		write(*,"('HEALpix #'(1I8)' pixels, l='(1I2))") N1, healpix_lorder
 		write(*,'(" -> Angular resolution "(1F12.3)" deg" )') healpix_angular_resolution(healpix_lorder)
+! 		open(1, file="test_healpix",status="unknown")
 ! 		do iray=1,N1
-! 			write(*,*) iray-1, xmux(iray), xmuy(iray), xmu(iray)
+! ! 			write(*,*) iray-1, xmux(iray), xmuy(iray), xmu(iray), wmu(iray)
+! 			write(1,"(*(1ES18.9E3))") xmux(iray), xmuy(iray), xmu(iray), x2(iray), wmu(iray)
+! ! 			write(*,*) iray-1, xmu(iray), x2(iray)
 ! 		enddo
+! 		close(1)
+! 		
+! ! 		stop
 		
 		deallocate(x2)
 		
