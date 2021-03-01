@@ -890,8 +890,30 @@ subroutine find_spectra()
            else
               delta_T = 200
            endif
+        else if (Teff <= 35000) then
+           type="Kurucz"
+
+           if (Teff < 11000) then
+              min_logg = 2.0
+           else if (Teff < 19000) then
+              min_logg = 2.5
+           else if (Teff < 27000) then
+              min_logg = 3.0
+           else if (Teff < 32000) then
+              min_logg = 3.5
+           else
+              min_logg = 4.0
+           endif
+           max_logg = 5.0
+
+           if (Teff <= 12000) then
+              delta_T = 500
+           else
+              delta_T = 1000
+           endif
+
         else
-           call error("Teff above 10000K needs to be implemented")
+           call error("Teff above 35000K needs to be implemented")
         endif
 
         ! Rounding off at the nearest point in the grid of stellar atmospheres
@@ -901,12 +923,18 @@ subroutine find_spectra()
 
         if (Teff < 1000) then
            write(sTeff, "(I3)") int(Teff)
-        else
+        else if (Teff < 10000) then
            write(sTeff, "(I4)") int(Teff)
+        else
+           write(sTeff, "(I5)") int(Teff)
         endif
         write(slogg, "(F3.1)") logg
 
-        etoile(i_star)%spectre = "lte"//trim(sTeff)//"-"//trim(slogg)//"."//trim(type)//".fits.gz"
+        if (type=="Kurucz") then
+           etoile(i_star)%spectre = "Kurucz"//trim(sTeff)//"-"//trim(slogg)//".fits.gz"
+        else
+           etoile(i_star)%spectre = "lte"//trim(sTeff)//"-"//trim(slogg)//"."//trim(type)//".fits.gz"
+        endif
 
         write(*,*) "Star #", i_star, " --> ", trim(etoile(i_star)%spectre)
      else ! We do not update the spectrum
