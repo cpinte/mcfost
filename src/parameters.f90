@@ -217,9 +217,11 @@ module parametres
   ! Stars
   ! 27/02/2019, adding spots coordinates
   type star_type
+     ! todo : indicate all units
      real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
+     real :: Mdot ! Msun
      real(kind=dp) :: x,y,z, vx,vy,vz
-     logical :: lb_body, out_model
+     logical :: lb_body, out_model, find_spectrum
      character(len=512) :: spectre
      integer :: icell
      integer :: Nr = 0

@@ -38,7 +38,7 @@ contains
     write(*,*)
     write(*,*) "You are running MCFOST "//trim(mcfost_release)
     write(*,*) "Git SHA = ", sha_id
-    
+
     ! Global logical variables
     call set_default_variables()
     lmcfost_lib = .true.
@@ -412,7 +412,7 @@ contains
        ierr = 1
        return
     endif
-    
+
     ! Temps d'execution
     call system_clock(time_end)
     if (time_end < time_begin) then
@@ -457,7 +457,7 @@ contains
     ! Freeing memory : todo : can we avoid to do that to speed things up
     call deallocate_Voronoi()
     call deallocate_densities()
-    
+
     ! Reset energy and temperature arrays
     call reset_radiation_field()
     call reset_temperature()
@@ -545,12 +545,12 @@ contains
           somme  = somme  + B/kappa(icell,lambda)*delta_wl
           somme2 = somme2 + B*delta_wl
        enddo
-       kappa_diffusion = somme2/somme&
+       kappa_diffusion = somme2/somme &
           *cm_to_AU/(densite_gaz(icell)*masse_mol_gaz*(cm_to_m)**3) ! cm^2/g
        ! check : somme2/somme * cm_to_AU /(masse_gaz(icell)/(volume(icell)*AU_to_cm**3))
     else
        kappa_diffusion = 0.
     endif
   end subroutine diffusion_opacity
-  
+
 end module mcfost2phantom

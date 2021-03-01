@@ -68,6 +68,6 @@
 
 #Star properties
   1 Number of stars
-  4000.0	2.0	1.0	0.0	0.0	0.0  T Temp, radius (solar radius),M (solar mass),x,y,z (AU), is a blackbody?
+  4000.0	2.0	1.0	0.0	0.0	0.0  T Temp, radius (solar radius),M (solar mass),x,y,z (AU), automatic spectrum?
   lte4000-3.5.NextGen.fits.gz
   0.0	2.2  fUV, slope_fUV

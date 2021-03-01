@@ -242,6 +242,7 @@ subroutine repartition_energie_etoiles()
   real, dimension(n_lambda,n_etoiles) :: prob_E_star0
   real(kind=dp), dimension(n_lambda) :: log_lambda, spectre_etoiles0
   real(kind=dp), dimension(n_etoiles) ::  L_star0, correct_Luminosity
+  real(kind=dp), dimension(n_etoiles) :: Lacc, Tacc
 
   real, dimension(:,:), allocatable :: spectre_tmp, tab_lambda_spectre, tab_spectre, tab_spectre0, tab_bb
   real(kind=dp), dimension(:), allocatable :: log_spectre, log_spectre0, log_wl_spectre
@@ -250,7 +251,7 @@ subroutine repartition_energie_etoiles()
   integer, dimension(n_etoiles) :: n_lambda_spectre, unit
   integer :: lambda, i, n, l, ios, n_lambda_spectre_max, n_wl
   real(kind=dp) :: wl, cst_wl, delta_wl, surface, terme, terme0, spectre, spectre0, Cst0
-  real ::  L_etoile, wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV, fUV
+  real ::  wl_inf, wl_sup, UV_ProDiMo, p, cst_UV_ProDiMo, correct_UV, fUV
   real(kind=dp) :: fact_sup, fact_inf, cst_spectre_etoiles
 
   real(kind=dp) :: wl_spectre_max, wl_spectre_min, wl_spectre_avg, wl_deviation
@@ -284,17 +285,13 @@ subroutine repartition_energie_etoiles()
   ! car on regarde en relatif par a ce qui est fait dans repartition_energie pour le disque
   ! En particulier, on a enleve un pi partout
 
-
-  ! Luminosite etoile (le facteur 4Pi a ete simplifie avec le 1/4pi de l'estimateur de Lucy 1999)
-  ! L_etoile=r_etoile**2*sigma*T_etoile**4   ! tout en SI sauf R en AU
-  L_etoile=sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 )  ! tout en SI sauf R en AU
-
   do i=2, n_etoiles
      if (etoile(i)%lb_body .neqv. (etoile(1)%lb_body)) then
         call error("all stars must be black bodies or", &
              msg2="all stars must not be black bodies : you cannot mix")
      endif
   enddo
+  if (etoile(1)%lb_body) etoile(:)%find_spectrum = .false.
 
   call find_spectra()
 
@@ -418,32 +415,63 @@ subroutine repartition_energie_etoiles()
   ! Sauvegarde spectre stellaire avant d'ajouter UV
   tab_spectre0(:,:) = tab_spectre(:,:)
 
+
+  !--------------------------------
   ! Flux UV additionnel pour ProDiMo
+  !--------------------------------
   wl_inf = 91.2e-9 ; ! en m
   wl_sup = 250e-9 ; ! en m
 
   ! wl doit etre en microns ici
   do i=1, n_etoiles
      fUV = etoile(i)%fUV
-     p = etoile(i)%slope_UV
+     if (fUV > tiny_real) then
+        p = etoile(i)%slope_UV
 
-     if (abs(p+1.0) > 1.0e-5) then
-        cst_UV_ProDiMo =  fUV * L_star0(i) * (p+1) / (wl_sup**(p+1) - wl_inf**(p+1)) / 1e6 !/ (1e6)**(p+1)
-     else
-        cst_UV_ProDiMo =  fUV * L_star0(i) * log(wl_sup/wl_inf) / 1e6 !/ (1e6)**(p+1)
-     endif
-
-     ! On ajoute l'UV que avant le pic de Wien
-     do l = 1, n_lambda_spectre(i)
-        if (tab_lambda_spectre(i,l)  < 2898./etoile(i)%T ) then
-           wl = tab_lambda_spectre(1,l) * 1e-6
-           UV_ProDiMo =  cst_UV_ProDiMo * wl**p
-           if (UV_ProDiMo >  tab_spectre(i,l)) tab_spectre(i,l) = UV_ProDiMo
+        if (abs(p+1.0) > 1.0e-5) then
+           cst_UV_ProDiMo =  fUV * L_star0(i) * (p+1) / (wl_sup**(p+1) - wl_inf**(p+1)) / 1e6 !/ (1e6)**(p+1)
+        else
+           cst_UV_ProDiMo =  fUV * L_star0(i) * log(wl_sup/wl_inf) / 1e6 !/ (1e6)**(p+1)
         endif
-     enddo
 
+        ! On ajoute l'UV que avant le pic de Wien
+        do l = 1, n_lambda_spectre(i)
+           if (tab_lambda_spectre(i,l)  < 2898./etoile(i)%T ) then
+              wl = tab_lambda_spectre(1,l) * 1e-6
+              UV_ProDiMo =  cst_UV_ProDiMo * wl**p
+              if (UV_ProDiMo >  tab_spectre(i,l)) tab_spectre(i,l) = UV_ProDiMo
+           endif
+        enddo
+     endif
   enddo ! n_etoiles
 
+  !--------------------------------
+  ! Calculate accretion spectrum
+  !--------------------------------
+  if (maxval(etoile(:)%Mdot) > tiny_real) then
+     ! Luminosity from the accretion [au^2 W / m^2]
+     Lacc(:) = Ggrav/AU3_to_m3 &                         ! convert G to AU^3 / s^s / kg
+          * etoile(:)%M*Msun_to_kg &                     ! M in kg
+          * etoile(:)%Mdot*Msun_to_kg/year_to_s &        ! Mdot in kg / s
+          / etoile(:)%r                                  ! R in AU
+     ! Converting Lacc to Tacc
+     Tacc(:) = (Lacc(:)/(quatre_pi * sigma * etoile(:)%r**2))**0.25
+
+     write(*,*) "Accretion onto stars: "
+     write(*,*) "Mdot=", etoile(:)%Mdot, "Msun/yr"
+     write(*,*) "Tacc=", Tacc(:), "K"
+
+     ! We add a black-body to the stellar spectrum
+     do i=1, n_etoiles
+        if (Tacc(i) > tiny_real) then
+           do l=1, n_lambda_spectre(i)
+              wl = tab_lambda_spectre(i,l) *1.e-6
+              cst_wl=cst_th/(Tacc(i)*wl)
+              tab_spectre(i,l) = tab_spectre(i,l) +  max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
+           enddo ! l
+        endif
+     enddo !
+  endif
 
   !---------------------------------------------------------------------------
   ! On calcule 2 trucs en meme tps :
@@ -573,13 +601,6 @@ subroutine repartition_energie_etoiles()
      ProDiMo_star_HR(:,1) = tab_lambda_spectre(1,:)
      ProDiMo_star_HR(:,2) = tab_spectre(1,:) * (surface / Cst0) * cst_spectre_etoiles  * tab_lambda_spectre(1,:) * 1e-6
   endif
-
-  !  TODO : L_etoile doit etre recalcule
-  ! L_etoile fixe le flux dans sed1
-  ! E_stars fixe le flux dans sed2
-  L_etoile = sum((etoile(:)%r)**2*sigma*(etoile(:)%T)**4 ) * correct_UV  ! tout en SI sauf R en AU
-
-  !write(*,*) "Verif", real(L_star_spectre), real(sigma*(etoile(1)%T)**4 * (Rsun_to_AU/pc_to_AU)**2)  * correct_UV
 
   ! Proba cumulee
   if (n_lambda > 1) then
@@ -911,59 +932,95 @@ subroutine find_spectra()
   write(*,*) "Trying to find appropriate stellar spectra ..."
 
   do i_star = 1, n_etoiles
-     Teff = etoile(i_star)%T
+     if (etoile(i_star)%find_spectrum) then
+        Teff = etoile(i_star)%T
 
-     r = etoile(i_star)%r / Rsun_to_AU
-     M = etoile(i_star)%M
+        r = etoile(i_star)%r / Rsun_to_AU
+        M = etoile(i_star)%M
 
-     if (M < tiny_real) then
-        call warning("Stellar mass is not set, forcing log(g) = 3.5")
-        logg = 3.5 ! stellar mass is not defined in the parameter file, we fix logg
-     else
-        logg = logg_Sun + log10(M/r**2)
-     endif
-
-     if (Teff < 100) then
-        call error("Teff below 100K needs to be implemented")
-     else if (Teff < 1500) then
-        type = "cond"
-        min_logg = 2.5
-        max_logg = 6
-        delta_T = 100
-     else if (Teff < 2700) then
-        type = "dusty"
-        min_logg = 3.5
-        max_logg = 6
-        delta_T = 100
-     else if (Teff < 10000) then
-        type = "NextGen"
-        min_logg = 3.5
-        max_logg = 5.5
-        if (Teff <= 4000) then
-           delta_T = 100
+        if (M < tiny_real) then
+           call warning("Stellar mass is not set, forcing log(g) = 3.5")
+           logg = 3.5 ! stellar mass is not defined in the parameter file, we fix logg
         else
-           delta_T = 200
+           logg = logg_Sun + log10(M/r**2)
         endif
-     else
-        call error("Teff above 10000K needs to be implemented")
+
+        if (Teff < 100) then
+           call error("Teff below 100K needs to be implemented")
+        else if (Teff < 1500) then
+           type = "cond"
+           min_logg = 2.5
+           max_logg = 6
+           delta_T = 100
+        else if (Teff < 2700) then
+           type = "dusty"
+           min_logg = 3.5
+           max_logg = 6
+           delta_T = 100
+        else if (Teff < 10000) then
+           type = "NextGen"
+           min_logg = 3.5
+           max_logg = 5.5
+           if (Teff <= 4000) then
+              delta_T = 100
+           else
+              delta_T = 200
+           endif
+        else if (Teff <= 35000) then
+           type="Kurucz"
+
+           if (Teff < 11000) then
+              min_logg = 2.0
+           else if (Teff < 19000) then
+              min_logg = 2.5
+           else if (Teff < 27000) then
+              min_logg = 3.0
+           else if (Teff < 32000) then
+              min_logg = 3.5
+           else
+              min_logg = 4.0
+           endif
+           max_logg = 5.0
+
+           if (Teff <= 12000) then
+              delta_T = 500
+           else
+              delta_T = 1000
+           endif
+
+        else
+           call error("Teff above 35000K needs to be implemented")
+        endif
+
+        ! Rounding off at the nearest point in the grid of stellar atmospheres
+        Teff = nint(Teff/delta_T) * delta_T
+        logg = nint(logg/delta_logg) * delta_logg
+        logg = min(max(logg,min_logg), max_logg)
+
+        if (Teff < 1000) then
+           write(sTeff, "(I3)") int(Teff)
+        else if (Teff < 10000) then
+           write(sTeff, "(I4)") int(Teff)
+        else
+           write(sTeff, "(I5)") int(Teff)
+        endif
+        write(slogg, "(F3.1)") logg
+
+        if (type=="Kurucz") then
+           etoile(i_star)%spectre = "Kurucz"//trim(sTeff)//"-"//trim(slogg)//".fits.gz"
+        else
+           etoile(i_star)%spectre = "lte"//trim(sTeff)//"-"//trim(slogg)//"."//trim(type)//".fits.gz"
+        endif
+
+        write(*,*) "Star #", i_star, " --> ", trim(etoile(i_star)%spectre)
+     else ! We do not update the spectrum
+        if (etoile(i_star)%lb_body) then
+           write(*,*) "Star #", i_star, " --> BB at T=", etoile(i_star)%T, "K"
+        else
+           write(*,*) "Star #", i_star, " --> ", trim(etoile(i_star)%spectre), " (forced)"
+        endif
      endif
-
-     ! Rounding off at the nearest point in the grid of stellar atmospheres
-     Teff = nint(Teff/delta_T) * delta_T
-     logg = nint(logg/delta_logg) * delta_logg
-     logg = min(max(logg,min_logg), max_logg)
-
-     if (Teff < 1000) then
-        write(sTeff, "(I3)") int(Teff)
-     else
-        write(sTeff, "(I4)") int(Teff)
-     endif
-     write(slogg, "(F3.1)") logg
-
-     etoile(i_star)%spectre = "lte"//trim(sTeff)//"-"//trim(slogg)//"."//trim(type)//".fits.gz"
-
-     write(*,*) "Star #", i_star, " --> ", trim(etoile(i_star)%spectre)
-  end do
+  enddo
 
   write(*,*) "Done"
 

@@ -466,18 +466,21 @@ contains
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -854,18 +857,21 @@ contains
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
        read(1,*) etoile(i)%fUV, etoile(i)%slope_UV
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -1219,12 +1225,14 @@ contains
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
@@ -1232,6 +1240,7 @@ contains
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -1572,12 +1581,14 @@ contains
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
@@ -1585,6 +1596,7 @@ contains
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -1922,12 +1934,14 @@ contains
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
@@ -1935,6 +1949,7 @@ contains
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -2276,12 +2291,14 @@ contains
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
@@ -2289,6 +2306,7 @@ contains
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -2620,12 +2638,14 @@ contains
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
@@ -2633,6 +2653,7 @@ contains
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -2962,12 +2983,14 @@ end subroutine read_para215
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
@@ -2975,6 +2998,7 @@ end subroutine read_para215
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -3302,12 +3326,14 @@ end subroutine read_para215
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
@@ -3315,6 +3341,7 @@ end subroutine read_para215
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -3621,12 +3648,14 @@ end subroutine read_para215
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
           read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
 
@@ -3634,6 +3663,7 @@ end subroutine read_para215
        etoile(i)%slope_UV = etoile(i)%slope_UV - 2.0  ! Fnu -> F_lambda
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 
@@ -3953,16 +3983,19 @@ end subroutine read_para215
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%lb_body, etoile(i)%fUV
-       if (.not.etoile(i)%lb_body) then
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum, etoile(i)%fUV
+       if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else
-          read(1,*)
+          read(1,*) line_buffer
        endif
+       etoile(i)%lb_body = .false.
+
        ! Passage rayon en AU
        etoile(i)%r = etoile(i)%r * Rsun_to_AU
     enddo
     etoile(:)%vx = 0.0 ; etoile(:)%vy = 0.0 ; etoile(:)%vz = 0.0
+    etoile(:)%Mdot = 0.0
 
     close(unit=1)
 

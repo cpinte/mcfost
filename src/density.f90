@@ -849,7 +849,7 @@ subroutine define_density_wall3D()
   write(*,*) "*********************************************************"
   write(*,*) "Adding 3D wall structure ...."
 
-  allocate(density_wall(n_cells,n_grains_tot), stat=alloc_status)
+  allocate(density_wall(n_grains_tot,n_cells), stat=alloc_status)
   allocate(masse_wall(n_cells), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error wall')
   density_wall = 0.
@@ -859,9 +859,8 @@ subroutine define_density_wall3D()
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
 
-
-     if (dz%geometry == 3) then ! wall
-        if (abs(dz%exp_beta) > 1e-6) call error("the wall must have Beta = 0")
+     if (dz%geometry == 5) then ! wall
+        !if (abs(dz%exp_beta) > 1e-6) call error("the wall must have Beta = 0")
 
         write(*,*) "Wall between", real(dz%rin), "and", real(dz%rmax), "AU"
         h_wall = dz%sclht
@@ -886,10 +885,10 @@ subroutine define_density_wall3D()
               hh = h_wall * (1.+cos(phi+pi))/2.
 
               if ((z > 0.).and.(z < hh)) then
-                 density_wall(icell,l) = density
+                 density_wall(l,icell) = density
                  !if (density > 0.) write(*,*) i,j, k, l, density_wall(i,j,k,l)
               else
-                 density_wall(icell,l) = 0.0
+                 density_wall(l,icell) = 0.0
               endif
            enddo ! l
 
@@ -905,13 +904,13 @@ subroutine define_density_wall3D()
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
 
-     if (dz%geometry == 3) then ! wall
+     if (dz%geometry == 5) then ! wall
         d_p => dust_pop(pop)
         mass = 0.0
 
         do icell=1,n_cells
            do l=d_p%ind_debut,d_p%ind_fin
-              mass=mass + density_wall(icell,l) * M_grain(l) * (volume(icell) * AU3_to_cm3)
+              mass=mass + density_wall(l,icell) * M_grain(l) * (volume(icell) * AU3_to_cm3)
            enddo !l
         enddo !icell
         mass =  mass*g_to_Msun
@@ -920,8 +919,8 @@ subroutine define_density_wall3D()
 
         do icell=1,n_cells
            do l=d_p%ind_debut,d_p%ind_fin
-              density_wall(icell,l) = density_wall(icell,l) * facteur
-              masse_wall(icell) = masse_wall(icell) + density_wall(icell,l) * M_grain(l) * volume(icell)
+              density_wall(l,icell) = density_wall(l,icell) * facteur
+              masse_wall(icell) = masse_wall(icell) + density_wall(l,icell) * M_grain(l) * volume(icell)
            enddo !l
         enddo ! icell
 
