@@ -86,7 +86,7 @@ module atom_transfer
 ! 	integer :: iNg_Norder=2, iNg_ndelay=5, iNg_Nperiod=5
 	real(kind=dp), allocatable :: ng_cur(:)
 	logical, allocatable :: lcell_converged(:)
-	real(kind=dp), allocatable :: gpop_old(:,:,:), Tex_old(:,:,:), ngpop(:,:,:), ne_old(:)
+	real(kind=dp), allocatable :: gpop_old(:,:,:), Tex_old(:,:,:), ngpop(:,:,:)
 	real(kind=dp), allocatable :: Gammaij_all(:,:,:,:), Rij_all(:,:,:), Rji_all(:,:,:) !need a flag to output it
 	integer :: NmaxLevel, NmaxTr
 	!Check-pointing and stopping and timing
@@ -1153,6 +1153,16 @@ module atom_transfer
 		!reevaluate here only if fixed during the loop but ne was iterated
 		!otherwise constant because 1) ne constant or 2), ne evaluated just after
 		if ((lfix_backgrnd_opac).and.(n_iterate_ne > 0)) then
+			!now if lfixed background we do not update lte pops ?
+			do nact=1, Natom
+				if (Atoms(nact)%ptr_atom%ID=="H") then
+					write(*,*) " -> updating LTE pops of hydrogen with non-LTE ne"
+					call LTEpops_H
+				else
+					write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID, " with non-LTE ne"
+					call LTEpops(Atoms(nact)%ptr_atom,.false.)
+				endif	
+			enddo
 			call compute_background_continua
 		endif
 		
@@ -1172,7 +1182,7 @@ module atom_transfer
 					nHmin(icell) = nH_minus(icell)
 				endif
 			enddo
-			do nact=1, Natom!see calc_ionisation_frac, for why we updated also passive atoms
+			do nact=1, Natom
 				if (Atoms(nact)%ptr_atom%ID=="H") then
 					write(*,*) " -> updating LTE pops of hydrogen with non-LTE ne"
 					call LTEpops_H
@@ -1388,13 +1398,14 @@ module atom_transfer
 ! 		real(kind=dp), allocatable :: err_pop(:,:)
 		logical :: labs, iterate_ne
 		logical :: l_iterate
-		logical :: accelerated, ng_rest, evaluate_background, lmean_intensity = .false.!,lapply_sor_correction
+		logical :: accelerated, ng_rest, lmean_intensity = .false.!,lapply_sor_correction
 		integer :: iorder, i0_rest, n_iter_accel, iacc!, iter_sor
 		integer :: nact, imax, icell_max, icell_max_2
 		integer :: icell, ilevel, imu, iphi, id_ref !for anisotropy
 		character(len=20) :: ne_start_sol = "NE_MODEL"
 		type (AtomType), pointer :: atom
 		integer(kind=8) :: mem_alloc_local = 0
+		real(kind=dp) :: diff_cont
 		
 		write(*,*) " USING MALI METHOD FOR NLTE LOOP"
 		
@@ -1851,7 +1862,6 @@ module atom_transfer
 			!evaluate electron density with the ionisation fraction
 			!I have to evaluate background continua if I update all atoms lte pops ?
 			!still update chi_c if electron scatt ?
-				evaluate_background = .false.
 				dne = 0.0_dp											
 				!Updating for non Ng iterations ? add a condition on the dM < 1e-2 ? (better ndelay)
 				!cond on accelerate ?
@@ -1868,21 +1878,23 @@ module atom_transfer
 ! -> If i update here, for the first iteration nold is not equal to the lte populations used for
 ! the first solution, so the first test on the convergence is wrong. But,
 ! after the first iteration it starts to  be consistent
-					do nact=1, Natom!see calc_ionisation_frac, for why we updated also passive atoms
+
+					if (.not.lfix_backgrnd_opac) then
+						do nact=1, Natom!see calc_ionisation_frac, for why we updated also passive atoms
 						!if evaluate background update passive atoms ?
-						if (Atoms(nact)%ptr_atom%ID=="H") then
-							write(*,*) " -> updating LTE pops of hydrogen"
-							call LTEpops_H
+							if (Atoms(nact)%ptr_atom%ID=="H") then
+								write(*,*) " -> updating LTE pops of hydrogen"
+								call LTEpops_H
 							!check pops actually are updated ??
-						else
-							write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID 
-							call LTEpops(Atoms(nact)%ptr_atom,.false.)
-						endif	
-					enddo
-					write(*,*) ''
+							else
+								write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID 
+								call LTEpops(Atoms(nact)%ptr_atom,.false.)
+							endif	
+						enddo
+						write(*,*) ''
+					endif
 					!chi_c(:,:) = chi_c(:,:) + ne(:)
 					!deallocate(ne_old)
-					evaluate_background = (.not.lfix_backgrnd_opac) !.true.
 					!convergence_map(:,1,NactiveAtoms+1,:) = dne
 				end if
 
@@ -1902,6 +1914,7 @@ module atom_transfer
    				!for all cells
 				dN2 = 0.0 !among all Tex
 				dN4 = 0.0 !among all Tion
+				diff_cont = 0
 				cell_loop2 : do icell=1,n_cells
 				
    					l_iterate = (icompute_atomRT(icell)>0)
@@ -1926,6 +1939,7 @@ module atom_transfer
 								endif
 									!convergence_map(icell, ilevel, nact, etape) = dN1
 							end do !over ilevel
+							diff_cont = max(diff_cont, abs(1.0 - atom%n(atom%Nlevel,icell)/n_new(nact,atom%Nlevel,icell)))
 
 							!I keep negative Temperatures for info.debug.
 							!hence the /= 0.0. But, some work should be done in update_pops and compute_Tex
@@ -1991,7 +2005,7 @@ module atom_transfer
 							do kr=1, atom%Ncont
 								Tex_old(nact, kr+Atom%Nline,icell) = atom%continua(kr)%Tex(icell)
 							enddo
-							!if (evaluate_background) then
+							!if (.not.lfix_backgrnd_opac) then
 							! !evalute LTE here ?? if so, need a local version of lte pops.
 							! !or store the populations nstar in a new array?
 							! recompute profiles or damping
@@ -2001,7 +2015,7 @@ module atom_transfer
 						end do
 						
 						!if I recompute all background continua ?  and damping ? evaluate damping locally ?
-						if (evaluate_background) then
+						if (.not.lfix_backgrnd_opac) then
 							nHmin(icell) = nH_minus(icell)
 							!-> this evaluate profiles or damping but also continuum quantities not needed ???
 							!-> do not check ni-njgij < 0 because a non converged state can lead to inversion of populations
@@ -2022,6 +2036,7 @@ module atom_transfer
 						
 					end if !if l_iterate
 				end do cell_loop2 !icell
+				write(*,*) " Maxx diff cont:", diff_cont, maxval( n_new(1,hydrogen%Nlevel,:) ) / nHtot(locate(n_new(1,hydrogen%Nlevel,:),maxval( n_new(1,hydrogen%Nlevel,:) )))
 				!! test on the solar case
 				!! use dN2 when step == 2 ?
 				!! change how Tex are initialised (presenly with T, use pops instead)

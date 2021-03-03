@@ -360,15 +360,25 @@ END FUNCTION get_logPartitionFunctionk
   real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
   real(kind=dp) :: n_eff, wocc, chi0, wocc0, E00, E, Egs
   integer :: Z, dZ, k, i, m
+  logical :: print_diff
+  real(kind=dp) :: max_nstar(hydrogen%Nlevel), min_nstar(hydrogen%Nlevel)
    
    E00 = 1.0 * 3e-11 * EV ! Joules
    Egs = hydrogen%E(1)
+   
+   print_diff = (maxval(hydrogen%nstar) > 0.0_dp)
+   if (print_diff) then
+   	do i=1,hydrogen%Nlevel
+   		max_nstar(i) = maxval(hydrogen%nstar(i,:))
+   		min_nstar(i) = minval(hydrogen%nstar(i,:),mask=icompute_atomrt > 0)
+   	enddo
+   endif
 
    !$omp parallel &
    !$omp default(none) &
    !$omp private(k, phik, dEion,i,dZ,dE,m,sum,phiHmin,wocc, n_eff, chi0, E) &
    !$omp shared(n_cells, icompute_atomRT, Elements, Hydrogen,c2,locupa_prob,wocc0, E00) &
-   !$omp shared(ne, nHmin, nHtot, T, Egs, ldissolve)
+   !$omp shared(ne, nHmin, nHtot, T, Egs, ldissolve, print_diff)
    !$omp do
    do k=1,n_cells
 
@@ -471,6 +481,11 @@ END FUNCTION get_logPartitionFunctionk
    enddo
 
   endif !if locupa_prob
+  
+  if (print_diff) then
+  	write(*,*) " Old Max/min nstar:", max_nstar(hydrogen%Nlevel), min_nstar(hydrogen%Nlevel)
+  	write(*,*) ' New max/min nstar', maxval(hydrogen%nstar(hydrogen%Nlevel,:)), minval(hydrogen%nstar(hydrogen%nlevel,:),mask=icompute_atomrt>0)
+  endif
 
  RETURN
  END SUBROUTINE LTEpops_H

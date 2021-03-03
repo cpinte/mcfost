@@ -40,7 +40,9 @@ MODULE solvene
  integer, parameter :: N_MAX_ELEMENT=26 !100 is the max, corresponding the atomic number
  real(kind=dp), parameter :: ne_min_limit = 1d-100!1d-100!1d-50 !if ne < ne_min_limt, ne = 0
 											!tiny_dp
- real(kind=dp), parameter :: fjk_lim = 1d-10
+ real(kind=dp), parameter :: fjk_lim = 1d-20
+ real(kind=dp) :: min_f_HII, max_f_HII
+ 
  CONTAINS
 
  function get_max_nstage()
@@ -276,6 +278,11 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
 ! 			if (fjk(i) < fjk_lim) fjk(i) = 0.0_dp
 ! 		
 ! 		enddo
+		
+		if (elem%model%id == "H") then
+			min_f_HII = min(min_f_HII, fjk(2))
+			max_f_HII = max(max_f_HII, fjk(2))
+		endif
 				
 	else !no model use LTE
 		!fjk(1) is N(1) / ntot !N(1) = sum_j=1 sum_i=1^N(j) n(i)
@@ -314,6 +321,10 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
 			dfjk(j) = (j-1) * dfjk(j)
 		enddo
 		
+		if (elem%id == "H") then
+			min_f_HII = min(min_f_HII, fjk(2))
+			max_f_HII = max(max_f_HII, fjk(2))
+		endif
 
 	endif
 
@@ -361,13 +372,16 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	id = 1
 
 	epsilon = 0.0
+	
+	min_f_HII = 1d50
+	max_f_HII = 0.0_dp
 
 	!$omp parallel &
 	!$omp default(none) &
 	!$omp private(k,n,j,fjk,dfjk,ne_old,niter,delta,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
 	!$omp private(dne, akj, id, ne0, elem, max_fjk, n0) &
 	!$omp shared(n_cells, Elements, ne_initial_solution,Hydrogen, ZM, unconverged_cells, Nelem) &
-	!$omp shared(ne, T, icompute_atomRT, nHtot, epsilon)
+	!$omp shared(ne, T, icompute_atomRT, nHtot, epsilon, max_f_HII, min_f_HII)
 	!$omp do
 	do k=1,n_cells
 		!$ id = omp_get_thread_num() + 1
@@ -539,6 +553,8 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 			write(*,*) " ------------------------------------------------ "
 			write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
 			write(*,'("   >>>  epsilon="(1ES17.8E3))') epsilon
+			write(*,*) " "
+			write(*,'("Ionisation fraction of HII "(1ES17.8E3, 1ES17.8E3))') max_f_HII, min_f_HII
 			write(*,*) " ------------------------------------------------ "
 	endif
 
@@ -825,7 +841,7 @@ write(*,*) "Test Nelem",Nelem
   
   write(*,*) "Maximum/minimum Electron density in the model (m^-3):"
   write(*,*) MAXVAL(ne),MINVAL(ne,mask=icompute_atomRT>0)
-  
+    
   !that's because I use the sum as a variable so the function doesn't exist.
   do k=2, nb_proc
    unconverged_cells(1) = unconverged_cells(1) + unconverged_cells(k)

@@ -51,7 +51,7 @@ module atmos_type
 	type (elemPointerArray), dimension(:), allocatable :: Elements
 	type (atomPointerArray), dimension(:), allocatable :: Atoms, ActiveAtoms, PassiveAtoms
 	real(kind=dp), dimension(:), allocatable :: nHtot, ne, Tpf, T, vturb
-	real(kind=dp), dimension(:), allocatable :: nHmin !Hminus populations
+	real(kind=dp), dimension(:), allocatable :: nedag, nHmin !Hminus populations
 	real(kind=dp) :: B_char = 0d0, v_char=0d0
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
 	logical :: lMagnetized = .false., calc_ne, laccretion_shock
