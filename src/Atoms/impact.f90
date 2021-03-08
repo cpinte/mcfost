@@ -272,7 +272,7 @@ MODULE IMPACT
   integer :: icell, i, j
   real(kind=dp) :: Cij(Hydrogen%Nlevel, Hydrogen%Nlevel)
   real(kind=dp) :: nr_ji, CI(hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)!, CI(Hydrogen%Nlevel,Hydrogen%Nlevel)
-  real(kind=dp) :: wi, wj
+  real(kind=dp) :: wi, wj, ni_on_nj_star
 
    Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
 	wj = 1.0
@@ -289,24 +289,30 @@ MODULE IMPACT
    CALL Johnson_CI(icell, CI) !bound-free i->Nlevel
    CALL Johnson_CE(icell, CE) !among all levels
    
+   !evaluated with initial pure-LTE ratio and then only ne updated ?
    do i=1,Hydrogen%Nlevel
     Cij(i,hydrogen%Nlevel) = CI(i)
-    Cij(hydrogen%Nlevel,i) = CI(i) * hydrogen%nstar(i,icell) / hydrogen%nstar(hydrogen%Nlevel,icell)
+    !
+    !use ne phi_T to updated collision rates ?? Or only on the total matrix??
+! 	ni_on_nj_star = ne(icell) * phi_T(icell, hydrogen%g(i)/hydrogen%g(hydrogen%Nlevel), hydrogen%E(hydrogen%Nlevel)-hydrogen%E(i))
+    Cij(hydrogen%Nlevel,i) = CI(i) * hydrogen%nstar(i,icell) / hydrogen%nstar(hydrogen%Nlevel,icell) !dependent on ne
     do j=i+1,Hydrogen%Nlevel-1
     	!write(*,*), i, j, CE(i,j),CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell)
  		Cij(i,j) = Cij(i,j) + CE(i,j)
- 		Cij(j,i) = Cij(j,i) + CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell)
+ 		Cij(j,i) = Cij(j,i) + CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell) !independent of ne
     end do
    end do
 
-   Cij(:,:) = Cij(:,:) * ne(icell)
+ !-> 7/03/2021, factorize out ne
+
+!    Cij(:,:) = Cij(:,:) * ne(icell)
 
 !    if (T(icell)==T(55)) then
 !    	do i=1, hydrogen%nlevel
 !    		write(*,*) "****",i, "****"
-!    		!write(*,*) (j, Cij(i,j), j=1,hydrogen%nlevel)
+!    		!write(*,*) (j, Cij(i,j)*ne(icell), j=1,hydrogen%nlevel)
 !    		do j=i+1, hydrogen%nlevel-1
-!    			write(*,*) i,j, CE(i,j)
+!    			write(*,*) i,j, CE(i,j)*ne(icell)
 !    		enddo
 !    	enddo
 !    	stop
