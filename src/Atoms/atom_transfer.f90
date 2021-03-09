@@ -1159,15 +1159,15 @@ module atom_transfer
 		if (n_iterate_ne > 0) then
 			!now if lfixed background we do not update lte pops
 			!-> so update them here for passive lines and continua
-			do nact=1, Natom
-				if (Atoms(nact)%ptr_atom%ID=="H") then
-					write(*,*) " -> updating LTE pops of hydrogen with non-LTE ne"
-					call LTEpops_H
-				else
-					write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID, " with non-LTE ne"
-					call LTEpops(Atoms(nact)%ptr_atom,.false.)
-				endif	
-			enddo
+! 			do nact=1, Natom
+! 				if (Atoms(nact)%ptr_atom%ID=="H") then
+! 					write(*,*) " -> updating LTE pops of hydrogen with non-LTE ne"
+! 					call LTEpops_H
+! 				else
+! 					write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID, " with non-LTE ne"
+! 					call LTEpops(Atoms(nact)%ptr_atom,.false.)
+! 				endif	
+! 			enddo
 			!update nHmin density if depends on LTE pops ?, bu should depend on non-LTE
 			if (lfix_backgrnd_opac) then
 				!also update profiles
@@ -1882,26 +1882,24 @@ module atom_transfer
 					call solve_electron_density(ne_start_sol, .true., dne)
 					!call Solve_Electron_Density_old(ne_start_sol)
 					!dne = maxval(abs(1.0_dp - ne_old(:)/(ne(:)+tiny_dp)))
-				!might be correct to do nstar_new = nstar_old * ne_new/ne_old ?
 ! -> If i update here, for the first iteration nold is not equal to the lte populations used for
 ! the first solution, so the first test on the convergence is wrong. But,
 ! after the first iteration it starts to  be consistent
+!-> only if in ionisation fraction active atoms are used (passive atoms we use lte pops)
 
-!-> updated at the end only to not introduce additional non linearities in collision ??
-! 					if (.not.lfix_backgrnd_opac) then
-! 						do nact=1, Natom!see calc_ionisation_frac, for why we updated also passive atoms
-! 						!if evaluate background update passive atoms ?
-! 							if (Atoms(nact)%ptr_atom%ID=="H") then
-! 								write(*,*) " -> updating LTE pops of hydrogen"
-! 								call LTEpops_H
-! 							!check pops actually are updated ??
-! 							else
-! 								write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID 
-! 								call LTEpops(Atoms(nact)%ptr_atom,.false.)
-! 							endif	
-! 						enddo
-! 						write(*,*) ''
-! 					endif
+					!separate passive active and passive (pure-LTE) and passive with non-LTE pops (keep constant ?)
+					!if lfixed_background, not need to update passive atoms.
+					do nact=1, Natom
+						if (Atoms(nact)%ptr_atom%ID=="H") then
+							write(*,*) " -> updating LTE pops of hydrogen"
+							call LTEpops_H
+							!check pops actually are updated ??
+						else
+							write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID 
+							call LTEpops(Atoms(nact)%ptr_atom,.false.)
+						endif	
+					enddo
+					write(*,*) ''
 					!chi_c(:,:) = chi_c(:,:) + ne(:)
 					!deallocate(ne_old)
 					!convergence_map(:,1,NactiveAtoms+1,:) = dne
@@ -2037,14 +2035,14 @@ module atom_transfer
 						if (update_bckgr_opac) then
 							!safe, used only if not lfixbackground
 							nHmin(icell) = nH_minus(icell)
-							call compute_atom_quantities(icell)
+! 							call compute_atom_quantities(icell)
 							!evaluate profiles anyway ? 
 						!if I recompute all background continua ?  and damping ? evaluate damping locally ?
 							if (.not.lfix_backgrnd_opac) then!only ne changes
 							!-> this evaluate profiles or damping but also continuum quantities not needed ???
 							!-> do not check ni-njgij < 0 because a non converged state can lead to inversion of populations
 							! modify it to update only nlte quantities ?
-! 								call compute_atom_quantities(icell)
+								call compute_atom_quantities(icell)
 								call background_continua_lambda(icell, Nlambda_cont, lambda_cont, chi_c(:,icell), eta_c(:,icell))
 							!or just re evaluate ne in chi_c like chi_c -ne_old + ne_new
 							endif

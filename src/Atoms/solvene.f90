@@ -247,6 +247,7 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
 		!.true. before the maxval
 		!detailed_model = (maxval(elem%model%n)>0.0).and.(elem%model%active)
 		!-> two much time to test n > 0 for large model
+		!or just nltepops ? for passive atoms ? 
 		detailed_model = (elem%model%NLTEpops .and. elem%model%active)
 		!can add condition on active or not, but check bckgr opac and eval of lte pops after
 	endif
