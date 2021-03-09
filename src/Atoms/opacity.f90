@@ -17,6 +17,7 @@ module Opacity
 	use getlambda, only									: hv, Nlambda_max_line, define_local_profile_grid
 	use planck, only 									: bpnu
 	use occupation_probability, only					: wocc_n, D_i
+	use lte, only 										: phi_T
 
 	use background_opacity, only						: Thomson, Hydrogen_ff, Hminus_bf, Hminus_bf_geltman, &
 															Hminus_bf_geltman, Hminus_bf_Wishart, Hminus_ff_john, Hminus_ff, Hminus_ff_bell_berr, lte_bound_free, H_bf_Xsection
@@ -26,7 +27,7 @@ module Opacity
 
 
 	implicit none
-	real(kind=dp), parameter :: prec_pops = 1d-100, frac_ne_limit = 1d-10, frac_ntot_limit = 1d-50!1d-50!1d-12
+	real(kind=dp), parameter :: prec_pops = 1d-100, frac_ne_limit = 1d-10, frac_ntot_limit = 1d-10!1d-50!1d-15
 	real(kind=dp) :: frac_limit_pops = frac_ntot_limit
     !for one ray
 	real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:)
@@ -531,69 +532,69 @@ module Opacity
 	end SUBROUTINE compute_atom_quantities
 	
 	!metal_bf typically
-	subroutine opacity_atom_bf_lte(icell)
-
-		integer, intent(in)											:: icell
-		integer														:: m, kr, kc, i, j, Nblue, Nred, la
-		type (AtomType), pointer									:: atom
-		real(kind=dp)												:: n_eff, wj, wi
-		real(kind=dp)												:: Diss, chi_ion, gij
-
-
-		do m=1,Npassiveatoms
-
-			atom => PassiveAtoms(m)%ptr_atom
-
-			do kc=atom%Ntr_line+1,atom%Ntr
-				kr = atom%at(kc)%ik 
-
-				i = atom%continua(kr)%i
-				j = atom%continua(kr)%j 
-
-				Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
-				wj = 1.0; wi = 1.0
-
-				if (ldissolve) then
-					if (atom%ID=="H") then
-						n_eff = real(i,kind=dp)
-						wi = wocc_n(icell, n_eff, real(atom%stage(i)), real(atom%stage(j)),hydrogen%n(1,icell))
-					else
-						n_eff = atom%stage(j)*sqrt(atom%Rydberg/(atom%E(j)-atom%E(i)))
-					endif
-				endif
-				
-				chi_ion = Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(j))
-
-				do la=1, atom%continua(kr)%nlambda
-				
-					Diss = D_i(icell, n_eff, real(atom%stage(i)), 1.0, lambda_cont(Nblue+la-1), atom%continua(kc)%lambda0, chi_ion)
-					gij = atom%nstar(i,icell)/atom%nstar(j,icell) * exp(-hc_k/T(icell)/lambda_cont(Nblue+la-1))
-
-					
-					if ( (atom%n(i,icell) - atom%n(j,icell) * gij) > 0.0) then
-						
-							chi_c(Nblue+la-1,icell) = chi_c(Nblue+la-1,icell) + &
-							diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - gij*atom%n(j,icell)) 
-       				
-							eta_c(Nblue+la-1,icell) = eta_c(Nblue+la-1,icell) + &
-							diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * gij * atom%n(j,icell)
-					else
-					
-							eta_c(Nblue+la-1,icell) = eta_c(Nblue+la-1,icell) + &
-							diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * gij * atom%n(j,icell)   
-							
-							chi_c(Nblue+la-1,icell) = chi_c(Nblue+la-1,icell) - &
-							diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - gij*atom%n(j,icell)) 
-
-					endif
-				enddo				
-
-			end do ! loop over Ncont
-			atom => NULL()
-		end do !loop over metals
-
-	return
-	end subroutine opacity_atom_bf_lte
+! 	subroutine opacity_atom_bf_lte(icell)
+! 
+! 		integer, intent(in)											:: icell
+! 		integer														:: m, kr, kc, i, j, Nblue, Nred, la
+! 		type (AtomType), pointer									:: atom
+! 		real(kind=dp)												:: n_eff, wj, wi
+! 		real(kind=dp)												:: Diss, chi_ion, gij
+! 
+! 
+! 		do m=1,Npassiveatoms
+! 
+! 			atom => PassiveAtoms(m)%ptr_atom
+! 
+! 			do kc=atom%Ntr_line+1,atom%Ntr
+! 				kr = atom%at(kc)%ik 
+! 
+! 				i = atom%continua(kr)%i
+! 				j = atom%continua(kr)%j 
+! 
+! 				Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
+! 				wj = 1.0; wi = 1.0
+! 
+! 				if (ldissolve) then
+! 					if (atom%ID=="H") then
+! 						n_eff = real(i,kind=dp)
+! 						wi = wocc_n(icell, n_eff, real(atom%stage(i)), real(atom%stage(j)),hydrogen%n(1,icell))
+! 					else
+! 						n_eff = atom%stage(j)*sqrt(atom%Rydberg/(atom%E(j)-atom%E(i)))
+! 					endif
+! 				endif
+! 				
+! 				chi_ion = Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(j))
+! 
+! 				do la=1, atom%continua(kr)%nlambda
+! 				
+! 					Diss = D_i(icell, n_eff, real(atom%stage(i)), 1.0, lambda_cont(Nblue+la-1), atom%continua(kc)%lambda0, chi_ion)
+! 					gij = atom%nstar(i,icell)/atom%nstar(j,icell) * exp(-hc_k/T(icell)/lambda_cont(Nblue+la-1))
+! 
+! 					
+! 					if ( (atom%n(i,icell) - atom%n(j,icell) * gij) > 0.0) then
+! 						
+! 							chi_c(Nblue+la-1,icell) = chi_c(Nblue+la-1,icell) + &
+! 							diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - gij*atom%n(j,icell)) 
+!        				
+! 							eta_c(Nblue+la-1,icell) = eta_c(Nblue+la-1,icell) + &
+! 							diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * gij * atom%n(j,icell)
+! 					else
+! 					
+! 							eta_c(Nblue+la-1,icell) = eta_c(Nblue+la-1,icell) + &
+! 							diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * gij * atom%n(j,icell)   
+! 							
+! 							chi_c(Nblue+la-1,icell) = chi_c(Nblue+la-1,icell) - &
+! 							diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - gij*atom%n(j,icell)) 
+! 
+! 					endif
+! 				enddo				
+! 
+! 			end do ! loop over Ncont
+! 			atom => NULL()
+! 		end do !loop over metals
+! 
+! 	return
+! 	end subroutine opacity_atom_bf_lte
 	
 	subroutine background_continua (icell)
 		integer, intent(in) :: icell
@@ -785,13 +786,15 @@ module Opacity
 		integer, intent(in) :: icell
 		integer :: nact, Nred, Nblue, kc, kr, i, j, nk, la
 		type(AtomType), pointer :: aatom
-		real(kind=dp) :: wi, wj, chi_ion, Diss, nn, gij
+		real(kind=dp) :: wi, wj, chi_ion, Diss, nn, gij, ni_on_nj_star
+		type (element), pointer :: elem
   
 		chi_c_nlte(:,icell) = 0d0
 		eta_c_nlte(:,icell) = 0d0
 
 		atom_loop : do nact = 1, Nactiveatoms
 			aatom => ActiveAtoms(nact)%ptr_atom
+			elem => Elements(aatom%periodic_table)%ptr_elem
    
 			tr_loop : do kr = aatom%Ntr_line+1,aatom%Ntr
 
@@ -818,15 +821,23 @@ module Opacity
 				endif
 
 				!get the ionisation potential for the ion ot be use in the dissolve fraction
-				chi_ion = Elements(aatom%periodic_table)%ptr_elem%ionpot(aatom%stage(j))
+				chi_ion = elem%ionpot(aatom%stage(j))
+! 				ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+				ni_on_nj_star = aatom%nstar(i,icell)/aatom%nstar(j,icell)
+				
+				gij = ni_on_nj_star * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0)
+
+				if ((aatom%n(i,icell) - aatom%n(j,icell) * gij) <= 0.0_dp) then
+					cycle tr_loop
+				endif
 
 				freq_loop : do la=1,aatom%continua(kc)%Nlambda
 
 					!beware even without diss it appears that sometime lambda(Nred) = lambda0 + epsilon > lambda0
 					Diss = D_i(icell, nn, real(aatom%stage(i)), 1.0, lambda_cont(Nblue+la-1), aatom%continua(kc)%lambda0, chi_ion)
-					gij = aatom%nstar(i,icell)/aatom%nstar(j,icell) * exp(-hc_k/T(icell)/lambda_cont(Nblue+la-1))
+					gij = ni_on_nj_star * exp(-hc_k/T(icell)/lambda_cont(Nblue+la-1))
 
-					if ((aatom%n(i,icell) - aatom%n(j,icell) * gij) > 0.0_dp) then
+! 					if ((aatom%n(i,icell) - aatom%n(j,icell) * gij) > 0.0_dp) then
 
 						chi_c_nlte(Nblue+la-1,icell) = chi_c_nlte(Nblue+la-1,icell) + &
             			Diss * aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - gij * aatom%n(j,icell))
@@ -835,18 +846,19 @@ module Opacity
             			Diss * aatom%continua(kc)%alpha(la) * aatom%continua(kc)%twohnu3_c2(la) * gij * aatom%n(j,icell)
 
             
-					else !neg or null
-						eta_c_nlte(Nblue+la-1,icell) = eta_c_nlte(Nblue+la-1,icell) + &
-            			Diss * aatom%continua(kc)%alpha(la) * aatom%continua(kc)%twohnu3_c2(la) * gij * aatom%n(j,icell)
+! 					else !neg or null
+! 						eta_c_nlte(Nblue+la-1,icell) = eta_c_nlte(Nblue+la-1,icell) + &
+!             			Diss * aatom%continua(kc)%alpha(la) * aatom%continua(kc)%twohnu3_c2(la) * gij * aatom%n(j,icell)
 					!assuming small inversions
 						!chi_c_nlte(Nblue+la-1,icell) = chi_c_nlte(Nblue+la-1,icell) - Diss * aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - gij * aatom%n(j,icell))
 !  
-					endif
+! 					endif
 
 				enddo freq_loop
 
 			end do tr_loop
    
+   			elem => null()
 			aatom => NULL()
 		end do atom_loop
 	
@@ -1035,11 +1047,14 @@ module Opacity
 					endif
 				endif 
 
+				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) <= 0.0_dp) then
+					cycle tr_loop
+				endif
 
 				phi0(1:Nlam) = profile(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred), x,y,z,x1,y1,z1,u,v,w,l)
+	
 
-
-				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
+! 				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
 
 
 					chi(Nblue:Nred,id) = chi(Nblue:Nred,id) + &
@@ -1048,10 +1063,10 @@ module Opacity
 					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + &
 						hc_fourPI * aatom%lines(kc)%Aji * phi0(1:Nlam) * aatom%n(j,icell)
 
-				else !neg or null
-					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + &
-						hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell) * phi0(1:Nlam)
-				endif
+! 				else !neg or null
+! 					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + &
+! 						hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell) * phi0(1:Nlam)
+! 				endif
 				
 				if (iterate) then  !only for active atoms ? if not hogerheijde only
 					!if (aatom%active) &
@@ -1076,7 +1091,7 @@ module Opacity
 		integer, intent(in) :: id, icell, iray
 		integer :: nact, j, i, kr, kc, Nb, Nr, la, Nl, icell_d
 		type (AtomType), pointer :: aatom
-		real(kind=dp) :: gij, wi, wj, chicc, wl,  wphi
+		real(kind=dp) :: gij, wi, wj, chicc, wl,  wphi, ni_on_nj_star
 		
 		!for one ray
 		Uji_down(:,:,:,id) = 0.0_dp
@@ -1088,7 +1103,7 @@ module Opacity
 		aatom_loop : do nact=1, Nactiveatoms
 			aatom => ActiveAtoms(nact)%ptr_atom
 			
-				do kr = aatom%Ntr_line+1, aatom%Ntr
+				cont_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
 			
 					kc = aatom%at(kr)%ik
 
@@ -1097,13 +1112,23 @@ module Opacity
 					Nb = aatom%continua(kc)%Nb; Nr = aatom%continua(kc)%Nr
 					Nl = Nr - Nb + 1
 
+! 					ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+					ni_on_nj_star = aatom%nstar(i,icell)/aatom%nstar(j,icell)
+
 				
 					icell_d = 1
 					if (ldissolve) then
 						if (aatom%ID=="H") icell_d = icell
 					endif
+					
+					gij = ni_on_nj_star * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0)			
+
+					if (aatom%n(i,icell) - gij*aatom%n(j,icell) <= 0.0_dp) then
+						cycle cont_loop
+					endif			
+
 		
-					do la=1, Nl
+					freq_loop : do la=1, Nl
 						if (la==1) then
 							wl = 0.5*(lambda(Nb+1)-lambda(Nb)) / lambda(Nb)
 						elseif (la==Nl) then
@@ -1112,12 +1137,12 @@ module Opacity
 							wl = 0.5*(lambda(Nb+la)-lambda(Nb+la-2)) / lambda(Nb+la-1)
 						endif
 
-						gij = aatom%nstar(i,icell)/aatom%nstar(j,icell) * exp(-hc_k/T(icell)/lambda(Nb+la-1))							
- 	
+						gij = ni_on_nj_star * exp(-hc_k/T(icell)/lambda(Nb+la-1))			
+										
  						!small inversions
 						!chicc = wl * fourpi_h * aatom%continua(kc)%alpha_nu(la,icell_d) * abs(aatom%n(i,icell) - gij*aatom%n(j,icell))
 						chicc = wl * fourpi_h * aatom%continua(kc)%alpha_nu(la,icell_d) * (aatom%n(i,icell) - gij*aatom%n(j,icell))
-						if (chicc < 0.0) chicc = 0.0_dp
+! 						if (chicc < 0.0) chicc = 0.0_dp !should not happend
 
 						Uji_down(Nb+la-1,j,nact,id) = Uji_down(Nb+la-1,j,nact,id) + &
 							aatom%continua(kc)%alpha_nu(la,icell_d) * (twohc/lambda(Nb+la-1)**3) * gij
@@ -1129,9 +1154,9 @@ module Opacity
 						!if (chicc > 0.0_dp) &
 						eta_atoms(Nb+la-1,nact,id) = eta_atoms(Nb+la-1,nact,id) + &
 							aatom%continua(kc)%alpha_nu(la,icell_d) * (twohc/lambda(Nb+la-1)**3)  * gij * aatom%n(j,icell)
-					enddo
+					enddo freq_loop
 			
-				enddo			
+				enddo cont_loop		
 			
 			!for each line eventually 
 			wi = 1.0; wj = 1.0
@@ -1143,17 +1168,23 @@ module Opacity
 				endif
 			endif 
 
-			do kr = 1, aatom%Ntr_line
+			line_loop : do kr = 1, aatom%Ntr_line
 			
 				kc = aatom%at(kr)%ik
+				
 
 				j = aatom%lines(kc)%j
 				i = aatom%lines(kc)%i
+				
+				if (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell) <= 0.0_dp) then
+					cycle line_loop
+				endif				
+				
 				Nb = aatom%lines(kc)%Nblue; Nr = aatom%lines(kc)%Nred
 			
 				Nl = Nr-dk_min+dk_max-Nb+1
 				wphi = 0.0
-				do la=1, Nl
+				freq2_loop : do la=1, Nl
 					if (la==1) then
 						wl = 0.5*1d3*hv
 						!wl = 0.5*(lambda(Nb+1)-lambda(Nb)) * clight / aatom%lines(kc)%lambda0
@@ -1170,7 +1201,7 @@ module Opacity
 						hc_fourPI * aatom%lines(kc)%Aji * aatom%lines(kc)%phi_loc(la,iray,id)
 					
 					!small inversions
-					if (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell) >= 0.0_dp) then
+! 					if (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell) >= 0.0_dp) then
 					
 					chi_down(Nb+dk_min-1+la,j,nact,id) = chi_down(Nb+dk_min-1+la,j,nact,id) + &
 						wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * abs(aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
@@ -1179,19 +1210,19 @@ module Opacity
 						wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * abs(aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
 
 						
-					endif
+! 					endif
 										
 					eta_atoms(Nb+dk_min-1+la,nact,id) = eta_atoms(Nb+dk_min-1+la,nact,id) + &
 						hc_fourPI * aatom%lines(kc)%Aji * aatom%lines(kc)%phi_loc(la,iray,id) * aatom%n(j,icell)
 
 					
 					wphi = wphi + wl * aatom%lines(kc)%phi_loc(la,iray,id)
-				enddo
+				enddo freq2_loop
 
 				chi_down(Nb+dk_min:Nr+dk_max,j,nact,id) = chi_down(Nb+dk_min:Nr+dk_max,j,nact,id) / wphi
 				chi_up(Nb+dk_min:Nr+dk_max,i,nact,id) = chi_up(Nb+dk_min:Nr+dk_max,i,nact,id) / wphi
 
-			enddo
+			enddo line_loop
 
 					
 		enddo aatom_loop
@@ -1239,13 +1270,17 @@ module Opacity
 					endif
 				endif 
 
+				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) <= 0.0_dp) then
+					cycle tr_loop
+				endif
+				
 				!fixed at the moment
 				call local_profile_zv(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred),phi0,phiZ, psiZ, x,y,z,x1,y1,z1,u,v,w,l)
 
 				etal = hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell)
 				chil = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
 
-				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
+! 				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
 
 					
 					chi(Nblue:Nred,id) = chi(Nblue:Nred,id) + chil * phi0(1:Nlam)
@@ -1257,14 +1292,14 @@ module Opacity
 						rho_p(Nblue:Nred,m,id) = rho_p(Nblue:Nred,m,id) + chil * psiz(1:Nlam,m)
 					enddo
 
-				else !neg or null
-					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + etal * phi0(1:Nlam) 
-					do m=1,3
-! 						chiQUV_p(Nblue:Nred,m,id) = chiQUV_p(Nblue:Nred,m,id) + chil * phiz(1:Nlam,m)
-						etaQUV_p(Nblue:Nred,m,id) = etaQUV_p(Nblue:Nred,m,id) + etal * phiz(1:Nlam,m)
-! 						rho_p(Nblue:Nred,m,id) = rho_p(Nblue:Nred,m,id) + chil * psiz(1:Nlam,m)
-					enddo						
-				endif
+! 				else !neg or null
+! 					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + etal * phi0(1:Nlam) 
+! 					do m=1,3
+! ! 						chiQUV_p(Nblue:Nred,m,id) = chiQUV_p(Nblue:Nred,m,id) + chil * phiz(1:Nlam,m)
+! 						etaQUV_p(Nblue:Nred,m,id) = etaQUV_p(Nblue:Nred,m,id) + etal * phiz(1:Nlam,m)
+! ! 						rho_p(Nblue:Nred,m,id) = rho_p(Nblue:Nred,m,id) + chil * psiz(1:Nlam,m)
+! 					enddo						
+! 				endif
 
     
 			end do tr_loop

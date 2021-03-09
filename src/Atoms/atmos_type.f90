@@ -60,7 +60,7 @@ module atmos_type
 	!removed the depency in rays of some quantity (like phi_loc or I) since rate matrix
 	!is built ray by ray, with is not the case for hogerheijde
     logical :: lmali_scheme, lhogerheijde_scheme !tmp
-    character(len=50) :: angular_quadrature = "carlson_A8_rh"!"HEALpix"!"HEALpix_adapt"'carlson_A8_rh'!
+    character(len=50) :: angular_quadrature = "HEALpix"!"HEALpix"!"HEALpix_adapt"'carlson_A8_rh'!
 	type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
 
 

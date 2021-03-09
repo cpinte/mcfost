@@ -6,7 +6,7 @@ MODULE io_opacity
  use atmos_type, only : Hydrogen, Helium, icompute_atomRT, NactiveAtoms, ne, T
  use atom_type
  use spectrum_type, only : chi, eta, sca_c, lambda, lambda_cont, chi_c, eta_c, chi_c_nlte, eta_c_nlte, &
- 							Jnu_cont, Nlambda, Nlambda_cont, eta0_bb, chi0_bb, eta_es
+ 							Jnu_cont, Nlambda, Nlambda_cont, eta0_bb, chi0_bb, Jnu
  use math, only : locate, Linear_1D, bezier2_interp, bezier3_interp
  use constant
  use Planck, only : bpnu
@@ -824,8 +824,8 @@ end subroutine write_radiative_rates_atom
      write(*,*) xtmp(l), Jtmp(l)
     enddo
     if (interpolate) then
-    	CALL bezier3_interp(Nlam_j, real(xtmp,kind=dp), Jtmp, Nlambda, lambda, eta_es(:,icell))
-    	eta_es(:,icell) = eta_es(:,icell) * ne(icell)
+    	CALL bezier3_interp(Nlam_j, real(xtmp,kind=dp), Jtmp, Nlambda, lambda, Jnu(:,icell))
+!     	eta_es(:,icell) = eta_es(:,icell) * ne(icell)
     else
     	Jnu_cont(:,icell) = Jtmp(:)
     endif
@@ -857,7 +857,6 @@ end subroutine write_radiative_rates_atom
  ! ATM assumes:
  !    1) Jnu is on the exact same wavelength grid
  !       and spatial grid as Itot
- ! eta_es is set to Jnu read * thomson
  ! -------------------------------------------- !
   integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
   logical :: extend, simple, anynull
@@ -961,18 +960,18 @@ end subroutine write_radiative_rates_atom
 	 CALL Warning("Jnu size does not match actual grid")
 	endif
 
-    CALL FTG2Dd(unit,1,-999,shape(Jnu_cont),Nl,n_Cells,eta_es,anynull,status)
+    CALL FTG2Dd(unit,1,-999,shape(Jnu_cont),Nl,n_Cells,Jnu,anynull,status)
     if (status > 0) then
       write(*,*) "Read_Jnu cannot read Jnu "
       CALL print_error(status)
     endif
     
-    if (lelectron_scattering) then
-    	write(*,*) "-> Initialize electron scattering emissivity"
-    	do l=1, n_cells
-    		eta_es(:,l) = eta_es(:,l) * thomson(l)
-    	enddo
-    endif
+!     if (lelectron_scattering) then
+!     	write(*,*) "-> Initialize electron scattering emissivity"
+!     	do l=1, n_cells
+!     		eta_es(:,l) = eta_es(:,l) * thomson(l)
+!     	enddo
+!     endif
 
 
   CALL ftclos(unit, status) !close
@@ -1009,7 +1008,7 @@ end subroutine write_radiative_rates_atom
   
   J_to_write(:,:) = 0.0_dp
   do icell=1, n_cells
-  	if (icompute_atomRT(icell)>0) J_to_write(:,icell) = eta_es(:,icell) / thomson(icell)
+  	if (icompute_atomRT(icell)>0) J_to_write(:,icell) = Jnu(:,icell)!eta_es(:,icell) / thomson(icell)
   enddo
 
   !get unique unit number
@@ -1051,7 +1050,7 @@ end subroutine write_radiative_rates_atom
   !write data
   CALL ftpprd(unit,group,fpixel,nelements,J_to_write,status)
   
-  if (allocated(eta_es)) then
+  if (allocated(Jnu)) then
   	write(*,*) " Jnu with line not implemented (write_jnu)"
 !    CALL ftcrhd(unit, status)
 ! 

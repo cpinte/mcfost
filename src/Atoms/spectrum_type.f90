@@ -34,7 +34,7 @@ module spectrum_type
 	real(kind=dp), dimension(:,:), allocatable :: chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, chi0_bb, eta0_bb
 	real(kind=dp), dimension(:,:,:), allocatable :: Icont
 	real(kind=dp), dimension(:), allocatable :: lambda, lambda_cont
-	real(kind=dp), dimension(:,:), allocatable :: Jnu_cont, eta_es
+	real(kind=dp), dimension(:,:), allocatable :: Jnu_cont, Jnu
 	real(kind=dp), dimension(:,:), allocatable :: Istar_tot, Istar_cont
 	real(kind=dp), dimension(:,:,:), allocatable :: Itot
 	real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux !incl, az, lambda, id ?
@@ -322,7 +322,7 @@ call error("initSpectrumImage not modified!!")
 		!otherwise allocated bellow for nlte.
 		if ((lelectron_scattering).and.(.not.alloc_atom_nlte)) then
 			call alloc_jnu
-			mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(eta_es) 
+			mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(Jnu) 
 		endif
 
 
@@ -337,7 +337,7 @@ call error("initSpectrumImage not modified!!")
 			
 			if (lelectron_scattering) then
 				call alloc_jnu
-				mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(eta_es) 
+				mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(Jnu) 
 			endif
                 			
 			! .....  add other NLTE opac
@@ -650,8 +650,8 @@ call error("initSpectrumImage not modified!!")
 	subroutine alloc_Jnu()
   
 
-		allocate(eta_es(Nlambda,n_cells))
-		eta_es = 0.0
+		allocate(Jnu(Nlambda,n_cells))
+		Jnu = 0.0
 
 		allocate(Jnu_cont(Nlambda_cont,n_cells))
 		Jnu_cont = 0.0
@@ -663,7 +663,7 @@ call error("initSpectrumImage not modified!!")
 	subroutine dealloc_Jnu()
     
 		if (allocated(Jnu_cont)) deallocate(Jnu_cont)
-		if (allocated(eta_es)) deallocate(eta_es)
+		if (allocated(Jnu)) deallocate(Jnu)
 
 	return 
 	end subroutine dealloc_Jnu

@@ -38,9 +38,7 @@ MODULE solvene
  real(kind=dp), parameter :: MAX_ELECTRON_ERROR=1d-6
  integer, parameter :: N_MAX_ELECTRON_ITERATIONS=50!100!50
  integer, parameter :: N_MAX_ELEMENT=26 !100 is the max, corresponding the atomic number
- real(kind=dp), parameter :: ne_min_limit = 1d-100!1d-100!1d-50 !if ne < ne_min_limt, ne = 0
-											!tiny_dp
- real(kind=dp), parameter :: fjk_lim = 1d-20
+ real(kind=dp), parameter :: ne_min_limit = 1d-100!if ne < ne_min_limt, ne = 0
  real(kind=dp) :: min_f_HII, max_f_HII
  
  CONTAINS
@@ -163,6 +161,7 @@ MODULE solvene
 !  RETURN
 ! END FUNCTION getPartitionFunctionk
 
+!should be min max for all cells.
 subroutine show_electron_given_per_elem(id, k, max_fjk)
 	integer, intent(in) :: k, id
 	real(kind=dp), intent(in), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk
@@ -179,8 +178,13 @@ subroutine show_electron_given_per_elem(id, k, max_fjk)
 	list_elem(8) = 19 !K
 	list_elem(9) = 20 !Ca
 	
-	write(*,*) " -- Electron given for that cell --"
-	write(*,'("  -- cell #"(1I5)," id#"(1I2)" T="(1F14.4)" K, nHtot="(1ES17.8E3)" m-3")') k, id, T(k), nHtot(k)
+	!locally
+	if (k > 0 .and. k < n_cells + 1) then
+		write(*,*) " -- Electron given for that cell --"
+		write(*,'("  -- cell #"(1I5)," id#"(1I2)" T="(1F14.4)" K, nHtot="(1ES17.8E3)" m-3")') k, id, T(k), nHtot(k)
+	else!for all
+		write(*,*) " -- Max electron given for all cells --"	
+	endif
 	
 	do ell=-N_negative_ions, 9
 	
@@ -269,15 +273,6 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
 		                                     
 		fjk(1:Nstage) = fjk(1:Nstage)/nTotal_atom(k, elem%model)
 		n0 = n0 / ntotal_atom(k,elem%model)
-				
-! 		!check limit on ionisation fraction
-! 		do i=1,Nstage
-! 		
-! 			!if the ionisation fraction is lower than a limit set to zero.
-! 			!always zero neutrals
-! 			if (fjk(i) < fjk_lim) fjk(i) = 0.0_dp
-! 		
-! 		enddo
 		
 		if (elem%model%id == "H") then
 			min_f_HII = min(min_f_HII, fjk(2))
@@ -364,24 +359,26 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	real(kind=dp), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk, min_fjk !Negative ions from -N_neg to 0 (H-), then from 1 to Nelem positive ions
 	integer :: n, k, niter, j, ZM, id
 	type (Element), pointer :: elem
-	integer :: unconverged_cells(nb_proc)
+	integer :: unconverged_cells(nb_proc), ik_max
 
 	!!if (verbose) write(*,*) "Initial solution for electron loop:", ne_initial_solution
 
 	unconverged_cells(:) = 0
 	id = 1
+	ik_max = 0
 
 	epsilon = 0.0
 	
 	min_f_HII = 1d50
 	max_f_HII = 0.0_dp
+	max_fjk(:) = 0.0_dp
 
 	!$omp parallel &
 	!$omp default(none) &
 	!$omp private(k,n,j,fjk,dfjk,ne_old,niter,delta,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
-	!$omp private(dne, akj, id, ne0, elem, max_fjk, n0) &
+	!$omp private(dne, akj, id, ne0, elem, n0) &
 	!$omp shared(n_cells, Elements, ne_initial_solution,Hydrogen, ZM, unconverged_cells, Nelem) &
-	!$omp shared(ne, T, icompute_atomRT, nHtot, epsilon, max_f_HII, min_f_HII)
+	!$omp shared(ne, T, icompute_atomRT, nHtot, epsilon, max_f_HII, min_f_HII, ik_max, max_fjk)
 	!$omp do
 	do k=1,n_cells
 		!$ id = omp_get_thread_num() + 1
@@ -460,15 +457,13 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 					delta = delta + ne_old*PhiHmin*n0!
 					sum = sum-(n0 + ne_old*dfjk(1))*PhiHmin ! (fjk(1) + ne_old*dfjk(1))
 					
-					max_fjk(0) = ne_old*PhiHmin*n0
+					max_fjk(0) = max(max_fjk(0),ne_old*PhiHmin*n0)
 					
 				end if
 				
 				!neutrals do not contribute
 				!j-1 = 0 for neutrals
 				!j-1 = 1 for singly ionised ions.
-
-				max_fjk(n) = 0
 
 				!avoiding neutrals
 				!fjk are Nj / Not with Nj the total population in stage j evaluated at LTE
@@ -479,10 +474,10 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 ! 					sum = sum + akj*dfjk(j)
 ! 					max_fjk(n) = max(max_fjk(n), akj*fjk(j))
 ! 				end do
+				akj = elem%Abund
 				!new the term j-1 already included in fjk and dfjk
 				do j=1, elem%Nstage !start at 1 but fjk and dfjk are 0 if stage 1 = neutral
 									!this allows a better match with detailed models that can have ionised level for j=1 (like Ca II)
-					akj = elem%Abund
 					!positive contribution to the electron density
 					delta = delta -akj*fjk(j)
 					sum = sum + akj*dfjk(j)
@@ -505,9 +500,14 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 			dne = abs ( 1.0_dp - ne_old / ne(k) )
 			ne_old = ne(k)
 			
+! 			test epsilon en para et pas para!!!
 			!can I do that in parallel ? epsilon is shared
 			!compare to the initial solution (the previous solution in non-LTE)
-			epsilon = max(epsilon, abs(1.0_dp - ne0 / ne(k)))
+			if (abs(1.0_dp - ne0 / ne(k)) > epsilon) then
+				epsilon = abs(1.0_dp - ne0 / ne(k))
+				ik_max = k
+			endif
+! 			epsilon = max(epsilon, abs(1.0_dp - ne0 / ne(k)))
 			
 ! 			if (k==70) then
 ! 				write(*,*) "dne=", dne, epsilon
@@ -540,10 +540,6 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 			end if !convergence test
     
 		end do !while loop
-		
-		!show after convergence of that cell
-! 		if (id==1) call show_electron_given_per_elem(id, k, max_fjk)
-		!will only show for the first thread.
 
 	end do !loop over spatial points
 	!$omp end do
@@ -552,9 +548,11 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	if (verbose) then
 			write(*,*) " ------------------------------------------------ "
 			write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
-			write(*,'("   >>>  epsilon="(1ES17.8E3))') epsilon
+			write(*,'("   >>>  epsilon="(1ES17.8E3)" at cell "(1I5))') epsilon, ik_max
+			write(*,*) " T = ", T(ik_max)," nH = ", nHtot(ik_max)
 			write(*,*) " "
 			write(*,'("Ionisation fraction of HII "(1ES17.8E3, 1ES17.8E3))') max_f_HII, min_f_HII
+! 			call show_electron_given_per_elem(0, 0, max_fjk)
 			write(*,*) " ------------------------------------------------ "
 	endif
 
@@ -565,7 +563,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
   if (unconverged_cells(1) > 0) then
   	write(*,*) "Found ", unconverged_cells(1)," unconverged cells (%):", 100*real(unconverged_Cells(1))/real(n_cells)
   endif
-  
+
 return
 end subroutine solve_electron_density
 

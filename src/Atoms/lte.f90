@@ -22,6 +22,8 @@ MODULE lte
  IMPLICIT NONE
 
  real(kind=dp), parameter :: phi_min_limit = 1d-100!tiny_dp!1d-100 !1d-50, tiny_dp
+ real(kind=dp), parameter :: CI = 0.5*(HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
+
 
  CONTAINS
  
@@ -69,6 +71,17 @@ END FUNCTION getPartitionFunctionk
        
  RETURN
 END FUNCTION get_logPartitionFunctionk
+
+function phi_T(k, gi_on_gj, dE)!Ui_on_Uj, 
+	real(kind=dp) :: phi_T
+	integer, intent(in) :: k
+	real(kind=dp), intent(in) ::dE, gi_on_gj!, Ui_on_Uj
+
+	phi_T = gi_on_gj * CI * T(k)**(-1.5_dp) * exp(dE / ( KBOLTZMANN*T(k) ))!* Ui_on_Uj * 
+
+return
+end function phi_T
+
 
  FUNCTION phi_jl(k, Ujl, Uj1l, ionpot) result(phi)
   ! -------------------------------------------------------------- !
@@ -205,7 +218,8 @@ END FUNCTION get_logPartitionFunctionk
    !UH = getPartitionFunctionk(elements(1)%ptr_elem, 1, icell)
    !Mostly 2
    UHm = 1.0
-   nH = nHtot(icell)!sum(Hydrogen%n(1:hydrogen%Nlevel-1,icell))
+   !nH = nHtot(icell)
+   nH = hydrogen%n(1,icell)!sum(Hydrogen%n(1:hydrogen%Nlevel-1,icell))
    nH_minus =  ne(icell) * phi_jl(icell, UHm, UH, E_ION_HMIN) * nH
       
   RETURN

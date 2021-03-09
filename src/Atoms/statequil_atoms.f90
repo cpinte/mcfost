@@ -3,7 +3,7 @@ MODULE statequil_atoms
 	use atmos_type, only					: ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements, hydrogen, helium
 	use atom_type
 	use spectrum_type, only					: lambda, Nlambda, Nlambda_cont, lambda_cont, Jnu_cont, Itot, dk, dk_min, dk_max, &
-												eta_es, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb
+												Jnu, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb
 	use constant
 	use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc
 	use math, only							: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, &
@@ -15,6 +15,8 @@ MODULE statequil_atoms
 	use occupation_probability, only 		: D_i, wocc_n
 	use profiles, only 						: write_profile
 	use opacity, only						: prec_pops, frac_limit_pops, frac_ne_limit
+	use lte, only 							: phi_T
+	use background_opacity, only			: Thomson
  
 	use mcfost_env, only					: dp
 	use constantes, only					: tiny_dp, sigma
@@ -26,7 +28,7 @@ MODULE statequil_atoms
 	!Nlambda,  Nproc not stored for all ray since no sub it and ray-ray building of rate matrix
 	real(kind=dp), allocatable :: psi(:,:,:), omega_sor_atom(:)
 	real(kind=dp), parameter :: Tmax = 1d10 !value of temperature of transition if ni = nj*gij
-	real(kind=dp), allocatable :: n_new(:,:,:)
+	real(kind=dp), allocatable :: n_new(:,:,:), cooling_rates(:,:,:)
 	character(len=50), parameter :: invpop_file = "inversion_populations.txt"
 	character(len=50), parameter :: profiles_file = "line_profile.txt"
 	character(len=50), parameter :: convergence_file = "thresh.txt", sub_convergence_file = "subthresh.txt"
@@ -146,7 +148,8 @@ MODULE statequil_atoms
     
 		atom%C(:,:,id) = 0d0
 		if (atom%ID=="H") then
-			atom%C(:,:,id) = Collision_Hydrogen(icell)
+			!7/03/2021, factorize out ne
+			atom%C(:,:,id) = ne(icell) * Collision_Hydrogen(icell)
 ! 			if (cswitch > 1.0) atom%C(:,:,id) = atom%C(:,:,id) * cswitch
 		else
 ! 			write(*,*) "Collision RH not set for large atoms"
@@ -304,7 +307,7 @@ MODULE statequil_atoms
 		
 
 		if (lelectron_scattering) then
-			eta_tot(:) = eta_tot(:) + eta_es(:,icell)
+			eta_tot(:) = eta_tot(:) + thomson(icell) * Jnu(:,icell) !eta_es(:,icell)
 		endif
 
   
@@ -491,7 +494,7 @@ MODULE statequil_atoms
 		real(kind=dp), intent(out) :: dT, Tex, Tion
 		integer :: nact, kr, kc, i, j
 		real(kind=dp) :: deltaE_k, ratio, Tdag, gij, dT_loc, Tion_loc, Tex_loc
-		real(kind=dp) :: wi, wj
+		real(kind=dp) :: wi, wj, ni_on_nj_star
 		
   
 		dT = 0.0_dp !for all transitions of one atom
@@ -597,7 +600,12 @@ MODULE statequil_atoms
       
 				!at threshold
 				!i.e., deltaE is hnu0
-				gij = atom%nstar(i,icell)/(atom%nstar(j,icell) ) * exp(-hc_k/atom%continua(kc)%lambda0/T(icell))
+				
+! 				ni_on_nj_star = ne(icell) * phi_T(icell, atom%g(i)/atom%g(j), atom%E(j)-atom%E(i))
+				ni_on_nj_star = atom%nstar(i,icell)/atom%nstar(j,icell) 
+				
+				
+				gij = ni_on_nj_star * exp(-hc_k/atom%continua(kc)%lambda0/T(icell))
 				ratio = log( wj*atom%n(i,icell)  / ( wi * atom%n(j,icell) * gij ) )
 				
 				if ((atom%n(i,icell) - gij * atom%n(j,icell)) <= 0.0 ) cycle tr_loop
@@ -1047,7 +1055,7 @@ MODULE statequil_atoms
 		real(kind=dp) :: etau, wphi, JJ, JJb, j1, j2, I1, I2, ehnukt, twohnu3_c2
 		real(kind=dp) :: wl, a1, a2
 		type(AtomType), pointer :: aatom, atom
-		real(kind=dp) :: wi, wj, nn, dk0, xcc_ij, xcc_ji
+		real(kind=dp) :: wi, wj, nn, dk0, xcc_ij, xcc_ji, ni_on_nj_star
 
 		aatom_loop : do nact = 1, Nactiveatoms
 			aatom => ActiveAtoms(nact)%ptr_atom
@@ -1141,6 +1149,8 @@ MODULE statequil_atoms
 ! 				chi_ion = Elements(aatom%periodic_table)%ptr_elem%ionpot(aatom%stage(j))
 ! 				neff = aatom%stage(j) * sqrt(aatom%Rydberg / (aatom%E(j) - aatom%E(i)) )
 
+! 				ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+				ni_on_nj_star = aatom%nstar(i,icell)/aatom%nstar(j,icell)
 				
 				Nblue = aatom%continua(kc)%Nb; Nred = aatom%continua(kc)%Nr
 				Nl = Nred-Nblue + 1
@@ -1179,7 +1189,7 @@ MODULE statequil_atoms
 				enddo
 
 				aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + waq*fourpi_h * JJ
-				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + waq*fourpi_h * JJb * ( aatom%nstar(i,icell)/aatom%nstar(j,icell) )
+				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + waq*fourpi_h * JJb * ni_on_nj_star
 
 				xcc_ij = 0.0_dp
 					sub_atrc_loop : do krr=1, aatom%Ntr
@@ -1223,194 +1233,194 @@ MODULE statequil_atoms
 	return
 	end subroutine calc_rates_mali
 	
-	subroutine calc_rates_mali_old(id, icell, iray, waq)
-		integer, intent(in) :: id, icell, iray
-		real(kind=dp), intent(in) :: waq
-		real(kind=dp) :: chicont, etacont
-		real(kind=dp), dimension(Nlambda_max_trans) :: Ieff		
-		!real(kind=dp), dimension(Nlambda) :: Ieff!chi_tot, eta_tot, 
-		integer :: nact, Nred, Nblue, kc, kcc, kr, krr, i, j, ip, jp, l, a0, Nl, icell_d
-		integer :: N1, N2
-		real(kind=dp) :: etau, wphi, JJ, JJb, j1, j2, I1, I2, ehnukt, twohnu3_c2
-		real(kind=dp) :: wl, a1, a2
-		type(AtomType), pointer :: aatom, atom
-		real(kind=dp) :: wi, wj, nn, dk0, xcc_ij, xcc_ji
-
-		aatom_loop : do nact = 1, Nactiveatoms
-			aatom => ActiveAtoms(nact)%ptr_atom
-
-			!move inside transition Ieff(1:Nlam) = Itot(Nb:Nred) ...
-			Ieff = Itot(:,iray,id) - Psi(:,iray,id) * eta_atoms(:,nact,id)
-			if (any_nan_infinity_vector(Ieff)>0) then
-				write(*,*) id, icell, iray, waq
-				write(*,*) "Ieff=", Ieff
-				call error("Infinity in Ieff")
-			endif
-			
-			atr_loop : do kr = 1, aatom%Ntr_line
-
-				kc = aatom%at(kr)%ik
-
-				Nred = aatom%lines(kc)%Nred;Nblue = aatom%lines(kc)%Nblue
-				i = aatom%lines(kc)%i
-				j = aatom%lines(kc)%j
-				
-				Nl = Nred-dk_min+dk_max-Nblue+1
-				a0 = Nblue+dk_min-1
-				
-				JJ = 0.0
-				wphi = 0.0
-				xcc_ji = 0.0				
-				
+! 	subroutine calc_rates_mali_old(id, icell, iray, waq)
+! 		integer, intent(in) :: id, icell, iray
+! 		real(kind=dp), intent(in) :: waq
+! 		real(kind=dp) :: chicont, etacont
+! 		real(kind=dp), dimension(Nlambda_max_trans) :: Ieff		
+! 		!real(kind=dp), dimension(Nlambda) :: Ieff!chi_tot, eta_tot, 
+! 		integer :: nact, Nred, Nblue, kc, kcc, kr, krr, i, j, ip, jp, l, a0, Nl, icell_d
+! 		integer :: N1, N2
+! 		real(kind=dp) :: etau, wphi, JJ, JJb, j1, j2, I1, I2, ehnukt, twohnu3_c2
+! 		real(kind=dp) :: wl, a1, a2
+! 		type(AtomType), pointer :: aatom, atom
+! 		real(kind=dp) :: wi, wj, nn, dk0, xcc_ij, xcc_ji
+! 
+! 		aatom_loop : do nact = 1, Nactiveatoms
+! 			aatom => ActiveAtoms(nact)%ptr_atom
+! 
+! 			!move inside transition Ieff(1:Nlam) = Itot(Nb:Nred) ...
+! 			Ieff = Itot(:,iray,id) - Psi(:,iray,id) * eta_atoms(:,nact,id)
+! 			if (any_nan_infinity_vector(Ieff)>0) then
+! 				write(*,*) id, icell, iray, waq
+! 				write(*,*) "Ieff=", Ieff
+! 				call error("Infinity in Ieff")
+! 			endif
+! 			
+! 			atr_loop : do kr = 1, aatom%Ntr_line
+! 
+! 				kc = aatom%at(kr)%ik
+! 
+! 				Nred = aatom%lines(kc)%Nred;Nblue = aatom%lines(kc)%Nblue
+! 				i = aatom%lines(kc)%i
+! 				j = aatom%lines(kc)%j
+! 				
+! 				Nl = Nred-dk_min+dk_max-Nblue+1
+! 				a0 = Nblue+dk_min-1
+! 				
+! 				JJ = 0.0
+! 				wphi = 0.0
+! 				xcc_ji = 0.0				
+! 				
+! ! 				enddo
+! 				do l=1,Nl
+! 					if (l==1) then
+! 						wl = 0.5*(1d3*hv)
+! 						!wl = 0.5*(lambda(a0+l+1)-lambda(a0+l)) * clight / aatom%lines(kc)%lambda0
+! 					elseif (l==Nl) then
+! 						wl = 0.5*(1d3*hv)
+! 						!wl = 0.5*(lambda(a0+l)-lambda(a0+l-1)) * clight / aatom%lines(kc)%lambda0
+! 					else
+! 						wl = 1d3*hv
+! 						!wl = 0.5*(lambda(a0+l+1)-lambda(a0+l-1)) * clight / aatom%lines(kc)%lambda0
+! 					endif
+! 
+! 					JJ = JJ + wl * Ieff(a0+l) * aatom%lines(kc)%phi_loc(l,iray,id)
+! 					wphi = wphi + wl * aatom%lines(kc)%phi_loc(l,iray,id)
+! 					xcc_ji = xcc_ji + chi_up(a0+l,i,nact,id)*psi(a0+l,iray,id)*Uji_down(a0+l,j,nact,id)
+! 					
 ! 				enddo
-				do l=1,Nl
-					if (l==1) then
-						wl = 0.5*(1d3*hv)
-						!wl = 0.5*(lambda(a0+l+1)-lambda(a0+l)) * clight / aatom%lines(kc)%lambda0
-					elseif (l==Nl) then
-						wl = 0.5*(1d3*hv)
-						!wl = 0.5*(lambda(a0+l)-lambda(a0+l-1)) * clight / aatom%lines(kc)%lambda0
-					else
-						wl = 1d3*hv
-						!wl = 0.5*(lambda(a0+l+1)-lambda(a0+l-1)) * clight / aatom%lines(kc)%lambda0
-					endif
-
-					JJ = JJ + wl * Ieff(a0+l) * aatom%lines(kc)%phi_loc(l,iray,id)
-					wphi = wphi + wl * aatom%lines(kc)%phi_loc(l,iray,id)
-					xcc_ji = xcc_ji + chi_up(a0+l,i,nact,id)*psi(a0+l,iray,id)*Uji_down(a0+l,j,nact,id)
-					
-				enddo
-				
-				JJ = waq * JJ / wphi
-				
-				!init at Aji
-				aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + JJ * aatom%lines(kc)%Bji
-				aatom%lines(kc)%Rij(id) = aatom%lines(kc)%Rij(id) + JJ * aatom%lines(kc)%Bij
-
-				!cross-coupling terms
-				xcc_ij = 0.0_dp! 
-					sub_atr_loop : do krr=1, aatom%Ntr
-				
-						kcc = aatom%at(krr)%ik
-					
-						select case (aatom%at(krr)%trtype)
-					
-						case ("ATOMIC_LINE")
-							ip = aatom%lines(kcc)%i
-							jp = aatom%lines(kcc)%j
-							N1 = aatom%lines(kcc)%Nblue+dk_min
-							N2 = aatom%lines(kcc)%Nred+dk_max
-							if (jp==i) then !i upper level of another transitions
-								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
-							endif
-					
-						case ("ATOMIC_CONTINUUM")
-							ip = aatom%continua(kcc)%i
-							jp = aatom%continua(kcc)%j
-							N1 = aatom%continua(kcc)%Nb
-							N2 = aatom%continua(kcc)%Nr
-							if (jp==i) then !i upper level of another transitions
-								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
-							endif
-					
-						case default
-							call error("Transition type unknown cross-coupling (line)", aatom%at(krr)%trtype)
-						end select
-				
-				
-					enddo sub_atr_loop
-
-				aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) - xcc_ji * waq
-				aatom%lines(kc)%Rij(id) = aatom%lines(kc)%Rij(id) + xcc_ij * waq
-				
-			end do atr_loop
-			
-			atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
-			
-	 			kc = aatom%at(kr)%ik
-
-				i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
-! 				chi_ion = Elements(aatom%periodic_table)%ptr_elem%ionpot(aatom%stage(j))
-! 				neff = aatom%stage(j) * sqrt(aatom%Rydberg / (aatom%E(j) - aatom%E(i)) )
-
-				
-				Nblue = aatom%continua(kc)%Nb; Nred = aatom%continua(kc)%Nr
-				Nl = Nred-Nblue + 1
-								
-				JJ = 0.0
-				JJb = 0.0
-				xcc_ji = 0.0
-				
-				icell_d = 1
-				if (ldissolve) then
-					if (aatom%ID=="H") icell_d = icell
-				endif
-				
-				do l=1, Nl
-					if (l==1) then
-						wl = 0.5*(lambda(Nblue+l)-lambda(Nblue)) / lambda(Nblue)
-					elseif (l==Nl) then
-						wl = 0.5*(lambda(Nred)-lambda(Nred-1))  / lambda(Nred)
-					else
-						wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-2)) / lambda(Nblue+l-1)
-					endif
-
-					a1 = aatom%continua(kc)%alpha_nu(l,icell_d)
-
-					JJ = JJ + wl  * a1 * Ieff(Nblue+l-1)
-															
-					ehnukt = exp(-hc_k/T(icell)/lambda(Nblue+l-1))
-					twohnu3_c2 = twohc/lambda(Nblue+l-1)**3 
-					JJb = JJb + wl * ( Ieff(Nblue+l-1) + twohnu3_c2 ) * ehnukt * a1
-					
-					xcc_ji = xcc_ji + chi_up(Nblue+l-1,i,nact,id)*Uji_down(Nblue+l-1,j,nact,id)*psi(Nblue+l-1,iray,id)
-
-				enddo
-
-				aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + waq*fourpi_h * JJ
-				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + waq*fourpi_h * JJb * ( aatom%nstar(i,icell)/aatom%nstar(j,icell) )
-
-				xcc_ij = 0.0_dp
-					sub_atrc_loop : do krr=1, aatom%Ntr
-				
-						kcc = aatom%at(krr)%ik
-					
-						select case (aatom%at(krr)%trtype)
-						case ("ATOMIC_LINE")
-							ip = aatom%lines(kcc)%i
-							jp = aatom%lines(kcc)%j
-							N1 = aatom%lines(kcc)%Nblue+dk_min
-							N2 = aatom%lines(kcc)%Nred+dk_max
-							if (jp==i) then !i upper level of another transitions
-								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
-							endif
-						case ("ATOMIC_CONTINUUM")
-							ip = aatom%continua(kcc)%i
-							jp = aatom%continua(kcc)%j
-							N1 = aatom%continua(kcc)%Nb
-							N2 = aatom%continua(kcc)%Nr
-							if (jp==i) then !i upper level of another transitions
-								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
-							endif
-					
-						case default
-							call error("Transition type unknown cross-coupling (continuum)", aatom%at(krr)%trtype)
-						end select
-				
-				
-					enddo sub_atrc_loop
-					
-				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) - xcc_ji * waq
-				aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + xcc_ij * waq
-
-			end do atrc_loop
-
-			aatom => NULL()
-
-		end do aatom_loop
-
-	return
-	end subroutine calc_rates_mali_old
+! 				
+! 				JJ = waq * JJ / wphi
+! 				
+! 				!init at Aji
+! 				aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + JJ * aatom%lines(kc)%Bji
+! 				aatom%lines(kc)%Rij(id) = aatom%lines(kc)%Rij(id) + JJ * aatom%lines(kc)%Bij
+! 
+! 				!cross-coupling terms
+! 				xcc_ij = 0.0_dp! 
+! 					sub_atr_loop : do krr=1, aatom%Ntr
+! 				
+! 						kcc = aatom%at(krr)%ik
+! 					
+! 						select case (aatom%at(krr)%trtype)
+! 					
+! 						case ("ATOMIC_LINE")
+! 							ip = aatom%lines(kcc)%i
+! 							jp = aatom%lines(kcc)%j
+! 							N1 = aatom%lines(kcc)%Nblue+dk_min
+! 							N2 = aatom%lines(kcc)%Nred+dk_max
+! 							if (jp==i) then !i upper level of another transitions
+! 								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
+! 							endif
+! 					
+! 						case ("ATOMIC_CONTINUUM")
+! 							ip = aatom%continua(kcc)%i
+! 							jp = aatom%continua(kcc)%j
+! 							N1 = aatom%continua(kcc)%Nb
+! 							N2 = aatom%continua(kcc)%Nr
+! 							if (jp==i) then !i upper level of another transitions
+! 								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
+! 							endif
+! 					
+! 						case default
+! 							call error("Transition type unknown cross-coupling (line)", aatom%at(krr)%trtype)
+! 						end select
+! 				
+! 				
+! 					enddo sub_atr_loop
+! 
+! 				aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) - xcc_ji * waq
+! 				aatom%lines(kc)%Rij(id) = aatom%lines(kc)%Rij(id) + xcc_ij * waq
+! 				
+! 			end do atr_loop
+! 			
+! 			atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
+! 			
+! 	 			kc = aatom%at(kr)%ik
+! 
+! 				i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
+! ! 				chi_ion = Elements(aatom%periodic_table)%ptr_elem%ionpot(aatom%stage(j))
+! ! 				neff = aatom%stage(j) * sqrt(aatom%Rydberg / (aatom%E(j) - aatom%E(i)) )
+! 
+! 				
+! 				Nblue = aatom%continua(kc)%Nb; Nred = aatom%continua(kc)%Nr
+! 				Nl = Nred-Nblue + 1
+! 								
+! 				JJ = 0.0
+! 				JJb = 0.0
+! 				xcc_ji = 0.0
+! 				
+! 				icell_d = 1
+! 				if (ldissolve) then
+! 					if (aatom%ID=="H") icell_d = icell
+! 				endif
+! 				
+! 				do l=1, Nl
+! 					if (l==1) then
+! 						wl = 0.5*(lambda(Nblue+l)-lambda(Nblue)) / lambda(Nblue)
+! 					elseif (l==Nl) then
+! 						wl = 0.5*(lambda(Nred)-lambda(Nred-1))  / lambda(Nred)
+! 					else
+! 						wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-2)) / lambda(Nblue+l-1)
+! 					endif
+! 
+! 					a1 = aatom%continua(kc)%alpha_nu(l,icell_d)
+! 
+! 					JJ = JJ + wl  * a1 * Ieff(Nblue+l-1)
+! 															
+! 					ehnukt = exp(-hc_k/T(icell)/lambda(Nblue+l-1))
+! 					twohnu3_c2 = twohc/lambda(Nblue+l-1)**3 
+! 					JJb = JJb + wl * ( Ieff(Nblue+l-1) + twohnu3_c2 ) * ehnukt * a1
+! 					
+! 					xcc_ji = xcc_ji + chi_up(Nblue+l-1,i,nact,id)*Uji_down(Nblue+l-1,j,nact,id)*psi(Nblue+l-1,iray,id)
+! 
+! 				enddo
+! 
+! 				aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + waq*fourpi_h * JJ
+! 				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + waq*fourpi_h * JJb * ( aatom%nstar(i,icell)/aatom%nstar(j,icell) )
+! 
+! 				xcc_ij = 0.0_dp
+! 					sub_atrc_loop : do krr=1, aatom%Ntr
+! 				
+! 						kcc = aatom%at(krr)%ik
+! 					
+! 						select case (aatom%at(krr)%trtype)
+! 						case ("ATOMIC_LINE")
+! 							ip = aatom%lines(kcc)%i
+! 							jp = aatom%lines(kcc)%j
+! 							N1 = aatom%lines(kcc)%Nblue+dk_min
+! 							N2 = aatom%lines(kcc)%Nred+dk_max
+! 							if (jp==i) then !i upper level of another transitions
+! 								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
+! 							endif
+! 						case ("ATOMIC_CONTINUUM")
+! 							ip = aatom%continua(kcc)%i
+! 							jp = aatom%continua(kcc)%j
+! 							N1 = aatom%continua(kcc)%Nb
+! 							N2 = aatom%continua(kcc)%Nr
+! 							if (jp==i) then !i upper level of another transitions
+! 								xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
+! 							endif
+! 					
+! 						case default
+! 							call error("Transition type unknown cross-coupling (continuum)", aatom%at(krr)%trtype)
+! 						end select
+! 				
+! 				
+! 					enddo sub_atrc_loop
+! 					
+! 				aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) - xcc_ji * waq
+! 				aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + xcc_ij * waq
+! 
+! 			end do atrc_loop
+! 
+! 			aatom => NULL()
+! 
+! 		end do aatom_loop
+! 
+! 	return
+! 	end subroutine calc_rates_mali_old
 	
 	
 	subroutine store_radiative_rates_mali(id, icell, init, waq, Nmaxtr, Rij, Rji)
@@ -1423,6 +1433,7 @@ MODULE statequil_atoms
 		integer :: i, j, Nl, Nblue, Nred, a0, icell_d
 		real(kind=dp) :: a1, JJb, a2, di1, di2, ehnukt, twohnu3_c2, wl
 		real(kind=dp) :: chi_ion, neff, Ieff1, Ieff2, JJ, wphi, J1, J2
+		real(kind=dp) :: ni_on_nj_star
 		type (AtomType), pointer :: atom
 	
 		if (init) then
@@ -1491,6 +1502,9 @@ MODULE statequil_atoms
 					if (ldissolve) then
 						if (atom%ID=="H") icell_d = icell
 					endif
+					
+! 					ni_on_nj_star = ne(icell) * phi_T(icell, atom%g(i)/atom%g(j), atom%E(j)-atom%E(i))
+					ni_on_nj_star = atom%nstar(i,icell)/atom%nstar(j,icell)	
 													
 					JJ = 0.0
 					JJb = 0.0
@@ -1512,7 +1526,7 @@ MODULE statequil_atoms
 					enddo
 
 					Rij(nact,kc) = Rij(nact,kc) + waq*fourpi_h * JJ
-					Rji(nact,kc) = Rji(nact,kc) + waq*fourpi_h * JJb * atom%nstar(i,icell)/atom%nstar(j,icell)			
+					Rji(nact,kc) = Rji(nact,kc) + waq*fourpi_h * JJb * ni_on_nj_star		
 			
 				case default
 					call error("transition type unknown", atom%at(l)%trtype)
@@ -1678,6 +1692,24 @@ MODULE statequil_atoms
 	return
 	end subroutine store_rate_matrices	
 	
+
+	subroutine update_cooling_rates(id, icell)
+		integer, intent(in) :: id, icell
+		integer :: nat, kr
+		
+		!only for active atoms at the moment
+		!analytical formula for LTE
+! 		do nat=1, NactiveAtoms
+! 		
+! 			do kr=1, activeatoms(nat)%ptr_atom%Ntr
+! 				cooling_rates(kr, nat, icell) = Rij * ni - nj * Rji				
+! 			enddo
+! 		
+! 		enddo
+	
+	return
+	end subroutine update_cooling_rates
+	
 	subroutine calc_bb_rates(id, icell, iray, n_rayons)
 
 		integer, intent(in) :: id, icell, iray, n_rayons
@@ -1694,7 +1726,7 @@ MODULE statequil_atoms
 		chi_tot(:) = chi0_bb(:,icell)!0.0
 		eta_tot(:) = eta0_bb(:,icell)!0.0
 		if (lelectron_scattering) then
-			eta_tot(:) = eta_es(:,icell)
+			eta_tot(:) = Jnu(:,icell) * thomson(icell) !eta_es(:,icell)
 		endif
   
 		atom_loop : do nact = 1, Natom!Nactiveatoms
