@@ -618,7 +618,7 @@ subroutine write_radiative_rates_atom(atom, Rij, Rji)
 		call ftpkyj(unit, "j", atom%continua(k)%j, ' ', status)
 		call ftpkyj(unit, "i", atom%continua(k)%i, ' ', status)
 		nu_phot = c_light / nm_to_m / atom%continua(k)%lambda0
-		call ftpkye(unit, "nu_phot", nu_phot,-14,"Hz", status)
+		call ftpkyd(unit, "nu_phot", nu_phot,-14,"Hz", status)
 		rates(1,:) = Rij(l,:); rates(2,:) = Rji(l,:)
 		call ftpprd(unit,group,fpixel,nelements,rates,status) 
 
