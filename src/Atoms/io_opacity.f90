@@ -546,6 +546,7 @@ subroutine write_radiative_rates_atom(atom, Rij, Rji)
 	logical :: extend, simple
 	integer :: nelements, alloc_status
 	real(kind=dp), allocatable, dimension(:,:) :: rates
+	real(kind=dp) :: nu0, nu_phot
  	
  	
   !get unique unit number
@@ -587,6 +588,9 @@ subroutine write_radiative_rates_atom(atom, Rij, Rji)
 	l = 1
 	call ftpkyj(unit, "j", atom%lines(1)%j,'', status)
 	call ftpkyj(unit, "i", atom%lines(1)%i, ' ', status)
+	call ftpkyj(unit, "i", atom%lines(1)%i, ' ', status)
+	nu0 = hc / nm_to_m / atom%lines(1)%lambda0
+	call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
 	rates(1,:) = Rij(l,:); rates(2,:) = Rji(l,:)
 	call ftpprd(unit,group,fpixel,nelements,rates,status) 
 
@@ -599,6 +603,8 @@ subroutine write_radiative_rates_atom(atom, Rij, Rji)
 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 		call ftpkyj(unit, "j", atom%lines(k)%j, ' ', status)
 		call ftpkyj(unit, "i", atom%lines(k)%i, ' ', status)
+		nu0 = hc / nm_to_m / atom%lines(k)%lambda0
+		call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
 		rates(1,:) = Rij(l,:); rates(2,:) = Rji(l,:)
 		call ftpprd(unit,group,fpixel,nelements,rates,status) 
 
@@ -611,6 +617,8 @@ subroutine write_radiative_rates_atom(atom, Rij, Rji)
 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 		call ftpkyj(unit, "j", atom%continua(k)%j, ' ', status)
 		call ftpkyj(unit, "i", atom%continua(k)%i, ' ', status)
+		nu_phot = hc / nm_to_m / atom%continua(k)%lambda0
+		call ftpkye(unit, "nu_phot", nu_phot,-14,"Hz", status)
 		rates(1,:) = Rij(l,:); rates(2,:) = Rji(l,:)
 		call ftpprd(unit,group,fpixel,nelements,rates,status) 
 
