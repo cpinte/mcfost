@@ -58,8 +58,8 @@ module atom_transfer
 	use messages, only 			: error, warning
 	
 	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, fill_collision_matrix, &
-									init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates,store_radiative_rates_mali,calc_rates, store_rate_matrices, &
-									psi, calc_rates_mali, n_new, radiation_free_pops_atom, omega_sor_atom
+									init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates_mali,calc_rates, store_rate_matrices, &
+									psi, calc_rates_mali, n_new, radiation_free_pops_atom, omega_sor_atom!,store_radiative_rates,
 	use collision, only			: CollisionRate !future deprecation
 	use impact, only			: collision_hydrogen
 
@@ -1151,24 +1151,9 @@ module atom_transfer
 		if (lcheckpoint) call prepare_check_pointing()
 
 		call NLTEloop_mali(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter)
-		
-		!reevaluate here only if fixed during the loop but ne was iterated
-		!otherwise constant because 1) ne constant or 2), ne evaluated just after
-! 		if ((lfix_backgrnd_opac).and.(n_iterate_ne > 0)) then
-		!or, if LTE not updated during non-LTE loop (to not modify collision, but opacities modified by ne)
+
 		if (n_iterate_ne > 0) then
-			!now if lfixed background we do not update lte pops
-			!-> so update them here for passive lines and continua
-! 			do nact=1, Natom
-! 				if (Atoms(nact)%ptr_atom%ID=="H") then
-! 					write(*,*) " -> updating LTE pops of hydrogen with non-LTE ne"
-! 					call LTEpops_H
-! 				else
-! 					write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID, " with non-LTE ne"
-! 					call LTEpops(Atoms(nact)%ptr_atom,.false.)
-! 				endif	
-! 			enddo
-			!update nHmin density if depends on LTE pops ?, bu should depend on non-LTE
+			!Update LTE pops here and nH- if not done during non-LTE loop
 			if (lfix_backgrnd_opac) then
 				!also update profiles
 				call compute_background_continua
@@ -1940,7 +1925,7 @@ module atom_transfer
 ! 						write(*,'(1I4, 1F14.4, 2ES17.8E3)') icell, T(icell), ne(icell), nHtot(icell)
 						do nact=1,NactiveAtoms
 							atom => ActiveAtoms(nact)%ptr_atom
-     					         					    
+							
 							do ilevel=1,atom%Nlevel
 ! 								write(*,'(1I2, " fne="(1L1)," fntot="(1L1))') ilevel, n_new(nact,ilevel,icell) >= frac_ne_limit * ne(icell), n_new(nact,ilevel,icell) >= frac_limit_pops * ntotal_atom(icell, atom)
 ! 								write(*,'("--> n="(1ES17.8E3)," fne="(1ES17.8E3)," fntot="(1ES17.8E3))') n_new(nact,ilevel,icell), frac_ne_limit * ne(icell), frac_limit_pops * ntotal_atom(icell, atom)
