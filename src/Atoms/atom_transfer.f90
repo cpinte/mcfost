@@ -970,7 +970,7 @@ module atom_transfer
   	!Forcing evaluation of ne (lsolve_for_ne == True) might smooth the solution.
   else
     ne_initial = "H_IONISATION"
-	write(*,*) "Solving for electron density from H+M ionisation"
+	if (calc_ne) write(*,*) "Solving for electron density from H+M ionisation"
   endif	
  
   !no electron density in the model nor previous fits file calc_ne == True.

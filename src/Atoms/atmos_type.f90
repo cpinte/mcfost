@@ -2408,8 +2408,23 @@ module atmos_type
    	endif
    endif
 
-  !but this one is needed
-   if (maxval(ne) == 0d0) calc_ne = .true.
+
+!    if (maxval(ne) == 0d0) calc_ne = .true.
+   calc_ne = .false.
+   icell_loop : do icell=1,n_cells
+    !check that in filled cells there is electron density otherwise we need to compute it
+    !from scratch.
+   	if (icompute_atomRT(icell) > 0) then
+   	
+   		if (ne(icell) <= 0.0_dp) then
+   			write(*,*) "  ** No electron density found the model! ** "
+   			calc_ne = .true. 
+   			exit icell_loop
+   		endif
+   	
+   	endif
+   
+   enddo icell_loop
 
   !no need if we do not the dark_zones from input file.
    call write_atmos_domain() !but for consistency with the plot functions in python
