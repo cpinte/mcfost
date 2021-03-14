@@ -1204,10 +1204,10 @@ module Opacity
 ! 					if (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell) >= 0.0_dp) then
 					
 					chi_down(Nb+dk_min-1+la,j,nact,id) = chi_down(Nb+dk_min-1+la,j,nact,id) + &
-						wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * abs(aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
+						wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
 					
 					chi_up(Nb+dk_min-1+la,i,nact,id) = chi_up(Nb+dk_min-1+la,i,nact,id) + &
-						wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * abs(aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
+						wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
 
 						
 ! 					endif
