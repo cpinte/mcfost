@@ -598,6 +598,11 @@ module atom_transfer
    labs = .false.
    ! Ray tracing : on se propage dans l'autre sens
    u0 = -u ; v0 = -v ; w0 = -w
+   
+   iray = 1 ! because the direction is fixed and we compute the flux emerging
+               ! from a pixel, by computing the Intensity in this pixel
+   ! L'obs est en dehors de la grille
+   ri = 2*n_rad ; zj=1 ; phik=1
 
    ! le nbre de subpixel en x est 2^(iter-1)
    subpixels = 1
@@ -614,11 +619,8 @@ module atom_transfer
      sdx(:) = dx(:) / real(subpixels,kind=dp)
      sdy(:) = dy(:) / real(subpixels,kind=dp)
 
-     iray = 1 ! because the direction is fixed and we compute the flux emerging
-               ! from a pixel, by computing the Intensity in this pixel
-
-     ! L'obs est en dehors de la grille
-     ri = 2*n_rad ; zj=1 ; phik=1
+!      !L'obs est en dehors de la grille
+!      ri = 2*n_rad ; zj=1 ; phik=1
 
      ! Boucle sur les sous-pixels qui calcule l'intensite au centre
      ! de chaque sous pixel
@@ -748,7 +750,7 @@ module atom_transfer
   real(kind=dp):: taille_pix, nu
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
-  integer, parameter :: n_rad_RT = 151, n_phi_RT = 100 !(100, 36)
+  integer, parameter :: n_rad_RT = 300, n_phi_RT = 200 !(100, 36)
   real(kind=dp), dimension(n_rad_RT) :: tab_r
   real(kind=dp):: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
   integer :: ri_RT, phi_RT, lambda
@@ -790,91 +792,67 @@ module atom_transfer
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
     
   if (RT_line_method==1) then !log pixels
-  !-> at the moment it is like rt_line_method==2 but with explicit integration over the map
-!     n_iter_min = 1
-!     n_iter_max = 1
-!     
-!     ! dx and dy are only required for stellar map here
-!     taille_pix = (map_size/zoom)  ! en AU
-!     dx(:) = x_plan_image * taille_pix
-!     dy(:) = y_plan_image * taille_pix
-! 
-!     i = 1
-!     j = 1
-!     lresolved = .false.
-! 
-!     rmin_RT = max(w*0.9_dp,0.05_dp) * Rmin
-!     rmax_RT = Rmax * 2.0_dp
-! 
-!     tab_r(1) = rmin_RT
-!     fact_r = exp( (1.0_dp/(real(n_rad_RT,kind=dp) -1))*log(rmax_RT/rmin_RT) )
-!     do ri_RT = 2, n_rad_RT
-!       tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
-!     enddo
-! 
-!     fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
-! 
-! 
-!     ! Boucle sur les rayons d'echantillonnage
-!     !$omp parallel &
-!     !$omp default(none) &
-!     !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
-!     !$omp shared(tab_r,fact_A,x,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
-!     !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz,fact_r)
-!     id = 1 ! pour code sequentiel
-! 
-!     if (l_sym_ima) then
-!       cst_phi = pi  / real(n_phi_RT,kind=dp)
-!     else
-!       cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
-!     endif
-! 
-!      !$omp do schedule(dynamic,1)
-!      do ri_RT=1, n_rad_RT
-!         !$ id = omp_get_thread_num() + 1
-!         r = tab_r(ri_RT)
-! 		
-!         taille_pix =  fact_A * r ! racine carree de l'aire du pixel
-! 
-!         do phi_RT=1,n_phi_RT ! de 0 + eps à 2pi - eps (eps = pi/n_phi_RT)
-!            phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
-! 			
-!            pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image
-!             ! C'est le centre en fait car dx = dy = 0.
-!            call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max, i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
-!         end do !j
-!      end do !i
-!      !$omp end do
-!      !$omp end parallel
+  
+  	!no sub pixels here
+    n_iter_min = 1
+    n_iter_max = 1
+    
+    dx(:) = 0.0_dp
+    dy(:) = 0.0_dp
+    
+    i = 1
+    j = 1
+    lresolved = .false.
 
-     ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-     taille_pix = (map_size/zoom) / real(n_rad_RT,kind=dp) ! en AU
-     lresolved = .false.
+    rmin_RT = 0.001_dp * Rmin!max(w*0.9_dp,0.05_dp) * Rmin
+    rmax_RT = Rmax * 1.0_dp ! Rmax  * 2.0_dp
 
-     dx(:) = x_plan_image * taille_pix
-     dy(:) = y_plan_image * taille_pix
+    tab_r(1) = rmin_RT
+    fact_r = exp( (1.0_dp/(real(n_rad_RT,kind=dp) -1))*log(rmax_RT/rmin_RT) )
+    do ri_RT = 2, n_rad_RT
+      tab_r(ri_RT) = tab_r(ri_RT-1) * fact_r
+    enddo
 
-     !$omp parallel &
-     !$omp default(none) &
-     !$omp private(i,j,id) &
-     !$omp shared(Icorner,pixelcorner,dx,dy,u,v,w,taille_pix,npix_x_max,npix_y) &
-     !$omp shared(n_iter_min,n_iter_max,ibin,iaz)
+    fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
 
-     ! loop on pixels
-     id = 1 ! pour code sequentiel
-     n_iter_min = 1 !1 !3
-     n_iter_max = 1 !1 !6
+
+    ! Boucle sur les rayons d'echantillonnage
+    !$omp parallel &
+    !$omp default(none) &
+    !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
+    !$omp shared(tab_r,fact_A,x,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
+    !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,ibin,iaz,fact_r)
+    id = 1 ! pour code sequentiel
+
+    if (l_sym_ima) then
+      cst_phi = pi  / real(n_phi_RT,kind=dp)
+    else
+      cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
+    endif
+
      !$omp do schedule(dynamic,1)
-     do i = 1,n_rad_RT
+     do ri_RT=1, n_rad_RT
         !$ id = omp_get_thread_num() + 1
-        do j = 1,n_rad_RT
-           pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
-           call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max,1,1,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+        r = tab_r(ri_RT)
+		
+        taille_pix =  fact_A * r ! racine carree de l'aire du pixel
+
+        do phi_RT=1,n_phi_RT ! de 0 + eps à 2pi - eps (eps = pi/n_phi_RT)
+           phi = cst_phi * (real(phi_RT,kind=dp) -0.5_dp)
+			
+           pixelcorner(:,id) = center(:) + r * sin(phi) * x_plan_image + r * cos(phi) * y_plan_image
+            ! C'est le centre en fait car dx = dy = 0.
+           call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max, i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         end do !j
      end do !i
      !$omp end do
-     !$omp end parallel
+     !$omp end parallel 
      
+     !-> if star_map set dx and dy to 
+	 !!taille_pix = (map_size/zoom)  ! en AU
+     !!dx(:) = x_plan_image * taille_pix
+     !!dy(:) = y_plan_image * taille_pix
+         
   else !method 2
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
@@ -882,6 +860,9 @@ module atom_transfer
 
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
+     
+     !-> dust_transfer
+     !!Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
      if (l_sym_ima) then
         npix_x_max = npix_x/2 + modulo(npix_x,2)
@@ -901,16 +882,8 @@ module atom_transfer
      n_iter_max = 1 !1 !6
      !$omp do schedule(dynamic,1)
      do i = 1,npix_x_max
-     !do i=npix_x_max/2+1, npix_x_max/2+1
-        !$ id = omp_get_thread_num() + 1
-!!write(*,*) "*****"
-!!write(*,*) "i=",i, "id=",id
+	 !$ id = omp_get_thread_num() + 1
         do j = 1,npix_y
-
-!!write(*,*) "j=",j
-        !do j=npix_y/2+1,npix_y/2+1
-        !write(*,*) "ipix, jpix", i, j
-           ! Coin en bas gauche du pixel
            pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
            call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
         end do !j
@@ -2110,7 +2083,7 @@ module atom_transfer
               				end if
               			end if
               		else !steps < 3
-               			if (n_iter >= 1000) then
+               			if (n_iter > 1000) then
              		 		write(*,*) "Warning : not enough iterations to converge !!"
                  			lconverged = .true.
               			end if             			
@@ -2553,10 +2526,10 @@ end subroutine INTEG_RAY_JNU
 	! -------------------------------------------------------- !
 #include "sprng_f.h"
 
-	integer, parameter :: maxIter = 11, n_rayons_start2 = 1000
-	integer, parameter :: n_rayons_max2 = n_rayons_start2 * (2**(maxIter-1))
-	real :: precision = 1e-1!, parameter
-	real, parameter :: lambda_min = 5., lambda_max0 = 100000
+! 	integer, parameter :: maxIter = 11, n_rayons_start2 = 1000
+! 	integer, parameter :: n_rayons_max2 = n_rayons_start2 * (2**(maxIter-1))
+	real :: precision! parameter with 1e-1
+! 	real, parameter :: lambda_min = 5., lambda_max0 = 100000
 	integer :: etape, etape_start, etape_end, iray, n_rayons, n_rayons_old
 	integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
 	logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lprevious_converged, write_convergence_file
@@ -2575,7 +2548,17 @@ end subroutine INTEG_RAY_JNU
 
 
 	write(*,*) "   --> Lambda iterating Jnu with Nlambda ", Nlambda_cont
-	precision = dpops_max_error
+	!Non-LTE loop with starting solution for Jnu
+	if (NactiveAtoms > 0) then
+		if (lfixed_J) then
+			!Jnu kept fixed, same resolution as populations
+			precision = dpops_max_error		
+		else !Starting solution no need to converge a lot
+			precision = 1e-1
+		endif
+	else!No active atoms
+		precision = dpops_max_error
+	endif
 
 	write(*,*) "   precision in J is ", precision
 	write_convergence_file = .false.
@@ -2667,7 +2650,7 @@ end subroutine INTEG_RAY_JNU
 
 	if (write_convergence_file ) then
 		open(unit=20, file="Jnu_convergence.s", status="unknown")
-		write(20,*) "maxIter:", maxIter, " Nlam:", Nlambda, " Ncells:", n_cells
+		write(20,*) " Nlam:", Nlambda, " Ncells:", n_cells
 	endif
 
 	do etape=etape_start, etape_end
@@ -2851,17 +2834,22 @@ end subroutine INTEG_RAY_JNU
           	    endif
         	else
            		lprevious_converged = .false.
-           		if (.not.lfixed_rays) then
-           			n_rayons_old = n_rayons
-              		n_rayons = n_rayons * 2
-              		write(*,*) ' -- Increasing number of rays :', n_rayons
-              		!!write(*,"('   '(1I10)' -> '(1I10))") n_rayons_old, n_rayons
-              		if (n_iter >= maxIter) then
-             		 	write(*,*) "Warning : not enough rays to converge !!"
+!            		if (.not.lfixed_rays) then
+!            			n_rayons_old = n_rayons
+!               		n_rayons = n_rayons * 2
+!               		write(*,*) ' -- Increasing number of rays :', n_rayons
+!               		!!write(*,"('   '(1I10)' -> '(1I10))") n_rayons_old, n_rayons
+!               		if (n_iter >= maxIter) then
+!              		 	write(*,*) "Warning : not enough rays to converge !!"
+!                  		lconverged = .true.
+!               		end if
+!           	   end if
+				if (lfixed_rays) then
+					if (n_iter > 1000) then
+             			write(*,*) "Warning Iterate_Jnu : not enough iterations to converge !!"
                  		lconverged = .true.
-              		end if
-
-          	   end if
+					endif
+				endif
         	end if
 
 	    end do !while
@@ -2870,14 +2858,15 @@ end subroutine INTEG_RAY_JNU
 	if (write_convergence_file ) close(20)
 
   
-	if (.not.lstop_after_jnu) then
-		Jnu(:,:) = 0.0_dp
-		do icell=1, n_cells
-			if (icompute_atomRT(icell)>0) then
-				call bezier2_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnu(:,icell))
-			endif
-		enddo  
-	endif
+  	!For non-LTE loop
+! 	if (.not.lstop_after_jnu) then
+	Jnu(:,:) = 0.0_dp
+	do icell=1, n_cells
+		if (icompute_atomRT(icell)>0) then
+			call bezier2_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnu(:,icell))
+		endif
+	enddo  
+! 	endif
  
   
   
