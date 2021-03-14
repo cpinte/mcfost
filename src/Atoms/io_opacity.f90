@@ -1004,20 +1004,20 @@ end subroutine write_radiative_rates_atom
   integer :: unit, status = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
   logical :: extend, simple
   integer :: nelements, icell, alloc_status
-  real(kind=dp), dimension(:,:), allocatable :: J_to_write
+!   real(kind=dp), dimension(:,:), allocatable :: J_to_write
 
   !written only if lelectron_scattering or if nlte loop activated, in that case, Jnu_total
   !is computed
   if ((.not. lelectron_scattering).and.(Nactiveatoms==0)) return
   write(*,*) " Writing mean intensity... "
   
-  allocate(J_to_write(Nlambda, n_cells), stat=alloc_status)
-  if (alloc_status > 0) call error("Allocation error J_to_write")
+!   allocate(J_to_write(Nlambda, n_cells), stat=alloc_status)
+!   if (alloc_status > 0) call error("Allocation error J_to_write")
   
-  J_to_write(:,:) = 0.0_dp
-  do icell=1, n_cells
-  	if (icompute_atomRT(icell)>0) J_to_write(:,icell) = Jnu(:,icell)!eta_es(:,icell) / thomson(icell)
-  enddo
+!   J_to_write(:,:) = 0.0_dp
+!   do icell=1, n_cells
+!   	if (icompute_atomRT(icell)>0) J_to_write(:,icell) = Jnu(:,icell)!eta_es(:,icell) / thomson(icell)
+!   enddo
 
   !get unique unit number
   CALL ftgiou(unit,status)
@@ -1054,28 +1054,32 @@ end subroutine write_radiative_rates_atom
   
   CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
   ! Additional optional keywords
-  CALL ftpkys(unit, "Jc(nu)", "W.m-2.Hz^-1.sr^-1", ' ', status)
+!   CALL ftpkys(unit, "Jc(nu)", "W.m-2.Hz^-1.sr^-1", ' ', status)
+  CALL ftpkys(unit, "J", "W.m-2.Hz^-1.sr^-1", ' ', status)
   !write data
-  CALL ftpprd(unit,group,fpixel,nelements,J_to_write,status)
+!   CALL ftpprd(unit,group,fpixel,nelements,J_to_write,status)
+  CALL ftpprd(unit,group,fpixel,nelements,Jnu,status)
   
-  if (allocated(Jnu)) then
-  	write(*,*) " Jnu with line not implemented (write_jnu)"
-!    CALL ftcrhd(unit, status)
-! 
-!    !  Initialize parameters about the FITS image
-!    CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-!    ! Additional optional keywords
-!    CALL ftpkys(unit, "J(nu)", "W.m-2.Hz^-1.sr^-1", ' ', status)
-!    !write data
-!    CALL ftpprd(unit,group,fpixel,nelements,NLTEspec%J,status)
+  !Jnu_cont
+  nelements = nelements / naxes(1)
+  naxes(1) = Nlambda_cont
+  nelements = nelements * naxes(1)
+  CALL ftcrhd(unit, status)
+  if (status > 0) then
+     CALL print_error(status)
   endif
+  CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  ! Additional optional keywords
+  CALL ftpkys(unit,"Jc", "W.m-2.Hz^-1.sr^-1", ' ', status)
+  !write data
+  CALL ftpprd(unit,group,fpixel,nelements,Jnu_cont,status)  
 
 
   CALL ftclos(unit, status)
   CALL ftfiou(unit, status)
 
   if (status > 0) CALL print_error(status)
-  deallocate(J_to_write)
+!   deallocate(J_to_write)
 
  RETURN
  END SUBROUTINE write_Jnu
