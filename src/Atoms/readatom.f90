@@ -925,7 +925,7 @@ MODULE readatom
     endif
     
 	!Check Nstage
-	if (Elements(Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%Nstage /= maxval(Atoms(nmet)%ptr_atom%stage) + 1) then
+	if (Elements(Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%Nstage < maxval(Atoms(nmet)%ptr_atom%stage) + 1) then
 		write(*,*) Atoms(nmet)%ptr_atom%id, maxval(Atoms(nmet)%ptr_atom%stage) + 1
 		write(*,*) "Ns pf = ", Elements(Atoms(nmet)%ptr_atom%periodic_table)%ptr_elem%Nstage
 		call error("Model has more ionisation stages than the one in the partition function!")
