@@ -227,6 +227,8 @@ module Voronoi_grid
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
     if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
+
+
     nb_proc_voro = min(16,nb_proc)
     allocate(n_neighbours(nb_proc_voro))
 
@@ -240,6 +242,7 @@ module Voronoi_grid
     ! For initial position of rays in ray-tracing mode
     Rmax = sqrt( (limits(2)-limits(1))**2 + (limits(4)-limits(3))**2 + (limits(6)-limits(5))**2 )
 
+    alloc_status = 0
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
          SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
@@ -408,11 +411,9 @@ module Voronoi_grid
           unit = "MB"
        endif
        write(*,*) "Trying to allocate", mem, unit//" for temporary neighbours list"
+       alloc_status = 0
        allocate(neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc_voro), stat=alloc_status)
-       if (alloc_status /=0) then
-          write(*,*) "Error when allocating neighbours list"
-          write(*,*) "Exiting"
-       endif
+       if (alloc_status /=0) call error("Allocation error neighbours_list_loc")
        neighbours_list_loc = 0
 
        n_in = 0 ! We initialize value at 0 as we have a reduction + clause
@@ -475,10 +476,7 @@ module Voronoi_grid
        endif
        write(*,*) "Trying to allocate", mem, unit//" for neighbours list"
        allocate(neighbours_list(n_neighbours_tot), stat=alloc_status)
-       if (alloc_status /=0) then
-          write(*,*) "Error when allocating neighbours list"
-          write(*,*) "Exiting"
-       endif
+       if (alloc_status /=0) call error("Allocation error neighbours list")
 
        row = n_cells_per_cpu * max_neighbours ;
        k = 0 ;
@@ -669,23 +667,25 @@ module Voronoi_grid
        mem = mem / 1024**2
        unit = "MB"
     endif
+
+    alloc_status = 0
     write(*,*) "Trying to allocate", mem, unit//" for neighbours list"
     allocate(neighbours_list(n_neighbours_tot), stat=alloc_status)
-    if (alloc_status /=0) then
-       write(*,*) "Error when allocating neighbours list"
-       write(*,*) "Exiting"
-    endif
+    if (alloc_status /=0) call error("Allocating neighbours list in read_saved_tesselation")
     read(1,iostat=ios) volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut
     close(unit=1)
-    if (ios /= 0) then ! if some dimension changed
-       return
-    endif
 
-    ! We are using the same file with the same limits
-    if (voronoi_sha1 == voronoi_sha1_saved) then
-       if (maxval(abs(limits-limits_saved)) < 1e-3) then
-          lcompute = .false.
+    if (ios == 0) then ! some dimension
+       ! We are using the same file with the same limits
+       if (voronoi_sha1 == voronoi_sha1_saved) then
+          if (maxval(abs(limits-limits_saved)) < 1e-3) then
+             lcompute = .false.
+          endif
        endif
+    endif
+    if (lcompute) then
+       write(*,*) "Tesselation needs to be recomputed, deallocating neighbours list"
+       deallocate(neighbours_list)
     endif
 
     return
