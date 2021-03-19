@@ -689,7 +689,7 @@ function v_proj(icell,x,y,z,u,v,w) !
            phi = atan2(y, x)
            vx = cos(phi) * vr - sin(phi) * vphi
            vy = sin(phi) * vr + cos(phi) * vphi
-           if ((l_sym_centrale).and.(z.lt.0)) vz = -vz
+           if ((l_sym_centrale).and.(z < 0)) vz = -vz
         endif
         v_proj = vx * u + vy * v + vz * w
      else ! Using analytical velocity field

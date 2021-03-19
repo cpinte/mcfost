@@ -193,7 +193,8 @@ module Voronoi_grid
     !$ use omp_lib
 
     integer, intent(in) :: n_points
-    real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h, vx,vy,vz
+    real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h
+    real(kind=dp), dimension(:), allocatable, intent(in) :: vx,vy,vz
     integer, dimension(n_points), intent(in) :: particle_id
     real(kind=dp), dimension(6), intent(in) :: limits
     logical, intent(in) :: check_previous_tesselation
@@ -429,7 +430,7 @@ module Voronoi_grid
 
        ! Allocating results array
        alloc_status = 0
-       allocate(V_tmp(n_cells_per_cpu), was_cell_cut_tmp(n_cells), stat=alloc_status)
+       allocate(V_tmp(n_cells), was_cell_cut_tmp(n_cells), stat=alloc_status)
        if (alloc_status /=0) call error("Allocation error before voro++ call")
 
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, PS%vectors, PS%cutting_distance_o_h, &
