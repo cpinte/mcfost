@@ -33,13 +33,21 @@ MODULE solvene
 
  IMPLICIT NONE
 
- integer :: Max_ionisation_stage
  integer, parameter :: N_negative_ions = 0 !currently only H- at index 0
  real(kind=dp), parameter :: MAX_ELECTRON_ERROR=1d-6
  integer, parameter :: N_MAX_ELECTRON_ITERATIONS=50!100!50
  integer, parameter :: N_MAX_ELEMENT=26 !100 is the max, corresponding the atomic number
  real(kind=dp), parameter :: ne_min_limit = 1d-100!if ne < ne_min_limt, ne = 0
+ real(kind=dp), parameter :: T_lim_non_lte = 5000.0_dp
+ 
+ integer :: Max_ionisation_stage
  real(kind=dp) :: min_f_HII, max_f_HII
+ 
+ !Introducing a lock for ne iterations with icompute_atomRT == 2
+ !the transfer (and opacity) is solved for icompute_atomRT > 0
+ !but if icompute_atomRT==2 electron density has the init value.
+ !then electron iterations skipped for icompute_atomRT /= 1
+
  
  CONTAINS
 
@@ -273,7 +281,8 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
 		end do  
 		                                     
 		fjk(1:Nstage) = fjk(1:Nstage)/nTotal_atom(k, elem%model)
-		n0 = n0 / ntotal_atom(k,elem%model)
+! 		n0 = n0 / ntotal_atom(k,elem%model)
+		n0 = 0.0_dp
 		
 		if (elem%model%id == "H") then
 			min_f_HII = min(min_f_HII, fjk(2))
@@ -297,7 +306,7 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
 ! 				dfjk(j) = 0d0
 ! 			endif
 			!-> fjk is zero if ne=0 in Sahaeq
-			dfjk(j) = -(j-1)*fjk(j)/( ne + tiny_dp)
+			dfjk(j) = -(j-1)*fjk(j)/ne
     
 			sum1 = sum1 + fjk(j)
 			sum2 = sum2 + dfjk(j)
@@ -328,6 +337,7 @@ return
 end subroutine calc_ionisation_frac
 
 !try without para ! for epsilon
+!get cells that have not changed with subsequent iteration in non-LTE loop
 subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	! ----------------------------------------------------------------------!
 	! Solve for electron density for a set of elements
@@ -383,9 +393,16 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 	!$omp do
 	do k=1,n_cells
 		!$ id = omp_get_thread_num() + 1
-		if (icompute_atomRT(k) <= 0) CYCLE !transparent or dark
 
-		!Initial solution for this cell
+! 		if (icompute_atomRT(k) <= 0) cycle !transparent or dark
+! 		if (icompute_atomRT(k)==2) then
+! 			write(*,*) "id",id," skipping cell ", k, " for electron density! fixed values, ne = ", ne(k)
+! 		endif
+		if (icompute_atomRT(k) /= 1) cycle  !<=0 transparent or dark
+											!==2 ne locked to model value
+											!==1 compute with RT
+		
+		!! Initial solution for this cell!! 
 		
 		!compute that value in any case of the starting solution
 		!Metal
@@ -489,7 +506,7 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 			end do !loop over elem
 
 
-			ne(k) = ne_old - nHtot(k)*delta / (1.-nHtot(k)*sum)
+			ne(k) = ne_old - nHtot(k)*delta / (1.0-nHtot(k)*sum)
 			
 ! 			if (ne(k) == 0.0) then
 ! 				write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, sum	
@@ -497,23 +514,19 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 ! 				ne(k) = ne_oldM
 ! 			endif			
 			
-			!!dne = abs((ne(k)-ne_old)/(ne_old+tiny_dp))
+! 			dne = abs((ne(k)-ne_old)/ne_old)
 			dne = abs ( 1.0_dp - ne_old / ne(k) )
 			ne_old = ne(k)
 			
 ! 			test epsilon en para et pas para!!!
 			!can I do that in parallel ? epsilon is shared
-			!compare to the initial solution (the previous solution in non-LTE)
+! 			compare to the initial solution (the previous solution in non-LTE)
 			if (abs(1.0_dp - ne0 / ne(k)) > epsilon) then
 				epsilon = abs(1.0_dp - ne0 / ne(k))
+! 			if (abs((ne(k) - ne0) / ne0) > epsilon) then
+! 				epsilon = abs((ne(k) - ne0) / ne0)
 				ik_max = k
 			endif
-! 			epsilon = max(epsilon, abs(1.0_dp - ne0 / ne(k)))
-			
-! 			if (k==70) then
-! 				write(*,*) "dne=", dne, epsilon
-! 				write(*,*) ne_old, ne(k)
-! 			endif
     
 			if (is_nan_infinity(ne(k))>0) then
 				write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, " sum=", sum
@@ -724,7 +737,7 @@ write(*,*) "Test Nelem",Nelem
   !$omp do
   do k=1,n_cells
    !$ id = omp_get_thread_num() + 1
-   if (icompute_atomRT(k) <= 0) CYCLE !transparent or dark
+   if (icompute_atomRT(k) <= 0) cycle !transparent or dark
 
 
    !write(*,*) "The thread,", omp_get_thread_num() + 1," is doing the cell ", k

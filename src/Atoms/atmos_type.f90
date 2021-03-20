@@ -2157,7 +2157,7 @@ module atmos_type
    real(kind=dp) :: Tring, thetai, thetao, tilt
    integer, parameter :: Nhead = 3 !Add more
    character(len=MAX_LENGTH) :: rotation_law
-   integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
+   integer :: icell, Nread, syst_status, N_points, k, i, j, acspot, N_fixed_ne = 0
    character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
    logical :: accretion_spots
    real :: south
@@ -2409,7 +2409,6 @@ module atmos_type
    endif
 
 
-!    if (maxval(ne) == 0d0) calc_ne = .true.
    calc_ne = .false.
    icell_loop : do icell=1,n_cells
     !check that in filled cells there is electron density otherwise we need to compute it
@@ -2417,14 +2416,17 @@ module atmos_type
    	if (icompute_atomRT(icell) > 0) then
    	
    		if (ne(icell) <= 0.0_dp) then
-   			write(*,*) "  ** No electron density found the model! ** "
+   			write(*,*) "  ** No electron density found in the model! ** "
    			calc_ne = .true. 
    			exit icell_loop
    		endif
    	
-   	endif
-   
+   	endif   
    enddo icell_loop
+   	N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
+   	if (N_fixed_ne > 0) then
+   		write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
+   	endif
 
   !no need if we do not the dark_zones from input file.
    call write_atmos_domain() !but for consistency with the plot functions in python

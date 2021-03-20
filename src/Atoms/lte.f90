@@ -250,7 +250,9 @@ end function phi_T
    !$omp do
    do k=1,n_cells
 
-    if (icompute_atomRT(k) /= 1) CYCLE
+!     if (icompute_atomRT(k) /= 1) CYCLE
+    if (icompute_atomRT(k) <= 0) cycle !transparent or dark
+
 
     sum = 1.0
     phik = ne(k)*phi_jl(k,1.d0,1.d0,0.d0)
@@ -396,7 +398,8 @@ end function phi_T
    !$omp do
    do k=1,n_cells
 
-    if (icompute_atomRT(k) /= 1) CYCLE
+!     if (icompute_atomRT(k) /= 1) CYCLE
+    if (icompute_atomRT(k) <= 0) cycle !transparent or dark
 
     sum = 1.0
     phik = ne(k)*phi_jl(k,1.d0,1.d0,0.d0)
@@ -564,7 +567,9 @@ end function phi_T
    !$omp do
    do k=1,n_cells
 
-    if (icompute_atomRT(k) /= 1) CYCLE
+!     if (icompute_atomRT(k) /= 1) CYCLE
+    if (icompute_atomRT(k) <= 0) cycle !transparent or dark
+
     if (debye) dEion = c2*sqrt(ne(k)/T(k))
 
     
