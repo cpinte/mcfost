@@ -240,11 +240,6 @@ module atom_transfer
 					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
-				
-! 				if (minval(tau) > 1000.) then
-! 					write(*,*) "taumin > 100 stopping propagation"
-! 					return
-! 				endif
 
 			end if  ! lcellule_non_vide
 			
@@ -373,27 +368,27 @@ module atom_transfer
 				
 				if (lorigin_atom .and. lcontrib_function) then
 					do la=1,Nlambda
-						if (x0>=0 .and. y0>=0 .and. z0>=0) then
-							flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau_line(la)) - exp(-(tau_line(la)+l_contrib * chi_line(la))) ) * Sline(la) / (tiny_dp + chi_line(la))!Snu(la)
-							if (tau_line(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id) !tau(la) * Snu(la) in logtau
-						endif
+! 						if (x0>=0 .and. y0>=0 .and. z0>=0) then
+						flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau_line(la)) - exp(-(tau_line(la)+l_contrib * chi_line(la))) ) * Sline(la) / (tiny_dp + chi_line(la))!Snu(la)
+						if (tau_line(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id) !tau(la) * Snu(la) in logtau
+! 						endif
 						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
 						tau(la) = tau(la) + dtau(la) !for next cell
 						tau_line(la) = tau_line(la) + l_contrib * chi_line(la)
 					enddo
 				else if (lorigin_atom) then
 					do la=1,Nlambda
-						if (x0>=0 .and. y0>=0 .and. z0>=0) then
-							flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
-						endif
+! 						if (x0>=0 .and. y0>=0 .and. z0>=0) then
+						flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
+! 						endif
 						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
 						tau(la) = tau(la) + dtau(la) !for next cell
 					enddo
 				else if (lcontrib_function) then
 					do la=1,Nlambda
-						if (x0>=0 .and. y0>=0 .and. z0>=0) then
-							if (tau(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id)
-						endif
+! 						if (x0>=0 .and. y0>=0 .and. z0>=0) then
+						if (tau(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id)
+! 						endif
 						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
 						tau(la) = tau(la) + dtau(la) !for next cell
 					enddo
@@ -1038,6 +1033,7 @@ module atom_transfer
 		endif
 		!allocated(dk ....)
 		
+		
 		NmaxLevel = 0
 		NmaxTr = 0
 		do nact=1,Nactiveatoms
@@ -1089,6 +1085,12 @@ module atom_transfer
 		if (alloc_status > 0) call error("Allocation error Tex_old")
 		Tex_old = 0.0_dp
 		mem_alloc_tot = mem_alloc_tot + sizeof(Tex_old)
+		
+		!allocate gpop_old that contains the population of three iterations before
+		allocate(gpop_old(NactiveAtoms, Nmaxlevel, n_cells)); gpop_old = 0.0_dp
+		do nact=1, Nactiveatoms
+			gpop_old(nact,1:activeatoms(nact)%ptr_atom%Nlevel,:) = activeatoms(nact)%ptr_atom%n(:,:)
+		enddo
 		
 		!sub iter needed ?
 		!allocate(pops(NactiveAtoms, NmaxLevel, nb_proc)); pops = 0d0
@@ -1433,6 +1435,7 @@ module atom_transfer
 		allocate(Tex_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tex for all cells for each line of each atom
 		allocate(Tion_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
 		diff_old = 1.0_dp
+		dM(:) = 1.0_dp
 		
 		mem_alloc_local = mem_alloc_local + sizeof(dM)+sizeof(dTm)+sizeof(Tex_ref)+sizeof(Tion_ref)
 		
@@ -1773,7 +1776,7 @@ module atom_transfer
 				
 				!Ng acceleration
    				accelerated = .false.
-   				if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(diff_old < 1d-1))).and.(maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
+   				if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(maxval(dM) < 1d-2))).and.(maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
    					iorder = n_iter - iNg_Ndelay
    					if (ng_rest) then
 						write(*,'(" -> Acceleration relaxes... "(1I2)" /"(1I2))') iorder-i0_rest, iNg_Nperiod
@@ -1832,13 +1835,15 @@ module atom_transfer
 				!Updating for non Ng iterations ? add a condition on the dM < 1e-2 ? (better ndelay)
 				!cond on accelerate ?
 				update_bckgr_opac = .false.
-				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)).and.(n_iter>ndelay_iterate_ne)) then
+! 				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)) .and. (n_iter>ndelay_iterate_ne)) then
+				if ((iterate_ne .and. maxval(dM) < min(1e-1,10*precision)) .and. (n_iter>ndelay_iterate_ne).and.(.not.lprevious_converged)) then
 					!chic(:,:) = chi(:,:) - ne(:)
 					!allocate(ne_old(n_cells))
 					!!ne_old(:) = ne(:)
 					!write(*,'("ne old ="(1ES17.8E3)"("(1ES17.8E3)") m^-3")') maxval(ne), minval(ne,mask=ne>0)
 					call solve_electron_density(ne_start_sol, .true., dne)
-					!call Solve_Electron_Density_old(ne_start_sol)
+! 					call Solve_Electron_Density_old(ne_start_sol)
+! 					dne = 0.0_dp
 					!dne = maxval(abs(1.0_dp - ne_old(:)/(ne(:)+tiny_dp)))
 ! -> If i update here, for the first iteration nold is not equal to the lte populations used for
 ! the first solution, so the first test on the convergence is wrong. But,
@@ -1863,6 +1868,8 @@ module atom_transfer
 					!convergence_map(:,1,NactiveAtoms+1,:) = dne
 					
 					update_bckgr_opac = .true.
+					write(*,*) "ne/nHtot = ", maxval(ne/nHtot), minval(ne/nHtot, mask=icompute_atomRT>0)
+! 					write(*,*) maxval((ne + nHtot) * mumolec * masseH), maxval(rho))
 					!true if ne has been iterated at this iteration
 				end if
 
@@ -1906,20 +1913,22 @@ module atom_transfer
 ! 								write(*,*) " "
 ! 								if ( n_new(nact,ilevel,icell) >= frac_ne_limit * ne(icell) ) then
 								if ( n_new(nact,ilevel,icell) >= frac_limit_pops * ntotal_atom(icell, atom) ) then
-									dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
+! 									dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
+									dn1 = abs(-2*atom%n(ilevel,icell) + n_new(nact,ilevel,icell) + gpop_old(nact,ilevel,icell)) /  n_new(nact,ilevel,icell)
 									dN = max(dN1, dN)
 									dM(nact) = max(dM(nact), dN1)
 								endif
 									!convergence_map(icell, ilevel, nact, etape) = dN1
 							end do !over ilevel
-							diff_cont = max(diff_cont, abs(1.0 - atom%n(atom%Nlevel,icell)/(1d-50 + n_new(nact,atom%Nlevel,icell) )))
+! 							diff_cont = max(diff_cont, abs(1.0 - atom%n(atom%Nlevel,icell)/(1d-50 + n_new(nact,atom%Nlevel,icell) )))
+							diff_cont = max(diff_cont, abs(-2*atom%n(atom%Nlevel,icell) + n_new(nact,atom%Nlevel,icell) + gpop_old(nact,atom%Nlevel,icell)) / n_new(nact,atom%Nlevel,icell))
 
 							!I keep negative Temperatures for info.debug.
 							!hence the /= 0.0. But, some work should be done in update_pops and compute_Tex
 							do kr=1, atom%Nline
 							
 								if (atom%lines(kr)%Tex(icell) /= 0.0_dp) then 
-									dN3 = abs(1.0 - Tex_old(nact, kr, icell) /  atom%lines(kr)%Tex(icell) )!( atom%lines(kr)%Tex(icell) + tiny_dp ) )
+									dN3 = abs(1.0 - Tex_old(nact, kr, icell) /  atom%lines(kr)%Tex(icell) )
 									dN2 = max(dN3,dN2)
 									dTM(nact) = max(dTM(nact), dN3)
 									if (dN3 >= dN2) then
@@ -1948,8 +1957,8 @@ module atom_transfer
 						end do !over atoms
 						
 						!compare for all atoms and all cells
-! 						diff = max(diff, dN) ! pops
-						diff = max(diff, dN2) ! Texi, only lines
+						diff = max(diff, dN) ! pops
+! 						diff = max(diff, dN2) ! Texi, only lines
 
 						
 						!do not update if lfixed_J
@@ -1957,6 +1966,9 @@ module atom_transfer
 							Jnu_cont(:,icell) = Jnew_cont(:,icell)
 							do la=1, Nlambda
 								dN1 = abs( 1.0_dp - Jnu(la,icell)/Jnew(la,icell) )
+! 								if (Jnu(la,icell) > 0.0_dp) then
+! 									dN1 = abs( (Jnew(la,icell) - Jnu(la,icell))/Jnu(la,icell) )
+! 								endif	
 								if (dN1 > dJ) then
 									dJ = dN1
 									lambda_max = lambda(la)
@@ -1972,7 +1984,7 @@ module atom_transfer
 						!Re init for next iteration if any
 						do nact=1, NactiveAtoms
 							atom => ActiveAtoms(nact)%ptr_atom
-							!gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
+							gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
 							atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
 							do kr=1,atom%Nline
 								Tex_old(nact, kr, icell) = atom%lines(kr)%Tex(icell)
@@ -2060,6 +2072,9 @@ module atom_transfer
 	        	write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), 100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))))/real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
 				write(*,*) " *************************************************************** "
 				diff_old = diff
+				
+! 				write(*,*) " set lprevious_converged to true for test"
+! 				lprevious_converged = .true.
 				
 				!(real(dne) < precision).and.
 				if ((real(diff) < precision).and.(maxval_cswitch_atoms() == 1.0_dp)) then
