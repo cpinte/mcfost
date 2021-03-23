@@ -680,9 +680,16 @@ module Voronoi_grid
        if (voronoi_sha1 == voronoi_sha1_saved) then
           if (maxval(abs(limits-limits_saved)) < 1e-3) then
              lcompute = .false.
+          else
+             write(*,*) "Limits have changed"
           endif
+       else
+          write(*,*) "sha1 has changed"
        endif
+    else
+       write(*,*) "Problem reading file"
     endif
+
     if (lcompute) then
        write(*,*) "Tesselation needs to be recomputed, deallocating neighbours list"
        deallocate(neighbours_list)
