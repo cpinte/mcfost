@@ -878,7 +878,11 @@ subroutine find_spectra()
            delta_T = 100
         else if (Teff < 2700) then
            type = "dusty"
-           min_logg = 3.5
+           if ((Teff < 2250).and.(Teff > 2050)) then
+              min_logg = 4.0 ! Some models appear to be missing
+           else
+              min_logg = 3.5
+           endif
            max_logg = 6
            delta_T = 100
         else if (Teff < 10000) then
