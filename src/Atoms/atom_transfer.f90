@@ -1087,10 +1087,10 @@ module atom_transfer
 		mem_alloc_tot = mem_alloc_tot + sizeof(Tex_old)
 		
 		!allocate gpop_old that contains the population of three iterations before
-		allocate(gpop_old(NactiveAtoms, Nmaxlevel, n_cells)); gpop_old = 0.0_dp
-		do nact=1, Nactiveatoms
-			gpop_old(nact,1:activeatoms(nact)%ptr_atom%Nlevel,:) = activeatoms(nact)%ptr_atom%n(:,:)
-		enddo
+! 		allocate(gpop_old(NactiveAtoms, Nmaxlevel, n_cells)); gpop_old = 0.0_dp
+! 		do nact=1, Nactiveatoms
+! 			gpop_old(nact,1:activeatoms(nact)%ptr_atom%Nlevel,:) = activeatoms(nact)%ptr_atom%n(:,:)
+! 		enddo
 		
 		!sub iter needed ?
 		!allocate(pops(NactiveAtoms, NmaxLevel, nb_proc)); pops = 0d0
@@ -1868,7 +1868,7 @@ module atom_transfer
 					!convergence_map(:,1,NactiveAtoms+1,:) = dne
 					
 					update_bckgr_opac = .true.
-					write(*,*) "ne/nHtot = ", maxval(ne/nHtot), minval(ne/nHtot, mask=icompute_atomRT>0)
+! 					write(*,*) "ne/nHtot = ", maxval(ne/nHtot), minval(ne/nHtot, mask=icompute_atomRT>0)
 ! 					write(*,*) maxval((ne + nHtot) * mumolec * masseH), maxval(rho))
 					!true if ne has been iterated at this iteration
 				end if
@@ -1913,15 +1913,15 @@ module atom_transfer
 ! 								write(*,*) " "
 ! 								if ( n_new(nact,ilevel,icell) >= frac_ne_limit * ne(icell) ) then
 								if ( n_new(nact,ilevel,icell) >= frac_limit_pops * ntotal_atom(icell, atom) ) then
-! 									dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
-									dn1 = abs(-2*atom%n(ilevel,icell) + n_new(nact,ilevel,icell) + gpop_old(nact,ilevel,icell)) /  n_new(nact,ilevel,icell)
+									dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
+! 									dn1 = abs(-2*atom%n(ilevel,icell) + n_new(nact,ilevel,icell) + gpop_old(nact,ilevel,icell)) /  n_new(nact,ilevel,icell)
 									dN = max(dN1, dN)
 									dM(nact) = max(dM(nact), dN1)
 								endif
 									!convergence_map(icell, ilevel, nact, etape) = dN1
 							end do !over ilevel
-! 							diff_cont = max(diff_cont, abs(1.0 - atom%n(atom%Nlevel,icell)/(1d-50 + n_new(nact,atom%Nlevel,icell) )))
-							diff_cont = max(diff_cont, abs(-2*atom%n(atom%Nlevel,icell) + n_new(nact,atom%Nlevel,icell) + gpop_old(nact,atom%Nlevel,icell)) / n_new(nact,atom%Nlevel,icell))
+							diff_cont = max(diff_cont, abs(1.0 - atom%n(atom%Nlevel,icell)/(1d-50 + n_new(nact,atom%Nlevel,icell) )))
+! 							diff_cont = max(diff_cont, abs(-2*atom%n(atom%Nlevel,icell) + n_new(nact,atom%Nlevel,icell) + gpop_old(nact,atom%Nlevel,icell)) / n_new(nact,atom%Nlevel,icell))
 
 							!I keep negative Temperatures for info.debug.
 							!hence the /= 0.0. But, some work should be done in update_pops and compute_Tex
@@ -1984,7 +1984,7 @@ module atom_transfer
 						!Re init for next iteration if any
 						do nact=1, NactiveAtoms
 							atom => ActiveAtoms(nact)%ptr_atom
-							gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
+! 							gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
 							atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
 							do kr=1,atom%Nline
 								Tex_old(nact, kr, icell) = atom%lines(kr)%Tex(icell)
@@ -2002,6 +2002,7 @@ module atom_transfer
 						end do
 						
 						!update only if ne has been iterated at this iteration
+						!move elsewhere if electron density is iterated with SEE
 						if (update_bckgr_opac) then
 							!safe, used only if not lfixbackground
 							nHmin(icell) = nH_minus(icell)
