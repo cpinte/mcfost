@@ -168,7 +168,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
     !call extract('isink',isink,hdr,ierr,default=0)
 
     write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
-    write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
+    !write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
     write(*,*) ' nptmass = ', nptmass
 
     allocate(tmp(np), tmp_dp(np))
@@ -554,7 +554,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
     endif
 
     write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
-    write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
+    !write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
     write(*,*) ' nptmass = ', nptmass
 
     allocate(tmp(np), tmp_dp(np))
@@ -779,7 +779,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   udens = umass_scaled/udist_scaled**3
   uerg_per_s = umass_scaled*udist_scaled**2/utime_scaled**3
   uWatt = uerg_per_s * erg_to_J
-  ulength_au = udist_scaled/ (au_to_cm)
+  ulength_au = udist_scaled / (au_to_cm)
   uvelocity =  udist_scaled / (m_to_cm) / utime_scaled ! m/s
   usolarmass = umass_scaled / Msun_to_g
 
@@ -931,10 +931,12 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  n_etoiles = 0
  do i=1,nptmass
     n_etoiles = n_etoiles + 1
-    if (real(xyzmh_ptmass(4,i)) > 0.013) then
-       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * scale_mass_units_factor), "Msun"
+    if (real(xyzmh_ptmass(4,i)) * scale_mass_units_factor > 0.013) then
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * scale_mass_units_factor), &
+            "Msun, Mdot=", real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
     else
-       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * scale_mass_units_factor), "Mjup"
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * scale_mass_units_factor), &
+            "Mjup, Mdot=", real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
     endif
     if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1)) * scale_length_units_factor), "au"
  enddo
