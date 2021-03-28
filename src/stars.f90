@@ -874,7 +874,12 @@ subroutine find_spectra()
         endif
 
         if (Teff < 100) then
-           call error("Teff below 100K needs to be implemented")
+           call warning("Teff below 100K needs to be implemented")
+           Teff = 100
+           type = "cond"
+           min_logg = 2.5
+           max_logg = 6
+           delta_T = 100
         else if (Teff < 1500) then
            type = "cond"
            min_logg = 2.5

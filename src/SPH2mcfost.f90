@@ -597,7 +597,7 @@ contains
           write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
           write(*,*) "*** The object will not radiate"
           etoile(i)%T = 3.
-          etoile(i)%r = 0.01
+          etoile(i)%r = 1e-4
        else if (etoile(i)%M < minM_Allard) then
           write(*,*) " "
           write(*,*) "*** WARNING : stellar object mass is below isochrone range"
