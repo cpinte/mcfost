@@ -62,8 +62,20 @@ MODULE IMPACT
  data phi  / 0.0, 3.1, 2.392, 1.972, 1.674, 1.444, 1.259, 0.974, 0.766, 0.608, 0.486, 0.390, &
  			 0.314, 0.253, 0.2049, 0.1661, 0.1347, 0.1095, 0.0889, 0.0723, 0.0589, 0.0480, &
  			 0.0390, 0.0319 /
+ 			 
+  real(kind=dp), parameter :: CI = 0.5*(HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
 
  CONTAINS
+ 
+function phi_T(k, gi_on_gj, dE)!Ui_on_Uj, 
+	real(kind=dp) :: phi_T
+	integer, intent(in) :: k
+	real(kind=dp), intent(in) ::dE, gi_on_gj!, Ui_on_Uj
+
+	phi_T = gi_on_gj * CI * T(k)**(-1.5_dp) * exp(dE / ( KBOLTZMANN*T(k) ))!* Ui_on_Uj * 
+
+return
+end function phi_T
 
  !Check addition of Collision ! probably a missing factor<
  !and the rates from j->i missing only i->j and i->ionisation (not recombination) present yet
@@ -266,14 +278,18 @@ MODULE IMPACT
  RETURN
  END SUBROUTINE Charge_transfer_with_H
 
- FUNCTION Collision_Hydrogen(icell) result(Cij)
+ !-> but ni/nHII should change with ne, change with ne*phiT
+ FUNCTION Collision_Hydrogen(icell,deriv) result(Cij)
   !Matrix containing the collision rates of hydrogen C(i,j) = collrate from i->j
   !This is not the collision rate matrix!
   integer :: icell, i, j
   real(kind=dp) :: Cij(Hydrogen%Nlevel, Hydrogen%Nlevel)
   real(kind=dp) :: nr_ji, CI(hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)!, CI(Hydrogen%Nlevel,Hydrogen%Nlevel)
   real(kind=dp) :: wi, wj, ni_on_nj_star
+  real(kind=dp), intent(out), optional :: deriv(hydrogen%Nlevel, hydrogen%Nlevel)
 
+  if (present(deriv)) deriv(:,:) = 0.0_dp
+	
    Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
 	wj = 1.0
 	wi = 1.0
@@ -292,16 +308,28 @@ MODULE IMPACT
    !evaluated with initial pure-LTE ratio and then only ne updated ?
    do i=1,Hydrogen%Nlevel
     Cij(i,hydrogen%Nlevel) = CI(i)
+    if (present(deriv)) deriv(i, hydrogen%Nlevel) = CI(i) / ne(icell)
     !
     !use ne phi_T to updated collision rates ?? Or only on the total matrix??
-! 	ni_on_nj_star = ne(icell) * phi_T(icell, hydrogen%g(i)/hydrogen%g(hydrogen%Nlevel), hydrogen%E(hydrogen%Nlevel)-hydrogen%E(i))
-    Cij(hydrogen%Nlevel,i) = CI(i) * hydrogen%nstar(i,icell) / hydrogen%nstar(hydrogen%Nlevel,icell) !dependent on ne
+	!!ni_on_nj_star = ne(icell) * phi_T(icell, hydrogen%g(i)/hydrogen%g(hydrogen%Nlevel), hydrogen%E(hydrogen%Nlevel)-hydrogen%E(i))
+	ni_on_nj_star = hydrogen%nstar(i,icell) / hydrogen%nstar(hydrogen%Nlevel,icell)
+	
+    Cij(hydrogen%Nlevel,i) = CI(i) * ni_on_nj_star!hydrogen%nstar(i,icell) / hydrogen%nstar(hydrogen%Nlevel,icell) !dependent on ne
+    if (present(deriv)) deriv(hydrogen%Nlevel,i) = 2.0 * CI(i)*ni_on_nj_star/ne(icell)!(hydrogen%nstar(i,icell) / hydrogen%nstar(hydrogen%Nlevel,icell)) / ne(icell)
     do j=i+1,Hydrogen%Nlevel-1
     	!write(*,*), i, j, CE(i,j),CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell)
  		Cij(i,j) = Cij(i,j) + CE(i,j)
  		Cij(j,i) = Cij(j,i) + CE(i,j) * hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell) !independent of ne
+ 		if (present(deriv)) then
+ 			deriv(i,j) = deriv(i,j) + CE(i,j) / ne(icell)
+ 			deriv(j,i) = deriv(j,i) + 2.0 * CE(i,j) * (hydrogen%nstar(i,icell)/hydrogen%nstar(j,icell))/ne(icell)
+ 		endif
     end do
    end do
+
+! 	write(*,*) "derivative of collisional rates:"
+! 	write(*,*) deriv
+
 
  !-> 7/03/2021, factorize out ne
 

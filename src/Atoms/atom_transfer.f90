@@ -57,9 +57,9 @@ module atom_transfer
 	use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k, area
 	use messages, only 			: error, warning
 	
-	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, fill_collision_matrix, &
+	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, update_populations_and_electrons, fill_collision_matrix, &
 									init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates_mali,calc_rates, store_rate_matrices, &
-									psi, calc_rates_mali, n_new, radiation_free_pops_atom, omega_sor_atom!,store_radiative_rates,
+									psi, calc_rates_mali, n_new, ne_new, radiation_free_pops_atom, omega_sor_atom!,store_radiative_rates,
 	use collision, only			: CollisionRate !future deprecation
 	use impact, only			: collision_hydrogen
 
@@ -1356,8 +1356,8 @@ module atom_transfer
 		real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
 		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:), Jnu_loc(:,:)
 ! 		real(kind=dp), allocatable :: err_pop(:,:)
-		logical :: labs, iterate_ne, update_bckgr_opac
-		logical :: l_iterate
+		logical :: labs, update_bckgr_opac
+		logical :: l_iterate, l_iterate_ne
 		logical :: accelerated, ng_rest, lmean_intensity = .false.!,lapply_sor_correction
 		integer :: iorder, i0_rest, n_iter_accel, iacc!, iter_sor
 		integer :: nact, imax, icell_max, icell_max_2
@@ -1392,9 +1392,6 @@ module atom_transfer
 				enddo
 			endif
 		endif
-		
-		!If we iterate electron scattering with the SEE. if == 0, ONCE SEE is set.
-		iterate_ne = (n_iterate_ne>0)
 
 		!!open(unit=unit_invfile, file=trim(invpop_file), status="unknown")
 		!!write(unit_invfile,*) n_cells
@@ -1475,6 +1472,12 @@ module atom_transfer
 		! ds is not used for this scheme at  the moment. Psi is used instead
 		!since there is no local subit needing recomputing psi
 		!! ds(:,:)
+		allocate(ne_new(n_cells), stat=alloc_status)
+		!ne_new(:) = 0.0_dp
+		!-> otherwise if icompute_atomRT(icell) == 2, n_new never updated and is zero!
+		ne_new(:) = ne(:)
+		if (alloc_status > 0) call error("Allocation error ne_new")
+		write(*,*) " size ne_new:", sizeof(ne_new) / 1024./1024.," MB"
 		allocate(n_new(NactiveAtoms,Nmaxlevel,n_cells),stat=alloc_status)
 		if (alloc_status > 0) call error("Allocation error n_new")
 		write(*,*) " size atom%n, n_new:", 2*sizeof(n_new) / 1024./1024.," MB"
@@ -1494,7 +1497,7 @@ module atom_transfer
 		if (alloc_Status > 0) call error("Allocation error chi_up")
 		
 		mem_alloc_local = mem_alloc_local + sizeof(n_new) + sizeof(psi) + sizeof(eta_atoms) + &
-			sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up)
+			sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ne_new)
 			
 		mem_alloc_tot = mem_alloc_tot + mem_alloc_local
 		write(*,'("Total memory allocated in NLTEloop:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
@@ -1522,15 +1525,10 @@ module atom_transfer
 			else if (etape==2) then 		
 				time_iteration = 0
 				
-				!or no ? because we resample the radiation field
-! 				if (etape_start == 1) then
-! 					Ndelay_iterate_ne = 0
-! 				endif
 				
 				!-> no iteration in MC but after the solution ??
-				if (iterate_ne) then
+				if (n_iterate_ne > 0) then
 					if (lno_iterate_ne_mc) then
-						iterate_ne = .false.
 						n_iterate_ne = 0	
 					endif
 				endif
@@ -1592,6 +1590,12 @@ module atom_transfer
 
 				max_n_iter_loc = 0
 				!reset in case of step 3
+				
+				!-> instead of mod() frequence of iterations ?
+				!( maxval(dM) < min(1e-1,10*precision) )
+				!-> add that to prevent oscillations close to convergence ??
+				!.and.(.not.lprevious_converged)
+				l_iterate_ne = (n_iterate_ne > 0) .and. ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
 
         	
 				!$omp parallel &
@@ -1601,7 +1605,7 @@ module atom_transfer
 				!$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ, psi_mean, psi, chi_loc, Jnu_loc) &
 				!$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
 				!$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, Jnu, xmu, xmux, xmuy,wmu,etoile,id_ref, xyz_pos,uvw_pos) &
-				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity) &
+				!$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity, l_iterate_ne) &
 				!$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
 				!$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda)
 				!$omp do schedule(static,1)
@@ -1756,9 +1760,10 @@ module atom_transfer
 
 			
 						end if !etape
-						
+												
 						call calc_rate_matrix(id, icell, lforce_lte)
-						call update_populations(id, icell, diff, .false., n_iter)
+! 						call update_populations(id, icell, diff, .false., n_iter)
+						call update_populations_and_electrons(id, icell, diff, .false., n_iter, (l_iterate_ne.and.icompute_atomRT(icell)==1))!The condition on icompute_atomRT is here because if it is > 0 but /= 1, ne is not iterated!
 
 
 						n_iter_loc = 0
@@ -1766,7 +1771,6 @@ module atom_transfer
 						
 						if (loutput_Rates) then
 							call store_rate_matrices(id,icell,Nmaxlevel,Gammaij_all(:,:,:,icell))
-							!!call store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell), Jnew(:,icell), .false.)
 						endif
 	
 					end if !icompute_atomRT
@@ -1828,30 +1832,21 @@ module atom_transfer
    				endif
    				
    				
-			!evaluate electron density with the ionisation fraction
-			!I have to evaluate background continua if I update all atoms lte pops ?
-			!still update chi_c if electron scatt ?
-				!!dne = 0.0_dp											
-				!Updating for non Ng iterations ? add a condition on the dM < 1e-2 ? (better ndelay)
-				!cond on accelerate ?
-				update_bckgr_opac = .false.
-! 				if ((iterate_ne .and. (mod(n_iter,n_iterate_ne)==0)) .and. (n_iter>ndelay_iterate_ne)) then
-				if ((iterate_ne .and. maxval(dM) < min(1e-1,10*precision)) .and. (n_iter>ndelay_iterate_ne).and.(.not.lprevious_converged)) then
-					!chic(:,:) = chi(:,:) - ne(:)
-					!allocate(ne_old(n_cells))
-					!!ne_old(:) = ne(:)
-					!write(*,'("ne old ="(1ES17.8E3)"("(1ES17.8E3)") m^-3")') maxval(ne), minval(ne,mask=ne>0)
-					call solve_electron_density(ne_start_sol, .true., dne)
-! 					call Solve_Electron_Density_old(ne_start_sol)
-! 					dne = 0.0_dp
-					!dne = maxval(abs(1.0_dp - ne_old(:)/(ne(:)+tiny_dp)))
-! -> If i update here, for the first iteration nold is not equal to the lte populations used for
-! the first solution, so the first test on the convergence is wrong. But,
-! after the first iteration it starts to  be consistent
-!-> only if in ionisation fraction active atoms are used (passive atoms we use lte pops)
 
-					!separate passive active and passive (pure-LTE) and passive with non-LTE pops (keep constant ?)
-					!if lfixed_background, not need to update passive atoms.
+				!-> evaluate ne for other non-LTE atoms not included in the non-LTE ionisation scheme ?
+				!with fixed non-LTE populations and non-LTE contributions
+				update_bckgr_opac = .false.
+				if (l_iterate_ne) then
+
+					!update ne from non-LTE ionisation
+!-> no because dne need tu be zeroed for each new iteration of all ne.
+! 					dne = max(dne, maxval(abs(1.0 - ne(:)/(ne_new(:)+1d-50))))
+					dne = maxval(abs(1.0 - ne(:)/(ne_new(:)+1d-50)))
+					ne(:) = ne_new(:)
+
+					!-> For all elements use the old version
+! 					call solve_electron_density(ne_start_sol, .true., dne)
+
 					do nact=1, Natom
 						if (Atoms(nact)%ptr_atom%ID=="H") then
 							write(*,*) " -> updating LTE pops of hydrogen"
@@ -1863,14 +1858,8 @@ module atom_transfer
 						endif	
 					enddo
 					write(*,*) ''
-					!chi_c(:,:) = chi_c(:,:) + ne(:)
-					!deallocate(ne_old)
-					!convergence_map(:,1,NactiveAtoms+1,:) = dne
 					
 					update_bckgr_opac = .true.
-! 					write(*,*) "ne/nHtot = ", maxval(ne/nHtot), minval(ne/nHtot, mask=icompute_atomRT>0)
-! 					write(*,*) maxval((ne + nHtot) * mumolec * masseH), maxval(rho))
-					!true if ne has been iterated at this iteration
 				end if
 
      		!Global convergence Tests
@@ -2219,14 +2208,14 @@ module atom_transfer
 			do nact=1, NactiveAtoms
 				call write_convergence_map_atom(ActiveAtoms(nact)%ptr_atom, etape_end, convergence_map(:,1:ActiveAtoms(nact)%ptr_atom%Nlevel, nact, :))
 			enddo
-			if (iterate_ne) call write_convergence_map_electron(etape_end, convergence_map(:,1,NactiveAtoms+1,:))
+			if (l_iterate_ne) call write_convergence_map_electron(etape_end, convergence_map(:,1,NactiveAtoms+1,:))
 			deallocate(convergence_map)
 		endif
 		
 		deallocate(dM, dTM, Tex_ref, Tion_ref)
 		if (allocated(Jnew)) deallocate(Jnew)
 		if (allocated(Jnew_cont)) deallocate(Jnew_cont)
-		deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms, n_new)
+		deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms, n_new, ne_new)
 		deallocate(stream)
 	
 		!!close(unit=unit_invfile)

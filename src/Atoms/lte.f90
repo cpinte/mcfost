@@ -22,7 +22,7 @@ MODULE lte
  IMPLICIT NONE
 
  real(kind=dp), parameter :: phi_min_limit = 1d-100!tiny_dp!1d-100 !1d-50, tiny_dp
- real(kind=dp), parameter :: CI = 0.5*(HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
+ !!real(kind=dp), parameter :: CI = 0.5*(HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
 
 
  CONTAINS
@@ -72,15 +72,15 @@ END FUNCTION getPartitionFunctionk
  RETURN
 END FUNCTION get_logPartitionFunctionk
 
-function phi_T(k, gi_on_gj, dE)!Ui_on_Uj, 
-	real(kind=dp) :: phi_T
-	integer, intent(in) :: k
-	real(kind=dp), intent(in) ::dE, gi_on_gj!, Ui_on_Uj
-
-	phi_T = gi_on_gj * CI * T(k)**(-1.5_dp) * exp(dE / ( KBOLTZMANN*T(k) ))!* Ui_on_Uj * 
-
-return
-end function phi_T
+! function phi_T(k, gi_on_gj, dE)!Ui_on_Uj, 
+! 	real(kind=dp) :: phi_T
+! 	integer, intent(in) :: k
+! 	real(kind=dp), intent(in) ::dE, gi_on_gj!, Ui_on_Uj
+! 
+! 	phi_T = gi_on_gj * CI * T(k)**(-1.5_dp) * exp(dE / ( KBOLTZMANN*T(k) ))!* Ui_on_Uj * 
+! 
+! return
+! end function phi_T
 
 
  FUNCTION phi_jl(k, Ujl, Uj1l, ionpot) result(phi)
@@ -465,11 +465,14 @@ end function phi_T
      write(*,*) " ************************************* "
      stop
     end if
+    
+!     write(*,*) " cell ", k
+!     write(*,*) T(k), nHtot(k), ne(K)
+!     write(*,*) hydrogen%nstar(:,k)
 
    end do !over depth points
    !$omp end do
    !$omp  end parallel
-
 
 
   if (ldissolve) then

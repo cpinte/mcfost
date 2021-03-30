@@ -17,7 +17,7 @@ module Opacity
 	use getlambda, only									: hv, Nlambda_max_line, define_local_profile_grid
 	use planck, only 									: bpnu
 	use occupation_probability, only					: wocc_n, D_i
-	use lte, only 										: phi_T
+! 	use lte, only 										: phi_T
 
 	use background_opacity, only						: Thomson, Hydrogen_ff, Hminus_bf, Hminus_bf_geltman, &
 															Hminus_bf_geltman, Hminus_bf_Wishart, Hminus_ff_john, Hminus_ff, Hminus_ff_bell_berr, lte_bound_free, H_bf_Xsection
