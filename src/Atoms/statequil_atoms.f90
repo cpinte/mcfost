@@ -9,7 +9,7 @@ MODULE statequil_atoms
 	use math, only							: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, &
 												linear_1D, solve_lin
 	use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte
-	use collision, only						: CollisionRate !future deprecation
+	use collision, only						: collision_rates_atom_loc!, CollisionRate_old
 	use impact, only						: Collision_Hydrogen
 	use getlambda, only						: hv, Nlambda_max_trans
 	use occupation_probability, only 		: D_i, wocc_n
@@ -159,7 +159,8 @@ MODULE statequil_atoms
 ! 			if (id==1) write(*,*) " Using RH routine for collision atom ", atom%ID
 			!write(*,*) "First test it to retrive lte results and compare with RH!"
 			!stop
-			atom%C(:,:,id) = CollisionRate(icell, atom)
+! 			atom%C(:,:,id) = CollisionRate_old(icell, atom)
+			atom%C(:,:,id) = collision_rates_atom_loc(icell, atom, deriv)
 		end if
 		if (atom%cswitch > 1.0) atom%C(:,:,id) = atom%C(:,:,id) * atom%cswitch
 
@@ -1414,7 +1415,7 @@ MODULE statequil_atoms
 		logical, intent(in) :: verbose
 		logical, intent(in) :: iterate_ne
 		type(AtomType), pointer :: atom
-		integer :: nact
+		integer :: nact, nact_start
 		logical :: accelerate = .false.
 		real(kind=dp) :: dM, dT, dTex, dpop, Tion, Tex
 		real(kind=dp), intent(out) :: delta
@@ -1466,7 +1467,14 @@ MODULE statequil_atoms
 			   
 		else		
 		!at the moment separate hydrogen and the others
-			do nact=2, Nactiveatoms
+		!-> beware, if hydrogen is not active , nact should be 1
+		!-> check for helium too.
+			if (hydrogen%active) then
+				nact_start = 2
+			else
+				nact_start = 1
+			endif
+			do nact=nact_start, Nactiveatoms
 				if (verbose) write(*,*) " Solving SEE for atom ", atom%ID
 				atom => activeatoms(nact)%ptr_atom
 				call SEE_atom(id, icell, atom, dM)

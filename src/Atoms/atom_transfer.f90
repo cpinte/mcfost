@@ -60,8 +60,6 @@ module atom_transfer
 	use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, update_populations_and_electrons, fill_collision_matrix, &
 									init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates_mali,calc_rates, store_rate_matrices, &
 									psi, calc_rates_mali, n_new, ne_new, radiation_free_pops_atom, omega_sor_atom!,store_radiative_rates,
-	use collision, only			: CollisionRate !future deprecation
-	use impact, only			: collision_hydrogen
 
 	implicit none
 
@@ -1357,7 +1355,7 @@ module atom_transfer
 		real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:), Jnu_loc(:,:)
 ! 		real(kind=dp), allocatable :: err_pop(:,:)
 		logical :: labs, update_bckgr_opac
-		logical :: l_iterate, l_iterate_ne
+		logical :: l_iterate, l_iterate_ne, update_ne_other_nlte
 		logical :: accelerated, ng_rest, lmean_intensity = .false.!,lapply_sor_correction
 		integer :: iorder, i0_rest, n_iter_accel, iacc!, iter_sor
 		integer :: nact, imax, icell_max, icell_max_2
@@ -1391,6 +1389,18 @@ module atom_transfer
 					endif
 				enddo
 			endif
+		endif
+		
+		!Hydrogen and Helium updated with SEE if present.
+		!For all other non-LTE atoms currently using the old scheme.
+		update_ne_other_nlte = (hydrogen%active.and.NactiveAtoms > 1).or.(.not.hydrogen%active)
+		if (associated(helium)) then
+		
+			update_ne_other_nlte = (helium%active.and.hydrogen%active.and.Nactiveatoms > 2).or.&
+									(.not.hydrogen%active.and.helium.active.and.Nactiveatoms > 1).or.&
+									(hydrogen%active.and..not.helium%active.and.NactiveAtoms > 1).or.&
+									(.not.hydrogen%active.and.helium%active)
+		
 		endif
 
 		!!open(unit=unit_invfile, file=trim(invpop_file), status="unknown")
@@ -1845,7 +1855,9 @@ module atom_transfer
 					ne(:) = ne_new(:)
 
 					!-> For all elements use the old version
-! 					call solve_electron_density(ne_start_sol, .true., dne)
+					if ( update_ne_other_nlte ) then
+						call solve_electron_density(ne_start_sol, .true., dne)
+					endif
 
 					do nact=1, Natom
 						if (Atoms(nact)%ptr_atom%ID=="H") then
