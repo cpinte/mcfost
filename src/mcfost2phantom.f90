@@ -5,7 +5,7 @@ module mcfost2phantom
 contains
 
   subroutine init_mcfost_phantom(mcfost_para_filename, ndusttypes, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
-       keep_particles, fix_star)
+       keep_particles, fix_star, turn_on_Lacc)
 
     use parametres
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
@@ -26,7 +26,7 @@ contains
     real(dp), dimension(6), intent(out) :: SPH_limits
     integer, intent(out) :: ierr
     real, intent(in), optional :: keep_particles
-    logical, intent(in), optional :: fix_star
+    logical, intent(in), optional :: fix_star, turn_on_Lacc
 
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
@@ -53,6 +53,14 @@ contains
        if (fix_star) then
           lfix_star = .true.
           write(*,*) "WARNING: using mcfost parameters for the stars"
+       endif
+    endif
+
+    lturn_off_Lacc = .true.
+    if (present(turn_on_Lacc)) then
+       if (turn_on_Lacc) then
+          lturn_off_Lacc = .false.
+          write(*,*) "WARNING: turning on accretion luminosity"
        endif
     endif
 

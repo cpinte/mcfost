@@ -191,6 +191,8 @@ subroutine set_default_variables()
   lcentre_on_sink = .false.
   lwrite_column_density = .false.
   lwrite_mol_column_density = .false.
+  lturn_off_planets = .false.
+  lturn_off_Lacc = .false.
 
   tmp_dir = "./"
 
@@ -1243,6 +1245,12 @@ subroutine initialisation_mcfost()
         read(s,*) which_planet
         write(*,*) "PLANET", which_planet, "AZ=", planet_az
         i_arg = i_arg + 1
+     case("-turn-off_planets")
+        i_arg = i_arg + 1
+        lturn_off_planets = .true.
+     case("-turn-off_Lacc")
+        i_arg = i_arg + 1
+        lturn_off_Lacc = .true.
      case("-correct_density_elongated_cells")
         i_arg = i_arg+1
         lcorrect_density_elongated_cells=.true.
@@ -1726,6 +1734,8 @@ subroutine display_help()
   write(*,*) "                                     desired azimuth in the map"
   write(*,*) "        : -planet <sink_particle_number> : select the sink particle used to"
   write(*,*) "                                           perform the dump rotation"
+  write(*,*) "        : -turn-off_planets : sink particles with id > 1 will not emit"
+  write(*,*) "        : -turn-off_Lacc : ignore accretion on sink particles"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"

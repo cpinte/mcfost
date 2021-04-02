@@ -169,7 +169,7 @@ contains
     integer, intent(in) :: n_SPH, ndusttypes
     real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,rho,massgas
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
-    integer,  allocatable, dimension(:), intent(in) :: particle_id
+    integer, dimension(n_SPH), intent(in) :: particle_id
     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
@@ -611,9 +611,16 @@ contains
     write(*,*) ""
     write(*,*) "New stellar parameters:"
     do i=1, n_etoiles
-       if (etoile(i)%M < minM_Allard) then
+       if (lturn_off_planets .and. i>1) then
           write(*,*) " "
-          write(*,*) "*** WARNING : stellar object mass is below isochrone range", etoile(i)%M < minM_Allard
+          write(*,*) "*** WARNING : turning off emission fron sink particle"
+          write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
+          write(*,*) "*** The object will not radiate"
+          etoile(i)%T = 3.
+          etoile(i)%r = 1e-4
+       else if (etoile(i)%M < minM_Allard) then
+          write(*,*) " "
+          write(*,*) "*** WARNING : stellar object mass is below isochrone range"
           write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
           write(*,*) "*** The object will not radiate"
           etoile(i)%T = 3.
