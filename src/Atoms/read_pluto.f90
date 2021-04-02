@@ -7,7 +7,7 @@
 !
 module pluto_mod
 
-	use density, only : densite_gaz, masse_gaz !used to build nHtot
+	!use density, only : densite_gaz, masse_gaz !used to build nHtot
 	use parametres
 	use messages
 	use constantes, only : masseH
@@ -186,7 +186,7 @@ module pluto_mod
 
     	!also work with grid-based code
     	!massdust, rhodust, hydro_grainsizes to allocated if ndusttypes = 0 !
-    	call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation)
+		call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation)
     	!correction for small density applied on mass_gas
     	
 		!*******************************
