@@ -671,7 +671,7 @@ function v_proj(icell,x,y,z,u,v,w) !
   integer, intent(in) :: icell
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
-  real(kind=dp) :: vitesse, vx, vy, vz, vr, vphi, norme, r, phi
+  real(kind=dp) :: vitesse, vx, vy, vz, v_r, v_phi, norme, r, phi
 
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)
@@ -685,10 +685,10 @@ function v_proj(icell,x,y,z,u,v,w) !
            vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
         else
            ! Convert the velocity field to Cartesian coordinates
-           vr = vfield_x(icell) ; vphi = vfield_y(icell) ;  vz = vfield_z(icell)
+           v_r = vfield_x(icell) ; v_phi = vfield_y(icell) ;  vz = vfield_z(icell)
            phi = atan2(y, x)
-           vx = cos(phi) * vr - sin(phi) * vphi
-           vy = sin(phi) * vr + cos(phi) * vphi
+           vx = cos(phi) * v_r - sin(phi) * v_phi
+           vy = sin(phi) * v_r + cos(phi) * v_phi
            if ((l_sym_centrale).and.(z < 0)) vz = -vz
         endif
         v_proj = vx * u + vy * v + vz * w
