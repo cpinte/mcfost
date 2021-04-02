@@ -238,15 +238,30 @@ module atom_transfer
 ! 				tau_c = tau_c + dtau_c
 
 !-> avoid multiple loop over frequencies and is faster for large Nlambda
+
+				!double loop but we test the condition only once if not included!
+				if (lorigin_atom.and.(.not.labs)) then
+					do la=1,Nlambda					
+						flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
+					enddo
+				endif
+				if (lcontrib_function.and.(.not.labs)) then
+					do la=1,Nlambda					
+						if (tau(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id)
+					enddo
+				endif
+
+
 				do la=1,Nlambda
-					Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
-					tau(la) = tau(la) + dtau(la) !for next cell
+					Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
+					tau(la) = tau(la) + dtau(la) !for next cell				
 				enddo
 
 				do la=1, Nlambda_cont
 					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
+
 
 			end if  ! lcellule_non_vide
 			
@@ -257,165 +272,166 @@ module atom_transfer
 	return
 	end subroutine integ_ray_line_i
 	
-  	subroutine integ_ray_line_flow(id,icell_in,x,y,z,u,v,w,iray,labs)
-	! ------------------------------------------------------------------------------- !
-	! For contribution functions and origin emission
-	! ------------------------------------------------------------------------------- !
-
-		integer, intent(in) :: id, icell_in, iray
-		real(kind=dp), intent(in) :: u,v,w
-		real(kind=dp), intent(in) :: x,y,z
-		logical, intent(in) :: labs
-		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, chi_line, tau_line, Sline!, LD
-		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
-		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
-		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
-
-		x1=x;y1=y;z1=z
-		x0=x;y0=y;z0=z
-		next_cell = icell_in
-		nbr_cell = 0
-		icell_prev = icell_in
-		tau(:) = 0.0_dp
-		tau_c(:) = 0.0_dp
-
-		Itot(:,iray,id) = 0d0
-		Icont(:,iray,id) = 0d0
-		
-		tau_line = 0.0_dp
-		chi_line = 0.0_dp
-		Sline = 0.0_dp
-				
-
-!!write(*,*) "id=",id
-!!write(*,*) "****"
-  ! -------------------------------------------------------------- !
-  !*** propagation dans la grille ***!
-  ! -------------------------------------------------------------- !
-  ! Will the ray intersect a star
-		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-
-  ! Boucle infinie sur les cellules
-		infinie : do ! Boucle infinie
-    ! Indice de la cellule
-			icell = next_cell
-			x0=x1 ; y0=y1 ; z0=z1
-    !write(*,*) "Boucle infinie, icell=", icell
-
-			if (icell <= n_cells) then
-				lcellule_non_vide = (icompute_atomRT(icell) > 0)
-				if (icompute_atomRT(icell) < 0) return !-1 if dark
-			else
-				lcellule_non_vide=.false.
-			endif
-    
-    ! Test sortie ! "The ray has reach the end of the grid"
-
-			if (test_exit_grid(icell, x0, y0, z0)) return
-
-			if (lintersect_stars) then
-				if (icell == icell_star) then
-					!can be done better
-! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
-!        			Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
-! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
-       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
-					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
-       				return
-      			end if
-   			 endif
-
-			nbr_cell = nbr_cell + 1
-
-    ! Calcul longeur de vol et profondeur optique dans la cellule
-			previous_cell = 0 ! unused, just for Voronoi
-			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-			
-    !count opacity only if the cell is filled, else go to next cell
-			if (lcellule_non_vide) then
-				lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet same as iterate?
-     ! opacities in m^-1
-
-				l_contrib = l_contrib * AU_to_m !l_contrib in m
-			
-				!total bound-bound + bound-free + background opacities lte + nlte
-! 				!rename it chi0_bckgr etc
-				if (llimit_mem) then
-					call interp_continuum_local(icell, chi(:,id), eta(:,id))
-				else
-					chi(:,id) = chi0_bb(:,icell)
-					eta(:,id) = eta0_bb(:,icell)				
-				endif
-
-				!includes a loop over all bound-bound, passive and active
-				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
-				
-				Sline = eta(:,id) - eta0_bb(:,icell)
-				chi_line = chi(:,id) - chi0_bb(:,icell)
-				
-				dtau(:) = l_contrib * chi(:,id)
-				            
-				if (lelectron_scattering) then
-					Snu = ( eta(:,id) + thomson(icell) * Jnu(:,icell) ) / ( chi(:,id) + tiny_dp )
-					Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)
-				else
-					Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
-					Snu_c = eta_c(:,icell)
-				endif
-				
-				if (Nactiveatoms > 0) then
-					Snu_c = ( Snu_c + eta_c_nlte(:,icell) ) / ( chi_c(:,icell) + chi_c_nlte(:,icell) + tiny_dp)
-					dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell))
-				else
-					Snu_c = Snu_c / (chi_c(:,icell) + tiny_dp)
-					dtau_c(:) = l_contrib * chi_c(:,icell)
-				endif
-				
-				if (lorigin_atom .and. lcontrib_function) then
-					do la=1,Nlambda
-! 						if (x0>=0 .and. y0>=0 .and. z0>=0) then
-						flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau_line(la)) - exp(-(tau_line(la)+l_contrib * chi_line(la))) ) * Sline(la) / (tiny_dp + chi_line(la))!Snu(la)
-						if (tau_line(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id) !tau(la) * Snu(la) in logtau
-! 						endif
-						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
-						tau(la) = tau(la) + dtau(la) !for next cell
-						tau_line(la) = tau_line(la) + l_contrib * chi_line(la)
-					enddo
-				else if (lorigin_atom) then
-					do la=1,Nlambda
-! 						if (x0>=0 .and. y0>=0 .and. z0>=0) then
-						flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
-! 						endif
-						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
-						tau(la) = tau(la) + dtau(la) !for next cell
-					enddo
-				else if (lcontrib_function) then
-					do la=1,Nlambda
-! 						if (x0>=0 .and. y0>=0 .and. z0>=0) then
-						if (tau(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id)
-! 						endif
-						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
-						tau(la) = tau(la) + dtau(la) !for next cell
-					enddo
-				endif
-				
-
-				!cont rad only
-				do la=1, Nlambda_cont
-					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
-					tau_c(la) = tau_c(la) + dtau_c(la)
-				enddo
-				
-			end if  ! lcellule_non_vide
-			
-    		icell_prev = icell			
-			
-		end do infinie
-
-	return
-	end subroutine integ_ray_line_flow
+	!deprecated
+!   	subroutine integ_ray_line_flow(id,icell_in,x,y,z,u,v,w,iray,labs)
+! 	! ------------------------------------------------------------------------------- !
+! 	! For contribution functions and origin emission
+! 	! ------------------------------------------------------------------------------- !
+! 
+! 		integer, intent(in) :: id, icell_in, iray
+! 		real(kind=dp), intent(in) :: u,v,w
+! 		real(kind=dp), intent(in) :: x,y,z
+! 		logical, intent(in) :: labs
+! 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
+! 		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, chi_line, tau_line, Sline!, LD
+! 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
+! 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
+! 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+! 
+! 		x1=x;y1=y;z1=z
+! 		x0=x;y0=y;z0=z
+! 		next_cell = icell_in
+! 		nbr_cell = 0
+! 		icell_prev = icell_in
+! 		tau(:) = 0.0_dp
+! 		tau_c(:) = 0.0_dp
+! 
+! 		Itot(:,iray,id) = 0d0
+! 		Icont(:,iray,id) = 0d0
+! 		
+! 		tau_line = 0.0_dp
+! 		chi_line = 0.0_dp
+! 		Sline = 0.0_dp
+! 				
+! 
+! !!write(*,*) "id=",id
+! !!write(*,*) "****"
+!   ! -------------------------------------------------------------- !
+!   !*** propagation dans la grille ***!
+!   ! -------------------------------------------------------------- !
+!   ! Will the ray intersect a star
+! 		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+! 
+!   ! Boucle infinie sur les cellules
+! 		infinie : do ! Boucle infinie
+!     ! Indice de la cellule
+! 			icell = next_cell
+! 			x0=x1 ; y0=y1 ; z0=z1
+!     !write(*,*) "Boucle infinie, icell=", icell
+! 
+! 			if (icell <= n_cells) then
+! 				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+! 				if (icompute_atomRT(icell) < 0) return !-1 if dark
+! 			else
+! 				lcellule_non_vide=.false.
+! 			endif
+!     
+!     ! Test sortie ! "The ray has reach the end of the grid"
+! 
+! 			if (test_exit_grid(icell, x0, y0, z0)) return
+! 
+! 			if (lintersect_stars) then
+! 				if (icell == icell_star) then
+! 					!can be done better
+! ! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
+! !        			Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
+! ! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
+! ! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+!        				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
+!        				return
+!       			end if
+!    			 endif
+! 
+! 			nbr_cell = nbr_cell + 1
+! 
+!     ! Calcul longeur de vol et profondeur optique dans la cellule
+! 			previous_cell = 0 ! unused, just for Voronoi
+! 			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+! 			
+!     !count opacity only if the cell is filled, else go to next cell
+! 			if (lcellule_non_vide) then
+! 				lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet same as iterate?
+!      ! opacities in m^-1
+! 
+! 				l_contrib = l_contrib * AU_to_m !l_contrib in m
+! 			
+! 				!total bound-bound + bound-free + background opacities lte + nlte
+! ! 				!rename it chi0_bckgr etc
+! 				if (llimit_mem) then
+! 					call interp_continuum_local(icell, chi(:,id), eta(:,id))
+! 				else
+! 					chi(:,id) = chi0_bb(:,icell)
+! 					eta(:,id) = eta0_bb(:,icell)				
+! 				endif
+! 
+! 				!includes a loop over all bound-bound, passive and active
+! 				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) ) 
+! 				
+! 				Sline = eta(:,id) - eta0_bb(:,icell)
+! 				chi_line = chi(:,id) - chi0_bb(:,icell)
+! 				
+! 				dtau(:) = l_contrib * chi(:,id)
+! 				            
+! 				if (lelectron_scattering) then
+! 					Snu = ( eta(:,id) + thomson(icell) * Jnu(:,icell) ) / ( chi(:,id) + tiny_dp )
+! 					Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)
+! 				else
+! 					Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
+! 					Snu_c = eta_c(:,icell)
+! 				endif
+! 				
+! 				if (Nactiveatoms > 0) then
+! 					Snu_c = ( Snu_c + eta_c_nlte(:,icell) ) / ( chi_c(:,icell) + chi_c_nlte(:,icell) + tiny_dp)
+! 					dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell))
+! 				else
+! 					Snu_c = Snu_c / (chi_c(:,icell) + tiny_dp)
+! 					dtau_c(:) = l_contrib * chi_c(:,icell)
+! 				endif
+! 				
+! 				if (lorigin_atom .and. lcontrib_function) then
+! 					do la=1,Nlambda
+! ! 						if (x0>=0 .and. y0>=0 .and. z0>=0) then
+! 						flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau_line(la)) - exp(-(tau_line(la)+l_contrib * chi_line(la))) ) * Sline(la) / (tiny_dp + chi_line(la))!Snu(la)
+! 						if (tau_line(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id) !tau(la) * Snu(la) in logtau
+! ! 						endif
+! 						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
+! 						tau(la) = tau(la) + dtau(la) !for next cell
+! 						tau_line(la) = tau_line(la) + l_contrib * chi_line(la)
+! 					enddo
+! 				else if (lorigin_atom) then
+! 					do la=1,Nlambda
+! ! 						if (x0>=0 .and. y0>=0 .and. z0>=0) then
+! 						flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
+! ! 						endif
+! 						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
+! 						tau(la) = tau(la) + dtau(la) !for next cell
+! 					enddo
+! 				else if (lcontrib_function) then
+! 					do la=1,Nlambda
+! ! 						if (x0>=0 .and. y0>=0 .and. z0>=0) then
+! 						if (tau(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id)
+! ! 						endif
+! 						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
+! 						tau(la) = tau(la) + dtau(la) !for next cell
+! 					enddo
+! 				endif
+! 				
+! 
+! 				!cont rad only
+! 				do la=1, Nlambda_cont
+! 					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
+! 					tau_c(la) = tau_c(la) + dtau_c(la)
+! 				enddo
+! 				
+! 			end if  ! lcellule_non_vide
+! 			
+!     		icell_prev = icell			
+! 			
+! 		end do infinie
+! 
+! 	return
+! 	end subroutine integ_ray_line_flow
 
   	subroutine integ_ray_line_z(id,icell_in,x,y,z,u,v,w,iray,labs)
 	! ------------------------------------------------------------------------------- !
@@ -463,8 +479,7 @@ module atom_transfer
     !write(*,*) "Boucle infinie, icell=", icell
 
 			if (icell <= n_cells) then
-				lcellule_non_vide = (icompute_atomRT(icell) > 0)
-				if (icompute_atomRT(icell) < 0) return !-1 if dark
+				lcellule_non_vide=.true.
 			else
 				lcellule_non_vide=.false.
 			endif
@@ -484,6 +499,11 @@ module atom_transfer
        				return
       			end if
    			 endif
+   			 
+			if (icell <= n_cells) then
+				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+				if (icompute_atomRT(icell) < 0) return !-1 if dark
+			endif
 
 			nbr_cell = nbr_cell + 1
 
@@ -1282,7 +1302,8 @@ module atom_transfer
 	write(*,'("Total memory allocated for image calculation:"(1ES17.8E3)" GB")') mem_alloc_tot / 1024./1024./1024.
 
 	if (lorigin_atom .or. lcontrib_function) then
-		integ_ray_line => integ_ray_line_flow 
+		!!integ_ray_line => integ_ray_line_flow 
+		write(*,*) " Check function when lorigin atom or lcontrib function"
 	endif
 
 	call init_directions_ray_tracing()
@@ -2509,9 +2530,7 @@ module atom_transfer
     x0=x1 ; y0=y1 ; z0=z1
 
     if (icell <= n_cells) then
-     !lcellule_non_vide=.true.
-     lcellule_non_vide = (icompute_atomRT(icell) > 0)
-     if (icompute_atomRT(icell) < 0) return !-1 if dark
+     lcellule_non_vide=.true.
     else
      lcellule_non_vide=.false.
     endif
@@ -2527,6 +2546,11 @@ module atom_transfer
        Ic(:,id) = Ic(:,id) + Istar(:) * exp(-tau_c) * local_stellar_brigthness(size(Ic(:,1)),lambda,i_star,icell_prev,x0,y0,z0,u,v,w)
        return
       end if
+    endif
+   
+    if (icell <= n_cells) then 
+     lcellule_non_vide = (icompute_atomRT(icell) > 0)
+     if (icompute_atomRT(icell) < 0) return !-1 if dark
     endif
 
     nbr_cell = nbr_cell + 1
@@ -3024,8 +3048,7 @@ end subroutine INTEG_RAY_JNU
 			x0=x1 ; y0=y1 ; z0=z1
 
 			if (icell <= n_cells) then
-				lcellule_non_vide = (icompute_atomRT(icell) > 0)
-				if (icompute_atomRT(icell) < 0) return !-1 if dark
+				lcellule_non_vide=.true.
 			else
 				lcellule_non_vide=.false.
 			endif
@@ -3036,6 +3059,11 @@ end subroutine INTEG_RAY_JNU
 			if (lintersect_stars) then
 				if (icell == icell_star) return
    			 endif
+   			 
+			if (icell <= n_cells) then
+				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+				if (icompute_atomRT(icell) < 0) return !-1 if dark
+			endif
 
 			nbr_cell = nbr_cell + 1
 
