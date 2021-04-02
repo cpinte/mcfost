@@ -448,29 +448,33 @@ subroutine repartition_energie_etoiles()
   !--------------------------------
   ! Calculate accretion spectrum
   !--------------------------------
-  if (maxval(etoile(:)%Mdot) > tiny_real) then
-     ! Luminosity from the accretion [au^2 W / m^2]
-     Lacc(:) = Ggrav/AU3_to_m3 &                         ! convert G to AU^3 / s^s / kg
-          * etoile(:)%M*Msun_to_kg &                     ! M in kg
-          * etoile(:)%Mdot*Msun_to_kg/year_to_s &        ! Mdot in kg / s
-          / etoile(:)%r                                  ! R in AU
-     ! Converting Lacc to Tacc
-     Tacc(:) = (Lacc(:)/(quatre_pi * sigma * etoile(:)%r**2))**0.25
+  if (.not.lturn_off_Lacc) then
+     if (maxval(etoile(:)%Mdot) > tiny_real) then
+        ! Luminosity from the accretion [au^2 W / m^2]
+        Lacc(:) = Ggrav/AU3_to_m3 &                         ! convert G to AU^3 / s^s / kg
+             * etoile(:)%M*Msun_to_kg &                     ! M in kg
+             * etoile(:)%Mdot*Msun_to_kg/year_to_s &        ! Mdot in kg / s
+             / etoile(:)%r                                  ! R in AU
+        ! Converting Lacc to Tacc
+        Tacc(:) = (Lacc(:)/(quatre_pi * sigma * etoile(:)%r**2))**0.25
 
-     write(*,*) "Accretion onto stars: "
-     write(*,*) "Mdot=", etoile(:)%Mdot, "Msun/yr"
-     write(*,*) "Tacc=", Tacc(:), "K"
+        write(*,*) "Accretion onto stars: "
+        write(*,*) "Mdot=", etoile(:)%Mdot, "Msun/yr"
+        write(*,*) "Tacc=", Tacc(:), "K"
 
-     ! We add a black-body to the stellar spectrum
-     do i=1, n_etoiles
-        if (Tacc(i) > tiny_real) then
-           do l=1, n_lambda_spectre(i)
-              wl = tab_lambda_spectre(i,l) *1.e-6
-              cst_wl=cst_th/(Tacc(i)*wl)
-              tab_spectre(i,l) = tab_spectre(i,l) +  max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
-           enddo ! l
-        endif
-     enddo !
+        ! We add a black-body to the stellar spectrum
+        do i=1, n_etoiles
+           if (Tacc(i) > tiny_real) then
+              do l=1, n_lambda_spectre(i)
+                 wl = tab_lambda_spectre(i,l) *1.e-6
+                 cst_wl=cst_th/(Tacc(i)*wl)
+                 tab_spectre(i,l) = tab_spectre(i,l) +  max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
+              enddo ! l
+           endif
+        enddo !
+     endif
+  else
+     write(*,*) "Turning off accretion luminosity"
   endif
 
   !---------------------------------------------------------------------------
@@ -946,7 +950,12 @@ subroutine find_spectra()
         endif
 
         if (Teff < 100) then
-           call error("Teff below 100K needs to be implemented")
+           call warning("Teff below 100K needs to be implemented")
+           Teff = 100
+           type = "cond"
+           min_logg = 2.5
+           max_logg = 6
+           delta_T = 100
         else if (Teff < 1500) then
            type = "cond"
            min_logg = 2.5
@@ -954,7 +963,11 @@ subroutine find_spectra()
            delta_T = 100
         else if (Teff < 2700) then
            type = "dusty"
-           min_logg = 3.5
+           if ((Teff < 2250).and.(Teff > 2050)) then
+              min_logg = 4.0 ! Some models appear to be missing
+           else
+              min_logg = 3.5
+           endif
            max_logg = 6
            delta_T = 100
         else if (Teff < 10000) then
