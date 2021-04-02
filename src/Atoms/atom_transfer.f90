@@ -2361,7 +2361,7 @@ module atom_transfer
 				if (lvoronoi) then 
 					rr = sqrt( x*x + y*y )
 					vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr
-					vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2
+					vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
 				else
 					vaccr = vr(icell_prev)		
 					vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2	
