@@ -674,8 +674,6 @@ function v_proj(icell,x,y,z,u,v,w) !
   integer, intent(in) :: icell
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
-  !-> Christophe defined vr and vphi but I HAVE defined them before...
-  !-> at the moment, I do this trick, adding 0 after the variables
   real(kind=dp) :: vitesse, vx, vy, vz, norme, r, r2, norme2, sign1, v_r, v_phi, phi
 
   if (lVoronoi) then
