@@ -83,6 +83,7 @@ subroutine set_default_variables()
   lmagnetoaccr = .false.
   lpluto_file = .false.
   lmodel_ascii = .false.
+  lmhd_voronoi = .false.
   lzeeman_polarisation = .false.
   lforce_lte = .false.
   lread_jnu_atom=.false.
@@ -771,23 +772,25 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) istep_start
         i_arg= i_arg+1
-     case("-pluto")
+     case("-mhd_voronoi")
         i_arg = i_arg + 1
-        lpluto_file=.true.
+        lmhd_voronoi = .true.
         lVoronoi = .true.
         l3D = .true.
+     case ("-model_pluto")  
+     	i_arg = i_arg + 1
+     	lpluto_file = .true.
+     	lmodel_ascii = .false.
         call get_command_argument(i_arg,s)
         if (s=="") call error("No filename provided for Pluto file!")
         n_pluto_files = 1
         allocate(density_files(n_pluto_files))
         density_files(1) = s
-        i_arg = i_arg + 1
+        i_arg = i_arg + 1  
      case("-model_ascii")
         i_arg = i_arg + 1
         lmodel_ascii = .true.
         lpluto_file = .false.
-        lVoronoi = .false.
-        !l3D = .true. !not necessarily, depends on the grid used to generate the model
         call get_command_argument(i_arg,s)
         if (s=="") call error("No filename provided for ascii Pluto file!")
         density_file = s
@@ -1646,6 +1649,16 @@ subroutine initialisation_mcfost()
   lonly_nLTE = .false.
   if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
   if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
+  
+  if (lpluto_file) then
+  	if (.not.lmhd_voronoi) call error("Set lmhd_voronoi to .true. (-mhd_voronoi) if lpluto_file!")
+  endif
+  
+  if (lmodel_ascii .and. lpluto_file) then
+  	call warning("lmodel_ascii and lpluto_file ! Assuming lmodel_ascii")
+  	lpluto_file = .false.
+  	!would mean in principle lmhd_voronoi
+  endif
 
   ! Signal handler
   ! do i=1,17
@@ -1684,8 +1697,9 @@ subroutine display_help()
   write(*,*) "        : -astrochem : creates the files for astrochem"
   write(*,*) "        : -phantom : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
-  write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
+  write(*,*) "        : -model_pluto <file> : read the <file> pluto HDF5 file"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
+  write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"

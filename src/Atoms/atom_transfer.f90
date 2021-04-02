@@ -43,9 +43,10 @@ module atom_transfer
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
 									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, &
 									ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint, istep_start, lno_iterate_ne_mc, &
-									healpix_lorder, healpix_lmin, healpix_lmax
+									healpix_lorder, healpix_lmin, healpix_lmax, lvoronoi, lmagnetoaccr
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
+	use Voronoi_grid, only		: Voronoi
 	!!use dust_transfer, only		: compute_stars_map
 	use dust_ray_tracing, only	: RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az,tab_RT_incl!!, stars_map, kappa
 	use stars, only				: intersect_spots, intersect_stars
@@ -139,16 +140,17 @@ module atom_transfer
     !write(*,*) "Boucle infinie, icell=", icell
 
 			if (icell <= n_cells) then
-				lcellule_non_vide = (icompute_atomRT(icell) > 0)
-				if (icompute_atomRT(icell) < 0) return !-1 if dark
+! 				if (test_exit_grid(icell, x0, y0, z0)) return
+! 				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+! 				if (icompute_atomRT(icell) < 0) return !-1 if dark
+				lcellule_non_vide=.true.
 			else
 				lcellule_non_vide=.false.
 			endif
-    
-    ! Test sortie ! "The ray has reach the end of the grid"
-
+			
+    		! Test sortie ! "The ray has reach the end of the grid"
 			if (test_exit_grid(icell, x0, y0, z0)) return
-
+			
 			if (lintersect_stars) then
 				if (icell == icell_star) then
 					!It is completely possible to merge Icont and Itot in the say function
@@ -162,9 +164,16 @@ module atom_transfer
        				return
       			end if
    			 endif
+   			 
+   			!With the Voronoi grid, somme cells can have a negative index
+   			!therefore we need to test_exit_grid before using icompute_atom_rt
+			if (icell <= n_cells) then
+				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+				if (icompute_atomRT(icell) < 0) return				
+			endif
 
 			nbr_cell = nbr_cell + 1
-			
+
     ! Calcul longeur de vol et profondeur optique dans la cellule
 			previous_cell = 0 ! unused, just for Voronoi
 			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
@@ -918,7 +927,7 @@ module atom_transfer
  ! -------------------------------INITIALIZE AL-RT ------------------------------------ !
   !only one available yet, I need one unpolarised, faster and more accurate.
   Voigt => VoigtHumlicek
-  profile => local_profile_interp 
+  profile => local_profile_interp
   integ_ray_line => integ_ray_line_i
 
   if (npix_x_save > 1) then
@@ -933,11 +942,16 @@ module atom_transfer
  ! ------------------------------------------------------------------------------------ !
         !! ----------------------- Read Model ---------------------- !!
 
-  if (.not.lpluto_file) then
-   if (lmodel_ascii) then
-    call readAtmos_ascii(density_file)
-   end if
-  end if
+	!set .true. in dust_transfer if lmhd_voronoi
+	if (lvoronoi) then
+		!calling procedure done in dust_transfer.f90
+	else
+   		if (lmodel_ascii) then
+    		call readAtmos_ascii(density_file)
+    	else
+    		call error("Expected model ascii when lmhd_voronoi = .false.!!")
+    	endif
+	endif
   
   if (lmagnetized) then
   	!or need to allocate line%adamp after or interpolate the dispersion profile
@@ -2273,7 +2287,7 @@ module atom_transfer
   		real(kind=dp), intent(in) :: u, v, w, x, y, z
   		real(kind=dp), dimension(N) :: local_stellar_brigthness
 
-  		real(kind=dp) :: Tchoc
+  		real(kind=dp) :: Tchoc, vaccr, vmod2, rr
   		real(kind=dp) :: mu, ulimb, LimbDarkening
   		integer :: ns,la
   		logical :: lintersect!=.false.! does not work here ?
@@ -2318,25 +2332,35 @@ module atom_transfer
    		!better to store a map(1:n_cells) with all Tchoc
    		!and if map(icell_prev) > 0 -> choc
 
+! ->doesn't work with lspherical_velocity !
 		lintersect = .false.
 		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
 			if (icompute_atomRT(icell_prev) > 0) then
-				if (vr(icell_prev) < 0.0_dp) then
+			
+				if (lvoronoi) then 
+					rr = sqrt( x*x + y*y )
+					vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr
+					vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2
+				else
+					vaccr = vr(icell_prev)		
+					vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2	
+				endif
+		
+				if (vaccr < 0.0_dp) then
 					if (Taccretion>0) then
 						Tchoc = Taccretion
-					else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
-						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * &
-							(0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+					else
+						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25						
 					endif
 					lintersect = (Tchoc > etoile(i_star)%T)
 				endif
-			endif
+				
+			endif !icompute_atomRT
 			if (lintersect) then
 				local_stellar_brigthness(:) = local_stellar_brigthness(:) + &
 				(exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
 			endif
-
-   		endif
+   		endif !laccretion_shock
 
 		local_stellar_brigthness(:) = LimbDarkening * local_stellar_brigthness(:)
 

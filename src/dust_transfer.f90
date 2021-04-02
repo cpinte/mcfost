@@ -25,6 +25,9 @@ module dust_transfer
   use init_mcfost
   use SPH2mcfost
   use ML_ProDiMo
+  
+  use pluto_mod, only : setup_mhd_to_mcfost! :-)
+  
   !$ use omp_lib
 
   implicit none
@@ -100,10 +103,11 @@ subroutine transfert_poussiere()
   if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
      call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
      call setup_grid()
-  else if (lpluto_file) then
-  	call error("PLUTO interface not handled yet!")
-!      CALL setup_pluto_to_mcfost(density_file)
-!      CALL setup_grid()
+  else if (lmhd_voronoi) then
+     call setup_mhd_to_mcfost()
+     call setup_grid()
+     !allocating for compatibility ... we really need to merge the code !
+     call allocate_densities(n_cells_max = n_cells + n_etoiles)
   else
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
@@ -112,7 +116,7 @@ subroutine transfert_poussiere()
 
   laffichage=.true.
 
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lpluto_file)) then ! already done by setup_SPH2mcfost
+  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()

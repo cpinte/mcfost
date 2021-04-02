@@ -86,6 +86,32 @@ module Voronoi_grid
 
      end subroutine voro
   end interface
+  
+  !! Future deprecation !!
+ !! same as voro_C but testing the wall direclty in the routine !!
+  interface
+     subroutine voro_with_wall(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
+          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, xs, ys, zs, rs, was_cell_cut, ierr) bind(C, name='voro_C_with_wall_db')
+       use, intrinsic :: iso_c_binding
+
+       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, n_vectors
+       real(c_double), dimension(6), intent(in) :: limits
+       real(c_double), dimension(n_points), intent(in) :: x,y,z,h
+       real(c_double), intent(in), value :: threshold, cutting_distance_o_h ! defines at which value we decide to cut the cell, and at how many h the cell will be cut
+       !stellar properties for spherical wall
+       real(c_double), intent(in), value :: xs,ys,zs,rs
+       ! normal vectors to the cutting plane (need to be normalized)
+       real(c_double), dimension(3,n_vectors), intent(in) :: cutting_vectors  ! access order is wrong, but only way to pass a 2d array to C with an unfixed dim
+
+       integer(c_int), intent(out) :: n_in,  ierr
+       integer(c_int), dimension(n_cpu), intent(out) ::  n_neighbours
+       real(c_double), dimension(n_points_per_cpu), intent(out) :: volume
+       integer(c_int), dimension(n_points_per_cpu), intent(out) :: first_neighbours,last_neighbours
+       integer(c_int), dimension(n_points_per_cpu * max_neighbours * n_cpu), intent(out) :: neighbours_list
+       logical(c_bool), dimension(n_points_per_cpu), intent(out) :: was_cell_cut
+
+     end subroutine voro_with_wall
+  end interface
 
   contains
 
@@ -592,6 +618,396 @@ module Voronoi_grid
     return
 
   end subroutine Voronoi_tesselation
+  
+  !building
+  !special wrapper for MHD codes (or grid codes).
+  !Some differences with the previous version which is dedicated to SPH models.
+  !Ultimately, the two will be merged. This is a debug and test versions mainly on grid models
+  subroutine Voronoi_tesselation_mhd(n_points, x,y,z,h, vx,vy,vz, limits, check_previous_tesselation)
+  
+  !h is currenlty not used but allocated
+  
+  !lrandom
+  !original id in mhd model ??
+
+    use iso_fortran_env
+    use, intrinsic :: iso_c_binding, only : c_bool
+    !$ use omp_lib
+
+    integer, intent(in) :: n_points
+    real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h, vx,vy,vz
+    !!integer, dimension(n_points), intent(in) :: particle_id
+    real(kind=dp), dimension(6), intent(in) :: limits
+    logical, intent(in) :: check_previous_tesselation
+
+
+    integer, parameter :: max_neighbours = 30  ! maximum number of neighbours per cell (to build temporary neighbours list)
+
+    real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
+    integer, dimension(:), allocatable :: mhd_id, mhd_original_id !original id is simply a loop from 1 to number of elements in the model line by line
+    real :: time, mem
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, n, time1, time2, itime, i, icell, istar, n_missing_cells, n_cells_per_cpu, nb_proc_voro
+    real(kind=dp), dimension(:), allocatable :: V_tmp
+    integer, dimension(:), allocatable :: first_neighbours,last_neighbours
+    integer, dimension(:), allocatable :: neighbours_list_loc
+    integer, dimension(:), allocatable :: n_neighbours ! nb_proc
+    logical(c_bool), dimension(:), allocatable :: was_cell_cut, was_cell_cut_tmp
+
+    logical :: is_outside_stars, lcompute
+
+    real(kind=dp), dimension(n_etoiles) :: deuxr2_star
+    real(kind=dp) :: dx, dy, dz, dist2
+
+    integer :: icell_start, icell_end, id, row, l, n_cells_before_stars
+
+    real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
+    character(len=2) :: unit
+
+!     logical, parameter :: lrandom = .true.
+    integer, dimension(:), allocatable :: order,mhd_id2,mhd_original_id2
+    real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
+
+    if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
+    nb_proc_voro = min(16,nb_proc)
+    allocate(n_neighbours(nb_proc_voro))
+
+    ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
+    call init_Platonic_Solid(12, threshold)
+
+    n_walls = 6
+    write(*,*) "Finding ", n_walls, "walls"
+    call init_Voronoi_walls(n_walls, limits)
+
+    ! For initial position of rays in ray-tracing mode
+    Rmax = sqrt( (limits(2)-limits(1))**2 + (limits(4)-limits(3))**2 + (limits(6)-limits(5))**2 )
+    write(*,*) " Rmax ray-tracing (Rstar) =", Rmax/etoile(1)%r 
+
+    allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
+         mhd_id(n_points+n_etoiles), stat=alloc_status)!, mhd_original_id(n_points+n_etoiles)
+    if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
+
+    do istar=1, n_etoiles
+       deuxr2_star(istar) = (2*etoile(istar)%r)**2
+    enddo
+
+    ! Filtering particles outside limits.
+    ! Particle inside the stars should not exists.
+    icell = 0
+    do i=1, n_points
+
+       ! We test if the point is in the model volume
+       if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
+          if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
+             if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
+             
+               is_outside_stars = .true.
+                loop_stars : do istar=1, n_etoiles
+                   dx = x(i) - etoile(istar)%x
+                   dy = y(i) - etoile(istar)%y
+                   dz = z(i) - etoile(istar)%z
+
+                   if (min(dx,dy,dz) < 2*etoile(istar)%r) then
+                      dist2 = dx**2 + dy**2 + dz**2
+                      if (dist2 < deuxr2_star(istar)) then
+                         is_outside_stars = .false.
+                         exit loop_stars
+                      endif
+                   endif
+                enddo loop_stars
+
+                if (is_outside_stars) then       
+                   icell = icell + 1
+                   mhd_id(icell) = i
+                   !mhd_original_id(icell) = particle_id(i)
+                   x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(icell) = h(i)
+                endif
+             endif
+          endif
+       endif
+    enddo
+    n_cells_before_stars = icell
+    n_cells = icell
+    n_cells_per_cpu = (1.0*n_cells) / nb_proc_voro + 1
+
+
+    ! Filtering stars outside the limits
+    etoile(:)%out_model = .true.
+    etoile(:)%icell = 0
+    icell = n_cells_before_stars
+    do i=1, n_etoiles
+       ! We test is the star is in the model
+       if ((etoile(i)%x > limits(1)).and.(etoile(i)%x < limits(2))) then
+          if ((etoile(i)%y > limits(3)).and.(etoile(i)%y < limits(4))) then
+             if ((etoile(i)%z > limits(5)).and.(etoile(i)%z < limits(6))) then
+                icell = icell + 1
+                mhd_id(icell) = 0
+                !mhd_original_id(icell) = 0
+                x_tmp(icell) = etoile(i)%x ; y_tmp(icell) = etoile(i)%y ; z_tmp(icell) = etoile(i)%z ; h_tmp(icell) = huge_real ;
+                etoile(i)%out_model = .false.
+                etoile(i)%icell = icell
+             endif
+          endif
+       endif
+    enddo
+    n_cells = icell
+    
+    alloc_status = 0
+    allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), was_cell_cut(n_cells), stat=alloc_status)
+    if (alloc_status /=0) call error("Allocation error Voronoi structure")
+    volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; was_cell_cut(:) = .false.
+    Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
+    Voronoi(:)%first_neighbour = 0
+    Voronoi(:)%last_neighbour = 0
+    Voronoi(:)%is_star = .false.
+
+    do icell=1, n_cells !icell == icell_star it simply sets to 0 the quantities
+       Voronoi(icell)%xyz(1) = x_tmp(icell)
+       Voronoi(icell)%xyz(2) = y_tmp(icell)
+       Voronoi(icell)%xyz(3) = z_tmp(icell)
+       Voronoi(icell)%h      = h_tmp(icell)
+       Voronoi_xyz(:,icell)  = Voronoi(icell)%xyz(:)
+       Voronoi(icell)%id     = mhd_id(icell) ! this is the id of the particles passed to mcfost
+!        Voronoi(icell)%original_id = SPH_original_id(icell) ! this is the particle id in phantom
+    enddo
+
+    !*************************
+    ! Velocities
+    !*************************
+    !always true by the way here
+    if (lemission_atom) then
+       do icell=1,n_cells_before_stars
+          i = mhd_id(icell)
+          Voronoi(icell)%vxyz(1) = vx(i)
+          Voronoi(icell)%vxyz(2) = vy(i)
+          Voronoi(icell)%vxyz(3) = vz(i)
+       enddo
+    endif
+
+    do i=1, n_etoiles
+       if (etoile(i)%icell > 0) Voronoi(etoile(i)%icell)%is_star = .true.
+    enddo
+    
+
+    call system_clock(time1)
+    write(*,*) "Performing Voronoi tesselation on ", n_cells, "grid points"
+    mem =  (1.0*n_cells) * (5*2 + 1) * 4.
+    if (mem > 1e9) then
+       mem = mem / 1024**3
+       unit = "GB"
+    else
+       mem = mem / 1024**2
+       unit = "MB"
+    endif
+    write(*,*) "mcfost will require ~", mem, unit//" of temporary memory for the tesselation" ! 5 double + 2 int arrays
+
+    if (operating_system == "Darwin" .and. (n_cells > 2e6)) then
+       call warning("Voronoi tesselation will likely crash with that many particle on a Mac. Switch to linux")
+    endif
+
+    if (check_previous_tesselation) then
+       call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
+            lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,was_cell_cut)
+    else
+       lcompute = .true.
+    endif
+
+
+    if (lcompute) then
+       mem = 4. * n_cells * max_neighbours
+       if (mem > 1e9) then
+          mem = mem / 1024**3
+          unit = "GB"
+       else
+          mem = mem / 1024**2
+          unit = "MB"
+       endif
+       write(*,*) "Trying to allocate", mem, unit//" for temporary neighbours list"
+       allocate(neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc_voro), stat=alloc_status)
+       if (alloc_status /=0) then
+          write(*,*) "Error when allocating neighbours list"
+          write(*,*) "Exiting"
+       endif
+       neighbours_list_loc = 0
+
+       n_in = 0 ! We initialize value at 0 as we have a reduction + clause
+       !$omp parallel default(none) num_threads(nb_proc_voro) &
+       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc_voro,n_cells_per_cpu) &
+       !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
+       !$omp private(id,n,icell_start,icell_end,ierr) &
+       !$omp private(V_tmp,was_cell_cut_tmp,alloc_status) &
+       !$omp shared(volume,was_cell_cut, etoile) &
+       !$omp reduction(+:n_in)
+       id = 1
+       !$ id = omp_get_thread_num() + 1
+       icell_start = (1.0 * (id-1)) / nb_proc_voro * n_cells + 1
+       icell_end = (1.0 * (id)) / nb_proc_voro * n_cells
+
+       ! Allocating results array
+       alloc_status = 0
+       allocate(V_tmp(n_cells_per_cpu), was_cell_cut_tmp(n_cells), stat=alloc_status)
+       if (alloc_status /=0) call error("Allocation error before voro++ call")
+
+!-> future change in voro()
+       call voro_with_wall(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, PS%vectors, PS%cutting_distance_o_h, &
+            icell_start-1,icell_end-1, id-1,nb_proc_voro,n_cells_per_cpu, &
+            n_in,V_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,etoile(1)%x,etoile(1)%y,etoile(1)%z,etoile(1)%r, was_cell_cut_tmp,ierr) ! icell & id shifted by 1 for C
+       if (ierr /= 0) then
+          write(*,*) "Voro++ excited with an error", ierr, "thread #", id
+          write(*,*) "Exiting"
+          call exit(1)
+       endif
+
+       ! Merging outputs from various cores
+       n=icell_end-icell_start+1
+       volume(icell_start:icell_end) = V_tmp(1:n)
+       was_cell_cut(icell_start:icell_end) = was_cell_cut_tmp(1:n)
+
+       deallocate(V_tmp, was_cell_cut_tmp)
+       !$omp end parallel
+
+       !-----------------------------------------------------------
+       ! Merging the neighbour arrays from the different threads
+       !-----------------------------------------------------------
+       ! We need to shift the indices of the neighbours
+       do id=2, nb_proc_voro
+          icell_start = (1.0 * (id-1)) / nb_proc_voro * n_cells + 1
+          icell_end = (1.0 * (id)) / nb_proc_voro * n_cells
+
+          ! Pointers to the first and last neighbours of the cell
+          first_neighbours(icell_start:icell_end) = first_neighbours(icell_start:icell_end) + last_neighbours(icell_start-1) + 1
+          last_neighbours(icell_start:icell_end)  = last_neighbours(icell_start:icell_end)  + last_neighbours(icell_start-1) + 1
+       enddo
+
+       ! Compacting neighbours list
+       n_neighbours_tot = sum(n_neighbours)
+       mem = 4. * n_neighbours_tot
+       if (mem > 1e9) then
+          mem = mem / 1024**3
+          unit = "GB"
+       else
+          mem = mem / 1024**2
+          unit = "MB"
+       endif
+       write(*,*) "Trying to allocate", mem, unit//" for neighbours list"
+       allocate(neighbours_list(n_neighbours_tot), stat=alloc_status)
+       if (alloc_status /=0) then
+          write(*,*) "Error when allocating neighbours list"
+          write(*,*) "Exiting"
+       endif
+
+       row = n_cells_per_cpu * max_neighbours ;
+       k = 0 ;
+       do id=1, nb_proc_voro
+          do i=1, n_neighbours(id)
+             k = k+1
+             neighbours_list(k) = neighbours_list_loc(row * (id-1) + i)
+          enddo
+       enddo
+       write(*,*) "Freeing temporary neighbours list"
+       deallocate(neighbours_list_loc)
+
+       if (check_previous_tesselation) then
+          call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list,was_cell_cut)
+       endif
+    else !lcompute
+       write(*,*) "Reading previous Voronoi tesselation"
+    endif
+    write(*,*) "Tesselation done"
+
+    ! Conversion to Fortran indices
+    Voronoi(:)%first_neighbour = first_neighbours(:) + 1
+    Voronoi(:)%last_neighbour = last_neighbours(:) + 1
+    deallocate(first_neighbours,last_neighbours)
+
+    Voronoi(:)%was_cut = was_cell_cut(:)
+    deallocate(was_cell_cut)
+
+    ! Saving position of the first neighbours to save time on memory access
+    ! Warning this seems to cost a fair bit of time
+    allocate(Voronoi_neighbour_xyz(3,n_saved_neighbours,n_cells)) ! tried 4 to align vectors, does not help
+    do icell=1, n_cells
+       l=0
+       do k=Voronoi(icell)%first_neighbour,Voronoi(icell)%last_neighbour
+          l = l+1
+          if (l <= n_saved_neighbours) then
+             j = neighbours_list(k)
+             if (j> n_cells) then
+                write(*,*) "icell =", icell, "k=", k, "j=", j, "n_cells=", n_cells
+                call error("Voronoi neighbour list index is invalid")
+             endif
+             if (j>0) Voronoi_neighbour_xyz(1:3,l,icell) = Voronoi_xyz(:,j)  ! this is slow
+          endif
+       enddo
+    enddo
+
+    ! Setting-up the walls
+    n_missing_cells = 0
+    do icell=1, n_cells
+       ! We check first that there is no issue in the tesselation
+       if (volume(icell) < tiny_real) then
+          n_missing_cells = n_missing_cells + 1
+          write(*,*) "WARNING: cell #", icell, "is missing"
+!           write(*,*) "original id =", SPH_original_id(icell)
+          write(*,*) "xyz=", x_tmp(icell), y_tmp(icell), z_tmp(icell)
+          write(*,*) "volume =", volume(icell)
+       endif
+
+       ! todo : find the cells touching the walls
+       do k=Voronoi(icell)%first_neighbour,Voronoi(icell)%last_neighbour
+          j = neighbours_list(k)
+          if (j < 0) then ! wall
+             j = -j ! wall index
+             wall(j)%n_neighbours = wall(j)%n_neighbours+1
+             if (wall(j)%n_neighbours > max_wall_neighbours) then
+                write(*,*) "ERROR : Voronoi wall", j, "max number of neighbours reached"
+                write(*,*) wall(j)%n_neighbours, max_wall_neighbours
+                write(*,*) "Exiting"
+                call exit(1)
+             endif
+             wall(j)%neighbour_list(wall(j)%n_neighbours) = icell
+          endif ! wall
+       enddo ! k
+    enddo ! icell
+
+    if (n_missing_cells > 0) then
+       write(*,*) "*******************************************"
+       if (n_missing_cells == 1) then
+           write(*,*) "WARNING: 1 cell is missing"
+       else
+          write(*,*) "WARNING:", n_missing_cells, "cells are missing"
+       endif
+       write(*,*) "*******************************************"
+    endif
+
+    write(*,*) "Building the kd-trees for the model walls"
+    call build_wall_kdtrees()
+
+    call system_clock(time2)
+    time=(time2 - time1)/real(time_tick)
+    if (time > 60) then
+       itime = int(time)
+       write (*,'(" Tesselation Time = ", I3, "h", I3, "m", I3, "s")')  itime/3600, mod(itime/60,60), mod(itime,60)
+    else
+       write (*,'(" Tesselation Time = ", F5.2, "s")')  time
+    endif
+    write(*,*) "Found", n_in, "cells"
+
+    if (n_in /= n_cells) then
+       write(*,*) "n_cells =", n_cells
+       write(*,*) "n in tesselation =", n_in
+       call error("some particles are not in the mesh")
+    endif
+
+    write(*,*) "Neighbours list size =", n_neighbours_tot
+    write(*,*) "Average number of neighbours =", real(n_neighbours_tot)/n_cells
+    write(*,*) "Voronoi volume =", sum(volume)
+
+    !i = 1
+    !write(*,*) i, real(Voronoi(i)%xyz(1)), real(Voronoi(i)%xyz(2)), real(Voronoi(i)%xyz(3)), real(volume(i)), Voronoi(i)%last_neighbour-Voronoi(i)%first_neighbour+1, neighbours_list(Voronoi(i)%first_neighbour:Voronoi(i)%last_neighbour)
+
+    return
+
+  end subroutine Voronoi_tesselation_mhd
 
   !**********************************************************
 

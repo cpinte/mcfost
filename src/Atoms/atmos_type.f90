@@ -1770,9 +1770,11 @@ module atmos_type
    !!-> allocated in fill elements, as Nelem is read from file now
    !!if (.not.allocated(Elements)) allocate(Elements(Nelem))
 
-   if (.not.lvoronoi) then
+   if (lvoronoi) then
+   	write(*,*) "Velocity fields for Voronoi cells mutualised with master version!"
     !allocate(Vxyz(Nspace,3))
     !Vxyz(:,:) = 0d0
+  else
     call warning("Futur deprecation of v_z, spherical vector use disntead")
     allocate(vR(n_cells)); vR = 0.0_dp
     allocate(vtheta(n_cells))
@@ -1819,61 +1821,61 @@ module atmos_type
    end subroutine alloc_atomic_atmos
 ! 
 ! !to do, this routine should change according to mcfost density array
-   subroutine define_atomRT_domain(itiny_T, itiny_nH)
-!    ! Set where to solve for the RT equation: where a cell is not
-!    ! transparent = where there is a significant density and temperature.
-!    ! Determines also if we have to force electron density calculation
-!    ! Might be used to tell where we solve the atomic line RT in case of a wind, magnetospheric
-!    !protoplanetary disk model.
-!    ! It is also set dark zones.
-!    ! icompute_atomRT = 0 -> transparent (rho, T <= tiny_H, tiny_T)
-!    ! icompute_atomRT = 1 -> filled (rho, T > tiny_H, tiny_T)
-!    ! icompute_atomRT = -1 -> dark (rho goes to infinity and T goes to 0)
-!     integer :: icell
-    real(kind=dp), optional :: itiny_nH, itiny_T
-!     real(kind=dp) :: Vchar=0d0, tiny_nH=1d0, tiny_T=1d2
-!     !with Very low value of densities or temperature it is possible to have
-!     !nan or infinity in the populations calculations because of numerical precisions
-! 
-!     if (present(itiny_T)) then
-!      write(*,*) "changing the value of tiny_T (K) = ", tiny_T," to", itiny_T
-!      tiny_T = itiny_T !K
-!     end if
-! 
-!     if (present(itiny_nH)) then
-!      write(*,*) "changing the value of tiny_nH (m^-3) = ", tiny_nH," to", itiny_nH
-!      tiny_nH = itiny_nH !m^-3
-!     end if
-! 
-!     if (maxval(ne) == 0d0) calc_ne = .true.
-! 
-!     if (tiny_T <= 0) then
-!      write(*,*) "changing the value of tiny_T = ", tiny_T," to", 2d2
-!      tiny_T = 2d0
-!     end if
-!     if (tiny_nH <= 0) then
-!      write(*,*) "changing the value of tiny_nH = ", tiny_nH," to", 1d0
-!      tiny_nH = 1d0
-!     end if
-! 
-! write(*,*) nHtot
-! write(*,*) "*"
-! write(*,*) T
-! stop
-!     !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T)
-!     ! atmos%icompute_atomRT(:) = 0 !transparent !already init
-!     where((nHtot > tiny_nH) .and. (T > tiny_T))
-!     	icompute_atomRT = 1
-!     end where
-! !     do icell=1,atmos%Nspace
-! ! !      atmos%lcompute_atomRT(icell) = &
-! ! !        (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
-! !     if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) &
-! !      	atmos%icompute_atomRT(icell) = 1 !filled
-! !     end do
-! 
-   return
-   end subroutine define_atomRT_domain
+!    subroutine define_atomRT_domain(itiny_T, itiny_nH)
+! !    ! Set where to solve for the RT equation: where a cell is not
+! !    ! transparent = where there is a significant density and temperature.
+! !    ! Determines also if we have to force electron density calculation
+! !    ! Might be used to tell where we solve the atomic line RT in case of a wind, magnetospheric
+! !    !protoplanetary disk model.
+! !    ! It is also set dark zones.
+! !    ! icompute_atomRT = 0 -> transparent (rho, T <= tiny_H, tiny_T)
+! !    ! icompute_atomRT = 1 -> filled (rho, T > tiny_H, tiny_T)
+! !    ! icompute_atomRT = -1 -> dark (rho goes to infinity and T goes to 0)
+! !     integer :: icell
+!     real(kind=dp), optional :: itiny_nH, itiny_T
+! !     real(kind=dp) :: Vchar=0d0, tiny_nH=1d0, tiny_T=1d2
+! !     !with Very low value of densities or temperature it is possible to have
+! !     !nan or infinity in the populations calculations because of numerical precisions
+! ! 
+! !     if (present(itiny_T)) then
+! !      write(*,*) "changing the value of tiny_T (K) = ", tiny_T," to", itiny_T
+! !      tiny_T = itiny_T !K
+! !     end if
+! ! 
+! !     if (present(itiny_nH)) then
+! !      write(*,*) "changing the value of tiny_nH (m^-3) = ", tiny_nH," to", itiny_nH
+! !      tiny_nH = itiny_nH !m^-3
+! !     end if
+! ! 
+! !     if (maxval(ne) == 0d0) calc_ne = .true.
+! ! 
+! !     if (tiny_T <= 0) then
+! !      write(*,*) "changing the value of tiny_T = ", tiny_T," to", 2d2
+! !      tiny_T = 2d0
+! !     end if
+! !     if (tiny_nH <= 0) then
+! !      write(*,*) "changing the value of tiny_nH = ", tiny_nH," to", 1d0
+! !      tiny_nH = 1d0
+! !     end if
+! ! 
+! ! write(*,*) nHtot
+! ! write(*,*) "*"
+! ! write(*,*) T
+! ! stop
+! !     !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T)
+! !     ! atmos%icompute_atomRT(:) = 0 !transparent !already init
+! !     where((nHtot > tiny_nH) .and. (T > tiny_T))
+! !     	icompute_atomRT = 1
+! !     end where
+! ! !     do icell=1,atmos%Nspace
+! ! ! !      atmos%lcompute_atomRT(icell) = &
+! ! ! !        (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
+! ! !     if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) &
+! ! !      	atmos%icompute_atomRT(icell) = 1 !filled
+! ! !     end do
+! ! 
+!    return
+!    end subroutine define_atomRT_domain
 
    subroutine alloc_magnetic_field()
    ! ----------------------------------------- !

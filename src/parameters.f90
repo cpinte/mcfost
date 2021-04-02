@@ -60,7 +60,7 @@ module parametres
   !!lstore_opac futur deprecation
   logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
        lcontrib_function, lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
-       ldissolve, laccurate_integ, loutput_rates, lorigin_atom
+       ldissolve, laccurate_integ, loutput_rates, lorigin_atom, lzeeman_polarisation
   integer :: Nrays_atom_transfer, istep_start
   
   !HEALpix
@@ -83,9 +83,10 @@ module parametres
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image, jnu_atom_file
   logical :: ltab_wavelength_image, lread_jnu_atom
-  ! PLUTO / MHD / ascii_model
+  !lmhd_voronoi enables the voronoi tesselation for either a pluto-formatted model (lpluto_file)
+  !or an ascii file ready for tesselation (lmodel_ascii)
   integer :: n_pluto_files
-  logical :: lpluto_file, lmodel_ascii, lzeeman_polarisation
+  logical :: lpluto_file, lmodel_ascii, lmhd_voronoi
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
