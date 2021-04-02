@@ -104,10 +104,8 @@ subroutine transfert_poussiere()
      call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
      call setup_grid()
   else if (lmhd_voronoi) then
-     call setup_mhd_to_mcfost()
+     call setup_mhd_to_mcfost() !uses sph_to_voronoi
      call setup_grid()
-     !allocating for compatibility ... we really need to merge the code !
-     call allocate_densities(n_cells_max = n_cells + n_etoiles)
   else
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost

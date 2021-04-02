@@ -143,7 +143,23 @@ contains
 
   subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,&
        SPH_grainsizes, SPH_limits, check_previous_tesselation, mask)
-
+       
+	! ************************************************************************************ !
+	! n_sph : number of points in the input model
+	! ndusttypes : number of dust species in the input model
+	! particle_id : index of the particle / cell centre in the input model
+	! x,y,z : coordinates of the particle / cell
+	! h : smoothing length to cut elongated cells
+	! vx,vy,vz : vector components of the velocity fields (cartesian) in the input model
+	! massgas : total mass of the gas
+	! massdust : total mass of the dust
+	! rho : gas density
+	! rhodust : dust density
+	! sph_grainsizes : size of grains for sph models
+	! sph_limits : limit of the input model box
+	! check_previous_tesselation :
+	! mask :
+	! ************************************************************************************ !    
     use Voronoi_grid
     use density, only : densite_gaz, masse_gaz, densite_pouss, masse
     use grains, only : n_grains_tot, M_grain
@@ -159,6 +175,7 @@ contains
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
     logical, dimension(:), allocatable, intent(in), optional :: mask
+    
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
@@ -185,7 +202,8 @@ contains
     write(*,*) "y =", minval(y), maxval(y)
     write(*,*) "z =", minval(z), maxval(z)
 
-    write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
+!     write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
+    write(*,*) "Found", n_SPH, " hydro particles with ", ndusttypes, "dust grains"
 
     if (lwrite_ASCII) then
        !  Write the file for the grid version of mcfost
@@ -247,7 +265,7 @@ contains
        k = int((1.0-limit_threshold) * n_SPH)
        limits(2) = select_inplace(k,real(x))
        limits(4) = select_inplace(k,real(y))
-       limits(6) = select_inplace(k,real(z))
+       limits(6) = select_inplace(k,real(z))       
     else
        limits(:) = SPH_limits(:)
     endif
@@ -445,6 +463,7 @@ contains
     endif
 
     ! We eventually reduce density to avoid artefacts: superseeded by cell cutting
+    !massgas is also modified
     if (density_factor < 1.-1e-6) then
        ! Removing cells at the "surface" of the SPH model:
        ! density is reduced so that they do not appear in images or cast artificial shadows,
@@ -455,6 +474,7 @@ contains
           if (Voronoi(icell)%was_cut) then
              n_force_empty = n_force_empty + 1
              call reduce_density(icell, density_factor)
+             massgas(Voronoi(icell)%id) = massgas(Voronoi(icell)%id) * density_factor
              cycle cell_loop
           endif
 
@@ -464,6 +484,7 @@ contains
              if (id_n < 0) then
                 n_force_empty = n_force_empty + 1
                 call reduce_density(icell, density_factor)
+             	massgas(Voronoi(icell)%id) = massgas(Voronoi(icell)%id) * density_factor
                 cycle cell_loop
              endif
           enddo

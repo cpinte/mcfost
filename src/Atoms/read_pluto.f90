@@ -7,6 +7,7 @@
 !
 module pluto_mod
 
+	use density, only : densite_gaz, masse_gaz !used to build nHtot
 	use parametres
 	use messages
 	use constantes, only : masseH
@@ -16,7 +17,8 @@ module pluto_mod
 							Taccretion, write_atmos_domain
 	
 	use utils
-	use Voronoi_grid, only : Voronoi, Voronoi_tesselation_mhd, volume, neighbours_list
+	use Voronoi_grid, only : Voronoi, volume, neighbours_list
+	use sph2mcfost, only : SPH_to_Voronoi
 ! 	use grid,
   
 	implicit none
@@ -29,14 +31,21 @@ module pluto_mod
 		integer										:: n_points, i, j, k, icell
 		integer										:: Nread
 		real(kind=dp), allocatable, dimension(:)	:: x,y,z,h!allocated in reading
-		real(kind=dp), allocatable, dimension(:)	:: vx,vy,vz,mass_gas, mass_ne, T_tmp, vt_tmp, dz
+		real(kind=dp), allocatable, dimension(:)	:: vx,vy,vz,mass_gas, mass_ne_on_massgas, T_tmp, vt_tmp, dz
+		real(kind=dp), allocatable, dimension(:)	:: rho, hydro_grainsizes, rhodust, massdust
+		logical, allocatable, dimension(:)			:: mask
+		
 		real(kind=dp)								:: thetai, thetao, tilt
 		integer, parameter							:: Nheader = 3 !Add more, for ascii file
 		character(len=MAX_LENGTH)					:: rotation_law
 		integer										:: syst_status, acspot, alloc_status
 		character(len=MAX_LENGTH)					:: inputline, FormatLine, cmd
-		real(kind=dp)								:: rho_to_nH
+		real(kind=dp)								:: rho_to_nH, vxmax, vxmin, vymax, vymin, vzmax, vzmin, vmax
 		logical										:: check_previous_tesselation
+		integer,  allocatable, dimension(:)			:: particle_id
+		real(kind=dp), dimension(6)					:: hydro_limits
+		integer										:: ndusttypes, voroindex, N_fixed_ne = 0
+		real, parameter								:: limit_factor = 1.01, Lextent = 1.01
 
 		write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
 
@@ -44,6 +53,21 @@ module pluto_mod
 		!stores pluto's model name. But also the filename from phantom.. So to date, the two
 		!codes cannot be merged.
 		!This is to be able to use read previous tesselation
+		
+		
+		lfix_star = .true.
+		lphantom_file = .false.
+		lignore_dust = .true.
+		lrandomize_voronoi = .false.
+		check_previous_tesselation = (.not.lrandomize_voronoi)
+		
+		if (lignore_dust) then
+			ndusttypes = 0
+			if (allocated(rhodust)) deallocate(rhodust,massdust)
+			
+		else
+			call error("Dust not handled yet for pluto models!")
+		endif
 		
 		!lvoronoi = .true. -> set to .true. if lmhd_voronoi
 		lmagnetized = lzeeman_polarisation !if Zeeman polarisation read magnetic field!
@@ -92,6 +116,12 @@ module pluto_mod
    				call error("Allocation error smoothing length h")
    			endif
 			!cut cells larger than 3*h
+			
+			allocate(particle_id(n_points), stat=alloc_status)
+			if (alloc_status > 0) then
+				call error("Allocation error particle_id (mhd_to_mcfost)")
+			endif
+			particle_id(:) = 0
 
 
    			allocate(x(n_points), y(n_points), z(n_points), stat=alloc_status)
@@ -104,7 +134,7 @@ module pluto_mod
    				call error("Allocation error vx, vy, vz")
    			endif
    			
-      		allocate(T_tmp(n_points), vt_tmp(n_points), dz(n_points), mass_gas(n_points), mass_ne(n_points), stat=alloc_status)
+      		allocate(T_tmp(n_points), vt_tmp(n_points), dz(n_points), mass_gas(n_points), mass_ne_on_massgas(n_points), stat=alloc_status)
    			if (alloc_status > 0) then
    				call error("Allocation error T_tmp")
    			endif
@@ -112,11 +142,12 @@ module pluto_mod
 			icell = 0	
 			Nread = 0
 			do icell=1, n_points
+				particle_id(icell) = icell
 				if (lmagnetized) then
 					call error("Magnetic field not available with Voronoi!")
 				else
 					call getnextLine(1, "#", FormatLine, inputline, Nread)
-					read(inputline(1:Nread),*) x(icell), y(icell), z(icell), T_tmp(icell), mass_gas(icell), mass_ne(icell), vx(icell), vy(icell), vz(icell), vt_tmp(icell), dz(icell)			
+					read(inputline(1:Nread),*) x(icell), y(icell), z(icell), T_tmp(icell), mass_gas(icell), mass_ne_on_massgas(icell), vx(icell), vy(icell), vz(icell), vt_tmp(icell), dz(icell)			
 				endif
 			enddo
 			!density_file
@@ -127,7 +158,7 @@ module pluto_mod
 			call error("lpluto_file or lmodel_ascii required for lmhd_voronoi!")
 		end if
 
-		!lfix_star = .true. only, yet
+
 		!???
 ! 		if ((.not.lfix_star).and.(lpluto_file.or.lmodel_ascii)) then
 ! ! 			write(*,*) "Error, lfix_star has to be .true. using pluto models !"
@@ -135,83 +166,29 @@ module pluto_mod
 ! 			!call compute_stellar_parameters()
 ! 		end if
 
-		! Model limits: do exist in pluto also ?
-		!call read_SPH_limits_file(SPH_limits_file, SPH_limits)
-
-		! Voronoi tesselation
-    	CALL mhd_to_voronoi(n_points,x,y,z,h,mass_gas,mass_ne,vx,vy,vz,T_tmp,vt_tmp,dz,check_previous_tesselation)
-
-		!deallocating temporary variables from input file.
-		deallocate(h,vx,vy,vz,mass_gas, mass_ne, x,y,z,T_tmp, vt_tmp, dz)
-
-! write(*,*) "before leaving setup_mhd_to_mcfost "
-! stop
-		return
-	end subroutine setup_mhd_to_mcfost 
-
-
-	subroutine read_pluto()
-	!read pluto format in hdf5
-	
-		call error("Pluto interface not available yet!")
-	
-	return
-	end subroutine read_pluto
-	
-	
-	subroutine mhd_to_voronoi(N, x,y,z, h, mass_gas, mass_ne, vx,vy,vz,T_tmp, vt_tmp, dz, check_previous_tesselation, mask)	
-		integer, intent(in) :: N
-		real(kind=dp), dimension(N), intent(in) :: x,y,z,h
-		real(kind=dp), dimension(N), intent(in) :: vx,vy,vz, mass_ne,mass_gas
-		real(kind=dp), dimension(N), intent(in) :: T_tmp, vt_tmp, dz
-		integer										:: N_fixed_ne = 0	
-		logical, intent(in) :: check_previous_tesselation
-		real(kind=dp), dimension(6) :: limits
-		real, parameter :: limit_factor = 1.01, Lextent = 1.01
-		real(kind=dp) :: rho_to_nH, vxmax, vxmin, vymax, vymin, vzmax, vzmin, vmax
-		integer :: icell, k, i, id_n, voroindex, n_force_empty
-		real(kind=dp), dimension(:), allocatable, optional :: mask
-		real :: density_factor
-		
-! 		if (lcorrect_density_elongated_cells) then
-! 			density_factor = correct_density_factor_elongated_cells
-! 		else
-! 			density_factor = 1
-! 		endif
-		density_factor = 1d-10
-		
-		!Show them in Rstar
-		write(*,*) "# Farthest particules (Rstar) :"
-		write(*,*) "x =", minval(x)/etoile(1)%r, maxval(x)/etoile(1)%r
-		write(*,*) "y =", minval(y)/etoile(1)%r, maxval(y)/etoile(1)%r
-		write(*,*) "z =", minval(z)/etoile(1)%r, maxval(z)/etoile(1)%r
-		
-		!Setting limits
+		! Setting limits explicitely here !
+		!call read_SPH_limits_file(" ", .false.)
+		hydro_limits(:) = 0
 
 		k = 1
-		limits(1) = select_inplace(k,real(x))*limit_factor
-		limits(3) = select_inplace(k,real(y))*limit_factor
-		limits(5) = select_inplace(k,real(z))*limit_factor
+		hydro_limits(1) = select_inplace(k,real(x))*limit_factor
+		hydro_limits(3) = select_inplace(k,real(y))*limit_factor
+		hydro_limits(5) = select_inplace(k,real(z))*limit_factor
 
-		k = N
-		limits(2) = select_inplace(k,real(x))*limit_factor
-		limits(4) = select_inplace(k,real(y))*limit_factor
-		limits(6) = select_inplace(k,real(z))*limit_factor
+		k = n_points
+		hydro_limits(2) = select_inplace(k,real(x))*limit_factor
+		hydro_limits(4) = select_inplace(k,real(y))*limit_factor
+		hydro_limits(6) = select_inplace(k,real(z))*limit_factor
 		write(*,*) "# Model limits (Rstar) :"
-		write(*,*) "x =", limits(1)/etoile(1)%r, limits(2)/etoile(1)%r
-		write(*,*) "y =", limits(3)/etoile(1)%r, limits(4)/etoile(1)%r
-		write(*,*) "z =", limits(5)/etoile(1)%r, limits(6)/etoile(1)%r
+		write(*,*) "x =", hydro_limits(1)/etoile(1)%r, hydro_limits(2)/etoile(1)%r
+		write(*,*) "y =", hydro_limits(3)/etoile(1)%r, hydro_limits(4)/etoile(1)%r
+		write(*,*) "z =", hydro_limits(5)/etoile(1)%r, hydro_limits(6)/etoile(1)%r
 
-		write(*,*) "Found", N, " mesh points "		
-
-		!*******************************
-		! Voronoi tesselation
-		!*******************************
-
-		call Voronoi_tesselation_mhd(N, x,y,z,h, vx,vy,vz, limits, check_previous_tesselation)
-		write(*,*) "Using n_cells =", n_cells	
-	
-		
+    	!also work with grid-based code
+    	!massdust, rhodust, hydro_grainsizes to allocated if ndusttypes = 0 !
+    	call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation)
+    	!correction for small density applied on mass_gas
+    	
 		!*******************************
 		! Accomodating model
 		!*******************************
@@ -219,11 +196,7 @@ module pluto_mod
 		!Velocity field arrays not allocated because lvoronoi is true
 		!-> fills element abundances structures for elements
 		call alloc_atomic_atmos
-
    		rho_to_nH = 1d3 / masseH / wght_per_H !convert from density to number density nHtot
-
-		!-> not needed only for dust and mol transfer ?
-		!call allocate_densities(n_cells_max=N+n_etoiles)
 
 		Vxmax = 0
 		Vymax = 0
@@ -235,20 +208,18 @@ module pluto_mod
 		icompute_atomRT(:) = 0
 		do icell=1,n_cells
 			voroindex = Voronoi(icell)%id
-! 			if (voronoi(icell)%is_star) cycle
 			if (voroindex > 0) then
 				nHtot(icell)  = Msun_to_kg * rho_to_nH * mass_gas(voroindex) /  (volume(icell) * AU3_to_m3)
 				
-				ne(icell) = Msun_to_kg * mass_ne(icell) / (volume(icell) * AU3_to_m3)
+				!store the ratio of mass electron on mass hydrogen
+				!to do the tesselation only on gas particle
+				!-> if ne is not present in the model, it is simply 0.
+				ne(icell) = Msun_to_kg * mass_ne_on_massgas(voroindex) * mass_gas(voroindex) / (volume(icell) * AU3_to_m3)
 				
 				T(icell) = T_tmp(voroindex)
 				
 				vturb(icell) = vt_tmp(voroindex)
-				
-             	Voronoi(icell)%vxyz(1) = vx(voroindex)
-             	Voronoi(icell)%vxyz(2) = vy(voroindex)
-            	Voronoi(icell)%vxyz(3) = vz(voroindex)
-            	
+
             	icompute_atomRT(icell) = dz(voroindex)
             	
             	vxmax = max(vxmax, abs(Voronoi(icell)%vxyz(1)))
@@ -263,57 +234,6 @@ module pluto_mod
 		end do
 
 		v_char = Vmax * Lextent
-		
-		!*************************
-		! Mask
-		!*************************
-		if (present(mask)) then
-			if (allocated(mask)) then
-				do icell=1,n_cells
-					voroindex = Voronoi(icell)%original_id
-					if (voroindex > 0) then
-						Voronoi(icell)%masked = mask(voroindex)
-					else
-						Voronoi(icell)%masked = .false.
-					endif
-				enddo
-			else
-				do icell=1,n_cells
-					Voronoi(icell)%masked = .false.
-				enddo
-			endif
-		else
-			do icell=1,n_cells
-				Voronoi(icell)%masked = .false.
-			enddo
-		endif
-
-		! We eventually reduce density to avoid artefacts: superseeded by cell cutting
-		if (density_factor < 1.0_dp) then
-		! Removing cells at the "surface" of the SPH model:
-		! density is reduced so that they do not appear in images or cast artificial shadows,
-		! but we can still compute a temperature (forcing them to be optically thin)
-			n_force_empty = 0
-			cell_loop : do icell=1,n_cells
-				! We reduce the density on cells that are very elongated
-				if (Voronoi(icell)%was_cut) then
-					n_force_empty = n_force_empty + 1
-					nHtot(icell) = density_factor * nHtot(icell)
-					cycle cell_loop
-				endif
-
-				! We reduce the density on cells that are touching a wall
-				do i=Voronoi(icell)%first_neighbour, Voronoi(icell)%last_neighbour
-					id_n = neighbours_list(i) ! id du voisin
-					if (id_n < 0) then
-						n_force_empty = n_force_empty + 1
-						nHtot(icell) = density_factor * nHtot(icell)
-						cycle cell_loop
-					endif
-				enddo
-			enddo cell_loop
-			write(*,*) "Density was reduced by", density_factor, "in", n_force_empty, "cells surrounding the model, ie", (1.0*n_force_empty)/n_cells * 100, "% of cells"
-		endif
 
 
 		write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
@@ -370,10 +290,23 @@ module pluto_mod
 		if (.not.calc_ne) then
 			write(*,*) "Maximum/minimum ne density in the model (m^-3):"
 			write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
-		endif
+		endif		
 
+
+		!deallocating temporary variables from input file.
+		deallocate(h,vx,vy,vz,mass_gas, mass_ne_on_massgas, x,y,z,T_tmp, vt_tmp, dz)
+		!if (allocated())
+
+		return
+	end subroutine setup_mhd_to_mcfost 
+
+
+	subroutine read_pluto()
+	!read pluto format in hdf5
+	
+		call error("Pluto interface not available yet!")
+	
 	return
-	end subroutine mhd_to_voronoi
+	end subroutine read_pluto
 
-
-END MODULE pluto_mod
+end module pluto_mod
