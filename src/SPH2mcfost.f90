@@ -167,11 +167,16 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,rho,massgas
+    real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
+    real(dp), dimension(:), allocatable, intent(inout) :: rho
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     integer, dimension(n_SPH), intent(in) :: particle_id
-    real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
-    real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
+!     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
+!     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
+!-> these ones are not necessarily allocated if ndusttypes = 0 (lignore_dust), thus they cannot have
+! an explicit shape. They also need to be allocatable.
+    real(dp), dimension(:,:), allocatable, intent(in) :: rhodust, massdust
+    real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
     logical, dimension(:), allocatable, intent(in), optional :: mask
@@ -463,7 +468,8 @@ contains
     endif
 
     ! We eventually reduce density to avoid artefacts: superseeded by cell cutting
-    !massgas is also modified
+    !massgas is also modified with the density factor for compatiblity with atomictransfer
+    !since massgas is inout.
     if (density_factor < 1.-1e-6) then
        ! Removing cells at the "surface" of the SPH model:
        ! density is reduced so that they do not appear in images or cast artificial shadows,

@@ -32,7 +32,8 @@ module pluto_mod
 		integer										:: Nread
 		real(kind=dp), allocatable, dimension(:)	:: x,y,z,h!allocated in reading
 		real(kind=dp), allocatable, dimension(:)	:: vx,vy,vz,mass_gas, mass_ne_on_massgas, T_tmp, vt_tmp, dz
-		real(kind=dp), allocatable, dimension(:)	:: rho, hydro_grainsizes, rhodust, massdust
+		real(kind=dp), allocatable, dimension(:)	:: rho, hydro_grainsizes
+		real(kind=dp), allocatable, dimension(:,:)	:: rhodust, massdust
 		logical, allocatable, dimension(:)			:: mask
 		
 		real(kind=dp)								:: thetai, thetao, tilt
@@ -147,7 +148,7 @@ module pluto_mod
 					call error("Magnetic field not available with Voronoi!")
 				else
 					call getnextLine(1, "#", FormatLine, inputline, Nread)
-					read(inputline(1:Nread),*) x(icell), y(icell), z(icell), T_tmp(icell), mass_gas(icell), mass_ne_on_massgas(icell), vx(icell), vy(icell), vz(icell), vt_tmp(icell), dz(icell)			
+					read(inputline(1:Nread),*) x(icell), y(icell), z(icell), T_tmp(icell), mass_gas(icell), mass_ne_on_massgas(icell), vx(icell), vy(icell), vz(icell), vt_tmp(icell), dz(icell)
 				endif
 			enddo
 			!density_file
@@ -185,9 +186,17 @@ module pluto_mod
 		write(*,*) "z =", hydro_limits(5)/etoile(1)%r, hydro_limits(6)/etoile(1)%r
 
     	!also work with grid-based code
-    	!massdust, rhodust, hydro_grainsizes to allocated if ndusttypes = 0 !
+    	!massdust, rhodust, hydro_grainsizes not allocated if ndusttypes = 0 !
+		!** bug handling
+!     	ndusttypes = 1 !oterwise bug
+!     	allocate(massdust(1, n_points),rhodust(1, n_points),hydro_grainsizes(1))
+    	!** bug handling
 		call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation)
-    	!correction for small density applied on mass_gas
+    	! -> correction for small density applied on mass_gas directly inside
+    	
+    	!** bug handling
+!     	deallocate(massdust,rhodust,hydro_grainsizes)
+    	!** bug handling
     	
 		!*******************************
 		! Accomodating model
@@ -232,6 +241,9 @@ module pluto_mod
             	Vmax = max( vmax, sqrt(Voronoi(icell)%vxyz(1)**2 + Voronoi(icell)%vxyz(2)**2 + Voronoi(icell)%vxyz(3)**2) )
 			endif
 		end do
+
+		!deallocating temporary variables from input file.
+		deallocate(h,vx,vy,vz,mass_gas, mass_ne_on_massgas, x,y,z,T_tmp, vt_tmp, dz)
 
 		v_char = Vmax * Lextent
 
@@ -292,10 +304,6 @@ module pluto_mod
 			write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
 		endif		
 
-
-		!deallocating temporary variables from input file.
-		deallocate(h,vx,vy,vz,mass_gas, mass_ne_on_massgas, x,y,z,T_tmp, vt_tmp, dz)
-		!if (allocated())
 
 		return
 	end subroutine setup_mhd_to_mcfost 
