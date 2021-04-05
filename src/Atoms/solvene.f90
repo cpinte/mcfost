@@ -306,7 +306,7 @@ subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
 ! 				dfjk(j) = 0d0
 ! 			endif
 			!-> fjk is zero if ne=0 in Sahaeq
-			dfjk(j) = -(j-1)*fjk(j)/ne
+			dfjk(j) = -(j-1)*fjk(j)/( ne + ne_min_limit)
     
 			sum1 = sum1 + fjk(j)
 			sum2 = sum2 + dfjk(j)
@@ -538,7 +538,11 @@ subroutine solve_electron_density(ne_initial_solution, verbose, epsilon)
 			
 			niter = niter + 1
 			if (dne <= MAX_ELECTRON_ERROR) then
-				if (ne(k) < ne_min_limit) ne(k) = 0d0 !tiny_dp or < tiny_dp
+				if (ne(k) < ne_min_limit) then
+					ne(k) = 0.0_dp !or ne(k) = ne_min_limit
+					write(*,*) " (Solve ne) ne < ne_min_limit, setting cell transparent!", k
+					icompute_atomRT(k) = 0
+				endif
 				exit
 			else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
 				if (dne > 0.0) then !shows the warning only if dne is actually greater than 1
