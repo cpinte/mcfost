@@ -1,6 +1,6 @@
 MODULE statequil_atoms
 
-	use atmos_type, only					: ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements, hydrogen, helium, nHtot
+	use atmos_type, only					: ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements, hydrogen, helium, nHtot, helium_is_active
 	use atom_type
 	use spectrum_type, only					: lambda, Nlambda, Nlambda_cont, lambda_cont, Jnu_cont, Itot, dk, dk_min, dk_max, &
 												Jnu, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb
@@ -1416,14 +1416,14 @@ MODULE statequil_atoms
 		logical, intent(in) :: iterate_ne
 		type(AtomType), pointer :: atom
 		integer :: nact, nact_start
-		logical :: accelerate = .false.
+		logical :: nonlte_ionisation
 		real(kind=dp) :: dM, dT, dTex, dpop, Tion, Tex
 		real(kind=dp), intent(out) :: delta
 		real(kind=dp) :: dne
 
 		dpop = 0.0_dp
 		dtex = 0.0_dp
-! if (icell /= 1) return		
+	
 		!electron density not iterated ?
 		!at the moment direcly call the old routine!
 		!works also for rest iterations (iterations where ne not iterated) ?
@@ -1432,18 +1432,23 @@ MODULE statequil_atoms
 			return
 		endif
 		
+		!here iterate_ne is .true. otherwise we exit after entering in update_populations
+		if (helium_is_active .or. hydrogen%active) nonlte_ionisation = .true.
+		!global variable helium_is_active is true if helium is associated and active.
+		!it avoids to double test the associate and the active statuses.
+		
 		if (verbose) write(*,'(" niter #"(1I4)" id #"(1I4))') nit, id
 
 		
 		nact = 1 !future test on all elements that can be included in the equation
-		if (hydrogen%active .and. activeatoms(nact)%ptr_atom%id=='H') then
-			if (verbose) write(*,*) " Solving SEE and charge conservation for ", hydrogen%id
+! 		if (hydrogen%active .and. activeatoms(nact)%ptr_atom%id=='H') then
+		if (nonlte_ionisation) then
+			if (verbose) write(*,*) " Solving SEE and charge conservation for H+He+ne"
 			!actually includes all non-LTE atom part of the equation
 			!loop for all non-LTE atoms included in the equations
-			!currently only H
+			!currently only H and He
 			
 			
-			!include a loop for all atoms included
 			call see_ionisation_nonlte(id, icell, dM, dne)
 
 			if (verbose) then
@@ -1467,6 +1472,7 @@ MODULE statequil_atoms
 			   
 		else		
 		!at the moment separate hydrogen and the others
+		!hydrogen always the first element. So if hydrogen is active, it is the first one!
 		!-> beware, if hydrogen is not active , nact should be 1
 		!-> check for helium too.
 			if (hydrogen%active) then
@@ -1474,7 +1480,13 @@ MODULE statequil_atoms
 			else
 				nact_start = 1
 			endif
-			do nact=nact_start, Nactiveatoms
+			aatom_loop : do nact=nact_start, Nactiveatoms
+				!skip helium if active as it is included in the nonlte ionisation
+				if (activeatoms(nact)%ptr_atom%ID=="He") then
+					write(*,*) " Avoinding Helium in SEE (withou ne)!"
+					cycle aatom_loop
+				endif
+				
 				if (verbose) write(*,*) " Solving SEE for atom ", atom%ID
 				atom => activeatoms(nact)%ptr_atom
 				call SEE_atom(id, icell, atom, dM)
@@ -1494,7 +1506,7 @@ MODULE statequil_atoms
 			   
 				atom => NULL()
 			
-			enddo
+			enddo aatom_loop
   		endif
   		
 		!flag the one with a "*"

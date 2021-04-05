@@ -20,7 +20,7 @@ module atom_transfer
 									
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
-									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom
+									compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, helium_is_active
 	use healpix_mod, only		: healpix_sphere, healpix_npix, healpix_weight, healpix_ring_mu_and_phi, healpix_listx
 									
 	use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
@@ -1429,6 +1429,7 @@ module atom_transfer
 		!Hydrogen and Helium updated with SEE if present.
 		!For all other non-LTE atoms currently using the old scheme.
 		update_ne_other_nlte = (hydrogen%active.and.NactiveAtoms > 1).or.(.not.hydrogen%active)
+		!can use helium_is_active global variable, avoiding to test the associated and active.
 		if (associated(helium)) then
 		
 			update_ne_other_nlte = (helium%active.and.hydrogen%active.and.Nactiveatoms > 2).or.&
@@ -2319,11 +2320,6 @@ module atom_transfer
    		endif
    
   		local_stellar_brigthness = 1.0_dp
-  		!add X-rays, UV flux etc..
-   
-		!if (ladd_xrays) then
-		!	....
-		!endif
    
 		!cos(theta) = dot(r,n)/module(r)/module(n)
 		if (llimb_darkening) then

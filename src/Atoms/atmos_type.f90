@@ -62,6 +62,7 @@ module atmos_type
     logical :: lmali_scheme, lhogerheijde_scheme !tmp
     character(len=50) :: angular_quadrature = "HEALpix"!"HEALpix"!"HEALpix_adapt"'carlson_A8_rh'!
 	type (AtomType), pointer :: Hydrogen => NULL(), Helium => NULL()
+	logical :: helium_is_active = .false.!avoid testing if helium is associated!
 
 
   contains

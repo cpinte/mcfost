@@ -3,7 +3,7 @@ MODULE readatom
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType, Element, determinate, rydberg_atom, &
   						n_eff, find_continuum
   use atmos_type, only : Nelem, Hydrogen, Helium, Elements, T, ne, vturb, lmagnetized, icompute_atomRT, &
-  							Natom, NpassiveAtoms, NactiveAtoms, Atoms, PassiveAtoms, ActiveAtoms
+  							Natom, NpassiveAtoms, NactiveAtoms, Atoms, PassiveAtoms, ActiveAtoms, helium_is_active
   use zeeman, only : Lande_eff, ZeemanMultiplet
   use getlambda
   use constant
@@ -892,6 +892,7 @@ MODULE readatom
   endif
 
   ! Alias to the most importent one
+  !always exits !!
   Hydrogen=>Atoms(1)%ptr_atom
   if (.not.associated(Hydrogen, Atoms(1)%ptr_atom)) CALL Error(" Hydrogen alias not associated to atomic model!")
 
@@ -934,6 +935,11 @@ MODULE readatom
    if (Atoms(nmet)%ptr_atom%periodic_table.eq.2)  then
            NULLIFY(Helium) !Because, it is associated to an Elem by default
            Helium => Atoms(nmet)%ptr_atom
+           helium_is_active = helium%active
+           write(*,*) "Helium pointers associated to atom in the table", nmet
+           if (helium_is_active) then
+           	write(*,*) " And it is active !", Atoms(nmet)%ptr_atom%active
+           endif
      if (.not.associated(Helium,Atoms(nmet)%ptr_atom)) &
       CALL Warning(" Helium alias is not associated to an atomic model!")
    end if
