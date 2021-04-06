@@ -929,12 +929,13 @@ MODULE statequil_atoms
 	return
 	end subroutine partial_radrate_matrix_partial_ne_atom
 	
-	subroutine collrate_matrix_atom (id, icell, atom, gamma_col, dgamma_dne)
+	subroutine collrate_matrix_atom (id, icell, atom, gamma_col, deriv_rate, dgamma_dne)
 	
 	!see Hubeny & Mihalas 2014 eq. 14.8b
 
 		integer, intent(in) :: id, icell
 		type (AtomType), intent(in) :: atom!, pointer
+		real(kind=dp), intent(in), dimension(atom%Nlevel,atom%Nlevel) :: deriv_rate
 		real(kind=dp), intent(out), dimension(atom%Nlevel,atom%Nlevel) :: gamma_col, dgamma_dne
 		integer :: l,lp
 
@@ -946,11 +947,11 @@ MODULE statequil_atoms
 			do lp=l+1,atom%Nlevel
 				gamma_col(l,lp) = -atom%C(lp,l,id)
 				gamma_col(lp,l) = -atom%C(l,lp,id)
-				dgamma_dne(l,lp) = -dgamma_dne(lp,l)!-2*atom%C(lp,l,id)/ne(icell)
-				dgamma_dne(lp,l) = -dgamma_dne(l,lp)!-atom%C(l,lp,id)/ne(icell)
+				dgamma_dne(l,lp) = -deriv_rate(lp,l)!dgamma_dne(lp,l)!-2*atom%C(lp,l,id)/ne(icell)
+				dgamma_dne(lp,l) = -deriv_rate(l,lp)!dgamma_dne(l,lp)!-atom%C(l,lp,id)/ne(icell)
 			enddo
 		enddo
-		
+				
 		do l=1,atom%Nlevel
 			dgamma_dne(l,l) = -sum(dgamma_dne(:,l))
 		enddo
@@ -995,34 +996,388 @@ MODULE statequil_atoms
 	return
 	end subroutine ionisation_frac_lte
 	
+	!should replace an equation for H SEE and He SEE
+! 	subroutine particle_conservation_new (icell, Neq, x, f, df)
+! 		integer, intent(in) :: icell, Neq
+! 		real(kind=dp), intent(in) :: x(neq)
+! 		real(kind=dp), intent(inout) :: f(neq), df(neq, neq)
+! 		integer :: imaxpop, nlev
+! 		real(kind=dp) :: ntotal
+! 		
+! 		ntotal = ntotal_atom(icell,hydrogen)
+! 		
+! 		nlev = Neq - 1 !remove electrons
+! 		
+! 		imaxpop = locate(x(1:nlev), maxval(x(1:nlev)))
+! 
+! 		!mass conservation: ntotal = sum_i n(i)
+! 		!eq imaxpop is replaced by:
+! 		!f(imaxpop) = ntotal - sum_i n(i) = 0
+! 		!or
+! 		!f(imaxpop) = 1.0 - sum_i n(i) / ntotal = 0
+! 	
+! 		f(imaxpop) = 1.0
+! 		f(imaxpop) = f(imaxpop) -sum(x(1:nlev)) / ntotal
+! 	
+! 		df(imaxpop,neq) = 0.0_dp
+! 		df(imaxpop,1:nlev) = -1.0_dp / ntotal
+! 
+! 	return
+! 	end subroutine particle_conservation_new
+! 
+! 		
+! derivative with np is not neq-1 its at hydrogen%Levek
+! derivative with ne is 0 for levels between ihel:N_level_heI, -1/x(neq) for levels
+! between Nlevel_geI+1:helium%Nlevel-1 and -2/x(neq) for HeIII that is for neq-1
+! or Nlevel_atoms
+! 	subroutine non_lte_charge_conservation_new (icell, neq, x, f, df)
+! 	!also computes the derivative of the charge conservation equation wuth
+! 	!ne and total population of stages with stage > 0 (like nH(Nlevel)=nHII)
+! 		integer, intent(in) :: icell, neq
+! 		real(kind=dp), intent(in) :: x(neq)
+! 		real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
+! 		integer :: n, j, n_start
+! 		type (element), pointer :: elem
+! 		real(kind=dp) :: akj, np_j
+! 		real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
+! 		!Separate in two parts: 1 non-LTE atoms and 2 electrons from LTE elements
+! 		
+! 		!derivative of CC (charge conservation) to ne
+! 		!x = (n1,n2,n3 .... ne)
+! 		np_j = 1.0_dp * hydrogen%n(hydrogen%Nlevel,icell) !the 1.0_dp represents the ionisation stage of nHII (2 for nHeIII)
+! 		df(neq,neq) = 1/x(neq)**2 * np_j!(sum(hydrogen%n(:,icell)*hydrogen%stage(:)))
+! 									!in principle if stage=0 we only add 0.
+! 									!for H it is only hydrogen%(nlevel,icell)
+! 									!more atoms can be added
+! 		!check:
+! 		!if (hydrogen%n(hydrogen%Nlevel,icell) /= sum(hydrogen%n(:,icell)*hydrogen%stage(:)))
+! 		!derivative to ions currently only nHII so the equation before neq is nHII
+! 		df(neq,neq-1) = -1.0 / x(neq) !pos_HII = neq - 1 if only hydrogen 
+! 		!for helium II it is -1/x(neq) df(neq, pos_heII)
+! 		!for helium III it is -2/x(neq) df(neq, pos_heIII)
+! 		
+! 		!non-LTE part of the charge conservation
+! 		f(neq) = 1.0 - (1.0 / x(neq)) * np_j!(sum(hydrogen%n(:,icell)*hydrogen%stage(:)))
+! 		!for H only should be 1 - hydrogen%n(hydrogen%Nlevel,icell)/x(eq) that is 1 - x(eq-1)/x(eq)
+! 
+! 		!now contribution from LTE atoms.
+! 		do n=2, 26 !for 26 elements avoinding hydrogen here
+! 					!need to avoid other non-LTE elements
+! 			elem => Elements(n)%ptr_elem
+! 
+! 			call ionisation_frac_lte(elem, icell, x(neq), fjk, dfjk)
+! 
+! 			do j=2, elem%Nstage
+! 				!pure LTE term j = 1 corresponds to the first ionisation stage always
+! 				!unlike in solve_ne where this loop is also for non-LTE models
+! 				akj = (j-1) * elem%abund * nhtot(icell) !(j-1) = 0 for neutrals and 1 for singly ionised
+! 				f(neq) = f(neq) - akj * fjk(j) / x(neq)
+! 				df(neq,neq) = df(neq,neq) + akj * fjk(j) / x(neq)**2 - akj / x(neq) * dfjk(j)
+! 			end do			
+! 			
+! 			elem => null()
+! 		
+! 		enddo
+! 		
+! ! 	write(*,*) "df(neq,neq)=", df(neq, neq)
+! ! 	write(*,*) "df(:,neq)=", df(:,neq)
+! ! 	write(*,*) "df(neq,:)=",df(neq,:)
+! ! 	write(*,*) "total=",df
+! ! 	stop
+! 	
+! 	return
+! 	end subroutine non_lte_charge_conservation_new
+! 	
+! 	subroutine rate_equation_atom_new(id,icell, neq, Nlevels, gamma_tot, dgrdne, dgcdne, x, f, df)
+! 		integer, intent(in) :: id, icell, neq, is, ie
+! 		real(kind=dp), intent(in) :: x(neq)
+! 		real(kind=dp), intent(in), dimension(Nlevels,Nlevels) :: gamma_tot, dgrdne, dgcdne
+! 		real(kind=dp), intent(out) ::  f(neq), df(neq,neq)
+! 		integer :: i, j, l, lp
+! 		real(kind=dp) :: part1, part2
+! 				
+! 		
+! 		f(1:Neq-1) = matmul( gamma_tot, x(1:neq-1) )
+! 		!derivative of l row for each lp column
+! 		!derivative of each SEE (a l row of Gamma) for all n(i)
+! 		!it is simply Gamma(i,l) since Gamma does not depend on n(i)
+! 		do l=1, Nlevels
+! 			do lp=1, Nlevels
+! 				df(l,lp) = gamma_tot(l,lp)
+! 				!for row l computes the lp derivatives of SEE(l)=f(k) with respect to n(lp)
+! 			enddo
+! 		enddo
+! 
+! 		!derivative of SEE to ne
+! 		!dCij/dne = Cij/ne
+! 		!dCji/dne = 2*Cji/ne
+! 		!dRji_cont/dne = Rji_cont/ne
+! 	
+! 		df(1:neq-1,neq) = matmul( dgcdne, x(1:neq-1) )
+! 		if (.not.lforce_lte) then
+! 			df(1:neq-1,neq) = df(1:neq-1,neq) + matmul( dgrdne, x(1:neq-1) )
+! 		endif
+! 		
+! 		return
+! 
+! 	return
+! 	end subroutine rate_equation_atom_new
+! 
+! 	
+! 	!H and He only. The other elements are iterated in the old fashion
+! 	!if He is active and n_iter_ne > 0 (here) H MUST BE active at the moment.
+! 	!I will write a specific routine for helium ionisation only without hydrogen.
+! 	!If you don't want hydrogen, just use a low level H atom I guess ? or force
+! 	!SEE at LTE and derivative to 0
+! 	subroutine see_ionisation_nonlte_H_and_He(id, icell, dM, dne)
+! 		!TO DO :positivity tests + zero value below prec_pops
+! 		!Stack all equations and derivative in the same matrix
+! 
+! 		integer, intent(in) :: id, icell
+! 		real(kind=dp), intent(out) :: dM, dne
+! 		integer :: nact, Neq, nact_start, n_iter, i, kr
+! 		!smoothing parameter default if damp_char. If native pops, damp the iterations by a facteur damp_scaling larger
+! 		real(kind=dp), parameter :: damp_scaling = 10.0, damp_char = 5.0, precision = 1d-5
+! 		real(kind=dp) :: d_damp, nedag, delta_f, dfpop, dfne
+! 		real(kind=dp), allocatable :: gamma_r(:,:,:), ndag(:), RR(:,:), CC(:,:), deriv(:,:,:), dgamrdne(:,:), dgamcdne(:,:)
+! 		real(kind=dp), allocatable :: fvar(:), dfvar(:,:), xvar(:) !Jacobian
+! 		logical :: lconverged, neg_pops, rest_damping, lsecond_try, verbose
+! 		integer, parameter :: maxIter = 1000
+! 		integer :: max_iter, Nlevel_atoms, ihel=0, ih=0, n_active
+! 				
+! 		verbose = .false. !debug mode
+! 		lconverged = .false.
+! 		rest_damping = .false.
+! 		d_damp = damp_char
+! 		lsecond_try = .false. !set to .true. to avoid starting again if the first iterative scheme failed
+! 		
+! 				
+! 		!Hydrogen always active here.
+! 		!number of equations = Nlevel_atom1 + Nlevel_atom2 + ... + 1 for ne
+! 		Nlevel_atoms = hydrogen%Nlevel
+! 		ih = 1
+! 		n_active = 1
+! 		if (helium_is_active) then
+! 			ihel = Nlevel_atoms + 1 !position of SEE of helium among
+! 									   !all levels
+! 			Nlevel_atoms = Nlevel_atoms + helium%Nlevel
+! 			!SEE(H) -> ih : hydrogen%Nlevel
+! 			!SEE(He) -> ihel : ihel + helium%Nlevel
+! 			n_active = n_active + 1
+! 		endif
+! 		Neq = Nlevel_atoms + 1
+! 		!currently allocate and deallocate for each cell
+! 		!futur fixed size
+! 		!unknowns = populations of atomic levels + electron density 
+! 		allocate(xvar(neq)); xvar(:) = 0.0_dp
+! 		!equations = Nlevel SEE per atom  + charge conservation (CC)
+! 		allocate(fvar(neq)); fvar(:) = 0.0_dp
+! 		!Jacobian of the systems = derivative of i equations to xvar of sum_j partial(fvar(i))/partial(xvar(j))
+! 		allocate(dfvar(neq,neq)); dfvar(:,:) = 0.0_dp
+! 		!old ne values to rest for the other cell. The new value is stored in ne_new for the next iterations
+! 		nedag = ne(icell)
+! 
+! 		allocate(ndag(Nlevel_atoms)) !hydrogen%Nlevel if only H
+! 		ndag(1:hydrogen%Nlevel) = hydrogen%n(:,icell)
+! 		if (helium_is_active) then
+! 			ndag(ihel:Nlevel_atoms) = helium%(:,icell)
+! 		endif
+! 
+! 
+! 		allocate(RR(Nlevel_atoms,Nlevel_atoms), CC(Nlevel_atoms,Nlevel_atoms), dgamcdne(Nlevel_atoms,Nlevel_atoms))
+! 		allocate(gamma_r(n_active, Nlevel_atoms,Nlevel_atoms),dgamrdne(Nlevel_atoms,Nlevel_atoms))
+! 		allocate(deriv(n_active, Nlevel_Atoms, Nlevel_atoms))
+! 		!derivative of RR is indep of ne
+! 		!gamma_r without ne. RRnew = gamma_r * nenew
+! 		allocate(gamma_tot(Nlevel_atoms, Nlevel_atoms)); gamma_tot = 0.0_dp
+! 		call radrate_matrix_atom(id, icell, hydrogen, gamma_r(1,1:hydrogen%Nlevel,1:hydrogen%Nlevel), deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel))
+! 		dgamrdne(1:hydrogen%Nlevel,1:hydrogen%Nlevel) = deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel)
+! 		if (helium_is_active) then
+! 			deriv = 0.0_dp
+! 			call radrate_matrix_atom(id, icell, helium, gamma_r(n_active,1:Nlevel_atoms,1:Nlevel_atoms), deriv(1:helium%Nlevel,1:helium%Nlevel))	
+! 			dgamrdne(ihel:Nlevel_atoms,ihel:Nlevel_atoms) = deriv(1:helium%Nlevel,1:helium%Nlevel)
+! 		endif
+! 		!gamma_r(i,j) = -Rji, diagonal not included!
+! 		!derivative of gamma_r wrt ne is included (with the diagonal!!). It is only non-zero
+! 		!for recombinason rate and is independent of ne as it is Rji/ne (Rji = Rji/ne_old * ne_new at each iteration so derivative to ne_new is always Rji/ne_old)
+! 		if (lforce_lte) then
+! 			gamma_r(:,:,:) = 0.0_dp
+! 			dgamrdne(:,:) = 0.0_dp
+! 		endif
+! 			
+! 		!start Newton-Raphson iterations
+! 		if (verbose) write(*,*) "T = ", T(icell), " nHtot = ", nHtot(icell)
+! 
+! 		n_iter = 0
+! 		max_iter = maxIter
+! 		
+! 		iterative_loop : do while (.not.lconverged)
+! 			delta_f = 0.0_dp
+! 			dfpop = 0.0_dp !only populations
+! 			dfne = 0.0_dp
+! 			
+! 			n_iter = n_iter + 1
+! 			
+! 			!always the last one
+! 			xvar(Neq) = ne(icell)
+! 			fvar(:) = 0.0
+! 			dfvar(:,:) = 0.0
+! 				
+! 			!set unknowns to old values
+! 			!First hydrogen
+! 			xvar(1:hydrogen%Nlevel) = hydrogen%n(:,icell)
+! 			RR(:,:) = gamma_r(1,:,:) !init to radiative rates
+! 			!we multiply ne by zero if lforce_lte.
+! 			do kr=1,hydrogen%Ncont
+! 				RR(hydrogen%continua(kr)%i,hydrogen%continua(kr)%j) = RR(hydrogen%continua(kr)%i,hydrogen%continua(kr)%j) * ne(icell)
+! 			enddo
+! 			call collision_matrix_atom(id, icell, hydrogen, deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel))
+! ! 			!fill it into CC
+! 			!derivative independent of the new value of ne but Collision need to be updated.
+! 			call collrate_matrix_atom(id, icell, hydrogen, CC(1:hydrogen%Nlevel,1:hydrogen%Nlevel), deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel))
+! 			dgamcdne(1:hydrogen%Nlevel,1:hydrogen%Nlevel) = deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel)
+! 
+! 			!overwrite the value accumulated. But for the first iteration it is the same (because of ne).
+! 			gamma_tot(1:hydrogen%Nlevel,1:hydrogen%nlevel) = RR(1:hydrogen%Nlevel,1:hydrogen%Nlevel) + CC(1:hydrogen%Nlevel,1:hydrogen%Nlevel)
+! 			!now compute the diagonal elements
+! 			do i=1, hydrogen%Nlevel !diagonal hence full rate matrix
+! 				gamma_tot(i,i) = sum(-gamma_tot(1:hydrogen%Nlevel,i)) !positive
+! 			enddo
+! 			
+! 			!since I m putting all equations of all levels in a big matrix
+! 			!i need matrix multiplication like gamma * n which goves equations for level l
+! 			!and same for derivative. So helium and H can be stacked.
+! 			!I have to pay attention to the index of starts and how I remove one equation per
+! 			!atom for mass conservation !
+! 			
+! 			!now helium
+! 			if (helium_is_active) then
+! 				xvar(ihel:Nlevel_atoms) = helium%n(:,icell)
+! 				RR(:,:) = gamma_r(n_active,:,:) !init to radiative rates
+! 			!we multiply ne by zero if lforce_lte.
+! 				do kr=1,helium%Ncont
+! 					RR(helium%continua(kr)%i,helium%continua(kr)%j) = RR(helium%continua(kr)%i,helium%continua(kr)%j) * ne(icell)
+! 				enddo
+! 				!cumulate the derivative for helium equations
+! 				call collision_matrix_atom(id, icell, helium, CC(1:helium%Nlevel,1:helium%Nlevel), deriv(1:helium%Nlevel,1:helium%Nlevel))
+! ! 			!fill it into CC
+! 			!derivative independent of the new value of ne but Collision need to be updated.
+! 				call collrate_matrix_atom(id, icell, helium, CC(1:Nlevel_atoms,1:Nlevel_atoms), deriv(1:helium%Nlevel,1:helium%Nlevel))
+! dgamcdne(ihel:Nlevel_atoms,ihel:Nlevel_atoms)
+! 			!overwrite the value accumulated. But for the first iteration it is the same (because of ne).
+! 				gamma_tot(ihel:Nlevel_atoms,ihel:Nlevel_atoms) = RR(n_active,ihel:Nlevel_atoms,ihel:Nlevel_atoms) + CC(n_active,ihel:Nlevel_atoms,ihel:Nlevel_atoms)
+! 			!now compute the diagonal elements
+! 				do i=1, helium%Nlevel !diagonal hence full rate matrix
+! 					gamma_tot(ihel+i,ihel+i) = sum(-gamma_tot(ihel:Nlevel_atoms,ihel+i)) !positive
+! 				enddo
+! 			endif
+! 
+! 			!rate equation for this atom stored in f and df !
+! 			!an equation per level dn_i/dt = 0 = sum_lp n_l * Gamma_lp_l
+! 			call rate_equation_atom_new(id, icell, Neq, Nlevel_atoms, gamma_tot(:,:), dgamrdne(:,:), dgamcdne(:,:), xvar, fvar, dfvar)
+! 	
+! 			!charge conservation!
+! 			call non_lte_charge_conservation (icell, neq, xvar, fvar, dfvar)
+! 				
+! 			!replace one equation of SEE by particle number conservation
+! 			!particule conservation!
+! 	ADD HELIUM
+! 			call particle_conservation (icell, Neq, xvar, fvar, dfvar)
+! 			
+! 			!newton raphson!
+! 	CHECK HELIUM
+! 			call multivariate_newton_raphson (neq, dfvar, fvar, xvar)
+! ! 			call multivariate_newton_raphson (neq-1, dfvar(1:neq-1,1:neq-1), fvar(1:neq-1), xvar(1:neq-1))
+! 
+! ADD HELIUM TEST			
+! 			!update atomic populations and ne
+! 			neg_pops = .false.
+! 			do i=1, hydrogen%Nlevel
+! 				hydrogen%n(i,icell) = hydrogen%n(i,icell) * ( 1.0 + fvar(i)/(1.0 + d_damp * abs(fvar(i))) )
+! 				if (hydrogen%n(i,icell) < 0.0) neg_pops = .true.
+! 			enddo
+! 			!keep ne constant for tests
+! 			ne(icell) = ne(icell) * ( 1.0 + fvar(neq)/(1.0 + d_damp * abs(fvar(neq))) )
+! 
+! 
+! 			if ( (ne(icell) < 1d-16 * hydrogen%n(hydrogen%Nlevel,icell)).or.(neg_pops) ) rest_damping = .true.
+! 			
+! 			if (rest_damping .and. d_damp < (damp_char + 1.0)) then !restart with more iterations and larger damping (more stable, slower convergence)
+! 				do i=1, hydrogen%Nlevel
+! 					xvar(i) = ndag(i)
+! 				enddo
+! 				xvar(neq) = nedag
+! 				d_damp = damp_char * damp_scaling
+! 				rest_damping = .false.
+! 				n_iter = 0
+! 				max_iter = damp_scaling * maxIter !can be large !
+! 
+! 			elseif (rest_damping) then
+! 				neg_pops = .false.
+! 				lconverged = .false.
+! 			endif
+! 
+! 			!should be fractional 
+! 			delta_f = max(delta_f, maxval(abs(fvar)))
+! 			dfpop = max(dfpop, maxval(abs(fvar(1:Neq-1))))
+! 			dfne = max(dfne, abs(fvar(neq)))
+! 			
+! 			if (verbose) then
+! 				write(*,'("niter #"(1I4))') n_iter
+! 				write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfn="(1ES17.8E3)" dfne="(1ES17.8E3) )') delta_f, dfpop, dfne
+! 			endif
+! 			
+! 			
+! 			if (n_iter > max_iter) then
+! 				if (lsecond_try) then
+! 					lconverged = .true.
+! 					write(*,*) "Not enough iterations to converge", max_iter
+! 				else
+! 					lsecond_try = .true.
+! 					lconverged = .false.
+! 					n_iter = 0
+! 					max_iter = damp_scaling * maxIter
+! 					d_damp = damp_scaling * damp_char
+! 					do i=1, hydrogen%Nlevel
+! 						xvar(i) = ndag(i)
+! 					enddo
+! 					xvar(neq) = nedag
+! 				endif
+! 			endif
+! 			
+! 			if ((delta_f < precision).and..not.rest_damping) then
+! 				lconverged = .true.
+! 				exit iterative_loop
+! 			endif
+! 
+! 		enddo iterative_loop !on convergence
+! 		
+! 		dne = abs(1.0 - nedag/ne(icell))
+! 		dM = maxval(abs(1.0 - ndag(:)/hydrogen%n(:,icell)))
+! ! 		write(*,'("(DELTA) non-LTE ionisation dM="(1ES17.8E3)" dne="(1ES17.8E3) )') dM, dne
+! 
+! 		n_new(1,1:hydrogen%Nlevel,icell) = hydrogen%n(:,icell)
+! 		ne_new(icell) = ne(icell) !will be set to ne once the new populations on all cells (with old quantities) have bee computed
+! 		hydrogen%n(:,icell) = ndag(:) !the first value before iterations
+! 										!needed for global convergence
+! 		ne(icell) = nedag !reset because we have to loop over all cells
+! 									!and we don't want to change the old values by the new one
+! 									!until all  cells are treated
+! 
+! 		deallocate(xvar,fvar,dfvar)
+! 		deallocate(gamma_r, ndag, RR, CC)
+! 				
+! 	return
+! 	end subroutine see_ionisation_nonlte_H_and_He
 	
-	subroutine particle_conservation (icell, Neq, x, f, df)
-		integer, intent(in) :: icell, Neq
-		real(kind=dp), intent(in) :: x(neq)
-		real(kind=dp), intent(inout) :: f(neq), df(neq, neq)
-		integer :: imaxpop, nlev
-		real(kind=dp) :: ntotal
-		
-		ntotal = ntotal_atom(icell,hydrogen)
-		
-		nlev = Neq - 1 !remove electrons
-		
-		imaxpop = locate(x(1:nlev), maxval(x(1:nlev)))
-
-		!mass conservation: ntotal = sum_i n(i)
-		!eq imaxpop is replaced by:
-		!f(imaxpop) = ntotal - sum_i n(i) = 0
-		!or
-		!f(imaxpop) = 1.0 - sum_i n(i) / ntotal = 0
+	subroutine see_ionisation_nonlte_helium
+	!for when H is passive but helium is active !
 	
-		f(imaxpop) = 1.0
-		f(imaxpop) = f(imaxpop) -sum(x(1:nlev)) / ntotal
+	!almost the same routine as for hydrogen only, only the ionisation routine changes
 	
-		df(imaxpop,neq) = 0.0_dp
-		df(imaxpop,1:nlev) = -1.0_dp / ntotal
-
 	return
-	end subroutine particle_conservation
+	end subroutine see_ionisation_nonlte_helium
+	
 	
 	subroutine multivariate_newton_raphson (neq, df, f, x)
 	
@@ -1045,158 +1400,8 @@ MODULE statequil_atoms
 	
 	return
 	end subroutine multivariate_newton_raphson
-		
-	subroutine non_lte_charge_conservation (icell, neq, x, f, df)
-	!also computes the derivative of the charge conservation equation wuth
-	!ne and total population of stages with stage > 0 (like nH(Nlevel)=nHII)
-		integer, intent(in) :: icell, neq
-		real(kind=dp), intent(in) :: x(neq)
-		real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
-		integer :: n, j
-		type (element), pointer :: elem
-		real(kind=dp) :: akj, np_j
-		real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
-		!Separate in two parts: 1 non-LTE atoms and 2 electrons from LTE elements
-		
-		!derivative of CC (charge conservation) to ne
-		!x = (n1,n2,n3 .... ne)
-		np_j = 1.0_dp * hydrogen%n(hydrogen%Nlevel,icell) !the 1.0_dp represents the ionisation stage of nHII (2 for nHeIII)
-		df(neq,neq) = 1/x(neq)**2 * np_j!(sum(hydrogen%n(:,icell)*hydrogen%stage(:)))
-									!in principle if stage=0 we only add 0.
-									!for H it is only hydrogen%(nlevel,icell)
-									!more atoms can be added
-		!check:
-		!if (hydrogen%n(hydrogen%Nlevel,icell) /= sum(hydrogen%n(:,icell)*hydrogen%stage(:)))
-		!derivative to ions currently only nHII so the equation before neq is nHII
-		df(neq,neq-1) = -1.0 / x(neq) !pos_HII = neq - 1 if only hydrogen 
-		!for helium II it is -1/x(neq) df(neq, pos_heII)
-		!for helium III it is -2/x(neq) df(neq, pos_heIII)
-		
-		!non-LTE part of the charge conservation
-		f(neq) = 1.0 - (1.0 / x(neq)) * np_j!(sum(hydrogen%n(:,icell)*hydrogen%stage(:)))
-		!for H only should be 1 - hydrogen%n(hydrogen%Nlevel,icell)/x(eq) that is 1 - x(eq-1)/x(eq)
 
-		!now contribution from LTE atoms.
-		do n=2, 26 !for 26 elements avoinding hydrogen here
-					!need to avoid other non-LTE elements
-			elem => Elements(n)%ptr_elem
-
-			call ionisation_frac_lte(elem, icell, x(neq), fjk, dfjk)
-
-			do j=2, elem%Nstage
-				!pure LTE term j = 1 corresponds to the first ionisation stage always
-				!unlike in solve_ne where this loop is also for non-LTE models
-				akj = (j-1) * elem%abund * nhtot(icell) !(j-1) = 0 for neutrals and 1 for singly ionised
-				f(neq) = f(neq) - akj * fjk(j) / x(neq)
-				df(neq,neq) = df(neq,neq) + akj * fjk(j) / x(neq)**2 - akj / x(neq) * dfjk(j)
-			end do			
-			
-			elem => null()
-		
-		enddo
-		
-! 	write(*,*) "df(neq,neq)=", df(neq, neq)
-! 	write(*,*) "df(:,neq)=", df(:,neq)
-! 	write(*,*) "df(neq,:)=",df(neq,:)
-! 	write(*,*) "total=",df
-! 	stop
-	
-	return
-	end subroutine non_lte_charge_conservation
-	
-	subroutine rate_equation_atom(id,icell, neq, atom, gamma_rad, dgrdne, gamma_col,  dgcdne, x, f, df)
-		integer, intent(in) :: id, icell, neq
-		type (atomtype), intent(in) :: atom !contains total rate matrix without diagonal in atom%Gamma
-		real(kind=dp), intent(in) :: x(neq)
-		real(kind=dp), intent(in), dimension(atom%Nlevel,atom%Nlevel) :: gamma_rad, dgrdne, gamma_col, dgcdne
-		real(kind=dp), intent(out) ::  f(neq), df(neq,neq)
-		integer :: i, j, l, lp
-		real(kind=dp) :: part1, part2
-				!individual equation for each level
-				
-		!also computes the derivative of each equation by each level
-		
-!-> here Gamma diag is filled (with eliminate_delta or explicit summation gamma(:,l,id) for each level l)
-		f(1:hydrogen%Nlevel) = matmul( hydrogen%gamma(:,:,id), x(1:hydrogen%Nlevel) )
-		!derivative of l row for each lp column
-		!derivative of each SEE (a l row of Gamma) for all n(i)
-		!it is simply Gamma(i,l) since Gamma does not depend on n(i)
-		do l=1, atom%Nlevel
-			do lp=1,atom%nlevel
-				df(l,lp) = hydrogen%gamma(l,lp,id)
-				!for row l computes the lp derivatives of SEE(l)=f(k) with respect to n(lp)
-			enddo
-		enddo
-
-		!derivative of SEE to ne
-		!dCij/dne = Cij/ne
-		!dCji/dne = 2*Cji/ne
-		!dRji_cont/dne = Rji_cont/ne
-	
-		df(1:neq-1,neq) = matmul( dgcdne, x(1:hydrogen%Nlevel) )
-		if (.not.lforce_lte) then
-			df(1:neq-1,neq) = df(1:neq-1,neq) + matmul( dgrdne, x(1:hydrogen%Nlevel) )
-		endif
-		
-		return
-		
-!-> here diag(Gamma) must be zero
-! 		do i=1, atom%Nlevel
-! 			part1 = -sum(atom%Gamma(:,i,id))
-! 			f(i) = x(i) * part1!SEE for the first level
-! 			do j=1, atom%Nlevel
-! 				f(i) = f(i) + x(j) * atom%Gamma(i,j,id)
-! 				if (i==j) then
-! 					df(i,j) = part1
-! 				else
-! 					df(i,j) = atom%Gamma(j,i,id) !index ?
-! 				endif
-! 			enddo
-! 			
-! 		enddo
-
-		do i=1, atom%Nlevel
-	
-			!add derivative to ne for recombinaison rates and collision rates
-		
-			if (i==atom%Nlevel) then
-				part1 = -sum(gamma_rad(:,i)) / x(neq)
-				part2 = -sum(gamma_col(:,i)) / x(neq)
-				df(i,neq) = x(i) * (part1 + 2.0 * part2)
-				do j=1, atom%Nlevel
-				
-					df(i,neq) = df(i,neq) + x(j)/x(neq) * gamma_col(i,j)
-				
-				enddo
-			else
-			
-				part1 = -sum(gamma_col(:,i)) / x(neq)
-				df(i,neq) = x(i) * part1
-				
-				do j=1, atom%Nlevel
-				
-					df(i,neq) = df(i,neq) + x(j) * gamma_col(i,j) / x(neq)
-				
-				enddo
-				
-				!recombination
-				!x(atom%Nlevel) is np in that case
-				df(i,neq) = df(i,neq) + (x(i) / x(neq)) * gamma_col(i,atom%Nlevel) + (x(atom%Nlevel)/x(neq))*(gamma_rad(atom%Nlevel,i)+2.0*gamma_col(atom%Nlevel,i))
-			
-			endif
-		enddo
-		
-		write(*,*) "der=", df(1:4,neq)
-		return
-				
-	
-	return
-	end subroutine rate_equation_atom
-
-	
-	!only hydrogen, need to be generalised
-	subroutine see_ionisation_nonlte(id, icell, dM, dne)
-		!to do add helium + other
+	subroutine see_ionisation_nonlte_hydrogen(id, icell, dM, dne)
 		!positivity tests + zero value below prec_pops
 
 		integer, intent(in) :: id, icell
@@ -1205,7 +1410,7 @@ MODULE statequil_atoms
 		!smoothing parameter default if damp_char. If native pops, damp the iterations by a facteur damp_scaling larger
 		real(kind=dp), parameter :: damp_scaling = 10.0, damp_char = 5.0, precision = 1d-5
 		real(kind=dp) :: d_damp, nedag, delta_f, dfpop, dfne
-		real(kind=dp), allocatable :: gamma_r(:,:), ndag(:), RR(:,:), CC(:,:), dgamrdne(:,:), dgamcdne(:,:)
+		real(kind=dp), allocatable :: gamma_r(:,:), ndag(:), RR(:,:), CC(:,:), dgamrdne(:,:), dgamcdne(:,:), deriv(:,:)
 		real(kind=dp), allocatable :: fvar(:), dfvar(:,:), xvar(:) !Jacobian
 		logical :: lconverged, neg_pops, rest_damping, lsecond_try, verbose
 		integer, parameter :: maxIter = 1000
@@ -1237,7 +1442,7 @@ MODULE statequil_atoms
 		ndag(:) = hydrogen%n(:,icell)
 
 		!Radiative rate matrix and collisional rate matrix
-		allocate(RR(hydrogen%Nlevel,hydrogen%Nlevel), CC(hydrogen%Nlevel,hydrogen%Nlevel), dgamcdne(hydrogen%Nlevel,hydrogen%Nlevel))
+		allocate(RR(hydrogen%Nlevel,hydrogen%Nlevel), CC(hydrogen%Nlevel,hydrogen%Nlevel), dgamcdne(hydrogen%Nlevel,hydrogen%Nlevel), deriv(hydrogen%Nlevel,hydrogen%Nlevel))
 		!normalised to ne radiative rate matrix
 		allocate(gamma_r(hydrogen%Nlevel,hydrogen%Nlevel),dgamrdne(hydrogen%Nlevel,hydrogen%Nlevel))
 		!Gamma_r(i_cont,j_cont) = R_jcont_icont / ne
@@ -1288,10 +1493,12 @@ MODULE statequil_atoms
 			!
 			!
 			!Derivative is okay (indep of ne)
-			call collision_matrix_atom(id, icell, hydrogen, dgamcdne)
+			!if (n_iter==1) update deriv otherwise no
+			call collision_matrix_atom(id, icell, hydrogen, deriv)
 ! 			!fill it into CC
 			!derivative independent of the new value of ne but Collision need to be updated.
-			call collrate_matrix_atom(id, icell, hydrogen, CC, dgamcdne)
+			!! deriv and dgmacdne cannot be the same at the moment ! dgamcdne is set to zero in the following.
+			call collrate_matrix_atom(id, icell, hydrogen, CC, deriv, dgamcdne)
 
 			!overwrite the value accumulated. But for the first iteration it is the same (because of ne).
 			hydrogen%Gamma(:,:,id) = RR(:,:) + CC(:,:)
@@ -1308,11 +1515,11 @@ MODULE statequil_atoms
 			call rate_equation_atom(id, icell, Neq, hydrogen, RR(:,:), dgamrdne(:,:), CC(:,:), dgamcdne(:,:), xvar, fvar, dfvar)
 	
 			!charge conservation!
-			call non_lte_charge_conservation (icell, neq, xvar, fvar, dfvar)
+			call non_lte_charge_conservation_H (icell, neq, xvar, fvar, dfvar)
 				
 			!replace one equation of SEE by particle number conservation
 			!particule conservation!
-			call particle_conservation (icell, Neq, xvar, fvar, dfvar)
+			call particle_conservation (icell, Neq, hydrogen, xvar, fvar, dfvar)
 			
 			!newton raphson!
 			call multivariate_newton_raphson (neq, dfvar, fvar, xvar)
@@ -1380,7 +1587,7 @@ MODULE statequil_atoms
 			endif
 
 		enddo iterative_loop !on convergence
-		
+
 		dne = abs(1.0 - nedag/ne(icell))
 		dM = maxval(abs(1.0 - ndag(:)/hydrogen%n(:,icell)))
 ! 		write(*,'("(DELTA) non-LTE ionisation dM="(1ES17.8E3)" dne="(1ES17.8E3) )') dM, dne
@@ -1394,12 +1601,188 @@ MODULE statequil_atoms
 									!until all  cells are treated
 
 		deallocate(xvar,fvar,dfvar)
-		deallocate(gamma_r, ndag, RR, CC)
+		deallocate(gamma_r, ndag, RR, CC, deriv)
 				
 	return
-	end subroutine see_ionisation_nonlte
-
+	end subroutine see_ionisation_nonlte_hydrogen
 	
+	subroutine non_lte_charge_conservation_H (icell, neq, x, f, df)
+	!also computes the derivative of the charge conservation equation wuth
+	!ne and total population of stages with stage > 0 (like nH(Nlevel)=nHII)
+		integer, intent(in) :: icell, neq
+		real(kind=dp), intent(in) :: x(neq)
+		real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
+		integer :: n, j, n_start
+		type (element), pointer :: elem
+		real(kind=dp) :: akj, np_j
+		real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
+		!Separate in two parts: 1 non-LTE atoms and 2 electrons from LTE elements
+		
+		!derivative of CC (charge conservation) to ne
+		!x = (n1,n2,n3 .... ne)
+		np_j = 1.0_dp * hydrogen%n(hydrogen%Nlevel,icell) !the 1.0_dp represents the ionisation stage of nHII (2 for nHeIII)
+		df(neq,neq) = 1/x(neq)**2 * np_j!(sum(hydrogen%n(:,icell)*hydrogen%stage(:)))
+									!in principle if stage=0 we only add 0.
+									!for H it is only hydrogen%(nlevel,icell)
+									!more atoms can be added
+		!check:
+		!if (hydrogen%n(hydrogen%Nlevel,icell) /= sum(hydrogen%n(:,icell)*hydrogen%stage(:)))
+		!derivative to ions currently only nHII so the equation before neq is nHII
+		df(neq,neq-1) = -1.0 / x(neq) !pos_HII = neq - 1 if only hydrogen 
+		!for helium II it is -1/x(neq) df(neq, pos_heII)
+		!for helium III it is -2/x(neq) df(neq, pos_heIII)
+		
+		!non-LTE part of the charge conservation
+		f(neq) = 1.0 - (1.0 / x(neq)) * np_j!(sum(hydrogen%n(:,icell)*hydrogen%stage(:)))
+		!for H only should be 1 - hydrogen%n(hydrogen%Nlevel,icell)/x(eq) that is 1 - x(eq-1)/x(eq)
+
+		!now contribution from LTE atoms.
+		do n=2, 26 !for 26 elements avoinding hydrogen here
+					!need to avoid other non-LTE elements
+			elem => Elements(n)%ptr_elem
+
+			call ionisation_frac_lte(elem, icell, x(neq), fjk, dfjk)
+
+			do j=2, elem%Nstage
+				!pure LTE term j = 1 corresponds to the first ionisation stage always
+				!unlike in solve_ne where this loop is also for non-LTE models
+				akj = (j-1) * elem%abund * nhtot(icell) !(j-1) = 0 for neutrals and 1 for singly ionised
+				f(neq) = f(neq) - akj * fjk(j) / x(neq)
+				df(neq,neq) = df(neq,neq) + akj * fjk(j) / x(neq)**2 - akj / x(neq) * dfjk(j)
+			end do			
+			
+			elem => null()
+		
+		enddo
+		
+! 	write(*,*) "df(neq,neq)=", df(neq, neq)
+! 	write(*,*) "df(:,neq)=", df(:,neq)
+! 	write(*,*) "df(neq,:)=",df(neq,:)
+! 	write(*,*) "total=",df
+! 	stop
+	
+	return
+	end subroutine non_lte_charge_conservation_H
+	
+	subroutine rate_equation_atom(id,icell, neq, atom, gamma_rad, dgrdne, gamma_col,  dgcdne, x, f, df)
+		integer, intent(in) :: id, icell, neq
+		type (atomtype), intent(in) :: atom !contains total rate matrix without diagonal in atom%Gamma
+		real(kind=dp), intent(in) :: x(neq)
+		real(kind=dp), intent(in), dimension(atom%Nlevel,atom%Nlevel) :: gamma_rad, dgrdne, gamma_col, dgcdne
+		real(kind=dp), intent(out) ::  f(neq), df(neq,neq)
+		integer :: i, j, l, lp
+		real(kind=dp) :: part1, part2
+				!individual equation for each level
+				
+		!also computes the derivative of each equation by each level
+		
+!-> here Gamma diag is filled (with eliminate_delta or explicit summation gamma(:,l,id) for each level l)
+		f(1:atom%Nlevel) = matmul( atom%gamma(:,:,id), x(1:atom%Nlevel) )
+		!derivative of l row for each lp column
+		!derivative of each SEE (a l row of Gamma) for all n(i)
+		!it is simply Gamma(i,l) since Gamma does not depend on n(i)
+		do l=1, atom%Nlevel
+			do lp=1,atom%nlevel
+				df(l,lp) = atom%gamma(l,lp,id)!hydrogen%gamma(l,lp,id)
+				!for row l computes the lp derivatives of SEE(l)=f(k) with respect to n(lp)
+			enddo
+		enddo
+
+		!derivative of SEE to ne
+		!dCij/dne = Cij/ne
+		!dCji/dne = 2*Cji/ne
+		!dRji_cont/dne = Rji_cont/ne
+	
+		df(1:neq-1,neq) = matmul( dgcdne, x(1:atom%Nlevel) )!hydrogen%
+		if (.not.lforce_lte) then
+			df(1:neq-1,neq) = df(1:neq-1,neq) + matmul( dgrdne, x(1:atom%Nlevel) )
+		endif
+		
+		return
+		
+		write(*,*) "should not be here"
+
+!To Do
+!-> here are more optimised code that we need to avoid many loops over levels
+
+!-> here diag(Gamma) must be zero
+! 		do i=1, atom%Nlevel
+! 			part1 = -sum(atom%Gamma(:,i,id))
+! 			f(i) = x(i) * part1!SEE for the first level
+! 			do j=1, atom%Nlevel
+! 				f(i) = f(i) + x(j) * atom%Gamma(i,j,id)
+! 				if (i==j) then
+! 					df(i,j) = part1
+! 				else
+! 					df(i,j) = atom%Gamma(j,i,id) !index ?
+! 				endif
+! 			enddo
+! 			
+! 		enddo
+
+		do i=1, atom%Nlevel
+	
+			!add derivative to ne for recombinaison rates and collision rates
+		
+			if (i==atom%Nlevel) then
+				part1 = -sum(gamma_rad(:,i)) / x(neq)
+				part2 = -sum(gamma_col(:,i)) / x(neq)
+				df(i,neq) = x(i) * (part1 + 2.0 * part2)
+				do j=1, atom%Nlevel
+				
+					df(i,neq) = df(i,neq) + x(j)/x(neq) * gamma_col(i,j)
+				
+				enddo
+			else
+			
+				part1 = -sum(gamma_col(:,i)) / x(neq)
+				df(i,neq) = x(i) * part1
+				
+				do j=1, atom%Nlevel
+				
+					df(i,neq) = df(i,neq) + x(j) * gamma_col(i,j) / x(neq)
+				
+				enddo
+				
+				!recombination
+				!x(atom%Nlevel) is np in that case
+				df(i,neq) = df(i,neq) + (x(i) / x(neq)) * gamma_col(i,atom%Nlevel) + (x(atom%Nlevel)/x(neq))*(gamma_rad(atom%Nlevel,i)+2.0*gamma_col(atom%Nlevel,i))
+			
+			endif
+		enddo
+				
+	
+	return
+	end subroutine rate_equation_atom
+	
+	subroutine particle_conservation (icell, Neq, atom, x, f, df)
+		integer, intent(in) :: icell, Neq
+		real(kind=dp), intent(in) :: x(neq)
+		type(AtomType), intent(in) :: atom
+		real(kind=dp), intent(inout) :: f(neq), df(neq, neq)
+		integer :: imaxpop, nlev
+		real(kind=dp) :: ntotal
+		
+		ntotal = ntotal_atom(icell,atom)!hydrogen
+		
+		nlev = Neq - 1 !remove electrons
+		
+		imaxpop = locate(x(1:nlev), maxval(x(1:nlev)))
+
+		!mass conservation: ntotal = sum_i n(i)
+		!eq imaxpop is replaced by:
+		!f(imaxpop) = ntotal - sum_i n(i) = 0
+		!or
+		!f(imaxpop) = 1.0 - sum_i n(i) / ntotal = 0
+	
+		f(imaxpop) = 1.0
+		f(imaxpop) = f(imaxpop) -sum(x(1:nlev)) / ntotal
+	
+		df(imaxpop,neq) = 0.0_dp
+		df(imaxpop,1:nlev) = -1.0_dp / ntotal
+
+	return
+	end subroutine particle_conservation
 	
 	subroutine update_populations_and_electrons(id, icell, delta, verbose, nit, iterate_ne)
 	! --------------------------------------------------------------------!
@@ -1423,7 +1806,7 @@ MODULE statequil_atoms
 
 		dpop = 0.0_dp
 		dtex = 0.0_dp
-	
+
 		!electron density not iterated ?
 		!at the moment direcly call the old routine!
 		!works also for rest iterations (iterations where ne not iterated) ?
@@ -1433,23 +1816,26 @@ MODULE statequil_atoms
 		endif
 		
 		!here iterate_ne is .true. otherwise we exit after entering in update_populations
-		if (helium_is_active .or. hydrogen%active) nonlte_ionisation = .true.
+! 		if (helium_is_active .or. hydrogen%active) nonlte_ionisation = .true.
 		!global variable helium_is_active is true if helium is associated and active.
 		!it avoids to double test the associate and the active statuses.
+		
+		!-> currenlty H is always active if H active
 		
 		if (verbose) write(*,'(" niter #"(1I4)" id #"(1I4))') nit, id
 
 		
 		nact = 1 !future test on all elements that can be included in the equation
 ! 		if (hydrogen%active .and. activeatoms(nact)%ptr_atom%id=='H') then
-		if (nonlte_ionisation) then
+		if (hydrogen%active) then
 			if (verbose) write(*,*) " Solving SEE and charge conservation for H+He+ne"
 			!actually includes all non-LTE atom part of the equation
 			!loop for all non-LTE atoms included in the equations
 			!currently only H and He
 			
 			
-			call see_ionisation_nonlte(id, icell, dM, dne)
+			call see_ionisation_nonlte_hydrogen(id, icell, dM, dne)
+! 			call see_ionisation_nonlte_H_and_He(id, icell, dM, dne)
 
 			if (verbose) then
 				write(*,'(" --> non-LTE ionisation dM="(1ES17.8E3)" dne="(1ES17.8E3) )') dM, dne
@@ -1483,7 +1869,7 @@ MODULE statequil_atoms
 			aatom_loop : do nact=nact_start, Nactiveatoms
 				!skip helium if active as it is included in the nonlte ionisation
 				if (activeatoms(nact)%ptr_atom%ID=="He") then
-					write(*,*) " Avoinding Helium in SEE (withou ne)!"
+					write(*,*) " Avoiding Helium in SEE (without ne)!"!bug test
 					cycle aatom_loop
 				endif
 				
