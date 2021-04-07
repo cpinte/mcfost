@@ -520,11 +520,12 @@ END FUNCTION get_logPartitionFunctionk
   ! -------------------------------------------------------------- !
   type (Atomtype), intent(inout) :: atom
   logical, intent(in) :: debye
-  logical :: locupa_prob
+  logical :: locupa_prob, print_diff
   real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
   real(kind=dp) :: n_eff, wocc, chi0, wocc0
   integer :: Z, dZ, k, i, m
   integer, allocatable, dimension(:) :: ndebye
+  real(kind=dp), dimension(atom%Nlevel) :: max_nstar, min_nstar !old_values
 
   ! debye shielding activated:
   ! It lowers the ionisation potential taking into account the charge of all levels
@@ -535,6 +536,14 @@ END FUNCTION get_logPartitionFunctionk
   ! Hubeny & Mihalas (2014)
   ! "Theory of Stellar Atmospheres" p. 244-246
   ! eq. 8.86 and 8.87
+  
+  print_diff = (maxval(atom%nstar) > 0.0_dp)
+   if (print_diff) then
+   	do i=1,atom%Nlevel
+   		max_nstar(i) = maxval(atom%nstar(i,:))
+   		min_nstar(i) = minval(atom%nstar(i,:),mask=icompute_atomrt > 0)
+   	enddo
+   endif
  
    !Not yet
    locupa_prob = .false. !Only for He
@@ -707,6 +716,11 @@ END FUNCTION get_logPartitionFunctionk
     enddo
   endif !if locupa_prob
   !CALL write_ltepops_file(52, atom, 1)
+  
+  if (print_diff) then
+  	write(*,*) " Old Max/min nstar:", max_nstar(atom%Nlevel), min_nstar(atom%Nlevel)
+  	write(*,*) ' New max/min nstar', maxval(atom%nstar(atom%Nlevel,:)), minval(atom%nstar(hydrogen%nlevel,:),mask=icompute_atomrt>0)
+  endif
 
   if (allocated(ndebye)) deallocate(ndebye)
  RETURN
