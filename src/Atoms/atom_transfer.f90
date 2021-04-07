@@ -1889,9 +1889,14 @@ module atom_transfer
 					!update ne from non-LTE ionisation
 !-> no because dne need tu be zeroed for each new iteration of all ne.
 ! 					dne = max(dne, maxval(abs(1.0 - ne(:)/(ne_new(:)+1d-50))))
-					dne = maxval(abs(1.0 - ne(:)/(ne_new(:)+1d-50)))
+					dne = maxval(abs(1.0 - ne(:)/(ne_new(:)+1d-50)),mask=icompute_atomRT==1)
+! 					dne = 0
+! 					do icell=1,n_cells
+! 						if (icompute_atomRT(icell)) then
+! 							dne = max(dne, abs(1.0 - ne(icell)/ne_new(icell)))
+! 						endif
+! 					enddo
 					ne(:) = ne_new(:)
-
 					!-> For all elements use the old version
 !!! WARNING NOT TESTED YET 05 April 2021 !!!!
 					if ( update_ne_other_nlte ) then	
