@@ -1426,6 +1426,9 @@ module atom_transfer
 			endif
 		endif
 		
+		
+		!-> note: At the moment, hydrogen is always ACTIVE is helium is active and n_iterate_ne > 0!
+		!         for simplicity.
 		!Hydrogen and Helium updated with SEE if present.
 		!For all other non-LTE atoms currently using the old scheme.
 		update_ne_other_nlte = (hydrogen%active.and.NactiveAtoms > 1).or.(.not.hydrogen%active)
@@ -1434,9 +1437,9 @@ module atom_transfer
 		
 			update_ne_other_nlte = (helium%active.and.hydrogen%active.and.Nactiveatoms > 2).or.&
 									(.not.hydrogen%active.and.helium.active.and.Nactiveatoms > 1).or.&
-									(hydrogen%active.and..not.helium%active.and.NactiveAtoms > 1).or.&
-									(.not.hydrogen%active.and.helium%active)
-		
+									(hydrogen%active.and..not.helium%active.and.NactiveAtoms > 1)!.or.&
+									!(.not.hydrogen%active.and.helium%active)
+									!included in see
 		endif
 
 		!!open(unit=unit_invfile, file=trim(invpop_file), status="unknown")
@@ -1811,7 +1814,6 @@ module atom_transfer
 ! 						call update_populations(id, icell, diff, .false., n_iter)
 						call update_populations_and_electrons(id, icell, diff, .false., n_iter, (l_iterate_ne.and.icompute_atomRT(icell)==1))!The condition on icompute_atomRT is here because if it is > 0 but /= 1, ne is not iterated!
 
-
 						n_iter_loc = 0
 						if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
 						
@@ -1891,7 +1893,11 @@ module atom_transfer
 					ne(:) = ne_new(:)
 
 					!-> For all elements use the old version
-					if ( update_ne_other_nlte ) then
+!!! WARNING NOT TESTED YET 05 April 2021 !!!!
+					if ( update_ne_other_nlte ) then	
+						if (helium_is_active .or. hydrogen%active) then
+							call warning("old ne recipe for non-LTE metals not tested yet!")
+						endif
 						call solve_electron_density(ne_start_sol, .true., dne)
 					endif
 
