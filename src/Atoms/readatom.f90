@@ -275,7 +275,10 @@ MODULE readatom
 
 
 	  elseif (atom%ID=="He") then
-	  	if (kr >= 4 .and. kr <= 6) then
+! 	  	if (kr >= 4 .and. kr <= 6) then
+!-> 07042021, write only for one line since they overlap and are close they always
+! are included!
+	  	if (kr == 5) then
 	  		atom%lines(kr)%write_flux_map =.true. 
 	  	endif
       else
@@ -836,6 +839,7 @@ MODULE readatom
    end if
    !!Atoms(nmet)%ptr_atom%dataFile = trim(popsFile) ! now the file atomID.fits.gz contains
                                                ! all informations including populations.
+                                               
 
    !Active atoms are treated in NLTE
    if (adjustl(actionKey).eq."ACTIVE") then
@@ -881,6 +885,40 @@ MODULE readatom
   end do
   close(unit)
   
+  !Temporary
+  !check that if helium is active and electron are iterated H must be active at the moment !!
+  check_helium : do nmet=1, Natom
+    if (atoms(nmet)%ptr_atom%id=="He") then
+    
+    	if ((n_iterate_ne > 0).and.(atoms(nmet)%ptr_atom%active)) then
+    		
+    		if (atoms(nmet)%ptr_atom%stage(1) > 0) then
+    			write(*,*) " !!!!!!!!! "
+    			call warning("Helium ground state is not in neutral stage ! Must be He I")
+    			write(*,*) atoms(nmet)%ptr_atom%stage(1), atoms(nmet)%ptr_atom%label(1), atoms(nmet)%ptr_atom%E(1), atoms(nmet)%ptr_atom%g(1)
+    			write(*,*) " !!!!!!!!! "
+    			stop
+    		endif
+    	
+    		!H always present and the first.
+    		!force to be active if helium active ?
+    		!at the moment print a warning!
+    		if (.not.atoms(1)%ptr_atom%active) then
+    			write(*,*) " !!!!!!!!!!!!!!!!!!!!!!! "
+!     			call WARNING(" Forcing hydrogen to be active when helium is active and n_iterate_ne > 0!!")
+    			call WARNING(" Hydrogen is passive, while helium is active and n_iterate_ne > 0!!")
+    			write(*,*) " !!!!!!!!!!!!!!!!!!!!!!! "
+!     			atoms(1)%ptr_atom%active = .true.
+!     			NactiveAtoms = NactiveAtoms + 1
+!     			NpassiveAtoms = NpassiveAtoms - 1
+    			exit check_helium
+    		endif
+    	
+    	endif
+    
+    endif
+  enddo check_helium
+  
   if (lfix_backgrnd_opac) then
   	do nmet=1, Natom
   		if (atoms(nmet)%ptr_atom%initial_solution.eq."OLD_POPULATIONS") then
@@ -890,6 +928,7 @@ MODULE readatom
   		endif
   	enddo
   endif
+  
 
   ! Alias to the most importent one
   !always exits !!
