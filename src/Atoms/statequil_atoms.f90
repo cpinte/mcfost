@@ -1017,6 +1017,7 @@ MODULE statequil_atoms
 	!-> do we need the same equation for Ntotal = H + He
 	!or one equation per SEE is to be replace by notal_H for H
 	!and notal_He for He ?
+	!-> why 1 - sum(pops)/ntot works and not to set 0, while it should be equivalent ?
 	subroutine particle_conservation_H_and_He (icell, Neq, x, f, df)
 		integer, intent(in) :: icell, Neq
 		real(kind=dp), intent(in) :: x(neq)
@@ -1036,9 +1037,8 @@ MODULE statequil_atoms
 		!or
 		!f(imaxpop) = 1.0 - sum_i n(i) / ntotal = 0
 	
-! 		f(imaxpop) = 1.0
-! 		f(imaxpop) = f(imaxpop) -sum(x(1:hydrogen%Nlevel)) / ntotal !0
-		f(imaxpop) = 0.0_dp
+		f(imaxpop) = 1.0_dp
+		f(imaxpop) = f(imaxpop) -sum(x(1:hydrogen%Nlevel)) / ntotal !~0, better to set to 0?
 	
 ! 		df(imaxpop,neq) = 0.0_dp
 		df(imaxpop,:) = 0.0_dp
@@ -1049,18 +1049,17 @@ MODULE statequil_atoms
 		
 		if (helium_is_active) then
 		
-			ntotal = ntotal_atom(icell,helium)
 			!relative to the sub array !!
 			imaxpop = locate(x(hydrogen%Nlevel+1:nlev), maxval(x(hydrogen%Nlevel+1:nlev)))
 			imaxpop = hydrogen%Nlevel+imaxpop
 ! 			write(*,*) "imaxpop = ", imaxpop
-! 			f(imaxpop) = 1.0
-! 			f(imaxpop) = f(imaxpop) -sum(x(hydrogen%Nlevel+1:nlev)) / ntotal
-			f(imaxpop) = 0.0_dp
-			df(imaxpop,:) = 0.0_dp
-			df(imaxpop,hydrogen%Nlevel+1:nlev) = -1.0_dp / ntotal
+			f(imaxpop) = 1.0_dp
+			f(imaxpop) = f(imaxpop) -sum(x(hydrogen%Nlevel+1:nlev)) / ntotal_atom(icell,helium) !~0 better to set 0 ?
 
-! 			write(*,*) ntotal, sum(x(hydrogen%Nlevel+1:nlev)), f(imaxpop)
+			df(imaxpop,:) = 0.0_dp
+			df(imaxpop,hydrogen%Nlevel+1:nlev) = -1.0_dp / ntotal_atom(icell,helium)
+
+! 			write(*,*) ntotal_atom(icell,helium), sum(x(hydrogen%Nlevel+1:nlev)), f(imaxpop)
 ! 			write(*,*) f(hydrogen%Nlevel+1:neq-1)
 ! 			stop
 		
@@ -2125,7 +2124,7 @@ MODULE statequil_atoms
 		!or
 		!f(imaxpop) = 1.0 - sum_i n(i) / ntotal = 0
 	
-		f(imaxpop) = 1.0
+		f(imaxpop) = 1.0_dp
 		f(imaxpop) = f(imaxpop) -sum(x(1:nlev)) / ntotal
 	
 		df(imaxpop,neq) = 0.0_dp
