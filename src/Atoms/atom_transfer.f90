@@ -1879,9 +1879,7 @@ module atom_transfer
    					enddo
    				endif
    				
-   				
-
-				!-> evaluate ne for other non-LTE atoms not included in the non-LTE ionisation scheme ?
+   				!-> evaluate ne for other non-LTE atoms not included in the non-LTE ionisation scheme ?
 				!with fixed non-LTE populations and non-LTE contributions
 				update_bckgr_opac = .false.
 				if (l_iterate_ne) then
