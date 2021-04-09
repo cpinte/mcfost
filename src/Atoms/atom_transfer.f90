@@ -15,7 +15,7 @@ module atom_transfer
 	use background_opacity, only: Thomson
 	use Planck, only			: bpnu
 	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, &
-									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, cntrb_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
+									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, cntrb_ray, tau_one_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
 									dealloc_jnu, reallocate_rays_arrays, write_contribution_functions_ray, write_flux, write_1D_arr_ascii, cntrb, flow_chart, write_lambda_cell_array, cf_file, flow_file
 									
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
@@ -242,7 +242,7 @@ module atom_transfer
 				!double loop but we test the condition only once if not included!
 				if (lorigin_atom.and.(.not.labs)) then
 					do la=1,Nlambda					
-						flow_chart(la,icell) = flow_chart(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
+						flow_chart(la,icell) = flow_chart(la,icell) + tau(la)*exp(-tau(la))!( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
 					enddo
 				endif
 				if (lcontrib_function.and.(.not.labs)) then
@@ -2991,6 +2991,8 @@ end subroutine INTEG_RAY_JNU
 		
 		write(*,*) " allocating space for contribution function for one ray"
 		allocate(cntrb_ray(Nlambda, n_cells))
+		allocate(tau_one_ray(Nlambda, n_cells))
+		tau_one_ray = 0.0_dp
 		cntrb_ray = 0.0_dp
 		
 		ibin = 1; iaz = 1
@@ -3017,7 +3019,7 @@ end subroutine INTEG_RAY_JNU
 		endif 
 		
 		call write_contribution_functions_ray
-		deallocate(cntrb_ray)  
+		deallocate(cntrb_ray,tau_one_ray)  
    
   return
   end subroutine compute_contribution_functions!_uvw
@@ -3054,6 +3056,10 @@ end subroutine INTEG_RAY_JNU
 
 			if (icell <= n_cells) then
 				lcellule_non_vide=.true.
+				if (icell > 0) then
+					lcellule_non_vide = (icompute_atomRT(icell) > 0)
+					if (icompute_atomRT(icell) < 0) return !-1 if dark				
+				endif
 			else
 				lcellule_non_vide=.false.
 			endif
@@ -3065,10 +3071,10 @@ end subroutine INTEG_RAY_JNU
 				if (icell == icell_star) return
    			 endif
    			 
-			if (icell <= n_cells) then
-				lcellule_non_vide = (icompute_atomRT(icell) > 0)
-				if (icompute_atomRT(icell) < 0) return !-1 if dark
-			endif
+! 			if (icell <= n_cells) then
+! 				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+! 				if (icompute_atomRT(icell) < 0) return !-1 if dark
+! 			endif
 
 			nbr_cell = nbr_cell + 1
 
@@ -3103,6 +3109,7 @@ end subroutine INTEG_RAY_JNU
 				
 
 				tau = tau + dtau
+				tau_one_ray(:,icell) = tau(:)*exp(-tau(:))
 
 			end if
 		end do infinie

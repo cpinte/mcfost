@@ -44,7 +44,7 @@ module spectrum_type
 	real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
 	real(kind=dp), allocatable, dimension(:,:,:,:) :: F_QUV
 	!in only one direction for one point ! 'centre of the model in this direction'
-	real(kind=dp), allocatable, dimension(:,:) :: cntrb_ray, cntrb, flow_chart !allocate 1 ray if only one direction!
+	real(kind=dp), allocatable, dimension(:,:) :: tau_one_ray, cntrb_ray, cntrb, flow_chart !allocate 1 ray if only one direction!
 
 	contains
   
@@ -484,10 +484,10 @@ call error("initSpectrumImage not modified!!")
    		!Future: contribution function for selected lines only !
 		if (lcontrib_function) then
 		
-			mem_alloc = 8 * n_cells * Nlambda / 1024./ 1024.
+			mem_alloc = real(8 * n_cells * Nlambda) / real(1024*1024)
 	 
-			if (mem_alloc > 1d3) then
-				write(*,*) " allocating ", mem_alloc/1024., " GB for contribution function.."
+			if (mem_alloc > 1000.0) then
+				write(*,*) " allocating ", mem_alloc/real(1024), " GB for contribution function.."
 			else
 				write(*,*) " allocating ", mem_alloc, " MB for contribution function.."
 			endif 
@@ -1278,7 +1278,7 @@ call error("initSpectrumImage not modified!!")
 
   !  Write the required header keywords.
 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.sr-1",'',status)
+		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.m-1",'',status)
 
 		call ftpprd(unit,group,fpixel,nelements,A,status)
 
@@ -1297,7 +1297,7 @@ call error("initSpectrumImage not modified!!")
   
 	subroutine write_contribution_functions_ray()
 	! -------------------------------------------------- !
-	! Write contribution function to disk.
+	! Write contribution function to disk. + tau_one
 	! --------------------------------------------------- !
 		integer :: status,unit,blocksize,bitpix,naxis, naxis2
 		integer, dimension(8) :: naxes, naxes2
@@ -1347,11 +1347,59 @@ call error("initSpectrumImage not modified!!")
 
   !  Write the required header keywords.
 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.sr-1",'cntrb I',status)
+		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.sr-1.m-1",'cntrb I',status)
   !  Write line CF to fits
 		write(*,*) "Max,min abs(cntrb)=",maxval(abs(cntrb_ray)), minval(abs(cntrb_ray),mask=abs(cntrb_ray)>0)
 		write(*,*) size(cntrb_ray), sizeof(cntrb_ray), nelements, shape(cntrb_ray)
 		call ftpprd(unit,group,fpixel,nelements,cntrb_ray,status)
+
+
+  !  Close the file and free the unit number.
+		call ftclos(unit, status)
+		call ftfiou(unit, status)
+
+  !  Check for any error, and if so print out error messages
+		if (status > 0) then
+			call print_error(status)
+		endif
+		
+		blocksize=1
+		call ftinit(unit,"tauone_ray.fits.gz",blocksize,status)
+
+		simple=.true.
+		extend=.true.
+		group=1
+		fpixel=1
+
+		bitpix=-64
+
+		if (lVoronoi) then   
+			naxis = 2
+			naxes(1) = Nlambda
+			naxes(2) = n_cells
+			nelements = naxes(1) * naxes(2)
+		else
+			if (l3D) then
+				naxis = 4
+				naxes(1) = Nlambda
+				naxes(2) = n_rad
+				naxes(3) = 2*nz
+				naxes(4) = n_az
+				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+			else
+				naxis = 3
+				naxes(1) = Nlambda
+				naxes(2) = n_rad
+				naxes(3) = nz
+				nelements = naxes(1) * naxes(2) * naxes(3)
+			end if
+		end if
+
+  !  Write the required header keywords.
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		call ftpkys(unit,'UNIT'," ",'tau x exp(-tau)',status)
+  !  Write line CF to fits
+		call ftpprd(unit,group,fpixel,nelements,tau_one_ray,status)
 
 
   !  Close the file and free the unit number.
