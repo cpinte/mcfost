@@ -23,7 +23,7 @@ module spectrum_type
    ! not that FLUX_FILE is 1D only if one pixel, otherwise it is a map.
    ! F(x,y,0,lambda) in several directions.
 	character(len=*), parameter :: FLUX_FILE="flux.fits.gz"
-	character(len=*), parameter :: CF_FILE="cntrb.fits.gz", FLOW_FILE="flow.fits.gz"
+	character(len=*), parameter :: CF_FILE="cntrb.fits.gz", ORIGIN_FILE="origin_atom.fits.gz"
 	
 	!shift in index of line profiles, function of iray and nb_proc
 	integer, dimension(:,:), allocatable :: dk
@@ -44,7 +44,7 @@ module spectrum_type
 	real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
 	real(kind=dp), allocatable, dimension(:,:,:,:) :: F_QUV
 	!in only one direction for one point ! 'centre of the model in this direction'
-	real(kind=dp), allocatable, dimension(:,:) :: tau_one_ray, cntrb_ray, cntrb, flow_chart !allocate 1 ray if only one direction!
+	real(kind=dp), allocatable, dimension(:,:) :: tau_one_ray, cntrb_ray, cntrb, origin_atom !allocate 1 ray if only one direction!
 
 	contains
   
@@ -519,17 +519,17 @@ call error("initSpectrumImage not modified!!")
 			endif 
       
 			if (mem_alloc >= 2.1d3) then !2.1 GB
-				call Warning(" To large flow_chart array. Use a wavelength table instead..")
+				call Warning(" To large origin_atom array. Use a wavelength table instead..")
 				!lorigin_atom = .false.
 			else
       
-				allocate(flow_chart(Nlambda,n_cells),stat=alloc_status)
-				mem_alloc_local = mem_alloc_local + sizeof(flow_chart)
+				allocate(origin_atom(Nlambda,n_cells),stat=alloc_status)
+				mem_alloc_local = mem_alloc_local + sizeof(origin_atom)
 				if (alloc_status > 0) then
-					call ERROR('Cannot allocate flow_chart')
+					call ERROR('Cannot allocate origin_atom')
 					!lorigin_atom = .false.
 				else
-					flow_chart(:,:) = 0.0_dp
+					origin_atom(:,:) = 0.0_dp
 				endif
 
 			end if		
@@ -640,7 +640,7 @@ call error("initSpectrumImage not modified!!")
 
 		if (allocated(cntrb_ray)) deallocate(cntrb_ray)
 		if (allocated(cntrb)) deallocate(cntrb)
-		if (allocated(flow_chart)) deallocate(flow_chart)
+		if (allocated(origin_atom)) deallocate(origin_atom)
 
 
 	return
@@ -1397,7 +1397,7 @@ call error("initSpectrumImage not modified!!")
 
   !  Write the required header keywords.
 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-		call ftpkys(unit,'UNIT'," ",'tau x exp(-tau)',status)
+		call ftpkys(unit,'UNIT'," ",'<tau>',status)
   !  Write line CF to fits
 		call ftpprd(unit,group,fpixel,nelements,tau_one_ray,status)
 
