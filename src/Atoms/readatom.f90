@@ -273,12 +273,13 @@ MODULE readatom
       	!Br gamma
       	if (atom%g(i)==32 .and. atom%g(j)==98) atom%lines(kr)%write_flux_map =.true. 
 
-
+!-> For other atoms need a better way as kr depends on the atomic files
+! while for H g is unique ! but not for other atoms!!
 	  elseif (atom%ID=="He") then
 ! 	  	if (kr >= 4 .and. kr <= 6) then
 !-> 07042021, write only for one line since they overlap and are close they always
 ! are included!
-	  	if (kr == 5) then
+	  	if ((kr == 5).or.(kr==15)) then
 	  		atom%lines(kr)%write_flux_map =.true. 
 	  	endif
       else
