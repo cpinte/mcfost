@@ -262,6 +262,7 @@ module atom_transfer
   	subroutine integ_ray_line_origin(id,icell_in,x,y,z,u,v,w,iray,labs)
 	! ------------------------------------------------------------------------------- !
 	! For contribution functions and origin emission
+	! labs is false here
 	! ------------------------------------------------------------------------------- !
 
 		integer, intent(in) :: id, icell_in, iray
@@ -373,24 +374,33 @@ module atom_transfer
 					dtau_c(:) = l_contrib * chi_c(:,icell)
 				endif
 
-				
-				if (lorigin_atom.and.(.not.labs)) then
+				if (lorigin_atom.and.lcontrib_function) then
+					do la=1,Nlambda		
+						cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)+dtau(la)) * eta(la,id)	
+						origin_atom(la,icell) = origin_atom(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)		
+! 						origin_atom(la,icell) = origin_atom(la,icell) + tau(la)!+dtau(la)
+						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
+						tau(la) = tau(la) + dtau(la) !for next cell	
+					enddo				
+				elseif (lorigin_atom) then
 					do la=1,Nlambda					
-						origin_atom(la,icell) = tau(la)+dtau(la)
+! 						origin_atom(la,icell) = origin_atom(la,icell) + tau(la)!+dtau(la)
+						origin_atom(la,icell) = origin_atom(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
+						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
+						tau(la) = tau(la) + dtau(la) !for next cell	
+					enddo
+				elseif (lcontrib_function) then
+					do la=1,Nlambda					
+						cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)+dtau(la)) * eta(la,id)	
+						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
+						tau(la) = tau(la) + dtau(la) !for next cell	
+					enddo
+				else !should not happen by the way, otherwise this routine is pointless
+					do la=1,Nlambda
+						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
+						tau(la) = tau(la) + dtau(la) !for next cell				
 					enddo
 				endif
-				
-				if (lcontrib_function.and.(.not.labs)) then
-					do la=1,Nlambda					
-						if (tau(la) > 0) cntrb(la,icell) = E2(tau(la)+dtau(la)) * eta(la,id)
-					enddo
-				endif
-
-
-				do la=1,Nlambda
-					Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
-					tau(la) = tau(la) + dtau(la) !for next cell				
-				enddo
 
 				do la=1, Nlambda_cont
 					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
@@ -686,10 +696,7 @@ module atom_transfer
   	F_QUV(:,ibin,iaz,3) = F_QUV(:,ibin,iaz,3) + normF * QUV(:,3) / npix2
   end if
   
-  if (lcontrib_function) cntrb(:,:) = cntrb(:,:) + cntrb(:,:) * normF
-  if (lorigin_atom) origin_atom(:,:) = origin_atom(:,:) + origin_atom(:,:) * normF
-  
-  
+   
   !Flux map for lines
   !adding a map for the continuum point too ?
   if (RT_line_method==1) then
@@ -850,6 +857,10 @@ module atom_transfer
 	 !!taille_pix = (map_size/zoom)  ! en AU
      !!dx(:) = x_plan_image * taille_pix
      !!dy(:) = y_plan_image * taille_pix
+  
+  	if (lcontrib_function.or.lorigin_atom) then
+  		call warning("CF not normalised with RT_line_method==1")
+ 	endif
          
   else !method 2
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
@@ -888,8 +899,13 @@ module atom_transfer
      end do !i
      !$omp end do
      !$omp end parallel
+     
+  	!takes time for large array beware!!
+  	if (lcontrib_function) cntrb(:,:) = cntrb(:,:) / real(max(npix_x,npix_y),kind=dp)
+  	if (lorigin_atom) origin_atom(:,:) = origin_atom(:,:) / real(max(npix_x,npix_y),kind=dp)    
+     
   end if
-  
+    
   !recombine for all proc
   flux(:,ibin,iaz,1) = sum(flux(:,ibin,iaz,:),dim=2)
   fluxc(:,ibin,iaz,1) = sum(fluxc(:,ibin,iaz,:),dim=2)
