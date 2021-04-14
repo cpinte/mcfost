@@ -16,7 +16,7 @@ module atom_transfer
 	use Planck, only			: bpnu
 	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, &
 									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, cntrb_ray, tau_one_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
-									dealloc_jnu, reallocate_rays_arrays, write_contribution_functions_ray, write_flux, write_1D_arr_ascii, cntrb, origin_atom, write_lambda_cell_array, cf_file, origin_file
+									dealloc_jnu, reallocate_rays_arrays, write_contribution_functions_ray, write_flux, write_1D_arr_ascii, cntrb, origin_atom, write_lambda_cell_array, cf_file, origin_file, write_atomic_maps
 									
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
@@ -43,7 +43,7 @@ module atom_transfer
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
 									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, &
 									ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint, istep_start, lno_iterate_ne_mc, &
-									healpix_lorder, healpix_lmin, healpix_lmax, lvoronoi, lmagnetoaccr
+									healpix_lorder, healpix_lmin, healpix_lmax, lvoronoi, lmagnetoaccr, lonly_top, lonly_bottom
 
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
 	use Voronoi_grid, only		: Voronoi
@@ -269,7 +269,7 @@ module atom_transfer
 		real(kind=dp), intent(in) :: u,v,w
 		real(kind=dp), intent(in) :: x,y,z
 		logical, intent(in) :: labs
-		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
+		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et, facteur_tau
 		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, chi_line, tau_line, Sline!, LD
 		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
@@ -373,11 +373,18 @@ module atom_transfer
 					Snu_c = Snu_c / (chi_c(:,icell) + tiny_dp)
 					dtau_c(:) = l_contrib * chi_c(:,icell)
 				endif
+				
+				! surface superieure ou inf
+				!only apply to the CF and Origin!
+				facteur_tau = 1.0
+				if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
+				if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
+				!tau = tau + dtau * facteur_tau
 
 				if (lorigin_atom.and.lcontrib_function) then
 					do la=1,Nlambda		
-						cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)+dtau(la)) * eta(la,id)	
-						origin_atom(la,icell) = origin_atom(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)		
+						if (tau(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id) * facteur_tau
+						origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)		
 ! 						origin_atom(la,icell) = origin_atom(la,icell) + tau(la)!+dtau(la)
 						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
 						tau(la) = tau(la) + dtau(la) !for next cell	
@@ -1320,7 +1327,8 @@ module atom_transfer
 		deallocate(cntrb)
 	endif
 	
-	call write_flux
+	call write_flux(only_flux=.true.)
+	call write_atomic_maps
 	deallocate(flux,fluxc)
 
 	!one ray
@@ -2980,10 +2988,12 @@ end subroutine INTEG_RAY_JNU
 		integer :: id, icell0, icell, iray
 		real(kind=dp) :: x0,y0,z0,u0,v0,w0
 		logical :: lintersect, labs
+! 		integer :: max_length
 		
-		write(*,*) " allocating space for contribution function for one ray"
-		allocate(cntrb_ray(Nlambda, n_cells))
-		allocate(tau_one_ray(Nlambda, n_cells))
+! 		write(*,*) " allocating space for contribution function for one ray"
+! 		allocate(cntrb_ray(Nlambda, n_cells))
+! 		allocate(tau_one_ray(Nlambda, n_cells))
+
 		tau_one_ray = 0.0_dp
 		cntrb_ray = 0.0_dp
 		
@@ -3004,17 +3014,122 @@ end subroutine INTEG_RAY_JNU
 
 
 		if (lintersect) then
-			call integ_ray_cntrb(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs)
+			call integ_ray_cntrb_new(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs)
+! 			call integ_ray_cntrb(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs)
 		else
 			write(*,*) "Nothing in this direction, cntrb_ray = 0"
 			return
 		endif 
 		
-		call write_contribution_functions_ray
-		deallocate(cntrb_ray,tau_one_ray)  
+! 		call write_contribution_functions_ray
+! 		deallocate(cntrb_ray,tau_one_ray)  
    
   return
   end subroutine compute_contribution_functions!_uvw
+  
+  	subroutine integ_ray_cntrb_new(id,icell_in,x,y,z,u,v,w,iray,labs)
+	! ------------------------------------------------------------------------------- !
+	!
+	! ------------------------------------------------------------------------------- !
+
+		integer, intent(in) :: id, icell_in, iray
+		real(kind=dp), intent(in) :: u,v,w
+		real(kind=dp), intent(in) :: x,y,z
+		logical, intent(in) :: labs
+		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
+		real(kind=dp), dimension(Nlambda) :: tau, dtau, cf, tauexptau
+		real(kind=dp) :: xmass, l_tot
+		integer, parameter :: unit_cf = 10
+		character(len=50) :: filename
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+		
+! 		write(filename, '("cntrb_u"(1)')
+		filename = "cntrb_ray.s"
+		open(unit_cf, file=filename, status="unknown")
+		write(unit_cf,*) Nlambda
+
+		x1=x;y1=y;z1=z
+		x0=x;y0=y;z0=z
+		next_cell = icell_in
+		nbr_cell = 0
+
+		tau(:) = 0.0_dp
+		xmass = 0.0_dp
+		l_tot = 0.0_dp
+
+
+		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+
+
+		infinie : do
+
+			icell = next_cell
+			x0=x1 ; y0=y1 ; z0=z1
+
+			if (icell <= n_cells) then
+				lcellule_non_vide=.true.
+				if (icell > 0) then
+					lcellule_non_vide = (icompute_atomRT(icell) > 0)
+					if (icompute_atomRT(icell) < 0) return !-1 if dark				
+				endif
+			else
+				lcellule_non_vide=.false.
+			endif
+    
+
+			if (test_exit_grid(icell, x0, y0, z0)) return
+
+			if (lintersect_stars) then
+				if (icell == icell_star) return
+   			 endif
+   			 
+! 			if (icell <= n_cells) then
+! 				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+! 				if (icompute_atomRT(icell) < 0) return !-1 if dark
+! 			endif
+
+			nbr_cell = nbr_cell + 1
+
+			previous_cell = 0 
+			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+			
+			if (lcellule_non_vide) then
+				lsubtract_avg = ((nbr_cell == 1).and.labs)
+
+				l_contrib = l_contrib * AU_to_m
+
+				!Total source fonction or set eta to 0 to have only line emissivity
+				chi(:,id) = chi0_bb(:,icell)
+				eta(:,id) = eta0_bb(:,icell)
+
+				!includes a loop over all bound-bound, passive and active
+				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,.false.) 
+							
+				dtau(:) = l_contrib * chi(:,id)
+				            
+				if (lelectron_scattering) then
+					eta(:,id) = eta(:,id) + thomson(icell)*Jnu(:,icell)
+				endif
+				
+				tau = tau + dtau
+				l_tot = l_tot + l_contrib
+				xmass = xmass + l_contrib * nHtot(icell) * masseH * 1d-3
+
+				write(unit_cf, '(1I, 5E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell)
+				do la=1, Nlambda
+					write(unit_cf,'(1F12.5, 3E20.7E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), tau(la)*exp(-tau(la))
+				enddo
+				
+							
+
+			end if
+		end do infinie
+		
+	close(unit_cf)
+
+	return
+	end subroutine integ_ray_Cntrb_new
   
   	subroutine integ_ray_cntrb(id,icell_in,x,y,z,u,v,w,iray,labs)
 	! ------------------------------------------------------------------------------- !
