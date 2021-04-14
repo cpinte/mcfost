@@ -183,7 +183,8 @@ MODULE PROFILES
 ! 			v1 = v_proj(icell,x1,y1,z1,u,v,w)
 ! 			dv = abs(v1-v0)			
 ! 			Nvspace = min(max(2,nint(dv/vbroad*20.)),NvspaceMax)
-! 			do nv=1, Nvspace
+! 			
+! 			do nv=2, Nvspace
 ! 			
 ! 				omegav(nv) = omegav(nv-1) + (v1 - v0) / real(Nvspace - 1) / vbroad
 ! 			

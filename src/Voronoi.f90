@@ -223,8 +223,16 @@ module Voronoi_grid
     character(len=2) :: unit
 
     logical, parameter :: lrandom = .true.
+!     logical :: lrandom
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
+    
+!     lrandom = lrandomize_voronoi
+!     if (lrandom) then
+!     	write(*,*) " Randomized particles, lrandom = True"
+!     else
+!     	write(*,*) " lrandom = .false."
+!     endif
 
     if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 

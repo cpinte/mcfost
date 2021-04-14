@@ -208,7 +208,11 @@ contains
     write(*,*) "z =", minval(z), maxval(z)
 
 !     write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
-    write(*,*) "Found", n_SPH, " hydro particles with ", ndusttypes, "dust grains"
+	if (ndusttypes) then
+		write(*,*) "Found", n_SPH, " hydro sites with ", ndusttypes, "dust grains."
+	else
+    	write(*,*) "Found", n_SPH, " hydro sites."
+	endif
 
     if (lwrite_ASCII) then
        !  Write the file for the grid version of mcfost

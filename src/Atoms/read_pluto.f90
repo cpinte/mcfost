@@ -46,7 +46,7 @@ module pluto_mod
 		integer,  allocatable, dimension(:)			:: particle_id
 		real(kind=dp), dimension(6)					:: hydro_limits
 		integer										:: ndusttypes, voroindex, N_fixed_ne = 0
-		real, parameter								:: limit_factor = 1.01, Lextent = 1.01
+		real, parameter								:: limit_factor = 1.005, Lextent = 1.01
 
 		write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
 
@@ -153,7 +153,7 @@ module pluto_mod
 			enddo
 			!density_file
 			
-			h(:) = 1.2 * maxval(sqrt(x**2+y**2+z**2))
+			h(:) = maxval(sqrt(x**2+y**2+z**2))
 
 		else
 			call error("lpluto_file or lmodel_ascii required for lmhd_voronoi!")
