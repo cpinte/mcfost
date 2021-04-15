@@ -578,56 +578,105 @@ MODULE math
 	end subroutine exp_lookup
 
 
-  FUNCTION E1 (x) result (y)
-   !First exponential integral
-   real, dimension(6) :: a6
-   real, dimension(4) :: a4, b4
-   real(kind=dp) :: y, x
+	function E1 (x)
+	!First exponential integral
+		real(kind=dp), dimension(6) :: a6
+		real(kind=dp), dimension(4) :: a4, b4
+		real(kind=dp), intent(in) :: x
+		real(kind=dp) :: E1
+		
+		a6(:) = 1.0_dp * (/-0.57721566,  0.99999193, -0.24991055,0.05519968, -0.00976004,  0.00107857 /)
 
-   data a6  /-0.57721566,  0.99999193, -0.24991055,&
-             0.05519968, -0.00976004,  0.00107857 /
-   data a4  / 8.5733287401, 18.0590169730, &
-               8.6347608925,  0.2677737343 /
-   data b4  /9.5733223454, 25.6329561486, &
-              21.0996530827,  3.9584969228/
+		a4(:) = 1.0_dp * (/ 8.5733287401, 18.0590169730, 8.6347608925,  0.2677737343 /)
+		b4(:) = 1.0_dp * (/9.5733223454, 25.6329561486, 21.0996530827,  3.9584969228/)
 
-   if (x<=0.0) then
-    write(*,*) "Arg of Exponential integral has to be > 0"
-    write(*,*) "exiting..."
-    stop
-   else if (x.gt.0 .and. x.le.1.) then
-    y = -log(x) + a6(1) + x*(a6(2) + x*(a6(3) + &
-       x*(a6(4) + x*(a6(5) + x*a6(6)))))
-   else if (x.gt.1 .and. x.le.80.) then
-    y  = a4(4)/x +  a4(3) + x*(a4(2) + x*(a4(1) + x))
-    y = y / (&
-       b4(4) + x*(b4(3) + x*(b4(2) + x*(b4(1) + x))) &
-        )
-    y = y * exp(-x);
-   else
-    y = 0.0
-   end if
+		!Error here, should return an error!
+		if (x<=0.0) then
+			E1 = 0.0_dp
+			return
+		else if (x > 0 .and. x <= 1.0_dp) then
+			E1 = -log(x) + a6(1) + x*(a6(2) + x*(a6(3) + x*(a6(4) + x*(a6(5) + x*a6(6)))))
+		else if (x > 1.0_dp .and. x <= 80.0_dp) then
+			E1  = a4(4)/x +  a4(3) + x*(a4(2) + x*(a4(1) + x))
+			E1 = E1 / ( b4(4) + x*(b4(3) + x*(b4(2) + x*(b4(1) + x))) )
+			E1 = E1 * exp(-x);
+		else
+			E1 = 0.0_dp
+		end if
 
-  RETURN
-  END FUNCTION E1
+	return
+	end function E1
+  
+	function E2(x)
+	! second exponential integral, using recurrence relation
+	! En+1 = 1/n * ( exp(-x) -xEn(x))
+		real(kind=dp), intent(in) :: x
+		real(kind=dp) :: E2
+   
+		if (x <= 0) then
+   			E2 = 0.0_dp
+   			return
+   		endif
 
-  FUNCTION E2(x) result (y)
-  ! second exponential integral, using recurrence relation
-  ! En+1 = 1/n * ( exp(-x) -xEn(x))
-   real(kind=dp) :: x, y
+		if (x > 0.0 .and. x <= 80.0) then
+			E2 = 1.0_dp * (exp(-x) - x * E1(x))
+		else
+			E2 = 0.0_dp
+		end if
 
-   if (x.le.0.) then
-    write(*,*) "Arg of Exponential integral has to be > 0"
-    write(*,*) "exiting..."
-    stop
-   else if (x.gt.0 .and. x.le.80.) then
-    y = 1./1. * (exp(-x) - x* E1(x))
-   else
-    y = 0.
-   end if
+	return
+	end function
+	
+!   FUNCTION E1 (x) result (y)
+!    !First exponential integral
+!    real, dimension(6) :: a6
+!    real, dimension(4) :: a4, b4
+!    real(kind=dp) :: y, x
+! 
+!    data a6  /-0.57721566,  0.99999193, -0.24991055,&
+!              0.05519968, -0.00976004,  0.00107857 /
+!    data a4  / 8.5733287401, 18.0590169730, &
+!                8.6347608925,  0.2677737343 /
+!    data b4  /9.5733223454, 25.6329561486, &
+!               21.0996530827,  3.9584969228/
+! 
+!    if (x<=0.0) then
+!     write(*,*) "Arg of Exponential integral has to be > 0"
+!     write(*,*) "exiting..."
+!     stop
+!    else if (x.gt.0 .and. x.le.1.) then
+!     y = -log(x) + a6(1) + x*(a6(2) + x*(a6(3) + &
+!        x*(a6(4) + x*(a6(5) + x*a6(6)))))
+!    else if (x.gt.1 .and. x.le.80.) then
+!     y  = a4(4)/x +  a4(3) + x*(a4(2) + x*(a4(1) + x))
+!     y = y / (&
+!        b4(4) + x*(b4(3) + x*(b4(2) + x*(b4(1) + x))) &
+!         )
+!     y = y * exp(-x);
+!    else
+!     y = 0.0
+!    end if
+! 
+!   RETURN
+!   END FUNCTION E1
 
-  RETURN
-  END FUNCTION
+!   FUNCTION E2(x) result (y)
+!   ! second exponential integral, using recurrence relation
+!   ! En+1 = 1/n * ( exp(-x) -xEn(x))
+!    real(kind=dp) :: x, y
+! 
+!    if (x.le.0.) then
+!     write(*,*) "Arg of Exponential integral has to be > 0"
+!     write(*,*) "exiting..."
+!     stop
+!    else if (x.gt.0 .and. x.le.80.) then
+!     y = 1./1. * (exp(-x) - x* E1(x))
+!    else
+!     y = 0.
+!    end if
+! 
+!   RETURN
+!   END FUNCTION
 
   SUBROUTINE cent_deriv(n,x,y,yp)
   integer :: n, k

@@ -52,7 +52,7 @@ module atom_transfer
 	use stars, only				: intersect_spots, intersect_stars
 	!use wavelengths, only		:
 	use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
-	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, sigma
+	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, sigma, Lsun, rsun_to_au, au_to_rsun
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
 	use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k, area
@@ -873,7 +873,7 @@ module atom_transfer
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
      lresolved = .true.
-
+     
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
      
@@ -2385,9 +2385,10 @@ module atom_transfer
 			if (lintersect) then
 				local_stellar_brigthness(:) = local_stellar_brigthness(:) + &
 				(exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
+				!Assuming BB shock
 			endif
    		endif !laccretion_shock
-
+   		
 		local_stellar_brigthness(:) = LimbDarkening * local_stellar_brigthness(:)
 
 	return
@@ -3130,9 +3131,11 @@ end subroutine INTEG_RAY_JNU
 				xmass = xmass + l_contrib * nHtot(icell) * masseH * 1d-3
 
 				write(unit_cf, '(1I, 5E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell)
+! 				write(*,*) 'icell=', icell, ne(icell), nHtot(icell), ' T=', T(icell)
 				do la=1, Nlambda
+! 					write(*,'(1F12.5, 5E20.7E3)') lambda(la), tau(la), dtau(la), chi(la,id), eta(la,id), eta(la,id)*E2(tau(la))
 					write(unit_cf,'(1F12.5, 3E20.7E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), tau(la)*exp(-tau(la))
-				enddo
+				enddo!
 				
 							
 
