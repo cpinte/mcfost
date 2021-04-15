@@ -1333,7 +1333,7 @@ module atom_transfer
 
 	!one ray
 ! 	if (lcontrib_function) then
-! 		call compute_contribution_functions
+		call compute_contribution_functions
 ! 	end if
 	
  
@@ -2985,6 +2985,8 @@ end subroutine INTEG_RAY_JNU
    !not para yet
 		real(kind=dp) :: u, v, w !, intent(in)
 		integer :: ibin, iaz
+		integer, parameter :: unit_cf = 10
+		character(len=512) :: filename, string1, string2
 		integer :: id, icell0, icell, iray
 		real(kind=dp) :: x0,y0,z0,u0,v0,w0
 		logical :: lintersect, labs
@@ -2998,36 +3000,51 @@ end subroutine INTEG_RAY_JNU
 		cntrb_ray = 0.0_dp
 		
 		ibin = 1; iaz = 1
-  		u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
-	
 		id = 1
 		labs = .false.
-		iray = 1
+		iray = 1		
+! 		filename = "cntrb_ray.s"
+
 		write(*,*) "   Computing contribution function at centre of the image..."
+		write(*,*) "      for all directions."
+				
+		do ibin=1,RT_n_incl
+			do iaz=1,RT_n_az		
 
-		! Ray tracing : on se propage dans l'autre sens
-		u0 = -u ; v0 = -v ; w0 = -w
-		x0 = 10*Rmax*u; y0 = 10*Rmax*v; z0 = 10*Rmax*w
+  				u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
+
+				! Ray tracing : on se propage dans l'autre sens
+				u0 = -u ; v0 = -v ; w0 = -w
+				x0 = 10*Rmax*u; y0 = 10*Rmax*v; z0 = 10*Rmax*w
 
 
-		call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
+				call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
 
 
-		if (lintersect) then
-			call integ_ray_cntrb_new(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs)
+				if (lintersect) then
+! 					write(filename, '("cntrb_ray_i"(1I2)"_a"(1I2)".s")') nint(tab_rt_incl(ibin)), nint(tab_rt_az(iaz))
+					write(string1,'(1I4)') nint(tab_rt_incl(ibin))
+					write(string2,'(1I4)') nint(tab_rt_az(iaz))
+					filename = "cntrb_ray_i"//trim(adjustl(string1))//"_a"//trim(adjustl(string2))//".s"
+					open(unit_cf, file=filename, status="unknown")
+					call integ_ray_cntrb_new(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs,unit_cf)
 ! 			call integ_ray_cntrb(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs)
-		else
-			write(*,*) "Nothing in this direction, cntrb_ray = 0"
-			return
-		endif 
-		
+					close(unit_cf)
+				else
+					write(*,*) "Nothing in this direction, cntrb_ray = 0"
+! 					return
+					cycle
+				endif 
+			enddo
+		enddo
+
 ! 		call write_contribution_functions_ray
 ! 		deallocate(cntrb_ray,tau_one_ray)  
    
   return
   end subroutine compute_contribution_functions!_uvw
   
-  	subroutine integ_ray_cntrb_new(id,icell_in,x,y,z,u,v,w,iray,labs)
+  	subroutine integ_ray_cntrb_new(id,icell_in,x,y,z,u,v,w,iray,labs,unit_cf)
 	! ------------------------------------------------------------------------------- !
 	!
 	! ------------------------------------------------------------------------------- !
@@ -3039,14 +3056,10 @@ end subroutine INTEG_RAY_JNU
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
 		real(kind=dp), dimension(Nlambda) :: tau, dtau, cf, tauexptau
 		real(kind=dp) :: xmass, l_tot
-		integer, parameter :: unit_cf = 10
-		character(len=50) :: filename
+		integer, intent(in) :: unit_cf
 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 		
-! 		write(filename, '("cntrb_u"(1)')
-		filename = "cntrb_ray.s"
-		open(unit_cf, file=filename, status="unknown")
 		write(unit_cf,*) Nlambda
 
 		x1=x;y1=y;z1=z
@@ -3126,8 +3139,6 @@ end subroutine INTEG_RAY_JNU
 			end if
 		end do infinie
 		
-	close(unit_cf)
-
 	return
 	end subroutine integ_ray_Cntrb_new
   
