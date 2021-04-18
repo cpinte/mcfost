@@ -1,7 +1,7 @@
 module spectrum_type
 
 	use atom_type, only : AtomicLine, AtomicContinuum, AtomType
-	use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, icompute_atomRT, lmagnetized
+	use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, icompute_atomRT, lmagnetized, laccretion_shock
 	use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table, make_wavelength_grid_new!, make_wavelength_grid, 
 	use math, only : linear_1D
 	use fits_utils, only : print_error
@@ -16,6 +16,8 @@ module spectrum_type
 	!use hdf5
 
 	implicit none
+	
+! 	procedure(local_irradiation), pointer :: local_irradiance => NULL()
 
 	real, parameter :: VACUUM_TO_AIR_LIMIT=200.0000
 	real, parameter :: AIR_TO_VACUUM_LIMIT=199.9352
@@ -37,12 +39,13 @@ module spectrum_type
 	real(kind=dp), dimension(:,:), allocatable :: Jnu_cont, Jnu
 	real(kind=dp), dimension(:,:), allocatable :: Istar_tot, Istar_cont
 	real(kind=dp), dimension(:,:,:), allocatable :: Itot
-	real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux !incl, az, lambda, id ?
+	real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux !incl, az, lambda!, id ?
 	real(kind=dp), allocatable, dimension(:,:,:,:) :: Fluxc
+	real(kind=dp), allocatable, dimension(:) :: Flux_acc !total accretion flux (including lines if present)
 
 	real(kind=dp), dimension(:,:,:), allocatable :: rho_p, chiQUV_p, etaQUV_p
 	real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
-	real(kind=dp), allocatable, dimension(:,:,:,:) :: F_QUV
+	real(kind=dp), allocatable, dimension(:,:,:,:,:) :: F_QUV
 	!in only one direction for one point ! 'centre of the model in this direction'
 	real(kind=dp), allocatable, dimension(:,:) :: tau_one_ray, cntrb_ray, cntrb, origin_atom !allocate 1 ray if only one direction!
 
@@ -444,14 +447,25 @@ call error("initSpectrumImage not modified!!")
 
 		!remove the pixel dimension
 		allocate(Flux(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
+! 		allocate(Flux(Nlambda,RT_N_INCL,RT_N_AZ), stat=alloc_status)
 		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux")
 		allocate(Fluxc(Nlambda_cont,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
+! 		allocate(Fluxc(Nlambda_cont,RT_N_INCL,RT_N_AZ), stat=alloc_status)
 		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux continuum")
-		Flux(:,:,:,:) = 0.0_dp
-		Fluxc(:,:,:,:) = 0.0_dp
+		Flux = 0.0_dp
+		Fluxc = 0.0_dp
 		
 		mem_alloc_local = mem_alloc_local + sizeof(Flux)+sizeof(fluxc)
 		if (lmagnetized) mem_alloc_local = mem_alloc_local + 3*sizeof(flux)/nb_proc
+		
+! 		if (laccretion_shock) then
+! ! 			allocate(Flux_acc(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
+! 			allocate(Flux_acc(Nlambda), stat=alloc_status)
+! 			if (alloc_Status > 0) call ERROR ("Cannot allocate Flux_acc")
+! 			write(*,*) " -> using ", sizeof(flux_acc)/1024./1024.," MB for accretion flux!"
+! 			mem_alloc_local = mem_alloc_local + sizeof(flux_acc)
+! 			Flux_acc = 0.0_dp
+! 		endif
 		
 		!now for the lines 
 		do nat=1, Natom
@@ -554,7 +568,7 @@ call error("initSpectrumImage not modified!!")
 		Stokes_U = 0.0_dp
 		Stokes_V = 0.0_dp
 
-		allocate(F_QUV(Nlambda,RT_N_INCL,RT_N_AZ,3)); F_QUV = 0.0_dp
+		allocate(F_QUV(Nlambda,RT_N_INCL,RT_N_AZ,3,nb_proc)); F_QUV = 0.0_dp
 		allocate(rho_p(Nlambda, 3, nb_proc)); rho_p = 0.0_dp
 		allocate(etaQUV_p(Nlambda, 3, nb_proc)); etaQUV_p = 0.0_dp
 		allocate(chiQUV_p(Nlambda, 3, nb_proc)); chiQUV_p = 0.0_dp
@@ -617,6 +631,7 @@ call error("initSpectrumImage not modified!!")
    	!can be deallocated before to save memory 
 		if (allocated(Flux)) deallocate(Flux)
 		if (allocated(Fluxc)) deallocate(Fluxc)
+		if (allocated(flux_acc)) deallocate(flux_acc)
 		
 		if (allocated(dk)) deallocate(dk)
 
@@ -717,11 +732,12 @@ call error("initSpectrumImage not modified!!")
 	if (status > 0) then
 		call print_error(status)
 	endif
-	call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+	call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm F_{\nu}}$',status)
 
 	
 	!  Write the array to the FITS file.
-	call ftpprd(unit,group,fpixel,nelements,Flux(:,:,:,1),status)
+	call ftpprd(unit,group,fpixel,nelements,sum(Flux(:,:,:,:),dim=4),status)
+! 	call ftpprd(unit,group,fpixel,nelements,Flux(:,:,:),status)
 	if (status > 0) then
 		call print_error(status)
 	endif
@@ -768,11 +784,12 @@ call error("initSpectrumImage not modified!!")
 	if (status > 0) then
 		call print_error(status)
 	endif
-	call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+	call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm F_{\nu}^{cont}}$',status)
 
 
 	!  Write the array to the FITS file.
-	call ftpprd(unit,group,fpixel,nelements,Fluxc(:,:,:,1),status)
+	call ftpprd(unit,group,fpixel,nelements,sum(Fluxc(:,:,:,:),dim=4),status)
+! 	call ftpprd(unit,group,fpixel,nelements,Fluxc(:,:,:),status)
 	if (status > 0) then
 		call print_error(status)
 	endif
@@ -821,10 +838,11 @@ call error("initSpectrumImage not modified!!")
 		if (status > 0) then
 			call print_error(status)
 		endif
-		call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'X_nu',status)
-
+		call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm X_{\nu}}$',status)
+	
 		!  Write the array to the FITS file.
-		call ftpprd(unit,group,fpixel,nelements,F_QUV,status)
+! 		call ftpprd(unit,group,fpixel,nelements,F_QUV,status)
+		call ftpprd(unit,group,fpixel,nelements,sum(F_QUV,dim=5),status)
 		if (status > 0) then
 			call print_error(status)
 		endif		
@@ -846,8 +864,9 @@ call error("initSpectrumImage not modified!!")
 		if (only_flux) return
 	endif
 	
-	write(*,*) "use new map!"
-	
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	write(*,*) "You should use the new map!"
+	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	
 	blocksize=1
 	simple=.true.
@@ -905,6 +924,7 @@ call error("initSpectrumImage not modified!!")
 				g_j(j) = atom%g(j_level(j))
 				lam_trans(j) = atom%lines(kr)%lambda0
 				nu_trans(j) = 1d9 * clight / lam_trans(j)
+				!includes the interaction zone due to velocity fields.
 				Nred = atom%lines(kr)%Nred+dk_max
 				Nblue = atom%lines(kr)%Nblue+dk_min
 				waves(1:Nred-Nblue+1,j) = lambda(Nblue:Nred)
@@ -959,6 +979,7 @@ call error("initSpectrumImage not modified!!")
 		if (status > 0) call print_error(status)
 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 		if (status > 0) call print_error(status)
+		call ftpkys(unit, "UNIT", "nm", comment, status)
 		call ftpprd(unit,group,fpixel,nelements,waves,status)
 		
 
@@ -1053,6 +1074,11 @@ call error("initSpectrumImage not modified!!")
   
 	write(*,*) "Writing line Flux maps"
 	
+	if (lvacuum_to_air) then
+		comment="AIR"
+		write(*,*) " -> lines' wavelengths converted to air in the call of write_flux() !"
+	endif
+	
 	blocksize=1
 	simple=.true.
 	extend=.false.
@@ -1101,6 +1127,7 @@ call error("initSpectrumImage not modified!!")
 				write(transition, '(1I10)') j !line j that we follow among all lines.
 				call ftinit(unit,trim(atom%ID)//"_line_"//trim(adjustl(transition))//".fits.gz",blocksize,status)
 
+				!-> includes the wavelengths due to velocity
 				naxes(1) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
 
  				!if we enter here there is necessarily at least one map!
@@ -1118,10 +1145,11 @@ call error("initSpectrumImage not modified!!")
 				pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
 				call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 	
-				call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
-				call ftpkye(unit,'dv',hv,-7,'km.s^-1',status)
+				call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm F_{\nu}}$',status)
+				call ftpkye(unit,'dv',hv,-7,'${\rm km\,s^{-1}}$',status)
 				!add dk_max and dk_min on Nblue and Nred ? 
-				call ftpkyj(unit,'dshift',dk_max,'dv in pixels',status)
+				call ftpkyj(unit,'dvshift',dk_max,'pixels',status)
+				!of the local profile with v = 0
 				call ftpkyj(unit,'ib',atom%lines(kr)%Nblue,'index blue',status)
 				call ftpkyj(unit,'ir',atom%lines(kr)%Nred,'index red',status)
 				call ftpkyj(unit,'i',atom%lines(kr)%i,'',status)
@@ -1129,7 +1157,7 @@ call error("initSpectrumImage not modified!!")
 				call ftpkyd(unit,'gi',atom%g(atom%lines(kr)%i),-7,'',status)
 				call ftpkyd(unit,'gj',atom%g(atom%lines(kr)%j),-7,'',status)
 				call ftpkyd(unit,'lambda0',atom%lines(kr)%lambda0,-7,'nm',status)
-				call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(kr)%lambda0,-7,'1e15 Hz',status)
+				call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(kr)%lambda0,-7,'10^15 Hz',status)
 				
 				!Write the array to the FITS file.
 				call ftpprd(unit,group,fpixel,naxes(1)*nelements,atom%lines(kr)%map(:,:,:,:,:),status)
@@ -1141,6 +1169,7 @@ call error("initSpectrumImage not modified!!")
 				if (status > 0) call print_error(status)
 				call ftphpr(unit,simple,bitpix,1,naxes,0,1,extend,status)
 				if (status > 0) call print_error(status)
+				call ftpkys(unit, "UNIT", "nm", comment, status)
 				call ftpprd(unit,group,fpixel,naxes(1),lambda(atom%lines(kr)%Nblue+dk_min:atom%lines(kr)%Nred+dk_max),status)
 				
 				!-> now continuum image at central wavelength

@@ -14,7 +14,7 @@ module atom_transfer
 									prec_pops, frac_limit_pops, frac_ne_limit
 	use background_opacity, only: Thomson
 	use Planck, only			: bpnu
-	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, &
+	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, Flux_acc, &
 									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, cntrb_ray, tau_one_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
 									dealloc_jnu, reallocate_rays_arrays, write_contribution_functions_ray, write_flux, write_1D_arr_ascii, cntrb, origin_atom, write_lambda_cell_array, cf_file, origin_file, write_atomic_maps
 									
@@ -52,7 +52,7 @@ module atom_transfer
 	use stars, only				: intersect_spots, intersect_stars
 	!use wavelengths, only		:
 	use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
-	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, sigma, Lsun, rsun_to_au, au_to_rsun
+	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, sigma, Lsun, rsun_to_au, au_to_rsun, c_light
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
 	use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k, area
@@ -78,6 +78,10 @@ module atom_transfer
 	procedure(integ_ray_line_i), pointer :: integ_ray_line => NULL()
  !Temporary variable for Zeeman calculations
 	real(kind=dp), dimension(:,:), allocatable :: QUV
+ ! Temporary variable for accretion intensity
+	real(kind=dp) :: Lum_acc, Lum_star
+	real(kind=dp), dimension(:), allocatable :: I0_acc, shock_area
+ 	real(kind=dp), dimension(:,:), allocatable :: Int_acc, Intc_acc
  !NLTE
  	real(kind=dp) :: dne
 	logical :: ljacobi_sor = .false., lfixed_J = .false. !Option to compute J assuming LTE and keep this value for NLTE transfer
@@ -161,6 +165,7 @@ module atom_transfer
 					!!Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
        				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
+! 					Itot(:,iray,id) = Itot(:,iray,id) + local_stellar_radiation(id,Nlambda,lambda,tau,i_star,icell_prev,x0,y0,z0,u,v,w)
        				return
       			end if
    			 endif
@@ -626,7 +631,7 @@ module atom_transfer
      Iold = I0
      I0 = 0d0
      I0c = 0d0
-     if (lmagnetized) QUV(:,:) = 0d0 !move outside
+     if (lmagnetized) QUV(:,:) = 0.0_dp !move outside
      ! Vecteurs definissant les sous-pixels
      sdx(:) = dx(:) / real(subpixels,kind=dp)
      sdy(:) = dy(:) / real(subpixels,kind=dp)
@@ -692,22 +697,21 @@ module atom_transfer
   normF = ( pixelsize / (distance*pc_to_AU) )**2
 
   ! adding to the total flux map.
-  !storing by proc is necessary here
+  !storing by proc is necessary here ?
   Flux(:,ibin,iaz,id) = Flux(:,ibin,iaz,id) + I0(:) * normF
   Fluxc(:,ibin,iaz,id) = Fluxc(:,ibin,iaz,id) + I0c(:) * normF
   
-  
   if (lmagnetized) then
-  	F_QUV(:,ibin,iaz,1) = F_QUV(:,ibin,iaz,1) + normF * QUV(:,1) / npix2
-  	F_QUV(:,ibin,iaz,2) = F_QUV(:,ibin,iaz,2) + normF * QUV(:,2) / npix2
-  	F_QUV(:,ibin,iaz,3) = F_QUV(:,ibin,iaz,3) + normF * QUV(:,3) / npix2
+  	F_QUV(:,ibin,iaz,1,id) = F_QUV(:,ibin,iaz,1,id) + normF * QUV(:,1) / npix2
+  	F_QUV(:,ibin,iaz,2,id) = F_QUV(:,ibin,iaz,2,id) + normF * QUV(:,2) / npix2
+  	F_QUV(:,ibin,iaz,3,id) = F_QUV(:,ibin,iaz,3,id) + normF * QUV(:,3) / npix2
   end if
   
    
   !Flux map for lines
   !adding a map for the continuum point too ?
   if (RT_line_method==1) then
-  !summation over pixels
+  !summation over pixels: ipix=1 jpix=1
   	do nat=1,Natom
   		atom => atoms(nat)%ptr_atom
   		do kr=1,atom%Nline
@@ -762,12 +766,11 @@ module atom_transfer
   real(kind=dp):: taille_pix, nu
   integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
 
-  integer, parameter :: n_rad_RT = 300, n_phi_RT = 200 !(100, 36)
+  integer, parameter :: n_rad_RT = 150, n_phi_RT = 101 !(300,200)!(100, 36)
   real(kind=dp), dimension(n_rad_RT) :: tab_r
   real(kind=dp):: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
-  integer :: ri_RT, phi_RT, lambda
+  integer :: ri_RT, phi_RT!, lambda
   logical :: lresolved
-  real(kind=dp) :: aphi(n_phi_RT), ap(n_rad_RT)
 
   write(*,*) "Vector to observer =", real(tab_u_rt(ibin,iaz)),real(tab_v_rt(ibin,iaz)),real(tab_w_rt(ibin))
   write(*,*) "i=", real(tab_RT_incl(ibin)), "az=", real(tab_RT_az(iaz))
@@ -865,9 +868,10 @@ module atom_transfer
      !!dx(:) = x_plan_image * taille_pix
      !!dy(:) = y_plan_image * taille_pix
   
-  	if (lcontrib_function.or.lorigin_atom) then
+	if (lcontrib_function.or.lorigin_atom) then
   		call warning("CF not normalised with RT_line_method==1")
  	endif
+
          
   else !method 2
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
@@ -912,10 +916,6 @@ module atom_transfer
   	if (lorigin_atom) origin_atom(:,:) = origin_atom(:,:) / real(max(npix_x,npix_y),kind=dp)    
      
   end if
-    
-  !recombine for all proc
-  flux(:,ibin,iaz,1) = sum(flux(:,ibin,iaz,:),dim=2)
-  fluxc(:,ibin,iaz,1) = sum(fluxc(:,ibin,iaz,:),dim=2)
 
  return
  end subroutine emission_line_map
@@ -1304,7 +1304,7 @@ module atom_transfer
 		integ_ray_line => integ_ray_line_origin
 		write(*,*) " -> using integ_ray_line_origin"
 	endif
-
+	
 	call init_directions_ray_tracing()
 	do ibin=1,RT_n_incl
 		do iaz=1,RT_n_az
@@ -1316,7 +1316,6 @@ module atom_transfer
 	if (lmagnetized) then
 		deallocate(QUV)
 	endif
-
 
 	if (allocated(origin_atom)) then
 		call write_lambda_cell_array(origin_atom, origin_file)
@@ -2394,102 +2393,76 @@ module atom_transfer
 	return
 	end function local_stellar_brigthness
  
-!  subroutine calc_stellar_surface_brightness(N,lambda,i_star,icell_prev,x,y,z,u,v,w,gamma)
-!  ! ---------------------------------------------------------------!
-!   ! Compute the stellar radiation field surface brightness.
-!   ! Istar = B(x,y,z;mu) * Stellar spectrum or B * BlackBody
-!   ! return gamma, the brightness. For uniform disk, gamma is 1.
-!   !
-!   ! If there is a shock spot at the surface, gamma returned is :
-!   ! gamma = 1 + ratio, such that the radiation from the star Istar is
-!   ! Istar = I(photosphere) + Ishock, with Ishock = I(photosphere) * ratio.
-!   ! (previously, Istar was Ishock, now it is the sum of the two contrib)
-!  ! -------------------------------------------------------------- !
-!   integer, intent(in) :: N, i_star, icell_prev
-!   real(kind=dp), dimension(N), intent(in) :: lambda
-!   real(kind=dp), dimension(N), intent(out) :: gamma
-!   real(kind=dp), intent(in) :: u, v, w, x, y, z
-!   real(kind=dp) :: energie(N), Tchoc
-!   real(kind=dp) :: mu, ulimb, LimbDarkening, surface, HC
-!   integer :: ns,la
-!   logical :: lintersect = .false.
-! 
-!    if (etoile(i_star)%T <= 1e-6) then !even with spots
-!     gamma(:) = 0.0_dp
-!     return !no radiation from the starr
-!    endif
-!    
-!    gamma(:) = 1.0_dp !init
-!    					 !if no spots (and no other sources like X rays, UV flux)
-!    					 !it is the outvalue
-!    
-!    !if (ladd_xrays) then
-!     !such that Ixray = Iphot * gamma and Istar = Iphot + Ixray = Iphot * (1 + gamma)
-! !     gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
-! !     where (lambda <= 50.)
-! !         gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
-! !     end where
-!    !endif
-!    
-!    !cos(theta) = dot(r,n)/module(r)/module(n)
-!    mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
-!    if (real(mu)>1d0) then !to avoid perecision error
-!     write(*,*) "mu=",mu, x, y, z, u, v, w
-!     call Error(" mu limb > 1!")
-!    end if
-!    
-!    
-!   ! Correct with the contrast gamma of a hotter/cooler region if any
-! !    call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect)
-! !    !avoid error with infinity for small lambda
-! !    if (lintersect) then
-! !    		!Means that Ispot = Bp(Tspot) = gamma * Iphot  = Ispot
-! !    		!gamma is initialized to one here.
-! !    		!The +1 (i.e., the gamma = gamma + ...) means that Istar = Iphot + Ispot = Iphot * (1 + gamma)
-! ! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/etoile(i_star)%SurfB(ns)%T)-1)
-! !      !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
-! !      	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
-! !  		!gamma = gamma + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
-! !    end if
-!    
-!    if ((laccretion_shock).and.(icell_prev<=n_cells)) then
-!    	if (icompute_atomRT(icell_prev)) then
-!    		if (vr(icell_prev) < 0.0_dp) then
-! !    		write(*,*) "Accretion E (K):", (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
-! !    			lintersect = .true.
-!    			if (Taccretion>0) then
-!    				Tchoc = Taccretion
-!    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
-!    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
-!    			endif
-! !    			if (Taccretion>0) then
-! !    				Tchoc = Taccretion
-! !    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
-! !    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
-! !    			endif
-!    			lintersect = (Tchoc > etoile(i_star)%T)
-!    		endif
-! 	endif !rho > 0
-! 	if (lintersect) then
-! ! 		write(*,*) "intersect spot"
-! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
-! 	endif
-! 
-!    endif!cells <= n_cells
-! 
-! 
-!    !Apply Limb darkening
-!    if (llimb_darkening) then
-!      call ERROR("option for reading limb darkening not implemented")
-!    else
-!      !ulimb = 0.6
-!      LimbDarkening = 1.0_dp!0.4 + 0.6 * mu!1.0_dp
-!    end if
-!    !Istar(:) = energie(:) * LimbDarkening * gamma(:)
-!    gamma(:) = LimbDarkening * gamma(:)
-! 
-!  return
-!  end subroutine calc_stellar_surface_brightness
+	function local_stellar_radiation(id, N,lambda,tau, i_star,icell_prev,x,y,z,u,v,w)
+	! ---------------------------------------------------------------!
+	!
+	! -------------------------------------------------------------- !
+  		integer, intent(in) :: N, i_star, icell_prev, id
+  		real(kind=dp), dimension(N), intent(in) :: lambda, tau
+  		real(kind=dp), intent(in) :: u, v, w, x, y, z
+  		real(kind=dp), dimension(N) :: local_stellar_radiation
+
+  		real(kind=dp) :: Tchoc, vaccr, vmod2, rr
+  		real(kind=dp) :: mu, ulimb, LimbDarkening
+  		integer :: ns,la
+  		logical :: lintersect!=.false.! does not work here ?
+
+   		if (etoile(i_star)%T <= 1e-6) then !even with spots
+    		local_stellar_radiation(:) = 0.0_dp !look at init_stellar_disk
+    		return !no radiation from the starr
+   		endif
+   
+  		local_stellar_radiation = 1.0_dp
+   
+		!cos(theta) = dot(r,n)/module(r)/module(n)
+		if (llimb_darkening) then
+     		call ERROR("option for reading limb darkening not implemented")
+			mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
+			if (real(mu)>1d0) then !to avoid perecision error
+				write(*,*) "mu=",mu, x, y, z, u, v, w
+				call Error(" mu limb > 1!")
+			end if
+		else
+			LimbDarkening = 1.0_dp
+		end if
+
+		lintersect = .false.
+		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
+			if (icompute_atomRT(icell_prev) > 0) then
+			
+				if (lvoronoi) then 
+					rr = sqrt( x*x + y*y )
+					vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr
+					vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
+				else
+					vaccr = vr(icell_prev)		
+					vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2	
+				endif
+		
+				if (vaccr < 0.0_dp) then
+					if (Taccretion>0) then
+						Tchoc = Taccretion
+					else
+						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25						
+					endif
+					lintersect = (Tchoc > etoile(i_star)%T)
+				endif
+				
+			endif !icompute_atomRT
+			if (lintersect) then
+				local_stellar_radiation(:) = local_stellar_radiation(:) + &
+				(exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
+! 				if (allocated(Int_acc)) then
+! 					Int_acc(:,id) = (local_stellar_radiation(:) - 1.0_dp) * LimbDarkening * Istar_tot(:,i_star) * exp(-tau)
+! 				endif
+				!Assuming BB shock
+			endif
+   		endif !laccretion_shock
+   		
+		local_stellar_radiation(:) = Istar_tot(:,i_star) * LimbDarkening * local_stellar_radiation(:) * exp(-tau)
+
+	return
+	end function local_stellar_radiation
 
    subroutine INTEG_RAY_JNU(id,icell_in,x,y,z,u,v,w,iray,labs, kappa_tot, Snu, Istar, Ic)
  ! ------------------------------------------------------------------------------- !
@@ -3237,6 +3210,103 @@ end subroutine INTEG_RAY_JNU
 
 	return
 	end subroutine integ_ray_Cntrb
+	
+!  subroutine calc_stellar_surface_brightness(N,lambda,i_star,icell_prev,x,y,z,u,v,w,gamma)
+!  ! ---------------------------------------------------------------!
+!   ! Compute the stellar radiation field surface brightness.
+!   ! Istar = B(x,y,z;mu) * Stellar spectrum or B * BlackBody
+!   ! return gamma, the brightness. For uniform disk, gamma is 1.
+!   !
+!   ! If there is a shock spot at the surface, gamma returned is :
+!   ! gamma = 1 + ratio, such that the radiation from the star Istar is
+!   ! Istar = I(photosphere) + Ishock, with Ishock = I(photosphere) * ratio.
+!   ! (previously, Istar was Ishock, now it is the sum of the two contrib)
+!  ! -------------------------------------------------------------- !
+!   integer, intent(in) :: N, i_star, icell_prev
+!   real(kind=dp), dimension(N), intent(in) :: lambda
+!   real(kind=dp), dimension(N), intent(out) :: gamma
+!   real(kind=dp), intent(in) :: u, v, w, x, y, z
+!   real(kind=dp) :: energie(N), Tchoc
+!   real(kind=dp) :: mu, ulimb, LimbDarkening, surface, HC
+!   integer :: ns,la
+!   logical :: lintersect = .false.
+! 
+!    if (etoile(i_star)%T <= 1e-6) then !even with spots
+!     gamma(:) = 0.0_dp
+!     return !no radiation from the starr
+!    endif
+!    
+!    gamma(:) = 1.0_dp !init
+!    					 !if no spots (and no other sources like X rays, UV flux)
+!    					 !it is the outvalue
+!    
+!    !if (ladd_xrays) then
+!     !such that Ixray = Iphot * gamma and Istar = Iphot + Ixray = Iphot * (1 + gamma)
+! !     gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
+! !     where (lambda <= 50.)
+! !         gamma(:) = gamma(:) + (exp(hc_k/lambda/etoile(i_star)%T)-1)/(exp(hc_k/lambda/1d6)-1)
+! !     end where
+!    !endif
+!    
+!    !cos(theta) = dot(r,n)/module(r)/module(n)
+!    mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
+!    if (real(mu)>1d0) then !to avoid perecision error
+!     write(*,*) "mu=",mu, x, y, z, u, v, w
+!     call Error(" mu limb > 1!")
+!    end if
+!    
+!    
+!   ! Correct with the contrast gamma of a hotter/cooler region if any
+! !    call intersect_spots(i_star,u,v,w,x,y,z, ns,lintersect)
+! !    !avoid error with infinity for small lambda
+! !    if (lintersect) then
+! !    		!Means that Ispot = Bp(Tspot) = gamma * Iphot  = Ispot
+! !    		!gamma is initialized to one here.
+! !    		!The +1 (i.e., the gamma = gamma + ...) means that Istar = Iphot + Ispot = Iphot * (1 + gamma)
+! ! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/etoile(i_star)%SurfB(ns)%T)-1)
+! !      !so that I_spot = Bplanck(Tspot) = Bp(Tstar) * gamma = Bp(Tstar)*B_spot/B_star
+! !      	!Lambda independent spots, Ts = 2*Tphot means Fspot = 2 * Fphot
+! !  		!gamma = gamma + (etoile(i_star)%SurfB(ns)%T - etoile(i_star)%T) / etoile(i_star)%T
+! !    end if
+!    
+!    if ((laccretion_shock).and.(icell_prev<=n_cells)) then
+!    	if (icompute_atomRT(icell_prev)) then
+!    		if (vr(icell_prev) < 0.0_dp) then
+! !    		write(*,*) "Accretion E (K):", (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+! !    			lintersect = .true.
+!    			if (Taccretion>0) then
+!    				Tchoc = Taccretion
+!    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
+!    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+!    			endif
+! !    			if (Taccretion>0) then
+! !    				Tchoc = Taccretion
+! !    			else!need a condition to use vtheta or vphi. Or an array that contains for each cell Tshock or zero (only for cell close to the star)
+! !    				Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)*abs(vr(icell_prev))/sigma * (0.5 * (vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2)))**0.25
+! !    			endif
+!    			lintersect = (Tchoc > etoile(i_star)%T)
+!    		endif
+! 	endif !rho > 0
+! 	if (lintersect) then
+! ! 		write(*,*) "intersect spot"
+! 		gamma(:) = gamma(:) + (exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
+! 	endif
+! 
+!    endif!cells <= n_cells
+! 
+! 
+!    !Apply Limb darkening
+!    if (llimb_darkening) then
+!      call ERROR("option for reading limb darkening not implemented")
+!    else
+!      !ulimb = 0.6
+!      LimbDarkening = 1.0_dp!0.4 + 0.6 * mu!1.0_dp
+!    end if
+!    !Istar(:) = energie(:) * LimbDarkening * gamma(:)
+!    gamma(:) = LimbDarkening * gamma(:)
+! 
+!  return
+!  end subroutine calc_stellar_surface_brightness
 
 	!building
 	subroutine NLTEloop(n_rayons_max,n_rayons_1,n_rayons_2,maxIter,verbose)
