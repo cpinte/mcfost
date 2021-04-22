@@ -14,7 +14,7 @@ module atom_transfer
 									prec_pops, frac_limit_pops, frac_ne_limit
 	use background_opacity, only: Thomson
 	use Planck, only			: bpnu
-	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, Flux_acc, &
+	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, Flux_acc, Ishock, Istar_loc, flux_star,&
 									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, cntrb_ray, tau_one_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
 									dealloc_jnu, reallocate_rays_arrays, write_contribution_functions_ray, write_flux, write_1D_arr_ascii, cntrb, origin_atom, write_lambda_cell_array, cf_file, origin_file, write_atomic_maps
 									
@@ -76,12 +76,9 @@ module atom_transfer
  	!!real(kind=dp), allocatable :: I0_rf(:), Iray_rf(:,:)
  !RT procedure
 	procedure(integ_ray_line_i), pointer :: integ_ray_line => NULL()
- !Temporary variable for Zeeman calculations
+ !Temporary variable for flux calculations
 	real(kind=dp), dimension(:,:), allocatable :: QUV
- ! Temporary variable for accretion intensity
-	real(kind=dp) :: Lum_acc, Lum_star
-	real(kind=dp), dimension(:), allocatable :: I0_acc, shock_area
- 	real(kind=dp), dimension(:,:), allocatable :: Int_acc, Intc_acc
+	real(kind=dp), dimension(:), allocatable :: Iacc
  !NLTE
  	real(kind=dp) :: dne
 	logical :: ljacobi_sor = .false., lfixed_J = .false. !Option to compute J assuming LTE and keep this value for NLTE transfer
@@ -126,6 +123,9 @@ module atom_transfer
 
 		Itot(:,iray,id) = 0d0
 		Icont(:,iray,id) = 0d0
+		
+		Istar_loc(:,id) = 0.0_dp
+		if (laccretion_shock) Ishock(:,id) = 0.0_dp
 				
 
 !!write(*,*) "id=",id
@@ -157,15 +157,12 @@ module atom_transfer
 			
 			if (lintersect_stars) then
 				if (icell == icell_star) then
-					!It is completely possible to merge Icont and Itot in the say function
-					!as the operation are similar
-					!!call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w,LDc)
-       				!!Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
+					!continuous emission of the shock and the star only no stored!
+       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
 					!!call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
 					!!Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
-       				Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
-					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
-! 					Itot(:,iray,id) = Itot(:,iray,id) + local_stellar_radiation(id,Nlambda,lambda,tau,i_star,icell_prev,x0,y0,z0,u,v,w)
+! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
+					call local_stellar_radiation(id,iray,Nlambda, lambda, tau,i_star,icell_prev,x0,y0,z0,u,v,w)
        				return
       			end if
    			 endif
@@ -244,6 +241,9 @@ module atom_transfer
 
 !-> avoid multiple loop over frequencies and is faster for large Nlambda
 
+				!if (icompute_atomRT(icell)==3) Ishock(:,id) = Ishock(:,id) + Itot(:,iray,id) * ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)		
+
+
 				do la=1,Nlambda
 					Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
 					tau(la) = tau(la) + dtau(la) !for next cell				
@@ -254,7 +254,6 @@ module atom_transfer
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
 				
-
 			end if  ! lcellule_non_vide
 			
     		icell_prev = icell !duplicate with previous_cell, but this avoid problem with Voronoi grid here
@@ -602,7 +601,7 @@ module atom_transfer
    real(kind=dp), intent(in) :: pixelsize,u,v,w
    integer, parameter :: maxSubPixels = 32
    real(kind=dp) :: x0,y0,z0,u0,v0,w0
-   real(kind=dp), dimension(Nlambda) :: Iold, I0
+   real(kind=dp), dimension(Nlambda) :: Iold, I0, I0_star
    real(kind=dp), dimension(Nlambda_cont) :: I0c
    real(kind=dp), dimension(3) :: sdx, sdy
    real(kind=dp):: npix2, diff, normF, R0
@@ -631,7 +630,9 @@ module atom_transfer
      Iold = I0
      I0 = 0d0
      I0c = 0d0
+     I0_star = 0.0_dp
      if (lmagnetized) QUV(:,:) = 0.0_dp !move outside
+     if (laccretion_shock) Iacc(:) = 0.0_dp
      ! Vecteurs definissant les sous-pixels
      sdx(:) = dx(:) / real(subpixels,kind=dp)
      sdy(:) = dy(:) / real(subpixels,kind=dp)
@@ -660,6 +661,10 @@ module atom_transfer
              	QUV(:,2) = QUV(:,2) + Stokes_Q(:,id) / npix2
              	QUV(:,1) = QUV(:,1) + Stokes_U(:,id) / npix2
              end if
+             
+             if (laccretion_shock) Iacc(:) = Iacc(:) + Ishock(:,id) / npix2
+             
+             I0_star = I0_star + Istar_loc(:,id) / npix2
 
            !else !Outside the grid, no radiation flux
            endif
@@ -700,14 +705,18 @@ module atom_transfer
   !storing by proc is necessary here ?
   Flux(:,ibin,iaz,id) = Flux(:,ibin,iaz,id) + I0(:) * normF
   Fluxc(:,ibin,iaz,id) = Fluxc(:,ibin,iaz,id) + I0c(:) * normF
+  Flux_star(:,ibin,iaz,id) = Flux_star(:,ibin,iaz,id) + I0_star(:) * normF
+  if (laccretion_shock) then
+  	Flux_acc(:,ibin,iaz,id) = Flux_acc(:,ibin,iaz,id) + Iacc(:) * normF
+  endif
   
   if (lmagnetized) then
-  	F_QUV(:,ibin,iaz,1,id) = F_QUV(:,ibin,iaz,1,id) + normF * QUV(:,1) / npix2
-  	F_QUV(:,ibin,iaz,2,id) = F_QUV(:,ibin,iaz,2,id) + normF * QUV(:,2) / npix2
-  	F_QUV(:,ibin,iaz,3,id) = F_QUV(:,ibin,iaz,3,id) + normF * QUV(:,3) / npix2
+  	F_QUV(:,ibin,iaz,1,id) = F_QUV(:,ibin,iaz,1,id) + normF * QUV(:,1)
+  	F_QUV(:,ibin,iaz,2,id) = F_QUV(:,ibin,iaz,2,id) + normF * QUV(:,2)
+  	F_QUV(:,ibin,iaz,3,id) = F_QUV(:,ibin,iaz,3,id) + normF * QUV(:,3)
   end if
   
-   
+  !Proc bug ??? need explicit proc id?
   !Flux map for lines
   !adding a map for the continuum point too ?
   if (RT_line_method==1) then
@@ -1295,6 +1304,7 @@ module atom_transfer
  		allocate(QUV(Nlambda,3))
 		call allocate_stokes_quantities
 	endif
+	if (laccretion_shock) allocate(Iacc(nlambda))
 
 	call alloc_flux_image()
 	write(*,*) "Computing emission flux map..."
@@ -1316,6 +1326,7 @@ module atom_transfer
 	if (lmagnetized) then
 		deallocate(QUV)
 	endif
+	if (laccretion_shock) deallocate(Iacc)
 
 	if (allocated(origin_atom)) then
 		call write_lambda_cell_array(origin_atom, origin_file)
@@ -1577,7 +1588,8 @@ module atom_transfer
 				!-> no iteration in MC but after the solution ??
 				if (n_iterate_ne > 0) then
 					if (lno_iterate_ne_mc) then
-						n_iterate_ne = 0	
+						n_iterate_ne = 0
+						!in that case, cannot test mod(n_iter, n_iterate_ne) because of division by 0
 					endif
 				endif
 			
@@ -1643,7 +1655,11 @@ module atom_transfer
 				!( maxval(dM) < min(1e-1,10*precision) )
 				!-> add that to prevent oscillations close to convergence ??
 				!.and.(.not.lprevious_converged)
-				l_iterate_ne = (n_iterate_ne > 0) .and. ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
+! 				l_iterate_ne = (n_iterate_ne > 0) .and. ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
+ !need to handle the case n_iterate_ne==0 here for the mod function.
+				if( n_iterate_ne ) then
+					l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
+				endif
 
         	
 				!$omp parallel &
@@ -2393,26 +2409,23 @@ module atom_transfer
 	return
 	end function local_stellar_brigthness
  
-	function local_stellar_radiation(id, N,lambda,tau, i_star,icell_prev,x,y,z,u,v,w)
+	subroutine local_stellar_radiation(id,iray,N,lambda,tau, i_star,icell_prev,x,y,z,u,v,w)
 	! ---------------------------------------------------------------!
 	!
 	! -------------------------------------------------------------- !
-  		integer, intent(in) :: N, i_star, icell_prev, id
+  		integer, intent(in) :: N, i_star, icell_prev, id, iray
   		real(kind=dp), dimension(N), intent(in) :: lambda, tau
   		real(kind=dp), intent(in) :: u, v, w, x, y, z
-  		real(kind=dp), dimension(N) :: local_stellar_radiation
 
   		real(kind=dp) :: Tchoc, vaccr, vmod2, rr
   		real(kind=dp) :: mu, ulimb, LimbDarkening
   		integer :: ns,la
-  		logical :: lintersect!=.false.! does not work here ?
+  		logical :: lintersect
 
    		if (etoile(i_star)%T <= 1e-6) then !even with spots
-    		local_stellar_radiation(:) = 0.0_dp !look at init_stellar_disk
-    		return !no radiation from the starr
+    		return !no radiation from the star
    		endif
    
-  		local_stellar_radiation = 1.0_dp
    
 		!cos(theta) = dot(r,n)/module(r)/module(n)
 		if (llimb_darkening) then
@@ -2425,7 +2438,9 @@ module atom_transfer
 		else
 			LimbDarkening = 1.0_dp
 		end if
-
+		
+		Istar_loc(:,id) = Limbdarkening * exp(-tau(:)) * Istar_tot(:,i_star)
+		
 		lintersect = .false.
 		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
 			if (icompute_atomRT(icell_prev) > 0) then
@@ -2450,19 +2465,22 @@ module atom_transfer
 				
 			endif !icompute_atomRT
 			if (lintersect) then
-				local_stellar_radiation(:) = local_stellar_radiation(:) + &
-				(exp(hc_k/max(lambda,10.0)/etoile(i_star)%T)-1)/(exp(hc_k/max(lambda,10.0)/Tchoc)-1)
-! 				if (allocated(Int_acc)) then
-! 					Int_acc(:,id) = (local_stellar_radiation(:) - 1.0_dp) * LimbDarkening * Istar_tot(:,i_star) * exp(-tau)
+! 				if (lshock_model) then
+! 					!Ishock(:,id) = ..
+! 				else
+					Ishock(:,id) = LimbDarkening * exp(-tau(:)) * Bpnu(Tchoc,lambda)
 ! 				endif
-				!Assuming BB shock
+
+				Itot(:,iray,id) = Itot(:,iray,id) + Ishock(:,id) + Istar_loc(:,id)
+				return
 			endif
    		endif !laccretion_shock
-   		
-		local_stellar_radiation(:) = Istar_tot(:,i_star) * LimbDarkening * local_stellar_radiation(:) * exp(-tau)
-
+   
+	Itot(:,iray,id) = Itot(:,iray,id) + Istar_loc(:,id)
+		
 	return
-	end function local_stellar_radiation
+	end subroutine local_stellar_radiation
+	
 
    subroutine INTEG_RAY_JNU(id,icell_in,x,y,z,u,v,w,iray,labs, kappa_tot, Snu, Istar, Ic)
  ! ------------------------------------------------------------------------------- !

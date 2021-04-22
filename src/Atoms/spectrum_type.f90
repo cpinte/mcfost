@@ -17,8 +17,6 @@ module spectrum_type
 
 	implicit none
 	
-! 	procedure(local_irradiation), pointer :: local_irradiance => NULL()
-
 	real, parameter :: VACUUM_TO_AIR_LIMIT=200.0000
 	real, parameter :: AIR_TO_VACUUM_LIMIT=199.9352
 	character(len=*), parameter :: WAVES_FILE="atom_transfer_waves_grid.fits.gz"
@@ -37,11 +35,11 @@ module spectrum_type
 	real(kind=dp), dimension(:,:,:), allocatable :: Icont
 	real(kind=dp), dimension(:), allocatable :: lambda, lambda_cont
 	real(kind=dp), dimension(:,:), allocatable :: Jnu_cont, Jnu
-	real(kind=dp), dimension(:,:), allocatable :: Istar_tot, Istar_cont
+	real(kind=dp), dimension(:,:), allocatable :: Istar_tot, Istar_cont, Ishock, Istar_loc
 	real(kind=dp), dimension(:,:,:), allocatable :: Itot
 	real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux !incl, az, lambda!, id ?
 	real(kind=dp), allocatable, dimension(:,:,:,:) :: Fluxc
-	real(kind=dp), allocatable, dimension(:) :: Flux_acc !total accretion flux (including lines if present)
+	real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux_star, Flux_acc !total accretion flux (including lines if present)
 
 	real(kind=dp), dimension(:,:,:), allocatable :: rho_p, chiQUV_p, etaQUV_p
 	real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
@@ -50,7 +48,6 @@ module spectrum_type
 	real(kind=dp), allocatable, dimension(:,:) :: tau_one_ray, cntrb_ray, cntrb, origin_atom !allocate 1 ray if only one direction!
 
 	contains
-  
  
 	function getlambda_limit(atom)
 	!reddest wavelength of the shortest b-b transition in the ground state
@@ -268,9 +265,13 @@ call error("initSpectrumImage not modified!!")
 			Istar_tot(:,:) = 0.0_dp
 			allocate(Istar_cont(Nlambda_cont,n_etoiles))
 			Istar_cont(:,:) = 0.0_dp
+			allocate(Istar_loc(Nlambda,nb_proc),stat=alloc_status)
+			if (alloc_status > 0) call error("Allocation error Istar_loc")
+			write(*,*) "-> using ", sizeof(Istar_loc)/1024./1024.," MB for local stellar radiation."
+			mem_alloc_local = mem_alloc_local + sizeof(Istar_tot) + sizeof(Istar_cont) + sizeof(Istar_loc)
+			Istar_loc = 0.0_dp
 		endif
 		
-		mem_alloc_local = mem_alloc_local + sizeof(Istar_tot) + sizeof(Istar_cont)
 
 		allocate(Itot(Nlambda, Nray, nb_proc),stat=alloc_status)
 		if (alloc_status > 0) call error("Allocation error Itot")
@@ -279,6 +280,15 @@ call error("initSpectrumImage not modified!!")
 		Icont = 0.0_dp
 		
 		mem_alloc_local = mem_alloc_local + sizeof(Itot)+sizeof(Icont) 
+
+
+		if (laccretion_shock) then
+			allocate(Ishock(Nlambda,nb_proc), stat=alloc_status)
+			if (alloc_Status > 0) call ERROR ("Cannot allocate Ishock")
+			write(*,*) " -> using ", sizeof(Ishock)/1024./1024.," MB for accretion intensity!"
+			mem_alloc_local = mem_alloc_local + sizeof(Ishock)
+			Ishock = 0.0_dp
+		endif
 		
 		!allocate(dk(Nray, nb_proc))
 		!if (alloc_status > 0) call error("Allocation error dk")
@@ -458,14 +468,18 @@ call error("initSpectrumImage not modified!!")
 		mem_alloc_local = mem_alloc_local + sizeof(Flux)+sizeof(fluxc)
 		if (lmagnetized) mem_alloc_local = mem_alloc_local + 3*sizeof(flux)/nb_proc
 		
-! 		if (laccretion_shock) then
-! ! 			allocate(Flux_acc(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
-! 			allocate(Flux_acc(Nlambda), stat=alloc_status)
-! 			if (alloc_Status > 0) call ERROR ("Cannot allocate Flux_acc")
-! 			write(*,*) " -> using ", sizeof(flux_acc)/1024./1024.," MB for accretion flux!"
-! 			mem_alloc_local = mem_alloc_local + sizeof(flux_acc)
-! 			Flux_acc = 0.0_dp
-! 		endif
+		allocate(flux_star(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
+		if (alloc_Status > 0) call ERROR ("Cannot allocate Flux_star")
+		mem_alloc_local = mem_alloc_local + sizeof(Flux_star)
+		Flux_star = 0.0_dp
+				
+		if (laccretion_shock) then
+			allocate(Flux_acc(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
+			if (alloc_Status > 0) call ERROR ("Cannot allocate Flux_acc")
+			write(*,*) " -> using ", sizeof(flux_acc)/1024./1024.," MB for accretion flux!"
+			mem_alloc_local = mem_alloc_local + sizeof(flux_acc)
+			Flux_acc = 0.0_dp
+		endif
 		
 		!now for the lines 
 		do nat=1, Natom
@@ -627,11 +641,12 @@ call error("initSpectrumImage not modified!!")
 		deallocate(lambda)
 		if (allocated(lambda_cont)) deallocate(lambda_cont)
 
-		deallocate(Itot, Icont, Istar_tot, Istar_cont)
+		deallocate(Itot, Icont)
+		if (allocated(Istar_tot)) deallocate(Istar_tot, Istar_cont, Istar_loc)
    	!can be deallocated before to save memory 
 		if (allocated(Flux)) deallocate(Flux)
 		if (allocated(Fluxc)) deallocate(Fluxc)
-		if (allocated(flux_acc)) deallocate(flux_acc)
+		if (allocated(flux_acc)) deallocate(flux_acc,Ishock)
 		
 		if (allocated(dk)) deallocate(dk)
 
@@ -817,6 +832,33 @@ call error("initSpectrumImage not modified!!")
 	if (status > 0) then
 		call print_error(status)
 	endif
+	
+	!Stellar flux
+	call ftcrhd(unit, status)
+	if (status > 0) then
+		call print_error(status)
+	endif
+	naxis = 3
+	naxes(1) = Nlambda
+	naxes(2) = RT_n_incl
+	naxes(3) = RT_n_az
+	
+	nelements = naxes(1)*naxes(2)*naxes(3)
+
+  !  Write the required header keywords.
+	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+	if (status > 0) then
+		call print_error(status)
+	endif
+	call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm Fstar_{\nu}}$',status)
+
+	
+	!  Write the array to the FITS file.
+	write(*,*) " Flux_star_max = ", maxval(sum(Flux_star(:,:,:,:),dim=4))
+	call ftpprd(unit,group,fpixel,nelements,sum(Flux_star(:,:,:,:),dim=4),status)
+	if (status > 0) then
+		call print_error(status)
+	endif
 
 	if (lmagnetized) then
 	
@@ -847,6 +889,29 @@ call error("initSpectrumImage not modified!!")
 			call print_error(status)
 		endif		
 	
+	endif
+	
+	if (laccretion_shock) then
+		call ftcrhd(unit, status)
+  		if (status > 0) then
+			call print_error(status)
+		endif
+		write(*,*) " Writing accretion flux to fits file"
+		naxis = 3
+		naxes(1) = Nlambda
+		naxes(2) = RT_n_incl
+		naxes(3) = RT_n_az
+		nelements = naxes(1)*naxes(2)*naxes(3)		
+		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		if (status > 0) then
+			call print_error(status)
+		endif
+		call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm Facc_{\nu}}$',status)
+		write(*,*)  "   -> max acc flux :", maxval(sum(flux_acc(:,:,:,:),dim=4))
+		call ftpprd(unit,group,fpixel,nelements,sum(Flux_acc(:,:,:,:),dim=4),status)
+		if (status > 0) then
+			call print_error(status)
+		endif
 	endif
 
    ! Close the file and free the unit number.
