@@ -59,7 +59,7 @@ MODULE constant
   !here I have a problem if I try to compute sigma0_H_ff using 7.100 of Hubeny Mihalas with SI units value
   !So I Take the cgs result and turn it to SI ...
   !we multiply sigma0_H_ff by nion (m^-3) * ne(m^-3) to have chi in 1d-10 m^5 * m-3 * m^-3 in m^-1
-  real(kind=dp), parameter    :: sigma0_H_ff = 3.6923284d8 * 1d-10 ! cm^5 K^1/2 Hz^-3 -> m^5 K^1/2 Hz^3
+  real(kind=dp), parameter    :: sigma0_H_ff = 3.6923284d8 * 1d-10 ! cm^5 K^1/2 Hz^-3 -> m^5 K^1/2 Hz^-3
    !K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / sqrt(M_ELECTRON)
    !K0 = (K0**3) * 4./3. * sqrt(2*pi/3./KBOLTZMANN) / HPLANCK / CLIGHT
    !sigma0_H_ff = K0
