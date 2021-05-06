@@ -414,7 +414,7 @@ contains
 
        destruction_factor = 1.
        do icell=1,n_cells
-          if (T_gas(icell) >= 1500.) destruction_factor = 0.0001
+          if (T_gas(icell) >= 1500. .and. .not. lturn_off_dust_subl) destruction_factor = 0.0001
           masse(icell) = 0.
           do k=1,n_grains_tot
              densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k) * destruction_factor
