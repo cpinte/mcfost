@@ -1162,6 +1162,7 @@ module atmos_type
       line = atom%lines(l)
       if (allocated(line%phi)) deallocate(line%phi)
       if (allocated(line%map)) deallocate(line%map)
+      if (allocated(line%mapc)) deallocate(line%mapc)
 !       if (allocated(line%phi_Q)) deallocate(line%phi_Q)
 !       if (allocated(line%phi_U)) deallocate(line%phi_U)
 !       if (allocated(line%phi_V)) deallocate(line%phi_V)
@@ -2238,7 +2239,12 @@ module atmos_type
    accretion_spots = .false.
    if (acspot==1) accretion_spots = .true.
    laccretion_shock = accretion_spots
-   Taccretion = Tshk !if <= 0, computed from the energy flow onto the star
+   Taccretion = Tshk
+   if (Taccretion==0.0_dp) Taccretion = -1.0_dp
+   !
+   !If Tshk is <= 0, the shock temperature is computed from the mass flux onto the star.
+   !However, Tshk becomes a correction factor un Tshock = abs(Tshk) * mass_flux
+   !
    !now read thetao and thetai
    call getnextline(1, "#", FormatLine, inputline, Nread)
    read(inputline(1:Nread),*) thetai, thetao, tilt
