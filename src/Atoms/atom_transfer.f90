@@ -15,8 +15,8 @@ module atom_transfer
 	use background_opacity, only: Thomson
 	use Planck, only			: bpnu
 	use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, Flux_acc, Ishock, Istar_loc, flux_star,&
-									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, cntrb_ray, tau_one_ray, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
-									dealloc_jnu, reallocate_rays_arrays, write_contribution_functions_ray, write_flux, write_1D_arr_ascii, cntrb, origin_atom, write_lambda_cell_array, cf_file, origin_file, write_atomic_maps
+									Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
+									dealloc_jnu, reallocate_rays_arrays, write_flux, write_1D_arr_ascii, originc_atom, origin_atom, write_lambda_cell_array, originc_file, origin_file, write_atomic_maps
 									
 	use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
 									readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
@@ -33,12 +33,12 @@ module atom_transfer
 	use io_atomic_pops, only	: write_pops_atom, write_electron, read_electron, write_hydrogen, write_Hminus, write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
 	use io_opacity, only 		: write_Jnu, write_taur, write_contrib_lambda_ascii, read_jnu_ascii, Jnu_File_ascii, read_Jnu, &
 									write_collision_matrix_atom, write_collision_matrix_atom_ascii, &
-									write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii
+									write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii, write_opacity_emissivity_map
 	use math
 	!$ use omp_lib
 	use molecular_emission, only: v_proj
 	use input, only				: lkeplerian, linfall, RT_line_method, nb_proc, RT_line_method, limb_darkening, mu_limb_darkening
-	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function, lorigin_atom, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
+	use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function_ray, lorigin_atom, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
 									l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
 									lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
 									DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, &
@@ -274,10 +274,13 @@ module atom_transfer
 		real(kind=dp), intent(in) :: x,y,z
 		logical, intent(in) :: labs
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et, facteur_tau
-		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, chi_line, tau_line, Sline!, LD
-		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
+		real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, chi_line, tau_line, Sline, Scont_interp
+		real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c
 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+		integer idref
+		
+! 		idref = locate(lambda,500d0)
 
 		x1=x;y1=y;z1=z
 		x0=x;y0=y;z0=z
@@ -379,45 +382,26 @@ module atom_transfer
 				endif
 				
 				! surface superieure ou inf
-				!only apply to the CF and Origin!
 				facteur_tau = 1.0
 				if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
 				if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
-				!tau = tau + dtau * facteur_tau
-
-				if (lorigin_atom.and.lcontrib_function) then
-					do la=1,Nlambda		
-						if (tau(la) > 0) cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)) * eta(la,id) * facteur_tau
-						origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)		
-! 						origin_atom(la,icell) = origin_atom(la,icell) + tau(la)!+dtau(la)
-						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
-						tau(la) = tau(la) + dtau(la) !for next cell	
-					enddo				
-				elseif (lorigin_atom) then
-					do la=1,Nlambda					
-! 						origin_atom(la,icell) = origin_atom(la,icell) + tau(la)!+dtau(la)
-						origin_atom(la,icell) = origin_atom(la,icell) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
-						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
-						tau(la) = tau(la) + dtau(la) !for next cell	
-					enddo
-				elseif (lcontrib_function) then
-					do la=1,Nlambda					
-						cntrb(la,icell) = cntrb(la,icell) + E2(tau(la)+dtau(la)) * eta(la,id)	
-						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
-						tau(la) = tau(la) + dtau(la) !for next cell	
-					enddo
-				else !should not happen by the way, otherwise this routine is pointless
-					do la=1,Nlambda
-						Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
-						tau(la) = tau(la) + dtau(la) !for next cell				
-					enddo
-				endif
-
+								
 				do la=1, Nlambda_cont
 					Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
+					originc_atom(la,icell) = originc_atom(la,icell) + facteur_tau * ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
 					tau_c(la) = tau_c(la) + dtau_c(la)
 				enddo
 				
+! 				Need to compute the contibution function relative to the continuum contribution function
+! 				Scont_interp = linear_1D_sorted(Nlambda_cont,lambda_cont, Snu_c, Nlambda,lambda)
+				do la=1,Nlambda			
+! 					origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * ( exp(-tau_line(la)) - exp(-(tau_line(la)+l_contrib*chi_line(la))) ) * Sline(la) / (chi_line(la) + 1d-100)		
+					origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Sline(la) / chi(la,id)!(Sline(la) - chi_line(la)*Scont_interp(la))/chi(la,id)
+					Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)					
+					tau(la) = tau(la) + dtau(la) !for next cell	
+					tau_line(la) = tau_line(la) + l_contrib * chi_line(la)
+				enddo
+
 			end if  ! lcellule_non_vide
 			
     		icell_prev = icell			
@@ -718,7 +702,8 @@ module atom_transfer
   
   !Proc bug ??? need explicit proc id?
   !Flux map for lines
-  !adding a map for the continuum point too ?
+  !The continuum map is sotred at the location of lambda0, which is not the necessarily the centre
+  !of the line in the observer's frame.
   if (RT_line_method==1) then
   !summation over pixels: ipix=1 jpix=1
   	do nat=1,Natom
@@ -731,6 +716,9 @@ module atom_transfer
   			
   				atom%lines(kr)%map(:,1,1,ibin,iaz) = &
   					atom%lines(kr)%map(:,1,1,ibin,iaz) + I0(nb:nr)*normF
+  					
+    			atom%lines(kr)%mapc(1,1,ibin,iaz) = &
+  				atom%lines(kr)%mapc(1,1,ibin,iaz) + interp1d_sorted(Nlambda_cont,lambda_cont,I0c, atom%lines(kr)%lambda0)*normF
   				
   			endif
   		
@@ -747,6 +735,7 @@ module atom_transfer
   				nb = atom%lines(kr)%Nblue + dk_min
   			
   				atom%lines(kr)%map(:,ipix,jpix,ibin,iaz) = I0(nb:nr)*normF
+    			atom%lines(kr)%mapc(ipix,jpix,ibin,iaz) = interp1d_sorted(Nlambda_cont,lambda_cont,I0c, atom%lines(kr)%lambda0)*normF
   				
   			endif
   		
@@ -876,10 +865,6 @@ module atom_transfer
 	 !!taille_pix = (map_size/zoom)  ! en AU
      !!dx(:) = x_plan_image * taille_pix
      !!dy(:) = y_plan_image * taille_pix
-  
-	if (lcontrib_function.or.lorigin_atom) then
-  		call warning("CF not normalised with RT_line_method==1")
- 	endif
 
          
   else !method 2
@@ -919,10 +904,7 @@ module atom_transfer
      end do !i
      !$omp end do
      !$omp end parallel
-     
-  	!takes time for large array beware!!
-  	if (lcontrib_function) cntrb(:,:) = cntrb(:,:) / real(max(npix_x,npix_y),kind=dp)
-  	if (lorigin_atom) origin_atom(:,:) = origin_atom(:,:) / real(max(npix_x,npix_y),kind=dp)    
+  
      
   end if
 
@@ -1300,20 +1282,25 @@ module atom_transfer
 	if (lmagnetized) then
 		integ_ray_line => integ_ray_line_z
 		lorigin_atom = .false.
-		lcontrib_function = .false.
  		allocate(QUV(Nlambda,3))
 		call allocate_stokes_quantities
 	endif
 	if (laccretion_shock) allocate(Iacc(nlambda))
+	
+	if (lorigin_atom)then
+		if (.not.rt_line_method==2) then
+			write(*,*) " Origin atom only with squared pixels!"
+			lorigin_atom = .false.
+		else
+			integ_ray_line => integ_ray_line_origin
+			write(*,*) " -> using integ_ray_line_origin"
+		endif
+	endif
 
 	call alloc_flux_image()
 	write(*,*) "Computing emission flux map..."
 	write(*,'("Total memory allocated for image calculation:"(1ES17.8E3)" GB")') mem_alloc_tot / 1024./1024./1024.
 
-	if (lorigin_atom .or. lcontrib_function) then
-		integ_ray_line => integ_ray_line_origin
-		write(*,*) " -> using integ_ray_line_origin"
-	endif
 	
 	call init_directions_ray_tracing()
 	do ibin=1,RT_n_incl
@@ -1329,22 +1316,23 @@ module atom_transfer
 	if (laccretion_shock) deallocate(Iacc)
 
 	if (allocated(origin_atom)) then
-		call write_lambda_cell_array(origin_atom, origin_file)
-		deallocate(origin_atom)
+		call write_lambda_cell_array(Nlambda, origin_atom, origin_file)
+		call write_lambda_cell_array(Nlambda_cont, originc_atom, originc_file)
+		deallocate(origin_atom,originc_atom)
 	endif	
-	if (allocated(cntrb)) then
-		call write_lambda_cell_array(cntrb, cf_file)
-		deallocate(cntrb)
-	endif
 	
 	call write_flux(only_flux=.true.)
 	call write_atomic_maps
 	deallocate(flux,fluxc)
+	
+	if (lorigin_atom) then
+		call write_opacity_emissivity_map
+	endif
 
-	!one ray
-! 	if (lcontrib_function) then
+	!one ray, passing through the centre of the image for each azimuth and inclination
+	if (lcontrib_function_ray) then
 		call compute_contribution_functions
-! 	end if
+	end if
 	
  
     !--> ascii files can be large !, commented. Only for debug (1D stellar cases)   
@@ -1376,7 +1364,6 @@ module atom_transfer
 	call dealloc_Spectrum !deallocate spectral variables
 	call dealloc_atomic_atmos
 	NULLIFY(Profile, Voigt, INTEG_RAY_LINE)
-	!call dealloc_profile_line_profiles
 
 	return
 	end subroutine atom_line_transfer
@@ -1819,7 +1806,7 @@ module atom_transfer
 
 
       			   			enddo !imu	
-      			   			
+      			   			!to remove
       			   			threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
 
 			
@@ -2455,10 +2442,11 @@ module atom_transfer
 				endif
 		
 				if (vaccr < 0.0_dp) then
-					if (Taccretion>0) then
+					if (Taccretion>0) then !constant accretion shock value from file
 						Tchoc = Taccretion
-					else
-						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25						
+					else! computed from mass flux and corrected by Taccretion factor!
+						!Taccretion is -1 if Taccretion is 0
+						Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25				
 					endif
 					lintersect = (Tchoc > etoile(i_star)%T)
 				endif
@@ -2971,26 +2959,19 @@ end subroutine INTEG_RAY_JNU
 	return
 	end subroutine Iterate_Jnu   
 
-	subroutine compute_contribution_functions!_uvw(u,v,w)
+	subroutine compute_contribution_functions
 	!for one ray at the centre of the image
 	!unpolarised case at the moment.
    !not para yet
 		real(kind=dp) :: u, v, w !, intent(in)
 		integer :: ibin, iaz
 		integer, parameter :: unit_cf = 10
-		character(len=512) :: filename, string1, string2
+		character(len=512) :: filename, string1, string2, fname_cont
 		integer :: id, icell0, icell, iray
 		real(kind=dp) :: x0,y0,z0,u0,v0,w0
 		logical :: lintersect, labs
 ! 		integer :: max_length
-		
-! 		write(*,*) " allocating space for contribution function for one ray"
-! 		allocate(cntrb_ray(Nlambda, n_cells))
-! 		allocate(tau_one_ray(Nlambda, n_cells))
-
-		tau_one_ray = 0.0_dp
-		cntrb_ray = 0.0_dp
-		
+				
 		ibin = 1; iaz = 1
 		id = 1
 		labs = .false.
@@ -3019,9 +3000,11 @@ end subroutine INTEG_RAY_JNU
 					write(string2,'(1I4)') nint(tab_rt_az(iaz))
 					filename = "cntrb_ray_i"//trim(adjustl(string1))//"_a"//trim(adjustl(string2))//".s"
 					open(unit_cf, file=filename, status="unknown")
-					call integ_ray_cntrb_new(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs,unit_cf)
-! 			call integ_ray_cntrb(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs)
+					fname_cont = "cntrb_ray_cont_i"//trim(adjustl(string1))//"_a"//trim(adjustl(string2))//".s"
+					open(unit_cf+1, file=fname_cont, status="unknown")
+					call integ_ray_cntrb(id,icell0,x0,y0,z0,u0,v0,w0,iray,labs,unit_cf)
 					close(unit_cf)
+					close(unit_cf+1)
 				else
 					write(*,*) "Nothing in this direction, cntrb_ray = 0"
 ! 					return
@@ -3030,13 +3013,11 @@ end subroutine INTEG_RAY_JNU
 			enddo
 		enddo
 
-! 		call write_contribution_functions_ray
-! 		deallocate(cntrb_ray,tau_one_ray)  
    
-  return
-  end subroutine compute_contribution_functions!_uvw
+	return
+	end subroutine compute_contribution_functions
   
-  	subroutine integ_ray_cntrb_new(id,icell_in,x,y,z,u,v,w,iray,labs,unit_cf)
+  	subroutine integ_ray_cntrb(id,icell_in,x,y,z,u,v,w,iray,labs,unit_cf)
 	! ------------------------------------------------------------------------------- !
 	!
 	! ------------------------------------------------------------------------------- !
@@ -3046,13 +3027,15 @@ end subroutine INTEG_RAY_JNU
 		real(kind=dp), intent(in) :: x,y,z
 		logical, intent(in) :: labs
 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-		real(kind=dp), dimension(Nlambda) :: tau, dtau, cf, tauexptau
+		real(kind=dp), dimension(Nlambda) :: tau, dtau
+		real(kind=dp), dimension(Nlambda_cont) :: tau_c, dtau_c
 		real(kind=dp) :: xmass, l_tot
 		integer, intent(in) :: unit_cf
-		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 		
 		write(unit_cf,*) Nlambda
+		write(unit_cf+1,*) Nlambda_cont
 
 		x1=x;y1=y;z1=z
 		x0=x;y0=y;z0=z
@@ -3062,7 +3045,12 @@ end subroutine INTEG_RAY_JNU
 		tau(:) = 0.0_dp
 		xmass = 0.0_dp
 		l_tot = 0.0_dp
+		Icont(:,1,id) = 0.0_dp
 
+		tau_c = 0.0
+		dtau_c = 0.0
+		
+		icell_prev = icell_in
 
 		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 
@@ -3085,7 +3073,8 @@ end subroutine INTEG_RAY_JNU
 
 			if (test_exit_grid(icell, x0, y0, z0)) return
 
-			if (lintersect_stars) then
+			if (lintersect_stars) then!only cont
+       			Icont(:,1,id) =  Icont(:,1,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
 				if (icell == icell_star) return
    			 endif
    			 
@@ -3105,8 +3094,12 @@ end subroutine INTEG_RAY_JNU
 				l_contrib = l_contrib * AU_to_m
 
 				!Total source fonction or set eta to 0 to have only line emissivity
-				chi(:,id) = chi0_bb(:,icell)
-				eta(:,id) = eta0_bb(:,icell)
+				if (llimit_mem) then
+					call interp_continuum_local(icell, chi(:,id), eta(:,id))
+				else
+					chi(:,id) = chi0_bb(:,icell)
+					eta(:,id) = eta0_bb(:,icell)
+				endif
 
 				!includes a loop over all bound-bound, passive and active
 				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,.false.) 
@@ -3116,118 +3109,133 @@ end subroutine INTEG_RAY_JNU
 				if (lelectron_scattering) then
 					eta(:,id) = eta(:,id) + thomson(icell)*Jnu(:,icell)
 				endif
-				
+
 				tau = tau + dtau
 				l_tot = l_tot + l_contrib
 				xmass = xmass + l_contrib * nHtot(icell) * masseH * 1d-3
+				
+				
+				dtau_c(:) = l_contrib * chi_c(:,icell)
+				Icont(:,1,id) = Icont(:,1,id) + eta_c(:,icell)/chi_c(:,icell) * exp(-tau_c) * (1.0 - exp(-dtau_c))
+				tau_c(:) = tau_c(:) + dtau_c(:)
 
-				write(unit_cf, '(1I, 5E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell)
+				write(unit_cf, '(1I, 6E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
+				write(unit_cf+1, '(1I, 6E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
 ! 				write(*,*) 'icell=', icell, ne(icell), nHtot(icell), ' T=', T(icell)
-				do la=1, Nlambda
-! 					write(*,'(1F12.5, 5E20.7E3)') lambda(la), tau(la), dtau(la), chi(la,id), eta(la,id), eta(la,id)*E2(tau(la))
-					write(unit_cf,'(1F12.5, 3E20.7E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), tau(la)*exp(-tau(la))
-				enddo!
+				if (llimit_mem) then
+					do la=1, Nlambda
+						write(unit_cf,'(1F12.5, 6E20.7E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), tau(la)*exp(-tau(la)), eta(la,id)/(1d-50 + chi(la,id)), chi(la,id)/tau(la), Icont(la,1,id) - eta(la,id)/(1d-50 + chi(la,id))
+					enddo!				
+				else
+					do la=1, Nlambda
+						write(unit_cf,'(1F12.5, 6E20.7E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), tau(la)*exp(-tau(la)), eta(la,id)/(1d-50 + chi(la,id)), chi(la,id)/tau(la), (eta(la,id)-eta0_bb(la,icell))/(1d-50 + chi(la,id)-chi0_bb(la,icell))
+					enddo!
+				endif
+				do la=1, Nlambda_cont
+					write(unit_cf+1,'(1F12.5, 6E20.7E3)') lambda_cont(la), tau_c(la), eta_c(la,icell)*E2(tau_c(la)), tau_c(la)*exp(-tau_c(la)), eta_c(la,icell)/chi_c(la,icell), chi_c(la,icell)/tau_c(la), Icont(la,1,id)			
+				enddo
 				
 							
 
 			end if
+			icell_prev = icell
 		end do infinie
 		
 	return
-	end subroutine integ_ray_Cntrb_new
-  
-  	subroutine integ_ray_cntrb(id,icell_in,x,y,z,u,v,w,iray,labs)
-	! ------------------------------------------------------------------------------- !
-	!
-	! ------------------------------------------------------------------------------- !
-
-		integer, intent(in) :: id, icell_in, iray
-		real(kind=dp), intent(in) :: u,v,w
-		real(kind=dp), intent(in) :: x,y,z
-		logical, intent(in) :: labs
-		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-		real(kind=dp), dimension(Nlambda) :: tau, dtau!,etal, chil
-		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
-		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
-
-		x1=x;y1=y;z1=z
-		x0=x;y0=y;z0=z
-		next_cell = icell_in
-		nbr_cell = 0
-
-		tau(:) = 0.0_dp
-
-
-		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-
-
-		infinie : do
-
-			icell = next_cell
-			x0=x1 ; y0=y1 ; z0=z1
-
-			if (icell <= n_cells) then
-				lcellule_non_vide=.true.
-				if (icell > 0) then
-					lcellule_non_vide = (icompute_atomRT(icell) > 0)
-					if (icompute_atomRT(icell) < 0) return !-1 if dark				
-				endif
-			else
-				lcellule_non_vide=.false.
-			endif
-    
-
-			if (test_exit_grid(icell, x0, y0, z0)) return
-
-			if (lintersect_stars) then
-				if (icell == icell_star) return
-   			 endif
-   			 
-! 			if (icell <= n_cells) then
-! 				lcellule_non_vide = (icompute_atomRT(icell) > 0)
-! 				if (icompute_atomRT(icell) < 0) return !-1 if dark
-! 			endif
-
-			nbr_cell = nbr_cell + 1
-
-			previous_cell = 0 
-			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-			
-			if (lcellule_non_vide) then
-				lsubtract_avg = ((nbr_cell == 1).and.labs)
-
-				l_contrib = l_contrib * AU_to_m
-
-				!Total source fonction or set eta to 0 to have only line emissivity
-				chi(:,id) = chi0_bb(:,icell)
-				eta(:,id) = eta0_bb(:,icell)
-
-				!includes a loop over all bound-bound, passive and active
-				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,.false.) 
-							
-				dtau(:) = l_contrib * chi(:,id)
-				            
-				if (lelectron_scattering) then
-					eta(:,id) = eta(:,id) + thomson(icell)*Jnu(:,icell)
-				endif
-
-				!Use etal only ?  here I plot dI/dr integrated over directions
-				!S_contrib(:,icell,id) =  eta(:,id) * exp(-tau(:)) !or S * -dtau/dr = S * dtau/l_contrib
-				do la=1, Nlambda
-					if (tau(la) > 0) cntrb_ray(la,icell) = eta(la,id) * E2(tau(la))!exp(-tau(:))
-					!->Flow chart
-					!cntrb_ray(la,icell) = ( eta(la,id)/chi(la,id) ) * (1.0_dp - exp(-dtau(la))) * exp(-tau(la))
-				enddo
-				
-
-				tau = tau + dtau
-				tau_one_ray(:,icell) = tau(:)*exp(-tau(:))
-
-			end if
-		end do infinie
-
-	return
 	end subroutine integ_ray_Cntrb
+  
+!   	subroutine integ_ray_cntrb(id,icell_in,x,y,z,u,v,w,iray,labs)
+! 	! ------------------------------------------------------------------------------- !
+! 	!
+! 	! ------------------------------------------------------------------------------- !
+! 
+! 		integer, intent(in) :: id, icell_in, iray
+! 		real(kind=dp), intent(in) :: u,v,w
+! 		real(kind=dp), intent(in) :: x,y,z
+! 		logical, intent(in) :: labs
+! 		real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
+! 		real(kind=dp), dimension(Nlambda) :: tau, dtau!,etal, chil
+! 		integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la
+! 		logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+! 
+! 		x1=x;y1=y;z1=z
+! 		x0=x;y0=y;z0=z
+! 		next_cell = icell_in
+! 		nbr_cell = 0
+! 
+! 		tau(:) = 0.0_dp
+! 
+! 
+! 		call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+! 
+! 
+! 		infinie : do
+! 
+! 			icell = next_cell
+! 			x0=x1 ; y0=y1 ; z0=z1
+! 
+! 			if (icell <= n_cells) then
+! 				lcellule_non_vide=.true.
+! 				if (icell > 0) then
+! 					lcellule_non_vide = (icompute_atomRT(icell) > 0)
+! 					if (icompute_atomRT(icell) < 0) return !-1 if dark				
+! 				endif
+! 			else
+! 				lcellule_non_vide=.false.
+! 			endif
+!     
+! 
+! 			if (test_exit_grid(icell, x0, y0, z0)) return
+! 
+! 			if (lintersect_stars) then
+! 				if (icell == icell_star) return
+!    			 endif
+!    			 
+! ! 			if (icell <= n_cells) then
+! ! 				lcellule_non_vide = (icompute_atomRT(icell) > 0)
+! ! 				if (icompute_atomRT(icell) < 0) return !-1 if dark
+! ! 			endif
+! 
+! 			nbr_cell = nbr_cell + 1
+! 
+! 			previous_cell = 0 
+! 			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+! 			
+! 			if (lcellule_non_vide) then
+! 				lsubtract_avg = ((nbr_cell == 1).and.labs)
+! 
+! 				l_contrib = l_contrib * AU_to_m
+! 
+! 				!Total source fonction or set eta to 0 to have only line emissivity
+! 				chi(:,id) = chi0_bb(:,icell)
+! 				eta(:,id) = eta0_bb(:,icell)
+! 
+! 				!includes a loop over all bound-bound, passive and active
+! 				call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,.false.) 
+! 							
+! 				dtau(:) = l_contrib * chi(:,id)
+! 				            
+! 				if (lelectron_scattering) then
+! 					eta(:,id) = eta(:,id) + thomson(icell)*Jnu(:,icell)
+! 				endif
+! 
+! 				!Use etal only ?  here I plot dI/dr integrated over directions
+! 				!S_contrib(:,icell,id) =  eta(:,id) * exp(-tau(:)) !or S * -dtau/dr = S * dtau/l_contrib
+! 				do la=1, Nlambda
+! 					if (tau(la) > 0) cntrb_ray(la,icell) = eta(la,id) * E2(tau(la))!exp(-tau(:))
+! 					!->Flow chart
+! 					!cntrb_ray(la,icell) = ( eta(la,id)/chi(la,id) ) * (1.0_dp - exp(-dtau(la))) * exp(-tau(la))
+! 				enddo
+! 				
+! 
+! 				tau = tau + dtau
+! 				tau_one_ray(:,icell) = tau(:)*exp(-tau(:))
+! 
+! 			end if
+! 		end do infinie
+! 
+! 	return
+! 	end subroutine integ_ray_Cntrb
 	
 !  subroutine calc_stellar_surface_brightness(N,lambda,i_star,icell_prev,x,y,z,u,v,w,gamma)
 !  ! ---------------------------------------------------------------!

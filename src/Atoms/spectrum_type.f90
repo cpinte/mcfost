@@ -3,10 +3,9 @@ module spectrum_type
 	use atom_type, only : AtomicLine, AtomicContinuum, AtomType
 	use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, icompute_atomRT, lmagnetized, laccretion_shock
 	use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table, make_wavelength_grid_new!, make_wavelength_grid, 
-	use math, only : linear_1D
 	use fits_utils, only : print_error
 	use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
-							lcontrib_function, lorigin_atom, n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
+							lorigin_atom, n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
 							lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot, llimit_mem
 	use input, only : nb_proc, RT_line_method,lkeplerian, linfall, l_sym_ima
 	use constantes, only : arcsec_to_deg
@@ -23,7 +22,7 @@ module spectrum_type
    ! not that FLUX_FILE is 1D only if one pixel, otherwise it is a map.
    ! F(x,y,0,lambda) in several directions.
 	character(len=*), parameter :: FLUX_FILE="flux.fits.gz"
-	character(len=*), parameter :: CF_FILE="cntrb.fits.gz", ORIGIN_FILE="origin_atom.fits.gz"
+	character(len=*), parameter :: ORIGINC_FILE="origin_atom_cont.fits.gz", ORIGIN_FILE="origin_atom.fits.gz"
 	
 	!shift in index of line profiles, function of iray and nb_proc
 	integer, dimension(:,:), allocatable :: dk
@@ -44,8 +43,7 @@ module spectrum_type
 	real(kind=dp), dimension(:,:,:), allocatable :: rho_p, chiQUV_p, etaQUV_p
 	real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
 	real(kind=dp), allocatable, dimension(:,:,:,:,:) :: F_QUV
-	!in only one direction for one point ! 'centre of the model in this direction'
-	real(kind=dp), allocatable, dimension(:,:) :: tau_one_ray, cntrb_ray, cntrb, origin_atom !allocate 1 ray if only one direction!
+	real(kind=dp), allocatable, dimension(:,:) :: origin_atom, originc_atom
 
 	contains
  
@@ -377,46 +375,45 @@ call error("initSpectrumImage not modified!!")
 	subroutine alloc_flux_image
 		!Store total flux and flux maps for selected lines
 		integer :: alloc_status, kr, nat
-		real :: mem_alloc, mem_flux, mem_cont
-		integer(kind=8) :: mem_alloc_local = 0
+		real :: mem_alloc, mem_flux, mem_cont, mem_for_file
+		integer(kind=8) :: mem_alloc_local = 0,  Ntrans_tot
 		real, dimension(:), allocatable :: mem_per_file
-		integer :: Nlam, Ntrans, N1, N2, Nstokes
+		integer :: Nlam, Ntrans
 		
 		allocate(mem_per_file(Natom))
+		mem_per_file = 0.0
 		
-		Nstokes = 1
-		if (lmagnetized) Nstokes = 4
-		
-		Ntrans = 0
-		Nlam = 0
+		Ntrans_tot = 0
 		do nat=1, Natom
 		
-			N1 = 0
-			N2 = 0
+			Ntrans = 0
+			Nlam = 0
+		
 			do kr=1,atoms(nat)%ptr_atom%Nline
 			
 				if (atoms(nat)%ptr_atom%lines(kr)%write_flux_map) then
 				
-					N2 = N2 + 1
-					
-					N1 = N1 + (atoms(nat)%ptr_atom%lines(kr)%Nred-dk_min+dk_max- & 
-						atoms(nat)%ptr_atom%lines(kr)%Nblue+1)
+					Ntrans = Ntrans + 1 !count number of transition for that atom
+					Nlam = Nlam + atoms(nat)%ptr_atom%lines(kr)%Nred-dk_min+dk_max-atoms(nat)%ptr_atom%lines(kr)%Nblue+1
+						
 	
 				endif
 				
 
 			enddo
-			Nlam = Nlam + N1
-			Ntrans = Ntrans + N2
-			!one per atol
-			mem_per_file(nat) = sizeof(N1*N2*npix_x*npix_y * rt_n_incl* rt_n_az)
-		
+			if (Ntrans == 0) cycle !go to next atom
+			Ntrans_tot = Ntrans_tot + Ntrans
+			!mean memory needed for that atom, Nlam+1 for the continuum, +Nlam for the grid
+			mem_per_file(nat) = real(8 * (Nlam + 1) + 8 * Nlam) * real(rt_n_incl*rt_n_az) * real(npix_x)/1024. * real(npix_y)/1024. / real(Ntrans)
 		enddo
-		mem_per_file(:) = mem_per_file /real(1024*1024)
+		mem_per_file = mem_per_file!total for each atom, average of all transitions.
+		mem_for_file = sum(mem_per_file) / real(Natom) !average per atom in MB
 
-		if (8*maxval(mem_per_file)/1024 > 2.5) then
-			call warning("Size of fits file to store flux map might be large")
-			write(*,*) "change the number of lines you want to keep"
+		!memory allocated for each file, so for all transitions of each atom (the one we write)
+		if (mem_for_file/1024 > 2.5) then
+			call warning("Size of fits file to store flux map for each line might be large")
+		else
+			write(*,*) " Will write in average ", mem_for_file, " MB for each line for each atom!"
 		endif
 		
 		!total flux and total cont  +  their wavelength grid  
@@ -424,16 +421,10 @@ call error("initSpectrumImage not modified!!")
 		mem_flux = Nlambda + Nlambda*rt_n_incl*rt_n_az*nb_proc
 		if (lmagnetized) mem_flux = mem_flux + 3 * Nlambda*rt_n_incl*rt_n_az
 		
-		if (Ntrans > 0) then
-		!total space for flux map + space for lines wavelength grid + space for single continuum map at nu0
-			mem_alloc = Nlam*npix_x*npix_y*rt_n_incl*rt_n_az + Nlam + npix_x*npix_y*rt_n_incl*rt_n_az
-		else
-			mem_alloc = 0
-		endif
 				
 		mem_flux = 8 * mem_flux / 1024. / 1024.
 		mem_cont = 8 * mem_cont / 1024. / 1024.
-		mem_alloc = 8 * mem_alloc / 1024. / 1024.
+		mem_alloc = mem_for_file * real(Natom) !for all transitions of all atoms !, the one we keep in memory
 		
 		!Flux  + Flux cont + lines grid
 		if (mem_flux + mem_cont > 1d3) then !in MB
@@ -443,12 +434,12 @@ call error("initSpectrumImage not modified!!")
 		endif
 		
 		!otherwise there is not flux map stored
-		if (Ntrans > 0) then
-		
+		if (Ntrans_tot > 0) then
+		!For all lines of all atoms!
 			if (mem_alloc > 1d3) then
-				write(*,*) " allocating ",mem_alloc / 1024., " GB for flux map for selected lines!"
+				write(*,*) " allocating ",mem_alloc / 1024., " GB of mem for flux map for selected lines!"
 			else
-				write(*,*) " allocating ",mem_alloc, " MB for flux map for selected lines!"			
+				write(*,*) " allocating ",mem_alloc, " MB of mem for flux map for selected lines!"			
 			endif
 		
 		endif
@@ -498,8 +489,16 @@ call error("initSpectrumImage not modified!!")
 							atoms(nat)%ptr_atom%g(atoms(nat)%ptr_atom%lines(kr)%i)
 						call error("Cannot allocate map for this line !")
 					endif
-					atoms(nat)%ptr_atom%lines(kr)%map(:,:,:,:,:) = 0.0_dp
-					mem_alloc_local = mem_alloc_local + sizeof(atoms(nat)%ptr_atom%lines(kr)%map)
+					allocate(atoms(nat)%ptr_atom%lines(kr)%mapc(npix_x, npix_y, rt_n_incl, rt_n_az),stat=alloc_status)
+					if (alloc_status > 0) then
+						write(*,*) atoms(nat)%ptr_atom%ID,atoms(nat)%ptr_atom%lines(kr)%j, atoms(nat)%ptr_atom%lines(kr)%i
+						write(*,*) atoms(nat)%ptr_atom%g(atoms(nat)%ptr_atom%lines(kr)%j), &
+							atoms(nat)%ptr_atom%g(atoms(nat)%ptr_atom%lines(kr)%i)
+						call error("Cannot allocate mapc for this line !")
+					endif
+					atoms(nat)%ptr_atom%lines(kr)%map = 0.0_dp
+					atoms(nat)%ptr_atom%lines(kr)%mapc = 0.0_dp
+					mem_alloc_local = mem_alloc_local + sizeof(atoms(nat)%ptr_atom%lines(kr)%map) + sizeof(atoms(nat)%ptr_atom%lines(kr)%mapc)
 				
 				endif
 				
@@ -510,36 +509,36 @@ call error("initSpectrumImage not modified!!")
 		    
 		!Contribution functions (for one ray it is allocated elsewhere)
    		!Future: contribution function for selected lines only !
-		if (lcontrib_function) then
-		
-			mem_alloc = real(8 * n_cells * Nlambda) / real(1024*1024)
-	 
-			if (mem_alloc > 1000.0) then
-				write(*,*) " allocating ", mem_alloc/real(1024), " GB for contribution function.."
-			else
-				write(*,*) " allocating ", mem_alloc, " MB for contribution function.."
-			endif 
-      
-			if (mem_alloc >= 2.1d3) then !2.1 GB
-				call Warning(" To large cntrb array. Use a wavelength table instead..")
-				lcontrib_function = .false.
-			else
-      
-				allocate(cntrb(Nlambda,n_cells),stat=alloc_status)
-				mem_alloc_local = mem_alloc_local + sizeof(cntrb)
-				if (alloc_status > 0) then
-					call ERROR('Cannot allocate cntrb_ray')
-					lcontrib_function = .false.
-				else
-					cntrb(:,:) = 0.0_dp
-				endif
-
-			end if
-
-		end if
+! 		if (lcontrib_function) then
+! 		
+! 			mem_alloc = real(8 * n_cells * Nlambda) / real(1024*1024)
+! 	 
+! 			if (mem_alloc > 1000.0) then
+! 				write(*,*) " allocating ", mem_alloc/real(1024), " GB for contribution function.."
+! 			else
+! 				write(*,*) " allocating ", mem_alloc, " MB for contribution function.."
+! 			endif 
+!       
+! 			if (mem_alloc >= 2.1d3) then !2.1 GB
+! 				call Warning(" To large cntrb array. Use a wavelength table instead..")
+! 				lcontrib_function = .false.
+! 			else
+!       
+! 				allocate(cntrb(Nlambda,n_cells),stat=alloc_status)
+! 				mem_alloc_local = mem_alloc_local + sizeof(cntrb)
+! 				if (alloc_status > 0) then
+! 					call ERROR('Cannot allocate cntrb_ray')
+! 					lcontrib_function = .false.
+! 				else
+! 					cntrb(:,:) = 0.0_dp
+! 				endif
+! 
+! 			end if
+! 
+! 		end if
 		
 		if (lorigin_atom) then
-			mem_alloc = 8 * n_cells * Nlambda / 1024./ 1024.
+			mem_alloc = 8 * n_cells * Nlambda / 1024./ 1024. + 8 * n_cells * Nlambda_cont / 1024./1024.
 			if (mem_alloc > 1d3) then
 				write(*,*) " allocating ", mem_alloc/1024., " GB for local emission origin.."
 			else
@@ -552,12 +551,15 @@ call error("initSpectrumImage not modified!!")
 			else
       
 				allocate(origin_atom(Nlambda,n_cells),stat=alloc_status)
-				mem_alloc_local = mem_alloc_local + sizeof(origin_atom)
+				allocate(originc_atom(Nlambda_cont,n_cells),stat=alloc_status)
+
+				mem_alloc_local = mem_alloc_local + sizeof(origin_atom) + sizeof(originc_atom)
 				if (alloc_status > 0) then
 					call ERROR('Cannot allocate origin_atom')
 					!lorigin_atom = .false.
 				else
-					origin_atom(:,:) = 0.0_dp
+					origin_atom = 0.0_dp
+					originc_atom = 0.0_dp
 				endif
 
 			end if		
@@ -668,9 +670,7 @@ call error("initSpectrumImage not modified!!")
 		endif
 
 
-		if (allocated(cntrb_ray)) deallocate(cntrb_ray)
-		if (allocated(cntrb)) deallocate(cntrb)
-		if (allocated(origin_atom)) deallocate(origin_atom)
+		if (allocated(origin_atom)) deallocate(origin_atom, originc_atom)
 
 
 	return
@@ -1238,6 +1238,35 @@ call error("initSpectrumImage not modified!!")
 				call ftpprd(unit,group,fpixel,naxes(1),lambda(atom%lines(kr)%Nblue+dk_min:atom%lines(kr)%Nred+dk_max),status)
 				
 				!-> now continuum image at central wavelength
+	
+				call ftcrhd(unit, status)
+				if (status > 0) call print_error(status)
+				call ftphpr(unit,simple,bitpix,4,naxes(2:naxis),0,1,extend,status)
+				if (status > 0) call print_error(status)
+				call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+				call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+				call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+				pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+				call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+ 
+				call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+				call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+				call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+				pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+				call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+	
+				call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm F_{\nu}}$',status)
+				call ftpkyj(unit,'index', atom%lines(kr)%Nmid,'index',status)
+				call ftpkyj(unit,'i',atom%lines(kr)%i,'',status)
+				call ftpkyj(unit,'j',atom%lines(kr)%j,'',status)
+				call ftpkyd(unit,'gi',atom%g(atom%lines(kr)%i),-7,'',status)
+				call ftpkyd(unit,'gj',atom%g(atom%lines(kr)%j),-7,'',status)
+				call ftpkyd(unit,'lambda0',atom%lines(kr)%lambda0,-7,'nm',status)
+				call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(kr)%lambda0,-7,'10^15 Hz',status)
+				
+				!Write the array to the FITS file.
+				call ftpprd(unit,group,fpixel,nelements,atom%lines(kr)%mapc(:,:,:,:),status)
+				if (status > 0) call print_error(status)
 
   				!  Close the file and free the unit number.
 				call ftclos(unit, status)
@@ -1361,11 +1390,12 @@ call error("initSpectrumImage not modified!!")
 	return
 	end function air2vacuum
 	
-	subroutine write_lambda_cell_array(A, filename)
+	subroutine write_lambda_cell_array(Nlam, A, filename)
 	! -------------------------------------------------- !
 	! Write array (Nlambda, n_cells) to disk
 	! --------------------------------------------------- !
-		real(kind=dp), dimension(Nlambda, n_cells) :: A
+		integer, intent(in) :: Nlam
+		real(kind=dp), dimension(Nlam, n_cells) :: A
 		character(len=*), intent(in) :: filename
 		integer :: status,unit,blocksize,bitpix,naxis, naxis2
 		integer, dimension(8) :: naxes, naxes2
@@ -1390,23 +1420,23 @@ call error("initSpectrumImage not modified!!")
 		fpixel=1
 
 		bitpix=-64
-
+		
 		if (lVoronoi) then   
 			naxis = 2
-			naxes(1) = Nlambda
+			naxes(1) = Nlam!Nlambda
 			naxes(2) = n_cells
 			nelements = naxes(1) * naxes(2)
 		else
 			if (l3D) then
 				naxis = 4
-				naxes(1) = Nlambda
+				naxes(1) = Nlam!Nlambda
 				naxes(2) = n_rad
 				naxes(3) = 2*nz
 				naxes(4) = n_az
 				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
 			else
 				naxis = 3
-				naxes(1) = Nlambda
+				naxes(1) = Nlam!Nlambda
 				naxes(2) = n_rad
 				naxes(3) = nz
 				nelements = naxes(1) * naxes(2) * naxes(3)
@@ -1432,124 +1462,124 @@ call error("initSpectrumImage not modified!!")
 	return
 	end subroutine write_lambda_cell_array
   
-	subroutine write_contribution_functions_ray()
-	! -------------------------------------------------- !
-	! Write contribution function to disk. + tau_one
-	! --------------------------------------------------- !
-		integer :: status,unit,blocksize,bitpix,naxis, naxis2
-		integer, dimension(8) :: naxes, naxes2
-		integer :: group,fpixel,nelements,la, icell
-		logical :: simple, extend
-		character(len=6) :: comment=""
-		real :: pixel_scale_x, pixel_scale_y
-  
-		write(*,*)" -> writing contribution function for single ray ..."
-  
-		!  Get an unused Logical Unit Number to use to open the FITS file.
-		status=0
-		call ftgiou (unit,status)
-
-   !  Create the new empty FITS file.
-		blocksize=1
-		call ftinit(unit,"cntrb_ray.fits.gz",blocksize,status)
-
-		simple=.true.
-		extend=.true.
-		group=1
-		fpixel=1
-
-		bitpix=-64
-
-		if (lVoronoi) then   
-			naxis = 2
-			naxes(1) = Nlambda
-			naxes(2) = n_cells
-			nelements = naxes(1) * naxes(2)
-		else
-			if (l3D) then
-				naxis = 4
-				naxes(1) = Nlambda
-				naxes(2) = n_rad
-				naxes(3) = 2*nz
-				naxes(4) = n_az
-				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
-			else
-				naxis = 3
-				naxes(1) = Nlambda
-				naxes(2) = n_rad
-				naxes(3) = nz
-				nelements = naxes(1) * naxes(2) * naxes(3)
-			end if
-		end if
-
-  !  Write the required header keywords.
-		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.sr-1.m-1",'cntrb I',status)
-  !  Write line CF to fits
-		write(*,*) "Max,min abs(cntrb)=",maxval(abs(cntrb_ray)), minval(abs(cntrb_ray),mask=abs(cntrb_ray)>0)
-		write(*,*) size(cntrb_ray), sizeof(cntrb_ray), nelements, shape(cntrb_ray)
-		call ftpprd(unit,group,fpixel,nelements,cntrb_ray,status)
-
-
-  !  Close the file and free the unit number.
-		call ftclos(unit, status)
-		call ftfiou(unit, status)
-
-  !  Check for any error, and if so print out error messages
-		if (status > 0) then
-			call print_error(status)
-		endif
-		
-		blocksize=1
-		call ftinit(unit,"tauone_ray.fits.gz",blocksize,status)
-
-		simple=.true.
-		extend=.true.
-		group=1
-		fpixel=1
-
-		bitpix=-64
-
-		if (lVoronoi) then   
-			naxis = 2
-			naxes(1) = Nlambda
-			naxes(2) = n_cells
-			nelements = naxes(1) * naxes(2)
-		else
-			if (l3D) then
-				naxis = 4
-				naxes(1) = Nlambda
-				naxes(2) = n_rad
-				naxes(3) = 2*nz
-				naxes(4) = n_az
-				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
-			else
-				naxis = 3
-				naxes(1) = Nlambda
-				naxes(2) = n_rad
-				naxes(3) = nz
-				nelements = naxes(1) * naxes(2) * naxes(3)
-			end if
-		end if
-
-  !  Write the required header keywords.
-		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-		call ftpkys(unit,'UNIT'," ",'<tau>',status)
-  !  Write line CF to fits
-		call ftpprd(unit,group,fpixel,nelements,tau_one_ray,status)
-
-
-  !  Close the file and free the unit number.
-		call ftclos(unit, status)
-		call ftfiou(unit, status)
-
-  !  Check for any error, and if so print out error messages
-		if (status > 0) then
-			call print_error(status)
-		endif
-
-	return
-	end subroutine write_contribution_functions_ray
 
 end module spectrum_type
 
+! 	subroutine write_contribution_functions_ray()
+! 	! -------------------------------------------------- !
+! 	! Write contribution function to disk. + tau_one
+! 	! --------------------------------------------------- !
+! 		integer :: status,unit,blocksize,bitpix,naxis, naxis2
+! 		integer, dimension(8) :: naxes, naxes2
+! 		integer :: group,fpixel,nelements,la, icell
+! 		logical :: simple, extend
+! 		character(len=6) :: comment=""
+! 		real :: pixel_scale_x, pixel_scale_y
+!   
+! 		write(*,*)" -> writing contribution function for single ray ..."
+!   
+! 		!  Get an unused Logical Unit Number to use to open the FITS file.
+! 		status=0
+! 		call ftgiou (unit,status)
+! 
+!    !  Create the new empty FITS file.
+! 		blocksize=1
+! 		call ftinit(unit,"cntrb_ray.fits.gz",blocksize,status)
+! 
+! 		simple=.true.
+! 		extend=.true.
+! 		group=1
+! 		fpixel=1
+! 
+! 		bitpix=-64
+! 
+! 		if (lVoronoi) then   
+! 			naxis = 2
+! 			naxes(1) = Nlambda
+! 			naxes(2) = n_cells
+! 			nelements = naxes(1) * naxes(2)
+! 		else
+! 			if (l3D) then
+! 				naxis = 4
+! 				naxes(1) = Nlambda
+! 				naxes(2) = n_rad
+! 				naxes(3) = 2*nz
+! 				naxes(4) = n_az
+! 				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+! 			else
+! 				naxis = 3
+! 				naxes(1) = Nlambda
+! 				naxes(2) = n_rad
+! 				naxes(3) = nz
+! 				nelements = naxes(1) * naxes(2) * naxes(3)
+! 			end if
+! 		end if
+! 
+!   !  Write the required header keywords.
+! 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! 		call ftpkys(unit,'UNIT',"W.m-2.Hz-1.sr-1.m-1",'cntrb I',status)
+!   !  Write line CF to fits
+! 		write(*,*) "Max,min abs(cntrb)=",maxval(abs(cntrb_ray)), minval(abs(cntrb_ray),mask=abs(cntrb_ray)>0)
+! 		write(*,*) size(cntrb_ray), sizeof(cntrb_ray), nelements, shape(cntrb_ray)
+! 		call ftpprd(unit,group,fpixel,nelements,cntrb_ray,status)
+! 
+! 
+!   !  Close the file and free the unit number.
+! 		call ftclos(unit, status)
+! 		call ftfiou(unit, status)
+! 
+!   !  Check for any error, and if so print out error messages
+! 		if (status > 0) then
+! 			call print_error(status)
+! 		endif
+! 		
+! 		blocksize=1
+! 		call ftinit(unit,"tauone_ray.fits.gz",blocksize,status)
+! 
+! 		simple=.true.
+! 		extend=.true.
+! 		group=1
+! 		fpixel=1
+! 
+! 		bitpix=-64
+! 
+! 		if (lVoronoi) then   
+! 			naxis = 2
+! 			naxes(1) = Nlambda
+! 			naxes(2) = n_cells
+! 			nelements = naxes(1) * naxes(2)
+! 		else
+! 			if (l3D) then
+! 				naxis = 4
+! 				naxes(1) = Nlambda
+! 				naxes(2) = n_rad
+! 				naxes(3) = 2*nz
+! 				naxes(4) = n_az
+! 				nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+! 			else
+! 				naxis = 3
+! 				naxes(1) = Nlambda
+! 				naxes(2) = n_rad
+! 				naxes(3) = nz
+! 				nelements = naxes(1) * naxes(2) * naxes(3)
+! 			end if
+! 		end if
+! 
+!   !  Write the required header keywords.
+! 		call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! 		call ftpkys(unit,'UNIT'," ",'<tau>',status)
+!   !  Write line CF to fits
+! 		call ftpprd(unit,group,fpixel,nelements,tau_one_ray,status)
+! 
+! 
+!   !  Close the file and free the unit number.
+! 		call ftclos(unit, status)
+! 		call ftfiou(unit, status)
+! 
+!   !  Check for any error, and if so print out error messages
+! 		if (status > 0) then
+! 			call print_error(status)
+! 		endif
+! 
+! 	return
+! 	end subroutine write_contribution_functions_ray

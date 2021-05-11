@@ -54,7 +54,7 @@ MODULE atom_type
    !Nlambda,(Nproc or Nspace, depends on the choice For flux calculations. Always Nlambda, Nspace for NLTE
    real(kind=dp), allocatable, dimension(:,:)  :: phi
    !!real(kind=dp), allocatable, dimension(:,:,:) :: eta
-   !map cont too ?
+   real(kind=dp), allocatable, dimension(:,:,:,:) :: mapc!lcont flux to be stored
    real(kind=dp), allocatable, dimension(:,:,:,:,:) :: map!line flux to be stored
    !used for wavelength integration
    real(kind=dp), allocatable, dimension(:,:,:) :: phi_loc!, phiZ, psi !3, Nlambda, Nray

@@ -78,7 +78,7 @@ subroutine set_default_variables()
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
   lvacuum_to_air = .false.
-  lcontrib_function = .false.
+  lcontrib_function_ray = .false.!computes line formation along a ray wich passes at the centre of the image.
   lorigin_atom = .false.
   lmagnetoaccr = .false.
   lpluto_file = .false.
@@ -649,10 +649,10 @@ subroutine initialisation_mcfost()
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
         lemission_atom=.true.
-     case("-contrib_function")
+     case("-cntrbf_ray_atom")!hidden at the moment.
         i_arg = i_arg + 1
-        lcontrib_function = .true.
-     case("-origin_atom")
+        lcontrib_function_ray = .true.
+     case("-origin_atom")!hidden at the moment.
         i_arg = i_arg + 1
         lorigin_atom = .true.
      case("-output_rates")
@@ -1835,9 +1835,8 @@ subroutine display_help()
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
-  write(*,*) "        : -contrib_function : Computes and stores the contribution function "
-  write(*,*) "        :                     for the Intensity, Ksi(iTrans,x,y,z,lambda)."
-  write(*,*) "        : -origin_atom : Computes and stores the emission of each cell"
+!   write(*,*) "        : -cntrbf_ray_atom : Computes the contribution function along a single ray!"
+!   write(*,*) "        : -origin_atom : Computes and stores the emission of each cell"
   write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
   write(*,*) "        : -read_jnu_atom : Read old Jnu values from file "

@@ -304,31 +304,31 @@ MODULE math
 
 
 
-   function linear_1D(N,x,y,Np,xp)
-     real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
-     integer :: N, Np, i, j
-
-	 linear_1D(:) = 0.0_dp
-!      do i=1,N-1
-!         do j=1,Np
-!            if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
+!    function linear_1D(N,x,y,Np,xp)
+!      real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
+!      integer :: N, Np, i, j
+! 
+! 	 linear_1D(:) = 0.0_dp
+! !      do i=1,N-1
+! !         do j=1,Np
+! !            if (xp(j)>=x(i) .and. xp(j)<=x(i+1)) then
+! !               t = (xp(j) - x(i)) / (x(i+1)-x(i))
+! !               linear_1D(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
+! !            endif
+! !         enddo
+! !      enddo
+!      do j=1,Np
+!         do i=1,N-1
+!            if (xp(j)>x(i) .and. xp(j)<=x(i+1)) then
 !               t = (xp(j) - x(i)) / (x(i+1)-x(i))
 !               linear_1D(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
 !            endif
 !         enddo
 !      enddo
-     do j=1,Np
-        do i=1,N-1
-           if (xp(j)>x(i) .and. xp(j)<=x(i+1)) then
-              t = (xp(j) - x(i)) / (x(i+1)-x(i))
-              linear_1D(j) = (1.0_dp - t) * y(i)  + t * y(i+1)
-           endif
-        enddo
-     enddo
-
-     return
-
-   end function linear_1D
+! 
+!      return
+! 
+!    end function linear_1D
    
    function linear_1D_sorted(n,x,y, np,xp)
      ! assumes that both x and xp are in increasing order
@@ -372,6 +372,44 @@ MODULE math
      return
    end function linear_1D_sorted
 
+   !wrapper around linear_1D_sorted for one point !
+   function interp1d_sorted(n,x,y, xp)
+     ! assumes that both x and xp are in increasing order
+     ! We only loop once over the initial array, and we only perform 1 test per element
+
+     integer, intent(in)                      :: n
+     real(kind=dp), dimension(n),  intent(in) :: x,y
+     real(kind=dp), intent(in)                :: xp
+     real(kind=dp) 							  :: interp1d_sorted
+     real(kind=dp), dimension(1)              :: temp
+
+     real(kind=dp) :: t
+     integer :: i, i0, j0
+
+     interp1d_sorted = 0.0_dp
+
+     j0=2
+     if (xp > x(1)) then
+        j0 = 1
+     else
+     	interp1d_sorted = 0.0
+     	return
+     endif
+
+     i0 = 2
+     loop_i : do i=i0, n
+        if (x(i) > xp) then
+              t = (xp - x(i-1)) / (x(i) - x(i-1))
+			  !write(*,*) j,i, t
+              interp1d_sorted = (1.0_dp - t) * y(i-1)  + t * y(i)
+              i0 = i
+              exit loop_i
+        endif
+     enddo loop_i
+
+
+     return
+   end function interp1d_sorted
  
   !not test yet
    function quad_1D_sorted(n,x,y, np,xp)
@@ -800,6 +838,7 @@ MODULE math
 
   !One point Bezier interpolation, wrapper around BezierN_interp
   ! return scallar
+  !-> need to change with linear_1d_sorted
   FUNCTION interp1D(x1a,ya,x1) result(y)
    real(kind=dp), dimension(:), intent(in) :: x1a, ya
    real(kind=dp), intent(in) :: x1
@@ -815,6 +854,7 @@ MODULE math
   RETURN
   END FUNCTION
 
+  !change name in bezier_interp
   FUNCTION interp1Darr(x1a,ya,x1) result(y)
    real(kind=dp), dimension(:), intent(in) :: x1a, ya, x1
    real(kind=dp), dimension(size(x1)) :: y

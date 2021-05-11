@@ -58,9 +58,9 @@ module parametres
 
   ! Atomic line radiative transfer
   !!lstore_opac futur deprecation
-  logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
-       lcontrib_function, lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
-       ldissolve, laccurate_integ, loutput_rates, lorigin_atom, lzeeman_polarisation
+  logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, lcontrib_function_ray, &
+  				lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
+       			ldissolve, laccurate_integ, loutput_rates, lorigin_atom, lzeeman_polarisation!lcontrib_function
   integer :: Nrays_atom_transfer, istep_start
   
   !HEALpix

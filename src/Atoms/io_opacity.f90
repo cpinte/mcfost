@@ -7,7 +7,7 @@ MODULE io_opacity
  use atom_type
  use spectrum_type, only : chi, eta, sca_c, lambda, lambda_cont, chi_c, eta_c, chi_c_nlte, eta_c_nlte, &
  							Jnu_cont, Nlambda, Nlambda_cont, eta0_bb, chi0_bb, Jnu
- use math, only : locate, Linear_1D, bezier2_interp, bezier3_interp
+ use math, only : locate, bezier2_interp, bezier3_interp
  use constant
  use Planck, only : bpnu
  use background_opacity
@@ -23,6 +23,8 @@ MODULE io_opacity
  use messages
  use mcfost_env, only : dp
  use parametres, only : lelectron_scattering
+ 
+ !$ use omp_lib
 
  IMPLICIT NONE
 
@@ -1284,6 +1286,153 @@ end subroutine write_radiative_rates_atom
 
  RETURN
  END SUBROUTINE write_cont_opac_ascii
+ 
+ 
+subroutine write_opacity_emissivity_map()
+	!computes and store for each cell and wavelength the opacity and emissivity.
+	!line opacities are given in the atom's frame (v = 0).
+	
+	!assumes that in chi0_bb and eta0_bb there are the continuum opacity and emissivty (both at LTE and non-LTE)
+	!now line opacity can be computed for v = 0
+
+	integer :: unit, status = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+	logical :: extend, simple
+	integer :: nelements, icell, alloc_status, id
+	integer(kind=8) :: Nsize
+	real(kind=dp), allocatable, dimension(:,:) :: chi_tmp, eta_tmp, chic_tmp, etac_tmp
+	character(len=50) :: filename_chi="chi_map.fits.gz"!separate file because they are big
+	character(len=50) :: filename_eta="eta_map.fits.gz"
+	
+	
+	write(*,*) " Writing emissivity and opacity map..."
+	allocate(chi_tmp(Nlambda, n_cells),stat=alloc_status)
+	if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
+	allocate(eta_tmp(Nlambda, n_cells),stat=alloc_status)
+	if (alloc_status /= 0) call error("Cannot allocate eta_tmp !")
+! 	chi_tmp = chi0_bb
+! 	eta_tmp = eta0_bb
+	Nsize = 2 * 8 * (n_cells/1024) * (Nlambda/1024)
+	if (Nsize /= 2 * sizeof(chi_tmp)/1024/1024) then
+		write(*,*)2 * 8 * n_cells * Nlambda, 2*sizeof(chi_tmp)
+	endif	
+	write(*,*) "Total size (cont + tot):", 2*sizeof(chi_tmp)/1024./1024. + 2*sizeof(chi_c)/1024./1024., " MB"
+
+	!x,y,z,x1,y1,z1, u,v,w are zero because we give the line emissivity in the cell icell
+	!in the atom's frame.	
+! 	x = R_grid(icell) * cos(phi_grid(icell))
+! 	y = R_grid(icell) * sin(phi_grid(icell))
+! 	z = z_grid(icell)
+
+	!fill chi and eta with line opacity.
+	id = 1
+	!$omp parallel &
+	!$omp default(none) &
+	!$omp private(id,icell) &
+	!$omp shared(chi, eta, chi0_bb, eta0_bb, chi_tmp, eta_tmp, n_cells, icompute_atomRT)
+	!$omp do schedule(static,1)
+	do icell=1, n_cells
+		!$ id = omp_get_thread_num() + 1
+		if (icompute_atomRT(icell)) then
+			chi(:,id) = chi0_bb(:,icell)
+			!-> only line source function  = line emiss / total opac
+			eta(:,id) = 0.0_dp!eta0_bb(:,icell)
+			call opacity_atom_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp, .false.)
+			chi_tmp(:,icell) = chi(:,id)
+			eta_tmp(:,icell) = eta(:,id)
+		endif
+	enddo
+	!$omp end do
+	!$omp end parallel
+
+
+	blocksize=1
+	simple = .true. !Standard fits
+	group = 1
+	fpixel = 1
+	extend = .true.
+	bitpix = -64
+
+	if (lVoronoi) then
+		naxis = 2
+		naxes(1) = Nlambda
+		naxes(2) = n_cells
+		nelements = naxes(2)
+	else
+		if (l3D) then
+			naxis = 4
+			naxes(1) = Nlambda
+			naxes(2) = n_rad
+			naxes(3) = 2*nz
+			naxes(4) = n_az
+			nelements = naxes(2) * naxes(3) * naxes(4)
+		else
+			naxis = 3
+			naxes(1) = Nlambda
+			naxes(2) = n_rad
+			naxes(3) = nz
+			nelements = naxes(2) * naxes(3)
+		end if
+	end if	
+	
+	!first write chi
+	!get unique unit number
+	call ftgiou(unit,status)
+	naxes(1) = Nlambda
+	if (status > 0) call print_error(status)	
+	call ftinit(unit,trim(filename_chi),blocksize,status)
+	if (status > 0) call print_error(status)	
+	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+	if (status > 0) call print_error(status)	
+	call ftpkys(unit, "chi", "m^-1", ' ', status)
+	if (status > 0) call print_error(status)	
+	call ftpprd(unit,group,fpixel,nelements*naxes(1),chi_tmp,status)
+	if (status > 0) call print_error(status)	
+	deallocate(chi_tmp)
+	call ftcrhd(unit, status)
+	if (status > 0) call print_error(status)
+	naxes(1) = Nlambda_cont
+	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+	if (status > 0) call print_error(status)
+	call ftpkys(unit, "chi_c", "m^-1", ' ', status)
+	allocate(chi_tmp(Nlambda_cont, n_cells))
+	chi_tmp = chi_c
+	if (NactiveAtoms > 0) chi_tmp = chi_tmp + chi_c_nlte
+	call ftpprd(unit,group,fpixel,naxes(1)*nelements,chi_tmp,status)
+	deallocate(chi_tmp)
+	call ftclos(unit, status)
+	if (status > 0) call print_error(status)	
+
+
+	!first write eta
+	call ftinit(unit,trim(filename_eta),blocksize,status)
+	naxes(1) = Nlambda
+	if (status > 0) call print_error(status)	
+	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+	if (status > 0) call print_error(status)	
+	call ftpkys(unit, "eta", "W.m^-3.Hz^-1.sr^-1", ' ', status)
+	if (status > 0) call print_error(status)	
+	call ftpprd(unit,group,fpixel,naxes(1)*nelements,eta_tmp,status)
+	if (status > 0) call print_error(status)	
+	deallocate(eta_tmp)
+	call ftcrhd(unit, status)
+	if (status > 0) call print_error(status)
+	naxes(1) = Nlambda_cont
+	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+	if (status > 0) call print_error(status)
+	call ftpkys(unit, "eta_c",  "W.m^-3.Hz^-1.sr^-1", ' ', status)
+	allocate(eta_tmp(Nlambda_cont, n_cells))
+	eta_tmp = eta_c
+	if (NactiveAtoms > 0) eta_tmp = eta_tmp + eta_c_nlte
+	call ftpprd(unit,group,fpixel,nelements*naxes(1),eta_tmp,status)
+	deallocate(eta_tmp)
+	call ftclos(unit, status)
+	if (status > 0) call print_error(status)
+
+	!free unit
+	call ftfiou(unit, status)
+
+return
+end subroutine write_opacity_emissivity_map
  
  
 ! 

@@ -6,8 +6,7 @@ MODULE statequil_atoms
 												Jnu, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb
 	use constant
 	use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc
-	use math, only							: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, &
-												linear_1D, solve_lin
+	use math, only							: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, solve_lin
 	use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte
 	use collision, only						: collision_rates_atom_loc!, CollisionRate_old
 	use impact, only						: Collision_Hydrogen
