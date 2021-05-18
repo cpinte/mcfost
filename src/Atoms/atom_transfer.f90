@@ -2360,27 +2360,34 @@ module atom_transfer
    		!better to store a map(1:n_cells) with all Tchoc
    		!and if map(icell_prev) > 0 -> choc
 
-! ->doesn't work with lspherical_velocity !
 		lintersect = .false.
 		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
 			if (icompute_atomRT(icell_prev) > 0) then
-			
+				rr = sqrt( x*x + y*y + z*z )
+
 				if (lvoronoi) then 
-					rr = sqrt( x*x + y*y )
-					vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr
+					vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr + Voronoi(icell_prev)%vxyz(3) * z/rr					
 					vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
 				else
-					vaccr = vr(icell_prev)		
-					vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2	
+					if (lmagnetoaccr) then
+						vaccr = vr(icell_prev) * x /rr + vr(icell_prev) * y/rr + v_z(icell_prev) * z/rr
+						vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2	
+					else
+						vaccr = vr(icell_prev)
+						vmod2 = vr(icell_prev)**2+vtheta(icell_prev)**2+vphi(icell_prev)**2	
+						
+					endif
 				endif
 		
 				if (vaccr < 0.0_dp) then
 					if (Taccretion>0) then
 						Tchoc = Taccretion
+						lintersect = .true.
 					else
-						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25						
+						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25		
+						lintersect = (Tchoc > etoile(i_star)%T)				
 					endif
-					lintersect = (Tchoc > etoile(i_star)%T)
+! 					lintersect = (Tchoc > etoile(i_star)%T)
 				endif
 				
 			endif !icompute_atomRT
@@ -2431,24 +2438,33 @@ module atom_transfer
 		lintersect = .false.
 		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
 			if (icompute_atomRT(icell_prev) > 0) then
+				rr = sqrt( x*x + y*y + z*z)
 			
 				if (lvoronoi) then 
-					rr = sqrt( x*x + y*y )
-					vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr
+					vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr + Voronoi(icell_prev)%vxyz(3) * z/rr
 					vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
 				else
-					vaccr = vr(icell_prev)		
-					vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2	
+					if (lmagnetoaccr) then
+! 					vaccr = vr(icell_prev)
+					!it is vr * cos(phi) * sin(theta) + vr * sin(phi)*sin(theta) + vz * cos(theta)	
+						vaccr = vr(icell_prev) * x /rr + vr(icell_prev) * y/rr + v_z(icell_prev) * z/rr
+						vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2	
+					else
+						vaccr = vr(icell_prev)
+						vmod2 = vr(icell_prev)**2+vtheta(icell_prev)**2+vphi(icell_prev)**2	
+					endif
 				endif
 		
 				if (vaccr < 0.0_dp) then
 					if (Taccretion>0) then !constant accretion shock value from file
 						Tchoc = Taccretion
+						lintersect = .true.!always true if the shock temperature is an input
 					else! computed from mass flux and corrected by Taccretion factor!
 						!Taccretion is -1 if Taccretion is 0
-						Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25				
+						Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25	
+						lintersect = (Tchoc > etoile(i_star)%T) !depends on the local value			
 					endif
-					lintersect = (Tchoc > etoile(i_star)%T)
+! 					lintersect = (Tchoc > etoile(i_star)%T)
 				endif
 				
 			endif !icompute_atomRT
