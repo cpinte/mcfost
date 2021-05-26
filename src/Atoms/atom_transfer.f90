@@ -52,7 +52,7 @@ module atom_transfer
 	use stars, only				: intersect_spots, intersect_stars
 	!use wavelengths, only		:
 	use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
-	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, sigma, Lsun, rsun_to_au, au_to_rsun, c_light
+	use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, kb, sigma, Lsun, rsun_to_au, au_to_rsun, c_light
 	use utils, only				: rotation_3d, cross_product
 	use naleat, only 			: seed, stream, gtype
 	use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k, area
@@ -2320,7 +2320,7 @@ module atom_transfer
   		real(kind=dp), intent(in) :: u, v, w, x, y, z
   		real(kind=dp), dimension(N) :: local_stellar_brigthness
 
-  		real(kind=dp) :: Tchoc, vaccr, vmod2, rr
+  		real(kind=dp) :: Tchoc, vaccr, vmod2, rr, enthalp
   		real(kind=dp) :: mu, ulimb, LimbDarkening
   		integer :: ns,la
   		logical :: lintersect!=.false.! does not work here ?
@@ -2364,13 +2364,15 @@ module atom_transfer
 		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
 			if (icompute_atomRT(icell_prev) > 0) then
 				rr = sqrt( x*x + y*y + z*z )
+				enthalp = 2.5 * 1d-3 * kb * T(icell_prev) / wght_per_H / masseH
 
 				if (lvoronoi) then 
 					vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr + Voronoi(icell_prev)%vxyz(3) * z/rr					
 					vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
 				else
 					if (lmagnetoaccr) then
-						vaccr = vr(icell_prev) * x /rr + vr(icell_prev) * y/rr + v_z(icell_prev) * z/rr
+! 						vaccr = vr(icell_prev) * x /rr + vr(icell_prev) * y/rr + v_z(icell_prev) * z/rr
+						vaccr = vr(icell_prev) * sqrt(1.0 - (z/rr)**2) * sign(1.0, z) + v_z(icell_prev) * z/rr
 						vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2	
 					else
 						vaccr = vr(icell_prev)
@@ -2384,7 +2386,7 @@ module atom_transfer
 						Tchoc = Taccretion
 						lintersect = .true.
 					else
-						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25		
+						Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25		
 						lintersect = (Tchoc > etoile(i_star)%T)				
 					endif
 ! 					lintersect = (Tchoc > etoile(i_star)%T)
@@ -2411,7 +2413,7 @@ module atom_transfer
   		real(kind=dp), dimension(N), intent(in) :: lambda, tau
   		real(kind=dp), intent(in) :: u, v, w, x, y, z
 
-  		real(kind=dp) :: Tchoc, vaccr, vmod2, rr
+  		real(kind=dp) :: Tchoc, vaccr, vmod2, rr, enthalp
   		real(kind=dp) :: mu, ulimb, LimbDarkening
   		integer :: ns,la
   		logical :: lintersect
@@ -2439,17 +2441,22 @@ module atom_transfer
 		if ((laccretion_shock).and.(icell_prev<=n_cells)) then
 			if (icompute_atomRT(icell_prev) > 0) then
 				rr = sqrt( x*x + y*y + z*z)
-			
+				!specific enthalpy of the gas
+				enthalp = 2.5 * 1d-3 * kb * T(icell_prev) / wght_per_H / masseH
+
+				!vaccr is vr, the spherical r velocity component
 				if (lvoronoi) then 
+					!x/rr = cos(phi)sin(theta); y/rr = sin(phi)sin(theta); z/rr = cos(theta)
 					vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr + Voronoi(icell_prev)%vxyz(3) * z/rr
 					vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
 				else
 					if (lmagnetoaccr) then
-! 					vaccr = vr(icell_prev)
-					!it is vr * cos(phi) * sin(theta) + vr * sin(phi)*sin(theta) + vz * cos(theta)	
-						vaccr = vr(icell_prev) * x /rr + vr(icell_prev) * y/rr + v_z(icell_prev) * z/rr
-						vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2	
-					else
+! 					vaccr = is not vr in that case (vr = cylindrical radius velocity)
+						!vr = vR * sin(theta) + vz * cos(theta)
+						vaccr = vr(icell_prev) * sqrt(1.0 - (z/rr)**2) + v_z(icell_prev) * z/rr
+! 						vaccr = vr(icell_prev) * sin(acos(z/rr)) + v_z(icell_prev) * z/rr
+						vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2
+					else !spherical vector here
 						vaccr = vr(icell_prev)
 						vmod2 = vr(icell_prev)**2+vtheta(icell_prev)**2+vphi(icell_prev)**2	
 					endif
@@ -2461,8 +2468,10 @@ module atom_transfer
 						lintersect = .true.!always true if the shock temperature is an input
 					else! computed from mass flux and corrected by Taccretion factor!
 						!Taccretion is -1 if Taccretion is 0
-						Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2))**0.25	
-						lintersect = (Tchoc > etoile(i_star)%T) !depends on the local value			
+! 						write(*,*) "choc = ", icell_prev, x, y, z, vaccr*1e-3, sqrt(vmod2)*1e-3
+						Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25	
+						lintersect = (Tchoc > etoile(i_star)%T) !depends on the local value		
+! 						write(*,*) " Tchoc = ", Tchoc, " rho = ", 1d-3 * masseH * wght_per_H * nHtot(icell_prev),"  T  =", T(icell_prev)
 					endif
 ! 					lintersect = (Tchoc > etoile(i_star)%T)
 				endif
