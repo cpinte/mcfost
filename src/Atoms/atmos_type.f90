@@ -6,7 +6,7 @@ module atmos_type
 	use constant
 	use messages
 	use constantes, only : tiny_dp
-	
+
 	use healpix_mod !all at the moment
 
 	!$ use omp_lib
@@ -41,9 +41,9 @@ module atmos_type
 	type elemPointerArray
 		type(Element), pointer :: ptr_elem => NULL()
 	end type elemPointerArray
-	
+
 	real(kind=dp), dimension(:,:), allocatable :: ds
-  
+
 	integer :: Npf, NactiveAtoms, Npassiveatoms, Natom
 	real(kind=dp) :: metallicity, totalAbund, avgWeight, wght_per_H, tau, Taccretion
 	real(kind=dp), allocatable, dimension(:) :: vR, v_z, vphi
@@ -67,7 +67,7 @@ module atmos_type
 
   contains
 
-  
+
   subroutine compute_angular_integration_weights(Nmu,Nphi)
 	integer, intent(in), optional :: Nmu, Nphi
 	integer :: N1, N2, iray,iphi,imu, alloc_status, Nquad
@@ -76,28 +76,28 @@ module atmos_type
 	real(kind=dp), allocatable, dimension(:) :: x1, x2, w1, w2
 	!tests of the quadrature properties
 	real(kind=dp) :: norm, integ1, integ2, integ3, integ, integ4, integ5, integ6
-	
+
 
 	select case (angular_quadrature)
-	
+
 	case ("HEALpix")
-	
+
 		N1 = healpix_npix(healpix_lorder)
 		N2 = N1
 		allocate(xmu(N1),wmu(N1),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmu and wmu")
 		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmux, xmuy")
-		
+
 		!phi (rad) x2
 		allocate(x2(N1))
-		
+
 		call healpix_sphere(healpix_lorder,xmu,x2)
-		
+
 		xmux(:) = sqrt(1.0_dp - xmu(:)*xmu(:)) * cos(x2(:))
 		xmuy(:) = sqrt(1.0_dp - xmu(:)*xmu(:)) * sin(x2(:))
 		wmu(:)  = healpix_weight(healpix_lorder) !a constant actually
-		
+
 		write(*,"('HEALpix #'(1I8)' pixels, l='(1I2))") N1, healpix_lorder
 		write(*,'(" -> Angular resolution "(1F12.3)" deg" )') healpix_angular_resolution(healpix_lorder)
 ! 		open(1, file="test_healpix",status="unknown")
@@ -107,27 +107,27 @@ module atmos_type
 ! ! 			write(*,*) iray-1, xmu(iray), x2(iray)
 ! 		enddo
 ! 		close(1)
-! 		
+!
 ! ! 		stop
-		
+
 		deallocate(x2)
-		
-		
+
+
 	case ("HEALpix_adapt")
-	
+
 		!not needed yet, computing on the fly
 		write(*,*) " Allocating space for healpix adapative scheme.."
-! 	
+!
 ! 		N1 = healpix_npix(healpix_lmax)
 ! 		N2 = N1
 ! 		allocate(xmu(N1),wmu(N1),stat=alloc_status)
 ! 		if (alloc_status > 0) call error("allocation error xmu and wmu")
 ! 		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
 ! 		if (alloc_status > 0) call error("allocation error xmux, xmuy")
-		
+
 		!here we return
 		return
-		
+
 	case ("gauss_legendre")
 		if (present(Nmu)) then
 			N1 = Nmu
@@ -138,12 +138,12 @@ module atmos_type
 			N2 = Nphi
 		else
 			N2 = 128
-		endif	
-	
+		endif
+
 		allocate(x1(N1),x2(N2), w1(N1), w2(N2), xmu(N1*N2), wmu(N1*N2),xmux(N1*N2),xmuy(N1*N2),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmu and wmu")
 
-	
+
 		!w0 = xmu = cos(theta)
 		call Gauss_Legendre_quadrature(-1.0_dp,1.0_dp,N1,x1,w1)
 		w1(:) = 0.5 * w1(:)
@@ -158,7 +158,7 @@ module atmos_type
 			w2(iphi) = 0.5 * (x2(iphi+1) - x2(iphi-1))
 		enddo
 		!wmu_phi(:) = wmu_phi(:) / (2.0*pi) !normed
-		
+
 		iray=1
 		do imu=1,N1
 			do iphi=1, N2
@@ -169,15 +169,15 @@ module atmos_type
 				iray = iray+1
 			enddo
 		enddo
-		
+
 		deallocate(x1,x2,w1,w2)
-		
+
 	!S0 quadratures
 	case ("bestard2021_L15N45")
 
 		Nquad = 45 !for all octants
 		allocate(colat(Nquad), azim(Nquad), wei(Nquad))
-			
+
 		wei = (/ 0.01114722, 0.01379874, 0.0172431 , 0.0172431 , 0.02112837,&
 			0.02112837, 0.02133918, 0.02133918, 0.02266582, 0.02266582,&
 			0.02005093, 0.02005093, 0.02055247, 0.02055247, 0.02304591,&
@@ -211,13 +211,13 @@ module atmos_type
 			98.02153292, 278.02153292,  77.83645181, 102.16354819,&
 			104.54232397, 284.54232397,  66.5552123 , 246.5552123 ,&
 			274.81844496 /)
-			
+
 		N1 = Nquad; N2 = Nquad
 		allocate(xmu(N1),wmu(N1),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmu and wmu")
 		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmux, xmuy")
-		
+
 		do imu=1, Nquad !loop not needed, just here for debug
 			w0 = cos(colat(imu)*pi/180.0_dp)
 			u0 = sqrt(1.0_dp  - w0*w0) * cos(azim(imu) * pi/180.0_dp)
@@ -227,14 +227,14 @@ module atmos_type
 			xmuy(imu) = v0
 			wmu(imu) = wei(imu)
 		enddo
-		
+
 		deallocate(azim, colat, wei)
-		
+
 	case ("bestard2021_L13N100")
 
 		Nquad = 100 !for all octants
 		allocate(colat(Nquad), azim(Nquad), wei(Nquad))
-			
+
 		wei = (/ 0.0071533 , 0.0071533 , 0.00768591, 0.00768591, 0.00814505,&
 			0.00814505, 0.00904856, 0.00904856, 0.00950044, 0.00950044,&
 			0.00824706, 0.00824706, 0.00948721, 0.00948721, 0.008946  ,&
@@ -255,7 +255,7 @@ module atmos_type
 			0.01127741, 0.01129493, 0.01129493, 0.01183551, 0.01183551,&
 			0.0120469 , 0.0120469 , 0.01188447, 0.01188447, 0.01230428,&
 			0.01230428, 0.00941874, 0.00941874, 0.00792367, 0.00792367 /)
-			
+
 		colat = (/ 168.78580254,  11.21419746,  15.86118896, 164.13881104,&
 			163.39805483,  16.60194517,  39.38236141, 140.61763859,&
 			147.07488616,  32.92511384,  37.11822007, 142.88177993,&
@@ -306,13 +306,13 @@ module atmos_type
 			215.77715659,  35.77715659, 283.48863003, 103.48863003,&
 			58.43126354, 238.43126354, 101.51273813, 281.51273813,&
 			186.37634066,   6.37634066, 188.7546611 ,   8.7546611/)
-			
+
 		N1 = Nquad; N2 = Nquad
 		allocate(xmu(N1),wmu(N1),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmu and wmu")
 		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmux, xmuy")
-		
+
 		do imu=1, Nquad !loop not needed, just here for debug
 			w0 = cos(colat(imu)*pi/180.0_dp)
 			u0 = sqrt(1.0_dp  - w0*w0) * cos(azim(imu) * pi/180.0_dp)
@@ -322,14 +322,14 @@ module atmos_type
 			xmuy(imu) = v0
 			wmu(imu) = wei(imu)
 		enddo
-		
+
 		deallocate(azim, colat, wei)
-		
+
 	case ("bestard2021_L15N124")
-	
+
 		Nquad = 124 !for all octants
 		allocate(colat(Nquad), azim(Nquad), wei(Nquad))
-	
+
 		wei = (/ 0.00337284, 0.00337284, 0.00728555, 0.00728555, 0.00562708,&
 			0.00562708, 0.00665609, 0.00665609, 0.00769006, 0.00769006,&
 			0.00731889, 0.00731889, 0.00769476, 0.00769476, 0.00757717,&
@@ -355,7 +355,7 @@ module atmos_type
 			0.00990831, 0.00990831, 0.00532327, 0.00532327, 0.00815445,&
 			0.00815445, 0.00654762, 0.00654762, 0.00878882, 0.00878882,&
 			0.00807136, 0.00807136, 0.00844545, 0.00844545 /)
-       
+
 		colat = (/ 88.11239003,  91.88760997, 117.57269402,  62.42730598,&
 			173.57550759,   6.42449241,  20.2690118 , 159.7309882 ,&
 			24.06178057, 155.93821943,  44.84012978, 135.15987022,&
@@ -387,7 +387,7 @@ module atmos_type
 			1.63211221, 178.36788779,  60.90436478, 119.09563522,&
 			20.02586803, 159.97413197,  78.01080035, 101.98919965,&
 			138.18196575,  41.81803425,  79.57087159, 100.42912841 /)
-			
+
 		azim = (/ 174.77345089, 354.77345089, 350.5860564 , 170.5860564 ,&
 			70.33319257, 250.33319257, 107.86825608, 287.86825608,&
 			336.51314148, 156.51314148, 333.50260454, 153.50260454,&
@@ -419,13 +419,13 @@ module atmos_type
 			339.36553119, 159.36553119,   4.39736598, 184.39736598,&
 			182.35156724,   2.35156724, 183.68622053,   3.68622053,&
 			177.69545682, 357.69545682, 359.39348695, 179.39348695 /)
-			
+
 		N1 = Nquad; N2 = Nquad
 		allocate(xmu(N1),wmu(N1),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmu and wmu")
 		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmux, xmuy")
-		
+
 		do imu=1, Nquad !loop not needed, just here for debug
 			w0 = cos(colat(imu)*pi/180.0_dp)
 			u0 = sqrt(1.0_dp  - w0*w0) * cos(azim(imu) * pi/180.0_dp)
@@ -435,9 +435,9 @@ module atmos_type
 			xmuy(imu) = v0
 			wmu(imu) = wei(imu)
 		enddo
-		
+
 		deallocate(azim, colat, wei)
-		
+
 	!S1 quadrature with L=15 and N=11*8 (total sphere)
 	case ("stepan2020")
 		Nquad = 11 !points per octant = Ntotal / 8
@@ -454,14 +454,14 @@ module atmos_type
 		wei(:) = (/ 0.011309124685216070, 0.009652307741108415, 0.013486249257448579, 0.011644240437362686, 0.012045724827157482, &
 					0.012838609802518424, 0.011977125696312044, 0.012838609802518421, 0.011309124685216068,0.010715526695526693, &
 					0.007183356369615116 /)
-		
+
 		N1 = 8*Nquad; N2 = 8*Nquad
 		allocate(xmu(N1),wmu(N1),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmu and wmu")
 		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmux, xmuy")
-		
-		
+
+
 		!define for each octant
 		!z > 0
 		!1)
@@ -474,7 +474,7 @@ module atmos_type
 			xmuy(imu) = v0
 			wmu(imu) = wei(imu)
 		enddo
-		
+
 		!2)
 		do imu=1, Nquad
 			w0 = cos(colat(imu)*pi/180.0_dp)
@@ -485,7 +485,7 @@ module atmos_type
 			xmuy(Nquad+imu) = v0
 			wmu(Nquad+imu) = wei(imu)
 		enddo
-		
+
 		!3)
 		do imu=1, Nquad
 			w0 = cos(colat(imu)*pi/180.0_dp)
@@ -496,7 +496,7 @@ module atmos_type
 			xmuy(2*Nquad+imu) = v0
 			wmu(2*Nquad+imu) = wei(imu)
 		enddo
-		
+
 		!4)
 		do imu=1, Nquad
 			w0 = cos(colat(imu)*pi/180.0_dp)
@@ -507,7 +507,7 @@ module atmos_type
 			xmuy(3*Nquad+imu) = v0
 			wmu(3*Nquad+imu) = wei(imu)
 		enddo
-		
+
 		!z < 0
 		!5)
 		do imu=1, Nquad !loop not needed, just here for debug
@@ -519,7 +519,7 @@ module atmos_type
 			xmuy(4*Nquad+imu) = v0
 			wmu(4*Nquad+imu) = wei(imu)
 		enddo
-		
+
 		!6)
 		do imu=1, Nquad
 			w0 = -cos(colat(imu)*pi/180.0_dp)
@@ -530,7 +530,7 @@ module atmos_type
 			xmuy(5*Nquad+imu) = v0
 			wmu(5*Nquad+imu) = wei(imu)
 		enddo
-		
+
 		!7)
 		do imu=1, Nquad
 			w0 = -cos(colat(imu)*pi/180.0_dp)
@@ -541,7 +541,7 @@ module atmos_type
 			xmuy(6*Nquad+imu) = v0
 			wmu(6*Nquad+imu) = wei(imu)
 		enddo
-		
+
 		!8)
 		do imu=1, Nquad
 			w0 = -cos(colat(imu)*pi/180.0_dp)
@@ -552,11 +552,11 @@ module atmos_type
 			xmuy(7*Nquad+imu) = v0
 			wmu(7*Nquad+imu) = wei(imu)
 		enddo
-		
+
 		deallocate(colat, azim, wei)
 
-	
-	case ("carlson_A8")	
+
+	case ("carlson_A8")
 	!B. G. Carlson
 		Nquad = 10 !S8
 		N1 = 8*Nquad; N2 = 8*Nquad
@@ -565,7 +565,7 @@ module atmos_type
 		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmux, xmuy")
 
-		!mine		
+		!mine
 		xmu(:) = (/ 0.95118973,  0.78679579,  0.78679579,  0.57735027,  0.57735027,&
         0.57735027,  0.21821789,  0.21821789,  0.21821789,  0.21821789, &
         0.95118973,  0.78679579,  0.78679579,  0.57735027,  0.57735027, &
@@ -583,9 +583,9 @@ module atmos_type
        -0.95118973, -0.78679579, -0.78679579, -0.57735027, -0.57735027, &
        -0.57735027, -0.21821789, -0.21821789, -0.21821789, -0.21821789/)
 
-		
+
 		xmux(:) = (/0.21821789,  0.57735027,  0.21821789,  0.78679579,  0.57735027, &
-        0.21821789,  0.95118973,  0.78679579,  0.57735027,  0.21821789, & 
+        0.21821789,  0.95118973,  0.78679579,  0.57735027,  0.21821789, &
        -0.21821789, -0.57735027, -0.21821789, -0.78679579, -0.57735027, &
        -0.21821789, -0.95118973, -0.78679579, -0.57735027, -0.21821789, &
        -0.21821789, -0.57735027, -0.21821789, -0.78679579, -0.57735027, &
@@ -600,7 +600,7 @@ module atmos_type
        -0.21821789, -0.95118973, -0.78679579, -0.57735027, -0.21821789, &
         0.21821789,  0.57735027,  0.21821789,  0.78679579,  0.57735027, &
         0.21821789,  0.95118973,  0.78679579,  0.57735027,  0.21821789/)
-				
+
 		xmuy(:) = (/0.21821789,  0.21821789,  0.57735027,  0.21821789,  0.57735027,&
         0.78679579,  0.21821789,  0.57735027,  0.78679579,  0.95118973, &
         0.21821789,  0.21821789,  0.57735027,  0.21821789,  0.57735027, &
@@ -617,7 +617,7 @@ module atmos_type
        -0.78679579, -0.21821789, -0.57735027, -0.78679579, -0.95118973, &
        -0.21821789, -0.21821789, -0.57735027, -0.21821789, -0.57735027, &
        -0.78679579, -0.21821789, -0.57735027, -0.78679579, -0.95118973/)
-				
+
 		!normalized to 8 octants to have sum(wmu) = 1.0
 		wmu(:) = (/0.01602704, 0.01130115, 0.01130115, 0.01130115, 0.00911197,&
        0.01130115, 0.01602704, 0.01130115, 0.01130115, 0.01602704,&
@@ -636,7 +636,7 @@ module atmos_type
        0.01602704, 0.01130115, 0.01130115, 0.01130115, 0.00911197,&
        0.01130115, 0.01602704, 0.01130115, 0.01130115, 0.01602704/)
 
-	case ("carlson_A8_rh")	
+	case ("carlson_A8_rh")
 	!B. G. Carlson
 		Nquad = 10 !S8
 		N1 = 8*Nquad; N2 = 8*Nquad
@@ -679,7 +679,7 @@ module atmos_type
        -0.57735027, -0.21821789, -0.57735027, -0.21821789, -0.21821789,&
         0.95118973,  0.78679579,  0.57735027,  0.21821789,  0.78679579,&
         0.57735027,  0.21821789,  0.57735027,  0.21821789,  0.21821789/)
-				
+
 		xmuy(:) = (/0.21821789,  0.57735027,  0.78679579,  0.95118973,  0.21821789,&
         0.57735027,  0.78679579,  0.21821789,  0.57735027,  0.21821789,&
         0.21821789,  0.57735027,  0.78679579,  0.95118973,  0.21821789,&
@@ -696,7 +696,7 @@ module atmos_type
        -0.57735027, -0.78679579, -0.21821789, -0.57735027, -0.21821789,&
        -0.21821789, -0.57735027, -0.78679579, -0.95118973, -0.21821789,&
        -0.57735027, -0.78679579, -0.21821789, -0.57735027, -0.21821789/)
-				
+
 		!normalized to 8 octants to have sum(wmu) = 1.0
 		wmu(:) = (/0.01587267, 0.01142294, 0.01142294, 0.01587267, 0.01142294,&
        0.00884434, 0.01142294, 0.01142294, 0.01142294, 0.01587267,&
@@ -714,7 +714,7 @@ module atmos_type
        0.00884434, 0.01142294, 0.01142294, 0.01142294, 0.01587267,&
        0.01587267, 0.01142294, 0.01142294, 0.01587267, 0.01142294,&
        0.00884434, 0.01142294, 0.01142294, 0.01142294, 0.01587267/)
- 
+
 	case ("carlson_B8_rh")
 		!rh
 		Nquad = 10
@@ -741,7 +741,7 @@ module atmos_type
        -0.50307326, -0.50307327, -0.50307327, -0.50307326, -0.70273364,&
        -0.70273364, -0.70273364, -0.85708017, -0.85708017, -0.98759216/)
 
-		
+
 		xmux(:) = (/0.85708018,  0.70273364,  0.50307327,  0.1110444 ,  0.70273364,&
         0.50307327,  0.1110444 ,  0.50307327,  0.1110444 ,  0.1110444 ,&
        -0.85708018, -0.70273364, -0.50307327, -0.1110444 , -0.70273364,&
@@ -758,7 +758,7 @@ module atmos_type
        -0.50307327, -0.1110444 , -0.50307327, -0.1110444 , -0.1110444 ,&
         0.85708018,  0.70273364,  0.50307327,  0.1110444 ,  0.70273364,&
         0.50307327,  0.1110444 ,  0.50307327,  0.1110444 ,  0.1110444/)
-				
+
 		xmuy(:) = (/0.1110444 ,  0.50307327,  0.70273364,  0.85708018,  0.1110444 ,&
         0.50307327,  0.70273364,  0.1110444 ,  0.50307327,  0.1110444 ,&
         0.1110444 ,  0.50307327,  0.70273364,  0.85708018,  0.1110444 ,&
@@ -775,7 +775,7 @@ module atmos_type
        -0.50307327, -0.70273364, -0.1110444 , -0.50307327, -0.1110444 ,&
        -0.1110444 , -0.50307327, -0.70273364, -0.85708018, -0.1110444 ,&
        -0.50307327, -0.70273364, -0.1110444 , -0.50307327, -0.1110444/)
-				
+
 		!normalized to 8 octants to have sum(wmu) = 1.0
 		wmu(:) = (/0.02144029, 0.00862565, 0.00862565, 0.02144029, 0.00862565,&
        0.00892523, 0.00862565, 0.00862565, 0.00862565, 0.02144029,&
@@ -793,7 +793,7 @@ module atmos_type
        0.00892523, 0.00862565, 0.00862565, 0.00862565, 0.02144029,&
        0.02144029, 0.00862565, 0.00862565, 0.02144029, 0.00862565,&
        0.00892523, 0.00862565, 0.00862565, 0.00862565, 0.02144029/)
-       
+
     case ("carlson_C16")
 		Nquad = 36
 		N1 = 8*Nquad; N2 = 8*Nquad
@@ -801,7 +801,7 @@ module atmos_type
 		if (alloc_status > 0) call error("allocation error xmu and wmu")
 		allocate(xmux(N2),xmuy(N2),stat=alloc_status)
 		if (alloc_status > 0) call error("allocation error xmux, xmuy")
-		
+
 		xmu(:) = (/0.97752522,  0.9067647 ,  0.9067647 ,  0.82999331,  0.82999331,&
         0.82999331,  0.74535599,  0.74535599,  0.74535599,  0.74535599,&
         0.64978629,  0.64978629,  0.64978629,  0.64978629,  0.64978629,&
@@ -860,7 +860,7 @@ module atmos_type
        -0.39440532, -0.39440532, -0.39440532, -0.39440532, -0.39440532,&
        -0.1490712 , -0.1490712 , -0.1490712 , -0.1490712 , -0.1490712 ,&
        -0.1490712 , -0.1490712 , -0.1490712/)
-		
+
 		xmux(:) = (/0.1490712 ,  0.39440532,  0.1490712 ,  0.53748385,  0.39440532,&
         0.1490712 ,  0.64978629,  0.53748385,  0.39440532,  0.1490712 ,&
         0.74535599,  0.64978629,  0.53748385,  0.39440532,  0.1490712 ,&
@@ -919,7 +919,7 @@ module atmos_type
         0.74535599,  0.64978629,  0.53748385,  0.39440532,  0.1490712 ,&
         0.97752522,  0.9067647 ,  0.82999331,  0.74535599,  0.64978629,&
         0.53748385,  0.39440532,  0.1490712 /)
-		
+
 		xmuy(:) = (/0.1490712 ,  0.1490712 ,  0.39440532,  0.1490712 ,  0.39440532,&
         0.53748385,  0.1490712 ,  0.39440532,  0.53748385,  0.64978629,&
         0.1490712 ,  0.39440532,  0.53748385,  0.64978629,  0.74535599,&
@@ -978,7 +978,7 @@ module atmos_type
        -0.53748385, -0.64978629, -0.74535599, -0.82999331, -0.9067647 ,&
        -0.1490712 , -0.39440532, -0.53748385, -0.64978629, -0.74535599,&
        -0.82999331, -0.9067647 , -0.97752522 /)
-		
+
 		wmu(:) = (/0.00437572, 0.00274193, 0.00274193, 0.00215982, 0.00174144,&
        0.00215982, 0.01649865, 0.0116337 , 0.0116337 , 0.01649865,&
        0.00198342, 0.00132394, 0.00115784, 0.00132394, 0.00198342,&
@@ -1037,17 +1037,17 @@ module atmos_type
        0.00139857, 0.00132394, 0.00139857, 0.00174144, 0.00274193,&
        0.00437572, 0.00274193, 0.00215982, 0.00198342, 0.00198342,&
        0.00215982, 0.00274193, 0.00437572 /)
-		
+
 	case ("bruls1999")
 	!Same as Carlson ? not useful ?
 		call error("Not defined yet","Bruls1999")
-	
+
 	case default
-	
+
 		call error("Anuglar integration method unknown!", trim(angular_quadrature))
-	
+
 	end select
-	
+
 	!Check the normalisation conditions + one integral
 	!1)
 	! int over dOmega is 4pi = sum of weights
@@ -1074,8 +1074,8 @@ module atmos_type
 	write(*,*) "2) (nx,ny,nz):", integ1, integ2, integ3
 	write(*,*) "3) (n.n):", integ4/3.0_dp, 1.0_dp/3.0_dp!4.0/3.0 * pi
 	write(*,*) " int(exp(-(nz**2 + nx**2)) dOmega):", integ, " true = ", 6.76171 / (4.0 * pi)
-	
- 	
+
+
   return
   end subroutine compute_angular_integration_weights
 
@@ -1443,7 +1443,7 @@ module atmos_type
 
   subroutine dealloc_atomic_atmos()
   integer :: n
-  
+
   if (allocated(ds)) deallocate(ds)
   if (allocated(xmu)) deallocate(xmu, wmu, xmux, xmuy)
 
@@ -1525,7 +1525,7 @@ module atmos_type
 !   logical :: anynull
 !   character(len=4) :: charID
 !   real :: A
-! 
+!
 !   EOF = 0
 !   !Start reading partition function by first reading the grid
 !   !get unique unit number
@@ -1544,7 +1544,7 @@ module atmos_type
 !    stop
 !   end if
 !   !write(*,*) NAXIST, atmos%Npf
-! 
+!
 !   allocate(atmos%Tpf(atmos%Npf))
 !   !now read temperature grid
 !   call ftgpvd(unit,1,1,atmos%Npf,-999,atmos%Tpf,anynull,EOF) !d because double !!
@@ -1555,11 +1555,11 @@ module atmos_type
 !   call ftclos(unit, EOF)
 !   ! free the unit number
 !   call ftfiou(unit, EOF)
-! 
+!
 !   n = 1 !H is the first element read
 !   EOF = 0
 !   !write(*,*) "Metallicity = ", atmos%metallicity
-! 
+!
 !   !read abundances
 !   open(unit=1, file=TRIM(ABUNDANCE_FILE),status="old")
 !   do while (n <= Nelem)!(EOF == 0)
@@ -1570,9 +1570,9 @@ module atmos_type
 !     atmos%Elements(n)%ptr_elem%weight=atomic_weights(n)
 !     atmos%Elements(n)%ptr_elem%ID = charID(1:2) !supposed to be lowercases!!!!!
 !     atmos%Elements(n)%ptr_elem%abund = 10.**(A-12.0)
-! 
+!
 !     if (A <= -99) atmos%Elements(n)%ptr_elem%abund = 0d0
-! 
+!
 !     write(*,*) n, "Element ", atmos%Elements(n)%ptr_elem%ID," has an abundance of A=",&
 !               atmos%Elements(n)%ptr_elem%abund,A," and a weight of w=",&
 !                atmos%Elements(n)%ptr_elem%weight
@@ -1586,7 +1586,7 @@ module atmos_type
 !                      atmos%Elements(n)%ptr_elem%weight
 !     !write(*,*) "updating total Abundance = ",atmos%totalAbund
 !     !write(*,*) "updating average weight = ", atmos%avgWeight
-! 
+!
 !     !attribute partition function to each element
 !     !the temperature grid is shared and saved in atmos%Tpf
 !     !write(*,*) "Fill partition function for element ", atmos%Elements(n)%ID
@@ -1604,11 +1604,11 @@ module atmos_type
 ! !     do ni=1,Nelem
 ! !      atmos%Elements(n)%n(:,:)=0d0
 ! !     end do
-! 
+!
 !     !write(*,*) "************************************"
 !     n = n + 1 !go to next element, n is 1 at init for H
 !    end if
-! 
+!
 ! !    if (n > Nelem) then
 ! !     exit
 ! !    end if
@@ -1621,7 +1621,7 @@ module atmos_type
 !   write(*,*) ""
 !   stop
 !   close(unit=1)
-! 
+!
 !   return
 !   end subroutine fillElements
 
@@ -1633,7 +1633,7 @@ module atmos_type
   !Elements in Abundance file are read in order of Z, so that H is 1, He is 2 ect
   type (Element) :: elem
   integer :: EOF, n, blocksize, unit, i, j, k, ni, syst_status
-  integer :: NAXIST, naxis_found, hdutype, Z, Nread
+  integer :: NAXIST(1), naxis_found, hdutype, Z, Nread
   character(len=256) :: some_comments
   logical :: anynull
   character(len=4) :: charID
@@ -1651,7 +1651,7 @@ module atmos_type
   call ftgknj(unit, 'NAXIS', 1, 1, NAXIST, naxis_found, EOF)
   !read dimension of partition function table
   call ftgkyj(unit, "NPOINTS", Npf, some_comments, EOF)
-  if (NAXIST.ne.Npf) then
+  if (NAXIST(1).ne.Npf) then
    write(*,*) "Error in reading pf data !"
    write(*,*) "NAXIST=",NAXIST," NPOINTS=", Npf
    write(*,*) "exiting... !"
@@ -1684,9 +1684,9 @@ module atmos_type
   write(*,*) " Reading abundances of ", Nelem, " elements..."
   if (Nelem < 3) write(*,*) " WARNING:, not that using Nelem < 3 will cause problem", &
   		" in solvene.f90 or other functions assuming abundances of metal of to 26 are known!!"
-  
+
   if (.not.allocated(Elements)) allocate(Elements(Nelem))
-  
+
   open(unit=1, file=TRIM(ABUNDANCE_FILE),status="old")
   !Read Number of elements
   !-> need to modify the file format to include if at the biginning
@@ -1694,10 +1694,10 @@ module atmos_type
   !read(inputline,*) Nelem
 
   do n=1, Nelem !H is first, then He ect
-  
+
     call getnextline(1, "#", FormatLine, inputline, Nread)
     read(inputline,*) charID, A
-    
+
     allocate(Elements(n)%ptr_elem)
     Elements(n)%ptr_elem%weight=atomic_weights(n)
     Elements(n)%ptr_elem%ID = charID(1:2) !supposed to be lowercases!!!!!
@@ -1708,7 +1708,7 @@ module atmos_type
 !     write(*,*) n, "Element ", Elements(n)%ptr_elem%ID," has an abundance of A=",&
 !               Elements(n)%ptr_elem%abund,A," and a weight of w=",&
 !                Elements(n)%ptr_elem%weight
-               
+
     Elements(n)%ptr_elem%abundance_set = .true.
 !
 !     if (n.gt.1 .and. metallicity.gt.0.) then
@@ -1749,7 +1749,7 @@ module atmos_type
   write(*,*) "Total average weight = ", avgWeight
   write(*,*) "Weight per Hydrogen = ", wght_per_H !i.e., per AMU = total mass
   write(*,*) ""
-  
+
   !store also the mass fraction of each element
   do n=1, Nelem
    Elements(n)%ptr_elem%massf = Elements(n)%ptr_elem%weight*Elements(n)%ptr_elem%Abund/wght_per_H
@@ -1812,16 +1812,16 @@ module atmos_type
 !    allocate(lcompute_atomRT(Nspace))
    allocate(icompute_atomRT(n_cells))
    icompute_atomRT(:) = 0 !everything transparent at init.
-   
+
     mem_alloc_local = sizeof(icompute_atomRT) * 10
-   
+
 	mem_alloc_tot = mem_alloc_tot + mem_alloc_local
 	write(*,'("Total memory allocated in alloc_atomic_atmos:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
-	
+
 
    return
    end subroutine alloc_atomic_atmos
-! 
+!
 ! !to do, this routine should change according to mcfost density array
 !    subroutine define_atomRT_domain(itiny_T, itiny_nH)
 ! !    ! Set where to solve for the RT equation: where a cell is not
@@ -1838,19 +1838,19 @@ module atmos_type
 ! !     real(kind=dp) :: Vchar=0d0, tiny_nH=1d0, tiny_T=1d2
 ! !     !with Very low value of densities or temperature it is possible to have
 ! !     !nan or infinity in the populations calculations because of numerical precisions
-! ! 
+! !
 ! !     if (present(itiny_T)) then
 ! !      write(*,*) "changing the value of tiny_T (K) = ", tiny_T," to", itiny_T
 ! !      tiny_T = itiny_T !K
 ! !     end if
-! ! 
+! !
 ! !     if (present(itiny_nH)) then
 ! !      write(*,*) "changing the value of tiny_nH (m^-3) = ", tiny_nH," to", itiny_nH
 ! !      tiny_nH = itiny_nH !m^-3
 ! !     end if
-! ! 
+! !
 ! !     if (maxval(ne) == 0d0) calc_ne = .true.
-! ! 
+! !
 ! !     if (tiny_T <= 0) then
 ! !      write(*,*) "changing the value of tiny_T = ", tiny_T," to", 2d2
 ! !      tiny_T = 2d0
@@ -1859,7 +1859,7 @@ module atmos_type
 ! !      write(*,*) "changing the value of tiny_nH = ", tiny_nH," to", 1d0
 ! !      tiny_nH = 1d0
 ! !     end if
-! ! 
+! !
 ! ! write(*,*) nHtot
 ! ! write(*,*) "*"
 ! ! write(*,*) T
@@ -1875,7 +1875,7 @@ module atmos_type
 ! ! !     if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) &
 ! ! !      	atmos%icompute_atomRT(icell) = 1 !filled
 ! ! !     end do
-! ! 
+! !
 !    return
 !    end subroutine define_atomRT_domain
 
@@ -1883,7 +1883,7 @@ module atmos_type
    ! ----------------------------------------- !
    ! Allocate space for magnetic field
    ! ----------------------------------------- !
-   
+
 !    write(*,*) ""
 !    call Warning("Allocate all arrays for magnetic field")
 !    write(*,*) ""
@@ -1921,21 +1921,21 @@ module atmos_type
     real(kind=dp) :: sig, cgb, ctb, stb
     real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
     real :: sign
- 
+
  	call error("Not implemented")
 
 	Bmodule = sqrt(bx*bx + by*by + bz*bz)
     cog = (bx*u + by*v + bz*w) / ( Bmodule + tiny_dp )
     sig = sqrt(1.0 - cog*cog)
 	sigsq = sig*sig
-	
-	
+
+
     co2c = ctb*ctb - stb*stb
     si2c = 2.0 * ctb * stb
 
     return
    end function B_project_From_vc
-   
+
   function B_project_angles(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
    ! ------------------------------------------- !
    ! Returned the module of the magnetic field at
@@ -1962,12 +1962,12 @@ module atmos_type
 		cog = 0.0;co2c = 0.0;si2c = 0.0;sigsq = 0.0
 		return
 	endif
-	
+
 	gamm = gammaB(icell)
 
-	
+
 	if (lmagnetoaccr) then
-	
+
 		if (.not.l3d) then
 			if (z < 0.0_dp) gamm = gamm + pi
 			co_chi = x / sqrt(x*x+y*y)
@@ -2000,11 +2000,11 @@ module atmos_type
 
 		b1 = (Bz - w * cog) * csc_theta
 		b2 = (v*Bx - By*u) * csc_theta
-		
+
 
     	co2c = (b1*b1 - b2*b2) / (1.0 - cog*cog)
     	si2c = 2.0 * b1 * b2 / (1.0 - cog*cog)
-    	
+
     endif
 ! 	write(*,*) Bmodule*1e4, cog, co2c, si2c, bx, by, bz
 ! 	stop
@@ -2179,7 +2179,7 @@ module atmos_type
    allocate(V2(n_cells)); V2=0.0_dp
    !For now we do not necessarily need to compute B if no polarization at all
    lmagnetized = lzeeman_polarisation !if Zeeman polarisation read magnetic field!
-   if (lmagnetized) then 
+   if (lmagnetized) then
    	write(*,*) " Allocating magnetic field array"
     call alloc_magnetic_field()
 !     allocate(B2(n_cells))
@@ -2266,7 +2266,7 @@ module atmos_type
 
      call getnextline(1, "#", FormatLine, inputline, Nread)
 
-	!In case of no polarisation, but magnetic field is present in the file, it is better to 
+	!In case of no polarisation, but magnetic field is present in the file, it is better to
 	!read the mandatory variables and put the magnetic field at the end of the file
      read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
          vR(icell), V2(icell), Vphi(icell), vturb(icell), icompute_atomRT(icell), &
@@ -2286,14 +2286,14 @@ module atmos_type
    if (lspherical_velocity) then
     vtheta(:) = V2(:)
     deallocate(V2)
-!     if (lmagnetized) then 
+!     if (lmagnetized) then
 !      Btheta(:) = B2(:)
 !      deallocate(B2, B_z)
 !     endif
    else if (lmagnetoaccr) then
     v_z(:) = V2(:)
     deallocate(V2)
-!     if (lmagnetized) then 
+!     if (lmagnetized) then
 !      B_z(:) = B2(:)
 !      deallocate(B2, Btheta)
 !     endif
@@ -2304,7 +2304,7 @@ module atmos_type
    !rho -> nH
    nHtot = nHtot * rho_to_nH
    close(unit=1)
-   
+
    write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
    write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
    write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
@@ -2358,7 +2358,7 @@ module atmos_type
         !center of the spot
    	    etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)! *cos(tilt) - sin(tc)*sin(tilt)
    	    etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
-   	    etoile(1)%SurfB(k)%r(3) = cos(tc)!south*(cos(tc) * cos(tilt) + cos(phic)*sin(tc)*sin(tilt))   	    
+   	    etoile(1)%SurfB(k)%r(3) = cos(tc)!south*(cos(tc) * cos(tilt) + cos(phic)*sin(tc)*sin(tilt))
 
 		etoile(1)%SurfB(k)%mui = cos(thetai)
     	etoile(1)%SurfB(k)%muo = cos(thetao)
@@ -2367,7 +2367,7 @@ module atmos_type
     	!with new location of spots in intersect_spots
     	!should not change if no tilt i.e., (from 0 to 2pi)
     	!In case of a tilt we should also take into account that the half ring turns into a point as the tilt goes to 90 degrees
-    	if (tilt>0) then 
+    	if (tilt>0) then
 			etoile(1)%SurfB(k)%mui = sqrt(1. - sin(thetai)**2 * (1.0 - sin(tilt)) )
     		etoile(1)%SurfB(k)%muo = sqrt(1. - sin(thetao)**2 * (1.0 - sin(tilt)) )
 
@@ -2379,8 +2379,8 @@ module atmos_type
    	    		etoile(1)%SurfB(k)%phio = -pi/2 * cos(tilt)**2
    	    		etoile(1)%SurfB(k)%phii = pi/2 * cos(tilt)**2
    	    	endif
-   	    endif 	
-    	
+   	    endif
+
   	  end do
   	 endif
 
@@ -2392,7 +2392,7 @@ module atmos_type
     Vmod = maxval(sqrt(vR**2+vtheta(:)**2+vphi(:)**2))
    endif
 
-	
+
     v_char = v_char + Vmod
 
 
@@ -2407,7 +2407,7 @@ module atmos_type
 	B_char = maxval(Bmag)
     write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
 
-   
+
   	 if (B_char <= 0.0_dp) then
 !    		deallocate(BR,Bphi)
 !    		if (allocated(B_z)) deallocate(B_z)
@@ -2423,14 +2423,14 @@ module atmos_type
     !check that in filled cells there is electron density otherwise we need to compute it
     !from scratch.
    	if (icompute_atomRT(icell) > 0) then
-   	
+
    		if (ne(icell) <= 0.0_dp) then
    			write(*,*) "  ** No electron density found in the model! ** "
-   			calc_ne = .true. 
+   			calc_ne = .true.
    			exit icell_loop
    		endif
-   	
-   	endif   
+
+   	endif
    enddo icell_loop
    	N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
    	if (N_fixed_ne > 0) then
@@ -2447,7 +2447,7 @@ module atmos_type
      write(*,*) " Vr = ", 1d-3 * maxval(abs(vR)), &
     	1d-3*minval(abs(vr),mask=icompute_atomRT>0)
      write(*,*) " Vtheta = ",  1d-3 * maxval(abs(vtheta)), &
-    	1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)    
+    	1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)
     else if (lmagnetoaccr) then
      write(*,*) " VRz = ", 1d-3 * maxval(sqrt(VR(:)**2 + v_z(:)**2)), &
     	1d-3*minval(sqrt(VR(:)**2 + v_z(:)**2),mask=icompute_atomRT>0)
@@ -2459,11 +2459,11 @@ module atmos_type
     write(*,*) " Vphi = ",  1d-3 * maxval(abs(vphi)), &
     	1d-3*minval(abs(vphi),mask=icompute_atomRT>0)
 
-   
+
    write(*,*) "Typical line extent due to V fields (km/s):"
    v_char = Lextent * v_char
    write(*,*) v_char/1d3
-   
+
    !if (xit) then
    write(*,*) "Maximum/minimum turbulent velocity (km/s):"
    write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
@@ -2480,15 +2480,15 @@ module atmos_type
 
   return
   end subroutine readAtmos_ascii
-  
+
 !   subroutine shock_surface(shock_area)
 !   	!identify the cell close to the choc and sum their area.
 !   	real(kind=dp), intent(out) :: shock_area
-!   	
+!
 !   return
 !   end subroutine
-  
-  
+
+
   !building
   subroutine refine_healpix_sphere()
 	use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
@@ -2501,7 +2501,7 @@ module atmos_type
   !dOmega(icell) the solid angle at which a cell is seen from a point source at r,
   !dOmega_healpix the solid angle subtended by each healpix pixels and Nr_min;
   !the minimum number of rays that has to pass in each cell.
-  
+
   	integer, parameter :: Nr_min = 5
   	real(kind=dp) :: cm_lim =  1d2 !column density limit
   	integer :: icell, ipix, i_star, icell_star, icell_prev, next_cell, previous_cell
@@ -2511,28 +2511,28 @@ module atmos_type
   	real(kind=dp) :: ls, l_contrib, l_void_before, nH_to_rho
   	logical :: lintersect_stars , lcellule_non_vide
   	real(kind=dp) :: dOmega, wphi, dOmega_l
-  	
+
   	!we have to do it iteratively to be sure that most cells are seen from ezch cell
   	!which is not the case with the starting low resolution.
   	!Otherwise the problem is straightforward.
-  
-  
+
+
 	nH_to_rho = 1-3 * masseH * wght_per_H
   !first init arrays for nested algorithm
   	call init_pix2xy_and_xy2pix
-  
+
   	!Init healpix max for each cell that have density.
-  
+
   	allocate(mask(n_cells))
 !   	mask = .false.
   	mask = (icompute_atomRT > 0)
   	call init_healpix_map(healpix_lorder,mask) !deallocated at the end of non-LTE loop
   	deallocate(mask)
-  	
+
   	!each pixel in base reoslution in healpix_map(icell)%p(:) will be refined up to
   	!lmax, in healpix_map(icell)%l(:)
   	!The actual pixels and angles associated are computed locally at the moment.
-  	
+
   	!for each cell propagates
   	!OMP directive here
 !   	do icell = 1, n_cells
@@ -2540,26 +2540,26 @@ module atmos_type
 ! 			x = r_grid(icell) * cos(phi_grid(icell))
 ! 			y = r_grid(icell) * sin(phi_grid(icell))
 ! 			z = z_grid(icell)
-! 			
+!
 ! 			do ipix=0, healpix_npix(healpix_lorder)-1
-! 			
+!
 ! 				healpix_pix_heirs_new
-! 			
+!
 ! 				ipix_start = 0
 ! 				ipix_end = healpix_npix(healpix_lorder)-1
-! 			
-! 			do ipix=ipix_start, ipix_end 
-! 			
+!
+! 			do ipix=ipix_start, ipix_end
+!
 ! 				call healpix_nested_mu_and_phi(l, ipix, w, wphi)
-! 				
+!
 ! 				!condition to increase l by 1 is:
 ! 				! dOmega / dOmega_l > Nr_min
 ! 				!dOmega * 3 * 4**l / pi > Nr_min
-! 
+!
 !   				cm = 0.0
-!   				
+!
 ! 				call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-! 
+!
 !   ! Boucle infinie sur les cellules
 ! 		infinie : do ! Boucle infinie
 !     ! Indice de la cellule
@@ -2567,67 +2567,67 @@ module atmos_type
 ! 			icell = next_cell
 ! 			x0=x1 ; y0=y1 ; z0=z1
 !     !write(*,*) "Boucle infinie, icell=", icell
-! 
+!
 ! 			if (icell <= n_cells) then
 ! 				lcellule_non_vide = (icompute_atomRT(icell) > 0)
 ! 				if (icompute_atomRT(icell) < 0) return !-1 if dark
 ! 			else
 ! 				lcellule_non_vide=.false.
 ! 			endif
-!     
+!
 !     ! Test sortie ! "The ray has reach the end of the grid"
-! 
+!
 ! 			if (test_exit_grid(icell, x0, y0, z0)) return
-! 
+!
 ! 			if (lintersect_stars) then
 ! 				if (icell == icell_star) then
 !        				return
 !       			end if
 !    			 endif
-! 
+!
 ! 			nbr_cell = nbr_cell + 1
-! 
+!
 !     ! Calcul longeur de vol et profondeur optique dans la cellule
 ! 			previous_cell = 0 ! unused, just for Voronoi
 ! 			call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,ls, l_contrib, l_void_before)
-! 			
+!
 !     !count opacity only if the cell is filled, else go to next cell
 ! 			if (lcellule_non_vide) then
-! 	
-! 	
+!
+!
 ! 			!integrate column density in that direction
 ! 			cm = cm + nH_to_rho * nHtot(icell) * l_contrib
 ! ! 				if (cm) > cm_lim) then
 ! ! 					return
 ! ! 				endif
-! 
-! 
+!
+!
 ! 			end if  ! lcellule_non_vide
 ! 		end do infinie
-! 				
-! 			
+!
+!
 ! 			enddo
-! 			
+!
 !   		endif
 !   	enddo
-!   	
-  
-  	
-  
+!
+
+
+
   return
   end subroutine refine_healpix_sphere
-  
+
   !few healpix routines, moved to healpix_mod.f90
-  
+
 !   function largest_integer_smaller_than_x(x)
 !   	real(kind=dp), intent(in) :: x
 !   	integer(kind=8) largest_integer_smaller_than_x
-!   	
+!
 !   	largest_integer_smaller_than_x = int(ceiling(x)) - 1
-!   	
+!
 !   	return
 !   end function largest_integer_smaller_than_x
-!   
+!
 !   function healpix_children_nested_index(pix)
 !   	!given the index of the parent pixel pix
 !   	!computes the 4 children pixel indexes
@@ -2635,40 +2635,40 @@ module atmos_type
 !   	integer, intent(in) :: pix
 !   	integer, dimension(n_children) :: healpix_children_nested_index
 !   	integer :: n
-!   	
+!
 !   	do n=0,n_children-1
 !   		healpix_children_nested_index(n+1) = 4*pix + n
 !   	enddo
-!   	
+!
 !   	return
 !   end function healpix_children_nested_index
-!   
+!
 !   function healpix_parent_nested_index(m)
 !   	integer, intent(in) :: m
 !   	integer :: healpix_parent_nested_index
-!   	
+!
 !   	!m=0,1,2,3 have the same parent
 !   	!m=4,5,6,7 have the same parent...
 !   	healpix_parent_nested_index = int(real(m)/4.0)
-!   
-!   	return 
+!
+!   	return
 !   end function healpix_parent_nested_index
-! 
+!
 !   function healpix_npix(l)
 !   	integer, intent(in) :: l
 !   	integer(kind=8) :: healpix_npix
-!   	
+!
 !   	!Npix = 12 * Nside**2
 !   	!with Nside = 2**l, the resolution of the grid
 !   	healpix_npix = 12 * 4**l
-!   	
+!
 !   	return
 !   end function healpix_npix
-!   
+!
 !   function healpix_weight(l)
 !   	integer, intent(in) :: l
 !   	real(kind=dp) :: healpix_weight
-!   	
+!
 !   	!weight = area/4pi
 !   	!area is 4pi / Npix
 !   	!Npix = 12 * Nside**2
@@ -2677,62 +2677,62 @@ module atmos_type
 !   	!weight = (pi/3)/(4pi)/4**l
 !   	!weight = (1./12.)/4**l
 !   	healpix_weight = (1.0/12.0) / real(4**l,kind=dp)
-!   	
+!
 !   	return
 !   end function healpix_weight
-!   
+!
 !   function healpix_angular_resolution(l)
 !   	!in degrees
 !   	integer, intent(in) :: l
 !   	real(kind=dp) :: healpix_angular_resolution
-!   	
+!
 !   	!4pi * healpix_weight is actually the solid angle it's the "square" resolution
 !   	!healpix_angular_resolution = 180.0 * sqrt( 4.0 * pi * healpix_weight(l) )/ pi
 ! 	healpix_angular_resolution = 180.0 * sqrt(pi/real(3*4**l)) / pi
-!   	
+!
 ! 	return
 !   end function healpix_angular_resolution
 !     	  !lshift, rshift
-!     	  
+!
 !   subroutine healpix_mu_and_phi(l, pix, mu, phi)
 !   	integer, intent(in) :: l, pix
 !   	integer :: p, i, j, pp
 !   	real(kind=dp), intent(out) :: mu, phi !cos(theta) and azimuth from the north pole
 !   	integer(kind=8) :: Npix, Nside, North_cap
 !   	real(kind=dp) :: four_on_Npix, ph, fodd, s
-!   	
+!
 !   	Npix = healpix_npix(l)
 !   	Nside = 2**l
 !   	North_cap = 2 * Nside * (Nside-1)
-!   	
+!
 !   	!C index
 !   	p = pix - 1
-!   	
+!
 !   	!better to do that out of the subroutine if called many times
 !   	!if pix in a do loop (do pix=1,Npix) should never happen
 !   	if (pix > Npix) then
 !   		write(*,*) pix, Npix, l
 !   		call error("(Healpix_mu_and_phi) pixel index larger than Npix")
 !   	endif
-!   	
+!
 !   	four_on_Npix = 4.0 / real(Npix)
-!   	
+!
 !   	if (p < North_cap) then !north
 !   		ph = 0.5 * real(1 + p)
-!   		
+!
 !   		! i = largest_integer_small_than_x(ph)
 !   		i = rshift(int(1 + floor(sqrt(real(1+2*p)))),1)
-! 		  	
+!
 ! 		j = (p+1) - 2 * i * (i-1)
-! 		
+!
 ! 		mu = 1.0 - real(i*i) * four_on_Npix
 ! 		phi = (real(j) - 0.5) * 0.5 * pi / real(i)
-! 		
+!
 ! 	elseif (p < (Npix - North_cap)) then !equator
 ! 		pp = p - North_cap
 ! 		i = pp/(4*Nside) + Nside !integer
 ! 		j = mod(pp,4*Nside) + 1
-! 		
+!
 ! 		!1 if i+Nside odd, 0.5 otherwise
 ! 		if (mod(i+Nside,2)==0) then
 ! 			fodd = 0.5
@@ -2741,47 +2741,47 @@ module atmos_type
 ! 		endif
 ! 		s = 0.5 * mod(i-Nside+1,2)
 ! 		!fodd = s, should give the same result
-! 		
+!
 ! 		!!see, it is simply 4/3
 ! 		!!(2*Nside * 4.0 / Npix ) * (Nside <<1) = 4/3 whatever Nside
 ! 		!!(4/Npix) * (Nside << 1) = 2/3/Nside whatever Nside
 ! 		!mu = four_on_Npix * real( ( 2 * Nside - i) * lshift(Nside,1) )
 ! 		mu = 4.0 / 3.0 - 2.0 * real(i) / real(3*Nside)
 ! 		phi = (real(j) - fodd) * pi / real(2 * Nside)
-! 	
-! 	else !south 
+!
+! 	else !south
 ! 		pp = Npix - p
 ! 		i = rshift(int(1 + floor(sqrt(real(2*pp-1)))),1)
 ! 		j = 4 * i + 1 - (pp - 2*i*(i-1))
-! 		
+!
 ! 		mu = -1.0 + real(i*i) * four_on_Npix
 ! 		phi = (real(j) - 0.5) * 0.5 * pi / real(i)
-! 	
+!
 ! 	endif
-!   	
+!
 !   	return
 !   end subroutine healpix_mu_and_phi
-!   
+!
 !   subroutine healpix_sphere(l,mu,phi)
 !   	integer, intent(in) :: l
 !   	real(kind=dp), dimension(12*4**l), intent(out) :: mu, phi
 !   	integer :: pix
-!   	
+!
 !   	mu(:) = 0.0_dp
 !   	phi(:) = 0.0_dp
-!   	
+!
 !   	do pix=1,healpix_npix(l)
-!   	
+!
 !   		call healpix_mu_and_phi(l,pix,mu(pix),phi(pix))
-!   		
+!
 !   	enddo
-!   	
+!
 !   	return
 !   end subroutine healpix_sphere
-  
-  
+
+
 !! Futur deprecation
-! 
+!
 !   subroutine writeAtmos_ascii()
 !   ! ------------------------------------- !
 !    ! Write GridType atmos to ascii file.
@@ -2794,9 +2794,9 @@ module atmos_type
 !    real(kind=dp), dimension(n_cells) :: XX, YY, ZZ
 !    real(kind=dp) :: r, rcyl, phi, z, sinTheta, rho_to_nH, fact
 !    real(kind=dp) :: dx, dy, dz, smooth_scale
-! 
+!
 !    rho_to_nH = 1d0 / AMU /atmos%avgWeight
-! 
+!
 !    if (n_az <= 1) then
 !     write(*,*) "Error, in this case, lmagnetoaccr is false, and", &
 !     	' n_az > 1'
@@ -2828,12 +2828,12 @@ module atmos_type
 !      end do
 !     end do
 !    end do
-! 
+!
 !    if (lstatic) then
 !     allocate(atmos%Vxyz(n_cells,3))
 !     atmos%Vxyz = 0d0
 !    end if
-! 
+!
 !    open(unit=1,file=trim(filename),status="replace")
 !    atmos%nHtot = atmos%nHtot / rho_to_nH !using total density instead of nHtot for writing
 !    !write Masses per cell instead of densities. Voronoi cells Volume is different than
@@ -2865,41 +2865,41 @@ module atmos_type
 !      		  minval(sqrt(sum(atmos%Vxyz**2,dim=2)), dim=1,&
 !      		  mask=sum(atmos%Vxyz**2,dim=2)>0)*1d-3
 !    close(unit=1)
-! 
+!
 !   return
 !   end subroutine writeAtmos_ascii
 
 end module atmos_type
 
 !   subroutine compute_anglequad_centres()
-! 
+!
 ! ! 	if (icentres==5) then
-! ! 	
+! !
 ! ! 		Ncentre = 5
 ! ! 		allocate(frac_pos(Ncentre, 3)); frac_pos(:,:) = 0.0
-! ! 	!-> Sobol	
+! ! 	!-> Sobol
 ! ! 		frac_pos(:,1) = (/ 0.5  , 0.75 , 0.25 , 0.375, 0.875 /)
 ! ! 		frac_pos(:,2) = (/ 0.5  , 0.25 , 0.75 , 0.375, 0.875 /)
 ! ! 		frac_pos(:,3) = (/ 0.5  , 0.75 , 0.25 , 0.625, 0.125 /)
-! ! 	else 
+! ! 	else
 ! 	if (icentres==10) then
-! 	
+!
 ! 		Ncentre = 10
 ! 		allocate(frac_pos(Ncentre, 3)); frac_pos(:,:) = 0.0_dp
-! 
+!
 ! 	!-> halton
 ! 		frac_pos(:,1) = (/ 0.375 , 0.875 , 0.0625 , 0.5625 , 0.3125 ,0.8125 , 0.1875 , 0.6875 , 0.4375 , 0.9375 /)
 ! 		frac_pos(:,2) = (/ 0.22222222, 0.55555556, 0.88888889, 0.03703704, 0.37037037,0.7037037 , 0.14814815, 0.48148148, 0.81481481, 0.25925926 /)
-! 		frac_pos(:,3) = (/ 0.24, 0.44, 0.64, 0.84, 0.08 ,0.28 , 0.48, 0.68  , 0.88 , 0.12 /)	
+! 		frac_pos(:,3) = (/ 0.24, 0.44, 0.64, 0.84, 0.08 ,0.28 , 0.48, 0.68  , 0.88 , 0.12 /)
 ! 	!-> Sobol
 ! ! 		frac_pos(:,1) = (/ 0.5   , 0.75  , 0.25  , 0.375 , 0.875 , 0.625 , 0.125 , 0.1875, 0.6875, 0.9375 /)
 ! ! 		frac_pos(:,2) = (/ 0.5   , 0.25  , 0.75  , 0.375 , 0.875 , 0.125 , 0.625 , 0.3125, 0.8125, 0.0625 /)
 ! ! 		frac_pos(:,3) = (/ 0.5   , 0.75  , 0.25  , 0.625 , 0.125 , 0.375 , 0.875 , 0.3125, 0.8125, 0.5625 /)
-! 
+!
 ! 	else if (icentres==50) then
 ! 		Ncentre = 50
 ! 		allocate(frac_pos(Ncentre, 3)); frac_pos(:,:) = 0.0_dp
-! 		
+!
 ! 	!-> Halton
 ! 		frac_pos(:,1) = (/ 0.375   , 0.875   , 0.0625  , 0.5625  , 0.3125  , 0.8125  ,&
 !        0.1875  , 0.6875  , 0.4375  , 0.9375  , 0.03125 , 0.53125 ,&
@@ -2926,7 +2926,7 @@ end module atmos_type
 !        0.648, 0.848, 0.088, 0.288, 0.488, 0.688, 0.888, 0.128, 0.328,&
 !        0.528, 0.728, 0.928, 0.168, 0.368, 0.568, 0.768, 0.968, 0.016,&
 !        0.216, 0.416, 0.616, 0.816, 0.056 /)
-! 		
+!
 ! 	!-> Sobol
 ! ! 		frac_pos(:,1) = (/ 0.5     , 0.75    , 0.25    , 0.375   , 0.875   , 0.625   ,&
 ! !        0.125   , 0.1875  , 0.6875  , 0.9375  , 0.4375  , 0.3125  ,&
@@ -2937,7 +2937,7 @@ end module atmos_type
 ! !        0.921875, 0.671875, 0.171875, 0.234375, 0.734375, 0.984375,&
 ! !        0.484375, 0.359375, 0.859375, 0.609375, 0.109375, 0.078125,&
 ! !        0.578125, 0.828125 /)
-! ! 		
+! !
 ! ! 		frac_pos(:,2) = (/ 0.5     , 0.25    , 0.75    , 0.375   , 0.875   , 0.125   ,&
 ! !        0.625   , 0.3125  , 0.8125  , 0.0625  , 0.5625  , 0.1875  ,&
 ! !        0.6875  , 0.4375  , 0.9375  , 0.46875 , 0.96875 , 0.21875 ,&
@@ -2947,7 +2947,7 @@ end module atmos_type
 ! !        0.640625, 0.390625, 0.890625, 0.078125, 0.578125, 0.328125,&
 ! !        0.828125, 0.453125, 0.953125, 0.203125, 0.703125, 0.234375,&
 ! !        0.734375, 0.484375 /)
-! ! 		
+! !
 ! ! 		frac_pos(:,3) = (/ 0.5     , 0.75    , 0.25    , 0.625   , 0.125   , 0.375   ,&
 ! !        0.875   , 0.3125  , 0.8125  , 0.5625  , 0.0625  , 0.9375  ,&
 ! !        0.4375  , 0.1875  , 0.6875  , 0.84375 , 0.34375 , 0.09375 ,&
@@ -2957,12 +2957,12 @@ end module atmos_type
 ! !        0.734375, 0.984375, 0.484375, 0.796875, 0.296875, 0.046875,&
 ! !        0.546875, 0.421875, 0.921875, 0.671875, 0.171875, 0.265625,&
 ! !        0.765625, 0.515625 /)
-! 		
+!
 ! 	else if (icentres==100) then
-! 	
+!
 ! 		Ncentre = 100
 ! 		allocate(frac_pos(Ncentre, 3)); frac_pos(:,:) = 0.0_dp
-! 		
+!
 ! 	!halton
 ! 		frac_pos(:,1) = (/ 0.375    , 0.875    , 0.0625   , 0.5625   , 0.3125   , 0.8125,&
 !        0.1875   , 0.6875   , 0.4375   , 0.9375   , 0.03125  , 0.53125  ,&
@@ -2981,7 +2981,7 @@ end module atmos_type
 !        0.3515625, 0.8515625, 0.2265625, 0.7265625, 0.4765625, 0.9765625,&
 !        0.0234375, 0.5234375, 0.2734375, 0.7734375, 0.1484375, 0.6484375,&
 !        0.3984375, 0.8984375, 0.0859375, 0.5859375 /)
-! 		
+!
 ! 		frac_pos(:,2) = (/ 0.22222222, 0.55555556, 0.88888889, 0.03703704, 0.37037037,&
 !        0.7037037 , 0.14814815, 0.48148148, 0.81481481, 0.25925926,&
 !        0.59259259, 0.92592593, 0.07407407, 0.40740741, 0.74074074,&
@@ -3002,7 +3002,7 @@ end module atmos_type
 !        0.3744856 , 0.70781893, 0.15226337, 0.48559671, 0.81893004,&
 !        0.26337449, 0.59670782, 0.93004115, 0.0781893 , 0.41152263,&
 !        0.74485597, 0.18930041, 0.52263374, 0.85596708, 0.30041152 /)
-! 		
+!
 ! 		frac_pos(:,3) = (/ 0.24 , 0.44 , 0.64 , 0.84 , 0.08 , 0.28 , 0.48 , 0.68 , 0.88 ,&
 !        0.12 , 0.32 , 0.52 , 0.72 , 0.92 , 0.16 , 0.36 , 0.56 , 0.76 ,&
 !        0.96 , 0.008, 0.208, 0.408, 0.608, 0.808, 0.048, 0.248, 0.448,&
@@ -3015,7 +3015,7 @@ end module atmos_type
 !        0.504, 0.704, 0.904, 0.144, 0.344, 0.544, 0.744, 0.944, 0.184,&
 !        0.384, 0.584, 0.784, 0.984, 0.032, 0.232, 0.432, 0.632, 0.832,&
 !        0.072 /)
-! 		
+!
 ! ! 	-> Sobol
 ! ! 		frac_pos(:,1) = (/ 0.5      , 0.75     , 0.25     , 0.375    , 0.875    , 0.625    ,&
 ! !        	0.125    , 0.1875   , 0.6875   , 0.9375   , 0.4375   , 0.3125   ,&
@@ -3034,7 +3034,7 @@ end module atmos_type
 ! !        	0.9921875, 0.7421875, 0.2421875, 0.1796875, 0.6796875, 0.9296875,&
 ! !        	0.4296875, 0.3046875, 0.8046875, 0.5546875, 0.0546875, 0.0390625,&
 ! !        	0.5390625, 0.7890625, 0.2890625, 0.4140625 /)
-! !        
+! !
 ! !     	frac_pos(:,2) = (/ 0.5      , 0.25     , 0.75     , 0.375    , 0.875    , 0.125    ,&
 ! !        	0.625    , 0.3125   , 0.8125   , 0.0625   , 0.5625   , 0.1875   ,&
 ! !        	0.6875   , 0.4375   , 0.9375   , 0.46875  , 0.96875  , 0.21875  ,&
@@ -3052,7 +3052,7 @@ end module atmos_type
 ! !        	0.9921875, 0.2421875, 0.7421875, 0.3046875, 0.8046875, 0.0546875,&
 ! !        	0.5546875, 0.1796875, 0.6796875, 0.4296875, 0.9296875, 0.1328125,&
 ! !        	0.6328125, 0.3828125, 0.8828125, 0.2578125 /)
-! !     
+! !
 ! !     	frac_pos(:,3) = (/ 0.5      , 0.75     , 0.25     , 0.625    , 0.125    , 0.375    ,&
 ! !        	0.875    , 0.3125   , 0.8125   , 0.5625   , 0.0625   , 0.9375   ,&
 ! !        	0.4375   , 0.1875   , 0.6875   , 0.84375  , 0.34375  , 0.09375  ,&
@@ -3073,7 +3073,7 @@ end module atmos_type
 !     else if (icentres == 1000) then
 ! 		Ncentre = 1000
 ! 		allocate(frac_pos(Ncentre, 3)); frac_pos(:,:) = 0.0_dp
-! 		
+!
 ! 	!-> Sobol
 ! 		frac_pos(:,1) = (/ 0.5       , 0.75      , 0.25      , 0.375     , 0.875     ,&
 !        0.625     , 0.125     , 0.1875    , 0.6875    , 0.9375    ,&
@@ -3275,7 +3275,7 @@ end module atmos_type
 !        0.92285156, 0.42285156, 0.29785156, 0.79785156, 0.54785156,&
 !        0.04785156, 0.03222656, 0.53222656, 0.78222656, 0.28222656,&
 !        0.40722656, 0.90722656, 0.65722656, 0.15722656, 0.21972656 /)
-!        
+!
 !     	frac_pos(:,2) = (/ 5.00000000e-01, 2.50000000e-01, 7.50000000e-01, 3.75000000e-01,&
 !        8.75000000e-01, 1.25000000e-01, 6.25000000e-01, 3.12500000e-01,&
 !        8.12500000e-01, 6.25000000e-02, 5.62500000e-01, 1.87500000e-01,&
@@ -3526,7 +3526,7 @@ end module atmos_type
 !        7.68554688e-01, 1.85546875e-02, 5.18554688e-01, 2.84179688e-01,&
 !        7.84179688e-01, 3.41796875e-02, 5.34179688e-01, 1.59179688e-01,&
 !        6.59179688e-01, 4.09179688e-01, 9.09179688e-01, 9.66796875e-02 /)
-!     
+!
 !     	frac_pos(:,3) = (/ 5.00000000e-01, 7.50000000e-01, 2.50000000e-01, 6.25000000e-01,&
 !        1.25000000e-01, 3.75000000e-01, 8.75000000e-01, 3.12500000e-01,&
 !        8.12500000e-01, 5.62500000e-01, 6.25000000e-02, 9.37500000e-01,&
@@ -3782,8 +3782,8 @@ end module atmos_type
 !     else
 !     	call warning(" wrong value of icentres, setting to 0")
 !     	Ncentre = 0
-!     endif  
-!   
+!     endif
+!
 !   return
 !   end subroutine compute_anglequad_centres
 
@@ -3793,7 +3793,7 @@ end module atmos_type
 !    for each cell starting from 1 to n_cells
 !    integer :: Nspace, Npf, Nactiveatoms, Npassiveatoms, Natom, Nrays = 1
 !    real(kind=dp) :: metallicity, totalAbund, avgWeight, wght_per_H
-! 
+!
 !    ! will be deprecated as I do not need optical_length_tot for stellar map. Only for checking
 !    real(kind=dp) :: tau !a variable used to sum up contribution of opacities along a ray
 !    !
