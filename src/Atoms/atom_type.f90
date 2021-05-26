@@ -115,6 +115,9 @@ MODULE atom_type
    real(kind=dp), dimension(:,:), pointer :: n, nstar
    real(kind=dp), dimension(:,:), allocatable :: b !not a pointer this one
    ! arrays of lines, continua containing different line, continuum each
+   real(kind=dp), dimension(:,:), allocatable :: gauss_prof !Common Gaussian line profile for all lines
+   real(kind=dp), dimension(:), allocatable :: ug
+   logical :: lgauss_prof = .false.
    type (AtomicLine), allocatable, dimension(:)         :: lines
    type (AtomicContinuum) , allocatable, dimension(:)   :: continua
    type (AtomicTransition), allocatable, dimension(:)   :: at !Atomic transition, lines first in readatom

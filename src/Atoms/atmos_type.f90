@@ -1154,7 +1154,7 @@ module atmos_type
     if (allocated(atom%eta)) deallocate(atom%eta)
     if (allocated(atom%etac)) deallocate(atom%etac)
     if (allocated(atom%chic)) deallocate(atom%chic)
-
+	if (allocated(atom%gauss_prof)) deallocate(atom%Gauss_prof,atom%ug)
 
 !!!     for this atom, free lines if allocated
      if (allocated(atom%lines)) then

@@ -61,7 +61,7 @@ MODULE readatom
     character(len=MAX_LENGTH) :: inputline, FormatLine
     integer :: Nread, i,j, EOF, nll, nc, Nfixed !deprecation future
     real, allocatable, dimension(:) :: levelNumber
-    logical :: Debeye, match, res=.false.
+    logical :: Debeye, match, res, setup_commin_gauss_prof
     logical, dimension(:), allocatable :: determined, parse_label
     real(kind=dp), dimension(:), allocatable :: old_nHtot
     character(len=20) :: shapeChar, symmChar, optionChar, vdWChar, nuDepChar
@@ -69,6 +69,9 @@ MODULE readatom
     real(kind=dp) :: C1, vDoppler, f, lambdaji
     real(kind=dp) :: lambdamin, geff, gamma_j, gamma_i
     EOF = 0
+    res = .false.
+    setup_commin_gauss_prof = .false.
+    
     !write(*,*) "Atom is part of the active atoms ?", atom%active
 
     !for Aji
@@ -417,6 +420,10 @@ MODULE readatom
      else if (trim(shapeChar).eq."GAUSS") then
         !write(*,*) "Using Gaussian profile for that line"
         atom%lines(kr)%Voigt = .false.
+        if (.not.setup_commin_gauss_prof) then
+        	setup_commin_gauss_prof = .true.
+        	atom%lgauss_prof = .true. !set only once per atom!
+        endif
 !      else if (trim(shapeChar).eq."COMPOSIT") then
 !         !write(*,*) "Using a Multi-component profile for that line"
 !         ! frist read the number of component
@@ -1081,6 +1088,7 @@ MODULE readatom
 ! 	 maxvel = maxval(atom%vbroad)
      !write(*,*) "maxvel for line ", kr, maxvel * 1e-3
      !!-> group of lines, linear in v
+     !for Gauss and voigt and sets line bounds!line%u deallocated if not needed
      call define_local_profile_grid (Atoms(nmet)%ptr_atom%lines(kr))
 
  
@@ -1094,7 +1102,12 @@ MODULE readatom
 
    
    enddo !over lines
-  
+  	if (atom%lgauss_prof) then
+  		write(*,*) " -> gauss profile for that atom ", atom%id
+  		call define_local_gauss_profile_grid(atom)
+  	endif
+! 	atom%lgauss_prof = .false.
+  	atom => null()
   enddo !over atoms
   write(*,*) "..done"
   Max_ionisation_stage = get_max_nstage()
