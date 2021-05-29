@@ -55,6 +55,9 @@ module atmos_type
 	real(kind=dp) :: B_char = 0d0, v_char=0d0
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
 	logical :: lMagnetized = .false., calc_ne, laccretion_shock
+	
+	real(kind=dp) :: thetai, thetao
+	
 	integer, allocatable, dimension(:) :: icompute_atomRT!
 	real(kind=dp), dimension(:), allocatable :: xmu, wmu, xmux, xmuy
 	!removed the depency in rays of some quantity (like phi_loc or I) since rate matrix
@@ -2146,340 +2149,332 @@ module atmos_type
  end subroutine writeTemperature
 
 
-  subroutine readAtmos_ascii(filename)
-  ! ------------------------------------------- !
-   ! Read from ascii file a model to be used
-   ! with the spherical grid of mcfost.
-   ! Suppose that the model read is computed on
-   ! a predefined grid by mcfost.
-  ! ------------------------------------------- !
-   use getline
-   use constantes
-   use grid, only : cell_map
-   character(len=*), intent(in)	:: filename
-   real(kind=dp) Tshk!, Oi, Oo
-   real(kind=dp) :: Tring, thetai, thetao, tilt
-   integer, parameter :: Nhead = 3 !Add more
-   character(len=MAX_LENGTH) :: rotation_law
-   integer :: icell, Nread, syst_status, N_points, k, i, j, acspot, N_fixed_ne = 0
-   character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
-   logical :: accretion_spots
-   real :: south
-   real, parameter :: Lextent = 1.0!1.1
-   real(kind=dp) :: rr, zz, pp!, dimension(n_cells) , V2
-   real(kind=dp), dimension(:), allocatable :: B2, V2
-   logical :: is_not_dark!, xit
-   real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, Mdot = 1d-7, tc, phic, Vmod, Vinf
+	subroutine readAtmos_ascii(filename)
+	! ------------------------------------------- !
+	! Read from ascii file a model to be used
+	! with the spherical grid of mcfost.
+	! Suppose that the model read is computed on
+	! a predefined grid by mcfost.
+	! We never enter here if lvoronoi is TRUE
+	! ------------------------------------------- !
+		use getline
+		use constantes
+		use grid, only : cell_map
+		character(len=*), intent(in)	:: filename
+		real(kind=dp) Tshk!, Oi, Oo
+		real(kind=dp) :: Tring, tilt!,thetai, thetao
+		integer, parameter :: Nhead = 3 !Add more
+		character(len=MAX_LENGTH) :: rotation_law
+		integer :: icell, Nread, syst_status, N_points, k, i, j, acspot, N_fixed_ne = 0
+		character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
+		logical :: accretion_spots
+		real :: south
+		real, parameter :: Lextent = 1.0!1.1
+		real(kind=dp) :: rr, zz, pp!, dimension(n_cells) , V2
+		real(kind=dp), dimension(:), allocatable :: B2, V2
+		logical :: is_not_dark!, xit
+		real(kind=dp) :: rho_to_nH, Lr, rmi, rmo, tc, phic, Vmod, Vinf
 
-   lmagnetoaccr = .false.
-   lspherical_velocity = .false.
-   lVoronoi = .false.
-   !read from file the velocity law if any
-   call alloc_atomic_atmos()
-   allocate(V2(n_cells)); V2=0.0_dp
-   !For now we do not necessarily need to compute B if no polarization at all
-   lmagnetized = lzeeman_polarisation !if Zeeman polarisation read magnetic field!
-   if (lmagnetized) then
-   	write(*,*) " Allocating magnetic field array"
-    call alloc_magnetic_field()
+		lmagnetoaccr = .false.
+		lspherical_velocity = .false.
+		lVoronoi = .false.
+		!read from file the velocity law if any
+		call alloc_atomic_atmos()
+		allocate(V2(n_cells)); V2=0.0_dp
+		!For now we do not necessarily need to compute B if no polarization at all
+		lmagnetized = lzeeman_polarisation !if Zeeman polarisation read magnetic field!
+		if (lmagnetized) then
+			write(*,*) " Allocating magnetic field array"
+			call alloc_magnetic_field()
 !     allocate(B2(n_cells))
     !only to read either Bz or Btheta depending on velocity law
-   endif
+		endif
 
    !change mean molecular weight in atom weight mean and mean molecular weight as mu*(1-ne/nTot) Hubeny pa 792
-   rho_to_nH = 1d3 /masseH / wght_per_H!atmos%avgWeight !density kg/m3 -> nHtot m^-3
+		rho_to_nH = 1d3 /masseH / wght_per_H!atmos%avgWeight !density kg/m3 -> nHtot m^-3
    !rho/avgWeight = Ngas total, see rutten page 143 eq 7.3
-!or use rho and for each element use the masse fraction to define its total number ?
-!should be the same as using Abund wrt to nHtot
+		!or use rho and for each element use the masse fraction to define its total number ?
+		!should be the same as using Abund wrt to nHtot
 
 
-   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
+		write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
 
    !could add header with magnetic field and so on
    !location of spots + lmagnetoaccretion flags if other kind of models with the use of spots
    ! + Tschok
 
-   cmd = "wc -l "//trim(filename)//" > ntest.txt"
-   call appel_syst(cmd,syst_status)
-   open(unit=1,file="ntest.txt",status="old")
-   read(1,*) N_points
-   close(unit=1)
-   !-2 because 2 headers lines
-   write(*,*) "Found ", N_points - Nhead, " points and grid has", n_cells, " points"
-   if (N_points - Nhead/= n_cells) then
-    write(*,*) "Should read a model for the exact same grid as mcfost !"
-    stop
-   end if
+		cmd = "wc -l "//trim(filename)//" > ntest.txt"
+		call appel_syst(cmd,syst_status)
+		open(unit=1,file="ntest.txt",status="old")
+		read(1,*) N_points
+		close(unit=1)
+		!-2 because 2 headers lines
+		write(*,*) "Found ", N_points - Nhead, " points and grid has", n_cells, " points"
+		if (N_points - Nhead/= n_cells) then
+			call error( "Should read a model for the exact same grid as mcfost !" )
+		end if
 
-   open(unit=1,file=filename, status="old")
-   call getnextline(1, "#", FormatLine, inputline, Nread)
-   read(inputline(1:Nread),*) rotation_law
+		open(unit=1,file=filename, status="old")
+		call getnextline(1, "#", FormatLine, inputline, Nread)
+		read(inputline(1:Nread),*) rotation_law
 
 
-    SELECT CASE (rotation_law)
-     CASE ("magneto-accretion")
-     	lmagnetoaccr = .true.
-     	write(*,*) " Velocity law is ", trim(rotation_law), lmagnetoaccr
-     CASE ("spherical_vector")
-     	lspherical_velocity = .true.
-     	write(*,*) " Velocity law is ", trim(rotation_law), lspherical_velocity
-     CASE ("None")
-     	write(*,*) " No interpolation of the velocity field", trim(rotation_law)
-     	write(*,*) " Profile and v_proj not modified to use that with not Voronoi grid yet"
-     	stop
-     CASE DEFAULT
-        write(*,*) " Velocity law ", rotation_law," not handled yet"
-        stop
-    end SELECT
+		select case (rotation_law)
+		case ("magneto-accretion")
+			lmagnetoaccr = .true.
+			write(*,*) " Velocity law is ", trim(rotation_law), lmagnetoaccr
+		case ("spherical_vector")
+			lspherical_velocity = .true.
+			write(*,*) " Velocity law is ", trim(rotation_law), lspherical_velocity
+		case ("None")
+			write(*,*) " No interpolation of the velocity field", trim(rotation_law)
+			write(*,*) " Profile and v_proj not modified to use that with not Voronoi grid yet"
+			stop
+		case default
+			write(*,*) " Velocity law ", rotation_law," not handled yet"
+			stop
+		end select
 
 
    !read T shock and if accretion spots
-   call getnextline(1, "#", FormatLine, inputline, Nread)
-   read(inputline(1:Nread),*) Tshk, acspot
-   accretion_spots = .false.
-   if (acspot==1) accretion_spots = .true.
-   laccretion_shock = accretion_spots
-   Taccretion = Tshk
-   if (Taccretion==0.0_dp) Taccretion = -1.0_dp
-   !
-   !If Tshk is <= 0, the shock temperature is computed from the mass flux onto the star.
-   !However, Tshk becomes a correction factor un Tshock = abs(Tshk) * mass_flux
-   !
-   !now read thetao and thetai
-   call getnextline(1, "#", FormatLine, inputline, Nread)
-   read(inputline(1:Nread),*) thetai, thetao, tilt
-   thetai = thetai * pi/180.
-   thetao = thetao * pi/180.
-   tilt = tilt * pi/180.
+		call getnextline(1, "#", FormatLine, inputline, Nread)
+		read(inputline(1:Nread),*) Tshk, acspot
+		accretion_spots = .false.
+		if (acspot==1) accretion_spots = .true.
+		laccretion_shock = accretion_spots
+		Taccretion = Tshk
+		if (Taccretion==0.0_dp) Taccretion = -1.0_dp
+		!
+		!If Tshk is <= 0, the shock temperature is computed from the mass flux onto the star.
+		!However, Tshk becomes a correction factor un Tshock = abs(Tshk) * mass_flux
+		!
+		!now read thetao and thetai, the colatitudes of the shock on the stellar surface (roughly with numerical sim.)
+		call getnextline(1, "#", FormatLine, inputline, Nread)
+		read(inputline(1:Nread),*) thetai, thetao, tilt
+		thetai = thetai * pi/180.
+		thetao = thetao * pi/180.
+		tilt = tilt * pi/180.
 
-   do i=1, n_rad
-     do j=j_start,nz !j_start = -nz in 3D
-      do k=1, n_az
-       if (j==0) then !midplane
-        !icell = cell_map(i,1,k)
-        cycle
-       else
-         icell = cell_map(i,j,k)
-       end if
-    Nread = 0
-    if (lmagnetized) then
+		do i=1, n_rad
+			do j=j_start,nz !j_start = -nz in 3D
+				do k=1, n_az
+       				if (j==0) then !midplane
+        				!icell = cell_map(i,1,k)
+        				cycle
+       				else
+         				icell = cell_map(i,j,k)
+       				end if
+    				Nread = 0
+    				if (lmagnetized) then
 
-     call getnextline(1, "#", FormatLine, inputline, Nread)
+     					call getnextline(1, "#", FormatLine, inputline, Nread)
 
-	!In case of no polarisation, but magnetic field is present in the file, it is better to
-	!read the mandatory variables and put the magnetic field at the end of the file
-     read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
-         vR(icell), V2(icell), Vphi(icell), vturb(icell), icompute_atomRT(icell), &
-         Bmag(icell), gammab(icell), chib(icell)
+					!In case of no polarisation, but magnetic field is present in the file, it is better to
+					!read the mandatory variables and put the magnetic field at the end of the file
+						read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
+							vR(icell), V2(icell), Vphi(icell), vturb(icell), icompute_atomRT(icell), &
+							Bmag(icell), gammab(icell), chib(icell)
          !BR(icell), B2(icell), Bphi(icell)
          !Bmag(icell), gammab(icell), chib(icell)
-    else
-     call getnextLine(1, "#", FormatLine, inputline, Nread)
-     read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
-         vR(icell), V2(icell), vphi(icell), vturb(icell), icompute_atomRT(icell)
+					else
+						call getnextLine(1, "#", FormatLine, inputline, Nread)
+						read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
+							vR(icell), V2(icell), vphi(icell), vturb(icell), icompute_atomRT(icell)
 
-    end if !magnetized
-     end do
-    end do
-   end do
+					end if !magnetized
+				end do
+			end do
+		end do
+		close(unit=1)
 
-   if (lspherical_velocity) then
-    vtheta(:) = V2(:)
-    deallocate(V2)
+		if (lspherical_velocity) then
+			vtheta(:) = V2(:)
+			deallocate(V2)
 !     if (lmagnetized) then
 !      Btheta(:) = B2(:)
 !      deallocate(B2, B_z)
 !     endif
-   else if (lmagnetoaccr) then
-    v_z(:) = V2(:)
-    deallocate(V2)
+		else if (lmagnetoaccr) then
+			v_z(:) = V2(:)
+			deallocate(V2)
 !     if (lmagnetized) then
 !      B_z(:) = B2(:)
 !      deallocate(B2, Btheta)
 !     endif
-   else
-    call error ("Wrong velocity law")
-   endif
+		else!should not happen here
+			call error ("Wrong velocity law (should not happen here)")
+		endif
 
-   !rho -> nH
-   nHtot = nHtot * rho_to_nH
-   close(unit=1)
+		!rho -> nH
+		nHtot = nHtot * rho_to_nH
 
-   write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
-   write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
-   write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
+		write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
+		write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
+		write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
+		
+!old way of setting geometrical structures onto the stellar surface. Using stars.f90/intersect_spots and etoile(1)%SurfB
+!-> future deprecation
+!-> not used anymore, to be removed (kept for checking accretion spot with old routines)
+		if (thetai-thetao /= 0.0) then
+! 			rmi = 1d0 / sin(thetai)**2
+! 			rmo = 1d0 / sin(thetao)**2
+! !    if ((present(Oi)) .and. (present(Oo))) then
+! !     rmi = 1d0 / sin(Oi * PI/180.)**2
+! !     rmo = 1d0 / sin(Oo * PI/180.)**2
+! !     thetai = Oi * PI/180.!asin(sqrt(1d0/rmi))
+! !     thetao = Oo * PI/180 !asin(sqrt(1d0/rmo))
+! !    else
+! !     rmi = 2d0
+! !     rmo = 3d0
+! !     thetai = asin(sqrt(1d0/2d0))
+! !     thetao = asin(sqrt(1d0/3d0))
+! !    end if
+! 			Lr = Ggrav * etoile(1)%M * Msun_to_kg * Msun /3.154e7  / (etoile(1)%r*au_to_m) * (1. - 2./(rmi + rmo))
+! 
+! 
+! 			write(*,*) "Angles at stellar surface (deg)", thetao*rad_to_deg, thetai*rad_to_deg
+! 			Tring = Lr / (4d0 * PI * (etoile(1)%r*au_to_m)**2 * sigma * abs(cos(thetai)-cos(thetao)))
+! 			Tring = Tring**0.25
+! 			write(*,*) " Accretion spots tilt (deg)", tilt*180./pi
 
-   if (thetai-thetao /= 0.) then
-   rmi = 1d0 / sin(thetai)**2
-   rmo = 1d0 / sin(thetao)**2
-!    if ((present(Oi)) .and. (present(Oo))) then
-!     rmi = 1d0 / sin(Oi * PI/180.)**2
-!     rmo = 1d0 / sin(Oo * PI/180.)**2
-!     thetai = Oi * PI/180.!asin(sqrt(1d0/rmi))
-!     thetao = Oo * PI/180 !asin(sqrt(1d0/rmo))
-!    else
-!     rmi = 2d0
-!     rmo = 3d0
-!     thetai = asin(sqrt(1d0/2d0))
-!     thetao = asin(sqrt(1d0/3d0))
-!    end if
-    Lr = Ggrav * etoile(1)%M * Msun_to_kg * Mdot / (etoile(1)%r*au_to_m) * (1. - 2./(rmi + rmo))
+! 			if (Tshk > 0) Tring = Tshk
+! 
+! 
+! 			!2 is for two rings, 2Pi is dphi from 0 to 2pi / total sphere surface
+! 			write(*,*) "Ring T ", Tring, "K"
+! 			write(*,*) "Surface ", 100*(abs(cos(thetai)-cos(thetao))), "%" !couverte par les deux anneaux sur toute la sphere
+! 			write(*,*) "Luminosity", Lr/Lsun, "Lsun"
 
-
-    write(*,*) "Angles at stellar surface (deg)", thetao*rad_to_deg, thetai*rad_to_deg
-    Tring = Lr / (4d0 * PI * (etoile(1)%r*au_to_m)**2 * sigma * abs(cos(thetai)-cos(thetao)))
-    Tring = Tring**0.25
-    write(*,*) " Accretion spots tilt (deg)", tilt*180./pi
-
-
-    if (Tshk > 0) Tring = Tshk
-
-
-   !2 is for two rings, 2Pi is dphi from 0 to 2pi / total sphere surface
-    write(*,*) "Ring T ", Tring, "K"
-    write(*,*) "Surface ", 100*(abs(cos(thetai)-cos(thetao))), "%" !couverte par les deux anneaux sur toute la sphere
-    write(*,*) "Luminosity", Lr/Lsun, "Lsun"
-
-
-
-    !Add ring
-     if (accretion_spots) then
-      etoile(1)%Nr = 2
-   	  allocate(etoile(1)%SurfB(etoile(1)%Nr))
-   	  do k=1,etoile(1)%Nr!should be 1 ring for testing
-   	    south = 1.
-    	tc = tilt!0d0 * PI/180 !center of vector position
-    	phic = 0d0 !vector position, pointing to the center of the spot
-    	if (k==2) then
-    		south = -1. !for the ring in the southern hemisphere
-    		tc = tc + pi
-    	endif
-    	etoile(1)%SurfB(k)%T = Tring
+			!Add ring
+			if (accretion_spots) then
+				etoile(1)%Nr = 2
+				allocate(etoile(1)%SurfB(etoile(1)%Nr))
+				do k=1,etoile(1)%Nr!should be 1 ring for testing
+					south = 1.
+					tc = tilt!0d0 * PI/180 !center of vector position
+					phic = 0d0 !vector position, pointing to the center of the spot
+					if (k==2) then
+						south = -1. !for the ring in the southern hemisphere
+						tc = tc + pi
+					endif
+    				etoile(1)%SurfB(k)%T = Tring
         !center of the spot
-   	    etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)! *cos(tilt) - sin(tc)*sin(tilt)
-   	    etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
-   	    etoile(1)%SurfB(k)%r(3) = cos(tc)!south*(cos(tc) * cos(tilt) + cos(phic)*sin(tc)*sin(tilt))
+   	    			etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)! *cos(tilt) - sin(tc)*sin(tilt)
+   	    			etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
+   	    			etoile(1)%SurfB(k)%r(3) = cos(tc)!south*(cos(tc) * cos(tilt) + cos(phic)*sin(tc)*sin(tilt))
 
-		etoile(1)%SurfB(k)%mui = cos(thetai)
-    	etoile(1)%SurfB(k)%muo = cos(thetao)
+					etoile(1)%SurfB(k)%mui = cos(thetai)
+    				etoile(1)%SurfB(k)%muo = cos(thetao)
 !     	etoile(1)%SurfB(k)%phio = 2*PI; etoile(1)%SurfB(k)%phii = 0d0
-    	etoile(1)%SurfB(k)%phio = PI; etoile(1)%SurfB(k)%phii = -PI
+    				etoile(1)%SurfB(k)%phio = PI; etoile(1)%SurfB(k)%phii = -PI
     	!with new location of spots in intersect_spots
     	!should not change if no tilt i.e., (from 0 to 2pi)
     	!In case of a tilt we should also take into account that the half ring turns into a point as the tilt goes to 90 degrees
-    	if (tilt>0) then
-			etoile(1)%SurfB(k)%mui = sqrt(1. - sin(thetai)**2 * (1.0 - sin(tilt)) )
-    		etoile(1)%SurfB(k)%muo = sqrt(1. - sin(thetao)**2 * (1.0 - sin(tilt)) )
+    				if (tilt>0) then
+						etoile(1)%SurfB(k)%mui = sqrt(1. - sin(thetai)**2 * (1.0 - sin(tilt)) )
+    					etoile(1)%SurfB(k)%muo = sqrt(1. - sin(thetao)**2 * (1.0 - sin(tilt)) )
 
-			!or use the factor 1/sqrt(1 - sin(tilt)**2 * cos(phi)**2) that makes the spot circular at tilt=90
-   	    	if (etoile(1)%SurfB(k)%r(3) >= 0) then
-   	    		etoile(1)%SurfB(k)%phio = pi/2 * cos(tilt)**2!/ sqrt(1.0 - sin(tilt)**2)
-   	    		etoile(1)%SurfB(k)%phii = -pi/2 * cos(tilt)**2
-   	    	else
-   	    		etoile(1)%SurfB(k)%phio = -pi/2 * cos(tilt)**2
-   	    		etoile(1)%SurfB(k)%phii = pi/2 * cos(tilt)**2
-   	    	endif
-   	    endif
+					!or use the factor 1/sqrt(1 - sin(tilt)**2 * cos(phi)**2) that makes the spot circular at tilt=90
+   	    				if (etoile(1)%SurfB(k)%r(3) >= 0) then
+   	    					etoile(1)%SurfB(k)%phio = pi/2 * cos(tilt)**2!/ sqrt(1.0 - sin(tilt)**2)
+   	    					etoile(1)%SurfB(k)%phii = -pi/2 * cos(tilt)**2
+   	    				else
+   	    					etoile(1)%SurfB(k)%phio = -pi/2 * cos(tilt)**2
+   	    					etoile(1)%SurfB(k)%phii = pi/2 * cos(tilt)**2
+   	    				endif
+   	    			endif
 
-  	  end do
-  	 endif
+  	  			end do
+			endif !if accretion spot
+		end if !thetai-thetao /= 0
+!-> end future deprec
 
-   end if !thetai-thetao /= 0
-
-   if (lmagnetoaccr) then
-    Vmod = maxval(sqrt(vR**2+v_z(:)**2+vphi(:)**2))
-   else if (lspherical_velocity) then
-    Vmod = maxval(sqrt(vR**2+vtheta(:)**2+vphi(:)**2))
-   endif
-
-
-    v_char = v_char + Vmod
+		if (lmagnetoaccr) then
+			Vmod = maxval(sqrt(vR**2+v_z(:)**2+vphi(:)**2))
+		else if (lspherical_velocity) then
+			Vmod = maxval(sqrt(vR**2+vtheta(:)**2+vphi(:)**2))
+		endif
 
 
-   if (lmagnetized) then
+    	v_char = v_char + Vmod
+
+
+		if (lmagnetized) then
 !    	if (lmagnetoaccr) then
 !      B_char = maxval(sqrt(BR**2+B_z(:)**2+Bphi(:)**2))
 !     else if (lspherical_velocity) then
 !      B_char = maxval(sqrt(BR**2+Btheta(:)**2+Bphi(:)**2))
 !     endif
-	gammaB = gammaB * pi / 180.0
-	chiB = chiB * pi / 180.0
-	B_char = maxval(Bmag)
-    write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
+			gammaB = gammaB * pi / 180.0
+			chiB = chiB * pi / 180.0
+			B_char = maxval(Bmag)
+			write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
 
 
-  	 if (B_char <= 0.0_dp) then
+			if (B_char <= 0.0_dp) then
 !    		deallocate(BR,Bphi)
 !    		if (allocated(B_z)) deallocate(B_z)
 !    		if (allocated(Btheta)) deallocate(Btheta)
-		deallocate(Bmag, gammab,chib)
-   		lmagnetized = .false.
-   	endif
-   endif
+				deallocate(Bmag, gammab,chib)
+				lmagnetized = .false.
+			endif
+		endif
 
 
-   calc_ne = .false.
-   icell_loop : do icell=1,n_cells
+		calc_ne = .false.
+		icell_loop : do icell=1,n_cells
     !check that in filled cells there is electron density otherwise we need to compute it
     !from scratch.
-   	if (icompute_atomRT(icell) > 0) then
+			if (icompute_atomRT(icell) > 0) then
 
-   		if (ne(icell) <= 0.0_dp) then
-   			write(*,*) "  ** No electron density found in the model! ** "
-   			calc_ne = .true.
-   			exit icell_loop
-   		endif
+   				if (ne(icell) <= 0.0_dp) then
+   					write(*,*) "  ** No electron density found in the model! ** "
+   					calc_ne = .true.
+   					exit icell_loop
+   				endif
 
-   	endif
-   enddo icell_loop
-   	N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
-   	if (N_fixed_ne > 0) then
-   		write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
-   	endif
+			endif
+		enddo icell_loop
+		N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
+		if (N_fixed_ne > 0) then
+			write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
+		endif
 
-  !no need if we do not the dark_zones from input file.
-   call write_atmos_domain() !but for consistency with the plot functions in python
-
-
-    write(*,*) "Maximum/minimum velocities in the model (km/s):"
-
-    if (lspherical_velocity) then
-     write(*,*) " Vr = ", 1d-3 * maxval(abs(vR)), &
-    	1d-3*minval(abs(vr),mask=icompute_atomRT>0)
-     write(*,*) " Vtheta = ",  1d-3 * maxval(abs(vtheta)), &
-    	1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)
-    else if (lmagnetoaccr) then
-     write(*,*) " VRz = ", 1d-3 * maxval(sqrt(VR(:)**2 + v_z(:)**2)), &
-    	1d-3*minval(sqrt(VR(:)**2 + v_z(:)**2),mask=icompute_atomRT>0)
-     write(*,*) " VR = ", 1d-3 * maxval(abs(vR)), &
-    	1d-3*minval(abs(vR),mask=icompute_atomRT>0)
-     write(*,*) " v_z = ",  1d-3 * maxval(abs(v_z)), &
-    	1d-3*minval(abs(v_z),mask=icompute_atomRT>0)
-    endif
-    write(*,*) " Vphi = ",  1d-3 * maxval(abs(vphi)), &
-    	1d-3*minval(abs(vphi),mask=icompute_atomRT>0)
+	!no need if we do not the dark_zones from input file.
+		call write_atmos_domain() !but for consistency with the plot functions in python
 
 
-   write(*,*) "Typical line extent due to V fields (km/s):"
-   v_char = Lextent * v_char
-   write(*,*) v_char/1d3
+		write(*,*) "Maximum/minimum velocities in the model (km/s):"
 
-   !if (xit) then
-   write(*,*) "Maximum/minimum turbulent velocity (km/s):"
-   write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
-   !endif
+		if (lspherical_velocity) then
+			write(*,*) " Vr = ", 1d-3 * maxval(abs(vR)), 1d-3*minval(abs(vr),mask=icompute_atomRT>0)
+			write(*,*) " Vtheta = ",  1d-3 * maxval(abs(vtheta)), 1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)
+		else if (lmagnetoaccr) then
+			write(*,*) " VRz = ", 1d-3 * maxval(sqrt(VR(:)**2 + v_z(:)**2)), 1d-3*minval(sqrt(VR(:)**2 + v_z(:)**2),mask=icompute_atomRT>0)
+			write(*,*) " VR = ", 1d-3 * maxval(abs(vR)), 1d-3*minval(abs(vR),mask=icompute_atomRT>0)
+			write(*,*) " v_z = ",  1d-3 * maxval(abs(v_z)), 1d-3*minval(abs(v_z),mask=icompute_atomRT>0)
+		endif
+		write(*,*) " Vphi = ",  1d-3 * maxval(abs(vphi)), 1d-3*minval(abs(vphi),mask=icompute_atomRT>0)
 
-   write(*,*) "Maximum/minimum Temperature in the model (K):"
-   write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)
-   write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-   write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)
-   if (.not.calc_ne) then
-   	write(*,*) "Maximum/minimum ne density in the model (m^-3):"
-   	write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
-   endif
 
-  return
-  end subroutine readAtmos_ascii
+		write(*,*) "Typical line extent due to V fields (km/s):"
+		v_char = Lextent * v_char
+		write(*,*) v_char/1d3
+
+		write(*,*) "Maximum/minimum turbulent velocity (km/s):"
+		write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
+
+		write(*,*) "Maximum/minimum Temperature in the model (K):"
+		write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)
+		write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+		write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)
+		if (.not.calc_ne) then
+			write(*,*) "Maximum/minimum ne density in the model (m^-3):"
+			write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
+		endif
+
+		return
+	end subroutine readAtmos_ascii
 
 !   subroutine shock_surface(shock_area)
 !   	!identify the cell close to the choc and sum their area.
