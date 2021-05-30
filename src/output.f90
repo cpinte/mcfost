@@ -1267,6 +1267,8 @@ end subroutine write_mol_column_density
 
 subroutine write_column(type, filename, lambda)
   ! WARNING: Only works if the star in in 0, 0, 0 at the moment
+  ! type : 1 == column density, 2 == optical depth
+  ! indices :
   ! 0 = towards the star, 1 = towards +z, 2 = towards -z and 3 = towards + r
 
   use optical_depth, only : compute_column
