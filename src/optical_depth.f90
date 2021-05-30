@@ -372,14 +372,17 @@ subroutine compute_column(type, column, lambda)
            if (test_exit_grid(icell0, x0, y0, z0)) exit inf_loop
 
            call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
-           if (type==1) then
-              factor = CD_units * densite_gaz(icell0) ! column density
-           else if (type==2) then
-              factor = kappa(icell0,lambda) ! optical depth, kappa in AU^-1
-           else
-              factor = CD_units * densite_gaz(icell0) * tab_abundance(icell0) ! molecular column density
+
+           if (icell0 <= n_cells) then
+              if (type==1) then
+                 factor = CD_units * densite_gaz(icell0) ! column density
+              else if (type==2) then
+                 factor = kappa(icell0,lambda) ! optical depth, kappa in AU^-1
+              else
+                 factor = CD_units * densite_gaz(icell0) * tab_abundance(icell0) ! molecular column density
+              endif
+              sum = sum + l_contrib * factor
            endif
-           sum = sum + l_contrib * factor
         enddo inf_loop
         column(icell,direction) = sum
      enddo ! icell

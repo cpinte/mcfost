@@ -187,7 +187,7 @@ subroutine transfert_poussiere()
         call init_directions_ray_tracing()
      endif
      call opacite(1,1)
-     call integ_tau(1) !TODO
+     call integ_tau(1)
 
      if (loptical_depth_map) call write_optical_depth_map(1)
 
