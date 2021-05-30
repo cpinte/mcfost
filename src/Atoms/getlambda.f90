@@ -504,7 +504,7 @@ module getlambda
 		real, parameter :: wing_to_core = 0.6 !0.3
 
 
-		vbroad = maxval(line%atom%vbroad)
+		vbroad = maxval(line%atom%vbroad) !takes time, but done only once per line!
 		vwing = line%qwing * vbroad
 		
 		!I compute the line bound up to qwing * vwing. But I expand the local profile
@@ -544,7 +544,6 @@ module getlambda
 ! 		stop		
 		
 		Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
-
    
 		Nmid = Nlambda/2 + 1
 		
@@ -573,6 +572,47 @@ module getlambda
 	
 	return
 	end subroutine define_local_profile_grid
+	
+	subroutine  define_local_gauss_profile_grid (atom)
+		type (AtomType), intent(inout) :: atom
+   		real(kind=dp), dimension(2*(Nlambda_line_c_log+Nlambda_line_w-1)-1) :: vel
+		real(kind=dp) ::  vcore, vwing, v0, v1, vbroad
+		integer :: Nlambda, la, Nmid, kr
+		real, parameter :: wing_to_core = 0.6 !0.3
+
+
+		vbroad = maxval(atom%vbroad)
+		vwing = 7.0 * vbroad
+		vcore = 4.0 * vbroad
+
+		v0 = - vwing
+		v1 = + vwing
+		vel = 0.0_dp
+
+
+		vel(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
+		vel(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)	
+		
+		Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+		
+		Nmid = Nlambda/2 + 1
+		
+		allocate(atom%ug(Nlambda)); atom%ug = 0.0
+
+		atom%ug(1:Nmid) = vel(1:Nmid)
+		atom%ug(Nmid+1:Nlambda) = -vel(Nmid-1:1:-1)
+		
+		!changing Nlambda for each gauss line
+! 		do kr=1, atom%Nline
+! 			if (.not.atom%lines(kr)%voigt) then
+! 				write(*,*) " Nlambda for gauss line changed from ", atom%lines(kr)%Nlambda, " to ", Nlambda
+! 				atom%lines(kr)%Nlambda = Nlambda
+! 			endif
+! 		enddo
+		
+	
+	return
+	end subroutine define_local_gauss_profile_grid
 
 	subroutine make_sub_wavelength_grid_line_lin(line, vD, aD)
 	! ------------------------------------------------------------ !

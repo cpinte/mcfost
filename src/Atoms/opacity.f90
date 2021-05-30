@@ -43,6 +43,10 @@ module Opacity
     
 		do n=1,Natom
 			atom => Atoms(n)%ptr_atom
+			
+			if (allocated(atom%gauss_prof)) then
+				deallocate(atom%gauss_prof, atom%ug) !common gauss profile
+			endif
         
 			do k = 1, atom%Ntr   
      
@@ -111,6 +115,21 @@ module Opacity
     
 		do n=1,Natom
 			atom => Atoms(n)%ptr_atom
+			
+			if (.not.associated(profile, local_profile_interp)) then
+				atom%lgauss_prof = .false.
+				deallocate(atom%ug)
+			endif
+			
+			!note lgauss_prof is false if not associated(profile,local_profile_interp)
+			if (atom%lgauss_prof) then
+				allocate(atom%gauss_prof(size(atom%ug), n_cells),stat=alloc_status)
+				if (alloc_status > 0.0) then
+					call error("Allocation error common gauss_prof!")
+				endif
+				size_phi_all = size_phi_all + sizeof(atom%gauss_prof(:,:)) + sizeof(atom%ug(:))
+				mem_alloc_local = mem_alloc_local + sizeof(atom%gauss_prof(:,:)) + sizeof(atom%ug(:))
+			endif
         
 			do k = 1, atom%Ntr   
      
@@ -189,15 +208,19 @@ module Opacity
 ! 
 							endif
 					else !Gaussian
-						!local Gaussian profiles are also interpolated, no? if commented!
-! 						if (associated(profile,local_profile_interp)) then
-! 							allocate(atom%lines(kc)%phi(size(atom%lines(kc)%u), n_cells), stat=alloc_status)
-! 							if (alloc_status > 0) call ERROR("Allocation error line%phi")
-! 							atom%lines(kc)%phi(:,:) = 0d0
-! 							size_phi_all = size_phi_all + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
-! 							mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%phi(:,:)) + sizeof(atom%lines(kc)%u(:))
-! 							!elseif
-						if (associated(profile,local_profile_dk)) then
+						if (associated(profile, local_profile_v)) then
+							!not used if profile computed locally.
+							deallocate(atom%lines(kc)%u)!allocated in define_local_profile_grid
+						elseif (associated(profile,local_profile_interp)) then
+							!profile is shared by gaussian lines of an atom!
+							!I just deallocate atom%lines(kc)%u
+							if (.not. atom%lgauss_prof) then !gaussian compute inplace, but line%u stored
+								size_phi_all = size_phi_all + sizeof(atom%lines(kc)%u(:))
+								mem_alloc_local = mem_alloc_local + sizeof(atom%lines(kc)%u(:))
+							else !common gaussian interp, deallocate line%u
+								deallocate(atom%lines(kc)%u)!allocated in define_local_profile_grid
+							endif
+						elseif (associated(profile,local_profile_dk)) then
 								!doesn't include the vel shift, just a local profile evaluated on the nlte grid.
 							Nlam = atom%lines(kc)%Nlambda
 							if (allocated(atom%lines(kc)%u)) deallocate(atom%lines(kc)%u)
@@ -327,6 +350,11 @@ module Opacity
     
 		do n=1,Natom
 			atom => Atoms(n)%ptr_atom
+			
+			if (atom%lgauss_prof) then
+				atom%gauss_prof(:,icell) = exp(-(atom%ug(:)/atom%vbroad(icell))**2) / (SQRTPI * atom%vbroad(icell))
+			endif
+			
 			do k = 1, atom%Ntr   
      
 				kc = atom%at(k)%ik 
@@ -372,9 +400,10 @@ module Opacity
 ! 			
 						endif
 					else !Gaussian
-!-> gaussian profiles are interpolated in case of interpolation too.-> Not if commented!!! check profiles also
-! 						if (associated(profile,local_profile_interp)) then
-! 							atom%lines(kc)%phi(:,icell) = exp(-(atom%lines(kc)%u(:)/atom%vbroad(icell))**2) / (SQRTPI *vbroad)
+!There is a comming gaussian profile per atom in case of local_profile_interp is associated to profile
+!!-> gaussian profiles are interpolated in case of interpolation too.-> Not if commented!!! check profiles also
+!! 						if (associated(profile,local_profile_interp)) then
+!! 							atom%lines(kc)%phi(:,icell) = exp(-(atom%lines(kc)%u(:)/atom%vbroad(icell))**2) / (SQRTPI *vbroad)
 						!elseif
 						if (associated(profile,local_profile_dk)) then
 							atom%lines(kc)%phi(:,icell) = exp(-( (lambda(Nblue:Nred)-atom%lines(kc)%lambda0)/atom%lines(kc)%lambda0 * clight/vbroad )**2 )/ (SQRTPI * vbroad)								

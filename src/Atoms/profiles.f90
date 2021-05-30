@@ -19,7 +19,8 @@ MODULE PROFILES
 	IMPLICIT NONE
 
 	PROCEDURE(local_profile_v), pointer :: profile => null()
-	integer, parameter :: NvspaceMax = 151, NbspaceMax = 1
+	integer, parameter :: NvspaceMax = 151
+	integer, parameter :: NbspaceMax = 1
 
 	CONTAINS
 	
@@ -170,7 +171,8 @@ MODULE PROFILES
 		i = line%i; j = line%j
 		Nred = line%Nred; Nblue = line%Nblue
 		vbroad = line%atom%vbroad(icell)
-		u0 = line%u / vbroad !avoind creating temporary array in interpolation
+		!u0 = line%u / vbroad !avoid creating temporary array in interpolation
+		!move below
 
 		local_profile_interp = 0d0
 		u1(:) = (lambda - line%lambda0)/line%lambda0 * clight/vbroad
@@ -223,6 +225,7 @@ MODULE PROFILES
 ! 					endif
 
 		if (line%voigt) then
+			u0 = line%u / vbroad
 !  						locprof = 0
 			do nv=1, Nvspace
  
@@ -233,12 +236,16 @@ MODULE PROFILES
 ! locprof = locprof + voigt(N, line%a(icell), u1p)/sqrtpi/vbroad/nvspace
 			enddo
 
-		else !gaussian, faster to evaluate in place, not sure ?
+		else !Common gauss profile interpolated!
+! 			u0 = line%u / vbroad
+			u0 = line%atom%ug(:) / vbroad
 			do nv=1, Nvspace
  
 				u1p(:) = u1(:) - omegav(nv)
 
-              	local_profile_interp(:) = local_profile_interp(:) + exp(-u1p*u1p) / sqrtpi / vbroad
+!               	local_profile_interp(:) = local_profile_interp(:) + exp(-u1p*u1p) / sqrtpi / vbroad
+ 				local_profile_interp(:) = local_profile_interp(:) + linear_1D_sorted(size(line%atom%ug),u0,line%atom%gauss_prof(:,icell),N,u1p)
+             	
               	
 			enddo		
 		endif 
