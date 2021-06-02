@@ -25,13 +25,10 @@ jobs:
     
     - name: create sha.f90 file # for some reason this does not work in the Makefile
       run: |
-         ls src/*.f90
          git log --pretty=format:"%H %d"
-         git log --pretty=format:"%H %d" | grep \(\*HEAD | awk \
-                   '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}'
+         git rev-parse HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$1"\""}'
          printf "module sha\n  implicit none\n" > src/sha.f90
-         git log --pretty=format:"%H %d" | grep \(\*HEAD | awk \
-                   '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> src/sha.f90
+         git rev-parse HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$1"\""}' >> src/sha.f90
          printf "end module sha\n" >> src/sha.f90
          cat src/sha.f90
 
