@@ -43,10 +43,9 @@ jobs:
 
     - name: compile mcfost
       env:
-           MCFOST_GIT: "1"
            MCFOST_INSTALL: "/usr/local"
            MCFOST_NO_XGBOOST: "yes"
            SYSTEM: "gfortran"
       run: |
            cd src
-           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib MCFOST_GIT=1
