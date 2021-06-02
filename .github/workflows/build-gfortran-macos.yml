@@ -23,8 +23,17 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-    - name: check git log works
-      run: git log --pretty=format:"%H %d"
+    - name: create sha.f90 file # for some reason this does not work in the Makefile
+      run: |
+         ls src/*.f90
+         git log --pretty=format:"%H %d"
+         git log --pretty=format:"%H %d" | grep \(HEAD | awk \
+                   '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}'
+         printf "module sha\n  implicit none\n" > src/sha.f90
+         git log --pretty=format:"%H %d" | grep \(HEAD | awk \
+                   '{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' >> src/sha.f90
+         printf "end module sha\n" >> src/sha.f90
+         cat src/sha.f90
 
     - name: install gfortran
       run: brew reinstall gcc
@@ -49,6 +58,7 @@ jobs:
            MCFOST_INSTALL: "/usr/local"
            MCFOST_NO_XGBOOST: "yes"
            SYSTEM: "gfortran"
+           MCFOST_GIT: "0"
       run: |
            cd src
-           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib MCFOST_GIT=1
+           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
