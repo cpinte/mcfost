@@ -2315,6 +2315,7 @@ module atom_transfer
 	! ---------------------------------------------------------------!
 	!
 	! -------------------------------------------------------------- !
+	use atmos_type, only : thetai, thetao
   		integer, intent(in) :: N, i_star, icell_prev
   		real(kind=dp), dimension(N), intent(in) :: lambda
   		real(kind=dp), intent(in) :: u, v, w, x, y, z
@@ -2385,7 +2386,8 @@ module atom_transfer
 					endif
 				endif
 		
-				if (vaccr < 0.0_dp) then
+! 				if (vaccr < 0.0_dp) then
+				if ( (vaccr < 0.0_dp) .and. ( (abs(z)/rr >= cos(thetai)).and.(abs(z)/rr <= cos(thetao)) ) ) then
 					if (Taccretion>0) then
 						Tchoc = Taccretion
 						lintersect = .true.
