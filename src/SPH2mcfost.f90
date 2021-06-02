@@ -143,23 +143,23 @@ contains
 
   subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,&
        SPH_grainsizes, SPH_limits, check_previous_tesselation, mask)
-       
-	! ************************************************************************************ !
-	! n_sph : number of points in the input model
-	! ndusttypes : number of dust species in the input model
-	! particle_id : index of the particle / cell centre in the input model
-	! x,y,z : coordinates of the particle / cell
-	! h : smoothing length to cut elongated cells
-	! vx,vy,vz : vector components of the velocity fields (cartesian) in the input model
-	! massgas : total mass of the gas
-	! massdust : total mass of the dust
-	! rho : gas density
-	! rhodust : dust density
-	! sph_grainsizes : size of grains for sph models
-	! sph_limits : limit of the input model box
-	! check_previous_tesselation :
-	! mask :
-	! ************************************************************************************ !    
+
+    ! ************************************************************************************ !
+    ! n_sph : number of points in the input model
+    ! ndusttypes : number of dust species in the input model
+    ! particle_id : index of the particle / cell centre in the input model
+    ! x,y,z : coordinates of the particle / cell
+    ! h : smoothing length to cut elongated cells
+    ! vx,vy,vz : vector components of the velocity fields (cartesian) in the input model
+    ! massgas : total mass of the gas
+    ! massdust : total mass of the dust
+    ! rho : gas density
+    ! rhodust : dust density
+    ! sph_grainsizes : size of grains for sph models
+    ! sph_limits : limit of the input model box
+    ! check_previous_tesselation :
+    ! mask :
+    ! ************************************************************************************ !
     use Voronoi_grid
     use density, only : densite_gaz, masse_gaz, densite_pouss, masse
     use grains, only : n_grains_tot, M_grain
@@ -171,16 +171,11 @@ contains
     real(dp), dimension(:), allocatable, intent(inout) :: rho
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     integer, dimension(n_SPH), intent(in) :: particle_id
-!     real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
-!     real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
-!-> these ones are not necessarily allocated if ndusttypes = 0 (lignore_dust), thus they cannot have
-! an explicit shape. They also need to be allocatable.
     real(dp), dimension(:,:), allocatable, intent(in) :: rhodust, massdust
     real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
     logical, dimension(:), allocatable, intent(in), optional :: mask
-    
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
@@ -207,12 +202,11 @@ contains
     write(*,*) "y =", minval(y), maxval(y)
     write(*,*) "z =", minval(z), maxval(z)
 
-!     write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
-	if (ndusttypes) then
-		write(*,*) "Found", n_SPH, " hydro sites with ", ndusttypes, "dust grains."
-	else
-    	write(*,*) "Found", n_SPH, " hydro sites."
-	endif
+    if (ndusttypes) then
+       write(*,*) "Found", n_SPH, " hydro sites with ", ndusttypes, "dust grains."
+    else
+       write(*,*) "Found", n_SPH, " hydro sites."
+    endif
 
     if (lwrite_ASCII) then
        !  Write the file for the grid version of mcfost
@@ -274,7 +268,7 @@ contains
        k = int((1.0-limit_threshold) * n_SPH)
        limits(2) = select_inplace(k,real(x))
        limits(4) = select_inplace(k,real(y))
-       limits(6) = select_inplace(k,real(z))       
+       limits(6) = select_inplace(k,real(z))
     else
        limits(:) = SPH_limits(:)
     endif
@@ -494,7 +488,7 @@ contains
              if (id_n < 0) then
                 n_force_empty = n_force_empty + 1
                 call reduce_density(icell, density_factor)
-             	massgas(Voronoi(icell)%id) = massgas(Voronoi(icell)%id) * density_factor
+                massgas(Voronoi(icell)%id) = massgas(Voronoi(icell)%id) * density_factor
                 cycle cell_loop
              endif
           enddo
@@ -747,20 +741,14 @@ contains
     use stars
 #include "sprng_f.h"
 
-
     integer, intent(in) :: n_points
     real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
-
     integer, parameter :: nb_proc = 1
-
     integer :: i, id, istar
-
-
     real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
 
     particle_loop : do i=1, n_points
        ! We do not touch the sink particles
-
        do istar=1, n_etoiles
           if (i == etoile(istar)%icell) cycle particle_loop
        enddo
@@ -773,7 +761,6 @@ contains
        x_tmp = x(i) * cos_phi + y(i) * sin_phi
        y_tmp = -x(i) * sin_phi + y(i) * cos_phi
        x(i) = x_tmp ; y(i) = y_tmp
-
 
        !-- velocities
        x_tmp = vx(i) * cos_phi + vy(i) * sin_phi
