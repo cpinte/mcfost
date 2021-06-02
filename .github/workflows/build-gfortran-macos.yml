@@ -22,6 +22,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    
+    - name: check git log works
       run: git log --pretty=format:"%H %d"
 
     - name: install gfortran
