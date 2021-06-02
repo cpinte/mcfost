@@ -298,7 +298,7 @@ subroutine define_gas_density()
                  icell = cell_map(i,j,k)
                  densite_gaz(icell) = densite_gaz(icell) + densite_gaz_tmp(icell) * facteur
               enddo !k
-              densite_gaz_midplane(i) = densite_gaz_midplane_tmp(i) + densite_gaz_midplane_tmp(i) * facteur
+              densite_gaz_midplane(i) = densite_gaz_midplane(i) + densite_gaz_midplane_tmp(i) * facteur
            enddo bz_gas_mass2
         enddo ! i
      endif
