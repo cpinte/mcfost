@@ -1016,8 +1016,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        etoile(i_etoile)%M = xyzmh_ptmass(4,i_etoile) * usolarmass
 
        etoile(i_etoile)%Mdot = 0.
-
-       etoile(i_etoile)%find_spectrum = .false.
     enddo
  else
     write(*,*) ""
