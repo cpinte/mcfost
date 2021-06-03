@@ -202,7 +202,7 @@ contains
     write(*,*) "y =", minval(y), maxval(y)
     write(*,*) "z =", minval(z), maxval(z)
 
-    if (ndusttypes) then
+    if (ndusttypes >= 1) then
        write(*,*) "Found", n_SPH, " hydro sites with ", ndusttypes, "dust grains."
     else
        write(*,*) "Found", n_SPH, " hydro sites."
