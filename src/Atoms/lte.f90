@@ -8,7 +8,8 @@
 MODULE lte
 
  use atom_type, only : AtomType, element, atomic_orbital_sqradius
- use atmos_type, only : Npf, Tpf, ne, T, Hydrogen, Helium, ntotal_atom, Elements, icompute_atomRT, nHmin, nHtot, wght_per_H, avgweight, &
+ use atmos_type, only : Npf, Tpf, ne, T, Hydrogen, Helium, ntotal_atom, &
+                  Elements, icompute_atomRT, nHmin, nHtot, wght_per_H, avgweight, &
  						Atoms, Natom
  use constant
  use math
@@ -26,7 +27,7 @@ MODULE lte
 
 
  CONTAINS
- 
+
  FUNCTION getPartitionFunctionk(elem, stage, k) result (Uk)
  ! ----------------------------------------------------------------------!
   ! Interpolate the partition function of Element elem in ionisation stage
@@ -36,7 +37,7 @@ MODULE lte
   type(Element) :: elem
   integer, intent(in) :: stage, k
   real(kind=dp) :: Uk, part_func(Npf), Uka(1)
-  
+
   part_func = elem%pf(stage,:)
   Uk = exp( Interp1D(Tpf,part_func,T(k)) )
   !Uk = (10.d0)**(Uk) !29/12/2019 -> part_func is ln(U)
@@ -60,7 +61,7 @@ END FUNCTION getPartitionFunctionk
   type(Element) :: elem
   integer, intent(in) :: stage, k
   real(kind=dp) :: Uk, part_func(Npf), Uka(1)
-  
+
   part_func = elem%pf(stage,:)
   Uk = Interp1D(Tpf,part_func,T(k)) !log(Uk)
   !out of bound the function return 0 not the inner (outer) bound.
@@ -68,17 +69,17 @@ END FUNCTION getPartitionFunctionk
 !   Uk = Uka(1)
 !   if( T(k) < Tpf(1) ) Uk = part_func(1)
 !   if (T(k) > Tpf(Npf)) Uk = part_func(Npf)
-       
+
  RETURN
 END FUNCTION get_logPartitionFunctionk
 
-! function phi_T(k, gi_on_gj, dE)!Ui_on_Uj, 
+! function phi_T(k, gi_on_gj, dE)!Ui_on_Uj,
 ! 	real(kind=dp) :: phi_T
 ! 	integer, intent(in) :: k
 ! 	real(kind=dp), intent(in) ::dE, gi_on_gj!, Ui_on_Uj
-! 
-! 	phi_T = gi_on_gj * CI * T(k)**(-1.5_dp) * exp(dE / ( KBOLTZMANN*T(k) ))!* Ui_on_Uj * 
-! 
+!
+! 	phi_T = gi_on_gj * CI * T(k)**(-1.5_dp) * exp(dE / ( KBOLTZMANN*T(k) ))!* Ui_on_Uj *
+!
 ! return
 ! end function phi_T
 
@@ -207,13 +208,13 @@ END FUNCTION get_logPartitionFunctionk
   RETURN
   END FUNCTION SahaEq
 
-  
+
 
   FUNCTION nH_minus(icell)
    !Saha Ionisation equation applied to H-
    integer :: icell
    real(kind=dp) :: nH_minus, nH, UH, UHm, n00
-   
+
    UH = 2.0
    !UH = getPartitionFunctionk(elements(1)%ptr_elem, 1, icell)
    !Mostly 2
@@ -221,10 +222,10 @@ END FUNCTION get_logPartitionFunctionk
    !nH = nHtot(icell)
    nH = hydrogen%n(1,icell)!sum(Hydrogen%n(1:hydrogen%Nlevel-1,icell))
    nH_minus =  ne(icell) * phi_jl(icell, UHm, UH, E_ION_HMIN) * nH
-      
+
   RETURN
   END FUNCTION nH_minus
-  
+
 !-> Check dissolve too
  SUBROUTINE LTEpops_H_and_Hmin()
   ! -------------------------------------------------------------- !
@@ -237,9 +238,9 @@ END FUNCTION get_logPartitionFunctionk
   integer :: Z, dZ, k, i, m
 
 
-   !Take the occupation probability only once the population of each level is known ? 
+   !Take the occupation probability only once the population of each level is known ?
    wocc0 = 1.0 !H- not hydrogenic
-   
+
    E00 = 1.0 * 3e-11 * EV ! Joules
 
    !$omp parallel &
@@ -259,16 +260,16 @@ END FUNCTION get_logPartitionFunctionk
     !a constant of the temperature and electron density
 
     do i=1, hydrogen%Nlevel
-    
+
      E = hydrogen%E(i)
-     
+
 	 !if (i==hydrogen%Nlevel) E = E - E00 * (ne(k)/T(k))**(0.5)
 
 	 !wrt ground level of Hmin which has E = 0 eV, and shift all other levels to E_ION_HMIN
 	 !so that E(1) - E(H-) = 0.7 - 0. = ionisation of H- and E(Nlevel) = 13.6eV + 0.7eV from the
 	 !ground state of Hminus.
 	 !dE = E' - E(H-)_groundstate, with E' = E + EH- (because taken by default wrt to E(1))
-     dE = E + E_ION_HMIN !- 2.0 * E00 * (ne(k)/T(k))**(0.5) 
+     dE = E + E_ION_HMIN !- 2.0 * E00 * (ne(k)/T(k))**(0.5)
      dZ = hydrogen%stage(i) + 1
 
      chi0 = Elements(hydrogen%periodic_table)%ptr_elem%ionpot(1+hydrogen%stage(i))
@@ -276,7 +277,7 @@ END FUNCTION get_logPartitionFunctionk
 
      ! --------- Boltzmann equation ------------------------------------------- !
 
-     hydrogen%nstar(i,k)=BoltzmannEq4dot20b(k, dE, 1.0_dp, hydrogen%g(i)) 
+     hydrogen%nstar(i,k)=BoltzmannEq4dot20b(k, dE, 1.0_dp, hydrogen%g(i))
 
      ! ---------- Saha equation ------------------------------------------------ !
 
@@ -288,12 +289,12 @@ END FUNCTION get_logPartitionFunctionk
       endif
      end do
 
- 
+
      sum = sum+hydrogen%nstar(i,k)
     end do
 
     nHmin(k) = hydrogen%Abund*nHtot(k)/sum * wocc0
-  
+
     !test positivity, can be 0
     if (nHmin(k) < 0) then !<= tiny_dp) then
        write(*,*) " ************************************* "
@@ -339,7 +340,7 @@ END FUNCTION get_logPartitionFunctionk
 		hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
       enddo
     endif
-   
+
    enddo
 
   endif !if locupa_prob
@@ -350,13 +351,13 @@ END FUNCTION get_logPartitionFunctionk
  END SUBROUTINE LTEpops_H_and_Hmin
 
  subroutine determine_Hminus_density()
- ! Compute the H- number density by solving a chemical 
+ ! Compute the H- number density by solving a chemical
  ! equilibrium between H-, HI and HII
- 
- 
+
+
  return
  end subroutine determine_Hminus_density
-        
+
  SUBROUTINE LTEpops_H()
   ! -------------------------------------------------------------- !
    ! computed wrt the ground state of H I
@@ -378,10 +379,10 @@ END FUNCTION get_logPartitionFunctionk
   integer :: Z, dZ, k, i, m
   logical :: print_diff
   real(kind=dp) :: max_nstar(hydrogen%Nlevel), min_nstar(hydrogen%Nlevel)
-   
+
    E00 = 1.0 * 3e-11 * EV ! Joules
    Egs = hydrogen%E(1)
-   
+
    print_diff = (maxval(hydrogen%nstar) > 0.0_dp)
    if (print_diff) then
    	do i=1,hydrogen%Nlevel
@@ -406,7 +407,7 @@ END FUNCTION get_logPartitionFunctionk
     !a constant of the temperature and electron density
 
     do i=2, hydrogen%Nlevel
-    
+
      E = hydrogen%E(i)
 
      dE = E - Egs
@@ -428,7 +429,7 @@ END FUNCTION get_logPartitionFunctionk
       endif
      end do
 
- 
+
      sum = sum+hydrogen%nstar(i,k)
     end do
 
@@ -442,7 +443,7 @@ END FUNCTION get_logPartitionFunctionk
        write(*,*) " ************************************* "
        stop
     end if
-    
+
     do i=2,hydrogen%Nlevel !debug
       hydrogen%nstar(i,k) = hydrogen%nstar(i,k)*hydrogen%nstar(1,k)
 
@@ -465,7 +466,7 @@ END FUNCTION get_logPartitionFunctionk
      write(*,*) " ************************************* "
      stop
     end if
-    
+
 !     write(*,*) " cell ", k
 !     write(*,*) T(k), nHtot(k), ne(K)
 !     write(*,*) hydrogen%nstar(:,k)
@@ -481,15 +482,15 @@ END FUNCTION get_logPartitionFunctionk
     !!sum = 0.0
     if (icompute_atomRT(k)>0) then
       do i=2, hydrogen%Nlevel-1 !only for bound-levels ?
-      
+
       	wocc = wocc_n(k, real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1), hydrogen%nstar(1,k))
-      	
+
       	!added to the continuum
 		!!sum = sum + hydrogen%nstar(i,k) * (1.0 - wocc)
-		
+
 		!remains b-b
 		hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
-				
+
       enddo
    	  wocc = wocc_n(k, real(1,kind=dp), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1), hydrogen%nstar(1,k))
       hydrogen%nstar(1,k) = hydrogen%nstar(1,k) * wocc
@@ -497,14 +498,15 @@ END FUNCTION get_logPartitionFunctionk
 
       !!hydrogen%nstar(hydrogen%Nlevel,k) = hydrogen%nstar(hydrogen%Nlevel,k) + sum
     endif
-   
+
    enddo
 
   endif !if locupa_prob
-  
+
   if (print_diff) then
   	write(*,*) " Old Max/min nstar:", max_nstar(hydrogen%Nlevel), min_nstar(hydrogen%Nlevel)
-  	write(*,*) ' New max/min nstar', maxval(hydrogen%nstar(hydrogen%Nlevel,:)), minval(hydrogen%nstar(hydrogen%nlevel,:),mask=icompute_atomrt>0)
+  	write(*,*) ' New max/min nstar', maxval(hydrogen%nstar(hydrogen%Nlevel,:)), &
+                                    minval(hydrogen%nstar(hydrogen%nlevel,:),mask=icompute_atomrt>0)
   endif
 
  RETURN
@@ -536,7 +538,7 @@ END FUNCTION get_logPartitionFunctionk
   ! Hubeny & Mihalas (2014)
   ! "Theory of Stellar Atmospheres" p. 244-246
   ! eq. 8.86 and 8.87
-  
+
   print_diff = (maxval(atom%nstar) > 0.0_dp)
    if (print_diff) then
    	do i=1,atom%Nlevel
@@ -544,20 +546,20 @@ END FUNCTION get_logPartitionFunctionk
    		min_nstar(i) = minval(atom%nstar(i,:),mask=icompute_atomrt > 0)
    	enddo
    endif
- 
+
    !Not yet
    locupa_prob = .false. !Only for He
    !Not yet. For H, use the LTEpops_H()
    !only for the bound levels of each ionisation stage ? The last level beeing the last continuum ?
    if (debye .and. locupa_prob) locupa_prob = .false.
-    
+
    if (debye) then
     c2 = sqrt(8.0*PI/KBOLTZMANN) * &
       (SQ(Q_ELECTRON)/(4.0*PI*EPSILON_0))**1.5
    !write(*,*) "c2=",c2,  atom%Abund * nHtot(1),  atom%Abund * nHtot(2)
     allocate(ndebye(atom%Nlevel))
     ndebye(:)=0
-    !reduce the ionisation potential of ion i+1 (wrt to the ground state) by nDebye(i) * (ne/T)**1/2. 
+    !reduce the ionisation potential of ion i+1 (wrt to the ground state) by nDebye(i) * (ne/T)**1/2.
     do i=2, atom%Nlevel
      if (atom%stage(i) - atom%stage(1) > 0) nDebye(i) = atom%stage(i) + 1
     enddo
@@ -584,7 +586,7 @@ END FUNCTION get_logPartitionFunctionk
 
     if (debye) dEion = c2*sqrt(ne(k)/T(k))
 
-    
+
     sum = 1.
     phik = ne(k)*phi_jl(k,1.d0,1.d0,0.d0)
     !a constant of the temperature and electron density
@@ -654,7 +656,7 @@ END FUNCTION get_logPartitionFunctionk
 !     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
 !     write(*,*) "ntot", ntotal_atom(k,atom), " nHtot=",nHtot(k)
     atom%nstar(1,k) = atom%Abund*nHtot(k)/sum
-  
+
     !test positivity, can be 0
     if (atom%nstar(1,k) < 0) then !<= tiny_dp) then
        write(*,*) " ************************************* "
@@ -716,7 +718,7 @@ END FUNCTION get_logPartitionFunctionk
     enddo
   endif !if locupa_prob
   !CALL write_ltepops_file(52, atom, 1)
-  
+
   if (print_diff) then
   	write(*,*) " Old Max/min nstar:", max_nstar(atom%Nlevel), min_nstar(atom%Nlevel)
   	write(*,*) ' New max/min nstar', maxval(atom%nstar(atom%Nlevel,:)), minval(atom%nstar(hydrogen%nlevel,:),mask=icompute_atomrt>0)
@@ -734,17 +736,17 @@ END FUNCTION get_logPartitionFunctionk
   ! -------------------------------------------------------------- !
   integer n, k
   logical :: debye=.false.
-     
+
   do n=1,Natom
    ! fill lte populations for each atom, active or not, only if not read from file
    if (Atoms(n)%ptr_atom%set_ltepops) then
-     if ( Atoms(n)%ptr_atom%ID == "H") then 
+     if ( Atoms(n)%ptr_atom%ID == "H") then
       allocate(nHmin(n_cells))
-      
+
 
       write(*,*) "Setting LTE populations for hydrogen"
-      
-      !Use a routine that includes H minus also ? use at is it ? use chemequil to determine nH- ??      
+
+      !Use a routine that includes H minus also ? use at is it ? use chemequil to determine nH- ??
       CALL LTEpops_H()
 
    		do k=1,n_cells
@@ -753,21 +755,21 @@ END FUNCTION get_logPartitionFunctionk
    		call write_Hminus()
    		!nHmin(k) = 1d10
 
-      
+
      else !other atoms
-   
+
       if (debye) then
      	 write(*,*) "Setting LTE populations for ", Atoms(n)%ptr_atom%ID, " atom (shielded)"
       else
      	 write(*,*) "Setting LTE populations for ", Atoms(n)%ptr_atom%ID," atom "
       endif
-      CALL LTEpops(Atoms(n)%ptr_atom,debye) !it is parralel 
+      CALL LTEpops(Atoms(n)%ptr_atom,debye) !it is parralel
      endif
-     
+
     !Write only if set_ltepops i.e., if not read from file.
 
    else !no set lte pops
-   
+
     if (n==1) then
     	write(*,*) " -> Setting H minus density from read Hydrogen populations..."
 		allocate(nHmin(n_cells))
@@ -787,21 +789,21 @@ END FUNCTION get_logPartitionFunctionk
 			write(*,*) "here in LTE, set n=nstar for bckgr cont only for LTE and ZERO rad initial sol"
 			stop
 		endif
-		!if (Atoms(n)%ptr_atom%initial_solution=="LTE_POPULATIONS") 
+		!if (Atoms(n)%ptr_atom%initial_solution=="LTE_POPULATIONS")
 		Atoms(n)%ptr_atom%n(:,:) = Atoms(n)%ptr_atom%nstar(:,:)
 	endif
-	
+
 	if (loutput_rates) call write_ltepops_file(52, Atoms(n)%ptr_atom)
 
-   
+
   enddo
 
   !!This is in case H is NLTE but has not converged pops yet, or not read from file
   !!because we need this in opacity routines for H b-f, f-f, H- b-f, H- f-f ect
   !!%NLTEpops is true only if %n /= 0 or after NLTE loop, or if pops are read from file.
   !! otherwise it is FALSE, even at the begening of NLTE.
-  !!if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar 
-                                            !for background Hydrogen and Hminus                                            
+  !!if (Hydrogen%active .and. .not.Hydrogen%NLTEpops) Hydrogen%n = Hydrogen%nstar
+                                            !for background Hydrogen and Hminus
 
  RETURN
  END SUBROUTINE set_LTE_populations
@@ -813,7 +815,7 @@ END FUNCTION get_logPartitionFunctionk
   integer, intent(in), optional :: delta_k
   integer :: dk, k, i
   real(kind=dp) :: wocc
-  
+
   if (present(delta_k)) then
    dk = delta_k
    if (dk <= 0) then
@@ -826,7 +828,7 @@ END FUNCTION get_logPartitionFunctionk
   else
    dk = 1
   endif
-  
+
   open(unit, file=trim(atom%ID)//"_wi.txt", status="unknown")
   do k=1, n_cells, dk
     if (icompute_atomRT(k)>0) then
@@ -839,35 +841,36 @@ END FUNCTION get_logPartitionFunctionk
         write(unit,"(1I3, 3E14.7, 1F14.7)") i, wocc, atom%nstar(i,k)/wocc * 1d-6, atom%nstar(i,k)*1d-6, atom%g(i)
        !endif
       enddo
-      write(unit,"(1I3, 1E14.7, 1E14.7, 1E14.7, 1F14.7)") atom%Nlevel, wocc, atom%nstar(atom%Nlevel,k)/wocc * 1d-6, atom%nstar(atom%Nlevel,k)*1d-6, atom%g(atom%Nlevel)
+      write(unit,"(1I3, 1E14.7, 1E14.7, 1E14.7, 1F14.7)") atom%Nlevel, wocc, &
+         atom%nstar(atom%Nlevel,k)/wocc * 1d-6, atom%nstar(atom%Nlevel,k)*1d-6, atom%g(atom%Nlevel)
     endif
-   
+
   enddo
-  close(unit)  
+  close(unit)
 
  RETURN
  END SUBROUTINE write_occupation_file
- 
+
  !building
  subroutine print_pops(atom, icell, unit)
  	integer, intent(in) :: icell
  	integer, intent(in), optional :: unit
  	type (AtomType), intent(in) :: atom
  	integer :: i
- 	 	
+
  	do i=1,atom%Nlevel
- 	
+
  	 	if (present(unit)) then
  			write(unit,'("level #"(1I3)," n="(1E20.7E3)" m^-3"," nstar="(1E20.7E3)" m^-3")') i, atom%n(i,icell), atom%nstar(i,icell)
  		else
   			write(*,'("level #"(1I3)," n="(1E20.7E3)" m^-3"," nstar="(1E20.7E3)" m^-3")') i, atom%n(i,icell), atom%nstar(i,icell)
  		endif
- 	
+
  	enddo
- 
+
  return
  end subroutine print_pops
- 
+
  SUBROUTINE write_ltepops_file(unit, atom, delta_k)
  !Depth index reversed
   type (AtomType), intent(in) :: atom
@@ -875,7 +878,7 @@ END FUNCTION get_logPartitionFunctionk
   integer, intent(in), optional :: delta_k
   integer :: dk, k, i, j, Nstage, Nj, ip
   real(kind=dp) :: wocc
-  
+
   if (present(delta_k)) then
    dk = delta_k
    if (dk <= 0) then
@@ -888,11 +891,11 @@ END FUNCTION get_logPartitionFunctionk
   else
    dk = 1
   endif
-  
+
   Nstage = atom%stage(atom%Nlevel)+1
   Nj = Nstage
   if (atom%ID=="H") Nj = Nstage + 1 !for H-
-  
+
   open(unit, file=trim(atom%ID)//"_ltepops.txt", status="unknown")
   write(unit,*) "atom ", atom%ID, ' with ', Nj, " stages"
   write(unit,*) "xmh=",AMU*1d3, "xmy=",wght_per_H,avgweight
@@ -910,7 +913,7 @@ END FUNCTION get_logPartitionFunctionk
         level_loop : do i=ip, atom%Nlevel
          if (atom%stage(i)+1 /= j) then
           ip = i
-          cycle stage_loop 
+          cycle stage_loop
          endif
          if (atom%n(i,k) /= atom%nstar(i,k)) then
          	write(unit,*) 'ilevel=',i, 'nstar=', atom%nstar(i, k)*1d-6, 'n=', atom%n(i, k)*1d-6
@@ -921,8 +924,8 @@ END FUNCTION get_logPartitionFunctionk
      enddo stage_loop
    endif
   enddo !space loop
-  close(unit)  
- 
+  close(unit)
+
  RETURN
  END SUBROUTINE write_ltepops_file
 
@@ -945,31 +948,31 @@ END MODULE lte
 !    integer, dimension(atom%Nlevel) :: j0
 !    type (Element), pointer :: elem
 !    logical :: methode1
-!    
+!
 !    methode1 = .false. !tmp
-! 
+!
 !    elem => Elements(atom%periodic_table)%ptr_elem
-! 
+!
 !    beta = 1.0_dp / (T(k) * KBOLTZMANN)
 !    C0 = 0.5 * (HPLANCK*HPLANCK / (2.0*pi*M_ELECTRON) * beta)**1.5
 !    !(M_ELECTRON/beta * 2.0*pi/HPLANCK**2.)**(1.5)
 !    !The values Nstage and j0 could be stored in atom.
-!       
+!
 !    !Nstage = atom%stage(atom%Nlevel) + 1 -> yes, but in general, we could have for instance
 !    ! a model atom for ion II and III ground level (like MgII model atom) and Nstage
 !    !is 2, not 3 !
 !    Nstage = atom%stage(atom%Nlevel) - atom%stage(1) + 1
 !    !maxval(atom%stage) - minval(atom%stage) + 1
-! 
+!
 !    NI(1:Nstage) = 0.0_dp !beyon Nstage not used. Nstage << Nlevel by definition
 !    j0(1:Nstage) = 0
 !    !find the index for each stage (0 and 1 for H) of the ground state of each stage
 !    !among all levels: for H 20 it is 1 (stage==0), and 20 (stage==1)
 !    j0(1:Nstage) = find_ground_state_ion(atom%Nlevel, atom%stage, Nstage)
 !    !write(*,*) Nstage, (j0(j), j=1,Nstage)
-! 
+!
 !    NI(Nstage) = 1.0_dp
-!    
+!
 !    !Saha equation to get the population of the state-0 each ionisation stage
 !    Uj1 = get_logPartitionFunctionk(elem, Nstage, k)
 !    do j=Nstage-1, 1, -1
@@ -982,13 +985,13 @@ END MODULE lte
 !     Uj1 = Uj
 !     !!write(*,*) NI(j), exp(Uj), elem%ionpot(j)/EV
 !    enddo
-! 
+!
 !    if (methode1) then
 !     NI(Nstage) = ntotal_atom(k, atom) / sum(NI(1:Nstage))
 !     NI(1:Nstage-1) = NI(1:Nstage-1) * NI(Nstage)
 !    endif
-! 
-! 
+!
+!
 !    !Now boltzmann equation for each level of each ion
 !    atom%nstar(:,k) = 0.0_dp
 !    atom%nstar(atom%Nlevel,k) = NI(Nstage) !last level not treated in detail i.e., = state-0
@@ -1003,17 +1006,17 @@ END MODULE lte
 !     j = j0(atom%stage(i)+1)
 !     Ej0 = atom%E(j)! ground state energy of each ion
 !     Uj = getPartitionFunctionk(elem, j, k)
-!     
+!
 !     if (methode1) then
-!       atom%nstar(i,k) = wi * BoltzmannEq9dot1(k, atom%E(i)-Ej0, atom%g(i), Uj) * NI(atom%stage(i)+1)    
-! 
+!       atom%nstar(i,k) = wi * BoltzmannEq9dot1(k, atom%E(i)-Ej0, atom%g(i), Uj) * NI(atom%stage(i)+1)
+!
 !     else
 !      atom%nstar(i,k) = wi * C0 * ne(k) * atom%g(i)/atom%g(j+1) * &
 !                     exp(beta*(elem%ionpot(j)-atom%E(i)-Ej0)) * NI(j+1)
 !     endif
 !    enddo
-!    
-! 
+!
+!
 !    !Abolute populations
 !    !!write(*,*) atom%ID, " populations of cell ", k
 !    !!write(*,*) (atom%nstar(i,k), i=1,atom%Nlevel)
@@ -1023,6 +1026,6 @@ END MODULE lte
 !    endif
 !    !!write(*,*) " total population of each level (m^-3)"
 !    !!write(*,*) (atom%nstar(i,k), i=1, atom%Nlevel)
-! 
+!
 !   RETURN
 !   END SUBROUTINE LTEpops_new

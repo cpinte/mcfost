@@ -99,7 +99,8 @@ contains
 
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
-    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
+         massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -225,14 +226,14 @@ contains
        !    N_part lines containing:
        !  - x,y,z: coordinates of each particle in AU
        !  - h: smoothing length of each particle in AU
-       !  - s: grain size of each particle in µm
+       !  - s: grain size of each particle in ï¿½m
        !
        !  Without grain growth: 2 lines containing:
        !  - n_sizes: number of grain sizes
-       !  - (s(i),i=1,n_sizes): grain sizes in µm
+       !  - (s(i),i=1,n_sizes): grain sizes in ï¿½m
        !  OR
        !  With grain growth: 1 line containing:
-       !  - s_min,s_max: smallest and largest grain size in µm
+       !  - s_min,s_max: smallest and largest grain size in ï¿½m
 
        open(unit=1,file="SPH_phantom.txt",status="replace")
        write(1,*) size(x)
@@ -493,7 +494,8 @@ contains
              endif
           enddo
        enddo cell_loop
-       write(*,*) "Density was reduced by", density_factor, "in", n_force_empty, "cells surrounding the model, ie", (1.0*n_force_empty)/n_cells * 100, "% of cells"
+       write(*,*) "Density was reduced by", density_factor, "in", n_force_empty,&
+          "cells surrounding the model, ie", (1.0*n_force_empty)/n_cells * 100, "% of cells"
     endif
 
     write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'

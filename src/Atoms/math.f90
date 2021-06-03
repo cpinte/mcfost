@@ -11,18 +11,18 @@ MODULE math
 	!a verifier. Not useful with Ng ?
 	subroutine solve_lin(A, b, N, minimized)
 		use utils, only : GaussSlv
-		!wrapper around GaussSlv with minimisation of the residual 
+		!wrapper around GaussSlv with minimisation of the residual
 		integer, intent(in) :: N
 		logical, intent(in) :: minimized
 		real(kind=dp), intent(inout) :: A(N,N), b(N)
 		real(kind=dp) :: Adag(N,N), bdag(N), res(N)
 		integer :: i, j
-		
+
 		if (minimized) then
 			bdag = b
 			Adag = A
 		endif
-		
+
 		!get new solutions from A
 		call GaussSlv(A, b, n)
 
@@ -35,17 +35,17 @@ MODULE math
 					res(i) = res(i) - Adag(i,j)*b(j)
 				enddo
 			enddo
-			
+
 			!solve for the residual
 			call Gaussslv(Adag, res, N)
 
 			b(:) = b(:) + res(:)
 		endif
-	
+
 	return
 	end subroutine solve_lin
-	
-	
+
+
 	function Ng_accelerate(niter, solution, m, n, lasts, check_negative_pops)
 		!Extra overheads if check_negative_pops is true
 		use utils, only : GaussSlv
@@ -57,7 +57,7 @@ MODULE math
 		real(kind=dp) :: A(n, n), b(n), w, dy, di,max_sol
 		!!integer, save :: niter
 		!!data niter /0/
-		
+
 		!!niter = niter + 1
 
 		lasts(:,niter) = solution(:)
@@ -65,7 +65,7 @@ MODULE math
 		if (niter <= n+1) return
 
 		A(:,:) = 0.0_dp; b(:) = 0.0_dp
-		
+
 		do k=1, m
 			!what is faster ?
 			if (solution(k) > 0.0) then!fast to check, than doing operations with dy and di zero for all i,j?
@@ -85,26 +85,27 @@ MODULE math
 				enddo
 			endif
 		enddo
-		
+
 		call Gaussslv(A, b, n)
 		!-> no imroved here since the routine is already doing that ?
 		!call solve_lin(A, b, n, .true.)
-		
+
 		!!write(*,*) "b",(b(i), i=1,n)
 		do i=1,n
 			solution(:) = solution(:) + b(i) * ( lasts(:,niter-i) - lasts(:,niter) )
 		enddo
-				
+
 		if (present(check_negative_pops)) then
 
 			max_sol = maxval(solution)
-		
+
 			if (check_negative_pops) then
 				pop_loop : do k=1,m
 					if (solution(k) < 0) then
 						write(*,*) "ERROR negative pops sol in Ng's acceleration"
 						write(*,*) " This is likely to be a bug !"
-						write(*,*) k, "sol:", solution(k), " relative to max:", solution(k)/max_sol, " relative to all:", solution(k) / sum(abs(solution))
+						write(*,*) k, "sol:", solution(k), " relative to max:", &
+                     solution(k)/max_sol, " relative to all:", solution(k) / sum(abs(solution))
 						write(*,*) " leaving..!"
 						stop
 						!better handling ??
@@ -113,17 +114,17 @@ MODULE math
 						!big loop over m inside loop over m. But we exist right after
 						exit pop_loop
 					endif
-				enddo pop_loop	
+				enddo pop_loop
 			endif
-			
+
 		endif
-		
+
 		ng_accelerate = .true.
 		!!if (acc_iter) niter = 0
 
 	return
 	end function ng_accelerate
-		
+
 !-> Building only a simple workaround just for the visibility in atom_transfer.f90. Not crucial.
 ! 	subroutine accelerate(n_iter, Nord, Ndelay, Nperiod, N, current_sol, previous_sols, accel)
 ! 		logical, intent(out) :: accel
@@ -132,8 +133,8 @@ MODULE math
 ! 		logical, save :: ng_rest
 ! 		integer, save :: n_iter_accel = 0
 ! 		integer :: i0_rest, iorder
-! 
-! 					
+!
+!
 ! 		accel = .false.
 ! 		if (n_iter > Ndelay) then
 ! 			iorder = n_iter - Ndelay
@@ -151,8 +152,8 @@ MODULE math
 ! 			ng_rest = .false.
 ! 			i0_rest = 0
 ! 			return
-! 		endif 
-! 				
+! 		endif
+!
 ! 	return
 ! 	end subroutine
 
@@ -162,14 +163,14 @@ MODULE math
 	!to have access to both
 		real(kind=dp) :: test, test2
 		integer, intent(in) :: i
-		
+
 		test = real(i,kind=dp)
 		return
-		
+
 		entry test2(i)
 			test2 = real(i,kind=dp)**2
 		return
-	
+
 	return
 	end function
 
@@ -270,11 +271,11 @@ MODULE math
      do i=1,size(y(:,1))
       do j=1, size(y(1,:))
        if (y(i,j) /= y(i,j)) then
-        write(*,*) "(Nan):", y(i,j), " i=", i, " j=",j 
+        write(*,*) "(Nan):", y(i,j), " i=", i, " j=",j
         val = 1
         return
        else if (y(i,j) > 0 .and. (y(i,j)==y(i,j)*10)) then
-        write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1), " i=", i, " j=",j 
+        write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1), " i=", i, " j=",j
         val = 2
         return
        end if
@@ -307,7 +308,7 @@ MODULE math
 !    function linear_1D(N,x,y,Np,xp)
 !      real(kind=dp) :: x(N),y(N),linear_1D(Np), xp(Np), t
 !      integer :: N, Np, i, j
-! 
+!
 ! 	 linear_1D(:) = 0.0_dp
 ! !      do i=1,N-1
 ! !         do j=1,Np
@@ -325,11 +326,11 @@ MODULE math
 !            endif
 !         enddo
 !      enddo
-! 
+!
 !      return
-! 
+!
 !    end function linear_1D
-   
+
    function linear_1D_sorted(n,x,y, np,xp)
      ! assumes that both x and xp are in increasing order
      ! We only loop once over the initial array, and we only perform 1 test per element
@@ -410,7 +411,7 @@ MODULE math
 
      return
    end function interp1d_sorted
- 
+
   !not test yet
    function quad_1D_sorted(n,x,y, np,xp)
      ! assumes that both x and xp are in increasing order
@@ -444,7 +445,7 @@ MODULE math
 			  	t = (xp(j) - x(i)) * (xp(j) - x(i+1)) / ((x(i-1) - x(i))*(x(i-1)-x(i+1)) )
 			  	t2 = (xp(j) - x(i-1)) * (xp(j) - x(i+1)) / ((x(i) - x(i-1))*(x(i)-x(i+1)) )
 			    t3 = (xp(j) - x(i-1)) * (xp(j) - x(i)) / ((x(i+1) - x(i-1))*(x(i+2)-x(i)) )
-			  	quad_1D_sorted(j) = quad_1D_sorted(j) + y(i-1)*t + y(i) * t2 + y(i+1) * t3  
+			  	quad_1D_sorted(j) = quad_1D_sorted(j) + y(i-1)*t + y(i) * t2 + y(i+1) * t3
 			  else
               	t = (x(i) - xp(j)) / (x(i) - x(i-1))
               	t2 = (xp(j) - x(i-1)) / (x(i) - x(i-1))
@@ -572,7 +573,7 @@ MODULE math
 
    RETURN
    END FUNCTION dPOW
-   
+
    !approximate exp(-x) = approx_exp_mx(x)
    !x is positive !
    !too slow atm
@@ -580,7 +581,7 @@ MODULE math
    	real(kind=dp), intent(in) :: x
    	real(kind=dp) :: approx_exp_mx
    	integer :: m
-   
+
    	if (x > 500.0) then
    		approx_exp_mx = 0.0 !exp(-(x>650)) -> 0
    	elseif (x < 1d-2) then !exp(-(x<1d-2)) -> taylor
@@ -588,10 +589,10 @@ MODULE math
    	else
    		approx_exp_mx = exp(-x)
    	endif
-   	
+
    return
    end function approx_exp_mx
-   
+
     !interpolation is to slow at the moment to be efficient
 	subroutine exp_lookup (N, argmin,argmax, x, table)
 	!stores a table of tau values (x) and their exp(-tau) (table)
@@ -603,7 +604,7 @@ MODULE math
    		real(kind=dp), dimension(N), intent(out) :: table
    		real(kind=dp), intent(out) :: x(N)
    		integer :: i
-   		
+
    		x(1) = 0.0
    		!include the spanl in a loop ?
    		x(2:N) = spanl(1e-6, argmax, N-1)
@@ -622,7 +623,7 @@ MODULE math
 		real(kind=dp), dimension(4) :: a4, b4
 		real(kind=dp), intent(in) :: x
 		real(kind=dp) :: E1
-		
+
 		a6(:) = 1.0_dp * (/-0.57721566,  0.99999193, -0.24991055,0.05519968, -0.00976004,  0.00107857 /)
 
 		a4(:) = 1.0_dp * (/ 8.5733287401, 18.0590169730, 8.6347608925,  0.2677737343 /)
@@ -644,13 +645,13 @@ MODULE math
 
 	return
 	end function E1
-  
+
 	function E2(x)
 	! second exponential integral, using recurrence relation
 	! En+1 = 1/n * ( exp(-x) -xEn(x))
 		real(kind=dp), intent(in) :: x
 		real(kind=dp) :: E2
-   
+
 		if (x <= 0) then
    			E2 = 0.0_dp
    			return
@@ -664,20 +665,20 @@ MODULE math
 
 	return
 	end function
-	
+
 !   FUNCTION E1 (x) result (y)
 !    !First exponential integral
 !    real, dimension(6) :: a6
 !    real, dimension(4) :: a4, b4
 !    real(kind=dp) :: y, x
-! 
+!
 !    data a6  /-0.57721566,  0.99999193, -0.24991055,&
 !              0.05519968, -0.00976004,  0.00107857 /
 !    data a4  / 8.5733287401, 18.0590169730, &
 !                8.6347608925,  0.2677737343 /
 !    data b4  /9.5733223454, 25.6329561486, &
 !               21.0996530827,  3.9584969228/
-! 
+!
 !    if (x<=0.0) then
 !     write(*,*) "Arg of Exponential integral has to be > 0"
 !     write(*,*) "exiting..."
@@ -694,7 +695,7 @@ MODULE math
 !    else
 !     y = 0.0
 !    end if
-! 
+!
 !   RETURN
 !   END FUNCTION E1
 
@@ -702,7 +703,7 @@ MODULE math
 !   ! second exponential integral, using recurrence relation
 !   ! En+1 = 1/n * ( exp(-x) -xEn(x))
 !    real(kind=dp) :: x, y
-! 
+!
 !    if (x.le.0.) then
 !     write(*,*) "Arg of Exponential integral has to be > 0"
 !     write(*,*) "exiting..."
@@ -712,7 +713,7 @@ MODULE math
 !    else
 !     y = 0.
 !    end if
-! 
+!
 !   RETURN
 !   END FUNCTION
 

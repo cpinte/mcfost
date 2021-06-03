@@ -55,9 +55,9 @@ module atmos_type
 	real(kind=dp) :: B_char = 0d0, v_char=0d0
            !B_char in Tesla and v_char in m/s, default 0T and 1km/s
 	logical :: lMagnetized = .false., calc_ne, laccretion_shock
-	
+
 	real(kind=dp) :: thetai, thetao
-	
+
 	integer, allocatable, dimension(:) :: icompute_atomRT!
 	real(kind=dp), dimension(:), allocatable :: xmu, wmu, xmux, xmuy
 	!removed the depency in rays of some quantity (like phi_loc or I) since rate matrix
@@ -2311,7 +2311,7 @@ module atmos_type
 		write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
 		write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
 		write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
-		
+
 !old way of setting geometrical structures onto the stellar surface. Using stars.f90/intersect_spots and etoile(1)%SurfB
 !-> future deprecation
 !-> not used anymore, to be removed (kept for checking accretion spot with old routines)
@@ -2330,16 +2330,16 @@ module atmos_type
 ! !     thetao = asin(sqrt(1d0/3d0))
 ! !    end if
 ! 			Lr = Ggrav * etoile(1)%M * Msun_to_kg * Msun /3.154e7  / (etoile(1)%r*au_to_m) * (1. - 2./(rmi + rmo))
-! 
-! 
+!
+!
 ! 			write(*,*) "Angles at stellar surface (deg)", thetao*rad_to_deg, thetai*rad_to_deg
 ! 			Tring = Lr / (4d0 * PI * (etoile(1)%r*au_to_m)**2 * sigma * abs(cos(thetai)-cos(thetao)))
 ! 			Tring = Tring**0.25
 ! 			write(*,*) " Accretion spots tilt (deg)", tilt*180./pi
 
 ! 			if (Tshk > 0) Tring = Tshk
-! 
-! 
+!
+!
 ! 			!2 is for two rings, 2Pi is dphi from 0 to 2pi / total sphere surface
 ! 			write(*,*) "Ring T ", Tring, "K"
 ! 			write(*,*) "Surface ", 100*(abs(cos(thetai)-cos(thetao))), "%" !couverte par les deux anneaux sur toute la sphere
@@ -2437,7 +2437,8 @@ module atmos_type
 		enddo icell_loop
 		N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
 		if (N_fixed_ne > 0) then
-			write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
+			write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
 		endif
 
 	!no need if we do not the dark_zones from input file.

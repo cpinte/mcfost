@@ -610,7 +610,8 @@ MODULE readatom
 !        atom%continua(kr)%lambdamin = 0.05 * atom%continua(kr)%lambda0
 !        atom%continua(kr)%lambdamin = max(10.0_dp, 1d-2 * atom%continua(kr)%lambda0)
        !!tmp
-       write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
+       write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') &
+          atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
        write(*,'(" -> lower edge cut at "(1F12.5)" nm !")'), atom%continua(kr)%lambdamin
 
        if (atom%continua(kr)%lambdamin>=atom%continua(kr)%lambda0) then
@@ -1197,7 +1198,8 @@ MODULE readatom
  	do n=1, NactiveAtoms
 
  		if (activeatoms(n)%ptr_atom%cswitch > 1.0) then
- 			activeatoms(n)%ptr_atom%cswitch = max(1.0_dp, min(activeatoms(n)%ptr_atom%cswitch, activeatoms(n)%ptr_atom%cswitch/cswitch_down_scaling_factor))
+ 			activeatoms(n)%ptr_atom%cswitch = max(1.0_dp, &
+            min(activeatoms(n)%ptr_atom%cswitch,activeatoms(n)%ptr_atom%cswitch/cswitch_down_scaling_factor))
  			if (.not. print_message) then
  				print_message = .true.
  				new_cs = activeatoms(n)%ptr_atom%cswitch

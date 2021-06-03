@@ -3983,7 +3983,8 @@ end subroutine read_para215
     endif
 
     do i=1,n_etoiles
-       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum, etoile(i)%fUV
+       read(1,*) etoile(i)%T, etoile(i)%r, etoile(i)%M, etoile(i)%x, &
+                 etoile(i)%y, etoile(i)%z, etoile(i)%find_spectrum, etoile(i)%fUV
        if (.not.etoile(i)%find_spectrum) then
           read(1,*) etoile(i)%spectre
        else

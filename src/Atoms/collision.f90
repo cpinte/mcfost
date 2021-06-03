@@ -73,7 +73,7 @@ module collision
 		end if
 
 		return
-		
+
 	end function fone
 
 	function ftwo(x) result(y)
@@ -324,7 +324,7 @@ module collision
 
 		return
 	end function summers
-	
+
 	function collision_rates_atom_loc(icell, atom, deriv) result(C)
 	! --------------------------------------------------------------------------- !
 	! Computes collisional rates and fills the C matrix.
@@ -340,7 +340,7 @@ module collision
 	! The function then reads this array at each cell to compute
 	! the collisional rates. This is not very efficient as interpolation
 	! are done on the fly. Still, it avoids storing the full collision matrix
-	! in memory and the time to compute the collisional rates is negligible 
+	! in memory and the time to compute the collisional rates is negligible
 	! compared to the time to integrate the RTE.
 	! --------------------------------------------------------------------------- !
 		type (AtomType), intent(inout) :: atom
@@ -559,7 +559,7 @@ module collision
 ! 				stop
 ! 			end if
 
-			
+
 			! -- END of reading data for key, now computing collision rates -- !
 			! Still in the loop over the lines in the atomic file.
 
@@ -571,19 +571,19 @@ module collision
 
             	!here Nitem is NTMP !
             	if (Nitem /= NTMP) call error("Error, Nitem should be NTMP!")
-            	
+
 !             	CC = interp_dp(coeff, TGRID, T(icell))
             	!if coeff and TGRID are not allocatables,
             	!the size of coeff and Tgrid must be given (otherwise interpolation errors appear) !
 				CC = interp_dp(coeff(1:Nitem), TGRID(1:Nitem), T(icell))
 
 			end if
-			
+
 			!Compute also the derivative if present.
 			!note that in principle ni_bb / nj_cont is prop to ne and
 			!ne * phi(T) should be use because LTE populations are updated afterwards
 			!not during the electron + SEE iterations. See impact.f90 and see_ionisation_nonlte in statequil_atom.f90 for more details.
-			
+
 			if (key.eq."OMEGA") then
 				! -- Collisional excitation of ions
 				!Cdown means from j->i
@@ -610,8 +610,8 @@ module collision
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0 * Cdown/ne(icell)
      				deriv(i,j) = deriv(i,j) + Cdown * atom%nstar(j,icell)/atom%nstar(i,icell) / ne(icell)
-     			endif   
-      
+     			endif
+
 			else if (key.eq."CI") then
 			! -- Collisional ionisation
 				deltaE = atom%E(j) - atom%E(i)
@@ -620,20 +620,20 @@ module collision
 				!write(*,*) "dE=",deltaE," exp()=",exp(-deltaE/(KBOLTZMANN*T(k)))
 				C(i,j) = C(i,j) + Cup
 				C(j,i) = C(j,i) + Cup * atom%nstar(i,icell)/atom%nstar(j,icell)
-      
+
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0 / ne(icell) * Cup * atom%nstar(i,icell)/atom%nstar(j,icell)
      				deriv(i,j) = deriv(i,j) + Cup / ne(icell)
-     			endif     
-      
+     			endif
+
 			else if (key.eq."CR") then
 			! -- Collisional de-excitation by electrons
 				Cdown = ne(icell) * CC
 				C(j,i) = C(j,i) + Cdown !here
-				
+
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0 / ne(icell) * cdown
-     			endif 
+     			endif
 
 			else if (key.eq."CP") then
 			! -- collisions with protons
@@ -645,7 +645,7 @@ module collision
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0 * Cdown/ne(icell)
      				deriv(i,j) = deriv(i,j) + Cdown * atom%nstar(j,icell)/atom%nstar(i,icell) / ne(icell)
-     			endif     
+     			endif
 			else if (key.eq."CH") then
 			! -- Collisions with neutral hydrogen
 				Cup = Hydrogen%n(1,icell) * CC
@@ -654,20 +654,20 @@ module collision
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0 / ne(icell) * Cup * atom%nstar(i,icell)/atom%nstar(j,icell)
      				deriv(i,j) = deriv(i,j) + Cup / ne(icell)
-     			endif 
+     			endif
 			else if (key.eq."CH0") then
 			! -- Charge exchange with neutral hydrogen
 				C(j,i) = C(j,i) + Hydrogen%n(1,icell)*CC
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0 / ne(icell) * Hydrogen%n(1,icell)*CC
-     			endif 
+     			endif
 			else if (key.eq."CH+") then
 			! -- charge exchange with protons
 				np = Hydrogen%n(Hydrogen%Nlevel,icell)
 				C(i,j) = C(i,j) + np*CC
      			if (present(deriv)) then
      				deriv(i,j) = deriv(i,j) + np*CC/ne(icell)
-     			endif 
+     			endif
 			else if (key.eq."SHULL82") then
 				acolsh = coeff(1)
 				tcolsh = coeff(2)
@@ -693,7 +693,7 @@ module collision
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0*cdn / ne(icell)
      				deriv(i,j) = deriv(i,j) + Cup / ne(icell)
-     			endif 
+     			endif
 			else if (key.eq."BADNELL") then
 			! -- Fit for dielectronic recombination form Badnell
 			! First line coefficients are energies in K (from Chianti)
@@ -719,8 +719,8 @@ module collision
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0 / ne(icell) * cdn
      				deriv(i,j) = deriv(i,j) + Cup / ne(icell)
-     			endif 
-     			
+     			endif
+
 ! 				deallocate(badi)
 			else if (key.eq."AR85-CDI") then
 			! -- Direct collisional ionisation
@@ -747,7 +747,7 @@ module collision
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0 / ne(icell) * cdn
      				deriv(i,j) = deriv(i,j) + Cup / ne(icell)
-     			endif 
+     			endif
 ! 				deallocate(cdi)
 			else if (key.eq."AR85-CEA") then
 			! -- Autoionisation
@@ -760,7 +760,7 @@ module collision
 				!  " C[ji,k]=",C(ji,k)
      			if (present(deriv)) then
      				deriv(i,j) = deriv(i,j) + Cup / ne(icell)
-     			endif 
+     			endif
 			else if (key.eq."AR85-CHP") then
 			! -- Charge transfer with ionised Hydrogen
 				ar85t1 = coeff(1)
@@ -771,11 +771,13 @@ module collision
 				ar85d = coeff(6)
 				if ((T(icell) >= ar85t1).and.(T(icell) <= ar85t2)) then
 					t4 = T(icell)/1d4
-					cup = ar85a * 1d-9 * (t4)**(ar85b) * exp(-ar85c*t4) * exp(-ar85d*EV/KBOLTZMANN/T(icell)) * Hydrogen%n(Hydrogen%Nlevel,icell) * (CM_TO_M)**3
+					cup = ar85a * 1d-9 * (t4)**(ar85b) * exp(-ar85c*t4) &
+                     * exp(-ar85d*EV/KBOLTZMANN/T(icell)) &
+                     * Hydrogen%n(Hydrogen%Nlevel,icell) * (CM_TO_M)**3
 					C(i,j) = C(i,j) + cup
      				if (present(deriv)) then
      					deriv(i,j) = deriv(i,j) + Cup / ne(icell)
-     				endif 
+     				endif
 				end if
 			else if (key.eq."AR85-CHH") then
 			! Charge transfer with neutral Hydrogen
@@ -791,7 +793,7 @@ module collision
 					C(j,i) = C(j,i) + cdn
      				if (present(deriv)) then
      					deriv(j,i) = deriv(j,i) + 2.0 / ne(icell) * cdn
-     				endif 
+     				endif
 				end if
 			else if (key.eq."BURGESS") then
 				write(*,*) "BURGESS NOT CHECK"
@@ -816,16 +818,16 @@ module collision
      			if (present(deriv)) then
      				deriv(j,i) = deriv(j,i) + 2.0 / ne(icell) * cdn
      				deriv(i,j) = deriv(i,j) + Cup / ne(icell)
-     			endif 
+     			endif
 			end if
-   
+
 		end do loop_lines_in_file
 
 ! 		deallocate(TGRID, coeff)
 
 		return
 	end function collision_rates_atom_loc
- 
+
 ! FUNCTION CollisionRate_old(icell, atom) result(C)
 !  ! -------------------------------------------------------------
 !  ! Computes collisional rates and fills the C matrix.
@@ -856,7 +858,7 @@ module collision
 !   real(8) :: t0sh, t1sh, summrs, tg, cdn, ccup
 !   real(8) :: ar85t1, ar85t2, ar85a, ar85b, ar85c, ar85d, t4
 !   real(8) :: de,zz,betab,cbar,dekt,dekti,wlog,wb,sumscl=0.0
-! 
+!
 !   ! -- Nitem2 is here to check
 !   ! that Nitem (read) is equals to the acutla number
 !   ! of item read Nitem2
@@ -864,19 +866,19 @@ module collision
 !   ! because it reads in an array of size Nitem, so
 !   ! Nitem are expected to be read and an error will be
 !   ! raise otherwise.
-! 
+!
 !   write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
-! 
+!
 !   C0 = ((E_RYDBERG/sqrt(M_ELECTRON)) * PI*SQ(RBOHR)) * sqrt(8.0/(PI*KBOLTZMANN))
-! 
+!
 !   ! -- Initialise the collisional matrix at each cell--
 !   C(:,:) = 0d0
 !   Nlines = size(atom%collision_lines)
-! 
+!
 !   key="        "
 !   ! -- Go throught the remaining lines in the file --
 !   ! read collisional data depending the cases of recipes.
-! 
+!
 !   !do while(key.ne.END_OF_FILE)
 !   do k1=1, Nlines
 !    countline = countline + 1
@@ -890,7 +892,7 @@ module collision
 !    ! for the interpolation of the coefficients
 !    ! you have to modify the file to flush right
 !    ! everything after the TEMP keyword.
-! 
+!
 !    key = adjustl(inputline(1:len(key)))
 !    !write(*,*) trim(inputline)
 !    !write(*,*) "Line = ", countline, " key=",key,"."
@@ -901,17 +903,17 @@ module collision
 !     allocate(TGRID(NTMP))
 !     ! Nread is len(NTMP) in string format, offset
 !     ! inputline to read TGRID only, after NTMP.
-! 
+!
 !     read(inputline(len(key)+3:Nread),*) (TGRID(k), k=1,NTMP)
 !     !write(*,*) (TGRID(k), k=1,NTMP)
 !     Nitem = NTMP
 !     Nitem2 = size(TGRID)
-! 
+!
 !    else if ((key.eq."OMEGA") .or. (key.eq."CE") .or.&
 !         (key.eq."CI") .or. (key.eq."CP") .or. &
 !         (key.eq."CH0") .or. (key.eq."CH+") .or. &
 !         (key.eq."CH") .or. (key.eq."CR")) then
-! 
+!
 !     ! -- read level indices and collision coefficients --
 !     Nitem = NTMP
 !     if (allocated(coeff)) deallocate(coeff)
@@ -920,9 +922,9 @@ module collision
 !     ! but read(inputline,*) key, i1, i2, coeff is OK
 !     !write(*,*) key, inputline(len(key)+1:)
 !     read(inputline(len(key)+1:),*) i1, i2,(coeff(k),k=1,Nitem)
-! 
+!
 !     Nitem2 = size(coeff)
-! 
+!
 !     i = MIN(i1,i2) + 1
 !     j = MAX(i1,i2) + 1 !from 1 to Nlevel (in C, 0 to Nlevel-1)
 !     ij = (i-1)*atom%Nlevel + j!j->i
@@ -931,7 +933,7 @@ module collision
 !     ! Cf = C(Nlevel,Nlevel).flatten, of size Nlevel*Nlevel
 !     ! C(i,j) = Cf(ij) = Cf(i*Nlevel + j)
 !     ! C(1,1) = Cf(1) -> i*Nlevel +j = 1 -> i=i-1
-! 
+!
 !    else if ((key.eq."AR85-CHP").or.(key.eq."AR85-CHH")) then
 !     Nitem = 6
 !     if (allocated(coeff)) deallocate(coeff)
@@ -939,46 +941,46 @@ module collision
 !     read(inputline(len(key)+1:),*) i1, i2, &
 !         (coeff(k),k=1,Nitem)
 !     !write(*,*) inputline(len(key)+1:)
-! 
+!
 !     Nitem2 = size(coeff)
-! 
+!
 !     i = MIN(i1,i2) + 1
 !     j = MAX(i1,i2) + 1
 !     ij = (i-1)*atom%Nlevel + j
 !     ji = (j-1)*atom%Nlevel + i
-! 
+!
 !    else if ((key.eq.'AR85-CEA').or.(key.eq."BURGESS")) then
 !      Nitem = 1
 !      if (allocated(coeff)) deallocate(coeff)
 !      allocate(coeff(Nitem))
-! 
+!
 !      read(inputline(len(key)+1:),*) i1, i2, coeff(1)
 !      i = MIN(i1,i2) + 1
 !      j = MAX(i1,i2) + 1
 !      ij = (i-1)*atom%Nlevel + j
 !      ji = (j-1)*atom%Nlevel + i
-! 
+!
 !      Nitem2 = size(coeff)
 !      !write(*,*) "CEA or BURGESS", i1, i2, i, ij
-! 
+!
 !    else if (key.eq."SHULL82") then
 !      Nitem = 8
 !      if (allocated(coeff)) deallocate(coeff)
 !      allocate(coeff(Nitem))
-! 
+!
 !      read(inputline(len(key)+1:),*) i1, i2,&
 !          (coeff(k),k=1,Nitem)
 !      i = MIN(i1,i2) + 1
 !      j = MAX(i1,i2) + 1
 !      ij = (i-1)*atom%Nlevel+j
 !      ji = (j-1)*atom%Nlevel +i
-! 
+!
 !      Nitem2 = size(coeff)
-! 
-! 
+!
+!
 !    else if (key.eq."BADNELL") then
 !     ! -- BADNELL formula for dielectronic recombination --
-! 
+!
 !     !write(*,*) inputline, Nread
 !     read(inputline(len(key)+1:),*) i1, i2, Ncoef
 !     Nrow = 2
@@ -995,9 +997,9 @@ module collision
 !     j = MAX(i1,i2) + 1
 !     ij = atom%Nlevel*(i-1) + j
 !     ji = atom%Nlevel*(j-1) + i
-! 
+!
 !     Nitem2 = size(badi(1,:)) * size(badi(:,1))
-! 
+!
 !    else if (key.eq."SUMMERS") then
 !     ! -- Switch for density dependent DR coefficient
 !     !
@@ -1005,15 +1007,15 @@ module collision
 !     ! density dependence of dielectronic recombination:
 !     ! sumscl = 0. -> no density dependence
 !     ! sumscl = 1. -> full density dependence
-! 
+!
 !     Nitem = 1
 !     read(inputline(len(key)+1:), *) sumscl
-! 
+!
 !     Nitem2 = 1
-! 
+!
 !    else if (key.eq."AR85-CDI") then
 !     read(inputline(len(key)+1:),*) i1, i2, Nrow
-! 
+!
 !     if (Nrow.gt.MSHELL) then
 !      write(*,*) "Nrow is greater than MSHELL, exiting..."
 !      stop
@@ -1022,17 +1024,17 @@ module collision
 !     allocate(cdi(Nrow, MSHELL))
 !     do m=1,Nrow
 !       inputline = atom%collision_lines(k1+m)
-! 
+!
 !       read(inputline,*) (cdi(m,k),k=1,MSHELL)
 !     end do
-! 
+!
 !     Nitem2 = size(cdi(1,:)) * size(cdi(:,1))
-! 
+!
 !     i = MIN(i1,i2) + 1
 !     j = MAX(i1,i2) + 1
 !     ij = (i-1)*atom%Nlevel +j
 !     ji = (j-1)*atom%Nlevel +i
-! 
+!
 !    else if (key.eq.END_OF_FILE) then
 !     exit
 !    else
@@ -1040,7 +1042,7 @@ module collision
 !     write(*,*) "exiting..."
 !     stop
 !    end if ! end over possible cases key
-! 
+!
 !    if (Nitem2 .ne. Nitem) then
 !     ! -- Actually, the error should be in the reading.
 !     write(*,*) "Error, read ", Nitem2," items->expected ", &
@@ -1049,19 +1051,19 @@ module collision
 !     write(*,*) "Exiting..."
 !     stop
 !    end if
-! 
+!
 !    ! -- END of reading, filling now ...
-! 
+!
 !    if ((key.eq."OMEGA") .or. (key.eq."CE") .or. &
 !        (key.eq."CI") .or. (key.eq."CP") .or. &
 !        (key.eq."CH0") .or. (key.eq."CH+") .or. &
 !        (key.eq."CH") .or. (key.eq."CR") ) then
-! 
-! 
+!
+!
 !                       !here Nitem is NTMP !!
 !     !CC = interp1D(TGRID, coeff, T(icell))
 !     CC = interp_dp(coeff, TGRID, T(icell))
-! 
+!
 !    end if
 !    if (key.eq."OMEGA") then
 !     ! -- Collisional excitation of ions
@@ -1165,7 +1167,7 @@ module collision
 !     ! First line coefficients are energies in K (from Chianti)
 !     ! Second line coefficients are coefficients (from Chianti)
 !     ! See Badnell 2006 for more details
-! 
+!
 !     !!do k =1,Nspace
 !      summrs = sumscl*summers(i,j,ne(icell),atom) + &
 !        (1.-sumscl)
@@ -1179,9 +1181,9 @@ module collision
 !      ! -- convert from cm3/s to m3/s
 !      cdn = cdn *ne(icell) * summrs * CUBE(CM_TO_M)
 !      cup = cdn * atom%nstar(j,icell)/atom%nstar(i,icell)
-! 
+!
 !      cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
-! 
+!
 !      C(j,i) = C(j,i) + cdn
 !      C(i,j) = C(i,j) + cup
 !      !write(*,*) "BADNELL", cdn, cup
@@ -1288,12 +1290,12 @@ module collision
 !     !!end do
 !    end if
 !   end do !loop over (remaining) lines (of the atomic model)
-! 
+!
 !  deallocate(TGRID)
 !  deallocate(coeff)
-! 
+!
 !  RETURN
-!  END FUNCTION CollisionRate_old	
+!  END FUNCTION CollisionRate_old
 end module collision
 
 !-> Futur deprecation, will be computed on the fly, but his routine will be kept

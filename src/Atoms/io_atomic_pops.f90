@@ -298,7 +298,8 @@ subroutine read_electron(lelectron_read)
 
 	!call FTG2Dd(unit,1,-999,shape(ne),naxes(1),naxes(2),ne,anynull,EOF)
 
-    write(*,'("  -- min(ne)="(1ES20.7E3)" m^-3; max(ne)="(1ES20.7E3)" m^-3")') , minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
+    write(*,'("  -- min(ne)="(1ES20.7E3)" m^-3; max(ne)="(1ES20.7E3)" m^-3")') &
+        minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
 
 return
 end subroutine read_electron
@@ -1112,8 +1113,10 @@ subroutine read_pops_atom(atom)
 			endif
 		enddo
     	write(*,"('Level #'(1I3))") l
-    	write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , minval(atom%n(l,:),mask=(icompute_atomRT>0)), maxval(atom%n(l,:))
-    	write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  minval(atom%nstar(l,:),mask=(icompute_atomRT>0)), maxval(atom%nstar(l,:))
+    	write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') &
+         minval(atom%n(l,:),mask=(icompute_atomRT>0)), maxval(atom%n(l,:))
+    	write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")') &
+         minval(atom%nstar(l,:),mask=(icompute_atomRT>0)), maxval(atom%nstar(l,:))
 	enddo
 
 

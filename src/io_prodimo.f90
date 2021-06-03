@@ -217,7 +217,7 @@ contains
                 eps_PAH = dust_pop(pop)%frac_mass /disk_zone(i)%gas_to_dust  ! fraction en masse (de gaz) des PAHS
 
                 ! 1.209274 = (mH2*nH2 + mHe * mHe) / (nH2 + nHe) avec nHe/nH2 = 10^-1.125
-                ! abondance en nombre par rapport à H-nuclei + correction pour NC
+                ! abondance en nombre par rapport ï¿½ H-nuclei + correction pour NC
                 fPAH(i) = fPAH(i) + (1.209274/masse_PAH) * eps_PAH/3e-7 * (NC/50.)
                 !write(*,*) i, fPAH(i), real(dust_pop(pop)%frac_mass * disk_zone(i)%diskmass), real(dust_pop(pop)%frac_mass),  real(disk_zone(i)%diskmass)
              endif  ! PAH
@@ -812,8 +812,8 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-    ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
-    ! C_ext = a² microns² -> 1e-8 cm²             \
+    ! tau est sans dimension : [kappa * lvol = density * aï¿½ * lvol]
+    ! C_ext = aï¿½ micronsï¿½ -> 1e-8 cmï¿½             \
     ! density en cm-3                      > reste facteur 149595.0
     ! longueur de vol en AU = 1.5e13 cm   /
     facteur = AU_to_cm * mum_to_cm**2
@@ -1449,7 +1449,8 @@ contains
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 7")
-    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p))  call error("HDU 7 does not have the right dimensions.")
+    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) &
+       call error("HDU 7 does not have the right dimensions.")
     npixels=naxes(1)*naxes(2)*naxes(3)
 
     ! read_image
@@ -1464,7 +1465,8 @@ contains
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 8")
-    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) call error("HDU 8 does not have the right dimensions.")
+    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) &
+       call error("HDU 8 does not have the right dimensions.")
     npixels=naxes(1)*naxes(2)*naxes(3)
 
     ! read_image
@@ -1479,7 +1481,8 @@ contains
     ! Check dimensions
     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
     if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 9")
-    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) call error("HDU 9 does not have the right dimensions.")
+    if ((naxes(1) /= n_rad_m2p).or.(naxes(2) /= nz_m2p).or.(naxes(3) /= n_lambda_m2p)) &
+       call error("HDU 9 does not have the right dimensions.")
     npixels=naxes(1)*naxes(2)*naxes(3)
 
     ! read_image
@@ -1796,7 +1799,8 @@ contains
           ! Check dimensions
           call ftgknj(unit,'NAXIS',1,10,naxes,nfound,fits_status)
           if (nfound /= 3) call error("failed to read the NAXISn keywords of HDU 5+")
-          if ((naxes(1) /= lpops%lmax(i)).or.(naxes(2) /= n_rad).or.(naxes(3) /= nz)) call error("HDU 5+ does not have the right dimensions.")
+          if ((naxes(1) /= lpops%lmax(i)).or.(naxes(2) /= n_rad).or.(naxes(3) /= nz)) &
+             call error("HDU 5+ does not have the right dimensions.")
           npixels=naxes(1)*naxes(2)*naxes(3)
 
           allocate(MCpops(lpops%lmax(i),n_rad,nz), stat=alloc_status)

@@ -51,7 +51,7 @@ function span_dp(xmin,xmax,n, dk)
   real(kind=dp) :: delta_x
 
   delta_x = (xmax-xmin)/real(n-1,kind=dp)
-  
+
   if (dk < 0) then
   	x1 = xmax
   	x2 = xmin
@@ -65,7 +65,7 @@ function span_dp(xmin,xmax,n, dk)
   	iend = n
   	i0 = 1
   endif
-  
+
   span_dp(i0) = x1
   do i=istart,iend,dk
      span_dp(i) = span_dp(i-dk) + dk * delta_x
@@ -331,11 +331,11 @@ end subroutine GaussSlv
 subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
   ! Effectue une rotation du vecteur (xinit,yinit,zinit)
   ! Le resultat (xfin,yfin,zfin) est dans
-  ! le systeme de coordonnees où le vecteur (u1,v1,w1)=(1,0,0).
+  ! le systeme de coordonnees oï¿½ le vecteur (u1,v1,w1)=(1,0,0).
   ! ie applique la meme rotation que celle qui transforme
   ! (1,0,0) en (u1,v1,w1) sur (xinit,yinit,zinit)
   ! C. Pinte : 1/03/06
-  ! Nouvelle version d'une routine de F. Ménard
+  ! Nouvelle version d'une routine de F. Mï¿½nard
 
   implicit none
 
@@ -358,7 +358,7 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
    !     !c'est pas un atan mais un atan2 d'on le sign(u1)
    !     cost=sign(1.0/sqrt(1.0+x*x),u1)        !cos(atan(x)) = 1/(1+sqrt(x*x))
    !     sint=x*cost                            !sin(atan(x)) = x/(1+sqrt(x*x))
-        ! Equivalent  à  (~ meme tps cpu):
+        ! Equivalent  ï¿½  (~ meme tps cpu):
          theta=atan2(v1,u1)
          cost=cos(theta)
          sint=sin(theta)
@@ -876,7 +876,8 @@ subroutine mcfost_v()
   read(1,*,iostat=ios) last_version
   close(unit=1,status="delete",iostat=ios)
 
-  if ((ios/=0) .or. (.not.is_digit(last_version(1:1)))) call error("Cannot get MCFOST last version number (Error 2)","Cannot read new version file")
+  if ((ios/=0) .or. (.not.is_digit(last_version(1:1)))) &
+     call error("Cannot get MCFOST last version number (Error 2)","Cannot read new version file")
 
   ! Do we have the last version ?
   if (last_version == mcfost_release) then
@@ -1536,7 +1537,7 @@ subroutine cdapres(cospsi, phi, u0, v0, w0, u1, v1, w1)
 !*
 !***************************************************
 ! 06/12/05 : - passage double car bug sous Icare
-!            - reduction nbre d'opérations
+!            - reduction nbre d'opï¿½rations
 !            (C. Pinte)
 !***************************************************
 

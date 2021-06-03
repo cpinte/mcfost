@@ -48,7 +48,7 @@ module parametres
 
   integer :: RT_sed_method ! cf routine dust_map pour def
 
-  ! Etapes de l'émission thermique
+  ! Etapes de l'ï¿½mission thermique
   logical :: ltemp, lsed, lsed_complete, l_em_disk_image, lchauff_int, lextra_heating, lno_internal_energy
   character(len=512), dimension(:), allocatable :: indices
   character(len=512) :: tab_wavelength
@@ -62,24 +62,24 @@ module parametres
   				lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
        			ldissolve, laccurate_integ, loutput_rates, lorigin_atom, lzeeman_polarisation!lcontrib_function
   integer :: Nrays_atom_transfer, istep_start
-  
+
   !HEALpix
   integer :: healpix_lorder, healpix_lmin, healpix_lmax !lmin and lmax not yet (for local evaluation)
-  
+
   logical :: llimit_mem, lfix_backgrnd_opac
   logical :: lcheckpoint, lsafe_stop
   !Convergence relative errors
   real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time
   integer :: checkpoint_period
-  
+
   !Ng's acceleration
   logical :: lng_acceleration
   integer :: iNg_Norder, iNg_ndelay, iNg_Nperiod
-  
+
   !electron density
   logical :: lsolve_for_ne, lno_iterate_ne_mc = .true. !.true.==no electron iteration during step 2
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
-  
+
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image, jnu_atom_file
   logical :: ltab_wavelength_image, lread_jnu_atom
@@ -98,7 +98,7 @@ module parametres
 
   ! Production d'images symetriques
   ! La symetrie est effectuee avant de choisir les pixels
-  ! le système est-il centrosymetrique
+  ! le systï¿½me est-il centrosymetrique
   ! le systeme a-t-il une symetrie axiale (ne compte que si N_phi > 1)
   logical :: l_sym_ima, l_sym_centrale, l_sym_axiale
 
@@ -108,11 +108,11 @@ module parametres
   real :: angle_interet, zoom, tau_seuil, wl_seuil
 
   real  :: cutoff = 7.0
-  
+
   !must be initialized to 0
   integer(kind=8) :: mem_alloc_tot !total memory allocated dynamically or not in bytes
 
-  ! Résolution de la grille de densité
+  ! Rï¿½solution de la grille de densitï¿½
   ! Nombre de cellules dans la direction r (echantillonage log)
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
   integer :: n_rad, n_rad_in  ! subdivision de la premiere cellule
@@ -127,7 +127,8 @@ module parametres
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, lVoronoi, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs
-  logical :: ldensity_file, lsigma_file, lvelocity_file, lvfield_cyl_coord, lphantom_file, lphantom_multi, lphantom_avg, lgadget2_file, lascii_SPH_file, llimits_file, lSPH_amin, lSPH_amax, lmcfost_lib
+  logical :: ldensity_file, lsigma_file, lvelocity_file, lvfield_cyl_coord, lphantom_file
+  logical :: lphantom_multi, lphantom_avg, lgadget2_file, lascii_SPH_file, llimits_file, lSPH_amin, lSPH_amax, lmcfost_lib
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lastrochem, lML
   logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
@@ -147,8 +148,10 @@ module parametres
   logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface, lwrite_column_density, lwrite_mol_column_density
 
   ! Phantom
-  logical :: ldudt_implicit, lscale_length_units, lscale_mass_units, lignore_dust, ldelete_Hill_sphere, lrandomize_Voronoi, lrandomize_azimuth, lrandomize_gap, lrandomize_outside_gap, lcentre_on_sink
-  real(kind=dp) :: ufac_implicit,scale_length_units_factor,scale_mass_units_factor,correct_density_factor_elongated_cells, SPH_amin, SPH_amax, fluffyness, gap_factor
+  logical :: ldudt_implicit, lscale_length_units, lscale_mass_units, lignore_dust
+  logical :: ldelete_Hill_sphere, lrandomize_Voronoi, lrandomize_azimuth, lrandomize_gap, lrandomize_outside_gap, lcentre_on_sink
+  real(kind=dp) :: ufac_implicit,scale_length_units_factor,scale_mass_units_factor
+  real(kind=dp) :: correct_density_factor_elongated_cells, SPH_amin, SPH_amax, fluffyness, gap_factor
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy
   integer :: isink_centre
 
