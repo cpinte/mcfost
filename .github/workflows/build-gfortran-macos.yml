@@ -2,7 +2,7 @@
 
 name: build-gfortran-macos
 
-# Controls when the action will run. 
+# Controls when the action will run.
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
@@ -22,15 +22,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    
-    - name: create sha.f90 file # for some reason this does not work in the Makefile
-      run: |
-         git log --pretty=format:"%H %d"
-         git rev-parse HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$1"\""}'
-         printf "module sha\n  implicit none\n" > src/sha.f90
-         git rev-parse HEAD | awk '{print "  character(len=40), parameter :: sha_id = \""$1"\""}' >> src/sha.f90
-         printf "end module sha\n" >> src/sha.f90
-         cat src/sha.f90
 
     - name: install gfortran
       run: brew reinstall gcc
@@ -55,7 +46,7 @@ jobs:
            MCFOST_INSTALL: "/usr/local"
            MCFOST_NO_XGBOOST: "yes"
            SYSTEM: "gfortran"
-           MCFOST_GIT: "0"
+           MCFOST_GIT: "1"
       run: |
            cd src
            make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
