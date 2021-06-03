@@ -240,7 +240,7 @@ voro++_wrapper.o :  voro++_wrapper.cpp
 	$(CXX) $(CCFLAGS) -c voro++_wrapper.cpp -I$(MCFOST_INSTALL)/include
 
 $(XGBOOST_WRAPPER).o :  $(XGBOOST_WRAPPER).cpp
-	$(CXX) $(CCFLAGS) $(COMPFLAGS) -c $(XGBOOST_WRAPPER).cpp -I$(MCFOST_INSTALL)/include
+	$(CXX) $(CCFLAGS) -c $(XGBOOST_WRAPPER).cpp -I$(MCFOST_INSTALL)/include
 
 %.o : %.f90
 	$(FC) $(FFLAGS) -c -DPOINTER_SIZE=8 $< -o $@ $(INCLUDE)
@@ -254,7 +254,7 @@ Voronoi.o : voro++_wrapper.o
 ifeq ($(MCFOST_GIT),1)
 sha.f90 : ../.git/objects mcfost_env.o
 	printf "module sha\n  implicit none\n" > sha.f90
-	git log --pretty=format:"%H %d" | grep \(HEAD | awk \
+	git rev-parse HEAD | awk \
 		'{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' \
 		>> sha.f90
 	printf "end module sha\n" >> sha.f90
