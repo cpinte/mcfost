@@ -99,7 +99,8 @@ contains
 
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
-    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
+    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
+         massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -468,7 +469,8 @@ contains
              endif
           enddo
        enddo cell_loop
-       write(*,*) "Density was reduced by", density_factor, "in", n_force_empty, "cells surrounding the model, ie", (1.0*n_force_empty)/n_cells * 100, "% of cells"
+       write(*,*) "Density was reduced by", density_factor, "in", n_force_empty, "cells surrounding the model, ie",&
+            (1.0*n_force_empty)/n_cells * 100, "% of cells"
     endif
 
     write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'

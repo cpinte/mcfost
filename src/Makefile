@@ -100,7 +100,7 @@ endif
 ifeq ($(SYSTEM), gfortran)
     FC= gfortran
     FFLAGS+= -m64 -cpp -O3 -funroll-loops -ffinite-math-only -fno-trapping-math \
-	     -ffree-line-length-none -fbacktrace
+	     -ffree-line-length-132 -fbacktrace
     STATIC_FLAGS= -static-libgcc -static-libstdc++
     DBLFLAG= -fdefault-real-8 -fdefault-double-8
     DEBUGFLAG= -g -fbounds-check -Wunused-variable -Wunused-function -Wuninitialized -fbacktrace

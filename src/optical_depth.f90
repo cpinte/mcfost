@@ -317,7 +317,8 @@ subroutine compute_column(type, column, lambda)
   column(:,:) = 0.0
   do direction = 1, n_directions
      !$omp parallel default(none) &
-     !$omp shared(densite_gaz,tab_abundance,lVoronoi,Voronoi,direction,column,r_grid,z_grid,phi_grid,n_cells,cross_cell,CD_units,kappa,lambda,type,test_exit_grid) &
+     !$omp shared(densite_gaz,tab_abundance,lVoronoi,Voronoi,direction,column,r_grid,z_grid,phi_grid,n_cells,cross_cell) &
+     !$omp shared(CD_units,kappa,lambda,type,test_exit_grid) &
      !$omp private(icell,previous_cell,next_cell,icell0,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,factor,sum)
      !$omp do
      do icell=1,n_cells
