@@ -66,11 +66,13 @@ module Voronoi_grid
   integer :: n_walls
 
   interface
-     subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
+     subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, &
+          icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
           n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
-       integer(c_int), intent(in), value :: n_points, max_neighbours,icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, n_vectors
+       integer(c_int), intent(in), value :: n_points, max_neighbours, icell_start, icell_end
+       integer(c_int), intent(in), value :: cpu_id, n_cpu, n_points_per_cpu, n_vectors
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z,h
        real(c_double), intent(in), value :: threshold, cutting_distance_o_h ! defines at which value we decide to cut the cell, and at how many h the cell will be cut
@@ -205,7 +207,8 @@ module Voronoi_grid
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
     integer, dimension(:), allocatable :: SPH_id, SPH_original_id
     real :: time, mem
-    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, n, time1, time2, itime, i, icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu, nb_proc_voro
+    integer :: n_in, n_neighbours_tot, ierr, alloc_status, k, j, n, time1, time2, itime, i
+    integer :: icell, istar, n_sublimate, n_missing_cells, n_cells_per_cpu, nb_proc_voro
     real(kind=dp), dimension(:), allocatable :: V_tmp
     integer, dimension(:), allocatable :: first_neighbours,last_neighbours
     integer, dimension(:), allocatable :: neighbours_list_loc
@@ -442,8 +445,8 @@ module Voronoi_grid
        allocate(V_tmp(n_cells), was_cell_cut_tmp(n_cells), stat=alloc_status)
        if (alloc_status /=0) call error("Allocation error before voro++ call")
 
-       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, PS%vectors, PS%cutting_distance_o_h, &
-            icell_start-1,icell_end-1, id-1,nb_proc_voro,n_cells_per_cpu, &
+       call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, &
+            PS%vectors, PS%cutting_distance_o_h, icell_start-1,icell_end-1, id-1,nb_proc_voro,n_cells_per_cpu, &
             n_in,V_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
@@ -498,7 +501,8 @@ module Voronoi_grid
        deallocate(neighbours_list_loc)
 
        if (check_previous_tesselation) then
-          call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot,first_neighbours,last_neighbours,neighbours_list,was_cell_cut)
+          call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours, last_neighbours, &
+               neighbours_list,was_cell_cut)
        endif
     else !lcompute
        write(*,*) "Reading previous Voronoi tesselation"
@@ -1015,7 +1019,8 @@ module Voronoi_grid
   !     p_r(i,:) = 0.5 * (Voronoi(id_n)%xyz(:) + r_cell(:)) - r(:) ! we can save an operation here
   !  enddo
 
-    num(1:n_neighbours) = n(1,1:n_neighbours) * p_r(1,1:n_neighbours) + n(2,1:n_neighbours) * p_r(2,1:n_neighbours) + n(3,1:n_neighbours) * p_r(3,1:n_neighbours)
+    num(1:n_neighbours) = n(1,1:n_neighbours) * p_r(1,1:n_neighbours) + &
+         n(2,1:n_neighbours) * p_r(2,1:n_neighbours) + n(3,1:n_neighbours) * p_r(3,1:n_neighbours)
     s_tmp(1:n_neighbours) = num(1:n_neighbours)/den(1:n_neighbours)
 
     s = huge(1.0)

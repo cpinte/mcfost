@@ -932,13 +932,15 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  do i=1,nptmass
     n_etoiles = n_etoiles + 1
     if (real(xyzmh_ptmass(4,i)) * scale_mass_units_factor > 0.013) then
-       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * scale_mass_units_factor), &
-            "Msun, Mdot=", real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", &
+            real(xyzmh_ptmass(4,i) * scale_mass_units_factor), "Msun, Mdot=", &
+            real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
     else
-       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * scale_mass_units_factor), &
-            "Mjup, Mdot=", real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+       write(*,*) "Sink #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", &
+            real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * scale_mass_units_factor), "Mjup, Mdot=", &
+            real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
     endif
-    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1)) * scale_length_units_factor), "au"
+    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))*scale_length_units_factor), "au"
  enddo
 
 
@@ -972,7 +974,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
           !vphi = - vx(i) * sin_phi + vy(i) * cos_phi
 
           ! Keplerian vphi
-          vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * scale_mass_units_factor * Msun_to_kg  * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
+          vphi = sqrt(Ggrav * xyzmh_ptmass(4,1) * scale_mass_units_factor * Msun_to_kg  &
+               * (r_cyl * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
 
           vx(i) = vr * cos_phi - vphi * sin_phi
           vy(i) = vr * sin_phi + vphi * cos_phi
