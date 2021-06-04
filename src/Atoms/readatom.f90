@@ -610,7 +610,8 @@ CONTAINS
           !        atom%continua(kr)%lambdamin = 0.05 * atom%continua(kr)%lambda0
           !        atom%continua(kr)%lambdamin = max(10.0_dp, 1d-2 * atom%continua(kr)%lambda0)
           !!tmp
-          write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
+          write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') &
+               atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
           write(*,'(" -> lower edge cut at "(1F12.5)" nm !")'), atom%continua(kr)%lambdamin
 
           if (atom%continua(kr)%lambdamin>=atom%continua(kr)%lambda0) then
@@ -627,15 +628,18 @@ CONTAINS
           if (ldissolve) then !only if we actually want to extrapolate
              if (atom%ID=="H") then ! .or. atom%ID=="He") then
         	CALL search_cont_lambdamax (atom%continua(kr), atom%Rydberg, atom%stage(i)+1,atom%E(j),atom%E(i))
-                CALL make_sub_wavelength_grid_cont_linlog(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+         CALL make_sub_wavelength_grid_cont_linlog(atom%continua(kr), &
+              atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
                 !!CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
              else
                 !there is dissolve but not for this atom
-                CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+                CALL make_sub_wavelength_grid_cont(atom%continua(kr), &
+                     atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
                 ! 			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
              endif
           else !no dissolve
-             CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+             CALL make_sub_wavelength_grid_cont(atom%continua(kr), &
+                  atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
              ! 			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
           endif
           ! %lambda allocated inside the routines.
@@ -903,7 +907,8 @@ CONTAINS
              if (atoms(nmet)%ptr_atom%stage(1) > 0) then
                 write(*,*) " !!!!!!!!! "
                 call warning("Helium ground state is not in neutral stage ! Must be He I")
-                write(*,*) atoms(nmet)%ptr_atom%stage(1), atoms(nmet)%ptr_atom%label(1), atoms(nmet)%ptr_atom%E(1), atoms(nmet)%ptr_atom%g(1)
+                write(*,*) atoms(nmet)%ptr_atom%stage(1), atoms(nmet)%ptr_atom%label(1), &
+                     atoms(nmet)%ptr_atom%E(1), atoms(nmet)%ptr_atom%g(1)
                 write(*,*) " !!!!!!!!! "
                 stop
              endif
@@ -1197,7 +1202,8 @@ CONTAINS
     do n=1, NactiveAtoms
 
        if (activeatoms(n)%ptr_atom%cswitch > 1.0) then
-          activeatoms(n)%ptr_atom%cswitch = max(1.0_dp, min(activeatoms(n)%ptr_atom%cswitch, activeatoms(n)%ptr_atom%cswitch/cswitch_down_scaling_factor))
+          activeatoms(n)%ptr_atom%cswitch = max(1.0_dp, min(activeatoms(n)%ptr_atom%cswitch, &
+               activeatoms(n)%ptr_atom%cswitch/cswitch_down_scaling_factor))
           if (.not. print_message) then
              print_message = .true.
              new_cs = activeatoms(n)%ptr_atom%cswitch

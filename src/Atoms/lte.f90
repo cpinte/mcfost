@@ -3,13 +3,11 @@
 ! Various routines to solve for LTE populations
 ! -------------------------------------------------------------- !
 ! -------------------------------------------------------------- !
-
-
 MODULE lte
 
   use atom_type, only : AtomType, element, atomic_orbital_sqradius
-  use atmos_type, only : Npf, Tpf, ne, T, Hydrogen, Helium, ntotal_atom, Elements, icompute_atomRT, nHmin, nHtot, wght_per_H, avgweight, &
-       Atoms, Natom
+  use atmos_type, only : Npf, Tpf, ne, T, Hydrogen, Helium, ntotal_atom, Elements, icompute_atomRT, &
+       nHmin, nHtot, wght_per_H, avgweight, Atoms, Natom
   use constant
   use math
   use occupation_probability, only : wocc_n
@@ -504,7 +502,8 @@ CONTAINS
 
     if (print_diff) then
        write(*,*) " Old Max/min nstar:", max_nstar(hydrogen%Nlevel), min_nstar(hydrogen%Nlevel)
-       write(*,*) ' New max/min nstar', maxval(hydrogen%nstar(hydrogen%Nlevel,:)), minval(hydrogen%nstar(hydrogen%nlevel,:),mask=icompute_atomrt>0)
+       write(*,*) ' New max/min nstar', maxval(hydrogen%nstar(hydrogen%Nlevel,:)),&
+            minval(hydrogen%nstar(hydrogen%nlevel,:),mask=icompute_atomrt>0)
     endif
 
     RETURN
@@ -719,7 +718,8 @@ CONTAINS
 
     if (print_diff) then
        write(*,*) " Old Max/min nstar:", max_nstar(atom%Nlevel), min_nstar(atom%Nlevel)
-       write(*,*) ' New max/min nstar', maxval(atom%nstar(atom%Nlevel,:)), minval(atom%nstar(hydrogen%nlevel,:),mask=icompute_atomrt>0)
+       write(*,*) ' New max/min nstar', maxval(atom%nstar(atom%Nlevel,:)), &
+            minval(atom%nstar(hydrogen%nlevel,:),mask=icompute_atomrt>0)
     endif
 
     if (allocated(ndebye)) deallocate(ndebye)
@@ -839,7 +839,8 @@ CONTAINS
              write(unit,"(1I3, 3E14.7, 1F14.7)") i, wocc, atom%nstar(i,k)/wocc * 1d-6, atom%nstar(i,k)*1d-6, atom%g(i)
              !endif
           enddo
-          write(unit,"(1I3, 1E14.7, 1E14.7, 1E14.7, 1F14.7)") atom%Nlevel, wocc, atom%nstar(atom%Nlevel,k)/wocc * 1d-6, atom%nstar(atom%Nlevel,k)*1d-6, atom%g(atom%Nlevel)
+          write(unit,"(1I3, 1E14.7, 1E14.7, 1E14.7, 1F14.7)") atom%Nlevel, wocc, atom%nstar(atom%Nlevel,k)/wocc * 1d-6, &
+               atom%nstar(atom%Nlevel,k)*1d-6, atom%g(atom%Nlevel)
        endif
 
     enddo

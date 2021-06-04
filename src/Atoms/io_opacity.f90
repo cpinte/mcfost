@@ -299,7 +299,8 @@ CONTAINS
 
 
     do icell=1, n_cells !how to read integer then float ?
-       write(1,"(8ES20.10E3)") real(icell), taul(icell), chil(icell), etal(icell), etac(icell), chic(icell), etasc(icell), sigmac(icell)
+       write(1,"(8ES20.10E3)") real(icell), taul(icell), chil(icell), etal(icell), etac(icell), chic(icell), &
+            etasc(icell), sigmac(icell)
     enddo
 
     close(1)
@@ -1336,7 +1337,8 @@ CONTAINS
           chi(:,id) = chi0_bb(:,icell)
           !-> only line source function  = line emiss / total opac
           eta(:,id) = 0.0_dp!eta0_bb(:,icell)
-          call opacity_atom_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp, .false.)
+          call opacity_atom_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  &
+               0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp, .false.)
           chi_tmp(:,icell) = chi(:,id)
           eta_tmp(:,icell) = eta(:,id)
        endif

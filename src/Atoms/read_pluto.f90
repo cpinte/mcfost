@@ -127,7 +127,8 @@ contains
           call error("Allocation error vx, vy, vz")
        endif
 
-       allocate(T_tmp(n_points), vt_tmp(n_points), dz(n_points), mass_gas(n_points), mass_ne_on_massgas(n_points), stat=alloc_status)
+       allocate(T_tmp(n_points), vt_tmp(n_points), dz(n_points), mass_gas(n_points), mass_ne_on_massgas(n_points), &
+            stat=alloc_status)
        if (alloc_status > 0) then
           call error("Allocation error T_tmp")
        endif
@@ -140,7 +141,8 @@ contains
              call error("Magnetic field not available with Voronoi!")
           else
              call getnextLine(1, "#", FormatLine, inputline, Nread)
-             read(inputline(1:Nread),*) x(icell), y(icell), z(icell), T_tmp(icell), mass_gas(icell), mass_ne_on_massgas(icell), vx(icell), vy(icell), vz(icell), vt_tmp(icell), dz(icell)
+             read(inputline(1:Nread),*) x(icell), y(icell), z(icell), T_tmp(icell), mass_gas(icell),&
+                  mass_ne_on_massgas(icell), vx(icell), vy(icell), vz(icell), vt_tmp(icell), dz(icell)
           endif
        enddo
        !density_file
@@ -183,7 +185,8 @@ contains
     !     	ndusttypes = 1 !oterwise bug
     !     	allocate(massdust(1, n_points),rhodust(1, n_points),hydro_grainsizes(1))
     !** bug handling
-    call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation)
+    call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, mass_gas, massdust, rho, rhodust,&
+         hydro_grainsizes, hydro_limits, check_previous_tesselation)
     ! -> correction for small density applied on mass_gas directly inside
 
     !** bug handling
@@ -267,7 +270,8 @@ contains
     enddo icell_loop
     N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
     if (N_fixed_ne > 0) then
-       write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
+       write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
     endif
 
     call write_atmos_domain() !but for consistency with the plot functions in python

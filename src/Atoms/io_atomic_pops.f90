@@ -1112,12 +1112,14 @@ CONTAINS
           endif
        enddo
        write(*,"('Level #'(1I3))") l
-       write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , minval(atom%n(l,:),mask=(icompute_atomRT>0)), maxval(atom%n(l,:))
-       write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  minval(atom%nstar(l,:),mask=(icompute_atomRT>0)), maxval(atom%nstar(l,:))
+       write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , &
+            minval(atom%n(l,:),mask=(icompute_atomRT>0)), maxval(atom%n(l,:))
+       write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  &
+            minval(atom%nstar(l,:),mask=(icompute_atomRT>0)), maxval(atom%nstar(l,:))
     enddo
 
-
     return
+
   end subroutine read_pops_atom
 
 end MODULE io_atomic_pops

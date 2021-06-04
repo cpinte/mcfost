@@ -240,13 +240,10 @@ CONTAINS
        ! 			u0 = line%u / vbroad
        u0 = line%atom%ug(:) / vbroad
        do nv=1, Nvspace
-
           u1p(:) = u1(:) - omegav(nv)
-
-          !               	local_profile_interp(:) = local_profile_interp(:) + exp(-u1p*u1p) / sqrtpi / vbroad
-          local_profile_interp(:) = local_profile_interp(:) + linear_1D_sorted(size(line%atom%ug),u0,line%atom%gauss_prof(:,icell),N,u1p)
-
-
+          ! local_profile_interp(:) = local_profile_interp(:) + exp(-u1p*u1p) / sqrtpi / vbroad
+          local_profile_interp(:) = local_profile_interp(:) + &
+               linear_1D_sorted(size(line%atom%ug),u0,line%atom%gauss_prof(:,icell),N,u1p)
        enddo
     endif
 
@@ -726,7 +723,8 @@ CONTAINS
     !damp not computed, to much time ?
     write(unit, *) " icell = ", icell, " atom = ", line%atom%ID, " vbroad = ", line%atom%vbroad(icell)
     write(unit, *) " l0 = ", line%lambda0, " lmin = ", line%lambdamin, " lmax = ", line%lambdamax
-    write(unit, *) " resol (nm) = ", lambda(line%Nblue+1)-lambda(line%Nblue), " resol(km/s) = ",1d-3 * clight*(lambda(line%Nblue+1)-lambda(line%Nblue))/lambda(line%Nblue)
+    write(unit, *) " resol (nm) = ", lambda(line%Nblue+1)-lambda(line%Nblue), &
+         " resol(km/s) = ",1d-3 * clight*(lambda(line%Nblue+1)-lambda(line%Nblue))/lambda(line%Nblue)
     if (allocated(line%a)) then
        write(unit, *) " Area = ", wphi," damping = ", line%a(icell)
     else

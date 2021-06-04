@@ -1,12 +1,14 @@
 MODULE statequil_atoms
 
-  use atmos_type, only					: ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements, hydrogen, helium, nHtot, helium_is_active
+  use atmos_type, only : ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements, hydrogen, helium, &
+       nHtot, helium_is_active
   use atom_type
-  use spectrum_type, only					: lambda, Nlambda, Nlambda_cont, lambda_cont, Jnu_cont, Itot, dk, dk_min, dk_max, &
+  use spectrum_type, only					: lambda, Nlambda, Nlambda_cont, lambda_cont, Jnu_cont, Itot, &
+       dk, dk_min, dk_max, &
        Jnu, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb
   use constant
   use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc
-  use math, only							: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, solve_lin
+  use math, only		: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, solve_lin
   use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte
   use collision, only						: collision_rates_atom_loc!, CollisionRate_old
   use impact, only						: Collision_Hydrogen
@@ -338,7 +340,8 @@ CONTAINS
           if (n_new(atom%activeindex,i,icell)*wj/wi - n_new(atom%activeindex,j,icell)*atom%lines(kc)%gij > 0.0_dp) then
 
              chi_tot(Nblue+dk_min:Nred+dk_max) = chi_tot(Nblue+dk_min:Nred+dk_max) + &
-                  hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * ( n_new(atom%activeindex,i,icell)*wj/wi - n_new(atom%activeindex,j,icell)*atom%lines(kc)%gij )
+                  hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * &
+                  ( n_new(atom%activeindex,i,icell)*wj/wi - n_new(atom%activeindex,j,icell)*atom%lines(kc)%gij )
              !(atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
 
              eta_tot(Nblue+dk_min:Nred+dk_max)= eta_tot(Nblue+dk_min:Nred+dk_max) + &
@@ -353,7 +356,8 @@ CONTAINS
              !atom%n(j,icell)
              ! 					eta_tot(Nblue+dk_min:Nred+dk_max)= eta_tot(Nblue+dk_min:Nred+dk_max) + 0.0_dp
              chi_tot(Nblue+dk_min:Nred+dk_max) = chi_tot(Nblue+dk_min:Nred+dk_max) - &
-                  hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * ( n_new(atom%activeindex,i,icell)*wj/wi - n_new(atom%activeindex,j,icell)*atom%lines(kc)%gij )
+                  hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * &
+                  ( n_new(atom%activeindex,i,icell)*wj/wi - n_new(atom%activeindex,j,icell)*atom%lines(kc)%gij )
              !(atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
              !
              !
@@ -469,7 +473,8 @@ CONTAINS
           enddo
 
           aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + fourpi_h * ( JJ / n_rayons )
-          aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + fourpi_h * ( JJb / n_rayons) * ( aatom%nstar(i,icell)/aatom%nstar(j,icell) )
+          aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + fourpi_h * ( JJb / n_rayons) * &
+               ( aatom%nstar(i,icell)/aatom%nstar(j,icell) )
 
 
        end do atrc_loop
@@ -1205,7 +1210,8 @@ CONTAINS
 
     !radiative part
     !H
-    df(1:hydrogen%Nlevel,neq) = df(1:hydrogen%Nlevel,neq) + matmul( dgrdne(1:hydrogen%Nlevel,1:hydrogen%Nlevel), x(1:hydrogen%Nlevel) )
+    df(1:hydrogen%Nlevel,neq) = df(1:hydrogen%Nlevel,neq) + matmul( dgrdne(1:hydrogen%Nlevel,1:hydrogen%Nlevel), &
+         x(1:hydrogen%Nlevel) )
     if (helium_is_active) then
        !He
        df(ihel:Nlevels,neq) = df(ihel:Nlevels,neq) + matmul(dgrdne(ihel:Nlevels,ihel:Nlevels), x(ihel:Nlevels))
@@ -1282,11 +1288,13 @@ CONTAINS
     allocate(gamma_r(n_active, Nlevel_atoms,Nlevel_atoms),dgamrdne(Nlevel_atoms,Nlevel_atoms))
     dgamrdne = 0.0_dp; dgamcdne = 0.0_dp
     !!allocate(gamma_tot(Nlevel_atoms, Nlevel_atoms)); gamma_tot = 0.0_dp
-    call radrate_matrix_atom(id, icell, hydrogen, gamma_r(1,1:hydrogen%Nlevel,1:hydrogen%Nlevel), deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel))
+    call radrate_matrix_atom(id, icell, hydrogen, gamma_r(1,1:hydrogen%Nlevel,1:hydrogen%Nlevel), &
+         deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel))
     dgamrdne(1:hydrogen%Nlevel,1:hydrogen%Nlevel) = deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel)
     if (helium_is_active) then
        deriv = 0.0_dp
-       call radrate_matrix_atom(id, icell, helium, gamma_r(n_active,1:helium%Nlevel,1:helium%Nlevel), deriv(1:helium%Nlevel,1:helium%Nlevel))
+       call radrate_matrix_atom(id, icell, helium, gamma_r(n_active,1:helium%Nlevel,1:helium%Nlevel), &
+            deriv(1:helium%Nlevel,1:helium%Nlevel))
        dgamrdne(ihel:Nlevel_atoms,ihel:Nlevel_atoms) = deriv(1:helium%Nlevel,1:helium%Nlevel)
     endif
     !gamma_r(i,j) = -Rji, diagonal not included!
@@ -1329,7 +1337,8 @@ CONTAINS
        ! 			!fill atom%C and its derivative
        !derivative independent of the new value of ne but Collision need to be updated.
        !build collisional rate matrix and its equivalent derivative
-       call collrate_matrix_atom(id, icell, hydrogen, CC(1:hydrogen%Nlevel,1:hydrogen%Nlevel), deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel), dgamcdne(1:hydrogen%Nlevel,1:hydrogen%Nlevel))
+       call collrate_matrix_atom(id, icell, hydrogen, CC(1:hydrogen%Nlevel,1:hydrogen%Nlevel), &
+            deriv(1:hydrogen%Nlevel,1:hydrogen%Nlevel), dgamcdne(1:hydrogen%Nlevel,1:hydrogen%Nlevel))
 
        ! 			gamma_tot(1:hydrogen%Nlevel,1:hydrogen%nlevel) = RR(1:hydrogen%Nlevel,1:hydrogen%Nlevel) + CC(1:hydrogen%Nlevel,1:hydrogen%Nlevel)
        hydrogen%Gamma(:,:,id) = RR(1:hydrogen%Nlevel,1:hydrogen%Nlevel) + CC(1:hydrogen%Nlevel,1:hydrogen%Nlevel)
@@ -1351,7 +1360,8 @@ CONTAINS
           enddo
           !cumulate the derivative for helium equations
           call collision_matrix_atom(id, icell, helium, deriv(1:helium%Nlevel,1:helium%Nlevel))
-          call collrate_matrix_atom(id, icell, helium, CC(1:helium%Nlevel,1:helium%Nlevel), deriv(1:helium%Nlevel,1:helium%Nlevel),dgamcdne(ihel:Nlevel_atoms,ihel:Nlevel_atoms))
+          call collrate_matrix_atom(id, icell, helium, CC(1:helium%Nlevel,1:helium%Nlevel), deriv(1:helium%Nlevel,1:helium%Nlevel), &
+               dgamcdne(ihel:Nlevel_atoms,ihel:Nlevel_atoms))
 
           ! 				gamma_tot(ihel:Nlevel_atoms,ihel:Nlevel_atoms) = RR(1:helium%Nlevel,1:helium%Nlevel) + CC(1:helium%Nlevel,1:helium%Nlevel)
           helium%gamma(:,:,id) = RR(1:helium%Nlevel,1:helium%Nlevel) + CC(1:helium%Nlevel,1:helium%Nlevel)
@@ -1427,7 +1437,8 @@ CONTAINS
 
        if (verbose) then
           write(*,'("niter #"(1I4))') n_iter
-          write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfH="(1ES17.8E3)" dfne="(1ES17.8E3)" dfHe="(1ES17.8E3) )') delta_f, dfpop_H, dfne, dfpop_he
+          write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfH="(1ES17.8E3)" dfne="(1ES17.8E3)" dfHe="(1ES17.8E3) )') &
+               delta_f, dfpop_H, dfne, dfpop_he
        endif
 
        if (n_iter > max_iter) then
@@ -1457,7 +1468,8 @@ CONTAINS
     if (helium_is_active) then
        dM_he = maxval(abs(1.0 - ndag(ihel:Nlevel_atoms)/helium%n(:,icell)))
        !!write(*,*) maxval(ndag(ihel:Nlevel_atoms)), maxval(helium%n(:,icell))
-       if (verbose) write(*,'("(DELTA) non-LTE ionisation dM_H="(1ES17.8E3)" dne="(1ES17.8E3)" dM_He="(1ES17.8E3) )') dM, dne, dM_he
+       if (verbose) write(*,'("(DELTA) non-LTE ionisation dM_H="(1ES17.8E3)" dne="(1ES17.8E3)" dM_He="(1ES17.8E3) )') &
+            dM, dne, dM_he
        dM = max(dM, dM_he)
     else
        if (verbose) write(*,'("(DELTA) non-LTE ionisation dM="(1ES17.8E3)" dne="(1ES17.8E3) )') dM, dne
@@ -1520,7 +1532,8 @@ CONTAINS
     ndag(:) = helium%n(:,icell)
 
     !Radiative rate matrix and collisional rate matrix
-    allocate(RR(helium%Nlevel,helium%Nlevel), CC(helium%Nlevel,helium%Nlevel), dgamcdne(helium%Nlevel,helium%Nlevel), deriv(helium%Nlevel,helium%Nlevel))
+    allocate(RR(helium%Nlevel,helium%Nlevel), CC(helium%Nlevel,helium%Nlevel), dgamcdne(helium%Nlevel,helium%Nlevel), &
+         deriv(helium%Nlevel,helium%Nlevel))
     !normalised to ne radiative rate matrix
     allocate(gamma_r(helium%Nlevel,helium%Nlevel),dgamrdne(helium%Nlevel,helium%Nlevel))
     !Gamma_r(i_cont,j_cont) = R_jcont_icont / ne
@@ -1789,7 +1802,8 @@ CONTAINS
     ndag(:) = hydrogen%n(:,icell)
 
     !Radiative rate matrix and collisional rate matrix
-    allocate(RR(hydrogen%Nlevel,hydrogen%Nlevel), CC(hydrogen%Nlevel,hydrogen%Nlevel), dgamcdne(hydrogen%Nlevel,hydrogen%Nlevel), deriv(hydrogen%Nlevel,hydrogen%Nlevel))
+    allocate(RR(hydrogen%Nlevel,hydrogen%Nlevel), CC(hydrogen%Nlevel,hydrogen%Nlevel), dgamcdne(hydrogen%Nlevel,hydrogen%Nlevel), &
+         deriv(hydrogen%Nlevel,hydrogen%Nlevel))
     !normalised to ne radiative rate matrix
     allocate(gamma_r(hydrogen%Nlevel,hydrogen%Nlevel),dgamrdne(hydrogen%Nlevel,hydrogen%Nlevel))
     !Gamma_r(i_cont,j_cont) = R_jcont_icont / ne
@@ -2094,8 +2108,8 @@ CONTAINS
 
           !recombination
           !x(atom%Nlevel) is np in that case
-          df(i,neq) = df(i,neq) + (x(i) / x(neq)) * gamma_col(i,atom%Nlevel) + (x(atom%Nlevel)/x(neq))*(gamma_rad(atom%Nlevel,i)+2.0*gamma_col(atom%Nlevel,i))
-
+          df(i,neq) = df(i,neq) + (x(i) / x(neq)) * gamma_col(i,atom%Nlevel) + &
+               (x(atom%Nlevel)/x(neq))*(gamma_rad(atom%Nlevel,i)+2.0*gamma_col(atom%Nlevel,i))
        endif
     enddo
 
@@ -2517,7 +2531,8 @@ CONTAINS
           wphi = 0.0
           xcc_ji = 0.0
 
-          Ieff(1:Nl) = Itot(Nblue+dk_min:Nred+dk_max,iray,id) - Psi(Nblue+dk_min:Nred+dk_max,iray,id) * eta_atoms(Nblue+dk_min:Nred+dk_max,nact,id)
+          Ieff(1:Nl) = Itot(Nblue+dk_min:Nred+dk_max,iray,id) - Psi(Nblue+dk_min:Nred+dk_max,iray,id) * &
+               eta_atoms(Nblue+dk_min:Nred+dk_max,nact,id)
 
           ! 				enddo
           do l=1,Nl
@@ -3175,10 +3190,12 @@ CONTAINS
 
 
              chi_tot(Nblue+dk_min:Nred+dk_max) = chi_tot(Nblue+dk_min:Nred+dk_max) + &
-                  hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * (atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
+                  hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * &
+                  (atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
 
              eta_tot(Nblue+dk_min:Nred+dk_max)= eta_tot(Nblue+dk_min:Nred+dk_max) + &
-                  atom%lines(kc)%twohnu3_c2 * atom%lines(kc)%gij * hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * atom%n(j,icell)
+                  atom%lines(kc)%twohnu3_c2 * atom%lines(kc)%gij * hc_fourPI * atom%lines(kc)%Bij * &
+                  atom%lines(kc)%phi_loc(:,iray,id) * atom%n(j,icell)
 
 
           else !neg or null
@@ -3187,7 +3204,8 @@ CONTAINS
              ! 						atom%lines(kc)%twohnu3_c2 * atom%lines(kc)%gij * hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * atom%n(j,icell)
              eta_tot(Nblue+dk_min:Nred+dk_max)= eta_tot(Nblue+dk_min:Nred+dk_max) + 0.0_dp
              chi_tot(Nblue+dk_min:Nred+dk_max) = chi_tot(Nblue+dk_min:Nred+dk_max) - &
-                  hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * (atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
+                  hc_fourPI * atom%lines(kc)%Bij * atom%lines(kc)%phi_loc(:,iray,id) * &
+                  (atom%n(i,icell)*wj/wi - atom%lines(kc)%gij*atom%n(j,icell))
 
 
           endif

@@ -8,19 +8,23 @@
 module atom_transfer
 
   use atom_type, only			: AtomType
-  use opacity, only			: dealloc_atom_quantities, alloc_atom_quantities, compute_atom_quantities, compute_background_continua, &
-       interp_background_opacity, opacity_atom_loc, interp_contopac, interp_continuum_local, & !compute_nlte_bound_free, &
-       nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, background_continua_lambda, opacity_atom_zeeman_loc, &
-       prec_pops, frac_limit_pops, frac_ne_limit
+  use opacity, only			: dealloc_atom_quantities, alloc_atom_quantities, compute_atom_quantities, &
+       compute_background_continua, interp_background_opacity, opacity_atom_loc, interp_contopac, interp_continuum_local, & !compute_nlte_bound_free, &
+       nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, &
+       background_continua_lambda, opacity_atom_zeeman_loc, prec_pops, frac_limit_pops, frac_ne_limit
   use background_opacity, only: Thomson
   use Planck, only			: bpnu
-  use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, Flux_acc, Ishock, Istar_loc, flux_star,&
-       Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
-       dealloc_jnu, reallocate_rays_arrays, write_flux, write_1D_arr_ascii, originc_atom, origin_atom, write_lambda_cell_array, originc_file, origin_file, write_atomic_maps
+  use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, &
+       eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, Flux_acc, &
+       Ishock, Istar_loc, flux_star, Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, &
+       init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
+       dealloc_jnu, reallocate_rays_arrays, write_flux, write_1D_arr_ascii, originc_atom, origin_atom, &
+       write_lambda_cell_array, originc_file, origin_file, write_atomic_maps
 
-  use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, ne, T, vr, vphi, v_z, vtheta, wght_per_H, &
-       readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
-       compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, helium_is_active
+  use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, &
+       ne, T, vr, vphi, v_z, vtheta, wght_per_H, readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, &
+       helium, lmali_scheme, lhogerheijde_scheme, compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, &
+       angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, helium_is_active
   use healpix_mod, only		: healpix_sphere, healpix_npix, healpix_weight, healpix_ring_mu_and_phi, healpix_listx
 
   use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
@@ -30,37 +34,45 @@ module atom_transfer
   use getlambda, only			: hv
   use voigtfunctions, only	: Voigt, VoigtHumlicek, dirac_line
   use profiles, only			: profile, local_profile_v, local_profile_thomson, local_profile_interp, local_profile_dk
-  use io_atomic_pops, only	: write_pops_atom, write_electron, read_electron, write_hydrogen, write_Hminus, write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
+  use io_atomic_pops, only	: write_pops_atom, write_electron, read_electron, write_hydrogen, write_Hminus, &
+       write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
   use io_opacity, only 		: write_Jnu, write_taur, write_contrib_lambda_ascii, read_jnu_ascii, Jnu_File_ascii, read_Jnu, &
        write_collision_matrix_atom, write_collision_matrix_atom_ascii, &
        write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii, write_opacity_emissivity_map
   use math
   !$ use omp_lib
   use molecular_emission, only: v_proj
-  use input, only				: lkeplerian, linfall, RT_line_method, nb_proc, RT_line_method, limb_darkening, mu_limb_darkening
-  use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function_ray, lorigin_atom, lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, &
-       l_sym_ima, etoile, npix_x, npix_y, npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
-       lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, NRAYS_ATOM_TRANSFER, &
-       DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, &
-       ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint, istep_start, lno_iterate_ne_mc, &
+  use input, only				: lkeplerian, linfall, RT_line_method, nb_proc, RT_line_method, &
+       limb_darkening, mu_limb_darkening
+  use parametres, only		: Rmax, Rmin, map_size, zoom, n_cells, lcontrib_function_ray, lorigin_atom, &
+       lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, l_sym_ima, etoile, npix_x, npix_y, &
+       npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
+       lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, &
+       NRAYS_ATOM_TRANSFER, DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, &
+       ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, &
+       safe_stop_time, checkpoint_period, lcheckpoint, istep_start, lno_iterate_ne_mc, &
        healpix_lorder, healpix_lmin, healpix_lmax, lvoronoi, lmagnetoaccr, lonly_top, lonly_bottom, l3D
 
   use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
   use Voronoi_grid, only		: Voronoi
   !!use dust_transfer, only		: compute_stars_map
-  use dust_ray_tracing, only	: RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, tab_RT_az,tab_RT_incl!!, stars_map, kappa
+  use dust_ray_tracing, only	: RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
+       tab_RT_az,tab_RT_incl!!, stars_map, kappa
   use stars, only				: intersect_spots, intersect_stars
   !use wavelengths, only		:
   use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
-  use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, masseH, kb, sigma, Lsun, rsun_to_au, au_to_rsun, c_light
+  use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, &
+       masseH, kb, sigma, Lsun, rsun_to_au, au_to_rsun, c_light
   use utils, only				: rotation_3d, cross_product
   use naleat, only 			: seed, stream, gtype
   use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k, area
   use messages, only 			: error, warning
 
-  use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, calc_bf_rates, calc_rate_matrix, update_populations, update_populations_and_electrons, fill_collision_matrix, &
-       init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates_mali,calc_rates, store_rate_matrices, &
-       psi, calc_rates_mali, n_new, ne_new, radiation_free_pops_atom, omega_sor_atom!,store_radiative_rates,
+  use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, &
+       calc_bf_rates, calc_rate_matrix, &
+       update_populations, update_populations_and_electrons, fill_collision_matrix, &
+       init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates_mali,calc_rates, &
+       store_rate_matrices, psi, calc_rates_mali, n_new, ne_new, radiation_free_pops_atom, omega_sor_atom!,store_radiative_rates,
 
   implicit none
 
@@ -158,7 +170,8 @@ contains
        if (lintersect_stars) then
           if (icell == icell_star) then
              !continuous emission of the shock and the star only no stored!
-             Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+             Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * &
+                  local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
              !!call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
              !!Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
              ! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
@@ -202,7 +215,8 @@ contains
 
           if ((nbr_cell == 1).and.labs) then
              if (lmali_scheme) then
-                if (minval(chi(:,id)) == 0) write(*,*) lambda(locate(chi(:,id), minval(chi(:,id)))), T(icell), ne(icell), nhtot(icell)
+                if (minval(chi(:,id)) == 0) write(*,*) lambda(locate(chi(:,id), minval(chi(:,id)))), T(icell), ne(icell), &
+                     nhtot(icell)
                 if (any_nan_infinity_vector(chi(:,id)) > 0) then
                    write(*,*) chi(:,id)
                    call error( "inf or nan in chi")
@@ -329,8 +343,10 @@ contains
 
        if (lintersect_stars) then
           if (icell == icell_star) then
-             Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
-             Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
+             Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * &
+                  local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+             Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * &
+                  local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
              return
           end if
        endif
@@ -388,7 +404,8 @@ contains
 
           do la=1, Nlambda_cont
              Icont(la,iray,id) = Icont(la,iray,id) + ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
-             originc_atom(la,icell) = originc_atom(la,icell) + facteur_tau * ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la))) ) * Snu_c(la)
+             originc_atom(la,icell) = originc_atom(la,icell) + facteur_tau * ( exp(-tau_c(la)) - exp(-(tau_c(la) + dtau_c(la)))) &
+                  * Snu_c(la)
              tau_c(la) = tau_c(la) + dtau_c(la)
           enddo
 
@@ -396,7 +413,8 @@ contains
           ! 				Scont_interp = linear_1D_sorted(Nlambda_cont,lambda_cont, Snu_c, Nlambda,lambda)
           do la=1,Nlambda
              ! 					origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * ( exp(-tau_line(la)) - exp(-(tau_line(la)+l_contrib*chi_line(la))) ) * Sline(la) / (chi_line(la) + 1d-100)
-             origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Sline(la) / chi(la,id)!(Sline(la) - chi_line(la)*Scont_interp(la))/chi(la,id)
+             origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * &
+                  Sline(la) / chi(la,id)!(Sline(la) - chi_line(la)*Scont_interp(la))/chi(la,id)
              Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
              tau(la) = tau(la) + dtau(la) !for next cell
              tau_line(la) = tau_line(la) + l_contrib * chi_line(la)
@@ -472,8 +490,10 @@ contains
              !        				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
              ! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
              ! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
-             Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
-             Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
+             Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * &
+                  local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+             Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * &
+                  local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
              return
           end if
        endif
@@ -718,8 +738,8 @@ contains
                      atom%lines(kr)%map(:,1,1,ibin,iaz) + I0(nb:nr)*normF
 
                 atom%lines(kr)%mapc(1,1,ibin,iaz) = &
-                     atom%lines(kr)%mapc(1,1,ibin,iaz) + interp1d_sorted(Nlambda_cont,lambda_cont,I0c, atom%lines(kr)%lambda0)*normF
-
+                     atom%lines(kr)%mapc(1,1,ibin,iaz) + interp1d_sorted(Nlambda_cont,lambda_cont,I0c, &
+                     atom%lines(kr)%lambda0)*normF
              endif
 
           enddo
@@ -735,8 +755,8 @@ contains
                 nb = atom%lines(kr)%Nblue + dk_min
 
                 atom%lines(kr)%map(:,ipix,jpix,ibin,iaz) = I0(nb:nr)*normF
-                atom%lines(kr)%mapc(ipix,jpix,ibin,iaz) = interp1d_sorted(Nlambda_cont,lambda_cont,I0c, atom%lines(kr)%lambda0)*normF
-
+                atom%lines(kr)%mapc(ipix,jpix,ibin,iaz) = interp1d_sorted(Nlambda_cont,lambda_cont,I0c, &
+                     atom%lines(kr)%lambda0)*normF
              endif
 
           enddo
@@ -1089,8 +1109,10 @@ contains
              enddo
              do m=1,atom%Nlevel
                 write(*,"('Level #'(3I1))") m
-                write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , minval(atom%n(m,:),mask=(icompute_atomRT>0)), maxval(atom%n(m,:))
-                write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  minval(atom%nstar(m,:),mask=(icompute_atomRT>0)), maxval(atom%nstar(m,:))
+                write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , &
+                     minval(atom%n(m,:),mask=(icompute_atomRT>0)), maxval(atom%n(m,:))
+                write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  &
+                     minval(atom%nstar(m,:),mask=(icompute_atomRT>0)), maxval(atom%nstar(m,:))
              enddo
           endif
           mem_alloc_tot = mem_alloc_tot + sizeof(atom%C) + sizeof(atom%Gamma)
@@ -1763,7 +1785,8 @@ contains
 
                       !might not work cause profile of iray==1 always used
                       if (loutput_Rates) then
-                         call store_radiative_rates_mali(id, icell, (iray==1), 1.0_dp / real(n_rayons,kind=dp), Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+                         call store_radiative_rates_mali(id, icell, (iray==1), 1.0_dp / &
+                              real(n_rayons,kind=dp), Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
                       endif
                    enddo
 
@@ -1790,7 +1813,8 @@ contains
                          !!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
                       endif
 
-                      threeKminusJ(:,icell) = threeKminusJ(:,icell) +  (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
+                      threeKminusJ(:,icell) = threeKminusJ(:,icell) +  &
+                           (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
                       Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
 
                       !for one ray
@@ -1801,7 +1825,8 @@ contains
 
                       if (loutput_Rates) then
                          !need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-                         call store_radiative_rates_mali(id, icell, (imu==1), weight, Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+                         call store_radiative_rates_mali(id, icell, (imu==1), weight, Nmaxtr, &
+                              Rij_all(:,:,icell), Rji_all(:,:,icell))
                       endif
 
 
@@ -1814,7 +1839,8 @@ contains
 
                 call calc_rate_matrix(id, icell, lforce_lte)
                 ! 						call update_populations(id, icell, diff, .false., n_iter)
-                call update_populations_and_electrons(id, icell, diff, .false., n_iter, (l_iterate_ne.and.icompute_atomRT(icell)==1))!The condition on icompute_atomRT is here because if it is > 0 but /= 1, ne is not iterated!
+                call update_populations_and_electrons(id, icell, diff, .false., n_iter, &
+                     (l_iterate_ne.and.icompute_atomRT(icell)==1))!The condition on icompute_atomRT is here because if it is > 0 but /= 1, ne is not iterated!
 
                 n_iter_loc = 0
                 if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
@@ -1830,7 +1856,8 @@ contains
 
           !Ng acceleration
           accelerated = .false.
-          if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(maxval(dM) < 1d-2))).and.(maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
+          if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(maxval(dM) < 1d-2))).and. &
+               (maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
              iorder = n_iter - iNg_Ndelay
              if (ng_rest) then
                 write(*,'(" -> Acceleration relaxes... "(1I2)" /"(1I2))') iorder-i0_rest, iNg_Nperiod
@@ -1848,7 +1875,8 @@ contains
                    !has to be parallel in the future
 
                    !for many atoms, increment niter only with the first one, as they go at the same speed.
-                   accelerated = ng_accelerate(iacc, ng_cur, n_cells * atom%Nlevel, iNg_Norder, ngpop(1:atom%Nlevel*n_cells,:,nact), check_negative_pops=.true.)
+                   accelerated = ng_accelerate(iacc, ng_cur, n_cells * atom%Nlevel, iNg_Norder, &
+                        ngpop(1:atom%Nlevel*n_cells,:,nact), check_negative_pops=.true.)
 
                    if (accelerated) then
                       !handle negative pops by simpling cancel Ng's iteration ? or ??
@@ -2118,7 +2146,10 @@ contains
           if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
           if (dJ /= 0.0_dp)  write(*,'("   >>> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
           write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
-          write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), 100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))))/real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
+          write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") &
+               size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
+               100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
+               real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
           write(*,*) " *************************************************************** "
           diff_old = diff
 
@@ -2177,7 +2208,8 @@ contains
                 lprevious_converged = .true.
                 call warning("Time limit would be exceeded, leaving...")
                 write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
-                write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
+                write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', &
+                     mod(time_iteration/60.,60.)," min"
                 write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
                 write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
                 lexit_after_nonlte_loop = .true.
@@ -2265,7 +2297,8 @@ contains
 
     if (allocated(convergence_map)) then
        do nact=1, NactiveAtoms
-          call write_convergence_map_atom(ActiveAtoms(nact)%ptr_atom, etape_end, convergence_map(:,1:ActiveAtoms(nact)%ptr_atom%Nlevel, nact, :))
+          call write_convergence_map_atom(ActiveAtoms(nact)%ptr_atom, etape_end, &
+               convergence_map(:,1:ActiveAtoms(nact)%ptr_atom%Nlevel, nact, :))
        enddo
        if (l_iterate_ne) call write_convergence_map_electron(etape_end, convergence_map(:,1,NactiveAtoms+1,:))
        deallocate(convergence_map)
@@ -2483,7 +2516,8 @@ contains
              else! computed from mass flux and corrected by Taccretion factor!
                 !Taccretion is -1 if Taccretion is 0
                 ! 						write(*,*) "choc = ", icell_prev, x, y, z, vaccr*1e-3, sqrt(vmod2)*1e-3, " H = ", enthalp
-                Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25
+                Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * &
+                     (0.5 * vmod2 + enthalp))**0.25
                 lintersect = (Tchoc > etoile(i_star)%T) !depends on the local value
                 ! 						write(*,*) " Tchoc = ", Tchoc, " rho = ", 1d-3 * masseH * wght_per_H * nHtot(icell_prev),"  T  =", T(icell_prev)
              endif
@@ -2567,7 +2601,8 @@ contains
        if (lintersect_stars) then
           if (icell == icell_star) then
              !        Ic(:,id) =  Ic(:,id) + Istar(:) * exp(-tau_c)
-             Ic(:,id) = Ic(:,id) + Istar(:) * exp(-tau_c) * local_stellar_brigthness(size(Ic(:,1)),lambda,i_star,icell_prev,x0,y0,z0,u,v,w)
+             Ic(:,id) = Ic(:,id) + Istar(:) * exp(-tau_c) * &
+                  local_stellar_brigthness(size(Ic(:,1)), lambda,i_star,icell_prev,x0,y0,z0,u,v,w)
              return
           end if
        endif
@@ -2824,7 +2859,8 @@ contains
 
                       !LI
                       Jnu_cont(:,icell) = Jnu_cont(:,icell) + Ic(:,1,id) * weight
-                      J20_cont(:,icell) = J20_cont(:,icell) + (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Ic(:,1,id) * weight
+                      J20_cont(:,icell) = J20_cont(:,icell) + (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) &
+                           * Ic(:,1,id) * weight
 
                       !ALI
                       lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*kappa_tot(:,icell))) * weight
@@ -2896,22 +2932,34 @@ contains
           Sold(:,:) = Snew(:,:)
           Jold(:,:) = Jnu_cont(:,:)
 
-          write(*,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') dSource, T(icell_max), ne(icell_max)
-          if (write_convergence_file ) write(20,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') dSource, T(icell_max), ne(icell_max)
+          write(*,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') &
+               dSource, T(icell_max), ne(icell_max)
+          if (write_convergence_file ) &
+               write(20,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') &
+               dSource, T(icell_max), ne(icell_max)
           write(*,'("  -- beta ="(1ES14.5E3))') beta(imax,icell_max)
           if (write_convergence_file ) write(20,'("  -- beta="(1ES14.5E3))') beta(imax,icell_max)
           write(*,'(" >>> icell_max "(1I5)," lambda="(1F14.7) " nm"," dJ="(1ES14.5E3))') icell_max, lambda(imax), diff
-          if (write_convergence_file ) write(20,'(" >>> icell_max "(I1)," lambda="(1F14.7)" nm"," dJ="(1ES14.5E3))') icell_max, lambda(imax), diff
+          if (write_convergence_file ) write(20,'(" >>> icell_max "(I1)," lambda="(1F14.7)" nm"," dJ="(1ES14.5E3))') &
+               icell_max, lambda(imax), diff
 
 
-          write(*,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
-          write(*,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
-          if (write_convergence_file ) write(20,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
-          if (write_convergence_file ) write(20,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
-          write(*,"('# unconverged cells :'(1I5), '('(1F12.3)' %)')") size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
-               100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))))/real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
-          if (write_convergence_file ) write(20,"('# unconverged cells : '(1I5), '('(1F12.3)' %)')") size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
-               100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))))/real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
+          write(*,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
+               maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
+          write(*,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
+               maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
+          if (write_convergence_file ) write(20,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
+               maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
+          if (write_convergence_file ) write(20,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
+               maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
+          write(*,"('# unconverged cells :'(1I5), '('(1F12.3)' %)')") &
+               size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
+               100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
+               real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
+          if (write_convergence_file ) write(20,"('# unconverged cells : '(1I5), '('(1F12.3)' %)')") &
+               size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
+               100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
+               real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
 
 
           ! 			lconverged = (real(diff) < precision)
@@ -2964,9 +3012,11 @@ contains
     do icell=1, n_cells
        do la=1, Nlambda_cont !if you change the format, check read_Jnu_ascii()
           if (lambda_cont(la) < 1d5) then
-             write(20,'(1F12.5,5E20.7E3)') lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
+             write(20,'(1F12.5,5E20.7E3)') &
+                  lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
           else
-             write(20,'(1F15.5,5E20.7E3)') lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
+             write(20,'(1F15.5,5E20.7E3)') &
+                  lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
           endif
        enddo
     enddo
@@ -2977,7 +3027,8 @@ contains
        open(unit=20, file="anis_ascii.txt", status="unknown")
        write(20,*) n_cells, Nlambda
        do icell=1, n_cells
-          call bezier2_interp(Nlambda_cont, lambda_cont, J20_cont(:,icell)/Jnu_cont(:,icell), Nlambda, lambda, threeKminusJ(:,icell))
+          call bezier2_interp(Nlambda_cont, lambda_cont, J20_cont(:,icell)/Jnu_cont(:,icell), &
+               Nlambda, lambda, threeKminusJ(:,icell))
           do la=1, Nlambda
              write(20,'(1F12.5,5E20.7E3)') lambda(la), 0.5*threeKminusJ(la,icell), 0.0, 0.0, 0.0, 0.0
           enddo
@@ -3113,7 +3164,8 @@ contains
        if (test_exit_grid(icell, x0, y0, z0)) return
 
        if (lintersect_stars) then!only cont
-          Icont(:,1,id) =  Icont(:,1,id) + exp(-tau_c) * Istar_cont(:,i_star) * local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
+          Icont(:,1,id) =  Icont(:,1,id) + exp(-tau_c) * Istar_cont(:,i_star) * &
+               local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
           if (icell == icell_star) return
        endif
 
@@ -3158,8 +3210,10 @@ contains
           Icont(:,1,id) = Icont(:,1,id) + eta_c(:,icell)/chi_c(:,icell) * exp(-tau_c) * (1.0 - exp(-dtau_c))
           tau_c(:) = tau_c(:) + dtau_c(:)
 
-          write(unit_cf, '(1I, 6E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
-          write(unit_cf+1, '(1I, 6E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
+          write(unit_cf, '(1I, 6E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), &
+               sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
+          write(unit_cf+1, '(1I, 6E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), &
+               sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
           ! 				write(*,*) 'icell=', icell, ne(icell), nHtot(icell), ' T=', T(icell)
           if (llimit_mem) then
              do la=1, Nlambda
@@ -3167,11 +3221,14 @@ contains
              enddo!
           else
              do la=1, Nlambda
-                write(unit_cf,'(1F12.5, 6E20.7E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), tau(la)*exp(-tau(la)), eta(la,id)/(1d-50 + chi(la,id)), chi(la,id)/tau(la), (eta(la,id)-eta0_bb(la,icell))/(1d-50 + chi(la,id)-chi0_bb(la,icell))
+                write(unit_cf,'(1F12.5, 6E20.7E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), &
+                     tau(la)*exp(-tau(la)), eta(la,id)/(1d-50 + chi(la,id)), chi(la,id)/tau(la), &
+                     (eta(la,id)-eta0_bb(la,icell))/(1d-50 + chi(la,id)-chi0_bb(la,icell))
              enddo!
           endif
           do la=1, Nlambda_cont
-             write(unit_cf+1,'(1F12.5, 6E20.7E3)') lambda_cont(la), tau_c(la), eta_c(la,icell)*E2(tau_c(la)), tau_c(la)*exp(-tau_c(la)), eta_c(la,icell)/chi_c(la,icell), chi_c(la,icell)/tau_c(la), Icont(la,1,id)
+             write(unit_cf+1,'(1F12.5, 6E20.7E3)') lambda_cont(la), tau_c(la), eta_c(la,icell)*E2(tau_c(la)), &
+                  tau_c(la)*exp(-tau_c(la)), eta_c(la,icell)/chi_c(la,icell), chi_c(la,icell)/tau_c(la), Icont(la,1,id)
           enddo
 
 

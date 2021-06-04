@@ -547,7 +547,8 @@ CONTAINS
           else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
              if (dne > 0.0) then !shows the warning only if dne is actually greater than 1
                 CALL Warning("Electron density has not converged for this cell")
-                write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne,"max(err)=", MAX_ELECTRON_ERROR, "ne=",ne(k), "T=",T(k)," nH=",nHtot(k)
+                write(*,*) "icell=",k,"maxIter=",N_MAX_ELECTRON_ITERATIONS,"dne=",dne, &
+                     "max(err)=", MAX_ELECTRON_ERROR, "ne=",ne(k), "T=",T(k)," nH=",nHtot(k)
                 !set articially ne to some value ?
                 if (dne >= 1.0) then
                    ne(k) = ne_oldM !already tested if < ne_min_limit

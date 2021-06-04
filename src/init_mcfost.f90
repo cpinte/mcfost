@@ -621,7 +621,7 @@ subroutine initialisation_mcfost()
         lforce_diff_approx=.true.
      case("-mol")
         i_arg = i_arg+1
-        lemission_mol=.true. 
+        lemission_mol=.true.
      case("-safe_stop")
         i_arg = i_arg + 1
         lsafe_stop = .true.
@@ -779,7 +779,7 @@ subroutine initialisation_mcfost()
         lmhd_voronoi = .true.
         lVoronoi = .true.
         l3D = .true.
-     case ("-model_pluto")  
+     case ("-model_pluto")
      	i_arg = i_arg + 1
      	lpluto_file = .true.
      	lmodel_ascii = .false.
@@ -788,7 +788,7 @@ subroutine initialisation_mcfost()
         n_pluto_files = 1
         allocate(density_files(n_pluto_files))
         density_files(1) = s
-        i_arg = i_arg + 1  
+        i_arg = i_arg + 1
      case("-model_ascii")
         i_arg = i_arg + 1
         lmodel_ascii = .true.
@@ -1544,7 +1544,8 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-  if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.(.not.lemission_atom).and.(.not.lstop_after_init)) then
+  if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.&
+       (.not.lemission_atom).and.(.not.lstop_after_init)) then
      write(*,*) "ERROR: Nothing to calculate!"
      write(*,*) "You can: "
      write(*,*) "- use the [-img wavelength] option to calculate an image"
@@ -1657,11 +1658,11 @@ subroutine initialisation_mcfost()
   lonly_nLTE = .false.
   if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
   if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
-  
+
   if (lpluto_file) then
   	if (.not.lmhd_voronoi) call error("Set lmhd_voronoi to .true. (-mhd_voronoi) if lpluto_file!")
   endif
-  
+
   if (lmodel_ascii .and. lpluto_file) then
   	call warning("lmodel_ascii and lpluto_file ! Assuming lmodel_ascii")
   	lpluto_file = .false.
@@ -1824,7 +1825,7 @@ subroutine display_help()
   write(*,*) "		  : -fix_background_opac : (force) keep background opacities constant during non-LTE loop, if iterate_ne."
   write(*,*) "		  : -limit_memory : continuous opacity are interpolated locally"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
-  write(*,*) "        : -iterate_ne_mc : force the calculation of electron density during Monte Carlo steps."  
+  write(*,*) "        : -iterate_ne_mc : force the calculation of electron density during Monte Carlo steps."
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"

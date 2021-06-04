@@ -2437,7 +2437,8 @@ contains
     enddo icell_loop
     N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
     if (N_fixed_ne > 0) then
-       write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
+       write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
     endif
 
     !no need if we do not the dark_zones from input file.
@@ -2450,7 +2451,8 @@ contains
        write(*,*) " Vr = ", 1d-3 * maxval(abs(vR)), 1d-3*minval(abs(vr),mask=icompute_atomRT>0)
        write(*,*) " Vtheta = ",  1d-3 * maxval(abs(vtheta)), 1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)
     else if (lmagnetoaccr) then
-       write(*,*) " VRz = ", 1d-3 * maxval(sqrt(VR(:)**2 + v_z(:)**2)), 1d-3*minval(sqrt(VR(:)**2 + v_z(:)**2),mask=icompute_atomRT>0)
+       write(*,*) " VRz = ", 1d-3 * maxval(sqrt(VR(:)**2 + v_z(:)**2)), &
+            1d-3*minval(sqrt(VR(:)**2 + v_z(:)**2),mask=icompute_atomRT>0)
        write(*,*) " VR = ", 1d-3 * maxval(abs(vR)), 1d-3*minval(abs(vR),mask=icompute_atomRT>0)
        write(*,*) " v_z = ",  1d-3 * maxval(abs(v_z)), 1d-3*minval(abs(v_z),mask=icompute_atomRT>0)
     endif

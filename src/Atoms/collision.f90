@@ -771,7 +771,8 @@ contains
           ar85d = coeff(6)
           if ((T(icell) >= ar85t1).and.(T(icell) <= ar85t2)) then
              t4 = T(icell)/1d4
-             cup = ar85a * 1d-9 * (t4)**(ar85b) * exp(-ar85c*t4) * exp(-ar85d*EV/KBOLTZMANN/T(icell)) * Hydrogen%n(Hydrogen%Nlevel,icell) * (CM_TO_M)**3
+             cup = ar85a * 1d-9 * (t4)**(ar85b) * exp(-ar85c*t4) * exp(-ar85d*EV/KBOLTZMANN/T(icell)) * &
+                  Hydrogen%n(Hydrogen%Nlevel,icell) * (CM_TO_M)**3
              C(i,j) = C(i,j) + cup
              if (present(deriv)) then
                 deriv(i,j) = deriv(i,j) + Cup / ne(icell)

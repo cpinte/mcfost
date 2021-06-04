@@ -104,7 +104,8 @@ CONTAINS
              if (solution(k) < 0) then
                 write(*,*) "ERROR negative pops sol in Ng's acceleration"
                 write(*,*) " This is likely to be a bug !"
-                write(*,*) k, "sol:", solution(k), " relative to max:", solution(k)/max_sol, " relative to all:", solution(k) / sum(abs(solution))
+                write(*,*) k, "sol:", solution(k), " relative to max:", solution(k)/max_sol, &
+                     " relative to all:", solution(k) / sum(abs(solution))
                 write(*,*) " leaving..!"
                 stop
                 !better handling ??

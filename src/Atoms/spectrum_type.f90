@@ -404,7 +404,8 @@ contains
        if (Ntrans == 0) cycle !go to next atom
        Ntrans_tot = Ntrans_tot + Ntrans
        !mean memory needed for that atom, Nlam+1 for the continuum, +Nlam for the grid
-       mem_per_file(nat) = real(8 * (Nlam + 1) + 8 * Nlam) * real(rt_n_incl*rt_n_az) * real(npix_x)/1024. * real(npix_y)/1024. / real(Ntrans)
+       mem_per_file(nat) = real(8 * (Nlam + 1) + 8 * Nlam) * real(rt_n_incl*rt_n_az) &
+            * real(npix_x)/1024. * real(npix_y)/1024. / real(Ntrans)
     enddo
     mem_per_file = mem_per_file!total for each atom, average of all transitions.
     mem_for_file = sum(mem_per_file) / real(Natom) !average per atom in MB
@@ -498,8 +499,8 @@ contains
              endif
              atoms(nat)%ptr_atom%lines(kr)%map = 0.0_dp
              atoms(nat)%ptr_atom%lines(kr)%mapc = 0.0_dp
-             mem_alloc_local = mem_alloc_local + sizeof(atoms(nat)%ptr_atom%lines(kr)%map) + sizeof(atoms(nat)%ptr_atom%lines(kr)%mapc)
-
+             mem_alloc_local = mem_alloc_local + sizeof(atoms(nat)%ptr_atom%lines(kr)%map) + &
+                  sizeof(atoms(nat)%ptr_atom%lines(kr)%mapc)
           endif
 
 
