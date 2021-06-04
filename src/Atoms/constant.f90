@@ -1,8 +1,8 @@
 MODULE constant
 
   ! ----------------------------------------------------------------- !
-   ! To avoid duplicates constants, constant calls constantes from
-   ! MCFOST and takes what it needs.
+  ! To avoid duplicates constants, constant calls constantes from
+  ! MCFOST and takes what it needs.
   ! ----------------------------------------------------------------- !
 
   use constantes, only : PI, KM_TO_M, masseH, c_light, hp, kb, cst_th, electron_charge
@@ -27,7 +27,7 @@ MODULE constant
   real(kind=dp), parameter ::  ABARH=7.42d-41 !polarizabilty of Hydrogen in [Fm^2]
   real(kind=dp), parameter    ::  pia0squarex2 = PI * 2d0 * RBOHR**2 !constant for collision Cross-sections
 
- ! --- Unit conversions ---
+  ! --- Unit conversions ---
 
   real(kind=dp), parameter ::  NM_TO_M =1.0d-9
   real(kind=dp), parameter ::  M_TO_NM =1.0d9
@@ -39,10 +39,10 @@ MODULE constant
   real(kind=dp), parameter ::  G_TO_KG=1.0d-03
   real(kind=dp), parameter ::  MICRON_TO_NM=1.0d+03
 
-  
+
   ! ------- Useful RT constants --------- !
   real(kind=dp), parameter :: sigma_e = 8.0*PI/3.0 * (Q_ELECTRON/(sqrt(4.0*PI*EPSILON_0) *&
-                                       (sqrt(M_ELECTRON)*CLIGHT)))**4.d0 !Thomson cross-section
+       (sqrt(M_ELECTRON)*CLIGHT)))**4.d0 !Thomson cross-section
 
   real(kind=dp), parameter    :: hc = HPLANCK * CLIGHT
   real(kind=dp), parameter    :: fourPI = 4d0*PI
@@ -54,17 +54,17 @@ MODULE constant
   !Photoionisation Xsection of Hydrogen, at nu0, alpha0 = sigma0_H * g_bg(0) * neff / Z/Z
   !Note an error in Hubeny Mihalas eq. 7.92. unit should be cm2 not cm^-2 !
   real(kind=dp), parameter    :: sigma0_H = (32d0)/(PI*3.*sqrt(3d0)) * EPSILON_0 * &
-          (HPLANCK**(3d0)) / (CLIGHT * (M_ELECTRON*Q_ELECTRON)**(2d0)) ! 7.904e-22 m^2
+       (HPLANCK**(3d0)) / (CLIGHT * (M_ELECTRON*Q_ELECTRON)**(2d0)) ! 7.904e-22 m^2
 
   !here I have a problem if I try to compute sigma0_H_ff using 7.100 of Hubeny Mihalas with SI units value
   !So I Take the cgs result and turn it to SI ...
   !we multiply sigma0_H_ff by nion (m^-3) * ne(m^-3) to have chi in 1d-10 m^5 * m-3 * m^-3 in m^-1
   real(kind=dp), parameter    :: sigma0_H_ff = 3.6923284d8 * 1d-10 ! cm^5 K^1/2 Hz^-3 -> m^5 K^1/2 Hz^-3
-   !K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / sqrt(M_ELECTRON)
-   !K0 = (K0**3) * 4./3. * sqrt(2*pi/3./KBOLTZMANN) / HPLANCK / CLIGHT
-   !sigma0_H_ff = K0
-          
- ! --- Mathematical constants ---
+  !K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / sqrt(M_ELECTRON)
+  !K0 = (K0**3) * 4./3. * sqrt(2*pi/3./KBOLTZMANN) / HPLANCK / CLIGHT
+  !sigma0_H_ff = K0
+
+  ! --- Mathematical constants ---
   real(kind=dp), parameter ::  SQRTPI=sqrt(pi)!1.77245385090551
 
 
@@ -85,7 +85,7 @@ MODULE constant
   real(8), parameter, private :: factor1D = 2d0, factor3D = 8d0/PI
   !previously: Vtherm = 2*KBOLTZMANN/AMU and v=sqrt(Vtherm * T / m + xit**2)
   real(8), parameter :: Vtherm = KBOLTZMANN/AMU * factor1D !m^2/s^2/K
-  
+
   real(8), dimension(NELEM_WEIGHTS) :: atomic_weights
   !starts at 1 for H, ends at NELEM_WEIGHTS
   DATA atomic_weights /1.008,4.003,6.939,9.013,10.81,12.01,  &
@@ -104,15 +104,15 @@ MODULE constant
   character(len=2), dimension(NELEM_WEIGHTS) :: elemental_ID
 
   DATA elemental_ID /'H ','He','Li','Be','B ','C ','N ','O ',    &
-                 'F ','Ne','Na','Mg','Al','Si','P ','S ','Cl', &
-                 'Ar','K ','Ca','Sc','Ti','V','Cr','Mn','Fe',  &
-                 'Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br', &
-                 'Kr','Rb','Sr','Y ','Zr','Nb','Mo','Tc','Ru', &
-                 'Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I ', &
-                 'Xe','Cs','Ba','La','Ce','Pr','Nd','Pm','Sm', &
-                 'Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu', &
-                 'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg', &
-                 'Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac', &
-                 'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es'/
+       'F ','Ne','Na','Mg','Al','Si','P ','S ','Cl', &
+       'Ar','K ','Ca','Sc','Ti','V','Cr','Mn','Fe',  &
+       'Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br', &
+       'Kr','Rb','Sr','Y ','Zr','Nb','Mo','Tc','Ru', &
+       'Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I ', &
+       'Xe','Cs','Ba','La','Ce','Pr','Nd','Pm','Sm', &
+       'Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu', &
+       'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg', &
+       'Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac', &
+       'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es'/
 
 END MODULE constant
