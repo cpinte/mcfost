@@ -545,9 +545,9 @@ contains
        v_char, lmagnetized, vturb, T, icompute_atomRT, calc_ne, write_atmos_domain
 
     integer, intent(in) :: n_SPH
-    real(dp), dimension(n_SPH), intent(in) :: T_tmp,vt_tmp,mass_gas
+    real(dp), dimension(n_SPH), intent(in) :: T_tmp,mass_gas
     real(dp), dimension(:), allocatable, intent(in) :: mass_ne_on_massgas ! not always allocated
-    real(dp), dimension(:), allocatable, intent(in) :: mask
+    real(dp), dimension(:), allocatable, intent(in) :: vt_tmp,mask
 
     integer :: icell,voroindex
     integer :: N_fixed_ne = 0
@@ -585,7 +585,7 @@ contains
 
           T(icell) = T_tmp(voroindex)
 
-          vturb(icell) = vt_tmp(voroindex)
+          if (allocated(vt_tmp)) vturb(icell) = vt_tmp(voroindex)
 
           if (allocated(mask)) icompute_atomRT(icell) = mask(voroindex)
 
