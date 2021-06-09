@@ -821,7 +821,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  SPH_grainsizes(:) = grainsize(:) * udist_scaled * cm_to_mum
  ! graindens * udens is in g/cm3
 
- if (lemission_mol) then
+ if (lemission_mol .or. lemission_atom) then
     allocate(vx(n_SPH),vy(n_SPH),vz(n_SPH),stat=alloc_status)
     if (alloc_status /=0) then
        write(*,*) "Allocation error velocities in phanton_2_mcfost"
