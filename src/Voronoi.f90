@@ -378,9 +378,11 @@ module Voronoi_grid
     if ((lemission_mol).or.(lemission_atom)) then
        do icell=1,n_cells_before_stars
           i = SPH_id(icell)
-          Voronoi(icell)%vxyz(1) = vx(i)
-          Voronoi(icell)%vxyz(2) = vy(i)
-          Voronoi(icell)%vxyz(3) = vz(i)
+          if (i > 0) then
+             Voronoi(icell)%vxyz(1) = vx(i)
+             Voronoi(icell)%vxyz(2) = vy(i)
+             Voronoi(icell)%vxyz(3) = vz(i)
+          endif
        enddo
     endif
 
