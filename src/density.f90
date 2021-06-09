@@ -745,7 +745,8 @@ subroutine define_dust_density()
               enddo
            else if (rcyl2 < rin2 - z2) then
               do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 densite_pouss(l,icell) = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)  * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
+                 densite_pouss(l,icell) = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf) &
+                      * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
               enddo
            else
               do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
