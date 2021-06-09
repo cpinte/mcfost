@@ -59,7 +59,7 @@ contains
        endif
 
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
-            particle_id, massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
+            particle_id, massgas,massdust,rho,rhodust,temp,extra_heating,ndusttypes, &
             SPH_grainsizes,mask,n_SPH,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump

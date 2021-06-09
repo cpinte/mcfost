@@ -210,7 +210,7 @@ contains
 
     real, parameter :: Tmin = 1.
 
-    real(dp), dimension(:), allocatable :: x_SPH,y_SPH,z_SPH,h_SPH,rhogas, massgas, vx_SPH,vy_SPH,vz_SPH, SPH_grainsizes
+    real(dp), dimension(:), allocatable :: x_SPH,y_SPH,z_SPH,h_SPH,rhogas,massgas,vx_SPH,vy_SPH,vz_SPH,Tgas,SPH_grainsizes
     integer, dimension(:), allocatable :: particle_id
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
     real, dimension(:), allocatable :: extra_heating
@@ -249,7 +249,7 @@ contains
          vxyzu,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,vxyz_ptmass,hfact,&
          umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,T_to_u)
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating,T_to_u)
 
     if (.not.lfix_star) call compute_stellar_parameters()
 
