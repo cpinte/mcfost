@@ -111,8 +111,12 @@ contains
     if (allocated(vx)) deallocate(vx,vy,vz)
     deallocate(massgas,rho)
     if (allocated(rhodust)) deallocate(rhodust,massdust)
+    if (allocated(temp)) deallocate(temp)
+    if (allocated(vturb)) deallocate(vturb)
+    if (allocated(mass_ne_on_massgas)) deallocate (mass_ne_on_massgas)
+    if (allocated(atomic_mask)) deallocate(atomic_mask)
 
-    ! Deleting partcles/cells in masked arreas (Hill sphere, etc)
+    ! Deleting particles/cells in masked areas (Hill sphere, etc)
     if (allocated(mask)) call delete_masked_particles()
 
     return
