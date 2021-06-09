@@ -894,8 +894,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              ! the atomic transfer and the ionisation state, at the moment
              ! we just assume everything is fully ionised to compute Tgas
              !
-             rhogasi = rhogasi*cm_to_m**3/g_to_kg
+             rhogasi = rhogasi*g_to_kg/cm_to_m**3
              Tgas(j) = get_temp_from_u(vxyzu(4,i)*uvelocity**2,rhogasi,mu=0.6_dp)
+             if (mod(j,100000).eq.0) print*,i,Tgas(j),vxyzu(4,i),rhogasi/g_to_kg*cm_to_m**3,'g/cm**3'
           endif
        endif
     endif
@@ -909,6 +910,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  write(*,*) 'SPH gas mass is  ', real(sum(massgas)), 'Msun'
  write(*,*) 'SPH dust mass is ', real(sum(massdust)),'Msun'
  write(*,*) ''
+
+ if (lemission_atom) write(*,*) ' max temperature is ',maxval(Tgas),' min temperature is ',minval(Tgas)
 
  lextra_heating = .false. ; ldudt_implicit = .false.
  if (.not.lno_internal_energy) then
@@ -1071,19 +1074,22 @@ end subroutine phantom_2_mcfost
 ! and internal energy (rho, u).
 ! INPUT:
 !    rho - density [kg/m3]
-!    u - internal energy [W/kg]
+!    u - internal energy [J/kg]
 ! OUTPUT:
 !    temp - temperature [K]
 !*************************************************************************
-real(dp) elemental function get_temp_from_u(rho,u,mu) result(temp)
+real(dp) function get_temp_from_u(rho,u,mu) result(temp)
  use constantes, only:kb_on_mh,radconst
  real(dp), intent(in) :: rho,u,mu
  real(dp) :: ft,dft,dt
  real(dp), parameter :: tol = 1.e-8
  integer :: its
 
+ temp = (u*rho/radconst)**0.25
+ return
  ! Take minimum of gas and radiation temperatures as initial guess
  temp = min(u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25)
+  print*,'rho,u  = ',rho,u,' T =',u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25,radconst,kb_on_mh
 
  dt = huge(0.)
  its = 0
@@ -1100,6 +1106,7 @@ real(dp) elemental function get_temp_from_u(rho,u,mu) result(temp)
        temp = temp - dt
     endif
  enddo
+ print*,'converged to T=',temp
 
 end function get_temp_from_u
 
