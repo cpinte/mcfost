@@ -52,7 +52,7 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
  ntypes_max = 0
  do ifile=1, n_files
     write(*,*) "---- Reading header file #", ifile
-    call read_phantom_bin_header()
+    !call read_phantom_bin_header()
     ! open file for read
     call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
     if (ierr /= 0) then
