@@ -587,8 +587,11 @@ contains
 
           if (allocated(vt_tmp)) vturb(icell) = vt_tmp(voroindex)
 
-          if (allocated(mask)) icompute_atomRT(icell) = mask(voroindex)
-
+          if (allocated(mask)) then
+             icompute_atomRT(icell) = mask(voroindex)
+          else
+             icompute_atomRT(icell) = 1
+          endif
           vxmax = max(vxmax, abs(Voronoi(icell)%vxyz(1)))
           vxmin = min(vxmin, max(abs(Voronoi(icell)%vxyz(1)),0.0))
           vymax = max(vymax, abs(Voronoi(icell)%vxyz(2)))
