@@ -10,12 +10,12 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
-      rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ierr)
+subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
+      rhogas,rhodust,Tgas,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ierr)
 
  integer,               intent(in) :: iunit, n_files
  character(len=*),dimension(n_files), intent(in) :: filenames
- real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,SPH_grainsizes
+ real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,vx,vy,vz,rhogas,Tgas,massgas,SPH_grainsizes
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
  logical, dimension(:), allocatable, intent(out) :: mask
@@ -52,7 +52,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
  ntypes_max = 0
  do ifile=1, n_files
     write(*,*) "---- Reading header file #", ifile
-
+    !call read_phantom_bin_header()
     ! open file for read
     call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
     if (ierr /= 0) then
@@ -236,6 +236,8 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
                          read(iunit,iostat=ierr) tmp_dp ; vxyzu(2,np0+1:np0+np) = tmp_dp
                       case('vz')
                          read(iunit,iostat=ierr) tmp_dp ; vxyzu(3,np0+1:np0+np) = tmp_dp
+                      case('u')
+                         read(iunit,iostat=ierr) tmp_dp ; vxyzu(4,np0+1:np0+np) = tmp_dp
                       case('dustfrac')
                          ngrains = ngrains + 1
                          if (ngrains > ndusttypes) then
@@ -368,7 +370,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
          vxyzu,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,&
          hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles, &
          n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
     n_SPH = 0
@@ -385,7 +387,7 @@ end subroutine read_phantom_bin_files
 
 subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
                                   particle_id,massgas,massdust,rhogas,rhodust, &
-                                  extra_heating,ndusttypes,SPH_grainsizes,     &
+                                  Tgas,extra_heating,ndusttypes,SPH_grainsizes,     &
                                   mask,n_SPH,ierr)
 
  use utils_hdf5, only:open_hdf5file,    &
@@ -400,7 +402,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,        &
                                                        vx,vy,vz,       &
                                                        rhogas,massgas, &
-                                                       SPH_grainsizes
+                                                       Tgas,SPH_grainsizes
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
  logical, dimension(:), allocatable, intent(out) :: mask
@@ -658,7 +660,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
                         massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
                         utime,udist,graindens,ndudt,dudt,ifiles,   &
                         n_SPH,x,y,z,h,vx,vy,vz,particle_id,SPH_grainsizes,     &
-                        massgas,massdust,rhogas,rhodust,extra_heating)
+                        massgas,massdust,rhogas,rhodust,Tgas,extra_heating)
 
   write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
 
@@ -715,14 +717,14 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
      vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
      utime, udist,graindens,ndudt,dudt,ifiles, &
      n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
-     SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating,T_to_u)
+     SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating,T_to_u)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
   ! rhodust & rhogas are in g/cm3
   ! extra_heating is in W
 
-  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad, Ggrav
+  use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm,Lsun,cm_to_mum,deg_to_rad,Ggrav,cm_to_m,g_to_kg
   use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az
   use parametres, only : lscale_length_units,scale_length_units_factor,lscale_mass_units,scale_mass_units_factor
 
@@ -740,7 +742,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
   ! MC
   integer, intent(out) :: n_SPH
-  real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,h,vx,vy,vz,rhogas,massgas ! massgas [Msun]
+  real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,h,vx,vy,vz,rhogas,massgas,Tgas ! massgas [Msun]
   integer, dimension(:),    allocatable, intent(out) :: particle_id
   real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
   real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
@@ -758,7 +760,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
   ! We check the units by recomputing G
   G_phantom = udist**3 / (utime**2 * umass)
-  if (abs(G_phantom - Ggrav*1e3) > 1e-2 * G_phantom) call error("Phatom units are not consistent")
+  if (abs(G_phantom - Ggrav*1e3) > 1e-2 * G_phantom) call error("Phantom units are not consistent")
 
   udist_scaled = udist
   umass_scaled = umass
@@ -809,7 +811,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
  allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),SPH_grainsizes(ndusttypes),particle_id(n_SPH),&
-      x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
+      x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),Tgas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
     write(*,*) "Exiting"
@@ -819,7 +821,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  SPH_grainsizes(:) = grainsize(:) * udist_scaled * cm_to_mum
  ! graindens * udens is in g/cm3
 
- if (lemission_mol) then
+ if (lemission_mol .or. lemission_atom) then
     allocate(vx(n_SPH),vy(n_SPH),vz(n_SPH),stat=alloc_status)
     if (alloc_status /=0) then
        write(*,*) "Allocation error velocities in phanton_2_mcfost"
@@ -849,7 +851,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
           y(j) = yi * ulength_au
           z(j) = zi * ulength_au
           h(j) = hi * ulength_au
-          if (lemission_mol) then
+          if (lemission_mol .or. lemission_atom) then
              vx(j) = vxi * uvelocity
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
@@ -867,10 +869,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
           y(j) = yi * ulength_au
           z(j) = zi * ulength_au
           h(j) = hi * ulength_au
-          if (lemission_mol) then
-             vx(j) = vxi * uvelocity
-             vy(j) = vyi * uvelocity
-             vz(j) = vzi * uvelocity
+          if (lemission_mol .or. lemission_atom) then
+             vx(j) = min(max(vxi * uvelocity,-1e7),1e7)
+             vy(j) = min(max(vyi * uvelocity,-1e7),1e7)
+             vz(j) = min(max(vzi * uvelocity,-1e7),1e7)
           endif
           rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
           dustfraci = sum(dustfrac(:,i))
@@ -884,6 +886,18 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              rhodust(k,j) = dustfrac(k,i)*rhogasi
              massdust(k,j) = dustfrac(k,i)*massgas(j)
           enddo
+          if (lemission_atom) then
+             !
+             ! solve for the gas temperature from the thermal energy
+             ! this should only be done if the temperature is NOT read from phantom
+             ! also: mu here should ideally be consistent with the abundances used for
+             ! the atomic transfer and the ionisation state, at the moment
+             ! we just assume everything is fully ionised to compute Tgas
+             !
+             rhogasi = rhogasi*g_to_kg/cm_to_m**3
+             Tgas(j) = get_temp_from_u(vxyzu(4,i)*uvelocity**2,rhogasi,mu=0.6_dp)
+             if (mod(j,100000).eq.0) print*,i,Tgas(j),'vel=',vxi*uvelocity,vyi*uvelocity,vzi*uvelocity,'m/s'
+          endif
        endif
     endif
  enddo
@@ -896,6 +910,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  write(*,*) 'SPH gas mass is  ', real(sum(massgas)), 'Msun'
  write(*,*) 'SPH dust mass is ', real(sum(massdust)),'Msun'
  write(*,*) ''
+
+ if (lemission_atom) write(*,*) ' max temperature is ',maxval(Tgas),' min temperature is ',minval(Tgas)
 
  lextra_heating = .false. ; ldudt_implicit = .false.
  if (.not.lno_internal_energy) then
@@ -1020,7 +1036,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
        etoile(i_etoile)%Mdot = 0.
     enddo
- else
+ elseif (n_etoiles > 0) then
     write(*,*) ""
     write(*,*) "Updating the stellar properties:"
     write(*,*) "There are now", n_etoiles, "stars in the model"
@@ -1040,6 +1056,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     etoile(:)%Mdot = xyzmh_ptmass(16,:) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
 
     etoile(:)%find_spectrum = .true.
+ else
+    write(*,*) ' WARNING: There are 0 stars in the model'
  endif
 
  return
@@ -1047,5 +1065,51 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 end subroutine phantom_2_mcfost
 
 !*************************************************************************
+! routine to to compute temperature from
+! internal energy assuming a mix of gas and radiation
+! pressure, where Trad = Tgas. That is, we solve the
+! quartic equation
+!
+!  a*T^4 + 3/2*rho*kb*T/mu = rho*u
+!
+! to determine the temperature from the supplied density
+! and internal energy (rho, u).
+! INPUT:
+!    rho - density [kg/m3]
+!    u - internal energy [J/kg]
+! OUTPUT:
+!    temp - temperature [K]
+!*************************************************************************
+real(dp) function get_temp_from_u(rho,u,mu) result(temp)
+ use constantes, only:kb_on_mh,radconst
+ real(dp), intent(in) :: rho,u,mu
+ real(dp) :: ft,dft,dt
+ real(dp), parameter :: tol = 1.e-8
+ integer :: its
+
+ temp = (u*rho/radconst)**0.25
+ return
+ ! Take minimum of gas and radiation temperatures as initial guess
+ temp = min(u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25)
+  print*,'rho,u  = ',rho,u,' T =',u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25,radconst,kb_on_mh
+
+ dt = huge(0.)
+ its = 0
+ do while (abs(dt) > tol*temp .and. its < 500)
+    its = its + 1
+    ft = u*rho - 1.5*kb_on_mh*temp*rho/mu - radconst*temp**4
+    dft = - 1.5*kb_on_mh*rho/mu - 4.*radconst*temp**3
+    dt = ft/dft ! Newton-Raphson
+    if (temp - dt > 1.2*temp) then
+       temp = 1.2*temp
+    elseif (temp - dt < 0.8*temp) then
+       temp = 0.8*temp
+    else
+       temp = temp - dt
+    endif
+ enddo
+ print*,'converged to T=',temp
+
+end function get_temp_from_u
 
 end module read_phantom
