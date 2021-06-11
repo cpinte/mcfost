@@ -10,12 +10,12 @@ module read_phantom
 
   contains
 
-subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,particle_id,massgas,massdust,&
+subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,particle_id,massgas,massdust,&
       rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ierr)
 
  integer,               intent(in) :: iunit, n_files
  character(len=*),dimension(n_files), intent(in) :: filenames
- real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,SPH_grainsizes
+ real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,SPH_grainsizes,T_gas
  integer,  intent(out), dimension(:),   allocatable :: particle_id
  real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
  logical, dimension(:), allocatable, intent(out) :: mask
@@ -35,14 +35,14 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
  integer, parameter :: maxinblock = 128
  integer, allocatable, dimension(:) :: npartoftype
  real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
- real(dp) :: hfact,umass,utime,udist
+ real(dp) :: hfact,umass,utime,udist,gmw
  integer(kind=1), allocatable, dimension(:) :: itype, ifiles
  real(4),  allocatable, dimension(:) :: tmp
  real(dp), allocatable, dimension(:) :: grainsize, graindens
- real(dp), allocatable, dimension(:) :: dudt, tmp_dp
+ real(dp), allocatable, dimension(:) :: dudt, tmp_dp,gastemperature
  real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu
  type(dump_h) :: hdr
- logical :: got_h,got_dustfrac,got_itype,tagged,matched
+ logical :: got_h,got_dustfrac,got_itype,tagged,matched,got_temperature,got_u
 
  integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
@@ -106,7 +106,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
     write(*,*) "---- Done"
  enddo ! ifile
 
- allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot))
+ allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot),gastemperature(np_tot))
  allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
  allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
 
@@ -183,6 +183,8 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
     ! extract info from real header
     call extract('massoftype',massoftype(ifile,1:ntypes),hdr,ierr)
     call extract('hfact',hfact,hdr,ierr)
+    call extract('gmw',gmw,hdr,ierr)
+    if (ierr /= 0) gmw=mu
     if (ndusttypes > 0) then
        call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr) ! code units here
        call extract('graindens',graindens(1:ndusttypes),hdr,ierr)
@@ -199,6 +201,8 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
     got_h = .false.
     got_dustfrac = .false.
     got_itype = .false.
+    got_temperature = .false.
+    got_u = .false.
     ! skip each block that is too small
     nblockarrays = narraylengths*nblocks
 
@@ -236,6 +240,12 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
                          read(iunit,iostat=ierr) tmp_dp ; vxyzu(2,np0+1:np0+np) = tmp_dp
                       case('vz')
                          read(iunit,iostat=ierr) tmp_dp ; vxyzu(3,np0+1:np0+np) = tmp_dp
+                      case('u')
+                         read(iunit,iostat=ierr) tmp_dp ; vxyzu(4,np0+1:np0+np) = tmp_dp
+                         got_u = .true.
+                      case('temperature')
+                         read(iunit,iostat=ierr) tmp_dp ; gastemperature(np0+1:np0+np) = tmp_dp
+                         got_temperature = .true.
                       case('dustfrac')
                          ngrains = ngrains + 1
                          if (ngrains > ndusttypes) then
@@ -359,15 +369,25 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,par
     dudt = 0.
  endif
 
+ if (got_temperature) then
+    print*, 'Using temperature from phantom temperature writeout'
+ elseif(got_u) then
+    print*, 'Calculating temperature from u'
+    gastemperature = vxyzu(4,:) * 2./3.*gmw*amu/kb * (100.*udist/utime)**2
+ else
+    print*, 'Gas temperature not found, setting to T=cmb to avoid dust sublimation'
+    gastemperature = 2.74
+ endif
+
  write(*,*) "Found", nptmass, "point masses in the phantom file"
 
  if (got_h) then
     call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
 
     call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,dustfluidtype,xyzh,&
-         vxyzu,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,&
+         vxyzu,gastemperature,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,&
          hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles, &
-         n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
+         n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
@@ -383,7 +403,7 @@ end subroutine read_phantom_bin_files
 
 !*************************************************************************
 
-subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
+subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,&
                                   particle_id,massgas,massdust,rhogas,rhodust, &
                                   extra_heating,ndusttypes,SPH_grainsizes,     &
                                   mask,n_SPH,ierr)
@@ -398,7 +418,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
  integer, intent(in) :: iunit, n_files
  character(len=*),dimension(n_files), intent(in) :: filenames
  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,        &
-                                                       vx,vy,vz,       &
+                                                       vx,vy,vz,T_gas, &
                                                        rhogas,massgas, &
                                                        SPH_grainsizes
  integer,  intent(out), dimension(:),   allocatable :: particle_id
@@ -420,7 +440,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
 
  integer(kind=1), allocatable, dimension(:) :: itype, ifiles
  real(4),  allocatable, dimension(:)   :: tmp, tmp_header
- real(dp), allocatable, dimension(:)   :: dudt, tmp_dp
+ real(dp), allocatable, dimension(:)   :: dudt, tmp_dp,gastemperature
  real(dp), allocatable, dimension(:)   :: grainsize, graindens
  real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu
  integer, allocatable, dimension(:) :: npartoftype
@@ -490,6 +510,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
   allocate(xyzh(4,np_tot),                        &
            itype(np_tot),                         &
            vxyzu(4,np_tot),                       &
+           gastemperature(np_tot),                &
            dustfrac(ndusttypes,np_tot),           &
            grainsize(ndusttypes),                 &
            graindens(ndusttypes),                 &
@@ -649,15 +670,18 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,  &
      dudt = 0.
   endif
 
+  gastemperature = 2.74
+  print*, 'Gas temperature not read from hdf files, setting to T=cmb to avoid dust sublimation'
+
   write(*,*) "Found", nptmass, "point masses in the phantom file"
 
   call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
 
   call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,      &
-                        dustfluidtype,xyzh,vxyzu,itype,grainsize,dustfrac, &
+                        dustfluidtype,xyzh,vxyzu,gastemperature,itype,grainsize,dustfrac, &
                         massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
                         utime,udist,graindens,ndudt,dudt,ifiles,   &
-                        n_SPH,x,y,z,h,vx,vy,vz,particle_id,SPH_grainsizes,     &
+                        n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id,SPH_grainsizes,     &
                         massgas,massdust,rhogas,rhodust,extra_heating)
 
   write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
@@ -712,10 +736,10 @@ end subroutine modify_dump
 
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh, &
-     vxyzu,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
+     vxyzu,gastemperature,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
      utime, udist,graindens,ndudt,dudt,ifiles, &
-     n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
-     SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating,T_to_u)
+     n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
+     SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
@@ -735,21 +759,21 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
   real(dp), intent(in) :: hfact,umass,utime,udist
   real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
+  real(dp), dimension(:), intent(in) :: gastemperature
   integer, intent(in) :: ndudt
   real(dp), dimension(:), intent(in) :: dudt
 
   ! MC
   integer, intent(out) :: n_SPH
-  real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,h,vx,vy,vz,rhogas,massgas ! massgas [Msun]
+  real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,h,vx,vy,vz,T_gas,rhogas,massgas ! massgas [Msun]
   integer, dimension(:),    allocatable, intent(out) :: particle_id
   real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
   real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
   real, dimension(:), allocatable, intent(out) :: extra_heating
-  real(dp), intent(in), optional :: T_to_u
 
 
   integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile
-  real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
+  real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udist_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
   real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
 
@@ -809,7 +833,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  ! Voronoi()%x  densite_gaz & densite_pous
  alloc_status = 0
  allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),SPH_grainsizes(ndusttypes),particle_id(n_SPH),&
-      x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),stat=alloc_status)
+      x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),T_gas(n_SPH),stat=alloc_status)
  if (alloc_status /=0) then
     write(*,*) "Allocation error in phanton_2_mcfost"
     write(*,*) "Exiting"
@@ -839,6 +863,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     vxi = vxyzu(1,i)
     vyi = vxyzu(2,i)
     vzi = vxyzu(3,i)
+    T_gasi = gastemperature(i)
 
     itypei = abs(iphase(i))
     if (hi > 0.) then
@@ -854,6 +879,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
+          T_gas(j) = T_gasi
           rhodusti = massoftype(ifile,itypei) * (hfact/hi)**3  * udens ! g/cm**3
           gasfraci = dustfrac(1,i)
           rhodust(1,j) = rhodusti
@@ -872,6 +898,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
           endif
+          T_gas(j) = T_gasi
           rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
           dustfraci = sum(dustfrac(:,i))
           if (dustfluidtype==1) then
@@ -903,7 +930,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        write(*,*) "Computing energy input"
        lextra_heating = .true.
        allocate(extra_heating(n_SPH), stat=alloc_status)
-       if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
+       if (alloc_status /=0) call error("Allocation error in phantom_2_mcfost")
 
        totlum = 0.
        do i=1,n_SPH
@@ -916,14 +943,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        write(*,*) "Total energy input = ",real(totlum/Lsun),' Lsun'
     endif
 
-    if (present( T_to_u )) then
-       ufac_implicit = T_to_u * uWatt
-       ldudt_implicit = .true.
-       write(*,*) "Implicit heating scheme"
-    else
-       ufac_implicit = 0.
-       ldudt_implicit = .false.
-    endif
+    ufac_implicit = 0.
+    ldudt_implicit = .false.
  endif
 
  write(*,*) "# Sink particles:"

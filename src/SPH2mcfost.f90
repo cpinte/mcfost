@@ -23,7 +23,7 @@ contains
 
     integer, parameter :: iunit = 1
 
-    real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,SPH_grainsizes
+    real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,SPH_grainsizes,T_gas
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
@@ -58,7 +58,7 @@ contains
           read_phantom_files => read_phantom_bin_files
        endif
 
-       call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
+       call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz,T_gas, &
             particle_id, massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
             SPH_grainsizes,mask,n_SPH,ierr)
 
@@ -80,10 +80,14 @@ contains
        write(*,*) "Performing gadget2mcfost setup"
        write(*,*) "Reading Gadget-2 density file: "//trim(SPH_file)
        call read_gadget2_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       T_gas = x       !to allocate memory
+       T_gas = 2.74
     else if (lascii_SPH_file) then
        write(*,*) "Performing SPH2mcfost setup"
        write(*,*) "Reading SPH density file: "//trim(SPH_file)
        call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       T_gas = x       !to allocate memory
+       T_gas = 2.74
     endif
     write(*,*) "Done"
 
@@ -100,7 +104,7 @@ contains
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
-         massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
+         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -142,7 +146,7 @@ contains
 
   !*********************************************************
 
-  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,&
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, T_gas, massgas,massdust,rho,rhodust,&
        SPH_grainsizes, SPH_limits, check_previous_tesselation, mask)
 
     ! ************************************************************************************ !
@@ -171,6 +175,7 @@ contains
     real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
     real(dp), dimension(:), allocatable, intent(inout) :: rho
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
+    real(dp), dimension(:), allocatable, intent(in) :: T_gas
     integer, dimension(n_SPH), intent(in) :: particle_id
     real(dp), dimension(:,:), allocatable, intent(in) :: rhodust, massdust
     real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes
@@ -182,7 +187,7 @@ contains
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust
-    real :: f, limit_threshold, density_factor
+    real :: f, limit_threshold, density_factor, destruction_factor
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n
 
     real(dp), dimension(6) :: limits
@@ -429,10 +434,12 @@ contains
        lvariable_dust = .false.
        write(*,*) "Using gas-to-dust ratio in mcfost parameter file"
 
+       destruction_factor = 1.
        do icell=1,n_cells
+          if (T_gas(icell) >= 1500. .and. .not. lturn_off_dust_subl) destruction_factor = 0.0001
           masse(icell) = 0.
           do k=1,n_grains_tot
-             densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k)
+             densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k) * destruction_factor
              masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
           enddo
        enddo
