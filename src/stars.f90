@@ -114,6 +114,7 @@ subroutine em_sphere_uniforme(id, i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,
   logical, intent(out) :: lintersect
 
   real(kind=dp) :: srw02, argmt, r_etoile, cospsi, phi
+  real(kind=dp), parameter :: precision = 1e-14_dp
 
   ! Position de depart aleatoire sur une sphere de rayon 1
   z = 2.0_dp * aleat1 - 1.0_dp
@@ -133,7 +134,7 @@ subroutine em_sphere_uniforme(id, i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,
   w2=1.0_dp-w*w
 
   ! Position de depart aleatoire sur une sphere de rayon r_etoile
-  r_etoile = etoile(i_star)%r
+  r_etoile = etoile(i_star)%r * (1._dp + precision)
   x = x * r_etoile
   y = y * r_etoile
   z = z * r_etoile

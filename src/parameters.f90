@@ -180,9 +180,9 @@ module parametres
   ! Stars
   type star_type
      ! todo : indicate all units
-     real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
+     real :: T, M, fUV, slope_UV, othin_sublimation_radius
      real :: Mdot ! Msun
-     real(kind=dp) :: x,y,z, vx,vy,vz
+     real(kind=dp) :: r, x,y,z, vx,vy,vz
      logical :: lb_body, out_model, find_spectrum
      character(len=512) :: spectre
      integer :: icell
