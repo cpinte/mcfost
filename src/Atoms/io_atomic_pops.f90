@@ -180,6 +180,7 @@ CONTAINS
     logical :: extend, simple, anynull
     integer :: nelements, naxis2(4), sys_status, naxis_found, hdutype
     character(len=512) :: cmd, some_comments
+    real :: nullval
 
     !check if data file already exist, otherwise lead and return .false.
     cmd = "ls "//trim(nefile)
@@ -208,7 +209,7 @@ CONTAINS
     fpixel = 1
     extend = .true.
     bitpix = -64
-
+    nullval = -999
 
     call ftmahd(unit,1,hdutype,status)
     if (status > 0) then
@@ -219,7 +220,35 @@ CONTAINS
 
     if (lVoronoi) then
        naxis = 1
-       call error("read_electron does not handled Voronoi grid yet!")
+
+       ! number of axes
+       call ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
+       if (status > 0) then
+          write(*,*) "error reading number of axis (naxis)"
+          call print_error(status)
+          stop
+       endif
+
+       call ftgkyj(unit, "NAXIS1", naxis_found, some_comments, status)
+       if (status > 0) then
+          write(*,*) "error reading ncells from file (naxis1)"
+          call print_error(status)
+          stop
+       endif
+       nelements = naxis_found
+
+       if (nelements /= n_cells) then
+          write(*,*) " found ",nelements," but need ",n_cells,": read_electron does not do interpolation yet!"
+          call error(" Model read does not match simulation box")
+       endif
+
+       call ftgpvd(unit,group,1,nelements,nullval,ne,anynull,status)
+       if (status > 0) then
+          write(*,*) "error reading ne density"
+          call print_error(status)
+          stop
+       endif
+
     else
 
        if (l3D) then
