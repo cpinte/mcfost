@@ -870,9 +870,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
           z(j) = zi * ulength_au
           h(j) = hi * ulength_au
           if (lemission_mol .or. lemission_atom) then
-             vx(j) = vxi * uvelocity
-             vy(j) = vyi * uvelocity
-             vz(j) = vzi * uvelocity
+             vx(j) = min(max(vxi * uvelocity,-1e7),1e7)
+             vy(j) = min(max(vyi * uvelocity,-1e7),1e7)
+             vz(j) = min(max(vzi * uvelocity,-1e7),1e7)
           endif
           rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
           dustfraci = sum(dustfrac(:,i))
@@ -896,7 +896,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              !
              rhogasi = rhogasi*g_to_kg/cm_to_m**3
              Tgas(j) = get_temp_from_u(vxyzu(4,i)*uvelocity**2,rhogasi,mu=0.6_dp)
-             if (mod(j,100000).eq.0) print*,i,Tgas(j),vxyzu(4,i),rhogasi/g_to_kg*cm_to_m**3,'g/cm**3'
+             if (mod(j,100000).eq.0) print*,i,Tgas(j),'vel=',vxi*uvelocity,vyi*uvelocity,vzi*uvelocity,'m/s'
           endif
        endif
     endif
@@ -1036,7 +1036,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
        etoile(i_etoile)%Mdot = 0.
     enddo
- else
+ elseif (n_etoiles > 0) then
     write(*,*) ""
     write(*,*) "Updating the stellar properties:"
     write(*,*) "There are now", n_etoiles, "stars in the model"
@@ -1056,6 +1056,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     etoile(:)%Mdot = xyzmh_ptmass(16,:) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
 
     etoile(:)%find_spectrum = .true.
+ else
+    write(*,*) ' WARNING: There are 0 stars in the model'
  endif
 
  return
