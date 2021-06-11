@@ -851,7 +851,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
           y(j) = yi * ulength_au
           z(j) = zi * ulength_au
           h(j) = hi * ulength_au
-          if (lemission_mol) then
+          if (lemission_mol .or. lemission_atom) then
              vx(j) = vxi * uvelocity
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
@@ -869,7 +869,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
           y(j) = yi * ulength_au
           z(j) = zi * ulength_au
           h(j) = hi * ulength_au
-          if (lemission_mol) then
+          if (lemission_mol .or. lemission_atom) then
              vx(j) = vxi * uvelocity
              vy(j) = vyi * uvelocity
              vz(j) = vzi * uvelocity
