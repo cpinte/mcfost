@@ -22,6 +22,7 @@ module constantes
   real, parameter :: sigma = 5.670367e-8     ! Stefan (en W/(m^2.K^4)) CODATA 2014
   real, parameter :: Ggrav = 6.67428e-11   ! (m^3.s^-2.kg^-1) e-8 en cgs, CODATA 2016, value recommended by IAU 2015 B3
   real(kind=dp), parameter :: electron_charge = 1.6021766208e-19_dp  ! Coulombs CODATA 2014
+  real(kind=dp), parameter :: radconst = 4.*sigma/c_light       ! radiation constant
 
   real(kind=dp), parameter :: Na = 6.022140857e23_dp   ! Nombre d'Avogadro CODATA 2014
   real(kind=dp), parameter :: amu = 1.0_dp/Na          ! atomic mass unit [g]
@@ -95,6 +96,9 @@ module constantes
 
   ! Time
   real(kind=dp), parameter :: year_to_s = 31557600 ! 365.25 days
+
+  ! Mixed constants
+  real(kind=dp), parameter :: kb_on_mH = kb/(amu*g_to_kg)  ! convert amu to kg
 
   ! Limites de precision numerique
   real, parameter :: tiny_real = tiny(0.0)

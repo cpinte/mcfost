@@ -218,8 +218,7 @@ contains
 
     real, parameter :: Tmin = 1.
 
-    real(dp), dimension(:), allocatable :: x_SPH,y_SPH,z_SPH,h_SPH,rhogas, massgas, vx_SPH,vy_SPH,vz_SPH, SPH_grainsizes
-    real(dp), dimension(:), allocatable :: Tgas_SPH
+    real(dp), dimension(:), allocatable :: x_SPH,y_SPH,z_SPH,h_SPH,rhogas,massgas,vx_SPH,vy_SPH,vz_SPH,Tgas,SPH_grainsizes
     integer, dimension(:), allocatable :: particle_id
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
     real, dimension(:), allocatable :: extra_heating
@@ -257,8 +256,13 @@ contains
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
          vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,vxyz_ptmass,hfact,&
          umass,utime,udist,graindens,ndudt,dudt,ifiles,&
+<<<<<<< HEAD
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
+=======
+         n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating,T_to_u)
+>>>>>>> 8907331e9e0de94410eb9dfd04f9afd4ca8b670f
 
     if (.not.lfix_star) call compute_stellar_parameters()
 
