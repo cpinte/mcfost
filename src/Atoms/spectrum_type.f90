@@ -29,7 +29,7 @@ module spectrum_type
   integer :: dk_max, dk_min
 
   integer :: Nlambda, Ntrans, Nlambda_cont
-  real(kind=dp) :: wavelength_ref = 0d0
+  real(kind=dp) :: wavelength_ref = 0.0
   real(kind=dp), dimension(:,:), allocatable :: chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, chi0_bb, eta0_bb
   real(kind=dp), dimension(:,:,:), allocatable :: Icont
   real(kind=dp), dimension(:), allocatable :: lambda, lambda_cont
