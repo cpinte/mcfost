@@ -668,7 +668,7 @@ contains
 
                 if (laccretion_shock) Iacc(:) = Iacc(:) + Ishock(:,id) / npix2
 
-                I0_star = I0_star + Istar_loc(:,id) / npix2
+                if (n_etoiles > 0) I0_star = I0_star + Istar_loc(:,id) / npix2
 
                 !else !Outside the grid, no radiation flux
              endif
