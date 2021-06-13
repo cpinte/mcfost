@@ -668,7 +668,7 @@ contains
 
                 if (laccretion_shock) Iacc(:) = Iacc(:) + Ishock(:,id) / npix2
 
-                I0_star = I0_star + Istar_loc(:,id) / npix2
+                if (n_etoiles > 0) I0_star = I0_star + Istar_loc(:,id) / npix2
 
                 !else !Outside the grid, no radiation flux
              endif
@@ -709,7 +709,9 @@ contains
     !storing by proc is necessary here ?
     Flux(:,ibin,iaz,id) = Flux(:,ibin,iaz,id) + I0(:) * normF
     Fluxc(:,ibin,iaz,id) = Fluxc(:,ibin,iaz,id) + I0c(:) * normF
-    Flux_star(:,ibin,iaz,id) = Flux_star(:,ibin,iaz,id) + I0_star(:) * normF
+    if (n_etoiles > 0) then
+    	Flux_star(:,ibin,iaz,id) = Flux_star(:,ibin,iaz,id) + I0_star(:) * normF
+    endif
     if (laccretion_shock) then
        Flux_acc(:,ibin,iaz,id) = Flux_acc(:,ibin,iaz,id) + Iacc(:) * normF
     endif
@@ -2708,7 +2710,9 @@ contains
 	endif
 
 
-    Istar(:) = Istar_cont(:,1)
+	if (n_etoiles > 0) then
+    	Istar(:) = Istar_cont(:,1)
+    endif!0 otherwise, does not take memory
     Jold = Jnu_cont
 
     do icell=1, n_cells
