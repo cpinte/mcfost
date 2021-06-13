@@ -196,7 +196,7 @@ module parametres
 
   ! SPH
   real :: SPH_keep_particles, planet_az
-  logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells, lturn_off_planets, lturn_off_Lacc
+  logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells, lturn_off_planets, lturn_off_Lacc, lturn_off_dust_subl
   integer :: which_planet
 
   logical :: lgap_Gaussian
@@ -222,9 +222,9 @@ module parametres
   ! 27/02/2019, adding spots coordinates
   type star_type
      ! todo : indicate all units
-     real :: r, T, M, fUV, slope_UV, othin_sublimation_radius
+     real :: T, M, fUV, slope_UV, othin_sublimation_radius
      real :: Mdot ! Msun
-     real(kind=dp) :: x,y,z, vx,vy,vz
+     real(kind=dp) :: r, x,y,z, vx,vy,vz
      logical :: lb_body, out_model, find_spectrum
      character(len=512) :: spectre
      integer :: icell
