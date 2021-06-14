@@ -862,7 +862,10 @@ contains
 	
 
     	!  Write the array to the FITS file.
-    	write(*,*) " Flux_star_max = ", maxval(sum(Flux_star(:,:,:,:),dim=4))
+    	if (maxval(sum(Flux_star(:,:,:,:),dim=4)) <= 0.0) then
+    		call warning("Bug with stellar flux !")
+    		write(*,*) " Flux_star_max = ", maxval(sum(Flux_star(:,:,:,:),dim=4))
+    	endif
     	call ftpprd(unit,group,fpixel,nelements,sum(Flux_star(:,:,:,:),dim=4),status)
     	if (status > 0) then
        		call print_error(status)
@@ -916,7 +919,10 @@ contains
           call print_error(status)
        endif
        call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm Facc_{\nu}}$',status)
-       write(*,*)  "   -> max acc flux :", maxval(sum(flux_acc(:,:,:,:),dim=4))
+       if (maxval(sum(flux_acc(:,:,:,:),dim=4)) <= 0.0) then
+       	call warning("Bug with accretion flux!")
+       	write(*,*)  "   -> max acc flux :", maxval(sum(flux_acc(:,:,:,:),dim=4))
+       endif
        call ftpprd(unit,group,fpixel,nelements,sum(Flux_acc(:,:,:,:),dim=4),status)
        if (status > 0) then
           call print_error(status)
