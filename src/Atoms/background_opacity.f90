@@ -275,7 +275,7 @@ contains
              !1 if lambda <= lambda0
              Diss = D_i(icell, real(i,kind=dp), real(atom%stage(i)),1.0, lambda(la), atom%continua(kr)%lambda0, chi_ion)
              twohnu3_c2 = twohc/lambda(la)**3
-             gij = atom%nstar(i,icell)/atom%nstar(j,icell) * exp(-hc_k/T(icell)/lambda(la))
+             gij = atom%nstar(i,icell)/(atom%nstar(j,icell) + 1d-100) * exp(-hc_k/T(icell)/lambda(la))
              ni_njgij = atom%n(i,icell) - atom%n(j,icell) * gij
 
              if ( ni_njgij > 0.0) then
