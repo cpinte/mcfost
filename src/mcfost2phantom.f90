@@ -5,7 +5,7 @@ module mcfost2phantom
 contains
 
   subroutine init_mcfost_phantom(mcfost_para_filename, ndusttypes, use_SPH_limits_file, SPH_limits_file, SPH_limits, ierr, &
-       keep_particles, fix_star, turn_on_Lacc)
+       keep_particles, fix_star, turn_on_Lacc, turn_on_dust_subl)
 
     use parametres
     use init_mcfost, only : set_default_variables, get_mcfost_utils_dir
@@ -26,8 +26,7 @@ contains
     real(dp), dimension(6), intent(out) :: SPH_limits
     integer, intent(out) :: ierr
     real, intent(in), optional :: keep_particles
-    logical, intent(in), optional :: fix_star, turn_on_Lacc
-
+    logical, intent(in), optional :: fix_star, turn_on_Lacc, turn_on_dust_subl
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
 
@@ -61,6 +60,14 @@ contains
        if (turn_on_Lacc) then
           lturn_off_Lacc = .false.
           write(*,*) "WARNING: turning on accretion luminosity"
+       endif
+    endif
+
+    lturn_off_dust_subl = .true.
+    if (present(turn_on_dust_subl)) then
+       if (turn_on_dust_subl) then
+          lturn_off_dust_subl = .false.
+          write(*,*) "WARNING: turning off dust sublimation"
        endif
     endif
 
@@ -154,7 +161,7 @@ contains
        xyzh,vxyzu,&!radiation,ivorcl,
     iphase,grainsize,graindens,dustfrac,massoftype,&
     xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-    Tphantom,n_packets,mu_gas,ierr,write_T_files,ISM,T_to_u)
+    Tphantom,n_packets,mu_gas,ierr,write_T_files,ISM,T_gas)
 
     use parametres
     use constantes, only : mu
@@ -182,12 +189,13 @@ contains
 
     integer, intent(in) :: np, nptmass, ntypes,ndusttypes,dustfluidtype!,maxirad,ivorcl
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
+    real(dp), dimension(np), intent(in) :: T_gas
 !    real(dp), dimension(maxirad,np), intent(inout) :: radiation
     integer(kind=1), dimension(np), intent(in) :: iphase
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize, graindens
     real(dp), dimension(ntypes), intent(in) :: massoftype
-    real(dp), intent(in) :: hfact, umass, utime, udist, T_to_u
+    real(dp), intent(in) :: hfact, umass, utime, udist!, T_to_u
     real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
     integer, dimension(ntypes), intent(in) :: npoftype
     integer, parameter :: n_files = 1 ! the library only works on 1 set of phantom particles
@@ -246,15 +254,20 @@ contains
     mu_gas = mu ! Molecular weight
 
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
-         vxyzu,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,vxyz_ptmass,hfact,&
+         vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,vxyz_ptmass,hfact,&
          umass,utime,udist,graindens,ndudt,dudt,ifiles,&
+<<<<<<< HEAD
+         n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
+=======
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating,T_to_u)
+>>>>>>> 8907331e9e0de94410eb9dfd04f9afd4ca8b670f
 
     if (.not.lfix_star) call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
-    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH, &
+    call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH, &
          massgas,massdust,rhogas,rhodust,SPH_grainsizes, SPH_limits, .false.)
 
     call setup_grid()

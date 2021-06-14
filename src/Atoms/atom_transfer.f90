@@ -51,7 +51,7 @@ module atom_transfer
        NRAYS_ATOM_TRANSFER, DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, &
        ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, &
        safe_stop_time, checkpoint_period, lcheckpoint, istep_start, lno_iterate_ne_mc, &
-       healpix_lorder, healpix_lmin, healpix_lmax, lvoronoi, lmagnetoaccr, lonly_top, lonly_bottom, l3D
+       healpix_lorder, healpix_lmin, healpix_lmax, lvoronoi, lmagnetoaccr, lonly_top, lonly_bottom, l3D, limg
 
   use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
   use Voronoi_grid, only		: Voronoi
@@ -709,7 +709,9 @@ contains
     !storing by proc is necessary here ?
     Flux(:,ibin,iaz,id) = Flux(:,ibin,iaz,id) + I0(:) * normF
     Fluxc(:,ibin,iaz,id) = Fluxc(:,ibin,iaz,id) + I0c(:) * normF
-    Flux_star(:,ibin,iaz,id) = Flux_star(:,ibin,iaz,id) + I0_star(:) * normF
+    if (n_etoiles > 0) then
+    	Flux_star(:,ibin,iaz,id) = Flux_star(:,ibin,iaz,id) + I0_star(:) * normF
+    endif
     if (laccretion_shock) then
        Flux_acc(:,ibin,iaz,id) = Flux_acc(:,ibin,iaz,id) + Iacc(:) * normF
     endif
@@ -947,6 +949,7 @@ contains
     logical :: lread_jnu_ascii = .false., lelectron_read
     type (AtomType), pointer :: atom
     integer :: alloc_status
+    real(kind=dp) :: lam0 = 500.0 !default
 
     !init at 0
     mem_alloc_tot = 0
@@ -1050,7 +1053,7 @@ contains
           n_rayons_max = n_rayons_start
        endif
 
-       call init_Spectrum(n_rayons_max,lam0=500d0,vacuum_to_air=lvacuum_to_air)
+       call init_Spectrum(n_rayons_max,lam0=lam0,vacuum_to_air=lvacuum_to_air)
 
 
        if (n_etoiles > 0) call init_stellar_disk
@@ -1257,7 +1260,7 @@ contains
           !and electron scattering here ?
 
        else
-          call init_Spectrum(Nrayone,lam0=500d0,vacuum_to_air=lvacuum_to_air)
+          call init_Spectrum(Nrayone,lam0=lam0,vacuum_to_air=lvacuum_to_air)
           if (n_etoiles > 0) call init_stellar_disk
           write(*,*) " Computing background opacities..."
           call alloc_atom_quantities !call compute_atom_quantities(icell) for each cell
@@ -2645,20 +2648,18 @@ contains
   subroutine Iterate_Jnu()
     ! -------------------------------------------------------- !
     ! Compute the mean radiation field at all cells
-    ! evaluated on a small grid and then interpolated on the
-    ! wavelength grid
+    ! evaluated on the continuum grid and then interpolated on the
+    ! total wavelength grid (and flat across lines).
     ! -------------------------------------------------------- !
 #include "sprng_f.h"
-
-    ! 	integer, parameter :: maxIter = 11, n_rayons_start2 = 1000
-    ! 	integer, parameter :: n_rayons_max2 = n_rayons_start2 * (2**(maxIter-1))
-    real :: precision! parameter with 1e-1
-    ! 	real, parameter :: lambda_min = 5., lambda_max0 = 100000
+    real :: precision
     integer :: etape, etape_start, etape_end, iray, n_rayons, n_rayons_old
     integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
-    logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lprevious_converged, write_convergence_file
+    logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lprevious_converged
+    
+    logical :: write_convergence_file, lcalc_anisotropy, lwrite_jnu_cont_ascii
 
-    real :: rand, rand2, rand3, smu, a1, a0, a2, a3
+    real :: rand, rand2, rand3
     real(kind=dp) :: dSource, dN
     real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dJ, diffs
     real(kind=dp), allocatable :: Jold(:,:), Jnew(:,:), tau_tot(:,:), Jnew_l(:,:), Jold_l(:,:)
@@ -2685,7 +2686,11 @@ contains
     endif
 
     write(*,*) "   precision in J is ", precision
+    
+    !->large debug arrays in ascii format if .true.
     write_convergence_file = .false.
+    lcalc_anisotropy = .false. !TD set to fits
+	lwrite_jnu_cont_ascii = .false. !TD set to fits
 
     if (allocated(ds)) deallocate(ds)
 
@@ -2697,76 +2702,76 @@ contains
     Jold = 0d0!; Jnew(:,:) = 0.0_dp
     allocate(Sth(Nlambda_cont, n_cells), Snew(Nlambda_cont, n_cells), Sold(Nlambda_cont, n_cells))
     Sth = 0.; Sold = 0.0; Snew = 0.0
-    allocate(Kappa_tot(Nlambda_cont, n_cells)); Kappa_tot = 0.
+    !allocate(Kappa_tot(Nlambda_cont, n_cells)); Kappa_tot = 0.
     allocate(beta(Nlambda_cont, n_cells)); beta = 0.
 
-    if (allocated(threeKminusJ)) deallocate(threekMinusJ)
-    allocate(threeKminusJ(Nlambda,n_cells),J20_cont(Nlambda_cont, n_cells))
-
+	if (lcalc_anisotropy) then
+		allocate(J20_cont(Nlambda_cont, n_cells))
+	endif
 
 
     if (n_etoiles > 0) Istar(:) = Istar_cont(:,1)
     Jold = Jnu_cont
 
-    !write(*,*) "  -> interpolating contopac on Jnu grid for each frequency.."
-    !write(*,*) "       lambda (min, max in nm):", minval(lambda_cont), maxval(lambda_cont)
     do icell=1, n_cells
        if (icompute_atomRT(icell) > 0) then
 
 
-          kappa_tot(:,icell) = chi_c(:,icell)
+!           kappa_tot(:,icell) = chi_c(:,icell)
+! 
+! 
+!           if (any_nan_infinity_vector(kappa_tot(:,icell)) > 0) then
+!              write(*,*) " Error inconsistant values found in kappa_tot after interpolation.."
+!              write(*,*) "icell=", icell, "kappa=",kappa_tot(:,icell)
+!              write(*,*) "Kc=", chi_c(:,icell)
+!           endif
 
 
-          if (any_nan_infinity_vector(kappa_tot(:,icell)) > 0) then
-             write(*,*) " Error inconsistant values found in kappa_tot after interpolation.."
-             write(*,*) "icell=", icell, "kappa=",kappa_tot(:,icell)
-             write(*,*) "Kc=", chi_c(:,icell)
-          endif
+          beta(:,icell) = thomson(icell) / chi_c(:,icell)!( kappa_tot(:,icell) + tiny_dp)
 
 
-          beta(:,icell) = thomson(icell) / ( kappa_tot(:,icell) + tiny_dp)
+!           if (any_nan_infinity_vector(beta(:,icell)) > 0) then
+!              write(*,*) " Error inconsistant values found in beta after interpolation.."
+!              write(*,*) "icell=", icell, "beta=",beta(:,icell)
+!              write(*,*) "sigma=", thomson(icell)
+!           endif
 
+          Sth(:,icell) = eta_c(:,icell) / (chi_c(:,icell)*(1.-beta(:,icell)))!( tiny_dp + kappa_tot(:,icell) * (1.-beta(:,icell)))
 
-          if (any_nan_infinity_vector(beta(:,icell)) > 0) then
-             write(*,*) " Error inconsistant values found in beta after interpolation.."
-             write(*,*) "icell=", icell, "beta=",beta(:,icell)
-             write(*,*) "sigma=", thomson(icell)
-          endif
-
-          Sth(:,icell) = eta_c(:,icell) / ( tiny_dp + kappa_tot(:,icell) * (1.-beta(:,icell)))
-
-          if (any_nan_infinity_vector(Sth(:,icell)) > 0) then
-             write(*,*) " Error inconsistant values found in Sth after interpolation.."
-             write(*,*) "icell=", icell, "Sth=",Sth(:,icell)
-             write(*,*) "kappa_abs=", ( kappa_tot(:,icell) * (1.-beta(:,icell)))
-          endif
+!           if (any_nan_infinity_vector(Sth(:,icell)) > 0) then
+!              write(*,*) " Error inconsistant values found in Sth after interpolation.."
+!              write(*,*) "icell=", icell, "Sth=",Sth(:,icell)
+!              write(*,*) "kappa_abs=", ( kappa_tot(:,icell) * (1.-beta(:,icell)))
+!           endif
 
           Sold(:,icell) = (1.-beta(:,icell))*Sth(:,icell) + beta(:,icell) * Jold(:,icell)
 
-          if (any_nan_infinity_vector(Sold(:,icell)) > 0) then
-             write(*,*) " Error inconsistant values found in Sold after interpolation.."
-             write(*,*) "icell=", icell, "Sold=",Sold(:,icell)
-             write(*,*) "Jold=", Jold(:,icell)
-          endif
+!           if (any_nan_infinity_vector(Sold(:,icell)) > 0) then
+!              write(*,*) " Error inconsistant values found in Sold after interpolation.."
+!              write(*,*) "icell=", icell, "Sold=",Sold(:,icell)
+!              write(*,*) "Jold=", Jold(:,icell)
+!           endif
 
 
        endif
     enddo
-    write(*,*) "Sold (max,min)", maxval(Sold), minval(Sold,mask=Sold>0)
-    write(*,*) "Sth (max,min)", maxval(STh), minval(Sth,mask=Sold>0)
-    write(*,*) "Jold (max,min)", maxval(Jold), minval(Jold,mask=Sold>0)
+!     write(*,*) "Sold (max,min)", maxval(Sold), minval(Sold,mask=Sold>0)
+!     write(*,*) "Sth (max,min)", maxval(STh), minval(Sth,mask=Sold>0)
     write(*,*) "beta (max,min)", maxval(beta), minval(beta,mask=Sold>0)
-    write(*,*) "kappa (max,min)", maxval(kappa_tot), minval(kappa_tot,mask=Sold>0)
-    write(*,*) "  ->..done"
+    write(*,*) "chi_tot (max,min)", maxval(chi_c), minval(chi_c,mask=Sold>0)
 
 
     if (.not.allocated(lcell_converged)) allocate(lcell_converged(n_cells))
 
-    !Only one step here !!
     labs = .true.
     id = 1
-    etape_start = 1
-    etape_end = 1
+    etape_start = istep_start!1
+    if (laccurate_integ) then
+       etape_end = 2!3, step 3 not implemented yet
+    else
+       etape_end = 1
+       if (istep_start==2) etape_end = 2
+    endif
     allocate(ds(1, nb_proc))
     ds = 0.0_dp !meters
 
@@ -2778,27 +2783,71 @@ contains
     endif
 
     do etape=etape_start, etape_end
-
+    
        if (etape==1) then
-          !Future deprecation with healpix
+
           call compute_angular_integration_weights()
 
           lfixed_rays = .true.
-          n_rayons = 1 !always
+          n_rayons = 1
           iray_start = 1
 
           write(*,*) " Using step 1 with ", size(xmu), " rays"
+          write(*,*) "Jold (max,min)", maxval(Jold), minval(Jold,mask=Sold>0)
 
           lprevious_converged = .false.
           lcell_converged(:) = .false.
           precision = dpops_max_error
+          
+          allocate(Ic(Nlambda_cont, 1, nb_proc))
+          Ic = 0.0_dp
 
+       else if (etape==2) then
+
+          write(*,*) " Using step 2 with ", Nrays_atom_transfer, " rays"
+          write(*,*) "Jold (max,min)", maxval(Jold), minval(Jold,mask=Sold>0)
+
+          lfixed_rays = .true.
+          n_rayons = Nrays_atom_transfer
+          iray_start = 1
+          lprevious_converged = .false.
+          lcell_converged(:) = .false.
+          if (etape_start==1) then
+             precision = 1e-1!1e-1!1e-3, 1e-2, fac_etape * 1.0 / sqrt(real(n_rayons))
+          else
+             precision = dpops_max_error
+          endif
+          write(*,*) " threshold:", precision
+          
+          if (allocated(Ic)) deallocate(Ic)
           allocate(Ic(Nlambda_cont, 1, nb_proc))
           Ic = 0.0_dp
 
        else
-          call error("step 1 only in iterate_Jnu")
+          call ERROR("etape unkown")
        end if
+
+
+!        if (etape==1) then
+!           !Future deprecation with healpix
+!           call compute_angular_integration_weights()
+! 
+!           lfixed_rays = .true.
+!           n_rayons = 1 !always
+!           iray_start = 1
+! 
+!           write(*,*) " Using step 1 with ", size(xmu), " rays"
+! 
+!           lprevious_converged = .false.
+!           lcell_converged(:) = .false.
+!           precision = dpops_max_error
+! 
+!           allocate(Ic(Nlambda_cont, 1, nb_proc))
+!           Ic = 0.0_dp
+! 
+!        else
+!           call error("step 1 only in iterate_Jnu")
+!        end if
 
        if (write_convergence_file ) write(20,*) "step:", etape, " nrays:", n_rayons
 
@@ -2813,12 +2862,12 @@ contains
 
           write(*,*) " -> Iteration #", n_iter, " Step #", etape
 
-          ! 			if (lfixed_rays) then
-          !     			stream = 0.0
-          !     			do i=1,nb_proc
-          !      				stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-          !     			end do
-          ! 			end if
+          if (lfixed_rays) then
+          stream = 0.0
+          	do i=1,nb_proc
+          		stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+          	end do
+          end if
 
           if (write_convergence_file ) write(20,*) " -> Iteration #", n_iter
           imax = 1
@@ -2831,8 +2880,8 @@ contains
           !$omp shared(lambda_cont, lambda_star, Snew, Sold, Sth, Istar, xmu,wmu, xmux, xmuy) &
           !$omp shared(lkeplerian,n_iter,gtype, nb_proc,seed,etoile) &
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
-          !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, kappa_tot, Ic,icompute_atomRT,J20_cont) &
-          !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule)
+          !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, chi_c, Ic,icompute_atomRT,J20_cont) &
+          !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,lcalc_anisotropy)
           !$omp do schedule(static,1)
           do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
@@ -2841,7 +2890,7 @@ contains
                 Jnu_cont(:,icell) = 0.0_dp
                 Snew(:,icell) = 0.0_dp
                 lambda_star(:,id) = 0.0_dp
-                J20_cont(:,icell) = 0.0_dp
+                if (lcalc_anisotropy) J20_cont(:,icell) = 0.0_dp
 
 
                 if (etape==1) then
@@ -2855,19 +2904,48 @@ contains
                       u0 = xmux(imu); v0 = xmuy(imu)
                       weight = wmu(imu)
 
-                      call INTEG_RAY_JNU(id, icell, x0, y0, z0, u0, v0, w0, 1, labs, kappa_tot, Sold, Istar, Ic(:,1,:))
+                      call integ_ray_jnu(id, icell, x0, y0, z0, u0, v0, w0, 1, labs, chi_c, Sold, Istar, Ic(:,1,:))
 
                       !LI
                       Jnu_cont(:,icell) = Jnu_cont(:,icell) + Ic(:,1,id) * weight
-                      J20_cont(:,icell) = J20_cont(:,icell) + (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) &
-                           * Ic(:,1,id) * weight
 
                       !ALI
-                      lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*kappa_tot(:,icell))) * weight
-
-                      ! 								if (n_iter==1 .and. icell==1) uvw_pos(:,imu,1) = (/u0,v0,w0/)
+                      lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*chi_c(:,icell))) * weight
 
                    enddo !imu
+                   
+                elseif (etape==2) then
+                
+                	weight = 1.0 / real(n_rayons)
+                   do iray=iray_start, iray_start-1+n_rayons
+
+
+                      rand  = sprng(stream(id))
+                      rand2 = sprng(stream(id))
+                      rand3 = sprng(stream(id))
+
+                      call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+
+                      ! Direction de propagation aleatoire
+                      rand = sprng(stream(id))
+                      W0 = 2.0_dp * rand - 1.0_dp !nz
+                      W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
+                      SRW02 = sqrt(W02)
+                      rand = sprng(stream(id))
+                      ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+                      U0 = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
+                      V0 = SRW02 * sin(ARGMT) !ny = sin(theta)*sin(phi)
+
+
+                      call integ_ray_jnu(id, icell, x0, y0, z0, u0, v0, w0, 1, labs, chi_c, Sold, Istar, Ic(:,1,:))
+
+                      !LI
+                      Jnu_cont(:,icell) = Jnu_cont(:,icell) + Ic(:,1,id) * weight
+
+                      !ALI
+                      lambda_star(:,id) = lambda_star(:,id) + (1d0 - exp(-ds(1,id)*chi_c(:,icell))) * weight
+
+                   enddo !iray
 
                 else
                    call error("step unknown!")
@@ -2879,6 +2957,8 @@ contains
                 !LI
                 !Snew(:,icell) = Sth(:,icell) * (1.0_dp - beta(:,icell)) + Jnu_cont(:,icell) * beta(:,icell)
 
+				if (lcalc_anisotropy) J20_cont(:,icell) = J20_cont(:,icell) + (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) &
+                           * Ic(:,1,id) * weight
              endif !icompute_AtomRT
 
           end do !icell
@@ -3006,44 +3086,44 @@ contains
     ! 	endif
 
 
+	if (lwrite_jnu_cont_ascii) then
+	
+    	open(unit=20, file="Jnu_no_interp.s", status="unknown")
+    	write(20,*) n_cells, Nlambda_cont
+   		do icell=1, n_cells
+       		do la=1, Nlambda_cont !if you change the format, check read_Jnu_ascii()
+          		if (lambda_cont(la) < 1d5) then
+             		write(20,'(1F12.5,5E20.7E3)') &
+                  	lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), chi_c(la,icell), Sold(la,icell)
+          		else
+             		write(20,'(1F15.5,5E20.7E3)') &
+                  	lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), chi_c(la,icell), Sold(la,icell)
+         		endif
+       		enddo
+    	enddo
+    	close(20)
 
-    open(unit=20, file="Jnu_no_interp.s", status="unknown")
-    write(20,*) n_cells, Nlambda_cont
-    do icell=1, n_cells
-       do la=1, Nlambda_cont !if you change the format, check read_Jnu_ascii()
-          if (lambda_cont(la) < 1d5) then
-             write(20,'(1F12.5,5E20.7E3)') &
-                  lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
-          else
-             write(20,'(1F15.5,5E20.7E3)') &
-                  lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), kappa_tot(la,icell), Sold(la,icell)
-          endif
-       enddo
-    enddo
-    close(20)
+	endif
+	if (lcalc_anisotropy) then
 
-    if (allocated(threeKminusJ)) then
-
-       open(unit=20, file="anis_ascii.txt", status="unknown")
-       write(20,*) n_cells, Nlambda
-       do icell=1, n_cells
-          call bezier2_interp(Nlambda_cont, lambda_cont, J20_cont(:,icell)/Jnu_cont(:,icell), &
-               Nlambda, lambda, threeKminusJ(:,icell))
-          do la=1, Nlambda
-             write(20,'(1F12.5,5E20.7E3)') lambda(la), 0.5*threeKminusJ(la,icell), 0.0, 0.0, 0.0, 0.0
-          enddo
-       enddo
-       close(20)
-
-       deallocate(threeKminusJ)
-
+       	open(unit=20, file="anis_ascii.txt", status="unknown")
+       	write(20,*) n_cells, Nlambda
+       	do icell=1, n_cells
+          	call bezier2_interp(Nlambda_cont, lambda_cont, J20_cont(:,icell)/Jnu_cont(:,icell), &
+              		Nlambda, lambda, threeKminusJ(:,icell))
+          	do la=1, Nlambda
+             	write(20,'(1F12.5,5E20.7E3)') lambda(la), 0.5*threeKminusJ(la,icell), 0.0, 0.0, 0.0, 0.0
+          	enddo
+       	enddo
+       	close(20)
+   		deallocate(J20_cont)
+    	
     endif
 
 
     if (allocated(xmu)) deallocate(xmu,wmu,xmux,xmuy) !in case we call nlte_loop after
-    if (allocated(J20_cont)) deallocate(J20_cont)
     deallocate(ds, lcell_converged)
-    deallocate(Jold, Sth, kappa_tot, beta, Istar, Ic, Sold, lambda_star, Snew, delta_J)
+    deallocate(Jold, Sth, beta, Istar, Ic, Sold, lambda_star, Snew, delta_J)
 
     ! ------------------------------------------------------------------------------------ !
     return

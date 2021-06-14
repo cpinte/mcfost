@@ -2169,7 +2169,7 @@ contains
     character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
     logical :: accretion_spots
     real :: south
-    real, parameter :: Lextent = 1.0!1.1
+    real, parameter :: Lextent = 1.0
     real(kind=dp) :: rr, zz, pp!, dimension(n_cells) , V2
     real(kind=dp), dimension(:), allocatable :: B2, V2
     logical :: is_not_dark!, xit
@@ -2286,7 +2286,7 @@ contains
        end do
     end do
     close(unit=1)
-
+    
     if (lspherical_velocity) then
        vtheta(:) = V2(:)
        deallocate(V2)

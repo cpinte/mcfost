@@ -178,7 +178,7 @@ contains
     !     	ndusttypes = 1 !oterwise bug
     !     	allocate(massdust(1, n_points),rhodust(1, n_points),hydro_grainsizes(1))
     !** bug handling
-    call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, mass_gas, massdust, rho, rhodust,&
+    call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, T_tmp, mass_gas, massdust, rho, rhodust,&
          hydro_grainsizes, hydro_limits, check_previous_tesselation)
     ! -> correction for small density applied on mass_gas directly inside
 

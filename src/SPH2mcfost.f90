@@ -100,7 +100,7 @@ contains
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
-         massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
+         temp, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
 
     ! setup needed for Atomic line transfer
     if (lemission_atom) then
@@ -151,7 +151,7 @@ contains
 
   !*********************************************************
 
-  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, massgas,massdust,rho,rhodust,&
+  subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, T_gas, massgas,massdust,rho,rhodust,&
        SPH_grainsizes, SPH_limits, check_previous_tesselation, mask)
 
     ! ************************************************************************************ !
@@ -180,6 +180,7 @@ contains
     real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
     real(dp), dimension(:), allocatable, intent(inout) :: rho
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
+    real(dp), dimension(:), allocatable, intent(in) :: T_gas
     integer, dimension(n_SPH), intent(in) :: particle_id
     real(dp), dimension(:,:), allocatable, intent(in) :: rhodust, massdust
     real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes
@@ -191,7 +192,7 @@ contains
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust
-    real :: f, limit_threshold, density_factor
+    real :: f, limit_threshold, density_factor, destruction_factor
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n
 
     real(dp), dimension(6) :: limits
@@ -438,10 +439,12 @@ contains
        lvariable_dust = .false.
        write(*,*) "Using gas-to-dust ratio in mcfost parameter file"
 
+       destruction_factor = 1.
        do icell=1,n_cells
+          if (T_gas(icell) >= 1500. .and. .not. lturn_off_dust_subl) destruction_factor = 0.0001
           masse(icell) = 0.
           do k=1,n_grains_tot
-             densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k)
+             densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k) * destruction_factor
              masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
           enddo
        enddo

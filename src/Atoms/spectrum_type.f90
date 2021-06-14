@@ -2,7 +2,7 @@ module spectrum_type
 
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType
   use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, icompute_atomRT, lmagnetized, laccretion_shock
-  use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table, make_wavelength_grid_new!, make_wavelength_grid,
+  use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table, make_wavelength_grid, make_wavelength_grid_new
   use fits_utils, only : print_error
   use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
        lorigin_atom, n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
@@ -29,7 +29,7 @@ module spectrum_type
   integer :: dk_max, dk_min
 
   integer :: Nlambda, Ntrans, Nlambda_cont
-  real(kind=dp) :: wavelength_ref = 0d0
+  real(kind=dp) :: wavelength_ref = 0.0
   real(kind=dp), dimension(:,:), allocatable :: chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, chi0_bb, eta0_bb
   real(kind=dp), dimension(:,:,:), allocatable :: Icont
   real(kind=dp), dimension(:), allocatable :: lambda, lambda_cont
@@ -85,14 +85,18 @@ contains
     if (present(lam0)) wavelength_ref = lam0
 
 
-    call make_wavelength_grid_new(wavelength_ref, v_char, lambda, Ntrans, lambda_cont)
+    !for each line
+    dk_max = int( sign(1.0_dp, v_char) * ( 1e-3 * abs(v_char) / hv + 0.5 ) )
+    write(*,*) "Maximum shift in index:", dk_max, (1e-3 * v_char + hv) / hv
+    if (1d3 * abs(dk_max) * hv / clight > 1.0) then
+    	call error("Doppler shift larger than c!")
+    endif
+
+!     call make_wavelength_grid(wavelength_ref, v_char, lambda, Ntrans, lambda_cont)
+    call make_wavelength_grid_new(wavelength_ref, dk_max, lambda, Ntrans, lambda_cont)
+    dk_min = -dk_max
 
     mem_alloc_tot = mem_alloc_tot + sizeof(lambda) + sizeof(lambda_cont)
-
-    !for each line
-    dk_max = int( sign(1.0_dp, v_char) * ( 1e-3 * abs(v_char) / hv + 0.5 ) )!sign(1.0_dp, v_char) * int( 1e-3 * abs(v_char) / hv + 0.5 ) !nint( (1e-3 * v_char) / hv)
-    dk_min = -dk_max
-    write(*,*) "Maximum shift in index:", dk_max, (1e-3 * v_char + hv) / hv - 1.0
 
     Nlambda_cont = size(lambda_cont)
     Nlambda = size(lambda)
@@ -460,10 +464,12 @@ contains
     mem_alloc_local = mem_alloc_local + sizeof(Flux)+sizeof(fluxc)
     if (lmagnetized) mem_alloc_local = mem_alloc_local + 3*sizeof(flux)/nb_proc
 
-    allocate(flux_star(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
-    if (alloc_Status > 0) call ERROR ("Cannot allocate Flux_star")
-    mem_alloc_local = mem_alloc_local + sizeof(Flux_star)
-    Flux_star = 0.0_dp
+	if (n_etoiles > 0) then
+    	allocate(flux_star(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
+    	if (alloc_Status > 0) call ERROR ("Cannot allocate Flux_star")
+    	mem_alloc_local = mem_alloc_local + sizeof(Flux_star)
+    	Flux_star = 0.0_dp
+    endif
 
     if (laccretion_shock) then
        allocate(Flux_acc(Nlambda,RT_N_INCL,RT_N_AZ,nb_proc), stat=alloc_status)
@@ -645,7 +651,7 @@ contains
     if (allocated(lambda_cont)) deallocate(lambda_cont)
 
     deallocate(Itot, Icont)
-    if (allocated(Istar_tot)) deallocate(Istar_tot, Istar_cont, Istar_loc)
+    if (allocated(Istar_tot)) deallocate(Istar_tot, Istar_cont, Istar_loc, flux_star)
     !can be deallocated before to save memory
     if (allocated(Flux)) deallocate(Flux)
     if (allocated(Fluxc)) deallocate(Fluxc)
@@ -835,30 +841,32 @@ contains
     endif
 
     !Stellar flux
-    call ftcrhd(unit, status)
-    if (status > 0) then
-       call print_error(status)
-    endif
-    naxis = 3
-    naxes(1) = Nlambda
-    naxes(2) = RT_n_incl
-    naxes(3) = RT_n_az
+    if (n_etoiles > 0) then
+    	call ftcrhd(unit, status)
+    	if (status > 0) then
+       		call print_error(status)
+    	endif
+    	naxis = 3
+    	naxes(1) = Nlambda
+    	naxes(2) = RT_n_incl
+    	naxes(3) = RT_n_az
 
-    nelements = naxes(1)*naxes(2)*naxes(3)
+    	nelements = naxes(1)*naxes(2)*naxes(3)
 
-    !  Write the required header keywords.
-    call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-    if (status > 0) then
-       call print_error(status)
-    endif
-    call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm Fstar_{\nu}}$',status)
+    	!  Write the required header keywords.
+    	call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+		if (status > 0) then
+       		call print_error(status)
+    	endif
+    	call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm Fstar_{\nu}}$',status)
+	
 
-
-    !  Write the array to the FITS file.
-    write(*,*) " Flux_star_max = ", maxval(sum(Flux_star(:,:,:,:),dim=4))
-    call ftpprd(unit,group,fpixel,nelements,sum(Flux_star(:,:,:,:),dim=4),status)
-    if (status > 0) then
-       call print_error(status)
+    	!  Write the array to the FITS file.
+    	write(*,*) " Flux_star_max = ", maxval(sum(Flux_star(:,:,:,:),dim=4))
+    	call ftpprd(unit,group,fpixel,nelements,sum(Flux_star(:,:,:,:),dim=4),status)
+    	if (status > 0) then
+       		call print_error(status)
+    	endif
     endif
 
     if (lmagnetized) then
