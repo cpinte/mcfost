@@ -2705,7 +2705,7 @@ contains
 
 
 
-    Istar(:) = Istar_cont(:,1)
+    if (n_etoiles > 0) Istar(:) = Istar_cont(:,1)
     Jold = Jnu_cont
 
     !write(*,*) "  -> interpolating contopac on Jnu grid for each frequency.."
