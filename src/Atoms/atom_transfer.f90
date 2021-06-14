@@ -2710,9 +2710,7 @@ contains
 	endif
 
 
-	if (n_etoiles > 0) then
-    	Istar(:) = Istar_cont(:,1)
-    endif!0 otherwise, does not take memory
+    if (n_etoiles > 0) Istar(:) = Istar_cont(:,1)
     Jold = Jnu_cont
 
     do icell=1, n_cells
