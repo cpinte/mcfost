@@ -1865,80 +1865,86 @@ contains
       endif
 !->cont end	
 
-          write(*,*) "bounds:"
-          write(*,*) "  -> max lam:", maxval(line_waves), " max_cont:", maxval(cont_grid)
+      write(*,*) "bounds:"
+      write(*,*) "  -> max lam:", maxval(line_waves), " max_cont:", maxval(cont_grid)
           ! " max reddest line:", maxval(group_red,mask=group_red>-1),
-    else !pure cont
-          allocate(cont_grid(Nlambda_cont),stat=alloc_status)
-          if (alloc_status > 0) call error("Allocation error cont_grid")
-          cont_grid(:) = cont_waves(:)
-          write(*,*) "  -> pure cont max_cont:", maxval(cont_grid)
-          Nspec_line = 0
-    endif !there is lines
-    !add lines + continua frequencies
-    Nspec_cont = size(cont_waves)
-    if (Nspec_cont /= Nlambda_cont) then
-       write(*,*) " Something went wrong with Nlambda cont"
-       stop
-    endif
+          
+      !add lines + continua frequencies
+      Nspec_cont = size(cont_waves)
+      if (Nspec_cont /= Nlambda_cont) then
+            write(*,*) " Something went wrong with Nlambda cont"
+            stop
+      endif
 
-    !initiate with lines
-    allocate(tmp_grid(Nspec_line+Nspec_cont), stat=alloc_status)
-    if (alloc_status > 0) call error ("Allocation error tmp_grid")
-    tmp_grid(:) = -99
-    do la=1,Nspec_line
-       tmp_grid(la) = line_waves(la)
-    enddo
-    write(*,*) " only lines"
-    write(*,*) maxval(tmp_grid), minval(tmp_grid,mask=tmp_grid /= -99)
+      !initiate with lines
+      allocate(tmp_grid(Nspec_line+Nspec_cont), stat=alloc_status)
+      if (alloc_status > 0) call error ("Allocation error tmp_grid")
+      tmp_grid(:) = -99
+      do la=1,Nspec_line
+            tmp_grid(la) = line_waves(la)
+      enddo
 
-    Nwaves = Nspec_line
-    !add continuum wavlengths (including reference wavelength), only outside line groups		
-    !First values below or beyond first and last groups
-    la = 0
-    do lac=Nspec_line+1, Nspec_cont+Nspec_line
-       if ((cont_waves(lac-Nspec_line) < group_blue(1)) .or. (cont_waves(lac-Nspec_line) > group_red(Ngroup))) then
-          tmp_grid(lac) = cont_waves(lac-Nspec_line)
-          Nwaves = Nwaves + 1
-          if (cont_waves(lac-Nspec_line) < group_blue(1)) la = lac
-       endif
-    enddo
+      Nwaves = Nspec_line
+      !add continuum wavlengths (including reference wavelength), only outside line groups		
+      !First values below or beyond first and last groups
+      la = 0
+      do lac=Nspec_line+1, Nspec_cont+Nspec_line
+            if ((cont_waves(lac-Nspec_line) < group_blue(1)) .or. (cont_waves(lac-Nspec_line) > group_red(Ngroup))) then
+                  tmp_grid(lac) = cont_waves(lac-Nspec_line)
+                  Nwaves = Nwaves + 1
+                  if (cont_waves(lac-Nspec_line) < group_blue(1)) la = lac
+            endif
+      enddo
 
-    !now values between groups
-    do lac=la+1, Nspec_cont+Nspec_line
-       group_loop : do n=2, Ngroup
-          if ((cont_waves(lac-Nspec_line) > group_red(n-1)).and.(cont_waves(lac-Nspec_line) < group_blue(n))) then
-             	Nwaves = Nwaves + 1
-             	tmp_grid(lac) = cont_waves(lac-Nspec_line)
+      !now values between groups
+      do lac=la+1, Nspec_cont+Nspec_line
+            group_loop : do n=2, Ngroup
+                  if ((cont_waves(lac-Nspec_line) > group_red(n-1)).and.(cont_waves(lac-Nspec_line) < group_blue(n))) then
+                        Nwaves = Nwaves + 1
+                        tmp_grid(lac) = cont_waves(lac-Nspec_line)
              	!else
              	! be smart and cycle to accelerate
-          endif
-       enddo group_loop
-    enddo
-    write(*,*) " with cont"
-    write(*,*) maxval(cont_grid), minval(cont_grid)
-    write(*,*) maxval(tmp_grid), minval(tmp_grid,mask=tmp_grid /= -99)
-    write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid, tmp_grid > 0))
-! 	stop
-    if (lthere_is_lines) deallocate(Nlambda_per_group, line_waves)
-    deallocate(cont_waves)
+                  endif
+            enddo group_loop
+      enddo
+      write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid, tmp_grid > 0))
+      deallocate(Nlambda_per_group, line_waves)
+      deallocate(cont_waves)
 
-    !continuum frequencies are sorted and so are the line frequencies
-    !but they are added at the end, so sorted is needed, but I can improve the previous
-    !loop to fill the tmp_frid in the ascending order of wavelengths
-    allocate(outgrid(Nwaves),stat=alloc_status)
-    tmp_grid = tmp_grid(bubble_sort(tmp_grid))
-    outgrid(:) = -99.0 !check
-    outgrid = pack(tmp_grid, mask=tmp_grid > 0)
+      !continuum frequencies are sorted and so are the line frequencies
+      !but they are added at the end, so sorted is needed, but I can improve the previous
+      !loop to fill the tmp_frid in the ascending order of wavelengths
+      allocate(outgrid(Nwaves),stat=alloc_status)
+      tmp_grid = tmp_grid(bubble_sort(tmp_grid))
+      outgrid(:) = -99.0 !check
+      outgrid = pack(tmp_grid, mask=tmp_grid > 0)
 
-    do lac=2, Nwaves
-    	if (outgrid(lac) <= outgrid(lac-1)) then
-    		write(*,*) lac, "lambda = ", outgrid(lac), outgrid(lac-1), minval(outgrid)
-    		call error("Sorted problem")
-    	endif
-    enddo
+      do lac=2, Nwaves
+            if (outgrid(lac) <= outgrid(lac-1)) then
+                  write(*,*) lac, "lambda = ", outgrid(lac), outgrid(lac-1), minval(outgrid)
+                  call error("Sorted problem")
+            endif
+      enddo
 
-    deallocate(tmp_grid)
+      deallocate(tmp_grid)         
+        
+    else !pure cont
+      Nspec_cont = size(cont_waves)
+      if (Nspec_cont /= Nlambda_cont) then
+            write(*,*) " Something went wrong with Nlambda cont"
+            stop
+      endif
+      allocate(cont_grid(Nlambda_cont),stat=alloc_status)
+      Nwaves = Nlambda_cont
+      if (alloc_status > 0) call error("Allocation error cont_grid")
+      cont_grid(:) = cont_waves(:)
+      write(*,*) "  -> pure cont max_cont:", maxval(cont_grid)
+      Nspec_line = 0
+      allocate(outgrid(Nwaves))
+      outgrid(:) = cont_grid(:)
+      deallocate(cont_waves)
+    endif !there is lines
+
 
     write(*,*) Nwaves, " unique wavelengths" !they are no eliminated lines
     write(*,*) Nspec_line, " line wavelengths"
