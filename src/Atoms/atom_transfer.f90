@@ -1678,12 +1678,12 @@ contains
           !$omp default(none) &
           !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi)&
           !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight) &
-          !$omp shared(icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ, psi_mean, psi, chi_loc, Jnu_loc) &
+          !$omp shared(Voronoi,icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ, psi_mean, psi, chi_loc, Jnu_loc) &
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
           !$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, Jnu, xmu, xmux, xmuy,wmu,etoile,id_ref, xyz_pos,uvw_pos) &
           !$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity, l_iterate_ne) &
           !$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
-          !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda)
+          !$omp shared(lvoronoi, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda)
           !$omp do schedule(static,1)
           do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
@@ -1795,10 +1795,15 @@ contains
 
                 elseif (etape==1) then !ray-by-ray, n_rayons fixed
 
-
-                   x0 = r_grid(icell) * cos(phi_grid(icell))
-                   y0 = r_grid(icell) * sin(phi_grid(icell))
-                   z0 = z_grid(icell)
+                   if (lvoronoi) then
+                   	x0 = Voronoi(icell)%xyz(1)
+                   	y0 = Voronoi(icell)%xyz(2)
+                   	z0 = Voronoi(icell)%xyz(3)
+                   else
+                   	x0 = r_grid(icell)*cos(phi_grid(icell))
+                   	y0 = r_grid(icell)*sin(phi_grid(icell))
+                   	z0 = z_grid(icell)
+                   endif
 
                    do imu=1, size(xmu)
 
@@ -2877,11 +2882,11 @@ contains
           !$omp default(none) &
           !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,iphi,imu) &
           !$omp private(argmt,norme, icell, delta_J, l_iterate,weight) &
-          !$omp shared(lambda_cont, lambda_star, Snew, Sold, Sth, Istar, xmu,wmu, xmux, xmuy) &
+          !$omp shared(Voronoi, lambda_cont, lambda_star, Snew, Sold, Sth, Istar, xmu,wmu, xmux, xmuy) &
           !$omp shared(lkeplerian,n_iter,gtype, nb_proc,seed,etoile) &
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
           !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, chi_c, Ic,icompute_atomRT,J20_cont) &
-          !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,lcalc_anisotropy)
+          !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,lcalc_anisotropy, lvoronoi)
           !$omp do schedule(static,1)
           do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
@@ -2895,9 +2900,15 @@ contains
 
                 if (etape==1) then
 
-                   x0 = r_grid(icell)*cos(phi_grid(icell))
-                   y0 = r_grid(icell)*sin(phi_grid(icell))
-                   z0 = z_grid(icell)
+                   if (lvoronoi) then
+                   	x0 = Voronoi(icell)%xyz(1)
+                   	y0 = Voronoi(icell)%xyz(2)
+                   	z0 = Voronoi(icell)%xyz(3)
+                   else
+                   	x0 = r_grid(icell)*cos(phi_grid(icell))
+                   	y0 = r_grid(icell)*sin(phi_grid(icell))
+                   	z0 = z_grid(icell)
+                   endif
 
                    do imu=1, size(xmu)
                       w0 = xmu(imu)
