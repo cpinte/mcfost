@@ -80,6 +80,8 @@ contains
        close(unit=1)
        N_points = N_points - Nheader
        write(*,*) " Input model has ", N_points," grid points !"
+       
+       N_points = N_points + n_etoiles
 
        open(unit=1,file=density_file, status="old")
        call getnextline(1, "#", FormatLine, inputline, Nread)
@@ -167,10 +169,12 @@ contains
     hydro_limits(2) = select_inplace(k,real(x))*limit_factor
     hydro_limits(4) = select_inplace(k,real(y))*limit_factor
     hydro_limits(6) = select_inplace(k,real(z))*limit_factor
-    write(*,*) "# Model limits (Rstar) :"
-    write(*,*) "x =", hydro_limits(1)/etoile(1)%r, hydro_limits(2)/etoile(1)%r
-    write(*,*) "y =", hydro_limits(3)/etoile(1)%r, hydro_limits(4)/etoile(1)%r
-    write(*,*) "z =", hydro_limits(5)/etoile(1)%r, hydro_limits(6)/etoile(1)%r
+    if (n_etoiles > 0) then
+    	write(*,*) "# Model limits (Rstar) :"
+    	write(*,*) "x =", hydro_limits(1)/etoile(1)%r, hydro_limits(2)/etoile(1)%r
+    	write(*,*) "y =", hydro_limits(3)/etoile(1)%r, hydro_limits(4)/etoile(1)%r
+    	write(*,*) "z =", hydro_limits(5)/etoile(1)%r, hydro_limits(6)/etoile(1)%r
+    endif
 
     !also work with grid-based code
     !massdust, rhodust, hydro_grainsizes not allocated if ndusttypes = 0 !
@@ -178,7 +182,7 @@ contains
     !     	ndusttypes = 1 !oterwise bug
     !     	allocate(massdust(1, n_points),rhodust(1, n_points),hydro_grainsizes(1))
     !** bug handling
-    call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, T_tmp, mass_gas, massdust, rho, rhodust,&
+    call sph_to_voronoi(n_points-n_etoiles, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, T_tmp, mass_gas, massdust, rho, rhodust,&
          hydro_grainsizes, hydro_limits, check_previous_tesselation)
     ! -> correction for small density applied on mass_gas directly inside
 
