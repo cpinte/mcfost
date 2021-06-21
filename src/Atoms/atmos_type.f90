@@ -2162,7 +2162,7 @@ contains
     use grid, only : cell_map
     character(len=*), intent(in)	:: filename
     real(kind=dp) Tshk!, Oi, Oo
-    real(kind=dp) :: Tring, tilt!,thetai, thetao
+    real(kind=dp) :: tilt!,thetai, thetao
     integer, parameter :: Nhead = 3 !Add more
     character(len=MAX_LENGTH) :: rotation_law
     integer :: icell, Nread, syst_status, N_points, k, i, j, acspot, N_fixed_ne = 0
@@ -2357,7 +2357,7 @@ contains
                 south = -1. !for the ring in the southern hemisphere
                 tc = tc + pi
              endif
-             etoile(1)%SurfB(k)%T = Tring
+             etoile(1)%SurfB(k)%T = Taccretion
              !center of the spot
              etoile(1)%SurfB(k)%r(1) = cos(phic)*sin(tc)! *cos(tilt) - sin(tc)*sin(tilt)
              etoile(1)%SurfB(k)%r(2) = sin(phic)*sin(tc)
