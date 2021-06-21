@@ -946,7 +946,7 @@ contains
     integer :: n_rayons_max = n_rayons_start2 * (2**(maxIter-1))
     integer, parameter :: Nrayone = 1
     character(len=20)  :: ne_initial
-    logical :: lread_jnu_ascii = .false., lelectron_read
+    logical :: lelectron_read, ljnu_read
     type (AtomType), pointer :: atom
     integer :: alloc_status
     real(kind=dp) :: lam0 = 500.0 !default
@@ -1270,13 +1270,8 @@ contains
           if (lelectron_scattering) then
 
              !    call alloc_jnu(.false.) -> already allocated in alloc_spectrum
-             !    if (.not.lread_jnu_atom) then
              if (lread_jnu_atom) then
-                !call read_jnu_ascii
-                !lread_jnu_ascii = .true.
-                call read_jnu
-                ! 		call read_jnu() !I now write Jnu in ascii file to be interpolated if lread_jnu_atom
-                !	   the interpolated version of Jnu is written at the end in write_jnu()
+                call read_jnu(ljnu_read)
              else
                 call iterate_Jnu()
                 call write_Jnu
@@ -1374,9 +1369,7 @@ contains
 
     if (lelectron_scattering.and.(NactiveAtoms==0)) then !otherwise if active, written even if not included in emissivity
        !Jnu is written to ascii file if read
-       if (lread_jnu_atom) then
-          if (lread_jnu_ascii) call write_Jnu
-       endif
+       call write_Jnu
        call dealloc_Jnu()
     endif
 
@@ -2759,11 +2752,10 @@ contains
 
        endif
     enddo
-!     write(*,*) "Sold (max,min)", maxval(Sold), minval(Sold,mask=Sold>0)
-!     write(*,*) "Sth (max,min)", maxval(STh), minval(Sth,mask=Sold>0)
-    write(*,*) "beta (max,min)", maxval(beta), minval(beta,mask=Sold>0)
-    write(*,*) "chi_tot (max,min)", maxval(chi_c), minval(chi_c,mask=Sold>0)
-
+    write(*,'("beta (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
+		maxval(maxval(beta(:,:),dim=2)), minval(minval(beta,dim=2,mask=Sold>0))
+    write(*,'("Kappa_tot (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
+		maxval(maxval(chi_c(:,:),dim=2)), minval(minval(chi_c,dim=2,mask=chi_c>0))
 
     if (.not.allocated(lcell_converged)) allocate(lcell_converged(n_cells))
 
@@ -2791,7 +2783,8 @@ contains
           iray_start = 1
 
           write(*,*) " Using step 1 with ", size(xmu), " rays"
-          write(*,*) "Jold (max,min)", maxval(Jold), minval(Jold,mask=Sold>0)
+          write(*,'("Jold (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
+			maxval(maxval(Jold(:,:),dim=2)), minval(minval(Jold,dim=2,mask=Jold>0))
 
           lprevious_converged = .false.
           lcell_converged(:) = .false.
@@ -2803,7 +2796,8 @@ contains
        else if (etape==2) then
 
           write(*,*) " Using step 2 with ", Nrays_atom_transfer, " rays"
-          write(*,*) "Jold (max,min)", maxval(Jold), minval(Jold,mask=Sold>0)
+          write(*,'("Jold (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
+			maxval(maxval(Jold(:,:),dim=2)), minval(minval(Jold,dim=2,mask=Jold>0))
 
           lfixed_rays = .true.
           n_rayons = Nrays_atom_transfer
@@ -2824,28 +2818,6 @@ contains
        else
           call ERROR("etape unkown")
        end if
-
-
-!        if (etape==1) then
-!           !Future deprecation with healpix
-!           call compute_angular_integration_weights()
-! 
-!           lfixed_rays = .true.
-!           n_rayons = 1 !always
-!           iray_start = 1
-! 
-!           write(*,*) " Using step 1 with ", size(xmu), " rays"
-! 
-!           lprevious_converged = .false.
-!           lcell_converged(:) = .false.
-!           precision = dpops_max_error
-! 
-!           allocate(Ic(Nlambda_cont, 1, nb_proc))
-!           Ic = 0.0_dp
-! 
-!        else
-!           call error("step 1 only in iterate_Jnu")
-!        end if
 
 
        lnotfixed_rays = .not.lfixed_rays
@@ -2977,9 +2949,7 @@ contains
           !$omp end parallel
           call progress_bar(50)
 
-
-
-		  write(*,*) " Convergence test do"
+          !convergence!		
           diff = 0d0
           dSource = 0.0_dp
           !$omp parallel &
@@ -3014,52 +2984,7 @@ contains
           end do cell_loop2 !icell
           !$omp end do
           !$omp end parallel
-          
-!           diff = 0d0
-!           dSource = 0.0_dp
-!           cell_loop2 : do icell=1, n_cells
-! 
-!              if (icompute_atomRT(icell)>0) then
-! 
-!                 dN = maxval(abs(Snew(:,icell) - Sold(:,icell))/Snew(:,icell))
-!                 dSource = max(dSource, dN)
-! 
-!                 ! 						dN = 0.0_dp
-!                 dJ = 0.0_dp
-!                 do la=1, Nlambda_cont
-!                    ! 							if (Snew(la,icell) > 0) then
-!                    ! 								dN = max(dN, abs(1.0 - Sold(la,icell) / Snew(la,icell)))
-!                    ! 								imax = locate(abs(1.0 - Sold(:,icell) / Snew(:,icell)), dN)
-!                    ! 							endif
-! 
-!                    if (Jnu_cont(la, icell) > 0) then
-!                       dJ = max(dJ,abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
-!                       imax = locate(abs(1.-Jold(:,icell)/Jnu_cont(:,icell)),abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
-!                    endif
-!                 enddo
-! 
-!                 !if (mod(icell,10)==0)
-!                 ! 						write(*,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
-!                 if (write_convergence_file ) write(20,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
-!                 if (dJ > diff) then
-!                    diff = dJ
-!                    icell_max = icell
-!                 endif
-!                 lcell_converged(icell) = (real(dJ) < precision)
-!                 ! 						if (dN > diff) then
-!                 ! 						  diff = dN
-!                 ! 						  icell_max = icell
-!                 ! 						  dSource = diff
-!                 ! 						endif
-!                 !      					lcell_converged(icell) = (real(dN) < precision)
-! 
-!          	 	Sold(:,icell) = Snew(:,icell)
-!           		Jold(:,icell) = Jnu_cont(:,icell)
-!              end if
-!           end do cell_loop2 !icell
-!           Sold(:,:) = Snew(:,:)
-!           Jold(:,:) = Jnu_cont(:,:)
-		  write(*,*) " Convergence test enddo"
+
 
           write(*,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') &
                dSource, T(icell_max), ne(icell_max)
@@ -3067,9 +2992,9 @@ contains
           write(*,'(" >>> icell_max "(1I7)," lambda="(1F14.7) " nm"," dJ="(1ES14.5E3))') icell_max, lambda(imax), diff
 
           write(*,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
-               maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
+               maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max),mask=Jnu_cont(:,icell_max)>0)
           write(*,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
-               maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
+               maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:),mask=Jnu_cont>0)
 
           write(*,"('# unconverged cells :'(1I7), '('(1F12.3)' %)')") &
                size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
@@ -3077,7 +3002,6 @@ contains
                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
 
 
-          ! 			lconverged = (real(diff) < precision)
           if (real(diff) < precision) then
              if (lprevious_converged) then
                 lconverged = .true.
@@ -3086,16 +3010,6 @@ contains
              endif
           else
              lprevious_converged = .false.
-             !            		if (.not.lfixed_rays) then
-             !            			n_rayons_old = n_rayons
-             !               		n_rayons = n_rayons * 2
-             !               		write(*,*) ' -- Increasing number of rays :', n_rayons
-             !               		!!write(*,"('   '(1I10)' -> '(1I10))") n_rayons_old, n_rayons
-             !               		if (n_iter >= maxIter) then
-             !              		 	write(*,*) "Warning : not enough rays to converge !!"
-             !                  		lconverged = .true.
-             !               		end if
-             !           	   end if
              if (lfixed_rays) then
                 if (n_iter > 1000) then
                    write(*,*) "Warning Iterate_Jnu : not enough iterations to converge !!"

@@ -501,11 +501,11 @@ CONTAINS
     endif !if locupa_prob
 
     if (print_diff) then
-       write(*,'("max(rho)="(1E20.7E3)" m^-3"," min(rho)="(1E20.7E3)" m^-3")'), &
+       write(*,'("max(rho)="(1ES20.7E3)" m^-3"," min(rho)="(1ES20.7E3)" m^-3")'), &
         maxval(hydrogen%Abund*nHtot), minval(hydrogen%Abund*nHtot,mask=nHtot > 0)
-       write(*,'("Old max(nstar)="(1E20.7E3)" m^-3"," min(nstar)="(1E20.7E3)" m^-3")'), &
+       write(*,'("Old max(nstar)="(1ES20.7E3)" m^-3"," min(nstar)="(1ES20.7E3)" m^-3")'), &
        	maxval(max_nstar(:)), minval(min_nstar(:))
-       write(*,'("New max(nstar)="(1E20.7E3)" m^-3"," min(nstar)="(1E20.7E3)" m^-3")'), &
+       write(*,'("New max(nstar)="(1ES20.7E3)" m^-3"," min(nstar)="(1ES20.7E3)" m^-3")'), &
 		maxval(maxval(hydrogen%nstar(:,:),dim=2)),&
         minval(minval(hydrogen%nstar(:,:),dim=2,mask=hydrogen%nstar(:,:)>0))
     endif
@@ -721,11 +721,11 @@ CONTAINS
     !CALL write_ltepops_file(52, atom, 1)
 
     if (print_diff) then            
-       write(*,'("max(rho)="(1E20.7E3)" m^-3"," min(rho)="(1E20.7E3)" m^-3")'), &
+       write(*,'("max(rho)="(1ES20.7E3)" m^-3"," min(rho)="(1ES20.7E3)" m^-3")'), &
         maxval(atom%Abund*nHtot), minval(atom%Abund*nHtot,mask=nHtot > 0)
-       write(*,'("Old max(nstar)="(1E20.7E3)" m^-3"," min(nstar)="(1E20.7E3)" m^-3")'), &
+       write(*,'("Old max(nstar)="(1ES20.7E3)" m^-3"," min(nstar)="(1ES20.7E3)" m^-3")'), &
        	maxval(max_nstar(:)), minval(min_nstar(:))
-       write(*,'("New max(nstar)="(1E20.7E3)" m^-3"," min(nstar)="(1E20.7E3)" m^-3")'), &
+       write(*,'("New max(nstar)="(1ES20.7E3)" m^-3"," min(nstar)="(1ES20.7E3)" m^-3")'), &
 		maxval(maxval(atom%nstar(:,:),dim=2)),&
         minval(minval(atom%nstar(:,:),dim=2,mask=atom%nstar(:,:)>0))
     endif
