@@ -861,19 +861,39 @@ CONTAINS
     RETURN
   END SUBROUTINE read_Jnu_ascii
 
-  !building
-  SUBROUTINE read_Jnu()
-    ! -------------------------------------------- !
+
+  SUBROUTINE read_Jnu(ljnu_read)
+    ! ------------------------------------------------------ !
     ! read Jnu from previous calculations
     ! ATM assumes:
+    ! TODO change what is written and so what is read because
+    ! the fits can be large !
+    ! Jnu_cont is interpolated from Jnu (with lines so)
     !    1) Jnu is on the exact same wavelength grid
     !       and spatial grid as Itot
-    ! -------------------------------------------- !
+    !    2) Reads also Jnu_cont (Nlambda_cont) !
+    ! ----------------------------------------------------- !
+    logical, intent(inout) :: ljnu_read
     integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
     logical :: extend, simple, anynull
-    integer :: nelements, naxis2(4), Nl, naxis_found, hdutype, l, icell
+    integer :: nelements, naxis2(4), Nl, naxis_found, hdutype, la, icell, sys_status
     character(len=256) :: some_comments
-    real(kind=dp), dimension(:), allocatable :: Jtmp
+    character(len=512) :: cmd
+
+    
+    !futur deprecation of lread_jnu_atom and ascii
+    
+    !check if data file already exist, otherwise lead and return .false.
+    cmd = "ls "//trim(Jnu_File)
+    call appel_syst(cmd, sys_status)
+    if (sys_status == 0) then !means the file exist
+       write(*,*) " Reading old Jnu.fits.gz file"
+       ljnu_read = .true.
+    else
+       write(*,*) " found no Jnu.fits.gz"
+       ljnu_read = .false.
+       return
+    endif
 
     !get unique unit number
     status = 0
@@ -894,7 +914,31 @@ CONTAINS
 
 
     if (lVoronoi) then
-       CALL error("read_Jnu: Voronoi not supported yet")
+       naxis = 2
+
+       ! number of axes
+       call ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
+       if (status > 0) then
+          write(*,*) "error reading number of axis (naxis)"
+          call print_error(status)
+          stop
+       endif
+
+       call ftgkyj(unit, "NAXIS1", Nl, some_comments, status)
+       if (status > 0) then
+          write(*,*) "error reading ncells from file (naxis1)"
+          call print_error(status)
+          stop
+       endif
+       nelements = Nl
+       
+       call ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
+       if (status > 0) then
+          write(*,*) "error reading ncells from file (naxis1)"
+          call print_error(status)
+          stop
+       endif
+
     else
        if (l3D) then
           naxis = 4
@@ -971,19 +1015,26 @@ CONTAINS
        CALL Warning("Jnu size does not match actual grid")
     endif
 
-    CALL FTG2Dd(unit,1,-999,shape(Jnu_cont),Nl,n_Cells,Jnu,anynull,status)
+    CALL FTG2Dd(unit,1,-999,shape(Jnu),Nl,n_cells,Jnu,anynull,status)
     if (status > 0) then
        write(*,*) "Read_Jnu cannot read Jnu "
        CALL print_error(status)
     endif
+    
+    
+    do icell=1, n_cells
+    	Jnu_cont(:,icell) = 0.0_dp
+    	if (icompute_atomRT(icell) > 0) then
 
-    !     if (lelectron_scattering) then
-    !     	write(*,*) "-> Initialize electron scattering emissivity"
-    !     	do l=1, n_cells
-    !     		eta_es(:,l) = eta_es(:,l) * thomson(l)
-    !     	enddo
-    !     endif
-
+          CALL bezier3_interp(Nlambda, lambda, Jnu(:,icell), Nlambda_cont, lambda_cont, Jnu_cont(:,icell))
+    	
+    	endif
+    enddo
+    
+    write(*,'("Jnu (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
+		maxval(maxval(Jnu(:,:),dim=2)), minval(minval(Jnu,dim=2,mask=Jnu>0))
+    write(*,'("Jnuc (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
+		maxval(maxval(Jnu_cont(:,:),dim=2)), minval(minval(Jnu_cont,dim=2,mask=Jnu_cont>0))
 
     CALL ftclos(unit, status) !close
     if (status > 0) then
@@ -1006,21 +1057,26 @@ CONTAINS
     ! ------------------------------------ !
     integer :: unit, status = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
     logical :: extend, simple
-    integer :: nelements, icell, alloc_status
-    !   real(kind=dp), dimension(:,:), allocatable :: J_to_write
+    integer :: nelements, icell, alloc_status, sys_status
+    character(len=512) :: cmd
 
     !written only if lelectron_scattering or if nlte loop activated, in that case, Jnu_total
     !is computed
     if ((.not. lelectron_scattering).and.(Nactiveatoms==0)) return
+
     write(*,*) " Writing mean intensity... "
+    !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
+    cmd = "ls "//trim(Jnu_file)
+    call appel_syst(cmd, sys_status)
+    if (sys_status == 0) then !means the file exist
 
-    !   allocate(J_to_write(Nlambda, n_cells), stat=alloc_status)
-    !   if (alloc_status > 0) call error("Allocation error J_to_write")
+       cmd = "mv "//trim(Jnu_file)//" "//"Jnu_old.fits.gz"
+       call appel_syst(cmd, sys_status)
+       if (sys_status /= 0) then
+          call error("Error in copying old Jnu!")
+       endif
 
-    !   J_to_write(:,:) = 0.0_dp
-    !   do icell=1, n_cells
-    !   	if (icompute_atomRT(icell)>0) J_to_write(:,icell) = Jnu(:,icell)!eta_es(:,icell) / thomson(icell)
-    !   enddo
+    endif
 
     !get unique unit number
     CALL ftgiou(unit,status)
@@ -1056,11 +1112,7 @@ CONTAINS
     CALL ftinit(unit,trim(Jnu_file),blocksize,status)
 
     CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-    ! Additional optional keywords
-    !   CALL ftpkys(unit, "Jc(nu)", "W.m-2.Hz^-1.sr^-1", ' ', status)
     CALL ftpkys(unit, "J", "W.m-2.Hz^-1.sr^-1", ' ', status)
-    !write data
-    !   CALL ftpprd(unit,group,fpixel,nelements,J_to_write,status)
     CALL ftpprd(unit,group,fpixel,nelements,Jnu,status)
 
     !Jnu_cont
@@ -1082,7 +1134,6 @@ CONTAINS
     CALL ftfiou(unit, status)
 
     if (status > 0) CALL print_error(status)
-    !   deallocate(J_to_write)
 
     RETURN
   END SUBROUTINE write_Jnu
