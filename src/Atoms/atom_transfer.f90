@@ -2566,7 +2566,7 @@ contains
     logical, intent(in) :: labs
     real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
     real(kind=dp), dimension(size(Ic(:,1))) :: LimbD
-    real(kind=dp), dimension(size(Ic(:,1))) :: tau_c!, tau
+    real(kind=dp), dimension(size(Ic(:,1))) :: tau_c
     integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
     logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars, eval_operator
 
@@ -2601,8 +2601,6 @@ contains
           lcellule_non_vide=.false.
        endif
 
-       !if (minval(tau_c) > 50.) return
-
        ! Test sortie ! "The ray has reach the end of the grid"
        if (test_exit_grid(icell, x0, y0, z0)) return
 
@@ -2633,14 +2631,17 @@ contains
           ! opacities in m^-1
           l_contrib = l_contrib * AU_to_m !l_contrib in m
 
-          Ic(:,id) = Ic(:,id) + exp(-tau_c) * (1.0_dp - exp(-l_contrib * kappa_tot(:,icell))) * Snu(:,icell)
-
           if ((nbr_cell == 1).and.labs) then
              ds(iray,id) = l * AU_to_m
           endif
 
           !tau = tau + dtau
-          tau_c = tau_c + l_contrib * kappa_tot(:,icell)
+!           Ic(:,id) = Ic(:,id) + exp(-tau_c) * (1.0_dp - exp(-l_contrib * kappa_tot(:,icell))) * Snu(:,icell)
+!           tau_c = tau_c + l_contrib * kappa_tot(:,icell)
+          do la=1, Nlambda_cont
+          	Ic(la,id) = Ic(la,id) + (exp(-tau_c(la)) - exp(-l_contrib * kappa_tot(la,icell)-tau_c(la))) * Snu(la,icell)
+          	tau_c(la) = tau_c(la) + l_contrib * kappa_tot(la,icell)
+          enddo
 
        end if  ! lcellule_non_vide
        icell_prev = icell
@@ -2662,10 +2663,10 @@ contains
     integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
     logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lprevious_converged
     
-    logical :: write_convergence_file, lcalc_anisotropy, lwrite_jnu_cont_ascii
+    logical :: lcalc_anisotropy, lwrite_jnu_cont_ascii
 
     real :: rand, rand2, rand3
-    real(kind=dp) :: dSource, dN
+    real(kind=dp) :: dSource, dN, dj_loc
     real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dJ, diffs
     real(kind=dp), allocatable :: Jold(:,:), Jnew(:,:), tau_tot(:,:), Jnew_l(:,:), Jold_l(:,:)
     real(kind=dp), allocatable :: Snew(:,:), Kappa_tot(:,:), beta(:,:), Istar(:), Ic(:,:,:), J20_cont(:,:)
@@ -2677,7 +2678,7 @@ contains
     real(kind=dp) :: lambda_max, weight
 
 
-    write(*,*) "   --> Lambda iterating Jnu with Nlambda ", Nlambda_cont
+    write(*,'("   --> Solving the continuum scattering (isotropic) problem with "(1I5)" lambda!")') Nlambda_cont
     !Non-LTE loop with starting solution for Jnu
     if (NactiveAtoms > 0) then
        if (lfixed_J) then
@@ -2692,8 +2693,6 @@ contains
 
     write(*,*) "   precision in J is ", precision
     
-    !->large debug arrays in ascii format if .true.
-    write_convergence_file = .false.
     lcalc_anisotropy = .false. !TD set to fits
 	lwrite_jnu_cont_ascii = .false. !TD set to fits
 
@@ -2781,12 +2780,6 @@ contains
     ds = 0.0_dp !meters
 
 
-
-    if (write_convergence_file ) then
-       open(unit=20, file="Jnu_convergence.s", status="unknown")
-       write(20,*) " Nlam:", Nlambda, " Ncells:", n_cells
-    endif
-
     do etape=etape_start, etape_end
     
        if (etape==1) then
@@ -2854,8 +2847,6 @@ contains
 !           call error("step 1 only in iterate_Jnu")
 !        end if
 
-       if (write_convergence_file ) write(20,*) "step:", etape, " nrays:", n_rayons
-
 
        lnotfixed_rays = .not.lfixed_rays
        lconverged = .false.
@@ -2874,7 +2865,6 @@ contains
           	end do
           end if
 
-          if (write_convergence_file ) write(20,*) " -> Iteration #", n_iter
           imax = 1
           imax_s = 1
 
@@ -2977,77 +2967,99 @@ contains
           !$omp end parallel
 
 
-
-          !should be para
+		  write(*,*) " Convergence test do"
           diff = 0d0
           dSource = 0.0_dp
+          !$omp parallel &
+          !$omp default(none) &
+          !$omp private(id,icell, la, dJ, dN, dj_loc) &
+          !$omp shared(icompute_atomRT, Jold, Jnu_cont, Sold, Snew, lcell_converged) &
+          !$omp shared(Nlambda_cont, n_cells, dSource, diff, icell_max, precision, imax)
+          !$omp do schedule(static,1)
           cell_loop2 : do icell=1, n_cells
-
+             !$ id = omp_get_thread_num() + 1
              if (icompute_atomRT(icell)>0) then
-
-                dN = maxval(abs(Snew(:,icell) - Sold(:,icell))/Snew(:,icell))
+                dJ = 0.0_dp
+                dN = 0.0_dp
+                do la=1, Nlambda_cont
+					 dj_loc = abs( 1.-Jold(la,icell)/Jnu_cont(la,icell) )
+					 if (dj_loc > dJ) then
+					 	dJ = dj_loc
+					 	imax = la
+					 endif
+                   dN = max( dN, abs( 1.0_dp - Sold(la,icell)/Snew(la,icell) ) )
+         	 	   Sold(la,icell) = Snew(la,icell)
+          		   Jold(la,icell) = Jnu_cont(la,icell)
+                enddo
                 dSource = max(dSource, dN)
 
-                ! 						dN = 0.0_dp
-                dJ = 0.0_dp
-                do la=1, Nlambda_cont
-                   ! 							if (Snew(la,icell) > 0) then
-                   ! 								dN = max(dN, abs(1.0 - Sold(la,icell) / Snew(la,icell)))
-                   ! 								imax = locate(abs(1.0 - Sold(:,icell) / Snew(:,icell)), dN)
-                   ! 							endif
-
-                   if (Jnu_cont(la, icell) > 0) then
-                      dJ = max(dJ,abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
-                      imax = locate(abs(1.-Jold(:,icell)/Jnu_cont(:,icell)),abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
-                   endif
-                enddo
-
-                !if (mod(icell,10)==0)
-                ! 						write(*,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
-                if (write_convergence_file ) write(20,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
                 if (dJ > diff) then
                    diff = dJ
                    icell_max = icell
                 endif
                 lcell_converged(icell) = (real(dJ) < precision)
-                ! 						if (dN > diff) then
-                ! 						  diff = dN
-                ! 						  icell_max = icell
-                ! 						  dSource = diff
-                ! 						endif
-                !      					lcell_converged(icell) = (real(dN) < precision)
-
              end if
-
           end do cell_loop2 !icell
-          Sold(:,:) = Snew(:,:)
-          Jold(:,:) = Jnu_cont(:,:)
+          !$omp end do
+          !$omp end parallel
+          
+!           diff = 0d0
+!           dSource = 0.0_dp
+!           cell_loop2 : do icell=1, n_cells
+! 
+!              if (icompute_atomRT(icell)>0) then
+! 
+!                 dN = maxval(abs(Snew(:,icell) - Sold(:,icell))/Snew(:,icell))
+!                 dSource = max(dSource, dN)
+! 
+!                 ! 						dN = 0.0_dp
+!                 dJ = 0.0_dp
+!                 do la=1, Nlambda_cont
+!                    ! 							if (Snew(la,icell) > 0) then
+!                    ! 								dN = max(dN, abs(1.0 - Sold(la,icell) / Snew(la,icell)))
+!                    ! 								imax = locate(abs(1.0 - Sold(:,icell) / Snew(:,icell)), dN)
+!                    ! 							endif
+! 
+!                    if (Jnu_cont(la, icell) > 0) then
+!                       dJ = max(dJ,abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
+!                       imax = locate(abs(1.-Jold(:,icell)/Jnu_cont(:,icell)),abs(1.-Jold(la,icell)/Jnu_cont(la,icell)))
+!                    endif
+!                 enddo
+! 
+!                 !if (mod(icell,10)==0)
+!                 ! 						write(*,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
+!                 if (write_convergence_file ) write(20,'((1I5)" ::> dJ="(1ES14.5E3), " Jmax="(1ES14.5E3), " Jmin="(1ES14.5E3), " beta="(1ES14.5E3))') icell, real(dJ), maxval(Jnu_cont(:,icell)), minval(Jnu_cont(:,icell)), maxval(beta(:,icell))
+!                 if (dJ > diff) then
+!                    diff = dJ
+!                    icell_max = icell
+!                 endif
+!                 lcell_converged(icell) = (real(dJ) < precision)
+!                 ! 						if (dN > diff) then
+!                 ! 						  diff = dN
+!                 ! 						  icell_max = icell
+!                 ! 						  dSource = diff
+!                 ! 						endif
+!                 !      					lcell_converged(icell) = (real(dN) < precision)
+! 
+!          	 	Sold(:,icell) = Snew(:,icell)
+!           		Jold(:,icell) = Jnu_cont(:,icell)
+!              end if
+!           end do cell_loop2 !icell
+!           Sold(:,:) = Snew(:,:)
+!           Jold(:,:) = Jnu_cont(:,:)
+		  write(*,*) " Convergence test enddo"
 
           write(*,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') &
                dSource, T(icell_max), ne(icell_max)
-          if (write_convergence_file ) &
-               write(20,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') &
-               dSource, T(icell_max), ne(icell_max)
           write(*,'("  -- beta ="(1ES14.5E3))') beta(imax,icell_max)
-          if (write_convergence_file ) write(20,'("  -- beta="(1ES14.5E3))') beta(imax,icell_max)
-          write(*,'(" >>> icell_max "(1I5)," lambda="(1F14.7) " nm"," dJ="(1ES14.5E3))') icell_max, lambda(imax), diff
-          if (write_convergence_file ) write(20,'(" >>> icell_max "(I1)," lambda="(1F14.7)" nm"," dJ="(1ES14.5E3))') &
-               icell_max, lambda(imax), diff
-
+          write(*,'(" >>> icell_max "(1I7)," lambda="(1F14.7) " nm"," dJ="(1ES14.5E3))') icell_max, lambda(imax), diff
 
           write(*,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
                maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
           write(*,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
                maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
-          if (write_convergence_file ) write(20,'(" @icell_max : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
-               maxval(Jnu_cont(:,icell_max)), minval(Jnu_cont(:,icell_max))
-          if (write_convergence_file ) write(20,'(" global     : Jmax="(1ES14.5E3)," Jmin="(1ES14.5E3) )') &
-               maxval(Jnu_cont(:,:)), minval(Jnu_cont(:,:))
-          write(*,"('# unconverged cells :'(1I5), '('(1F12.3)' %)')") &
-               size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
-               100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
-               real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
-          if (write_convergence_file ) write(20,"('# unconverged cells : '(1I5), '('(1F12.3)' %)')") &
+
+          write(*,"('# unconverged cells :'(1I7), '('(1F12.3)' %)')") &
                size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
                100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
@@ -3083,7 +3095,6 @@ contains
        end do !while
        write(*,*) etape, "Threshold =", precision
     end do !over etapes
-    if (write_convergence_file ) close(20)
 
 
     !For non-LTE loop
