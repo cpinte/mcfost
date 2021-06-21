@@ -646,6 +646,9 @@ contains
   ! 	end subroutine fill_map
 
   subroutine dealloc_spectrum()
+  
+  
+    call dealloc_jnu
 
     deallocate(lambda)
     if (allocated(lambda_cont)) deallocate(lambda_cont)

@@ -1269,23 +1269,24 @@ contains
 
           if (lelectron_scattering) then
 
-             !    call alloc_jnu(.false.) -> already allocated in alloc_spectrum
              if (lread_jnu_atom) then
                 call read_jnu(ljnu_read)
-             else
+                !still starts electron scattering from this value!
+                !does not jump at the image calculation yet.
+             endif
+             !else
                 call iterate_Jnu()
                 call write_Jnu
                 if (lstop_after_jnu) then
                    write(*,*) " Jnu calculation done."
                    stop
                 endif
-             endif !lelectron scattering
+             !endif !lread_jnu_atom
 
           endif !electron scatt
+          
        endif !atomic lines transfer with either lte or nlte populations
        !using the same grid as the nlte loop
-
-
     endif !NLTE
 
     !for all so after nlte case (debug)
@@ -1367,18 +1368,11 @@ contains
     ! 		call write_taur(500._dp,0._dp,0._dp,1.0_dp)
     ! 	endif
 
-    if (lelectron_scattering.and.(NactiveAtoms==0)) then !otherwise if active, written even if not included in emissivity
-       !Jnu is written to ascii file if read
-       call write_Jnu
-       call dealloc_Jnu()
-    endif
-
-    if (allocated(psi_mean)) deallocate(psi_mean, chi_loc)
     ! ------------------------------------------------------------------------------------ !
     ! ------------------------------------------------------------------------------------ !
     ! -------------------------------- CLEANING ------------------------------------------ !
+    if (allocated(psi_mean)) deallocate(psi_mean, chi_loc)
     if (allocated(QUV)) deallocate(QUV)
-
     call dealloc_Spectrum !deallocate spectral variables
     call dealloc_atomic_atmos
     NULLIFY(Profile, Voigt, INTEG_RAY_LINE)
