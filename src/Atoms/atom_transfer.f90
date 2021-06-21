@@ -63,7 +63,7 @@ module atom_transfer
   use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
   use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, &
        masseH, kb, sigma, Lsun, rsun_to_au, au_to_rsun, c_light
-  use utils, only				: rotation_3d, cross_product
+  use utils, only				: rotation_3d, cross_product, progress_bar
   use naleat, only 			: seed, stream, gtype
   use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k, area
   use messages, only 			: error, warning
@@ -2673,7 +2673,7 @@ contains
     real(kind=dp), allocatable :: lambda_star(:,:), Sth(:,:), Sold(:,:), Sline(:,:), delta_J(:)
 
     logical :: labs, l_iterate
-    integer :: la, icell, imax, icell_max, icell_max_s, imax_s
+    integer :: la, icell, imax, icell_max, ibar, n_cells_done
     integer :: imu, iphi
     real(kind=dp) :: lambda_max, weight
 
@@ -2855,6 +2855,8 @@ contains
        do while (.not.lconverged)
 
           n_iter = n_iter + 1
+          ibar = 0
+          n_cells_done = 0
 
           write(*,*) " -> Iteration #", n_iter, " Step #", etape
 
@@ -2865,15 +2867,14 @@ contains
           	end do
           end if
 
-          imax = 1
-          imax_s = 1
 
+          call progress_bar(0)
           !$omp parallel &
           !$omp default(none) &
           !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,iphi,imu) &
           !$omp private(argmt,norme, icell, delta_J, l_iterate,weight) &
           !$omp shared(Voronoi, lambda_cont, lambda_star, Snew, Sold, Sth, Istar, xmu,wmu, xmux, xmuy) &
-          !$omp shared(lkeplerian,n_iter,gtype, nb_proc,seed,etoile) &
+          !$omp shared(lkeplerian,n_iter,gtype, nb_proc,seed,etoile,ibar, n_cells_done) &
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
           !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, chi_c, Ic,icompute_atomRT,J20_cont) &
           !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,lcalc_anisotropy, lvoronoi)
@@ -2962,9 +2963,20 @@ contains
                            * Ic(:,1,id) * weight
              endif !icompute_AtomRT
 
+             ! Progress bar
+             !$omp atomic
+             n_cells_done = n_cells_done + 1
+             if (real(n_cells_done) > 0.02*ibar*n_cells) then
+             	call progress_bar(ibar)
+            	!$omp atomic
+             	ibar = ibar+1
+             endif
+
           end do !icell
           !$omp end do
           !$omp end parallel
+          call progress_bar(50)
+
 
 
 		  write(*,*) " Convergence test do"
