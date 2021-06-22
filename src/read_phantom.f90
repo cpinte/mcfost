@@ -318,6 +318,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
                          read(iunit,iostat=ierr) xyzmh_ptmass(5,1:nptmass)
                       case('mdotav')
                          read(iunit,iostat=ierr) xyzmh_ptmass(16,1:nptmass)
+                         print*, 'read mdot. Mdot=', xyzmh_ptmass(16,1:nptmass)
                       case('vx')
                          read(iunit,iostat=ierr) vxyz_ptmass(1,1:nptmass)
                       case('vy')
@@ -326,6 +327,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
                          read(iunit,iostat=ierr) vxyz_ptmass(3,1:nptmass)
                       case default
                          matched = .false.
+                         read(iunit,iostat=ierr)
                       end select
                    else
                       matched = .false.
@@ -373,7 +375,9 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
     print*, 'Using temperature from phantom temperature writeout'
  elseif(got_u) then
     print*, 'Calculating temperature from u'
-    gastemperature = vxyzu(4,:) * 2./3.*gmw*amu/kb * (100.*udist/utime)**2
+    ! Phantom uses erg/g for u, and mcfost uses J/K for kb.
+    gastemperature = vxyzu(4,:) * 2./3.*gmw*amu/kb*erg_to_J * (udist/utime)**2
+    print*, 'maximum temperatur = ', maxval(gastemperature)
  else
     print*, 'Gas temperature not found, setting to T=cmb to avoid dust sublimation'
     gastemperature = 2.74
