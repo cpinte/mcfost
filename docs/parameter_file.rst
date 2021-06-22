@@ -426,19 +426,15 @@ Star properties
 * ``x``, ``y``, ``z``: position of the star, in au. If this is not (0,0,0), the
   image symmetries must be set to F
 
-* ``is_blackbody``: is the stellar emission approximated by a blackbody
-  of temperature Temp? If not, the stellar spectrum indicated in the
-  following line is used instead
+* ``automatic_spectrum?``: should the stellar spectrum estimated automatically from the effective temperature and radius ?
+  If not, the stellar spectrum indicated in the following line is used instead
 
   .. note:: ``Teff`` vs stellar atmosphere model. The effective
           temperature is only used to compute the total stellar
           luminosity and it doesn't need to match the atmosphere
-          model. In practice, the atmosphere model shoud be chosen
-          with the effective temperature closest to the target's, use
-          the same ``Teff`` and adjust ``Rstar`` to get the right
-          Lstar. However, one could use more precise numbers for both
-          Teff and Rstar (when available in the literature, for
-          instance).
+          model. In practice, the atmosphere model will be chosen
+          with the effective temperature closest to the target's. In any case, the luminosity will be set by
+          ``Teff`` and ``Rstar`` (assuming there is no UV excess).
 
 
 * ``fUV, slope_fUV:`` photospheric UV excess and its slope in Fnu.
