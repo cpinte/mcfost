@@ -1027,6 +1027,7 @@ CONTAINS
     
     !interpolating on total grid.
     !Later, interpolated locally if Jnu is flat !
+    write(*,*) " **** Interpolating Jnuc onto lambda grid!"
     do icell=1, n_cells
     	Jnu(:,icell) = 0.0_dp
     	if (icompute_atomRT(icell) > 0) then
@@ -1035,6 +1036,7 @@ CONTAINS
     	
     	endif
     enddo
+    write(*,*) " ***done."
 
     write(*,'("Jnuc (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
 		maxval(maxval(Jnu_cont(:,:),dim=2)), minval(minval(Jnu_cont,dim=2,mask=Jnu_cont>0))
