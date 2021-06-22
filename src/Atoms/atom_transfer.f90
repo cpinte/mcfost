@@ -36,7 +36,7 @@ module atom_transfer
   use profiles, only			: profile, local_profile_v, local_profile_thomson, local_profile_interp, local_profile_dk
   use io_atomic_pops, only	: write_pops_atom, write_electron, read_electron, write_hydrogen, write_Hminus, &
        write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
-  use io_opacity, only 		: write_Jnu, write_taur, write_contrib_lambda_ascii, read_jnu_ascii, Jnu_File_ascii, read_Jnu, &
+  use io_opacity, only 		: write_Jnu, write_Jnu_cont, write_taur, write_contrib_lambda_ascii, read_Jnu_cont, read_Jnu, &
        write_collision_matrix_atom, write_collision_matrix_atom_ascii, &
        write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii, write_opacity_emissivity_map
   use math
@@ -1240,7 +1240,10 @@ contains
        enddo
        if (loutput_rates) deallocate(Rij_all,Rji_all,Gammaij_all)
 
-       if (lelectron_scattering) call write_Jnu
+       if (lelectron_scattering) then
+       	call write_Jnu_cont
+       	call write_Jnu!futur deprec if not needed
+       endif
 
        !->> Case of ltab or not and add chi_c_nlte and eta_c_nlte
        !then if ltab_wavelength_image ...
@@ -1269,14 +1272,15 @@ contains
 
           if (lelectron_scattering) then
 
+			 !Here Jnu is flat across lines so we only need Jnu_cont to be written
              if (lread_jnu_atom) then
-                call read_jnu(ljnu_read)
+                call read_jnu_cont(ljnu_read)
                 !still starts electron scattering from this value!
                 !does not jump at the image calculation yet.
              endif
              !else
                 call iterate_Jnu()
-                call write_Jnu
+                call write_Jnu_cont
                 if (lstop_after_jnu) then
                    write(*,*) " Jnu calculation done."
                    stop
