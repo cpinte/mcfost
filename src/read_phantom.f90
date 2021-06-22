@@ -322,6 +322,7 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
                          read(iunit,iostat=ierr) vxyz_ptmass(3,1:nptmass)
                       case default
                          matched = .false.
+                         read(iunit,iostat=ierr)
                       end select
                    else
                       matched = .false.
@@ -366,12 +367,14 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
  endif
 
  if (got_temperature) then
-    print*, 'Using temperature from phantom temperature writeout'
+    write(*,*) 'Using temperature from phantom temperature writeout'
  elseif(got_u) then
-    print*, 'Calculating temperature from u'
-    gastemperature = vxyzu(4,:) * 2./3.*gmw*amu/kb * (100.*udist/utime)**2
+    write(*,*) 'Calculating temperature from u'
+    ! Phantom uses erg/g for u, and mcfost uses J/K for kb.
+    gastemperature = vxyzu(4,:) * 2./3.*gmw*amu/kb*erg_to_J * (udist/utime)**2
+    write(*,*) 'Maximum temperature = ', maxval(gastemperature)
  else
-    print*, 'Gas temperature not found, setting to T=cmb to avoid dust sublimation'
+    write(*,*) 'Gas temperature not found, setting to T=cmb to avoid dust sublimation'
     gastemperature = 2.74
  endif
 
@@ -667,7 +670,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,&
   endif
 
   gastemperature = 2.74
-  print*, 'Gas temperature not read from hdf files, setting to T=cmb to avoid dust sublimation'
+  write(*,*) 'Gas temperature not read from hdf files, setting to T=cmb to avoid dust sublimation'
 
   write(*,*) "Found", nptmass, "point masses in the phantom file"
 
