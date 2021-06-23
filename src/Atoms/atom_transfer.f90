@@ -2666,8 +2666,12 @@ contains
     logical :: labs, l_iterate
     integer :: la, icell, imax, icell_max, ibar, n_cells_done
     integer :: imu, iphi
+    
+    integer :: omp_chunk_size
+    
     real(kind=dp) :: lambda_max, weight
 
+	omp_chunk_size = nint( 0.01 * n_cells / nb_proc )
 
     write(*,'("   --> Solving the continuum scattering (isotropic) problem with "(1I5)" lambda!")') Nlambda_cont
     !Non-LTE loop with starting solution for Jnu
@@ -2683,6 +2687,7 @@ contains
     endif
 
     write(*,*) "   precision in J is ", precision
+    write(*,*) " Dynamic scheduling chunk size!", omp_chunk_size
     
     lcalc_anisotropy = .false. !TD set to fits
 	lwrite_jnu_cont_ascii = .false. !TD set to fits
@@ -2848,7 +2853,7 @@ contains
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
           !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, chi_c, Ic,icompute_atomRT,J20_cont) &
           !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,lcalc_anisotropy, lvoronoi)
-          !$omp do schedule(dynamic,1) !!static, 1
+          !$omp do schedule(dynamic)!!,omp_chunk_size) !!static, 1
           do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
 
@@ -2956,7 +2961,7 @@ write(*,*) "debug : do convergence"
           !$omp private(id,icell, la, dJ, dN, dj_loc) &
           !$omp shared(icompute_atomRT, Jold, Jnu_cont, Sold, Snew, lcell_converged) &
           !$omp shared(Nlambda_cont, n_cells, dSource, diff, icell_max, precision, imax)
-          !$omp do schedule(dynamic,1) !!static, 1
+          !$omp do schedule(dynamic)!!, omp_chunk_size)
           cell_loop2 : do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
              if (icompute_atomRT(icell)>0) then
