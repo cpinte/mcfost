@@ -2853,6 +2853,7 @@ contains
              !$ id = omp_get_thread_num() + 1
 
              if (icompute_atomRT(icell)>0) then
+             	write(*,*) " cell", icell, " id = ", id + 1
                 Jnu_cont(:,icell) = 0.0_dp
                 Snew(:,icell) = 0.0_dp
                 lambda_star(:,id) = 0.0_dp
@@ -2946,7 +2947,7 @@ contains
           !$omp end do
           !$omp end parallel
           call progress_bar(50)
-
+write(*,*) "debug : do convergence"
           !convergence!		
           diff = 0d0
           dSource = 0.0_dp
@@ -2982,6 +2983,7 @@ contains
           end do cell_loop2 !icell
           !$omp end do
           !$omp end parallel
+write(*,*) "debug : enddo convergence"
 
 
           write(*,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') &
