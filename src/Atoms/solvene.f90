@@ -390,7 +390,7 @@ CONTAINS
     !$omp private(dne, akj, id, ne0, elem, n0) &
     !$omp shared(n_cells, Elements, ne_initial_solution,Hydrogen, ZM, unconverged_cells, Nelem) &
     !$omp shared(ne, T, icompute_atomRT, nHtot, epsilon, max_f_HII, min_f_HII, ik_max, max_fjk)
-    !$omp do
+    !$omp do schedule(dynamic) !!without schedule
     do k=1,n_cells
        !$ id = omp_get_thread_num() + 1
 
