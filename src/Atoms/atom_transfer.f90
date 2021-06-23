@@ -2832,9 +2832,9 @@ contains
 
           if (lfixed_rays) then
           stream = 0.0
-!           	do i=1,nb_proc
-!           		stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-!           	end do
+          	do i=1,nb_proc
+          		stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+          	end do
           end if
 
 
@@ -2848,7 +2848,7 @@ contains
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
           !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, chi_c, Ic,icompute_atomRT,J20_cont) &
           !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,lcalc_anisotropy, lvoronoi)
-          !$omp do schedule(static,1)
+          !$omp do schedule(dynamic,1) !!static, 1
           do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
 
@@ -2956,7 +2956,7 @@ write(*,*) "debug : do convergence"
           !$omp private(id,icell, la, dJ, dN, dj_loc) &
           !$omp shared(icompute_atomRT, Jold, Jnu_cont, Sold, Snew, lcell_converged) &
           !$omp shared(Nlambda_cont, n_cells, dSource, diff, icell_max, precision, imax)
-          !$omp do schedule(static,1)
+          !$omp do schedule(dynamic,1) !!static, 1
           cell_loop2 : do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
              if (icompute_atomRT(icell)>0) then
