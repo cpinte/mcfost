@@ -2832,9 +2832,9 @@ contains
 
           if (lfixed_rays) then
           stream = 0.0
-          	do i=1,nb_proc
-          		stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-          	end do
+!           	do i=1,nb_proc
+!           		stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+!           	end do
           end if
 
 
@@ -2853,7 +2853,7 @@ contains
              !$ id = omp_get_thread_num() + 1
 
              if (icompute_atomRT(icell)>0) then
-             	write(*,*) " cell", icell, " id = ", id + 1
+             	write(*,*) " cell", icell, " id = ", id
                 Jnu_cont(:,icell) = 0.0_dp
                 Snew(:,icell) = 0.0_dp
                 lambda_star(:,id) = 0.0_dp
