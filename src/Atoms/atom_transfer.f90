@@ -2853,12 +2853,12 @@ contains
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
           !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, chi_c, Ic,icompute_atomRT,J20_cont) &
           !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,lcalc_anisotropy, lvoronoi)
-          !$omp do schedule(dynamic)!!,omp_chunk_size) !!static, 1
+          !$omp do schedule(dynamic,omp_chunk_size) !!static, 1
           do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
 
              if (icompute_atomRT(icell)>0) then
-             	write(*,*) " cell", icell, " id = ", id
+!              	write(*,*) " cell", icell, " id = ", id
                 Jnu_cont(:,icell) = 0.0_dp
                 Snew(:,icell) = 0.0_dp
                 lambda_star(:,id) = 0.0_dp
@@ -2961,7 +2961,7 @@ write(*,*) "debug : do convergence"
           !$omp private(id,icell, la, dJ, dN, dj_loc) &
           !$omp shared(icompute_atomRT, Jold, Jnu_cont, Sold, Snew, lcell_converged) &
           !$omp shared(Nlambda_cont, n_cells, dSource, diff, icell_max, precision, imax)
-          !$omp do schedule(dynamic)!!, omp_chunk_size)
+          !$omp do schedule(dynamic, omp_chunk_size)
           cell_loop2 : do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
              if (icompute_atomRT(icell)>0) then
