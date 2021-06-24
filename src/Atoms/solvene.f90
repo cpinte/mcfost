@@ -29,6 +29,7 @@ MODULE solvene
   use mcfost_env, only : dp
   use constantes, only : tiny_dp, huge_dp
   use parametres, only : n_cells
+  use utils, only : progress_bar
   !$ use omp_lib
 
   IMPLICIT NONE
@@ -368,12 +369,15 @@ CONTAINS
     real(kind=dp):: ne_oldM, UkM, PhiHmin, n0
     real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
     real(kind=dp), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk, min_fjk !Negative ions from -N_neg to 0 (H-), then from 1 to Nelem positive ions
-    integer :: n, k, niter, j, ZM, id
+    integer :: n, k, niter, j, ZM, id, ibar, n_cells_done, n_cells_skipped
     type (Element), pointer :: elem
     integer :: unconverged_cells(nb_proc), ik_max
 
     !!if (verbose) write(*,*) "Initial solution for electron loop:", ne_initial_solution
-
+    ibar = 0
+    n_cells_done = 0
+    n_cells_skipped = 0!size(pack(icompute_atomRT,mask=icompute_atomRT /= 1))
+    
     unconverged_cells(:) = 0
     id = 1
     ik_max = 0
@@ -384,16 +388,16 @@ CONTAINS
     max_f_HII = 0.0_dp
     max_fjk(:) = 0.0_dp
 
+    call progress_bar(0)
     !$omp parallel &
     !$omp default(none) &
     !$omp private(k,n,j,fjk,dfjk,ne_old,niter,delta,sum,PhiHmin,Uk,Ukp1,ne_oldM) &
     !$omp private(dne, akj, id, ne0, elem, n0) &
     !$omp shared(n_cells, Elements, ne_initial_solution,Hydrogen, ZM, unconverged_cells, Nelem) &
-    !$omp shared(ne, T, icompute_atomRT, nHtot, epsilon, max_f_HII, min_f_HII, ik_max, max_fjk)
+    !$omp shared(ne, T, icompute_atomRT, nHtot, epsilon, max_f_HII, min_f_HII, ik_max, max_fjk, ibar, n_cells_done, n_cells_skipped)
     !$omp do schedule(dynamic) !!without schedule
     do k=1,n_cells
        !$ id = omp_get_thread_num() + 1
-
        ! 		if (icompute_atomRT(k) <= 0) cycle !transparent or dark
        ! 		if (icompute_atomRT(k)==2) then
        ! 			write(*,*) "id",id," skipping cell ", k, " for electron density! fixed values, ne = ", ne(k)
@@ -559,10 +563,21 @@ CONTAINS
           end if !convergence test
 
        end do !while loop
+       
+       ! Progress bar
+       !$omp atomic
+       n_cells_done = n_cells_done + 1
+       if (real(n_cells_done) > 0.02*ibar*(n_cells-n_cells_skipped)) then
+       	call progress_bar(ibar)
+       	!$omp atomic
+       	ibar = ibar+1
+       endif
 
     end do !loop over spatial points
     !$omp end do
     !$omp end parallel
+    call progress_bar(50)
+    write(*,*) " "
 
     if (verbose) then
        write(*,*) " ------------------------------------------------ "
