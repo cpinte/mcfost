@@ -81,6 +81,7 @@ module atom_transfer
   !  	real, parameter :: table_tau_min = 0.0, table_tau_max = 650.0
   !  	real(kind=dp), dimension(N_etau_table) :: table_etau, table_xtau
   !OpenMp and debug
+  integer :: omp_chunk_size
   real(kind=dp), allocatable :: convergence_map(:,:,:,:) !say, N_cells, Nlevel, Natom, Nstep
   integer, dimension(:), allocatable :: npix_x_id, npix_y_id, cell_id
   real(kind=dp), dimension(:,:,:), allocatable :: xyz_pos, uvw_pos, chi_loc
@@ -951,6 +952,10 @@ contains
     integer :: alloc_status
     real(kind=dp) :: lam0 = 500.0 !default
 
+    
+
+	omp_chunk_size = 1!max(nint( 0.01 * n_cells / nb_proc ),1)
+	write(*,*) "**debug omp_chunk_size:", omp_chunk_size
     !init at 0
     mem_alloc_tot = 0
 
@@ -1341,8 +1346,8 @@ contains
     if (laccretion_shock) deallocate(Iacc)
 
     if (allocated(origin_atom)) then
-       call write_lambda_cell_array(Nlambda, origin_atom, origin_file)
-       call write_lambda_cell_array(Nlambda_cont, originc_atom, originc_file)
+       call write_lambda_cell_array(Nlambda, origin_atom, origin_file,"W.m^-2.Hz^-1.sr^-1")
+       call write_lambda_cell_array(Nlambda_cont, originc_atom, originc_file,"W.m^-2.Hz^-1.sr^-1")
        deallocate(origin_atom,originc_atom)
     endif
 
@@ -1412,11 +1417,12 @@ contains
     type (AtomType), pointer :: atom
     integer(kind=8) :: mem_alloc_local = 0
     real(kind=dp) :: diff_cont
+    integer :: ibar, n_cells_done
 
     write(*,*) " USING MALI METHOD FOR NLTE LOOP"
 
     !only for step 1 at the moment
-    allocate(threeKminusJ(nlambda, n_cells))
+    !allocate(threeKminusJ(nlambda, n_cells))
     !or (nlambda, nb_proc) if only used locally as a threshold
     allocate(Jnu_loc(nlambda,nb_proc))
     id_ref = locate(lambda, 500.0_dp)
@@ -1638,6 +1644,8 @@ contains
 
           n_iter = n_iter + 1
           write(*,*) " -> Iteration #", n_iter, " Step #", etape
+          ibar = 0
+          n_cells_done = 0
           !!write(unit_invfile,*) "************************************************"
           !!write(unit_invfile,*) "step ", etape, ' iter ', n_iter
           !!write(unit_invfile,*) "************************************************"
@@ -1664,18 +1672,18 @@ contains
              l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
           endif
 
-
+          call progress_bar(0)
           !$omp parallel &
           !$omp default(none) &
           !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi)&
           !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight) &
-          !$omp shared(Voronoi,icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, threeKminusJ, psi_mean, psi, chi_loc, Jnu_loc) &
+          !$omp shared(Voronoi,icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, psi_mean, psi, chi_loc, Jnu_loc) &
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
           !$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, Jnu, xmu, xmux, xmuy,wmu,etoile,id_ref, xyz_pos,uvw_pos) &
           !$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity, l_iterate_ne) &
           !$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
-          !$omp shared(lvoronoi, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda)
-          !$omp do schedule(static,1)
+          !$omp shared(lvoronoi, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda, ibar, n_cells_done)
+          !$omp do schedule(dynamic,omp_chunk_size) !!static
           do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
              l_iterate = (icompute_atomRT(icell)>0)
@@ -1686,7 +1694,6 @@ contains
                    Jnew_cont(:,icell) = 0.0
                    !!psi_mean(:,icell) = 0.0
                 endif
-                threeKminusJ(:,icell) = 0.0
                 Jnu_loc(:,id) = 0.0
 
                 call fill_Collision_matrix(id, icell) !computes = C(i,j) before computing rates
@@ -1812,8 +1819,6 @@ contains
                          !!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
                       endif
 
-                      threeKminusJ(:,icell) = threeKminusJ(:,icell) +  &
-                           (3.0 * (u0*x0+v0*y0+w0*z0)**2/(x0**2+y0**2+z0**2) - 1.0) * Itot(:,1,id) * weight
                       Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
 
                       !for one ray
@@ -1830,8 +1835,6 @@ contains
 
 
                    enddo !imu
-                   !to remove
-                   threeKminusJ(:,icell) = 0.5 * threeKminusJ(:,icell) / Jnu_loc(:,id)
 
 
                 end if !etape
@@ -1849,11 +1852,24 @@ contains
                 endif
 
              end if !icompute_atomRT
+             
+             ! Progress bar
+             !$omp atomic
+             n_cells_done = n_cells_done + 1
+             if (real(n_cells_done) > 0.02*ibar*n_cells) then
+             	call progress_bar(ibar)
+             	!$omp atomic
+             	ibar = ibar+1
+             endif             
+             
           end do !icell
           !$omp end do
           !$omp end parallel
+          call progress_bar(50)
+          write(*,*) " " !for progress bar
 
           !Ng acceleration
+          !should be para
           accelerated = .false.
           if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(maxval(dM) < 1d-2))).and. &
                (maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
@@ -1923,6 +1939,9 @@ contains
              ! 							dne = max(dne, abs(1.0 - ne(icell)/ne_new(icell)))
              ! 						endif
              ! 					enddo
+             write(*,'("OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+             write(*,'("NEW ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne_new,mask=icompute_atomRT>0), maxval(ne_new)
+
              ne(:) = ne_new(:)
              !-> For all elements use the old version
 !!! WARNING NOT TESTED YET 05 April 2021 !!!!
@@ -2237,18 +2256,7 @@ contains
        if (allocated(ng_cur)) deallocate(ng_cur)
     endif
 
-    !if (lelectron_scattering) then
-    ! 		write(*,*) " Writing Jnu cont to ascii file..."
-    !   		open(unit=20, file=Jnu_File_ascii, status="unknown")
-    !   		write(20,*) n_cells, Nlambda_cont
-    !   		do icell=1, n_cells
-    !   			do la=1, Nlambda_cont
-    !     			write(20,'(1F12.5,5E20.7E3)') lambda_cont(la), Jnu_cont(la,icell), 0.0, thomson(icell)/(chi_c(la,icell)+chi_c_nlte(la,icell)), 0.0, 0.0
-    !    			enddo
-    !   		enddo
-    !   		close(20)
-    !   		write(*,*) "done"
-    !endif
+
     if (allocated(xyz_pos)) then
        ! 			open(unit=20,file="xyz_pos.txt",status="unknown")
        ! 			write(20,*) 1, 1
@@ -2265,22 +2273,22 @@ contains
        ! 			close(20)
     endif
 
-    if (allocated(threeKminusJ)) then
-       !only at id_ref until fits file
-       write(*,*) " Writing anisotropy to ascii file..."
-
-       open(unit=20, file="anis_ascii.txt", status="unknown")
-       write(20,*) n_cells, 1!Nlambda
-       do icell=1, n_cells
-          !do la=1, Nlambda
-          do la=id_ref,id_ref
-             write(20,'(1F12.5,5E20.7E3)') lambda(la), threeKminusJ(la,icell), 0.0, 0.0, 0.0, 0.0
-          enddo
-       enddo
-       close(20)
-       write(*,*) "done"
-       deallocate(threeKminusJ)
-    endif
+!     if (allocated(threeKminusJ)) then
+!        !only at id_ref until fits file
+!        write(*,*) " Writing anisotropy to ascii file..."
+! 
+!        open(unit=20, file="anis_ascii.txt", status="unknown")
+!        write(20,*) n_cells, 1!Nlambda
+!        do icell=1, n_cells
+!           !do la=1, Nlambda
+!           do la=id_ref,id_ref
+!              write(20,'(1F12.5,5E20.7E3)') lambda(la), threeKminusJ(la,icell), 0.0, 0.0, 0.0, 0.0
+!           enddo
+!        enddo
+!        close(20)
+!        write(*,*) "done"
+!        deallocate(threeKminusJ)
+!     endif
     if (allocated(psi_mean)) then
        write(*,*) " Writing <Psi> to ascii file..."
        open(unit=20, file="psim_ascii.txt", status="unknown")
@@ -2654,8 +2662,6 @@ contains
     integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
     logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lprevious_converged
     
-    logical :: lcalc_anisotropy, lwrite_jnu_cont_ascii
-
     real :: rand, rand2, rand3
     real(kind=dp) :: dSource, dN, dj_loc
     real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dJ, diffs
@@ -2666,12 +2672,10 @@ contains
     logical :: labs, l_iterate
     integer :: la, icell, imax, icell_max, ibar, n_cells_done
     integer :: imu, iphi
-    
-    integer :: omp_chunk_size
-    
     real(kind=dp) :: lambda_max, weight
+    
+    logical :: lcalc_anisotropy = .false.
 
-	omp_chunk_size = nint( 0.01 * n_cells / nb_proc )
 
     write(*,'("   --> Solving the continuum scattering (isotropic) problem with "(1I5)" lambda!")') Nlambda_cont
     !Non-LTE loop with starting solution for Jnu
@@ -2689,8 +2693,6 @@ contains
     write(*,*) "   precision in J is ", precision
     write(*,*) " Dynamic scheduling chunk size!", omp_chunk_size
     
-    lcalc_anisotropy = .false. !TD set to fits
-	lwrite_jnu_cont_ascii = .false. !TD set to fits
 
     if (allocated(ds)) deallocate(ds)
 
@@ -2836,7 +2838,7 @@ contains
           write(*,*) " -> Iteration #", n_iter, " Step #", etape
 
           if (lfixed_rays) then
-          stream = 0.0
+          	stream = 0.0
           	do i=1,nb_proc
           		stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
           	end do
@@ -2853,7 +2855,7 @@ contains
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
           !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, chi_c, Ic,icompute_atomRT,J20_cont) &
           !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,lcalc_anisotropy, lvoronoi)
-          !$omp do schedule(dynamic,omp_chunk_size) !!static, 1
+          !$omp do schedule(dynamic,omp_chunk_size)
           do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
 
@@ -2894,7 +2896,7 @@ contains
                    
                 elseif (etape==2) then
                 
-                	weight = 1.0 / real(n_rayons)
+                   weight = 1.0 / real(n_rayons)
                    do iray=iray_start, iray_start-1+n_rayons
 
 
@@ -2952,7 +2954,7 @@ contains
           !$omp end do
           !$omp end parallel
           call progress_bar(50)
-write(*,*) "debug : do convergence"
+
           !convergence!		
           diff = 0d0
           dSource = 0.0_dp
@@ -2988,7 +2990,6 @@ write(*,*) "debug : do convergence"
           end do cell_loop2 !icell
           !$omp end do
           !$omp end parallel
-write(*,*) "debug : enddo convergence"
 
 
           write(*,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') &
@@ -3039,38 +3040,27 @@ write(*,*) "debug : enddo convergence"
     ! 	endif
 
 
-	if (lwrite_jnu_cont_ascii) then
-	
-    	open(unit=20, file="Jnu_no_interp.s", status="unknown")
-    	write(20,*) n_cells, Nlambda_cont
-   		do icell=1, n_cells
-       		do la=1, Nlambda_cont !if you change the format, check read_Jnu_ascii()
-          		if (lambda_cont(la) < 1d5) then
-             		write(20,'(1F12.5,5E20.7E3)') &
-                  	lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), chi_c(la,icell), Sold(la,icell)
-          		else
-             		write(20,'(1F15.5,5E20.7E3)') &
-                  	lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), chi_c(la,icell), Sold(la,icell)
-         		endif
-       		enddo
-    	enddo
-    	close(20)
+! 	
+!     	open(unit=20, file="Jnu_no_interp.s", status="unknown")
+!     	write(20,*) n_cells, Nlambda_cont
+!    		do icell=1, n_cells
+!        		do la=1, Nlambda_cont !if you change the format, check read_Jnu_ascii()
+!           		if (lambda_cont(la) < 1d5) then
+!              		write(20,'(1F12.5,5E20.7E3)') &
+!                   	lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), chi_c(la,icell), Sold(la,icell)
+!           		else
+!              		write(20,'(1F15.5,5E20.7E3)') &
+!                   	lambda_cont(la), Jnu_cont(la,icell), Sth(la,icell), beta(la,icell), chi_c(la,icell), Sold(la,icell)
+!          		endif
+!        		enddo
+!     	enddo
+!     	close(20)
 
-	endif
 	if (lcalc_anisotropy) then
-
-       	open(unit=20, file="anis_ascii.txt", status="unknown")
-       	write(20,*) n_cells, Nlambda
-       	do icell=1, n_cells
-          	call bezier2_interp(Nlambda_cont, lambda_cont, J20_cont(:,icell)/Jnu_cont(:,icell), &
-              		Nlambda, lambda, threeKminusJ(:,icell))
-          	do la=1, Nlambda
-             	write(20,'(1F12.5,5E20.7E3)') lambda(la), 0.5*threeKminusJ(la,icell), 0.0, 0.0, 0.0, 0.0
-          	enddo
-       	enddo
-       	close(20)
-   		deallocate(J20_cont)
-    	
+	
+		call write_lambda_cell_array(Nlambda_cont, J20_cont, "J20c.fits.gz","W.m^-2.Hz^-1.sr^-1")
+		deallocate(J20_cont)
+		
     endif
 
 

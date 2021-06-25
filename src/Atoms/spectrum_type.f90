@@ -1408,22 +1408,20 @@ contains
     return
   end function air2vacuum
 
-  subroutine write_lambda_cell_array(Nlam, A, filename)
+  subroutine write_lambda_cell_array(Nlam, A, filename, units)
     ! -------------------------------------------------- !
     ! Write array (Nlambda, n_cells) to disk
     ! --------------------------------------------------- !
     integer, intent(in) :: Nlam
     real(kind=dp), dimension(Nlam, n_cells) :: A
-    character(len=*), intent(in) :: filename
+    character(len=*), intent(in) :: filename, units
     integer :: status,unit,blocksize,bitpix,naxis, naxis2
     integer, dimension(8) :: naxes, naxes2
     integer :: group,fpixel,nelements,la, icell
     logical :: simple, extend
-    character(len=6) :: comment=""
-    real :: pixel_scale_x, pixel_scale_y
+    
 
     write(*,*)" -> writing ", trim(filename)
-
     !  Get an unused Logical Unit Number to use to open the FITS file.
     status=0
     call ftgiou (unit,status)
@@ -1463,7 +1461,7 @@ contains
 
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-    call ftpkys(unit,'UNIT',"W.m-2.Hz-1.m-1",'',status)
+!     call ftpkys(unit,trim(units),'',status)
 
     call ftpprd(unit,group,fpixel,nelements,A,status)
 
