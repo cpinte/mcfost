@@ -2669,13 +2669,14 @@ contains
     real(kind=dp), allocatable :: Snew(:,:), Kappa_tot(:,:), beta(:,:), Istar(:), Ic(:,:,:), J20_cont(:,:)
     real(kind=dp), allocatable :: lambda_star(:,:), Sth(:,:), Sold(:,:), Sline(:,:), delta_J(:)
 
-    logical :: labs, l_iterate
+    logical :: labs
     integer :: la, icell, imax, icell_max, ibar, n_cells_done
-    integer :: imu, iphi
+    integer :: imu, iphi, time_iteration, time_nonlte
     real(kind=dp) :: lambda_max, weight
     
     logical :: lcalc_anisotropy = .false.
 
+    call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
 
     write(*,'("   --> Solving the continuum scattering (isotropic) problem with "(1I5)" lambda!")') Nlambda_cont
     !Non-LTE loop with starting solution for Jnu
@@ -2777,9 +2778,10 @@ contains
     ds = 0.0_dp !meters
 
 
-    do etape=etape_start, etape_end
+    step_loop : do etape=etape_start, etape_end
     
        if (etape==1) then
+          time_iteration = 0
 
           call compute_angular_integration_weights()
 
@@ -2799,6 +2801,7 @@ contains
           Ic = 0.0_dp
 
        else if (etape==2) then
+          time_iteration = 0
 
           write(*,*) " Using step 2 with ", Nrays_atom_transfer, " rays"
           write(*,'("Jold (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
@@ -2849,9 +2852,9 @@ contains
           !$omp parallel &
           !$omp default(none) &
           !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,iphi,imu) &
-          !$omp private(argmt,norme, icell, delta_J, l_iterate,weight) &
+          !$omp private(argmt,norme, icell, delta_J, weight) &
           !$omp shared(Voronoi, lambda_cont, lambda_star, Snew, Sold, Sth, Istar, xmu,wmu, xmux, xmuy) &
-          !$omp shared(lkeplerian,n_iter,gtype, nb_proc,seed,etoile,ibar, n_cells_done) &
+          !$omp shared(n_iter,gtype, nb_proc,seed,etoile,ibar, n_cells_done) &
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged) &
           !$omp shared(n_cells,ds, Jold, Jnu_cont, beta, chi_c, Ic,icompute_atomRT,J20_cont) &
           !$omp shared(lfixed_Rays,lnotfixed_Rays,labs,etape,pos_em_cellule,lcalc_anisotropy, lvoronoi)
@@ -2860,6 +2863,7 @@ contains
              !$ id = omp_get_thread_num() + 1
 
              if (icompute_atomRT(icell)>0) then
+             
 !              	write(*,*) " cell", icell, " id = ", id
                 Jnu_cont(:,icell) = 0.0_dp
                 Snew(:,icell) = 0.0_dp
@@ -2904,7 +2908,7 @@ contains
                       rand2 = sprng(stream(id))
                       rand3 = sprng(stream(id))
 
-                      call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+                      call  pos_em_cellule(icell,rand,rand2,rand3,x0,y0,z0)
 
                       ! Direction de propagation aleatoire
                       rand = sprng(stream(id))
@@ -3023,10 +3027,50 @@ contains
                 endif
              endif
           end if
+          
+          !***********************************************************!
+          ! ********** timing and checkpointing **********************!
+
+          call system_clock(time_end,count_rate=time_tick,count_max=time_max)
+          if (time_end < time_begin) then
+             time_nlte=real(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
+          else
+             time_nlte=real(time_end - time_begin)/real(time_tick)
+          endif
+
+          if (n_iter <= 4) then
+             time_iteration = time_iteration + time_nlte  * 0.25
+             !if the problem converge in less than 4 iterations pb
+          endif
+
+
+          if (lsafe_stop) then
+
+             if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= 4)) then
+                lconverged = .true.
+                lprevious_converged = .true.
+                call warning("Time limit would be exceeded, leaving...")
+                write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
+                write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', &
+                     mod(time_iteration/60.,60.)," min"
+                write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+                write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
+                lexit_after_nonlte_loop = .true.
+                !lsafe_stop only would leave the code even if the time is below the walltime
+                exit step_loop
+             endif
+
+          endif
 
        end do !while
        write(*,*) etape, "Threshold =", precision
-    end do !over etapes
+       
+       if (n_iter >= 4) then
+          write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
+          write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+       endif
+       
+    end do step_loop!over etapes
 
 
     !For non-LTE loop
