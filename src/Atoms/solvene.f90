@@ -582,7 +582,7 @@ CONTAINS
     if (verbose) then
        write(*,*) " ------------------------------------------------ "
        write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
-       write(*,'("   >>>  epsilon="(1ES17.8E3)" at cell "(1I5))') epsilon, ik_max
+       write(*,'("   >>>  epsilon="(1ES17.8E3)" at cell "(1I7))') epsilon, ik_max
        write(*,*) " T = ", T(ik_max)," nH = ", nHtot(ik_max)
        write(*,*) " "
        write(*,'("Ionisation fraction of HII "(1ES17.8E3, 1ES17.8E3))') max_f_HII, min_f_HII

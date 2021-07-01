@@ -1615,7 +1615,7 @@ contains
        endif
     enddo
 
-    write(*,*) "Total continuum frequencies, before merging : ", Nlambda_cont - Nremoved!lac
+    !write(*,*) "Total continuum frequencies, before merging : ", Nlambda_cont - Nremoved!lac
     if (Nremoved > 0) then 
        write(*,*) " ->", Nremoved, " duplicate frequencies"
        deallocate(cont_waves)
@@ -1708,13 +1708,13 @@ contains
       enddo
     		
       write(*,*) " Found ", Ngroup, " groups of lines"
-      do Nlam=1, Ngroup
-      	write(*,*) " group ", Nlam, " lamin = ", group_blue(Nlam), ' lamax = ', group_red(Nlam), &
-      		" lamid = ", 0.5 * (group_blue(Nlam)+group_red(Nlam))
-      enddo
-      write(*,*) " -> ", sum(Nline_per_group), " lines"
-      write(*,*) " Found ", sum(Nline_per_group) - Ngroup, " overlapping regions for", sum(Nline_per_group), " lines"
-      write(*,*) " --> ", Ngroup, " groups of lines"
+!       do Nlam=1, Ngroup
+!       	write(*,*) " group ", Nlam, " lamin = ", group_blue(Nlam), ' lamax = ', group_red(Nlam), &
+!       		" lamid = ", 0.5 * (group_blue(Nlam)+group_red(Nlam))
+!       enddo
+!       write(*,*) " -> ", sum(Nline_per_group), " lines"
+!       write(*,*) " Found ", sum(Nline_per_group) - Ngroup, " overlapping regions for", sum(Nline_per_group), " lines"
+!       write(*,*) " --> ", Ngroup, " groups of lines"
       allocate(Nlambda_per_group(Ngroup), stat=alloc_status)
       if (alloc_status > 0) then
           write(*,*) "Allocation error Nlambda_per_group"
@@ -1776,7 +1776,7 @@ contains
 !       write(*,*) Nlambda_per_group
       Nspec_line = sum(Nlambda_per_group)
       line_waves = pack(line_waves,mask=line_waves > 0)
-      write(*,*) " Nspec_line = ", Nspec_line, " check=", size(line_waves)
+      !write(*,*) " Nspec_line = ", Nspec_line, " check=", size(line_waves)
 
       deallocate(all_lamin, all_lamax, all_lam0)
 
@@ -1865,8 +1865,8 @@ contains
       endif
 !->cont end	
 
-      write(*,*) "bounds:"
-      write(*,*) "  -> max lam:", maxval(line_waves), " max_cont:", maxval(cont_grid)
+      !write(*,*) "bounds:"
+      !write(*,*) "  -> max lam:", maxval(line_waves), " max_cont:", maxval(cont_grid)
           ! " max reddest line:", maxval(group_red,mask=group_red>-1),
           
       !add lines + continua frequencies
@@ -1907,7 +1907,7 @@ contains
                   endif
             enddo group_loop
       enddo
-      write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid, tmp_grid > 0))
+      !write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid, tmp_grid > 0))
       deallocate(Nlambda_per_group, line_waves)
       deallocate(cont_waves)
 
@@ -2021,9 +2021,9 @@ contains
           atom%lines(kr)%Nred = locate(outgrid, atom%lines(kr)%lambdamax)
           atom%lines(kr)%Nmid = locate(outgrid, atom%lines(kr)%lambda0)
           atom%lines(kr)%Nlambda = atom%lines(kr)%Nred - atom%lines(kr)%Nblue + 1
-          write(*,*) "line", kr, " lam0=",atom%lines(kr)%lambda0, atom%lines(kr)%lambdamin, atom%lines(kr)%lambdamax
-          write(*,*) " -> bounds on the grid:", outgrid(atom%lines(kr)%Nblue), outgrid(atom%lines(kr)%Nred)
-          write(*,*) " -> max extent:", outgrid(atom%lines(kr)%Nblue)*(1.0 - delta_v/clight), outgrid(atom%lines(kr)%Nred)*(1.0 + delta_v/clight)
+          !write(*,*) "line", kr, " lam0=",atom%lines(kr)%lambda0, atom%lines(kr)%lambdamin, atom%lines(kr)%lambdamax
+          !write(*,*) " -> bounds on the grid:", outgrid(atom%lines(kr)%Nblue), outgrid(atom%lines(kr)%Nred)
+          !write(*,*) " -> max extent:", outgrid(atom%lines(kr)%Nblue)*(1.0 - delta_v/clight), outgrid(atom%lines(kr)%Nred)*(1.0 + delta_v/clight)
           if (atom%lines(kr)%Nblue-dshift < 1) then
              write(*,*) "Error for line ", kr, " of atom ", atom%ID
              write(*,*) " Nblue below 1"
