@@ -1058,6 +1058,88 @@ CONTAINS
 
     RETURN
   END SUBROUTINE read_Jnu_cont
+  
+  subroutine write_Jnu_cont_bin
+    ! ------------------------------------ !
+    ! write the mean radiation field
+    ! ------------------------------------ !
+    integer :: unit, status = 0
+    integer :: icell, la, sys_status
+    character(len=512) :: cmd
+
+    !written only if lelectron_scattering or if nlte loop activated, in that case, Jnu_total
+    !is computed
+    if ( (.not. lelectron_scattering) )return
+
+    write(*,*) " Writing mean continuum intensity... "
+    !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
+!     cmd = "ls "//trim(Jnuc_file)
+!     call appel_syst(cmd, sys_status)
+!     if (sys_status == 0) then !means the file exist
+! 
+!        cmd = "mv "//trim(Jnuc_file)//" "//"Jnuc_old.fits.gz"
+!        call appel_syst(cmd, sys_status)
+!        if (sys_status /= 0) then
+!           call error("Error in copying old Jnu!")
+!        endif
+! 
+!     endif
+
+    !get unique unit number
+    call ftgiou(unit,status)
+    open(unit, file="jnuc_bin",form="unformatted",status='unknown',access="sequential",iostat=sys_status)
+
+	write(unit,iostat=sys_status) Jnu_cont
+	!for each lambda write each cell
+! 	do la=1, Nlambda_cont
+! 		do icell=1, n_cells
+! 			write(unit,iostat=sys_status) Jnu_cont(la, icell)
+! 		enddo
+! 	enddo
+
+	close(unit)
+    call ftfiou(unit, status)
+
+
+    return
+  end subroutine write_Jnu_cont_bin
+  
+  subroutine read_Jnu_cont_bin
+    ! ------------------------------------ !
+    ! write the mean radiation field
+    ! ------------------------------------ !
+    integer :: unit, status = 0
+    integer :: icell, la, sys_status
+    character(len=512) :: cmd
+
+    !written only if lelectron_scattering or if nlte loop activated, in that case, Jnu_total
+    !is computed
+    if ( (.not. lelectron_scattering) )return
+
+
+    !get unique unit number
+    call ftgiou(unit,status)
+    open(unit, file="jnuc_bin", status='old',form='unformatted',iostat=sys_status)
+    if (sys_status /= 0)  then
+       close(unit)
+       write(*,*) "No mean intensity to read!"
+       return
+    endif
+
+	!for each lambda write each cell
+	read(unit, iostat=sys_status) Jnu_cont
+! 	do la=1, Nlambda_cont
+! 		do icell=1, n_cells
+! 			read(unit,iostat=sys_status) Jnu_cont(la, icell)
+! 		enddo
+! 	enddo
+
+	close(unit)
+    call ftfiou(unit, status)
+
+
+    return
+  end subroutine read_Jnu_cont_bin
 
   SUBROUTINE write_Jnu_cont
     ! ------------------------------------ !
