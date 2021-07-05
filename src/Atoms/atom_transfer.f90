@@ -18,8 +18,8 @@ module atom_transfer
        eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, Flux_acc, &
        Ishock, Istar_loc, flux_star, Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, &
        init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
-       dealloc_jnu, reallocate_rays_arrays, write_flux, write_1D_arr_ascii, originc_atom, origin_atom, &
-       write_lambda_cell_array, originc_file, origin_file, write_atomic_maps
+       dealloc_jnu, reallocate_rays_arrays, write_flux, originc_atom, origin_atom, &
+       originc_file, origin_file, write_atomic_maps
 
   use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, &
        ne, T, vr, vphi, v_z, vtheta, wght_per_H, readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, &
@@ -38,7 +38,7 @@ module atom_transfer
        write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
   use io_opacity, only 		: write_Jnu, write_Jnu_cont, write_taur, write_contrib_lambda_ascii, read_Jnu_cont, read_Jnu, &
        write_collision_matrix_atom, write_collision_matrix_atom_ascii, write_jnu_cont_bin, read_jnu_cont_bin, &
-       write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii, write_opacity_emissivity_map
+       write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii, write_opacity_emissivity_map, write_dbmatrix_bin
   use math
   !$ use omp_lib
   use molecular_emission, only: v_proj
@@ -410,12 +410,10 @@ contains
              tau_c(la) = tau_c(la) + dtau_c(la)
           enddo
 
-          ! 				Need to compute the contibution function relative to the continuum contribution function
-          ! 				Scont_interp = linear_1D_sorted(Nlambda_cont,lambda_cont, Snu_c, Nlambda,lambda)
           do la=1,Nlambda
-             ! 					origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * ( exp(-tau_line(la)) - exp(-(tau_line(la)+l_contrib*chi_line(la))) ) * Sline(la) / (chi_line(la) + 1d-100)
              origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * &
-                  Sline(la) / chi(la,id)!(Sline(la) - chi_line(la)*Scont_interp(la))/chi(la,id)
+                  Snu(la)!Sline(la) / chi(la,id)
+!              origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * exp(-(tau(la))) * Snu(la)!eta(la,id)
              Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
              tau(la) = tau(la) + dtau(la) !for next cell
              tau_line(la) = tau_line(la) + l_contrib * chi_line(la)
@@ -1246,7 +1244,8 @@ contains
        if (loutput_rates) deallocate(Rij_all,Rji_all,Gammaij_all)
 
        if (lelectron_scattering) then
-       	call write_Jnu_cont
+!        	call write_Jnu_cont
+       	call write_Jnu_cont_bin
        	call write_Jnu!futur deprec if not needed
        endif
 
@@ -1348,8 +1347,10 @@ contains
     if (laccretion_shock) deallocate(Iacc)
 
     if (allocated(origin_atom)) then
-       call write_lambda_cell_array(Nlambda, origin_atom, origin_file,"W.m^-2.Hz^-1.sr^-1")
-       call write_lambda_cell_array(Nlambda_cont, originc_atom, originc_file,"W.m^-2.Hz^-1.sr^-1")
+!        call write_lambda_cell_array(Nlambda, origin_atom, origin_file_fits,"W.m^-2.Hz^-1.sr^-1")
+!        call write_lambda_cell_array(Nlambda_cont, originc_atom, originc_file_fits,"W.m^-2.Hz^-1.sr^-1")
+       call write_dbmatrix_bin(origin_file, origin_atom)
+       call write_dbmatrix_bin(originc_file, originc_atom)
        deallocate(origin_atom,originc_atom)
     endif
 
@@ -3104,7 +3105,7 @@ contains
 
 	if (lcalc_anisotropy) then
 	
-		call write_lambda_cell_array(Nlambda_cont, J20_cont, "J20c.fits.gz","W.m^-2.Hz^-1.sr^-1")
+		call write_dbmatrix_bin("J20c.fits.gz",J20_cont)
 		deallocate(J20_cont)
 		
     endif

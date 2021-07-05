@@ -35,6 +35,41 @@ MODULE io_opacity
 
 CONTAINS
 
+  
+  subroutine write_dbmatrix_bin(filename, A)
+    integer :: unit
+    character(len=*), intent(in) :: filename
+    real(kind=dp), intent(in) :: A(:,:)
+    integer :: sys_status
+
+    call ftgiou(unit,sys_status)
+    open(unit, file=trim(filename),form="unformatted",status='unknown',access="sequential",iostat=sys_status)
+	write(unit,iostat=sys_status) A
+	close(unit)
+    call ftfiou(unit, sys_status)
+    
+   end subroutine write_dbmatrix_bin
+   
+  subroutine read_dbmatrix_bin(filename, A)
+    integer :: unit
+    character(len=*), intent(in) :: filename
+    real(kind=dp), intent(inout) :: A(:,:)
+    integer :: sys_status
+
+    call ftgiou(unit,sys_status)
+    open(unit, file=trim(filename),form="unformatted",status='old',iostat=sys_status)
+    if (sys_status /= 0)  then
+       close(unit)
+       write(*,*) "No ", trim(filename), " to read!"
+       return
+    endif
+	read(unit, iostat=sys_status) A
+	close(unit)
+    call ftfiou(unit, sys_status)
+    
+   end subroutine read_dbmatrix_bin
+   
+
   SUBROUTINE integ_cont_optical_depth(id,icell_in,xi,yi,zi,u,v,w,chic,tauc,dtauc,dl,ltot)
     ! Given chic, the continuum opacity,
     !integrate the continuum optical depth in the direction (u,v,w).
@@ -1058,6 +1093,7 @@ CONTAINS
 
     RETURN
   END SUBROUTINE read_Jnu_cont
+
   
   subroutine write_Jnu_cont_bin
     ! ------------------------------------ !
@@ -1685,8 +1721,76 @@ CONTAINS
     RETURN
   END SUBROUTINE write_cont_opac_ascii
 
-
+  !written to binary instead
   subroutine write_opacity_emissivity_map()
+    integer :: unit, status = 0
+    integer :: alloc_status, id, icell
+    integer(kind=8) :: Nsize
+    real(kind=dp), allocatable, dimension(:,:) :: chi_tmp, eta_tmp, chic_tmp, etac_tmp
+    character(len=50) :: filename_chi="chi_map.out"!separate file because they are big
+    character(len=50) :: filename_eta="eta_map.out"  
+    
+    write(*,*) " Writing emissivity and opacity map..."
+    !call write_dbmatrix_bin("chitot.out",chi
+    allocate(chi_tmp(Nlambda, n_cells),stat=alloc_status)
+    if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
+    allocate(eta_tmp(Nlambda, n_cells),stat=alloc_status)
+    if (alloc_status /= 0) call error("Cannot allocate eta_tmp !")
+
+
+    !fill chi and eta with line opacity.
+    id = 1
+    !$omp parallel &
+    !$omp default(none) &
+    !$omp private(id,icell) &
+    !$omp shared(chi, eta, chi0_bb, eta0_bb, chi_tmp, eta_tmp, n_cells, icompute_atomRT)
+    !$omp do schedule(dynamic,1)
+    do icell=1, n_cells
+       !$ id = omp_get_thread_num() + 1
+       if (icompute_atomRT(icell)) then
+          chi(:,id) = chi0_bb(:,icell)
+          !-> only line source function  = line emiss / total opac
+          eta(:,id) = 0.0_dp!eta0_bb(:,icell)
+          call opacity_atom_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  &
+               0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp, .false.)
+          chi_tmp(:,icell) = chi(:,id)
+          eta_tmp(:,icell) = eta(:,id)
+       endif
+    enddo
+    !$omp end do
+    !$omp end parallel
+
+
+    call ftgiou(unit,status)
+    
+    open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="sequential",iostat=status)
+	write(unit,iostat=status) chi_tmp
+    deallocate(chi_tmp)
+    allocate(chi_tmp(Nlambda_cont, n_cells))
+    chi_tmp = chi_c
+    if (NactiveAtoms > 0) chi_tmp = chi_tmp + chi_c_nlte
+	write(unit,iostat=status) chi_tmp
+    deallocate(chi_tmp)
+	close(unit)
+	
+    open(unit, file=trim(filename_eta),form="unformatted",status='unknown',access="sequential",iostat=status)
+	write(unit,iostat=status) eta_tmp
+    deallocate(eta_tmp)
+    allocate(eta_tmp(Nlambda_cont, n_cells))
+    eta_tmp = eta_c
+    if (NactiveAtoms > 0) eta_tmp = eta_tmp + eta_c_nlte
+	write(unit,iostat=status) eta_tmp
+    deallocate(eta_tmp)
+	close(unit)
+
+    !free unit
+    call ftfiou(unit, status)
+  
+  	return
+  end subroutine write_opacity_emissivity_map
+
+  !old, not working for large arrays because of the limitation of fits file
+  subroutine write_opacity_emissivity_map_fits()
     !computes and store for each cell and wavelength the opacity and emissivity.
     !line opacities are given in the atom's frame (v = 0).
 
@@ -1703,6 +1807,7 @@ CONTAINS
 
 
     write(*,*) " Writing emissivity and opacity map..."
+    !call write_dbmatrix_bin("chitot.out",chi
     allocate(chi_tmp(Nlambda, n_cells),stat=alloc_status)
     if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
     allocate(eta_tmp(Nlambda, n_cells),stat=alloc_status)
@@ -1831,8 +1936,101 @@ CONTAINS
     call ftfiou(unit, status)
 
     return
-  end subroutine write_opacity_emissivity_map
+  end subroutine write_opacity_emissivity_map_fits
 
+  subroutine write_1D_arr_ascii(N, x, arr, filename)
+    ! -------------------------------------------------- !
+    ! write 2 table, x and arr (size(x)) to ascii file
+    ! --------------------------------------------------- !
+    integer, intent(in) :: N
+    character(len=*), intent(in) :: filename
+    real(kind=dp), intent(in), dimension(N) :: x, arr
+    integer :: status,unit
+    integer :: la, j, i
+
+
+    !  Get an unused Logical Unit Number to use to open the FITS file.
+    status=0
+    unit = 10
+
+    open(unit,file=trim(filename), status='unknown', iostat=status)
+    do la=1, N
+       write(unit, *) x(la), arr(la)
+    enddo
+    close(unit)
+
+    return
+  end subroutine write_1D_arr_ascii
+  
+  subroutine write_lambda_cell_array(Nlam, A, filename, units)
+    ! -------------------------------------------------- !
+    ! Write array (Nlambda, n_cells) to disk
+    ! --------------------------------------------------- !
+    integer, intent(in) :: Nlam
+    real(kind=dp), dimension(Nlam, n_cells) :: A
+    character(len=*), intent(in) :: filename, units
+    integer :: status,unit,blocksize,bitpix,naxis, naxis2
+    integer, dimension(8) :: naxes, naxes2
+    integer :: group,fpixel,nelements,la, icell
+    logical :: simple, extend
+    
+
+    write(*,*)" -> writing ", trim(filename)
+    !  Get an unused Logical Unit Number to use to open the FITS file.
+    status=0
+    call ftgiou (unit,status)
+
+    !  Create the new empty FITS file.
+    blocksize=1
+    call ftinit(unit,trim(filename),blocksize,status)
+
+    simple=.true.
+    extend=.true.
+    group=1
+    fpixel=1
+
+    bitpix=-64
+
+    if (lVoronoi) then
+       naxis = 2
+       naxes(1) = Nlam!Nlambda
+       naxes(2) = n_cells
+       nelements = naxes(1) * naxes(2)
+    else
+       if (l3D) then
+          naxis = 4
+          naxes(1) = Nlam!Nlambda
+          naxes(2) = n_rad
+          naxes(3) = 2*nz
+          naxes(4) = n_az
+          nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+       else
+          naxis = 3
+          naxes(1) = Nlam!Nlambda
+          naxes(2) = n_rad
+          naxes(3) = nz
+          nelements = naxes(1) * naxes(2) * naxes(3)
+       end if
+    end if
+
+    !  Write the required header keywords.
+    call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+!     call ftpkys(unit,trim(units),'',status)
+
+    call ftpprd(unit,group,fpixel,nelements,A,status)
+
+
+    !  Close the file and free the unit number.
+    call ftclos(unit, status)
+    call ftfiou(unit, status)
+
+    !  Check for any error, and if so print out error messages
+    if (status > 0) then
+       call print_error(status)
+    endif
+
+    return
+  end subroutine write_lambda_cell_array
 
   !
   ! !building

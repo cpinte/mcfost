@@ -22,7 +22,8 @@ module spectrum_type
   ! not that FLUX_FILE is 1D only if one pixel, otherwise it is a map.
   ! F(x,y,0,lambda) in several directions.
   character(len=*), parameter :: FLUX_FILE="flux.fits.gz"
-  character(len=*), parameter :: ORIGINC_FILE="origin_atom_cont.fits.gz", ORIGIN_FILE="origin_atom.fits.gz"
+  character(len=*), parameter :: ORIGINC_FILE="origin_atom_cont.out", ORIGIN_FILE="origin_atom.out"
+  character(len=*), parameter :: ORIGINC_FILE_FITS="origin_atom_cont.fits.gz", ORIGIN_FILE_FITS="origin_atom.fits.gz"
 
   !shift in index of line profiles, function of iray and nb_proc
   integer, dimension(:,:), allocatable :: dk
@@ -1304,30 +1305,6 @@ contains
     return
   end subroutine write_atomic_maps
 
-  subroutine write_1D_arr_ascii(N, x, arr, filename)
-    ! -------------------------------------------------- !
-    ! write 2 table, x and arr (size(x)) to ascii file
-    ! --------------------------------------------------- !
-    integer, intent(in) :: N
-    character(len=*), intent(in) :: filename
-    real(kind=dp), intent(in), dimension(N) :: x, arr
-    integer :: status,unit
-    integer :: la, j, i
-
-
-    !  Get an unused Logical Unit Number to use to open the FITS file.
-    status=0
-    unit = 10
-
-    open(unit,file=trim(filename), status='unknown', iostat=status)
-    do la=1, N
-       write(unit, *) x(la), arr(la)
-    enddo
-    close(unit)
-
-    return
-  end subroutine write_1D_arr_ascii
-
   subroutine writeWavelength()
     ! --------------------------------------------------------------- !
     ! Write wavelength grid build with each transition of each atom
@@ -1407,76 +1384,6 @@ contains
 
     return
   end function air2vacuum
-
-  subroutine write_lambda_cell_array(Nlam, A, filename, units)
-    ! -------------------------------------------------- !
-    ! Write array (Nlambda, n_cells) to disk
-    ! --------------------------------------------------- !
-    integer, intent(in) :: Nlam
-    real(kind=dp), dimension(Nlam, n_cells) :: A
-    character(len=*), intent(in) :: filename, units
-    integer :: status,unit,blocksize,bitpix,naxis, naxis2
-    integer, dimension(8) :: naxes, naxes2
-    integer :: group,fpixel,nelements,la, icell
-    logical :: simple, extend
-    
-
-    write(*,*)" -> writing ", trim(filename)
-    !  Get an unused Logical Unit Number to use to open the FITS file.
-    status=0
-    call ftgiou (unit,status)
-
-    !  Create the new empty FITS file.
-    blocksize=1
-    call ftinit(unit,trim(filename),blocksize,status)
-
-    simple=.true.
-    extend=.true.
-    group=1
-    fpixel=1
-
-    bitpix=-64
-
-    if (lVoronoi) then
-       naxis = 2
-       naxes(1) = Nlam!Nlambda
-       naxes(2) = n_cells
-       nelements = naxes(1) * naxes(2)
-    else
-       if (l3D) then
-          naxis = 4
-          naxes(1) = Nlam!Nlambda
-          naxes(2) = n_rad
-          naxes(3) = 2*nz
-          naxes(4) = n_az
-          nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
-       else
-          naxis = 3
-          naxes(1) = Nlam!Nlambda
-          naxes(2) = n_rad
-          naxes(3) = nz
-          nelements = naxes(1) * naxes(2) * naxes(3)
-       end if
-    end if
-
-    !  Write the required header keywords.
-    call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-!     call ftpkys(unit,trim(units),'',status)
-
-    call ftpprd(unit,group,fpixel,nelements,A,status)
-
-
-    !  Close the file and free the unit number.
-    call ftclos(unit, status)
-    call ftfiou(unit, status)
-
-    !  Check for any error, and if so print out error messages
-    if (status > 0) then
-       call print_error(status)
-    endif
-
-    return
-  end subroutine write_lambda_cell_array
 
 
 end module spectrum_type
