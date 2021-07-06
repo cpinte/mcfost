@@ -1152,6 +1152,7 @@ CONTAINS
     !is computed
     if ( (.not. lelectron_scattering) )return
 
+	write(*,*) " Reading mean continuum intensity..."
 
     !get unique unit number
     call ftgiou(unit,status)
@@ -1161,6 +1162,16 @@ CONTAINS
        write(*,*) "No mean intensity to read!"
        return
     endif
+!     cmd = "ls "//trim(Jnu_File)
+!     call appel_syst(cmd, sys_status)
+!     if (sys_status == 0) then !means the file exist
+!        write(*,*) " Reading old Jnu.fits.gz file"
+!        ljnu_read = .true.
+!     else
+!        write(*,*) " found no Jnu.fits.gz"
+!        ljnu_read = .false.
+!        return
+!     endif
 
 	!for each lambda write each cell
 	read(unit, iostat=sys_status) Jnu_cont
@@ -1172,7 +1183,26 @@ CONTAINS
 
 	close(unit)
     call ftfiou(unit, status)
+    
+    !interpolating on total grid.
+    !Later, interpolated locally if Jnu is flat !
+    !-> futur deprec, Jnu will be local (too big) and flat across lines
+    write(*,*) " **** Interpolating Jnuc onto lambda grid!"
+    do icell=1, n_cells
+    	Jnu(:,icell) = 0.0_dp
+    	if (icompute_atomRT(icell) > 0) then
 
+          CALL bezier3_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnu(:,icell))
+    	
+    	endif
+    enddo
+    write(*,*) " ***done."
+
+    write(*,'("Jnuc (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
+		maxval(maxval(Jnu_cont(:,:),dim=2)), minval(minval(Jnu_cont,dim=2,mask=Jnu_cont>0))
+    
+    write(*,'("Jnu (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
+		maxval(maxval(Jnu(:,:),dim=2)), minval(minval(Jnu,dim=2,mask=Jnu>0))
 
     return
   end subroutine read_Jnu_cont_bin
