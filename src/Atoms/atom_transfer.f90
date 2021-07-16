@@ -36,7 +36,7 @@ module atom_transfer
   use profiles, only			: profile, local_profile_v, local_profile_thomson, local_profile_interp, local_profile_dk
   use io_atomic_pops, only	: write_pops_atom, write_electron, read_electron, write_hydrogen, write_Hminus, &
        write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
-  use io_opacity, only 		: write_Jnu, write_Jnu_cont, write_taur, write_contrib_lambda_ascii, read_Jnu_cont, read_Jnu, &
+  use io_opacity, only 		: write_Jnu_cont, write_taur, write_contrib_lambda_ascii, read_Jnu_cont, &
        write_collision_matrix_atom, write_collision_matrix_atom_ascii, write_jnu_cont_bin, read_jnu_cont_bin, &
        write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii, write_opacity_emissivity_map, write_dbmatrix_bin
   use math
@@ -208,6 +208,9 @@ contains
              chi(:,id) = chi0_bb(:,icell)
              eta(:,id) = eta0_bb(:,icell)
           endif
+          if (lelectron_scattering) then
+          	Jnu(:,1) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          endif
 
           !includes a loop over all bound-bound, passive and active
           call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) )
@@ -230,7 +233,7 @@ contains
           endif
 
           if (lelectron_scattering) then
-             Snu = ( eta(:,id) + thomson(icell) * Jnu(:,icell) ) / ( chi(:,id) + tiny_dp )
+             Snu = ( eta(:,id) + thomson(icell) * Jnu(:,1) ) / ( chi(:,id) + tiny_dp )
              Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)
           else
              Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
@@ -373,6 +376,9 @@ contains
              chi(:,id) = chi0_bb(:,icell)
              eta(:,id) = eta0_bb(:,icell)
           endif
+          if (lelectron_scattering) then
+          	Jnu(:,1) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          endif
 
           !includes a loop over all bound-bound, passive and active
           call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) )
@@ -383,7 +389,7 @@ contains
           dtau(:) = l_contrib * chi(:,id)
 
           if (lelectron_scattering) then
-             Snu = ( eta(:,id) + thomson(icell) * Jnu(:,icell) ) / ( chi(:,id) + tiny_dp )
+             Snu = ( eta(:,id) + thomson(icell) * Jnu(:,1) ) / ( chi(:,id) + tiny_dp )
              Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)
           else
              Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
@@ -522,6 +528,9 @@ contains
              chi(:,id) = chi0_bb(:,icell)
              eta(:,id) = eta0_bb(:,icell)
           endif
+          if (lelectron_scattering) then
+          	Jnu(:,1) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          endif
 
           !includes a loop over all bound-bound, passive and active
           call opacity_atom_zeeman_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) )
@@ -530,7 +539,7 @@ contains
 
 
           if (lelectron_scattering) then
-             Snu = ( eta(:,id) + thomson(icell) * Jnu(:,icell) ) / ( chi(:,id) + tiny_dp )
+             Snu = ( eta(:,id) + thomson(icell) * Jnu(:,1) ) / ( chi(:,id) + tiny_dp )
              Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)
           else
              Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
@@ -945,7 +954,7 @@ contains
     integer :: n_rayons_max = n_rayons_start2 * (2**(maxIter-1))
     integer, parameter :: Nrayone = 1
     character(len=20)  :: ne_initial
-    logical :: lelectron_read, ljnu_read
+    logical :: lelectron_read
     type (AtomType), pointer :: atom
     integer :: alloc_status
     real(kind=dp) :: lam0 = 500.0 !default
@@ -1244,9 +1253,7 @@ contains
        if (loutput_rates) deallocate(Rij_all,Rji_all,Gammaij_all)
 
        if (lelectron_scattering) then
-!        	call write_Jnu_cont
        	call write_Jnu_cont_bin
-       	call write_Jnu!futur deprec if not needed
        endif
 
        !->> Case of ltab or not and add chi_c_nlte and eta_c_nlte
@@ -1278,7 +1285,6 @@ contains
 
 			 !Here Jnu is flat across lines so we only need Jnu_cont to be written
              if (lread_jnu_atom) then
-!                 call read_jnu_cont(ljnu_read)
 				call read_jnu_cont_bin
                 !still starts electron scattering from this value!
                 !does not jump at the image calculation yet.
@@ -1408,11 +1414,11 @@ contains
     real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
     real(kind=dp) :: dT, dN2, dN3, dN4, diff_old
     real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
-    real(kind=dp), allocatable :: Jnew(:,:), Jnew_cont(:,:), Jnu_loc(:,:)
+    real(kind=dp), allocatable :: Jnew_cont(:,:)
     ! 		real(kind=dp), allocatable :: err_pop(:,:)
     logical :: labs, update_bckgr_opac
     logical :: l_iterate, l_iterate_ne, update_ne_other_nlte
-    logical :: accelerated, ng_rest, lmean_intensity = .false.!,lapply_sor_correction
+    logical :: accelerated, ng_rest!,lapply_sor_correction
     integer :: iorder, i0_rest, n_iter_accel, iacc!, iter_sor
     integer :: nact, imax, icell_max, icell_max_2
     integer :: icell, ilevel, imu, iphi, id_ref !for anisotropy
@@ -1424,29 +1430,9 @@ contains
 
     write(*,*) " USING MALI METHOD FOR NLTE LOOP"
 
-    !only for step 1 at the moment
-    !allocate(threeKminusJ(nlambda, n_cells))
-    !or (nlambda, nb_proc) if only used locally as a threshold
-    allocate(Jnu_loc(nlambda,nb_proc))
-    id_ref = locate(lambda, 500.0_dp)
-    !write anisotropy at ref wavelength only otherwise too big file (in ascii, n_lambda * n_cells * 8 bits)
-    !if used, we only need it locally or at one wavelenegth
-
     !time for individual steps + check the time from the checkpointing time if any
     !and if it is set lconverged = .true. and .lprevious converged == true
     call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
-
-    if (lelectron_scattering) then
-       lmean_intensity = .true.
-       !initial solution if not fixed J
-       if (.not.lfixed_J) then
-          do icell=1,n_cells
-             if (icompute_atomRT(icell)) then
-                Jnu(:,icell) = Bpnu(T(icell), lambda)
-             endif
-          enddo
-       endif
-    endif
 
 
     !-> note: At the moment, hydrogen is always ACTIVE is helium is active and n_iterate_ne > 0!
@@ -1492,14 +1478,6 @@ contains
 
     allocate(dM(Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
     allocate(dTM(Nactiveatoms)); dM=0d0 !keep tracks of Tex for all cells for each atom
-    if (lmean_intensity) then
-       allocate(Jnew(Nlambda, n_cells)); Jnew = 0.0
-       allocate(Jnew_cont(Nlambda_cont, n_cells)); Jnew_cont = 0.0
-       write(*,*) "size Jtot:", 2*sizeof(Jnew)/1024./1024.," MB" !+Jnu
-       write(*,*) "size Jcont:", 2*sizeof(Jnu_cont)/1024./1024.," MB"
-       mem_alloc_local = mem_alloc_local + 2*(sizeof(Jnew)+sizeof(Jnew_cont))
-    endif
-
     allocate(Tex_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tex for all cells for each line of each atom
     allocate(Tion_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
     diff_old = 1.0_dp
@@ -1539,6 +1517,13 @@ contains
     write(*,*) " step start ",etape_start, istep_start
     write(*,*) " step end", etape_end
     write(*,*) "---------------------------------------"
+
+    if (lelectron_scattering.and..not.lfixed_j) then
+    !otherwise, Jnu_cont is fixed if lfixed_j and not updated!
+       allocate(Jnew_cont(Nlambda_cont, n_cells)); Jnew_cont = 0.0
+       mem_alloc_local = mem_alloc_local + sizeof(Jnew_cont)
+       write(*,*) " size Jnew_cont:", sizeof(Jnew_cont)/1024./1024.," MB"
+    endif
 
     ! ds is not used for this scheme at  the moment. Psi is used instead
     !since there is no local subit needing recomputing psi
@@ -1680,10 +1665,10 @@ contains
           !$omp default(none) &
           !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,iray_p,imu,iphi)&
           !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme, icell, nact, atom, l_iterate, weight) &
-          !$omp shared(Voronoi,icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, psi_mean, psi, chi_loc, Jnu_loc) &
+          !$omp shared(Voronoi,icompute_atomRT, dpops_sub_max_error,lkeplerian,lforce_lte,n_iter, psi_mean, psi, chi_loc) &
           !$omp shared(stream,n_rayons,iray_start, r_grid, z_grid, phi_grid, lcell_converged,loutput_rates, Nlambda_cont, Nlambda, lambda_cont) &
           !$omp shared(n_cells, gpop_old,integ_ray_line, Itot, Icont, Jnu_cont, Jnu, xmu, xmux, xmuy,wmu,etoile,id_ref, xyz_pos,uvw_pos) &
-          !$omp shared(Jnew, Jnew_cont, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, lmean_intensity, l_iterate_ne) &
+          !$omp shared(Jnew_cont, lfixed_j, lelectron_scattering,chi0_bb, etA0_bb, T,eta_atoms, l_iterate_ne) &
           !$omp shared(nHmin, chi_c, chi_c_nlte, eta_c, eta_c_nlte, ds, Rij_all, Rji_all, Nmaxtr, Gammaij_all, Nmaxlevel) &
           !$omp shared(lvoronoi, lfixed_Rays,lnotfixed_Rays,labs,max_n_iter_loc, etape,pos_em_cellule,Nactiveatoms,lambda, ibar, n_cells_done)
           !$omp do schedule(dynamic,omp_chunk_size) !!static
@@ -1692,12 +1677,10 @@ contains
              l_iterate = (icompute_atomRT(icell)>0)
 
              if (l_iterate) then
-                if (lmean_intensity) then
-                   Jnew(:,icell) = 0.0
+                if (lelectron_scattering.and..not.lfixed_j) then
                    Jnew_cont(:,icell) = 0.0
                    !!psi_mean(:,icell) = 0.0
                 endif
-                Jnu_loc(:,id) = 0.0
 
                 call fill_Collision_matrix(id, icell) !computes = C(i,j) before computing rates
                 call initGamma(id) !init Gamma to C and init radiative rates
@@ -1728,8 +1711,7 @@ contains
 
                       call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)
 
-                      if (lmean_intensity) then
-                         Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) / n_rayons
+                      if (lelectron_scattering.and..not.lfixed_j) then
                          Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) / n_rayons
                       endif
 
@@ -1776,8 +1758,7 @@ contains
 
                    !for all rays accumulated
                    do iray=1, n_rayons !for all
-                      if (lmean_intensity) then
-                         Jnew(:,icell) = Jnew(:,icell) + Itot(:,iray,id) / n_rayons
+                      if (lelectron_scattering.and..not.lfixed_j) then
                          Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,iray,id) / n_rayons
                       endif
 
@@ -1816,13 +1797,10 @@ contains
 
                       call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)
 
-                      if (lmean_intensity) then
-                         Jnew(:,icell) = Jnew(:,icell) + Itot(:,1,id) * weight
+                      if (lelectron_scattering.and..not.lfixed_j) then
                          Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
                          !!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
                       endif
-
-                      Jnu_loc(:,id) = Jnu_loc(:,id) + Itot(:,1,id) * weight
 
                       !for one ray
                       if (.not.lforce_lte) then
@@ -2059,19 +2037,18 @@ contains
 
 
                 !do not update if lfixed_J
-                if ((lmean_intensity).and..not.(lfixed_J)) then
-                   Jnu_cont(:,icell) = Jnew_cont(:,icell)
-                   do la=1, Nlambda
-                      dN1 = abs( 1.0_dp - Jnu(la,icell)/Jnew(la,icell) )
+                if (lelectron_scattering.and..not.lfixed_j) then
+                   do la=1, Nlambda_cont
+                      dN1 = abs( 1.0_dp - Jnu_cont(la,icell)/Jnew_cont(la,icell) )
                       ! 								if (Jnu(la,icell) > 0.0_dp) then
                       ! 									dN1 = abs( (Jnew(la,icell) - Jnu(la,icell))/Jnu(la,icell) )
                       ! 								endif
                       if (dN1 > dJ) then
                          dJ = dN1
-                         lambda_max = lambda(la)
+                         lambda_max = lambda_cont(la)
                       endif
                       !updating
-                      Jnu(la,icell) = Jnew(la,icell)
+                      Jnu_cont(la,icell) = Jnew_cont(la,icell)
                    enddo
 
                 endif
@@ -2315,7 +2292,6 @@ contains
     endif
 
     deallocate(dM, dTM, Tex_ref, Tion_ref)
-    if (allocated(Jnew)) deallocate(Jnew)
     if (allocated(Jnew_cont)) deallocate(Jnew_cont)
     deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms, n_new, ne_new)
     deallocate(stream)
@@ -3078,12 +3054,13 @@ contains
 
     !For non-LTE loop
     ! 	if (.not.lstop_after_jnu) then
-    Jnu(:,:) = 0.0_dp
-    do icell=1, n_cells
-       if (icompute_atomRT(icell)>0) then
-          call bezier2_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnu(:,icell))
-       endif
-    enddo
+    !interpolated locally 
+!     Jnu(:,:) = 0.0_dp
+!     do icell=1, n_cells
+!        if (icompute_atomRT(icell)>0) then
+!           call bezier2_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnu(:,icell))
+!        endif
+!     enddo
     ! 	endif
 
 
@@ -3261,6 +3238,9 @@ contains
              chi(:,id) = chi0_bb(:,icell)
              eta(:,id) = eta0_bb(:,icell)
           endif
+          if (lelectron_scattering) then
+          	Jnu(:,1) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          endif
 
           !includes a loop over all bound-bound, passive and active
           call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,.false.)
@@ -3268,7 +3248,7 @@ contains
           dtau(:) = l_contrib * chi(:,id)
 
           if (lelectron_scattering) then
-             eta(:,id) = eta(:,id) + thomson(icell)*Jnu(:,icell)
+             eta(:,id) = eta(:,id) + thomson(icell)*Jnu(:,1)
           endif
 
           tau = tau + dtau

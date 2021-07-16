@@ -28,7 +28,7 @@ MODULE io_opacity
 
   IMPLICIT NONE
 
-  character(len=15), parameter :: Jnu_File = "Jnu.fits.gz", Jnuc_file = "Jnuc.fits.gz"
+  character(len=15), parameter :: Jnuc_file = "Jnuc.fits.gz"!Jnu_File = "Jnu.fits.gz", 
   character(len=15), parameter :: Jnu_File_ascii="Jnu_cont.s"
   character(len=15), parameter :: taur_File = "taur.fits.gz"
   character(len=15), parameter :: contrib_file = "contrib.fits.gz"
@@ -856,30 +856,28 @@ CONTAINS
 
     !at the moment
     !   if (nlam_j /= Nlambda) then
-    interpolate = .true.
-    write(*,*) "    -> interpolating on RT grid..."
-    !   else
-    !   	interpolate = .false.
-    !   endif
-
-    !also reads the other parameters in the file Sth, beta, kappa_tot, Sold
-    !but they are not needed here
-    do icell=1, n_cells
-       !unfortunatelly reading xtmp n_cells time
-       do l=1, nlam_j
-          !read(unit, '(1F12.5,5E20.7E3)') xtmp(l), Jtmp(l), dum, dum, dum, dum
-          read(unit, *) xtmp(l), Jtmp(l), dum, dum, dum, dum
-          write(*,*) xtmp(l), Jtmp(l)
-       enddo
-       if (interpolate) then
-          CALL bezier3_interp(Nlam_j, real(xtmp,kind=dp), Jtmp, Nlambda, lambda, Jnu(:,icell))
-          !     	eta_es(:,icell) = eta_es(:,icell) * ne(icell)
-       else
-          Jnu_cont(:,icell) = Jtmp(:)
-       endif
-       xtmp = 0.; Jtmp = 0.
-    enddo
-    if (interpolate) write(*,*) "    -> ..done"
+!     interpolate = .false. !will not work with true!
+!     if (interpolate) then
+!     	write(*,*) "    -> interpolating on RT grid..."
+! 
+!     !also reads the other parameters in the file Sth, beta, kappa_tot, Sold
+!     !but they are not needed here
+!     do icell=1, n_cells
+!        !unfortunatelly reading xtmp n_cells time
+!        do l=1, nlam_j
+!           !read(unit, '(1F12.5,5E20.7E3)') xtmp(l), Jtmp(l), dum, dum, dum, dum
+!           read(unit, *) xtmp(l), Jtmp(l), dum, dum, dum, dum
+!           write(*,*) xtmp(l), Jtmp(l)
+!        enddo
+!        if (interpolate) then
+!           CALL bezier3_interp(Nlam_j, real(xtmp,kind=dp), Jtmp, Nlambda, lambda, Jnu(:,icell))
+!           !     	eta_es(:,icell) = eta_es(:,icell) * ne(icell)
+!        else
+!           Jnu_cont(:,icell) = Jtmp(:)
+!        endif
+!        xtmp = 0.; Jtmp = 0.
+!     enddo
+!     if (interpolate) write(*,*) "    -> ..done"
 
 
     close(unit)
@@ -1060,24 +1058,23 @@ CONTAINS
        CALL print_error(status)
     endif
     
-    !interpolating on total grid.
-    !Later, interpolated locally if Jnu is flat !
-    write(*,*) " **** Interpolating Jnuc onto lambda grid!"
-    do icell=1, n_cells
-    	Jnu(:,icell) = 0.0_dp
-    	if (icompute_atomRT(icell) > 0) then
-
-          CALL bezier3_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnu(:,icell))
-    	
-    	endif
-    enddo
-    write(*,*) " ***done."
+!-> interpolated locally if Jnu is flat !
+!     write(*,*) " **** Interpolating Jnuc onto lambda grid!"
+!     do icell=1, n_cells
+!     	Jnu(:,icell) = 0.0_dp
+!     	if (icompute_atomRT(icell) > 0) then
+! 
+!           CALL bezier3_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnu(:,icell))
+!     	
+!     	endif
+!     enddo
+!     write(*,*) " ***done."
 
     write(*,'("Jnuc (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
 		maxval(maxval(Jnu_cont(:,:),dim=2)), minval(minval(Jnu_cont,dim=2,mask=Jnu_cont>0))
     
-    write(*,'("Jnu (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
-		maxval(maxval(Jnu(:,:),dim=2)), minval(minval(Jnu,dim=2,mask=Jnu>0))
+!     write(*,'("Jnu (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
+! 		maxval(maxval(Jnu(:,:),dim=2)), minval(minval(Jnu,dim=2,mask=Jnu>0))
 
     CALL ftclos(unit, status) !close
     if (status > 0) then
@@ -1184,25 +1181,23 @@ CONTAINS
 	close(unit)
     call ftfiou(unit, status)
     
-    !interpolating on total grid.
-    !Later, interpolated locally if Jnu is flat !
-    !-> futur deprec, Jnu will be local (too big) and flat across lines
-    write(*,*) " **** Interpolating Jnuc onto lambda grid!"
-    do icell=1, n_cells
-    	Jnu(:,icell) = 0.0_dp
-    	if (icompute_atomRT(icell) > 0) then
-
-          CALL bezier3_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnu(:,icell))
-    	
-    	endif
-    enddo
-    write(*,*) " ***done."
+!Jnu is now supposed to be flat across lines and inteprolated locally !
+!     write(*,*) " **** Interpolating Jnuc onto lambda grid!"
+!     do icell=1, n_cells
+!     	Jnu(:,icell) = 0.0_dp
+!     	if (icompute_atomRT(icell) > 0) then
+! 
+!           CALL bezier3_interp(Nlambda_cont, lambda_cont, Jnu_cont(:,icell), Nlambda, lambda, Jnu(:,icell))
+!     	
+!     	endif
+!     enddo
+!     write(*,*) " ***done."
 
     write(*,'("Jnuc (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
 		maxval(maxval(Jnu_cont(:,:),dim=2)), minval(minval(Jnu_cont,dim=2,mask=Jnu_cont>0))
     
-    write(*,'("Jnu (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
-		maxval(maxval(Jnu(:,:),dim=2)), minval(minval(Jnu,dim=2,mask=Jnu>0))
+!     write(*,'("Jnu (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
+! 		maxval(maxval(Jnu(:,:),dim=2)), minval(minval(Jnu,dim=2,mask=Jnu>0))
 
     return
   end subroutine read_Jnu_cont_bin
@@ -1280,275 +1275,275 @@ CONTAINS
   END SUBROUTINE write_Jnu_cont
 
 
-  SUBROUTINE read_Jnu(ljnu_read)
-    ! ------------------------------------------------------ !
-    ! read Jnu from previous calculations
-    ! ----------------------------------------------------- !
-    logical, intent(inout) :: ljnu_read
-    integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
-    logical :: extend, simple, anynull
-    integer :: nelements, naxis2(4), Nl, naxis_found, hdutype, la, icell, sys_status
-    character(len=256) :: some_comments
-    character(len=512) :: cmd
-
-    
-    !futur deprecation of lread_jnu_atom and ascii
-    
-    !check if data file already exist, otherwise lead and return .false.
-    cmd = "ls "//trim(Jnu_File)
-    call appel_syst(cmd, sys_status)
-    if (sys_status == 0) then !means the file exist
-       write(*,*) " Reading old Jnu.fits.gz file"
-       ljnu_read = .true.
-    else
-       write(*,*) " found no Jnu.fits.gz"
-       ljnu_read = .false.
-       return
-    endif
-
-    !get unique unit number
-    status = 0
-    CALL ftgiou(unit,status)
-
-    CALL ftopen(unit, TRIM(Jnu_File), 0, blocksize, status)
-    if (status > 0) then
-       write(*,*) "Read_Jnu fitsError (1) "
-       CALL print_error(status)
-    endif
-
-    !  Initialize parameters about the FITS image
-    simple = .true. !Standard fits
-    group = 1
-    fpixel = 1
-    extend = .true.
-    bitpix = -64
-
-
-    if (lVoronoi) then
-       naxis = 2
-
-       ! number of axes
-       call ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
-       if (status > 0) then
-          write(*,*) "error reading number of axis (naxis)"
-          call print_error(status)
-          stop
-       endif
-
-       call ftgkyj(unit, "NAXIS1", Nl, some_comments, status)
-       if (status > 0) then
-          write(*,*) "error reading ncells from file (naxis1)"
-          call print_error(status)
-          stop
-       endif
-       nelements = Nl
-       
-       call ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
-       if (status > 0) then
-          write(*,*) "error reading ncells from file (naxis1)"
-          call print_error(status)
-          stop
-       endif
-
-    else
-       if (l3D) then
-          naxis = 4
-          CALL ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
-          if (status > 0) then
-             write(*,*) "Read_Jnu fitsError (2) "
-             CALL print_error(status)
-          endif !the first one is the number of axis in the fits right ?
-          !!nelements = naxis_found
-
-
-
-          CALL ftgkyj(unit, "NAXIS1", naxis_found, some_comments, status)
-          if (status > 0) then
-             write(*,*) "Read_Jnu fitsError (3) "
-             CALL print_error(status)
-          endif
-          Nl = naxis_found
-
-          CALL ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
-          if (status > 0) then
-             write(*,*) "Read_Jnu fitsError (4) "
-             CALL print_error(status)
-          endif
-          nelements = naxis_found
-          CALL ftgkyj(unit, "NAXIS3", naxis_found, some_comments, status)
-          if (status > 0) then
-             write(*,*) "Readpops fitsError (5) "
-             CALL print_error(status)
-          endif
-          nelements = nelements * naxis_found
-          CALL ftgkyj(unit, "NAXIS4", naxis_found, some_comments, status)
-          if (status > 0) then
-             write(*,*) "Read_Jnu fitsError (6) "
-             CALL print_error(status)
-          endif
-          nelements = nelements * Nl *  naxis_found
-       else
-
-          naxis = 3
-          CALL ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
-          if (status > 0) then
-             write(*,*) "Read_Jnu fitsError (2) "
-             CALL print_error(status)
-          endif
-          !nelements = naxis_found
-
-
-          CALL ftgkyj(unit, "NAXIS1", naxis_found, some_comments, status)
-          if (status > 0) then
-             write(*,*) "Read_Jnu fitsError (3) "
-             CALL print_error(status)
-          endif
-          Nl = naxis_found
-
-
-          CALL ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
-          if (status > 0) then
-             write(*,*) "Read_Jnu fitsError (3) "
-             CALL print_error(status)
-          endif
-          nelements = naxis_found
-          CALL ftgkyj(unit, "NAXIS3", naxis_found, some_comments, status)
-          if (status > 0) then
-             write(*,*) "Read_Jnu fitsError (4) "
-             CALL print_error(status)
-          endif
-          nelements = nelements * naxis_found * Nl
-       endif !l3D
-    end if
-
-
-    if (Nl /= Nlambda) then
-       CALL Warning("Jnu size does not match actual grid")
-    endif
-
-    CALL FTG2Dd(unit,1,-999,shape(Jnu),Nl,n_cells,Jnu,anynull,status)
-    if (status > 0) then
-       write(*,*) "Read_Jnu cannot read Jnu "
-       CALL print_error(status)
-    endif
-    
-    
-!     do icell=1, n_cells
-!     	Jnu_cont(:,icell) = 0.0_dp
-!     	if (icompute_atomRT(icell) > 0) then
+!   SUBROUTINE read_Jnu(ljnu_read)
+!     ! ------------------------------------------------------ !
+!     ! read Jnu from previous calculations
+!     ! ----------------------------------------------------- !
+!     logical, intent(inout) :: ljnu_read
+!     integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
+!     logical :: extend, simple, anynull
+!     integer :: nelements, naxis2(4), Nl, naxis_found, hdutype, la, icell, sys_status
+!     character(len=256) :: some_comments
+!     character(len=512) :: cmd
 ! 
-!           CALL bezier3_interp(Nlambda, lambda, Jnu(:,icell), Nlambda_cont, lambda_cont, Jnu_cont(:,icell))
-!     	
-!     	endif
-!     enddo
-    
-    write(*,'("Jnu (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
-		maxval(maxval(Jnu(:,:),dim=2)), minval(minval(Jnu,dim=2,mask=Jnu>0))
-!     write(*,'("Jnuc (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
-! 		maxval(maxval(Jnu_cont(:,:),dim=2)), minval(minval(Jnu_cont,dim=2,mask=Jnu_cont>0))
-
-    CALL ftclos(unit, status) !close
-    if (status > 0) then
-       write(*,*) "Read_Jnu fitsError (8) "
-       CALL print_error(status)
-    endif
-
-    CALL ftfiou(unit, status) !free
-    if (status > 0) then
-       write(*,*) "Read_Jnu fitsError (9) "
-       CALL print_error(status)
-    endif
-
-    RETURN
-  END SUBROUTINE read_Jnu
-
-  SUBROUTINE write_Jnu
-    ! ------------------------------------ !
-    ! write the mean radiation field
-    ! ------------------------------------ !
-    integer :: unit, status = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
-    logical :: extend, simple
-    integer :: nelements, icell, alloc_status, sys_status
-    character(len=512) :: cmd
-
-    !written only if lelectron_scattering or if nlte loop activated, in that case, Jnu_total
-    !is computed
-    if ((.not. lelectron_scattering).and.(Nactiveatoms==0)) return
-
-    write(*,*) " Writing mean intensity... "
-    !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
-    cmd = "ls "//trim(Jnu_file)
-    call appel_syst(cmd, sys_status)
-    if (sys_status == 0) then !means the file exist
-
-       cmd = "mv "//trim(Jnu_file)//" "//"Jnu_old.fits.gz"
-       call appel_syst(cmd, sys_status)
-       if (sys_status /= 0) then
-          call error("Error in copying old Jnu!")
-       endif
-
-    endif
-
-    !get unique unit number
-    CALL ftgiou(unit,status)
-    blocksize=1
-    simple = .true. !Standard fits
-    group = 1
-    fpixel = 1
-    extend = .true.
-    bitpix = -64
-
-    if (lVoronoi) then
-       naxis = 2
-       naxes(1) = Nlambda
-       naxes(2) = n_cells ! equivalent n_cells
-       nelements = naxes(1)*naxes(2)
-    else
-       if (l3D) then
-          naxis = 4
-          naxes(1) = Nlambda
-          naxes(2) = n_rad
-          naxes(3) = 2*nz
-          naxes(4) = n_az
-          nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
-       else
-          naxis = 3
-          naxes(1) = Nlambda
-          naxes(2) = n_rad
-          naxes(3) = nz
-          nelements = naxes(1) * naxes(2) * naxes(3)
-       end if
-    end if
-
-    CALL ftinit(unit,trim(Jnu_file),blocksize,status)
-
-    CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-    CALL ftpkys(unit, "J", "W.m-2.Hz^-1.sr^-1", ' ', status)
-    CALL ftpprd(unit,group,fpixel,nelements,Jnu,status)
-
-    !Jnu_cont
-    !-> written separately 
-!     nelements = nelements / naxes(1)
-!     naxes(1) = Nlambda_cont
-!     nelements = nelements * naxes(1)
-!     CALL ftcrhd(unit, status)
+!     
+!     !futur deprecation of lread_jnu_atom and ascii
+!     
+!     !check if data file already exist, otherwise lead and return .false.
+!     cmd = "ls "//trim(Jnu_File)
+!     call appel_syst(cmd, sys_status)
+!     if (sys_status == 0) then !means the file exist
+!        write(*,*) " Reading old Jnu.fits.gz file"
+!        ljnu_read = .true.
+!     else
+!        write(*,*) " found no Jnu.fits.gz"
+!        ljnu_read = .false.
+!        return
+!     endif
+! 
+!     !get unique unit number
+!     status = 0
+!     CALL ftgiou(unit,status)
+! 
+!     CALL ftopen(unit, TRIM(Jnu_File), 0, blocksize, status)
 !     if (status > 0) then
+!        write(*,*) "Read_Jnu fitsError (1) "
 !        CALL print_error(status)
 !     endif
+! 
+!     !  Initialize parameters about the FITS image
+!     simple = .true. !Standard fits
+!     group = 1
+!     fpixel = 1
+!     extend = .true.
+!     bitpix = -64
+! 
+! 
+!     if (lVoronoi) then
+!        naxis = 2
+! 
+!        ! number of axes
+!        call ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
+!        if (status > 0) then
+!           write(*,*) "error reading number of axis (naxis)"
+!           call print_error(status)
+!           stop
+!        endif
+! 
+!        call ftgkyj(unit, "NAXIS1", Nl, some_comments, status)
+!        if (status > 0) then
+!           write(*,*) "error reading ncells from file (naxis1)"
+!           call print_error(status)
+!           stop
+!        endif
+!        nelements = Nl
+!        
+!        call ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
+!        if (status > 0) then
+!           write(*,*) "error reading ncells from file (naxis1)"
+!           call print_error(status)
+!           stop
+!        endif
+! 
+!     else
+!        if (l3D) then
+!           naxis = 4
+!           CALL ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
+!           if (status > 0) then
+!              write(*,*) "Read_Jnu fitsError (2) "
+!              CALL print_error(status)
+!           endif !the first one is the number of axis in the fits right ?
+!           !!nelements = naxis_found
+! 
+! 
+! 
+!           CALL ftgkyj(unit, "NAXIS1", naxis_found, some_comments, status)
+!           if (status > 0) then
+!              write(*,*) "Read_Jnu fitsError (3) "
+!              CALL print_error(status)
+!           endif
+!           Nl = naxis_found
+! 
+!           CALL ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
+!           if (status > 0) then
+!              write(*,*) "Read_Jnu fitsError (4) "
+!              CALL print_error(status)
+!           endif
+!           nelements = naxis_found
+!           CALL ftgkyj(unit, "NAXIS3", naxis_found, some_comments, status)
+!           if (status > 0) then
+!              write(*,*) "Readpops fitsError (5) "
+!              CALL print_error(status)
+!           endif
+!           nelements = nelements * naxis_found
+!           CALL ftgkyj(unit, "NAXIS4", naxis_found, some_comments, status)
+!           if (status > 0) then
+!              write(*,*) "Read_Jnu fitsError (6) "
+!              CALL print_error(status)
+!           endif
+!           nelements = nelements * Nl *  naxis_found
+!        else
+! 
+!           naxis = 3
+!           CALL ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
+!           if (status > 0) then
+!              write(*,*) "Read_Jnu fitsError (2) "
+!              CALL print_error(status)
+!           endif
+!           !nelements = naxis_found
+! 
+! 
+!           CALL ftgkyj(unit, "NAXIS1", naxis_found, some_comments, status)
+!           if (status > 0) then
+!              write(*,*) "Read_Jnu fitsError (3) "
+!              CALL print_error(status)
+!           endif
+!           Nl = naxis_found
+! 
+! 
+!           CALL ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
+!           if (status > 0) then
+!              write(*,*) "Read_Jnu fitsError (3) "
+!              CALL print_error(status)
+!           endif
+!           nelements = naxis_found
+!           CALL ftgkyj(unit, "NAXIS3", naxis_found, some_comments, status)
+!           if (status > 0) then
+!              write(*,*) "Read_Jnu fitsError (4) "
+!              CALL print_error(status)
+!           endif
+!           nelements = nelements * naxis_found * Nl
+!        endif !l3D
+!     end if
+! 
+! 
+!     if (Nl /= Nlambda) then
+!        CALL Warning("Jnu size does not match actual grid")
+!     endif
+! 
+!     CALL FTG2Dd(unit,1,-999,shape(Jnu),Nl,n_cells,Jnu,anynull,status)
+!     if (status > 0) then
+!        write(*,*) "Read_Jnu cannot read Jnu "
+!        CALL print_error(status)
+!     endif
+!     
+!     
+! !     do icell=1, n_cells
+! !     	Jnu_cont(:,icell) = 0.0_dp
+! !     	if (icompute_atomRT(icell) > 0) then
+! ! 
+! !           CALL bezier3_interp(Nlambda, lambda, Jnu(:,icell), Nlambda_cont, lambda_cont, Jnu_cont(:,icell))
+! !     	
+! !     	endif
+! !     enddo
+!     
+!     write(*,'("Jnu (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
+! 		maxval(maxval(Jnu(:,:),dim=2)), minval(minval(Jnu,dim=2,mask=Jnu>0))
+! !     write(*,'("Jnuc (max)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1"," (min)="(1ES20.7E3)" W.m^-2.Hz^-1.sr^-1")'), &
+! ! 		maxval(maxval(Jnu_cont(:,:),dim=2)), minval(minval(Jnu_cont,dim=2,mask=Jnu_cont>0))
+! 
+!     CALL ftclos(unit, status) !close
+!     if (status > 0) then
+!        write(*,*) "Read_Jnu fitsError (8) "
+!        CALL print_error(status)
+!     endif
+! 
+!     CALL ftfiou(unit, status) !free
+!     if (status > 0) then
+!        write(*,*) "Read_Jnu fitsError (9) "
+!        CALL print_error(status)
+!     endif
+! 
+!     RETURN
+!   END SUBROUTINE read_Jnu
+
+!   SUBROUTINE write_Jnu
+!     ! ------------------------------------ !
+!     ! write the mean radiation field
+!     ! ------------------------------------ !
+!     integer :: unit, status = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
+!     logical :: extend, simple
+!     integer :: nelements, icell, alloc_status, sys_status
+!     character(len=512) :: cmd
+! 
+!     !written only if lelectron_scattering or if nlte loop activated, in that case, Jnu_total
+!     !is computed
+!     if ((.not. lelectron_scattering).and.(Nactiveatoms==0)) return
+! 
+!     write(*,*) " Writing mean intensity... "
+!     !check if data file already exist, can be the case if initial solutions is OLD_POPULATIONS
+!     cmd = "ls "//trim(Jnu_file)
+!     call appel_syst(cmd, sys_status)
+!     if (sys_status == 0) then !means the file exist
+! 
+!        cmd = "mv "//trim(Jnu_file)//" "//"Jnu_old.fits.gz"
+!        call appel_syst(cmd, sys_status)
+!        if (sys_status /= 0) then
+!           call error("Error in copying old Jnu!")
+!        endif
+! 
+!     endif
+! 
+!     !get unique unit number
+!     CALL ftgiou(unit,status)
+!     blocksize=1
+!     simple = .true. !Standard fits
+!     group = 1
+!     fpixel = 1
+!     extend = .true.
+!     bitpix = -64
+! 
+!     if (lVoronoi) then
+!        naxis = 2
+!        naxes(1) = Nlambda
+!        naxes(2) = n_cells ! equivalent n_cells
+!        nelements = naxes(1)*naxes(2)
+!     else
+!        if (l3D) then
+!           naxis = 4
+!           naxes(1) = Nlambda
+!           naxes(2) = n_rad
+!           naxes(3) = 2*nz
+!           naxes(4) = n_az
+!           nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+!        else
+!           naxis = 3
+!           naxes(1) = Nlambda
+!           naxes(2) = n_rad
+!           naxes(3) = nz
+!           nelements = naxes(1) * naxes(2) * naxes(3)
+!        end if
+!     end if
+! 
+!     CALL ftinit(unit,trim(Jnu_file),blocksize,status)
+! 
 !     CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-!     ! Additional optional keywords
-!     CALL ftpkys(unit,"Jc", "W.m-2.Hz^-1.sr^-1", ' ', status)
-!     !write data
-!     CALL ftpprd(unit,group,fpixel,nelements,Jnu_cont,status)
-
-
-    CALL ftclos(unit, status)
-    CALL ftfiou(unit, status)
-
-    if (status > 0) CALL print_error(status)
-
-    RETURN
-  END SUBROUTINE write_Jnu
+!     CALL ftpkys(unit, "J", "W.m-2.Hz^-1.sr^-1", ' ', status)
+!     CALL ftpprd(unit,group,fpixel,nelements,Jnu,status)
+! 
+!     !Jnu_cont
+!     !-> written separately 
+! !     nelements = nelements / naxes(1)
+! !     naxes(1) = Nlambda_cont
+! !     nelements = nelements * naxes(1)
+! !     CALL ftcrhd(unit, status)
+! !     if (status > 0) then
+! !        CALL print_error(status)
+! !     endif
+! !     CALL ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+! !     ! Additional optional keywords
+! !     CALL ftpkys(unit,"Jc", "W.m-2.Hz^-1.sr^-1", ' ', status)
+! !     !write data
+! !     CALL ftpprd(unit,group,fpixel,nelements,Jnu_cont,status)
+! 
+! 
+!     CALL ftclos(unit, status)
+!     CALL ftfiou(unit, status)
+! 
+!     if (status > 0) CALL print_error(status)
+! 
+!     RETURN
+!   END SUBROUTINE write_Jnu
 
   SUBROUTINE write_cont_opac_ascii(atom)
     ! ----------------------------------------------------------- !
