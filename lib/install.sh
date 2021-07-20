@@ -112,6 +112,12 @@ if [ "$SKIP_HDF5" != "yes" ]; then
 fi
 if [ "$SKIP_XGBOOST" != "yes" ]; then
     git clone --recursive https://github.com/dmlc/xgboost
+    cd xgboost
+    git checkout v0.90
+    # We need to install rabit manually as the submodule was removed
+    \rm -rf rabit
+    git clone git@github.com:dmlc/rabit.git
+    cd ..
 fi
 
 #-------------------------------------------
@@ -172,14 +178,9 @@ echo "Done"
 if [ "$SKIP_XGBOOST" != "yes" ]; then
     echo "Compiling XGBoost ..."
     cd xgboost
-    git checkout v0.90
-    #-- we remove the test for the moment even if this works for gfortran
-    #if [ "$SYSTEM" = "ifort" ] ; then
-    \cp ../ifort/xgboost/base.h include/xgboost/base.h
-    #fi
-    \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ was hard-coded in the Mekefile
+    \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ is hard-coded in the Makefile
 
-    # compiling with gfortran for now as there are some issues with ifort 2020 on linux
+    # Forcing g++ for now as there are some issues with ifort 2020 on linux
     CC_old=$CC
     FC_old=$FC
     CXX_old=$CXX
@@ -189,6 +190,11 @@ if [ "$SKIP_XGBOOST" != "yes" ]; then
     export FC=gfortran
     export CXX=g++
     export CFLAGS="-m64"
+
+    #-- we remove the ifort test for the moment even if the default works for gfortran
+    #if [ "$SYSTEM" = "ifort" ] ; then
+    \cp ../ifort/xgboost/base.h include/xgboost/base.h
+    #fi
 
     make -j
     \cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
