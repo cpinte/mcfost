@@ -226,11 +226,6 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -618,11 +613,6 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -1003,11 +993,6 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -1371,12 +1356,6 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
-
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -1724,11 +1703,6 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -2079,11 +2053,6 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -2432,11 +2401,6 @@ contains
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -2770,11 +2734,6 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -3114,11 +3073,6 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -3455,11 +3409,6 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lvariable_dust is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')
@@ -3786,11 +3735,6 @@ end subroutine read_para215
     ! ---------------
     read(1,*) line_buffer
     read(1,*) n_zones
-    if (n_zones > 1) then
-       lvariable_dust=.true. ; exp_strat=0.
-       write(*,*) "You are using a n-zone parameter file"
-       write(*,*) "lstrat is set to true and exp_strat to 0."
-    endif
     ! Allocation des variables pour disque a une zone
     allocate(disk_zone(n_zones), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error disk parameters')

@@ -50,8 +50,7 @@
 set -eu
 
 #-- Preliminary checks
-for comm in make tar; do
-#for comm in svn make tar; do
+for comm in make tar wget; do
     if ! command -v $comm >/dev/null 2>&1; then
         echo "error: $comm command not found"
         exit 1
@@ -108,12 +107,17 @@ pushd .
 wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
 wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-3.47.tar.gz
 git clone https://github.com/cpinte/voro
-#svn checkout --username anonsvn --password anonsvn https://code.lbl.gov/svn/voro/trunk voro
 if [ "$SKIP_HDF5" != "yes" ]; then
     wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
 fi
 if [ "$SKIP_XGBOOST" != "yes" ]; then
     git clone --recursive https://github.com/dmlc/xgboost
+    cd xgboost
+    git checkout v0.90
+    # We need to install rabit manually as the submodule was removed
+    \rm -rf rabit
+    git clone git@github.com:dmlc/rabit.git
+    cd ..
 fi
 
 #-------------------------------------------
@@ -159,7 +163,6 @@ elif [ "$SYSTEM" = "gfortran" ]; then
 fi
 
 cd voro
-svn up -r604
 # Allowing for up to 1e8 particles (1e7 by default)
 \cp -f ../voro++/config.hh src/
 make
@@ -175,14 +178,9 @@ echo "Done"
 if [ "$SKIP_XGBOOST" != "yes" ]; then
     echo "Compiling XGBoost ..."
     cd xgboost
-    git checkout v0.90
-    #-- we remove the test for the moment even if this works for gfortran
-    #if [ "$SYSTEM" = "ifort" ] ; then
-    \cp ../ifort/xgboost/base.h include/xgboost/base.h
-    #fi
-    \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ was hard-coded in the Mekefile
+    \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ is hard-coded in the Makefile
 
-    # compiling with gfortran for now as there are some issues with ifort 2020 on linux
+    # Forcing g++ for now as there are some issues with ifort 2020 on linux
     CC_old=$CC
     FC_old=$FC
     CXX_old=$CXX
@@ -192,6 +190,11 @@ if [ "$SKIP_XGBOOST" != "yes" ]; then
     export FC=gfortran
     export CXX=g++
     export CFLAGS="-m64"
+
+    #-- we remove the ifort test for the moment even if the default works for gfortran
+    #if [ "$SYSTEM" = "ifort" ] ; then
+    \cp ../ifort/xgboost/base.h include/xgboost/base.h
+    #fi
 
     make -j
     \cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib

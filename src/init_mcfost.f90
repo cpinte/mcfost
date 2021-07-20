@@ -262,7 +262,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1
 
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, ln_zone, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -275,7 +275,6 @@ subroutine initialisation_mcfost()
   lPA = .false.
   lmc = .false.
   lMC_bins = .false.
-  ln_zone=.false. ;
   lHG = .false.
   lonly_scatt = .false.
   lno_T = .false.
@@ -444,15 +443,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,band)
         read(band,*,iostat=ios) wvl
         if (ios/=0) call error("wavelength needed for -op. Error #2")
-        i_arg = i_arg+1
-     case("-n-zone")
-        ln_zone=.true.
-        write(*,*) "n-zone disk calculation"
-        i_arg = i_arg+1
-        if (i_arg > nbr_arg) call error("Number of zones needed")
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) n_zones
-        if (ios/=0) call error("Number of zones needed")
         i_arg = i_arg+1
      case("-origin")
         lorigine=.true.
@@ -1360,6 +1350,7 @@ subroutine initialisation_mcfost()
   else
      call read_para(para)
   endif
+  if (n_zones > 1) lvariable_dust=.true.
 
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
   if (lemission_atom.and.para_version < 2.11) call error("Atomic line RT only available for latest versions")
@@ -1445,18 +1436,6 @@ subroutine initialisation_mcfost()
      basename_data_dir = "data_disk"
      data_dir = trim(root_dir)//"/"//trim(seed_dir)//"/"//trim(basename_data_dir)
      call save_data_prop(para,base_para)
-  endif
-
-  if (ln_zone) then
-     !lvariable_dust=.true.
-     write(*,*) "WARNING: lvariable_dust is not set automatically to TRUE !!!!!!!!!"
-
-     if (exp_strat > 1.0e-6) then
-        write(*,*) "!!!  WARNING  !!!"
-        write(*,*) "Using the [-2zone] option automatically turns on the disk settling "
-        write(*,*) "To avoid this, you should set [exp_strat] to 0.0 in the parameter file"
-        write(*,*) "Continuing anyway"
-     endif
   endif
 
   if (lread_Seb_Charnoz) lvariable_dust = .true.
