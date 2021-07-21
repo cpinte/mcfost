@@ -80,7 +80,7 @@ contains
        close(unit=1)
        N_points = N_points - Nheader
        write(*,*) " Input model has ", N_points," grid points !"
-       
+
        N_points = N_points + n_etoiles
 
        open(unit=1,file=density_file, status="old")
@@ -182,8 +182,8 @@ contains
     !     	ndusttypes = 1 !oterwise bug
     !     	allocate(massdust(1, n_points),rhodust(1, n_points),hydro_grainsizes(1))
     !** bug handling
-    call sph_to_voronoi(n_points-n_etoiles, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, T_tmp, mass_gas, massdust, rho, rhodust,&
-         hydro_grainsizes, hydro_limits, check_previous_tesselation)
+    call sph_to_voronoi(n_points-n_etoiles, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, &
+         T_tmp, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation)
     ! -> correction for small density applied on mass_gas directly inside
 
     !** bug handling
