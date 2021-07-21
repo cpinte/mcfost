@@ -45,6 +45,9 @@ module spectrum_type
   real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
   real(kind=dp), allocatable, dimension(:,:,:,:,:) :: F_QUV
   real(kind=dp), allocatable, dimension(:,:) :: origin_atom, originc_atom
+  
+  logical :: limage_at_lam0 = .false.
+  real(kind=dp), allocatable, dimension(:,:,:,:) :: image_map
 
 contains
 
@@ -83,7 +86,12 @@ contains
     alloc_nlte_vars = Nactiveatoms > 0
 
 
-    if (present(lam0)) wavelength_ref = lam0
+    if (present(lam0)) then
+    	wavelength_ref = lam0
+    	if (RT_line_method==2 .and. .not.lmagnetized) then
+    		limage_at_lam0 = .true.
+    	endif
+    endif
 
 
     !for each line
@@ -482,6 +490,16 @@ contains
        end if
     endif
 
+	if ( limage_at_lam0 ) then
+
+    	allocate(image_map(npix_x, npix_y, rt_n_incl, rt_n_az),stat=alloc_status)
+        if (alloc_status > 0) then
+            call error("Cannot allocate image_map !")
+        endif	
+        image_map = 0.0_dp
+        mem_alloc_local = mem_alloc_local + sizeof(image_map)
+	
+	endif
 
     mem_alloc_tot = mem_alloc_tot + mem_alloc_local
     write(*,'("Total memory allocated in alloc_flux_image:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
@@ -592,6 +610,7 @@ contains
 
     if (allocated(origin_atom)) deallocate(origin_atom, originc_atom)
 
+	if (limage_at_lam0) deallocate(image_map)
 
     return
   end subroutine dealloc_Spectrum
@@ -1213,8 +1232,76 @@ contains
     enddo !atom
 
 
+	if (limage_at_lam0) call write_image_map()
+
     return
   end subroutine write_atomic_maps
+  
+  subroutine write_image_map()
+    integer :: status,unit,blocksize,bitpix,naxis
+    integer, dimension(4) :: naxes
+    integer :: group,fpixel,nelements
+    logical :: simple, extend
+    character(len=6) :: comment="VACUUM"
+    real :: pixel_scale_x, pixel_scale_y
+    character(len=10) :: wave_write
+
+
+    blocksize=1
+    simple=.true.
+    extend=.false.
+    group=1
+    fpixel=1
+    bitpix=-64
+
+    naxis=4
+    naxes(1)=npix_x
+    naxes(2)=npix_y
+    naxes(3)=RT_n_incl
+    naxes(4)=RT_n_az
+    nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+
+    status=0
+    call ftgiou (unit,status)
+    write(wave_write, '(1I10)') nint(wavelength_ref)
+    call ftinit(unit,"image_"//trim(adjustl(wave_write))//".fits.gz",blocksize,status)
+
+
+    call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+    if (status > 0) call print_error(status)
+    call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+    call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+    call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+    pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+    call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+
+    call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+    call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+    call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+    pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+	call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+
+    call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm F_{\nu}}$',status)
+    call ftpkyd(unit,'lambda0',wavelength_ref,-7,'nm',status)
+
+    !Write the array to the FITS file.
+    call ftpprd(unit,group,fpixel,nelements,image_map,status)
+    if (status > 0) call print_error(status)
+
+
+    !  Close the file and free the unit number.
+    call ftclos(unit, status)
+    if (status > 0) then
+        call print_error(status)
+    endif
+    call ftfiou(unit, status)
+    if (status > 0) then
+        call print_error(status)
+    endif
+
+    return
+  end subroutine write_image_map
 
   subroutine writeWavelength()
     ! --------------------------------------------------------------- !

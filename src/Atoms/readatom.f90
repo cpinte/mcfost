@@ -628,7 +628,7 @@ CONTAINS
           if (ldissolve) then !only if we actually want to extrapolate
              if (atom%ID=="H") then ! .or. atom%ID=="He") then
         	CALL search_cont_lambdamax (atom%continua(kr), atom%Rydberg, atom%stage(i)+1,atom%E(j),atom%E(i))
-         CALL make_sub_wavelength_grid_cont_linlog(atom%continua(kr), &
+        	CALL make_sub_wavelength_grid_cont_linlog(atom%continua(kr), &
               atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
                 !!CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
              else
