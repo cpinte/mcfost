@@ -1439,6 +1439,8 @@ contains
     integer(kind=8) :: mem_alloc_local = 0
     real(kind=dp) :: diff_cont
     integer :: ibar, n_cells_done
+    integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
+
 
     write(*,*) " USING MALI METHOD FOR NLTE LOOP"
 
@@ -2205,15 +2207,14 @@ contains
              time_nlte=real(time_end - time_begin)/real(time_tick)
           endif
 
-          if (n_iter <= 4) then
-             time_iteration = time_iteration + time_nlte  * 0.25
-             !if the problem converge in less than 4 iterations pb
+          if (n_iter <= n_iter_counted) then
+             time_iteration = time_iteration + time_nlte / real(n_iter_counted)
           endif
 
 
           if (lsafe_stop) then
 
-             if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= 4)) then
+             if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= n_iter_counted)) then
                 lconverged = .true.
                 lprevious_converged = .true.
                 call warning("Time limit would be exceeded, leaving...")
@@ -2234,7 +2235,7 @@ contains
        write(*,*) "step: ", etape, "Threshold: ", precision!dpops_max_error
        !real values are possible, not needed and would increase the amount
        !of lign of codes.
-       if (n_iter >= 4) then
+       if (n_iter >= n_iter_counted) then
           write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
           write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
        endif
