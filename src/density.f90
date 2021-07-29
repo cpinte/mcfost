@@ -65,6 +65,9 @@ subroutine define_gas_density()
   real(kind=dp), dimension(:), allocatable :: densite_gaz_tmp, densite_gaz_midplane_tmp
 
 
+
+  write(*,*) "TEST", lgap_gaussian
+
   allocate(densite_gaz_tmp(n_cells), densite_gaz_midplane_tmp(n_rad), stat=alloc_status)
   densite_gaz_tmp = 0.0 ; densite_gaz_midplane_tmp = 0.0
   densite_gaz = 0.0 ;
@@ -267,6 +270,7 @@ subroutine define_gas_density()
      endif ! dz%geometry
 
      if (lgap_Gaussian) then
+        write(*,*) "GAP", f_gap_gaussian, r_gap_gaussian, sigma_gap_gaussian
         do icell=1, n_cells
            densite_gaz_tmp(icell) = densite_gaz_tmp(icell) * (1.0 - f_gap_Gaussian * &
                 exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
@@ -1232,7 +1236,7 @@ subroutine read_density_file()
 
      if (status == 0) then
         write(*,*) "Updating gas-to-dust ratio to", gas2dust
-        dz%gas_to_dust = gas2dust
+        disk_zone(1)%gas_to_dust = gas2dust
      endif
      status = 0
 
@@ -1359,7 +1363,6 @@ subroutine read_density_file()
 
 
   ! Passing the densities and velocities to mcfost arrays
-  dz = disk_zone(1)
   do k=1, n_az
      do j=j_start,nz
         if (l3D_file) then

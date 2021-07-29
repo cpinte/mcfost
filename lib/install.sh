@@ -90,6 +90,15 @@ else
     exit 1
 fi
 
+
+# Detecting operating system
+if [ "$(uname | tr '[:lower:]' '[:upper:]' 2>&1 | grep -c DARWIN)" -eq 1 ]; then
+    os="macos"
+else
+    os="linux"
+fi
+
+
 #-- Check if SKIP_HDF5 is set, if not, set to 'no'
 if [ -z ${SKIP_HDF5+x} ]; then SKIP_HDF5=no; fi
 
@@ -127,7 +136,10 @@ echo "Compiling SPRNG ..."
 tar xzvf sprng2.0b.tar.gz
 \cp -f "$SYSTEM/make.CHOICES" sprng2.0
 \cp -f "$SYSTEM/make.INTEL" sprng2.0/SRC
-if [ "$(uname | tr '[:lower:]' '[:upper:]' 2>&1 | grep -c DARWIN)" -eq 1 ]; then
+if [ "$SYSTEM" = "gfortran" ] ; then
+    \cp -f "$SYSTEM/primes_64.c" sprng2.0/SRC # recent gfortran has an issue with having duplicate symbols between primes_32 and primes_64
+fi
+if [ "$os" = "macos" ]; then
     \cp -f macos/insertmenu.mac sprng2.0/SRC/insertmenu
 fi
 
@@ -180,16 +192,18 @@ if [ "$SKIP_XGBOOST" != "yes" ]; then
     cd xgboost
     \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ is hard-coded in the Makefile
 
-    # Forcing g++ for now as there are some issues with ifort 2020 on linux
-    CC_old=$CC
-    FC_old=$FC
-    CXX_old=$CXX
-    CFLAGS_old=$CFLAGS
+    if [ "$os" = "linux" ]; then
+        # Forcing g++ for now as there are some issues with ifort 2020 on linux
+        CC_old=$CC
+        FC_old=$FC
+        CXX_old=$CXX
+        CFLAGS_old=$CFLAGS
 
-    export CC=gcc
-    export FC=gfortran
-    export CXX=g++
-    export CFLAGS="-m64"
+        export CC=gcc
+        export FC=gfortran
+        export CXX=g++
+        export CFLAGS="-m64"
+    fi
 
     #-- we remove the ifort test for the moment even if the default works for gfortran
     #if [ "$SYSTEM" = "ifort" ] ; then
@@ -205,11 +219,13 @@ if [ "$SKIP_XGBOOST" != "yes" ]; then
     cd ~1
     echo "Done"
 
-    # Restoring flags
-    export CC=$CC_old
-    export FC=$FC_old
-    export CXX=$CXX_old
-    export CFLAGS=$CFLAGS_old
+    if [ "$os" = "linux" ]; then
+        # Restoring flags
+        export CC=$CC_old
+        export FC=$FC_old
+        export CXX=$CXX_old
+        export CFLAGS=$CFLAGS_old
+    fi
 else
     echo "Skipping XGBoost ..."
     echo "Make sure to set MCFOST_NO_XGBOOST=yes when compiling MCFOST"
