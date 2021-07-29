@@ -19,7 +19,7 @@ module atom_transfer
        Ishock, Istar_loc, flux_star, Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, &
        init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
        dealloc_jnu, reallocate_rays_arrays, write_flux, originc_atom, origin_atom, &
-       originc_file, origin_file, write_atomic_maps
+       originc_file, origin_file, write_atomic_maps, limage_at_lam0, image_map, wavelength_ref
 
   use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, &
        ne, T, vr, vphi, v_z, vtheta, wght_per_H, readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, &
@@ -94,7 +94,7 @@ module atom_transfer
   real(kind=dp), dimension(:), allocatable :: Iacc
   !NLTE
   real(kind=dp) :: dne
-  logical :: ljacobi_sor = .false., lfixed_J = .false. !Option to compute J assuming LTE and keep this value for NLTE transfer
+  logical :: ljacobi_sor = .false., lfixed_J = .false. !computes and fix J for the non-LTE loop
   ! 	logical :: lNg_acceleration = .true.
   ! 	integer :: iNg_Norder=2, iNg_ndelay=5, iNg_Nperiod=5
   real(kind=dp), allocatable :: ng_cur(:)
@@ -772,7 +772,11 @@ contains
           enddo
           atom => NULL()
        enddo
-
+       
+		if (limage_at_lam0 ) then
+			image_map(ipix,jpix,ibin,iaz) = &
+				interp1d_sorted(Nlambda,lambda,I0,wavelength_ref)*(pixelsize*zoom/map_size)**2
+		endif
     endif
 
 
@@ -957,8 +961,8 @@ contains
     logical :: lelectron_read
     type (AtomType), pointer :: atom
     integer :: alloc_status
-    real(kind=dp) :: lam0 = 500.0 !default
 
+    real(kind=dp) :: lam0 = 500.0 !default
     
 
 	omp_chunk_size = 1!max(nint( 0.01 * n_cells / nb_proc ),1)
@@ -1076,8 +1080,14 @@ contains
 
        !use the same rays as nlteloop
        if (lelectron_scattering) then
-          !otherwise, J = 0 at init for nlte loop
-          if (lfixed_J) call iterate_Jnu
+          if (lread_jnu_atom) then
+          	!If present use previous calculation for initial solution
+			call read_jnu_cont_bin
+          else
+          	if (lfixed_J) call iterate_Jnu
+          	!if not lfixed_J, iterate from scratch (0)
+          	!otherwise, compute it at LTE and fix it
+          endif
        endif
 
        if (allocated(ds)) deallocate(ds)
@@ -1253,6 +1263,7 @@ contains
        if (loutput_rates) deallocate(Rij_all,Rji_all,Gammaij_all)
 
        if (lelectron_scattering) then
+!         if (lfixed_J) call iterate_jnu
        	call write_Jnu_cont_bin
        endif
 
@@ -1288,6 +1299,7 @@ contains
 				call read_jnu_cont_bin
                 !still starts electron scattering from this value!
                 !does not jump at the image calculation yet.
+                !this allows to restart a calculation!
              endif
              !else
                 call iterate_Jnu()
@@ -1362,7 +1374,7 @@ contains
 
     call write_flux(only_flux=.true.)
     call write_atomic_maps
-    deallocate(flux,fluxc)
+!     deallocate(flux,fluxc)
 
     if (lorigin_atom) then
        call write_opacity_emissivity_map
@@ -1417,7 +1429,7 @@ contains
     real(kind=dp), allocatable :: Jnew_cont(:,:)
     ! 		real(kind=dp), allocatable :: err_pop(:,:)
     logical :: labs, update_bckgr_opac
-    logical :: l_iterate, l_iterate_ne, update_ne_other_nlte
+    logical :: l_iterate = .false., l_iterate_ne = .false., update_ne_other_nlte = .false.
     logical :: accelerated, ng_rest!,lapply_sor_correction
     integer :: iorder, i0_rest, n_iter_accel, iacc!, iter_sor
     integer :: nact, imax, icell_max, icell_max_2
@@ -1427,6 +1439,8 @@ contains
     integer(kind=8) :: mem_alloc_local = 0
     real(kind=dp) :: diff_cont
     integer :: ibar, n_cells_done
+    integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
+
 
     write(*,*) " USING MALI METHOD FOR NLTE LOOP"
 
@@ -2193,15 +2207,14 @@ contains
              time_nlte=real(time_end - time_begin)/real(time_tick)
           endif
 
-          if (n_iter <= 4) then
-             time_iteration = time_iteration + time_nlte  * 0.25
-             !if the problem converge in less than 4 iterations pb
+          if (n_iter <= n_iter_counted) then
+             time_iteration = time_iteration + time_nlte / real(n_iter_counted)
           endif
 
 
           if (lsafe_stop) then
 
-             if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= 4)) then
+             if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= n_iter_counted)) then
                 lconverged = .true.
                 lprevious_converged = .true.
                 call warning("Time limit would be exceeded, leaving...")
@@ -2222,7 +2235,7 @@ contains
        write(*,*) "step: ", etape, "Threshold: ", precision!dpops_max_error
        !real values are possible, not needed and would increase the amount
        !of lign of codes.
-       if (n_iter >= 4) then
+       if (n_iter >= n_iter_counted) then
           write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
           write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
        endif
@@ -2651,6 +2664,7 @@ contains
     logical :: labs
     integer :: la, icell, imax, icell_max, ibar, n_cells_done
     integer :: imu, iphi, time_iteration, time_nonlte
+    integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
     real(kind=dp) :: lambda_max, weight
     
     logical :: lcalc_anisotropy = .false.
@@ -2806,7 +2820,6 @@ contains
           call ERROR("etape unkown")
        end if
 
-
        lnotfixed_rays = .not.lfixed_rays
        lconverged = .false.
        n_iter = 0
@@ -2825,8 +2838,7 @@ contains
           		stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
           	end do
           end if
-
-
+          
           call progress_bar(0)
           !$omp parallel &
           !$omp default(none) &
@@ -2842,6 +2854,7 @@ contains
              !$ id = omp_get_thread_num() + 1
 
              if (icompute_atomRT(icell)>0) then
+
              
 !              	write(*,*) " cell", icell, " id = ", id
                 Jnu_cont(:,icell) = 0.0_dp
@@ -3017,15 +3030,14 @@ contains
              time_nlte=real(time_end - time_begin)/real(time_tick)
           endif
 
-          if (n_iter <= 4) then
-             time_iteration = time_iteration + time_nlte  * 0.25
-             !if the problem converge in less than 4 iterations pb
+          if (n_iter <= n_iter_counted) then
+             time_iteration = time_iteration + time_nlte  / real( n_iter_counted)
           endif
 
 
           if (lsafe_stop) then
 
-             if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= 4)) then
+             if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= n_iter_counted)) then
                 lconverged = .true.
                 lprevious_converged = .true.
                 call warning("Time limit would be exceeded, leaving...")
@@ -3044,7 +3056,7 @@ contains
        end do !while
        write(*,*) etape, "Threshold =", precision
        
-       if (n_iter >= 4) then
+       if (n_iter >= n_iter_counted) then
           write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
           write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
        endif

@@ -480,7 +480,7 @@ contains
              Nblue = atom%continua(kc)%Nblue; Nred = atom%continua(kc)%Nred
              chi_ion = Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(j))
              neff = atom%stage(j) * sqrt(atom%Rydberg / (atom%E(j) - atom%E(i)) )
-             gij = atom%nstar(i,icell)/atom%nstar(j,icell)
+             gij = atom%nstar(i,icell)/(atom%nstar(j,icell) + 1d-100)
 
              icell_d = 1
              wj = 1.0; wi = 1.0
