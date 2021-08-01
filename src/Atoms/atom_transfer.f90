@@ -1190,7 +1190,7 @@ contains
        !!allocate(psi_mean(nlambda, n_cells)); psi_mean = 0.0
        !!allocate(chi_loc(nlambda, n_rayons_max, nb_proc)); chi_loc = 0.0
 
-       write(*,'("->Total memory allocated before NLTEloop:"(1ES17.8E3)" MB")') mem_alloc_tot/1024./1024.
+       write(*,'("->Total memory allocated before NLTEloop:"(1F14.3)" MB")') mem_alloc_tot/1024./1024./1024.
 
        if (lcheckpoint) call prepare_check_pointing()
 
@@ -1536,7 +1536,7 @@ contains
     !otherwise, Jnu_cont is fixed if lfixed_j and not updated!
        allocate(Jnew_cont(Nlambda_cont, n_cells)); Jnew_cont = 0.0
        mem_alloc_local = mem_alloc_local + sizeof(Jnew_cont)
-       write(*,*) " size Jnew_cont:", sizeof(Jnew_cont)/1024./1024.," MB"
+       write(*,*) " size Jnew_cont:", sizeof(Jnew_cont)/1024./1024./1024.," GB"
     endif
 
     ! ds is not used for this scheme at  the moment. Psi is used instead
@@ -1560,7 +1560,7 @@ contains
     write(*,*) " size eta_atoms:", sizeof(eta_atoms) / 1024./1024.," MB"
     allocate(Uji_down(Nlambda,Nmaxlevel,NactiveAtoms,nb_proc),stat=alloc_status)
     if (alloc_Status > 0) call error("Allocation error Uji_down")
-    write(*,*) " size cross-coupling:", 3 * sizeof(Uji_down) / 1024./1024.," MB"
+    write(*,*) " size cross-coupling:", 3 * sizeof(Uji_down) / 1024./1024./1024.," GB"
     allocate(chi_down(Nlambda,Nmaxlevel,NactiveAtoms,nb_proc),stat=alloc_status)
     if (alloc_Status > 0) call error("Allocation error chi_down")
     allocate(chi_up(Nlambda,Nmaxlevel,NactiveAtoms,nb_proc),stat=alloc_status)
@@ -1570,8 +1570,8 @@ contains
          sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ne_new)
 
     mem_alloc_tot = mem_alloc_tot + mem_alloc_local
-    write(*,'("Total memory allocated in NLTEloop:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
-    write(*,'("Total memory allocated up to now:"(1ES17.8E3)" GB")') mem_alloc_tot / 1024./1024./1024.
+    write(*,'("Total memory allocated in NLTEloop:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
+    write(*,'("Total memory allocated up to now:"(1F14.3)" GB")') mem_alloc_tot / 1024./1024./1024.
 
 
     step_loop : do etape=etape_start, etape_end
@@ -2958,7 +2958,7 @@ contains
           !$omp default(none) &
           !$omp private(id,icell, la, dJ, dN, dj_loc) &
           !$omp shared(icompute_atomRT, T, ne, Jold, Jnu_cont, Sold, Snew, lcell_converged) &
-          !$omp shared(Nlambda_cont, n_cells, dSource, diff, icell_max, precision, imax)
+          !$omp shared(Nlambda_cont, lambda_cont, n_cells, dSource, diff, icell_max, precision, imax)
           !$omp do schedule(dynamic, omp_chunk_size)
           cell_loop2 : do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
@@ -2966,7 +2966,7 @@ contains
                 dJ = 0.0_dp
                 dN = 0.0_dp
                 do la=1, Nlambda_cont
-                	write(*,"(1I6,1F12.5, 3ES20.7E3)") icell, T(icell), ne(icell), Jnu_cont(la,icell), Jold(la,icell)
+                	write(*,"(1I6,2F12.5, 3ES20.7E3)") icell, lambda_cont(la), T(icell), ne(icell), Jnu_cont(la,icell), Jold(la,icell)
 					 dj_loc = abs( 1.-Jold(la,icell)/Jnu_cont(la,icell) )
 					 if (dj_loc > dJ) then
 					 	dJ = dj_loc

@@ -212,8 +212,8 @@ contains
     allocate(chi_c(Nlambda_cont,n_cells), eta_c(Nlambda_cont,n_cells), stat=alloc_status)
     !-> At the moment not needed because only Thomson scattering included
     !allocate(sca_c(Nlambda_cont,n_cells), stat=alloc_status)
-    ! 		write(*,*) " size chi_c/eta_c ", 2 * n_cells * Nlambda_cont/1024./1024., " MB"
-    ! 		write(*,*) " size chi_c/eta_c ", (size(chi_c)+size(eta_c))/1024./1024., " MB"
+    ! 		write(*,*) " size chi_c/eta_c ", 2 * n_cells * Nlambda_cont/1024./1024./1024., " GB"
+    ! 		write(*,*) " size chi_c/eta_c ", (size(chi_c)+size(eta_c))/1024./1024./1024., " GB"
 
     if (alloc_status > 0) then
        call error("Allocation error, continuum opacities")
@@ -223,9 +223,9 @@ contains
     if (allocated(sca_c)) then
        sca_c = 0.0_dp
        mem_alloc_local = mem_alloc_local + sizeof(chi_c)
-       write(*,*) " -> size contopac:", 3 * sizeof(chi_c) /1024./1024.," MB"
+       write(*,*) " -> size contopac:", 3 * sizeof(chi_c) /1024./1024./1024.," GB"
     else
-       write(*,*) " -> size contopac:", 2 * sizeof(chi_c) /1024./1024.," MB"
+       write(*,*) " -> size contopac:", 2 * sizeof(chi_c) /1024./1024./1024.," GB"
     endif
 
     mem_alloc_local = mem_alloc_local + sizeof(chi_c) * 2
@@ -242,7 +242,7 @@ contains
        allocate(chi0_bb(Nlambda , n_cells))
        eta0_bb = 0.0_dp
        chi0_bb = 0.0_dp
-       write(*,*) " -> size contopac (line grid):", 2*sizeof(chi0_bb)/1024./1024.," MB"
+       write(*,*) " -> size contopac (line grid):", 2*sizeof(chi0_bb)/1024./1024./1024.," GB"
        mem_alloc_local = mem_alloc_local + sizeof(eta0_bb) * 2
     else
        write(*,*) " -> Reducing memory usage by interpolating continuous opacity!"
@@ -253,7 +253,7 @@ contains
        call alloc_jnu
        mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(Jnu)
        write(*,*) " -> size Jnu(lambda):", sizeof(Jnu)/1024./1024.," MB"
-       write(*,*) " -> size Jnu_cont:", sizeof(Jnu_cont)/1024./1024.," MB"
+       write(*,*) " -> size Jnu_cont:", sizeof(Jnu_cont)/1024./1024./1024.," GB"
     endif
 
 
@@ -270,7 +270,7 @@ contains
           call alloc_jnu
           mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(Jnu)
           write(*,*) " -> size Jnu(lambda):", sizeof(Jnu)/1024./1024.," MB"
-          write(*,*) " -> size Jnu_cont:", sizeof(Jnu_cont)/1024./1024.," MB"
+          write(*,*) " -> size Jnu_cont:", sizeof(Jnu_cont)/1024./1024./1024.," GB"
        endif
 
        ! .....  add other NLTE opac
@@ -288,7 +288,7 @@ contains
     endif
 
     mem_alloc_tot = mem_alloc_tot + mem_alloc_local
-    write(*,'("Total memory allocated in alloc_spectrum:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
+    write(*,'("Total memory allocated in alloc_spectrum:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
 
     return
   end subroutine alloc_Spectrum
@@ -502,7 +502,7 @@ contains
 	endif
 
     mem_alloc_tot = mem_alloc_tot + mem_alloc_local
-    write(*,'("Total memory allocated in alloc_flux_image:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
+    write(*,'("Total memory allocated in alloc_flux_image:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
 
 
     deallocate(mem_per_file)

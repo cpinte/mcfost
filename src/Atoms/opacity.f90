@@ -318,9 +318,9 @@ contains
        atom => NULL()
     enddo
 
-    write(*,*) " Size of all local profiles for interp:", size_phi_all/1024./1024., ' MB'
+    write(*,*) " Size of all local profiles for interp:", size_phi_all/1024./1024./1024., ' GB'
     mem_alloc_tot = mem_alloc_tot + mem_alloc_local
-    write(*,'("Total memory allocated in alloc_atom_quantities:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
+    write(*,'("Total memory allocated in alloc_atom_quantities:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
 
 
     RETURN
