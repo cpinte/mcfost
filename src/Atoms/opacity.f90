@@ -891,7 +891,7 @@ contains
           !get the ionisation potential for the ion ot be use in the dissolve fraction
           chi_ion = elem%ionpot(aatom%stage(j))
           ! 				ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
-          ni_on_nj_star = aatom%nstar(i,icell)/aatom%nstar(j,icell)
+          ni_on_nj_star = aatom%nstar(i,icell)/(aatom%nstar(j,icell) + 1d-100)
 
           gij = ni_on_nj_star * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0)
 
@@ -1181,7 +1181,7 @@ contains
           Nl = Nr - Nb + 1
 
           ! 					ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
-          ni_on_nj_star = aatom%nstar(i,icell)/aatom%nstar(j,icell)
+          ni_on_nj_star = aatom%nstar(i,icell)/(aatom%nstar(j,icell) + 1d-100)
 
 
           icell_d = 1

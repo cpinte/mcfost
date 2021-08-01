@@ -2957,7 +2957,7 @@ contains
           !$omp parallel &
           !$omp default(none) &
           !$omp private(id,icell, la, dJ, dN, dj_loc) &
-          !$omp shared(icompute_atomRT, Jold, Jnu_cont, Sold, Snew, lcell_converged) &
+          !$omp shared(icompute_atomRT, T, ne, Jold, Jnu_cont, Sold, Snew, lcell_converged) &
           !$omp shared(Nlambda_cont, n_cells, dSource, diff, icell_max, precision, imax)
           !$omp do schedule(dynamic, omp_chunk_size)
           cell_loop2 : do icell=1, n_cells
@@ -2966,6 +2966,7 @@ contains
                 dJ = 0.0_dp
                 dN = 0.0_dp
                 do la=1, Nlambda_cont
+                	write(*,"(1I6,1F12.5, 3ES20.7E3)") icell, T(icell), ne(icell), Jnu_cont(la,icell), Jold(la,icell)
 					 dj_loc = abs( 1.-Jold(la,icell)/Jnu_cont(la,icell) )
 					 if (dj_loc > dJ) then
 					 	dJ = dj_loc
