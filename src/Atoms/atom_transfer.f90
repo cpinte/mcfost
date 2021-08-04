@@ -2747,11 +2747,6 @@ contains
 !              write(*,*) "icell=", icell, "Sold=",Sold(:,icell)
 !              write(*,*) "Jold=", Jold(:,icell)
 !           endif
-		if (icell==994) then
-		    write(*,"(1I6,1F12.5, 3ES20.7E3)") icell, T(icell), ne(icell), Jnu_cont(1,icell), Jold(1,icell)
-		    write(*,"(3ES20.7E3)") Sold(1,icell), beta(1,icell), Sth(1,icell)
-		    write(*,"(3ES20.7E3)") chi_c(1,icell), eta_c(1,icell), thomson(icell)
-		endif
 
        endif
     enddo
@@ -2973,14 +2968,16 @@ contains
                 	write(*,"(1I6,2F12.5, 3ES20.7E3)") icell, lambda_cont(la), T(icell), ne(icell), Jnu_cont(la,icell), Jold(la,icell)
 		    		write(*,"(4ES20.7E3)") Sold(la,icell), beta(la,icell), Sth(la,icell), Snew(la,icell)
 		    		write(*,"(3ES20.7E3)") chi_c(la,icell), eta_c(la,icell), thomson(icell)
-					 dj_loc = abs( 1.-Jold(la,icell)/Jnu_cont(la,icell) )
-					 if (dj_loc > dJ) then
-					 	dJ = dj_loc
-					 	imax = la
-					 endif
-                   dN = max( dN, abs( 1.0_dp - Sold(la,icell)/Snew(la,icell) ) )
-         	 	   Sold(la,icell) = Snew(la,icell)
-          		   Jold(la,icell) = Jnu_cont(la,icell)
+		    		if (Jnu_cont(la,icell) > 0.0) then
+					 	dj_loc = abs( 1.-Jold(la,icell)/Jnu_cont(la,icell) )
+					 	if (dj_loc > dJ) then
+					 		dJ = dj_loc
+					 		imax = la
+					 	endif
+					endif
+                    dN = max( dN, abs( 1.0_dp - Sold(la,icell)/(Snew(la,icell)+1d-50) ) )
+         	 	    Sold(la,icell) = Snew(la,icell)
+          		    Jold(la,icell) = Jnu_cont(la,icell)
                 enddo
                 dSource = max(dSource, dN)
 
