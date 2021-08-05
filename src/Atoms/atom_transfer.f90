@@ -2751,9 +2751,11 @@ contains
        endif
     enddo
     write(*,'("beta (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
-		maxval(maxval(beta(:,:),dim=2)), minval(minval(beta,dim=2,mask=Sold>0))
+		maxval(maxval(beta(:,:),dim=2)), minval(minval(beta,dim=2,mask=chi_c>0))
     write(*,'("Kappa_tot (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
 		maxval(maxval(chi_c(:,:),dim=2)), minval(minval(chi_c,dim=2,mask=chi_c>0))
+    write(*,'("eta (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
+		maxval(maxval(eta_c(:,:),dim=2)), minval(minval(eta_c,dim=2,mask=chi_c>0))
 
     if (.not.allocated(lcell_converged)) allocate(lcell_converged(n_cells))
 
@@ -2965,9 +2967,9 @@ contains
                 dJ = 0.0_dp
                 dN = 0.0_dp
                 do la=1, Nlambda_cont
-                	write(*,"(1I6,2F12.5, 3ES20.7E3)") icell, lambda_cont(la), T(icell), ne(icell), Jnu_cont(la,icell), Jold(la,icell)
-		    		write(*,"(4ES20.7E3)") Sold(la,icell), beta(la,icell), Sth(la,icell), Snew(la,icell)
-		    		write(*,"(3ES20.7E3)") chi_c(la,icell), eta_c(la,icell), thomson(icell)
+!                 	write(*,"(1I6,2F12.5, 3ES20.7E3)") icell, lambda_cont(la), T(icell), ne(icell), Jnu_cont(la,icell), Jold(la,icell)
+! 		    		write(*,"(4ES20.7E3)") Sold(la,icell), beta(la,icell), Sth(la,icell), Snew(la,icell)
+! 		    		write(*,"(3ES20.7E3)") chi_c(la,icell), eta_c(la,icell), thomson(icell)
 		    		if (Jnu_cont(la,icell) > 0.0) then
 					 	dj_loc = abs( 1.-Jold(la,icell)/Jnu_cont(la,icell) )
 					 	if (dj_loc > dJ) then
