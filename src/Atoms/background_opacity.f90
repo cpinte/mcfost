@@ -15,7 +15,7 @@ module background_opacity
   use atom_type, only : AtomicContinuum, find_continuum, AtomType
   use atmos_type, only : Hydrogen, Helium, T, ne, Elements, nHmin, nHtot, PassiveAtoms, Npassiveatoms
   use constant
-  use math, only : linear_1D_sorted, interp1D, interp2D
+  use math, only : locate, linear_1D_sorted, interp1d_sorted, interp1D, interp2D
   use occupation_probability, only : D_i, wocc_n
   use parametres, only : ldissolve
 
@@ -169,7 +169,7 @@ contains
     u0 = n_eff*n_eff * HPLANCK*CLIGHT / (NM_TO_M * cont%lambda0) / Z / Z / E_RYDBERG - 1.
 
     g_bf = Gaunt_bf(u, n_eff)
-    g_bf0 = Gaunt_bf(u0, n_eff)
+!     g_bf0 = Gaunt_bf(u0, n_eff)
 
     !     if (lambda > cont%lambda0) then !linear  extrapolation of g_bf
     !       u1 = n_eff**2 * HPLANCK*CLIGHT / (NM_TO_M * 0.8 * cont%lambda0 ) / Z*Z / E_RYDBERG - 1
@@ -223,13 +223,14 @@ contains
     integer, intent(in)											:: icell, N
     real(kind=dp), intent(in), dimension(N)						:: lambda
     real(kind=dp), intent(out), dimension(N)					:: chi, eta
-    integer														:: m, kr, kc, i, j, Nblue, Nred, la, Nf
+    integer														:: m, kr, kc, i, j, la
     type (AtomType), pointer									:: atom
     real(kind=dp)												:: wj, wi, l_min, l_max, twohnu3_c2, n_eff
     real(kind=dp)												:: Diss, chi_ion, gij, alpha, ni_njgij
 
     chi = 0.0_dp
     eta = 0.0_dp
+
     do m=1, NpassiveAtoms
        atom => PassiveAtoms(m)%ptr_atom
 
@@ -239,12 +240,14 @@ contains
           i = atom%continua(kr)%i
           j = atom%continua(kr)%j
 
-          Nf = size(atom%continua(kr)%lambda_file)
 
           l_min = atom%continua(kr)%lambdamin
           l_max = atom%continua(kr)%lambdamax
 
-          Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
+		  !-> avoid real precision errors and discrepancy with nonlte_bf() which uses Nblue and Nred!
+		  !(so the closest blue and red wavelengths on the grid and not exactly l_min/l_max)
+          l_min = lambda(locate(lambda, l_min))
+          l_max = lambda(locate(lambda, l_max))
 
           wj = 1.0; wi = 1.0
 
@@ -261,14 +264,18 @@ contains
 
 
           do la=1, N
-             if ((lambda(la) < l_min).or.(lambda(la)>l_max)) cycle
+!              if ((lambda(la) < l_min).or.(lambda(la)>l_max)) cycle
+			 if (lambda(la) < l_min) cycle
+			 if (lambda(la) > l_max) exit
 
              !can be long depending on n_cells and N; but avoid storing
              !this on memory and it is computed only once.
              if (atom%continua(kr)%hydrogenic) then
                 alpha = H_bf_Xsection(atom%continua(kr), lambda(la))
              else
-                alpha = interp(atom%continua(kr)%alpha_file, atom%continua(kr)%lambda_file, lambda(la))
+!                 alpha = interp(atom%continua(kr)%alpha_file, atom%continua(kr)%lambda_file, lambda(la))
+                alpha = interp1d_sorted(size(atom%continua(kr)%alpha_file), atom%continua(kr)%lambda_file, &
+                						atom%continua(kr)%alpha_file, lambda(la))
              endif
              !!alpha = atom%continua(kr)%alpha(la)
 
@@ -509,7 +516,6 @@ contains
     real(kind=dp), dimension(NBF) :: lambdaBF, alphaBF
     real(kind=dp) :: lam, stm, twohnu3_c2, alpha
 
-    !in 1e-21
     data lambdaBF / 0.0, 50.0, 100.0, 150.0, 200.0, 250.0,  &
          300.0, 350.0, 400.0, 450.0, 500.0, 550.0,&
          600.0, 650.0, 700.0, 750.0, 800.0, 850.0,&
@@ -518,15 +524,20 @@ contains
          1400.0, 1450.0, 1500.0, 1550.0, 1600.0,  &
          1641.9 /
 
+    !in 1e-21
     data alphaBF / 0.0,  0.15, 0.33, 0.57, 0.85, 1.17, 1.52,&
          1.89, 2.23, 2.55, 2.84, 3.11, 3.35, 3.56,&
          3.71, 3.83, 3.92, 3.95, 3.93, 3.85, 3.73,&
          3.58, 3.38, 3.14, 2.85, 2.54, 2.20, 1.83,&
          1.46, 1.06, 0.71, 0.40, 0.17, 0.0 /
+    
+!     chi = 1d-21 * linear_1D_Sorted(NBF,lambdaBF,alphaBF,N,lambda) * nHmin(icell)
+!     eta = chi * twohc / lambda**3 * exp(-hc_k/T(icell)/lambda)
+!     chi = chi * (1.0 - exp(-hc_k/T(icell)/lambda))
 
     chi = 0d0
     eta = 0d0
-
+    
     do la=1, N
        lam = lambda(la)
        !do not test negativity of lambda
@@ -536,7 +547,7 @@ contains
        twohnu3_c2 = twohc / lam**3.
 
        alpha = 1d-21 * interp1D(lambdaBF*1d0, alphaBF*1d0, lam)  !1e-17 cm^2 to m^2
-       !alpha(:) = linear_1D_sorted(NBF, lambdaBF*1.0_dp, alphaBF*1.0_dp,1,lam) ; * 1d-21 *alpha(1)
+
        chi(la) = nHmin(icell) * (1.-stm) * alpha
        eta(la) = nHmin(icell) * twohnu3_c2 * stm * alpha
 

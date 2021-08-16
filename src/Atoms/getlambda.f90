@@ -259,7 +259,7 @@ contains
     l1 = cont%lambda0 !cannot be larger than lambda0 ! frequency for photoionisation
     l0 = lambdamin
     cont%Nlambda = Nlambda_cont
-    allocate(cont%lambda(cont%Nlambda))
+    allocate(cont%lambda(cont%Nlambda))    
     resol = (l1 - l0) / real(cont%Nlambda - 1, kind=dp)
     !    write(*,*) "Continuum:", cont%lambda0, cont%j,"->",cont%i, &
     !               " Resolution (nm):", resol, " lambdamin =", lambdamin
@@ -474,7 +474,7 @@ contains
     !Not used if maxvel is already the maximum extent in velocity !
 
     if (line%polarizable) then
-       vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
+       vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
     else
        vB = 0.0_dp
     endif
@@ -507,6 +507,9 @@ contains
 
     vbroad = maxval(line%atom%vbroad) !takes time, but done only once per line!
     vwing = line%qwing * vbroad
+    if (line%polarizable) then
+    	vwing = vwing + line%qwing * B_char * LARMOR * line%lambda0 * NM_TO_M * abs(line%g_Lande_eff)
+    endif
 
     !I compute the line bound up to qwing * vwing. But I expand the local profile
     !farther
@@ -634,7 +637,7 @@ contains
 
     vB = 0d0
     if (line%polarizable) vB =  &
-         B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
+         B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
 
 
     v_char =  min(L * vD * (1.0 + aD**(-1.0)) + L * vB,3e5)
@@ -693,7 +696,7 @@ contains
 
     vB = 0d0
     if (line%polarizable) vB =  &
-         B_char * LARMOR * (line%lambda0*NM_TO_M) * dabs(line%g_lande_eff)
+         B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
 
     !!v_char = L * (v_char + 2d0*vD + vB) !=maximum extension of a line
     !!v_char = v_char + L * (vB  + vD)
@@ -1594,6 +1597,7 @@ contains
           !lambda_file (and alpha_file) kept if allocated for explicit continua
        enddo
     enddo
+
     !sort continuum frequencies
     Nmore_cont_freq = 0.0
     allocate(sorted_indexes(Nlambda_cont),stat=alloc_status)

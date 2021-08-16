@@ -755,11 +755,14 @@ CONTAINS
              !Use a routine that includes H minus also ? use at is it ? use chemequil to determine nH- ??
              CALL LTEpops_H()
 
-             do k=1,n_cells
-                if (icompute_atomRT(k) > 0) nHmin(k) = nH_minus(k)
-             enddo
-             call write_Hminus()
-             !nHmin(k) = 1d10
+			 if (.not.hydrogen%active)  then
+			 	write(*,*) " -> setting H- density (H is passive)"
+             	do k=1,n_cells
+                	if (icompute_atomRT(k) > 0) nHmin(k) = nH_minus(k)
+             	enddo
+             	call write_Hminus()
+             	!nHmin(k) = 1d10
+             endif
 
 
           else !other atoms
@@ -774,16 +777,17 @@ CONTAINS
 
           !Write only if set_ltepops i.e., if not read from file.
 
-       else !no set lte pops
+       else !.not. set_ltepops, populations read from file, just compute H- if n==1 (H)
 
           if (n==1) then
-             write(*,*) " -> Setting H minus density from read Hydrogen populations..."
+             write(*,*) " -> Setting H- density from read Hydrogen populations..."
              allocate(nHmin(n_cells))
              do k=1,n_cells
                 if (icompute_atomRT(k) > 0) nHmin(k) = nH_minus(k)
              enddo
              call write_Hminus()
           endif
+          
        endif !set_ltepops
 
        !If populations not read from file (that is with NLTEpops = .fals.) we need to set n=nstar
@@ -797,6 +801,14 @@ CONTAINS
           endif
           !if (Atoms(n)%ptr_atom%initial_solution=="LTE_POPULATIONS")
           Atoms(n)%ptr_atom%n(:,:) = Atoms(n)%ptr_atom%nstar(:,:)
+          if (n==1) then
+          	!Here need to compute H- from initial solution of n
+			 write(*,*) " -> evaluating H- density with LTE H pops (H is active)"
+             do k=1,n_cells
+                if (icompute_atomRT(k) > 0) nHmin(k) = nH_minus(k)
+             enddo
+             call write_Hminus()
+          endif
        endif
 
        if (loutput_rates) call write_ltepops_file(52, Atoms(n)%ptr_atom)

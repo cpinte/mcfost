@@ -21,6 +21,7 @@ module Opacity
   use mcfost_env, only								: dp
   use input, only										: ds
   use molecular_emission, only						: v_proj
+  
 
 
   implicit none
@@ -114,8 +115,10 @@ contains
        atom => Atoms(n)%ptr_atom
 
        if (.not.associated(profile, local_profile_interp)) then
-          atom%lgauss_prof = .false.
-          deallocate(atom%ug)
+          if (atom%lgauss_prof) then
+          	deallocate(atom%ug)
+          	atom%lgauss_prof = .false.
+          endif
        endif
 
        !note lgauss_prof is false if not associated(profile,local_profile_interp)
@@ -279,6 +282,7 @@ contains
                      lambda_cont(atom%continua(kc)%Nblue:atom%continua(kc)%Nred))
                 n_eff = atom%stage(atom%continua(kc)%j)*sqrt(atom%Rydberg/(atom%E(atom%continua(kc)%j)-atom%E(atom%continua(kc)%i)))
                 mem_alloc_local = mem_alloc_local + sizeof(atom%continua(kc)%alpha(:))
+
              else !interpolation of the read Cross-section
                 !       cont is not an alias but a copy of contiua(kc), so cont%alpha not deallocated
                 allocate(atom%continua(kc)%alpha(atom%continua(kc)%Nlambda), stat=alloc_status)
@@ -599,114 +603,9 @@ contains
     RETURN
   end SUBROUTINE compute_atom_quantities
 
-  !metal_bf typically
-  ! 	subroutine opacity_atom_bf_lte(icell)
-  !
-  ! 		integer, intent(in)											:: icell
-  ! 		integer														:: m, kr, kc, i, j, Nblue, Nred, la
-  ! 		type (AtomType), pointer									:: atom
-  ! 		real(kind=dp)												:: n_eff, wj, wi
-  ! 		real(kind=dp)												:: Diss, chi_ion, gij
-  !
-  !
-  ! 		do m=1,Npassiveatoms
-  !
-  ! 			atom => PassiveAtoms(m)%ptr_atom
-  !
-  ! 			do kc=atom%Ntr_line+1,atom%Ntr
-  ! 				kr = atom%at(kc)%ik
-  !
-  ! 				i = atom%continua(kr)%i
-  ! 				j = atom%continua(kr)%j
-  !
-  ! 				Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
-  ! 				wj = 1.0; wi = 1.0
-  !
-  ! 				if (ldissolve) then
-  ! 					if (atom%ID=="H") then
-  ! 						n_eff = real(i,kind=dp)
-  ! 						wi = wocc_n(icell, n_eff, real(atom%stage(i)), real(atom%stage(j)),hydrogen%n(1,icell))
-  ! 					else
-  ! 						n_eff = atom%stage(j)*sqrt(atom%Rydberg/(atom%E(j)-atom%E(i)))
-  ! 					endif
-  ! 				endif
-  !
-  ! 				chi_ion = Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(j))
-  !
-  ! 				do la=1, atom%continua(kr)%nlambda
-  !
-  ! 					Diss = D_i(icell, n_eff, real(atom%stage(i)), 1.0, lambda_cont(Nblue+la-1), atom%continua(kc)%lambda0, chi_ion)
-  ! 					gij = atom%nstar(i,icell)/atom%nstar(j,icell) * exp(-hc_k/T(icell)/lambda_cont(Nblue+la-1))
-  !
-  !
-  ! 					if ( (atom%n(i,icell) - atom%n(j,icell) * gij) > 0.0) then
-  !
-  ! 							chi_c(Nblue+la-1,icell) = chi_c(Nblue+la-1,icell) + &
-  ! 							diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - gij*atom%n(j,icell))
-  !
-  ! 							eta_c(Nblue+la-1,icell) = eta_c(Nblue+la-1,icell) + &
-  ! 							diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * gij * atom%n(j,icell)
-  ! 					else
-  !
-  ! 							eta_c(Nblue+la-1,icell) = eta_c(Nblue+la-1,icell) + &
-  ! 							diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * gij * atom%n(j,icell)
-  !
-  ! 							chi_c(Nblue+la-1,icell) = chi_c(Nblue+la-1,icell) - &
-  ! 							diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - gij*atom%n(j,icell))
-  !
-  ! 					endif
-  ! 				enddo
-  !
-  ! 			end do ! loop over Ncont
-  ! 			atom => NULL()
-  ! 		end do !loop over metals
-  !
-  ! 	return
-  ! 	end subroutine opacity_atom_bf_lte
-
-  subroutine background_continua (icell)
-    integer, intent(in) :: icell
-    integer :: la, nat
-    real(kind=dp), dimension(Nlambda_cont) :: chi, eta, Bp
-
-    Bp = Bpnu(T(icell), lambda_cont)
-
-    chi_c(:,icell) = Thomson(icell)!0.0_dp
-    eta_c(:,icell) = 0.0_dp
-    ! 		sca_c(:,icell) = 0.0_dp
-
-    ! 		call Hminus_bf_wishart(icell, Nlambda_cont, lambda_cont, chi, eta) !->better with turbospec
-    call Hminus_bf_geltman(icell, Nlambda_cont, lambda_cont, chi, eta) !->better with rh
-    chi_c(:,icell) = chi_c(:,icell) + chi(:)
-    eta_c(:,icell) = eta_c(:,icell) + eta(:)
-
-    call Hminus_ff_bell_berr(icell, Nlambda_cont, lambda_cont, chi)
-    chi_c(:,icell) = chi_c(:,icell) + chi(:)
-    eta_c(:,icell) = eta_c(:,icell) + chi(:) * Bp(:)
-    !
-    call Hydrogen_ff(icell, Nlambda_cont, lambda_cont, chi)
-    chi_c(:,icell) = chi_c(:,icell) + chi(:)
-    eta_c(:,icell) = eta_c(:,icell) + chi(:) * Bp(:)
-
-    ! 		!now atomic LTE bound-free
-    if (NpassiveAtoms > 0) then
-       call lte_bound_free(icell, Nlambda_cont, lambda_cont, chi, eta)
-       chi_c(:,icell) = chi_c(:,icell) + chi(:)
-       eta_c(:,icell) = eta_c(:,icell) + eta(:)
-    endif
-
-    ! 		sca_c(:,icell) = Thomson(icell)
-    ! 		!Rayleigh scattering is included no more at the moment. Might be necessary for some temperature
-    ! 		!below the Lyman limit
-    !
-    ! 		!Total opac once source functions are known
-    ! 		chi_c(:,icell) = chi_c(:,icell) +  sca_c(:,icell)
-
-    return
-  end subroutine background_continua
-
   subroutine background_continua_lambda (icell, Nx, x, chiout, etaout)
-    !Scattering coefficients at the moment recomputed in propagation since it is prop to Jnu * thomson only (no H scatt at the moment)
+    !Scattering coefficients at the moment recomputed in propagation since it is prop to Jnu * thomson only 
+    !(no Reyleigh scatt at the moment)
     integer, intent(in) :: icell, Nx
     integer :: la, nat
     real(kind=dp), dimension(Nx), intent(in) :: x
@@ -718,7 +617,7 @@ contains
     chiout(:) = thomson(icell)
     etaout(:) = 0.0_dp
 
-    ! 		!call Hminus_bf_wishart(icell, N, lambda, chi, eta) !->better with turbospec
+!     call Hminus_bf_wishart(icell, N, lambda, chi, eta) !->better with turbospec
     call Hminus_bf_geltman(icell,Nx, x, chi, eta) !->better with rh
     chiout(:) = chiout(:) + chi(:)
     etaout(:) = etaout(:) + eta(:)
@@ -745,6 +644,9 @@ contains
     !$ use omp_lib
     integer :: icell, id, icell0
     icell0 = 1
+    
+    write(*,*) " -> Computing background continua..."
+    
     !$omp parallel &
     !$omp default(none) &
     !$omp private(icell,id,icell0) &
@@ -757,7 +659,6 @@ contains
           call compute_atom_quantities(icell,verbose=0)!1,2,3
           !!need for BackgroundContinua
           !!and lines
-!!!!call background_continua(icell)
           call background_continua_lambda(icell, Nlambda_cont, lambda_cont, chi_c(:,icell), eta_c(:,icell))
           !!call background_continua_lambda(icell, Nlambda, lambda, chi0_bb(:,icell), eta0_bb(:,icell))
           if (NactiveAtoms > 0) then
@@ -765,90 +666,153 @@ contains
           endif
 
           if (.not.llimit_mem) then
-             call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+!              call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+             call interp_continuum_local(icell, chi0_bb(:,icell), eta0_bb(:,icell))             
           endif
 
        endif
     end do
     !$omp end do
     !$omp end parallel
+    
+    write(*,*) " -> done!"
 
     return
   end subroutine compute_background_continua
 
-  !not used anymore ?
-  subroutine interp_contopac()
-    !$ use omp_lib
-    integer :: icell, id, icell0
-    icell0 = 1
-
-    !$omp parallel &
-    !$omp default(none) &
-    !$omp private(icell,id,icell0) &
-    !$omp shared(n_cells, icompute_atomRT,chi0_bb, eta0_bb)
-    !$omp do schedule(dynamic,1)
-    do icell=1, n_cells
-       !$ id = omp_get_thread_num() + 1
-       if (icompute_atomRT(icell) > 0) then
-          call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
-          if (any_nan_infinity_vector(chi0_bb(:,icell)) /= 0) then
-             write(*,*) chi0_bb(:,icell)
-             call error("nan.infinity error in chi0_bb")
-          endif
-          if (any_nan_infinity_vector(eta0_bb(:,icell)) /= 0) then
-             write(*,*) eta0_bb(:,icell)
-             call error("nan.infinity error in eta0_bb")
-          endif
-       endif
-    end do
-    !$omp end do
-    !$omp end parallel
-
-    return
-  end subroutine interp_contopac
-
-
-  !scattering term is not taken as the one the continuum
-  subroutine continuum_line (icell, lambda0, chi00, eta00)
+  subroutine interp_continuum_local(icell, chii, etai)
+    !Jnu_cont interpolated locally and scattering emissivity added elsewhere
+    !To do: interpolate mean intensity here!
     integer, intent(in) :: icell
-    real(kind=dp), intent(in) :: lambda0
-    real(kind=dp), intent(out) :: chi00, eta00
-    integer :: la, nat
-    real(kind=dp) :: chi(1), eta(1), l(1), Bp
+    integer :: i, j, i0,j0
+    !it seems I'm having an interpolation error at the first point, so just avoinding it..
+    real(kind=dp), dimension(Nlambda_cont) :: chi0, eta0
+    real(kind=dp), dimension(Nlambda), intent(out) :: chii, etai
+    real(kind=dp) :: u
+    
+!     call interp_background_opacity(icell, chii, etai)
+!     return
 
-    chi00 = 0.0
-    eta00 = 0.0
-    Bp = Bpnu(T(icell), lambda0)
-    l(1) = lambda0
+    chii = 0.0_dp
+    etai = 0.0_dp
+
+    chi0 = chi_c(:,icell)
+    eta0 = eta_c(:,icell)
 
 
-    ! 		call Hminus_bf_wishart(icell, 1, l, chi, eta)
-    call Hminus_bf_geltman(icell,1,l,chi,eta) !->better with rh
-    chi00 = chi00 + chi(1)
-    eta00 = eta00 + eta(1)
+    if (NactiveAtoms>0) then
+       chi0 = chi0 + chi_c_nlte(:,icell)
+       eta0 = eta0 + eta_c_nlte(:,icell)
+    endif
 
-    call Hminus_ff_bell_berr(icell, 1, l, chi)
-    chi00 = chi00 + chi(1)
-    eta00 = eta00 + chi(1) * Bp
 
-    call Hydrogen_ff(icell, 1, l, chi)
-    chi00 = chi00 + chi(1)
-    eta00 = eta00 + chi(1) * Bp
+    j0=Nlambda+1
+    do j=1, Nlambda
+       if (lambda(j) >= lambda_cont(1)) then
+          j0 = j
+          exit
+       endif
+    enddo
 
-    !now atomic LTE bound-free
-    call lte_bound_free(icell, 1, l, chi, eta)
-    chi00 = chi00 + chi(1)
-    eta00 = eta00 + eta(1)
 
-    chi00 = chi00 + Thomson(icell)
-    !if using electron scattering from the continuum
-    !if (lelectron_scattering) eta00 = eta00 + interp_dp(Jnu_cont(:,icell) * sca_c(:,icell), lambda_cont, lambda0)
+    i0 = 2
+    do j=j0,Nlambda
+       loop_i : do i=i0, Nlambda_cont
+          if (lambda_cont(i) > lambda(j)) then
+             u = (lambda(j) - lambda_cont(i-1)) / (lambda_cont(i) - lambda_cont(i-1))
+             chii(j) = (1.0_dp - u) * chi0(i-1)  + u * chi0(i)
+             etai(j) = (1.0_dp - u) * eta0(i-1)  + u * eta0(i)
+             i0 = i
+             exit loop_i
+          endif
+       enddo loop_i
+    enddo
 
-    chi00 = chi00 + interp_dp(chi_c_nlte(:,icell), lambda_cont, lambda0)
-    eta00 = eta00 + interp_dp(eta_c_nlte(:,icell), lambda_cont, lambda0)
+
+    !in case the last and first wavelength are the same
+    if (lambda_cont(Nlambda_cont) == lambda(Nlambda)) then
+       chii(Nlambda) = chi0(Nlambda_cont)
+       etai(Nlambda) = eta0(Nlambda_cont)
+    endif
+! 
+!     if (lambda_cont(1) == lambda(1)) then
+!        chii(1) = chi0(1)
+!        etai(1) = eta0(1)
+!     endif
 
     return
-  end subroutine continuum_line
+  end subroutine interp_continuum_local
+  
+  subroutine interp_background_opacity(icell, chii, etai)
+    !linear interpolation of continuum opacities from lambda_cont grid to lambda grid
+    !Nlambda >> Nlambda_cont
+    !Jnu_cont interpolated locally and scattering emissivity added elsewhere
+    !To do: interpolate mean intensity here!
+    integer, intent(in) :: icell
+    integer :: i, j, i0,j0, kc
+    real(kind=dp), dimension(Nlambda_cont) :: chi0, eta0
+    real(kind=dp), dimension(Nlambda), intent(out) :: chii, etai
+    real(kind=dp) :: u
+
+    chii = 0.0_dp
+    etai = 0.0_dp
+
+    chi0 = chi_c(:,icell)
+    eta0 = eta_c(:,icell)
+
+    if (NactiveAtoms>0) then
+       chi0 = chi0 + chi_c_nlte(:,icell)
+       eta0 = eta0 + eta_c_nlte(:,icell)
+    endif
+
+    i0 = 1
+    j0 = 1
+
+    !!linear interpolation of both arrays
+    do i=i0,Nlambda_cont-1
+       do j=j0,Nlambda
+          if (lambda(j)>=lambda_cont(i) .and. lambda(j)<=lambda_cont(i+1)) then
+             u = (lambda(j) - lambda_cont(i)) / (lambda_cont(i+1) - lambda_cont(i))
+             chii(j) = (1.0_dp - u) * chi0(i) + u * chi0(i+1)
+             etai(j) = (1.0_dp - u) * eta0(i) + u * eta0(i+1)
+          endif
+       enddo
+    enddo
+
+
+    return
+  end subroutine interp_background_opacity
+
+!   subroutine interp_contopac()
+!     !$ use omp_lib
+!     integer :: icell, id, icell0
+!     icell0 = 1
+! 
+!     !$omp parallel &
+!     !$omp default(none) &
+!     !$omp private(icell,id,icell0) &
+!     !$omp shared(n_cells, icompute_atomRT,chi0_bb, eta0_bb)
+!     !$omp do schedule(dynamic,1)
+!     do icell=1, n_cells
+!        !$ id = omp_get_thread_num() + 1
+!        if (icompute_atomRT(icell) > 0) then
+!        	  call interp_continuum_local(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+! !           call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+!           if (any_nan_infinity_vector(chi0_bb(:,icell)) /= 0) then
+!              write(*,*) chi0_bb(:,icell)
+!              call error("nan.infinity error in chi0_bb")
+!           endif
+!           if (any_nan_infinity_vector(eta0_bb(:,icell)) /= 0) then
+!              write(*,*) eta0_bb(:,icell)
+!              call error("nan.infinity error in eta0_bb")
+!           endif
+!        endif
+!     end do
+!     !$omp end do
+!     !$omp end parallel
+! 
+!     return
+!   end subroutine interp_contopac
 
   subroutine NLTE_bound_free(icell)
     integer, intent(in) :: icell
@@ -955,117 +919,6 @@ contains
   !
   ! 	return
   ! 	end subroutine compute_nlte_bound_free
-
-  subroutine interp_background_opacity(icell, chii, etai)
-    !linear interpolation of continuum opacities from lambda_cont grid to lambda grid
-    !lambda >> lambda_cont
-    integer, intent(in) :: icell
-    integer :: i, j, i0,j0, kc
-    !it seems I'm having an interpolation error at the first point, so just avoinding it..
-    real(kind=dp), dimension(Nlambda_cont) :: chi0, eta0
-    real(kind=dp), dimension(Nlambda), intent(out) :: chii, etai
-    real(kind=dp) :: u
-
-    chii = 0.0_dp
-    etai = 0.0_dp
-
-    chi0 = chi_c(:,icell)
-    eta0 = eta_c(:,icell)
-
-    !-> I use the table eta_es that is proportional to Jnu(Itot) instead
-    !      	if (lelectron_scattering) then
-    !      		eta0 = eta0 + sca_c(:,icell) * Jnu_cont(:,icell)
-    !      	endif
-
-    if (NactiveAtoms>0) then
-       chi0 = chi0 + chi_c_nlte(:,icell)
-       eta0 = eta0 + eta_c_nlte(:,icell)
-    endif
-
-    i0 = 1
-    j0 = 1
-
-    !!linear interpolation of both arrays
-    do i=i0,Nlambda_cont-1
-       do j=j0,Nlambda
-          if (lambda(j)>=lambda_cont(i) .and. lambda(j)<=lambda_cont(i+1)) then
-             u = (lambda(j) - lambda_cont(i)) / (lambda_cont(i+1) - lambda_cont(i))
-             chii(j) = (1.0_dp - u) * chi0(i) + u * chi0(i+1)
-             etai(j) = (1.0_dp - u) * eta0(i) + u * eta0(i+1)
-          endif
-       enddo
-    enddo
-
-
-    return
-  end subroutine interp_background_opacity
-
-  subroutine interp_continuum_local(icell, chii, etai)
-    integer, intent(in) :: icell
-    integer :: i, j, i0,j0
-    !it seems I'm having an interpolation error at the first point, so just avoinding it..
-    real(kind=dp), dimension(Nlambda_cont) :: chi0, eta0
-    real(kind=dp), dimension(Nlambda), intent(out) :: chii, etai
-    real(kind=dp) :: u
-
-    chii = 0.0_dp
-    etai = 0.0_dp
-
-    chi0 = chi_c(:,icell)
-    eta0 = eta_c(:,icell)
-
-
-    if (NactiveAtoms>0) then
-       chi0 = chi0 + chi_c_nlte(:,icell)
-       eta0 = eta0 + eta_c_nlte(:,icell)
-    endif
-
-
-    j0=Nlambda+1
-    do j=1, Nlambda
-       if (lambda(j) > lambda_cont(1)) then!>=
-          j0 = j
-          exit
-       endif
-    enddo
-
-
-    i0 = 2
-    do j=j0,Nlambda
-       loop_i : do i=i0, Nlambda_cont
-          if (lambda_cont(i) > lambda(j)) then
-             u = (lambda(j) - lambda_cont(i-1)) / (lambda_cont(i) - lambda_cont(i-1))
-             chii(j) = (1.0_dp - u) * chi0(i-1)  + u * chi0(i)
-             etai(j) = (1.0_dp - u) * eta0(i-1)  + u * eta0(i)
-             i0 = i
-             exit loop_i
-          endif
-       enddo loop_i
-    enddo
-
-
-    !in case the last and first wavelength are the same
-    if (lambda_cont(Nlambda_cont) == lambda(Nlambda)) then
-       chii(Nlambda) = chi0(Nlambda_cont)
-       etai(Nlambda) = eta0(Nlambda_cont)
-    endif
-
-    if (lambda_cont(1) == lambda(1)) then
-       chii(1) = chi0(1)
-       etai(1) = eta0(1)
-    endif
-
-    !  	write(*,*) j0
-    !  	write(*,*) chii(Nlambda-3:Nlambda)
-    !  	write(*,*) etai(Nlambda-3:Nlambda)
-    !  	write(*,*) chi0(Nlambda_cont-3:Nlambda_cont)
-    !  	write(*,*) eta0(Nlambda_cont-3:Nlambda_cont)
-    !  	write(*,*) lambda(Nlambda-3:Nlambda)
-    !  	write(*,*) lambda_cont(Nlambda_cont-3:Nlambda_cont)
-    !  	stop
-
-    return
-  end subroutine interp_continuum_local
 
   subroutine opacity_atom_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
 
@@ -1300,6 +1153,7 @@ contains
     return
   end subroutine cross_coupling_terms
 
+  !TO DO merge with opacity_atom_loc()
   subroutine opacity_atom_zeeman_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
 
     integer, intent(in) :: id, icell, iray
@@ -1344,8 +1198,11 @@ contains
              cycle tr_loop
           endif
 
-          !fixed at the moment
-          call local_profile_zv(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred),phi0,phiZ, psiZ, x,y,z,x1,y1,z1,u,v,w,l)
+          !if not init, bug when line is not polarizable why
+          phiz = 0.0
+          psiz = 0.0
+          !!fixed at the moment
+          call local_profile_zv(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred),phi0(1:Nlam),phiZ(1:Nlam,:), psiZ(1:Nlam,:), x,y,z,x1,y1,z1,u,v,w,l)
 
           etal = hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell)
           chil = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
@@ -1360,6 +1217,22 @@ contains
              chiQUV_p(Nblue:Nred,m,id) = chiQUV_p(Nblue:Nred,m,id) + chil * phiz(1:Nlam,m)
              etaQUV_p(Nblue:Nred,m,id) = etaQUV_p(Nblue:Nred,m,id) + etal * phiz(1:Nlam,m)
              rho_p(Nblue:Nred,m,id) = rho_p(Nblue:Nred,m,id) + chil * psiz(1:Nlam,m)
+          	 if (any_nan_infinity_vector(phiz(:,m)) > 0) then
+          	 	write(*,*) "(phiz)", icell, m, Nlam, chil, etal
+          	 	write(*,*) phiz(:,m)
+          	 	stop
+          	 endif
+          	 if (any_nan_infinity_vector(psiz(:,m)) > 0) then
+          	 	write(*,*) "(psiz)", icell, m, Nlam, chil, etal
+          	 	write(*,*) psiz(:,m)
+          	 	stop
+          	 endif
+!           	 if (aatom%lines(kc)%polarizable) then
+!           	 write(*,*) "m=", m, size(phiz)
+!           	 write(*,*) "phi0=",maxval(phi0)
+!           	 write(*,*) "phiz(m)", maxval(phiz(:,m))
+!           	 write(*,*) "psiz(m)=", maxval(psiz(:,m))
+!           	 endif
           enddo
 
           ! 				else !neg or null
@@ -1381,8 +1254,248 @@ contains
 
     return
   end subroutine opacity_atom_zeeman_loc
+  
+  subroutine solve_stokes_mat(id,icell,la,Q,P)
+	!Fill the modified Stokes matrix K'
+	!and computes the matrix R  and the vector P
+	!such that dot(I,R) = P.
+	!Then, solve for IR = P, and get P the new
+	!Stokes vector = (I,Q,U,V)^t
+	!
+	!Q is the atenutation factor for the local point
+	!For wavelength index la.
+  	integer, intent(in) :: id, la,icell
+  	real(kind=dp), intent(in) :: Q
+  	real(kind=dp), intent(inout) :: P(4)
+  	real(kind=dp) :: R(4,4)
+ 
+  	!    / eta/chi  \
+  	!    | etaQ/chi |
+  	!S = | etaU/chi |
+  	!    \ etaV/chi / 	
+  	!P = Svect * Q
+  	
+  	!Absorption-dispersion matrix
+  	!    /  chi  chiQ  chiU   chiV \
+  	!    |                         |
+  	!    |  chiQ  chi  rhoV  -rhoU |
+  	!KK =|                         |
+  	!    |  chiU -rhoV  chi   rhoQ |
+  	!    |                         |
+  	!    \  chiV  rhoU  -rhoQ  chi /
+  	
+  	!KK' = K/chi - eye(4); diag(KK') = 0
+  	!R = eye(4) + Q*KK'; diag(R) = 1.0
+  	!
+
+	!P(1) already filled with Snu * Q
+	P(2) = etaQUV_p(la,1,id)/chi(la,id) * Q!SQ exp(-tau) (1 - exp(-dtau))
+	P(3) = etaQUV_p(la,2,id)/chi(la,id) * Q!SU exp(-tau) (1 - exp(-dtau))
+	P(4) = etaQUV_p(la,3,id)/chi(la,id) * Q!SV exp(-tau) (1 - exp(-dtau))
+	
+          	 if (any_nan_infinity_vector(P) > 0) then
+          	 	write(*,*) "(1)", icell, la, lambda(la), P
+          	 	stop
+          	 endif
+
+! 	R = 0.0	 
+	!eye(4)
+	R(1,1) = 1.0
+	R(2,2) = 1.0
+	R(3,3) = 1.0
+	R(4,4) = 1.0
+	
+	R(1,2) = chiQUV_p(la,1,id)/chi(la,id) * Q
+	R(1,3) = chiQUV_p(la,2,id)/chi(la,id) * Q
+	R(1,4) = chiQUV_p(la,3,id)/chi(la,id) * Q
+	
+	R(2,1) = R(1,2)
+	R(2,3) = rho_p(la,3,id)/chi(la,id) * Q
+	R(2,4) = -rho_p(la,2,id)/chi(la,id) * Q
+	
+	R(3,1) = R(1,3)
+	R(3,2) = -R(2,3)
+	R(3,4) = rho_p(la,1,id)/chi(la,id) * Q
+	
+	R(4,1) = R(1,4)
+	R(4,2) = -R(2,4)
+	R(4,3) = -R(3,4)
+
+          	 if (any_nan_infinity_matrix(R) > 0) then
+          	 	write(*,*) "(2)", icell, la, lambda(la),R
+          	 	stop
+          	 endif
+
+! 	call solve_lin(R,P,4,.true.)
+	call invert_4x4(R)
+          	 if (any_nan_infinity_matrix(R) > 0) then
+          	 	write(*,*) "(3)",icell, la, lambda(la), R
+          	 	stop
+          	 endif
+
+	P = matmul(R,P)
+          	 if (any_nan_infinity_vector(P) > 0) then
+          	 	write(*,*) "(4)", icell, la, lambda(la), P
+          	 	stop
+          	 endif
+
+
+!     Stokes_Q(la,id) += P(2)
+!     Stokes_U(la,id) += P(3)
+!     Stokes_V(la,id) += P(4)
+
+  	return
+  end subroutine
 
 end module Opacity
+
+  !metal_bf typically
+  ! 	subroutine opacity_atom_bf_lte(icell)
+  !
+  ! 		integer, intent(in)											:: icell
+  ! 		integer														:: m, kr, kc, i, j, Nblue, Nred, la
+  ! 		type (AtomType), pointer									:: atom
+  ! 		real(kind=dp)												:: n_eff, wj, wi
+  ! 		real(kind=dp)												:: Diss, chi_ion, gij
+  !
+  !
+  ! 		do m=1,Npassiveatoms
+  !
+  ! 			atom => PassiveAtoms(m)%ptr_atom
+  !
+  ! 			do kc=atom%Ntr_line+1,atom%Ntr
+  ! 				kr = atom%at(kc)%ik
+  !
+  ! 				i = atom%continua(kr)%i
+  ! 				j = atom%continua(kr)%j
+  !
+  ! 				Nblue = atom%continua(kr)%Nblue; Nred = atom%continua(kr)%Nred
+  ! 				wj = 1.0; wi = 1.0
+  !
+  ! 				if (ldissolve) then
+  ! 					if (atom%ID=="H") then
+  ! 						n_eff = real(i,kind=dp)
+  ! 						wi = wocc_n(icell, n_eff, real(atom%stage(i)), real(atom%stage(j)),hydrogen%n(1,icell))
+  ! 					else
+  ! 						n_eff = atom%stage(j)*sqrt(atom%Rydberg/(atom%E(j)-atom%E(i)))
+  ! 					endif
+  ! 				endif
+  !
+  ! 				chi_ion = Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(j))
+  !
+  ! 				do la=1, atom%continua(kr)%nlambda
+  !
+  ! 					Diss = D_i(icell, n_eff, real(atom%stage(i)), 1.0, lambda_cont(Nblue+la-1), atom%continua(kc)%lambda0, chi_ion)
+  ! 					gij = atom%nstar(i,icell)/atom%nstar(j,icell) * exp(-hc_k/T(icell)/lambda_cont(Nblue+la-1))
+  !
+  !
+  ! 					if ( (atom%n(i,icell) - atom%n(j,icell) * gij) > 0.0) then
+  !
+  ! 							chi_c(Nblue+la-1,icell) = chi_c(Nblue+la-1,icell) + &
+  ! 							diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - gij*atom%n(j,icell))
+  !
+  ! 							eta_c(Nblue+la-1,icell) = eta_c(Nblue+la-1,icell) + &
+  ! 							diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * gij * atom%n(j,icell)
+  ! 					else
+  !
+  ! 							eta_c(Nblue+la-1,icell) = eta_c(Nblue+la-1,icell) + &
+  ! 							diss * atom%continua(kr)%alpha(la) * atom%continua(kr)%twohnu3_c2(la) * gij * atom%n(j,icell)
+  !
+  ! 							chi_c(Nblue+la-1,icell) = chi_c(Nblue+la-1,icell) - &
+  ! 							diss * atom%continua(kr)%alpha(la) * (atom%n(i,icell) - gij*atom%n(j,icell))
+  !
+  ! 					endif
+  ! 				enddo
+  !
+  ! 			end do ! loop over Ncont
+  ! 			atom => NULL()
+  ! 		end do !loop over metals
+  !
+  ! 	return
+  ! 	end subroutine opacity_atom_bf_lte
+  
+  !scattering term is not taken as the one the continuum
+!   subroutine continuum_line (icell, lambda0, chi00, eta00)
+!     integer, intent(in) :: icell
+!     real(kind=dp), intent(in) :: lambda0
+!     real(kind=dp), intent(out) :: chi00, eta00
+!     integer :: la, nat
+!     real(kind=dp) :: chi(1), eta(1), l(1), Bp
+! 
+!     chi00 = 0.0
+!     eta00 = 0.0
+!     Bp = Bpnu(T(icell), lambda0)
+!     l(1) = lambda0
+! 
+! 
+!     ! 		call Hminus_bf_wishart(icell, 1, l, chi, eta)
+!     call Hminus_bf_geltman(icell,1,l,chi,eta) !->better with rh
+!     chi00 = chi00 + chi(1)
+!     eta00 = eta00 + eta(1)
+! 
+!     call Hminus_ff_bell_berr(icell, 1, l, chi)
+!     chi00 = chi00 + chi(1)
+!     eta00 = eta00 + chi(1) * Bp
+! 
+!     call Hydrogen_ff(icell, 1, l, chi)
+!     chi00 = chi00 + chi(1)
+!     eta00 = eta00 + chi(1) * Bp
+! 
+!     !now atomic LTE bound-free
+!     call lte_bound_free(icell, 1, l, chi, eta)
+!     chi00 = chi00 + chi(1)
+!     eta00 = eta00 + eta(1)
+! 
+!     chi00 = chi00 + Thomson(icell)
+!     !if using electron scattering from the continuum
+!     !if (lelectron_scattering) eta00 = eta00 + interp_dp(Jnu_cont(:,icell) * sca_c(:,icell), lambda_cont, lambda0)
+! 
+!     chi00 = chi00 + interp_dp(chi_c_nlte(:,icell), lambda_cont, lambda0)
+!     eta00 = eta00 + interp_dp(eta_c_nlte(:,icell), lambda_cont, lambda0)
+! 
+!     return
+!   end subroutine continuum_line
+
+!   subroutine background_continua (icell)
+!     integer, intent(in) :: icell
+!     integer :: la, nat
+!     real(kind=dp), dimension(Nlambda_cont) :: chi, eta, Bp
+! 
+!     Bp = Bpnu(T(icell), lambda_cont)
+! 
+!     chi_c(:,icell) = Thomson(icell)!0.0_dp
+!     eta_c(:,icell) = 0.0_dp
+!     ! 		sca_c(:,icell) = 0.0_dp
+! 
+!     ! 		call Hminus_bf_wishart(icell, Nlambda_cont, lambda_cont, chi, eta) !->better with turbospec
+!     call Hminus_bf_geltman(icell, Nlambda_cont, lambda_cont, chi, eta) !->better with rh
+!     chi_c(:,icell) = chi_c(:,icell) + chi(:)
+!     eta_c(:,icell) = eta_c(:,icell) + eta(:)
+! 
+!     call Hminus_ff_bell_berr(icell, Nlambda_cont, lambda_cont, chi)
+!     chi_c(:,icell) = chi_c(:,icell) + chi(:)
+!     eta_c(:,icell) = eta_c(:,icell) + chi(:) * Bp(:)
+!     !
+!     call Hydrogen_ff(icell, Nlambda_cont, lambda_cont, chi)
+!     chi_c(:,icell) = chi_c(:,icell) + chi(:)
+!     eta_c(:,icell) = eta_c(:,icell) + chi(:) * Bp(:)
+! 
+!     ! 		!now atomic LTE bound-free
+!     if (NpassiveAtoms > 0) then
+!        call lte_bound_free(icell, Nlambda_cont, lambda_cont, chi, eta)
+!        chi_c(:,icell) = chi_c(:,icell) + chi(:)
+!        eta_c(:,icell) = eta_c(:,icell) + eta(:)
+!     endif
+! 
+!     ! 		sca_c(:,icell) = Thomson(icell)
+!     ! 		!Rayleigh scattering is included no more at the moment. Might be necessary for some temperature
+!     ! 		!below the Lyman limit
+!     !
+!     ! 		!Total opac once source functions are known
+!     ! 		chi_c(:,icell) = chi_c(:,icell) +  sca_c(:,icell)
+! 
+!     return
+!   end subroutine background_continua
 
 !  	subroutine cross_coupling_terms(id, icell, iray)
 ! 		integer, intent(in) :: id, iray, icell

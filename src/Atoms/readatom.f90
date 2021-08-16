@@ -67,7 +67,8 @@ CONTAINS
     character(len=20) :: shapeChar, symmChar, optionChar, vdWChar, nuDepChar
     character(len=2) :: IDread
     real(kind=dp) :: C1, vDoppler, f, lambdaji
-    real(kind=dp) :: lambdamin, geff, gamma_j, gamma_i
+    real(kind=dp) :: lambdamin
+    real :: geff, gamma_j, gamma_i
     EOF = 0
     res = .false.
     setup_commin_gauss_prof = .false.
@@ -159,8 +160,8 @@ CONTAINS
        !either Landé, or S, J, L etc.
        !If usefull, levels with -99 will be skiped
        !for instance for zeeman polar.
-       atom%qJ(i) = -99d0
-       atom%qS(i) = -99d0
+       atom%qJ(i) = -99.
+       atom%qS(i) = -99.0
        atom%Lorbit(i) = -99
        determined(i) = .false.
        parse_label(i) = .false.
@@ -208,9 +209,10 @@ CONTAINS
        atom%at(kr)%trtype = atom%lines(kr)%trtype; atom%at(kr)%ik=kr
        atom%at(kr)%lcontrib_to_opac=.true.
 
+       atom%lines(kr)%polarizable = .false.
        atom%lines(kr)%isotope_frac = 1.
        atom%lines(kr)%g_lande_eff = -99.0
-       atom%lines(kr)%glande_i = -99; atom%lines(kr)%glande_j = -99
+       atom%lines(kr)%glande_i = -99.0; atom%lines(kr)%glande_j = -99.0
        !atom%lines(kr)%trtype="ATOMIC_LINE"
        CALL getnextline(atomunit, COMMENT_CHAR, FormatLine, inputline, Nread)
        Nread = len(trim(inputline)) ! because, if blanck
@@ -245,6 +247,11 @@ CONTAINS
              CALL Warning("Unable to use read lande factors, try to compute them..")
              atom%lines(kr)%g_lande_eff = -99 !force calculation
           end if
+          if ((atom%lines(kr)%glande_j == 0.0 .and. atom%lines(kr)%glande_i == 0.0).or.&
+          		(atom%lines(kr)%g_lande_eff == 0.0)) then
+          		atom%lines(kr)%ZeemanPattern = 0
+          		write(*,*) " ++-> line", i, j, " unpolarized!"
+          endif
        else
           write(*,*) inputline
           CALL error(" Unable to parse atomic file line")
@@ -349,7 +356,8 @@ CONTAINS
        !!
        !If Selection rule is OK and g_lande_eff not given from file and atomic label
        !correctly determined
-       if ((abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.) .and. &
+       if (lmagnetized) then
+       	if ((abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.) .and. &
             (atom%lines(kr)%g_Lande_eff <= -99) .and. &
             (determined(atom%lines(kr)%j)) .and. (determined(atom%lines(kr)%i))) then !
           ! do not compute geff if term is not
@@ -357,7 +365,7 @@ CONTAINS
           ! ie if g_lande_eff > -99
           ! fill lande_g_factor if determined and not given
           ! for b-b transitions
-          CALL Lande_eff(atom, kr)
+          	CALL Lande_eff(atom, kr)
           !compute indiviual glande of levels also
           !!testing
           !!write(*,*) wKul(atom, kr, 0)**2
@@ -365,14 +373,14 @@ CONTAINS
           !!write(*,*) wKul(atom, kr, 2)**2
           !!stop
           !write(*,*) "geff = ", atom%lines(kr)%g_lande_eff
-       end if
+       	end if
        !!atom%has_atomic_polarization = .false. !different criterion than polarizable
        !!atom%lines(kr)%has_alignement = .false. !depending on the polarisability factor
        ! if we neglect J-states coherences
-       atom%lines(kr)%polarizable = .false. !check also deltaJ
        !write(*,*) "dJ=", abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j))
-       atom%lines(kr)%polarizable = (lmagnetized) .and. &
-            (atom%lines(kr)%g_lande_eff > -99)! .and. (abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.)
+       !lmagnetized is .true. if we do the test here!
+       	atom%lines(kr)%polarizable = (atom%lines(kr)%g_lande_eff > -99).and.(atom%lines(kr)%ZeemanPattern /= 0)
+        ! .and. (abs(atom%qJ(atom%lines(kr)%i) - atom%qJ(atom%lines(kr)%j)) <= 1.)
        !not need to be determined here. Because geff can be read from file and be > -99
        !even if the levels are not determined. In this case deltaJ = 0 (-99+99).
        !Exception if one of the level is determined but not the other, in this case
@@ -381,8 +389,10 @@ CONTAINS
        !In case of PRT but the line is not polarized, set a Zeeman structure with Nc=1,
        !S=0, q=0, shift=0
        ! line%ZP = 0 if WEAK_FIEKD solution; otherwise has to be -1, 1 or .not.polarizable
-       if (atom%lines(kr)%ZeemanPattern /= 0) CALL ZeemanMultiplet(atom%lines(kr))
-
+       	if (atom%lines(kr)%polarizable) then
+       		call ZeemanMultiplet(atom%lines(kr))
+       	endif
+	   endif !lmagnetized
        ! oscillator strength saved
        atom%lines(kr)%fosc = f
        lambdaji = (HPLANCK * CLIGHT) / (atom%E(j) - atom%E(i))

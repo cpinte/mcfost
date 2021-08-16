@@ -573,7 +573,7 @@ CONTAINS
          l !physical length of the cell
     integer 													:: Nvspace, Nzc
     real(kind=dp), dimension(NvspaceMax) 						:: Omegav
-    real(kind=dp) 												:: norm, vbroad, cog, s2c, c2c, B, sigsq
+    real(kind=dp) 												:: norm, vbroad, admp, cog, s2c, c2c, B, sigsq
     real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
          dv, omegav_mean
     type (AtomicLine), intent(in)								:: line
@@ -581,23 +581,27 @@ CONTAINS
     real(kind=dp), dimension(N)			                    	:: u1, u1p, ub
     real(kind=dp), intent(out)									:: phi0(N), phiZ(N,3), psiZ(N,3)
     real(kind=dp)												:: H(N), F(N), psi(N,-1:1), phi(N,-1:1)
+    logical														:: lnot_magnetized
+    
 
-    B = B_project_angles(icell,x,y,z,u,v,w,cog,sigsq,c2c,s2c)
+    B = B_project_angles(icell,x,y,z,u,v,w,cog,sigsq,c2c,s2c,lnot_magnetized)
 
-    ! 		write(*,*) B*1e4, cog, sigsq, c2c, s2c
-    ! 		stop
+    !Output arrays correspond to I, Q, U, V with phi0 for I and psiZ(:,i) for i=Q,U,V
 
-    !those correspond to I, Q, U, V with phi0 for I and psiZ(:,i) for i=Q,U,V
-    phi0(:) = 0.0
-    phiz(:,:) = 0.0; psiz(:,:) = 0.0
 
-    !psi and phi are the Zeeman components with -1, 0 and +1 depending on the deltaM
-
-    if ((B < tiny_dp).or..not.(line%polarizable)) then
+    if (lnot_magnetized.or..not.(line%polarizable)) then
+       !The test could be done elsewhere though
        phi0 = local_profile_v(line,icell,lsubstract_avg,N,lambda,x,y,z,x1,y1,z1,u,v,w,l)
        return
     endif
-
+    
+    !tmp
+    if (line%voigt) then
+    	admp = line%a(icell)
+    else
+    	admp = 0.0_dp
+    	!to handle dispersion profile with gaussian (Voigt(a=0))
+    endif
 
     Nvspace = NvspaceMax
     i = line%i; j = line%j
@@ -635,48 +639,55 @@ CONTAINS
     norm = Nvspace * vbroad * sqrtpi
     psi = 0.0_dp; phi = 0.0_dp
 
-    if (line%voigt) then
+    !psi and phi are the Zeeman components with -1, 0 and +1 depending on the deltaM
+
+    !if (line%voigt) then
 
        do nv=1, Nvspace
 
           u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/vbroad
 
           do nc=1,Nzc
-             ! the splitting is 0 if unpolarized 'cause zm%shift(nc=Nzc=1)=0d0
-             !there is a + omegaB because, -deltaLam^JJp_MMp=splitting = lamB * (gp*Mp - g*M)
-             ub = u1p(:) + line%zm%shift(nc) * B * LARMOR * line%lambda0 * NM_TO_M / vbroad
 
-             H = Voigt(line%Nlambda, line%adamp, ub, F)
+             ub = u1p(:) - line%zm%shift(nc) * B * LARMOR * line%lambda0 * NM_TO_M / vbroad
 
-             psi(:,line%zm%q(nc)) = psi(:,line%zm%q(nc)) + line%zm%strength(nc) * F(:) / norm
-
-             phi(:,line%zm%q(nc)) = phi(:,line%zm%q(nc)) + line%zm%strength(nc) * H(:) / norm
-          end do !components
-
-       enddo
-
-    else
-       do nv=1, Nvspace
-
-          u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/vbroad
-
-          do nc=1,Nzc
-             ! the splitting is 0 if unpolarized 'cause zm%shift(nc=Nzc=1)=0d0
-             !there is a + omegaB because, -deltaLam^JJp_MMp=splitting = lamB * (gp*Mp - g*M)
-             ub = u1p(:) + line%zm%shift(nc) * B * LARMOR * line%lambda0 * NM_TO_M / vbroad
-
-             H = exp(-ub**2)
-             F = -2 * ub(:) * H !?
-             !-> need a version for a = 0 that returns gaussian + dispersion profile with a = 0
-             !              		H = Voigt(line%Nlambda, 0.0_dp, ub, F)
+             H = Voigt(line%Nlambda, admp, ub, F)
 
              psi(:,line%zm%q(nc)) = psi(:,line%zm%q(nc)) + line%zm%strength(nc) * F(:) / norm
 
              phi(:,line%zm%q(nc)) = phi(:,line%zm%q(nc)) + line%zm%strength(nc) * H(:) / norm
+             
+!              if (nv==1) then
+!              	write(*,*) Nvspace, nc, line%zm%q(nc)
+!              	write(*,*) "phi(:,q)=", phi(:,line%zm%q(nc))
+!              	write(*,*) "psi(:,q)=", psi(:,line%zm%q(nc))
+!              endif
           end do !components
 
        enddo
-    endif
+
+!     else
+!        do nv=1, Nvspace
+! 
+!           u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/vbroad
+! 
+!           do nc=1,Nzc
+!              ! the splitting is 0 if unpolarized 'cause zm%shift(nc=Nzc=1)=0d0
+!              !there is a + omegaB because, -deltaLam^JJp_MMp=splitting = lamB * (gp*Mp - g*M)
+!              ub = u1p(:) + line%zm%shift(nc) * B * LARMOR * line%lambda0 * NM_TO_M / vbroad
+! 
+!              !H = exp(-ub**2)
+!              !F = -2 * ub(:) * H !?
+!              !-> need a version for a = 0 that returns gaussian + dispersion profile with a = 0
+!              !              		H = Voigt(line%Nlambda, 0.0_dp, ub, F)
+! 
+!              psi(:,line%zm%q(nc)) = psi(:,line%zm%q(nc)) + line%zm%strength(nc) * F(:) / norm
+! 
+!              phi(:,line%zm%q(nc)) = phi(:,line%zm%q(nc)) + line%zm%strength(nc) * H(:) / norm
+!           end do !components
+! 
+!        enddo
+!     endif
 
     phi0(:) = 0.5 *(phi(:,0) * sigsq + 0.5 *(1.0+cog*cog) * (phi(:,-1)+phi(:,1)))
 
@@ -693,23 +704,17 @@ CONTAINS
     psiz(:,2) = 0.5*(psi(:,0)-0.5*(psi(:,-1)+psi(:,1)))*s2c*sigsq
     !rhoV/chiI
     psiz(:,3) = 0.5*(psi(:,-1)-psi(:,1))*cog
+    
 
-    !         if (line%i==1 .and. line%j==3) then
-    !         	write(*,*) maxval(abs(psiz(:,1))), maxval(abs(psiz(:,2))), maxval(abs(psiz(:,3)))
-    !         	write(*,*) minval(abs(psiz(:,1))), minval(abs(psiz(:,2))), minval(abs(psiz(:,3)))
-    !         endif
-    !         write(*,*) "phiI =", phi0(N/2)
-    !         write(*,*) "chiQ=", phiz(N/2,1), " chiU=", phiz(N/2,2), " chiV=", phiz(N/2,3)
-    !         write(*,*) "rQ=", psiz(N/2,1), " rU=", psiz(N/2,2), " rV=", psiz(N/2,3)
-    !
-    !         write(*,*) "phiI =", phi0(1)
-    !         write(*,*) "chiQ=", phiz(1,1), " chiU=", phiz(1,2), " chiV=", phiz(1,3)
-    !         write(*,*) "rQ=", psiz(1,1), " rU=", psiz(1,2), " rV=", psiz(1,3)
-    !
-    !         write(*,*) "phiI =", phi0(N)
-    !         write(*,*) "chiQ=", phiz(N,1), " chiU=", phiz(N,2), " chiV=", phiz(N,3)
-    !         write(*,*) "rQ=", psiz(N,1), " rU=", psiz(N,2), " rV=", psiz(N,3)
-
+! write(*,*) "phi0(:)=", maxval(phi0)
+! write(*,*) "phiQ(:)=", maxval(phiz(:,1))
+! write(*,*) "phiU(:)=", maxval(phiz(:,2))
+! write(*,*) "phiV(:)=", maxval(phiz(:,3))
+! write(*,*) "psiQ(:)=", maxval(psiz(:,1))
+! write(*,*) "psiU(:)=", maxval(psiz(:,2))
+! write(*,*) "psiV(:)=", maxval(psiz(:,3))
+ 
+! stop
     return
   end subroutine local_profile_zv
 

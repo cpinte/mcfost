@@ -43,12 +43,12 @@ MODULE atom_type
      integer :: Nlambda ! Number of wavelength points between Nblue and Nred = Nred-Nblue + 1
      integer :: Nblue=0, Nred = 0, Nmid=0 !Index of the line on the whole grid in the absence of velocity shifts or magnetic fields
      real(kind=dp) :: lambda0, lambdamin, lambdamax ! boundary of the line in absence of velocity shifts or magnetic fields
-     real(kind=dp) :: isotope_frac, g_Lande_eff, Aji, Bji, Bij, Grad, cStark, fosc
+     real(kind=dp) :: isotope_frac, Aji, Bji, Bij, Grad, cStark, fosc
      real(kind=dp) :: twohnu3_c2, gij
      !qcore is not used yet: size of the line "core" if non uniform grid (for interp)
      !qwing is used to compute the maximum extension of the line: Vmax = qwing * max(vD)
      real :: qcore, qwing
-     real(kind=dp) :: glande_i, glande_j
+     real :: glande_i, glande_j, g_Lande_eff
      real(kind=dp), dimension(4) :: cvdWaals
      !!integer, allocatable, dimension(:,:) :: dk!size (Nray, id) = index displacement of a line due to velocity
      !Nlambda,(Nproc or Nspace, depends on the choice For flux calculations. Always Nlambda, Nspace for NLTE
@@ -56,19 +56,20 @@ MODULE atom_type
      !!real(kind=dp), allocatable, dimension(:,:,:) :: eta
      real(kind=dp), allocatable, dimension(:,:,:,:) :: mapc!lcont flux to be stored
      real(kind=dp), allocatable, dimension(:,:,:,:,:) :: map!line flux to be stored
+     real(kind=dp), allocatable, dimension(:,:,:,:,:,:) :: mapx!line flux to be stored
      !used for wavelength integration
      real(kind=dp), allocatable, dimension(:,:,:) :: phi_loc!, phiZ, psi !3, Nlambda, Nray
      !wlam is the integration wavelenght weight = phi
      real(kind=dp), allocatable, dimension(:)  :: lambda, CoolRates_ij, w_lam, Rij, Rji, Jbar
      !real(kind=dp), allocatable, dimension(:) :: fomega !for Rayleigh scattering
-     real(kind=dp) :: Qelast, adamp!, chi0, eta0 ! at a cell
+     real(kind=dp) :: Qelast!, chi0, eta0 ! at a cell
      real(kind=dp), dimension(:), allocatable :: Tex, deta !differentiel of source function
      !keep CLIGHT * (nu0 - nu)/nu0 for lines												(method for Voigt)
      real(kind=dp), dimension(:), allocatable :: u, a, pvoigt_eta!aeff, r, r1
      !damping for all cells(a) and Thomson effective damping (eff)
      real(kind=dp), allocatable, dimension(:,:) :: rho_pfr
      character(len=ATOM_LABEL_WIDTH) :: name ! for instance Halpha, h, k, Hbeta, D1, D2 etc
-     integer :: ZeemanPattern! 0 = WF, -1=EFFECTIVEE TRIPLET, 1=FULL
+     integer :: ZeemanPattern
      type (AtomType), pointer :: atom => NULL()
      type (ZeemanType) :: zm
   END TYPE AtomicLine
@@ -106,7 +107,7 @@ MODULE atom_type
      real(kind=dp) :: Rydberg, scatt_limit !minimum wavelength for Rayleigh scattering
      real(kind=dp)                :: cswitch = 1.0_dp, Abund, weight, massf !mass fraction
      real(kind=dp), allocatable, dimension(:) :: g, E, vbroad!, ntotal
-     real(kind=dp), allocatable, dimension(:) :: qS, qJ
+     real, allocatable, dimension(:) :: qS, qJ
      ! allocated in readatom.f90, freed with freeAtoms()
      !futur deprecation, because I will stop using RH routine
      character(len=MAX_LENGTH), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
@@ -390,20 +391,22 @@ CONTAINS
     RETURN
   END FUNCTION getPrincipal
 
-  !Should be more efficient ?
+  !Should be more explicit and easy to parse at reading of the model!
   ! easy to break
   SUBROUTINE determinate(label, g, S, L,J, determined)
     ! get principal quantum number from label
-    logical, intent(out) :: determined
-    integer, intent(out) :: L!, J
-    logical :: unknown_orbital
-    real(kind=dp) :: J
-    real(kind=dp), intent(out) :: S
     real(kind=dp), intent(in) :: g
     character(len=ATOM_LABEL_WIDTH), intent(in) :: label
+    logical, intent(out) :: determined
+    integer, intent(out) :: L
+    real, intent(out) :: J, S
+    
+    
+    logical :: unknown_orbital
     character(len=ATOM_LABEL_WIDTH+1) :: multiplet
     character(len=1) :: orbit
     integer :: i, Nl, parity, dk
+    
     multiplet = trim(label)
     Nl = len(multiplet)
 
@@ -435,14 +438,14 @@ CONTAINS
        RETURN
     end if
 
-    S = (real(S,kind=8) - 1.)/2.
+    S = (real(S) - 1.)/2.
     L = getOrbital(orbit, unknown_orbital)
     if (unknown_orbital) then
        determined = .false.
        return
     endif
 
-    J = L + S!(g-1.)/2.
+    J = real(L) + S!(g-1.)/2.
     if (J>(L+S)) then
        determined = .false.
     end if
@@ -455,7 +458,7 @@ CONTAINS
     type (AtomType) :: atom
     integer :: kr, i, j
     integer :: K, twice
-    real wK, Jj, Ji
+    real :: wK, Jj, Ji
 
     wK = 1.
     twice = 2 !
@@ -537,5 +540,27 @@ CONTAINS
     end if
     RETURN
   END SUBROUTINE PTrowcol
+  
+  !    function atomZnumber_old(atomID) result(Z)
+  !    --------------------------------------
+  !    return the atomic number of an atom
+  !    with ID = atomID.
+  !    Hydrogen is 1
+  !    --------------------------------------
+  !     character(len=ATOM_ID_WIDTH) :: atomID
+  !     integer :: Z, i
+  !
+  !     Z = 1
+  !     do i=1,Nelem
+  !      if (atmos%Elements(i)%ID.eq.atomID) then
+  !        Z = i
+  !        exit
+  !      end if
+  !     do while (atmos%Elements(Z)%ptr_elem%ID.ne.atomID)
+  !      Z=Z+1
+  !     end do
+  !
+  !    return
+  !    end function atomZnumber_old
 
 END MODULE atom_type

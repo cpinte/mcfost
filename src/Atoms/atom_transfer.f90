@@ -9,9 +9,9 @@ module atom_transfer
 
   use atom_type, only			: AtomType
   use opacity, only			: dealloc_atom_quantities, alloc_atom_quantities, compute_atom_quantities, &
-       compute_background_continua, interp_background_opacity, opacity_atom_loc, interp_contopac, interp_continuum_local, & !compute_nlte_bound_free, &
-       nlte_bound_free, background_continua, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, &
-       background_continua_lambda, opacity_atom_zeeman_loc, prec_pops, frac_limit_pops, frac_ne_limit
+       compute_background_continua, opacity_atom_loc, interp_continuum_local, &
+       nlte_bound_free, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, &
+       background_continua_lambda, opacity_atom_zeeman_loc, solve_stokes_mat, prec_pops, frac_limit_pops, frac_ne_limit
   use background_opacity, only: Thomson
   use Planck, only			: bpnu
   use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, &
@@ -208,6 +208,8 @@ contains
              chi(:,id) = chi0_bb(:,icell)
              eta(:,id) = eta0_bb(:,icell)
           endif
+          !to Do: if llimit_mem, Jnu_cont should be interpolated in interp_continuum_local
+          !otherwise, here.
           if (lelectron_scattering) then
           	Jnu(:,1) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
           endif
@@ -217,10 +219,15 @@ contains
 
           dtau(:) = l_contrib * chi(:,id)
 
+		  !To do: remove all the tests
           if ((nbr_cell == 1).and.labs) then
              if (lmali_scheme) then
-                if (minval(chi(:,id)) == 0) write(*,*) lambda(locate(chi(:,id), minval(chi(:,id)))), T(icell), ne(icell), &
+                if (minval(chi(:,id)) == 0) then
+                	write(*,*) "Warning", id, icell, " chi is 0 at a wavelength"
+                	write(*,*) lambda(locate(chi(:,id), minval(chi(:,id)))), T(icell), ne(icell), &
                      nhtot(icell)
+                     chi(:,id) = chi(:,id) + tiny_dp !need to remove, tmp
+                endif
                 if (any_nan_infinity_vector(chi(:,id)) > 0) then
                    write(*,*) chi(:,id)
                    call error( "inf or nan in chi")
@@ -247,6 +254,13 @@ contains
              Snu_c = Snu_c / (chi_c(:,icell) + tiny_dp)
              dtau_c(:) = l_contrib * chi_c(:,icell)
           endif
+!           if (.not.labs .and. (icell==1 .or. icell==n_cells)) then
+!           	write(*,*) icell, maxval(chi0_bb(:,icell)), maxval(eta0_bb(:,icell))
+!           	write(*,*) minval(chi0_bb(:,icell),mask=icompute_atomRT==1), minval(eta0_bb(:,icell),mask=icompute_atomRT==1)
+!           	write(*,*) maxval(Snu)!, maxval(eta0_bb(:,icell))
+!           	write(*,*) minval(Snu)!, minval(eta0_bb(:,icell),mask=icompute_atomRT==1)
+!           	if (icell==1)stop
+!           endif
 
           !Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau(:)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
           !-> faster written that way ?
@@ -433,7 +447,8 @@ contains
 
     return
   end subroutine integ_ray_line_origin
-
+  
+  !TO DO merge with opacity_atom_loc() and  integ_ray_line_i()
   subroutine integ_ray_line_z(id,icell_in,x,y,z,u,v,w,iray,labs)
     ! ------------------------------------------------------------------------------- !
     !
@@ -443,8 +458,8 @@ contains
     real(kind=dp), intent(in) :: u,v,w
     real(kind=dp), intent(in) :: x,y,z
     logical, intent(in) :: labs
-    real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-    real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, S_Q, S_U, S_V!, LD
+    real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
+    real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau!, LD
     real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
     integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
     logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
@@ -460,12 +475,16 @@ contains
 
     Itot(:,iray,id) = 0d0
     Icont(:,iray,id) = 0d0
-
     Stokes_V(:,id) = 0d0
     Stokes_Q(:,id) = 0d0
     Stokes_U(:,id) = 0d0
 
+    Istar_loc(:,id) = 0.0_dp
+    if (laccretion_shock) Ishock(:,id) = 0.0_dp
 
+
+    !!write(*,*) "id=",id
+    !!write(*,*) "****"
     ! -------------------------------------------------------------- !
     !*** propagation dans la grille ***!
     ! -------------------------------------------------------------- !
@@ -486,26 +505,23 @@ contains
        endif
 
        ! Test sortie ! "The ray has reach the end of the grid"
-
        if (test_exit_grid(icell, x0, y0, z0)) return
 
+	   !The star is not polarised at the moment
        if (lintersect_stars) then
           if (icell == icell_star) then
-             ! 					call calc_stellar_surface_brightness(Nlambda_cont,lambda_cont,i_star, icell_prev, x0, y0, z0, u,v,w,LDc)
-             !        				Icont(:,iray,id) =  Icont(:,iray,id) + LDc(:) * Istar_cont(:,i_star)*exp(-tau_c(:))
-             ! 					call calc_stellar_surface_brightness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w,LD)
-             ! 					Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * LD(:)
+             !continuous emission of the shock and the star only no stored!
              Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * &
                   local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
-             Itot(:,iray,id) =  Itot(:,iray,id) + exp(-tau) * Istar_tot(:,i_star) * &
-                  local_stellar_brigthness(Nlambda,lambda,i_star, icell_prev, x0, y0, z0, u,v,w)
+             call local_stellar_radiation(id,iray,Nlambda, lambda, tau,i_star,icell_prev,x0,y0,z0,u,v,w)
              return
           end if
        endif
 
+
        if (icell <= n_cells) then
           lcellule_non_vide = (icompute_atomRT(icell) > 0)
-          if (icompute_atomRT(icell) < 0) return !-1 if dark
+          if (icompute_atomRT(icell) < 0) return
        endif
 
        nbr_cell = nbr_cell + 1
@@ -537,6 +553,9 @@ contains
 
           dtau(:) = l_contrib * chi(:,id)
 
+          if ((nbr_cell == 1).and.labs) then
+				write(*,*) "labs should be false here!"
+          endif
 
           if (lelectron_scattering) then
              Snu = ( eta(:,id) + thomson(icell) * Jnu(:,1) ) / ( chi(:,id) + tiny_dp )
@@ -554,36 +573,16 @@ contains
              dtau_c(:) = l_contrib * chi_c(:,icell)
           endif
 
-          !explicit product of Seff = S - (K/chiI - 1) * I
-          !Is there a particular initialization to do for polarisation ?
-          !because it will be zero at the first place
-          Snu(:) = Snu(:) -chiQUV_p(:,1,id) / chi(:,id) * Stokes_Q(:,id) - &
-               chiQUV_p(:,2,id) / chi(:,id) *  Stokes_U(:,id) - &
-               chiQUV_p(:,3,id) / chi(:,id) *  Stokes_V(:,id)
-
-
-          S_Q(:) = etaQUV_p(:,1,id) /chi(:,id) - &
-               chiQUV_p(:,1,id) / chi(:,id) * Itot(:,iray,id) - &
-               rho_p(:,3,id)/chi(:,id) * Stokes_U(:,id) + &
-               rho_p(:,2,id)/chi(:,id) * Stokes_V(:,id)
-
-          S_U(:) = etaQUV_p(:,2,id) /chi(:,id) - &
-               chiQUV_p(:,2,id) / chi(:,id) * Itot(:,iray,id) + &
-               rho_p(:,3,id)/chi(:,id) * Stokes_Q(:,id) - &
-               rho_p(:,1,id)/chi(:,id) * Stokes_V(:,id)
-
-          S_V(:) = etaQUV_p(:,3,id) /chi(:,id) - &
-               chiQUV_p(:,3,id) / chi(:,id) * Itot(:,iray,id) - &
-               rho_p(:,2,id)/chi(:,id) * Stokes_Q(:,id) + &
-               rho_p(:,1,id)/chi(:,id) * Stokes_U(:,id)
-
 
           do la=1,Nlambda
-             Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
-             Stokes_Q(la,id) = Stokes_Q(la,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * S_Q(la)
-             Stokes_U(la,id) = Stokes_U(la,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * S_U(la)
-             Stokes_V(la,id) = Stokes_V(la,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * S_V(la)
-
+             Q = ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) )
+             P(1) = Snu(la) * Q
+          	 call solve_stokes_mat(id,icell,la, Q, P)
+          	 Itot(la,iray,id) = Itot(la,iray,id) + P(1)
+          	 Stokes_Q(la,id) = Stokes_Q(la,id) + P(2)
+          	 Stokes_U(la,id) = Stokes_U(la,id) + P(3)
+          	 Stokes_V(la,id) = Stokes_V(la,id) + P(4)
+!              Itot(la,iray,id) = Itot(la,iray,id) + P(1)
              tau(la) = tau(la) + dtau(la) !for next cell
           enddo
 
@@ -594,13 +593,12 @@ contains
 
        end if  ! lcellule_non_vide
 
-       icell_prev = icell
+       icell_prev = icell !duplicate with previous_cell, but this avoid problem with Voronoi grid here
 
     end do infinie
 
     return
   end subroutine integ_ray_line_z
-
 
   subroutine flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
     ! -------------------------------------------------------------- !
@@ -750,6 +748,15 @@ contains
                 atom%lines(kr)%mapc(1,1,ibin,iaz) = &
                      atom%lines(kr)%mapc(1,1,ibin,iaz) + interp1d_sorted(Nlambda_cont,lambda_cont,I0c, &
                      atom%lines(kr)%lambda0)*normF
+                     
+           		if (lmagnetized) then
+                	atom%lines(kr)%mapx(:,1,1,ibin,iaz,1) = &
+                		atom%lines(kr)%mapx(:,ipix,jpix,ibin,iaz,1)  + QUV(nb:nr,1)*normF
+                	atom%lines(kr)%mapx(:,1,1,ibin,iaz,2) = &
+                		atom%lines(kr)%mapx(:,ipix,jpix,ibin,iaz,2)  + QUV(nb:nr,2)*normF
+                	atom%lines(kr)%mapx(:,1,1,ibin,iaz,3) = &
+                		atom%lines(kr)%mapx(:,ipix,jpix,ibin,iaz,3)  + QUV(nb:nr,3)*normF
+                endif
              endif
 
           enddo
@@ -767,6 +774,12 @@ contains
                 atom%lines(kr)%map(:,ipix,jpix,ibin,iaz) = I0(nb:nr)*normF
                 atom%lines(kr)%mapc(ipix,jpix,ibin,iaz) = interp1d_sorted(Nlambda_cont,lambda_cont,I0c, &
                      atom%lines(kr)%lambda0)*normF
+                     
+                if (lmagnetized) then
+                	atom%lines(kr)%mapx(:,ipix,jpix,ibin,iaz,1) = QUV(nb:nr,1)*normF
+                	atom%lines(kr)%mapx(:,ipix,jpix,ibin,iaz,2) = QUV(nb:nr,2)*normF
+                	atom%lines(kr)%mapx(:,ipix,jpix,ibin,iaz,3) = QUV(nb:nr,3)*normF
+                endif
              endif
 
           enddo
@@ -966,7 +979,6 @@ contains
     
 
 	omp_chunk_size = 1!max(nint( 0.01 * n_cells / nb_proc ),1)
-	write(*,*) "**debug omp_chunk_size:", omp_chunk_size
     !init at 0
     mem_alloc_tot = 0
 
@@ -1001,6 +1013,7 @@ contains
           call error("Expected model ascii when lmhd_voronoi = .false.!!")
        endif
     endif
+    !call empty_cells()
 
     if (lmagnetized) then
        !or need to allocate line%adamp after or interpolate the dispersion profile
@@ -1047,7 +1060,8 @@ contains
        endif
     endif
 
-    call set_LTE_populations !write pops at the end because we probably have NLTE pops also
+    call set_LTE_populations 
+    !write pops at the end because we probably have NLTE pops also
 
     if (NactiveAtoms > 0) then
 
@@ -1073,9 +1087,7 @@ contains
 
 
        if (n_etoiles > 0) call init_stellar_disk
-       write(*,*) " Computing background opacities..."!+ init nlte cont opac + interpolation for lines
-       call alloc_atom_quantities !call compute_atom_quantities(icell) for each cell
-
+       call alloc_atom_quantities
        call compute_background_continua
 
        !use the same rays as nlteloop
@@ -1125,6 +1137,7 @@ contains
           !calc_delta_Tex_atom
 
           if (atom%initial_solution=="ZERO_RADIATION") then
+          	!Still H- is at LTE at first.
              write(*,*) "-> Initial solution at SEE with I = 0 for atom ", atom%ID
              !factorize in a new subroutine for all cells ?
              do icell=1,n_cells
@@ -1287,10 +1300,8 @@ contains
        else
           call init_Spectrum(Nrayone,lam0=lam0,vacuum_to_air=lvacuum_to_air)
           if (n_etoiles > 0) call init_stellar_disk
-          write(*,*) " Computing background opacities..."
-          call alloc_atom_quantities !call compute_atom_quantities(icell) for each cell
+          call alloc_atom_quantities
           call compute_background_continua
-          write(*,*) " ..done"
 
           if (lelectron_scattering) then
 
@@ -1364,39 +1375,37 @@ contains
     endif
     if (laccretion_shock) deallocate(Iacc)
 
-    if (allocated(origin_atom)) then
-!        call write_lambda_cell_array(Nlambda, origin_atom, origin_file_fits,"W.m^-2.Hz^-1.sr^-1")
-!        call write_lambda_cell_array(Nlambda_cont, originc_atom, originc_file_fits,"W.m^-2.Hz^-1.sr^-1")
-       call write_dbmatrix_bin(origin_file, origin_atom)
-       call write_dbmatrix_bin(originc_file, originc_atom)
-       deallocate(origin_atom,originc_atom)
-    endif
-
     call write_flux(only_flux=.true.)
     call write_atomic_maps
 !     deallocate(flux,fluxc)
 
     if (lorigin_atom) then
+!        call write_lambda_cell_array(Nlambda, origin_atom, origin_file_fits,"W.m^-2.Hz^-1.sr^-1")
+!        call write_lambda_cell_array(Nlambda_cont, originc_atom, originc_file_fits,"W.m^-2.Hz^-1.sr^-1")
+       call write_dbmatrix_bin(origin_file, origin_atom)
+       call write_dbmatrix_bin(originc_file, originc_atom)
+       deallocate(origin_atom,originc_atom)
+       loutput_rates = .true. !only at the end!
+    endif
+    
+    if (loutput_rates) then
        call write_opacity_emissivity_map
     endif
+!     if (loutput_rates) then
+!     	call write_cont_opac_ascii(hydrogen)
+!     !  		!chi0_bb and eta0_bb not modified
+!     	do kr=1,hydrogen%Nline
+!     		if (hydrogen%lines(kr)%write_flux_map) then
+!     			call write_contrib_lambda_ascii(hydrogen%lines(kr)%lambda0,0.0_dp,0.0_dp,1.0_dp,(kr==1))
+!     		endif
+!     	enddo
+!     	call write_taur(500._dp,0._dp,0._dp,1.0_dp)
+!     endif
 
     !one ray, passing through the centre of the image for each azimuth and inclination
     if (lcontrib_function_ray) then
        call compute_contribution_functions
     end if
-
-
-    !--> ascii files can be large !, commented. Only for debug (1D stellar cases)
-    !     if (loutput_rates) then
-    ! 		call write_cont_opac_ascii(hydrogen)
-    ! !  		!chi0_bb and eta0_bb not modified
-    !  		do kr=1,hydrogen%Nline
-    !  			if (hydrogen%lines(kr)%write_flux_map) then
-    ! 				call write_contrib_lambda_ascii(hydrogen%lines(kr)%lambda0,0.0_dp,0.0_dp,1.0_dp,(kr==1))
-    ! 			endif
-    ! 		enddo
-    ! 		call write_taur(500._dp,0._dp,0._dp,1.0_dp)
-    ! 	endif
 
     ! ------------------------------------------------------------------------------------ !
     ! ------------------------------------------------------------------------------------ !
@@ -1637,6 +1646,7 @@ contains
           call ERROR("etape unkown")
        end if
 
+       lprevious_converged = lforce_lte!avoid useless second iteration.
        lnotfixed_rays = .not.lfixed_rays
        lconverged = .false.
        n_iter = 0
@@ -1670,7 +1680,7 @@ contains
           !.and.(.not.lprevious_converged)
           ! 				l_iterate_ne = (n_iterate_ne > 0) .and. ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
           !need to handle the case n_iterate_ne==0 here for the mod function.
-          if( n_iterate_ne ) then
+          if( n_iterate_ne > 0 ) then
              l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
           endif
 
@@ -1835,7 +1845,7 @@ contains
                 end if !etape
 
                 call calc_rate_matrix(id, icell, lforce_lte)
-                ! 						call update_populations(id, icell, diff, .false., n_iter)
+!                 call update_populations(id, icell, diff, .false., n_iter)
                 call update_populations_and_electrons(id, icell, diff, .false., n_iter, &
                      (l_iterate_ne.and.icompute_atomRT(icell)==1))!The condition on icompute_atomRT is here because if it is > 0 but /= 1, ne is not iterated!
 
@@ -2111,7 +2121,7 @@ contains
 
                 !because of opac nlte changed
                 if (.not.llimit_mem) then
-                   call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+                   call interp_continuum_local(icell, chi0_bb(:,icell), eta0_bb(:,icell))
                 endif
                 !end init
 
@@ -3712,7 +3722,7 @@ contains
     ! 							else
     ! !need to include cont nlte
     ! 								call initGamma(id)
-    ! ! 								call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+    ! ! 								call interp_continuum_local(icell, chi0_bb(:,icell), eta0_bb(:,icell))
     ! 								do iray=1,n_rayons
     ! 									call calc_rates(id, icell, iray, n_rayons)
     ! 								enddo
@@ -3828,7 +3838,7 @@ contains
     ! 						end do
     ! 						call NLTE_bound_free(icell)
     ! 						!because of opac nlte changed
-    ! 						call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
+    ! 						call interp_continuum_local(icell, chi0_bb(:,icell), eta0_bb(:,icell))
     ! 						!end init
     !
     ! 					end if

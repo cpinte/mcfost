@@ -3,16 +3,16 @@
 ! ---------------------------------------------------------------------- !
 MODULE io_opacity
 
-  use atmos_type, only : Hydrogen, Helium, icompute_atomRT, NactiveAtoms, ne, T
+  use atmos_type, only : Hydrogen, Helium, icompute_atomRT, NactiveAtoms, ne, T, lmagnetized
   use atom_type
   use spectrum_type, only : chi, eta, sca_c, lambda, lambda_cont, chi_c, eta_c, chi_c_nlte, eta_c_nlte, &
-       Jnu_cont, Nlambda, Nlambda_cont, eta0_bb, chi0_bb, Jnu
+       Jnu_cont, Nlambda, Nlambda_cont, eta0_bb, chi0_bb, Jnu, etaQUV_p, chiQUV_p, rho_p
   use math, only : locate, bezier2_interp, bezier3_interp
   use constant
   use Planck, only : bpnu
   use background_opacity
   use occupation_probability, only : D_i
-  use opacity, only : interp_background_opacity, opacity_atom_loc
+  use opacity, only : interp_background_opacity, opacity_atom_loc, opacity_atom_zeeman_loc
   use statequil_atoms, only : collision_matrix_atom
 
   !MCFOST's original modules
@@ -1747,19 +1747,31 @@ CONTAINS
   END SUBROUTINE write_cont_opac_ascii
 
   !written to binary instead
+  !include Zeeman opac  if lmagnetized, can be large!
+  !In that case before chic and after chi, there is rho_p !
+  !eta unchanged.
+  !dim of eta and chi is (Nlambda, 4, n_cells) in that case
   subroutine write_opacity_emissivity_map()
     integer :: unit, status = 0
-    integer :: alloc_status, id, icell
+    integer :: alloc_status, id, icell, m, Nrec
     integer(kind=8) :: Nsize
-    real(kind=dp), allocatable, dimension(:,:) :: chi_tmp, eta_tmp, chic_tmp, etac_tmp
+    real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
     character(len=50) :: filename_chi="chi_map.out"!separate file because they are big
     character(len=50) :: filename_eta="eta_map.out"  
     
-    write(*,*) " Writing emissivity and opacity map..."
+    write(*,*) " Writing emissivity and opacity map (rest frame) ..."
     !call write_dbmatrix_bin("chitot.out",chi
-    allocate(chi_tmp(Nlambda, n_cells),stat=alloc_status)
+    if (lmagnetized) then
+    	Nrec = 4
+    	allocate(rho_tmp(Nlambda, Nrec-1, n_cells),stat=alloc_status)
+    	if (alloc_status /= 0) call error("Cannot allocate rho_tmp !")
+    	call warning("  Polarized case with an observer // to z!")
+    else
+    	Nrec = 1
+    endif
+    allocate(chi_tmp(Nlambda, Nrec, n_cells),stat=alloc_status)
     if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
-    allocate(eta_tmp(Nlambda, n_cells),stat=alloc_status)
+    allocate(eta_tmp(Nlambda, Nrec, n_cells),stat=alloc_status)
     if (alloc_status /= 0) call error("Cannot allocate eta_tmp !")
 
 
@@ -1767,7 +1779,8 @@ CONTAINS
     id = 1
     !$omp parallel &
     !$omp default(none) &
-    !$omp private(id,icell) &
+    !$omp private(id,icell,m) &
+    !$omp shared(rho_tmp, rho_p, chiQUV_p, Nrec, etaQUV_p,lmagnetized) &
     !$omp shared(chi, eta, chi0_bb, eta0_bb, chi_tmp, eta_tmp, n_cells, icompute_atomRT)
     !$omp do schedule(dynamic,1)
     do icell=1, n_cells
@@ -1776,10 +1789,24 @@ CONTAINS
           chi(:,id) = chi0_bb(:,icell)
           !-> only line source function  = line emiss / total opac
           eta(:,id) = 0.0_dp!eta0_bb(:,icell)
-          call opacity_atom_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  &
+          if (lmagnetized) then
+          	!along z axis !
+          	call opacity_atom_zeeman_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  &
+               0.0_dp,  0.0_dp,  1.0_dp,  0.0_dp, .false.)
+          else
+          	call opacity_atom_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  &
                0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp, .false.)
-          chi_tmp(:,icell) = chi(:,id)
-          eta_tmp(:,icell) = eta(:,id)
+          endif
+          chi_tmp(:,1,icell) = chi(:,id)
+          eta_tmp(:,1,icell) = eta(:,id)
+          do m=2,Nrec
+          	!m=1, unpolarized already filled.
+          	!etaQUV, chiQUV only for Q(=1), U, V
+          	eta_tmp(:,m,icell) = etaQUV_p(:,m-1,id)
+          	chi_tmp(:,m,icell) = chiQUV_p(:,m-1,id)
+          	!only QUV for rho_p
+          	rho_tmp(:,m-1,icell) = rho_p(:,m-1,id)
+          enddo
        endif
     enddo
     !$omp end do
@@ -1790,10 +1817,15 @@ CONTAINS
     
     open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="sequential",iostat=status)
 	write(unit,iostat=status) chi_tmp
+	if (lmagnetized) then
+		write(unit, iostat=status) rho_tmp
+		deallocate(rho_tmp)
+	endif
     deallocate(chi_tmp)
-    allocate(chi_tmp(Nlambda_cont, n_cells))
-    chi_tmp = chi_c
-    if (NactiveAtoms > 0) chi_tmp = chi_tmp + chi_c_nlte
+    allocate(chi_tmp(Nlambda_cont, 1, n_cells))
+    !no Zeeman no contpol yet
+    chi_tmp(:,1,:) = chi_c
+    if (NactiveAtoms > 0) chi_tmp(:,1,:) = chi_tmp(:,1,:) + chi_c_nlte
 	write(unit,iostat=status) chi_tmp
     deallocate(chi_tmp)
 	close(unit)
@@ -1801,9 +1833,10 @@ CONTAINS
     open(unit, file=trim(filename_eta),form="unformatted",status='unknown',access="sequential",iostat=status)
 	write(unit,iostat=status) eta_tmp
     deallocate(eta_tmp)
-    allocate(eta_tmp(Nlambda_cont, n_cells))
-    eta_tmp = eta_c
-    if (NactiveAtoms > 0) eta_tmp = eta_tmp + eta_c_nlte
+    !no Zeeman no contpol yet
+    allocate(eta_tmp(Nlambda_cont,1, n_cells))
+    eta_tmp(:,1,:) = eta_c
+    if (NactiveAtoms > 0) eta_tmp(:,1,:) = eta_tmp(:,1,:) + eta_c_nlte
 	write(unit,iostat=status) eta_tmp
     deallocate(eta_tmp)
 	close(unit)

@@ -14,7 +14,7 @@ MODULE barklem
   use constant
 
   !MCFOST's originals
-  use mcfost_env, only : mcfost_utils! convert from the relative location of atomic data
+  use mcfost_env, only : dp, mcfost_utils! convert from the relative location of atomic data
   ! to mcfost's environnement folders.
 
   IMPLICIT NONE
@@ -42,8 +42,8 @@ MODULE barklem
 
   TYPE BarklemType
      integer :: N1, N2
-     real(8), allocatable, dimension(:) :: neff1, neff2
-     real(8), allocatable, dimension(:,:) :: cross, alpha
+     real(kind=dp), allocatable, dimension(:) :: neff1, neff2
+     real(kind=dp), allocatable, dimension(:,:) :: cross, alpha
      character(len=2) :: barklem_type
   END TYPE BarklemType
 
@@ -55,7 +55,7 @@ CONTAINS
     character(len=2), intent(in) :: btype
     TYPE (BarklemType), intent(inout) :: bs
     logical, intent(out) :: res
-    real(8) :: neff1_0, neff2_0
+    real(kind=dp) :: neff1_0, neff2_0
     integer :: j, i, n, Nread
     character(len=MAX_LENGTH) :: inputline, FomatLine !len=120
     character(len=50) :: barklem_data
@@ -136,14 +136,14 @@ CONTAINS
     TYPE (BarklemType) :: bs
     logical, intent(out) :: res
     logical :: determined
-    real(8) :: Si, Sj
-    real(8) :: Jj, Ji
-    real(8) :: neff1, neff2, nefftmp
-    real(8) :: findex1, findex2, reducemass, meanvelocity
-    real(8) :: crossmean, E_Rydberg2, deltaEi, deltaEj
+    real :: Si, Sj
+    real :: Jj, Ji
+    real(kind=dp) :: neff1, neff2, nefftmp
+    real(kind=dp) :: findex1, findex2, reducemass, meanvelocity
+    real(kind=dp) :: crossmean, E_Rydberg2, deltaEi, deltaEj
     integer :: Li, Lj, i, j, Z, ic, k, index, index1
     character(len=ATOM_LABEL_WIDTH) :: label_i, label_j
-    real(8) :: testcc
+    real(kind=dp) :: testcc
 
     i = Atom%lines(kr)%i
     j = Atom%lines(kr)%j

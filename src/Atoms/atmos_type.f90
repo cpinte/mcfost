@@ -1166,6 +1166,7 @@ contains
           if (allocated(line%phi)) deallocate(line%phi)
           if (allocated(line%map)) deallocate(line%map)
           if (allocated(line%mapc)) deallocate(line%mapc)
+          if (allocated(line%mapx)) deallocate(line%mapx)
           !       if (allocated(line%phi_Q)) deallocate(line%phi_Q)
           !       if (allocated(line%phi_U)) deallocate(line%phi_U)
           !       if (allocated(line%phi_V)) deallocate(line%phi_V)
@@ -1824,63 +1825,62 @@ contains
 
     return
   end subroutine alloc_atomic_atmos
-  !
-  ! !to do, this routine should change according to mcfost density array
-  !    subroutine define_atomRT_domain(itiny_T, itiny_nH)
-  ! !    ! Set where to solve for the RT equation: where a cell is not
-  ! !    ! transparent = where there is a significant density and temperature.
-  ! !    ! Determines also if we have to force electron density calculation
-  ! !    ! Might be used to tell where we solve the atomic line RT in case of a wind, magnetospheric
-  ! !    !protoplanetary disk model.
-  ! !    ! It is also set dark zones.
-  ! !    ! icompute_atomRT = 0 -> transparent (rho, T <= tiny_H, tiny_T)
-  ! !    ! icompute_atomRT = 1 -> filled (rho, T > tiny_H, tiny_T)
-  ! !    ! icompute_atomRT = -1 -> dark (rho goes to infinity and T goes to 0)
-  ! !     integer :: icell
-  !     real(kind=dp), optional :: itiny_nH, itiny_T
-  ! !     real(kind=dp) :: Vchar=0d0, tiny_nH=1d0, tiny_T=1d2
-  ! !     !with Very low value of densities or temperature it is possible to have
-  ! !     !nan or infinity in the populations calculations because of numerical precisions
-  ! !
-  ! !     if (present(itiny_T)) then
-  ! !      write(*,*) "changing the value of tiny_T (K) = ", tiny_T," to", itiny_T
-  ! !      tiny_T = itiny_T !K
-  ! !     end if
-  ! !
-  ! !     if (present(itiny_nH)) then
-  ! !      write(*,*) "changing the value of tiny_nH (m^-3) = ", tiny_nH," to", itiny_nH
-  ! !      tiny_nH = itiny_nH !m^-3
-  ! !     end if
-  ! !
-  ! !     if (maxval(ne) == 0d0) calc_ne = .true.
-  ! !
-  ! !     if (tiny_T <= 0) then
-  ! !      write(*,*) "changing the value of tiny_T = ", tiny_T," to", 2d2
-  ! !      tiny_T = 2d0
-  ! !     end if
-  ! !     if (tiny_nH <= 0) then
-  ! !      write(*,*) "changing the value of tiny_nH = ", tiny_nH," to", 1d0
-  ! !      tiny_nH = 1d0
-  ! !     end if
-  ! !
-  ! ! write(*,*) nHtot
-  ! ! write(*,*) "*"
-  ! ! write(*,*) T
-  ! ! stop
-  ! !     !atmos%lcompute_atomRT = (atmos%nHtot > tiny_nH) .and. (atmos%T > tiny_T)
-  ! !     ! atmos%icompute_atomRT(:) = 0 !transparent !already init
-  ! !     where((nHtot > tiny_nH) .and. (T > tiny_T))
-  ! !     	icompute_atomRT = 1
-  ! !     end where
-  ! ! !     do icell=1,atmos%Nspace
-  ! ! ! !      atmos%lcompute_atomRT(icell) = &
-  ! ! ! !        (atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)
-  ! ! !     if ((atmos%nHtot(icell) > tiny_nH) .and. (atmos%T(icell) > tiny_T)) &
-  ! ! !      	atmos%icompute_atomRT(icell) = 1 !filled
-  ! ! !     end do
-  ! !
-  !    return
-  !    end subroutine define_atomRT_domain
+  
+  subroutine empty_cells (itiny_T, itiny_nH, itiny_ne)
+      !Empty cells based on a minimum threshold in T AND nH AND ne
+      !icompute_atomRT = 0 -> transparent
+      !icompute_atomRT = 1 -> filled
+      !icompute_atomRT = 2 -> filled with fixed electronic density
+      !icompute_atomRT = -1 -> dark
+      real(kind=dp), optional :: itiny_nH, itiny_T, itiny_ne
+      real(kind=dp) :: tiny_nH=1d6, tiny_T=5d2, tiny_ne = 1d6
+      integer :: id, icell, N_emptied_cell = 0
+      !minimum ne and nH are 1 particle per cm^3.
+      
+      if (present(itiny_T)) then
+       	tiny_T = itiny_T !K
+      end if
+
+      if (present(itiny_nH)) then
+       	tiny_nH = itiny_nH !m^-3
+      end if
+      
+      if (present(itiny_ne)) then
+       	tiny_ne = itiny_ne !m^-3
+      end if
+      
+!       where ((nHtot <= tiny_nH) .and. (ne <= tiny_ne) .and. (T <= tiny_T))
+!       	icompute_atomRT = 0
+!       endwhere
+
+	  !Better to use reduction +clause
+      !$omp parallel &
+      !$omp default(none) &
+      !$omp private(id,icell)&
+      !$omp shared(nHtot, n_cells, tiny_nH, T, tiny_T, icompute_atomRT, N_emptied_cell)
+      !$omp do schedule(dynamic,1)
+      do icell=1,n_cells
+        !$ id = omp_get_thread_num() + 1
+      	if  (icompute_atomRT(icell) > 0) then
+      	
+      		if ((nHtot(icell) <= tiny_nH).or.(T(icell) <= tiny_T)) then
+      			N_emptied_cell = N_emptied_cell + 1
+      			icompute_atomRT(icell) = 0
+      		endif
+      	
+      	endif
+      enddo
+      !$omp end do
+      !$omp end parallel
+      
+      if (N_emptied_cell > 0) then
+      	write(*,'("A total of "(1I6)" cells have been emptied!")') N_emptied_cell
+      	write(*,'(   "Representing "(1F12.4)" % of "(1F12.3)" cells.")') &
+      		100*real(N_emptied_cell)/real(n_cells), real(n_cells)   
+      endif
+
+  return
+  end subroutine empty_cells
 
   subroutine alloc_magnetic_field()
     ! ----------------------------------------- !
@@ -1903,16 +1903,9 @@ contains
     return
   end subroutine alloc_magnetic_field
 
-  function B_project_from_vc(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
+  function B_project_from_vc(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c, lno_mag) result(Bmodule)
     ! ------------------------------------------- !
     ! Using the vector component
-    ! Returned the module of the magnetic field at
-    ! one point of the model icell and the cosine of the angles
-    ! gamma and 2*chi.
-    ! Gamma is the angle between B and the los
-    ! chi is the angle between Bperp and ex
-    ! Bperp is the projection of B onto a plane
-    ! perpendicular to the los
     !
     ! cos(gamma) = n dot B
     ! cos(2x) = cos(x)**2 - sin(x)**2
@@ -1921,33 +1914,50 @@ contains
     integer :: icell
     real(kind=dp) :: x, y, z, u, v, w, Bmodule
     real(kind=dp) :: bx, by, bz, r, norme, r2, norme2
-    real(kind=dp) :: sig, cgb, ctb, stb
+    real(kind=dp) :: cgb, ccb, scb
     real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
     real :: sign
+    logical :: lno_mag
 
-    call error("Not implemented")
+    call error("Zeeman angles from magnetic field vector components (BR,Bz,Bphi) Not implemented!")
 
     Bmodule = sqrt(bx*bx + by*by + bz*bz)
-    cog = (bx*u + by*v + bz*w) / ( Bmodule + tiny_dp )
-    sig = sqrt(1.0 - cog*cog)
-    sigsq = sig*sig
+    
+    !unpolarized profile !
+    if (Bmodule == 0.0) then
+    	lno_mag = .true.
+    	return
+    endif
+    lno_mag = .false.
+    
+    !cos of the angle between B and the lost
+    cog = (bx*u + by*v + bz*w) / Bmodule
+    sigsq = 1.0 - cog*cog
 
+	!cos of the angle between B and the z axis !
+	cgb = bz / Bmodule
+	!cos and sine of chib, the angle between B and x axis!
+	ccb = bx / sqrt(bx*bx + by*by)
+	!ccb = cos(atan(by/x))
+	!csb = sin(atan(by/bx))
+	scb = by / sqrt(bx*bx + by*by)
 
-    co2c = ctb*ctb - stb*stb
-    si2c = 2.0 * ctb * stb
+	!what are these angles
+    co2c = ccb*ccb - scb*scb
+    si2c = 2.0 * ccb * scb
 
     return
   end function B_project_From_vc
 
-  function B_project_angles(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c) result(Bmodule)
+  function B_project_angles(icell, x,y,z,u,v,w, cog, sigsq, co2c, si2c,lno_mag) result(Bmodule)
     ! ------------------------------------------- !
     ! Returned the module of the magnetic field at
     ! one point of the model icell and the cosine of the angles
     ! gamma and 2*chi.
     ! Gamma is the angle between B and the los
-    ! chi is the angle between Bperp and ex
+    ! chi is the angle between Bperp and e1
     ! Bperp is the projection of B onto a plane
-    ! perpendicular to the los
+    ! perpendicular to the los making angle chi with e1.
     !
     ! cos(gamma) = n dot B
     ! cos(2x) = cos(x)**2 - sin(x)**2
@@ -1956,42 +1966,61 @@ contains
     integer :: icell
     real(kind=dp) :: x, y, z, u, v, w, Bmodule
     real(kind=dp) :: bx, by, bz, b1, b2, csc_theta
-    real(kind=dp) :: co_2chi, si_2chi, co_chi, si_chi, gamm
+    !in (x,y,z) frame
+    real(kind=dp) :: co_2chi, si_2chi, co_chi, si_chi
+    real(kind=dp) :: gamm, sigamm, cogamm, norm
+    !in reference axis of polarisation!
     real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
-    real :: sign
+    logical :: lno_mag
 
-    if (Bmag(icell) == 0.0_dp) then
+!     if (Bmag(icell) == 0.0_dp) then
+	!-> for debug only
+    if (abs(Bmag(icell)) <= 1d-10) then !1d-6 Gauss
        Bmodule = 0.0
-       cog = 0.0;co2c = 0.0;si2c = 0.0;sigsq = 0.0
+       lno_mag = .true.
        return
     endif
+    
+    lno_mag = .false.
 
     gamm = gammaB(icell)
-
+    sigamm = sin(gamm)
+    cogamm = cos(gamm)
 
     if (lmagnetoaccr) then
-
+		!Only for dipolar magnetosphere
        if (.not.l3d) then
           if (z < 0.0_dp) gamm = gamm + pi
-          co_chi = x / sqrt(x*x+y*y)
-          si_chi = y / sqrt(y*y + x*x)
+          norm = sqrt(x*x + y*y)
+          if  (norm > 0.0) then
+          	co_chi = x / norm
+          	si_chi = y / norm
+          else
+          	co_chi = 1.0
+          	si_chi = 0.0
+          endif
           si_2chi = 2 * co_chi * si_chi
           co_2chi = (co_chi**2 - si_chi**2)
-       endif
-    else
+       else !3d !!
+       	co_chi = cos(chiB(icell))
+       	si_chi = sin(chiB(icell))
+       	co_2chi = cos(2*chiB(icell))
+       	si_2chi = sin(2*chiB(icell))
+       endif !not 3d, hence dipolar mag.
+    else !lspherical_vector 3d or 2d.
        co_chi = cos(chiB(icell))
        si_chi = sin(chiB(icell))
        co_2chi = cos(2*chiB(icell))
        si_2chi = sin(2*chiB(icell))
     endif
 
-    Bx = co_chi * sin(gamm)
-    By = si_chi * sin(gamm)
-    Bz = cos(gamm)
+    Bx = co_chi * sigamm
+    By = si_chi * sigamm
+    Bz = cogamm
 
     if (abs(w) == 1.0) then
        Bmodule = Bmag(icell)
-       cog = Bz
+       cog = Bz*w
        si2c = si_2chi
        co2c = co_2chi
        sigsq = 1.0 - cog*cog
@@ -2009,34 +2038,22 @@ contains
        si2c = 2.0 * b1 * b2 / (1.0 - cog*cog)
 
     endif
-    ! 	write(*,*) Bmodule*1e4, cog, co2c, si2c, bx, by, bz
-    ! 	stop
+    !for debugging only!
+    if (abs(cog) <= 1d-10) cog = 0.0
+    if (abs(co2c) <= 1d-10) co2c = 0.0
+    if (abs(si2c) <= 1d-10) si2c = 0.0
+    
+    if (icell== -10000 ) then!set to 1, n_cells or whatever if (B,gb,cb) is constant
+		write(*,*) "u=",u, " v=",v, " w=", w
+		write(*,*) " B=", Bmodule*1e4, " gammB=", gammaB(icell)*180/pi, " chib=", chib(icell)*180/pi
+		write(*,*) "bx=", bx, " by=", by, " bz=", bz
+		write(*,*) 'b1=', b1, " b2=", b2
+    	write(*,*)  "cos(gam)=", cog, " sin2gam=", sigsq, " cos(2chi)=", co2c, " sin(2chi)=", si2c
+!     	stop
+    endif
     return
   end function B_project_angles
 
-
-  !    !!should be moved in Atom_type
-  !    function atomZnumber_old(atomID) result(Z)
-  !    --------------------------------------
-  !    return the atomic number of an atom
-  !    with ID = atomID.
-  !    Hydrogen is 1
-  !    --------------------------------------
-  !     character(len=ATOM_ID_WIDTH) :: atomID
-  !     integer :: Z, i
-  !
-  !     Z = 1
-  !     do i=1,Nelem
-  !      if (atmos%Elements(i)%ID.eq.atomID) then
-  !        Z = i
-  !        exit
-  !      end if
-  !     do while (atmos%Elements(Z)%ptr_elem%ID.ne.atomID)
-  !      Z=Z+1
-  !     end do
-  !
-  !    return
-  !    end function atomZnumber_old
 
   subroutine write_atmos_domain()
     ! ------------------------------------ !
@@ -2179,6 +2196,8 @@ contains
     lspherical_velocity = .false.
     lVoronoi = .false.
     !read from file the velocity law if any
+    !if lmagnetized means B are present in the file it is only needed
+    !if lzeeman_polarisation is true.
     call alloc_atomic_atmos()
     allocate(V2(n_cells)); V2=0.0_dp
     !For now we do not necessarily need to compute B if no polarization at all
@@ -2223,6 +2242,9 @@ contains
     case ("magneto-accretion")
        lmagnetoaccr = .true.
        write(*,*) " Velocity law is ", trim(rotation_law), lmagnetoaccr
+       if (lmagnetized) then
+       	call warning(" --> CHeck projection with lmagnetoaccr and Bfield!")
+       endif
     case ("spherical_vector")
        lspherical_velocity = .true.
        write(*,*) " Velocity law is ", trim(rotation_law), lspherical_velocity
@@ -2407,7 +2429,7 @@ contains
        !     endif
        gammaB = gammaB * pi / 180.0
        chiB = chiB * pi / 180.0
-       B_char = maxval(Bmag)
+       B_char = maxval(abs(Bmag))
        write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
 
 

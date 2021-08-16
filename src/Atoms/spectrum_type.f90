@@ -1,7 +1,7 @@
 module spectrum_type
 
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType
-  use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, icompute_atomRT, lmagnetized, laccretion_shock
+  use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, B_char, icompute_atomRT, lmagnetized, laccretion_shock
   use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table, make_wavelength_grid, make_wavelength_grid_new
   use fits_utils, only : print_error
   use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
@@ -425,6 +425,16 @@ contains
              atoms(nat)%ptr_atom%lines(kr)%mapc = 0.0_dp
              mem_alloc_local = mem_alloc_local + sizeof(atoms(nat)%ptr_atom%lines(kr)%map) + &
                   sizeof(atoms(nat)%ptr_atom%lines(kr)%mapc)
+            if (lmagnetized) then
+             	allocate(atoms(nat)%ptr_atom%lines(kr)%mapx(Nlam, npix_x, npix_y, rt_n_incl, rt_n_az,3),stat=alloc_status)
+             	if (alloc_status > 0) then
+                	write(*,*) atoms(nat)%ptr_atom%ID,atoms(nat)%ptr_atom%lines(kr)%j, atoms(nat)%ptr_atom%lines(kr)%i
+                	write(*,*) atoms(nat)%ptr_atom%g(atoms(nat)%ptr_atom%lines(kr)%j), &
+                     	atoms(nat)%ptr_atom%g(atoms(nat)%ptr_atom%lines(kr)%i)
+                	call error("Cannot allocate mapx for this line !")
+             	endif
+             	mem_alloc_local = mem_alloc_local + sizeof(atoms(nat)%ptr_atom%lines(kr)%mapx)
+             endif
           endif
 
 
@@ -641,6 +651,7 @@ contains
 
 
   subroutine write_flux(only_flux)
+  	use parametres, only : etoile
     !
     !write flux total and flux map for lines
     !
@@ -775,7 +786,7 @@ contains
     endif
 
     !Stellar flux
-    if (n_etoiles > 0) then
+    if ((n_etoiles > 0).and.maxval(etoile(:)%T) > 1.0_dp) then
     	call ftcrhd(unit, status)
     	if (status > 0) then
        		call print_error(status)
@@ -1075,7 +1086,7 @@ contains
     !write 2d flux maps for atomic lines in individual files
     !
     integer :: status,unit,blocksize,bitpix,naxis
-    integer, dimension(5) :: naxes
+    integer, dimension(6) :: naxes
     integer :: group,fpixel,nelements
     integer :: kr,n, j
     logical :: simple, extend
@@ -1106,6 +1117,10 @@ contains
     naxes(4)=RT_n_incl
     naxes(5)=RT_n_az
     nelements=naxes(2)*naxes(3)*naxes(4)*naxes(5)
+    
+    if (lmagnetized) then
+    	naxes(6) = 3
+    endif
 
     !do we need to write line map ? for what atoms
     write_map(:) = .false.
@@ -1216,6 +1231,16 @@ contains
              !Write the array to the FITS file.
              call ftpprd(unit,group,fpixel,nelements,atom%lines(kr)%mapc(:,:,:,:),status)
              if (status > 0) call print_error(status)
+             
+             if (lmagnetized) then
+             	call ftcrhd(unit, status)
+             	if (status > 0) call print_error(status)
+             	call ftphpr(unit,simple,bitpix,6,naxes,0,1,extend,status)
+             	if (status > 0) call print_error(status)
+             	!Write the array to the FITS file.
+             	call ftpprd(unit,group,fpixel,nelements*naxes(1)*naxes(6),atom%lines(kr)%mapx(:,:,:,:,:,:),status)
+             	if (status > 0) call print_error(status)            
+             endif
 
              !  Close the file and free the unit number.
              call ftclos(unit, status)
