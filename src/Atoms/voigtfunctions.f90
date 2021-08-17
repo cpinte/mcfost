@@ -1,30 +1,31 @@
 ! --------------------------------------------------------------------------- !
 ! Implements Voigt function procedures
 ! --------------------------------------------------------------------------- !
-MODULE voigtfunctions
+module voigtfunctions
 
   use constant
   use mcfost_env, only : dp
   use math, only : locate
 
-  IMPLICIT NONE
+implicit none
 
-  PROCEDURE(VoigtHumlicek), pointer :: Voigt => null()
+procedure(VoigtHumlicek), pointer :: Voigt => null()
 
-CONTAINS
+contains
 
-  FUNCTION VoigtHumlicek(N, a, v, F) result(L)
+function VoigtHumlicek(N, a, v, F)
     !--------------------------------------------------------------
     ! Generates Voigt and anomalous dispersion profiles
     ! See Humlicek (1982) JQSRT 27, 437
     ! W4 = Voigt + i*Faraday-Voigt (dispersion profile)
     !--------------------------------------------------------------
-    real(kind=dp) :: a
-    real(kind=dp) :: v(N), L(N)
+    integer, intent(in) :: N
+    real(kind=dp), intent(in) :: a, v(N)
+    real(kind=dp) :: VoigtHumlicek(N)
     real(kind=dp), intent(out), optional :: F(N)
     complex(kind=dp) :: w4, z, u, v4
     real(kind=dp) :: s
-    integer :: i, N
+    integer :: i
 
     do i = 1, n
 
@@ -50,62 +51,80 @@ CONTAINS
                u*(61.57037d0-u*(1.841439d0-u)))))))
           w4 = exp(u) - w4/v4 !cdexp, can be optimized by splitting the exp on real and imag parts
        endif
-       L(i) = real(w4,kind=dp)!w4%re!!dble(w4)
-       if (present(F)) F(i) = aimag(w4)!w4%im!
-
-    enddo
-
-    RETURN
-  END FUNCTION VoigtHumlicek
-
-  FUNCTION dirac_line(N, v) result(L)
-    real(kind=dp) :: v(N), L(N), minv = 1d20
-    integer :: i, N, i1
-
-    ! 	L(:) = 0.0_dp
-    ! 	i = locate(v, 0.0_dp)
-    ! 	L(i) = 1.0_dp
-
-    i1 = N
-    do i=1, N
-       minv = min(minv, abs(v(i)))
-       if (abs(v(i)) == minv) then
-          v(i) = 1.0
-          v(i1) = 0.0
-          i1 = i
-       else
-          v(i) = 0.0
+       VoigtHumlicek(i) = real(w4,kind=dp)!w4%re
+       if (present(F)) then 
+       	F(i) = aimag(w4)!w4%im
+!        	write(*,*) i, v(i)!, " L=", VoigtHumlicek(i), ", F=", f(i)
+!        	write(*,*) " w4=", w4
+!			write(*,*) minval(VoigtHumlicek), minval(F)
        endif
 
     enddo
+    
+    return
+end function VoigtHumlicek
+
+function dirac_line(N, v)
+	integer, intent(in) :: N
+    real(kind=dp), intent(in) :: v(N)
+    real(kind=dp) :: dirac_line(N), minv = 1d20
+    integer :: i, i1
+
+    i = locate(v, minval(abs(v)))
+    where (v == v(i))
+    	dirac_line = 1.0_dp
+    elsewhere
+    	dirac_line = 0.0_dp
+    endwhere
+
+!     i1 = N
+!     do i=1, N
+!        minv = min(minv, abs(v(i)))
+!        if (abs(v(i)) == minv) then
+!           dirac_line(i) = 1.0
+!           dirac_line(i1) = 0.0
+!           i1 = i
+!        else
+!           dirac_line(i) = 0.0
+!        endif
+! 
+!     enddo
 
 
-    RETURN
-  END FUNCTION dirac_line
+    return
+end function dirac_line
 
 
-  FUNCTION gate_line(N, v, vlim) result(L)
-    real(kind=dp) :: vlim
-    real(kind=dp) :: v(N), L(N)
-    integer :: i, N
+function gate_line(N, v, vlim)
+  	integer, intent(in) :: N
+    real(kind=dp), intent(in) :: vlim, v(N)
+    real(kind=dp) :: gate_line(N)
+    integer :: i
+    
+    where (abs(v) > vlim)
+    	gate_line = 1.0_dp
+    elsewhere
+    	gate_line = 0.0_dp
+    endwhere
 
-    do i=1, N
+!     do i=1, N
+! 
+!        if (abs(v(i)) > vlim ) then
+!           gate_line(i) = 0.0_dp
+!        else
+!           gate_line(i) = 1.0_dp
+!        endif
+! 
+!     enddo
 
-       if (abs(v(i)) > vlim ) then
-          L(i) = 0.0_dp
-       else
-          L(i) = 1.0_dp
-       endif
+    return
+end function gate_line
 
-    enddo
-
-    RETURN
-  END FUNCTION gate_line
-
-  FUNCTION Voigt_thomson(N, a, vbroad, v) result(L) !for unpolarised profile
-    real(kind=dp) :: a, vbroad
-    real(kind=dp) :: v(N), L(N)
-    integer :: i, N
+function VoigtThomson(N, a, vbroad, v)
+	integer, intent(in) :: N
+    real(kind=dp), intent(in) :: a, vbroad, v(N)
+    real(kind=dp) :: VoigtThomson(N)
+    integer :: i
     real(kind=dp) :: aeff, ratio, eta, al
 
     al = a * vbroad
@@ -119,14 +138,14 @@ CONTAINS
     eta = 1.36603*ratio - 0.47719*(ratio*ratio) + 0.11116*(ratio*ratio*ratio)
 
 
-    L(:) = eta * ( aeff/pi * (v**2 + aeff**2)**(-1.0) ) + &
+    VoigtThomson(:) = eta * ( aeff/pi * (v**2 + aeff**2)**(-1.0) ) + &
          (1.0_dp - eta) * exp(-(v/aeff)**2) / aeff / sqrtpi
 
 
-    RETURN
-  END FUNCTION Voigt_thomson
+    return
+end function VoigtThomson
 
-END MODULE voigtfunctions
+end module voigtfunctions
 
 
 

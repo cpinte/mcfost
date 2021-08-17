@@ -1972,6 +1972,8 @@ contains
     !in reference axis of polarisation!
     real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
     logical :: lno_mag
+    
+    !In this configuration, Bmag(icell) should always be > 0?
 
 !     if (Bmag(icell) == 0.0_dp) then
 	!-> for debug only
@@ -2043,14 +2045,13 @@ contains
     if (abs(co2c) <= 1d-10) co2c = 0.0
     if (abs(si2c) <= 1d-10) si2c = 0.0
     
-    if (icell== -10000 ) then!set to 1, n_cells or whatever if (B,gb,cb) is constant
-		write(*,*) "u=",u, " v=",v, " w=", w
-		write(*,*) " B=", Bmodule*1e4, " gammB=", gammaB(icell)*180/pi, " chib=", chib(icell)*180/pi
-		write(*,*) "bx=", bx, " by=", by, " bz=", bz
-		write(*,*) 'b1=', b1, " b2=", b2
-    	write(*,*)  "cos(gam)=", cog, " sin2gam=", sigsq, " cos(2chi)=", co2c, " sin(2chi)=", si2c
-!     	stop
-    endif
+!     if (icell > 0 ) then
+! 		write(*,*) "u=",u, " v=",v, " w=", w, " r=",sqrt(x*x+y*y+z*z)/etoile(1)%r
+! 		write(*,*) " B=", Bmodule*1e4, " gammB=", gammaB(icell)*180/pi, " chib=", chib(icell)*180/pi
+! 		write(*,*) "bx=", bx, " by=", by, " bz=", bz
+! 		write(*,*) 'b1=', b1, " b2=", b2
+!     	write(*,*)  "cos(gam)=", cog, " sin2gam=", sigsq, " cos(2chi)=", co2c, " sin(2chi)=", si2c
+!     endif
     return
   end function B_project_angles
 
@@ -2309,6 +2310,8 @@ contains
     end do
     close(unit=1)
     
+    !Handling of magnetic field components only depends on what choice I make for the magnetic field
+    !Presently I read B, theta and chi !
     if (lspherical_velocity) then
        vtheta(:) = V2(:)
        deallocate(V2)
@@ -2420,7 +2423,7 @@ contains
 
     v_char = v_char + Vmod
 
-
+	!to change according to what B quantities are read!!
     if (lmagnetized) then
        !    	if (lmagnetoaccr) then
        !      B_char = maxval(sqrt(BR**2+B_z(:)**2+Bphi(:)**2))

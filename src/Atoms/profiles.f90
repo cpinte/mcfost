@@ -20,7 +20,7 @@ MODULE PROFILES
 
   PROCEDURE(local_profile_v), pointer :: profile => null()
   integer, parameter :: NvspaceMax = 151
-  integer, parameter :: NbspaceMax = 1
+  integer, parameter :: NbspaceMax = 17
 
 CONTAINS
 
@@ -131,6 +131,7 @@ CONTAINS
           u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
 
           local_profile_v(:) = local_profile_v(:) + Voigt(N, line%a(icell), u1p)
+
        enddo
 
     else
@@ -562,7 +563,6 @@ CONTAINS
 
   !Currently, the magnetic field is assumed constant inside the cell and there is not projection
   !To Do split the magnetic field like the velocity field
-  !-> but first compute it in the middle path.
   subroutine local_profile_zv(line,icell,lsubstract_avg,N,lambda, phi0, phiz, psiz, x,y,z,x1,y1,z1,u,v,w,l)
     ! phi = Voigt / sqrt(pi) / vbroad(icell)
     integer, intent(in) 							            :: icell, N
@@ -571,8 +571,9 @@ CONTAINS
     real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
          x1,y1,z1, &      ! velocity field and magnetic field
          l !physical length of the cell
-    integer 													:: Nvspace, Nzc
+    integer 													:: Nvspace, Nzc, Nbspace
     real(kind=dp), dimension(NvspaceMax) 						:: Omegav
+!     real(kind=dp), dimension(NbspaceMax) 						:: Omegab
     real(kind=dp) 												:: norm, vbroad, admp, cog, s2c, c2c, B, sigsq
     real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
          dv, omegav_mean
@@ -587,7 +588,6 @@ CONTAINS
     B = B_project_angles(icell,x,y,z,u,v,w,cog,sigsq,c2c,s2c,lnot_magnetized)
 
     !Output arrays correspond to I, Q, U, V with phi0 for I and psiZ(:,i) for i=Q,U,V
-
 
     if (lnot_magnetized.or..not.(line%polarizable)) then
        !The test could be done elsewhere though
@@ -651,7 +651,8 @@ CONTAINS
 
              ub = u1p(:) - line%zm%shift(nc) * B * LARMOR * line%lambda0 * NM_TO_M / vbroad
 
-             H = Voigt(line%Nlambda, admp, ub, F)
+			 !not line%Nlambda. line%Nlambda==N only if not shift in index! (0 fields)
+             H = Voigt(N, admp, ub, F)
 
              psi(:,line%zm%q(nc)) = psi(:,line%zm%q(nc)) + line%zm%strength(nc) * F(:) / norm
 
@@ -665,6 +666,9 @@ CONTAINS
           end do !components
 
        enddo
+       
+!-> Can au Gaussian line be polarized ??
+!-> need a version for a = 0 that returns gaussian + equivalent dispersion profile with a = 0
 
 !     else
 !        do nv=1, Nvspace
@@ -678,8 +682,7 @@ CONTAINS
 ! 
 !              !H = exp(-ub**2)
 !              !F = -2 * ub(:) * H !?
-!              !-> need a version for a = 0 that returns gaussian + dispersion profile with a = 0
-!              !              		H = Voigt(line%Nlambda, 0.0_dp, ub, F)
+!              ! H = Voigt(line%Nlambda, 0.0_dp, ub, F)
 ! 
 !              psi(:,line%zm%q(nc)) = psi(:,line%zm%q(nc)) + line%zm%strength(nc) * F(:) / norm
 ! 
@@ -713,7 +716,7 @@ CONTAINS
 ! write(*,*) "psiQ(:)=", maxval(psiz(:,1))
 ! write(*,*) "psiU(:)=", maxval(psiz(:,2))
 ! write(*,*) "psiV(:)=", maxval(psiz(:,3))
- 
+!  
 ! stop
     return
   end subroutine local_profile_zv

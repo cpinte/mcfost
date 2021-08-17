@@ -818,6 +818,10 @@ contains
     endif
 
     if (lmagnetized) then
+    
+    	if (maxval(sum(F_QUV,dim=5)) == 0.0) then
+    		call warning("Magnetic field is present but it seems there is no polarisation!")
+    	endif
 
        call ftcrhd(unit, status)
        if (status > 0) then

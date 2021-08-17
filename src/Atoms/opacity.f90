@@ -1212,6 +1212,12 @@ contains
 
           chi(Nblue:Nred,id) = chi(Nblue:Nred,id) + chil * phi0(1:Nlam)
           eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + etal * phi0(1:Nlam)
+          
+          if (minval(chi(Nblue:Nred,id)) < 0) then
+          	write(*,*) id, icell, chil
+          	write(*,*) "phi=", phi0(1:Nlam)
+          	call error("chi neg!")
+          endif
 
           do m=1,3
              chiQUV_p(Nblue:Nred,m,id) = chiQUV_p(Nblue:Nred,m,id) + chil * phiz(1:Nlam,m)
@@ -1293,10 +1299,13 @@ contains
 	P(3) = etaQUV_p(la,2,id)/chi(la,id) * Q!SU exp(-tau) (1 - exp(-dtau))
 	P(4) = etaQUV_p(la,3,id)/chi(la,id) * Q!SV exp(-tau) (1 - exp(-dtau))
 	
-          	 if (any_nan_infinity_vector(P) > 0) then
-          	 	write(*,*) "(1)", icell, la, lambda(la), P
-          	 	stop
-          	 endif
+    if (any_nan_infinity_vector(P) > 0) then
+        write(*,*) "(nan/inf P)", " icell=",icell, " la=",la, " lam=",lambda(la)
+        write(*,*) 'Q=',Q
+        write(*,*) 'P=',P
+        write(*,*) 'chi=',chi(la,id)
+    	stop
+    endif
 
 ! 	R = 0.0	 
 	!eye(4)
@@ -1321,23 +1330,23 @@ contains
 	R(4,2) = -R(2,4)
 	R(4,3) = -R(3,4)
 
-          	 if (any_nan_infinity_matrix(R) > 0) then
-          	 	write(*,*) "(2)", icell, la, lambda(la),R
-          	 	stop
-          	 endif
+    if (any_nan_infinity_matrix(R) > 0) then
+        write(*,*) "(2)", icell, la, lambda(la),R
+        stop
+    endif
 
 ! 	call solve_lin(R,P,4,.true.)
 	call invert_4x4(R)
-          	 if (any_nan_infinity_matrix(R) > 0) then
-          	 	write(*,*) "(3)",icell, la, lambda(la), R
-          	 	stop
-          	 endif
+    if (any_nan_infinity_matrix(R) > 0) then
+        write(*,*) "(3)",icell, la, lambda(la), R
+        stop
+    endif
 
 	P = matmul(R,P)
-          	 if (any_nan_infinity_vector(P) > 0) then
-          	 	write(*,*) "(4)", icell, la, lambda(la), P
-          	 	stop
-          	 endif
+	if (any_nan_infinity_vector(P) > 0) then
+        write(*,*) "(4)", icell, la, lambda(la), P
+        stop
+	endif
 
 
 !     Stokes_Q(la,id) += P(2)
