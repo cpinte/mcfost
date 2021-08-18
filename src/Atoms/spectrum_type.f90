@@ -31,7 +31,8 @@ module spectrum_type
 
   integer :: Nlambda, Ntrans, Nlambda_cont
   real(kind=dp) :: wavelength_ref = 0.0
-  real(kind=dp), dimension(:,:), allocatable :: chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, chi0_bb, eta0_bb
+  real(kind=dp), dimension(:,:), allocatable :: chi_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, chi0_bb, eta0_bb
+  real(kind=dp), allocatable :: sca_c(:,:), HI_rayleigh_part2(:), HeI_rayleigh_part2(:)
   real(kind=dp), dimension(:,:,:), allocatable :: Icont
   real(kind=dp), dimension(:), allocatable :: lambda, lambda_cont
   real(kind=dp), dimension(:,:), allocatable :: Jnu_cont, Jnu
@@ -51,26 +52,6 @@ module spectrum_type
 
 contains
 
-  function getlambda_limit(atom)
-    !reddest wavelength of the shortest b-b transition in the ground state
-    real(kind=dp) :: getlambda_limit
-    type(AtomType) :: atom
-    integer :: kr
-
-    getlambda_limit = 1d6
-    do kr=1, atom%Nline
-
-       if (atom%lines(kr)%i==1) then !transition to the ground state
-          getlambda_limit = min(getlambda_limit, lambda(atom%lines(kr)%Nred))
-       endif
-
-    enddo
-
-    !avoid problem
-    getlambda_limit = max(lambda(1), getlambda_limit)
-
-    return
-  end function getlambda_limit
 
   subroutine init_Spectrum(Nray, lam0, vacuum_to_air)
     ! ------------------------------------------- !
@@ -109,11 +90,6 @@ contains
 
     Nlambda_cont = size(lambda_cont)
     Nlambda = size(lambda)
-    !Futur deprecation, rayleigh scattering will undergo a revamp, and some informations
-    !will be hardcoded. Atm, Rayleigh scattering is deactivated
-    !only for H and He atm, not changed for image even if we remove lines
-    hydrogen%scatt_limit = getlambda_limit(hydrogen)
-    if (associated(helium)) helium%scatt_limit = getlambda_limit(helium)
 
     call writeWavelength()
 
@@ -167,6 +143,7 @@ contains
     !Polarized quantities allocated in adjustStokes_Mode
     integer, intent(in) :: Nray
     integer :: nat, k, Nlambda_max, alloc_status, istar, size_phi_loc_tot
+    integer :: size_sca_cont
     type (AtomType), pointer :: atom
     logical, intent(in)    :: alloc_atom_nlte
     integer(kind=8) :: mem_alloc_local = 0
@@ -214,6 +191,13 @@ contains
     !allocate(sca_c(Nlambda_cont,n_cells), stat=alloc_status)
     ! 		write(*,*) " size chi_c/eta_c ", 2 * n_cells * Nlambda_cont/1024./1024./1024., " GB"
     ! 		write(*,*) " size chi_c/eta_c ", (size(chi_c)+size(eta_c))/1024./1024./1024., " GB"
+    allocate(HI_rayleigh_part2(Nlambda_cont), stat=alloc_status)
+    size_sca_cont = sizeof(HI_rayleigh_part2)
+    if (associated(helium)) then
+    	allocate(HeI_rayleigh_part2(Nlambda_cont), stat=alloc_status)
+    	size_sca_cont = sizeof(HeI_rayleigh_part2)
+    endif
+
 
     if (alloc_status > 0) then
        call error("Allocation error, continuum opacities")
@@ -224,11 +208,12 @@ contains
        sca_c = 0.0_dp
        mem_alloc_local = mem_alloc_local + sizeof(chi_c)
        write(*,*) " -> size contopac:", 3 * sizeof(chi_c) /1024./1024./1024.," GB"
+       call error("The use of sca_c is deprecated!")
     else
-       write(*,*) " -> size contopac:", 2 * sizeof(chi_c) /1024./1024./1024.," GB"
+       write(*,*) " -> size contopac:", (2*sizeof(chi_c) + size_sca_cont) /1024./1024./1024.," GB"
     endif
 
-    mem_alloc_local = mem_alloc_local + sizeof(chi_c) * 2
+    mem_alloc_local = mem_alloc_local + sizeof(chi_c) * 2 + size_sca_cont
 
     allocate(eta(Nlambda ,nb_proc))
     allocate(chi(Nlambda ,nb_proc))
@@ -284,6 +269,7 @@ contains
           enddo
        enddo
        mem_alloc_local = mem_alloc_local + size_phi_loc_tot
+       write(*,*) " -> size phi_loc(Nlambda,Nray,nb_proc):", size_phi_loc_tot/1024./1024./1024., ' GB'
 
     endif
 
@@ -609,7 +595,8 @@ contains
     endif
 
 
-    deallocate(chi_c,  eta_c)
+    deallocate(chi_c,  eta_c, HI_rayleigh_part2)
+    if (allocated(HeI_rayleigh_part2)) deallocate(HeI_rayleigh_part2)
     if (allocated(sca_c)) deallocate(sca_c)
     deallocate(chi, eta)
 

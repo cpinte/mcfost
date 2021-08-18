@@ -1,7 +1,7 @@
 MODULE readatom
 
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType, Element, determinate, rydberg_atom, &
-       n_eff, find_continuum
+       n_eff, find_continuum, atomZnumber, ATOM_ID_WIDTH
   use atmos_type, only : Nelem, Hydrogen, Helium, Elements, T, ne, vturb, lmagnetized, icompute_atomRT, &
        Natom, NpassiveAtoms, NactiveAtoms, Atoms, PassiveAtoms, ActiveAtoms, helium_is_active
   use zeeman, only : Lande_eff, ZeemanMultiplet
@@ -44,6 +44,34 @@ MODULE readatom
   !if it is 1.0, no extrapolation i.e., lambdamax=lambda0
 
 CONTAINS
+
+  !This is not used anymore., can be use to check atomZnumber in atom_type.f90
+  function atomZnumber_old(atomID) result(Z)
+     !--------------------------------------
+     !return the atomic number of an atom
+     !with ID = atomID.
+     !Hydrogen is 1
+     !--------------------------------------
+      character(len=ATOM_ID_WIDTH) :: atomID
+      integer :: Z, i
+  
+      Z = 1
+      do i=1,Nelem
+       if (Elements(i)%ptr_elem%ID == atomID) then
+         Z = i
+         exit
+       end if
+      enddo
+      write(*,*) "atomZnumber_old found:", Z
+      Z = 1
+      do while (Elements(Z)%ptr_elem%ID /= atomID)
+       Z=Z+1
+      end do
+      write(*,*) "atomZnumber_old found(bis):", Z
+
+  
+  	return
+  end function atomZnumber_old
 
   SUBROUTINE readModelAtom(atomunit, atom, atom_file)
 !!!
@@ -1141,6 +1169,12 @@ CONTAINS
     !   write(*,*) "  -> writing lines individual wavelength grid"
     !   !write lines grid
     !   CALL write_lines_grid()
+    
+!     do nmet=1,Natom
+!     	atom => Atoms(nmet)%ptr_atom
+!     	write(*,*) "Z=",atomZnumber_old(atom%ID), " atomZnumber_new=", atomZnumber(atom)
+!     enddo
+!     stop
 
     RETURN
   END SUBROUTINE readAtomicModels

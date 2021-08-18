@@ -24,8 +24,10 @@ module background_opacity
   use utils, only 	  : interp
 
   implicit none
-
-  real(kind=dp), parameter :: LONG_RAYLEIGH_WAVE=1.d6 !nm
+	
+	real, parameter :: lambda_limit_HI_rayleigh = 102.6 !nm
+	real, parameter :: lambda_limit_HeI_rayleigh = 140.0 !nm
+!   real(kind=dp), parameter :: LONG_RAYLEIGH_WAVE=1.d6 !nm
   !!integer, parameter :: NJOHN=6, NFF=17, NTHETA=16
 
 contains
@@ -33,8 +35,8 @@ contains
   function Thomson(icell)
     ! ------------------------------------------------------------- !
     ! Thomson scattering cross-section in non relativistic limit.
-    ! (i.e., wavelength independent)
-    ! unit m^2
+    ! (i.e., wavelength independent) x ne density.
+    ! unit m^-1
     ! ------------------------------------------------------------- !
     integer, intent(in) 			:: icell
     real(kind=dp)				    :: Thomson
@@ -43,6 +45,42 @@ contains
 
     return
   end function Thomson
+  
+  !The splitting of Rayleigh scattering in a depth dependent term (like Thomson(icell))
+  ! and wavelength term makes both the storage and the evaluation more efficient.
+  !And, easier to include in J calculation!
+  function HI_rayleigh_part1(icell)
+    ! ------------------------------------------------------------- !
+    ! H I Rayleigh scattering cross-section x nHI.
+    ! unit m^-1
+    ! ------------------------------------------------------------- ! 	
+    integer, intent(in) :: icell
+  	real(kind=dp) :: HI_rayleigh_part1
+  	
+!   	HI_rayleigh_part1 = sigma_e * sum(Hydrogen%n(1:Hydrogen%Nlevel-1,icell)) !m^-1
+  	HI_rayleigh_part1 = sigma_e * Hydrogen%n(1,icell)
+
+	return  
+  end function HI_rayleigh_part1
+  
+  subroutine init_HI_rayleigh_part2(N, Lambda,HI_rayleigh_part2)
+    ! ------------------------------------------------------------- !
+    ! H I Rayleigh scattering cross-section.
+    ! wavelength dependent term
+    ! ------------------------------------------------------------- ! 
+    integer, intent(in) :: N
+    real(kind=dp), intent(in) :: Lambda(N)
+    real(kind=dp), intent(out) :: HI_rayleigh_part2(N)
+
+    where(lambda > lambda_limit_HI_rayleigh)
+        HI_rayleigh_part2 = (1d0 + (156.6d0/lambda)**2.d0 + &
+            (148.d0/lambda)**4d0)*(96.6d0/lambda)**4d0
+    elsewhere
+    	HI_rayleigh_part2 = 0.0
+    end where    
+    
+    return
+  end subroutine init_HI_rayleigh_part2	
 
   subroutine HI_Rayleigh(id, icell, N, lambda, scatt)
     ! ------------------------------------------------------------- !
@@ -51,14 +89,13 @@ contains
     ! ------------------------------------------------------------- !
     integer, intent(in)                                       :: icell, id, N
     real(kind=dp), dimension(N), intent(in) 					:: lambda
-    real(kind=dp) 											:: lambda_limit
+    real        											:: lambda_limit
     real(kind=dp), dimension(N), intent(out) 				:: scatt
     integer :: k
 
-    lambda_limit = hydrogen%scatt_limit!102.6
     scatt = 0d0
 
-    where(lambda > lambda_limit)
+    where(lambda > lambda_limit_HI_rayleigh)
        scatt = (1d0 + (156.6d0/lambda)**2.d0 + &
             (148.d0/lambda)**4d0)*(96.6d0/lambda)**4d0
     end where
@@ -69,6 +106,56 @@ contains
 
     return
   end subroutine HI_Rayleigh
+  
+  function HeI_rayleigh_part1(icell)
+    ! ------------------------------------------------------------- !
+    ! He I Rayleigh scattering cross-section x nHeI.
+    ! unit m^-1
+    ! ------------------------------------------------------------- ! 	
+    integer, intent(in) :: icell
+  	real(kind=dp) :: HeI_rayleigh_part1
+  	integer :: last_neutral_level
+  	
+  	!need to evaluate neutr_index only once.  	
+  	!could be faster
+	last_neutral_level = 1
+    do while (Helium%stage(last_neutral_level) == 0)
+       last_neutral_level = last_neutral_level+1
+    enddo
+    last_neutral_level = last_neutral_level - 1 !first (or first ion) continuum - 1
+
+	!first ion - 1
+! 	last_neutral_level = find_continuum(helium, 1) - 1
+	if (helium%stage(last_neutral_level) /= 0.0) then
+		write(*,*) "Helium as no neutral levels, sigHe = 0", last_neutral_level
+		HeI_rayleigh_part1 = 0.0_dp
+		return
+	endif
+  	
+!   	HeI_rayleigh_part1 = sigma_e * sum(Helium%n(1:last_neutral_level,icell)) !m^-1
+  	HeI_rayleigh_part1 = sigma_e * Helium%n(1,icell)!m^-1
+  
+  	return
+  end function HeI_rayleigh_part1
+  
+  subroutine init_HeI_rayleigh_part2(N, Lambda, HeI_rayleigh_part2)
+    ! ------------------------------------------------------------- !
+    ! H I Rayleigh scattering cross-section.
+    ! wavelength dependent term
+    ! ------------------------------------------------------------- ! 
+    integer, intent(in) :: N
+    real(kind=dp), intent(in) :: Lambda(N)
+    real(kind=dp), intent(out) :: HeI_rayleigh_part2(N)
+
+    where(lambda > lambda_limit_HeI_rayleigh)
+       HeI_rayleigh_part2 = 4d0 * (1d0 + (66.9d0/lambda)**2.d0 + &
+            (64.1d0/lambda)**4d0)*(37.9d0/lambda)**4d0
+    elsewhere
+    	HeI_rayleigh_part2 = 0.0
+    end where    
+    
+    return
+  end subroutine init_HeI_rayleigh_part2	
 
   subroutine HeI_Rayleigh(id, icell, N, lambda, scatt)
     ! ------------------------------------------------------------- !
@@ -78,14 +165,12 @@ contains
     ! ------------------------------------------------------------- !
     !type (AtomType), intent(in)                               :: atom
     integer, intent(in)                                       :: icell, id, N
-    real(kind=dp) 											:: lambda_limit!, sigma_e
     real(kind=dp), dimension(N), intent(in)					:: lambda
     real(kind=dp), dimension(N), intent(out) 				:: scatt
     integer													:: Neutr_index, l
 
     if (.not.associated(Helium)) return
 
-    lambda_limit = helium%scatt_limit!50.0_dp
     scatt = 0d0
 
     l = 1
@@ -95,7 +180,7 @@ contains
     Neutr_index = l - 1
 
 
-    where(lambda > lambda_limit)
+    where(lambda > lambda_limit_HeI_rayleigh)
        scatt(:) = 4d0 * (1d0 + (66.9d0/lambda)**2.d0 + &
             (64.1d0/lambda)**4d0)*(37.9d0/lambda)**4d0
     end where

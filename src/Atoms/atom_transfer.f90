@@ -239,6 +239,7 @@ contains
              endif
           endif
 
+		  !add rayleigh scatt to Jnu * emissiviy_scatt
           if (lelectron_scattering) then
              Snu = ( eta(:,id) + thomson(icell) * Jnu(:,1) ) / ( chi(:,id) + tiny_dp )
              Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)

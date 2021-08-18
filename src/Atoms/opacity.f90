@@ -1,11 +1,11 @@
 module Opacity
 
-  use atmos_type, only : hydrogen, ntotal_atom, T, ne, NactiveAtoms, Natom, Npassiveatoms, ActiveAtoms, &
+  use atmos_type, only : hydrogen, helium, ntotal_atom, T, ne, NactiveAtoms, Natom, Npassiveatoms, ActiveAtoms, &
        PassiveAtoms, Atoms, Elements, icompute_atomRT, lmali_scheme, lhogerheijde_scheme, nhtot
   use atom_type
   use spectrum_type, only : Itot, Icont, lambda, nlambda, Nlambda_cont, lambda_cont, dk, dk_min, dk_max, &
        chi0_bb, eta0_bb, chi_c, sca_c, eta_c, chi, eta, chi_c_nlte, eta_c_nlte, Jnu_cont, &
-       rho_p, etaQUV_p, chiQUV_p
+       rho_p, etaQUV_p, chiQUV_p, HeI_rayleigh_part2, HI_rayleigh_part2
   use constant
   use constantes, only : tiny_dp, huge_dp, AU_to_m
   use messages
@@ -17,7 +17,8 @@ module Opacity
   use planck, only : bpnu
   use occupation_probability, only : wocc_n, D_i
    use background_opacity, only						: Thomson, Hydrogen_ff, Hminus_bf, Hminus_bf_geltman, &
-       Hminus_bf_geltman, Hminus_bf_Wishart, Hminus_ff_john, Hminus_ff, Hminus_ff_bell_berr, lte_bound_free, H_bf_Xsection
+       Hminus_bf_geltman, Hminus_bf_Wishart, Hminus_ff_john, Hminus_ff, Hminus_ff_bell_berr, lte_bound_free, H_bf_Xsection, &
+       	init_HeI_rayleigh_part2, init_HI_rayleigh_part2, HeI_rayleigh_part1, HI_rayleigh_part1
   use mcfost_env, only								: dp
   use input, only										: ds
   use molecular_emission, only						: v_proj
@@ -614,8 +615,13 @@ contains
 
     Bp = Bpnu(T(icell),x)
 
-    chiout(:) = thomson(icell)
+	!HI Rayleigh, always allocated
+    chiout(:) = thomson(icell) + HI_rayleigh_part1(icell) * HI_rayleigh_part2(:)
     etaout(:) = 0.0_dp
+    
+    if (associated(helium)) then
+    	chiout(:) = chiout(:) + HeI_rayleigh_part1(icell) * HeI_rayleigh_part2(:)
+    endif
 
 !     call Hminus_bf_wishart(icell, N, lambda, chi, eta) !->better with turbospec
     call Hminus_bf_geltman(icell,Nx, x, chi, eta) !->better with rh
@@ -646,6 +652,14 @@ contains
     icell0 = 1
     
     write(*,*) " -> Computing background continua..."
+    !init wavelength dependent Rayleigh cross-sections.
+    !Done only once, not updated during non-LTE loop! (Only at the end if electron updated
+    !and n_iterate_ne == 0)!
+    !if (maxval(HI_rayleigh_part2)==0) then... !but before init to 0 after allocation!
+    call init_HI_rayleigh_part2(Nlambda_cont, lambda_cont, HI_rayleigh_part2)
+    if (associated(helium)) then
+    	call init_HeI_rayleigh_part2(Nlambda_cont, lambda_cont, HeI_rayleigh_part2)
+    endif
     
     !$omp parallel &
     !$omp default(none) &
@@ -666,7 +680,6 @@ contains
           endif
 
           if (.not.llimit_mem) then
-!              call interp_background_opacity(icell, chi0_bb(:,icell), eta0_bb(:,icell))
              call interp_continuum_local(icell, chi0_bb(:,icell), eta0_bb(:,icell))             
           endif
 
@@ -690,6 +703,7 @@ contains
     real(kind=dp), dimension(Nlambda), intent(out) :: chii, etai
     real(kind=dp) :: u
     
+!     This one is deprecated! used for debug only
 !     call interp_background_opacity(icell, chii, etai)
 !     return
 
@@ -744,6 +758,11 @@ contains
   end subroutine interp_continuum_local
   
   subroutine interp_background_opacity(icell, chii, etai)
+  !
+  !
+  !This one is deprecated, interp_continuum_local is used instead
+  !
+  !
     !linear interpolation of continuum opacities from lambda_cont grid to lambda grid
     !Nlambda >> Nlambda_cont
     !Jnu_cont interpolated locally and scattering emissivity added elsewhere

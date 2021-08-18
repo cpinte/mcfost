@@ -104,7 +104,7 @@ MODULE atom_type
      ! ions etc ...
      integer, allocatable, dimension(:)  :: stage, Lorbit
      !integer(8)            :: offset_coll, colunit
-     real(kind=dp) :: Rydberg, scatt_limit !minimum wavelength for Rayleigh scattering
+     real(kind=dp) :: Rydberg
      real(kind=dp)                :: cswitch = 1.0_dp, Abund, weight, massf !mass fraction
      real(kind=dp), allocatable, dimension(:) :: g, E, vbroad!, ntotal
      real, allocatable, dimension(:) :: qS, qJ
@@ -541,26 +541,26 @@ CONTAINS
     RETURN
   END SUBROUTINE PTrowcol
   
-  !    function atomZnumber_old(atomID) result(Z)
-  !    --------------------------------------
-  !    return the atomic number of an atom
-  !    with ID = atomID.
-  !    Hydrogen is 1
-  !    --------------------------------------
-  !     character(len=ATOM_ID_WIDTH) :: atomID
-  !     integer :: Z, i
-  !
-  !     Z = 1
-  !     do i=1,Nelem
-  !      if (atmos%Elements(i)%ID.eq.atomID) then
-  !        Z = i
-  !        exit
-  !      end if
-  !     do while (atmos%Elements(Z)%ptr_elem%ID.ne.atomID)
-  !      Z=Z+1
-  !     end do
-  !
-  !    return
-  !    end function atomZnumber_old
+  function getlambda_limit(atom, lambda)
+    !reddest wavelength of the shortest b-b transition in the ground state
+    real(kind=dp) :: getlambda_limit
+    type(AtomType) :: atom
+    real(kind=dp), dimension(:), intent(in) :: Lambda
+    integer :: kr
+
+    getlambda_limit = 1d6
+    do kr=1, atom%Nline
+
+       if (atom%lines(kr)%i==1) then !transition to the ground state
+          getlambda_limit = min(getlambda_limit, lambda(atom%lines(kr)%Nred))
+       endif
+
+    enddo
+
+    !avoid problem
+    getlambda_limit = max(lambda(1), getlambda_limit)
+
+    return
+  end function getlambda_limit
 
 END MODULE atom_type
