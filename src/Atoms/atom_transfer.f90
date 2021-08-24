@@ -3165,6 +3165,7 @@ contains
     !for one ray at the centre of the image
     !unpolarised case at the moment.
     !not para yet
+    ! Does not include non opacities of the continuum
     real(kind=dp) :: u, v, w !, intent(in)
     integer :: ibin, iaz
     integer, parameter :: unit_cf = 10
@@ -3182,6 +3183,10 @@ contains
 
     write(*,*) "   Computing contribution function at centre of the image..."
     write(*,*) "      for all directions."
+    
+    if (NactiveAtoms > 0) then
+    	call Warning("Missing Non-LTE continuum opacities in CF rays")
+    endif
 
     do ibin=1,RT_n_incl
        do iaz=1,RT_n_az
@@ -3229,8 +3234,8 @@ contains
     real(kind=dp), intent(in) :: x,y,z
     logical, intent(in) :: labs
     real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
-    real(kind=dp), dimension(Nlambda) :: tau, dtau
-    real(kind=dp), dimension(Nlambda_cont) :: tau_c, dtau_c
+    real(kind=dp), dimension(Nlambda) :: tau, dtau, etas_loc
+    real(kind=dp), dimension(Nlambda_cont) :: tau_c, dtau_c, etasc_loc
     real(kind=dp) :: xmass, l_tot
     integer, intent(in) :: unit_cf
     integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
@@ -3251,6 +3256,9 @@ contains
 
     tau_c = 0.0
     dtau_c = 0.0
+    
+    etasc_loc(:) = 0.0_dp
+    etas_loc(:) = 0.0_dp
 
     icell_prev = icell_in
 
@@ -3281,6 +3289,7 @@ contains
           if (icell == icell_star) return
        endif
 
+		!-> test for Voronoi here ?
        ! 			if (icell <= n_cells) then
        ! 				lcellule_non_vide = (icompute_atomRT(icell) > 0)
        ! 				if (icompute_atomRT(icell) < 0) return !-1 if dark
@@ -3304,7 +3313,20 @@ contains
              eta(:,id) = eta0_bb(:,icell)
           endif
           if (lelectron_scattering) then
-          	Jnu(:,id) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          	etasc_loc = Jnu_cont(:,icell) * (thomson(icell) + HI_rayleigh_part1(icell) * HI_rayleigh_part2(:))
+          	if (associated(helium)) then
+          		etasc_loc = etasc_loc + Jnu_cont(:,icell) * HeI_rayleigh_part1(icell) * HeI_rayleigh_part2(:)
+          	endif
+          	etas_loc = linear_1D_sorted(Nlambda_cont,lambda_cont,etasc_loc, Nlambda,lambda)
+			etas_loc(Nlambda) = etasc_loc(Nlambda_cont)
+			
+          	dtau_c(:) = l_contrib * chi_c(:,icell)
+          	Icont(:,1,id) = Icont(:,1,id) + (eta_c(:,icell)+etasc_loc(:))/chi_c(:,icell) * exp(-tau_c) * (1.0 - exp(-dtau_c))
+          	tau_c(:) = tau_c(:) + dtau_c(:)
+		  else
+          	dtau_c(:) = l_contrib * chi_c(:,icell)
+          	Icont(:,1,id) = Icont(:,1,id) + eta_c(:,icell)/chi_c(:,icell) * exp(-tau_c) * (1.0 - exp(-dtau_c))
+          	tau_c(:) = tau_c(:) + dtau_c(:)
           endif
 
           !includes a loop over all bound-bound, passive and active
@@ -3313,7 +3335,7 @@ contains
           dtau(:) = l_contrib * chi(:,id)
 
           if (lelectron_scattering) then
-             eta(:,id) = eta(:,id) + thomson(icell)*Jnu(:,id)
+             eta(:,id) = eta(:,id) + etas_loc(:)
           endif
 
           tau = tau + dtau
@@ -3321,28 +3343,24 @@ contains
           xmass = xmass + l_contrib * nHtot(icell) * masseH * 1d-3
 
 
-          dtau_c(:) = l_contrib * chi_c(:,icell)
-          Icont(:,1,id) = Icont(:,1,id) + eta_c(:,icell)/chi_c(:,icell) * exp(-tau_c) * (1.0 - exp(-dtau_c))
-          tau_c(:) = tau_c(:) + dtau_c(:)
-
-          write(unit_cf, '(1I, 6E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), &
+          write(unit_cf, '(1I, 4ES17.8E3, 2F12.5)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), &
                sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
-          write(unit_cf+1, '(1I, 6E20.7E3)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), &
+          write(unit_cf+1, '(1I, 4ES17.8E3, 2F12.5)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), &
                sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
           ! 				write(*,*) 'icell=', icell, ne(icell), nHtot(icell), ' T=', T(icell)
           if (llimit_mem) then
              do la=1, Nlambda
-                write(unit_cf,'(1F12.5, 6E20.7E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), tau(la)*exp(-tau(la)), eta(la,id)/(1d-50 + chi(la,id)), chi(la,id)/tau(la), Icont(la,1,id) - eta(la,id)/(1d-50 + chi(la,id))
+                write(unit_cf,'(1F12.5, 6ES17.8E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), tau(la)*exp(-tau(la)), eta(la,id)/(1d-50 + chi(la,id)), chi(la,id)/tau(la), Icont(la,1,id) - eta(la,id)/(1d-50 + chi(la,id))
              enddo!
           else
              do la=1, Nlambda
-                write(unit_cf,'(1F12.5, 6E20.7E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), &
-                     tau(la)*exp(-tau(la)), eta(la,id)/(1d-50 + chi(la,id)), chi(la,id)/tau(la), &
-                     (eta(la,id)-eta0_bb(la,icell))/(1d-50 + chi(la,id)-chi0_bb(la,icell))
-             enddo!
+                write(unit_cf,'(1F12.5, 6ES17.8E3)') lambda(la), tau(la), eta(la,id)*E2(tau(la)), &
+                     tau(la)*exp(-tau(la)), eta(la,id)/(tiny_dp + chi(la,id)), chi(la,id)/tau(la), &
+                     (eta(la,id)-eta0_bb(la,icell))/(max(1d-50,chi(la,id)-chi0_bb(la,icell)))
+             enddo
           endif
           do la=1, Nlambda_cont
-             write(unit_cf+1,'(1F12.5, 6E20.7E3)') lambda_cont(la), tau_c(la), eta_c(la,icell)*E2(tau_c(la)), &
+             write(unit_cf+1,'(1F12.5, 6ES17.8E3)') lambda_cont(la), tau_c(la), eta_c(la,icell)*E2(tau_c(la)), &
                   tau_c(la)*exp(-tau_c(la)), eta_c(la,icell)/chi_c(la,icell), chi_c(la,icell)/tau_c(la), Icont(la,1,id)
           enddo
 
