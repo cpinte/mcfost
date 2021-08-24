@@ -12,14 +12,14 @@ module atom_transfer
        compute_background_continua, opacity_atom_loc, interp_continuum_local, &
        nlte_bound_free, Uji_down, chi_up, chi_down, eta_atoms, cross_coupling_terms, &
        background_continua_lambda, opacity_atom_zeeman_loc, solve_stokes_mat, prec_pops, frac_limit_pops, frac_ne_limit
-  use background_opacity, only: Thomson
+  use background_opacity, only: Thomson, HI_rayleigh_part1, HeI_rayleigh_part1
   use Planck, only			: bpnu
   use spectrum_type, only     : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, &
        eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, Istar_cont, Flux_acc, &
        Ishock, Istar_loc, flux_star, Stokes_Q, Stokes_U, Stokes_V, Flux, Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, &
        init_spectrum, init_spectrum_image, dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
        dealloc_jnu, reallocate_rays_arrays, write_flux, originc_atom, origin_atom, &
-       originc_file, origin_file, write_atomic_maps, limage_at_lam0, image_map, wavelength_ref
+       originc_file, origin_file, write_atomic_maps, limage_at_lam0, image_map, wavelength_ref, HI_rayleigh_part2, HeI_rayleigh_part2
 
   use atmos_type, only		: nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, &
        ne, T, vr, vphi, v_z, vtheta, wght_per_H, readatmos_ascii, dealloc_atomic_atmos, ActiveAtoms, nHmin, hydrogen, &
@@ -68,10 +68,10 @@ module atom_transfer
   use cylindrical_grid, only	: volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k, area
   use messages, only 			: error, warning
 
-  use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates, &
+  use statequil_atoms, only   : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates_hoger, &
        calc_bf_rates, calc_rate_matrix, &
        update_populations, update_populations_and_electrons, fill_collision_matrix, &
-       init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates_mali,calc_rates, &
+       init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates_mali,calc_rates_draft, &
        store_rate_matrices, psi, calc_rates_mali, n_new, ne_new, radiation_free_pops_atom, omega_sor_atom!,store_radiative_rates,
 
   implicit none
@@ -120,8 +120,8 @@ contains
     real(kind=dp), intent(in) :: x,y,z
     logical, intent(in) :: labs
     real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et
-    real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau!, LD
-    real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
+    real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, etas_loc
+    real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c, etasc_loc
     integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
     logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
@@ -134,8 +134,11 @@ contains
     tau(:) = 0.0_dp
     tau_c(:) = 0.0_dp
 
-    Itot(:,iray,id) = 0d0
-    Icont(:,iray,id) = 0d0
+    Itot(:,iray,id) = 0.0_dp
+    Icont(:,iray,id) = 0.0_dp
+    
+    etasc_loc(:) = 0.0_dp
+    etas_loc(:) = 0.0_dp
 
     Istar_loc(:,id) = 0.0_dp
     if (laccretion_shock) Ishock(:,id) = 0.0_dp
@@ -211,7 +214,16 @@ contains
           !to Do: if llimit_mem, Jnu_cont should be interpolated in interp_continuum_local
           !otherwise, here.
           if (lelectron_scattering) then
-          	Jnu(:,1) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          	etasc_loc = Jnu_cont(:,icell) * (thomson(icell) + HI_rayleigh_part1(icell) * HI_rayleigh_part2(:))
+          	if (associated(helium)) then
+          		etasc_loc = etasc_loc + Jnu_cont(:,icell) * HeI_rayleigh_part1(icell) * HeI_rayleigh_part2(:)
+          	endif
+          	!Or use Jnu, but need _rayleigh_part2 on Nlambda too (at init opac)  to avoid a lots of interpolations.
+!           	Jnu(:,id) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+				!-> check edges of the interpolation !
+			!-> pb with the edge of the interpolation routine !
+          	etas_loc = linear_1D_sorted(Nlambda_cont,lambda_cont,etasc_loc, Nlambda,lambda)
+			etas_loc(Nlambda) = etasc_loc(Nlambda_cont)!only if the lambda agrees, at the edge
           endif
 
           !includes a loop over all bound-bound, passive and active
@@ -241,8 +253,14 @@ contains
 
 		  !add rayleigh scatt to Jnu * emissiviy_scatt
           if (lelectron_scattering) then
-             Snu = ( eta(:,id) + thomson(icell) * Jnu(:,1) ) / ( chi(:,id) + tiny_dp )
-             Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)
+!              Snu = ( eta(:,id) + ( thomson(icell) + HI_rayleigh_part1(icell) ) * Jnu(:,id) ) / ( chi(:,id) + tiny_dp )
+!              Snu_c = eta_c(:,icell) + ( thomson(icell) + HI_rayleigh_part1(icell) ) * Jnu_cont(:,icell)
+!              if (associated(helium)) then
+!              	Snu = Snu + ( HeI_rayleigh_part1(icell) * Jnu(:,id) )/ ( chi(:,id) + tiny_dp )
+!              	Snu_c = Snu_c + HeI_rayleigh_part1(icell)  * Jnu_cont(:,icell)            
+!              endif
+             Snu = ( eta(:,id) + etas_loc(:) ) / ( chi(:,id) + tiny_dp )
+             Snu_c = eta_c(:,icell) + etasc_loc(:)
           else
              Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
              Snu_c = eta_c(:,icell)
@@ -307,8 +325,8 @@ contains
     real(kind=dp), intent(in) :: x,y,z
     logical, intent(in) :: labs
     real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, edt, et, facteur_tau
-    real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, chi_line, tau_line, Sline, Scont_interp
-    real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c
+    real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, chi_line, tau_line, Sline, Scont_interp, etas_loc
+    real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c, etasc_loc
     integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
     logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
     integer idref
@@ -392,7 +410,13 @@ contains
              eta(:,id) = eta0_bb(:,icell)
           endif
           if (lelectron_scattering) then
-          	Jnu(:,1) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          	etasc_loc = Jnu_cont(:,icell) * (thomson(icell) + HI_rayleigh_part1(icell) * HI_rayleigh_part2(:))
+          	if (associated(helium)) then
+          		etasc_loc = etasc_loc + Jnu_cont(:,icell) * HeI_rayleigh_part1(icell) * HeI_rayleigh_part2(:)
+          	endif
+!           	Jnu(:,id) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          	etas_loc = linear_1D_sorted(Nlambda_cont,lambda_cont,etasc_loc, Nlambda,lambda)
+			etas_loc(Nlambda) = etasc_loc(Nlambda_cont)
           endif
 
           !includes a loop over all bound-bound, passive and active
@@ -404,8 +428,8 @@ contains
           dtau(:) = l_contrib * chi(:,id)
 
           if (lelectron_scattering) then
-             Snu = ( eta(:,id) + thomson(icell) * Jnu(:,1) ) / ( chi(:,id) + tiny_dp )
-             Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)
+             Snu = ( eta(:,id) + etas_loc(:) ) / ( chi(:,id) + tiny_dp )
+             Snu_c = eta_c(:,icell) + etasc_loc(:)
           else
              Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
              Snu_c = eta_c(:,icell)
@@ -460,8 +484,8 @@ contains
     real(kind=dp), intent(in) :: x,y,z
     logical, intent(in) :: labs
     real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
-    real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau!, LD
-    real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c!, LDc
+    real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, etas_loc
+    real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c, etasc_loc
     integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
     logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
@@ -546,7 +570,13 @@ contains
              eta(:,id) = eta0_bb(:,icell)
           endif
           if (lelectron_scattering) then
-          	Jnu(:,1) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          	etasc_loc = Jnu_cont(:,icell) * (thomson(icell) + HI_rayleigh_part1(icell) * HI_rayleigh_part2(:))
+          	if (associated(helium)) then
+          		etasc_loc = etasc_loc + Jnu_cont(:,icell) * HeI_rayleigh_part1(icell) * HeI_rayleigh_part2(:)
+          	endif
+!           	Jnu(:,id) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          	etas_loc = linear_1D_sorted(Nlambda_cont,lambda_cont,etasc_loc, Nlambda,lambda)
+			etas_loc(Nlambda) = etasc_loc(Nlambda_cont)
           endif
 
           !includes a loop over all bound-bound, passive and active
@@ -559,8 +589,8 @@ contains
           endif
 
           if (lelectron_scattering) then
-             Snu = ( eta(:,id) + thomson(icell) * Jnu(:,1) ) / ( chi(:,id) + tiny_dp )
-             Snu_c = eta_c(:,icell) + thomson(icell) * Jnu_cont(:,icell)
+             Snu = ( eta(:,id) + etas_loc(:) ) / ( chi(:,id) + tiny_dp )
+             Snu_c = eta_c(:,icell) + etasc_loc(:)
           else
              Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
              Snu_c = eta_c(:,icell)
@@ -2734,7 +2764,11 @@ contains
 !           endif
 
 
-          beta(:,icell) = thomson(icell) / chi_c(:,icell)!( kappa_tot(:,icell) + tiny_dp)
+!           beta(:,icell) = thomson(icell) / chi_c(:,icell)
+          beta(:,icell) = ( thomson(icell) + HI_rayleigh_part1(icell)*HI_rayleigh_part2(:) ) / chi_c(:,icell)
+          if (associated(helium)) then
+          	beta(:,icell) = beta(:,icell) + HeI_rayleigh_part1(icell)*HeI_rayleigh_part2(:) / chi_c(:,icell)
+          endif
 
 
 !           if (any_nan_infinity_vector(beta(:,icell)) > 0) then
@@ -3268,7 +3302,7 @@ contains
              eta(:,id) = eta0_bb(:,icell)
           endif
           if (lelectron_scattering) then
-          	Jnu(:,1) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
+          	Jnu(:,id) = linear_1D_sorted(Nlambda_cont,lambda_cont,Jnu_cont(:,icell), Nlambda,lambda)
           endif
 
           !includes a loop over all bound-bound, passive and active
@@ -3277,7 +3311,7 @@ contains
           dtau(:) = l_contrib * chi(:,id)
 
           if (lelectron_scattering) then
-             eta(:,id) = eta(:,id) + thomson(icell)*Jnu(:,1)
+             eta(:,id) = eta(:,id) + thomson(icell)*Jnu(:,id)
           endif
 
           tau = tau + dtau

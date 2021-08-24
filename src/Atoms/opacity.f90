@@ -649,6 +649,7 @@ contains
   subroutine compute_background_continua()
     !$ use omp_lib
     integer :: icell, id, icell0
+    real(kind=dp) :: lam0
     icell0 = 1
     
     write(*,*) " -> Computing background continua..."
@@ -656,7 +657,9 @@ contains
     !Done only once, not updated during non-LTE loop! (Only at the end if electron updated
     !and n_iterate_ne == 0)!
     !if (maxval(HI_rayleigh_part2)==0) then... !but before init to 0 after allocation!
-    call init_HI_rayleigh_part2(Nlambda_cont, lambda_cont, HI_rayleigh_part2)
+!     lam0 = lambda(hydrogen%lines(1)%Nred+dk_max)
+!     lam0 = lambda(hydrogen%continua(1)%Nr)
+    call init_HI_rayleigh_part2(Nlambda_cont, lambda_cont, HI_rayleigh_part2)!,lim=lam0)
     if (associated(helium)) then
     	call init_HeI_rayleigh_part2(Nlambda_cont, lambda_cont, HeI_rayleigh_part2)
     endif

@@ -25,7 +25,7 @@ module background_opacity
 
   implicit none
 	
-	real, parameter :: lambda_limit_HI_rayleigh = 102.6 !nm
+	real, parameter :: lambda_limit_HI_rayleigh = 91.1763062831680!102.6 !nm
 	real, parameter :: lambda_limit_HeI_rayleigh = 140.0 !nm
 !   real(kind=dp), parameter :: LONG_RAYLEIGH_WAVE=1.d6 !nm
   !!integer, parameter :: NJOHN=6, NFF=17, NTHETA=16
@@ -63,7 +63,7 @@ contains
 	return  
   end function HI_rayleigh_part1
   
-  subroutine init_HI_rayleigh_part2(N, Lambda,HI_rayleigh_part2)
+  subroutine init_HI_rayleigh_part2(N, Lambda,HI_rayleigh_part2, lim)
     ! ------------------------------------------------------------- !
     ! H I Rayleigh scattering cross-section.
     ! wavelength dependent term
@@ -71,8 +71,18 @@ contains
     integer, intent(in) :: N
     real(kind=dp), intent(in) :: Lambda(N)
     real(kind=dp), intent(out) :: HI_rayleigh_part2(N)
+    real(kind=dp), intent(in), optional :: lim
+    real :: lambda_limit_lya
+    
+    !using the reddest wavelength covered by Lyman alpha ? 
+    if (present(lim)) then
+    	lambda_limit_lya = lim
+    	write(*,*) " Limit for H Rayleigh scattering sets to ", lim
+    else
+    	lambda_limit_lya = lambda_limit_HI_rayleigh
+    endif
 
-    where(lambda > lambda_limit_HI_rayleigh)
+    where(lambda > lambda_limit_lya)
         HI_rayleigh_part2 = (1d0 + (156.6d0/lambda)**2.d0 + &
             (148.d0/lambda)**4d0)*(96.6d0/lambda)**4d0
     elsewhere
@@ -146,6 +156,8 @@ contains
     integer, intent(in) :: N
     real(kind=dp), intent(in) :: Lambda(N)
     real(kind=dp), intent(out) :: HeI_rayleigh_part2(N)
+    
+    write(*,*) "*** Check limit for rayleigh scattering Helium  and ground state(s) (sigHe1, sigHe2) ***"
 
     where(lambda > lambda_limit_HeI_rayleigh)
        HeI_rayleigh_part2 = 4d0 * (1d0 + (66.9d0/lambda)**2.d0 + &

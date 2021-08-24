@@ -232,12 +232,15 @@ contains
     else
        write(*,*) " -> Reducing memory usage by interpolating continuous opacity!"
     endif
+    
+    !Jnu(:,id) is not allocated anymore at the moment.
 
     !otherwise allocated bellow for nlte.
     if ((lelectron_scattering).and.(.not.alloc_atom_nlte)) then
        call alloc_jnu
-       mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(Jnu)
-       write(*,*) " -> size Jnu(lambda):", sizeof(Jnu)/1024./1024.," MB"
+       mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont)! + sizeof(Jnu)
+!        write(*,*) " -> size Jnu(lambda):", sizeof(Jnu)/1024./1024.," MB"
+!        write(*,*) " ::", sizeof(Jnu)/1024./1024./real(nb_proc)," MB per proc!"
        write(*,*) " -> size Jnu_cont:", sizeof(Jnu_cont)/1024./1024./1024.," GB"
     endif
 
@@ -253,8 +256,10 @@ contains
 
        if (lelectron_scattering) then
           call alloc_jnu
-          mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont) + sizeof(Jnu)
-          write(*,*) " -> size Jnu(lambda):", sizeof(Jnu)/1024./1024.," MB"
+          mem_alloc_local = mem_alloc_local +  sizeof(Jnu_cont)! + sizeof(Jnu)
+          !one per proc!
+!           write(*,*) " -> size Jnu(lambda):", sizeof(Jnu)/1024./1024.," MB"
+!           write(*,*) " ::", sizeof(Jnu)/1024./1024./real(nb_proc)," MB per proc!"
           write(*,*) " -> size Jnu_cont:", sizeof(Jnu_cont)/1024./1024./1024.," GB"
        endif
 
@@ -617,8 +622,13 @@ contains
 
 
 	!Flat and locally interpolated !
-    allocate(Jnu(Nlambda,1))
-    Jnu = 0.0
+	!In case Nlambda x nb_proc is still large it is possible
+
+!-> variable etas and etasc defined locally in subroutines!
+! on the heap. Should be okey, because easier when rayleigh scattering is present
+! otherwise need to store rayleigh_part2 on Nlambda and Nlambda_cont!
+!     allocate(Jnu(Nlambda,nb_proc))
+!     Jnu = 0.0
 
 	!At the moment stored on the whole grid !
     allocate(Jnu_cont(Nlambda_cont,n_cells))

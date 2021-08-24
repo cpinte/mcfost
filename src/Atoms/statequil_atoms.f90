@@ -292,7 +292,7 @@ CONTAINS
   END SUBROUTINE init_bb_rates_atom
 
   !building inclued n_new, new wave integ
-  subroutine calc_rates(id, icell, iray, n_rayons)
+  subroutine calc_rates_draft(id, icell, iray, n_rayons)
     integer, intent(in) :: id, icell, iray, n_rayons
     integer :: iray_p
     real(kind=dp) :: chicont, etacont
@@ -311,7 +311,9 @@ CONTAINS
 
 
     if (lelectron_scattering) then
-       eta_tot(:) = eta_tot(:) + thomson(icell) * Jnu(:,icell) !eta_es(:,icell)
+    	write(*,*) "calc_rates_draft, elec scatt not available!"
+    	stop
+!        eta_tot(:) = eta_tot(:) + thomson(icell) * Jnu(:,id) !eta_es(:,icell)
     endif
 
 
@@ -485,7 +487,7 @@ CONTAINS
 
 
     return
-  end subroutine calc_rates
+  end subroutine calc_rates_draft
 
   !occupa prob
   !Define a negative Tex for inversion of Temperature ? because the ratio of ni/nj exists
@@ -3147,7 +3149,7 @@ CONTAINS
   end subroutine store_rate_matrices
 
 
-  subroutine calc_bb_rates(id, icell, iray, n_rayons)
+  subroutine calc_bb_rates_hoger(id, icell, iray, n_rayons)
 
     integer, intent(in) :: id, icell, iray, n_rayons
     real(kind=dp) :: chicont, etacont
@@ -3163,7 +3165,9 @@ CONTAINS
     chi_tot(:) = chi0_bb(:,icell)!0.0
     eta_tot(:) = eta0_bb(:,icell)!0.0
     if (lelectron_scattering) then
-       eta_tot(:) = Jnu(:,icell) * thomson(icell) !eta_es(:,icell)
+    	write(*,*) "elec scatt not included in calc_bb_rates_hoger!"
+    	stop
+!        eta_tot(:) = Jnu(:,id) * thomson(icell)
     endif
 
     atom_loop : do nact = 1, Natom!Nactiveatoms
@@ -3312,7 +3316,7 @@ CONTAINS
     end do aatom_loop
 
     return
-  end subroutine calc_bb_rates
+  end subroutine calc_bb_rates_hoger
 
   SUBROUTINE calc_bf_rates(id, icell, Jr)
     integer, intent(in) :: id, icell
