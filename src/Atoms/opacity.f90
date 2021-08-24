@@ -649,8 +649,11 @@ contains
   subroutine compute_background_continua()
     !$ use omp_lib
     integer :: icell, id, icell0
+    integer :: ibar,n_cells_done
     real(kind=dp) :: lam0
     icell0 = 1
+    ibar = 0
+    n_cells_done = 0
     
     write(*,*) " -> Computing background continua..."
     !init wavelength dependent Rayleigh cross-sections.
@@ -663,12 +666,13 @@ contains
     if (associated(helium)) then
     	call init_HeI_rayleigh_part2(Nlambda_cont, lambda_cont, HeI_rayleigh_part2)
     endif
-    
+
+    call progress_bar(0)    
     !$omp parallel &
     !$omp default(none) &
     !$omp private(icell,id,icell0) &
     !$omp shared(llimit_mem,Nlambda_cont, lambda_cont, chi_c, eta_c, Nlambda, lambda) &
-    !$omp shared(n_cells, icompute_atomRT, NactiveAtoms, chi0_bb, eta0_bb)
+    !$omp shared(n_cells, icompute_atomRT, NactiveAtoms, chi0_bb, eta0_bb, n_cells_done, ibar)
     !$omp do schedule(dynamic,1)
     do icell=1, n_cells
        !$ id = omp_get_thread_num() + 1
@@ -687,11 +691,19 @@ contains
           endif
 
        endif
+		! Progress bar
+		!$omp atomic
+		n_cells_done = n_cells_done + 1
+		if (real(n_cells_done) > 0.02*ibar*n_cells) then
+			call progress_bar(ibar)
+			!$omp atomic
+			ibar = ibar+1
+		endif
     end do
     !$omp end do
     !$omp end parallel
-    
-    write(*,*) " -> done!"
+    call progress_bar(50)
+    write(*,*) ""!" -> done!"
 
     return
   end subroutine compute_background_continua

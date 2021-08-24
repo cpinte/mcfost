@@ -2869,6 +2869,8 @@ contains
        lnotfixed_rays = .not.lfixed_rays
        lconverged = .false.
        n_iter = 0
+       
+       write(*,*) ""
 
        do while (.not.lconverged)
 
@@ -3053,8 +3055,8 @@ contains
                size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
                100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
-
-
+          write(*,*) ""
+          
           if (real(diff) < precision) then
              if (lprevious_converged) then
                 lconverged = .true.

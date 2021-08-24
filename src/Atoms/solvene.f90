@@ -577,7 +577,6 @@ CONTAINS
     !$omp end do
     !$omp end parallel
     call progress_bar(50)
-    write(*,*) " "
 
     if (verbose) then
        write(*,*) " ------------------------------------------------ "
