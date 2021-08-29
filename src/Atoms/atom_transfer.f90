@@ -2777,7 +2777,7 @@ contains
 !              write(*,*) "sigma=", thomson(icell)
 !           endif
 
-          Sth(:,icell) = eta_c(:,icell) / (chi_c(:,icell)*(1.-beta(:,icell)))!( tiny_dp + kappa_tot(:,icell) * (1.-beta(:,icell)))
+          Sth(:,icell) = eta_c(:,icell) / (1d-100 + chi_c(:,icell)*(1.-beta(:,icell)))!( tiny_dp + kappa_tot(:,icell) * (1.-beta(:,icell)))
 
 !           if (any_nan_infinity_vector(Sth(:,icell)) > 0) then
 !              write(*,*) " Error inconsistant values found in Sth after interpolation.."
@@ -3018,13 +3018,14 @@ contains
 ! 		    		write(*,"(4ES20.7E3)") Sold(la,icell), beta(la,icell), Sth(la,icell), Snew(la,icell)
 ! 		    		write(*,"(3ES20.7E3)") chi_c(la,icell), eta_c(la,icell), thomson(icell)
 		    		if (Jnu_cont(la,icell) > 0.0) then
-					 	dj_loc = abs( 1.-Jold(la,icell)/Jnu_cont(la,icell) )
+					 	dj_loc = abs( 1.0_dp -Jold(la,icell)/Jnu_cont(la,icell) )
 					 	if (dj_loc > dJ) then
 					 		dJ = dj_loc
 					 		imax = la
 					 	endif
-					endif
-                    dN = max( dN, abs( 1.0_dp - Sold(la,icell)/(Snew(la,icell)+1d-50) ) )
+! 					endif
+                    	dN = max( dN, abs( 1.0_dp - Sold(la,icell)/(Snew(la,icell)) ) )!+1d-50) ) )
+                    endif
          	 	    Sold(la,icell) = Snew(la,icell)
           		    Jold(la,icell) = Jnu_cont(la,icell)
                 enddo
