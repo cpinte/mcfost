@@ -2707,6 +2707,8 @@ contains
     integer :: imu, iphi, time_iteration, time_nonlte
     integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
     real(kind=dp) :: lambda_max, weight
+    real(kind=dp), parameter :: beta_max = 0.999 !Allow convergence in region where beta=1
+    											 !Should be deprecated in the future with MC method
     
     logical :: lcalc_anisotropy = .false.
 
@@ -2750,6 +2752,7 @@ contains
     if (n_etoiles > 0) Istar(:) = Istar_cont(:,1)
     Jold = Jnu_cont
 
+	!could be parallel
     do icell=1, n_cells
        if (icompute_atomRT(icell) > 0) then
 
@@ -2764,11 +2767,18 @@ contains
 !           endif
 
 
-!           beta(:,icell) = thomson(icell) / chi_c(:,icell)
-          beta(:,icell) = ( thomson(icell) + HI_rayleigh_part1(icell)*HI_rayleigh_part2(:) ) / chi_c(:,icell)
-          if (associated(helium)) then
-          	beta(:,icell) = beta(:,icell) + HeI_rayleigh_part1(icell)*HeI_rayleigh_part2(:) / chi_c(:,icell)
-          endif
+!           !beta(:,icell) = thomson(icell) / chi_c(:,icell)
+!           beta(:,icell) = ( thomson(icell) + HI_rayleigh_part1(icell)*HI_rayleigh_part2(:) ) / chi_c(:,icell)
+!           if (associated(helium)) then
+!           	beta(:,icell) = beta(:,icell) + HeI_rayleigh_part1(icell)*HeI_rayleigh_part2(:) / chi_c(:,icell)
+!           endif
+          do la=1,Nlambda_cont
+          	beta(la,icell) = ( thomson(icell) + HI_rayleigh_part1(icell)*HI_rayleigh_part2(la) ) / chi_c(la,icell)
+          	if (associated(helium)) then
+          		beta(la,icell) = beta(la,icell) + HeI_rayleigh_part1(icell)*HeI_rayleigh_part2(la) / chi_c(la,icell)
+          	endif
+          	beta(la,icell) = min(beta(la,icell), beta_max)
+          enddo
 
 
 !           if (any_nan_infinity_vector(beta(:,icell)) > 0) then
@@ -2777,7 +2787,7 @@ contains
 !              write(*,*) "sigma=", thomson(icell)
 !           endif
 
-          Sth(:,icell) = eta_c(:,icell) / (1d-100 + chi_c(:,icell)*(1.-beta(:,icell)))!( tiny_dp + kappa_tot(:,icell) * (1.-beta(:,icell)))
+          Sth(:,icell) = eta_c(:,icell) / (chi_c(:,icell)*(1.-beta(:,icell)))!( tiny_dp + kappa_tot(:,icell) * (1.-beta(:,icell)))
 
 !           if (any_nan_infinity_vector(Sth(:,icell)) > 0) then
 !              write(*,*) " Error inconsistant values found in Sth after interpolation.."
@@ -2801,6 +2811,8 @@ contains
 		maxval(maxval(chi_c(:,:),dim=2)), minval(minval(chi_c,dim=2,mask=chi_c>0))
     write(*,'("eta (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
 		maxval(maxval(eta_c(:,:),dim=2)), minval(minval(eta_c,dim=2,mask=chi_c>0))
+		
+	!if  minval(beta) == beta_max (or 1)  make Jold == something  ?
 
     if (.not.allocated(lcell_converged)) allocate(lcell_converged(n_cells))
 
@@ -3024,6 +3036,8 @@ contains
 					 		imax = la
 					 	endif
 ! 					endif
+						write(*,*) icell, la, "Sold=", Sold(la, icell), " Snew=", Snew(la,icell)
+						write(*,*) "Jold=", Jold(la, icell), " Jnew=", Jnu_cont(la,icell)
                     	dN = max( dN, abs( 1.0_dp - Sold(la,icell)/(Snew(la,icell)) ) )!+1d-50) ) )
                     endif
          	 	    Sold(la,icell) = Snew(la,icell)
