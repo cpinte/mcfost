@@ -29,7 +29,7 @@ module atom_transfer
 
   use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
   use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
-  use constant, only			: MICRON_TO_NM, hc_k, sigma_e
+  use constant, only			: hc_k, fourpi, NM_TO_M
   use solvene, only			: solve_electron_density_old, solve_electron_density
   use getlambda, only			: hv
   use voigtfunctions, only	: Voigt, VoigtHumlicek, dirac_line
@@ -2688,6 +2688,9 @@ contains
     ! Compute the mean radiation field at all cells
     ! evaluated on the continuum grid and then interpolated on the
     ! total wavelength grid (and flat across lines).
+    !
+    ! Future deprecation : Use Monte Carlo methode for the pure
+    !   continuum scattering problem.
     ! -------------------------------------------------------- !
 #include "sprng_f.h"
     real :: precision
@@ -2698,17 +2701,14 @@ contains
     real :: rand, rand2, rand3
     real(kind=dp) :: dSource, dN, dj_loc
     real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, norme, dJ, diffs
-    real(kind=dp), allocatable :: Jold(:,:), Jnew(:,:), tau_tot(:,:), Jnew_l(:,:), Jold_l(:,:)
-    real(kind=dp), allocatable :: Snew(:,:), Kappa_tot(:,:), beta(:,:), Istar(:), Ic(:,:,:), J20_cont(:,:)
-    real(kind=dp), allocatable :: lambda_star(:,:), Sth(:,:), Sold(:,:), Sline(:,:), delta_J(:)
+    real(kind=dp), allocatable :: Jold(:,:), beta(:,:), Istar(:), Ic(:,:,:), J20_cont(:,:)
+    real(kind=dp), allocatable :: lambda_star(:,:), Sth(:,:), Sold(:,:), delta_J(:), Snew(:,:) 
 
     logical :: labs
     integer :: la, icell, imax, icell_max, ibar, n_cells_done
     integer :: imu, iphi, time_iteration, time_nonlte
     integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
     real(kind=dp) :: lambda_max, weight
-    real(kind=dp), parameter :: beta_max = 0.999 !Allow convergence in region where beta=1
-    											 !Should be deprecated in the future with MC method
     
     logical :: lcalc_anisotropy = .false.
 
@@ -2737,74 +2737,46 @@ contains
     allocate(Istar(Nlambda_cont), delta_J(Nlambda_cont), lambda_star(Nlambda_cont, nb_proc))
     Istar = 0.0_dp; delta_J = 0.0; lambda_star = 0.0_dp
 
-    allocate(Jold(Nlambda_cont, n_cells))!, Jnew(Nlambda_cont, n_cells))
-    Jold = 0d0!; Jnew(:,:) = 0.0_dp
+    allocate(Jold(Nlambda_cont, n_cells)); Jold = 0.0_dp
     allocate(Sth(Nlambda_cont, n_cells), Snew(Nlambda_cont, n_cells), Sold(Nlambda_cont, n_cells))
-    Sth = 0.; Sold = 0.0; Snew = 0.0
-    !allocate(Kappa_tot(Nlambda_cont, n_cells)); Kappa_tot = 0.
-    allocate(beta(Nlambda_cont, n_cells)); beta = 0.
+    Sth = 0.0_dp; Sold = 0.0_dp; Snew = 0.0_dp
+    allocate(beta(Nlambda_cont, n_cells)); beta = 0.0_dp
 
 	if (lcalc_anisotropy) then
-		allocate(J20_cont(Nlambda_cont, n_cells))
+		allocate(J20_cont(Nlambda_cont, n_cells)); J20_cont = 0.0_dp
 	endif
 
 
-    if (n_etoiles > 0) Istar(:) = Istar_cont(:,1)
+    if (n_etoiles > 0) then
+    	Istar(:) = Istar_cont(:,1)
+    	if (n_etoiles > 1) call warning("Multiple stars not handled in iterate_jnu() !!")
+    endif
     Jold = Jnu_cont
 
 	!could be parallel
     do icell=1, n_cells
        if (icompute_atomRT(icell) > 0) then
 
-
-!           kappa_tot(:,icell) = chi_c(:,icell)
-! 
-! 
-!           if (any_nan_infinity_vector(kappa_tot(:,icell)) > 0) then
-!              write(*,*) " Error inconsistant values found in kappa_tot after interpolation.."
-!              write(*,*) "icell=", icell, "kappa=",kappa_tot(:,icell)
-!              write(*,*) "Kc=", chi_c(:,icell)
-!           endif
-
-
-!           !beta(:,icell) = thomson(icell) / chi_c(:,icell)
-!           beta(:,icell) = ( thomson(icell) + HI_rayleigh_part1(icell)*HI_rayleigh_part2(:) ) / chi_c(:,icell)
-!           if (associated(helium)) then
-!           	beta(:,icell) = beta(:,icell) + HeI_rayleigh_part1(icell)*HeI_rayleigh_part2(:) / chi_c(:,icell)
-!           endif
+		  !to handle case of beta=1 better.
           do la=1,Nlambda_cont
+          
           	beta(la,icell) = ( thomson(icell) + HI_rayleigh_part1(icell)*HI_rayleigh_part2(la) ) / chi_c(la,icell)
           	if (associated(helium)) then
           		beta(la,icell) = beta(la,icell) + HeI_rayleigh_part1(icell)*HeI_rayleigh_part2(la) / chi_c(la,icell)
           	endif
-          	beta(la,icell) = min(beta(la,icell), beta_max)
-          enddo
 
+			if (beta(la,icell) < 1.0_dp) then
+          		Sth(la,icell) = eta_c(la,icell) / (chi_c(la,icell)*(1.0_dp-beta(la,icell)))
+          	else!beta=1, set Jold to something otherwise ALI does not converge. Use MC methode! 
+          		Jold(la,icell) = sigma * T(icell)**4 / fourpi * sum(lambda_cont)/real(Nlambda_cont) * NM_TO_M / c_light
+          	endif
 
-!           if (any_nan_infinity_vector(beta(:,icell)) > 0) then
-!              write(*,*) " Error inconsistant values found in beta after interpolation.."
-!              write(*,*) "icell=", icell, "beta=",beta(:,icell)
-!              write(*,*) "sigma=", thomson(icell)
-!           endif
+          	Sold(la,icell) = (1.0_dp-beta(la,icell))*Sth(la,icell) + beta(la,icell) * Jold(la,icell)
 
-          Sth(:,icell) = eta_c(:,icell) / (chi_c(:,icell)*(1.-beta(:,icell)))!( tiny_dp + kappa_tot(:,icell) * (1.-beta(:,icell)))
-
-!           if (any_nan_infinity_vector(Sth(:,icell)) > 0) then
-!              write(*,*) " Error inconsistant values found in Sth after interpolation.."
-!              write(*,*) "icell=", icell, "Sth=",Sth(:,icell)
-!              write(*,*) "kappa_abs=", ( kappa_tot(:,icell) * (1.-beta(:,icell)))
-!           endif
-
-          Sold(:,icell) = (1.-beta(:,icell))*Sth(:,icell) + beta(:,icell) * Jold(:,icell)
-
-!           if (any_nan_infinity_vector(Sold(:,icell)) > 0) then
-!              write(*,*) " Error inconsistant values found in Sold after interpolation.."
-!              write(*,*) "icell=", icell, "Sold=",Sold(:,icell)
-!              write(*,*) "Jold=", Jold(:,icell)
-!           endif
-
-       endif
-    enddo
+          enddo !lambda
+		
+       endif !icompute_atomRT
+    enddo !cells
     write(*,'("beta (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
 		maxval(maxval(beta(:,:),dim=2)), minval(minval(beta,dim=2,mask=chi_c>0))
     write(*,'("Kappa_tot (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
@@ -2812,8 +2784,6 @@ contains
     write(*,'("eta (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
 		maxval(maxval(eta_c(:,:),dim=2)), minval(minval(eta_c,dim=2,mask=chi_c>0))
 		
-	!if  minval(beta) == beta_max (or 1)  make Jold == something  ?
-
     if (.not.allocated(lcell_converged)) allocate(lcell_converged(n_cells))
 
     labs = .true.
@@ -3011,7 +2981,9 @@ contains
           !$omp end parallel
           call progress_bar(50)
 
-          !convergence!		
+          !convergence!	
+		  icell_max	= 1
+		  imax = 1
           diff = 0d0
           dSource = 0.0_dp
           !$omp parallel &
@@ -3036,8 +3008,6 @@ contains
 					 		imax = la
 					 	endif
 ! 					endif
-						write(*,*) icell, la, "Sold=", Sold(la, icell), " Snew=", Snew(la,icell)
-						write(*,*) "Jold=", Jold(la, icell), " Jnew=", Jnu_cont(la,icell)
                     	dN = max( dN, abs( 1.0_dp - Sold(la,icell)/(Snew(la,icell)) ) )!+1d-50) ) )
                     endif
          	 	    Sold(la,icell) = Snew(la,icell)
@@ -3054,7 +3024,16 @@ contains
           end do cell_loop2 !icell
           !$omp end do
           !$omp end parallel
-
+if (is_nan_infinity(dSource)>0) then
+write(*,*) "dSource is nan!"
+write(*,*) maxval(Sold), minval(Sold)
+write(*,*) maxval(Snew),minval(Snew)
+endif
+if (is_nan_infinity(diff)>0) then
+write(*,*) "dJ is nan!"
+write(*,*) maxval(Jold), minval(Jold)
+write(*,*) maxval(Jnu_cont),minval(Jnu_cont)
+endif
 
           write(*,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') &
                dSource, T(icell_max), ne(icell_max)
