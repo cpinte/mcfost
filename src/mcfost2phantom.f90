@@ -63,14 +63,6 @@ contains
        endif
     endif
 
-    lturn_off_dust_subl = .true.
-    if (present(turn_on_dust_subl)) then
-       if (turn_on_dust_subl) then
-          lturn_off_dust_subl = .false.
-          write(*,*) "WARNING: turning off dust sublimation"
-       endif
-    endif
-
     ! Model limits
     if (use_SPH_limits_file) then
        call read_SPH_limits_file(SPH_limits_file, SPH_limits)
@@ -157,11 +149,10 @@ contains
 
   !*************************************************************************
 
-  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype,npoftype,&!maxirad,
-       xyzh,vxyzu,&!radiation,ivorcl,
-    iphase,grainsize,graindens,dustfrac,massoftype,&
-    xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-    Tphantom,n_packets,mu_gas,ierr,write_T_files,ISM,T_gas)
+  subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype, &
+       npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
+       xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
+       Tphantom, n_packets,mu_gas,ierr,write_T_files,ISM,T_gas)
 
     use parametres
     use constantes, only : mu

@@ -170,7 +170,7 @@ contains
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp) :: mass, somme, Mtot, Mtot_dust
-    real :: f, limit_threshold, density_factor, destruction_factor
+    real :: f, limit_threshold, density_factor
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n
 
     real(dp), dimension(6) :: limits
@@ -409,16 +409,13 @@ contains
        ! until phantom provides a proper grain size distribution
        call normalize_dust_density( sum(masse_gaz) * g_to_Msun / disk_zone(1)%gas_to_dust)
     else ! ndusttypes = 0 : using the gas density
-
        lvariable_dust = .false.
        write(*,*) "Using gas-to-dust ratio in mcfost parameter file"
 
-       destruction_factor = 1.
        do icell=1,n_cells
-          if (T_gas(icell) >= 1500. .and. .not. lturn_off_dust_subl) destruction_factor = 0.0001
           masse(icell) = 0.
           do k=1,n_grains_tot
-             densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k) * destruction_factor
+             densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k)
              masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
           enddo
        enddo
