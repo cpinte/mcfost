@@ -1548,7 +1548,6 @@ contains
        if (alloc_status > 0) then
           call error("Cannot allocate Ng table !")
        endif
-       write(*,*) " Size ngpop:", sizeof(ngpop)/1024./1024., " MB"
        mem_alloc_local = mem_alloc_local + sizeof(ngpop)
     endif
 
@@ -1605,6 +1604,8 @@ contains
     if (alloc_Status > 0) call error("Allocation error chi_down")
     allocate(chi_up(Nlambda,Nmaxlevel,NactiveAtoms,nb_proc),stat=alloc_status)
     if (alloc_Status > 0) call error("Allocation error chi_up")
+    
+    if (lNg_acceleration) write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024., " MB"
 
     mem_alloc_local = mem_alloc_local + sizeof(n_new) + sizeof(psi) + sizeof(eta_atoms) + &
          sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ne_new)
@@ -1907,8 +1908,10 @@ contains
           !Ng acceleration
           !should be para
           accelerated = .false.
-          if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(maxval(dM) < 1d-2))).and. &
-               (maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
+!           if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(maxval(dM) < 1d-2))).and. &
+!                (maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
+          if ( (lNg_acceleration .and. (n_iter > iNg_Ndelay)).and.(maxval_cswitch_atoms()==1.0_dp)&
+          	.and.(.not.lprevious_converged) ) then
              iorder = n_iter - iNg_Ndelay
              if (ng_rest) then
                 write(*,'(" -> Acceleration relaxes... "(1I2)" /"(1I2))') iorder-i0_rest, iNg_Nperiod
@@ -2609,7 +2612,6 @@ contains
     nbr_cell = 0
     icell_prev = icell_in
 
-    !tau(:) = 0.0_dp !go from surface down to the star
     tau_c(:) = 0.0_dp
 
     Ic(:,id) = 0.0
@@ -2659,7 +2661,7 @@ contains
 
        !count opacity only if the cell is filled, else go to next cell
        if (lcellule_non_vide) then
-          lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet
+       
           ! opacities in m^-1
           l_contrib = l_contrib * AU_to_m !l_contrib in m
 
@@ -2667,9 +2669,7 @@ contains
              ds(iray,id) = l * AU_to_m
           endif
 
-          !tau = tau + dtau
-!           Ic(:,id) = Ic(:,id) + exp(-tau_c) * (1.0_dp - exp(-l_contrib * kappa_tot(:,icell))) * Snu(:,icell)
-!           tau_c = tau_c + l_contrib * kappa_tot(:,icell)
+
           do la=1, Nlambda_cont
           	Ic(la,id) = Ic(la,id) + (exp(-tau_c(la)) - exp(-l_contrib * kappa_tot(la,icell)-tau_c(la))) * Snu(la,icell)
           	tau_c(la) = tau_c(la) + l_contrib * kappa_tot(la,icell)
@@ -2694,6 +2694,7 @@ contains
     ! -------------------------------------------------------- !
 #include "sprng_f.h"
     real :: precision
+    integer, parameter :: n_iter_max = 300
     integer :: etape, etape_start, etape_end, iray, n_rayons, n_rayons_old
     integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
     logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lprevious_converged
@@ -2710,6 +2711,7 @@ contains
     integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
     real(kind=dp) :: lambda_max, weight
     
+    integer :: n_beta_max
     logical :: lcalc_anisotropy = .false.
 
     call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
@@ -2754,6 +2756,7 @@ contains
     Jold = Jnu_cont
 
 	!could be parallel
+	n_beta_max = 0
     do icell=1, n_cells
        if (icompute_atomRT(icell) > 0) then
 
@@ -2765,10 +2768,12 @@ contains
           		beta(la,icell) = beta(la,icell) + HeI_rayleigh_part1(icell)*HeI_rayleigh_part2(la) / chi_c(la,icell)
           	endif
 
-			if (beta(la,icell) < 1.0_dp) then
+			if ( beta(la,icell) < 1.0_dp ) then
           		Sth(la,icell) = eta_c(la,icell) / (chi_c(la,icell)*(1.0_dp-beta(la,icell)))
           	else!beta=1, set Jold to something otherwise ALI does not converge. Use MC methode! 
-          		Jold(la,icell) = sigma * T(icell)**4 / fourpi * sum(lambda_cont)/real(Nlambda_cont) * NM_TO_M / c_light
+				n_beta_max = n_beta_max + 1
+! 				Sth(la,icell) = Bpnu(T(icell), 2.897771955d6 / T(icell))
+! 				beta(la,icell) = 0.9999
           	endif
 
           	Sold(la,icell) = (1.0_dp-beta(la,icell))*Sth(la,icell) + beta(la,icell) * Jold(la,icell)
@@ -2783,6 +2788,11 @@ contains
 		maxval(maxval(chi_c(:,:),dim=2)), minval(minval(chi_c,dim=2,mask=chi_c>0))
     write(*,'("eta (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
 		maxval(maxval(eta_c(:,:),dim=2)), minval(minval(eta_c,dim=2,mask=chi_c>0))
+			
+	if (n_beta_max > 0) then
+		write(*,'("WARNING: ~"(1I6)" cells with beta=1 not iterated!")') n_beta_max / Nlambda_cont
+		write(*,*) ""
+	endif
 		
     if (.not.allocated(lcell_converged)) allocate(lcell_converged(n_cells))
 
@@ -2812,7 +2822,9 @@ contains
 
           write(*,*) " Using step 1 with ", size(xmu), " rays"
           write(*,'("Jold (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
-			maxval(maxval(Jold(:,:),dim=2)), minval(minval(Jold,dim=2,mask=Jold>0))
+			maxval(maxval(Jold(:,:),dim=2)), minval(minval(Jold,dim=2,mask=chi_c>0))
+          write(*,'("Sold (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
+			maxval(maxval(Sold(:,:),dim=2)), minval(minval(Sold,dim=2,mask=chi_c>0))
 
           lprevious_converged = .false.
           lcell_converged(:) = .false.
@@ -2826,7 +2838,9 @@ contains
 
           write(*,*) " Using step 2 with ", Nrays_atom_transfer, " rays"
           write(*,'("Jold (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
-			maxval(maxval(Jold(:,:),dim=2)), minval(minval(Jold,dim=2,mask=Jold>0))
+			maxval(maxval(Jold(:,:),dim=2)), minval(minval(Jold,dim=2,mask=chi_c>0))
+          write(*,'("Sold (max)="(1ES20.7E3)," (min)="(1ES20.7E3))'), &
+			maxval(maxval(Sold(:,:),dim=2)), minval(minval(Sold,dim=2,mask=chi_c>0))
 
           lfixed_rays = .true.
           n_rayons = Nrays_atom_transfer
@@ -2959,7 +2973,7 @@ contains
 
                 !ALI
                 delta_J(:) = Jnu_cont(:,icell) - Lambda_star(:,id) * Sold(:,icell)
-                Snew(:,icell) = (beta(:,icell)*delta_J(:) + (1.0-beta(:,icell))*Sth(:,icell))/(1.0-beta(:,icell)*Lambda_star(:,id))
+                Snew(:,icell) = (beta(:,icell)*delta_J(:) + (1.0_dp-beta(:,icell))*Sth(:,icell))/(1.0_dp-beta(:,icell)*Lambda_star(:,id))
                 !LI
                 !Snew(:,icell) = Sth(:,icell) * (1.0_dp - beta(:,icell)) + Jnu_cont(:,icell) * beta(:,icell)
 
@@ -2995,26 +3009,27 @@ contains
           cell_loop2 : do icell=1, n_cells
              !$ id = omp_get_thread_num() + 1
              if (icompute_atomRT(icell)>0) then
-                dJ = 0.0_dp
-                dN = 0.0_dp
+                dJ = 0.0_dp!over lambda
+                dN = 0.0_dp!over lambda
                 do la=1, Nlambda_cont
-!                 	write(*,"(1I6,2F12.5, 3ES20.7E3)") icell, lambda_cont(la), T(icell), ne(icell), Jnu_cont(la,icell), Jold(la,icell)
-! 		    		write(*,"(4ES20.7E3)") Sold(la,icell), beta(la,icell), Sth(la,icell), Snew(la,icell)
-! 		    		write(*,"(3ES20.7E3)") chi_c(la,icell), eta_c(la,icell), thomson(icell)
-		    		if (Jnu_cont(la,icell) > 0.0) then
-					 	dj_loc = abs( 1.0_dp -Jold(la,icell)/Jnu_cont(la,icell) )
+! 		    		if (Jnu_cont(la,icell) > 0.0) then
+! 					 	dj_loc = abs( 1.0_dp -Jold(la,icell)/max(Jnu_cont(la,icell),tiny_dp) )
+					 	dj_loc = abs( Jnu_cont(la,icell) - Jold(la,icell) )/ max(Jnu_cont(la,icell),tiny_dp)
+! 					 	dj_loc = abs( Jnu_cont(la,icell) - Jold(la,icell) )/ max(Jold(la,icell),tiny_dp)
 					 	if (dj_loc > dJ) then
 					 		dJ = dj_loc
 					 		imax = la
 					 	endif
 ! 					endif
-                    	dN = max( dN, abs( 1.0_dp - Sold(la,icell)/(Snew(la,icell)) ) )!+1d-50) ) )
-                    endif
+!                     	dN = max( dN, abs( 1.0_dp - Sold(la,icell)/(max(Snew(la,icell),tiny_dp)) ) )
+                    	dN = max( dN, abs( Snew(la,icell) - Sold(la,icell) )/ max(Snew(la,icell),tiny_dp) )
+!                     endif
          	 	    Sold(la,icell) = Snew(la,icell)
           		    Jold(la,icell) = Jnu_cont(la,icell)
                 enddo
+                !over cells
                 dSource = max(dSource, dN)
-
+				!over cells
                 if (dJ > diff) then
                    diff = dJ
                    icell_max = icell
@@ -3024,16 +3039,17 @@ contains
           end do cell_loop2 !icell
           !$omp end do
           !$omp end parallel
-if (is_nan_infinity(dSource)>0) then
-write(*,*) "dSource is nan!"
-write(*,*) maxval(Sold), minval(Sold)
-write(*,*) maxval(Snew),minval(Snew)
-endif
-if (is_nan_infinity(diff)>0) then
-write(*,*) "dJ is nan!"
-write(*,*) maxval(Jold), minval(Jold)
-write(*,*) maxval(Jnu_cont),minval(Jnu_cont)
-endif
+          
+! if (is_nan_infinity(dSource)>0) then
+! 	write(*,*) "dSource is nan!"
+! 	write(*,*) maxval(Sold), minval(Sold)
+! 	write(*,*) maxval(Snew),minval(Snew)
+! endif
+! if (is_nan_infinity(diff)>0) then
+! 	write(*,*) "dJ is nan!"
+! 	write(*,*) maxval(Jold), minval(Jold)
+! 	write(*,*) maxval(Jnu_cont),minval(Jnu_cont)
+! endif
 
           write(*,'(" >>> dS = "(1ES14.5E3)," T(icell_max)="(1F14.5)" K", " ne(icell_max)="(1ES14.5E2))') &
                dSource, T(icell_max), ne(icell_max)
@@ -3051,7 +3067,7 @@ endif
                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
           write(*,*) ""
           
-          if (real(diff) < precision) then
+          if (diff < precision) then
              if (lprevious_converged) then
                 lconverged = .true.
              else
@@ -3060,7 +3076,7 @@ endif
           else
              lprevious_converged = .false.
              if (lfixed_rays) then
-                if (n_iter > 1000) then
+                if (n_iter > n_iter_max) then
                    write(*,*) "Warning Iterate_Jnu : not enough iterations to converge !!"
                    lconverged = .true.
                 endif
@@ -3141,7 +3157,7 @@ endif
 
 	if (lcalc_anisotropy) then
 	
-		call write_dbmatrix_bin("J20c.fits.gz",J20_cont)
+		call write_dbmatrix_bin("j20c_bin",J20_cont)
 		deallocate(J20_cont)
 		
     endif
