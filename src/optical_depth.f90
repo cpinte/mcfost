@@ -76,7 +76,10 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
         return
      endif
      if (lintersect_stars) then
-        if (icell0 == icell_star) return
+        if (icell0 == icell_star) then
+           flag_sortie = .true.
+           return
+        endif
      endif
 
      ! Pour cas avec approximation de diffusion

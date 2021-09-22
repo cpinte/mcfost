@@ -974,7 +974,12 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !   if (.not.flag_star) Stokes=0.
      !endif
      call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
-     if ((icell>n_cells).and.(.not.flag_sortie)) write(*,*) "PB cell", icell
+!     if ((icell>n_cells).and.(.not.flag_sortie)) then
+!        write(*,*) "*********************"
+!        write(*,*) "PB cell", icell, id, x,y,z,u,v,w
+!        write(*,*) flag_star,flag_direct_star,tau,dvol,flag_sortie
+!        write(*,*) "*********************"
+!     endif
 
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee

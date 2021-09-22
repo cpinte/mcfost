@@ -461,18 +461,18 @@ subroutine repartition_energie_etoiles()
 
         write(*,*) "Accretion onto stars: "
         write(*,*) "Mdot=", etoile(:)%Mdot, "Msun/yr"
-        write(*,*) "Tacc=", Tacc(:), "K"
+        write(*,*) "Tacc=", real(Tacc(:)), "K"
 
         ! We add a black-body to the stellar spectrum
         do i=1, n_etoiles
            if (Tacc(i) > tiny_real) then
               do l=1, n_lambda_spectre(i)
-                 wl = tab_lambda_spectre(i,l) *1.e-6
+                 wl = tab_lambda_spectre(i,l) * 1.e-6
                  cst_wl=cst_th/(Tacc(i)*wl)
                  tab_spectre(i,l) = tab_spectre(i,l) +  max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
               enddo ! l
            endif
-        enddo !
+        enddo
      endif
   else
      write(*,*) "Turning off accretion luminosity"

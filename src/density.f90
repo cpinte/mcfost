@@ -65,10 +65,6 @@ subroutine define_gas_density()
   ! Pas besoin dans la poussiere car a chaque pop, il y a des tailles de grains independantes
   real(kind=dp), dimension(:), allocatable :: densite_gaz_tmp, densite_gaz_midplane_tmp
 
-
-
-  write(*,*) "TEST", lgap_gaussian
-
   allocate(densite_gaz_tmp(n_cells), densite_gaz_midplane_tmp(n_rad), stat=alloc_status)
   densite_gaz_tmp = 0.0 ; densite_gaz_midplane_tmp = 0.0
   densite_gaz = 0.0 ;
@@ -1356,12 +1352,13 @@ subroutine read_density_file()
         call error("cannot read bitpix in fits file")
      endif
 
+     write(*,*) "Velocity range:", minval(sph_V), maxval(sph_V)
+
      allocate(vfield_x(n_cells),vfield_y(n_cells),vfield_z(n_cells))
   endif ! lread_gas_velocity
 
   call ftclos(unit, status)
   call ftfiou(unit, status)
-
 
   ! Passing the densities and velocities to mcfost arrays
   do k=1, n_az
