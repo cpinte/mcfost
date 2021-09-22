@@ -461,18 +461,18 @@ subroutine repartition_energie_etoiles()
 
         write(*,*) "Accretion onto stars: "
         write(*,*) "Mdot=", etoile(:)%Mdot, "Msun/yr"
-        write(*,*) "Tacc=", Tacc(:), "K"
+        write(*,*) "Tacc=", real(Tacc(:)), "K"
 
         ! We add a black-body to the stellar spectrum
         do i=1, n_etoiles
            if (Tacc(i) > tiny_real) then
               do l=1, n_lambda_spectre(i)
-                 wl = tab_lambda_spectre(i,l) *1.e-6
+                 wl = tab_lambda_spectre(i,l) * 1.e-6
                  cst_wl=cst_th/(Tacc(i)*wl)
                  tab_spectre(i,l) = tab_spectre(i,l) +  max(Cst0/ ( ((exp(min(cst_wl,700.)) -1.)+1.e-30) * (wl**5)), 1e-200_dp) ;
               enddo ! l
            endif
-        enddo !
+        enddo
      endif
   else
      write(*,*) "Turning off accretion luminosity"
@@ -833,11 +833,11 @@ subroutine intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
         if (s1 < 0) then ! we already entered the star
            ! We can probably skip that test, s1 must be positive as we must be outside the star
            s2 = -b + rac
-           if (s2 < 0) then ! we already exited the star
-              cycle star_loop
-           else ! We are still in the sphere and will exit it
-              d_to_star = min(d_to_star, s2)
-              call error("Packet is inside the star")
+           if (s2 > 0) then ! for s2 < 0: we already exited the star
+              ! We are still in the sphere and will exit it
+              ! This means that we had a round-off error somewhere
+              d_to_star = 0.0_dp
+              i_star = i
            endif
         else ! We will enter in the star
            if (s1 < d_to_star) then

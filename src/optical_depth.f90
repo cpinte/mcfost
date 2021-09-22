@@ -19,7 +19,7 @@ module optical_depth
   contains
 
 subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,&
-         ltot,flag_sortie,lpacket_alive)
+         ltot,flag_sortie)
 ! Integration par calcul de la position de l'interface entre cellules
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
 ! C. Pinte
@@ -35,7 +35,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
   real, intent(in) :: extrin
   real(kind=dp), intent(inout) :: xio,yio,zio
   real, intent(out) :: ltot
-  logical, intent(out) :: flag_sortie, lpacket_alive
+  logical, intent(out) :: flag_sortie
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
   real(kind=dp) :: l, tau, opacite, l_contrib, l_void_before
@@ -45,7 +45,6 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
   lstop = .false.
   flag_sortie = .false.
-  lpacket_alive = .true.
 
   x0=xio;y0=yio;z0=zio
   x1=xio;y1=yio;z1=zio
@@ -81,7 +80,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
      endif
      if (lintersect_stars) then
         if (icell0 == icell_star) then
-           lpacket_alive = .false.
+           flag_sortie = .true.
            return
         endif
      endif
