@@ -725,7 +725,7 @@ contains
           ! On fait le test sur a difference
           diff = maxval( abs(I0 - Iold) / (I0 + 1e-300_dp) )
           ! There is no iteration for Q, U, V, assuming that if I is converged, then Q, U, V also.
-          ! Can be added and then use diff as max(diff, diffQ, diffU, diffV)
+          ! Can be added and then use diff with I = (sqrt(I**2 + Q**2 + U**2 + V**2))
           if (diff > precision ) then
              ! On est pas converge
              subpixels = subpixels * 2
@@ -819,7 +819,7 @@ contains
        
 		if (limage_at_lam0 ) then
 			image_map(ipix,jpix,ibin,iaz) = &
-				interp1d_sorted(Nlambda,lambda,I0,wavelength_ref)*(pixelsize*zoom/map_size)**2
+				interp1d_sorted(Nlambda,lambda,I0,wavelength_ref)*normF!(pixelsize*zoom/map_size)**2
 		endif
     endif
 
@@ -1477,7 +1477,7 @@ contains
     character(len=20) :: ne_start_sol = "NE_MODEL"
     type (AtomType), pointer :: atom
     integer(kind=8) :: mem_alloc_local = 0
-    real(kind=dp) :: diff_cont
+    real(kind=dp) :: diff_cont, conv_speed
     integer :: ibar, n_cells_done
     integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
 
@@ -1683,6 +1683,8 @@ contains
        lconverged = .false.
        n_iter = 0
        dne = 0.0_dp
+       diff_old = 0.0
+       conv_speed = 100
 
        do while (.not.lconverged)
 
@@ -1924,21 +1926,19 @@ contains
                 do nact=1,NactiveAtoms
                    atom => ActiveAtoms(nact)%ptr_atom
                    allocate(ng_cur(n_cells * atom%Nlevel)); ng_cur(:) = 0.0_dp
-                   !flatten2 works better with 2D arrays (tested on 1D and 2D models)
                    ng_cur = flatten2(atom%Nlevel, n_cells,n_new(nact,1:atom%Nlevel,:))
                    !has to be parallel in the future
 
                    !for many atoms, increment niter only with the first one, as they go at the same speed.
                    accelerated = ng_accelerate(iacc, ng_cur, n_cells * atom%Nlevel, iNg_Norder, &
-                        ngpop(1:atom%Nlevel*n_cells,:,nact), check_negative_pops=.true.)
+                        ngpop(1:atom%Nlevel*n_cells,:,nact), check_negative_pops=.false.)
+                        
+                    !if check_negative_pops is present :
+                    ! if .true., negative pops raise an error.
+                    ! if .false. should I cancel the acceleration ?
+                    !if not present, there is no checking nor handling.
 
                    if (accelerated) then
-                      !handle negative pops by simpling cancel Ng's iteration ? or ??
-                      !    								if (minval(ng_cur)<0.0_dp) then
-                      !    									!error raised inside ng_accelerate at the moment
-                      ! 									call error("Negative population after Ng!")
-                      !    								endif
-
                       !-> only reshape because we only print accelerated iteration for all atoms at once
                       n_new(nact, 1:atom%Nlevel,:) = reform2(atom%Nlevel, n_cells, ng_cur)
                    endif
@@ -2162,9 +2162,8 @@ contains
 
              end if !if l_iterate
           end do cell_loop2 !icell
-          write(*,'("  ---> dnHII="(1ES17.8E3))') diff_cont
-
-
+          write(*,'("  ---> dnHII="(1ES17.8E3))') diff_cont  
+          conv_speed = -(diff-diff_old)
           ! 				if ((ljacobi_sor).and..not.(lapply_sor_correction)) then
           !
           ! 					nact = 1
@@ -2202,12 +2201,14 @@ contains
           if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
           if (dJ /= 0.0_dp)  write(*,'("   >>> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
           write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
+          if (conv_speed /= 0.0_dp) write(*,'("   ->> speed="(1ES17.8E3))') conv_speed
           write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") &
                size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
                100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
           write(*,*) " *************************************************************** "
           diff_old = diff
+               
 
           ! 				write(*,*) " set lprevious_converged to true for test"
           ! 				lprevious_converged = .true.

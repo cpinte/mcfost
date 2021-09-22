@@ -158,9 +158,9 @@ CONTAINS
        endif
     enddo
 
-    call Gaussslv(A, b, n)
+    !call Gaussslv(A, b, n)
     !-> no imroved here since the routine is already doing that ?
-    !call solve_lin(A, b, n, .true.)
+    call solve_lin(A, b, n, .true.)
 
     !!write(*,*) "b",(b(i), i=1,n)
     do i=1,n
@@ -169,9 +169,9 @@ CONTAINS
 
     if (present(check_negative_pops)) then
 
-       max_sol = maxval(solution)
-
        if (check_negative_pops) then
+          max_sol = maxval(solution)
+
           pop_loop : do k=1,m
              if (solution(k) < 0) then
                 write(*,*) "ERROR negative pops sol in Ng's acceleration"
@@ -180,13 +180,18 @@ CONTAINS
                      " relative to all:", solution(k) / sum(abs(solution))
                 write(*,*) " leaving..!"
                 stop
-                !better handling ??
-                !! setting to last sol ? cancel acceleration ? impose delay ??
-                !!solution(:) = lasts(:,niter)
-                !big loop over m inside loop over m. But we exist right after
                 exit pop_loop
              endif
           enddo pop_loop
+!        else
+!        	if (minval(solution) < 0.0) then
+!        		!if negligible we just discard them ?
+!        		write(*,*) " WARNING: ngpop negative!"
+! ! 			where(solution < 0.0)
+! ! 				solution = lasts(:,niter)
+! ! 			endwhere
+! ! 			solution = lasts(:,niter) !cancel acceleration
+!        	endif	
        endif
 
     endif
@@ -532,7 +537,7 @@ CONTAINS
     return
   end function quad_1D_sorted
 
-
+  !building
   function convolve(x, y, K)
     !x, y, and K have the same dimension
     !using trapezoidal rule
