@@ -25,9 +25,9 @@ module dust_transfer
   use init_mcfost
   use SPH2mcfost
   use ML_ProDiMo
-  
+
   use pluto_mod, only : setup_mhd_to_mcfost! :-)
-  
+
   !$ use omp_lib
 
   implicit none
@@ -982,9 +982,13 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
      !endif
-     call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
-     if (.not.lpacket_alive) return
-     if ((icell>n_cells).and.(.not.flag_sortie)) write(*,*) "PB cell", icell
+     call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
+!     if ((icell>n_cells).and.(.not.flag_sortie)) then
+!        write(*,*) "*********************"
+!        write(*,*) "PB cell", icell, id, x,y,z,u,v,w
+!        write(*,*) flag_star,flag_direct_star,tau,dvol,flag_sortie
+!        write(*,*) "*********************"
+!     endif
 
      ! Le photon est-il encore dans la grille ?
      if (flag_sortie) return ! Vie du photon terminee

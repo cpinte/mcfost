@@ -196,7 +196,7 @@ module parametres
 
   ! SPH
   real :: SPH_keep_particles, planet_az
-  logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells, lturn_off_planets, lturn_off_Lacc, lturn_off_dust_subl
+  logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells, lturn_off_planets, lturn_off_Lacc
   integer :: which_planet
 
   logical :: lgap_Gaussian
