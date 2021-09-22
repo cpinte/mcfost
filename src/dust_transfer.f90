@@ -933,7 +933,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! C. Pinte
   ! 27/05/09
 
-
   ! - flag_star_direct et flag_scatt a initialiser : on a besoin des 2
   ! - separer 1ere diffusion et reste
   ! - lom supprime !
@@ -982,16 +981,15 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
      !endif
-     call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie)
+     call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
+     if (flag_sortie) return ! Vie du photon terminee
+
 !     if ((icell>n_cells).and.(.not.flag_sortie)) then
 !        write(*,*) "*********************"
 !        write(*,*) "PB cell", icell, id, x,y,z,u,v,w
 !        write(*,*) flag_star,flag_direct_star,tau,dvol,flag_sortie
 !        write(*,*) "*********************"
 !     endif
-
-     ! Le photon est-il encore dans la grille ?
-     if (flag_sortie) return ! Vie du photon terminee
 
      if (lvariable_dust) p_icell = icell
 
@@ -1857,6 +1855,7 @@ subroutine tau_surface_map(lambda,tau, ibin,iaz)
         call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
         if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+           lpacket_alive = .true.
            call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                 flag_star,flag_direct_star,tau,ltot,flag_sortie,lpacket_alive)
            if (flag_sortie) then ! We do not reach the surface tau=1

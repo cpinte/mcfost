@@ -18,8 +18,7 @@ module optical_depth
 
   contains
 
-subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,&
-         ltot,flag_sortie)
+subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie,lpacket_alive)
 ! Integration par calcul de la position de l'interface entre cellules
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
 ! C. Pinte
@@ -36,6 +35,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
   real(kind=dp), intent(inout) :: xio,yio,zio
   real, intent(out) :: ltot
   logical, intent(out) :: flag_sortie
+  logical, intent(inout) :: lpacket_alive
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
   real(kind=dp) :: l, tau, opacite, l_contrib, l_void_before
@@ -75,6 +75,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
      ! Test sortie
      if (test_exit_grid(icell0, x0, y0, z0)) then
+        lpacket_alive = .false.
         flag_sortie = .true.
         return
      endif
@@ -1002,6 +1003,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
   logical :: flag_sortie, lpacket_alive
 
   real(kind=dp), dimension(4) :: Stokes
+
+  lpacket_alive = .true.
 
   do pk=1, n_az
      ri_in_dark_zone(pk)=n_rad
