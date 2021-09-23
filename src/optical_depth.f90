@@ -16,11 +16,12 @@ module optical_depth
 
   contains
 
-subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,extrin,ltot,flag_sortie,lpacket_alive)
-! Integration par calcul de la position de l'interface entre cellules
-! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
-! C. Pinte
-! 05/02/05
+subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,&
+     extrin,ltot,flag_sortie,lpacket_alive)
+  ! Integration par calcul de la position de l'interface entre cellules
+  ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
+  ! C. Pinte
+  ! 05/02/05
 
   implicit none
 
