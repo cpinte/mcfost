@@ -74,12 +74,12 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
      ! Test sortie
      if (test_exit_grid(icell0, x0, y0, z0)) then
-        lpacket_alive = .false.
         flag_sortie = .true.
         return
      endif
      if (lintersect_stars) then
         if (icell0 == icell_star) then
+           lpacket_alive = .false.
            flag_sortie = .true.
            return
         endif

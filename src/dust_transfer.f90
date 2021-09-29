@@ -933,8 +933,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   real(kind=dp), intent(inout) :: x,y,z,u,v,w
   real(kind=dp), dimension(4), intent(inout) :: stokes
 
-  logical, intent(inout) :: flag_star, flag_ISM
-  logical, intent(out) :: flag_scatt, lpacket_alive
+  logical, intent(inout) :: flag_star, flag_ISM, lpacket_alive
+  logical, intent(out) :: flag_scatt
 
   real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
   integer :: p_icell, taille_grain, itheta
@@ -944,7 +944,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
   flag_scatt = .false.
   flag_sortie = .false.
-  lpacket_alive=.true.
+
   if (flag_star) then
      flag_direct_star = .true.
   else
