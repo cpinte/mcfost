@@ -968,7 +968,7 @@ subroutine read_density_file()
   real(kind=dp) :: somme, mass, facteur
   real :: a, tmp, gas2dust
 
-  real, dimension(:,:,:,:), allocatable :: sph_dens, sph_gas_velocity ! (n_rad,nz,n_az,n_a)
+  real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:,:,:), allocatable :: sph_gas_dens ! (n_rad,nz,n_az)
   real, dimension(:,:,:,:), allocatable :: sph_V ! (n_rad,nz,n_az,3)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
@@ -977,8 +977,6 @@ subroutine read_density_file()
   real(kind=dp), dimension(:,:,:), allocatable :: sph_gas_dens_dp
   real(kind=dp), dimension(:), allocatable :: a_sph_dp
   real(kind=dp) :: f
-
-  type(disk_zone_type) :: dz
 
   logical :: lread_gas_density, lread_gas_velocity
 
@@ -1302,11 +1300,11 @@ subroutine read_density_file()
      lvelocity_file = .true.
 
      if (l3D_file) then
-        allocate(sph_gas_velocity(n_rad,2*nz,n_az,3))
+        allocate(sph_V(n_rad,2*nz,n_az,3))
      else
-        allocate(sph_gas_velocity(n_rad,nz,n_az,3))
+        allocate(sph_V(n_rad,nz,n_az,3))
      endif
-     sph_gas_velocity = 0.0
+     sph_V = 0.0
 
      ! move to next hdu
      call ftmrhd(unit,1,hdutype,status)
@@ -1336,7 +1334,7 @@ subroutine read_density_file()
 
      ! read_image
      if (bitpix==-32) then
-        call ftgpve(unit,group,firstpix,npixels,nullval,sph_gas_velocity,anynull,status)
+        call ftgpve(unit,group,firstpix,npixels,nullval,sph_V,anynull,status)
      else if (bitpix==-64) then
         if (l3D_file) then
            allocate(sph_V_dp(n_rad,2*nz,n_az,3))
@@ -1345,12 +1343,13 @@ subroutine read_density_file()
         endif
         sph_V_dp = 0.0_dp
         call ftgpvd(unit,group,firstpix,npixels,nullval,sph_V_dp,anynull,status)
-        sph_gas_velocity = real(sph_V_dp,kind=sp)
+        sph_V = real(sph_V_dp,kind=sp)
         deallocate(sph_V_dp)
      else
         call error("cannot read bitpix in fits file")
      endif
 
+     sph_V = sph_V
      write(*,*) "Velocity range:", minval(sph_V), maxval(sph_V)
 
      allocate(vfield_x(n_cells),vfield_y(n_cells),vfield_z(n_cells))
@@ -1384,9 +1383,9 @@ subroutine read_density_file()
               endif
 
               if (lread_gas_velocity) then
-                 vfield_x(icell) = sph_gas_velocity(i,jj,k,1)
-                 vfield_y(icell) = sph_gas_velocity(i,jj,k,2)
-                 vfield_z(icell) = sph_gas_velocity(i,jj,k,3)
+                 vfield_x(icell) = sph_V(i,jj,k,1)
+                 vfield_y(icell) = sph_V(i,jj,k,2)
+                 vfield_z(icell) = sph_V(i,jj,k,3)
                  if ((.not.l3D_file).and.(j<0)) vfield_z(icell) = - vfield_z(icell)
               endif
            enddo ! i
@@ -1403,18 +1402,19 @@ subroutine read_density_file()
 
   ! Normalisation
   if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
-     facteur = dz%diskmass * dz%gas_to_dust / mass
+     facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+
      ! Somme sur les zones pour densite finale
      do icell=1,n_cells
         densite_gaz(icell) = densite_gaz(icell) * facteur
      enddo ! icell
+  else
+     call error('Gas mass is 0')
   endif
 
   ! Tableau de masse de gaz
   do icell=1,n_cells
-     do k=1, n_az
-        masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
-     enddo !k
+     masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
   enddo ! icell
 
   if (lvariable_dust) then
