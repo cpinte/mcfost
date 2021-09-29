@@ -161,7 +161,7 @@ module parametres
 
   ! SPH
   real :: SPH_keep_particles, planet_az
-  logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells, lturn_off_planets, lturn_off_Lacc
+  logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells, lturn_off_planets, lturn_off_Lacc, lforce_Mdot
   integer :: which_planet
 
   logical :: lgap_Gaussian
@@ -183,7 +183,7 @@ module parametres
      real :: T, M, fUV, slope_UV, othin_sublimation_radius
      real :: Mdot ! Msun
      real(kind=dp) :: r, x,y,z, vx,vy,vz
-     logical :: lb_body, out_model, find_spectrum
+     logical :: lb_body, out_model, find_spectrum, force_Mdot
      character(len=512) :: spectre
      integer :: icell
   end type star_type
