@@ -582,12 +582,12 @@ contains
     real(kind=dp), dimension(2*(Nlambda_line_c_log+Nlambda_line_w-1)-1) :: vel
     real(kind=dp) ::  vcore, vwing, v0, v1, vbroad
     integer :: Nlambda, la, Nmid, kr
-    real, parameter :: wing_to_core = 0.6 !0.3
-
+!     real, parameter :: fw = 7.0, fc = 4.0
+    real, parameter :: fw = 3.0, fc = 1.0
 
     vbroad = maxval(atom%vbroad)
-    vwing = 7.0 * vbroad
-    vcore = 4.0 * vbroad
+    vwing = fw * vbroad
+    vcore = fc * vbroad
 
     v0 = - vwing
     v1 = + vwing
