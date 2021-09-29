@@ -770,7 +770,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
   real, dimension(:), allocatable, intent(out) :: extra_heating
 
-
+  type(star_type), dimension(:), allocatable :: etoile_old
   integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
   real(dp) :: udist_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
@@ -1034,7 +1034,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
  if (lfix_star) then
     write(*,*) ""
-    write(*,*) "Stellar parameters will not be updated, only the star positions and masses"
+    write(*,*) "Stellar parameters will not be updated, only the star positions, velocities and masses"
     if (n_etoiles > n_etoiles_old) then
        write(*,*) "WARNING: sink with id >", n_etoiles_old, "will be ignored in the RT"
        n_etoiles = n_etoiles_old
@@ -1049,15 +1049,24 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        etoile(i_etoile)%vz = vxyz_ptmass(3,i_etoile) * uvelocity
 
        etoile(i_etoile)%M = xyzmh_ptmass(4,i_etoile) * usolarmass
-
-       etoile(i_etoile)%Mdot = 0.
     enddo
  elseif (n_etoiles > 0) then
     write(*,*) ""
     write(*,*) "Updating the stellar properties:"
     write(*,*) "There are now", n_etoiles, "stars in the model"
-    if (allocated(etoile)) deallocate(etoile)
+
+    ! Saving if the accretion rate was forced
+    allocate(etoile_old(n_etoiles_old))
+    if (allocated(etoile)) then
+       etoile_old(:) = etoile(:)
+       deallocate(etoile)
+    endif
     allocate(etoile(n_etoiles))
+    do i=1, min(n_etoiles, n_etoiles_old)
+       etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
+       etoile(i)%Mdot = etoile_old(i)%Mdot
+    enddo
+    deallocate(etoile_old)
 
     etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
     etoile(:)%y = xyzmh_ptmass(2,:) * ulength_au
@@ -1069,8 +1078,11 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
     etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
 
-    etoile(:)%Mdot = xyzmh_ptmass(16,:) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
-
+    do i=1, n_etoiles
+       if (.not.etoile(i)%force_Mdot) then
+          etoile(i)%Mdot = xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
+       endif
+    enddo
     etoile(:)%find_spectrum = .true.
  else
     write(*,*) ' WARNING: There are 0 stars in the model'

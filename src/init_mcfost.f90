@@ -193,6 +193,7 @@ subroutine set_default_variables()
   lwrite_mol_column_density = .false.
   lturn_off_planets = .false.
   lturn_off_Lacc = .false.
+  lforce_Mdot = .false.
 
   tmp_dir = "./"
 
@@ -265,6 +266,13 @@ subroutine initialisation_mcfost()
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
+  integer, parameter :: nmax_stars = 100
+  real, dimension(nmax_stars) :: star_Mdot
+  logical, dimension(nmax_stars) :: star_force_Mdot
+  real :: Mdot
+  integer :: istar_Mdot
+
+
   write(*,*) "You are running MCFOST "//trim(mcfost_release)
   write(*,*) "Git SHA = ", sha_id
 
@@ -280,6 +288,8 @@ subroutine initialisation_mcfost()
   lno_SED = .false.
   lpola = .false.
   lstar_bb = .false.
+  star_force_Mdot(:) = .false.
+  star_Mdot(:) = 0.0
 
   ! Global logical variables
   call set_default_variables()
@@ -1325,6 +1335,17 @@ subroutine initialisation_mcfost()
      case("-star_bb")
         i_arg = i_arg + 1
         lstar_bb = .true.
+     case("-Mdot")
+        i_arg = i_arg + 1
+        lforce_Mdot = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) istar_Mdot
+        star_force_Mdot(istar_Mdot) = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) Mdot
+        star_Mdot(istar_Mdot) = Mdot
+        i_arg = i_arg + 1
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1383,9 +1404,19 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-  if ( lwrite_column_density .and. .not. ldisk_struct) call error("-cd option requires - or +disk_struct option")
+  if (lwrite_column_density .and. .not. ldisk_struct) call error("-cd option requires - or +disk_struct option")
 
   if (lstar_bb) etoile(:)%lb_body = .true.
+
+  if (lforce_Mdot) then
+     do i=1, n_etoiles
+        if (i > nmax_stars) call error("Maximal number of stars is hard-coded to 100")
+        if (star_force_Mdot(i)) then
+           etoile(i)%force_Mdot = .true.
+           etoile(i)%Mdot = star_Mdot(i)
+        endif
+     enddo
+  endif
 
   write(*,*) 'Input file read successfully'
 
@@ -1764,6 +1795,7 @@ subroutine display_help()
   write(*,*) "        : -star_bb : forces a black-body for the stellar spectrum"
   write(*,*) "        : -spot <T_spot> <surface_fraction> <theta> <phi>, T_spot in K, theta & phi in degrees"
   write(*,*) "        : -limb_darkening <filename>"
+  write(*,*) "        : -Mdot <star_id> <Mdot> : forces accretion rate on star (Msun/yr)"
   write(*,*) " "
   write(*,*) " Options related to dust properties"
   write(*,*) "        : -dust_prop : computes opacity, albedo, asymmetry parameter,"
