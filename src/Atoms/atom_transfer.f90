@@ -1293,12 +1293,14 @@ contains
              if (allocated(atom%Gamma)) deallocate(atom%Gamma)
              if (allocated(atom%C)) deallocate(atom%C)
              if (loutput_rates) then
-                call write_radiative_rates_atom(atom, Rij_all(nact,1:atom%Ntr,:), Rji_all(nact,1:atom%Ntr,:))
-                call write_rate_matrix_atom(atom, Gammaij_all(nact,1:atom%Nlevel,1:atom%Nlevel,:))
+             	!To Do: write collision rates instead of matrix (sum over all transitions,
+             	! -> informations of individual levels lost !)
+				call write_collision_matrix_atom(atom)
+                call write_radiative_rates_atom(atom, Rij_all(atom%activeindex,1:atom%Ntr,:), Rji_all(atom%activeindex,1:atom%Ntr,:))
+                call write_rate_matrix_atom(atom, Gammaij_all(atom%activeindex,1:atom%Nlevel,1:atom%Nlevel,:))
              endif
           endif
-          !!if (associated(hydrogen,atom)) call write_collision_matrix_atom(hydrogen)
-          call write_collision_matrix_atom(atom)
+!           if (loutput_rates) call write_collision_matrix_atom(atom)
           do m=1, atom%Nline
              deallocate(atom%lines(m)%phi_loc)
           enddo

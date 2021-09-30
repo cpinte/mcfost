@@ -1447,6 +1447,9 @@ CONTAINS
           if (lsecond_try) then
              lconverged = .true.
              write(*,*) "Not enough iterations to converge", max_iter
+             write(*,*) "err = ", delta_f
+             write(*,*) " cell", icell, " id", id
+             write(*,*) ""
           else
              lsecond_try = .true.
              lconverged = .false.
@@ -1652,6 +1655,9 @@ CONTAINS
           if (lsecond_try) then
              lconverged = .true.
              write(*,*) "Not enough iterations to converge", max_iter
+             write(*,*) "err = ", delta_f
+             write(*,*) " cell", icell, " id", id
+             write(*,*) ""
           else
              lsecond_try = .true.
              lconverged = .false.
@@ -1931,6 +1937,9 @@ CONTAINS
           if (lsecond_try) then
              lconverged = .true.
              write(*,*) "Not enough iterations to converge", max_iter
+             write(*,*) "err = ", delta_f
+             write(*,*) " cell", icell, " id", id
+             write(*,*) ""
           else
              lsecond_try = .true.
              lconverged = .false.
@@ -2898,6 +2907,28 @@ CONTAINS
        Rij(:,:) = 0.0_dp
        Rji(:,:) = 0.0_dp
     endif
+    
+    !if lforce_lte we only store the Aji terms in the line radiative rates
+    !and 0 elsewhere.
+    if (lforce_lte) then
+    	do nact=1, NactiveAtoms
+
+       		atom => Activeatoms(nact)%ptr_atom
+
+       		do kc=1, atom%Ntr_line
+
+        		kr = atom%at(kc)%ik
+
+        		if (init) Rji(nact,kc) = atom%lines(kr)%Aji
+        	
+        	end do
+        	
+        	atom => NULL()
+        	
+        enddo
+             
+    	return
+    endif
 
     do nact=1, NactiveAtoms
 
@@ -3126,6 +3157,8 @@ CONTAINS
 
   subroutine store_rate_matrices(id, icell, Nmaxlevel, Aij)
     !atom%Gamma should be filled with the value before exciting subiterations
+	!built rate matrix with allocated radiative rate
+	!These are the MALI rates at the moment (not Rij_all and Rji_all as it should rather be.)
     integer, intent(in) :: icell, Nmaxlevel, id
     real(kind=dp), dimension(NactiveAtoms, Nmaxlevel, Nmaxlevel), intent(inout) :: Aij
     integer :: nact
@@ -3138,7 +3171,11 @@ CONTAINS
        atom => Activeatoms(nact)%ptr_atom
        !!call collision_matrix_atom(id, icell, atom)
        call initGamma_atom(id, atom) !init with collisions
-       call rate_matrix_atom(id, icell, atom, lforce_lte) !built rate matrix with allocated radiative rate
+       !if lforce_lte it will be equivalent to the collision matrix!
+       !lforce_lte is set to .false. here so that, even at LTE, Gamma includes Aji terms
+       !in the radiative rates and the collision matrix is the pure Gamma matrix!
+       !In that case Rij_all contains only Aji
+       call rate_matrix_atom(id, icell, atom, .false.)
        call eliminate_delta(id, atom)
        Aij(nact,1:atom%Nlevel,1:atom%Nlevel) = atom%Gamma(:,:,id)
        atom => NULL()
