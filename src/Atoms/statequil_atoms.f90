@@ -2564,7 +2564,13 @@ CONTAINS
 
           enddo
 
-          JJ = waq * JJ / wphi
+		  !Trick here, it is however dangerous!
+		  !wphi should never be 0 or < 0 ! or there is a problem with the local profile.
+          if (wphi > 0.0) then	  
+          	JJ = waq * JJ / wphi
+          else
+          	JJ = 0.0
+          endif
 
           !init at Aji
           aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + JJ * aatom%lines(kc)%Bji
