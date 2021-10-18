@@ -53,61 +53,6 @@ end function spanl
 
 !************************************************************
 
-subroutine polint(xa,ya,n,x,y,dy)
-! Interpolation polynomiale
-! xa, ya : tab des abscisses et ordonnees
-! n : degre du polynome + 1 = taille xa, ya
-! x : abscisse du point considere
-! y, dy : valeur et erreur
-  implicit none
-
-  integer, intent(in) :: n
-  integer, parameter :: nmax = 10
-  real, intent(in) :: x
-  real, dimension(n) , intent(in) :: xa, ya
-  real, intent(out) :: y, dy
-
-  integer :: i,m,ns
-  real :: den,dif,dift,ho,hp,w
-  real, dimension(nmax) :: c,d
-
-  ns=1
-  dif=abs(x-xa(1))
-  do i=1,n
-     dift=abs(x-xa(i))
-     if (dift.lt.dif) then
-        ns=i
-        dif=dift
-     endif
-     c(i)=ya(i)
-     d(i)=ya(i)
-  enddo
-  y=ya(ns)
-  ns=ns-1
-  do m=1,n-1
-     do i=1,n-m
-        ho=xa(i)-x
-        hp=xa(i+m)-x
-        w=c(i+1)-d(i)
-        den=ho-hp
-        if(den == 0.) call error('failure in polint')
-        den=w/den
-        d(i)=hp*den
-        c(i)=ho*den
-     enddo !i
-     if (2*ns.lt.n-m)then
-        dy=c(ns+1)
-     else
-        dy=d(ns)
-        ns=ns-1
-     endif
-     y=y+dy
-  enddo !m
-  return
-end subroutine polint
-
-!***************************************************
-
 real(kind=sp) function interp_sp(y, x, xp)
 ! interpole lineaire entre les points
 ! fait une extrapolation lineaire entre les 2 premiers ou 2 derniers points
@@ -1096,7 +1041,7 @@ subroutine lgnd(lmax,x,p)
   ! copyrighted by Cambridge University Press in 1997.
   ! Program 5.4 : originally named LGND
 
-  ! 29/08/11 : C. Pinte : translated in fortran 90 TODO : regarder NR
+  ! 29/08/11 : C. Pinte : translated in fortran 90
 
   integer, intent(in) :: lmax
   real(kind=dp), intent(in) :: x
