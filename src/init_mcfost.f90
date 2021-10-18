@@ -208,7 +208,7 @@ subroutine initialisation_mcfost()
 
   implicit none
 
-  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, mcfost_no_disclaimer, i
+  integer :: ios, nbr_arg, i_arg, nx, ny, syst_status, imol, i
   integer :: current_date, update_date, mcfost_auto_update, ntheta, nazimuth, ilen
   real(kind=dp) :: wvl
   real :: opt_zoom, utils_version, PA
@@ -1114,14 +1114,6 @@ subroutine initialisation_mcfost()
      end select
   enddo ! while
 
-
-
-  ! Display the disclaimer if needed
-  mcfost_no_disclaimer = 0
-  call get_environment_variable('MCFOST_NO_DISCLAIMER',s)
-  if (s/="") read(s,*) mcfost_no_disclaimer
-  if (mcfost_no_disclaimer == 0) call display_disclaimer()
-
   ! Lecture du fichier de parametres
   if (lProDiMo2mcfost) then
      call read_mcfost2ProDiMo(para)
@@ -1592,61 +1584,6 @@ subroutine display_help()
   call exit(0)
 
 end subroutine display_help
-
-!********************************************************************
-
-subroutine display_disclaimer()
-
-  character(len=10) :: accept
-  character(len=512) :: cmd, home
-  integer :: syst_status
-
-  write(*,*) "*******************************************"
-  write(*,*) "*          MCFOST DISCLAIMER              *"
-  write(*,*) "*    @ C. Pinte, F. Menard, G. Duchene    *"
-  write(*,*) "*                                         *"
-  write(*,*) "* MCFOST is available on a collaborative  *"
-  write(*,*) "* basis. Using MCFOST implies that you    *"
-  write(*,*) "* agree to :                              *"
-  write(*,*) "*  - offer us co-author right on any      *"
-  write(*,*) "* resulting publication.                  *"
-  write(*,*) "*  - NOT distribute MCFOST without our    *"
-  write(*,*) "* explicit agreement.                     *"
-  write(*,*) "*  - contact us if you initiate a new     *"
-  write(*,*) "* scientific project with MCFOST.         *"
-
-  call get_environment_variable('HOME',home)
-  if (home == "") then
-     home="./"
-  else
-     home=trim(home)//"/"
-  endif
-
-  if (.not.is_file(trim(home)//"/.mcfost/accept_disclaimer_"//mcfost_release)) then
-     write(*,*) "*                                         *"
-     write(*,*) "* Do you accept ? (yes/no)"
-     read(*,*) accept
-
-     if ( (accept(1:3) == "yes").or.(accept(1:3) == "Yes").or.(accept(1:3) == "YES") &
-          .or.(accept(1:1) == "Y").or.(accept(1:1) == "y") ) then
-        cmd = 'mkdir -p ~/.mcfost'
-        call appel_syst(cmd,syst_status)
-        open(unit=1,file=trim(home)//"/.mcfost/accept_disclaimer_"//mcfost_release,status="new")
-        close(unit=1)
-        write(*,*) "* Thank you !                             *"
-     else
-        write(*,*) "* Exiting MCFOST                          *"
-        write(*,*) "*******************************************"
-        call exit(0)
-     endif
-  endif ! accept disclaimer
-
-  write(*,*) "*******************************************"
-
-  return
-
-end subroutine display_disclaimer
-
 
 !********************************************************************
 
