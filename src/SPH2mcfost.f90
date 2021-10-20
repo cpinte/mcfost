@@ -246,14 +246,14 @@ contains
        write(*,*) SPH_keep_particles*100, "% of particles in each dimension"
 
        k = max(int(limit_threshold * n_SPH),1)
-       limits(1) = select_inplace(k,real(x))
-       limits(3) = select_inplace(k,real(y))
-       limits(5) = select_inplace(k,real(z))
+       limits(1) = find_kth_smallest_inplace(k,real(x))
+       limits(3) = find_kth_smallest_inplace(k,real(y))
+       limits(5) = find_kth_smallest_inplace(k,real(z))
 
        k = int((1.0-limit_threshold) * n_SPH)
-       limits(2) = select_inplace(k,real(x))
-       limits(4) = select_inplace(k,real(y))
-       limits(6) = select_inplace(k,real(z))
+       limits(2) = find_kth_smallest_inplace(k,real(x))
+       limits(4) = find_kth_smallest_inplace(k,real(y))
+       limits(6) = find_kth_smallest_inplace(k,real(z))
     else
        limits(:) = SPH_limits(:)
     endif

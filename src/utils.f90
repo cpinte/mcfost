@@ -176,7 +176,7 @@ end function interp_dp
 
 subroutine GaussSlv(a, b, n)
   ! Resolution d'un systeme d'equation par methode de Gauss
-  ! C'est bourrin de chez bourrin : meme pas de recherche du pivot max !!!
+  ! Non optimise : meme pas de recherche du pivot max !!!
   ! C. Pinte
   ! 22/09/07
 
@@ -1004,11 +1004,9 @@ function bubble_sort(data_in)
            tmp_i = bubble_sort(i)
            bubble_sort(i) = bubble_sort(i+1)
            bubble_sort(i+1) = tmp_i
-
         endif
      end do ! i
      pass = pass +1
-
   end do ! while
 
   return
@@ -1178,7 +1176,7 @@ subroutine Gauss_Legendre_quadrature(x1,x2,n, x,w)
      do while (.not.conv)
         p1 = 1.0_dp ; p2 = 0.0_dp
 
-        !Loop up the recurrence relation to get the Legendre polynomial evaluated at z
+        ! Loop up the recurrence relation to get the Legendre polynomial evaluated at z
         do j = 1, n
            dj=real(j,kind=dp)
            p3 = p2
@@ -1322,94 +1320,92 @@ end subroutine progress_bar
 
 !************************************************************
 
-function select(k,arr)
-  ! Returns the kth smallest value in the array arr. The input array will be rearranged to have
-  ! this value in location arr(k), with all smaller elements moved to arr(1:k-1) (in arbitrary
-  ! order) and all larger elements in arr(k+1:) (also in arbitrary order).
+function find_kth_smallest(k,array)
+  ! Returns the kth smallest value in the array.
+  ! The input array will be rearranged to have this value in location array(k),
+  ! with all smaller elements moved to arr(1:k-1) (in arbitrary order) and
+  ! all larger elements in arr(k+1:) (also in arbitrary order).
 
   integer, intent(in) :: k
-  real(sp), dimension(:), intent(inout) :: arr
-  real(sp) :: select
+  real(sp), dimension(:), intent(inout) :: array
+  real(sp) :: find_kth_smallest
 
-  integer :: i,r,j,l,n
+  integer :: i,r,j,l
   real(sp) :: a
-  n=size(arr)
 
   l=1
-  r=n
+  r=size(array)
   do
      if (r-l <= 1) then ! Active partition contains 1 or 2 elements.
         if (r-l == 1) then
-           if (arr(l)>arr(r)) call swap(arr(l),arr(r))  ! Active partition contains 2 elements.
+           if (array(l)>array(r)) call swap(array(l),array(r))  ! Active partition contains 2 elements.
         endif
-        select=arr(k)
+        find_kth_smallest=array(k)
         return
      else
-        ! Choose median of left, center, and right elements
-        ! as partitioning element a. Also rearrange so
-        ! that arr(l) <= arr(l+1) <= arr(r).
+        ! Choose median of left, center, and right elements as partitioning element a.
+        ! Also rearrange so that array(l) <= array(l+1) <= array(r).
         i=(l+r)/2
-        call swap(arr(i),arr(l+1))
-        if (arr(l)>arr(r))   call swap(arr(l),arr(r))
-        if (arr(l+1)>arr(r)) call swap(arr(l+1),arr(r))
-        if (arr(l)>arr(l+1)) call swap(arr(l),arr(l+1))
+        call swap(array(i),array(l+1))
+        if (array(l)>array(r))   call swap(array(l),array(r))
+        if (array(l+1)>array(r)) call swap(array(l+1),array(r))
+        if (array(l)>array(l+1)) call swap(array(l),array(l+1))
         i=l+1 ! Initialize pointers for partitioning.
         j=r
-        a=arr(l+1) ! Partitioning element.
-        do ! Here is the meat.
+        a=array(l+1) ! Partitioning element.
+        do
            do ! Scan up to find element > a.
               i=i+1
-              if (arr(i) >= a) exit
-           end do
+              if (array(i) >= a) exit
+           enddo
            do ! Scan down to find element < a.
               j=j-1
-              if (arr(j) <= a) exit
-           end do
+              if (array(j) <= a) exit
+           enddo
            if (j < i) exit ! Pointers crossed. Exit with partitioning complete.
-           call swap(arr(i),arr(j)) ! Exchange elements.
-        end do
-        arr(l+1)=arr(j) ! Insert partitioning element.
-        arr(j)=a
+           call swap(array(i),array(j)) ! Exchange elements.
+        enddo
+        array(l+1)=array(j) ! Insert partitioning element.
+        array(j)=a
         if (j >= k) r=j-1 ! Keep active the partition that contains the kth element.
         if (j <= k) l=i
-     end if
-  end do
+     endif
+  enddo
 
   return
 
-end function select
+end function find_kth_smallest
 
 !************************************************************
 
-function select_inplace(k,arr)
-  ! Returns the kth smallest value in the array arr, without altering the input array.
+function find_kth_smallest_inplace(k,array)
+  ! Returns the kth smallest value in the array, without altering the input array.
   ! In Fortran 90's assumed memory-rich environment, we just call select in scratch space.
   ! C.P. : this is an issue for very large arrays: using allocatable array instead
 
   integer, intent(in) :: k
-  real(sp), dimension(:), intent(in) :: arr
-  real(sp) :: select_inplace
+  real(sp), dimension(:), intent(in) :: array
+  real(sp) :: find_kth_smallest_inplace
 
-  real(sp), dimension(:), allocatable :: tarr
+  real(sp), dimension(:), allocatable :: tmp_array
 
-  allocate(tarr(size(arr)))
+  allocate(tmp_array(size(array)))
 
-  tarr=arr
-  select_inplace=select(k,tarr)
-  deallocate(tarr)
+  tmp_array=array
+  find_kth_smallest_inplace=find_kth_smallest(k,tmp_array)
+  deallocate(tmp_array)
 
   return
 
-end function select_inplace
+end function find_kth_smallest_inplace
 
 !************************************************************
 
 subroutine swap(a,b)
   real(sp), intent(inout) :: a,b
-  real(sp) :: dum
+  real(sp) :: tmp
 
-  dum=a ; a=b ; b=dum
-
+  tmp=a ; a=b ; b=tmp
   return
 
 end subroutine swap
