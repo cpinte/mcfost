@@ -15,8 +15,11 @@ MCFOST is a 3D continuum and line radiative transfer code based on the Monte Car
 
 Code Papers
 -----------
+Core papers :
 - Pinte et al. 2006:  https://ui.adsabs.harvard.edu/abs/2006A%26A...459..797P/abstract
 - Pinte et al. 2009 : https://ui.adsabs.harvard.edu/abs/2009A%26A...498..967P/abstract
+
+Radiative transfer in atomic lines:
 - Tessore et al. 2021 : https://ui.adsabs.harvard.edu/abs/2021A%26A...647A..27T/abstract
 
 Licence
