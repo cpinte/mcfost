@@ -1,7 +1,7 @@
 [![build-gfortran-macos](https://github.com/cpinte/mcfost/actions/workflows/build-gfortran-macos.yml/badge.svg)](https://github.com/cpinte/mcfost/actions/workflows/build-gfortran-macos.yml)
 
-MCFOST
-======
+The MCFOST radiative transfer code
+==================================
 
 - Code: <https://github.com/cpinte/mcfost>
 - Docs: <https://ipag.osug.fr/~pintec/mcfost/docs/html/index.html>
