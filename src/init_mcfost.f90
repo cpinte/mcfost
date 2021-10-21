@@ -81,8 +81,8 @@ subroutine set_default_variables()
   lphantom_file=.false.
   lphantom_multi = .false.
   lphantom_avg = .false.
-  lSPH_amin = .false.
-  lSPH_amax = .false.
+  lforce_SPH_amin = .false.
+  lforce_SPH_amax = .false.
   lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
@@ -695,13 +695,13 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
      case("-SPH_amin")
-        lSPH_amin = .true.
+        lforce_SPH_amin = .true.
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
         read(s,*) SPH_amin
         i_arg = i_arg + 1
      case("-SPH_amax")
-        lSPH_amax = .true.
+        lforce_SPH_amax = .true.
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
         read(s,*) SPH_amax
@@ -1577,6 +1577,9 @@ subroutine display_help()
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
   write(*,*) "        : -centre_on_sink <number> : centre the model on the sink particle"
+  write(*,*) "        : -SPH_amin <size> [mum] : force the grain size that follow the gas"
+  write(*,*) "        : -SPH_amax <size> [mum] : force the grain size that follow the dust"
+  write(*,*) "                                   (only works with 1 grain size dump)"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

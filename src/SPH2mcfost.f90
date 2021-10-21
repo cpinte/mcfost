@@ -332,6 +332,15 @@ contains
           a_SPH(1) = 1. ;
        endif
 
+       if (lforce_SPH_amin) a_SPH(1) = SPH_amin
+       if (lforce_SPH_amax) then
+          if (ndusttypes == 1) then
+             a_SPH(2) = SPH_amax
+          else
+             call error("Can only froce SPH grain size is ndusttypes == 1")
+          endif
+       endif
+
        ! temporary for old phantom dumps were grain sizes were not defined
        if (SPH_grainsizes(1) < tiny_real) then
           a_SPH(1) = 1. ;
