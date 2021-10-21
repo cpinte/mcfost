@@ -22,11 +22,22 @@ Core papers :
 Radiative transfer in atomic lines:
 - Tessore et al. 2021 : https://ui.adsabs.harvard.edu/abs/2021A%26A...647A..27T/abstract
 
+
 Licence
 -------
 
 See LICENCE file for usage and distribution conditions.
 
 The code is open source under GPLv3. 
+
 If the code is useful for your research, please get in touch with us.  
-We welcome collaborations, and hopefully would be able to help.
+We welcome scientific collaborations, and hopefully we will be able to help.
+
+
+Contributing
+------------
+We welcome contributions, including (but not limited to):
+
+1. Code, via [pull request](https://github.com/cpinte/mcfost/pulls). Please read developer section of user guide for guidelines.
+2. Documentation, also by [pull request](https://github.com/cpinte/mcfost/pulls). Docs can be edited in the docs/ directory of the main code.
+3. Suggestions for features or bug reports, via the [issue tracker](https://github.com/cpinte/mcfost/issues/new). Please file bugs via github rather than by email.
