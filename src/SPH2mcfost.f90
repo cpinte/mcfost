@@ -272,14 +272,14 @@ contains
        write(*,*) SPH_keep_particles*100, "% of particles in each dimension"
 
        k = max(int(limit_threshold * n_SPH),1)
-       limits(1) = select_inplace(k,real(x))
-       limits(3) = select_inplace(k,real(y))
-       limits(5) = select_inplace(k,real(z))
+       limits(1) = find_kth_smallest_inplace(k,real(x))
+       limits(3) = find_kth_smallest_inplace(k,real(y))
+       limits(5) = find_kth_smallest_inplace(k,real(z))
 
        k = int((1.0-limit_threshold) * n_SPH)
-       limits(2) = select_inplace(k,real(x))
-       limits(4) = select_inplace(k,real(y))
-       limits(6) = select_inplace(k,real(z))
+       limits(2) = find_kth_smallest_inplace(k,real(x))
+       limits(4) = find_kth_smallest_inplace(k,real(y))
+       limits(6) = find_kth_smallest_inplace(k,real(z))
     else
        limits(:) = SPH_limits(:)
     endif
@@ -356,6 +356,15 @@ contains
        else
           write(*,*) "WARNING: assuming dust grains smaller than 1mum are following the gas"
           a_SPH(1) = 1. ;
+       endif
+
+       if (lforce_SPH_amin) a_SPH(1) = SPH_amin
+       if (lforce_SPH_amax) then
+          if (ndusttypes == 1) then
+             a_SPH(2) = SPH_amax
+          else
+             call error("Can only froce SPH grain size is ndusttypes == 1")
+          endif
        endif
 
        ! temporary for old phantom dumps were grain sizes were not defined

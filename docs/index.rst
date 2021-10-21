@@ -39,3 +39,9 @@ Pinte, C., Harries, T. J., Min, M., et al. 2009,
 Pinte, C., Ménard, F., Duchêne, G., & Bastien, P. 2006,
 `A&A <http://www.aanda.org/10.1051/0004-6361:20053275/pdf>`__, `459,
 797 <http://adsabs.harvard.edu/abs/2006A%26A...459..797P>`__
+
+For the atomic line transfer:
+
+Tessore, B., Pinte, C., Bouvier, J., Ménard, F., 2021,
+`A&A < https://www.aanda.org/articles/aa/pdf/2021/03/aa39697-20.pdf>`__,
+`647, A27 >https://ui.adsabs.harvard.edu/abs/2021A%26A...647A..27T/abstract>`__

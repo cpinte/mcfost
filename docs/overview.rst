@@ -21,9 +21,8 @@ handled by MCFOST and its use can be extended to other astrophysical
 objects. For instance, tests have been performed on infalling envelopes
 and AGB stars.
 
-.. important:: The code is not public domain yet but available on request on a
-               collaborative basis, with explicit permissions of the authors
-               (see disclaimers below).
+.. important:: The code is open source under GPLv3. We also kindly ask you cite the code papers in scientific publications if you use MCFOST in your research. We also welcome collaborations and are happy ti provide help with using the code and interpreting the results.
+
 
 The core of the algorithms are described in
 `Pinte et al. (2006) <http://adsabs.harvard.edu/abs/2006A%26A...459..797P>`__
@@ -56,7 +55,7 @@ short characteristic before the full 2D or 3D calculation. Output
 spectra and channel maps are calculated via a ray-tracing procedure.
 
 
-.. note:: MCFOST is in constant development and this documentation is very
+.. note:: MCFOST is in constant development and this documentation is
           likely to be lagging. Please contact Christophe Pinte for the latest updates.
 
 
@@ -69,28 +68,6 @@ constraints on the derived parameters.
 .. warning:: Use at your own risk!!! The author does not take any
              responsibility for the use (or misuse of the code). There might be
              bugs.
-
-
-Disclaimers
----------------
-
-MCFOST is available on a **collaborative basis**. Using MCFOST implies that you agree to :
-
-*  offer us (C. Pinte, F. Menard, G. Duchene) co-author right on any resulting publication.
-*  NOT distribute MCFOST without our explicit agreement.
-*  contact us if you initiate a new scientific project with MCFOST.
-
-Please also acknowledge funding from the Australian Research Council
-under contracts FT170100040 and DP180104235,
-from Agence Nationale pour la
-Recherche (ANR) of France under contract ANR-16-CE31-0013.
-
-The IDL code MCRE (MCFOST Results Explorer) is also available on a
-collaborative basis. Using MCRE implies to offer M. Perrin co-author
-right. However its use is deprecated. Instead users are encouraged to
-use the Python mcfost package, available from
-`github <https://github.com/cpinte/mcfost-python>`__,
-by M. Perrin, C. Pinte, and S. Wolff.
 
 
 Slack channel
