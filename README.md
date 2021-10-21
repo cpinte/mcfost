@@ -29,6 +29,7 @@ Licence
 See LICENCE file for usage and distribution conditions.
 
 The code is open source under GPLv3. 
+We also kindly ask you cite the code papers in scientific publications if you are using the code in your research.
 
 If the code is useful for your research, please get in touch with us.  
 We welcome scientific collaborations, and hopefully we will be able to help.
