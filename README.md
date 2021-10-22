@@ -10,7 +10,7 @@ The MCFOST radiative transfer code
 About
 -----
 
-MCFOST is a 3D continuum and line radiative transfer code based on the Monte Carlo method (plus ray-tracing). It is mainly designed to study the circumstellar environment of young stellar objects. The calculations are done exactly within the limitations of the Monte Carlo noise and machine precision, i.e. no approximation are used in the calculations. The code has been strongly optimized for speed.
+MCFOST is a 3D continuum and line radiative transfer code based on an hybrid Monte Carlo and ray-tracing method. It is mainly designed to study the circumstellar environment of young stellar objects, but has been used for a wide range of astrophysical problems. The calculations are done exactly within the limitations of the Monte Carlo noise and machine precision, i.e. no approximation are used in the calculations. The code has been strongly optimized for speed.
 
 
 Code Papers
