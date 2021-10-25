@@ -930,6 +930,7 @@ contains
        else
           stm = exp(-hc_k/T(icell)/lambda(la))
           sigma = 1d-29 * interp2D(lambdai*1d0,thetai*1d0,1d0*alphai,lam,theta) !m^2/Pa
+          !Need bi-linear interpolation
           chi(la) = sigma * pe * nH!m^-1
        endif
        ! 	 if (icell==66) then
