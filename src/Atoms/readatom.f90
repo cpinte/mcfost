@@ -828,7 +828,7 @@ CONTAINS
     real, parameter :: epsilon = 5e-3
     real :: eps
     real(kind=dp) :: epsilon_l_max !if epsilon > 1/pi/adamp, the value of xwing_lorentz is negative
-    real(kind=dp) :: max_adamp, adamp, maxvel, vel, min_resol
+    real(kind=dp) :: max_adamp, adamp, maxvel, vel, min_resol, max_resol
     integer, intent(in) :: unit
     character(len=MAX_LENGTH) :: inputline
     character(len=15) :: FormatLine
@@ -1055,10 +1055,12 @@ CONTAINS
     end do
 
     min_Resol = 1d30
+    max_resol = 0.0
     do nmet=1,Natom
        do k=1,n_cells
           if (icompute_atomRT(k)>0) then
              min_resol = min(Atoms(nmet)%ptr_atom%vbroad(k), min_resol)
+             max_resol = max(Atoms(nmet)%ptr_atom%vbroad(k), max_resol)
           endif
        enddo
     enddo
@@ -1067,8 +1069,7 @@ CONTAINS
     if (art_hv > 0.0) then
        hv = art_hv
     endif
-    write(*,*) "resol(km/s)", hv, " min(vD) (km/s) = ", min_resol * 1d-3
-
+	write(*,'("R(km/s)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
 
     !Move after LTEpops for first estimates of damping
     !line wave grid define here to have the max damping
