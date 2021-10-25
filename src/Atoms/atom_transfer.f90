@@ -2204,7 +2204,7 @@ contains
           if (dJ /= 0.0_dp)  write(*,'("   >>> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
           write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
           if (conv_speed /= 0.0_dp) write(*,'("   ->> speed="(1ES17.8E3))') conv_speed
-          write(*,"('Unconverged cells #'(1I5), ' fraction :'(1F12.3)' %')") &
+          write(*,"('Unconverged cells #'(1I6), ' fraction :'(1F12.3)' %')") &
                size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
                100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
