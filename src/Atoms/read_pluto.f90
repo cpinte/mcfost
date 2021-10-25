@@ -162,14 +162,14 @@ contains
     hydro_limits(:) = 0
 
     k = 1
-    hydro_limits(1) = select_inplace(k,real(x))*limit_factor
-    hydro_limits(3) = select_inplace(k,real(y))*limit_factor
-    hydro_limits(5) = select_inplace(k,real(z))*limit_factor
+    hydro_limits(1) = find_kth_smallest_inplace(k,real(x))*limit_factor
+    hydro_limits(3) = find_kth_smallest_inplace(k,real(y))*limit_factor
+    hydro_limits(5) = find_kth_smallest_inplace(k,real(z))*limit_factor
 
     k = n_points
-    hydro_limits(2) = select_inplace(k,real(x))*limit_factor
-    hydro_limits(4) = select_inplace(k,real(y))*limit_factor
-    hydro_limits(6) = select_inplace(k,real(z))*limit_factor
+    hydro_limits(2) = find_kth_smallest_inplace(k,real(x))*limit_factor
+    hydro_limits(4) = find_kth_smallest_inplace(k,real(y))*limit_factor
+    hydro_limits(6) = find_kth_smallest_inplace(k,real(z))*limit_factor
     if (n_etoiles > 0) then
     	write(*,*) "# Model limits (Rstar) :"
     	write(*,*) "x =", hydro_limits(1)/etoile(1)%r, hydro_limits(2)/etoile(1)%r
