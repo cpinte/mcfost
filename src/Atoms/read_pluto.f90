@@ -2,7 +2,7 @@ module pluto_mod
   use parametres
   use messages
   use getline
-  use atmos_type, only : lmagnetized, laccretion_shock, Taccretion
+  use atmos_type, only : lmagnetized, laccretion_shock, Taccretion, empty_cells
 
   use utils
   use sph2mcfost, only : SPH_to_Voronoi, Hydro_to_Voronoi_atomic
@@ -137,12 +137,13 @@ contains
           else
              call getnextLine(1, "#", FormatLine, inputline, Nread)
              read(inputline(1:Nread),*) x(icell), y(icell), z(icell), T_tmp(icell), mass_gas(icell),&
-                  mass_ne_on_massgas(icell), vx(icell), vy(icell), vz(icell), vt_tmp(icell), dz(icell)
+                  mass_ne_on_massgas(icell), vx(icell), vy(icell), vz(icell), vt_tmp(icell), dz(icell), h(icell)
           endif
        enddo
        !density_file
 
-       h(:) = maxval(sqrt(x**2+y**2+z**2))
+		!Included in the input model now.
+!        h(:) = maxval(sqrt(x**2+y**2+z**2))
 
     else
        call error("lpluto_file or lmodel_ascii required for lmhd_voronoi!")
@@ -191,6 +192,7 @@ contains
     !** bug handling
 
     call hydro_to_Voronoi_atomic(n_points,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,dz)
+! 	call empty_cells
 
     !deallocating temporary variables from input file.
     deallocate(h,vx,vy,vz,mass_gas, mass_ne_on_massgas, x,y,z,T_tmp, vt_tmp, dz)
