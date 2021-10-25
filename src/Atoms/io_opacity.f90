@@ -48,6 +48,7 @@ CONTAINS
 	close(unit)
     call ftfiou(unit, sys_status)
     
+    return
    end subroutine write_dbmatrix_bin
    
   subroutine read_dbmatrix_bin(filename, A)
@@ -67,8 +68,66 @@ CONTAINS
 	close(unit)
     call ftfiou(unit, sys_status)
     
+    return
    end subroutine read_dbmatrix_bin
    
+   
+   !could be para with offset
+   subroutine write_contopac_bin(filename)
+
+    integer :: unit
+    character(len=*), intent(in) :: filename
+    integer :: sys_status   
+    integer :: icell, la
+
+
+    call ftgiou(unit,sys_status)
+    open(unit, file=trim(filename),form="unformatted",status='unknown',access="sequential",iostat=sys_status)
+    
+    do icell=1,n_cells
+    
+    	do la=1,Nlambda_cont
+			write(unit,iostat=sys_status) chi_c(la,icell)
+		enddo
+		do la=1,Nlambda_cont
+			write(unit,iostat=sys_status) eta_c(la,icell)
+		enddo
+
+	enddo
+	
+	close(unit)
+    call ftfiou(unit, sys_status) 
+   
+   	return
+   end subroutine write_contopac_bin
+  
+   !could be para with offset 
+   subroutine read_contopac_bin(filename)
+    integer :: unit
+    character(len=*), intent(in) :: filename
+    integer :: sys_status
+    integer :: icell, la
+
+    call ftgiou(unit,sys_status)
+    open(unit, file=trim(filename),form="unformatted",status='old',iostat=sys_status)
+    if (sys_status /= 0)  then
+       close(unit)
+       write(*,*) "No ", trim(filename), " to read!"
+       return
+    endif
+    do icell=1,n_cells
+    	do la=1,Nlambda_cont
+			read(unit, iostat=sys_status) chi_c(la,icell)
+		enddo
+    	do la=1,Nlambda_cont
+			read(unit, iostat=sys_status) eta_c(la,icell)
+		enddo
+	enddo
+	close(unit)
+    call ftfiou(unit, sys_status)   
+   
+   	return
+   end subroutine read_contopac_bin
 
   SUBROUTINE integ_cont_optical_depth(id,icell_in,xi,yi,zi,u,v,w,chic,tauc,dtauc,dl,ltot)
     ! Given chic, the continuum opacity,
