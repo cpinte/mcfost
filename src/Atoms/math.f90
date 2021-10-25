@@ -536,6 +536,19 @@ CONTAINS
 
     return
   end function quad_1D_sorted
+  
+  !trilinear or in grid directly
+  
+  !bilinear then bilinear_1pt
+  
+!   function bilinear_1pt(x,y,xi,yi)
+!    !bilinear interpolation at point (xi,yi)
+!   	real(kind=dp), intent(in) :: x(4),y(4)
+!   	real(kind=dp), intent(in) :: xi, yi
+!   	real(kind=dp) :: bilinear_1pt
+!   
+!   	return
+!   end function bilinear_1pt
 
   !building
   function convolve(x, y, K)
@@ -942,7 +955,7 @@ CONTAINS
     RETURN
   END FUNCTION interp1Darr
 
-  FUNCTION interp2D(x1a,x2a,ya,x1,x2) result(y)
+  function interp2D(x1a,x2a,ya,x1,x2) result(y)
     ! interpolate at points x1 and x2
     ! inside the grid vectors x1a and x2a.
     ! special case for Barklem data.
@@ -961,17 +974,24 @@ CONTAINS
     tmp1(1) = x1
     tmp2(1) = x2
 
-    do j=1,size(x1a) !y-axis interpolation
-       yb = ya(j,:)
-       call bezier2_interp(size(x2a),x2a,yb,1, tmp2, tmp3)
-       ymtmp(j) = tmp3(1) !tmp3 needed to extract the scalar value
-    end do
-    call bezier2_interp(size(x1a), x1a, ymtmp, 1, tmp1, tmp3)
+!     do j=1,size(x1a) !y-axis interpolation
+!        yb = ya(j,:)
+!        call bezier2_interp(size(x2a),x2a,yb,1, tmp2, tmp3)
+!        ymtmp(j) = tmp3(1) !tmp3 needed to extract the scalar value
+!     end do
+!     call bezier2_interp(size(x1a), x1a, ymtmp, 1, tmp1, tmp3)
+    
+    do j=1,size(x1a)
+    	yb = ya(j,:)
+    	tmp3 = linear_1D_sorted(size(x2a),x2a,yb,1,tmp2)
+    	ymtmp(j) = tmp3(1)
+    enddo
+	tmp3 = linear_1D_sorted(size(x1a),x1a,ymtmp,1,tmp1)
 
     y = tmp3(1)
 
-    RETURN
-  END FUNCTION interp2D
+    return
+  end function interp2D
 
   FUNCTION interp2Darr(N1a, x1a, N2a, x2a,ya,N1, x1, N2, x2) result(y)
     integer, intent(in) :: N1a, N2a, N1, N2
