@@ -27,6 +27,7 @@ MODULE statequil_atoms
   use input, only 						: nb_proc
 
   IMPLICIT NONE
+  logical :: ldamp_jacobi = .false.
   !Nlambda,  Nproc not stored for all ray since no sub it and ray-ray building of rate matrix
   real(kind=dp), allocatable :: psi(:,:,:), omega_sor_atom(:)
   real(kind=dp), parameter :: Tmax = 1d10 !value of temperature of transition if ni = nj*gij
@@ -2348,13 +2349,16 @@ CONTAINS
     Gamma_dag = atom%Gamma(:,:,id) !with diagonal
     atom%Gamma(imaxpop,:,id) = 1.0_dp
 
-    call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
-    !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel, .true.)
-
-    ! 		!-> solve for residual
-    ! 		delta = atom%n(:,icell) + matmul(atom%Gamma(:,:,id), ndag)
-    ! 		call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
-    ! 		atom%n(:,icell) = ndag(:) + omega_sor_atom(atom%activeindex) * delta(:)
+	if (ldamp_jacobi) then
+    !-> solve for residual. By default omega_sor_atom is 1.0
+    	delta = atom%n(:,icell) - matmul(atom%Gamma(:,:,id), ndag)
+    	call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
+   		atom%n(:,icell) = ndag(:) + omega_sor_atom(atom%activeindex) * delta(:)
+   	else !Jacobi
+    	call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
+   	endif
+!     call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
+!     !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel, .true.)
 
     if ((maxval(atom%n(:,icell)) < 0.0)) then
        !raise warning or error if all populations are negative. Otherwise, handle

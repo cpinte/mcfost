@@ -72,7 +72,7 @@ module atom_transfer
        calc_bf_rates, calc_rate_matrix, &
        update_populations, update_populations_and_electrons, fill_collision_matrix, &
        init_bb_rates_atom, initgamma, initgamma_atom , init_rates_atom, store_radiative_rates_mali,calc_rates_draft, &
-       store_rate_matrices, psi, calc_rates_mali, n_new, ne_new, radiation_free_pops_atom, omega_sor_atom!,store_radiative_rates,
+       store_rate_matrices, psi, calc_rates_mali, n_new, ne_new, radiation_free_pops_atom, omega_sor_atom, ldamp_jacobi!,store_radiative_rates,
 
   implicit none
 
@@ -94,7 +94,7 @@ module atom_transfer
   real(kind=dp), dimension(:), allocatable :: Iacc
   !NLTE
   real(kind=dp) :: dne
-  logical :: ljacobi_sor = .false., lfixed_J = .false. !computes and fix J for the non-LTE loop
+  logical :: lfixed_J = .false. !computes and fix J for the non-LTE loop
   ! 	logical :: lNg_acceleration = .true.
   ! 	integer :: iNg_Norder=2, iNg_ndelay=5, iNg_Nperiod=5
   real(kind=dp), allocatable :: ng_cur(:)
@@ -1468,12 +1468,11 @@ contains
     real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
     real(kind=dp) :: dT, dN2, dN3, dN4, diff_old
     real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
-    real(kind=dp), allocatable :: Jnew_cont(:,:)
-    ! 		real(kind=dp), allocatable :: err_pop(:,:)
+    real(kind=dp), allocatable :: Jnew_cont(:,:), err_pop(:,:)
     logical :: labs, update_bckgr_opac
     logical :: l_iterate = .false., l_iterate_ne = .false., update_ne_other_nlte = .false.
-    logical :: accelerated, ng_rest!,lapply_sor_correction
-    integer :: iorder, i0_rest, n_iter_accel, iacc!, iter_sor
+    logical :: accelerated, ng_rest,lapply_sor_correction
+    integer :: iorder, i0_rest, n_iter_accel, iacc, iter_sor
     integer :: nact, imax, icell_max, icell_max_2
     integer :: icell, ilevel, imu, iphi, id_ref !for anisotropy
     character(len=20) :: ne_start_sol = "NE_MODEL"
@@ -1510,12 +1509,13 @@ contains
     !!write(unit_invfile,*) n_cells
 
 
-    ! 		if (ljacobi_sor) then
-    ! 			iter_sor = 0
-    ! 			lapply_sor_correction = .false.
-    ! 			allocate(omega_sor_atom(NactiveAtoms)); omega_sor_atom(:) = 1.0_dp
-    ! 			allocate(err_pop(Nactiveatoms,3)); err_pop(:,:) = 0.0_dp
-    ! 		endif
+	if (ldamp_jacobi) then
+		iter_sor = 0
+		lapply_sor_correction = .false.
+		allocate(omega_sor_atom(NactiveAtoms)); omega_sor_atom(:) = 1.0_dp
+		allocate(err_pop(Nactiveatoms,3)); err_pop(:,:) = 0.0_dp
+		omega_sor_atom(:) = 1.5
+	endif
 
     ! 		if (laccurate_integ) then
     ! 			if (iterate_ne) then
@@ -2166,23 +2166,29 @@ contains
           end do cell_loop2 !icell
           write(*,'("  ---> dnHII="(1ES17.8E3))') diff_cont  
           conv_speed = -(diff-diff_old)
-          ! 				if ((ljacobi_sor).and..not.(lapply_sor_correction)) then
-          !
-          ! 					nact = 1
-          ! 					iter_sor = n_iter - 6 !3 previous dn/n are stored, and used for the next iterations
-          ! 					if ((iter_sor > 0).and.(iter_sor < 4)) then
-          ! 						err_pop(:,iter_sor) = dM(:)
-          ! 						write(*,*) n_iter, iter_sor, err_pop(nact,iter_sor)
-          ! 					endif
-          !
-          ! 					!!if (iter_sor == 4) write(*,*) "alpha=", abs (err_pop(nact,1) - 2.0*err_pop(nact,2) + err_pop(nact,3) )
-          !
-          ! 					if ( (mod(n_iter,10) == 0).and.(err_pop(nact,3)/err_pop(nact,2) <= 1.0) ) then
-          ! 						omega_sor_atom(nact) = 2.0_dp / ( 1.0 + sqrt(1.0 - err_pop(nact,3)/err_pop(nact,2) ) )
-          ! 						lapply_sor_correction = .true.
-          ! 						write(*,*) n_iter, "omega_sor=", omega_sor_atom(nact), err_pop(nact,:)
-          ! 					endif
-          ! 				endif
+          !a more dynamic criterion should be use, that also depends on the atom.
+          if (ldamp_jacobi) then
+          	if (abs(conv_speed) < 1e-2) then
+          		omega_sor_atom(:) = 1.5
+          	else
+          		omega_sor_atom(:) = 1.0
+          	endif
+          endif
+!           if ((ldamp_jacobi).and..not.(lapply_sor_correction)) then
+!           
+! 			nact = 1
+! 			iter_sor = n_iter - 6 !3 previous dn/n are stored, and used for the next iterations
+! 			if ((iter_sor > 0).and.(iter_sor < 4)) then
+! 				err_pop(:,iter_sor) = dM(:)
+! 				write(*,*) "acc sor", n_iter, iter_sor, err_pop(nact,iter_sor)
+! 			endif
+!                     
+!           	if ( (err_pop(nact,3)/err_pop(nact,2) <= 1.0) ) then
+!           		omega_sor_atom(nact) = 2.0_dp / ( 1.0 + sqrt(1.0 - err_pop(nact,3)/err_pop(nact,2) ) )
+! !           		lapply_sor_correction = .true.
+!           		write(*,*) "SOR", n_iter, activeatoms(nact)%ptr_atom%id,"omega_sor=", omega_sor_atom(nact), err_pop(nact,:)
+!           	endif
+!           endif
 
           if (maxval(max_n_iter_loc)>0) write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
           write(*,'(" -> icell_max1 #"(1I6)," icell_max2 #"(1I6))') icell_max, icell_max_2
