@@ -13,7 +13,7 @@ module stars
 
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
        repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra, &
-       intersect_stars
+       intersect_stars, distance_to_star
 
   private
 
@@ -813,7 +813,17 @@ subroutine intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
   real(kind=dp) :: b,c, delta, rac, s1, s2, d_to_star
   integer :: i
 
-
+!   d_to_star = distance_to_stars(x,y,z,u,v,w,i_star)
+!   lintersect_stars = (i_star > 0)
+!   if (lintersect_stars) then
+!      icell_star = etoile(i_star)%icell
+!   else
+!      icell_star = 0
+!   end if
+! 
+!   return
+  
+  
   r(1) = x ; r(2) = y ; r(3) = z
   k(1) = u ; k(2) = v ; k(3) = w
 
