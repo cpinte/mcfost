@@ -720,7 +720,7 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   eps_dust2 = 0.0_dp
 
   ! Ajout du champ de radiation stellaire diffuse 1 seule fois
-  call calc_Isca_rt2_star(lambda, p_lambda, ibin) ! this is the slow line  : 1.6s sur 2.4s  ---> 0.54s apres parallelization
+  !call calc_Isca_rt2_star(lambda, p_lambda, ibin) ! this is the slow line  : 1.6s sur 2.4s  ---> 0.54s apres parallelization
 
   ! Contribution lumiere diffusee (y compris multiple et thermique diffusee)
   call calc_Isca_rt2(lambda, p_lambda, ibin)  ! ~ 0.7s sur 2.4s

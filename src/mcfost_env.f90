@@ -11,7 +11,7 @@ module mcfost_env
   character(len=128) :: web_server    = "http://ipag.osug.fr/public/pintec/"
   character(len=128) :: webpage       = "/mcfost/"
   character(len=128) :: utils_webpage = "/mcfost_utils/"
-  character(len=128) :: doc_webpage   = "/mcfost/docs/html/"
+  character(len=128) :: doc_webpage   = "https://mcfost.readthedocs.io/"
 
   ! Système
   integer :: nb_proc
