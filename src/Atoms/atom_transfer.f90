@@ -1468,10 +1468,10 @@ contains
     real(kind=dp) :: diff, norme, dN, dN1, dJ, lambda_max
     real(kind=dp) :: dT, dN2, dN3, dN4, diff_old
     real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
-    real(kind=dp), allocatable :: Jnew_cont(:,:), err_pop(:,:)
+    real(kind=dp), allocatable :: Jnew_cont(:,:)
     logical :: labs, update_bckgr_opac
     logical :: l_iterate = .false., l_iterate_ne = .false., update_ne_other_nlte = .false.
-    logical :: accelerated, ng_rest,lapply_sor_correction
+    logical :: accelerated, ng_rest, lng_turned_on
     integer :: iorder, i0_rest, n_iter_accel, iacc, iter_sor
     integer :: nact, imax, icell_max, icell_max_2
     integer :: icell, ilevel, imu, iphi, id_ref !for anisotropy
@@ -1511,10 +1511,7 @@ contains
 
 	if (ldamp_jacobi) then
 		iter_sor = 0
-		lapply_sor_correction = .false.
 		allocate(omega_sor_atom(NactiveAtoms)); omega_sor_atom(:) = 1.0_dp
-		allocate(err_pop(Nactiveatoms,3)); err_pop(:,:) = 0.0_dp
-		omega_sor_atom(:) = 1.5
 	endif
 
     ! 		if (laccurate_integ) then
@@ -1551,6 +1548,10 @@ contains
           call error("Cannot allocate Ng table !")
        endif
        mem_alloc_local = mem_alloc_local + sizeof(ngpop)
+       !if lng_turned_on is used, iNg_Ndelay is  deprecated and
+       !the value of conv_speed is used.
+       lng_turned_on = .false.
+       iNg_Ndelay = 0
     endif
 
     deallocate(stream)
@@ -1685,8 +1686,7 @@ contains
        lconverged = .false.
        n_iter = 0
        dne = 0.0_dp
-       diff_old = 0.0
-       conv_speed = 100
+       conv_speed = 0.0
 
        do while (.not.lconverged)
 
@@ -1914,7 +1914,9 @@ contains
           accelerated = .false.
 !           if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(maxval(dM) < 1d-2))).and. &
 !                (maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
-          if ( (lNg_acceleration .and. (n_iter > iNg_Ndelay)).and.(maxval_cswitch_atoms()==1.0_dp)&
+!           if ( (lNg_acceleration .and. (n_iter > iNg_Ndelay)).and.(maxval_cswitch_atoms()==1.0_dp)&
+!           	.and.(.not.lprevious_converged) ) then
+          if ( (lNg_acceleration .and. lng_turned_on).and.(maxval_cswitch_atoms()==1.0_dp)&
           	.and.(.not.lprevious_converged) ) then
              iorder = n_iter - iNg_Ndelay
              if (ng_rest) then
@@ -2165,30 +2167,42 @@ contains
              end if !if l_iterate
           end do cell_loop2 !icell
           write(*,'("  ---> dnHII="(1ES17.8E3))') diff_cont  
-          conv_speed = -(diff-diff_old)
-          !a more dynamic criterion should be use, that also depends on the atom.
+          if (n_iter > 1) conv_speed = (diff_old - diff) !>0 if converging.
+          !!a more dynamic criterion should be use, that also depends on the atom.
           if (ldamp_jacobi) then
-          	if (abs(conv_speed) < 1e-2) then
-          		omega_sor_atom(:) = 1.5
-          	else
+          	if (iter_sor == 3) then
+          		write(*,*) " Damped jacobi  iteration"
+          		if ((conv_speed < 1e-1).and.(conv_speed > 0)) then
+          		  	write(*,*) "  Over estimating solution"
+          			if (conv_speed < 1e-4) then
+          				omega_sor_atom(:) = 1.9
+          			elseif ( (conv_speed >= 1e-4) .and. (conv_speed < 1e-2) ) then
+          				omega_sor_atom(:) = 1.5
+          			else
+          				omega_sor_atom(:) = 1.0
+          			endif
+          		elseif (conv_speed < 0) then
+          		 	 write(*,*) "  Reducing solution"
+          			omega_sor_atom(:) = 0.5
+          		endif
+          		iter_sor = 100
           		omega_sor_atom(:) = 1.0
+          	else
+          		if (abs(conv_speed)<1e-2) then
+           			iter_sor = iter_sor + 1         		
+          		endif
           	endif
           endif
-!           if ((ldamp_jacobi).and..not.(lapply_sor_correction)) then
-!           
-! 			nact = 1
-! 			iter_sor = n_iter - 6 !3 previous dn/n are stored, and used for the next iterations
-! 			if ((iter_sor > 0).and.(iter_sor < 4)) then
-! 				err_pop(:,iter_sor) = dM(:)
-! 				write(*,*) "acc sor", n_iter, iter_sor, err_pop(nact,iter_sor)
-! 			endif
-!                     
-!           	if ( (err_pop(nact,3)/err_pop(nact,2) <= 1.0) ) then
-!           		omega_sor_atom(nact) = 2.0_dp / ( 1.0 + sqrt(1.0 - err_pop(nact,3)/err_pop(nact,2) ) )
-! !           		lapply_sor_correction = .true.
-!           		write(*,*) "SOR", n_iter, activeatoms(nact)%ptr_atom%id,"omega_sor=", omega_sor_atom(nact), err_pop(nact,:)
-!           	endif
-!           endif
+          
+          if (n_iter > 1) then
+          	!be sure we are converging before extrapolating
+          	if ((conv_speed > 0.0).and.(conv_speed < 1e-3)) then
+          		if (.not.lng_turned_on) then
+          			lng_turned_on = .true.
+          			iNg_Ndelay = n_iter
+          		endif
+          	endif
+          endif
 
           if (maxval(max_n_iter_loc)>0) write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
           write(*,'(" -> icell_max1 #"(1I6)," icell_max2 #"(1I6))') icell_max, icell_max_2
@@ -2209,7 +2223,7 @@ contains
           if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
           if (dJ /= 0.0_dp)  write(*,'("   >>> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
           write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
-          if (conv_speed /= 0.0_dp) write(*,'("   ->> speed="(1ES17.8E3))') conv_speed
+          write(*,'("   ->> speed="(1ES17.8E3))') conv_speed
           write(*,"('Unconverged cells #'(1I6), ' fraction :'(1F12.3)' %')") &
                size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
                100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
@@ -2300,6 +2314,10 @@ contains
     if (lNg_acceleration) then
        if (allocated(ngpop)) deallocate(ngpop)
        if (allocated(ng_cur)) deallocate(ng_cur)
+    endif
+    
+    if (ldamp_jacobi) then
+    	deallocate(omega_sor_atom)
     endif
 
 
