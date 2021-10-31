@@ -2168,39 +2168,32 @@ contains
              end if !if l_iterate
           end do cell_loop2 !icell
           write(*,'("  ---> dnHII="(1ES17.8E3))') diff_cont  
+          !backward derivative
           if (n_iter > 1) then
-          	conv_speed = (diff_old - diff) !>0 if converging.
-          	conv_acc = conv_acc - conv_speed
+          	conv_speed = (diff - diff_old) !<0 converging.
+          	conv_acc = conv_speed - conv_acc !>0 accelerating
           endif
           !!a more dynamic criterion should be use, that also depends on the atom.
           if (ldamp_jacobi) then
-          	if (iter_sor == 3) then
-          		write(*,*) " Damped jacobi  iteration"
-          		if ((conv_speed < 1e-1).and.(conv_speed > 0)) then
-          		  	write(*,*) "  Over estimating solution"
-          			if (conv_speed < 1e-4) then
-          				omega_sor_atom(:) = 1.9
-          			elseif ( (conv_speed >= 1e-4) .and. (conv_speed < 1e-2) ) then
-          				omega_sor_atom(:) = 1.5
-          			else
-          				omega_sor_atom(:) = 1.0
-          			endif
-          		elseif (conv_speed < 0) then
-          		 	 write(*,*) "  Reducing solution"
-          			omega_sor_atom(:) = 0.5
+          	!conv_speed is negative if we converge!
+          	if (conv_speed <= 0) then
+          		if (-conv_speed < 1d-4) then
+          			omega_sor_atom(:) = 1.8
+          		else
+          			omega_sor_atom(:) = 1.0
           		endif
-          		iter_sor = 100
-          		omega_sor_atom(:) = 1.0
           	else
-          		if (abs(conv_speed)<1e-2) then
-           			iter_sor = iter_sor + 1         		
+          		if (conv_speed > 5) then
+          			omega_sor_atom(:) = 0.8
+          		else
+          			omega_sor_atom(:) = 1.0
           		endif
           	endif
           endif
           
           if (lng_acceleration) then
           	!be sure we are converging before extrapolating
-          	if ((n_iter>1).and.(conv_speed > 0.0).and.(abs(conv_acc) < 1e-3)) then
+          	if ( (n_iter>1).and.(conv_speed <= 0).and.(-conv_speed < 1d-3) ) then
           		if (.not.lng_turned_on) then
           			lng_turned_on = .true.
           			iNg_Ndelay = n_iter
