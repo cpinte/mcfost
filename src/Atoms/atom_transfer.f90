@@ -1478,7 +1478,7 @@ contains
     character(len=20) :: ne_start_sol = "NE_MODEL"
     type (AtomType), pointer :: atom
     integer(kind=8) :: mem_alloc_local = 0
-    real(kind=dp) :: diff_cont, conv_speed
+    real(kind=dp) :: diff_cont, conv_speed, conv_acc
     integer :: ibar, n_cells_done
     integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
 
@@ -1687,6 +1687,7 @@ contains
        n_iter = 0
        dne = 0.0_dp
        conv_speed = 0.0
+       conv_acc = 0.0
 
        do while (.not.lconverged)
 
@@ -2167,7 +2168,10 @@ contains
              end if !if l_iterate
           end do cell_loop2 !icell
           write(*,'("  ---> dnHII="(1ES17.8E3))') diff_cont  
-          if (n_iter > 1) conv_speed = (diff_old - diff) !>0 if converging.
+          if (n_iter > 1) then
+          	conv_speed = (diff_old - diff) !>0 if converging.
+          	conv_acc = conv_acc - conv_speed
+          endif
           !!a more dynamic criterion should be use, that also depends on the atom.
           if (ldamp_jacobi) then
           	if (iter_sor == 3) then
@@ -2194,9 +2198,9 @@ contains
           	endif
           endif
           
-          if (n_iter > 1) then
+          if (lng_acceleration) then
           	!be sure we are converging before extrapolating
-          	if ((conv_speed > 0.0).and.(conv_speed < 1e-3)) then
+          	if ((n_iter>1).and.(conv_speed > 0.0).and.(abs(conv_acc) < 1e-3)) then
           		if (.not.lng_turned_on) then
           			lng_turned_on = .true.
           			iNg_Ndelay = n_iter
@@ -2216,20 +2220,21 @@ contains
              endif
              write(*,'("   >>>   dT="(1ES17.8E3))') dTM(nact)
              write(*,'("    --->   dT(line)="(1ES17.8E3), " dT(cont)="(1ES17.8E3))') dN2, dN4
-             write(*,'("    ->> Te(icell_max2)="(1F14.4)" K", " Tion="(1ES17.8E3)" K")') T(icell_max_2), Tion_ref(nact)
-             write(*,'("    ->> Te(icell_max1)="(1F14.4)" K", " Texi="(1ES17.8E3)" K")') T(icell_max), Tex_ref(nact)
+             write(*,'("    ->> Te(icell_max2)="(1F14.4)" K", " Tion="(1F14.4)" K")') T(icell_max_2), Tion_ref(nact)
+             write(*,'("    ->> Te(icell_max1)="(1F14.4)" K", " Texi="(1F14.4)" K")') T(icell_max), Tex_ref(nact)
              write(*,*) " ------------------------------------------------ "
           enddo
           if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
           if (dJ /= 0.0_dp)  write(*,'("   >>> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
           write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
-          write(*,'("   ->> speed="(1ES17.8E3))') conv_speed
+          write(*,'("   ->> speed="(1ES17.8E3)"; acc="(1ES17.8E3))') conv_speed, conv_acc
           write(*,"('Unconverged cells #'(1I6), ' fraction :'(1F12.3)' %')") &
                size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
                100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
           write(*,*) " *************************************************************** "
           diff_old = diff
+          conv_acc = conv_speed
                
 
           ! 				write(*,*) " set lprevious_converged to true for test"
