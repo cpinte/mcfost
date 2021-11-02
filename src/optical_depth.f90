@@ -475,10 +475,10 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
         lsubtract_avg = ((nbr_cell == 1).and.labs)
 
         ! local line profile mutiplied by frequency
-        P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l,ispeed,tab_speed)
+        P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,ispeed,tab_speed)
 
         if ((nbr_cell == 1).and.labs) then
-           ds(iray,id) = l
+           ds(iray,id) = l_contrib
            Doppler_P_x_freq(:,iray,id) = P(:)
         endif
 
@@ -567,11 +567,11 @@ end subroutine integ_ray_mol
 
 !***********************************************************
 
-function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l,ispeed,tab_speed)
+function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,ispeed,tab_speed)
 
   integer, intent(in) :: icell
   logical, intent(in) :: lsubtract_avg
-  real(kind=dp), intent(in) :: x0,y0,z0,x1,y1,z1,u,v,w,l
+  real(kind=dp), intent(in) :: x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib
   integer, dimension(2), intent(in) :: ispeed
   real(kind=dp), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
 
@@ -601,7 +601,7 @@ function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l,ispee
 
      ! Vitesse projete le long du trajet dans la cellule
      do ivpoint=2, n_vpoints-1
-        delta_vol_phi = (real(ivpoint,kind=dp))/(real(n_vpoints,kind=dp)) * l
+        delta_vol_phi = l_void_before + (real(ivpoint,kind=dp))/(real(n_vpoints,kind=dp)) * l_contrib
         xphi=x0+delta_vol_phi*u
         yphi=y0+delta_vol_phi*v
         zphi=z0+delta_vol_phi*w
@@ -758,7 +758,7 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
 
      if (lcellule_non_vide) then
         ! local line profile mutiplied by frequency
-        P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l,ispeed,tab_speed)
+        P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,ispeed,tab_speed)
 
         do i=1,nTrans
            iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
