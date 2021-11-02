@@ -179,17 +179,9 @@ contains
 
     !also work with grid-based code
     !massdust, rhodust, hydro_grainsizes not allocated if ndusttypes = 0 !
-    !** bug handling
-    !     	ndusttypes = 1 !oterwise bug
-    !     	allocate(massdust(1, n_points),rhodust(1, n_points),hydro_grainsizes(1))
-    !** bug handling
     call sph_to_voronoi(n_points-n_etoiles, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, &
          T_tmp, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation)
     ! -> correction for small density applied on mass_gas directly inside
-
-    !** bug handling
-    !     	deallocate(massdust,rhodust,hydro_grainsizes)
-    !** bug handling
 
     call hydro_to_Voronoi_atomic(n_points,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,dz)
 ! 	call empty_cells
