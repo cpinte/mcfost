@@ -85,7 +85,7 @@ contains
     else if (lascii_SPH_file) then
        write(*,*) "Performing SPH2mcfost setup"
        write(*,*) "Reading SPH density file: "//trim(SPH_file)
-       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,particle_id, ndusttypes,n_SPH,ierr)
        T_gas = x       !to allocate memory
        T_gas = 2.74
     endif
@@ -93,7 +93,8 @@ contains
 
     if (lignore_dust) then
        ndusttypes = 0
-       if (allocated(rhodust)) deallocate(rhodust,massdust)
+       if (allocated(rhodust)) deallocate(rhodust)
+       if (allocated(massdust)) deallocate(massdust)
     endif
 
     if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
@@ -160,8 +161,9 @@ contains
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(:), allocatable, intent(in) :: T_gas
     integer, dimension(n_SPH), intent(in) :: particle_id
-    real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
-    real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
+    !added allocatble and remove dimension otherwise bug if lignore_dust
+    real(dp), dimension(:,:), allocatable, intent(in) :: rhodust, massdust!(ndusttypes,n_SPH) otherwise if lignore_dust bug
+    real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes!(ndusttypes)
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
     logical, dimension(:), allocatable, intent(in), optional :: mask
@@ -210,14 +212,14 @@ contains
        !    N_part lines containing:
        !  - x,y,z: coordinates of each particle in AU
        !  - h: smoothing length of each particle in AU
-       !  - s: grain size of each particle in µm
+       !  - s: grain size of each particle in ï¿½m
        !
        !  Without grain growth: 2 lines containing:
        !  - n_sizes: number of grain sizes
-       !  - (s(i),i=1,n_sizes): grain sizes in µm
+       !  - (s(i),i=1,n_sizes): grain sizes in ï¿½m
        !  OR
        !  With grain growth: 1 line containing:
-       !  - s_min,s_max: smallest and largest grain size in µm
+       !  - s_min,s_max: smallest and largest grain size in ï¿½m
 
        open(unit=1,file="SPH_phantom.txt",status="replace")
        write(1,*) size(x)
@@ -768,12 +770,13 @@ contains
 
   !*********************************************************
 
-  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
+  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,particle_id, ndusttypes,n_SPH,ierr)
 
     integer,               intent(in) :: iunit
     character(len=*),      intent(in) :: filename
     real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust
+    integer, intent(out), dimension(:), allocatable :: particle_id
     integer, intent(out) :: ndusttypes, n_SPH,ierr
 
     integer :: syst_status, alloc_status, ios, i
@@ -786,18 +789,19 @@ contains
     open(unit=1,file="ntest.txt",status="old")
     read(1,*) n_SPH
     close(unit=1)
-    ndusttypes =1
+    ndusttypes = 1
 
     write(*,*) "n_SPH read_test_ascii_file = ", n_SPH
 
     alloc_status = 0
-    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
+    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), rhodust(ndusttypes,n_SPH), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
 
     open(unit=1, file=filename, status='old', iostat=ios)
     do i=1, n_SPH
        read(1,*) x(i), y(i), z(i), h(i), massgas(i)
        rhogas(i) = massgas(i)
+       particle_id(i) = i
     enddo
 
     write(*,*) "MinMax=", minval(massgas), maxval(massgas)

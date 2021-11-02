@@ -24,7 +24,7 @@ module Voronoi_grid
      real(kind=dp) :: h ! SPH smoothing lengths or typical cell size in grid based codes
      integer :: id, original_id, first_neighbour, last_neighbour
      logical(kind=lp) :: exist, is_star, was_cut
-     logical :: is_star_neighbour = .false.!.true. is .not.is_star and a star's neighbour! default is .false..
+     logical :: is_star_neighbour!.true. if .not.is_star and a star's neighbour! default is .false..
      logical :: masked
   end type Voronoi_cell
 
@@ -73,7 +73,7 @@ module Voronoi_grid
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours, icell_start, icell_end
-       integer(c_int), intent(in), value :: cpu_id, n_cpu, n_points_per_cpu, n_vectors
+       integer(c_int), intent(in), value :: cpu_id, n_cpu, n_points_per_cpu, n_vectors, n_stars
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z,h
        real(c_double), intent(in), value :: threshold, cutting_distance_o_h ! defines at which value we decide to cut the cell, and at how many h the cell will be cut
@@ -94,62 +94,6 @@ module Voronoi_grid
   end interface
 
   contains
-  
-
-function distance_to_star(x,y,z,u,v,w,i_star)
-  ! This routine implies that a star is in a unique cell
-  ! return the index of a star (i_star > 0) if a star will be intersected
-  ! by a ray going in the direction (u,v,w).
-  ! Computes also the distance between the point (x,y,z) and the star in that direction.
-
-  real(kind=dp) :: distance_to_star
-  real(kind=dp), intent(in) :: x,y,z, u,v,w
-  integer, intent(out) :: i_star
-	
-  real(kind=dp), dimension(3) :: r, k, delta_r
-  real(kind=dp) :: b,c, delta, rac, s1, s2
-  integer :: i
-
-
-  r(1) = x ; r(2) = y ; r(3) = z
-  k(1) = u ; k(2) = v ; k(3) = w
-
-  distance_to_star = huge(1.0_dp)
-
-  i_star = 0
-  star_loop : do i = 1, n_etoiles
-     delta_r(:)  = r(:) - (/etoile(i)%x, etoile(i)%y, etoile(i)%z/)
-     b = dot_product(delta_r,k)
-     c = dot_product(delta_r,delta_r) - (etoile(i)%r)**2
-     delta = b*b - c
-
-     if (delta >= 0.) then ! the packet will encounter (or has encoutered) the star
-        rac = sqrt(delta)
-        s1 = -b - rac
-
-        if (s1 < 0) then ! we already entered the star
-           ! We can probably skip that test, s1 must be positive as we must be outside the star
-           s2 = -b + rac
-           if (s2 > 0) then ! for s2 < 0: we already exited the star
-              ! We are still in the sphere and will exit it
-              ! This means that we had a round-off error somewhere
-              distance_to_star = 0.0_dp
-              i_star = i
-           endif
-        else ! We will enter in the star
-           if (s1 < distance_to_star) then
-              distance_to_star = s1
-              i_star = i
-           endif
-        endif ! s1 < 0
-
-     endif ! delta < 0
-
-  enddo star_loop
-
-
-return
-end function distance_to_star
 
     subroutine define_Voronoi_grid()
       ! This is an empty routine as a target for define_grid
@@ -278,7 +222,7 @@ end function distance_to_star
 
     logical :: is_outside_stars, lcompute
 
-    real(kind=dp), dimension(n_etoiles) :: deuxr2_star
+!     real(kind=dp), dimension(n_etoiles) :: deuxr2_star
     real(kind=dp) :: dx, dy, dz, dist2
 
     integer :: icell_start, icell_end, id, row, l, n_cells_before_stars
@@ -311,9 +255,10 @@ end function distance_to_star
          SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
 
-    do istar=1, n_etoiles
-       deuxr2_star(istar) = (2*etoile(istar)%r)**2
-    enddo
+!to do: to remove
+!     do istar=1, n_etoiles
+!        deuxr2_star(istar) = (2*etoile(istar)%r)**2
+!     enddo
 
     ! Filtering particles outside the limits
     icell = 0
@@ -321,27 +266,29 @@ end function distance_to_star
     do i=1, n_points
 
        ! We test if the point is in the model volume
+       !-> Voronoi cells are now cut at the surface of the star. We only need
+       ! to test if a particle is below Rstar.
        if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
           if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
              if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
-!-> Voronoi cells are now cut at the surface of the star.
+
                 ! We also test if the edge of the cell can be inside the star
-                ! We test for the edge, so the center needs to be at twice the radius
                 is_outside_stars = .true.
-!                 loop_stars : do istar=1, n_etoiles
-!                    dx = x(i) - etoile(istar)%x
-!                    dy = y(i) - etoile(istar)%y
-!                    dz = z(i) - etoile(istar)%z
-! 
-!                    if (min(dx,dy,dz) < 2*etoile(istar)%r) then
-!                       dist2 = dx**2 + dy**2 + dz**2
-!                       if (dist2 < deuxr2_star(istar)) then
-!                          is_outside_stars = .false.
-!                          n_sublimate = n_sublimate + 1
-!                          exit loop_stars
-!                       endif
-!                    endif
-!                 enddo loop_stars
+
+                loop_stars : do istar=1, n_etoiles
+                   dx = x(i) - etoile(istar)%x
+                   dy = y(i) - etoile(istar)%y
+                   dz = z(i) - etoile(istar)%z
+
+                   if (min(dx,dy,dz) < etoile(istar)%r) then
+                      dist2 = dx**2 + dy**2 + dz**2
+                      if (dist2 < etoile(istar)%r**2) then
+                         is_outside_stars = .false.
+                         n_sublimate = n_sublimate + 1
+                         exit loop_stars
+                      endif
+                   endif
+                enddo loop_stars
 
                 if (is_outside_stars) then
                    icell = icell + 1
@@ -953,19 +900,6 @@ end function distance_to_star
        ! centered on the center of the cell
        delta_r = r - r_cell(:)
        
-       
-       if (is_a_star_neighbour) then
-       	   !if it is a star neighbour, we just need to compute the distance from the next star
-       		d_to_star = distance_to_star(x,y,z,u,v,w,i_star)
-       		!It is a neighbour so if the star is intersected (i_star>0) it is necessarily the next cell.
-       		!Otherwise, i_star == 0 (does not intersect the star in this direction (u,v,w)), so it is a wall.
-       		if (i_star > 0) then
-       	  		s_void_before = 0.0_dp
-       			s_contrib = d_to_star
-				return
-			endif
-       endif
-       
        	b = dot_product(delta_r,k)
        	c = dot_product(delta_r,delta_r) - (h * PS%cutting_distance_o_h)**2
        	delta = b*b - c
@@ -999,6 +933,21 @@ end function distance_to_star
     else ! the cell was not cut
        s_void_before = 0.0_dp
        s_contrib = s
+    endif
+    
+       
+    if (is_a_star_neighbour) then
+       	d_to_star = distance_to_star(x,y,z,u,v,w,i_star)
+       	!It is a neighbour so if the star is intersected (i_star>0) it might be the next cell.
+       	!Otherwise, i_star == 0 (does not intersect the star in this direction (u,v,w)).
+       	if (i_star > 0) then
+       	  	if (d_to_star < s) then !indeed a star, we use d_to_stars and set next_cell
+       	  		s_contrib = d_to_star
+       	  		next_cell = etoile(i_star)%icell
+       	  	!else  !not a star, another cell.
+       	  		!s_contrib = s
+       	  	endif
+		endif
     endif
 
     return
@@ -1260,6 +1209,64 @@ end function distance_to_star
     return
 
   end function distance_to_wall
+
+  !----------------------------------------
+  
+  function distance_to_star(x,y,z,u,v,w,i_star)
+  ! This routine implies that a star is in a unique cell
+  ! return the index of a star (i_star > 0) if a star will be intersected
+  ! by a ray going in the direction (u,v,w).
+  ! Computes also the distance between the point (x,y,z) and the star in that direction.
+
+    real(kind=dp) :: distance_to_star
+    real(kind=dp), intent(in) :: x,y,z, u,v,w
+    integer, intent(out) :: i_star
+	
+    real(kind=dp), dimension(3) :: r, k, delta_r
+    real(kind=dp) :: b,c, delta, rac, s1, s2
+    integer :: i
+
+
+    r(1) = x ; r(2) = y ; r(3) = z
+    k(1) = u ; k(2) = v ; k(3) = w
+
+    distance_to_star = huge(1.0_dp)
+
+    i_star = 0
+    star_loop : do i = 1, n_etoiles
+     	delta_r(:)  = r(:) - (/etoile(i)%x, etoile(i)%y, etoile(i)%z/)
+     	b = dot_product(delta_r,k)
+     	c = dot_product(delta_r,delta_r) - (etoile(i)%r)**2
+     	delta = b*b - c
+
+     	if (delta >= 0.) then ! the packet will encounter (or has encoutered) the star
+        	rac = sqrt(delta)
+        	s1 = -b - rac
+
+        	if (s1 < 0) then ! we already entered the star
+           ! We can probably skip that test, s1 must be positive as we must be outside the star
+           	s2 = -b + rac
+           	if (s2 > 0) then ! for s2 < 0: we already exited the star
+              ! We are still in the sphere and will exit it
+              ! This means that we had a round-off error somewhere
+              	distance_to_star = 0.0_dp
+              	i_star = i
+           	endif
+        	
+        else ! We will enter in the star
+           	if (s1 < distance_to_star) then
+              	distance_to_star = s1
+              	i_star = i
+           		endif
+        	endif ! s1 < 0
+
+     	endif ! delta < 0
+
+    enddo star_loop
+
+
+    return
+  end function distance_to_star
 
   !----------------------------------------
 
@@ -1532,7 +1539,6 @@ integer function find_Voronoi_cell(id, iwall, x,y,z)
 end function find_Voronoi_cell
 
 !----------------------------------------
-
 
 !  subroutine kdtree2_example
 !
