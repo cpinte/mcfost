@@ -160,8 +160,8 @@ contains
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(:), allocatable, intent(in) :: T_gas
     integer, dimension(n_SPH), intent(in) :: particle_id
-    real(dp), dimension(ndusttypes,n_SPH), intent(in) :: rhodust, massdust
-    real(dp), dimension(ndusttypes), intent(in) :: SPH_grainsizes
+    real(dp), dimension(:,:), allocatable, intent(in) :: rhodust, massdust ! ndusttypes,n_SPH
+    real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes ! ndusttypes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
     logical, dimension(:), allocatable, intent(in), optional :: mask
