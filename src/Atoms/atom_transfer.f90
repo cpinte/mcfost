@@ -266,10 +266,10 @@ contains
 
           if (Nactiveatoms > 0) then
              Snu_c = ( Snu_c + eta_c_nlte(:,icell) ) / ( chi_c(:,icell) + chi_c_nlte(:,icell) + tiny_dp)
-             dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell))
+             dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell)) * AU_to_m
           else
              Snu_c = Snu_c / (chi_c(:,icell) + tiny_dp)
-             dtau_c(:) = l_contrib * chi_c(:,icell)
+             dtau_c(:) = l_contrib * chi_c(:,icell) * AU_to_m
           endif
 !           if (.not.labs .and. (icell==1 .or. icell==n_cells)) then
 !           	write(*,*) icell, maxval(chi0_bb(:,icell)), maxval(eta0_bb(:,icell))
@@ -433,10 +433,10 @@ contains
 
           if (Nactiveatoms > 0) then
              Snu_c = ( Snu_c + eta_c_nlte(:,icell) ) / ( chi_c(:,icell) + chi_c_nlte(:,icell) + tiny_dp)
-             dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell))
+             dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell)) * AU_to_m
           else
              Snu_c = Snu_c / (chi_c(:,icell) + tiny_dp)
-             dtau_c(:) = l_contrib * chi_c(:,icell)
+             dtau_c(:) = l_contrib * chi_c(:,icell) * AU_to_m
           endif
 
           ! surface superieure ou inf
@@ -457,7 +457,7 @@ contains
 !              origin_atom(la,icell) = origin_atom(la,icell) + facteur_tau * exp(-(tau(la))) * Snu(la)!eta(la,id)
              Itot(la,iray,id) = Itot(la,iray,id) + ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) ) * Snu(la)
              tau(la) = tau(la) + dtau(la) !for next cell
-             tau_line(la) = tau_line(la) + l_contrib * chi_line(la)
+             tau_line(la) = tau_line(la) + l_contrib * chi_line(la) * AU_to_m
           enddo
 
        end if  ! lcellule_non_vide
@@ -592,10 +592,10 @@ contains
 
           if (Nactiveatoms > 0) then
              Snu_c = ( Snu_c + eta_c_nlte(:,icell) ) / ( chi_c(:,icell) + chi_c_nlte(:,icell) + tiny_dp)
-             dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell))
+             dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell)) * AU_to_m
           else
              Snu_c = Snu_c / (chi_c(:,icell) + tiny_dp)
-             dtau_c(:) = l_contrib * chi_c(:,icell)
+             dtau_c(:) = l_contrib * chi_c(:,icell) * AU_to_m
           endif
 
 
@@ -3332,8 +3332,6 @@ contains
        if (lcellule_non_vide) then
           lsubtract_avg = ((nbr_cell == 1).and.labs)
 
-          l_contrib = l_contrib * AU_to_m
-
           !Total source fonction or set eta to 0 to have only line emissivity
           if (llimit_mem) then
              call interp_continuum_local(icell, chi(:,id), eta(:,id))
@@ -3349,11 +3347,11 @@ contains
           	etas_loc = linear_1D_sorted(Nlambda_cont,lambda_cont,etasc_loc, Nlambda,lambda)
 			etas_loc(Nlambda) = etasc_loc(Nlambda_cont)
 			
-          	dtau_c(:) = l_contrib * chi_c(:,icell)
+          	dtau_c(:) = l_contrib * chi_c(:,icell) * AU_to_m
           	Icont(:,1,id) = Icont(:,1,id) + (eta_c(:,icell)+etasc_loc(:))/chi_c(:,icell) * exp(-tau_c) * (1.0 - exp(-dtau_c))
           	tau_c(:) = tau_c(:) + dtau_c(:)
 		  else
-          	dtau_c(:) = l_contrib * chi_c(:,icell)
+          	dtau_c(:) = l_contrib * chi_c(:,icell) * AU_to_m
           	Icont(:,1,id) = Icont(:,1,id) + eta_c(:,icell)/chi_c(:,icell) * exp(-tau_c) * (1.0 - exp(-dtau_c))
           	tau_c(:) = tau_c(:) + dtau_c(:)
           endif
@@ -3361,15 +3359,15 @@ contains
           !includes a loop over all bound-bound, passive and active
           call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,.false.)
 
-          dtau(:) = l_contrib * chi(:,id)
+          dtau(:) = l_contrib * chi(:,id) * AU_to_m
 
           if (lelectron_scattering) then
              eta(:,id) = eta(:,id) + etas_loc(:)
           endif
 
           tau = tau + dtau
-          l_tot = l_tot + l_contrib
-          xmass = xmass + l_contrib * nHtot(icell) * masseH * 1d-3
+          l_tot = l_tot + l_contrib * AU_to_m
+          xmass = xmass + l_contrib * AU_to_m *  nHtot(icell) * masseH * 1d-3
 
 
           write(unit_cf, '(1I, 4ES17.8E3, 2F12.5)') icell, l_tot, xmass, nHtot(icell), ne(icell), T(icell), &
