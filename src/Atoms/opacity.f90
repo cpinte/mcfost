@@ -954,11 +954,11 @@ contains
   ! 	return
   ! 	end subroutine compute_nlte_bound_free
 
-  subroutine opacity_atom_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
+  subroutine opacity_atom_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib, iterate)
 
     integer, intent(in) :: id, icell, iray
     logical, intent(in) :: iterate
-    real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
+    real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
     integer :: nact, Nred, Nblue, kc, kr, i, j
     type(AtomType), pointer :: aatom
     integer :: dk0, dk1, Nlam
@@ -1006,7 +1006,7 @@ contains
              cycle tr_loop
           endif
 
-          phi0(1:Nlam) = profile(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred), x,y,z,x1,y1,z1,u,v,w,l)
+          phi0(1:Nlam) = profile(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred), x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
 
 
           ! 				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
@@ -1188,11 +1188,11 @@ contains
   end subroutine cross_coupling_terms
 
   !TO DO merge with opacity_atom_loc()
-  subroutine opacity_atom_zeeman_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l, iterate)
+  subroutine opacity_atom_zeeman_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib,  iterate)
 
     integer, intent(in) :: id, icell, iray
     logical, intent(in) :: iterate
-    real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l
+    real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
     integer :: nact, Nred, Nblue, kc, kr, i, j, m
     type(AtomType), pointer :: aatom
     integer :: dk0, dk1, Nlam
@@ -1236,7 +1236,7 @@ contains
           phiz = 0.0
           psiz = 0.0
           !!fixed at the moment
-          call local_profile_zv(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred),phi0(1:Nlam),phiZ(1:Nlam,:), psiZ(1:Nlam,:), x,y,z,x1,y1,z1,u,v,w,l)
+          call local_profile_zv(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred),phi0(1:Nlam),phiZ(1:Nlam,:), psiZ(1:Nlam,:), x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
 
           etal = hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell)
           chil = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))

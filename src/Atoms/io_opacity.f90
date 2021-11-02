@@ -253,7 +253,7 @@ CONTAINS
           !call interp_bound_free_opacity(icell, chi(:,id), eta(:,id))
           !total boun-bound + bound-free + background opacities lte + nlte
           chi(:,id) = chi0_bb(:,icell); eta(:,id) = eta0_bb(:,icell) !!-> true only if chi0_bb and eta0_bb contains the continuum at lambda(1:Nlambda)
-          call opacity_atom_loc(id, icell, iray,x0,y0,z0,x1,y1,z1,u,v,w,l,.false.)
+          call opacity_atom_loc(id, icell, iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before, l_contrib,.false.)
 
           chibb(:,icell) = chi(:,id)
           etabb(:,icell) = eta(:,id)
@@ -1851,10 +1851,10 @@ CONTAINS
           if (lmagnetized) then
           	!along z axis !
           	call opacity_atom_zeeman_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  &
-               0.0_dp,  0.0_dp,  1.0_dp,  0.0_dp, .false.)
+               0.0_dp,  0.0_dp,  1.0_dp,  0.0_dp, 0.0_dp, .false.)
           else
           	call opacity_atom_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  &
-               0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp, .false.)
+               0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp, 0.0_dp, .false.)
           endif
           chi_tmp(:,1,icell) = chi(:,id)
           eta_tmp(:,1,icell) = eta(:,id)
@@ -1957,7 +1957,7 @@ CONTAINS
           !-> only line source function  = line emiss / total opac
           eta(:,id) = 0.0_dp!eta0_bb(:,icell)
           call opacity_atom_loc(id, icell, 1, 0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp,  &
-               0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp, .false.)
+               0.0_dp,  0.0_dp,  0.0_dp,  0.0_dp, 0.0_dp, .false.)
           chi_tmp(:,icell) = chi(:,id)
           eta_tmp(:,icell) = eta(:,id)
        endif

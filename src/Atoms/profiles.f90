@@ -72,14 +72,14 @@ CONTAINS
   !if projection done before, we do not need x,y,z,l ect
 
 
-  function local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+  function local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
     ! phi = Voigt / sqrt(pi) / vbroad(icell)
     integer, intent(in) 							            :: icell, N
     logical, intent(in)											:: lsubstract_avg
     real(kind=dp), dimension(N), intent(in)						:: lambda
     real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
          x1,y1,z1, &      ! velocity field and magnetic field
-         l !physical length of the cell
+         l_void_before,l_contrib !physical length of the cell
     integer 													:: Nvspace
     real(kind=dp), dimension(NvspaceMax) 						:: Omegav
     real(kind=dp) 												:: norm
@@ -111,7 +111,7 @@ CONTAINS
        Nvspace = min(max(2,nint(dv/line%atom%vbroad(icell)*20.)),NvspaceMax)
 
        do nv=2, Nvspace-1
-          delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+          delta_vol_phi = l_void_before + (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
           xphi=x+delta_vol_phi*u
           yphi=y+delta_vol_phi*v
           zphi=z+delta_vol_phi*w
@@ -151,14 +151,14 @@ CONTAINS
   end function local_profile_v
 
   !gaussian are NOT interpolated (because it is not much faster but would be costly in memory to store all gaussian lines)
-  function local_profile_interp(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+  function local_profile_interp(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
     ! phi = Voigt / sqrt(pi) / vbroad(icell)
     integer, intent(in) 							            :: icell, N
     logical, intent(in)											:: lsubstract_avg
     real(kind=dp), intent(in), dimension(N)						:: lambda
     real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
          x1,y1,z1, &      ! velocity field and magnetic field
-         l !physical length of the cell
+         l_void_before,l_contrib !physical length of the cell
     integer 													:: Nvspace
     real(kind=dp), dimension(NvspaceMax) 						:: Omegav
     real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi, t, vbroad, dv
@@ -202,7 +202,7 @@ CONTAINS
        ! 		write(*,*) "Nv = ", max(2,nint(dv/line%atom%vbroad(icell)*20.))
        ! 		write(*,*) v0/1e3, v1/1e3, dv/1e3, NvspaceMax
        do nv=2, Nvspace-1
-          delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+          delta_vol_phi = l_void_before + (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
           xphi=x+delta_vol_phi*u
           yphi=y+delta_vol_phi*v
           zphi=z+delta_vol_phi*w
@@ -275,14 +275,14 @@ CONTAINS
     return
   end function local_profile_interp
 
-  function local_profile_thomson(line,icell,lsubstract_avg, N, lambda, x,y,z,x1,y1,z1,u,v,w,l)
+  function local_profile_thomson(line,icell,lsubstract_avg, N, lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
     ! phi = Voigt / sqrt(pi) / vbroad(icell)
     integer, intent(in) 							            :: icell, N
     logical, intent(in) 										:: lsubstract_avg
     real(kind=dp), dimension(N), intent(in)						:: lambda
     real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
          x1,y1,z1, &      ! velocity field and magnetic field
-         l !physical length of the cell
+         l_void_before,l_contrib !physical length of the cell
     integer 													:: Nvspace
     real(kind=dp), dimension(NvspaceMax) 						:: Omegav
     real(kind=dp) 												:: v0, v1, dv, delta_vol_phi, xphi, yphi, zphi, aeff, eta, ratio, aL, vbroad
@@ -312,7 +312,7 @@ CONTAINS
        Nvspace = min(max(2,nint(dv/vbroad*20.)),NvspaceMax)
 
        do nv=2, Nvspace-1
-          delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+          delta_vol_phi = l_void_before+(real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
           xphi=x+delta_vol_phi*u
           yphi=y+delta_vol_phi*v
           zphi=z+delta_vol_phi*w
@@ -364,14 +364,14 @@ CONTAINS
     return
   end function local_profile_thomson
 
-  function local_profile_dirac(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+  function local_profile_dirac(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
     ! phi = Voigt / sqrt(pi) / vbroad(icell)
     integer, intent(in) 							            :: icell, N
     logical, intent(in)											:: lsubstract_avg
     real(kind=dp), intent(in), dimension(N)						:: lambda
     real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
          x1,y1,z1, &      ! velocity field and magnetic field
-         l !physical length of the cell
+         l_void_before,l_contrib !physical length of the cell
     integer 													:: Nvspace
     real(kind=dp), dimension(NvspaceMax) 						:: Omegav
     real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi, t, vbroad, dv
@@ -400,7 +400,7 @@ CONTAINS
        Nvspace = min(max(2,nint(dv/vbroad*20.)),NvspaceMax)
 
        do nv=2, Nvspace-1
-          delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+          delta_vol_phi = l_void_before+(real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
           xphi=x+delta_vol_phi*u
           yphi=y+delta_vol_phi*v
           zphi=z+delta_vol_phi*w
@@ -425,14 +425,14 @@ CONTAINS
     return
   end function local_profile_dirac
 
-  function local_profile_gate(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+  function local_profile_gate(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
     ! phi = Voigt / sqrt(pi) / vbroad(icell)
     integer, intent(in) 							            :: icell, N
     logical, intent(in)											:: lsubstract_avg
     real(kind=dp), intent(in), dimension(N)						:: lambda
     real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
          x1,y1,z1, &      ! velocity field and magnetic field
-         l !physical length of the cell
+         l_void_before,l_contrib !physical length of the cell
     integer 													:: Nvspace
     real(kind=dp), dimension(NvspaceMax) 						:: Omegav
     real(kind=dp) :: v0, v1, delta_vol_phi, xphi, yphi, zphi, t, vbroad, dv, max_u
@@ -462,7 +462,7 @@ CONTAINS
        Nvspace = min(max(2,nint(dv/vbroad*20.)),NvspaceMax)
 
        do nv=2, Nvspace-1
-          delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+          delta_vol_phi = l_void_before+(real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
           xphi=x+delta_vol_phi*u
           yphi=y+delta_vol_phi*v
           zphi=z+delta_vol_phi*w
@@ -487,7 +487,7 @@ CONTAINS
     return
   end function local_profile_gate
 
-  function local_profile_dk(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
+  function local_profile_dk(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
     !comoving (local) profile is shifted on the observed grid depending on the velocity.
     !The profile is defined on a N size grid which encompass the maximum possible displacement
     !due to the velocity, but the local profile is shifted only from i1:i2 (Nblue and Nred on this
@@ -498,7 +498,7 @@ CONTAINS
     real(kind=dp), dimension(N), intent(in)						:: lambda
     real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
          x1,y1,z1, &      ! velocity field and magnetic field
-         l !physical length of the cell
+         l_void_before,l_contrib !physical length of the cell
     integer 													:: Nvspace
     real(kind=dp) 												:: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
          dv
@@ -526,7 +526,7 @@ CONTAINS
        dv = abs(v1-v0)
        Nvspace = min(max(2,nint(dv/line%atom%vbroad(icell)*20.)),NvspaceMax)
        do nv=2, Nvspace-1
-          delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+          delta_vol_phi = l_void_before + (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
           xphi=x+delta_vol_phi*u
           yphi=y+delta_vol_phi*v
           zphi=z+delta_vol_phi*w
@@ -563,14 +563,14 @@ CONTAINS
 
   !Currently, the magnetic field is assumed constant inside the cell and there is not projection
   !To Do split the magnetic field like the velocity field
-  subroutine local_profile_zv(line,icell,lsubstract_avg,N,lambda, phi0, phiz, psiz, x,y,z,x1,y1,z1,u,v,w,l)
+  subroutine local_profile_zv(line,icell,lsubstract_avg,N,lambda, phi0, phiz, psiz, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
     ! phi = Voigt / sqrt(pi) / vbroad(icell)
     integer, intent(in) 							            :: icell, N
     logical, intent(in)											:: lsubstract_avg
     real(kind=dp), dimension(N), intent(in)						:: lambda
     real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
          x1,y1,z1, &      ! velocity field and magnetic field
-         l !physical length of the cell
+         l_void_before,l_contrib !physical length of the cell
     integer 													:: Nvspace, Nzc, Nbspace
     real(kind=dp), dimension(NvspaceMax) 						:: Omegav
 !     real(kind=dp), dimension(NbspaceMax) 						:: Omegab
@@ -591,7 +591,7 @@ CONTAINS
 
     if (lnot_magnetized.or..not.(line%polarizable)) then
        !The test could be done elsewhere though
-       phi0 = local_profile_v(line,icell,lsubstract_avg,N,lambda,x,y,z,x1,y1,z1,u,v,w,l)
+       phi0 = local_profile_v(line,icell,lsubstract_avg,N,lambda,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
        return
     endif
     
@@ -625,7 +625,7 @@ CONTAINS
        Nvspace = min(max(2,nint(dv/line%atom%vbroad(icell)*20.)),NvspaceMax)
 
        do nv=2, Nvspace-1
-          delta_vol_phi = (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l
+          delta_vol_phi = l_void_before + (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
           xphi=x+delta_vol_phi*u
           yphi=y+delta_vol_phi*v
           zphi=z+delta_vol_phi*w

@@ -202,8 +202,6 @@ contains
           lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet same as iterate?
           ! opacities in m^-1
 
-          l_contrib = l_contrib * AU_to_m !l_contrib in m
-
           !total bound-bound + bound-free + background opacities lte + nlte
           if (llimit_mem) then
              call interp_continuum_local(icell, chi(:,id), eta(:,id))
@@ -227,9 +225,9 @@ contains
           endif
 
           !includes a loop over all bound-bound, passive and active
-          call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) )
+          call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,( (nbr_cell==1).and.labs ) )
 
-          dtau(:) = l_contrib * chi(:,id)
+          dtau(:) = l_contrib * chi(:,id) * AU_to_m
 
 		  !To do: remove all the tests
           if ((nbr_cell == 1).and.labs) then
@@ -244,10 +242,10 @@ contains
                    write(*,*) chi(:,id)
                    call error( "inf or nan in chi")
                 endif
-                psi(:,iray,id) = ( 1.0_dp - exp( -l*AU_to_m*chi(:,id) ) ) / chi(:,id)
+                psi(:,iray,id) = ( 1.0_dp - exp( -l_contrib*chi(:,id)* AU_to_m ) ) / chi(:,id)
                 if (allocated(chi_loc)) chi_loc(:,iray,id)  = chi(:,id)
              else
-                ds(iray,id) = l*au_to_m
+                ds(iray,id) = l_contrib * AU_to_m
              endif
           endif
 
@@ -399,8 +397,6 @@ contains
           lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet same as iterate?
           ! opacities in m^-1
 
-          l_contrib = l_contrib * AU_to_m !l_contrib in m
-
           !total bound-bound + bound-free + background opacities lte + nlte
           ! 				!rename it chi0_bckgr etc
           if (llimit_mem) then
@@ -420,12 +416,12 @@ contains
           endif
 
           !includes a loop over all bound-bound, passive and active
-          call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) )
+          call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,( (nbr_cell==1).and.labs ) )
 
           Sline = eta(:,id) - eta0_bb(:,icell)
           chi_line = chi(:,id) - chi0_bb(:,icell)
 
-          dtau(:) = l_contrib * chi(:,id)
+          dtau(:) = l_contrib * chi(:,id) * AU_to_m
 
           if (lelectron_scattering) then
              Snu = ( eta(:,id) + etas_loc(:) ) / ( chi(:,id) + tiny_dp )
@@ -560,8 +556,6 @@ contains
           lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet same as iterate?
           ! opacities in m^-1
 
-          l_contrib = l_contrib * AU_to_m !l_contrib in m
-
           !total bound-bound + bound-free + background opacities lte + nlte
           if (llimit_mem) then
              call interp_continuum_local(icell, chi(:,id), eta(:,id))
@@ -580,9 +574,9 @@ contains
           endif
 
           !includes a loop over all bound-bound, passive and active
-          call opacity_atom_zeeman_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,( (nbr_cell==1).and.labs ) )
+          call opacity_atom_zeeman_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,( (nbr_cell==1).and.labs ) )
 
-          dtau(:) = l_contrib * chi(:,id)
+          dtau(:) = l_contrib * chi(:,id) * AU_to_m
 
           if ((nbr_cell == 1).and.labs) then
 				write(*,*) "labs should be false here!"
@@ -2691,7 +2685,7 @@ contains
           l_contrib = l_contrib * AU_to_m !l_contrib in m
 
           if ((nbr_cell == 1).and.labs) then
-             ds(iray,id) = l * AU_to_m
+             ds(iray,id) = l_contrib
           endif
 
 
@@ -3365,7 +3359,7 @@ contains
           endif
 
           !includes a loop over all bound-bound, passive and active
-          call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l,.false.)
+          call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,.false.)
 
           dtau(:) = l_contrib * chi(:,id)
 
@@ -4106,7 +4100,7 @@ end module atom_transfer
 ! 				l_contrib = l_contrib * AU_to_m !l_contrib in m
 !
 ! 				if ((nbr_cell == 1).and.labs) then
-! 					ds(iray,id) = l * AU_to_m
+! 					ds(iray,id) = l_contrib
 ! 				endif
 !
 ! 				!total bound-bound + bound-free + background opacities lte + nlte
@@ -4375,7 +4369,7 @@ end module atom_transfer
 ! 						if (lmali_scheme) then
 ! 							psi(la,iray,id) = ( 1.0_dp - exp( -l*AU_to_m*chi(la,id) ) ) / chi(la,id)
 ! 						else
-! 							ds(iray,id) = l*au_to_m
+! 							ds(iray,id) = l_contrib
 ! 						endif
 ! 					endif
 !
