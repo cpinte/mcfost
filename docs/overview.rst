@@ -18,7 +18,7 @@ reproduce most of the observations of disks:
 
 The Monte Carlo method being generic, any complex structure can be
 handled by MCFOST and its use can be extended to other astrophysical
-objects. For instance, tests have been performed on infalling envelopes
+objects. For instance, calculations have succesfully been performed on infalling envelopes
 and AGB stars.
 
 .. important:: The code is open source under GPLv3. We also kindly ask you cite the code papers in scientific publications if you use MCFOST in your research. We also welcome collaborations and are happy ti provide help with using the code and interpreting the results.

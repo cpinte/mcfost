@@ -1,4 +1,5 @@
-[![build-gfortran-macos](https://github.com/cpinte/mcfost/actions/workflows/build-gfortran-macos.yml/badge.svg)](https://github.com/cpinte/mcfost/actions/workflows/build-gfortran-macos.yml)
+
+
 
 The MCFOST radiative transfer code
 ==================================
@@ -6,6 +7,8 @@ The MCFOST radiative transfer code
 - Code: <https://github.com/cpinte/mcfost>
 - Docs: <https://mcfost.readthedocs.io/>
 
+[![build-gfortran-macos](https://github.com/cpinte/mcfost/actions/workflows/build-gfortran-macos.yml/badge.svg)](https://github.com/cpinte/mcfost/actions/workflows/build-gfortran-macos.yml) 
+[![Documentation Status](https://readthedocs.org/projects/mcfost/badge/?version=stable)](https://mcfost.readthedocs.io/en/stable/?badge=stable)
 
 About
 -----
