@@ -25,11 +25,11 @@ void progress_bar(float progress) {
 #define SQ(x)	(x*x)
 
 int index_star(int icell, int n_stars, int *stars_id) {
-	int k;	
-	for (k=0; k<n_stars; k++) {
-		if ( (icell==stars_id[k]) ? true : false ) return k;
-	}
-	return -1;
+  int k;
+  for (k=0; k<n_stars; k++) {
+    if ( (icell==stars_id[k]) ? true : false ) return k;
+  }
+  return -1;
 }
 
 
@@ -62,7 +62,7 @@ extern "C" {
     nx=int(dx*ilscale+1);
     ny=int(dy*ilscale+1);
     nz=int(dz*ilscale+1);
-    
+
     //Local bool array to know if a cell is a star
     //an element per cell/per_cpu
     int *has_a_star, find_at_least_one_star=false;
@@ -87,7 +87,7 @@ extern "C" {
 
     int n_neighbours_cell, first_neighbour, last_neighbour;
     int max_size_list = max_neighbours * n;
-    double cx, cy, cz, cutting_distance, delta_edge;
+    double cx, cy, cz, cutting_distance, delta_edge,f,d_to_star;
 
     n_neighbours[cpu_id] = 0;
     last_neighbour = -1;
@@ -129,20 +129,18 @@ extern "C" {
           if (n_neighbours[cpu_id] > max_size_list) {ierr = 1; exit(1);}
 
           c.neighbors(vi);
-          
-          
+
           i_star = index_star(pid, n_stars, stellar_id);
-   		  if (i_star > -1) {
-   		 	puts("find a star!");
-   		 	printf("pid = %d, pid_loc = %d, i_star = %d, icell_star = %d\n",pid,pid_loc,i_star,stellar_id[i_star]);
-   		 	puts("");
-   		 	if (!find_at_least_one_star) find_at_least_one_star=true;
-          	for (i=0; i<n_neighbours_cell; i++) {
+          if (i_star > -1) {
+            puts("find a star!");
+            printf("pid = %d, pid_loc = %d, i_star = %d, icell_star = %d\n",pid,pid_loc,i_star,stellar_id[i_star]);
+            puts("");
+            if (!find_at_least_one_star) find_at_least_one_star=true;
+            for (i=0; i<n_neighbours_cell; i++) {
               if (vi[i] >=0) // Flag neighbour as neighbour of stars
-			  	has_a_star[vi[i]] = pid;//stellar_id[i_star]
-          	}
-   		  }         
-          
+                has_a_star[vi[i]] = pid;//stellar_id[i_star]
+            }
+          }
 
           for (i=0; i<n_neighbours_cell; i++) {
             if (vi[i] >=0) {
@@ -175,7 +173,7 @@ extern "C" {
     n_in = pid_loc+1;
 
     if (cpu_id == n_cpu-1) progress_bar(1.0);
-    
+
     /* Loop again over all cells but only do operations on cells that are stars */
     //A small temporary check for debug!
     if (find_at_least_one_star) {
@@ -185,28 +183,36 @@ extern "C" {
     	return;
     }
 
+    // We re-initialise the loop
+    vlo.start()
     pid_loc = -1;
     do {
       pid = vlo.pid(); // id of the current cell in the c_loop
 
       if ((pid >= icell_start) && (pid <= icell_end)) {
         pid_loc++; //increment even if not a star's neighbour !
-		icell_star = has_a_star[pid];
-		if (icell_star > -1)  {//a star
-		  con.compute_cell(c,vlo);
-		  
-		  stellar_neighb[pid_loc] = true;
+        icell_star = has_a_star[pid];
+        if (icell_star > -1)  {//a star
+          con.compute_cell(c,vlo);
 
+          stellar_neighb[pid_loc] = true;
 
           i_star = index_star(icell_star, n_stars, stellar_id);
-          cutting_distance = sqrt(SQ(x[pid]-x[icell_star]) + SQ(y[pid]-y[icell_star]) + SQ(z[pid]-z[icell_star])) - stellar_radius[i_star];
-          norm_vect = sqrt(SQ(x[pid]-x[icell_star]) + SQ(y[pid]-y[icell_star]) +  SQ(z[pid]-z[icell_star]));         	
+          dx = x[icell_star]-x[pid] ;
+          dy = y[icell_star]-y[pid] ;
+          dz = z[icell_star]-z[pid] ;
+          d_to_star = sqrt(dx*dx + dy*dy + dz*dz);
+          cutting_distance = d_to_star - stellar_radius[i_star] ;
 
-          c.plane(-(x[pid]-x[icell_star])/norm_vect, -(y[pid]-y[icell_star])/norm_vect, -(z[pid]-z[icell_star])/norm_vect, cutting_distance);
+          // Normalised vector towards star
+          f = 1./d_to_star ;
+          dx *= f ; dy *= f ; dz *= f;
 
-         	 
+          // We add a plane at the stelar surface
+          c.plane(dx,dy,dz,cutting_distance);
+
+          // We recompute the volume after the cut
           volume[pid_loc] = c.volume();
-
         } // stellar neighbour
       } // pid test
     } while(vlo.inc()); //Finds the next particle to test
