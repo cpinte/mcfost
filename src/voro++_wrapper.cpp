@@ -22,7 +22,6 @@ void progress_bar(float progress) {
 }
 
 #define n_elements(x)  (sizeof(x) / sizeof((x)[0]))
-#define SQ(x)	(x*x)
 
 int index_star(int icell, int n_stars, int *stars_id) {
   int k;
@@ -184,7 +183,7 @@ extern "C" {
     }
 
     // We re-initialise the loop
-    vlo.start()
+    vlo.start();
     pid_loc = -1;
     do {
       pid = vlo.pid(); // id of the current cell in the c_loop
