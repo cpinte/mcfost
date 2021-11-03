@@ -85,9 +85,7 @@ contains
     else if (lascii_SPH_file) then
        write(*,*) "Performing SPH2mcfost setup"
        write(*,*) "Reading SPH density file: "//trim(SPH_file)
-       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,vx,vy,vz,massgas,rho,rhodust,particle_id, ndusttypes,n_SPH,ierr)
-       T_gas = x       !to allocate memory
-       T_gas = 2.74
+       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,vx,vy,vz,T_gas,massgas,rho,rhodust,particle_id, ndusttypes,n_SPH,ierr)
     endif
     write(*,*) "Done"
 
@@ -769,11 +767,11 @@ contains
 
   !*********************************************************
 
-  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,vx,vy,vz,massgas,rhogas,rhodust,particle_id, ndusttypes,n_SPH,ierr)
+  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id, ndusttypes,n_SPH,ierr)
 
     integer,               intent(in) :: iunit
     character(len=*),      intent(in) :: filename
-    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas,vx,vy,vz
+    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas,vx,vy,vz,T_gas
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust
     integer, intent(out), dimension(:), allocatable :: particle_id
     integer, intent(out) :: ndusttypes, n_SPH,ierr
@@ -794,12 +792,12 @@ contains
 
     alloc_status = 0
     allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), rhodust(ndusttypes,n_SPH), &
-    	vx(n_sph), vy(n_sph), vz(n_sph), stat=alloc_status)
+    	vx(n_sph), vy(n_sph), vz(n_sph), T_gas(n_sph), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
 
     open(unit=1, file=filename, status='old', iostat=ios)
     do i=1, n_SPH
-       read(1,*) x(i), y(i), z(i), h(i), massgas(i), vx(i), vy(i), vz(i)
+       read(1,*) x(i), y(i), z(i), h(i), T_gas(i), massgas(i), vx(i), vy(i), vz(i)
        rhogas(i) = massgas(i)
        particle_id(i) = i
     enddo
