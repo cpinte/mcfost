@@ -9,7 +9,7 @@ module SPH2mcfost
   implicit none
 
   procedure(read_phantom_bin_files), pointer :: read_phantom_files => null()
-
+  
 contains
 
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
@@ -34,6 +34,7 @@ contains
     integer :: ndusttypes, ierr, i, ilen
     character(len=100) :: line_buffer
     logical :: check_previous_tesselation
+    
 
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
@@ -809,6 +810,80 @@ contains
     return
 
   end subroutine read_ascii_SPH_file
+  
+
+subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id,ndusttypes,n_sph)
+    use naleat, only : seed, stream, gtype
+#include "sprng_f.h"
+
+    real :: rand, rand2, rand3
+    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas,vx,vy,vz,T_gas
+    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
+    integer, intent(out), dimension(:), allocatable :: particle_id
+    integer, intent(out) :: ndusttypes, n_SPH
+	real, parameter :: rmi = 2.2, rmo = 3.0 !unit of etoile(1)%r
+    integer :: alloc_status, i, id
+    real(kind=dp) :: rr, tt, pp, sintt, costt, vol
+
+
+    !force nb_proc to 1 here, but we don't want to set nb_proc = 1 for the rest of the calc.
+    if (allocated(stream)) deallocate(stream)
+    allocate(stream(1))
+    stream = 0.0
+    do i=1, 1
+       !write(*,*) gtype, i-1,nb_proc,seed,SPRNG_DEFAULT
+       !init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+       stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+    enddo
+
+	lignore_dust = .true.
+    ndusttypes = 0
+    llimits_file = .false.
+    limits_file = ""
+    lascii_sph_file = .false.
+    lphantom_file = .false.
+    lgadget2_file = .false.
+
+    if (allocated(x)) then
+    	deallocate(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id)
+    endif
+    
+    n_sph = 100000
+
+    alloc_status = 0
+    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), &
+    	vx(n_sph), vy(n_sph), vz(n_sph), T_gas(n_sph), stat=alloc_status)
+    if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
+    
+    id = 1
+    do i=1, n_sph
+       particle_id(i) = i
+       rand  = sprng(stream(id))
+       rand2 = sprng(stream(id))
+       rand3 = sprng(stream(id))
+       costt = (2*rand2-1)
+       sintt = sqrt(1.0 - costt*costt)
+       pp = pi * (2*rand3-1)
+       rr = ( rmi + (rmo - rmi) * rand )! * sintt*sintt
+       x(i) = rr * sintt * cos(pp) * etoile(1)%r
+       y(i) = rr * sintt * sin(pp) * etoile(1)%r
+       z(i) = rr * costt * etoile(1)%r
+       vol = (rand + 1) * 0.025 * etoile(1)%r**3 * (4.0/3.0) * pi
+       vx(i) = 0.0
+       vy(i) = 0.0
+       vz(i) = 0.0
+       T_gas(i) = 1000.0
+       massgas(i) = 1d-10 * (vol * AU_to_m**3) * kg_to_Msun!Msun
+       rhogas(i) = massgas(i)
+       h(i) = 3.0 * rmo * etoile(1)%r
+    enddo
+    
+    
+    deallocate(stream)
+
+
+return
+end subroutine
 
   !*********************************************************
 
