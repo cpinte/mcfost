@@ -67,8 +67,11 @@ extern "C" {
     int *has_a_star, find_at_least_one_star=false;
     int i_star = -1, icell_star = -1; //< 0 no stars!
     double norm_vect;
+    int ave_stellar_neighbours = 0;
     has_a_star = (int *) malloc(n* sizeof(int));//n_points_per_cpu
-    for (i=0;i<n;i++) has_a_star[i] = -1;
+    for (i=0;i<n;i++) {
+    	has_a_star[i] = -1;
+    }
 
     // Define the container
     particle_order po;
@@ -138,6 +141,8 @@ extern "C" {
             for (i=0; i<n_neighbours_cell; i++) {
               if (vi[i] >=0) // Flag neighbour as neighbour of stars
                 has_a_star[vi[i]] = pid;//stellar_id[i_star]
+                printf("part %d is a star neighbour\n",vi[i]);
+                ave_stellar_neighbours += 1;
             }
           }
 
@@ -177,6 +182,8 @@ extern "C" {
     //A small temporary check for debug!
     if (find_at_least_one_star) {
     	puts("Find a star, cutting neigbours!");
+    	ave_stellar_neighbours = int((double) ave_stellar_neighbours/((double) n_stars));
+    	printf("Stars have in average %d neighbours!\n", ave_stellar_neighbours);
     } else {
     	free(has_a_star);
     	return;
@@ -192,6 +199,7 @@ extern "C" {
         pid_loc++; //increment even if not a star's neighbour !
         icell_star = has_a_star[pid];
         if (icell_star > -1)  {//a star
+          printf("cell %d, %d has a star as neighbour !\n", pid, pid_loc);
           con.compute_cell(c,vlo);
 
           stellar_neighb[pid_loc] = true;

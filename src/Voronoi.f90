@@ -225,7 +225,7 @@ module Voronoi_grid
 !     real(kind=dp), dimension(n_etoiles) :: deuxr2_star
     real(kind=dp) :: dx, dy, dz, dist2
 
-    integer :: icell_start, icell_end, id, row, l, n_cells_before_stars
+    integer :: icell_start, icell_end, id, row, l, n_cells_before_stars, n_average_neighb_stars
 
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     character(len=2) :: unit
@@ -520,6 +520,15 @@ module Voronoi_grid
     deallocate(was_cell_cut)
     Voronoi(:)%is_star_neighbour = star_neighb(:)
     deallocate(star_neighb)
+    n_average_neighb_stars = 0
+    do icell=1,n_cells
+       	if (Voronoi(icell)%is_star_neighbour) then
+       		write(*,*) "voro cell", icell, " is a star neighbour!"
+       		n_average_neighb_stars = n_average_neighb_stars + 1
+       	endif
+    enddo
+    write(*,*) "stars have in average ", int(real(n_average_neighb_stars)/real(n_etoiles)), " neighbours."
+    
 
     ! Saving position of the first neighbours to save time on memory access
     ! Warning this seems to cost a fair bit of time
