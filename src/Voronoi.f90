@@ -222,7 +222,6 @@ module Voronoi_grid
 
     logical :: is_outside_stars, lcompute
 
-!     real(kind=dp), dimension(n_etoiles) :: deuxr2_star
     real(kind=dp) :: dx, dy, dz, dist2
 
     integer :: icell_start, icell_end, id, row, l, n_cells_before_stars, n_average_neighb_stars
@@ -254,11 +253,6 @@ module Voronoi_grid
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
          SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
-
-!to do: to remove
-!     do istar=1, n_etoiles
-!        deuxr2_star(istar) = (2*etoile(istar)%r)**2
-!     enddo
 
     ! Filtering particles outside the limits
     icell = 0
@@ -448,7 +442,8 @@ module Voronoi_grid
 
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, &
             PS%vectors, PS%cutting_distance_o_h, icell_start-1,icell_end-1, id-1,nb_proc_voro,n_cells_per_cpu, &
-            n_in,V_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,n_etoiles, etoile(:)%icell-1,etoile(:)%r,star_neighb_tmp, ierr) ! icell & id shifted by 1 for C
+            n_in,V_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,&
+            n_etoiles, etoile(:)%icell-1,etoile(:)%r,star_neighb_tmp, ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
@@ -524,11 +519,10 @@ module Voronoi_grid
     n_average_neighb_stars = 0
     do icell=1,n_cells
        	if (Voronoi(icell)%is_star_neighbour) then
-       		write(*,*) "voro cell", icell, " is a star neighbour!"!tmp
        		n_average_neighb_stars = n_average_neighb_stars + 1
        	endif
     enddo
-    write(*,'("mean number of stellar neighbours="(1I5))') &
+    if (n_average_neighb_stars>0) write(*,'("mean number of stellar neighbours="(1I5))') &
     	int(real(size(pack(Voronoi(:)%is_star_neighbour,mask=Voronoi(:)%is_star_neighbour)))/real(n_etoiles))
 
 
@@ -846,6 +840,7 @@ module Voronoi_grid
     ilast = Voronoi(icell)%last_neighbour
     was_cut = Voronoi(icell)%was_cut
     h = Voronoi(icell)%h
+    !Store the id of the neighbouring stars instead ?
     is_a_star_neighbour = Voronoi(icell)%is_star_neighbour
 
     l=0
@@ -947,7 +942,6 @@ module Voronoi_grid
     endif
     
        
-    !could store the id of the stars instead of a bool
     if (is_a_star_neighbour) then
        	d_to_star = distance_to_star(x,y,z,u,v,w,i_star)
        	!It is a neighbour so if the star is intersected (i_star>0) it might be the next cell.
@@ -956,10 +950,8 @@ module Voronoi_grid
        	  	if (d_to_star < s) then !indeed a star, we use d_to_stars and set next_cell
        	  		s_contrib = d_to_star
        	  		next_cell = etoile(i_star)%icell
-       	  	!else  !not a star, another cell.
-       	  		!s_contrib = s
        	  	endif
-		endif
+		   endif
     endif
 
     return
