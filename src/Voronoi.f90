@@ -520,15 +520,17 @@ module Voronoi_grid
     deallocate(was_cell_cut)
     Voronoi(:)%is_star_neighbour = star_neighb(:)
     deallocate(star_neighb)
+
     n_average_neighb_stars = 0
     do icell=1,n_cells
        	if (Voronoi(icell)%is_star_neighbour) then
-       		write(*,*) "voro cell", icell, " is a star neighbour!"
+       		write(*,*) "voro cell", icell, " is a star neighbour!"!tmp
        		n_average_neighb_stars = n_average_neighb_stars + 1
        	endif
     enddo
-    write(*,*) "stars have in average ", int(real(n_average_neighb_stars)/real(n_etoiles)), " neighbours."
-    
+    write(*,'("mean number of stellar neighbours="(1I5))') &
+    	int(real(size(pack(Voronoi(:)%is_star_neighbour,mask=Voronoi(:)%is_star_neighbour)))/real(n_etoiles))
+
 
     ! Saving position of the first neighbours to save time on memory access
     ! Warning this seems to cost a fair bit of time
@@ -945,6 +947,7 @@ module Voronoi_grid
     endif
     
        
+    !could store the id of the stars instead of a bool
     if (is_a_star_neighbour) then
        	d_to_star = distance_to_star(x,y,z,u,v,w,i_star)
        	!It is a neighbour so if the star is intersected (i_star>0) it might be the next cell.

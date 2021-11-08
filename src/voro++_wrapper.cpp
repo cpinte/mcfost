@@ -104,7 +104,43 @@ extern "C" {
       ierr = 1;
       exit(1);
     }
+    
+    /* We loop over all cells to identify the stellar neighbours. 
+       This is not optimal, but otherwise it does not work in parallel.
+    */
+    pid_loc = -1;
+    do {
+      	pid = vlo.pid(); // id of the current cell in the c_loop
+        pid_loc++; //increment even if not a star's neighbour !
+        i_star = index_star(pid, n_stars, stellar_id);
 
+        if (i_star > -1) {
+       		if (!con.compute_cell(c,vlo)){
+       			puts("Error stellar cell has been removed!");
+       			exit(1);
+       		}
+            c.neighbors(vi);
+
+            puts("find a star!");
+            printf("pid = %d, pid_loc = %d, i_star = %d, icell_star = %d\n",pid,pid_loc,i_star,stellar_id[i_star]);
+            puts("");
+            if (!find_at_least_one_star) find_at_least_one_star=true;
+            for (i=0; i<c.number_of_faces(); i++) {
+              if (vi[i] >=0) // Flag neighbour as neighbour of stars
+                has_a_star[vi[i]] = pid;//stellar_id[i_star]
+                printf("part %d is a star neighbour\n",vi[i]);
+                ave_stellar_neighbours += 1;
+            }
+         } //it's a star        
+              
+    } while(vlo.inc()); 
+    if ((find_at_least_one_star)&&(cpu_id==0)) {
+    	puts("Find a star, cutting neigbours!");
+    	ave_stellar_neighbours = int((double) ave_stellar_neighbours/((double) n_stars));
+    	printf("Stars have in average %d neighbours!\n", ave_stellar_neighbours);
+    }
+     
+    vlo.start(); //re-init the looop
     pid_loc = -1; // pid_loc is the cell index for this core, ie starting at 0
     do {
       pid = vlo.pid(); // id of the current cell in the c_loop
@@ -132,19 +168,19 @@ extern "C" {
 
           c.neighbors(vi);
 
-          i_star = index_star(pid, n_stars, stellar_id);
-          if (i_star > -1) {
-            puts("find a star!");
-            printf("pid = %d, pid_loc = %d, i_star = %d, icell_star = %d\n",pid,pid_loc,i_star,stellar_id[i_star]);
-            puts("");
-            if (!find_at_least_one_star) find_at_least_one_star=true;
-            for (i=0; i<n_neighbours_cell; i++) {
-              if (vi[i] >=0) // Flag neighbour as neighbour of stars
-                has_a_star[vi[i]] = pid;//stellar_id[i_star]
-                printf("part %d is a star neighbour\n",vi[i]);
-                ave_stellar_neighbours += 1;
-            }
-          }
+//           i_star = index_star(pid, n_stars, stellar_id);
+//           if (i_star > -1) {
+//             puts("find a star!");
+//             printf("pid = %d, pid_loc = %d, i_star = %d, icell_star = %d\n",pid,pid_loc,i_star,stellar_id[i_star]);
+//             puts("");
+//             if (!find_at_least_one_star) find_at_least_one_star=true;
+//             for (i=0; i<n_neighbours_cell; i++) {
+//               if (vi[i] >=0) // Flag neighbour as neighbour of stars
+//                 has_a_star[vi[i]] = pid;//stellar_id[i_star]
+//                 printf("part %d is a star neighbour\n",vi[i]);
+//                 ave_stellar_neighbours += 1;
+//             }
+//           }
 
           for (i=0; i<n_neighbours_cell; i++) {
             if (vi[i] >=0) {
@@ -171,59 +207,88 @@ extern "C" {
           }
           // Volume of the cell (computed after eventual cut)
           volume[pid_loc] = c.volume();
+          
+          
+          
+          icell_star = has_a_star[pid];
+          if (icell_star > -1)  {//a star
+          	printf("cell %d, %d has a star as neighbour, proc=%d !\n", pid, pid_loc,cpu_id);
+
+          	stellar_neighb[pid_loc] = true;
+
+          	i_star = index_star(icell_star, n_stars, stellar_id);
+          	dx = x[icell_star]-x[pid] ;
+          	dy = y[icell_star]-y[pid] ;
+          	dz = z[icell_star]-z[pid] ;
+          	d_to_star = sqrt(dx*dx + dy*dy + dz*dz);
+          	cutting_distance = d_to_star - stellar_radius[i_star] ;
+
+         	 // Normalised vector towards star
+          	f = 1./d_to_star ;
+          	dx *= f ; dy *= f ; dz *= f;
+
+          	// We add a plane at the stelar surface
+          	c.plane(dx,dy,dz,cutting_distance);
+
+          	// We recompute the volume after the cut
+          	volume[pid_loc] = c.volume();
+          } // stellar neighbour                   
+          
         }  // con.compute_cell
       } // pid test
     } while(vlo.inc()); //Finds the next particle to test
     n_in = pid_loc+1;
 
     if (cpu_id == n_cpu-1) progress_bar(1.0);
-
+    
+    free(has_a_star);
+    return;
     /* Loop again over all cells but only do operations on cells that are stars */
     //A small temporary check for debug!
-    if (find_at_least_one_star) {
-    	puts("Find a star, cutting neigbours!");
-    	ave_stellar_neighbours = int((double) ave_stellar_neighbours/((double) n_stars));
-    	printf("Stars have in average %d neighbours!\n", ave_stellar_neighbours);
-    } else {
-    	free(has_a_star);
-    	return;
-    }
+//     if (find_at_least_one_star) {
+//     	puts("Find a star, cutting neigbours!");
+//     	ave_stellar_neighbours = int((double) ave_stellar_neighbours/((double) n_stars));
+//     	printf("Stars have in average %d neighbours!\n", ave_stellar_neighbours);
+//     } else {
+//     	free(has_a_star);
+//     	return;
+//     }
 
     // We re-initialise the loop
-    vlo.start();
-    pid_loc = -1;
-    do {
-      pid = vlo.pid(); // id of the current cell in the c_loop
-
-      if ((pid >= icell_start) && (pid <= icell_end)) {
-        pid_loc++; //increment even if not a star's neighbour !
-        icell_star = has_a_star[pid];
-        if (icell_star > -1)  {//a star
-          printf("cell %d, %d has a star as neighbour !\n", pid, pid_loc);
-          con.compute_cell(c,vlo);
-
-          stellar_neighb[pid_loc] = true;
-
-          i_star = index_star(icell_star, n_stars, stellar_id);
-          dx = x[icell_star]-x[pid] ;
-          dy = y[icell_star]-y[pid] ;
-          dz = z[icell_star]-z[pid] ;
-          d_to_star = sqrt(dx*dx + dy*dy + dz*dz);
-          cutting_distance = d_to_star - stellar_radius[i_star] ;
-
-          // Normalised vector towards star
-          f = 1./d_to_star ;
-          dx *= f ; dy *= f ; dz *= f;
-
-          // We add a plane at the stelar surface
-          c.plane(dx,dy,dz,cutting_distance);
-
-          // We recompute the volume after the cut
-          volume[pid_loc] = c.volume();
-        } // stellar neighbour
-      } // pid test
-    } while(vlo.inc()); //Finds the next particle to test
-    // free temporary storage before leaving
-    free(has_a_star);
+//     vlo.start();
+//     pid_loc = -1;
+//     do {
+//       pid = vlo.pid(); // id of the current cell in the c_loop
+// 
+//       if ((pid >= icell_start) && (pid <= icell_end)) {
+//         pid_loc++; //increment even if not a star's neighbour !
+//         icell_star = has_a_star[pid];
+//         if (icell_star > -1)  {//a star
+//           printf("cell %d, %d has a star as neighbour !\n", pid, pid_loc);
+//           con.compute_cell(c,vlo);
+// 
+//           stellar_neighb[pid_loc] = true;
+// 
+//           i_star = index_star(icell_star, n_stars, stellar_id);
+//           dx = x[icell_star]-x[pid] ;
+//           dy = y[icell_star]-y[pid] ;
+//           dz = z[icell_star]-z[pid] ;
+//           d_to_star = sqrt(dx*dx + dy*dy + dz*dz);
+//           cutting_distance = d_to_star - stellar_radius[i_star] ;
+// 
+//           // Normalised vector towards star
+//           f = 1./d_to_star ;
+//           dx *= f ; dy *= f ; dz *= f;
+// 
+//           // We add a plane at the stelar surface
+//           c.plane(dx,dy,dz,cutting_distance);
+// 
+//           // We recompute the volume after the cut
+//           volume[pid_loc] = c.volume();
+//         } // stellar neighbour
+//       } // pid test
+//     } while(vlo.inc()); //Finds the next particle to test
+//     // free temporary storage before leaving
+//     free(has_a_star);
   }
 }
