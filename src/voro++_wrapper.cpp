@@ -34,7 +34,8 @@ int index_star(int icell, int n_stars, int *stars_id)
   int k;
   for (k = 0; k < n_stars; k++)
   {
-    if ((icell == stars_id[k]) ? true : false)
+    // if ((icell == stars_id[k]) ? true : false)
+    if (icell == stars_id[k])
       return k;
   }
   return -1;
@@ -157,7 +158,7 @@ extern "C"
     if ((find_at_least_one_star) && (cpu_id == 0))
     {
       ave_stellar_neighbours = int((double)ave_stellar_neighbours / ((double)n_stars));
-      //printf("Stars have in average %d neighbours!\n", ave_stellar_neighbours);
+      // printf("Stars have in average %d neighbours!\n", ave_stellar_neighbours);
     }
 
     vlo.start();  //re-init the looop
