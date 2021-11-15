@@ -12,8 +12,8 @@ module stars
   public :: spectre_etoiles, E_stars, ProDiMo_star_HR, R_ISM, E_ISM, prob_E_star
 
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
-       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, intersect_stars, &
-       intersect_spots, find_spectra
+       repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra, &
+       intersect_stars, distance_to_star
 
   private
 
@@ -65,7 +65,7 @@ end subroutine deallocate_stellar_spectra
 !**********************************************************************
 
 subroutine select_etoile(lambda,aleat,n_star)
-! Sélection d'étoile qui va émettre le photon
+! Sï¿½lection d'ï¿½toile qui va ï¿½mettre le photon
 ! C. Pinte
 ! 21/05/05
 
@@ -139,7 +139,7 @@ subroutine em_sphere_uniforme(id, i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,
   y = y * r_etoile
   z = z * r_etoile
 
-  ! Ajout position de l'étoile
+  ! Ajout position de l'ï¿½toile
   x=x+etoile(i_star)%x
   y=y+etoile(i_star)%y
   z=z+etoile(i_star)%z
@@ -184,7 +184,7 @@ end subroutine em_sphere_uniforme
 !  u = srw02 * cos(argmt)
 !  v = srw02 * sin(argmt)
 !
-!  ! Position de l'étoile
+!  ! Position de l'ï¿½toile
 !  x=etoile(n_star)%x
 !  y=etoile(n_star)%y
 !  z=etoile(n_star)%z
@@ -296,7 +296,7 @@ subroutine repartition_energie_etoiles()
 
   call find_spectra()
 
-  if (etoile(1)%lb_body) then ! les étoiles sont des corps noirs
+  if (etoile(1)%lb_body) then ! les ï¿½toiles sont des corps noirs
      ! Creation d'un corps a haute resolution en F_lambda
      ! R = 1Rsun et distance = 1pc
      n_lambda_spectre(:) = 1000
@@ -320,10 +320,10 @@ subroutine repartition_energie_etoiles()
 
      enddo !i
 
-  else ! les étoiles ne sont pas des corps noirs
+  else ! les ï¿½toiles ne sont pas des corps noirs
      ! On calcule 2 trucs en meme tps :
      ! - CDF_E_star : proba cumulee a lambda fixe d'emission en fonction de l'etoile
-     ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
+     ! - spectre_etoile : proba d'emettre a lambda pour toutes les ï¿½toiles
      ! Lecture des spectres
      n_lambda_spectre_max = 0
      do i=1, n_etoiles
@@ -481,7 +481,7 @@ subroutine repartition_energie_etoiles()
   !---------------------------------------------------------------------------
   ! On calcule 2 trucs en meme tps :
   ! - CDF_E_star : proba cumulee a lambda fixe d'emission en fonction de l'etoile
-  ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
+  ! - spectre_etoile : proba d'emettre a lambda pour toutes les ï¿½toiles
   !---------------------------------------------------------------------------
 
   !---------------------------------------------------
@@ -506,7 +506,7 @@ subroutine repartition_energie_etoiles()
 
         wl = tab_lambda(lambda)*1.e-6
         delta_wl=tab_delta_lambda(lambda)*1.e-6
-        ! delta_wl est la largeur du bin d'intégration
+        ! delta_wl est la largeur du bin d'intï¿½gration
         CDF_E_star(lambda,0) = 0.0
 
         wl_inf =  tab_lambda_inf(lambda)
@@ -813,7 +813,17 @@ subroutine intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
   real(kind=dp) :: b,c, delta, rac, s1, s2, d_to_star
   integer :: i
 
-
+!   d_to_star = distance_to_stars(x,y,z,u,v,w,i_star)
+!   lintersect_stars = (i_star > 0)
+!   if (lintersect_stars) then
+!      icell_star = etoile(i_star)%icell
+!   else
+!      icell_star = 0
+!   end if
+! 
+!   return
+  
+  
   r(1) = x ; r(2) = y ; r(3) = z
   k(1) = u ; k(2) = v ; k(3) = w
 

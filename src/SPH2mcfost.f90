@@ -9,7 +9,7 @@ module SPH2mcfost
   implicit none
 
   procedure(read_phantom_bin_files), pointer :: read_phantom_files => null()
-
+  
 contains
 
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
@@ -34,6 +34,7 @@ contains
     real :: factor
     integer :: ndusttypes, ierr, i, ilen
     logical :: check_previous_tesselation
+    
 
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
@@ -83,13 +84,14 @@ contains
     else if (lascii_SPH_file) then
        write(*,*) "Performing SPH2mcfost setup"
        write(*,*) "Reading SPH density file: "//trim(SPH_file)
-       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,vx,vy,vz,T_gas,massgas,rho,rhodust,particle_id, ndusttypes,n_SPH,ierr)
     endif
     write(*,*) "Done"
 
     if (lignore_dust) then
        ndusttypes = 0
-       if (allocated(rhodust)) deallocate(rhodust,massdust)
+       if (allocated(rhodust)) deallocate(rhodust)
+       if (allocated(massdust)) deallocate(massdust)
     endif
 
     if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
@@ -236,14 +238,14 @@ contains
        !    N_part lines containing:
        !  - x,y,z: coordinates of each particle in AU
        !  - h: smoothing length of each particle in AU
-       !  - s: grain size of each particle in micron
+       !  - s: grain size of each particle in �m
        !
        !  Without grain growth: 2 lines containing:
        !  - n_sizes: number of grain sizes
-       !  - (s(i),i=1,n_sizes): grain sizes in micron
+       !  - (s(i),i=1,n_sizes): grain sizes in �m
        !  OR
        !  With grain growth: 1 line containing:
-       !  - s_min,s_max: smallest and largest grain size in micron
+       !  - s_min,s_max: smallest and largest grain size in �m
 
        open(unit=1,file="SPH_phantom.txt",status="replace")
        write(1,*) size(x)
@@ -931,12 +933,13 @@ contains
 
   !*********************************************************
 
-  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,massgas,rhogas,rhodust,ndusttypes,n_SPH,ierr)
+  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id, ndusttypes,n_SPH,ierr)
 
     integer,               intent(in) :: iunit
     character(len=*),      intent(in) :: filename
-    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas
+    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas,vx,vy,vz,T_gas
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust
+    integer, intent(out), dimension(:), allocatable :: particle_id
     integer, intent(out) :: ndusttypes, n_SPH,ierr
 
     integer :: syst_status, alloc_status, ios, i
@@ -949,18 +952,20 @@ contains
     open(unit=1,file="ntest.txt",status="old")
     read(1,*) n_SPH
     close(unit=1)
-    ndusttypes =1
+    ndusttypes = 1
 
     write(*,*) "n_SPH read_test_ascii_file = ", n_SPH
 
     alloc_status = 0
-    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),rhodust(ndusttypes,n_SPH), stat=alloc_status)
+    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), rhodust(ndusttypes,n_SPH), &
+    	vx(n_sph), vy(n_sph), vz(n_sph), T_gas(n_sph), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
 
     open(unit=1, file=filename, status='old', iostat=ios)
     do i=1, n_SPH
-       read(1,*) x(i), y(i), z(i), h(i), massgas(i)
+       read(1,*) x(i), y(i), z(i), h(i), T_gas(i), massgas(i), vx(i), vy(i), vz(i)
        rhogas(i) = massgas(i)
+       particle_id(i) = i
     enddo
 
     write(*,*) "MinMax=", minval(massgas), maxval(massgas)
@@ -970,6 +975,80 @@ contains
     return
 
   end subroutine read_ascii_SPH_file
+  
+
+subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id,ndusttypes,n_sph)
+    use naleat, only : seed, stream, gtype
+#include "sprng_f.h"
+
+    real :: rand, rand2, rand3
+    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas,vx,vy,vz,T_gas
+    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
+    integer, intent(out), dimension(:), allocatable :: particle_id
+    integer, intent(out) :: ndusttypes, n_SPH
+	real, parameter :: rmi = 2.2, rmo = 3.0 !unit of etoile(1)%r
+    integer :: alloc_status, i, id
+    real(kind=dp) :: rr, tt, pp, sintt, costt, vol
+
+
+    !force nb_proc to 1 here, but we don't want to set nb_proc = 1 for the rest of the calc.
+    if (allocated(stream)) deallocate(stream)
+    allocate(stream(1))
+    stream = 0.0
+    do i=1, 1
+       !write(*,*) gtype, i-1,nb_proc,seed,SPRNG_DEFAULT
+       !init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+       stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+    enddo
+
+	lignore_dust = .true.
+    ndusttypes = 0
+    llimits_file = .false.
+    limits_file = ""
+    lascii_sph_file = .false.
+    lphantom_file = .false.
+    lgadget2_file = .false.
+
+    if (allocated(x)) then
+    	deallocate(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id)
+    endif
+    
+    n_sph = 100000
+
+    alloc_status = 0
+    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), &
+    	vx(n_sph), vy(n_sph), vz(n_sph), T_gas(n_sph), stat=alloc_status)
+    if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
+    
+    id = 1
+    do i=1, n_sph
+       particle_id(i) = i
+       rand  = sprng(stream(id))
+       rand2 = sprng(stream(id))
+       rand3 = sprng(stream(id))
+       costt = (2*rand2-1)
+       sintt = sqrt(1.0 - costt*costt)
+       pp = pi * (2*rand3-1)
+       rr = ( rmi + (rmo - rmi) * rand )! * sintt*sintt
+       x(i) = rr * sintt * cos(pp) * etoile(1)%r
+       y(i) = rr * sintt * sin(pp) * etoile(1)%r
+       z(i) = rr * costt * etoile(1)%r
+       vol = (rand + 1) * 0.025 * etoile(1)%r**3 * (4.0/3.0) * pi
+       vx(i) = 0.0
+       vy(i) = 0.0
+       vz(i) = 0.0
+       T_gas(i) = 1000.0
+       massgas(i) = 1d-10 * (vol * AU_to_m**3) * kg_to_Msun!Msun
+       rhogas(i) = massgas(i)
+       h(i) = 3.0 * rmo * etoile(1)%r
+    enddo
+    
+    
+    deallocate(stream)
+
+
+return
+end subroutine
 
   !*********************************************************
 
