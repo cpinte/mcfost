@@ -58,7 +58,7 @@ module atom_transfer
   !!use dust_transfer, only		: compute_stars_map
   use dust_ray_tracing, only	: RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
        tab_RT_az,tab_RT_incl!!, stars_map, kappa
-  use stars, only				: intersect_spots, intersect_stars
+  use stars, only				: intersect_stars!,intersect_spots
   !use wavelengths, only		:
   use mcfost_env, only		: dp, time_begin, time_end, time_tick, time_max
   use constantes, only		: tiny_dp, huge_dp, au_to_m, pc_to_au, deg_to_rad, tiny_real, pi, deux_pi, rad_to_deg, &
@@ -2571,7 +2571,6 @@ contains
 
           !test with thetao and thetai to restrain the shock area a "shock" inside a shock
           if ( (vaccr < 0.0_dp) .and. ( (abs(z)/rr >= cos(thetai)).and.(abs(z)/rr <= cos(thetao)) ) ) then
-             ! 				if (vaccr < 0.0_dp) then
              if (Taccretion>0) then !constant accretion shock value from file
                 Tchoc = Taccretion
                 lintersect = .true.!always true if the shock temperature is an input
@@ -2580,7 +2579,7 @@ contains
                 ! 						write(*,*) "choc = ", icell_prev, x, y, z, vaccr*1e-3, sqrt(vmod2)*1e-3, " H = ", enthalp
                 Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * &
                      (0.5 * vmod2 + enthalp))**0.25
-                lintersect = (Tchoc > etoile(i_star)%T) !depends on the local value
+                lintersect = (Tchoc > 0.0*etoile(i_star)%T) !depends on the local value
                 ! 						write(*,*) " Tchoc = ", Tchoc, " rho = ", 1d-3 * masseH * wght_per_H * nHtot(icell_prev),"  T  =", T(icell_prev)
              endif
              ! 					lintersect = (Tchoc > etoile(i_star)%T)
