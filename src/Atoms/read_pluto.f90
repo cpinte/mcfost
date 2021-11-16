@@ -2,7 +2,7 @@ module pluto_mod
   use parametres
   use messages
   use getline
-  use atmos_type, only : lmagnetized, laccretion_shock, Taccretion, empty_cells
+  use atmos_type, only : lmagnetized, laccretion_shock, Taccretion, empty_cells, thetao, thetai
 
   use utils
   use sph2mcfost, only : SPH_to_Voronoi, Hydro_to_Voronoi_atomic
@@ -21,7 +21,7 @@ contains
     real(kind=dp), allocatable, dimension(:) :: rho, hydro_grainsizes
     real(kind=dp), allocatable, dimension(:,:) :: rhodust, massdust
 
-    real(kind=dp)                            :: thetai, thetao, tilt
+    real(kind=dp)                            :: tilt
     integer, parameter                       :: Nheader = 3 !Add more, for ascii file
     character(len=MAX_LENGTH)                :: rotation_law
     integer                                  :: syst_status, acspot, alloc_status
@@ -94,10 +94,15 @@ contains
        call getnextline(1, "#", FormatLine, inputline, Nread)
        read(inputline(1:Nread),*) Taccretion, acspot
        laccretion_shock =  (acspot == 1)
+       if (Taccretion==0.0_dp) Taccretion = -1.0_dp
 
        !unused her, but still present
        call getnextline(1, "#", FormatLine, inputline, Nread)
        read(inputline(1:Nread),*) thetai, thetao, tilt
+       !for compatibility
+       tilt = tilt * pi / 180.0
+       thetai = thetai * pi / 180.0
+       thetao = thetao * pi / 180.
 
        allocate(h(n_points), stat=alloc_status)
        if (alloc_status > 0) then
