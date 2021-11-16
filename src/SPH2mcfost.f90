@@ -23,7 +23,7 @@ contains
 
     integer, parameter :: iunit = 1
 
-    real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,SPH_grainsizes
+    real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,SPH_grainsizes,T_gas
     real(dp), allocatable, dimension(:) :: temp,vturb,mass_ne_on_massgas,atomic_mask
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
