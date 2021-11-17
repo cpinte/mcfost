@@ -121,8 +121,8 @@ extern "C"
       exit(1);
     }
 
-    /* 
-       We loop over all cells to identify the stellar neighbours. 
+    /*
+       We loop over all cells to identify the stellar neighbours.
        This is not optimal, but otherwise it does not work in parallel.
     */
     pid_loc = -1;
@@ -234,8 +234,7 @@ extern "C"
 
           //If the cell is a star's neighbor, cut it at the surface of the star.
           icell_star = has_a_star[pid];
-          if (icell_star > -1)
-          { //a star neighbor
+          if (icell_star > -1) { //a star neighbor
             stellar_neighb[pid_loc] = true;
 
             i_star = index_star(icell_star, n_stars, stellar_id);
@@ -243,23 +242,29 @@ extern "C"
             dy = y[icell_star] - y[pid];
             dz = z[icell_star] - z[pid];
             d_to_star = sqrt(dx * dx + dy * dy + dz * dz);
-            cutting_distance = d_to_star - stellar_radius[i_star];
 
-            // Normalised vector towards star
-            f = 1. / d_to_star;
-            dx *= f;
-            dy *= f;
-            dz *= f;
+            if (d_to_star < 2* stellar_radius[i_star]) { // The particle is too close to the star, we will need to cut it
+              cutting_distance = d_to_star - stellar_radius[i_star];
+              if (cutting_distance < 0) {
+                std::cout << "Error : cell " << pid << " is inside star " << i_star << std::endl;
+                std::cout << "Exiting" << std::endl;
+                ierr = 1;
+                exit(1);
+              }
 
-            // We add a plane at the stelar surface
-            c.plane(dx, dy, dz, cutting_distance);
+              // Normalised vector towards star
+              f = 1. / d_to_star;
+              dx *= f; dy *= f; dz *= f;
 
-            // We recompute the volume after the cut
-            volume[pid_loc] = c.volume();
+              // We add a plane at the stellar surface
+              c.plane(dx, dy, dz, cutting_distance);
+
+              // We recompute the volume after the cut
+              volume[pid_loc] = c.volume();
+            } // d_to_star
           } // stellar neighbour
-
-        }                // con.compute_cell
-      }                  // pid test
+        } // con.compute_cell
+      } // pid test
     } while (vlo.inc()); //Finds the next particle to test
     n_in = pid_loc + 1;
 
