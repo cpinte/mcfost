@@ -27,7 +27,7 @@ module atom_transfer
        angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, helium_is_active
   use healpix_mod, only		: healpix_sphere, healpix_npix, healpix_weight, healpix_ring_mu_and_phi, healpix_listx
 
-  use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
+  use readatom, only			: read_Atomic_Models, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
   use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
   use constant, only			: hc_k, fourpi, NM_TO_M
   use solvene, only			: solve_electron_density_old, solve_electron_density
@@ -1049,7 +1049,7 @@ contains
     !! --------------------------------------------------------- !!
     ! ------------------------------------------------------------------------------------ !
     ! ----------------------- READATOM and INITIZALIZE POPS ------------------------------ !
-    call readAtomicModels(atomunit)!if old_pops not compatible with fixed background
+    call read_Atomic_Models(atomunit)!if old_pops not compatible with fixed background
     !because of the electron density evaluated in non-LTE
     !if background fixed, they will be computed with the current estimate of
     !electron density and non-LTE pops !

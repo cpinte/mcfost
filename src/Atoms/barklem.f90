@@ -8,9 +8,9 @@
 
 module barklem
 
-   use atom_type, only : AtomType, parse_label, ATOM_LABEL_WIDTH
+   use atom_type, only  : AtomType, parse_label, ATOM_LABEL_WIDTH
    use getline
-   use math, only : interp2D, locate, gammln
+   use math, only       : interp2D, locate, gammln
    use constant
    use mcfost_env, only : dp, mcfost_utils! convert from the relative location of atomic data
                                           ! to mcfost's environnement folders.
