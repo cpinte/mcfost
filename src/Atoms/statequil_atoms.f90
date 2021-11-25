@@ -14,7 +14,6 @@ MODULE statequil_atoms
   use impact, only						: Collision_Hydrogen
   use getlambda, only						: hv, Nlambda_max_trans
   use occupation_probability, only 		: D_i, wocc_n
-  use profiles, only 						: write_profile
   use opacity, only						: prec_pops, frac_limit_pops, frac_ne_limit
   use lte, only 							: getPartitionFunctionk, sahaeq!, phi_T
   use solvene, only 						: Max_ionisation_stage
@@ -411,9 +410,6 @@ CONTAINS
 
           JJ = JJ / wphi / n_rayons
 
-          ! 				if ((wphi < 0.7) .or. (wphi > 1.1)) then
-          ! 					call write_profile(unit_profiles, icell, aatom%lines(kc), kc, wphi)
-          ! 				endif
 
           !init at Aji
           aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + JJ * aatom%lines(kc)%Bji
@@ -3329,9 +3325,6 @@ CONTAINS
           ! 					write(*,*) "icell = ", icell, " id = ", id
           ! 					write(*,*) " --> Beware, profile not well normalized for line ", i, j, " area = ", wphi
           ! 				endif
-          if ((wphi < 0.7) .or. (wphi > 1.1)) then
-             call write_profile(unit_profiles, icell, aatom%lines(kc), kc, wphi)
-          endif
 
           !init at Aji
           aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + JJ * aatom%lines(kc)%Bji

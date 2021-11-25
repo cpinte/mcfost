@@ -1,6 +1,6 @@
 MODULE readatom
 
-  use atom_type, only : AtomicLine, AtomicContinuum, AtomType, Element, determinate, rydberg_atom, &
+  use atom_type, only : AtomicLine, AtomicContinuum, AtomType, Element, parse_label, rydberg_atom, &
        n_eff, find_continuum, atomZnumber, ATOM_ID_WIDTH
   use atmos_type, only : Nelem, Hydrogen, Helium, Elements, T, ne, vturb, lmagnetized, icompute_atomRT, &
        Natom, NpassiveAtoms, NactiveAtoms, Atoms, PassiveAtoms, ActiveAtoms, helium_is_active
@@ -9,10 +9,9 @@ MODULE readatom
   use constant
   use uplow
   use getline
-  use barklem, only : getBarklem
+  use barklem, only : get_Barklem_cross_data
   use io_atomic_pops, only	: read_pops_atom
   use collision, only : read_collisions
-  use broad, only : Damping
   use solvene, only : Max_ionisation_stage, get_max_nstage
 
   !$ use omp_lib
@@ -90,7 +89,7 @@ CONTAINS
     integer :: Nread, i,j, EOF, nll, nc, Nfixed !deprecation future
     real, allocatable, dimension(:) :: levelNumber
     logical :: Debeye, match, res, setup_commin_gauss_prof
-    logical, dimension(:), allocatable :: determined, parse_label
+    logical, dimension(:), allocatable :: determined, parse_labs
     real(kind=dp), dimension(:), allocatable :: old_nHtot
     character(len=20) :: shapeChar, symmChar, optionChar, vdWChar, nuDepChar
     character(len=2) :: IDread
@@ -165,7 +164,7 @@ CONTAINS
     allocate(atom%qS(atom%Nlevel))
     allocate(atom%qJ(atom%Nlevel))
     allocate(determined(atom%Nlevel))
-    allocate(parse_label(atom%Nlevel))
+    allocate(parse_labs(atom%Nlevel))
     allocate(atom%nstar(atom%Nlevel,n_cells))
 
     atom%Ntr = atom%Nline + atom%Ncont
@@ -192,7 +191,7 @@ CONTAINS
        atom%qS(i) = -99.0
        atom%Lorbit(i) = -99
        determined(i) = .false.
-       parse_label(i) = .false.
+       parse_labs(i) = .false.
     end do  ! Note that the levelNumber starts at 0, but indexing in
     ! fortran starts at 1 so that the good number to use
     ! here is +1 wrt the the number read in file.
@@ -350,23 +349,23 @@ CONTAINS
        ! continuum levels parsing is usefull
        ! to obtain W2(Jj,Ji) appearing in
        ! resonant dichroism
-       if (.not.parse_label(atom%lines(kr)%i)) then
-          CALL determinate(atom%label(atom%lines(kr)%i),&
+       if (.not.parse_labs(atom%lines(kr)%i)) then
+          CALL parse_label(atom%label(atom%lines(kr)%i),&
                atom%g(atom%lines(kr)%i),&
                atom%qS(atom%lines(kr)%i),&
                atom%Lorbit(atom%lines(kr)%i),&
                atom%qJ(atom%lines(kr)%i), &
                determined(atom%lines(kr)%i))
-          parse_label(atom%lines(kr)%i) = .true.
+          parse_labs(atom%lines(kr)%i) = .true.
        end if
-       if (.not.parse_label(atom%lines(kr)%j)) then
-          CALL determinate(atom%label(atom%lines(kr)%j),&
+       if (.not.parse_labs(atom%lines(kr)%j)) then
+          CALL parse_label(atom%label(atom%lines(kr)%j),&
                atom%g(atom%lines(kr)%j),&
                atom%qS(atom%lines(kr)%j),&
                atom%Lorbit(atom%lines(kr)%j),&
                atom%qJ(atom%lines(kr)%j), &
                determined(atom%lines(kr)%j))
-          parse_label(atom%lines(kr)%i) = .true. !even if determined is false.
+          parse_labs(atom%lines(kr)%i) = .true. !even if determined is false.
        end if
        ! not that if J > L+S determined is FALSE
        ! just like if the term could not be parsed
@@ -503,19 +502,14 @@ CONTAINS
        !      atom%lines(kr)%Voigt = .false.
 
        !Now parse Broedening recipe
-       if (trim(vdWChar).eq."PARAMTR") then
-          atom%lines(kr)%vdWaals = "RIDDER_RENSBERGEN"
-          CALL Error ("Not used anymore!")
-       else if (trim(vdWChar).eq."UNSOLD") then
-          !write(*,*) "Using UNSOLD recipe for broadening"
+       if (trim(vdWChar).eq."UNSOLD") then
           atom%lines(kr)%vdWaals = "UNSOLD"
           atom%lines(kr)%cvdWaals(4) = 0.
           atom%lines(kr)%cvdWaals(2) = 0.
        else if (trim(vdWChar).eq."BARKLEM") then
           atom%lines(kr)%vdWaals = "BARKLEM"
-          CALL getBarklem(atom, kr, res)
+          CALL get_Barklem_cross_data(atom, kr, res)
           !if (res) &
-          write(*,*) "Using BARKLEM recipe for broadening"
           if (.not. res) then
              write(*,*) &
                   "Line <atom%lines(kr)%j>->atom%lines(kr)%i>", &
@@ -813,7 +807,7 @@ CONTAINS
 
     deallocate(levelNumber)
     deallocate(determined)
-    deallocate(parse_label)
+    deallocate(parse_labs)
     !close atomic file
     close(unit=atomunit) !later it will be open again for
     !reading collision

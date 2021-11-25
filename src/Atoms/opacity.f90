@@ -9,7 +9,7 @@ module Opacity
   use constant
   use constantes, only : tiny_dp, huge_dp, AU_to_m
   use messages
-  use broad, only : Damping, line_damping
+  use broad, only : line_damping
   use parametres
   use voigtfunctions, only : Voigt
   use profiles
@@ -969,14 +969,6 @@ contains
     ! 		real(kind=dp), dimension(Nlambda) :: phi0
 
     !-> chi and eta contains already chi_c, chi_c_nlte and eta_c, eta_c_nlte
-
-    ! 		dv_dl = gradv(icell, x,y,z,x1,y1,z1,u,v,w,l,dk0)
-    ! 		if (dk0 >= 0) then
-    ! 			dk0 = min(dk_max, 6 * dk0)
-    ! 		else
-    ! 			dk0 = max(dk_min, 6 * dk0)
-    ! 		endif
-    ! 		dk0 = dk_max
 
     atom_loop : do nact = 1, Natom!Nactiveatoms
        aatom => Atoms(nact)%ptr_atom!ActiveAtoms(nact)%ptr_atom
