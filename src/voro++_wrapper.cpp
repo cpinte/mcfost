@@ -34,7 +34,6 @@ int index_star(int icell, int n_stars, int *stars_id)
   int k;
   for (k = 0; k < n_stars; k++)
   {
-    // if ((icell == stars_id[k]) ? true : false)
     if (icell == stars_id[k])
       return k;
   }
@@ -78,9 +77,9 @@ extern "C"
 
     //Local bool array to know if a cell is a stellar neighbor
     //an element per cell/per_cpu
-    int *has_a_star, find_at_least_one_star = false;
+    int *has_a_star;
+    bool find_at_least_one_star = false;
     int i_star = -1, icell_star = -1; //< 0 no stars!
-    double norm_vect;
     int ave_stellar_neighbours = 0;
     //We check all cells on each cpu!
     has_a_star = (int *)malloc(n * sizeof(int));
@@ -121,8 +120,8 @@ extern "C"
       exit(1);
     }
 
-    /* 
-       We loop over all cells to identify the stellar neighbours. 
+    /*
+       We loop over all cells to identify the stellar neighbours.
        This is not optimal, but otherwise it does not work in parallel.
     */
     pid_loc = -1;
@@ -156,10 +155,7 @@ extern "C"
     } while (vlo.inc());
     //This is kept as a fast check
     if ((find_at_least_one_star) && (cpu_id == 0))
-    {
       ave_stellar_neighbours = int((double)ave_stellar_neighbours / ((double)n_stars));
-      // printf("Stars have in average %d neighbours!\n", ave_stellar_neighbours);
-    }
 
     vlo.start();  //re-init the looop
     pid_loc = -1; // pid_loc is the cell index for this core, ie starting at 0
@@ -243,21 +239,31 @@ extern "C"
             dy = y[icell_star] - y[pid];
             dz = z[icell_star] - z[pid];
             d_to_star = sqrt(dx * dx + dy * dy + dz * dz);
-            cutting_distance = d_to_star - stellar_radius[i_star];
 
-            // Normalised vector towards star
-            f = 1. / d_to_star;
-            dx *= f;
-            dy *= f;
-            dz *= f;
+            if (d_to_star < 2 * stellar_radius[i_star])
+            { // The particle is too close to the star, we will need to cut it
+              cutting_distance = d_to_star - stellar_radius[i_star];
+              if (cutting_distance < 0)
+              {
+                std::cout << "Error : cell " << pid << " is inside star " << i_star << std::endl;
+                std::cout << "Exiting" << std::endl;
+                ierr = 1;
+                exit(1);
+              }
 
-            // We add a plane at the stelar surface
-            c.plane(dx, dy, dz, cutting_distance);
+              // Normalised vector towards star
+              f = 1. / d_to_star;
+              dx *= f;
+              dy *= f;
+              dz *= f;
 
-            // We recompute the volume after the cut
-            volume[pid_loc] = c.volume();
-          } // stellar neighbour
+              // We add a plane at the stellar surface
+              c.plane(dx, dy, dz, cutting_distance);
 
+              // We recompute the volume after the cut
+              volume[pid_loc] = c.volume();
+            }            // d_to_star
+          }              // stellar neighbour
         }                // con.compute_cell
       }                  // pid test
     } while (vlo.inc()); //Finds the next particle to test

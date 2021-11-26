@@ -27,7 +27,7 @@ module atom_transfer
        angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, helium_is_active
   use healpix_mod, only		: healpix_sphere, healpix_npix, healpix_weight, healpix_ring_mu_and_phi, healpix_listx
 
-  use readatom, only			: readAtomicModels, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
+  use readatom, only			: read_Atomic_Models, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
   use lte, only				: set_LTE_populations, nH_minus, ltepops, ltepops_h
   use constant, only			: hc_k, fourpi, NM_TO_M
   use solvene, only			: solve_electron_density_old, solve_electron_density
@@ -1049,7 +1049,7 @@ contains
     !! --------------------------------------------------------- !!
     ! ------------------------------------------------------------------------------------ !
     ! ----------------------- READATOM and INITIZALIZE POPS ------------------------------ !
-    call readAtomicModels(atomunit)!if old_pops not compatible with fixed background
+    call read_Atomic_Models(atomunit)!if old_pops not compatible with fixed background
     !because of the electron density evaluated in non-LTE
     !if background fixed, they will be computed with the current estimate of
     !electron density and non-LTE pops !
@@ -1405,6 +1405,8 @@ contains
     call write_flux(only_flux=.true.)
     call write_atomic_maps
 !     deallocate(flux,fluxc)
+
+    !call compute_Imu
 
     if (lorigin_atom) then
 !        call write_lambda_cell_array(Nlambda, origin_atom, origin_file_fits,"W.m^-2.Hz^-1.sr^-1")
@@ -4020,6 +4022,139 @@ contains
   end subroutine NLTEloop
   ! ------------------------------------------------------------------------------------ !
 
+  subroutine compute_Imu()
+   use utils, only: Gauss_Legendre_quadrature, span
+   use constantes, only : Au_to_Rsun
+
+   integer, parameter :: Nmu = 500
+   real(kind=dp) :: u, v, w, uvw(3), x(3), y(3)
+   integer :: id, icell0, icell, i, j, iray, alloc_status
+   real(kind=dp), dimension(:), allocatable :: weight_mu, cos_theta, p, q
+   integer, parameter :: maxSubPixels = 32
+   real(kind=dp) :: x0,y0,z0,u0,v0,w0, r0, r1, rr, phi
+   real(kind=dp), dimension(:,:,:), allocatable :: Imu, Imuc
+   real(kind=dp):: normF
+   logical :: lintersect, labs
+
+   allocate(weight_mu(Nmu), cos_theta(Nmu), p(Nmu), q(Nmu), stat=alloc_status)
+   if (alloc_status > 0) call error(" Allocation error cos_theta(Nmu)")
+!    allocate(Imu(Nlambda,Nmu,n_cells), Imuc(Nlambda_cont,Nmu,n_cells), stat=alloc_status)
+!    if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
+   allocate(Imu(Nlambda,Nmu,1), Imuc(Nlambda_cont,Nmu,1), stat=alloc_status)
+   if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
+
+
+   Imu(:,:,:) = 0.0_dp
+   Imuc(:,:,:) = 0.0_dp
+   labs = .false.
+   id = 1
+   iray = 1
+   phi = pi
+
+   !look parallel to z
+   u = 0.0_dp
+   v = 0.0_dp!-1.745d-22!
+   w = 1.0_dp
+
+   uvw = (/u,v,w/) !vector position
+   x = (/1.0_dp,0.0_dp,0.0_dp/)
+   y = -cross_product(x, uvw)
+
+   ! Ray tracing : on se propage dans l'autre sens
+   u0 = -u ; v0 = -v ; w0 = -w
+
+   call gauss_legendre_quadrature(0.0_dp, 1.0_dp, Nmu, cos_theta, weight_mu)
+
+  !!!$omp parallel &
+  !!!$omp default(none) &
+  !!!$omp private(j,i,id,u0,v0,w0,lintersect,icell0) &
+  !!!$omp shared(Imu, Imuc, u,v,w,Rmax,iray,labs,Itot, Icont)
+   do j=1,Nmu
+   !!!$ id = omp_get_thread_num() + 1
+
+    rr = Rmax * sqrt(1.0 - cos_theta(j)**2)
+    !rr = Rmax * real(j-1)/real(Nmu-1)
+    !cos_theta(j) = sqrt(1.0 - (rr/Rmax)**2)
+    !!write(*,*) "rr=", rr, " q=", q(j)
+
+    x0 = 10.0*Rmax*u + rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
+    y0 = 10.0*Rmax*v + rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
+    z0 = 10.0*Rmax*w + rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
+
+    !!write(*,*) "x'=",rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
+    !!write(*,*) "y'=",rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
+    !!write(*,*) "z'=",rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
+
+
+    call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
+
+    !cos_theta(j)  = abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
+    p(j) = rr*AU_to_rsun
+    !!write(*,*) "mu=", cos_theta(j), abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
+
+	!!write(*,*) "x0=",x0, " y0=",y0, " z0=",z0
+
+	if (cos_theta(j) < 0.05) then
+		if( (icell0 > n_cells).or.(icell0 < 1) ) then
+			call warning("for this cos(theta) the ray is put in the star! check prec grid")
+			write(*,*) "cos(theta)=",cos_theta(j), " icell=", icell0, " intersect?:", lintersect
+			cycle !because of prec grid ??
+		endif
+	endif
+
+     if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+     	call integ_ray_line(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs)
+        Imu(:,j,1) = Itot(:,iray,id)
+        Imuc(:,j,1) = Icont(:,iray,id)
+! 		call integrate_i_icell(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs, Imu(:,j,:), Imuc(:,j,:))
+
+     endif
+   enddo
+   !!!$omp end do
+   !!!$omp end parallel
+
+   open(unit=14,file="Imu.s",status="unknown")
+   open(unit=15,file="Imuc.s",status="unknown")
+   write(14,*) Nlambda, Nmu, 1
+   write(15,*) Nlambda_cont, Nmu, 1
+   write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
+   write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
+   write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
+   write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
+   do i=1,Nlambda
+    write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,1),  j=1,Nmu)
+   enddo
+   do i=1,Nlambda_cont
+    write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,1),  j=1,Nmu)
+   enddo
+   close(14)
+   close(15)
+
+!    open(unit=14,file="Imu.s",status="unknown")
+!    open(unit=15,file="Imuc.s",status="unknown")
+!    write(14,*) Nlambda, Nmu, n_cells
+!    write(15,*) Nlambda_cont, Nmu, n_cells
+!    write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
+!    write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
+!    write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
+!    write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
+!    do icell=1, n_cells
+!    	do i=1,Nlambda
+!     	write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,icell),  j=1,Nmu)
+!   	enddo
+!    enddo
+!    do icell=1, n_cells
+!    	do i=1,Nlambda_cont
+!     	write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,icell),  j=1,Nmu)
+!    	enddo
+!    enddo
+!    close(14)
+!    close(15)
+
+   deallocate(weight_mu, cos_theta, p, Imu, Imuc,q)
+
+  return
+  end subroutine compute_Imu
 end module atom_transfer
 !   	subroutine integrate_i_icell(id,icell_in,x,y,z,u,v,w,iray,labs, I, Ic)
 ! 	! ------------------------------------------------------------------------------- !
@@ -4138,144 +4273,6 @@ end module atom_transfer
 ! 	return
 ! 	end subroutine integrate_i_icell
 !
-!   subroutine compute_Imu()
-!    use utils, only: Gauss_Legendre_quadrature, span
-!    use constantes, only : Au_to_Rsun
-!
-!    integer, parameter :: Nmu = 500
-!    real(kind=dp) :: u, v, w, uvw(3), x(3), y(3)
-!    integer :: id, icell0, icell, i, j, iray, alloc_status
-!    real(kind=dp), dimension(:), allocatable :: weight_mu, cos_theta, p
-!    integer, parameter :: maxSubPixels = 32
-!    real(kind=dp) :: x0,y0,z0,u0,v0,w0, r0, r1, rr, phi
-!    real(kind=dp), dimension(:,:,:), allocatable :: Imu, Imuc
-!    real(kind=dp):: normF
-!    logical :: lintersect, labs
-!
-!    allocate(weight_mu(Nmu), cos_theta(Nmu), p(Nmu), stat=alloc_status)
-!    if (alloc_status > 0) call error(" Allocation error cos_theta(Nmu)")
-! !    allocate(Imu(Nlambda,Nmu,n_cells), Imuc(Nlambda_cont,Nmu,n_cells), stat=alloc_status)
-! !    if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
-!    allocate(Imu(Nlambda,Nmu,1), Imuc(Nlambda_cont,Nmu,1), stat=alloc_status)
-!    if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
-!
-!
-!    Imu(:,:,:) = 0.0_dp
-!    Imuc(:,:,:) = 0.0_dp
-!    labs = .false.
-!    id = 1
-!    iray = 1
-!    phi = pi
-!
-!    !look parallel to z
-!    u = 0.0_dp
-!    v = -1.745d-22!0.0_dp
-!    w = 1.0_dp
-!
-!    uvw = (/u,v,w/) !vector position
-!    x = (/1.0_dp,0.0_dp,0.0_dp/)
-!    y = -cross_product(x, uvw)
-!
-!    ! Ray tracing : on se propage dans l'autre sens
-!    u0 = -u ; v0 = -v ; w0 = -w
-!
-!
-!    !r0 = 1d-5
-!    !r1 = Rmax * 1.005
-!    !q = span(real(r0),real(r1), Nmu)
-!
-!    call gauss_legendre_quadrature(0.0_dp, 1.0_dp, Nmu, cos_theta, weight_mu)
-!
-!   !!!$omp parallel &
-!   !!!$omp default(none) &
-!   !!!$omp private(j,i,id,u0,v0,w0,lintersect,icell0) &
-!   !!!$omp shared(Imu, Imuc, u,v,w,Rmax,iray,labs,Itot, Icont)
-!    do j=1,Nmu
-!    !!!$ id = omp_get_thread_num() + 1
-!
-!     rr = Rmax * sqrt(1.0 - cos_theta(j)**2)
-!     !!write(*,*) "rr=", rr, " q=", q(j)
-!
-!     x0 = 10.0*Rmax*u + rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
-!     y0 = 10.0*Rmax*v + rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
-!     z0 = 10.0*Rmax*w + rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
-!
-!     !!write(*,*) "x'=",rr * sin(phi) * x(1) + rr * cos(phi) * y(1)
-!     !!write(*,*) "y'=",rr * sin(phi) * x(2) + rr * cos(phi) * y(2)
-!     !!write(*,*) "z'=",rr * sin(phi) * x(3) + rr * cos(phi) * y(3)
-!
-!
-!     call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
-!
-!     !cos_theta(j)  = abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
-!     p(j) = rr*AU_to_rsun
-!     !!write(*,*) "mu=", cos_theta(j), abs(x0*u + y0*v + z0*w) / sqrt(z0*z0 + x0*x0 + y0*y0)
-!
-! 	!!write(*,*) "x0=",x0, " y0=",y0, " z0=",z0
-!
-! 	if (cos_theta(j) < 0.05) then
-! 		if( (icell0 > n_cells).or.(icell0 < 1) ) then
-! 			call warning("for this cos(theta) the ray is put in the star! check prec grid")
-! 			write(*,*) "cos(theta)=",cos_theta(j), " icell=", icell0, " intersect?:", lintersect
-! 			cycle !because of prec grid ??
-! 		endif
-! 	endif
-!
-!      if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
-!      	call integ_ray_line(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs)
-!         Imu(:,j,1) = Itot(:,iray,id)
-!         Imuc(:,j,1) = Icont(:,iray,id)
-! ! 		call integrate_i_icell(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs, Imu(:,j,:), Imuc(:,j,:))
-!
-!      endif
-!    enddo
-!    !!!$omp end do
-!    !!!$omp end parallel
-!
-!    open(unit=14,file="Imu.s",status="unknown")
-!    open(unit=15,file="Imuc.s",status="unknown")
-!    write(14,*) Nlambda, Nmu, 1
-!    write(15,*) Nlambda_cont, Nmu, 1
-!    write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
-!    write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
-!    write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-!    write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-!    do i=1,Nlambda
-!     write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,1),  j=1,Nmu)
-!    enddo
-!    do i=1,Nlambda_cont
-!     write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,1),  j=1,Nmu)
-!    enddo
-!    close(14)
-!    close(15)
-!
-! !    open(unit=14,file="Imu.s",status="unknown")
-! !    open(unit=15,file="Imuc.s",status="unknown")
-! !    write(14,*) Nlambda, Nmu, n_cells
-! !    write(15,*) Nlambda_cont, Nmu, n_cells
-! !    write(14,'(*(E20.7E3))') (p(j), j=1,Nmu)
-! !    write(15,'(*(E20.7E3))') (p(j), j=1,Nmu)
-! !    write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-! !    write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
-! !    do icell=1, n_cells
-! !    	do i=1,Nlambda
-! !     	write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,icell),  j=1,Nmu)
-! !   	enddo
-! !    enddo
-! !    do icell=1, n_cells
-! !    	do i=1,Nlambda_cont
-! !     	write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,icell),  j=1,Nmu)
-! !    	enddo
-! !    enddo
-! !    close(14)
-! !    close(15)
-!
-!    deallocate(weight_mu, cos_theta, p, Imu, Imuc)
-!
-!   return
-!   end subroutine compute_Imu
-
-
 !   	subroutine integ_ray_line_i_new(id,icell_in,x,y,z,u,v,w,iray,labs)
 ! 	! ------------------------------------------------------------------------------- !
 ! 	!
