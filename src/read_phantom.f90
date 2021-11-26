@@ -26,7 +26,7 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
  integer, parameter :: nsinkproperties = 17
  integer(kind=8) :: number8(maxarraylengths)
  integer :: i,j,k,iblock,nums(ndatatypes,maxarraylengths)
- integer :: nblocks,narraylengths,nblockarrays,number,idust
+ integer :: nblocks,narraylengths,nblockarrays,number,idust,ieos
  character(len=lentag) :: tag
  character(len=lenid)  :: fileid
  integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt
@@ -184,6 +184,7 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
     call extract('massoftype',massoftype(ifile,1:ntypes),hdr,ierr)
     call extract('hfact',hfact,hdr,ierr)
     call extract('gmw',gmw,hdr,ierr)
+    call extract('ieos',ieos,hdr,ierr)
     if (ierr /= 0) gmw=mu
     if (ndusttypes > 0) then
        call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr) ! code units here
@@ -387,7 +388,7 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
          vxyzu,gastemperature,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,&
          hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles, &
          n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating)
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating,ieos)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
  else
     n_SPH = 0
@@ -432,7 +433,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,&
 
  integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max
  integer :: np,ntypes,nptmass,dustfluidtype,ndudt
- integer :: error,ndustsmall,ndustlarge
+ integer :: error,ndustsmall,ndustlarge,ieos
 
  integer, parameter :: maxtypes = 100
  integer, parameter :: nsinkproperties = 17
@@ -681,7 +682,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,&
                         massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
                         utime,udist,graindens,ndudt,dudt,ifiles,   &
                         n_SPH,x,y,z,h,vx,vy,vz,particle_id,SPH_grainsizes,     &
-                        massgas,massdust,rhogas,rhodust,Tgas,extra_heating)
+                        massgas,massdust,rhogas,rhodust,Tgas,extra_heating,ieos)
 
   write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
 
@@ -738,7 +739,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
      vxyzu,gastemperature,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
      utime, udist,graindens,ndudt,dudt,ifiles, &
      n_SPH,x,y,z,h,vx,vy,vz,particle_id, &
-     SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating)
+     SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating,ieos)
 
   ! Convert phantom quantities & units to mcfost quantities & units
   ! x,y,z are in au
@@ -749,7 +750,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az
   use parametres, only : lscale_length_units,scale_length_units_factor,lscale_mass_units,scale_mass_units_factor
 
-  integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype, n_files
+  integer, intent(in) :: np,nptmass,ntypes,ndusttypes,dustfluidtype, n_files,ieos
   real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
   integer(kind=1), dimension(np), intent(in) :: iphase, ifiles
   real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
@@ -917,7 +918,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
              ! we just assume everything is fully ionised to compute Tgas
              !
              rhogasi = rhogasi*g_to_kg/cm_to_m**3
-             Tgas(j) = get_temp_from_u(vxyzu(4,i)*uvelocity**2,rhogasi,mu=0.6_dp)
+             Tgas(j) = get_temp_from_u(rhogasi,vxyzu(4,i)*uvelocity**2,0.6_dp,ieos)
              if (mod(j,100000).eq.0) print*,i,Tgas(j),'vel=',vxi*uvelocity,vyi*uvelocity,vzi*uvelocity,'m/s'
           endif
        endif
@@ -1108,36 +1109,39 @@ end subroutine phantom_2_mcfost
 ! OUTPUT:
 !    temp - temperature [K]
 !*************************************************************************
-real(dp) function get_temp_from_u(rho,u,mu) result(temp)
+real(dp) function get_temp_from_u(rho,u,mu,ieos) result(temp)
  use constantes, only:kb_on_mh,radconst
  real(dp), intent(in) :: rho,u,mu
+ integer, intent(in) :: ieos
  real(dp) :: ft,dft,dt
  real(dp), parameter :: tol = 1.e-8
  integer :: its
 
- temp = (u*rho/radconst)**0.25
- return
- ! Take minimum of gas and radiation temperatures as initial guess
- temp = min(u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25)
-  print*,'rho,u  = ',rho,u,' T =',u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25,radconst,kb_on_mh
+ if (ieos==2) then
+    temp = u*mu/(1.5*kb_on_mh)
+    ! temp = (u*rho/radconst)**0.25
+ elseif (ieos==12) then
+    ! Take minimum of gas and radiation temperatures as initial guess
+    temp = min(u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25)
+    print*,'rho,u  = ',rho,u,' T =',u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25,radconst,kb_on_mh
 
- dt = huge(0.)
- its = 0
- do while (abs(dt) > tol*temp .and. its < 500)
-    its = its + 1
-    ft = u*rho - 1.5*kb_on_mh*temp*rho/mu - radconst*temp**4
-    dft = - 1.5*kb_on_mh*rho/mu - 4.*radconst*temp**3
-    dt = ft/dft ! Newton-Raphson
-    if (temp - dt > 1.2*temp) then
-       temp = 1.2*temp
-    elseif (temp - dt < 0.8*temp) then
-       temp = 0.8*temp
-    else
-       temp = temp - dt
-    endif
- enddo
- print*,'converged to T=',temp
-
+   dt = huge(0.)
+   its = 0
+   do while (abs(dt) > tol*temp .and. its < 500)
+      its = its + 1
+      ft = u*rho - 1.5*kb_on_mh*temp*rho/mu - radconst*temp**4
+      dft = - 1.5*kb_on_mh*rho/mu - 4.*radconst*temp**3
+      dt = ft/dft ! Newton-Raphson
+      if (temp - dt > 1.2*temp) then
+         temp = 1.2*temp
+      elseif (temp - dt < 0.8*temp) then
+         temp = 0.8*temp
+      else
+         temp = temp - dt
+      endif
+   enddo
+   print*,'converged to T=',temp
+ endif
 end function get_temp_from_u
 
 end module read_phantom

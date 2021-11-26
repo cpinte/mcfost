@@ -1,8 +1,10 @@
 module spectrum_type
 
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType
-  use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, B_char, icompute_atomRT, lmagnetized, laccretion_shock
-  use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table, make_wavelength_grid, make_wavelength_grid_new
+  use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, B_char,&
+  icompute_atomRT, lmagnetized, laccretion_shock
+  use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table,&
+  make_wavelength_grid,make_wavelength_grid_new
   use fits_utils, only : print_error
   use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
        lorigin_atom, n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
