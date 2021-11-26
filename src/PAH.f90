@@ -5,6 +5,7 @@ module PAH
   use constantes
   use dust_prop
   use utils, only : interp
+  use sort, only : index_quicksort
 
   implicit none
 
@@ -172,7 +173,7 @@ function PAH_specific_heat(T,taille_grain)
   !hbarw = [hbarw_CCop, hbarw_CCip, hbarw_CH]
   !g = [g_CCop, g_CCip, g_CH]
 
-  s = bubble_sort(hbarw) ! renvoie les indices tries (=sort en Yorick), slow
+  s = index_quicksort(hbarw)
   hbarw = hbarw(s)
   g = g(s)
 
@@ -196,7 +197,6 @@ end function PAH_specific_heat
 !******************************************************
 
 subroutine test_PAH_specific_heat()
-
 
   implicit none
 
