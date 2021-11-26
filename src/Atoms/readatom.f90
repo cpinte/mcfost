@@ -204,7 +204,7 @@ module readatom
                atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
                atom%lines(kr)%Grad, atom%lines(kr)%cStark
          else
-            write(*,*) " ->Read aditional g_lande_eff for that line"
+            write(*,*) " ->Read aditional g_lande_eff for that line", kr
             read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%Nlambda, &
                symmChar, atom%lines(kr)%qcore,atom%lines(kr)%qwing, vdWChar,&
                atom%lines(kr)%cvdWaals(1), atom%lines(kr)%cvdWaals(2), &

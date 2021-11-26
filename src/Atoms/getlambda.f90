@@ -7,7 +7,8 @@ module getlambda
   use math, only : locate
 
   use parametres
-  use utils, only : span, spanl, bubble_sort, spanl_dp, span_dp
+  use utils, only : span, spanl, spanl_dp, span_dp
+  use sort, only : index_bubble_sort
   use messages
 
   implicit none
@@ -799,7 +800,7 @@ contains
        call error("Allocation error, sorted_indexes")
     endif
     lambda_us(:) = lambda(:)
-    sorted_indexes = bubble_sort(lambda)
+    sorted_indexes = index_bubble_sort(lambda)
     lambda(:) = lambda(sorted_indexes)
     x0 = minval(lambda); x1 = maxval(lambda)
     hv = 1e3 !m/s
@@ -1050,7 +1051,7 @@ contains
     Nmore_cont_freq = 0.0
     allocate(sorted_indexes(Nlambda_cont),stat=alloc_status)
     if (alloc_status > 0) call error ("Allocation error sorted_indexes (cont)")
-    sorted_indexes = bubble_sort(cont_waves)
+    sorted_indexes = index_bubble_sort(cont_waves)
     cont_waves(:) = cont_waves(sorted_indexes)
     deallocate(sorted_indexes)
 
@@ -1112,7 +1113,7 @@ contains
           stop
        endif
       !sort lines so that all_lamin(1) is always the first line
-      sorted_indexes = bubble_sort(all_lamin)
+      sorted_indexes = index_bubble_sort(all_lamin)
       all_lamin(:) = all_lamin(sorted_indexes)
       !->not necessarily ordered by min to max, but follows the order of lamin
       !so that lmax(1) is associated to lamin(1)  which is important.
@@ -1305,7 +1306,7 @@ contains
           endif
 
           allocate(sorted_indexes(Nmore_cont_freq))
-          sorted_indexes(:) = bubble_sort(tmp_grid)
+          sorted_indexes(:) = index_bubble_sort(tmp_grid)
           tmp_grid(:) = tmp_grid(sorted_indexes)
           cont_waves(Nlambda_cont+1:Nlambda_cont + Nmore_cont_freq) = tmp_grid(:)
           Nlambda_cont = Nlambda_cont + Nmore_cont_freq
@@ -1383,7 +1384,7 @@ contains
     !but they are added at the end, so sorted is needed, but I can improve the previous
     !loop to fill the tmp_frid in the ascending order of wavelengths
     allocate(outgrid(Nwaves),stat=alloc_status)
-    tmp_grid = tmp_grid(bubble_sort(tmp_grid))
+    tmp_grid = tmp_grid(index_bubble_sort(tmp_grid))
     outgrid(:) = -99.0 !check
     outgrid = pack(tmp_grid, mask=tmp_grid > 0)
 !     write(*,*) maxval(outgrid), minval(outgrid)
@@ -1602,7 +1603,7 @@ contains
     Nmore_cont_freq = 0.0
     allocate(sorted_indexes(Nlambda_cont),stat=alloc_status)
     if (alloc_status > 0) call error ("Allocation error sorted_indexes (cont)")
-    sorted_indexes = bubble_sort(cont_waves)
+    sorted_indexes = index_bubble_sort(cont_waves)
     cont_waves(:) = cont_waves(sorted_indexes)
     deallocate(sorted_indexes)
 
@@ -1661,7 +1662,7 @@ contains
           stop
        endif
       !sort lines so that all_lamin(1) is always the first line
-      sorted_indexes = bubble_sort(all_lamin)
+      sorted_indexes = index_bubble_sort(all_lamin)
       all_lamin(:) = all_lamin(sorted_indexes)
       !->not necessarily ordered by min to max, but follows the order of lamin
       !so that lmax(1) is associated to lamin(1)  which is important.
@@ -1855,7 +1856,7 @@ contains
           endif
 
           allocate(sorted_indexes(Nmore_cont_freq))
-          sorted_indexes(:) = bubble_sort(tmp_grid)
+          sorted_indexes(:) = index_bubble_sort(tmp_grid)
           tmp_grid(:) = tmp_grid(sorted_indexes)
           cont_waves(Nlambda_cont+1:Nlambda_cont + Nmore_cont_freq) = tmp_grid(:)
           Nlambda_cont = Nlambda_cont + Nmore_cont_freq
@@ -1920,7 +1921,7 @@ contains
       !but they are added at the end, so sorted is needed, but I can improve the previous
       !loop to fill the tmp_frid in the ascending order of wavelengths
       allocate(outgrid(Nwaves),stat=alloc_status)
-      tmp_grid = tmp_grid(bubble_sort(tmp_grid))
+      tmp_grid = tmp_grid(index_bubble_sort(tmp_grid))
       outgrid(:) = -99.0 !check
       outgrid = pack(tmp_grid, mask=tmp_grid > 0)
 

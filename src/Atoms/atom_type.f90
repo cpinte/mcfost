@@ -1,8 +1,8 @@
 module atom_type
 
-   use math, only : w6js
+   use math, only       : w6js
    use mcfost_env, only : dp
-   use constant, only : M_ELECTRON, AMU, E_RYDBERG
+   use constant, only   : M_ELECTRON, AMU, E_RYDBERG
 
    implicit none
 

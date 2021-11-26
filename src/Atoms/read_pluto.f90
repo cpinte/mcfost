@@ -6,6 +6,7 @@ module pluto_mod
 
   use utils
   use sph2mcfost, only : SPH_to_Voronoi, Hydro_to_Voronoi_atomic
+  use sort, only : find_kth_smallest_inplace
 
   implicit none
 
