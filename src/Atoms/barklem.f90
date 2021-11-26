@@ -177,7 +177,7 @@ module barklem
 
          !Barklem only for neutrals
          ! stage is 0 for neutrals, 1 for singly ionised
-         if (atom%stage(i).lt.0) then
+         if (atom%stage(i) > 0) then
             res = .false. !use Unsold
             return
          end if
@@ -193,14 +193,14 @@ module barklem
          !write(*,'("Si="(1F2.2)", Li="(1I2)", Ji="(1F2.2))') Si, Li, Ji
          !write(*,'("Sj="(1F2.2)", Lj="(1I2)", Jj="(1F2.2))') Sj, Lj, Jj
 
-         if ((Li.eq.0 .and. Lj.eq.1) .or. &
-               (Lj.eq.0 .and. Li.eq.1)) then!S and P orbits
+         if ((Li==0 .and. Lj==1) .or. &
+               (Lj==0 .and. Li==1)) then!S and P orbits
             call init_Barklem_cross_data("SP", bs, res)
-         else if ((Li.eq.1 .and. lj.eq.2) .or. &
-            (Lj.eq.1 .and. li.eq.2)) then !P and D orbits
+         else if ((Li==1 .and. lj==2) .or. &
+            (Lj==1 .and. li==2)) then !P and D orbits
             call init_Barklem_cross_data("PD", bs, res)
-         else if ((Li.eq.2 .and. lj.eq.3) .or. &
-            (Lj.eq.2 .and. li.eq.3)) then !D and F orbits
+         else if ((Li==2 .and. lj==3) .or. &
+            (Lj==2 .and. li==3)) then !D and F orbits
             call init_Barklem_cross_data("DF", bs, res)
          end if
 
@@ -213,7 +213,7 @@ module barklem
          Z = atom%stage(j)+1
 
          ic = j + 1
-         do while (atom%stage(ic) .lt. Z)
+         do while (atom%stage(ic) < Z)
             ic = ic + 1
          end do
 
@@ -228,14 +228,14 @@ module barklem
          !https://www.nist.gov/pml/atomic-spectroscopy-compendium-basic-ideas-notation-data-and-formulas/atomic-spectroscopy-term
 
          !swamp double
-         if (Li.gt.Lj) then
+         if (Li > Lj) then
             nefftmp = neff1
             neff1 = neff2
             neff2 = nefftmp
          end if
 
-         if ((neff1 .lt. bs%neff1(1)) .or. &
-            neff1 .gt. (bs%neff1(bs%N1))) then
+         if ((neff1 < bs%neff1(1)) .or. &
+            neff1 > (bs%neff1(bs%N1))) then
             !write(*,*) neff1, bs%neff1(1), bs%neff1(bs%N1)
             !write(*,*) neff2, bs%neff2(1), bs%neff2(bs%N2)
             write(*,*) "neff outside domain, use Unsold"
@@ -249,8 +249,8 @@ module barklem
 
          index1 = index
 
-         if ((neff2 .lt.bs%neff2(1)) .or. &
-            (neff2 .gt. bs%neff2(bs%N2))) then
+         if ((neff2 < bs%neff2(1)) .or. &
+            (neff2 > bs%neff2(bs%N2))) then
             res = .false.
             return
          end if

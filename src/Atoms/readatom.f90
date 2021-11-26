@@ -23,8 +23,8 @@ module readatom
    use solvene, only             : Max_ionisation_stage, get_max_nstage
    !$ use omp_lib
    use messages
-   use mcfost_env, only           : mcfost_utils
-   use parametres, only           : art_hv
+   use mcfost_env, only          : mcfost_utils
+   use parametres, only          : art_hv
 
    implicit none
 
@@ -787,10 +787,9 @@ module readatom
       if (art_hv > 0.0) then
          hv = art_hv
       endif
-      write(*,'("R(km/s)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
+      write(*,'("R="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
 
-      !Move after LTEpops for first estimates of damping
-      !line wave grid define here to have the max damping
+
       write(*,*) " Generating sub wavelength grid and lines boundary for all atoms..."
       do nmet=1, Natom
          atom => Atoms(nmet)%ptr_atom

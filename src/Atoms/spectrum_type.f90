@@ -5,7 +5,7 @@ module spectrum_type
   use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table, make_wavelength_grid, make_wavelength_grid_new
   use fits_utils, only : print_error
   use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
-       lorigin_atom, n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
+       n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
        lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot, llimit_mem
   use input, only : nb_proc, RT_line_method,lkeplerian, linfall, l_sym_ima
   use constantes, only : arcsec_to_deg
@@ -463,33 +463,33 @@ contains
     !
     ! 		end if
 
-    if (lorigin_atom) then
-       mem_alloc = 8 * n_cells * Nlambda / 1024./ 1024. + 8 * n_cells * Nlambda_cont / 1024./1024.
-       if (mem_alloc > 1d3) then
-          write(*,*) " allocating ", mem_alloc/1024., " GB for local emission origin.."
-       else
-          write(*,*) " allocating ", mem_alloc, " MB for local emission origin.."
-       endif
+   !  if (lorigin_atom) then
+   !     mem_alloc = 8 * n_cells * Nlambda / 1024./ 1024. + 8 * n_cells * Nlambda_cont / 1024./1024.
+   !     if (mem_alloc > 1d3) then
+   !        write(*,*) " allocating ", mem_alloc/1024., " GB for local emission origin.."
+   !     else
+   !        write(*,*) " allocating ", mem_alloc, " MB for local emission origin.."
+   !     endif
 
-       if (mem_alloc >= 2.1d3) then !2.1 GB
-          call Warning(" To large origin_atom array. Use a wavelength table instead..")
-          !lorigin_atom = .false.
-       else
+   !     if (mem_alloc >= 2.1d3) then !2.1 GB
+   !        call Warning(" To large origin_atom array. Use a wavelength table instead..")
+   !        !lorigin_atom = .false.
+   !     else
 
-          allocate(origin_atom(Nlambda,n_cells),stat=alloc_status)
-          allocate(originc_atom(Nlambda_cont,n_cells),stat=alloc_status)
+   !        allocate(origin_atom(Nlambda,n_cells),stat=alloc_status)
+   !        allocate(originc_atom(Nlambda_cont,n_cells),stat=alloc_status)
 
-          mem_alloc_local = mem_alloc_local + sizeof(origin_atom) + sizeof(originc_atom)
-          if (alloc_status > 0) then
-             call ERROR('Cannot allocate origin_atom')
-             !lorigin_atom = .false.
-          else
-             origin_atom = 0.0_dp
-             originc_atom = 0.0_dp
-          endif
+   !        mem_alloc_local = mem_alloc_local + sizeof(origin_atom) + sizeof(originc_atom)
+   !        if (alloc_status > 0) then
+   !           call ERROR('Cannot allocate origin_atom')
+   !           !lorigin_atom = .false.
+   !        else
+   !           origin_atom = 0.0_dp
+   !           originc_atom = 0.0_dp
+   !        endif
 
-       end if
-    endif
+   !     end if
+   !  endif
 
 	if ( limage_at_lam0 ) then
 
