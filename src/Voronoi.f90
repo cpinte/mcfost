@@ -9,7 +9,7 @@ module Voronoi_grid
   use cylindrical_grid, only : volume
   use kdtree2_module
   use messages
-  use os  
+  use os
 
   implicit none
   save
@@ -355,7 +355,7 @@ module Voronoi_grid
     Voronoi(:)%last_neighbour = 0
     Voronoi(:)%is_star = .false.
     star_neighb(:) = .false.
-    
+
     do icell=1, n_cells
        Voronoi(icell)%xyz(1) = x_tmp(icell)
        Voronoi(icell)%xyz(2) = y_tmp(icell)
@@ -815,7 +815,7 @@ module Voronoi_grid
 
     real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
     integer :: i, id_n, l, ifirst, ilast
-    
+
     integer :: i_star
     real(kind=dp) :: d_to_star
     logical :: is_a_star_neighbour
@@ -832,7 +832,7 @@ module Voronoi_grid
 
     s = 1e30 !huge_real
     next_cell = 0
-    
+
     ! We do all the access to Voronoi(icell) now
     r_cell(:) = Voronoi(icell)%xyz(:)
     ifirst = Voronoi(icell)%first_neighbour
@@ -904,7 +904,7 @@ module Voronoi_grid
        ! We check where the packet intersect the sphere of radius Voronoi(icell)%h * PS%cutting_distance_o_h
        ! centered on the center of the cell
        delta_r = r - r_cell(:)
-       
+
        	b = dot_product(delta_r,k)
        	c = dot_product(delta_r,delta_r) - (h * PS%cutting_distance_o_h)**2
        	delta = b*b - c
@@ -939,18 +939,17 @@ module Voronoi_grid
        s_void_before = 0.0_dp
        s_contrib = s
     endif
-    
-       
+
     if (is_a_star_neighbour) then
-       	d_to_star = distance_to_star(x,y,z,u,v,w,i_star)
-       	!It is a neighbour so if the star is intersected (i_star>0) it might be the next cell.
-       	!Otherwise, i_star == 0 (does not intersect the star in this direction (u,v,w)).
-       	if (i_star > 0) then
-       	  	if (d_to_star < s) then !indeed a star, we use d_to_stars and set next_cell
-       	  		s_contrib = d_to_star
-       	  		next_cell = etoile(i_star)%icell
-       	  	endif
-		   endif
+       d_to_star = distance_to_star(x,y,z,u,v,w,i_star)
+       ! It is a neighbour so if the star is intersected (i_star>0) it might be the next cell.
+       ! Otherwise, i_star == 0 (does not intersect the star in this direction (u,v,w)).
+       if (i_star > 0) then
+          if (d_to_star < s) then !indeed a star, we use d_to_stars and set next_cell
+             s_contrib = d_to_star
+             next_cell = etoile(i_star)%icell
+          endif
+       endif
     endif
 
     return
@@ -1214,7 +1213,7 @@ module Voronoi_grid
   end function distance_to_wall
 
   !----------------------------------------
-  
+
   function distance_to_star(x,y,z,u,v,w,i_star)
   ! This routine implies that a star is in a unique cell
   ! return the index of a star (i_star > 0) if a star will be intersected
@@ -1224,7 +1223,7 @@ module Voronoi_grid
     real(kind=dp) :: distance_to_star
     real(kind=dp), intent(in) :: x,y,z, u,v,w
     integer, intent(out) :: i_star
-	
+
     real(kind=dp), dimension(3) :: r, k, delta_r
     real(kind=dp) :: b,c, delta, rac, s1, s2
     integer :: i
@@ -1255,7 +1254,7 @@ module Voronoi_grid
               	distance_to_star = 0.0_dp
               	i_star = i
            	endif
-        	
+
         else ! We will enter in the star
            	if (s1 < distance_to_star) then
               	distance_to_star = s1
