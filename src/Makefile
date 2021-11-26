@@ -3,6 +3,7 @@
 #------------------------------------------------------------------------------#
 # Linux compiling server
 LINUX_SERVER=ozstar
+IPAG_SERVER=ipag-nfs
 
 KNOWN_SYSTEM=no
 
@@ -182,7 +183,7 @@ endif
 Atom_dir=Atoms
 
 SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90       \
-          operating_system.f90 random_numbers.f90 utils.f90 fits_utils.f90       \
+          operating_system.f90 random_numbers.f90 utils.f90 sort.f90 fits_utils.f90 \
           grains.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90         \
           Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90         \
           Temperature.f90 $(Atom_dir)/constant.f90\
@@ -294,11 +295,11 @@ release : clean main
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release mcfost_env.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h %d %s" --date=short  --graph | sed s/"dmz\/master, phare\/master, github\/master, bitbucket\/master"// | sed s/"()"// | sed s/", ,"/","/ > web/history.txt
-	rsync -Pur  web/* horus:/user/publicdir/pintec/mcfost
-	ssh horus "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
+	rsync -Pur  web/* $(IPAG_SERVER):/user/publicdir/pintec/mcfost
+	ssh $(IPAG_SERVER) "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files ; cd  /user/publicdir/pintec/mcfost/linux ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
 
 release_doc:
-	pushd . ; cd ../docs ; make html ; cd _build ; tar czf html.tgz html ; scp -r html.tgz horus:/user/publicdir/pintec/mcfost/docs ; ssh horus "cd /user/publicdir/pintec/mcfost/docs ; tar xzf html.tgz ; rm -f html.tgz" ; popd
+	pushd . ; cd ../docs ; make html ; cd _build ; tar czf html.tgz html ; scp -r html.tgz $(IPAG_SERVER):/user/publicdir/pintec/mcfost/docs ; ssh $(IPAG_SERVER) "cd /user/publicdir/pintec/mcfost/docs ; tar xzf html.tgz ; rm -f html.tgz" ; popd
 
 release_mac : main
 	\cp -f mcfost $(MCFOST_INSTALL)/bin/
@@ -311,13 +312,13 @@ release_mac : main
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
 	grep mcfost_release mcfost_env.f90 | awk '{print $$6}' | sed s/\"//g > web/version.txt
 	git log --pretty=format:"%cd  %h  %d %s" --date=short --graph --branches > web/history.txt
-	rsync -Pur -r web/* horus:/user/publicdir/pintec/mcfost
-	ssh horus "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
+	rsync -Pur -r web/* $(IPAG_SERVER):/user/publicdir/pintec/mcfost
+	ssh $(IPAG_SERVER) "cd  /user/publicdir/pintec/mcfost/mac ; tar xzf mcfost_bin.tgz ; mv mcfost_update mcfost ; rm -f mcfost.tgz ; tar czf mcfost.tgz mcfost --remove-files"
 
 release_utils :
 	tar czvf mcfost_utils.tgz -C../utils .
 	openssl sha1 mcfost_utils.tgz | awk '{print $2}' > mcfost_utils.sha1
-	scp -r mcfost_utils.tgz mcfost_utils.sha1 ../utils/Version horus:/user/publicdir/pintec/mcfost_utils/
+	scp -r mcfost_utils.tgz mcfost_utils.sha1 ../utils/Version $(IPAG_SERVER):/user/publicdir/pintec/mcfost_utils/
 	rm -f mcfost_utils.tgz mcfost_utils.sha1
 
 fosti :
