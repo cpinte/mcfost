@@ -78,8 +78,7 @@ subroutine set_default_variables()
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
   lvacuum_to_air = .false.
-  lcontrib_function_ray = .false.!computes line formation along a ray wich passes at the centre of the image.
-  lorigin_atom = .false.
+  !lorigin_atom = .false., not yet
   lmagnetoaccr = .false.
   lpluto_file = .false.
   lmodel_ascii = .false.
@@ -648,12 +647,12 @@ subroutine initialisation_mcfost()
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
         lemission_atom=.true.
-     case("-cntrbf_ray_atom")!hidden at the moment.
-        i_arg = i_arg + 1
-        lcontrib_function_ray = .true.
-     case("-origin_atom")!hidden at the moment.
-        i_arg = i_arg + 1
-        lorigin_atom = .true.
+   !   case("-cntrbf_ray_atom")!hidden at the moment.
+   !      i_arg = i_arg + 1
+   !      lcontrib_function_ray = .true.
+   !   case("-origin_atom")!hidden at the moment.
+   !      i_arg = i_arg + 1
+   !      lorigin_atom = .true.
      case("-output_rates")
         i_arg = i_arg + 1
         loutput_rates = .true.
