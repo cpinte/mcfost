@@ -3,7 +3,8 @@ module Voronoi_grid
   use constantes
   use mcfost_env
   use parametres
-  use utils, only : bubble_sort, appel_syst, Knuth_shuffle
+  use utils, only : appel_syst
+  use sort, only : Knuth_shuffle, index_quicksort
   use naleat, only : seed, stream, gtype
   use cylindrical_grid, only : volume
   use kdtree2_module
@@ -69,7 +70,8 @@ module Voronoi_grid
   interface
      subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, &
           icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
-          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, n_stars, stars_cell, stars_radius, stellar_neighb, ierr) bind(C, name='voro_C')
+          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, &
+          n_stars, stars_cell, stars_radius, stellar_neighb, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours, icell_start, icell_end
@@ -243,7 +245,6 @@ module Voronoi_grid
 
     if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 
-
     nb_proc_voro = min(16,nb_proc)
     allocate(n_neighbours(nb_proc_voro))
 
@@ -266,7 +267,6 @@ module Voronoi_grid
     icell = 0
     n_sublimate = 0
     do i=1, n_points
-
        ! We test if the point is in the model volume
        !-> Voronoi cells are now cut at the surface of the star. We only need
        ! to test if a particle is below Rstar.
@@ -623,7 +623,8 @@ module Voronoi_grid
 
   !**********************************************************
 
-  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,neighbours_list,was_cell_cut,star_neighb)
+  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,&
+   last_neighbours,neighbours_list,was_cell_cut,star_neighb)
 
     use, intrinsic :: iso_c_binding, only : c_bool
 
@@ -1313,7 +1314,7 @@ module Voronoi_grid
        endif
     enddo
 
-    order = bubble_sort(real(s_walls,kind=dp))
+    order = index_quicksort(real(s_walls,kind=dp))
 
     ! Move to the closest plane & check that the packet is in the model
     check_wall : do i = 1, n_walls

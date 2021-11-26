@@ -1014,57 +1014,6 @@ end function is_digit
 
 !************************************************************
 
-function bubble_sort(data_in)
-  ! Implementation of Bubble sort
-  ! Warning : this is N^2, only for small arrays
-  ! Same behaviour as yorick to allow ordering of mutiple arrays
-  ! Return the order of data, the sorted array would be data_in(order)
-  !
-  ! C. Pinte
-  ! 02/05/11
-
-  real(kind=dp), dimension(:), intent(in) :: data_in
-  real(kind=dp), dimension(:), allocatable :: data
-  integer, dimension(:), allocatable :: bubble_sort ! indices
-
-  integer :: i, pass, n, tmp_i
-  logical :: sorted
-  real(kind=dp) ::  temp
-
-  n = size(data_in)
-  allocate(bubble_sort(n),data(n))
-  data = data_in
-
-  bubble_sort = indgen(n) ;
-
-  pass = 1
-  sorted = .false.
-
-  do while(.not.sorted)
-     sorted = .true.
-
-     do i = 1,n-pass
-        if(data(i) > data(i+1)) then
-           temp = data(i)
-           data(i) = data(i+1)
-           data(i+1) = temp
-           sorted = .false.
-
-           ! same operation on indices
-           tmp_i = bubble_sort(i)
-           bubble_sort(i) = bubble_sort(i+1)
-           bubble_sort(i+1) = tmp_i
-        endif
-     end do ! i
-     pass = pass +1
-  end do ! while
-
-  return
-
-end function bubble_sort
-
-!************************************************************
-
 function is_diff(a,b)
 
   logical is_diff
@@ -1370,98 +1319,6 @@ end subroutine progress_bar
 
 !************************************************************
 
-function find_kth_smallest(k,array)
-  ! Returns the kth smallest value in the array.
-  ! The input array will be rearranged to have this value in location array(k),
-  ! with all smaller elements moved to arr(1:k-1) (in arbitrary order) and
-  ! all larger elements in arr(k+1:) (also in arbitrary order).
-
-  integer, intent(in) :: k
-  real(sp), dimension(:), intent(inout) :: array
-  real(sp) :: find_kth_smallest
-
-  integer :: i,r,j,l
-  real(sp) :: a
-
-  l=1
-  r=size(array)
-  do
-     if (r-l <= 1) then ! Active partition contains 1 or 2 elements.
-        if (r-l == 1) then
-           if (array(l)>array(r)) call swap(array(l),array(r))  ! Active partition contains 2 elements.
-        endif
-        find_kth_smallest=array(k)
-        return
-     else
-        ! Choose median of left, center, and right elements as partitioning element a.
-        ! Also rearrange so that array(l) <= array(l+1) <= array(r).
-        i=(l+r)/2
-        call swap(array(i),array(l+1))
-        if (array(l)>array(r))   call swap(array(l),array(r))
-        if (array(l+1)>array(r)) call swap(array(l+1),array(r))
-        if (array(l)>array(l+1)) call swap(array(l),array(l+1))
-        i=l+1 ! Initialize pointers for partitioning.
-        j=r
-        a=array(l+1) ! Partitioning element.
-        do
-           do ! Scan up to find element > a.
-              i=i+1
-              if (array(i) >= a) exit
-           enddo
-           do ! Scan down to find element < a.
-              j=j-1
-              if (array(j) <= a) exit
-           enddo
-           if (j < i) exit ! Pointers crossed. Exit with partitioning complete.
-           call swap(array(i),array(j)) ! Exchange elements.
-        enddo
-        array(l+1)=array(j) ! Insert partitioning element.
-        array(j)=a
-        if (j >= k) r=j-1 ! Keep active the partition that contains the kth element.
-        if (j <= k) l=i
-     endif
-  enddo
-
-  return
-
-end function find_kth_smallest
-
-!************************************************************
-
-function find_kth_smallest_inplace(k,array)
-  ! Returns the kth smallest value in the array, without altering the input array.
-  ! In Fortran 90's assumed memory-rich environment, we just call select in scratch space.
-  ! C.P. : this is an issue for very large arrays: using allocatable array instead
-
-  integer, intent(in) :: k
-  real(sp), dimension(:), intent(in) :: array
-  real(sp) :: find_kth_smallest_inplace
-
-  real(sp), dimension(:), allocatable :: tmp_array
-
-  allocate(tmp_array(size(array)))
-
-  tmp_array=array
-  find_kth_smallest_inplace=find_kth_smallest(k,tmp_array)
-  deallocate(tmp_array)
-
-  return
-
-end function find_kth_smallest_inplace
-
-!************************************************************
-
-subroutine swap(a,b)
-  real(sp), intent(inout) :: a,b
-  real(sp) :: tmp
-
-  tmp=a ; a=b ; b=tmp
-  return
-
-end subroutine swap
-
-!************************************************************
-
 subroutine cdapres(cospsi, phi, u0, v0, w0, u1, v1, w1)
 !***************************************************
 !*--------COSINUS DIRECTEURS APRES LA DIFFUSION-----
@@ -1536,33 +1393,5 @@ subroutine read_comments(iunit)
   return
 
 end subroutine read_comments
-
-!***************************************************
-
-subroutine Knuth_shuffle(a)
-
-  integer, intent(inout) :: a(:)
-
-  integer :: seed_size
-  integer, dimension(:), allocatable :: seed
-  integer :: i, randpos, temp
-  real :: r
-
-  call random_seed(size=seed_size)
-  allocate(seed(seed_size))
-  seed(:) = 42
-  call random_seed(put=seed)
-
-  do i = size(a), 2, -1
-     call random_number(r)
-     randpos = int(r * i) + 1
-     temp = a(randpos)
-     a(randpos) = a(i)
-     a(i) = temp
-  enddo
-
-  return
-
-end subroutine Knuth_Shuffle
 
 end module utils

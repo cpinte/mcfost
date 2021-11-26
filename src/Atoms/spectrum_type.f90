@@ -1,8 +1,10 @@
 module spectrum_type
 
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType
-  use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, B_char, icompute_atomRT, lmagnetized, laccretion_shock
-  use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table, make_wavelength_grid, make_wavelength_grid_new
+  use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, B_char,&
+  icompute_atomRT, lmagnetized, laccretion_shock
+  use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table,&
+  make_wavelength_grid,make_wavelength_grid_new
   use fits_utils, only : print_error
   use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
        n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
@@ -46,7 +48,7 @@ module spectrum_type
   real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
   real(kind=dp), allocatable, dimension(:,:,:,:,:) :: F_QUV
   real(kind=dp), allocatable, dimension(:,:) :: origin_atom, originc_atom
-  
+
   logical :: limage_at_lam0 = .false.
   real(kind=dp), allocatable, dimension(:,:,:,:) :: image_map
 
@@ -232,7 +234,7 @@ contains
     else
        write(*,*) " -> Reducing memory usage by interpolating continuous opacity!"
     endif
-    
+
     !Jnu(:,id) is not allocated anymore at the moment.
 
     !otherwise allocated bellow for nlte.
@@ -496,10 +498,10 @@ contains
     	allocate(image_map(npix_x, npix_y, rt_n_incl, rt_n_az),stat=alloc_status)
         if (alloc_status > 0) then
             call error("Cannot allocate image_map !")
-        endif	
+        endif
         image_map = 0.0_dp
         mem_alloc_local = mem_alloc_local + sizeof(image_map)
-	
+
 	endif
 
     mem_alloc_tot = mem_alloc_tot + mem_alloc_local
@@ -575,8 +577,8 @@ contains
   ! 	end subroutine fill_map
 
   subroutine dealloc_spectrum()
-  
-  
+
+
     call dealloc_jnu
 
     deallocate(lambda)
@@ -649,9 +651,7 @@ contains
 
   subroutine write_flux(only_flux)
   	use parametres, only : etoile
-    !
-    !write flux total and flux map for lines
-    !
+    ! write flux total and flux map for lines
     logical, optional :: only_flux
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(6) :: naxes
@@ -801,7 +801,7 @@ contains
        		call print_error(status)
     	endif
     	call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm Fstar_{\nu}}$',status)
-	
+
 
     	!  Write the array to the FITS file.
     	if (maxval(sum(Flux_star(:,:,:,:),dim=4)) <= 0.0) then
@@ -815,7 +815,7 @@ contains
     endif
 
     if (lmagnetized) then
-    
+
     	if (maxval(sum(F_QUV,dim=5)) == 0.0) then
     		call warning("Magnetic field is present but it seems there is no polarisation!")
     	endif
@@ -1118,7 +1118,7 @@ contains
     naxes(4)=RT_n_incl
     naxes(5)=RT_n_az
     nelements=naxes(2)*naxes(3)*naxes(4)*naxes(5)
-    
+
     if (lmagnetized) then
     	naxes(6) = 3
     endif
@@ -1232,7 +1232,7 @@ contains
              !Write the array to the FITS file.
              call ftpprd(unit,group,fpixel,nelements,atom%lines(kr)%mapc(:,:,:,:),status)
              if (status > 0) call print_error(status)
-             
+
              if (lmagnetized) then
              	call ftcrhd(unit, status)
              	if (status > 0) call print_error(status)
@@ -1240,7 +1240,7 @@ contains
              	if (status > 0) call print_error(status)
              	!Write the array to the FITS file.
              	call ftpprd(unit,group,fpixel,nelements*naxes(1)*naxes(6),atom%lines(kr)%mapx(:,:,:,:,:,:),status)
-             	if (status > 0) call print_error(status)            
+             	if (status > 0) call print_error(status)
              endif
 
              !  Close the file and free the unit number.
@@ -1262,7 +1262,7 @@ contains
 
     return
   end subroutine write_atomic_maps
-  
+
   subroutine write_image_map()
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(4) :: naxes

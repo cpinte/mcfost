@@ -259,7 +259,7 @@ contains
     l1 = cont%lambda0 !cannot be larger than lambda0 ! frequency for photoionisation
     l0 = lambdamin
     cont%Nlambda = Nlambda_cont
-    allocate(cont%lambda(cont%Nlambda))    
+    allocate(cont%lambda(cont%Nlambda))
     resol = (l1 - l0) / real(cont%Nlambda - 1, kind=dp)
     !    write(*,*) "Continuum:", cont%lambda0, cont%j,"->",cont%i, &
     !               " Resolution (nm):", resol, " lambdamin =", lambdamin
@@ -1765,7 +1765,7 @@ contains
       		line_waves(la) = line_waves(la-1) * (1.0 + 1d3 * hv / clight)
       		Nlambda_per_group(n) = Nlambda_per_group(n) + 1
       		if (line_waves(la) >= group_red(n)) exit inf
-      		if (la >= size(line_waves)) call error('Error la larger than size line_waves!')
+      		if (la >= size(line_waves)) call error('la larger than size line_waves!')
       		lac = lac + 1
 !       		write(*,*) lac, la, line_waves(la)
       	enddo inf

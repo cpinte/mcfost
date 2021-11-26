@@ -4,6 +4,7 @@ module grid
   use constantes
   use grains
   use utils
+  use sort, only : index_quicksort
 
   use cylindrical_grid
   use spherical_grid
@@ -39,7 +40,7 @@ module grid
    Izone_tmp(:) =  dust_pop(:)%zone
 
    ! order following Rin
-   order = bubble_sort(disk_zone(:)%Rmin)
+   order = index_quicksort(disk_zone(:)%Rmin)
 
    ! Reordering zones
    do i=1, n_zones

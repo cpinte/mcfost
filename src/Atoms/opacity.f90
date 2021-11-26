@@ -998,7 +998,8 @@ contains
              cycle tr_loop
           endif
 
-          phi0(1:Nlam) = profile(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred), x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+          phi0(1:Nlam) = profile(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred),&
+          x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
 
 
           ! 				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
@@ -1228,7 +1229,8 @@ contains
           phiz = 0.0
           psiz = 0.0
           !!fixed at the moment
-          call local_profile_zv(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred),phi0(1:Nlam),phiZ(1:Nlam,:), psiZ(1:Nlam,:), x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+          call local_profile_zv(aatom%lines(kc),icell,iterate,Nlam,&
+          lambda(Nblue:Nred),phi0(1:Nlam),phiZ(1:Nlam,:), psiZ(1:Nlam,:), x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
 
           etal = hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell)
           chil = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))

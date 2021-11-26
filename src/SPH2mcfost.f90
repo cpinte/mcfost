@@ -3,6 +3,7 @@ module SPH2mcfost
   use parametres
   use constantes
   use utils
+  use sort, only : find_kth_smallest_inplace
   use density, only : normalize_dust_density, reduce_density
   use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
 
