@@ -1825,7 +1825,7 @@ contains
 
     return
   end subroutine alloc_atomic_atmos
-  
+
   subroutine empty_cells (itiny_T, itiny_nH, itiny_ne)
       !Empty cells based on a minimum threshold in T AND nH AND ne
       !icompute_atomRT = 0 -> transparent
@@ -1836,7 +1836,7 @@ contains
       real(kind=dp) :: tiny_nH=1d6, tiny_T=5d2, tiny_ne = 1d6
       integer :: id, icell, N_emptied_cell = 0
       !minimum ne and nH are 1 particle per cm^3.
-      
+
       if (present(itiny_T)) then
        	tiny_T = itiny_T !K
       end if
@@ -1844,11 +1844,11 @@ contains
       if (present(itiny_nH)) then
        	tiny_nH = itiny_nH !m^-3
       end if
-      
+
       if (present(itiny_ne)) then
        	tiny_ne = itiny_ne !m^-3
       end if
-      
+
 !       where ((nHtot <= tiny_nH) .and. (ne <= tiny_ne) .and. (T <= tiny_T))
 !       	icompute_atomRT = 0
 !       endwhere
@@ -1862,21 +1862,21 @@ contains
       do icell=1,n_cells
         !$ id = omp_get_thread_num() + 1
       	if  (icompute_atomRT(icell) > 0) then
-      	
+
       		if ((nHtot(icell) <= tiny_nH).or.(T(icell) <= tiny_T)) then
       			N_emptied_cell = N_emptied_cell + 1
       			icompute_atomRT(icell) = 0
       		endif
-      	
+
       	endif
       enddo
       !$omp end do
       !$omp end parallel
-      
+
       if (N_emptied_cell > 0) then
       	write(*,'("A total of "(1I6)" cells have been emptied!")') N_emptied_cell
       	write(*,'(   "Representing "(1F12.4)" % of "(1F12.3)" cells.")') &
-      		100*real(N_emptied_cell)/real(n_cells), real(n_cells)   
+      		100*real(N_emptied_cell)/real(n_cells), real(n_cells)
       endif
 
   return
@@ -1922,14 +1922,14 @@ contains
     call error("Zeeman angles from magnetic field vector components (BR,Bz,Bphi) Not implemented!")
 
     Bmodule = sqrt(bx*bx + by*by + bz*bz)
-    
+
     !unpolarized profile !
     if (Bmodule == 0.0) then
     	lno_mag = .true.
     	return
     endif
     lno_mag = .false.
-    
+
     !cos of the angle between B and the lost
     cog = (bx*u + by*v + bz*w) / Bmodule
     sigsq = 1.0 - cog*cog
@@ -1972,7 +1972,7 @@ contains
     !in reference axis of polarisation!
     real(kind=dp), intent(inout) :: cog, co2c, si2c, sigsq
     logical :: lno_mag
-    
+
     !In this configuration, Bmag(icell) should always be > 0?
 
 !     if (Bmag(icell) == 0.0_dp) then
@@ -1982,7 +1982,7 @@ contains
        lno_mag = .true.
        return
     endif
-    
+
     lno_mag = .false.
 
     gamm = gammaB(icell)
@@ -2044,7 +2044,7 @@ contains
     if (abs(cog) <= 1d-10) cog = 0.0
     if (abs(co2c) <= 1d-10) co2c = 0.0
     if (abs(si2c) <= 1d-10) si2c = 0.0
-    
+
 !     if (icell > 0 ) then
 ! 		write(*,*) "u=",u, " v=",v, " w=", w, " r=",sqrt(x*x+y*y+z*z)/etoile(1)%r
 ! 		write(*,*) " B=", Bmodule*1e4, " gammB=", gammaB(icell)*180/pi, " chib=", chib(icell)*180/pi
@@ -2309,7 +2309,7 @@ contains
        end do
     end do
     close(unit=1)
-    
+
     !Handling of magnetic field components only depends on what choice I make for the magnetic field
     !Presently I read B, theta and chi !
     if (lspherical_velocity) then
@@ -2473,7 +2473,7 @@ contains
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
 
     if (lspherical_velocity) then
-       write(*,*) " Vr = ", 1d-3 * maxval(abs(vR)), 1d-3*minval(abs(vr),mask=icompute_atomRT>0)
+       write(*,*) " Vr = ", 1e-3 * maxval(abs(vR)), 1d-3*minval(abs(vr),mask=icompute_atomRT>0)
        write(*,*) " Vtheta = ",  1d-3 * maxval(abs(vtheta)), 1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)
     else if (lmagnetoaccr) then
        write(*,*) " VRz = ", 1d-3 * maxval(sqrt(VR(:)**2 + v_z(:)**2)), &
@@ -2492,12 +2492,12 @@ contains
     write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
 
     write(*,*) "Maximum/minimum Temperature in the model (K):"
-    write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)
+    write(*,*) real(maxval(T)), real(maxval(T,mask=icompute_atomRT>0))
     write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-    write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)
+    write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
     if (.not.calc_ne) then
        write(*,*) "Maximum/minimum ne density in the model (m^-3):"
-       write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
+       write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
     endif
 
     return
