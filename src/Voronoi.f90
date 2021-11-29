@@ -189,7 +189,7 @@ module Voronoi_grid
 
     !************************************************************************
 
-  subroutine Voronoi_tesselation(n_points, particle_id, x,y,z,h, vx,vy,vz, limits, check_previous_tesselation)
+  subroutine Voronoi_tesselation(n_points, particle_id, x,y,z,h, vx,vy,vz, is_ghost, limits, check_previous_tesselation)
 
     use iso_fortran_env
     use, intrinsic :: iso_c_binding, only : c_bool
@@ -198,6 +198,7 @@ module Voronoi_grid
     integer, intent(in) :: n_points
     real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h
     real(kind=dp), dimension(:), allocatable, intent(in) :: vx,vy,vz
+    integer, dimension(:), allocatable, intent(in) :: is_ghost
     integer, dimension(n_points), intent(in) :: particle_id
     real(kind=dp), dimension(6), intent(in) :: limits
     logical, intent(in) :: check_previous_tesselation
@@ -230,6 +231,7 @@ module Voronoi_grid
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
+
     if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 
     nb_proc_voro = min(16,nb_proc)
@@ -258,33 +260,35 @@ module Voronoi_grid
     icell = 0
     n_sublimate = 0
     do i=1, n_points
-       ! We test if the point is in the model volume
-       if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
-          if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
-             if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
+       if (is_ghost(i) == 0) then
+          ! We test if the point is in the model volume
+          if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
+             if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
+                if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
 
-                ! We also test if the edge of the cell can be inside the star
-                ! We test for the edge, so the center needs to be at twice the radius
-                is_outside_stars = .true.
-                loop_stars : do istar=1, n_etoiles
-                   dx = x(i) - etoile(istar)%x
-                   dy = y(i) - etoile(istar)%y
-                   dz = z(i) - etoile(istar)%z
+                   ! We also test if the edge of the cell can be inside the star
+                   ! We test for the edge, so the center needs to be at twice the radius
+                   is_outside_stars = .true.
+                   loop_stars : do istar=1, n_etoiles
+                      dx = x(i) - etoile(istar)%x
+                      dy = y(i) - etoile(istar)%y
+                      dz = z(i) - etoile(istar)%z
 
-                   if (min(dx,dy,dz) < 2*etoile(istar)%r) then
-                      dist2 = dx**2 + dy**2 + dz**2
-                      if (dist2 < deuxr2_star(istar)) then
-                         is_outside_stars = .false.
-                         n_sublimate = n_sublimate + 1
-                         exit loop_stars
+                      if (min(dx,dy,dz) < 2*etoile(istar)%r) then
+                         dist2 = dx**2 + dy**2 + dz**2
+                         if (dist2 < deuxr2_star(istar)) then
+                            is_outside_stars = .false.
+                            n_sublimate = n_sublimate + 1
+                            exit loop_stars
+                         endif
                       endif
-                   endif
-                enddo loop_stars
+                   enddo loop_stars
 
-                if (is_outside_stars) then
-                   icell = icell + 1
-                   SPH_id(icell) = i ; SPH_original_id(icell) = particle_id(i)
-                   x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(icell) = h(i)
+                   if (is_outside_stars) then
+                      icell = icell + 1
+                      SPH_id(icell) = i ; SPH_original_id(icell) = particle_id(i)
+                      x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(icell) = h(i)
+                   endif
                 endif
              endif
           endif
@@ -535,7 +539,7 @@ module Voronoi_grid
           write(*,*) "WARNING: cell #", icell, "is missing"
           write(*,*) "original id =", SPH_original_id(icell)
           write(*,*) "xyz=", x_tmp(icell), y_tmp(icell), z_tmp(icell)
-          write(*,*) "volume =", volume(icell)
+          write(*,*) "volume =", volume(icell), ", was cut:", Voronoi(icell)%was_cut
        endif
 
        ! todo : find the cells touching the walls
