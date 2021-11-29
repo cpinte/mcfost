@@ -6,11 +6,12 @@ module SPH2mcfost
   use sort, only : find_kth_smallest_inplace
   use density, only : normalize_dust_density, reduce_density
   use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
+  use sort, only : index_quicksort
 
   implicit none
 
   procedure(read_phantom_bin_files), pointer :: read_phantom_files => null()
-  
+
 contains
 
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
@@ -25,17 +26,18 @@ contains
     integer, parameter :: iunit = 1
 
     real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,SPH_grainsizes,T_gas
-    real(dp), allocatable, dimension(:) :: temp,vturb,mass_ne_on_massgas,atomic_mask
+    real(dp), allocatable, dimension(:) :: vturb,mass_ne_on_massgas,atomic_mask
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
     logical, allocatable, dimension(:) :: mask ! size == np, not n_SPH, index is original SPH id
 
+    integer, dimension(:), allocatable :: is_ghost
     real(dp), dimension(6) :: SPH_limits
     real :: factor
     integer :: ndusttypes, ierr, i, ilen
     logical :: check_previous_tesselation
-    
+
 
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
@@ -61,7 +63,7 @@ contains
        endif
 
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
-            particle_id, massgas,massdust,rho,rhodust,temp,extra_heating,ndusttypes, &
+            particle_id, massgas,massdust,rho,rhodust,T_gas,extra_heating,ndusttypes, &
             SPH_grainsizes,mask,n_SPH,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
@@ -103,18 +105,17 @@ contains
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
-         temp, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, mask=mask)
-
-    ! setup needed for Atomic line transfer
-    if (lemission_atom) then
-       call hydro_to_Voronoi_atomic(n_SPH,temp,vturb,massgas,mass_ne_on_massgas,atomic_mask)
-    endif
+         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
     deallocate(massgas,rho)
     if (allocated(rhodust)) deallocate(rhodust,massdust)
-    if (allocated(temp)) deallocate(temp)
+
+    ! setup needed for Atomic line transfer
+    if (lemission_atom) then
+       call hydro_to_Voronoi_atomic(n_SPH,T_gas,vturb,massgas,mass_ne_on_massgas,atomic_mask)
+    endif
     if (allocated(vturb)) deallocate(vturb)
     if (allocated(mass_ne_on_massgas)) deallocate (mass_ne_on_massgas)
     if (allocated(atomic_mask)) deallocate(atomic_mask)
@@ -155,7 +156,7 @@ contains
   !*********************************************************
 
   subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, T_gas, massgas,massdust,rho,rhodust,&
-       SPH_grainsizes, SPH_limits, check_previous_tesselation, mask)
+       SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, mask)
 
     ! ************************************************************************************ !
     ! n_sph : number of points in the input model
@@ -185,15 +186,19 @@ contains
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(:), allocatable, intent(in) :: T_gas
     integer, dimension(n_SPH), intent(in) :: particle_id
-    real(dp), dimension(:,:), allocatable, intent(in) :: rhodust, massdust ! ndusttypes,n_SPH
+    real(dp), dimension(:,:), allocatable, intent(inout) :: rhodust, massdust ! ndusttypes,n_SPH
     real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes ! ndusttypes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
     logical, dimension(:), allocatable, intent(in), optional :: mask
 
+    integer, dimension(:), allocatable, intent(out) :: is_ghost
+
+
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
+
     real(dp) :: mass, somme, Mtot, Mtot_dust
     real :: f, limit_threshold, density_factor
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n
@@ -292,13 +297,13 @@ contains
     write(*,*) "y =", limits(3), limits(4)
     write(*,*) "z =", limits(5), limits(6)
 
+
+    call test_duplicate_particles(n_SPH, particle_id, x,y,z, massgas,massdust,rho,rhodust, is_ghost)
+
     !*******************************
     ! Voronoi tesselation
     !*******************************
-    ! Make the Voronoi tesselation on the SPH particles ---> define_Voronoi_grid : volume
-    !call Voronoi_tesselation_cmd_line(n_SPH, x,y,z, limits)
-
-    call Voronoi_tesselation(n_SPH, particle_id, x,y,z,h,vx,vy,vz, limits, check_previous_tesselation)
+    call Voronoi_tesselation(n_SPH, particle_id, x,y,z,h,vx,vy,vz, is_ghost, limits, check_previous_tesselation)
     !deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
 
@@ -675,6 +680,67 @@ contains
   end subroutine hydro_to_Voronoi_atomic
 
 
+  subroutine test_duplicate_particles(n_SPH, particle_id, x,y,z, massgas,massdust,rho,rhodust, is_ghost)
+    ! Filtering particles at the same position
+    ! They are defined as ghost of the main one. The main gets the total mass and denity.
+    ! We keep the main particle_id to be able to give the ghost particle the same temperature as the main particle
+
+    integer, intent(in) :: n_SPH
+    integer, dimension(n_SPH), intent(in) :: particle_id
+    real(kind=dp), dimension(n_SPH), intent(inout) :: x, y, z, massgas, rho
+    real(dp), dimension(:,:), allocatable, intent(inout) :: rhodust, massdust
+
+    integer, dimension(:), allocatable, intent(out) :: is_ghost
+
+    real, parameter :: prec = 1e-14
+
+    real(kind=dp), dimension(:), allocatable :: x2
+    integer, dimension(:), allocatable :: order
+    real :: dr2
+    integer :: i, j, ii, jj, nkill, alloc_status
+
+    alloc_status=0
+    allocate(x2(n_SPH), order(n_SPH), is_ghost(n_SPH), stat=alloc_status)
+    if (alloc_status /=0) call error("Allocation error test_duplicate_particles")
+
+    x2(:) = x(:)**2 + y(:)**2 + z(:)**2
+    order = index_quicksort(x2)
+
+    is_ghost(:) = 0
+    nkill = 0
+    do i=1, n_SPH
+       ii = order(i)
+       loop2 : do j=i+1, n_SPH
+          jj = order(j)
+          dr2 = (x(ii)-x(jj))**2 + (y(ii)-y(jj))**2 + (z(ii)-z(jj))**2
+          if (dr2 < prec * x2(ii)) then
+             is_ghost(jj) = particle_id(ii)
+             nkill = nkill+1
+
+             ! Adding ghost particle to main one
+             rho(ii) = rho(ii) + rho(jj)
+             massgas(ii) = massgas(ii) + massgas(jj)
+             rhodust(:,ii) = rhodust(:,ii) + rhodust(:,jj)
+             massdust(:,ii) = massdust(:,ii) + massdust(:,jj)
+          else
+             exit loop2
+          endif
+       enddo loop2 ! j
+    enddo ! i
+    deallocate(order,x2)
+
+    if (nkill > 0) then
+       write(*,*)
+       write(*,*) nkill, "SPH particles were flagged as ghosts and merged"
+       write(*,*)
+    endif
+
+    return
+
+  end subroutine test_duplicate_particles
+
+  !*********************************************************
+
   subroutine compute_stellar_parameters()
 
     integer :: i
@@ -976,7 +1042,7 @@ contains
     return
 
   end subroutine read_ascii_SPH_file
-  
+
 
 subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id,ndusttypes,n_sph)
     use naleat, only : seed, stream, gtype
@@ -1013,14 +1079,14 @@ subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle
     if (allocated(x)) then
     	deallocate(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id)
     endif
-    
+
     n_sph = 100000
 
     alloc_status = 0
     allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), &
     	vx(n_sph), vy(n_sph), vz(n_sph), T_gas(n_sph), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
-    
+
     id = 1
     do i=1, n_sph
        particle_id(i) = i
@@ -1043,8 +1109,8 @@ subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle
        rhogas(i) = massgas(i)
        h(i) = 3.0 * rmo * etoile(1)%r
     enddo
-    
-    
+
+
     deallocate(stream)
 
 
