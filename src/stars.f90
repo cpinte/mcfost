@@ -820,10 +820,10 @@ subroutine intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
 !   else
 !      icell_star = 0
 !   end if
-! 
+!
 !   return
-  
-  
+
+
   r(1) = x ; r(2) = y ; r(3) = z
   k(1) = u ; k(2) = v ; k(3) = w
 
@@ -855,9 +855,7 @@ subroutine intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
               i_star = i
            endif
         endif ! s1 < 0
-
      endif ! delta < 0
-
   enddo star_loop
 
   lintersect_stars = (i_star > 0)

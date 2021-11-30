@@ -21,6 +21,7 @@ contains
     real(kind=dp), allocatable, dimension(:) :: vx,vy,vz,mass_gas, mass_ne_on_massgas, T_tmp, vt_tmp, dz
     real(kind=dp), allocatable, dimension(:) :: rho, hydro_grainsizes
     real(kind=dp), allocatable, dimension(:,:) :: rhodust, massdust
+    integer,       allocatable, dimension(:) :: is_ghost
 
     real(kind=dp)                            :: tilt
     integer, parameter                       :: Nheader = 3 !Add more, for ascii file
@@ -186,7 +187,7 @@ contains
     !also work with grid-based code
     !massdust, rhodust, hydro_grainsizes not allocated if ndusttypes = 0 !
     call sph_to_voronoi(n_points-n_etoiles, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, &
-         T_tmp, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation)
+         T_tmp, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation, is_ghost)
     ! -> correction for small density applied on mass_gas directly inside
 
     call hydro_to_Voronoi_atomic(n_points,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,dz)

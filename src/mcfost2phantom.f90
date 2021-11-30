@@ -209,8 +209,9 @@ contains
 
     real, parameter :: Tmin = 1.
 
-    real(dp), dimension(:), allocatable :: x_SPH,y_SPH,z_SPH,h_SPH,rhogas,massgas,vx_SPH,vy_SPH,vz_SPH,Tgas,SPH_grainsizes
-    integer, dimension(:), allocatable :: particle_id
+    real(dp), dimension(:), allocatable :: x_SPH,y_SPH,z_SPH,h_SPH,rhogas, massgas, vx_SPH,vy_SPH,vz_SPH, SPH_grainsizes
+    real(dp), dimension(:), allocatable :: Tgas_SPH
+    integer, dimension(:), allocatable :: particle_id, is_ghost
     real(dp), dimension(:,:), allocatable :: rhodust, massdust
     real, dimension(:), allocatable :: extra_heating
     real(dp), dimension(n_files,ntypes) :: massoftype2
@@ -220,7 +221,7 @@ contains
     real(kind=dp) :: x,y,z, u,v,w
     real :: rand, time, cpu_time_begin, cpu_time_end
     integer :: n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i, lambda_seuil
-    integer :: itime, alloc_status
+    integer :: itime, ieos, alloc_status
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
@@ -247,19 +248,14 @@ contains
     call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
          vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,vxyz_ptmass,hfact,&
          umass,utime,udist,graindens,ndudt,dudt,ifiles,&
-<<<<<<< HEAD
-         n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
-=======
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas,extra_heating,T_to_u)
->>>>>>> 8907331e9e0de94410eb9dfd04f9afd4ca8b670f
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas_SPH,extra_heating,ieos)
 
     if (.not.lfix_star) call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH, &
-         massgas,massdust,rhogas,rhodust,SPH_grainsizes, SPH_limits, .false.)
+         massgas,massdust,rhogas,rhodust,SPH_grainsizes, SPH_limits, .false., is_ghost)
 
     call setup_grid()
     call setup_scattering()
@@ -400,6 +396,7 @@ contains
     endif
     ! SPH particles ignored by mcfost
     Tphantom = -1.
+
     ! Remapping to phantom indices
     !radiation(ivorcl,:) = -1.
     do icell=1, n_cells
@@ -410,6 +407,7 @@ contains
           !radiation(ivorcl,i_SPH) = icell
        endif
     enddo
+    call set_ghost_particle_temperature(n_SPH, is_ghost, Tphantom)
 
     ! Resetting memory state for next call
     call reset_mcfost_phantom()
@@ -564,5 +562,29 @@ contains
        kappa_diffusion = 0.
     endif
   end subroutine diffusion_opacity
+
+  !*************************************************************************
+
+  subroutine set_ghost_particle_temperature(n_SPH, is_ghost, T_phantom)
+    ! mcfost will detect particles on top of each other and flag them of ghost
+    ! Here we set the ghost tenperature == to the main particle temperature
+
+    use mcfost_env, only : sp
+
+    integer, intent(in) :: n_SPH
+    integer, dimension(n_SPH), intent(in) :: is_ghost
+    real(sp), dimension(n_SPH), intent(inout) :: T_phantom
+
+    integer :: i
+
+    do i=1, n_SPH
+       if (is_ghost(i) > 0) then
+          T_phantom(i) = T_phantom(is_ghost(i))
+       endif
+    end do
+
+    return
+
+  end subroutine set_ghost_particle_temperature
 
 end module mcfost2phantom
