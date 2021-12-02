@@ -189,7 +189,7 @@ module atom_transfer
             write(*,*) "points of cell ", icell, " inside the star!"
             write(*,*) "x0=",x0,"y0=",y0,"z0=",z0
             write(*,*) "d/rs=",sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r, "Rs=",etoile(1)%r
-            write(*,*) "is cell a star neihbour ? ", Voronoi(icell)%is_star_neighbour
+            if (lvoronoi) write(*,*) "is cell a star neihbour ? ", Voronoi(icell)%is_star_neighbour
             ! lcellule_non_vide = .false.
             return
          endif
