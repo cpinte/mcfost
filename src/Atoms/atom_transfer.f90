@@ -2044,7 +2044,9 @@ module atom_transfer
             endif
 
             !test with thetao and thetai to restrain the shock area a "shock" inside a shock
-            if ( (vaccr < 0.0_dp) .and. ( (abs(z)/rr >= cos(thetai)).and.(abs(z)/rr <= cos(thetao)) ) ) then
+            !-> does not work
+            ! if ( (vaccr < 0.0_dp) .and. ( (abs(z)/rr >= cos(thetai)).and.(abs(z)/rr <= cos(thetao)) ) ) then
+            if (vaccr < 0.0_dp) then
                if (Taccretion>0) then !constant accretion shock value from file
                   Tchoc = Taccretion
                   lintersect = .true.
