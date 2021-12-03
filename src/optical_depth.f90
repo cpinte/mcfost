@@ -207,7 +207,7 @@ subroutine integ_tau(lambda)
   if (.not.lvariable_dust) then
      icell = icell_ref
      if (kappa(icell,lambda) > tiny_real) then
-        write(*,*) " Column density (g/cm�)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
+        write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
              (kappa(icell,lambda)/AU_to_cm))
      endif
   endif
@@ -225,7 +225,7 @@ subroutine integ_tau(lambda)
   if (.not.lvariable_dust) then
      icell = icell_ref
      if (kappa(icell,lambda) > tiny_real) then
-        write(*,*) " Column density (g/cm�)   = ", real(tau*(masse(icell)/(volume(1)*3.347929d39))/ &
+        write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(1)*3.347929d39))/ &
              (kappa(icell,lambda)/1.49597870691e13))
      endif
   endif
@@ -238,7 +238,7 @@ end subroutine integ_tau
 
 subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,lmin,lmax)
 ! Integration par calcul de la position de l'interface entre cellules
-! de l'opacite totale dans une direction donn�e
+! de l'opacite totale dans une direction donnée
 ! Grille a geometrie cylindrique
 ! C. Pinte
 ! 19/04/05
@@ -906,7 +906,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
   do pk=1, n_az
      ri_in_dark_zone(pk)=n_rad
      ri_out_dark_zone(pk)=1
-     ! �tape 1 : radialement depuis le centre
+     ! étape 1 : radialement depuis le centre
      somme = 0.0
      do1 : do i=1,n_rad
         somme=somme+kappa(cell_map(i,1,pk),lambda)*(r_lim(i)-r_lim(i-1))
@@ -916,7 +916,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
         endif
      enddo do1
 
-     ! �tape 2 : radialement depuis rout
+     ! étape 2 : radialement depuis rout
      somme = 0.0
      do2 : do i=n_rad,1,-1
         somme=somme+kappa(cell_map(i,1,pk),lambda)*(r_lim(i)-r_lim(i-1))
@@ -928,7 +928,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
      if (ri_out_dark_zone(pk)==n_rad) ri_out_dark_zone(pk)=n_rad-1
 
      if (lcylindrical) then
-        ! �tape 3 : verticalement
+        ! étape 3 : verticalement
         do i=ri_in_dark_zone(pk), ri_out_dark_zone(pk)
            somme = 0.0
            do3 : do j=nz, 1, -1
@@ -940,7 +940,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
            enddo do3
         enddo
 
-        ! �tape 3.5 : verticalement dans autre sens
+        ! étape 3.5 : verticalement dans autre sens
         if (l3D) then
            do i=ri_in_dark_zone(pk), ri_out_dark_zone(pk)
               somme = 0.0
@@ -963,7 +963,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
   l_is_dark_zone = .false.
   l_dark_zone(:) = .false.
 
-  ! �tape 4 : test sur tous les angles
+  ! étape 4 : test sur tous les angles
   if (.not.l3D) then
      cell : do i=max(ri_in_dark_zone(1),2), ri_out_dark_zone(1)
         do j=zj_sup_dark_zone(i,1),1,-1
