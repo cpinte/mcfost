@@ -1774,7 +1774,7 @@ module atom_transfer
           endif
 
           if (maxval(max_n_iter_loc)>0) write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
-          write(*,'(" -> icell_max1 #"(1I6)," icell_max2 #"(1I6))') icell_max, icell_max_2
+          write(*,'(" -> icell_max1 #"(2I6)," icell_max2 #"(2I6))') icell_max, icell_max_2
           write(*,*) " ------------------------------------------------ "
           do nact=1,NactiveAtoms
              write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%ptr_atom%ID
