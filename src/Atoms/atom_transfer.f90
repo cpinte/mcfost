@@ -41,8 +41,8 @@ module atom_transfer
    use io_atomic_pops, only	   : write_pops_atom, write_electron, read_electron, write_hydrogen, write_Hminus, &
                                  write_convergence_map_atom, write_convergence_map_electron, prepare_check_pointing
    use io_opacity, only 		   : write_Jnu_cont, write_taur, write_contrib_lambda_ascii, read_Jnu_cont, &
-                                 write_collision_matrix_atom, write_collision_matrix_atom_ascii, write_jnu_cont_bin, read_jnu_cont_bin, &
-                                 write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii, &
+                                 write_collision_matrix_atom, write_collision_matrix_atom_ascii, write_jnu_cont_bin, &
+                                 read_jnu_cont_bin, write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii, &
                                  write_opacity_emissivity_map, write_dbmatrix_bin
    use math
    !$ use omp_lib
@@ -51,12 +51,13 @@ module atom_transfer
                                  limb_darkening, mu_limb_darkening
    use parametres, only          : Rmax, Rmin, map_size, zoom, n_cells, &
                                  lelectron_scattering, n_rad, nz, n_az, distance, ang_disque, l_sym_ima, etoile, npix_x, npix_y, &
-                                 npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, ltab_wavelength_image, &
-                                 lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, llimb_darkening, dpops_max_error, laccurate_integ, &
-                                 NRAYS_ATOM_TRANSFER, DPOPS_SUB_MAX_ERROR, n_iterate_ne,lforce_lte, loutput_rates, ing_norder, ing_nperiod, &
-                                 ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne, llimit_mem, lfix_backgrnd_opac, lsafe_stop, &
-                                 safe_stop_time, checkpoint_period, lcheckpoint, istep_start, lno_iterate_ne_mc, &
-                                 healpix_lorder, healpix_lmin, healpix_lmax, lvoronoi, lmagnetoaccr, lonly_top, lonly_bottom, l3D, limg
+                                 npix_x_save, npix_y_save, lpluto_file, lmodel_ascii, density_file, lsolve_for_ne, &
+                                 ltab_wavelength_image, lvacuum_to_air, n_etoiles, lread_jnu_atom, lstop_after_jnu, &
+                                 llimb_darkening, dpops_max_error, NRAYS_ATOM_TRANSFER, n_iterate_ne,lforce_lte, loutput_rates, &
+                                 ing_norder, ing_nperiod, ing_ndelay, lng_acceleration, mem_alloc_tot, ndelay_iterate_ne, &
+                                 llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint, &
+                                 istep_start, lno_iterate_ne_mc, laccurate_integ,  healpix_lorder, healpix_lmin, healpix_lmax, &
+                                 lvoronoi, lmagnetoaccr, lonly_top, lonly_bottom, l3D, limg, DPOPS_SUB_MAX_ERROR
 
    use grid, only                : test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
    use Voronoi_grid, only        : Voronoi
@@ -79,7 +80,7 @@ module atom_transfer
                                  n_new, ne_new, radiation_free_pops_atom, omega_sor_atom, ldamp_jacobi!,store_radiative_rates,
 
    implicit none
-
+                                                                                                                                 
    !OpenMp and debug
    integer :: omp_chunk_size
    real(kind=dp), allocatable :: convergence_map(:,:,:,:) !say, N_cells, Nlevel, Natom, Nstep
@@ -155,7 +156,6 @@ module atom_transfer
 
       ! Will the ray intersect a star
       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-
       ! Boucle infinie sur les cellules (we go over the grid.)
       infinie : do ! Boucle infinie
       ! Indice de la cellule
@@ -174,20 +174,25 @@ module atom_transfer
 
          if (lintersect_stars) then !"will interesct"
             if (icell == icell_star) then!"has intersected"
-               !continuous emission of the shock and the star only no stored!
-               ! Icont(:,iray,id) =  Icont(:,iray,id) + exp(-tau_c) * Istar_cont(:,i_star) * &
-                  ! local_stellar_brigthness(Nlambda_cont,lambda_cont,i_star, icell_prev,x0, y0, z0, u,v,w)
                call local_stellar_radiation(id,iray,tau,tau_c,i_star,icell_prev,x0,y0,z0,u,v,w)
                return
             end if
          endif
-
          !With the Voronoi grid, somme cells can have a negative index
          !therefore we need to test_exit_grid before using icompute_atom_rt
          if (icell <= n_cells) then
             lcellule_non_vide = (icompute_atomRT(icell) > 0)
             if (icompute_atomRT(icell) < 0) return
-         endif     
+         endif
+         ! lcellule_non_vide = .true.
+         if (sqrt(x0*x0+y0*y0+z0*z0)<=etoile(1)%R) then
+            write(*,*) "points of cell ", icell, " inside the star!"
+            write(*,*) "x0=",x0,"y0=",y0,"z0=",z0
+            write(*,*) "d/rs=",sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r, "Rs=",etoile(1)%r
+            if (lvoronoi) write(*,*) "is cell a star neihbour ? ", Voronoi(icell)%is_star_neighbour
+            ! lcellule_non_vide = .false.
+            return
+         endif
 
          nbr_cell = nbr_cell + 1
 
@@ -223,12 +228,13 @@ module atom_transfer
 
             !includes a loop over all bound-bound, passive and active
             if (labs) then!non-LTE
-               call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,( (nbr_cell==1).and.labs ) )
+               !.labs. is .true here, so we only test if nbr_cell==1
+               call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,(nbr_cell==1))
             else
                if (lmagnetized) then
-                  call opacity_atom_zeeman_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,( (nbr_cell==1).and.labs ) )
+                  call opacity_atom_zeeman_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,.false.)
                else
-                  call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,( (nbr_cell==1).and.labs ) )
+                  call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,.false.)
                endif
             endif
 
@@ -260,13 +266,13 @@ module atom_transfer
 
             if (labs) then
             ! do la=1,Nlambda
-               Itot(:,iray,id) = Itot(:,iray,id) + ( exp(-tau(:)) - exp(-(tau(:)+dtau(:))) ) * Snu(:)
+               Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
                tau(:) = tau(:) + dtau(:) !for next cell
             ! enddo
             else
                if (lmagnetized) then
                   do la=1,Nlambda
-                     Q = ( exp(-tau(la)) - exp(-(tau(la)+dtau(la))) )
+                     Q = exp(-tau(la)) * (1.0_dp - exp(-dtau(la)))
                      P(1) = Snu(la) * Q
                      call solve_stokes_mat(id,icell,la, Q, P)
                      Itot(la,iray,id) = Itot(la,iray,id) + P(1)
@@ -276,7 +282,7 @@ module atom_transfer
                      tau(la) = tau(la) + dtau(la)
                   enddo
                else
-                  Itot(:,iray,id) = Itot(:,iray,id) + ( exp(-tau(:)) - exp(-(tau(:)+dtau(:))) ) * Snu(:)
+                  Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
                   tau(:) = tau(:) + dtau(:) !for next cell
                endif
             endif
@@ -294,7 +300,7 @@ module atom_transfer
       return
    end subroutine integ_ray_line_i
 
-
+  
    subroutine flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
    ! -------------------------------------------------------------- !
    ! Computes the flux emerging out of a pixel.
@@ -671,8 +677,6 @@ module atom_transfer
       !init at 0
       mem_alloc_tot = 0
 
-
-
       ! -------------------------------INITIALIZE AL-RT ------------------------------------ !
       !only one available yet, I need one unpolarised, faster and more accurate.
       Voigt => VoigtHumlicek
@@ -702,7 +706,10 @@ module atom_transfer
          endif
       endif
       !call empty_cells()
-
+      !if done  after non-LTE, line%a not allocated since local profile is used.
+      if (lmagnetized) then
+         profile => local_profile_v
+      endif
 
       !! --------------------------------------------------------- !!
       ! ------------------------------------------------------------------------------------ !
@@ -860,7 +867,7 @@ module atom_transfer
             write(*,*) "Evaluate Electron density from converged populations..."
             ne_initial = "NE_MODEL"
             call solve_electron_density(ne_initial, .true., dne)
-            write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+            write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
 
             do nact=1, Natom
                if (Atoms(nact)%ptr_atom%ID=="H") then
@@ -901,7 +908,8 @@ module atom_transfer
              	!To Do: write collision rates instead of matrix (sum over all transitions,
              	! -> informations of individual levels lost !)
                   call write_collision_matrix_atom(atom)
-                  call write_radiative_rates_atom(atom, Rij_all(atom%activeindex,1:atom%Ntr,:), Rji_all(atom%activeindex,1:atom%Ntr,:))
+                  call write_radiative_rates_atom(atom, Rij_all(atom%activeindex,1:atom%Ntr,:), &
+                     Rji_all(atom%activeindex,1:atom%Ntr,:))
                   call write_rate_matrix_atom(atom, Gammaij_all(atom%activeindex,1:atom%Nlevel,1:atom%Nlevel,:))
                endif
             endif
@@ -969,10 +977,9 @@ module atom_transfer
       endif
 
       if (lmagnetized) then
-         !or need to allocate line%adamp after or interpolate the dispersion profile
-         write(*,*) "Cannot yet accomodate local_profile_interp with polarised calc"
          !FOR IMAGE with labs = .false.
-         profile => local_profile_v
+         !profile => local_profile_v, this one need line%adamp.
+         !re allocate profiles here (to use interpolated profile for non-LTE)
          allocate(QUV(Nlambda,3))
          call allocate_stokes_quantities
       endif
@@ -1346,7 +1353,8 @@ module atom_transfer
 
                       if (loutput_Rates) then
                          !need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-                         call store_radiative_rates_mali(id, icell,(iray==1), 1.0_dp / real(n_rayons,kind=dp), Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
+                         call store_radiative_rates_mali(id, icell,(iray==1), 1.0_dp / real(n_rayons,kind=dp), &
+                           Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
                       endif
 
 
@@ -1545,8 +1553,10 @@ module atom_transfer
              ! 							dne = max(dne, abs(1.0 - ne(icell)/ne_new(icell)))
              ! 						endif
              ! 					enddo
-             write(*,'("OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
-             write(*,'("NEW ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne_new,mask=icompute_atomRT>0), maxval(ne_new)
+             write(*,'("OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+               minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
+             write(*,'("NEW ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+               minval(ne_new,mask=(icompute_atomRT>0)), maxval(ne_new)
 
              ne(:) = ne_new(:)
              !-> For all elements use the old version
@@ -1764,7 +1774,7 @@ module atom_transfer
           endif
 
           if (maxval(max_n_iter_loc)>0) write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
-          write(*,'(" -> icell_max1 #"(1I6)," icell_max2 #"(1I6))') icell_max, icell_max_2
+          write(*,'(" -> icell_max1 #"(2I6)," icell_max2 #"(2I6))') icell_max, icell_max_2
           write(*,*) " ------------------------------------------------ "
           do nact=1,NactiveAtoms
              write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%ptr_atom%ID
@@ -2034,7 +2044,9 @@ module atom_transfer
             endif
 
             !test with thetao and thetai to restrain the shock area a "shock" inside a shock
-            if ( (vaccr < 0.0_dp) .and. ( (abs(z)/rr >= cos(thetai)).and.(abs(z)/rr <= cos(thetao)) ) ) then
+            !-> does not work
+            ! if ( (vaccr < 0.0_dp) .and. ( (abs(z)/rr >= cos(thetai)).and.(abs(z)/rr <= cos(thetao)) ) ) then
+            if (vaccr < 0.0_dp) then
                if (Taccretion>0) then !constant accretion shock value from file
                   Tchoc = Taccretion
                   lintersect = .true.
@@ -2663,6 +2675,7 @@ module atom_transfer
       integer, parameter :: maxSubPixels = 32
       real(kind=dp) :: x0,y0,z0,u0,v0,w0, r0, r1, rr, phi
       real(kind=dp), dimension(:,:,:), allocatable :: Imu, Imuc
+      real(kind=dp), dimension(:,:,:), allocatable :: IQ,IU,IV
       real(kind=dp):: normF
       logical :: lintersect, labs
 
@@ -2670,6 +2683,10 @@ module atom_transfer
       if (alloc_status > 0) call error(" Allocation error cos_theta(Nmu)")
       allocate(Imu(Nlambda,Nmu,1), Imuc(Nlambda_cont,Nmu,1), stat=alloc_status)
       if (alloc_status > 0) call error(" Allocation error Imu, Imuc")
+      if (lmagnetized) then
+         allocate(IQ(Nlambda,Nmu,1), IU(Nlambda,Nmu,1),IV(Nlambda,Nmu,1), stat=alloc_status)
+         if (alloc_status > 0) call error(" Allocation error Q,U,V")
+      endif
 
 
       Imu(:,:,:) = 0.0_dp
@@ -2725,6 +2742,11 @@ module atom_transfer
             call integ_ray_line(id, icell0, x0,y0,z0,u0,v0,w0,iray,labs)
             Imu(:,j,1) = Itot(:,iray,id)
             Imuc(:,j,1) = Icont(:,iray,id)
+            if (lmagnetized) then
+               IQ(:,j,1) = Stokes_Q(:,id)
+               IU(:,j,1) = Stokes_U(:,id)
+               IV(:,j,1) = Stokes_V(:,id)
+            endif
          endif
       enddo
       !!!$omp end do
@@ -2739,7 +2761,12 @@ module atom_transfer
       write(14,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
       write(15,'(*(E20.7E3))') (cos_theta(j), j=1,Nmu)
       do i=1,Nlambda
-         write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,1),  j=1,Nmu)
+         if (lmagnetized) then
+            write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,1),  j=1,Nmu), &
+               (IQ(i,j,1),  j=1,Nmu), (IU(i,j,1),  j=1,Nmu), (IV(i,j,1),  j=1,Nmu)
+         else
+            write(14,'(1F12.5, *(E20.7E3))') lambda(i), (Imu(i,j,1),  j=1,Nmu)
+         endif
       enddo
       do i=1,Nlambda_cont
          write(15,'(1F12.5, *(E20.7E3))') lambda_cont(i), (Imuc(i,j,1),  j=1,Nmu)
@@ -2747,6 +2774,9 @@ module atom_transfer
       close(14)
       close(15)
       deallocate(weight_mu, cos_theta, p, Imu, Imuc,q)
+      if (lmagnetized) then
+         deallocate(IQ,IU,IV)
+      endif
 
       return
    end subroutine compute_Imu

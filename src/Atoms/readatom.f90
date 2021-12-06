@@ -448,9 +448,10 @@ module readatom
                      ! 			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
                   endif
                else !no dissolve
-                  call make_sub_wavelength_grid_cont(atom%continua(kr), &
-                       atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
-                  ! 			call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+                  ! call make_sub_wavelength_grid_cont(atom%continua(kr), &
+                     !   atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
+                  	call make_sub_wavelength_grid_cont_log_nu(atom%continua(kr), &
+                        atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
                endif
                ! %lambda allocated inside the routines.
                !        CALL make_sub_wavelength_grid_cont(atom%continua(kr), atom%continua(kr)%lambdamin,atom%continua(kr)%lambdamax)
