@@ -914,33 +914,33 @@ module Voronoi_grid
        	delta = b*b - c
 
        	if (delta < 0.) then ! the packet never encounters the sphere
-         	 s_void_before = s
-          	s_contrib = 0.0_dp
+           s_void_before = s
+           s_contrib = 0.0_dp
        	else ! the packet encounters the sphere
-          	rac = sqrt(delta)
-          	s1 = -b - rac
-          	s2 = -b + rac
+           rac = sqrt(delta)
+           s1 = -b - rac
+           s2 = -b + rac
 
-          	if (s1 < 0) then ! we already entered the sphere
-             	if (s2 < 0) then ! we already exited the sphere
-                	s_void_before = s
-                	s_contrib = 0.0_dp
-             	else ! We are still in the sphere and will exit it
-                	s_void_before = 0.0_dp
-                	s_contrib = min(s2,s)
-             	endif
-          	else ! We will enter in the sphere (both s1 and s2 are > 0)
-             	if (s1 < s) then ! We will enter the sphere in this cell
-                	s_void_before = s1
-                	s_contrib = min(s2,s) - s1
-             	else ! We will not enter the sphere in this sphere
-                	s_void_before = s
-                	s_contrib = 0.0_dp
-             	endif
-          	endif
+           if (s1 < 0) then ! we already entered the sphere
+              if (s2 < 0) then ! we already exited the sphere
+                 s_void_before = s
+                 s_contrib = 0.0_dp
+              else ! We are still in the sphere and will exit it
+                 s_void_before = 0.0_dp
+                 s_contrib = min(s2,s)
+              endif
+           else ! We will enter in the sphere (both s1 and s2 are > 0)
+              if (s1 < s) then ! We will enter the sphere in this cell
+                 s_void_before = s1
+                 s_contrib = min(s2,s) - s1
+              else ! We will not enter the sphere in this sphere
+                 s_void_before = s
+                 s_contrib = 0.0_dp
+              endif
+           endif
        	endif ! delta < 0
-    else ! the cell was not cut
-       s_void_before = 0.0_dp
+     else ! the cell was not cut
+        s_void_before = 0.0_dp
        s_contrib = s
     endif
 
