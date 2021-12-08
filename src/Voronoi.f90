@@ -22,9 +22,10 @@ module Voronoi_grid
 
   type Voronoi_cell
      real(kind=dp), dimension(3) :: xyz, vxyz
-     real(kind=dp) :: h ! SPH smoothing lengths
+     real(kind=dp) :: h ! SPH smoothing lengths or typical cell size in grid based codes
      integer :: id, original_id, first_neighbour, last_neighbour
      logical(kind=lp) :: exist, is_star, was_cut
+     logical :: is_star_neighbour!.true. if .not.is_star and a star's neighbour! default is .false..
      logical :: masked
   end type Voronoi_cell
 
@@ -69,16 +70,18 @@ module Voronoi_grid
   interface
      subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, &
           icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
-          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, ierr) bind(C, name='voro_C')
+          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, n_stars, stars_cell, stars_radius, stellar_neighb, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours, icell_start, icell_end
-       integer(c_int), intent(in), value :: cpu_id, n_cpu, n_points_per_cpu, n_vectors
+       integer(c_int), intent(in), value :: cpu_id, n_cpu, n_points_per_cpu, n_vectors, n_stars
        real(c_double), dimension(6), intent(in) :: limits
        real(c_double), dimension(n_points), intent(in) :: x,y,z,h
        real(c_double), intent(in), value :: threshold, cutting_distance_o_h ! defines at which value we decide to cut the cell, and at how many h the cell will be cut
        ! normal vectors to the cutting plane (need to be normalized)
        real(c_double), dimension(3,n_vectors), intent(in) :: cutting_vectors  ! access order is wrong, but only way to pass a 2d array to C with an unfixed dim
+       integer(c_int), intent(in) :: stars_cell(n_stars)
+       real(c_double), intent(in) :: stars_radius(n_stars)
 
        integer(c_int), intent(out) :: n_in,  ierr
        integer(c_int), dimension(n_cpu), intent(out) ::  n_neighbours
@@ -86,6 +89,7 @@ module Voronoi_grid
        integer(c_int), dimension(n_points_per_cpu), intent(out) :: first_neighbours,last_neighbours
        integer(c_int), dimension(n_points_per_cpu * max_neighbours * n_cpu), intent(out) :: neighbours_list
        logical(c_bool), dimension(n_points_per_cpu), intent(out) :: was_cell_cut
+       logical(c_bool), dimension(n_points_per_cpu), intent(out) :: stellar_neighb
 
      end subroutine voro
   end interface
@@ -216,13 +220,13 @@ module Voronoi_grid
     integer, dimension(:), allocatable :: neighbours_list_loc
     integer, dimension(:), allocatable :: n_neighbours ! nb_proc
     logical(c_bool), dimension(:), allocatable :: was_cell_cut, was_cell_cut_tmp
+    logical(c_bool), dimension(:), allocatable :: star_neighb_tmp, star_neighb
 
     logical :: is_outside_stars, lcompute
 
-    real(kind=dp), dimension(n_etoiles) :: deuxr2_star
     real(kind=dp) :: dx, dy, dz, dist2
 
-    integer :: icell_start, icell_end, id, row, l, n_cells_before_stars
+    integer :: icell_start, icell_end, id, row, l, n_cells_before_stars, n_average_neighb_stars
 
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     character(len=2) :: unit
@@ -252,31 +256,28 @@ module Voronoi_grid
          SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
 
-    do istar=1, n_etoiles
-       deuxr2_star(istar) = (2*etoile(istar)%r)**2
-    enddo
-
-    ! Filtering particles outside the limits and inside stars
+    ! Filtering particles outside the limits
     icell = 0
     n_sublimate = 0
     do i=1, n_points
        if (is_ghost(i) == 0) then
           ! We test if the point is in the model volume
+          !-> Voronoi cells are now cut at the surface of the star. We only need to test if a particle is below Rstar.
           if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
              if ((y(i) > limits(3)).and.(y(i) < limits(4))) then
                 if ((z(i) > limits(5)).and.(z(i) < limits(6))) then
 
                    ! We also test if the edge of the cell can be inside the star
-                   ! We test for the edge, so the center needs to be at twice the radius
                    is_outside_stars = .true.
+
                    loop_stars : do istar=1, n_etoiles
                       dx = x(i) - etoile(istar)%x
                       dy = y(i) - etoile(istar)%y
                       dz = z(i) - etoile(istar)%z
 
-                      if (min(dx,dy,dz) < 2*etoile(istar)%r) then
+                      if (min(dx,dy,dz) < etoile(istar)%r) then
                          dist2 = dx**2 + dy**2 + dz**2
-                         if (dist2 < deuxr2_star(istar)) then
+                         if (dist2 < etoile(istar)%r**2) then
                             is_outside_stars = .false.
                             n_sublimate = n_sublimate + 1
                             exit loop_stars
@@ -349,13 +350,14 @@ module Voronoi_grid
 
     alloc_status = 0
     allocate(Voronoi(n_cells), Voronoi_xyz(3,n_cells), volume(n_cells), first_neighbours(n_cells),last_neighbours(n_cells), &
-         was_cell_cut(n_cells), stat=alloc_status)
+         was_cell_cut(n_cells), star_neighb(n_cells), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi structure")
     volume(:) = 0.0 ; first_neighbours(:) = 0 ; last_neighbours(:) = 0 ; was_cell_cut(:) = .false.
     Voronoi(:)%exist = .true. ! we filter before, so all the cells should exist now
     Voronoi(:)%first_neighbour = 0
     Voronoi(:)%last_neighbour = 0
     Voronoi(:)%is_star = .false.
+    star_neighb(:) = .false.
 
     do icell=1, n_cells
        Voronoi(icell)%xyz(1) = x_tmp(icell)
@@ -401,7 +403,7 @@ module Voronoi_grid
 
     if (check_previous_tesselation) then
        call read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
-            lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,was_cell_cut)
+            lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,was_cell_cut,star_neighb)
     else
        lcompute = .true.
     endif
@@ -424,11 +426,11 @@ module Voronoi_grid
 
        n_in = 0 ! We initialize value at 0 as we have a reduction + clause
        !$omp parallel default(none) num_threads(nb_proc_voro) &
-       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc_voro,n_cells_per_cpu) &
+       !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc_voro,n_cells_per_cpu,etoile) &
        !$omp shared(first_neighbours,last_neighbours,neighbours_list_loc,n_neighbours,PS) &
        !$omp private(id,n,icell_start,icell_end,ierr) &
-       !$omp private(V_tmp,was_cell_cut_tmp,alloc_status) &
-       !$omp shared(volume,was_cell_cut) &
+       !$omp private(V_tmp,was_cell_cut_tmp,alloc_status,star_neighb_tmp) &
+       !$omp shared(volume,was_cell_cut,star_neighb, n_etoiles) &
        !$omp reduction(+:n_in)
        id = 1
        !$ id = omp_get_thread_num() + 1
@@ -437,12 +439,13 @@ module Voronoi_grid
 
        ! Allocating results array
        alloc_status = 0
-       allocate(V_tmp(n_cells), was_cell_cut_tmp(n_cells), stat=alloc_status)
+       allocate(V_tmp(n_cells), was_cell_cut_tmp(n_cells), star_neighb_tmp(n_cells), stat=alloc_status)
        if (alloc_status /=0) call error("Allocation error before voro++ call")
 
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, &
             PS%vectors, PS%cutting_distance_o_h, icell_start-1,icell_end-1, id-1,nb_proc_voro,n_cells_per_cpu, &
-            n_in,V_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,ierr) ! icell & id shifted by 1 for C
+            n_in,V_tmp,first_neighbours,last_neighbours,n_neighbours,neighbours_list_loc,was_cell_cut_tmp,&
+            n_etoiles, etoile(:)%icell-1,etoile(:)%r,star_neighb_tmp, ierr) ! icell & id shifted by 1 for C
        if (ierr /= 0) then
           write(*,*) "Voro++ excited with an error", ierr, "thread #", id
           write(*,*) "Exiting"
@@ -453,8 +456,9 @@ module Voronoi_grid
        n=icell_end-icell_start+1
        volume(icell_start:icell_end) = V_tmp(1:n)
        was_cell_cut(icell_start:icell_end) = was_cell_cut_tmp(1:n)
+       star_neighb(icell_start:icell_end) = star_neighb_tmp(1:n)
 
-       deallocate(V_tmp, was_cell_cut_tmp)
+       deallocate(V_tmp, was_cell_cut_tmp,star_neighb_tmp)
        !$omp end parallel
 
        !-----------------------------------------------------------
@@ -497,7 +501,7 @@ module Voronoi_grid
 
        if (check_previous_tesselation) then
           call save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours, last_neighbours, &
-               neighbours_list,was_cell_cut)
+               neighbours_list,was_cell_cut,star_neighb)
        endif
     else !lcompute
        write(*,*) "Reading previous Voronoi tesselation"
@@ -511,6 +515,18 @@ module Voronoi_grid
 
     Voronoi(:)%was_cut = was_cell_cut(:)
     deallocate(was_cell_cut)
+    Voronoi(:)%is_star_neighbour = star_neighb(:)
+    deallocate(star_neighb)
+
+    n_average_neighb_stars = 0
+    do icell=1,n_cells
+       	if (Voronoi(icell)%is_star_neighbour) then
+       		n_average_neighb_stars = n_average_neighb_stars + 1
+       	endif
+    enddo
+    if (n_average_neighb_stars>0) write(*,'("mean number of stellar neighbours="(1I5))') &
+    	int(real(size(pack(Voronoi(:)%is_star_neighbour,mask=Voronoi(:)%is_star_neighbour)))/real(n_etoiles))
+
 
     ! Saving position of the first neighbours to save time on memory access
     ! Warning this seems to cost a fair bit of time
@@ -601,14 +617,14 @@ module Voronoi_grid
 
   !**********************************************************
 
-  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,neighbours_list,was_cell_cut)
+  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,neighbours_list,was_cell_cut,star_neighb)
 
     use, intrinsic :: iso_c_binding, only : c_bool
 
     real(kind=dp), intent(in), dimension(6) :: limits
     integer, intent(in) :: n_in, n_neighbours_tot
     integer, dimension(:), intent(in) :: first_neighbours,last_neighbours, neighbours_list
-    logical(c_bool), dimension(:), intent(in) :: was_cell_cut
+    logical(c_bool), dimension(:), intent(in) :: was_cell_cut, star_neighb
     character(len=512) :: filename
     character(len=40) :: voronoi_sha1
 
@@ -618,7 +634,7 @@ module Voronoi_grid
     open(1,file=filename,status='replace',form='unformatted')
     ! todo : add id for the SPH file : filename + sha1 ??  + limits !!
     write(1) voronoi_sha1, limits, n_in, n_neighbours_tot
-    write(1) volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut
+    write(1) volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut, star_neighb
     close(1)
 
     return
@@ -629,7 +645,7 @@ module Voronoi_grid
   !**********************************************************
 
   subroutine read_saved_Voronoi_tesselation(n_cells,max_neighbours, limits, &
-       lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,was_cell_cut)
+       lcompute, n_in,first_neighbours,last_neighbours,n_neighbours_tot,neighbours_list,was_cell_cut,star_neighb)
 
     use, intrinsic :: iso_c_binding, only : c_bool
 
@@ -640,7 +656,7 @@ module Voronoi_grid
     integer, intent(out) :: n_in, n_neighbours_tot
     integer, dimension(n_cells), intent(out) :: first_neighbours,last_neighbours
     integer, dimension(:), allocatable, intent(out) :: neighbours_list
-    logical(c_bool), dimension(n_cells), intent(out) :: was_cell_cut
+    logical(c_bool), dimension(n_cells), intent(out) :: was_cell_cut, star_neighb
 
     character(len=512) :: filename
     integer :: ios, alloc_status
@@ -679,7 +695,7 @@ module Voronoi_grid
     write(*,*) "Trying to allocate", mem, unit//" for neighbours list"
     allocate(neighbours_list(n_neighbours_tot), stat=alloc_status)
     if (alloc_status /=0) call error("Allocating neighbours list in read_saved_tesselation")
-    read(1,iostat=ios) volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut
+    read(1,iostat=ios) volume, first_neighbours,last_neighbours, neighbours_list, was_cell_cut, star_neighb
     close(unit=1)
 
     if (ios == 0) then ! some dimension
@@ -803,6 +819,10 @@ module Voronoi_grid
     real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
     integer :: i, id_n, l, ifirst, ilast
 
+    integer :: i_star
+    real(kind=dp) :: d_to_star
+    logical :: is_a_star_neighbour
+
     real(kind=dp) :: b, c, delta, rac, s1, s2, h
     real(kind=dp), dimension(3) :: delta_r
 
@@ -822,6 +842,8 @@ module Voronoi_grid
     ilast = Voronoi(icell)%last_neighbour
     was_cut = Voronoi(icell)%was_cut
     h = Voronoi(icell)%h
+    !Store the id of the neighbouring stars instead ?
+    is_a_star_neighbour = Voronoi(icell)%is_star_neighbour
 
     l=0
     nb_loop : do i=ifirst,ilast
@@ -885,39 +907,52 @@ module Voronoi_grid
        ! We check where the packet intersect the sphere of radius Voronoi(icell)%h * PS%cutting_distance_o_h
        ! centered on the center of the cell
        delta_r = r - r_cell(:)
-       b = dot_product(delta_r,k)
-       c = dot_product(delta_r,delta_r) - (h * PS%cutting_distance_o_h)**2
-       delta = b*b - c
 
-       if (delta < 0.) then ! the packet never encounters the sphere
-          s_void_before = s
-          s_contrib = 0.0_dp
-       else ! the packet encounters the sphere
-          rac = sqrt(delta)
-          s1 = -b - rac
-          s2 = -b + rac
+       	b = dot_product(delta_r,k)
+       	c = dot_product(delta_r,delta_r) - (h * PS%cutting_distance_o_h)**2
+       	delta = b*b - c
 
-          if (s1 < 0) then ! we already entered the sphere
-             if (s2 < 0) then ! we already exited the sphere
-                s_void_before = s
-                s_contrib = 0.0_dp
-             else ! We are still in the sphere and will exit it
-                s_void_before = 0.0_dp
-                s_contrib = min(s2,s)
-             endif
-          else ! We will enter in the sphere (both s1 and s2 are > 0)
-             if (s1 < s) then ! We will enter the sphere in this cell
-                s_void_before = s1
-                s_contrib = min(s2,s) - s1
-             else ! We will not enter the sphere in this sphere
-                s_void_before = s
-                s_contrib = 0.0_dp
-             endif
-          endif
-       endif ! delta < 0
+       	if (delta < 0.) then ! the packet never encounters the sphere
+         	 s_void_before = s
+          	s_contrib = 0.0_dp
+       	else ! the packet encounters the sphere
+          	rac = sqrt(delta)
+          	s1 = -b - rac
+          	s2 = -b + rac
+
+          	if (s1 < 0) then ! we already entered the sphere
+             	if (s2 < 0) then ! we already exited the sphere
+                	s_void_before = s
+                	s_contrib = 0.0_dp
+             	else ! We are still in the sphere and will exit it
+                	s_void_before = 0.0_dp
+                	s_contrib = min(s2,s)
+             	endif
+          	else ! We will enter in the sphere (both s1 and s2 are > 0)
+             	if (s1 < s) then ! We will enter the sphere in this cell
+                	s_void_before = s1
+                	s_contrib = min(s2,s) - s1
+             	else ! We will not enter the sphere in this sphere
+                	s_void_before = s
+                	s_contrib = 0.0_dp
+             	endif
+          	endif
+       	endif ! delta < 0
     else ! the cell was not cut
        s_void_before = 0.0_dp
        s_contrib = s
+    endif
+
+    if (is_a_star_neighbour) then
+       d_to_star = distance_to_star(x,y,z,u,v,w,i_star)
+       ! It is a neighbour so if the star is intersected (i_star>0) it might be the next cell.
+       ! Otherwise, i_star == 0 (does not intersect the star in this direction (u,v,w)).
+       if (i_star > 0) then
+          if (d_to_star < s) then !indeed a star, we use d_to_stars and set next_cell
+             s_contrib = d_to_star
+             next_cell = etoile(i_star)%icell
+          endif
+       endif
     endif
 
     return
@@ -1179,6 +1214,64 @@ module Voronoi_grid
     return
 
   end function distance_to_wall
+
+  !----------------------------------------
+
+  function distance_to_star(x,y,z,u,v,w,i_star)
+  ! This routine implies that a star is in a unique cell
+  ! return the index of a star (i_star > 0) if a star will be intersected
+  ! by a ray going in the direction (u,v,w).
+  ! Computes also the distance between the point (x,y,z) and the star in that direction.
+
+    real(kind=dp) :: distance_to_star
+    real(kind=dp), intent(in) :: x,y,z, u,v,w
+    integer, intent(out) :: i_star
+
+    real(kind=dp), dimension(3) :: r, k, delta_r
+    real(kind=dp) :: b,c, delta, rac, s1, s2
+    integer :: i
+
+
+    r(1) = x ; r(2) = y ; r(3) = z
+    k(1) = u ; k(2) = v ; k(3) = w
+
+    distance_to_star = huge(1.0_dp)
+
+    i_star = 0
+    star_loop : do i = 1, n_etoiles
+     	delta_r(:)  = r(:) - (/etoile(i)%x, etoile(i)%y, etoile(i)%z/)
+     	b = dot_product(delta_r,k)
+     	c = dot_product(delta_r,delta_r) - (etoile(i)%r)**2
+     	delta = b*b - c
+
+     	if (delta >= 0.) then ! the packet will encounter (or has encoutered) the star
+        	rac = sqrt(delta)
+        	s1 = -b - rac
+
+        	if (s1 < 0) then ! we already entered the star
+           ! We can probably skip that test, s1 must be positive as we must be outside the star
+           	s2 = -b + rac
+           	if (s2 > 0) then ! for s2 < 0: we already exited the star
+              ! We are still in the sphere and will exit it
+              ! This means that we had a round-off error somewhere
+              	distance_to_star = 0.0_dp
+              	i_star = i
+           	endif
+
+        else ! We will enter in the star
+           	if (s1 < distance_to_star) then
+              	distance_to_star = s1
+              	i_star = i
+           		endif
+        	endif ! s1 < 0
+
+     	endif ! delta < 0
+
+    enddo star_loop
+
+
+    return
+  end function distance_to_star
 
   !----------------------------------------
 
@@ -1451,7 +1544,6 @@ integer function find_Voronoi_cell(id, iwall, x,y,z)
 end function find_Voronoi_cell
 
 !----------------------------------------
-
 
 !  subroutine kdtree2_example
 !
