@@ -70,8 +70,8 @@ module Voronoi_grid
   interface
      subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, &
           icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
-          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, &
-          n_stars, stars_cell, stars_radius, stellar_neighb, ierr) bind(C, name='voro_C')
+          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, &
+          was_cell_cut, n_stars, stars_cell, stars_radius, stellar_neighb, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours, icell_start, icell_end
@@ -617,8 +617,8 @@ module Voronoi_grid
 
   !**********************************************************
 
-  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,&
-   last_neighbours,neighbours_list,was_cell_cut,star_neighb)
+  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,&
+       neighbours_list,was_cell_cut,star_neighb)
 
     use, intrinsic :: iso_c_binding, only : c_bool
 
