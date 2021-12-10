@@ -70,8 +70,8 @@ module Voronoi_grid
   interface
      subroutine voro(n_points, max_neighbours, limits,x,y,z,h, threshold, n_vectors, cutting_vectors, cutting_distance_o_h, &
           icell_start,icell_end, cpu_id, n_cpu, n_points_per_cpu, &
-          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, was_cell_cut, &
-          n_stars, stars_cell, stars_radius, stellar_neighb, ierr) bind(C, name='voro_C')
+          n_in, volume, first_neighbours,last_neighbours,n_neighbours,neighbours_list, &
+          was_cell_cut, n_stars, stars_cell, stars_radius, stellar_neighb, ierr) bind(C, name='voro_C')
        use, intrinsic :: iso_c_binding
 
        integer(c_int), intent(in), value :: n_points, max_neighbours, icell_start, icell_end
@@ -617,8 +617,8 @@ module Voronoi_grid
 
   !**********************************************************
 
-  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,&
-   last_neighbours,neighbours_list,was_cell_cut,star_neighb)
+  subroutine save_Voronoi_tesselation(limits, n_in, n_neighbours_tot, first_neighbours,last_neighbours,&
+       neighbours_list,was_cell_cut,star_neighb)
 
     use, intrinsic :: iso_c_binding, only : c_bool
 
@@ -922,33 +922,33 @@ write(*,*) "we go in next cell", next_cell, " ind_cell_voro=", check_cell
        	delta = b*b - c
 
        	if (delta < 0.) then ! the packet never encounters the sphere
-         	 s_void_before = s
-          	s_contrib = 0.0_dp
+           s_void_before = s
+           s_contrib = 0.0_dp
        	else ! the packet encounters the sphere
-          	rac = sqrt(delta)
-          	s1 = -b - rac
-          	s2 = -b + rac
+           rac = sqrt(delta)
+           s1 = -b - rac
+           s2 = -b + rac
 
-          	if (s1 < 0) then ! we already entered the sphere
-             	if (s2 < 0) then ! we already exited the sphere
-                	s_void_before = s
-                	s_contrib = 0.0_dp
-             	else ! We are still in the sphere and will exit it
-                	s_void_before = 0.0_dp
-                	s_contrib = min(s2,s)
-             	endif
-          	else ! We will enter in the sphere (both s1 and s2 are > 0)
-             	if (s1 < s) then ! We will enter the sphere in this cell
-                	s_void_before = s1
-                	s_contrib = min(s2,s) - s1
-             	else ! We will not enter the sphere in this sphere
-                	s_void_before = s
-                	s_contrib = 0.0_dp
-             	endif
-          	endif
+           if (s1 < 0) then ! we already entered the sphere
+              if (s2 < 0) then ! we already exited the sphere
+                 s_void_before = s
+                 s_contrib = 0.0_dp
+              else ! We are still in the sphere and will exit it
+                 s_void_before = 0.0_dp
+                 s_contrib = min(s2,s)
+              endif
+           else ! We will enter in the sphere (both s1 and s2 are > 0)
+              if (s1 < s) then ! We will enter the sphere in this cell
+                 s_void_before = s1
+                 s_contrib = min(s2,s) - s1
+              else ! We will not enter the sphere in this sphere
+                 s_void_before = s
+                 s_contrib = 0.0_dp
+              endif
+           endif
        	endif ! delta < 0
-    else ! the cell was not cut
-       s_void_before = 0.0_dp
+     else ! the cell was not cut
+        s_void_before = 0.0_dp
        s_contrib = s
     endif
 

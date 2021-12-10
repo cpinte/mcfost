@@ -1067,6 +1067,10 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
        etoile(i)%Mdot = etoile_old(i)%Mdot
     enddo
+    ! If we have new stars
+    do i=n_etoiles_old,n_etoiles
+       etoile(i)%force_Mdot = .false.
+    enddo
     deallocate(etoile_old)
 
     etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
