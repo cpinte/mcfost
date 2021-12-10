@@ -817,6 +817,8 @@ module Voronoi_grid
     real(kind=dp), intent(out) :: x1, y1, z1, s, s_contrib, s_void_before
     integer, intent(out) :: next_cell
 
+    real(kind=dp), parameter :: prec = 1e-5
+
     real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
     integer :: i, id_n, l, ifirst, ilast
 
@@ -887,6 +889,8 @@ write(*,*) "s=",s, " s_tmp=", s_tmp
        endif
 
     enddo nb_loop ! i
+
+    s = s * (1.0_dp + prec)
 
     x1 = x + u*s
     y1 = y + v*s
