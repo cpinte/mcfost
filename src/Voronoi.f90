@@ -845,7 +845,7 @@ module Voronoi_grid
     h = Voronoi(icell)%h
     !Store the id of the neighbouring stars instead ?
     is_a_star_neighbour = Voronoi(icell)%is_star_neighbour
-write(*,*) "In cross-voronoi cell"
+
     l=0
     nb_loop : do i=ifirst,ilast
        l = l+1
@@ -879,8 +879,6 @@ write(*,*) "In cross-voronoi cell"
           ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardant le wall d'entree
           if (s_tmp < 0.) s_tmp = huge(1.0)
        endif
-write(*,*) "icell:", icell, " icell_neighb:", id_n
-write(*,*) "s=",s, " s_tmp=", s_tmp 
        if (s_tmp < s) then
           s = s_tmp
           next_cell = id_n
@@ -891,13 +889,6 @@ write(*,*) "s=",s, " s_tmp=", s_tmp
     x1 = x + u*s
     y1 = y + v*s
     z1 = z + w*s
-
-call indice_cellule_Voronoi(x,y,z, check_cell)
-write(*,*) "we are in cell", icell, " ind_cell_voro=", check_cell
-write(*,*) "x1=",x1,' y1=',y1,' z1=', z1
-write(*,*) "d_next_cell/Rs=", sqrt(x1*x1+y1*y1+z1*z1)/etoile(1)%r
-call indice_cellule_Voronoi(x1,y1,z1, check_cell)
-write(*,*) "we go in next cell", next_cell, " ind_cell_voro=", check_cell
 
     if (next_cell == 0) then ! there is a rounding-off error somewehere
        ! We correct the cell index and do not move the packet
@@ -954,18 +945,15 @@ write(*,*) "we go in next cell", next_cell, " ind_cell_voro=", check_cell
 
     if (is_a_star_neighbour) then
        d_to_star = distance_to_star(x,y,z,u,v,w,i_star)
-       write(*,*) i_star, "d_to_star=",d_to_star/etoile(1)%r
        ! It is a neighbour so if the star is intersected (i_star>0) it might be the next cell.
        ! Otherwise, i_star == 0 (does not intersect the star in this direction (u,v,w)).
        if (i_star > 0) then
-         write(*,*) " next cell is the star"
           if (d_to_star < s) then ! indeed a star, we use d_to_stars and set next_cell
              s_contrib = d_to_star
              next_cell = etoile(i_star)%icell
           endif
        endif
     endif
-    write(*,*) "leaving cross-voronoi cell"
 
     return
 
