@@ -191,7 +191,6 @@ module atom_transfer
             write(*,*) "d/rs=",sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r, "Rs=",etoile(1)%r
             if (lvoronoi) write(*,*) "is cell a star neihbour ? ", Voronoi(icell)%is_star_neighbour
             ! lcellule_non_vide = .false.
-            return
          endif
 
          nbr_cell = nbr_cell + 1
@@ -361,7 +360,12 @@ module atom_transfer
                z0 = pixelcorner(3) + (i - 0.5_dp) * sdx(3) + (j-0.5_dp) * sdy(3)
                ! On se met au bord de la grille : propagation a l'envers
                call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
+               write(*,*) "Move to grid, lintersect ? ", lintersect
                if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+                  write(*,*) "icell entering integ_ray_line", icell
+                  write(*,*) "x0,y0,z0=",x0,y0,z0
+                  write(*,*) "d/Rs=",sqrt(x0*x0+y0*y0+z0*z0)/etoile(1)%r
+                  write(*,*) "icell_star=", etoile(1)%icell
                   call integ_ray_line(id, icell, x0,y0,z0,u0,v0,w0,iray,labs)
 
                   I0 = I0 + Itot(:,iray,id)
@@ -640,9 +644,10 @@ module atom_transfer
          n_iter_min = 1 !1 !3
          n_iter_max = 1 !1 !6
          !$omp do schedule(dynamic,1)
-         do i = 1,npix_x_max
+         do i = 161,161!1,npix_x_max
             !$ id = omp_get_thread_num() + 1
-            do j = 1,npix_y
+            do j = 158,158!1,npix_y
+               write(*,*) i, j
                pixelcorner(:,id) = Icorner(:) + (i-1) * dx(:) + (j-1) * dy(:)
                call flux_pixel_line(id,ibin,iaz,n_iter_min,n_iter_max,i,j,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
             end do !j
