@@ -109,13 +109,13 @@ contains
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
-    deallocate(massgas,rho)
     if (allocated(rhodust)) deallocate(rhodust,massdust)
 
     ! setup needed for Atomic line transfer
     if (lemission_atom) then
        call hydro_to_Voronoi_atomic(n_SPH,T_gas,vturb,massgas,mass_ne_on_massgas,atomic_mask)
     endif
+    deallocate(massgas,rho)
     if (allocated(vturb)) deallocate(vturb)
     if (allocated(mass_ne_on_massgas)) deallocate (mass_ne_on_massgas)
     if (allocated(atomic_mask)) deallocate(atomic_mask)
