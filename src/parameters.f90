@@ -9,6 +9,7 @@ module parametres
   save
 
   real :: para_version
+  real(kind=dp) :: simu_time = 0.0
 
   logical :: lpara, lstop_after_init
   integer :: indice_etape, etape_i, etape_f
