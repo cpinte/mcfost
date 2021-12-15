@@ -193,6 +193,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
     call extract('umass',umass,hdr,ierr)
     call extract('utime',utime,hdr,ierr)
     call extract('udist',udist,hdr,ierr)
+    call extract('time',simu_time,hdr,ierr)
 
     read (iunit, iostat=ierr) number
     if (ierr /= 0) return
@@ -809,6 +810,8 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   ulength_au = udist_scaled / (au_to_cm)
   uvelocity =  udist_scaled / (m_to_cm) / utime_scaled ! m/s
   usolarmass = umass_scaled / Msun_to_g
+
+  simu_time = simu_time * utime_scaled
 
  if (dustfluidtype == 1) then
     ! 1-fluid: always use gas particles for Voronoi mesh
