@@ -8,7 +8,7 @@ module spectrum_type
   use fits_utils, only : print_error
   use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
        n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
-       lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot, llimit_mem
+       lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot, llimit_mem, simu_time
   use input, only : nb_proc, RT_line_method,lkeplerian, linfall, l_sym_ima
   use constantes, only : arcsec_to_deg
   use constant, only : clight
@@ -697,7 +697,7 @@ contains
        call print_error(status)
     endif
     call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm F_{\nu}}$',status)
-
+    call ftpkye(unit,'TIME',simu_time,-7,'s',status)
 
     !  Write the array to the FITS file.
     call ftpprd(unit,group,fpixel,nelements,sum(Flux(:,:,:,:),dim=4),status)
