@@ -72,7 +72,6 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
        return
     endif
 
-    call extract('time',simu_time,hdr,ierr)
     call extract('nparttot',np,hdr,ierr)
     call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
     if (ierr /= 0) then
@@ -195,6 +194,8 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
     call extract('umass',umass,hdr,ierr)
     call extract('utime',utime,hdr,ierr)
     call extract('udist',udist,hdr,ierr)
+    call extract('time',simu_time,hdr,ierr)
+    simu_time = simu_time * utime
 
     read (iunit, iostat=ierr) number
     if (ierr /= 0) return
