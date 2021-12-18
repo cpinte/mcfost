@@ -660,7 +660,7 @@ contains
     logical :: simple, extend
     character(len=6) :: comment="VACUUM"
     real(kind=dp) :: lambda_vac(Nlambda), Fnu, lambdac_vac(Nlambda_cont)
-    real :: pixel_scale_x, pixel_scale_y, time
+    real :: pixel_scale_x, pixel_scale_y
     type (AtomType), pointer :: atom
     logical, dimension(Natom) :: write_map
     real(kind=dp), allocatable :: g_i(:), g_j(:), maps(:,:,:,:,:,:), nu_trans(:), lam_trans(:), waves(:,:)
@@ -697,9 +697,8 @@ contains
        call print_error(status)
     endif
     call ftpkys(unit,'BUNIT',"${\rm W \, m^{-2} \, Hz^{-1} \, pixel^{-1}}$",'${\rm F_{\nu}}$',status)
-    time = simu_time
-    call ftpkye(unit,'TIME',time,-7,'s',status)
-    
+    call ftpkye(unit,'TIME',real(simu_time),-7,'s',status)
+
     !  Write the array to the FITS file.
     call ftpprd(unit,group,fpixel,nelements,sum(Flux(:,:,:,:),dim=4),status)
     ! 	call ftpprd(unit,group,fpixel,nelements,Flux(:,:,:),status)
