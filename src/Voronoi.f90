@@ -435,8 +435,8 @@ module Voronoi_grid
        !$omp reduction(+:n_in)
        id = 1
        !$ id = omp_get_thread_num() + 1
-       icell_start = (1.0 * (id-1)) / nb_proc_voro * n_cells + 1
-       icell_end = (1.0 * (id)) / nb_proc_voro * n_cells
+       icell_start = (1.0_dp * (id-1)) / nb_proc_voro * n_cells + 1
+       icell_end = (1.0_dp * (id)) / nb_proc_voro * n_cells
 
        ! Allocating results array
        alloc_status = 0
@@ -467,8 +467,8 @@ module Voronoi_grid
        !-----------------------------------------------------------
        ! We need to shift the indices of the neighbours
        do id=2, nb_proc_voro
-          icell_start = (1.0 * (id-1)) / nb_proc_voro * n_cells + 1
-          icell_end = (1.0 * (id)) / nb_proc_voro * n_cells
+          icell_start = (1.0_dp * (id-1)) / nb_proc_voro * n_cells + 1
+          icell_end = (1.0_dp * (id)) / nb_proc_voro * n_cells
 
           ! Pointers to the first and last neighbours of the cell
           first_neighbours(icell_start:icell_end) = first_neighbours(icell_start:icell_end) + last_neighbours(icell_start-1) + 1
