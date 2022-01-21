@@ -1983,7 +1983,7 @@ module atom_transfer
       integer, intent(in) :: i_star, icell_prev, id, iray
       real(kind=dp), dimension(:), intent(in) :: tau, tau_c
       real(kind=dp), intent(in) :: u, v, w, x, y, z
-
+      ! real(kind=dp), parameter :: prec = 1d-5
       real(kind=dp) :: Tchoc, vaccr, vmod2, rr, enthalp
       real(kind=dp) :: mu, ulimb, LimbDarkening, sign_z
       integer :: ns,la
