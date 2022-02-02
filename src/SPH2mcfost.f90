@@ -562,8 +562,10 @@ contains
     use Voronoi_grid, only : Voronoi, volume
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
-    use atmos_type, only : alloc_atomic_atmos, alloc_magnetic_field, wght_per_H, nHtot, ne, &
-       v_char, lmagnetized, vturb, T, icompute_atomRT, calc_ne, write_atmos_domain
+    use elements_type, only : wght_per_H, read_abundance
+   !  use mhd2mcfost, only : alloc_atomrt_grid, nHtot, ne, &
+   !     v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne
+    use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne
 
     integer, intent(in) :: n_SPH
     real(dp), dimension(n_SPH), intent(in) :: T_tmp,mass_gas
@@ -581,7 +583,8 @@ contains
     !alloc space for all physical quantities.
     !Velocity field arrays not allocated because lvoronoi is true
     !-> fills element abundances structures for elements
-    call alloc_atomic_atmos
+    call alloc_atomrt_grid
+    call read_abundance
     rho_to_nH = 1d3 / masseH / wght_per_H !convert from density to number density nHtot
 
     Vxmax = 0
@@ -635,7 +638,7 @@ contains
     ! 		endif
 
 
-    calc_ne = .false.
+    lcalc_ne = .false.
     icell_loop : do icell=1,n_cells
        !check that in filled cells there is electron density otherwise we need to compute it
        !from scratch.
@@ -643,7 +646,7 @@ contains
 
           if (ne(icell) <= 0.0_dp) then
              write(*,*) "  ** No electron density found in the model! ** "
-             calc_ne = .true.
+             lcalc_ne = .true.
              exit icell_loop
           endif
 
@@ -654,8 +657,6 @@ contains
        write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
             N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
     endif
-
-    call write_atmos_domain() !but for consistency with the plot functions in python
 
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
     write(*,*) "|Vx|", vxmax*1d-3, vxmin*1d-3
@@ -672,7 +673,7 @@ contains
     write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)
     write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
     write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)
-    if (.not.calc_ne) then
+    if (.not.lcalc_ne) then
        write(*,*) "Maximum/minimum ne density in the model (m^-3):"
        write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
     endif
