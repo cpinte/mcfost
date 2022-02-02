@@ -1,3 +1,4 @@
+!To do, remove part that defines the grid and the dust_transfer!
 module dust_transfer
 
   use parametres
@@ -26,7 +27,8 @@ module dust_transfer
   use SPH2mcfost
   use ML_ProDiMo
 
-  use pluto_mod, only : setup_mhd_to_mcfost! :-)
+  !use pluto_mod, only : setup_mhd_to_mcfost! :-)
+  use mhd2mcfost, only : setup_mhd_to_mcfost, read_spheregrid_ascii
 
   !$ use omp_lib
 
@@ -66,7 +68,7 @@ subroutine transfert_poussiere()
 
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
 
-  ! Paramètres parallelisation
+  ! Paramï¿½tres parallelisation
   integer :: id=1
 
   real(kind=dp), target :: nnfot2, n_phot_sed2
@@ -110,6 +112,8 @@ subroutine transfert_poussiere()
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
+     !future interface with stellar rt code
+     if (lmodel_ascii) call read_spheregrid_ascii(density_file)
   endif
 
   laffichage=.true.
@@ -200,11 +204,11 @@ subroutine transfert_poussiere()
 
      if (lopacite_only) call exit(0)
 
-     if (l_em_disk_image) then ! le disque émet
+     if (l_em_disk_image) then ! le disque ï¿½met
         if (.not.(ldust_prop.and.lstop_after_init)) then ! we do not need the temperature if we only compute the dust prop
            call lect_Temperature()
         endif
-     else ! Seule l'étoile émet
+     else ! Seule l'ï¿½toile ï¿½met
         Tdust=0.0
      endif !l_em_disk_image
 
@@ -217,7 +221,7 @@ subroutine transfert_poussiere()
      endif
 
      first_etape_obs=2
-     ! Nbre d'étapes à déterminer pour code thermique
+     ! Nbre d'ï¿½tapes ï¿½ dï¿½terminer pour code thermique
      if (lTemp) then
         etape_i=1
         letape_th=.true.
@@ -233,7 +237,7 @@ subroutine transfert_poussiere()
            etape_f=1+n_lambda
            n_lambda2 = n_lambda
         else
-           etape_f=1+n_lambda2 ! modif nombre étape
+           etape_f=1+n_lambda2 ! modif nombre ï¿½tape
         endif
      else
         etape_f=1
@@ -358,7 +362,7 @@ subroutine transfert_poussiere()
   ind_etape = etape_start
 
   !************************************************************
-  !  Boucle principale sur les étapes du calcul
+  !  Boucle principale sur les ï¿½tapes du calcul
   !************************************************************
   n_iter = 0 ! Nbre iteration grains hors equilibre
   do while (ind_etape <= etape_f)
@@ -436,7 +440,7 @@ subroutine transfert_poussiere()
               call init_directions_ray_tracing()
            endif
 
-           ! Recalcul des propriétés optiques
+           ! Recalcul des propriï¿½tï¿½s optiques
            ! Try to restore dust calculation from previous run
            call read_saved_dust_prop(letape_th, lcompute_dust_prop)
            if (lcompute_dust_prop) then
@@ -500,7 +504,7 @@ subroutine transfert_poussiere()
      endif
 
 
-     ! Les pointeurs (meme les tab) doivent être privés !!! COPYIN
+     ! Les pointeurs (meme les tab) doivent ï¿½tre privï¿½s !!! COPYIN
      !$omp parallel &
      !$omp default(none) &
      !$omp firstprivate(lambda,p_lambda) &
@@ -841,14 +845,14 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
   lintersect = .true.
 
   rand = sprng(stream(id))
-  if (rand <= frac_E_stars(lambda)) then ! Emission depuis étoile
+  if (rand <= frac_E_stars(lambda)) then ! Emission depuis ï¿½toile
      flag_star=.true.
      flag_ISM=.false.
 
      rand = sprng(stream(id))
-     ! Choix de l'étoile
+     ! Choix de l'ï¿½toile
      call select_etoile(lambda,rand,i_star)
-     ! Emission depuis l'étoile
+     ! Emission depuis l'ï¿½toile
      rand  = sprng(stream(id))
      rand2 = sprng(stream(id))
      rand3 = sprng(stream(id))
@@ -911,7 +915,7 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
      U0 = SRW02 * cos(ARGMT)
      V0 = SRW02 * sin(ARGMT)
 
-     ! Parametres de stokes : lumière non polarisée
+     ! Parametres de stokes : lumiï¿½re non polarisï¿½e
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
 
      if (lweight_emission) then
@@ -1035,7 +1039,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               if (lsepar_pola) then
-                 ! Nouveaux paramètres de Stokes
+                 ! Nouveaux paramï¿½tres de Stokes
                  if (laggregate) then
                     call new_stokes_gmm(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
                  else
@@ -1053,7 +1057,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               PHI = PI * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Paramètres de Stokes non modifiés
+              ! Paramï¿½tres de Stokes non modifiï¿½s
            endif
 
         else ! methode 2 : diffusion sur la population de grains
@@ -1070,7 +1074,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               PHI = PI * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Nouveaux paramètres de Stokes
+              ! Nouveaux paramï¿½tres de Stokes
               if (lsepar_pola) call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
            else ! fonction de phase HG
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
@@ -1083,7 +1087,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               phi = pi * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Paramètres de Stokes non modifiés
+              ! Paramï¿½tres de Stokes non modifiï¿½s
            endif
         endif
 
@@ -1145,7 +1149,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
         u = srw02 * cos(argmt)
         v = srw02 * sin(argmt)
 
-        ! Emission non polarisée : remise à 0 des parametres de Stokes
+        ! Emission non polarisï¿½e : remise ï¿½ 0 des parametres de Stokes
         Stokes(2)=0.0 ; Stokes(3)=0.0 ; Stokes(4)=0.0
      endif ! tab_albedo_pos
 

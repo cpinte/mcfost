@@ -54,13 +54,15 @@ module parametres
   character(len=512), dimension(:), allocatable :: indices
   character(len=512) :: tab_wavelength
 
+  !gas transfer here
+
   ! Emission moleculaire
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
 
   ! Atomic line radiative transfer
   !!lstore_opac futur deprecation
-  logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
-  				lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
+  logical :: lemission_atom, lelectron_scattering, &
+  				lforce_lte, lvfield_sphere_coord, lstop_after_jnu, &
        			ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
   integer :: Nrays_atom_transfer, istep_start
   

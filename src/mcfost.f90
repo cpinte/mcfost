@@ -3,10 +3,10 @@ program BIGCRUNCH
   ! Code de transfert radiatif Monte-Carlo : MCFOST
   !***********************************************************
   ! Transfert dans la poussiere : lumiere diffusee et emission
-  ! thermique et dans le gaz : raies moleculaires
-  ! Code parallèle OpenMP
+  ! thermique et dans le gaz : raies moleculaires et atomiques
+  ! Code parallÃ¨le OpenMP
   !
-  ! F. Menard, G. Duchene et C. Pinte
+  ! F. Menard, G. Duchene, C. Pinte et B. Tessore ( ? :-) )
   ! Grenoble, Exeter, Grenoble, Santiago
   !
   !***********************************************************
@@ -15,11 +15,13 @@ program BIGCRUNCH
   use dust_transfer
   use mol_transfer
   use atom_transfer, only : atom_line_transfer
+  !use gas_transfer
 
   implicit none
 
   integer :: itime
   real :: time, cpu_time_begin, cpu_time_end
+  logical :: lgas_transfer = .false.
 
   ! debut de l'execution
   call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
@@ -33,22 +35,28 @@ program BIGCRUNCH
 
   ! Transfert radiatif dans le continu
   ldust_transfer = .true.
+  !To do -> extract from ldust_transfer everything whuch defines the grid
+  !-> possibility to set ldust_transfer to .false. and go to the full gas RT.
   if (ldust_transfer) then
      call transfert_poussiere()
   endif
 
   ! Emission moleculaire ...
+  !to do merge with lgas_transfer
   if (lemission_mol) then
      call mol_line_transfer()
   endif
 
   if (lemission_atom) then
-     write(*,*) ""
-     write(*,*) '*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*'
-     write(*,*) '* Solving for the radiative transfer equation for atomic lines. *'
-     write(*,*) '*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*'
      call atom_line_transfer
   endif
+
+  !both gas absorption and emission (atomic and molecular lines and continua)...
+!   if (lgas_transfer) then
+!    write(*,*) " ***** CONGRATULATIONS ***** "
+!    write(*n*) " U R USING MCFOST NEW COMBINED ATOM-MOLECULE routines!"
+!    call gas_trans_transfer()
+!   endif
 
   ! Temps d'execution
   call system_clock(time_end)

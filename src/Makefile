@@ -179,36 +179,29 @@ endif
 
 #------------------------------------------------------------------------------#
 # Sources and objects
-#Atomic line transfer
-Atom_dir=Atoms
+#gas transfer. (Only atoms at the moment)
+gdir=gas
 
-SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90       \
-          operating_system.f90 random_numbers.f90 utils.f90 sort.f90 fits_utils.f90 \
-          grains.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90         \
-          Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90         \
-          Temperature.f90 $(Atom_dir)/constant.f90\
-          $(Atom_dir)/math.f90                \
-	  $(Atom_dir)/atom_type.f90 $(Atom_dir)/getline.f90                      \
-          $(Atom_dir)/uplow.f90 density.f90 read_opacity.f90 scattering.f90      \
-          coated_sphere.f90 dust_prop.f90 healpix_mod.f90 $(Atom_dir)/atmos_type.f90             \
-          molecular_emission.f90 PAH.f90              \
-          $(Atom_dir)/zeeman.f90 input.f90 $(Atom_dir)/broad.f90                 \
-          $(Atom_dir)/getlambda.f90 benchmarks.f90 read_param.f90                \
-          dust_ray_tracing.f90 radiation_field.f90 thermal_emission.f90          \
-          diffusion.f90 io_prodimo.f90 disk_physics.f90 optical_depth.f90 ML_prodimo.f90 output.f90\
-          mem.f90 init_mcfost.f90 io_phantom_infiles.f90 \
-	  io_phantom_utils.f90 utils_hdf5.f90 mess_up_SPH.f90 read_phantom.f90 read_gadget2.f90  \
-	  SPH2mcfost.f90  $(Atom_dir)/read_pluto.f90 $(Atom_dir)/spectrum_type.f90 $(Atom_dir)/barklem.f90   \
-	  $(Atom_dir)/occupation_probability.f90 $(Atom_dir)/impact.f90 \
-	  $(Atom_dir)/io_atomic_pops.f90 $(Atom_dir)/collision.f90 \
-	  $(Atom_dir)/lte.f90 $(Atom_dir)/solvene.f90 \
-	  $(Atom_dir)/readatom.f90 $(Atom_dir)/stark.f90 \
-	  $(Atom_dir)/voigtfunctions.f90 $(Atom_dir)/profiles.f90                \
-	  $(Atom_dir)/planck.f90 $(Atom_dir)/background_opacity.f90\
-	  dust_transfer.f90 $(Atom_dir)/opacity.f90            \
-	  $(Atom_dir)/statequil_atoms.f90 \
-	  $(Atom_dir)/io_opacity.f90 \
-	  mol_transfer.f90 $(Atom_dir)/atom_transfer.f90
+
+SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90		\
+          operating_system.f90 random_numbers.f90 utils.f90 sort.f90 fits_utils.f90	\
+          grains.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90 		\
+          Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90		\
+          Temperature.f90 density.f90 read_opacity.f90 scattering.f90 			\
+          coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90		\
+          input.f90 benchmarks.f90 $(gdir)/elements_type.f90 $(gdir)/atom_type.f90	\
+          $(gdir)/wavelengths_gas.f90							\
+          read_param.f90 dust_ray_tracing.f90 uplow.f90 ${gdir}/barklem.f90		\
+          $(gdir)/occupation_probability.f90 $(gdir)/lte.f90				\
+          radiation_field.f90 thermal_emission.f90 diffusion.f90			\
+          io_prodimo.f90 disk_physics.f90 optical_depth.f90 ML_prodimo.f90 		\
+          output.f90 mem.f90  init_mcfost.f90 io_phantom_infiles.f90			\
+          io_phantom_utils.f90 utils_hdf5.f90 mess_up_SPH.f90 read_phantom.f90		\
+          read_gadget2.f90 SPH2mcfost.f90 mhd2mcfost.f90 dust_transfer.f90		\
+          mol_transfer.f90 $(gdir)/collision_atom.f90 $(gdir)/io_atom.f90		\
+          $(gdir)/electron_density.f90 $(gdir)/gas_contopac.f90	$(gdir)/broad.f90	\
+          $(gdir)/atom_transfer.f90
+
 
 OBJECTS= $(SOURCES:.f90=.o)
 
@@ -339,7 +332,7 @@ wardlaw :
 .PHONY : clean cleandata cleandata_dust cleanall
 
 clean :
-	rm -rf *.o $(Atom_dir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a
+	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a
 	if test $(MCFOST_GIT) = 1 ; then rm -rf sha.f90; fi
 
 cleandata :
@@ -351,8 +344,8 @@ cleandata_dust :
 cleanall : clean cleandata
 	rm -rf mcfost
 
-cleanNLTEmod :
-	rm -rf $(Atom_dir)/*.o $(Atom_dir)/*.mod
+cleanGasmod :
+	rm -rf $(gdir)/*.o $(gdir)/*.mod
 
 #------------------------------------------------------------------------------#
 # Backup

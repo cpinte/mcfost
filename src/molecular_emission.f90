@@ -661,12 +661,11 @@ end subroutine J_mol_loc
 !***********************************************************
 
 function v_proj(icell,x,y,z,u,v,w) !
-  use atmos_type, only : vr, vtheta, vphi, v_z
   ! Vitesse projete en 1 point d'une cellule
   ! C. Pinte
   ! 13/07/07
-  ! Added projection for magnetospheric accretion and spherical vector
-  ! 21/02/19; B. Tessore
+  ! Added projection for cylindrical and spherical velocity components
+  ! 28/01/2022; B. Tessore
 
   implicit none
 
@@ -696,7 +695,7 @@ function v_proj(icell,x,y,z,u,v,w) !
         endif
         v_proj = vx * u + vy * v + vz * w
      else ! Using analytical velocity field
-        if ((.not.lmagnetoaccr.and..not.lspherical_velocity).and.&
+        if ((.not.lvfield_cyl_coord.and..not.lvfield_sphere_coord).and.&
         	(lkeplerian.or.linfall)) vitesse = vfield(icell)
 
         if (lkeplerian) then
@@ -730,10 +729,11 @@ function v_proj(icell,x,y,z,u,v,w) !
            else
               v_proj = 0.0_dp
            endif
-        else if (lmagnetoaccr) then
+        else if (lvfield_cyl_coord) then!lmagnetoaccr
+           !here vfield_x, vfield_y and vfield_z are R, z, phi
            r = sqrt(x*x+y*y)
-           vx = 0_dp; vy = 0_dp!; vz = 0_dp
-           vz = v_z(icell)
+           vx = 0_dp; vy = 0_dp; vz = 0_dp
+           vz = vfield_y(icell)
            !only if z strictly positive in the model (2D)
            if ( (.not.l3D) .and. (z < 0_dp) ) vz = -vz
            !!vz = v_z(icell) * sign(1.0_dp,z), in 3D models, this change of sign is taken care (??)
@@ -742,14 +742,15 @@ function v_proj(icell,x,y,z,u,v,w) !
            						 !spherical wind of stars
               norme = 1.0_dp/r
 
-              vx = vR(icell) * x * norme - vphi(icell) * y * norme
-              vy = vR(icell) * y * norme + vphi(icell) * x * norme
+              vx = vfield_x(icell) * x * norme - vfield_z(icell) * y * norme
+              vy = vfield_x(icell) * y * norme + vfield_z(icell) * x * norme
 
               v_proj = vx*u + vy*v + vz*w
           else
           	  v_proj = vz*w!0.0_dp
           endif
-		else if (lspherical_velocity) then !missing theta projection
+		else if (lvfield_sphere_coord) then
+           !here vfield_x, vfield_y and vfield_z are r, theta, phi
 			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
 			vx = 0.; vy = 0.; vz = 0.;
 
@@ -765,9 +766,9 @@ function v_proj(icell,x,y,z,u,v,w) !
 
 			if (r > tiny_dp) then
 				norme = 1.0_dp / r
-				vx = vr(icell) * x * norme - y * norme2 * vphi(icell) + norme2 * ( z * norme * x * vtheta(icell) )
-				vy = vr(icell) * y * norme + x * norme2 * vphi(icell) + norme2 * ( z * norme * y * vtheta(icell) )
-				vz = vr(icell) * z * norme - sign1 * r2 / r * vtheta(icell)
+				vx = vfield_x(icell) * x * norme - y * norme2 * vfield_z(icell) + norme2 * ( z * norme * x * vfield_y(icell) )
+				vy = vfield_x(icell) * y * norme + x * norme2 * vfield_z(icell) + norme2 * ( z * norme * y * vfield_y(icell) )
+				vz = vfield_x(icell) * z * norme - sign1 * r2 / r * vfield_y(icell)
 				v_proj = vx * u + vy * v + vz * w
 			else
 				v_proj = 0.0_dp

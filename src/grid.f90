@@ -5,6 +5,7 @@ module grid
   use grains
   use utils
   use sort, only : index_quicksort
+  use mcfost_env, only : dp
 
   use cylindrical_grid
   use spherical_grid
@@ -20,9 +21,67 @@ module grid
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
 
 
-  real, dimension(:), allocatable :: vfield, vfield_x, vfield_y, vfield_z ! n_cells
+  real(kind=dp), dimension(:), allocatable :: vfield, vfield_x, vfield_y, vfield_z ! n_cells
+  real(kind=dp) :: v_char, B_char
+  logical :: lcalc_ne, lmagnetized
+  !real(kind=dp), dimension(:), allocatable :: vfield_v1, vfield_v2, vfield_v3
+  real(kind=dp), dimension(:), allocatable :: ne, nHtot, T, nHmin, vturb
+  integer, dimension(:), allocatable :: icompute_atomRT
 
   contains
+
+  subroutine alloc_atomrt_grid()
+   integer(kind=8) :: mem_alloc_local = 0
+
+
+   allocate(nHtot(n_cells), ne(n_cells), T(n_cells))
+   allocate(nHmin(n_cells), vturb(n_cells))
+
+   !here vfield_x,_y and _z are either R,z, phi or r,theta, phi.
+   !works onlt if lvelocity_file = .false.
+   if (allocated(vfield_x)) deallocate(vfield_x, vfield_y, vfield_z)
+   if (.not.lvoronoi) then
+   !    allocate(vfield_v1(n_cells)); vfield_v1 = 0.0_dp
+   !    allocate(vfield_v2(n_cells)); vfield_v2 = 0.0_dp
+   !    allocate(vfield_v3(n_cells)); vfield_v3 = 0.0_dp
+       allocate(vfield_x(n_cells)); vfield_x = 0.0_dp
+       allocate(vfield_y(n_cells)); vfield_y = 0.0_dp
+       allocate(vfield_z(n_cells)); vfield_z = 0.0_dp
+   end if
+
+   lcalc_ne = .false.
+   T = 0.0
+   nHtot = 0.0
+   ne = 0.0
+   nHmin = 0.0
+   vturb = 0.0 !m/s
+   
+
+   allocate(icompute_atomRT(n_cells))
+   icompute_atomRT = 0 !everything transparent at init.
+
+
+   ! mem_alloc_tot = mem_alloc_tot + mem_alloc_local
+   ! write(*,'("Total memory allocated in alloc_atomic_atmos:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
+
+
+   return
+ end subroutine alloc_atomrt_grid
+
+ subroutine dealloc_atomrt_grid
+
+   deallocate(nHtot, ne, T, vturb)
+   if (allocated(nHmin)) deallocate(nHmin)
+
+   if (.not.lvoronoi) then
+      deallocate(vfield_x,vfield_y,vfield_z)
+   end if
+
+
+   deallocate(icompute_atomRT)
+
+   return
+ end subroutine dealloc_atomrt_grid
 
  subroutine order_zones()
    ! Order the various zones according to their Rin
@@ -287,6 +346,8 @@ subroutine setup_grid()
 
 end subroutine setup_grid
 
+!to do
+!subroutine to find the neighbours of a cell.
 
 subroutine nnk_smooth(arr)
 	!Nearest Neighbours Kernel smoother for spherical and Voronoi grids.

@@ -45,7 +45,7 @@ module readatom
 
    contains
 
-   subroutine read_Model_Atom(atomunit, atom, atom_file)
+   subroutine read_model_Atom(atomunit, atom, atom_file)
    !
    ! read independent atomic model
    ! Iinitialize the atom values

@@ -77,9 +77,7 @@ subroutine set_default_variables()
   lno_iterate_ne_mc = .true. !.true. means no iteration of electron during MC steps
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
-  lvacuum_to_air = .false.
   !lorigin_atom = .false., not yet
-  lmagnetoaccr = .false.
   lpluto_file = .false.
   lmodel_ascii = .false.
   lmhd_voronoi = .false.
@@ -677,9 +675,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ndelay_iterate_ne
         i_arg= i_arg+1
-     case("-vacuum_to_air")
-        i_arg = i_arg + 1
-        lvacuum_to_air = .true.
      case("-read_jnu_atom")
      	i_arg = i_arg + 1
      	lread_jnu_atom = .true.
@@ -1837,7 +1832,6 @@ subroutine display_help()
   write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
-  write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
 !   write(*,*) "        : -cntrbf_ray_atom : Computes the contribution function along a single ray!"
 !   write(*,*) "        : -origin_atom : Computes and stores the emission of each cell"
   write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
