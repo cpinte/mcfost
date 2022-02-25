@@ -2038,13 +2038,20 @@ module atom_transfer
             !-> does not work
             ! if ( (vaccr < 0.0_dp) .and. ( (abs(z)/rr >= cos(thetai)).and.(abs(z)/rr <= cos(thetao)) ) ) then
             if (vaccr < 0.0_dp) then
+               !Even if fixed choc temperature, check that the column contributes to the accretion by computing
+               !Tchoc from kinetic energy and be sure that it is larger than, say, 1000 K.
+               Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * &
+                  (0.5 * vmod2 + enthalp))**0.25
+               lintersect = (Tchoc > 1000.0)
                if (Taccretion>0) then !constant accretion shock value from file
                   Tchoc = Taccretion
-                  lintersect = .true.
+                  ! lintersect = .true.
                else! computed from mass flux and corrected by Taccretion factor!
-                  Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * &
-                     (0.5 * vmod2 + enthalp))**0.25
-                  lintersect = (Tchoc > 0.0*etoile(i_star)%T) !depends on the local value
+                  Tchoc = abs(Taccretion) * Tchoc
+                  ! Tchoc = abs(Taccretion) * (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * &
+                  !    (0.5 * vmod2 + enthalp))**0.25
+                  !recompute lintersect in that case to not include the thin accreting regions.
+                  lintersect = (Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
                endif
             endif
 

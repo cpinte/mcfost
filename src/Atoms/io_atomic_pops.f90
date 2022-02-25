@@ -998,8 +998,40 @@ CONTAINS
 
     if (lVoronoi) then
        naxis = 2
-       call error("read_pops_atom does not handled Voronoi grid yet!")
-    else
+
+       call ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
+       if (status > 0) then
+          write(*,*) "error reading number of axis (naxis)"
+          call print_error(status)
+          stop
+       endif
+
+       !Nlevel
+       call ftgkyj(unit, "NAXIS1", naxis_found, some_comments, status)
+       if (status > 0) then
+          write(*,*) "error reading Nlevel from file (naxis1)"
+          call print_error(status)
+          stop
+       endif
+
+       if (naxis_found /= atom%Nlevel) then
+          if (naxis_found /= naxis2(1)) then
+             write(*,*) "Nlevel read does not match atom !", atom%Nlevel
+             stop
+          endif
+       endif
+       nelements = naxis_found
+
+       !n_cells
+       call ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
+       if (status > 0) then
+          write(*,*) "error reading nrad from file (naxis2)"
+          call print_error(status)
+          stop
+       endif
+       nelements = nelements * naxis_found
+
+    else !not Voronoi read Nlevel, R, z, phi
 
        if (l3D) then
           naxis = 4
@@ -1075,6 +1107,8 @@ CONTAINS
           nelements = nelements * naxis_found
        endif
 
+      endif !lvoronoi
+
        if (nelements /= atom%Nlevel * n_cells) then
           write(*,*) " read_pops_atom does not do interpolation yet!"
           call Error (" Model read does not match simulation box")
@@ -1105,8 +1139,6 @@ CONTAINS
           stop
        endif
 
-
-    endif !lvoronoi
 
     call ftclos(unit, status) !close
     if (status > 0) then
