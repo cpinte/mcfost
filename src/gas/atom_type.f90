@@ -21,7 +21,7 @@ module atom_type
       integer :: i, j, Nlambda
       ! integer :: Nblue = 0, Nred = 0, Nmid = 0, N0 = 0, Nb, Nr
       real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionisation
-      real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2
+      ! real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2
       real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file
       type (AtomType), pointer :: atom => NULL()
    end type AtomicContinuum

@@ -350,7 +350,8 @@ module io_atom
                      call search_cont_lambdamax (atom%continua(kr), atom%Rydberg, atom%stage(i)+1,atom%E(j),atom%E(i))
                   endif
                endif
-
+               !the Nlambda from file is not used except if not hydrogenic
+               atom%continua(kr)%Nlambda = 0
             case default
 
                call error("nudepchar!")
@@ -665,33 +666,6 @@ module io_atom
       return
    end subroutine search_cont_lambdamax
 
-   ! subroutine compute_line_bound(line)
-   ! ! ------------------------------------------------------------ !
-   ! ! Compute the line bounds : lamndamin and lambdamax
-   ! ! the total extent of line in the atom's frame (no velocity).
-   ! ! ------------------------------------------------------------ !
-   !    type (AtomicLine), intent(inout) :: line
-   !    real(kind=dp) :: vB, vmax, vth
-   
-      
-   !    if (line%polarizable) then
-   !       vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
-   !    else
-   !       vB = 0.0_dp
-   !    endif
-   !    vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
-   !    write(*,*) vth*1d-3, line%atom%weight
-   !    vmax = line%qwing * (vth + vB)
-    
-    
-   !    line%lambdamin = line%lambda0*(1.0-vmax/C_LIGHT)
-   !    line%lambdamax = line%lambda0*(1.0+vmax/C_LIGHT)
-   !    line%vmax = real(vmax)
-   !    write(*,'("line "(1I2)"->"(1I2)"; vmax="(1F12.3)" km/s")') line%j, line%i, line%vmax*1d-3
-   !    write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
-    
-   !    return
-   ! end subroutine compute_line_bound
 
    subroutine write_pops_atom(atom,iter,step)
    ! ----------------------------------------------------------------- !
@@ -892,7 +866,39 @@ module io_atom
 
    if (lVoronoi) then
       naxis = 2
-      call error("read_pops_atom does not handled Voronoi grid yet!")
+      call ftgknj(unit, 'NAXIS', 1, naxis, naxis2, naxis_found, status)
+      if (status > 0) then
+         write(*,*) "error reading number of axis (naxis)"
+         call print_error(status)
+         stop
+      endif
+
+      !Nlevel
+      call ftgkyj(unit, "NAXIS1", naxis_found, some_comments, status)
+      if (status > 0) then
+         write(*,*) "error reading Nlevel from file (naxis1)"
+         call print_error(status)
+         stop
+      endif
+
+      if (naxis_found /= atom%Nlevel) then
+         if (naxis_found /= naxis2(1)) then
+            write(*,*) "Nlevel read does not match atom !", atom%Nlevel
+            stop
+         endif
+      endif
+      nelements = naxis_found
+
+      !n_cells
+      call ftgkyj(unit, "NAXIS2", naxis_found, some_comments, status)
+      if (status > 0) then
+         write(*,*) "error reading nrad from file (naxis2)"
+         call print_error(status)
+         stop
+      endif
+
+      nelements = nelements * naxis_found
+
    else
 
       if (l3D) then
@@ -969,38 +975,37 @@ module io_atom
          nelements = nelements * naxis_found
       endif
 
-      if (nelements /= atom%Nlevel * n_cells) then
-         write(*,*) " read_pops_atom does not do interpolation yet!"
-         call Error (" Model read does not match simulation box")
-      endif
-
-      !READ NLTE
-      call FTG2Dd(unit,1,-999,shape(atom%n),atom%Nlevel,n_cells,atom%n,anynull,status)
-      if (status > 0) then
-         write(*,*) "error reading non-LTE populations ", atom%id
-         call print_error(status)
-         stop
-      endif
-
-
-      !now LTE
-      call FTMAHD(unit,2,hdutype,status)
-      if (status > 0) then
-         write(*,*) "error opening LTE hdu ", atom%id
-         call print_error(status)
-         stop
-      endif
-
-      atom%nstar(:,:) = 0.0_dp
-      call FTG2Dd(unit,1,-999,shape(atom%nstar),atom%Nlevel,n_cells,atom%nstar,anynull,status)
-      if (status > 0) then
-         write(*,*) "error reading LTE populations ", atom%id
-         call print_error(status)
-         stop
-      endif
-
-
    endif !lvoronoi
+
+   if (nelements /= atom%Nlevel * n_cells) then
+      write(*,*) " read_pops_atom does not do interpolation yet!"
+      call Error (" Model read does not match simulation box")
+   endif
+
+   !READ NLTE
+   call FTG2Dd(unit,1,-999,shape(atom%n),atom%Nlevel,n_cells,atom%n,anynull,status)
+   if (status > 0) then
+      write(*,*) "error reading non-LTE populations ", atom%id
+      call print_error(status)
+      stop
+   endif
+
+
+   !now LTE
+   call FTMAHD(unit,2,hdutype,status)
+   if (status > 0) then
+      write(*,*) "error opening LTE hdu ", atom%id
+      call print_error(status)
+      stop
+   endif
+
+   atom%nstar(:,:) = 0.0_dp
+   call FTG2Dd(unit,1,-999,shape(atom%nstar),atom%Nlevel,n_cells,atom%nstar,anynull,status)
+   if (status > 0) then
+      write(*,*) "error reading LTE populations ", atom%id
+      call print_error(status)
+      stop
+   endif
 
    call ftclos(unit, status) !close
    if (status > 0) then
