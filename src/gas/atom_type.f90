@@ -18,10 +18,10 @@ module atom_type
 
    type AtomicContinuum
       logical :: hydrogenic
-      integer :: i, j, Nlambda
-      ! integer :: Nblue = 0, Nred = 0, Nmid = 0, N0 = 0, Nb, Nr
+      integer :: i, j
+      integer :: Nb, Nr, Nlambda
       real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionisation
-      ! real(kind=dp), allocatable, dimension(:)  :: lambda, alpha, twohnu3_c2
+      real(kind=dp), allocatable, dimension(:)  :: alpha, twohnu3_c2
       real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file
       type (AtomType), pointer :: atom => NULL()
    end type AtomicContinuum
@@ -31,15 +31,14 @@ module atom_type
       logical  :: Voigt=.true.
       character(len=17) :: vdWaals
       integer :: i, j
-      ! integer :: Nlambda
-      ! integer :: Nblue=0, Nred = 0, Nmid=0
+      integer :: Nb, Nr, Nlambda
       real(kind=dp) :: lambda0, lambdamin, lambdamax
       real(kind=dp) :: Aji, Bji, Bij, Grad, cStark, fosc
-      real(kind=dp) :: twohnu3_c2, gij
-      real :: qwing, vmax !m/s
+      real(kind=dp) :: twohnu3_c2, gij, vmax !m/s
+      real :: qwing
       real(kind=dp), dimension(4) :: cvdWaals
-      real(kind=dp), dimension(:), allocatable :: u, a
-      real(kind=dp), dimension(:), allocatable :: pvoigt_eta, aeff, r, r1 !thomson approx. of Voigt.
+      real(kind=dp), dimension(:), allocatable :: a
+      ! real(kind=dp), dimension(:), allocatable :: u, pvoigt_eta, aeff, r, r1 !thomson approx. of Voigt.
       ! real(kind=dp), allocatable, dimension(:,:)  :: phi
       type (AtomType), pointer :: atom => NULL()
       integer :: ZeemanPattern

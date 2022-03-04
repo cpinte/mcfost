@@ -2310,6 +2310,10 @@ contains
     end do
     close(unit=1)
 
+    vR = 0
+    v2 = 0
+    vphi = 0
+
     !Handling of magnetic field components only depends on what choice I make for the magnetic field
     !Presently I read B, theta and chi !
     if (lspherical_velocity) then

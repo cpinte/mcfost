@@ -8,16 +8,20 @@ module atom_transfer
 
    use parametres
    use io_atom, only : read_atomic_models, write_pops_atom
+   use wavelengths_gas, only : make_wavelength_nlte, lambda
    use elecdensity, only : solve_ne, write_electron, read_electron
-   use grid, only : lcalc_ne
+   use grid, only : lcalc_ne, move_to_grid
    use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops
    use atom_type, only : atoms
-   use gas_contopac, only : background_continua_lambda, alloc_rayleigh_xsections
+   use init_mcfost, only :  nb_proc
+   use gas_contopac, only : background_continua_lambda
+   use opacity_atom, only : alloc_atom_opac, Itot, psi, opacity_atom_bf_loc, opacity_atom_bb_loc
+   use optical_depth, only : integ_ray_atom
+   use utils, only : cross_product, gauss_legendre_quadrature
 
    implicit none
                     
    integer :: omp_chunk_size
-   real(kind=dp), allocatable :: Itot(:), Icont(:)
 
    contains
 
@@ -30,9 +34,14 @@ module atom_transfer
    ! --------------------------------------------------------------------------- !
       integer  :: ne_initial
       logical :: lelectron_read
-      real(kind=dp) :: dne, chit(4),etat(4),xlam(4)
+      real(kind=dp) :: dne
 
-      omp_chunk_size = 1!max(nint( 0.01 * n_cells / nb_proc ),1)
+      integer :: la, j, icell0
+      logical :: lintersect
+      real(kind=dp) :: rr, u,v,w,u0,w0,v0,x0,y0,z0,x(3),y(3),uvw(3),cos_theta(1), weight_mu(1)
+      real(kind=dp), allocatable :: chit(:),etat(:),xlam(:), Ftot(:,:)
+
+      omp_chunk_size = max(nint( 0.01 * n_cells / nb_proc ),1)
       mem_alloc_tot = 0
 
       !read atomic models
@@ -71,24 +80,54 @@ module atom_transfer
 
       call ltepops_atoms() 
 
-      !call init_Spectrum(Nrayone,lam0=lam0,vacuum_to_air=lvacuum_to_air)
-      !if (n_etoiles > 0) call init_stellar_disk
-      !call alloc_atom_quantities
-      !call compute_background_continua
+      !every indexes are defined on the lambda frequency. 
+      !So even when lambda is passed as an argument, it is expected
+      !that the indexes correspond at that grid.
+      call make_wavelength_nlte
+      !allocate quantities in space and for this frequency grid
+      call alloc_atom_opac(size(lambda), lambda)
 
+      ! allocate(chit(size(lambda)),etat(size(lambda)))
+      ! chit = 0
+      ! etat = 0
+      ! call background_continua_lambda(1, size(lambda), lambda, chit, etat)
+      ! call opacity_atom_bf_loc(1,size(lambda),lambda,chit,etat)
+      ! call opacity_atom_bb_loc(1,1,1,0.0d0,0.0d0,0.0d0,0.0d0,0.0d0,0.0d0,0d0,0.d0,1.d0,0.0d0,0.0d0,.false.,size(lambda),lambda,chit,etat)
 
-      xlam(1) = 10.0
-      xlam(2) = 300.0
-      xlam(3) = 500.0
-      xlam(4) = 3000.
-      call alloc_rayleigh_xsections(4,xlam)
-      call background_continua_lambda(1, 4, xlam, chit, etat)
-      write(*,*) chit 
-      write(*,*) etat
+      u = 0.0_dp
+      v = 0.0_dp
+      w = 1.0_dp
 
-      do ne_initial=1, atoms(1)%p%Ntr
-         write(*,*) "trans", atoms(1)%p%tab_trans(ne_initial)
+      uvw = (/u,v,w/) !vector position
+      x = (/1.0_dp,0.0_dp,0.0_dp/)
+      y = -cross_product(x, uvw)
+
+      ! Ray tracing : on se propage dans l'autre sens
+      u0 = -u ; v0 = -v ; w0 = -w
+      call gauss_legendre_quadrature(0.0_dp, 1.0_dp, size(cos_theta), cos_theta, weight_mu)
+      allocate(Ftot(size(lambda),nb_proc))
+      Ftot = 0.0
+      do j=1,size(cos_theta)
+
+         rr = Rmax * sqrt(1.0 - cos_theta(j)**2)
+
+         x0 = 10.0*Rmax*u + rr * y(1)
+         y0 = 10.0*Rmax*v + rr * y(2)
+         z0 = 10.0*Rmax*w + rr * y(3)
+
+         call move_to_grid(1,x0,y0,z0,u0,v0,w0,icell0,lintersect)
+         if (lintersect) then
+            call integ_ray_atom(1,icell0,x0,y0,z0,u0,v0,w0,1,.false.,size(lambda),lambda)
+         endif
+         Ftot(:,1) = Ftot(:,1) + Itot(:,1,1) * weight_mu(j)
       enddo
+      open(1,file="sun.txt",status="unknown")
+      do la=1,size(lambda)
+
+         write(1,*) lambda(la), Ftot(la,1)
+      enddo
+      close(1)
+
 
 
       return

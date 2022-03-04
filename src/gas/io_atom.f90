@@ -223,11 +223,6 @@ module io_atom
          atom%lines(kr)%Bij = (atom%g(j) / atom%g(i)) * atom%lines(kr)%Bji
          atom%lines(kr)%lambda0 = lambdaji / NM_TO_M
 
-         !lambdamax and lambdamin
-         !depends on how the integration in frequency is done !
-         !might be not useful or lambdamax, lambdamin might not be accurate !!
-         !call compute_line_bound(atom%lines(kr))
-
          !gi * Bij = gj * Bji
          !gi/gj = Bji/Bij so that niBij - njBji = Bij (ni - gij nj)
          atom%lines(kr)%gij = atom%lines(kr)%Bji / atom%lines(kr)%Bij !gi/gj
@@ -252,7 +247,6 @@ module io_atom
          end select
          if (atom%lines(kr)%Voigt) then
             allocate(atom%lines(kr)%a(n_cells))
-            atom%lines(kr)%a = 0.0_dp
          endif
 
 
@@ -278,6 +272,10 @@ module io_atom
             case default
                atom%lines(kr)%vdWaals = "UNSOLD"
          end select
+
+         !define the extension of a line for non-LTE loop and images.
+         call compute_line_bound(atom%lines(kr))
+
 
       end do !end loop over bound-bound transitions
 
@@ -574,57 +572,37 @@ module io_atom
          end if
       end do
 
-      ! min_Resol = 1d30
-      ! max_resol = 0.0
-      ! do nmet=1,n_atoms
-      !    do k=1,n_cells
-      !       if (icompute_atomRT(k)>0) then
-      !          min_resol = min(Atoms(nmet)%ptr_atom%vbroad(k), min_resol)
-      !          max_resol = max(Atoms(nmet)%ptr_atom%vbroad(k), max_resol)
-      !       endif
-      !    enddo
-      ! enddo
-      !hv = 0.46 * real(min_resol) * 1e-3
-      ! hv = 5.0
-      ! if (art_hv > 0.0) then
-      !    hv = art_hv
-      ! endif
-      ! write(*,'("R="(1F7.3)" km/s")') hv
-
-
-      ! write(*,*) " Generating sub wavelength grid and lines boundary for all atoms..."
-      ! do nmet=1, n_atoms
-      !    atom => Atoms(nmet)%ptr_atom
-      !    !!write(*,*) "ID:", Atoms(nmet)%ptr_atom%ID
-      !    do kr=1, Atoms(nmet)%ptr_atom%Nline
-
-      !       maxvel = Atoms(nmet)%ptr_atom%lines(kr)%qwing * maxval(atom%vbroad)
-
- 
-      !       call define_local_profile_grid (Atoms(nmet)%ptr_atom%lines(kr))
-
-
-      !       !-> depends if we interpolate profile on finer grid !
-      !       !!-> linear
-      !       !      CALL make_sub_wavelength_grid_line_lin(Atoms(nmet)%ptr_atom%lines(kr),&
-      !       !                                         maxval(Atoms(nmet)%ptr_atom%vbroad), max_adamp)
-      !       !!-> logarithmic
-      !       !      CALL make_sub_wavelength_grid_line(Atoms(nmet)%ptr_atom%lines(kr),&
-      !       !                                         maxval(Atoms(nmet)%ptr_atom%vbroad), max_adamp)
-
-
-      !    enddo !over lines
-      !    if (atom%lgauss_prof) then
-      !       write(*,*) " -> gauss profile for that atom ", atom%id
-      !       call define_local_gauss_profile_grid(atom)
-      !    endif
-      !    atom => null()
-      ! enddo !over atoms
-      ! write(*,*) "..done"
-      ! Max_ionisation_stage = get_max_nstage()
-
+   
       return
    end subroutine read_Atomic_Models
+
+   subroutine compute_line_bound(line)
+      ! ------------------------------------------------------------ !
+      ! Compute the line bounds : lamndamin and lambdamax
+      ! the total extent of line in the atom's frame (no velocity).
+      ! ------------------------------------------------------------ !
+      type (AtomicLine), intent(inout) :: line
+      real(kind=dp) :: vB, vmax, vth
+      
+         
+      if (line%polarizable) then
+         vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
+      else
+         vB = 0.0_dp
+      endif
+      vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
+      !write(*,*) "max(vth) line = ", vth*1d-3, line%atom%weight
+      vmax = line%qwing * (vth + vB)
+       
+       
+      line%lambdamin = line%lambda0*(1.0-vmax/C_LIGHT)
+      line%lambdamax = line%lambda0*(1.0+vmax/C_LIGHT)
+      line%vmax = vmax
+      !write(*,'("line "(1I2)"->"(1I2)"; vmax="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
+      !write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
+       
+      return
+   end subroutine compute_line_bound
 
    subroutine search_cont_lambdamax (cont, Rinf, Z, Ej, Ei)
       !Search the lambdamax = first lambda for which Gaunt < 0

@@ -1826,7 +1826,7 @@ subroutine display_help()
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
-  write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
+!   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
   write(*,*) "        : -art_line_resol <v> : resolution of the non-LTE grid of art in km/s"
   write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
@@ -1844,7 +1844,7 @@ subroutine display_help()
   write(*,*) "        : -Ng_Norder <Norder> : Order of Ng's acceleration"
   write(*,*) "        : -Ng_Ndelay <Ndelay> : Delay before first Ng's acceleration"
   write(*,*) "        : -Ng_Nperiod <Nperiod> : Cycle of Ng's iteration"
-  write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
+!   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"
   write(*,*) "        : -safe_stop_time <real> : calc_time_limit in days "
 

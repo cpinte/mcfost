@@ -11,6 +11,8 @@ module optical_depth
   use radiation_field, only : save_radiation_field
   use density
   use stars, only : intersect_stars
+  use gas_contopac, only : background_continua_lambda
+  use opacity_atom, only : opacity_atom_bb_loc, opacity_atom_bf_loc, Itot, psi
 
   implicit none
 
@@ -785,6 +787,111 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
   return
 
 end subroutine optical_length_tot_mol
+
+!********************************************************************
+   subroutine integ_ray_atom(id,icell_in,x,y,z,u,v,w,iray,labs,N,lambda)
+   ! ------------------------------------------------------------------------------- !
+   ! TO DO: merge integ_ray_atom + integ_ray_line
+   ! Zeeman
+   ! scattering 
+   ! level dissolution
+   ! dust   
+   ! ------------------------------------------------------------------------------- !
+
+      integer, intent(in) :: id, icell_in, iray
+      real(kind=dp), intent(in) :: u,v,w
+      real(kind=dp), intent(in) :: x,y,z
+      logical, intent(in) :: labs
+      integer, intent(in) :: N
+      real(kind=dp), dimension(N), intent(in) :: lambda
+      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
+      real(kind=dp), dimension(N) :: Snu, tau, dtau, chi
+      integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
+      logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+
+      x1=x;y1=y;z1=z
+      x0=x;y0=y;z0=z
+      next_cell = icell_in
+      nbr_cell = 0
+      icell_prev = icell_in
+
+      tau(:) = 0.0_dp
+
+      Itot(:,iray,id) = 0.0_dp
+   
+      ! Will the ray intersect a star
+      call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+      ! Boucle infinie sur les cellules (we go over the grid.)
+      infinie : do ! Boucle infinie
+      ! Indice de la cellule
+         icell = next_cell
+         x0=x1 ; y0=y1 ; z0=z1
+
+         lcellule_non_vide = (icell <= n_cells)
+         ! if (icell <= n_cells) then
+         !    lcellule_non_vide=.true.
+         ! else
+         !    lcellule_non_vide=.false.
+         ! endif
+
+         ! Test sortie ! "The ray has reach the end of the grid"
+         if (test_exit_grid(icell, x0, y0, z0)) return
+
+         if (lintersect_stars) then !"will interesct"
+            if (icell == icell_star) then!"has intersected"
+               !call local_stellar_radiation(id,iray,tau,tau_c,i_star,icell_prev,x0,y0,z0,u,v,w)
+               return
+            end if
+         endif
+         !With the Voronoi grid, somme cells can have a negative index
+         !therefore we need to test_exit_grid before using icompute_atom_rt
+         if (icell <= n_cells) then
+            lcellule_non_vide = (icompute_atomRT(icell) > 0)
+            if (icompute_atomRT(icell) < 0) return
+         endif
+
+         nbr_cell = nbr_cell + 1
+
+         ! Calcul longeur de vol et profondeur optique dans la cellule
+         previous_cell = 0 ! unused, just for Voronoi
+         call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+         !count opacity only if the cell is filled, else go to next cell
+         if (lcellule_non_vide) then
+            lsubtract_avg = ((nbr_cell == 1).and.labs)
+            ! opacities in m^-1, l_contrib in au
+
+            !does not change with iray though.
+            !init Snu and chi
+            call background_continua_lambda(icell, N, lambda, chi, Snu)
+            !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
+            !accumulate b-f and b-b un chi and Sny
+            call opacity_atom_bf_loc(icell,N,lambda,chi,Snu)
+            call opacity_atom_bb_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,&
+               l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,Snu)
+
+            dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m
+
+            if (lsubtract_avg) then
+               !Lambda operator / chi_dag
+               psi(:,iray,id) = ( 1.0_dp - exp( -dtau(:) ) ) / chi
+               ds(iray,id) = l_contrib * AU_to_m
+            endif
+
+            Snu = Snu / chi
+
+            Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
+            tau(:) = tau(:) + dtau(:) !for next cell
+
+         end if  ! lcellule_non_vide
+
+         icell_prev = icell 
+         !duplicate with previous_cell, but this avoid problem with Voronoi grid here
+
+      end do infinie
+
+      return
+   end subroutine integ_ray_atom
 
 !********************************************************************
 

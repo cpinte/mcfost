@@ -14,19 +14,24 @@ module wavelengths_gas
  
    !Number of points for each transition
    !continuum wavelength double for level dissolution !
-   integer, parameter :: Nlambda_cont = 101!61!41! 141 !continuum, linear
-   integer, parameter :: Nlambda_cont_log = 31!61!31!ontinuum log scaled
-   integer, parameter :: Nlambda_line_w = 24, Nlambda_line_c_log = 51 !12 et 31
-   integer, parameter :: Nlambda_line_c = 51!line linear1
-   real, parameter    :: hvel_nlte = 6.0!for line in km/s, 1-3 for static models
+   integer, parameter :: Nlambda_cont = 101
+   integer, parameter :: Nlambda_cont_log = 31
+   integer, parameter :: Nlambda_line_w = 24
+   integer, parameter :: Nlambda_line_c_log = 14
    real               :: hv
-   ! integer            :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans !number max of lambda for all lines
+   !number max of lambda for all lines
+   integer            :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans
 
+   !group of overlapping transitions
    integer :: N_groups
    real(kind=dp), dimension(:), allocatable :: group_blue, group_red
-   real(kind=dp), allocatable :: lambda_cont(:)
+   integer, dimension(:), allocatable :: Nline_per_group, Nlambda_per_group
+   !non-lte freq grid
+   real(kind=dp), allocatable :: lambda_cont(:), lambda(:)
 
+   !generator of grid for specific transitions
    procedure(make_sub_wavelength_grid_cont_log_nu), pointer :: subgrid_cont => make_sub_wavelength_grid_cont_log_nu
+   procedure(line_lambda_grid), pointer :: subgrid_line => line_lambda_grid!_dv
  
    contains
 
@@ -72,18 +77,58 @@ module wavelengths_gas
       return
    end function make_sub_wavelength_grid_cont_log_nu
 
-   function line_u_grid(k, line, N)
+   function line_u_grid_loc(k, line, N)
       !return for line line and cell k, the paramer:
       ! u = (lambda - lambda0) / lambda0 * c_light / vth
       integer, parameter :: Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
       integer, intent(in) :: k
       integer, intent(out) :: N
-      real(kind=dp), dimension(Nlambda) :: line_u_grid
+      real(kind=dp), dimension(Nlambda) :: line_u_grid_loc
       type (atomicline), intent(in) :: line
-      real(kind=dp) ::  vcore, vwing, v0, v1, vth, vB
+      real(kind=dp) ::  vcore, vwing, vth, vB
       integer :: la, Nmid
 
       vth = vbroad(T(k), line%atom%weight, vturb(k))
+      vB = 0.0_dp
+      if (line%polarizable) then
+         !replace b_char by magnetic field modulus here
+         vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
+      else
+         vB = 0.0_dp
+      endif
+      vwing = line%qwing * (vth + vB)
+
+      vcore = 2.5 * vth!wing_to_core * vwing
+
+      line_u_grid_loc = 0.0_dp
+
+  
+      line_u_grid_loc(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
+
+      line_u_grid_loc(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
+    
+      Nmid = Nlambda/2 + 1
+    
+      line_u_grid_loc(1:Nmid) = line_u_grid_loc(1:Nmid)
+      line_u_grid_loc(Nmid+1:Nlambda) = -line_u_grid_loc(Nmid-1:1:-1)
+
+      line_u_grid_loc(:) = line_u_grid_loc(:) / vth
+
+      N = nlambda     
+ 
+      return
+   end function line_u_grid_loc
+
+   function line_lambda_grid(line,Nlambda)
+      !integer, parameter :: Nlambda = (2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1)
+      integer, intent(in) :: nlambda
+      real(kind=dp), dimension(Nlambda) :: line_lambda_grid
+      type (atomicline), intent(inout) :: line
+      real(kind=dp) ::  vcore, vwing, v0, v1, vth, vB
+      integer :: la, Nmid
+
+      !not the exact width at a given cell, but the maximum extent!
+      vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
       vB = 0.0_dp
       ! if (line%polarizable) then
       !    !replace b_char by magnetic field modulus here
@@ -92,93 +137,90 @@ module wavelengths_gas
       !    vB = 0.0_dp
       ! endif
       vwing = line%qwing * (vth + vB)
+      vwing = c_light * (line%lambdamax - line%lambda0) / line%lambda0 !line%vmax
 
       vcore = 2.5 * vth!wing_to_core * vwing
   
       v0 = - vwing
       v1 = + vwing
-      line_u_grid = 0.0_dp
+      line_lambda_grid = 0.0_dp
 
   
-      line_u_grid(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
+      line_lambda_grid(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
 
-      line_u_grid(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
+      line_lambda_grid(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
     
       Nmid = Nlambda/2 + 1
     
-      line_u_grid(1:Nmid) = line_u_grid(1:Nmid)
-      line_u_grid(Nmid+1:Nlambda) = -line_u_grid(Nmid-1:1:-1)
+      line_lambda_grid(1:Nmid) = line_lambda_grid(1:Nmid)
+      line_lambda_grid(Nmid+1:Nlambda) = -line_lambda_grid(Nmid-1:1:-1)
 
-      line_u_grid(:) = line_u_grid(:) / vth
+      line_lambda_grid = (1.0 + line_lambda_grid/c_light) * line%lambda0
 
-      N = nlambda     
+      ! line%lambdamin = (1.0 + minval(line_lambda_grid)/c_light) * line%lambda0
+      ! line%lambdamax = (1.0 + maxval(line_lambda_grid)/c_light) * line%lambda0
  
       return
-   end function line_u_grid
+   end function line_lambda_grid
 
-   function group_grid()
-      real(kind=dp) :: group_grid
-      group_grid = 0
-      return
-   end function group_grid
+   function line_lambda_grid_dv(line,Nlambda)
+      !integer, parameter :: Nlambda = nint( (2*line%vmax)/hv + 1 )
+      integer, intent(in) :: nlambda
+      real(kind=dp), dimension(Nlambda) :: line_lambda_grid_dv
+      type (atomicline), intent(inout) :: line
+      real(kind=dp) ::  vwing, vth
+      integer :: la, Nmid
 
-   subroutine compute_line_bound(line)
-   ! ------------------------------------------------------------ !
-   ! Compute the line bounds : lamndamin and lambdamax
-   ! the total extent of line in the atom's frame (no velocity).
-   ! ------------------------------------------------------------ !
-      type (AtomicLine), intent(inout) :: line
-      real(kind=dp) :: vB, vmax, vth
-   
-      
-      if (line%polarizable) then
-         vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
-      else
-         vB = 0.0_dp
-      endif
-      vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
-      write(*,*) "vth line = ", vth*1d-3, line%atom%weight
-      vmax = line%qwing * (vth + vB)
-    
-    
-      line%lambdamin = line%lambda0*(1.0-vmax/C_LIGHT)
-      line%lambdamax = line%lambda0*(1.0+vmax/C_LIGHT)
-      line%vmax = real(vmax)
-      write(*,'("line "(1I2)"->"(1I2)"; vmax="(1F12.3)" km/s")') line%j, line%i, line%vmax*1d-3
-      write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
-    
-      return
-   end subroutine compute_line_bound
-
-   subroutine make_wavelength_group()
-      !Divide the frequency interval in groups where lines overlap.
-      !if no overlap there is Nline group + Ngroup_cont.
-      !For the continua, groups are added between lines
-      !and similarly the cont groups include the overlap of continua.
-      !
-      !
-      ! Store also the information on the transitions of each atom
-      ! belonging to each group.
-
+      !not the exact width at a given cell, but the maximum extent!
  
-      integer :: Ntrans, Ncont, Nlines, Nlambda_cont
-      integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved
+      vwing = c_light * (line%lambdamax - line%lambda0) / line%lambda0
+      vwing = line%vmax
+
+      line_lambda_grid_dv = 0.0_dp
+      line_lambda_grid_dv(1) = line%lambdamin
+      do la=2, nlambda
+
+         line_lambda_grid_dv(la) = line_lambda_grid_dv(la-1) * (1.0 + 1d3 * hv/c_light)
+
+      enddo
+ 
+      return
+   end function line_lambda_grid_dv
+
+   subroutine deallocate_wavelengths_nlte()
+
+      return
+   end subroutine deallocate_wavelengths_nlte
+
+   subroutine make_wavelength_nlte()
+
+      !Total frequency grid, concatenation of all
+      !individual grids.
+      ! used only for the non-LTE loop.
+ 
+      integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda
+      integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved, Nwaves, check_new_freq
       type (AtomType), pointer :: atom
       integer :: alloc_status, lac, la
-      real(kind=dp), dimension(:), allocatable :: tmp_grid, all_l0, all_l1
+      real(kind=dp), dimension(:), allocatable :: tmp_grid, tmp_grid2, all_l0, all_l1
       integer, parameter :: Ngroup_max = 1000
-      real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp
+      real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
       integer, dimension(:), allocatable :: sorted_indexes
-      real(kind=dp) :: max_cont
+      real(kind=dp) :: max_cont, l0, l1
+      real :: hv_loc !like hv
+      real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
  
       Ntrans = 0
       !Compute number of transitions in total, the number of wavelengths for the continua
-      ! and sets the line bounds.
+      ! and computes the optimal resolution for all lines including all atoms.
       Nlines = 0
       Nlambda_cont = 0
       Ncont = 0
+      hv = 1d30
       do n=1, N_atoms
          atom => atoms(n)%p
+         !km/s
+         hv = min(hv, 1d-3 * 0.46*vbroad(minval(T,mask=T>0),atom%weight,minval(vturb,mask=T>0)))
          do kr=1,atom%Ncont
             if (atom%continua(kr)%hydrogenic) then
                atom%continua(kr)%Nlambda = Nlambda_cont_log
@@ -189,7 +231,13 @@ module wavelengths_gas
             Nlambda_cont = Nlambda_cont + atom%continua(kr)%Nlambda
          enddo
          do kr=1,atom%Nline
-            call compute_line_bound(atom%lines(kr))
+            if (associated(subgrid_line,line_lambda_grid)) then
+               atom%lines(kr)%Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+            ! elseif (associated(subgrid_line,line_lambda_grid_dv)) then
+            !    atom%lines(kr)%Nlambda = nint(2 * line%vmax / hv + 1)
+            ! else
+            !    call error("wrong association for subline_grid!")
+            endif
          enddo 
          Ntrans = Ntrans + atom%Ntr
       
@@ -197,27 +245,37 @@ module wavelengths_gas
          Ncont = Ncont + atom%Ncont
       enddo
       atom => null()
-
+      if (associated(subgrid_line,line_lambda_grid_dv)) then
+         if (art_hv > 0.0) then
+            write(*,'("R="(1F7.3)" km/s; optimal:"(1F7.3)" km/s")') art_hv, hv
+            hv = art_hv
+         else
+            write(*,'("R="(1F7.3)" km/s")') hv        
+         endif
+      else
+         hv = 0.0
+      endif
       ! ********************** Pure continuum RT ********************** !
+      !Even if continuum RT is removed, that part is important
       allocate(lambda_cont(Nlambda_cont), stat=alloc_status)
       if (alloc_status>0) then
-         write(*,*) "Allocation error cont_waves"
-         stop
+         call error("Allocation error cont_waves")
       endif
-      lac = 0
- 
-      
+
+      lac = 1
       do n=1, N_atoms
          atom => atoms(n)%p
          do kr=1,atom%Ncont
             if (atom%continua(kr)%hydrogenic) then
-               lambda_cont(lac:lac+atom%continua(kr)%Nlambda) = subgrid_cont(atom%continua(kr))
+               lambda_cont(lac:(lac-1)+atom%continua(kr)%Nlambda) = subgrid_cont(atom%continua(kr))
             else 
-               lambda_cont(lac:lac+atom%continua(kr)%Nlambda) = atom%continua(kr)%lambda_file
+               lambda_cont(lac:lac-1+atom%continua(kr)%Nlambda) = atom%continua(kr)%lambda_file(:)
             endif
             lac = lac + atom%continua(kr)%Nlambda
         enddo
+        atom => null()
       enddo
+      write(*,*) "lac end=", lac-1
  
       !sort continuum frequencies
       Nmore_cont_freq = 0.0
@@ -252,517 +310,390 @@ module wavelengths_gas
       Nlambda_cont = Nlambda_cont - Nremoved
       ! ********************** ***************** ********************** !
 
-      ! *********************** continuum and line groups *********************** !
-      !allocate table of lambdamax and lambdamin
-      allocate(all_l0(Ntrans), all_l1(Ntrans),stat=alloc_status)
-      if (alloc_status > 0) call error("problem when allocating all_l0/all_l1")
-      Nlam = 0
-      do n=1, N_atoms
-         atom => atoms(n)%p
-         do kr=1,atom%Ncont
-            Nlam = Nlam + 1
-            all_l0(Nlam) = atom%continua(kr)%lambdamin
-            all_l1(Nlam) = atom%continua(kr)%lambdamax
+      ! ********************** cont + line    RT ********************** !
+      if (.true.) then!Nlines > 0) then !lines are present in some atoms
+         allocate(all_l0(Nlines), all_l1(Nlines), stat=alloc_status)
+
+         Nlam = 0
+         do n=1, N_atoms
+            atom => atoms(n)%p
+ 
+            do kr=1,atom%Nline
+               Nlam = Nlam + 1
+               all_l0(Nlam) = atom%lines(kr)%lambdamin
+               all_l1(Nlam) = atom%lines(kr)%lambdamax
+            enddo
+ 
          enddo
-         do kr=1,atom%Nline
-            Nlam = Nlam + 1
-            all_l0(Nlam) = atom%lines(kr)%lambdamin
-            all_l1(Nlam) = atom%lines(kr)%lambdamax
+         atom => null()
+ 
+         allocate(sorted_indexes(Nlam),stat=alloc_status)
+         if (alloc_status > 0) then
+            call error("Allocation error sorted_indexes(Nlam)")
+         endif
+         sorted_indexes = index_bubble_sort(all_l0)
+         !I sort the lambdamin, and lambdamax array is ordered so that
+         !the index in all_l0 and in all_l1 correspond to the same pair of 
+         !lambda min/max
+         all_l0(:) = all_l0(sorted_indexes)
+         all_l1(:) = all_l1(sorted_indexes)
+         deallocate(sorted_indexes)
+
+         group_blue_tmp(:) = -1.0
+         group_red_tmp(:) = -1.0
+ 
+         N_groups = 1
+         group_blue_tmp(N_groups) = all_l0(1)
+         group_red_tmp(N_groups) = all_l1(1)
+         !Find group of lines, and store for each group the lambda_blue and lambda_red of each group
+         !if a line overlaps with the previous line, add it to the same group and check the next line.
+         !Stop counting lines in a group if the next line does not overlap with the previous line. In
+         !the latter case, create a new group and start again.
+         ! Note: the first and last lines of a group may not overlap.
+         Nline_per_group_tmp(:) = 0
+         Nline_per_group_tmp(N_groups) = 1
+         do Nlam = 2, Nlines
+ 
+            !Is the line overlapping the previous line ?
+ 
+            !Yes, add it to the same group
+            if (((all_l0(Nlam) >= group_blue_tmp(N_groups)).and.&
+               (all_l0(Nlam) <= group_red_tmp(N_groups))).or.&
+               ((all_l1(Nlam) >= group_blue_tmp(N_groups)).and.&
+               (all_l1(Nlam) <= group_red_tmp(N_groups)))) then
+ 
+               group_blue_tmp(N_groups) = min(all_l0(Nlam), group_blue_tmp(N_groups))
+               group_red_tmp(N_groups) = max(all_l1(Nlam), group_red_tmp(N_groups))
+ 
+               Nline_per_group_tmp(N_groups) = Nline_per_group_tmp(N_groups) + 1
+ 
+            !no, create a new group, starting with this line at first element
+            else
+               N_groups = N_groups + 1
+               if (N_groups > Ngroup_max) then
+                  call error(" Error, Ngroup > Ngroup_max")
+               endif
+               group_blue_tmp(N_groups) = all_l0(Nlam)
+               group_red_tmp(N_groups) = all_l1(Nlam)
+               Nline_per_group_tmp(N_groups) = 1
+           endif
+ 
+         enddo !end loop to create group
+         allocate(Nlambda_per_group(N_groups), group_red(N_groups), &
+         group_blue(N_groups), Nline_per_group(N_groups), stat=alloc_status)
+         if (alloc_status > 0) then
+           call error("Allocation error groups")
+         endif
+         group_blue(:) = group_blue_tmp(1:N_groups)
+         group_red(:) = group_red_tmp(1:N_groups)
+         Nline_per_group(:) = Nline_per_group_tmp(1:N_groups)
+
+         !some statistics
+         write(*,*) " Found ", N_groups, " groups of lines for ", Nlines, " lines in total."
+         write(*,*) "   -> ", sum(Nline_per_group) - N_groups, " overlapping regions"! for", sum(Nline_per_group), " lines"
+         do Nlam=1, N_groups
+            write(*,*) " group ", Nlam, " lamin = ", group_blue(Nlam), ' lamax = ', group_red(Nlam)
          enddo
-      enddo
-      sorted_indexes = index_bubble_sort(all_l0)
-      all_l0(:) = all_l0(sorted_indexes)
-      all_l1(:) = all_l1(sorted_indexes)
 
-
-   !    N_groups = 1
-   !    group_blue_tmp = 0.0; group_red_tmp = 0.0
-   !    group_blue_tmp(Ngroup) = all_l0(1)
-   !    group_red_tmp(Ngroup) = all_l1(1)
-   !    !Find group of transitions, and store for each group the lambda_blue and lambda_red of each group
-   !    !if a line overlaps with the previous line, add it to the same group and check the next line.
-   !     !Stop counting lines in a group if the next line does not overlap with the previous line. In
-   !     !the latter case, create a new group and start again.
-   !   ! Note: the first and last lines of a group may not overlap.
-   !     Nline_per_group(:) = 0
-   !     Nline_per_group(1) = 1
-   !     do Nlam = 2, size(all_lamin)
+         allocate(tmp_grid(1000000),stat=alloc_status)
+         if (alloc_status > 0) call error("Allocation error tmp_grid (line)!")
+         tmp_grid = -1.0
  
-   !         !Is the line overlapping the previous line ?
+         !groups are not really used here
+         lac = 1
+         do n=1, N_atoms
+            atom => atoms(n)%p
  
-   !         !Yes, add it to the same group
-   !         if (((all_lamin(Nlam) >= group_blue(Ngroup)).and.&
-   !          (all_lamin(Nlam) <= group_red(Ngroup))).or.&
-   !          ((all_lamax(Nlam) >= group_blue(Ngroup)).and.&
-   !          (all_lamax(Nlam) <= group_red(Ngroup)))) then
+            do kr=1,atom%Nline
+
+               if (hv>0.0) then
+                  atom%lines(kr)%Nlambda = nint(2 * 1d-3 * atom%lines(kr)%vmax / hv + 1)
+                  write(*,*) "Nlambda line hv>0:", nint(2 * 1d-3 * atom%lines(kr)%vmax / hv + 1)
+               else
+                  write(*,*) "Nlambda line:", atom%lines(kr)%Nlambda
+               endif
+               tmp_grid(lac:atom%lines(kr)%Nlambda+lac-1) = subgrid_line(atom%lines(kr),atom%lines(kr)%Nlambda)
+               lac = lac + atom%lines(kr)%Nlambda
+
+            enddo
+
+         enddo
+         atom => null()
+         tmp_grid = pack(tmp_grid,tmp_grid > 0)
+         Nlambda = size(tmp_grid)
+         allocate(sorted_indexes(Nlambda),stat=alloc_status)
+         if (alloc_status > 0) call error ("Allocation error sorted_indexes (line)")
+         sorted_indexes = index_bubble_sort(tmp_Grid)
+         tmp_grid(:) = tmp_grid(sorted_indexes)
+         deallocate(sorted_indexes)
+         !count the number of wavelengths per groups ? 
+         !remove duplicates or points below resolution.
+         allocate(tmp_grid2(Nlambda), stat=alloc_status)
+         if (alloc_status > 0) call error ("Allocation error tmp_grid2")
+         tmp_grid2(2:Nlambda) = 0.0
+         tmp_grid2(1) = tmp_grid(1)
+         Nremoved = 0
+
+         !here we will remove points that are also below hv so as to preserve the grid resolutin.
+         !however we keep points with hv_loc above hv as it means we are comparing lambda of different
+         !line groups.
+         !TO DO: check that when hv_loc >> hv it is indeed  because we change group.
+         if (hv>0.0) then
+            do la = 2, Nlambda
+               hv_loc = ceiling ( real (1d-3 * c_light * (tmp_grid(la)-tmp_grid(la-1)) / tmp_grid(la) ) )
+               if (abs(hv_loc - hv) >= prec_vel) then !hv or more.
+                  tmp_grid2(la) = tmp_grid(la)
+               else!below grid resolution, remove.
+                  Nremoved = Nremoved + 1
+               endif
+            enddo
+         else
+            do la = 2, Nlambda
+               if (tmp_grid(la) > tmp_grid(la-1)) then
+                  tmp_grid2(la) = tmp_grid(la)
+               else
+                  Nremoved = Nremoved + 1
+               endif
+            enddo
+         endif
+         if (Nremoved > 0) then
+            write(*,*) " ->", Nremoved, " duplicate frequencies in lines"
+            deallocate(tmp_grid)
+            ! allocate(tmp_grid(Nlambda-Nremoved), stat=alloc_status)
+            tmp_grid(:) = Pack(tmp_grid2, tmp_grid2 > 0)
+         endif
+         deallocate(tmp_grid2)
+         Nlambda = size(tmp_grid)!Nlambda - Nremoved
+         do n=1,N_groups
+            write(*,*) n, size(pack(tmp_grid,&
+            (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
+            Nlambda_per_group(n) = size(pack(tmp_grid,&
+               (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
+         enddo
+         write(*,*) " ** BUG HERE ?? ** "
+         write(*,*) "There are in total ", Nlambda, " wavelength points for the lines grid.", sum(Nlambda_per_group)
+         write(*,*) "** ?? ** "
+
+         ! !-> This is only useful for the pure-continuum RT !!!!
+         ! !and should disappear at some point.
+         ! !-> Add continuum points beyond last "bound-free" continuum
+         ! !In case they are lines beyond the last continuum I add at least3 points per line for the continuum in this region
+         ! !->cont end		this is heavy for nothing but should work !
+         ! !finalise continuum here by reckoning how much freq we need
+         ! !make the new points go farther than line_waves for interpolation.
+         ! Nmore_cont_freq = 0
+         ! do n=1, N_groups
+         !    l0 = group_blue(n)
+         !    l1 = group_red(n)
+         !    if (l0 > max_cont) then
+         !       Nmore_cont_freq = Nmore_cont_freq + 1
+         !    endif
+         !    if (l1 > max_cont) then
+         !       Nmore_cont_freq = Nmore_cont_freq + 1
+         !    endif
+         !    if (0.5*(l0+l1) > max_cont) then
+         !       Nmore_cont_freq = Nmore_cont_freq + 1
+         !    endif
  
-   !            group_blue(Ngroup) = min(all_lamin(Nlam), group_blue(Ngroup))
-   !            group_red(Ngroup) = max(all_lamax(Nlam), group_red(Ngroup))
+         ! enddo
  
-   !            Nline_per_group(Ngroup) = Nline_per_group(Ngroup) + 1
+         ! check_new_freq = Nmore_cont_freq
+         ! if (Nmore_cont_freq > 0) then
+         !    write(*,*) "Adding new wavelength points for lines beyond continuum max!"
+         !    write(*,*) "  -> Adding ", Nmore_cont_freq," points"
+         !    write(*,*) "max cont, max line", max_cont, maxval(tmp_grid)
+         !    allocate(tmp_grid2(Nlambda_cont))
+         !    tmp_grid2 = lambda_cont
+         !    deallocate(lambda_cont)
+         !    allocate(lambda_cont(Nlambda_cont + Nmore_cont_freq))
+         !    lambda_cont(1:Nlambda_cont) = tmp_grid2(:)
+         !    deallocate(tmp_grid2)
+         !    allocate(tmp_grid2(Nmore_cont_freq))
+         !    tmp_grid2(:) = 0.0_dp
  
-   !            !no, create a new group, starting with this line at first element
-   !         else
-   !            Ngroup = Ngroup + 1
-   !            if (Ngroup > Ngroup_max) then
-   !               write(*,*) " Error, Ngroup > Ngroup_max", Ngroup_max
-   !               stop
-   !            endif
-   !            group_blue(Ngroup) = all_lamin(Nlam)
-   !            group_red(Ngroup) = all_lamax(Nlam)
-   !            Nline_per_group(Ngroup) = 1
-   !         endif
+         !    Nmore_cont_freq = 0
+         !    do n=1, N_groups
+         !       l0 = group_blue(n)
+         !       l1 = group_red(n)
+         !       if (l0 > max_cont) then
+         !          Nmore_cont_freq = Nmore_cont_freq + 1
+         !          tmp_grid2(Nmore_cont_freq) = l0
+         !       endif
+         !       if (0.5*(l0+l1) > max_cont) then
+         !          Nmore_cont_freq = Nmore_cont_freq + 1
+         !          tmp_grid2(Nmore_cont_freq) = 0.5 * (l0+l1)
+         !       endif
+         !       if (l1 > max_cont) then
+         !          Nmore_cont_freq = Nmore_cont_freq + 1
+         !          tmp_grid2(Nmore_cont_freq) = l1
+         !       endif
+         !    enddo
+         !    if (Nmore_cont_freq /= check_new_freq) then
+         !       call Warning("There are probably some frequency missing!")
+         !       write(*,*) "Nmore_freq: ",check_new_freq," Nfreq_added: ", Nmore_cont_freq
+         !    endif
  
-   !     enddo
+         !    allocate(sorted_indexes(Nmore_cont_freq))
+         !    sorted_indexes(:) = index_bubble_sort(tmp_grid2)
+         !    tmp_grid2(:) = tmp_grid2(sorted_indexes)
+         !    lambda_cont(Nlambda_cont+1:Nlambda_cont + Nmore_cont_freq) = tmp_grid2(:)
+         !    Nlambda_cont = Nlambda_cont + Nmore_cont_freq
+         !    deallocate(tmp_grid2, sorted_indexes)
+         ! endif
+ 
+         ! if (size(lambda_cont) /= Nlambda_cont) then
+         !     write(*,*) " Something went wrong with Nlambda cont"
+         !     stop
+         ! endif
 
-      !now the group by taking into account overlap between continua
+         !initiate with lines
+         allocate(tmp_grid2(nlambda+Nlambda_cont), stat=alloc_status)
+         if (alloc_status > 0) call error ("Allocation error tmp2_grid (final)")
+         tmp_grid2(:) = -99
+         tmp_grid2(1:Nlambda) = tmp_grid(:)
+ 
+         Nwaves = Nlambda
+         !add continuum wavlengths only outside line groups
+         !First values below or beyond first and last groups
+         la = 0
+         do lac=Nlambda+1, Nlambda+Nlambda_cont
+            if ((lambda_cont(lac-Nlambda) < group_blue(1)) .or. (lambda_cont(lac-Nlambda) > group_red(N_groups))) then
+                   tmp_grid2(lac) = lambda_cont(lac-Nlambda)
+                   Nwaves = Nwaves + 1
+                   if (lambda_cont(lac-Nlambda) < group_blue(1)) la = lac
+             endif
+         enddo
+ 
+         !now values between groups
+         do lac=la+1, Nlambda_cont+Nlambda
+            group_loop : do n=2, N_groups
+               if ((lambda_cont(lac-Nlambda) > group_red(n-1)).and.(lambda_cont(lac-Nlambda) < group_blue(n))) then
+                  Nwaves = Nwaves + 1
+                  tmp_grid2(lac) = lambda_cont(lac-nlambda)
+                 !else
+                 ! be smart and cycle to accelerate
+               endif
+            enddo group_loop
+         enddo
+         write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid2, tmp_grid2 > 0))
+         deallocate(tmp_grid)
+         !
+         ! If I remove continuum RT !
+         !
+         deallocate(lambda_cont)
+ 
+         !continuum frequencies are sorted and so are the line frequencies
+         !but they are added at the end, so sorted is needed, but I can improve the previous
+         !loop to fill the tmp_frid in the ascending order of wavelengths
+         allocate(lambda(Nwaves),stat=alloc_status)
+         tmp_grid2 = tmp_grid2(index_bubble_sort(tmp_grid2))
+         lambda(:) = -99.0 !check
+         lambda = pack(tmp_grid2, mask=tmp_grid2 > 0)
+ 
+         do lac=2, Nwaves
+            if (lambda(lac) <= lambda(lac-1)) then
+               write(*,*) lac, "lambda = ", lambda(lac), lambda(lac-1), minval(lambda)
+               call error("Sorted problem")
+            endif
+         enddo
+         deallocate(tmp_grid2)
+ 
+      else !pure cont
+         Nwaves = Nlambda_cont
+         allocate(lambda(Nwaves),stat=alloc_status)
+         if (alloc_status>0) call error("allocation error lambda, in pure cont!")
+         lambda = lambda_cont
+         deallocate(lambda_cont)
+         Nlambda = 0
+      endif !there is lines
 
-      ! ************************** ******************** *********************** !
-
-      ! *********************** continuum groups *********************** !
-
-      ! *********************** **************** *********************** !
-
-      ! ************************** line groups ************************* !
-
+ 
+      write(*,*) Nwaves, " unique wavelengths" !they are no eliminated lines
+      write(*,*) Nlambda, " line wavelengths"
+      write(*,*) Nlambda_cont, " continuum wavelengths"
+      ! if (Nlines>1) then
+      !    write(*,*) "Mean number of lines per group:", real(sum(Nline_per_group))/real(Ngroup)
+      !    write(*,*) "Mean number of wavelengths per group:", real(Nspec_line)/real(Ngroup)
+      !    write(*,*) "Mean number of wavelengths per line:", real(Nspec_line)/real(Ntrans-Ncont)
+      !    write(*,*) "Resolution of line's groups (km/s):", hv
+      ! endif 
       ! ************************** ************ ************************* !
 
+      write(*,'("Wavelength grid: "(1F12.4)" mum to",(1F12.4)" mum")') m_to_km*minval(lambda),m_to_km*maxval(lambda)
+
+      !Now indexes of each transition on the lambda grid
+      Nlambda_max_line = 0
+      Nlambda_max_cont = 0
+      Nlambda_max_trans = 0
+      do n=1,N_atoms
+         atom => Atoms(n)%p
+         do kr=1,atom%Ncont !only on the cont grid !
  
-      !-> lines + cont
-!       lthere_is_lines = (Nlam > 0)
-!       if (lthere_is_lines) then
-!         allocate(all_lamin(Nlam), all_lamax(Nlam), all_lam0(Nlam), stat=alloc_status)
-!         if (alloc_status > 0) then
-!            write(*,*) "Allocation error all_lam*"
-!            stop
-!         endif
+            atom%continua(kr)%Nb = locate(lambda, atom%continua(kr)%lambdamin)
+            atom%continua(kr)%Nr = locate(lambda, atom%continua(kr)%lambdamax)
+            atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
+            l0 = lambda(locate(lambda, atom%continua(kr)%lambda0))
+            ! atom%continua(kr)%Nblue = locate(cont_grid, atom%continua(kr)%lambdamin)
+            ! atom%continua(kr)%Nred = locate(cont_grid, atom%continua(kr)%lambdamax)
+            ! atom%continua(kr)%Nmid = locate(cont_grid, 0.5*(atom%continua(kr)%lambdamin+atom%continua(kr)%lambdamax))
+            ! atom%continua(kr)%N0 = locate(cont_grid, atom%continua(kr)%lambda0)
+            ! atom%continua(kr)%Nlambda = atom%continua(kr)%Nred - atom%continua(kr)%Nblue + 1
  
-!         !Store the maximum and minimum extent of each line including max velocity field
-!         !lines can be red/blue-shifted at a max/min wavelength of red/blue *(1+/- delta_v/clight)
-!         Nlam = 0
-!         do n=1, Natom
-!            atom => atoms(n)%ptr_atom
+           !in any problem of grid resolution etc or locate approximation.
+           !We take Nred-1 to be sure than the lambda_cont(Nred) <= lambda0.
+           !Only if not dissolution.
+           !We just need to avoind having cont_lambda(Nred)>lambda0, since the cross section is in (lambda/lambda0)**3
+            if (l0 /= atom%continua(kr)%lambda0) then
+               if (.not.ldissolve) then
+                  if (lambda(atom%continua(kr)%Nr) > atom%continua(kr)%lambda0) then
+                     call Warning("continuum Nred larger than lambda0 !")
+                     write(*,*) atom%continua(kr)%lambda0
+                     if (lambda(atom%continua(kr)%Nr-1) <= atom%continua(kr)%lambda0) then
+                        write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0
+                        !To do while until <= lambda0
+                        atom%continua(kr)%Nr = atom%continua(kr)%Nr-1
+                        atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
+                        write(*,*) "new val at Nred:", lambda(atom%continua(kr)%Nr)
+                    endif
+                  endif
+               endif
+            endif
+            Nlambda_max_cont = max(Nlambda_max_cont,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1)
  
-!            do kr=1,atom%Nline
-!               Nlam = Nlam + 1
-!               all_lamin(Nlam) = atom%lines(kr)%lambdamin * (1.0 - delta_v / clight)
-!               all_lamax(Nlam) = atom%lines(kr)%lambdamax * ( 1.0 + 2*delta_v / clight)
-!               all_lam0(Nlam) = atom%lines(kr)%lambda0
-!            enddo
+         enddo
  
-!         enddo
+         do kr=1,atom%Nline
+            atom%lines(kr)%Nb = locate(lambda, atom%lines(kr)%lambdamin)
+            atom%lines(kr)%Nr = locate(lambda, atom%lines(kr)%lambdamax)
+            atom%lines(kr)%Nlambda = atom%lines(kr)%Nr - atom%lines(kr)%Nb + 1
+            ! write(*,*) "line", kr, " lam0=",atom%lines(kr)%lambda0, atom%lines(kr)%lambdamin, atom%lines(kr)%lambdamax
+            ! write(*,*) " -> bounds on the grid:", lambda(atom%lines(kr)%Nb), lambda(atom%lines(kr)%Nr)
+            Nlambda_max_line = max(Nlambda_max_line, atom%lines(kr)%Nlambda)
+         enddo
  
-!         allocate(sorted_indexes(Nlam),stat=alloc_status)
-!         if (alloc_status > 0) then
-!            write(*,*) "Allocation error sorted_indexes(Nlam)"
-!            stop
-!         endif
-!        !sort lines so that all_lamin(1) is always the first line
-!        sorted_indexes = index_bubble_sort(all_lamin)
-!        all_lamin(:) = all_lamin(sorted_indexes)
-!        !->not necessarily ordered by min to max, but follows the order of lamin
-!        !so that lmax(1) is associated to lamin(1)  which is important.
-!        !If lines overlap, the lmax(1) could be associated to lmin(2) for instance.
-!        all_lamax(:) = all_lamax(sorted_indexes)
-!        deallocate(sorted_indexes)
+         atom => NULL()
+      enddo
+      write(*,*) "Number of max freq points for all lines resolution :", Nlambda_max_line
+      write(*,*) "Number of max freq points for all cont resolution :", Nlambda_max_cont
+      Nlambda_max_trans = max(Nlambda_max_line,Nlambda_max_cont)
+      write(*,*) "Number of max freq points for all trans :", Nlambda_max_trans
+
+      return
+   end subroutine make_wavelength_nlte
+
+!    subroutine make_wavelength_group()
+      ! Divide the frequency interval in groups where lines overlap.
+      ! if no overlap there is Nline group + Ngroup_cont.
+      ! For the continua, groups are added between lines
+      ! and similarly the cont groups include the overlap of continua.
+      
+      
+      ! Store also the information on the transitions of each atom
+      ! belonging to each group.
+      ! Start with the same structure as
  
-!        group_blue(:) = -1.0
-!        group_red(:) = -1.0
-!        group_mid(:) = -1.0
- 
-!        Ngroup = 1
-!        group_blue(Ngroup) = all_lamin(1)
-!        group_red(Ngroup) = all_lamax(1)
-!        !Find group of lines, and store for each group the lambda_blue and lambda_red of each group
-!        !if a line overlaps with the previous line, add it to the same group and check the next line.
-!        !Stop counting lines in a group if the next line does not overlap with the previous line. In
-!        !the latter case, create a new group and start again.
-!      ! Note: the first and last lines of a group may not overlap.
-!        Nline_per_group(:) = 0
-!        Nline_per_group(1) = 1
-!        do Nlam = 2, size(all_lamin)
- 
-!            !Is the line overlapping the previous line ?
- 
-!            !Yes, add it to the same group
-!            if (((all_lamin(Nlam) >= group_blue(Ngroup)).and.&
-!             (all_lamin(Nlam) <= group_red(Ngroup))).or.&
-!             ((all_lamax(Nlam) >= group_blue(Ngroup)).and.&
-!             (all_lamax(Nlam) <= group_red(Ngroup)))) then
- 
-!               group_blue(Ngroup) = min(all_lamin(Nlam), group_blue(Ngroup))
-!               group_red(Ngroup) = max(all_lamax(Nlam), group_red(Ngroup))
- 
-!               Nline_per_group(Ngroup) = Nline_per_group(Ngroup) + 1
- 
-!               !no, create a new group, starting with this line at first element
-!            else
-!               Ngroup = Ngroup + 1
-!               if (Ngroup > MAX_GROUP_OF_LINES) then
-!                  write(*,*) " Error, Ngroup > MAX_GROUP_OF_LINES", Ngroup
-!                  stop
-!               endif
-!               group_blue(Ngroup) = all_lamin(Nlam)
-!               group_red(Ngroup) = all_lamax(Nlam)
-!               Nline_per_group(Ngroup) = 1
-!            endif
- 
-!        enddo
- 
-!        write(*,*) " Found ", Ngroup, " groups of lines"
-!  !       do Nlam=1, Ngroup
-!  !       	write(*,*) " group ", Nlam, " lamin = ", group_blue(Nlam), ' lamax = ', group_red(Nlam), &
-!  !       		" lamid = ", 0.5 * (group_blue(Nlam)+group_red(Nlam))
-!  !       enddo
-!  !       write(*,*) " -> ", sum(Nline_per_group), " lines"
-!  !       write(*,*) " Found ", sum(Nline_per_group) - Ngroup, " overlapping regions for", sum(Nline_per_group), " lines"
-!  !       write(*,*) " --> ", Ngroup, " groups of lines"
-!        allocate(Nlambda_per_group(Ngroup), stat=alloc_status)
-!        if (alloc_status > 0) then
-!            write(*,*) "Allocation error Nlambda_per_group"
-!            stop
-!        endif
- 
-!        !sample each group with constant resol in km/s from group_blue(n) to group_red(n)
-!        allocate(line_waves(1000000),stat=alloc_status)
-!        if (alloc_status > 0) call error("Allocation error line_waves!")
-!        line_waves = -1.0
- 
-!        !add all edges of each line ? + ref wavelength. Break the regularity of the grid ?
-!        lac = 1
-!  !       if (wl_ref > 0.0) then
-!  !       	lac = 2
-!  !       	line_waves(1) = wl_ref
-!  !       else
-!  !       	lac = 1
-!  !       endif
-!  !       do n=1, Natom
-!  !       	atom => atoms(n)%ptr_atom
-!  !
-!  !       	do kr=1,atom%Nline
-!  !         	line_waves(lac) = atom%lines(kr)%lambda0
-!  !         	lac = lac + 1
-!  !         	line_waves(lac) = atom%lines(kr)%lambdamin
-!  !         	lac = lac + 1
-!  !         	line_waves(lac) = atom%lines(kr)%lambdamax
-!  !         	lac = lac + 1
-!  !       	enddo
-!  !
-!  !       enddo
- 
-!        shift = lac!1
-!        do n=1, Ngroup
- 
-!           line_waves(shift) = group_blue(n)
-!  !       	write(*,*) "n=", n, " shift = ", shift
-!           lac = 2
-!           Nlambda_per_group(n) = 1
-!           inf : do
-!              la = lac + shift - 1
-!              line_waves(la) = line_waves(la-1) * (1.0 + 1d3 * hv / clight)
-!              Nlambda_per_group(n) = Nlambda_per_group(n) + 1
-!              if (line_waves(la) >= group_red(n)) exit inf
-!              if (la >= size(line_waves)) call error('la larger than size line_waves!')
-!              lac = lac + 1
-!  !       		write(*,*) lac, la, line_waves(la)
-!           enddo inf
-!           !change group_red!!
- 
-!  !       	write(*,*) 'gr change from to ', group_red(n), line_waves(la), la
-!           group_red(n) = line_waves(la)!make the continuum below lines the same
- 
-!           shift = shift + Nlambda_per_group(n)
-!  !       	write(*,*) ' Nlambda = ', Nlambda_per_group(n)
- 
-!        enddo
-!  !       write(*,*) Nlambda_per_group
-!        Nspec_line = sum(Nlambda_per_group)
-!        line_waves = pack(line_waves,mask=line_waves > 0)
-!        !write(*,*) " Nspec_line = ", Nspec_line, " check=", size(line_waves)
- 
-!        deallocate(all_lamin, all_lamax, all_lam0)
- 
- 
-!        !-> Add continuum points beyond last continuum
-!        !In case they are lines beyond the last continuum I add at least3 points per line for the continuum in this region
-!        !->cont end		this is heavy for nothing but should work !
-!        !finalise continuum here by reckoning how much freq we need
-!        !make the new points go farther than line_waves for interpolation.
-!        Nmore_cont_freq = 0
-!        do n=1, Ngroup
-!            l0 = group_blue(n)
-!            l1 = group_red(n)
-!            if (l0 > max_cont) then
-!                  Nmore_cont_freq = Nmore_cont_freq + 1
-!  !              	write(*,*) "adding more continuum (1)"
-!  !              	write(*,*) l0, max_cont
-!            endif
-!            if (l1 > max_cont) then
-!                  Nmore_cont_freq = Nmore_cont_freq + 1
-!  !              	write(*,*) "adding more continuum (2)"
-!  !              	write(*,*) l1, max_cont
-!            endif
-!            if (0.5*(l0+l1) > max_cont) then
-!                  Nmore_cont_freq = Nmore_cont_freq + 1
-!  !              	write(*,*) "adding more continuum (3)"
-!  !              	write(*,*) 0.5*(l0+l1), max_cont
-!            endif
- 
-!        enddo
- 
-!        check_new_freq = Nmore_cont_freq
-!        if (Nmore_cont_freq > 0) then
-!            write(*,*) "Adding new wavelength points for lines beyond continuum max!"
-!            write(*,*) "  -> Adding ", Nmore_cont_freq," points"
-!            allocate(tmp_grid(Nlambda_cont))
-!            tmp_grid = cont_waves
-!            deallocate(cont_waves)
-!            allocate(cont_waves(Nlambda_cont + Nmore_cont_freq))
-!            cont_waves(1:Nlambda_cont) = tmp_grid(:)
-!            deallocate(tmp_grid)
-!            allocate(tmp_grid(Nmore_cont_freq))
-!            tmp_grid(:) = 0.0_dp
- 
- 
-!            Nmore_cont_freq = 0
-!            do n=1, Ngroup
-!  !              	write(*,*) "n=",n
-!                  l0 = group_blue(n)
-!                  l1 = group_red(n)
-!                  if (l0 > max_cont) then
-!                     Nmore_cont_freq = Nmore_cont_freq + 1
-!                     tmp_grid(Nmore_cont_freq) = l0
-!  !              		write(*,*) "(1)", Nmore_cont_freq , "l0=",l0
-!                  endif
-!                  if (0.5*(l0+l1) > max_cont) then
-!                     Nmore_cont_freq = Nmore_cont_freq + 1
-!                     tmp_grid(Nmore_cont_freq) = 0.5 * (l0+l1)
-!  !              		write(*,*) "(2)", Nmore_cont_freq , "lmid=", 0.5*(l0+l1)
-!                  endif
-!                  if (l1 > max_cont) then
-!                     Nmore_cont_freq = Nmore_cont_freq + 1
-!                     tmp_grid(Nmore_cont_freq) = l1
-!  !              		write(*,*) "(3)", Nmore_cont_freq , "l1=",l1
-!                  endif
- 
-!            enddo
-!            if (Nmore_cont_freq /= check_new_freq) then
-!                  call Warning("There are probably some frequency missing!")
-!                  write(*,*) "Nmore_freq: ",check_new_freq," Nfreq_added: ", Nmore_cont_freq
-!            endif
- 
-!            allocate(sorted_indexes(Nmore_cont_freq))
-!            sorted_indexes(:) = index_bubble_sort(tmp_grid)
-!            tmp_grid(:) = tmp_grid(sorted_indexes)
-!            cont_waves(Nlambda_cont+1:Nlambda_cont + Nmore_cont_freq) = tmp_grid(:)
-!            Nlambda_cont = Nlambda_cont + Nmore_cont_freq
-!            deallocate(tmp_grid, sorted_indexes)
-!            allocate(cont_grid(Nlambda_cont),stat=alloc_status)
-!            if (alloc_status > 0) call error("Allocation error cont_grid")
-!            cont_grid(:) = cont_waves(:)
-!        else
-!             allocate(cont_grid(Nlambda_cont),stat=alloc_status)
-!             if (alloc_status > 0) call error("Allocation error cont_grid")
-!             cont_grid(:) = cont_waves(:)
-!        endif
-!  !->cont end
- 
-!        !write(*,*) "bounds:"
-!        !write(*,*) "  -> max lam:", maxval(line_waves), " max_cont:", maxval(cont_grid)
-!            ! " max reddest line:", maxval(group_red,mask=group_red>-1),
- 
-!        !add lines + continua frequencies
-!        Nspec_cont = size(cont_waves)
-!        if (Nspec_cont /= Nlambda_cont) then
-!              write(*,*) " Something went wrong with Nlambda cont"
-!              stop
-!        endif
- 
-!        !initiate with lines
-!        allocate(tmp_grid(Nspec_line+Nspec_cont), stat=alloc_status)
-!        if (alloc_status > 0) call error ("Allocation error tmp_grid")
-!        tmp_grid(:) = -99
-!        do la=1,Nspec_line
-!              tmp_grid(la) = line_waves(la)
-!        enddo
- 
-!        Nwaves = Nspec_line
-!        !add continuum wavlengths (including reference wavelength), only outside line groups
-!        !First values below or beyond first and last groups
-!        la = 0
-!        do lac=Nspec_line+1, Nspec_cont+Nspec_line
-!              if ((cont_waves(lac-Nspec_line) < group_blue(1)) .or. (cont_waves(lac-Nspec_line) > group_red(Ngroup))) then
-!                    tmp_grid(lac) = cont_waves(lac-Nspec_line)
-!                    Nwaves = Nwaves + 1
-!                    if (cont_waves(lac-Nspec_line) < group_blue(1)) la = lac
-!              endif
-!        enddo
- 
-!        !now values between groups
-!        do lac=la+1, Nspec_cont+Nspec_line
-!              group_loop : do n=2, Ngroup
-!                    if ((cont_waves(lac-Nspec_line) > group_red(n-1)).and.(cont_waves(lac-Nspec_line) < group_blue(n))) then
-!                          Nwaves = Nwaves + 1
-!                          tmp_grid(lac) = cont_waves(lac-Nspec_line)
-!                  !else
-!                  ! be smart and cycle to accelerate
-!                    endif
-!              enddo group_loop
-!        enddo
-!        !write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid, tmp_grid > 0))
-!        deallocate(Nlambda_per_group, line_waves)
-!        deallocate(cont_waves)
- 
-!        !continuum frequencies are sorted and so are the line frequencies
-!        !but they are added at the end, so sorted is needed, but I can improve the previous
-!        !loop to fill the tmp_frid in the ascending order of wavelengths
-!        allocate(outgrid(Nwaves),stat=alloc_status)
-!        tmp_grid = tmp_grid(index_bubble_sort(tmp_grid))
-!        outgrid(:) = -99.0 !check
-!        outgrid = pack(tmp_grid, mask=tmp_grid > 0)
- 
-!        do lac=2, Nwaves
-!              if (outgrid(lac) <= outgrid(lac-1)) then
-!                    write(*,*) lac, "lambda = ", outgrid(lac), outgrid(lac-1), minval(outgrid)
-!                    call error("Sorted problem")
-!              endif
-!        enddo
- 
-!        deallocate(tmp_grid)
- 
-!      else !pure cont
-!        Nspec_cont = size(cont_waves)
-!        if (Nspec_cont /= Nlambda_cont) then
-!              write(*,*) " Something went wrong with Nlambda cont"
-!              stop
-!        endif
-!        allocate(cont_grid(Nlambda_cont),stat=alloc_status)
-!        Nwaves = Nlambda_cont
-!        if (alloc_status > 0) call error("Allocation error cont_grid")
-!        cont_grid(:) = cont_waves(:)
-!        write(*,*) "  -> pure cont max_cont:", maxval(cont_grid)
-!        Nspec_line = 0
-!        allocate(outgrid(Nwaves))
-!        outgrid(:) = cont_grid(:)
-!        deallocate(cont_waves)
-!      endif !there is lines
- 
- 
-!      write(*,*) Nwaves, " unique wavelengths" !they are no eliminated lines
-!      write(*,*) Nspec_line, " line wavelengths"
-!      write(*,*) Nspec_cont, " continuum wavelengths"
-!      if (lthere_is_lines) then
-!        write(*,*) "Mean number of lines per group:", real(sum(Nline_per_group))/real(Ngroup)
-!        write(*,*) "Mean number of wavelengths per group:", real(Nspec_line)/real(Ngroup)
-!        write(*,*) "Mean number of wavelengths per line:", real(Nspec_line)/real(Ntrans-Ncont)
-!        write(*,*) "Resolution of line's groups (km/s):", hv
-!      endif
-!      write(*,*) "Mean number of wavelengths per continuum:", real(Nwaves - Nspec_line) / real(Ncont)
- 
-!      lam_unit = "nm"
-!      l0 = minval(outgrid); l1 = maxval(outgrid)
-!      if (l1 > 1e6) then
-!        l1 = 10000000./l1
-!        lam_unit = "cm^-1"
-!      else if (l1 > 1e6) then
-!        l1 = l1 * 1e-9 * 1e3
-!        lam_unit = "mm"
-!      else if (l1 > 1e7) then
-!        l1 = l1 * 1e-9 * 1e2
-!        lam_unit = "cm"
-!      endif
-!      write(*,'("Wavelength grid: "(1F12.4)" nm to",(1F12.4)" "(1A15))') l0, l1, lam_unit
- 
-!      !allocate indexes on the grid
-!      Nlambda_max_line = 0
-!      Nlambda_max_cont = 0
-!      Nlambda_max_trans = 0
-!      do n=1,Natom
-!         atom => Atoms(n)%ptr_atom
-!         do kr=1,atom%Ncont !only on the cont grid !
- 
-!            atom%continua(kr)%Nb = locate(outgrid, atom%continua(kr)%lambdamin)
-!            atom%continua(kr)%Nr = locate(outgrid, atom%continua(kr)%lambdamax)
- 
-!            atom%continua(kr)%Nblue = locate(cont_grid, atom%continua(kr)%lambdamin)
-!            atom%continua(kr)%Nred = locate(cont_grid, atom%continua(kr)%lambdamax)
-!            atom%continua(kr)%Nmid = locate(cont_grid, 0.5*(atom%continua(kr)%lambdamin+atom%continua(kr)%lambdamax))
-!            atom%continua(kr)%N0 = locate(cont_grid, atom%continua(kr)%lambda0)
-!            atom%continua(kr)%Nlambda = atom%continua(kr)%Nred - atom%continua(kr)%Nblue + 1
- 
-!            !in any problem of grid resolution etc or locate approximation.
-!            !We take Nred-1 to be sure than the lambda_cont(Nred) <= lambda0.
-!            !Only if not dissolution.
-!            !We just need to avoind having cont_lambda(Nred)>lambda0, since the cross section is in (lambda/lambda0)**3
-!            if (cont_grid(atom%continua(kr)%N0) /= atom%continua(kr)%lambda0) then
-!            !!write(*,*) " Beware, cont%lambda0 might not be on the grid", kr, atom%continua(kr)%i, atom%continua(kr)%j
-!               if (.not.ldissolve) then
-!                  if (cont_grid(atom%continua(kr)%Nred) > atom%continua(kr)%lambda0) then
-!                     call Warning("continuum Nred larger than lambda0 !")
-!                     write(*,*) atom%continua(kr)%lambda0, cont_grid(atom%continua(kr)%Nred)
-!                     if (cont_grid(atom%continua(kr)%Nred-1) <= atom%continua(kr)%lambda0) then
-!                        write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0
-!                        !To do while until <= lambda0
-!                        atom%continua(kr)%Nred = atom%continua(kr)%Nred-1
-!                        atom%continua(kr)%N0 = atom%continua(kr)%Nred
-!                        atom%continua(kr)%Nlambda = atom%continua(kr)%Nred - atom%continua(kr)%Nblue + 1
-!                        atom%continua(kr)%Nr = locate(outgrid,cont_grid(atom%continua(kr)%Nred))
-!                        write(*,*) "new val at Nred:", outgrid(atom%continua(kr)%Nr), cont_grid(atom%continua(kr)%Nred)
-!                     endif
-!                  endif
-!               endif
-!            endif
-!            !sur la grille totale
-!            Nlambda_max_cont = max(Nlambda_max_cont,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1)
- 
-!         enddo
- 
-!        !The indexes on the grid do not include the maximum shift. So lambdamax/min += max shift < / > max/min lambda grid
-!         do kr=1,atom%Nline
-!            atom%lines(kr)%Nblue = locate(outgrid, atom%lines(kr)%lambdamin)
-!            atom%lines(kr)%Nred = locate(outgrid, atom%lines(kr)%lambdamax)
-!            atom%lines(kr)%Nmid = locate(outgrid, atom%lines(kr)%lambda0)
-!            atom%lines(kr)%Nlambda = atom%lines(kr)%Nred - atom%lines(kr)%Nblue + 1
-!            !write(*,*) "line", kr, " lam0=",atom%lines(kr)%lambda0, atom%lines(kr)%lambdamin, atom%lines(kr)%lambdamax
-!            !write(*,*) " -> bounds on the grid:", outgrid(atom%lines(kr)%Nblue), outgrid(atom%lines(kr)%Nred)
-!            !write(*,*) " -> max extent:", outgrid(atom%lines(kr)%Nblue)*(1.0 - delta_v/clight), outgrid(atom%lines(kr)%Nred)*(1.0 + delta_v/clight)
-!            if (atom%lines(kr)%Nblue-dshift < 1) then
-!               write(*,*) "Error for line ", kr, " of atom ", atom%ID
-!               write(*,*) " Nblue below 1"
-!               write(*,*) "Nb=",atom%lines(kr)%Nblue, " shift=",-dshift
-!               write(*,*) " -> sum :", atom%lines(kr)%Nred-nint(1e-3 * delta_v/hv)
-!               write(*,*) " lambdamin (CMF) = ", atom%lines(kr)%lambdamin
-!               write(*,*) " max(lambda) grid  = ", minval(outgrid)
-!               write(*,*) outgrid(atom%lines(kr)%Nblue)*(1.0 - delta_v/clight)
-!               stop
-!            else if(atom%lines(kr)%Nred+dshift > Nwaves) then
-!               write(*,*) "Error for line ", kr, " of atom ", atom%ID
-!               write(*,*) " Nred larger than Nwaves", Nwaves, size(outgrid)
-!               write(*,*) "Nr=",atom%lines(kr)%Nred, " shift=",dshift
-!               write(*,*) " -> sum :", atom%lines(kr)%Nred+nint(1e-3 * delta_v/hv)
-!               write(*,*) " lambdamax (CMF) = ", atom%lines(kr)%lambdamax
-!               write(*,*) " max(lambda) grid  = ", maxval(outgrid)
-!               write(*,*) outgrid(atom%lines(kr)%Nred)*(1.0 + delta_v/clight)
-!               write(*,*) "reducing shift"
-!               dshift = Nwaves - atom%lines(kr)%Nred
-!               write(*,*) dshift
-!  !              stop
-!            endif
-!            !does not take the shift into account
-!            Nlambda_max_line = max(Nlambda_max_line, atom%lines(kr)%Nlambda)
-!         enddo
- 
-!         atom => NULL()
-!      enddo
-!      write(*,*) "Number of max freq points for all lines at this resolution :", Nlambda_max_line
-!      write(*,*) "Number of max freq points for all cont at this resolution :", Nlambda_max_cont
-!      !takes the shift into account, maximum size needed for a frequency array for line opacity.
-!  !     Nlambda_max_trans = max(Nlambda_max_line+2*int( sign(1.0_dp, delta_v) * ( 1e-3 * abs(delta_v) / hv + 0.5 ) ),Nlambda_max_cont)
-!      Nlambda_max_trans = max(Nlambda_max_line+2*dshift,Nlambda_max_cont)
-!      write(*,*) "Number of max freq points for all trans at this resolution :", Nlambda_max_trans
-!  ! stop
-     return
-   end subroutine make_wavelength_group
+!      return
+!    end subroutine make_wavelength_group
 
  end module wavelengths_gas
  

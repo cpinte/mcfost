@@ -132,7 +132,6 @@ module gas_contopac
       return
    end subroutine dealloc_rayleigh_xsections
   
-  
    elemental function Gaunt_bf(u, n_eff)
       ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
       ! See also Menzel & Pekeris 1935
