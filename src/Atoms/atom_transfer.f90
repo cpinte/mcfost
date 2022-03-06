@@ -743,7 +743,7 @@ module atom_transfer
 
          n_rayons_max = 1
 
-         call init_Spectrum(n_rayons_max,lam0=lam0,vacuum_to_air=lvacuum_to_air)
+         call init_Spectrum(.false.,n_rayons_max,lam0=lam0,vacuum_to_air=lvacuum_to_air)
          if (n_etoiles > 0) call init_stellar_disk
          call alloc_atom_quantities
          call compute_background_continua
@@ -934,7 +934,7 @@ module atom_transfer
       !     !and electron scattering here ?
 
       !  else
-         call init_Spectrum(Nrayone,lam0=lam0,vacuum_to_air=lvacuum_to_air)
+         call init_Spectrum(.true.,Nrayone,lam0=lam0,vacuum_to_air=lvacuum_to_air)
          if (n_etoiles > 0) call init_stellar_disk
          call alloc_atom_quantities
          call compute_background_continua

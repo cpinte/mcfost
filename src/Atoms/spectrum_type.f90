@@ -55,11 +55,12 @@ module spectrum_type
 contains
 
 
-  subroutine init_Spectrum(Nray, lam0, vacuum_to_air)
+  subroutine init_Spectrum(limage, Nray, lam0, vacuum_to_air)
     ! ------------------------------------------- !
     ! Allocate and store the wavelength grid for
     ! NLTE atomic line transfer.
     ! ------------------------------------------- !
+    logical, intent(in) :: limage
     integer, intent(in) :: Nray
     integer :: kr, nat
     real(kind=dp), optional :: lam0
@@ -76,17 +77,17 @@ contains
     	endif
     endif
 
+    !set to zero if .not. limage that's why it is computed before!
+    dk_max = int( sign(1.0_dp, v_char) * ( 1e-3 * abs(v_char) / hv + 0.5 ) )
+!     call make_wavelength_grid(wavelength_ref, v_char, lambda, Ntrans, lambda_cont)
+    call make_wavelength_grid_new(limage, wavelength_ref, dk_max, lambda, Ntrans, lambda_cont)
+    dk_min = -dk_max
 
     !for each line
-    dk_max = int( sign(1.0_dp, v_char) * ( 1e-3 * abs(v_char) / hv + 0.5 ) )
     write(*,*) "Maximum shift in index:", dk_max, (1e-3 * v_char + hv) / hv
     if (1d3 * abs(dk_max) * hv / clight > 1.0) then
     	call error("Doppler shift larger than c!")
     endif
-
-!     call make_wavelength_grid(wavelength_ref, v_char, lambda, Ntrans, lambda_cont)
-    call make_wavelength_grid_new(wavelength_ref, dk_max, lambda, Ntrans, lambda_cont)
-    dk_min = -dk_max
 
     mem_alloc_tot = mem_alloc_tot + sizeof(lambda) + sizeof(lambda_cont)
 

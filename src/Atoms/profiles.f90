@@ -21,37 +21,6 @@ module PROFILES
 
    contains
 
-   !building
-  !-> subroutine to call different line profile for different lines
-  !more general and easier than having a line=> Voigt() or a line=>profile() ?
-
-  ! 	subroutine line_profile(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l, prof)
-  ! 		! phi = Voigt / sqrt(pi) / vbroad(icell)
-  ! 		integer, intent(in) 							            :: icell, N
-  ! 		logical, intent(in)											:: lsubstract_avg
-  ! 		real(kind=dp), dimension(N), intent(in)						:: lambda
-  ! 		real(kind=dp), intent(in) 					            	:: x,y,z,u,v,w,& !positions and angles used to project
-  !                                 				               			x1,y1,z1, &      ! velocity field and magnetic field
-  !                                 				               			l !physical length of the cell
-  ! 		type (AtomicLine), intent(in)								:: line
-  ! 		real(kind=dp), intent(out) 									:: prof
-  !
-  !
-  ! 		if (line%voigt) then
-  ! 			prof = local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
-  ! 		elseif (line%pvoigt) then
-  ! 			prof = local_profile_thomson(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
-  ! 		elseif (line%voigt_interp .or. line%gauss_interp) then
-  ! 			prof = local_profile_interp(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
-  ! 		else!only gauss
-  ! 			prof = local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l)
-  ! 		endif
-  !
-  ! 	return
-  ! 	end subroutine line_profile
-
-  !Might be better because for all lines of an atom or even for all lines of all atoms should be equivalent
-  !if projection done before, we do not need x,y,z,l ect
 
 
    function local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
@@ -83,6 +52,7 @@ module PROFILES
       if (lvoronoi) then
          omegav(1) = v0
          Nvspace = 1
+         omegav_mean = v0
       else
 
          Omegav = 0.0
@@ -100,9 +70,9 @@ module PROFILES
             omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
          enddo
          omegav(Nvspace) = v1
+         omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
       endif
-      omegav_mean = 0.0_dp
-      !!if (lsubstract_avg) omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
+      if (lsubstract_avg) omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
 
       norm = Nvspace * line%atom%vbroad(icell) * sqrtpi
 
@@ -110,7 +80,7 @@ module PROFILES
 
          do nv=1, Nvspace
 
-            u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
+            u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
 
             local_profile_v(:) = local_profile_v(:) + Voigt(N, line%a(icell), u1p)
 
@@ -119,7 +89,7 @@ module PROFILES
       else
          do nv=1, Nvspace
 
-            u1p(:) = u1(:) - (omegav(nv) - omegav_mean)/line%atom%vbroad(icell)
+            u1p(:) = u1(:) - omegav(nv)/line%atom%vbroad(icell)
 
             local_profile_v(:) = local_profile_v(:) + exp(-u1p**2)
 
@@ -166,6 +136,7 @@ module PROFILES
       if (lvoronoi) then
          omegav(1) = v0 / vbroad
          Nvspace = 1
+         omegav_mean = v0 / vbroad
       else
 
          Omegav = 0.0_dp
@@ -181,8 +152,9 @@ module PROFILES
             omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w) / vbroad
          enddo
          omegav(Nvspace) = v1 / vbroad
-
+         omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
       endif
+      if (lsubstract_avg) omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
 
 
       if (line%voigt) then

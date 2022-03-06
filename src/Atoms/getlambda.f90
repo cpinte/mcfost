@@ -1514,8 +1514,9 @@ contains
     return
   end subroutine make_wavelength_grid
 
-  subroutine make_wavelength_grid_new(wl_ref, dshift, outgrid, Ntrans, cont_grid)
+  subroutine make_wavelength_grid_new(limage, wl_ref, dshift, outgrid, Ntrans, cont_grid)
 
+    logical, intent(in) :: limage
     real(kind=dp), intent(in) :: wl_ref
     integer, intent(out) :: Ntrans
     integer, intent(inout) :: dshift
@@ -1542,6 +1543,9 @@ contains
     endif
     Ntrans = 0
     !given maximum shift in index, dshift, for a resolution hv, obtain delta_v in m/s
+    if (.not.limage) then
+      dshift = 0
+    endif
     delta_v = 1d3*hv*dshift
 
     !maximum and minimum wavelength for only lines, including max velocity field
