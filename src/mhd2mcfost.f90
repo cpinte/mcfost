@@ -355,7 +355,7 @@ module mhd2mcfost
         write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
     
         write(*,*) "Maximum/minimum Temperature in the model (K):"
-        write(*,*) real(maxval(T)), real(maxval(T,mask=icompute_atomRT>0))
+        write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
         write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
         write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
         if (.not.lcalc_ne) then

@@ -27,7 +27,7 @@ module wavelengths_gas
    real(kind=dp), dimension(:), allocatable :: group_blue, group_red
    integer, dimension(:), allocatable :: Nline_per_group, Nlambda_per_group
    !non-lte freq grid
-   real(kind=dp), allocatable :: lambda_cont(:), lambda(:)
+   real(kind=dp), allocatable :: tab_lambda_cont(:)
 
    !generator of grid for specific transitions
    procedure(make_sub_wavelength_grid_cont_log_nu), pointer :: subgrid_cont => make_sub_wavelength_grid_cont_log_nu
@@ -192,12 +192,14 @@ module wavelengths_gas
       return
    end subroutine deallocate_wavelengths_nlte
 
-   subroutine make_wavelength_nlte()
+   subroutine make_wavelength_nlte(lambda)
+   !now lambda is returned in micron beware !!
+      !mum to nm = km_to_m
 
       !Total frequency grid, concatenation of all
       !individual grids.
       ! used only for the non-LTE loop.
- 
+      real(kind=dp), intent(out), allocatable :: lambda(:)
       integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda
       integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved, Nwaves, check_new_freq
       type (AtomType), pointer :: atom
@@ -257,7 +259,7 @@ module wavelengths_gas
       endif
       ! ********************** Pure continuum RT ********************** !
       !Even if continuum RT is removed, that part is important
-      allocate(lambda_cont(Nlambda_cont), stat=alloc_status)
+      allocate(tab_lambda_cont(Nlambda_cont), stat=alloc_status)
       if (alloc_status>0) then
          call error("Allocation error cont_waves")
       endif
@@ -267,9 +269,9 @@ module wavelengths_gas
          atom => atoms(n)%p
          do kr=1,atom%Ncont
             if (atom%continua(kr)%hydrogenic) then
-               lambda_cont(lac:(lac-1)+atom%continua(kr)%Nlambda) = subgrid_cont(atom%continua(kr))
+               tab_lambda_cont(lac:(lac-1)+atom%continua(kr)%Nlambda) = subgrid_cont(atom%continua(kr))
             else 
-               lambda_cont(lac:lac-1+atom%continua(kr)%Nlambda) = atom%continua(kr)%lambda_file(:)
+               tab_lambda_cont(lac:lac-1+atom%continua(kr)%Nlambda) = atom%continua(kr)%lambda_file(:)
             endif
             lac = lac + atom%continua(kr)%Nlambda
         enddo
@@ -281,19 +283,19 @@ module wavelengths_gas
       Nmore_cont_freq = 0.0
       allocate(sorted_indexes(Nlambda_cont),stat=alloc_status)
       if (alloc_status > 0) call error ("Allocation error sorted_indexes (cont)")
-      sorted_indexes = index_bubble_sort(lambda_cont)
-      lambda_cont(:) = lambda_cont(sorted_indexes)
+      sorted_indexes = index_bubble_sort(tab_lambda_cont)
+      tab_lambda_cont(:) = tab_lambda_cont(sorted_indexes)
       deallocate(sorted_indexes)
  
       !remove duplicates
       allocate(tmp_grid(Nlambda_cont), stat=alloc_status)
       if (alloc_status > 0) call error ("Allocation error tmp_grid (cont)")
       tmp_grid(2:Nlambda_cont) = 0.0
-      tmp_grid(1) = lambda_cont(1)
+      tmp_grid(1) = tab_lambda_cont(1)
       Nremoved = 0
       do la = 2, Nlambda_cont
-         if (lambda_cont(la) > lambda_cont(la-1)) then
-            tmp_grid(la) = lambda_cont(la)
+         if (tab_lambda_cont(la) > tab_lambda_cont(la-1)) then
+            tmp_grid(la) = tab_lambda_cont(la)
          else
             Nremoved = Nremoved + 1
          endif
@@ -301,12 +303,12 @@ module wavelengths_gas
  
       if (Nremoved > 0) then
          write(*,*) " ->", Nremoved, " duplicate frequencies"
-         deallocate(lambda_cont)
-         allocate(lambda_cont(Nlambda_cont-Nremoved), stat=alloc_status)
-         lambda_cont(:) = Pack(tmp_grid, tmp_grid > 0)
+         deallocate(tab_lambda_cont)
+         allocate(tab_lambda_cont(Nlambda_cont-Nremoved), stat=alloc_status)
+         tab_lambda_cont(:) = Pack(tmp_grid, tmp_grid > 0)
       endif
       deallocate(tmp_grid)
-      max_cont = maxval(lambda_cont)
+      max_cont = maxval(tab_lambda_cont)
       Nlambda_cont = Nlambda_cont - Nremoved
       ! ********************** ***************** ********************** !
 
@@ -503,10 +505,10 @@ module wavelengths_gas
          !    write(*,*) "  -> Adding ", Nmore_cont_freq," points"
          !    write(*,*) "max cont, max line", max_cont, maxval(tmp_grid)
          !    allocate(tmp_grid2(Nlambda_cont))
-         !    tmp_grid2 = lambda_cont
-         !    deallocate(lambda_cont)
-         !    allocate(lambda_cont(Nlambda_cont + Nmore_cont_freq))
-         !    lambda_cont(1:Nlambda_cont) = tmp_grid2(:)
+         !    tmp_grid2 = tab_lambda_cont
+         !    deallocate(tab_lambda_cont)
+         !    allocate(tab_lambda_cont(Nlambda_cont + Nmore_cont_freq))
+         !    tab_lambda_cont(1:Nlambda_cont) = tmp_grid2(:)
          !    deallocate(tmp_grid2)
          !    allocate(tmp_grid2(Nmore_cont_freq))
          !    tmp_grid2(:) = 0.0_dp
@@ -536,12 +538,12 @@ module wavelengths_gas
          !    allocate(sorted_indexes(Nmore_cont_freq))
          !    sorted_indexes(:) = index_bubble_sort(tmp_grid2)
          !    tmp_grid2(:) = tmp_grid2(sorted_indexes)
-         !    lambda_cont(Nlambda_cont+1:Nlambda_cont + Nmore_cont_freq) = tmp_grid2(:)
+         !    tab_lambda_cont(Nlambda_cont+1:Nlambda_cont + Nmore_cont_freq) = tmp_grid2(:)
          !    Nlambda_cont = Nlambda_cont + Nmore_cont_freq
          !    deallocate(tmp_grid2, sorted_indexes)
          ! endif
  
-         ! if (size(lambda_cont) /= Nlambda_cont) then
+         ! if (size(tab_lambda_cont) /= Nlambda_cont) then
          !     write(*,*) " Something went wrong with Nlambda cont"
          !     stop
          ! endif
@@ -557,19 +559,19 @@ module wavelengths_gas
          !First values below or beyond first and last groups
          la = 0
          do lac=Nlambda+1, Nlambda+Nlambda_cont
-            if ((lambda_cont(lac-Nlambda) < group_blue(1)) .or. (lambda_cont(lac-Nlambda) > group_red(N_groups))) then
-                   tmp_grid2(lac) = lambda_cont(lac-Nlambda)
+            if ((tab_lambda_cont(lac-Nlambda) < group_blue(1)) .or. (tab_lambda_cont(lac-Nlambda) > group_red(N_groups))) then
+                   tmp_grid2(lac) = tab_lambda_cont(lac-Nlambda)
                    Nwaves = Nwaves + 1
-                   if (lambda_cont(lac-Nlambda) < group_blue(1)) la = lac
+                   if (tab_lambda_cont(lac-Nlambda) < group_blue(1)) la = lac
              endif
          enddo
  
          !now values between groups
          do lac=la+1, Nlambda_cont+Nlambda
             group_loop : do n=2, N_groups
-               if ((lambda_cont(lac-Nlambda) > group_red(n-1)).and.(lambda_cont(lac-Nlambda) < group_blue(n))) then
+               if ((tab_lambda_cont(lac-Nlambda) > group_red(n-1)).and.(tab_lambda_cont(lac-Nlambda) < group_blue(n))) then
                   Nwaves = Nwaves + 1
-                  tmp_grid2(lac) = lambda_cont(lac-nlambda)
+                  tmp_grid2(lac) = tab_lambda_cont(lac-nlambda)
                  !else
                  ! be smart and cycle to accelerate
                endif
@@ -580,7 +582,7 @@ module wavelengths_gas
          !
          ! If I remove continuum RT !
          !
-         deallocate(lambda_cont)
+         deallocate(tab_lambda_cont)
  
          !continuum frequencies are sorted and so are the line frequencies
          !but they are added at the end, so sorted is needed, but I can improve the previous
@@ -602,8 +604,8 @@ module wavelengths_gas
          Nwaves = Nlambda_cont
          allocate(lambda(Nwaves),stat=alloc_status)
          if (alloc_status>0) call error("allocation error lambda, in pure cont!")
-         lambda = lambda_cont
-         deallocate(lambda_cont)
+         lambda = tab_lambda_cont
+         deallocate(tab_lambda_cont)
          Nlambda = 0
       endif !there is lines
 
@@ -618,8 +620,6 @@ module wavelengths_gas
       !    write(*,*) "Resolution of line's groups (km/s):", hv
       ! endif 
       ! ************************** ************ ************************* !
-
-      write(*,'("Wavelength grid: "(1F12.4)" mum to",(1F12.4)" mum")') m_to_km*minval(lambda),m_to_km*maxval(lambda)
 
       !Now indexes of each transition on the lambda grid
       Nlambda_max_line = 0
@@ -640,7 +640,7 @@ module wavelengths_gas
             ! atom%continua(kr)%Nlambda = atom%continua(kr)%Nred - atom%continua(kr)%Nblue + 1
  
            !in any problem of grid resolution etc or locate approximation.
-           !We take Nred-1 to be sure than the lambda_cont(Nred) <= lambda0.
+           !We take Nred-1 to be sure than the tab_lambda_cont(Nred) <= lambda0.
            !Only if not dissolution.
            !We just need to avoind having cont_lambda(Nred)>lambda0, since the cross section is in (lambda/lambda0)**3
             if (l0 /= atom%continua(kr)%lambda0) then
@@ -677,6 +677,12 @@ module wavelengths_gas
       write(*,*) "Number of max freq points for all cont resolution :", Nlambda_max_cont
       Nlambda_max_trans = max(Nlambda_max_line,Nlambda_max_cont)
       write(*,*) "Number of max freq points for all trans :", Nlambda_max_trans
+
+      !output grid in micron
+      lambda = lambda * m_to_km
+      !now lambda will be stored in micron for compatibility
+      !but a lots of atomic variables use nm.
+      write(*,'("Wavelength grid: "(1F12.4)" mum to",(1F12.4)" mum")') minval(lambda),maxval(lambda)
 
       return
    end subroutine make_wavelength_nlte

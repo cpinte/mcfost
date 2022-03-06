@@ -840,6 +840,7 @@ end subroutine optical_length_tot_mol
          if (lintersect_stars) then !"will interesct"
             if (icell == icell_star) then!"has intersected"
                !call local_stellar_radiation(id,iray,tau,tau_c,i_star,icell_prev,x0,y0,z0,u,v,w)
+               ! tau_to_star(:,i_star) = tau
                return
             end if
          endif

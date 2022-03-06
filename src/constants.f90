@@ -83,7 +83,7 @@ module constantes
   real(kind=dp), parameter :: km_to_m = 1.0e3_dp
   real(kind=dp), parameter ::  NM_TO_M =1.0d-9
   real(kind=dp), parameter ::  M_TO_NM =1.0d9
-  real(kind=dp), parameter ::  MICRON_TO_NM=1.0d+03 !in fact it is km_to_m
+  !micron to nm is also km_to_m (and nm to micron m_to_km)
 
   real(kind=dp), parameter :: Rsun = 6.957e8_dp ! IAU 2015 B3 definition, https://arxiv.org/abs/1605.09788
   real, parameter :: Teff_Sun = 5772.0 ! IAU 2015

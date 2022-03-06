@@ -17,13 +17,64 @@ module gas_contopac
    use constantes
    use utils, only : locate, interp, bilinear, linear_1D_sorted, Bpnu
    use occupation_probability, only : D_i, wocc_n
-   use parametres, only : ldissolve
+   use parametres, only : ldissolve, n_cells
 
    implicit none
 	
    real, parameter :: lambda_limit_HI_rayleigh = 91.1763062831680!102.6 !nm
    real, parameter :: lambda_limit_HeI_rayleigh = 140.0 !
    real(kind=dp), dimension(:), allocatable :: Hray_lambda, HeIray_lambda
+   real(kind=dp), dimension(:), allocatable :: alpha_geltman, alpha_wishart
+   integer, parameter :: N_geltman = 34, N_wishart = 63
+   real(kind=dp), dimension(N_wishart) :: lambdai_wishart, alphai_wishart
+   real(kind=dp), dimension(N_geltman) :: lambdai_geltman, alphai_geltman
+   real(kind=dp), parameter :: lambda_base = 500.0_dp
+   real(kind=dp), dimension(:), allocatable :: exphckT !exp(-hc_k/T)
+
+   data lambdai_geltman / 0.0, 50.0, 100.0, 150.0, 200.0, 250.0,  &
+   300.0, 350.0, 400.0, 450.0, 500.0, 550.0,&
+   600.0, 650.0, 700.0, 750.0, 800.0, 850.0,&
+   900.0, 950.0, 1000.0, 1050.0, 1100.0,    &
+   1150.0, 1200.0, 1250.0, 1300.0, 1350.0,  &
+   1400.0, 1450.0, 1500.0, 1550.0, 1600.0,  &
+   1641.9 /
+
+   !in 1e-21
+   data alphai_geltman / 0.0,  0.15, 0.33, 0.57, 0.85, 1.17, 1.52,&
+   1.89, 2.23, 2.55, 2.84, 3.11, 3.35, 3.56,&
+   3.71, 3.83, 3.92, 3.95, 3.93, 3.85, 3.73,&
+   3.58, 3.38, 3.14, 2.85, 2.54, 2.20, 1.83,&
+   1.46, 1.06, 0.71, 0.40, 0.17, 0.0 /
+
+    !36
+    !    data lambdai_wishart / 0.00,1250.00 ,  1750.00  , 2250.70  , 2750.81  , 3250.94,&
+    !    3751.07  , 4251.20  , 4751.33   ,5251.46 ,  5751.59 ,  6251.73, &
+    !    6751.86  , 7252.00  , 7752.13  , 8252.27  , 8752.40   ,9252.54,&
+    !    9752.67 ,  10252.81  ,10752.95 , 11253.08 , 11753.22 , 12253.35,&
+    !   12753.49  ,13253.62 , 13753.76 , 14253.90 , 14754.03  ,15254.17,&
+    !   15504.24 , 15754.30  ,16004.37 , 16104.40 , 16204.43 , 16304.45 /
+
+    !1d-18 cm^2 * (1d-2)**2 for m^2 = 1d-22
+    !   data alphai_wishart /0.0  ,     5.431 ,    7.918    , 11.08  ,   14.46   ,  17.92, &
+    !      21.35 ,    24.65   ,  27.77  ,   30.62   ,  33.17   ,  35.37,&
+    !      37.17  ,   38.54  ,   39.48  ,   39.95   ,  39.95 ,    39.48,&
+    !      38.53  ,   37.13 ,   35.28  ,   33.01 ,    30.34     ,27.33,&
+    !      24.02  ,   20.46   ,  16.74   ,  12.95  ,   9.211   ,  5.677,&
+    !      4.052 ,    2.575 ,    1.302   ,  .8697    , .4974   ,  .1989 /
+
+   data lambdai_wishart / 250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750,      &
+   4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000, 6250, 6500,     &
+   6750, 7000, 7250, 7500, 7750, 8000, 8250, 8500, 8750, 9000, 9250,     &
+   9500, 9750, 10000, 10250, 10500, 10750, 11000, 11250, 11500, 11750,   &
+   12000, 12250, 12500, 12750, 13000, 13250, 13500, 13750, 14000,        &
+   14250, 14500, 14750, 15000, 15250, 15500, 15750, 16000, 16100, 16200, &
+   16300 /
+   data alphai_wishart / 5.431, 6.512, 7.918, 9.453, 11.08,12.75,14.46,16.19,17.92,19.65,21.35,   &
+   23.02,24.65,26.24, 27.77, 29.23,30.62,31.94,33.17,34.32, 35.37,36.32,    &
+   37.17,37.91,38.54,39.07,39.48,39.77,39.95, 40.01, 39.95, 39.77, 39.48,   &
+   39.06,38.53,37.89,37.13,36.25,35.28,34.19,33.01,31.72,30.34,28.87,       &
+   27.33,25.71,24.02,22.26,20.46,18.62,16.74,14.85,12.95,11.07,9.211,7.407, &
+   5.677,4.052,2.575,1.302,0.8697,0.4974, 0.1989 /
 
    contains
 
@@ -97,7 +148,7 @@ module gas_contopac
       return
    end function HeI_rayleigh
 
-   subroutine alloc_rayleigh_xsections(N, lambda)
+   subroutine alloc_gas_contopac(N, lambda)
       integer, intent(in) :: N
       real(kind=dp), intent(in) :: Lambda(N)
 
@@ -120,17 +171,35 @@ module gas_contopac
          end where 
       endif
 
+      !cheap !
+      !allocate cross-sections and compute then on lambda grid.
+      allocate(alpha_geltman(N), alpha_wishart(N))
+      alpha_geltman = 0.0
+      alpha_wishart = 0.0
+      alpha_wishart = 1d-22 * linear_1D_sorted(N_wishart, lambdai_wishart, alphai_wishart, N, 10*lambda)
+      alpha_geltman = 1d-21 * linear_1D_sorted(N_geltman, lambdai_geltman, alphai_geltman, N, lambda) !1e-17 cm^2 to m^2
 
+
+      !for obvious reason a lambda base is used to avoid exp(-hc_k/T) to goes with zero at low T.
+      allocate(exphckT(n_cells))
+      exphckT(:) = exp(-hc_k/T/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm)
+    
       return 
-   end subroutine alloc_rayleigh_xsections
+   end subroutine alloc_gas_contopac
 
-   subroutine dealloc_rayleigh_xsections
+   subroutine dealloc_gas_contopac
 
       deallocate(Hray_lambda)
       if (allocated(HeIray_lambda)) deallocate(HeIray_lambda)
 
+      !deallocate or not because depends on cells so unchanged if we change lambda grid...
+      deallocate(exphckT)
+      !anyway should not cost anything!
+
+      deallocate(alpha_wishart, alpha_geltman)
+
       return
-   end subroutine dealloc_rayleigh_xsections
+   end subroutine dealloc_gas_contopac
   
    elemental function Gaunt_bf(u, n_eff)
       ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
@@ -247,18 +316,20 @@ module gas_contopac
          return
       endif
 
-      do la=1,N
-         stim = 1. - exp(-hc_k/lambda(la)/T(icell))
+      ! do la=1,N
+      !    ! stim = 1. - exp(-hc_k/lambda(la)/T(icell))
+      !    stim = 1.0 - exphckT(icell)**(lambda_base/lambda(la))
 
-         ! = alpha0 /nu**3 / sqrt(T) = m^5
-         !I now consider ne as part of the cross-sections to be in the same units as
-         !the bound-free cross-sections
-         alpha = H_ff_Xsection(1, T(icell), lambda(la)) * ne(icell)
+      !    ! = alpha0 /nu**3 / sqrt(T) = m^5
+      !    !I now consider ne as part of the cross-sections to be in the same units as
+      !    !the bound-free cross-sections
+      !    alpha = H_ff_Xsection(1, T(icell), lambda(la)) * ne(icell)
 
 
-         chi(la) =  alpha * np * stim
-      enddo
-
+      !    chi(la) =  alpha * np * stim
+      ! enddo
+      chi(:) = np * H_ff_Xsection(1, T(icell), lambda(:)) * ne(icell) * &
+         (1.0 - exphckT(icell)**(lambda_base/lambda(:)) )
     return
    end subroutine Hydrogen_ff
 
@@ -335,7 +406,6 @@ module gas_contopac
       return
    end subroutine Hminus_bf_john
 
-
    subroutine Hminus_bf_geltman(icell, N, lambda, chi, eta)
     !-----------------------------------------------------------------
     ! Calculates the negative hydrogen (H-) bound-free continuum
@@ -347,52 +417,31 @@ module gas_contopac
     real(kind=dp), dimension(N), intent(in) :: lambda
     integer :: la
     real(kind=dp), intent(out), dimension(N) :: chi, eta
-    integer, parameter :: NBF=34
-    real(kind=dp), dimension(NBF) :: lambdaBF, alphaBF
-    real(kind=dp) :: lam, stm, twohnu3_c2, alpha(N)
+    real(kind=dp) :: lam, stm, twohnu3_c2
 
-    data lambdaBF / 0.0, 50.0, 100.0, 150.0, 200.0, 250.0,  &
-         300.0, 350.0, 400.0, 450.0, 500.0, 550.0,&
-         600.0, 650.0, 700.0, 750.0, 800.0, 850.0,&
-         900.0, 950.0, 1000.0, 1050.0, 1100.0,    &
-         1150.0, 1200.0, 1250.0, 1300.0, 1350.0,  &
-         1400.0, 1450.0, 1500.0, 1550.0, 1600.0,  &
-         1641.9 /
-
-    !in 1e-21
-    data alphaBF / 0.0,  0.15, 0.33, 0.57, 0.85, 1.17, 1.52,&
-         1.89, 2.23, 2.55, 2.84, 3.11, 3.35, 3.56,&
-         3.71, 3.83, 3.92, 3.95, 3.93, 3.85, 3.73,&
-         3.58, 3.38, 3.14, 2.85, 2.54, 2.20, 1.83,&
-         1.46, 1.06, 0.71, 0.40, 0.17, 0.0 /
     
-   !  chi = 1d-21 * linear_1D_Sorted(NBF,lambdaBF,alphaBF,N,lambda) * nHmin(icell)
-   !  eta = chi * twohc / lambda**3 * exp(-hc_k/T(icell)/lambda)
-   !  chi = chi * (1.0 - exp(-hc_k/T(icell)/lambda))
 
-
-   alpha(:) = 1d-21 * linear_1D_sorted(NBF, lambdabF, alphaBF, N, lambda) !1e-17 cm^2 to m^2
-    
     do la=1, N
        lam = lambda(la)
        !do not test negativity of lambda
-       if (lam >= lambdaBF(NBF)) then
+       if (lam >= lambdai_geltman(N_geltman)) then
          chi(la:N) = 0.0
          eta(la:N) = 0.0
          exit
        endif
 
-       stm = exp(-hc_k/T(icell)/lam)
+       stm = exphckT(icell)**(lambda_base/lam) !exp(-hc_k/T(icell)/lam)
        twohnu3_c2 = twohc / lam**3.
 
-       chi(la) = nHmin(icell) * (1.-stm) * alpha(la)
-       eta(la) = nHmin(icell) * twohnu3_c2 * stm * alpha(la)
+       chi(la) = nHmin(icell) * (1.-stm) * alpha_geltman(la)
+       eta(la) = nHmin(icell) * twohnu3_c2 * stm * alpha_geltman(la)
 
     enddo
 
 
       return
    end subroutine Hminus_bf_geltman
+
 
    subroutine Hminus_bf_Wishart(icell, N, lambda, chi, eta)
     !The one use in Turbospectrum, number 1 in opacity
@@ -405,54 +454,18 @@ module gas_contopac
     integer :: la
     real(kind=dp), dimension(N), intent(in)	:: lambda
     real(kind=dp), dimension(N), intent(out) :: chi, eta
-    !    real, dimension(36) :: lambda, alpha
-    real(kind=dp), dimension(63) :: lambdai, alphai
-    real(kind=dp) :: lam, stm, sigma(N), chi_extr(1), eta_extr(1), lambda_extr(1)
+    real(kind=dp) :: lam, stm, chi_extr(1), eta_extr(1), lambda_extr(1)
 
     chi(:) = 0.0_dp
     eta(:) = 0.0_dp
 
-    !    data lambda / 0.00,1250.00 ,  1750.00  , 2250.70  , 2750.81  , 3250.94,&
-    !    3751.07  , 4251.20  , 4751.33   ,5251.46 ,  5751.59 ,  6251.73, &
-    !    6751.86  , 7252.00  , 7752.13  , 8252.27  , 8752.40   ,9252.54,&
-    !    9752.67 ,  10252.81  ,10752.95 , 11253.08 , 11753.22 , 12253.35,&
-    !   12753.49  ,13253.62 , 13753.76 , 14253.90 , 14754.03  ,15254.17,&
-    !   15504.24 , 15754.30  ,16004.37 , 16104.40 , 16204.43 , 16304.45 /
-
-    !1d-18 cm^2 * (1d-2)**2 for m^2 = 1d-22
-    !   data alpha /0.0  ,     5.431 ,    7.918    , 11.08  ,   14.46   ,  17.92, &
-    !      21.35 ,    24.65   ,  27.77  ,   30.62   ,  33.17   ,  35.37,&
-    !      37.17  ,   38.54  ,   39.48  ,   39.95   ,  39.95 ,    39.48,&
-    !      38.53  ,   37.13 ,   35.28  ,   33.01 ,    30.34     ,27.33,&
-    !      24.02  ,   20.46   ,  16.74   ,  12.95  ,   9.211   ,  5.677,&
-    !      4.052 ,    2.575 ,    1.302   ,  .8697    , .4974   ,  .1989 /
-
-    data lambdai / 250, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 3250, 3500, 3750,      &
-         4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000, 6250, 6500,     &
-         6750, 7000, 7250, 7500, 7750, 8000, 8250, 8500, 8750, 9000, 9250,     &
-         9500, 9750, 10000, 10250, 10500, 10750, 11000, 11250, 11500, 11750,   &
-         12000, 12250, 12500, 12750, 13000, 13250, 13500, 13750, 14000,        &
-         14250, 14500, 14750, 15000, 15250, 15500, 15750, 16000, 16100, 16200, &
-         16300 /
-
-    data alphai / 5.431, 6.512, 7.918, 9.453, 11.08,12.75,14.46,16.19,17.92,19.65,21.35,   &
-         23.02,24.65,26.24, 27.77, 29.23,30.62,31.94,33.17,34.32, 35.37,36.32,    &
-         37.17,37.91,38.54,39.07,39.48,39.77,39.95, 40.01, 39.95, 39.77, 39.48,   &
-         39.06,38.53,37.89,37.13,36.25,35.28,34.19,33.01,31.72,30.34,28.87,       &
-         27.33,25.71,24.02,22.26,20.46,18.62,16.74,14.85,12.95,11.07,9.211,7.407, &
-         5.677,4.052,2.575,1.302,0.8697,0.4974, 0.1989 /
-
-   sigma(:) = 1d-22 * linear_1D_sorted(63,lambdai, alphai, N, 10*lambda)
-   !beware linear_1D_sorted doesn't handle well the values out of bounds (y(xi>x) = 0 not y(x))
-
-
     freq_loop : do la=1, N
        lam = lambda(la) * 10. !AA
        !stm = 0.0
-       stm = exp(-hc_k / T(icell) / lambda(la))
+       stm = exphckT(icell)**(lambda_base/lambda(la)) !exp(-hc_k / T(icell) / lambda(la))
 
-       !if (lam < minval(lambdai)) then
-       if (lam < lambdai(1)) then
+       !if (lam < minval(lambdai_wishart)) then
+       if (lam < lambdai_wishart(1)) then
           !cyle
           !other formula for very low frequencies
           lambda_extr(1) = lambda(la)
@@ -461,12 +474,12 @@ module gas_contopac
           eta(la) = eta_extr(1)
           !cycle
           !else if (lam > maxval(lambdai)) then
-       elseif (lam > lambdai(63)) then
+       elseif (lam > lambdai_wishart(N_wishart)) then
           exit freq_loop
        else
 
-         chi(la) = sigma(la) * (1.0 - stm) * nHmin(icell)
-          eta(la) = sigma(la) * twohc/lambda(la)**3  * stm * nHmin(icell)
+         chi(la) = alpha_wishart(la) * (1.0 - stm) * nHmin(icell)
+         eta(la) = alpha_wishart(la) * twohc/lambda(la)**3  * stm * nHmin(icell)
 
        endif
     enddo freq_loop
@@ -662,7 +675,7 @@ module gas_contopac
          if (lam > lambdai(23)) then
             chi(la) = Hminus_ff_john_lam(icell,lambda(la))
          else
-            stm = exp(-hc_k/T(icell)/lambda(la))
+            stm = exphckT(icell)**(lambda_base/lambda(la)) !exp(-hc_k/T(icell)/lambda(la))
             sigma = 1d-29 * bilinear(23,lambdai,11,thetai,alphai,lam,theta) !m^2/Pa
             chi(la) = sigma * pe * nH!m^-1
          endif
