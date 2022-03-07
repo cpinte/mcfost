@@ -370,7 +370,6 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
     enddo ! block
 
     if (lpotential) then
-       write(*,*) "test", nptmass_found, nptmass
        call extract('x2',xyzmh_ptmass(1,nptmass_found+1),hdr,ierr)
        call extract('y2',xyzmh_ptmass(2,nptmass_found+1),hdr,ierr)
        call extract('z2',xyzmh_ptmass(3,nptmass_found+1),hdr,ierr)
@@ -777,7 +776,6 @@ subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
 end subroutine modify_dump
 
 !*************************************************************************
-
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh, &
      vxyzu,gastemperature,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &

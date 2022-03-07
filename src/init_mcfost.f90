@@ -11,6 +11,7 @@ module init_mcfost
   use input, only : Tfile, lect_lambda, read_phase_function, read_molecules_names
   use ProdiMo
   use utils
+  use read_fargo3d, only : read_fargo3d_parameters
 
   implicit none
 
@@ -215,7 +216,7 @@ subroutine initialisation_mcfost()
 
   character(len=512) :: cmd, s, str_seed, para, base_para
   character(len=4) :: n_chiffres
-  character(len=128)  :: fmt1
+  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id
 
   logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb
 
@@ -1106,6 +1107,13 @@ subroutine initialisation_mcfost()
         read(s,*) Mdot
         star_Mdot(istar_Mdot) = Mdot
         i_arg = i_arg + 1
+     case("-fargo3d","-fargo")
+        i_arg = i_arg + 1
+        lfargo3d = .true.
+        call get_command_argument(i_arg,fargo3d_dir)
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,fargo3d_id)
+        i_arg = i_arg + 1
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1119,6 +1127,15 @@ subroutine initialisation_mcfost()
   else
      call read_para(para)
   endif
+
+  if (lfargo3d) then
+     l3D = .true.
+     if (n_zones > 1) call error("fargo3d mode only work with 1 zone")
+     call warning("farg3d : forcing spherical grid") ! only spherical grid is implemented for now
+     disk_zone(1)%geometry = 2
+     call read_fargo3d_parameters(fargo3d_dir, fargo3d_id)
+  endif
+
   if (n_zones > 1) lvariable_dust=.true.
 
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
