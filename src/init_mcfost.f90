@@ -66,6 +66,7 @@ subroutine set_default_variables()
   healpix_lmin = 1
   healpix_lmax = 7 !6 !5
   ! Atomic lines Radiative Transfer (AL-RT)
+  lsobolev_regime = .false.
   lsafe_stop = .false.
   safe_stop_time = 155520.0!1.8days in seconds, default
   llimit_mem = .false.
@@ -624,6 +625,10 @@ subroutine initialisation_mcfost()
      case("-safe_stop")
         i_arg = i_arg + 1
         lsafe_stop = .true.
+      case("-sobolev_regime")
+         !currently beeing test, does not appear then in option.
+         i_arg = i_arg + 1
+         lsobolev_regime = .true.
      case("-safe_stop_time")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("time needed (safe_stop)")

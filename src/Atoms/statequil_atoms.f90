@@ -9,7 +9,7 @@ MODULE statequil_atoms
   use constant
   use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc
   use math, only		: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, solve_lin
-  use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte
+  use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte, lsobolev_regime
   use collision, only						: collision_rates_atom_loc!, CollisionRate_old
   use impact, only						: Collision_Hydrogen
   use getlambda, only						: hv, Nlambda_max_trans
@@ -2530,11 +2530,13 @@ CONTAINS
        atr_loop : do kr = 1, aatom%Ntr_line
 
           kc = aatom%at(kr)%ik
+          !all lines contribute, so don't evaluate lcontrib_to_opac
 
           Nred = aatom%lines(kc)%Nred;Nblue = aatom%lines(kc)%Nblue
           i = aatom%lines(kc)%i
           j = aatom%lines(kc)%j
 
+          !dk should be zero now
           Nl = Nred-dk_min+dk_max-Nblue+1
           a0 = Nblue+dk_min-1
 
@@ -2544,6 +2546,9 @@ CONTAINS
 
           Ieff(1:Nl) = Itot(Nblue+dk_min:Nred+dk_max,iray,id) - Psi(Nblue+dk_min:Nred+dk_max,iray,id) * &
                eta_atoms(Nblue+dk_min:Nred+dk_max,nact,id)
+          if (lsobolev_regime) then
+            Ieff(1:Nl) = 0.0
+          endif
 
           ! 				enddo
           do l=1,Nl
@@ -2617,6 +2622,7 @@ CONTAINS
        atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
 
           kc = aatom%at(kr)%ik
+          !all transitions contribue so I don't test lcontrib_to_opac
 
           i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
           ! 				chi_ion = Elements(aatom%periodic_table)%ptr_elem%ionpot(aatom%stage(j))
