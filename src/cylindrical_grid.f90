@@ -3,7 +3,6 @@ module cylindrical_grid
   use constantes
   use parametres
   use messages
-  use read_fargo3d, only : fargo3d, check_fargo3d_grid
 
   implicit none
 
@@ -505,8 +504,7 @@ subroutine define_cylindrical_grid()
      enddo
   endif
 
-
-  if (lfargo3d) call check_fargo3d_grid(r_lim,theta_lim,phi_grid_tmp)
+!  if (lfargo3d) call check_fargo3d_grid(r_lim,theta_lim,phi_grid_tmp)
 
   ! Unit test to compare with fargo3d domain_z.dat
   do j=nz,1, -1

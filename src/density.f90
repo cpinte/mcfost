@@ -1004,8 +1004,9 @@ subroutine read_density_file()
   call ftgkyj(unit,"read_gas_velocity",read_gas_velocity,comment,status)
   if (status /=0) read_gas_velocity = 0
   write(*,*) "read_gas_velocity =", read_gas_velocity
-  lread_gas_velocity = (read_gas_velocity == 1).or.(read_gas_velocity == 2)
-  lvfield_cyl_coord = (read_gas_velocity == 2)
+
+  lread_gas_velocity = read_gas_velocity >= 1
+  vfield_coord = read_gas_velocity ! 1 = cartesian, 2 = cylindrical, 3 = spherical
 
   status = 0
   group=1
@@ -1295,8 +1296,15 @@ subroutine read_density_file()
   !------------------------
   if (lread_gas_velocity) then
      write(*,*) "Reading gas velocity ..."
-     if (lvfield_cyl_coord) then
+     if (vfield_coord == 1) then
+        write(*,*) "Velocity field is in Cartesian coordinates."
+     else if (vfield_coord == 2) then
         write(*,*) "Velocity field is in cylindrical coordinates."
+     else if (vfield_coord == 3) then
+        write(*,*) "Velocity field is in spherical coordinates."
+     else
+        write(*,*) "*** vfield_coord =", vfield_coord
+        call error("Unkown coordinate system for velocity field")
      endif
      lvelocity_file = .true.
 
@@ -1353,7 +1361,7 @@ subroutine read_density_file()
      sph_V = sph_V
      write(*,*) "Velocity range:", minval(sph_V), maxval(sph_V)
 
-     allocate(vfield_x(n_cells),vfield_y(n_cells),vfield_z(n_cells))
+     allocate(vfield3d(n_cells,3))
   endif ! lread_gas_velocity
 
   call ftclos(unit, status)
@@ -1384,10 +1392,8 @@ subroutine read_density_file()
               endif
 
               if (lread_gas_velocity) then
-                 vfield_x(icell) = sph_V(i,jj,k,1)
-                 vfield_y(icell) = sph_V(i,jj,k,2)
-                 vfield_z(icell) = sph_V(i,jj,k,3)
-                 if ((.not.l3D_file).and.(j<0)) vfield_z(icell) = - vfield_z(icell)
+                 vfield3d(icell,:) = sph_V(i,jj,k,:)
+                 if ((.not.l3D_file).and.(j<0)) vfield3d(icell,3) = - vfield3d(icell,3)
               endif
            enddo ! i
         endif ! j==0

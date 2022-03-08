@@ -3,20 +3,10 @@ module read_fargo3d
   use parametres
   use messages
   use mcfost_env
+  use grid
+  use cylindrical_grid
 
   implicit none
-
-  type fargo3d_model
-     integer :: nx, ny, nz, realtype
-     real(kind=dp) :: xmin,xmax, ymin,ymax, zmin,zmax
-     logical :: log_spacing, corrotating_frame
-
-     real(kind=dp) :: dt, aspect_ratio, nu, gamma, cs
-     character(len=128) :: dir, id, planetconfig
-
-  end type fargo3d_model
-
-  type(fargo3d_model) :: fargo3d
 
   contains
 
@@ -148,36 +138,67 @@ subroutine read_fargo3d_files()
   !open(unit=100, status="old", file=filename, form="unformatted", access="direct", recl = NX*NY*NZ*8)
   !read(100,rec=1) data
 
-  real(dp), dimension(:,:,:), allocatable  :: data
-  integer :: ios, iunit, alloc_status, i
+  real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
+  integer :: ios, iunit, alloc_status, l, recl, i,j, jj, k
 
   character(len=128) :: filename
   character(len=16), dimension(4) :: file_types
 
-  allocate(data(fargo3d%nx,fargo3d%ny,fargo3d%nz), stat=alloc_status) ! ie --> az, r, theta
+  ! dimensions are az, r, theta
+  allocate(fargo3d_density(fargo3d%nx,fargo3d%ny,fargo3d%nz),fargo3d_vx(fargo3d%nx,fargo3d%ny,fargo3d%nz), &
+       fargo3d_vy(fargo3d%nx,fargo3d%ny,fargo3d%nz),fargo3d_vz(fargo3d%nx,fargo3d%ny,fargo3d%nz),stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error when reading fargo3d files')
-  data = 0.0_dp
+  fargo3d_density = 0.0_dp ; fargo3d_vx  = 0.0_dp ; fargo3d_vy = 0.0_dp ; fargo3d_vz = 0.0_dp
 
   ios = 0
   iunit = 1
+  recl = dp*fargo3d%nx*fargo3d%ny*fargo3d%nz
 
   file_types(1) = "gasdens"
   file_types(2) = "gasvx"
   file_types(3) = "gasvy"
   file_types(4) = "gasvz"
-  do i=1, 4
-     filename = trim(fargo3d%dir)//"/"//trim(file_types(i))//trim(trim(fargo3d%id))//".dat"
+  do l=1, 4
+     filename = trim(fargo3d%dir)//"/"//trim(file_types(l))//trim(trim(fargo3d%id))//".dat"
      write(*,*) "Reading "//trim(filename)
-     open(unit=iunit, status="old", file=filename, form="unformatted", iostat=ios, access="direct", recl=8*fargo3d%nx*fargo3d%ny*fargo3d%nz)
+     open(unit=iunit, file=filename, status="old", form="unformatted", iostat=ios, access="direct" , recl=recl)
      if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
-     read(iunit, rec=1, iostat=ios) data
+     select case(l)
+        case(1)
+           read(iunit, rec=1, iostat=ios) fargo3d_density
+        case(2)
+           read(iunit, rec=1, iostat=ios) fargo3d_vx
+        case(3)
+           read(iunit, rec=1, iostat=ios) fargo3d_vy
+        case(4)
+           read(iunit, rec=1, iostat=ios) fargo3d_vz
+        end select
      if (ios /= 0) call error("reading fargo3d file:"//trim(filename))
      close(iunit)
-
-
   enddo
 
-  deallocate(data)
+  lvelocity_file = .true.
+  vfield_coord = 3 ! spherical
+!
+!  do i=1, n_rad
+!     jj= 0
+!     bz : do j=j_start-1,nz+1 ! 1 extra empty cell in theta on each side
+!        if (j==0) cycle bz
+!        jj = jj + 1
+!        do k=1, n_az
+!           icell = cell_map(i,j,k)
+!
+!           densite_gaz(icell) = fargo3d_density(k,i,jj)
+!           vfield3d(icell,1)    = fargo3d_vx(k,i,jj) ! vr
+!           vfield3d(icell,2)    = fargo3d_vx(k,i,jj) ! vphi
+!           vfield3d(icell,3)    = fargo3d_vz(k,i,jj) ! vtheta
+!        enddo ! k
+!     enddo bz
+!  enddo ! i
+
+
+
+!  deallocate()
   stop
 
 end subroutine read_fargo3d_files
