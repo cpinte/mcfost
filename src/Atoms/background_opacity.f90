@@ -331,8 +331,10 @@ contains
     do m=1, NpassiveAtoms
        atom => PassiveAtoms(m)%ptr_atom
 
-       do kc=atom%Ntr_line+1,atom%Ntr
+       tr_loop : do kc=atom%Ntr_line+1,atom%Ntr
           kr = atom%at(kc)%ik
+
+          if (.not.atom%at(kc)%lcontrib_to_opac) cycle tr_loop
 
           i = atom%continua(kr)%i
           j = atom%continua(kr)%j
@@ -395,7 +397,7 @@ contains
 
              endif
           enddo
-       enddo
+       enddo tr_loop
     end do ! loop over Ncont
 
     return

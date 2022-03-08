@@ -1242,6 +1242,8 @@ contains
           atom%at(k1) = trans(k)
           !write(*,*) atom%at(k1)%ik, atom%at(k1)%trtype
           k1 = k1 + 1
+      !  else
+      !    !deallocate the trans data
        end if
     end do
 
@@ -1254,6 +1256,8 @@ contains
           atom%at(k1) = trans(k)
           !write(*,*) atom%at(k1)%ik, atom%at(k1)%trtype
           k1 = k1 + 1
+         ! else
+         !    !deallocate the trans data
        end if
     end do
 
@@ -1262,7 +1266,7 @@ contains
     return
   end subroutine realloc_transitions
 
-
+  !-> does not rely on atom%at
   subroutine realloc_line_transitions_deprec(atom, Nl_new, mask)
     !basicazlly does what PAck does
     integer, intent(in) :: Nl_new

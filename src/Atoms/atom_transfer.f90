@@ -18,11 +18,11 @@ module atom_transfer
    use spectrum_type, only       : dk, dk_max, dk_min, sca_c, chi, eta, chi_c, eta_c, eta_c_nlte, chi_c_nlte, &
                                  eta0_bb, chi0_bb, lambda, Nlambda, lambda_cont, Nlambda_cont, Itot, Icont, Istar_tot, &
                                  Istar_cont, Flux_acc, Ishock, Istar_loc, flux_star, Stokes_Q, Stokes_U, Stokes_V, Flux, &
-                                 Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, init_spectrum, init_spectrum_image, &
+                                 Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, init_spectrum, &
                                  dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
                                  dealloc_jnu, reallocate_rays_arrays, write_flux,  &
                                  write_atomic_maps, limage_at_lam0, image_map, &
-                                 wavelength_ref, HI_rayleigh_part2, HeI_rayleigh_part2
+                                 wavelength_ref, HI_rayleigh_part2, HeI_rayleigh_part2, alloc_wavelengths_raytracing
 
    use atmos_type, only          : nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, &
                                  ne, T, vr, vphi, v_z, vtheta, wght_per_H, readatmos_ascii, dealloc_atomic_atmos, &
@@ -743,7 +743,7 @@ module atom_transfer
 
          n_rayons_max = 1
 
-         call init_Spectrum(.false.,n_rayons_max,lam0=lam0,vacuum_to_air=lvacuum_to_air)
+         call init_Spectrum(.false.,n_rayons_max)
          if (n_etoiles > 0) call init_stellar_disk
          call alloc_atom_quantities
          call compute_background_continua
@@ -916,46 +916,39 @@ module atom_transfer
             call write_Jnu_cont_bin
          endif
 
-      !  !->> Case of ltab or not and add chi_c_nlte and eta_c_nlte
-      !  !then if ltab_wavelength_image ...
-      !  if (ltab_wavelength_image) then
-      !     call error("tab wavelength not implemented")
-      !  else
-      !     !just remove the Nrays dependencies
-      !     call reallocate_rays_arrays(nrayOne)
-      !  endif
+      endif !end non-LTE
+      ! !now computing image
+      !before allocating the grid here, keep only the transitions for which
+      !we want a map!
+      !at the moment, I use the lcontrib_to_opac!
+      if (NActiveAtoms > 0) call dealloc_atom_quantities
+      call alloc_wavelengths_raytracing(.true.,Nrayone)
+      !TO do. If not npix_x or npix_y > 1; computes the total flux.
+      !otherwise, total flux not computed
+      !In that case, read the tab_lambda from the file and reset the indexes (do that in init_spectrum)
+      !!call init_Spectrum(.true.,Nrayone,lam0=lam0,vacuum_to_air=lvacuum_to_air)
+      if (n_etoiles > 0) call init_stellar_disk
+      call alloc_atom_quantities
+      call compute_background_continua
 
-      else !no nlte or using old populations so no chi_c_nlte no eta_c_nlte and atom is passive with old_populations
-
-      !  if (ltab_wavelength_image) then !atomic lines transfer with either lte or nlte populations
-      !     !using user defined grid
-
-      !     call error("tab wavelength not implemented")
-      !     !and electron scattering here ?
-
-      !  else
-         call init_Spectrum(.true.,Nrayone,lam0=lam0,vacuum_to_air=lvacuum_to_air)
-         if (n_etoiles > 0) call init_stellar_disk
-         call alloc_atom_quantities
-         call compute_background_continua
-
-         if (lelectron_scattering) then
+      if (lelectron_scattering) then
+         call warning("jnu might not be on the same grid now, except if cont is the same!")
+         write(*,*) " -> jnu cont must be interpolated locally and lambda_jnu must be stored!"
             !Here Jnu is flat across lines so we only need Jnu_cont to be written
-            if (lread_jnu_atom) then
-               call read_jnu_cont_bin
+         if (lread_jnu_atom) then
+            call read_jnu_cont_bin
                !still starts electron scattering from this value!
                !does not jump at the image calculation yet.
                !this allows to restart a calculation!
-            endif
-            call iterate_Jnu()
-            call write_jnu_cont_bin
-            if (lstop_after_jnu) then
-               write(*,*) " Jnu calculation done."
-               stop
-            endif
-         endif !electron scatt
+         endif
+         call iterate_Jnu()
+         call write_jnu_cont_bin
+         if (lstop_after_jnu) then
+            write(*,*) " Jnu calculation done."
+            stop
+         endif
+      endif !electron scatt
           
-      endif !atomic lines transfer with either lte or nlte populations
 
       !for all so after nlte case (debug)
       do m=1,Natom
@@ -965,6 +958,12 @@ module atom_transfer
       if (lexit_after_nonlte_loop) then
          return
        !free all data or because we leave after not needed
+      endif
+
+      !call compute_Imu
+    
+      if (loutput_rates) then
+         call write_opacity_emissivity_map
       endif
 
       if (lmagnetized) then
@@ -995,11 +994,6 @@ module atom_transfer
 
       call write_flux(only_flux=.true.)
       call write_atomic_maps
-      !call compute_Imu
-    
-      if (loutput_rates) then
-         call write_opacity_emissivity_map
-      endif
 
       ! ------------------------------------------------------------------------------------ !
       ! ------------------------------------------------------------------------------------ !

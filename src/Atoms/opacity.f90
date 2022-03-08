@@ -47,9 +47,11 @@ contains
           deallocate(atom%gauss_prof, atom%ug) !common gauss profile
        endif
 
-       do k = 1, atom%Ntr
+       tr_loop : do k = 1, atom%Ntr
 
           kc = atom%at(k)%ik
+
+          if (.not.atom%at(k)%lcontrib_to_opac) cycle tr_loop
 
           select case (atom%at(k)%trtype)
 
@@ -95,7 +97,7 @@ contains
           case default
              call Error("Transition type unknown", atom%at(k)%trtype)
           end select
-       enddo
+       enddo tr_loop
        atom => NULL()
     enddo
 
@@ -132,7 +134,9 @@ contains
           mem_alloc_local = mem_alloc_local + sizeof(atom%gauss_prof(:,:)) + sizeof(atom%ug(:))
        endif
 
-       do k = 1, atom%Ntr
+       tr_loop : do k = 1, atom%Ntr
+
+         if (.not.atom%at(k)%lcontrib_to_opac) cycle tr_loop
 
           kc = atom%at(k)%ik
 
@@ -319,7 +323,7 @@ contains
           case default
              call Error("Transition type unknown", atom%at(k)%trtype)
           end select
-       enddo
+       enddo tr_loop
        atom => NULL()
     enddo
 
@@ -361,7 +365,8 @@ contains
           atom%gauss_prof(:,icell) = exp(-(atom%ug(:)/atom%vbroad(icell))**2) / (SQRTPI * atom%vbroad(icell))
        endif
 
-       do k = 1, atom%Ntr
+       tr_loop : do k = 1, atom%Ntr
+          if (.not.atom%at(k)%lcontrib_to_opac) cycle tr_loop
 
           kc = atom%at(k)%ik
 
@@ -596,7 +601,7 @@ contains
           case default
              call Error("Transition type unknown", atom%at(k)%trtype)
           end select
-       enddo
+       enddo tr_loop
        atom => NULL()
     enddo
 
@@ -864,6 +869,8 @@ contains
 
        tr_loop : do kr = aatom%Ntr_line+1,aatom%Ntr
 
+         if (.not.aatom%at(kr)%lcontrib_to_opac) cycle tr_loop
+
 
           kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
 
@@ -975,6 +982,7 @@ contains
 
        tr_loop : do kr = 1,aatom%Ntr_line
 
+         if (.not.aatom%at(kr)%lcontrib_to_opac) cycle tr_loop
           kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
 
           Nred = aatom%lines(kc)%Nred; Nblue = aatom%lines(kc)%Nblue
@@ -1053,6 +1061,10 @@ contains
 
        cont_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
 
+         !-> should be always true for non-LTE
+         ! if (.not.atom%at(kr)%lcontrib_to_opac) cycle cont_loop
+
+
           kc = aatom%at(kr)%ik
 
           j = aatom%continua(kc)%j
@@ -1117,7 +1129,8 @@ contains
        endif
 
        line_loop : do kr = 1, aatom%Ntr_line
-
+         !-> should be always true for non-LTE
+         ! if (.not.atom%at(kr)%lcontrib_to_opac) cycle line_loop
           kc = aatom%at(kr)%ik
 
 
@@ -1201,7 +1214,7 @@ contains
        aatom => Atoms(nact)%ptr_atom
 
        tr_loop : do kr = 1,aatom%Ntr_line
-
+          if (.not.aatom%at(kr)%lcontrib_to_opac) cycle tr_loop
           kc = aatom%at(kr)%ik
 
           Nred = aatom%lines(kc)%Nred; Nblue = aatom%lines(kc)%Nblue

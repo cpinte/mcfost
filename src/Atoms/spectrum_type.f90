@@ -3,12 +3,12 @@ module spectrum_type
   use atom_type, only : AtomicLine, AtomicContinuum, AtomType
   use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, B_char,&
   icompute_atomRT, lmagnetized, laccretion_shock
-  use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table,&
-  make_wavelength_grid,make_wavelength_grid_new
+  use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table,min_resol,max_resol,&
+  make_wavelength_grid,make_wavelength_grid_new,make_wavelengths_raytracing, define_local_profile_grid,define_local_gauss_profile_grid
   use fits_utils, only : print_error
   use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
        n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
-       lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot, llimit_mem, simu_time
+       lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot, llimit_mem, simu_time, art_hv_nlte, art_hv
   use input, only : nb_proc, RT_line_method,lkeplerian, linfall, l_sym_ima
   use constantes, only : arcsec_to_deg
   use constant, only : clight
@@ -49,7 +49,7 @@ module spectrum_type
   real(kind=dp), allocatable, dimension(:,:,:,:,:) :: F_QUV
   real(kind=dp), allocatable, dimension(:,:) :: origin_atom, originc_atom
 
-  logical :: limage_at_lam0 = .false.
+  logical :: limage_at_lam0
   real(kind=dp), allocatable, dimension(:,:,:,:) :: image_map
 
 contains
@@ -69,7 +69,7 @@ contains
 
     alloc_nlte_vars = Nactiveatoms > 0
 
-
+    limage_at_lam0 = .false.
     if (present(lam0)) then
     	wavelength_ref = lam0
     	if (RT_line_method==2 .and. .not.lmagnetized) then
@@ -78,6 +78,15 @@ contains
     endif
 
     !set to zero if .not. limage that's why it is computed before!
+    hv = 0.46 * real(min_resol) * 1e-3
+    if (limage) then
+      if (art_hv > 0) hv = art_hv
+      write(*,'("R(raytrace)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
+    else
+      if (art_hv_nlte > 0.0) hv = art_hv_nlte
+      write(*,'("R(nlte)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
+    endif
+
     dk_max = int( sign(1.0_dp, v_char) * ( 1e-3 * abs(v_char) / hv + 0.5 ) )
 !     call make_wavelength_grid(wavelength_ref, v_char, lambda, Ntrans, lambda_cont)
     call make_wavelength_grid_new(limage, wavelength_ref, dk_max, lambda, Ntrans, lambda_cont)
@@ -102,26 +111,68 @@ contains
   end subroutine init_Spectrum
 
 
-  subroutine init_Spectrum_Image()
-    ! -------------------------------------------------------------------- !
-    ! Allocate a special wavelength grid for emission_line map.
-    ! This allows to solve for the RT equation only for a specific line.
-    ! This fasten LTE calculation in case of 1 line.
-    ! -------------------------------------------------------------------- !
-    real(kind=dp), dimension(Nlambda) :: old_grid
+  subroutine alloc_wavelengths_raytracing(limage,Nray, lam0, vacuum_to_air)
+   !should work with the non-LTE
+   ! ------------------------------------------- !
+   ! Allocate and store the wavelength grid for
+   ! NLTE atomic line transfer.
+   ! ------------------------------------------- !
+   logical, intent(in) :: limage
+   integer, intent(in) :: Nray
+   integer :: kr, nat
+   real(kind=dp), optional :: lam0
+   logical, optional :: vacuum_to_air
+   logical :: alloc_nlte_vars, alloc_image_vars
 
-    integer, parameter :: Nray = 1 !only one for image !!
+   alloc_nlte_vars = Nactiveatoms > 0
 
-    integer, dimension(:), allocatable :: Nlam_R
-    integer :: nat, kr, Ntrans_new, kp, kc
-    !for Jnu
-    integer :: icell, alloc_status, Nwaves_old
-    real(kind=dp), dimension(:,:), allocatable :: Jnuo, Jnuoc
+   limage_at_lam0 = .false.
+   if (present(lam0)) then
+      wavelength_ref = lam0
+      if (RT_line_method==2 .and. .not.lmagnetized) then
+         limage_at_lam0 = .true.
+      endif
+   endif
 
-    call error("initSpectrumImage not modified!!")
+   hv = 0.46 * real(min_resol) * 1e-3
+   if (limage) then
+     if (art_hv > 0) hv = art_hv
+     write(*,'("R(raytrace)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
+   else
+     if (art_hv_nlte > 0.0) hv = art_hv_nlte
+     write(*,'("R(nlte)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
+   endif
 
-    return
-  end subroutine init_Spectrum_Image
+   if (alloc_nlte_vars) then
+      call dealloc_spectrum
+      do nat=1, natom
+         do kr=1, atoms(nat)%ptr_atom%Nline
+            call define_local_profile_grid (atoms(nat)%ptr_atom%lines(kr))
+         enddo
+         if (atoms(nat)%ptr_atom%lgauss_prof) call define_local_gauss_profile_grid(atoms(nat)%ptr_atom)
+      enddo
+   endif
+
+   !set to zero if .not. limage that's why it is computed before!
+   dk_max = int( sign(1.0_dp, v_char) * ( 1e-3 * abs(v_char) / hv + 0.5 ) )
+   call make_wavelengths_raytracing(limage, wavelength_ref, dk_max, lambda, Ntrans, lambda_cont)
+   dk_min = -dk_max
+
+   !for each line
+   write(*,*) "Maximum shift in index:", dk_max, (1e-3 * v_char + hv) / hv
+   if (1d3 * abs(dk_max) * hv / clight > 1.0) then
+      call error("Doppler shift larger than c!")
+   endif
+
+   mem_alloc_tot = mem_alloc_tot + sizeof(lambda) + sizeof(lambda_cont)
+
+   Nlambda_cont = size(lambda_cont)
+   Nlambda = size(lambda)
+
+   call alloc_spectrum(alloc_nlte_vars, Nray)
+
+   return
+ end subroutine alloc_wavelengths_raytracing
 
 
   subroutine reallocate_rays_arrays(newNray)
@@ -586,11 +637,14 @@ contains
     if (allocated(lambda_cont)) deallocate(lambda_cont)
 
     deallocate(Itot, Icont)
-    if (allocated(Istar_tot)) deallocate(Istar_tot, Istar_cont, Istar_loc, flux_star)
+    if (allocated(Istar_tot)) deallocate(Istar_tot, Istar_cont)
+    if (allocated(Istar_loc)) deallocate(Istar_loc)
+    if ( allocated(flux_star) ) deallocate(flux_star)
     !can be deallocated before to save memory
     if (allocated(Flux)) deallocate(Flux)
     if (allocated(Fluxc)) deallocate(Fluxc)
-    if (allocated(flux_acc)) deallocate(flux_acc,Ishock)
+    if (allocated(flux_acc)) deallocate(flux_acc)
+    if (allocated(Ishock)) deallocate(Ishock)
 
     if (allocated(dk)) deallocate(dk)
 
@@ -607,6 +661,8 @@ contains
     if (allocated(HeI_rayleigh_part2)) deallocate(HeI_rayleigh_part2)
     if (allocated(sca_c)) deallocate(sca_c)
     deallocate(chi, eta)
+
+    if (allocated(chi_c_nlte)) deallocate(chi_c_nlte, eta_c_nlte)
 
     if (allocated(chi0_bb)) then
        deallocate(chi0_bb, eta0_bb)
@@ -1089,6 +1145,7 @@ contains
     !
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(6) :: naxes
+    integer, dimension(4) :: naxes_cont
     integer :: group,fpixel,nelements
     integer :: kr,n, j
     logical :: simple, extend
@@ -1098,6 +1155,8 @@ contains
     real :: pixel_scale_x, pixel_scale_y
     type (AtomType), pointer :: atom
     logical, dimension(Natom) :: write_map
+    real(kind=dp), dimension(:, :, :, :, :, :), allocatable :: tmp_arr
+    integer :: i3
 
     write(*,*) "Writing line Flux maps"
 
@@ -1114,11 +1173,17 @@ contains
     bitpix=-64
 
     naxis=5
-    naxes(2)=npix_x
-    naxes(3)=npix_y
+   !  naxes(2)=npix_x
+   !  naxes(3)=npix_y
+   !  naxes(4)=RT_n_incl
+   !  naxes(5)=RT_n_az
+   !  nelements=naxes(2)*naxes(3)*naxes(4)*naxes(5)
+    naxes(1) = npix_x
+    naxes(2) = npix_y
+   !  naxes(3) = Nlam
     naxes(4)=RT_n_incl
     naxes(5)=RT_n_az
-    nelements=naxes(2)*naxes(3)*naxes(4)*naxes(5)
+    nelements=naxes(1)*naxes(2)*naxes(4)*naxes(5)
 
     if (lmagnetized) then
     	naxes(6) = 3
@@ -1159,7 +1224,8 @@ contains
              call ftinit(unit,trim(atom%ID)//"_line_"//trim(adjustl(transition))//".fits.gz",blocksize,status)
 
              !-> includes the wavelengths due to velocity
-             naxes(1) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
+            !  naxes(1) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
+             naxes(3) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
 
              !if we enter here there is necessarily at least one map!
              call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
@@ -1191,23 +1257,36 @@ contains
              call ftpkyd(unit,'nu0',1d-6*clight / atom%lines(kr)%lambda0,-7,'10^15 Hz',status)
 
              !Write the array to the FITS file.
-             call ftpprd(unit,group,fpixel,naxes(1)*nelements,atom%lines(kr)%map(:,:,:,:,:),status)
+             !need to transpose porperly but avoid to change everything
+             allocate(tmp_arr(naxes(1),naxes(2),naxes(3),naxes(4), naxes(5),1))
+             do i3=1,naxes(3)
+               tmp_arr(:,:,i3,:,:,1) = atom%lines(kr)%map(i3,:,:,:,:)
+             enddo
+            !  call ftpprd(unit,group,fpixel,naxes(1)*nelements,atom%lines(kr)%map(:,:,:,:,:),status)
+             call ftpprd(unit,group,fpixel,naxes(3)*nelements,tmp_arr(:,:,:,:,:,1),status)
+             deallocate(tmp_arr)
              if (status > 0) call print_error(status)
 
              !create new hdu for lambda grid
              !-> convert to air ?
              call ftcrhd(unit, status)
              if (status > 0) call print_error(status)
-             call ftphpr(unit,simple,bitpix,1,naxes,0,1,extend,status)
+             call ftphpr(unit,simple,bitpix,1,naxes(3),0,1,extend,status)
              if (status > 0) call print_error(status)
              call ftpkys(unit, "UNIT", "nm", comment, status)
-             call ftpprd(unit,group,fpixel,naxes(1),lambda(atom%lines(kr)%Nblue+dk_min:atom%lines(kr)%Nred+dk_max),status)
+             !check axis of wavelength !!!
+             call ftpprd(unit,group,fpixel,naxes(3),lambda(atom%lines(kr)%Nblue+dk_min:atom%lines(kr)%Nred+dk_max),status)
 
              !-> now continuum image at central wavelength
+             naxes_cont(1) = naxes(1)
+             naxes_cont(2) = naxes(2)
+             naxes_cont(3) = naxes(4)
+             naxes_cont(4) = naxes(5)
+             
 
              call ftcrhd(unit, status)
              if (status > 0) call print_error(status)
-             call ftphpr(unit,simple,bitpix,4,naxes(2:naxis),0,1,extend,status)
+             call ftphpr(unit,simple,bitpix,4,naxes_cont,0,1,extend,status)
              if (status > 0) call print_error(status)
              call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
              call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
@@ -1240,7 +1319,12 @@ contains
              	call ftphpr(unit,simple,bitpix,6,naxes,0,1,extend,status)
              	if (status > 0) call print_error(status)
              	!Write the array to the FITS file.
-             	call ftpprd(unit,group,fpixel,nelements*naxes(1)*naxes(6),atom%lines(kr)%mapx(:,:,:,:,:,:),status)
+                allocate(tmp_arr(naxes(1),naxes(2),naxes(3),naxes(4), naxes(5),3))
+                do i3=1,naxes(3)
+                  tmp_arr(:,:,i3,:,:,:) = atom%lines(kr)%mapx(i3,:,:,:,:,:)
+                enddo
+             	call ftpprd(unit,group,fpixel,nelements*naxes(3)*naxes(6),tmp_arr,status)
+                deallocate(tmp_arr)
              	if (status > 0) call print_error(status)
              endif
 

@@ -101,6 +101,7 @@ subroutine set_default_variables()
   dpops_max_error = 1e-1
   dpops_sub_max_error = 1e-4
   art_hv = 0.0 !default is frac * min(vD)
+  art_hv_nlte = 0.0 !default is frac * min(vD)
   !
   lpuffed_rim = .false.
   lno_backup = .false.
@@ -809,6 +810,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) art_hv
         i_arg= i_arg+1
+      case("-art_nlte_line_resol")
+         i_arg = i_arg + 1
+         if (i_arg > nbr_arg) call error("resolution (km/s) needed with -art_nlte_line_resol !")
+         call get_command_argument(i_arg,s)
+         read(s,*,iostat=ios) art_hv_nlte
+         i_arg= i_arg+1
      case("-healpix_lorder")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("l value needed for healpix !")
@@ -1833,7 +1840,8 @@ subroutine display_help()
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
-  write(*,*) "        : -art_line_resol <v> : resolution of the non-LTE grid of art in km/s"
+  write(*,*) "        : -art_line_resol <v> : resolution of the image grid of art in km/s"
+  write(*,*) "        : -art_nlte_line_resol <v> : resolution of the non-LTE grid of art in km/s"
   write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
