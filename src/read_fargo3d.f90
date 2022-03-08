@@ -30,6 +30,8 @@ subroutine read_fargo3d_parameters(dir,id)
   fargo3d%dir = dir
   fargo3d%id = id
 
+  write(*,*) fargo3d%dir
+
   iunit = 1
   ios = 0
 
@@ -71,6 +73,7 @@ subroutine read_fargo3d_parameters(dir,id)
            fargo3d%log_spacing = .true.
         else
            fargo3d%log_spacing = .false.
+           call error("MCFOST linear grid for fargo3d not implemented yet")
         endif
      case("FRAME")
         if ((val == "C").or.(val == "c")) then
@@ -101,19 +104,84 @@ subroutine read_fargo3d_parameters(dir,id)
      end select
   end do
 
-  stop
+  ! Updating mcfost parameters
+  write(*,*) "Reading FARGO3D model"
+  write(*,*) "Forcing spherical grid and updating dimension"
+
+  grid_type = 2
+  n_rad = fargo3d%ny
+  n_rad_in = 1
+  n_az = fargo3d%nx
+  nz = fargo3d%nz/2 + 1
+
+  disk_zone(1)%rin  = fargo3d%ymin
+  disk_zone(1)%edge=0.0
+  disk_zone(1)%rmin = disk_zone(1)%rin
+  disk_zone(1)%rout = fargo3d%ymax
+  disk_zone(1)%rmax = fargo3d%ymax
+
+  write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az
+  write(*,*) "rin=", real(disk_zone(1)%rin), "rout=", real(disk_zone(1)%rout)
 
   return
 
 end subroutine read_fargo3d_parameters
 
 
-subroutine read_fargo3_files()
+!---------------------------------------------
 
-  ! Reading grid
+subroutine check_fargo3d_grid(r,theta,phi)
+
+  real(dp), dimension(*) :: r, theta, phi
+
+  return
+
+end subroutine check_fargo3d_grid
+
+!---------------------------------------------
+
+
+subroutine read_fargo3d_files()
 
   ! Reading dump file
+  !real*8  :: data(nx*ny*nz)
+  !open(unit=100, status="old", file=filename, form="unformatted", access="direct", recl = NX*NY*NZ*8)
+  !read(100,rec=1) data
 
-end subroutine read_fargo3_files
+  real(dp), dimension(:,:,:), allocatable  :: data
+  integer :: ios, iunit, alloc_status, i
+
+  character(len=128) :: filename
+  character(len=16), dimension(4) :: file_types
+
+  allocate(data(fargo3d%nx,fargo3d%ny,fargo3d%nz), stat=alloc_status) ! ie --> az, r, theta
+  if (alloc_status > 0) call error('Allocation error when reading fargo3d files')
+  data = 0.0_dp
+
+  ios = 0
+  iunit = 1
+
+  file_types(1) = "gasdens"
+  file_types(2) = "gasvx"
+  file_types(3) = "gasvy"
+  file_types(4) = "gasvz"
+  do i=1, 4
+     filename = trim(fargo3d%dir)//"/"//trim(file_types(i))//trim(trim(fargo3d%id))//".dat"
+     write(*,*) "Reading "//trim(filename)
+     open(unit=iunit, status="old", file=filename, form="unformatted", iostat=ios, access="direct", recl=8*fargo3d%nx*fargo3d%ny*fargo3d%nz)
+     if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+     read(iunit, rec=1, iostat=ios) data
+     if (ios /= 0) call error("reading fargo3d file:"//trim(filename))
+     close(iunit)
+
+
+  enddo
+
+  deallocate(data)
+  stop
+
+end subroutine read_fargo3d_files
+
+
 
 end module read_fargo3d

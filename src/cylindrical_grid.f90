@@ -3,6 +3,7 @@ module cylindrical_grid
   use constantes
   use parametres
   use messages
+  use read_fargo3d, only : fargo3d, check_fargo3d_grid
 
   implicit none
 
@@ -201,6 +202,7 @@ subroutine define_cylindrical_grid()
   real(kind=dp), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
   real(kind=dp) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=dp) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
+  real(kind=dp) :: theta, dtheta, theta_max
   integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
 
   type(disk_zone_type) :: dz
@@ -285,7 +287,7 @@ subroutine define_cylindrical_grid()
      ln_delta_r_in = (1.0_dp/real(n_rad_in_region,kind=dp))*log(delta_r)
      delta_r_in = exp(ln_delta_r_in)
 
-     ! Selection de la zone correpondante : pente la plus forte
+     ! Selection de la zone correspondante : pente la plus forte
      puiss = 0.0_dp
      do iz=1, n_zones
         if (disk_zone(iz)%region == ir) then
@@ -433,7 +435,7 @@ subroutine define_cylindrical_grid()
      z_lim(:,nz+2)=1.0e30
      zmaxmax = maxval(zmax)
 
-  else !lspherical
+  else ! lspherical
      ! tab_r est en spherique ici
      w_lim(0) = 0.0_dp
      theta_lim(0) = 0.0_dp
@@ -443,20 +445,32 @@ subroutine define_cylindrical_grid()
      theta_lim(nz) = pi/2.
      tan_theta_lim(nz) = 1.e30_dp
 
-     do j=1, nz-1
-        ! repartition uniforme en cos
-        w= real(j,kind=dp)/real(nz,kind=dp)
-        w_lim(j) = w
-        tan_theta_lim(j) = w / sqrt(1.0_dp - w*w)
-        theta_lim(j) = atan(tan_theta_lim(j))
-     enddo
+     if (lfargo3d) then ! repartition uniforme en theta, jusqu'a theta max, puis 1 cellule vide jusqu'a pi/2
+        theta_max = 0.5 * pi - fargo3d%zmin
+        dtheta = theta_max / (nz-1)
+        do j=1, nz-1
+
+           theta = j * dtheta
+           theta_lim(j) = theta
+           tan_theta_lim(j) = tan(theta)
+           w_lim(j) = sin(theta)
+        enddo
+
+     else ! repartition uniforme en cos
+        do j=1, nz-1
+           w= real(j,kind=dp)/real(nz,kind=dp)
+           w_lim(j) = w
+           tan_theta_lim(j) = w / sqrt(1.0_dp - w*w)
+           theta_lim(j) = atan(tan_theta_lim(j))
+        enddo
+     endif
 
      do i=1, n_rad
         !rsph = 0.5*(r_lim(i) +r_lim(i-1))
         rsph = sqrt(r_lim(i) * r_lim(i-1))
 
         do j=1,nz
-           w = (real(j,kind=dp)-0.5_dp)/real(nz,kind=dp)
+           w = w_lim(j)
            uv = sqrt(1.0_dp - w*w)
            r_grid_tmp(i,j)=rsph * uv
            z_grid_tmp(i,j)=rsph * w
@@ -491,6 +505,20 @@ subroutine define_cylindrical_grid()
      enddo
   endif
 
+
+  if (lfargo3d) call check_fargo3d_grid(r_lim,theta_lim,phi_grid_tmp)
+
+  ! Unit test to compare with fargo3d domain_z.dat
+  do j=nz,1, -1
+     write(*,*) nz-j +3 , pi/2 - theta_lim(j)  ! --> ok, teste sans pb
+  enddo
+
+  ! Unit test to compare with fargo3d domain_y.dat : tab_r
+  ! Unit test
+  ! check that is only an offset
+
+
+
   ! Determine the zone for each cell
   do ir = 1, n_regions
      do i=1, n_rad
@@ -509,7 +537,7 @@ subroutine define_cylindrical_grid()
 
      r_grid(icell) = r_grid_tmp(i,j)
      z_grid(icell) = z_grid_tmp(i,j)
-     phi_grid(icell) = phi_grid_tmp(k)
+     phi_grid(icell) = phi_grid_tmp(k)  ! BUG ?? : this is the limit of th ecell, not the center
   enddo
 
 

@@ -11,7 +11,7 @@ module init_mcfost
   use input, only : Tfile, lect_lambda, read_phase_function, read_molecules_names
   use ProdiMo
   use utils
-  use read_fargo3d, only : read_fargo3d_parameters
+  use read_fargo3d, only : read_fargo3d_parameters, read_fargo3d_files
 
   implicit none
 
@@ -1114,6 +1114,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,fargo3d_id)
         i_arg = i_arg + 1
+        read(fargo3d_id,*,iostat=ios) i
+        if (ios/=0) call error("fargo3d dump number needed")
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1134,6 +1136,9 @@ subroutine initialisation_mcfost()
      call warning("farg3d : forcing spherical grid") ! only spherical grid is implemented for now
      disk_zone(1)%geometry = 2
      call read_fargo3d_parameters(fargo3d_dir, fargo3d_id)
+
+
+     call read_fargo3d_files()
   endif
 
   if (n_zones > 1) lvariable_dust=.true.
