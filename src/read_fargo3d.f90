@@ -5,6 +5,7 @@ module read_fargo3d
   use mcfost_env
   use grid
   use cylindrical_grid
+  use density
 
   implicit none
 
@@ -20,8 +21,6 @@ subroutine read_fargo3d_parameters(dir,id)
   fargo3d%dir = dir
   fargo3d%id = id
 
-  write(*,*) fargo3d%dir
-
   iunit = 1
   ios = 0
 
@@ -35,8 +34,6 @@ subroutine read_fargo3d_parameters(dir,id)
   do while(ios==0)
      n_lines=n_lines+1
      read(1,*,iostat=ios) key, val
-
-     write(*,*) trim(key), " --> ", trim(val)
 
      select case(trim(key))
      ! reading grid parameters
@@ -96,7 +93,7 @@ subroutine read_fargo3d_parameters(dir,id)
 
   ! Updating mcfost parameters
   write(*,*) "Reading FARGO3D model"
-  write(*,*) "Forcing spherical grid and updating dimension"
+  write(*,*) "Forcing spherical grid geometry and updating dimensions"
 
   grid_type = 2
   n_rad = fargo3d%ny
@@ -124,6 +121,15 @@ subroutine check_fargo3d_grid(r,theta,phi)
 
   real(dp), dimension(*) :: r, theta, phi
 
+
+  ! Unit test to compare with fargo3d domain_z.dat
+  !do j=nz,1, -1
+  !   write(*,*) nz-j +3 , pi/2 - theta_lim(j)  ! --> ok, teste sans pb
+  !enddo
+
+  ! Unit test to compare with fargo3d domain_y.dat : tab_r
+  ! Unit test for phi check that is only an offset
+
   return
 
 end subroutine check_fargo3d_grid
@@ -133,13 +139,9 @@ end subroutine check_fargo3d_grid
 
 subroutine read_fargo3d_files()
 
-  ! Reading dump file
-  !real*8  :: data(nx*ny*nz)
-  !open(unit=100, status="old", file=filename, form="unformatted", access="direct", recl = NX*NY*NZ*8)
-  !read(100,rec=1) data
-
   real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
-  integer :: ios, iunit, alloc_status, l, recl, i,j, jj, k
+  integer :: ios, iunit, alloc_status, l, recl, i,j, jj, k, icell, id
+  real(dp) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
 
   character(len=128) :: filename
   character(len=16), dimension(4) :: file_types
@@ -177,28 +179,45 @@ subroutine read_fargo3d_files()
      close(iunit)
   enddo
 
+  ! Reading planet properties
+  filename = trim(fargo3d%dir)//"/planet0.dat"
+  write(*,*) "Reading "//trim(filename)
+  open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+  if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+
+  read(fargo3d%id,*) id
+  do while(ios==0)
+     read(iunit,*) i, x, y, z, vx, vy, vz, Mp, time, Omega_p
+     if (i==id) exit
+  enddo
+
+  !-----------------------------------
+  ! Passing data to mcfost
+  !-----------------------------------
   lvelocity_file = .true.
   vfield_coord = 3 ! spherical
-!
-!  do i=1, n_rad
-!     jj= 0
-!     bz : do j=j_start-1,nz+1 ! 1 extra empty cell in theta on each side
-!        if (j==0) cycle bz
-!        jj = jj + 1
-!        do k=1, n_az
-!           icell = cell_map(i,j,k)
-!
-!           densite_gaz(icell) = fargo3d_density(k,i,jj)
-!           vfield3d(icell,1)    = fargo3d_vx(k,i,jj) ! vr
-!           vfield3d(icell,2)    = fargo3d_vx(k,i,jj) ! vphi
-!           vfield3d(icell,3)    = fargo3d_vz(k,i,jj) ! vtheta
-!        enddo ! k
-!     enddo bz
-!  enddo ! i
 
+  allocate(vfield3d(n_cells,3), stat=alloc_status)
+  if (alloc_status /= 0) call error("memory allocation error fargo3v vfield3d")
 
+  do i=1, n_rad
+     jj= 0
+     bz : do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
+        if (j==0) cycle bz
+        jj = jj + 1
+        do k=1, n_az
+           icell = cell_map(i,j,k)
 
-!  deallocate()
+           densite_gaz(icell) = fargo3d_density(k,i,jj)
+           vfield3d(icell,1)    = fargo3d_vy(k,i,jj) ! vr
+           vfield3d(icell,2)    = fargo3d_vx(k,i,jj) + r_grid(icell) * Omega_p ! vphi
+           vfield3d(icell,3)    = fargo3d_vz(k,i,jj) ! vtheta
+        enddo ! k
+     enddo bz
+  enddo ! i
+  deallocate(fargo3d_density,fargo3d_vx,fargo3d_vy,fargo3d_vz)
+
+  write(*,*) "STOPPING"
   stop
 
 end subroutine read_fargo3d_files

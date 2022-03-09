@@ -506,17 +506,6 @@ subroutine define_cylindrical_grid()
 
 !  if (lfargo3d) call check_fargo3d_grid(r_lim,theta_lim,phi_grid_tmp)
 
-  ! Unit test to compare with fargo3d domain_z.dat
-  do j=nz,1, -1
-     write(*,*) nz-j +3 , pi/2 - theta_lim(j)  ! --> ok, teste sans pb
-  enddo
-
-  ! Unit test to compare with fargo3d domain_y.dat : tab_r
-  ! Unit test
-  ! check that is only an offset
-
-
-
   ! Determine the zone for each cell
   do ir = 1, n_regions
      do i=1, n_rad

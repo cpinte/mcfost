@@ -1137,9 +1137,6 @@ subroutine initialisation_mcfost()
      call warning("farg3d : forcing spherical grid") ! only spherical grid is implemented for now
      disk_zone(1)%geometry = 2
      call read_fargo3d_parameters(fargo3d_dir, fargo3d_id)
-
-
-     call read_fargo3d_files()
   endif
 
   if (n_zones > 1) lvariable_dust=.true.
