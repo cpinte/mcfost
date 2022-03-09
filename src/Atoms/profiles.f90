@@ -154,7 +154,7 @@ module PROFILES
          omegav(Nvspace) = v1 / vbroad
          omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
       endif
-      if (lsubstract_avg) omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+      ! if (lsubstract_avg) omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
 
 
       if (line%voigt) then
