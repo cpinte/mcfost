@@ -743,7 +743,7 @@ module atom_transfer
 
          n_rayons_max = 1
 
-         call init_Spectrum(.false.,n_rayons_max)
+         call init_Spectrum(.true.,n_rayons_max)
          if (n_etoiles > 0) call init_stellar_disk
          call alloc_atom_quantities
          call compute_background_continua
@@ -921,15 +921,15 @@ module atom_transfer
       !before allocating the grid here, keep only the transitions for which
       !we want a map!
       !at the moment, I use the lcontrib_to_opac!
-      if (NActiveAtoms > 0) call dealloc_atom_quantities
-      call alloc_wavelengths_raytracing(.true.,Nrayone)
-      !TO do. If not npix_x or npix_y > 1; computes the total flux.
-      !otherwise, total flux not computed
-      !In that case, read the tab_lambda from the file and reset the indexes (do that in init_spectrum)
-      !!call init_Spectrum(.true.,Nrayone,lam0=lam0,vacuum_to_air=lvacuum_to_air)
-      if (n_etoiles > 0) call init_stellar_disk
-      call alloc_atom_quantities
-      call compute_background_continua
+      ! if (NActiveAtoms > 0) call dealloc_atom_quantities
+      ! call alloc_wavelengths_raytracing(.true.,Nrayone)
+      ! !TO do. If not npix_x or npix_y > 1; computes the total flux.
+      ! !otherwise, total flux not computed
+      ! !In that case, read the tab_lambda from the file and reset the indexes (do that in init_spectrum)
+      ! !!call init_Spectrum(.true.,Nrayone,lam0=lam0,vacuum_to_air=lvacuum_to_air)
+      ! if (n_etoiles > 0) call init_stellar_disk
+      ! call alloc_atom_quantities
+      ! call compute_background_continua
 
       if (lelectron_scattering) then
          call warning("jnu might not be on the same grid now, except if cont is the same!")

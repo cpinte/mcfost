@@ -1,11 +1,11 @@
 MODULE statequil_atoms
 
   use atmos_type, only : ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements, hydrogen, helium, &
-       nHtot, helium_is_active
+       nHtot, helium_is_active, laccretion_shock
   use atom_type
   use spectrum_type, only					: lambda, Nlambda, Nlambda_cont, lambda_cont, Jnu_cont, Itot, &
        dk, dk_min, dk_max, &
-       Jnu, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb
+       Jnu, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb, Istar_loc, Ishock
   use constant
   use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc
   use math, only		: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, solve_lin
@@ -2547,7 +2547,8 @@ CONTAINS
           Ieff(1:Nl) = Itot(Nblue+dk_min:Nred+dk_max,iray,id) - Psi(Nblue+dk_min:Nred+dk_max,iray,id) * &
                eta_atoms(Nblue+dk_min:Nred+dk_max,nact,id)
           if (lsobolev_regime) then
-            Ieff(1:Nl) = 0.0
+            Ieff(1:Nl) = Istar_loc(Nblue+dk_min:Nred+dk_max,id)!0.0
+            if (laccretion_shock) Ieff(1:Nl) = Ieff(1:Nl) + Ishock(Nblue+dk_min:Nred+dk_max,id)
           endif
 
           ! 				enddo
