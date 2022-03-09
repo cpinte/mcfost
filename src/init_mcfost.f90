@@ -1134,7 +1134,7 @@ subroutine initialisation_mcfost()
   if (lfargo3d) then
      l3D = .true.
      if (n_zones > 1) call error("fargo3d mode only work with 1 zone")
-     call warning("farg3d : forcing spherical grid") ! only spherical grid is implemented for now
+     call warning("fargo3d : forcing spherical grid") ! only spherical grid is implemented for now
      disk_zone(1)%geometry = 2
      call read_fargo3d_parameters(fargo3d_dir, fargo3d_id)
   endif

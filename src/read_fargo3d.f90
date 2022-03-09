@@ -137,19 +137,22 @@ end subroutine check_fargo3d_grid
 subroutine read_fargo3d_files()
 
   real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
-  integer :: ios, iunit, alloc_status, l, recl, i,j, jj, k, icell, id
+  integer :: ios, iunit, alloc_status, l, recl, i,j, jj, k, icell, id, n_etoiles_old
   real(dp) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
 
   character(len=128) :: filename
   character(len=16), dimension(4) :: file_types
 
-  real(dp) :: Ggrav_fargo3d = 1.0_dp
-  real(dp) :: umass, usolarmass, ulength, utime, udens, uvelocity
+  real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au
+  type(star_type), dimension(:), allocatable :: etoile_old
 
-  usolarmass = 1
+  usolarmass = 1.0_dp
+  ulength_au = 1.0_dp
+  Ggrav_fargo3d = 1.0_dp
+
   umass = usolarmass *  Msun_to_kg
-  ulength = AU_to_m
-  utime = sqrt(ulength**3/(Ggrav_fargo3d*umass))
+  ulength = ulength_au * AU_to_m
+  utime = sqrt(ulength**3/((Ggrav/Ggrav_fargo3d)*umass))
 
   udens = umass / ulength**3
   uvelocity = ulength / utime
@@ -200,6 +203,66 @@ subroutine read_fargo3d_files()
      if (i==id) exit
   enddo
 
+  ! Checking units :
+  ! Omega_p * uvelocity == 29.78 km/s : OK
+
+  n_etoiles_old = n_etoiles
+  n_etoiles = 2 ! Hard coded for new
+
+  if (lfix_star) then
+     write(*,*) ""
+     write(*,*) "Stellar parameters will not be updated, only the star positions, velocities and masses"
+     if (n_etoiles /= n_etoiles_old) call error("Wrong number of stars in mcfost parameter files")
+  else
+     write(*,*) ""
+     write(*,*) "Updating the stellar properties:"
+     write(*,*) "There are now", n_etoiles, "stars in the model"
+
+     ! Saving if the accretion rate was forced
+     allocate(etoile_old(n_etoiles_old))
+     if (allocated(etoile)) then
+        etoile_old(:) = etoile(:)
+        deallocate(etoile)
+     endif
+     allocate(etoile(n_etoiles))
+     do i=1, min(n_etoiles, n_etoiles_old)
+        etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
+        etoile(i)%Mdot = etoile_old(i)%Mdot
+     enddo
+     ! If we have new stars
+     do i=n_etoiles_old,n_etoiles
+        etoile(i)%force_Mdot = .false.
+        etoile(i)%Mdot = 0.
+     enddo
+     deallocate(etoile_old)
+     etoile(:)%find_spectrum = .true.
+  endif
+
+  etoile(1)%x = 0_dp ; etoile(1)%y = 0_dp ; etoile(1)%z = 0_dp
+  etoile(1)%vx = 0_dp ; etoile(1)%vy = 0_dp ; etoile(1)%vz = 0_dp
+  etoile(1)%M = 1_dp * usolarmass
+
+  etoile(2)%x = x * ulength_au
+  etoile(2)%y = y * ulength_au
+  etoile(2)%z = z * ulength_au
+
+  etoile(2)%vx = vx * uvelocity
+  etoile(2)%vy = vy * uvelocity
+  etoile(2)%vz = vz * uvelocity
+
+  etoile(2)%M = Mp * usolarmass
+
+  do i=1,n_etoiles
+     if (etoile(i)%M > 0.013) then
+        write(*,*) "Star   #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
+             real(etoile(i)%M), "Msun, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
+     else
+        write(*,*) "Planet #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
+             real(etoile(i)%M * GxMsun/GxMjup), "MJup, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
+     endif
+     if (i>1) write(*,*)  "       distance=", real(sqrt((etoile(i)%x - etoile(1)%x)**2 + (etoile(i)%y - etoile(1)%y)**2 + (etoile(i)%z - etoile(1)%z)**2)), "au"
+  enddo
+
   !-----------------------------------
   ! Passing data to mcfost
   !-----------------------------------
@@ -226,11 +289,6 @@ subroutine read_fargo3d_files()
      enddo bz
   enddo ! i
   deallocate(fargo3d_density,fargo3d_vx,fargo3d_vy,fargo3d_vz)
-
-
-  ! define stars
-
-
 
   write(*,*) "Done"
   stop
