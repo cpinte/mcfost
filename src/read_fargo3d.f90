@@ -92,9 +92,6 @@ subroutine read_fargo3d_parameters(dir,id)
   end do
 
   ! Updating mcfost parameters
-  write(*,*) "Reading FARGO3D model"
-  write(*,*) "Forcing spherical grid geometry and updating dimensions"
-
   grid_type = 2
   n_rad = fargo3d%ny
   n_rad_in = 1
@@ -146,6 +143,18 @@ subroutine read_fargo3d_files()
   character(len=128) :: filename
   character(len=16), dimension(4) :: file_types
 
+  real(dp) :: Ggrav_fargo3d = 1.0_dp
+  real(dp) :: umass, usolarmass, ulength, utime, udens, uvelocity
+
+  usolarmass = 1
+  umass = usolarmass *  Msun_to_kg
+  ulength = AU_to_m
+  utime = sqrt(ulength**3/(Ggrav_fargo3d*umass))
+
+  udens = umass / ulength**3
+  uvelocity = ulength / utime
+
+
   ! dimensions are az, r, theta
   allocate(fargo3d_density(fargo3d%nx,fargo3d%ny,fargo3d%nz),fargo3d_vx(fargo3d%nx,fargo3d%ny,fargo3d%nz), &
        fargo3d_vy(fargo3d%nx,fargo3d%ny,fargo3d%nz),fargo3d_vz(fargo3d%nx,fargo3d%ny,fargo3d%nz),stat=alloc_status)
@@ -194,6 +203,7 @@ subroutine read_fargo3d_files()
   !-----------------------------------
   ! Passing data to mcfost
   !-----------------------------------
+  write(*,*) "Converting fargo3d files to mcfost ..."
   lvelocity_file = .true.
   vfield_coord = 3 ! spherical
 
@@ -208,16 +218,21 @@ subroutine read_fargo3d_files()
         do k=1, n_az
            icell = cell_map(i,j,k)
 
-           densite_gaz(icell) = fargo3d_density(k,i,jj)
-           vfield3d(icell,1)    = fargo3d_vy(k,i,jj) ! vr
-           vfield3d(icell,2)    = fargo3d_vx(k,i,jj) + r_grid(icell) * Omega_p ! vphi
-           vfield3d(icell,3)    = fargo3d_vz(k,i,jj) ! vtheta
+           densite_gaz(icell) = fargo3d_density(k,i,jj) * udens
+           vfield3d(icell,1)  = fargo3d_vy(k,i,jj) * uvelocity! vr
+           vfield3d(icell,2)  = (fargo3d_vx(k,i,jj) + r_grid(icell) * Omega_p) * uvelocity ! vphi
+           vfield3d(icell,3)  = fargo3d_vz(k,i,jj) * uvelocity! vtheta
         enddo ! k
      enddo bz
   enddo ! i
   deallocate(fargo3d_density,fargo3d_vx,fargo3d_vy,fargo3d_vz)
 
-  write(*,*) "STOPPING"
+
+  ! define stars
+
+
+
+  write(*,*) "Done"
   stop
 
 end subroutine read_fargo3d_files

@@ -204,7 +204,10 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
     call extract('massoftype',massoftype(ifile,1:ntypes),hdr,ierr)
     call extract('hfact',hfact,hdr,ierr)
     call extract('gmw',gmw,hdr,ierr)
-    if (ierr /= 0) gmw=mu
+    if (ierr /= 0) then
+       write(*,*) "Using mcfost value instead : ", mu
+       gmw=mu
+    endif
     if (ndusttypes > 0) then
        call extract('grainsize',grainsize(1:ndusttypes),hdr,ierr) ! code units here
        call extract('graindens',graindens(1:ndusttypes),hdr,ierr)
@@ -850,6 +853,13 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   usolarmass = umass_scaled / Msun_to_g
 
   simu_time = simu_time * utime_scaled
+
+
+  write(*,*) umass, usolarmass
+  write(*,*) utime
+  write(*,*) udist
+  stop
+
 
  if (dustfluidtype == 1) then
     ! 1-fluid: always use gas particles for Voronoi mesh
