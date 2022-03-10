@@ -138,13 +138,13 @@ contains
   subroutine read_fargo3d_files()
 
     real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
-    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, k, icell, id, n_etoiles_old
+    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old
     real(dp) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
 
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
 
-    real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au
+    real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
     type(star_type), dimension(:), allocatable :: etoile_old
 
     usolarmass = 1.0_dp
@@ -270,31 +270,58 @@ contains
     !-----------------------------------
     ! Passing data to mcfost
     !-----------------------------------
-    write(*,*) "Converting fargo3d files to mcfost ..."
+    write(*,*) "Converting fargo3d files to mcfost ...", maxval(fargo3d_density)
     lvelocity_file = .true.
     vfield_coord = 3 ! spherical
 
     allocate(vfield3d(n_cells,3), stat=alloc_status)
     if (alloc_status /= 0) call error("memory allocation error fargo3v vfield3d")
 
+    write(*,*) "Constant spatial distribution"
+
     do i=1, n_rad
        jj= 0
        bz : do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
           if (j==0) cycle bz
           jj = jj + 1
-          do k=1, n_az
-             icell = cell_map(i,j,k)
+          do phik=1, n_az
+             icell = cell_map(i,j,phik)
 
-             densite_gaz(icell) = fargo3d_density(k,i,jj) * udens
-             vfield3d(icell,1)  = fargo3d_vy(k,i,jj) * uvelocity! vr
-             vfield3d(icell,2)  = (fargo3d_vx(k,i,jj) + r_grid(icell) * Omega_p) * uvelocity ! vphi
-             vfield3d(icell,3)  = fargo3d_vz(k,i,jj) * uvelocity! vtheta
+             densite_gaz(icell) = fargo3d_density(phik,i,jj) * udens
+             densite_pouss(:,icell) = fargo3d_density(phik,i,jj) * udens
+
+             vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity! vr
+             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell) * Omega_p) * uvelocity ! vphi
+             vfield3d(icell,3)  = fargo3d_vz(phik,i,jj) * uvelocity! vtheta
           enddo ! k
        enddo bz
     enddo ! i
     deallocate(fargo3d_density,fargo3d_vx,fargo3d_vy,fargo3d_vz)
 
+    ! Normalisation density : copy and paste frpm read_density_file for now : needs to go in subroutine
 
+    ! Calcul de la masse de gaz de la zone
+    mass = 0.
+    do icell=1,n_cells
+       mass = mass + densite_gaz(icell) *  masse_mol_gaz * volume(icell)
+    enddo !icell
+    mass =  mass * AU3_to_m3 * g_to_Msun
+
+    ! Normalisation
+    if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+       facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+
+       ! Somme sur les zones pour densite finale
+       do icell=1,n_cells
+          densite_gaz(icell) = densite_gaz(icell) * facteur
+          masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+       enddo ! icell
+    else
+       call error('Gas mass is 0')
+    endif
+
+    write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+    call normalize_dust_density()
 
     write(*,*) "Done"
 
