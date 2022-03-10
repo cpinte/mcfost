@@ -827,18 +827,18 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
   ! We check the units by recomputing G
   G_phantom = udist**3 / (utime**2 * umass)
-  if (abs(G_phantom - Ggrav*1e3) > 1e-2 * G_phantom) call error("Phatom units are not consistent")
+  if (abs(G_phantom - Ggrav*1e3) > 1e-2 * G_phantom) call error("Phantom units are not consistent")
 
   udist_scaled = udist
   umass_scaled = umass
   if (lscale_length_units) then
-     write(*,*) 'Lengths are rescaled by ', scale_length_units_factor
+     write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
      udist_scaled = udist * scale_length_units_factor
   else
      scale_length_units_factor = 1.0
   endif
   if (lscale_mass_units) then
-     write(*,*) 'Mass are rescaled by ', scale_mass_units_factor
+     write(*,*) 'Mass are rescaled by ', real(scale_mass_units_factor)
      umass_scaled = umass * scale_mass_units_factor
   else
      scale_mass_units_factor = 1.0

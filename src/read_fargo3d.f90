@@ -99,11 +99,17 @@ contains
     n_az = fargo3d%nx
     nz = fargo3d%nz/2 + 1
 
-    disk_zone(1)%rin  = fargo3d%ymin
+    if (lscale_length_units) then
+       write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
+    else
+       scale_length_units_factor = 1.0
+    endif
+
+    disk_zone(1)%rin  = fargo3d%ymin * scale_length_units_factor
     disk_zone(1)%edge=0.0
     disk_zone(1)%rmin = disk_zone(1)%rin
-    disk_zone(1)%rout = fargo3d%ymax
-    disk_zone(1)%rmax = fargo3d%ymax
+    disk_zone(1)%rout = fargo3d%ymax * scale_length_units_factor
+    disk_zone(1)%rmax = disk_zone(1)%rout
 
     write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az
     write(*,*) "rin=", real(disk_zone(1)%rin), "rout=", real(disk_zone(1)%rout)
@@ -147,9 +153,23 @@ contains
     real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
     type(star_type), dimension(:), allocatable :: etoile_old
 
+
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
     Ggrav_fargo3d = 1.0_dp
+
+    if (lscale_length_units) then
+       ulength_au = ulength_au * scale_length_units_factor
+    else
+       scale_length_units_factor = 1.0
+    endif
+
+    if (lscale_mass_units) then
+       write(*,*) 'Mass are rescaled by ', real(scale_mass_units_factor)
+       usolarmass = usolarmass * scale_mass_units_factor
+    else
+       scale_mass_units_factor = 1.0
+    endif
 
     umass = usolarmass *  Msun_to_kg
     ulength = ulength_au * AU_to_m
@@ -157,7 +177,6 @@ contains
 
     udens = umass / ulength**3
     uvelocity = ulength / utime
-
 
     ! dimensions are az, r, theta
     allocate(fargo3d_density(fargo3d%nx,fargo3d%ny,fargo3d%nz),fargo3d_vx(fargo3d%nx,fargo3d%ny,fargo3d%nz), &
@@ -270,7 +289,7 @@ contains
     !-----------------------------------
     ! Passing data to mcfost
     !-----------------------------------
-    write(*,*) "Converting fargo3d files to mcfost ...", maxval(fargo3d_density)
+    write(*,*) "Converting fargo3d files to mcfost ..."
     lvelocity_file = .true.
     vfield_coord = 3 ! spherical
 
