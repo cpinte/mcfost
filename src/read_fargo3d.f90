@@ -153,6 +153,12 @@ contains
     real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
     type(star_type), dimension(:), allocatable :: etoile_old
 
+    ! Todo : add option to skip velocity files if only continuum is needed
+
+    ! Todo : offset in azimuth between fargo3d and mcfost --> just rotate planet coordinates ?
+
+    ! Todo : correct : Omega_p and vphi (r_grid) for unit scaling
+
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
@@ -186,30 +192,6 @@ contains
 
     ios = 0
     iunit = 1
-    recl = dp*fargo3d%nx*fargo3d%ny*fargo3d%nz
-
-    file_types(1) = "gasdens"
-    file_types(2) = "gasvx"
-    file_types(3) = "gasvy"
-    file_types(4) = "gasvz"
-    do l=1, 4
-       filename = trim(fargo3d%dir)//"/"//trim(file_types(l))//trim(trim(fargo3d%id))//".dat"
-       write(*,*) "Reading "//trim(filename)
-       open(unit=iunit, file=filename, status="old", form="unformatted", iostat=ios, access="direct" , recl=recl)
-       if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
-       select case(l)
-       case(1)
-          read(iunit, rec=1, iostat=ios) fargo3d_density
-       case(2)
-          read(iunit, rec=1, iostat=ios) fargo3d_vx
-       case(3)
-          read(iunit, rec=1, iostat=ios) fargo3d_vy
-       case(4)
-          read(iunit, rec=1, iostat=ios) fargo3d_vz
-       end select
-       if (ios /= 0) call error("reading fargo3d file:"//trim(filename))
-       close(iunit)
-    enddo
 
     ! Reading planet properties
     filename = trim(fargo3d%dir)//"/planet0.dat"
@@ -293,6 +275,31 @@ contains
     lvelocity_file = .true.
     vfield_coord = 3 ! spherical
 
+    recl = dp*fargo3d%nx*fargo3d%ny*fargo3d%nz
+
+    file_types(1) = "gasdens"
+    file_types(2) = "gasvx"
+    file_types(3) = "gasvy"
+    file_types(4) = "gasvz"
+    do l=1, 4
+       filename = trim(fargo3d%dir)//"/"//trim(file_types(l))//trim(trim(fargo3d%id))//".dat"
+       write(*,*) "Reading "//trim(filename)
+       open(unit=iunit, file=filename, status="old", form="unformatted", iostat=ios, access="direct" , recl=recl)
+       if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+       select case(l)
+       case(1)
+          read(iunit, rec=1, iostat=ios) fargo3d_density
+       case(2)
+          read(iunit, rec=1, iostat=ios) fargo3d_vx ! vphi
+       case(3)
+          read(iunit, rec=1, iostat=ios) fargo3d_vy ! vr
+       case(4)
+          read(iunit, rec=1, iostat=ios) fargo3d_vz ! vtheta
+       end select
+       if (ios /= 0) call error("reading fargo3d file:"//trim(filename))
+       close(iunit)
+    enddo
+
     allocate(vfield3d(n_cells,3), stat=alloc_status)
     if (alloc_status /= 0) call error("memory allocation error fargo3v vfield3d")
 
@@ -310,12 +317,16 @@ contains
              densite_pouss(:,icell) = fargo3d_density(phik,i,jj) * udens
 
              vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity! vr
-             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell) * Omega_p) * uvelocity ! vphi
+             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
              vfield3d(icell,3)  = fargo3d_vz(phik,i,jj) * uvelocity! vtheta
           enddo ! k
        enddo bz
     enddo ! i
     deallocate(fargo3d_density,fargo3d_vx,fargo3d_vy,fargo3d_vz)
+
+    !write(*,*) maxval(vfield3d(:,1))/1000., maxval(vfield3d(:,2))/1000., maxval(vfield3d(:,3))/1000.
+    !write(*,*) etoile(2)%vx/1000., etoile(2)%vy/1000., etoile(2)%vz/1000.
+    !stop
 
     ! Normalisation density : copy and paste frpm read_density_file for now : needs to go in subroutine
 
