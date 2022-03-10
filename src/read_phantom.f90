@@ -854,13 +854,6 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
 
   simu_time = simu_time * utime_scaled
 
-
-  write(*,*) umass, usolarmass
-  write(*,*) utime
-  write(*,*) udist
-  stop
-
-
  if (dustfluidtype == 1) then
     ! 1-fluid: always use gas particles for Voronoi mesh
     use_dust_particles = .false.

@@ -7,11 +7,12 @@ module SPH2mcfost
   use density, only : normalize_dust_density, reduce_density
   use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
   use sort, only : index_quicksort
+  use stars, only : compute_stellar_parameters
 
   implicit none
 
   procedure(read_phantom_bin_files), pointer :: read_phantom_files => null()
-  
+
 contains
 
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
@@ -37,7 +38,7 @@ contains
     integer :: ndusttypes, ierr, i, ilen
     character(len=100) :: line_buffer
     logical :: check_previous_tesselation
-    
+
 
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
@@ -574,151 +575,6 @@ contains
 
   !*********************************************************
 
-  subroutine compute_stellar_parameters()
-
-    integer :: i
-
-    character(len=512) :: isochrone_file, filename
-    character(len=100) :: line_buffer
-    character(len=1)   :: s_age
-
-    character(len=2) :: SpT
-    real :: L, R, T, M, minM, maxM, logg, minM_Allard, maxM_Allard, minM_Siess, maxM_Siess
-    real(kind=dp) :: Gcm_to_Rsun
-    integer :: age, k
-
-    logical :: lread_Siess, lread_Allard
-    integer, parameter :: nSpT_Siess = 29
-    real, dimension(nSpT_Siess) :: logR_Siess, logTeff_Siess, logM_Siess
-    integer, parameter :: nSpT_Allard = 50
-    real, dimension(nSpT_Allard) :: logR_Allard, logTeff_Allard, logM_Allard
-
-    if (n_etoiles < 1) return
-
-    minM_Siess = 0.1
-    maxM_siess = 7.0
-
-    minM_Allard = 0.0005
-    maxM_Allard = minM_Siess
-
-    ! Which models do we need to read ?
-    lread_Siess = .False. ; lread_Allard = .False.
-    do i=1, n_etoiles
-       M = etoile(i)%M
-       if (M > minM_Siess)  then
-          lread_Siess = .True.
-       else
-          lread_Allard = .True.
-       endif
-    enddo
-
-    if (lread_Siess) then
-       ! Siess models
-       isochrone_file = "Siess/isochrone_"//trim(system_age)//".txt"
-       write(*,*) "Reading isochrone file: "//trim(isochrone_file)
-       filename = trim(mcfost_utils)//"/Isochrones/"//trim(isochrone_file)
-
-       open(unit=1,file=filename,status="old")
-       do i=1,3
-          read(1,*) line_buffer
-       enddo
-       minM_Siess = 1.e30 ; maxM = 0 ;
-       do i=1, nSpT_Siess
-          read(1,*) SpT, L, r, T, M
-          logR_Siess(i) = log(r) ; logTeff_Siess(i) = log(T) ; logM_Siess(i) = log(M)
-       enddo
-       close(unit=1)
-    endif
-
-    if (lread_Allard) then
-       ! Allard models if mass < 0.1Msun
-       isochrone_file = "Allard/model.AMES-Cond-2000.M-0.0.2MASS.AB"
-       write(*,*) "Reading isochrone file: "//trim(isochrone_file)
-       filename = trim(mcfost_utils)//"/Isochrones/"//trim(isochrone_file)
-
-       s_age = system_age(1:1)
-       read(s_age,*) age ! age is an int with age in Myr
-
-       open(unit=1,file=filename,status="old")
-       Gcm_to_Rsun = 1e9 * cm_to_m/Rsun
-       ! Skipping age block
-       do k=1,age-1
-          ! header
-          do i=1,4
-             read(1,*) line_buffer
-          enddo
-          ! data
-          line_loop : do i=1,nSpT_Allard
-             read(1,'(A)') line_buffer
-             if (line_buffer(1:1) == "-") exit line_loop
-          enddo line_loop
-       enddo
-
-       ! header
-       do i=1,4
-          read(1,*) line_buffer
-       enddo
-       ! data
-       k=0
-       line_loop2 : do i=1,nSpT_Allard
-          read(1,'(A)') line_buffer
-          if (line_buffer(1:1) == "-") exit line_loop2
-          k = k+1
-          read(line_buffer,*) M, T, L, logg, R
-          logR_Allard(i) = log(r * Gcm_to_Rsun) ; logTeff_Allard(i) = log(T) ; logM_Allard(i) = log(M)
-       enddo line_loop2
-       close(unit=1)
-    endif
-
-    ! interpoler L et T, les fonctions sont plus smooth
-    write(*,*) ""
-    write(*,*) "New stellar parameters:"
-    do i=1, n_etoiles
-       if (lturn_off_planets .and. i>1) then
-          write(*,*) " "
-          write(*,*) "*** WARNING : turning off emission fron sink particle"
-          write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
-          write(*,*) "*** The object will not radiate"
-          etoile(i)%T = 3.
-          etoile(i)%r = 1e-4
-       else if (etoile(i)%M < minM_Allard) then
-          write(*,*) " "
-          write(*,*) "*** WARNING : stellar object mass is below isochrone range"
-          write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
-          write(*,*) "*** The object will not radiate"
-          etoile(i)%T = 3.
-          etoile(i)%r = 0.01
-       else if (etoile(i)%M < maxM_Allard) then
-          etoile(i)%T = exp(interp(logTeff_Allard(1:k), logM_Allard(1:k), log(etoile(i)%M)))
-          etoile(i)%r = exp(interp(logR_Allard(1:k), logM_Allard(1:k), log(etoile(i)%M)))
-       else ! using Siess' models
-          if (etoile(i)%M > maxM_Siess) then
-             write(*,*) " "
-             write(*,*) "*** WARNING : stellar object mass is above in isochrone range"
-             write(*,*) "*** object #", i, "M=", etoile(i)%M, "Msun"
-             write(*,*) "*** Stellar properties are extrapolated"
-          endif
-          etoile(i)%T = exp(interp(logTeff_Siess, logM_Siess, log(etoile(i)%M)))
-          etoile(i)%r = exp(interp(logR_Siess, logM_Siess, log(etoile(i)%M)))
-       endif
-
-       ! Pas de fUV et pas de spectre stellaire pour le moment
-       etoile(i)%fUV = 0.0 ; etoile(i)%slope_UV = 0.0 ;
-       etoile(i)%lb_body = .false.
-       etoile(i)%spectre = "None"
-
-       write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", etoile(i)%r, "Rsun"
-    enddo
-
-    ! Passage rayon en AU
-    etoile(:)%r = etoile(:)%r * Rsun_to_AU
-
-    return
-
-  end subroutine compute_stellar_parameters
-
-  !*********************************************************
-
   subroutine delete_masked_particles()
 
     use Voronoi_grid
@@ -878,7 +734,7 @@ contains
     return
 
   end subroutine read_ascii_SPH_file
-  
+
 
 subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id,ndusttypes,n_sph)
     use naleat, only : seed, stream, gtype
@@ -915,14 +771,14 @@ subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle
     if (allocated(x)) then
     	deallocate(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id)
     endif
-    
+
     n_sph = 100000
 
     alloc_status = 0
     allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), &
     	vx(n_sph), vy(n_sph), vz(n_sph), T_gas(n_sph), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
-    
+
     id = 1
     do i=1, n_sph
        particle_id(i) = i
@@ -945,8 +801,8 @@ subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle
        rhogas(i) = massgas(i)
        h(i) = 3.0 * rmo * etoile(1)%r
     enddo
-    
-    
+
+
     deallocate(stream)
 
 
