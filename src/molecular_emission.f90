@@ -674,7 +674,8 @@ function v_proj(icell,x,y,z,u,v,w) !
   integer, intent(in) :: icell
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
-  real(kind=dp) :: vitesse, vx, vy, vz, norme, r, r2, norme2, sign1, v_r, v_phi, phi
+  real(kind=dp) :: vitesse, vx, vy, vz, v_r, v_phi, v_theta, v_rcyl, norme, r, phi, rcyl, rcyl2, r2
+  real(kind=dp) :: cos_phi, sin_phi, cos_theta, sin_theta, sign1, norme2
 
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)
@@ -684,20 +685,44 @@ function v_proj(icell,x,y,z,u,v,w) !
      v_proj = vx * u + vy * v + vz * w
   else
      if (lvelocity_file) then
-        if (.not.(lvfield_cyl_coord)) then
-           vx = vfield_x(icell) ; vy = vfield_y(icell) ; vz = vfield_z(icell)
-        else
-           ! Convert the velocity field to Cartesian coordinates
-           v_r = vfield_x(icell) ; v_phi = vfield_y(icell) ;  vz = vfield_z(icell)
+        if (vfield_coord == 1) then
+           vx = vfield3d(icell,1) ; vy = vfield3d(icell,2) ; vz = vfield3d(icell,3)
+        else if (vfield_coord == 2) then
+           ! Convert the velocity field from cylindrical to Cartesian coordinates
+           v_r = vfield3d(icell,1) ; v_phi = vfield3d(icell,2) ;  vz = vfield3d(icell,3)
            phi = atan2(y, x)
            vx = cos(phi) * v_r - sin(phi) * v_phi
            vy = sin(phi) * v_r + cos(phi) * v_phi
            if ((l_sym_centrale).and.(z < 0)) vz = -vz
+        else
+
+           ! Convert the velocity field from cylindrical to Cartesian coordinates
+           v_r = vfield3d(icell,1) ; v_phi = vfield3d(icell,2) ;  v_theta = vfield3d(icell,3)
+
+           rcyl2 = x*x + y*y
+           r2 = rcyl2 + z*z
+           rcyl = sqrt(rcyl2)
+           r = sqrt(r2)
+
+           cos_theta = rcyl/r
+           sin_theta = z/r
+
+           cos_phi = x/rcyl
+           sin_phi = y/rcyl
+
+           !           write(*,*) cos_phi, cos(atan2(y, x)) ! OK
+
+           vz = v_theta * cos_theta + v_r * sin_theta
+           v_rcyl = v_theta * sin_theta + v_r * cos_theta
+
+           vx = v_rcyl * cos_phi - v_phi * sin_phi
+           vy = v_rcyl * sin_phi + v_phi * cos_phi
         endif
+
         v_proj = vx * u + vy * v + vz * w
+
      else ! Using analytical velocity field
-        if ((.not.lmagnetoaccr.and..not.lspherical_velocity).and.&
-        	(lkeplerian.or.linfall)) vitesse = vfield(icell)
+        if ((.not.lmagnetoaccr.and..not.lspherical_velocity).and.(lkeplerian.or.linfall)) vitesse = vfield(icell)
 
         if (lkeplerian) then
            r = sqrt(x*x+y*y)
@@ -738,42 +763,41 @@ function v_proj(icell,x,y,z,u,v,w) !
            if ( (.not.l3D) .and. (z < 0_dp) ) vz = -vz
            !!vz = v_z(icell) * sign(1.0_dp,z), in 3D models, this change of sign is taken care (??)
 
-           if (r > tiny_dp) then !rotational + wind, should work also with
-           						 !spherical wind of stars
+           if (r > tiny_dp) then !rotational + wind, should work also with spherical wind of stars
               norme = 1.0_dp/r
 
               vx = vR(icell) * x * norme - vphi(icell) * y * norme
               vy = vR(icell) * y * norme + vphi(icell) * x * norme
 
               v_proj = vx*u + vy*v + vz*w
-          else
-          	  v_proj = vz*w!0.0_dp
-          endif
-		else if (lspherical_velocity) then !missing theta projection
-			r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
-			vx = 0.; vy = 0.; vz = 0.;
+           else
+              v_proj = vz*w!0.0_dp
+           endif
+        else if (lspherical_velocity) then !missing theta projection
+           r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
+           vx = 0.; vy = 0.; vz = 0.;
 
-			sign1 = 1_dp
-			!because theta only from 0 to pi/2 if 2D. But velocity is negative in z < 0
-		    if ( (.not.l3D) .and. (z < 0_dp) ) sign1 = -1_dp
+           sign1 = 1_dp
+           !because theta only from 0 to pi/2 if 2D. But velocity is negative in z < 0
+           if ( (.not.l3D) .and. (z < 0_dp) ) sign1 = -1_dp
 
-			if (r2 > tiny_dp) then
-				norme2 = 1.0_dp / r2
-			else
-				norme2 = 0.0_dp
-			endif
+           if (r2 > tiny_dp) then
+              norme2 = 1.0_dp / r2
+           else
+              norme2 = 0.0_dp
+           endif
 
-			if (r > tiny_dp) then
-				norme = 1.0_dp / r
-				vx = vr(icell) * x * norme - y * norme2 * vphi(icell) + norme2 * ( z * norme * x * vtheta(icell) )
-				vy = vr(icell) * y * norme + x * norme2 * vphi(icell) + norme2 * ( z * norme * y * vtheta(icell) )
-				vz = vr(icell) * z * norme - sign1 * r2 / r * vtheta(icell)
-				v_proj = vx * u + vy * v + vz * w
-			else
-				v_proj = 0.0_dp
-			endif
+           if (r > tiny_dp) then
+              norme = 1.0_dp / r
+              vx = vr(icell) * x * norme - y * norme2 * vphi(icell) + norme2 * ( z * norme * x * vtheta(icell) )
+              vy = vr(icell) * y * norme + x * norme2 * vphi(icell) + norme2 * ( z * norme * y * vtheta(icell) )
+              vz = vr(icell) * z * norme - sign1 * r2 / r * vtheta(icell)
+              v_proj = vx * u + vy * v + vz * w
+           else
+              v_proj = 0.0_dp
+           endif
 
-		else
+        else
            call error("velocity field not defined")
         endif
      endif ! ldensity_file
