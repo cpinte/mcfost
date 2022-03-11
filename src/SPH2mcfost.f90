@@ -177,12 +177,11 @@ contains
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
 
-    real(dp) :: mass, somme, Mtot, Mtot_dust
+    real(dp) :: mass, somme, Mtot, Mtot_dust, facteur
     real :: f, limit_threshold, density_factor
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n
 
     real(dp), dimension(6) :: limits
-
 
     if (lcorrect_density_elongated_cells) then
        density_factor = correct_density_factor_elongated_cells
@@ -304,6 +303,28 @@ contains
           densite_gaz(icell)  = 0.
        endif
     enddo
+
+    mass = 0.
+    do icell=1,n_cells
+       mass = mass + masse_gaz(icell)
+    enddo !icell
+    mass =  mass * g_to_Msun
+
+    if (lforce_Mgas) then ! Todo : testing for now, use a routine to avoid repeting code
+       ! Normalisation
+       if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+          facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+
+          ! Somme sur les zones pour densite finale
+          do icell=1,n_cells
+             densite_gaz(icell) = densite_gaz(icell) * facteur
+             masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+          enddo ! icell
+       else
+          call error('Gas mass is 0')
+       endif
+    endif
+
 
     ! Tableau de densite et masse de poussiere
     ! interpolation en taille

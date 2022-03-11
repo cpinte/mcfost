@@ -81,6 +81,7 @@ subroutine set_default_variables()
   lphantom_file=.false.
   lphantom_multi = .false.
   lphantom_avg = .false.
+  lforce_Mgas = .false.
   lforce_SPH_amin = .false.
   lforce_SPH_amax = .false.
   lascii_SPH_file = .false.
@@ -706,6 +707,9 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
         read(s,*) SPH_amax
+        i_arg = i_arg + 1
+     case("-force_Mgas")
+        lforce_Mgas = .true.
         i_arg = i_arg + 1
      case("-gadget","-gadget2")
         i_arg = i_arg + 1
@@ -1468,8 +1472,9 @@ subroutine display_help()
   write(*,*) "        : -prodimo : creates required files for ProDiMo"
   write(*,*) "        : -p2m : reads the results from ProDiMo"
   write(*,*) "        : -astrochem : creates the files for astrochem"
-  write(*,*) "        : -phantom : reads a phantom dump file"
+  write(*,*) "        : -phantom <dump> : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
+  write(*,*) "        : -fargo3d <dir> <id> : reads a fargo3d model"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -1599,6 +1604,7 @@ subroutine display_help()
   write(*,*) "        : -SPH_amin <size> [mum] : force the grain size that follow the gas"
   write(*,*) "        : -SPH_amax <size> [mum] : force the grain size that follow the dust"
   write(*,*) "                                   (only works with 1 grain size dump)"
+  write(*,*) "        : -force_Mgas : force the gas mass to be the value given the mcfost parameter file"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

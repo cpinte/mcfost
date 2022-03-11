@@ -269,6 +269,15 @@ contains
     enddo
     if (.not.lfix_star) call compute_stellar_parameters()
 
+    if (lplanet_az) then
+       which_planet = 1 ! 1 planet for now
+       RT_n_az = 1
+       RT_az_min = planet_az + atan2(-y, -x) / deg_to_rad
+       RT_az_max = RT_az_min
+       write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
+       write(*,*) "WARNING: updating the azimuth to:", RT_az_min
+    endif
+
 
     !-----------------------------------
     ! Passing data to mcfost

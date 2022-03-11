@@ -96,7 +96,7 @@ module parametres
   logical :: ldensity_file, lsigma_file, lvelocity_file, lphantom_file, lphantom_multi, lphantom_avg
   logical :: lgadget2_file, lascii_SPH_file, llimits_file, lforce_SPH_amin, lforce_SPH_amax, lmcfost_lib
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lastrochem, lML
-  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
+  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa, lforce_Mgas
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
   integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
 
