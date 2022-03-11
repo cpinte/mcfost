@@ -35,7 +35,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
  integer, parameter :: maxinblock = 128
  integer, allocatable, dimension(:) :: npartoftype
  real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
- real(dp) :: hfact,umass,utime,udist,gmw,x2
+ real(dp) :: hfact,umass,utime,ulength,gmw,x2
  integer(kind=1), allocatable, dimension(:) :: itype, ifiles
  real(4),  allocatable, dimension(:) :: tmp
  real(dp), allocatable, dimension(:) :: grainsize, graindens
@@ -215,7 +215,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
 
     call extract('umass',umass,hdr,ierr)
     call extract('utime',utime,hdr,ierr)
-    call extract('udist',udist,hdr,ierr)
+    call extract('udist',ulength,hdr,ierr)
     call extract('time',simu_time,hdr,ierr)
 
     read (iunit, iostat=ierr) number
@@ -420,7 +420,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
  elseif(got_u) then
     write(*,*) 'Calculating temperature from u'
     ! Phantom uses erg/g for u, and mcfost uses J/K for kb.
-    gastemperature = vxyzu(4,:) * 2./3.*gmw*amu/kb*erg_to_J * (udist/utime)**2
+    gastemperature = vxyzu(4,:) * 2./3.*gmw*amu/kb*erg_to_J * (ulength/utime)**2
     write(*,*) 'Maximum temperature = ', maxval(gastemperature)
  else
     write(*,*) 'Gas temperature not found, setting to T=cmb to avoid dust sublimation'
@@ -428,11 +428,11 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
  endif
 
  if (got_h) then
-    call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
+    call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
     call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,dustfluidtype,xyzh,&
          vxyzu,gastemperature,itype,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,&
-         hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles, &
+         hfact,umass,utime,ulength,graindens,ndudt,dudt,ifiles, &
          n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
          SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
@@ -491,7 +491,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
  real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu
  integer, allocatable, dimension(:) :: npartoftype
  real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
- real(dp) :: hfact,umass,utime,udist
+ real(dp) :: hfact,umass,utime,ulength
 
  integer(HID_T) :: hdf5_file_id
  integer(HID_T) :: hdf5_group_id
@@ -608,7 +608,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
     endif
     call read_from_hdf5(umass,'umass',hdf5_group_id,got,error)
     call read_from_hdf5(utime,'utime',hdf5_group_id,got,error)
-    call read_from_hdf5(udist,'udist',hdf5_group_id,got,error)
+    call read_from_hdf5(ulength,'udist',hdf5_group_id,got,error)
 
     if (error /= 0) then
        write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF header group ***'
@@ -721,12 +721,12 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
 
   write(*,*) "Found", nptmass, "point masses in the phantom file"
 
-  call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
+  call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
   call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,n_files,      &
                         dustfluidtype,xyzh,vxyzu,gastemperature,itype,grainsize,dustfrac, &
                         massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
-                        utime,udist,graindens,ndudt,dudt,ifiles,   &
+                        utime,ulength,graindens,ndudt,dudt,ifiles,   &
                         n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id,SPH_grainsizes,     &
                         massgas,massdust,rhogas,rhodust,extra_heating)
 
@@ -741,12 +741,12 @@ end subroutine read_phantom_hdf_files
 
 !*************************************************************************
 
-subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
+subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
   integer, intent(in) :: np, nptmass
   real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
   real(kind=dp), dimension(:,:), intent(inout) :: xyzmh_ptmass
-  real(kind=dp), intent(in) :: udist
+  real(kind=dp), intent(in) :: ulength
 
   real(kind=dp), dimension(3) :: centre
 
@@ -757,11 +757,11 @@ subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, udist, mask)
   ! Modifying SPH dump
   if (ldelete_Hill_sphere) then
      allocate(mask(np))
-     call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,udist, mask)
+     call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,ulength, mask)
   endif
   if (lrandomize_azimuth)     call randomize_azimuth(np, xyzh, vxyzu, mask)
-  if (lrandomize_gap)         call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor, .true.)
-  if (lrandomize_outside_gap) call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,udist, gap_factor, .false.)
+  if (lrandomize_gap)         call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,ulength, gap_factor, .true.)
+  if (lrandomize_outside_gap) call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,ulength, gap_factor, .false.)
 
   if (lcentre_on_sink) then
      write(*,*) "Recentering on sink #", isink_centre, nptmass, np
@@ -782,7 +782,7 @@ end subroutine modify_dump
 
 subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh, &
      vxyzu,gastemperature,iphase,grainsize,dustfrac,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
-     utime, udist,graindens,ndudt,dudt,ifiles, &
+     utime, ulength,graindens,ndudt,dudt,ifiles, &
      n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
      SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating)
 
@@ -802,7 +802,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
   real(dp), dimension(ndusttypes),    intent(in) :: graindens
   real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
-  real(dp), intent(in) :: hfact,umass,utime,udist
+  real(dp), intent(in) :: hfact,umass,utime,ulength
   real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
   real(dp), dimension(:), intent(in) :: gastemperature
   integer, intent(in) :: ndudt
@@ -819,21 +819,21 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   type(star_type), dimension(:), allocatable :: etoile_old
   integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile
   real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
-  real(dp) :: udist_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
+  real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
   real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
 
   logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
 
 
   ! We check the units by recomputing G
-  G_phantom = udist**3 / (utime**2 * umass)
+  G_phantom = ulength**3 / (utime**2 * umass)
   if (abs(G_phantom - Ggrav*1e3) > 1e-2 * G_phantom) call error("Phantom units are not consistent")
 
-  udist_scaled = udist
+  ulength_scaled = ulength
   umass_scaled = umass
   if (lscale_length_units) then
      write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
-     udist_scaled = udist * scale_length_units_factor
+     ulength_scaled = ulength * scale_length_units_factor
   else
      scale_length_units_factor = 1.0
   endif
@@ -843,21 +843,21 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
   else
      scale_mass_units_factor = 1.0
   endif
-  utime_scaled = sqrt(udist_scaled**3/(G_phantom*umass_scaled))
+  utime_scaled = sqrt(ulength_scaled**3/(G_phantom*umass_scaled))
 
-  udens = umass_scaled/udist_scaled**3
-  uerg_per_s = umass_scaled*udist_scaled**2/utime_scaled**3
+  udens = umass_scaled/ulength_scaled**3
+  uerg_per_s = umass_scaled*ulength_scaled**2/utime_scaled**3
   uWatt = uerg_per_s * erg_to_J
-  ulength_au = udist_scaled / (au_to_cm)
-  uvelocity =  udist_scaled / (m_to_cm) / utime_scaled ! m/s
+  ulength_au = ulength_scaled / (au_to_cm)
+  uvelocity =  ulength_scaled / (m_to_cm) / utime_scaled ! m/s
   usolarmass = umass_scaled / Msun_to_g
 
   simu_time = simu_time * utime_scaled
 
- if (dustfluidtype == 1) then
-    ! 1-fluid: always use gas particles for Voronoi mesh
-    use_dust_particles = .false.
- endif
+  if (dustfluidtype == 1) then
+     ! 1-fluid: always use gas particles for Voronoi mesh
+     use_dust_particles = .false.
+  endif
 
  write(*,*) ''
  if (use_dust_particles) then
@@ -887,7 +887,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  endif
 
  ! Dust grain sizes in microns
- SPH_grainsizes(:) = grainsize(:) * udist_scaled * cm_to_mum
+ SPH_grainsizes(:) = grainsize(:) * ulength_scaled * cm_to_mum
  ! graindens * udens is in g/cm3
 
  if (lemission_mol) then
@@ -1000,15 +1000,15 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
  do i=1,nptmass
     n_etoiles = n_etoiles + 1
     if (real(xyzmh_ptmass(4,i)) * scale_mass_units_factor > 0.013) then
-       write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", &
-            real(xyzmh_ptmass(4,i) * scale_mass_units_factor), "Msun, Mdot=", &
+       write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
+            real(xyzmh_ptmass(4,i) * usolarmass), "Msun, Mdot=", &
             real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
     else
-       write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * scale_length_units_factor), "au, M=", &
-            real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * scale_mass_units_factor), "Mjup, Mdot=", &
+       write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
+            real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * usolarmass), "Mjup, Mdot=", &
             real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
     endif
-    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))*scale_length_units_factor), "au"
+    if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))*ulength_au), "au"
  enddo
 
 
