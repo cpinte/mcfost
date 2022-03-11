@@ -671,8 +671,8 @@ function v_proj(icell,x,y,z,u,v,w) !
   integer, intent(in) :: icell
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
-  real(kind=dp) :: vitesse, vx, vy, vz, v_r, v_phi, norme, r, phi, vtheta, rcyl, rcyl2, r2
-  real(kind=dp) :: cos_phi, sin_phi, cos_theta, sin_theta, vr, vrcyl, vphi
+  real(kind=dp) :: vitesse, vx, vy, vz, v_r, v_phi, v_theta, v_rcyl, norme, r, phi, rcyl, rcyl2, r2
+  real(kind=dp) :: cos_phi, sin_phi, cos_theta, sin_theta
 
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)
@@ -692,8 +692,9 @@ function v_proj(icell,x,y,z,u,v,w) !
            vy = sin(phi) * v_r + cos(phi) * v_phi
            if ((l_sym_centrale).and.(z < 0)) vz = -vz
         else
+
            ! Convert the velocity field from cylindrical to Cartesian coordinates
-           v_r = vfield3d(icell,1) ; v_phi = vfield3d(icell,2) ;  vtheta = vfield3d(icell,3)
+           v_r = vfield3d(icell,1) ; v_phi = vfield3d(icell,2) ;  v_theta = vfield3d(icell,3)
 
            rcyl2 = x*x + y*y
            r2 = rcyl2 + z*z
@@ -706,11 +707,13 @@ function v_proj(icell,x,y,z,u,v,w) !
            cos_phi = x/rcyl
            sin_phi = y/rcyl
 
-           vz = vtheta * cos_theta + vr * sin_theta
-           vrcyl = vtheta * sin_theta + vr * cos_theta
+!           write(*,*) cos_phi, cos(atan2(y, x)) ! OK
 
-           vx = vrcyl * cos_phi - vphi * sin_phi
-           vy = vrcyl * sin_phi + vphi * cos_phi
+           vz = v_theta * cos_theta + v_r * sin_theta
+           v_rcyl = v_theta * sin_theta + v_r * cos_theta
+
+           vx = v_rcyl * cos_phi - v_phi * sin_phi
+           vy = v_rcyl * sin_phi + v_phi * cos_phi
         endif
 
         v_proj = vx * u + vy * v + vz * w

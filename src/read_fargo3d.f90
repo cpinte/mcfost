@@ -244,13 +244,15 @@ contains
     etoile(1)%vx = 0_dp ; etoile(1)%vy = 0_dp ; etoile(1)%vz = 0_dp
     etoile(1)%M = 1_dp * usolarmass
 
-    etoile(2)%x = x * ulength_au
-    etoile(2)%y = y * ulength_au
-    etoile(2)%z = z * ulength_au
+    ! -x and -y as phi is defined differently in fargo3d
+    etoile(2)%x = -x * ulength_au
+    etoile(2)%y = -y * ulength_au
+    etoile(2)%z =  z * ulength_au
 
-    etoile(2)%vx = vx * uvelocity
-    etoile(2)%vy = vy * uvelocity
-    etoile(2)%vz = vz * uvelocity
+    ! -vx and -y as phi is defined differently in fargo3d
+    etoile(2)%vx = -vx * uvelocity
+    etoile(2)%vy = -vy * uvelocity
+    etoile(2)%vz =  vz * uvelocity
 
     etoile(2)%M = Mp * usolarmass
 
