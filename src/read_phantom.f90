@@ -1103,7 +1103,9 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
     ! Saving if the accretion rate was forced
     allocate(etoile_old(n_etoiles_old))
     if (allocated(etoile)) then
-       etoile_old(:) = etoile(:)
+       do i=n_etoiles_old,n_etoiles
+          etoile_old(i) = etoile(i)
+       enddo
        deallocate(etoile)
     endif
     allocate(etoile(n_etoiles))
