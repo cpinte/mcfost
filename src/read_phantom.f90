@@ -322,8 +322,16 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
                 elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
                    nptmass_j = number8(j) ! HACK
 
-                   nptmass0=nptmass_found+1
+                   nptmass0 = nptmass_found+1
                    nptmass_found = nptmass_found + nptmass_j
+
+
+                   ! Todo : I need to check with Daniel, but the lines above do not work
+                   ! there seem to be mutiple data block with j=2, only the 1st one contains the sinks
+                   nptmass0 = 1
+                   nptmass_found = 2
+
+                   write(*,*) "test", nptmass0, nptmass_found, nptmass
 
                    read(iunit,iostat=ierr) tag
                    matched = .true.
