@@ -318,26 +318,15 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
                       read(iunit,iostat=ierr)
                    endif
                    if (ierr /= 0) call error("Error reading tag: "//trim(tag))
-                !elseif (j==1 .and. number8(j)==nptmass) then
-                elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
-                   nptmass_j = number8(j) ! HACK
-
-                   nptmass0 = nptmass_found+1
-                   nptmass_found = nptmass_found + nptmass_j
-
-
-                   ! Todo : I need to check with Daniel, but the lines above do not work
-                   ! there seem to be mutiple data block with j=2, only the 1st one contains the sinks
-                   nptmass0 = 1
-                   nptmass_found = 2
-
-                   write(*,*) "test", nptmass0, nptmass_found, nptmass
-
+                elseif (j==2 .and. number8(j) > 0) then ! sink particles
                    read(iunit,iostat=ierr) tag
                    matched = .true.
                    if (i==i_real .or. i==i_real8) then
                       select case(trim(tag))
                       case('x')
+                         nptmass_j = number8(j) ! We rely on x being the 1st data array for sink particles
+                         nptmass0 = nptmass_found+1
+                         nptmass_found = nptmass_found + nptmass_j
                          read(iunit,iostat=ierr) xyzmh_ptmass(1,nptmass0:nptmass_found)
                       case('y')
                          read(iunit,iostat=ierr) xyzmh_ptmass(2,nptmass0:nptmass_found)
