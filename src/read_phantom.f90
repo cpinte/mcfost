@@ -165,10 +165,8 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
     endif
     call extract('ntypes',ntypes,hdr,ierr)
     call extract('nptmass',nptmass,hdr,ierr,default=0)
-    !call extract('isink',isink,hdr,ierr,default=0)
 
     write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
-    !write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
     write(*,*) ' nptmass = ', nptmass
 
      write(*,*) "Found", nptmass, "point masses"
@@ -238,15 +236,10 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
        if (ierr /= 0) call error('Reading block header')
        do j=1,narraylengths
           do i=1,ndatatypes
-             !write(*,*) ' data type ',i,' arrays = ',nums(i,j)
              do k=1,nums(i,j)
-                !write(*,*) "k=", k, np0, np
-
                 if (j==1 .and. number8(j)==np) then
                    read(iunit, iostat=ierr) tag
                    if (ierr /= 0) call error('Reading tag')
-                   !write(*,"(1x,a)",advance='no') trim(tag)
-
                    matched = .true.
                    if (i==i_real .or. i==i_real8) then
                       select case(trim(tag))
@@ -352,16 +345,8 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
                       matched = .false.
                       read(iunit,iostat=ierr)
                    endif
-                   !     if (matched) then
-                   !        write(*,"(a)") '->',trim(tag)
-                   !     else
-                   !        write(*,"(a)")
-                   !     endif
-
-
                 else
                    read(iunit, iostat=ierr) tag ! tag
-                   !print*,tagarr(1)
                    read(iunit, iostat=ierr) ! array
                 endif
              enddo
