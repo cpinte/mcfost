@@ -448,7 +448,6 @@ subroutine define_cylindrical_grid()
         theta_max = 0.5 * pi - fargo3d%zmin
         dtheta = theta_max / (nz-1)
         do j=1, nz-1
-
            theta = j * dtheta
            theta_lim(j) = theta
            tan_theta_lim(j) = tan(theta)
