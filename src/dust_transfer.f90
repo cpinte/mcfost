@@ -469,7 +469,15 @@ subroutine transfert_poussiere()
         if (lweight_emission) call define_proba_weight_emission(lambda)
 
         call repartition_energie(lambda)
-        if (lmono0) write(*,*) "frac. energy emitted by star : ", frac_E_stars(1)
+        if (lmono0) then
+           write(*,*) "frac. energy emitted by star(s) : ", frac_E_stars(1)
+           if (n_etoiles > 1) then
+              write(*,*) "Relative fraction of energy emitted by each star:"
+              do i=1, n_etoiles
+                 write(*,*) "Star #", i, "-->", prob_E_star(1,i)
+              enddo
+           endif
+        endif
 
      endif !letape_th
 

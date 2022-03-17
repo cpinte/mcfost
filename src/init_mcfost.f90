@@ -186,6 +186,8 @@ subroutine set_default_variables()
   lvphi_Kep = .false.
   lfluffy = .false.
   ldelete_hill_sphere = .false.
+  ldelete_inside_rsph = .false.
+  ldelete_outside_rsph = .false.
   lrandomize_Voronoi = .false.
   lrandomize_azimuth = .false.
   lrandomize_gap = .false.
@@ -1318,6 +1320,18 @@ subroutine initialisation_mcfost()
      case("-delete_Hill_sphere")
         i_arg = i_arg + 1
         ldelete_Hill_sphere = .true.
+     case("-delete_inside_rsph")
+        i_arg = i_arg + 1
+        ldelete_inside_rsph = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) rsph_min
+        i_arg = i_arg + 1
+     case("-delete_outside_rsph")
+        i_arg = i_arg + 1
+        ldelete_outside_rsph = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) rsph_max
+        i_arg = i_arg + 1
      case("-random_az")
         i_arg = i_arg + 1
         lrandomize_azimuth = .true.
@@ -1904,6 +1918,8 @@ subroutine display_help()
   write(*,*) "        : -scale_mass_units <scaling_factor> : over-ride the mass units read in by this factor"
   write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
   write(*,*) "        : -delete_Hill_sphere : delete SPH particles inside Hill spheres of planets"
+  write(*,*) "        : -delete_inside_rsph <r> : delete SPH particles inside spherical radius"
+  write(*,*) "        : -delete_outside_rsph <r> : delete SPH particles outside spherical radius"
   write(*,*) "        : -no_vr : force the radial velocities to be 0"
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"

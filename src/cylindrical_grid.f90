@@ -512,7 +512,6 @@ subroutine define_cylindrical_grid()
         theta_max = 0.5 * pi - fargo3d%zmin
         dtheta = theta_max / (nz-1)
         do j=1, nz-1
-
            theta = j * dtheta
            theta_lim(j) = theta
            tan_theta_lim(j) = tan(theta)
@@ -573,7 +572,7 @@ subroutine define_cylindrical_grid()
      enddo
   endif
 
-!  if (lfargo3d) call check_fargo3d_grid(r_lim,theta_lim,phi_grid_tmp)
+  if (lfargo3d) call check_fargo3d_grid(r_lim,theta_lim,phi_grid_tmp)
 
   ! Determine the zone for each cell
   do ir = 1, n_regions
@@ -1360,5 +1359,63 @@ end subroutine define_cylindrical_grid
     return
 
   end subroutine pos_em_cellule_cyl
+
+  !---------------------------------------------
+
+  subroutine check_fargo3d_grid(r,theta,phi)
+
+    real(dp), dimension(*) :: r, theta, phi
+
+    character(len=128) :: filename
+
+    integer :: i, j, iunit, ios
+    real(dp) :: buffer, t, radius
+
+    iunit = 1
+
+    ! Unit test to compare with fargo3d domain_z.dat
+    filename = trim(fargo3d%dir)//"/domain_z.dat" ! 0 means vertical +z
+    open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+    if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+
+    do j=1,3
+       read(iunit,*) buffer
+    enddo
+
+    !do j=nz,1, -1
+    !  write(*,*) nz-j +3 , pi/2 - theta_lim(j)  ! --> ok, teste sans pb
+    !enddo
+
+    do j=nz-1,1, -1
+       read(iunit,*) t
+       if ( t - (pi/2 - theta_lim(j)) > 1e-6 * t) call error("fargo3d theta grid")
+    enddo
+
+    ! Unit test to compare with fargo3d domain_y.dat : tab_r
+    filename = trim(fargo3d%dir)//"/domain_y.dat"
+    open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+    if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+
+    do i=1,3
+       read(iunit,*) buffer
+    enddo
+
+    do i=0,n_rad
+       read(iunit,*) radius
+       radius = radius * scale_length_units_factor
+       if (radius - r_lim(i) > 1e-6 * radius) call error("fargo3d radius grid")
+    enddo
+
+    ! Unit test for phi check that is only an offset
+    filename = trim(fargo3d%dir)//"/domain_x.dat"
+    open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+    if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+
+    write(*,*) "fargo3d grid tested ok"
+    return
+
+  end subroutine check_fargo3d_grid
+
+  !---------------------------------------------
 
 end module cylindrical_grid

@@ -118,28 +118,7 @@ contains
 
   end subroutine read_fargo3d_parameters
 
-
   !---------------------------------------------
-
-  subroutine check_fargo3d_grid(r,theta,phi)
-
-    real(dp), dimension(*) :: r, theta, phi
-
-
-    ! Unit test to compare with fargo3d domain_z.dat
-    !do j=nz,1, -1
-    !   write(*,*) nz-j +3 , pi/2 - theta_lim(j)  ! --> ok, teste sans pb
-    !enddo
-
-    ! Unit test to compare with fargo3d domain_y.dat : tab_r
-    ! Unit test for phi check that is only an offset
-
-    return
-
-  end subroutine check_fargo3d_grid
-
-  !---------------------------------------------
-
 
   subroutine read_fargo3d_files()
 

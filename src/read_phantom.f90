@@ -165,10 +165,8 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
     endif
     call extract('ntypes',ntypes,hdr,ierr)
     call extract('nptmass',nptmass,hdr,ierr,default=0)
-    !call extract('isink',isink,hdr,ierr,default=0)
 
     write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
-    !write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
     write(*,*) ' nptmass = ', nptmass
 
      write(*,*) "Found", nptmass, "point masses"
@@ -239,15 +237,10 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
        if (ierr /= 0) call error('Reading block header')
        do j=1,narraylengths
           do i=1,ndatatypes
-             !write(*,*) ' data type ',i,' arrays = ',nums(i,j)
              do k=1,nums(i,j)
-                !write(*,*) "k=", k, np0, np
-
                 if (j==1 .and. number8(j)==np) then
                    read(iunit, iostat=ierr) tag
                    if (ierr /= 0) call error('Reading tag')
-                   !write(*,"(1x,a)",advance='no') trim(tag)
-
                    matched = .true.
                    if (i==i_real .or. i==i_real8) then
                       select case(trim(tag))
@@ -315,18 +308,15 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
                       read(iunit,iostat=ierr)
                    endif
                    if (ierr /= 0) call error("Error reading tag: "//trim(tag))
-                !elseif (j==1 .and. number8(j)==nptmass) then
-                elseif (j==2) then ! HACK : what is j exactly anyway ? and why would we need to test for j==1
-                   nptmass_j = number8(j) ! HACK
-
-                   nptmass0=nptmass_found+1
-                   nptmass_found = nptmass_found + nptmass_j
-
+                elseif (j==2 .and. number8(j) > 0) then ! sink particles
                    read(iunit,iostat=ierr) tag
                    matched = .true.
                    if (i==i_real .or. i==i_real8) then
                       select case(trim(tag))
                       case('x')
+                         nptmass_j = number8(j) ! We rely on x being the 1st data array for sink particles
+                         nptmass0 = nptmass_found+1
+                         nptmass_found = nptmass_found + nptmass_j
                          read(iunit,iostat=ierr) xyzmh_ptmass(1,nptmass0:nptmass_found)
                       case('y')
                          read(iunit,iostat=ierr) xyzmh_ptmass(2,nptmass0:nptmass_found)
@@ -352,16 +342,8 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
                       matched = .false.
                       read(iunit,iostat=ierr)
                    endif
-                   !     if (matched) then
-                   !        write(*,"(a)") '->',trim(tag)
-                   !     else
-                   !        write(*,"(a)")
-                   !     endif
-
-
                 else
                    read(iunit, iostat=ierr) tag ! tag
-                   !print*,tagarr(1)
                    read(iunit, iostat=ierr) ! array
                 endif
              enddo
@@ -751,11 +733,17 @@ subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
   integer :: i
 
+
   ! Modifying SPH dump
-  if (ldelete_Hill_sphere) then
+  if (ldelete_Hill_sphere .or. ldelete_inside_rsph .or. ldelete_outside_rsph) then
      allocate(mask(np))
-     call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,ulength, mask)
+     mask(:) = .false.
   endif
+
+  if (ldelete_Hill_sphere)  call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,ulength, mask)
+  if (ldelete_inside_rsph)  call mask_inside_rsph(np, xyzh, ulength, rsph_min, mask)
+  if (ldelete_outside_rsph) call mask_outside_rsph(np, xyzh, ulength, rsph_max, mask)
+
   if (lrandomize_azimuth)     call randomize_azimuth(np, xyzh, vxyzu, mask)
   if (lrandomize_gap)         call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,ulength, gap_factor, .true.)
   if (lrandomize_outside_gap) call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,ulength, gap_factor, .false.)
