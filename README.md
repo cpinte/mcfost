@@ -48,4 +48,4 @@ We welcome contributions, including (but not limited to):
 
 Visualising your results
 ------------------------
-We suggest to use [pymcfost](https://github.com/cpinte/pymcfost). Alternative options are discussed in the [documentation](https://mcfost.readthedocs.io/en/latest/tools.html)
+We suggest to use [pymcfost](https://github.com/cpinte/pymcfost). Alternative options are discussed in the [documentation](https://mcfost.readthedocs.io/en/latest/tools.html).
