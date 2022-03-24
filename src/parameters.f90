@@ -59,7 +59,7 @@ module parametres
 
   ! Atomic line radiative transfer
   !!lstore_opac futur deprecation
-  logical :: lsobolev_regime
+  logical :: lno_radiative_coupling, lsobolev, lsobolev_only, lexit_after_nonlte_loop
   logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
   				lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
        			ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation

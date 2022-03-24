@@ -483,7 +483,7 @@ contains
     v_char =  Ld * real(v0 + int(vB)) !m/s
 
 
-    Nlam = 2 * ( 1e-3 * v_char / hv ) + 1
+    Nlam = 0!2 * ( 1e-3 * v_char / hv ) + 1
     line%Nlambda = nint(Nlam)
     !but not use at this point. Will be replaced when the full grid
     !is computed
@@ -492,7 +492,6 @@ contains
     !! This will be used to fine the index of the line on the global grid
     line%lambdamin = line%lambda0*(1-v_char/CLIGHT)
     line%lambdamax = line%lambda0*(1+v_char/CLIGHT)
-    write(*,*) line%lambdamin, line%lambdamax, line%Nlambda
 
 
     return
@@ -518,7 +517,7 @@ contains
     !while allowing a large range for the interpolation ?
     line%lambdamin = line%lambda0*(1-vwing/CLIGHT)
     line%lambdamax = line%lambda0*(1+vwing/CLIGHT)
-    line%Nlambda = nint(2 * ( 1e-3 * vwing / hv )  ) - 1
+   !  line%Nlambda = nint(2 * ( 1e-3 * vwing / hv )  ) - 1
 
     !leaving here to not allocate u in case the profile is not interpolated
     !is impossible since we need to check the association profile, local_profile_interp
@@ -549,6 +548,7 @@ contains
     ! 		stop
 
     Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+    line%Nlambda = Nlambda
 
     Nmid = Nlambda/2 + 1
 
@@ -1520,6 +1520,7 @@ contains
     real(kind=dp), intent(in) :: wl_ref
     integer, intent(out) :: Ntrans
     integer, intent(inout) :: dshift
+    integer :: dk0
     real(kind=dp), allocatable, dimension(:), intent(out) :: outgrid, cont_grid
     real(kind=dp), dimension(:), allocatable :: cont_waves, line_waves
     integer, parameter :: MAX_GROUP_OF_LINES = 1000
@@ -1530,7 +1531,7 @@ contains
     integer, dimension(:), allocatable :: sorted_indexes, Nlambda_per_group
     integer :: Nspec_cont, Nspec_line, Nremoved, Nwaves_cont, Nlines
     integer :: n, kr, la, lac, shift, alloc_status, Nmore_cont_freq, check_new_freq
-    real(kind=dp) :: l0, l1, max_cont, f_plus, f_minus
+    real(kind=dp) :: l0, l1, max_cont
     real(kind=dp) :: vmin, vmax, vv, delta_v
     real(kind=dp), dimension(:), allocatable :: more_cont_waves
     type (AtomType), pointer :: atom
@@ -1542,14 +1543,12 @@ contains
        deallocate(outgrid)
     endif
     Ntrans = 0
+    dk0 = dshift
     !given maximum shift in index, dshift, for a resolution hv, obtain delta_v in m/s
     if (.not.limage) then
       dshift = 0
     endif
     delta_v = 1d3*hv*dshift
-
-    f_minus = (1.0 - delta_v / clight)
-    f_plus = (1.0 + delta_v / clight)
 
     !maximum and minimum wavelength for only lines, including max velocity field
     !Count Number of transitions and number of lines
@@ -2028,7 +2027,6 @@ contains
 
        enddo
 
-		!The indexes on the grid do not include the maximum shift. So lambdamax/min += max shift < / > max/min lambda grid
        do kr=1,atom%Nline
           atom%lines(kr)%Nblue = locate(outgrid, atom%lines(kr)%lambdamin)
           atom%lines(kr)%Nred = locate(outgrid, atom%lines(kr)%lambdamax)
@@ -2090,7 +2088,7 @@ contains
     real(kind=dp), dimension(MAX_GROUP_OF_LINES) :: group_blue, group_red, group_mid
     real(kind=dp), dimension(:), allocatable :: all_lamin, all_lamax, tmp_grid, all_lam0
     integer, dimension(:), allocatable :: sorted_indexes, Nlambda_per_group
-    integer :: Nspec_cont, Nspec_line, Nremoved, Nwaves_cont, Nlines
+    integer :: Nspec_cont, Nspec_line, Nremoved, Nwaves_cont, Nlines, ib, ir, Noverlap
     integer :: n, kr, la, lac, shift, alloc_status, Nmore_cont_freq, check_new_freq
     real(kind=dp) :: l0, l1, max_cont, f_plus, f_minus
     real(kind=dp) :: vmin, vmax, vv, delta_v
@@ -2585,39 +2583,78 @@ contains
           !remember outgrid is arount the ray-traced lines so it is like finding the continuum that falls
           !under these lines
           if (limage) then
-            !here cont_grid and outgrid are the same. if limage
-            if ( (atom%continua(kr)%lambdamin > outgrid(atom%continua(kr)%Nr)).or.&
-               (atom%continua(kr)%lambdamax < outgrid(atom%continua(kr)%Nb))  ) then
-               atom%at(ktr)%lcontrib_to_opac = .false.!default .true.
-               ! write(*,*) " *** continuum transition ", kr, " of atom ", atom%ID, " skipped for raytracing" 
-               cycle cont_loop !go to next cont, no need to continue
-            else
-               write(*,*) " *** continuum transition ", kr, " of atom ", atom%ID, " overlaps with a line"             
+            !here cont_grid and outgrid are the same (limage is .true.)
+            atom%at(ktr)%lcontrib_to_opac = .false. !by default it is .True. and in image mod, there is no cont!
+            !is the continuum overlapping at least one line ?
+            !Nb and Nr includes all possible lines overlapped
+            !write(*,*) "************************************************************************************"
+            !write(*,*) "cont:", kr
+            !write(*,*) atom%continua(kr)%lambdamin, atom%continua(kr)%lambdamax, atom%continua(kr)%lambda0
+            atom%continua(kr)%Nb = 2*size(outgrid)
+            atom%continua(kr)%Nr = 0
+            Noverlap = 0       
+            loop_group_a : do lac=1,ngroup
+               if ( (atom%continua(kr)%lambdamax >= group_blue(lac)).and.(atom%continua(kr)%lambdamin <= group_red(lac)) ) then
+                  atom%at(ktr)%lcontrib_to_opac = .true.
+                  Noverlap = Noverlap + 1
+                  !write(*,*) "group :", group_blue(lac), group_red(lac)
+                  ! write(*,*) " *** cont transition ", kr, " of atom ", atom%ID, " overlaps with another line" 
+                  ! write(*,*) "    -> in group ", lac, group_blue(lac), group_red(lac)
+                  ib = locate(outgrid,group_blue(lac))
+                  ir = locate(outgrid,group_red(lac))
+                  atom%continua(kr)%Nb = min(atom%continua(kr)%Nb,ib)
+                  atom%continua(kr)%Nr = max(atom%continua(kr)%Nr,ir)
+        
+                  !same grid here
+                  atom%continua(kr)%Nblue = atom%continua(kr)%Nb
+                  atom%continua(kr)%Nred = atom%continua(kr)%Nr
+                  atom%continua(kr)%Nmid = locate(outgrid, 0.5*(outgrid(atom%continua(kr)%Nb)+outgrid(atom%continua(kr)%Nr)))
+                  atom%continua(kr)%Nlambda = atom%continua(kr)%Nred - atom%continua(kr)%Nblue + 1
+                  !write(*,*) "New cont limit:", atom%continua(kr)%Nblue, atom%continua(kr)%Nred 
+                  !write(*,*) "lmin = ", outgrid(atom%continua(kr)%Nblue), "lmax = ", outgrid(atom%continua(kr)%Nred)
+                  !exit loop_group_a
+                  !cannot cycle because the continuum can overlap several lines (?)
+               endif
+            enddo loop_group_a
+            if (Noverlap > 0) then
+               if (Noverlap==1) then
+                  write(*,*) " *** cont transition ", kr, " of atom ", atom%ID, " overlaps with ",Noverlap," line" 
+               else
+                  write(*,*) " *** cont transition ", kr, " of atom ", atom%ID, " overlaps with ",Noverlap," lines" 
+               endif
+               write(*,*) "    -> bounds ", outgrid(atom%continua(kr)%Nb), outgrid(atom%continua(kr)%Nr)
             endif
+            !write(*,*) "************************************************************************************"
+            if (.not.atom%at(ktr)%lcontrib_to_opac) cycle cont_loop
           endif
 
           !in any problem of grid resolution etc or locate approximation.
           !We take Nred-1 to be sure than the lambda_cont(Nred) <= lambda0.
           !Only if not dissolution.
-          !We just need to avoind having cont_lambda(Nred)>lambda0, since the cross section is in (lambda/lambda0)**3
-          if (cont_grid(atom%continua(kr)%N0) /= atom%continua(kr)%lambda0) then
+          !We just need to avoid having cont_lambda(Nred)>lambda0, since the cross section is in (lambda/lambda0)**3
+
+          !but don't do the check for limage as cont_grid(N0) will be different than cont%lambda0, because we include continua
+          !only around lines (so cont%lambdamax /= lambda0 /= cont_grid(N0)
+          if (.not.limage ) then
+            if (cont_grid(atom%continua(kr)%N0) /= atom%continua(kr)%lambda0) then
           !!write(*,*) " Beware, cont%lambda0 might not be on the grid", kr, atom%continua(kr)%i, atom%continua(kr)%j
-             if (.not.ldissolve) then
-                if (cont_grid(atom%continua(kr)%Nred) > atom%continua(kr)%lambda0) then
-                   call Warning("continuum Nred larger than lambda0 !")
-                   write(*,*) atom%continua(kr)%lambda0, cont_grid(atom%continua(kr)%Nred)
-                   if (cont_grid(atom%continua(kr)%Nred-1) <= atom%continua(kr)%lambda0) then
-                      write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0
+               if (.not.ldissolve) then
+                  if (cont_grid(atom%continua(kr)%Nred) > atom%continua(kr)%lambda0) then
+                     call Warning("continuum Nred larger than lambda0 !")
+                     write(*,*) atom%continua(kr)%lambda0, cont_grid(atom%continua(kr)%Nred)
+                     if (cont_grid(atom%continua(kr)%Nred-1) <= atom%continua(kr)%lambda0) then
+                        write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0
                       !To do while until <= lambda0
-                      atom%continua(kr)%Nred = atom%continua(kr)%Nred-1
-                      atom%continua(kr)%N0 = atom%continua(kr)%Nred
-                      atom%continua(kr)%Nlambda = atom%continua(kr)%Nred - atom%continua(kr)%Nblue + 1
-                      atom%continua(kr)%Nr = locate(outgrid,cont_grid(atom%continua(kr)%Nred))
-                      write(*,*) "new val at Nred:", outgrid(atom%continua(kr)%Nr), cont_grid(atom%continua(kr)%Nred)
-                   endif
-                endif
-             endif
-          endif
+                        atom%continua(kr)%Nred = atom%continua(kr)%Nred-1
+                        atom%continua(kr)%N0 = atom%continua(kr)%Nred
+                        atom%continua(kr)%Nlambda = atom%continua(kr)%Nred - atom%continua(kr)%Nblue + 1
+                        atom%continua(kr)%Nr = locate(outgrid,cont_grid(atom%continua(kr)%Nred))
+                        write(*,*) "new val at Nred:", outgrid(atom%continua(kr)%Nr), cont_grid(atom%continua(kr)%Nred)
+                     endif
+                  endif
+               endif
+            endif
+         endif !if limage
           !sur la grille totale
           Nlambda_max_cont = max(Nlambda_max_cont,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1)
 
@@ -2625,7 +2662,7 @@ contains
 
        !don't remove the transition without write_flux_map( tab_trans_raytracing), but the transitions
        !that don't fall on the wavelentgh interval and that do not contribute to opac
-		!The indexes on the grid do not include the maximum shift. So lambdamax/min += max shift < / > max/min lambda grid
+		 !The indexes on the grid do not include the maximum shift. So lambdamax/min += max shift < / > max/min lambda grid
        line_loop : do kr=1,atom%Nline
          ktr = kr
           atom%lines(kr)%Nblue = locate(outgrid, atom%lines(kr)%lambdamin)
@@ -2643,11 +2680,11 @@ contains
                !The grid has be generated to include only lines for the raytracing, so we test if the other lines partially fall
                !in these regions.
 
-               !1)
-               !-> test on line group is better ??
-               !strictly > because group here includes shift in vel.
-               !lambdamax/min without shift (?)
+
+               !testing if a line overlap at least one of the raytraced line
+               !the line bounds are unchanged (look at the continuum)
                loop_group_b : do lac=1,ngroup
+               !the shift is added to check if the line will overlap a group
                   if ( ((atom%lines(kr)%lambdamax*f_plus < group_red(lac)).and.(atom%lines(kr)%lambdamax*f_plus > group_blue(lac))).or.&
                         ((atom%lines(kr)%lambdamin*f_minus > group_blue(lac)).and.(atom%lines(kr)%lambdamin*f_minus < group_red(lac))) ) then
                      atom%at(ktr)%lcontrib_to_opac = .true.
@@ -2658,21 +2695,6 @@ contains
                enddo loop_group_b
                !find nothing probably out otherwise lcontrib is true (even if it was false first)
                if (.not.atom%at(ktr)%lcontrib_to_opac) cycle line_loop
-
-               !2)
-               !-> this one works but break if Nlue=Nred because there is a single freq!
-               ! if ( ((atom%lines(kr)%lambdamin < outgrid(atom%lines(kr)%Nred)).or.&
-               !    (atom%lines(kr)%lambdamax > outgrid(atom%lines(kr)%Nblue))).and.&
-               !    ((atom%lines(kr)%Nlambda > 1))  ) then
-               !    atom%at(ktr)%lcontrib_to_opac = .true. !okey we don't raytrace this, but it has a non zero opacity
-               !                                           !around a raytraced line.
-               !    ! write(*,*) atom%lines(kr)%lambdamin, atom%lines(kr)%lambdamax
-               !    ! write(*,*) outgrid(atom%lines(kr)%Nblue), outgrid(atom%lines(kr)%Nred)
-               !    write(*,*) " *** line transition ", kr, " of atom ", atom%ID, " overlaps with another line" 
-               ! else !this line does not overlap a raytraced line and is not a raytraced line !
-               !    ! write(*,*) " *** line transition ", kr, " of atom ", atom%ID, " skipped for raytracing" 
-               !    cycle line_loop !go to next line
-               ! endif
             endif
          endif
 

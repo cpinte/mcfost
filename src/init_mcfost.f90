@@ -66,7 +66,9 @@ subroutine set_default_variables()
   healpix_lmin = 1
   healpix_lmax = 7 !6 !5
   ! Atomic lines Radiative Transfer (AL-RT)
-  lsobolev_regime = .false.
+  lno_radiative_coupling = .false.
+  lsobolev = .false.
+  lsobolev_only = .false.
   lsafe_stop = .false.
   safe_stop_time = 155520.0!1.8days in seconds, default
   llimit_mem = .false.
@@ -625,10 +627,15 @@ subroutine initialisation_mcfost()
      case("-safe_stop")
         i_arg = i_arg + 1
         lsafe_stop = .true.
-      case("-sobolev_regime")
-         !currently beeing test, does not appear then in option.
+      case("-no_radiative_coupling")
          i_arg = i_arg + 1
-         lsobolev_regime = .true.
+         lno_radiative_coupling = .true.
+      case("-sobolev")
+         i_arg = i_arg + 1
+         lsobolev = .true.
+      case("-sobolev_only")
+         i_arg = i_arg + 1
+         lsobolev_only = .true.
      case("-safe_stop_time")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("time needed (safe_stop)")
@@ -1843,6 +1850,9 @@ subroutine display_help()
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
+  write(*,*) "        : -sobolev : Initial solution using Sobolev method for all atoms"
+  write(*,*) "        : -sobolev_only : In Sobolev mode, stop the calculation after the Sobolev pops have been obtained."
+  write(*,*) "        : -no_radiative_coupling : Solve MALI equations with psi = psi^* (local coupling only!)"
   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
   write(*,*) "        : -art_line_resol <v> : resolution of the image grid of art in km/s"

@@ -2181,7 +2181,7 @@ contains
     ! ------------------------------------------- !
     use getline
     use constantes
-    use grid, only : cell_map
+    use grid, only : cell_map, r_grid, z_grid
     character(len=*), intent(in)	:: filename
     real(kind=dp) Tshk!, Oi, Oo
     real(kind=dp) :: tilt!,thetai, thetao
@@ -2314,6 +2314,7 @@ contains
     end do
     close(unit=1)
 
+   !  vR = (300d3 - 50d3) * (1.0 - real(1)/[(real(i),i=1,n_cells)])**0.5 + 50d3
     !Handling of magnetic field components only depends on what choice I make for the magnetic field
     !Presently I read B, theta and chi !
     if (lspherical_velocity) then

@@ -143,7 +143,7 @@ contains
      write(*,'("R(nlte)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
    endif
 
-   if (alloc_nlte_vars) then
+   if ((alloc_nlte_vars).and.allocated(Itot)) then
       call dealloc_spectrum
       do nat=1, natom
          do kr=1, atoms(nat)%ptr_atom%Nline

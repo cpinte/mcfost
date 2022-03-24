@@ -7,9 +7,9 @@ MODULE statequil_atoms
        dk, dk_min, dk_max, &
        Jnu, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb, Istar_loc, Ishock
   use constant
-  use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc
+  use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc, mean_grad_v, dOmega_core, mean_length_scale
   use math, only		: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, solve_lin
-  use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte, lsobolev_regime
+  use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte, lno_radiative_coupling, lsobolev
   use collision, only						: collision_rates_atom_loc!, CollisionRate_old
   use impact, only						: Collision_Hydrogen
   use getlambda, only						: hv, Nlambda_max_trans
@@ -24,6 +24,7 @@ MODULE statequil_atoms
   use messages, only 						: error, warning
   use utils, only 						: gaussslv, interp
   use input, only 						: nb_proc
+  use molecular_emission, only : gradv, vlabs
 
   IMPLICIT NONE
   logical :: ldamp_jacobi = .false.
@@ -39,8 +40,10 @@ MODULE statequil_atoms
 CONTAINS
 
 
-  !n_new must not be allocated to fill atom%n
+  !n_new MUST NOT be allocated to fill atom%n
   !see see_atom (otherwise new pop = n_new and atom%n=nstar
+  !no iteration !!
+  !TO DO: add electron ? maybe
   subroutine radiation_free_pops_atom(id, icell, atom, verbose)
 
     !still with Collisions
@@ -110,6 +113,7 @@ CONTAINS
 
     end do tr_loop
 
+    !evaluate new electronic density ??
     call see_atom(id, icell, atom, dM)
 
     if (verbose) then
@@ -251,6 +255,31 @@ CONTAINS
     enddo
     RETURN
   END SUBROUTINE initGamma
+
+  subroutine init_rates_sobolev(id)
+   integer, intent(in) :: id
+   type (AtomType), pointer :: atom
+   integer :: nact, kr
+
+   do nact = 1, NactiveAtoms
+      atom => ActiveAtoms(nact)%ptr_atom
+      call initGamma_atom(id, atom)
+
+      do kr=1, atom%Nline
+         atom%lines(kr)%Rij(id) = 0.0
+         atom%lines(kr)%Rji(id) = 0.0
+      enddo
+
+      do kr=1, atom%Ncont
+         atom%continua(kr)%Rij(id) = 0.0
+         atom%continua(kr)%Rji(id) = 0.0
+      enddo
+
+      atom => null()
+   enddo
+
+   return
+  end subroutine init_rates_sobolev
 
 
   SUBROUTINE init_rates_atom(id, atom)
@@ -2510,6 +2539,647 @@ CONTAINS
   END SUBROUTINE update_populations
 
 
+  subroutine solve_pops_sobolev
+   !uses angle averaged quantities and non-local term is neglected.
+   !TO DO: add electronic density iteration, cswitch, timing + checkpointing
+   ! -> there is no background continua here
+   use parametres, only : n_iterate_ne, ndelay_iterate_ne, dpops_max_error
+   use atmos_type, only : icompute_atomRT
+   !$ use omp_lib
+   use utils, only : progress_bar
+   use mcfost_env, only  : time_begin, time_end, time_tick, time_max
+   use lte, only : ltepops, ltepops_h
+   use parametres, only : lsafe_stop, safe_stop_time, lexit_after_nonlte_loop
+   integer :: id, icell, ibar, n_cells_done, n_iter
+   logical :: l_iterate_ne, lconverged, lprevious_converged, laverage
+   real(kind=dp) :: diff, dne, diff_old, dM(NactiveAtoms),dN, dN1
+   integer :: ilevel, nact, NmaxLevel, alloc_status
+   real :: precision
+   type (AtomType), pointer :: atom
+   logical, allocatable, dimension(:) :: lcell_converged
+   integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
+   real :: time_iteration, time_nlte
+
+   write(*,*) " Solving populations using the Sobolev approximation"
+   write(*,*) " "
+   laverage = .true.
+
+   call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
+
+   Nmaxlevel = 0
+   do nact=1, NactiveAtoms
+      NmaxLevel = max(Nmaxlevel,ActiveAtoms(nact)%ptr_atom%Nlevel)
+   enddo
+
+   allocate(lcell_converged(n_cells))
+   lcell_converged = .false.
+   allocate(ne_new(n_cells), stat=alloc_status)
+   ne_new(:) = ne(:)
+   if (alloc_status > 0) call error("Allocation error ne_new")
+   write(*,*) " size ne_new:", sizeof(ne_new) / 1024./1024.," MB"
+   allocate(n_new(NactiveAtoms,Nmaxlevel,n_cells),stat=alloc_status)
+   if (alloc_status > 0) call error("Allocation error n_new")
+   write(*,*) " size atom%n, n_new:", 2*sizeof(n_new) / 1024./1024.," MB"
+   n_new(:,:,:) = 0.0_dp
+
+   id = 1
+   precision = dpops_max_error
+
+   diff_old = 0.0
+   dne = 0.0
+   lprevious_converged = .false.
+   lconverged = .false.
+   n_iter = 0
+   l_iterate_ne = .false.
+   do while (.not.lconverged)
+      ibar = 0
+      n_iter = n_iter + 1
+      n_cells_done = 0
+      write(*,*) " -> Iteration #", n_iter
+
+      if( n_iterate_ne > 0 ) then
+         l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
+      endif
+
+      call progress_bar(0)
+      !$omp parallel &
+      !$omp default(none) &
+      !$omp private(id,icell) &
+      !$omp private(diff)&
+      !$omp shared(lforce_lte,n_iter,l_iterate_ne)&
+      !$omp shared(ibar,n_cells_done,n_cells, laverage)&
+      !$omp shared (icompute_atomRT)
+      !$omp do schedule(dynamic,1)
+      do icell=1, n_cells
+         !$ id = omp_get_thread_num() + 1
+         if (icompute_atomRT(icell) > 0) then
+            !init rate matrix to Collision matrix, and init radiative rates
+            call fill_Collision_matrix(id, icell)
+            call init_rates_sobolev(id)
+            !compute the radiative rate in the Sobolev approximation
+            if (laverage) then
+               call calc_rates_sobolev_average(id, icell)
+            else
+            !  do iray=1,..
+            !  call integ_ray_sobolev() ! to get gradv and Istar_loc in that direction
+            !  calc_rates_sobolev(id,icell,iray,wei)
+            !  enddo
+            endif !laverage
+            !fill rate matrix with the radiative rates
+            call calc_rate_matrix(id, icell,.false.)
+            !call update_populations(id, icell, diff, .false., n_iter)
+            !compute new populations and electron density if desired
+            call update_populations_and_electrons(id, icell, diff, .false., n_iter, &
+            (l_iterate_ne.and.icompute_atomRT(icell)==1))!The condition on icompute_atomRT is here because if it is > 0 but /= 1, ne is not iterated!
+         endif
+         ! Progress bar
+         !$omp atomic
+         n_cells_done = n_cells_done + 1
+         if (real(n_cells_done) > 0.02*ibar*n_cells) then
+            call progress_bar(ibar)
+            !$omp atomic
+            ibar = ibar+1
+         endif             
+      enddo
+      !$omp end do
+      !$omp end parallel
+      call progress_bar(50)
+      if (l_iterate_ne) then
+         dne = maxval(abs(1.0 - ne(:)/(ne_new(:)+1d-50)),mask=icompute_atomRT==1)
+         write(*,'("OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+         minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
+         write(*,'("NEW ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+         minval(ne_new,mask=(icompute_atomRT>0)), maxval(ne_new)
+         ne(:) = ne_new(:)
+
+         !no background opac
+         do nact=1, Natom
+            if (Atoms(nact)%ptr_atom%ID=="H") then
+               write(*,*) " -> updating LTE pops of hydrogen"
+               call LTEpops_H
+               !check pops actually are updated ??
+            else
+               write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID
+               call LTEpops(Atoms(nact)%ptr_atom,.false.)
+            endif
+         enddo
+      endif !iterate_ne
+
+      !criterion of convergence
+
+
+      !Global convergence Tests
+      id = 1
+      !should be para
+      dM(:) = 0.0 !all pops
+      diff = 0.0
+      dN = 0.0
+      do icell=1,n_cells
+
+         if (icompute_atomRT(icell)>0) then
+
+            dN = 0.0
+            do nact=1,NactiveAtoms
+               atom => ActiveAtoms(nact)%ptr_atom
+               do ilevel=1,atom%Nlevel
+                  if ( n_new(nact,ilevel,icell) >= frac_limit_pops * ntotal_atom(icell, atom) ) then
+                     dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
+                     dN = max(dN1, dN)
+                     dM(nact) = max(dM(nact), dN1)
+                  endif
+               end do !over ilevel
+
+               atom => NULL()
+            end do !over atoms
+
+            diff = max(diff, dN)
+
+            lcell_converged(icell) = (real(diff) < precision)
+
+            do nact=1, NactiveAtoms
+               atom => ActiveAtoms(nact)%ptr_atom
+               atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
+               atom => NULL()
+            end do
+         end if
+      end do
+
+
+      write(*,*) " ------------------------------------------------ "
+      do nact=1,NactiveAtoms
+         write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%ptr_atom%ID
+         write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
+      enddo
+      if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
+      write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
+      write(*,"('Unconverged cells #'(1I6), ' fraction :'(1F12.3)' %')") &
+           size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
+           100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
+           real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
+      write(*,*) " *************************************************************** "
+      diff_old = diff
+ 
+      if ((real(diff) < precision)) then!.and.(maxval_cswitch_atoms() == 1.0_dp)) then
+         if (lprevious_converged) then
+            lconverged = .true.
+         else
+            lprevious_converged = .true.
+         endif
+      else !continue to iterate even if n_rayons max is reached ?
+         lprevious_converged = .false.
+         ! if ((cswitch_enabled).and.(maxval_cswitch_atoms() > 1.0)) then
+         !    call adjust_cswitch_atoms
+         ! endif
+         if (n_iter > 50) then
+            write(*,*) "Warning : not enough iterations to converge !!"
+            lconverged = .true.
+         end if
+      end if
+
+      !***********************************************************!
+      ! ********** timing and checkpointing **********************!
+
+      call system_clock(time_end,count_rate=time_tick,count_max=time_max)
+      if (time_end < time_begin) then
+         time_nlte=real(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
+      else
+         time_nlte=real(time_end - time_begin)/real(time_tick)
+      endif
+
+      if (n_iter <= n_iter_counted) then
+         time_iteration = time_iteration + time_nlte / real(n_iter_counted)
+      endif
+
+
+      if (lsafe_stop) then
+
+         if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= n_iter_counted)) then
+            lconverged = .true.
+            lprevious_converged = .true.
+            call warning("Time limit would be exceeded, leaving...")
+            write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
+            write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', &
+                 mod(time_iteration/60.,60.)," min"
+            write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+            write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
+            lexit_after_nonlte_loop = .true.
+         endif
+
+      endif
+    !  ***********************************************************!
+
+
+   enddo !while loop
+   deallocate(lcell_converged,ne_new,n_new)
+
+   if (n_iter >= n_iter_counted) then
+      write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
+      write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+   endif
+
+   return
+  end subroutine solve_pops_sobolev
+
+  subroutine calc_rates_sobolev_average(id, icell)
+   !accurates if chi0 / gradv is large (gradv small or large chi0 ) or  chi0/gradv is mall (0 chi0 or large gradv)
+   !if chi0/gradv is of the order of unity it is not accurate anymore. In principle, gradv is always small.
+   use parametres, only : etoile
+   use planck, only : Bpnu
+   use opacity, only : domega_shock
+   use atmos_type, only : Taccretion
+   integer, intent(in) :: id, icell
+   real, parameter :: fact_tau = 1.0 !>0; could be 3.0 for mcfost
+   real(kind=dp), parameter :: prec_vel = 1d-50 !m/s
+   real(kind=dp), parameter :: limit_tau = 1.0
+   real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
+   ! real(kind=dp), dimension(Nlambda_max_trans) :: tau_cont
+   integer :: nact, i, j, kc, kr, Nr, Nb, l, Nl, i1, i2
+   real(kind=dp) :: Sij, Jbar, tau0, beta, chi_ij, F, Icore
+   real(kind=dp) :: JJ, JJb, twohnu3_c2, ehnukt, a1, wl, W, r2_ratio
+   type(AtomType), pointer :: aatom
+   real(kind=dp) :: ni_on_nj_star, tau_escape
+   logical :: lno_cont = .false.
+
+   aatom_loop : do nact = 1, Nactiveatoms
+      aatom => ActiveAtoms(nact)%ptr_atom
+
+
+      atr_loop : do kr = 1, aatom%Ntr_line
+
+         kc = aatom%at(kr)%ik
+         !all lines contribute, so don't evaluate lcontrib_to_opac
+
+         !-> not used yet without non-local term
+         Nr = aatom%lines(kc)%Nred;Nb = aatom%lines(kc)%Nblue
+         Nl = Nr-Nb+1 -dk_min + dk_max
+         i = aatom%lines(kc)%i
+         j = aatom%lines(kc)%j
+
+         if (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell) <= 0.0) cycle atr_loop
+
+         if (laccretion_shock) then
+            Icore = Bpnu(etoile(1)%T*1d0,aatom%lines(kc)%lambda0) * (dOmega_core(icell)-domega_shock(icell))
+            Icore = Icore + Bpnu(Taccretion,aatom%lines(kc)%lambda0) * dOmega_shock(icell)
+         else
+            Icore = Bpnu(etoile(1)%T*1d0,aatom%lines(kc)%lambda0) * dOmega_core(icell)
+         endif
+
+         !line Source function in absence of continuum and in CFR
+         !Sij = nj Aji / (ni Bij - nj Bji)
+         Sij = aatom%lines(kc)%Aji * aatom%n(j,icell) / &
+            ( aatom%lines(kc)%Bij * (aatom%n(i,icell)-aatom%n(j,icell)*aatom%lines(kc)%gij) )
+   
+         chi_ij = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell))
+         tau_escape = fact_tau * chi_ij * mean_length_scale(icell) / aatom%vbroad(icell)
+         if (mean_grad_v(icell) > prec_vel) then
+            !s^-1
+            tau0 = fact_tau * chi_ij / mean_grad_v(icell)
+            if (tau0 > tau_escape) tau0 = tau_escape
+         else !escape probability
+            tau0 = tau_escape
+         endif
+         ! write(*,*) icell, "dtau=",tau_escape-tau0, " prec=", prec_vel, " dv/ds=",mean_grad_v(icell)
+         !if (tau0 < 1d-5) then
+         !  beta = 1.0 - tau0 / 2.0 + tau0**2 / 6.0
+         !else
+         ! beta = (1.0 - exp(-tau0))/tau0
+         !endif
+         beta = (1.0 - exp(-tau0))/tau0 !frequency integral of Psi basically, in the Sobolev limit
+         if (beta > 1.0001) then !otherwise it is a numerical error ? 
+            write(*,*) ""
+            write(*,*) "icell=",icell,"Sij=",Sij,"chi_ij=",chi_ij, "<dv/ds>=",mean_grad_v(icell)
+            write(*,*) "beta=",beta, "tau0=",tau0, "tau escape=", tau_escape
+            call warning("beta larger than 1")
+            beta = 1.0
+         endif
+
+         !Jbar in the Sobolev limit without non-local term
+         !The integration goes only for rays here !
+         Jbar = (1.0 - beta) * Sij + beta * Icore
+         aatom%lines(kc)%Rji(id) = beta * aatom%lines(kc)%Aji + beta * Icore * aatom%lines(kc)%Bji
+         ! aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Aji + Jbar * aatom%lines(kc)%Bji
+         aatom%lines(kc)%Rij(id) = beta*Icore * aatom%lines(kc)%Bij
+
+
+      enddo atr_loop
+
+      if (lno_cont) cycle aatom_loop
+
+      !continuum in the optically thin limit
+      atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
+
+         kc = aatom%at(kr)%ik
+         !all transitions contribue so I don't test lcontrib_to_opac
+
+         i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
+         !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+         ni_on_nj_star = aatom%nstar(i,icell)/aatom%nstar(j,icell)
+
+         Nb = aatom%continua(kc)%Nblue; Nr = aatom%continua(kc)%Nred
+         ! Nb = aatom%continua(kc)%Nb; Nr = aatom%continua(kc)%Nr
+         Nl = Nr-Nb + 1
+
+         JJ = 0.0
+         JJb = 0.0
+
+         tau0 = mean_length_scale(icell) *  aatom%continua(kc)%alpha(Nl) * &
+         ( aatom%n(i,icell) - aatom%n(j,icell) * &
+            (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0) )
+         !trick to account for optically think continua that should be treated at LTE (Rij = Rji = 0)
+         ! tau_cont(1:Nl) = mean_length_scale(icell) *  aatom%continua(kc)%alpha(:) * &
+         !    ( aatom%n(i,icell) - aatom%n(j,icell) * &
+         !       (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/lambda_cont(Nb:Nr)) )
+         ! if(maxval(tau_cont)> limit_tau) then
+         if (tau0 > limit_tau) then
+            cycle
+         endif
+
+         if (laccretion_shock) then
+            Ieff(1:Nl) = (dOmega_core(icell)-domega_shock(icell)) * Bpnu(etoile(1)%T*1d0,lambda_cont(Nb:Nr))
+            Ieff(1:Nl) = Ieff(1:Nl) + domega_shock(icell) * Bpnu(Taccretion,lambda_cont(Nb:Nr))
+         else
+            Ieff(1:Nl) = dOmega_core(icell) * Bpnu(etoile(1)%T*1d0,lambda_cont(Nb:Nr))
+         endif
+         !Ieff *= * exp(-tau_cont(1:Nl))
+
+         !if continuum is optically thick, Rij and Rji are zero -> LTE
+         !Istar_loc is 0 if we don't touch the star for that direction.
+
+         do l=1, Nl
+            if (l==1) then
+               wl = 0.5*(lambda_cont(Nb+l)-lambda_cont(Nb)) / lambda_cont(Nb)
+            elseif (l==Nl) then
+               wl = 0.5*(lambda_cont(Nr)-lambda_cont(Nr-1))  / lambda_cont(Nr)
+            else
+               wl = 0.5*(lambda_cont(Nb+l)-lambda_cont(Nb+l-2)) / lambda_cont(Nb+l-1)
+            endif
+
+            a1 = aatom%continua(kc)%alpha(l)
+
+            JJ = JJ + wl  * a1 * Ieff(l)
+            
+            ehnukt = exp(-hc_k/T(icell)/lambda_cont(Nb+l-1))
+            twohnu3_c2 = twohc/lambda_cont(Nb+l-1)**3
+            JJb = JJb + wl * ( Ieff(l) + twohnu3_c2 ) * ehnukt * a1
+   
+         enddo
+
+         !angular integration only
+         aatom%continua(kc)%Rij(id) = fourpi_h * JJ
+         aatom%continua(kc)%Rji(id) = fourpi_h * JJb * ni_on_nj_star
+
+ 
+      end do atrc_loop
+
+
+      aatom => NULL()
+
+   end do aatom_loop
+
+   return
+ end subroutine calc_rates_sobolev_average
+
+!  subroutine integ_ray_sobolev(id,icell_in,x,y,z,u,v,w,iray)
+!    !get velocity gradient in a specific direction + core radiation
+!       integer, intent(in) :: id, icell_in, iray
+!       real(kind=dp), intent(in) :: u,v,w
+!       real(kind=dp), intent(in) :: x,y,z
+!       ! real(kind=dp) :: tau(nlambda), tau_c(nlambda_cont)
+!       real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
+!       integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
+!       logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+
+!       x1=x;y1=y;z1=z
+!       x0=x;y0=y;z0=z
+!       next_cell = icell_in
+!       nbr_cell = 0
+!       icell_prev = icell_in
+
+!       Istar_loc(:,id) = 0.0_dp
+!       ! tau = 0.0
+!       ! tau_c = 0.0
+!       if (laccretion_shock) Ishock(:,id) = 0.0_dp
+
+
+!       ! Will the ray intersect a star
+!       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+!       ! Boucle infinie sur les cellules (we go over the grid.)
+!       infinie : do ! Boucle infinie
+!       ! Indice de la cellule
+!          icell = next_cell
+!          x0=x1 ; y0=y1 ; z0=z1
+
+!          lcellule_non_vide = (icell <= n_cells)
+!          ! if (icell <= n_cells) then
+!          !    lcellule_non_vide=.true.
+!          ! else
+!          !    lcellule_non_vide=.false.
+!          ! endif
+
+!          ! Test sortie ! "The ray has reach the end of the grid"
+!          if (test_exit_grid(icell, x0, y0, z0)) return
+
+!          if (lintersect_stars) then !"will interesct"
+!             if (icell == icell_star) then!"has intersected"
+!                ! call local_stellar_radiation(id,iray,tau,tau_c,i_star,icell_prev,x0,y0,z0,u,v,w)
+!                return
+!             end if
+!          endif
+!          !With the Voronoi grid, somme cells can have a negative index
+!          !therefore we need to test_exit_grid before using icompute_atom_rt
+!          if (icell <= n_cells) then
+!             lcellule_non_vide = (icompute_atomRT(icell) > 0)
+!             if (icompute_atomRT(icell) < 0) return
+!          endif
+
+!          nbr_cell = nbr_cell + 1
+
+!          ! Calcul longeur de vol et profondeur optique dans la cellule
+!          previous_cell = 0 ! unused, just for Voronoi
+!          call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+!          !count opacity only if the cell is filled, else go to next cell
+!          if (lcellule_non_vide) then
+!             lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet same as iterate?
+!             ! opacities in m^-1, l_contrib in au
+
+
+!             if (nbr_cell == 1) then
+!                ds(iray,id) = l_contrib * AU_to_m
+!                gradv(iray,id) = abs( v_proj(icell,x0,y0,z0,u,v,w) - v_proj(icell,x1,y1,z1,u,v,w) )
+!             endif
+
+
+!          end if  ! lcellule_non_vide
+
+!          icell_prev = icell 
+!          !duplicate with previous_cell, but this avoid problem with Voronoi grid here
+
+!       end do infinie
+
+!       return
+!    end subroutine integ_ray_sobolev
+
+!  subroutine calc_rates_sobolev(id, icell, iray, wei)
+!    !does the integral in direction numerically
+!    ! used with integ_ray_sobolev()
+!    !irradiation not handled properly
+!    integer, intent(in) :: id, icell,iray
+!    real(kind=dp), intent(in) :: wei
+!    integer, intent(in) :: id, icell
+!    real, parameter :: fact_tau = 1.0 !>0; could be 3.0 for mcfost
+!    real(kind=dp), parameter :: prec_vel = 1d-50 !m/s
+!    real(kind=dp), parameter :: limit_tau = 1.0
+!    real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
+!    ! real(kind=dp), dimension(Nlambda_max_trans) :: tau_cont
+!    integer :: nact, i, j, kc, kr, Nr, Nb, l, Nl, i1, i2
+!    real(kind=dp) :: Sij, Jbar, tau0, beta, chi_ij, F, Icore
+!    real(kind=dp) :: JJ, JJb, twohnu3_c2, ehnukt, a1, wl, W, r2_ratio
+!    type(AtomType), pointer :: aatom
+!    real(kind=dp) :: ni_on_nj_star, tau_escape, dvds
+!    logical :: lno_cont = .true.
+
+!    dvds = gradv(iray,id) / ds(iray,id)
+
+!    aatom_loop : do nact = 1, Nactiveatoms
+!       aatom => ActiveAtoms(nact)%ptr_atom
+
+
+!       atr_loop : do kr = 1, aatom%Ntr_line
+
+!          kc = aatom%at(kr)%ik
+!          !all lines contribute, so don't evaluate lcontrib_to_opac
+
+!          !-> not used yet without non-local term
+!          Nr = aatom%lines(kc)%Nred;Nb = aatom%lines(kc)%Nblue
+!          Nl = Nr-Nb+1 -dk_min + dk_max
+!          i = aatom%lines(kc)%i
+!          j = aatom%lines(kc)%j
+
+!          if (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell) <= 0.0) cycle atr_loop
+
+!          ! if (laccretion_shock) then
+!          !    Icore = Bpnu(etoile(1)%T*1d0,aatom%lines(kc)%lambda0) * (dOmega_core(icell)-domega_shock(icell))
+!          !    Icore = Icore + Bpnu(Taccretion,aatom%lines(kc)%lambda0) * dOmega_shock(icell)
+!          ! else
+!          !    Icore = Bpnu(etoile(1)%T*1d0,aatom%lines(kc)%lambda0) * dOmega_core(icell)
+!          ! endif
+
+!          Icore = Istar_loc(aatom%lines(kc)%N0,id)
+!          if (laccretion_shock) Icore = Icore + Ishock(aatom%lines(kc)%N0,id)
+
+!          !line Source function in absence of continuum and in CFR
+!          !Sij = nj Aji / (ni Bij - nj Bji)
+!          Sij = aatom%lines(kc)%Aji * aatom%n(j,icell) / &
+!             ( aatom%lines(kc)%Bij * (aatom%n(i,icell)-aatom%n(j,icell)*aatom%lines(kc)%gij) )
+   
+!          chi_ij = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell))
+!          tau_escape = fact_tau * chi_ij * mean_length_scale(icell) / aatom%vbroad(icell)
+!          if (dvds > prec_vel) then
+!             !s^-1
+!             tau0 = fact_tau * chi_ij / dvds
+!             if (tau0 > tau_escape) tau0 = tau_escape
+!          else !escape probability
+!             tau0 = tau_escape
+!          endif
+!          ! write(*,*) icell, "dtau=",tau_escape-tau0, " prec=", prec_vel, " dv/ds=",mean_grad_v(icell)
+!          !if (tau0 < 1d-5) then
+!          !  beta = 1.0 - tau0 / 2.0 + tau0**2 / 6.0
+!          !else
+!          ! beta = (1.0 - exp(-tau0))/tau0
+!          !endif
+!          beta = (1.0 - exp(-tau0))/tau0 !frequency integral of Psi basically, in the Sobolev limit
+!          if (beta > 1.0001) then !otherwise it is a numerical error ? 
+!             write(*,*) ""
+!             write(*,*) "icell=",icell,"Sij=",Sij,"chi_ij=",chi_ij, "<dv/ds>=",dvds
+!             write(*,*) "beta=",beta, "tau0=",tau0, "tau escape=", tau_escape
+!             call warning("beta larger than 1")
+!             beta = 1.0
+!          endif
+
+!          aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + wei * (beta * aatom%lines(kc)%Aji + beta * Icore * aatom%lines(kc)%Bji)
+!          ! aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Aji + Jbar * aatom%lines(kc)%Bji
+!          aatom%lines(kc)%Rij(id) = aatom%lines(kc)%Rij(id) + wei * (beta*Icore * aatom%lines(kc)%Bij)
+
+
+!       enddo atr_loop
+
+!       if (lno_cont) cycle aatom_loop
+
+!       !continuum in the optically thin limit
+!       atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
+
+!          kc = aatom%at(kr)%ik
+!          !all transitions contribue so I don't test lcontrib_to_opac
+
+!          i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
+!          !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+!          ni_on_nj_star = aatom%nstar(i,icell)/aatom%nstar(j,icell)
+
+!          Nb = aatom%continua(kc)%Nblue; Nr = aatom%continua(kc)%Nred
+!          ! Nb = aatom%continua(kc)%Nb; Nr = aatom%continua(kc)%Nr
+!          Nl = Nr-Nb + 1
+
+!          JJ = 0.0
+!          JJb = 0.0
+
+!          tau0 = mean_length_scale(icell) *  aatom%continua(kc)%alpha(Nl) * &
+!          ( aatom%n(i,icell) - aatom%n(j,icell) * &
+!             (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0) )
+!          !trick to account for optically think continua that should be treated at LTE (Rij = Rji = 0)
+!          ! tau_cont(1:Nl) = mean_length_scale(icell) *  aatom%continua(kc)%alpha(:) * &
+!          !    ( aatom%n(i,icell) - aatom%n(j,icell) * &
+!          !       (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/lambda_cont(Nb:Nr)) )
+!          ! if(maxval(tau_cont)> limit_tau) then
+!          if (tau0 > limit_tau) then
+!             cycle
+!          endif
+
+!          if (laccretion_shock) then
+!             Ieff(1:Nl) = (dOmega_core(icell)-domega_shock(icell)) * Bpnu(etoile(1)%T*1d0,lambda_cont(Nb:Nr))
+!             Ieff(1:Nl) = Ieff(1:Nl) + domega_shock(icell) * Bpnu(Taccretion,lambda_cont(Nb:Nr))
+!          else
+!             Ieff(1:Nl) = dOmega_core(icell) * Bpnu(etoile(1)%T*1d0,lambda_cont(Nb:Nr))
+!          endif
+!          !Ieff *= * exp(-tau_cont(1:Nl))
+
+!          !if continuum is optically thick, Rij and Rji are zero -> LTE
+!          !Istar_loc is 0 if we don't touch the star for that direction.
+
+!          do l=1, Nl
+!             if (l==1) then
+!                wl = 0.5*(lambda_cont(Nb+l)-lambda_cont(Nb)) / lambda_cont(Nb)
+!             elseif (l==Nl) then
+!                wl = 0.5*(lambda_cont(Nr)-lambda_cont(Nr-1))  / lambda_cont(Nr)
+!             else
+!                wl = 0.5*(lambda_cont(Nb+l)-lambda_cont(Nb+l-2)) / lambda_cont(Nb+l-1)
+!             endif
+
+!             a1 = aatom%continua(kc)%alpha(l)
+
+!             JJ = JJ + wl  * a1 * Ieff(l)
+            
+!             ehnukt = exp(-hc_k/T(icell)/lambda_cont(Nb+l-1))
+!             twohnu3_c2 = twohc/lambda_cont(Nb+l-1)**3
+!             JJb = JJb + wl * ( Ieff(l) + twohnu3_c2 ) * ehnukt * a1
+   
+!          enddo
+
+
+!          aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + wei * fourpi_h * JJ
+!          aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + wei * fourpi_h * JJb * ni_on_nj_star
+
+ 
+!       end do atrc_loop
+
+
+!       aatom => NULL()
+
+!    end do aatom_loop
+
+!    return
+!  end subroutine calc_rates_sobolev
+
   subroutine calc_rates_mali(id, icell, iray, waq)
     integer, intent(in) :: id, icell, iray
     real(kind=dp), intent(in) :: waq
@@ -2546,10 +3216,6 @@ CONTAINS
 
           Ieff(1:Nl) = Itot(Nblue+dk_min:Nred+dk_max,iray,id) - Psi(Nblue+dk_min:Nred+dk_max,iray,id) * &
                eta_atoms(Nblue+dk_min:Nred+dk_max,nact,id)
-          if (lsobolev_regime) then
-            Ieff(1:Nl) = Istar_loc(Nblue+dk_min:Nred+dk_max,id)!0.0
-            if (laccretion_shock) Ieff(1:Nl) = Ieff(1:Nl) + Ishock(Nblue+dk_min:Nred+dk_max,id)
-          endif
 
           ! 				enddo
           do l=1,Nl
@@ -2640,7 +3306,6 @@ CONTAINS
           xcc_ji = 0.0
 
           Ieff(1:Nl) = Itot(Nblue:Nred,iray,id) - Psi(Nblue:Nred,iray,id) * eta_atoms(Nblue:Nred,nact,id)
-
 
           icell_d = 1
           if (ldissolve) then

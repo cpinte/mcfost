@@ -30,7 +30,8 @@ module Opacity
   real(kind=dp) :: frac_limit_pops = frac_ntot_limit
   !for one ray
   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:)
-  real(kind=dp), allocatable :: R_xcc(:,:,:,:)
+  real(kind=dp), allocatable :: R_xcc(:,:,:,:), mean_grad_v(:), domega_core(:), mean_length_scale(:)
+  real(kind=dp), allocatable :: domega_shock(:)
 
 contains
 
@@ -961,6 +962,24 @@ contains
   ! 	return
   ! 	end subroutine compute_nlte_bound_free
 
+  function calc_shift(id,icell,Nblue,x,y,z,u,v,w,v0)
+   !we only need an approximate shift to take into account lines that will escape their boundary
+   !and that will eventually overlap with another line.
+   !In non-LTE it matters only for different lines (because we integrate over phi)
+   integer :: calc_shift
+   integer, intent(in) :: id, icell, Nblue
+   real(kind=dp), intent(in) :: x,y,z,u,v,w
+   real(kind=dp) :: vloc, v0
+   integer :: iloc
+
+   vloc = v_proj(icell,x,y,z,u,v,w) - v0
+   ! iloc = locate(lambda,lambda(Nblue)*(1.0+vloc/c_light))   !too slow
+   ! calc_shift = iloc - Nblue
+   calc_shift = nint( 1d-3 * vloc / hv - 0.5)
+
+   return
+  end function calc_shift
+
   subroutine opacity_atom_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib, iterate)
 
     integer, intent(in) :: id, icell, iray
@@ -968,8 +987,8 @@ contains
     real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
     integer :: nact, Nred, Nblue, kc, kr, i, j
     type(AtomType), pointer :: aatom
-    integer :: dk0, dk1, Nlam
-    real(kind=dp) :: wi, wj, adamp, dv_dl
+    integer :: Nlam, shift
+    real(kind=dp) :: wi, wj, adamp
     !if there is 40 points for the unperturbed profile for all lines, the size is 40. If there are velocity fields
     !we add two times the shift. This is however, much lower than Nlambda !!
     real(kind=dp), dimension(Nlambda_max_line+2*dk_max) :: phi0
@@ -1006,17 +1025,33 @@ contains
              cycle tr_loop
           endif
 
-          phi0(1:Nlam) = profile(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue:Nred),&
-          x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+          shift = 0
+          !calc vlabs during the propagation instead and if lsubstract_avg simply set the cell at 0 velocities instead of
+          !re centering it. Still vlabs will be the mean from (x0,y0,z0) to (x1,y1,z1)
+         !  if (iterate) then
+         !    shift = 0
+         !  else!we either know vlabs here from previous cell or we are computing image and vlabs is 0!
+         !    shift = calc_shift(id,icell,Nblue,x,y,z,u,v,w,vlabs(iray,id))
+         !    shift = max(min(shift,Nlambda-Nred),1-Nblue)
+         !    !the shift will move the line somewhere and is relevent only if the line falls onto another line
+         !    !due to its velocity displacement.
+         !    !if the same line is moved outside its bound due to the velocity shifts, it does not affect
+         !    !the calculation of Jbar since the integral is done in the rest frame of the cell around phi_loc(v=0).
+         !    !so in practice there is no significant overlap of different transitions due to the velocity fields.
+         !  endif
+
+
+          phi0(1:Nlam) = profile(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue+shift:Nred+shift),&
+          x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib,vlabs(iray,id))
 
 
           ! 				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
 
 
-          chi(Nblue:Nred,id) = chi(Nblue:Nred,id) + &
+          chi(Nblue+shift:Nred+shift,id) = chi(Nblue+shift:Nred+shift,id) + &
                hc_fourPI * aatom%lines(kc)%Bij * phi0(1:Nlam) * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
 
-          eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + &
+          eta(Nblue+shift:Nred+shift,id)= eta(Nblue+shift:Nred+shift,id) + &
                hc_fourPI * aatom%lines(kc)%Aji * phi0(1:Nlam) * aatom%n(j,icell)
 
           ! 				else !neg or null
@@ -1397,6 +1432,64 @@ contains
   	return
   end subroutine
 
+!   subroutine opacity_sobolev_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib, iterate)
+
+!    integer, intent(in) :: id, icell, iray
+!    logical, intent(in) :: iterate
+!    real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
+!    integer :: nact, Nred, Nblue, kc, kr, i, j
+!    type(AtomType), pointer :: aatom
+!    integer :: Nlam, shift
+!    real(kind=dp) :: wi, wj, adamp
+
+!    atom_loop : do nact = 1, Natom!Nactiveatoms
+!       aatom => Atoms(nact)%ptr_atom!ActiveAtoms(nact)%ptr_atom
+
+!       tr_loop : do kr = 1,aatom%Ntr_line
+
+!         if (.not.aatom%at(kr)%lcontrib_to_opac) cycle tr_loop
+!          kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
+
+!          Nred = aatom%lines(kc)%Nred+dk_min; Nblue = aatom%lines(kc)%Nblue+dk_max
+!          i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
+
+
+!          Nblue = Nblue + dk_min
+!          Nred = Nred + dk_max
+!          Nlam = Nred - Nblue + 1
+
+!          wj = 1.0; wi = 1.0
+!          if (ldissolve) then
+!             if (aatom%ID=="H") then
+!                !nn
+!                wj = wocc_n(icell, real(j,kind=dp), real(aatom%stage(j)), real(aatom%stage(j)+1),hydrogen%n(1,icell)) !1 for H
+!                wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1),hydrogen%n(1,icell))
+!             endif
+!          endif
+
+!          if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) <= 0.0_dp) then
+!             cycle tr_loop
+!          endif
+
+!          !gradient is v_proj(x1,y1,z1) - vlabs(iray,id)
+!          if (iterate) vlabs(iray,id) = v_proj(icell,x,y,z,u,v,w)
+
+!          chi(Nblue:Nred,id) = chi(Nblue:Nred,id) + &
+!               hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
+
+!          eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + &
+!               hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell)
+
+
+!       end do tr_loop
+
+!       aatom => NULL()
+
+!    end do atom_loop
+
+
+!    return
+!  end subroutine opacity_sobolev_loc
 end module Opacity
 
   !metal_bf typically

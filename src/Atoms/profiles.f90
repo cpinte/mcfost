@@ -15,7 +15,7 @@ module PROFILES
 
    implicit none
 
-   procedure(local_profile_v), pointer :: profile => null()
+   procedure(local_profile_interp), pointer :: profile => null()
    integer, parameter :: NvspaceMax = 151
    integer, parameter :: NbspaceMax = 17
 
@@ -23,7 +23,7 @@ module PROFILES
 
 
 
-   function local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   function local_profile_v(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib,vmean)
       ! phi = Voigt / sqrt(pi) / vbroad(icell)
       integer, intent(in)                    :: icell, N
       logical, intent(in)                    :: lsubstract_avg
@@ -32,6 +32,7 @@ module PROFILES
                                              x1,y1,z1, &      ! velocity field and magnetic field
                                              l_void_before,l_contrib !physical length of the cell
       integer 											:: Nvspace
+      real(kind=dp), intent(inout)           :: vmean
       real(kind=dp), dimension(NvspaceMax)   :: Omegav
       real(kind=dp)                          :: norm
       real(kind=dp)                          :: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
@@ -72,7 +73,12 @@ module PROFILES
          omegav(Nvspace) = v1
          omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
       endif
-      if (lsubstract_avg) omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+      if (lsubstract_avg) then
+         vmean = omegav_mean
+      !    omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+      ! else
+      !    omegav(1:Nvspace) = omegav(1:Nvspace) - vmean
+      endif
 
       norm = Nvspace * line%atom%vbroad(icell) * sqrtpi
 
@@ -103,7 +109,7 @@ module PROFILES
    end function local_profile_v
 
   !gaussian are NOT interpolated (because it is not much faster but would be costly in memory to store all gaussian lines)
-   function local_profile_interp(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   function local_profile_interp(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib, vmean)
    ! phi = Voigt / sqrt(pi) / vbroad(icell)
       integer, intent(in)                    :: icell, N
       logical, intent(in)                    :: lsubstract_avg
@@ -112,6 +118,7 @@ module PROFILES
                                           x1,y1,z1, &      ! velocity field and magnetic field
                                           l_void_before,l_contrib !physical length of the cell
       integer 											:: Nvspace
+      real(kind=dp), intent(inout)           :: vmean
       real(kind=dp), dimension(NvspaceMax)   :: Omegav
       real(kind=dp)                          :: norm
       real(kind=dp)                          :: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
@@ -154,7 +161,12 @@ module PROFILES
          omegav(Nvspace) = v1 / vbroad
          omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
       endif
-      ! if (lsubstract_avg) omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+      if (lsubstract_avg) then
+         vmean = omegav_mean * vbroad
+      !    omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+      ! else
+      !    omegav(1:Nvspace) = omegav(1:Nvspace) - vmean / vbroad
+      endif
 
 
       if (line%voigt) then
@@ -344,7 +356,7 @@ module PROFILES
 !     real(kind=dp), dimension(NbspaceMax)   :: Omegab
       real(kind=dp)                          :: norm, vbroad, admp, cog, s2c, c2c, B, sigsq
       real(kind=dp)                          :: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
-                                             dv, omegav_mean
+                                             dv, omegav_mean, dummy
       type (AtomicLine), intent(in)          :: line
       integer                                :: Nred, Nblue, i, j, nv, nc
       real(kind=dp), dimension(N)            :: u1, u1p, ub
@@ -359,7 +371,7 @@ module PROFILES
 
       if (lnot_magnetized.or..not.(line%polarizable)) then
          !The test could be done elsewhere though
-         phi0 = local_profile_v(line,icell,lsubstract_avg,N,lambda,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+         phi0 = local_profile_v(line,icell,lsubstract_avg,N,lambda,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib,dummy)
          return
       endif
     

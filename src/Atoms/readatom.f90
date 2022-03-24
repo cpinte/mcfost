@@ -796,15 +796,6 @@ module readatom
             call define_local_profile_grid (Atoms(nmet)%ptr_atom%lines(kr))
 
 
-            !-> depends if we interpolate profile on finer grid !
-            !!-> linear
-            !      CALL make_sub_wavelength_grid_line_lin(Atoms(nmet)%ptr_atom%lines(kr),&
-            !                                         maxval(Atoms(nmet)%ptr_atom%vbroad), max_adamp)
-            !!-> logarithmic
-            !      CALL make_sub_wavelength_grid_line(Atoms(nmet)%ptr_atom%lines(kr),&
-            !                                         maxval(Atoms(nmet)%ptr_atom%vbroad), max_adamp)
-
-
          enddo !over lines
          if (atom%lgauss_prof) then
             write(*,*) " -> gauss profile for that atom ", atom%id
