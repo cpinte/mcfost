@@ -24,7 +24,7 @@ MODULE statequil_atoms
   use messages, only 						: error, warning
   use utils, only 						: gaussslv, interp
   use input, only 						: nb_proc
-  use molecular_emission, only : gradv, vlabs
+  use molecular_emission, only : vlabs!, gradv
 
   IMPLICIT NONE
   logical :: ldamp_jacobi = .false.
