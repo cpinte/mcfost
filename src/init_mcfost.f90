@@ -11,6 +11,7 @@ module init_mcfost
   use input, only : Tfile, lect_lambda, read_phase_function, read_molecules_names
   use ProdiMo
   use utils
+  use read_fargo3d, only : read_fargo3d_parameters, read_fargo3d_files
 
   implicit none
 
@@ -125,10 +126,10 @@ subroutine set_default_variables()
   loutput_mc=.false.
   ldensity_file=.false.
   lvelocity_file=.false.
-  lvfield_cyl_coord=.false.
   lphantom_file=.false.
   lphantom_multi = .false.
   lphantom_avg = .false.
+  lforce_Mgas = .false.
   lforce_SPH_amin = .false.
   lforce_SPH_amax = .false.
   lascii_SPH_file = .false.
@@ -187,6 +188,8 @@ subroutine set_default_variables()
   lvphi_Kep = .false.
   lfluffy = .false.
   ldelete_hill_sphere = .false.
+  ldelete_inside_rsph = .false.
+  ldelete_outside_rsph = .false.
   lrandomize_Voronoi = .false.
   lrandomize_azimuth = .false.
   lrandomize_gap = .false.
@@ -209,6 +212,8 @@ subroutine set_default_variables()
   system_age = "3Myr"
 
   SPH_keep_particles = 0.999
+
+  vfield_coord = 0
 
   return
 
@@ -263,7 +268,7 @@ subroutine initialisation_mcfost()
 
   character(len=512) :: cmd, s, str_seed, para, base_para
   character(len=4) :: n_chiffres
-  character(len=128)  :: fmt1
+  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id
 
   logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb
 
@@ -962,6 +967,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) SPH_amax
         i_arg = i_arg + 1
+     case("-force_Mgas")
+        lforce_Mgas = .true.
+        i_arg = i_arg + 1
      case("-gadget","-gadget2")
         i_arg = i_arg + 1
         lgadget2_file=.true.
@@ -1319,6 +1327,18 @@ subroutine initialisation_mcfost()
      case("-delete_Hill_sphere")
         i_arg = i_arg + 1
         ldelete_Hill_sphere = .true.
+     case("-delete_inside_rsph")
+        i_arg = i_arg + 1
+        ldelete_inside_rsph = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) rsph_min
+        i_arg = i_arg + 1
+     case("-delete_outside_rsph")
+        i_arg = i_arg + 1
+        ldelete_outside_rsph = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) rsph_max
+        i_arg = i_arg + 1
      case("-random_az")
         i_arg = i_arg + 1
         lrandomize_azimuth = .true.
@@ -1363,6 +1383,15 @@ subroutine initialisation_mcfost()
         read(s,*) Mdot
         star_Mdot(istar_Mdot) = Mdot
         i_arg = i_arg + 1
+     case("-fargo3d","-fargo")
+        i_arg = i_arg + 1
+        lfargo3d = .true.
+        call get_command_argument(i_arg,fargo3d_dir)
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,fargo3d_id)
+        i_arg = i_arg + 1
+        read(fargo3d_id,*,iostat=ios) i
+        if (ios/=0) call error("fargo3d dump number needed")
      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1376,6 +1405,15 @@ subroutine initialisation_mcfost()
   else
      call read_para(para)
   endif
+
+  if (lfargo3d) then
+     l3D = .true.
+     if (n_zones > 1) call error("fargo3d mode only work with 1 zone")
+     call warning("fargo3d : forcing spherical grid") ! only spherical grid is implemented for now
+     disk_zone(1)%geometry = 2
+     call read_fargo3d_parameters(fargo3d_dir, fargo3d_id)
+  endif
+
   if (n_zones > 1) lvariable_dust=.true.
 
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
@@ -1723,8 +1761,9 @@ subroutine display_help()
   write(*,*) "        : -prodimo : creates required files for ProDiMo"
   write(*,*) "        : -p2m : reads the results from ProDiMo"
   write(*,*) "        : -astrochem : creates the files for astrochem"
-  write(*,*) "        : -phantom : reads a phantom dump file"
+  write(*,*) "        : -phantom <dump> : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
+  write(*,*) "        : -fargo3d <dir> <id> : reads a fargo3d model"
   write(*,*) "        : -model_pluto <file> : read the <file> pluto HDF5 file"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
   write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
@@ -1889,6 +1928,8 @@ subroutine display_help()
   write(*,*) "        : -scale_mass_units <scaling_factor> : over-ride the mass units read in by this factor"
   write(*,*) "        : -fluffyness <factor> : shift grain sizes between phantom and mcfost"
   write(*,*) "        : -delete_Hill_sphere : delete SPH particles inside Hill spheres of planets"
+  write(*,*) "        : -delete_inside_rsph <r> : delete SPH particles inside spherical radius"
+  write(*,*) "        : -delete_outside_rsph <r> : delete SPH particles outside spherical radius"
   write(*,*) "        : -no_vr : force the radial velocities to be 0"
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
@@ -1896,6 +1937,7 @@ subroutine display_help()
   write(*,*) "        : -SPH_amin <size> [mum] : force the grain size that follow the gas"
   write(*,*) "        : -SPH_amax <size> [mum] : force the grain size that follow the dust"
   write(*,*) "                                   (only works with 1 grain size dump)"
+  write(*,*) "        : -force_Mgas : force the gas mass to be the value given the mcfost parameter file"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

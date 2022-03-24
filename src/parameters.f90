@@ -129,11 +129,14 @@ module parametres
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, lVoronoi, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs
-  logical :: ldensity_file, lsigma_file, lvelocity_file, lvfield_cyl_coord, lphantom_file, lphantom_multi, lphantom_avg
+  logical :: ldensity_file, lsigma_file, lvelocity_file, lphantom_file, lphantom_multi, lphantom_avg
   logical :: lgadget2_file, lascii_SPH_file, llimits_file, lforce_SPH_amin, lforce_SPH_amax, lmcfost_lib
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lastrochem, lML
-  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
+  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa, lforce_Mgas
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
+  integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
+
+  logical :: lfargo3d
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -152,8 +155,9 @@ module parametres
   ! Phantom
   logical :: ldudt_implicit, lscale_length_units, lscale_mass_units, lignore_dust
   logical :: ldelete_Hill_sphere, lrandomize_Voronoi, lrandomize_azimuth, lrandomize_gap, lrandomize_outside_gap, lcentre_on_sink
+  logical :: ldelete_inside_rsph, ldelete_outside_rsph
   real(kind=dp) :: ufac_implicit,scale_length_units_factor,scale_mass_units_factor,correct_density_factor_elongated_cells
-  real(kind=dp) :: SPH_amin, SPH_amax, fluffyness, gap_factor
+  real(kind=dp) :: SPH_amin, SPH_amax, fluffyness, gap_factor, rsph_min, rsph_max
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy
   integer :: isink_centre
 
@@ -270,9 +274,19 @@ module parametres
   integer ::  RT_n_incl, RT_n_az
   logical :: lRT_i_centered
 
-
   integer :: nLevels
   real(kind=dp) :: largeur_profile
 
+    type fargo3d_model
+     integer :: nx, ny, nz, realtype
+     real(kind=dp) :: xmin,xmax, ymin,ymax, zmin,zmax
+     logical :: log_spacing, corrotating_frame
+
+     real(kind=dp) :: dt, aspect_ratio, nu, gamma, cs
+     character(len=128) :: dir, id, planetconfig
+
+  end type fargo3d_model
+
+  type(fargo3d_model) :: fargo3d
 
 end module parametres

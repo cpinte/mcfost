@@ -1,15 +1,14 @@
 module mess_up_SPH
 
+  use constantes
+
   implicit none
 
-  public :: mask_Hill_sphere, randomize_azimuth, randomize_gap
+  public :: mask_Hill_sphere, randomize_azimuth, randomize_gap, mask_inside_rsph, mask_outside_rsph
 
   private
 
   integer, parameter :: i_star = 1
-  integer, parameter :: dp = selected_real_kind(p=13,r=200)
-  real(dp), parameter :: pi = 4._dp*atan(1._dp)
-  real(kind=dp), parameter :: au_to_cm = 149597870700._dp * 100 ! IAU 2012 definition
 
 contains
 
@@ -23,7 +22,7 @@ contains
     real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: udist
 
-    logical, dimension(np), intent(out) :: mask
+    logical, dimension(np), intent(inout) :: mask
 
     integer :: i_planet, i, n_delete
     real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz
@@ -32,24 +31,23 @@ contains
 
     ! We assume that the 1st sink particle is the actual star
     ! and the following sink particles are planets
-    mask(:) = .false.
     do i_planet=2, nptmass
        n_delete = 0
 
        r_Hill2 = Hill_radius2(nptmass, xyzmh_ptmass, i_planet)
        r_Hill = sqrt(r_Hill2)
-       write(*,*) "Sink particle #", i_planet, "Hill radius =", r_Hill * udist / au_to_cm, "au"
+       write(*,*) "Sink particle #", i_planet, "Hill radius =", r_Hill * udist * scale_length_units_factor / au_to_cm, "au"
 
        particle_loop : do i=1, np
           ! We ignore dead particles, as they will be filtered out later
           if (xyzh(4,i) < 0) cycle particle_loop
 
-          ! We exlude particles that are not with a cube around the sink particle
-          dx = xyzh(1,i) - xyzmh_ptmass(1,i_planet)
+          ! We exclude particles that are not with a cube around the sink particle
+          dx = abs(xyzh(1,i) - xyzmh_ptmass(1,i_planet))
           if (dx > r_Hill) cycle particle_loop
-          dy = xyzh(2,i) - xyzmh_ptmass(2,i_planet)
+          dy = abs(xyzh(2,i) - xyzmh_ptmass(2,i_planet))
           if (dy > r_Hill) cycle particle_loop
-          dz = xyzh(3,i) - xyzmh_ptmass(3,i_planet)
+          dz = abs(xyzh(3,i) - xyzmh_ptmass(3,i_planet))
           if (dz > r_Hill) cycle particle_loop
 
           ! We then test on the sphere itself
@@ -67,7 +65,80 @@ contains
 
   end subroutine mask_Hill_sphere
 
+!*********************************************************
+
+  subroutine mask_inside_rsph(np, xyzh,udist, rsph, mask)
+
+    integer, intent(in) :: np
+    real(kind=dp), dimension(:,:), intent(in) :: xyzh
+    real(kind=dp), intent(in) :: udist, rsph
+
+    logical, dimension(np), intent(inout) :: mask
+
+    integer :: i, n_delete
+    real(kind=dp) :: d2, r, r2, dx, dy, dz, ulength_au
+
+    ulength_au = udist * scale_length_units_factor  / au_to_cm
+    r = rsph /  ulength_au  ! converting back to phantom code units
+
+    r2 = r * r
+
+    n_delete = 0
+    particle_loop : do i=1, np
+       dx = abs(xyzh(1,i))
+       if (dx > r) cycle particle_loop
+       dy = abs(xyzh(2,i))
+       if (dy > r) cycle particle_loop
+       dz = abs(xyzh(3,i))
+       if (dz > r) cycle particle_loop
+
+       ! We then test on the sphere itself
+       d2 = dx**2 + dy**2 + dz**2
+       if (d2 < r2) then ! particle is inside rsph
+          mask(i) = .true.
+          n_delete = n_delete + 1
+       endif
+    enddo particle_loop
+
+    write(*,*) n_delete, "particles were deleted indide rsph=", rsph
+    return
+
+  end subroutine mask_inside_rsph
+
+!*********************************************************
+
+  subroutine mask_outside_rsph(np, xyzh,udist, rsph, mask)
+
+    integer, intent(in) :: np
+    real(kind=dp), dimension(:,:), intent(in) :: xyzh
+    real(kind=dp), intent(in) :: udist, rsph
+
+    logical, dimension(np), intent(inout) :: mask
+
+    integer :: i, n_delete
+    real(kind=dp) :: d2, r, r2, ulength_au
+
+    ulength_au = udist * scale_length_units_factor  / au_to_cm
+    r = rsph /  ulength_au  ! converting back to phantom code units
+
+    r2 = r * r
+
+    n_delete = 0
+    particle_loop : do i=1, np
+       d2 = sum(xyzh(:,i)**2)
+       if (d2 > r2) then ! particle is outside rsph
+          mask(i) = .true.
+          n_delete = n_delete + 1
+       endif
+    enddo particle_loop
+
+    write(*,*) n_delete, "particles were deleted outside rsph=", rsph
+    return
+
+  end subroutine mask_outside_rsph
+
   !*********************************************************
+
 
   function d2_from_star(nptmass, xyzmh_ptmass, i_planet) result(d2)
     ! Compute the square of distance between star and sink particle i_planet

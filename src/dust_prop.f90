@@ -808,7 +808,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   endif
 
   ! Calcul opacite et probabilite de diffusion
-  do icell=1, n_cells  ! this can be long when there are many cells
+  do icell=1, n_cells  ! Todo : this can be long when there are many cells --> skip loop when lvariable_dust is false
      kappa(icell,lambda) = 0.0
      k_sca_tot = 0.0
      k_abs_tot = 0.0
