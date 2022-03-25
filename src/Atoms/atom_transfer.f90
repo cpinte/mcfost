@@ -698,7 +698,7 @@ module atom_transfer
             if (vaccr < 0.0_dp) then
                Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * 0.5 * vmod2)**0.25
                is_inshock = (Tchoc > 1000.0)
-               Tout = Tchoc
+               Tout = Taccretion
                if (Taccretion<=0.0) then 
                   is_inshock = (abs(Taccretion) * Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
                   Tout = abs(Taccretion) * Tchoc
