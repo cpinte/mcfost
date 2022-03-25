@@ -2560,8 +2560,10 @@ CONTAINS
    integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
    real :: time_iteration, time_nlte
 
+   write(*,*) " "
    write(*,*) " Solving populations using the Sobolev approximation"
    write(*,*) " "
+
    laverage = .true.
 
    call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
@@ -2591,6 +2593,8 @@ CONTAINS
    lconverged = .false.
    n_iter = 0
    l_iterate_ne = .false.
+   time_iteration = 0
+   time_nlte = 0
    do while (.not.lconverged)
       ibar = 0
       n_iter = n_iter + 1
@@ -2609,7 +2613,7 @@ CONTAINS
       !$omp shared(lforce_lte,n_iter,l_iterate_ne)&
       !$omp shared(ibar,n_cells_done,n_cells, laverage)&
       !$omp shared (icompute_atomRT)
-      !$omp do schedule(dynamic,1)
+      !$omp do schedule(dynamic,1) !dynamic because we don't use randomly generated rays
       do icell=1, n_cells
          !$ id = omp_get_thread_num() + 1
          if (icompute_atomRT(icell) > 0) then
@@ -2781,6 +2785,8 @@ CONTAINS
   end subroutine solve_pops_sobolev
 
   subroutine calc_rates_sobolev_average(id, icell)
+   !TO DO use Taccretion position dependent
+   !WARNING: does not work with Taccretion = 0.0 (position dependent)
    !accurates if chi0 / gradv is large (gradv small or large chi0 ) or  chi0/gradv is mall (0 chi0 or large gradv)
    !if chi0/gradv is of the order of unity it is not accurate anymore. In principle, gradv is always small.
    use parametres, only : etoile

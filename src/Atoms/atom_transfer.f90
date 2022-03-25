@@ -653,14 +653,22 @@ module atom_transfer
       return
    end subroutine emission_line_map
 
+   function calc_Tshock()
+      real(kind=dp) :: calc_Tshock
+
+
+      return
+   end function calc_Tshock
+
    function is_inshock(id, iray, i_star, icell_prev, x, y, z, Tout)
       logical :: is_inshock
       integer :: i_star, icell_prev, id, iray
       real(kind=dp), intent(out) :: Tout
-      real(kind=dp), intent(in) ::  x, y, z !u, v, w,
+      real(kind=dp) ::  x, y, z !u, v, w
       real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
 
       is_inshock = .false.
+      if (.not.laccretion_shock) return
 
       if (icell_prev<=n_cells) then
          if (icompute_atomRT(icell_prev) > 0) then
@@ -705,9 +713,10 @@ module atom_transfer
 
 
    subroutine calc_mean_grad_v()
-      !TO DO VORONOI
+      !TO DO: iterate to increase the number of rays while dOmega changes ?
       !estimate the mean velocity gradient for each cell
-      !by Monte Carlo integration. For each ray starting in a cell
+      !by Monte Carlo integration. 
+      !For each ray starting in a cell,
       ! the <V> = 1/N sum (abs(v1-v0)) / l_contrib; in s^-1
       ! the solid angle of the "core (or stellar surface)" as seen by a cell
       ! is also computed by counting those rays that intersect the star.
@@ -728,11 +737,11 @@ module atom_transfer
       integer :: icell, id, i, previous_cell
       real(kind=dp) :: x0,y0,z0,x1,y1,z1,u,v,w
       real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
-      integer :: next_cell, iray, n_rayons_integ, icell_in
+      integer :: next_cell, iray, n_rayons_integ, icell_in, icell1
       integer, parameter :: n_rayons = 100000, lpix_ord = 10
       real :: rand, rand2, rand3
       real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei
-      real(kind=dp) :: l,l_contrib, l_void_before, Tchoc, chi0 = 1d1
+      real(kind=dp) :: l,l_contrib, l_void_before, Tchoc, chi0 = 1d0
       integer :: ibar, n_cells_done, lpix_order_old
       integer :: i_star, icell_star
       logical :: lintersect_stars
@@ -747,7 +756,7 @@ module atom_transfer
       allocate(mean_grad_v(n_cells),mean_length_scale(n_cells))
       !these ones should be (n_cells, n_stars)
       allocate(domega_core(n_cells),d_to_star(n_cells), Wdi(n_cells))
-      mean_grad_v = 0.0
+      mean_grad_v = tiny_dp!0.0
       mean_length_scale = 0.0
       domega_core = 0.0
       d_to_star = 0.0
@@ -760,13 +769,10 @@ module atom_transfer
          allocate(domega_star(n_cells)); domega_star = 0.0
       endif
 
-      allocate(test_integ(n_cells)); test_integ = 0.0
+      allocate(test_integ(n_cells)); test_integ = tiny_dp!0.0
 
       id = 1
       if (lhealpix_mod) then
-         if (lvoronoi) then
-            call error("mean velocity gradient cannot (yet) be estimated with Healpix and the voronoi grid!")
-         endif
          write(*,*) " Setting healpix order temporary to", lpix_ord
          write(*,*) " -> input: ", healpix_lorder
          lpix_order_old = healpix_lorder
@@ -786,26 +792,36 @@ module atom_transfer
       !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,x1,y1,z1,u,v,w) &
       !$omp private(wei,i_star,icell_star,lintersect_stars,v0,v1,r0)&
       !$omp private(l_contrib,l_void_before,l,W02,SRW02,ARGMT,previous_cell,next_cell) &
-      !$omp private(l1,l2,l3,xa,xb,xc,xa1,xb1,xc1,icell_in,Tchoc) &
+      !$omp private(l1,l2,l3,xa,xb,xc,xa1,xb1,xc1,icell_in,Tchoc,icell1) &
       !$omp shared(wmu,xmu,xmux,xmuy,n_rayons_integ,Wdi,d_to_star, dOmega_core,etoile)&
       !$omp shared(phi_grid,r_grid,z_grid,pos_em_cellule,ibar, n_cells_done,stream,n_cells)&
       !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT)&
-      !$omp shared(lvoronoi,laccretion_shock,domega_shock,domega_star, test_integ, chi0)
-      !$omp do schedule(static,1)
+      !$omp shared(lvoronoi,Voronoi,laccretion_shock,domega_shock,domega_star, test_integ, chi0)
+      !$omp do schedule(static,omp_chunk_size)
       do icell=1, n_cells
          !$ id = omp_get_thread_num() + 1
          if (icompute_atomRT(icell) > 0) then
 
             !from the centre of the cell is enough
-            r0 = sqrt(r_grid(icell)**2+z_grid(icell)**2)
+            if (lvoronoi) then
+               r0 = sqrt(sum(Voronoi(icell)%xyz(:)**2))
+            else
+               r0 = sqrt(r_grid(icell)**2+z_grid(icell)**2)
+            endif
             d_to_star(icell) = r0 - etoile(1)%r
             Wdi(icell) = 0.5*(1.0 - sqrt(1.0 - (etoile(1)%r/r0)**2))
 
             do iray=1, n_rayons_integ
                if (lhealpix_mod) then
-                  x0 = r_grid(icell) * cos(phi_grid(icell))
-                  y0 = r_Grid(icell) * sin(phi_grid(icell))
-                  z0 = z_grid(icell)
+                  if (lvoronoi) then
+                     x0 = Voronoi(icell)%xyz(1)
+                     y0 = Voronoi(icell)%xyz(2)
+                     z0 = Voronoi(icell)%xyz(3)
+                  else
+                     x0 = r_grid(icell) * cos(phi_grid(icell))
+                     y0 = r_grid(icell) * sin(phi_grid(icell))
+                     z0 = z_grid(icell)
+                  endif
                   w = xmu(iray)
                   u = xmux(iray)
                   v = xmuy(iray)
@@ -834,6 +850,15 @@ module atom_transfer
 
                previous_cell = 0 ! unused, just for Voronoi
                call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+               if (lvoronoi) then
+                  if (test_exit_grid(next_cell, x0, y0, z0)) then
+                     v1 = 0.0
+                  else
+                     v1 = v_proj(next_cell,x1,y1,z1,u,v,w)
+                  endif
+               else
+                  v1 = v_proj(icell,x1,y1,z1,u,v,w)
+               endif
 
                if (lintersect_stars) then !"will interesct"
                   dOmega_core(icell) = dOmega_core(icell) + wei
@@ -841,8 +866,8 @@ module atom_transfer
                   if (laccretion_shock) then !will intersect the shock?
                      !propagate until we reach the stellar surface
                      xa1 = x0; xb1 = y0; xc1 = z0
+                     xa = x0; xb = y0; xc = z0
                      inf : do
-                        xa = xa1; xb = xb1; xc = xc1
                         if (next_cell==icell_star) then
                            !in shock ??
                            if (is_inshock(id, iray, i_star, icell_in, xa, xb, xc, Tchoc)) then 
@@ -853,7 +878,12 @@ module atom_transfer
                            exit inf !because we touch the star
                         endif
                         icell_in = next_cell
+                        if (test_exit_grid(icell_in, xa, xb, xc)) exit inf
+                        if (icell_in <= n_cells) then
+                           if (icompute_atomRT(icell_in) < 0) exit inf
+                        endif
                         call cross_cell(xa,xb,xc,u,v,w,icell_in,previous_cell,xa1,xb1,xc1, next_cell,l1,l2,l3)
+                        xa = xa1; xb = xb1; xc = xc1
                      enddo inf
                   endif!shock surface
                   !thus, dOmega_shock = f_shock * dOmega_core
@@ -861,14 +891,24 @@ module atom_transfer
                end if !touch star, computes dOmega_core
 
                v0 = v_proj(icell,x0,y0,z0,u,v,w)
-               v1 = v_proj(icell,x1,y1,z1,u,v,w)
+               ! v1 = v_proj(icell1,x1,y1,z1,u,v,w)
                mean_grad_v(icell) = mean_grad_v(icell) + wei * abs(v0-v1)/(l_contrib * AU_to_m)
                mean_length_scale(icell) = mean_length_scale(icell) + wei * l_contrib*AU_to_m
-            !    if (abs(v0-v1) <= 0.0) then
-            !       write(*,*) '0 grad'
-            !    endif
-               test_integ(icell) = test_integ(icell) + wei * (1.0 - exp(-chi0*l_contrib * AU_to_m/abs(v0-v1)))/(chi0*l_contrib * AU_to_m/abs(v0-v1))
+               if (abs(v0-v1) > 0.0) then
+                  test_integ(icell) = test_integ(icell) + wei * (1.0 - exp(-chi0*l_contrib * AU_to_m/abs(v0-v1)))/(chi0*l_contrib * AU_to_m/abs(v0-v1))
+               endif
             enddo
+            ! if (dOmega_core(icell)==0.0_dp) then
+            !    write(*,*) Wdi(icell)
+            !    call warning("bug solid angle dOmega_core = 0.0")
+            !    dOmega_core(icell) = Wdi(icell)
+            ! endif
+            ! if (laccretion_shock) then
+            !    if (dOmega_core(icell)-domega_shock(icell) <= 0.0_dp) then
+            !       write(*,*) dOmega_core(icell), domega_shock(icell), domega_star(icell)
+            !       call error("bug solid angles")
+            !    endif
+            ! endif
          endif
          ! Progress bar
          !$omp atomic
@@ -887,16 +927,16 @@ module atom_transfer
       !how to reconstruct shock surface ??
       ! do icell=1, n_cells
       !    if (icompute_atomRT(icell)) then
-      !       write(*,*) icell,"d = ", d_to_star(icell)/etoile(1)%r," dOmegac=", dOmega_core(icell), " W=",Wdi(icell)
+      !       write(*,*) 'icell=', icell, ' T=',T(icell), ' nH=',nHtot(icell)
+      !       write(*,*) "d = ", d_to_star(icell)/etoile(1)%r," dOmegac=", dOmega_core(icell), " W=",Wdi(icell)
       !       write(*,*) "<gradv> (/s)=", mean_grad_v(icell) * 1d-3, " <l> (Rstar)", mean_length_scale(icell)/(AU_to_m*etoile(1)%r)
       !       if (laccretion_shock) then
       !          write(*,*) "dOmega_shock=", domega_shock(icell),  "dOmegaStar=", domega_star(icell)
-      !          write(*,*) "f = ", dOmega_shock(icell)*((d_to_star(icell)+etoile(1)%r)/etoile(1)%r)**2, dOmega_core(icell)*((d_to_star(icell)+etoile(1)%r)/etoile(1)%r)**2
+      !          ! write(*,*) "f = ", dOmega_shock(icell)*((d_to_star(icell)+etoile(1)%r)/etoile(1)%r)**2, dOmega_core(icell)*((d_to_star(icell)+etoile(1)%r)/etoile(1)%r)**2
       !       endif
       !       write(*,*) "beta=", (1.0-exp(-chi0/mean_grad_v(icell)))/(chi0/mean_grad_v(icell)), test_integ(icell)
       !    endif
       ! enddo
-      ! stop
       
       write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
       write(*,'("max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') maxval(domega_core), minval(domega_core,icompute_atomRT>0)
@@ -942,7 +982,7 @@ module atom_transfer
     
       !init
       lexit_after_nonlte_loop = .false.
-      omp_chunk_size = 1!max(nint( 0.01 * n_cells / nb_proc ),1)
+      omp_chunk_size = max(nint( 0.01 * n_cells / nb_proc ),1)
       !init at 0
       mem_alloc_tot = 0
 
