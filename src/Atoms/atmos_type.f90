@@ -1410,7 +1410,9 @@ contains
     !data are actually transposed from my fits to fortran
     allocate(data_krz(Npf+1,Nstage))
     allocate(ionpot(Nstage))
-    allocate(pf(Nstage, Npf))
+   !  allocate(pf(Nstage, Npf))
+    !25/03/2022
+    allocate(pf(Npf,Nstage))
     !now read the value of pf for that atom
     ! remember: pf(:,1) =  ion potentials
     !           pf(:,2:) = partition functions for all ion pots.
@@ -1432,7 +1434,8 @@ contains
        do j=2,Npf+1
           !!if (code.eq.1) write(*,*) 'pf=', data_krz(j,i)
 !!!pf(i,j-1) = LOG10(data_krz(j,i)) !29/12/2019, using neperien log
-          pf(i,j-1) = LOG(data_krz(j,i))
+         !  pf(i,j-1) = LOG(data_krz(j,i))
+         pf(j-1,i) = LOG(data_krz(j,i)) !25/03/2022
           !!if (code.eq.1) write(*,*) 'pf10powLog=', 10**(pf(i,j-1))
        end do
     end do

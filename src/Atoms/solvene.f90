@@ -153,23 +153,6 @@ CONTAINS
   END SUBROUTINE ne_Metal
 
 
-  !  FUNCTION getPartitionFunctionk(elem, stage, k) result (Uk)
-  !  ! ----------------------------------------------------------------------!
-  !   ! Interpolate the partition function of Element elem in ionisation stage
-  !   ! stage at cell point k.
-  !  ! ----------------------------------------------------------------------!
-  !
-  !   type(Element) :: elem
-  !   integer, intent(in) :: stage, k
-  !   real(kind=dp) :: Uk, part_func(Npf)
-  !
-  !   part_func = elem%pf(stage,:)
-  !   Uk = Interp1D(Tpf,part_func,T(k))
-  !   !!Uk = (10.d0)**(Uk) !! 29/12/2019 changed log10 in log
-  !   Uk = exp(Uk)
-  !  RETURN
-  ! END FUNCTION getPartitionFunctionk
-
   !should be min max for all cells.
   subroutine show_electron_given_per_elem(id, k, max_fjk)
     integer, intent(in) :: k, id
