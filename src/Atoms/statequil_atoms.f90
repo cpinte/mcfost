@@ -36,6 +36,7 @@ MODULE statequil_atoms
   character(len=50), parameter :: profiles_file = "line_profile.txt"
   character(len=50), parameter :: convergence_file = "thresh.txt", sub_convergence_file = "subthresh.txt"
   integer, parameter :: unit_invfile = 20, unit_profiles = 25, unit_conver = 30, unit_subconver = 35
+  real(kind=dp) :: Tchoc_average
 
 CONTAINS
 
@@ -2796,7 +2797,7 @@ CONTAINS
    integer, intent(in) :: id, icell
    real, parameter :: fact_tau = 1.0 !>0; could be 3.0 for mcfost
    real(kind=dp), parameter :: prec_vel = 1d-50 !m/s
-   real(kind=dp), parameter :: limit_tau = 1.0
+   real(kind=dp), parameter :: limit_tau = 1d5 !avoid Rij,Rji cont if tau_cont > limit_tau
    real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
    ! real(kind=dp), dimension(Nlambda_max_trans) :: tau_cont
    integer :: nact, i, j, kc, kr, Nr, Nb, l, Nl, i1, i2
@@ -2821,11 +2822,12 @@ CONTAINS
          i = aatom%lines(kc)%i
          j = aatom%lines(kc)%j
 
+         !pops inversions
          if (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell) <= 0.0) cycle atr_loop
 
          if (laccretion_shock) then
             Icore = Bpnu(etoile(1)%T*1d0,aatom%lines(kc)%lambda0) * (dOmega_core(icell)-domega_shock(icell))
-            Icore = Icore + Bpnu(Taccretion,aatom%lines(kc)%lambda0) * dOmega_shock(icell)
+            Icore = Icore + Bpnu(Tchoc_average,aatom%lines(kc)%lambda0) * dOmega_shock(icell)
          else
             Icore = Bpnu(etoile(1)%T*1d0,aatom%lines(kc)%lambda0) * dOmega_core(icell)
          endif
@@ -2900,9 +2902,15 @@ CONTAINS
             cycle
          endif
 
+         !pops inversions
+         if (( aatom%n(i,icell) - aatom%n(j,icell) * &
+         (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0) )<= 0.0) then
+             cycle atrc_loop
+         endif
+
          if (laccretion_shock) then
             Ieff(1:Nl) = (dOmega_core(icell)-domega_shock(icell)) * Bpnu(etoile(1)%T*1d0,lambda_cont(Nb:Nr))
-            Ieff(1:Nl) = Ieff(1:Nl) + domega_shock(icell) * Bpnu(Taccretion,lambda_cont(Nb:Nr))
+            Ieff(1:Nl) = Ieff(1:Nl) + domega_shock(icell) * Bpnu(Tchoc_average,lambda_cont(Nb:Nr))
          else
             Ieff(1:Nl) = dOmega_core(icell) * Bpnu(etoile(1)%T*1d0,lambda_cont(Nb:Nr))
          endif

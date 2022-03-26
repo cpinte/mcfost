@@ -28,7 +28,7 @@ module atom_transfer
                                  ne, T, vr, vphi, v_z, vtheta, wght_per_H, readatmos_ascii, dealloc_atomic_atmos, &
                                  ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
                                  compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, &
-                                 angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, helium_is_active
+                                 angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, helium_is_active, is_inshock
    use healpix_mod, only         : healpix_sphere, healpix_npix, healpix_weight, healpix_ring_mu_and_phi, healpix_listx
 
    use readatom, only            : read_Atomic_Models, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
@@ -653,66 +653,9 @@ module atom_transfer
       return
    end subroutine emission_line_map
 
-   function calc_Tshock()
-      real(kind=dp) :: calc_Tshock
-
-
-      return
-   end function calc_Tshock
-
-   function is_inshock(id, iray, i_star, icell_prev, x, y, z, Tout)
-      logical :: is_inshock
-      integer :: i_star, icell_prev, id, iray
-      real(kind=dp), intent(out) :: Tout
-      real(kind=dp) ::  x, y, z !u, v, w
-      real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
-
-      is_inshock = .false.
-      if (.not.laccretion_shock) return
-
-      if (icell_prev<=n_cells) then
-         if (icompute_atomRT(icell_prev) > 0) then
-            rr = sqrt( x*x + y*y + z*z)
-            !specific enthalpy of the gas neglected
-
-            !vaccr is vr, the spherical r velocity component
-            if (lvoronoi) then !always 3d
-               vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr + Voronoi(icell_prev)%vxyz(3) * z/rr
-               vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
-            else
-               if (lmagnetoaccr) then
-                  if (l3D) then !needed here if not 2.5d
-                     sign_z = 1.0
-                  else
-                     sign_z = sign(1.0, z)
-                  endif
-                  vaccr = vr(icell_prev) * sqrt(1.0 - (z/rr)**2) + sign_z * v_z(icell_prev) * z/rr
-                  vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2
-               else !spherical vector here
-                  vaccr = vr(icell_prev) !always negative for accretion
-                  vmod2 = vr(icell_prev)**2+vtheta(icell_prev)**2+vphi(icell_prev)**2
-               endif
-            endif
-
-
-            if (vaccr < 0.0_dp) then
-               Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * 0.5 * vmod2)**0.25
-               is_inshock = (Tchoc > 1000.0)
-               Tout = Taccretion
-               if (Taccretion<=0.0) then 
-                  is_inshock = (abs(Taccretion) * Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
-                  Tout = abs(Taccretion) * Tchoc
-               endif
-            endif
-
-         endif !icompute_atomRT
-      endif !laccretion_shock
-
-      return
-   end function is_inshock
-
 
    subroutine calc_mean_grad_v()
+      use statequil_atoms, only : Tchoc_average
       !TO DO: iterate to increase the number of rays while dOmega changes ?
       !estimate the mean velocity gradient for each cell
       !by Monte Carlo integration. 
@@ -740,10 +683,10 @@ module atom_transfer
       integer :: next_cell, iray, n_rayons_integ, icell_in, icell1
       integer, parameter :: n_rayons = 100000, lpix_ord = 10
       real :: rand, rand2, rand3
-      real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei
+      real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, tmp(nb_proc)
       real(kind=dp) :: l,l_contrib, l_void_before, Tchoc, chi0 = 1d0
       integer :: ibar, n_cells_done, lpix_order_old
-      integer :: i_star, icell_star
+      integer :: i_star, icell_star, n_rays_shock(nb_proc)
       logical :: lintersect_stars
       logical, parameter :: lhealpix_mod = .false.
       real(kind=dp), allocatable :: d_to_star(:), Wdi(:), domega_star(:), test_integ(:)
@@ -765,6 +708,9 @@ module atom_transfer
       if (laccretion_shock) then
          allocate(domega_shock(n_cells))
          domega_shock = 0.0
+         Tchoc_average = 0.0
+         n_rays_shock = 0
+         tmp = 0.0
       !test: function of n_stars in principle
          allocate(domega_star(n_cells)); domega_star = 0.0
       endif
@@ -795,7 +741,7 @@ module atom_transfer
       !$omp private(l1,l2,l3,xa,xb,xc,xa1,xb1,xc1,icell_in,Tchoc,icell1) &
       !$omp shared(wmu,xmu,xmux,xmuy,n_rayons_integ,Wdi,d_to_star, dOmega_core,etoile)&
       !$omp shared(phi_grid,r_grid,z_grid,pos_em_cellule,ibar, n_cells_done,stream,n_cells)&
-      !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT)&
+      !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,tmp, n_rays_shock)&
       !$omp shared(lvoronoi,Voronoi,laccretion_shock,domega_shock,domega_star, test_integ, chi0)
       !$omp do schedule(static,omp_chunk_size)
       do icell=1, n_cells
@@ -872,6 +818,8 @@ module atom_transfer
                            !in shock ??
                            if (is_inshock(id, iray, i_star, icell_in, xa, xb, xc, Tchoc)) then 
                               dOmega_shock(icell) = dOmega_shock(icell) + wei
+                              tmp(id) = tmp(id) + Tchoc
+                              n_rays_shock(id) = n_rays_shock(id) + 1
                            else
                               dOmega_star(icell) = domega_star(icell) + wei
                            endif
@@ -922,6 +870,7 @@ module atom_transfer
       !$omp end do
       !$omp end parallel
       call progress_bar(50)
+      if (laccretion_shock) Tchoc_average = sum(tmp) / real(sum(n_rays_shock))
 
       !just testing
       !how to reconstruct shock surface ??
@@ -943,6 +892,7 @@ module atom_transfer
       if (laccretion_shock) then
          write(*,'("max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') maxval(domega_shock), minval(domega_shock,icompute_atomRT>0)
          write(*,'("max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') maxval(domega_star), minval(domega_star,icompute_atomRT>0)
+         write(*,*) "<Tshock> = ", Tchoc_average, ' K'
       endif
       write(*,'("max((<beta>-beta)/beta)="(1ES17.8E3)" %; min((<beta>-beta)/beta))="(1ES17.8E3)" %")') &
          100*maxval((((1.0-exp(-chi0/mean_grad_v(:)))/(chi0/mean_grad_v(:))-test_integ)/test_integ)), &

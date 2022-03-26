@@ -1636,6 +1636,59 @@ contains
   !   return
   !   end subroutine fillElements
 
+  function is_inshock(id, iray, i_star, icell_prev, x, y, z, Tout)
+   use grid, only : voronoi
+   use constantes, only : sigma
+   logical :: is_inshock
+   integer :: i_star, icell_prev, id, iray
+   real(kind=dp), intent(out) :: Tout
+   real(kind=dp) ::  x, y, z !u, v, w
+   real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
+
+   is_inshock = .false.
+   if (.not.laccretion_shock) return
+
+   if (icell_prev<=n_cells) then
+      if (icompute_atomRT(icell_prev) > 0) then
+         rr = sqrt( x*x + y*y + z*z)
+         !specific enthalpy of the gas neglected
+
+         !vaccr is vr, the spherical r velocity component
+         if (lvoronoi) then !always 3d
+            vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr + Voronoi(icell_prev)%vxyz(3) * z/rr
+            vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
+         else
+            if (lmagnetoaccr) then
+               if (l3D) then !needed here if not 2.5d
+                  sign_z = 1.0
+               else
+                  sign_z = sign(1.0, z)
+               endif
+               vaccr = vr(icell_prev) * sqrt(1.0 - (z/rr)**2) + sign_z * v_z(icell_prev) * z/rr
+               vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2
+            else !spherical vector here
+               vaccr = vr(icell_prev) !always negative for accretion
+               vmod2 = vr(icell_prev)**2+vtheta(icell_prev)**2+vphi(icell_prev)**2
+            endif
+         endif
+
+
+         if (vaccr < 0.0_dp) then
+            Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * 0.5 * vmod2)**0.25
+            is_inshock = (Tchoc > 1000.0)
+            Tout = Taccretion
+            if (Taccretion<=0.0) then 
+               is_inshock = (abs(Taccretion) * Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
+               Tout = abs(Taccretion) * Tchoc
+            endif
+         endif
+
+      endif !icompute_atomRT
+   endif !laccretion_shock
+
+   return
+  end function is_inshock
+
   subroutine fillElements()
     !This routine read the abundance of elements listed in the
     ! abundance.input file, and keep the log partition function values
