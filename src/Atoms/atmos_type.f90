@@ -1638,11 +1638,11 @@ contains
 
   function is_inshock(id, iray, i_star, icell_prev, x, y, z, Tout)
    use grid, only : voronoi
-   use constantes, only : sigma
+   use constantes, only : sigma, kb
    logical :: is_inshock
    integer :: i_star, icell_prev, id, iray
    real(kind=dp), intent(out) :: Tout
-   real(kind=dp) ::  x, y, z !u, v, w
+   real(kind=dp) :: enthalp,  x, y, z !u, v, w
    real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
 
    is_inshock = .false.
@@ -1651,7 +1651,7 @@ contains
    if (icell_prev<=n_cells) then
       if (icompute_atomRT(icell_prev) > 0) then
          rr = sqrt( x*x + y*y + z*z)
-         !specific enthalpy of the gas neglected
+         enthalp = 2.5 * 1d3 * kb * T(icell_prev) / wght_per_H / masseH
 
          !vaccr is vr, the spherical r velocity component
          if (lvoronoi) then !always 3d
@@ -1674,7 +1674,7 @@ contains
 
 
          if (vaccr < 0.0_dp) then
-            Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * 0.5 * vmod2)**0.25
+            Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25
             is_inshock = (Tchoc > 1000.0)
             Tout = Taccretion
             if (Taccretion<=0.0) then 
