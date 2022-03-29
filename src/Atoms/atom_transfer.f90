@@ -907,6 +907,7 @@ module atom_transfer
          write(*,*) "Restoring input lorder ..."
          healpix_lorder = lpix_order_old
          write(*,*) " ->", healpix_lorder
+         deallocate(xmu,wmu,xmux,xmuy)
       endif
 
       return
@@ -1032,7 +1033,7 @@ module atom_transfer
          if (allocated(ds)) deallocate(ds)
          allocate(ds(1, nb_proc), stat=alloc_status)
          if (allocated(vlabs)) deallocate(vlabs)
-         allocate(vlabs(1,nb_proc))
+         allocate(vlabs(1,nb_proc)); vlabs = 0.0
 
          NmaxLevel = 0
          NmaxTr = 0
@@ -1471,9 +1472,7 @@ module atom_transfer
           time_iteration = 0
 
           !Future deprecation with healpix
-          if (.not.allocated(xmu)) then
-            call compute_angular_integration_weights()
-          endif
+          call compute_angular_integration_weights()
 
           lfixed_rays = .true.
           n_rayons = 1 !always
@@ -2228,6 +2227,9 @@ module atom_transfer
     if (allocated(Jnew_cont)) deallocate(Jnew_cont)
     deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms, n_new, ne_new)
     deallocate(stream)
+    if (allocated(xmu)) then
+      deallocate(xmu,wmu,xmux,xmuy)
+    endif
 
     !!close(unit=unit_invfile)
 

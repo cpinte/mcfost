@@ -971,9 +971,9 @@ contains
    real(kind=dp), intent(in) :: x,y,z,u,v,w
    real(kind=dp) :: vloc, v0
    integer :: iloc
-
+   !blue shifted (v<0) frequency increases, lambda decreases
    vloc = v_proj(icell,x,y,z,u,v,w) - v0
-   ! iloc = locate(lambda,lambda(Nblue)*(1.0+vloc/c_light))   !too slow
+   ! iloc = locate(lambda,lambda(Nblue)*(1.0-vloc/c_light))   !too slow
    ! calc_shift = iloc - Nblue
    calc_shift = nint( 1d-3 * vloc / hv - 0.5)
 
@@ -1227,6 +1227,84 @@ contains
 
     return
   end subroutine cross_coupling_terms
+
+  subroutine cross_coupling_terms_cont(id, icell)
+   !Lines are neglected even in Sobolev
+   !TO DO: add lines for Sobolev
+   integer, intent(in) :: id, icell
+   integer :: nact, j, i, kr, kc, Nb, Nr, la, Nl, icell_d
+   type (AtomType), pointer :: aatom
+   real(kind=dp) :: gij, wi, wj, chicc, wl,  wphi, ni_on_nj_star
+
+   !for one ray
+   !on the continuum grid
+   Uji_down(:,:,:,id) = 0.0_dp
+   chi_down(:,:,:,id) = 0.0_dp
+   chi_up(:,:,:,id)   = 0.0_dp
+
+   eta_atoms(:,:,id) = 0.0_dp
+
+   aatom_loop : do nact=1, Nactiveatoms
+      aatom => ActiveAtoms(nact)%ptr_atom
+
+      cont_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
+
+        !-> should be always true for non-LTE
+        ! if (.not.atom%at(kr)%lcontrib_to_opac) cycle cont_loop
+
+
+         kc = aatom%at(kr)%ik
+
+         j = aatom%continua(kc)%j
+         i = aatom%continua(kc)%i
+         Nb = aatom%continua(kc)%Nblue; Nr = aatom%continua(kc)%Nred
+         Nl = Nr - Nb + 1
+
+         ! 					ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+         ni_on_nj_star = aatom%nstar(i,icell)/(aatom%nstar(j,icell) + 1d-100)
+
+
+         gij = ni_on_nj_star * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0)
+
+         if (aatom%n(i,icell) - gij*aatom%n(j,icell) <= 0.0_dp) then
+            cycle cont_loop
+         endif
+
+
+         freq_loop : do la=1, Nl
+            if (la==1) then
+               wl = 0.5*(lambda_cont(Nb+1)-lambda_cont(Nb)) / lambda_cont(Nb)
+            elseif (la==Nl) then
+               wl = 0.5*(lambda_cont(Nb+la-1)-lambda_cont(Nb+la-2)) / lambda_cont(Nb+la-1)
+            else
+               wl = 0.5*(lambda_cont(Nb+la)-lambda_cont(Nb+la-2)) / lambda_cont(Nb+la-1)
+            endif
+
+            gij = ni_on_nj_star * exp(-hc_k/T(icell)/lambda_cont(Nb+la-1))
+
+            !small inversions
+            !chicc = wl * fourpi_h * aatom%continua(kc)%alpha_nu(la,icell_d) * abs(aatom%n(i,icell) - gij*aatom%n(j,icell))
+            chicc = wl * fourpi_h * aatom%continua(kc)%alpha(la) * (aatom%n(i,icell) - gij*aatom%n(j,icell))
+            ! 						if (chicc < 0.0) chicc = 0.0_dp !should not happend
+
+            Uji_down(Nb+la-1,j,nact,id) = Uji_down(Nb+la-1,j,nact,id) + &
+                 aatom%continua(kc)%alpha(la) * (twohc/lambda_cont(Nb+la-1)**3) * gij
+
+            chi_down(Nb+la-1,j,nact,id) = chi_down(Nb+la-1,j,nact,id) + chicc
+
+            chi_up(Nb+la-1,i,nact,id) = chi_up(Nb+la-1,i,nact,id) + chicc
+            !check consistency with nlte b-f and how negative opac is handled
+            !if (chicc > 0.0_dp) &
+            eta_atoms(Nb+la-1,nact,id) = eta_atoms(Nb+la-1,nact,id) + &
+                 aatom%continua(kc)%alpha(la) * (twohc/lambda_cont(Nb+la-1)**3)  * gij * aatom%n(j,icell)
+         enddo freq_loop
+
+      enddo cont_loop
+
+   enddo aatom_loop
+
+   return
+ end subroutine cross_coupling_terms_cont
 
   !TO DO merge with opacity_atom_loc()
   subroutine opacity_atom_zeeman_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib,  iterate)
