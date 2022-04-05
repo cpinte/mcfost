@@ -2720,7 +2720,6 @@ CONTAINS
                enddo
                !fill line radiative rates in the Sobolev approx.
                !-> if lno_cont use mali for the continua and bound-free rates
-               !-> use MALI also in the bound-bound rates ?
                call calc_rates_sobolev_average(id, icell, .true.)
             endif !laverage
             !fill rate matrix with the radiative rates
@@ -3182,9 +3181,9 @@ CONTAINS
          type (AtomicLine) :: line
          real(kind=dp) :: u,v,w
          real(kind=dp) :: x,y,z, Tchoc, dl
-         real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, vcell, v0, ni_njgij
+         real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ni_njgij, v0
          real(kind=dp) :: S, dtau, tau, gradv, chi, tau_escape, tau0, non_local_term_sobolev
-         real(kind=dp) :: rr, vv
+         real(kind=dp) :: rr(3), vv(3), rcell(3), vcell(3)
          integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, icell_prev
          logical :: lcellule_non_vide, lintersect_stars, loverlap
    
@@ -3230,17 +3229,21 @@ CONTAINS
             dl = l_contrib * AU_to_m
    
             if (nbr_cell==1) then
-               vcell = v_proj(icell_in,x0,y0,z0,u,v,w)!0.5 * (v_proj(icell,x0,y0,z0,u,v,w) + v_proj(icell,x1,y1,z1,u,v,w))
+               vcell(:) = get_vx_vy_vz(icell,x0,y0,z0,u,v,w)
+               rcell(1) = x0; rcell(2) = y0; rcell(3) = z0
                lcellule_non_vide = .false.
             endif
 
             if (lcellule_non_vide) then
-               v0 = v_proj(icell,x0,y0,z0,u,v,w)!0.5 + (v_proj(icell,x0,y0,z0,u,v,w) + v_proj(icell,x1,y1,z1,u,v,w))
-               ! loverlap = (abs(v0 - vcell) <= 1.0*(line%atom%vbroad(icell_in)+line%atom%vbroad(icell)))
                !loverlap = solve equation dot((r - r'),(v(r) - v(r'))) = 0
-               loverlap = (abs(v0 - vcell) == 0.0_dp)
+               rr(:) = (/x0,y0,z0/) - rcell(:)
+               vv(:) = get_vx_vy_vz(icell,x0,y0,z0,u,v,w) - vcell(:)
+               loverlap = (abs(dot_product(rr(:),vv(:))) <= tiny_dp)
+               !missing something here ? ?
                if (loverlap) then
                   lcellule_non_vide = .true. !useless but for checking
+                  write(*,*) "including overlap for cell", icell_in, " with cell ", icell
+                  write(*,*) dot_product(rr(:),vv(:))
                else
                   lcellule_non_vide = .false.
                endif
@@ -3283,6 +3286,74 @@ CONTAINS
    
          return
       end function non_local_term_sobolev
+
+      function get_vx_vy_vz(icell,x,y,z,u,v,w)
+       use atmos_type, only : v_z, vphi, vr, vtheta
+       use parametres, only : lmagnetoaccr, lspherical_velocity, Lvoronoi, l3d
+       use grid, only : Voronoi
+         real(kind=dp) :: get_vx_vy_vz(3)
+         integer, intent(in) :: icell
+         real(kind=dp), intent(in) :: x,y,z,u,v,w
+       
+         real(kind=dp) :: vitesse, vx, vy, vz, v_r, v_phi, v_theta, v_rcyl, norme, r, phi, rcyl, rcyl2, r2
+         real(kind=dp) :: sign1, norme2
+       
+         if (lVoronoi) then
+            vx = Voronoi(icell)%vxyz(1)
+            vy = Voronoi(icell)%vxyz(2)
+            vz = Voronoi(icell)%vxyz(3)
+       
+            get_vx_vy_vz(:) = (/vx,vy,vz/)
+            ! return
+            ! get_vx_vy_vz(:) (/vx*u,vy*v,vz*w/)
+         else
+            if (lmagnetoaccr) then
+                  r = sqrt(x*x+y*y)
+                  vx = 0_dp; vy = 0_dp!; vz = 0_dp
+                  vz = v_z(icell)
+                  !only if z strictly positive in the model (2D)
+                  if ( (.not.l3D) .and. (z < 0_dp) ) vz = -vz
+                  !!vz = v_z(icell) * sign(1.0_dp,z), in 3D models, this change of sign is taken care (??)
+       
+                  if (r > tiny_dp) then !rotational + wind, should work also with spherical wind of stars
+                     norme = 1.0_dp/r
+       
+                     vx = vR(icell) * x * norme - vphi(icell) * y * norme
+                     vy = vR(icell) * y * norme + vphi(icell) * x * norme
+       
+                  endif
+            else if (lspherical_velocity) then !missing theta projection
+                  r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
+                  vx = 0.; vy = 0.; vz = 0.;
+       
+                  sign1 = 1_dp
+                  !because theta only from 0 to pi/2 if 2D. But velocity is negative in z < 0
+                  if ( (.not.l3D) .and. (z < 0_dp) ) sign1 = -1_dp
+       
+                  if (r2 > tiny_dp) then
+                     norme2 = 1.0_dp / r2
+                  else
+                     norme2 = 0.0_dp
+                  endif
+       
+                  if (r > tiny_dp) then
+                     norme = 1.0_dp / r
+                     vx = vr(icell) * x * norme - y * norme2 * vphi(icell) + norme2 * ( z * norme * x * vtheta(icell) )
+                     vy = vr(icell) * y * norme + x * norme2 * vphi(icell) + norme2 * ( z * norme * y * vtheta(icell) )
+                     vz = vr(icell) * z * norme - sign1 * r2 / r * vtheta(icell)
+                  endif
+       
+            else
+               call error("velocity field not defined")
+            endif
+            get_vx_vy_vz(:) = (/vx,vy,vz/)
+            ! return
+            ! get_vx_vy_vz(:) = (/vx*u,vy*v,vz*w/)
+         endif
+       
+         return
+       
+       end function get_vx_vy_vz
 
  subroutine calc_rates_sobolev_ray(id, icell, iray, wei,x,y,z,u,v,w)
    use parametres, only : etoile
