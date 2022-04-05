@@ -192,6 +192,15 @@ module atom_transfer
          previous_cell = 0 ! unused, just for Voronoi
          call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
 
+         if (labs.and.lno_radiative_coupling) then
+            !only local points in nlte (labs is true) but still keep irradiation from the stellar core!
+            if (nbr_cell > 1) then
+               lcellule_non_vide = .false.
+               if (.not.lintersect_stars) return! no rad. coupling and no star radiation in that direction.
+                                             !exit directly.
+            endif
+         endif
+
          !count opacity only if the cell is filled, else go to next cell
          if (lcellule_non_vide) then
             lsubtract_avg = ((nbr_cell == 1).and.labs) !not used yet same as iterate?
@@ -260,14 +269,6 @@ module atom_transfer
             ! do la=1,Nlambda
                Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
                tau(:) = tau(:) + dtau(:) !for next cell
-               if (lno_radiative_coupling) then
-                  !ONLY in non-LTE (labs=.true.)
-                  !so that idag - psi*eta_atoms dag is -chi_bckgr * Sbckgr/chi
-                  !which is expected since for MALI we assume
-                  !that the background continua are unchanged during the iteration
-                  !TO DO. add stellar radiation
-                  return
-               endif
             ! enddo
             else
                if (lmagnetized) then
@@ -933,7 +934,7 @@ module atom_transfer
     
       !init
       lexit_after_nonlte_loop = .false.
-      omp_chunk_size = max(nint( 0.01 * n_cells / nb_proc ),1)
+      omp_chunk_size = 1!max(nint( 0.01 * n_cells / nb_proc ),1)
       !init at 0
       mem_alloc_tot = 0
 
@@ -4417,3 +4418,147 @@ end module atom_transfer
 
 !       return
 !    end subroutine local_stellar_radiation
+!   subroutine integ_ray_line_no_radiative_coupling(id,icell_in,x,y,z,u,v,w,iray)
+!       ! ------------------------------------------------------------------------------- !
+!       ! ------------------------------------------------------------------------------- !
+   
+!          integer, intent(in) :: id, icell_in, iray
+!          real(kind=dp), intent(in) :: u,v,w
+!          real(kind=dp), intent(in) :: x,y,z
+!          real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
+!          real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, etas_loc
+!          real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c, etasc_loc
+!          integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
+!          logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+   
+!          x1=x;y1=y;z1=z
+!          x0=x;y0=y;z0=z
+!          next_cell = icell_in
+!          nbr_cell = 0
+!          icell_prev = icell_in
+   
+!          tau(:) = 0.0_dp
+!          tau_c(:) = 0.0_dp
+   
+!          Itot(:,iray,id) = 0.0_dp
+!          Icont(:,iray,id) = 0.0_dp
+       
+!          etasc_loc(:) = 0.0_dp
+!          etas_loc(:) = 0.0_dp
+   
+!          Istar_loc(:,id) = 0.0_dp
+!          if (laccretion_shock) Ishock(:,id) = 0.0_dp
+   
+   
+!          ! Will the ray intersect a star
+!          call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+!          ! Boucle infinie sur les cellules (we go over the grid.)
+!          infinie : do ! Boucle infinie
+!          ! Indice de la cellule
+!             icell = next_cell
+!             x0=x1 ; y0=y1 ; z0=z1
+   
+!             lcellule_non_vide = (icell <= n_cells)
+!             ! if (icell <= n_cells) then
+!             !    lcellule_non_vide=.true.
+!             ! else
+!             !    lcellule_non_vide=.false.
+!             ! endif
+   
+!             ! Test sortie ! "The ray has reach the end of the grid"
+!             if (test_exit_grid(icell, x0, y0, z0)) return
+   
+!             if (lintersect_stars) then !"will interesct"
+!                if (icell == icell_star) then!"has intersected"
+!                   call local_stellar_radiation(id,iray,tau,tau_c,i_star,icell_prev,x0,y0,z0,u,v,w)
+!                   return
+!                end if
+!             endif
+!             !With the Voronoi grid, somme cells can have a negative index
+!             !therefore we need to test_exit_grid before using icompute_atom_rt
+!             if (icell <= n_cells) then
+!                lcellule_non_vide = (icompute_atomRT(icell) > 0)
+!                if (icompute_atomRT(icell) < 0) return
+!             endif
+   
+!             nbr_cell = nbr_cell + 1
+   
+!             ! Calcul longeur de vol et profondeur optique dans la cellule
+!             previous_cell = 0 ! unused, just for Voronoi
+!             call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+!             if (nbr_cell > 1) then 
+!                lcellule_non_vide = .false.
+!                if (.not.lintersect_stars) return
+!             endif
+   
+!             !count opacity only if the cell is filled, else go to next cell
+!             !here force nbr_cell == 1 to do calculations !
+!             if (lcellule_non_vide) then
+!                lsubtract_avg = .true.
+!                ! opacities in m^-1, l_contrib in au
+   
+!                !total bound-bound + bound-free + background opacities lte + nlte
+!                if (llimit_mem) then
+!                   call interp_continuum_local(icell, chi(:,id), eta(:,id))
+!                else
+!                   chi(:,id) = chi0_bb(:,icell)
+!                   eta(:,id) = eta0_bb(:,icell)
+!                endif
+!                !to Do: if llimit_mem, Jnu_cont should be interpolated in interp_continuum_local
+!                !otherwise, here.
+!                if (lelectron_scattering) then
+!                   etasc_loc = Jnu_cont(:,icell) * (thomson(icell) + HI_rayleigh_part1(icell) * HI_rayleigh_part2(:))
+!                   if (associated(helium)) then
+!                      etasc_loc = etasc_loc + Jnu_cont(:,icell) * HeI_rayleigh_part1(icell) * HeI_rayleigh_part2(:)
+!                   endif
+!                   !Or use Jnu, but need _rayleigh_part2 on Nlambda too (at init opac)  to avoid a lots of interpolations.
+!                   !-> check edges of the interpolation !
+!                   !-> pb with the edge of the interpolation routine !
+!                   etas_loc = linear_1D_sorted(Nlambda_cont,lambda_cont,etasc_loc, Nlambda,lambda)
+!                   etas_loc(Nlambda) = etasc_loc(Nlambda_cont)!only if the lambda agrees, at the edge
+!                endif
+   
+!                !includes a loop over all bound-bound, passive and active
+!                call opacity_atom_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,.true.)
+   
+!                dtau(:) = l_contrib * chi(:,id) * AU_to_m !au * m^-1 * au_to_m
+   
+!                !Lambda operator / chi_dag
+!                psi(:,iray,id) = ( 1.0_dp - exp( -l_contrib*chi(:,id)* AU_to_m ) ) / chi(:,id)
+!                !if (allocated(chi_loc)) chi_loc(:,iray,id)  = chi(:,id)
+!                ds(iray,id) = l_contrib * AU_to_m
+   
+!                !add rayleigh scatt to Jnu * emissiviy_scatt
+!                if (lelectron_scattering) then
+!                   Snu = ( eta(:,id) + etas_loc(:) ) / ( chi(:,id) + tiny_dp )
+!                   Snu_c = eta_c(:,icell) + etasc_loc(:)
+!                else
+!                   Snu = eta(:,id) / ( chi(:,id) + tiny_dp )
+!                   Snu_c = eta_c(:,icell)
+!                endif
+   
+!                if (Nactiveatoms > 0) then
+!                   Snu_c = ( Snu_c + eta_c_nlte(:,icell) ) / ( chi_c(:,icell) + chi_c_nlte(:,icell) + tiny_dp)
+!                   dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell)) * AU_to_m
+!                else
+!                   Snu_c = Snu_c / (chi_c(:,icell) + tiny_dp)
+!                   dtau_c(:) = l_contrib * chi_c(:,icell) * AU_to_m
+!                endif
+   
+!                ! do la=1,Nlambda
+!                Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
+!                tau(:) = tau(:) + dtau(:) !for next cell
+   
+!                Icont(:,iray,id) = Icont(:,iray,id) + ( exp(-tau_c(:)) - exp(-(tau_c(:) + dtau_c(:))) ) * Snu_c(:)
+!                tau_c(:) = tau_c(:) + dtau_c(:)
+   
+!             end if  ! lcellule_non_vide
+   
+!             icell_prev = icell 
+!             !duplicate with previous_cell, but this avoid problem with Voronoi grid here
+   
+!          end do infinie
+   
+!          return
+!       end subroutine integ_ray_line_no_radiative_coupling

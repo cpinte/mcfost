@@ -2546,12 +2546,14 @@ CONTAINS
    use atmos_type, only : icompute_atomRT, compute_angular_integration_weights,xmu,wmu,xmux,xmuy
    use grid, only : voronoi, r_grid, z_grid, phi_grid, pos_em_cellule
    !$ use omp_lib
+   use spectrum_type, only : Istar_cont, lambda_cont
+   use planck, only : Bpnu
    use utils, only : progress_bar
    use molecular_emission, only : v_proj
    use naleat, only  : seed, stream, gtype
    use mcfost_env, only  : time_begin, time_end, time_tick, time_max
    use lte, only : ltepops, ltepops_h, nh_minus
-   use opacity, only : cross_coupling_terms_cont, nlte_bound_free, background_continua_lambda
+   use opacity, only : cross_coupling_terms_cont, nlte_bound_free, background_continua_lambda, domega_shock
    use parametres, only : lsafe_stop, safe_stop_time, lexit_after_nonlte_loop, lvoronoi, lfix_backgrnd_opac,  Nrays_atom_transfer, lsobolev_only
 #include "sprng_f.h"
    integer :: id, icell, ibar, n_cells_done, n_iter, i
@@ -2581,6 +2583,7 @@ CONTAINS
    enddo
    ! allocate(F_sobol(1,NmaxLine,NactiveAtoms,nb_proc)); F_sobol = 0.0! non-local term in direction iray for cell id
 
+   allocate(Jext(nlambda_cont,nb_proc)); Jext = 0.0
    if (.not.laverage) then
       ! call compute_angular_integration_weights()
       ! n_rayons = size(xmu)
@@ -2595,7 +2598,6 @@ CONTAINS
                chi_down(nlambda_cont,Nmaxlevel,NactiveAtoms,nb_proc),&
                chi_up(nlambda_cont,Nmaxlevel,NactiveAtoms,nb_proc))
 
-      allocate(Jext(nlambda_cont,nb_proc)); Jext = 0.0
       allocate(dv_proj(1,nb_proc)); dv_proj = 0.0_dp
    endif
 
@@ -2651,6 +2653,7 @@ CONTAINS
       !$omp private(rand,rand2,rand3,argmt,w02,srw02)&
       !$omp shared(lforce_lte,n_iter,l_iterate_ne,xmu,xmux,xmuy,wmu,Jext,vlabs)&
       !$omp shared(ibar,n_cells_done,n_cells, laverage, stream, pos_em_cellule)&
+      !$omp shared(laccretion_shock, Istar_cont, domega_core, domega_shock, Tchoc_average, lambda_cont)&
       !$omp shared (icompute_atomRT,n_rayons,Icont,voronoi,r_grid,z_grid,phi_grid,lvoronoi)
       !$omp do schedule(static, 1)!max(nint( 0.01 * n_cells / nb_proc ),1)
       !!$omp do schedule(dynamic,1) !no random rays here.
@@ -2664,6 +2667,13 @@ CONTAINS
             !and overlapping transitions.
             if (laverage) then
                !Treatment of the continuum rates empirical, lno_cont is .false.
+               if (laccretion_shock) then
+                  Jext(:,id) = Istar_cont(:,1) * (dOmega_core(icell)-domega_shock(icell))
+                  Jext(:,id) = Jext(:,id) + Bpnu(Tchoc_average,lambda_cont) * dOmega_shock(icell)
+               else
+                  Jext(:,id) = Istar_cont(:,1) * dOmega_core(icell)
+               endif
+               vlabs(1,id) = 0.0_dp
                call calc_rates_sobolev_average(id, icell, .false.)
             else
                ! if (lvoronoi) then
@@ -2704,18 +2714,17 @@ CONTAINS
                   Icont(:,1,id) = integ_ray_cont(id,icell,x0,y0,z0,u,v,w,1) !continuum intensity + psi + irradiation + dv_proj and ds
                   call cross_coupling_terms_cont(id,icell) !for that direction with psi
                   call calc_rates_mali_cont(id,icell,1,wei) !fill mali rates for the continuum integrated of frequency
-                  call calc_rates_sobolev_ray(id, icell, 1, wei,x0,y0,z0,u,v,w) !fed with Icont and dv_proj at id.
+                  !-> if Sobolev along rays, comment calc_rates_sobolev_average below.
+                  ! call calc_rates_sobolev_ray(id, icell, 1, wei,x0,y0,z0,u,v,w) !fed with Icont and dv_proj at id.
                   Jext(:,id) = Jext(:,id) + Icont(:,1,id) * wei
                enddo
-               !fill line radiative rates in the Sobolev approx. lno_cont is .true.
-               !because lno_cont is .true., we use the external radiation field Jext at cell id to feed the line
-               !radiative rates. 
-               ! call calc_rates_sobolev_average(id, icell, .true.)
-               !TO DO: try with lno_cont==.false. and Jext without solving the continuum with MALI
+               !fill line radiative rates in the Sobolev approx.
+               !-> if lno_cont use mali for the continua and bound-free rates
+               !-> use MALI also in the bound-bound rates ?
+               call calc_rates_sobolev_average(id, icell, .true.)
             endif !laverage
             !fill rate matrix with the radiative rates
-            call calc_rate_matrix(id, icell,.false.)
-            !call update_populations(id, icell, diff, .false., n_iter)
+            call calc_rate_matrix(id, icell, .false.)
             !compute new populations and electron density if desired
             call update_populations_and_electrons(id, icell, diff, .false., n_iter, &
             (l_iterate_ne.and.icompute_atomRT(icell)==1))!The condition on icompute_atomRT is here because if it is > 0 but /= 1, ne is not iterated!
@@ -2875,9 +2884,9 @@ CONTAINS
       deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms)
       if (allocated(xmu)) deallocate(xmu,xmux,xmuy,wmu)
       if (allocated(stream)) deallocate(stream)
-      if (allocated(Jext)) deallocate(Jext)
       if (allocated(dv_proj)) deallocate(dv_proj)
    endif
+   if (allocated(Jext)) deallocate(Jext)
    ! if (allocated(F_sobol)) deallocate(F_sobol)
 
    if (n_iter >= n_iter_counted) then
@@ -2892,30 +2901,22 @@ CONTAINS
    !accurates if chi0 / gradv is large (gradv small or large chi0 ) or  chi0/gradv is mall (0 chi0 or large gradv)
    !if chi0/gradv is of the order of unity it is not accurate anymore. In principle, gradv is always small.
    !TO DO: add non-local term
-   use parametres, only : etoile
-   use planck, only : Bpnu
-   use opacity, only : domega_shock
-   use atmos_type, only : Taccretion
    integer, intent(in) :: id, icell
    logical, intent(in) :: lno_cont
-   real, parameter :: fact_tau = 1.0 !>0; could be 3.0 for mcfost
+   real, parameter :: fact_tau = 1.0 !>0
    real(kind=dp), parameter :: prec_vel = 1d-50 !m/s
    real(kind=dp), parameter :: limit_tau = 1d2 !avoid Rij,Rji cont if tau_cont > limit_tau
    ! real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
    real(kind=dp), dimension(Nlambda_cont) :: Ieff
-   ! real(kind=dp), dimension(Nlambda_cont) :: tau_cont
-   integer :: nact, i, j, kc, kr, Nr, Nb, l, Nl, i1, i2
-   real(kind=dp) :: Sij, Jbar, tau0, beta, chi_ij, Ts, Icore, l0
-   real(kind=dp) :: JJ, JJb, twohnu3_c2, ehnukt, a1, wl, r, F
+   integer :: nact, i, j, kc, kr, Nr, Nb, l, Nl
+   real(kind=dp) :: Sij, Jbar, tau0, beta, chi_ij, Icore, l0, chi_ik
+   real(kind=dp) :: JJ, JJb, twohnu3_c2, ehnukt, a1, wl, F, tau_ij_max
    type(AtomType), pointer :: aatom
-   real(kind=dp) :: ni_on_nj_star, tau_escape!, Sc(nlambda_cont), Sc0, Utild
+   real(kind=dp) :: ni_on_nj_star, tau_escape!, Sc(nlambda_cont), Sc0, Utild, r
 
    ! Sc = (eta_c(:,icell)+eta_c_nlte(:,icell)) / (tiny_dp + chi_c(:,icell)+chi_c_nlte(:,icell))
 
-   ! Ts = etoile(1)%T*1d0
-   ! if (laccretion_shock) Ts = (dOmega_core(icell)-domega_shock(icell)) * etoile(1)%T*1d0 / dOmega_core(icell) + &
-   !    Tchoc_average * dOmega_shock(icell) / dOmega_core(icell)
-
+   tau_ij_max = 0.0
    !-> no overlapping transitions and background continua
    aatom_loop : do nact = 1, Nactiveatoms
       aatom => ActiveAtoms(nact)%ptr_atom
@@ -2941,22 +2942,7 @@ CONTAINS
          !if vproj > 0 (blue shifted) lambda decreases, frequency increases
          !must be evaluated at lambda0 * (1 - vproj/c)
          l0 = aatom%lines(kc)%lambda0 * (1.0 - vlabs(1,id)/c_light)!vlabs not defined if laverage is .true. !
-         if (laccretion_shock) then
-            Icore = Bpnu(etoile(1)%T*1d0,l0) * (dOmega_core(icell)-domega_shock(icell))
-            Icore = Icore + Bpnu(Tchoc_average,l0) * dOmega_shock(icell)
-         else
-            Icore = Bpnu(etoile(1)%T*1d0,l0) * dOmega_core(icell)
-         endif
-         ! Icore = Bpnu(Ts,aatom%lines(kc)%lambda0) * dOmega_core(icell)
-         if (lno_cont) then!feed the external radiation field to the line radiative rates
-            ! write(*,*) ""
-            ! write(*,*) "id=",id, "icell=",icell
-            ! write(*,*) "lam0=",aatom%lines(kc)%lambda0, "lam0'=",l0
-            ! !slow but to check
-            ! write(*,'("Jext_nu0="(1ES17.8E3)"; Icore="(1ES17.8E3))') ,interp(Jext(:,id),lambda_cont,l0), Icore
-            ! write(*,*) ""
-            Icore = interp(Jext(:,id),lambda_cont,l0)
-         endif
+         Icore = interp(Jext(:,id),lambda_cont,l0)
 
          !line Source function in absence of continuum and in CFR
          !Sij = nj Aji / (ni Bij - nj Bji)
@@ -2966,26 +2952,28 @@ CONTAINS
          chi_ij = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell))
          tau_escape = fact_tau * chi_ij * mean_length_scale(icell) / aatom%vbroad(icell)
          if (mean_grad_v(icell) > prec_vel) then
+         ! if (mean_grad_v(icell) > 3.0*aatom%vbroad(icell)/mean_length_scale(icell)) then
             !s^-1
             tau0 = fact_tau * chi_ij / mean_grad_v(icell)
             if (tau0 > tau_escape) tau0 = tau_escape
          else !escape probability
             tau0 = tau_escape
          endif
+         tau_ij_max = max(tau_ij_max,tau0)
          ! write(*,*) icell, "dtau=",tau_escape-tau0, " prec=", prec_vel, " dv/ds=",mean_grad_v(icell)
-         !if (tau0 < 1d-5) then
-         !  beta = 1.0 - tau0 / 2.0 + tau0**2 / 6.0
-         !else
-         ! beta = (1.0 - exp(-tau0))/tau0
-         !endif
-         beta = (1.0 - exp(-tau0))/tau0 !frequency integral of Psi basically, in the Sobolev limit
+         if (tau0 < 1d-5) then
+            beta = 1.0 - tau0 / 2.0 + tau0**2 / 6.0
+         else
+            beta = (1.0 - exp(-tau0))/tau0
+         endif
+         ! beta = (1.0 - exp(-tau0))/tau0 !frequency integral of Psi basically, in the Sobolev limit
          if (beta > 1.001) then !otherwise it is a numerical error ? 
             write(*,*) ""
             write(*,*) "icell=",icell,"Sij=",Sij,"chi_ij=",chi_ij, "<dv/ds>=",mean_grad_v(icell)
             write(*,*) "beta=",beta, "tau0=",tau0, "tau escape=", tau_escape
             call warning("beta larger than 1")
          endif
-         beta = min(beta, 1.0_dp)
+         ! beta = min(beta, 1.0_dp)
          ! Sc0 = interp(Sc,lambda_cont,l0)
          ! r = interp(chi_c(:,icell)+chi_c_nlte(:,icell),lambda_cont,l0)/chi_ij * aatom%vbroad(icell) 
          ! Utild = r
@@ -3002,9 +2990,8 @@ CONTAINS
       enddo atr_loop
 
       if (lno_cont) cycle aatom_loop
-      !empirical treatment of the bound-free rates
-      !feed with Jext also ?? or irrelevant if we have mali cont
 
+      !use Jext!
       !continuum in the optically thin limit
       atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
 
@@ -3021,19 +3008,7 @@ CONTAINS
 
          JJ = 0.0
          JJb = 0.0
-
-         tau0 = mean_length_scale(icell) *  aatom%continua(kc)%alpha(Nl) * &
-         ( aatom%n(i,icell) - aatom%n(j,icell) * &
-            (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0) )
-         !trick to account for optically think continua that should be treated at LTE (Rij = Rji = 0)
-         ! tau_cont(1:Nl) = mean_length_scale(icell) *  aatom%continua(kc)%alpha(:) * &
-         !    ( aatom%n(i,icell) - aatom%n(j,icell) * &
-         !       (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/lambda_cont(Nb:Nr)) )
-         ! if(maxval(tau_cont)> limit_tau) then
-         ! if (tau0 > limit_tau) then
-         !    cycle
-         ! endif
-         ! if (kc <= 2) cycle
+         tau0 = 0.0_dp
 
          !pops inversions
          if (( aatom%n(i,icell) - aatom%n(j,icell) * &
@@ -3041,17 +3016,19 @@ CONTAINS
              cycle atrc_loop
          endif
 
-         if (laccretion_shock) then
-            Ieff(1:Nl) = (dOmega_core(icell)-domega_shock(icell)) * Bpnu(etoile(1)%T*1d0,lambda_cont(Nb:Nr))
-            Ieff(1:Nl) = Ieff(1:Nl) + domega_shock(icell) * Bpnu(Tchoc_average,lambda_cont(Nb:Nr))
-         else
-            Ieff(1:Nl) = dOmega_core(icell) * Bpnu(etoile(1)%T*1d0,lambda_cont(Nb:Nr))
-         endif
-         ! Ieff(1:Nl) = dOmega_core(icell) * Bpnu(Ts,lambda_cont(Nb:Nr))
-         !Ieff *= * exp(-tau_cont(1:Nl))
+         chi_ik = aatom%continua(kc)%alpha(Nl) * &
+            ( aatom%n(i,icell) - aatom%n(j,icell) * &
+            (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0) )
+         tau0 = mean_length_scale(icell) * chi_ik
+         ! if (tau0 > limit_tau) then
+         !    ! write(*,*) "***skipping cont ", kc, tau0, " at icell=", icell, tau_ij_max
+         !    cycle atrc_loop
+         ! endif
+         ! if (kc <= 1) cycle atrc_loop
+
+         Ieff(1:Nl) = Jext(nb:Nr,id)! * exp(-tau0)
 
          !if continuum is optically thick, Rij and Rji are zero -> LTE
-         !Istar_loc is 0 if we don't touch the star for that direction.
 
          do l=1, Nl
             if (l==1) then
