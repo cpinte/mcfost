@@ -201,7 +201,7 @@ subroutine define_cylindrical_grid()
   real(kind=dp), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
   real(kind=dp) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=dp) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
-  real(kind=dp) :: theta, dtheta, theta_max
+  real(kind=dp) :: theta, dtheta
   integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
 
   type(disk_zone_type) :: dz
