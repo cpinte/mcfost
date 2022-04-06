@@ -444,8 +444,7 @@ subroutine define_cylindrical_grid()
      theta_lim(nz) = pi/2.
      tan_theta_lim(nz) = 1.e30_dp
 
-     if (lfargo3d) then ! repartition uniforme en theta, jusqu'a theta max, puis 1 cellule vide jusqu'a pi/2
-        theta_max = 0.5 * pi - fargo3d%zmin
+     if (lregular_theta) then ! repartition uniforme en theta, jusqu'a theta max, puis 1 cellule vide jusqu'a pi/2
         dtheta = theta_max / (nz-1)
         do j=1, nz-1
            theta = j * dtheta
@@ -453,7 +452,6 @@ subroutine define_cylindrical_grid()
            tan_theta_lim(j) = tan(theta)
            w_lim(j) = sin(theta)
         enddo
-
      else ! repartition uniforme en cos
         do j=1, nz-1
            w= real(j,kind=dp)/real(nz,kind=dp)

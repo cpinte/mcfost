@@ -11,7 +11,8 @@ module init_mcfost
   use input, only : Tfile, lect_lambda, read_phase_function, read_molecules_names
   use ProdiMo
   use utils
-  use read_fargo3d, only : read_fargo3d_parameters, read_fargo3d_files
+  use read_fargo3d, only : read_fargo3d_parameters
+  use read_athena, only : read_athena_parameters
 
   implicit none
 
@@ -152,6 +153,8 @@ subroutine set_default_variables()
   lturn_off_planets = .false.
   lturn_off_Lacc = .false.
   lforce_Mdot = .false.
+  lregular_theta = .false.
+  theta_max = 0.5*pi
 
   tmp_dir = "./"
 
@@ -220,7 +223,7 @@ subroutine initialisation_mcfost()
 
   character(len=512) :: cmd, s, str_seed, para, base_para
   character(len=4) :: n_chiffres
-  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id
+  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file
 
   logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb
 
@@ -1135,7 +1138,12 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         read(fargo3d_id,*,iostat=ios) i
         if (ios/=0) call error("fargo3d dump number needed")
-     case default
+     case("-athena++","-athena")
+        i_arg = i_arg + 1
+        lathena = .true.
+        call get_command_argument(i_arg,athena_file)
+         i_arg = i_arg + 1
+      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
         call exit(0)
@@ -1155,6 +1163,13 @@ subroutine initialisation_mcfost()
      call warning("fargo3d : forcing spherical grid") ! only spherical grid is implemented for now
      disk_zone(1)%geometry = 2
      call read_fargo3d_parameters(fargo3d_dir, fargo3d_id)
+  endif
+  if (lathena) then
+     l3D = .true.
+     if (n_zones > 1) call error("athena mode only work with 1 zone")
+     call warning("athena : forcing spherical grid") ! only spherical grid is implemented for now
+     disk_zone(1)%geometry = 2
+     call read_athena_parameters(athena_file)
   endif
 
   if (n_zones > 1) lvariable_dust=.true.
@@ -1489,6 +1504,7 @@ subroutine display_help()
   write(*,*) "        : -phantom <dump> : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -fargo3d <dir> <id> : reads a fargo3d model"
+  write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"

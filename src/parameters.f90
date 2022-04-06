@@ -88,6 +88,8 @@ module parametres
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
   integer :: n_cells, nrz, p_n_cells, icell_ref
+  logical :: lregular_theta
+  real :: theta_max
 
   logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt, lwall
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
@@ -100,7 +102,7 @@ module parametres
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
   integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
 
-  logical :: lfargo3d
+  logical :: lfargo3d, lathena
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -232,16 +234,27 @@ module parametres
   integer :: nLevels
   real(kind=dp) :: largeur_profile
 
-    type fargo3d_model
+  type fargo3d_model
      integer :: nx, ny, nz, realtype
      real(kind=dp) :: xmin,xmax, ymin,ymax, zmin,zmax
      logical :: log_spacing, corrotating_frame
 
      real(kind=dp) :: dt, aspect_ratio, nu, gamma, cs
      character(len=128) :: dir, id, planetconfig
-
   end type fargo3d_model
 
   type(fargo3d_model) :: fargo3d
+
+  type athena_model
+     integer :: nx1, nx2, nx3
+     real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
+     logical :: log_spacing, corrotating_frame
+
+     real(kind=dp) :: time
+     character(len=128) :: filename
+  end type athena_model
+
+  type(athena_model) :: athena
+
 
 end module parametres

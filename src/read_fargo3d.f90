@@ -98,6 +98,8 @@ contains
     n_rad_in = 1
     n_az = fargo3d%nx
     nz = fargo3d%nz/2 + 1
+    lregular_theta = .true.
+    theta_max = 0.5 * pi - fargo3d%zmin
 
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
@@ -121,6 +123,8 @@ contains
   !---------------------------------------------
 
   subroutine read_fargo3d_files()
+
+    ! fargo3d data is ordered in x = phi, y = r, z = theta
 
     real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
     integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old
