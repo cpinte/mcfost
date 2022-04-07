@@ -27,7 +27,7 @@ module atom_transfer
    use atmos_type, only          : nHtot, icompute_atomRT, lmagnetized, ds, Nactiveatoms, Atoms, calc_ne, Natom, &
                                  ne, T, vr, vphi, v_z, vtheta, wght_per_H, readatmos_ascii, dealloc_atomic_atmos, &
                                  ActiveAtoms, nHmin, hydrogen, helium, lmali_scheme, lhogerheijde_scheme, &
-                                 compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, &
+                                 compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, max_Tshock, min_Tshock, &
                                  angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, helium_is_active, is_inshock
    use healpix_mod, only         : healpix_sphere, healpix_npix, healpix_weight, healpix_ring_mu_and_phi, healpix_listx
 
@@ -1268,7 +1268,11 @@ module atom_transfer
          allocate(QUV(Nlambda,3))
          call allocate_stokes_quantities
       endif
-      if (laccretion_shock) allocate(Iacc(nlambda))
+      if (laccretion_shock) then
+         allocate(Iacc(nlambda))
+         max_Tshock = 0.0
+         min_Tshock = 1d7
+      endif
 
       call alloc_flux_image()
       write(*,*) "Computing emission flux map..."
@@ -1285,7 +1289,10 @@ module atom_transfer
       if (lmagnetized) then
          deallocate(QUV)
       endif
-      if (laccretion_shock) deallocate(Iacc)
+      if (laccretion_shock) then
+         deallocate(Iacc)
+         write(*,'("max(Tshock) = "(1F12.3)" K; min(Tshock) = "(1F12.3)" K")') max_Tshock, min_Tshock
+      endif
 
       call write_flux(only_flux=.true.)
       call write_atomic_maps
@@ -2298,9 +2305,9 @@ module atom_transfer
 
       if (is_inshock(id, iray, i_star, icell_prev, x, y, z, Tchoc)) then
          Ishock(:,id) = LimbDarkening * exp(-tau(:)) * Bpnu(Tchoc,lambda)
-         Itot(:,iray,id) = Itot(:,iray,id) + Ishock(:,id) + Istar_loc(:,id)
+         Itot(:,iray,id) = Itot(:,iray,id) + Ishock(:,id)! + Istar_loc(:,id)
          Icont(:,iray,id) = Icont(:,iray,id) + LimbDarkening * exp(-tau_c(:)) *&
-            (Bpnu(Tchoc,lambda_cont) + Istar_cont(:,i_star)) 
+            (Bpnu(Tchoc,lambda_cont))! + Istar_cont(:,i_star)) 
 
          return
       endif
