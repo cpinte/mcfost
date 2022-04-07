@@ -243,7 +243,7 @@ module readatom
             !H beta
             if (atom%g(i)==8 .and. atom%g(j)==32) atom%lines(kr)%write_flux_map =.true.
             !H gamma
-            if (atom%g(i)==8 .and. atom%g(j)==50) atom%lines(kr)%write_flux_map =.true.
+            ! if (atom%g(i)==8 .and. atom%g(j)==50) atom%lines(kr)%write_flux_map =.true.
             !Pa beta
             if (atom%g(i)==18 .and. atom%g(j)==50) atom%lines(kr)%write_flux_map =.true.
             !Br gamma
