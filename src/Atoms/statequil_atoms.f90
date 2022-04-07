@@ -2568,7 +2568,7 @@ CONTAINS
    real :: time_iteration, time_nlte
 
    !.true. == pure Sobolev with opt thin continuum
-   laverage = .false.
+   laverage = .true.
 
 
    write(*,*) " "
@@ -4037,130 +4037,22 @@ CONTAINS
     return
   end subroutine store_radiative_rates_mali
 
-  !used only to write radiative rates computed with the converged radiation field
-  !not used in the iterative scheme
-  ! 	subroutine store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij, Rji, Jr, angle_quad)
-  ! 	!continua radiative rates computed also with total I
-  ! 		integer, intent(in) :: icell, n_rayons, Nmaxtr, id
-  ! 		logical, intent(in) :: angle_quad
-  ! 		real(kind=dp), dimension(NactiveAtoms, Nmaxtr), intent(inout) :: Rij, Rji
-  ! 		real(kind=dp), dimension(Nlambda) :: Jr
-  ! 		integer :: kc, kr, nact, l, iray,imu,iphi,iray_p
-  ! 		integer :: i, j, Nl, Nblue, Nred, a0, icell_d
-  ! 		real(kind=dp) :: a1, JJb, a2, di1, di2, ehnukt, twohnu3_c2, wl
-  ! 		real(kind=dp) :: chi_ion, neff, Ieff1, Ieff2, JJ, wphi, J1, J2
-  ! 		type (AtomType), pointer :: atom
-  !
-  ! 		Rij(:,:) = 0.0_dp
-  ! 		Rji(:,:) = 0.0_dp
-  !
-  ! 		do nact=1, NactiveAtoms
-  !
-  ! 			atom => Activeatoms(nact)%ptr_atom
-  !
-  ! 			do kc=1, atom%Ntr
-  !
-  ! 				kr = atom%at(kc)%ik
-  !
-  ! 				select case (atom%at(kc)%trtype)
-  !
-  ! 				case ("ATOMIC_LINE")
-  !
-  ! 					Nred = atom%lines(kr)%Nred
-  ! 					Nblue = atom%lines(kr)%Nblue
-  ! 					i = atom%lines(kr)%i
-  ! 					j = atom%lines(kr)%j
-  !
-  ! 					Nl = Nred-dk_min+dk_max-Nblue+1
-  ! 					a0 = Nblue+dk_min-1
-  ! 					Rji(nact,kc) = atom%lines(kr)%Aji
-  !
-  !
-  ! 					if (angle_quad) then
-  ! 						write(*,*) " Angle_quad not implemented yet"
-  ! 						!check iray if lmali
-  ! 						stop " mali"
-  !
-  ! 						else !pure mc
-  ! 							do iray=1, n_rayons
-  ! 								JJ = 0.0
-  ! 								wphi = 0.0
-  !
-  ! 								do l=1,Nl
-  !
-  ! 									if (l==1) then
-  ! 										wl = 0.5*(lambda(a0+l+1)-lambda(a0+l)) * clight / atom%lines(kr)%lambda0
-  ! 									elseif (l==Nl) then
-  ! 										wl = 0.5*(lambda(a0+l)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
-  ! 									else
-  ! 										wl = 0.5*(lambda(a0+l+1)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
-  ! 									endif
-  !
-  ! 									JJ = JJ + wl * Itot(a0+l,iray,id) * atom%lines(kr)%phi_loc(l,iray,id)
-  ! 									wphi = wphi + wl * atom%lines(kr)%phi_loc(l,iray,id)
-  !
-  ! 								enddo
-  ! 								!init at Aji
-  ! 								Rji(nact,kc) = Rji(nact,kc) + atom%lines(kr)%Bji * JJ / n_rayons / wphi
-  ! 								Rij(nact,kc) = Rij(nact,kc) + atom%lines(kr)%Bij * JJ / n_rayons / wphi
-  !
-  ! 							enddo
-  !
-  ! 						endif !over angle_quad
-  !
-  !
-  ! 				case ("ATOMIC_CONTINUUM")
-  !
-  !
-  ! 					i = atom%continua(kr)%i; j = atom%continua(kr)%j
-  ! 					chi_ion = Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(j))
-  ! 					neff = atom%stage(j) * sqrt(atom%Rydberg / (atom%E(j) - atom%E(i)) )
-  !
-  !
-  ! 					Nblue = atom%continua(kr)%Nb; Nred = atom%continua(kr)%Nr
-  ! 					Nl = Nred-Nblue + 1
-  !
-  ! 					icell_d = 1
-  ! 					if (ldissolve) then
-  ! 						if (atom%ID=="H") icell_d = icell
-  ! 					endif
-  !
-  ! 					JJ = 0.0
-  ! 					JJb = 0.0
-  !
-  ! 					do l=1, Nl
-  !
-  ! 						if (l==1) then
-  ! 							wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-1)) / lambda(Nblue+l-1)
-  ! 						elseif (l==Nl) then
-  ! 							wl = 0.5*(lambda(Nblue+l-1)-lambda(Nblue+l-2))  / lambda(Nblue+l-1)
-  ! 						else
-  ! 							wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-2)) / lambda(Nblue+l-1)
-  ! 						endif
-  !
-  ! 						a1 = atom%continua(kr)%alpha_nu(l,icell_d)
-  !
-  ! 						JJ = JJ + wl * Jr (Nblue+l-1) * a1
-  ! 						JJb = JJb + wl * a1 * exp(-hc_k/T(icell)/lambda(Nblue+l-1)) * &
-  ! 							(twohc/lambda(Nblue+l-1)**3 + Jr(Nblue+l-1))
-  ! 					enddo
-  !
-  !
-  ! 					Rij(nact,kc) = fourpi_h * JJ
-  ! 					Rji(nact,kc) = fourpi_h * JJb * atom%nstar(i,icell)/atom%nstar(j,icell)
-  !
-  ! 				case default
-  ! 					call error("transition type unknown", atom%at(l)%trtype)
-  !
-  ! 				end select
-  !
-  ! 			enddo
-  !
-  ! 			atom => NULL()
-  ! 		enddo
-  !
-  ! 	return
-  ! 	end subroutine store_radiative_rates
+!   subroutine store_radiative_rates_sobolev(id, icell, Nmaxtr, Rij, Rji)
+!    !continua radiative rates computed also with total I
+!    integer, intent(in) :: icell, Nmaxtr, id
+!    real(kind=dp), dimension(NactiveAtoms, Nmaxtr), intent(inout) :: Rij, Rji
+!    integer :: kc, kr, nact, l, imu,iphi,iray_p
+!    integer :: i, j, Nl, Nblue, Nred, a0, icell_d
+!    real(kind=dp) :: a1, JJb, a2, di1, di2, ehnukt, twohnu3_c2, wl
+!    real(kind=dp) :: chi_ion, neff, Ieff1, Ieff2, JJ, wphi, J1, J2
+!    real(kind=dp) :: ni_on_nj_star
+!    type (AtomType), pointer :: atom
+
+
+!    return 
+!   end subroutine store_radiative_rates_sobolev
+
+
 
   subroutine store_rate_matrices(id, icell, Nmaxlevel, Aij)
     !atom%Gamma should be filled with the value before exciting subiterations
