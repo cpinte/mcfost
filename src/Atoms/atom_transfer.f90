@@ -1231,10 +1231,14 @@ module atom_transfer
       !we want a map!
       !at the moment, I use the lcontrib_to_opac!
       if (NActiveAtoms > 0) call dealloc_atom_quantities
-      call alloc_wavelengths_raytracing(.true.,Nrayone)
-      !TO do. If not npix_x or npix_y > 1; computes the total flux.
-      !otherwise, total flux not computed
-      !In that case, read the tab_lambda from the file and reset the indexes (do that in init_spectrum)
+      ! if (npix_x > 1 .or. npix_y > 1) then
+         call alloc_wavelengths_raytracing(.true.,Nrayone)
+      ! else!-> does not WORK because continua need to be recomputed
+      ! !TO do. If not npix_x or npix_y > 1; computes the total flux.
+      ! !otherwise, total flux not computed
+      ! !In that case, read the tab_lambda from the file and reset the indexes (do that in init_spectrum)
+      !    call init_Spectrum(.true.,1)
+      ! endif
       if (n_etoiles > 0) call init_stellar_disk
       call alloc_atom_quantities
       call compute_background_continua
@@ -1512,7 +1516,7 @@ module atom_transfer
           lcell_converged(:) = .false.
           fac_etape = 0.1
           if (etape_start==1) then
-             precision = fac_etape * 1e-1!1e-1!1e-3, 1e-2, fac_etape * 1.0 / sqrt(real(n_rayons))
+             precision = min(1e-1,10.0*dpops_max_error)!fac_etape * 1.0 / sqrt(real(n_rayons))
           else
              precision = dpops_max_error
           endif
