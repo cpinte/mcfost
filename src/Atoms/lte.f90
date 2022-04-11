@@ -38,15 +38,15 @@ CONTAINS
    !the creation of a temporary array is not that faster right ?
    !the solution is to reshape elem%pf in elem%pf(N,Nstage) so that elem%pf(:,stage) are contiguous in memory
    !part_func = elem%pf(:,stage)!elem%pf(stage,:)
-   !  Uk = exp( Interp1D(Tpf,part_func,T(k)) )
+   !  Uk = exp( Interp1D(Tpf,elem%pf(:,stage),T(k)) )
     !!!!Uk = (10.d0)**(Uk) !29/12/2019 -> part_func is ln(U)
 
     !->faster
     !out of bound the function return 0 not the inner (outer) bound.
       Uka(:) = linear_1D_sorted(Npf, Tpf, elem%pf(:,stage), 1, T(k))
       Uk = exp(Uka(1))
-      if( T(k) < Tpf(1) ) Uk = exp(elem%pf(1,stage))
-      if (T(k) > Tpf(Npf)) Uk = exp(elem%pf(Npf,stage))
+      if( T(k) <= Tpf(1) ) Uk = exp(elem%pf(1,stage))
+      if (T(k) >= Tpf(Npf)) Uk = exp(elem%pf(Npf,stage))
 
     RETURN
   END FUNCTION getPartitionFunctionk
