@@ -872,7 +872,6 @@ contains
 
          if (.not.aatom%at(kr)%lcontrib_to_opac) cycle tr_loop
 
-
           kc = aatom%at(kr)%ik !relative index of a transition among continua or lines
 
 
@@ -1039,7 +1038,6 @@ contains
          !    !the calculation of Jbar since the integral is done in the rest frame of the cell around phi_loc(v=0).
          !    !so in practice there is no significant overlap of different transitions due to the velocity fields.
          !  endif
-
 
           phi0(1:Nlam) = profile(aatom%lines(kc),icell,iterate,Nlam,lambda(Nblue+shift:Nred+shift),&
           x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib,vlabs(iray,id))

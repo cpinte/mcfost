@@ -1014,7 +1014,6 @@ module atom_transfer
          n_rayons_max = 1
 
          call init_Spectrum(.true.,n_rayons_max)
-         ! call alloc_wavelengths_raytracing(.false.,n_rayons_max)
          if (n_etoiles > 0) call init_stellar_disk
          call alloc_atom_quantities
          call compute_background_continua
@@ -1129,9 +1128,10 @@ module atom_transfer
             ! call NLTEloop_mali(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter)
             ! ActiveAtoms(1)%ptr_atom%Ntr_line = ActiveAtoms(1)%ptr_atom%nline !add_lines
             ! ActiveAtoms(1)%ptr_atom%Ntr = ActiveAtoms(1)%ptr_atom%nline+ActiveAtoms(1)%ptr_atom%ncont !add_lines
-            ! ! ActiveAtoms(1)%ptr_atom%Ntr = ActiveAtoms(1)%ptr_atom%Ntr_line !remove_cont
+            !
+            ! ActiveAtoms(1)%ptr_atom%Ntr = ActiveAtoms(1)%ptr_atom%Ntr_line !remove_cont
             call NLTEloop_mali(n_rayons_max, n_rayons_start, n_rayons_start2, maxIter)
-            ! ! ActiveAtoms(1)%ptr_atom%Ntr = ActiveAtoms(1)%ptr_atom%Ntr_line+ActiveAtoms(1)%ptr_atom%ncont !add_cont
+            ! ActiveAtoms(1)%ptr_atom%Ntr = ActiveAtoms(1)%ptr_atom%Ntr_line+ActiveAtoms(1)%ptr_atom%ncont !add_cont
          endif
 
          if (n_iterate_ne > 0) then
@@ -1737,8 +1737,6 @@ module atom_transfer
 
 
                    enddo !imu
-
-
                 end if !etape
 
                 call calc_rate_matrix(id, icell, lforce_lte)
