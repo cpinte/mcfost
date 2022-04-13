@@ -207,7 +207,7 @@ subroutine define_cylindrical_grid()
   real(kind=dp), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
   real(kind=dp) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=dp) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
-  real(kind=dp) :: theta, dtheta, theta_max
+  real(kind=dp) :: theta, dtheta, delta_phi
   integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
 
   type(disk_zone_type) :: dz
@@ -508,8 +508,7 @@ subroutine define_cylindrical_grid()
      theta_lim(nz) = pi/2.
      tan_theta_lim(nz) = 1.e30_dp
 
-     if (lfargo3d) then ! repartition uniforme en theta, jusqu'a theta max, puis 1 cellule vide jusqu'a pi/2
-        theta_max = 0.5 * pi - fargo3d%zmin
+     if (lregular_theta) then ! repartition uniforme en theta, jusqu'a theta max, puis 1 cellule vide jusqu'a pi/2
         dtheta = theta_max / (nz-1)
         do j=1, nz-1
            theta = j * dtheta
@@ -517,7 +516,6 @@ subroutine define_cylindrical_grid()
            tan_theta_lim(j) = tan(theta)
            w_lim(j) = sin(theta)
         enddo
-
      else ! repartition uniforme en cos
         do j=1, nz-1
            w= real(j,kind=dp)/real(nz,kind=dp)
@@ -534,7 +532,7 @@ subroutine define_cylindrical_grid()
         !if (lread_1D_grid) rsph = r_lim(i)
 
         do j=1,nz
-           w = w_lim(j)
+           w = 0.5*(w_lim(j)+w_lim(j-1))
            uv = sqrt(1.0_dp - w*w)
            r_grid_tmp(i,j)=rsph * uv
            z_grid_tmp(i,j)=rsph * w
@@ -553,9 +551,10 @@ subroutine define_cylindrical_grid()
 
   ! Version 3D
   if (l3D) then
+     delta_phi = 2.0*pi/real(n_az)
      do k=1, n_az
-        phi_grid_tmp(k) = 2.0*pi*real(k)/real(n_az)
-        phi = phi_grid_tmp(k)
+        phi_grid_tmp(k) = delta_phi * (real(k)-0.5)
+        phi = delta_phi * real(k)
         if (abs(modulo(phi-0.5*pi,pi)) < 1.0e-6) then
            tan_phi_lim(k) = 1.0d300
         else
@@ -594,7 +593,7 @@ subroutine define_cylindrical_grid()
 
      r_grid(icell) = r_grid_tmp(i,j)
      z_grid(icell) = z_grid_tmp(i,j)
-     phi_grid(icell) = phi_grid_tmp(k)  ! BUG ?? : this is the limit of th ecell, not the center
+     phi_grid(icell) = phi_grid_tmp(k)
   enddo
 
 	if(lread_1D_grid) deallocate(tab_r_1D_tmp)

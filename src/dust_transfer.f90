@@ -27,6 +27,7 @@ module dust_transfer
   use ML_ProDiMo
   use pluto_mod, only : setup_mhd_to_mcfost! :-)
   use read_fargo3d, only : read_fargo3d_files
+  use read_athena, only : read_athena_model
   !$ use omp_lib
 
   implicit none
@@ -123,6 +124,8 @@ subroutine transfert_poussiere()
         call densite_Seb_Charnoz2()
      else if (lfargo3d) then
         call read_fargo3d_files()
+     else if (lathena) then
+        call read_athena_model()
      else
         if (lsigma_file) call read_sigma_file()
         call define_density()

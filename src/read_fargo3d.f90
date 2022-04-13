@@ -16,7 +16,7 @@ contains
 
     character(len=*), intent(in) :: dir, id
 
-    character(len=128) :: s, key, val, filename
+    character(len=128) :: key, val, filename
     integer :: ios, n_lines, iunit
 
     fargo3d%dir = dir
@@ -98,6 +98,8 @@ contains
     n_rad_in = 1
     n_az = fargo3d%nx
     nz = fargo3d%nz/2 + 1
+    lregular_theta = .true.
+    theta_max = 0.5 * pi - fargo3d%zmin
 
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
@@ -121,6 +123,8 @@ contains
   !---------------------------------------------
 
   subroutine read_fargo3d_files()
+
+    ! fargo3d data is ordered in x = phi, y = r, z = theta
 
     real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
     integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old
@@ -183,6 +187,7 @@ contains
        read(iunit,*) i, x, y, z, vx, vy, vz, Mp, time, Omega_p
        if (i==id) exit
     enddo
+    simu_time = time * utime
 
     ! Checking units :
     ! Omega_p * uvelocity == 29.78 km/s : OK
@@ -291,7 +296,7 @@ contains
     enddo
 
     allocate(vfield3d(n_cells,3), stat=alloc_status)
-    if (alloc_status /= 0) call error("memory allocation error fargo3v vfield3d")
+    if (alloc_status /= 0) call error("memory allocation error fargo3d vfield3d")
 
     write(*,*) "Constant spatial distribution"
 
@@ -318,7 +323,7 @@ contains
     !write(*,*) etoile(2)%vx/1000., etoile(2)%vy/1000., etoile(2)%vz/1000.
     !stop
 
-    ! Normalisation density : copy and paste frpm read_density_file for now : needs to go in subroutine
+    ! Normalisation density : copy and paste from read_density_file for now : needs to go in subroutine
 
     ! Calcul de la masse de gaz de la zone
     mass = 0.
