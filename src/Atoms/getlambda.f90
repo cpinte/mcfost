@@ -2685,10 +2685,13 @@ contains
                !the line bounds are unchanged (look at the continuum)
                loop_group_b : do lac=1,ngroup
                !the shift is added to check if the line will overlap a group
-                  if ( ((atom%lines(kr)%lambdamax*f_plus < group_red(lac)).and.(atom%lines(kr)%lambdamax*f_plus > group_blue(lac))).or.&
-                        ((atom%lines(kr)%lambdamin*f_minus > group_blue(lac)).and.(atom%lines(kr)%lambdamin*f_minus < group_red(lac))) ) then
+                  if ( ((atom%lines(kr)%lambdamax*f_plus < group_red(lac)).and.&
+                        (atom%lines(kr)%lambdamax*f_plus > group_blue(lac))).or.&
+                        ((atom%lines(kr)%lambdamin*f_minus > group_blue(lac)).and.&
+                           (atom%lines(kr)%lambdamin*f_minus < group_red(lac))) ) then
                      atom%at(ktr)%lcontrib_to_opac = .true.
-                     write(*,*) " *** line transition ", kr, " of atom ", atom%ID, " overlaps with another line" 
+                     write(*,*) " *** line transition ", kr, " of atom ", &
+                        atom%ID, " overlaps with another line" 
                      write(*,*) "    -> in group ", lac, group_blue(lac), group_red(lac)
                      exit loop_group_b
                   endif

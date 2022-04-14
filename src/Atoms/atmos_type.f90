@@ -1660,9 +1660,9 @@ contains
          else
             if (lmagnetoaccr) then
                if (l3D) then !needed here if not 2.5d
-                  sign_z = 1.0
+                  sign_z = 1.0_dp
                else
-                  sign_z = sign(1.0, z)
+                  sign_z = sign(1.0_dp, z)
                endif
                vaccr = vr(icell_prev) * sqrt(1.0 - (z/rr)**2) + sign_z * v_z(icell_prev) * z/rr
                vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2

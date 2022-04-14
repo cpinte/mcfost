@@ -4,7 +4,8 @@ module spectrum_type
   use atmos_type, only : helium, hydrogen, NactiveAtoms, Natom, Atoms, v_char, B_char,&
   icompute_atomRT, lmagnetized, laccretion_shock
   use getlambda, only  : hv, adjust_wavelength_grid, Read_wavelengths_table,min_resol,max_resol,&
-  make_wavelength_grid,make_wavelength_grid_new,make_wavelengths_raytracing, define_local_profile_grid,define_local_gauss_profile_grid
+  make_wavelength_grid,make_wavelength_grid_new,make_wavelengths_raytracing, define_local_profile_grid,&
+   define_local_gauss_profile_grid
   use fits_utils, only : print_error
   use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
        n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
@@ -81,10 +82,12 @@ contains
     hv = 0.46 * real(min_resol) * 1e-3
     if (limage) then
       if (art_hv > 0) hv = art_hv
-      write(*,'("R(raytrace)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
+      write(*,'("R(raytrace)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') &
+         hv, min_resol * 1d-3, max_resol * 1d-3
     else
       if (art_hv_nlte > 0.0) hv = art_hv_nlte
-      write(*,'("R(nlte)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
+      write(*,'("R(nlte)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') &
+         hv, min_resol * 1d-3, max_resol * 1d-3
     endif
 
     dk_max = int( sign(1.0_dp, v_char) * ( 1e-3 * abs(v_char) / hv + 0.5 ) )
@@ -137,10 +140,12 @@ contains
    hv = 0.46 * real(min_resol) * 1e-3
    if (limage) then
      if (art_hv > 0) hv = art_hv
-     write(*,'("R(raytrace)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
+     write(*,'("R(raytrace)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') &
+      hv, min_resol * 1d-3, max_resol * 1d-3
    else
      if (art_hv_nlte > 0.0) hv = art_hv_nlte
-     write(*,'("R(nlte)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') hv, min_resol * 1d-3, max_resol * 1d-3
+     write(*,'("R(nlte)="(1F7.3)" km/s; min(Vth)="(1F7.3)" km/s; max(Vth)="(1F7.3)" km/s")') &
+      hv, min_resol * 1d-3, max_resol * 1d-3
    endif
 
    if ((alloc_nlte_vars).and.allocated(Itot)) then
