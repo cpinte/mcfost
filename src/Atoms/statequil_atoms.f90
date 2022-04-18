@@ -2439,13 +2439,14 @@ CONTAINS
        !Small populations are kept but not used in the convergence test
        !and in Tex. Populations below prec_pops (including negative) are set
        !to zero.
-       ! 			if (atom%n(l,icell) < frac_ne_limit * ne(icell)) then
+      !  if (atom%n(l,icell) < frac_ne_limit * ne(icell)) then
        if (atom%n(l,icell) < frac_limit_pops * ntotal) then
           Nsmall_pops = Nsmall_pops + 1
           level_index(lp) = l
           lp = lp + 1
-          if (atom%n(l,icell) <= prec_pops * ntotal) then
-             atom%n(l,icell) = 0.0_dp
+         !  if (atom%n(l,icell) <= prec_pops * ntotal) then
+          if (atom%n(l,icell) <= 0.0_dp) then
+             atom%n(l,icell) = abs(atom%n(l,icell))!0.0_dp
              Nneg_or_null_pops = Nneg_or_null_pops + 1
           endif
        else
