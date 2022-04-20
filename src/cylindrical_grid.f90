@@ -495,6 +495,7 @@ subroutine define_cylindrical_grid()
      enddo
 
   endif ! cylindrique ou spherique
+  phi_grid_tmp(:) = 0.0_dp
 
   ! Version 3D
   if (l3D) then
