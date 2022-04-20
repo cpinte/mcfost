@@ -2231,6 +2231,33 @@ contains
     return
   end subroutine writeTemperature
 
+  subroutine check_for_zero_electronic_density()
+   integer :: N_fixed_ne, icell
+
+   calc_ne = .false.
+   icell_loop : do icell=1,n_cells
+      !check that in filled cells there is electron density otherwise we need to compute it
+      !from scratch.
+      if (icompute_atomRT(icell) > 0) then
+
+         if (ne(icell) <= 0.0_dp) then
+            write(*,*) "  ** No electron density found in the model! ** "
+            calc_ne = .true.
+            exit icell_loop
+         endif
+
+      endif
+   enddo icell_loop
+   N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
+   if (N_fixed_ne > 0) then
+      write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
+   endif
+
+   return 
+
+  end subroutine check_for_zero_electronic_density
+
   subroutine readAtmos_ascii(filename)
     ! ------------------------------------------- !
     ! Read from ascii file a model to be used
@@ -2247,7 +2274,7 @@ contains
     real(kind=dp) :: tilt!,thetai, thetao
     integer, parameter :: Nhead = 3 !Add more
     character(len=MAX_LENGTH) :: rotation_law
-    integer :: icell, Nread, syst_status, N_points, k, i, j, acspot, N_fixed_ne = 0
+    integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
     character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
     logical :: accretion_spots
     real :: south
@@ -2316,6 +2343,8 @@ contains
 		write(*,*) "Maximum/minimum ne density in the model (m^-3):"
 		write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
 
+      call check_for_zero_electronic_density()
+      
       return
     endif
 
@@ -2550,25 +2579,7 @@ contains
     endif
 
 
-    calc_ne = .false.
-    icell_loop : do icell=1,n_cells
-       !check that in filled cells there is electron density otherwise we need to compute it
-       !from scratch.
-       if (icompute_atomRT(icell) > 0) then
-
-          if (ne(icell) <= 0.0_dp) then
-             write(*,*) "  ** No electron density found in the model! ** "
-             calc_ne = .true.
-             exit icell_loop
-          endif
-
-       endif
-    enddo icell_loop
-    N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
-    if (N_fixed_ne > 0) then
-       write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
-            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
-    endif
+    call check_for_zero_electronic_density
 
     !no need if we do not the dark_zones from input file.
     call write_atmos_domain() !but for consistency with the plot functions in python
