@@ -72,7 +72,7 @@ module atom_transfer
                                  masseH, kb, sigma, Lsun, rsun_to_au, au_to_rsun, c_light
    use utils, only               : rotation_3d, cross_product, progress_bar
    use naleat, only              : seed, stream, gtype
-   use cylindrical_grid, only    : volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k, area
+   use cylindrical_grid, only    : volume, r_grid, z_grid, phi_grid, cell_map_i, cell_map_j, cell_map_k
    use messages, only            : error, warning
    use statequil_atoms, only     : invpop_file, profiles_file, unit_invfile, unit_profiles, calc_bb_rates_hoger, &
                                  calc_bf_rates, calc_rate_matrix, update_populations, update_populations_and_electrons, &
@@ -1516,6 +1516,7 @@ module atom_transfer
           lcell_converged(:) = .false.
           fac_etape = 0.1
           if (etape_start==1) then
+             !Trick: use low hleapix rays number with lower dpops to have low dpops here
              precision = min(1e-1,10.0*dpops_max_error)
           else
              precision = dpops_max_error

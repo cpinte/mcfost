@@ -2579,7 +2579,7 @@ contains
   subroutine refine_healpix_sphere()
     use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
     use stars, only				: intersect_stars
-    use cylindrical_grid, only	: r_grid, z_grid, phi_grid, area
+    use cylindrical_grid, only	: r_grid, z_grid, phi_grid
     use spherical_grid, only	: solid_angle_cell_sph
     !given a base resolution healpix_lorder, refine each pixel according
     !to a given criterion up to healpix_lmax.
