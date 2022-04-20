@@ -949,7 +949,6 @@ module atom_transfer
       else
          RT_line_method = 1 !pixels circulaires
       end if
-      write(*,*) "phi=",phi_grid
 
 
       ! ------------------------------------------------------------------------------------ !

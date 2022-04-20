@@ -64,6 +64,8 @@ module read1d_models
 		etoile(1)%x = 0.0_dp
 		etoile(1)%y = 0.0_dp
 		etoile(1)%z = 0.0_dp
+		!Temperature read from file
+		!etoile(1)%T = real(tab_T_mod1(1))
 		!other elements not useful in 1d mode !
 		tab_r_mod1d = tab_r_mod1d * Rstar_mod * m_to_au
 
