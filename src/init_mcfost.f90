@@ -13,6 +13,7 @@ module init_mcfost
   use utils
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters
+  use read1d_models, only : read_grid_1d
 
   implicit none
 
@@ -86,6 +87,7 @@ subroutine set_default_variables()
   !lorigin_atom = .false., not yet
   lmagnetoaccr = .false.
   lpluto_file = .false.
+  lmodel_1d = .false.
   lmodel_ascii = .false.
   lmhd_voronoi = .false.
   lzeeman_polarisation = .false.
@@ -808,6 +810,16 @@ subroutine initialisation_mcfost()
         allocate(density_files(n_pluto_files))
         density_files(1) = s
         i_arg = i_arg + 1
+     case ("-model_1d")
+     	i_arg = i_arg + 1
+     	lmodel_1d = .true.
+     	lmodel_ascii = .true.
+        call get_command_argument(i_arg,s)
+        if (s=="") call error("No filename provided for Pluto file!")
+        allocate(density_files(1))
+        density_file = s
+        density_files(1) = density_file
+        i_arg = i_arg + 1
      case("-model_ascii")
         i_arg = i_arg + 1
         lmodel_ascii = .true.
@@ -1428,6 +1440,13 @@ subroutine initialisation_mcfost()
      disk_zone(1)%geometry = 2
      call read_athena_parameters(athena_file)
   endif
+  if (lmodel_1d) then
+   l3d = .false.
+   n_zones = 1
+   disk_zone(1)%geometry = 2
+   call warning("model_1d : reading 1d  stellar atmosphere model")
+   call read_grid_1d()!density_file
+  endif
 
   if (n_zones > 1) lvariable_dust=.true.
 
@@ -1782,6 +1801,7 @@ subroutine display_help()
   write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
   write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
+  write(*,*) "        : -model_1d : interface with stellar atmosphere models."
   write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"

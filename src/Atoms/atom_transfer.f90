@@ -154,7 +154,6 @@ module atom_transfer
       Istar_loc(:,id) = 0.0_dp
       if (laccretion_shock) Ishock(:,id) = 0.0_dp
 
-
       ! Will the ray intersect a star
       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
       ! Boucle infinie sur les cellules (we go over the grid.)
@@ -950,6 +949,7 @@ module atom_transfer
       else
          RT_line_method = 1 !pixels circulaires
       end if
+      write(*,*) "phi=",phi_grid
 
 
       ! ------------------------------------------------------------------------------------ !

@@ -49,7 +49,7 @@ module parametres
 
   integer :: RT_sed_method ! cf routine dust_map pour def
 
-  ! Etapes de l'�mission thermique
+  ! Etapes de l'émission thermique
   logical :: ltemp, lsed, lsed_complete, l_em_disk_image, lchauff_int, lextra_heating, lno_internal_energy
   character(len=512), dimension(:), allocatable :: indices
   character(len=512) :: tab_wavelength
@@ -59,7 +59,7 @@ module parametres
 
   ! Atomic line radiative transfer
   !!lstore_opac futur deprecation
-  logical :: lno_radiative_coupling, lsobolev, lsobolev_only, lexit_after_nonlte_loop
+  logical :: lno_radiative_coupling, lsobolev, lsobolev_only, lexit_after_nonlte_loop, lmodel_1d
   logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
   				lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
        			ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
@@ -100,7 +100,7 @@ module parametres
 
   ! Production d'images symetriques
   ! La symetrie est effectuee avant de choisir les pixels
-  ! le syst�me est-il centrosymetrique
+  ! le système est-il centrosymetrique
   ! le systeme a-t-il une symetrie axiale (ne compte que si N_phi > 1)
   logical :: l_sym_ima, l_sym_centrale, l_sym_axiale
 
@@ -114,7 +114,7 @@ module parametres
   !must be initialized to 0
   integer(kind=8) :: mem_alloc_tot !total memory allocated dynamically or not in bytes
 
-  ! R�solution de la grille de densit�
+  ! Résolution de la grille de densité
   ! Nombre de cellules dans la direction r (echantillonage log)
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
   integer :: n_rad, n_rad_in  ! subdivision de la premiere cellule

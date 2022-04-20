@@ -182,16 +182,17 @@ endif
 #Atomic line transfer
 Atom_dir=Atoms
 
-SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90       \
+SOURCES = mcfost_env.f90 parameters.f90 constants.f90 $(Atom_dir)/constant.f90 \
+          sha.f90 messages.f90 $(Atom_dir)/getline.f90 $(Atom_dir)/uplow.f90    \
           operating_system.f90 random_numbers.f90 utils.f90 sort.f90 fits_utils.f90 \
+          $(Atom_dir)/math.f90 read1d_models.f90 \
           grains.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90         \
           Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90         \
-          Temperature.f90 $(Atom_dir)/constant.f90\
-          $(Atom_dir)/math.f90                \
-	  $(Atom_dir)/atom_type.f90 $(Atom_dir)/getline.f90                      \
-          $(Atom_dir)/uplow.f90 density.f90 read_opacity.f90 scattering.f90      \
+          Temperature.f90  $(Atom_dir)/atom_type.f90 healpix_mod.f90 \
+          $(Atom_dir)/atmos_type.f90 \
+          density.f90 read_opacity.f90 scattering.f90      \
 	  read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90 \
-          coated_sphere.f90 dust_prop.f90 healpix_mod.f90 $(Atom_dir)/atmos_type.f90             \
+          coated_sphere.f90 dust_prop.f90              \
           molecular_emission.f90 PAH.f90              \
           $(Atom_dir)/zeeman.f90 input.f90 $(Atom_dir)/broad.f90                 \
           $(Atom_dir)/getlambda.f90 benchmarks.f90 read_param.f90                \

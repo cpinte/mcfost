@@ -7,6 +7,8 @@ module atmos_type
   use messages
   use constantes, only : tiny_dp
 
+  use read1d_models, only : tab_r_mod1d, tab_T_mod1, tab_rho_mod1, tab_ne_mod1, &
+   tab_v_mod1, tab_vt_mod1, tab_zone_mod1
   use healpix_mod !all at the moment
 
   !$ use omp_lib
@@ -2229,6 +2231,68 @@ contains
     return
   end subroutine writeTemperature
 
+	! subroutine model1d_to_mcfost()
+	! 	real(kind=dp) :: rho_to_nH, Rstar_mod, v_char
+	! 	integer :: i, Nr
+	! 	real(kind=dp), dimension(:), allocatable :: r_mod, T_mod, rho_mod, ne_mod
+	! 	real(kind=dp), dimension(:), allocatable :: vr_mod, vt_mod, vphi_mod, vturb_mod
+	! 	integer :: istart, n_cells_tmp	
+	
+	! 	lmagnetoaccr = .false.
+	! 	lspherical_velocity = .true.
+	! 	lvoronoi = .false.
+	! 	lmagnetized = .false.
+	! 	calc_ne = .false.		
+	
+	! 	!read model 1 here expect:
+	! 	!Rstar
+	! 	!Nr
+	! 	!r in (increasing) stellar radius, T, rho, ne, vr, vt, vphi, vturb
+	! 	open(unit=1,file=density_file, status="old")
+	! 	read(unit=1,*) Rstar_mod
+	! 	read(unit=1,*) Nr
+	! 	allocate(r_mod(Nr),T_mod(Nr), rho_mod(Nr), ne_mod(Nr), vr_mod(Nr), vt_mod(Nr), vphi_mod(Nr), vturb_mod(Nr))
+	! 	do i=1, Nr
+	! 		read(unit=1,*) r_mod(i), T_mod(i), rho_mod(i), ne_mod(i), vr_mod(i), vt_mod(i), vphi_mod(i), vturb_mod(i)
+	! 	enddo
+	! 	close(unit=1)
+		
+	! 	call alloc_atomic_atmos()
+	! 	rho_to_nH = 1d3 /masseH / wght_per_H
+	! 	icompute_atomRT(:) = 1
+	! 	T(:) = T_mod(2:n_cells)
+	! 	nHtot(:) = rho_mod(2:n_cells) * rho_to_nH
+	! 	ne(:) = ne_mod(2:n_cells)
+	! 	vr(:) = vr_mod(2:n_cells)
+	! 	vturb(:) = vturb_mod(2:n_cells)
+	! 	vtheta(:) = vt_mod(2:n_cells)
+	! 	vphi(:) = vphi_mod(2:n_cells)
+		
+	! 	deallocate(r_mod,T_mod,rho_mod,ne_mod,vr_mod,vturb_mod,vt_mod,vphi_mod)
+
+		
+	! 	write(*,*) "Maximum/minimum velocities in the model (km/s):"
+	! 	write(*,*) " Vr = ", 1e-3 * maxval(abs(vR)), 1d-3*minval(abs(vr),mask=icompute_atomRT>0)
+	! 	write(*,*) " Vtheta = ",  1d-3 * maxval(abs(vtheta)), 1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)
+	! 	write(*,*) " Vphi = ",  1d-3 * maxval(abs(vphi)), 1d-3*minval(abs(vphi),mask=icompute_atomRT>0)
+
+	! 	v_char = maxval(sqrt(vR(:)**2+vtheta(:)**2+vphi(:)**2))
+	! 	write(*,*) "Typical line extent due to V fields (km/s):"
+	! 	v_char = 1.01 * v_char
+	! 	write(*,*) v_char/1d3
+
+	! 	write(*,*) "Maximum/minimum turbulent velocity (km/s):"
+	! 	write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
+
+	! 	write(*,*) "Maximum/minimum Temperature in the model (K):"
+	! 	write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
+	! 	write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+	! 	write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
+	! 	write(*,*) "Maximum/minimum ne density in the model (m^-3):"
+	! 	write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
+
+	! 	return
+	! end subroutine model1d_to_mcfost
 
   subroutine readAtmos_ascii(filename)
     ! ------------------------------------------- !
@@ -2240,7 +2304,7 @@ contains
     ! ------------------------------------------- !
     use getline
     use constantes
-    use grid, only : cell_map, r_grid, z_grid
+    use grid, only : cell_map, r_grid, z_grid, phi_grid
     character(len=*), intent(in)	:: filename
     real(kind=dp) Tshk!, Oi, Oo
     real(kind=dp) :: tilt!,thetai, thetao
@@ -2278,6 +2342,44 @@ contains
     !rho/avgWeight = Ngas total, see rutten page 143 eq 7.3
     !or use rho and for each element use the masse fraction to define its total number ?
     !should be the same as using Abund wrt to nHtot
+
+    if (lmodel_1d) then
+		lmagnetoaccr = .false.
+		lspherical_velocity = .true.
+		lvoronoi = .false.
+		lmagnetized = .false.
+		calc_ne = .false.
+		icompute_atomRT(:) = tab_zone_mod1(2:n_cells+1)
+		T(:) = tab_T_mod1(2:n_cells+1)
+		nHtot(:) = tab_rho_mod1(2:n_cells+1) * rho_to_nH
+		ne(:) = tab_ne_mod1(2:n_cells+1)
+		vr(:) = tab_v_mod1(1,2:n_cells+1)
+		vtheta(:) = tab_v_mod1(2,2:n_cells+1)
+		vphi(:) = tab_v_mod1(3,2:n_cells+1)
+		vturb(:) = tab_vt_mod1(2:n_cells+1)
+		deallocate(tab_r_mod1d,tab_T_mod1,tab_rho_mod1,tab_ne_mod1,tab_v_mod1,tab_vt_mod1,tab_zone_mod1)		
+		write(*,*) "Maximum/minimum velocities in the model (km/s):"
+		write(*,*) " Vr = ", 1e-3 * maxval(abs(vR)), 1d-3*minval(abs(vr),mask=icompute_atomRT>0)
+		write(*,*) " Vtheta = ",  1d-3 * maxval(abs(vtheta)), 1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)
+		write(*,*) " Vphi = ",  1d-3 * maxval(abs(vphi)), 1d-3*minval(abs(vphi),mask=icompute_atomRT>0)
+
+		v_char = maxval(sqrt(vR(:)**2+vtheta(:)**2+vphi(:)**2))
+		write(*,*) "Typical line extent due to V fields (km/s):"
+		v_char = 1.01 * v_char
+		write(*,*) v_char/1d3
+
+		write(*,*) "Maximum/minimum turbulent velocity (km/s):"
+		write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
+
+		write(*,*) "Maximum/minimum Temperature in the model (K):"
+		write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
+		write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+		write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
+		write(*,*) "Maximum/minimum ne density in the model (m^-3):"
+		write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
+
+      return
+    endif
 
 
     write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
@@ -2580,7 +2682,6 @@ contains
     use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
     use stars, only				: intersect_stars
     use cylindrical_grid, only	: r_grid, z_grid, phi_grid
-    use spherical_grid, only	: solid_angle_cell_sph
     !given a base resolution healpix_lorder, refine each pixel according
     !to a given criterion up to healpix_lmax.
     !criterion is dOmega(icell) / dOmega_healpix <= Nr_min, with
