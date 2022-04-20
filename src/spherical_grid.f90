@@ -10,7 +10,7 @@ module spherical_grid
   implicit none
 
   public :: cross_spherical_cell, pos_em_cellule_sph, indice_cellule_sph, test_exit_grid_sph, &
-       move_to_grid_sph, solid_angle_cell_sph !Ben
+       move_to_grid_sph
 
 
   private
@@ -236,11 +236,11 @@ end subroutine indice_cellule_sph_theta
        ! on avance ou recule en r ? -> produit scalaire
        dotprod = b
        if (dotprod < 0.0_dp) then
-          ! on recule : on cherche rayon inférieur
+          ! on recule : on cherche rayon infï¿½rieur
           c=(r0_2-r_lim_2(ri0-1)*correct_moins)
           delta=b*b-c
-          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon inférieur
-             ! on cherche le rayon supérieur
+          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon infï¿½rieur
+             ! on cherche le rayon supï¿½rieur
              c=(r0_2-r_lim_2(ri0)*correct_plus)
              delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
              delta_rad=1
@@ -248,7 +248,7 @@ end subroutine indice_cellule_sph_theta
              delta_rad=-1
           endif
        else
-          ! on avance : on cherche le rayon supérieur
+          ! on avance : on cherche le rayon supï¿½rieur
           c=(r0_2-r_lim_2(ri0)*correct_plus)
           delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
           delta_rad=1
@@ -523,7 +523,6 @@ end subroutine indice_cellule_sph_theta
 
     real(kind=dp) :: x0, y0, z0, x1, y1, z1, r0_2, b, c, rac, delta, s1, delta_vol, correct_moins
 
-
     correct_moins = 1.0_dp - 1.0e-10_dp
 
     x0=x ; y0=y ; z0=z
@@ -647,20 +646,5 @@ end subroutine indice_cellule_sph_theta
   return
 
 end subroutine pos_em_cellule_sph
-
-!Ben
-function solid_angle_cell_sph(icell)
-	integer, intent(in) :: icell
-	real(kind=dp) :: solid_angle_cell_sph, x0,y0
-	integer :: i,j,k
-	
-	i =  cell_map_i(icell)
-	x0 = r_grid(icell) * cos(phi_grid(icell))
-	y0 = r_grid(icell) * sin(phi_grid(icell))
-	solid_angle_cell_sph = ( abs(r_lim_3(i) - r_lim_3(i-1))**(1./3.) ) / sqrt(x0*x0+y0*y0+z_grid(icell)*z_grid(icell))
-	solid_angle_cell_sph = solid_angle_cell_sph**2
-	
-	return 
-end function solid_angle_cell_sph
 
 end module spherical_grid
