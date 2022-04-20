@@ -426,7 +426,7 @@ subroutine define_cylindrical_grid()
   if (lcylindrical) then
      ! Calcul volume des cellules (pour calculer leur masse)
      ! On prend ici le rayon au milieu de la cellule
-     ! facteur 2 car sym�trie
+     ! facteur 2 car symétrie
      ! tab_r est en cylindrique ici
 
      do i=1, n_rad
@@ -909,11 +909,11 @@ end subroutine define_cylindrical_grid
        ! on avance ou recule en r ? -> produit scalaire
        dotprod=u*x0+v*y0  ! ~ b
        if (dotprod < 0.0_dp) then
-          ! on recule : on cherche rayon inf�rieur
+          ! on recule : on cherche rayon inférieur
           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
           delta=b*b-c
-          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon inf�rieur
-             ! on cherche le rayon sup�rieur
+          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon inférieur
+             ! on cherche le rayon supérieur
              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
              delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
              delta_rad=1
@@ -921,7 +921,7 @@ end subroutine define_cylindrical_grid
              delta_rad=-1
           endif
        else
-          ! on avance : on cherche le rayon sup�rieur
+          ! on avance : on cherche le rayon supérieur
           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
           delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
           delta_rad=1
@@ -936,7 +936,7 @@ end subroutine define_cylindrical_grid
 
 
        ! 2) position interface verticale
-       ! on monte ou on descend par rapport au plan �quatorial ?
+       ! on monte ou on descend par rapport au plan équatorial ?
        dotprod=w*z0
        if (dotprod == 0.0_dp) then
           t=1.0e10
@@ -1329,7 +1329,7 @@ end subroutine define_cylindrical_grid
        else
           z= -(z_lim(ri,-zj)+aleat2*(z_lim(ri,-zj+1)-z_lim(ri,-zj)))
        endif
-    else ! 2D : choix al�atoire du signe
+    else ! 2D : choix aléatoire du signe
        if (aleat2 > 0.5_dp) then
           z=z_lim(ri,zj)+(2.0_dp*(aleat2-0.5_dp))*(z_lim(ri,abs(zj)+1)-z_lim(ri,zj))
        else
