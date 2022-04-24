@@ -31,11 +31,14 @@ contains
 
     integer, intent(in) :: unit
     type (AtomType), intent(inout) :: atom
-    character(len=Nmax_line_per_collision), dimension(Nmax_lines) :: lines_in_file !check len char matches the one in atom%
+   !  character(len=Nmax_line_per_collision), dimension(Nmax_lines) :: lines_in_file !check len char matches the one in atom%
+    character(len=:), dimension(:), allocatable :: lines_in_file !check len char matches the one in atom%
     integer :: N !real number of lines
     integer :: Nread, status
     character(len=3) :: END_OF_FILE="END", key
     character(len=Nmax_line_per_collision*10) :: inputline
+
+    allocate(character(len=Nmax_line_per_collision) :: lines_in_file(Nmax_lines))
 
     n = 0
     !it is still important to read an END in the file
@@ -57,6 +60,8 @@ contains
    !    write(*,*) atom%collision_lines(nread)
    !  enddo
    !  if (atom%ID=="He")stop
+
+    deallocate(lines_in_file)
 
     return
   end subroutine read_collisions
