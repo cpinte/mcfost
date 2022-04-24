@@ -1844,7 +1844,7 @@ CONTAINS
     !$omp do schedule(dynamic,1)
     do icell=1, n_cells
        !$ id = omp_get_thread_num() + 1
-       if (icompute_atomRT(icell)) then
+       if (icompute_atomRT(icell) > 0) then
           chi(:,id) = chi0_bb(:,icell)
           !-> only line source function  = line emiss / total opac
           eta(:,id) = 0.0_dp!eta0_bb(:,icell)
