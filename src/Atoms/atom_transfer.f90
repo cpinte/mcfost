@@ -30,6 +30,7 @@ module atom_transfer
                                  compute_angular_integration_weights, wmu, xmu, xmux, xmuy, v_char, max_Tshock, min_Tshock, &
                                  angular_quadrature, Taccretion, laccretion_shock, ntotal_atom, helium_is_active, is_inshock
    use healpix_mod, only         : healpix_sphere, healpix_npix, healpix_weight, healpix_ring_mu_and_phi, healpix_listx
+   use read1d_models, only       : xcorona, Icorona
 
    use readatom, only            : read_Atomic_Models, cswitch_enabled, maxval_cswitch_atoms, adjust_cswitch_atoms
    use lte, only                 : set_LTE_populations, nH_minus, ltepops, ltepops_h
@@ -126,7 +127,7 @@ module atom_transfer
       real(kind=dp), intent(in) :: x,y,z
       logical, intent(in) :: labs
       real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
-      real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, etas_loc
+      real(kind=dp), dimension(Nlambda) :: Snu, tau, dtau, etas_loc, Icoronal_illum
       real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c, etasc_loc
       integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
       logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
@@ -182,7 +183,16 @@ module atom_transfer
          !therefore we need to test_exit_grid before using icompute_atom_rt
          if (icell <= n_cells) then
             lcellule_non_vide = (icompute_atomRT(icell) > 0)
-            if (icompute_atomRT(icell) < 0) return
+            ! if (icompute_atomRT(icell) < 0) return
+            if (icompute_atomRT(icell) < 0) then
+               if (icompute_atomRT(icell) == -1) then
+                  return
+               else
+                  !Does not return but cell is empty (lcellule_non_vide is .false.)
+                  Icoronal_illum = linear_1D_sorted(size(xcorona),xcorona,Icorona(:,1),Nlambda,lambda)
+                  Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * Icoronal_illum
+               endif
+            endif
          endif
 
          nbr_cell = nbr_cell + 1
@@ -974,7 +984,7 @@ module atom_transfer
       !! --------------------------------------------------------- !!
       ! ------------------------------------------------------------------------------------ !
       ! ----------------------- READATOM and INITIZALIZE POPS ------------------------------ !
-      call read_Atomic_Models(atomunit)
+      call read_Atomic_Models()
 
       !not in the model but fits file exists from previous run ?
       call read_electron(lelectron_read)
@@ -1298,6 +1308,8 @@ module atom_transfer
       endif
 
       call write_flux(only_flux=.true.)
+      !if wavelengths are converted in air wavelenghts
+      !the lambda and lambda_cont grids are modified in write_flux()
       call write_atomic_maps
 
       ! ------------------------------------------------------------------------------------ !
