@@ -55,7 +55,7 @@ module readatom
       type (AtomType), intent(inout), target :: atom
       character(len=*), intent(in) :: atom_file
       character(len=MAX_LENGTH) :: inputline, FormatLine
-      integer :: Nread, i,j, EOF, nll, nc, Nfixed !deprecation future
+      integer :: status, Nread, i,j, EOF, nll, nc, Nfixed !deprecation future
       real, allocatable, dimension(:) :: levelNumber
       logical :: Debeye, match, res, setup_common_gauss_prof
       logical, dimension(:), allocatable :: determined, parse_labs
@@ -72,7 +72,8 @@ module readatom
 
       C1 = 2.*PI * (Q_ELECTRON/EPSILON_0) * (Q_ELECTRON/M_ELECTRON / CLIGHT)
 
-      open(unit=atomunit,file=atom_file,status="old")
+      open(unit=atomunit,file=atom_file,status="old",iostat=status)
+      if (status /= 0) call error("cannot open atomic model!")
       !FormatLine = "(1A<MAX_LENGTH>)" !not working with ifort
       write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
 
@@ -163,11 +164,9 @@ module readatom
 
       ! Check if there is at least one continuum transition
       if (atom%stage(atom%Nlevel) /= atom%stage(atom%Nlevel-1)+1) then
-         write(*,*) atom%stage
-         write(*,*) atom%stage(atom%Nlevel), atom%stage(atom%Nlevel-1)+1
-         write(*,*) "Atomic model does not have an overlying continuum"
-         write(*,*) "exiting..."
-         stop
+         write(*,*) 'stage=',atom%stage
+         write(*,*) 'stage(Nlevel)=',atom%stage(atom%Nlevel), 'stage(Nlevel-1)+1=',atom%stage(atom%Nlevel-1)+1
+         call error("Atomic model does not have an overlying continuum! (LTE, broadening...)")
       end if
 
       !Starting from now, i is the index of the lower level
@@ -548,7 +547,7 @@ module readatom
       return
    end subroutine read_Model_Atom
 
-   subroutine read_Atomic_Models(unit)
+   subroutine read_Atomic_Models()
       !Read all atomic files present in atoms.input file
       !successive call of readModelAtom()
       integer :: EOF=0,Nread, nmet, mmet, nblancks, nact, npass
@@ -557,7 +556,7 @@ module readatom
       real :: eps
       real(kind=dp) :: epsilon_l_max !if epsilon > 1/pi/adamp, the value of xwing_lorentz is negative
       real(kind=dp) :: max_adamp, adamp, maxvel, vel
-      integer, intent(in) :: unit
+      integer :: unit, status
       character(len=MAX_LENGTH) :: inputline
       character(len=15) :: FormatLine
       character(len=MAX_LENGTH) :: popsfile, filename
@@ -577,10 +576,11 @@ module readatom
     !   if (fact_pseudo_cont > 1.0) then
     !    Write(*,*) " Hydrogenic continua extrapolated up to lambda0 x ", fact_pseudo_cont
     !   endif
-
+      unit = 1
       Nactiveatoms = 0
       Npassiveatoms = 0
-      open(unit=unit,file=TRIM(ATOMS_INPUT), status="old")!mcfost_utils)//TRIM(ATOMS_INPUT)
+      open(unit=unit,file=TRIM(ATOMS_INPUT), status="old", iostat=status)!mcfost_utils)//TRIM(ATOMS_INPUT)
+      if (status /= 0) call error("unable to open atomic files!")
 
       !get number of atomic models to read
       call getnextline(unit, COMMENT_CHAR,FormatLine, &
@@ -634,7 +634,8 @@ module readatom
          end if
          !   ! just opoen the model to check that Hydrogen is the first model
          !   !
-         open(unit=unit+nmet,file=trim(mcfost_utils)//TRIM(path_to_atoms)//trim(filename),status="old")
+         open(unit=unit+nmet,file=trim(mcfost_utils)//TRIM(path_to_atoms)//trim(filename),status="old",iostat=status)
+         if (status /= 0) call error("can open second atomic model in test hydrogen first!")
          call getnextline(unit+nmet, COMMENT_CHAR, FormatLine, inputline, Nread)
          read(inputline,*) IDread
          if (nmet==1 .and. IDread/="H ") then

@@ -2379,12 +2379,12 @@ CONTAINS
     !-> solve for residual. By default omega_sor_atom is 1.0
     	delta = atom%n(:,icell) - matmul(atom%Gamma(:,:,id), ndag)
     	call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
-   		atom%n(:,icell) = ndag(:) + omega_sor_atom(atom%activeindex) * delta(:)
-   	else !Jacobi
+   	atom%n(:,icell) = ndag(:) + omega_sor_atom(atom%activeindex) * delta(:)
+   else !Jacobi
     	call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
-   	endif
-!     call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
-!     !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel, .true.)
+   endif
+!  call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
+!  !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel, .true.)
 
     if ((maxval(atom%n(:,icell)) < 0.0)) then
        !raise warning or error if all populations are negative. Otherwise, handle

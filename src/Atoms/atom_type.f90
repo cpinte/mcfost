@@ -8,6 +8,7 @@ module atom_type
 
    integer, parameter :: ATOM_LABEL_WIDTH=20
    integer, parameter :: ATOM_ID_WIDTH=2, MAX_LENGTH=512
+   integer, parameter :: Nmax_line_per_collision = 1000 !size max of the character for each collision line
    !    real(kind=dp), parameter :: BRK=4.0
    !    integer, parameter :: MSHELL=5
    !    character(len=20), dimension(16) :: col_recipes !16 recipes for collision rates
@@ -107,7 +108,8 @@ module atom_type
       real, allocatable, dimension(:) :: qS, qJ
       ! allocated in readatom.f90, freed with freeAtoms()
       !futur deprecation, because I will stop using RH routine
-      character(len=MAX_LENGTH), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
+      character(len=Nmax_line_per_collision), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
+      ! character(len=MAX_LENGTH), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
       !Nlevel * Nlevel * Nproc
       real(kind=dp), dimension(:,:,:), allocatable :: Gamma, C!, Rij
       real(kind=dp), dimension(:,:), pointer :: n, nstar
