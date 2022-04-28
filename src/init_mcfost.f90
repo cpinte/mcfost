@@ -1537,6 +1537,7 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
+  write(*,*) "        : -Tfile <file> : read a given temperature file"
   write(*,*) "        : -diff_approx : enforce computation of T structure with diff approx."
   write(*,*) "        : -no_diff_approx : compute T structure with only MC method"
   write(*,*) "        : -only_diff_approx : only compute the diffusion approx"
