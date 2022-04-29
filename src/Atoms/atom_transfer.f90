@@ -20,7 +20,7 @@ module atom_transfer
                                  Istar_cont, Flux_acc, Ishock, Istar_loc, flux_star, Stokes_Q, Stokes_U, Stokes_V, Flux, &
                                  Fluxc, F_QUV, rho_p, etaQUV_p, chiQUV_p, init_spectrum, &
                                  dealloc_spectrum, Jnu_cont, Jnu, alloc_flux_image, allocate_stokes_quantities, &
-                                 dealloc_jnu, reallocate_rays_arrays, write_flux,  &
+                                 dealloc_jnu, reallocate_rays_arrays, write_flux, ori, tet, &
                                  write_atomic_maps, limage_at_lam0, image_map, &
                                  wavelength_ref, HI_rayleigh_part2, HeI_rayleigh_part2, alloc_wavelengths_raytracing
 
@@ -44,7 +44,7 @@ module atom_transfer
    use io_opacity, only 		   : write_Jnu_cont, write_taur, write_contrib_lambda_ascii, read_Jnu_cont, &
                                  write_collision_matrix_atom, write_collision_matrix_atom_ascii, write_jnu_cont_bin, &
                                  read_jnu_cont_bin, write_radiative_rates_atom, write_rate_matrix_atom, write_cont_opac_ascii, &
-                                 write_opacity_emissivity_map, write_dbmatrix_bin
+                                 write_opacity_emissivity_map, write_dbmatrix_bin, write_origin_atom
    use math
    !$ use omp_lib
    use molecular_emission, only  : v_proj, vlabs, dv_proj!,gradv
@@ -59,7 +59,7 @@ module atom_transfer
                                  llimit_mem, lfix_backgrnd_opac, lsafe_stop, safe_stop_time, checkpoint_period, lcheckpoint, &
                                  istep_start, lno_iterate_ne_mc, laccurate_integ,  healpix_lorder, healpix_lmin, healpix_lmax, &
                                  lvoronoi, lmagnetoaccr, lonly_top, lonly_bottom, l3D, limg, DPOPS_SUB_MAX_ERROR, &
-                                 lno_radiative_coupling, lsobolev, lsobolev_only
+                                 lno_radiative_coupling, lsobolev, lsobolev_only, lorigine
 
    use grid, only                : test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
    use Voronoi_grid, only        : Voronoi
@@ -280,6 +280,15 @@ module atom_transfer
                tau(:) = tau(:) + dtau(:) !for next cell
             ! enddo
             else
+               if (lorigine) then
+                  ! ori(:,icell,id) = ori(:,icell,id) + Snu * exp(-tau) * (1.0_dp - exp(-dtau))
+                  !only if 0, so cell are updated only once, okey ?
+                  if (maxval(ori(:,icell,id))==0.0_dp) then
+                     ori(:,icell,id) = ori(:,icell,id) + Snu * exp(-tau) * (1.0_dp - exp(-dtau))
+                     ! ori(:,icell,id) = ori(:,icell,id) + eta(:,id) * exp(-tau(:))
+                     tet(:,icell,id) = tet(:,icell,id) + tau(:) * exp(-tau(:))
+                  endif
+               endif
                if (lmagnetized) then
                   do la=1,Nlambda
                      Q = exp(-tau(la)) * (1.0_dp - exp(-dtau(la)))
@@ -499,7 +508,7 @@ module atom_transfer
        
          if (limage_at_lam0 ) then
             image_map(ipix,jpix,ibin,iaz) = &
-               interp1d_sorted(Nlambda,lambda,I0,wavelength_ref)*normF!(pixelsize*zoom/map_size)**2
+               interp1d_sorted(Nlambda,lambda,I0,wavelength_ref)*normF
          endif
       endif
 
@@ -1270,7 +1279,7 @@ module atom_transfer
          endif
       endif !electron scatt
               
-      if (loutput_rates) then
+      if (loutput_rates .or. lorigine) then
          call write_opacity_emissivity_map
       endif
 
@@ -1308,6 +1317,7 @@ module atom_transfer
       endif
 
       call write_flux(only_flux=.true.)
+      if (lorigine) call write_origin_atom()
       !if wavelengths are converted in air wavelenghts
       !the lambda and lambda_cont grids are modified in write_flux()
       call write_atomic_maps

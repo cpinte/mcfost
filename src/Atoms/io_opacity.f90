@@ -1805,6 +1805,27 @@ CONTAINS
     RETURN
   END SUBROUTINE write_cont_opac_ascii
 
+   subroutine write_origin_atom
+      use spectrum_type, only : ori, tet
+      integer :: status = 0, i
+
+      !!accumulate in the first proc before writing
+      do i=2,nb_proc
+         ori(:,:,1) = ori(:,:,1) + ori(:,:,i)
+         tet(:,:,1) = tet(:,:,1) + tet(:,:,i)
+      enddo
+    
+      open(15, file="origin_atom.out",form="unformatted",status='unknown',access="sequential",iostat=status)
+      write(15,iostat=status) ori(:,:,1)!sum(ori(:,:,:),dim=3) !sum over proc!
+      close(15)
+	
+      open(15, file="tet_atom.out",form="unformatted",status='unknown',access="sequential",iostat=status)
+      write(15,iostat=status) tet(:,:,1)!sum(tet(:,:,:),dim=3)
+      close(15)
+  
+  	return
+  end subroutine write_origin_atom
+
   !written to binary instead
   !include Zeeman opac  if lmagnetized, can be large!
   !In that case before chic and after chi, there is rho_p !

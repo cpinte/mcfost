@@ -84,7 +84,6 @@ subroutine set_default_variables()
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
   lvacuum_to_air = .false.
-  !lorigin_atom = .false., not yet
   lmagnetoaccr = .false.
   lpluto_file = .false.
   lmodel_1d = .false.
@@ -673,9 +672,6 @@ subroutine initialisation_mcfost()
    !   case("-cntrbf_ray_atom")!hidden at the moment.
    !      i_arg = i_arg + 1
    !      lcontrib_function_ray = .true.
-   !   case("-origin_atom")!hidden at the moment.
-   !      i_arg = i_arg + 1
-   !      lorigin_atom = .true.
      case("-output_rates")
         i_arg = i_arg + 1
         loutput_rates = .true.
@@ -1937,7 +1933,6 @@ subroutine display_help()
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "        : -vacuum_to_air : convert vacuum wavelengths to air wavelengths"
 !   write(*,*) "        : -cntrbf_ray_atom : Computes the contribution function along a single ray!"
-!   write(*,*) "        : -origin_atom : Computes and stores the emission of each cell"
   write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
   write(*,*) "        : -read_jnu_atom : Read old Jnu values from file "

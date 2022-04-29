@@ -8,7 +8,7 @@ module spectrum_type
    define_local_gauss_profile_grid
   use fits_utils, only : print_error
   use parametres, only : n_cells, lelectron_scattering, n_etoiles, npix_x, npix_y, rt_n_incl, rt_n_az, &
-       n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, &
+       n_rad, n_az, nz, map_size, distance, zoom, lmagnetoaccr, lzeeman_polarisation, lorigine, &
        lvacuum_to_air, ltab_wavelength_image, lvoronoi, l3D, mem_alloc_tot, llimit_mem, simu_time, art_hv_nlte, art_hv
   use input, only : nb_proc, RT_line_method,lkeplerian, linfall, l_sym_ima
   use constantes, only : arcsec_to_deg
@@ -25,8 +25,6 @@ module spectrum_type
   ! not that FLUX_FILE is 1D only if one pixel, otherwise it is a map.
   ! F(x,y,0,lambda) in several directions.
   character(len=*), parameter :: FLUX_FILE="flux.fits.gz"
-  character(len=*), parameter :: ORIGINC_FILE="origin_atom_cont.out", ORIGIN_FILE="origin_atom.out"
-  character(len=*), parameter :: ORIGINC_FILE_FITS="origin_atom_cont.fits.gz", ORIGIN_FILE_FITS="origin_atom.fits.gz"
 
   !shift in index of line profiles, function of iray and nb_proc
   integer, dimension(:,:), allocatable :: dk
@@ -48,7 +46,7 @@ module spectrum_type
   real(kind=dp), dimension(:,:,:), allocatable :: rho_p, chiQUV_p, etaQUV_p
   real(kind=dp), allocatable, dimension(:,:) :: Stokes_Q, Stokes_U, Stokes_V
   real(kind=dp), allocatable, dimension(:,:,:,:,:) :: F_QUV
-  real(kind=dp), allocatable, dimension(:,:) :: origin_atom, originc_atom
+  real(kind=dp), allocatable, dimension(:,:,:) :: ori, tet
 
   logical :: limage_at_lam0
   real(kind=dp), allocatable, dimension(:,:,:,:) :: image_map
@@ -348,7 +346,7 @@ contains
     !Store total flux and flux maps for selected lines
     integer :: alloc_status, kr, nat
     real :: mem_alloc, mem_flux, mem_cont, mem_for_file
-    integer(kind=8) :: mem_alloc_local = 0,  Ntrans_tot
+    integer(kind=8) :: mem_alloc_local = 0,  Ntrans_tot, mem_alloc_origine
     real, dimension(:), allocatable :: mem_per_file
     integer :: Nlam, Ntrans
 
@@ -447,6 +445,27 @@ contains
        Flux_acc = 0.0_dp
     endif
 
+   !anyway this is a small Nlambda array with the lambda for image beeing defined only for ray-traced lines
+   if (rt_n_incl > 1 .or. rt_n_az >1) then
+      write(*,*) "*** WARNING: origin atom will be averaged over inclinations and/or azimuths with "
+      write(*,*) "       rt_n_incl or rt_n_az > 1 !"
+      ! lorigine = .false.
+   endif
+   if (lorigine) then
+      mem_alloc_origine = 0
+      !allocate space for contribution function line%o and tau exp(-tau) tet
+      allocate(ori(Nlambda,n_cells,nb_proc),stat=alloc_status)
+      if (alloc_status > 0) call error("cannot allocate ori !")
+      mem_alloc_origine = sizeof(ori)
+      ori = 0.0_dp
+      mem_alloc_local = mem_alloc_local + mem_alloc_origine
+      allocate(tet(Nlambda,n_cells,nb_proc),stat=alloc_status)
+      if (alloc_status > 0) call error("cannot allocate tet !")
+      tet = 0.0_dp
+      mem_alloc_origine = mem_alloc_origine + sizeof(tet)
+      mem_alloc_local = mem_alloc_local + mem_alloc_origine
+   endif
+
     !now for the lines
     do nat=1, Natom
 
@@ -485,70 +504,35 @@ contains
              	endif
              	mem_alloc_local = mem_alloc_local + sizeof(atoms(nat)%ptr_atom%lines(kr)%mapx)
              endif
-          endif
+
+            !-> not defined by line yet!
+            ! if (rt_n_incl > 1 .or. rt_n_az >1) then
+            !    write(*,*) "*** WARNING: origin atom will be averaged over inclinations and/or azimuths with "
+            !    write(*,*) "       rt_n_incl or rt_n_az > 1 !"
+            !    ! lorigine = .false.
+            ! endif
+            ! if (lorigine) then
+            !    mem_alloc_origine = 0
+            !    !allocate space for contribution function line%o and tau exp(-tau) tet
+            !    allocate(atoms(nat)%ptr_atom%lines(kr)%o(Nlam,n_cells,nb_proc),stat=alloc_status)
+            !    if (alloc_status > 0) call error("cannot allocate line%o !")
+            !    mem_alloc_origine = sizeof(atoms(nat)%ptr_atom%lines(kr)%o)
+            !    atoms(nat)%ptr_atom%lines(kr)%o = 0.0_dp
+            !    mem_alloc_local = mem_alloc_local + mem_alloc_origine
+            !    allocate(atoms(nat)%ptr_atom%lines(kr)%tet(Nlam,n_cells,nb_proc),stat=alloc_status)
+            !    if (alloc_status > 0) call error("cannot allocate line%tet !")
+            !    atoms(nat)%ptr_atom%lines(kr)%tet = 0.0_dp
+            !    mem_alloc_origine = mem_alloc_origine + sizeof(atoms(nat)%ptr_atom%lines(kr)%tet)
+            !    mem_alloc_local = mem_alloc_local + mem_alloc_origine
+            ! endif
+
+
+          endif !write_flux_map
 
 
        enddo
 
     enddo
-
-    !Contribution functions (for one ray it is allocated elsewhere)
-    !Future: contribution function for selected lines only !
-    ! 		if (lcontrib_function) then
-    !
-    ! 			mem_alloc = real(8 * n_cells * Nlambda) / real(1024*1024)
-    !
-    ! 			if (mem_alloc > 1000.0) then
-    ! 				write(*,*) " allocating ", mem_alloc/real(1024), " GB for contribution function.."
-    ! 			else
-    ! 				write(*,*) " allocating ", mem_alloc, " MB for contribution function.."
-    ! 			endif
-    !
-    ! 			if (mem_alloc >= 2.1d3) then !2.1 GB
-    ! 				call Warning(" To large cntrb array. Use a wavelength table instead..")
-    ! 				lcontrib_function = .false.
-    ! 			else
-    !
-    ! 				allocate(cntrb(Nlambda,n_cells),stat=alloc_status)
-    ! 				mem_alloc_local = mem_alloc_local + sizeof(cntrb)
-    ! 				if (alloc_status > 0) then
-    ! 					call ERROR('Cannot allocate cntrb_ray')
-    ! 					lcontrib_function = .false.
-    ! 				else
-    ! 					cntrb(:,:) = 0.0_dp
-    ! 				endif
-    !
-    ! 			end if
-    !
-    ! 		end if
-
-   !  if (lorigin_atom) then
-   !     mem_alloc = 8 * n_cells * Nlambda / 1024./ 1024. + 8 * n_cells * Nlambda_cont / 1024./1024.
-   !     if (mem_alloc > 1d3) then
-   !        write(*,*) " allocating ", mem_alloc/1024., " GB for local emission origin.."
-   !     else
-   !        write(*,*) " allocating ", mem_alloc, " MB for local emission origin.."
-   !     endif
-
-   !     if (mem_alloc >= 2.1d3) then !2.1 GB
-   !        call Warning(" To large origin_atom array. Use a wavelength table instead..")
-   !        !lorigin_atom = .false.
-   !     else
-
-   !        allocate(origin_atom(Nlambda,n_cells),stat=alloc_status)
-   !        allocate(originc_atom(Nlambda_cont,n_cells),stat=alloc_status)
-
-   !        mem_alloc_local = mem_alloc_local + sizeof(origin_atom) + sizeof(originc_atom)
-   !        if (alloc_status > 0) then
-   !           call ERROR('Cannot allocate origin_atom')
-   !           !lorigin_atom = .false.
-   !        else
-   !           origin_atom = 0.0_dp
-   !           originc_atom = 0.0_dp
-   !        endif
-
-   !     end if
-   !  endif
 
 	if ( limage_at_lam0 ) then
 
@@ -563,6 +547,9 @@ contains
 
     mem_alloc_tot = mem_alloc_tot + mem_alloc_local
     write(*,'("Total memory allocated in alloc_flux_image:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
+    if (lorigine) then
+      write(*,'(" *** with "(1F14.3)" GB for CF and tau x exp(-tau)")') mem_alloc_origine / 1024./1024./1024.
+    endif
 
 
     deallocate(mem_per_file)
@@ -674,7 +661,7 @@ contains
     endif
 
 
-    if (allocated(origin_atom)) deallocate(origin_atom, originc_atom)
+    if (lorigine) deallocate(ori, tet)
 
 	if (limage_at_lam0) deallocate(image_map)
 
