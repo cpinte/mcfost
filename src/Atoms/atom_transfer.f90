@@ -1537,11 +1537,10 @@ module atom_transfer
           lcell_converged(:) = .false.
           fac_etape = 0.1
           if (etape_start==1) then
-             !Trick: use low hleapix rays number with lower dpops to have low dpops here
+             !Trick: use low healpix rays number with lower dpops to have low dpops here
              precision = min(1e-1,10.0*dpops_max_error)
           else
              precision = dpops_max_error
-             n_rayons = 1.0/fac_etape * 1.0/precision
           endif
          !  precision = dpops_max_error
          !  n_rayons = 1.0/fac_etape * 1.0/precision
