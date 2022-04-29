@@ -284,8 +284,8 @@ module atom_transfer
                   ! ori(:,icell,id) = ori(:,icell,id) + Snu * exp(-tau) * (1.0_dp - exp(-dtau))
                   !only if 0, so cell are updated only once, okey ?
                   if (maxval(ori(:,icell,id))==0.0_dp) then
-                     ori(:,icell,id) = ori(:,icell,id) + Snu * exp(-tau) * (1.0_dp - exp(-dtau))
-                     ! ori(:,icell,id) = ori(:,icell,id) + eta(:,id) * exp(-tau(:))
+                     !ori(:,icell,id) = ori(:,icell,id) + Snu * exp(-tau) * (1.0_dp - exp(-dtau))
+                     ori(:,icell,id) = ori(:,icell,id) + eta(:,id) * exp(-tau(:))
                      tet(:,icell,id) = tet(:,icell,id) + tau(:) * exp(-tau(:))
                   endif
                endif
