@@ -10,9 +10,8 @@
 module collision
   use math, only : E1, E2
   use constant
-  use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol, atomZnumber
+  use atom_type, only : AtomType, ATOM_ID_WIDTH, PTrowcol, atomZnumber, Nmax_line_per_collision
   use atmos_type, only : Hydrogen, Helium, ne, Atoms, T, Elements
-  use getline
   use messages
   use mcfost_env, only : dp
   use utils, only : interp_dp
@@ -23,7 +22,8 @@ module collision
   integer, parameter :: MSHELL=5
   character, parameter :: COMMENT_CHAR="#"
   real(kind=dp), parameter :: C0 = ((E_RYDBERG/sqrt(M_ELECTRON)) * PI*(RBOHR)**2) * sqrt(8.0/(PI*KBOLTZMANN))
-  integer :: Max_size_elements = 100
+  integer, parameter :: Max_size_elements = 100
+  integer, parameter :: Nmax_lines = 10000 !number max of lines for all collision data
 
 contains
 
@@ -31,29 +31,37 @@ contains
 
     integer, intent(in) :: unit
     type (AtomType), intent(inout) :: atom
-
-    integer, parameter :: Nmax_lines = 10000 !change that if too many lines for collision in file
-    character(len=MAX_LENGTH), dimension(Nmax_lines) :: lines_in_file !check len char matches the one in atom%
+   !  character(len=Nmax_line_per_collision), dimension(Nmax_lines) :: lines_in_file !check len char matches the one in atom%
+    character(len=:), dimension(:), allocatable :: lines_in_file !check len char matches the one in atom%
     integer :: N !real number of lines
-    integer :: Nread, checkfseek, fseek
-    character(len=8) :: END_OF_FILE="END     ", key
-    character(len=MAX_LENGTH) :: inputline, FormatLine
+    integer :: Nread, status
+    character(len=3) :: END_OF_FILE="END", key
+    character(len=Nmax_line_per_collision*10) :: inputline
+
+    allocate(character(len=Nmax_line_per_collision) :: lines_in_file(Nmax_lines))
 
     n = 0
-
-    write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
-    key="        "
-
     !it is still important to read an END in the file
+    key = "   "
     do while(key /= END_OF_FILE)
-       n = n + 1
-       call getnextline(unit, COMMENT_CHAR, FormatLine, inputline, Nread)
-       lines_in_file(n) = inputline(1:Nread)
-       key = adjustl(inputline(1:len(key)))
+      read(unit,'(1A<Nmax_line_per_collision*10>)',iostat=status) inputline
+      key = adjustl(inputline)
+      Nread = len(trim(inputline))
+      if (inputline(1:1)=='#' .or. Nread==0) cycle
+      if (Nread > Nmax_line_per_collision) call error("Collision: Nread > Nmax_line_per_collision")
+      n = n + 1
+      if (n > Nmax_lines) call error("Collision: not enough number of lines for all collision data")
+      lines_in_file(n) = inputline(1:Nread)
     enddo
 
     allocate(atom%collision_lines(N))
     atom%collision_lines(:) = lines_in_file(1:N)
+   !  do nread=1,N
+   !    write(*,*) atom%collision_lines(nread)
+   !  enddo
+   !  if (atom%ID=="He")stop
+
+    deallocate(lines_in_file)
 
     return
   end subroutine read_collisions
@@ -349,7 +357,9 @@ contains
     real(kind=dp), intent(out), optional :: deriv(atom%Nlevel, atom%Nlevel)
     integer :: ij, k, Nread, countline=0, colunit
     integer :: NTMP, n, m, ii, Nitem, i1, i2, i, j, ji, Nitem2
-    character(len=8) :: END_OF_FILE="END     ", key
+    character(len=3) :: END_OF_FILE="END"
+    integer, parameter :: max_len_key = 8!set by the maximum length of a keyword!!
+    character(len=max_len_key) :: key
     ! 		real(kind=dp), dimension(:), allocatable :: TGRID, coeff
     ! 		real(kind=dp), dimension(:,:), allocatable :: badi, cdi
     real(kind=dp), dimension(Max_size_elements) :: TGRID, coeff
@@ -357,7 +367,7 @@ contains
     real(kind=dp) :: np, CC
     real(kind=dp) :: deltaE, Cdown, Cup, gij, xj, fac, fxj
     integer :: Ncoef, Nrow, Nlines, k1
-    character(len=MAX_LENGTH) :: inputline, FormatLine
+    character(len=Nmax_line_per_collision) :: inputline, FormatLine
     real(kind=dp) :: acolsh, tcolsh, aradsh, xradsh, adish, bdish
     real(kind=dp) :: t0sh, t1sh, summrs, tg, cdn, ccup
     real(kind=dp) :: ar85t1, ar85t2, ar85a, ar85b, ar85c, ar85d, t4
@@ -374,7 +384,7 @@ contains
     ! Nitem are expected to be read and an error will be
     ! raise otherwise.
 
-    write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
+    write(FormatLine,'("(1"A,I5")")') "A", Nmax_line_per_collision
 
 
     ! -- Initialise the collisional matrix at each cell -- !
@@ -384,14 +394,13 @@ contains
 
     Nlines = size(atom%collision_lines)
 
-    key="        "
     ! -- Go throught the remaining lines in the file -- !
     ! read collisional data depending the cases of recipes.
 
     loop_lines_in_file : do k1=1, Nlines
        countline = countline + 1
        inputline = atom%collision_lines(k1)
-       Nread = len(inputline)
+       Nread = len(inputline)!already trimed
        ! do not go further, because after there is
        ! the number of grid points, which is in general
        ! one or two digits.
@@ -400,18 +409,18 @@ contains
        ! you have to modify the file to flush right
        ! everything after the TEMP keyword.
 
-       key = adjustl(inputline(1:len(key)))
+       key = adjustl(inputline(1:max_len_key))
        !write(*,*) trim(inputline)
        !write(*,*) "Line = ", countline, " key=",key,"."
        if (key.eq."TEMP") then
-          read(inputline(len(key)+1:len(key)+3), *) NTMP
+          read(inputline(max_len_key+1:max_len_key+3), *) NTMP
           !write(*,*) "NTMP = ", NTMP
           ! 				if (allocated(TGRID)) deallocate(TGRID)
           ! 				allocate(TGRID(NTMP))
           ! Nread is len(NTMP) in string format, offset
           ! inputline to read TGRID only, after NTMP.
           Tgrid(1:NTMP) = 0.0_dp
-          read(inputline(len(key)+3:Nread),*) (TGRID(k), k=1,NTMP)
+          read(inputline(max_len_key+3:Nread),*) (TGRID(k), k=1,NTMP)
           !write(*,*) (TGRID(k), k=1,NTMP)
           Nitem = NTMP
           if (Nitem > max_size_elements) call error("Number temperature points for collision data larger than the available size!")
@@ -431,7 +440,7 @@ contains
           ! but read(inputline,*) key, i1, i2, coeff is OK
           !write(*,*) key, inputline(len(key)+1:)
           coeff(1:Nitem) = 0.0_dp
-          read(inputline(len(key)+1:),*) i1, i2,(coeff(k),k=1,Nitem)
+          read(inputline(max_len_key+1:),*) i1, i2,(coeff(k),k=1,Nitem)
           ! 				Nitem2 = size(coeff)
 
           i = MIN(i1,i2) + 1
@@ -448,8 +457,8 @@ contains
           ! 				if (allocated(coeff)) deallocate(coeff)
           ! 				allocate(coeff(Nitem))
           coeff(1:Nitem) = 0.0_dp
-          read(inputline(len(key)+1:),*) i1, i2, (coeff(k),k=1,Nitem)
-          !write(*,*) inputline(len(key)+1:)
+          read(inputline(max_len_key+1:),*) i1, i2, (coeff(k),k=1,Nitem)
+          !write(*,*) inputline(max_len_key+1:)
           ! 				Nitem2 = size(coeff)
 
           i = MIN(i1,i2) + 1
@@ -462,7 +471,7 @@ contains
           ! 				if (allocated(coeff)) deallocate(coeff)
           ! 				allocate(coeff(Nitem))
           coeff(1:Nitem) = 0.0_dp
-          read(inputline(len(key)+1:),*) i1, i2, coeff(1)
+          read(inputline(max_len_key+1:),*) i1, i2, coeff(1)
           i = MIN(i1,i2) + 1
           j = MAX(i1,i2) + 1
           ij = (i-1)*atom%Nlevel + j
@@ -476,7 +485,7 @@ contains
           ! 				if (allocated(coeff)) deallocate(coeff)
           ! 				allocate(coeff(Nitem))
           coeff(1:Nitem) = 0.0_dp
-          read(inputline(len(key)+1:),*) i1, i2,(coeff(k),k=1,Nitem)
+          read(inputline(max_len_key+1:),*) i1, i2,(coeff(k),k=1,Nitem)
           i = MIN(i1,i2) + 1
           j = MAX(i1,i2) + 1
           ij = (i-1)*atom%Nlevel + j
@@ -489,7 +498,7 @@ contains
           ! -- BADNELL formula for dielectronic recombination --
 
           !write(*,*) inputline, Nread
-          read(inputline(len(key)+1:),*) i1, i2, Ncoef
+          read(inputline(max_len_key+1:),*) i1, i2, Ncoef
           Nrow = 2
           Nitem = Nrow*Ncoef
           if (Nitem > max_size_elements) call error("Number of coeffs for BADNELL collision data larger than the available size!")
@@ -518,11 +527,11 @@ contains
           ! sumscl = 1. -> full density dependence
 
           Nitem = 1
-          read(inputline(len(key)+1:), *) sumscl
+          read(inputline(max_len_key+1:), *) sumscl
           ! 				Nitem2 = 1
 
        else if (key.eq."AR85-CDI") then
-          read(inputline(len(key)+1:),*) i1, i2, Nrow
+          read(inputline(max_len_key+1:),*) i1, i2, Nrow
 
           if (Nrow > MSHELL) then
              call error("(Collision AR85-CDI) Nrow is greater than MSHELL, exiting...")

@@ -7,6 +7,8 @@ module atmos_type
   use messages
   use constantes, only : tiny_dp
 
+  use read1d_models, only : tab_r_mod1d, tab_T_mod1, tab_rho_mod1, tab_ne_mod1, &
+   tab_v_mod1, tab_vt_mod1, tab_zone_mod1
   use healpix_mod !all at the moment
 
   !$ use omp_lib
@@ -56,7 +58,7 @@ module atmos_type
   !B_char in Tesla and v_char in m/s, default 0T and 1km/s
   logical :: lMagnetized = .false., calc_ne, laccretion_shock
 
-  real(kind=dp) :: thetai, thetao
+  real(kind=dp) :: thetai, thetao, max_Tshock = 0.0,min_Tshock = 1d8
 
   integer, allocatable, dimension(:) :: icompute_atomRT!
   real(kind=dp), dimension(:), allocatable :: xmu, wmu, xmux, xmuy
@@ -1242,6 +1244,8 @@ contains
           atom%at(k1) = trans(k)
           !write(*,*) atom%at(k1)%ik, atom%at(k1)%trtype
           k1 = k1 + 1
+      !  else
+      !    !deallocate the trans data
        end if
     end do
 
@@ -1254,6 +1258,8 @@ contains
           atom%at(k1) = trans(k)
           !write(*,*) atom%at(k1)%ik, atom%at(k1)%trtype
           k1 = k1 + 1
+         ! else
+         !    !deallocate the trans data
        end if
     end do
 
@@ -1262,7 +1268,7 @@ contains
     return
   end subroutine realloc_transitions
 
-
+  !-> does not rely on atom%at
   subroutine realloc_line_transitions_deprec(atom, Nl_new, mask)
     !basicazlly does what PAck does
     integer, intent(in) :: Nl_new
@@ -1406,7 +1412,9 @@ contains
     !data are actually transposed from my fits to fortran
     allocate(data_krz(Npf+1,Nstage))
     allocate(ionpot(Nstage))
-    allocate(pf(Nstage, Npf))
+   !  allocate(pf(Nstage, Npf))
+    !25/03/2022
+    allocate(pf(Npf,Nstage))
     !now read the value of pf for that atom
     ! remember: pf(:,1) =  ion potentials
     !           pf(:,2:) = partition functions for all ion pots.
@@ -1428,7 +1436,8 @@ contains
        do j=2,Npf+1
           !!if (code.eq.1) write(*,*) 'pf=', data_krz(j,i)
 !!!pf(i,j-1) = LOG10(data_krz(j,i)) !29/12/2019, using neperien log
-          pf(i,j-1) = LOG(data_krz(j,i))
+         !  pf(i,j-1) = LOG(data_krz(j,i))
+         pf(j-1,i) = LOG(data_krz(j,i)) !25/03/2022
           !!if (code.eq.1) write(*,*) 'pf10powLog=', 10**(pf(i,j-1))
        end do
     end do
@@ -1628,6 +1637,62 @@ contains
   !
   !   return
   !   end subroutine fillElements
+
+  function is_inshock(id, iray, i_star, icell_prev, x, y, z, Tout)
+   use grid, only : voronoi
+   use constantes, only : sigma, kb
+   logical :: is_inshock
+   integer :: i_star, icell_prev, id, iray
+   real(kind=dp), intent(out) :: Tout
+   real(kind=dp) :: enthalp,  x, y, z !u, v, w
+   real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
+
+   is_inshock = .false.
+   if (.not.laccretion_shock) return
+
+   if (icell_prev<=n_cells) then
+      if (icompute_atomRT(icell_prev) > 0) then
+         rr = sqrt( x*x + y*y + z*z)
+         enthalp = 2.5 * 1d3 * kb * T(icell_prev) / wght_per_H / masseH
+
+         !vaccr is vr, the spherical r velocity component
+         if (lvoronoi) then !always 3d
+            vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr + Voronoi(icell_prev)%vxyz(3) * z/rr
+            vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
+         else
+            if (lmagnetoaccr) then
+               if (l3D) then !needed here if not 2.5d
+                  sign_z = 1.0_dp
+               else
+                  sign_z = sign(1.0_dp, z)
+               endif
+               vaccr = vr(icell_prev) * sqrt(1.0 - (z/rr)**2) + sign_z * v_z(icell_prev) * z/rr
+               vmod2 = vr(icell_prev)**2+v_z(icell_prev)**2+vphi(icell_prev)**2
+            else !spherical vector here
+               vaccr = vr(icell_prev) !always negative for accretion
+               vmod2 = vr(icell_prev)**2+vtheta(icell_prev)**2+vphi(icell_prev)**2
+            endif
+         endif
+
+
+         if (vaccr < 0.0_dp) then
+            ! Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25
+            Tchoc = ( 1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * 0.5 * abs(vaccr)**3 )**0.25
+            is_inshock = (Tchoc > 1000.0)
+            Tout = Taccretion
+            if (Taccretion<=0.0) then 
+               is_inshock = (abs(Taccretion) * Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
+               Tout = abs(Taccretion) * Tchoc
+            endif
+            max_Tshock = max(max_Tshock, Tout)
+            min_Tshock = min(min_Tshock, Tout)
+         endif
+
+      endif !icompute_atomRT
+   endif !laccretion_shock
+
+   return
+  end function is_inshock
 
   subroutine fillElements()
     !This routine read the abundance of elements listed in the
@@ -2166,6 +2231,32 @@ contains
     return
   end subroutine writeTemperature
 
+  subroutine check_for_zero_electronic_density()
+   integer :: N_fixed_ne, icell
+
+   calc_ne = .false.
+   icell_loop : do icell=1,n_cells
+      !check that in filled cells there is electron density otherwise we need to compute it
+      !from scratch.
+      if (icompute_atomRT(icell) > 0) then
+
+         if (ne(icell) <= 0.0_dp) then
+            write(*,*) "  ** No electron density found in the model! ** "
+            calc_ne = .true.
+            exit icell_loop
+         endif
+
+      endif
+   enddo icell_loop
+   N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
+   if (N_fixed_ne > 0) then
+      write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
+   endif
+
+   return 
+
+  end subroutine check_for_zero_electronic_density
 
   subroutine readAtmos_ascii(filename)
     ! ------------------------------------------- !
@@ -2177,13 +2268,13 @@ contains
     ! ------------------------------------------- !
     use getline
     use constantes
-    use grid, only : cell_map
+    use grid, only : cell_map, r_grid, z_grid, phi_grid
     character(len=*), intent(in)	:: filename
     real(kind=dp) Tshk!, Oi, Oo
     real(kind=dp) :: tilt!,thetai, thetao
     integer, parameter :: Nhead = 3 !Add more
     character(len=MAX_LENGTH) :: rotation_law
-    integer :: icell, Nread, syst_status, N_points, k, i, j, acspot, N_fixed_ne = 0
+    integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
     character(len=MAX_LENGTH) :: inputline, FormatLine, cmd
     logical :: accretion_spots
     real :: south
@@ -2215,6 +2306,47 @@ contains
     !rho/avgWeight = Ngas total, see rutten page 143 eq 7.3
     !or use rho and for each element use the masse fraction to define its total number ?
     !should be the same as using Abund wrt to nHtot
+
+    if (lmodel_1d) then
+      laccretion_shock = .false.
+		lmagnetoaccr = .false.
+		lspherical_velocity = .true.
+		lvoronoi = .false.
+		lmagnetized = .false.
+		calc_ne = .false.
+		icompute_atomRT(:) = tab_zone_mod1(2:n_cells+1)
+		T(:) = tab_T_mod1(2:n_cells+1)
+		nHtot(:) = tab_rho_mod1(2:n_cells+1) * rho_to_nH
+		ne(:) = tab_ne_mod1(2:n_cells+1)
+		vr(:) = tab_v_mod1(1,2:n_cells+1)
+		vtheta(:) = tab_v_mod1(2,2:n_cells+1)
+		vphi(:) = tab_v_mod1(3,2:n_cells+1)
+		vturb(:) = tab_vt_mod1(2:n_cells+1)
+		deallocate(tab_r_mod1d,tab_T_mod1,tab_rho_mod1,tab_ne_mod1,tab_v_mod1,tab_vt_mod1,tab_zone_mod1)		
+		write(*,*) "Maximum/minimum velocities in the model (km/s):"
+		write(*,*) " Vr = ", 1e-3 * maxval(abs(vR)), 1d-3*minval(abs(vr),mask=icompute_atomRT>0)
+		write(*,*) " Vtheta = ",  1d-3 * maxval(abs(vtheta)), 1d-3*minval(abs(vtheta),mask=icompute_atomRT>0)
+		write(*,*) " Vphi = ",  1d-3 * maxval(abs(vphi)), 1d-3*minval(abs(vphi),mask=icompute_atomRT>0)
+
+		v_char = maxval(sqrt(vR(:)**2+vtheta(:)**2+vphi(:)**2))
+		write(*,*) "Typical line extent due to V fields (km/s):"
+		v_char = 1.01 * v_char
+		write(*,*) v_char/1d3
+
+		write(*,*) "Maximum/minimum turbulent velocity (km/s):"
+		write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
+
+		write(*,*) "Maximum/minimum Temperature in the model (K):"
+		write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
+		write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+		write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
+		write(*,*) "Maximum/minimum ne density in the model (m^-3):"
+		write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
+
+      call check_for_zero_electronic_density()
+      
+      return
+    endif
 
 
     write(FormatLine,'("(1"A,I3")")') "A", MAX_LENGTH
@@ -2310,10 +2442,7 @@ contains
     end do
     close(unit=1)
 
-    vR = 0
-    v2 = 0
-    vphi = 0
-
+   !  vR = (300d3 - 50d3) * (1.0 - real(1)/[(real(i),i=1,n_cells)])**0.5 + 50d3
     !Handling of magnetic field components only depends on what choice I make for the magnetic field
     !Presently I read B, theta and chi !
     if (lspherical_velocity) then
@@ -2450,25 +2579,7 @@ contains
     endif
 
 
-    calc_ne = .false.
-    icell_loop : do icell=1,n_cells
-       !check that in filled cells there is electron density otherwise we need to compute it
-       !from scratch.
-       if (icompute_atomRT(icell) > 0) then
-
-          if (ne(icell) <= 0.0_dp) then
-             write(*,*) "  ** No electron density found in the model! ** "
-             calc_ne = .true.
-             exit icell_loop
-          endif
-
-       endif
-    enddo icell_loop
-    N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
-    if (N_fixed_ne > 0) then
-       write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
-            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
-    endif
+    call check_for_zero_electronic_density
 
     !no need if we do not the dark_zones from input file.
     call write_atmos_domain() !but for consistency with the plot functions in python
@@ -2496,7 +2607,7 @@ contains
     write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
 
     write(*,*) "Maximum/minimum Temperature in the model (K):"
-    write(*,*) real(maxval(T)), real(maxval(T,mask=icompute_atomRT>0))
+    write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
     write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
     write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
     if (.not.calc_ne) then
@@ -2519,8 +2630,7 @@ contains
   subroutine refine_healpix_sphere()
     use grid, only				: test_exit_grid, cross_cell, pos_em_cellule, move_to_grid
     use stars, only				: intersect_stars
-    use cylindrical_grid, only	: r_grid, z_grid, phi_grid, area
-    use spherical_grid, only	: solid_angle_cell_sph
+    use cylindrical_grid, only	: r_grid, z_grid, phi_grid
     !given a base resolution healpix_lorder, refine each pixel according
     !to a given criterion up to healpix_lmax.
     !criterion is dOmega(icell) / dOmega_healpix <= Nr_min, with

@@ -1,15 +1,15 @@
 MODULE statequil_atoms
 
   use atmos_type, only : ne, T, nTotal_atom, ActiveAtoms, Atoms, Natom, Nactiveatoms, nHmin, ds, elements, hydrogen, helium, &
-       nHtot, helium_is_active
+       nHtot, helium_is_active, laccretion_shock
   use atom_type
   use spectrum_type, only					: lambda, Nlambda, Nlambda_cont, lambda_cont, Jnu_cont, Itot, &
        dk, dk_min, dk_max, &
-       Jnu, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb
+       Jnu, eta_c, sca_c, chi_c, chi_c_nlte, eta_c_nlte, eta0_bb, chi0_bb, Istar_loc, Ishock, Icont
   use constant
-  use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc
+  use opacity, only 						: eta_atoms, Uji_down, chi_down, chi_up, R_xcc, mean_grad_v, dOmega_core, mean_length_scale
   use math, only		: locate, any_nan_infinity_matrix, any_nan_infinity_vector, is_nan_infinity, solve_lin
-  use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte
+  use parametres, only 					: ldissolve, lelectron_scattering, n_cells, lforce_lte, lno_radiative_coupling, lsobolev
   use collision, only						: collision_rates_atom_loc!, CollisionRate_old
   use impact, only						: Collision_Hydrogen
   use getlambda, only						: hv, Nlambda_max_trans
@@ -24,23 +24,27 @@ MODULE statequil_atoms
   use messages, only 						: error, warning
   use utils, only 						: gaussslv, interp
   use input, only 						: nb_proc
+  use molecular_emission, only : vlabs!, gradv
 
   IMPLICIT NONE
   logical :: ldamp_jacobi = .false.
   !Nlambda,  Nproc not stored for all ray since no sub it and ray-ray building of rate matrix
-  real(kind=dp), allocatable :: psi(:,:,:), omega_sor_atom(:)
+  real(kind=dp), allocatable :: psi(:,:,:), omega_sor_atom(:), dv_proj(:,:), F_sobol(:,:,:,:), Jext(:,:) !external cont field for Sobolev!
   real(kind=dp), parameter :: Tmax = 1d10 !value of temperature of transition if ni = nj*gij
   real(kind=dp), allocatable :: n_new(:,:,:), ne_new(:)
   character(len=50), parameter :: invpop_file = "inversion_populations.txt"
   character(len=50), parameter :: profiles_file = "line_profile.txt"
   character(len=50), parameter :: convergence_file = "thresh.txt", sub_convergence_file = "subthresh.txt"
   integer, parameter :: unit_invfile = 20, unit_profiles = 25, unit_conver = 30, unit_subconver = 35
+  real(kind=dp) :: Tchoc_average
 
 CONTAINS
 
 
-  !n_new must not be allocated to fill atom%n
+  !n_new MUST NOT be allocated to fill atom%n
   !see see_atom (otherwise new pop = n_new and atom%n=nstar
+  !no iteration !!
+  !TO DO: add electron ? maybe
   subroutine radiation_free_pops_atom(id, icell, atom, verbose)
 
     !still with Collisions
@@ -110,6 +114,7 @@ CONTAINS
 
     end do tr_loop
 
+    !evaluate new electronic density ??
     call see_atom(id, icell, atom, dM)
 
     if (verbose) then
@@ -251,6 +256,31 @@ CONTAINS
     enddo
     RETURN
   END SUBROUTINE initGamma
+
+  subroutine init_rates_sobolev(id)
+   integer, intent(in) :: id
+   type (AtomType), pointer :: atom
+   integer :: nact, kr
+
+   do nact = 1, NactiveAtoms
+      atom => ActiveAtoms(nact)%ptr_atom
+      call initGamma_atom(id, atom)
+
+      do kr=1, atom%Nline
+         atom%lines(kr)%Rij(id) = 0.0
+         atom%lines(kr)%Rji(id) = 0.0
+      enddo
+
+      do kr=1, atom%Ncont
+         atom%continua(kr)%Rij(id) = 0.0
+         atom%continua(kr)%Rji(id) = 0.0
+      enddo
+
+      atom => null()
+   enddo
+
+   return
+  end subroutine init_rates_sobolev
 
 
   SUBROUTINE init_rates_atom(id, atom)
@@ -2349,12 +2379,12 @@ CONTAINS
     !-> solve for residual. By default omega_sor_atom is 1.0
     	delta = atom%n(:,icell) - matmul(atom%Gamma(:,:,id), ndag)
     	call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
-   		atom%n(:,icell) = ndag(:) + omega_sor_atom(atom%activeindex) * delta(:)
-   	else !Jacobi
+   	atom%n(:,icell) = ndag(:) + omega_sor_atom(atom%activeindex) * delta(:)
+   else !Jacobi
     	call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
-   	endif
-!     call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
-!     !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel, .true.)
+   endif
+!  call GaussSlv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
+!  !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel, .true.)
 
     if ((maxval(atom%n(:,icell)) < 0.0)) then
        !raise warning or error if all populations are negative. Otherwise, handle
@@ -2409,13 +2439,14 @@ CONTAINS
        !Small populations are kept but not used in the convergence test
        !and in Tex. Populations below prec_pops (including negative) are set
        !to zero.
-       ! 			if (atom%n(l,icell) < frac_ne_limit * ne(icell)) then
+      !  if (atom%n(l,icell) < frac_ne_limit * ne(icell)) then
        if (atom%n(l,icell) < frac_limit_pops * ntotal) then
           Nsmall_pops = Nsmall_pops + 1
           level_index(lp) = l
           lp = lp + 1
-          if (atom%n(l,icell) <= prec_pops * ntotal) then
-             atom%n(l,icell) = 0.0_dp
+         !  if (atom%n(l,icell) <= prec_pops * ntotal) then
+          if (atom%n(l,icell) <= 0.0_dp) then
+             atom%n(l,icell) = abs(atom%n(l,icell))!0.0_dp
              Nneg_or_null_pops = Nneg_or_null_pops + 1
           endif
        else
@@ -2510,6 +2541,884 @@ CONTAINS
   END SUBROUTINE update_populations
 
 
+  subroutine solve_pops_sobolev
+   !uses angle averaged quantities and non-local term is neglected.
+   use parametres, only : n_iterate_ne, ndelay_iterate_ne, dpops_max_error
+   use atmos_type, only : icompute_atomRT, compute_angular_integration_weights,xmu,wmu,xmux,xmuy
+   use grid, only : voronoi, r_grid, z_grid, phi_grid, pos_em_cellule
+   !$ use omp_lib
+   use spectrum_type, only : Istar_cont, lambda_cont
+   use planck, only : Bpnu
+   use utils, only : progress_bar
+   use molecular_emission, only : v_proj
+   use naleat, only  : seed, stream, gtype
+   use mcfost_env, only  : time_begin, time_end, time_tick, time_max
+   use lte, only : ltepops, ltepops_h, nh_minus
+   use opacity, only : cross_coupling_terms_cont, nlte_bound_free, background_continua_lambda, domega_shock
+   use parametres, only : lsafe_stop, safe_stop_time, lexit_after_nonlte_loop, lvoronoi, lfix_backgrnd_opac,  Nrays_atom_transfer, lsobolev_only
+#include "sprng_f.h"
+   integer :: id, icell, ibar, n_cells_done, n_iter, i
+   logical :: l_iterate_ne, lconverged, lprevious_converged, laverage, update_bckgr_opac
+   real(kind=dp) :: diff, dne, diff_old, dM(NactiveAtoms),dN, dN1
+   integer :: ilevel, nact, NmaxLevel, alloc_status, iray, n_rayons, Nmaxline
+   real(kind=dp) :: u,v,w,x0,y0,z0,wei,argmt,w02,srw02
+   real :: precision, rand,rand2,rand3
+   type (AtomType), pointer :: atom
+   logical, allocatable, dimension(:) :: lcell_converged
+   integer, parameter :: n_iter_counted = 1!iteration time evaluated with n_iter_counted iterations
+   real :: time_iteration, time_nlte
+
+   !.true. == pure Sobolev with opt thin continuum
+   laverage = .true.
+
+
+   write(*,*) " "
+   write(*,*) " Solving populations using the Sobolev approximation"
+   write(*,*) " "
+
+   Nmaxlevel = 0
+   NmaxLine = 0
+   do nact=1, NactiveAtoms
+      NmaxLevel = max(Nmaxlevel,ActiveAtoms(nact)%ptr_atom%Nlevel)
+      NmaxLine = max(NmaxLine,ActiveAtoms(nact)%ptr_atom%Nline)
+   enddo
+   ! allocate(F_sobol(1,NmaxLine,NactiveAtoms,nb_proc)); F_sobol = 0.0! non-local term in direction iray for cell id
+
+   allocate(Jext(nlambda_cont,nb_proc)); Jext = 0.0
+   if (.not.laverage) then
+      ! call compute_angular_integration_weights()
+      ! n_rayons = size(xmu)
+      n_rayons =  Nrays_atom_transfer
+      if (allocated(stream)) deallocate(stream)
+      allocate(stream(nb_proc))
+      stream = 0.0
+      if (allocated(psi)) deallocate(psi)
+      allocate(psi(Nlambda_cont,1,nb_proc))
+      allocate(eta_atoms(nlambda_cont,NactiveAtoms,nb_proc))
+      allocate(uji_down(nlambda_cont,Nmaxlevel,NactiveAtoms,nb_proc),&
+               chi_down(nlambda_cont,Nmaxlevel,NactiveAtoms,nb_proc),&
+               chi_up(nlambda_cont,Nmaxlevel,NactiveAtoms,nb_proc))
+
+      allocate(dv_proj(1,nb_proc)); dv_proj = 0.0_dp
+   endif
+
+   call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
+
+   allocate(lcell_converged(n_cells))
+   lcell_converged = .false.
+   allocate(ne_new(n_cells), stat=alloc_status)
+   ne_new(:) = ne(:)
+   if (alloc_status > 0) call error("Allocation error ne_new")
+   write(*,*) " size ne_new:", sizeof(ne_new) / 1024./1024.," MB"
+   allocate(n_new(NactiveAtoms,Nmaxlevel,n_cells),stat=alloc_status)
+   if (alloc_status > 0) call error("Allocation error n_new")
+   write(*,*) " size atom%n, n_new:", 2*sizeof(n_new) / 1024./1024.," MB"
+   n_new(:,:,:) = 0.0_dp
+
+   id = 1
+   precision = dpops_max_error
+   if (.not.lsobolev_only) then
+      precision = 1e-1!min(1e-1,10.0 * dpops_max_error)
+      !check if I used healpix to change the number of rays
+      n_rayons = 100
+   endif
+
+   diff_old = 0.0
+   dne = 0.0
+   lprevious_converged = .false.
+   lconverged = .false.
+   n_iter = 0
+   l_iterate_ne = .false.
+   time_iteration = 0
+   time_nlte = 0
+   do while (.not.lconverged)
+      ibar = 0
+      n_iter = n_iter + 1
+      n_cells_done = 0
+      write(*,*) " -> Iteration #", n_iter
+
+      stream = 0.0
+      do i=1,nb_proc
+         stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+      end do
+
+      if( n_iterate_ne > 0 ) then
+         l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
+      endif
+
+      call progress_bar(0)
+      !$omp parallel &
+      !$omp default(none) &
+      !$omp private(id,icell) &
+      !$omp private(diff,x0,y0,z0,u,v,w,wei,iray)&
+      !$omp private(rand,rand2,rand3,argmt,w02,srw02)&
+      !$omp shared(lforce_lte,n_iter,l_iterate_ne,xmu,xmux,xmuy,wmu,Jext,vlabs)&
+      !$omp shared(ibar,n_cells_done,n_cells, laverage, stream, pos_em_cellule)&
+      !$omp shared(laccretion_shock, Istar_cont, domega_core, domega_shock, Tchoc_average, lambda_cont)&
+      !$omp shared (icompute_atomRT,n_rayons,Icont,voronoi,r_grid,z_grid,phi_grid,lvoronoi)
+      !$omp do schedule(static, 1)!max(nint( 0.01 * n_cells / nb_proc ),1)
+      !!$omp do schedule(dynamic,1) !no random rays here.
+      do icell=1, n_cells
+         !$ id = omp_get_thread_num() + 1
+         if (icompute_atomRT(icell) > 0) then
+            !init rate matrix to Collision matrix, and init radiative rates
+            call fill_Collision_matrix(id, icell)
+            call init_rates_sobolev(id)
+            !compute the radiative rates in the Sobolev approximation without overlying background continuum
+            !and overlapping transitions.
+            if (laverage) then
+               !Treatment of the continuum rates empirical, lno_cont is .false.
+               if (laccretion_shock) then
+                  Jext(:,id) = Istar_cont(:,1) * (dOmega_core(icell)-domega_shock(icell))
+                  Jext(:,id) = Jext(:,id) + Bpnu(Tchoc_average,lambda_cont) * dOmega_shock(icell)
+               else
+                  Jext(:,id) = Istar_cont(:,1) * dOmega_core(icell)
+               endif
+               vlabs(1,id) = 0.0_dp
+               call calc_rates_sobolev_average(id, icell, .false.)
+            else
+               ! if (lvoronoi) then
+               !    x0 = Voronoi(icell)%xyz(1)
+               !    y0 = Voronoi(icell)%xyz(2)
+               !    z0 = Voronoi(icell)%xyz(3)
+               ! else
+               !    x0 = r_grid(icell) * cos(phi_grid(icell))
+               !    y0 = r_grid(icell) * sin(phi_grid(icell))
+               !    z0 = z_grid(icell)
+               ! endif
+               ! Jext(:,id) = 0.0_dp !reset for integration
+               ! do iray=1,n_rayons!add the continuum rates using exact MALI integration
+               !    w = xmu(iray)
+               !    u = xmux(iray)
+               !    v = xmuy(iray)
+               !    wei = wmu(iray)
+               wei = 1.0 / real(n_rayons,kind=dp)
+               Jext(:,id) = 0.0_dp !reset for integration
+               do iray=1, n_rayons
+                  rand  = sprng(stream(id))
+                  rand2 = sprng(stream(id))
+                  rand3 = sprng(stream(id))
+
+                  call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+
+                  ! Direction de propagation aleatoire
+                  rand = sprng(stream(id))
+                  W = 2.0_dp * rand - 1.0_dp !nz
+                  W02 =  1.0_dp - W*W !1-mu**2 = sin(theta)**2
+                  SRW02 = sqrt(W02)
+                  rand = sprng(stream(id))
+                  ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+                  U = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
+                  V = SRW02 * sin(ARGMT) !ny = sin(theta)*sin(phi)
+
+                  vlabs(1,id) = v_proj(icell,x0,y0,z0,u,v,w)
+                  Icont(:,1,id) = integ_ray_cont(id,icell,x0,y0,z0,u,v,w,1) !continuum intensity + psi + irradiation + dv_proj and ds
+                  call cross_coupling_terms_cont(id,icell) !for that direction with psi
+                  call calc_rates_mali_cont(id,icell,1,wei) !fill mali rates for the continuum integrated of frequency
+                  !-> if Sobolev along rays, comment calc_rates_sobolev_average below.
+                  ! call calc_rates_sobolev_ray(id, icell, 1, wei,x0,y0,z0,u,v,w) !fed with Icont and dv_proj at id.
+                  Jext(:,id) = Jext(:,id) + Icont(:,1,id) * wei
+               enddo
+               !fill line radiative rates in the Sobolev approx.
+               !-> if lno_cont use mali for the continua and bound-free rates
+               call calc_rates_sobolev_average(id, icell, .true.)
+            endif !laverage
+            !fill rate matrix with the radiative rates
+            call calc_rate_matrix(id, icell, .false.)
+            !compute new populations and electron density if desired
+            call update_populations_and_electrons(id, icell, diff, .false., n_iter, &
+            (l_iterate_ne.and.icompute_atomRT(icell)==1))!The condition on icompute_atomRT is here because if it is > 0 but /= 1, ne is not iterated!
+         endif
+         ! Progress bar
+         !$omp atomic
+         n_cells_done = n_cells_done + 1
+         if (real(n_cells_done) > 0.02*ibar*n_cells) then
+            call progress_bar(ibar)
+            !$omp atomic
+            ibar = ibar+1
+         endif             
+      enddo
+      !$omp end do
+      !$omp end parallel
+      call progress_bar(50)
+      update_bckgr_opac = .false.
+      if (l_iterate_ne) then
+         dne = maxval(abs(1.0 - ne(:)/(ne_new(:)+1d-50)),mask=icompute_atomRT==1)
+         write(*,'("OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+         minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
+         write(*,'("NEW ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+         minval(ne_new,mask=(icompute_atomRT>0)), maxval(ne_new)
+         ne(:) = ne_new(:)
+
+         !no background opac
+         do nact=1, Natom
+            if (Atoms(nact)%ptr_atom%ID=="H") then
+               write(*,*) " -> updating LTE pops of hydrogen"
+               call LTEpops_H
+               !check pops actually are updated ??
+            else
+               write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID
+               call LTEpops(Atoms(nact)%ptr_atom,.false.)
+            endif
+         enddo
+         update_bckgr_opac = .true.
+      endif !iterate_ne
+
+      !criterion of convergence
+
+
+      !Global convergence Tests
+      id = 1
+      !should be para
+      dM(:) = 0.0 !all pops
+      diff = 0.0
+      dN = 0.0
+      do icell=1,n_cells
+
+         if (icompute_atomRT(icell)>0) then
+
+            dN = 0.0
+            do nact=1,NactiveAtoms
+               atom => ActiveAtoms(nact)%ptr_atom
+               do ilevel=1,atom%Nlevel
+                  if ( n_new(nact,ilevel,icell) >= frac_limit_pops * ntotal_atom(icell, atom) ) then
+                     dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
+                     dN = max(dN1, dN)
+                     dM(nact) = max(dM(nact), dN1)
+                  endif
+               end do !over ilevel
+
+               atom => NULL()
+            end do !over atoms
+
+            diff = max(diff, dN)
+
+            lcell_converged(icell) = (real(diff) < precision)
+
+            do nact=1, NactiveAtoms
+               atom => ActiveAtoms(nact)%ptr_atom
+               atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
+               atom => NULL()
+            end do
+
+            if (update_bckgr_opac) then
+               !safe, used only if not lfixbackground
+               nHmin(icell) = nH_minus(icell)
+               if (.not.lfix_backgrnd_opac) then
+                  call background_continua_lambda(icell, Nlambda_cont, lambda_cont, chi_c(:,icell), eta_c(:,icell))
+               endif
+            endif
+            call NLTE_bound_free(icell)
+
+         end if
+      end do
+
+
+      write(*,*) " ------------------------------------------------ "
+      do nact=1,NactiveAtoms
+         write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%ptr_atom%ID
+         write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
+      enddo
+      if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
+      write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
+      write(*,"('Unconverged cells #'(1I6), ' fraction :'(1F12.3)' %')") &
+           size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
+           100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
+           real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
+      write(*,*) " *************************************************************** "
+      diff_old = diff
+ 
+      if ((real(diff) < precision)) then!.and.(maxval_cswitch_atoms() == 1.0_dp)) then
+         if (lprevious_converged) then
+            lconverged = .true.
+         else
+            lprevious_converged = .true.
+         endif
+      else !continue to iterate even if n_rayons max is reached ?
+         lprevious_converged = .false.
+         ! if ((cswitch_enabled).and.(maxval_cswitch_atoms() > 1.0)) then
+         !    call adjust_cswitch_atoms
+         ! endif
+         if (n_iter > 50) then
+            write(*,*) "Warning : not enough iterations to converge !!"
+            lconverged = .true.
+         end if
+      end if
+
+      !***********************************************************!
+      ! ********** timing and checkpointing **********************!
+
+      call system_clock(time_end,count_rate=time_tick,count_max=time_max)
+      if (time_end < time_begin) then
+         time_nlte=real(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
+      else
+         time_nlte=real(time_end - time_begin)/real(time_tick)
+      endif
+
+      if (n_iter <= n_iter_counted) then
+         time_iteration = time_iteration + time_nlte / real(n_iter_counted)
+      endif
+
+
+      if (lsafe_stop) then
+
+         if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= n_iter_counted)) then
+            lconverged = .true.
+            lprevious_converged = .true.
+            call warning("Time limit would be exceeded, leaving...")
+            write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
+            write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', &
+                 mod(time_iteration/60.,60.)," min"
+            write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+            write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
+            lexit_after_nonlte_loop = .true.
+         endif
+
+      endif
+    !  ***********************************************************!
+
+
+   enddo !while loop
+   deallocate(lcell_converged,ne_new,n_new)
+   if (.not.laverage) then
+      deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms)
+      if (allocated(xmu)) deallocate(xmu,xmux,xmuy,wmu)
+      if (allocated(stream)) deallocate(stream)
+      if (allocated(dv_proj)) deallocate(dv_proj)
+   endif
+   if (allocated(Jext)) deallocate(Jext)
+   ! if (allocated(F_sobol)) deallocate(F_sobol)
+
+   if (n_iter >= n_iter_counted) then
+      write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
+      write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+   endif
+
+   return
+  end subroutine solve_pops_sobolev
+
+  subroutine calc_rates_sobolev_average(id, icell, lno_cont)
+   !accurates if chi0 / gradv is large (gradv small or large chi0 ) or  chi0/gradv is mall (0 chi0 or large gradv)
+   !if chi0/gradv is of the order of unity it is not accurate anymore. In principle, gradv is always small.
+   !TO DO: add non-local term
+   integer, intent(in) :: id, icell
+   logical, intent(in) :: lno_cont
+   real, parameter :: fact_tau = 1.0 !>0
+   real(kind=dp), parameter :: prec_vel = 1d-50 !m/s
+   real(kind=dp), parameter :: limit_tau = 1d2 !avoid Rij,Rji cont if tau_cont > limit_tau
+   ! real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
+   real(kind=dp), dimension(Nlambda_cont) :: Ieff
+   integer :: nact, i, j, kc, kr, Nr, Nb, l, Nl
+   real(kind=dp) :: Sij, Jbar, tau0, beta, chi_ij, Icore, l0, chi_ik
+   real(kind=dp) :: JJ, JJb, twohnu3_c2, ehnukt, a1, wl, F, tau_ij_max
+   type(AtomType), pointer :: aatom
+   real(kind=dp) :: ni_on_nj_star, tau_escape!, Sc(nlambda_cont), Sc0, Utild, r
+
+   ! Sc = (eta_c(:,icell)+eta_c_nlte(:,icell)) / (tiny_dp + chi_c(:,icell)+chi_c_nlte(:,icell))
+
+   tau_ij_max = 0.0
+   !-> no overlapping transitions and background continua
+   aatom_loop : do nact = 1, Nactiveatoms
+      aatom => ActiveAtoms(nact)%ptr_atom
+
+
+      atr_loop : do kr = 1, aatom%Ntr_line
+
+         kc = aatom%at(kr)%ik
+         !all lines contribute, so don't evaluate lcontrib_to_opac
+
+         !-> not used yet without non-local term
+         Nr = aatom%lines(kc)%Nred;Nb = aatom%lines(kc)%Nblue
+         Nl = Nr-Nb+1 -dk_min + dk_max
+         i = aatom%lines(kc)%i
+         j = aatom%lines(kc)%j
+
+         !pops inversions
+         if (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell) <= 0.0) cycle atr_loop
+
+         !location and direction not needed if averaged
+         F = 0.0_dp
+         
+         !if vproj > 0 (blue shifted) lambda decreases, frequency increases
+         !must be evaluated at lambda0 * (1 - vproj/c)
+         l0 = aatom%lines(kc)%lambda0 * (1.0 - vlabs(1,id)/c_light)!vlabs not defined if laverage is .true. !
+         Icore = interp(Jext(:,id),lambda_cont,l0)
+
+         !line Source function in absence of continuum and in CFR
+         !Sij = nj Aji / (ni Bij - nj Bji)
+         Sij = aatom%lines(kc)%Aji * aatom%n(j,icell) / &
+            ( aatom%lines(kc)%Bij * (aatom%n(i,icell)-aatom%n(j,icell)*aatom%lines(kc)%gij) )
+   
+         chi_ij = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell))
+         tau_escape = fact_tau * chi_ij * mean_length_scale(icell) / aatom%vbroad(icell)
+         if (mean_grad_v(icell) > prec_vel) then
+         ! if (mean_grad_v(icell) > 3.0*aatom%vbroad(icell)/mean_length_scale(icell)) then
+            !s^-1
+            tau0 = fact_tau * chi_ij / mean_grad_v(icell)
+            if (tau0 > tau_escape) tau0 = tau_escape
+         else !escape probability
+            tau0 = tau_escape
+         endif
+         tau_ij_max = max(tau_ij_max,tau0)
+         ! write(*,*) icell, "dtau=",tau_escape-tau0, " prec=", prec_vel, " dv/ds=",mean_grad_v(icell)
+         if (tau0 < 1d-5) then
+            beta = 1.0 - tau0 / 2.0 + tau0**2 / 6.0
+         else
+            beta = (1.0 - exp(-tau0))/tau0
+         endif
+         ! beta = (1.0 - exp(-tau0))/tau0 !frequency integral of Psi basically, in the Sobolev limit
+         if (beta > 1.001) then !otherwise it is a numerical error ? 
+            write(*,*) ""
+            write(*,*) "icell=",icell,"Sij=",Sij,"chi_ij=",chi_ij, "<dv/ds>=",mean_grad_v(icell)
+            write(*,*) "beta=",beta, "tau0=",tau0, "tau escape=", tau_escape
+            call warning("beta larger than 1")
+         endif
+         ! beta = min(beta, 1.0_dp)
+         ! Sc0 = interp(Sc,lambda_cont,l0)
+         ! r = interp(chi_c(:,icell)+chi_c_nlte(:,icell),lambda_cont,l0)/chi_ij * aatom%vbroad(icell) 
+         ! Utild = r
+
+         !Jbar in the Sobolev limit without non-local term
+         !The integration goes only for rays here !
+         Jbar = (1.0 - beta) * Sij + beta * Icore !Rji = Aji + Jbar * Bji
+         aatom%lines(kc)%Rji(id) = beta * aatom%lines(kc)%Aji + beta * aatom%lines(kc)%Bji * (Icore + F)
+         aatom%lines(kc)%Rij(id) = beta * aatom%lines(kc)%Bij * (Icore + F)
+         ! aatom%lines(kc)%Rji(id) = (Utild+beta) * aatom%lines(kc)%Aji + (Utild*Sc0 + beta * Icore )* aatom%lines(kc)%Bji
+         ! aatom%lines(kc)%Rij(id) = (utild*Sc0 + beta*Icore)* aatom%lines(kc)%Bij
+
+
+      enddo atr_loop
+
+      if (lno_cont) cycle aatom_loop
+
+      !use Jext!
+      !continuum in the optically thin limit
+      atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
+
+         kc = aatom%at(kr)%ik
+         !all transitions contribue so I don't test lcontrib_to_opac
+
+         i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
+         !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+         ni_on_nj_star = aatom%nstar(i,icell)/aatom%nstar(j,icell)
+
+         Nb = aatom%continua(kc)%Nblue; Nr = aatom%continua(kc)%Nred
+         ! Nb = aatom%continua(kc)%Nb; Nr = aatom%continua(kc)%Nr
+         Nl = Nr-Nb + 1
+
+         JJ = 0.0
+         JJb = 0.0
+         tau0 = 0.0_dp
+
+         !pops inversions
+         if (( aatom%n(i,icell) - aatom%n(j,icell) * &
+         (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0) )<= 0.0) then
+             cycle atrc_loop
+         endif
+
+         chi_ik = aatom%continua(kc)%alpha(Nl) * &
+            ( aatom%n(i,icell) - aatom%n(j,icell) * &
+            (aatom%nstar(i,icell)/aatom%nstar(j,icell)) * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0) )
+         tau0 = mean_length_scale(icell) * chi_ik
+         ! if (tau0 > limit_tau) then
+         !    ! write(*,*) "***skipping cont ", kc, tau0, " at icell=", icell, tau_ij_max
+         !    cycle atrc_loop
+         ! endif
+         ! if (kc <= 1) cycle atrc_loop
+
+         Ieff(1:Nl) = Jext(nb:Nr,id)! * exp(-tau0)
+
+         !if continuum is optically thick, Rij and Rji are zero -> LTE
+
+         do l=1, Nl
+            if (l==1) then
+               wl = 0.5*(lambda_cont(Nb+l)-lambda_cont(Nb)) / lambda_cont(Nb)
+            elseif (l==Nl) then
+               wl = 0.5*(lambda_cont(Nr)-lambda_cont(Nr-1))  / lambda_cont(Nr)
+            else
+               wl = 0.5*(lambda_cont(Nb+l)-lambda_cont(Nb+l-2)) / lambda_cont(Nb+l-1)
+            endif
+
+            a1 = aatom%continua(kc)%alpha(l)
+
+            JJ = JJ + wl  * a1 * Ieff(l)
+            
+            ehnukt = exp(-hc_k/T(icell)/lambda_cont(Nb+l-1))
+            twohnu3_c2 = twohc/lambda_cont(Nb+l-1)**3
+            JJb = JJb + wl * ( Ieff(l) + twohnu3_c2 ) * ehnukt * a1
+   
+         enddo
+
+         !angular integration only
+         aatom%continua(kc)%Rij(id) = fourpi_h * JJ
+         aatom%continua(kc)%Rji(id) = fourpi_h * JJb * ni_on_nj_star
+
+ 
+      end do atrc_loop
+
+
+      aatom => NULL()
+
+   end do aatom_loop
+
+   return
+ end subroutine calc_rates_sobolev_average
+
+ function integ_ray_cont(id,icell_in,x,y,z,u,v,w,iray)
+   ! ------------------------------------------------------------------------------- !
+   ! Integrate along a ray the continuum intensity
+   ! continuum intensities are stored on ram.
+   ! ------------------------------------------------------------------------------- !
+   use grid, only : test_exit_grid, cross_cell
+   use atmos_type, only : is_inshock, icompute_atomRT
+   use parametres, only : etoile
+   use planck, only : Bpnu
+   use constantes, only : AU_to_m
+   use stars, only : intersect_stars
+   use spectrum_type, only : Istar_cont
+   use molecular_emission, only : v_proj
+
+      integer :: id, icell_in, iray
+      real(kind=dp) :: u,v,w
+      real(kind=dp) :: x,y,z, Tchoc
+      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
+      real(kind=dp), dimension(Nlambda_cont) :: Snu_c, dtau_c, tau_c, integ_ray_cont
+      integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
+      logical :: lcellule_non_vide, lintersect_stars
+
+      x1=x;y1=y;z1=z
+      x0=x;y0=y;z0=z
+      next_cell = icell_in
+      nbr_cell = 0
+      icell_prev = icell_in
+
+      tau_c(:) = 0.0_dp
+
+      integ_ray_cont = 0.0_dp
+    
+      ! Will the ray intersect a star
+      call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+      ! Boucle infinie sur les cellules (we go over the grid.)
+      infinie : do ! Boucle infinie
+      ! Indice de la cellule
+         icell = next_cell
+         x0=x1 ; y0=y1 ; z0=z1
+
+         lcellule_non_vide = (icell <= n_cells)
+
+         ! Test sortie ! "The ray has reach the end of the grid"
+         if (test_exit_grid(icell, x0, y0, z0)) return
+
+         if (lintersect_stars) then !"will interesct"
+            if (icell == icell_star) then!"has intersected"
+               integ_ray_cont(:) = integ_ray_cont(:) + exp(-tau_c(:)) * Istar_cont(:,i_star)
+               if (is_inshock(id,1,i_star,icell_prev,x0,y0,z0,Tchoc)) then
+                  integ_ray_cont(:) = integ_ray_cont(:) + exp(-tau_c(:)) * Bpnu(Tchoc,lambda_cont)
+               endif
+               return
+            end if
+         endif
+         !With the Voronoi grid, somme cells can have a negative index
+         !therefore we need to test_exit_grid before using icompute_atom_rt
+         if (icell <= n_cells) then
+            lcellule_non_vide = (icompute_atomRT(icell) > 0)
+            if (icompute_atomRT(icell) < 0) return
+         endif
+
+         nbr_cell = nbr_cell + 1
+
+         ! Calcul longeur de vol et profondeur optique dans la cellule
+         previous_cell = 0 ! unused, just for Voronoi
+         call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+         !count opacity only if the cell is filled, else go to next cell
+         if (lcellule_non_vide) then
+
+            !continuous opacities are kept in memory in this version !!
+
+
+            dtau_c(:) = l_contrib * (chi_c(:,icell) + chi_c_nlte(:,icell)) * AU_to_m !au * m^-1 * au_to_m
+
+            if (nbr_cell == 1) then
+               !Lambda operator / chi_dag
+               !must be allocated on the cont grid
+               ds(iray,id) = l_contrib * AU_to_m
+               dv_proj(iray,id) = abs(v_proj(icell,x0,y0,z0,u,v,w)-v_proj(icell,x1,y1,z1,u,v,w))
+               psi(:,iray,id) = ( 1.0_dp - exp( -l_contrib*(chi_c(:,icell) + chi_c_nlte(:,icell))* AU_to_m ) ) / (tiny_dp + chi_c(:,icell) + chi_c_nlte(:,icell))
+            endif
+
+
+            Snu_c = ( eta_c(:,icell) + eta_c_nlte(:,icell) ) / ( chi_c(:,icell) + chi_c_nlte(:,icell) + tiny_dp)
+            integ_ray_cont(:) = integ_ray_cont(:) + ( exp(-tau_c(:)) - exp(-(tau_c(:) + dtau_c(:))) ) * Snu_c(:)
+            tau_c(:) = tau_c(:) + dtau_c(:)
+
+         end if  ! lcellule_non_vide
+
+         icell_prev = icell 
+         !duplicate with previous_cell, but this avoid problem with Voronoi grid here
+
+      end do infinie
+
+      return
+   end function integ_ray_cont
+
+   function non_local_term_sobolev(id,icell_in,x,y,z,u,v,w,iray,line)
+      ! ------------------------------------------------------------------------------- !
+      ! Integrate along a ray to obtain the non-local term in Sobolev.
+      ! Does not handle overlapping lines due to velocity fields. Only self overlap
+      ! because v = v'
+      ! AT the moment does not consider different lines overlap
+      ! ------------------------------------------------------------------------------- !
+      use grid, only : test_exit_grid, cross_cell
+      use atmos_type, only : is_inshock, icompute_atomRT
+      use parametres, only : etoile
+      use planck, only : Bpnu
+      use constantes, only : AU_to_m
+      use stars, only : intersect_stars
+      use spectrum_type, only : Istar_cont
+      use molecular_emission, only : v_proj
+   
+         integer :: id, icell_in, iray
+         type (AtomicLine) :: line
+         real(kind=dp) :: u,v,w
+         real(kind=dp) :: x,y,z, Tchoc, dl
+         real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ni_njgij, v0
+         real(kind=dp) :: S, dtau, tau, gradv, chi, tau_escape, tau0, non_local_term_sobolev
+         real(kind=dp) :: rr(3), vv(3), rcell(3), vcell(3)
+         integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, icell_prev
+         logical :: lcellule_non_vide, lintersect_stars, loverlap
+   
+         x1=x;y1=y;z1=z
+         x0=x;y0=y;z0=z
+         next_cell = icell_in
+         nbr_cell = 0
+         icell_prev = icell_in
+   
+         tau = 0.0_dp
+         non_local_term_sobolev = 0.0
+
+         ! Will the ray intersect a star
+         call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+         ! Boucle infinie sur les cellules (we go over the grid.)
+         infinie : do ! Boucle infinie
+         ! Indice de la cellule
+            icell = next_cell
+            x0=x1 ; y0=y1 ; z0=z1
+   
+            lcellule_non_vide = (icell <= n_cells)
+   
+            ! Test sortie ! "The ray has reach the end of the grid"
+            if (test_exit_grid(icell, x0, y0, z0)) return
+   
+            if (lintersect_stars) then !"will interesct"
+               if (icell == icell_star) then!"has intersected"
+                  return
+               end if
+            endif
+            !With the Voronoi grid, somme cells can have a negative index
+            !therefore we need to test_exit_grid before using icompute_atom_rt
+            if (icell <= n_cells) then
+               lcellule_non_vide = (icompute_atomRT(icell) > 0)
+               if (icompute_atomRT(icell) < 0) return
+            endif
+   
+            nbr_cell = nbr_cell + 1
+   
+            ! Calcul longeur de vol et profondeur optique dans la cellule
+            previous_cell = 0 ! unused, just for Voronoi
+            call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+            dl = l_contrib * AU_to_m
+   
+            if (nbr_cell==1) then
+               vcell(:) = get_vx_vy_vz(icell,x0,y0,z0,u,v,w)
+               rcell(1) = x0; rcell(2) = y0; rcell(3) = z0
+               lcellule_non_vide = .false.
+            endif
+
+            if (lcellule_non_vide) then
+               !loverlap = solve equation dot((r - r'),(v(r) - v(r'))) = 0
+               rr(:) = (/x0,y0,z0/) - rcell(:)
+               vv(:) = get_vx_vy_vz(icell,x0,y0,z0,u,v,w) - vcell(:)
+               loverlap = (abs(dot_product(rr(:),vv(:))) <= tiny_dp)
+               !missing something here ? ?
+               if (loverlap) then
+                  lcellule_non_vide = .true. !useless but for checking
+                  write(*,*) "including overlap for cell", icell_in, " with cell ", icell
+                  write(*,*) dot_product(rr(:),vv(:))
+               else
+                  lcellule_non_vide = .false.
+               endif
+            endif
+
+            !count opacity only if the cell is filled, else go to next cell
+            if (lcellule_non_vide) then
+               gradv = abs(v_proj(icell,x0,y0,z0,u,v,w)-v_proj(icell,x1,y1,z1,u,v,w)) / dl
+
+
+               ni_njgij = line%atom%n(line%i,icell)-line%atom%n(line%j,icell)*line%gij
+
+               dtau = 0
+               S = line%Aji * line%atom%n(line%j,icell) / ( line%Bij * ni_njgij )
+               chi = hc_fourPI * line%Bij * ni_njgij
+
+               tau_escape = chi * dl /line%atom%vbroad(icell)
+               if (gradv > 1d-50) then
+                     !s^-1
+                  tau0 = chi / gradv
+                  if (tau0 > tau_escape) tau0 = tau_escape
+               else !escape probability
+                  tau0 = tau_escape
+               endif
+               dtau = tau0
+   
+               non_local_term_sobolev = non_local_term_sobolev + exp(-tau) * S * (1.0 - exp(-dtau))
+               if (is_nan_infinity(non_local_term_sobolev)>0) then
+                  write(*,*) "infinity in non_local_term_sobolev", id, icell, line%atom%ID, line%i, line%j
+                  write(*,*) tau, dtau, S, chi, dl, gradv, line%atom%vbroad(icell), ni_njgij
+                  stop
+               endif
+               tau = tau + dtau   
+            end if  ! lcellule_non_vide
+   
+            icell_prev = icell 
+            !duplicate with previous_cell, but this avoid problem with Voronoi grid here
+   
+         end do infinie
+   
+         return
+      end function non_local_term_sobolev
+
+      function get_vx_vy_vz(icell,x,y,z,u,v,w)
+       use atmos_type, only : v_z, vphi, vr, vtheta
+       use parametres, only : lmagnetoaccr, lspherical_velocity, Lvoronoi, l3d
+       use grid, only : Voronoi
+         real(kind=dp) :: get_vx_vy_vz(3)
+         integer, intent(in) :: icell
+         real(kind=dp), intent(in) :: x,y,z,u,v,w
+       
+         real(kind=dp) :: vitesse, vx, vy, vz, v_r, v_phi, v_theta, v_rcyl, norme, r, phi, rcyl, rcyl2, r2
+         real(kind=dp) :: sign1, norme2
+       
+         if (lVoronoi) then
+            vx = Voronoi(icell)%vxyz(1)
+            vy = Voronoi(icell)%vxyz(2)
+            vz = Voronoi(icell)%vxyz(3)
+       
+            get_vx_vy_vz(:) = (/vx,vy,vz/)
+            ! return
+            ! get_vx_vy_vz(:) (/vx*u,vy*v,vz*w/)
+         else
+            if (lmagnetoaccr) then
+                  r = sqrt(x*x+y*y)
+                  vx = 0_dp; vy = 0_dp!; vz = 0_dp
+                  vz = v_z(icell)
+                  !only if z strictly positive in the model (2D)
+                  if ( (.not.l3D) .and. (z < 0_dp) ) vz = -vz
+                  !!vz = v_z(icell) * sign(1.0_dp,z), in 3D models, this change of sign is taken care (??)
+       
+                  if (r > tiny_dp) then !rotational + wind, should work also with spherical wind of stars
+                     norme = 1.0_dp/r
+       
+                     vx = vR(icell) * x * norme - vphi(icell) * y * norme
+                     vy = vR(icell) * y * norme + vphi(icell) * x * norme
+       
+                  endif
+            else if (lspherical_velocity) then !missing theta projection
+                  r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
+                  vx = 0.; vy = 0.; vz = 0.;
+       
+                  sign1 = 1_dp
+                  !because theta only from 0 to pi/2 if 2D. But velocity is negative in z < 0
+                  if ( (.not.l3D) .and. (z < 0_dp) ) sign1 = -1_dp
+       
+                  if (r2 > tiny_dp) then
+                     norme2 = 1.0_dp / r2
+                  else
+                     norme2 = 0.0_dp
+                  endif
+       
+                  if (r > tiny_dp) then
+                     norme = 1.0_dp / r
+                     vx = vr(icell) * x * norme - y * norme2 * vphi(icell) + norme2 * ( z * norme * x * vtheta(icell) )
+                     vy = vr(icell) * y * norme + x * norme2 * vphi(icell) + norme2 * ( z * norme * y * vtheta(icell) )
+                     vz = vr(icell) * z * norme - sign1 * r2 / r * vtheta(icell)
+                  endif
+       
+            else
+               call error("velocity field not defined")
+            endif
+            get_vx_vy_vz(:) = (/vx,vy,vz/)
+            ! return
+            ! get_vx_vy_vz(:) = (/vx*u,vy*v,vz*w/)
+         endif
+       
+         return
+       
+       end function get_vx_vy_vz
+
+ subroutine calc_rates_sobolev_ray(id, icell, iray, wei,x,y,z,u,v,w)
+   use parametres, only : etoile
+   use planck, only : Bpnu
+   use opacity, only : domega_shock
+   use atmos_type, only : Taccretion
+   integer, intent(in) :: id, icell, iray
+   real(kind=dp), intent(in) :: wei, x,y,z,u,v,w
+   real, parameter :: fact_tau = 1.0 !>0; could be 3.0 for mcfost
+   real(kind=dp), parameter :: prec_vel = 1d-50 !m/s
+   integer :: nact, i, j, kc, kr
+   real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds, F
+   type(AtomType), pointer :: aatom
+   real(kind=dp) :: ni_on_nj_star, tau_escape
+
+   dvds = dv_proj(iray,id) / ds(iray,id)
+
+   !-> no overlapping transitions and background continua
+   aatom_loop : do nact = 1, Nactiveatoms
+      aatom => ActiveAtoms(nact)%ptr_atom
+
+
+      atr_loop : do kr = 1, aatom%Ntr_line
+
+         kc = aatom%at(kr)%ik
+         !all lines contribute, so don't evaluate lcontrib_to_opac
+
+         i = aatom%lines(kc)%i
+         j = aatom%lines(kc)%j
+
+         !pops inversions
+         if (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell) <= 0.0) cycle atr_loop
+         F = non_local_term_sobolev(id,icell,x,y,z,u,v,w,iray,aatom%lines(kc))
+         
+         !if vproj > 0 (blue shifted) lambda decreases, frequency increases
+         !must be evaluated at lambda0 * (1 - vproj/c)
+         l0 = aatom%lines(kc)%lambda0 * (1.0 - vlabs(1,id)/c_light)!vlabs not defined if laverage is .true. !
+         Icore = interp(Icont(:,iray,id),lambda_cont,l0)
+   
+         chi_ij = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)-aatom%lines(kc)%gij*aatom%n(j,icell))
+         tau_escape = fact_tau * chi_ij * ds(iray,id) / aatom%vbroad(icell)
+         if (dvds > prec_vel) then
+            !s^-1
+            tau0 = fact_tau * chi_ij / dvds
+            if (tau0 > tau_escape) tau0 = tau_escape
+         else !escape probability
+            tau0 = tau_escape
+         endif
+         beta = min((1.0 - exp(-tau0))/tau0,1.0_dp)
+         !beta * F_sobol(iray,id)
+
+         aatom%lines(kc)%Rji(id) = aatom%lines(kc)%Rji(id) + wei * ( beta * aatom%lines(kc)%Aji + beta * aatom%lines(kc)%Bji * (Icore + F) )
+         aatom%lines(kc)%Rij(id) = aatom%lines(kc)%Rij(id) + wei * beta * aatom%lines(kc)%Bij * (Icore + F)
+
+
+      enddo atr_loop
+
+      aatom => NULL()
+
+   end do aatom_loop
+
+   return
+ end subroutine calc_rates_sobolev_ray
+
   subroutine calc_rates_mali(id, icell, iray, waq)
     integer, intent(in) :: id, icell, iray
     real(kind=dp), intent(in) :: waq
@@ -2530,11 +3439,13 @@ CONTAINS
        atr_loop : do kr = 1, aatom%Ntr_line
 
           kc = aatom%at(kr)%ik
+          !all lines contribute, so don't evaluate lcontrib_to_opac
 
           Nred = aatom%lines(kc)%Nred;Nblue = aatom%lines(kc)%Nblue
           i = aatom%lines(kc)%i
           j = aatom%lines(kc)%j
 
+          !dk should be zero now
           Nl = Nred-dk_min+dk_max-Nblue+1
           a0 = Nblue+dk_min-1
 
@@ -2617,6 +3528,7 @@ CONTAINS
        atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
 
           kc = aatom%at(kr)%ik
+          !all transitions contribue so I don't test lcontrib_to_opac
 
           i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
           ! 				chi_ion = Elements(aatom%periodic_table)%ptr_elem%ionpot(aatom%stage(j))
@@ -2633,7 +3545,6 @@ CONTAINS
           xcc_ji = 0.0
 
           Ieff(1:Nl) = Itot(Nblue:Nred,iray,id) - Psi(Nblue:Nred,iray,id) * eta_atoms(Nblue:Nred,nact,id)
-
 
           icell_d = 1
           if (ldissolve) then
@@ -2706,6 +3617,97 @@ CONTAINS
     return
   end subroutine calc_rates_mali
 
+  subroutine calc_rates_mali_cont(id, icell, iray, waq)
+   !cross-coupling terms and eta_atoms and psi must be allocated on the continuum grid
+   !TO DO: add lines in Sobolev ??
+   integer, intent(in) :: id, icell, iray
+   real(kind=dp), intent(in) :: waq
+   !takes the max shift of lines
+   ! real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
+   real(kind=dp), dimension(Nlambda_cont) :: Ieff
+   integer :: nact, Nred, Nblue, kc, kcc, kr, krr, i, j, ip, jp, l, a0, Nl, icell_d
+   integer :: N1, N2
+   real(kind=dp) :: etau, wphi, JJ, JJb, j1, j2, I1, I2, ehnukt, twohnu3_c2
+   real(kind=dp) :: wl, a1, a2
+   type(AtomType), pointer :: aatom, atom
+   real(kind=dp) :: wi, wj, nn, dk0, xcc_ij, xcc_ji, ni_on_nj_star
+
+   aatom_loop : do nact = 1, Nactiveatoms
+      aatom => ActiveAtoms(nact)%ptr_atom
+
+
+      atrc_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
+
+         kc = aatom%at(kr)%ik
+         !all transitions contribue so I don't test lcontrib_to_opac
+
+         i = aatom%continua(kc)%i; j = aatom%continua(kc)%j
+         ! 				chi_ion = Elements(aatom%periodic_table)%ptr_elem%ionpot(aatom%stage(j))
+         ! 				neff = aatom%stage(j) * sqrt(aatom%Rydberg / (aatom%E(j) - aatom%E(i)) )
+
+         ! 				ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+         ni_on_nj_star = aatom%nstar(i,icell)/aatom%nstar(j,icell)
+
+         Nblue = aatom%continua(kc)%Nblue; Nred = aatom%continua(kc)%Nred
+         Nl = Nred-Nblue + 1
+
+         JJ = 0.0
+         JJb = 0.0
+         xcc_ji = 0.0
+
+         Ieff(1:Nl) = Icont(Nblue:Nred,iray,id) - Psi(Nblue:Nred,iray,id) * eta_atoms(Nblue:Nred,nact,id)
+
+
+         do l=1, Nl
+            if (l==1) then
+               wl = 0.5*(lambda_cont(Nblue+l)-lambda_cont(Nblue)) / lambda_cont(Nblue)
+            elseif (l==Nl) then
+               wl = 0.5*(lambda_cont(Nred)-lambda_cont(Nred-1))  / lambda_cont(Nred)
+            else
+               wl = 0.5*(lambda_cont(Nblue+l)-lambda_cont(Nblue+l-2)) / lambda_cont(Nblue+l-1)
+            endif
+
+            a1 = aatom%continua(kc)%alpha(l)
+
+            JJ = JJ + wl  * a1 * Ieff(l)
+
+            ehnukt = exp(-hc_k/T(icell)/lambda_cont(Nblue+l-1))
+            twohnu3_c2 = twohc/lambda_cont(Nblue+l-1)**3
+            JJb = JJb + wl * ( Ieff(l) + twohnu3_c2 ) * ehnukt * a1
+
+            xcc_ji = xcc_ji + chi_up(Nblue+l-1,i,nact,id)*Uji_down(Nblue+l-1,j,nact,id)*psi(Nblue+l-1,iray,id)
+
+         enddo
+
+         aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + waq*fourpi_h * JJ
+         aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) + waq*fourpi_h * JJb * ni_on_nj_star
+
+         xcc_ij = 0.0_dp
+         sub_atrc_loop : do krr=aatom%Ntr_line+1, aatom%Ntr
+
+            kcc = aatom%at(krr)%ik
+
+            ip = aatom%continua(kcc)%i
+            jp = aatom%continua(kcc)%j
+            N1 = aatom%continua(kcc)%Nblue
+            N2 = aatom%continua(kcc)%Nred
+            if (jp==i) then !i upper level of another transitions
+               xcc_ij = xcc_ij + sum(chi_down(N1:N2,j,nact,id)*psi(N1:N2,iray,id)*Uji_down(N1:N2,i,nact,id))
+            endif
+
+         enddo sub_atrc_loop
+
+         aatom%continua(kc)%Rji(id) = aatom%continua(kc)%Rji(id) - xcc_ji * waq
+         aatom%continua(kc)%Rij(id) = aatom%continua(kc)%Rij(id) + xcc_ij * waq
+
+      end do atrc_loop
+
+      aatom => NULL()
+
+   end do aatom_loop
+
+   return
+ end subroutine calc_rates_mali_cont
   ! 	subroutine calc_rates_mali_old(id, icell, iray, waq)
   ! 		integer, intent(in) :: id, icell, iray
   ! 		real(kind=dp), intent(in) :: waq
@@ -3036,130 +4038,22 @@ CONTAINS
     return
   end subroutine store_radiative_rates_mali
 
-  !used only to write radiative rates computed with the converged radiation field
-  !not used in the iterative scheme
-  ! 	subroutine store_radiative_rates(id, icell, n_rayons, Nmaxtr, Rij, Rji, Jr, angle_quad)
-  ! 	!continua radiative rates computed also with total I
-  ! 		integer, intent(in) :: icell, n_rayons, Nmaxtr, id
-  ! 		logical, intent(in) :: angle_quad
-  ! 		real(kind=dp), dimension(NactiveAtoms, Nmaxtr), intent(inout) :: Rij, Rji
-  ! 		real(kind=dp), dimension(Nlambda) :: Jr
-  ! 		integer :: kc, kr, nact, l, iray,imu,iphi,iray_p
-  ! 		integer :: i, j, Nl, Nblue, Nred, a0, icell_d
-  ! 		real(kind=dp) :: a1, JJb, a2, di1, di2, ehnukt, twohnu3_c2, wl
-  ! 		real(kind=dp) :: chi_ion, neff, Ieff1, Ieff2, JJ, wphi, J1, J2
-  ! 		type (AtomType), pointer :: atom
-  !
-  ! 		Rij(:,:) = 0.0_dp
-  ! 		Rji(:,:) = 0.0_dp
-  !
-  ! 		do nact=1, NactiveAtoms
-  !
-  ! 			atom => Activeatoms(nact)%ptr_atom
-  !
-  ! 			do kc=1, atom%Ntr
-  !
-  ! 				kr = atom%at(kc)%ik
-  !
-  ! 				select case (atom%at(kc)%trtype)
-  !
-  ! 				case ("ATOMIC_LINE")
-  !
-  ! 					Nred = atom%lines(kr)%Nred
-  ! 					Nblue = atom%lines(kr)%Nblue
-  ! 					i = atom%lines(kr)%i
-  ! 					j = atom%lines(kr)%j
-  !
-  ! 					Nl = Nred-dk_min+dk_max-Nblue+1
-  ! 					a0 = Nblue+dk_min-1
-  ! 					Rji(nact,kc) = atom%lines(kr)%Aji
-  !
-  !
-  ! 					if (angle_quad) then
-  ! 						write(*,*) " Angle_quad not implemented yet"
-  ! 						!check iray if lmali
-  ! 						stop " mali"
-  !
-  ! 						else !pure mc
-  ! 							do iray=1, n_rayons
-  ! 								JJ = 0.0
-  ! 								wphi = 0.0
-  !
-  ! 								do l=1,Nl
-  !
-  ! 									if (l==1) then
-  ! 										wl = 0.5*(lambda(a0+l+1)-lambda(a0+l)) * clight / atom%lines(kr)%lambda0
-  ! 									elseif (l==Nl) then
-  ! 										wl = 0.5*(lambda(a0+l)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
-  ! 									else
-  ! 										wl = 0.5*(lambda(a0+l+1)-lambda(a0+l-1)) * clight / atom%lines(kr)%lambda0
-  ! 									endif
-  !
-  ! 									JJ = JJ + wl * Itot(a0+l,iray,id) * atom%lines(kr)%phi_loc(l,iray,id)
-  ! 									wphi = wphi + wl * atom%lines(kr)%phi_loc(l,iray,id)
-  !
-  ! 								enddo
-  ! 								!init at Aji
-  ! 								Rji(nact,kc) = Rji(nact,kc) + atom%lines(kr)%Bji * JJ / n_rayons / wphi
-  ! 								Rij(nact,kc) = Rij(nact,kc) + atom%lines(kr)%Bij * JJ / n_rayons / wphi
-  !
-  ! 							enddo
-  !
-  ! 						endif !over angle_quad
-  !
-  !
-  ! 				case ("ATOMIC_CONTINUUM")
-  !
-  !
-  ! 					i = atom%continua(kr)%i; j = atom%continua(kr)%j
-  ! 					chi_ion = Elements(atom%periodic_table)%ptr_elem%ionpot(atom%stage(j))
-  ! 					neff = atom%stage(j) * sqrt(atom%Rydberg / (atom%E(j) - atom%E(i)) )
-  !
-  !
-  ! 					Nblue = atom%continua(kr)%Nb; Nred = atom%continua(kr)%Nr
-  ! 					Nl = Nred-Nblue + 1
-  !
-  ! 					icell_d = 1
-  ! 					if (ldissolve) then
-  ! 						if (atom%ID=="H") icell_d = icell
-  ! 					endif
-  !
-  ! 					JJ = 0.0
-  ! 					JJb = 0.0
-  !
-  ! 					do l=1, Nl
-  !
-  ! 						if (l==1) then
-  ! 							wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-1)) / lambda(Nblue+l-1)
-  ! 						elseif (l==Nl) then
-  ! 							wl = 0.5*(lambda(Nblue+l-1)-lambda(Nblue+l-2))  / lambda(Nblue+l-1)
-  ! 						else
-  ! 							wl = 0.5*(lambda(Nblue+l)-lambda(Nblue+l-2)) / lambda(Nblue+l-1)
-  ! 						endif
-  !
-  ! 						a1 = atom%continua(kr)%alpha_nu(l,icell_d)
-  !
-  ! 						JJ = JJ + wl * Jr (Nblue+l-1) * a1
-  ! 						JJb = JJb + wl * a1 * exp(-hc_k/T(icell)/lambda(Nblue+l-1)) * &
-  ! 							(twohc/lambda(Nblue+l-1)**3 + Jr(Nblue+l-1))
-  ! 					enddo
-  !
-  !
-  ! 					Rij(nact,kc) = fourpi_h * JJ
-  ! 					Rji(nact,kc) = fourpi_h * JJb * atom%nstar(i,icell)/atom%nstar(j,icell)
-  !
-  ! 				case default
-  ! 					call error("transition type unknown", atom%at(l)%trtype)
-  !
-  ! 				end select
-  !
-  ! 			enddo
-  !
-  ! 			atom => NULL()
-  ! 		enddo
-  !
-  ! 	return
-  ! 	end subroutine store_radiative_rates
+!   subroutine store_radiative_rates_sobolev(id, icell, Nmaxtr, Rij, Rji)
+!    !continua radiative rates computed also with total I
+!    integer, intent(in) :: icell, Nmaxtr, id
+!    real(kind=dp), dimension(NactiveAtoms, Nmaxtr), intent(inout) :: Rij, Rji
+!    integer :: kc, kr, nact, l, imu,iphi,iray_p
+!    integer :: i, j, Nl, Nblue, Nred, a0, icell_d
+!    real(kind=dp) :: a1, JJb, a2, di1, di2, ehnukt, twohnu3_c2, wl
+!    real(kind=dp) :: chi_ion, neff, Ieff1, Ieff2, JJ, wphi, J1, J2
+!    real(kind=dp) :: ni_on_nj_star
+!    type (AtomType), pointer :: atom
+
+
+!    return 
+!   end subroutine store_radiative_rates_sobolev
+
+
 
   subroutine store_rate_matrices(id, icell, Nmaxlevel, Aij)
     !atom%Gamma should be filled with the value before exciting subiterations

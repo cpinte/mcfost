@@ -3,6 +3,7 @@ module cylindrical_grid
   use constantes
   use parametres
   use messages
+  use read1d_models, only : tab_r_mod1d
 
   implicit none
 
@@ -10,18 +11,11 @@ module cylindrical_grid
        move_to_grid_cyl, define_cylindrical_grid, build_cylindrical_cell_mapping,  cell_map, cell_map_i, cell_map_j,&
        cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, &
        z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, volume, l_dark_zone, zmax, delta_cell_dark_zone, &
-       ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone, area
+       ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone
 
   real(kind=dp), parameter, public :: prec_grille=1.0e-14_dp
 
   private
-
-  !Ben, added aire in public
-  character(len=11), parameter :: file_tab_r_1D = 'grid_1D.txt'
-  real(kind=dp), dimension(:), allocatable :: tab_r_1D_tmp
-  integer :: n_rad_1D
-  logical :: lread_1D_grid
-  real(kind=dp), dimension(:), allocatable :: area !test, area of the cell in AU**2
 
   real(kind=dp) :: zmaxmax
 
@@ -203,10 +197,11 @@ subroutine define_cylindrical_grid()
   integer :: i,j,k, izone, ii, ii_min, ii_max, icell
 
   !tab en cylindrique ou spherique suivant grille
-  real(kind=dp), dimension(n_rad) :: V, Aire !Ben added aire
+  real(kind=dp), dimension(n_rad) :: V
   real(kind=dp), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
   real(kind=dp) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=dp) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
+  real(kind=dp) :: theta, dtheta, delta_phi
   integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
 
   type(disk_zone_type) :: dz
@@ -253,38 +248,8 @@ subroutine define_cylindrical_grid()
      if (alloc_status > 0) call error('Allocation error zmax, volume')
      zmax = 0.0 ; volume=0.0
      
-     !Ben
-     allocate(area(n_cells), stat=alloc_status)
-     if (alloc_status > 0) call error("Allocation error area")
   endif
   ! end allocation
-
-	lread_1D_grid = .false.
-	if ((n_cells == n_rad).and.(n_regions==1).and.(n_rad_in == 1.0)) lread_1D_grid = .true.
-	if (lread_1D_grid) then
-		write(*,*) 'Reading 1D radius grid from file'
-		open(15, file=file_tab_r_1D, status='old')
-		read(15,*) n_rad_1D
-		allocate(tab_r_1D_tmp(n_rad_1D), stat=alloc_status)
-		if (alloc_status > 0) call error('allocation error tab_r_1D_tmp')
-		do k=1, n_rad_1D
-			read(15,*) tab_r_1D_tmp(k)
-			!write(*,*) 'r=',tab_r_1D_tmp(k),tab_r_1D_tmp(k)*etoile(1)%r 
-		enddo
-		close(15)
-		!write(*,*) ' Old Rmax/Rmin', Rmax, Rmin
-
-		Rmin = tab_r_1D_tmp(1)*etoile(1)%r
-		Rmax = tab_r_1D_tmp(n_rad_1D)*etoile(1)%r
-		!write(*,*) ' New Rmax, Rmin', Rmax, Rmin
-		if (etoile(1)%r>Rmin) then
-			call warning('Rstar=>Rmin')
-		endif
-		if (n_rad_1D -1 /= n_cells) then
-			write(*,*) " Error, the grid of radius read should be n_cells + 1"
-			lread_1D_grid = .false.
-		endif
-	endif
 
   Rmax2 = Rmax*Rmax
 
@@ -322,7 +287,7 @@ subroutine define_cylindrical_grid()
      ln_delta_r_in = (1.0_dp/real(n_rad_in_region,kind=dp))*log(delta_r)
      delta_r_in = exp(ln_delta_r_in)
 
-     ! Selection de la zone correpondante : pente la plus forte
+     ! Selection de la zone correspondante : pente la plus forte
      puiss = 0.0_dp
      do iz=1, n_zones
         if (disk_zone(iz)%region == ir) then
@@ -390,32 +355,19 @@ subroutine define_cylindrical_grid()
      istart = n_cells_tmp+1
   enddo ! ir
 
-	if (lread_1D_grid) then
-		istart = 1
-		n_cells_tmp = 0
-		tab_r = 0.0
-		tab_r2 = 0.0
-		tab_r3 = 0.0
-		tab_r(istart) = Rmin
-		tab_r2(istart) = tab_r(istart) * tab_r(istart)
-		tab_r3(istart) = tab_r2(istart) * tab_r(istart)
-
-		write(*,*) istart, n_rad_region, n_empty
-		write(*,*) ' Redefining grid to match model'
-		do i=istart + 1, istart+n_rad_region
-		!!do i=istart, istart+n_rad_region-1
-			tab_r(i) = tab_r_1D_tmp(i)*etoile(1)%r
-			tab_r2(i) = tab_r(i) * tab_r(i)
-			tab_r3(i) = tab_r2(i) * tab_r(i)
-			!write(*,*) i, tab_r(i), tab_r(i)/etoile(1)%r, tab_r(i-1)/etoile(1)%r
-		enddo
-		!write(*,*) "Rmax = ", rmax/etoile(1)%r
-		!stop
-		if (maxval(tab_r)-maxval(tab_r_1D_tmp*etoile(1)%r) /= 0.0) call error("read grid doesn't match the grid")
-		!write(*,*) 'n_rad_region=', n_rad_region, ' n_cells = ', n_cells
-		n_cells_tmp = istart+n_rad_region
-		istart = n_cells_tmp + 1
-	endif
+	if (lmodel_1d) then
+     !Redfine the grid edge for the stellar atmosphere models (marcs, multi, kurucz, cmfgen etc)
+		! istart = 1
+		! n_cells_tmp = 0
+      tab_r(:) = tab_r_mod1d
+      tab_r2(:) = tab_r(:)*tab_r(:)
+      tab_r3(:) = tab_r(:)*tab_r2(:)
+		! n_cells_tmp = istart+n_rad_region
+		! istart = n_cells_tmp + 1
+		if (maxval(tab_r)-maxval(tab_r_mod1d) /= 0.0) then
+         call error("read 1d grid doesn't match the grid")
+      endif
+   endif
 
   r_lim(0)= rmin
   r_lim_2(0)= rmin**2
@@ -430,7 +382,7 @@ subroutine define_cylindrical_grid()
   if (lcylindrical) then
      ! Calcul volume des cellules (pour calculer leur masse)
      ! On prend ici le rayon au milieu de la cellule
-     ! facteur 2 car symétrie
+     ! facteur 2 car symÃ©trie
      ! tab_r est en cylindrique ici
 
      do i=1, n_rad
@@ -497,7 +449,7 @@ subroutine define_cylindrical_grid()
      z_lim(:,nz+2)=1.0e30
      zmaxmax = maxval(zmax)
 
-  else !lspherical
+  else ! lspherical
      ! tab_r est en spherique ici
      w_lim(0) = 0.0_dp
      theta_lim(0) = 0.0_dp
@@ -507,22 +459,29 @@ subroutine define_cylindrical_grid()
      theta_lim(nz) = pi/2.
      tan_theta_lim(nz) = 1.e30_dp
 
-     do j=1, nz-1
-        ! repartition uniforme en cos
-        w= real(j,kind=dp)/real(nz,kind=dp)
-        w_lim(j) = w
-        tan_theta_lim(j) = w / sqrt(1.0_dp - w*w)
-        theta_lim(j) = atan(tan_theta_lim(j))
-     enddo
+     if (lregular_theta) then ! repartition uniforme en theta, jusqu'a theta max, puis 1 cellule vide jusqu'a pi/2
+        dtheta = theta_max / (nz-1)
+        do j=1, nz-1
+           theta = j * dtheta
+           theta_lim(j) = theta
+           tan_theta_lim(j) = tan(theta)
+           w_lim(j) = sin(theta)
+        enddo
+     else ! repartition uniforme en cos
+        do j=1, nz-1
+           w= real(j,kind=dp)/real(nz,kind=dp)
+           w_lim(j) = w
+           tan_theta_lim(j) = w / sqrt(1.0_dp - w*w)
+           theta_lim(j) = atan(tan_theta_lim(j))
+        enddo
+     endif
 
      do i=1, n_rad
         !rsph = 0.5*(r_lim(i) +r_lim(i-1))
         rsph = sqrt(r_lim(i) * r_lim(i-1))
-        !Ben
-        !if (lread_1D_grid) rsph = r_lim(i)
 
         do j=1,nz
-           w = (real(j,kind=dp)-0.5_dp)/real(nz,kind=dp)
+           w = 0.5*(w_lim(j)+w_lim(j-1))
            uv = sqrt(1.0_dp - w*w)
            r_grid_tmp(i,j)=rsph * uv
            z_grid_tmp(i,j)=rsph * w
@@ -530,20 +489,20 @@ subroutine define_cylindrical_grid()
 
         if ((tab_r3(i+1)-tab_r3(i)) > 1.0e-6*tab_r3(i)) then
            V(i)=4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i)) /real(nz)
-           Aire(i) = 4.0 * pi * (tab_r2(i+1) - tab_r2(i)) / real(nz)!Ben
         else
            V(i)=4.0*pi*rsph**2*(tab_r(i+1)-tab_r(i)) /real(nz)
-           Aire(i) = 4.0 * pi * rsph * (tab_r(i+1)-tab_r(i)) /real(nz)!Ben
         endif
      enddo
 
   endif ! cylindrique ou spherique
+  phi_grid_tmp(:) = 0.0_dp
 
   ! Version 3D
   if (l3D) then
+     delta_phi = 2.0*pi/real(n_az)
      do k=1, n_az
-        phi_grid_tmp(k) = 2.0*pi*real(k)/real(n_az)
-        phi = phi_grid_tmp(k)
+        phi_grid_tmp(k) = delta_phi * (real(k)-0.5)
+        phi = delta_phi * real(k)
         if (abs(modulo(phi-0.5*pi,pi)) < 1.0e-6) then
            tan_phi_lim(k) = 1.0d300
         else
@@ -552,13 +511,14 @@ subroutine define_cylindrical_grid()
      enddo !k
 
      V(:) = V(:) * 0.5 / real(n_az)
-     Aire(:) = Aire(:) * 0.5 / real(n_az)!Ben
 
      do j=1,nz
         r_grid_tmp(:,-j) = r_grid_tmp(:,j)
         z_grid_tmp(:,-j) = -z_grid_tmp(:,j)
      enddo
   endif
+
+  if (lfargo3d) call check_fargo3d_grid(r_lim,theta_lim,phi_grid_tmp)
 
   ! Determine the zone for each cell
   do ir = 1, n_regions
@@ -575,16 +535,11 @@ subroutine define_cylindrical_grid()
      j = cell_map_j(icell)
      k = cell_map_k(icell)
      volume(icell) = V(i)
-     !Ben
-     area(icell) = Aire(i) !only in spherical yet
 
      r_grid(icell) = r_grid_tmp(i,j)
      z_grid(icell) = z_grid_tmp(i,j)
      phi_grid(icell) = phi_grid_tmp(k)
   enddo
-
-	if(lread_1D_grid) deallocate(tab_r_1D_tmp)
-
   ! Pour Sebastien Charnoz
   if (lSeb_Charnoz) then
      write(*,*) "# n_rad nz"
@@ -906,11 +861,11 @@ end subroutine define_cylindrical_grid
        ! on avance ou recule en r ? -> produit scalaire
        dotprod=u*x0+v*y0  ! ~ b
        if (dotprod < 0.0_dp) then
-          ! on recule : on cherche rayon inférieur
+          ! on recule : on cherche rayon infÃ©rieur
           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
           delta=b*b-c
-          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon inférieur
-             ! on cherche le rayon supérieur
+          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon infÃ©rieur
+             ! on cherche le rayon supÃ©rieur
              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
              delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
              delta_rad=1
@@ -918,7 +873,7 @@ end subroutine define_cylindrical_grid
              delta_rad=-1
           endif
        else
-          ! on avance : on cherche le rayon supérieur
+          ! on avance : on cherche le rayon supÃ©rieur
           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
           delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
           delta_rad=1
@@ -933,7 +888,7 @@ end subroutine define_cylindrical_grid
 
 
        ! 2) position interface verticale
-       ! on monte ou on descend par rapport au plan équatorial ?
+       ! on monte ou on descend par rapport au plan Ã©quatorial ?
        dotprod=w*z0
        if (dotprod == 0.0_dp) then
           t=1.0e10
@@ -1326,7 +1281,7 @@ end subroutine define_cylindrical_grid
        else
           z= -(z_lim(ri,-zj)+aleat2*(z_lim(ri,-zj+1)-z_lim(ri,-zj)))
        endif
-    else ! 2D : choix aléatoire du signe
+    else ! 2D : choix alÃ©atoire du signe
        if (aleat2 > 0.5_dp) then
           z=z_lim(ri,zj)+(2.0_dp*(aleat2-0.5_dp))*(z_lim(ri,abs(zj)+1)-z_lim(ri,zj))
        else
@@ -1345,5 +1300,63 @@ end subroutine define_cylindrical_grid
     return
 
   end subroutine pos_em_cellule_cyl
+
+  !---------------------------------------------
+
+  subroutine check_fargo3d_grid(r,theta,phi)
+
+    real(dp), dimension(*) :: r, theta, phi
+
+    character(len=128) :: filename
+
+    integer :: i, j, iunit, ios
+    real(dp) :: buffer, t, radius
+
+    iunit = 1
+
+    ! Unit test to compare with fargo3d domain_z.dat
+    filename = trim(fargo3d%dir)//"/domain_z.dat" ! 0 means vertical +z
+    open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+    if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+
+    do j=1,3
+       read(iunit,*) buffer
+    enddo
+
+    !do j=nz,1, -1
+    !  write(*,*) nz-j +3 , pi/2 - theta_lim(j)  ! --> ok, teste sans pb
+    !enddo
+
+    do j=nz-1,1, -1
+       read(iunit,*) t
+       if ( t - (pi/2 - theta_lim(j)) > 1e-6 * t) call error("fargo3d theta grid")
+    enddo
+
+    ! Unit test to compare with fargo3d domain_y.dat : tab_r
+    filename = trim(fargo3d%dir)//"/domain_y.dat"
+    open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+    if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+
+    do i=1,3
+       read(iunit,*) buffer
+    enddo
+
+    do i=0,n_rad
+       read(iunit,*) radius
+       radius = radius * scale_length_units_factor
+       if (radius - r_lim(i) > 1e-6 * radius) call error("fargo3d radius grid")
+    enddo
+
+    ! Unit test for phi check that is only an offset
+    filename = trim(fargo3d%dir)//"/domain_x.dat"
+    open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+    if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+
+    write(*,*) "fargo3d grid tested ok"
+    return
+
+  end subroutine check_fargo3d_grid
+
+  !---------------------------------------------
 
 end module cylindrical_grid
