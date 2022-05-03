@@ -1102,7 +1102,7 @@ subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,x
        etoile(i)%Mdot = etoile_old(i)%Mdot
     enddo
     ! If we have new stars
-    do i=n_etoiles_old,n_etoiles
+    do i=n_etoiles_old+1,n_etoiles
        etoile(i)%force_Mdot = .false.
        etoile(i)%Mdot = 0.
     enddo
