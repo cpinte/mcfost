@@ -370,7 +370,8 @@ module gas_contopac
 
       Cn(:) = (/152.519d0,49.534d0,-118.858d0,92.536d0,-34.194d0,4.982d0/)
 
-      alpha = hc_k / MICRON_TO_NM ! hc_k = hc/k/nm_to_m
+      !check here km_to_m = micron_to_nm
+      alpha = hc_k / km_to_m ! hc_k = hc/k/nm_to_m
       lambda0 = 1.6419 !micron, photo detachement threshold
 
       nH = hydrogen%n(1,icell)
@@ -381,7 +382,7 @@ module gas_contopac
 
       do la=1, N
 
-         lam = lambda(la) / MICRON_TO_NM !nm->micron
+         lam = lambda(la) / km_to_m !nm->micron
          !if (lambda > 0.125 .and. lambda < lambda0) then
          if (lam <= lambda0) then
 
@@ -507,7 +508,7 @@ module gas_contopac
 
       chi = 0.0
       theta = 5040d0 / T(icell)
-      lam = lambda / MICRON_TO_NM
+      lam = lambda / km_to_m
 
       if (theta < 0.5 .or. theta > 3.6) return
       if (lam <= 0.1823) return

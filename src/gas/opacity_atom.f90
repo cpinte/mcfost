@@ -11,6 +11,7 @@ module Opacity_atom
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj
    use utils, only               : linear_1D_sorted
+   !$ use omp_lib
 
    implicit none
 
