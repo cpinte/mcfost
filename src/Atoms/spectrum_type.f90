@@ -446,7 +446,7 @@ contains
     endif
 
    !anyway this is a small Nlambda array with the lambda for image beeing defined only for ray-traced lines
-   if (rt_n_incl > 1 .or. rt_n_az >1) then
+   if ((lorigine).and.(rt_n_incl > 1 .or. rt_n_az >1)) then
       write(*,*) "*** WARNING: origin atom will be averaged over inclinations and/or azimuths with "
       write(*,*) "       rt_n_incl or rt_n_az > 1 !"
       ! lorigine = .false.
