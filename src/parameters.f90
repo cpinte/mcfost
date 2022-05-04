@@ -49,7 +49,7 @@ module parametres
 
   integer :: RT_sed_method ! cf routine dust_map pour def
 
-  ! Etapes de l'�mission thermique
+  ! Etapes de l'émission thermique
   logical :: ltemp, lsed, lsed_complete, l_em_disk_image, lchauff_int, lextra_heating, lno_internal_energy
   character(len=512), dimension(:), allocatable :: indices
   character(len=512) :: tab_wavelength
@@ -61,9 +61,10 @@ module parametres
 
   ! Atomic line radiative transfer
   !!lstore_opac futur deprecation
-  logical :: lemission_atom, lelectron_scattering, &
-  				lforce_lte, lvfield_sphere_coord, lstop_after_jnu, &
-       			ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
+  logical :: lno_radiative_coupling, lsobolev, lsobolev_only, lexit_after_nonlte_loop, lmodel_1d
+  logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
+  				lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
+       			ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation, lvfield_sphere_coord
   integer :: Nrays_atom_transfer, istep_start
   
   !HEALpix
@@ -72,7 +73,7 @@ module parametres
   logical :: llimit_mem, lfix_backgrnd_opac
   logical :: lcheckpoint, lsafe_stop
   !Convergence relative errors
-  real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time
+  real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time, art_hv_nlte
   integer :: checkpoint_period
   
   !Ng's acceleration
@@ -101,7 +102,7 @@ module parametres
 
   ! Production d'images symetriques
   ! La symetrie est effectuee avant de choisir les pixels
-  ! le syst�me est-il centrosymetrique
+  ! le système est-il centrosymetrique
   ! le systeme a-t-il une symetrie axiale (ne compte que si N_phi > 1)
   logical :: l_sym_ima, l_sym_centrale, l_sym_axiale
 
@@ -115,7 +116,7 @@ module parametres
   !must be initialized to 0
   integer(kind=8) :: mem_alloc_tot !total memory allocated dynamically or not in bytes
 
-  ! R�solution de la grille de densit�
+  ! Résolution de la grille de densité
   ! Nombre de cellules dans la direction r (echantillonage log)
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
   integer :: n_rad, n_rad_in  ! subdivision de la premiere cellule
@@ -125,16 +126,21 @@ module parametres
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
   integer :: n_cells, nrz, p_n_cells, icell_ref
+  logical :: lregular_theta
+  real :: theta_max
 
   logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt, lwall
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, lVoronoi, is_there_disk, lno_backup, lonly_diff_approx, lforce_diff_approx
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs
-  logical :: ldensity_file, lsigma_file, lvelocity_file, lvfield_cyl_coord, lphantom_file, lphantom_multi, lphantom_avg
+  logical :: ldensity_file, lsigma_file, lvelocity_file, lphantom_file, lphantom_multi, lphantom_avg
   logical :: lgadget2_file, lascii_SPH_file, llimits_file, lforce_SPH_amin, lforce_SPH_amax, lmcfost_lib
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lastrochem, lML
-  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa
+  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa, lforce_Mgas
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
+  integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
+
+  logical :: lfargo3d, lathena
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -153,8 +159,9 @@ module parametres
   ! Phantom
   logical :: ldudt_implicit, lscale_length_units, lscale_mass_units, lignore_dust
   logical :: ldelete_Hill_sphere, lrandomize_Voronoi, lrandomize_azimuth, lrandomize_gap, lrandomize_outside_gap, lcentre_on_sink
+  logical :: ldelete_inside_rsph, ldelete_outside_rsph
   real(kind=dp) :: ufac_implicit,scale_length_units_factor,scale_mass_units_factor,correct_density_factor_elongated_cells
-  real(kind=dp) :: SPH_amin, SPH_amax, fluffyness, gap_factor
+  real(kind=dp) :: SPH_amin, SPH_amax, fluffyness, gap_factor, rsph_min, rsph_max
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy
   integer :: isink_centre
 
@@ -271,9 +278,30 @@ module parametres
   integer ::  RT_n_incl, RT_n_az
   logical :: lRT_i_centered
 
-
   integer :: nLevels
   real(kind=dp) :: largeur_profile
+
+  type fargo3d_model
+     integer :: nx, ny, nz, realtype
+     real(kind=dp) :: xmin,xmax, ymin,ymax, zmin,zmax
+     logical :: log_spacing, corrotating_frame
+
+     real(kind=dp) :: dt, aspect_ratio, nu, gamma, cs
+     character(len=128) :: dir, id, planetconfig
+  end type fargo3d_model
+
+  type(fargo3d_model) :: fargo3d
+
+  type athena_model
+     integer :: nx1, nx2, nx3
+     real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
+     logical :: log_spacing, corrotating_frame
+
+     real(kind=dp) :: time
+     character(len=128) :: filename
+  end type athena_model
+
+  type(athena_model) :: athena
 
 
 end module parametres

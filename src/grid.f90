@@ -20,13 +20,13 @@ module grid
   procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
 
-
-  real(kind=dp), dimension(:), allocatable :: vfield, vfield_x, vfield_y, vfield_z ! n_cells
   real(kind=dp) :: v_char, B_char
   logical :: lcalc_ne, lmagnetized
   !real(kind=dp), dimension(:), allocatable :: vfield_v1, vfield_v2, vfield_v3
   real(kind=dp), dimension(:), allocatable :: ne, nHtot, T, nHmin, vturb
   integer, dimension(:), allocatable :: icompute_atomRT
+  real, dimension(:,:), allocatable :: vfield3d ! n_cells x 3
+  real, dimension(:), allocatable :: vfield ! n_cells
 
   contains
 

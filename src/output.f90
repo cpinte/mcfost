@@ -1264,7 +1264,6 @@ end subroutine write_mol_column_density
 
 !***********************************************************
 
-
 subroutine write_column(type, filename, lambda)
   ! WARNING: Only works if the star in in 0, 0, 0 at the moment
   ! type : 1 == column density, 2 == optical depth
@@ -2104,20 +2103,12 @@ subroutine ecriture_UV_field()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
-  integer :: group,fpixel,nelements, lambda, l, icell
+  integer :: group,fpixel,nelements
 
   logical :: simple, extend
   character(len=512) :: filename
 
-  integer, parameter :: n=200
-
-  real(kind=dp) :: n_photons_envoyes, energie_photon
-  real(kind=dp), dimension(n_lambda,n_cells) :: J
   real, dimension(n_cells) :: G
-  real(kind=dp), dimension(n) :: wl, J_interp
-  real(kind=dp), dimension(n_lambda) :: lamb
-  real(kind=dp) :: delta_wl
-
 
   ! D'après van Dishoeck et al. (2008) le champs FUV de Draine est de 2.67e-3 erg cm-2 s-1
   ! Soit 2.67e-6 W / m2
@@ -2127,48 +2118,7 @@ subroutine ecriture_UV_field()
 
   write(*,*) "Writing "//trim(filename)
 
-  ! Step 2
-  do lambda=1, n_lambda
-     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes ! F_lambda here
-     do icell=1, n_cells
-        J(lambda,icell) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
-     enddo
-  enddo
-  lamb(:) = tab_lambda(:) * 1e-6 ! en m
-
-  ! van Dischoeck 2008
-  wl(:) = span(0.0912,0.2,n) * 1e-6 ! en m
-  delta_wl = (wl(n) - wl(1))/(n-1.) ! en m
-  do icell=1,n_cells
-     do l=1,n
-        J_interp(l) = interp( J(:,icell),lamb(:),wl(l))
-     enddo
-
-     ! integration trapeze
-     G(icell) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl / 2.67e-6
-  enddo ! icell
-
-!---  ! Le petit et al
-!---  wl(:) = span(0.0912,0.24,n) * 1e-6 ! en m
-!---  delta_wl = (wl(n) - wl(1))/(n-1.) * 1e-6  ! must be in AA ??
-!---
-!---  do ri=1,n_rad
-!---     do zj=j_start,nz
-!---        do phik=1, n_az
-!---           do l=1,n
-!---              J_interp(l) = interp( J(:,ri,zj,phik),lamb(:),wl(l))
-!---           enddo
-!---
-!---           ! Le Petit et al 2006 page 19-20
-!---           ! integration trapeze
-!---           G(ri,zj,phik) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl  &
-!---                * 4*pi/c_light / (5.6e-14 * erg_to_J * m_to_cm**3)
-!---
-!---           Gio(ri,zj,phik) = G(ri,zj,phik) ! Teste OK par comparaison avec yorick
-!---        enddo
-!---     enddo
-!---  enddo
+  G(:) = compute_UV_field()
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
@@ -2223,6 +2173,68 @@ end subroutine ecriture_UV_field
 
 
 !********************************************************************
+
+function compute_UV_field() result(G)
+
+  real, dimension(n_cells) :: G
+
+  integer :: lambda, l, icell
+  integer, parameter :: n=200
+
+  real(kind=dp) :: n_photons_envoyes, energie_photon
+  real(kind=dp), dimension(n_lambda,n_cells) :: J
+  real(kind=dp), dimension(n) :: wl, J_interp
+  real(kind=dp), dimension(n_lambda) :: lamb
+  real(kind=dp) :: delta_wl
+
+  do lambda=1, n_lambda
+     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
+     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes ! F_lambda here
+     do icell=1, n_cells
+        J(lambda,icell) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
+     enddo
+  enddo
+  lamb(:) = tab_lambda(:) * 1e-6 ! en m
+
+  ! van Dischoeck 2008
+  wl(:) = span(0.0912,0.2,n) * 1e-6 ! en m
+  delta_wl = (wl(n) - wl(1))/(n-1.) ! en m
+  do icell=1,n_cells
+     do l=1,n
+        J_interp(l) = interp( J(:,icell),lamb(:),wl(l))
+     enddo
+
+     ! integration trapeze
+     G(icell) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl / 2.67e-6
+  enddo ! icell
+
+!---  ! Le petit et al
+!---  wl(:) = span(0.0912,0.24,n) * 1e-6 ! en m
+!---  delta_wl = (wl(n) - wl(1))/(n-1.) * 1e-6  ! must be in AA ??
+!---
+!---  do ri=1,n_rad
+!---     do zj=j_start,nz
+!---        do phik=1, n_az
+!---           do l=1,n
+!---              J_interp(l) = interp( J(:,ri,zj,phik),lamb(:),wl(l))
+!---           enddo
+!---
+!---           ! Le Petit et al 2006 page 19-20
+!---           ! integration trapeze
+!---           G(ri,zj,phik) = (sum(J_interp(:)) - 0.5 * (J_interp(1) + J_interp(n)) ) * delta_wl  &
+!---                * 4*pi/c_light / (5.6e-14 * erg_to_J * m_to_cm**3)
+!---
+!---           Gio(ri,zj,phik) = G(ri,zj,phik) ! Teste OK par comparaison avec yorick
+!---        enddo
+!---     enddo
+!---  enddo
+
+  return
+
+end function compute_UV_field
+
+!********************************************************************
+
 
 subroutine ecriture_temperature(iTemperature)
 
