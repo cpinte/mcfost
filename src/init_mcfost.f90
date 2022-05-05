@@ -65,8 +65,8 @@ subroutine set_default_variables()
   lcheckpoint = .false.
   checkpoint_period = 15
   !HEALpix
-  healpix_lorder = 2
-  healpix_lmin = 1
+  healpix_lorder = 1
+  healpix_lmin = 0
   healpix_lmax = 7 !6 !5
   ! Atomic lines Radiative Transfer (AL-RT)
   lno_radiative_coupling = .false.
@@ -83,13 +83,7 @@ subroutine set_default_variables()
   lno_iterate_ne_mc = .true. !.true. means no iteration of electron during MC steps
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
-<<<<<<< HEAD
-  !lorigin_atom = .false., not yet
-=======
   lvacuum_to_air = .false.
-  lmagnetoaccr = .false.
->>>>>>> AtomicTransfer
-  lpluto_file = .false.
   lmodel_1d = .false.
   lmodel_ascii = .false.
   lmhd_voronoi = .false.
@@ -673,9 +667,6 @@ subroutine initialisation_mcfost()
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
         lemission_atom=.true.
-   !   case("-cntrbf_ray_atom")!hidden at the moment.
-   !      i_arg = i_arg + 1
-   !      lcontrib_function_ray = .true.
      case("-output_rates")
         i_arg = i_arg + 1
         loutput_rates = .true.
@@ -797,36 +788,38 @@ subroutine initialisation_mcfost()
         lmhd_voronoi = .true.
         lVoronoi = .true.
         l3D = .true.
-     case ("-pluto")
-     	i_arg = i_arg + 1
-     	lpluto_file = .true.
-     	lmodel_ascii = .false.
-        call get_command_argument(i_arg,s)
-        if (s=="") call error("No filename provided for Pluto file!")
-        n_pluto_files = 1
-        allocate(density_files(n_pluto_files))
-        density_files(1) = s
-        i_arg = i_arg + 1
+        ldensity_file = .false.
+   !   case ("-pluto")
+   !   	i_arg = i_arg + 1
+   !   	lpluto_file = .true.
+   !   	lmodel_ascii = .false.
+   !      call get_command_argument(i_arg,s)
+   !      if (s=="") call error("No filename provided for Pluto file!")
+   !      n_pluto_files = 1
+   !      allocate(density_files(n_pluto_files))
+   !      density_files(1) = s
+   !      i_arg = i_arg + 1
      case ("-model_1d")
      	i_arg = i_arg + 1
      	lmodel_1d = .true.
-     	lmodel_ascii = .true.
-        call get_command_argument(i_arg,s)
-        if (s=="") call error("No filename provided for Pluto file!")
-        allocate(density_files(1))
-        density_file = s
-        density_files(1) = density_file
-        i_arg = i_arg + 1
+     	lmodel_ascii = .false.
+      ldensity_file = .false.
+      !   call get_command_argument(i_arg,s)
+      !   if (s=="") call error("No filename provided for Pluto file!")
+      !   allocate(density_files(1))
+      !   density_file = s
+      !   density_files(1) = density_file
+      !   i_arg = i_arg + 1
      case("-model_ascii")
         i_arg = i_arg + 1
         lmodel_ascii = .true.
-        lpluto_file = .false.
-        call get_command_argument(i_arg,s)
-        if (s=="") call error("No filename provided for ascii Pluto file!")
-        density_file = s
-        allocate(density_files(1))
-        density_files(1) = density_file
-        i_arg = i_arg + 1
+        ldensity_file = .false.
+      !   call get_command_argument(i_arg,s)
+      !   if (s=="") call error("No filename provided for ascii Pluto file!")
+      !   density_file = s
+      !   allocate(density_files(1))
+      !   density_files(1) = density_file
+      !   i_arg = i_arg + 1
      case("-zeeman_polarisation")
         i_arg = i_arg + 1
         lzeeman_polarisation=.true.
@@ -1442,8 +1435,10 @@ subroutine initialisation_mcfost()
    n_zones = 1
    disk_zone(1)%geometry = 2
    call warning("model_1d : reading 1d  stellar atmosphere model")
-   call read_grid_1d()!density_file
+   call read_grid_1d(density_file)
   endif
+  if (lmodel_ascii .or. lmodel_1d) ldensity_file = .false. !because -df is used to 
+                                                           !the pass the model to mcfost!
 
   if (n_zones > 1) lvariable_dust=.true.
 
@@ -1498,8 +1493,8 @@ subroutine initialisation_mcfost()
 
   write(*,*) 'Input file read successfully'
 
-  if ((lmodel_ascii.or.lpluto_file).and.(lascii_sph_file.or.lphantom_file)) then
-   call error("Cannot use Phantom and Pluto files at the same time presently.")
+  if ((lmodel_ascii.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
+   call error("Cannot use Phantom and MHD files at the same time presently.")
   end if
 
   ! Correction sur les valeurs du .para
@@ -1747,16 +1742,6 @@ subroutine initialisation_mcfost()
   if (lRE_LTE .and. .not.lRE_nLTE .and. .not. lnRE) lonly_LTE = .true.
   if (lRE_nLTE .and. .not.lRE_LTE .and. .not. lnRE) lonly_nLTE = .true.
 
-  if (lpluto_file) then
-  	if (.not.lmhd_voronoi) call error("Set lmhd_voronoi to .true. (-mhd_voronoi) if lpluto_file!")
-  endif
-
-  if (lmodel_ascii .and. lpluto_file) then
-  	call warning("lmodel_ascii and lpluto_file ! Assuming lmodel_ascii")
-  	lpluto_file = .false.
-  	!would mean in principle lmhd_voronoi
-  endif
-
   ! Signal handler
   ! do i=1,17
   !    sig=signal(i,sig_handler,-1)
@@ -1795,7 +1780,7 @@ subroutine display_help()
   write(*,*) "        : -phantom <dump> : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -fargo3d <dir> <id> : reads a fargo3d model"
-  write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
+!   write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
   write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
   write(*,*) "        : -model_1d : interface with stellar atmosphere models."
@@ -1933,7 +1918,6 @@ subroutine display_help()
   write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
-!   write(*,*) "        : -cntrbf_ray_atom : Computes the contribution function along a single ray!"
   write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
   write(*,*) "        : -read_jnu_atom : Read old Jnu values from file "

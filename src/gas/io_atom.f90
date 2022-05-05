@@ -115,7 +115,10 @@ module io_atom
       allocate(atom%nstar(atom%Nlevel,n_cells))
       !total number of transitions for this model
       atom%Ntr = atom%Nline + atom%Ncont
+      !-> to remove tab_trans ??
       allocate(atom%tab_trans(atom%Ntr))
+      allocate(atom%ij_to_trans(atom%Nlevel,atom%Nlevel))
+      allocate(atom%i_trans(atom%Ntr),atom%j_trans(atom%Ntr))
       atom%Ntr_line = atom%Nline
       atom%nstar(:,:) = 0d0
       !default
@@ -149,7 +152,9 @@ module io_atom
       write(*,*) "MAGNETIC POLARIZATION REMOVED AT THE MOMENT"
       allocate(atom%lines(atom%Nline))
       do kr=1,atom%Nline
+
          atom%tab_trans(kr) = kr
+
          atom%lines(kr)%atom => atom
          atom%lines(kr)%polarizable = .false.
          atom%lines(kr)%g_lande_eff = -99.0
@@ -169,7 +174,9 @@ module io_atom
 
          atom%lines(kr)%i = min(i,j)
          atom%lines(kr)%j = max(i,j)
-
+         atom%ij_to_trans(atom%lines(kr)%i,atom%lines(kr)%j) = kr
+         atom%i_trans(kr) = atom%lines(kr)%i
+         atom%j_trans(kr) = atom%lines(kr)%j
 
          if (atom%lines(kr)%qwing < 3.0) then
 
@@ -286,7 +293,9 @@ module io_atom
       ! ----------------------------------------- !
       allocate(atom%continua(atom%Ncont))
       do kr=1,atom%Ncont
+
          atom%tab_trans(kr+atom%Ntr_line) = kr+atom%Ntr_line
+
          atom%continua(kr)%atom => atom
 
          call read_line(atomunit,FormatLine, inputline, Nread)
@@ -296,6 +305,10 @@ module io_atom
          i = i + 1
          atom%continua(kr)%j = max(i,j)
          atom%continua(kr)%i = min(i,j)
+         atom%ij_to_trans(atom%continua(kr)%i,atom%continua(kr)%j) = kr+atom%Ntr_line
+         atom%i_trans(kr+atom%Ntr_line) = atom%continua(kr)%i
+         atom%j_trans(kr+atom%Ntr_line) = atom%continua(kr)%j
+
          lambdaji = (HP*C_LIGHT)/ (atom%E(j)-atom%E(i))
          atom%continua(kr)%lambda0 = lambdaji/NM_TO_M !nm
          atom%continua(kr)%lambdamax = atom%continua(kr)%lambda0

@@ -4,7 +4,7 @@
 module mhd2mcfost
 
     use constantes
-    use grid, only : cell_map, vfield_x, vfield_y, vfield_z, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne
+    use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne, check_for_zero_electronic_density
     use parametres
     use messages
     use utils
@@ -14,7 +14,7 @@ module mhd2mcfost
 
     implicit none
 
-    real(kind=dp) :: Taccretion
+    real(kind=dp) :: Taccretion, max_Tshock = 0.0,min_Tshock = 1d8
     logical :: laccretion_shock
 
     contains
@@ -70,11 +70,11 @@ module mhd2mcfost
            call error("Dust not handled yet for pluto models!")
         endif
     
-        if (lpluto_file) then
-           write(*,*) "Voronoi tesselation on Pluto model..."
-           !read and convert to mcfost units
-           call read_pluto() ! to date empty
-        elseif (lmodel_ascii) then
+      !   if (lpluto_file) then
+      !      write(*,*) "Voronoi tesselation on Pluto model..."
+      !      !read and convert to mcfost units
+      !      call read_pluto() ! to date empty
+        if (lmodel_ascii) then
 
            cmd = "wc -l "//trim(density_file)//" > ntest.txt"
            call appel_syst(cmd,syst_status)
@@ -91,11 +91,7 @@ module mhd2mcfost
            !unused
         !    read(inputline(1:Nread),*) rotation_law
     
-           !!lmagnetoaccr = .false.
-           !!lspherical_velocity = .false.
            lvelocity_file = .false.
-           lvfield_sphere_coord = .false.
-           lvfield_cyl_coord = .true. !in mcfost, need lvelocity_file .false.
            !-> .false. with Voronoi
            !read T shock and if accretion spots
            call read_line(1, FormatLine, inputline, Nread)
@@ -189,7 +185,39 @@ module mhd2mcfost
         return
       end subroutine setup_mhd_to_mcfost
     
+      subroutine setup_model1d_to_mcfost()
+      use read1d_models, only : tab_r_mod1d, tab_T_mod1, tab_rho_mod1, tab_ne_mod1, &
+               tab_v_mod1, tab_vt_mod1, tab_zone_mod1
 
+         real(kind=dp) :: rho_to_nH
+
+		   call alloc_atomrt_grid()
+         call read_abundance
+
+         rho_to_nH = 1d3 / masseH / wght_per_H
+
+         laccretion_shock = .false.
+		   lvoronoi = .false.
+		   lmagnetized = .false.
+		   lcalc_ne = .false.
+         
+		   icompute_atomRT(:) = tab_zone_mod1(2:n_cells+1)
+		   T(:) = tab_T_mod1(2:n_cells+1)
+		   nHtot(:) = tab_rho_mod1(2:n_cells+1) * rho_to_nH
+		   ne(:) = tab_ne_mod1(2:n_cells+1)
+		   vfield3d(:,1) = tab_v_mod1(1,2:n_cells+1)
+		   vfield3d(:,2) = tab_v_mod1(2,2:n_cells+1)
+		   vfield3d(:,3) = tab_v_mod1(3,2:n_cells+1)
+		   vturb(:) = tab_vt_mod1(2:n_cells+1)
+
+         call check_for_zero_electronic_density()
+         call print_info_model()
+
+
+		!tab_r_mod1d deallocated later in cylindrical grid
+		deallocate(tab_T_mod1,tab_rho_mod1,tab_ne_mod1,tab_v_mod1,tab_vt_mod1,tab_zone_mod1)
+      return
+    end subroutine setup_model1d_to_mcfost
 
     subroutine read_spheregrid_ascii(filename)
     ! ------------------------------------------- !
@@ -198,19 +226,18 @@ module mhd2mcfost
         character(len=*), intent(in)	:: filename
         integer, parameter :: Nhead = 3 !Add more
         character(len=50) :: rotation_law
-        integer :: icell, Nread, syst_status, N_points, k, i, j, acspot, N_fixed_ne = 0
+        integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
         character(len=512) :: inputline, FormatLine, cmd
         real(kind=dp) :: rr, zz, pp, Vmod
+        
+        write(*,*) "**** WARNING CHECK THE VELOCIOTY IN VFIELD3D"
 
         call alloc_atomrt_grid
         call read_abundance
     
-        lvfield_sphere_coord = .false.
         lVoronoi = .false.
         !deactivated at the moment. I'll put back Zeeman pol later
-        lmagnetized = .false.  
-        lvelocity_file = .false.!needed with the new flag
-        lvfield_cyl_coord = .false. !in mcfost, need lvelocity_file .false.
+        lvelocity_file = .true.
     
         write(FormatLine,'("(1"A,I3")")') "A", 512
     
@@ -236,16 +263,17 @@ module mhd2mcfost
     
         select case (rotation_law)
         case ("magneto-accretion")
-            lvfield_cyl_coord = .true.
-           write(*,*) " Velocity law is ", trim(rotation_law), lvfield_cyl_coord
+            vfield_coord = 2
+           write(*,*) " Velocity law is ", trim(rotation_law)
            if (lmagnetized) then
                call warning(" --> CHeck projection with lmagnetoaccr and Bfield!")
            endif
         case ("spherical_vector")
-            lvfield_sphere_coord = .true.
-           write(*,*) " Velocity law is ", trim(rotation_law), lvfield_sphere_coord
+            vfield_coord = 3
+           write(*,*) " Velocity law is ", trim(rotation_law)
         case default
            write(*,*) " Velocity law ", rotation_law," not handled yet"
+           vfield_coord = 1 !cartesian
            stop
         end select
     
@@ -287,7 +315,7 @@ module mhd2mcfost
                  else
                     call read_line(1, FormatLine, inputline, Nread)
                     read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
-                         vfield_x(icell), vfield_y(icell), vfield_z(icell), vturb(icell), icompute_atomRT(icell)
+                         vfield3d(icell,1), vfield3d(icell,2), vfield3d(icell,3), vturb(icell), icompute_atomRT(icell)
 
                  end if !magnetized
               end do
@@ -302,7 +330,7 @@ module mhd2mcfost
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
     
-        Vmod = maxval(sqrt(vfield_x**2+vfield_y(:)**2+vfield_z(:)**2))
+        Vmod = sqrt( maxval(sum(vfield3d**2,dim=2)) )
     
         v_char = Vmod
     
@@ -322,54 +350,104 @@ module mhd2mcfost
         ! endif
     
     
-        lcalc_ne = .false.
-        icell_loop : do icell=1,n_cells
-           !check that in filled cells there is electron density otherwise we need to compute it
-           !from scratch.
-           if (icompute_atomRT(icell) > 0) then
-    
-              if (ne(icell) <= 0.0_dp) then
-                 write(*,*) "  ** No electron density found in the model! ** "
-                 lcalc_ne = .true.
-                 exit icell_loop
-              endif
-    
-           endif
-        enddo icell_loop
-        N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
-        if (N_fixed_ne > 0) then
-           write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
-                N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
-        endif
-    
-        write(*,*) "Maximum/minimum velocities in the model (km/s):"
-        write(*,*) " V1 = ", 1e-3 * maxval(abs(vfield_x)), 1d-3*minval(abs(vfield_x),mask=icompute_atomRT>0)
-        write(*,*) " V2 = ",  1d-3 * maxval(abs(vfield_y)), 1d-3*minval(abs(vfield_y),mask=icompute_atomRT>0)
-        write(*,*) "Vphi = ",  1d-3 * maxval(abs(vfield_z)), 1d-3*minval(abs(vfield_z),mask=icompute_atomRT>0)
-    
-    
-        write(*,*) "Typical line extent due to V fields (km/s):"
-        write(*,*) v_char/1d3
-    
-        write(*,*) "Maximum/minimum turbulent velocity (km/s):"
-        write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
-    
-        write(*,*) "Maximum/minimum Temperature in the model (K):"
-        write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
-        write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-        write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
-        if (.not.lcalc_ne) then
-           write(*,*) "Maximum/minimum ne density in the model (m^-3):"
-           write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
-        endif
+		  call check_for_zero_electronic_density()
+        call print_info_model()
+
     
         return
       end subroutine read_spheregrid_ascii
 
-      subroutine read_marcs()
+  function is_inshock(id, iray, i_star, icell_prev, x, y, z, Tout)
+   use grid, only : voronoi
+   use constantes, only : sigma, kb
+   logical :: is_inshock
+   integer :: i_star, icell_prev, id, iray
+   real(kind=dp), intent(out) :: Tout
+   real(kind=dp) :: enthalp,  x, y, z !u, v, w
+   real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
 
-        return
-      end subroutine read_marcs
+   is_inshock = .false.
+   if (.not.laccretion_shock) return
+
+   if (icell_prev<=n_cells) then
+      if (icompute_atomRT(icell_prev) > 0) then
+         rr = sqrt( x*x + y*y + z*z)
+         enthalp = 2.5 * 1d3 * kb * T(icell_prev) / wght_per_H / masseH
+
+         !vaccr is vr, the spherical r velocity component
+         if (lvoronoi) then !always 3d
+            vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr + Voronoi(icell_prev)%vxyz(3) * z/rr
+            vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
+         else
+         	if (vfield_coord==1) then
+               if (l3D) then !needed here if not 2.5d
+                  sign_z = 1.0_dp
+               else
+                  sign_z = sign(1.0_dp, z)
+               endif
+         		vaccr = vfield3d(icell_prev,1) * x/rr + vfield3d(icell_prev,2) * y/rr + vfield3d(icell_prev,3) * z/rr * sign_z
+            elseif (vfield_coord==2) then
+               if (l3D) then !needed here if not 2.5d
+                  sign_z = 1.0_dp
+               else
+                  sign_z = sign(1.0_dp, z)
+               endif
+               vaccr = vfield3d(icell_prev,1) * sqrt(1.0 - (z/rr)**2) + sign_z * vfield3d(icell_prev,2) * z/rr
+            else !spherical vector here
+               vaccr = vfield3d(icell_prev,1) !always negative for accretion
+            endif
+            vmod2 = sum(vfield3d(icell_prev,:)**2)
+         endif
+
+
+         if (vaccr < 0.0_dp) then
+            ! Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25
+            Tchoc = ( 1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * 0.5 * abs(vaccr)**3 )**0.25
+            is_inshock = (Tchoc > 1000.0)
+            Tout = Taccretion
+            if (Taccretion<=0.0) then 
+               is_inshock = (abs(Taccretion) * Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
+               Tout = abs(Taccretion) * Tchoc
+            endif
+            max_Tshock = max(max_Tshock, Tout)
+            min_Tshock = min(min_Tshock, Tout)
+         endif
+
+      endif !icompute_atomRT
+   endif !laccretion_shock
+
+   return
+  end function is_inshock
+
+
+   subroutine print_info_model 
+      real(kind=dp) :: v_char 
+
+      v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+
+      write(*,*) "Maximum/minimum velocities in the model (km/s):"
+      write(*,*) " V1 = ", 1e-3 * maxval(abs(vfield3d(:,1))), 1d-3*minval(abs(vfield3d(:,1)),mask=icompute_atomRT>0)
+      write(*,*) " V2 = ",  1d-3 * maxval(abs(vfield3d(:,2))), 1d-3*minval(abs(vfield3d(:,2)),mask=icompute_atomRT>0)
+      write(*,*) " V3 = ",  1d-3 * maxval(abs(vfield3d(:,3))), 1d-3*minval(abs(vfield3d(:,3)),mask=icompute_atomRT>0)
+    
+    
+      write(*,*) "Typical line extent due to V fields (km/s):"
+      write(*,*) v_char/1d3
+    
+      write(*,*) "Maximum/minimum turbulent velocity (km/s):"
+      write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
+    
+      write(*,*) "Maximum/minimum Temperature in the model (K):"
+      write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
+      write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+      write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
+      if (.not.lcalc_ne) then
+         write(*,*) "Maximum/minimum ne density in the model (m^-3):"
+         write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
+      endif
+
+   return
+   end subroutine print_info_model
     
 
 end module mhd2mcfost

@@ -367,6 +367,7 @@ subroutine define_cylindrical_grid()
 		if (maxval(tab_r)-maxval(tab_r_mod1d) /= 0.0) then
          call error("read 1d grid doesn't match the grid")
       endif
+      deallocate(tab_r_mod1d)
    endif
 
   r_lim(0)= rmin

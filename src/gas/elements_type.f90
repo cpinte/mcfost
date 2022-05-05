@@ -200,7 +200,8 @@ module elements_type
             !data are actually transposed from my fits to fortran
             elems(n)%Nstage = Nstage
             allocate(elems(n)%ionpot(elems(n)%Nstage))
-            allocate(elems(n)%pf(elems(n)%Nstage, Npf))
+            !-> all T for a given ionisation stage are contiguous in memory!
+            allocate(elems(n)%pf(Npf,elems(n)%Nstage))
             !now read the value of pf for that atom
             ! remember: pf(:,1) =  ion potentials
             !           pf(:,2:) = partition functions for all ion pots.
@@ -221,7 +222,7 @@ module elements_type
                 do j=2,Npf+1
                !!if (code.eq.1) write(*,*) 'pf=', data_krz(j,i)
      !!!pf(i,j-1) = LOG10(data_krz(j,i)) !29/12/2019, using neperien log
-                    elems(n)%pf(i,j-1) = LOG(data_krz(j,i))
+                    elems(n)%pf(j-1,i) = LOG(data_krz(j,i))
                !!if (code.eq.1) write(*,*) 'pf10powLog=', 10**(pf(i,j-1))
                 end do
             end do
@@ -307,17 +308,19 @@ module elements_type
         type(Element), intent(in) :: elem
         integer, intent(in) :: j
         real(kind=dp), intent(in) :: temp
-        real(kind=dp) :: Uk, Uka(1)
+        real(kind=dp) :: Uk
+        real(kind=dp) :: Uka(1), tp(1)
 
-        Uk = exp( interp(elem%pf(j,:),Tpf,temp) )
-        !Uk = (10.d0)**(Uk) !29/12/2019 -> part_func is ln(U)
+        ! Uk = exp( interp(elem%pf(:,j),Tpf,temp) )
+        ! elem%pf(:,j) is ln(U)
     
         !->faster
         !out of bound the function return 0 not the inner (outer) bound.
-        !   Uka(:) = linear_1D_sorted(Npf, Tpf, part_func, 1, T(k))
-        !   Uk = exp(Uka(1))
-        !   if( T(k) < Tpf(1) ) Uk = exp(part_func(1))
-        !   if (T(k) > Tpf(Npf)) Uk = exp(part_func(Npf))
+          tp(1) = temp
+          Uka(:) = linear_1D_sorted(Npf, Tpf, elem%pf(:,j), 1, tp)
+          Uk = exp(Uka(1))
+          if( temp < Tpf(1) ) Uk = exp(elem%pf(1,j))
+          if (temp > Tpf(Npf)) Uk = exp(elem%pf(Npf,j))
     
         return
     end function get_pf

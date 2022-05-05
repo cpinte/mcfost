@@ -17,6 +17,7 @@ module output
   use stars, only : E_stars
   use thermal_emission, only : L_packet_th
   use density
+  use atom_type, only : n_atoms, atoms
 
   implicit none
   save
@@ -37,6 +38,7 @@ module output
   ! Line transfer
   real, dimension(:,:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,phi,x,y
   real, dimension(:,:,:,:,:), allocatable :: continu ! trans,thetai,phi,x,y
+  real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux_total !total flux  when line transfer ("high resolution SED")
 
 
   real(kind=dp) :: sin_disk, cos_disk
@@ -190,6 +192,66 @@ subroutine allocate_mol_maps(imol)
   return
 
 end subroutine allocate_mol_maps
+
+!**********************************************************************
+
+subroutine allocate_atom_maps()
+  !There is a single file for each transition
+  !because this file can be pretty large.
+  !The total flux is allocated also if the sed mode is on.
+
+  integer :: alloc_status, max_lambda, max_trans
+  integer :: n, k, ilevel, jlevel, kr
+
+  max_lambda = n_lambda!max lambda_per_line
+  max_trans = 1!maxval( atoms(:)%p%nTrans_raytracing )
+
+ if (npix_x_save > 1) then
+     !-> temporary because I have not created a special grid for images yet
+     allocate(flux_total(n_lambda, RT_n_incl, RT_n_az, nb_proc),stat=alloc_status)
+     flux_total = 0.0_dp
+
+     RT_line_method = 2
+     npix_x = npix_x_save ; npix_y = npix_y_save
+     do n=1, n_atoms
+     	if (atoms(n)%p%lline) then
+     		do k=1, atoms(n)%p%nTrans_raytracing 
+     			ilevel = atoms(n)%p%i_Trans_rayTracing(k)
+         	jlevel = atoms(n)%p%j_Trans_rayTracing(k)
+            kr = atoms(n)%p%ij_to_trans(ilevel,jlevel)
+     			max_lambda = atoms(n)%p%lines(kr)%Nlambda
+     			allocate(atoms(n)%p%lines(kr)%map(npix_x,npix_y,max_lambda,RT_n_incl,RT_n_az),stat=alloc_status)
+     			atoms(n)%p%lines(kr)%map = 0.0_dp
+     		enddo
+     	endif
+     enddo
+  else
+     RT_line_method = 1
+     allocate(flux_total(n_lambda, RT_n_incl, RT_n_az, nb_proc),stat=alloc_status)
+     flux_total = 0.0_dp
+  endif
+  if (alloc_status > 0) call error('Allocation error atom_maps')
+
+  return
+
+end subroutine allocate_atom_maps
+
+subroutine deallocate_atom_maps()
+	integer :: n,kr
+
+	if (allocated(flux_total)) deallocate(flux_total)
+	
+	do n=1,n_atoms
+		if (atoms(n)%p%lline) then
+			do kr=1, atoms(n)%p%Nline
+				if (allocated(atoms(n)%p%lines(kr)%map)) deallocate(atoms(n)%p%lines(kr)%map)
+			enddo
+		endif
+	enddo
+	
+	return
+	
+end subroutine deallocate_atom_maps
 
 !**********************************************************************
 
@@ -382,7 +444,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
         endif
 
         if (lsepar_contrib) then
-           if (flag_star) then ! photon étoile
+           if (flag_star) then ! photon ï¿½toile
               if (flag_scatt) then
                  STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
@@ -427,7 +489,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            endif
 
            if (lsepar_contrib) then
-              if (flag_star) then ! photon étoile
+              if (flag_star) then ! photon ï¿½toile
                  if (flag_scatt) then
                     STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                          STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
@@ -456,7 +518,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            endif
 
            if (lsepar_contrib) then
-              if (flag_star) then ! photon étoile
+              if (flag_star) then ! photon ï¿½toile
                  if (flag_scatt) then
                     STOKEI_star_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
                          STOKEI_star_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
@@ -485,7 +547,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(4)
         endif
         if (lsepar_contrib) then
-           if (flag_star) then ! photon étoile
+           if (flag_star) then ! photon ï¿½toile
               if (flag_scatt) then
                  STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
@@ -511,7 +573,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      sed_u(lambda,capt,c_phi,id) = sed_u(lambda,capt,c_phi,id) + stok(3)
      sed_v(lambda,capt,c_phi,id) = sed_v(lambda,capt,c_phi,id) + stok(4)
      n_phot_sed(lambda,capt,c_phi,id) = n_phot_sed(lambda,capt,c_phi,id) + 1.0_dp
-     if (flag_star) then ! photon étoile
+     if (flag_star) then ! photon ï¿½toile
         if (flag_scatt) then
            sed_star_scat(lambda,capt,c_phi,id) = sed_star_scat(lambda,capt,c_phi,id) + stok(1)
         else
@@ -2110,9 +2172,9 @@ subroutine ecriture_UV_field()
 
   real, dimension(n_cells) :: G
 
-  ! D'après van Dishoeck et al. (2008) le champs FUV de Draine est de 2.67e-3 erg cm-2 s-1
+  ! D'aprï¿½s van Dishoeck et al. (2008) le champs FUV de Draine est de 2.67e-3 erg cm-2 s-1
   ! Soit 2.67e-6 W / m2
-  ! C'est entre 912 et 2000 Angströms (la borne supérieure varie un peu d'un papier à l'autre).
+  ! C'est entre 912 et 2000 Angstrï¿½ms (la borne supï¿½rieure varie un peu d'un papier ï¿½ l'autre).
 
   filename = trim(data_dir)//"/UV_field.fits.gz"
 

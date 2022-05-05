@@ -1546,10 +1546,7 @@ end function locate
    i0 = max(locate(xi,xo),2)
    j0 = max(locate(yi,yo),2)
 
-   write(*,*) i0, j0
-
-   write(*,*) "bilinear interpolation not tested yet!!"
-
+   ! write(*,*) i0, j0
 
    norm = ((xi(i0) - xi(i0-1)) * (yi(j0) - yi(j0-1)))
    f11 = f(i0-1,j0-1)

@@ -37,16 +37,11 @@ module grid
    allocate(nHtot(n_cells), ne(n_cells), T(n_cells))
    allocate(nHmin(n_cells), vturb(n_cells))
 
-   !here vfield_x,_y and _z are either R,z, phi or r,theta, phi.
+   !here vfield3d are either R,z, phi or r,theta, phi.
    !works onlt if lvelocity_file = .false.
-   if (allocated(vfield_x)) deallocate(vfield_x, vfield_y, vfield_z)
+   if (allocated(vfield3d)) deallocate(vfield3d)
    if (.not.lvoronoi) then
-   !    allocate(vfield_v1(n_cells)); vfield_v1 = 0.0_dp
-   !    allocate(vfield_v2(n_cells)); vfield_v2 = 0.0_dp
-   !    allocate(vfield_v3(n_cells)); vfield_v3 = 0.0_dp
-       allocate(vfield_x(n_cells)); vfield_x = 0.0_dp
-       allocate(vfield_y(n_cells)); vfield_y = 0.0_dp
-       allocate(vfield_z(n_cells)); vfield_z = 0.0_dp
+       allocate(vfield3d(n_cells,3)); vfield3d = 0.0_dp
    end if
 
    lcalc_ne = .false.
@@ -74,7 +69,7 @@ module grid
    if (allocated(nHmin)) deallocate(nHmin)
 
    if (.not.lvoronoi) then
-      deallocate(vfield_x,vfield_y,vfield_z)
+      deallocate(vfield3d)
    end if
 
 
@@ -82,6 +77,33 @@ module grid
 
    return
  end subroutine dealloc_atomrt_grid
+ 
+  subroutine check_for_zero_electronic_density()
+   integer :: N_fixed_ne, icell
+
+   lcalc_ne = .false.
+   icell_loop : do icell=1,n_cells
+      !check that in filled cells there is electron density otherwise we need to compute it
+      !from scratch.
+      if (icompute_atomRT(icell) > 0) then
+
+         if (ne(icell) <= 0.0_dp) then
+            write(*,*) "  ** No electron density found in the model! ** "
+            lcalc_ne = .true.
+            exit icell_loop
+         endif
+
+      endif
+   enddo icell_loop
+   N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
+   if (N_fixed_ne > 0) then
+      write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
+   endif
+
+   return 
+
+  end subroutine check_for_zero_electronic_density
 
  subroutine order_zones()
    ! Order the various zones according to their Rin

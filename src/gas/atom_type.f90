@@ -2,6 +2,7 @@ module atom_type
 
    use mcfost_env, only : dp
    use constantes, only   : mel, AMU_KG, E_RYDBERG, vtherm
+   use messages, only : error
 
    implicit none
 
@@ -32,12 +33,14 @@ module atom_type
       character(len=17) :: vdWaals
       integer :: i, j
       integer :: Nb, Nr, Nlambda
+      integer :: Nover_inf, Nover_sup !max index of overlap with another line
       real(kind=dp) :: lambda0, lambdamin, lambdamax
       real(kind=dp) :: Aji, Bji, Bij, Grad, cStark, fosc
       real(kind=dp) :: twohnu3_c2, gij, vmax !m/s
       real :: qwing
       real(kind=dp), dimension(4) :: cvdWaals
       real(kind=dp), dimension(:), allocatable :: a
+      real(kind=dp), dimension(:,:,:,:,:), allocatable :: map !2d flux in the line
       ! real(kind=dp), dimension(:), allocatable :: u, pvoigt_eta, aeff, r, r1 !thomson approx. of Voigt.
       ! real(kind=dp), allocatable, dimension(:,:)  :: phi
       type (AtomType), pointer :: atom => NULL()
@@ -55,7 +58,8 @@ module atom_type
       !0->LTE; 1->OLD_POPULATIONS; 2->ZERO_RADIATION; 3->CSWITCH; 4->SOBOLEV/CEP 
       !only for lines !
       integer :: j_Trans_rayTracing(Nmax_Trans_raytracing), i_Trans_rayTracing(Nmax_Trans_raytracing)
-      integer, allocatable, dimension(:) :: tab_trans
+      integer, allocatable, dimension(:) :: tab_trans, i_trans, j_trans !return the index of a transition from 1 to atom%Ntr
+      integer, allocatable, dimension(:,:) :: ij_to_trans !from i and j return the index of a transiton
       !Compatibility with RH, stored the collision in character format!
       character(len=512), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
       real(kind=dp)                :: cswitch, Abund, weight, massf !mass fraction
@@ -93,6 +97,44 @@ module atom_type
    logical :: cswitch_enabled = .false.
    
    contains
+
+   subroutine get_trans_number(atom, ilevel,jlevel,kr)
+      !from lower level i and upper level j
+      !return the transition number from the first line 1 
+      !to the last continuum = tab_trans(atom%Ntrans)
+      type (AtomType), intent(in) :: atom
+      integer, intent(in) :: ilevel, jlevel
+      integer, intent(out) :: kr
+      integer :: i, j, k 
+      kr = 0
+
+      do i=1, atom%Ntr
+         k = atom%tab_trans(i)
+         if(k < atom%Ntr_line + 1) then !line
+            do j=1, atom%Nline
+               if ((atom%lines(j)%i==ilevel).and.(atom%lines(j)%j==jlevel)) then
+                  write(*,*) "found transition it is a line", k, atom%lines(j)%lambda0
+                  write(*,*) atom%lines(j)%i, atom%lines(j)%j
+                  kr = k
+                  return
+               endif
+            enddo
+         else !continua
+            do j=atom%Ntr_line+1, atom%Ntr
+               if ((atom%continua(j)%i==ilevel).and.(atom%continua(j)%j==jlevel)) then
+                  write(*,*) "found transition it is a continuum", k, atom%continua(j)%lambda0
+                  write(*,*) atom%continua(j)%i, atom%continua(j)%j
+                  kr = k
+                  return
+               endif
+            enddo
+         endif
+      enddo
+
+      call error("(get_trans_number) did not find the transition ! ")
+      return
+
+   end subroutine get_trans_number
 
    function rydberg_atom(atom)!correct from electron mass
       type (AtomType), intent(in) :: atom

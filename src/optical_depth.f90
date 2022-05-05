@@ -797,7 +797,7 @@ end subroutine optical_length_tot_mol
    ! level dissolution
    ! dust   
    ! ------------------------------------------------------------------------------- !
-
+      use read1d_models, only :  Icorona, xcorona, lcoronal_illumination !from above
       integer, intent(in) :: id, icell_in, iray
       real(kind=dp), intent(in) :: u,v,w
       real(kind=dp), intent(in) :: x,y,z
@@ -805,7 +805,7 @@ end subroutine optical_length_tot_mol
       integer, intent(in) :: N
       real(kind=dp), dimension(N), intent(in) :: lambda
       real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
-      real(kind=dp), dimension(N) :: Snu, tau, dtau, chi
+      real(kind=dp), dimension(N) :: Snu, tau, dtau, chi, coronal_irrad
       integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
       logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
@@ -848,7 +848,15 @@ end subroutine optical_length_tot_mol
          !therefore we need to test_exit_grid before using icompute_atom_rt
          if (icell <= n_cells) then
             lcellule_non_vide = (icompute_atomRT(icell) > 0)
-            if (icompute_atomRT(icell) < 0) return
+            if (icompute_atomRT(icell) < 0) then
+               if (icompute_atomRT(icell) == -1) then
+                  return
+               else
+                  !Does not return but cell is empty (lcellule_non_vide is .false.)
+                  coronal_irrad = linear_1D_sorted(size(xcorona),xcorona,Icorona(:,1),N,lambda)
+                  Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * coronal_irrad
+               endif
+            endif
          endif
 
          nbr_cell = nbr_cell + 1
@@ -878,6 +886,13 @@ end subroutine optical_length_tot_mol
                psi(:,iray,id) = ( 1.0_dp - exp( -dtau(:) ) ) / chi
                ds(iray,id) = l_contrib * AU_to_m
             endif
+
+            ! if (lorigine) then
+            !    if (maxval(ori(:,icell,id))==0.0_dp) then
+            !       ori(:,icell,id) = ori(:,icell,id) + eta(:,id) * exp(-tau(:))
+            !       tet(:,icell,id) = tet(:,icell,id) + tau(:) * exp(-tau(:))
+            !    endif
+            ! endif
 
             Snu = Snu / chi
 

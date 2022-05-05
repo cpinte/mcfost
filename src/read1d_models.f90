@@ -24,8 +24,9 @@ module read1d_models
 	contains
 	
 	
-	subroutine read_grid_1d()
+	subroutine read_grid_1d(mod_file)
 		!first loop on the model to read the list of radii to generate the grid
+		character(len=*), intent(in) :: mod_file
 		real(kind=dp) ::  Rstar_mod, Fcorona
 		integer :: Nr, i, Nlambda_corona
 		real(kind=dp) :: Fnorm, dnu, Rmax_c
@@ -40,8 +41,10 @@ module read1d_models
 		! lvoronoi = .false.
 		! lmagnetized = .false.
 		! calc_ne = .false.	
+		lvelocity_file = .true.
+		vfield_coord = 3
 		
-		open(unit=1,file=density_file, status="old")
+		open(unit=1,file=mod_file, status="old")
 		read(1,*) Rstar_mod
 		read(1,*) Nr
 		allocate(tab_r_mod1d(Nr),tab_T_mod1(Nr),tab_ne_mod1(Nr),tab_rho_mod1(Nr))
@@ -105,7 +108,7 @@ module read1d_models
 		write(*,*) "WARNING distance and map size set to : "
 		distance = Rmax * au_to_pc !pc
 		map_size = 2.005 * Rmax !au
-		write(*,*) distance, ' pc', map_size * 1e3, 'mau'
+		write(*,*) distance, ' pc', map_size * 1e3, 'mau'		
 	
 		return
 	end subroutine read_grid_1d

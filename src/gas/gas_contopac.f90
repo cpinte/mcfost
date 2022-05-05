@@ -13,7 +13,7 @@ module gas_contopac
    use atom_type, only : AtomicContinuum, find_continuum, AtomType, hydrogen, helium, &
       PassiveAtoms, Npassiveatoms
    use elements_type, only : elems
-   use grid, only : T, ne, nHmin, nHtot
+   use grid, only : T, ne, nHmin, nHtot, icompute_atomrt
    use constantes
    use utils, only : locate, interp, bilinear, linear_1D_sorted, Bpnu
    use occupation_probability, only : D_i, wocc_n
@@ -151,6 +151,7 @@ module gas_contopac
    subroutine alloc_gas_contopac(N, lambda)
       integer, intent(in) :: N
       real(kind=dp), intent(in) :: Lambda(N)
+      real(kind=dp), allocatable, dimension(:) :: tab_lambda_ang
 
       allocate(Hray_lambda(N))
 
@@ -174,16 +175,21 @@ module gas_contopac
       !cheap !
       !allocate cross-sections and compute then on lambda grid.
       allocate(alpha_geltman(N), alpha_wishart(N))
+      tab_lambda_ang = lambda * 10d0
       alpha_geltman = 0.0
       alpha_wishart = 0.0
-      alpha_wishart = 1d-22 * linear_1D_sorted(N_wishart, lambdai_wishart, alphai_wishart, N, 10*lambda)
+      alpha_wishart = 1d-22 * linear_1D_sorted(N_wishart, lambdai_wishart, alphai_wishart, N, tab_lambda_ang)
+      deallocate(tab_lambda_ang)
       alpha_geltman = 1d-21 * linear_1D_sorted(N_geltman, lambdai_geltman, alphai_geltman, N, lambda) !1e-17 cm^2 to m^2
 
 
       !for obvious reason a lambda base is used to avoid exp(-hc_k/T) to goes with zero at low T.
-      allocate(exphckT(n_cells))
-      exphckT(:) = exp(-hc_k/T/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm)
-    
+      allocate(exphckT(n_cells)); exphckT(:) = 0.0_dp
+      where (icompute_atomRT > 0)
+         exphckT(:) = exp(-hc_k/T/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm)
+      endwhere
+		write(*,'("max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
+
       return 
    end subroutine alloc_gas_contopac
 

@@ -27,7 +27,7 @@ module wavelengths_gas
    real(kind=dp), dimension(:), allocatable :: group_blue, group_red
    integer, dimension(:), allocatable :: Nline_per_group, Nlambda_per_group
    !non-lte freq grid
-   real(kind=dp), allocatable :: tab_lambda_cont(:)
+   real(kind=dp), allocatable :: tab_lambda_cont(:), tab_lambda_nm(:)
 
    !generator of grid for specific transitions
    procedure(make_sub_wavelength_grid_cont_log_nu), pointer :: subgrid_cont => make_sub_wavelength_grid_cont_log_nu
@@ -192,18 +192,19 @@ module wavelengths_gas
       return
    end subroutine deallocate_wavelengths_nlte
 
-   subroutine make_wavelength_nlte(lambda)
+   subroutine make_wavelength_nlte(lambda,Vmax_overlap)
    !now lambda is returned in micron beware !!
       !mum to nm = km_to_m
 
       !Total frequency grid, concatenation of all
       !individual grids.
       ! used only for the non-LTE loop.
+      real(kind=dp), optional :: vmax_overlap
       real(kind=dp), intent(out), allocatable :: lambda(:)
       integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda
       integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved, Nwaves, check_new_freq
       type (AtomType), pointer :: atom
-      integer :: alloc_status, lac, la
+      integer :: alloc_status, lac, la, nb, krr
       real(kind=dp), dimension(:), allocatable :: tmp_grid, tmp_grid2, all_l0, all_l1
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
@@ -211,6 +212,13 @@ module wavelengths_gas
       real(kind=dp) :: max_cont, l0, l1
       real :: hv_loc !like hv
       real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
+      logical :: check_for_overlap
+
+      check_for_overlap = .false.
+      if (present(vmax_overlap)) then
+         check_for_overlap = (abs(vmax_overlap) > 0.0) 
+         if (check_for_overlap) write(*,*) "*** Searching for maximum overlap between lines!"
+      endif
  
       Ntrans = 0
       !Compute number of transitions in total, the number of wavelengths for the continua
@@ -669,6 +677,53 @@ module wavelengths_gas
             ! write(*,*) "line", kr, " lam0=",atom%lines(kr)%lambda0, atom%lines(kr)%lambdamin, atom%lines(kr)%lambdamax
             ! write(*,*) " -> bounds on the grid:", lambda(atom%lines(kr)%Nb), lambda(atom%lines(kr)%Nr)
             Nlambda_max_line = max(Nlambda_max_line, atom%lines(kr)%Nlambda)
+            !second loop over all other lines of all other atoms to check for overlap !
+            !init there are no overlaps
+            ! *** natural overlaps are already taken into account into Nblue and Nred ***
+            atom%lines(kr)%Nover_inf = atom%lines(kr)%Nb
+            atom%lines(kr)%Nover_sup = atom%lines(kr)%Nr
+            !Does not change Nlambda (?)
+            if (check_for_overlap) then
+
+               inner_atom_loop : do nb = 1, n_atoms
+                  inner_line_loop : do krr=1, atoms(nb)%p%Nline
+
+                     if ( (nb==n).and.(kr==krr) ) cycle inner_line_loop
+
+                     l0 = min(atom%lines(kr)%lambda0,atoms(nb)%p%lines(krr)%lambda0)
+                     l1 = max(atom%lines(kr)%lambda0,atoms(nb)%p%lines(krr)%lambda0)
+
+                     if ( (l1-l0)/l0 <= abs(vmax_overlap)/c_light ) then
+                        atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, locate(lambda, atom%lines(kr)%lambda0*(1.0 +  abs(vmax_overlap)/c_light)))
+                        atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, locate(lambda, atom%lines(kr)%lambda0*(1.0 -  abs(vmax_overlap)/c_light)))
+                        ! write(*,*) "overlap of line", kr, atom%lines(kr)%lambda0, " of atom ", atom%ID, &
+                        !    " with line", krr, atoms(nb)%p%lines(krr)%lambda0, " of atom ", atoms(nb)%p%ID, " N0 = ", &
+                        !    locate(lambda, atoms(nb)%p%lines(krr)%lambda0)
+
+                        ! stop
+                     endif
+
+
+                     ! l0 = atom%lines(kr)%lambdamin*(1.0 - abs(vmax_overlap)/c_light)
+                     ! l1 = atom%lines(kr)%lambdamax*(1.0 + abs(vmax_overlap)/c_light)
+                     ! if ( (l0 > atoms(nb)%p%lines(krr)%lambdamin) .and. (l0 < atoms(nb)%p%lines(krr)%lambdamax)  ) then
+                     !    atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, locate(lambda, l0))
+                     ! endif
+                     ! if ( (l1 > atoms(nb)%p%lines(krr)%lambdamin) .and. (l1 < atoms(nb)%p%lines(krr)%lambdamax)  ) then
+                     !    atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, locate(lambda, l1))
+                     ! endif
+
+
+                  enddo inner_line_loop
+               enddo inner_atom_loop 
+
+               if (atom%lines(kr)%Nover_sup /= atom%lines(kr)%Nr .or. atom%lines(kr)%Nover_inf /= atom%lines(kr)%Nb) then
+                  write(*,*) "Consistency of overlap must be checked!"
+                  ! write(*,*) "line", kr, " is overlapping",  atom%lines(kr)%Nover_inf,  atom%lines(kr)%Nb, &
+                  !                atom%lines(kr)%Nover_sup,  atom%lines(kr)%Nr
+                  !re calc Nlambda ??
+               endif
+            endif !check for overlap
          enddo
  
          atom => NULL()
@@ -678,11 +733,11 @@ module wavelengths_gas
       Nlambda_max_trans = max(Nlambda_max_line,Nlambda_max_cont)
       write(*,*) "Number of max freq points for all trans :", Nlambda_max_trans
 
-      !output grid in micron
-      lambda = lambda * m_to_km
+      ! !output grid in micron
+      ! lambda = lambda * m_to_km
       !now lambda will be stored in micron for compatibility
       !but a lots of atomic variables use nm.
-      write(*,'("Wavelength grid: "(1F12.4)" mum to",(1F12.4)" mum")') minval(lambda),maxval(lambda)
+      write(*,'("Wavelength grid: "(1F12.4)" nm to",(1F12.4)" nm")') minval(lambda),maxval(lambda)
 
       return
    end subroutine make_wavelength_nlte

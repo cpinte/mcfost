@@ -587,7 +587,7 @@ contains
     use elements_type, only : wght_per_H, read_abundance
    !  use mhd2mcfost, only : alloc_atomrt_grid, nHtot, ne, &
    !     v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne
-    use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne
+    use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne, check_for_zero_electronic_density
 
     integer, intent(in) :: n_SPH
     real(dp), dimension(n_SPH), intent(in) :: T_tmp,mass_gas
@@ -595,7 +595,6 @@ contains
     real(dp), dimension(:), allocatable, intent(in) :: vt_tmp,mask
 
     integer :: icell,voroindex
-    integer :: N_fixed_ne = 0
     real(kind=dp) :: rho_to_nH, vxmax, vxmin, vymax, vymin, vzmax, vzmin, vmax
     real, parameter :: Lextent = 1.01
 
@@ -660,25 +659,7 @@ contains
     ! 		endif
 
 
-    lcalc_ne = .false.
-    icell_loop : do icell=1,n_cells
-       !check that in filled cells there is electron density otherwise we need to compute it
-       !from scratch.
-       if (icompute_atomRT(icell) > 0) then
-
-          if (ne(icell) <= 0.0_dp) then
-             write(*,*) "  ** No electron density found in the model! ** "
-             lcalc_ne = .true.
-             exit icell_loop
-          endif
-
-       endif
-    enddo icell_loop
-    N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
-    if (N_fixed_ne > 0) then
-       write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
-            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
-    endif
+	call check_for_zero_electronic_density
 
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
     write(*,*) "|Vx|", vxmax*1d-3, vxmin*1d-3

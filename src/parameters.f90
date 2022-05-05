@@ -61,10 +61,9 @@ module parametres
 
   ! Atomic line radiative transfer
   !!lstore_opac futur deprecation
-  logical :: lno_radiative_coupling, lsobolev, lsobolev_only, lexit_after_nonlte_loop, lmodel_1d
+  logical :: lno_radiative_coupling, lsobolev, lsobolev_only, lexit_after_nonlte_loop
   logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
-  				lmagnetoaccr, lforce_lte, lspherical_velocity, lstop_after_jnu, &
-       			ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation, lvfield_sphere_coord
+  				lforce_lte, lstop_after_jnu, ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
   integer :: Nrays_atom_transfer, istep_start
   
   !HEALpix
@@ -87,10 +86,9 @@ module parametres
   !Wavelength table for spectrally resolved images and spectra
   character(len=50) :: tab_wavelength_image, jnu_atom_file
   logical :: ltab_wavelength_image, lread_jnu_atom
-  !lmhd_voronoi enables the voronoi tesselation for either a pluto-formatted model (lpluto_file)
+  !lmhd_voronoi enables the voronoi tesselation for either a pluto-formatted model (not ye)
   !or an ascii file ready for tesselation (lmodel_ascii)
-  integer :: n_pluto_files
-  logical :: lpluto_file, lmodel_ascii, lmhd_voronoi
+  logical :: lmodel_ascii, lmhd_voronoi, lmodel_1d
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet

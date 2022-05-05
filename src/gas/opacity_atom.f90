@@ -19,6 +19,7 @@ module Opacity_atom
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:)!move in see
    ! real(kind=dp), parameter :: lambda_base = 500.0
    ! real(kind=dp), dimension(:), allocatable :: exphckT !exp(-hc_k/T)
+   real(kind=dp) :: vlabs
 
    contains
 
@@ -106,6 +107,18 @@ module Opacity_atom
       return
    end subroutine opacity_atom_bf_loc
 
+   function calc_vloc(icell,u,v,w,x,y,z,x1,y1,z1)
+      !computes the local mean velocity in direction (u,v,w) of the cell icell
+      !by averaging between points (x,y,z) and (x1,y1,z1).
+      real(kind=dp) :: calc_vloc
+      integer, intent(in) :: icell
+      real(kind=dp), intent(in) :: x, y, z, x1, y1, z1
+      real(kind=dp), intent(in) :: u, v, w
+
+      calc_vloc = 0.5 * (v_proj(icell,x1,y1,z1,u,v,w) + v_proj(icell,x,y,z,u,v,w))
+      return
+   end function calc_vloc
+
    subroutine opacity_atom_bb_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib, &
          iterate,N,lambda,chi,Snu)
       integer, intent(in) :: id, icell, iray,N
@@ -118,17 +131,37 @@ module Opacity_atom
       real(kind=dp), dimension(Nlambda_max_line) :: phi0
 
 
+      !average speed of the cell icell with iterate = (lsubstract_avg.and.nbr_cell==1) in direction iray.
+      !always 0 if labs is .false.
+      vlabs = 0.0_dp
+
       atom_loop : do nat = 1, N_Atoms
          atom => Atoms(nat)%p
 
          tr_loop : do kr = 1,atom%Nline
 
+            !if .not.labs (image or LTE), Nred and Nblue includes the maxium extension of line
+            !due to velocity fields (and not only the natural width + damping)
             Nred = atom%lines(kr)%Nr; Nblue = atom%lines(kr)%Nb
             Nlam = atom%lines(kr)%Nlambda
             i = atom%lines(kr)%i; j = atom%lines(kr)%j
 
             if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) then
                cycle tr_loop
+            endif
+            
+            if (iterate) then
+               vlabs = calc_vloc(icell,u,v,w,x,y,z,x1,y1,z1)
+               write(*,*) id, icell, " vlabs = ", vlabs * 1d-3
+            else
+               if (vlabs < 0) then
+                  Nblue = atom%lines(kr)%Nover_inf
+                  Nred = Nlam - 1 + Nblue
+               elseif (vlabs > 0) then
+                  Nred = atom%lines(kr)%Nover_sup
+                  Nblue = Nred - Nlam + 1
+               !vlabs == 0.0 (or labs) does not change Nblue and Nred
+               endif
             endif
 
             phi0(1:Nlam) = profile_art(atom%lines(kr),icell,iterate,Nlam,lambda(Nblue:Nred),&
@@ -180,7 +213,8 @@ module Opacity_atom
                                                 dv, omegav_mean
       type (AtomicLine), intent(in)          :: line
       integer                                :: Nred, Nblue, i, j, nv
-      real(kind=dp), dimension(N)            :: u1, profile_art
+      real(kind=dp), dimension(N)            :: u0, profile_art, u1
+      ! real(kind=dp), dimension(N,NvspaceMax) :: u1
 
 
       Nvspace = NvspaceMax
@@ -188,7 +222,7 @@ module Opacity_atom
       Nred = line%Nr; Nblue = line%Nb
       vth = vbroad(T(icell),line%Atom%weight, vturb(icell))
 
-      u1(:) = (lambda - line%lambda0)/line%lambda0  * ( c_light/vth )
+      u0(:) = (lambda - line%lambda0)/line%lambda0  * ( c_light/vth )
 
       v0 = v_proj(icell,x,y,z,u,v,w)
       if (lvoronoi) then
@@ -214,19 +248,38 @@ module Opacity_atom
          omegav(Nvspace) = v1
          omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
       endif
-      if (lsubstract_avg) omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+      !in non-LTE:
+      !the actual cell icell_nlte must be centered on 0 (moving at vmean).
+      !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte) 
+      if (lsubstract_avg) then!labs == .true.
+         omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+         !omegav_mean should be close to vlabs
+         write(*,*) "vlabs=", vlabs*1d-3, omegav_mean * 1d-3
+         stop
+      else
+         !recentre the cell on the speed of the non-lte cell,
+         !so that the kinematics is computed with respect to a non-moving non-lte cell.
+         !it is always 0 in LTE or image (when labs = .false.)
+         omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs
+         write(*,*) "vlabs = ", vlabs * 1d-3
+      endif
 
 
       if (line%voigt) then
-         profile_art(:) = Voigt(N, line%a(icell), u1(:) - omegav(1)/vth)
+         u1(:) = u0(:) - omegav(1)/vth
+         profile_art(:) = Voigt(N, line%a(icell), u1(:))
          do nv=2, Nvspace
-            profile_art(:) = profile_art(:) + Voigt(N, line%a(icell), u1(:) - omegav(nv)/vth)
+            u1(:) = u0(:) - omegav(nv)/vth
+            profile_art(:) = profile_art(:) + Voigt(N, line%a(icell), u1(:))
          enddo
 
       else
-         profile_art(:) = exp(-(u1(:) - omegav(1)/vth)**2)
+         !u1 = (u0 - omegav(nv)/vth)**2
+         u1(:) = u0(:)*u0(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
+         profile_art(:) = exp(-u1(:))
          do nv=2, Nvspace
-            profile_art(:) = profile_art(:) + exp(-(u1(:) - omegav(nv)/vth)**2)
+            u1(:) = u0(:)*u0(:) + (omegav(nv)/vth)*(omegav(nv)/vth) - 2*u0(:) * omegav(nv)/vth
+            profile_art(:) = profile_art(:) + exp(-u1(:))
          enddo
       endif
 
