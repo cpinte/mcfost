@@ -704,16 +704,6 @@ module wavelengths_gas
                      endif
 
 
-                     ! l0 = atom%lines(kr)%lambdamin*(1.0 - abs(vmax_overlap)/c_light)
-                     ! l1 = atom%lines(kr)%lambdamax*(1.0 + abs(vmax_overlap)/c_light)
-                     ! if ( (l0 > atoms(nb)%p%lines(krr)%lambdamin) .and. (l0 < atoms(nb)%p%lines(krr)%lambdamax)  ) then
-                     !    atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, locate(lambda, l0))
-                     ! endif
-                     ! if ( (l1 > atoms(nb)%p%lines(krr)%lambdamin) .and. (l1 < atoms(nb)%p%lines(krr)%lambdamax)  ) then
-                     !    atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, locate(lambda, l1))
-                     ! endif
-
-
                   enddo inner_line_loop
                enddo inner_atom_loop 
 

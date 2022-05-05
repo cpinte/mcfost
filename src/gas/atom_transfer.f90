@@ -245,10 +245,7 @@ module atom_transfer
          Flux_total(:,ibin,iaz,id) = Flux_total(:,ibin,iaz,id) + I0(:) * normF
       ! endif
 
-      !Proc bug ??? need explicit proc id?
-      !Flux map for lines
-      !The continuum map is sotred at the location of lambda0, which is not the necessarily the centre
-      !of the line in the observer's frame.
+
       if (RT_line_method==2) then
          do nat=1,N_atoms
             atom => atoms(nat)%p

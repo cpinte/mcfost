@@ -213,7 +213,7 @@ module Opacity_atom
                                                 dv, omegav_mean
       type (AtomicLine), intent(in)          :: line
       integer                                :: Nred, Nblue, i, j, nv
-      real(kind=dp), dimension(N)            :: u0, profile_art, u1
+      real(kind=dp), dimension(N)            :: u0, profile_art, u1, u0sq
       ! real(kind=dp), dimension(N,NvspaceMax) :: u1
 
 
@@ -275,10 +275,11 @@ module Opacity_atom
 
       else
          !u1 = (u0 - omegav(nv)/vth)**2
-         u1(:) = u0(:)*u0(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
+         u0sq(:) = u0(:)*u0(:)
+         u1(:) = u0sq(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
          profile_art(:) = exp(-u1(:))
          do nv=2, Nvspace
-            u1(:) = u0(:)*u0(:) + (omegav(nv)/vth)*(omegav(nv)/vth) - 2*u0(:) * omegav(nv)/vth
+            u1(:) = u0sq(:) + (omegav(nv)/vth)*(omegav(nv)/vth) - 2*u0(:) * omegav(nv)/vth
             profile_art(:) = profile_art(:) + exp(-u1(:))
          enddo
       endif
