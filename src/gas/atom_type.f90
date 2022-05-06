@@ -18,7 +18,7 @@ module atom_type
 
 
    type AtomicContinuum
-      logical :: hydrogenic
+      logical :: hydrogenic, lcontrib
       integer :: i, j
       integer :: Nb, Nr, Nlambda
       real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionisation
@@ -29,7 +29,7 @@ module atom_type
 
    type AtomicLine
       logical  :: polarizable
-      logical  :: Voigt=.true.
+      logical  :: Voigt, lcontrib
       character(len=17) :: vdWaals
       integer :: i, j
       integer :: Nb, Nr, Nlambda
@@ -58,7 +58,8 @@ module atom_type
       !0->LTE; 1->OLD_POPULATIONS; 2->ZERO_RADIATION; 3->CSWITCH; 4->SOBOLEV/CEP 
       !only for lines !
       integer :: j_Trans_rayTracing(Nmax_Trans_raytracing), i_Trans_rayTracing(Nmax_Trans_raytracing)
-      integer, allocatable, dimension(:) :: tab_trans, i_trans, j_trans !return the index of a transition from 1 to atom%Ntr
+      ! integer, allocatable, dimension(:) :: tab_trans -> not useful anymore (?)
+      integer, allocatable, dimension(:) :: i_trans, j_trans !return the index of a transition from 1 to atom%Ntr
       integer, allocatable, dimension(:,:) :: ij_to_trans !from i and j return the index of a transiton
       !Compatibility with RH, stored the collision in character format!
       character(len=512), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
@@ -98,43 +99,49 @@ module atom_type
    
    contains
 
-   subroutine get_trans_number(atom, ilevel,jlevel,kr)
+   function trans_number(atom, ilevel,jlevel)
       !from lower level i and upper level j
       !return the transition number from the first line 1 
-      !to the last continuum = tab_trans(atom%Ntrans)
+      !to the last continuum = atom%Ntrans
+      !
+      !
+      ! TO DO: check that the returned number is consistent !
+      !        define an independent function not relying on atom%ij_to_trans
       type (AtomType), intent(in) :: atom
       integer, intent(in) :: ilevel, jlevel
-      integer, intent(out) :: kr
-      integer :: i, j, k 
-      kr = 0
+      integer :: i, j, k , trans_number
 
-      do i=1, atom%Ntr
-         k = atom%tab_trans(i)
-         if(k < atom%Ntr_line + 1) then !line
-            do j=1, atom%Nline
-               if ((atom%lines(j)%i==ilevel).and.(atom%lines(j)%j==jlevel)) then
-                  write(*,*) "found transition it is a line", k, atom%lines(j)%lambda0
-                  write(*,*) atom%lines(j)%i, atom%lines(j)%j
-                  kr = k
-                  return
-               endif
-            enddo
-         else !continua
-            do j=atom%Ntr_line+1, atom%Ntr
-               if ((atom%continua(j)%i==ilevel).and.(atom%continua(j)%j==jlevel)) then
-                  write(*,*) "found transition it is a continuum", k, atom%continua(j)%lambda0
-                  write(*,*) atom%continua(j)%i, atom%continua(j)%j
-                  kr = k
-                  return
-               endif
-            enddo
-         endif
-      enddo
+      trans_number = atom%ij_to_trans(ilevel,jlevel)
 
-      call error("(get_trans_number) did not find the transition ! ")
       return
 
-   end subroutine get_trans_number
+      ! do i=1, atom%Ntr
+      !    k = atom%tab_trans(i)
+      !    if(k < atom%Ntr_line + 1) then !line
+      !       do j=1, atom%Nline
+      !          if ((atom%lines(j)%i==ilevel).and.(atom%lines(j)%j==jlevel)) then
+      !             write(*,*) "found transition it is a line", k, atom%lines(j)%lambda0
+      !             write(*,*) atom%lines(j)%i, atom%lines(j)%j
+      !             kr = k
+      !             return
+      !          endif
+      !       enddo
+      !    else !continua
+      !       do j=atom%Ntr_line+1, atom%Ntr
+      !          if ((atom%continua(j)%i==ilevel).and.(atom%continua(j)%j==jlevel)) then
+      !             write(*,*) "found transition it is a continuum", k, atom%continua(j)%lambda0
+      !             write(*,*) atom%continua(j)%i, atom%continua(j)%j
+      !             kr = k
+      !             return
+      !          endif
+      !       enddo
+      !    endif
+      ! enddo
+
+      ! call error("(get_trans_number) did not find the transition ! ")
+      ! return
+
+   end function trans_number
 
    function rydberg_atom(atom)!correct from electron mass
       type (AtomType), intent(in) :: atom
