@@ -29,6 +29,9 @@ module Opacity_atom
       integer :: nat, kr, icell, nb, nr
       type(AtomType), pointer :: atm
       real(kind=dp) :: vth
+      integer(kind=8) :: mem_loc
+
+      mem_loc = 0
 
       call alloc_gas_contopac(N,x)
   
@@ -37,10 +40,12 @@ module Opacity_atom
 
       do nat=1, n_atoms
          atm => atoms(nat)%p
+         !if commong gauss prof add in mem_loc
          do kr=1,atm%nline
                if (atm%lines(kr)%Voigt) then
                   allocate(atm%lines(kr)%v(atm%lines(kr)%Nlambda),atm%lines(kr)%phi(atm%lines(kr)%Nlambda,n_cells))
                   allocate(atm%lines(kr)%a(n_cells))
+                  mem_loc = mem_loc + sizeof(atm%lines(kr)%a)+sizeof(atm%lines(kr)%phi)+sizeof(atm%lines(kr)%v)
                endif
          enddo
 
@@ -80,6 +85,8 @@ module Opacity_atom
 
          atm => null()
       enddo
+
+      write(*,'("allocate "(1F6.4)" GB for line profiles")') real(mem_loc) / 1024.0/1024./1024.0
 
 
       return
@@ -224,7 +231,7 @@ module Opacity_atom
                endif
             endif
 
-            phi0(1:Nlam) = profile_art_i(atom%lines(kr),icell,iterate,Nlam,lambda(Nblue:Nred),&
+            phi0(1:Nlam) = profile_art(atom%lines(kr),icell,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
 
@@ -366,7 +373,7 @@ module Opacity_atom
                                                 dv, omegav_mean
       type (AtomicLine), intent(in)          :: line
       integer                                :: Nred, Nblue, i, j, nv
-      real(kind=dp), dimension(N)            :: u0, profile_art_i, u1, u0sq
+      real(kind=dp), dimension(N)            :: uloc, u0, profile_art_i, u1, u0sq
       ! real(kind=dp), dimension(N,NvspaceMax) :: u1
 
 
@@ -376,6 +383,7 @@ module Opacity_atom
       vth = vbroad(T(icell),line%Atom%weight, vturb(icell))
 
       u0(:) = (lambda - line%lambda0)/line%lambda0  * ( c_light/vth )
+      uloc(:) = line%v(:) / vth
 
       v0 = v_proj(icell,x,y,z,u,v,w)
       if (lvoronoi) then
@@ -420,10 +428,10 @@ module Opacity_atom
 
       if (line%voigt) then
          u1(:) = u0(:) - omegav(1)/vth
-         profile_art_i(:) = linear_1D_sorted(N,u0(:),line%phi(:,icell),N,u1(:))
+         profile_art_i(:) = linear_1D_sorted(N,uloc(:),line%phi(:,icell),N,u1(:))
          do nv=2, Nvspace
             u1(:) = u0(:) - omegav(nv)/vth
-            profile_art_i(:) = profile_art_i(:) + linear_1D_sorted(N,u0(:),line%phi(:,icell),N,u1(:))
+            profile_art_i(:) = profile_art_i(:) + linear_1D_sorted(N,uloc(:),line%phi(:,icell),N,u1(:))
          enddo
 
       else

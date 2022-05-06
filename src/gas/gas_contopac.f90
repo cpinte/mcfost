@@ -18,6 +18,7 @@ module gas_contopac
    use utils, only : bilinear, linear_1D_sorted, Bpnu, locate
    use occupation_probability, only : D_i, wocc_n
    use parametres, only : ldissolve, n_cells
+   use messages, only : error
 
    implicit none
 	
@@ -29,7 +30,9 @@ module gas_contopac
    real(kind=dp), dimension(N_wishart) :: lambdai_wishart, alphai_wishart
    real(kind=dp), dimension(N_geltman) :: lambdai_geltman, alphai_geltman
    !TO DO -> interpolate 1/2 of the table to avoid bilinear interpolation
-   real(kind=dp), dimension(:,:), allocatable :: alpha_bell_berr
+   real(kind=dp), dimension(:), allocatable :: j0_theta_bell_berr
+   integer :: i0_lam_bell_berr
+   real(kind=dp) :: lambdai_bell_berr(23), thetai_bell_berr(11), alphai_bell_berr(23,11)
    real(kind=dp), parameter :: lambda_base = 500.0_dp
    real(kind=dp), dimension(:), allocatable :: exphckT !exp(-hc_k/T)
 
@@ -77,6 +80,72 @@ module gas_contopac
    39.06,38.53,37.89,37.13,36.25,35.28,34.19,33.01,31.72,30.34,28.87,       &
    27.33,25.71,24.02,22.26,20.46,18.62,16.74,14.85,12.95,11.07,9.211,7.407, &
    5.677,4.052,2.575,1.302,0.8697,0.4974, 0.1989 /
+
+   !AA, index 12 is 9113.0 AA
+   data lambdai_bell_berr  /0.00, 1823.00, 2278.0, 2604.0, 3038.0, 3645.0,			&
+         4557.0, 5063.0, 5696.0, 6510.0, 7595.0, 9113.0, 					&
+         10126.0, 11392.0, 13019.0, 15189.0, 18227.0, 22784.0,				&
+         30378.0, 45567.0, 91134.0, 113918.0, 151890.0						/
+
+   data thetai_bell_berr /0.5, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.8, 3.6		/
+
+   !1d-26 cm^4/dyn = 1d-26 * 1d-3 m^2 / Pa = 1d-29 m^2/Pa
+      !t = 0.5
+   data alphai_bell_berr(:,1) /0.0, 1.78e-2, 2.28e-2, 2.77e-2, 3.64e-2, 5.20e-2,		&
+         7.91e-2, 9.65e-2, 1.21e-1, 1.54e-1, 2.08e-1, 2.93e-1,			&
+         3.58e-1, 4.48e-1, 5.79e-1, 7.81e-1, 1.11, 1.73,					&
+         3.04, 6.79, 2.70e1, 4.23e1, 7.51e1								/
+      !t = 0.6
+   data alphai_bell_berr(:,2) /0.0, 2.22e-2, 2.80e-2, 3.42e-2, 4.47e-2, 6.33e-2,		&
+         9.59e-2, 1.17e-1, 1.46e-1, 1.88e-1, 2.50e-1, 3.54e-1, 4.32e-1,	&
+         5.39e-1, 6.99e-1, 9.40e-1, 1.34, 2.08, 3.65, 8.16, 3.24e1,		&
+         5.06e1, 9.0e1													/
+      !t = 0.8
+   data alphai_bell_berr(:,3) /0.0, 3.08e-2, 3.88e-2, 4.76e-2, 6.16e-2, 8.59e-2,		&
+         1.29e-1, 1.57e-1, 1.95e-1, 2.49e-1, 3.32e-1, 4.68e-1, 5.72e-1,	&
+         7.11e-1, 9.24e-1, 1.24, 1.77, 2.74, 4.80, 1.07e1, 4.26e1, 		&
+         6.64e1, 1.18e2													/
+      !t = 1.0
+   data alphai_bell_berr(:,4) /0.0, 4.02e-2, 4.99e-2, 6.15e-2, 7.89e-2, 1.08e-1,		&
+         1.61e-1, 1.95e-1, 2.41e-1, 3.09e-1, 4.09e-1, 5.76e-1, 7.02e-1,		&
+         8.71e-1, 1.13, 1.52, 2.17, 3.37, 5.86, 1.31e1, 5.19e1, 8.08e1,		&
+         1.44e2																/
+      !t = 1.2
+   data alphai_bell_berr(:,5) /0.0, 4.98e-2, 6.14e-2, 7.60e-2, 9.66e-2, 1.31e-1,		&
+         1.94e-1, 2.34e-1, 2.88e-1, 3.67e-1, 4.84e-1, 6.77e-1, 8.25e-1, 	&
+         1.02, 1.33, 1.78, 2.53, 3.90, 6.86, 1.53e1, 6.07e1, 9.45e1,		&
+         1.68e2															/
+      !t = 1.4
+   data alphai_bell_berr(:,6) /0.0, 5.96e-2, 7.32e-2, 9.08e-2, 1.14e-1, 1.54e-1, 	&
+         2.27e-1, 2.72e-1, 3.34e-1, 4.24e-1, 5.57e-1, 7.77e-1, 9.43e-1, 	&
+         1.16, 1.51, 2.02, 2.87, 4.50, 7.79, 1.74e1, 6.89e1, 1.07e2, 	&
+         1.91e2															/
+      !t = 1.6
+   data alphai_bell_berr(:,7) /0.0, 6.95e-2, 8.51e-2, 1.05e-1, 1.32e-1, 1.78e-1, 	&
+         2.60e-1, 3.11e-1, 3.81e-1, 4.82e-1, 6.30e-1, 8.74e-1, 1.06,		&
+         1.29, 1.69, 2.26, 3.20, 5.01, 8.67, 1.94e1, 7.68e1, 1.20e2, 	&
+         2.12e2															/
+
+      !t = 1.8
+   data alphai_bell_berr(:,8) /0.0, 7.95e-2, 9.72e-2, 1.21e-1, 1.50e-1, 2.01e-1, 	&
+         2.93e-1,3.51e-1, 4.28e-1, 5.39e-1, 7.02e-1,9.69e-1,1.17, 1.43, 	&
+         1.86,2.48, 3.51,5.50, 9.50, 2.12e1, 8.42e1, 1.31e2, 2.34e2		/
+
+      !t = 2.0
+   data alphai_bell_berr(:,9) /0.0, 8.96e-2, 1.1e-1, 1.36e-1, 1.69e-1, 2.25e-1, 		&
+         3.27e-1, 3.9e-1, 4.75e-1, 5.97e-1, 7.74e-1, 1.06, 1.28, 1.57, 	&
+         2.02, 2.69, 3.8, 5.95, 1.03e1, 2.30e1, 9.14e1, 1.42e2, 2.53e2	/
+
+      !t = 2.8
+   data alphai_bell_berr(:,10) /0.0, 1.31e-1, 1.60e-1, 1.99e-1, 2.43e-1, 3.21e-1, 	&
+         4.63e-1, 5.49e-1, 6.67e-1, 8.30e-1, 1.06, 1.45, 1.73, 2.09, 	&
+         2.67, 3.52, 4.92, 7.59, 1.32e1, 2.95e1, 1.17e2, 1.83e2, 		&
+         3.25e2															/
+
+      !t = 3.6
+   data alphai_bell_berr(:,11) /0.0, 1.72e-1, 2.11e-1, 2.62e-1, 3.18e-1, 4.18e-1,	&
+         6.02e-1, 7.11e-1, 8.61e-1, 1.07, 1.36, 1.83, 2.17, 2.60, 3.31, 	&
+         4.31, 5.97, 9.06, 1.56e1, 3.50e1, 1.40e2, 2.19e2, 3.88e2		/
 
    contains
 
@@ -155,6 +224,8 @@ module gas_contopac
       integer, intent(in) :: N
       real(kind=dp), intent(in) :: Lambda(N)
       real(kind=dp), allocatable, dimension(:) :: tab_lambda_ang
+      real(kind=dp) :: theta
+      integer :: icell
 
       allocate(Hray_lambda(N))
 
@@ -185,13 +256,21 @@ module gas_contopac
       deallocate(tab_lambda_ang)
       alpha_geltman = 1d-21 * linear_1D_sorted(N_geltman, lambdai_geltman, alphai_geltman, N, lambda) !1e-17 cm^2 to m^2
 
+      allocate(j0_theta_bell_berr(n_cells))
+      i0_lam_bell_berr = max(locate(lambdai_bell_berr, 10*lambda(1)),2)!all wavelengths are contiguous. We only need the index of the first one
 
       !for obvious reason a lambda base is used to avoid exp(-hc_k/T) to goes with zero at low T.
       allocate(exphckT(n_cells)); exphckT(:) = 0.0_dp
-      where (icompute_atomRT > 0)
-         exphckT(:) = exp(-hc_k/T/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm))
-      endwhere
-		write(*,'("max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
+      do icell=1,n_cells
+         if (icompute_AtomRT(icell)>0) then
+            theta = 5040. / T(icell)
+            j0_theta_bell_berr(icell) = max(locate(thetai_bell_berr, theta),2)
+            exphckT(icell) = exp(-hc_k/T(icell)/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm))
+         endif
+      enddo
+		write(*,'("allocate "(1F6.4)" GB for j0_bell_berr")') real(sizeof(j0_theta_bell_berr))/1024./1024./1024.
+		write(*,'("allocate "(1F6.4)" GB for exp(-hc/kT)")') real(sizeof(exphckT))/1024./1024./1024.
+		write(*,'(" -> max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
 
       return 
    end subroutine alloc_gas_contopac
@@ -205,7 +284,8 @@ module gas_contopac
       deallocate(exphckT)
       !anyway should not cost anything!
 
-      deallocate(alpha_wishart, alpha_geltman)
+      deallocate(alpha_wishart, alpha_geltman, j0_theta_bell_berr)
+      i0_lam_bell_berr = 0
 
       return
    end subroutine dealloc_gas_contopac
@@ -599,11 +679,8 @@ module gas_contopac
       real(kind=dp), dimension(N), intent(in) :: lambda
       integer :: la
       real(kind=dp), dimension(N), intent(out) :: chi
-      real(kind=dp), dimension(:) :: lambdai(23), thetai(11)
-      real(kind=dp), dimension(23,11) :: alphai
       integer :: i0, j0
       real(kind=dp) :: lam, stm, sigma, theta, pe, nH
-      ! real(kind=dp), dimension(N) :: alpha_bell_berr_loc
 
       chi(:) = 0.0_dp
       theta = 5040. / T(icell)
@@ -614,93 +691,25 @@ module gas_contopac
          if (theta > 3.6) theta = 3.6_dp
       endif
 
-      !AA, index 12 (11 in C) is 9113.0 AA
-      data lambdai  /0.00, 1823.00, 2278.0, 2604.0, 3038.0, 3645.0,			&
-         4557.0, 5063.0, 5696.0, 6510.0, 7595.0, 9113.0, 					&
-         10126.0, 11392.0, 13019.0, 15189.0, 18227.0, 22784.0,				&
-         30378.0, 45567.0, 91134.0, 113918.0, 151890.0						/
-
-      data thetai /0.5, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.8, 3.6		/
-
-      !1d-26 cm^4/dyn = 1d-26 * 1d-3 m^2 / Pa = 1d-29 m^2/Pa
-      !t = 0.5
-      data alphai(:,1) /0.0, 1.78e-2, 2.28e-2, 2.77e-2, 3.64e-2, 5.20e-2,		&
-         7.91e-2, 9.65e-2, 1.21e-1, 1.54e-1, 2.08e-1, 2.93e-1,			&
-         3.58e-1, 4.48e-1, 5.79e-1, 7.81e-1, 1.11, 1.73,					&
-         3.04, 6.79, 2.70e1, 4.23e1, 7.51e1								/
-      !t = 0.6
-      data alphai(:,2) /0.0, 2.22e-2, 2.80e-2, 3.42e-2, 4.47e-2, 6.33e-2,		&
-         9.59e-2, 1.17e-1, 1.46e-1, 1.88e-1, 2.50e-1, 3.54e-1, 4.32e-1,	&
-         5.39e-1, 6.99e-1, 9.40e-1, 1.34, 2.08, 3.65, 8.16, 3.24e1,		&
-         5.06e1, 9.0e1													/
-      !t = 0.8
-      data alphai(:,3) /0.0, 3.08e-2, 3.88e-2, 4.76e-2, 6.16e-2, 8.59e-2,		&
-         1.29e-1, 1.57e-1, 1.95e-1, 2.49e-1, 3.32e-1, 4.68e-1, 5.72e-1,	&
-         7.11e-1, 9.24e-1, 1.24, 1.77, 2.74, 4.80, 1.07e1, 4.26e1, 		&
-         6.64e1, 1.18e2													/
-      !t = 1.0
-      data alphai(:,4) /0.0, 4.02e-2, 4.99e-2, 6.15e-2, 7.89e-2, 1.08e-1,		&
-         1.61e-1, 1.95e-1, 2.41e-1, 3.09e-1, 4.09e-1, 5.76e-1, 7.02e-1,		&
-         8.71e-1, 1.13, 1.52, 2.17, 3.37, 5.86, 1.31e1, 5.19e1, 8.08e1,		&
-         1.44e2																/
-      !t = 1.2
-      data alphai(:,5) /0.0, 4.98e-2, 6.14e-2, 7.60e-2, 9.66e-2, 1.31e-1,		&
-         1.94e-1, 2.34e-1, 2.88e-1, 3.67e-1, 4.84e-1, 6.77e-1, 8.25e-1, 	&
-         1.02, 1.33, 1.78, 2.53, 3.90, 6.86, 1.53e1, 6.07e1, 9.45e1,		&
-         1.68e2															/
-      !t = 1.4
-      data alphai(:,6) /0.0, 5.96e-2, 7.32e-2, 9.08e-2, 1.14e-1, 1.54e-1, 	&
-         2.27e-1, 2.72e-1, 3.34e-1, 4.24e-1, 5.57e-1, 7.77e-1, 9.43e-1, 	&
-         1.16, 1.51, 2.02, 2.87, 4.50, 7.79, 1.74e1, 6.89e1, 1.07e2, 	&
-         1.91e2															/
-      !t = 1.6
-      data alphai(:,7) /0.0, 6.95e-2, 8.51e-2, 1.05e-1, 1.32e-1, 1.78e-1, 	&
-         2.60e-1, 3.11e-1, 3.81e-1, 4.82e-1, 6.30e-1, 8.74e-1, 1.06,		&
-         1.29, 1.69, 2.26, 3.20, 5.01, 8.67, 1.94e1, 7.68e1, 1.20e2, 	&
-         2.12e2															/
-
-      !t = 1.8
-      data alphai(:,8) /0.0, 7.95e-2, 9.72e-2, 1.21e-1, 1.50e-1, 2.01e-1, 	&
-         2.93e-1,3.51e-1, 4.28e-1, 5.39e-1, 7.02e-1,9.69e-1,1.17, 1.43, 	&
-         1.86,2.48, 3.51,5.50, 9.50, 2.12e1, 8.42e1, 1.31e2, 2.34e2		/
-
-      !t = 2.0
-      data alphai(:,9) /0.0, 8.96e-2, 1.1e-1, 1.36e-1, 1.69e-1, 2.25e-1, 		&
-         3.27e-1, 3.9e-1, 4.75e-1, 5.97e-1, 7.74e-1, 1.06, 1.28, 1.57, 	&
-         2.02, 2.69, 3.8, 5.95, 1.03e1, 2.30e1, 9.14e1, 1.42e2, 2.53e2	/
-
-      !t = 2.8
-      data alphai(:,10) /0.0, 1.31e-1, 1.60e-1, 1.99e-1, 2.43e-1, 3.21e-1, 	&
-         4.63e-1, 5.49e-1, 6.67e-1, 8.30e-1, 1.06, 1.45, 1.73, 2.09, 	&
-         2.67, 3.52, 4.92, 7.59, 1.32e1, 2.95e1, 1.17e2, 1.83e2, 		&
-         3.25e2															/
-
-      !t = 3.6
-      data alphai(:,11) /0.0, 1.72e-1, 2.11e-1, 2.62e-1, 3.18e-1, 4.18e-1,	&
-         6.02e-1, 7.11e-1, 8.61e-1, 1.07, 1.36, 1.83, 2.17, 2.60, 3.31, 	&
-         4.31, 5.97, 9.06, 1.56e1, 3.50e1, 1.40e2, 2.19e2, 3.88e2		/
-
 
       pe = ne(icell) * KB * T(icell)
       nH = hydrogen%n(1,icell)
 
-      ! already interpolated on all cells with 1d-29 factor !
-      ! alpha_bell_berr_loc = interp_1d(23,lambdai,alpha_bell_berr(:,icell), N, lambda)
 
-      j0 = min(max(locate(thetai, theta),2),11) !do once per cell
-      i0 = max(locate(lambdai, lambda(1)) - 1,1)!all wavelengths are contiguous. We only need the index of the first one
+      j0 = j0_theta_bell_berr(icell)
+      i0 = i0_lam_bell_berr
 
       do la=1, N
          lam = lambda(la) * 10.
-         if (lam > lambdai(23)) then
+         if (lam > lambdai_bell_berr(23)) then
             chi(la) = Hminus_ff_john_lam(icell,lambda(la))
          else
-            sigma = 1d-29 * bilinear(23,lambdai,min(i0+la,23),11,thetai,j0,alphai,lam,theta) !m^2/Pa
-            ! write(*,*) Sigma, bilinear(23,lambdai,i0+la,11,thetai,j0,alphai,lambdai(2),thetai(3))
-            ! write(*,*) i0+la, j0, lam, theta
-            ! stop
+            if (lam > lambdai_bell_berr(i0)) then
+               i0 = i0 + 1
+            endif
+            if (i0==24) call error("test bug H- ff bilin")
+            sigma = 1d-29 * bilinear(23,lambdai_bell_berr,i0,11,thetai_bell_berr,j0,alphai_bell_berr,lam,theta) !m^2/Pa
             chi(la) = sigma * pe * nH!m^-1
-            !chi(la) = pe * nH * alpha_bell_berr_loc(la)
          endif
       enddo
 
