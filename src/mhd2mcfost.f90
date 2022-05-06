@@ -11,11 +11,9 @@ module mhd2mcfost
     use sph2mcfost, only : SPH_to_Voronoi, Hydro_to_Voronoi_atomic
     use sort, only : find_kth_smallest_inplace
     use elements_type
+    use stars, only : laccretion_shock, Taccretion
 
     implicit none
-
-    real(kind=dp) :: Taccretion, max_Tshock = 0.0,min_Tshock = 1d8
-    logical :: laccretion_shock
 
     contains
 
@@ -205,9 +203,9 @@ module mhd2mcfost
 		   T(:) = tab_T_mod1(2:n_cells+1)
 		   nHtot(:) = tab_rho_mod1(2:n_cells+1) * rho_to_nH
 		   ne(:) = tab_ne_mod1(2:n_cells+1)
-		   vfield3d(:,1) = tab_v_mod1(1,2:n_cells+1)
-		   vfield3d(:,2) = tab_v_mod1(2,2:n_cells+1)
-		   vfield3d(:,3) = tab_v_mod1(3,2:n_cells+1)
+		   vfield3d(:,1) = tab_v_mod1(1,2:n_cells+1) !r
+		   vfield3d(:,2) = tab_v_mod1(3,2:n_cells+1) ! vphi
+		   vfield3d(:,3) = tab_v_mod1(2,2:n_cells+1) ! vtheta
 		   vturb(:) = tab_vt_mod1(2:n_cells+1)
 
          call check_for_zero_electronic_density()
@@ -315,7 +313,9 @@ module mhd2mcfost
                  else
                     call read_line(1, FormatLine, inputline, Nread)
                     read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
-                         vfield3d(icell,1), vfield3d(icell,2), vfield3d(icell,3), vturb(icell), icompute_atomRT(icell)
+                         vfield3d(icell,1), vfield3d(icell,3), vfield3d(icell,2), vturb(icell), icompute_atomRT(icell)
+                         ! vR                  vz/vtheta              vphi
+                         !beware vfield3d(2) is vphi and vfield3d(3) = vz or vtheta
 
                  end if !magnetized
               end do
@@ -356,68 +356,6 @@ module mhd2mcfost
     
         return
       end subroutine read_spheregrid_ascii
-
-  function is_inshock(id, iray, i_star, icell_prev, x, y, z, Tout)
-   use grid, only : voronoi
-   use constantes, only : sigma, kb
-   logical :: is_inshock
-   integer :: i_star, icell_prev, id, iray
-   real(kind=dp), intent(out) :: Tout
-   real(kind=dp) :: enthalp,  x, y, z !u, v, w
-   real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
-
-   is_inshock = .false.
-   if (.not.laccretion_shock) return
-
-   if (icell_prev<=n_cells) then
-      if (icompute_atomRT(icell_prev) > 0) then
-         rr = sqrt( x*x + y*y + z*z)
-         enthalp = 2.5 * 1d3 * kb * T(icell_prev) / wght_per_H / masseH
-
-         !vaccr is vr, the spherical r velocity component
-         if (lvoronoi) then !always 3d
-            vaccr = Voronoi(icell_prev)%vxyz(1)*x/rr + Voronoi(icell_prev)%vxyz(2)*y/rr + Voronoi(icell_prev)%vxyz(3) * z/rr
-            vmod2 = sum( Voronoi(icell_prev)%vxyz(:)**2 )
-         else
-         	if (vfield_coord==1) then
-               if (l3D) then !needed here if not 2.5d
-                  sign_z = 1.0_dp
-               else
-                  sign_z = sign(1.0_dp, z)
-               endif
-         		vaccr = vfield3d(icell_prev,1) * x/rr + vfield3d(icell_prev,2) * y/rr + vfield3d(icell_prev,3) * z/rr * sign_z
-            elseif (vfield_coord==2) then
-               if (l3D) then !needed here if not 2.5d
-                  sign_z = 1.0_dp
-               else
-                  sign_z = sign(1.0_dp, z)
-               endif
-               vaccr = vfield3d(icell_prev,1) * sqrt(1.0 - (z/rr)**2) + sign_z * vfield3d(icell_prev,2) * z/rr
-            else !spherical vector here
-               vaccr = vfield3d(icell_prev,1) !always negative for accretion
-            endif
-            vmod2 = sum(vfield3d(icell_prev,:)**2)
-         endif
-
-
-         if (vaccr < 0.0_dp) then
-            ! Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25
-            Tchoc = ( 1d-3 * masseH * wght_per_H * nHtot(icell_prev)/sigma * 0.5 * abs(vaccr)**3 )**0.25
-            is_inshock = (Tchoc > 1000.0)
-            Tout = Taccretion
-            if (Taccretion<=0.0) then 
-               is_inshock = (abs(Taccretion) * Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
-               Tout = abs(Taccretion) * Tchoc
-            endif
-            max_Tshock = max(max_Tshock, Tout)
-            min_Tshock = min(min_Tshock, Tout)
-         endif
-
-      endif !icompute_atomRT
-   endif !laccretion_shock
-
-   return
-  end function is_inshock
 
 
    subroutine print_info_model 

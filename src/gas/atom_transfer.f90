@@ -24,8 +24,8 @@ module atom_transfer
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
                                    tab_RT_az,tab_RT_incl
-   use stars, only               : intersect_stars
-   use output, only : allocate_atom_maps, flux_total
+   use stars, only               : intersect_stars, laccretion_shock, max_Tshock, min_Tshock
+   use output, only : allocate_atom_maps, flux_total, write_total_flux, write_atomic_maps
 
    !$ use omp_lib
 
@@ -46,7 +46,7 @@ module atom_transfer
    ! This routine initialises the necessary quantities for atomic line transfer
    ! and calls the appropriate routines for LTE or NLTE transfer.
    ! --------------------------------------------------------------------------- !
-      integer  :: ne_initial, ibin, iaz
+      integer  :: ne_initial, ibin, iaz, nat
       logical :: lelectron_read
       real(kind=dp) :: v_char
 
@@ -133,13 +133,20 @@ module atom_transfer
       !add an limage mode
       call allocate_atom_maps()
       write(*,*) "Computing emission flux map..."
-
+      if (laccretion_shock) then
+         max_Tshock = 0.0
+         min_Tshock = 1d8
+      endif
       call init_directions_ray_tracing()
       do ibin=1,RT_n_incl
          do iaz=1,RT_n_az
             call emission_line_map(ibin,iaz)
          end do
       end do
+      do nat=1, n_atoms
+         if (atoms(nat)%p%lline) call write_atomic_maps(atoms(nat)%p) !onyly with RT = 2
+      enddo
+      call write_total_flux() !tmp only with RT = 1
       write(*,*) " ..done"
 
 
@@ -421,9 +428,13 @@ module atom_transfer
 
    subroutine spectrum_1d()
       !TO DO log rays
-      !after non-LTE loop!
+      !TO DO fits format
+
+      !NOTE: cos_theta in that case is minimum at Rmax which is not the limb.
+      ! the limb is at p = 1.0 (rr=Rstar). In plan geomtry, cos_theta is minimum at the limb.
+      ! the plan-parralel cos_theta is np.sqrt(1.0 - p**2) for p < 1.0.
       integer :: la, j, icell0, id
-      logical :: lintersect
+      logical :: lintersect, labs
       integer, parameter :: Nimpact = 100
       real(kind=dp) :: rr, u,v,w,u0,w0,v0,x0,y0,z0,x(3),y(3),uvw(3)
       real(kind=dp), allocatable :: cos_theta(:), weight_mu(:), p(:)
@@ -445,6 +456,7 @@ module atom_transfer
       id = 1
       n_rays_done = 0
       ibar = 0
+      labs = .false.
 
       uvw = (/u,v,w/) !vector position
       x = (/1.0_dp,0.0_dp,0.0_dp/)
@@ -460,7 +472,7 @@ module atom_transfer
       !$omp private(id,icell0,j) &
       !$omp private(x0,y0,z0,lintersect,rr) &
       !$omp shared(cos_theta,p,Itot,N_lambda,tab_lambda_nm,x,y,weight_mu,ibar,n_rays_done)&
-      !$omp shared(u,v,w,u0,v0,w0,Rmax,Rmin)
+      !$omp shared(u,v,w,u0,v0,w0,Rmax,Rmin,labs)
       !$omp do schedule(dynamic,1)
       do j=1,Nimpact
          !$ id = omp_get_thread_num() + 1
@@ -474,7 +486,7 @@ module atom_transfer
          
          call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
          if (lintersect) then
-            call integ_ray_atom(id,icell0,x0,y0,z0,u0,v0,w0,j,.false.,n_lambda,tab_lambda_nm)
+            call integ_ray_atom(id,icell0,x0,y0,z0,u0,v0,w0,j,labs,n_lambda,tab_lambda_nm)
          endif
 
          !$omp atomic
@@ -496,8 +508,8 @@ module atom_transfer
       open(1,file="spectrum_1d.txt",status="unknown")
       write(1,*) Nimpact, N_lambda
       write(1,'(*(1ES17.8E3))') (p(j), j=1,Nimpact)
-      ! write(1,'(*(1ES17.8E3))') (cos_theta(j), j=1,Nimpact)
-      ! write(1,'(*(1ES17.8E3))') (weight_mu(j), j=1,Nimpact)
+      write(1,'(*(1ES17.8E3))') (cos_theta(j), j=1,Nimpact)
+      write(1,'(*(1ES17.8E3))') (weight_mu(j), j=1,Nimpact)
       write(1,'(*(1F12.4))') (tab_lambda_nm(la), la=1,N_lambda)
       do la=1,N_lambda
             write(1,'(*(1ES17.8E3))') (I_1d(la,j), j=1,Nimpact)

@@ -71,8 +71,9 @@ module Opacity_atom
       integer :: nat, Nred, Nblue, kr, i, j, idelem
       type(AtomType), pointer :: atom
       real(kind=dp) :: wi, wj, chi_ion, Diss, nn, gij, ni_on_nj_star
+      real(kind=dp), dimension(N) :: ehnukt
 
-
+      ehnukt(:) = exphckT(icell)**(lambda_base/lambda(:))
 
       atom_loop : do nat = 1, N_atoms
          atom => Atoms(nat)%p
@@ -80,22 +81,24 @@ module Opacity_atom
 
          tr_loop : do kr = 1,atom%Ncont
 
+            if (.not.atom%continua(kr)%lcontrib) cycle
+
             Nred = atom%continua(kr)%Nr; Nblue = atom%continua(kr)%Nb
             i = atom%continua(kr)%i; j = atom%continua(kr)%j
             !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
             ni_on_nj_star = atom%nstar(i,icell)/(atom%nstar(j,icell) + 1d-100)
 
-            gij = ni_on_nj_star * exphckT(icell)**(1.0/atom%continua(kr)%lambda0)
+            gij = ni_on_nj_star * exphckT(icell)**(lambda_base/atom%continua(kr)%lambda0)
             if ((atom%n(i,icell) - atom%n(j,icell) * gij) <= 0.0_dp) then
                cycle tr_loop
             endif
 
             !should be the same as directly exp(-hc_kT/lambda)
             chi(Nblue:Nred) = chi(Nblue:Nred) + atom%continua(kr)%alpha(:) * (atom%n(i,icell) - &
-               ni_on_nj_star * exphckT(icell)**(lambda_base/lambda(Nblue:Nred)) * atom%n(j,icell))
+               ni_on_nj_star * ehnukt(Nblue:Nred) * atom%n(j,icell))
 
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + atom%n(j,icell) * atom%continua(kr)%alpha(:) * atom%continua(kr)%twohnu3_c2(:) *& 
-               ni_on_nj_star * exphckT(icell)**(lambda_base/lambda(Nblue:Nred))
+               ni_on_nj_star * ehnukt(Nblue:Nred)
 
             ! write(*,*) 100*maxval(abs(exphckT(icell)**(lambda_base/lambda(Nblue:Nred)) - exp(-hc_k/T(icell)/lambda(Nblue:Nred)))/exp(-hc_k/T(icell)/lambda(Nblue:Nred)))
          end do tr_loop
@@ -140,6 +143,8 @@ module Opacity_atom
 
          tr_loop : do kr = 1,atom%Nline
 
+            if (.not.atom%lines(kr)%lcontrib) cycle
+
             !if .not.labs (image or LTE), Nred and Nblue includes the maxium extension of line
             !due to velocity fields (and not only the natural width + damping)
             Nred = atom%lines(kr)%Nr; Nblue = atom%lines(kr)%Nb
@@ -166,6 +171,7 @@ module Opacity_atom
 
             phi0(1:Nlam) = profile_art(atom%lines(kr),icell,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+            !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
 
 
 
@@ -179,7 +185,7 @@ module Opacity_atom
 
             !Store profile for integration or accumulate radiative rates here ?
             if (iterate) then
-               phi_loc(1:Nlam,atom%tab_trans(kr),nat,iray,id) = phi0(1:Nlam)
+               phi_loc(1:Nlam,atom%ij_to_trans(i,j),nat,iray,id) = phi0(1:Nlam)
             endif
 
 
@@ -261,7 +267,7 @@ module Opacity_atom
          !so that the kinematics is computed with respect to a non-moving non-lte cell.
          !it is always 0 in LTE or image (when labs = .false.)
          omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs
-         write(*,*) "vlabs = ", vlabs * 1d-3
+         ! write(*,*) "vlabs = ", vlabs * 1d-3
       endif
 
 

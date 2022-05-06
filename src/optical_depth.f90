@@ -10,7 +10,7 @@ module optical_depth
   use cylindrical_grid
   use radiation_field, only : save_radiation_field
   use density
-  use stars, only : intersect_stars
+  use stars, only : intersect_stars, star_rad
   use gas_contopac, only : background_continua_lambda
   use opacity_atom, only : opacity_atom_bb_loc, opacity_atom_bf_loc, Itot, psi
 
@@ -841,6 +841,8 @@ end subroutine optical_length_tot_mol
             if (icell == icell_star) then!"has intersected"
                !call local_stellar_radiation(id,iray,tau,tau_c,i_star,icell_prev,x0,y0,z0,u,v,w)
                ! tau_to_star(:,i_star) = tau
+               Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau(:)) * &
+                  star_rad(id,iray,i_star,icell_prev,x0,y0,z0,u,v,w,N,lambda)
                return
             end if
          endif

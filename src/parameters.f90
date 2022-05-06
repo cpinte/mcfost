@@ -62,8 +62,8 @@ module parametres
   ! Atomic line radiative transfer
   !!lstore_opac futur deprecation
   logical :: lno_radiative_coupling, lsobolev, lsobolev_only, lexit_after_nonlte_loop
-  logical :: lemission_atom, lelectron_scattering, lvacuum_to_air, &
-  				lforce_lte, lstop_after_jnu, ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
+  logical :: lemission_atom, lelectron_scattering, lforce_lte, lstop_after_jnu, &
+            ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
   integer :: Nrays_atom_transfer, istep_start
   
   !HEALpix

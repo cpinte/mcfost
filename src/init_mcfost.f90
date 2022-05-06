@@ -83,7 +83,6 @@ subroutine set_default_variables()
   lno_iterate_ne_mc = .true. !.true. means no iteration of electron during MC steps
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
-  lvacuum_to_air = .false.
   lmodel_1d = .false.
   lmodel_ascii = .false.
   lmhd_voronoi = .false.

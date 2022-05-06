@@ -15,7 +15,7 @@ module gas_contopac
    use elements_type, only : elems
    use grid, only : T, ne, nHmin, nHtot, icompute_atomrt
    use constantes
-   use utils, only : locate, interp, bilinear, linear_1D_sorted, Bpnu
+   use utils, only : bilinear, linear_1D_sorted, Bpnu, locate
    use occupation_probability, only : D_i, wocc_n
    use parametres, only : ldissolve, n_cells
 
@@ -28,6 +28,8 @@ module gas_contopac
    integer, parameter :: N_geltman = 34, N_wishart = 63
    real(kind=dp), dimension(N_wishart) :: lambdai_wishart, alphai_wishart
    real(kind=dp), dimension(N_geltman) :: lambdai_geltman, alphai_geltman
+   !TO DO -> interpolate 1/2 of the table to avoid bilinear interpolation
+   real(kind=dp), dimension(:,:), allocatable :: alpha_bell_berr
    real(kind=dp), parameter :: lambda_base = 500.0_dp
    real(kind=dp), dimension(:), allocatable :: exphckT !exp(-hc_k/T)
 
@@ -79,6 +81,7 @@ module gas_contopac
    contains
 
    subroutine background_continua_lambda(icell, Nx, x, chiout, etaout)
+   !TO DO: a single wavelength loop for all subroutines
       integer, intent(in) :: icell, Nx
       integer :: la, nat
       real(kind=dp), dimension(Nx), intent(in) :: x
@@ -104,9 +107,9 @@ module gas_contopac
       chiout(:) = chiout(:) + chi(:)
       etaout(:) = etaout(:) + eta(:)
   
-      call Hminus_ff_bell_berr(icell, Nx, x, chi)
-      chiout(:) = chiout(:) + chi(:)
-      etaout(:) = etaout(:) + chi(:) * Bp(:)
+      ! call Hminus_ff_bell_berr(icell, Nx, x, chi)
+      ! chiout(:) = chiout(:) + chi(:)
+      ! etaout(:) = etaout(:) + chi(:) * Bp(:)
 
       !now atomic LTE bound-free
       !elsewhere even if LTE
@@ -186,7 +189,7 @@ module gas_contopac
       !for obvious reason a lambda base is used to avoid exp(-hc_k/T) to goes with zero at low T.
       allocate(exphckT(n_cells)); exphckT(:) = 0.0_dp
       where (icompute_atomRT > 0)
-         exphckT(:) = exp(-hc_k/T/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm)
+         exphckT(:) = exp(-hc_k/T/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm))
       endwhere
 		write(*,'("max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
 
@@ -425,8 +428,9 @@ module gas_contopac
     integer :: la
     real(kind=dp), intent(out), dimension(N) :: chi, eta
     real(kind=dp) :: lam, stm, twohnu3_c2
+    real(kind=dp), dimension(N) :: ehnukT
 
-    
+    ehnukT(:) = exphckT(icell)**(lambda_base/lambda)
 
     do la=1, N
        lam = lambda(la)
@@ -437,7 +441,7 @@ module gas_contopac
          exit
        endif
 
-       stm = exphckT(icell)**(lambda_base/lam) !exp(-hc_k/T(icell)/lam)
+       stm = ehnukT(la)!exphckT(icell)**(lambda_base/lam) !exp(-hc_k/T(icell)/lam)
        twohnu3_c2 = twohc / lam**3.
 
        chi(la) = nHmin(icell) * (1.-stm) * alpha_geltman(la)
@@ -462,14 +466,16 @@ module gas_contopac
     real(kind=dp), dimension(N), intent(in)	:: lambda
     real(kind=dp), dimension(N), intent(out) :: chi, eta
     real(kind=dp) :: lam, stm, chi_extr(1), eta_extr(1), lambda_extr(1)
+    real(kind=dp), dimension(N) :: ehnukT
 
     chi(:) = 0.0_dp
     eta(:) = 0.0_dp
+    ehnukT(:) = exphckT(icell)**(lambda_base/lambda(:))
 
     freq_loop : do la=1, N
        lam = lambda(la) * 10. !AA
        !stm = 0.0
-       stm = exphckT(icell)**(lambda_base/lambda(la)) !exp(-hc_k / T(icell) / lambda(la))
+       stm = ehnukT(la)!exphckT(icell)**(lambda_base/lambda(la)) !exp(-hc_k / T(icell) / lambda(la))
 
        !if (lam < minval(lambdai_wishart)) then
        if (lam < lambdai_wishart(1)) then
@@ -595,8 +601,9 @@ module gas_contopac
       real(kind=dp), dimension(N), intent(out) :: chi
       real(kind=dp), dimension(:) :: lambdai(23), thetai(11)
       real(kind=dp), dimension(23,11) :: alphai
-      real :: inter
+      integer :: i0, j0
       real(kind=dp) :: lam, stm, sigma, theta, pe, nH
+      ! real(kind=dp), dimension(N) :: alpha_bell_berr_loc
 
       chi(:) = 0.0_dp
       theta = 5040. / T(icell)
@@ -677,14 +684,20 @@ module gas_contopac
       pe = ne(icell) * KB * T(icell)
       nH = hydrogen%n(1,icell)
 
+      ! already interpolated on all cells with 1d-29 factor !
+      ! alpha_bell_berr_loc = interp_1d(23,lambdai,alpha_bell_berr(:,icell), N, lambda)
+
+      j0 = locate(thetai, theta) !do once per cell
+      i0 = locate(lambdai, lambda(1)) - 1!all wavelengths are contiguous. We only need the index of the first one
+
       do la=1, N
          lam = lambda(la) * 10.
          if (lam > lambdai(23)) then
             chi(la) = Hminus_ff_john_lam(icell,lambda(la))
          else
-            stm = exphckT(icell)**(lambda_base/lambda(la)) !exp(-hc_k/T(icell)/lambda(la))
-            sigma = 1d-29 * bilinear(23,lambdai,11,thetai,alphai,lam,theta) !m^2/Pa
+            sigma = 1d-29 * bilinear(23,lambdai,i0+la,11,thetai,j0,alphai,lam,theta) !m^2/Pa
             chi(la) = sigma * pe * nH!m^-1
+            !chi(la) = pe * nH * alpha_bell_berr_loc(la)
          endif
       enddo
 

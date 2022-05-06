@@ -185,12 +185,13 @@ gdir=gas
 
 SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90          \
           operating_system.f90 random_numbers.f90 utils.f90 sort.f90 fits_utils.f90 \
-          grains.f90 read1d_models.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90            \
+          grains.f90 read1d_models.f90 cylindrical_grid.f90 spherical_grid.f90      \
+          kdtree2.f90 $(gdir)/elements_type.f90                                     \
           Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90            \
           Temperature.f90 density.f90 read_opacity.f90 scattering.f90               \
           read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90          \
           coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90            \
-          input.f90 benchmarks.f90 $(gdir)/elements_type.f90 $(gdir)/atom_type.f90  \
+          input.f90 benchmarks.f90 $(gdir)/atom_type.f90  \
           $(gdir)/wavelengths_gas.f90 $(gdir)/broad.f90                             \
           read_param.f90 dust_ray_tracing.f90 uplow.f90 ${gdir}/barklem.f90         \
           $(gdir)/occupation_probability.f90 $(gdir)/lte.f90                        \

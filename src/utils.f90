@@ -1475,16 +1475,16 @@ end function is_nan_infinity
 function vacuum2air(Nlambda, lambda_vac) result(lambda_air)
    !wavelength in nm
    integer, intent(in) :: Nlambda
-   real(kind=dp), dimension(:), intent(in) :: lambda_vac
+   real(kind=dp), dimension(Nlambda), intent(in) :: lambda_vac
    real(kind=dp), dimension(Nlambda) :: lambda_air
    real(kind=dp), dimension(Nlambda) :: sqwave, reduction
 
-   where (lambda_vac.ge.VACUUM_TO_AIR_LIMIT)
-      sqwave = 1./(lambda_vac**2)
-      reduction = 1. + 2.735182e-4 + &
-           (1.314182 + 2.76249e+4 * sqwave) * sqwave
+   where (lambda_vac >= VACUUM_TO_AIR_LIMIT)
+      sqwave = 1_dp/(lambda_vac**2)
+      reduction = 1.0 + 2.735182d-4 + &
+           (1.314182 + 2.76249d4 * sqwave) * sqwave
       lambda_air = lambda_vac / reduction
-   else where(lambda_vac.lt.VACUUM_TO_AIR_LIMIT)
+   else where(lambda_vac < VACUUM_TO_AIR_LIMIT)
       lambda_air = lambda_vac
    end where
 
@@ -1495,17 +1495,17 @@ function vacuum2air(Nlambda, lambda_vac) result(lambda_air)
  function air2vacuum(Nlambda, lambda_air) result(lambda_vac)
    !wavelength in nm
    integer, intent(in) :: Nlambda
-   real(kind=dp), dimension(:), intent(in) :: lambda_air
+   real(kind=dp), dimension(Nlambda), intent(in) :: lambda_air
    real(kind=dp), dimension(Nlambda) :: lambda_vac
    real(kind=dp), dimension(Nlambda) :: sqwave, increase
 
-   where (lambda_air.ge.AIR_TO_VACUUM_LIMIT)
-      sqwave = (1.0e+7 / lambda_air)**2
-      increase = 1.0000834213E+00 + &
-           2.406030E+06/(1.30E+10 - sqwave) + &
-           1.5997E+04/(3.89E+09 - sqwave)
+   where (lambda_air >= AIR_TO_VACUUM_LIMIT)
+      sqwave = (1.0d7 / lambda_air)**2
+      increase = 1.0000834213d+00 + &
+           2.406030d6/(1.30d10 - sqwave) + &
+           1.5997d4/(3.89d9 - sqwave)
       lambda_vac = lambda_air * increase
-   else where(lambda_air.lt.AIR_TO_VACUUM_LIMIT)
+   else where(lambda_air < AIR_TO_VACUUM_LIMIT)
       lambda_vac = lambda_air
    end where
 
@@ -1531,20 +1531,21 @@ function locate(xx,x,mask)
    return
 end function locate
 
- function bilinear(N,xi,M,yi,f,xo,yo)
+ function bilinear(N,xi,i0,M,yi,j0,f,xo,yo)
    !bilinear interpolation of the function f(N,M)
    !defined on points xi(N), yi(M) at real xo, real yo.
-   !too slow ?, not accurate ??
+   !too slow ? f***ck
    real(kind=dp) :: bilinear
    integer, intent(in) :: N, M
    real(kind=dp), intent(in) :: xi(N),yi(M),f(N,M)
    real(kind=dp), intent(in) :: xo,yo 
-   integer :: i0, j0
+   integer, intent(in) :: i0, j0
+   integer :: i, j
    real(kind=dp) :: norm, f11, f21, f12, f22
 
    !find closest point in i0 and j0
-   i0 = max(locate(xi,xo),2)
-   j0 = max(locate(yi,yo),2)
+   ! i0 = max(locate(xi,xo),2)
+   ! j0 = max(locate(yi,yo),2)
 
    ! write(*,*) i0, j0
 

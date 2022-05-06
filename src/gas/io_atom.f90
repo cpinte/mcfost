@@ -116,7 +116,7 @@ module io_atom
       !total number of transitions for this model
       atom%Ntr = atom%Nline + atom%Ncont
       !-> to remove tab_trans ??
-      allocate(atom%tab_trans(atom%Ntr))
+      ! allocate(atom%tab_trans(atom%Ntr))
       allocate(atom%ij_to_trans(atom%Nlevel,atom%Nlevel))
       allocate(atom%i_trans(atom%Ntr),atom%j_trans(atom%Ntr))
       atom%Ntr_line = atom%Nline
@@ -153,7 +153,9 @@ module io_atom
       allocate(atom%lines(atom%Nline))
       do kr=1,atom%Nline
 
-         atom%tab_trans(kr) = kr
+         ! atom%tab_trans(kr) = kr
+         atom%lines(kr)%lcontrib = .true. !init, all transitions contributes to opacity
+                                          !in images, lines can be removed by setting lcontrib to .false. (expect if overlap)
 
          atom%lines(kr)%atom => atom
          atom%lines(kr)%polarizable = .false.
@@ -294,7 +296,8 @@ module io_atom
       allocate(atom%continua(atom%Ncont))
       do kr=1,atom%Ncont
 
-         atom%tab_trans(kr+atom%Ntr_line) = kr+atom%Ntr_line
+         ! atom%tab_trans(kr+atom%Ntr_line) = kr+atom%Ntr_line
+         atom%continua(kr)%lcontrib = .true.
 
          atom%continua(kr)%atom => atom
 

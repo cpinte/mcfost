@@ -6,6 +6,7 @@ module stars
   use messages
   use wavelengths
   use grid
+  use elements_type, only : wght_per_H
 
   implicit none
 
@@ -14,6 +15,8 @@ module stars
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
        repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra, &
        intersect_stars, distance_to_star, compute_stellar_parameters
+  !-> to move in parameters ?     
+  public :: star_rad, laccretion_shock, max_Tshock, min_Tshock, Taccretion 
 
   private
 
@@ -26,6 +29,11 @@ module stars
   real(kind=dp), dimension(3) :: centre_ISM  ! centre of the ISM emitting sphere
 
   real, dimension(:,:), allocatable :: ProDiMo_star_HR
+
+  !onto the star(s)
+  !to move in parameters ?? (also remove in public declaration)
+  logical :: laccretion_shock
+  real(kind=dp) :: Taccretion, max_Tshock = 0.0,min_Tshock = 1d8
 
   contains
 
@@ -871,64 +879,108 @@ end subroutine intersect_stars
 
 !***********************************************************
 
-subroutine intersect_spots(i_star,u,v,w,x,y,z,ispot,lintersect)
-  ! ------------------------------------------------------------ !
-  ! Knowing a ray/pack hits the star, will it hit a spot ?
-  ! suppose no spot overlap.
-  ! ------------------------------------------------------------ !
+   function star_rad(id,iray,i_star,icell0,x,y,z,u,v,w,N,lambda)
+   ! ---------------------------------------------------------------!
+   ! routine to manage the radiation of the stellar boundary
+   !
+   ! TO  DO: 
+   ! - add limb darkening
+   ! - add reading spectrum direclty (either flux or full CLV)
+   ! -------------------------------------------------------------- !
+      integer, intent(in) :: i_star, icell0, id, iray, N
+      real(kind=dp), intent(in) :: u, v, w, x, y, z, lambda(N)
+      real(kind=dp) :: Tchoc, mu
+      real(kind=dp) :: star_rad(N)
 
-  ! C. Pinte : I belive this duplicates code in emit_packet in dust_transfer.f90
-
-  real(kind=dp), intent(in) :: x,y,z, u,v,w
-  logical, intent(out) :: lintersect
-  integer, intent(in) :: i_star
-  integer, intent(out) :: ispot
-
-  real(kind=dp), dimension(3) :: r, k
-  real(kind=dp) :: mu, phi
-  logical :: in_azimuth
-  integer :: i
-
-  r(1) = x ; r(2) = y ; r(3) = z
-  k(1) = u ; k(2) = v ; k(3) = w
-
-  ispot = 0
-  lintersect = .false.
-  spot_loop : do i = 1, etoile(i_star)%Nr
-     !angle between a ray-direction and the spot position vector
-     mu = dot_product(r,etoile(i_star)%SurfB(i)%r)/dsqrt(x**2+y**2+z**2)
-     !azimuth of a ray on the stellar disk
-     !phi = modulo(atan2(y,x),2*real(pi,kind=dp))!phi spot from 0 to 2*pi
-     !->allows spots, cut azimuthally
-     phi = atan2(y,x)!phi spot from -pi to pi
-
-     if (z >= 0) then
-     	in_azimuth = (phi >= etoile(i_star)%SurfB(i)%phii).and.(phi <= etoile(i_star)%SurfB(i)%phio)
-     else
-     	if (phi >= 0) then
-     		in_azimuth = (phi >= etoile(i_star)%SurfB(i)%phii)
-     	else
-     		in_azimuth = (phi <= etoile(i_star)%SurfB(i)%phio)
-     	endif
-     endif
+      if (etoile(i_star)%T <= 1e-6) then !even with spots
+         star_rad(:) = 0.0_dp
+         return !no radiation from the star
+      endif
 
 
-!      if ((mu<=etoile(i_star)%SurfB(i)%muo).and.&
-!           (mu>=etoile(i_star)%SurfB(i)%mui).and.&
-!           (phi>=etoile(i_star)%SurfB(i)%phii).and.&
-!           (phi<=etoile(i_star)%SurfB(i)%phio)) then !inside the spot
-     if ((mu<=etoile(i_star)%SurfB(i)%muo).and.&
-          (mu>=etoile(i_star)%SurfB(i)%mui).and.in_azimuth) then !inside the spot
+      !cos(theta) = dot(r,n)/module(r)/module(n)
+      ! if (llimb_darkening) then
+      !    call ERROR("option for reading limb darkening not implemented")
+      !    mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
+      !    if (real(mu)>1d0) then !to avoid perecision error
+      !       write(*,*) "mu=",mu, x, y, z, u, v, w
+      !       call Error(" mu limb > 1!")
+      !    end if
+      ! else
+      !    LimbDarkening = 1.0_dp
+      ! end if
 
-        ispot = i
-        lintersect = .true.
-        exit spot_loop
-     end if
-  end do spot_loop
+      star_rad(:) = Bpnu(lambda,etoile(i_star)%T*1d0)
 
-  return
+      if (is_inshock(id, iray, i_star, icell0, x, y, z, Tchoc)) then
+         star_rad(:) = star_rad(:) + Bpnu(lambda,Tchoc)
+         return
+      endif
 
-end subroutine intersect_spots
+      return
+   end function star_rad
+
+  function is_inshock(id, iray, i_star, icell0, x, y, z, Tout)
+   use grid, only : voronoi
+   use constantes, only : sigma, kb
+   logical :: is_inshock
+   integer :: i_star, icell0, id, iray
+   real(kind=dp), intent(out) :: Tout
+   real(kind=dp) :: enthalp,  x, y, z !u, v, w
+   real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
+
+   is_inshock = .false.
+   if (.not.laccretion_shock) return
+
+   if (icell0<=n_cells) then
+      if (icompute_atomRT(icell0) > 0) then
+         rr = sqrt( x*x + y*y + z*z)
+         enthalp = 2.5 * 1d3 * kb * T(icell0) / wght_per_H / masseH
+
+         !vaccr is vr, the spherical r velocity component
+         if (lvoronoi) then !always 3d
+            vaccr = Voronoi(icell0)%vxyz(1)*x/rr + Voronoi(icell0)%vxyz(2)*y/rr + Voronoi(icell0)%vxyz(3) * z/rr
+            vmod2 = sum( Voronoi(icell0)%vxyz(:)**2 )
+         else
+         	if (vfield_coord==1) then
+               if (l3D) then !needed here if not 2.5d
+                  sign_z = 1.0_dp
+               else
+                  sign_z = sign(1.0_dp, z)
+               endif
+         		vaccr = vfield3d(icell0,1) * x/rr + vfield3d(icell0,2) * y/rr + vfield3d(icell0,3) * z/rr * sign_z
+            elseif (vfield_coord==2) then
+               if (l3D) then !needed here if not 2.5d
+                  sign_z = 1.0_dp
+               else
+                  sign_z = sign(1.0_dp, z)
+               endif
+               vaccr = vfield3d(icell0,1) * sqrt(1.0 - (z/rr)**2) + sign_z * vfield3d(icell0,2) * z/rr
+            else !spherical vector here
+               vaccr = vfield3d(icell0,1) !always negative for accretion
+            endif
+            vmod2 = sum(vfield3d(icell0,:)**2)
+         endif
+
+
+         if (vaccr < 0.0_dp) then
+            ! Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell0)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25
+            Tchoc = ( 1d-3 * masseH * wght_per_H * nHtot(icell0)/sigma * 0.5 * abs(vaccr)**3 )**0.25
+            is_inshock = (Tchoc > 1000.0)
+            Tout = Taccretion
+            if (Taccretion<=0.0) then 
+               is_inshock = (abs(Taccretion) * Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
+               Tout = abs(Taccretion) * Tchoc
+            endif
+            max_Tshock = max(max_Tshock, Tout)
+            min_Tshock = min(min_Tshock, Tout)
+         endif
+
+      endif !icompute_atomRT
+   endif !laccretion_shock
+
+   return
+  end function is_inshock
 
 !***********************************************************
 
