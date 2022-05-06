@@ -193,7 +193,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90      
           coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90            \
           input.f90 benchmarks.f90 $(gdir)/atom_type.f90  \
           $(gdir)/wavelengths_gas.f90 $(gdir)/broad.f90                             \
-          read_param.f90 dust_ray_tracing.f90 uplow.f90 ${gdir}/barklem.f90         \
+          read_param.f90 dust_ray_tracing.f90 uplow.f90 ${gdir}/abo.f90         \
           $(gdir)/occupation_probability.f90 $(gdir)/lte.f90                        \
           radiation_field.f90 thermal_emission.f90 diffusion.f90                    \
           io_prodimo.f90 disk_physics.f90 $(gdir)/gas_contopac.f90 		    \

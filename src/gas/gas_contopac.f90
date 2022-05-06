@@ -107,9 +107,9 @@ module gas_contopac
       chiout(:) = chiout(:) + chi(:)
       etaout(:) = etaout(:) + eta(:)
   
-      ! call Hminus_ff_bell_berr(icell, Nx, x, chi)
-      ! chiout(:) = chiout(:) + chi(:)
-      ! etaout(:) = etaout(:) + chi(:) * Bp(:)
+      call Hminus_ff_bell_berr(icell, Nx, x, chi)
+      chiout(:) = chiout(:) + chi(:)
+      etaout(:) = etaout(:) + chi(:) * Bp(:)
 
       !now atomic LTE bound-free
       !elsewhere even if LTE
@@ -687,15 +687,18 @@ module gas_contopac
       ! already interpolated on all cells with 1d-29 factor !
       ! alpha_bell_berr_loc = interp_1d(23,lambdai,alpha_bell_berr(:,icell), N, lambda)
 
-      j0 = locate(thetai, theta) !do once per cell
-      i0 = locate(lambdai, lambda(1)) - 1!all wavelengths are contiguous. We only need the index of the first one
+      j0 = min(max(locate(thetai, theta),2),11) !do once per cell
+      i0 = max(locate(lambdai, lambda(1)) - 1,1)!all wavelengths are contiguous. We only need the index of the first one
 
       do la=1, N
          lam = lambda(la) * 10.
          if (lam > lambdai(23)) then
             chi(la) = Hminus_ff_john_lam(icell,lambda(la))
          else
-            sigma = 1d-29 * bilinear(23,lambdai,i0+la,11,thetai,j0,alphai,lam,theta) !m^2/Pa
+            sigma = 1d-29 * bilinear(23,lambdai,min(i0+la,23),11,thetai,j0,alphai,lam,theta) !m^2/Pa
+            ! write(*,*) Sigma, bilinear(23,lambdai,i0+la,11,thetai,j0,alphai,lambdai(2),thetai(3))
+            ! write(*,*) i0+la, j0, lam, theta
+            ! stop
             chi(la) = sigma * pe * nH!m^-1
             !chi(la) = pe * nH * alpha_bell_berr_loc(la)
          endif

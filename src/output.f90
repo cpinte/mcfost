@@ -3319,6 +3319,7 @@ end subroutine ecriture_spectre
 
 !**********************************************************************
 subroutine write_atomic_maps(atom)
+   use dust_ray_tracing, only  : tab_RT_az,tab_RT_incl
    !wavelength are written in air.
 
    !there is a test before on atom%lline
@@ -3400,10 +3401,12 @@ subroutine write_atomic_maps(atom)
 
       call ftpkys(unit,'BUNIT',"W/m2/Hz/pixel",'',status)
 
-      ! call ftpkyj(unit,'cos(i)min',dk_max,'',status)
-      ! call ftpkyj(unit,'cos(i)max',dk_max,'',status)
-      ! call ftpkyj(unit,'azmin',dk_max,'degress',status)
-      ! call ftpkyj(unit,'azmax',dk_max,'degress',status)
+      !linear in cos(i)
+      call ftpkye(unit,'imin',minval(tab_RT_incl),-7,'degress',status)
+      call ftpkye(unit,'imax',maxval(tab_RT_incl),-7,'degress',status)
+      !linear
+      call ftpkye(unit,'azmin',minval(tab_RT_az),-7,'degress',status)
+      call ftpkye(unit,'azmax',maxval(tab_RT_az),-7,'degress',status)
 
       call ftpkyj(unit,'i',atom%lines(kr)%i,'',status)
       call ftpkyj(unit,'j',atom%lines(kr)%j,'',status)

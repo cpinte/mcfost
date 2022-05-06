@@ -5,7 +5,7 @@ module io_atom
    !use zeeman, only              : Lande_eff, ZeemanMultiplet
    use constantes
    use uplow
-   use barklem, only             : get_Barklem_cross_data
+   use abo, only             : get_Barklem_cross_data
    use collision_atom, only      : read_collisions
    use messages
    use mcfost_env, only          : mcfost_utils
@@ -254,12 +254,10 @@ module io_atom
                write(*,*) "Line profile shape", shapechar, " unknown, using voigt."
                atom%lines(kr)%Voigt = .true.
          end select
-         if (atom%lines(kr)%Voigt) then
-            allocate(atom%lines(kr)%a(n_cells))
-         endif
 
 
          !Van der Waaks collision method
+         !line%a allocated in opacity_atom.f90
          atom%lines(kr)%cvdWaals(4) = 0.
          atom%lines(kr)%cvdWaals(2) = 0.
          atom%lines(kr)%cvdWaals(1) = 0.
@@ -493,6 +491,10 @@ module io_atom
 
          !sets atom%ID too.
          call read_model_atom(unit+nmet, Atoms(nmet)%p)
+         ! if (Atoms(nmet)%p%lgauss_prof) then
+         !    write(*,*) "**-> allocating gauss profile for atom", Atoms(nmet)%p%id
+         !    call alloc_common_gauss_profile(Atoms(nmet)%p) !deallocated in opacity
+         ! endif
 
       end do !over atoms
 

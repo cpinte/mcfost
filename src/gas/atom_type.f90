@@ -42,7 +42,7 @@ module atom_type
       real(kind=dp), dimension(:), allocatable :: a
       real(kind=dp), dimension(:,:,:,:,:), allocatable :: map !2d flux in the line
       ! real(kind=dp), dimension(:), allocatable :: u, pvoigt_eta, aeff, r, r1 !thomson approx. of Voigt.
-      ! real(kind=dp), allocatable, dimension(:,:)  :: phi
+      real(kind=dp), allocatable :: v(:), phi(:,:)
       type (AtomType), pointer :: atom => NULL()
       integer :: ZeemanPattern
       real :: glande_i, glande_j, g_Lande_eff
@@ -76,7 +76,8 @@ module atom_type
       ! populations read from previous run
       logical                :: NLTEpops, set_ltepops
       logical :: lgauss_prof = .false.
-      !real(kind=dp), allocatable :: ug(:), phi_g(:,:)
+      !common gauss profile for gauss profile lines
+      real(kind=dp), allocatable :: vg(:), phig(:,:)
       real(kind=dp), dimension(:,:), pointer :: n, nstar
       type (AtomicLine), allocatable, dimension(:)         :: lines
       type (AtomicContinuum) , allocatable, dimension(:)   :: continua
