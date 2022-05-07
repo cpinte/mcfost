@@ -6,7 +6,8 @@ module Opacity_atom
    use parametres
    use broad, Only               : line_damping
    use voigts, only              : voigt
-   use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, exphckT, lambda_base, dealloc_gas_contopac
+   use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, &
+                                     dealloc_gas_contopac, hnu_k!exphckT, lambda_base,
    use wavelengths_gas, only     : Nlambda_max_line
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj
@@ -17,8 +18,6 @@ module Opacity_atom
 
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:)!move in see
-   ! real(kind=dp), parameter :: lambda_base = 500.0
-   ! real(kind=dp), dimension(:), allocatable :: exphckT !exp(-hc_k/T)
    real(kind=dp) :: vlabs
 
    contains
@@ -135,7 +134,7 @@ module Opacity_atom
       real(kind=dp) :: wi, wj, chi_ion, Diss, nn, gij, ni_on_nj_star
       real(kind=dp), dimension(N) :: ehnukt
 
-      ehnukt(:) = exphckT(icell)**(lambda_base/lambda(:))
+      ehnukt(:) = exp(hnu_k/T(icell))!exphckT(icell)**(lambda_base/lambda(:))
 
       atom_loop : do nat = 1, N_atoms
          atom => Atoms(nat)%p
@@ -150,7 +149,7 @@ module Opacity_atom
             !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
             ni_on_nj_star = atom%nstar(i,icell)/(atom%nstar(j,icell) + 1d-100)
 
-            gij = ni_on_nj_star * exphckT(icell)**(lambda_base/atom%continua(kr)%lambda0)
+            gij = ni_on_nj_star * exp(-hc_k/T(icell)/atom%continua(kr)%lambda0)
             if ((atom%n(i,icell) - atom%n(j,icell) * gij) <= 0.0_dp) then
                cycle tr_loop
             endif
@@ -162,7 +161,6 @@ module Opacity_atom
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + atom%n(j,icell) * atom%continua(kr)%alpha(:) * atom%continua(kr)%twohnu3_c2(:) *& 
                ni_on_nj_star * ehnukt(Nblue:Nred)
 
-            ! write(*,*) 100*maxval(abs(exphckT(icell)**(lambda_base/lambda(Nblue:Nred)) - exp(-hc_k/T(icell)/lambda(Nblue:Nred)))/exp(-hc_k/T(icell)/lambda(Nblue:Nred)))
          end do tr_loop
 
          atom => NULL()

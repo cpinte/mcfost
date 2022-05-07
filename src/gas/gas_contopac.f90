@@ -32,13 +32,15 @@ module gas_contopac
    real(kind=dp), dimension(:,:), allocatable :: john_hminus_term2, john_hminus_term1
    real(kind=dp) :: john_an(6), john_an2(4), john_bn(6), john_bn2(4),john_cn(6), john_cn2(4), &
       john_dn(6), john_dn2(4), john_en(6), john_en2(4), john_fn(6), john_fn2(4)   
-   !TO DO -> interpolate 1/2 of the table to avoid bilinear interpolation
    real(kind=dp), dimension(:), allocatable :: j0_theta_bell_berr
    integer :: i0_lam_bell_berr
    real(kind=dp), allocatable :: alphai_bell_berr_part(:,:)
    real(kind=dp) :: lambdai_bell_berr(23), thetai_bell_berr(11), alphai_bell_berr(23,11)
-   real(kind=dp), parameter :: lambda_base = 500.0_dp
-   real(kind=dp), dimension(:), allocatable :: exphckT !exp(-hc_k/T)
+   real(kind=dp), dimension(:), allocatable :: hnu_k !-hnu_k
+   !-> it seems actually faster to compute -hnu/k dans takes exp(-hnu/k/T(icell)) locally
+   !  we avoid to do a 1/tab_read operation instead we do 1/real and takes the exp.
+   ! real(kind=dp), parameter :: lambda_base = 500.0_dp
+   ! real(kind=dp), dimension(:), allocatable :: exphckT !exp(-hc_k/T)
 
    data lambdai_geltman / 0.0, 50.0, 100.0, 150.0, 200.0, 250.0,  &
    300.0, 350.0, 400.0, 450.0, 500.0, 550.0,&
@@ -299,18 +301,21 @@ module gas_contopac
       enddo
 
       !for obvious reason a lambda base is used to avoid exp(-hc_k/T) to goes with zero at low T.
-      allocate(exphckT(n_cells)); exphckT(:) = 0.0_dp
+      ! allocate(exphckT(n_cells)); exphckT(:) = 0.0_dp
+      allocate(hnu_k(N)); hnu_k(:) = -hc_k/lambda(:)
       do icell=1,n_cells
          if (icompute_AtomRT(icell)>0) then
             theta = 5040. / T(icell)
             j0_theta_bell_berr(icell) = max(locate(thetai_bell_berr, theta),2)
-            exphckT(icell) = exp(-hc_k/T(icell)/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm))
+            ! exphckT(icell) = exp(-hc_k/T(icell)/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm))
          endif
       enddo
 		write(*,'("allocate "(1F6.4)" GB for alphai_bell_berr_part")') real(sizeof(alphai_bell_berr_part))/1024./1024./1024.
 		write(*,'("allocate "(1F6.4)" GB for j0_bell_berr")') real(sizeof(j0_theta_bell_berr))/1024./1024./1024.
-		write(*,'("allocate "(1F6.4)" GB for exp(-hc/kT)")') real(sizeof(exphckT))/1024./1024./1024.
-		write(*,'(" -> max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
+		write(*,'("allocate "(1F6.4)" GB for -hnu_k")') real(sizeof(hnu_k))/1024./1024./1024.
+		write(*,'(" -> max(hnu_k)="(1ES14.5E3)"; min(hnu_k)="(ES14.5E3))') maxval(hnu_k), minval(hnu_k,mask=icompute_AtomRT>0)
+		! write(*,'("allocate "(1F6.4)" GB for exp(-hc/kT)")') real(sizeof(exphckT))/1024./1024./1024.
+		! write(*,'(" -> max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
 
       return 
    end subroutine alloc_gas_contopac
@@ -321,7 +326,8 @@ module gas_contopac
       if (allocated(HeIray_lambda)) deallocate(HeIray_lambda)
 
       !deallocate or not because depends on cells so unchanged if we change lambda grid...
-      deallocate(exphckT)
+      ! deallocate(exphckT)
+      deallocate(hnu_k)
       !anyway should not cost anything!
 
       deallocate(alpha_wishart, alpha_geltman)
@@ -460,8 +466,10 @@ module gas_contopac
 
       !    chi(la) =  alpha * np * stim
       ! enddo
+      ! chi(:) = np * H_ff_Xsection(1, T(icell), lambda(:)) * ne(icell) * &
+      !    (1.0 - exphckT(icell)**(lambda_base/lambda(:)) )
       chi(:) = np * H_ff_Xsection(1, T(icell), lambda(:)) * ne(icell) * &
-         (1.0 - exphckT(icell)**(lambda_base/lambda(:)) )
+         (1.0 - exp(hnu_k/T(icell)) )
     return
    end subroutine Hydrogen_ff
 
@@ -553,7 +561,8 @@ module gas_contopac
     real(kind=dp) :: lam, stm, twohnu3_c2
     real(kind=dp), dimension(N) :: ehnukT
 
-    ehnukT(:) = exphckT(icell)**(lambda_base/lambda)
+   !  ehnukT(:) = exphckT(icell)**(lambda_base/lambda)
+    ehnukt(:) = exp(hnu_k/T(icell))
 
     do la=1, N
        lam = lambda(la)
@@ -564,7 +573,7 @@ module gas_contopac
          exit
        endif
 
-       stm = ehnukT(la)!exphckT(icell)**(lambda_base/lam) !exp(-hc_k/T(icell)/lam)
+       stm = ehnukT(la)
        twohnu3_c2 = twohc / lam**3.
 
        chi(la) = nHmin(icell) * (1.-stm) * alpha_geltman(la)
@@ -593,12 +602,13 @@ module gas_contopac
 
     chi(:) = 0.0_dp
     eta(:) = 0.0_dp
-    ehnukT(:) = exphckT(icell)**(lambda_base/lambda(:))
+   !  ehnukT(:) = exphckT(icell)**(lambda_base/lambda(:))
+      ehnukT(:) = exp(hnu_k/T(icell))
 
     freq_loop : do la=1, N
        lam = lambda(la) * 10. !AA
        !stm = 0.0
-       stm = ehnukT(la)!exphckT(icell)**(lambda_base/lambda(la)) !exp(-hc_k / T(icell) / lambda(la))
+       stm = ehnukT(la)
 
        !if (lam < minval(lambdai_wishart)) then
        if (lam < lambdai_wishart(1)) then
