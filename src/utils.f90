@@ -407,24 +407,29 @@ end function Bnu
 
 !***********************************************************
 
-elemental Function Bpnu (lambda,T)
+!-> note. Elemental function are too slow!
+Function Bpnu (N,lambda,T)
 ! -----------------------------------------------------
 ! Return an array of planck functions at all wavelengths
 ! for the cell temperature.
 ! Bnu in W/m2/Hz/sr
 ! lambda in nm
 ! -----------------------------------------------------
-real(kind=dp), intent(in) :: T, lambda
-real(kind=dp) :: hnu_kT, twohnu3_c2, Bpnu
+integer, intent(in) :: N
+real(kind=dp), intent(in) :: T, lambda(N)
+real(kind=dp) :: hnu_kT, twohnu3_c2, Bpnu(N)
+integer la
 
-twohnu3_c2 = 2.*HC / (NM_TO_M * lambda)**3
-hnu_kT = hc_k / lambda / T
+do la=1, N
+   twohnu3_c2 = 2.*HC / (NM_TO_M * lambda(la))**3
+   hnu_kT = hc_k / lambda(la) / T
 
-if (hnu_kT < 600.0) then
-   Bpnu = twohnu3_c2 / (exp(hnu_kT)-1.0)
-else
-   Bpnu = 0. ! exponential is infinite, Bnu goes to zero
-end if
+   if (hnu_kT > 100.0) then
+      Bpnu(la) = 0.0
+   else
+      Bpnu(la) = twohnu3_c2 / (exp(hnu_kT)-1.0)
+   end if 
+enddo
 
 return
 end function bpnu

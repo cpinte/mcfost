@@ -14,7 +14,7 @@ module atom_transfer
    use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda
    use wavelengths_gas, only : make_wavelength_nlte, tab_lambda_nm
    use elecdensity, only : solve_ne, write_electron, read_electron
-   use grid, only : lcalc_ne, move_to_grid, vfield3d
+   use grid, only : lcalc_ne, move_to_grid, vfield3d, icompute_atomRT
    use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops
    use atom_type, only : atoms, atomtype, n_atoms
    use init_mcfost, only :  nb_proc
@@ -41,6 +41,11 @@ module atom_transfer
       return
    end subroutine nlte_loop_mali
 
+   subroutine setup_image_grid()
+
+      return
+   end subroutine setup_image_grid
+
    subroutine atom_line_transfer()
    ! --------------------------------------------------------------------------- !
    ! This routine initialises the necessary quantities for atomic line transfer
@@ -48,7 +53,7 @@ module atom_transfer
    ! --------------------------------------------------------------------------- !
       integer  :: ne_initial, ibin, iaz, nat
       logical :: lelectron_read
-      real(kind=dp) :: v_char
+      real(kind=dp) :: v_char, max_vel_shift, v1, v2
 
 
       write(*,*) " *** BIG WARNING **** "
@@ -95,6 +100,21 @@ module atom_transfer
       endif
 
       call ltepops_atoms() 
+      max_vel_shift = 0.0
+      do ibin=1,n_cells
+         v1 = sqrt(sum(vfield3d(ibin,:)**2))
+         do iaz=1,n_cells
+            v2 = sqrt(sum(vfield3d(iaz,:)**2))
+            if ((icompute_atomRT(ibin)>0).and.(icompute_atomRT(iaz)>0)) then
+               max_vel_shift = max(max_vel_shift,abs(v1-v2))
+            endif
+         enddo
+      enddo
+      write(*,*) max_vel_shift*1d-3, maxval(sqrt(sum(vfield3d(:,:)**2,dim=2)))*1d-3
+      v_char = max_vel_shift
+      !because for non-LTE we compute the motion of each cell wrt to the actual cell
+      !so the maximum shift is what we have if all cells move at their max speed (v(icell))
+      ! stop
 
       !every indexes are defined on the lambda frequency. 
       !So even when lambda is passed as an argument, it is expected
@@ -131,6 +151,7 @@ module atom_transfer
       !re alloc lambda here. Eventually use the tab_lambda in the file
       !for SED flux
       !add an limage mode
+      !call setup_image_grid()!either for RT_line_method==1 or >1
       call allocate_atom_maps()
       write(*,*) "Computing emission flux map..."
       if (laccretion_shock) then
@@ -435,7 +456,7 @@ module atom_transfer
       ! the plan-parralel cos_theta is np.sqrt(1.0 - p**2) for p < 1.0.
       integer :: la, j, icell0, id
       logical :: lintersect, labs
-      integer, parameter :: Nimpact = 100
+      integer, parameter :: Nimpact = 10
       real(kind=dp) :: rr, u,v,w,u0,w0,v0,x0,y0,z0,x(3),y(3),uvw(3)
       real(kind=dp), allocatable :: cos_theta(:), weight_mu(:), p(:)
       real(kind=dp), allocatable ::I_1d(:,:)

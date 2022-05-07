@@ -29,9 +29,13 @@ module gas_contopac
    integer, parameter :: N_geltman = 34, N_wishart = 63
    real(kind=dp), dimension(N_wishart) :: lambdai_wishart, alphai_wishart
    real(kind=dp), dimension(N_geltman) :: lambdai_geltman, alphai_geltman
+   real(kind=dp), dimension(:,:), allocatable :: john_hminus_term2, john_hminus_term1
+   real(kind=dp) :: john_an(6), john_an2(4), john_bn(6), john_bn2(4),john_cn(6), john_cn2(4), &
+      john_dn(6), john_dn2(4), john_en(6), john_en2(4), john_fn(6), john_fn2(4)   
    !TO DO -> interpolate 1/2 of the table to avoid bilinear interpolation
    real(kind=dp), dimension(:), allocatable :: j0_theta_bell_berr
    integer :: i0_lam_bell_berr
+   real(kind=dp), allocatable :: alphai_bell_berr_part(:,:)
    real(kind=dp) :: lambdai_bell_berr(23), thetai_bell_berr(11), alphai_bell_berr(23,11)
    real(kind=dp), parameter :: lambda_base = 500.0_dp
    real(kind=dp), dimension(:), allocatable :: exphckT !exp(-hc_k/T)
@@ -147,31 +151,45 @@ module gas_contopac
          6.02e-1, 7.11e-1, 8.61e-1, 1.07, 1.36, 1.83, 2.17, 2.60, 3.31, 	&
          4.31, 5.97, 9.06, 1.56e1, 3.50e1, 1.40e2, 2.19e2, 3.88e2		/
 
+   !micron
+   !H- free-free
+   data john_an /0.d0,2483.346d0,-3449.889d0,2200.04d0,-696.271d0,88.283d0/
+   data john_bn /0.d0,285.827d0,-1158.382d0,2427.719d0,-1841.4d0,444.517d0/
+   data john_cn /0.d0,-2054.291d0,8746.523d0,-13651.105d0,8624.97d0,-1863.864d0/
+   data john_dn /0.d0,2827.776d0,-11485.632d0,16755.524d0,-10051.53d0,2095.288d0/
+   data john_en /0.d0,-1341.537d0,5303.609d0,-7510.494d0,4400.067d0,-901.788d0/
+   data john_fn /0.d0,208.952d0,-812.939d0,1132.738d0,-655.02d0,132.985d0/
+   data john_an2 /518.1021d0,473.2636d0,-482.2089d0,115.5291d0/
+   data john_bn2 /-734.8666d0,1443.4137d0,-737.1616d0,169.6374d0/
+   data john_cn2 /1021.1775d0,-1977.3395d0,1096.8827d0,-245.649d0/
+   data john_dn2 /-479.0721d0,922.3575d0,-521.1341d0,114.243d0/
+   data john_en2 /93.1373d0,-178.9275d0,101.7963d0,-21.9972d0/
+   data john_fn2 /-6.4285d0,12.36d0,-7.0571d0,1.5097d0/
+
    contains
 
    subroutine background_continua_lambda(icell, Nx, x, chiout, etaout)
    !TO DO: a single wavelength loop for all subroutines
       integer, intent(in) :: icell, Nx
-      integer :: la, nat
       real(kind=dp), dimension(Nx), intent(in) :: x
       real(kind=dp), dimension(Nx), intent(out) :: chiout, etaout
       real(kind=dp), dimension(Nx) :: chi, eta, Bp
-  
-      Bp(:) = Bpnu(x, T(icell))
-  
+    
       !HI Rayleigh must be initialised first
       chiout(:) = thomson(icell) + HI_rayleigh(icell)
       etaout(:) = 0.0_dp
-      
+
       if (associated(helium)) then
          chiout(:) = chiout(:) + HeI_rayleigh(icell)
       endif
+
+      Bp(:) = Bpnu(Nx,x,T(icell))
 
       call Hydrogen_ff(icell, Nx, x, chi)
       chiout(:) = chiout(:) + chi(:)
       etaout(:) = etaout(:) + chi(:) * Bp(:)
   
-  !     call Hminus_bf_wishart(icell, N, lambda, chi, eta) !->better with turbospec
+      ! call Hminus_bf_wishart(icell, N, lambda, chi, eta) !->better with turbospec
       call Hminus_bf_geltman(icell,Nx, x, chi, eta) !->better with rh
       chiout(:) = chiout(:) + chi(:)
       etaout(:) = etaout(:) + eta(:)
@@ -224,8 +242,13 @@ module gas_contopac
       integer, intent(in) :: N
       real(kind=dp), intent(in) :: Lambda(N)
       real(kind=dp), allocatable, dimension(:) :: tab_lambda_ang
-      real(kind=dp) :: theta
-      integer :: icell
+      real(kind=dp) :: theta, lam
+      integer :: icell, la, i
+
+      write(*,*) " ***WaRNING ****"
+      write(*,*) "elemental function should be changed. they are too slow!"
+      write(*,*) "if they are called often, like if bckgr opac is computed on the fly"
+      write(*,*) ""
 
       allocate(Hray_lambda(N))
 
@@ -253,11 +276,27 @@ module gas_contopac
       alpha_geltman = 0.0
       alpha_wishart = 0.0
       alpha_wishart = 1d-22 * linear_1D_sorted(N_wishart, lambdai_wishart, alphai_wishart, N, tab_lambda_ang)
-      deallocate(tab_lambda_ang)
       alpha_geltman = 1d-21 * linear_1D_sorted(N_geltman, lambdai_geltman, alphai_geltman, N, lambda) !1e-17 cm^2 to m^2
 
       allocate(j0_theta_bell_berr(n_cells))
+      allocate(alphai_bell_berr_part(N,11))
+      !interpolate on lambda grid so we only need to interpolate locally in depth
+      do i=1,11
+         alphai_bell_berr_part(:,i) = linear_1D_sorted(23,lambdai_bell_berr,alphai_bell_berr(:,i),n,tab_lambda_ang)
+      enddo
+      deallocate(tab_lambda_ang)
       i0_lam_bell_berr = max(locate(lambdai_bell_berr, 10*lambda(1)),2)!all wavelengths are contiguous. We only need the index of the first one
+
+      !we only need term1 of John H- free-free since, bell_berr routine is used.
+      !it is used for lambda > lambdai_bell_berr.max()
+      allocate(john_hminus_term1(6,N))
+      do i=1,6
+         do la=1,N
+            lam = lambda(la) / km_to_m !nm to micron
+            john_hminus_term1(i,la) = (lam**2 * john_an(i) + john_bn(i) + john_cn(i)/lam + &
+               john_dn(i)/lam**2 + john_en(i)/lam**3 + john_fn(i)/lam**4)
+         enddo
+      enddo
 
       !for obvious reason a lambda base is used to avoid exp(-hc_k/T) to goes with zero at low T.
       allocate(exphckT(n_cells)); exphckT(:) = 0.0_dp
@@ -268,6 +307,7 @@ module gas_contopac
             exphckT(icell) = exp(-hc_k/T(icell)/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm))
          endif
       enddo
+		write(*,'("allocate "(1F6.4)" GB for alphai_bell_berr_part")') real(sizeof(alphai_bell_berr_part))/1024./1024./1024.
 		write(*,'("allocate "(1F6.4)" GB for j0_bell_berr")') real(sizeof(j0_theta_bell_berr))/1024./1024./1024.
 		write(*,'("allocate "(1F6.4)" GB for exp(-hc/kT)")') real(sizeof(exphckT))/1024./1024./1024.
 		write(*,'(" -> max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
@@ -284,8 +324,11 @@ module gas_contopac
       deallocate(exphckT)
       !anyway should not cost anything!
 
-      deallocate(alpha_wishart, alpha_geltman, j0_theta_bell_berr)
+      deallocate(alpha_wishart, alpha_geltman)
+      deallocate(alphai_bell_berr_part, j0_theta_bell_berr)
       i0_lam_bell_berr = 0
+
+      deallocate(john_hminus_term2)
 
       return
    end subroutine dealloc_gas_contopac
@@ -627,11 +670,13 @@ module gas_contopac
       kappa = 0.0_dp
       if (lam < 0.3645) then
          do n=1,4
+         !kappa = kappa + theta**((n+1)/2d0) * john_term2(n,la)
             kappa = kappa + theta**((n+1)/2d0) * (lam**2 * An2(n) + Bn2(n) + Cn2(n)/lam + &
                Dn2(n)/lam**2 + En2(n)/lam**3 + Fn2(n)/lam**4)
          enddo
       else! if (lambda > 0.3645) then
          do n=1,6
+            !kappa = kappa + theta**((n+1)/2d0) * john_term1(n,la)
             kappa = kappa + theta**((n+1)/2d0) * (lam**2 * An(n) + Bn(n) + Cn(n)/lam + &
                Dn(n)/lam**2 + En(n)/lam**3 + Fn(n)/lam**4)
          enddo
@@ -663,6 +708,35 @@ module gas_contopac
       return
    end subroutine Hminus_ff_john
 
+   function H_minus_ff_bell_berr_long(icell, la)
+      !spcial john for long wavelength of bell berr
+      !out of the table. (lambda > 150 000 AA)
+      integer, intent(in) :: icell, la
+      real(kind=dp) :: funit, K
+      real(kind=dp) :: H_minus_ff_bell_berr_long
+      real(kind=dp) :: theta, nH
+      integer :: n
+
+      H_minus_ff_bell_berr_long = 0.0
+      theta = 5040d0 / T(icell)
+
+      !never happen with the condition in H_minus_ff_bell_berr
+      ! if (theta < 0.5 .or. theta > 3.6) return
+
+      funit = 1d-3 !cm4/dyne to m2/Pa
+      nH = hydrogen%n(1,icell)
+
+      K = 1d-29 * funit * ne(icell) * KB * T(icell) * nH
+
+      H_minus_ff_bell_berr_long = 0.0_dp
+      do n=1,6
+         H_minus_ff_bell_berr_long = H_minus_ff_bell_berr_long + theta**((n+1)/2d0) * john_hminus_term1(n,la)
+      enddo
+      H_minus_ff_bell_berr_long = H_minus_ff_bell_berr_long * K
+
+      return
+   end function H_minus_ff_bell_berr_long
+
    subroutine Hminus_ff_bell_berr(icell, N, lambda, chi)
    !-----------------------------------------------------------------
    ! Calculates the negative hydrogen (H-) free-free continuum
@@ -680,11 +754,12 @@ module gas_contopac
       integer :: la
       real(kind=dp), dimension(N), intent(out) :: chi
       integer :: i0, j0
-      real(kind=dp) :: lam, stm, sigma, theta, pe, nH
+      real(kind=dp) :: lam, stm, sigma(N), theta, pe, nH, tt
 
       chi(:) = 0.0_dp
       theta = 5040. / T(icell)
 
+      !no extrapolation
       if (theta < 0.5 .or. theta > 3.6) then
          !return
          if (theta < 0.5) theta = 0.5_dp
@@ -699,17 +774,25 @@ module gas_contopac
       j0 = j0_theta_bell_berr(icell)
       i0 = i0_lam_bell_berr
 
+      sigma(:) = alphai_bell_berr_part(:,1)
+      !linear interpolation in depth
+      if (thetai_bell_berr(j0)>theta) then
+         tt = (theta - thetai_bell_berr(j0-1)) / (thetai_bell_berr(j0)-thetai_bell_berr(j0-1))
+         sigma(:) = (1.0 - tt) * alphai_bell_berr_part(:,j0-1) + tt * alphai_bell_berr_part(:,j0)
+      endif
+
       do la=1, N
          lam = lambda(la) * 10.
          if (lam > lambdai_bell_berr(23)) then
-            chi(la) = Hminus_ff_john_lam(icell,lambda(la))
+            chi(la) = H_minus_ff_bell_berr_long(icell,la)!Hminus_ff_john_lam(icell,lambda(la))
          else
-            if (lam > lambdai_bell_berr(i0)) then
-               i0 = i0 + 1
-            endif
-            if (i0==24) call error("test bug H- ff bilin")
-            sigma = 1d-29 * bilinear(23,lambdai_bell_berr,i0,11,thetai_bell_berr,j0,alphai_bell_berr,lam,theta) !m^2/Pa
-            chi(la) = sigma * pe * nH!m^-1
+            ! if (lam > lambdai_bell_berr(i0)) then
+            !    i0 = i0 + 1
+            ! endif
+            ! if (i0==24) call error("test bug H- ff bilin")
+            ! sigma = 1d-29 * bilinear(23,lambdai_bell_berr,i0,11,thetai_bell_berr,j0,alphai_bell_berr,lam,theta) !m^2/Pa
+            ! chi(la) = sigma * pe * nH!m^-1
+            chi(la) = 1d-29 * sigma(la) * pe * nH!m^-1
          endif
       enddo
 

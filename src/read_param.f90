@@ -869,6 +869,7 @@ contains
          NactiveAtoms = NactiveAtoms + 1
       endif
       read(1,*) atoms(nat)%p%initial
+      read(1,*) atoms(nat)%p%vmax_rt, atoms(nat)%p%n_speed_rt
       read(1,*) atoms(nat)%p%lline, atoms(nat)%p%nTrans_raytracing
       if (atoms(nat)%p%nTrans_raytracing>Nmax_Trans_raytracing) then
             call error("number max of transitions for RT reached!")

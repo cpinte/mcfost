@@ -910,10 +910,10 @@ end subroutine intersect_stars
       !    LimbDarkening = 1.0_dp
       ! end if
 
-      star_rad(:) = Bpnu(lambda,etoile(i_star)%T*1d0)
+      star_rad(:) = Bpnu(N,lambda,etoile(i_star)%T*1d0)
 
       if (is_inshock(id, iray, i_star, icell0, x, y, z, Tchoc)) then
-         star_rad(:) = star_rad(:) + Bpnu(lambda,Tchoc)
+         star_rad(:) = star_rad(:) + Bpnu(N,lambda,Tchoc)
          return
       endif
 

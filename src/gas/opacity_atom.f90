@@ -221,6 +221,8 @@ module Opacity_atom
                vlabs = calc_vloc(icell,u,v,w,x,y,z,x1,y1,z1)
                write(*,*) id, icell, " vlabs = ", vlabs * 1d-3
             else
+            !-> no. in non-LTE (vlabs /= 0) if vlabs=0.0001 m/s the profile is completely shifted wich is wrong
+            !compute the maximum relative shift (max(abs(v(icell)-v'(icell))))
                if (vlabs < 0) then
                   Nblue = atom%lines(kr)%Nover_inf
                   Nred = Nlam - 1 + Nblue

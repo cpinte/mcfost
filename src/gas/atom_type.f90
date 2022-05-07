@@ -58,6 +58,8 @@ module atom_type
       !0->LTE; 1->OLD_POPULATIONS; 2->ZERO_RADIATION; 3->CSWITCH; 4->SOBOLEV/CEP 
       !only for lines !
       integer :: j_Trans_rayTracing(Nmax_Trans_raytracing), i_Trans_rayTracing(Nmax_Trans_raytracing)
+      real :: vmax_rt !km/s !!
+      integer :: n_speed_rt
       ! integer, allocatable, dimension(:) :: tab_trans -> not useful anymore (?)
       integer, allocatable, dimension(:) :: i_trans, j_trans !return the index of a transition from 1 to atom%Ntr
       integer, allocatable, dimension(:,:) :: ij_to_trans !from i and j return the index of a transiton

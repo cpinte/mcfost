@@ -281,7 +281,11 @@ module io_atom
          end select
 
          !define the extension of a line for non-LTE loop and images.
-         call compute_line_bound(atom%lines(kr))
+         !here, limage is .false. vmax is computed from the atomic file
+         !and from the "natural" width of the line.
+         call compute_line_bound(atom%lines(kr),.false.)
+         !if limage is .true., vmax is atom%vmax_rt.
+         !with limage, line%Nlambda is also fixed by atom%n_speed_rt.
 
 
       end do !end loop over bound-bound transitions
@@ -594,12 +598,13 @@ module io_atom
       return
    end subroutine read_Atomic_Models
 
-   subroutine compute_line_bound(line)
+   subroutine compute_line_bound(line,limage)
       ! ------------------------------------------------------------ !
       ! Compute the line bounds : lamndamin and lambdamax
       ! the total extent of line in the atom's frame (no velocity).
       ! ------------------------------------------------------------ !
       type (AtomicLine), intent(inout) :: line
+      logical, intent(in) :: limage
       real(kind=dp) :: vB, vmax, vth
       
          
@@ -611,14 +616,21 @@ module io_atom
       vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
       !write(*,*) "max(vth) line = ", vth*1d-3, line%atom%weight
       vmax = line%qwing * (vth + vB)
+      if (limage) vmax = line%atom%vmax_rt*1d3
        
        
       line%lambdamin = line%lambda0*(1.0-vmax/C_LIGHT)
       line%lambdamax = line%lambda0*(1.0+vmax/C_LIGHT)
       line%vmax = vmax
-      !write(*,'("line "(1I2)"->"(1I2)"; vmax="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
-      !write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
-       
+
+      if (limage) then
+         write(*,'("line "(1I2)"->"(1I2)"; Vmax (Ray-Trace)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
+         write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
+      ! else
+      !    write(*,'("line "(1I2)"->"(1I2)"; Vmax (non-LTE)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
+      !    write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
+      endif
+
       return
    end subroutine compute_line_bound
 
