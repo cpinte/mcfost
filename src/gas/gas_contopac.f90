@@ -242,6 +242,7 @@ module gas_contopac
    end function HeI_rayleigh
 
    subroutine alloc_gas_contopac(N, lambda)
+   !could be para, at least the cell part.
       integer, intent(in) :: N
       real(kind=dp), intent(in) :: Lambda(N)
       real(kind=dp), allocatable, dimension(:) :: tab_lambda_ang
@@ -335,7 +336,7 @@ module gas_contopac
       deallocate(alphai_bell_berr_part, j0_theta_bell_berr)
       i0_lam_bell_berr = 0
 
-      deallocate(john_hminus_term2)
+      deallocate(john_hminus_term1)
 
       return
    end subroutine dealloc_gas_contopac

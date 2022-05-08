@@ -84,8 +84,8 @@ module parametres
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
   
   !Wavelength table for spectrally resolved images and spectra
-  character(len=50) :: tab_wavelength_image, jnu_atom_file
-  logical :: ltab_wavelength_image, lread_jnu_atom
+  character(len=50) :: jnu_atom_file
+  logical :: lread_jnu_atom
   !lmhd_voronoi enables the voronoi tesselation for either a pluto-formatted model (not ye)
   !or an ascii file ready for tesselation (lmodel_ascii)
   logical :: lmodel_ascii, lmhd_voronoi, lmodel_1d

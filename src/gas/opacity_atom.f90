@@ -22,6 +22,7 @@ module Opacity_atom
 
    contains
 
+   !could be parralel
    subroutine alloc_atom_opac(N,x)
       integer, intent(in) :: N
       real(kind=dp), dimension(N) :: x
@@ -43,6 +44,7 @@ module Opacity_atom
          atm => atoms(nat)%p
          !if commong gauss prof add in mem_loc
          do kr=1,atm%nline
+               if (.not.atm%lines(kr)%lcontrib) cycle
                if (atm%lines(kr)%Voigt) then
                   allocate(atm%lines(kr)%v(atm%lines(kr)%Nlambda),atm%lines(kr)%phi(atm%lines(kr)%Nlambda,n_cells))
                   allocate(atm%lines(kr)%a(n_cells))
@@ -53,6 +55,7 @@ module Opacity_atom
          do icell=1, n_cells
             if (icompute_atomRT(icell) <= 0) cycle
             do kr=1,atm%nline
+               if (.not.atm%lines(kr)%lcontrib) cycle
                if (atm%lines(kr)%Voigt) then
                   nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
                   atm%lines(kr)%a(icell) = line_damping(icell,atm%lines(kr))
@@ -65,6 +68,7 @@ module Opacity_atom
          enddo
 
          do kr=1,atm%nline
+            if (.not.atm%lines(kr)%lcontrib) cycle
             if (atm%lines(kr)%Voigt) then
                nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
                atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 !m/s
@@ -72,6 +76,7 @@ module Opacity_atom
          enddo
 
          do kr = 1, atm%Ncont
+            if (.not.atm%continua(kr)%lcontrib) cycle
             ! allocate(atm%continua(kr)%twohnu3_c2(atm%continua(kr)%Nlambda))
             ! atm%continua(kr)%twohnu3_c2(:) = twohc/x(atm%continua(kr)%Nb:atm%continua(kr)%Nr)**3
             ! allocate(atm%continua(kr)%alpha(atm%continua(kr)%Nlambda))

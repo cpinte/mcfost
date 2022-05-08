@@ -61,7 +61,6 @@ subroutine set_default_variables()
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
-  ltab_wavelength_image = .false.
   lcheckpoint = .false.
   checkpoint_period = 15
   !HEALpix
@@ -915,13 +914,6 @@ subroutine initialisation_mcfost()
      case("-level_dissolution")
         i_arg = i_arg + 1
         ldissolve =.true.
-     case("-tab_wavelength_image")
-        i_arg = i_arg + 1
-        ltab_wavelength_image = .true.
-        call get_command_argument(i_arg, s)
-        if (s=="") call error("No filename provided for frequency grid!")
-        tab_wavelength_image = s
-        i_arg = i_arg + 1
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
@@ -1917,7 +1909,6 @@ subroutine display_help()
   write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
-  write(*,*) "        : -tab_wavelength_image <file.s> : Input wavelength grid used for images and spectra "
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
   write(*,*) "        : -read_jnu_atom : Read old Jnu values from file "
   write(*,*) "        : -calc_jnu_atom : Stop the code after Jnu_scattering has been computed and written. "

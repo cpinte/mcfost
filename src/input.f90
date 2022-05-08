@@ -183,8 +183,8 @@ subroutine lect_Temperature()
   integer, dimension(5) :: naxes
   logical :: anynull
 
-  !B. Tessore.
-  if (lemission_atom .and.(.not.lsed).and.(.not.ltemp)) RETURN
+  !B. Tessore., Temporary
+  if (lemission_atom .or.(.not.lsed).and.(.not.ltemp)) RETURN
 
   if (lRE_LTE) then
      status=0

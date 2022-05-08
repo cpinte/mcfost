@@ -12,6 +12,7 @@ module io_atom
    use parametres, only          : art_hv
    use grid, only                : T, vturb, B_char
    use fits_utils
+   use wavelengths_gas, only : compute_line_bound
 
    implicit none
 
@@ -598,41 +599,6 @@ module io_atom
       return
    end subroutine read_Atomic_Models
 
-   subroutine compute_line_bound(line,limage)
-      ! ------------------------------------------------------------ !
-      ! Compute the line bounds : lamndamin and lambdamax
-      ! the total extent of line in the atom's frame (no velocity).
-      ! ------------------------------------------------------------ !
-      type (AtomicLine), intent(inout) :: line
-      logical, intent(in) :: limage
-      real(kind=dp) :: vB, vmax, vth
-      
-         
-      if (line%polarizable) then
-         vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
-      else
-         vB = 0.0_dp
-      endif
-      vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
-      !write(*,*) "max(vth) line = ", vth*1d-3, line%atom%weight
-      vmax = line%qwing * (vth + vB)
-      if (limage) vmax = line%atom%vmax_rt*1d3
-       
-       
-      line%lambdamin = line%lambda0*(1.0-vmax/C_LIGHT)
-      line%lambdamax = line%lambda0*(1.0+vmax/C_LIGHT)
-      line%vmax = vmax
-
-      if (limage) then
-         write(*,'("line "(1I2)"->"(1I2)"; Vmax (Ray-Trace)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
-         write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
-      ! else
-      !    write(*,'("line "(1I2)"->"(1I2)"; Vmax (non-LTE)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
-      !    write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
-      endif
-
-      return
-   end subroutine compute_line_bound
 
    subroutine search_cont_lambdamax (cont, Rinf, Z, Ej, Ei)
       !Search the lambdamax = first lambda for which Gaunt < 0

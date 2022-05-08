@@ -11,15 +11,16 @@ module atom_transfer
                                  limb_darkening, mu_limb_darkening
    use constantes, only : nm_to_m, m_to_km, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au
    use io_atom, only : read_atomic_models, write_pops_atom
-   use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda
-   use wavelengths_gas, only : make_wavelength_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont
+   use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
+   use wavelengths_gas, only : make_wavelength_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
+                                 deallocate_wavelengths_gasrt, make_wavelengths_raytracing
    use elecdensity, only : solve_ne, write_electron, read_electron
    use grid, only : lcalc_ne, move_to_grid, vfield3d, icompute_atomRT
    use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops
    use atom_type, only : atoms, atomtype, n_atoms
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
-   use opacity_atom, only : alloc_atom_opac, Itot, psi, opacity_atom_bf_loc, opacity_atom_bb_loc
+   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
@@ -42,6 +43,46 @@ module atom_transfer
    end subroutine nlte_loop_mali
 
    subroutine setup_image_grid()
+      use wavelengths_gas, only : compute_line_bound
+   !to do lmono -limg
+   !keep somewhere tab_lambda_sed = tab_lambda because tab_lambda is overwritten in non-LTE
+      integer :: kr, nat
+
+      call deallocate_wavelengths_gasrt(tab_lambda)
+      call dealloc_atom_opac()
+      call init_directions_ray_tracing()
+
+      !high resolution flux (no images)
+      if (RT_line_method==1) then
+      !-> don't forget to change allocation in alloc_atom_maps in output.f90 as a function of RT line method
+      !if (lsed) then
+      ! use the tab_lambda (*micron to nm) in the parameter file to compute a low res spectrum ?
+      !
+      !endif
+         write(*,*) "not yet"
+         stop
+         !works also
+         do nat=1,N_atoms
+            do kr=1, atoms(nat)%p%Nline
+               call compute_line_bound(atoms(nat)%p%lines(kr),.true.)
+            enddo
+         enddo
+         call make_wavelength_nlte(tab_lambda_nm)
+      !images for ray-traced lines
+      else
+         !create a wavelength grid around ray-traced lines
+         !keep all transitions overlapping with those lines;
+         call make_wavelengths_raytracing(tab_lambda_nm,.true.)
+      endif
+      n_lambda = size(tab_lambda_nm)
+      tab_lambda = tab_lambda_nm * nm_to_m!micron
+
+      call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      call allocate_atom_maps()
+      if (laccretion_shock) then
+         max_Tshock = 0.0
+         min_Tshock = 1d8
+      endif
 
       return
    end subroutine setup_image_grid
@@ -100,6 +141,7 @@ module atom_transfer
       endif
 
       call ltepops_atoms() 
+!-> non-LTE here
       max_vel_shift = 0.0
       do ibin=1,n_cells
          v1 = sqrt(sum(vfield3d(ibin,:)**2))
@@ -110,8 +152,8 @@ module atom_transfer
             endif
          enddo
       enddo
-      write(*,*) max_vel_shift*1d-3, maxval(sqrt(sum(vfield3d(:,:)**2,dim=2)))*1d-3
       v_char = max_vel_shift
+      write(*,*) "v_char", v_char * 1d-3
       !because for non-LTE we compute the motion of each cell wrt to the actual cell
       !so the maximum shift is what we have if all cells move at their max speed (v(icell))
       ! stop
@@ -123,16 +165,17 @@ module atom_transfer
       !otherwise, we pass group wavelength and check contributing opacities for each group
       !but it is like indexes at the end?
       deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
-      write(*,*) "v_char", v_char * 1d-3
       call make_wavelength_nlte(tab_lambda_nm,vmax_overlap=v_char)
       n_lambda = size(tab_lambda_nm)
-      tab_lambda = tab_lambda_nm * nm_to_m * m_to_km !micron
+      tab_lambda = tab_lambda_nm * nm_to_m!micron
 
       !allocate quantities in space and for this frequency grid
       call alloc_atom_opac(n_lambda, tab_lambda_nm)
       !-> still allocate cont on tab_lambda_cont 
       !-> use interpolation to go from cont grid to total grid
       !except for images ?
+
+!-> end non-LTE
 
       !for image keep only the transitions in the file for ray_tracing
       !recompute a special wavelength grid with new n_lambda and tab_lambda
@@ -145,6 +188,7 @@ module atom_transfer
       if (lmodel_1d) then
          !in 1d we don't care about the images, we compute cylindrically symmetric
          !intensity (still with velocity).
+         if (v_char > 0) write(*,*) "beware in 1d, the shifts are not taken yet!"
          call spectrum_1d()
          !deallocate and exit code
          return !from atomic transfer!
@@ -154,14 +198,14 @@ module atom_transfer
       !re alloc lambda here. Eventually use the tab_lambda in the file
       !for SED flux
       !add an limage mode
-      !call setup_image_grid()!either for RT_line_method==1 or >1
-      call allocate_atom_maps()
+      call setup_image_grid()
+      ! call allocate_atom_maps()
+      ! if (laccretion_shock) then
+      !    max_Tshock = 0.0
+      !    min_Tshock = 1d8
+      ! endif
+      ! call init_directions_ray_tracing()
       write(*,*) "Computing emission flux map..."
-      if (laccretion_shock) then
-         max_Tshock = 0.0
-         min_Tshock = 1d8
-      endif
-      call init_directions_ray_tracing()
       do ibin=1,RT_n_incl
          do iaz=1,RT_n_az
             call emission_line_map(ibin,iaz)
