@@ -691,7 +691,8 @@ contains
 
     integer, intent(in) :: n_SPH
     integer, dimension(n_SPH), intent(in) :: particle_id
-    real(kind=dp), dimension(n_SPH), intent(inout) :: x, y, z, massgas, rho
+    real(kind=dp), dimension(n_SPH), intent(inout) :: x, y, z, massgas
+    real(kind=dp), dimension(:), allocatable, intent(inout) :: rho
     real(dp), dimension(:,:), allocatable, intent(inout) :: rhodust, massdust
 
     integer, dimension(:), allocatable, intent(out) :: is_ghost
@@ -722,10 +723,12 @@ contains
              nkill = nkill+1
 
              ! Adding ghost particle to main one
-             rho(ii) = rho(ii) + rho(jj)
              massgas(ii) = massgas(ii) + massgas(jj)
-             rhodust(:,ii) = rhodust(:,ii) + rhodust(:,jj)
-             massdust(:,ii) = massdust(:,ii) + massdust(:,jj)
+             if (.not.lignore_dust) then
+               rho(ii) = rho(ii) + rho(jj)
+               rhodust(:,ii) = rhodust(:,ii) + rhodust(:,jj)
+               massdust(:,ii) = massdust(:,ii) + massdust(:,jj)
+             endif
           else
              exit loop2
           endif
