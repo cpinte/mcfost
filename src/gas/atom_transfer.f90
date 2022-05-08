@@ -11,8 +11,8 @@ module atom_transfer
    use constantes, only : nm_to_m, m_to_km, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au
    use io_atom, only : read_atomic_models, write_pops_atom
    use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
-   use wavelengths_gas, only : make_wavelength_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
-                                 deallocate_wavelengths_gasrt, make_wavelengths_raytracing
+   use wavelengths_gas, only : make_wavelengths_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
+                                 deallocate_wavelengths_gasrt, make_wavelengths_raytracing, make_wavelengths_flux
    use elecdensity, only : solve_ne, write_electron, read_electron
    use grid, only : lcalc_ne, move_to_grid, vfield3d, icompute_atomRT
    use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops
@@ -66,27 +66,19 @@ module atom_transfer
       ! use the tab_lambda (*micron to nm) in the parameter file to compute a low res spectrum ?
       !
       !endif
-         write(*,*) "not yet"
-         stop
-         !works also
-         do nat=1,N_atoms
-            do kr=1, atoms(nat)%p%Nline
-               call compute_line_bound(atoms(nat)%p%lines(kr),.true.)
-            enddo
-         enddo
          ! if (lsed) then
          !    tab_lambda = tab_lambda_save
          !    tab_lambda_nm = tab_lambda * m_to_km
          !    tab_lambda_cont = tab_lambda_nm
          !    !recompute index of lines to see if we keep them (or too low resol)
          ! else !high res flux
-            call make_wavelength_nlte(tab_lambda_nm)
+            call make_wavelengths_flux(tab_lambda_nm,lsed)
          ! endif
       !images for ray-traced lines
       else
          !create a wavelength grid around ray-traced lines
          !keep all transitions overlapping with those lines;
-         call make_wavelengths_raytracing(tab_lambda_nm,.true.)
+         call make_wavelengths_raytracing(tab_lambda_nm)
       endif
       n_lambda = size(tab_lambda_nm)
       tab_lambda = tab_lambda_nm * nm_to_m!micron
@@ -180,25 +172,24 @@ module atom_transfer
          !otherwise, we pass group wavelength and check contributing opacities for each group
          !but it is like indexes at the end?
          deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
-         call make_wavelength_nlte(tab_lambda_nm,vmax_overlap=v_char)
+         call make_wavelengths_nlte(tab_lambda_nm,vmax_overlap=v_char)
          n_lambda = size(tab_lambda_nm)
          tab_lambda = tab_lambda_nm * nm_to_m!micron
 
          !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm)
+
+         stop
       end if !active atoms
 
-      !for image keep only the transitions in the file for ray_tracing
-      !recompute a special wavelength grid with new n_lambda and tab_lambda
-      !and solve the transfer for these wavelengths covering only the transitions
-      !for ray tracing.
-      !keep a copy of tab_lambda from the file if we want to compute a sed
-      !check that the index on the lambda for map is consistent witht eh value of lambda for a 
-      !line because in worst, line%nr and line%nb can be 1, but very unlikely meaning the line is on the grid.
 
       if (lmodel_1d) then
-         write(*,*) "1d : define grid for rT_line_method==1 like for flux total"
-         stop
+         call deallocate_wavelengths_gasrt(tab_lambda)
+         call dealloc_atom_opac()
+         call make_wavelengths_flux(tab_lambda_nm,.false.)
+         n_lambda = size(tab_lambda_nm)
+         tab_lambda = tab_lambda_nm * nm_to_m
+         call alloc_atom_opac(n_lambda, tab_lambda_nm)
          call spectrum_1d()
          !deallocate and exit code
          return !from atomic transfer!
