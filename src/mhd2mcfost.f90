@@ -61,6 +61,10 @@ module mhd2mcfost
         check_previous_tesselation = (.not.lrandomize_voronoi)
         n_points = 0 ! to avoid compiler warning
     
+        !needed for Voronoi
+        if (allocated(density_files)) deallocate(density_files)
+        allocate(density_files(1)); density_files(1) = density_file
+
         if (lignore_dust) then
            ndusttypes = 0
            if (allocated(rhodust)) deallocate(rhodust,massdust)
