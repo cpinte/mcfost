@@ -207,12 +207,7 @@ subroutine allocate_atom_maps()
   max_lambda = n_lambda!max lambda_per_line
   max_trans = 1!maxval( atoms(:)%p%nTrans_raytracing )
 
- if (npix_x_save > 1) then
-     !-> temporary because I have not created a special grid for images yet
-     allocate(flux_total(n_lambda, RT_n_incl, RT_n_az, nb_proc),stat=alloc_status)
-     flux_total = 0.0_dp
-
-     RT_line_method = 2
+ if (RT_line_method > 1) then
      npix_x = npix_x_save ; npix_y = npix_y_save
      do n=1, n_atoms
      	if (atoms(n)%p%lline) then
@@ -226,10 +221,11 @@ subroutine allocate_atom_maps()
      		enddo
      	endif
      enddo
-  else
-     RT_line_method = 1
+  elseif (RT_line_method==1) then
      allocate(flux_total(n_lambda, RT_n_incl, RT_n_az, nb_proc),stat=alloc_status)
      flux_total = 0.0_dp
+  else
+   call error("(allocate_atom_maps) RT_line_method undefined!")
   endif
   if (alloc_status > 0) call error('Allocation error atom_maps')
 

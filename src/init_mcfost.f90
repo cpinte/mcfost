@@ -787,37 +787,15 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         ldensity_file = .false.
-   !   case ("-pluto")
-   !   	i_arg = i_arg + 1
-   !   	lpluto_file = .true.
-   !   	lmodel_ascii = .false.
-   !      call get_command_argument(i_arg,s)
-   !      if (s=="") call error("No filename provided for Pluto file!")
-   !      n_pluto_files = 1
-   !      allocate(density_files(n_pluto_files))
-   !      density_files(1) = s
-   !      i_arg = i_arg + 1
      case ("-model_1d")
      	i_arg = i_arg + 1
      	lmodel_1d = .true.
      	lmodel_ascii = .false.
       ldensity_file = .false.
-      !   call get_command_argument(i_arg,s)
-      !   if (s=="") call error("No filename provided for Pluto file!")
-      !   allocate(density_files(1))
-      !   density_file = s
-      !   density_files(1) = density_file
-      !   i_arg = i_arg + 1
      case("-model_ascii")
         i_arg = i_arg + 1
         lmodel_ascii = .true.
         ldensity_file = .false.
-      !   call get_command_argument(i_arg,s)
-      !   if (s=="") call error("No filename provided for ascii Pluto file!")
-      !   density_file = s
-      !   allocate(density_files(1))
-      !   density_files(1) = density_file
-      !   i_arg = i_arg + 1
      case("-zeeman_polarisation")
         i_arg = i_arg + 1
         lzeeman_polarisation=.true.
@@ -1771,7 +1749,6 @@ subroutine display_help()
   write(*,*) "        : -phantom <dump> : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -fargo3d <dir> <id> : reads a fargo3d model"
-!   write(*,*) "        : -pluto <file> : read the <file> pluto HDF5 file"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
   write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
   write(*,*) "        : -model_1d : interface with stellar atmosphere models."

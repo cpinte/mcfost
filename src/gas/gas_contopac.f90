@@ -324,19 +324,19 @@ module gas_contopac
 
    subroutine dealloc_gas_contopac
 
-      deallocate(Hray_lambda)
+      if (allocated(Hray_lambda)) deallocate(Hray_lambda)
       if (allocated(HeIray_lambda)) deallocate(HeIray_lambda)
 
       !deallocate or not because depends on cells so unchanged if we change lambda grid...
       ! deallocate(exphckT)
-      deallocate(hnu_k)
+      if (allocated(hnu_k)) deallocate(hnu_k)
       !anyway should not cost anything!
 
-      deallocate(alpha_wishart, alpha_geltman)
-      deallocate(alphai_bell_berr_part, j0_theta_bell_berr)
+      if (allocated(alpha_wishart)) deallocate(alpha_wishart, alpha_geltman)
+      if (allocated(alphai_bell_berr_part)) deallocate(alphai_bell_berr_part, j0_theta_bell_berr)
       i0_lam_bell_berr = 0
 
-      deallocate(john_hminus_term1)
+      if (allocated(john_hminus_term1)) deallocate(john_hminus_term1)
 
       return
    end subroutine dealloc_gas_contopac

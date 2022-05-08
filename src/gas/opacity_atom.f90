@@ -117,7 +117,7 @@ module Opacity_atom
       if (allocated(psi)) then
          deallocate(psi)
       endif
-      deallocate(Itot)
+      if (allocated(Itot)) deallocate(Itot)
 
       do nat=1, n_atoms
          atm => atoms(nat)%p
@@ -131,8 +131,10 @@ module Opacity_atom
          enddo
 
          do kr = 1, atm%Ncont
-            deallocate(atm%continua(kr)%twohnu3_c2)
-            deallocate(atm%continua(kr)%alpha)
+            if (allocated(atm%continua(kr)%twohnu3_c2)) then 
+               deallocate(atm%continua(kr)%twohnu3_c2)
+               deallocate(atm%continua(kr)%alpha)
+            endif
          enddo
 
          atm => null()

@@ -225,8 +225,8 @@ module wavelengths_gas
 
    subroutine deallocate_wavelengths_gasrt(lambda)
       real(kind=dp), intent(inout), allocatable, dimension(:) :: lambda
-      deallocate(tab_lambda_cont, tab_lambda_nm)
-      deallocate(lambda)
+      if (allocated(lambda)) deallocate(lambda)
+      if (allocated(tab_lambda_nm)) deallocate(tab_lambda_cont, tab_lambda_nm)
       !deallocate atom grid..
       !deallocate group..
       if (allocated(group_blue)) deallocate(group_blue, group_red)
@@ -843,6 +843,9 @@ module wavelengths_gas
          Ncont = Ncont + atom%Ncont
       enddo
       atom => null()
+
+      !if .not limage add continuum here and do not test on Nlines==0
+
       if( Nlines==0 ) then
          call error("It seems that you want to compute an image but there is no lines!")
       endif

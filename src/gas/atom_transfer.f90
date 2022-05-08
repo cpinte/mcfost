@@ -7,8 +7,7 @@
 module atom_transfer
 
    use parametres
-   use input, only               : lkeplerian, linfall, RT_line_method, RT_line_method, &
-                                 limb_darkening, mu_limb_darkening
+   use input, only               : lkeplerian, linfall, limb_darkening, mu_limb_darkening, RT_line_method
    use constantes, only : nm_to_m, m_to_km, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au
    use io_atom, only : read_atomic_models, write_pops_atom
    use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
@@ -17,7 +16,7 @@ module atom_transfer
    use elecdensity, only : solve_ne, write_electron, read_electron
    use grid, only : lcalc_ne, move_to_grid, vfield3d, icompute_atomRT
    use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops
-   use atom_type, only : atoms, atomtype, n_atoms
+   use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac
@@ -52,6 +51,14 @@ module atom_transfer
       call dealloc_atom_opac()
       call init_directions_ray_tracing()
 
+      !defined in alloc_Atomic_maps but I need n_lambda so RT_line_method
+      !before
+      if (npix_x_save > 1) then
+         RT_line_method = 2
+      else
+         RT_line_method = 1
+      endif
+
       !high resolution flux (no images)
       if (RT_line_method==1) then
       !-> don't forget to change allocation in alloc_atom_maps in output.f90 as a function of RT line method
@@ -67,7 +74,14 @@ module atom_transfer
                call compute_line_bound(atoms(nat)%p%lines(kr),.true.)
             enddo
          enddo
-         call make_wavelength_nlte(tab_lambda_nm)
+         ! if (lsed) then
+         !    tab_lambda = tab_lambda_save
+         !    tab_lambda_nm = tab_lambda * m_to_km
+         !    tab_lambda_cont = tab_lambda_nm
+         !    !recompute index of lines to see if we keep them (or too low resol)
+         ! else !high res flux
+            call make_wavelength_nlte(tab_lambda_nm)
+         ! endif
       !images for ray-traced lines
       else
          !create a wavelength grid around ray-traced lines
@@ -96,7 +110,6 @@ module atom_transfer
       logical :: lelectron_read
       real(kind=dp) :: v_char, max_vel_shift, v1, v2
 
-
       write(*,*) " *** BIG WARNING **** "
       write(*,*) " !!!!! CHECK FOR BILINEAR INTERP in utils.f90 ! !!!!"
       write(*,*) "check solve ne" 
@@ -104,7 +117,6 @@ module atom_transfer
 
       omp_chunk_size = max(nint( 0.01 * n_cells / nb_proc ),1)
       mem_alloc_tot = 0
-      v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
 
       !read atomic models
       call read_atomic_Models()
@@ -141,41 +153,40 @@ module atom_transfer
       endif
 
       call ltepops_atoms() 
-!-> non-LTE here
-      max_vel_shift = 0.0
-      do ibin=1,n_cells
-         v1 = sqrt(sum(vfield3d(ibin,:)**2))
-         do iaz=1,n_cells
-            v2 = sqrt(sum(vfield3d(iaz,:)**2))
-            if ((icompute_atomRT(ibin)>0).and.(icompute_atomRT(iaz)>0)) then
-               max_vel_shift = max(max_vel_shift,abs(v1-v2))
-            endif
+
+      if( Nactiveatoms > 0) then
+
+         v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+         max_vel_shift = 0.0
+         do ibin=1,n_cells
+            v1 = sqrt(sum(vfield3d(ibin,:)**2))
+            do iaz=1,n_cells
+               v2 = sqrt(sum(vfield3d(iaz,:)**2))
+               if ((icompute_atomRT(ibin)>0).and.(icompute_atomRT(iaz)>0)) then
+                  max_vel_shift = max(max_vel_shift,abs(v1-v2))
+               endif
+            enddo
          enddo
-      enddo
-      v_char = max_vel_shift
-      write(*,*) "v_char", v_char * 1d-3
-      !because for non-LTE we compute the motion of each cell wrt to the actual cell
-      !so the maximum shift is what we have if all cells move at their max speed (v(icell))
-      ! stop
+         v_char = max_vel_shift
+         write(*,*) "v_char", v_char * 1d-3
+         !because for non-LTE we compute the motion of each cell wrt to the actual cell
+         !so the maximum shift is what we have if all cells move at their max speed (v(icell))
+         ! stop
 
-      !every indexes are defined on the lambda frequency. 
-      !So even when lambda is passed as an argument, it is expected
-      !that the indexes correspond at that grid.
-      !Even if we split the transfer un group of wavelength that's probably best to keep indexes.
-      !otherwise, we pass group wavelength and check contributing opacities for each group
-      !but it is like indexes at the end?
-      deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
-      call make_wavelength_nlte(tab_lambda_nm,vmax_overlap=v_char)
-      n_lambda = size(tab_lambda_nm)
-      tab_lambda = tab_lambda_nm * nm_to_m!micron
+         !every indexes are defined on the lambda frequency. 
+         !So even when lambda is passed as an argument, it is expected
+         !that the indexes correspond at that grid.
+         !Even if we split the transfer un group of wavelength that's probably best to keep indexes.
+         !otherwise, we pass group wavelength and check contributing opacities for each group
+         !but it is like indexes at the end?
+         deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
+         call make_wavelength_nlte(tab_lambda_nm,vmax_overlap=v_char)
+         n_lambda = size(tab_lambda_nm)
+         tab_lambda = tab_lambda_nm * nm_to_m!micron
 
-      !allocate quantities in space and for this frequency grid
-      call alloc_atom_opac(n_lambda, tab_lambda_nm)
-      !-> still allocate cont on tab_lambda_cont 
-      !-> use interpolation to go from cont grid to total grid
-      !except for images ?
-
-!-> end non-LTE
+         !allocate quantities in space and for this frequency grid
+         call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      end if !active atoms
 
       !for image keep only the transitions in the file for ray_tracing
       !recompute a special wavelength grid with new n_lambda and tab_lambda
@@ -186,9 +197,8 @@ module atom_transfer
       !line because in worst, line%nr and line%nb can be 1, but very unlikely meaning the line is on the grid.
 
       if (lmodel_1d) then
-         !in 1d we don't care about the images, we compute cylindrically symmetric
-         !intensity (still with velocity).
-         if (v_char > 0) write(*,*) "beware in 1d, the shifts are not taken yet!"
+         write(*,*) "1d : define grid for rT_line_method==1 like for flux total"
+         stop
          call spectrum_1d()
          !deallocate and exit code
          return !from atomic transfer!
@@ -199,22 +209,19 @@ module atom_transfer
       !for SED flux
       !add an limage mode
       call setup_image_grid()
-      ! call allocate_atom_maps()
-      ! if (laccretion_shock) then
-      !    max_Tshock = 0.0
-      !    min_Tshock = 1d8
-      ! endif
-      ! call init_directions_ray_tracing()
       write(*,*) "Computing emission flux map..."
       do ibin=1,RT_n_incl
          do iaz=1,RT_n_az
             call emission_line_map(ibin,iaz)
          end do
       end do
-      do nat=1, n_atoms
-         if (atoms(nat)%p%lline) call write_atomic_maps(atoms(nat)%p) !onyly with RT = 2
-      enddo
-      call write_total_flux() !tmp only with RT = 1
+      if (RT_line_method==1) then
+         call write_total_flux()
+      else
+         do nat=1, n_atoms
+            if (atoms(nat)%p%lline) call write_atomic_maps(atoms(nat)%p) !onyly with RT = 2
+         enddo
+      endif
       write(*,*) " ..done"
 
 
@@ -315,13 +322,9 @@ module atom_transfer
       ! Flux out of a pixel in W/m2/Hz/pix
       normF = ( pixelsize / (distance*pc_to_AU) )**2
 
-      !-> temporary becaus eI haven't redefined the grid for images!
-      ! if (RT_line_method==1) then
+      if (RT_line_method==1) then
          Flux_total(:,ibin,iaz,id) = Flux_total(:,ibin,iaz,id) + I0(:) * normF
-      ! endif
-
-
-      if (RT_line_method==2) then
+      else
          do nat=1,N_atoms
             atom => atoms(nat)%p
             do kr=1,atom%nTrans_rayTracing
