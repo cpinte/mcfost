@@ -12,7 +12,7 @@ module atom_transfer
    use constantes, only : nm_to_m, m_to_km, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au
    use io_atom, only : read_atomic_models, write_pops_atom
    use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda
-   use wavelengths_gas, only : make_wavelength_nlte, tab_lambda_nm
+   use wavelengths_gas, only : make_wavelength_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont
    use elecdensity, only : solve_ne, write_electron, read_electron
    use grid, only : lcalc_ne, move_to_grid, vfield3d, icompute_atomRT
    use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops
@@ -130,6 +130,9 @@ module atom_transfer
 
       !allocate quantities in space and for this frequency grid
       call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      !-> still allocate cont on tab_lambda_cont 
+      !-> use interpolation to go from cont grid to total grid
+      !except for images ?
 
       !for image keep only the transitions in the file for ray_tracing
       !recompute a special wavelength grid with new n_lambda and tab_lambda

@@ -11,8 +11,7 @@ module optical_depth
   use radiation_field, only : save_radiation_field
   use density
   use stars, only : intersect_stars, star_rad
-  use gas_contopac, only : background_continua_lambda
-  use opacity_atom, only : opacity_atom_bb_loc, opacity_atom_bf_loc, Itot, psi
+  use opacity_atom, only : opacity_atom_bb_loc, contopac_atom_loc, Itot, psi
 
   implicit none
 
@@ -872,12 +871,8 @@ end subroutine optical_length_tot_mol
             lsubtract_avg = ((nbr_cell == 1).and.labs)
             ! opacities in m^-1, l_contrib in au
 
-            !does not change with iray though.
-            !init Snu and chi
-            call background_continua_lambda(icell, N, lambda, chi, Snu)
-            !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
-            !accumulate b-f and b-b un chi and Sny
-            call opacity_atom_bf_loc(icell,N,lambda,chi,Snu)
+
+            call contopac_atom_loc(icell, N, lambda, chi, Snu)
             call opacity_atom_bb_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,&
                l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,Snu)
 

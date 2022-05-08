@@ -20,7 +20,8 @@ module atom_type
    type AtomicContinuum
       logical :: hydrogenic, lcontrib
       integer :: i, j
-      integer :: Nb, Nr, Nlambda
+      integer :: Nb, Nr, Nlambda !global
+      integer :: Nbc, Nrc, Nlambdac !cont
       real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionisation
       real(kind=dp), allocatable, dimension(:)  :: alpha, twohnu3_c2
       real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file

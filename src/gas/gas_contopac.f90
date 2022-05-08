@@ -19,6 +19,10 @@ module gas_contopac
    use occupation_probability, only : D_i, wocc_n
    use parametres, only : ldissolve, n_cells
    use messages, only : error
+   use wavelengths_gas, only : tab_lambda_cont, n_lambda_cont
+                              !allocate and compute gas_contopac on a small grid
+                              !and interpolate on tab_lambda ?
+                              !do the same for bound-free ? 
 
    implicit none
 	
@@ -176,7 +180,7 @@ module gas_contopac
       real(kind=dp), dimension(Nx), intent(in) :: x
       real(kind=dp), dimension(Nx), intent(out) :: chiout, etaout
       real(kind=dp), dimension(Nx) :: chi, eta, Bp
-    
+
       !HI Rayleigh must be initialised first
       chiout(:) = thomson(icell) + HI_rayleigh(icell)
       etaout(:) = 0.0_dp
@@ -199,9 +203,6 @@ module gas_contopac
       call Hminus_ff_bell_berr(icell, Nx, x, chi)
       chiout(:) = chiout(:) + chi(:)
       etaout(:) = etaout(:) + chi(:) * Bp(:)
-
-      !now atomic LTE bound-free
-      !elsewhere even if LTE
 
       return
    end subroutine background_continua_lambda
@@ -313,7 +314,7 @@ module gas_contopac
 		write(*,'("allocate "(1F6.4)" GB for alphai_bell_berr_part")') real(sizeof(alphai_bell_berr_part))/1024./1024./1024.
 		write(*,'("allocate "(1F6.4)" GB for j0_bell_berr")') real(sizeof(j0_theta_bell_berr))/1024./1024./1024.
 		write(*,'("allocate "(1F6.4)" GB for -hnu_k")') real(sizeof(hnu_k))/1024./1024./1024.
-		write(*,'(" -> max(hnu_k)="(1ES14.5E3)"; min(hnu_k)="(ES14.5E3))') maxval(hnu_k), minval(hnu_k,mask=icompute_AtomRT>0)
+		write(*,'(" -> max(hnu_k)="(1ES14.5E3)"; min(hnu_k)="(ES14.5E3))') maxval(hnu_k), minval(hnu_k)
 		! write(*,'("allocate "(1F6.4)" GB for exp(-hc/kT)")') real(sizeof(exphckT))/1024./1024./1024.
 		! write(*,'(" -> max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
 

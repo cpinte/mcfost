@@ -8,7 +8,7 @@ module Opacity_atom
    use voigts, only              : voigt
    use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, &
                                      dealloc_gas_contopac, hnu_k!exphckT, lambda_base,
-   use wavelengths_gas, only     : Nlambda_max_line
+   use wavelengths_gas, only     : Nlambda_max_line, n_lambda_cont, tab_lambda_cont
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj
    use utils, only               : linear_1D_sorted
@@ -32,7 +32,9 @@ module Opacity_atom
 
       mem_loc = 0
 
-      call alloc_gas_contopac(N,x)
+      ! call alloc_gas_contopac(N,x)
+      !-> on a small grid and interpolated later
+      call alloc_gas_contopac(n_lambda_cont,tab_lambda_cont)
   
       allocate(psi(N,1,nb_proc))
       allocate(Itot(N,1,nb_proc))
@@ -70,14 +72,24 @@ module Opacity_atom
          enddo
 
          do kr = 1, atm%Ncont
-            allocate(atm%continua(kr)%twohnu3_c2(atm%continua(kr)%Nlambda))
-            atm%continua(kr)%twohnu3_c2(:) = twohc/x(atm%continua(kr)%Nb:atm%continua(kr)%Nr)**3
-            allocate(atm%continua(kr)%alpha(atm%continua(kr)%Nlambda))
+            ! allocate(atm%continua(kr)%twohnu3_c2(atm%continua(kr)%Nlambda))
+            ! atm%continua(kr)%twohnu3_c2(:) = twohc/x(atm%continua(kr)%Nb:atm%continua(kr)%Nr)**3
+            ! allocate(atm%continua(kr)%alpha(atm%continua(kr)%Nlambda))
+            ! if (atm%continua(kr)%hydrogenic) then
+            !    atm%continua(kr)%alpha(:) = H_bf_Xsection(atm%continua(kr), x(atm%continua(kr)%Nb:atm%continua(kr)%Nr))
+            ! else
+            !    atm%continua(kr)%alpha(:) = linear_1D_sorted(size(atm%continua(kr)%alpha_file),&
+            !    atm%continua(kr)%lambda_file,atm%continua(kr)%alpha_file,atm%continua(kr)%Nlambda,x(atm%continua(kr)%Nb:atm%continua(kr)%Nr))
+            ! endif
+            !-> on a small grid and interpolated later
+            allocate(atm%continua(kr)%twohnu3_c2(atm%continua(kr)%Nlambdac))
+            atm%continua(kr)%twohnu3_c2(:) = twohc/tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc)**3
+            allocate(atm%continua(kr)%alpha(atm%continua(kr)%Nlambdac))
             if (atm%continua(kr)%hydrogenic) then
-               atm%continua(kr)%alpha(:) = H_bf_Xsection(atm%continua(kr), x(atm%continua(kr)%Nb:atm%continua(kr)%Nr))
+               atm%continua(kr)%alpha(:) = H_bf_Xsection(atm%continua(kr), tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
             else
                atm%continua(kr)%alpha(:) = linear_1D_sorted(size(atm%continua(kr)%alpha_file),&
-               atm%continua(kr)%lambda_file,atm%continua(kr)%alpha_file,atm%continua(kr)%Nlambda,x(atm%continua(kr)%Nb:atm%continua(kr)%Nr))
+               atm%continua(kr)%lambda_file,atm%continua(kr)%alpha_file,atm%continua(kr)%Nlambdac,tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
             endif
 
          enddo
@@ -125,7 +137,47 @@ module Opacity_atom
       return
    end subroutine dealloc_atom_opac
 
+   subroutine contopac_atom_loc(icell,N,lambda,chi,snu)
+      integer, intent(in) :: icell, N
+      real(kind=dp), intent(in), dimension(N) :: lambda
+      real(kind=dp), intent(inout), dimension(N) :: chi, Snu
+      real(kind=dp), dimension(N_lambda_cont) :: chic, snuc
+      integer :: la, lac, i0
+      real(kind=dp) :: w
+
+      !init continuous opacity with background gas continuum.
+      call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+      !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
+      !accumulate b-f
+      call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+
+      chi(1) = chic(1)
+      snu(1) = snuc(1)
+
+      !linear interpolation
+      i0 = 2
+      do la=1, N
+         loop_i : do lac=i0, n_lambda_cont
+            if (tab_lambda_cont(lac) > lambda(la)) then
+               w = (lambda(la) - tab_lambda_cont(lac-1)) / (tab_lambda_cont(lac) - tab_lambda_cont(lac-1))
+               chi(la) = (1.0_dp - w) * chic(lac-1)  + w * chic(lac)
+               snu(la) = (1.0_dp - w) * snuc(lac-1)  + w * snuc(lac)
+               i0 = lac
+               exit loop_i
+            endif
+         enddo loop_i
+      enddo
+      if (lambda(N)==tab_lambda_cont(n_lambda_cont)) then
+         chi(N) = chic(n_lambda_cont)
+         snu(N) = snuc(n_lambda_cont)
+      endif
+
+
+      return
+   end subroutine contopac_atom_loc
+
    subroutine opacity_atom_bf_loc(icell,N,lambda,chi,Snu)
+   !to do: remove lambda dep since it must be consistent with Nr, Nb
       integer, intent(in) :: icell, N
       real(kind=dp), intent(in), dimension(N) :: lambda
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
@@ -144,7 +196,8 @@ module Opacity_atom
 
             if (.not.atom%continua(kr)%lcontrib) cycle
 
-            Nred = atom%continua(kr)%Nr; Nblue = atom%continua(kr)%Nb
+            !beware Nc here, assumed tab_lambda_cont
+            Nred = atom%continua(kr)%Nrc; Nblue = atom%continua(kr)%Nbc
             i = atom%continua(kr)%i; j = atom%continua(kr)%j
             !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
             ni_on_nj_star = atom%nstar(i,icell)/(atom%nstar(j,icell) + 1d-100)
@@ -184,6 +237,7 @@ module Opacity_atom
 
    subroutine opacity_atom_bb_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib, &
          iterate,N,lambda,chi,Snu)
+   !to do: remove lambda dep since it must be consistent with Nr, Nb
       integer, intent(in) :: id, icell, iray,N
       logical, intent(in) :: iterate
       real(kind=dp), intent(in), dimension(N) :: lambda

@@ -23,7 +23,7 @@ module wavelengths_gas
    integer            :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans
 
    !group of overlapping transitions
-   integer :: N_groups
+   integer :: N_groups, n_lambda_cont
    real(kind=dp), dimension(:), allocatable :: group_blue, group_red
    integer, dimension(:), allocatable :: Nline_per_group, Nlambda_per_group
    !non-lte freq grid
@@ -318,7 +318,7 @@ module wavelengths_gas
       ! ********************** ***************** ********************** !
 
       ! ********************** cont + line    RT ********************** !
-      if (.true.) then!Nlines > 0) then !lines are present in some atoms
+      if (Nlines > 0) then !(.true.) then!lines are present in some atoms
          allocate(all_l0(Nlines), all_l1(Nlines), stat=alloc_status)
 
          Nlam = 0
@@ -481,77 +481,80 @@ module wavelengths_gas
          write(*,*) "There are in total ", Nlambda, " wavelength points for the lines grid.", sum(Nlambda_per_group)
          write(*,*) "** ?? ** "
 
-         ! !-> This is only useful for the pure-continuum RT !!!!
-         ! !and should disappear at some point.
-         ! !-> Add continuum points beyond last "bound-free" continuum
-         ! !In case they are lines beyond the last continuum I add at least3 points per line for the continuum in this region
-         ! !->cont end		this is heavy for nothing but should work !
-         ! !finalise continuum here by reckoning how much freq we need
-         ! !make the new points go farther than line_waves for interpolation.
-         ! Nmore_cont_freq = 0
-         ! do n=1, N_groups
-         !    l0 = group_blue(n)
-         !    l1 = group_red(n)
-         !    if (l0 > max_cont) then
-         !       Nmore_cont_freq = Nmore_cont_freq + 1
-         !    endif
-         !    if (l1 > max_cont) then
-         !       Nmore_cont_freq = Nmore_cont_freq + 1
-         !    endif
-         !    if (0.5*(l0+l1) > max_cont) then
-         !       Nmore_cont_freq = Nmore_cont_freq + 1
-         !    endif
+         ! ----------- small cont grid start ------------- !
+         !-> This is only useful for the pure-continuum RT !!!!
+         !and should disappear at some point.
+         !-> Add continuum points beyond last "bound-free" continuum
+         !In case they are lines beyond the last continuum I add at least3 points per line for the continuum in this region
+         !->cont end		this is heavy for nothing but should work !
+         !finalise continuum here by reckoning how much freq we need
+         !make the new points go farther than line_waves for interpolation.
+         Nmore_cont_freq = 0
+         do n=1, N_groups
+            l0 = group_blue(n)
+            l1 = group_red(n)
+            if (l0 > max_cont) then
+               Nmore_cont_freq = Nmore_cont_freq + 1
+            endif
+            if (l1 > max_cont) then
+               Nmore_cont_freq = Nmore_cont_freq + 1
+            endif
+            if (0.5*(l0+l1) > max_cont) then
+               Nmore_cont_freq = Nmore_cont_freq + 1
+            endif
  
-         ! enddo
+         enddo
  
-         ! check_new_freq = Nmore_cont_freq
-         ! if (Nmore_cont_freq > 0) then
-         !    write(*,*) "Adding new wavelength points for lines beyond continuum max!"
-         !    write(*,*) "  -> Adding ", Nmore_cont_freq," points"
-         !    write(*,*) "max cont, max line", max_cont, maxval(tmp_grid)
-         !    allocate(tmp_grid2(Nlambda_cont))
-         !    tmp_grid2 = tab_lambda_cont
-         !    deallocate(tab_lambda_cont)
-         !    allocate(tab_lambda_cont(Nlambda_cont + Nmore_cont_freq))
-         !    tab_lambda_cont(1:Nlambda_cont) = tmp_grid2(:)
-         !    deallocate(tmp_grid2)
-         !    allocate(tmp_grid2(Nmore_cont_freq))
-         !    tmp_grid2(:) = 0.0_dp
+         check_new_freq = Nmore_cont_freq
+         if (Nmore_cont_freq > 0) then
+            write(*,*) "Adding new wavelength points for lines beyond continuum max!"
+            write(*,*) "  -> Adding ", Nmore_cont_freq," points"
+            write(*,*) "max cont, max line", max_cont, maxval(tmp_grid)
+            allocate(tmp_grid2(Nlambda_cont))
+            tmp_grid2 = tab_lambda_cont
+            deallocate(tab_lambda_cont)
+            allocate(tab_lambda_cont(Nlambda_cont + Nmore_cont_freq))
+            tab_lambda_cont(1:Nlambda_cont) = tmp_grid2(:)
+            deallocate(tmp_grid2)
+            allocate(tmp_grid2(Nmore_cont_freq))
+            tmp_grid2(:) = 0.0_dp
  
-         !    Nmore_cont_freq = 0
-         !    do n=1, N_groups
-         !       l0 = group_blue(n)
-         !       l1 = group_red(n)
-         !       if (l0 > max_cont) then
-         !          Nmore_cont_freq = Nmore_cont_freq + 1
-         !          tmp_grid2(Nmore_cont_freq) = l0
-         !       endif
-         !       if (0.5*(l0+l1) > max_cont) then
-         !          Nmore_cont_freq = Nmore_cont_freq + 1
-         !          tmp_grid2(Nmore_cont_freq) = 0.5 * (l0+l1)
-         !       endif
-         !       if (l1 > max_cont) then
-         !          Nmore_cont_freq = Nmore_cont_freq + 1
-         !          tmp_grid2(Nmore_cont_freq) = l1
-         !       endif
-         !    enddo
-         !    if (Nmore_cont_freq /= check_new_freq) then
-         !       call Warning("There are probably some frequency missing!")
-         !       write(*,*) "Nmore_freq: ",check_new_freq," Nfreq_added: ", Nmore_cont_freq
-         !    endif
+            Nmore_cont_freq = 0
+            do n=1, N_groups
+               l0 = group_blue(n)
+               l1 = group_red(n)
+               if (l0 > max_cont) then
+                  Nmore_cont_freq = Nmore_cont_freq + 1
+                  tmp_grid2(Nmore_cont_freq) = l0
+               endif
+               if (0.5*(l0+l1) > max_cont) then
+                  Nmore_cont_freq = Nmore_cont_freq + 1
+                  tmp_grid2(Nmore_cont_freq) = 0.5 * (l0+l1)
+               endif
+               if (l1 > max_cont) then
+                  Nmore_cont_freq = Nmore_cont_freq + 1
+                  tmp_grid2(Nmore_cont_freq) = l1
+               endif
+            enddo
+            if (Nmore_cont_freq /= check_new_freq) then
+               call Warning("There are probably some frequency missing!")
+               write(*,*) "Nmore_freq: ",check_new_freq," Nfreq_added: ", Nmore_cont_freq
+            endif
  
-         !    allocate(sorted_indexes(Nmore_cont_freq))
-         !    sorted_indexes(:) = index_bubble_sort(tmp_grid2)
-         !    tmp_grid2(:) = tmp_grid2(sorted_indexes)
-         !    tab_lambda_cont(Nlambda_cont+1:Nlambda_cont + Nmore_cont_freq) = tmp_grid2(:)
-         !    Nlambda_cont = Nlambda_cont + Nmore_cont_freq
-         !    deallocate(tmp_grid2, sorted_indexes)
-         ! endif
+            allocate(sorted_indexes(Nmore_cont_freq))
+            sorted_indexes(:) = index_bubble_sort(tmp_grid2)
+            tmp_grid2(:) = tmp_grid2(sorted_indexes)
+            tab_lambda_cont(Nlambda_cont+1:Nlambda_cont + Nmore_cont_freq) = tmp_grid2(:)
+            Nlambda_cont = Nlambda_cont + Nmore_cont_freq
+            deallocate(tmp_grid2, sorted_indexes)
+         endif
  
-         ! if (size(tab_lambda_cont) /= Nlambda_cont) then
-         !     write(*,*) " Something went wrong with Nlambda cont"
-         !     stop
-         ! endif
+         if (size(tab_lambda_cont) /= Nlambda_cont) then
+             write(*,*) " Something went wrong with Nlambda cont"
+             stop
+         endif
+
+         ! ----------- small cont grid end ------------- !
 
          !initiate with lines
          allocate(tmp_grid2(nlambda+Nlambda_cont), stat=alloc_status)
@@ -587,7 +590,7 @@ module wavelengths_gas
          !
          ! If I remove continuum RT !
          !
-         deallocate(tab_lambda_cont)
+         ! deallocate(tab_lambda_cont)
  
          !continuum frequencies are sorted and so are the line frequencies
          !but they are added at the end, so sorted is needed, but I can improve the previous
@@ -614,7 +617,6 @@ module wavelengths_gas
          Nlambda = 0
       endif !there is lines
 
- 
       write(*,*) Nwaves, " unique wavelengths" !they are no eliminated lines
       write(*,*) Nlambda, " line wavelengths"
       write(*,*) Nlambda_cont, " continuum wavelengths"
@@ -632,8 +634,12 @@ module wavelengths_gas
       Nlambda_max_trans = 0
       do n=1,N_atoms
          atom => Atoms(n)%p
-         do kr=1,atom%Ncont !only on the cont grid !
- 
+         do kr=1,atom%Ncont
+
+            atom%continua(kr)%Nbc = locate(tab_lambda_cont, atom%continua(kr)%lambdamin)
+            atom%continua(kr)%Nrc = locate(tab_lambda_cont, atom%continua(kr)%lambdamax)
+            atom%continua(kr)%Nlambdac = atom%continua(kr)%Nrc - atom%continua(kr)%Nbc + 1
+
             atom%continua(kr)%Nb = locate(lambda, atom%continua(kr)%lambdamin)
             atom%continua(kr)%Nr = locate(lambda, atom%continua(kr)%lambdamax)
             atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
@@ -720,6 +726,7 @@ module wavelengths_gas
       Nlambda_max_trans = max(Nlambda_max_line,Nlambda_max_cont)
       write(*,*) "Number of max freq points for all trans :", Nlambda_max_trans
 
+      n_lambda_cont = size(tab_lambda_cont)
       ! !output grid in micron
       ! lambda = lambda * m_to_km
       !now lambda will be stored in micron for compatibility
