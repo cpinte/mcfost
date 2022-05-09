@@ -697,14 +697,24 @@ module wavelengths_gas
                if (.not.ldissolve) then
                   if (lambda(atom%continua(kr)%Nr) > atom%continua(kr)%lambda0) then
                      call Warning("continuum Nred larger than lambda0 !")
-                     write(*,*) atom%continua(kr)%lambda0
-                     if (lambda(atom%continua(kr)%Nr-1) <= atom%continua(kr)%lambda0) then
-                        write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0
-                        !To do while until <= lambda0
+                     write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0, ' Nr=', atom%continua(kr)%Nr
+                     do while (lambda(atom%continua(kr)%Nr) > atom%continua(kr)%lambda0)
                         atom%continua(kr)%Nr = atom%continua(kr)%Nr-1
                         atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
-                        write(*,*) "new val at Nred:", lambda(atom%continua(kr)%Nr)
-                    endif
+                        if (atom%continua(kr)%Nlambda == 1) call error('accomadting bound-free egdes')
+                     enddo
+                     write(*,*) "new val at Nred:", lambda(atom%continua(kr)%Nr), ' Nr=', atom%continua(kr)%Nr
+                  !    write(*,*) atom%continua(kr)%lambda0
+                  !    if (lambda(atom%continua(kr)%Nr-1) <= atom%continua(kr)%lambda0) then
+                  !       write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0
+                  !       !To do while until <= lambda0
+                  !       atom%continua(kr)%Nr = atom%continua(kr)%Nr-1
+                  !       atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
+                  !       write(*,*) "new val at Nred:", lambda(atom%continua(kr)%Nr)
+                  !   endif
+                     atom%continua(kr)%Nbc = locate(tab_lambda_cont, atom%continua(kr)%lambdamin)
+                     atom%continua(kr)%Nrc = locate(tab_lambda_cont, lambda(atom%continua(kr)%Nr))
+                     atom%continua(kr)%Nlambdac = atom%continua(kr)%Nrc - atom%continua(kr)%Nbc + 1
                   endif
                endif
             endif
@@ -1107,7 +1117,7 @@ module wavelengths_gas
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
       integer, dimension(:), allocatable :: sorted_indexes
-      real(kind=dp) :: max_cont, l0, l1
+      real(kind=dp) :: max_cont, l0, l1, lr
       real :: hv_loc !like hv
       real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
 
@@ -1485,12 +1495,27 @@ module wavelengths_gas
             Nlambda = 0
          endif !there is lines
       else
-         call error("sed mode for wavelength flux not yet!")
+         !lambda is in micron and is read from the parameter file
+         Nwaves = size(lambda)
+         Nlambda = Nwaves
+         Nlambda_cont = Nwaves
+         allocate(tab_lambda_nm(size(lambda)), tab_lambda_cont(size(lambda)))
+         tab_lambda_nm = lambda * km_to_m !micron to nm
+         tab_lambda_cont = tab_lambda_nm
+         !we just need to check the bounds of the transitions on this grid
+         !in particular bound-free egdes and lines.
+         do n=1,n_atoms
+            do kr=1,atoms(n)%p%Nline
+               call compute_line_bound(atoms(n)%p%lines(kr),.true.)
+            enddo
+         enddo
       endif
 
       write(*,*) Nwaves, " unique wavelengths" !they are no eliminated lines
-      write(*,*) Nlambda, " line wavelengths"
-      write(*,*) Nlambda_cont, " continuum wavelengths"
+      if (.not.lfrom_file) then
+         write(*,*) Nlambda, " line wavelengths"
+         write(*,*) Nlambda_cont, " continuum wavelengths"
+      endif
 
       !Now indexes of each transition on the lambda grid
       Nlambda_max_line = 0
@@ -1504,27 +1529,46 @@ module wavelengths_gas
             atom%continua(kr)%Nrc = locate(tab_lambda_cont, atom%continua(kr)%lambdamax)
             atom%continua(kr)%Nlambdac = atom%continua(kr)%Nrc - atom%continua(kr)%Nbc + 1
 
-            atom%continua(kr)%Nb = locate(lambda, atom%continua(kr)%lambdamin)
-            atom%continua(kr)%Nr = locate(lambda, atom%continua(kr)%lambdamax)
-            atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
-            l0 = lambda(locate(lambda, atom%continua(kr)%lambda0))
- 
-           !in any problem of grid resolution etc or locate approximation.
-           !We take Nred-1 to be sure than the tab_lambda_cont(Nred) <= lambda0.
-           !Only if not dissolution.
-           !We just need to avoind having cont_lambda(Nred)>lambda0, since the cross section is in (lambda/lambda0)**3
+            if (lfrom_file) then
+               atom%continua(kr)%Nb = locate(tab_lambda_nm, atom%continua(kr)%lambdamin)
+               atom%continua(kr)%Nr = locate(tab_lambda_nm, atom%continua(kr)%lambdamax)
+               atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
+               l0 = tab_lambda_nm(locate(tab_lambda_nm, atom%continua(kr)%lambda0))
+               lr = tab_lambda_nm(atom%continua(kr)%Nr)
+            else
+               atom%continua(kr)%Nb = locate(lambda, atom%continua(kr)%lambdamin)
+               atom%continua(kr)%Nr = locate(lambda, atom%continua(kr)%lambdamax)
+               atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
+               l0 = lambda(locate(lambda, atom%continua(kr)%lambda0))
+               lr = lambda(atom%continua(kr)%Nr)
+            endif
             if (l0 /= atom%continua(kr)%lambda0) then
                if (.not.ldissolve) then
-                  if (lambda(atom%continua(kr)%Nr) > atom%continua(kr)%lambda0) then
+                  if (lr > atom%continua(kr)%lambda0) then
                      call Warning("continuum Nred larger than lambda0 !")
-                     write(*,*) atom%continua(kr)%lambda0
-                     if (lambda(atom%continua(kr)%Nr-1) <= atom%continua(kr)%lambda0) then
-                        write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0
-                        !To do while until <= lambda0
-                        atom%continua(kr)%Nr = atom%continua(kr)%Nr-1
-                        atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
-                        write(*,*) "new val at Nred:", lambda(atom%continua(kr)%Nr)
-                    endif
+                     write(*,*) " ++++ adjusting Nred", " lambda0=",atom%continua(kr)%lambda0, ' Nr=', atom%continua(kr)%Nr
+                     if (lfrom_file) then
+                        do while (tab_lambda_nm(atom%continua(kr)%Nr) > atom%continua(kr)%lambda0)
+                           write(*,*) tab_lambda_nm(atom%continua(kr)%Nr), atom%continua(kr)%lambda0
+                           atom%continua(kr)%Nr = atom%continua(kr)%Nr-1
+                           atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
+                           if (atom%continua(kr)%Nlambda == 1) call error('accomadting bound-free egdes')
+                        enddo
+                        atom%continua(kr)%Nbc = atom%continua(kr)%Nb
+                        atom%continua(kr)%Nrc = atom%continua(kr)%Nr
+                        atom%continua(kr)%Nlambdac = atom%continua(kr)%Nlambda
+                        write(*,*) "new val at Nred:", tab_lambda_nm(atom%continua(kr)%Nr), ' Nr=', atom%continua(kr)%Nr
+                     else
+                        do while (lambda(atom%continua(kr)%Nr) > atom%continua(kr)%lambda0)
+                           atom%continua(kr)%Nr = atom%continua(kr)%Nr-1
+                           atom%continua(kr)%Nlambda = atom%continua(kr)%Nr - atom%continua(kr)%Nb + 1
+                           if (atom%continua(kr)%Nlambda == 1) call error('accomadting bound-free egdes')
+                        enddo
+                        atom%continua(kr)%Nbc = locate(tab_lambda_cont, atom%continua(kr)%lambdamin)
+                        atom%continua(kr)%Nrc = locate(tab_lambda_cont, lambda(atom%continua(kr)%Nr))
+                        atom%continua(kr)%Nlambdac = atom%continua(kr)%Nrc - atom%continua(kr)%Nbc + 1
+                        write(*,*) "new val at Nred:", lambda(atom%continua(kr)%Nr), ' Nr=', atom%continua(kr)%Nr
+                     endif
                   endif
                endif
             endif
@@ -1542,9 +1586,13 @@ module wavelengths_gas
             !second loop over all other lines of all other atoms to check for overlap !
             !init there are no overlaps
             ! *** natural overlaps are already taken into account into Nblue and Nred ***
+            !Does not change Nlambda (?)
             atom%lines(kr)%Nover_inf = atom%lines(kr)%Nb
             atom%lines(kr)%Nover_sup = atom%lines(kr)%Nr
-            !Does not change Nlambda (?)
+            if (lfrom_file) then
+               !check edges
+               if (atom%lines(kr)%Nlambda < 3) atom%lines(kr)%lcontrib = .false.
+            endif
          enddo
  
          atom => NULL()
@@ -1559,7 +1607,12 @@ module wavelengths_gas
       ! lambda = lambda * m_to_km
       !now lambda will be stored in micron for compatibility
       !but a lots of atomic variables use nm.
-      write(*,'("Wavelength grid: "(1F12.4)" nm to",(1F12.4)" nm")') minval(lambda),maxval(lambda)
+      if (lfrom_file) then
+         write(*,'("Wavelength grid: "(1F12.4)" nm to ",(1F12.4)" nm")') minval(tab_lambda_nm),maxval(tab_lambda_nm)
+         write(*,'(" -> "(1F12.4)" mum to ",(1F12.4)" mum")') minval(lambda),maxval(lambda)
+      else
+         write(*,'("Wavelength grid: "(1F12.4)" nm to",(1F12.4)" nm")') minval(lambda),maxval(lambda)
+      endif
 
       return
    end subroutine make_wavelengths_flux

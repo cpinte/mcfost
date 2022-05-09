@@ -8,7 +8,7 @@ module atom_transfer
 
    use parametres
    use input, only               : lkeplerian, linfall, limb_darkening, mu_limb_darkening, RT_line_method
-   use constantes, only : nm_to_m, m_to_km, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au
+   use constantes, only : nm_to_m, m_to_km, km_to_m, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au
    use io_atom, only : read_atomic_models, write_pops_atom
    use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
    use wavelengths_gas, only : make_wavelengths_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
@@ -33,6 +33,7 @@ module atom_transfer
                     
    integer :: omp_chunk_size
    real(kind=dp) :: dne
+   real(kind=dp), allocatable, dimension(:) :: tab_lambda_Sed
 
    contains
 
@@ -59,22 +60,14 @@ module atom_transfer
          RT_line_method = 1
       endif
 
-      !high resolution flux (no images)
       if (RT_line_method==1) then
-      !-> don't forget to change allocation in alloc_atom_maps in output.f90 as a function of RT line method
-      !if (lsed) then
-      ! use the tab_lambda (*micron to nm) in the parameter file to compute a low res spectrum ?
-      !
-      !endif
-         ! if (lsed) then
-         !    tab_lambda = tab_lambda_save
-         !    tab_lambda_nm = tab_lambda * m_to_km
-         !    tab_lambda_cont = tab_lambda_nm
-         !    !recompute index of lines to see if we keep them (or too low resol)
-         ! else !high res flux
-            call make_wavelengths_flux(tab_lambda_nm,lsed)
-         ! endif
-      !images for ray-traced lines
+            if (lsed) then
+               !tab lambda from file
+               call make_wavelengths_flux(tab_lambda_sed,.true.)
+            else
+               !tab lambda similar to the non-LTE grid with lines edge from parameter file.
+               call make_wavelengths_flux(tab_lambda_nm,.false.)
+            endif
       else
          !create a wavelength grid around ray-traced lines
          !keep all transitions overlapping with those lines;
@@ -109,6 +102,10 @@ module atom_transfer
 
       omp_chunk_size = max(nint( 0.01 * n_cells / nb_proc ),1)
       mem_alloc_tot = 0
+      if (lsed) then
+         allocate(tab_lambda_sed(size(tab_lambda)))
+         tab_lambda_sed = tab_lambda
+      endif
 
       !read atomic models
       call read_atomic_Models()
@@ -174,7 +171,7 @@ module atom_transfer
          deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
          call make_wavelengths_nlte(tab_lambda_nm,vmax_overlap=v_char)
          n_lambda = size(tab_lambda_nm)
-         tab_lambda = tab_lambda_nm * nm_to_m!micron
+         tab_lambda = tab_lambda_nm * m_to_km
 
          !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm)
@@ -188,7 +185,7 @@ module atom_transfer
          call dealloc_atom_opac()
          call make_wavelengths_flux(tab_lambda_nm,.false.)
          n_lambda = size(tab_lambda_nm)
-         tab_lambda = tab_lambda_nm * nm_to_m
+         tab_lambda = tab_lambda_nm * m_to_km
          call alloc_atom_opac(n_lambda, tab_lambda_nm)
          call spectrum_1d()
          !deallocate and exit code
@@ -196,9 +193,7 @@ module atom_transfer
       endif
 
 
-      !re alloc lambda here. Eventually use the tab_lambda in the file
-      !for SED flux
-      !add an limage mode
+      !re alloc lambda here.
       call setup_image_grid()
       write(*,*) "Computing emission flux map..."
       do ibin=1,RT_n_incl
