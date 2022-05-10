@@ -77,7 +77,7 @@ module parametres
   
   !Ng's acceleration
   logical :: lng_acceleration
-  integer :: iNg_Norder, iNg_ndelay, iNg_Nperiod
+  integer :: iNg_Norder, iNg_Nperiod!, iNg_ndelay -> deprec
   
   !electron density
   logical :: lsolve_for_ne, lno_iterate_ne_mc = .true. !.true.==no electron iteration during step 2

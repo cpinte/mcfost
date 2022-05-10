@@ -7,8 +7,9 @@ module Opacity_atom
    use broad, Only               : line_damping
    use voigts, only              : voigt
    use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, &
-                                     dealloc_gas_contopac, hnu_k!exphckT, lambda_base,
-   use wavelengths_gas, only     : Nlambda_max_line, n_lambda_cont, tab_lambda_cont
+                                     dealloc_gas_contopac, hnu_k
+   use wavelengths, only         :  n_lambda
+   use wavelengths_gas, only     : Nlambda_max_line, n_lambda_cont, tab_lambda_cont, tab_lambda_nm
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj
    use utils, only               : linear_1D_sorted
@@ -18,6 +19,7 @@ module Opacity_atom
 
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:)!move in see
+   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:)
    real(kind=dp) :: vlabs
 
    contains
@@ -36,9 +38,6 @@ module Opacity_atom
       ! call alloc_gas_contopac(N,x)
       !-> on a small grid and interpolated later
       call alloc_gas_contopac(n_lambda_cont,tab_lambda_cont)
-  
-      allocate(psi(N,1,nb_proc))
-      allocate(Itot(N,1,nb_proc))
 
       do nat=1, n_atoms
          atm => atoms(nat)%p
@@ -114,11 +113,6 @@ module Opacity_atom
 
       call dealloc_gas_contopac()
   
-      if (allocated(psi)) then
-         deallocate(psi)
-      endif
-      if (allocated(Itot)) deallocate(Itot)
-
       do nat=1, n_atoms
          atm => atoms(nat)%p
 
@@ -306,9 +300,8 @@ module Opacity_atom
                hc_fourPI * atom%lines(kr)%Aji * phi0(1:Nlam) * atom%n(j,icell)
 
 
-            !Store profile for integration or accumulate radiative rates here ?
-            if (iterate) then
-               phi_loc(1:Nlam,atom%ij_to_trans(i,j),nat,iray,id) = phi0(1:Nlam)
+            if ((iterate.and.atom%active)) then
+               phi_loc(1:Nlam,atom%ij_to_trans(i,j),atom%activeindex,iray,id) = phi0(1:Nlam)
             endif
 
 
@@ -325,6 +318,150 @@ module Opacity_atom
 
       return
    end subroutine opacity_atom_bb_loc
+
+!check dk shift and hc_fourpi in chicc lines (not in atomic transfer TT)
+   subroutine xcoupling(id, icell, iray)
+      integer, intent(in) :: id, icell, iray
+      integer :: nact, j, i, kr, Nb, Nr, la, Nl
+      integer :: i0, j0, la0
+      type (AtomType), pointer :: aatom
+      real(kind=dp) :: gij, chicc, wl, ni_on_nj_star, wphi
+      real(kind=dp) :: term1(n_lambda_cont), term2(n_lambda_cont), term3(n_lambda_cont)
+      real(kind=dp), dimension(Nlambda_max_line) :: phi0, wei_line
+
+      Uji_down(:,:,:,id) = 0.0_dp
+      chi_down(:,:,:,id) = 0.0_dp
+      chi_up(:,:,:,id)   = 0.0_dp
+
+      eta_atoms(:,:,id) = 0.0_dp
+
+      !split into two loops for better optimization
+      !all continua are computed and then interpolated for lines.
+      term1 = 0.0
+      term2 = 0.0
+      term2 = 0.0
+      do nact=1, Nactiveatoms
+         aatom => ActiveAtoms(nact)%p
+
+         cont_loop : do kr = 1, aatom%Ncont
+
+            if (.not.aatom%continua(kr)%lcontrib) cycle cont_loop
+
+            j = aatom%continua(kr)%j
+            i = aatom%continua(kr)%i
+            Nb = aatom%continua(kr)%Nbc; Nr = aatom%continua(kr)%Nrc
+            Nl = Nr-Nb+1
+
+            !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+            ni_on_nj_star = aatom%nstar(i,icell)/(aatom%nstar(j,icell) + 1d-100)
+
+
+            gij = ni_on_nj_star * exp(-hc_k/T(icell)/aatom%continua(kr)%lambda0)
+
+      
+            if (aatom%n(i,icell) - gij*aatom%n(j,icell) <= 0.0_dp) cycle cont_loop
+
+
+            freq_loop : do la=1, Nl
+               if (la==1) then
+                  wl = 0.5*(tab_lambda_cont(Nb+1)-tab_lambda_cont(Nb)) / tab_lambda_cont(Nb)
+               elseif (la==Nl) then
+                  wl = 0.5*(tab_lambda_cont(Nb+la-1)-tab_lambda_cont(Nb+la-2)) / tab_lambda_cont(Nb+la-1)
+               else
+                  wl = 0.5*(tab_lambda_cont(Nb+la)-tab_lambda_cont(Nb+la-2)) / tab_lambda_cont(Nb+la-1)
+               endif
+
+               gij = ni_on_nj_star * exp(hc_k/T(icell)/tab_lambda_cont(Nb-1+la))
+
+               term1(Nb-1+la) = term1(Nb-1+la) + fourpi_h * wl * aatom%continua(kr)%alpha(la) * (aatom%n(i,icell) - gij*aatom%n(j,icell))
+               term2(Nb-1+la) = term2(Nb-1+la) + aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij
+               term2(Nb-1+la) = term3(Nb-1+la) + aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij * aatom%n(j,icell)
+
+            enddo freq_loop
+
+         enddo cont_loop
+      enddo
+
+      !linear interpolation
+      chi_down(1,j,nact,id) = chi_down(1,j,nact,id) + term1(1)
+      chi_up(1,j,nact,id) = chi_up(1,j,nact,id) + term1(1)
+      Uji_down(1,j,nact,id) = Uji_down(1,j,nact,id) + term2(1)
+      eta_atoms(1,nact,id) = eta_atoms(1,nact,id) + term3(1)
+      i0 = 2
+      do la=1, n_lambda
+         loop_i : do la0=i0, n_lambda_cont
+            if (tab_lambda_cont(la0) > tab_lambda_nm(la)) then
+               wl = (tab_lambda_nm(la) - tab_lambda_cont(la0-1)) / (tab_lambda_cont(la0-1) - tab_lambda_cont(la0-1))
+
+               chi_down(la,j,nact,id) = chi_down(la,j,nact,id) + (1.0_dp - wl) *term1(la0-1)  + wl * term1(la0)
+               chi_up(la,j,nact,id) = chi_up(la,j,nact,id) + (1.0_dp - wl) *term1(la0-1)  + wl * term1(la0)
+               Uji_down(la,j,nact,id) = Uji_down(la,j,nact,id) + (1.0_dp - wl) *term2(la0-1)  + wl * term2(la0)
+               eta_atoms(la,nact,id) = eta_atoms(la,nact,id) + + (1.0_dp - wl) *term3(la0-1)  + wl * term3(la0)
+
+               i0 = la0
+               exit loop_i
+            endif
+         enddo loop_i
+      enddo
+      chi_down(n_lambda,j,nact,id) = chi_down(n_lambda,j,nact,id) + term1(n_lambda_cont)
+      chi_up(n_lambda,j,nact,id) = chi_up(n_lambda,j,nact,id) + term1(n_lambda_cont)
+      Uji_down(n_lambda,j,nact,id) = Uji_down(n_lambda,j,nact,id) + term2(n_lambda_cont)
+      eta_atoms(n_lambda,nact,id) = eta_atoms(n_lambda,nact,id) + term3(n_lambda_cont)
+
+      aatom_loop : do nact=1, NactiveAtoms
+
+         line_loop : do kr = 1, aatom%Nline
+
+            if (.not.aatom%lines(kr)%lcontrib) cycle line_loop
+
+
+            j = aatom%lines(kr)%j
+            i = aatom%lines(kr)%i
+
+            if (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell) <= 0.0_dp) cycle line_loop
+
+            Nb = aatom%lines(kr)%Nb; Nr = aatom%lines(kr)%Nr
+            Nl = Nr - Nb + 1
+         !need shift here ???
+         !  Nl = Nr-dk_min+dk_max-Nb+1
+
+
+            wphi = 0.0
+            do la=1,Nl
+               if (la==1) then
+                  wl = 0.5*(tab_lambda_nm(Nb+1)-tab_lambda_nm(Nb)) * c_light / aatom%lines(kr)%lambda0
+               elseif (la==Nl) then
+                  wl = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) * c_light / aatom%lines(kr)%lambda0
+               else
+                  wl = 0.5*(tab_lambda_nm(Nb+la+1)-tab_lambda_nm(Nb+la-1)) * c_light / aatom%lines(kr)%lambda0
+               endif
+               wei_line(la) = wl
+               phi0(la) = phi_loc(la,kr,nact,iray,id)
+               wphi = wphi + wl * phi0(la)
+            enddo
+
+            freq2_loop : do la=1, Nl
+               wl = wei_line(la)
+
+               Uji_down(Nb-1+la,j,nact,id) = Uji_down(Nb-1+la,j,nact,id) + hc_fourPI * aatom%lines(kr)%Aji * phi0(la)/wphi
+
+               !maybe the hc_fourpi here simplify
+               chicc = wl * hc_fourPI * aatom%lines(kr)%Bij * (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(la)/wphi
+
+
+               chi_down(Nb-1+la,j,nact,id) = chi_down(Nb-1+la,j,nact,id) + chicc
+               chi_up(Nb-1+la,j,nact,id) = chi_up(Nb-1+la,j,nact,id) + chicc
+
+               eta_atoms(Nb-1+la,nact,id) = eta_atoms(Nb-1+la,nact,id) + &
+                  hc_fourPI * aatom%lines(kr)%Aji * aatom%n(j,icell) * phi0(la)/wphi
+
+            enddo freq2_loop
+
+         enddo line_loop
+      enddo aatom_loop
+
+    return
+   end subroutine xcoupling
 
    function profile_art(line,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
       ! phi = Voigt / sqrt(pi) / vbroad(icell)
@@ -511,358 +648,7 @@ module Opacity_atom
       return
    end function profile_art_i
 
-  !no level dissolution yet
-  !fills also eta_atoms
-  !check conditions on negative opac
-!   subroutine cross_coupling_terms(id, icell, iray)
-!     integer, intent(in) :: id, icell, iray
-!     integer :: nact, j, i, kr, kc, Nb, Nr, la, Nl, icell_d
-!     type (AtomType), pointer :: aatom
-!     real(kind=dp) :: gij, wi, wj, chicc, wl,  wphi, ni_on_nj_star
-
-!     !for one ray
-!     Uji_down(:,:,:,id) = 0.0_dp
-!     chi_down(:,:,:,id) = 0.0_dp
-!     chi_up(:,:,:,id)   = 0.0_dp
-
-!     eta_atoms(:,:,id) = 0.0_dp
-
-!     aatom_loop : do nact=1, Nactiveatoms
-!        aatom => ActiveAtoms(nact)%ptr_atom
-
-!        cont_loop : do kr = aatom%Ntr_line+1, aatom%Ntr
-
-!           kc = aatom%at(kr)%ik
-
-!           j = aatom%continua(kc)%j
-!           i = aatom%continua(kc)%i
-!           Nb = aatom%continua(kc)%Nb; Nr = aatom%continua(kc)%Nr
-!           Nl = Nr - Nb + 1
-
-!           ! 					ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
-!           ni_on_nj_star = aatom%nstar(i,icell)/(aatom%nstar(j,icell) + 1d-100)
-
-
-!           icell_d = 1
-!           if (ldissolve) then
-!              if (aatom%ID=="H") icell_d = icell
-!           endif
-
-!           gij = ni_on_nj_star * exp(-hc_k/T(icell)/aatom%continua(kc)%lambda0)
-
-!           if (aatom%n(i,icell) - gij*aatom%n(j,icell) <= 0.0_dp) then
-!              cycle cont_loop
-!           endif
-
-
-!           freq_loop : do la=1, Nl
-!              if (la==1) then
-!                 wl = 0.5*(lambda(Nb+1)-lambda(Nb)) / lambda(Nb)
-!              elseif (la==Nl) then
-!                 wl = 0.5*(lambda(Nb+la-1)-lambda(Nb+la-2)) / lambda(Nb+la-1)
-!              else
-!                 wl = 0.5*(lambda(Nb+la)-lambda(Nb+la-2)) / lambda(Nb+la-1)
-!              endif
-
-!              gij = ni_on_nj_star * exp(-hc_k/T(icell)/lambda(Nb+la-1))
-
-!              !small inversions
-!              !chicc = wl * fourpi_h * aatom%continua(kc)%alpha_nu(la,icell_d) * abs(aatom%n(i,icell) - gij*aatom%n(j,icell))
-!              chicc = wl * fourpi_h * aatom%continua(kc)%alpha_nu(la,icell_d) * (aatom%n(i,icell) - gij*aatom%n(j,icell))
-!              ! 						if (chicc < 0.0) chicc = 0.0_dp !should not happend
-
-!              Uji_down(Nb+la-1,j,nact,id) = Uji_down(Nb+la-1,j,nact,id) + &
-!                   aatom%continua(kc)%alpha_nu(la,icell_d) * (twohc/lambda(Nb+la-1)**3) * gij
-
-!              chi_down(Nb+la-1,j,nact,id) = chi_down(Nb+la-1,j,nact,id) + chicc
-
-!              chi_up(Nb+la-1,i,nact,id) = chi_up(Nb+la-1,i,nact,id) + chicc
-!              !check consistency with nlte b-f and how negative opac is handled
-!              !if (chicc > 0.0_dp) &
-!              eta_atoms(Nb+la-1,nact,id) = eta_atoms(Nb+la-1,nact,id) + &
-!                   aatom%continua(kc)%alpha_nu(la,icell_d) * (twohc/lambda(Nb+la-1)**3)  * gij * aatom%n(j,icell)
-!           enddo freq_loop
-
-!        enddo cont_loop
-
-!        !for each line eventually
-!        wi = 1.0; wj = 1.0
-!        if (ldissolve) then
-!           if (aatom%ID=="H") then
-!              !nn
-!              wj = wocc_n(icell, real(j,kind=dp), real(aatom%stage(j)), real(aatom%stage(j)+1),hydrogen%n(1,icell))!1 for H
-!              wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1),hydrogen%n(1,icell))
-!           endif
-!        endif
-
-!        line_loop : do kr = 1, aatom%Ntr_line
-
-!           kc = aatom%at(kr)%ik
-
-
-!           j = aatom%lines(kc)%j
-!           i = aatom%lines(kc)%i
-
-!           if (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell) <= 0.0_dp) then
-!              cycle line_loop
-!           endif
-
-!           Nb = aatom%lines(kc)%Nblue; Nr = aatom%lines(kc)%Nred
-
-!           Nl = Nr-dk_min+dk_max-Nb+1
-!           wphi = 0.0
-!           freq2_loop : do la=1, Nl
-!              if (la==1) then
-!                 wl = 0.5*1d3*hv
-!                 !wl = 0.5*(lambda(Nb+1)-lambda(Nb)) * clight / aatom%lines(kc)%lambda0
-!              elseif (la==Nl) then
-!                 wl = 0.5*1d3*hv
-!                 !wl = 0.5*(lambda(Nr)-lambda(Nr-1)) * clight / aatom%lines(kc)%lambda0
-!              else
-!                 wl = 1d3*hv
-!                 !wl = 0.5*(lambda(Nb+la+1)-lambda(Nb+la-1)) * clight / aatom%lines(kc)%lambda0
-!              endif
-
-
-!              Uji_down(Nb+dk_min-1+la,j,nact,id) = Uji_down(Nb+dk_min-1+la,j,nact,id) + &
-!                   hc_fourPI * aatom%lines(kc)%Aji * aatom%lines(kc)%phi_loc(la,iray,id)
-
-!              !small inversions
-!              ! 					if (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell) >= 0.0_dp) then
-
-!              chi_down(Nb+dk_min-1+la,j,nact,id) = chi_down(Nb+dk_min-1+la,j,nact,id) + &
-!                   wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * &
-!                   (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
-
-!              chi_up(Nb+dk_min-1+la,i,nact,id) = chi_up(Nb+dk_min-1+la,i,nact,id) + &
-!                   wl * aatom%lines(kc)%Bij * aatom%lines(kc)%phi_loc(la,iray,id) * &
-!                   (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
-
-
-!              ! 					endif
-
-!              eta_atoms(Nb+dk_min-1+la,nact,id) = eta_atoms(Nb+dk_min-1+la,nact,id) + &
-!                   hc_fourPI * aatom%lines(kc)%Aji * aatom%lines(kc)%phi_loc(la,iray,id) * aatom%n(j,icell)
-
-
-!              wphi = wphi + wl * aatom%lines(kc)%phi_loc(la,iray,id)
-!           enddo freq2_loop
-
-!           chi_down(Nb+dk_min:Nr+dk_max,j,nact,id) = chi_down(Nb+dk_min:Nr+dk_max,j,nact,id) / wphi
-!           chi_up(Nb+dk_min:Nr+dk_max,i,nact,id) = chi_up(Nb+dk_min:Nr+dk_max,i,nact,id) / wphi
-
-!        enddo line_loop
-
-
-!     enddo aatom_loop
-
-!     return
-!   end subroutine cross_coupling_terms
-
-  !TO DO merge with opacity_atom_loc()
-!   subroutine opacity_atom_zeeman_loc(id, icell, iray, x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib,  iterate)
-
-!     integer, intent(in) :: id, icell, iray
-!     logical, intent(in) :: iterate
-!     real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
-!     integer :: nact, Nred, Nblue, kc, kr, i, j, m
-!     type(AtomType), pointer :: aatom
-!     integer :: dk0, dk1, Nlam
-!     real(kind=dp) :: wi, wj, adamp, dv_dl, chil, etal
-!     real(kind=dp), dimension(Nlambda_max_line+2*dk_max) :: phi0
-!     real(kind=dp), dimension(Nlambda_max_line+2*dk_max,3) :: phiZ, psiZ
-
-!     chiQUV_p(:,:,id) = 0.0_dp
-!     etaQUV_p(:,:,id) = 0.0_dp
-!     rho_p(:,:,id) = 0.0_dp
-
-!     atom_loop : do nact = 1, Natom
-!        aatom => Atoms(nact)%ptr_atom
-
-!        tr_loop : do kr = 1,aatom%Ntr_line
-
-!           kc = aatom%at(kr)%ik
-
-!           Nred = aatom%lines(kc)%Nred; Nblue = aatom%lines(kc)%Nblue
-!           i = aatom%lines(kc)%i;j = aatom%lines(kc)%j
-
-
-!           Nblue = Nblue + dk_min
-!           Nred = Nred + dk_max
-!           Nlam = Nred - Nblue + 1
-
-!           wj = 1.0; wi = 1.0
-!           if (ldissolve) then
-!              if (aatom%ID=="H") then
-!                 !nn
-!                 wj = wocc_n(icell, real(j,kind=dp), real(aatom%stage(j)), real(aatom%stage(j)+1),hydrogen%n(1,icell)) !1 for H
-!                 wi = wocc_n(icell, real(i,kind=dp), real(aatom%stage(i)), real(aatom%stage(i)+1),hydrogen%n(1,icell))
-!              endif
-!           endif
-
-!           if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) <= 0.0_dp) then
-!              cycle tr_loop
-!           endif
-
-!           !if not init, bug when line is not polarizable why
-!           phiz = 0.0
-!           psiz = 0.0
-!           !!fixed at the moment
-!           call local_profile_zv(aatom%lines(kc),icell,iterate,Nlam,&
-!           lambda(Nblue:Nred),phi0(1:Nlam),phiZ(1:Nlam,:), psiZ(1:Nlam,:), x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
-
-!           etal = hc_fourPI * aatom%lines(kc)%Aji * aatom%n(j,icell)
-!           chil = hc_fourPI * aatom%lines(kc)%Bij * (aatom%n(i,icell)*wj/wi - aatom%lines(kc)%gij*aatom%n(j,icell))
-
-!           ! 				if ((aatom%n(i,icell)*wj/wi - aatom%n(j,icell)*aatom%lines(kc)%gij) > 0.0_dp) then
-
-
-!           chi(Nblue:Nred,id) = chi(Nblue:Nred,id) + chil * phi0(1:Nlam)
-!           eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + etal * phi0(1:Nlam)
-          
-!           if (minval(chi(Nblue:Nred,id)) < 0) then
-!           	write(*,*) id, icell, chil
-!           	write(*,*) "phi=", phi0(1:Nlam)
-!           	call error("chi neg!")
-!           endif
-
-!           do m=1,3
-!              chiQUV_p(Nblue:Nred,m,id) = chiQUV_p(Nblue:Nred,m,id) + chil * phiz(1:Nlam,m)
-!              etaQUV_p(Nblue:Nred,m,id) = etaQUV_p(Nblue:Nred,m,id) + etal * phiz(1:Nlam,m)
-!              rho_p(Nblue:Nred,m,id) = rho_p(Nblue:Nred,m,id) + chil * psiz(1:Nlam,m)
-!           	 if (any_nan_infinity_vector(phiz(:,m)) > 0) then
-!           	 	write(*,*) "(phiz)", icell, m, Nlam, chil, etal
-!           	 	write(*,*) phiz(:,m)
-!           	 	stop
-!           	 endif
-!           	 if (any_nan_infinity_vector(psiz(:,m)) > 0) then
-!           	 	write(*,*) "(psiz)", icell, m, Nlam, chil, etal
-!           	 	write(*,*) psiz(:,m)
-!           	 	stop
-!           	 endif
-! !           	 if (aatom%lines(kc)%polarizable) then
-! !           	 write(*,*) "m=", m, size(phiz)
-! !           	 write(*,*) "phi0=",maxval(phi0)
-! !           	 write(*,*) "phiz(m)", maxval(phiz(:,m))
-! !           	 write(*,*) "psiz(m)=", maxval(psiz(:,m))
-! !           	 endif
-!           enddo
-
-!           ! 				else !neg or null
-!           ! 					eta(Nblue:Nred,id)= eta(Nblue:Nred,id) + etal * phi0(1:Nlam)
-!           ! 					do m=1,3
-!           ! ! 						chiQUV_p(Nblue:Nred,m,id) = chiQUV_p(Nblue:Nred,m,id) + chil * phiz(1:Nlam,m)
-!           ! 						etaQUV_p(Nblue:Nred,m,id) = etaQUV_p(Nblue:Nred,m,id) + etal * phiz(1:Nlam,m)
-!           ! ! 						rho_p(Nblue:Nred,m,id) = rho_p(Nblue:Nred,m,id) + chil * psiz(1:Nlam,m)
-!           ! 					enddo
-!           ! 				endif
-
-
-!        end do tr_loop
-
-!        aatom => NULL()
-
-!     end do atom_loop
-
-
-!     return
-!   end subroutine opacity_atom_zeeman_loc
-  
-!   subroutine solve_stokes_mat(id,icell,la,Q,P)
-! 	!Fill the modified Stokes matrix K'
-! 	!and computes the matrix R  and the vector P
-! 	!such that dot(I,R) = P.
-! 	!Then, solve for IR = P, and get P the new
-! 	!Stokes vector = (I,Q,U,V)^t
-! 	!
-! 	!Q is the atenutation factor for the local point
-! 	!For wavelength index la.
-!   	integer, intent(in) :: id, la,icell
-!   	real(kind=dp), intent(in) :: Q
-!   	real(kind=dp), intent(inout) :: P(4)
-!   	real(kind=dp) :: R(4,4)
  
-!   	!    / eta/chi  \
-!   	!    | etaQ/chi |
-!   	!S = | etaU/chi |
-!   	!    \ etaV/chi / 	
-!   	!P = Svect * Q
-  	
-!   	!Absorption-dispersion matrix
-!   	!    /  chi  chiQ  chiU   chiV \
-!   	!    |                         |
-!   	!    |  chiQ  chi  rhoV  -rhoU |
-!   	!KK =|                         |
-!   	!    |  chiU -rhoV  chi   rhoQ |
-!   	!    |                         |
-!   	!    \  chiV  rhoU  -rhoQ  chi /
-  	
-!   	!KK' = K/chi - eye(4); diag(KK') = 0
-!   	!R = eye(4) + Q*KK'; diag(R) = 1.0
-!   	!
-
-! 	!P(1) already filled with Snu * Q
-! 	P(2) = etaQUV_p(la,1,id)/chi(la,id) * Q!SQ exp(-tau) (1 - exp(-dtau))
-! 	P(3) = etaQUV_p(la,2,id)/chi(la,id) * Q!SU exp(-tau) (1 - exp(-dtau))
-! 	P(4) = etaQUV_p(la,3,id)/chi(la,id) * Q!SV exp(-tau) (1 - exp(-dtau))
-	
-!     if (any_nan_infinity_vector(P) > 0) then
-!         write(*,*) "(nan/inf P)", " icell=",icell, " la=",la, " lam=",lambda(la)
-!         write(*,*) 'Q=',Q
-!         write(*,*) 'P=',P
-!         write(*,*) 'chi=',chi(la,id)
-!     	stop
-!     endif
-
-! ! 	R = 0.0	 
-! 	!eye(4)
-! 	R(1,1) = 1.0
-! 	R(2,2) = 1.0
-! 	R(3,3) = 1.0
-! 	R(4,4) = 1.0
-	
-! 	R(1,2) = chiQUV_p(la,1,id)/chi(la,id) * Q
-! 	R(1,3) = chiQUV_p(la,2,id)/chi(la,id) * Q
-! 	R(1,4) = chiQUV_p(la,3,id)/chi(la,id) * Q
-	
-! 	R(2,1) = R(1,2)
-! 	R(2,3) = rho_p(la,3,id)/chi(la,id) * Q
-! 	R(2,4) = -rho_p(la,2,id)/chi(la,id) * Q
-	
-! 	R(3,1) = R(1,3)
-! 	R(3,2) = -R(2,3)
-! 	R(3,4) = rho_p(la,1,id)/chi(la,id) * Q
-	
-! 	R(4,1) = R(1,4)
-! 	R(4,2) = -R(2,4)
-! 	R(4,3) = -R(3,4)
-
-!     if (any_nan_infinity_matrix(R) > 0) then
-!         write(*,*) "(2)", icell, la, lambda(la),R
-!         stop
-!     endif
-
-! ! 	call solve_lin(R,P,4,.true.)
-! 	call invert_4x4(R)
-!     if (any_nan_infinity_matrix(R) > 0) then
-!         write(*,*) "(3)",icell, la, lambda(la), R
-!         stop
-!     endif
-
-! 	P = matmul(R,P)
-! 	if (any_nan_infinity_vector(P) > 0) then
-!         write(*,*) "(4)", icell, la, lambda(la), P
-!         stop
-! 	endif
-
-
-! !     Stokes_Q(la,id) += P(2)
-! !     Stokes_U(la,id) += P(3)
-! !     Stokes_V(la,id) += P(4)
-
-!   	return
-!   end subroutine
-
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
       !not para to be able to write while computing!
       integer, intent(in) :: Nlambda

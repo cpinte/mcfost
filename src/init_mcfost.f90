@@ -91,7 +91,7 @@ subroutine set_default_variables()
   ldissolve = .false.
   lng_acceleration = .false.
   iNg_Norder = 0
-  iNg_ndelay = 5
+!   iNg_ndelay = 5
   iNg_Nperiod = 5
   istep_start = 1
   ! AL-RT
@@ -839,16 +839,16 @@ subroutine initialisation_mcfost()
          lng_acceleration = .true.
          write(*,*) " Ng's acceleration activated"
         endif
-     case("-Ng_Ndelay")
-        i_arg = i_arg + 1
-        if (i_arg > nbr_arg) call error("Ng'acc delay needed with -Ng_Ndelay !")
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) iNg_Ndelay
-        i_arg= i_arg+1
-        if (iNg_Ndelay < 0) then
-         call warning ("Ng Ndelay < 0 setting to abs!")
-         iNg_Ndelay = abs(iNg_Ndelay)
-        endif
+!      case("-Ng_Ndelay")
+!         i_arg = i_arg + 1
+!         if (i_arg > nbr_arg) call error("Ng'acc delay needed with -Ng_Ndelay !")
+!         call get_command_argument(i_arg,s)
+!         read(s,*,iostat=ios) iNg_Ndelay
+!         i_arg= i_arg+1
+!         if (iNg_Ndelay < 0) then
+!          call warning ("Ng Ndelay < 0 setting to abs!")
+!          iNg_Ndelay = abs(iNg_Ndelay)
+!         endif
      case("-Ng_Nperiod")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Ng'acc period needed with -Ng_Nperiod !")
@@ -1893,7 +1893,7 @@ subroutine display_help()
   write(*,*) "        : -max_err <max_err> : max relative error"
   write(*,*) "        : -max_err_sub <max_err_sub> : max relative error for sub-iterations"
   write(*,*) "        : -Ng_Norder <Norder> : Order of Ng's acceleration"
-  write(*,*) "        : -Ng_Ndelay <Ndelay> : Delay before first Ng's acceleration"
+!   write(*,*) "        : -Ng_Ndelay <Ndelay> : Delay before first Ng's acceleration"
   write(*,*) "        : -Ng_Nperiod <Nperiod> : Cycle of Ng's iteration"
 !   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"
