@@ -208,7 +208,12 @@ subroutine allocate_atom_maps()
   max_trans = 1!maxval( atoms(:)%p%nTrans_raytracing )
 
  if (RT_line_method > 1) then
-     npix_x = npix_x_save ; npix_y = npix_y_save
+     if (RT_line_method==2) then
+      npix_x = npix_x_save ; npix_y = npix_y_save
+     else
+      !for testing
+      npix_x = 12*4**(healpix_lorder) ; npix_y = 1
+     endif
      do n=1, n_atoms
      	if (atoms(n)%p%lline) then
      		do k=1, atoms(n)%p%nTrans_raytracing 

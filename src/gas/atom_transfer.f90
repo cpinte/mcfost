@@ -30,6 +30,7 @@ module atom_transfer
    use molecular_emission, only  : ds
    use messages, only : error
 
+   use healpix_mod
    !$ use omp_lib
 
    implicit none
@@ -939,6 +940,7 @@ module atom_transfer
       !before
       if (npix_x_save > 1) then
          RT_line_method = 2
+         if (npix_y == 1) RT_line_method = 3
       else
          RT_line_method = 1
       endif
@@ -1229,6 +1231,9 @@ module atom_transfer
       integer :: ri_RT, phi_RT
       logical :: lresolved
 
+      real(kind=dp) :: z1, z2
+      integer, dimension(:), allocatable :: tab_pix_healpix
+
       write(*,*) "Vector to observer =", real(tab_u_rt(ibin,iaz)),real(tab_v_rt(ibin,iaz)),real(tab_w_rt(ibin))
       write(*,*) "i=", real(tab_RT_incl(ibin)), "az=", real(tab_RT_az(iaz))
 
@@ -1324,7 +1329,7 @@ module atom_transfer
          !!dy(:) = y_plan_image * taille_pix
 
 
-      else !method 2
+      elseif (RT_line_method == 2) then !method 2
          ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
          taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
          lresolved = .true.
@@ -1349,8 +1354,8 @@ module atom_transfer
 
          ! loop on pixels
          id = 1 ! pour code sequentiel
-         n_iter_min = 1 !1 !3
-         n_iter_max = 1 !1 !6
+         n_iter_min = 1
+         n_iter_max = 1
          !$omp do schedule(dynamic,1)
          do i = 1,npix_x_max
             !$ id = omp_get_thread_num() + 1
@@ -1361,6 +1366,43 @@ module atom_transfer
          end do !i
          !$omp end do
          !$omp end parallel
+
+     else !method 3, healpix array map !
+         call error("healpix pixel map not yet!")
+         ! lresolved = .true.
+         ! zoom = 1.0 !here
+         
+
+         ! npix_x_max = npix_x - (2**healpix_lorder) * ((2**healpix_lorder) - 1) * 2 
+         ! allocate(tab_pix_healpix(npix_x_max))
+         ! call healpix_ring_northern_pixels(healpix_lorder,tab_pix_healpix)
+
+         ! taille_pix = 1.0 / real(npix_x_max) ! en AU
+         ! !with healpix we already pass the centre of each pixel
+         ! dx(:) = 0.0_dp
+         ! dy(:) = 0.0_dp
+
+         ! !$omp parallel &
+         ! !$omp default(none) &
+         ! !$omp private(i,id,z1,z2,j) &
+         ! !$omp shared(ibin, iaz, pixelcorner,u,v,w,taille_pix)&
+         ! !$omp shared(dx, dy, npix_x_max,l,healpix_lorder,tab_pix_healpix) 
+
+         ! ! loop on pixels
+         ! id = 1 ! pour code sequentiel
+         ! !$omp do schedule(dynamic,1)
+         ! do i=1, npix_x_max !from healpix
+         !    !$ id = omp_get_thread_num() + 1
+         !    ! healpix pixel centre
+         !    call healpix_ring_mu_and_phi(healpix_lorder, tab_pix_healpix(i), z1, z2)
+         !    pixelcorner(:,id) = l*(/sqrt(1.0 - z1*z1)*cos(z2),sqrt(1.0-z1*z1)*sin(z2),z1/)
+         !    call intensite_pixel_atom(id,ibin,iaz,1,1,i,1,pixelcorner(:,id),taille_pix,dx,dy,u,v,w)
+         ! end do !i
+         ! !$omp end do
+         ! !$omp end parallel
+
+         ! deallocate(tab_pix_healpix)
+
       end if
 
       return

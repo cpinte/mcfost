@@ -739,6 +739,34 @@ module healpix_mod
 	return
 	end subroutine healpix_ring_mu_and_phi
 
+	subroutine healpix_ring_northern_pixels(l, pixs)
+		integer, intent(in) :: l
+		integer, dimension(:), intent(out) :: pixs
+		integer :: p
+		integer(kind=8) :: Npix, Nside, North_cap, Nupper
+
+		Npix = healpix_npix(l)
+		Nside = 2**l
+		North_cap = 2 * Nside * (Nside-1)
+
+		Nupper = Npix - North_cap
+		if (size(pixs) /= Nupper) then
+			write(*,*) "error Nupper size (pixs)"
+		endif
+
+		do p=0,Npix-1
+
+			if (p < North_cap) then !north
+				pixs(p+1) = p+1
+			elseif (p < (Npix - North_cap)) then !equator
+				pixs(p+1) = p+1
+			endif
+
+		enddo
+
+	return
+	end subroutine healpix_ring_northern_pixels
+
 !-> commented for python
 	subroutine healpix_sphere(l,mu,phi)
 		integer, intent(in) :: l
