@@ -1145,7 +1145,10 @@ module wavelengths_gas
                   atom%continua(kr)%Nlambda = Nlambda_cont_log
                   if (atom%continua(kr)%lambdamax > atom%continua(kr)%lambda0) then
                      atom%continua(kr)%Nlambda = atom%continua(kr)%Nlambda + Nlambda_cont_log + 1
-                  endif               
+                  endif  
+               else
+                  !needs a reset
+                  atom%continua(kr)%Nlambda = size(atom%continua(kr)%lambda_file)             
                endif
                Nlambda_cont = Nlambda_cont + atom%continua(kr)%Nlambda
             enddo
@@ -1185,7 +1188,6 @@ module wavelengths_gas
          sorted_indexes = index_bubble_sort(tab_lambda_cont)
          tab_lambda_cont(:) = tab_lambda_cont(sorted_indexes)
          deallocate(sorted_indexes)
- 
          !remove duplicates
          allocate(tmp_grid(Nlambda_cont), stat=alloc_status)
          if (alloc_status > 0) call error ("Allocation error tmp_grid (cont)")
@@ -1389,7 +1391,6 @@ module wavelengths_gas
                endif
  
             enddo
- 
             check_new_freq = Nmore_cont_freq
             if (Nmore_cont_freq > 0) then
                write(*,*) "Adding new wavelength points for lines beyond continuum max!"
@@ -1472,7 +1473,6 @@ module wavelengths_gas
             enddo
             ! write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid2, tmp_grid2 > 0))
             deallocate(tmp_grid)
- 
  
             !continuum frequencies are sorted and so are the line frequencies
             !but they are added at the end, so sorted is needed, but I can improve the previous

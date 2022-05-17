@@ -396,7 +396,7 @@ module io_atom
             write(*,*) "  -> Reading collision data from RH for atom ", atom%ID
             call read_collisions(atomunit, atom)
             call warning("  ** the data for each transition must be consistent with transitions in the file")
-            write(*,*) "          a value of -99 is given to missing transitions and are skipped **"
+            write(*,*) "a value of -99 is given to missing transitions and are skipped **"
          endif
 
          allocate(atom%n(atom%Nlevel,n_cells))
