@@ -569,7 +569,7 @@ module gas_contopac
     do la=1, N
        lam = lambda(la)
        !do not test negativity of lambda
-       if (lam >= lambdai_geltman(N_geltman)) then
+       if (lam > lambdai_geltman(N_geltman)) then
          chi(la:N) = 0.0
          eta(la:N) = 0.0
          exit

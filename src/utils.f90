@@ -1426,7 +1426,6 @@ subroutine read_comments(iunit)
 
 end subroutine read_comments
 
-!maybe read_comments and getnextline are too similar ? 
 subroutine read_line(unit,FMT,line,Nread,commentchar)
    !
    !Get next line which is not a comment line nor an empty line
@@ -1460,22 +1459,63 @@ subroutine read_line(unit,FMT,line,Nread,commentchar)
    return
 end subroutine read_line
 
-function is_nan_infinity(y) result(val)
-   real(kind=dp) :: y, val
+function is_nan_infinity(y)
+   real(kind=dp), intent(in) :: y
+   integer :: is_nan_infinity
 
-   val = 0
+   is_nan_infinity = 0
    if (y /= y) then
       write(*,*) "(Nan):", y
-      val = 1
+      is_nan_infinity = 1
       return
    else if (y > 0 .and. (y==y*10)) then
       write(*,*) "(infinity):", y
-      val = 2
+      is_nan_infinity = 2
       return
    end if
 
    return
 end function is_nan_infinity
+
+function is_nan_infinity_matrix(y)
+    real(kind=dp), intent(in) :: y(:,:)
+    integer :: is_nan_infinity_matrix, i, j
+
+    is_nan_infinity_matrix = 0
+    do i=1,size(y(:,1))
+       do j=1, size(y(1,:))
+          if (y(i,j) /= y(i,j)) then
+             write(*,*) "(Nan):", y(i,j), " i=", i, " j=",j
+             is_nan_infinity_matrix = 1
+             return
+          else if (y(i,j) > 0 .and. (y(i,j)==y(i,j)*10)) then
+             write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1), " i=", i, " j=",j
+             is_nan_infinity_matrix = 2
+             return
+          end if
+       end do
+    end do
+    return
+end function is_nan_infinity_matrix
+
+function is_nan_infinity_vector(y)
+    real(kind=dp), intent(in) :: y(:)
+    integer :: is_nan_infinity_vector, i
+
+    is_nan_infinity_vector = 0
+    do i=1,size(y)
+       if (y(i) /= y(i)) then
+          write(*,*) "(Nan):", y(i), " i=", i, y(i)/=y(i)
+          is_nan_infinity_vector = 1
+          return
+       else if (y(i)>0 .and. (y(i)==y(i)*10)) then
+          write(*,*) "(infinity):", y(i), y(i)*(1+0.1), " i=", i, (y(i)==y(i)*10)
+          is_nan_infinity_vector = 2
+          return
+       end if
+    end do
+    return
+end function is_nan_infinity_vector
 
 function vacuum2air(Nlambda, lambda_vac) result(lambda_air)
    !wavelength in nm

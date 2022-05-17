@@ -9,9 +9,9 @@ module Opacity_atom
    use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, &
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
-   use wavelengths_gas, only     : Nlambda_max_line, n_lambda_cont, tab_lambda_cont, tab_lambda_nm
+   use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm
    use constantes, only          : c_light
-   use molecular_emission, only  : v_proj
+   use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
    !$ use omp_lib
 
@@ -19,7 +19,7 @@ module Opacity_atom
 
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:)!move in see
-   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:)
+   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:)
    real(kind=dp) :: vlabs
 
    contains
@@ -166,13 +166,10 @@ module Opacity_atom
                i0 = lac
                exit loop_i
             endif
-         enddo loop_i
+         enddo loop_i 
       enddo
-      if (lambda(N)==tab_lambda_cont(n_lambda_cont)) then
-         chi(N) = chic(n_lambda_cont)
-         snu(N) = snuc(n_lambda_cont)
-      endif
-
+      chi(N) = chic(n_lambda_cont)
+      snu(N) = snuc(n_lambda_cont)
 
       return
    end subroutine contopac_atom_loc
@@ -272,7 +269,7 @@ module Opacity_atom
             
             if (iterate) then
                vlabs = calc_vloc(icell,u,v,w,x,y,z,x1,y1,z1)
-               write(*,*) id, icell, " vlabs = ", vlabs * 1d-3
+               ! write(*,*) id, icell, " vlabs = ", vlabs * 1d-3
             else
             !-> no. in non-LTE (vlabs /= 0) if vlabs=0.0001 m/s the profile is completely shifted wich is wrong
             !compute the maximum relative shift (max(abs(v(icell)-v'(icell))))
@@ -319,14 +316,19 @@ module Opacity_atom
       return
    end subroutine opacity_atom_bb_loc
 
-!check dk shift and hc_fourpi in chicc lines (not in atomic transfer TT)
-   subroutine xcoupling(id, icell, iray)
+
+   subroutine xcoupling(id, icell, iray, lupdate_psi)
+   !test: update_psi in case of local subiterations.
+   !background not iterated (included in I)
+   !to do add bound-free
+   !to do add background
       integer, intent(in) :: id, icell, iray
+      logical, intent(in) :: lupdate_psi
       integer :: nact, j, i, kr, Nb, Nr, la, Nl
-      integer :: i0, j0, la0
+      integer :: i0, j0, la0, N1, N2
       type (AtomType), pointer :: aatom
-      real(kind=dp) :: gij, chicc, wl, ni_on_nj_star, wphi
-      real(kind=dp) :: term1(n_lambda_cont), term2(n_lambda_cont), term3(n_lambda_cont)
+      real(kind=dp) :: gij, chicc, wl, ni_on_nj_star, wphi, twohnu3_c2
+      real(kind=dp) :: term1(Nlambda_max_cont), term2(Nlambda_max_cont), term3(Nlambda_max_cont)
       real(kind=dp), dimension(Nlambda_max_line) :: phi0, wei_line
 
       Uji_down(:,:,:,id) = 0.0_dp
@@ -334,13 +336,10 @@ module Opacity_atom
       chi_up(:,:,:,id)   = 0.0_dp
 
       eta_atoms(:,:,id) = 0.0_dp
+      if (lupdate_psi) chi_tot(:) = 1d-50
 
-      !split into two loops for better optimization
-      !all continua are computed and then interpolated for lines.
-      term1 = 0.0
-      term2 = 0.0
-      term2 = 0.0
-      do nact=1, Nactiveatoms
+      aatom_loop : do nact=1, Nactiveatoms
+
          aatom => ActiveAtoms(nact)%p
 
          cont_loop : do kr = 1, aatom%Ncont
@@ -351,6 +350,7 @@ module Opacity_atom
             i = aatom%continua(kr)%i
             Nb = aatom%continua(kr)%Nbc; Nr = aatom%continua(kr)%Nrc
             Nl = Nr-Nb+1
+            N1 = aatom%continua(kr)%Nb; N2 = aatom%continua(kr)%Nr
 
             !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
             ni_on_nj_star = aatom%nstar(i,icell)/(aatom%nstar(j,icell) + 1d-100)
@@ -371,44 +371,40 @@ module Opacity_atom
                   wl = 0.5*(tab_lambda_cont(Nb+la)-tab_lambda_cont(Nb+la-2)) / tab_lambda_cont(Nb+la-1)
                endif
 
-               gij = ni_on_nj_star * exp(hc_k/T(icell)/tab_lambda_cont(Nb-1+la))
+               gij = ni_on_nj_star * exp(hnu_k(Nb-1+la)/T(icell))
 
-               term1(Nb-1+la) = term1(Nb-1+la) + fourpi_h * wl * aatom%continua(kr)%alpha(la) * (aatom%n(i,icell) - gij*aatom%n(j,icell))
-               term2(Nb-1+la) = term2(Nb-1+la) + aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij
-               term2(Nb-1+la) = term3(Nb-1+la) + aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij * aatom%n(j,icell)
-
+               term1(la) = fourpi_h * wl * aatom%continua(kr)%alpha(la) * (aatom%n(i,icell) - gij*aatom%n(j,icell))
+               term2(la) = aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij
+               term3(la) = aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij * aatom%n(j,icell)
             enddo freq_loop
+            !linear interpolation
+            chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1)
+            chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1)
+            Uji_down(n1,j,nact,id) = Uji_down(N1,j,nact,id) + term2(1)
+            eta_atoms(N1,nact,id) = eta_atoms(N1,nact,id) + term3(1)
+            i0 = 2
+            do la=N1,N2
+               loop_i : do la0=i0, Nl
+                  if (tab_lambda_cont(Nb+la0-1) > tab_lambda_nm(la)) then
+                     wl = (tab_lambda_nm(la) - tab_lambda_cont(Nb+la0-2)) / (tab_lambda_cont(Nb+la0-1) - tab_lambda_cont(Nb+la0-2))
+
+                     chi_down(la,j,nact,id) = chi_down(la,j,nact,id) + (1.0_dp - wl) *term1(la0-1)  + wl * term1(la0)
+                     chi_up(la,i,nact,id) = chi_up(la,i,nact,id) + (1.0_dp - wl) *term1(la0-1)  + wl * term1(la0)
+                     Uji_down(la,j,nact,id) = Uji_down(la,j,nact,id) + (1.0_dp - wl) *term2(la0-1)  + wl * term2(la0)
+                     eta_atoms(la,nact,id) = eta_atoms(la,nact,id) + (1.0_dp - wl) *term3(la0-1)  + wl * term3(la0)
+
+                     i0 = la0
+                     exit loop_i
+                  endif
+               enddo loop_i
+            enddo
+            chi_down(n2,j,nact,id) = chi_down(n2,j,nact,id) + term1(Nl)
+            chi_up(n2,i,nact,id) = chi_up(n2,i,nact,id) + term1(Nl)
+            Uji_down(n2,j,nact,id) = Uji_down(n2,j,nact,id) + term2(Nl)
+            eta_atoms(n2,nact,id) = eta_atoms(n2,nact,id) + term3(Nl)
 
          enddo cont_loop
-      enddo
 
-      !linear interpolation
-      chi_down(1,j,nact,id) = chi_down(1,j,nact,id) + term1(1)
-      chi_up(1,j,nact,id) = chi_up(1,j,nact,id) + term1(1)
-      Uji_down(1,j,nact,id) = Uji_down(1,j,nact,id) + term2(1)
-      eta_atoms(1,nact,id) = eta_atoms(1,nact,id) + term3(1)
-      i0 = 2
-      do la=1, n_lambda
-         loop_i : do la0=i0, n_lambda_cont
-            if (tab_lambda_cont(la0) > tab_lambda_nm(la)) then
-               wl = (tab_lambda_nm(la) - tab_lambda_cont(la0-1)) / (tab_lambda_cont(la0-1) - tab_lambda_cont(la0-1))
-
-               chi_down(la,j,nact,id) = chi_down(la,j,nact,id) + (1.0_dp - wl) *term1(la0-1)  + wl * term1(la0)
-               chi_up(la,j,nact,id) = chi_up(la,j,nact,id) + (1.0_dp - wl) *term1(la0-1)  + wl * term1(la0)
-               Uji_down(la,j,nact,id) = Uji_down(la,j,nact,id) + (1.0_dp - wl) *term2(la0-1)  + wl * term2(la0)
-               eta_atoms(la,nact,id) = eta_atoms(la,nact,id) + + (1.0_dp - wl) *term3(la0-1)  + wl * term3(la0)
-
-               i0 = la0
-               exit loop_i
-            endif
-         enddo loop_i
-      enddo
-      chi_down(n_lambda,j,nact,id) = chi_down(n_lambda,j,nact,id) + term1(n_lambda_cont)
-      chi_up(n_lambda,j,nact,id) = chi_up(n_lambda,j,nact,id) + term1(n_lambda_cont)
-      Uji_down(n_lambda,j,nact,id) = Uji_down(n_lambda,j,nact,id) + term2(n_lambda_cont)
-      eta_atoms(n_lambda,nact,id) = eta_atoms(n_lambda,nact,id) + term3(n_lambda_cont)
-
-      aatom_loop : do nact=1, NactiveAtoms
 
          line_loop : do kr = 1, aatom%Nline
 
@@ -422,9 +418,6 @@ module Opacity_atom
 
             Nb = aatom%lines(kr)%Nb; Nr = aatom%lines(kr)%Nr
             Nl = Nr - Nb + 1
-         !need shift here ???
-         !  Nl = Nr-dk_min+dk_max-Nb+1
-
 
             wphi = 0.0
             do la=1,Nl
@@ -433,32 +426,44 @@ module Opacity_atom
                elseif (la==Nl) then
                   wl = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) * c_light / aatom%lines(kr)%lambda0
                else
-                  wl = 0.5*(tab_lambda_nm(Nb+la+1)-tab_lambda_nm(Nb+la-1)) * c_light / aatom%lines(kr)%lambda0
+                  wl = 0.5*(tab_lambda_nm(Nb+la)-tab_lambda_nm(Nb+la-2)) * c_light / aatom%lines(kr)%lambda0
                endif
                wei_line(la) = wl
                phi0(la) = phi_loc(la,kr,nact,iray,id)
                wphi = wphi + wl * phi0(la)
             enddo
 
+
             freq2_loop : do la=1, Nl
                wl = wei_line(la)
 
-               Uji_down(Nb-1+la,j,nact,id) = Uji_down(Nb-1+la,j,nact,id) + hc_fourPI * aatom%lines(kr)%Aji * phi0(la)/wphi
+               Uji_down(Nb-1+la,j,nact,id) = Uji_down(Nb-1+la,j,nact,id) + hc_fourPI * aatom%lines(kr)%Aji * phi0(la)!/wphi
 
-               !maybe the hc_fourpi here simplify
-               chicc = wl * hc_fourPI * aatom%lines(kr)%Bij * (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(la)/wphi
+               !there is a hc_fourpi factor that simplifies here, because integral is over dnu/hnu dOmega = dv/hc dOmega * hc/4pi
+               !dv dOmega/4pi which is whtat is contained in wl (for dv) and what the angular integration provides (dOmega/4pi)
+               chicc = wl * aatom%lines(kr)%Bij * (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(la)/wphi
 
 
                chi_down(Nb-1+la,j,nact,id) = chi_down(Nb-1+la,j,nact,id) + chicc
-               chi_up(Nb-1+la,j,nact,id) = chi_up(Nb-1+la,j,nact,id) + chicc
+               chi_up(Nb-1+la,i,nact,id) = chi_up(Nb-1+la,i,nact,id) + chicc
 
                eta_atoms(Nb-1+la,nact,id) = eta_atoms(Nb-1+la,nact,id) + &
-                  hc_fourPI * aatom%lines(kr)%Aji * aatom%n(j,icell) * phi0(la)/wphi
+                  hc_fourPI * aatom%lines(kr)%Aji * aatom%n(j,icell) * phi0(la)!/wphi
+
 
             enddo freq2_loop
+            if (lupdate_psi) then
+               chi_tot(Nb:Nr) = chi_tot(Nb:Nr) + hc_fourPI * aatom%lines(kr)%Bij * (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(:)
+            endif
 
          enddo line_loop
+
+         aatom => null()
       enddo aatom_loop
+
+      if (lupdate_psi) then
+         psi(:,1,id) = (1.0_dp - exp(-ds(iray,id)*chi_tot))/chi_tot
+      endif
 
     return
    end subroutine xcoupling
@@ -520,8 +525,8 @@ module Opacity_atom
       if (lsubstract_avg) then!labs == .true.
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
          !omegav_mean should be close to vlabs
-         write(*,*) "vlabs=", vlabs*1d-3, omegav_mean * 1d-3
-         stop
+         ! write(*,*) "vlabs=", vlabs*1d-3, omegav_mean * 1d-3
+         ! stop
       else
          !recentre the cell on the speed of the non-lte cell,
          !so that the kinematics is computed with respect to a non-moving non-lte cell.

@@ -9,6 +9,7 @@ module atom_type
    integer, parameter   :: ATOM_LABEL_WIDTH=20
    integer, parameter   :: ATOM_ID_WIDTH=2
    integer, parameter   :: Nmax_Trans_raytracing = 100
+   integer, parameter   :: Nmax_line_per_collision = 1000 !size max of the character for each collision line
 
    type ZeemanType
       integer :: Ncomponent
@@ -25,6 +26,7 @@ module atom_type
       real(kind=dp) :: lambda0, isotope_Frac, alpha0, lambdamin, lambdamax !continuum maximum frequency > frequency photoionisation
       real(kind=dp), allocatable, dimension(:)  :: alpha, twohnu3_c2
       real(kind=dp), allocatable, dimension(:)  :: lambda_file, alpha_file
+      real(kind=dp), allocatable, dimension(:)  :: Rij, Rji, Cij, Cji
       type (AtomType), pointer :: atom => NULL()
    end type AtomicContinuum
 
@@ -39,6 +41,7 @@ module atom_type
       real(kind=dp) :: Aji, Bji, Bij, Grad, cStark, fosc
       real(kind=dp) :: twohnu3_c2, gij, vmax !m/s
       real :: qwing
+      real(kind=dp), allocatable, dimension(:)  :: Rij, Rji, Cij, Cji 
       real(kind=dp), dimension(4) :: cvdWaals
       real(kind=dp), dimension(:), allocatable :: a
       real(kind=dp), dimension(:,:,:,:,:), allocatable :: map !2d flux in the line
@@ -65,7 +68,7 @@ module atom_type
       integer, allocatable, dimension(:) :: i_trans, j_trans !return the index of a transition from 1 to atom%Ntr
       integer, allocatable, dimension(:,:) :: ij_to_trans !from i and j return the index of a transiton
       !Compatibility with RH, stored the collision in character format!
-      character(len=512), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
+      character(len=Nmax_line_per_collision), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
       real(kind=dp)                :: cswitch, Abund, weight, massf !mass fraction
       integer                      :: periodic_table, activeindex !order of the active atom in the
       character(len=ATOM_LABEL_WIDTH), allocatable, dimension(:)  :: label
@@ -80,8 +83,9 @@ module atom_type
       logical                :: NLTEpops, set_ltepops
       logical :: lgauss_prof = .false.
       !common gauss profile for gauss profile lines
-      real(kind=dp), allocatable :: vg(:), phig(:,:)
+      real(kind=dp), allocatable :: vg(:), phig(:,:), Gamma(:,:,:)
       real(kind=dp), dimension(:,:), pointer :: n, nstar
+      ! real(kind=dp), dimension(:,:) :: phi_T !such that nexphi_T = ni/nj
       type (AtomicLine), allocatable, dimension(:)         :: lines
       type (AtomicContinuum) , allocatable, dimension(:)   :: continua
    end type AtomType
@@ -99,7 +103,7 @@ module atom_type
    integer, parameter :: cwitch_niter = 12!nint(ceil(log(cswitch_val)/log(cswitch_down_scaling_factor)))
    real(kind=dp), parameter :: cswitch_val = 1d12
    real(kind=dp), parameter :: cswitch_down_scaling_factor = 10.0!ceil(exp(log(cswitch_val)/cswitch_niter))
-   logical :: cswitch_enabled = .false.
+   logical :: lcswitch_enabled = .false. !if only one atom has cswith, it is True.
    
    contains
 
@@ -465,8 +469,6 @@ module atom_type
       return
    end function atomZnumber
 
-  
-!But why, a cswitch per atom ? It is going at the same speed for all atoms right ?
    function maxval_cswitch_atoms ()
       !for all atoms, check the maximum value of the cswitch
       integer :: n
@@ -482,18 +484,18 @@ module atom_type
       return
    end function maxval_cswitch_atoms
 
-   !could be done for only one common parameter by the way
+
    subroutine adjust_cswitch_atoms ()
       !for all active atoms, decreases the cswitch value from cswitch_down_scaling_factor
       integer :: n
-      logical :: print_message = .false.
+      logical :: print_message
       real(kind=dp) :: new_cs
 
       print_message = .false.
 
       do n=1, NactiveAtoms
 
-         if (activeatoms(n)%p%cswitch > 1.0) then
+         if (activeatoms(n)%p%cswitch > 1.0_dp) then
             activeatoms(n)%p%cswitch = max(1.0_dp, min(activeatoms(n)%p%cswitch, &
                activeatoms(n)%p%cswitch/cswitch_down_scaling_factor))
             if (.not. print_message) then

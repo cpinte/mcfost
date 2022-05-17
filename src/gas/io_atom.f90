@@ -89,8 +89,6 @@ module io_atom
       write(*,*) "Nlevel=",atom%Nlevel," Nline=",atom%Nline,&
                   " Ncont=", atom%Ncont
 
-      atom%cswitch = 1.0_dp
-
       !atomic level spectroscopic term
       allocate(atom%label(atom%Nlevel))
       !atomic level Energy w/ ground level
@@ -119,6 +117,7 @@ module io_atom
       !-> to remove tab_trans ??
       ! allocate(atom%tab_trans(atom%Ntr))
       allocate(atom%ij_to_trans(atom%Nlevel,atom%Nlevel))
+      atom%ij_to_trans(:,:) = -99
       allocate(atom%i_trans(atom%Ntr),atom%j_trans(atom%Ntr))
       atom%Ntr_line = atom%Nline
       atom%nstar(:,:) = 0d0
@@ -377,7 +376,8 @@ module io_atom
       enddo !bound-free
 
       atom%set_ltepops = .true. !by default compute lte populations
-      atom%NLTEpops = .false.
+      !non-LTE pops in electronic density ? write non-LTE pops to file ? 
+      atom%NLTEpops = .false. !set to true during non-LTE loop if initial /= 0
 
       ! allocate some space
       if (atom%initial==2) then
@@ -389,33 +389,27 @@ module io_atom
 
       if (atom%active) then
 
+         atom%cswitch = 1.0_dp
 
          ! reading collision rates of RH
          if (atom%ID /= "H") then
             write(*,*) "  -> Reading collision data from RH for atom ", atom%ID
             call read_collisions(atomunit, atom)
+            call warning("  ** the data for each transition must be consistent with transitions in the file")
+            write(*,*) "          a value of -99 is given to missing transitions and are skipped **"
          endif
 
          allocate(atom%n(atom%Nlevel,n_cells))
          atom%n = 0.0_dp
-         if (atom%initial == 0) then
+         if (atom%initial == 0) then!(initial==0 .or. initial==3)
             atom%n = atom%nstar !still need to be computed
             atom%set_ltepops = .true.
+            !if (initial==0) then
             write(*,*) " -> Setting initial solution to LTE "
+            !else
+            !  cswitch
+            !endif
 
-         else if (atom%initial == 3) then
-            atom%n = atom%nstar !still need to be computed
-            atom%set_ltepops = .true.
-            if (.not. lforce_lte) then !otherwise cswitch is not LTE
-               write(*,*) " -> Setting initial solution to LTE with CSWITCH "
-               atom%cswitch = cswitch_val
-               if (.not. cswitch_enabled) cswitch_enabled = .true.!we need at least one
-            endif
-         else if (atom%initial == 2) then
-
-            atom%n = atom%nstar
-            atom%set_ltepops = .true.
-            !nlte pops is false
 
          else if (atom%initial == 1) then
 
@@ -424,13 +418,39 @@ module io_atom
             atom%NLTEpops = .true.
             atom%set_ltepops = .false. !read and USE also LTE populations from file!!
 
+         else if (atom%initial == 2) then
+
+            call error("initial solution == 2 (opt thin) not implemented yet!")
+            atom%n = atom%nstar
+            atom%set_ltepops = .true.
+            !nlte pops is false and are set after first electron density and lte pops.
+
+         else if (atom%initial == 3) then
+            atom%n = atom%nstar !still need to be computed
+            !like initial==0
+            atom%set_ltepops = .true.
+            if (.not. lforce_lte) then !otherwise cswitch is not LTE
+               write(*,*) " -> Setting initial solution to LTE with CSWITCH "
+               atom%cswitch = cswitch_val
+               if (.not. lcswitch_enabled) lcswitch_enabled = .true.!we need at least one
+            endif
+
+         else if (atom%initial == 4) then
+
+            call error("initial solution == 4 (Sobolev) not implemented yet!")
+            atom%n = atom%nstar
+            atom%set_ltepops = .true.
+            !nlte pops is false and are set after first electron density and lte pops.
+
          end if
       else !not active = PASSIVE
+         !other initials do not matter, always LTE ! (except if read)
          if (atom%initial == 1) then
 
             allocate(atom%n(atom%Nlevel,n_cells)) !not allocated if passive, n->nstar
             write(*,*) " -> Reading (non-LTE AND LTE) populations from file for passive atom..."
             call read_pops_atom(atom)
+            !by default. Need a case with only LTE ?
             atom%NLTEpops = .true.
             atom%set_ltepops = .false. !read and USE also LTE populations from file!!
 
@@ -595,7 +615,6 @@ module io_atom
          end if
       end do
 
-   
       return
    end subroutine read_Atomic_Models
 
@@ -963,7 +982,6 @@ module io_atom
       call print_error(status)
       stop
    endif
-
 
    !now LTE
    call FTMAHD(unit,2,hdutype,status)

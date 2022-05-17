@@ -767,20 +767,21 @@ module healpix_mod
 	return
 	end subroutine healpix_ring_northern_pixels
 
-!-> commented for python
-	subroutine healpix_sphere(l,mu,phi)
+	subroutine healpix_sphere(l,mu,xmu,ymu)
 		integer, intent(in) :: l
-  		real(kind=dp), dimension(12*4**l), intent(out) :: mu, phi
+  		real(kind=dp), dimension(12*4**l), intent(out) :: xmu, ymu, mu
+  		real(kind=dp) :: z, phi
   		integer :: pix
 
-  		mu(:) = 0.0_dp
-  		phi(:) = 0.0_dp
 
 		call init_pix2xy_and_xy2pix
   		do pix=1,healpix_npix(l)
 
-!   			call healpix_ring_mu_and_phi(l,pix,mu(pix),phi(pix))
-  			call healpix_nested_mu_and_phi (l, pix-1, mu(pix), phi(pix))
+!   			call healpix_ring_mu_and_phi(l,pix,z,phi)
+  			call healpix_nested_mu_and_phi (l, pix-1, z, phi)
+  			mu(pix) = z
+  			xmu(pix) = sqrt(1.0_dp - z*z) * cos(phi)
+  			ymu(pix) = sqrt(1.0_dp - z*z) * sin(phi)
 
   		enddo
 

@@ -15,7 +15,6 @@ module optical_depth
 
   implicit none
 
-  !!procedure(dust_and_mol_optical_length_tot), pointer :: optical_length_tot => null()
 
   contains
 
@@ -880,8 +879,18 @@ end subroutine optical_length_tot_mol
 
             if (lsubtract_avg) then
                !Lambda operator / chi_dag
-               psi(:,iray,id) = ( 1.0_dp - exp( -dtau(:) ) ) / chi
+               !force PSI to be ray-by-ray but not ds !
+               !local, unaffected by vel.
+               psi(:,1,id) = ( 1.0_dp - exp( -dtau(:) ) ) / chi
                ds(iray,id) = l_contrib * AU_to_m
+               !-> to remove, only debug
+               if (is_nan_infinity_vector(psi(:,1,id))>0) then
+                  write(*,*) size(psi(:,1,id))
+                  write(*,*) "psi=", minval(psi(:,1,id)), maxval(psi(:,1,id))
+                  write(*,*) "chi=", minval(chi), maxval(chi)
+                  write(*,*) "dt=", minval(dtau), maxval(dtau)
+                  call error("psi")
+               endif
             endif
 
             ! if (lorigine) then

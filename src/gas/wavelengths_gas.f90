@@ -137,7 +137,6 @@ module wavelengths_gas
          vB = 0.0_dp
       endif
       vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
-      !write(*,*) "max(vth) line = ", vth*1d-3, line%atom%weight
       vmax = line%qwing * (vth + vB)
       if (limage) vmax = line%atom%vmax_rt*1d3
        
@@ -146,7 +145,9 @@ module wavelengths_gas
       line%lambdamax = line%lambda0*(1.0+vmax/C_LIGHT)
       line%vmax = vmax
 
-      if (limage) then
+      !avoid to print too much info. all lines are kept for lmodel_1d spectra.
+      !to remove after debug ?
+      if (limage.and..not.lmodel_1d) then
          write(*,'("line "(1I2)"->"(1I2)"; Vmax (Ray-Trace)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
          write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
       ! else
@@ -245,7 +246,7 @@ module wavelengths_gas
       integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda
       integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved, Nwaves, check_new_freq
       type (AtomType), pointer :: atom
-      integer :: alloc_status, lac, la, nb, krr
+      integer :: alloc_status, lac, la, nb, krr, max_Nlambda_indiv
       real(kind=dp), dimension(:), allocatable :: tmp_grid, tmp_grid2, all_l0, all_l1
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
@@ -326,7 +327,7 @@ module wavelengths_gas
         enddo
         atom => null()
       enddo
-      write(*,*) "lac end=", lac-1
+      ! write(*,*) "lac end=", lac-1
  
       !sort continuum frequencies
       Nmore_cont_freq = 0.0
@@ -442,9 +443,9 @@ module wavelengths_gas
          !some statistics
          write(*,*) " Found ", N_groups, " groups of lines for ", Nlines, " lines in total."
          write(*,*) "   -> ", sum(Nline_per_group) - N_groups, " overlapping regions"! for", sum(Nline_per_group), " lines"
-         do Nlam=1, N_groups
-            write(*,*) " group ", Nlam, " lamin = ", group_blue(Nlam), ' lamax = ', group_red(Nlam)
-         enddo
+         ! do Nlam=1, N_groups
+         !    write(*,*) " group ", Nlam, " lamin = ", group_blue(Nlam), ' lamax = ', group_red(Nlam)
+         ! enddo
 
          allocate(tmp_grid(1000000),stat=alloc_status)
          if (alloc_status > 0) call error("Allocation error tmp_grid (line)!")
@@ -452,6 +453,7 @@ module wavelengths_gas
  
          !groups are not really used here
          lac = 1
+         max_Nlambda_indiv = 0
          do n=1, N_atoms
             atom => atoms(n)%p
  
@@ -459,10 +461,11 @@ module wavelengths_gas
 
                if (hv>0.0) then
                   atom%lines(kr)%Nlambda = nint(2 * 1d-3 * atom%lines(kr)%vmax / hv + 1)
-                  write(*,*) "Nlambda line hv>0:", nint(2 * 1d-3 * atom%lines(kr)%vmax / hv + 1)
-               else
-                  write(*,*) "Nlambda line:", atom%lines(kr)%Nlambda
+                  ! write(*,*) "Nlambda line hv>0:", nint(2 * 1d-3 * atom%lines(kr)%vmax / hv + 1)
+               ! else
+                  ! write(*,*) "Nlambda line:", atom%lines(kr)%Nlambda
                endif
+               max_Nlambda_indiv = max(max_Nlambda_indiv,atom%lines(kr)%Nlambda)
                tmp_grid(lac:atom%lines(kr)%Nlambda+lac-1) = subgrid_line(atom%lines(kr),atom%lines(kr)%Nlambda)
                lac = lac + atom%lines(kr)%Nlambda
 
@@ -515,15 +518,15 @@ module wavelengths_gas
          endif
          deallocate(tmp_grid2)
          Nlambda = size(tmp_grid)!Nlambda - Nremoved
-         do n=1,N_groups
-            write(*,*) n, size(pack(tmp_grid,&
-            (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
-            Nlambda_per_group(n) = size(pack(tmp_grid,&
-               (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
-         enddo
-         write(*,*) " ** BUG HERE ?? ** "
-         write(*,*) "There are in total ", Nlambda, " wavelength points for the lines grid.", sum(Nlambda_per_group)
-         write(*,*) "** ?? ** "
+         ! do n=1,N_groups
+         !    write(*,*) n, size(pack(tmp_grid,&
+         !    (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
+         !    Nlambda_per_group(n) = size(pack(tmp_grid,&
+         !       (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
+         ! enddo
+         ! write(*,*) " ** BUG HERE ?? ** "
+         ! write(*,*) "There are in total ", Nlambda, " wavelength points for the lines grid.", sum(Nlambda_per_group)
+         ! write(*,*) "** ?? ** "
 
          ! ----------- small cont grid start ------------- !
          !-> This is only useful for the pure-continuum RT !!!!
@@ -629,7 +632,7 @@ module wavelengths_gas
                endif
             enddo group_loop
          enddo
-         write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid2, tmp_grid2 > 0))
+         ! write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid2, tmp_grid2 > 0))
          deallocate(tmp_grid)
          !
          ! If I remove continuum RT !
@@ -664,6 +667,7 @@ module wavelengths_gas
       write(*,*) Nwaves, " unique wavelengths" !they are no eliminated lines
       write(*,*) Nlambda, " line wavelengths"
       write(*,*) Nlambda_cont, " continuum wavelengths"
+      write(*,*) max_Nlambda_indiv, " max individual wavelengths for a line" 
       ! if (Nlines>1) then
       !    write(*,*) "Mean number of lines per group:", real(sum(Nline_per_group))/real(Ngroup)
       !    write(*,*) "Mean number of wavelengths per group:", real(Nspec_line)/real(Ngroup)
@@ -1172,7 +1176,7 @@ module wavelengths_gas
             enddo
             atom => null()
          enddo
-         write(*,*) "lac end=", lac-1
+         ! write(*,*) "lac end=", lac-1
  
          !sort continuum frequencies
          Nmore_cont_freq = 0.0
@@ -1288,9 +1292,9 @@ module wavelengths_gas
             !some statistics
             write(*,*) " Found ", N_groups, " groups of lines for ", Nlines, " lines in total."
             write(*,*) "   -> ", sum(Nline_per_group) - N_groups, " overlapping regions"! for", sum(Nline_per_group), " lines"
-            do Nlam=1, N_groups
-               write(*,*) " group ", Nlam, " lamin = ", group_blue(Nlam), ' lamax = ', group_red(Nlam)
-            enddo
+            ! do Nlam=1, N_groups
+            !    write(*,*) " group ", Nlam, " lamin = ", group_blue(Nlam), ' lamax = ', group_red(Nlam)
+            ! enddo
 
             allocate(tmp_grid(1000000),stat=alloc_status)
             if (alloc_status > 0) call error("Allocation error tmp_grid (line)!")
@@ -1355,12 +1359,12 @@ module wavelengths_gas
             endif
             deallocate(tmp_grid2)
             Nlambda = size(tmp_grid)!Nlambda - Nremoved
-            do n=1,N_groups
-               write(*,*) n, size(pack(tmp_grid,&
-               (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
-               Nlambda_per_group(n) = size(pack(tmp_grid,&
-                  (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
-            enddo
+            ! do n=1,N_groups
+            !    write(*,*) n, size(pack(tmp_grid,&
+            !    (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
+            !    Nlambda_per_group(n) = size(pack(tmp_grid,&
+            !       (tmp_grid >= group_blue(n)).and.tmp_grid <= group_red(n)))
+            ! enddo
 
             ! ----------- small cont grid start ------------- !
             !-> This is only useful for the pure-continuum RT !!!!
@@ -1466,7 +1470,7 @@ module wavelengths_gas
                   endif
                enddo group_loop
             enddo
-            write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid2, tmp_grid2 > 0))
+            ! write(*,*) " Check Nwaves:", Nwaves,  size(pack(tmp_grid2, tmp_grid2 > 0))
             deallocate(tmp_grid)
  
  

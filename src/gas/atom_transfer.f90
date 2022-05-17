@@ -14,21 +14,23 @@ module atom_transfer
    use wavelengths_gas, only : make_wavelengths_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
                                  deallocate_wavelengths_gasrt, make_wavelengths_raytracing, make_wavelengths_flux, Nlambda_max_line
    use elecdensity, only : solve_ne, write_electron, read_electron
-   use grid, only : lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, ne
+   use grid, only : nHtot, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, ne, Voronoi, r_grid, phi_grid, z_grid
    use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops
-   use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, hydrogen, helium
+   use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, hydrogen, helium, adjust_cswitch_atoms, maxval_cswitch_atoms, lcswitch_enabled
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
-   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, uji_down, chi_up, chi_down, eta_atoms, phi_loc
+   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling
+   use see, only : n_new, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
+                  rate_matrix, init_rates, update_populations, accumulate_radrates_mali
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
                                    tab_RT_az,tab_RT_incl
    use stars, only               : intersect_stars, laccretion_shock, max_Tshock, min_Tshock
    use output, only : allocate_atom_maps, flux_total, write_total_flux, write_atomic_maps
-   use mcfost_env, only          : dp, time_begin, time_end, time_tick, time_max
+   use mcfost_env, only          : dp, time_tick, time_max
    use molecular_emission, only  : ds
-   use messages, only : error
+   use messages, only : error, warning
 
    use healpix_mod
    !$ use omp_lib
@@ -36,13 +38,14 @@ module atom_transfer
    implicit none
                     
    integer :: omp_chunk_size
-   real(kind=dp) :: dne
    real(kind=dp), allocatable, dimension(:) :: tab_lambda_Sed
 
    contains
 
-!TO DO Ng
-!Trad, Tion
+!TO DO 
+!      add iterate ne
+!      add Ng
+!      add Trad, Tion
    subroutine nlte_loop_mali()
    ! ----------------------------------------------------------------------- !
    ! Descriptor
@@ -52,56 +55,56 @@ module atom_transfer
       integer :: etape, etape_start, etape_end, iray, n_rayons
       integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
       integer, dimension(nb_proc) :: max_n_iter_loc
-      logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
-      real :: rand, rand2, rand3, precision, fac_etape
-      integer, parameter :: n_rayons_max = 1
+      integer, parameter :: maxIter = 1000, maxIter_loc = 100
+      logical :: lfixed_Rays, lconverged, lconverged_loc, lprevious_converged
+      real :: rand, rand2, rand3, fac_etape
+      real(kind=dp) :: precision
+      integer, parameter :: n_rayons_max = 1 !ray-by-ray except for subiterations
+                                             !but in that case only itot and phi_loc and ds needs
+                                             !to have n_rayons_sub size.
       integer :: n_rayons_sub
-
+      real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy
       real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
-      real(kind=dp) :: diff, norme, dN, dN1
-      real(kind=dp) :: dT, dN2, dN3, dN4, diff_old, dne
+      real(kind=dp) :: diff, diff_old, dne, dN, dN1
       real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
 
       logical :: labs, lsubiteration = .false.
-      logical :: l_iterate, l_iterate_ne, update_ne_other_nlte
+      logical :: l_iterate, l_iterate_ne, lupdate_ne_other_nlte
       ! logical :: accelerated, ng_rest, lng_turned_on
       ! integer :: iorder, i0_rest, n_iter_accel, iacc
 
       integer :: nact, imax, icell_max, icell_max_2
-      integer :: icell, ilevel, imu, iphi, Nmaxlevel, NMaxtrans, Nmaxline
+      integer :: icell, ilevel, Ng_Ndelay
+      logical :: lng_turned_on
 
       type (AtomType), pointer :: atom
-      integer(kind=8) :: mem_alloc_local = 0
+      integer(kind=8) :: mem_alloc_local
       real(kind=dp) :: diff_cont, conv_speed, conv_acc
 
-      real(kind=dp), dimension(:), allocatable :: lcell_converged, ne_new, ngpop!check size
-
+      real :: time_iteration, time_nlte
+      integer :: count_start, count_end
       integer :: ibar, n_cells_done
       integer, parameter :: n_iter_counted = 1
 
+      ! -------------------------------- INITIALIZATION -------------------------------- !
+      write(*,*) '-------------------------- NON-LTE LOOP ------------------------------ '
       !non-LTE mode
       labs = .true.
       id = 1
+      if (lforce_lte) lsubiteration = .false.
 
-      NmaxLevel = 0
-      Nmaxtrans = 0
-      do i=1, NactiveAtoms
-         NmaxLevel = max(Nmaxlevel, ActiveAtoms(i)%p%Nlevel)
-         NmaxTrans = max(NmaxTrans, ActiveAtoms(i)%p%Ntr)
-         Nmaxline = max(Nmaxline, ActiveAtoms(i)%p%Nline)
-      enddo
-
-      !time for individual steps + check the time from the checkpointing time if any
-      !and if it is set lconverged = .true. and .lprevious converged == true
-      call system_clock(time_begin,count_rate=time_tick,count_max=time_max)
-
-      update_ne_other_nlte = (hydrogen%active.and.NactiveAtoms > 1).or.(.not.hydrogen%active)
+      l_iterate_ne = .false.
+      lupdate_ne_other_nlte = (hydrogen%active.and.NactiveAtoms > 1).or.(.not.hydrogen%active)
       if (associated(helium)) then
 
-         update_ne_other_nlte = (helium%active.and.hydrogen%active.and.Nactiveatoms > 2).or.&
+         lupdate_ne_other_nlte = (helium%active.and.hydrogen%active.and.Nactiveatoms > 2).or.&
                                  (.not.hydrogen%active.and.helium.active.and.Nactiveatoms > 1).or.&
                                  (hydrogen%active.and..not.helium%active.and.NactiveAtoms > 1)
       endif
+      !Use non-LTE pops for electrons and to write to file.
+      do nact=1,NactiveAtoms
+         if (.not.activeatoms(nact)%p%nltepops) activeatoms(nact)%p%nltepops = .true.
+      enddo
 
       allocate(dM(Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
       allocate(dTM(Nactiveatoms)); dM=0d0 !keep tracks of Tex for all cells for each atom
@@ -110,818 +113,439 @@ module atom_transfer
       diff_old = 1.0_dp
       dM(:) = 1.0_dp
 
+      !-> negligible
+      mem_alloc_local = 0
       mem_alloc_local = mem_alloc_local + sizeof(dM)+sizeof(dTm)+sizeof(Tex_ref)+sizeof(Tion_ref)
 
-      ! if (lNg_acceleration) then
-      !    n_iter_accel = 0
-      !    i0_rest = 0
-      !    ng_rest = .false.
-      !    iacc = 0
-      !    allocate(ngpop(n_cells * NmaxLevel, iNg_Norder+2, NactiveAtoms), stat=alloc_status)
-      !    if (alloc_status > 0) then
-      !       call error("Cannot allocate Ng table !")
-      !    endif
-      !    mem_alloc_local = mem_alloc_local + sizeof(ngpop)
-      !    lng_turned_on = .false.
-      ! endif
+
+      !How many steps and which one
+      etape_start = istep_start
+      n_rayons = healpix_npix(healpix_lorder)
+      n_rayons_sub = 1 !for allocation of phi and Itot on the maximum number of rays!
+      if (laccurate_integ) then
+         etape_end = 2
+         if (lsubiteration) n_rayons_sub = max(n_rayons,N_rayons_mc)
+      else
+         etape_end = 1
+         if (lsubiteration) n_rayons_sub = n_rayons
+         if (istep_start==2) then 
+            etape_end = 2
+            if (lsubiteration) n_rayons_sub = N_rayons_mc
+         endif
+      endif
 
       if (allocated(stream)) deallocate(stream)
       allocate(stream(nb_proc),stat=alloc_status)
       if (alloc_status > 0) call error("Allocation error stream")
       if (allocated(ds)) deallocate(ds)
-      allocate(ds(1,nb_proc))
-
-      !How many steps and which one
-      etape_start = istep_start
-      n_rayons_sub = 100 !put healpix here
-      if (laccurate_integ) then
-         etape_end = 2
-         n_rayons_sub = 100 !put mc here
-      else
-         etape_end = 1
-         if (istep_start==2) then 
-            etape_end = 2
-            n_rayons_sub = 100 !put mc here
-         endif
-      endif
-
-      !-> allocate space for non-LTE only quantities !
-      allocate(ne_new(n_cells), stat=alloc_status)
-      ne_new(:) = ne(:)
-      if (alloc_status > 0) call error("Allocation error ne_new")
-      write(*,*) " size ne_new:", sizeof(ne_new) / 1024./1024.," MB"
-      ! allocate(n_new(NactiveAtoms,Nmaxlevel,n_cells),stat=alloc_status)
-      ! if (alloc_status > 0) call error("Allocation error n_new")
-      ! write(*,*) " size atom%n, n_new:", 2*sizeof(n_new) / 1024./1024.," MB"
-      ! n_new(:,:,:) = 0.0_dp
-      allocate(psi(n_lambda, n_rayons_max, nb_proc), stat=alloc_status); psi = 0.0_dp
-      write(*,*) " size psi:", sizeof(psi) / 1024./1024.," MB"
-      if (alloc_Status > 0) call error("Allocation error psi in nlte loop")
-      allocate(eta_atoms(n_lambda,NactiveAtoms,nb_proc),stat=alloc_status)
-      if (alloc_Status > 0) call error("Allocation error eta_atoms")
-      write(*,*) " size eta_atoms:", sizeof(eta_atoms) / 1024./1024.," MB"
-      allocate(Uji_down(n_lambda,Nmaxlevel,NactiveAtoms,nb_proc),stat=alloc_status)
-      if (alloc_Status > 0) call error("Allocation error Uji_down")
-      write(*,*) " size cross-coupling:", 3 * sizeof(Uji_down) / 1024./1024./1024.," GB"
-      allocate(chi_down(n_lambda,Nmaxlevel,NactiveAtoms,nb_proc),stat=alloc_status)
-      if (alloc_Status > 0) call error("Allocation error chi_down")
-      allocate(chi_up(n_lambda,Nmaxlevel,NactiveAtoms,nb_proc),stat=alloc_status)
-      if (alloc_Status > 0) call error("Allocation error chi_up")
-      allocate(lcell_converged(n_cells),stat=alloc_status)
-      if (alloc_Status > 0) call error("Allocation error lcell_converged")
-      write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
-    
-      if (lNg_acceleration) write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024., " MB"
-
       if (lsubiteration) then
-         allocate(Itot(n_lambda,n_rayons_sub,nb_proc),stat=alloc_status)
-         if (alloc_Status > 0) call error("Allocation error Itot")
-         allocate(phi_loc(Nlambda_max_line,Nmaxline,NactiveAtoms,n_rayons_sub,nb_proc),stat=alloc_status)
-         if (alloc_Status > 0) call error("Allocation error phi_loc")
+         allocate(ds(n_rayons_sub,nb_proc))
       else
-         allocate(Itot(n_lambda,1,nb_proc),stat=alloc_status)
-         if (alloc_Status > 0) call error("Allocation error Itot")
-         allocate(phi_loc(Nlambda_max_line,Nmaxline,NactiveAtoms,1,nb_proc),stat=alloc_status)
-         if (alloc_Status > 0) call error("Allocation error phi_loc")
+         allocate(ds(n_rayons_max,nb_proc))
       endif
-      write(*,*) " size Itot:", sizeof(Itot) / 1024./1024./1024.," GB"
-      write(*,*) " size phi_loc:", sizeof(phi_loc) / 1024./1024./1024.," GB"
+      !-> negligible
+      mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
+      call alloc_nlte_var(n_rayons_max,n_rayons_sub,lsubiteration)
 
-      mem_alloc_local = mem_alloc_local + sizeof(psi) + sizeof(eta_atoms) + sizeof(Itot) + sizeof(phi_loc) + &
-         sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ne_new) + sizeof(lcell_converged) !+ sizeof(n_new)
-      write(*,'("Total memory allocated in NLTEloop:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
-
+    
       lfixed_rays = .true.
-      n_rayons = 1 !always
       iray_start = 1
 
-!       !outer loop on etapes
-!       step_loop : do etape=etape_start, etape_end
+      ! --------------------------- OUTER LOOP ON STEP --------------------------- !
 
-!          if (etape==1) then
-!             time_iteration = 0
-!             lprevious_converged = .false.
-!             lcell_converged(:) = .false.
-!             precision = dpops_max_error
+      step_loop : do etape=etape_start, etape_end
 
-!          else if (etape==2) then
-!             time_iteration = 0
-!             lprevious_converged = .false.
-!             lcell_converged(:) = .false.
-!             fac_etape = 0.1
-!             if (etape_start==1) then
-!                precision = min(1e-1,10.0*dpops_max_error)
-!             else
-!                precision = dpops_max_error
-!             endif
+         write(*,*) ""
+         if (etape==1) then
+            precision = dpops_max_error
+            !use stepan if healpix_lorder < 2?
+            allocate(xmux(n_rayons),xmu(n_rayons),xmuy(n_rayons),wmu(n_rayons))
+            wmu(:) = healpix_weight(healpix_lorder)
+            write(*,'(" ****-> Using "(1I8)" pixels for healpix, resolution of "(1F12.3)" degrees")') n_rayons,  healpix_angular_resolution(healpix_lorder)
+            call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
+         else if (etape==2) then
+            lng_turned_on = .false.
+            fac_etape = 0.1
+            if (etape_start==1) then
+               precision = min(1e-1,10.0*dpops_max_error)
+            else
+               precision = dpops_max_error
+            endif
+            n_rayons = N_rayons_mc
+            write(*,'(" ****-> Using "(1I4)" rays for Monte-Carlo step, ~resolution of "(1F12.3)" degrees")') n_rayons, 360.0 * sqrt(pi/real(n_rayons))/pi
+            allocate(wmu(n_rayons))
+            wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+         else
+            call error("(n_lte_loop_mali) etape unkown")
+         end if
+         write(*,*) ""
+         call system_clock(count_start,count_rate=time_tick,count_max=time_max)
 
-!             !iterate ng even in Monte Carlo ?!
-!             ! if (lNg_acceleration) then
-!             !    deallocate(ngpop)
-!             !    if (allocated(ng_cur)) deallocate(ng_cur)
-!             !    lNg_acceleration = .false.
-!             ! endif
-!          else
-!             call ("(n_lte_loop_mali) etape unkown")
-!          end if
+         lconverged = .false.
+         lprevious_converged =  lforce_lte
+         lcell_converged(:) = .false.
+         lng_turned_on = .false.
+         n_iter = 0
+         dne = 0.0_dp
+         conv_speed = 0.0
+         conv_acc = 0.0
+         diff_old = 0.0
+         time_iteration = 0.
 
-!          lprevious_converged = lforce_lte
-!          lnotfixed_rays = .not.lfixed_rays
-!          lconverged = .false.
-!          n_iter = 0
-!          dne = 0.0_dp
-!          conv_speed = 0.0
-!          conv_acc = 0.0
+         !***********************************************************!
+         ! *************** Main convergence loop ********************!
+         do while (.not.lconverged)
 
-!          !for this etape, iterate until convergence
-!          do while (.not.lconverged)
+            n_iter = n_iter + 1
+            write(*,'(" *** Iteration #"(1I3)"; step #"(1I1))') n_iter, etape
+            ibar = 0
+            n_cells_done = 0
 
-!             n_iter = n_iter + 1
-!             write(*,*) " -> Iteration #", n_iter, " Step #", etape
-!             ibar = 0
-!             n_cells_done = 0
+            if (lfixed_rays) then
+               stream = 0.0
+               stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+            end if
 
-!             if (lfixed_rays) then
-!                stream = 0.0
-!                stream(:) = (init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT), i=1,nb_proc)
-!             end if
+            max_n_iter_loc = 0
 
-!             max_n_iter_loc = 0
-!           !reset in case of step 3
+            if( n_iterate_ne > 0 ) then
+               l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
+            endif
 
-!             if( n_iterate_ne > 0 ) then
-!                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
-!             endif
+            call progress_bar(0)
+            !$omp parallel &
+            !$omp default(none) &
+            !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
+            !$omp private(l_iterate,weight,diff,lconverged_loc,n_iter_loc)&
+            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
+            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,max_n_iter_loc) &
+            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne)
+            !$omp do schedule(static,omp_chunk_size)
+            do icell=1, n_cells
+               !$ id = omp_get_thread_num() + 1
+               l_iterate = (icompute_atomRT(icell)>0)
 
-!             call progress_bar(0)
-!             !$omp parallel &
-!             !$omp default(none) &
-!             !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02, la, dM, dN, dN1,imu,iphi)&
-!             !$omp shared()
-!             !$omp do schedule(static,omp_chunk_size)
-!             do icell=1, n_cells
-!                !$ id = omp_get_thread_num() + 1
-!                l_iterate = (icompute_atomRT(icell)>0)
+               if (l_iterate) then
 
-!                if (l_iterate) then
+                  !also init atom%Gamma
+                  call init_rates(id,icell)
 
+                  if (etape==1) then
 
-!                 call fill_Collision_matrix(id, icell) !computes = C(i,j) before computing rates
-!                 call initGamma(id) !init Gamma to C and init radiative rates
-!                 !psi(:,iray,id) = 0.0_dp !no use full here
-
-
-!                 if ( etape == 2) then !ray-by-ray, n_rayons fixed
-!                    ! Position aleatoire dans la cellule
-!                    do iray=iray_start, iray_start-1+n_rayons
-
-
-!                       rand  = sprng(stream(id))
-!                       rand2 = sprng(stream(id))
-!                       rand3 = sprng(stream(id))
-
-!                       call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
-
-!                       ! Direction de propagation aleatoire
-!                       rand = sprng(stream(id))
-!                       W0 = 2.0_dp * rand - 1.0_dp !nz
-!                       W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
-!                       SRW02 = sqrt(W02)
-!                       rand = sprng(stream(id))
-!                       ARGMT = PI * (2.0_dp * rand - 1.0_dp)
-!                       U0 = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
-!                       V0 = SRW02 * sin(ARGMT) !ny = sin(theta)*sin(phi)
-
-!                       call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)
-
-!                       if (lelectron_scattering.and..not.lfixed_j) then
-!                          Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) / n_rayons
-!                       endif
-
-!                       !for one ray
-!                       if (.not.lforce_lte) then
-!                          call cross_coupling_terms(id, icell, 1)
-!                          call calc_rates_mali(id, icell, 1, 1.0_dp / real(n_rayons,kind=dp))
-!                       endif
-
-!                       if (loutput_Rates) then
-!                          !need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-!                          call store_radiative_rates_mali(id, icell,(iray==1), 1.0_dp / real(n_rayons,kind=dp), &
-!                            Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
-!                       endif
+                     !cell centre
+                     if (lvoronoi) then
+                        x0 = Voronoi(icell)%xyz(1)
+                   	   y0 = Voronoi(icell)%xyz(2)
+                   	   z0 = Voronoi(icell)%xyz(3)
+                     else
+                   	   x0 = r_grid(icell)*cos(phi_grid(icell))
+                   	   y0 = r_grid(icell)*sin(phi_grid(icell))
+                   	   z0 = z_grid(icell)
+                     endif
 
 
-!                    enddo !iray
+                     do iray=1, n_rayons
+
+                        w0 = xmu(iray)
+                        u0 = xmux(iray)
+                        v0 = xmuy(iray)
+
+                        weight = wmu(iray)
+
+                        !for one ray
+                        if (.not.lforce_lte) then
+                           !-> cannot compute radiative rates here if lforce_lte
+                           call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,1,labs,n_lambda,tab_lambda_nm)
+                           call xcoupling(id, icell,1, .false.)
+                           call accumulate_radrates_mali(id, icell,1, weight)
+                        endif
+
+                     enddo
 
 
-!                 else if (etape==3) then	!accumulate rays, n_rayons not fixed
+                  elseif ( etape == 2) then
+                   ! Position aleatoire dans la cellule
+                     do iray=1,n_rayons
 
-!                    do iray=iray_start, iray_start-1+n_rayons !for the new added rays
+                        rand  = sprng(stream(id))
+                        rand2 = sprng(stream(id))
+                        rand3 = sprng(stream(id))
 
+                        call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
 
-!                       rand  = sprng(stream(id))
-!                       rand2 = sprng(stream(id))
-!                       rand3 = sprng(stream(id))
+                        ! Direction de propagation aleatoire
+                        rand = sprng(stream(id))
+                        W0 = 2.0_dp * rand - 1.0_dp !nz
+                        W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
+                        SRW02 = sqrt(W02)
+                        rand = sprng(stream(id))
+                        ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+                        U0 = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
+                        V0 = SRW02 * sin(ARGMT) !ny = sin(theta)*sin(phi)
 
-!                       call  pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+                        weight = wmu(iray)
 
-!                       ! Direction de propagation aleatoire
-!                       rand = sprng(stream(id))
-!                       W0 = 2.0_dp * rand - 1.0_dp !nz
-!                       W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
-!                       SRW02 = sqrt(W02)
-!                       rand = sprng(stream(id))
-!                       ARGMT = PI * (2.0_dp * rand - 1.0_dp)
-!                       U0 = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
-!                       V0 = SRW02 * sin(ARGMT) !ny = sin(theta)*sin(phi)
+                        !for one ray
+                        if (.not.lforce_lte) then
+                           call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,1,labs,n_lambda,tab_lambda_nm)
+                           call xcoupling(id, icell,1, .false.)
+                           call accumulate_radrates_mali(id, icell,1, weight)
+                        endif
 
+                     enddo !iray
+                  else
+                     call error("etape inconnue")
+                  end if !etape
 
-!                       call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, iray, labs)
+                  call rate_matrix(id)
+                  call update_populations(id, icell, (l_iterate_ne.and.icompute_atomRT(icell)==1), diff)
 
-!                    enddo !iray
+                  ! n_iter_loc = 0
+                  ! lconverged_loc = .not.lsubiteration
+                  ! npl(1:hydrogen%Nlevel,1,id) = hydrogen%n(:,icell)
+                  ! !this is n_new that is to be updated here, not atom%n ! ("old pops")
+                  ! do while (.not.lconverged_loc)
+                  !    n_iter_loc = n_iter_loc + 1
 
-!                    !for all rays accumulated
-!                    do iray=1, n_rayons !for all
-!                       if (lelectron_scattering.and..not.lfixed_j) then
-!                          Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,iray,id) / n_rayons
-!                       endif
+                  !    hydrogen%n(:,icell) = n_new(1:hydrogen%Nlevel,1,icell)
 
-!                       !for one ray
-!                       if (.not.lforce_lte) then
-!                          call cross_coupling_terms(id, icell, iray)
-!                          call calc_rates_mali(id, icell, iray, 1.0_dp / real(n_rayons,kind=dp))
-!                       endif
+                  !    !psi is updated.
+                  !    !currenlty includes only the lines opacity!
+                  !    !loop over rays of this step (not n_rayons_sub)
+                  !    do iray=1,n_rayons
+                  !       call xcoupling(id, icell, iray, .true.)
+                  !       call accumulate_radrates_mali(id, icell, iray, weight)                        
+                  !    enddo
+                  !    call rate_matrix(id)
+                  !    !electronic density fixed for the sub-iterations (because it is already an iterative loop)
+                  !    !do the electron density iterations after the sub-iterations ??
+                  !    call update_populations(id, icell,.false.,diff)
 
-!                       !might not work cause profile of iray==1 always used
-!                       if (loutput_Rates) then
-!                          call store_radiative_rates_mali(id, icell, (iray==1), 1.0_dp / &
-!                               real(n_rayons,kind=dp), Nmaxtr, Rij_all(:,:,icell), Rji_all(:,:,icell))
-!                       endif
-!                    enddo
+                  !    ! write(*,*) "subit:", id, n_iter_loc, diff
+                  !    if (real(diff) < dpops_sub_max_error) lconverged_loc = .true.
 
-!                 elseif (etape==1) then !ray-by-ray, n_rayons fixed
+                  !    if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
+                  !    if (n_iter_loc == maxIter_loc) lconverged_loc = .true.
+                  ! enddo
+                  ! hydrogen%n(:,icell) = npl(1:hydrogen%Nlevel,1,id)
 
-!                    if (lvoronoi) then
-!                    	x0 = Voronoi(icell)%xyz(1)
-!                    	y0 = Voronoi(icell)%xyz(2)
-!                    	z0 = Voronoi(icell)%xyz(3)
-!                    else
-!                    	x0 = r_grid(icell)*cos(phi_grid(icell))
-!                    	y0 = r_grid(icell)*sin(phi_grid(icell))
-!                    	z0 = z_grid(icell)
-!                    endif
+                  ! if ( (lNg_acceleration .and. lng_turned_on).and.&
+                  !       (maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
 
-!                    do imu=1, size(xmu)
+                  ! endif
 
-!                       w0 = xmu(imu)
-!                       u0 = xmux(imu)
-!                       v0 = xmuy(imu)
-
-!                       weight = wmu(imu)
-
-!                       call integ_ray_line(id, icell, x0, y0, z0, u0, v0, w0, 1, labs)
-
-!                       if (lelectron_scattering.and..not.lfixed_j) then
-!                          Jnew_cont(:,icell) = Jnew_cont(:,icell) + Icont(:,1,id) * weight
-!                          !!psi_mean(:,icell) = psi_mean(:,icell) + chi_loc(:,1,id) * psi(:,1,id) * weight
-!                       endif
-
-!                       !for one ray
-!                       if (.not.lforce_lte) then
-!                          call cross_coupling_terms(id, icell, 1)
-!                          call calc_rates_mali(id, icell, 1, weight)
-!                       endif
-
-!                       if (loutput_Rates) then
-!                          !need to take into account the fact that for MALI no quandities are store for all ray so Rij needs to be computed ray by ray
-!                          call store_radiative_rates_mali(id, icell, (imu==1), weight, Nmaxtr, &
-!                               Rij_all(:,:,icell), Rji_all(:,:,icell))
-!                       endif
-
-
-!                    enddo !imu
-!                 end if !etape
-
-!                 call calc_rate_matrix(id, icell, lforce_lte)
-! !                 call update_populations(id, icell, diff, .false., n_iter)
-!                 call update_populations_and_electrons(id, icell, diff, .false., n_iter, &
-!                      (l_iterate_ne.and.icompute_atomRT(icell)==1))!The condition on icompute_atomRT is here because if it is > 0 but /= 1, ne is not iterated!
-
-!                 n_iter_loc = 0
-!                 if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
-
-!                 if (loutput_Rates) then
-!                    call store_rate_matrices(id,icell,Nmaxlevel,Gammaij_all(:,:,:,icell))
-!                 endif
-
-!              end if !icompute_atomRT
+               end if !icompute_atomRT
              
-!              ! Progress bar
-!              !$omp atomic
-!              n_cells_done = n_cells_done + 1
-!              if (real(n_cells_done) > 0.02*ibar*n_cells) then
-!              	call progress_bar(ibar)
-!              	!$omp atomic
-!              	ibar = ibar+1
-!              endif             
+               ! Progress bar
+               !$omp atomic
+               n_cells_done = n_cells_done + 1
+               if (real(n_cells_done) > 0.02*ibar*n_cells) then
+             	   call progress_bar(ibar)
+             	   !$omp atomic
+             	   ibar = ibar+1
+               endif             
              
-!           end do !icell
-!           !$omp end do
-!           !$omp end parallel
-!           call progress_bar(50)
-!           write(*,*) " " !for progress bar
+            end do !icell
+            !$omp end do
+            !$omp end parallel
+            call progress_bar(50)
+            write(*,*) " " !for progress bar
 
-!           !Ng acceleration
-!           !should be para
-!           accelerated = .false.
-! !           if ( (lNg_acceleration .and. ((n_iter > iNg_Ndelay).and.(maxval(dM) < 1d-2))).and. &
-! !                (maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
-! !           if ( (lNg_acceleration .and. (n_iter > iNg_Ndelay)).and.(maxval_cswitch_atoms()==1.0_dp)&
-! !           	.and.(.not.lprevious_converged) ) then
-!           if ( (lNg_acceleration .and. lng_turned_on).and.(maxval_cswitch_atoms()==1.0_dp)&
-!           	.and.(.not.lprevious_converged) ) then
-!              iorder = n_iter - iNg_Ndelay
-!              if (ng_rest) then
-!                 write(*,'(" -> Acceleration relaxes... "(1I2)" /"(1I2))') iorder-i0_rest, iNg_Nperiod
-!                 if (iorder-i0_rest == iNg_Nperiod) ng_rest = .false.
-!              else
-!                 !Still, all atoms run at the same speed
-!                 i0_rest = iorder
-!                 iacc = iacc + 1
-!                 write(*,'(" -> Accumulate solutions... "(1I2)" /"(1I2))') iacc, iNg_Norder+2
-!                 do nact=1,NactiveAtoms
-!                    atom => ActiveAtoms(nact)%ptr_atom
-!                    allocate(ng_cur(n_cells * atom%Nlevel)); ng_cur(:) = 0.0_dp
-!                    ng_cur = flatten2(atom%Nlevel, n_cells,n_new(nact,1:atom%Nlevel,:))
-!                    !has to be parallel in the future
+            !***********************************************************!
+            ! ************************** Ng's **************************!
+ 
+            !***********************************************************!
+            ! ******************* checkpointing ************************!
 
-!                    !for many atoms, increment niter only with the first one, as they go at the same speed.
-!                    accelerated = ng_accelerate(iacc, ng_cur, n_cells * atom%Nlevel, iNg_Norder, &
-!                         ngpop(1:atom%Nlevel*n_cells,:,nact), check_negative_pops=.false.)
-                        
-!                     !if check_negative_pops is present :
-!                     ! if .true., negative pops raise an error.
-!                     ! if .false. should I cancel the acceleration ?
-!                     !if not present, there is no checking nor handling.
+            !***********************************************************!
+            ! *******************  update ne metals  *******************!
 
-!                    if (accelerated) then
-!                       !-> only reshape because we only print accelerated iteration for all atoms at once
-!                       n_new(nact, 1:atom%Nlevel,:) = reform2(atom%Nlevel, n_cells, ng_cur)
-!                    endif
+            !-> evaluate ne for other non-LTE atoms not included in the non-LTE ionisation scheme ?
+            !with fixed non-LTE populations and non-LTE contributions
+            if (l_iterate_ne) then
+               !add in solve_ne_loc cell-by-cell
+               !add in other atom in non_lte_charge_conservation only for the ionisation frac.
+               !evaluate non-lte donors other than h + he
+               !update lte opac and related quantities
+               !damping and profiles for instance
+               !re update nHmin(icell) = nH_minus(icell)
 
-!                    deallocate(ng_cur)
-!                    atom => NULL()
-!                 enddo
-!                 !for all atoms should be accelerated at the same time
-!                 if (accelerated) then
-!                    n_iter_accel = n_iter_accel + 1 !True number of accelerated iter
-!                    write(*,'("     ++> Ng iteration #"(1I4))') n_iter_accel
-!                    ng_rest = (iNg_Nperiod > 0)!.true.
-!                    iacc = 0
-!                 endif
+            end if
 
-!              endif
-!           endif
+            !***********************************************************!
+            ! ****************  Convergence checking  ******************!
 
-!           if ((mod(n_iter, checkpoint_period)==0).and.(lcheckpoint)) then
-!              do nact=1, NactiveAtoms
-!                 call write_pops_atom(ActiveAtoms(nact)%ptr_atom,iter=n_iter,step=etape)
-!              enddo
-!           endif
+            id = 1
+            dM(:) = 0.0 !all pops
+            diff_cont = 0
+            diff = 0.0
+            !$omp parallel &
+            !$omp default(none) &
+            !$omp private(id,icell,l_iterate,dN1,dN,ilevel,nact,atom)&
+            !$omp shared(diff, diff_cont, dM,n_new,Activeatoms,lcell_converged)&
+            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot)
+            !$omp do schedule(dynamic,1)
+            cell_loop2 : do icell=1,n_cells
+               !$ id = omp_get_thread_num() + 1
+               l_iterate = (icompute_atomRT(icell)>0)
 
-!           !-> evaluate ne for other non-LTE atoms not included in the non-LTE ionisation scheme ?
-!           !with fixed non-LTE populations and non-LTE contributions
-!           update_bckgr_opac = .false.
-!           if (l_iterate_ne) then
+               if (l_iterate) then
 
-!              !update ne from non-LTE ionisation
-!              !-> no because dne need tu be zeroed for each new iteration of all ne.
-!              ! 					dne = max(dne, maxval(abs(1.0 - ne(:)/(ne_new(:)+1d-50))))
-!              dne = maxval(abs(1.0 - ne(:)/(ne_new(:)+1d-50)),mask=icompute_atomRT==1)
-!              ! 					dne = 0
-!              ! 					do icell=1,n_cells
-!              ! 						if (icompute_atomRT(icell)) then
-!              ! 							dne = max(dne, abs(1.0 - ne(icell)/ne_new(icell)))
-!              ! 						endif
-!              ! 					enddo
-!              write(*,'("OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
-!                minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
-!              write(*,'("NEW ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
-!                minval(ne_new,mask=(icompute_atomRT>0)), maxval(ne_new)
+                  !Local only
+                  dN = 0.0 !for all levels of all atoms of this cell
+                  do nact=1,NactiveAtoms
+                     atom => ActiveAtoms(nact)%p
 
-!              ne(:) = ne_new(:)
-!              !-> For all elements use the old version
-! !!! WARNING NOT TESTED YET 05 April 2021 !!!!
-!              if ( update_ne_other_nlte ) then
-!                 if (helium_is_active .or. hydrogen%active) then
-!                    call warning("old ne recipe for non-LTE metals not tested yet!")
-!                 endif
-!                 call solve_electron_density(ne_start_sol, .true., dne)
-!              endif
-
-!              do nact=1, Natom
-!                 if (Atoms(nact)%ptr_atom%ID=="H") then
-!                    write(*,*) " -> updating LTE pops of hydrogen"
-!                    call LTEpops_H
-!                    !check pops actually are updated ??
-!                 else
-!                    write(*,*) " -> updating LTE pops of ",Atoms(nact)%ptr_atom%ID
-!                    call LTEpops(Atoms(nact)%ptr_atom,.false.)
-!                 endif
-!              enddo
-!              write(*,*) ''
-
-!              update_bckgr_opac = .true.
-!           end if
-
-!           !Global convergence Tests
-!           id = 1
-!           !should be para
-!           dM(:) = 0.0 !all pops
-!           diff_cont = 0
-!           !add a dpops cont ?
-!           diff = 0.0
-!           dJ = 0.0
-!           lambda_max = 0.0
-!           dT = 0.0
-!           dTM(:) = 0.0 !all temperature (ion+line)
-!           Tex_ref(:) = 0.0
-!           Tion_ref(:) = 0.0
-!           icell_max = 1
-!           icell_max_2 = 1
-!           !for all cells
-!           dN2 = 0.0 !among all Tex
-!           dN4 = 0.0 !among all Tion
-!           cell_loop2 : do icell=1,n_cells
-
-!              l_iterate = (icompute_atomRT(icell)>0)
-
-!              if (l_iterate) then
-
-!                 !Local only
-!                 dN = 0.0 !for all levels of all atoms of this cell
-!                 ! 						dN2 = 0.0 !among all Tex
-!                 ! 						dN4 = 0.0 !among all Tion
-
-!                 ! 						write(*,'(1I4, 1F14.4, 2ES17.8E3)') icell, T(icell), ne(icell), nHtot(icell)
-!                 do nact=1,NactiveAtoms
-!                    atom => ActiveAtoms(nact)%ptr_atom
-
-!                    do ilevel=1,atom%Nlevel
-!                       ! 								write(*,'(1I2, " fne="(1L1)," fntot="(1L1))') ilevel, n_new(nact,ilevel,icell) >= frac_ne_limit * ne(icell), n_new(nact,ilevel,icell) >= frac_limit_pops * ntotal_atom(icell, atom)
-!                       ! 								write(*,'("--> n="(1ES17.8E3)," fne="(1ES17.8E3)," fntot="(1ES17.8E3))') n_new(nact,ilevel,icell), frac_ne_limit * ne(icell), frac_limit_pops * ntotal_atom(icell, atom)
-!                       ! 								write(*,'("--> n/ne="(1ES17.8E3)," n/ntot="(1ES17.8E3))') n_new(nact,ilevel,icell) / ne(icell), n_new(nact,ilevel,icell) / ntotal_atom(icell, atom)
-!                       ! 								write(*,*) " "
-!                       ! 								if ( n_new(nact,ilevel,icell) >= frac_ne_limit * ne(icell) ) then
-!                       if ( n_new(nact,ilevel,icell) >= frac_limit_pops * ntotal_atom(icell, atom) ) then
-!                          dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
-!                          ! 									dn1 = abs(-2*atom%n(ilevel,icell) + n_new(nact,ilevel,icell) + gpop_old(nact,ilevel,icell)) /  n_new(nact,ilevel,icell)
-!                          dN = max(dN1, dN)
-!                          dM(nact) = max(dM(nact), dN1)
-!                       endif
-!                       !convergence_map(icell, ilevel, nact, etape) = dN1
-!                    end do !over ilevel
-!                    diff_cont = max(diff_cont, abs(1.0 - atom%n(atom%Nlevel,icell)/(1d-50 + n_new(nact,atom%Nlevel,icell) )))
-!                    ! 							diff_cont = max(diff_cont, abs(-2*atom%n(atom%Nlevel,icell) + n_new(nact,atom%Nlevel,icell) + gpop_old(nact,atom%Nlevel,icell)) / n_new(nact,atom%Nlevel,icell))
-
-!                    !I keep negative Temperatures for info.debug.
-!                    !hence the /= 0.0. But, some work should be done in update_pops and compute_Tex
-!                    do kr=1, atom%Nline
-
-!                       if (atom%lines(kr)%Tex(icell) /= 0.0_dp) then
-!                          dN3 = abs(1.0 - Tex_old(nact, kr, icell) /  atom%lines(kr)%Tex(icell) )
-!                          dN2 = max(dN3,dN2)
-!                          dTM(nact) = max(dTM(nact), dN3)
-!                          if (dN3 >= dN2) then
-!                             Tex_ref(nact) = atom%lines(kr)%Tex(icell)
-!                             icell_max = icell
-!                          endif
-!                       endif
-
-!                    enddo
-
-!                    do kr=1, atom%Ncont
-
-!                       if ( atom%continua(kr)%Tex(icell) /= 0.0_dp) then
-!                          dN3 = abs(1.0 - Tex_old(nact, kr+atom%Nline, icell) /  atom%continua(kr)%Tex(icell) )
-!                          dN4 = max(dN3,dN4)
-!                          dTM(nact) = max(dTM(nact), dN3)
-!                          if (dN3 >= dN4) then
-!                             Tion_ref(nact) = atom%continua(kr)%Tex(icell)
-!                             icell_max_2 = icell
-!                          endif
-!                       endif
-
-!                    enddo
-
-!                    atom => NULL()
-!                 end do !over atoms
-
-!                 !compare for all atoms and all cells
-!                 diff = max(diff, dN) ! pops
-!                 ! 						diff = max(diff, dN2) ! Texi, only lines
+                     do ilevel=1,atom%Nlevel
+                        if ( n_new(nact,ilevel,icell) >= frac_limit_pops * atom%Abund*nHtot(icell) ) then
+                           dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
+                           dN = max(dN1, dN)
+                           dM(nact) = max(dM(nact), dN1)
+                        endif
+                     end do !over ilevel
+                     diff_cont = max(diff_cont, abs(1.0 - atom%n(atom%Nlevel,icell)/(1d-50 + n_new(nact,atom%Nlevel,icell) )))
 
 
-!                 !do not update if lfixed_J
-!                 if (lelectron_scattering.and..not.lfixed_j) then
-!                    do la=1, Nlambda_cont
-!                       dN1 = abs( 1.0_dp - Jnu_cont(la,icell)/Jnew_cont(la,icell) )
-!                       ! 								if (Jnu(la,icell) > 0.0_dp) then
-!                       ! 									dN1 = abs( (Jnew(la,icell) - Jnu(la,icell))/Jnu(la,icell) )
-!                       ! 								endif
-!                       if (dN1 > dJ) then
-!                          dJ = dN1
-!                          lambda_max = lambda_cont(la)
-!                       endif
-!                       !updating
-!                       Jnu_cont(la,icell) = Jnew_cont(la,icell)
-!                    enddo
+                     atom => NULL()
+                  end do !over atoms
 
-!                 endif
+                  !compare for all atoms and all cells
+                  diff = max(diff, dN) ! pops
+                  lcell_converged(icell) = (real(diff) < precision)!.and.(dne < precision)
 
-!                 lcell_converged(icell) = (real(diff) < precision)!.and.(dne < precision)
+                  !Re init for next iteration if any
+                  do nact=1, NactiveAtoms
+                     atom => ActiveAtoms(nact)%p
+                     atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
+                     atom => NULL()
+                  end do
 
-!                 !Re init for next iteration if any
-!                 do nact=1, NactiveAtoms
-!                    atom => ActiveAtoms(nact)%ptr_atom
-!                    ! 							gpop_old(nact, 1:atom%Nlevel,icell) = atom%n(:,icell)
-!                    atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
-!                    do kr=1,atom%Nline
-!                       Tex_old(nact, kr, icell) = atom%lines(kr)%Tex(icell)
-!                    enddo
-!                    do kr=1, atom%Ncont
-!                       Tex_old(nact, kr+Atom%Nline,icell) = atom%continua(kr)%Tex(icell)
-!                    enddo
-!                    !if (.not.lfix_backgrnd_opac) then
-!                    ! !evalute LTE here ?? if so, need a local version of lte pops.
-!                    ! !or store the populations nstar in a new array?
-!                    ! recompute profiles or damping
-!                    !
-!                    !endif
-!                    atom => NULL()
-!                 end do
-
-!                 !update only if ne has been iterated at this iteration
-!                 !move elsewhere if electron density is iterated with SEE
-!                 if (update_bckgr_opac) then
-!                    !safe, used only if not lfixbackground
-!                    nHmin(icell) = nH_minus(icell)
-!                    ! 							call compute_atom_quantities(icell)
-!                    !evaluate profiles anyway ?
-!                    !if I recompute all background continua ?  and damping ? evaluate damping locally ?
-!                    if (.not.lfix_backgrnd_opac) then!only ne changes
-!                       !-> this evaluate profiles or damping but also continuum quantities not needed ???
-!                       !-> do not check ni-njgij < 0 because a non converged state can lead to inversion of populations
-!                       ! modify it to update only nlte quantities ?
-!                       call compute_atom_quantities(icell)
-!                       call background_continua_lambda(icell, Nlambda_cont, lambda_cont, chi_c(:,icell), eta_c(:,icell))
-!                       !or just re evaluate ne in chi_c like chi_c -ne_old + ne_new
-!                    endif
-!                 endif
-
-!                 call NLTE_bound_free(icell)
-
-!                 !because of opac nlte changed
-!                 if (.not.llimit_mem) then
-!                    call interp_continuum_local(icell, chi0_bb(:,icell), eta0_bb(:,icell))
-!                 endif
-!                 !end init
-
-
-!              end if !if l_iterate
-!           end do cell_loop2 !icell
-!           write(*,'("  ---> dnHII="(1ES17.8E3))') diff_cont  
-!           !backward derivative
-!           if (n_iter > 1) then
-!           	conv_speed = (diff - diff_old) !<0 converging.
-!           	conv_acc = conv_speed - conv_acc !>0 accelerating
-!           endif
-!           !!a more dynamic criterion should be use, that also depends on the atom.
-!           if (ldamp_jacobi) then
-!           	!conv_speed is negative if we converge!
-!           	if (conv_speed <= 0) then
-!           		if (-conv_speed < 1d-4) then
-!           			omega_sor_atom(:) = 1.8
-!           		else
-!           			omega_sor_atom(:) = 1.0
-!           		endif
-!           	else
-!           		if (conv_speed > 5) then
-!           			omega_sor_atom(:) = 0.8
-!           		else
-!           			omega_sor_atom(:) = 1.0
-!           		endif
-!           	endif
-!           endif
+               end if !if l_iterate
+            end do cell_loop2 !icell
+            !$omp end do
+            !$omp end parallel
+  
+            if (n_iter > 1) then
+               conv_speed = (diff - diff_old) !<0 converging.
+               conv_acc = conv_speed - conv_acc !>0 accelerating
+            endif
           
-!           if (lng_acceleration) then
-!           	!be sure we are converging before extrapolating
-!           	if ( (n_iter>1).and.(conv_speed <= 0).and.(-conv_speed < 1d-3) ) then
-!           		if (.not.lng_turned_on) then
-!           			lng_turned_on = .true.
-!           			iNg_Ndelay = n_iter
-!           		endif
-!           	endif
-!           endif
 
-!           if (maxval(max_n_iter_loc)>0) write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
-!           write(*,'(" -> icell_max1 #"(2I6)," icell_max2 #"(2I6))') icell_max, icell_max_2
-!           write(*,*) " ------------------------------------------------ "
-!           do nact=1,NactiveAtoms
-!              write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%ptr_atom%ID
-!              if (accelerated) then
-!                 write(*,'("   >>> dpop="(1ES17.8E3)" (Accelerated)")') dM(nact)
-!              else
-!                 write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
-!              endif
-!              write(*,'("   >>>   dT="(1ES17.8E3))') dTM(nact)
-!              write(*,'("    --->   dT(line)="(1ES17.8E3), " dT(cont)="(1ES17.8E3))') dN2, dN4
-!              write(*,'("    ->> Te(icell_max2)="(1F14.4)" K", " Tion="(1F14.4)" K")') T(icell_max_2), Tion_ref(nact)
-!              write(*,'("    ->> Te(icell_max1)="(1F14.4)" K", " Texi="(1F14.4)" K")') T(icell_max), Tex_ref(nact)
-!              write(*,*) " ------------------------------------------------ "
-!           enddo
-!           if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
-!           if (dJ /= 0.0_dp)  write(*,'("   >>> dJ="(1ES14.5E3)" @"(1F14.4)" nm")') dJ, lambda_max !at the end of the loop over n_cells
-!           write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old !at the end of the loop over n_cells
-!           write(*,'("   ->> speed="(1ES17.8E3)"; acc="(1ES17.8E3))') conv_speed, conv_acc
-!           write(*,"('Unconverged cells #'(1I6), ' fraction :'(1F12.3)' %')") &
-!                size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0))), &
-!                100.*real(size(pack(lcell_converged,mask=(lcell_converged.eqv..false.).and.(icompute_atomRT>0)))) / &
-!                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
-!           write(*,*) " *************************************************************** "
-!           diff_old = diff
-!           conv_acc = conv_speed
+            if (maxval(max_n_iter_loc)>1) write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
+            do nact=1,NactiveAtoms
+               write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%p%ID
+               write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
+            enddo
+            if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
+            write(*,*) ""
+            write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old
+            write(*,'("   ->> diffcont="(1ES17.8E3))') diff_cont
+            write(*,'("   ->> speed="(1ES17.8E3)"; acc="(1ES17.8E3))') conv_speed, conv_acc
+            write(*,"('   ->> Unconverged cells #'(1I6), ' fraction :'(1F12.3)' %')") &
+               size(pack(lcell_converged,mask=(lcell_converged==.false.).and.(icompute_atomRT>0))), &
+               100.*real(size(pack(lcell_converged,mask=(lcell_converged==.false.).and.(icompute_atomRT>0)))) / &
+               real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
+            write(*,*) "      -------------------------------------------------- "
+            diff_old = diff
+            conv_acc = conv_speed
                
 
-!           ! 				write(*,*) " set lprevious_converged to true for test"
-!           ! 				lprevious_converged = .true.
+            if ((diff < precision).and.maxval_cswitch_atoms()==1.0_dp)then
+               if (lprevious_converged) then
+                  lconverged = .true.
+               else
+                  lprevious_converged = .true.
+               endif
+            else
+               lprevious_converged = .false.
+               if ((lcswitch_enabled).and.(maxval_cswitch_atoms() > 1.0_dp)) then
+                  call adjust_cswitch_atoms()
+               endif
+               if (n_iter > maxIter) then
+                  call warning("not enough iterations to converge !!")
+                  lconverged = .true.
+               end if
+            end if
 
-!           !(real(dne) < precision).and.
-!           if ((real(diff) < precision).and.(maxval_cswitch_atoms() == 1.0_dp)) then
-!              if (lprevious_converged) then
-!                 lconverged = .true.
-!              else
-!                 lprevious_converged = .true.
-!              endif
-!           else !continue to iterate even if n_rayons max is reached ?
-!              lprevious_converged = .false.
-!              if ((cswitch_enabled).and.(maxval_cswitch_atoms() > 1.0)) then
-!                 call adjust_cswitch_atoms
-!              endif
-!              if (.not.lfixed_rays) then !step 3 only
-!                 n_rayons = n_rayons * 2
-!                 write(*,*) ' -- Increasing number of rays :', n_rayons
-!                 if (n_rayons > n_rayons_max) then
-!                    if (n_iter >= maxIter) then
-!                       write(*,*) "Warning : not enough rays to converge !!"
-!                       lconverged = .true.
-!                    end if
-!                 end if
-!              else !steps < 3
-!                 if (n_iter > 1000) then
-!                    write(*,*) "Warning : not enough iterations to converge !!"
-!                    lconverged = .true.
-!                 end if
-!              end if
-!           end if
+            !***********************************************************!
+            ! **********  Ng's acceleration administration *************!
 
-!           !***********************************************************!
-!           ! ********** timing and checkpointing **********************!
+            if (lng_acceleration) then
+          	!be sure we are converging before extrapolating
+          	   if ( (n_iter>1).and.(conv_speed <= 0).and.(-conv_speed < 1d-3) ) then
+          		   if (.not.lng_turned_on) then
+          			   lng_turned_on = .true.
+          			   Ng_Ndelay = n_iter
+          		   endif
+            	endif
+            endif
 
-!           call system_clock(time_end,count_rate=time_tick,count_max=time_max)
-!           if (time_end < time_begin) then
-!              time_nlte=real(time_end + (1.0 * time_max)- time_begin)/real(time_tick)
-!           else
-!              time_nlte=real(time_end - time_begin)/real(time_tick)
-!           endif
+            !***********************************************************!
+            ! ********** timing and checkpointing **********************!
 
-!           if (n_iter <= n_iter_counted) then
-!              time_iteration = time_iteration + time_nlte / real(n_iter_counted)
-!           endif
+            call system_clock(count_end,count_rate=time_tick,count_max=time_max)
+            if (count_end < count_start) then
+               time_nlte=real(count_end + (1.0 * time_max)- count_start)/real(time_tick)
+            else
+               time_nlte=real(count_end - count_start)/real(time_tick)
+            endif
 
-
-!           if (lsafe_stop) then
-
-!              if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= n_iter_counted)) then
-!                 lconverged = .true.
-!                 lprevious_converged = .true.
-!                 call warning("Time limit would be exceeded, leaving...")
-!                 write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
-!                 write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', &
-!                      mod(time_iteration/60.,60.)," min"
-!                 write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
-!                 write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
-!                 lexit_after_nonlte_loop = .true.
-!                 !lsafe_stop only would leave the code even if the time is below the walltime
-!                 exit step_loop
-!              endif
-
-!           endif
-!           !***********************************************************!
-
-!        end do !while
-!        write(*,*) "step: ", etape, "Threshold: ", precision!dpops_max_error
-!        !real values are possible, not needed and would increase the amount
-!        !of lign of codes.
-!        if (n_iter >= n_iter_counted) then
-!           write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', mod(time_iteration/60.,60.)," min"
-!           write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
-!        endif
-
-!     end do step_loop
-
-!     ! -------------------------------- CLEANING ------------------------------------------ !
-
-!     if (lNg_acceleration) then
-!        if (allocated(ngpop)) deallocate(ngpop)
-!        if (allocated(ng_cur)) deallocate(ng_cur)
-!     endif
-    
-!     if (ldamp_jacobi) then
-!     	deallocate(omega_sor_atom)
-!     endif
+            !average time of a single iteration for this step !
+            if (n_iter <= n_iter_counted) then
+               time_iteration = time_iteration + time_nlte / real(n_iter_counted)
+            endif
 
 
-!     if (allocated(xyz_pos)) then
-!        ! 			open(unit=20,file="xyz_pos.txt",status="unknown")
-!        ! 			write(20,*) 1, 1
-!        ! 			write(20,*) 1627, cell_map_i(1627), cell_map_j(1627), cell_map_k(1627)
-!        ! 			do iray=1,1
-!        ! 				write(20,'(*(1E20.7E3))') (xyz_pos(i,iray,1),i=1,3)
-!        ! 			enddo
-!        ! 			close(20)
-!        ! 			open(unit=20,file="uvw_pos.txt",status="unknown")
-!        ! 			write(20,*) 1, size(xmu), size(xmu)/8
-!        ! 			do imu=1,size(xmu)
-!        ! 				write(20,'(*(1E20.7E3))') (uvw_pos(i,imu,1),i=1,3)
-!        ! 			enddo
-!        ! 			close(20)
-!     endif
+            if (lsafe_stop) then
+               if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= n_iter_counted)) then
+                  lconverged = .true.
+                  lprevious_converged = .true.
+                  call warning("Time limit would be exceeded, leaving...")
+                  write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
+                  write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', &
+                                                mod(time_iteration/60.,60.)," min"
+                  write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+                  write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
+                  lexit_after_nonlte_loop = .true.
+                  exit step_loop
+               endif
+            endif
 
-! !     if (allocated(threeKminusJ)) then
-! !        !only at id_ref until fits file
-! !        write(*,*) " Writing anisotropy to ascii file..."
-! ! 
-! !        open(unit=20, file="anis_ascii.txt", status="unknown")
-! !        write(20,*) n_cells, 1!Nlambda
-! !        do icell=1, n_cells
-! !           !do la=1, Nlambda
-! !           do la=id_ref,id_ref
-! !              write(20,'(1F12.5,5E20.7E3)') lambda(la), threeKminusJ(la,icell), 0.0, 0.0, 0.0, 0.0
-! !           enddo
-! !        enddo
-! !        close(20)
-! !        write(*,*) "done"
-! !        deallocate(threeKminusJ)
-! !     endif
-!     if (allocated(psi_mean)) then
-!        write(*,*) " Writing <Psi> to ascii file..."
-!        open(unit=20, file="psim_ascii.txt", status="unknown")
-!        write(20,*) n_cells, Nlambda
-!        do icell=1, n_cells
-!           do la=1, Nlambda
-!              write(20,'(1F12.5,5E20.7E3)') lambda(la), psi_mean(la,icell), 0.0, 0.0, 0.0, 0.0
-!           enddo
-!        enddo
-!        close(20)
-!        write(*,*) "done"
-!     endif
+         !***********************************************************!
+         !***********************************************************!
 
-!     if (allocated(convergence_map)) then
-!        do nact=1, NactiveAtoms
-!           call write_convergence_map_atom(ActiveAtoms(nact)%ptr_atom, etape_end, &
-!                convergence_map(:,1:ActiveAtoms(nact)%ptr_atom%Nlevel, nact, :))
-!        enddo
-!        if (l_iterate_ne) call write_convergence_map_electron(etape_end, convergence_map(:,1,NactiveAtoms+1,:))
-!        deallocate(convergence_map)
-!     endif
+         end do !while
+  
+         if (n_iter >= n_iter_counted) then
+            write(*,'("<time iteration>="(1F6.3)" min; <time step>="(1F6.3)" min")') mod(time_iteration/60.,60.), mod(n_iter * time_iteration/60.,60.)
+            write(*,'(" --> ~time step (cpu)="(1F6.3)" min")') mod(n_iter * time_iteration * nb_proc/60.,60.)
+         endif
 
-!     deallocate(dM, dTM, Tex_ref, Tion_ref)
-!     if (allocated(Jnew_cont)) deallocate(Jnew_cont)
-!     deallocate(psi, chi_up, chi_down, Uji_down, eta_atoms, n_new, ne_new)
-!     deallocate(stream)
-!     if (allocated(xmu)) then
-!       deallocate(xmu,wmu,xmux,xmuy)
-!     endif
+         if (etape==1) deallocate(xmux,xmuy,xmu)
+         if (allocated(wmu)) deallocate(wmu)
 
-!     !!close(unit=unit_invfile)
+         write(*,'("  <step #"(1I1)" done! >>threshold="(1ES17.8E3))') etape,  precision
 
-!     if (n_iterate_ne > 0) then
-!        write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
-!        call write_electron
-!        call write_Hminus
-!     endif
+      end do step_loop
+
+      ! -------------------------------- CLEANING ------------------------------------------ !
+
+      if (n_iterate_ne > 0) then
+         write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+         call write_electron
+      endif
+
+      do nact=1,N_atoms
+         call write_pops_atom(Atoms(nact)%p)
+      end do
 
 
+      call dealloc_nlte_var()
+      deallocate(dM, dTM, Tex_ref, Tion_ref)
+      deallocate(stream,ds)
 
-!       do m=1,N_atoms
-!          call write_pops_atom(Atoms(m)%p)
-!       end do
-
-      !deallocate non-LTE variables and leave.
-      !deallocate Itot. Will be allocated again for images.
-      deallocate(ne_new,psi,eta_atoms,chi_up,chi_down,uji_down,lcell_converged,itot,phi_loc)!n_new)
-      if (allocated(ngpop)) deallocate(ngpop)
+      ! --------------------------------    END    ------------------------------------------ !
+      write(*,*) '-------------------------- ------------ ------------------------------ '
 
       return
    end subroutine nlte_loop_mali
@@ -981,7 +605,7 @@ module atom_transfer
    ! --------------------------------------------------------------------------- !
       integer  :: ne_initial, ibin, iaz, nat
       logical :: lelectron_read
-      real(kind=dp) :: v_char, max_vel_shift, v1, v2
+      real(kind=dp) :: dne, v_char, max_vel_shift, v1, v2
 
       write(*,*) " *** BIG WARNING **** "
       write(*,*) " !!!!! CHECK FOR BILINEAR INTERP in utils.f90 ! !!!!"
@@ -1067,7 +691,6 @@ module atom_transfer
          call nlte_loop_mali()
          if (lexit_after_nonlte_loop) return
 
-         stop
       end if !active atoms
 
 
@@ -1115,7 +738,7 @@ module atom_transfer
       real(kind=dp), dimension(N_lambda) :: Iold, I0
       real(kind=dp), dimension(3) :: sdx, sdy
       real(kind=dp):: npix2, diff, normF
-      real(kind=dp), parameter :: precision = 1.e-2
+      real(kind=dp), parameter :: precision = 1d-2
       integer :: i, j, subpixels, iray, ri, zj, phik, icell, iter
       logical :: lintersect, labs
       integer :: kr, krr, nat

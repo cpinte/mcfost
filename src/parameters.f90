@@ -60,16 +60,14 @@ module parametres
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
 
   ! Atomic line radiative transfer
-  !!lstore_opac futur deprecation
-  logical :: lno_radiative_coupling, lsobolev, lsobolev_only, lexit_after_nonlte_loop
-  logical :: lemission_atom, lelectron_scattering, lforce_lte, lstop_after_jnu, &
-            ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
-  integer :: Nrays_atom_transfer, istep_start
+  logical :: lexit_after_nonlte_loop, lstop_after_jnu
+  logical :: lemission_atom, lelectron_scattering, lforce_lte,  &
+            	ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
+  integer :: N_rayons_mc, istep_start
   
   !HEALpix
   integer :: healpix_lorder, healpix_lmin, healpix_lmax !lmin and lmax not yet (for local evaluation)
   
-  logical :: llimit_mem, lfix_backgrnd_opac
   logical :: lcheckpoint, lsafe_stop
   !Convergence relative errors
   real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time, art_hv_nlte
@@ -77,17 +75,13 @@ module parametres
   
   !Ng's acceleration
   logical :: lng_acceleration
-  integer :: iNg_Norder, iNg_Nperiod!, iNg_ndelay -> deprec
+  integer :: Ng_Norder, Ng_Nperiod
   
   !electron density
-  logical :: lsolve_for_ne, lno_iterate_ne_mc = .true. !.true.==no electron iteration during step 2
+  logical :: lsolve_for_ne
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
   
-  !Wavelength table for spectrally resolved images and spectra
-  character(len=50) :: jnu_atom_file
-  logical :: lread_jnu_atom
-  !lmhd_voronoi enables the voronoi tesselation for either a pluto-formatted model (not ye)
-  !or an ascii file ready for tesselation (lmodel_ascii)
+
   logical :: lmodel_ascii, lmhd_voronoi, lmodel_1d
 
   ! Decomposition image

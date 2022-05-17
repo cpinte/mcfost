@@ -68,18 +68,12 @@ subroutine set_default_variables()
   healpix_lmin = 0
   healpix_lmax = 7 !6 !5
   ! Atomic lines Radiative Transfer (AL-RT)
-  lno_radiative_coupling = .false.
-  lsobolev = .false.
-  lsobolev_only = .false.
   lsafe_stop = .false.
   safe_stop_time = 155520.0!1.8days in seconds, default
-  llimit_mem = .false.
-  lfix_backgrnd_opac = .false.
   lemission_atom = .false.
   lelectron_scattering = .false.
   lstop_after_jnu = .false.
   lsolve_for_ne = .false.
-  lno_iterate_ne_mc = .true. !.true. means no iteration of electron during MC steps
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
   lmodel_1d = .false.
@@ -87,21 +81,19 @@ subroutine set_default_variables()
   lmhd_voronoi = .false.
   lzeeman_polarisation = .false.
   lforce_lte = .false.
-  lread_jnu_atom=.false.
   ldissolve = .false.
   lng_acceleration = .false.
-  iNg_Norder = 0
-!   iNg_ndelay = 5
-  iNg_Nperiod = 5
+  Ng_Norder = 0
+  Ng_Nperiod = 5
   istep_start = 1
   ! AL-RT
   laccurate_integ = .false.
-  Nrays_atom_transfer = 100
+  N_rayons_mc = 100
   loutput_rates = .false.
   !
   ! Max relative error in transfer. ATM only atomic line transfer
   dpops_max_error = 1e-1
-  dpops_sub_max_error = 1e-4
+  dpops_sub_max_error = 1e-2
   art_hv = 0.0 !default is frac * min(vD)
   art_hv_nlte = 0.0 !default is frac * min(vD)
   !
@@ -632,15 +624,6 @@ subroutine initialisation_mcfost()
      case("-safe_stop")
         i_arg = i_arg + 1
         lsafe_stop = .true.
-      case("-no_radiative_coupling")
-         i_arg = i_arg + 1
-         lno_radiative_coupling = .true.
-      case("-sobolev")
-         i_arg = i_arg + 1
-         lsobolev = .true.
-      case("-sobolev_only")
-         i_arg = i_arg + 1
-         lsobolev_only = .true.
      case("-safe_stop_time")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("time needed (safe_stop)")
@@ -655,12 +638,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) checkpoint_period !in iterations
         i_arg= i_arg+1
-	 case("-limit_memory")
-	 	i_arg = i_arg + 1
-	 	llimit_mem = .true.
-	 case("-fix_background_opac")
-	 	i_arg = i_arg + 1
-	 	lfix_backgrnd_opac = .true.
      case("-atom")
         ! Option to solve for the RTE for atoms
         i_arg = i_arg+1
@@ -671,9 +648,6 @@ subroutine initialisation_mcfost()
      case("-electron_scatt") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
         lelectron_scattering = .true.
-     case("-iterate_ne_mc") !force solving ne density during MC steps.
-        i_arg = i_arg + 1
-        lno_iterate_ne_mc = .false.
      case("-solve_ne") !force solving ne density even if provided in the model
         i_arg = i_arg + 1
         lsolve_for_ne = .true.
@@ -689,9 +663,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) ndelay_iterate_ne
         i_arg= i_arg+1
-     case("-read_jnu_atom")
-     	i_arg = i_arg + 1
-     	lread_jnu_atom = .true.
      case("-calc_jnu_atom")
      	i_arg = i_arg + 1
      	lstop_after_jnu = .true.
@@ -830,43 +801,33 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Ng'acc order needed with -Ng_Norder !")
         call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) iNg_Norder
+        read(s,*,iostat=ios) Ng_Norder
         i_arg= i_arg+1
-        if (iNg_Norder <= 1) then
+        if (Ng_Norder <= 1) then
          call warning ("Ng Norder <= 1, turning off Ng'acceleration!")
          lng_acceleration = .false.
         else
          lng_acceleration = .true.
          write(*,*) " Ng's acceleration activated"
         endif
-!      case("-Ng_Ndelay")
-!         i_arg = i_arg + 1
-!         if (i_arg > nbr_arg) call error("Ng'acc delay needed with -Ng_Ndelay !")
-!         call get_command_argument(i_arg,s)
-!         read(s,*,iostat=ios) iNg_Ndelay
-!         i_arg= i_arg+1
-!         if (iNg_Ndelay < 0) then
-!          call warning ("Ng Ndelay < 0 setting to abs!")
-!          iNg_Ndelay = abs(iNg_Ndelay)
-!         endif
      case("-Ng_Nperiod")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Ng'acc period needed with -Ng_Nperiod !")
         call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) iNg_Nperiod
+        read(s,*,iostat=ios) Ng_Nperiod
         i_arg= i_arg+1
-        if (iNg_Nperiod < 0) then
+        if (Ng_Nperiod < 0) then
          call warning ("Ng Nperiod < 0 setting to abs!")
-         iNg_Nperiod = abs(iNg_Nperiod)
+         Ng_Nperiod = abs(Ng_Nperiod)
         endif
-     case("-Nray_atom")
+     case("-Nrays_mc_step")
         i_arg = i_arg + 1
-        if (i_arg > nbr_arg) call error("Number of rays needed with -Nray_atom !")
+        if (i_arg > nbr_arg) call error("Number of rays needed with -Nrays_mc_step !")
         call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) Nrays_atom_transfer
+        read(s,*,iostat=ios) N_rayons_mc
         i_arg= i_arg+1
-        if (Nrays_atom_transfer <= 0) then
-         call error ("Nray must be > 0")
+        if (N_rayons_mc <= 0) then
+         call error ("N_rayons_mc must be > 0")
         endif
      case("-max_err")
         i_arg = i_arg + 1
@@ -1852,6 +1813,7 @@ subroutine display_help()
   write(*,*) "        : -phase-function <s11.fits> : uses a tabulated phase function (rt2 only)"
   write(*,*) "        : -tau=1_surface"
   write(*,*) " "
+  write(*,*) "        : -Nrays_mc_step <Nray> : Number of rays for angular quadrature in Monte Carlo step"
   write(*,*) " Options related to molecular emission"
   write(*,*) "        : -freeze-out <T>"
   write(*,*) "        : -freeze-out_depletion <relative depletion> between 0 and 1"
@@ -1869,25 +1831,17 @@ subroutine display_help()
   !healpix options missing. Waiting finle adaptive scheme.
   write(*,*) "        : -start_step <int> : Select the first step for non-LTE loop (default 1)"
   write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
-  write(*,*) "		  : -fix_background_opac : (force) keep background opacities constant during non-LTE loop, if iterate_ne."
-  write(*,*) "		  : -limit_memory : continuous opacity are interpolated locally"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
-  write(*,*) "        : -iterate_ne_mc : force the calculation of electron density during Monte Carlo steps."
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
 !   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
-  write(*,*) "        : -sobolev : Initial solution using Sobolev method for all atoms"
-  write(*,*) "        : -sobolev_only : In Sobolev mode, stop the calculation after the Sobolev pops have been obtained."
-  write(*,*) "        : -no_radiative_coupling : Solve MALI equations with psi = psi^* (local coupling only!)"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
   write(*,*) "        : -art_line_resol <v> : resolution of the image grid of art in km/s"
   write(*,*) "        : -art_nlte_line_resol <v> : resolution of the non-LTE grid of art in km/s"
-  write(*,*) "        : -Nray_atom <Nray> : Number of rays for angular quadrature in atom transfer"
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
   write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
-  write(*,*) "        : -read_jnu_atom : Read old Jnu values from file "
   write(*,*) "        : -calc_jnu_atom : Stop the code after Jnu_scattering has been computed and written. "
 !-> this one could also be use for mol tranfer, like Ng or tab_wavelength
   write(*,*) "        : -max_err <max_err> : max relative error"
