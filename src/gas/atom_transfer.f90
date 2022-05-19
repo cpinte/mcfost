@@ -19,7 +19,7 @@ module atom_transfer
    use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, hydrogen, helium, adjust_cswitch_atoms, maxval_cswitch_atoms, lcswitch_enabled, vbroad
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
-   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling
+   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, vlabs
    use see, only : n_new, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   rate_matrix, init_rates, update_populations, accumulate_radrates_mali
    use optical_depth, only : integ_ray_atom
@@ -405,7 +405,6 @@ module atom_transfer
                !$omp end parallel
                write(*,'("  NEW ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
                   minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
-!do do print LTE updates use print_pops with max and min and mean only!!
                write(*,*) ''  
             end if
             !***********************************************************!
@@ -592,6 +591,63 @@ module atom_transfer
       return
    end subroutine nlte_loop_mali
 
+   subroutine compute_max_relative_velocity(dv)
+      real(kind=dp), intent(out) :: dv
+      real(kind=dp) :: v1,v2
+      integer :: i1, i2, id
+
+         id = 1
+         if (lvoronoi) then
+            dv = sqrt( maxval(Voronoi(:)%xyz(1)**2+Voronoi(:)%xyz(2)**2+Voronoi(:)%xyz(3)**2) )
+            if (dv == 0.0_dp) return 
+            dv = 0.0_dp
+
+            !$omp parallel &
+            !$omp default(none) &
+            !$omp private(id,i1, i2,v1, v2)&
+            !$omp shared(dv, icompute_atomRT, Voronoi, n_Cells)
+            !$omp do schedule(dynamic,1)
+            do i1=1,n_cells
+               !$ id = omp_get_thread_num() + 1
+               v1 = sqrt(sum(Voronoi(i1)%xyz**2))
+               do i2=1,n_cells
+                  v2 = sqrt(sum(Voronoi(i2)%xyz**2))
+                  if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+                     dv = max(dv,abs(v1-v2))
+                  endif
+               enddo
+            enddo
+            !$omp end do
+            !$omp end parallel
+         else
+            dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+            if (dv==0.0_dp) return
+
+            dv = 0.0_dp
+            !$omp parallel &
+            !$omp default(none) &
+            !$omp private(id,i1,i2,v1,v2)&
+            !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells)
+            !$omp do schedule(dynamic,1)
+            do i1=1,n_cells
+               !$ id = omp_get_thread_num() + 1
+               v1 = sqrt(sum(vfield3d(i1,:)**2))
+               do i2=1,n_cells
+                  v2 = sqrt(sum(vfield3d(i2,:)**2))
+                  if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+                     dv = max(dv,abs(v1-v2))
+                  endif
+               enddo
+            enddo
+            !$omp end do
+            !$omp end parallel
+         endif
+
+         write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
+
+      return
+   end subroutine compute_max_relative_velocity
+
    subroutine setup_image_grid()
       use wavelengths_gas, only : compute_line_bound
    !to do lmono -limg
@@ -606,7 +662,7 @@ module atom_transfer
       !before
       if (npix_x_save > 1) then
          RT_line_method = 2
-         if (npix_y == 1) RT_line_method = 3
+         if (npix_y_save == 1) RT_line_method = 3
       else
          RT_line_method = 1
       endif
@@ -647,12 +703,14 @@ module atom_transfer
    ! --------------------------------------------------------------------------- !
       integer  :: ne_initial, ibin, iaz, nat
       logical :: lelectron_read
-      real(kind=dp) :: dne, v_char, max_vel_shift, v1, v2
+      real(kind=dp) :: dne, v_char
 
       write(*,*) " *** BIG WARNING **** "
       write(*,*) " !!!!! CHECK FOR BILINEAR INTERP in utils.f90 ! !!!!"
       write(*,*) "check solve ne" 
       write(*,*) " ******************** "
+
+      allocate(vlabs(nb_proc))
 
       omp_chunk_size = max(nint( 0.01 * n_cells / nb_proc ),1)
       mem_alloc_tot = 0
@@ -698,23 +756,9 @@ module atom_transfer
       call ltepops_atoms() 
 
       if( Nactiveatoms > 0) then
-
-         v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
-         max_vel_shift = 0.0
-         do ibin=1,n_cells
-            v1 = sqrt(sum(vfield3d(ibin,:)**2))
-            do iaz=1,n_cells
-               v2 = sqrt(sum(vfield3d(iaz,:)**2))
-               if ((icompute_atomRT(ibin)>0).and.(icompute_atomRT(iaz)>0)) then
-                  max_vel_shift = max(max_vel_shift,abs(v1-v2))
-               endif
-            enddo
-         enddo
-         v_char = max_vel_shift
-         write(*,*) "v_char", v_char * 1d-3
          !because for non-LTE we compute the motion of each cell wrt to the actual cell
          !so the maximum shift is what we have if all cells move at their max speed (v(icell))
-         ! stop
+         call compute_max_relative_velocity(v_char)
 
          !every indexes are defined on the lambda frequency. 
          !So even when lambda is passed as an argument, it is expected
@@ -734,7 +778,7 @@ module atom_transfer
          if (lexit_after_nonlte_loop) return
 
       end if !active atoms
-
+      vlabs(:) = 0.0_dp !remains 0 for images or at lte!
 
       if (lmodel_1d) then
          call spectrum_1d()
@@ -760,6 +804,9 @@ module atom_transfer
       endif
       write(*,*) " ..done"
 
+      write(*,*) "TO DO: add deallocation here"
+      call dealloc_atom_opac()
+      deallocate(Itot,vlabs)
 
       return
    end subroutine atom_line_transfer

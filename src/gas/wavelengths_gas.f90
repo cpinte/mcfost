@@ -251,7 +251,7 @@ module wavelengths_gas
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
       integer, dimension(:), allocatable :: sorted_indexes
-      real(kind=dp) :: max_cont, l0, l1
+      real(kind=dp) :: max_cont, l0, l1, dvmin
       real :: hv_loc !like hv
       real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
       logical :: check_for_overlap
@@ -744,19 +744,23 @@ module wavelengths_gas
                inner_atom_loop : do nb = 1, n_atoms
                   inner_line_loop : do krr=1, atoms(nb)%p%Nline
 
+                     !Nover_inf/sup = Nb/r
                      if ( (nb==n).and.(kr==krr) ) cycle inner_line_loop
 
-                     l0 = min(atom%lines(kr)%lambda0,atoms(nb)%p%lines(krr)%lambda0)
-                     l1 = max(atom%lines(kr)%lambda0,atoms(nb)%p%lines(krr)%lambda0)
+                     l0 = atom%lines(kr)%lambda0
+                     l1 = atoms(nb)%p%lines(krr)%lambda0
 
-                     if ( (l1-l0)/l0 <= abs(vmax_overlap)/c_light ) then
-                        atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, locate(lambda, atom%lines(kr)%lambda0*(1.0 +  abs(vmax_overlap)/c_light)))
-                        atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, locate(lambda, atom%lines(kr)%lambda0*(1.0 -  abs(vmax_overlap)/c_light)))
-                        ! write(*,*) "overlap of line", kr, atom%lines(kr)%lambda0, " of atom ", atom%ID, &
-                        !    " with line", krr, atoms(nb)%p%lines(krr)%lambda0, " of atom ", atoms(nb)%p%ID, " N0 = ", &
-                        !    locate(lambda, atoms(nb)%p%lines(krr)%lambda0)
+                     write(*,*) l0, l1, abs(vmax_overlap)/c_light
+                     write(*,*) abs(l1-l0)/l0, abs(vmax_overlap)/c_light
 
-                        ! stop
+                     if ( abs(l1-l0)/l0 <= abs(vmax_overlap)/c_light ) then
+                        dvmin = c_light * abs(l1-l0)/l0
+                        ! atom%lines(kr)%dvmin = max(dvmin,atom%lines(kr)%dvmin)
+                        atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, locate(lambda, atom%lines(kr)%lambda0*(1.0 +  dvmin/c_light)))
+                        atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, locate(lambda, atom%lines(kr)%lambda0*(1.0 -  dvmin/c_light)))
+                        write(*,*) "overlap of line", kr, atom%lines(kr)%lambda0, " of atom ", atom%ID, &
+                           " with line", krr, atoms(nb)%p%lines(krr)%lambda0, " of atom ", atoms(nb)%p%ID, " N0 = ", &
+                           locate(lambda, atoms(nb)%p%lines(krr)%lambda0), " dvmin=", dvmin *1d-3
                      endif
 
 
@@ -765,8 +769,8 @@ module wavelengths_gas
 
                if (atom%lines(kr)%Nover_sup /= atom%lines(kr)%Nr .or. atom%lines(kr)%Nover_inf /= atom%lines(kr)%Nb) then
                   write(*,*) "Consistency of overlap must be checked!"
-                  ! write(*,*) "line", kr, " is overlapping",  atom%lines(kr)%Nover_inf,  atom%lines(kr)%Nb, &
-                  !                atom%lines(kr)%Nover_sup,  atom%lines(kr)%Nr
+                  write(*,*) "line", kr, " is overlapping",  atom%lines(kr)%Nover_inf,  atom%lines(kr)%Nb, &
+                                 atom%lines(kr)%Nover_sup,  atom%lines(kr)%Nr
                   !re calc Nlambda ??
                endif
             endif !check for overlap

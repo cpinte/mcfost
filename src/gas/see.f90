@@ -114,7 +114,6 @@ module see
         mem_alloc_local = mem_alloc_local + sizeof(psi) + sizeof(eta_atoms) + sizeof(Itot) + sizeof(phi_loc) + &
             sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ne_new) + sizeof(lcell_converged) + sizeof(n_new)
 
-
         allocate(tab_Uji_cont(NmaxCont,NactiveAtoms,n_cells))
         allocate(tab_Vij_cont(Nlambda_max_cont,NmaxCont,NactiveAtoms))
         write(*,*) " size tab_Uji_cont:", sizeof(tab_Uji_cont) / 1024./1024./1024.," GB"
