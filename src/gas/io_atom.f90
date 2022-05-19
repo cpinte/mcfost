@@ -9,7 +9,6 @@ module io_atom
    use collision_atom, only      : read_collisions
    use messages
    use mcfost_env, only          : mcfost_utils
-   use parametres, only          : art_hv
    use grid, only                : T, vturb, B_char
    use fits_utils
    use wavelengths_gas, only : compute_line_bound
@@ -144,6 +143,12 @@ module io_atom
          write(*,*) "exiting..."
          stop
       end if
+
+
+      !if H: stage(Nlevel) = 1 -> 2 stages (including neutrals)
+      !if He: stage(Nlevel) = 2 -> 3 stages (HeI, HeII, HeIII)
+      !etc
+      atom%Nstage = atom%stage(atom%Nlevel) + 1
 
       !Starting from now, i is the index of the lower level
       !it cannot be used as a loop index :-)
@@ -523,37 +528,23 @@ module io_atom
 
       end do !over atoms
 
-      !Temporary
-      !check that if helium is active and electron are iterated H must be active at the moment !!
-      check_helium : do nmet=1, N_atoms
-         if (atoms(nmet)%p%id=="He") then
-
-            if ((n_iterate_ne > 0).and.(atoms(nmet)%p%active)) then
-
+      !Check the ground state of each atom if iterate_ne and they are active.
+      if (n_iterate_ne > 0) then
+         check_atoms : do nmet=1, N_atoms
+            if (atoms(nmet)%p%active) then
                if (atoms(nmet)%p%stage(1) > 0) then
                   write(*,*) " !!!!!!!!! "
-                  call warning("Helium ground state is not in neutral stage ! Must be He I")
-                  write(*,*) atoms(nmet)%p%stage(1), atoms(nmet)%p%label(1), &
-                     atoms(nmet)%p%E(1), atoms(nmet)%p%g(1)
+                  write(*,*) "Atom", atoms(nmet)%p%id
+                  write(*,*) "  --> ground state of atom is not in neutral stage !"
+                  write(*,*) "stage=",atoms(nmet)%p%stage(1), atoms(nmet)%p%label(1)
+                  write(*,*) "Egs=", atoms(nmet)%p%E(1), " g=", atoms(nmet)%p%g(1)
                   write(*,*) " !!!!!!!!! "
                   stop
+                  cycle check_atoms
                endif
-
-               !H always present and the first.
-               !force to be active if helium active ?
-               !at the moment print a warning!
-               if (.not.atoms(1)%p%active) then
-                  write(*,*) " !!!!!!!!!!!!!!!!!!!!!!! "
-                  call WARNING(" Hydrogen is passive, while helium is active and n_iterate_ne > 0!!")
-                  write(*,*) " !!!!!!!!!!!!!!!!!!!!!!! "
-                  exit check_helium
-               endif
-
             endif
-
-         endif
-      enddo check_helium
-
+         enddo check_atoms
+      endif
 
       ! Alias to the most importent one
       !always exits !!

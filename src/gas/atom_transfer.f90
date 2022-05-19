@@ -8,15 +8,15 @@ module atom_transfer
 
    use parametres
    use input, only               : lkeplerian, linfall, limb_darkening, mu_limb_darkening, RT_line_method
-   use constantes, only : nm_to_m, m_to_km, km_to_m, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au
+   use constantes, only : nm_to_m, m_to_km, km_to_m, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au, sqrtpi, c_light
    use io_atom, only : read_atomic_models, write_pops_atom
    use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
    use wavelengths_gas, only : make_wavelengths_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
                                  deallocate_wavelengths_gasrt, make_wavelengths_raytracing, make_wavelengths_flux, Nlambda_max_line
    use elecdensity, only : solve_ne, write_electron, read_electron
-   use grid, only : nHtot, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, ne, Voronoi, r_grid, phi_grid, z_grid
-   use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops
-   use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, hydrogen, helium, adjust_cswitch_atoms, maxval_cswitch_atoms, lcswitch_enabled
+   use grid, only : T, vturb,nHtot, nHmin, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, ne, Voronoi, r_grid, phi_grid, z_grid
+   use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
+   use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, hydrogen, helium, adjust_cswitch_atoms, maxval_cswitch_atoms, lcswitch_enabled, vbroad
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling
@@ -31,6 +31,8 @@ module atom_transfer
    use mcfost_env, only          : dp, time_tick, time_max
    use molecular_emission, only  : ds
    use messages, only : error, warning
+   use voigts, only : Voigt
+   use broad, only : line_damping
 
    use healpix_mod
    !$ use omp_lib
@@ -69,12 +71,13 @@ module atom_transfer
       real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
 
       logical :: labs, lsubiteration = .false.
-      logical :: l_iterate, l_iterate_ne, lupdate_ne_other_nlte
+      logical :: l_iterate, l_iterate_ne
+      real(kind=dp) :: vth
       ! logical :: accelerated, ng_rest, lng_turned_on
       ! integer :: iorder, i0_rest, n_iter_accel, iacc
 
       integer :: nact, imax, icell_max, icell_max_2
-      integer :: icell, ilevel, Ng_Ndelay
+      integer :: icell, ilevel, Ng_Ndelay, nb, nr
       logical :: lng_turned_on
 
       type (AtomType), pointer :: atom
@@ -94,13 +97,7 @@ module atom_transfer
       if (lforce_lte) lsubiteration = .false.
 
       l_iterate_ne = .false.
-      lupdate_ne_other_nlte = (hydrogen%active.and.NactiveAtoms > 1).or.(.not.hydrogen%active)
-      if (associated(helium)) then
 
-         lupdate_ne_other_nlte = (helium%active.and.hydrogen%active.and.Nactiveatoms > 2).or.&
-                                 (.not.hydrogen%active.and.helium.active.and.Nactiveatoms > 1).or.&
-                                 (hydrogen%active.and..not.helium%active.and.NactiveAtoms > 1)
-      endif
       !Use non-LTE pops for electrons and to write to file.
       do nact=1,NactiveAtoms
          if (.not.activeatoms(nact)%p%nltepops) activeatoms(nact)%p%nltepops = .true.
@@ -210,6 +207,7 @@ module atom_transfer
 
             if( n_iterate_ne > 0 ) then
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
+               if (lforce_lte) l_iterate_ne = .false.
             endif
 
             call progress_bar(0)
@@ -307,7 +305,7 @@ module atom_transfer
                   ! do while (.not.lconverged_loc)
                   !    n_iter_loc = n_iter_loc + 1
 
-                  !    hydrogen%n(:,icell) = n_new(1:hydrogen%Nlevel,1,icell)
+                  !    hydrogen%n(:,icell) = n_new(1,1:hydrogen%Nlevel,icell)
 
                   !    !psi is updated.
                   !    !currenlty includes only the lines opacity!
@@ -353,24 +351,65 @@ module atom_transfer
 
             !***********************************************************!
             ! ************************** Ng's **************************!
- 
-            !***********************************************************!
-            ! ******************* checkpointing ************************!
 
             !***********************************************************!
             ! *******************  update ne metals  *******************!
-
-            !-> evaluate ne for other non-LTE atoms not included in the non-LTE ionisation scheme ?
-            !with fixed non-LTE populations and non-LTE contributions
             if (l_iterate_ne) then
-               !add in solve_ne_loc cell-by-cell
-               !add in other atom in non_lte_charge_conservation only for the ionisation frac.
-               !evaluate non-lte donors other than h + he
                !update lte opac and related quantities
                !damping and profiles for instance
-               !re update nHmin(icell) = nH_minus(icell)
-
+               id = 1
+               dne = 0.0
+               write(*,'("  OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+                  minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
+               !$omp parallel &
+               !$omp default(none) &
+               !$omp private(id,icell,l_iterate,nact,ilevel,vth,nb,nr)&
+               !$omp shared(T,vturb,nHmin,icompute_atomRT,ne, ne_new,n_cells)&
+               !$omp shared(tab_lambda_nm,atoms,n_atoms,dne)
+               !$omp do schedule(dynamic,1)
+               do icell=1,n_cells
+                  !$ id = omp_get_thread_num() + 1
+                  l_iterate = (icompute_atomRT(icell)>0) 
+                  if (l_iterate) then 
+                     dne = max(dne, abs(1.0_dp - ne(icell)/ne_new(icell)))
+                     ne(icell) = ne_new(icell) !needed for lte pops !
+                     call LTEpops_H_loc(icell)
+                     nHmin(icell) = nH_minus(icell)
+                     do nact = 2, n_atoms
+                        call LTEpops_atom_loc(icell,Atoms(nact)%p,.false.)
+                     enddo
+                     !recompute profiles or damping !
+                     !could be combined in a single loop;
+                     !but need to check that no all lte pops are needed for damping.
+                     !Also need to change if profile interp is used or not! (a and phi)
+                     do nact = 2, n_atoms
+                        do ilevel=1,Atoms(nact)%p%nline
+                           if (.not.Atoms(nact)%p%lines(ilevel)%lcontrib) cycle
+                           if (Atoms(nact)%p%lines(ilevel)%Voigt) then
+                              nb = Atoms(nact)%p%lines(ilevel)%nb; nr = Atoms(nact)%p%lines(ilevel)%nr
+                              Atoms(nact)%p%lines(ilevel)%a(icell) = line_damping(icell,Atoms(nact)%p%lines(ilevel))
+                           !tmp because of vbroad!
+                              vth = vbroad(T(icell),Atoms(nact)%p%weight, vturb(icell))
+                              Atoms(nact)%p%lines(ilevel)%v(:) = &
+                                 c_light * (tab_lambda_nm(nb:nr)-Atoms(nact)%p%lines(ilevel)%lambda0)&
+                                 /Atoms(nact)%p%lines(ilevel)%lambda0 / vth
+                              Atoms(nact)%p%lines(ilevel)%phi(:,icell) = &
+                                 Voigt(Atoms(nact)%p%lines(ilevel)%Nlambda, Atoms(nact)%p%lines(ilevel)%a(icell), Atoms(nact)%p%lines(ilevel)%v(:))&
+                                  / (vth * sqrtpi)
+                           endif
+                        enddo
+                     enddo
+                  end if !if l_iterate
+               end do
+               !$omp end do
+               !$omp end parallel
+               write(*,'("  NEW ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+                  minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
+!do do print LTE updates use print_pops with max and min and mean only!!
+               write(*,*) ''  
             end if
+            !***********************************************************!
+            ! ******************* checkpointing ************************!
 
             !***********************************************************!
             ! ****************  Convergence checking  ******************!
@@ -436,7 +475,10 @@ module atom_transfer
                write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%p%ID
                write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
             enddo
-            if (dne /= 0.0_dp) write(*,'("   >>> dne="(1ES17.8E3))') dne
+            if (dne /= 0.0_dp) then
+               write(*,*) ""
+               write(*,'("   >>> dne="(1ES17.8E3))') dne
+            endif
             write(*,*) ""
             write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old
             write(*,'("   ->> diffcont="(1ES17.8E3))') diff_cont

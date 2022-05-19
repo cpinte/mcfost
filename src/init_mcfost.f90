@@ -632,6 +632,7 @@ subroutine initialisation_mcfost()
         safe_stop_time = safe_stop_time * 86400.!convert in sec
         i_arg= i_arg+1
      case("-checkpoint")
+     	call error("option -checkpoint not yet")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Period needed for checkpoint!")
         lcheckpoint = .true.
@@ -643,9 +644,11 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         lemission_atom=.true.
      case("-output_rates")
+     	call error("option -output_rates not yet")
         i_arg = i_arg + 1
         loutput_rates = .true.
      case("-electron_scatt") !force solving ne density even if provided in the model
+     	call error("option -electron_scatt not yet")
         i_arg = i_arg + 1
         lelectron_scattering = .true.
      case("-solve_ne") !force solving ne density even if provided in the model
@@ -664,6 +667,7 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) ndelay_iterate_ne
         i_arg= i_arg+1
      case("-calc_jnu_atom")
+     	call error("option -calc_jnu_atom not yet")
      	i_arg = i_arg + 1
      	lstop_after_jnu = .true.
      case("-puffed_up_rim")
@@ -768,6 +772,7 @@ subroutine initialisation_mcfost()
         lmodel_ascii = .true.
         ldensity_file = .false.
      case("-zeeman_polarisation")
+     	call error("Zeeman polarisation not yet!")
         i_arg = i_arg + 1
         lzeeman_polarisation=.true.
      case("-accurate_integ")
@@ -779,12 +784,6 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) art_hv
         i_arg= i_arg+1
-      case("-art_nlte_line_resol")
-         i_arg = i_arg + 1
-         if (i_arg > nbr_arg) call error("resolution (km/s) needed with -art_nlte_line_resol !")
-         call get_command_argument(i_arg,s)
-         read(s,*,iostat=ios) art_hv_nlte
-         i_arg= i_arg+1
      case("-healpix_lorder")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("l value needed for healpix !")
@@ -851,6 +850,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lforce_lte=.true.
      case("-level_dissolution")
+     	call error("Level's dissolution not yet!")
         i_arg = i_arg + 1
         ldissolve =.true.
      case("-phantom")
@@ -1830,24 +1830,21 @@ subroutine display_help()
   write(*,*) " Options related to atomic lines emission"
   !healpix options missing. Waiting finle adaptive scheme.
   write(*,*) "        : -start_step <int> : Select the first step for non-LTE loop (default 1)"
-  write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
+!   write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
 !   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
-  write(*,*) "        : -art_line_resol <v> : resolution of the image grid of art in km/s"
-  write(*,*) "        : -art_nlte_line_resol <v> : resolution of the non-LTE grid of art in km/s"
-  write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
-  write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
-  write(*,*) "			Unless specified, the frequency grid used for the NLTE loop is used."
-  write(*,*) "        : -calc_jnu_atom : Stop the code after Jnu_scattering has been computed and written. "
+  write(*,*) "        : -art_line_resol <v> : resolution of the non-LTE grid of art in km/s"
+!   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
+!   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
+!   write(*,*) "        : -calc_jnu_atom : Stop the code after Jnu_scattering has been computed and written. "
 !-> this one could also be use for mol tranfer, like Ng or tab_wavelength
   write(*,*) "        : -max_err <max_err> : max relative error"
   write(*,*) "        : -max_err_sub <max_err_sub> : max relative error for sub-iterations"
   write(*,*) "        : -Ng_Norder <Norder> : Order of Ng's acceleration"
-!   write(*,*) "        : -Ng_Ndelay <Ndelay> : Delay before first Ng's acceleration"
   write(*,*) "        : -Ng_Nperiod <Nperiod> : Cycle of Ng's iteration"
 !   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"

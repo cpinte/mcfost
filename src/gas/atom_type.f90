@@ -72,7 +72,7 @@ module atom_type
       real(kind=dp)                :: cswitch, Abund, weight, massf !mass fraction
       integer                      :: periodic_table, activeindex !order of the active atom in the
       character(len=ATOM_LABEL_WIDTH), allocatable, dimension(:)  :: label
-      integer                :: Nlevel, Nline, Ncont, Ntr, Ntr_line
+      integer                :: Nlevel, Nline, Ncont, Ntr, Ntr_line, Nstage
       ! BY CONVENTION, stage=0 for neutrals, 1 for singly ionised
       integer, allocatable, dimension(:)  :: stage, Lorbit
       real(kind=dp) :: Rydberg
@@ -83,7 +83,8 @@ module atom_type
       logical                :: NLTEpops, set_ltepops
       logical :: lgauss_prof = .false.
       !common gauss profile for gauss profile lines
-      real(kind=dp), allocatable :: vg(:), phig(:,:), Gamma(:,:,:)
+      real(kind=dp), allocatable :: vg(:), phig(:,:)
+      real(kind=dp), allocatable :: Gamma(:,:,:), dgdne(:,:,:) !derivative of Gamma to ne (n_iterate_ne>0)
       real(kind=dp), dimension(:,:), pointer :: n, nstar
       ! real(kind=dp), dimension(:,:) :: phi_T !such that nexphi_T = ni/nj
       type (AtomicLine), allocatable, dimension(:)         :: lines
