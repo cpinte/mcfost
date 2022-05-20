@@ -158,7 +158,7 @@ module see
         atom => null()
 
         !see + ionisation for all atoms ?? 
-        if (n_iterate_ne) then
+        if (n_iterate_ne > 0) then
             Neq_ne = NlevelTotal + 1 !adding charge conservation
             write(*,*) " There are ", Neq_ne, " equations for non-LTE SEE + ionisation"
             allocate(gtot(NlevelTotal,NlevelTotal,nb_proc),gr_save(NmaxLevel,NlevelTotal,NactiveAtoms,nb_proc))
@@ -213,7 +213,7 @@ module see
 
         if (allocated(chi_tot)) deallocate(chi_tot)
 
-        if (n_iterate_ne) then
+        if (n_iterate_ne > 0) then
             deallocate(gtot,gr_save,dgrdne,dgcdne)
             deallocate(xvar,fvar,dfvar,npop_dag,gs_ion,pops_ion)
             do n=1,NactiveAtoms
