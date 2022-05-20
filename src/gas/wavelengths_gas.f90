@@ -243,7 +243,7 @@ module wavelengths_gas
       ! used only for the non-LTE loop.
       real(kind=dp), optional :: vmax_overlap
       real(kind=dp), intent(out), allocatable :: lambda(:)
-      integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda
+      integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda, Nlambda_max_line_vel
       integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved, Nwaves, check_new_freq
       type (AtomType), pointer :: atom
       integer :: alloc_status, lac, la, nb, krr, max_Nlambda_indiv
@@ -251,7 +251,7 @@ module wavelengths_gas
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
       integer, dimension(:), allocatable :: sorted_indexes
-      real(kind=dp) :: max_cont, l0, l1, dvmin
+      real(kind=dp) :: max_cont, l0, l1, dvmin, vth_max
       real :: hv_loc !like hv
       real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
       logical :: check_for_overlap
@@ -680,6 +680,7 @@ module wavelengths_gas
       Nlambda_max_line = 0
       Nlambda_max_cont = 0
       Nlambda_max_trans = 0
+      Nlambda_max_line_vel = 0
       do n=1,N_atoms
          atom => Atoms(n)%p
          do kr=1,atom%Ncont
@@ -738,9 +739,11 @@ module wavelengths_gas
             ! *** natural overlaps are already taken into account into Nblue and Nred ***
             atom%lines(kr)%Nover_inf = atom%lines(kr)%Nb
             atom%lines(kr)%Nover_sup = atom%lines(kr)%Nr
-            !Does not change Nlambda (?)
+            !Does not change Nlambda (?) recompute it (??)
             if (check_for_overlap) then
-
+            !check overlap of line kr with other lines (krr) of any atom.
+            !if overlap, expands the bound of line kr (only for the non-LTE radiative coupling)
+               vth_max= vbroad(maxval(T),atom%weight,maxval(vturb))
                inner_atom_loop : do nb = 1, n_atoms
                   inner_line_loop : do krr=1, atoms(nb)%p%Nline
 
@@ -750,35 +753,38 @@ module wavelengths_gas
                      l0 = atom%lines(kr)%lambda0
                      l1 = atoms(nb)%p%lines(krr)%lambda0
 
-                     write(*,*) l0, l1, abs(vmax_overlap)/c_light
-                     write(*,*) abs(l1-l0)/l0, abs(vmax_overlap)/c_light
+                     dvmin = c_light * abs(l1-l0)/l0 - 3.0*vth_max
+                     !-> no overlap du to motion of cells
+                     if (dvmin >  abs(vmax_overlap)) cycle inner_line_loop
 
-                     if ( abs(l1-l0)/l0 <= abs(vmax_overlap)/c_light ) then
-                        dvmin = c_light * abs(l1-l0)/l0
+                     write(*,*) "d_line-to-line (km/s)=", 1d-3*dvmin, " maxshift=", 1d-3*abs(vmax_overlap)
+                     write(*,*) "l0 ref=", l0, " l1=", l1
+
+                     if ( dvmin <= abs(vmax_overlap)) then
                         ! atom%lines(kr)%dvmin = max(dvmin,atom%lines(kr)%dvmin)
                         atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, locate(lambda, atom%lines(kr)%lambda0*(1.0 +  dvmin/c_light)))
                         atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, locate(lambda, atom%lines(kr)%lambda0*(1.0 -  dvmin/c_light)))
                         write(*,*) "overlap of line", kr, atom%lines(kr)%lambda0, " of atom ", atom%ID, &
                            " with line", krr, atoms(nb)%p%lines(krr)%lambda0, " of atom ", atoms(nb)%p%ID, " N0 = ", &
                            locate(lambda, atoms(nb)%p%lines(krr)%lambda0), " dvmin=", dvmin *1d-3
+                        write(*,*) " no overlap bounds on the grid:", atom%lines(kr)%Nb,atom%lines(kr)%Nr
+                        write(*,*) " bounds wtih overlap the grid:", atom%lines(kr)%Nover_inf,atom%lines(kr)%Nover_sup
+                        Nlambda_max_line_vel  = max(Nlambda_max_line_vel,atom%lines(kr)%Nover_sup-atom%lines(kr)%Nover_inf + 1)
                      endif
-
 
                   enddo inner_line_loop
                enddo inner_atom_loop 
 
-               if (atom%lines(kr)%Nover_sup /= atom%lines(kr)%Nr .or. atom%lines(kr)%Nover_inf /= atom%lines(kr)%Nb) then
-                  write(*,*) "Consistency of overlap must be checked!"
-                  write(*,*) "line", kr, " is overlapping",  atom%lines(kr)%Nover_inf,  atom%lines(kr)%Nb, &
-                                 atom%lines(kr)%Nover_sup,  atom%lines(kr)%Nr
-                  !re calc Nlambda ??
-               endif
             endif !check for overlap
          enddo
  
          atom => NULL()
       enddo
       write(*,*) "Number of max freq points for all lines resolution :", Nlambda_max_line
+      if (check_for_overlap) then
+         write(*,*) " -> or taking into account velocity shifts :", Nlambda_max_line_vel
+         ! Nlambda_max_line = Nlambda_max_line_vel !? in general continua dominates the number of points.
+      endif
       write(*,*) "Number of max freq points for all cont resolution :", Nlambda_max_cont
       Nlambda_max_trans = max(Nlambda_max_line,Nlambda_max_cont)
       write(*,*) "Number of max freq points for all trans :", Nlambda_max_trans

@@ -565,7 +565,7 @@ module atom_transfer
          if (etape==1) deallocate(xmux,xmuy,xmu)
          if (allocated(wmu)) deallocate(wmu)
 
-         write(*,'("  <step #"(1I1)" done! >>threshold="(1ES17.8E3))') etape,  precision
+         write(*,'("  <step #"(1I1)" done! :: threshold="(1ES17.8E3)">")') etape,  precision
 
       end do step_loop
 
