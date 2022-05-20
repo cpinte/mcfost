@@ -490,22 +490,24 @@ module elecdensity
     logical, intent(in) :: verbose
     !difference wrt the initial solution, not criterion of convergence (dne)
     real(kind=dp), intent(inout) :: epsilon
-    real(kind=dp):: ne_oldM, UkM, PhiHmin, ne0, Uk, Ukp1
+    real(kind=dp):: ne_oldM, UkM, PhiHmin, ne0, Uk, Ukp1, eps_id(nb_proc)
     real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
     real(kind=dp), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk, min_fjk !Negative ions from -N_neg to 0 (H-), then from 1 to Nelem positive ions
     integer :: k, ZM, id, ibar, n_cells_done, n_cells_skipped
-    integer :: unconverged_cells(nb_proc), ik_max
+    integer :: unconverged_cells(nb_proc), ik_max, ik_max_id(nb_proc)
 
     ibar = 0
     n_cells_done = 0
     n_cells_skipped = 0!size(pack(icompute_atomRT,mask=icompute_atomRT /= 1))
     
     unconverged_cells(:) = 0
+    eps_id(:) = 0.0
+    ik_max_id = 0.0
     id = 1
-    ik_max = 0
 
     !difference with initial solution
     epsilon = 0.0
+    ik_max = 0
 
     min_f_HII = 1d50
     max_f_HII = 0.0_dp
@@ -515,10 +517,11 @@ module elecdensity
     call progress_bar(0)
     !$omp parallel &
     !$omp default(none) &
-    !$omp private(k, ne_oldM, id) &
-    !$omp shared(n_cells, initial, Hydrogen, ZM, unconverged_cells, ne0, Uk, Ukp1,Elems) &
-    !$omp shared(ne, T, icompute_atomRT, nHtot, epsilon, max_f_HII, min_f_HII, ik_max, max_fjk, ibar, n_cells_done, n_cells_skipped)
-    !$omp do schedule(dynamic) !!without schedule
+    !$omp private(k, ne_oldM, id, ne0, Uk, Ukp1) &
+    !$omp shared(n_cells, initial, Hydrogen, ZM, unconverged_cells, Elems)&
+    !$omp shared(ik_max_id, eps_id, ne, T, icompute_atomRT, nHtot) &
+    !$omp shared(max_f_HII, min_f_HII, ik_max, max_fjk, ibar, n_cells_done, n_cells_skipped)
+    !$omp do schedule(dynamic)
     do k=1,n_cells
        !$ id = omp_get_thread_num() + 1
 
@@ -568,11 +571,9 @@ module elecdensity
        call solve_ne_loc(k, ne0)
       
  
-      if (abs(1.0_dp - ne0 / ne(k)) > epsilon) then
-         epsilon = abs(1.0_dp - ne0 / ne(k))
-             !if (abs((ne(k) - ne0) / ne0) > epsilon) then
-             !epsilon = abs((ne(k) - ne0) / ne0)
-         ik_max = k
+      if (abs(1.0_dp - ne0 / ne(k)) > eps_id(id)) then
+         eps_id(id) = abs(1.0_dp - ne0 / ne(k))
+         ik_max_id(id) = k
       endif
 
        
@@ -589,6 +590,8 @@ module elecdensity
     !$omp end do
     !$omp end parallel
     call progress_bar(50)
+    epsilon = maxval(eps_id)
+    ik_max = ik_max_id(locate(eps_id, epsilon))
 
     if (verbose) then
        write(*,*) " ---------------------------------------------------- "
