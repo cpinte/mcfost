@@ -1297,6 +1297,7 @@ end subroutine define_cylindrical_grid
 
     integer :: i, j, iunit, ios
     real(dp) :: buffer, t, radius
+    logical :: lerror = .false.
 
     iunit = 1
 
@@ -1330,8 +1331,12 @@ end subroutine define_cylindrical_grid
     do i=0,n_rad
        read(iunit,*) radius
        radius = radius * scale_length_units_factor
-       if (radius - r_lim(i) > 1e-6 * radius) call error("fargo3d radius grid")
+       if (radius - r_lim(i) > 1e-6 * radius) then
+          write (*,*) i, "fargo3d r=", radius, "mcfost r=", r_lim(i)
+          lerror=.true.
+       endif
     enddo
+    if (lerror) call error("fargo3d radius grid")
 
     ! Unit test for phi check that is only an offset
     filename = trim(fargo3d%dir)//"/domain_x.dat"
