@@ -61,7 +61,7 @@ contains
              fargo3d%log_spacing = .true.
           else
              fargo3d%log_spacing = .false.
-             call error("MCFOST linear grid for fargo3d not implemented yet")
+             llinear_rgrid = .true.
           endif
        case("FRAME")
           if ((val == "C").or.(val == "c")) then

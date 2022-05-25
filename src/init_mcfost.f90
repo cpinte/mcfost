@@ -155,6 +155,7 @@ subroutine set_default_variables()
   lforce_Mdot = .false.
   lregular_theta = .false.
   theta_max = 0.5*pi
+  llinear_rgrid = .false.
 
   tmp_dir = "./"
 
