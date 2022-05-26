@@ -138,6 +138,7 @@ contains
     integer, parameter :: n_planets_max = 9
     character(len=1) :: s
     real(dp), dimension(n_planets_max) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
+    real(dp) :: Omega
 
     ! Todo : add option to skip velocity files if only continuum is needed
 
@@ -272,6 +273,8 @@ contains
     enddo
     if (.not.lfix_star) call compute_stellar_parameters()
 
+    if (which_planet==0) which_planet=1
+
     if (lplanet_az) then
        RT_n_az = 1
        RT_az_min = planet_az + atan2(-y(which_planet), -x(which_planet)) / deg_to_rad
@@ -280,6 +283,12 @@ contains
        write(*,*) "WARNING: updating the azimuth to:", RT_az_min
     endif
 
+    if (n_planets < 1) then
+       Omega = 1.00049987506246096_dp
+       write(*,*) "Forcing corotating frame as there is no planet"
+    else
+       Omega = Omega_p(which_planet)
+    endif
 
     !-----------------------------------
     ! Passing data to mcfost
@@ -330,7 +339,7 @@ contains
              densite_pouss(:,icell) = fargo3d_density(phik,i,jj) * udens
 
              vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity! vr
-             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega_p(which_planet)) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
              vfield3d(icell,3)  = fargo3d_vz(phik,i,jj) * uvelocity! vtheta
           enddo ! k
        enddo bz
