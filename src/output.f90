@@ -1027,9 +1027,11 @@ end subroutine ecriture_map_ray_tracing
 
 !**********************************************************************
 
-subroutine write_tau_surface()
+subroutine write_tau_surface(imol)
 
   implicit none
+
+  integer, intent(in) :: imol
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
@@ -1047,7 +1049,12 @@ subroutine write_tau_surface()
   image = 0.0 ;
 
   lambda=1
-  filename = trim(data_dir)//"/tau=1_surface.fits.gz"
+  if (imol==0) then ! continuum
+     filename = trim(data_dir)//"/tau=1_surface.fits.gz"
+  else
+     filename = trim(data_dir2(imol))//"/tau=1_surface.fits.gz"
+  endif
+  write(*,*) "Writing "//trim(filename)
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0

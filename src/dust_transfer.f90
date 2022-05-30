@@ -701,7 +701,7 @@ subroutine transfert_poussiere()
            enddo
 
            call ecriture_map_ray_tracing()
-           if (ltau1_surface) call write_tau_surface()
+           if (ltau1_surface) call write_tau_surface(0) ! 0 for continuum
         endif
 
      elseif (letape_th) then ! Calcul de la structure en temperature
@@ -1793,7 +1793,7 @@ end subroutine intensite_pixel_dust
 
 !***********************************************************
 
-subroutine tau_surface_map(lambda,tau, ibin,iaz)
+subroutine tau_surface_map(lambda,tau,ibin,iaz)
 
   real, intent(in) :: tau
   integer, intent(in) :: lambda, ibin, iaz

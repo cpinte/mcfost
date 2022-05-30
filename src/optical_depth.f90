@@ -571,6 +571,127 @@ end subroutine integ_ray_mol
 
 !***********************************************************
 
+subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_speed,tau_threshold,flag_sortie)
+  ! Copmputes position where a given optical depth is reached
+  ! This is simplified version of integ_ray_mol (also inspired by phsyical_length)
+  ! only computes optical depth and stopes where given tau_max is reached
+
+  integer, intent(in) :: imol, icell_in
+  real(kind=dp), intent(inout) :: x,y,z
+  real(kind=dp), intent(in) :: u,v,w, tau_threshold
+  integer, dimension(2), intent(in) :: ispeed
+  real(kind=dp), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
+  logical, intent(out) :: flag_sortie
+
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ltot
+  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite
+  real(kind=dp) :: tau_max, tau_previous
+
+  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell, iv
+
+  logical :: lcellule_non_vide, lstop
+  logical, parameter :: lsubtract_avg = .false.
+
+  x1=x;y1=y;z1=z
+  next_cell = icell_in
+  nbr_cell = 0
+
+  ltot = 0.0_dp
+  lstop = .false.
+  flag_sortie = .false.
+  tau_mol(:) = 0.0_dp
+
+  ! Boucle infinie sur les cellules
+  infinie : do ! Boucle infinie
+     ! Indice de la cellule
+     icell = next_cell
+     x0=x1 ; y0=y1 ; z0=z1
+
+     if (icell <= n_cells) then
+        lcellule_non_vide=.true.
+     else
+        lcellule_non_vide=.false.
+     endif
+
+     ! Test sortie
+     if (test_exit_grid(icell, x0, y0, z0)) then
+         flag_sortie = .true.
+        return
+     endif
+
+     nbr_cell = nbr_cell + 1
+
+     ! Calcul longeur de vol et profondeur optique dans la cellule
+     previous_cell = 0 ! unused, just for Voronoi
+     call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
+
+     if (lcellule_non_vide) then
+        ! local line profile mutiplied by frequency
+        P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,ispeed,tab_speed)
+
+        !do i=1,nTrans
+        !iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
+
+        opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
+
+        ! Epaisseur optique
+        dtau_mol(:) =  l_contrib * opacite(:)
+
+        ! Mise a jour profondeur optique pour cellule suivante
+        ! Warning tau and  tau_c are smaller array (dimension nTrans)
+        tau_mol(:) = tau_mol(:) + dtau_mol(:)
+        tau_max =  maxval(tau_mol(:))
+
+        if (tau_max > tau_threshold) then
+           lstop = .true.
+           iv = maxloc(tau_mol(:),dim=1) + ispeed(1)-1
+
+           !write(*,*) maxloc(tau_mol(:),dim=1), iv
+         !  if (iv>ispeed(2)) then
+         !     do i=ispeed(1),ispeed(2)
+         !        write(*,*) i, tau_mol(i), maxval(tau_mol(:)), maxloc(tau_mol(:)), maxloc(tau_mol(:),dim=1)
+         !     enddo
+         !  endif
+
+           tau_previous = tau_mol(iv) - dtau_mol(iv)
+
+           ! rescaling l_contrib so that tau_max = tau_threshold
+           l_contrib = l_contrib  * (tau_threshold-tau_previous)/(tau_max-tau_previous)
+           l = l_void_before + l_contrib
+           ltot=ltot+l
+        else
+           ltot=ltot+l
+        endif
+     else
+        ltot=ltot+l
+     endif  ! lcellule_non_vide
+
+
+     ! On a fini d'integrer : sortie de la routine
+     if (lstop) then
+        flag_sortie = .false.
+        ! we recompute the position
+        x=x0+l*u
+        y=y0+l*v
+        z=z0+l*w
+
+        if (.not.lVoronoi) then
+           if (l3D) then
+              if (lcylindrical) call indice_cellule(x,y,z, previous_cell)
+           endif
+        endif ! todo : on ne fait rien dans la cas Voronoi ???
+
+        return
+     endif ! lstop
+
+  enddo infinie
+
+  return
+
+end subroutine physical_length_mol
+
+!********************************************************************
+
 function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,ispeed,tab_speed)
 
   integer, intent(in) :: icell
