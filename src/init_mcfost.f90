@@ -13,6 +13,8 @@ module init_mcfost
   use utils
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters
+  use read_idefix, only : read_idefix_parameters
+
 
   implicit none
 
@@ -154,6 +156,9 @@ subroutine set_default_variables()
   lturn_off_Lacc = .false.
   lforce_Mdot = .false.
   lregular_theta = .false.
+  lfargo3d = .false.
+  lathena = .false.
+  lidefix = .false.
   theta_max = 0.5*pi
   llinear_rgrid = .false.
 
@@ -224,7 +229,7 @@ subroutine initialisation_mcfost()
 
   character(len=512) :: cmd, s, str_seed, para, base_para
   character(len=4) :: n_chiffres
-  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file
+  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file, idefix_file
 
   logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb, lold_PA
 
@@ -1144,10 +1149,15 @@ subroutine initialisation_mcfost()
         lathena = .true.
         call get_command_argument(i_arg,athena_file)
         i_arg = i_arg + 1
+     case("-idefix")
+        i_arg = i_arg + 1
+        lidefix = .true.
+        call get_command_argument(i_arg,idefix_file)
+         i_arg = i_arg + 1
      case("-old_PA")
         i_arg = i_arg + 1
         lold_PA = .true.
-     case default
+      case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
         call exit(0)
@@ -1174,6 +1184,13 @@ subroutine initialisation_mcfost()
      call warning("athena : forcing spherical grid") ! only spherical grid is implemented for now
      disk_zone(1)%geometry = 2
      call read_athena_parameters(athena_file)
+  endif
+  if (lidefix) then
+     l3D = .true.
+     if (n_zones > 1) call error("athena mode only work with 1 zone")
+     call warning("idefix : forcing spherical grid") ! only spherical grid is implemented for now
+     disk_zone(1)%geometry = 2
+     call read_idefix_parameters(idefix_file)
   endif
 
   if (n_zones > 1) lvariable_dust=.true.
@@ -1511,6 +1528,7 @@ subroutine display_help()
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -fargo3d <dir> <id> : reads a fargo3d model"
   write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
+  write(*,*) "        : -idefix <dump> : reads an idefix vtk file"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
