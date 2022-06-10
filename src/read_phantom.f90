@@ -725,8 +725,8 @@ end subroutine read_phantom_hdf_files
 subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
   integer, intent(in) :: np, nptmass
-  real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
-  real(kind=dp), dimension(:,:), intent(inout) :: xyzmh_ptmass
+  real(kind=dp), allocatable, dimension(:,:), intent(inout) :: xyzh, vxyzu
+  real(kind=dp), allocatable, dimension(:,:), intent(inout) :: xyzmh_ptmass
   real(kind=dp), intent(in) :: ulength
 
   real(kind=dp), dimension(3) :: centre

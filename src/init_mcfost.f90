@@ -192,6 +192,7 @@ subroutine set_default_variables()
   lforce_Mdot = .false.
   lregular_theta = .false.
   theta_max = 0.5*pi
+  llinear_rgrid = .false.
 
   tmp_dir = "./"
 
@@ -262,7 +263,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file
 
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb, lold_PA
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -1331,8 +1332,11 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lathena = .true.
         call get_command_argument(i_arg,athena_file)
-         i_arg = i_arg + 1
-      case default
+        i_arg = i_arg + 1
+     case("-old_PA")
+        i_arg = i_arg + 1
+        lold_PA = .true.
+     case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
         call exit(0)
@@ -1572,7 +1576,9 @@ subroutine initialisation_mcfost()
   if (.not.limg) loutput_mc = .true.
 
   if (lPA) ang_disque = PA
-  ang_disque = - ang_disque ! rotation North vers East
+  ! rotation North vers East and red-shifted side to North if PA=0
+  ang_disque = -90 - ang_disque
+  if (lold_PA) ang_disque = ang_disque + 90 ! old mcfost convention
 
   if (lzoom) then
      zoom = opt_zoom
@@ -1728,6 +1734,7 @@ subroutine display_help()
   write(*,*) "        : -zoom <zoom> (overrides value in parameter file)"
   write(*,*) "        : -resol <nx> <ny> (overrides value in parameter file)"
   write(*,*) "        : -PA (override value in parameter file)"
+  write(*,*) "        : -old_PA : use old definition (PA of minor axis, red-shifted side to West for PA=0)"
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
   write(*,*) "        : -casa : write an image ready for CASA"
   write(*,*) "        : -nphot_img : overwrite the value in the parameter file"

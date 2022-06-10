@@ -61,7 +61,7 @@ contains
              fargo3d%log_spacing = .true.
           else
              fargo3d%log_spacing = .false.
-             call error("MCFOST linear grid for fargo3d not implemented yet")
+             llinear_rgrid = .true.
           endif
        case("FRAME")
           if ((val == "C").or.(val == "c")) then
@@ -127,14 +127,18 @@ contains
     ! fargo3d data is ordered in x = phi, y = r, z = theta
 
     real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
-    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old
-    real(dp) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
+    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old, i_planet, n_planets
 
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
 
     real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
     type(star_type), dimension(:), allocatable :: etoile_old
+
+    integer, parameter :: n_planets_max = 9
+    character(len=1) :: s
+    real(dp), dimension(n_planets_max) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
+    real(dp) :: Omega
 
     ! Todo : add option to skip velocity files if only continuum is needed
 
@@ -177,23 +181,37 @@ contains
     iunit = 1
 
     ! Reading planet properties
-    filename = trim(fargo3d%dir)//"/planet0.dat"
-    write(*,*) "Reading "//trim(filename)
-    open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
-    if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
+    n_planets = 0
+    planet_loop : do i_planet=1, n_planets_max
+       write(s,"(I1)") i_planet-1
+       filename = trim(fargo3d%dir)//"/planet"//s//".dat"
+       open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+       if (ios /= 0) exit planet_loop
+       n_planets = n_planets+1
+       write(*,*) "Reading "//trim(filename)
+       read(fargo3d%id,*) id
+       do while(ios==0)
+          read(iunit,*) i, x(i_planet), y(i_planet), z(i_planet), vx(i_planet), vy(i_planet), vz(i_planet), &
+               Mp(i_planet), time(i_planet), Omega_p(i_planet)
+          if (i==id) exit
+       enddo
+       close(iunit)
+    enddo planet_loop
 
-    read(fargo3d%id,*) id
-    do while(ios==0)
-       read(iunit,*) i, x, y, z, vx, vy, vz, Mp, time, Omega_p
-       if (i==id) exit
-    enddo
-    simu_time = time * utime
+    write(s,"(I1)") n_planets
+    write(*,*) "Found "//s// " planets"
+
+    if (n_planets > 0) then
+       simu_time = time(n_planets) * utime
+    else
+       simu_time = 0 ! todo : eventually needs to find a better way to get the time
+    endif
 
     ! Checking units :
     ! Omega_p * uvelocity == 29.78 km/s : OK
 
     n_etoiles_old = n_etoiles
-    n_etoiles = 2 ! Hard coded for new
+    n_etoiles = 1 + n_planets
 
     if (lfix_star) then
        write(*,*) ""
@@ -228,17 +246,19 @@ contains
     etoile(1)%vx = 0_dp ; etoile(1)%vy = 0_dp ; etoile(1)%vz = 0_dp
     etoile(1)%M = 1_dp * usolarmass
 
-    ! -x and -y as phi is defined differently in fargo3d
-    etoile(2)%x = -x * ulength_au
-    etoile(2)%y = -y * ulength_au
-    etoile(2)%z =  z * ulength_au
+    do i=1, n_planets
+       ! -x and -y as phi is defined differently in fargo3d
+       etoile(i+1)%x = -x(i) * ulength_au
+       etoile(i+1)%y = -y(i) * ulength_au
+       etoile(i+1)%z =  z(i) * ulength_au
 
-    ! -vx and -y as phi is defined differently in fargo3d
-    etoile(2)%vx = -vx * uvelocity
-    etoile(2)%vy = -vy * uvelocity
-    etoile(2)%vz =  vz * uvelocity
+       ! -vx and -y as phi is defined differently in fargo3d
+       etoile(i+1)%vx = -vx(i) * uvelocity
+       etoile(i+1)%vy = -vy(i) * uvelocity
+       etoile(i+1)%vz =  vz(i) * uvelocity
 
-    etoile(2)%M = Mp * usolarmass
+       etoile(i+1)%M = Mp(i) * usolarmass
+    enddo
 
     do i=1,n_etoiles
        if (etoile(i)%M > 0.013) then
@@ -253,15 +273,22 @@ contains
     enddo
     if (.not.lfix_star) call compute_stellar_parameters()
 
+    if (which_planet==0) which_planet=1
+
     if (lplanet_az) then
-       which_planet = 1 ! 1 planet for now
        RT_n_az = 1
-       RT_az_min = planet_az + atan2(-y, -x) / deg_to_rad
+       RT_az_min = planet_az + atan2(-y(which_planet), -x(which_planet)) / deg_to_rad
        RT_az_max = RT_az_min
        write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
        write(*,*) "WARNING: updating the azimuth to:", RT_az_min
     endif
 
+    if (n_planets < 1) then
+       Omega = 1.00049987506246096_dp
+       write(*,*) "Forcing corotating frame as there is no planet"
+    else
+       Omega = Omega_p(which_planet)
+    endif
 
     !-----------------------------------
     ! Passing data to mcfost
@@ -312,7 +339,7 @@ contains
              densite_pouss(:,icell) = fargo3d_density(phik,i,jj) * udens
 
              vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity! vr
-             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
              vfield3d(icell,3)  = fargo3d_vz(phik,i,jj) * uvelocity! vtheta
           enddo ! k
        enddo bz
