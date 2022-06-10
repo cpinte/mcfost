@@ -132,7 +132,7 @@ module parametres
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
   integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
 
-  logical :: lfargo3d, lathena
+  logical :: lfargo3d, lathena, lidefix
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -294,6 +294,17 @@ module parametres
   end type athena_model
 
   type(athena_model) :: athena
+
+  type idefix_model
+     integer :: nx1, nx2, nx3
+     real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
+     logical :: log_spacing, corrotating_frame
+
+     real(kind=dp) :: time
+     character(len=128) :: filename
+  end type idefix_model
+
+  type(idefix_model) :: idefix
 
 
 end module parametres

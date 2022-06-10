@@ -206,7 +206,7 @@ subroutine integ_tau(lambda)
   write(*,*) 'Integ tau dans plan eq. = ', tau
 
   if (.not.lvariable_dust) then
-     icell = icell_ref
+     icell = icell_not_empty
      if (kappa(icell,lambda) > tiny_real) then
         write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
              (kappa(icell,lambda)/AU_to_cm))
@@ -224,7 +224,7 @@ subroutine integ_tau(lambda)
   write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",E12.5)') angle, tau
 
   if (.not.lvariable_dust) then
-     icell = icell_ref
+     icell = icell_not_empty
      if (kappa(icell,lambda) > tiny_real) then
         write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(1)*3.347929d39))/ &
              (kappa(icell,lambda)/1.49597870691e13))
