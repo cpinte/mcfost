@@ -524,7 +524,7 @@ module Voronoi_grid
        		n_average_neighb_stars = n_average_neighb_stars + 1
        	endif
     enddo
-    if (n_average_neighb_stars>0) write(*,'("mean number of stellar neighbours="(1I5))') &
+    if (n_average_neighb_stars>0) write(*,'(" Mean number of stellar neighbours = "(1I5))') &
     	int(real(size(pack(Voronoi(:)%is_star_neighbour,mask=Voronoi(:)%is_star_neighbour)))/real(n_etoiles))
 
 

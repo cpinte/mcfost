@@ -19,9 +19,9 @@ module atom_transfer
    use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, hydrogen, helium, adjust_cswitch_atoms, maxval_cswitch_atoms, lcswitch_enabled, vbroad
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
-   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, vlabs
+   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, vlabs, write_opacity_emissivity_bin
    use see, only : n_new, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
-                  rate_matrix, init_rates, update_populations, accumulate_radrates_mali
+                  init_rates, update_populations, accumulate_radrates_mali, write_rates
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
@@ -45,7 +45,6 @@ module atom_transfer
    contains
 
 !TO DO 
-!      add iterate ne
 !      add Ng
 !      add Trad, Tion
    subroutine nlte_loop_mali()
@@ -59,7 +58,7 @@ module atom_transfer
       integer, dimension(nb_proc) :: max_n_iter_loc
       integer, parameter :: maxIter = 1000, maxIter_loc = 100
       logical :: lfixed_Rays, lconverged, lconverged_loc, lprevious_converged
-      real :: rand, rand2, rand3, fac_etape
+      real :: rand, rand2, rand3
       real(kind=dp) :: precision
       integer, parameter :: n_rayons_max = 1 !ray-by-ray except for subiterations
                                              !but in that case only itot and phi_loc and ds needs
@@ -67,7 +66,7 @@ module atom_transfer
       integer :: n_rayons_sub
       real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy
       real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
-      real(kind=dp) :: diff, diff_old, dne, dN, dN1
+      real(kind=dp) :: diff, diff_old, dne, dN, dN1, dNc
       real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
 
       logical :: labs, lsubiteration = .false.
@@ -154,20 +153,21 @@ module atom_transfer
 
          write(*,*) ""
          if (etape==1) then
-            precision = dpops_max_error
             !use stepan if healpix_lorder < 2?
             allocate(xmux(n_rayons),xmu(n_rayons),xmuy(n_rayons),wmu(n_rayons))
             wmu(:) = healpix_weight(healpix_lorder)
             write(*,'(" ****-> Using "(1I8)" pixels for healpix, resolution of "(1F12.3)" degrees")') n_rayons,  healpix_angular_resolution(healpix_lorder)
             call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
-         else if (etape==2) then
-            lng_turned_on = .false.
-            fac_etape = 0.1
-            if (etape_start==1) then
-               precision = min(1e-1,10.0*dpops_max_error)
+            if (etape_end > 1) then
+               !use that etape to have an initial solution already close to
+               !convergence for the next etape.
+               precision = 1d-1!min(1e-1,10.0*dpops_max_error)
             else
+               !only one etape, use dpops_max_error
                precision = dpops_max_error
             endif
+         else if (etape==2) then
+            precision = dpops_max_error
             n_rayons = N_rayons_mc
             write(*,'(" ****-> Using "(1I4)" rays for Monte-Carlo step, ~resolution of "(1F12.3)" degrees")') n_rayons, 360.0 * sqrt(pi/real(n_rayons))/pi
             allocate(wmu(n_rayons))
@@ -179,11 +179,10 @@ module atom_transfer
          call system_clock(count_start,count_rate=time_tick,count_max=time_max)
 
          lconverged = .false.
-         lprevious_converged =  lforce_lte
+         lprevious_converged = lforce_lte
          lcell_converged(:) = .false.
          lng_turned_on = .false.
          n_iter = 0
-         dne = 0.0_dp
          conv_speed = 0.0
          conv_acc = 0.0
          diff_old = 0.0
@@ -194,7 +193,7 @@ module atom_transfer
          do while (.not.lconverged)
 
             n_iter = n_iter + 1
-            write(*,'(" *** Iteration #"(1I3)"; step #"(1I1))') n_iter, etape
+            write(*,'(" *** Iteration #"(1I3)"; step #"(1I1)"; theshold: "(1ES11.2E3))') n_iter, etape, precision
             ibar = 0
             n_cells_done = 0
 
@@ -207,7 +206,7 @@ module atom_transfer
 
             if( n_iterate_ne > 0 ) then
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
-               if (lforce_lte) l_iterate_ne = .false.
+               ! if (lforce_lte) l_iterate_ne = .false.
             endif
 
             call progress_bar(0)
@@ -295,7 +294,6 @@ module atom_transfer
                      call error("etape inconnue")
                   end if !etape
 
-                  call rate_matrix(id)
                   call update_populations(id, icell, (l_iterate_ne.and.icompute_atomRT(icell)==1), diff)
 
                   ! n_iter_loc = 0
@@ -314,7 +312,6 @@ module atom_transfer
                   !       call xcoupling(id, icell, iray, .true.)
                   !       call accumulate_radrates_mali(id, icell, iray, weight)                        
                   !    enddo
-                  !    call rate_matrix(id)
                   !    !electronic density fixed for the sub-iterations (because it is already an iterative loop)
                   !    !do the electron density iterations after the sub-iterations ??
                   !    call update_populations(id, icell,.false.,diff)
@@ -369,7 +366,7 @@ module atom_transfer
                !$omp do schedule(dynamic,1)
                do icell=1,n_cells
                   !$ id = omp_get_thread_num() + 1
-                  l_iterate = (icompute_atomRT(icell)>0) 
+                  l_iterate = (icompute_atomRT(icell)==1) 
                   if (l_iterate) then 
                      dne = max(dne, abs(1.0_dp - ne(icell)/ne_new(icell)))
                      ne(icell) = ne_new(icell) !needed for lte pops !
@@ -403,7 +400,7 @@ module atom_transfer
                end do
                !$omp end do
                !$omp end parallel
-               write(*,'("  NEW ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+               write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
                   minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                write(*,*) ''  
             end if
@@ -419,7 +416,7 @@ module atom_transfer
             diff = 0.0
             !$omp parallel &
             !$omp default(none) &
-            !$omp private(id,icell,l_iterate,dN1,dN,ilevel,nact,atom)&
+            !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,atom)&
             !$omp shared(diff, diff_cont, dM,n_new,Activeatoms,lcell_converged)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot)
             !$omp do schedule(dynamic,1)
@@ -431,6 +428,7 @@ module atom_transfer
 
                   !Local only
                   dN = 0.0 !for all levels of all atoms of this cell
+                  dNc = 0.0!cont levels
                   do nact=1,NactiveAtoms
                      atom => ActiveAtoms(nact)%p
 
@@ -441,22 +439,22 @@ module atom_transfer
                            dM(nact) = max(dM(nact), dN1)
                         endif
                      end do !over ilevel
-                     diff_cont = max(diff_cont, abs(1.0 - atom%n(atom%Nlevel,icell)/(1d-50 + n_new(nact,atom%Nlevel,icell) )))
-
+                     dNc = max(dNc, dN1)!the last dN1 is necessarily the last ion of each species
 
                      atom => NULL()
                   end do !over atoms
 
                   !compare for all atoms and all cells
                   diff = max(diff, dN) ! pops
-                  lcell_converged(icell) = (real(diff) < precision)!.and.(dne < precision)
+                  diff_cont = max(diff_cont,dNc)
+                  lcell_converged(icell) = (diff < precision)!.and.(dne < precision)
 
                   !Re init for next iteration if any
                   do nact=1, NactiveAtoms
                      atom => ActiveAtoms(nact)%p
                      atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
-                     atom => NULL()
                   end do
+                  atom => null()
 
                end if !if l_iterate
             end do cell_loop2 !icell
@@ -472,20 +470,21 @@ module atom_transfer
             if (maxval(max_n_iter_loc)>1) write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
             do nact=1,NactiveAtoms
                write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%p%ID
-               write(*,'("   >>> dpop="(1ES17.8E3))') dM(nact)
+               write(*,'("   >>> dpop="(1ES13.5E3))') dM(nact)
             enddo
             if (dne /= 0.0_dp) then
                write(*,*) ""
-               write(*,'("   >>> dne="(1ES17.8E3))') dne
+               write(*,'("   >>> dne="(1ES13.5E3))') dne
             endif
             write(*,*) ""
-            write(*,'(" <<->> diff="(1ES17.8E3)," old="(1ES17.8E3))') diff, diff_old
-            write(*,'("   ->> diffcont="(1ES17.8E3))') diff_cont
-            write(*,'("   ->> speed="(1ES17.8E3)"; acc="(1ES17.8E3))') conv_speed, conv_acc
-            write(*,"('   ->> Unconverged cells #'(1I6), ' fraction :'(1F12.3)' %')") &
+            write(*,'(" <<->> diff="(1ES13.5E3)," old="(1ES13.5E3))') diff, diff_old
+            write(*,'("   ->> diffcont="(1ES13.5E3))') diff_cont
+            write(*,'("   ->> speed="(1ES12.4E3)"; acc="(1ES12.4E3))') conv_speed, conv_acc
+            write(*,"('   ->> Unconverged cells #'(1I6)'; fraction:'(1F6.2)'%')")&!; lgeps:'1F4.1)") &
                size(pack(lcell_converged,mask=(lcell_converged==.false.).and.(icompute_atomRT>0))), &
                100.*real(size(pack(lcell_converged,mask=(lcell_converged==.false.).and.(icompute_atomRT>0)))) / &
-               real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
+               real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))!, log10(precision)
+            ! write(*,'("   ->> threshold="(1ES11.2E3))'), precision
             write(*,*) "      -------------------------------------------------- "
             diff_old = diff
             conv_acc = conv_speed
@@ -565,7 +564,8 @@ module atom_transfer
          if (etape==1) deallocate(xmux,xmuy,xmu)
          if (allocated(wmu)) deallocate(wmu)
 
-         write(*,'("  <step #"(1I1)" done! :: threshold="(1ES17.8E3)">")') etape,  precision
+         ! write(*,'("  <step #"(1I1)" done! :: threshold="(1ES17.8E3)">")') etape,  precision
+         write(*,'("  <step #"(1I1)" done!>")') etape
 
       end do step_loop
 
@@ -580,6 +580,7 @@ module atom_transfer
          call write_pops_atom(Atoms(nact)%p)
       end do
 
+      if (loutput_rates) call write_rates()
 
       call dealloc_nlte_var()
       deallocate(dM, dTM, Tex_ref, Tion_ref)
@@ -1222,7 +1223,8 @@ module atom_transfer
       enddo
       close(1)
 
-      deallocate(cos_theta, weight_mu, p, I_1d, Itot)
+      ! call write_opacity_emissivity_bin(n_lambda, tab_lambda_nm)
+      deallocate(cos_theta, weight_mu, p, I_1d, Itot, tab_lambda_nm, tab_lambda)
 
    return
    end subroutine spectrum_1d

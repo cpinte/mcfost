@@ -171,43 +171,6 @@ module elecdensity
     return
   end subroutine show_electron_given_per_elem
 
-  subroutine ionisation_frac_lte(elem, k, ne, fjk, dfjk)
-  !special version that forces ionisation fraction at LTE.
-    real(kind=dp), intent(in) :: ne
-    integer, intent(in) :: k
-    type (Element), intent(in) :: Elem
-    real(kind=dp), dimension(:), intent(inout) :: fjk, dfjk
-    real(kind=dp) :: Uk, Ukp1, sum1, sum2
-    integer :: j,  Nstage
-    !return Nj / Ntot
-    !for neutral j * Nj/Ntot = 0
-
-    !fjk(1) is N(1) / ntot !N(1) = sum_j=1 sum_i=1^N(j) n(i)
-    fjk(1)=1.
-    dfjk(1)=0.
-    sum1 = 1.
-    sum2 = 0.
-    Uk = get_pf(elem,1,T(k))
-    do j=2,Elem%Nstage
-       Ukp1 = get_pf(elem,j,T(k))
-       fjk(j) = Sahaeq(T(k),fjk(j-1),Ukp1,Uk,elem%ionpot(j-1),ne)
-       !fjk(j) = ne * cste, der = cste  fjk(j) / ne
-
-       dfjk(j) = -(j-1)*fjk(j)/ne
-
-       sum1 = sum1 + fjk(j)
-       sum2 = sum2 + dfjk(j)
-
-       Uk = Ukp1
-    end do
-
-    fjk(:)=fjk(:)/sum1
-    dfjk(:)=(dfjk(:)-fjk(:)*sum2)/sum1
-
-
-    return
-  end subroutine ionisation_frac_lte
-
   subroutine calc_ionisation_frac(elem, k, ne, fjk, dfjk, n0)
     !return j * Nj / Ntot and N0/Ntot
 
@@ -595,11 +558,12 @@ module elecdensity
 
     if (verbose) then
        write(*,*) " ---------------------------------------------------- "
-       write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
-       write(*,'("   >>>  Diff to previous solution="(1ES17.8E3)" at cell "(1I7))') epsilon, ik_max
+       write(*,'("ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+       write(*,'("   >>>  Diff to previous solution="(1ES13.5E3)" at cell "(1I7))') epsilon, ik_max
+      !  write(*,'("   >>>  Diff to previous solution="(1ES17.8E3)" at cell "(1I7))') epsilon, ik_max
        write(*,*) " T = ", T(ik_max)," nH = ", nHtot(ik_max)
        write(*,*) " "
-       write(*,'("Ionisation fraction of HII "(1ES17.8E3, 1ES17.8E3))') max_f_HII, min_f_HII
+       write(*,'("Ionisation fraction of HII "(1ES13.5E3, 1ES13.5E3))') max_f_HII, min_f_HII
        ! 			call show_electron_given_per_elem(0, 0, max_fjk)
        write(*,*) " ---------------------------------------------------- "
     endif

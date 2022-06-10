@@ -80,7 +80,6 @@ module broad
       real(kind=dp), intent(out) :: GvdW
       integer, intent(in) :: icell
       type (AtomicLine), intent(in) :: line
-      type (Element), pointer :: Helium_elem
       integer :: i, j, ic, Z, k
       real(kind=dp) :: vrel35_H, vrel35_He, fourPIeps0, deltaR
       real(kind=dp) :: cross, gammaCorrH, gammaCorrHe, C625
@@ -107,7 +106,8 @@ module broad
             cross = 8.08 * (line%cvdWaals(1)*vrel35_H+line%cvdWaals(3)*Elems(2)%abund*vrel35_He)*C625
             GvdW = cross * T(icell)**(3d-1)
          case ("BARKLEM")
-            cross = 8.08 * line%cvdWaals(3)*Helium_elem%abund*vrel35_He*C625 * T(icell)**(0.3)  !Unsold
+            !-> elems(2) is Helium.
+            cross = 8.08 * line%cvdWaals(3)*Elems(2)%abund*vrel35_He*C625 * T(icell)**(0.3)  !Unsold
             GvdW = line%cvdWaals(1) * T(icell)**(0.5 - 0.5*line%cvdWaals(2)) + cross
          case default
             write(*,*) "Method for van der Waals broadening unknown", line%vdwaals

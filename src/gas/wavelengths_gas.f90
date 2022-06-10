@@ -272,6 +272,7 @@ module wavelengths_gas
       do n=1, N_atoms
          atom => atoms(n)%p
          !km/s
+         !TO DO: define one hv per atom !
          hv = min(hv, 1d-3 * 0.46*vbroad(minval(T,mask=T>0),atom%weight,minval(vturb,mask=T>0)))
          do kr=1,atom%Ncont
             if (atom%continua(kr)%hydrogenic) then
@@ -287,8 +288,8 @@ module wavelengths_gas
                atom%lines(kr)%Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
             ! elseif (associated(subgrid_line,line_lambda_grid_dv)) then
             !    atom%lines(kr)%Nlambda = nint(2 * line%vmax / hv + 1)
-            ! else
-            !    call error("wrong association for subline_grid!")
+            else
+               call error("Before use lambda_grid_dv, change hv in hv(n_atoms) and the corresponding routines (this one and the line grid)!")
             endif
          enddo 
          Ntrans = Ntrans + atom%Ntr
@@ -460,6 +461,7 @@ module wavelengths_gas
             do kr=1,atom%Nline
 
                if (hv>0.0) then
+                  !use one hv per atom here (?)
                   atom%lines(kr)%Nlambda = nint(2 * 1d-3 * atom%lines(kr)%vmax / hv + 1)
                   ! write(*,*) "Nlambda line hv>0:", nint(2 * 1d-3 * atom%lines(kr)%vmax / hv + 1)
                ! else

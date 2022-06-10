@@ -4,7 +4,6 @@ module see
     use elements_type
     use grid
     use parametres
-    use elecdensity, only  : ionisation_frac_lte
     use gas_contopac, only        : H_bf_Xsection
     use wavelengths, only         :  n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm
@@ -12,11 +11,14 @@ module see
     use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, chi_tot
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
+    use fits_utils, only : print_error
 
     implicit none
 
-    real(kind=dp), parameter :: frac_limit_pops = 1d-50
+    real(kind=dp), parameter :: frac_limit_pops = 1d-10!1d-50
     !Variables for Non-LTE loop and MALI method
+    !TO DO: merge npgop and n_new. n_new is a special version of ngpop
+    !merge ne ?
     real(kind=dp), allocatable :: n_new(:,:,:), lcell_converged(:), ne_new(:), ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Uji_cont(:,:,:), tab_Vij_cont(:,:,:)
 
@@ -25,8 +27,8 @@ module see
     integer :: Neq_ne
     integer, allocatable, dimension(:,:) :: gs_ion !index of the ground states of each ion
     real(kind=dp), allocatable :: gtot(:,:,:), gr_save(:,:,:,:), dgrdne(:,:,:), dgcdne(:,:,:)
-    real(kind=dp), allocatable :: pops_ion(:,:,:) ,npop_dag(:,:)
-    real(kind=dp), allocatable :: fvar(:,:), dfvar(:,:,:), xvar(:,:) !Jacobian
+    real(kind=dp), allocatable :: pops_ion(:,:,:), npop_dag(:,:)
+    real(kind=dp), allocatable :: fvar(:,:), xvar(:,:), dfvar(:,:,:)!Jacobian
 
 
     contains
@@ -181,7 +183,7 @@ module see
         endif
 
 
-        write(*,'("Total memory allocated in NLTEloop:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
+        write(*,'("  Total memory allocated in NLTEloop:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
 
         return 
     end subroutine alloc_nlte_var
@@ -380,16 +382,12 @@ module see
     !see Hubeny & Mihalas 2014 eq. 14.8a to 14.8c for the rate matrix elements.
     !Rij and Rji are 0 if lte.
     !atom%cswitch is 1.0 by default
+    ! If lforce_lte (-see_lte) radiative rates are initialized at 0 and never updated.
     !TO DO:
     ! occupation probability
         integer, intent(in) :: id
         type (AtomType), intent(inout) :: atom
         integer :: kr, l, i, j
-        real(kind=dp) :: nlte_fact
-        nlte_fact = 1.0_dp
-        if (lforce_lte) nlte_fact = 0.0_dp
-        !only Rji are initialised to Aji or Uji for cont and lines!
-        !even if lforce_lte.
 
         atom%Gamma(:,:,id) = 0.0_dp
 
@@ -401,7 +399,7 @@ module see
             ! write(*,*)"Rji=", atom%lines(kr)%Rji(id),"Cji=",atom%lines(kr)%Cji(id)
 
             atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - (atom%lines(kr)%Rij(id)+atom%cswitch*atom%lines(kr)%Cij(id))
-            atom%Gamma(i,j,id) = atom%Gamma(i,j,id) - (nlte_fact*atom%lines(kr)%Rji(id)+atom%cswitch*atom%lines(kr)%Cji(id))
+            atom%Gamma(i,j,id) = atom%Gamma(i,j,id) - (atom%lines(kr)%Rji(id)+atom%cswitch*atom%lines(kr)%Cji(id))
 
         enddo
 
@@ -413,7 +411,7 @@ module see
             ! write(*,*) "Rji=",atom%continua(kr)%Rji(id),"Cji=",atom%continua(kr)%Cji(id)
 
             atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - (atom%continua(kr)%Rij(id)+atom%cswitch*atom%continua(kr)%Cij(id))
-            atom%Gamma(i,j,id) = atom%Gamma(i,j,id) - (nlte_fact*atom%continua(kr)%Rji(id)+atom%cswitch*atom%continua(kr)%Cji(id))
+            atom%Gamma(i,j,id) = atom%Gamma(i,j,id) - (atom%continua(kr)%Rji(id)+atom%cswitch*atom%continua(kr)%Cji(id))
 
         enddo
 
@@ -434,12 +432,13 @@ module see
         integer :: n
 
         do n=1,NactiveAtoms
-            call init_rates_atom(id,icell,ActiveAtoms(n)%p)
+            call init_radrates_atom(id,icell,ActiveAtoms(n)%p)
 
             !x ne included. Derivatives to ne not included.
             if (activeatoms(n)%p%id=='H') then
                 call collision_rates_hydrogen_loc(id,icell)
             else 
+                call init_colrates_atom(id,ActiveAtoms(n)%p)
                 call collision_rates_atom_loc(id,icell,ActiveAtoms(n)%p)
             endif
         enddo
@@ -447,30 +446,47 @@ module see
         return 
     end subroutine init_rates
 
-    subroutine init_rates_atom(id,icell,atom)
-        integer, intent(in) :: id, icell
+    subroutine init_colrates_atom(id,atom)
+        integer, intent(in) :: id
         type (atomtype), intent(inout) :: atom 
-        integer :: kr, i, j
+        integer :: kr
 
         do kr=1,atom%Ncont
-            i = atom%continua(kr)%i; j = atom%continua(kr)%j
-            atom%continua(kr)%Rij(id) = 0.0_dp
-            !updated value of ni and nj!
-            atom%continua(kr)%Rji(id) = tab_Uji_cont(kr,atom%activeindex,icell) * atom%nstar(i,icell)/atom%nstar(j,icell)
             atom%continua(kr)%Cij(id) = 0.0_dp
             atom%continua(kr)%Cji(id) = 0.0_dp
         enddo
 
         do kr=1,atom%Nline
-            atom%lines(kr)%Rij(id) = 0.0_dp
-            atom%lines(kr)%Rji(id) = atom%lines(kr)%Aji
             atom%lines(kr)%Cij(id) = 0.0_dp
             atom%lines(kr)%Cji(id) = 0.0_dp
         enddo
 
         return
+    end subroutine init_colrates_atom
 
-    end subroutine init_rates_atom
+    subroutine init_radrates_atom(id,icell,atom)
+        integer, intent(in) :: id, icell
+        type (atomtype), intent(inout) :: atom 
+        integer :: kr, i, j
+        real(kind=dp) :: nlte_fact
+        nlte_fact = 1.0_dp
+        if (lforce_lte) nlte_fact = 0.0_dp
+
+        do kr=1,atom%Ncont
+            i = atom%continua(kr)%i; j = atom%continua(kr)%j
+            atom%continua(kr)%Rij(id) = 0.0_dp
+            !updated value of ni and nj!
+            atom%continua(kr)%Rji(id) = nlte_fact * tab_Uji_cont(kr,atom%activeindex,icell) * atom%nstar(i,icell)/atom%nstar(j,icell)
+        enddo
+
+        do kr=1,atom%Nline
+            atom%lines(kr)%Rij(id) = 0.0_dp
+            atom%lines(kr)%Rji(id) = nlte_fact * atom%lines(kr)%Aji
+        enddo
+
+        return
+
+    end subroutine init_radrates_atom
 
 
 !to do level dissolution
@@ -652,13 +668,12 @@ module see
             call see_atoms_ne(id,icell,delta,dne)
         else
             do nact=1, Nactiveatoms
-
                 atom => activeatoms(nact)%p
+                call rate_matrix_atom(id, atom)
                 call SEE_atom(id, icell, atom, dM)
                 !max for all atoms
                 delta = max(delta, dM)
                 atom => null()
-
             enddo
         endif
         !do nact=1,NactiveAtoms
@@ -679,19 +694,22 @@ module see
         integer, parameter :: maxIter = 1000
         integer :: n_iter, max_iter
         integer, parameter :: damp_scaling = 10
-        real(kind=dp), parameter :: damp_char = 5.0, precision = 1d-3!1d-5
+        real(kind=dp), parameter :: damp_char = 5.0, precision = 1d-5
         logical ::verbose, lconverged, rest_damping, lsecond_try, neg_pops
-        real(kind=dp) :: d_damp
+        real(kind=dp) :: d_damp, tmp_fact
 
         type (AtomType), pointer :: at
-        integer :: n, nlev, i, j, kr
+        integer :: n, nlev, i, j, kr, ip, jp
         real(kind=dp) ::delta_f, dfpop,dfne
+
+        verbose = .false.!debug mode
+        tmp_fact = 1.0_dp
+        if (lforce_lte) tmp_fact = 0.0_dp
 
         nlev = Neq_ne - 1
 
         dM = 0.0
         dne = 0.0
-        verbose = .false.!debug mode
         lconverged = .false.
         rest_damping = .false.
         d_damp = damp_char
@@ -709,8 +727,8 @@ module see
             at => ActiveAtoms(n)%p
             npop_dag(i:(i-1)+at%Nlevel,id) = at%n(:,icell)
             call radrate_matrix_on_ne_atom(id,icell,at,at%gamma(:,:,id),at%dgdne(:,:,id))
-            dgrdne(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) = at%dgdne(:,:,id)
-            gr_save(1:at%Nlevel,1:at%Nlevel,n,id) = at%gamma(:,:,id)
+            dgrdne(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) = tmp_fact*at%dgdne(:,:,id)
+            gr_save(1:at%Nlevel,1:at%Nlevel,n,id) = tmp_fact*at%gamma(:,:,id)
             i = i + at%Nlevel
         enddo
         at => null()
@@ -722,15 +740,13 @@ module see
         max_iter = maxIter
 
         iterative_loop : do while (.not.lconverged)
-            ! delta_f = 0.0_dp
-            ! dfpop = 0.0_dp !only populations
-            ! dfne = 0.0_dp
 
             n_iter = n_iter + 1
-
+            xvar(1:nlev,id) = 0.0
             xvar(Neq_ne,id) = ne(icell) !current value
             fvar(:,id) = 0.0
             dfvar(:,:,id) = 0.0
+            pops_ion(:,:,id) = 0.0
 
             !initiate with CURRENT values
             !get the total populations of each ion except the neutrals!    
@@ -745,16 +761,16 @@ module see
                 ! write(*,*) ""
                 ! write(*,*) at%Id, at%Nstage, gs_ion(1,n)
                 do j=2, at%Nstage-1
-                    ! write(*,*) gs_ion(j-1,n),gs_ion(j,n)
+                    ! write(*,*) gs_ion(j,n),gs_ion(j+1,n)
                     pops_ion(j-1,n,id) = sum(at%n(gs_ion(j,n):gs_ion(j+1,n)-1,icell))
-                    ! if (at%ID=="He")write(*,*) sum(helium%n(19:24,icell)), pops_ion(j-1,n)
+                    ! write(*,*) pops_ion(j-1,n,id)
                 enddo
                 pops_ion(at%Nstage-1,n,id) = at%n(at%Nlevel,icell)
-                ! if (at%ID=="H")write(*,*) hydrogen%n(hydrogen%Nlevel,icell), pops_ion(at%Nstage-1,n)
-                ! if (at%ID=="He")write(*,*) helium%n(25,icell), pops_ion(at%Nstage-1,n)
+                ! write(*,*) pops_ion(at%Nstage-1,n,id),  at%n(at%Nlevel,icell)        
                 if (at%ID=='H') then
                     call collision_rates_hydrogen_loc(id,icell)
                 else
+                    call init_colrates_atom(id,at)
                     call collision_rates_atom_loc(id,icell,at)
                 endif
 !*****!
@@ -763,7 +779,8 @@ module see
                 !add current ne estimate to continua radiative rates
                 gtot(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) = gr_save(1:at%Nlevel,1:at%Nlevel,n,id)
                 do kr=at%Ntr_line+1,at%Ntr
-                    gtot(i+at%i_trans(kr)-1,i+at%j_trans(kr)-1,id) = gtot(i+at%i_trans(kr)-1,i+at%j_trans(kr)-1,id) * xvar(neq_ne,id)
+                    ip = at%i_trans(kr); jp = at%j_trans(kr)
+                    gtot(i+ip-1,i+jp-1,id) = gtot(i+ip-1,i+jp-1,id) * xvar(neq_ne,id)
                 enddo
                 !recompute diagonal for that atom now that ne is taken intout account in gam_rad
                 !can be done better
@@ -774,14 +791,16 @@ module see
 
                 call colrate_matrix_atom(id, icell, at, at%gamma(:,:,id),at%dgdne(:,:,id))
                 dgcdne(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) = at%dgdne(:,:,id)
-                gtot(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) = gtot(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) + at%Gamma(:,:,id) 
-                i = i + at%Nlevel
+                gtot(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) = gtot(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) + at%Gamma(:,:,id)
+                i = i + at%nlevel
             enddo
             at=>null()
-
+            ! write(*,*) icell, T(icell), ne(icell), nHtot(icell)
+            ! write(*,*) "g=",gtot(:,:,id)
+            ! write(*,*) "dg=",dgrdne(:,:,id)+dgcdne(:,:,id)
+            ! stop
             !rate equation for this atom stored in f and df !
             !an equation per level dn_i/dt = 0 = sum_lp n_l * Gamma_lp_l
-!**** can I do a single loop for all equations of all atoms here ???
             call rate_equations(id, icell, Neq_ne, gtot(:,:,id), dgrdne(:,:,id), dgcdne(:,:,id), xvar(:,id), fvar(:,id), dfvar(:,:,id))
 
             !charge conservation!
@@ -793,7 +812,7 @@ module see
 
             !newton raphson!
             call multivariate_newton_raphson (neq_ne, dfvar(:,:,id), fvar(:,id), xvar(:,id))
-
+ 
             !update atomic populations and ne
             neg_pops = .false.
             i = 1
@@ -801,15 +820,15 @@ module see
                 at => ActiveAtoms(n)%p
                 do j=1,at%Nlevel
                     at%n(j,icell) = at%n(j,icell) * ( 1.0_dp + fvar((i-1)+j,id)/(1.0_dp + d_damp * abs(fvar((i-1)+j,id))) )
-                    neg_pops = (at%n(j,icell) < 0.0)
+                    if (at%n(j,icell) < 0.0) neg_pops = .true.
                 enddo
                 i = i + at%Nlevel
             enddo
             at => null()
-            ne(icell) = ne(icell) * ( 1.0 + fvar(neq_ne,id)/(1.0 + d_damp * abs(fvar(neq_ne,id))) )
-
-
-            if ( (ne(icell) < 1d-16 * hydrogen%n(hydrogen%Nlevel,icell)).or.(neg_pops) ) rest_damping = .true.
+            ne(icell) = ne(icell) * ( 1.0 + fvar(neq_ne,id)/(1.0_dp + d_damp * abs(fvar(neq_ne,id))) )
+            !                       1d-16
+            if ( (ne(icell) < frac_limit_pops * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
+            !-> here pops_ion has the old values !
             !restart with more iterations and larger damping (more stable, slower convergence)
             if (rest_damping .and. d_damp < (damp_char + 1.0)) then
                 xvar(:,id) = npop_dag(:,id)
@@ -824,13 +843,13 @@ module see
             endif
 
             !should be fractional
-            delta_f = maxval(abs(fvar(:,id)))!max(delta_f, maxval(abs(fvar)))
-            dfpop = maxval(abs(fvar(1:Neq_ne-1,id)))!max(dfpop, maxval(abs(fvar(1:Neq_ne-1))))
-            dfne = abs(fvar(neq_ne,id))!max(dfne, abs(fvar(neq_ne)))
+            delta_f = maxval(abs(fvar(:,id)))
+            dfpop = maxval(abs(fvar(1:Neq_ne-1,id)))
+            dfne = abs(fvar(neq_ne,id))
 
             if (verbose) then
-                write(*,'("niter #"(1I4))') n_iter
-                write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfne="(1ES17.8E3))') delta_f, dfne
+                write(*,'("niter #"(1I5))') n_iter
+                write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfpop="(1ES17.8E3)" dfne="(1ES17.8E3))') delta_f, dfpop, dfne
             endif
 
             if (n_iter > max_iter) then
@@ -848,6 +867,7 @@ module see
                     max_iter = damp_scaling * maxIter
                     d_damp = real(damp_scaling) * damp_char
                     xvar(:,id) = npop_dag(:,id)
+                    if (verbose) write(*,*) "second iter", max_iter, d_damp
                 endif
             endif
 
@@ -858,9 +878,10 @@ module see
 
         enddo iterative_loop !on convergence
 
-        !compute global convergence rate and reset values (ne, n) to the 
+        !compute global convergence rate and reset values (ne, n) to
         ! the value of the MALI iteration.
-        ! the new ne and n are updated only after the end of a MALI iteration (loop over all cells).
+        ! the new ne and n are updated only after the end of a MALI iteration (loop over all cells) to avoid 
+        ! introducing to much non-linearity.
 
         dne = abs(1.0_dp - npop_dag(Neq_ne,id)/ne(icell))
         dM = 0
@@ -884,6 +905,43 @@ module see
 
         return
     end subroutine see_atoms_ne
+
+  subroutine ionisation_frac_lte(elem, k, ne, fjk, dfjk)
+  !special version that forces ionisation fraction at LTE.
+    real(kind=dp), intent(in) :: ne
+    integer, intent(in) :: k
+    type (Element), intent(in) :: Elem
+    real(kind=dp), dimension(:), intent(inout) :: fjk, dfjk
+    real(kind=dp) :: Uk, Ukp1, sum1, sum2
+    integer :: j,  Nstage
+    !return Nj / Ntot
+    !for neutral j * Nj/Ntot = 0
+
+    !fjk(1) is N(1) / ntot !N(1) = sum_j=1 sum_i=1^N(j) n(i)
+    fjk(1)=1.
+    dfjk(1)=0.
+    sum1 = 1.
+    sum2 = 0.
+    Uk = get_pf(elem,1,T(k))
+    do j=2,Elem%Nstage
+       Ukp1 = get_pf(elem,j,T(k))
+       fjk(j) = Sahaeq(T(k),fjk(j-1),Ukp1,Uk,elem%ionpot(j-1),ne)
+       !fjk(j) = ne * cste, der = cste  fjk(j) / ne
+
+       dfjk(j) = -(j-1)*fjk(j)/ne
+
+       sum1 = sum1 + fjk(j)
+       sum2 = sum2 + dfjk(j)
+
+       Uk = Ukp1
+    end do
+
+    fjk(:)=fjk(:)/sum1
+    dfjk(:)=(dfjk(:)-fjk(:)*sum2)/sum1
+
+
+    return
+  end subroutine ionisation_frac_lte
     
     subroutine non_lte_charge_conservation (id,icell, neq, x, f, df)
     !F_cc = 1.0 - 1/ne * (np + nHeII + 2*nHeIII) = 0
@@ -906,8 +964,8 @@ module see
         enddo
 
         !derivative of CC to ne
-        f(neq) = 1.0 - (1.0/x(neq)) * sum_ions !factor 2 for nHeIII included (1 for np and nheII)
-        df(neq,neq) = 1/x(neq)**2 * sum_ions
+        f(neq) = 1.0_dp - sum_ions / x(neq) !factor 2 for nHeIII included (1 for np and nheII)
+        df(neq,neq) = sum_ions / x(neq)**2
 
         !derivative of CC to ions and individual levels making up to the ions pops.
         !in otherword, derivative to x(1:neq-1) if x belongs to an ion (stage > 0, not neutral)
@@ -922,13 +980,17 @@ module see
             do k=1, activeatoms(n)%p%Nlevel
                 st = activeatoms(n)%p%stage(k)
                 !for neutrals it adds 0 !
-                df(neq,(i-1)+k) = -1.0/x(neq) * st
+                df(neq,(i-1)+k) = -st / x(neq)
                 !for debug only
                 if ((i-1)+k == neq) call error("non_lte_charge_conservation!")
             enddo
             i = i + activeatoms(n)%p%Nlevel
         enddo
 
+
+        ! f(neq) = 1.0
+        ! df(neq,neq) = 0
+        ! df(neq,:) = 0.0
         !now contribution from bacgrkound atoms.
         lte_elem_loop : do n=1, 26 !for 26 elements, can go up to Nelem(size(Elems)) in principle!
             elem = Elems(n)
@@ -1019,6 +1081,11 @@ module see
             dgcdne(i,i) = -sum(dgcdne(:,i))
         enddo
 
+        if (atom%cswitch>1.0) then
+            gc(:,:) = gc(:,:) * atom%cswitch
+            dgcdne(:,:) = dgcdne(:,:) * atom%cswitch
+        endif
+
         return
     end subroutine colrate_matrix_atom
 
@@ -1030,7 +1097,7 @@ module see
         real(kind=dp), intent(in) :: x(neq)
         real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
         integer :: ieq, jvar
-
+        real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
 
         do ieq=1, neq
             f(ieq) = f(ieq) * -1.0_dp
@@ -1038,10 +1105,28 @@ module see
                 df(ieq,jvar) = df(ieq,jvar) * x(jvar)
             enddo
         enddo
-! write(*,*) "x=",x
-! write(*,*) "f=",f
-! write(*,*) "df=",df
+
+        ! *********************** !
+        Adag(:,:) = df(:,:)
+        bdag(:) = f(:)
+        ! *********************** !
+
         call GaussSlv(df,f,neq)
+
+        ! *********************** !
+        !compute difference between new solution and old one
+        res(:) = bdag(:)
+        do ieq=1,Neq
+            do jvar=1,Neq
+                res(ieq) = res(ieq) - Adag(ieq,jvar)*f(jvar)
+            enddo
+        enddo
+
+        !solve for the residual
+        call Gaussslv(Adag, res, Neq)
+
+        f(:) = f(:) + res(:)
+        ! *********************** !
 
         return
     end subroutine multivariate_newton_raphson
@@ -1051,8 +1136,8 @@ module see
         real(kind=dp), intent(in) :: x(neq)
         real(kind=dp), intent(in), dimension(neq-1,neq-1) :: gam,dgrdne, dgcdne
         real(kind=dp), intent(out) ::  f(neq), df(neq,neq)
-        ! integer :: n
-        ! type (AtomType), pointer :: at
+        integer :: n, i
+        type (AtomType), pointer :: at
 
         !derivative of SEE to ne
         !dCij/dne = Cij/ne
@@ -1060,18 +1145,21 @@ module see
         !dRji_cont/dne = Rji_cont/ne
 
         Nlevels = neq - 1
-
-        !equations for all levels
-        f(1:Nlevels) = matmul( gam,x(1:Nlevels) )
         !derivative of the equation of all levels to that level
         df(1:Nlevels,1:Nlevels) = gam(:,:)
 
+        i = 1
+        do n=1, Nactiveatoms
+            at => ActiveAtoms(n)%p
+            f(i:(i-1)+at%Nlevel) = matmul( gam(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel),x(i:(i-1)+at%Nlevel) )
         !derivatives of all levels to ne.
-        !-> compiler errors here write(*,*) matmul( dgcdne(:,:)+dgrdne(:,:), x(1:Nlevels) )
-        df(1:Nlevels,neq) = matmul( dgcdne(:,:), x(1:Nlevels) ) + &
-                            matmul( dgrdne(:,:), x(1:Nlevels) )
-        !Note: if the sum is done in matmul it raises a catastrophic error
-  
+            !-> compiler errors here write(*,*) matmul( dgcdne(:,:)+dgrdne(:,:), x(1:Nlevels) )
+            df(i:(i-1)+at%Nlevel,neq) = matmul( dgcdne(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel), x(i:(i-1)+at%Nlevel) ) + &
+                            matmul( dgrdne(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel), x(i:(i-1)+at%Nlevel) )
+            i = i + at%Nlevel
+        enddo
+        at => null()
+
         return
     end subroutine rate_equations
 
@@ -1089,7 +1177,6 @@ module see
             ntotal = nHtot(icell) * activeatoms(n)%p%abund
             !relative to sub array of x
             imaxpop = (i-1) + locate(x(i:(i-1)+nlev), maxval(x(i:(i-1)+nlev)))
-            ! f(imaxpop) = 1.0_dp
             f(imaxpop) = 1.0_dp -sum(x(i:(i-1)+nlev)) / ntotal !~0, better to set to 0?
             df(imaxpop,neq) = 0.0_dp
             df(imaxpop,i:(i-1)+nlev) = -1.0_dp / ntotal
@@ -1100,11 +1187,147 @@ module see
     end subroutine particle_conservation
 
 
+    subroutine write_rates()
+    !From the rates, the collisional, radiative and total rates matrices can be easily
+    ! built.
+        integer :: n
+
+        do n=1, NactiveAtoms
+            call write_collisional_rates_atom(ActiveAtoms(n)%p)
+            !call write_radiative_rates_atom(ActiveAtoms(n)%p)
+        enddo
+
+        return
+    end subroutine write_rates
+
+    !TO DO
+    subroutine write_radiative_rates_atom(atom)
+        type(AtomType), intent(inout) :: atom
+        integer :: icell, id, kr, i, j, kr_start
+        real(kind=dp), dimension(:,:,:), allocatable :: rates
+        integer :: naxis, naxes(3), unit, status, nelements
+        real(kind=dp) :: nu0
+
+        return
+    end subroutine write_radiative_rates_atom
+
+    subroutine write_collisional_rates_atom(atom)
+    !change axes order ? 
+        type(AtomType), intent(inout) :: atom
+        integer :: icell, id, kr, i, j, kr_start
+        real(kind=dp), dimension(:,:,:), allocatable :: rates
+        integer :: naxis, naxes(4), unit, status, nelements
+        real(kind=dp) :: nu0
+        
+        allocate(rates(atom%Ntr,n_cells,2),stat=status)
+        rates(:,:,:) = 0.0_dp
+        if (status>0) call error("(write_collisional_rates_atom) Cannot allocate rates!")
+
+        id = 1
+        !could be para
+        do icell=1, n_cells
+            if (icompute_atomRT(icell) > 0) then
+                if (atom%id=='H') then
+                    call collision_rates_hydrogen_loc(id,icell)
+                else 
+                    call init_colrates_atom(id,atom)
+                    call collision_rates_atom_loc(id,icell,atom)
+                endif
+                do kr=1, atom%Nline
+                    rates(kr,icell,1) = atom%lines(kr)%Cij(id)
+                    rates(kr,icell,2) = atom%lines(kr)%Cji(id)
+                enddo
+                do kr=atom%Ntr_line+1, atom%Ntr
+                    rates(kr,icell,1) = atom%continua(kr-atom%Ntr_line)%Cij(id)
+                    rates(kr,icell,2) = atom%continua(kr-atom%Ntr_line)%Cji(id)
+                enddo
+            endif
+        enddo
+
+        !get unique unit number
+        call ftgiou(unit,status)
+        if (status > 0) call print_error(status)
+
+        if (lVoronoi) then
+            naxis = 2
+            naxes(1) = n_cells
+            naxes(2) = 2
+            nelements = naxes(1) * naxes(2)
+        else
+            if (l3D) then
+                naxis = 4
+                naxes(1) = n_rad
+                naxes(2) = 2*nz
+                naxes(3) = n_az
+                naxes(4) = 2
+                nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+            else
+                naxis = 3
+                naxes(1) = n_rad
+                naxes(2) = nz
+                naxes(3) = 2
+                nelements = naxes(1) * naxes(2) * naxes(3)
+            end if
+        end if
 
 
+        !separate the rates in individual HDU for more clarity
 
+        call ftinit(unit,trim(atom%ID)//"_colrate.fits.gz",1,status)
+        if (status > 0) call print_error(status)
+        call ftphpr(unit,.true.,-64,naxis,naxes,0,1,.true.,status)
+        if (status > 0) call print_error(status)
+        kr = 1
+        i = atom%i_trans(kr)
+        j = atom%j_trans(kr)
+        call ftpkyj(unit, "j", j,'', status)
+        call ftpkyj(unit, "i", i, ' ', status)
+        if (atom%Nline > 1) then 
+            nu0 = c_light / nm_to_m / atom%lines(kr)%lambda0
+            kr_start = atom%Ntr_line + 1
+        else
+            nu0 = c_light / nm_to_m / atom%continua(kr)%lambda0
+            kr_start = 2
+        endif
+        call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
+        call ftpprd(unit,1,1,nelements,rates(kr,:,:),status)
 
+        do kr=2, atom%Nline
+            call ftcrhd(unit, status)
+            if (status > 0) call print_error(status)
+            call ftphpr(unit,.true.,-64,naxis,naxes,0,1,.true.,status)
+            if (status > 0) call print_error(status)
+            i = atom%lines(kr)%i
+            j = atom%lines(kr)%j
+            call ftpkyj(unit, "j", j,'', status)
+            call ftpkyj(unit, "i", i, ' ', status)
+            nu0 = c_light / nm_to_m / atom%lines(kr)%lambda0
+            call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
+            call ftpprd(unit,1,1,nelements,rates(kr,:,:),status)
+        enddo
 
+        do kr=kr_start, atom%Ntr
+            call ftcrhd(unit, status)
+            if (status > 0) call print_error(status)
+            call ftphpr(unit,.true.,-64,naxis,naxes,0,1,.true.,status)
+            if (status > 0) call print_error(status)
+            i = atom%continua(kr - atom%Ntr_line)%i
+            j = atom%continua(kr - atom%Ntr_line)%j
+            call ftpkyj(unit, "j", j,'', status)
+            call ftpkyj(unit, "i", i, ' ', status)
+            nu0 = c_light / nm_to_m / atom%continua(kr-atom%Ntr_line)%lambda0
+            call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
+            call ftpprd(unit,1,1,nelements,rates(kr,:,:),status)
+        enddo
+
+        call ftclos(unit, status)
+        call ftfiou(unit, status)
+
+        if (status > 0) call print_error(status)
+
+        deallocate(rates)
+        return
+    end subroutine write_collisional_rates_atom
 
 
 

@@ -10,6 +10,7 @@ module optical_depth
   use cylindrical_grid
   use radiation_field, only : save_radiation_field
   use density
+  use read1d_models, only :  Icorona, xcorona!from above
   use stars, only : intersect_stars, star_rad
   use opacity_atom, only : opacity_atom_bb_loc, contopac_atom_loc, Itot, psi
 
@@ -795,7 +796,6 @@ end subroutine optical_length_tot_mol
    ! level dissolution
    ! dust   
    ! ------------------------------------------------------------------------------- !
-      use read1d_models, only :  Icorona, xcorona, lcoronal_illumination !from above
       integer, intent(in) :: id, icell_in, iray
       real(kind=dp), intent(in) :: u,v,w
       real(kind=dp), intent(in) :: x,y,z
@@ -837,8 +837,6 @@ end subroutine optical_length_tot_mol
 
          if (lintersect_stars) then !"will interesct"
             if (icell == icell_star) then!"has intersected"
-               !call local_stellar_radiation(id,iray,tau,tau_c,i_star,icell_prev,x0,y0,z0,u,v,w)
-               ! tau_to_star(:,i_star) = tau
                Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau(:)) * &
                   star_rad(id,iray,i_star,icell_prev,x0,y0,z0,u,v,w,N,lambda)
                return

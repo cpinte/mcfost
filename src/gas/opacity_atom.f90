@@ -685,7 +685,6 @@ module Opacity_atom
       call ftgiou(unit2,status)
       open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="sequential",iostat=status)
       open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="sequential",iostat=status) 
-     
       id = 1
       do icell=1, n_cells
          !$ id = omp_get_thread_num() + 1
@@ -695,7 +694,7 @@ module Opacity_atom
             !accumulate b-f and b-b un chi and Sny
             call opacity_atom_bf_loc(icell,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
             call opacity_atom_bb_loc(id,icell,1,0d0,0d0,0d0,0d0,0d0,0d0,0d0,0d0,-1d0,&
-               0d0,0d0,.true.,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
+               0d0,0d0,.false.,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
             ! do m=2,Nrec
             !    !m=1, unpolarized already filled.
             !    !etaQUV, chiQUV only for Q(=1), U, V

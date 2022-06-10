@@ -29,6 +29,9 @@ module collision_atom
       real(kind=dp) :: CI(hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)
       real(kind=dp) :: ni_on_nj_star
 
+      ! call collision_rates_atom_loc(id,icell,hydrogen)
+      ! return
+
       Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
       call Johnson_CI(icell, CI) !bound-free i->Nlevel
       j = hydrogen%Nlevel
@@ -109,6 +112,8 @@ module collision_atom
          S = C0 * pia0squarex2 * (n*yn)**2 * (An*(E1(yn)/yn - E1(zn)/zn) + &
             (Bnp - An*log(2*n*n))*(ksi_johnson(yn)-ksi_johnson(zn)))
          !write(*,*) icell, i, "S=", S
+         !Here the term exp(yn)/sqrt(T) would be compensated by the multiplication by exp(-dE)/sqrt(T) (see the routine collision 
+         !when CI and CE are read from the file). So, I don't include it here as the routine evaluates locally the values.
          !check that otherwise multiply by exp(yn)
          Cik(i) = S !RH -> exp(yn) / sqrt(T(icell)) !per ne
          !we compute it at icell so in fact we could avoid / sqrt(icell)
@@ -241,7 +246,8 @@ module collision_atom
    ! end subroutine collision_rates_atom_new_loc
 
   subroutine read_collisions(unit, atom)
-
+   !To Do check here that the collision data are consistent with the transitions in the model
+   !instead of doing it in the colling routine
     integer, intent(in) :: unit
     type (AtomType), intent(inout) :: atom
    !  character(len=Nmax_line_per_collision), dimension(Nmax_lines) :: lines_in_file !check len char matches the one in atom%
@@ -548,8 +554,6 @@ module collision_atom
 
    !to do change reading
    !to do rewokr for being faster
-   !add atom%tab_trans_cij, tab_trans_cji ? 
-   !add a single Cij and Cdow and add at the end ?
   subroutine collision_rates_atom_loc(id, icell, atom)
     ! --------------------------------------------------------------------------- !
     ! Computes collisional rates for each transition of atom.
@@ -600,8 +604,6 @@ module collision_atom
     ! read collisional data depending the cases of recipes.
 
     loop_lines_in_file : do k1=1, Nlines
-       kr = 0
-
        countline = countline + 1
        inputline = atom%collision_lines(k1)
        Nread = len(inputline)!already trimed
@@ -657,6 +659,7 @@ module collision_atom
           ! C(i,j) = Cf(ij) = Cf(i*Nlevel + j)
           ! C(1,1) = Cf(1) -> i*Nlevel +j = 1 -> i=i-1
           kr = atom%ij_to_trans(i,j)
+         !  if (kr > 0) write(*,'(1A)') trim(adjustl(inputline))
 
        else if ((key.eq."AR85-CHP").or.(key.eq."AR85-CHH")) then
           Nitem = 6
@@ -779,6 +782,7 @@ module collision_atom
        ! -- END of reading data for key, now computing collision rates -- !
        ! Still in the loop over the lines in the atomic file.
 
+       cdown = 0.0; Cup = 0.0
        if ((key.eq."OMEGA") .or. (key.eq."CE") .or. &
             (key.eq."CI") .or. (key.eq."CP") .or. &
             (key.eq."CH0") .or. (key.eq."CH+") .or. &

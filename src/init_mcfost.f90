@@ -644,7 +644,6 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         lemission_atom=.true.
      case("-output_rates")
-     	call error("option -output_rates not yet")
         i_arg = i_arg + 1
         loutput_rates = .true.
      case("-electron_scatt") !force solving ne density even if provided in the model
@@ -762,6 +761,7 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         ldensity_file = .false.
+        !later lpluto_file = .true.
      case ("-model_1d")
      	i_arg = i_arg + 1
      	lmodel_1d = .true.
@@ -1838,7 +1838,7 @@ subroutine display_help()
 !   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
   write(*,*) "        : -art_line_resol <v> : resolution of the non-LTE grid of art in km/s"
-!   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
+  write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
 !   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
 !   write(*,*) "        : -calc_jnu_atom : Stop the code after Jnu_scattering has been computed and written. "
 !-> this one could also be use for mol tranfer, like Ng or tab_wavelength
