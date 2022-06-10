@@ -29,8 +29,6 @@ module collision_atom
       real(kind=dp) :: CI(hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)
       real(kind=dp) :: ni_on_nj_star
 
-      ! call collision_rates_atom_loc(id,icell,hydrogen)
-      ! return
 
       Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
       call Johnson_CI(icell, CI) !bound-free i->Nlevel

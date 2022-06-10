@@ -186,14 +186,16 @@ module atom_transfer
          conv_speed = 0.0
          conv_acc = 0.0
          diff_old = 0.0
-         time_iteration = 0.
+         time_iteration = 0.0
+         dne = 0.0
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
          do while (.not.lconverged)
 
             n_iter = n_iter + 1
-            write(*,'(" *** Iteration #"(1I3)"; step #"(1I1)"; theshold: "(1ES11.2E3))') n_iter, etape, precision
+            !                    goes with maxIter
+            write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; theshold: "(1ES11.2E3))') n_iter, etape, precision
             ibar = 0
             n_cells_done = 0
 
@@ -355,7 +357,6 @@ module atom_transfer
                !update lte opac and related quantities
                !damping and profiles for instance
                id = 1
-               dne = 0.0
                write(*,'("  OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
                   minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                !$omp parallel &
@@ -466,14 +467,16 @@ module atom_transfer
                conv_acc = conv_speed - conv_acc !>0 accelerating
             endif
           
-
-            if (maxval(max_n_iter_loc)>1) write(*,'(" -> "(1I10)" sub-iterations")') maxval(max_n_iter_loc)
+            !                                     goes with maxIter_loc
+            if (maxval(max_n_iter_loc)>1) write(*,'(" -> "(1I3)" sub-iterations")') maxval(max_n_iter_loc)
             do nact=1,NactiveAtoms
-               write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%p%ID
+               write(*,'("                  "(1A2))') ActiveAtoms(nact)%p%ID
+               ! write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%p%ID
                write(*,'("   >>> dpop="(1ES13.5E3))') dM(nact)
             enddo
             if (dne /= 0.0_dp) then
                write(*,*) ""
+               write(*,'("                  "(1A2))') "Ne"
                write(*,'("   >>> dne="(1ES13.5E3))') dne
             endif
             write(*,*) ""
@@ -489,7 +492,6 @@ module atom_transfer
             diff_old = diff
             conv_acc = conv_speed
                
-
             if ((diff < precision).and.maxval_cswitch_atoms()==1.0_dp)then
                if (lprevious_converged) then
                   lconverged = .true.

@@ -1115,12 +1115,13 @@ module see
 
         ! *********************** !
         !compute difference between new solution and old one
-        res(:) = bdag(:)
-        do ieq=1,Neq
-            do jvar=1,Neq
-                res(ieq) = res(ieq) - Adag(ieq,jvar)*f(jvar)
-            enddo
-        enddo
+        ! res(:) = bdag(:)
+        ! do ieq=1,Neq
+        !     do jvar=1,Neq
+        !         res(ieq) = res(ieq) - Adag(ieq,jvar)*f(jvar)
+        !     enddo
+        ! enddo
+        res(:) = bdag(:) - matmul(Adag,f)
 
         !solve for the residual
         call Gaussslv(Adag, res, Neq)
