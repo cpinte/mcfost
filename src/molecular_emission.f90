@@ -686,7 +686,7 @@ function v_proj(icell,x,y,z,u,v,w) !
   else
     !also work with pluto's models, model ascci and model 1d!
      if (lvelocity_file) then
-        if (vfield_coord == 1) then
+        if (vfield_coord == 1) then ! cartesian velocity field
            vx = vfield3d(icell,1) ; vy = vfield3d(icell,2) ; vz = vfield3d(icell,3)
         else if (vfield_coord == 2) then
            ! Convert the velocity field from cylindrical to Cartesian coordinates
@@ -694,10 +694,9 @@ function v_proj(icell,x,y,z,u,v,w) !
            phi = atan2(y, x)
            vx = cos(phi) * v_r - sin(phi) * v_phi
            vy = sin(phi) * v_r + cos(phi) * v_phi
-           if ((l_sym_centrale).and.(z < 0)) vz = -vz
-        else
-
-           ! Convert the velocity field from cylindrical to Cartesian coordinates
+           if ((.not.l3d).and.(z < 0)) vz = -vz
+        else ! vfield == 3 --> spherical
+           ! Convert the velocity field from spherical to Cartesian coordinates
            v_r = vfield3d(icell,1) ; v_phi = vfield3d(icell,2) ;  v_theta = vfield3d(icell,3)
 
            rcyl2 = x*x + y*y
@@ -710,14 +709,14 @@ function v_proj(icell,x,y,z,u,v,w) !
 
            cos_phi = x/rcyl
            sin_phi = y/rcyl
-
-           !           write(*,*) cos_phi, cos(atan2(y, x)) ! OK
+           ! write(*,*) cos_phi, cos(atan2(y, x)) ! OK
 
            vz = v_theta * cos_theta + v_r * sin_theta
            v_rcyl = v_theta * sin_theta + v_r * cos_theta
 
            vx = v_rcyl * cos_phi - v_phi * sin_phi
            vy = v_rcyl * sin_phi + v_phi * cos_phi
+           if ((.not.l3d).and.(z < 0)) vz = -vz
         endif
 
         v_proj = vx * u + vy * v + vz * w

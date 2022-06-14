@@ -73,16 +73,24 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
     endif
 
     call extract('nparttot',np,hdr,ierr)
+    write(*,*) "TEST1"
     call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
+    write(*,*) "TEST2", ierr, ndusttypes
     if (ierr /= 0) then
+       write(*,*) "test3"
        ! ndusttypes is for pre-largegrain multigrain headers
        call extract('ndustsmall',ndustsmall,hdr,ierr,default=0)
        call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
        ! ndusttype must be the same for all files : todo : add a test
        ndusttypes = ndustsmall + ndustlarge
 
+       write(*,*) ierr, ndustsmall, ndustlarge, ndusttypes
+       write(*,*) (ndusttypes==0 .and. ierr/=0)
+
        ! If ndusttypes, ndustlarge and ndustsmall are all missing, manually count grains
        if (ndusttypes==0 .and. ierr/=0) then
+          write(*,*) "test4"
+
              ! For older files where ndusttypes is not output to the header
           idust = 0
           do i = 1,maxinblock
@@ -109,7 +117,6 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
  allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot),gastemperature(np_tot))
  allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
  allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
-
 
  np0 = 0
  ntypes0 = 0
@@ -270,7 +277,9 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
                             ierr = 1 ;
                             return
                          endif
-                         read(iunit,iostat=ierr) dustfrac(ngrains,1:np)
+                         write(*,*) ngrains, np
+                         write(*,*) shape(dustfrac)
+                         read(iunit,iostat=ierr) dustfrac(ngrains,:)
                          got_dustfrac = .true.
                       case default
                          matched = .false.
@@ -302,7 +311,6 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
                          got_itype = .true.
                          read(iunit,iostat=ierr) itype(np0+1:np0+np)
                          itype(np0+1:np0+np) = itype(np0+1:np0+np) + ntypes0 ! shifting types for succesive files
-                         write(*,*) "MAX", maxval(itype(np0+1:np0+np)), ntypes0
                       case default
                          read(iunit,iostat=ierr)
                       end select

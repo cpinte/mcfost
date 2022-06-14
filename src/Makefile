@@ -190,6 +190,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 me
           Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90            \
           Temperature.f90 density.f90 read_opacity.f90 scattering.f90               \
           read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90          \
+          read_idefix.f90 \
           coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90            \
           input.f90 benchmarks.f90 $(gdir)/atom_type.f90  \
           $(gdir)/wavelengths_gas.f90 $(gdir)/broad.f90                             \
@@ -205,7 +206,6 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 me
           mol_transfer.f90 $(gdir)/collision_atom.f90 $(gdir)/io_atom.f90           \
           $(gdir)/electron_density.f90 $(gdir)/see.f90                              \
           $(gdir)/atom_transfer.f90
-
 
 OBJECTS= $(SOURCES:.f90=.o)
 
