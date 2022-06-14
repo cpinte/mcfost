@@ -653,6 +653,9 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
           (n_photons_envoyes *  AU_to_cm * pi) !lambda.F_lambda
   endif
 
+  !write(*,*) "TATA", lambda, kappa(1,lambda), tab_albedo_pos(1,lambda)
+
+
   ! Intensite specifique diffusion
   !$omp parallel &
   !$omp default(none) &
@@ -664,13 +667,15 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
      facteur = energie_photon / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
      kappa_sca = kappa(icell,lambda) * tab_albedo_pos(icell,lambda)
 
+     !write(*,*) icell,  kappa_sca, kappa(icell,lambda), tab_albedo_pos(icell,lambda)
+
      ! TODO : les lignes suivantes sont tres cheres en OpenMP
      if (kappa(icell,lambda) > tiny_dp) then
         do itype=1,N_type_flux
            I_scatt(:,:,itype) = sum(xI_scatt(:,:,itype,iRT,icell,:),dim=3) * facteur * kappa_sca
         enddo ! itype
 
-        eps_dust1(:,:,1,icell) =  (  I_scatt(:,:,1) +  J_th(icell) ) / kappa(icell,lambda)
+        eps_dust1(:,:,1,icell) =  (I_scatt(:,:,1) +  J_th(icell)) / kappa(icell,lambda)
 
         ! TODO : there is might a problem in polarization in 2D
         if (lsepar_pola) then
@@ -678,9 +683,9 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
         endif
 
         if (lsepar_contrib) then
-           eps_dust1(:,:,n_Stokes+2,icell) =    I_scatt(:,:,n_Stokes+2) / kappa(icell,lambda)
-           eps_dust1(:,:,n_Stokes+3,icell) =    J_th(icell) / kappa(icell,lambda)
-           eps_dust1(:,:,n_Stokes+4,icell) =    I_scatt(:,:,n_Stokes+4) / kappa(icell,lambda)
+           eps_dust1(:,:,n_Stokes+2,icell) = I_scatt(:,:,n_Stokes+2) / kappa(icell,lambda)
+           eps_dust1(:,:,n_Stokes+3,icell) = J_th(icell) / kappa(icell,lambda)
+           eps_dust1(:,:,n_Stokes+4,icell) = I_scatt(:,:,n_Stokes+4) / kappa(icell,lambda)
         endif ! lsepar_contrib
      else
         eps_dust1(:,:,:,icell) = 0.0_dp

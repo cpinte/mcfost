@@ -27,14 +27,17 @@ contains
 
     ! Reading parameter files and extracting key parameters
     filename = trim(dir)//"/variables.par"
+    write(*,*) "Reading "//trim(filename)
     open(unit=iunit,file=trim(filename),status='old',form='formatted',iostat=ios)
     if (ios /= 0) call error("opening "//trim(filename))
 
     ! On compte les lignes avec des donnees
     n_lines = 0
-    do while(ios==0)
+    infinity : do while(ios==0)
        n_lines=n_lines+1
        read(1,*,iostat=ios) key, val
+       ! write(*,*) trim(key), " ", trim(val), " ", ios
+       if (ios/=0) exit infinity
 
        select case(trim(key))
           ! reading grid parameters
@@ -75,7 +78,6 @@ contains
           else
              fargo3d%realtype = sp
           endif
-
           ! Additional parameters
        case("DT")
           read(val,*,iostat=ios) fargo3d%dt
@@ -90,7 +92,8 @@ contains
        case("GAMMA")
           read(val,*,iostat=ios) fargo3d%gamma
        end select
-    end do
+    end do infinity
+    write(*,*) "done"
 
     ! Updating mcfost parameters
     grid_type = 2
@@ -307,16 +310,34 @@ contains
        filename = trim(fargo3d%dir)//"/"//trim(file_types(l))//trim(trim(fargo3d%id))//".dat"
        write(*,*) "Reading "//trim(filename)
        open(unit=iunit, file=filename, status="old", form="unformatted", iostat=ios, access="direct" , recl=recl)
-       if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
        select case(l)
        case(1)
+          if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
           read(iunit, rec=1, iostat=ios) fargo3d_density
        case(2)
-          read(iunit, rec=1, iostat=ios) fargo3d_vx ! vphi
+          if (ios /= 0) then
+             call warning("opening fargo3d file:"//trim(filename))
+             fargo3d_vx = 0.0_dp
+             ios=0
+          else
+             read(iunit, rec=1, iostat=ios) fargo3d_vx ! vphi
+          endif
        case(3)
-          read(iunit, rec=1, iostat=ios) fargo3d_vy ! vr
+          if (ios /= 0) then
+             call warning("opening fargo3d file:"//trim(filename))
+             fargo3d_vx = 0.0_dp
+             ios=0
+          else
+             read(iunit, rec=1, iostat=ios) fargo3d_vy ! vr
+          endif
        case(4)
-          read(iunit, rec=1, iostat=ios) fargo3d_vz ! vtheta
+          if (ios /= 0) then
+             call warning("opening fargo3d file:"//trim(filename))
+             fargo3d_vz = 0.0_dp
+             ios=0
+          else
+             read(iunit, rec=1, iostat=ios) fargo3d_vz ! vtheta
+          endif
        end select
        if (ios /= 0) call error("reading fargo3d file:"//trim(filename))
        close(iunit)
