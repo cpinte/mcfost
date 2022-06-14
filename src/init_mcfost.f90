@@ -197,7 +197,6 @@ subroutine set_default_variables()
   lidefix = .false.
   theta_max = 0.5*pi
   llinear_rgrid = .false.
-  lold_PA = .false.
 
   tmp_dir = "./"
 
@@ -296,6 +295,7 @@ subroutine initialisation_mcfost()
   lstar_bb = .false.
   star_force_Mdot(:) = .false.
   star_Mdot(:) = 0.0
+  lold_PA = .false.
 
   ! Global logical variables
   call set_default_variables()
