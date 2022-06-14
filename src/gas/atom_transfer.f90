@@ -382,7 +382,7 @@ module atom_transfer
                      !could be combined in a single loop;
                      !but need to check that no all lte pops are needed for damping.
                      !Also need to change if profile interp is used or not! (a and phi)
-                     do nact = 2, n_atoms
+                     do nact = 1, n_atoms
                         do ilevel=1,Atoms(nact)%p%nline
                            if (.not.Atoms(nact)%p%lines(ilevel)%lcontrib) cycle
                            if (Atoms(nact)%p%lines(ilevel)%Voigt) then
@@ -390,11 +390,9 @@ module atom_transfer
                               Atoms(nact)%p%lines(ilevel)%a(icell) = line_damping(icell,Atoms(nact)%p%lines(ilevel))
                            !tmp because of vbroad!
                               vth = vbroad(T(icell),Atoms(nact)%p%weight, vturb(icell))
-                              Atoms(nact)%p%lines(ilevel)%v(:) = &
-                                 c_light * (tab_lambda_nm(nb:nr)-Atoms(nact)%p%lines(ilevel)%lambda0)&
-                                 /Atoms(nact)%p%lines(ilevel)%lambda0 / vth
+                              !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
                               Atoms(nact)%p%lines(ilevel)%phi(:,icell) = &
-                                 Voigt(Atoms(nact)%p%lines(ilevel)%Nlambda, Atoms(nact)%p%lines(ilevel)%a(icell), Atoms(nact)%p%lines(ilevel)%v(:))&
+                                 Voigt(Atoms(nact)%p%lines(ilevel)%Nlambda, Atoms(nact)%p%lines(ilevel)%a(icell), Atoms(nact)%p%lines(ilevel)%v(:)/vth)&
                                   / (vth * sqrtpi)
                            endif
                         enddo

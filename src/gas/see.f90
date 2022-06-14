@@ -20,7 +20,7 @@ module see
     !TO DO: merge npgop and n_new. n_new is a special version of ngpop
     !merge ne ?
     real(kind=dp), allocatable :: n_new(:,:,:), lcell_converged(:), ne_new(:), ngpop(:,:,:,:)
-    real(kind=dp), allocatable :: tab_Uji_cont(:,:,:), tab_Vij_cont(:,:,:)
+    real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
 
 
     !variables for non-LTE H (+He) ionisation
@@ -116,13 +116,13 @@ module see
         mem_alloc_local = mem_alloc_local + sizeof(psi) + sizeof(eta_atoms) + sizeof(Itot) + sizeof(phi_loc) + &
             sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ne_new) + sizeof(lcell_converged) + sizeof(n_new)
 
-        allocate(tab_Uji_cont(NmaxCont,NactiveAtoms,n_cells))
+        allocate(tab_Aji_cont(NmaxCont,NactiveAtoms,n_cells))
         allocate(tab_Vij_cont(Nlambda_max_cont,NmaxCont,NactiveAtoms))
-        write(*,*) " size tab_Uji_cont:", sizeof(tab_Uji_cont) / 1024./1024./1024.," GB"
+        write(*,*) " size tab_Aji_cont:", sizeof(tab_Aji_cont) / 1024./1024./1024.," GB"
         write(*,*) " size tab_Vij_cont:", sizeof(tab_Vij_cont) / 1024./1024./1024.," GB"
         !integrate in frequency Uji which is fourpi/h * anu * 2hnu3/c2 * exp(-hnu/kT)
         !for each cont get the cross-sections
-        mem_alloc_local = mem_alloc_local + sizeof(tab_Uji_cont) + sizeof(tab_Vij_cont)
+        mem_alloc_local = mem_alloc_local + sizeof(tab_Aji_cont) + sizeof(tab_Vij_cont)
         do n=1, NactiveAtoms
             atom => ActiveAtoms(n)%p
             do kr=1,atom%Ncont
@@ -138,7 +138,7 @@ module see
                 !could be para
                 do icell=1, n_cells
                     if (icompute_atomRT(icell) > 0) then
-                        tab_Uji_cont(kr,n,icell) = 0.0_dp !frequncy and angle integrated!
+                        tab_Aji_cont(kr,n,icell) = 0.0_dp !frequncy and angle integrated!
                         do l=2,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1
                             anu1 = tab_Vij_cont(l,kr,n)
                             anu2 = tab_Vij_cont(l-1,kr,n)
@@ -149,7 +149,7 @@ module see
                             b1 = twohc/tab_lambda_nm(atom%continua(kr)%Nb+l-1)**4
                             b2 = twohc/tab_lambda_nm(atom%continua(kr)%Nb+l-2)**4
 
-                            tab_Uji_cont(kr,n,icell) = tab_Uji_cont(kr,n,icell) + fourpi_h * 0.5*(anu1*e1*b1 + anu2*e2*b2) * &
+                            tab_Aji_cont(kr,n,icell) = tab_Aji_cont(kr,n,icell) + fourpi_h * 0.5*(anu1*e1*b1 + anu2*e2*b2) * &
                                 (tab_lambda_nm(atom%continua(kr)%Nb+l-1) - tab_lambda_nm(atom%continua(kr)%Nb+l-2))
   
                         enddo
@@ -197,7 +197,7 @@ module see
         deallocate(ne_new,psi,eta_atoms,chi_up,chi_down,uji_down,lcell_converged)
         deallocate(itot,phi_loc,n_new)    
 
-        deallocate(tab_Uji_cont, tab_Vij_cont) 
+        deallocate(tab_Aji_cont, tab_Vij_cont) 
 
         do n=1, NactiveAtoms
             atom => ActiveAtoms(n)%p
@@ -476,7 +476,7 @@ module see
             i = atom%continua(kr)%i; j = atom%continua(kr)%j
             atom%continua(kr)%Rij(id) = 0.0_dp
             !updated value of ni and nj!
-            atom%continua(kr)%Rji(id) = nlte_fact * tab_Uji_cont(kr,atom%activeindex,icell) * atom%nstar(i,icell)/atom%nstar(j,icell)
+            atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * atom%nstar(i,icell)/atom%nstar(j,icell)
         enddo
 
         do kr=1,atom%Nline

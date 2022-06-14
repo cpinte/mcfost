@@ -240,7 +240,7 @@ module wavelengths_gas
       integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda, Nlambda_max_line_vel
       integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved, Nwaves, check_new_freq
       type (AtomType), pointer :: atom
-      integer :: alloc_status, lac, la, nb, krr, max_Nlambda_indiv
+      integer :: alloc_status, lac, la, nb, krr, max_Nlambda_indiv, Noverlap
       real(kind=dp), dimension(:), allocatable :: tmp_grid, tmp_grid2, all_l0, all_l1
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
@@ -723,6 +723,7 @@ module wavelengths_gas
  
          enddo
  
+         Noverlap = 0
          do kr=1,atom%Nline
             atom%lines(kr)%Nb = locate(lambda, atom%lines(kr)%lambdamin)
             atom%lines(kr)%Nr = locate(lambda, atom%lines(kr)%lambdamax)
@@ -757,6 +758,7 @@ module wavelengths_gas
                      write(*,*) "l0 ref=", l0, " l1=", l1
 
                      if ( dvmin <= abs(vmax_overlap)) then
+                        Noverlap = Noverlap + 1
                         ! atom%lines(kr)%dvmin = max(dvmin,atom%lines(kr)%dvmin)
                         atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, locate(lambda, atom%lines(kr)%lambda0*(1.0 +  dvmin/c_light)))
                         atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, locate(lambda, atom%lines(kr)%lambda0*(1.0 -  dvmin/c_light)))
@@ -776,6 +778,9 @@ module wavelengths_gas
  
          atom => NULL()
       enddo
+      if (Noverlap > 0) then
+         write(*,*) 'There are', Noverlap, ' overlapping regions out of ', Nlines, ' lines.'
+      endif
       write(*,*) "Number of max freq points for all lines resolution :", Nlambda_max_line
       if (check_for_overlap) then
          write(*,*) " -> or taking into account velocity shifts :", Nlambda_max_line_vel

@@ -58,9 +58,9 @@ module Opacity_atom
                if (atm%lines(kr)%Voigt) then
                   nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
                   atm%lines(kr)%a(icell) = line_damping(icell,atm%lines(kr))
-                  !tmp because of vbroad!
+                  !tmp because of vbroad, recomputed after in m/s
                   vth = vbroad(T(icell),atm%weight, vturb(icell))
-                  atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth
+                  atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth !unitless
                   atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, atm%lines(kr)%a(icell), atm%lines(kr)%v(:)) / (vth * sqrtpi)
                endif
             enddo
@@ -70,6 +70,7 @@ module Opacity_atom
             if (.not.atm%lines(kr)%lcontrib) cycle
             if (atm%lines(kr)%Voigt) then
                nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
+               !-> will not change during the non-LTE loop.
                atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 !m/s
             endif
          enddo
@@ -289,7 +290,7 @@ module Opacity_atom
                ! Nlam = Nred-Nblue + 1
             endif
 
-            phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iterate,Nlam,lambda(Nblue:Nred),&
+            phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
 
@@ -382,7 +383,10 @@ module Opacity_atom
             eta_atoms(N1,nact,id) = eta_atoms(N1,nact,id) + term3(1)
             i0 = 2
             do la=N1,N2
-               wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
+               if (la>1) then
+                  wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
+               !otherwise, wl is the previous one, first point of the grid
+               endif
                loop_i : do la0=i0, Nl
                   if (tab_lambda_cont(Nb+la0-1) > tab_lambda_nm(la)) then
                      wt = (tab_lambda_nm(la) - tab_lambda_cont(Nb+la0-2)) / (tab_lambda_cont(Nb+la0-1) - tab_lambda_cont(Nb+la0-2))
@@ -572,90 +576,90 @@ module Opacity_atom
       return
    end function profile_art
 
-   ! function profile_art_i(line,id,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
-   !    integer, intent(in)                    :: icell, N, id
-   !    logical, intent(in)                    :: lsubstract_avg
-   !    real(kind=dp), dimension(N), intent(in):: lambda
-   !    real(kind=dp), intent(in)              :: x,y,z,u,v,w,& !positions and angles used to project
-   !                                           x1,y1,z1, &      ! velocity field and magnetic field
-   !                                           l_void_before,l_contrib !physical length of the cell
-   !    integer 											:: Nvspace
-   !    real(kind=dp), dimension(NvspaceMax)   :: Omegav
-   !    real(kind=dp)                          :: norm, vth
-   !    real(kind=dp)                          :: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
-   !                                              dv, omegav_mean
-   !    type (AtomicLine), intent(in)          :: line
-   !    integer                                :: Nred, Nblue, i, j, nv
-   !    real(kind=dp), dimension(N)            :: uloc, u0, profile_art_i, u1, u0sq
-   !    ! real(kind=dp), dimension(N,NvspaceMax) :: u1
+   function profile_art_i(line,id,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+      integer, intent(in)                    :: icell, N, id
+      logical, intent(in)                    :: lsubstract_avg
+      real(kind=dp), dimension(N), intent(in):: lambda
+      real(kind=dp), intent(in)              :: x,y,z,u,v,w,& !positions and angles used to project
+                                             x1,y1,z1, &      ! velocity field and magnetic field
+                                             l_void_before,l_contrib !physical length of the cell
+      integer 											:: Nvspace
+      real(kind=dp), dimension(NvspaceMax)   :: Omegav
+      real(kind=dp)                          :: norm, vth
+      real(kind=dp)                          :: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
+                                                dv, omegav_mean
+      type (AtomicLine), intent(in)          :: line
+      integer                                :: Nred, Nblue, i, j, nv
+      real(kind=dp), dimension(N)            :: uloc, u0, profile_art_i, u1, u0sq
+      ! real(kind=dp), dimension(N,NvspaceMax) :: u1
 
 
-   !    Nvspace = NvspaceMax
-   !    i = line%i; j = line%j
-   !    Nred = line%Nr; Nblue = line%Nb
-   !    vth = vbroad(T(icell),line%Atom%weight, vturb(icell))
+      Nvspace = NvspaceMax
+      i = line%i; j = line%j
+      Nred = line%Nr; Nblue = line%Nb
+      vth = vbroad(T(icell),line%Atom%weight, vturb(icell))
 
-   !    u0(:) = (lambda - line%lambda0)/line%lambda0  * ( c_light/vth )
-   !    uloc(:) = line%v(:) / vth
+      u0(:) = (lambda - line%lambda0)/line%lambda0  * ( c_light/vth )
 
-   !    v0 = v_proj(icell,x,y,z,u,v,w)
-   !    if (lvoronoi) then
-   !       omegav(1) = v0
-   !       Nvspace = 1
-   !       omegav_mean = v0
-   !    else
+      v0 = v_proj(icell,x,y,z,u,v,w)
+      if (lvoronoi) then
+         omegav(1) = v0
+         Nvspace = 1
+         omegav_mean = v0
+      else
 
-   !       Omegav = 0.0
-   !       omegav(1) = v0
-   !       v1 = v_proj(icell,x1,y1,z1,u,v,w)
+         Omegav = 0.0
+         omegav(1) = v0
+         v1 = v_proj(icell,x1,y1,z1,u,v,w)
 
-   !       dv = abs(v1-v0)
-   !       Nvspace = min(max(2,nint(dv/vth*20.)),NvspaceMax)
+         dv = abs(v1-v0)
+         Nvspace = min(max(2,nint(dv/vth*20.)),NvspaceMax)
 
-   !       do nv=2, Nvspace-1
-   !          delta_vol_phi = l_void_before + (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
-   !          xphi=x+delta_vol_phi*u
-   !          yphi=y+delta_vol_phi*v
-   !          zphi=z+delta_vol_phi*w
-   !          omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
-   !       enddo
-   !       omegav(Nvspace) = v1
-   !       omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
-   !    endif
-   !    !in non-LTE:
-   !    !the actual cell icell_nlte must be centered on 0 (moving at vmean).
-   !    !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte) 
-   !    if (lsubstract_avg) then!labs == .true.
-   !       omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
-   !       vlabs(id) = omegav_mean
-   !    else
-   !       omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(id)
-   !    endif
+         do nv=2, Nvspace-1
+            delta_vol_phi = l_void_before + (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
+            xphi=x+delta_vol_phi*u
+            yphi=y+delta_vol_phi*v
+            zphi=z+delta_vol_phi*w
+            omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+         enddo
+         omegav(Nvspace) = v1
+         omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
+      endif
+      !in non-LTE:
+      !the actual cell icell_nlte must be centered on 0 (moving at vmean).
+      !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte) 
+      if (lsubstract_avg) then!labs == .true.
+         omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+         vlabs(id) = omegav_mean
+      else
+         omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(id)
+      endif
 
 
-   !    if (line%voigt) then
-   !       u1(:) = u0(:) - omegav(1)/vth
-   !       profile_art_i(:) = linear_1D_sorted(N,uloc(:),line%phi(:,icell),N,u1(:))
-   !       do nv=2, Nvspace
-   !          u1(:) = u0(:) - omegav(nv)/vth
-   !          profile_art_i(:) = profile_art_i(:) + linear_1D_sorted(N,uloc(:),line%phi(:,icell),N,u1(:))
-   !       enddo
+      if (line%voigt) then
+         u1(:) = u0(:) - omegav(1)/vth
+         uloc(:) = line%v(:) / vth
+         profile_art_i(:) = linear_1D_sorted(N,uloc(:),line%phi(:,icell),N,u1(:))
+         do nv=2, Nvspace
+            u1(:) = u0(:) - omegav(nv)/vth
+            profile_art_i(:) = profile_art_i(:) + linear_1D_sorted(N,uloc(:),line%phi(:,icell),N,u1(:))
+         enddo
 
-   !    else
-   !       !u1 = (u0 - omegav(nv)/vth)**2
-   !       u0sq(:) = u0(:)*u0(:)
-   !       u1(:) = u0sq(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
-   !       profile_art_i(:) = exp(-u1(:))
-   !       do nv=2, Nvspace
-   !          u1(:) = u0sq(:) + (omegav(nv)/vth)*(omegav(nv)/vth) - 2*u0(:) * omegav(nv)/vth
-   !          profile_art_i(:) = profile_art_i(:) + exp(-u1(:))
-   !       enddo
-   !    endif
+      else
+         !u1 = (u0 - omegav(nv)/vth)**2
+         u0sq(:) = u0(:)*u0(:)
+         u1(:) = u0sq(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
+         profile_art_i(:) = exp(-u1(:)) / sqrtpi / vth
+         do nv=2, Nvspace
+            u1(:) = u0sq(:) + (omegav(nv)/vth)*(omegav(nv)/vth) - 2*u0(:) * omegav(nv)/vth
+            profile_art_i(:) = profile_art_i(:) + exp(-u1(:)) / sqrtpi / vth
+         enddo
+      endif
 
-   !    profile_art_i(:) = profile_art_i(:) / Nvspace
+      profile_art_i(:) = profile_art_i(:) / Nvspace
 
-   !    return
-   ! end function profile_art_i
+      return
+   end function profile_art_i
 
  
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
