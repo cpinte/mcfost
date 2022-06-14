@@ -18,8 +18,10 @@ module wavelengths_gas
    !continuum wavelength double for level dissolution !
    integer, parameter :: Nlambda_cont = 101
    integer, parameter :: Nlambda_cont_log = 31
-   integer, parameter :: Nlambda_line_w = 24
-   integer, parameter :: Nlambda_line_c_log = 14
+   integer, parameter :: Nlambda_line_w = 14
+   integer, parameter :: Nlambda_line_c_log = 12
+   real, parameter    :: vwing_on_vth = 5.0 !local line goes from 0 to vwing_on_vth * vth km/s
+   real, parameter    :: vcore_on_vth = 0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
    real               :: hv
    !number max of lambda for all lines
    integer            :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans
@@ -137,7 +139,12 @@ module wavelengths_gas
          vB = 0.0_dp
       endif
       vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
-      vmax = line%qwing * (vth + vB)
+      ! vmax = line%qwing * (vth + vB)
+      if (line%voigt) then
+         vmax = vwing_on_vth * (vth + vb) !qwing not needed. Here local profile only. For ray-tracing, the extension is in the param file.
+      else
+         vmax = 3.0 * (vth + vb)
+      endif
       if (limage) vmax = line%atom%vmax_rt*1d3
        
        
@@ -163,28 +170,17 @@ module wavelengths_gas
       integer, intent(in) :: nlambda
       real(kind=dp), dimension(Nlambda) :: line_lambda_grid
       type (atomicline), intent(inout) :: line
-      real(kind=dp) ::  vcore, vwing, v0, v1, vth, vB
+      real(kind=dp) ::  vcore, vwing, vth
       integer :: la, Nmid
 
-      !not the exact width at a given cell, but the maximum extent!
-      vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
-      vB = 0.0_dp
-      ! if (line%polarizable) then
-      !    !replace b_char by magnetic field modulus here
-      !    vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
-      ! else
-      !    vB = 0.0_dp
-      ! endif
-      vwing = line%qwing * (vth + vB)
-      vwing = c_light * (line%lambdamax - line%lambda0) / line%lambda0 !line%vmax
 
-      vcore = 2.5 * vth!wing_to_core * vwing
+      vwing = line%vmax
+      vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
+      vcore = vcore_on_vth * vth
   
-      v0 = - vwing
-      v1 = + vwing
+
       line_lambda_grid = 0.0_dp
 
-  
       line_lambda_grid(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
 
       line_lambda_grid(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
@@ -210,9 +206,7 @@ module wavelengths_gas
       real(kind=dp) ::  vwing, vth
       integer :: la, Nmid
 
-      !not the exact width at a given cell, but the maximum extent!
- 
-      vwing = c_light * (line%lambdamax - line%lambda0) / line%lambda0
+      !not the exact width at a given cell, but the maximum extent! 
       vwing = line%vmax
 
       line_lambda_grid_dv = 0.0_dp

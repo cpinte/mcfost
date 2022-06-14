@@ -333,7 +333,7 @@ module Opacity_atom
       integer :: nact, j, i, kr, Nb, Nr, la, Nl
       integer :: i0, j0, la0, N1, N2
       type (AtomType), pointer :: aatom
-      real(kind=dp) :: gij, chicc, wl, ni_on_nj_star, wphi, twohnu3_c2
+      real(kind=dp) :: gij, chicc, wl, ni_on_nj_star, wphi, twohnu3_c2, wt
       real(kind=dp) :: term1(Nlambda_max_cont), term2(Nlambda_max_cont), term3(Nlambda_max_cont)
       real(kind=dp), dimension(Nlambda_max_line) :: phi0, wei_line
 
@@ -367,55 +367,60 @@ module Opacity_atom
       
             if (aatom%n(i,icell) - gij*aatom%n(j,icell) <= 0.0_dp) cycle cont_loop
 
-
+            !The wavelength integration weight cannot be used in that loop because we interpolate after.
             freq_loop : do la=1, Nl
-               if (la==1) then
-                  wl = 0.5*(tab_lambda_cont(Nb+1)-tab_lambda_cont(Nb)) / tab_lambda_cont(Nb)
-               elseif (la==Nl) then
-                  wl = 0.5*(tab_lambda_cont(Nb+la-1)-tab_lambda_cont(Nb+la-2)) / tab_lambda_cont(Nb+la-1)
-               else
-                  wl = 0.5*(tab_lambda_cont(Nb+la)-tab_lambda_cont(Nb+la-2)) / tab_lambda_cont(Nb+la-1)
-               endif
-
                gij = ni_on_nj_star * exp(hnu_k(Nb-1+la)/T(icell))
-
-               term1(la) = fourpi_h * wl * aatom%continua(kr)%alpha(la) * (aatom%n(i,icell) - gij*aatom%n(j,icell))
+               term1(la) = fourpi_h * aatom%continua(kr)%alpha(la) * (aatom%n(i,icell) - gij*aatom%n(j,icell))
                term2(la) = aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij
                term3(la) = aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij * aatom%n(j,icell)
             enddo freq_loop
-            !linear interpolation
-            chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1)
-            chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1)
+            !linear interpolation + adding wavelength integration weight
+            wl = 0.5*(tab_lambda_nm(N1+1)-tab_lambda_nm(N1)) / tab_lambda_nm(N1)
+            chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1) * wl
+            chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1) * wl
             Uji_down(n1,j,nact,id) = Uji_down(N1,j,nact,id) + term2(1)
             eta_atoms(N1,nact,id) = eta_atoms(N1,nact,id) + term3(1)
             i0 = 2
             do la=N1,N2
+               wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
                loop_i : do la0=i0, Nl
                   if (tab_lambda_cont(Nb+la0-1) > tab_lambda_nm(la)) then
-                     wl = (tab_lambda_nm(la) - tab_lambda_cont(Nb+la0-2)) / (tab_lambda_cont(Nb+la0-1) - tab_lambda_cont(Nb+la0-2))
+                     wt = (tab_lambda_nm(la) - tab_lambda_cont(Nb+la0-2)) / (tab_lambda_cont(Nb+la0-1) - tab_lambda_cont(Nb+la0-2))
 
-                     chi_down(la,j,nact,id) = chi_down(la,j,nact,id) + (1.0_dp - wl) *term1(la0-1)  + wl * term1(la0)
-                     chi_up(la,i,nact,id) = chi_up(la,i,nact,id) + (1.0_dp - wl) *term1(la0-1)  + wl * term1(la0)
-                     Uji_down(la,j,nact,id) = Uji_down(la,j,nact,id) + (1.0_dp - wl) *term2(la0-1)  + wl * term2(la0)
-                     eta_atoms(la,nact,id) = eta_atoms(la,nact,id) + (1.0_dp - wl) *term3(la0-1)  + wl * term3(la0)
+                     chi_down(la,j,nact,id) = chi_down(la,j,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) )*wl
+                     chi_up(la,i,nact,id) = chi_up(la,i,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) ) *wl
+                     Uji_down(la,j,nact,id) = Uji_down(la,j,nact,id) + (1.0_dp - wt) *term2(la0-1)  + wt * term2(la0)
+                     eta_atoms(la,nact,id) = eta_atoms(la,nact,id) + (1.0_dp - wt) *term3(la0-1)  + wt * term3(la0)
 
                      i0 = la0
                      exit loop_i
                   endif
                enddo loop_i
             enddo
-            chi_down(n2,j,nact,id) = chi_down(n2,j,nact,id) + term1(Nl)
-            chi_up(n2,i,nact,id) = chi_up(n2,i,nact,id) + term1(Nl)
+            wl = 0.5*(tab_lambda_nm(N2)-tab_lambda_nm(N2-1)) / tab_lambda_nm(N2-1)
+            chi_down(n2,j,nact,id) = chi_down(n2,j,nact,id) + term1(Nl) * wl
+            chi_up(n2,i,nact,id) = chi_up(n2,i,nact,id) + term1(Nl) * wl
             Uji_down(n2,j,nact,id) = Uji_down(n2,j,nact,id) + term2(Nl)
             eta_atoms(n2,nact,id) = eta_atoms(n2,nact,id) + term3(Nl)
 
          enddo cont_loop
 
+         ! do la=1, n_lambda
+         !     if (la==1) then
+         !        wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la)) / tab_lambda_nm(la)
+         !     elseif (la==n_lambda) then
+         !        wl = 0.5*(tab_lambda_nm(la)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
+         !     else
+         !        wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
+         !     endif    
+         !     chi_down(la,:,:,id) =  chi_down(la,:,:,id)  * wl
+         !     chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl     
+         ! enddo
+
 
          line_loop : do kr = 1, aatom%Nline
 
             if (.not.aatom%lines(kr)%lcontrib) cycle line_loop
-
 
             j = aatom%lines(kr)%j
             i = aatom%lines(kr)%i
@@ -448,7 +453,6 @@ module Opacity_atom
                !there is a hc_fourpi factor that simplifies here, because integral is over dnu/hnu dOmega = dv/hc dOmega * hc/4pi
                !dv dOmega/4pi which is whtat is contained in wl (for dv) and what the angular integration provides (dOmega/4pi)
                chicc = wl * aatom%lines(kr)%Bij * (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(la)/wphi
-
 
                chi_down(Nb-1+la,j,nact,id) = chi_down(Nb-1+la,j,nact,id) + chicc
                chi_up(Nb-1+la,i,nact,id) = chi_up(Nb-1+la,i,nact,id) + chicc
@@ -660,12 +664,13 @@ module Opacity_atom
       real(kind=dp), intent(in) :: lambda(Nlambda)
       integer :: unit, unit2, status = 0
       integer :: alloc_status, id, icell, m, Nrec
-      integer(kind=8) :: Nsize
       real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
-      character(len=50) :: filename_chi="chi_map.bin"
+      character(len=11) :: filename_chi="chi_map.bin"
       character(len=50) :: filename_eta="eta_map.bin"  
-      character(len=50) :: filename_rho="magnetoopt_map.bin"  
+      character(len=18) :: filename_rho="magnetoopt_map.bin"  
       
+      call warning("opacity emissivity map bug here because of molecular emission and r=0!")
+
       write(*,*) " Writing emissivity and opacity map (rest frame) ..."
       ! if (lmagnetized) then
       !    Nrec = 4
@@ -688,12 +693,9 @@ module Opacity_atom
       id = 1
       do icell=1, n_cells
          !$ id = omp_get_thread_num() + 1
-         if (icompute_atomRT(icell)) then
-            call background_continua_lambda(icell, Nlambda, lambda, chi_tmp(:,icell,1), eta_tmp(:,icell,1))
-            !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
-            !accumulate b-f and b-b un chi and Sny
-            call opacity_atom_bf_loc(icell,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
-            call opacity_atom_bb_loc(id,icell,1,0d0,0d0,0d0,0d0,0d0,0d0,0d0,0d0,-1d0,&
+         if (icompute_atomRT(icell) > 0) then
+            call contopac_atom_loc(icell,Nlambda,lambda,chi_tmp(:,icell,1),eta_tmp(:,icell,1))
+            call opacity_atom_bb_loc(id,icell,1,0d0,0d0,0d0,0d0,0d0,0d0,0d0,0d0,0d0,&
                0d0,0d0,.false.,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
             ! do m=2,Nrec
             !    !m=1, unpolarized already filled.

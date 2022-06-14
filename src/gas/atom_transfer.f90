@@ -296,16 +296,18 @@ module atom_transfer
                      call error("etape inconnue")
                   end if !etape
 
-                  call update_populations(id, icell, (l_iterate_ne.and.icompute_atomRT(icell)==1), diff)
-
                   ! n_iter_loc = 0
-                  ! lconverged_loc = .not.lsubiteration
-                  ! npl(1:hydrogen%Nlevel,1,id) = hydrogen%n(:,icell)
+                  ! lconverged_loc = (.not.lsubiteration)
+                  ! npl(1,1:hydrogen%Nlevel,id) = hydrogen%n(:,icell)
                   ! !this is n_new that is to be updated here, not atom%n ! ("old pops")
                   ! do while (.not.lconverged_loc)
                   !    n_iter_loc = n_iter_loc + 1
 
-                  !    hydrogen%n(:,icell) = n_new(1,1:hydrogen%Nlevel,icell)
+                  !    !electronic density fixed for the sub-iterations (because it is already an iterative loop)
+                  !    !do the electron density iterations after the sub-iterations ??
+                  !    call update_populations(id, icell,.false.,diff)
+
+                  !    hydrogen%n(:,icell) = n_new(1:hydrogen%Nlevel,1,icell)
 
                   !    !psi is updated.
                   !    !currenlty includes only the lines opacity!
@@ -314,9 +316,6 @@ module atom_transfer
                   !       call xcoupling(id, icell, iray, .true.)
                   !       call accumulate_radrates_mali(id, icell, iray, weight)                        
                   !    enddo
-                  !    !electronic density fixed for the sub-iterations (because it is already an iterative loop)
-                  !    !do the electron density iterations after the sub-iterations ??
-                  !    call update_populations(id, icell,.false.,diff)
 
                   !    ! write(*,*) "subit:", id, n_iter_loc, diff
                   !    if (real(diff) < dpops_sub_max_error) lconverged_loc = .true.
@@ -324,12 +323,15 @@ module atom_transfer
                   !    if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
                   !    if (n_iter_loc == maxIter_loc) lconverged_loc = .true.
                   ! enddo
-                  ! hydrogen%n(:,icell) = npl(1:hydrogen%Nlevel,1,id)
+                  ! hydrogen%n(:,icell) = npl(1,1:hydrogen%Nlevel,id)
 
                   ! if ( (lNg_acceleration .and. lng_turned_on).and.&
                   !       (maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
 
                   ! endif
+
+                  !update populations of all atoms including electrons
+                  call update_populations(id, icell, (l_iterate_ne.and.icompute_atomRT(icell)==1), diff)
 
                end if !icompute_atomRT
              
@@ -798,6 +800,11 @@ module atom_transfer
             call emission_line_map(ibin,iaz)
          end do
       end do
+
+      if (laccretion_shock) then
+         if (max_Tshock>0) write(*,'("max(Tshock)="(1I5)" K; min(Tshock)="(1I5)" K")') nint(max_Tshock), nint(min_Tshock)
+      endif
+
       if (RT_line_method==1) then
          call write_total_flux()
       else

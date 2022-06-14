@@ -194,12 +194,12 @@ module gas_contopac
       call Hydrogen_ff(icell, Nx, x, chi)
       chiout(:) = chiout(:) + chi(:)
       etaout(:) = etaout(:) + chi(:) * Bp(:)
-  
+
       ! call Hminus_bf_wishart(icell, N, lambda, chi, eta) !->better with turbospec
       call Hminus_bf_geltman(icell,Nx, x, chi, eta) !->better with rh
       chiout(:) = chiout(:) + chi(:)
       etaout(:) = etaout(:) + eta(:)
-  
+
       call Hminus_ff_bell_berr(icell, Nx, x, chi)
       chiout(:) = chiout(:) + chi(:)
       etaout(:) = etaout(:) + chi(:) * Bp(:)

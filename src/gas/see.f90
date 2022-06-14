@@ -1064,7 +1064,7 @@ module see
             i = atom%lines(kr)%i; j = atom%lines(kr)%j
             gc(j,i) = gc(j,i) - atom%lines(kr)%Cij(id)
             gc(i,j) = gc(i,j) - atom%lines(kr)%Cji(id)
-            dgcdne(i,j) = dgcdne(i,j) - 2.0 * atom%lines(kr)%Cji(id) / ne(icell)
+            dgcdne(i,j) = dgcdne(i,j) - atom%lines(kr)%Cji(id) / ne(icell) !no factor 2 here, bound-bound
             dgcdne(j,i) = dgcdne(j,i) - atom%lines(kr)%Cij(id) / ne(icell)
         enddo
 
