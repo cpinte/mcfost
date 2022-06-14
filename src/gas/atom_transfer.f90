@@ -601,7 +601,7 @@ module atom_transfer
 
          id = 1
          if (lvoronoi) then
-            dv = sqrt( maxval(Voronoi(:)%xyz(1)**2+Voronoi(:)%xyz(2)**2+Voronoi(:)%xyz(3)**2) )
+            dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
             if (dv == 0.0_dp) return 
             dv = 0.0_dp
 
@@ -612,9 +612,9 @@ module atom_transfer
             !$omp do schedule(dynamic,1)
             do i1=1,n_cells
                !$ id = omp_get_thread_num() + 1
-               v1 = sqrt(sum(Voronoi(i1)%xyz**2))
+               v1 = sqrt(sum(Voronoi(i1)%vxyz**2))
                do i2=1,n_cells
-                  v2 = sqrt(sum(Voronoi(i2)%xyz**2))
+                  v2 = sqrt(sum(Voronoi(i2)%vxyz**2))
                   if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
                      dv = max(dv,abs(v1-v2))
                   endif
