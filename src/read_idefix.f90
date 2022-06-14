@@ -52,7 +52,7 @@ contains
     write(*,*) trim(line)
     write(*,*) trim(key), nfields
 
-    read(1,'(A)',iostat=ios) line ! Geomertry
+    read(1,'(A)',iostat=ios) line ! Geometry
     read(1,'(A)',iostat=ios) line
     read(1,'(A)',iostat=ios) line ! periodicity
     read(1,'(A)',iostat=ios) line
@@ -64,12 +64,46 @@ contains
     read(line, *) key, npoints
 
     close(unit=1)
-    write(*,*) "DONE"
 
-    open(unit=iunit,file=trim(filename),status='old',form='unformatted', access="stream", convert="big_endian", iostat=ios)
-    read(iunit,pos=6) geometry
+    ! Does not work
+    !open(unit=iunit,file=trim(filename),status='old',form='unformatted', access="sequential", convert="big_endian", iostat=ios)
+    !do i=1,6
+    !   read(iunit)
+    !enddo
+    !do i=1,1
+    !   read(iunit) geometry
+    !   write(*,*) i, geometry
+    !enddo
+    !close(unit=iunit)
+
+    open(unit       = iunit,       &
+         file       = trim(filename), &
+         form       = 'UNFORMATTED',  &
+         access     = 'SEQUENTIAL',   &
+         action     = 'WRITE',        &
+         convert    = 'BIG_ENDIAN',   &
+         !recordtype = 'STREAM',       &
+         !buffered   = 'YES',          &
+         iostat     = ios)
+
+    do i=1,6
+       read(iunit) line
+    enddo
+    read(iunit) geometry
     write(*,*) geometry
-    close(unit=iunit)
+
+    ! Maybe use that code :
+    !https://git-xen.lmgc.univ-montp2.fr/lmgc90/lmgc90_user/blob/d24baec633e2f84b34e8b2375dd1ec3260cec383/src/Core/src/post/vtkwrite/full_LIB_VTK_IO.f90
+
+    ! This one below works but implies to know the position
+    !open(unit=iunit,file=trim(filename),status='old',form='unformatted', access="stream", convert="big_endian", iostat=ios)
+    !do i=1,150
+    !   read(iunit,pos=i) geometry
+    !   write(*,*) i, geometry ! i = 129 --> value = 2 ok
+    !enddo
+    !close(unit=iunit)
+
+    write(*,*) "DONE"
     stop
 
     ! On compte les lignes avec des donnees

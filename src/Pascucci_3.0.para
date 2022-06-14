@@ -9,7 +9,7 @@
   61  0.110662 2168.76          n_lambda, lambda_min, lambda_max [mum] Do not change this line unless you know what you are doing
   T T F 		  compute temperature?, compute sed?, use default wavelength grid for ouput ?
   Pascucci.lambda		  wavelength file (if previous parameter is F)
-  F T			  separation of different contributions?, stokes parameters?
+  T T			  separation of different contributions?, stokes parameters?
 
 #Grid geometry and size
   1			  1 = cylindrical, 2 = spherical, 3 = Voronoi tesselation (this is in beta, please ask Christophe)
