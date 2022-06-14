@@ -359,6 +359,7 @@ module atom_transfer
                !update lte opac and related quantities
                !damping and profiles for instance
                id = 1
+               dne = 0.0_dp
                write(*,'("  OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
                   minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                !$omp parallel &
