@@ -192,6 +192,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 $(Atom_dir)/constant.f90 \
           $(Atom_dir)/atmos_type.f90 \
           density.f90 read_opacity.f90 scattering.f90      \
 	  read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90 \
+          read_idefix.f90 \
           coated_sphere.f90 dust_prop.f90              \
           molecular_emission.f90 PAH.f90              \
           $(Atom_dir)/zeeman.f90 input.f90 $(Atom_dir)/broad.f90                 \

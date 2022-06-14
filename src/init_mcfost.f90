@@ -14,6 +14,7 @@ module init_mcfost
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters
   use read1d_models, only : read_grid_1d
+  use read_idefix, only : read_idefix_parameters
 
   implicit none
 
@@ -203,7 +204,12 @@ subroutine set_default_variables()
   lturn_off_Lacc = .false.
   lforce_Mdot = .false.
   lregular_theta = .false.
+  lfargo3d = .false.
+  lathena = .false.
+  lidefix = .false.
   theta_max = 0.5*pi
+  llinear_rgrid = .false.
+  lold_PA = .false.
 
   tmp_dir = "./"
 
@@ -272,9 +278,9 @@ subroutine initialisation_mcfost()
 
   character(len=512) :: cmd, s, str_seed, para, base_para
   character(len=4) :: n_chiffres
-  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file
+  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file, idefix_file
 
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb, lold_PA
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -1407,7 +1413,15 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lathena = .true.
         call get_command_argument(i_arg,athena_file)
+        i_arg = i_arg + 1
+     case("-idefix")
+        i_arg = i_arg + 1
+        lidefix = .true.
+        call get_command_argument(i_arg,idefix_file)
          i_arg = i_arg + 1
+     case("-old_PA")
+        i_arg = i_arg + 1
+        lold_PA = .true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1436,12 +1450,21 @@ subroutine initialisation_mcfost()
      disk_zone(1)%geometry = 2
      call read_athena_parameters(athena_file)
   endif
+<<<<<<< HEAD
   if (lmodel_1d) then
    l3d = .false.
    n_zones = 1
    disk_zone(1)%geometry = 2
    call warning("model_1d : reading 1d  stellar atmosphere model")
    call read_grid_1d()!density_file
+=======
+  if (lidefix) then
+     l3D = .true.
+     if (n_zones > 1) call error("athena mode only work with 1 zone")
+     call warning("idefix : forcing spherical grid") ! only spherical grid is implemented for now
+     disk_zone(1)%geometry = 2
+     call read_idefix_parameters(idefix_file)
+>>>>>>> master
   endif
 
   if (n_zones > 1) lvariable_dust=.true.
@@ -1646,7 +1669,9 @@ subroutine initialisation_mcfost()
   if (.not.limg) loutput_mc = .true.
 
   if (lPA) ang_disque = PA
-  ang_disque = - ang_disque ! rotation North vers East
+  ! rotation North vers East and red-shifted side to North if PA=0
+  ang_disque = -90 - ang_disque
+  if (lold_PA) ang_disque = ang_disque + 90 ! old mcfost convention
 
   if (lzoom) then
      zoom = opt_zoom
@@ -1799,6 +1824,7 @@ subroutine display_help()
   write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
   write(*,*) "        : -model_1d : interface with stellar atmosphere models."
   write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
+  write(*,*) "        : -idefix <dump> : reads an idefix vtk file"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"
@@ -1813,6 +1839,7 @@ subroutine display_help()
   write(*,*) "        : -zoom <zoom> (overrides value in parameter file)"
   write(*,*) "        : -resol <nx> <ny> (overrides value in parameter file)"
   write(*,*) "        : -PA (override value in parameter file)"
+  write(*,*) "        : -old_PA : use old definition (PA of minor axis, red-shifted side to West for PA=0)"
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
   write(*,*) "        : -casa : write an image ready for CASA"
   write(*,*) "        : -nphot_img : overwrite the value in the parameter file"

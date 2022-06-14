@@ -247,7 +247,7 @@ subroutine define_cylindrical_grid()
      allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error zmax, volume')
      zmax = 0.0 ; volume=0.0
-     
+
   endif
   ! end allocation
 
@@ -279,95 +279,108 @@ subroutine define_cylindrical_grid()
         endif
      endif
 
-     ! Grille log avec subdivision cellule interne
-     !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
-     ln_delta_r = (1.0_dp/real(n_rad_region-n_rad_in_region+1,kind=dp))*log(regions(ir)%Rmax/R0)
-     delta_r = exp(ln_delta_r)
-
-     ln_delta_r_in = (1.0_dp/real(n_rad_in_region,kind=dp))*log(delta_r)
-     delta_r_in = exp(ln_delta_r_in)
-
-     ! Selection de la zone correspondante : pente la plus forte
-     puiss = 0.0_dp
-     do iz=1, n_zones
-        if (disk_zone(iz)%region == ir) then
-           p=1+dz%surf-dz%exp_beta
-           if (p > puiss) then
-              puiss = p
-           endif
-        endif
-     enddo
-
      ! Calcul recursif hors boucle //
      ! Calcul les rayons separant les cellules de (1 a n_rad + 1)
      tab_r(istart) = R0
-     tab_r2(istart) = tab_r(istart) * tab_r(istart)
-     tab_r3(istart) = tab_r2(istart) * tab_r(istart)
 
-     if (puiss == 0.0) then
-        do i=istart+1, istart + n_rad_in_region
-           tab_r(i) = exp(log(R0) - (log(R0)-log(R0*delta_r))*(2.0**(i-istart)-1.0)/(2.0**n_rad_in_region-1.0))
-           tab_r2(i) = tab_r(i) * tab_r(i)
-           tab_r3(i) = tab_r2(i) * tab_r(i)
+     if (llinear_rgrid) then
+        delta_r = (regions(ir)%Rmax - R0)/n_rad_region
+        do i=istart+1, istart + n_rad_region
+           tab_r(i) = R0 + (i-istart) * delta_r
         enddo
-     else
-        r_i = exp(puiss*log(R0))
-        r_f = exp(puiss*log(R0*delta_r))
-        dr=r_f-r_i
-        fac = 1.0/(2.0**(n_rad_in_region+1)-1.0)
-        do i=istart+1, istart + n_rad_in_region
-           tab_r(i) = (R0**puiss - (R0**puiss-(R0*delta_r)**puiss) &
-                *(2.0**(i-istart+1)-1.0)/(2.0**(n_rad_in_region+1)-1.0))**(1.0/puiss)
-           !     tab_rcyl(i) = exp( 1.0/puiss * log(r_i + dr * (2.0**(i)-1.0) * fac) )
-           !if (tab_rcyl(i) - tab_rcyl(i-1) < 1.0d-15*tab_rcyl(i-1)) then
-           if (tab_r(i) - tab_r(i-1) < prec_grille*tab_r(i-1)) then
-              call error("spatial grid resolution too high", &
-                   msg2="Differences between two cells are below double precision")
+
+        n_cells_tmp = istart+n_rad_region
+
+        ! Cellules vides
+        if (ir < n_regions) then
+           if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
+              delta_r = (regions(ir+1)%Rmin - regions(ir)%Rmax)/n_empty
+              do i=istart+n_rad_region+1, istart+n_rad_region+n_empty
+                 tab_r(i) = tab_r(i-1) + delta_r
+              enddo
+              n_cells_tmp = n_cells_tmp + n_empty
            endif
-           tab_r2(i) = tab_r(i) * tab_r(i)
-           tab_r3(i) = tab_r2(i) * tab_r(i)
-        enddo
-     endif
-
-     ! Grille log apres subdivision "1ere" cellule
-     do i=istart + n_rad_in_region+1, istart+n_rad_region
-        tab_r(i) = tab_r(i-1) * delta_r
-        tab_r2(i) = tab_r(i) * tab_r(i)
-        tab_r3(i) = tab_r2(i) * tab_r(i)
-     enddo
-
-     n_cells_tmp = istart+n_rad_region
-
-     ! Cellules vides
-     if (ir < n_regions) then
-        if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
-           ln_delta_r = (1.0_dp/real(n_empty+1,kind=dp))*log(regions(ir+1)%Rmin/regions(ir)%Rmax)
-           delta_r = exp(ln_delta_r)
-           do i=istart+n_rad_region+1, istart+n_rad_region+n_empty
-              tab_r(i) = tab_r(i-1) * delta_r
-              tab_r2(i) = tab_r(i) * tab_r(i)
-              tab_r3(i) = tab_r2(i) * tab_r(i)
-           enddo
-           n_cells_tmp = n_cells_tmp + n_empty
         endif
-     endif
 
-     istart = n_cells_tmp+1
+        istart = n_cells_tmp+1
+     else
+        ! Grille log avec subdivision cellule interne
+        !delta_r = (rout/rmin)**(1.0/(real(n_rad-n_rad_in+1)))
+        ln_delta_r = (1.0_dp/real(n_rad_region-n_rad_in_region+1,kind=dp))*log(regions(ir)%Rmax/R0)
+        delta_r = exp(ln_delta_r)
+
+        ln_delta_r_in = (1.0_dp/real(n_rad_in_region,kind=dp))*log(delta_r)
+        delta_r_in = exp(ln_delta_r_in)
+
+        ! Selection de la zone correspondante : pente la plus forte
+        puiss = 0.0_dp
+        do iz=1, n_zones
+           if (disk_zone(iz)%region == ir) then
+              p=1+dz%surf-dz%exp_beta
+              if (p > puiss) then
+                 puiss = p
+              endif
+           endif
+        enddo
+
+        if (puiss == 0.0) then
+           do i=istart+1, istart + n_rad_in_region
+              tab_r(i) = exp(log(R0) - (log(R0)-log(R0*delta_r))*(2.0**(i-istart)-1.0)/(2.0**n_rad_in_region-1.0))
+           enddo
+        else
+           r_i = exp(puiss*log(R0))
+           r_f = exp(puiss*log(R0*delta_r))
+           dr=r_f-r_i
+           fac = 1.0/(2.0**(n_rad_in_region+1)-1.0)
+           do i=istart+1, istart + n_rad_in_region
+              tab_r(i) = (R0**puiss - (R0**puiss-(R0*delta_r)**puiss) &
+                   *(2.0**(i-istart+1)-1.0)/(2.0**(n_rad_in_region+1)-1.0))**(1.0/puiss)
+              !     tab_rcyl(i) = exp( 1.0/puiss * log(r_i + dr * (2.0**(i)-1.0) * fac) )
+              !if (tab_rcyl(i) - tab_rcyl(i-1) < 1.0d-15*tab_rcyl(i-1)) then
+              if (tab_r(i) - tab_r(i-1) < prec_grille*tab_r(i-1)) then
+                 call error("spatial grid resolution too high", &
+                      msg2="Differences between two cells are below double precision")
+              endif
+           enddo
+        endif
+
+        ! Grille log apres subdivision "1ere" cellule
+        do i=istart + n_rad_in_region+1, istart+n_rad_region
+           tab_r(i) = tab_r(i-1) * delta_r
+        enddo
+
+        n_cells_tmp = istart+n_rad_region
+
+        ! Cellules vides
+        if (ir < n_regions) then
+           if ( (regions(ir+1)%Rmin > regions(ir)%Rmax) ) then
+              ln_delta_r = (1.0_dp/real(n_empty+1,kind=dp))*log(regions(ir+1)%Rmin/regions(ir)%Rmax)
+              delta_r = exp(ln_delta_r)
+              do i=istart+n_rad_region+1, istart+n_rad_region+n_empty
+                 tab_r(i) = tab_r(i-1) * delta_r
+              enddo
+              n_cells_tmp = n_cells_tmp + n_empty
+           endif
+        endif
+
+        istart = n_cells_tmp+1
+     endif ! linear or log grid
   enddo ! ir
 
-	if (lmodel_1d) then
+  if (lmodel_1d) then
      !Redfine the grid edge for the stellar atmosphere models (marcs, multi, kurucz, cmfgen etc)
-		! istart = 1
-		! n_cells_tmp = 0
-      tab_r(:) = tab_r_mod1d
-      tab_r2(:) = tab_r(:)*tab_r(:)
-      tab_r3(:) = tab_r(:)*tab_r2(:)
-		! n_cells_tmp = istart+n_rad_region
-		! istart = n_cells_tmp + 1
-		if (maxval(tab_r)-maxval(tab_r_mod1d) /= 0.0) then
-         call error("read 1d grid doesn't match the grid")
-      endif
+     ! istart = 1
+     ! n_cells_tmp = 0
+     tab_r(:) = tab_r_mod1d
+     ! n_cells_tmp = istart+n_rad_region
+     ! istart = n_cells_tmp + 1
+     if (maxval(tab_r)-maxval(tab_r_mod1d) /= 0.0) call error("read 1d grid doesn't match the grid")
    endif
+
+   do i=1,n_rad+1
+      tab_r2(i) = tab_r(i) * tab_r(i)
+      tab_r3(i) = tab_r2(i) * tab_r(i)
+   enddo
 
   r_lim(0)= rmin
   r_lim_2(0)= rmin**2
@@ -1311,6 +1324,7 @@ end subroutine define_cylindrical_grid
 
     integer :: i, j, iunit, ios
     real(dp) :: buffer, t, radius
+    logical :: lerror = .false.
 
     iunit = 1
 
@@ -1344,8 +1358,12 @@ end subroutine define_cylindrical_grid
     do i=0,n_rad
        read(iunit,*) radius
        radius = radius * scale_length_units_factor
-       if (radius - r_lim(i) > 1e-6 * radius) call error("fargo3d radius grid")
+       if (radius - r_lim(i) > 1e-6 * radius) then
+          write (*,*) i, "fargo3d r=", radius, "mcfost r=", r_lim(i)
+          lerror=.true.
+       endif
     enddo
+    if (lerror) call error("fargo3d radius grid")
 
     ! Unit test for phi check that is only an offset
     filename = trim(fargo3d%dir)//"/domain_x.dat"

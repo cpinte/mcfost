@@ -689,6 +689,14 @@ subroutine alloc_emission_mol(imol)
 
   call allocate_mol_maps(imol)
 
+  if (ltau1_surface) then
+     if (.not.allocated(tau_surface)) then
+        allocate(tau_surface(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error tau_surface')
+        tau_surface = 0.0
+     endif
+  endif
+
   return
 
 end subroutine alloc_emission_mol
@@ -716,7 +724,7 @@ subroutine dealloc_emission_mol()
 
   if (ldouble_RT) deallocate(kappa_mol_o_freq2, emissivite_mol_o_freq2, tab_nLevel2, Jmol2)
 
-  deallocate(I0, I0c, tab_speed_rt) ! besoin de dealoue tab_speed_rt pour plusieyrs ray
+  deallocate(I0, I0c, tab_speed_rt) ! besoin de dealouer tab_speed_rt pour plusieurs rayons
   if (lorigine) deallocate(origine_mol)
 
   return

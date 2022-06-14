@@ -1,4 +1,4 @@
-module read_fargo3d
+module read_idefix
 
   use parametres
   use messages
@@ -12,32 +12,105 @@ module read_fargo3d
 
 contains
 
-  subroutine read_fargo3d_parameters(dir,id)
+  subroutine read_idefix_parameters(filename)
 
-    character(len=*), intent(in) :: dir, id
+    character(len=*), intent(in) :: filename
 
-    character(len=128) :: key, val, filename
-    integer :: ios, n_lines, iunit
+    character(len=32) :: line, key, val1, val2, val3, buf, val
+    integer :: ios, iunit, nfields , n_lines, i
 
-    fargo3d%dir = dir
-    fargo3d%id = id
+    integer :: nx1, nx2, nx3, npoints
+
+    integer :: geometry, periodicity
+    integer :: time
+    logical :: lbinary
+
+
+    idefix%filename = filename
 
     iunit = 1
     ios = 0
 
-    ! Reading parameter files and extracting key parameters
-    filename = trim(dir)//"/variables.par"
-    write(*,*) "Reading "//trim(filename)
-    open(unit=iunit,file=trim(filename),status='old',form='formatted',iostat=ios)
+    ! reading ascii part of the vtk file
+    open(unit=iunit,file=trim(filename),status='old',form='formatted', access="stream", convert="big_endian", iostat=ios)
     if (ios /= 0) call error("opening "//trim(filename))
+
+    read(1,'(A)',iostat=ios) line ! vtk
+    read(1,'(A)',iostat=ios) line ! Idefix
+    read(1,'(A)',iostat=ios) line ! BINARY
+    if (trim(line) == "BINARY") lbinary = .true.
+    read(1,'(A)',iostat=ios) line ! DATASET
+    read(1,'(A)',iostat=ios) line ! FIELD
+
+    read(line, *) key, val1, val2
+    if (trim(key) == "FIELD") then
+       read(val2, *) nfields
+    else
+       call error("Missing field entry in idefix file")
+    endif
+
+    write(*,*) trim(line)
+    write(*,*) trim(key), nfields
+
+    read(1,'(A)',iostat=ios) line ! Geometry
+    read(1,'(A)',iostat=ios) line
+    read(1,'(A)',iostat=ios) line ! periodicity
+    read(1,'(A)',iostat=ios) line
+    read(1,'(A)',iostat=ios) line ! time
+    read(1,'(A)',iostat=ios) line
+    read(1,'(A)',iostat=ios) line ! dimensions
+    read(line, *) key, nx1, nx2, nx3
+    read(1,'(A)',iostat=ios) line ! n_points
+    read(line, *) key, npoints
+
+    close(unit=1)
+
+    ! Does not work
+    !open(unit=iunit,file=trim(filename),status='old',form='unformatted', access="sequential", convert="big_endian", iostat=ios)
+    !do i=1,6
+    !   read(iunit)
+    !enddo
+    !do i=1,1
+    !   read(iunit) geometry
+    !   write(*,*) i, geometry
+    !enddo
+    !close(unit=iunit)
+
+    open(unit       = iunit,       &
+         file       = trim(filename), &
+         form       = 'UNFORMATTED',  &
+         access     = 'SEQUENTIAL',   &
+         action     = 'WRITE',        &
+         convert    = 'BIG_ENDIAN',   &
+         !recordtype = 'STREAM',       &
+         !buffered   = 'YES',          &
+         iostat     = ios)
+
+    do i=1,6
+       read(iunit) line
+    enddo
+    read(iunit) geometry
+    write(*,*) geometry
+
+    ! Maybe use that code :
+    !https://git-xen.lmgc.univ-montp2.fr/lmgc90/lmgc90_user/blob/d24baec633e2f84b34e8b2375dd1ec3260cec383/src/Core/src/post/vtkwrite/full_LIB_VTK_IO.f90
+
+    ! This one below works but implies to know the position
+    !open(unit=iunit,file=trim(filename),status='old',form='unformatted', access="stream", convert="big_endian", iostat=ios)
+    !do i=1,150
+    !   read(iunit,pos=i) geometry
+    !   write(*,*) i, geometry ! i = 129 --> value = 2 ok
+    !enddo
+    !close(unit=iunit)
+
+    write(*,*) "DONE"
+    stop
 
     ! On compte les lignes avec des donnees
     n_lines = 0
-    infinity : do while(ios==0)
+    do while(ios==0)
        n_lines=n_lines+1
-       read(1,*,iostat=ios) key, val
-       ! write(*,*) trim(key), " ", trim(val), " ", ios
-       if (ios/=0) exit infinity
+
 
        select case(trim(key))
           ! reading grid parameters
@@ -64,7 +137,7 @@ contains
              fargo3d%log_spacing = .true.
           else
              fargo3d%log_spacing = .false.
-             llinear_rgrid = .true.
+             call error("MCFOST linear grid for fargo3d not implemented yet")
           endif
        case("FRAME")
           if ((val == "C").or.(val == "c")) then
@@ -78,6 +151,7 @@ contains
           else
              fargo3d%realtype = sp
           endif
+
           ! Additional parameters
        case("DT")
           read(val,*,iostat=ios) fargo3d%dt
@@ -92,8 +166,7 @@ contains
        case("GAMMA")
           read(val,*,iostat=ios) fargo3d%gamma
        end select
-    end do infinity
-    write(*,*) "done"
+    end do
 
     ! Updating mcfost parameters
     grid_type = 2
@@ -121,27 +194,23 @@ contains
 
     return
 
-  end subroutine read_fargo3d_parameters
+  end subroutine read_idefix_parameters
 
   !---------------------------------------------
 
-  subroutine read_fargo3d_files()
+  subroutine read_idefix_model()
 
     ! fargo3d data is ordered in x = phi, y = r, z = theta
 
     real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
-    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old, i_planet, n_planets
+    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old
+    real(dp) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
 
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
 
     real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
     type(star_type), dimension(:), allocatable :: etoile_old
-
-    integer, parameter :: n_planets_max = 9
-    character(len=1) :: s
-    real(dp), dimension(n_planets_max) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
-    real(dp) :: Omega
 
     ! Todo : add option to skip velocity files if only continuum is needed
 
@@ -184,37 +253,23 @@ contains
     iunit = 1
 
     ! Reading planet properties
-    n_planets = 0
-    planet_loop : do i_planet=1, n_planets_max
-       write(s,"(I1)") i_planet-1
-       filename = trim(fargo3d%dir)//"/planet"//s//".dat"
-       open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
-       if (ios /= 0) exit planet_loop
-       n_planets = n_planets+1
-       write(*,*) "Reading "//trim(filename)
-       read(fargo3d%id,*) id
-       do while(ios==0)
-          read(iunit,*) i, x(i_planet), y(i_planet), z(i_planet), vx(i_planet), vy(i_planet), vz(i_planet), &
-               Mp(i_planet), time(i_planet), Omega_p(i_planet)
-          if (i==id) exit
-       enddo
-       close(iunit)
-    enddo planet_loop
+    filename = trim(fargo3d%dir)//"/planet0.dat"
+    write(*,*) "Reading "//trim(filename)
+    open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+    if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
 
-    write(s,"(I1)") n_planets
-    write(*,*) "Found "//s// " planets"
-
-    if (n_planets > 0) then
-       simu_time = time(n_planets) * utime
-    else
-       simu_time = 0 ! todo : eventually needs to find a better way to get the time
-    endif
+    read(fargo3d%id,*) id
+    do while(ios==0)
+       read(iunit,*) i, x, y, z, vx, vy, vz, Mp, time, Omega_p
+       if (i==id) exit
+    enddo
+    simu_time = time * utime
 
     ! Checking units :
     ! Omega_p * uvelocity == 29.78 km/s : OK
 
     n_etoiles_old = n_etoiles
-    n_etoiles = 1 + n_planets
+    n_etoiles = 2 ! Hard coded for new
 
     if (lfix_star) then
        write(*,*) ""
@@ -249,19 +304,17 @@ contains
     etoile(1)%vx = 0_dp ; etoile(1)%vy = 0_dp ; etoile(1)%vz = 0_dp
     etoile(1)%M = 1_dp * usolarmass
 
-    do i=1, n_planets
-       ! -x and -y as phi is defined differently in fargo3d
-       etoile(i+1)%x = -x(i) * ulength_au
-       etoile(i+1)%y = -y(i) * ulength_au
-       etoile(i+1)%z =  z(i) * ulength_au
+    ! -x and -y as phi is defined differently in fargo3d
+    etoile(2)%x = -x * ulength_au
+    etoile(2)%y = -y * ulength_au
+    etoile(2)%z =  z * ulength_au
 
-       ! -vx and -y as phi is defined differently in fargo3d
-       etoile(i+1)%vx = -vx(i) * uvelocity
-       etoile(i+1)%vy = -vy(i) * uvelocity
-       etoile(i+1)%vz =  vz(i) * uvelocity
+    ! -vx and -y as phi is defined differently in fargo3d
+    etoile(2)%vx = -vx * uvelocity
+    etoile(2)%vy = -vy * uvelocity
+    etoile(2)%vz =  vz * uvelocity
 
-       etoile(i+1)%M = Mp(i) * usolarmass
-    enddo
+    etoile(2)%M = Mp * usolarmass
 
     do i=1,n_etoiles
        if (etoile(i)%M > 0.013) then
@@ -276,22 +329,15 @@ contains
     enddo
     if (.not.lfix_star) call compute_stellar_parameters()
 
-    if (which_planet==0) which_planet=1
-
     if (lplanet_az) then
+       which_planet = 1 ! 1 planet for now
        RT_n_az = 1
-       RT_az_min = planet_az + atan2(-y(which_planet), -x(which_planet)) / deg_to_rad
+       RT_az_min = planet_az + atan2(-y, -x) / deg_to_rad
        RT_az_max = RT_az_min
        write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
        write(*,*) "WARNING: updating the azimuth to:", RT_az_min
     endif
 
-    if (n_planets < 1) then
-       Omega = 1.00049987506246096_dp
-       write(*,*) "Forcing corotating frame as there is no planet"
-    else
-       Omega = Omega_p(which_planet)
-    endif
 
     !-----------------------------------
     ! Passing data to mcfost
@@ -310,34 +356,16 @@ contains
        filename = trim(fargo3d%dir)//"/"//trim(file_types(l))//trim(trim(fargo3d%id))//".dat"
        write(*,*) "Reading "//trim(filename)
        open(unit=iunit, file=filename, status="old", form="unformatted", iostat=ios, access="direct" , recl=recl)
+       if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
        select case(l)
        case(1)
-          if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
           read(iunit, rec=1, iostat=ios) fargo3d_density
        case(2)
-          if (ios /= 0) then
-             call warning("opening fargo3d file:"//trim(filename))
-             fargo3d_vx = 0.0_dp
-             ios=0
-          else
-             read(iunit, rec=1, iostat=ios) fargo3d_vx ! vphi
-          endif
+          read(iunit, rec=1, iostat=ios) fargo3d_vx ! vphi
        case(3)
-          if (ios /= 0) then
-             call warning("opening fargo3d file:"//trim(filename))
-             fargo3d_vx = 0.0_dp
-             ios=0
-          else
-             read(iunit, rec=1, iostat=ios) fargo3d_vy ! vr
-          endif
+          read(iunit, rec=1, iostat=ios) fargo3d_vy ! vr
        case(4)
-          if (ios /= 0) then
-             call warning("opening fargo3d file:"//trim(filename))
-             fargo3d_vz = 0.0_dp
-             ios=0
-          else
-             read(iunit, rec=1, iostat=ios) fargo3d_vz ! vtheta
-          endif
+          read(iunit, rec=1, iostat=ios) fargo3d_vz ! vtheta
        end select
        if (ios /= 0) call error("reading fargo3d file:"//trim(filename))
        close(iunit)
@@ -360,7 +388,7 @@ contains
              densite_pouss(:,icell) = fargo3d_density(phik,i,jj) * udens
 
              vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity! vr
-             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
              vfield3d(icell,3)  = fargo3d_vz(phik,i,jj) * uvelocity! vtheta
           enddo ! k
        enddo bz
@@ -398,6 +426,6 @@ contains
 
     write(*,*) "Done"
 
-  end subroutine read_fargo3d_files
+  end subroutine read_idefix_model
 
-end module read_fargo3d
+end module read_idefix

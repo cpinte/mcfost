@@ -146,8 +146,15 @@ Images
 
 * ``distance``: Distance to the object in pc
 
-* ``disk_PA``: Position angle of the semi-minor axis of the disk, measured
-  counter-clockwise. If disk PA is not set to 0\ :sup:`o`, some of the
+* ``disk_PA``: position angle of the disk major axis from North to East.
+  PA = means that the red-shifted side of the disk is towards North.
+
+.. important:: For version below 3.0.43, PA was defined as the
+  position angle of the semi-minor axis of the disk, measured
+  counter-clockwise, with red-shifted side towards West. This
+  convention can be recovered with comman line option -old_PA.
+
+  If disk PA is not set to +/-90\ :sup:`o`, some of the
   image symmetries (see below) will automatically be set to F
 
 Scattering Method
