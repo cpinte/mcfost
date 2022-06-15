@@ -103,9 +103,9 @@ module atom_transfer
       enddo
 
       allocate(dM(Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
-      allocate(dTM(Nactiveatoms)); dM=0d0 !keep tracks of Tex for all cells for each atom
-      allocate(Tex_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tex for all cells for each line of each atom
-      allocate(Tion_ref(Nactiveatoms)); dM=0d0 !keep tracks of max Tion for all cells for each cont of each atom
+      allocate(dTM(Nactiveatoms)); dTM=0d0 !keep tracks of Tex for all cells for each atom
+      allocate(Tex_ref(Nactiveatoms)); Tex_ref=0d0 !keep tracks of max Tex for all cells for each line of each atom
+      allocate(Tion_ref(Nactiveatoms)); Tion_ref=0d0 !keep tracks of max Tion for all cells for each cont of each atom
       diff_old = 1.0_dp
       dM(:) = 1.0_dp
 
