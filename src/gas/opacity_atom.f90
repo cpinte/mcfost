@@ -9,7 +9,7 @@ module Opacity_atom
    use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, &
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
-   use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm
+   use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, vwing_on_vth
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
@@ -18,9 +18,10 @@ module Opacity_atom
    implicit none
 
    !local profile for cell id in direction iray for all atoms and b-b trans
-   real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:)
+   real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:)
    real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:)
-   integer, parameter 		   :: NvspaceMax = 151                                      
+   integer, parameter 		   :: NvspaceMax = 151
+   logical                    :: lnon_lte_loop                                      
 
    contains
 
@@ -243,17 +244,14 @@ module Opacity_atom
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
       real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
       integer :: nat, Nred, Nblue, kr, i, j, Nlam
-      real(kind=dp) :: vloc, dv, vth
+      real(kind=dp) :: dv, vth
       type(AtomType), pointer :: atom
       real(kind=dp), dimension(Nlambda_max_line) :: phi0
 
-      vloc = calc_vloc(icell,u,v,w,x,y,z,x1,y1,z1)
-      ! write(*,*) id, icell, "vloc=",vloc * 1d-3, " vlabs=", vlabs*1d-3
-      dv = 0.0
-      if (vlabs(id) /= 0.0_dp) then
-         dv = vloc - vlabs(id) 
-         ! write(*,*) " gradv between cell and nlte cell", dv*1d-3
-      endif 
+      dv = 0.0_dp
+      if (lnon_lte_loop.and..not.iterate) then !not iterate but non-LTE
+         dv = calc_vloc(icell,u,v,w,x,y,z,x1,y1,z1)
+      endif
 
       atom_loop : do nat = 1, N_Atoms
          atom => Atoms(nat)%p
@@ -270,11 +268,9 @@ module Opacity_atom
             Nlam = atom%lines(kr)%Nlambda
             i = atom%lines(kr)%i; j = atom%lines(kr)%j
 
-            if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) then
-               cycle tr_loop
-            endif
+            if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle tr_loop
             
-            if (abs(dv)>3.0*vth) then
+            if (abs(dv)>vwing_on_vth*vth) then
                !move the profile to the red edge up to Nover_sup
                !change Nlam ??
                if (dv > 0) then
@@ -293,8 +289,6 @@ module Opacity_atom
             phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
-
-
 
 
             chi(Nblue:Nred) = chi(Nblue:Nred) + &
@@ -498,8 +492,6 @@ module Opacity_atom
                                                 dv, omegav_mean
       integer                                :: Nred, Nblue, i, j, nv
       real(kind=dp), dimension(N)            :: u0, profile_art, u1, u0sq
-      ! real(kind=dp), dimension(N,NvspaceMax) :: u1
-
 
       Nvspace = NvspaceMax
       i = line%i; j = line%j
@@ -537,17 +529,6 @@ module Opacity_atom
       !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte) 
       if (lsubstract_avg) then!labs == .true.
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
-         vlabs(id) = omegav_mean
-         !omegav_mean should be close to vlabs
-         ! write(*,*) "vlabs(icell_nlte)=", vlabs*1d-3, omegav_mean * 1d-3
-      else
-         !recentre the cell on the speed of the non-lte cell,
-         !so that the kinematics is computed with respect to a non-moving non-lte cell.
-         !it is always 0 in LTE or image (when labs = .false.)
-         omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(id)
-         ! write(*,*) " Omega vmean (icell)", omegav_mean * 1d-3
-         ! write(*,*) "  -> after relative speed = ", sum(omegav(1:Nvspace))/real(Nvspace,kind=dp) * 1d-3
-         ! stop
       endif
 
 
@@ -591,8 +572,6 @@ module Opacity_atom
       type (AtomicLine), intent(in)          :: line
       integer                                :: Nred, Nblue, i, j, nv
       real(kind=dp), dimension(N)            :: uloc, u0, profile_art_i, u1, u0sq
-      ! real(kind=dp), dimension(N,NvspaceMax) :: u1
-
 
       Nvspace = NvspaceMax
       i = line%i; j = line%j
@@ -625,14 +604,8 @@ module Opacity_atom
          omegav(Nvspace) = v1
          omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
       endif
-      !in non-LTE:
-      !the actual cell icell_nlte must be centered on 0 (moving at vmean).
-      !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte) 
       if (lsubstract_avg) then!labs == .true.
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
-         vlabs(id) = omegav_mean
-      else
-         omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(id)
       endif
 
 
