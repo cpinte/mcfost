@@ -172,6 +172,8 @@ module atom_transfer
             write(*,'(" ****-> Using "(1I4)" rays for Monte-Carlo step, ~resolution of "(1F12.3)" degrees")') n_rayons, 360.0 * sqrt(pi/real(n_rayons))/pi
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            !-> this is to have a smoother transition between the two steps.
+            if (etape_start==1) Ndelay_iterate_ne = 1
          else
             call error("(n_lte_loop_mali) etape unkown")
          end if
@@ -187,7 +189,6 @@ module atom_transfer
          conv_acc = 0.0
          diff_old = 0.0
          time_iteration = 0.0
-         dne = 0.0
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
@@ -207,7 +208,7 @@ module atom_transfer
             max_n_iter_loc = 0
 
             if( n_iterate_ne > 0 ) then
-               l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>ndelay_iterate_ne)
+               l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
                ! if (lforce_lte) l_iterate_ne = .false.
             endif
 
@@ -475,7 +476,7 @@ module atom_transfer
                ! write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%p%ID
                write(*,'("   >>> dpop="(1ES13.5E3))') dM(nact)
             enddo
-            if (dne /= 0.0_dp) then
+            if (l_iterate_ne) then
                write(*,*) ""
                write(*,'("                  "(1A2))') "Ne"
                write(*,'("   >>> dne="(1ES13.5E3))') dne
