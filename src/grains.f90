@@ -6,7 +6,6 @@ module grains
   save
 
   type dust_grain_type
-     real :: nbre_grains !, r
      integer :: zone, methode_chauffage, pop
      logical :: is_PAH
   end type dust_grain_type
@@ -36,7 +35,7 @@ module grains
   integer :: n_grains_tot , n_grains_RE_LTE, n_grains_RE_nLTE, n_grains_nRE
   integer :: grain_RE_LTE_start, grain_RE_LTE_end, grain_RE_nLTE_start, grain_RE_nLTE_end, grain_nRE_start, grain_nRE_end
 
-  real,dimension(:), allocatable :: nbre_grains !n_grains_tot
+  real(kind=dp),dimension(:), allocatable :: nbre_grains !n_grains_tot
   real, dimension(:), allocatable :: r_grain, r_grain_min, r_grain_max, r_core, S_grain, M_grain !n_grains_tot
   real, dimension(:,:), allocatable :: frac_mass_pop !n_zones, n_pop
 
