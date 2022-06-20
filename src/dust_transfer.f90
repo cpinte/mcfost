@@ -466,11 +466,11 @@ subroutine transfert_poussiere()
 
         call repartition_energie(lambda)
         if (lmono0) then
-           write(*,*) "frac. energy emitted by star(s) : ", frac_E_stars(1)
+           write(*,*) "frac. energy emitted by star(s) : ", real(frac_E_stars(1))
            if (n_etoiles > 1) then
               write(*,*) "Relative fraction of energy emitted by each star:"
               do i=1, n_etoiles
-                 write(*,*) "Star #", i, "-->", prob_E_star(1,i)
+                 write(*,*) "Star #", i, "-->", real(prob_E_star(1,i))
               enddo
            endif
         endif
@@ -502,7 +502,7 @@ subroutine transfert_poussiere()
         w = 0.0 ; u = 1.0 ; v = 0.0
         call indice_cellule(x,y,z, icell)
         call optical_length_tot(1,lambda,Stokes,icell,x,y,y,u,v,w,tau,lmin,lmax)
-        write(*,*) "", real(tab_lambda(lambda)) ,"  ", frac_E_stars(lambda), "  ", tau
+        write(*,*) "", real(tab_lambda(lambda)) ,"  ", real(frac_E_stars(lambda)), "  ", tau
      endif
 
 

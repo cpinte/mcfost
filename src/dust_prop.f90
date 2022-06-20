@@ -14,13 +14,13 @@ module dust_prop
 
   implicit none
 
-  real, dimension(:,:), allocatable :: kappa !n_cells, n_lambda
-  real, dimension(:,:), allocatable :: kappa_abs_LTE ! n_cells, n_lambda
-  real, dimension(:,:), allocatable :: kappa_abs_nLTE, kappa_abs_RE ! n_cells, n_lambda
-  real, dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, proba_abs_RE_LTE_p_nLTE
-  real, dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
+  real(dp), dimension(:,:), allocatable :: kappa !n_cells, n_lambda
+  real(dp), dimension(:,:), allocatable :: kappa_abs_LTE ! n_cells, n_lambda
+  real(dp), dimension(:,:), allocatable :: kappa_abs_nLTE, kappa_abs_RE ! n_cells, n_lambda
+  real(dp), dimension(:,:), allocatable :: proba_abs_RE, proba_abs_RE_LTE, proba_abs_RE_LTE_p_nLTE
+  real(dp), dimension(:,:,:), allocatable :: kabs_nLTE_CDF, kabs_nRE_CDF ! 0:n_grains, n_cells, n_lambda
 
-  real, dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda
+  real(dp), dimension(:,:,:), allocatable :: ksca_CDF ! 0:n_grains, n_cells, n_lambda
   !* ksca_CDF(i) represente la probabilite cumulee en-dessous d'une
   !* certaine taille de grain. Ce tableau est utilise pour le tirage
   !* aleatoire de la taille du grain diffuseur, puisqu'elle doit prendre
