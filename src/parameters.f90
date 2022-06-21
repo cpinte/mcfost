@@ -121,7 +121,7 @@ module parametres
   ! Phantom
   logical :: ldudt_implicit, lscale_length_units, lscale_mass_units, lignore_dust
   logical :: ldelete_Hill_sphere, lrandomize_Voronoi, lrandomize_azimuth, lrandomize_gap, lrandomize_outside_gap, lcentre_on_sink
-  logical :: ldelete_inside_rsph, ldelete_outside_rsph
+  logical :: ldelete_inside_rsph, ldelete_outside_rsph, ldelete_above_theta
   real(kind=dp) :: ufac_implicit,scale_length_units_factor,scale_mass_units_factor,correct_density_factor_elongated_cells
   real(kind=dp) :: SPH_amin, SPH_amax, fluffyness, gap_factor, rsph_min, rsph_max
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy
