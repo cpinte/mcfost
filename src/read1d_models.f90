@@ -36,11 +36,6 @@ module read1d_models
 		n_az = 1
 		nz = 1
 
-		! lmagnetoaccr = .false.
-		! lspherical_velocity = .true.
-		! lvoronoi = .false.
-		! lmagnetized = .false.
-		! calc_ne = .false.	
 		lvelocity_file = .true.
 		vfield_coord = 3
 		

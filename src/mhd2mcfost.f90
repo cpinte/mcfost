@@ -90,8 +90,6 @@ module mhd2mcfost
     
            open(unit=1,file=density_file, status="old")
            call read_line(1, FormatLine, inputline, Nread)
-           !unused
-        !    read(inputline(1:Nread),*) rotation_law
     
            lvelocity_file = .false.
            !-> .false. with Voronoi
@@ -102,11 +100,6 @@ module mhd2mcfost
            if (Taccretion==0.0_dp) Taccretion = -1.0_dp
     
            call read_line(1, FormatLine, inputline, Nread)
-        !    read(inputline(1:Nread),*) thetai, thetao, tilt
-        !    !for compatibility
-        !    tilt = tilt * pi / 180.0
-        !    thetai = thetai * pi / 180.0
-        !    thetao = thetao * pi / 180.
     
            allocate(h(n_points), stat=alloc_status)
            if (alloc_status > 0) then
@@ -227,7 +220,6 @@ module mhd2mcfost
     ! ------------------------------------------- !
         character(len=*), intent(in)	:: filename
         integer, parameter :: Nhead = 3 !Add more
-        character(len=50) :: rotation_law
         integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
         character(len=512) :: inputline, FormatLine, cmd
         real(kind=dp) :: rr, zz, pp, Vmod
@@ -260,24 +252,18 @@ module mhd2mcfost
     
         open(unit=1,file=filename, status="old")
         call read_line(1, FormatLine, inputline, Nread)
-        read(inputline(1:Nread),*) rotation_law
-    
-    
-        select case (rotation_law)
-        case ("magneto-accretion")
-            vfield_coord = 2
-           write(*,*) " Velocity law is ", trim(rotation_law)
-           if (lmagnetized) then
-               call warning(" --> CHeck projection with lmagnetoaccr and Bfield!")
-           endif
-        case ("spherical_vector")
-            vfield_coord = 3
-           write(*,*) " Velocity law is ", trim(rotation_law)
-        case default
-           write(*,*) " Velocity law ", rotation_law," not handled yet"
-           vfield_coord = 1 !cartesian
-           stop
-        end select
+        read(inputline(1:Nread),*) vfield_coord    
+        select case (vfield_coord )
+         case (1)
+            write(*,*) "-> Using cartesian velocity fields"
+         case (2)
+            write(*,*) "-> Using cylidnrical velocity fields"
+         case (3)
+            write(*,*) "-> Using spherical velocity fields"
+         case default
+            write(*,*) "value of vfield_coord", vfield_coord," unknown!"
+            stop
+         end select
     
     
         !read T shock and if accretion spots
