@@ -396,8 +396,8 @@ module io_atom
 
          atom%cswitch = 1.0_dp
 
-         ! reading collision rates of RH
-         if (atom%ID /= "H") then
+         ! reading collision rates of RH, even for H even if it is not used.
+         if (atom%ID /= "X") then
             write(*,*) "  -> Reading collision data from RH for atom ", atom%ID
             call read_collisions(atomunit, atom)
             call warning("  ** the data for each transition must be consistent with transitions in the file")

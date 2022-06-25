@@ -24,7 +24,7 @@ module wavelengths_gas
    real, parameter    :: vcore_on_vth = 0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
    real               :: hv
    !number max of lambda for all lines
-   integer            :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans
+   integer            :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans, Nlambda_max_line_vel
 
    !group of overlapping transitions
    integer :: N_groups, n_lambda_cont
@@ -237,10 +237,10 @@ module wavelengths_gas
       ! used only for the non-LTE loop.
       real(kind=dp), optional :: vmax_overlap
       real(kind=dp), intent(out), allocatable :: lambda(:)
-      integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda, Nlambda_max_line_vel
+      integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda
       integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved, Nwaves, check_new_freq
       type (AtomType), pointer :: atom
-      integer :: alloc_status, lac, la, nb, krr, max_Nlambda_indiv, Noverlap
+      integer :: alloc_status, lac, la, nb, krr, max_Nlambda_indiv, Noverlap, ib, ir
       real(kind=dp), dimension(:), allocatable :: tmp_grid, tmp_grid2, all_l0, all_l1
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
@@ -656,14 +656,13 @@ module wavelengths_gas
          allocate(lambda(Nwaves),stat=alloc_status)
          if (alloc_status>0) call error("allocation error lambda, in pure cont!")
          lambda = tab_lambda_cont
-         deallocate(tab_lambda_cont)
          Nlambda = 0
       endif !there is lines
 
       write(*,*) Nwaves, " unique wavelengths" !they are no eliminated lines
       write(*,*) Nlambda, " line wavelengths"
       write(*,*) Nlambda_cont, " continuum wavelengths"
-      write(*,*) max_Nlambda_indiv, " max individual wavelengths for a line" 
+      if (Nlines > 1) write(*,*) max_Nlambda_indiv, " max individual wavelengths for a line" 
       ! if (Nlines>1) then
       !    write(*,*) "Mean number of lines per group:", real(sum(Nline_per_group))/real(Ngroup)
       !    write(*,*) "Mean number of wavelengths per group:", real(Nspec_line)/real(Ngroup)
@@ -731,15 +730,15 @@ module wavelengths_gas
             ! write(*,*) "line", kr, " lam0=",atom%lines(kr)%lambda0, atom%lines(kr)%lambdamin, atom%lines(kr)%lambdamax
             ! write(*,*) " -> bounds on the grid:", lambda(atom%lines(kr)%Nb), lambda(atom%lines(kr)%Nr)
             Nlambda_max_line = max(Nlambda_max_line, atom%lines(kr)%Nlambda)
+            Nlambda_max_line_vel = max(Nlambda_max_line,Nlambda_max_line_vel)
             !second loop over all other lines of all other atoms to check for overlap !
             !init there are no overlaps
             ! *** natural overlaps are already taken into account into Nblue and Nred ***
             atom%lines(kr)%Nover_inf = atom%lines(kr)%Nb
             atom%lines(kr)%Nover_sup = atom%lines(kr)%Nr
-            !Does not change Nlambda (?) recompute it (??)
+            !Does not change Nlambda -> represent local line.
             if (check_for_overlap) then
-            !check overlap of line kr with other lines (krr) of any atom.
-            !if overlap, expands the bound of line kr (only for the non-LTE radiative coupling)
+
                vth_max= vbroad(maxval(T),atom%weight,maxval(vturb))
                inner_atom_loop : do nb = 1, n_atoms
                   inner_line_loop : do krr=1, atoms(nb)%p%Nline
@@ -750,18 +749,25 @@ module wavelengths_gas
                      l0 = atom%lines(kr)%lambda0
                      l1 = atoms(nb)%p%lines(krr)%lambda0
 
-                     dvmin = c_light * abs(l1-l0)/l0 - 3.0*vth_max
+                     dvmin = c_light * abs(l1-l0)/l0 - atom%lines(kr)%vmax!vwing_on_vth*vth_max
                      !-> no overlap du to motion of cells
                      if (dvmin >  abs(vmax_overlap)) cycle inner_line_loop
 
-                     write(*,*) "d_line-to-line (km/s)=", 1d-3*dvmin, " maxshift=", 1d-3*abs(vmax_overlap)
-                     write(*,*) "l0 ref=", l0, " l1=", l1
-
                      if ( dvmin <= abs(vmax_overlap)) then
+                        ir = locate(lambda, atom%lines(kr)%lambda0*(1.0 +  dvmin/c_light))                      
+                        ib = locate(lambda, atom%lines(kr)%lambda0*(1.0 -  dvmin/c_light))
+                        !if only few pixels no need to shift
+                        if (abs(ib-atom%lines(kr)%Nb) <= 5) ib = atom%lines(kr)%Nb
+                        if (abs(ir-atom%lines(kr)%Nr) <= 5) ir = atom%lines(kr)%Nr
+
+                        if ((abs(ib-atom%lines(kr)%Nb) <= 5) .and. (abs(ir-atom%lines(kr)%Nr) <= 5)) cycle inner_line_loop
+
+                        write(*,*) "d_line-to-line (km/s)=", 1d-3*dvmin, " maxshift=", 1d-3*abs(vmax_overlap)
+                        write(*,*) "l0 ref=", l0, " l1=", l1
+
                         Noverlap = Noverlap + 1
-                        ! atom%lines(kr)%dvmin = max(dvmin,atom%lines(kr)%dvmin)
-                        atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, locate(lambda, atom%lines(kr)%lambda0*(1.0 +  dvmin/c_light)))
-                        atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, locate(lambda, atom%lines(kr)%lambda0*(1.0 -  dvmin/c_light)))
+                        atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, ir)
+                        atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, ib)
                         write(*,*) "overlap of line", kr, atom%lines(kr)%lambda0, " of atom ", atom%ID, &
                            " with line", krr, atoms(nb)%p%lines(krr)%lambda0, " of atom ", atoms(nb)%p%ID, " N0 = ", &
                            locate(lambda, atoms(nb)%p%lines(krr)%lambda0), " dvmin=", dvmin *1d-3
@@ -791,10 +797,6 @@ module wavelengths_gas
       write(*,*) "Number of max freq points for all trans :", Nlambda_max_trans
 
       n_lambda_cont = size(tab_lambda_cont)
-      ! !output grid in micron
-      ! lambda = lambda * m_to_km
-      !now lambda will be stored in micron for compatibility
-      !but a lots of atomic variables use nm.
       write(*,'("Wavelength grid: "(1F12.4)" nm to",(1F12.4)" nm")') minval(lambda),maxval(lambda)
 
       return

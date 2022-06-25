@@ -45,7 +45,6 @@ module molecular_emission
   real(kind=dp), dimension(:), allocatable :: tab_v ! n_speed
 
   real(kind=dp), dimension(:,:), allocatable :: ds!, gradv !local velocity difference between two cells in a specific direction
-  real(kind=dp), dimension(:,:), allocatable :: vlabs!mean velocity of cell id during non-LTE loop
   real(kind=dp), dimension(:,:,:,:), allocatable :: I0, I02 ! nSpeed,nTrans,iray,ncpus
   real(kind=dp), dimension(:,:,:), allocatable :: I0c ! Intensite dans le continu: nTrans,iray,ncpus
   real(kind=dp), dimension(:,:,:), allocatable :: Doppler_P_x_freq

@@ -29,6 +29,8 @@ module collision_atom
       real(kind=dp) :: CI(hydrogen%Nlevel), CE(Hydrogen%Nlevel,Hydrogen%Nlevel)
       real(kind=dp) :: ni_on_nj_star
 
+      ! call collision_rates_atom_loc(id, icell, hydrogen)
+      ! return
 
       Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
       call Johnson_CI(icell, CI) !bound-free i->Nlevel
@@ -40,6 +42,8 @@ module collision_atom
          hydrogen%continua(kr)%Cij(id) = ne(icell) * CI(i) !deriv = Cij/ne
          hydrogen%continua(kr)%Cji(id) = ne(icell) * CI(i) * ni_on_nj_star !deriv = 2*Cji/ne
       enddo
+
+      if (hydrogen%Nline==0) return
 
       call Johnson_CE(icell, CE) !among all levels
 
@@ -265,7 +269,7 @@ module collision_atom
       key = adjustl(inputline)
       Nread = len(trim(inputline))
       if (inputline(1:1)=='#' .or. Nread==0) cycle
-      if (Nread > Nmax_line_per_collision) call error("Collision: Nread > Nmax_line_per_collision")
+      if (Nread > 10*Nmax_line_per_collision) call error("Collision: Nread > Nmax_line_per_collision")
       n = n + 1
       if (n > Nmax_lines) call error("Collision: not enough number of lines for all collision data")
       lines_in_file(n) = inputline(1:Nread)

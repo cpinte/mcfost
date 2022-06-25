@@ -9,7 +9,7 @@ module Opacity_atom
    use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, &
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
-   use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, vwing_on_vth
+   use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, Nlambda_max_line_vel
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
@@ -21,7 +21,7 @@ module Opacity_atom
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:)
    real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:)
    integer, parameter 		   :: NvspaceMax = 151
-   logical                    :: lnon_lte_loop                                      
+   logical 		               :: lnon_lte_loop                                      
 
    contains
 
@@ -244,9 +244,10 @@ module Opacity_atom
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
       real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
       integer :: nat, Nred, Nblue, kr, i, j, Nlam
-      real(kind=dp) :: dv, vth
+      real(kind=dp) :: dv
       type(AtomType), pointer :: atom
       real(kind=dp), dimension(Nlambda_max_line) :: phi0
+      ! real(kind=dp), dimension(Nlambda_max_line_vel) :: phi0
 
       dv = 0.0_dp
       if (lnon_lte_loop.and..not.iterate) then !not iterate but non-LTE
@@ -255,8 +256,6 @@ module Opacity_atom
 
       atom_loop : do nat = 1, N_Atoms
          atom => Atoms(nat)%p
-
-         vth = vbroad(T(icell),atom%weight, vturb(icell))
 
          tr_loop : do kr = 1,atom%Nline
 
@@ -270,7 +269,7 @@ module Opacity_atom
 
             if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle tr_loop
             
-            if (abs(dv)>vwing_on_vth*vth) then
+            if (abs(dv)>atom%lines(kr)%vmax) then
                !move the profile to the red edge up to Nover_sup
                !change Nlam ??
                if (dv > 0) then
@@ -283,7 +282,7 @@ module Opacity_atom
                   Nblue =  atom%lines(kr)%Nover_inf
                   Nred = Nlam + Nblue - 1
                endif
-               ! Nlam = Nred-Nblue + 1
+               Nlam = Nred - Nblue + 1
             endif
 
             phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,iterate,Nlam,lambda(Nblue:Nred),&
@@ -337,6 +336,7 @@ module Opacity_atom
       chi_up(:,:,:,id)   = 0.0_dp
 
       eta_atoms(:,:,id) = 0.0_dp
+      !-> missing LTE here
       if (lupdate_psi) chi_tot(:) = 1d-50
 
       aatom_loop : do nact=1, Nactiveatoms
@@ -370,23 +370,23 @@ module Opacity_atom
                term3(la) = aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij * aatom%n(j,icell)
             enddo freq_loop
             !linear interpolation + adding wavelength integration weight
-            wl = 0.5*(tab_lambda_nm(N1+1)-tab_lambda_nm(N1)) / tab_lambda_nm(N1)
-            chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1) * wl
-            chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1) * wl
+            ! wl = 0.5*(tab_lambda_nm(N1+1)-tab_lambda_nm(N1)) / tab_lambda_nm(N1)
+            chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1)! * wl
+            chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1)! * wl
             Uji_down(n1,j,nact,id) = Uji_down(N1,j,nact,id) + term2(1)
             eta_atoms(N1,nact,id) = eta_atoms(N1,nact,id) + term3(1)
             i0 = 2
             do la=N1,N2
-               if (la>1) then
-                  wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
-               !otherwise, wl is the previous one, first point of the grid
-               endif
+               ! if (la>1) then
+               !    wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
+               ! !otherwise, wl is the previous one, first point of the grid
+               ! endif
                loop_i : do la0=i0, Nl
                   if (tab_lambda_cont(Nb+la0-1) > tab_lambda_nm(la)) then
                      wt = (tab_lambda_nm(la) - tab_lambda_cont(Nb+la0-2)) / (tab_lambda_cont(Nb+la0-1) - tab_lambda_cont(Nb+la0-2))
 
-                     chi_down(la,j,nact,id) = chi_down(la,j,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) )*wl
-                     chi_up(la,i,nact,id) = chi_up(la,i,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) ) *wl
+                     chi_down(la,j,nact,id) = chi_down(la,j,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) )!*wl
+                     chi_up(la,i,nact,id) = chi_up(la,i,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) )!*wl
                      Uji_down(la,j,nact,id) = Uji_down(la,j,nact,id) + (1.0_dp - wt) *term2(la0-1)  + wt * term2(la0)
                      eta_atoms(la,nact,id) = eta_atoms(la,nact,id) + (1.0_dp - wt) *term3(la0-1)  + wt * term3(la0)
 
@@ -395,25 +395,25 @@ module Opacity_atom
                   endif
                enddo loop_i
             enddo
-            wl = 0.5*(tab_lambda_nm(N2)-tab_lambda_nm(N2-1)) / tab_lambda_nm(N2-1)
-            chi_down(n2,j,nact,id) = chi_down(n2,j,nact,id) + term1(Nl) * wl
-            chi_up(n2,i,nact,id) = chi_up(n2,i,nact,id) + term1(Nl) * wl
+            ! wl = 0.5*(tab_lambda_nm(N2)-tab_lambda_nm(N2-1)) / tab_lambda_nm(N2-1)
+            chi_down(n2,j,nact,id) = chi_down(n2,j,nact,id) + term1(Nl)! * wl
+            chi_up(n2,i,nact,id) = chi_up(n2,i,nact,id) + term1(Nl)! * wl
             Uji_down(n2,j,nact,id) = Uji_down(n2,j,nact,id) + term2(Nl)
             eta_atoms(n2,nact,id) = eta_atoms(n2,nact,id) + term3(Nl)
 
          enddo cont_loop
 
-         ! do la=1, n_lambda
-         !     if (la==1) then
-         !        wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la)) / tab_lambda_nm(la)
-         !     elseif (la==n_lambda) then
-         !        wl = 0.5*(tab_lambda_nm(la)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
-         !     else
-         !        wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
-         !     endif    
-         !     chi_down(la,:,:,id) =  chi_down(la,:,:,id)  * wl
-         !     chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl     
-         ! enddo
+         do la=1, n_lambda
+             if (la==1) then
+                wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la)) / tab_lambda_nm(la)
+             elseif (la==n_lambda) then
+                wl = 0.5*(tab_lambda_nm(la)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
+             else
+                wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
+             endif    
+             chi_down(la,:,:,id) =  chi_down(la,:,:,id)  * wl
+             chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl     
+         enddo
 
 
          line_loop : do kr = 1, aatom%Nline
@@ -461,7 +461,7 @@ module Opacity_atom
 
             enddo freq2_loop
             if (lupdate_psi) then
-               chi_tot(Nb:Nr) = chi_tot(Nb:Nr) + hc_fourPI * aatom%lines(kr)%Bij * (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(:)
+               chi_tot(Nb:Nr) = chi_tot(Nb:Nr) + hc_fourPI * aatom%lines(kr)%Bij * (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(1:Nl)
             endif
 
          enddo line_loop
@@ -634,6 +634,60 @@ module Opacity_atom
       return
    end function profile_art_i
 
+
+   subroutine local_intensity(id,icell,iray,iloc,ii)
+   !computes the contribution of a cell to the emergent intensity at that cell (ii)
+   ! and the total intensity to that cell (iloc)
+      integer, intent(in) :: id, icell, iray
+      real(kind=dp) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib!intent(in) ? 
+      real(kind=8), intent(out) :: ii(:), iloc(:)
+      real(kind=dp) :: chi0(n_lambda)
+      integer :: nat, i, j, kr, Nr, Nb, Nlam
+      real(kind=dp), dimension(Nlambda_max_line) :: phi0
+      type(AtomType), pointer :: atom
+
+      iloc(:) = Itot(:,1,id)
+      call contopac_atom_loc(icell,n_lambda,tab_lambda_nm,chi0,ii(:))
+      !add lines in the ref of the cell
+
+      x = 0.0_dp; y = x; z = x; x1 = 0.0_dp; y1 = x1; z1 = x1
+      u = 0.0_dp; v = 0.0_dp; w = 0.0_dp
+      l_void_before = 0.0_dp; l_contrib = 0.0_dp
+
+      atom_loop : do nat = 1, N_Atoms
+         atom => Atoms(nat)%p
+
+         tr_loop : do kr = 1,atom%Nline
+
+            if (.not.atom%lines(kr)%lcontrib) cycle
+
+            Nr = atom%lines(kr)%Nr; Nb = atom%lines(kr)%Nb
+            Nlam = atom%lines(kr)%Nlambda
+            i = atom%lines(kr)%i; j = atom%lines(kr)%j
+
+            if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle tr_loop
+            
+
+            phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,.true.,Nlam,tab_lambda_nm(Nb:Nr),&
+                                 x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+
+
+            chi0(Nb:Nr) = chi0(Nb:Nr) + &
+               hc_fourPI * atom%lines(kr)%Bij * phi0(1:Nlam) * (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell))
+
+            ii(Nb:Nr) = ii(Nb:Nr) + hc_fourPI * atom%lines(kr)%Aji * phi0(1:Nlam) * atom%n(j,icell)
+
+         end do tr_loop
+
+         atom => null()
+
+      end do atom_loop
+
+      !or ii(:) = ii(:) * psi(:,1,id) !(1.0 - exp(-dtau))/chi
+      ii(:) = ii(:)/chi0(:) * (1.0_dp - exp(-chi0*ds(iray,id)))
+
+      return
+   end subroutine local_intensity
  
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
       !not para to be able to write while computing!

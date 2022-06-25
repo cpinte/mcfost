@@ -19,7 +19,7 @@ module atom_transfer
    use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, hydrogen, helium, adjust_cswitch_atoms, maxval_cswitch_atoms, lcswitch_enabled, vbroad
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
-   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, lnon_lte_loop
+   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, lnon_lte_loop, local_intensity
    use see, only : n_new, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates
    use optical_depth, only : integ_ray_atom
@@ -49,6 +49,7 @@ module atom_transfer
 !TO DO 
 !      add Ng
 !      add Trad, Tion
+!      checkpointing
    subroutine nlte_loop_mali()
    ! ----------------------------------------------------------------------- !
    ! Descriptor
@@ -63,6 +64,7 @@ module atom_transfer
       integer, parameter :: n_rayons_max = 1 !ray-by-ray except for subiterations
                                              !but in that case only itot and phi_loc and ds needs
                                              !to have n_rayons_sub size.
+      real(kind=8), dimension(:,:,:), allocatable :: iloc_tmp, cntrb_tmp
       integer :: n_rayons_sub
       real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy
       real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
@@ -143,7 +145,6 @@ module atom_transfer
       mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
       call alloc_nlte_var(n_rayons_max,n_rayons_sub,lsubiteration)
 
-    
       lfixed_rays = .true.
       iray_start = 1
 
@@ -172,13 +173,16 @@ module atom_transfer
             write(*,'(" ****-> Using "(1I4)" rays for Monte-Carlo step, ~resolution of "(1F12.3)" degrees")') n_rayons, 360.0 * sqrt(pi/real(n_rayons))/pi
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
-            !-> this is to have a smoother transition between the two steps.
-            if (etape_start==1) Ndelay_iterate_ne = 1
          else
             call error("(n_lte_loop_mali) etape unkown")
          end if
          write(*,*) ""
          call system_clock(count_start,count_rate=time_tick,count_max=time_max)
+
+         ! if (allocated(iloc_tmp)) deallocate(iloc_tmp,cntrb_tmp)
+         ! allocate(iloc_tmp(n_lambda,n_rayons, nb_proc),cntrb_tmp(n_lambda,n_rayons,nb_proc))
+         ! iloc_tmp = 0.0; cntrb_tmp = 0.0
+         ! write(*,*) "WARNING: size iloc: ", 2*sizeof(iloc_tmp)/1024./1024./1024., " GB, step", etape
 
          lconverged = .false.
          lprevious_converged = lforce_lte
@@ -219,7 +223,7 @@ module atom_transfer
             !$omp private(l_iterate,weight,diff,lconverged_loc,n_iter_loc)&
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,max_n_iter_loc) &
-            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne)
+            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,iloc_tmp,cntrb_tmp,n_iter)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
@@ -260,7 +264,7 @@ module atom_transfer
                            call xcoupling(id, icell,1, .false.)
                            call accumulate_radrates_mali(id, icell,1, weight)
                         endif
-
+                        ! call local_intensity(id,icell,iray,iloc_tmp(:,iray,id),cntrb_tmp(:,iray,id))
                      enddo
 
 
@@ -292,11 +296,12 @@ module atom_transfer
                            call xcoupling(id, icell,1, .false.)
                            call accumulate_radrates_mali(id, icell,1, weight)
                         endif
-
+                        ! call local_intensity(id,icell,iray,iloc_tmp(:,iray,id),cntrb_tmp(:,iray,id))
                      enddo !iray
                   else
                      call error("etape inconnue")
                   end if !etape
+                  ! if (n_iter == 1 .and. icell > 2000) call write_local_intensity(id,icell,etape,n_rayons,iloc_tmp,cntrb_tmp)
 
                   ! n_iter_loc = 0
                   ! lconverged_loc = (.not.lsubiteration)
@@ -590,6 +595,7 @@ module atom_transfer
       call dealloc_nlte_var()
       deallocate(dM, dTM, Tex_ref, Tion_ref)
       deallocate(stream,ds)
+      ! deallocate(iloc_tmp,cntrb_tmp)
 
       ! --------------------------------    END    ------------------------------------------ !
       write(*,*) '-------------------------- ------------ ------------------------------ '
@@ -597,144 +603,29 @@ module atom_transfer
       return
    end subroutine nlte_loop_mali
 
-   subroutine compute_max_relative_velocity(dv)
-      use molecular_emission, only : v_proj
-      use grid, only : cross_cell, test_exit_grid
-      real(kind=dp), intent(out) :: dv
-      real(kind=dp) :: v1,v2
-      integer :: i1, i2, id
+   subroutine write_local_intensity(id,icell,step,n_rayons,iloc,cntrb)
+      !write the intensity of cells for all directions
+      ! of the non-LTE loop.
+      !Binary format.
+      integer, intent(in) :: id, icell,n_rayons, step
+      integer :: unit, status, ir, ic
+      real(kind=8), intent(in) :: iloc(:,:,:), cntrb(:,:,:)
+      character(len=1) :: step_char
 
-      integer, parameter :: n_rayons = 10000
-      integer :: i, next_cell, previous_cell
-      integer :: i_star, icell_star
-      logical :: lintersect_stars, lcellule_non_vide
-      real :: rand, rand2, rand3
-      real(kind=dp) :: u, v, w, x0, y0, z0, x, y, z, x1, y1, z1
-      real(kind=dp) :: w02, srw02, argmt,l, l_contrib, l_void_before
+      write(step_char, '(i0)') step
+ 
+      call ftgiou(unit,status)
+      open(unit, file="iloc_step"//step_char//".bin",form="unformatted",status='unknown',access="sequential",iostat=status)
+      write(unit,iostat=status) icell, id, size(iloc(:,1,id)), n_rayons
+      write(unit,iostat=status) tab_lambda_nm
+      write(unit,iostat=status) iloc(:,:,id) !total intensity at cell icell
+      write(unit,iostat=status) cntrb(:,:,id) !contribution of cell icell to intensity at icell
+      close(unit)
+      call ftfiou(unit, status)
 
-      if (lvoronoi) then
-         dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
-      else
-         dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
-      endif
-      ! if (dv==0.0_dp) return
-
-      ! if (allocated(stream)) deallocate(stream)
-      ! allocate(stream(nb_proc))
-      ! stream = 0.0
-      ! do i=1,nb_proc
-      !    stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-      ! end do
-
-      ! id = 1
-      ! dv = 0.0_dp
-      ! !$omp parallel &
-      ! !$omp default(none) &
-      ! !$omp private(id,i1,i2,v1,v2,rand,rand2,rand3,u,v,w,x0,y0,z0,argmt,w02,srw02,x,y,z,i_star,icell_star)&
-      ! !$omp private(i,x1,y1,z1,l,l_contrib,l_void_before,next_cell,previous_cell,lcellule_non_vide,lintersect_stars)&
-      ! !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells,stream,cross_cell,pos_em_cellule, test_exit_grid)
-      ! !$omp do schedule(static,1)
-      ! do i1=1,n_cells
-      !    !$ id = omp_get_thread_num() + 1
-      !    if (icompute_atomRT(i1) <= 0) cycle
-      !    !compute velocity gradient between all cells in the ray path from i1
-      !    do i=1, n_rayons
-      !       rand  = sprng(stream(id))
-      !       rand2 = sprng(stream(id))
-      !       rand3 = sprng(stream(id))
-      !       call pos_em_cellule(i1,rand,rand2,rand3,x,y,z)
-      !       rand = sprng(stream(id))
-      !       W = 2.0_dp * rand - 1.0_dp
-      !       W02 =  1.0_dp - W*W
-      !       SRW02 = sqrt(W02)
-      !       rand = sprng(stream(id))
-      !       ARGMT = PI * (2.0_dp * rand - 1.0_dp)
-      !       U = SRW02 * cos(ARGMT)
-      !       V = SRW02 * sin(ARGMT)
-
-      !       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-      !       x1=x;y1=y;z1=z
-      !       x0=x;y0=y;z0=z
-      !       next_cell = i1
-      !       v1 = v_proj(i1,x0,y0,z0,u,v,w)
-      !       infinie : do ! Boucle infinie
-      !          i2 = next_cell
-      !          x0=x1 ; y0=y1 ; z0=z1
-      !          lcellule_non_vide = (i2 <= n_cells)
-      !          if (test_exit_grid(i2, x0, y0, z0)) exit infinie
-      !          if (lintersect_stars) then
-      !             if (i2 == icell_star) exit infinie
-      !          end if
-      !          if (i2 <= n_cells) then
-      !             lcellule_non_vide = (icompute_atomRT(i2) > 0)
-      !             if (icompute_atomRT(i2) < 0) exit infinie
-      !          endif
-
-      !          call cross_cell(x0,y0,z0, u,v,w, i2, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-
-      !          !compute velocity gradient between cell i1 and crossed cells i2
-      !          if (lcellule_non_vide) then
-      !             v2 = v_proj(i2,x0,y0,z0,u,v,w)
-      !             dv = max(dv,abs(v2))!-v1))
-      !          endif
-
-      !       enddo infinie
-      !    enddo
-      ! enddo
-      ! !$omp end do
-      ! !$omp end parallel
-      ! deallocate(stream)
-
-      ! if (lvoronoi) then
-      !    dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
-      !    if (dv == 0.0_dp) return 
-      !    dv = 0.0_dp
-
-      !    !$omp parallel &
-      !    !$omp default(none) &
-      !    !$omp private(id,i1, i2,v1, v2)&
-      !    !$omp shared(dv, icompute_atomRT, Voronoi, n_Cells)
-      !    !$omp do schedule(dynamic,1)
-      !    do i1=1,n_cells
-      !       !$ id = omp_get_thread_num() + 1
-      !       v1 = sqrt(sum(Voronoi(i1)%vxyz**2))
-      !       do i2=1,n_cells
-      !          v2 = sqrt(sum(Voronoi(i2)%vxyz**2))
-      !          if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
-      !             dv = max(dv,abs(v1-v2))
-      !          endif
-      !       enddo
-      !    enddo
-      !    !$omp end do
-      !    !$omp end parallel
-      ! else
-      !    dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
-      !    if (dv==0.0_dp) return
-
-      !    dv = 0.0_dp
-      !    !$omp parallel &
-      !    !$omp default(none) &
-      !    !$omp private(id,i1,i2,v1,v2)&
-      !    !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells)
-      !    !$omp do schedule(dynamic,1)
-      !    do i1=1,n_cells
-      !       !$ id = omp_get_thread_num() + 1
-      !       v1 = sqrt(sum(vfield3d(i1,:)**2))
-      !       do i2=1,n_cells
-      !          v2 = sqrt(sum(vfield3d(i2,:)**2))
-      !          if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
-      !             dv = max(dv,abs(v1-v2))
-      !          endif
-      !       enddo
-      !    enddo
-      !    !$omp end do
-      !    !$omp end parallel
-      ! endif
-
-      write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
-
+      stop
       return
-   end subroutine compute_max_relative_velocity
+   end subroutine write_local_intensity
 
    subroutine setup_image_grid()
    !to do lmono -limg
@@ -841,9 +732,12 @@ module atom_transfer
       call ltepops_atoms() 
 
       if( Nactiveatoms > 0) then
-         !because for non-LTE we compute the motion of each cell wrt to the actual cell
-         !so the maximum shift is what we have if all cells move at their max speed (v(icell))
-         call compute_max_relative_velocity(v_char)
+         if (lvoronoi) then
+            v_char = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
+         else
+            v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+         endif
+         write(*,'("maximum gradv="(1F12.3)" km/s")') v_char*1d-3
 
          !every indexes are defined on the lambda frequency. 
          !So even when lambda is passed as an argument, it is expected
@@ -1320,3 +1214,142 @@ module atom_transfer
    end subroutine spectrum_1d
 
 end module atom_transfer
+!   subroutine compute_max_relative_velocity(dv)
+!       use molecular_emission, only : v_proj
+!       use grid, only : cross_cell, test_exit_grid
+!       real(kind=dp), intent(out) :: dv
+!       real(kind=dp) :: v1,v2
+!       integer :: i1, i2, id
+
+!       ! integer, parameter :: n_rayons = 10000
+!       ! integer :: i, next_cell, previous_cell
+!       ! integer :: i_star, icell_star
+!       ! logical :: lintersect_stars, lcellule_non_vide
+!       ! real :: rand, rand2, rand3
+!       ! real(kind=dp) :: u, v, w, x0, y0, z0, x, y, z, x1, y1, z1
+!       ! real(kind=dp) :: w02, srw02, argmt,l, l_contrib, l_void_before
+
+!       if (lvoronoi) then
+!          dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
+!       else
+!          dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+!       endif
+      
+!       ! if (dv==0.0_dp) return
+
+!       ! if (allocated(stream)) deallocate(stream)
+!       ! allocate(stream(nb_proc))
+!       ! stream = 0.0
+!       ! do i=1,nb_proc
+!       !    stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
+!       ! end do
+
+!       ! id = 1
+!       ! dv = 0.0_dp
+!       ! !$omp parallel &
+!       ! !$omp default(none) &
+!       ! !$omp private(id,i1,i2,v1,v2,rand,rand2,rand3,u,v,w,x0,y0,z0,argmt,w02,srw02,x,y,z,i_star,icell_star)&
+!       ! !$omp private(i,x1,y1,z1,l,l_contrib,l_void_before,next_cell,previous_cell,lcellule_non_vide,lintersect_stars)&
+!       ! !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells,stream,cross_cell,pos_em_cellule, test_exit_grid)
+!       ! !$omp do schedule(static,1)
+!       ! do i1=1,n_cells
+!       !    !$ id = omp_get_thread_num() + 1
+!       !    if (icompute_atomRT(i1) <= 0) cycle
+!       !    !compute velocity gradient between all cells in the ray path from i1
+!       !    do i=1, n_rayons
+!       !       rand  = sprng(stream(id))
+!       !       rand2 = sprng(stream(id))
+!       !       rand3 = sprng(stream(id))
+!       !       call pos_em_cellule(i1,rand,rand2,rand3,x,y,z)
+!       !       rand = sprng(stream(id))
+!       !       W = 2.0_dp * rand - 1.0_dp
+!       !       W02 =  1.0_dp - W*W
+!       !       SRW02 = sqrt(W02)
+!       !       rand = sprng(stream(id))
+!       !       ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+!       !       U = SRW02 * cos(ARGMT)
+!       !       V = SRW02 * sin(ARGMT)
+
+!       !       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+!       !       x1=x;y1=y;z1=z
+!       !       x0=x;y0=y;z0=z
+!       !       next_cell = i1
+!       !       v1 = v_proj(i1,x0,y0,z0,u,v,w)
+!       !       infinie : do ! Boucle infinie
+!       !          i2 = next_cell
+!       !          x0=x1 ; y0=y1 ; z0=z1
+!       !          lcellule_non_vide = (i2 <= n_cells)
+!       !          if (test_exit_grid(i2, x0, y0, z0)) exit infinie
+!       !          if (lintersect_stars) then
+!       !             if (i2 == icell_star) exit infinie
+!       !          end if
+!       !          if (i2 <= n_cells) then
+!       !             lcellule_non_vide = (icompute_atomRT(i2) > 0)
+!       !             if (icompute_atomRT(i2) < 0) exit infinie
+!       !          endif
+
+!       !          call cross_cell(x0,y0,z0, u,v,w, i2, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+!       !          !compute velocity gradient between cell i1 and crossed cells i2
+!       !          if (lcellule_non_vide) then
+!       !             v2 = v_proj(i2,x0,y0,z0,u,v,w)
+!       !             dv = max(dv,abs(v2))!-v1))
+!       !          endif
+
+!       !       enddo infinie
+!       !    enddo
+!       ! enddo
+!       ! !$omp end do
+!       ! !$omp end parallel
+!       ! deallocate(stream)
+
+!       ! if (lvoronoi) then
+!       !    dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
+!       !    if (dv == 0.0_dp) return 
+!       !    dv = 0.0_dp
+
+!       !    !$omp parallel &
+!       !    !$omp default(none) &
+!       !    !$omp private(id,i1, i2,v1, v2)&
+!       !    !$omp shared(dv, icompute_atomRT, Voronoi, n_Cells)
+!       !    !$omp do schedule(dynamic,1)
+!       !    do i1=1,n_cells
+!       !       !$ id = omp_get_thread_num() + 1
+!       !       v1 = sqrt(sum(Voronoi(i1)%vxyz**2))
+!       !       do i2=1,n_cells
+!       !          v2 = sqrt(sum(Voronoi(i2)%vxyz**2))
+!       !          if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+!       !             dv = max(dv,abs(v1-v2))
+!       !          endif
+!       !       enddo
+!       !    enddo
+!       !    !$omp end do
+!       !    !$omp end parallel
+!       ! else
+!       !    dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+!       !    if (dv==0.0_dp) return
+
+!       !    dv = 0.0_dp
+!       !    !$omp parallel &
+!       !    !$omp default(none) &
+!       !    !$omp private(id,i1,i2,v1,v2)&
+!       !    !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells)
+!       !    !$omp do schedule(dynamic,1)
+!       !    do i1=1,n_cells
+!       !       !$ id = omp_get_thread_num() + 1
+!       !       v1 = sqrt(sum(vfield3d(i1,:)**2))
+!       !       do i2=1,n_cells
+!       !          v2 = sqrt(sum(vfield3d(i2,:)**2))
+!       !          if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+!       !             dv = max(dv,abs(v1-v2))
+!       !          endif
+!       !       enddo
+!       !    enddo
+!       !    !$omp end do
+!       !    !$omp end parallel
+!       ! endif
+
+!       write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
+
+!       return
+!    end subroutine compute_max_relative_velocity

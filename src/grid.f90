@@ -23,8 +23,8 @@ module grid
   real(kind=dp) :: v_char, B_char
   logical :: lcalc_ne, lmagnetized
   !real(kind=dp), dimension(:), allocatable :: vfield_v1, vfield_v2, vfield_v3
-  real(kind=dp), dimension(:), allocatable :: ne, nHtot, T, nHmin, vturb
-  integer, dimension(:), allocatable :: icompute_atomRT
+  real(kind=dp), dimension(:), allocatable :: ne, nHtot, T, nHmin, vturb ! n_cells
+  integer, dimension(:), allocatable :: icompute_atomRT !n_cells
   real, dimension(:,:), allocatable :: vfield3d ! n_cells x 3
   real, dimension(:), allocatable :: vfield ! n_cells
 
@@ -33,7 +33,9 @@ module grid
   subroutine alloc_atomrt_grid()
    integer(kind=8) :: mem_alloc_local = 0
 
-
+   !merge vturb and v_turb (molecular emission)
+   !TO DO: move vturb in molecular emission in grid.f90
+   !  use that vturb for atomRT
    allocate(nHtot(n_cells), ne(n_cells), T(n_cells))
    allocate(nHmin(n_cells), vturb(n_cells))
 
