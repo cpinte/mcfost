@@ -128,6 +128,7 @@ subroutine set_default_variables()
   lforce_HG = .false.
   lphase_function_file = .false.
   ltau1_surface=.false.
+  lflux_fraction_surface=.false.
   lcasa=.false.
   lplanet_az = .false.
   which_planet = 0
@@ -1007,6 +1008,13 @@ subroutine initialisation_mcfost()
      case("-tau=1_surface")
         i_arg = i_arg + 1
         ltau1_surface=.true.
+     case("-flux_fraction_surface")
+        i_arg = i_arg + 1
+        lflux_fraction_surface=.true.
+        call get_command_argument(i_arg,s)
+        sflux_fraction = s
+        read(s,*) flux_fraction
+        i_arg = i_arg + 1
      case("-z_scaling_env")
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
@@ -1636,6 +1644,7 @@ subroutine display_help()
   write(*,*) "        : -qsca=qabs : forces albedo = 0.5"
   write(*,*) "        : -phase-function <s11.fits> : uses a tabulated phase function (rt2 only)"
   write(*,*) "        : -tau=1_surface"
+  write(*,*) "        : -flux_fraction_surface <fraction>"
   write(*,*) " "
   write(*,*) " Options related to molecular emission"
   write(*,*) "        : -freeze-out <T>"

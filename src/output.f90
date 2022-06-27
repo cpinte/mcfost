@@ -985,10 +985,17 @@ subroutine write_tau_surface(imol)
   image = 0.0 ;
 
   lambda=1
-  if (imol==0) then ! continuum
-     filename = trim(data_dir)//"/tau=1_surface.fits.gz"
+
+  if (lflux_fraction_surface) then
+     filename = "f"//trim(sflux_fraction)//"_surface.fits.gz"
   else
-     filename = trim(data_dir2(imol))//"/tau=1_surface.fits.gz"
+     filename = "tau=1_surface.fits.gz"
+  endif
+
+  if (imol==0) then ! continuum
+     filename = trim(data_dir)//"/"//trim(filename)
+  else
+     filename = trim(data_dir2(imol))//"/"//trim(filename)
   endif
   write(*,*) "Writing "//trim(filename)
 
