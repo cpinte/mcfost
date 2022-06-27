@@ -197,22 +197,22 @@ subroutine define_cylindrical_grid()
   integer :: i,j,k, izone, ii, ii_min, ii_max, icell
 
   !tab en cylindrique ou spherique suivant grille
-  real(kind=dp), dimension(n_rad) :: V
   real(kind=dp), dimension(n_rad+1) :: tab_r, tab_r2, tab_r3
+  real(kind=dp), dimension(nz) :: dcos_theta
   real(kind=dp) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=dp) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
-  real(kind=dp) :: theta, dtheta, delta_phi
+  real(kind=dp) :: theta, dtheta, delta_phi, Vi
   integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status
 
   type(disk_zone_type) :: dz
 
-  real(kind=dp), dimension(:,:), allocatable :: r_grid_tmp, z_grid_tmp
+  real(kind=dp), dimension(:,:), allocatable :: V, r_grid_tmp, z_grid_tmp
   real(kind=dp), dimension(:), allocatable :: phi_grid_tmp
 
   if (l3D) then
-     allocate(r_grid_tmp(n_rad,-nz:nz), z_grid_tmp(n_rad,-nz:nz), phi_grid_tmp(n_az), stat=alloc_status)
+     allocate(V(n_rad,-nz:nz),r_grid_tmp(n_rad,-nz:nz), z_grid_tmp(n_rad,-nz:nz), phi_grid_tmp(n_az), stat=alloc_status)
   else
-     allocate(r_grid_tmp(n_rad,nz), z_grid_tmp(n_rad,nz), phi_grid_tmp(n_az), stat=alloc_status)
+     allocate(V(n_rad,nz),r_grid_tmp(n_rad,nz), z_grid_tmp(n_rad,nz), phi_grid_tmp(n_az), stat=alloc_status)
   endif
 
 
@@ -446,11 +446,11 @@ subroutine define_cylindrical_grid()
 
      do i=1, n_rad
         if ((tab_r2(i+1)-tab_r2(i)) > 1.0e-6*tab_r2(i)) then
-           V(i)=2.0_dp*pi*(tab_r2(i+1)-tab_r2(i)) * zmax(i)/real(nz)
+           V(i,:)=2.0_dp*pi*(tab_r2(i+1)-tab_r2(i)) * zmax(i)/real(nz)
            dr2_grid(i) = tab_r2(i+1)-tab_r2(i)
         else
            rcyl = r_grid_tmp(i,1)
-           V(i)=4.0_dp*pi*rcyl*(tab_r(i+1)-tab_r(i)) * zmax(i)/real(nz)
+           V(i,:)=4.0_dp*pi*rcyl*(tab_r(i+1)-tab_r(i)) * zmax(i)/real(nz)
            dr2_grid(i) = 2.0_dp * rcyl*(tab_r(i+1)-tab_r(i))
         endif
 
@@ -477,15 +477,23 @@ subroutine define_cylindrical_grid()
      theta_lim(nz) = pi/2.
      tan_theta_lim(nz) = 1.e30_dp
 
-     if (lregular_theta) then ! repartition uniforme en theta, jusqu'a theta max, puis 1 cellule vide jusqu'a pi/2
+     if (lregular_theta) then
+        ! uniform distribution in theta up to theta max (nz-1 cells), then 1 extra cell up to pi/2
+        if (abs(theta_max - pi/2) < 1e-6) theta_max = pi/2 * real(nz-1)/real(nz) ! If theta max is pi/2, the extra cell has the same angular size
         dtheta = theta_max / (nz-1)
+
         do j=1, nz-1
            theta = j * dtheta
            theta_lim(j) = theta
            tan_theta_lim(j) = tan(theta)
            w_lim(j) = sin(theta)
+
+           dcos_theta(j) = w_lim(j) - w_lim(j-1)
         enddo
-     else ! repartition uniforme en cos
+        dcos_theta(nz) = w_lim(nz) - w_lim(nz-1)
+     else
+        ! uniform distribution in cosine
+        dcos_theta = 1.0_dp/real(nz)
         do j=1, nz-1
            w= real(j,kind=dp)/real(nz,kind=dp)
            w_lim(j) = w
@@ -506,10 +514,13 @@ subroutine define_cylindrical_grid()
         enddo
 
         if ((tab_r3(i+1)-tab_r3(i)) > 1.0e-6*tab_r3(i)) then
-           V(i)=4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i)) /real(nz)
+           Vi = 4.0/3.0*pi*(tab_r3(i+1)-tab_r3(i))
         else
-           V(i)=4.0*pi*rsph**2*(tab_r(i+1)-tab_r(i)) /real(nz)
+           Vi = 4.0*pi*rsph**2*(tab_r(i+1)-tab_r(i))
         endif
+        do j=1,nz
+           V(i,j) = Vi * dcos_theta(j)
+        enddo
      enddo
 
   endif ! cylindrique ou spherique
@@ -528,9 +539,10 @@ subroutine define_cylindrical_grid()
         endif
      enddo !k
 
-     V(:) = V(:) * 0.5 / real(n_az)
+     V(:,:) = V(:,:) * 0.5 / real(n_az)
 
      do j=1,nz
+        V(:,-j) = V(:,j)
         r_grid_tmp(:,-j) = r_grid_tmp(:,j)
         z_grid_tmp(:,-j) = -z_grid_tmp(:,j)
      enddo
@@ -552,7 +564,8 @@ subroutine define_cylindrical_grid()
      i = cell_map_i(icell)
      j = cell_map_j(icell)
      k = cell_map_k(icell)
-     volume(icell) = V(i)
+
+     volume(icell) = V(i,j)
 
      r_grid(icell) = r_grid_tmp(i,j)
      z_grid(icell) = z_grid_tmp(i,j)
