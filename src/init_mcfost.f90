@@ -164,6 +164,7 @@ subroutine set_default_variables()
   lforce_HG = .false.
   lphase_function_file = .false.
   ltau1_surface=.false.
+  lflux_fraction_surface=.false.
   lcasa=.false.
   lplanet_az = .false.
   which_planet = 0
@@ -181,6 +182,7 @@ subroutine set_default_variables()
   ldelete_hill_sphere = .false.
   ldelete_inside_rsph = .false.
   ldelete_outside_rsph = .false.
+  ldelete_above_theta = .false.
   lrandomize_Voronoi = .false.
   lrandomize_azimuth = .false.
   lrandomize_gap = .false.
@@ -1194,6 +1196,13 @@ subroutine initialisation_mcfost()
      case("-tau=1_surface")
         i_arg = i_arg + 1
         ltau1_surface=.true.
+     case("-flux_fraction_surface")
+        i_arg = i_arg + 1
+        lflux_fraction_surface=.true.
+        call get_command_argument(i_arg,s)
+        sflux_fraction = s
+        read(s,*) flux_fraction
+        i_arg = i_arg + 1
      case("-z_scaling_env")
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
@@ -1279,6 +1288,12 @@ subroutine initialisation_mcfost()
         ldelete_outside_rsph = .true.
         call get_command_argument(i_arg,s)
         read(s,*) rsph_max
+        i_arg = i_arg + 1
+     case("-delete_above_latitude")
+        i_arg = i_arg + 1
+        ldelete_above_theta = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) theta_max
         i_arg = i_arg + 1
      case("-random_az")
         i_arg = i_arg + 1
@@ -1837,6 +1852,7 @@ subroutine display_help()
   write(*,*) "        : -qsca=qabs : forces albedo = 0.5"
   write(*,*) "        : -phase-function <s11.fits> : uses a tabulated phase function (rt2 only)"
   write(*,*) "        : -tau=1_surface"
+  write(*,*) "        : -flux_fraction_surface <fraction>"
   write(*,*) " "
   write(*,*) "        : -Nrays_mc_step <Nray> : Number of rays for angular quadrature in Monte Carlo step"
   write(*,*) " Options related to molecular emission"
@@ -1889,6 +1905,7 @@ subroutine display_help()
   write(*,*) "        : -delete_Hill_sphere : delete SPH particles inside Hill spheres of planets"
   write(*,*) "        : -delete_inside_rsph <r> : delete SPH particles inside spherical radius"
   write(*,*) "        : -delete_outside_rsph <r> : delete SPH particles outside spherical radius"
+  write(*,*) "        : -delete_above_latitude <theta> : delete SPH particles above a given latitude [radian]"
   write(*,*) "        : -no_vr : force the radial velocities to be 0"
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"

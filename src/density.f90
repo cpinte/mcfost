@@ -28,12 +28,9 @@ module density
   real(kind=dp), dimension(:), allocatable :: densite_gaz_midplane   ! densite_gaz gives the midplane density for j=0
   real(kind=dp), dimension(:), allocatable :: Surface_density
 
-  real :: coeff_exp, coeff1, coeff2, rcyl
-
-  real, dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
-  integer :: icell_not_empty
+  real(kind=dp), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
   real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
-  real(kind=dp), dimension(:,:), allocatable :: masse_rayon ! en g!!!!  n_rad, n_az
+  integer :: icell_not_empty
 
   contains
 
@@ -56,7 +53,7 @@ subroutine define_gas_density()
   integer :: i,j, k, izone, alloc_status, icell
   real(kind=dp), dimension(n_zones) :: cst_gaz
   real(kind=dp) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C, somme
-  real(kind=dp) :: rcyl2, z2, rin2, rmax2, rmin2, rsph0
+  real(kind=dp) :: rcyl2, z2, rin2, rmax2, rmin2, rsph0, rcyl, coeff_exp
 
   type(disk_zone_type) :: dz
 
@@ -772,7 +769,6 @@ subroutine define_dust_density()
                  !R(r) = (  (r/rc)^-2alpha_in + (r/rc)^-2alpha_out )^-1/2
                  !Z(r,z) =  exp( - (abs(z)/h(r))^gamma  )
 
-
                  ! Warp analytique
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
@@ -786,20 +782,15 @@ subroutine define_dust_density()
                     z0 = 0.0
                  endif
 
-                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                    if (rcyl > dz%rmax) then
-                       density = 0.0
-                    else if (rcyl < dz%rmin) then
-                       density = 0.0
-                    else
-                       density = nbre_grains(l) * cst_pous(pop) * &
-                            ( (rcyl/dz%Rc)**(-2*dz%surf) + (rcyl/dz%Rc)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
-                            exp( - (abs(z -z0)/h)**dz%vert_exponent)
-                    endif
-                    densite_pouss(l,icell) = density
-                 enddo ! l
-
-
+                 if (rcyl > dz%rmax) then
+                    density = 0.0
+                 else if (rcyl < dz%rmin) then
+                    density = 0.0
+                 else
+                    density =  cst_pous(pop) * ( (rcyl/dz%Rc)**(-2*dz%surf) + (rcyl/dz%Rc)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
+                         exp( - (abs(z -z0)/h)**dz%vert_exponent)
+                 endif
+                 densite_pouss(:,icell) = density * nbre_grains(:)
               enddo !k
            enddo bz_debris !j
         enddo !i

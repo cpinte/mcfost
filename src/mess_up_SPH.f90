@@ -4,7 +4,7 @@ module mess_up_SPH
 
   implicit none
 
-  public :: mask_Hill_sphere, randomize_azimuth, randomize_gap, mask_inside_rsph, mask_outside_rsph
+  public :: mask_Hill_sphere, randomize_azimuth, randomize_gap, mask_inside_rsph, mask_outside_rsph, mask_above_theta
 
   private
 
@@ -125,7 +125,7 @@ contains
 
     n_delete = 0
     particle_loop : do i=1, np
-       d2 = sum(xyzh(:,i)**2)
+       d2 = sum(xyzh(1:3,i)**2)
        if (d2 > r2) then ! particle is outside rsph
           mask(i) = .true.
           n_delete = n_delete + 1
@@ -139,6 +139,37 @@ contains
 
   !*********************************************************
 
+  subroutine mask_above_theta(np, xyzh,udist, theta_max, mask)
+
+    integer, intent(in) :: np
+    real(kind=dp), dimension(:,:), intent(in) :: xyzh
+    real(kind=dp), intent(in) :: udist
+    real, intent(in) :: theta_max
+
+    logical, dimension(np), intent(inout) :: mask
+
+    integer :: i, n_delete
+    real(kind=dp) :: r, tan_theta_max, tan_theta
+
+    n_delete = 0
+    tan_theta_max = tan(theta_max)
+
+    particle_loop : do i=1, np
+       r = sqrt(xyzh(1,i)**2 + xyzh(2,i)**2)
+       tan_theta = abs(xyzh(3,i)/r)
+
+       if (tan_theta > tan_theta_max) then ! particle is above theta_max
+          mask(i) = .true.
+          n_delete = n_delete + 1
+       endif
+    enddo particle_loop
+
+    write(*,*) n_delete, "particles were deleted above theta=", theta_max, "rad"
+    return
+
+  end subroutine mask_above_theta
+
+  !*********************************************************
 
   function d2_from_star(nptmass, xyzmh_ptmass, i_planet) result(d2)
     ! Compute the square of distance between star and sink particle i_planet

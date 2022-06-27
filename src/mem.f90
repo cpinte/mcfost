@@ -689,7 +689,7 @@ subroutine alloc_emission_mol(imol)
 
   call allocate_mol_maps(imol)
 
-  if (ltau1_surface) then
+  if (ltau1_surface.or.lflux_fraction_surface) then
      if (.not.allocated(tau_surface)) then
         allocate(tau_surface(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
         if (alloc_status > 0) call error('Allocation error tau_surface')
