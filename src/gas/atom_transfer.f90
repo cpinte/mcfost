@@ -93,6 +93,7 @@ module atom_transfer
       ! -------------------------------- INITIALIZATION -------------------------------- !
       write(*,*) '-------------------------- NON-LTE LOOP ------------------------------ '
       !non-LTE mode
+      lnon_lte_loop = .true.
       labs = .true.
       id = 1
       if (lforce_lte) lsubiteration = .false.
@@ -423,14 +424,14 @@ module atom_transfer
             dM(:) = 0.0 !all pops
             diff_cont = 0
             diff = 0.0
-            !$omp parallel &
-            !$omp default(none) &
-            !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,atom)&
-            !$omp shared(diff, diff_cont, dM,n_new,Activeatoms,lcell_converged)&
-            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot)
-            !$omp do schedule(dynamic,1)
+            !!$omp parallel &
+            !!$omp default(none) &
+            !!$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,atom)&
+            !!$omp shared(diff, diff_cont, dM,n_new,Activeatoms,lcell_converged)&
+            !!$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot)
+            !!$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
-               !$ id = omp_get_thread_num() + 1
+               !!$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
 
                if (l_iterate) then
@@ -467,8 +468,8 @@ module atom_transfer
 
                end if !if l_iterate
             end do cell_loop2 !icell
-            !$omp end do
-            !$omp end parallel
+            !!$omp end do
+            !!$omp end parallel
   
             if (n_iter > 1) then
                conv_speed = (diff - diff_old) !<0 converging.
@@ -598,6 +599,7 @@ module atom_transfer
       ! deallocate(iloc_tmp,cntrb_tmp)
 
       ! --------------------------------    END    ------------------------------------------ !
+      lnon_lte_loop = .false.
       write(*,*) '-------------------------- ------------ ------------------------------ '
 
       return
@@ -688,6 +690,7 @@ module atom_transfer
       write(*,*) "check solve ne" 
       write(*,*) " ******************** "
 
+      lnon_lte_loop = .false.
       omp_chunk_size = max(nint( 0.01 * n_cells / nb_proc ),1)
       mem_alloc_tot = 0
       if (lsed) then
@@ -753,12 +756,10 @@ module atom_transfer
          !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm)
 
-         lnon_lte_loop = .true.
          call nlte_loop_mali()
          if (lexit_after_nonlte_loop) return
 
       end if !active atoms
-      lnon_lte_loop = .false.
 
       if (lmodel_1d) then
          call spectrum_1d()

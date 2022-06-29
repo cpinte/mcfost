@@ -285,7 +285,7 @@ module Opacity_atom
                Nlam = Nred - Nblue + 1
             endif
 
-            phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,iterate,Nlam,lambda(Nblue:Nred),&
+            phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
 
@@ -370,7 +370,7 @@ module Opacity_atom
                term3(la) = aatom%continua(kr)%alpha(la) * aatom%continua(kr)%twohnu3_c2(la) * gij * aatom%n(j,icell)
             enddo freq_loop
             !linear interpolation + adding wavelength integration weight
-            ! wl = 0.5*(tab_lambda_nm(N1+1)-tab_lambda_nm(N1)) / tab_lambda_nm(N1)
+            !wl = 0.5*(tab_lambda_nm(N1+1)-tab_lambda_nm(N1)) / tab_lambda_nm(N1)
             chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1)! * wl
             chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1)! * wl
             Uji_down(n1,j,nact,id) = Uji_down(N1,j,nact,id) + term2(1)
@@ -409,7 +409,7 @@ module Opacity_atom
              elseif (la==n_lambda) then
                 wl = 0.5*(tab_lambda_nm(la)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
              else
-                wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
+                wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
              endif    
              chi_down(la,:,:,id) =  chi_down(la,:,:,id)  * wl
              chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl     
@@ -441,7 +441,6 @@ module Opacity_atom
                phi0(la) = phi_loc(la,kr,nact,iray,id)
                wphi = wphi + wl * phi0(la)
             enddo
-
 
             freq2_loop : do la=1, Nl
                wl = wei_line(la)

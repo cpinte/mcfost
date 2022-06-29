@@ -80,7 +80,7 @@ module see
         !only count n_new has atom%n is global in the code and "normal"
         write(*,*) " size n_new:", sizeof(n_new) / 1024./1024.," MB"
         n_new(:,:,:) = 0.0_dp
-        allocate(psi(n_lambda, n_rayons_max, nb_proc), stat=alloc_status); psi = 0.0_dp
+        allocate(psi(n_lambda, n_rayons_max, nb_proc), stat=alloc_status); psi(:,:,:) = 0.0_dp
         write(*,*) " size psi:", sizeof(psi) / 1024./1024.," MB"
         if (alloc_Status > 0) call error("Allocation error psi in nlte loop")
         allocate(eta_atoms(n_lambda,NactiveAtoms,nb_proc),stat=alloc_status)
@@ -140,38 +140,38 @@ module see
                 do icell=1, n_cells
                     if (icompute_atomRT(icell) > 0) then
                         tab_Aji_cont(kr,n,icell) = 0.0_dp !frequency and angle integrated!
-                        do l=2,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1
-                            anu1 = tab_Vij_cont(l,kr,n)
-                            anu2 = tab_Vij_cont(l-1,kr,n)
-
-                            e1 = exp(-hc_k/T(icell)/tab_lambda_nm(atom%continua(kr)%Nb+l-1))
-                            e2 = exp(-hc_k/T(icell)/tab_lambda_nm(atom%continua(kr)%Nb+l-2))
-
-                            b1 = twohc/tab_lambda_nm(atom%continua(kr)%Nb+l-1)**4
-                            b2 = twohc/tab_lambda_nm(atom%continua(kr)%Nb+l-2)**4
-
-                            wl = (tab_lambda_nm(atom%continua(kr)%Nb+l-1) - tab_lambda_nm(atom%continua(kr)%Nb+l-2))
-
-                            tab_Aji_cont(kr,n,icell) = tab_Aji_cont(kr,n,icell) + wl * fourpi_h * 0.5*(anu1*e1*b1 + anu2*e2*b2)
-  
-                        enddo
-                        ! do l=1,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1
-                        !     if (l==1) then
-                        !         wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nb+l+1)-tab_lambda_nm(atom%continua(kr)%Nb+l)) / tab_lambda_nm(atom%continua(kr)%Nb+l)
-                        !     elseif (l==n_lambda) then
-                        !         wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nb+l)-tab_lambda_nm(atom%continua(kr)%Nb+l-1)) / tab_lambda_nm(atom%continua(kr)%Nb+l-1)
-                        !     else
-                        !         wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nb+l+1)-tab_lambda_nm(atom%continua(kr)%Nb+l-1)) / tab_lambda_nm(atom%continua(kr)%Nb+l-1)
-                        !     endif 
+                        ! do l=2,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1
                         !     anu1 = tab_Vij_cont(l,kr,n)
+                        !     anu2 = tab_Vij_cont(l-1,kr,n)
 
                         !     e1 = exp(-hc_k/T(icell)/tab_lambda_nm(atom%continua(kr)%Nb+l-1))
+                        !     e2 = exp(-hc_k/T(icell)/tab_lambda_nm(atom%continua(kr)%Nb+l-2))
 
-                        !     b1 = twohc/tab_lambda_nm(atom%continua(kr)%Nb+l-1)**3
+                        !     b1 = twohc/tab_lambda_nm(atom%continua(kr)%Nb+l-1)**4
+                        !     b2 = twohc/tab_lambda_nm(atom%continua(kr)%Nb+l-2)**4
 
-                        !     tab_Aji_cont(kr,n,icell) = tab_Aji_cont(kr,n,icell) + fourpi_h * anu1*e1*b1 * wl
+                        !     wl = (tab_lambda_nm(atom%continua(kr)%Nb+l-1) - tab_lambda_nm(atom%continua(kr)%Nb+l-2))
+
+                        !     tab_Aji_cont(kr,n,icell) = tab_Aji_cont(kr,n,icell) + wl * fourpi_h * 0.5*(anu1*e1*b1 + anu2*e2*b2)
   
                         ! enddo
+                        do l=1,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1
+                            if (l==1) then
+                                wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nb+1)-tab_lambda_nm(atom%continua(kr)%Nb)) / tab_lambda_nm(atom%continua(kr)%Nb)
+                            elseif (l==n_lambda) then
+                                wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nr)-tab_lambda_nm(atom%continua(kr)%Nr-1)) / tab_lambda_nm(atom%continua(kr)%Nr-1)
+                            else
+                                wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nb+l)-tab_lambda_nm(atom%continua(kr)%Nb+l-2)) / tab_lambda_nm(atom%continua(kr)%Nb+l-1)
+                            endif 
+                            anu1 = tab_Vij_cont(l,kr,n)
+
+                            e1 = exp(-hc_k/T(icell)/tab_lambda_nm(atom%continua(kr)%Nb+l-1))
+
+                            b1 = twohc/tab_lambda_nm(atom%continua(kr)%Nb+l-1)**3
+
+                            tab_Aji_cont(kr,n,icell) = tab_Aji_cont(kr,n,icell) + fourpi_h * anu1*e1*b1 * wl
+  
+                        enddo
                     endif
                 enddo 
             enddo
@@ -442,7 +442,7 @@ module see
             atom%Gamma(l,l,id) = sum(-atom%Gamma(:,l,id)) !positive
         end do
 
-
+! stop
         return
     end subroutine rate_matrix_atom
 
@@ -455,6 +455,7 @@ module see
 
             !x ne included. Derivatives to ne not included.
             if (activeatoms(n)%p%id=='H') then
+                ! call init_colrates_atom(id,ActiveAtoms(n)%p)
                 call collision_rates_hydrogen_loc(id,icell)
             else 
                 call init_colrates_atom(id,ActiveAtoms(n)%p)
@@ -529,7 +530,7 @@ module see
         real(kind=dp) :: jbar_up, jbar_down, xcc_down, xcc_up
         real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star
         real(kind=dp) :: ehnukt, ehnukt1
-
+! write(*,*) icell, T(icell)
         atom_loop : do nact = 1, Nactiveatoms
             atom => ActiveAtoms(nact)%p
 
@@ -551,25 +552,25 @@ module see
                 !(Psi - Psi^\ast) eta
                 Ieff(1:Nl) = Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id)
 
-                do l=2, nl
-                    wl = c_light * (tab_lambda_nm(i0+l) - tab_lambda_nm(i0+l-1))/atom%lines(kr)%lambda0
-                    Jbar_up = Jbar_up + 0.5 * (Ieff(l)*phi0(l)+Ieff(l-1)*phi0(l-1)) * wl
-                    wphi = wphi + 0.5*(phi0(l)+phi0(l-1)) * wl
-                    !xcc_down = xcc_down + 0.5 * ...
-                enddo  
-                xcc_down = sum(chi_up(Nb:Nr,i,nact,id)*psi(Nb:nR,1,id)*Uji_down(Nb:Nr,j,nact,id))
-                ! do l=1, nl
-                !     if (l==1) then
-                !         wl = 0.5*(tab_lambda_nm(Nb+1)-tab_lambda_nm(Nb)) * c_light / atom%lines(kr)%lambda0
-                !     elseif (l==nl) then
-                !         wl = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) * c_light / atom%lines(kr)%lambda0
-                !     else
-                !         wl = 0.5*(tab_lambda_nm(Nb+l)-tab_lambda_nm(Nb+l-2)) * c_light / atom%lines(kr)%lambda0
-                !     endif
-                !     Jbar_up = Jbar_up + Ieff(l)*phi0(l) * wl
-                !     wphi = wphi + phi0(l) * wl
-                !     xcc_down = xcc_down + chi_up(i0+l,i,nact,id)*psi(i0+l,1,id)*Uji_down(i0+l,j,nact,id)
-                ! enddo 
+                ! do l=2, nl
+                !     wl = c_light * (tab_lambda_nm(i0+l) - tab_lambda_nm(i0+l-1))/atom%lines(kr)%lambda0
+                !     Jbar_up = Jbar_up + 0.5 * (Ieff(l)*phi0(l)+Ieff(l-1)*phi0(l-1)) * wl
+                !     wphi = wphi + 0.5*(phi0(l)+phi0(l-1)) * wl
+                !     !xcc_down = xcc_down + 0.5 * ...
+                ! enddo  
+                ! xcc_down = sum(chi_up(Nb:Nr,i,nact,id)*psi(Nb:nR,1,id)*Uji_down(Nb:Nr,j,nact,id))
+                do l=1, nl
+                    if (l==1) then
+                        wl = 0.5*(tab_lambda_nm(Nb+1)-tab_lambda_nm(Nb)) * c_light / atom%lines(kr)%lambda0
+                    elseif (l==nl) then
+                        wl = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) * c_light / atom%lines(kr)%lambda0
+                    else
+                        wl = 0.5*(tab_lambda_nm(i0+l+1)-tab_lambda_nm(i0+l-1)) * c_light / atom%lines(kr)%lambda0
+                    endif
+                    Jbar_up = Jbar_up + Ieff(l)*phi0(l) * wl
+                    wphi = wphi + phi0(l) * wl
+                    xcc_down = xcc_down + chi_up(i0+l,i,nact,id)*psi(i0+l,1,id)*Uji_down(i0+l,j,nact,id)
+                enddo 
 
                 if (wphi <= 0.0) then
                     call error("critical! wphi in accumulate_rates_mali!")
@@ -605,7 +606,8 @@ module see
 
                 atom%lines(kr)%Rji(id) = atom%lines(kr)%Rji(id) - xcc_down * dOmega
                 atom%lines(kr)%Rij(id) = atom%lines(kr)%Rij(id) + xcc_up * dOmega
-
+! write(*,*) "line", kr, "x->down",xcc_down, " x->up", xcc_up
+! write(*,*) " Jup", Jbar_up, " Jdown", Jbar_down
             end do line_loop
 
             do kr = 1, atom%Ncont
@@ -625,41 +627,41 @@ module see
 
                 Ieff(1:Nl) = Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id)
 
-                do l=2, Nl
+                ! do l=2, Nl
 
-                    anu = tab_Vij_cont(l,kr,nact)
-                    anu1 = tab_Vij_cont(l-1,kr,nact)
-
-                    wl = (tab_lambda_nm(i0+l) - tab_lambda_nm(i0+l-1))
-
-                    Jbar_up = Jbar_up + 0.5 * (anu*Ieff(l)/tab_lambda_nm(i0+l)+anu1*Ieff(l-1)/tab_lambda_nm(i0+l-1)) * wl
-
-                    ehnukt = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l))/tab_lambda_nm(i0+l)
-                    ehnukt1 = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l-1))/tab_lambda_nm(i0+l-1)
-
-                    Jbar_down = jbar_down + 0.5 * ( anu*Ieff(l)*ehnukt + anu1*Ieff(l-1)*ehnukt1 ) * wl
-
-                enddo
-                xcc_down = sum(chi_up(Nb:Nr,i,nact,id)*Uji_down(Nb:Nr,j,nact,id)*psi(Nb:Nr,1,id))
-
-                ! do l=1, Nl
-                !     if (l==1) then
-                !         wl = 0.5*(tab_lambda_nm(i0+l+1)-tab_lambda_nm(i0+l)) / tab_lambda_nm(i0+l)
-                !     elseif (l==n_lambda) then
-                !         wl = 0.5*(tab_lambda_nm(i0+l)-tab_lambda_nm(i0+l-1)) / tab_lambda_nm(i0+l-1)
-                !     else
-                !         wl = 0.5*(tab_lambda_nm(i0+l+1)-tab_lambda_nm(i0+l-1)) / tab_lambda_nm(i0+l-1)
-                !     endif 
                 !     anu = tab_Vij_cont(l,kr,nact)
+                !     anu1 = tab_Vij_cont(l-1,kr,nact)
 
-                !     Jbar_up = Jbar_up + anu*Ieff(l)*wl
+                !     wl = (tab_lambda_nm(i0+l) - tab_lambda_nm(i0+l-1))
 
-                !     ehnukt = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l))
+                !     Jbar_up = Jbar_up + 0.5 * (anu*Ieff(l)/tab_lambda_nm(i0+l)+anu1*Ieff(l-1)/tab_lambda_nm(i0+l-1)) * wl
 
-                !     Jbar_down = jbar_down + anu*Ieff(l)*ehnukt*wl
+                !     ehnukt = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l))/tab_lambda_nm(i0+l)
+                !     ehnukt1 = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l-1))/tab_lambda_nm(i0+l-1)
 
-                !     xcc_down = xcc_down + chi_up(i0+l,i,nact,id)*Uji_down(i0+l,j,nact,id)*psi(i0+l,1,id)
+                !     Jbar_down = jbar_down + 0.5 * ( anu*Ieff(l)*ehnukt + anu1*Ieff(l-1)*ehnukt1 ) * wl
+
                 ! enddo
+                ! xcc_down = sum(chi_up(Nb:Nr,i,nact,id)*Uji_down(Nb:Nr,j,nact,id)*psi(Nb:Nr,1,id))
+
+                do l=1, Nl
+                    if (l==1) then
+                        wl = 0.5*(tab_lambda_nm(Nb+1)-tab_lambda_nm(Nb)) / tab_lambda_nm(Nb)
+                    elseif (l==n_lambda) then
+                        wl = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) / tab_lambda_nm(Nr)
+                    else
+                        wl = 0.5*(tab_lambda_nm(i0+l+1)-tab_lambda_nm(i0+l-1)) / tab_lambda_nm(i0+l)
+                    endif 
+                    anu = tab_Vij_cont(l,kr,nact)
+
+                    Jbar_up = Jbar_up + anu*Ieff(l)*wl
+
+                    ehnukt = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l))
+
+                    Jbar_down = jbar_down + anu*Ieff(l)*ehnukt*wl
+
+                    xcc_down = xcc_down + chi_up(i0+l,i,nact,id)*Uji_down(i0+l,j,nact,id)*psi(i0+l,1,id)
+                enddo
 
 
                 atom%continua(kr)%Rij(id) = atom%continua(kr)%Rij(id) + dOmega*fourpi_h * Jbar_up
@@ -675,6 +677,17 @@ module see
                     Nbp = atom%lines(krr)%Nb
                     Nrp = atom%lines(krr)%Nr
                     if (jp==i) then !i upper level of another transitions
+                    ! if (kr==3) then
+                    !     write(*,*) "xcc with line", krr, ip, jp
+                    !     write(*,*) "val=", sum(chi_down(Nbp:Nrp,j,nact,id)*psi(Nbp:Nrp,1,id)*Uji_down(Nbp:Nrp,i,nact,id))
+                    !     write(*,*) tab_lambda_nm(Nbp), tab_lambda_nm(Nrp), atom%lines(krr)%voigt
+                    !     write(*,*) sum(chi_down(Nbp:Nrp,j,nact,id)), maxval(Uji_down(Nbp:Nrp,i,nact,id)), maxval(psi(nbp:nrp,1,id))
+                    !     write(*,*) Nbp, Nrp
+                    !     ! do l=Nbp,Nrp
+                    !     !     write(*,*) tab_lambda_nm(l),psi(l,1,id)
+                    !     ! enddo
+                    !     ! stop
+                    ! endif
                         xcc_up = xcc_up + sum(chi_down(Nbp:Nrp,j,nact,id)*psi(Nbp:Nrp,1,id)*Uji_down(Nbp:Nrp,i,nact,id))
                     endif
                 enddo
@@ -684,23 +697,23 @@ module see
                     Nbp = atom%continua(krr)%Nb
                     Nrp = atom%continua(krr)%Nr
                     if (jp==i) then !i upper level of another transitions
+                    ! if (kr==3) then
+                    !     write(*,*) "xcc with cont", krr, ip, jp
+                    ! endif
                         xcc_up = xcc_up + sum(chi_down(Nbp:Nrp,j,nact,id)*psi(Nbp:Nrp,1,id)*Uji_down(Nbp:Nrp,i,nact,id))
                     endif
                 enddo
 
                 atom%continua(kr)%Rji(id) = atom%continua(kr)%Rji(id) - xcc_down * dOmega
                 atom%continua(kr)%Rij(id) = atom%continua(kr)%Rij(id) + xcc_up * dOmega
-                ! if (i==1 .and. j==16) then
-                !     write(*,*) Jbar_up, Jbar_down
-                !     write(*,*) xcc_up, xcc_down, "  xcc_target=", 3.518458262995762E-003
-                !     write(*,*) dOmega
-                !     write(*,*) 'Rji=',atom%continua(kr)%Rji(id),  ' Rij=', atom%continua(kr)%Rij(id)
-                ! endif
+! write(*,*) "cont", kr, "x->down",xcc_down, " x->up", xcc_up
+! write(*,*) " Jup", Jbar_up, " Jdown", Jbar_down
+
             enddo
             atom => NULL()
 
         end do atom_loop
-
+! stop
         return
     end subroutine accumulate_radrates_mali
 
@@ -723,8 +736,6 @@ module see
         else
             do nact=1, Nactiveatoms
                 atom => activeatoms(nact)%p
-                !-> should not be needed...
-                call check_radrates(id,icell,.false.,atom)
                 call rate_matrix_atom(id, atom)
                 call SEE_atom(id, icell, atom, dM)
                 !max for all atoms
@@ -824,8 +835,8 @@ module see
         do n=1,nactiveatoms
             at => ActiveAtoms(n)%p
             npop_dag(i:(i-1)+at%Nlevel,id) = at%n(:,icell)
-            !-> should not be needed...
-            call check_radrates(id,icell,verbose,at)
+            ! !-> should not be needed...
+            ! call check_radrates(id,icell,verbose,at)
             call radrate_matrix_on_ne_atom(id,icell,at,at%gamma(:,:,id),at%dgdne(:,:,id))
             dgrdne(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) = tmp_fact*at%dgdne(:,:,id)
             gr_save(1:at%Nlevel,1:at%Nlevel,n,id) = tmp_fact*at%gamma(:,:,id)
