@@ -285,7 +285,7 @@ module Opacity_atom
                Nlam = Nred - Nblue + 1
             endif
 
-            phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iterate,Nlam,lambda(Nblue:Nred),&
+            phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
 
