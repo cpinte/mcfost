@@ -112,11 +112,9 @@ module parametres
   ! Prodimo
   logical :: lprodimo, lprodimo_input_dir, lforce_ProDiMo_PAH
 
-  logical, parameter :: ltest_rt3 = .false. ! marche pas
-  logical, parameter :: ltest_rt4 = .false.  ! marche pas non plus
-
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM
-  logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface, lflux_fraction_surface, lwrite_column_density, lwrite_mol_column_density
+  logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface, lflux_fraction_surface
+  logical :: lwrite_column_density, lwrite_mol_column_density
   character(len=8) :: sflux_fraction
   real(kind=dp) :: flux_fraction
 

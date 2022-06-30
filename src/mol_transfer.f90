@@ -110,8 +110,8 @@ subroutine mol_line_transfer()
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
               call emission_line_map(imol,ibin,iaz)
-              if (ltau1_surface) call emission_line_tau_surface_map(imol,1,1.0_dp, ibin,iaz) ! 1st transition only for now
-              if (lflux_fraction_surface) call  emission_line_energy_fraction_surface_map(imol,1,flux_fraction, ibin,iaz) ! 1st transition only for now
+              if (ltau1_surface) call emission_line_tau_surface_map(imol,1.0_dp, ibin,iaz)
+              if (lflux_fraction_surface) call  emission_line_energy_fraction_surface_map(imol,flux_fraction, ibin,iaz)
            enddo
         enddo
 
@@ -575,9 +575,8 @@ subroutine emission_line_map(imol,ibin,iaz)
      n_iter_max = 1
 
      ! dx and dy are only required for stellar map here
-     taille_pix = (map_size/zoom)  ! en AU
-     dx(:) = x_plan_image * taille_pix
-     dy(:) = y_plan_image * taille_pix
+     dx(:) = x_plan_image * (map_size/zoom)  ! en au
+     dy(:) = y_plan_image * (map_size/zoom)  ! en au
 
      i = 1
      j = 1
@@ -630,7 +629,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      lresolved = .true.
 
      ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-     taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
+     taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en au
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
@@ -822,8 +821,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   IPc = IPc * (pixelsize / (distance*pc_to_AU) )**2
 
   ! et multiplication par la frequence pour avoir du nu.F_nu
-
-  ! Warning IP, IPc are smaller array (dimension mol(imol)%nTrans_raytracin)
+  ! Warning IP, IPc are smaller array (dimension mol(imol)%nTrans_raytracing)
   do i=1,mol(imol)%nTrans_raytracing
      iTrans = mol(imol)%indice_Trans_raytracing(i)
      IP(:,i) = IP(:,i) * transfreq(iTrans)
@@ -1075,16 +1073,16 @@ end subroutine init_abundance
 
 !***********************************************************
 
-subroutine emission_line_tau_surface_map(imol,iTrans,tau,ibin,iaz)
+subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
 
   real(kind=dp), intent(in) :: tau
-  integer, intent(in) :: imol, iTrans, ibin, iaz
+  integer, intent(in) :: imol, ibin, iaz
   real(kind=dp) :: u,v,w
 
   real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=dp), dimension(3,nb_proc) :: pixelcenter
 
-  integer :: i,j, id, p_lambda, icell
+  integer :: i,j, id, p_lambda, icell, iTrans
   real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0
   logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
@@ -1123,6 +1121,9 @@ subroutine emission_line_tau_surface_map(imol,iTrans,tau,ibin,iaz)
 
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
+
+  ! We only consider the 1st transition for now
+  iTrans = mol(imol)%indice_Trans_raytracing(1)
 
   ! Tableau vitesse
   !nTrans_raytracing = mol(imol)%nTrans_raytracing
@@ -1181,17 +1182,17 @@ end subroutine emission_line_tau_surface_map
 
 !***********************************************************
 
-subroutine emission_line_energy_fraction_surface_map(imol,iTrans,flux_fraction,ibin,iaz)
+subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz)
 
   real(kind=dp), intent(in) :: flux_fraction
-  integer, intent(in) :: imol, iTrans, ibin, iaz
+  integer, intent(in) :: imol, ibin, iaz
   real(kind=dp) :: u,v,w
 
   real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=dp), dimension(3,nb_proc) :: pixelcenter
 
-  integer :: i,j, id, p_lambda, icell
-  real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0, Flux
+  integer :: i,j, id, p_lambda, icell, iTrans, iiTrans
+  real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0, Flux, pixelsize, factor
   logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
 
@@ -1223,12 +1224,19 @@ subroutine emission_line_energy_fraction_surface_map(imol,iTrans,flux_fraction,i
   center(1) = x0 ; center(2) = y0 ; center(3) = z0
 
   ! Vecteurs definissant les pixels (dx,dy) dans le repere universel
-  taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
+  taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en au
   dx(:) = x_plan_image * taille_pix
   dy(:) = y_plan_image * taille_pix
 
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
+
+  ! We only consider the 1st transition for now
+  iTrans = 1
+  iiTrans = mol(imol)%indice_Trans_raytracing(iTrans)
+
+  ! Corrective factor : we want the flux before we take into account the pixel size
+  factor = flux_fraction / (taille_pix / (distance*pc_to_AU))**2 /  transfreq(iiTrans)
 
   ! Tableau vitesse
   !nTrans_raytracing = mol(imol)%nTrans_raytracing
@@ -1238,9 +1246,9 @@ subroutine emission_line_energy_fraction_surface_map(imol,iTrans,flux_fraction,i
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
-  !$omp private(flag_star,flag_direct_star,flag_sortie,lpacket_alive,pixelcenter) &
-  !$omp shared(flux_fraction,Flux,Icorner,imol,iTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
-  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface,move_to_grid,spectre)
+  !$omp private(flag_star,flag_direct_star,flag_sortie,lpacket_alive,pixelcenter,Flux) &
+  !$omp shared(flux_fraction,Icorner,imol,iTrans,iiTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
+  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface,move_to_grid,spectre,factor)
   id = 1 ! pour code sequentiel
 
   tau_surface = 0.0_dp
@@ -1263,11 +1271,11 @@ subroutine emission_line_energy_fraction_surface_map(imol,iTrans,flux_fraction,i
         call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
         ! Maximum flux in pixel
-        Flux = maxval(spectre(i,j,:,iTrans,ibin,iaz)) * flux_fraction
+        Flux = maxval(spectre(i,j,:,iTrans,ibin,iaz)) * factor
 
         if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
            lpacket_alive = .true.
-           call physical_length_mol_Flux(imol,iTrans,icell,x0,y0,z0,u0,v0,w0,ispeed,tab_speed_rt,Flux,flag_sortie)
+           call physical_length_mol_Flux(imol,iiTrans,icell,x0,y0,z0,u0,v0,w0,ispeed,tab_speed_rt,Flux,flag_sortie)
            if (flag_sortie) then ! We do not reach the surface tau=1
               tau_surface(i,j,ibin,iaz,:,id) = 0.0
            else
