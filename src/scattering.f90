@@ -450,7 +450,7 @@ subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
 
   ! Il faut coriger pour la nouvelle definition de nang_scatt
   ! Il faut aussi corriger la normalisation de s11 (faire comme mueller_Mie)
-  ! int S11 sin(theta) dtheta = Qsca, utilise la normalisation excate, pas numerique
+  ! int S11 sin(theta) dtheta = Qsca, utilise la normalisation exacte, pas numerique
   call error("mueller_gmm needs to be updated")
 
   if(n_grains_tot > 1) call error("You must choose n_grains_tot=1")

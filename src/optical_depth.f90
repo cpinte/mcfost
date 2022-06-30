@@ -647,13 +647,6 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
            lstop = .true.
            iv = maxloc(tau_mol(:),dim=1) + ispeed(1)-1
 
-           !write(*,*) maxloc(tau_mol(:),dim=1), iv
-         !  if (iv>ispeed(2)) then
-         !     do i=ispeed(1),ispeed(2)
-         !        write(*,*) i, tau_mol(i), maxval(tau_mol(:)), maxloc(tau_mol(:)), maxloc(tau_mol(:),dim=1)
-         !     enddo
-         !  endif
-
            tau_previous = tau_mol(iv) - dtau_mol(iv)
 
            ! rescaling l_contrib so that tau_max = tau_threshold
@@ -706,10 +699,10 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
   logical, intent(out) :: flag_sortie
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ltot
-  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite, I_mol, Snu
+  real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite, I_mol, Snu, dI_mol
   real(kind=dp) :: I_max, I_previous
 
-  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell, iv
+  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell
 
   logical :: lcellule_non_vide, lstop
   logical, parameter :: lsubtract_avg = .false.
@@ -760,28 +753,26 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
         ! Epaisseur optique
         dtau_mol(:) =  l_contrib * opacite(:)
 
-        ! Mise a jour profondeur optique pour cellule suivante
-        ! Warning tau and  tau_c are smaller array (dimension nTrans)
-        tau_mol(:) = tau_mol(:) + dtau_mol(:)
-
-
         ! Fonction source
         Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) &
              + emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-300_dp)
 
         ! Specific intensity
-        I_mol(:) = I_mol(:) + exp(-tau_mol(:)) * (1.0_dp - exp(-dtau_mol(:))) * Snu(:)
+        dI_mol(:) = exp(-tau_mol(:)) * (1.0_dp - exp(-dtau_mol(:))) * Snu(:)
+        I_mol(:) = I_mol(:) + dI_mol(:)
+
+        ! Mise a jour profondeur optique pour cellule suivante
+        ! Warning tau and  tau_c are smaller array (dimension nTrans)
+        tau_mol(:) = tau_mol(:) + dtau_mol(:)
 
         I_max =  maxval(I_mol(:))
 
         if (I_max > Flux_threshold) then
            lstop = .true.
-           iv = maxloc(I_mol(:),dim=1) + ispeed(1)-1
-
-           I_previous = I_mol(iv) - exp(-tau_mol(iv)) * (1.0_dp - exp(-dtau_mol(iv))) * Snu(iv)
+           I_previous = maxval(I_mol(:)-dI_mol(:))
 
            ! rescaling l_contrib so that tau_max = tau_threshold
-           l_contrib = l_contrib  * (Flux_threshold-I_previous)/(I_max-I_previous)
+           if (I_max-I_previous > 0) l_contrib = l_contrib  * (Flux_threshold-I_previous)/(I_max-I_previous)
            l = l_void_before + l_contrib
            ltot=ltot+l
         else
