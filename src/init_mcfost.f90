@@ -127,7 +127,7 @@ subroutine set_default_variables()
   lcylindrical_rotation = .false.
   lforce_HG = .false.
   lphase_function_file = .false.
-  ltau1_surface=.false.
+  ltau_surface=.false.
   lflux_fraction_surface=.false.
   lcasa=.false.
   lplanet_az = .false.
@@ -1007,13 +1007,20 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
      case("-tau=1_surface")
         i_arg = i_arg + 1
-        ltau1_surface=.true.
+        ltau_surface=.true.
+        stau_surface = "1"
+        tau_surface = 1.0
+     case("-tau_surface")
+        i_arg = i_arg + 1
+        ltau_surface=.true.
+        call get_command_argument(i_arg,stau_surface)
+        read(stau_surface,*) tau_surface
+        i_arg = i_arg + 1
      case("-flux_fraction_surface")
         i_arg = i_arg + 1
         lflux_fraction_surface=.true.
-        call get_command_argument(i_arg,s)
-        sflux_fraction = s
-        read(s,*) flux_fraction
+        call get_command_argument(i_arg,sflux_fraction)
+        read(sflux_fraction,*) flux_fraction
         i_arg = i_arg + 1
      case("-z_scaling_env")
         i_arg = i_arg + 1
