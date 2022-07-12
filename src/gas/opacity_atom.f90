@@ -18,7 +18,7 @@ module Opacity_atom
    implicit none
 
    !local profile for cell id in direction iray for all atoms and b-b trans
-   real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:)
+   real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
    real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:)
    integer, parameter 		   :: NvspaceMax = 151
    logical 		               :: lnon_lte_loop                                      
@@ -96,6 +96,7 @@ module Opacity_atom
             else
                atm%continua(kr)%alpha(:) = linear_1D_sorted(size(atm%continua(kr)%alpha_file),&
                atm%continua(kr)%lambda_file,atm%continua(kr)%alpha_file,atm%continua(kr)%Nlambdac,tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
+               !to chheck the edge
             endif
 
          enddo
@@ -154,8 +155,8 @@ module Opacity_atom
       !accumulate b-f
       call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
 
-      chi(1) = chic(1)
-      snu(1) = snuc(1)
+      ! chi(1) = chic(1)
+      ! snu(1) = snuc(1)
 
       !linear interpolation
       i0 = 2
@@ -251,7 +252,7 @@ module Opacity_atom
 
       dv = 0.0_dp
       if (lnon_lte_loop.and..not.iterate) then !not iterate but non-LTE
-         dv = calc_vloc(icell,u,v,w,x,y,z,x1,y1,z1)
+         dv = calc_vloc(icell,u,v,w,x,y,z,x1,y1,z1) - vlabs(iray,id)
       endif
 
       atom_loop : do nat = 1, N_Atoms
@@ -282,10 +283,12 @@ module Opacity_atom
                   Nblue =  atom%lines(kr)%Nover_inf
                   Nred = Nlam + Nblue - 1
                endif
+               ! Nred = atom%lines(kr)%Nover_sup
+               ! Nblue = atom%lines(kr)%Nover_inf
                Nlam = Nred - Nblue + 1
             endif
 
-            phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,iterate,Nlam,lambda(Nblue:Nred),&
+            phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
 
@@ -371,10 +374,10 @@ module Opacity_atom
             enddo freq_loop
             !linear interpolation + adding wavelength integration weight
             !wl = 0.5*(tab_lambda_nm(N1+1)-tab_lambda_nm(N1)) / tab_lambda_nm(N1)
-            chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1)! * wl
-            chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1)! * wl
-            Uji_down(n1,j,nact,id) = Uji_down(N1,j,nact,id) + term2(1)
-            eta_atoms(N1,nact,id) = eta_atoms(N1,nact,id) + term3(1)
+            ! chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1)! * wl
+            ! chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1)! * wl
+            ! Uji_down(n1,j,nact,id) = Uji_down(N1,j,nact,id) + term2(1)
+            ! eta_atoms(N1,nact,id) = eta_atoms(N1,nact,id) + term3(1)
             i0 = 2
             do la=N1,N2
                ! if (la>1) then
@@ -475,9 +478,9 @@ module Opacity_atom
     return
    end subroutine xcoupling
 
-   function profile_art(line,id,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   function profile_art(line,id,icell,iray,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
       ! phi = Voigt / sqrt(pi) / vbroad(icell)
-      integer, intent(in)                    :: id, icell, N
+      integer, intent(in)                    :: id, icell, N, iray
       type (AtomicLine), intent(in)          :: line
       logical, intent(in)                    :: lsubstract_avg
       real(kind=dp), dimension(N), intent(in):: lambda
@@ -528,6 +531,9 @@ module Opacity_atom
       !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte) 
       if (lsubstract_avg) then!labs == .true.
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+         vlabs(iray,id) = omegav_mean
+      else
+         if (lnon_lte_loop) omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(iray,id)
       endif
 
 
@@ -556,8 +562,8 @@ module Opacity_atom
       return
    end function profile_art
 
-   function profile_art_i(line,id,icell,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
-      integer, intent(in)                    :: icell, N, id
+   function profile_art_i(line,id,icell,iray,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+      integer, intent(in)                    :: icell, N, id, iray
       logical, intent(in)                    :: lsubstract_avg
       real(kind=dp), dimension(N), intent(in):: lambda
       real(kind=dp), intent(in)              :: x,y,z,u,v,w,& !positions and angles used to project
@@ -605,16 +611,19 @@ module Opacity_atom
       endif
       if (lsubstract_avg) then!labs == .true.
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+         vlabs(iray,id) = omegav_mean
+      else
+         if (lnon_lte_loop) omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(iray,id)
       endif
 
 
       if (line%voigt) then
          u1(:) = u0(:) - omegav(1)/vth
          uloc(:) = line%v(:) / vth
-         profile_art_i(:) = linear_1D_sorted(N,uloc(:),line%phi(:,icell),N,u1(:))
+         profile_art_i(:) = linear_1D_sorted(line%nlambda,uloc(:),line%phi(:,icell),N,u1(:))
          do nv=2, Nvspace
             u1(:) = u0(:) - omegav(nv)/vth
-            profile_art_i(:) = profile_art_i(:) + linear_1D_sorted(N,uloc(:),line%phi(:,icell),N,u1(:))
+            profile_art_i(:) = profile_art_i(:) + linear_1D_sorted(line%nlambda,uloc(:),line%phi(:,icell),N,u1(:))
          enddo
 
       else
@@ -632,61 +641,6 @@ module Opacity_atom
 
       return
    end function profile_art_i
-
-
-   subroutine local_intensity(id,icell,iray,iloc,ii)
-   !computes the contribution of a cell to the emergent intensity at that cell (ii)
-   ! and the total intensity to that cell (iloc)
-      integer, intent(in) :: id, icell, iray
-      real(kind=dp) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib!intent(in) ? 
-      real(kind=8), intent(out) :: ii(:), iloc(:)
-      real(kind=dp) :: chi0(n_lambda)
-      integer :: nat, i, j, kr, Nr, Nb, Nlam
-      real(kind=dp), dimension(Nlambda_max_line) :: phi0
-      type(AtomType), pointer :: atom
-
-      iloc(:) = Itot(:,1,id)
-      call contopac_atom_loc(icell,n_lambda,tab_lambda_nm,chi0,ii(:))
-      !add lines in the ref of the cell
-
-      x = 0.0_dp; y = x; z = x; x1 = 0.0_dp; y1 = x1; z1 = x1
-      u = 0.0_dp; v = 0.0_dp; w = 0.0_dp
-      l_void_before = 0.0_dp; l_contrib = 0.0_dp
-
-      atom_loop : do nat = 1, N_Atoms
-         atom => Atoms(nat)%p
-
-         tr_loop : do kr = 1,atom%Nline
-
-            if (.not.atom%lines(kr)%lcontrib) cycle
-
-            Nr = atom%lines(kr)%Nr; Nb = atom%lines(kr)%Nb
-            Nlam = atom%lines(kr)%Nlambda
-            i = atom%lines(kr)%i; j = atom%lines(kr)%j
-
-            if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle tr_loop
-            
-
-            phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,.true.,Nlam,tab_lambda_nm(Nb:Nr),&
-                                 x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
-
-
-            chi0(Nb:Nr) = chi0(Nb:Nr) + &
-               hc_fourPI * atom%lines(kr)%Bij * phi0(1:Nlam) * (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell))
-
-            ii(Nb:Nr) = ii(Nb:Nr) + hc_fourPI * atom%lines(kr)%Aji * phi0(1:Nlam) * atom%n(j,icell)
-
-         end do tr_loop
-
-         atom => null()
-
-      end do atom_loop
-
-      !or ii(:) = ii(:) * psi(:,1,id) !(1.0 - exp(-dtau))/chi
-      ii(:) = ii(:)/chi0(:) * (1.0_dp - exp(-chi0*ds(iray,id)))
-
-      return
-   end subroutine local_intensity
  
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
       !not para to be able to write while computing!

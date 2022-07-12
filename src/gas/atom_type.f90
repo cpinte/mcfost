@@ -69,7 +69,8 @@ module atom_type
       integer, allocatable, dimension(:,:) :: ij_to_trans !from i and j return the index of a transiton
       !Compatibility with RH, stored the collision in character format!
       character(len=Nmax_line_per_collision), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
-      real(kind=dp)                :: cswitch, Abund, weight, massf !mass fraction
+      real(kind=dp)                :: cswitch, Abund
+      real :: weight, massf !mass fraction
       integer                      :: periodic_table, activeindex !order of the active atom in the
       character(len=ATOM_LABEL_WIDTH), allocatable, dimension(:)  :: label
       integer                :: Nlevel, Nline, Ncont, Ntr, Ntr_line, Nstage
@@ -513,7 +514,8 @@ module atom_type
    end subroutine adjust_cswitch_atoms
 
    function vbroad(temp, w, xi)
-      real(kind=dp), intent(in) :: temp, w, xi
+      real(kind=dp), intent(in) :: temp, xi
+      real, intent(in) :: w
       real(kind=dp) :: vbroad
   
       vbroad = sqrt( Vtherm*temp/w + xi*xi )

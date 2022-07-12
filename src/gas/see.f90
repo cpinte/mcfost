@@ -607,7 +607,8 @@ module see
                 atom%lines(kr)%Rji(id) = atom%lines(kr)%Rji(id) - xcc_down * dOmega
                 atom%lines(kr)%Rij(id) = atom%lines(kr)%Rij(id) + xcc_up * dOmega
 ! write(*,*) "line", kr, "x->down",xcc_down, " x->up", xcc_up
-! write(*,*) " Jup", Jbar_up, " Jdown", Jbar_down
+! write(*,*) " Jup", Jbar_up*domega, " Jdown", Jbar_down*domega
+! if (kr==1) write(*,*) atom%lines(kr)%Rji(id), atom%lines(kr)%Aji, xcc_down * dOmega, Jbar_down * dOmega * atom%lines(kr)%Bji
             end do line_loop
 
             do kr = 1, atom%Ncont
@@ -626,6 +627,11 @@ module see
                 xcc_down = 0.0
 
                 Ieff(1:Nl) = Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id)
+                ! write(*,*) Itot(Nb:Nr,iray,id)
+                ! write(*,*) Psi(Nb:Nr,1,id)*eta_atoms(Nb:Nr,nact,id)
+                ! write(*,*) Psi(Nb:Nr,1,id)
+                ! write(*,*) eta_atoms(Nb:Nr,nact,id)
+                ! stop
 
                 ! do l=2, Nl
 
@@ -707,7 +713,7 @@ module see
                 atom%continua(kr)%Rji(id) = atom%continua(kr)%Rji(id) - xcc_down * dOmega
                 atom%continua(kr)%Rij(id) = atom%continua(kr)%Rij(id) + xcc_up * dOmega
 ! write(*,*) "cont", kr, "x->down",xcc_down, " x->up", xcc_up
-! write(*,*) " Jup", Jbar_up, " Jdown", Jbar_down
+! write(*,*) " Jup", Jbar_up, " Jdown", Jbar_down, "uji = ", tab_Aji_cont(kr,nact,icell)
 
             enddo
             atom => NULL()
@@ -755,16 +761,17 @@ module see
         logical, intent(in) :: verbose
         integer :: l
         type(AtomType), pointer, intent(inout) :: at
+        real(kind=dp), parameter :: rate_limit = 1d-15
 
         do l=1, at%Nline
-            if (at%lines(l)%Rij(id)<0.0_dp) then
+            if (at%lines(l)%Rij(id)<rate_limit) then
                 if (verbose) then
                     write(*,*) "WARNING at cell", icell, id, " for atom", at%ID
                     write(*,*) "Rij of line", at%lines(l)%i, at%lines(l)%j, " is negative!"
                 endif
                 at%lines(l)%Rij(id) = 0.0_dp
             endif
-            if (at%lines(l)%Rji(id)<0.0_dp) then
+            if (at%lines(l)%Rji(id)<rate_limit) then
                 if (verbose) then
                     write(*,*) "WARNING at cell", icell, id
                     write(*,*) "Rji of line", at%lines(l)%i, at%lines(l)%j, " is negative!"
@@ -773,14 +780,14 @@ module see
             endif
         enddo
         do l=1, at%Ncont
-            if (at%continua(l)%Rij(id)<0.0_dp) then
+            if (at%continua(l)%Rij(id)<rate_limit) then
                 if (verbose) then
                     write(*,*) "WARNING at cell", icell, id, " for atom", at%ID
                     write(*,*) "Rij of cont", at%continua(l)%i, at%continua(l)%j, " is negative!"
                 endif
                 at%continua(l)%Rij(id) = 0.0_dp
             endif
-            if (at%continua(l)%Rji(id)<0.0_dp) then
+            if (at%continua(l)%Rji(id)<rate_limit) then
                 if (verbose) then
                     write(*,*) "WARNING at cell", icell, id
                     write(*,*) "Rji of cont", at%continua(l)%i, at%continua(l)%j, " is negative!"
