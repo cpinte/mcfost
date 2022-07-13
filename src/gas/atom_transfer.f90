@@ -96,12 +96,6 @@ module atom_transfer
       labs = .true.
       id = 1
       if (lforce_lte) lsubiteration = .false.
-      if (laccretion_shock) then
-         max_Tshock = 0.0
-         min_Tshock = 1d8
-      endif
-
-
       l_iterate_ne = .false.
 
       !Use non-LTE pops for electrons and to write to file.
@@ -588,9 +582,6 @@ module atom_transfer
          call write_pops_atom(Atoms(nact)%p)
       end do
 
-      if (laccretion_shock) then
-         if (max_Tshock>0) write(*,'("max(Tshock)="(1I5)" K; min(Tshock)="(1I5)" K")') nint(max_Tshock), nint(min_Tshock)
-      endif
 
       if (loutput_rates) call write_rates()
 

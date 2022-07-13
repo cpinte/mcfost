@@ -248,7 +248,6 @@ module Opacity_atom
       real(kind=dp) :: dv
       type(AtomType), pointer :: atom
       real(kind=dp), dimension(Nlambda_max_line) :: phi0
-      ! real(kind=dp), dimension(Nlambda_max_line_vel) :: phi0
 
       dv = 0.0_dp
       if (lnon_lte_loop.and..not.iterate) then !not iterate but non-LTE
