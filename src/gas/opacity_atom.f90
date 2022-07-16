@@ -17,6 +17,7 @@ module Opacity_atom
 
    implicit none
 
+   real(kind=dp), allocatable, dimension(:,:) :: chi_cont, eta_cont
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
    real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:)
@@ -32,7 +33,7 @@ module Opacity_atom
       integer :: nat, kr, icell, nb, nr
       type(AtomType), pointer :: atm
       real(kind=dp) :: vth
-      integer(kind=8) :: mem_loc
+      integer(kind=8) :: mem_loc, mem_contopac
 
       mem_loc = 0
 
@@ -104,8 +105,18 @@ module Opacity_atom
          atm => null()
       enddo
 
-      write(*,'("allocate "(1F6.4)" GB for line profiles")') real(mem_loc) / 1024.0/1024./1024.0
+      !now if not limit_mem, store the initial value of the continuum opacities
+      !for image mode or for 1st iteration of the non-LTE loop;
+      mem_contopac = 0
+      if (.not.llimit_mem) then
+         allocate(chi_cont(n_lambda_cont,n_cells), eta_cont(n_lambda_cont,n_cells))
+         mem_contopac = 2 * sizeof(chi_cont)
+         mem_loc = mem_loc + mem_contopac
+         call calc_contopac()!needs continua(:)%alpha etc
+      endif
 
+      write(*,'("allocate "(1F6.4)" GB for background opacities")') real(mem_loc) / 1024.0/1024./1024.0
+      if (mem_contopac>0) write(*,'("  -> with "(1F6.4)" GB for contopac.")') real(mem_contopac) / 1024.0/1024./1024.0
 
       return
    end subroutine alloc_atom_opac
@@ -115,6 +126,7 @@ module Opacity_atom
       type(AtomType), pointer :: atm
 
       call dealloc_gas_contopac()
+      if (allocated(chi_cont)) deallocate(chi_cont,eta_cont)
   
       do nat=1, n_atoms
          atm => atoms(nat)%p
@@ -141,6 +153,47 @@ module Opacity_atom
       return
    end subroutine dealloc_atom_opac
 
+   subroutine calc_contopac_loc(icell)
+      integer, intent(in) :: icell
+
+      call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chi_cont(:,icell), eta_cont(:,icell))
+      call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chi_cont(:,icell), eta_cont(:,icell))
+
+      return
+   end subroutine calc_contopac_loc
+
+   subroutine calc_contopac()
+      integer :: icell, ibar, n_cells_done
+
+      write(*,*) " ** Init continuous background opacities..."
+      ibar = 0
+      n_cells_done = 0
+
+      !$omp parallel &
+      !$omp default(none) &
+      !$omp private(icell) &
+      !$omp shared(ibar,n_cells_done,n_cells,icompute_atomrt)
+      !$omp do schedule(dynamic,1)
+      do icell=1, n_Cells
+         if (icompute_atomRT(icell)>0) then
+            call calc_contopac_loc(icell)
+            !$omp atomic
+            n_cells_done = n_cells_done + 1
+            if (real(n_cells_done) > 0.02*ibar*n_cells) then
+               call progress_bar(ibar)
+               !$omp atomic
+               ibar = ibar+1
+            endif  
+         endif  
+      enddo
+      !$omp end do
+      !$omp end parallel
+      call progress_bar(50)
+      write(*,*) " " !for progress bar
+
+      return
+   end subroutine calc_contopac
+
    subroutine contopac_atom_loc(icell,N,lambda,chi,snu)
       integer, intent(in) :: icell, N
       real(kind=dp), intent(in), dimension(N) :: lambda
@@ -148,12 +201,17 @@ module Opacity_atom
       real(kind=dp), dimension(N_lambda_cont) :: chic, snuc
       integer :: la, lac, i0
       real(kind=dp) :: w
-
-      !init continuous opacity with background gas continuum.
-      call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
-      !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
-      !accumulate b-f
-      call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+      
+      if (llimit_mem) then
+         !init continuous opacity with background gas continuum.
+         call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+         !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
+         !accumulate b-f
+         call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+      else
+         chic(:) = chi_cont(:,icell)
+         snuc(:) = eta_cont(:,icell)
+      endif
 
       ! chi(1) = chic(1)
       ! snu(1) = snuc(1)

@@ -82,7 +82,7 @@ module parametres
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
   
 
-  logical :: lmodel_ascii, lmhd_voronoi, lmodel_1d
+  logical :: lmodel_ascii, lmhd_voronoi, lmodel_1d, llimit_mem
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
@@ -214,12 +214,6 @@ module parametres
   character(len=512), dimension(:), allocatable :: density_files
   integer :: n_phantom_files
 
-  !Need to know the position on the star of the spot and its extent
-  type surface_brightness_type
-     real(kind=dp) :: r(3), muo, mui, phio, phii
-     real(kind=dp) :: T ! Temperature of the region
-  end type surface_brightness_type
-
   ! Stars
   ! 27/02/2019, adding spots coordinates
   type star_type
@@ -230,8 +224,6 @@ module parametres
      logical :: lb_body, out_model, find_spectrum, force_Mdot
      character(len=512) :: spectre
      integer :: icell
-     integer :: Nr = 0
-     type(surface_brightness_type), dimension(:), allocatable :: SurfB
   end type star_type
 
   integer :: n_etoiles

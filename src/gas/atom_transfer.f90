@@ -19,7 +19,7 @@ module atom_transfer
    use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, hydrogen, helium, adjust_cswitch_atoms, maxval_cswitch_atoms, lcswitch_enabled, vbroad
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
-   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, lnon_lte_loop, vlabs
+   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, lnon_lte_loop, vlabs, calc_contopac_loc
    use see, only : n_new, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates
    use optical_depth, only : integ_ray_atom
@@ -456,6 +456,11 @@ module atom_transfer
                      atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
                   end do
                   atom => null()
+
+                  !if electronic density is not updated, it is not necessary
+                  !to compute the lte continous opacities.
+                  !but the overhead should be negligible at this point.
+                  if (.not.llimit_mem) call calc_contopac_loc(icell)
 
                end if !if l_iterate
             end do cell_loop2 !icell

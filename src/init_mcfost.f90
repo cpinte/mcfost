@@ -64,6 +64,7 @@ subroutine set_default_variables()
   lemission_mol=.false.
   lcheckpoint = .false.
   checkpoint_period = 15
+  llimit_mem = .false. !if true, contopac are computed locally.
   !HEALpix
   healpix_lorder = 1
   healpix_lmin = 0
@@ -629,6 +630,9 @@ subroutine initialisation_mcfost()
      case("-mol")
         i_arg = i_arg+1
         lemission_mol=.true.
+     case("-limit_mem")
+        i_arg = i_arg + 1
+        llimit_mem = .true.
      case("-safe_stop")
         i_arg = i_arg + 1
         lsafe_stop = .true.
@@ -1890,6 +1894,7 @@ subroutine display_help()
 !   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"
   write(*,*) "        : -safe_stop_time <real> : calc_time_limit in days "
+  write(*,*) "        : -limit_mem : compute background continua on the fly."
 
   write(*,*) " "
   write(*,*) " Options related to phantom"
