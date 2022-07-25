@@ -8,7 +8,7 @@ module output
   use constantes
   use dust_prop
   use molecular_emission
-  use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface, stars_map
+  use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface_map, stars_map
   use utils
   use Voronoi_grid
   use grid
@@ -1053,7 +1053,7 @@ subroutine write_tau_surface(imol)
   if (lflux_fraction_surface) then
      filename = "f"//trim(sflux_fraction)//"_surface.fits.gz"
   else
-     filename = "tau=1_surface.fits.gz"
+     filename = "tau="//trim(stau_surface)//"_surface.fits.gz"
   endif
 
   if (imol==0) then ! continuum
@@ -1119,7 +1119,7 @@ subroutine write_tau_surface(imol)
      do iaz=1,RT_n_az
         do j=1,npix_y
            do i=1,npix_x
-              image(i,j,ibin,iaz,:) = sum(tau_surface(i,j,ibin,iaz,:,:), dim=2)
+              image(i,j,ibin,iaz,:) = sum(tau_surface_map(i,j,ibin,iaz,:,:), dim=2)
            enddo !i
         enddo !j
      enddo ! iaz

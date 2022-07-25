@@ -143,10 +143,11 @@ module parametres
   logical :: lprodimo, lprodimo_input_dir, lforce_ProDiMo_PAH
 
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM
-  logical :: lread_grain_size_distrib, lphase_function_file,ltau1_surface, lflux_fraction_surface
+  logical :: lread_grain_size_distrib, lphase_function_file,ltau_surface, lflux_fraction_surface
   logical :: lwrite_column_density, lwrite_mol_column_density
-  character(len=8) :: sflux_fraction
+  character(len=8) :: sflux_fraction, stau_surface
   real(kind=dp) :: flux_fraction
+  real :: tau_surface
 
   ! Phantom
   logical :: ldudt_implicit, lscale_length_units, lscale_mass_units, lignore_dust

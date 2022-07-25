@@ -73,25 +73,17 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
     endif
 
     call extract('nparttot',np,hdr,ierr)
-    write(*,*) "TEST1"
     call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
-    write(*,*) "TEST2", ierr, ndusttypes
     if (ierr /= 0) then
-       write(*,*) "test3"
        ! ndusttypes is for pre-largegrain multigrain headers
        call extract('ndustsmall',ndustsmall,hdr,ierr,default=0)
        call extract('ndustlarge',ndustlarge,hdr,ierr,default=0)
        ! ndusttype must be the same for all files : todo : add a test
        ndusttypes = ndustsmall + ndustlarge
 
-       write(*,*) ierr, ndustsmall, ndustlarge, ndusttypes
-       write(*,*) (ndusttypes==0 .and. ierr/=0)
-
        ! If ndusttypes, ndustlarge and ndustsmall are all missing, manually count grains
        if (ndusttypes==0 .and. ierr/=0) then
-          write(*,*) "test4"
-
-             ! For older files where ndusttypes is not output to the header
+          ! For older files where ndusttypes is not output to the header
           idust = 0
           do i = 1,maxinblock
              if (hdr%realtags(i)=='grainsize') idust = idust + 1
@@ -277,8 +269,6 @@ subroutine read_phantom_bin_files(iunit,n_files,filenames,x,y,z,h,vx,vy,vz,parti
                             ierr = 1 ;
                             return
                          endif
-                         write(*,*) ngrains, np
-                         write(*,*) shape(dustfrac)
                          read(iunit,iostat=ierr) dustfrac(ngrains,:)
                          got_dustfrac = .true.
                       case default

@@ -126,89 +126,85 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
      nbre_reemission = 0.0
   endif
 
-     mem_size = (1.0 * p_Nc) * n_T * n_lambda * 4. / 1024.**3
+  mem_size = (1.0 * p_Nc) * n_T * n_lambda * 4. / 1024.**3
+  if (mem_size < max_mem) then
+     low_mem_th_emission = .false.
+     if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
+     allocate(kdB_dT_CDF(n_lambda,n_T,p_Nc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error kdB_dT_CDF')
+     kdB_dT_CDF = 0
+  else
+     low_mem_th_emission = .true.
+     write(*,*) "Using low memory mode for thermal emission"
+     allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_LTE_CDF')
+     kdB_dT_1grain_LTE_CDF = 0
+  endif
+
+  if (lRE_nLTE) then
+     mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_Nc * n_lambda * 4. / 1024.**3
      if (mem_size < max_mem) then
-        low_mem_th_emission = .false.
-        if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for temperature calculation"
-        allocate(kdB_dT_CDF(n_lambda,n_T,p_Nc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error kdB_dT_CDF')
-        kdB_dT_CDF = 0
+        low_mem_th_emission_nLTE = .false.
+        if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
+        allocate(kabs_nLTE_CDF(grain_RE_nLTE_start-1:grain_RE_nLTE_end,Nc,n_lambda),stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error kabs_nLTE_CDF')
+        kabs_nLTE_CDF = 0.0
      else
-        low_mem_th_emission = .true.
-        write(*,*) "Using low memory mode for thermal emission"
-        allocate(kdB_dT_1grain_LTE_CDF(n_lambda,grain_RE_LTE_start:grain_RE_LTE_end,n_T), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_LTE_CDF')
-        kdB_dT_1grain_LTE_CDF = 0
+        low_mem_th_emission_nLTE = .true.
+        write(*,*) "Using low memory mode for nLTE thermal emission"
      endif
 
-     if (lRE_nLTE) then
+     allocate(kdB_dT_1grain_nLTE_CDF(n_lambda,grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_nLTE_CDF')
+     kdB_dT_1grain_nLTE_CDF=0.0
 
-        mem_size = (1.0 * (grain_RE_nLTE_end-grain_RE_nLTE_start+2)) * p_Nc * n_lambda * 4. / 1024.**3
-        if (mem_size < max_mem) then
-           low_mem_th_emission_nLTE = .false.
-           if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering probability"
-           allocate(kabs_nLTE_CDF(grain_RE_nLTE_start-1:grain_RE_nLTE_end,Nc,n_lambda),stat=alloc_status)
-           if (alloc_status > 0) call error('Allocation error kabs_nLTE_CDF')
-           kabs_nLTE_CDF = 0.0
-        else
-           low_mem_th_emission_nLTE = .true.
-           write(*,*) "Using low memory mode for nLTE thermal emission"
-        endif
+     allocate(log_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error log_E_em_1grain')
+     log_E_em_1grain=0.0
 
-        allocate(kdB_dT_1grain_nLTE_CDF(n_lambda,grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_nLTE_CDF')
-        kdB_dT_1grain_nLTE_CDF=0.0
+     allocate(xT_ech_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc,nb_proc),stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error xT_ech_1grain')
+     xT_ech_1grain = 2
+  endif
 
-        allocate(log_E_em_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error log_E_em_1grain')
-        log_E_em_1grain=0.0
+  if (lnRE) then
+     allocate(E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T),&
+          log_E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error E_em_1grain')
+     E_em_1grain_nRE=0.0
+     log_E_em_1grain_nRE=0.0
 
-        allocate(xT_ech_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc,nb_proc),stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error xT_ech_1grain')
-        xT_ech_1grain = 2
+     allocate(Tdust_1grain_nRE_old(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error Tdust_1grain_nRE_old')
+     Tdust_1grain_nRE_old =0.0
+
+     allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,Nc), &
+          maxP_old(grain_nRE_start:grain_nRE_end,Nc), &
+          stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error Tpeak')
+     Tpeak_old=0
+     maxP_old=0.
+
+     allocate(xT_ech_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc,nb_proc),stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error xT_ech_1grain_nRE')
+     xT_ech_1grain_nRE = 2
+
+     allocate(kdB_dT_1grain_nRE_CDF(n_lambda,grain_nRE_start:grain_nRE_end,n_T),stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_nRE_CDF')
+     kdB_dT_1grain_nRE_CDF=0.0
+
+     if (lRE_nlTE) then
+        allocate(Tdust_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error Tdust_1grain_old')
+        Tdust_old=0.
      endif
 
+     allocate(Emissivite_nRE_old(Nc,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error Emissivite_nRE_old')
+     Emissivite_nRE_old = 0.0
+  endif
 
-     if (lnRE) then
-        allocate(E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T),&
-             log_E_em_1grain_nRE(grain_nRE_start:grain_nRE_end,n_T), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error E_em_1grain')
-        E_em_1grain_nRE=0.0
-        log_E_em_1grain_nRE=0.0
-
-        allocate(Tdust_1grain_nRE_old(grain_nRE_start:grain_nRE_end,Nc), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error Tdust_1grain_nRE_old')
-        Tdust_1grain_nRE_old =0.0
-
-        allocate(Tpeak_old(grain_nRE_start:grain_nRE_end,Nc), &
-             maxP_old(grain_nRE_start:grain_nRE_end,Nc), &
-             stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error Tpeak')
-        Tpeak_old=0
-        maxP_old=0.
-
-        allocate(xT_ech_1grain_nRE(grain_nRE_start:grain_nRE_end,Nc,nb_proc),stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error xT_ech_1grain_nRE')
-        xT_ech_1grain_nRE = 2
-
-        allocate(kdB_dT_1grain_nRE_CDF(n_lambda,grain_nRE_start:grain_nRE_end,n_T),stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error kdB_dT_1grain_nRE_CDF')
-        kdB_dT_1grain_nRE_CDF=0.0
-
-        if (lRE_nlTE) then
-           allocate(Tdust_1grain_old(grain_RE_nLTE_start:grain_RE_nLTE_end,Nc),stat=alloc_status)
-           if (alloc_status > 0) call error('Allocation error Tdust_1grain_old')
-           Tdust_old=0.
-        endif
-     endif
-
-     if (lnRE) then
-        allocate(Emissivite_nRE_old(Nc,n_lambda), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error Emissivite_nRE_old')
-        Emissivite_nRE_old = 0.0
-     endif
-
-     return
+  return
 
 end subroutine allocate_thermal_emission
 

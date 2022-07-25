@@ -166,8 +166,14 @@ subroutine alloc_dynamique(n_cells_max)
   call allocate_thermal_energy(Nc)
 
   ! Tableaux relatifs aux prop optiques des cellules
-  allocate(kappa(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), stat=alloc_status)
-  kappa=0.0 ; kappa_abs_LTE=0.0
+  ! todo : could be p_Nc ...
+  allocate(kappa(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), tab_albedo_pos(Nc,n_lambda), stat=alloc_status)
+  kappa=0.0 ; kappa_abs_LTE=0.0 ; tab_albedo_pos = 0
+  if (alloc_status > 0) then
+     write(*,*) 'Allocation error kappa and albedo'
+     stop
+  endif
+
 
   if (.not.(lonly_LTE.or.lonly_nLTE)) then
      allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status) ; proba_abs_RE_LTE=0.0
@@ -184,19 +190,12 @@ subroutine alloc_dynamique(n_cells_max)
   endif
   if (alloc_status > 0) call error('Allocation error kappa_abs')
 
-  ! todo : could be p_Nc ...
-  allocate(tab_albedo_pos(Nc,n_lambda),stat=alloc_status)
-  if (alloc_status > 0) then
-     write(*,*) 'Allocation error tab_albedo_pos, tab_albedo_pos'
-     stop
-  endif
-  tab_albedo_pos = 0
-
   if (aniso_method==2) then
      allocate(tab_g_pos(Nc,n_lambda),stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_albedo_pos, tab_g_pos')
      tab_g_pos = 0.0
   endif
+
 
   ! **************************************************
   ! Tableaux relatifs aux prop optiques des cellules ou des grains
@@ -689,11 +688,11 @@ subroutine alloc_emission_mol(imol)
 
   call allocate_mol_maps(imol)
 
-  if (ltau1_surface.or.lflux_fraction_surface) then
-     if (.not.allocated(tau_surface)) then
-        allocate(tau_surface(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
+  if (ltau_surface.or.lflux_fraction_surface) then
+     if (.not.allocated(tau_surface_map)) then
+        allocate(tau_surface_map(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
         if (alloc_status > 0) call error('Allocation error tau_surface')
-        tau_surface = 0.0
+        tau_surface_map = 0.0
      endif
   endif
 

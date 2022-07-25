@@ -114,13 +114,13 @@ subroutine mol_line_transfer()
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
               call emission_line_map(imol,ibin,iaz)
-              if (ltau1_surface) call emission_line_tau_surface_map(imol,1.0_dp, ibin,iaz)
+              if (ltau_surface) call emission_line_tau_surface_map(imol,tau_surface, ibin,iaz)
               if (lflux_fraction_surface) call  emission_line_energy_fraction_surface_map(imol,flux_fraction, ibin,iaz)
            enddo
         enddo
 
         call ecriture_spectre(imol)
-        if (ltau1_surface .or. lflux_fraction_surface) call write_tau_surface(imol)
+        if (ltau_surface .or. lflux_fraction_surface) call write_tau_surface(imol)
 
      endif ! lline
 
@@ -1080,7 +1080,7 @@ end subroutine init_abundance
 
 subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
 
-  real(kind=dp), intent(in) :: tau
+  real, intent(in) :: tau
   integer, intent(in) :: imol, ibin, iaz
   real(kind=dp) :: u,v,w
 
@@ -1140,10 +1140,10 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
   !$omp private(flag_star,flag_direct_star,flag_sortie,lpacket_alive,pixelcenter) &
   !$omp shared(tau,Icorner,imol,iTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
-  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface,move_to_grid)
+  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid)
   id = 1 ! pour code sequentiel
 
-  tau_surface = 0.0_dp
+  tau_surface_map = 0.0_dp
 
   !$omp do schedule(dynamic,1)
   do i = 1, npix_x
@@ -1166,14 +1166,14 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
            lpacket_alive = .true.
            call physical_length_mol(imol,iTrans,icell,x0,y0,z0,u0,v0,w0,ispeed,tab_speed_rt,tau,flag_sortie)
            if (flag_sortie) then ! We do not reach the surface tau=1
-              tau_surface(i,j,ibin,iaz,:,id) = 0.0
+              tau_surface_map(i,j,ibin,iaz,:,id) = 0.0
            else
-              tau_surface(i,j,ibin,iaz,1,id) = x0
-              tau_surface(i,j,ibin,iaz,2,id) = y0
-              tau_surface(i,j,ibin,iaz,3,id) = z0
+              tau_surface_map(i,j,ibin,iaz,1,id) = x0
+              tau_surface_map(i,j,ibin,iaz,2,id) = y0
+              tau_surface_map(i,j,ibin,iaz,3,id) = z0
            endif
         else ! We do not reach the disk
-           tau_surface(i,j,ibin,iaz,:,id) = 0.0
+           tau_surface_map(i,j,ibin,iaz,:,id) = 0.0
         endif
 
      enddo !j
@@ -1253,10 +1253,10 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
   !$omp private(flag_star,flag_direct_star,flag_sortie,lpacket_alive,pixelcenter,Flux) &
   !$omp shared(flux_fraction,Icorner,imol,iTrans,iiTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
-  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface,move_to_grid,spectre,factor)
+  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid,spectre,factor)
   id = 1 ! pour code sequentiel
 
-  tau_surface = 0.0_dp
+  tau_surface_map = 0.0_dp
 
   !$omp do schedule(dynamic,1)
   do i = 1, npix_x
@@ -1282,14 +1282,14 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
            lpacket_alive = .true.
            call physical_length_mol_Flux(imol,iiTrans,icell,x0,y0,z0,u0,v0,w0,ispeed,tab_speed_rt,Flux,flag_sortie)
            if (flag_sortie) then ! We do not reach the surface tau=1
-              tau_surface(i,j,ibin,iaz,:,id) = 0.0
+              tau_surface_map(i,j,ibin,iaz,:,id) = 0.0
            else
-              tau_surface(i,j,ibin,iaz,1,id) = x0
-              tau_surface(i,j,ibin,iaz,2,id) = y0
-              tau_surface(i,j,ibin,iaz,3,id) = z0
+              tau_surface_map(i,j,ibin,iaz,1,id) = x0
+              tau_surface_map(i,j,ibin,iaz,2,id) = y0
+              tau_surface_map(i,j,ibin,iaz,3,id) = z0
            endif
         else ! We do not reach the disk
-           tau_surface(i,j,ibin,iaz,:,id) = 0.0
+           tau_surface_map(i,j,ibin,iaz,:,id) = 0.0
         endif
 
      enddo !j

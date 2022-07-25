@@ -672,7 +672,7 @@ subroutine transfert_poussiere()
 
                     time_1 = time_2
                     call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
-                    if (ltau1_surface) call tau_surface_map(lambda,1.0, ibin,iaz)
+                    if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
                     call system_clock(time_2)
                     time_RT = time_RT + (time_2 - time_1)
                  enddo
@@ -685,7 +685,7 @@ subroutine transfert_poussiere()
 
                  time_1 = time_2
                  call dust_map(lambda,ibin,iaz) ! Ne prend pas de temps en SED
-                 if (ltau1_surface) call tau_surface_map(lambda,1.0, ibin,iaz)
+                 if (ltau_surface) call compute_tau_surface_map(lambda,tau_surface, ibin,iaz)
                  call system_clock(time_2)
                  time_RT = time_RT + (time_2 - time_1)
               endif
@@ -701,7 +701,7 @@ subroutine transfert_poussiere()
            enddo
 
            call ecriture_map_ray_tracing()
-           if (ltau1_surface) call write_tau_surface(0) ! 0 for continuum
+           if (ltau_surface) call write_tau_surface(0) ! 0 for continuum
         endif
 
      elseif (letape_th) then ! Calcul de la structure en temperature
@@ -1793,7 +1793,7 @@ end subroutine intensite_pixel_dust
 
 !***********************************************************
 
-subroutine tau_surface_map(lambda,tau,ibin,iaz)
+subroutine compute_tau_surface_map(lambda,tau,ibin,iaz)
 
   real, intent(in) :: tau
   integer, intent(in) :: lambda, ibin, iaz
@@ -1855,7 +1855,7 @@ subroutine tau_surface_map(lambda,tau,ibin,iaz)
   !$omp private(i,j,id,Stokes,icell,lintersect,x0,y0,z0,u0,v0,w0) &
   !$omp private(flag_star,flag_direct_star,ltot,flag_sortie,lpacket_alive) &
   !$omp shared(tau,Icorner,lambda,P_lambda,pixelcenter,dx,dy,u,v,w) &
-  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface,move_to_grid)
+  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid)
   id = 1 ! pour code sequentiel
 
   !$omp do schedule(dynamic,1)
@@ -1879,15 +1879,15 @@ subroutine tau_surface_map(lambda,tau,ibin,iaz)
            lpacket_alive = .true.
            call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                 flag_star,flag_direct_star,tau,ltot,flag_sortie,lpacket_alive)
-           if (flag_sortie) then ! We do not reach the surface tau=1
-              tau_surface(i,j,ibin,iaz,:,id) = 0.0
+           if (flag_sortie) then ! We do not reacopth the surface tau=1
+              tau_surface_map(i,j,ibin,iaz,:,id) = 0.0
            else
-              tau_surface(i,j,ibin,iaz,1,id) = x0
-              tau_surface(i,j,ibin,iaz,2,id) = y0
-              tau_surface(i,j,ibin,iaz,3,id) = z0
+              tau_surface_map(i,j,ibin,iaz,1,id) = x0
+              tau_surface_map(i,j,ibin,iaz,2,id) = y0
+              tau_surface_map(i,j,ibin,iaz,3,id) = z0
            endif
         else ! We do not reach the disk
-           tau_surface(i,j,ibin,iaz,:,id) = 0.0
+           tau_surface_map(i,j,ibin,iaz,:,id) = 0.0
         endif
 
      enddo !j
@@ -1897,6 +1897,6 @@ subroutine tau_surface_map(lambda,tau,ibin,iaz)
 
   return
 
-end subroutine tau_surface_map
+end subroutine compute_tau_surface_map
 
 end module dust_transfer

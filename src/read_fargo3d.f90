@@ -286,11 +286,15 @@ contains
        write(*,*) "WARNING: updating the azimuth to:", RT_az_min
     endif
 
-    if (n_planets < 1) then
-       Omega = 1.00049987506246096_dp
-       write(*,*) "Forcing corotating frame as there is no planet"
+    if (fargo3d%corrotating_frame) then
+       if (n_planets < 1) then
+          Omega = 1.00049987506246096_dp
+          write(*,*) "Forcing corotating frame as there is no planet"
+       else
+          Omega = Omega_p(which_planet)
+       endif
     else
-       Omega = Omega_p(which_planet)
+       Omega = 0.0_dp
     endif
 
     !-----------------------------------

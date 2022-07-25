@@ -579,7 +579,8 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
 
   integer, intent(in) :: imol, icell_in
   real(kind=dp), intent(inout) :: x,y,z
-  real(kind=dp), intent(in) :: u,v,w, tau_threshold
+  real(kind=dp), intent(in) :: u,v,w
+  real :: tau_threshold
   integer, dimension(2), intent(in) :: ispeed
   real(kind=dp), dimension(ispeed(1):ispeed(2)), intent(in) :: tab_speed
   logical, intent(out) :: flag_sortie
@@ -632,7 +633,6 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
 
         !do i=1,nTrans
         !iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
-
         opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
 
         ! Epaisseur optique
