@@ -31,19 +31,15 @@ module io_atom
       real(kind=dp) :: dummy
       character(len=2) :: IDread
       character(len=512) :: inputline, FormatLine
-      logical :: find_abund, res, setup_common_gauss_prof
+      logical :: find_abund, res
       real, allocatable, dimension(:) :: levelNumber
       logical, dimension(:), allocatable :: determined, parse_labs
       character(len=20) :: shapeChar, vdWChar, nuDepChar
       real(kind=dp) :: f, lambdaji, lambdamin
       integer :: Nread, i,j, EOF, nll, nc, kr, la
 
-      
       EOF = 0
       res = .false.
-      setup_common_gauss_prof = .false.
-
-
 
       open(unit=atomunit,file=trim(mcfost_utils)//trim(path_to_atoms)//trim(atom%filename),status="old")
       !FormatLine = "(1A<MAX_LENGTH>)" !not working with ifort
@@ -246,10 +242,6 @@ module io_atom
          select case(shapechar)
             case ("GAUSS")
                atom%lines(kr)%Voigt = .false.
-               if (.not.setup_common_gauss_prof) then
-                  setup_common_gauss_prof = .true.
-                  atom%lgauss_prof = .true. !set only once per atom!
-               endif
             case ("VOIGT")
                atom%lines(kr)%Voigt = .true.
             ! case ("THOMSON")
@@ -521,10 +513,6 @@ module io_atom
 
          !sets atom%ID too.
          call read_model_atom(unit+nmet, Atoms(nmet)%p)
-         ! if (Atoms(nmet)%p%lgauss_prof) then
-         !    write(*,*) "**-> allocating gauss profile for atom", Atoms(nmet)%p%id
-         !    call alloc_common_gauss_profile(Atoms(nmet)%p) !deallocated in opacity
-         ! endif
 
       end do !over atoms
 
@@ -925,10 +913,7 @@ module io_atom
          call print_error(status)
          stop
       endif
-      ! 		if (naxis_found /= nrad) then
-      ! 			write(*,*) "nrad read does not match grid !", naxis_found
-      ! 			stop
-      ! 		endif
+
       nelements = nelements * naxis_found
 
       !z
@@ -938,10 +923,7 @@ module io_atom
          call print_error(status)
          stop
       endif
-      ! 		if (naxis_found /= nz) then
-      ! 			write(*,*) "nz read does not match grid !", naxis_found
-      ! 			stop
-      ! 		endif
+
       nelements = nelements * naxis_found
 
       !phi axis ?
@@ -952,10 +934,7 @@ module io_atom
             call print_error(status)
             stop
          endif
-         ! 			if (naxis_found /= n_az) then
-         ! 				write(*,*) "n_az read does not match grid !", naxis_found
-         ! 				stop
-         ! 			endif
+
          nelements = nelements * naxis_found
       endif
 
@@ -1001,10 +980,9 @@ module io_atom
    if (status > 0) then
       write(*,*) "error cannot free file unit!"
       call print_error(status)
-      ! 		stop
    endif
 
-   ! write(*,*) " min/max pops for each level:"
+
    do l=1,atom%Nlevel
       write(*,"('Level #'(1I3))") l
       write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , &

@@ -16,12 +16,13 @@ module atom_transfer
    use elecdensity, only : solve_ne, write_electron, read_electron
    use grid, only : T, vturb,nHtot, nHmin, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, ne, Voronoi, r_grid, phi_grid, z_grid
    use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
-   use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, hydrogen, helium, adjust_cswitch_atoms, maxval_cswitch_atoms, lcswitch_enabled, vbroad
+   use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, passiveAtoms, npassiveatoms, hydrogen, helium, adjust_cswitch_atoms, &
+                           maxval_cswitch_atoms, lcswitch_enabled, vbroad
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, lnon_lte_loop, vlabs, calc_contopac_loc
-   use see, only : n_new, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
-                  init_rates, update_populations, accumulate_radrates_mali, write_rates
+   use see, only : ngpop, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
+                  init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
@@ -70,6 +71,8 @@ module atom_transfer
       real(kind=dp) :: diff, diff_old, dne, dN, dN1, dNc
       real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
 
+      !if lsubiteration, Itot, ds and phi_loc are n_rayons sizes and 
+      !iray should be passed to the subroutines xoupling, integ_ray_line, accumulate_rates_mali.
       logical :: labs, lsubiteration = .false.
       logical :: l_iterate, l_iterate_ne
       real(kind=dp) :: vth
@@ -135,12 +138,14 @@ module atom_transfer
       allocate(stream(nb_proc),stat=alloc_status)
       if (alloc_status > 0) call error("Allocation error stream")
       if (allocated(ds)) deallocate(ds)
+      !unlike ds, vlabs does not need to be stored for all rays.
       if (lsubiteration) then
          allocate(ds(n_rayons_sub,nb_proc))
+         allocate(vlabs(n_rayons_sub,nb_proc))      
       else
          allocate(ds(n_rayons_max,nb_proc))
+         allocate(vlabs(n_rayons_max,nb_proc))      
       endif
-      allocate(vlabs(n_rayons_max,nb_proc))      
       !-> negligible
       mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
       call alloc_nlte_var(n_rayons_max,n_rayons_sub,lsubiteration)
@@ -216,7 +221,9 @@ module atom_transfer
             !$omp default(none) &
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff,lconverged_loc,n_iter_loc)&
+            !!$omp private(nact, atom) & !subiterations
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
+            !!$omp shared(lsubiteration, dpops_sub_max_error, ngpop, NactiveAtoms, ActiveAtoms) & !subiterations
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,max_n_iter_loc) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot)
             !$omp do schedule(static,omp_chunk_size)
@@ -295,42 +302,64 @@ module atom_transfer
                      call error("etape inconnue")
                   end if !etape
 
+                  !update populations of all atoms including electrons
+                  call update_populations(id, icell, (l_iterate_ne.and.icompute_atomRT(icell)==1), diff)
+
+                  ! ! ************************ SUB-ITER ************************!
                   ! n_iter_loc = 0
-                  ! lconverged_loc = (.not.lsubiteration)
-                  ! npl(1,1:hydrogen%Nlevel,id) = hydrogen%n(:,icell)
-                  ! !this is n_new that is to be updated here, not atom%n ! ("old pops")
+                  ! !do sub-iterations of populations for this electronic density.
+                  ! if (lsubiteration) then
+                  !    do nact=1, NactiveAtoms
+                  !       atom => ActiveAtoms(nact)%p
+                  !       ngpop(1:atom%Nlevel,nact,icell,3) = atom%n(:,icell)
+                  !    enddo
+                  !    atom => null()
+                  !    lconverged_loc = .false.
+                  ! else
+                  !    lconverged_loc = .true.
+                  ! endif
                   ! do while (.not.lconverged_loc)
                   !    n_iter_loc = n_iter_loc + 1
 
-                  !    !electronic density fixed for the sub-iterations (because it is already an iterative loop)
-                  !    !do the electron density iterations after the sub-iterations ??
-                  !    call update_populations(id, icell,.false.,diff)
 
-                  !    hydrogen%n(:,icell) = n_new(1:hydrogen%Nlevel,1,icell)
+                  !    ! call init_rates(id,icell)
+                  !    !update only radiative rates
+                  !    do nact=1, NactiveAtoms
+                  !       call init_radrates_atom(id,icell,ActiveAtoms(nact)%p)
+                  !    enddo
 
-                  !    !psi is updated.
-                  !    !currenlty includes only the lines opacity!
-                  !    !loop over rays of this step (not n_rayons_sub)
                   !    do iray=1,n_rayons
                   !       call xcoupling(id, icell, iray, .true.)
+                  !       weight = wmu(iray)
                   !       call accumulate_radrates_mali(id, icell, iray, weight)                        
                   !    enddo
 
-                  !    ! write(*,*) "subit:", id, n_iter_loc, diff
+                  !    call update_populations(id, icell,.false.,diff)
+                  !    write(*,*) "sub-iter:", n_iter_loc, diff
+                  !    do nact=1, NactiveAtoms
+                  !       atom => ActiveAtoms(nact)%p
+                  !       atom%n(:,icell) = ngpop(1:atom%Nlevel,nact,icell,1)
+                  !    enddo
+                  !    atom => null()
+
+
                   !    if (real(diff) < dpops_sub_max_error) lconverged_loc = .true.
 
                   !    if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
                   !    if (n_iter_loc == maxIter_loc) lconverged_loc = .true.
                   ! enddo
-                  ! hydrogen%n(:,icell) = npl(1,1:hydrogen%Nlevel,id)
-
-                  ! if ( (lNg_acceleration .and. lng_turned_on).and.&
-                  !       (maxval_cswitch_atoms()==1.0_dp).and.(.not.lprevious_converged) ) then
-
+                  ! if (lsubiteration) then
+                  !    do nact=1, NactiveAtoms
+                  !       atom => ActiveAtoms(nact)%p
+                  !       atom%n(:,icell) = ngpop(1:atom%Nlevel,nact,icell,3)
+                  !    enddo
+                  !    atom => null()
                   ! endif
+                  ! ! ! ************************** END! **************************!
 
-                  !update populations of all atoms including electrons
-                  call update_populations(id, icell, (l_iterate_ne.and.icompute_atomRT(icell)==1), diff)
+                  ! ************************** NG's **************************!
+
+                  ! ************************** END! **************************!
 
                end if !icompute_atomRT
              
@@ -350,13 +379,8 @@ module atom_transfer
             write(*,*) " " !for progress bar
 
             !***********************************************************!
-            ! ************************** Ng's **************************!
-
-            !***********************************************************!
             ! *******************  update ne metals  *******************!
             if (l_iterate_ne) then
-               !update lte opac and related quantities
-               !damping and profiles for instance
                id = 1
                dne = 0.0_dp
                write(*,'("  OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
@@ -365,7 +389,7 @@ module atom_transfer
                !$omp default(none) &
                !$omp private(id,icell,l_iterate,nact,ilevel,vth,nb,nr)&
                !$omp shared(T,vturb,nHmin,icompute_atomRT,ne, ne_new,n_cells)&
-               !$omp shared(tab_lambda_nm,atoms,n_atoms,dne)
+               !$omp shared(tab_lambda_nm,atoms,n_atoms,dne,PassiveAtoms,NpassiveAtoms)
                !$omp do schedule(dynamic,1)
                do icell=1,n_cells
                   !$ id = omp_get_thread_num() + 1
@@ -378,25 +402,23 @@ module atom_transfer
                      do nact = 2, n_atoms
                         call LTEpops_atom_loc(icell,Atoms(nact)%p,.false.)
                      enddo
-                     !recompute profiles or damping !
-                     !could be combined in a single loop;
-                     !but need to check that no all lte pops are needed for damping.
-                     !Also need to change if profile interp is used or not! (a and phi)
-                     do nact = 1, n_atoms
-                        do ilevel=1,Atoms(nact)%p%nline
-                           if (.not.Atoms(nact)%p%lines(ilevel)%lcontrib) cycle
-                           if (Atoms(nact)%p%lines(ilevel)%Voigt) then
-                              nb = Atoms(nact)%p%lines(ilevel)%nb; nr = Atoms(nact)%p%lines(ilevel)%nr
-                              Atoms(nact)%p%lines(ilevel)%a(icell) = line_damping(icell,Atoms(nact)%p%lines(ilevel))
-                           !tmp because of vbroad!
-                              vth = vbroad(T(icell),Atoms(nact)%p%weight, vturb(icell))
+                     !update profiles only for passive atoms. For active atoms we need new non-LTE pops.
+                     !if LTE pops are not updated (so no ne_new) profiles of LTE elements are unchanged.
+                     do nact = 1, NpassiveAtoms
+                        do ilevel=1,PassiveAtoms(nact)%p%nline
+                           if (.not.PassiveAtoms(nact)%p%lines(ilevel)%lcontrib) cycle
+                           if (PassiveAtoms(nact)%p%lines(ilevel)%Voigt) then
+                              nb = PassiveAtoms(nact)%p%lines(ilevel)%nb; nr = PassiveAtoms(nact)%p%lines(ilevel)%nr
+                              PassiveAtoms(nact)%p%lines(ilevel)%a(icell) = line_damping(icell,PassiveAtoms(nact)%p%lines(ilevel))
+                              !tmp because of vbroad!
+                              vth = vbroad(T(icell),PassiveAtoms(nact)%p%weight, vturb(icell))
                               !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
-                              Atoms(nact)%p%lines(ilevel)%phi(:,icell) = &
-                                 Voigt(Atoms(nact)%p%lines(ilevel)%Nlambda, Atoms(nact)%p%lines(ilevel)%a(icell), Atoms(nact)%p%lines(ilevel)%v(:)/vth)&
-                                  / (vth * sqrtpi)
+                              PassiveAtoms(nact)%p%lines(ilevel)%phi(:,icell) = &
+                                 Voigt(PassiveAtoms(nact)%p%lines(ilevel)%Nlambda, PassiveAtoms(nact)%p%lines(ilevel)%a(icell), PassiveAtoms(nact)%p%lines(ilevel)%v(:)/vth)&
+                                    / (vth * sqrtpi)
                            endif
                         enddo
-                     enddo
+                     enddo !over passive atoms
                   end if !if l_iterate
                end do
                !$omp end do
@@ -413,16 +435,17 @@ module atom_transfer
 
             id = 1
             dM(:) = 0.0 !all pops
-            diff_cont = 0
+            diff_cont = 0.0
             diff = 0.0
-            !!$omp parallel &
-            !!$omp default(none) &
-            !!$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,atom)&
-            !!$omp shared(diff, diff_cont, dM,n_new,Activeatoms,lcell_converged)&
-            !!$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot)
-            !!$omp do schedule(dynamic,1)
+            !$omp parallel &
+            !$omp default(none) &
+            !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,atom,nb,nr,vth)&
+            !$omp shared(ngpop,Activeatoms,lcell_converged,vturb,T)&!diff, diff_cont, dM,
+            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm) &
+            !$omp reduction(max:dM,diff,diff_cont)
+            !$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
-               !!$ id = omp_get_thread_num() + 1
+               !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
 
                if (l_iterate) then
@@ -434,8 +457,8 @@ module atom_transfer
                      atom => ActiveAtoms(nact)%p
 
                      do ilevel=1,atom%Nlevel
-                        if ( n_new(nact,ilevel,icell) >= frac_limit_pops * atom%Abund*nHtot(icell) ) then
-                           dN1 = abs(1d0-atom%n(ilevel,icell)/n_new(nact,ilevel,icell))
+                        if ( ngpop(ilevel,nact,icell,1) >= frac_limit_pops * atom%Abund*nHtot(icell) ) then
+                           dN1 = abs(1d0-atom%n(ilevel,icell)/ngpop(ilevel,nact,icell,1))
                            dN = max(dN1, dN)
                            dM(nact) = max(dM(nact), dN1)
                         endif
@@ -453,7 +476,25 @@ module atom_transfer
                   !Re init for next iteration if any
                   do nact=1, NactiveAtoms
                      atom => ActiveAtoms(nact)%p
-                     atom%n(:,icell) = n_new(nact,1:atom%Nlevel,icell)
+                     atom%n(:,icell) = ngpop(1:atom%Nlevel,nact,icell,1)
+                     !store for two successive iterations.
+                     ! ngpop(1:atom%Nlevel,nact,icell,iter) = atom%n(:,icell)
+
+                     !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next ieration.
+                     !Only for Active Atoms here. PAssive Atoms are updated only if electronic density is iterated.
+                     !Also need to change if profile interp is used or not! (a and phi)
+                     do ilevel=1,atom%nline
+                        if (.not.atom%lines(ilevel)%lcontrib) cycle
+                        if (atom%lines(ilevel)%Voigt) then
+                           nb = atom%lines(ilevel)%nb; nr = atom%lines(ilevel)%nr
+                           atom%lines(ilevel)%a(icell) = line_damping(icell,atom%lines(ilevel))
+                           !tmp because of vbroad!
+                           vth = vbroad(T(icell),atom%weight, vturb(icell))
+                           !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
+                           atom%lines(ilevel)%phi(:,icell) = &
+                              Voigt(atom%lines(ilevel)%Nlambda, atom%lines(ilevel)%a(icell), atom%lines(ilevel)%v(:)/vth)/ (vth * sqrtpi)
+                        endif
+                     enddo
                   end do
                   atom => null()
 
@@ -464,8 +505,8 @@ module atom_transfer
 
                end if !if l_iterate
             end do cell_loop2 !icell
-            !!$omp end do
-            !!$omp end parallel
+            !$omp end do
+            !$omp end parallel
   
             if (n_iter > 1) then
                conv_speed = (diff - diff_old) !<0 converging.

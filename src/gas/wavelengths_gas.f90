@@ -20,7 +20,10 @@ module wavelengths_gas
    integer, parameter :: Nlambda_cont_log = 31
    integer, parameter :: Nlambda_line_w = 14
    integer, parameter :: Nlambda_line_c_log = 12
-   real, parameter    :: vwing_on_vth = 5.0 !local line goes from 0 to vwing_on_vth * vth km/s
+   integer, parameter :: Nlambda_line_gauss = 11
+   real, parameter    :: vwing_on_vth_gauss = 3.0 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
+   real, parameter    :: vwing_on_vth = 5.0 !local (Voigt) line goes from 0 to vwing_on_vth * vth km/s
+   !-> for Gaussian and Voigt profiles
    real, parameter    :: vcore_on_vth = 0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
    real               :: hv
    !number max of lambda for all lines
@@ -81,48 +84,6 @@ module wavelengths_gas
       return
    end function make_sub_wavelength_grid_cont_log_nu
 
-   function line_u_grid_loc(k, line, N)
-      !return for line line and cell k, the paramer:
-      ! u = (lambda - lambda0) / lambda0 * c_light / vth
-      integer, parameter :: Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
-      integer, intent(in) :: k
-      integer, intent(out) :: N
-      real(kind=dp), dimension(Nlambda) :: line_u_grid_loc
-      type (atomicline), intent(in) :: line
-      real(kind=dp) ::  vcore, vwing, vth, vB
-      integer :: la, Nmid
-
-      vth = vbroad(T(k), line%atom%weight, vturb(k))
-      vB = 0.0_dp
-      if (line%polarizable) then
-         !replace b_char by magnetic field modulus here
-         vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
-      else
-         vB = 0.0_dp
-      endif
-      vwing = line%qwing * (vth + vB)
-
-      vcore = 2.5 * vth!wing_to_core * vwing
-
-      line_u_grid_loc = 0.0_dp
-
-  
-      line_u_grid_loc(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
-
-      line_u_grid_loc(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
-    
-      Nmid = Nlambda/2 + 1
-    
-      line_u_grid_loc(1:Nmid) = line_u_grid_loc(1:Nmid)
-      line_u_grid_loc(Nmid+1:Nlambda) = -line_u_grid_loc(Nmid-1:1:-1)
-
-      line_u_grid_loc(:) = line_u_grid_loc(:) / vth
-
-      N = nlambda     
- 
-      return
-   end function line_u_grid_loc
-
    subroutine compute_line_bound(line,limage)
       ! ------------------------------------------------------------ !
       ! Compute the line bounds : lamndamin and lambdamax
@@ -143,7 +104,7 @@ module wavelengths_gas
       if (line%voigt) then
          vmax = vwing_on_vth * (vth + vb) !qwing not needed. Here local profile only. For ray-tracing, the extension is in the param file.
       else
-         vmax = 3.0 * (vth + vb)
+         vmax = vwing_on_vth_gauss * vth
       endif
       if (limage) vmax = line%atom%vmax_rt*1d3
        
@@ -180,6 +141,14 @@ module wavelengths_gas
   
 
       line_lambda_grid = 0.0_dp
+
+      !completely linear for Gaussian
+      if (.not.line%voigt) then
+         !Only half the core points at the moment (compared to Voigt)
+         !Still, add one point for force span_dp to goes to 0
+         line_lambda_grid(:) = (1.0 + span_dp(-vwing,vwing,Nlambda_line_w+mod(Nlambda_line_gauss+1,2),1)/c_light) * line%lambda0
+         return !leave here for gaussian.
+      endif
 
       line_lambda_grid(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
 
@@ -279,7 +248,11 @@ module wavelengths_gas
          enddo
          do kr=1,atom%Nline
             if (associated(subgrid_line,line_lambda_grid)) then
-               atom%lines(kr)%Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+               if (atom%lines(kr)%voigt) then
+                  atom%lines(kr)%Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+               else
+                  atom%lines(kr)%Nlambda = Nlambda_line_gauss + mod(Nlambda_line_w+1,2)
+               endif
             ! elseif (associated(subgrid_line,line_lambda_grid_dv)) then
             !    atom%lines(kr)%Nlambda = nint(2 * line%vmax / hv + 1)
             else
@@ -1636,7 +1609,47 @@ module wavelengths_gas
 
  end module wavelengths_gas
  
+   ! function line_u_grid_loc(k, line, N)
+   !    !return for line line and cell k, the paramer:
+   !    ! u = (lambda - lambda0) / lambda0 * c_light / vth
+   !    integer, parameter :: Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+   !    integer, intent(in) :: k
+   !    integer, intent(out) :: N
+   !    real(kind=dp), dimension(Nlambda) :: line_u_grid_loc
+   !    type (atomicline), intent(in) :: line
+   !    real(kind=dp) ::  vcore, vwing, vth, vB
+   !    integer :: la, Nmid
+
+   !    vth = vbroad(T(k), line%atom%weight, vturb(k))
+   !    vB = 0.0_dp
+   !    if (line%polarizable) then
+   !       !replace b_char by magnetic field modulus here
+   !       vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
+   !    else
+   !       vB = 0.0_dp
+   !    endif
+   !    vwing = line%qwing * (vth + vB)
+
+   !    vcore = 2.5 * vth!wing_to_core * vwing
+
+   !    line_u_grid_loc = 0.0_dp
+
+  
+   !    line_u_grid_loc(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
+
+   !    line_u_grid_loc(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
+    
+   !    Nmid = Nlambda/2 + 1
+    
+   !    line_u_grid_loc(1:Nmid) = line_u_grid_loc(1:Nmid)
+   !    line_u_grid_loc(Nmid+1:Nlambda) = -line_u_grid_loc(Nmid-1:1:-1)
+
+   !    line_u_grid_loc(:) = line_u_grid_loc(:) / vth
+
+   !    N = nlambda     
  
+   !    return
+   ! end function line_u_grid_loc 
  
 !    subroutine  define_local_gauss_profile_grid (atom)
 !       type (AtomType), intent(inout) :: atom

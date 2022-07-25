@@ -9,7 +9,8 @@ module Opacity_atom
    use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, &
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
-   use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, Nlambda_max_line_vel
+   use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, &
+                                    Nlambda_max_line_vel, vwing_on_vth_gauss
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
@@ -20,7 +21,7 @@ module Opacity_atom
    real(kind=dp), allocatable, dimension(:,:) :: chi_cont, eta_cont
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
-   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:)
+   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:), eta_tot(:)
    integer, parameter 		   :: NvspaceMax = 151
    logical 		               :: lnon_lte_loop                                      
 
@@ -30,7 +31,7 @@ module Opacity_atom
    subroutine alloc_atom_opac(N,x)
       integer, intent(in) :: N
       real(kind=dp), dimension(N) :: x
-      integer :: nat, kr, icell, nb, nr
+      integer :: nat, kr, icell, nb, nr, nl_gauss
       type(AtomType), pointer :: atm
       real(kind=dp) :: vth
       integer(kind=8) :: mem_loc, mem_contopac
@@ -43,7 +44,6 @@ module Opacity_atom
 
       do nat=1, n_atoms
          atm => atoms(nat)%p
-         !if commong gauss prof add in mem_loc
          do kr=1,atm%nline
                if (.not.atm%lines(kr)%lcontrib) cycle
                if (atm%lines(kr)%Voigt) then
@@ -55,13 +55,15 @@ module Opacity_atom
 
          do icell=1, n_cells
             if (icompute_atomRT(icell) <= 0) cycle
+            !tmp because of vbroad, recomputed after in m/s
+            vth = vbroad(T(icell),atm%weight, vturb(icell))
+            !Voigt
             do kr=1,atm%nline
                if (.not.atm%lines(kr)%lcontrib) cycle
                if (atm%lines(kr)%Voigt) then
                   nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
                   atm%lines(kr)%a(icell) = line_damping(icell,atm%lines(kr))
-                  !tmp because of vbroad, recomputed after in m/s
-                  vth = vbroad(T(icell),atm%weight, vturb(icell))
+
                   atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth !unitless
                   atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, atm%lines(kr)%a(icell), atm%lines(kr)%v(:)) / (vth * sqrtpi)
                endif
@@ -130,9 +132,6 @@ module Opacity_atom
   
       do nat=1, n_atoms
          atm => atoms(nat)%p
-
-         !first allocation in io_atom
-         if (allocated(atm%vg)) deallocate(atm%vg,atm%phig)
 
          do kr=1,atm%nline
             if (allocated( atm%lines(kr)%a)) deallocate(atm%lines(kr)%a )
@@ -212,9 +211,6 @@ module Opacity_atom
          chic(:) = chi_cont(:,icell)
          snuc(:) = eta_cont(:,icell)
       endif
-
-      ! chi(1) = chic(1)
-      ! snu(1) = snuc(1)
 
       !linear interpolation
       i0 = 2
@@ -379,9 +375,6 @@ module Opacity_atom
 
    subroutine xcoupling(id, icell, iray, lupdate_psi)
    !test: update_psi in case of local subiterations.
-   !background not iterated (included in I)
-   !to do add bound-free
-   !to do add background
       integer, intent(in) :: id, icell, iray
       logical, intent(in) :: lupdate_psi
       integer :: nact, j, i, kr, Nb, Nr, la, Nl
@@ -396,8 +389,15 @@ module Opacity_atom
       chi_up(:,:,:,id)   = 0.0_dp
 
       eta_atoms(:,:,id) = 0.0_dp
-      !-> missing LTE here
-      if (lupdate_psi) chi_tot(:) = 1d-50
+      !-> can do better, not optimized
+      if (lupdate_psi) then
+         chi_tot(:) = 1d-50
+         ! call calc_contopac_loc(icell)
+         ! chi_tot(:) = linear_1D_sorted(n_lambda_cont,tab_lambda_cont,chi_cont(:,icell),n_lambda,tab_lambda_nm)
+         ! chi_tot(1) = chi_cont(1,icell)
+         ! chi_tot(n_lambda) = chi_cont(n_lambda_cont,icell)
+         ! call contopac_atom_loc(icell,n_lambda,tab_lambda_nm,chi_tot,eta_tot)
+      endif
 
       aatom_loop : do nact=1, Nactiveatoms
 
@@ -474,7 +474,6 @@ module Opacity_atom
              chi_down(la,:,:,id) =  chi_down(la,:,:,id)  * wl
              chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl     
          enddo
-
 
          line_loop : do kr = 1, aatom%Nline
 
@@ -603,8 +602,8 @@ module Opacity_atom
          enddo
 
       else
-         !u1 = (u0 - omegav(nv)/vth)**2
          u0sq(:) = u0(:)*u0(:)
+         !Note: u1 = (u0 - omegav(nv)/vth)**2
          u1(:) = u0sq(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
          profile_art(:) = exp(-u1(:))
          do nv=2, Nvspace
@@ -666,14 +665,14 @@ module Opacity_atom
          omegav(Nvspace) = v1
          omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
       endif
-      if (lsubstract_avg) then!labs == .true.
+      if (lsubstract_avg) then
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
          vlabs(iray,id) = omegav_mean
       else
          if (lnon_lte_loop) omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(iray,id)
       endif
 
-
+!is it really necessary to invole 1/vth for the interpolation ? can do in velocity direclty
       if (line%voigt) then
          u1(:) = u0(:) - omegav(1)/vth
          uloc(:) = line%v(:) / vth
@@ -684,7 +683,6 @@ module Opacity_atom
          enddo
 
       else
-         !u1 = (u0 - omegav(nv)/vth)**2
          u0sq(:) = u0(:)*u0(:)
          u1(:) = u0sq(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
          profile_art_i(:) = exp(-u1(:)) / sqrtpi / vth

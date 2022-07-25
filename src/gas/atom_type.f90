@@ -82,9 +82,6 @@ module atom_type
       ! atom can be passive but NLTEpops true. This is the case of
       ! populations read from previous run
       logical                :: NLTEpops, set_ltepops
-      logical :: lgauss_prof = .false.
-      !common gauss profile for gauss profile lines
-      real(kind=dp), allocatable :: vg(:), phig(:,:)
       real(kind=dp), allocatable :: Gamma(:,:,:), dgdne(:,:,:) !derivative of Gamma to ne (n_iterate_ne>0)
       real(kind=dp), dimension(:,:), pointer :: n, nstar
       ! real(kind=dp), dimension(:,:) :: phi_T !such that nexphi_T = ni/nj
@@ -102,8 +99,8 @@ module atom_type
    integer :: n_atoms, Nactiveatoms, NpassiveAtoms
    logical :: helium_is_active
 
-   integer, parameter :: cwitch_niter = 12!nint(ceil(log(cswitch_val)/log(cswitch_down_scaling_factor)))
-   real(kind=dp), parameter :: cswitch_val = 1d12
+   ! integer, parameter :: cwitch_niter = 12!nint(ceil(log(cswitch_val)/log(cswitch_down_scaling_factor)))
+   real(kind=dp), parameter :: cswitch_val = 1d6!1d12
    real(kind=dp), parameter :: cswitch_down_scaling_factor = 10.0!ceil(exp(log(cswitch_val)/cswitch_niter))
    logical :: lcswitch_enabled = .false. !if only one atom has cswith, it is True.
    

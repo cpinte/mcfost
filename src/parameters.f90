@@ -215,7 +215,6 @@ module parametres
   integer :: n_phantom_files
 
   ! Stars
-  ! 27/02/2019, adding spots coordinates
   type star_type
      ! todo : indicate all units
      real :: T, M, fUV, slope_UV, othin_sublimation_radius

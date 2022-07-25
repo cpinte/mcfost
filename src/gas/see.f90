@@ -8,18 +8,18 @@ module see
     use wavelengths, only         :  n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm
     use utils, only               : gaussslv, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
-    use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, chi_tot
+    use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, chi_tot, eta_tot
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
     use fits_utils, only : print_error
 
     implicit none
 
+    !populations below that threshold not taken into account in convergence.
     real(kind=dp), parameter :: frac_limit_pops = 1d-10!1d-50
     !Variables for Non-LTE loop and MALI method
-    !TO DO: merge npgop and n_new. n_new is a special version of ngpop
-    !merge ne ?
-    real(kind=dp), allocatable :: n_new(:,:,:), lcell_converged(:), ne_new(:), ngpop(:,:,:,:)
+    !TO DO: merge npgop and ne_new ? 
+    real(kind=dp), allocatable :: lcell_converged(:), ne_new(:), ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
 
 
@@ -75,11 +75,21 @@ module see
         ne_new(:) = ne(:)
         if (alloc_status > 0) call error("Allocation error ne_new")
         write(*,*) " size ne_new:", sizeof(ne_new) / 1024./1024.," MB"
-        allocate(n_new(NactiveAtoms,Nmaxlevel,n_cells),stat=alloc_status)
-        if (alloc_status > 0) call error("Allocation error n_new")
-        !only count n_new has atom%n is global in the code and "normal"
-        write(*,*) " size n_new:", sizeof(n_new) / 1024./1024.," MB"
-        n_new(:,:,:) = 0.0_dp
+        !TODO: include new electronic density at the end ??
+        ! NOTE: index 1 is always the current solution ! Previously n_new.
+        if (lNg_acceleration) then
+            !lsubiteration must be false ?
+            if (lsubiteration) call error('subiter + Ng not yet!')
+            allocate(ngpop(NmaxLevel,NactiveAtoms,n_cells,Ng_Norder+2),stat=alloc_status)
+            if (alloc_Status > 0) call error("Allocation error ngpop (lng_acc)")
+        else
+            !even if no Ng acceleration nor subiterations allows for storing 2 previous solutions (2 + 1)
+            !for the non-LTE populations: improve convergence criterion
+            !1 is current, 2 is previous, 3 is previous previous
+            allocate(ngpop(NmaxLevel,NactiveAtoms,n_cells,3),stat=alloc_status)
+            if (alloc_Status > 0) call error("Allocation error ngpop")
+        endif
+        write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024., " MB"
         allocate(psi(n_lambda, n_rayons_max, nb_proc), stat=alloc_status); psi(:,:,:) = 0.0_dp
         write(*,*) " size psi:", sizeof(psi) / 1024./1024.," MB"
         if (alloc_Status > 0) call error("Allocation error psi in nlte loop")
@@ -96,15 +106,13 @@ module see
         allocate(lcell_converged(n_cells),stat=alloc_status)
         if (alloc_Status > 0) call error("Allocation error lcell_converged")
         write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
-    
-        if (lNg_acceleration) write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024., " MB"
 
         if (lsubiteration) then
             allocate(Itot(n_lambda,n_rayons_sub,nb_proc),stat=alloc_status)
             if (alloc_Status > 0) call error("Allocation error Itot")
             allocate(phi_loc(Nlambda_max_line,Nmaxline,NactiveAtoms,n_rayons_sub,nb_proc),stat=alloc_status)
             if (alloc_Status > 0) call error("Allocation error phi_loc")
-            allocate(chi_tot(n_lambda))
+            allocate(chi_tot(n_lambda),eta_tot(n_lambda))
         else
             allocate(Itot(n_lambda,n_rayons_max,nb_proc),stat=alloc_status)
             if (alloc_Status > 0) call error("Allocation error Itot")
@@ -115,7 +123,7 @@ module see
         write(*,*) " size phi_loc:", sizeof(phi_loc) / 1024./1024./1024.," GB"
 
         mem_alloc_local = mem_alloc_local + sizeof(psi) + sizeof(eta_atoms) + sizeof(Itot) + sizeof(phi_loc) + &
-            sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ne_new) + sizeof(lcell_converged) + sizeof(n_new)
+            sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ne_new) + sizeof(lcell_converged) + sizeof(ngpop)
 
         allocate(tab_Aji_cont(NmaxCont,NactiveAtoms,n_cells))
         allocate(tab_Vij_cont(Nlambda_max_cont,NmaxCont,NactiveAtoms))
@@ -212,9 +220,8 @@ module see
         integer :: n, kr
         type (AtomType), pointer :: atom
 
-        if (allocated(ngpop)) deallocate(ngpop)
         deallocate(ne_new,psi,eta_atoms,chi_up,chi_down,uji_down,lcell_converged)
-        deallocate(itot,phi_loc,n_new)    
+        deallocate(itot,phi_loc,ngpop)   
 
         deallocate(tab_Aji_cont, tab_Vij_cont) 
 
@@ -232,7 +239,7 @@ module see
             atom => null()
         enddo  
 
-        if (allocated(chi_tot)) deallocate(chi_tot)
+        if (allocated(chi_tot)) deallocate(chi_tot,eta_tot)
 
         if (n_iterate_ne > 0) then
             deallocate(gtot,gr_save,dgrdne,dgcdne)
@@ -378,8 +385,8 @@ module see
     ! 			write(*,*) "*************** *********** ***************"
     ! 		endif
 
-        if (allocated(n_new)) then
-            n_new(atom%activeindex,1:atom%Nlevel,icell) = atom%n(:,icell)
+        if (allocated(ngpop)) then
+            ngpop(1:atom%Nlevel,atom%activeindex,icell,1) = atom%n(:,icell)
             atom%n(:,icell) = ndag
         endif
         return
@@ -736,6 +743,7 @@ module see
         real(kind=dp) :: dM, dne
         real(kind=dp), intent(out) :: delta
 
+        delta = 0.0
         if (iterate_ne) then
             !all atoms + ne at the same time
             call see_atoms_ne(id,icell,delta,dne)
@@ -1013,7 +1021,7 @@ module see
         do n=1,NactiveAtoms
             at => Activeatoms(n)%p
             dM = max(dM,maxval(abs(1.0 - npop_dag(i:(i-1)+at%Nlevel,id)/at%n(:,icell))))
-            n_new(at%activeindex,1:at%Nlevel,icell) = at%n(:,icell)
+            ngpop(1:at%Nlevel,at%activeindex,icell,1) = at%n(:,icell)
             !reset
             at%n(:,icell) = npop_dag(i:(i-1)+at%Nlevel,id) !the first value before iterations
             i = i + at%Nlevel
