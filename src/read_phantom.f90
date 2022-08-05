@@ -55,10 +55,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
 
     ! open file for read
     call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
-    if (ierr /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - '//trim(get_error_text(ierr))//' ***'
-       return
-    endif
+    if (ierr /= 0) call error("cannot open "//trim(filenames(ifile)))
 
     if (fileid(2:2)=='T') then
        tagged = .true.
@@ -66,11 +63,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
        tagged = .false.
     endif
     call read_header(iunit,hdr,tagged,ierr)
-    if (.not.tagged) then
-       write(*,"(/,a,/)") ' *** ERROR - Phantom dump too old to be read by MCFOST ***'
-       ierr = 1000
-       return
-    endif
+    if (.not.tagged) call error("Phantom dump too old to be read by MCFOST")
 
     call extract('nparttot',np,hdr,ierr)
     call extract('ndusttypes',ndusttypes,hdr,ierr,default=0)
@@ -117,11 +110,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
 
     ! open file for read
     call open_dumpfile_r(iunit,filenames(ifile),fileid,ierr,requiretags=.true.)
-    if (ierr /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - '//trim(get_error_text(ierr))//' ***'
-       return
-    endif
-    print "(1x,a)",trim(fileid)
+    if (ierr /= 0) call error("cannot open "//trim(filenames(ifile)))
 
     if (fileid(2:2)=='T') then
        tagged = .true.
@@ -129,11 +118,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
        tagged = .false.
     endif
     call read_header(iunit,hdr,tagged,ierr)
-    if (.not.tagged) then
-       write(*,"(/,a,/)") ' *** ERROR - Phantom dump too old to be read by MCFOST ***'
-       ierr = 1000
-       return
-    endif
+    if (.not.tagged) call error("Phantom dump too old to be read by MCFOST")
 
     ! get nblocks
     call extract('nblocks',nblocks,hdr,ierr,default=1)
@@ -192,7 +177,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
 
     if (npartoftype(2) > 0) then
        dustfluidtype = 2
-       write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, may be discarded ***'
+       call warning("Phantom dump contains two-fluid dust particles, may be discarded")
     else
        dustfluidtype = 1
     endif
@@ -459,7 +444,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
 
  integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max
  integer :: np,ntypes,nptmass,dustfluidtype,ndudt
- integer :: error,ndustsmall,ndustlarge
+ integer :: ndustsmall,ndustlarge
 
  integer, parameter :: maxtypes = 100
  integer, parameter :: nsinkproperties = 17
@@ -478,7 +463,7 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
 
  logical :: got
 
-  error = 0
+  ierr = 0
   np_tot = 0
   ntypes_tot = 0
   ntypes_max = 0
@@ -491,40 +476,32 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
     filename = trim(filenames(ifile))
 
     ! open file
-    call open_hdf5file(filename,hdf5_file_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF file ***'
-    endif
+    call open_hdf5file(filename,hdf5_file_id,ierr)
+    if (ierr /= 0) call error("cannot open Phantom HDF file: "//trim(filename))
 
     ! open header group
-    call open_hdf5group(hdf5_file_id,'header',hdf5_group_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF header group ***'
-    endif
+    call open_hdf5group(hdf5_file_id,'header',hdf5_group_id,ierr)
+    if (ierr /= 0) call error("cannot open Phantom HDF header group in "//trim(filename))
 
     ! read header values
-    call read_from_hdf5(np,'nparttot',hdf5_group_id,got,error)
-    call read_from_hdf5(ntypes,'ntypes',hdf5_group_id,got,error)
-    call read_from_hdf5(ndusttypes,'ndusttypes',hdf5_group_id,got,error)
+    call read_from_hdf5(np,'nparttot',hdf5_group_id,got,ierr)
+    call read_from_hdf5(ntypes,'ntypes',hdf5_group_id,got,ierr)
+    call read_from_hdf5(ndusttypes,'ndusttypes',hdf5_group_id,got,ierr)
     if (.not. got) then
        ! ndusttypes is for pre-largegrain multigrain headers
-       call read_from_hdf5(ndustsmall,'ndustsmall',hdf5_group_id,got,error)
-       call read_from_hdf5(ndustlarge,'ndustlarge',hdf5_group_id,got,error)
+       call read_from_hdf5(ndustsmall,'ndustsmall',hdf5_group_id,got,ierr)
+       call read_from_hdf5(ndustlarge,'ndustlarge',hdf5_group_id,got,ierr)
        ! ndusttype must be the same for all files : todo : add a test
        ndusttypes = ndustsmall + ndustlarge
     endif
 
     ! close the header group
-    call close_hdf5group(hdf5_group_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF header group ***'
-    endif
+    call close_hdf5group(hdf5_group_id,ierr)
+    if (ierr /= 0) call error("cannot close Phantom HDF header group in "//trim(filename))
 
     ! close file
-    call close_hdf5file(hdf5_file_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF file ***'
-    endif
+    call close_hdf5file(hdf5_file_id,ierr)
+    if (ierr /= 0) call error("cannot close Phantom HDF file: "//trim(filename))
 
     np_tot = np_tot + np
     ntypes_tot = ntypes_tot + ntypes
@@ -552,53 +529,45 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
 
     ! open file
     filename = trim(filenames(ifile))
-    call open_hdf5file(filename,hdf5_file_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF file ***'
-    endif
+    call open_hdf5file(filename,hdf5_file_id,ierr)
+    if (ierr /= 0) call error("cannot open Phantom HDF file: "//trim(filename))
 
     ! open header group
-    call open_hdf5group(hdf5_file_id,'header',hdf5_group_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF header group ***'
-    endif
+    call open_hdf5group(hdf5_file_id,'header',hdf5_group_id,ierr)
+    if (ierr /= 0) call error("cannot open Phantom HDF header group in "//trim(filename))
 
     ! read from header
-    call read_from_hdf5(np,'nparttot',hdf5_group_id,got,error)
-    call read_from_hdf5(ntypes,'ntypes',hdf5_group_id,got,error)
-    call read_from_hdf5(npartoftype,'npartoftype',hdf5_group_id,got,error)
-    call read_from_hdf5(nptmass,'nptmass',hdf5_group_id,got,error)
-    call read_from_hdf5(ndusttypes,'ndusttypes',hdf5_group_id,got,error)
+    call read_from_hdf5(np,'nparttot',hdf5_group_id,got,ierr)
+    call read_from_hdf5(ntypes,'ntypes',hdf5_group_id,got,ierr)
+    call read_from_hdf5(npartoftype,'npartoftype',hdf5_group_id,got,ierr)
+    call read_from_hdf5(nptmass,'nptmass',hdf5_group_id,got,ierr)
+    call read_from_hdf5(ndusttypes,'ndusttypes',hdf5_group_id,got,ierr)
     if (.not. got) then
        ! ndusttypes is for pre-largegrain multigrain headers
-       call read_from_hdf5(ndustsmall,'ndustsmall',hdf5_group_id,got,error)
-       call read_from_hdf5(ndustlarge,'ndustlarge',hdf5_group_id,got,error)
+       call read_from_hdf5(ndustsmall,'ndustsmall',hdf5_group_id,got,ierr)
+       call read_from_hdf5(ndustlarge,'ndustlarge',hdf5_group_id,got,ierr)
        ! ndusttype must be the same for all files : todo : add a test
        ndusttypes = ndustsmall + ndustlarge
     endif
-    call read_from_hdf5(massoftype(ifile,1:ntypes),'massoftype',hdf5_group_id,got,error)
-    call read_from_hdf5(hfact,'hfact',hdf5_group_id,got,error)
+    call read_from_hdf5(massoftype(ifile,1:ntypes),'massoftype',hdf5_group_id,got,ierr)
+    call read_from_hdf5(hfact,'hfact',hdf5_group_id,got,ierr)
     if (ndusttypes > 0) then
        allocate(tmp_header(np))
-       call read_from_hdf5(tmp_header,'grainsize',hdf5_group_id,got,error)
+       call read_from_hdf5(tmp_header,'grainsize',hdf5_group_id,got,ierr)
        grainsize(1:ndusttypes) = tmp_header(1:ndusttypes)
-       call read_from_hdf5(tmp_header,'graindens',hdf5_group_id,got,error)
+       call read_from_hdf5(tmp_header,'graindens',hdf5_group_id,got,ierr)
        graindens(1:ndusttypes) = tmp_header(1:ndusttypes)
        deallocate(tmp_header)
     endif
-    call read_from_hdf5(umass,'umass',hdf5_group_id,got,error)
-    call read_from_hdf5(utime,'utime',hdf5_group_id,got,error)
-    call read_from_hdf5(ulength,'udist',hdf5_group_id,got,error)
+    call read_from_hdf5(umass,'umass',hdf5_group_id,got,ierr)
+    call read_from_hdf5(utime,'utime',hdf5_group_id,got,ierr)
+    call read_from_hdf5(ulength,'udist',hdf5_group_id,got,ierr)
 
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF header group ***'
-    endif
+    if (ierr /= 0) call error("cannot read Phantom HDF header group in "//trim(filename))
 
     ! close the header group
-    call close_hdf5group(hdf5_group_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF header group ***'
-    endif
+    call close_hdf5group(hdf5_group_id,ierr)
+    if (ierr /= 0) call error("cannot close Phantom HDF header group in "//trim(filename))
 
     write(*,*) ' npart = ',np,' ntypes = ',ntypes, ' ndusttypes = ',ndusttypes
     !write(*,*) ' npartoftype = ',npartoftype(ntypes0+1:ntypes0+ntypes)
@@ -608,74 +577,60 @@ subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
 
     if (npartoftype(2) > 0) then
        dustfluidtype = 2
-       write(*,"(/,a,/)") ' *** WARNING: Phantom dump contains two-fluid dust particles, may be discarded ***'
+       call warning("Phantom dump contains two-fluid dust particles, may be discarded")
     else
        dustfluidtype = 1
     endif
 
     ! open particles group
-    call open_hdf5group(hdf5_file_id,'particles',hdf5_group_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF particles group ***'
-    endif
+    call open_hdf5group(hdf5_file_id,'particles',hdf5_group_id,ierr)
+    if (ierr /= 0) call error("cannot open Phantom HDF particles group in "//trim(filename))
 
     got_dustfrac = .false.
     got_itype = .false.
     ndudt = 0
 
     ! TODO: read particle arrays
-    call read_from_hdf5(itype(np0+1:np0+np),'itype',hdf5_group_id,got,error)
+    call read_from_hdf5(itype(np0+1:np0+np),'itype',hdf5_group_id,got,ierr)
     if (got) got_itype = .true.
-    call read_from_hdf5(xyzh(1:3,np0+1:np0+np),'xyz',hdf5_group_id,got,error)
-    call read_from_hdf5(xyzh(4,np0+1:np0+np),'h',hdf5_group_id,got,error)
-    call read_from_hdf5(vxyzu(1:3,np0+1:np0+np),'vxyz',hdf5_group_id,got,error)
-    call read_from_hdf5(dustfrac(1:ndusttypes,np0+1:np0+np),'dustfrac',hdf5_group_id,got,error)
+    call read_from_hdf5(xyzh(1:3,np0+1:np0+np),'xyz',hdf5_group_id,got,ierr)
+    call read_from_hdf5(xyzh(4,np0+1:np0+np),'h',hdf5_group_id,got,ierr)
+    call read_from_hdf5(vxyzu(1:3,np0+1:np0+np),'vxyz',hdf5_group_id,got,ierr)
+    call read_from_hdf5(dustfrac(1:ndusttypes,np0+1:np0+np),'dustfrac',hdf5_group_id,got,ierr)
     if (got) got_dustfrac = .true.
 
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF particles group ***'
-    endif
+    if (ierr /= 0) call error("cannot read Phantom HDF particles group in "//trim(filename))
 
     ! close the particles group
-    call close_hdf5group(hdf5_group_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF particles group ***'
-    endif
+    call close_hdf5group(hdf5_group_id,ierr)
+    if (ierr /= 0) call error("cannot close Phantom HDF particles group in "//trim(filename))
 
     ! open sinks group
-    call open_hdf5group(hdf5_file_id,'sinks',hdf5_group_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot open Phantom HDF sinks group ***'
-    endif
+    call open_hdf5group(hdf5_file_id,'sinks',hdf5_group_id,ierr)
+    if (ierr /= 0) call error("cannot open Phantom HDF sinks group in "//trim(filename))
 
     ! read sinks
     allocate(xyzmh_ptmass(nsinkproperties,nptmass), vxyz_ptmass(3,nptmass))
-    call read_from_hdf5(xyzmh_ptmass(1:3,:),'xyz',hdf5_group_id,got,error)
-    call read_from_hdf5(xyzmh_ptmass(4,:),'m',hdf5_group_id,got,error)
-    call read_from_hdf5(xyzmh_ptmass(5,:),'h',hdf5_group_id,got,error)
-    call read_from_hdf5(vxyz_ptmass(:,:),'vxyz',hdf5_group_id,got,error)
+    call read_from_hdf5(xyzmh_ptmass(1:3,:),'xyz',hdf5_group_id,got,ierr)
+    call read_from_hdf5(xyzmh_ptmass(4,:),'m',hdf5_group_id,got,ierr)
+    call read_from_hdf5(xyzmh_ptmass(5,:),'h',hdf5_group_id,got,ierr)
+    call read_from_hdf5(vxyz_ptmass(:,:),'vxyz',hdf5_group_id,got,ierr)
 
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot read Phantom HDF sinks group ***'
-    endif
+    if (ierr /= 0)  call error("cannot read Phantom HDF sinks group in "//trim(filename))
 
-    call read_from_hdf5(xyzmh_ptmass(16,:),'mdotav',hdf5_group_id,got,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** WARNMING : mdotav not present'
-       error =0
+    call read_from_hdf5(xyzmh_ptmass(16,:),'mdotav',hdf5_group_id,got,ierr)
+    if (ierr /= 0) then
+       call warning("mdotav not present")
+       ierr =0
     endif
 
     ! close the sinks group
-    call close_hdf5group(hdf5_group_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF sinks group ***'
-    endif
+    call close_hdf5group(hdf5_group_id,ierr)
+    if (ierr /= 0) call error("cannot close Phantom HDF sinks group in "//trim(filename))
 
     ! close file
-    call close_hdf5file(hdf5_file_id,error)
-    if (error /= 0) then
-       write(*,"(/,a,/)") ' *** ERROR - cannot close Phantom HDF file ***'
-    endif
+    call close_hdf5file(hdf5_file_id,ierr)
+    if (ierr /= 0) call error("cannot close Phantom HDF file "//trim(filename))
 
     ifiles(np0+1:np0+np) = ifile ! index of the file
 
