@@ -972,6 +972,14 @@ subroutine read_density_file()
 
   logical :: lread_gas_density, lread_gas_velocity
 
+  if (lplanet_az) then ! Planet is along x-axis by default in wakeflow
+     RT_n_az = 1
+     RT_az_min = planet_az
+     RT_az_max = RT_az_min
+     write(*,*) "Moving planet #1 to azimuth =", planet_az
+     write(*,*) "WARNING: updating the azimuth to:", RT_az_min
+  endif
+
   ! Lecture donnees
   status=0
   !  Get an unused Logical Unit Number to use to open the FITS file.
