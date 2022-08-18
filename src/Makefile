@@ -64,10 +64,10 @@ ifdef xgboost
 endif
 
 ifndef XGBOOST
-    ifeq ($(MCFOST_NO_XGBOOST), yes)
-        XGBOOST = no
-    else
+    ifeq ($(MCFOST_XGBOOST), yes)
         XGBOOST = yes
+    else
+        XGBOOST = no
     endif
 endif
 
