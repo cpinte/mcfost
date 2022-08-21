@@ -138,9 +138,28 @@ mcfost source code is hosted on github (as a private directory, public release w
 
      $ ./install.sh SKIP_HDF5=yes
 
+   You can compile the libraries for a given compiler using directly::
+
+     $ ./install.sh ifort
+
+   or::
+
+     $ ./install.sh gfortran
+
+   This will override the ``SYSTEM`` environment variable and allows you to have both version of the libraries (the script will install them in different sub-directories).
+
+
 6. Enter the src directory and compile with::
 
      $ make
+
+   You can also overide the compiler here with::
+
+     $ make ifort=yes
+
+   or::
+
+     $ make gfortran=yes
 
 7. If you plan to use ``mcfost+phantom`` to perform live radiation hydrodynamics calculations, you can compile the mcfost library with::
 

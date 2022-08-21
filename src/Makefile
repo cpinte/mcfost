@@ -10,15 +10,19 @@ KNOWN_SYSTEM=no
 LIB= $(MCFOST_INSTALL)/lib
 
 ifndef SYSTEM
-    SYSTEM= ifort
+    SYSTEM=ifort
 endif
 
 ifeq ($(gfortran), yes)
     SYSTEM=gfortran
 endif
 
+ifeq ($(ifort), yes)
+    SYSTEM=ifort
+endif
+
 ifndef OPENMP
-    OPENMP= yes
+    OPENMP=yes
 endif
 
 # Forcing static flags when compiling the releases
