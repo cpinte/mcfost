@@ -77,6 +77,7 @@ module constantes
   real(kind=dp), parameter :: erg_to_J = 1.0e-7_dp
   real, parameter :: jansky = 1.0e-26 ! W.m^-2.Hz-1 (F_nu en jansky)
   real, parameter :: Lsun = 3.828e26 ! [W] IAU 2015
+  real, parameter :: Tsun = 5777 ! [K] effective tenperature of the sun
 
   ! Masses
   real(kind=dp), parameter :: g_to_kg = 1.0e-3_dp

@@ -325,7 +325,7 @@ module Voronoi_grid
     endif
 
     if (n_sublimate > 0) then
-       write(*,*) n_sublimate, "particles have been sublimated"
+       write(*,*) n_sublimate, "particles are located inside the stars"
        write(*,*) "Not implemented yet : MCFOST will probably crash !!!!"
     endif
 
