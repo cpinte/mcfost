@@ -33,16 +33,17 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
  integer, parameter :: maxtypes = 6
  integer, parameter :: maxfiles = 3
  integer, parameter :: maxinblock = 128
+ integer, parameter :: n_nucleation = 10
  integer, allocatable, dimension(:) :: npartoftype
  real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
- real(dp) :: hfact,umass,utime,ulength,gmw,x2
+ real(dp) :: hfact,umass,utime,ulength,gmw,x2,mass_per_H
  integer(kind=1), allocatable, dimension(:) :: itype, ifiles
  real(4),  allocatable, dimension(:) :: tmp
  real(dp), allocatable, dimension(:) :: grainsize, graindens
  real(dp), allocatable, dimension(:) :: dudt, tmp_dp,gastemperature
- real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu
+ real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu,nucleation
  type(dump_h) :: hdr
- logical :: got_h,got_dustfrac,got_itype,tagged,matched,got_temperature,got_u,lpotential
+ logical :: got_h,got_dustfrac,got_itype,tagged,matched,got_temperature,got_u,lpotential,do_nucleation
 
  integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
@@ -93,6 +94,16 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
     ntypes_tot = ntypes_tot + ntypes
     ntypes_max = max(ntypes_max,ntypes)
 
+    call extract('mass_per_H',mass_per_h,hdr,ierr)
+    if (ierr /= 0) then
+       ! No dust nucleation
+       do_nucleation = .false.
+    else
+       do_nucleation = .true.
+    endif
+
+    write(*,*) "do_nucleation", do_nucleation
+
     call free_header(hdr, ierr)
 
     close(iunit)
@@ -102,6 +113,7 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
  allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot),gastemperature(np_tot))
  allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
  allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
+ if (do_nucleation) allocate(nucleation(n_nucleation,np_tot))
 
  np0 = 0
  ntypes0 = 0
@@ -257,6 +269,21 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
                          endif
                          read(iunit,iostat=ierr) dustfrac(ngrains,:)
                          got_dustfrac = .true.
+
+                      ! Nucleation
+                      case('K0')
+                         read(iunit,iostat=ierr) tmp_dp ; nucleation(2,np0+1:np0+np) = tmp_dp
+                      case('K1')
+                         read(iunit,iostat=ierr) tmp_dp ; nucleation(3,np0+1:np0+np) = tmp_dp
+                      case('K2')
+                         read(iunit,iostat=ierr) tmp_dp ; nucleation(4,np0+1:np0+np) = tmp_dp
+                      case('K3')
+                         read(iunit,iostat=ierr) tmp_dp ; nucleation(5,np0+1:np0+np) = tmp_dp
+                      case('mu')
+                         read(iunit,iostat=ierr) tmp_dp ; nucleation(6,np0+1:np0+np) = tmp_dp
+                      case('kappa')
+                         read(iunit,iostat=ierr) tmp_dp ; nucleation(9,np0+1:np0+np) = tmp_dp
+
                       case default
                          matched = .false.
                          read(iunit,iostat=ierr)
@@ -312,6 +339,15 @@ subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_g
                          read(iunit,iostat=ierr) xyzmh_ptmass(4,nptmass0:nptmass_found)
                       case('h')
                          read(iunit,iostat=ierr) xyzmh_ptmass(5,nptmass0:nptmass_found)
+                      case('lum')
+                         read(iunit,iostat=ierr) vxyz_ptmass(12,nptmass0:nptmass_found)
+                         write(*,*) "lum", vxyz_ptmass(12,nptmass0:nptmass_found)
+                      case('Teff')
+                         read(iunit,iostat=ierr) vxyz_ptmass(13,nptmass0:nptmass_found)
+                         write(*,*) "Teff", vxyz_ptmass(13,nptmass0:nptmass_found)
+                      case('Reff')
+                         read(iunit,iostat=ierr) vxyz_ptmass(14,nptmass0:nptmass_found)
+                         write(*,*) "Reff", vxyz_ptmass(14,nptmass0:nptmass_found)
                       case('mdotav')
                          read(iunit,iostat=ierr) xyzmh_ptmass(16,nptmass0:nptmass_found)
                       case('vx')
