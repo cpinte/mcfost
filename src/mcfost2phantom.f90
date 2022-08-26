@@ -401,9 +401,6 @@ contains
     !radiation(ivorcl,:) = -1.
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%original_id ! this is the particle id number in phantom
-
-       write(*,*) icell, "/", n_cells, i_SPH
-
        if (i_SPH > 0) then
           Tphantom(i_SPH)  = Tdust(icell)
           n_packets(i_SPH) = sum(xN_abs(icell,1,:))
