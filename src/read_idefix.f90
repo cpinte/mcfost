@@ -3,6 +3,7 @@ module read_idefix
   use parametres
   use messages
   use mcfost_env
+  use VTKtools
   use grid
   use cylindrical_grid
   use density
@@ -16,166 +17,40 @@ contains
 
     character(len=*), intent(in) :: filename
 
-    character(len=32) :: line, key, val1, val2, val3, buf, val
-    integer :: ios, iunit, nfields , n_lines, i
 
-    integer :: nx1, nx2, nx3, npoints
-
-    integer :: geometry, periodicity
-    integer :: time
-    logical :: lbinary
-
+    integer :: geometry, time
+    integer, dimension(3) :: dimensions
+    character(:), allocatable :: origin
+    real, dimension(:), allocatable :: x1, x2, x3
+    real(dp) :: dx
 
     idefix%filename = filename
+    call readVTK_header(filename, idefix%iunit, dimensions, idefix%time, origin, x1, x2, x3)
 
-    iunit = 1
-    ios = 0
+    idefix%origin = origin
+    idefix%nx1 = dimensions(1) ! r
+    idefix%nx2 = dimensions(2) ! theta
+    idefix%nx3 = dimensions(3) ! phi
 
-    ! reading ascii part of the vtk file
-    open(unit=iunit,file=trim(filename),status='old',form='formatted', access="stream", convert="big_endian", iostat=ios)
-    if (ios /= 0) call error("opening "//trim(filename))
+    ! Checking is the grid is linear
+    idefix%log_spacing = (x1(idefix%nx1) - x1(idefix%nx1-1)) > 1.01 * (x1(2) - x1(1))
 
-    read(1,'(A)',iostat=ios) line ! vtk
-    read(1,'(A)',iostat=ios) line ! Idefix
-    read(1,'(A)',iostat=ios) line ! BINARY
-    if (trim(line) == "BINARY") lbinary = .true.
-    read(1,'(A)',iostat=ios) line ! DATASET
-    read(1,'(A)',iostat=ios) line ! FIELD
-
-    read(line, *) key, val1, val2
-    if (trim(key) == "FIELD") then
-       read(val2, *) nfields
-    else
-       call error("Missing field entry in idefix file")
-    endif
-
-    write(*,*) trim(line)
-    write(*,*) trim(key), nfields
-
-    read(1,'(A)',iostat=ios) line ! Geometry
-    read(1,'(A)',iostat=ios) line
-    read(1,'(A)',iostat=ios) line ! periodicity
-    read(1,'(A)',iostat=ios) line
-    read(1,'(A)',iostat=ios) line ! time
-    read(1,'(A)',iostat=ios) line
-    read(1,'(A)',iostat=ios) line ! dimensions
-    read(line, *) key, nx1, nx2, nx3
-    read(1,'(A)',iostat=ios) line ! n_points
-    read(line, *) key, npoints
-
-    close(unit=1)
-
-    ! Does not work
-    !open(unit=iunit,file=trim(filename),status='old',form='unformatted', access="sequential", convert="big_endian", iostat=ios)
-    !do i=1,6
-    !   read(iunit)
-    !enddo
-    !do i=1,1
-    !   read(iunit) geometry
-    !   write(*,*) i, geometry
-    !enddo
-    !close(unit=iunit)
-
-    open(unit       = iunit,       &
-         file       = trim(filename), &
-         form       = 'UNFORMATTED',  &
-         access     = 'SEQUENTIAL',   &
-         action     = 'WRITE',        &
-         convert    = 'BIG_ENDIAN',   &
-         !recordtype = 'STREAM',       &
-         !buffered   = 'YES',          &
-         iostat     = ios)
-
-    do i=1,6
-       read(iunit) line
-    enddo
-    read(iunit) geometry
-    write(*,*) geometry
-
-    ! Maybe use that code :
-    !https://git-xen.lmgc.univ-montp2.fr/lmgc90/lmgc90_user/blob/d24baec633e2f84b34e8b2375dd1ec3260cec383/src/Core/src/post/vtkwrite/full_LIB_VTK_IO.f90
-
-    ! This one below works but implies to know the position
-    !open(unit=iunit,file=trim(filename),status='old',form='unformatted', access="stream", convert="big_endian", iostat=ios)
-    !do i=1,150
-    !   read(iunit,pos=i) geometry
-    !   write(*,*) i, geometry ! i = 129 --> value = 2 ok
-    !enddo
-    !close(unit=iunit)
-
-    write(*,*) "DONE"
-    stop
-
-    ! On compte les lignes avec des donnees
-    n_lines = 0
-    do while(ios==0)
-       n_lines=n_lines+1
-
-
-       select case(trim(key))
-          ! reading grid parameters
-       case("NX")
-          read(val,*,iostat=ios) fargo3d%nx
-       case("NY")
-          read(val,*,iostat=ios) fargo3d%ny
-       case("NZ")
-          read(val,*,iostat=ios) fargo3d%nz
-       case("XMIN")
-          read(val,*,iostat=ios) fargo3d%xmin
-       case("XMAX")
-          read(val,*,iostat=ios) fargo3d%xmax
-       case("YMIN")
-          read(val,*,iostat=ios) fargo3d%ymin
-       case("YMAX")
-          read(val,*,iostat=ios) fargo3d%ymax
-       case("ZMIN")
-          read(val,*,iostat=ios) fargo3d%zmin
-       case("ZMAX")
-          read(val,*,iostat=ios) fargo3d%zmax
-       case("SPACING")
-          if ((val == "LOG").or.(val == "log").or.(val == "Log")) then
-             fargo3d%log_spacing = .true.
-          else
-             fargo3d%log_spacing = .false.
-             call error("MCFOST linear grid for fargo3d not implemented yet")
-          endif
-       case("FRAME")
-          if ((val == "C").or.(val == "c")) then
-             fargo3d%corrotating_frame = .true.
-          else
-             fargo3d%corrotating_frame = .false.
-          endif
-       case("REALTYPE")
-          if ((val == "float64").or.(val == "FLOAT64")) then
-             fargo3d%realtype = dp
-          else
-             fargo3d%realtype = sp
-          endif
-
-          ! Additional parameters
-       case("DT")
-          read(val,*,iostat=ios) fargo3d%dt
-       case("ASPECTRATIO")
-          read(val,*,iostat=ios) fargo3d%aspect_ratio
-       case("NU")
-          read(val,*,iostat=ios) fargo3d%nu
-       case("PLANETCONFIG")
-          fargo3d%planetconfig = val
-       case("CS")
-          read(val,*,iostat=ios) fargo3d%cs
-       case("GAMMA")
-          read(val,*,iostat=ios) fargo3d%gamma
-       end select
-    end do
+    ! Model boundaries
+    idefix%x1_min = x1(1)
+    idefix%x1_max = x1(idefix%nx1)
+    idefix%x2_min = x2(1)
+    idefix%x2_max = x2(idefix%nx2)
+    idefix%x3_min = x3(1)
+    idefix%x3_max = x3(idefix%nx3)
 
     ! Updating mcfost parameters
     grid_type = 2
-    n_rad = fargo3d%ny
+    n_rad = idefix%nx1-1
     n_rad_in = 1
-    n_az = fargo3d%nx
-    nz = fargo3d%nz/2 + 1
+    nz = idefix%nx2-1
+    n_az = idefix%nx3-1
     lregular_theta = .true.
-    theta_max = 0.5 * pi - fargo3d%zmin
+    theta_max = 0.5 * pi - idefix%x3_min
 
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
@@ -183,10 +58,10 @@ contains
        scale_length_units_factor = 1.0
     endif
 
-    disk_zone(1)%rin  = fargo3d%ymin * scale_length_units_factor
+    disk_zone(1)%rin  = idefix%x1_min * scale_length_units_factor
     disk_zone(1)%edge=0.0
     disk_zone(1)%rmin = disk_zone(1)%rin
-    disk_zone(1)%rout = fargo3d%ymax * scale_length_units_factor
+    disk_zone(1)%rout = idefix%x1_max * scale_length_units_factor
     disk_zone(1)%rmax = disk_zone(1)%rout
 
     write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az
@@ -200,28 +75,26 @@ contains
 
   subroutine read_idefix_model()
 
-    ! fargo3d data is ordered in x = phi, y = r, z = theta
+    ! idefix data is ordered in x1 = r, x2 = theta, x3 = phi
 
-    real(dp), dimension(:,:,:), allocatable  :: fargo3d_density, fargo3d_vx, fargo3d_vy, fargo3d_vz
+    real(dp), dimension(:,:,:), allocatable  :: rho, vx1, vx2, vx3
     integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old
-    real(dp) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
 
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
 
-    real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
+    real(dp) :: Ggrav_idefix, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
     type(star_type), dimension(:), allocatable :: etoile_old
 
-    ! Todo : add option to skip velocity files if only continuum is needed
-
-    ! Todo : offset in azimuth between fargo3d and mcfost --> just rotate planet coordinates ?
-
-    ! Todo : correct : Omega_p and vphi (r_grid) for unit scaling
-
+    ! Planet properties hard coded for now
+    real, parameter :: Mp = 1e-3
+    real, parameter :: Omega_p = 1.0
+    real, parameter :: x = 1.0, y=0.0, z=0.0
+    real, parameter :: vx=0.0, vy=1.0, vz=1.0
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
-    Ggrav_fargo3d = 1.0_dp
+    Ggrav_idefix = 1.0_dp
 
     if (lscale_length_units) then
        ulength_au = ulength_au * scale_length_units_factor
@@ -238,38 +111,15 @@ contains
 
     umass = usolarmass *  Msun_to_kg
     ulength = ulength_au * AU_to_m
-    utime = sqrt(ulength**3/((Ggrav/Ggrav_fargo3d)*umass))
+    utime = sqrt(ulength**3/((Ggrav/Ggrav_idefix)*umass))
 
     udens = umass / ulength**3
     uvelocity = ulength / utime
 
-    ! dimensions are az, r, theta
-    allocate(fargo3d_density(fargo3d%nx,fargo3d%ny,fargo3d%nz),fargo3d_vx(fargo3d%nx,fargo3d%ny,fargo3d%nz), &
-         fargo3d_vy(fargo3d%nx,fargo3d%ny,fargo3d%nz),fargo3d_vz(fargo3d%nx,fargo3d%ny,fargo3d%nz),stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error when reading fargo3d files')
-    fargo3d_density = 0.0_dp ; fargo3d_vx  = 0.0_dp ; fargo3d_vy = 0.0_dp ; fargo3d_vz = 0.0_dp
 
-    ios = 0
-    iunit = 1
-
-    ! Reading planet properties
-    filename = trim(fargo3d%dir)//"/planet0.dat"
-    write(*,*) "Reading "//trim(filename)
-    open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
-    if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
-
-    read(fargo3d%id,*) id
-    do while(ios==0)
-       read(iunit,*) i, x, y, z, vx, vy, vz, Mp, time, Omega_p
-       if (i==id) exit
-    enddo
-    simu_time = time * utime
-
-    ! Checking units :
-    ! Omega_p * uvelocity == 29.78 km/s : OK
-
+    ! --- copy/paste from read_fargo3d
     n_etoiles_old = n_etoiles
-    n_etoiles = 2 ! Hard coded for new
+    n_etoiles = 2 ! Hard coded for now
 
     if (lfix_star) then
        write(*,*) ""
@@ -337,39 +187,20 @@ contains
        write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
        write(*,*) "WARNING: updating the azimuth to:", RT_az_min
     endif
+    ! ---- end copy/paste from read_fargo3d
+
+    ! reading data
 
 
     !-----------------------------------
     ! Passing data to mcfost
     !-----------------------------------
-    write(*,*) "Converting fargo3d files to mcfost ..."
+
+    ! copied from read_athena++
+
+    write(*,*) "Converting idefix files to mcfost ..."
     lvelocity_file = .true.
     vfield_coord = 3 ! spherical
-
-    recl = dp*fargo3d%nx*fargo3d%ny*fargo3d%nz
-
-    file_types(1) = "gasdens"
-    file_types(2) = "gasvx"
-    file_types(3) = "gasvy"
-    file_types(4) = "gasvz"
-    do l=1, 4
-       filename = trim(fargo3d%dir)//"/"//trim(file_types(l))//trim(trim(fargo3d%id))//".dat"
-       write(*,*) "Reading "//trim(filename)
-       open(unit=iunit, file=filename, status="old", form="unformatted", iostat=ios, access="direct" , recl=recl)
-       if (ios /= 0) call error("opening fargo3d file:"//trim(filename))
-       select case(l)
-       case(1)
-          read(iunit, rec=1, iostat=ios) fargo3d_density
-       case(2)
-          read(iunit, rec=1, iostat=ios) fargo3d_vx ! vphi
-       case(3)
-          read(iunit, rec=1, iostat=ios) fargo3d_vy ! vr
-       case(4)
-          read(iunit, rec=1, iostat=ios) fargo3d_vz ! vtheta
-       end select
-       if (ios /= 0) call error("reading fargo3d file:"//trim(filename))
-       close(iunit)
-    enddo
 
     allocate(vfield3d(n_cells,3), stat=alloc_status)
     if (alloc_status /= 0) call error("memory allocation error fargo3d vfield3d")
@@ -384,21 +215,18 @@ contains
           do phik=1, n_az
              icell = cell_map(i,j,phik)
 
-             densite_gaz(icell) = fargo3d_density(phik,i,jj) * udens
-             densite_pouss(:,icell) = fargo3d_density(phik,i,jj) * udens
+             densite_gaz(icell) = rho(phik,i,jj) * udens
+             densite_pouss(:,icell) = rho(phik,i,jj) * udens
 
-             vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity! vr
-             vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
-             vfield3d(icell,3)  = fargo3d_vz(phik,i,jj) * uvelocity! vtheta
+             vfield3d(icell,1)  = vx1(phik,i,jj) * uvelocity! vr
+             vfield3d(icell,2)  = (vx3(phik,i,jj) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,3)  = vx2(phik,i,jj) * uvelocity! vtheta
           enddo ! k
        enddo bz
     enddo ! i
-    deallocate(fargo3d_density,fargo3d_vx,fargo3d_vy,fargo3d_vz)
+    deallocate(rho,vx1,vx2,vx3)
 
-    !write(*,*) maxval(vfield3d(:,1))/1000., maxval(vfield3d(:,2))/1000., maxval(vfield3d(:,3))/1000.
-    !write(*,*) etoile(2)%vx/1000., etoile(2)%vy/1000., etoile(2)%vz/1000.
-    !stop
-
+    ! -- another copy and paste from read_fargo3d
     ! Normalisation density : copy and paste from read_density_file for now : needs to go in subroutine
 
     ! Calcul de la masse de gaz de la zone
@@ -423,6 +251,7 @@ contains
 
     write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
     call normalize_dust_density()
+    ! -- end copy and paste from read_fargo3d
 
     write(*,*) "Done"
 

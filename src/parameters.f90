@@ -258,12 +258,13 @@ module parametres
   type(athena_model) :: athena
 
   type idefix_model
-     integer :: nx1, nx2, nx3
+     integer :: nx1, nx2, nx3, iunit
      real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
      logical :: log_spacing, corrotating_frame
 
-     real(kind=dp) :: time
+     real :: time
      character(len=128) :: filename
+     character(len=32) :: origin
   end type idefix_model
 
   type(idefix_model) :: idefix
