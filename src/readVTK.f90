@@ -211,7 +211,7 @@ contains
     newposition=position
   end subroutine readScalars
 
-  subroutine readVTK_header(filename, unit, dimensions, time, origin, x1, x2, x3)
+  subroutine readVTK_header(filename, unit, position, dimensions, time, origin, x1, x2, x3)
     ! read only the header of a VTK file and keepthe unit open
 
     character(len=*), intent(in) :: filename
@@ -267,6 +267,50 @@ contains
 
   end subroutine readVTK_header
 
+
+  subroutine readVTK_data(unit, old_position, dimensions, rho, vx1, vx2, vx3)
+    ! read only the data of a VTK file (after readVTK_header)
+
+    integer, intent(in) :: unit, old_position
+    integer, dimension(3), intent(in) :: dimensions
+    real, allocatable, dimension(:,:,:), intent(out) :: rho, vx1, vx2, vx3
+
+
+    integer :: position, newposition
+    character (:), allocatable :: line
+    character (3) :: varName
+    real, allocatable, dimension(:,:,:) :: array
+
+    position = old_position
+    do
+       call readLine(unit, position, line, newposition)
+       if(newposition<0) exit
+       if(line(1:9) == "CELL_DATA") then
+          ! we're entering the meat
+          !skip the extra line feed
+          position=newposition+1
+       else if(line(1:7) == "SCALARS") then
+          call readScalars(unit, position, dimensions, array, varName, position)
+          if(varName=="RHO") then
+             rho = array
+          else if(varName=="VX1") then
+             vx1 = array
+          else if(varName=="VX2") then
+             vx2 = array
+          else if(varName=="VX3") then
+             vx3 = array
+          endif
+       else
+          write(*,*) "Unknown line in file:", line
+          exit
+       endif
+    enddo
+
+    close(unit=unit)
+
+  end subroutine readVTK_data
+
+
   subroutine readVTK(filename, dimensions, time, origin, x1, x2, x3, rho, vx1, vx2, vx3)
     implicit none
     character(len=*), intent(in) :: filename
@@ -286,7 +330,6 @@ contains
     real, allocatable, dimension(:,:,:) :: array
 
 
-
     ! This is a comment line; it is ignored by the compiler
     open(unit = 1, file= filename,form="unformatted",access="stream",CONVERT='BIG_ENDIAN')
     position = 1
@@ -294,11 +337,11 @@ contains
     ! 1st line: 1 vtk Data......
     call readLine(1, position, line, position)
 
-    !2nd Line : Idefix xxxxx
+    ! 2nd Line : Idefix xxxxx
     call readLine(1, position, line, position)
     origin = line
 
-    !3rd Line : BINARY (should be checked!)
+    ! 3rd Line : BINARY (should be checked!)
     call readLine(1, position, line, position)
 
     ! 4th Line : DATASET STRUCTURED (or other)
@@ -307,9 +350,7 @@ contains
     !Field data and others
     do
        call readLine(1, position, line, newposition)
-       if(newposition<0) then
-          exit
-       endif
+       if(newposition<0) exit
        if(line(1:5) == "FIELD") then
           call readField(1, position, geometry, periodicity, time, position)
        else if(line(1:10) == "DIMENSIONS") then
@@ -339,6 +380,9 @@ contains
        endif
     enddo
     close(1)
+
+    return
+
   end subroutine readVTK
 
 end module VTKtools

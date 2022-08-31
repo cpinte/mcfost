@@ -17,7 +17,6 @@ contains
 
     character(len=*), intent(in) :: filename
 
-
     integer :: geometry, time
     integer, dimension(3) :: dimensions
     character(:), allocatable :: origin
@@ -25,9 +24,10 @@ contains
     real(dp) :: dx
 
     idefix%filename = filename
-    call readVTK_header(filename, idefix%iunit, dimensions, idefix%time, origin, x1, x2, x3)
+    call readVTK_header(filename, idefix%iunit, idefix%position, dimensions, idefix%time, origin, x1, x2, x3)
 
     idefix%origin = origin
+    idefix%dimensions = dimensions
     idefix%nx1 = dimensions(1) ! r
     idefix%nx2 = dimensions(2) ! theta
     idefix%nx3 = dimensions(3) ! phi
@@ -47,7 +47,7 @@ contains
     grid_type = 2
     n_rad = idefix%nx1-1
     n_rad_in = 1
-    nz = idefix%nx2-1
+    nz = (idefix%nx2-1)/2+1
     n_az = idefix%nx3-1
     lregular_theta = .true.
     theta_max = 0.5 * pi - idefix%x3_min
@@ -77,7 +77,7 @@ contains
 
     ! idefix data is ordered in x1 = r, x2 = theta, x3 = phi
 
-    real(dp), dimension(:,:,:), allocatable  :: rho, vx1, vx2, vx3
+    real, dimension(:,:,:), allocatable  :: rho, vx1, vx2, vx3
     integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old
 
     character(len=128) :: filename
@@ -191,6 +191,9 @@ contains
 
     ! reading data
 
+    write(*,*) "Reading Idefix data ..."
+    call readVTK_data(idefix%iunit, idefix%position, idefix%dimensions, rho, vx1, vx2, vx3)
+    write(*,*) "Done"
 
     !-----------------------------------
     ! Passing data to mcfost
@@ -215,12 +218,12 @@ contains
           do phik=1, n_az
              icell = cell_map(i,j,phik)
 
-             densite_gaz(icell) = rho(phik,i,jj) * udens
-             densite_pouss(:,icell) = rho(phik,i,jj) * udens
+             densite_gaz(icell) = rho(i,jj,phik) * udens
+             densite_pouss(:,icell) = rho(i,jj,phik) * udens
 
-             vfield3d(icell,1)  = vx1(phik,i,jj) * uvelocity! vr
-             vfield3d(icell,2)  = (vx3(phik,i,jj) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
-             vfield3d(icell,3)  = vx2(phik,i,jj) * uvelocity! vtheta
+             vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
+             vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
           enddo ! k
        enddo bz
     enddo ! i

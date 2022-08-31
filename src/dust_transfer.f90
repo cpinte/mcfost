@@ -27,6 +27,7 @@ module dust_transfer
   use ML_ProDiMo
   use read_fargo3d, only : read_fargo3d_files
   use read_athena, only : read_athena_model
+  use read_idefix, only : read_idefix_model
   !$ use omp_lib
 
   implicit none
@@ -119,6 +120,8 @@ subroutine transfert_poussiere()
         call read_fargo3d_files()
      else if (lathena) then
         call read_athena_model()
+     else if (lidefix) then
+        call read_idefix_model()
      else
         if (lsigma_file) call read_sigma_file()
         call define_density()
