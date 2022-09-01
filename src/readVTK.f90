@@ -31,6 +31,7 @@ contains
     getLineSize = loc
 
     return
+
   end function getLineSize
 
   subroutine readLine(file, position, line, newposition)
@@ -311,79 +312,79 @@ contains
   end subroutine readVTK_data
 
 
-  subroutine readVTK(filename, dimensions, time, origin, x1, x2, x3, rho, vx1, vx2, vx3)
-    implicit none
-    character(len=*), intent(in) :: filename
-    integer, dimension(3), intent(out) :: dimensions
-    real, intent(out) :: time
-    character (:), allocatable, intent(out) :: origin
-    real, allocatable, intent(out) :: x1(:), x2(:), x3(:)
-    real, allocatable, dimension(:,:,:), intent(out) :: rho, vx1, vx2, vx3
-
-    character (:), allocatable :: line
-    character (3) :: varName
-    integer :: position, newposition
-    integer :: lineSize, nPoints
-    integer :: geometry
-    integer, dimension(3) :: periodicity
-
-    real, allocatable, dimension(:,:,:) :: array
-
-
-    ! This is a comment line; it is ignored by the compiler
-    open(unit = 1, file= filename,form="unformatted",access="stream",CONVERT='BIG_ENDIAN')
-    position = 1
-
-    ! 1st line: 1 vtk Data......
-    call readLine(1, position, line, position)
-
-    ! 2nd Line : Idefix xxxxx
-    call readLine(1, position, line, position)
-    origin = line
-
-    ! 3rd Line : BINARY (should be checked!)
-    call readLine(1, position, line, position)
-
-    ! 4th Line : DATASET STRUCTURED (or other)
-    call readLine(1, position, line, position)
-
-    !Field data and others
-    do
-       call readLine(1, position, line, newposition)
-       if(newposition<0) exit
-       if(line(1:5) == "FIELD") then
-          call readField(1, position, geometry, periodicity, time, position)
-       else if(line(1:10) == "DIMENSIONS") then
-          lineSize = newposition-position-1
-          read(line(11:lineSize),*) dimensions
-          position=newposition
-       else if(line(1:6) == "POINTS") then
-          call readPoints(1, position, geometry, dimensions, x1, x2, x3, position)
-       else if(line(1:9) == "CELL_DATA") then
-          ! we're entering the meat
-          !skip the extra line feed
-          position=newposition+1
-       else if(line(1:7) == "SCALARS") then
-          call readScalars(1, position, dimensions, array, varName, position)
-          if(varName=="RHO") then
-             rho = array
-          else if(varName=="VX1") then
-             vx1 = array
-          else if(varName=="VX2") then
-             vx2 = array
-          else if(varName=="VX3") then
-             vx3 = array
-          endif
-       else
-          print *, "Unknown line in file:", line
-          exit
-       endif
-    enddo
-    close(1)
-
-    return
-
-  end subroutine readVTK
+!  subroutine readVTK(filename, dimensions, time, origin, x1, x2, x3, rho, vx1, vx2, vx3)
+!    implicit none
+!    character(len=*), intent(in) :: filename
+!    integer, dimension(3), intent(out) :: dimensions
+!    real, intent(out) :: time
+!    character (:), allocatable, intent(out) :: origin
+!    real, allocatable, intent(out) :: x1(:), x2(:), x3(:)
+!    real, allocatable, dimension(:,:,:), intent(out) :: rho, vx1, vx2, vx3
+!
+!    character (:), allocatable :: line
+!    character (3) :: varName
+!    integer :: position, newposition
+!    integer :: lineSize, nPoints
+!    integer :: geometry
+!    integer, dimension(3) :: periodicity
+!
+!    real, allocatable, dimension(:,:,:) :: array
+!
+!
+!    ! This is a comment line; it is ignored by the compiler
+!    open(unit = 1, file= filename,form="unformatted",access="stream",CONVERT='BIG_ENDIAN')
+!    position = 1
+!
+!    ! 1st line: 1 vtk Data......
+!    call readLine(1, position, line, position)
+!
+!    ! 2nd Line : Idefix xxxxx
+!    call readLine(1, position, line, position)
+!    origin = line
+!
+!    ! 3rd Line : BINARY (should be checked!)
+!    call readLine(1, position, line, position)
+!
+!    ! 4th Line : DATASET STRUCTURED (or other)
+!    call readLine(1, position, line, position)
+!
+!    !Field data and others
+!    do
+!       call readLine(1, position, line, newposition)
+!       if(newposition<0) exit
+!       if(line(1:5) == "FIELD") then
+!          call readField(1, position, geometry, periodicity, time, position)
+!       else if(line(1:10) == "DIMENSIONS") then
+!          lineSize = newposition-position-1
+!          read(line(11:lineSize),*) dimensions
+!          position=newposition
+!       else if(line(1:6) == "POINTS") then
+!          call readPoints(1, position, geometry, dimensions, x1, x2, x3, position)
+!       else if(line(1:9) == "CELL_DATA") then
+!          ! we're entering the meat
+!          !skip the extra line feed
+!          position=newposition+1
+!       else if(line(1:7) == "SCALARS") then
+!          call readScalars(1, position, dimensions, array, varName, position)
+!          if(varName=="RHO") then
+!             rho = array
+!          else if(varName=="VX1") then
+!             vx1 = array
+!          else if(varName=="VX2") then
+!             vx2 = array
+!          else if(varName=="VX3") then
+!             vx3 = array
+!          endif
+!       else
+!          print *, "Unknown line in file:", line
+!          exit
+!       endif
+!    enddo
+!    close(1)
+!
+!    return
+!
+!  end subroutine readVTK
 
 end module VTKtools
 
