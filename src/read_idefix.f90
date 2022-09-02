@@ -40,8 +40,8 @@ contains
     idefix%x1_max = x1(idefix%nx1)
     idefix%x2_min = x2(1)
     idefix%x2_max = x2(idefix%nx2)
-    idefix%x3_min = x3(1)
-    idefix%x3_max = x3(idefix%nx3)
+    idefix%x3_min = x3(1)           ! these values should be 0 to 2*pi,
+    idefix%x3_max = x3(idefix%nx3)  ! while fargo3d is -pi to pi
 
     ! Updating mcfost parameters
     grid_type = 2
@@ -154,9 +154,9 @@ contains
     etoile(1)%vx = 0_dp ; etoile(1)%vy = 0_dp ; etoile(1)%vz = 0_dp
     etoile(1)%M = 1_dp * usolarmass
 
-    ! -x and -y as phi is defined differently in fargo3d
-    etoile(2)%x = -x * ulength_au
-    etoile(2)%y = -y * ulength_au
+    ! x and y are oposite to fargo3d
+    etoile(2)%x = x * ulength_au
+    etoile(2)%y = y * ulength_au
     etoile(2)%z =  z * ulength_au
 
     ! -vx and -y as phi is defined differently in fargo3d
@@ -182,7 +182,7 @@ contains
     if (lplanet_az) then
        which_planet = 1 ! 1 planet for now
        RT_n_az = 1
-       RT_az_min = planet_az + atan2(-y, -x) / deg_to_rad
+       RT_az_min = planet_az + atan2(y, x) / deg_to_rad
        RT_az_max = RT_az_min
        write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
        write(*,*) "WARNING: updating the azimuth to:", RT_az_min
