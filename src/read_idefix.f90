@@ -50,7 +50,7 @@ contains
     nz = (idefix%nx2-1)/2+1
     n_az = idefix%nx3-1
     lregular_theta = .true.
-    theta_max = 0.5 * pi - idefix%x3_min
+    theta_max = 0.5 * pi - idefix%x2_min
 
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
@@ -206,7 +206,7 @@ contains
     vfield_coord = 3 ! spherical
 
     allocate(vfield3d(n_cells,3), stat=alloc_status)
-    if (alloc_status /= 0) call error("memory allocation error fargo3d vfield3d")
+    if (alloc_status /= 0) call error("memory allocation error idefix vfield3d")
 
     write(*,*) "Constant spatial distribution"
 
@@ -221,9 +221,9 @@ contains
              densite_gaz(icell) = rho(i,jj,phik) * udens
              densite_pouss(:,icell) = rho(i,jj,phik) * udens
 
-             vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
+             vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity ! vr
              vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
-             vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
+             vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity ! vtheta
           enddo ! k
        enddo bz
     enddo ! i
