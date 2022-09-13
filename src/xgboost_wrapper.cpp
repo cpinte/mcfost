@@ -28,7 +28,7 @@ extern "C" {
 
     const float *outXGB;
 
-    if(int err = XGBoosterPredict(booster, input, 0, 0, &out_len, &outXGB)){
+    if(int err = XGBoosterPredict(booster, input, 0, 0, 0, &out_len, &outXGB)){
       std::cerr << "xgb predict error" << std::endl;
       return err;
     }

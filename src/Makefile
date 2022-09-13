@@ -152,7 +152,7 @@ endif
 #-- optional compilation with xgboost, as there are some issues on some systems
 ifeq ($(XGBOOST), yes)
     XGBOOST_WRAPPER = xgboost_wrapper
-    LXGBOOST= -lxgboost -ldmlc -lrabit
+    LXGBOOST= -lxgboost -ldmlc
 else
     XGBOOST_WRAPPER = no_xgboost_wrapper
 endif

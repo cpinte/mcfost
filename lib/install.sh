@@ -121,12 +121,6 @@ if [ "$SKIP_HDF5" != "yes" ]; then
 fi
 if [ "$MCFOST_XGBOOST" = "yes" ]; then
     git clone --recursive https://github.com/dmlc/xgboost
-    cd xgboost
-    git checkout v0.90
-    # We need to install rabit manually as the submodule was removed
-    \rm -rf rabit
-    git clone git@github.com:dmlc/rabit.git
-    cd ..
 fi
 
 #-------------------------------------------
@@ -190,42 +184,50 @@ echo "Done"
 if [ "$MCFOST_XGBOOST" = "yes" ]; then
     echo "Compiling XGBoost ..."
     cd xgboost
-    \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ is hard-coded in the Makefile
+    git checkout v1.6.2
 
-    if [ "$os" = "linux" ]; then
-        # Forcing g++ for now as there are some issues with ifort 2020 on linux
-        CC_old=$CC
-        FC_old=$FC
-        CXX_old=$CXX
-        CFLAGS_old=$CFLAGS
+   # if [ "$os" = "linux" ]; then
+   #     # Forcing g++ for now as there are some issues with ifort 2020 on linux : this works fine on gadi with ifort 2021
+   #     CC_old=$CC
+   #     FC_old=$FC
+   #     CXX_old=$CXX
+   #     CFLAGS_old=$CFLAGS
+   #
+   #     export CC=gcc
+   #     export FC=gfortran
+   #     export CXX=g++
+   #     export CFLAGS="-m64"
+   # fi
 
-        export CC=gcc
-        export FC=gfortran
-        export CXX=g++
-        export CFLAGS="-m64"
-    fi
-
-    #-- we remove the ifort test for the moment even if the default works for gfortran
+    #-- we remove the ifort test for the moment even if the default works for gfortran : this works fine on gadi too
     #if [ "$SYSTEM" = "ifort" ] ; then
-    \cp ../ifort/xgboost/base.h include/xgboost/base.h
+    #\cp ../ifort/xgboost/base.h include/xgboost/base.h
+#    55c55
+#<     !defined(__CUDACC__)
+#---
+#>     !defined(__CUDACC__) && (!__INTEL_COMPILER)
+
+
     #fi
 
-    make -j
-    \cp dmlc-core/libdmlc.a rabit/lib/librabit.a lib/libxgboost.a ../lib
+    # we want the static library
+    cmake . -DBUILD_STATIC_LIB=ON
+    make -j 4
+    \cp dmlc-core/libdmlc.a lib/libxgboost.a ../lib
     \cp -r dmlc-core/include/dmlc rabit/include/rabit include/xgboost ../include
-    # We will need the .h file when linking MCFOST, the path is hard-coded in the the xgboost files
+    # We will need the .h file when linking MCFOST, the 'src/common' path is hard-coded in the the xgboost files
     mkdir -p "$MCFOST_INSTALL/src/common"
     \cp -r src/common/*.h "$MCFOST_INSTALL/src/common"
     cd ~1
     echo "Done"
 
-    if [ "$os" = "linux" ]; then
-        # Restoring flags
-        export CC=$CC_old
-        export FC=$FC_old
-        export CXX=$CXX_old
-        export CFLAGS=$CFLAGS_old
-    fi
+#    if [ "$os" = "linux" ]; then
+#        # Restoring flags
+#        export CC=$CC_old
+#        export FC=$FC_old
+#        export CXX=$CXX_old
+#        export CFLAGS=$CFLAGS_old
+#    fi
 else
     echo "Skipping XGBoost ..."
     echo "Make sure that MCFOST_XGBOOST is not set yes when compiling MCFOST"
