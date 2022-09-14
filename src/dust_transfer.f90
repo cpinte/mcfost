@@ -147,12 +147,12 @@ subroutine transfert_poussiere()
   if ((ldisk_struct).and.(.not. ldust_sublimation)) then
      ! We write it later if there is sublimation
      if (lastrochem) then
-        call write_disk_struct(.true.,.true.)
+        call write_disk_struct(.true.,.true.,.false.)
      else
         if (n_cells <= 1000000) then
-           call write_disk_struct(.true.,lwrite_column_density)
+           call write_disk_struct(.true.,lwrite_column_density,lwrite_velocity)
         else ! We do not write the density as the file is big
-           call write_disk_struct(.false.,lwrite_column_density)
+           call write_disk_struct(.false.,lwrite_column_density,lwrite_velocity)
         endif
      endif
   endif
@@ -287,7 +287,7 @@ subroutine transfert_poussiere()
            call define_grid()
            call define_dust_density()
 
-           if (ldisk_struct) call write_disk_struct(.false.,lwrite_column_density) ! We do now in cases where we computed the dust submination radius
+           if (ldisk_struct) call write_disk_struct(.false.,lwrite_column_density,lwrite_velocity)
 
            do lambda=1,n_lambda
               ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem

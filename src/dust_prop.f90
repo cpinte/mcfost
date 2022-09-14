@@ -868,7 +868,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
 
 
   ! proba absorption sur une taille donnée
-  if (lRE_nLTE.and. (.not.low_mem_th_emission_nLTE)) then
+  if (lRE_nLTE .and. (.not.low_mem_th_emission_nLTE)) then
      if (letape_th) then
         do icell=1, n_cells
            kabs_nLTE_CDF(grain_RE_nLTE_start-1,icell,lambda)=0.0
