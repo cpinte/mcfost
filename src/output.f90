@@ -599,9 +599,7 @@ subroutine write_stokes_fits()
      call ftfiou(unit, status)
 
       !  Check for any error, and if so print out error messages
-     if (status > 0) then
-	call print_error(status)
-     end if
+     if (status > 0) call print_error(status)
   endif
 
 
@@ -725,11 +723,10 @@ subroutine write_stokes_fits()
   call ftfiou(unit, status)
 
   ! Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
+
 end subroutine write_stokes_fits
 
 !***********************************************************
@@ -953,9 +950,7 @@ subroutine ecriture_map_ray_tracing()
   endif
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
@@ -1069,9 +1064,7 @@ subroutine write_tau_surface(imol)
   deallocate(image)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
@@ -1166,11 +1159,10 @@ subroutine ecriture_sed_ray_tracing()
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
+
 end subroutine ecriture_sed_ray_tracing
 
 !**********************************************************************
@@ -1502,9 +1494,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   if (lparticle_density) then
@@ -1631,9 +1621,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grain_sizes.fits.gz"
@@ -1675,9 +1663,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grain_sizes_min.fits.gz"
@@ -1719,9 +1705,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grain_sizes_max.fits.gz"
@@ -1763,9 +1747,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grain_masses.fits.gz"
@@ -1807,9 +1789,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/volume.fits.gz"
@@ -1865,9 +1845,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grid.fits.gz"
@@ -1960,18 +1938,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
-
-  ! Wrting the column density
-  if (lcolumn_density) call write_column_density()
-
-  if (lstop_after_init) then
-     write(*,*) "Exiting"
-     call exit(0)
-  endif
-
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   if (lvelocity) then
@@ -2060,9 +2027,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
      call ftfiou(unit, status)
 
      !  Check for any error, and if so print out error messages
-     if (status > 0) then
-        call print_error(status)
-     end if
+     if (status > 0) call print_error(status)
   endif
 
   ! Wrting the column density
@@ -2072,8 +2037,6 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
      write(*,*) "Exiting"
      call exit(0)
   endif
-
-
   write(*,*) "Done"
 
   return
@@ -2425,9 +2388,7 @@ subroutine ecriture_temperature(iTemperature)
      call ftfiou(unit, status)
 
      !  Check for any error, and if so print out error messages
-     if (status > 0) then
-        call print_error(status)
-     end if
+     if (status > 0) call print_error(status)
   endif
 
   if (lRE_nLTE) then
@@ -2489,9 +2450,7 @@ subroutine ecriture_temperature(iTemperature)
      call ftfiou(unit, status)
 
      !  Check for any error, and if so print out error messages
-     if (status > 0) then
-        call print_error(status)
-     end if
+     if (status > 0) call print_error(status)
   endif
 
   if (lnRE) then
@@ -2655,9 +2614,7 @@ subroutine ecriture_temperature(iTemperature)
      call ftfiou(unit, status)
 
      !  Check for any error, and if so print out error messages
-     if (status > 0) then
-        call print_error(status)
-     end if
+     if (status > 0) call print_error(status)
   endif
 
   return
@@ -2746,9 +2703,7 @@ subroutine ecriture_Tex(imol,ext)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   deallocate(Tex)
 
@@ -2824,9 +2779,7 @@ subroutine taille_moyenne_grains()
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
@@ -3000,9 +2953,7 @@ subroutine ecriture_sed(ised)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
 !  write(*,*) "Nbre paquets recus", real(nbre_photons_loop)*real(nbre_photons_eq_th), sum(sed), sum(sed)/(real(nbre_photons_loop)*real(nbre_photons_eq_th))
 
@@ -3311,9 +3262,7 @@ subroutine ecriture_spectre(imol)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  endif
+  if (status > 0) call print_error(status)
 
   !------------------------------------------------------------------------------
   ! Origine
@@ -3360,10 +3309,7 @@ subroutine ecriture_spectre(imol)
      call ftfiou(unit, status)
 
      !  Check for any error, and if so print out error messages
-     if (status > 0) then
-        call print_error(status)
-     endif
-
+     if (status > 0) call print_error(status)
   endif ! lorigine
 
   return
