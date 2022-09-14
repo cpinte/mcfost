@@ -509,7 +509,7 @@ contains
     call ecriture_temperature(1)
 
     call appel_syst("rm -rf data_disk ; mkdir -p data_disk", syst_status)
-    call write_disk_struct(.false., .false.)
+    call write_disk_struct(.false., .false.,.false.)
     call appel_syst("mv data_disk/grid.fits.gz "//trim(data_dir), syst_status)
 
     return
