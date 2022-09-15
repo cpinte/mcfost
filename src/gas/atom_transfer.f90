@@ -14,13 +14,16 @@ module atom_transfer
    use wavelengths_gas, only : make_wavelengths_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
                                  deallocate_wavelengths_gasrt, make_wavelengths_raytracing, make_wavelengths_flux, Nlambda_max_line
    use elecdensity, only : solve_ne, write_electron, read_electron
-   use grid, only : T, vturb,nHtot, nHmin, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, ne, Voronoi, r_grid, phi_grid, z_grid
+   use grid, only : T, vturb,nHtot, nHmin, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, &
+        ne, Voronoi, r_grid, phi_grid, z_grid
    use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
-   use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, passiveAtoms, npassiveatoms, hydrogen, helium, adjust_cswitch_atoms, &
+   use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, passiveAtoms, npassiveatoms, &
+        hydrogen, helium, adjust_cswitch_atoms, &
                            maxval_cswitch_atoms, lcswitch_enabled, vbroad
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
-   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, lnon_lte_loop, vlabs, calc_contopac_loc
+   use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
+        lnon_lte_loop, vlabs, calc_contopac_loc
    use see, only : ngpop, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
@@ -41,13 +44,13 @@ module atom_transfer
 
    implicit none
 
-#include "sprng_f.h"                  
+#include "sprng_f.h"
    integer :: omp_chunk_size
    real(kind=dp), allocatable, dimension(:) :: tab_lambda_Sed
 
    contains
 
-!TO DO 
+!TO DO
 !      add Ng
 !      add Trad, Tion
 !      checkpointing
@@ -71,7 +74,7 @@ module atom_transfer
       real(kind=dp) :: diff, diff_old, dne, dN, dN1, dNc
       real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
 
-      !if lsubiteration, Itot, ds and phi_loc are n_rayons sizes and 
+      !if lsubiteration, Itot, ds and phi_loc are n_rayons sizes and
       !iray should be passed to the subroutines xoupling, integ_ray_line, accumulate_rates_mali.
       logical :: labs, lsubiteration = .false.
       logical :: l_iterate, l_iterate_ne
@@ -128,7 +131,7 @@ module atom_transfer
       else
          etape_end = 1
          if (lsubiteration) n_rayons_sub = n_rayons
-         if (istep_start==2) then 
+         if (istep_start==2) then
             etape_end = 2
             if (lsubiteration) n_rayons_sub = N_rayons_mc
          endif
@@ -141,10 +144,10 @@ module atom_transfer
       !unlike ds, vlabs does not need to be stored for all rays.
       if (lsubiteration) then
          allocate(ds(n_rayons_sub,nb_proc))
-         allocate(vlabs(n_rayons_sub,nb_proc))      
+         allocate(vlabs(n_rayons_sub,nb_proc))
       else
          allocate(ds(n_rayons_max,nb_proc))
-         allocate(vlabs(n_rayons_max,nb_proc))      
+         allocate(vlabs(n_rayons_max,nb_proc))
       endif
       !-> negligible
       mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
@@ -162,7 +165,8 @@ module atom_transfer
             !use stepan if healpix_lorder < 2?
             allocate(xmux(n_rayons),xmu(n_rayons),xmuy(n_rayons),wmu(n_rayons))
             wmu(:) = healpix_weight(healpix_lorder)
-            write(*,'(" ****-> Using "(1I8)" pixels for healpix, resolution of "(1F12.3)" degrees")') n_rayons,  healpix_angular_resolution(healpix_lorder)
+            write(*,'(" ****-> Using "(1I8)" pixels for healpix, resolution of "(1F12.3)" degrees")') n_rayons,  &
+                 healpix_angular_resolution(healpix_lorder)
             call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
             if (etape_end > 1) then
                !use that etape to have an initial solution already close to
@@ -175,7 +179,8 @@ module atom_transfer
          else if (etape==2) then
             precision = dpops_max_error
             n_rayons = N_rayons_mc
-            write(*,'(" ****-> Using "(1I4)" rays for Monte-Carlo step, ~resolution of "(1F12.3)" degrees")') n_rayons, 360.0 * sqrt(pi/real(n_rayons))/pi
+            write(*,'(" ****-> Using "(1I4)" rays for Monte-Carlo step, ~resolution of "(1F12.3)" degrees")') n_rayons, &
+                 360.0 * sqrt(pi/real(n_rayons))/pi
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
          else
@@ -225,7 +230,7 @@ module atom_transfer
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
             !!$omp shared(lsubiteration, dpops_sub_max_error, ngpop, NactiveAtoms, ActiveAtoms) & !subiterations
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,max_n_iter_loc) &
-            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot)
+            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
@@ -331,7 +336,7 @@ module atom_transfer
                   !    do iray=1,n_rayons
                   !       call xcoupling(id, icell, iray, .true.)
                   !       weight = wmu(iray)
-                  !       call accumulate_radrates_mali(id, icell, iray, weight)                        
+                  !       call accumulate_radrates_mali(id, icell, iray, weight)
                   !    enddo
 
                   !    call update_populations(id, icell,.false.,diff)
@@ -362,7 +367,7 @@ module atom_transfer
                   ! ************************** END! **************************!
 
                end if !icompute_atomRT
-             
+
                ! Progress bar
                !$omp atomic
                n_cells_done = n_cells_done + 1
@@ -370,8 +375,8 @@ module atom_transfer
              	   call progress_bar(ibar)
              	   !$omp atomic
              	   ibar = ibar+1
-               endif             
-             
+               endif
+
             end do !icell
             !$omp end do
             !$omp end parallel
@@ -389,12 +394,12 @@ module atom_transfer
                !$omp default(none) &
                !$omp private(id,icell,l_iterate,nact,ilevel,vth,nb,nr)&
                !$omp shared(T,vturb,nHmin,icompute_atomRT,ne, ne_new,n_cells)&
-               !$omp shared(tab_lambda_nm,atoms,n_atoms,dne,PassiveAtoms,NpassiveAtoms)
+               !$omp shared(tab_lambda_nm,atoms,n_atoms,dne,PassiveAtoms,NpassiveAtoms,Voigt)
                !$omp do schedule(dynamic,1)
                do icell=1,n_cells
                   !$ id = omp_get_thread_num() + 1
-                  l_iterate = (icompute_atomRT(icell)==1) 
-                  if (l_iterate) then 
+                  l_iterate = (icompute_atomRT(icell)==1)
+                  if (l_iterate) then
                      dne = max(dne, abs(1.0_dp - ne(icell)/ne_new(icell)))
                      ne(icell) = ne_new(icell) !needed for lte pops !
                      call LTEpops_H_loc(icell)
@@ -414,7 +419,8 @@ module atom_transfer
                               vth = vbroad(T(icell),PassiveAtoms(nact)%p%weight, vturb(icell))
                               !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
                               PassiveAtoms(nact)%p%lines(ilevel)%phi(:,icell) = &
-                                 Voigt(PassiveAtoms(nact)%p%lines(ilevel)%Nlambda, PassiveAtoms(nact)%p%lines(ilevel)%a(icell), PassiveAtoms(nact)%p%lines(ilevel)%v(:)/vth)&
+                                   Voigt(PassiveAtoms(nact)%p%lines(ilevel)%Nlambda, PassiveAtoms(nact)%p%lines(ilevel)%a(icell), &
+                                   PassiveAtoms(nact)%p%lines(ilevel)%v(:)/vth)&
                                     / (vth * sqrtpi)
                            endif
                         enddo
@@ -425,7 +431,7 @@ module atom_transfer
                !$omp end parallel
                write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
                   minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
-               write(*,*) ''  
+               write(*,*) ''
             end if
             !***********************************************************!
             ! ******************* checkpointing ************************!
@@ -440,8 +446,8 @@ module atom_transfer
             !$omp parallel &
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,atom,nb,nr,vth)&
-            !$omp shared(ngpop,Activeatoms,lcell_converged,vturb,T)&!diff, diff_cont, dM,
-            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm) &
+            !$omp shared(ngpop,Activeatoms,lcell_converged,vturb,T)&!diff, diff_cont, dM)&
+            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm,voigt) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
@@ -492,7 +498,8 @@ module atom_transfer
                            vth = vbroad(T(icell),atom%weight, vturb(icell))
                            !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
                            atom%lines(ilevel)%phi(:,icell) = &
-                              Voigt(atom%lines(ilevel)%Nlambda, atom%lines(ilevel)%a(icell), atom%lines(ilevel)%v(:)/vth)/ (vth * sqrtpi)
+                                Voigt(atom%lines(ilevel)%Nlambda, atom%lines(ilevel)%a(icell), atom%lines(ilevel)%v(:)/vth) &
+                                / (vth * sqrtpi)
                         endif
                      enddo
                   end do
@@ -507,12 +514,12 @@ module atom_transfer
             end do cell_loop2 !icell
             !$omp end do
             !$omp end parallel
-  
+
             if (n_iter > 1) then
                conv_speed = (diff - diff_old) !<0 converging.
                conv_acc = conv_speed - conv_acc !>0 accelerating
             endif
-          
+
             !                                     goes with maxIter_loc
             if (maxval(max_n_iter_loc)>1) write(*,'(" -> "(1I3)" sub-iterations")') maxval(max_n_iter_loc)
             do nact=1,NactiveAtoms
@@ -530,14 +537,14 @@ module atom_transfer
             write(*,'("   ->> diffcont="(1ES13.5E3))') diff_cont
             write(*,'("   ->> speed="(1ES12.4E3)"; acc="(1ES12.4E3))') conv_speed, conv_acc
             write(*,"('   ->> Unconverged cells #'(1I6)'; fraction:'(1F6.2)'%')")&!; lgeps:'1F4.1)") &
-               size(pack(lcell_converged,mask=(lcell_converged==.false.).and.(icompute_atomRT>0))), &
-               100.*real(size(pack(lcell_converged,mask=(lcell_converged==.false.).and.(icompute_atomRT>0)))) / &
+               size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0))), &
+               100.*real(size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0)))) / &
                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))!, log10(precision)
             ! write(*,'("   ->> threshold="(1ES11.2E3))'), precision
             write(*,*) "      -------------------------------------------------- "
             diff_old = diff
             conv_acc = conv_speed
-               
+
             if ((diff < precision).and.maxval_cswitch_atoms()==1.0_dp)then
                if (lprevious_converged) then
                   lconverged = .true.
@@ -603,9 +610,10 @@ module atom_transfer
          !***********************************************************!
 
          end do !while
-  
+
          if (n_iter >= n_iter_counted) then
-            write(*,'("<time iteration>="(1F6.3)" min; <time step>="(1F6.3)" min")') mod(time_iteration/60.,60.), mod(n_iter * time_iteration/60.,60.)
+            write(*,'("<time iteration>="(1F6.3)" min; <time step>="(1F6.3)" min")') mod(time_iteration/60.,60.), &
+                 mod(n_iter * time_iteration/60.,60.)
             write(*,'(" --> ~time step (cpu)="(1F6.3)" min")') mod(n_iter * time_iteration * nb_proc/60.,60.)
          endif
 
@@ -662,7 +670,7 @@ module atom_transfer
       ! else
       !    dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
       ! endif
-      
+
       ! if (dv==0.0_dp) return
 
       ! if (allocated(stream)) deallocate(stream)
@@ -736,7 +744,7 @@ module atom_transfer
 
       if (lvoronoi) then
          dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
-         if (dv == 0.0_dp) return 
+         if (dv == 0.0_dp) return
          dv = 0.0_dp
 
          !$omp parallel &
@@ -843,7 +851,7 @@ module atom_transfer
 
       write(*,*) " *** BIG WARNING **** "
       write(*,*) " !!!!! CHECK FOR BILINEAR INTERP in utils.f90 ! !!!!"
-      write(*,*) "check solve ne" 
+      write(*,*) "check solve ne"
       write(*,*) " ******************** "
 
       lnon_lte_loop = .false.
@@ -888,13 +896,13 @@ module atom_transfer
          endif
       endif
 
-      call ltepops_atoms() 
+      call ltepops_atoms()
 
       if( Nactiveatoms > 0) then
 
          call compute_max_relative_velocity(v_char)
 
-         !every indexes are defined on the lambda frequency. 
+         !every indexes are defined on the lambda frequency.
          !So even when lambda is passed as an argument, it is expected
          !that the indexes correspond at that grid.
          !Even if we split the transfer un group of wavelength that's probably best to keep indexes.
@@ -974,7 +982,7 @@ module atom_transfer
       labs = .false.
       u0 = -u ; v0 = -v ; w0 = -w
 
-      iray = 1 
+      iray = 1
       ri = 2*n_rad ; zj=1 ; phik=1
 
       ! le nbre de subpixel en x est 2^(iter-1)
@@ -1054,11 +1062,11 @@ module atom_transfer
             enddo
             atom => NULL()
          enddo
-      endif   
+      endif
 
 
-      return 
-   end subroutine intensite_pixel_atom 
+      return
+   end subroutine intensite_pixel_atom
 
   subroutine emission_line_map(ibin,iaz)
    ! -------------------------------------------------------------- !
@@ -1221,9 +1229,9 @@ module atom_transfer
          call error("healpix pixel map not yet!")
          ! lresolved = .true.
          ! zoom = 1.0 !here
-         
 
-         ! npix_x_max = npix_x - (2**healpix_lorder) * ((2**healpix_lorder) - 1) * 2 
+
+         ! npix_x_max = npix_x - (2**healpix_lorder) * ((2**healpix_lorder) - 1) * 2
          ! allocate(tab_pix_healpix(npix_x_max))
          ! call healpix_ring_northern_pixels(healpix_lorder,tab_pix_healpix)
 
@@ -1236,7 +1244,7 @@ module atom_transfer
          ! !$omp default(none) &
          ! !$omp private(i,id,z1,z2,j) &
          ! !$omp shared(ibin, iaz, pixelcorner,u,v,w,taille_pix)&
-         ! !$omp shared(dx, dy, npix_x_max,l,healpix_lorder,tab_pix_healpix) 
+         ! !$omp shared(dx, dy, npix_x_max,l,healpix_lorder,tab_pix_healpix)
 
          ! ! loop on pixels
          ! id = 1 ! pour code sequentiel
@@ -1256,7 +1264,7 @@ module atom_transfer
       end if
 
       return
-   end subroutine emission_line_map   
+   end subroutine emission_line_map
 
    subroutine spectrum_1d()
       !TO DO log rays
@@ -1316,7 +1324,7 @@ module atom_transfer
       !$omp private(id,icell0,j) &
       !$omp private(x0,y0,z0,lintersect,rr) &
       !$omp shared(cos_theta,p,Itot,N_lambda,tab_lambda_nm,x,y,weight_mu,ibar,n_rays_done)&
-      !$omp shared(u,v,w,u0,v0,w0,Rmax,Rmin,labs)
+      !$omp shared(u,v,w,u0,v0,w0,Rmax,Rmin,labs,move_to_grid)
       !$omp do schedule(dynamic,1)
       do j=1,Nimpact
          !$ id = omp_get_thread_num() + 1
@@ -1327,7 +1335,7 @@ module atom_transfer
          x0 = 10.0*Rmax*u + rr * y(1)
          y0 = 10.0*Rmax*v + rr * y(2)
          z0 = 10.0*Rmax*w + rr * y(3)
-         
+
          call move_to_grid(id,x0,y0,z0,u0,v0,w0,icell0,lintersect)
          if (lintersect) then
             call integ_ray_atom(id,icell0,x0,y0,z0,u0,v0,w0,j,labs,n_lambda,tab_lambda_nm)
@@ -1339,7 +1347,7 @@ module atom_transfer
             call progress_bar(ibar)
             !$omp atomic
             ibar = ibar+1
-         endif  
+         endif
       enddo
       !$omp end do
       !$omp end parallel
@@ -1383,7 +1391,7 @@ end module atom_transfer
    !    character(len=1) :: step_char
 
    !    write(step_char, '(i0)') step
- 
+
    !    call ftgiou(unit,status)
    !    open(unit, file="iloc_step"//step_char//".bin",form="unformatted",status='unknown',access="sequential",iostat=status)
    !    write(unit,iostat=status) icell, id, size(iloc(:,1,id)), n_rayons

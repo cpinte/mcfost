@@ -102,6 +102,7 @@ module constantes
   real, parameter :: Lsun = 3.828e26 ! [W] IAU 2015
   real(kind=dp), parameter ::  j_to_ev=1/ev_to_j!6.241506363094028e+18
   real(kind=dp), parameter ::  j_to_cm1=5.040963080525957d+22
+  real, parameter :: Tsun = 5777 ! [K] effective tenperature of the sun
 
   ! Masses
   real(kind=dp), parameter :: g_to_kg = 1.0e-3_dp

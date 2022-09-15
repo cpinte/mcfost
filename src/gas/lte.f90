@@ -355,16 +355,16 @@ module lte
          !$omp shared(nHmin, n_atoms, atoms, debye, hydrogen)
          !$omp do schedule(dynamic)
          do k=1, n_cells
-   
+
             if (icompute_atomRT(k) <= 0) cycle !transparent or dark
-            
+
             n = 1
             if (hydrogen%set_ltepops) then
                call LTEpops_H_loc(k)
 
                if (.not.hydrogen%active)  then
                   nHmin(k) = nH_minus(k)
-               endif  
+               endif
             else !.not. set_ltepops, populations read from file, just compute H- if n==1 (H)
                nHmin(k) = nH_minus(k)
             endif !set_ltepops
@@ -422,10 +422,10 @@ module lte
          integer :: Z, dZ, k, i, m
          logical :: print_diff
          real(kind=dp) :: max_nstar(hydrogen%Nlevel), min_nstar(hydrogen%Nlevel)
-   
+
          E00 = 1.0 * 3e-11 * electron_charge ! Joules
          Egs = hydrogen%E(1)
-   
+
          print_diff = (maxval(hydrogen%nstar) > 0.0_dp)
          if (print_diff) then
             do i=1,hydrogen%Nlevel
@@ -433,7 +433,7 @@ module lte
                min_nstar(i) = minval(hydrogen%nstar(i,:),mask=icompute_atomrt > 0)
             enddo
          endif
-   
+
          !$omp parallel &
          !$omp default(none) &
          !$omp private(k, phik, dEion,i,dZ,dE,m,sum,phiHmin,wocc, n_eff, chi0, E) &
@@ -441,28 +441,28 @@ module lte
          !$omp shared(ne, nHmin, nHtot, T, Egs, ldissolve, print_diff)
          !$omp do schedule(dynamic)
          do k=1,n_cells
-   
+
             if (icompute_atomRT(k) <= 0) cycle !transparent or dark
-   
+
             sum = 1.0
             phik = ne(k)*phi_jl(T(k),1.d0,1.d0,0.d0)
             !a constant of the temperature and electron density
-   
+
             do i=2, hydrogen%Nlevel
-   
+
                E = hydrogen%E(i)
-   
+
                dE = E - Egs
                dZ = hydrogen%stage(i) - hydrogen%stage(1)
-   
+
                chi0 = Elems(hydrogen%periodic_table)%ionpot(1+hydrogen%stage(i))
-   
+
              ! --------- Boltzmann equation ------------------------------------------- !
-   
+
                hydrogen%nstar(i,k)=BoltzmannEq4dot20b(T(k), dE, hydrogen%g(1), hydrogen%g(i))
-   
+
              ! ---------- Saha equation ------------------------------------------------ !
-   
+
                do m=1,dZ
                   if (ne(k)>0) then
                      hydrogen%nstar(i,k)=hydrogen%nstar(i,k)/phik
@@ -470,13 +470,13 @@ module lte
                      hydrogen%nstar(i,k) = 0d0
                   endif
                end do
-   
-   
+
+
                sum = sum+hydrogen%nstar(i,k)
             end do
-   
+
             hydrogen%nstar(1,k) = hydrogen%Abund*nHtot(k)/sum
-   
+
             !test positivity, can be 0
             if ((hydrogen%nstar(1,k) < 0)) then !<= tiny_dp) then
                write(*,*) " ************************************* "
@@ -485,21 +485,21 @@ module lte
                write(*,*) " ************************************* "
                stop
             end if
-   
+
             do i=2,hydrogen%Nlevel !debug
                hydrogen%nstar(i,k) = hydrogen%nstar(i,k)*hydrogen%nstar(1,k)
-   
+
                if (hydrogen%nstar(i,k) < 0) then !<= tiny_dp) then
                   write(*,*) " ************************************* "
-                  write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), " lower than", &
-                     " tiny_dp."
-                  write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k), &
-                     " n0=", hydrogen%nstar(1,k)
+                  write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), &
+                       " lower than tiny_dp."
+                  write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), &
+                       "ne=",ne(k), " n0=", hydrogen%nstar(1,k)
                   write(*,*) " ************************************* "
                 stop
                end if
             end do
-   
+
             if (maxval(hydrogen%nstar(:,k)) >= huge_dp) then
                write(*,*) " ************************************* "
                write(*,*) "ERROR, populations of hydrogen larger than huge_dp"
@@ -508,36 +508,38 @@ module lte
                write(*,*) " ************************************* "
                stop
             end if
-   
+
          end do !over depth points
          !$omp end do
          !$omp  end parallel
-   
-   
+
+
          if (ldissolve) then
             if (loutput_rates) call write_occupation_file(52, hydrogen, 1)
             do k=1, n_cells
                !!sum = 0.0
                if (icompute_atomRT(k)>0) then
                   do i=2, hydrogen%Nlevel-1 !only for bound-levels ?
-                     wocc = wocc_n(T(k), ne(k), real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1), hydrogen%nstar(1,k))
-   
+                     wocc = wocc_n(T(k), ne(k), real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1), &
+                          hydrogen%nstar(1,k))
+
                      ! added to the continuum
                      !!sum = sum + hydrogen%nstar(i,k) * (1.0 - wocc)
-   
+
                      !remains b-b
                      hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
-   
+
                   enddo
-                  wocc = wocc_n(T(k), ne(k), real(1,kind=dp), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1), hydrogen%nstar(1,k))
+                  wocc = wocc_n(T(k), ne(k), real(1,kind=dp), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1), &
+                       hydrogen%nstar(1,k))
                   hydrogen%nstar(1,k) = hydrogen%nstar(1,k) * wocc
                   !hydrogen%nstar(hydrogen%Nlevel,k) = hydrogen%nstar(hydrogen%Nlevel,k) + sum
                endif
-   
+
             enddo
-   
+
          endif !if locupa_prob
-   
+
          if (print_diff) then
             write(*,'("max(rho)="(1ES20.7E3)" m^-3"," min(rho)="(1ES20.7E3)" m^-3")'), &
                maxval(hydrogen%Abund*nHtot), minval(hydrogen%Abund*nHtot,mask=nHtot > 0)
@@ -547,7 +549,7 @@ module lte
                maxval(maxval(hydrogen%nstar(:,:),dim=2)),&
                minval(minval(hydrogen%nstar(:,:),dim=2,mask=hydrogen%nstar(:,:)>0))
          endif
-   
+
          return
    end subroutine LTEpops_H
 
@@ -725,7 +727,7 @@ module lte
          enddo
       endif !if locupa_prob
 
-      if (print_diff) then            
+      if (print_diff) then
          write(*,'("max(rho)="(1ES20.7E3)" m^-3"," min(rho)="(1ES20.7E3)" m^-3")'), &
             maxval(atom%Abund*nHtot), minval(atom%Abund*nHtot,mask=nHtot > 0)
          write(*,'("Old max(nstar)="(1ES20.7E3)" m^-3"," min(nstar)="(1ES20.7E3)" m^-3")'), &
@@ -779,7 +781,7 @@ module lte
                   if (icompute_atomRT(k) > 0) nHmin(k) = nH_minus(k)
                enddo
             endif
-          
+
          endif !set_ltepops
 
          !If populations not read from file (NLTEpops = .fals.) we need to set n=nstar
@@ -867,9 +869,11 @@ module lte
       do i=1,atom%Nlevel
 
          if (present(unit)) then
-            write(unit,'("level #"(1I3)," n="(1ES20.7E3)" m^-3"," nstar="(1ES20.7E3)" m^-3")') i, atom%n(i,icell), atom%nstar(i,icell)
+            write(unit,'("level #"(1I3)," n="(1ES20.7E3)" m^-3"," nstar="(1ES20.7E3)" m^-3")') i, atom%n(i,icell), &
+                 atom%nstar(i,icell)
          else
-            write(*,'("level #"(1I3)," n="(1ES20.7E3)" m^-3"," nstar="(1ES20.7E3)" m^-3")') i, atom%n(i,icell), atom%nstar(i,icell)
+            write(*,'("level #"(1I3)," n="(1ES20.7E3)" m^-3"," nstar="(1ES20.7E3)" m^-3")') i, atom%n(i,icell), &
+                 atom%nstar(i,icell)
          endif
 
       enddo

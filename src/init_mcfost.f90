@@ -191,6 +191,7 @@ subroutine set_default_variables()
   lcentre_on_sink = .false.
   lwrite_column_density = .false.
   lwrite_mol_column_density = .false.
+  lwrite_velocity = .false.
   lturn_off_planets = .false.
   lturn_off_Lacc = .false.
   lforce_Mdot = .false.
@@ -1330,6 +1331,10 @@ subroutine initialisation_mcfost()
      case("-mol_cd","-mol_column_density")
         i_arg = i_arg + 1
         lwrite_mol_column_density = .true.
+     case("-write_velocity")
+        i_arg = i_arg + 1
+        lwrite_velocity = .true.
+        ldisk_struct=.true.
      case("-centre_on_sink")
         i_arg = i_arg + 1
         lcentre_on_sink = .true.

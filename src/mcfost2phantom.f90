@@ -192,6 +192,10 @@ contains
     integer, parameter :: n_files = 1 ! the library only works on 1 set of phantom particles
     integer(kind=1), dimension(np) :: ifiles
 
+    ! Tmp : do_nucleation and nucleation will need to be intent(in)
+    logical, parameter :: do_nucleation = .false.
+    real(kind=dp), dimension(:,:), allocatable :: nucleation
+
     logical, intent(in), optional :: write_T_files
 
     logical, intent(in) :: compute_Frad ! does mcfost need to compute the radiation pressure
@@ -245,11 +249,11 @@ contains
     ierr = 0
     mu_gas = mu ! Molecular weight
 
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,n_files,dustfluidtype,xyzh,&
-         vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),massoftype2(1,1:ntypes),xyzmh_ptmass,vxyz_ptmass,hfact,&
-         umass,utime,udist,graindens,ndudt,dudt,ifiles,&
-         n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,particle_id,&
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,Tgas_SPH,extra_heating,ieos)
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,do_nucleation,n_files,dustfluidtype,xyzh,&
+         vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),nucleation(:,:),massoftype2(1,1:ntypes),&
+         xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles,&
+         n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,ieos)
 
     if (.not.lfix_star) call compute_stellar_parameters()
 
@@ -401,9 +405,6 @@ contains
     !radiation(ivorcl,:) = -1.
     do icell=1, n_cells
        i_SPH = Voronoi(icell)%original_id ! this is the particle id number in phantom
-
-       write(*,*) icell, "/", n_cells, i_SPH
-
        if (i_SPH > 0) then
           Tphantom(i_SPH)  = Tdust(icell)
           n_packets(i_SPH) = sum(xN_abs(icell,1,:))
@@ -508,7 +509,7 @@ contains
     call ecriture_temperature(1)
 
     call appel_syst("rm -rf data_disk ; mkdir -p data_disk", syst_status)
-    call write_disk_struct(.false., .false.)
+    call write_disk_struct(.false., .false.,.false.)
     call appel_syst("mv data_disk/grid.fits.gz "//trim(data_dir), syst_status)
 
     return

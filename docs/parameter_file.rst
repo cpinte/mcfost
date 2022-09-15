@@ -152,7 +152,9 @@ Images
 .. important:: For version below 3.0.43, PA was defined as the
   position angle of the semi-minor axis of the disk, measured
   counter-clockwise, with red-shifted side towards West. This
-  convention can be recovered with comman line option -old_PA.
+  convention can be recovered with comman line option -old_PA
+  (this removes 90 degrees from the PA set in the parameter file).
+
 
   If disk PA is not set to +/-90\ :sup:`o`, some of the
   image symmetries (see below) will automatically be set to F

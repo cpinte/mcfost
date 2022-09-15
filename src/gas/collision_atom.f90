@@ -48,7 +48,7 @@ module collision_atom
       call Johnson_CE(icell, CE) !among all levels
 
       !bound-levels
-      !i-> hydrogen%Nlevel already filled 
+      !i-> hydrogen%Nlevel already filled
       do i=1,hydrogen%Nlevel
          do j=i+1,hydrogen%Nlevel-1
             kr = hydrogen%ij_to_trans(i,j)
@@ -114,7 +114,7 @@ module collision_atom
          S = C0 * pia0squarex2 * (n*yn)**2 * (An*(E1(yn)/yn - E1(zn)/zn) + &
             (Bnp - An*log(2*n*n))*(ksi_johnson(yn)-ksi_johnson(zn)))
          !write(*,*) icell, i, "S=", S
-         !Here the term exp(yn)/sqrt(T) would be compensated by the multiplication by exp(-dE)/sqrt(T) (see the routine collision 
+         !Here the term exp(yn)/sqrt(T) would be compensated by the multiplication by exp(-dE)/sqrt(T) (see the routine collision
          !when CI and CE are read from the file). So, I don't include it here as the routine evaluates locally the values.
          !check that otherwise multiply by exp(yn)
          Cik(i) = S !RH -> exp(yn) / sqrt(T(icell)) !per ne
@@ -560,7 +560,7 @@ module collision_atom
     ! --------------------------------------------------------------------------- !
     ! Computes collisional rates for each transition of atom.
     ! The routine is made such that new recipe can be implemented easily.
-    ! 
+    !
     ! C in m^-3 s^-1 collisional rate units.
     ! it is ne(icell) * Cij
     !

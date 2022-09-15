@@ -6,7 +6,8 @@ module see
     use parametres
     use gas_contopac, only        : H_bf_Xsection
     use wavelengths, only         :  n_lambda
-    use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm
+    use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, &
+         tab_lambda_cont, tab_lambda_nm
     use utils, only               : gaussslv, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
     use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, chi_tot, eta_tot
     use messages, only : warning, error
@@ -18,8 +19,9 @@ module see
     !populations below that threshold not taken into account in convergence.
     real(kind=dp), parameter :: frac_limit_pops = 1d-10!1d-50
     !Variables for Non-LTE loop and MALI method
-    !TO DO: merge npgop and ne_new ? 
-    real(kind=dp), allocatable :: lcell_converged(:), ne_new(:), ngpop(:,:,:,:)
+    !TO DO: merge npgop and ne_new ?
+    logical, allocatable :: lcell_converged(:)
+    real(kind=dp), allocatable ::  ne_new(:), ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
 
 
@@ -138,10 +140,12 @@ module see
                 i = atom%Continua(kr)%i
                 j = atom%continua(kr)%j
                 if (atom%continua(kr)%hydrogenic) then
-                    tab_Vij_cont(1:atom%continua(kr)%Nlambda,kr,n) = H_bf_Xsection(atom%continua(kr), tab_lambda_nm(atom%continua(kr)%Nb:atom%continua(kr)%Nr))
+                   tab_Vij_cont(1:atom%continua(kr)%Nlambda,kr,n) = H_bf_Xsection(atom%continua(kr), &
+                        tab_lambda_nm(atom%continua(kr)%Nb:atom%continua(kr)%Nr))
                 else
                     tab_Vij_cont(1:atom%continua(kr)%Nlambda,kr,n) = linear_1D_sorted(size(atom%continua(kr)%alpha_file),&
-                        atom%continua(kr)%lambda_file,atom%continua(kr)%alpha_file,atom%continua(kr)%Nlambda,tab_lambda_nm(atom%continua(kr)%Nb:atom%continua(kr)%Nr))
+                         atom%continua(kr)%lambda_file,atom%continua(kr)%alpha_file,atom%continua(kr)%Nlambda,&
+                         tab_lambda_nm(atom%continua(kr)%Nb:atom%continua(kr)%Nr))
                 endif
                 !loop for all cells here can be long
                 !could be para
@@ -161,16 +165,19 @@ module see
                         !     wl = (tab_lambda_nm(atom%continua(kr)%Nb+l-1) - tab_lambda_nm(atom%continua(kr)%Nb+l-2))
 
                         !     tab_Aji_cont(kr,n,icell) = tab_Aji_cont(kr,n,icell) + wl * fourpi_h * 0.5*(anu1*e1*b1 + anu2*e2*b2)
-  
+
                         ! enddo
                         do l=1,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1
                             if (l==1) then
-                                wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nb+1)-tab_lambda_nm(atom%continua(kr)%Nb)) / tab_lambda_nm(atom%continua(kr)%Nb)
+                               wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nb+1)-tab_lambda_nm(atom%continua(kr)%Nb)) / &
+                                    tab_lambda_nm(atom%continua(kr)%Nb)
                             elseif (l==n_lambda) then
-                                wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nr)-tab_lambda_nm(atom%continua(kr)%Nr-1)) / tab_lambda_nm(atom%continua(kr)%Nr-1)
+                               wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nr)-tab_lambda_nm(atom%continua(kr)%Nr-1)) / &
+                                    tab_lambda_nm(atom%continua(kr)%Nr-1)
                             else
-                                wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nb+l)-tab_lambda_nm(atom%continua(kr)%Nb+l-2)) / tab_lambda_nm(atom%continua(kr)%Nb+l-1)
-                            endif 
+                               wl = 0.5*(tab_lambda_nm(atom%continua(kr)%Nb+l)-tab_lambda_nm(atom%continua(kr)%Nb+l-2)) / &
+                                    tab_lambda_nm(atom%continua(kr)%Nb+l-1)
+                            endif
                             anu1 = tab_Vij_cont(l,kr,n)
 
                             e1 = exp(-hc_k/T(icell)/tab_lambda_nm(atom%continua(kr)%Nb+l-1))
@@ -178,15 +185,15 @@ module see
                             b1 = twohc/tab_lambda_nm(atom%continua(kr)%Nb+l-1)**3
 
                             tab_Aji_cont(kr,n,icell) = tab_Aji_cont(kr,n,icell) + fourpi_h * anu1*e1*b1 * wl
-  
+
                         enddo
                     endif
-                enddo 
+                enddo
             enddo
         enddo
         atom => null()
 
-        !see + ionisation for all atoms ?? 
+        !see + ionisation for all atoms ??
         if (n_iterate_ne > 0) then
             Neq_ne = NlevelTotal + 1 !adding charge conservation
             write(*,*) " There are ", Neq_ne, " equations for non-LTE SEE + ionisation"
@@ -199,7 +206,7 @@ module see
                 mem_alloc_local = mem_alloc_local + sizeof(activeAtoms(n)%p%dgdne)
                 gs_ion(1,n) = 1
                 do j=2, activeatoms(n)%p%Nstage
-                    gs_ion(j,n) = find_continuum(activeatoms(n)%p, gs_ion(j-1,n)) 
+                    gs_ion(j,n) = find_continuum(activeatoms(n)%p, gs_ion(j-1,n))
                 enddo
                 !index of the ground state of each ion.
                 !if H: gs_ion(1) = 1; gs_ion(2) = nlevel
@@ -212,7 +219,7 @@ module see
 
         write(*,'("  Total memory allocated in NLTEloop:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
 
-        return 
+        return
     end subroutine alloc_nlte_var
 
     subroutine dealloc_nlte_var()
@@ -221,9 +228,9 @@ module see
         type (AtomType), pointer :: atom
 
         deallocate(ne_new,psi,eta_atoms,chi_up,chi_down,uji_down,lcell_converged)
-        deallocate(itot,phi_loc,ngpop)   
+        deallocate(itot,phi_loc,ngpop)
 
-        deallocate(tab_Aji_cont, tab_Vij_cont) 
+        deallocate(tab_Aji_cont, tab_Vij_cont)
 
         do n=1, NactiveAtoms
             atom => ActiveAtoms(n)%p
@@ -237,7 +244,7 @@ module see
                 deallocate(atom%continua(kr)%Cij,atom%continua(kr)%Cji)
             enddo
             atom => null()
-        enddo  
+        enddo
 
         if (allocated(chi_tot)) deallocate(chi_tot,eta_tot)
 
@@ -248,8 +255,8 @@ module see
                 deallocate(activeAtoms(n)%p%dgdne)
             enddo
         endif
- 
-        return 
+
+        return
     end subroutine dealloc_nlte_var
 
 
@@ -464,18 +471,18 @@ module see
             if (activeatoms(n)%p%id=='H') then
                 ! call init_colrates_atom(id,ActiveAtoms(n)%p)
                 call collision_rates_hydrogen_loc(id,icell)
-            else 
+            else
                 call init_colrates_atom(id,ActiveAtoms(n)%p)
                 call collision_rates_atom_loc(id,icell,ActiveAtoms(n)%p)
             endif
         enddo
 
-        return 
+        return
     end subroutine init_rates
 
     subroutine init_colrates_atom(id,atom)
         integer, intent(in) :: id
-        type (atomtype), intent(inout) :: atom 
+        type (atomtype), intent(inout) :: atom
         integer :: kr
 
         do kr=1,atom%Ncont
@@ -493,7 +500,7 @@ module see
 
     subroutine init_radrates_atom(id,icell,atom)
         integer, intent(in) :: id, icell
-        type (atomtype), intent(inout) :: atom 
+        type (atomtype), intent(inout) :: atom
         integer :: kr, i, j
         real(kind=dp) :: nlte_fact
         nlte_fact = 1.0_dp
@@ -503,7 +510,8 @@ module see
             i = atom%continua(kr)%i; j = atom%continua(kr)%j
             atom%continua(kr)%Rij(id) = 0.0_dp
             !updated value of ni and nj!
-            atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * atom%nstar(i,icell)/atom%nstar(j,icell)
+            atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
+                 atom%nstar(i,icell)/atom%nstar(j,icell)
         enddo
 
         do kr=1,atom%Nline
@@ -520,12 +528,12 @@ module see
     subroutine accumulate_radrates_mali(id, icell, iray, domega)
     ! --------------------------------------------------------- !
     ! Accumulate radiative rates for the MALI method.
-    !  Rates are integrated in frequency and accumulated 
+    !  Rates are integrated in frequency and accumulated
     !  ray-by-ray.
     !
     ! BEWARE: Psi independent of iray (so iray can be different of 1 during sub-iter)
     !
-    ! 
+    !
     ! --------------------------------------------------------- !
         integer, intent(in) :: id, icell, iray
         real(kind=dp), intent(in) :: dOmega
@@ -564,7 +572,7 @@ module see
                 !     Jbar_up = Jbar_up + 0.5 * (Ieff(l)*phi0(l)+Ieff(l-1)*phi0(l-1)) * wl
                 !     wphi = wphi + 0.5*(phi0(l)+phi0(l-1)) * wl
                 !     !xcc_down = xcc_down + 0.5 * ...
-                ! enddo  
+                ! enddo
                 ! xcc_down = sum(chi_up(Nb:Nr,i,nact,id)*psi(Nb:nR,1,id)*Uji_down(Nb:Nr,j,nact,id))
                 do l=1, nl
                     if (l==1) then
@@ -577,7 +585,7 @@ module see
                     Jbar_up = Jbar_up + Ieff(l)*phi0(l) * wl
                     wphi = wphi + phi0(l) * wl
                     xcc_down = xcc_down + chi_up(i0+l,i,nact,id)*psi(i0+l,1,id)*Uji_down(i0+l,j,nact,id)
-                enddo 
+                enddo
 
                 if (wphi <= 0.0) then
                     call error("critical! wphi in accumulate_rates_mali!")
@@ -664,7 +672,7 @@ module see
                         wl = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) / tab_lambda_nm(Nr)
                     else
                         wl = 0.5*(tab_lambda_nm(i0+l+1)-tab_lambda_nm(i0+l-1)) / tab_lambda_nm(i0+l)
-                    endif 
+                    endif
                     anu = tab_Vij_cont(l,kr,nact)
 
                     Jbar_up = Jbar_up + anu*Ieff(l)*wl
@@ -877,7 +885,7 @@ module see
             dgcdne(:,:,id) = 0.0_dp
 
             !initiate with CURRENT values
-            !get the total populations of each ion except the neutrals!    
+            !get the total populations of each ion except the neutrals!
             !ionisation fraction is
             !do j=1,nstage-1
             ! j * pops_ion(j) (pops_ion(1)=singly ionised, pops_ion(2)=twice ionised)
@@ -894,7 +902,7 @@ module see
                     ! write(*,*) pops_ion(j-1,n,id)
                 enddo
                 pops_ion(at%Nstage-1,n,id) = at%n(at%Nlevel,icell)
-                ! write(*,*) pops_ion(at%Nstage-1,n,id),  at%n(at%Nlevel,icell)        
+                ! write(*,*) pops_ion(at%Nstage-1,n,id),  at%n(at%Nlevel,icell)
                 if (at%ID=='H') then
                     ! call init_colrates_atom(id,at)
                     call collision_rates_hydrogen_loc(id,icell)
@@ -916,7 +924,7 @@ module see
                 do j=1,at%Nlevel
                     gtot(i-1+j,i-1+j,id) = 0.0_dp !set to 0 because the diag id already filled
                     gtot(i-1+j,i-1+j,id) = -sum(gtot(i:(i-1)+at%Nlevel,i-1+j,id))
-                enddo 
+                enddo
 
                 call colrate_matrix_atom(id, icell, at, at%gamma(:,:,id),at%dgdne(:,:,id))
                 dgcdne(i:(i-1)+at%Nlevel,i:(i-1)+at%Nlevel,id) = at%dgdne(:,:,id)
@@ -926,7 +934,8 @@ module see
             at=>null()
             !rate equation for this atom stored in f and df !
             !an equation per level dn_i/dt = 0 = sum_lp n_l * Gamma_lp_l
-            call rate_equations(id, icell, Neq_ne, gtot(:,:,id), dgrdne(:,:,id), dgcdne(:,:,id), xvar(:,id), fvar(:,id), dfvar(:,:,id))
+            call rate_equations(id, icell, Neq_ne, gtot(:,:,id), dgrdne(:,:,id), dgcdne(:,:,id), xvar(:,id), &
+                 fvar(:,id), dfvar(:,:,id))
 
             !charge conservation!
             call non_lte_charge_conservation (id,icell, neq_ne, xvar(:,id), fvar(:,id), dfvar(:,:,id))
@@ -937,7 +946,7 @@ module see
 
             !newton raphson!
             call multivariate_newton_raphson (neq_ne, dfvar(:,:,id), fvar(:,id), xvar(:,id))
- 
+
             !update atomic populations and ne
             neg_pops = .false.
             i = 1
@@ -1012,7 +1021,7 @@ module see
 
         !compute global convergence rate and reset values (ne, n) to
         ! the value of the MALI iteration.
-        ! the new ne and n are updated only after the end of a MALI iteration (loop over all cells) to avoid 
+        ! the new ne and n are updated only after the end of a MALI iteration (loop over all cells) to avoid
         ! introducing to much non-linearity.
 
         dne = abs(1.0_dp - npop_dag(Neq_ne,id)/ne(icell))
@@ -1031,7 +1040,7 @@ module see
         if (verbose) write(*,'("(DELTA) non-LTE ionisation dM="(1ES17.8E3)" dne="(1ES17.8E3) )') dM, dne
 
 
-        ne_new(icell) = ne(icell) 
+        ne_new(icell) = ne(icell)
         ne(icell) = npop_dag(Neq_ne,id)
 
 
@@ -1074,7 +1083,7 @@ module see
 
     return
   end subroutine ionisation_frac_lte
-    
+
     subroutine non_lte_charge_conservation (id,icell, neq, x, f, df)
     !F_cc = 1.0 - 1/ne * (np + nHeII + 2*nHeIII) = 0
     !F_cc = 1.0 - 1/ne * (sum_atom pops_ion(atom)*stage(ion)) = 0
@@ -1344,13 +1353,13 @@ module see
     end subroutine write_radiative_rates_atom
 
     subroutine write_collisional_rates_atom(atom)
-    !change axes order ? 
+    !change axes order ?
         type(AtomType), intent(inout) :: atom
         integer :: icell, id, kr, i, j, kr_start
         real(kind=dp), dimension(:,:,:), allocatable :: rates
         integer :: naxis, naxes(4), unit, status, nelements
         real(kind=dp) :: nu0
-        
+
         allocate(rates(atom%Ntr,n_cells,2),stat=status)
         rates(:,:,:) = 0.0_dp
         if (status>0) call error("(write_collisional_rates_atom) Cannot allocate rates!")
@@ -1361,7 +1370,7 @@ module see
             if (icompute_atomRT(icell) > 0) then
                 if (atom%id=='H') then
                     call collision_rates_hydrogen_loc(id,icell)
-                else 
+                else
                     call init_colrates_atom(id,atom)
                     call collision_rates_atom_loc(id,icell,atom)
                 endif
@@ -1414,7 +1423,7 @@ module see
         j = atom%j_trans(kr)
         call ftpkyj(unit, "j", j,'', status)
         call ftpkyj(unit, "i", i, ' ', status)
-        if (atom%Nline > 1) then 
+        if (atom%Nline > 1) then
             nu0 = c_light / nm_to_m / atom%lines(kr)%lambda0
             kr_start = atom%Ntr_line + 1
         else

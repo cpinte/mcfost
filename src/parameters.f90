@@ -122,7 +122,7 @@ module parametres
   real :: theta_max
 
   logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt, lwall
-  logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
+  logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, lwrite_velocity, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, llinear_rgrid, lVoronoi, is_there_disk, lno_backup
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, lonly_diff_approx, lforce_diff_approx
   logical :: ldensity_file, lsigma_file, lvelocity_file, lphantom_file, lphantom_multi, lphantom_avg
@@ -288,12 +288,15 @@ module parametres
   type(athena_model) :: athena
 
   type idefix_model
-     integer :: nx1, nx2, nx3
+     integer :: nx1, nx2, nx3, iunit, position
+     integer, dimension(3) :: dimensions
      real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
      logical :: log_spacing, corrotating_frame
 
-     real(kind=dp) :: time
+
+     real :: time
      character(len=128) :: filename
+     character(len=32) :: origin
   end type idefix_model
 
   type(idefix_model) :: idefix

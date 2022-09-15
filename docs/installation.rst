@@ -115,22 +115,57 @@ mcfost source code is hosted on github (as a private directory, public release w
      $ which gcc
      /usr/local/bin/gcc
 
+   On some MacOS installation, this last step does not seem to work, but you can link by hand, for instance with::
 
-4. Change directory to ``mcfost/lib`` and run the installation script::
+     $ cd /usr/local/bin
+     $ ln -s gcc-11 gcc
+     $ ln -s g++-11 g++
 
-   $ ./install.sh
+  (depending on your gcc/g++ version).
+
+4. If you wish to compile mcfost with the chemistry emulator, you also need to set::
+
+     $ export MCFOST_XGBOOST=yes
+
+5. Change directory to ``mcfost/lib`` and run the installation script::
+
+     $ ./install.sh
 
    This should install the required files to ``/my/install/dir/lib`` and
    ``/my/install/dir/include``.
-5. Enter the src directory and compile with::
+
+   If you already have the HDF5 library with fortran wrapper installed, you can skip the compilation of HDF5 with::
+
+     $ ./install.sh SKIP_HDF5=yes
+
+   You can compile the libraries for a given compiler using directly::
+
+     $ ./install.sh ifort
+
+   or::
+
+     $ ./install.sh gfortran
+
+   This will override the ``SYSTEM`` environment variable and allows you to have both version of the libraries (the script will install them in different sub-directories).
+
+
+6. Enter the src directory and compile with::
 
      $ make
 
-6. If you plan to use ``mcfost+phantom`` to perform live rdaiation hydrodynamics calculations, you can compile the mcfost library with::
+   You can also overide the compiler here with::
+
+     $ make ifort=yes
+
+   or::
+
+     $ make gfortran=yes
+
+7. If you plan to use ``mcfost+phantom`` to perform live radiation hydrodynamics calculations, you can compile the mcfost library with::
 
      $ make libmcfost.a
 
-7. Set the environment variable ``MCFOST_UTILS`` to point to a directory
+8. Set the environment variable ``MCFOST_UTILS`` to point to a directory
    where you want mcfost to store its data files.
    E.g. edit your shell startup files to include either::
 
@@ -142,14 +177,14 @@ mcfost source code is hosted on github (as a private directory, public release w
 
    for bash or bash-like shell.
 
-8. You should now be able to run::
+9. You should now be able to run::
 
      $ mcfost --help
 
 
  to get a short list of the available options.
 
-9. Download mcfost data files with::
+10. Download mcfost data files with::
 
       $ mcfost -setup
 
@@ -240,7 +275,7 @@ avoid this, include those commeand in your ``.bashrc`` or equivalent::
 $ export OMP_STACKSIZE=512M
 $ ulimit -s unlimited
 
-If the last command does not work on MacOS, you can try:
+If the last command does not work on MacOS, you can try::
 
 $ ulimit -s hard
 

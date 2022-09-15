@@ -23,7 +23,7 @@ module Opacity_atom
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
    real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:), eta_tot(:)
    integer, parameter 		   :: NvspaceMax = 151
-   logical 		               :: lnon_lte_loop                                      
+   logical 		               :: lnon_lte_loop
 
    contains
 
@@ -65,7 +65,8 @@ module Opacity_atom
                   atm%lines(kr)%a(icell) = line_damping(icell,atm%lines(kr))
 
                   atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth !unitless
-                  atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, atm%lines(kr)%a(icell), atm%lines(kr)%v(:)) / (vth * sqrtpi)
+                  atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, atm%lines(kr)%a(icell), atm%lines(kr)%v(:)) &
+                       / (vth * sqrtpi)
                endif
             enddo
          enddo
@@ -92,13 +93,16 @@ module Opacity_atom
             ! endif
             !-> on a small grid and interpolated later
             allocate(atm%continua(kr)%twohnu3_c2(atm%continua(kr)%Nlambdac))
-            atm%continua(kr)%twohnu3_c2(:) = twohc/tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc)**3
+            atm%continua(kr)%twohnu3_c2(:) = twohc / &
+                 tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc)**3
             allocate(atm%continua(kr)%alpha(atm%continua(kr)%Nlambdac))
             if (atm%continua(kr)%hydrogenic) then
-               atm%continua(kr)%alpha(:) = H_bf_Xsection(atm%continua(kr), tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
+               atm%continua(kr)%alpha(:) = H_bf_Xsection(atm%continua(kr), &
+                    tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
             else
                atm%continua(kr)%alpha(:) = linear_1D_sorted(size(atm%continua(kr)%alpha_file),&
-               atm%continua(kr)%lambda_file,atm%continua(kr)%alpha_file,atm%continua(kr)%Nlambdac,tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
+                    atm%continua(kr)%lambda_file,atm%continua(kr)%alpha_file,atm%continua(kr)%Nlambdac,&
+                    tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
                !to chheck the edge
             endif
 
@@ -129,7 +133,7 @@ module Opacity_atom
 
       call dealloc_gas_contopac()
       if (allocated(chi_cont)) deallocate(chi_cont,eta_cont)
-  
+
       do nat=1, n_atoms
          atm => atoms(nat)%p
 
@@ -139,7 +143,7 @@ module Opacity_atom
          enddo
 
          do kr = 1, atm%Ncont
-            if (allocated(atm%continua(kr)%twohnu3_c2)) then 
+            if (allocated(atm%continua(kr)%twohnu3_c2)) then
                deallocate(atm%continua(kr)%twohnu3_c2)
                deallocate(atm%continua(kr)%alpha)
             endif
@@ -182,8 +186,8 @@ module Opacity_atom
                call progress_bar(ibar)
                !$omp atomic
                ibar = ibar+1
-            endif  
-         endif  
+            endif
+         endif
       enddo
       !$omp end do
       !$omp end parallel
@@ -200,7 +204,7 @@ module Opacity_atom
       real(kind=dp), dimension(N_lambda_cont) :: chic, snuc
       integer :: la, lac, i0
       real(kind=dp) :: w
-      
+
       if (llimit_mem) then
          !init continuous opacity with background gas continuum.
          call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
@@ -223,7 +227,7 @@ module Opacity_atom
                i0 = lac
                exit loop_i
             endif
-         enddo loop_i 
+         enddo loop_i
       enddo
       chi(N) = chic(n_lambda_cont)
       snu(N) = snuc(n_lambda_cont)
@@ -266,7 +270,7 @@ module Opacity_atom
             chi(Nblue:Nred) = chi(Nblue:Nred) + atom%continua(kr)%alpha(:) * (atom%n(i,icell) - &
                ni_on_nj_star * ehnukt(Nblue:Nred) * atom%n(j,icell))
 
-            Snu(Nblue:Nred) = Snu(Nblue:Nred) + atom%n(j,icell) * atom%continua(kr)%alpha(:) * atom%continua(kr)%twohnu3_c2(:) *& 
+            Snu(Nblue:Nred) = Snu(Nblue:Nred) + atom%n(j,icell) * atom%continua(kr)%alpha(:) * atom%continua(kr)%twohnu3_c2(:) *&
                ni_on_nj_star * ehnukt(Nblue:Nred)
 
          end do tr_loop
@@ -322,7 +326,7 @@ module Opacity_atom
             i = atom%lines(kr)%i; j = atom%lines(kr)%j
 
             if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle tr_loop
-            
+
             if (abs(dv)>atom%lines(kr)%vmax) then
                !move the profile to the red edge up to Nover_sup
                !change Nlam ??
@@ -419,7 +423,7 @@ module Opacity_atom
 
             gij = ni_on_nj_star * exp(-hc_k/T(icell)/aatom%continua(kr)%lambda0)
 
-      
+
             if (aatom%n(i,icell) - gij*aatom%n(j,icell) <= 0.0_dp) cycle cont_loop
 
             !The wavelength integration weight cannot be used in that loop because we interpolate after.
@@ -470,9 +474,9 @@ module Opacity_atom
                 wl = 0.5*(tab_lambda_nm(la)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
              else
                 wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
-             endif    
+             endif
              chi_down(la,:,:,id) =  chi_down(la,:,:,id)  * wl
-             chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl     
+             chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl
          enddo
 
          line_loop : do kr = 1, aatom%Nline
@@ -519,7 +523,8 @@ module Opacity_atom
 
             enddo freq2_loop
             if (lupdate_psi) then
-               chi_tot(Nb:Nr) = chi_tot(Nb:Nr) + hc_fourPI * aatom%lines(kr)%Bij * (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(1:Nl)
+               chi_tot(Nb:Nr) = chi_tot(Nb:Nr) + hc_fourPI * aatom%lines(kr)%Bij * &
+                    (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(1:Nl)
             endif
 
          enddo line_loop
@@ -584,7 +589,7 @@ module Opacity_atom
       endif
       !in non-LTE:
       !the actual cell icell_nlte must be centered on 0 (moving at vmean).
-      !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte) 
+      !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte)
       if (lsubstract_avg) then!labs == .true.
          omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
          vlabs(iray,id) = omegav_mean
@@ -696,7 +701,7 @@ module Opacity_atom
 
       return
    end function profile_art_i
- 
+
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
       !not para to be able to write while computing!
       integer, intent(in) :: Nlambda
@@ -705,9 +710,9 @@ module Opacity_atom
       integer :: alloc_status, id, icell, m, Nrec
       real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
       character(len=11) :: filename_chi="chi_map.bin"
-      character(len=50) :: filename_eta="eta_map.bin"  
-      character(len=18) :: filename_rho="magnetoopt_map.bin"  
-      
+      character(len=50) :: filename_eta="eta_map.bin"
+      character(len=18) :: filename_rho="magnetoopt_map.bin"
+
       call warning("opacity emissivity map bug here because of molecular emission and r=0!")
 
       write(*,*) " Writing emissivity and opacity map (rest frame) ..."
@@ -723,12 +728,12 @@ module Opacity_atom
       if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
       allocate(eta_tmp(Nlambda, n_cells, Nrec),stat=alloc_status)
       if (alloc_status /= 0) call error("Cannot allocate eta_tmp !")
-  
-  
+
+
       call ftgiou(unit,status)
       call ftgiou(unit2,status)
       open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="sequential",iostat=status)
-      open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="sequential",iostat=status) 
+      open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="sequential",iostat=status)
       id = 1
       do icell=1, n_cells
          !$ id = omp_get_thread_num() + 1
@@ -753,20 +758,20 @@ module Opacity_atom
          write(unit2,iostat=status) eta_tmp(:,icell,:)
          !if lmagnetized write rho_tmp(:,icell,Nrec)
       enddo
-  
-   
+
+
       ! if (lmagnetized) then
       !   write(unit, iostat=status) rho_tmp
       !   deallocate(rho_tmp)
       ! endif
       deallocate(chi_tmp, eta_tmp)
       close(unit)
-      close(unit2)                 
-  
+      close(unit2)
+
       !free unit
       call ftfiou(unit, status)
       call ftfiou(unit2, status)
-    
+
       return
    end subroutine write_opacity_emissivity_bin
 

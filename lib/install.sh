@@ -33,16 +33,16 @@
 #                  MCFOST. The libraries will be
 #                  installed under this directory.
 #
+# MCFOST_XGBOOST   : a boolean flag ("yes" or "no") to
+#                  compile the XGBoost libraries.
+#                  If "yes", you also need to compile MCFOST
+#                  with MCFOST_XGBOOST=yes to use CGBoost.
+#                  Optional, default value is "no".
+#
 # SKIP_HDF5      : a boolean flag ("yes" or "no") to
 #                  skip compiling the HDF5 libraries.
 #                  If "yes", you must provide HDF5_DIR
 #                  when compiling MCFOST. Optional,
-#                  default value is "no".
-#
-# SKIP_XGBOOST   : a boolean flag ("yes" or "no") to
-#                  skip compiling the XGBoost libraries.
-#                  If "yes", you must compile MCFOST
-#                  with MCFOST_NO_XGBOOST=yes. Optional,
 #                  default value is "no".
 #
 #--------------------------------------------------------
@@ -102,8 +102,8 @@ fi
 #-- Check if SKIP_HDF5 is set, if not, set to 'no'
 if [ -z ${SKIP_HDF5+x} ]; then SKIP_HDF5=no; fi
 
-#-- Check if SKIP_XGBOOST is set, if not, set to 'no'
-if [ -z ${SKIP_XGBOOST+x} ]; then SKIP_XGBOOST=no; fi
+#-- Check if MCFOST_XGBOOST is set, if not, set to 'no'
+if [ -z ${MCFOST_XGBOOST+x} ]; then MCFOST_XGBOOST=no; fi
 
 #-- Clean previous files if any
 rm -rf lib include sprng2.0 cfitsio voro xgboost
@@ -119,7 +119,7 @@ git clone https://github.com/cpinte/voro
 if [ "$SKIP_HDF5" != "yes" ]; then
     wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
 fi
-if [ "$SKIP_XGBOOST" != "yes" ]; then
+if [ "$MCFOST_XGBOOST" = "yes" ]; then
     git clone --recursive https://github.com/dmlc/xgboost
     cd xgboost
     git checkout v0.90
@@ -187,7 +187,7 @@ echo "Done"
 #-------------------------------------------
 # XGBoost
 #-------------------------------------------
-if [ "$SKIP_XGBOOST" != "yes" ]; then
+if [ "$MCFOST_XGBOOST" = "yes" ]; then
     echo "Compiling XGBoost ..."
     cd xgboost
     \cp ../ifort/xgboost/rabit/Makefile rabit/ # g++ is hard-coded in the Makefile
@@ -228,7 +228,7 @@ if [ "$SKIP_XGBOOST" != "yes" ]; then
     fi
 else
     echo "Skipping XGBoost ..."
-    echo "Make sure to set MCFOST_NO_XGBOOST=yes when compiling MCFOST"
+    echo "Make sure that MCFOST_XGBOOST is not set yes when compiling MCFOST"
 fi
 
 #---------------------------------------------

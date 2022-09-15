@@ -56,7 +56,6 @@ contains
     athena%nx2=RootGridSize(2)
     athena%nx3=RootGridSize(3)
 
-
     call hdf_read_attribute(group_id,"", "RootGridX1",RootGridX1) ! r
     call hdf_read_attribute(group_id,"", "RootGridX2",RootGridX2) ! theta
     call hdf_read_attribute(group_id,"", "RootGridX3",RootGridX3) ! phi
@@ -164,7 +163,7 @@ contains
 
     ! --- copy/paste from read_fargo3d
     n_etoiles_old = n_etoiles
-    n_etoiles = 2 ! Hard coded for new
+    n_etoiles = 2 ! Hard coded for now
 
     if (lfix_star) then
        write(*,*) ""

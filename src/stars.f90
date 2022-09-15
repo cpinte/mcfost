@@ -1237,7 +1237,7 @@ end subroutine find_spectra
        etoile(i)%lb_body = .false.
        etoile(i)%spectre = "None"
 
-       write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", etoile(i)%r, "Rsun"
+       write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", real(etoile(i)%r), "Rsun"
     enddo
 
     ! Passage rayon en AU

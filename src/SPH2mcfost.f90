@@ -63,8 +63,11 @@ contains
           read_phantom_files => read_phantom_bin_files
        endif
 
-       call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz, &
-            particle_id, massgas,massdust,rho,rhodust,T_gas,extra_heating,ndusttypes, &
+       !subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,particle_id,massgas,massdust,&
+       !rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ierr)
+
+       call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz,T_gas, &
+            particle_id, massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
             SPH_grainsizes,mask,n_SPH,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
@@ -587,7 +590,8 @@ contains
     use elements_type, only : wght_per_H, read_abundance
    !  use mhd2mcfost, only : alloc_atomrt_grid, nHtot, ne, &
    !     v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne
-    use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne, check_for_zero_electronic_density
+    use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne, &
+         check_for_zero_electronic_density
 
     integer, intent(in) :: n_SPH
     real(dp), dimension(n_SPH), intent(in) :: T_tmp,mass_gas
