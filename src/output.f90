@@ -3478,6 +3478,9 @@ subroutine write_atomic_maps(atom)
       call ftpkyd(unit,'lambda0',lam0_air(1),-7,'nm (air)',status)
       call ftpkyd(unit,'nu0',1d-6*c_light / atom%lines(kr)%lambda0,-7,'10^15 Hz',status)
 
+      !aspro compatibility
+      call ftpkyd(unit,'CRVAL3',lam0_air(1)*1d-3,-7,'micron',status)
+      call ftpkyd(unit,'CDELT3',1d-3*sum(lambda_loc(2:naxes(3))-lambda_loc(1:naxes(3)-1))/real(naxes(3)-1),-7,'micron',status)
             !  call ftpprd(unit,group,fpixel,naxes(1)*nelements,atom%lines(kr)%map(:,:,:,:,:),status)
       call ftpprd(unit,group,fpixel,naxes(3)*nelements,atom%lines(kr)%map,status)
       if (status > 0) call print_error(status)
