@@ -154,7 +154,7 @@ subroutine set_default_variables()
   lcentre_on_sink = .false.
   lwrite_column_density = .false.
   lwrite_mol_column_density = .false.
-  lwrite_velocity = .true.
+  lwrite_velocity = .false.
   lturn_off_planets = .false.
   lturn_off_Lacc = .false.
   lforce_Mdot = .false.
