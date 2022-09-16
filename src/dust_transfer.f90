@@ -1000,8 +1000,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 !        write(*,*) "*********************"
 !     endif
 
-     if (lvariable_dust) p_icell = icell
-
      ! Sinon la vie du photon continue : il y a interaction
      ! Diffusion ou absorption
      flag_direct_star = .false.

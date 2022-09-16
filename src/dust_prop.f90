@@ -14,6 +14,7 @@ module dust_prop
 
   implicit none
 
+  real(dp), dimension(:), allocatable :: kappa_factor
   real(dp), dimension(:,:), allocatable :: kappa !n_cells, n_lambda
   real(dp), dimension(:,:), allocatable :: kappa_abs_LTE ! n_cells, n_lambda
   real(dp), dimension(:,:), allocatable :: kappa_abs_nLTE, kappa_abs_RE ! n_cells, n_lambda
@@ -775,7 +776,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   logical, intent(in), optional :: no_scatt
 
   integer :: icell, k, thetaj
-  real(kind=dp) ::  density, fact, k_abs_RE, k_abs_tot, k_sca_tot, angle
+  real(kind=dp) ::  density, fact, k_abs_RE, k_abs_tot, k_sca_tot, rho0
   logical :: lcompute_obs,  ldens0, compute_scatt
 
 
@@ -808,7 +809,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   endif
 
   ! Calcul opacite et probabilite de diffusion
-  do icell=1, n_cells  ! Todo : this can be long when there are many cells --> skip loop when lvariable_dust is false
+  do icell=1, p_n_cells  ! Todo : this can be long when there are many cells --> skip loop when lvariable_dust is false
      kappa(icell,lambda) = 0.0
      k_sca_tot = 0.0
      k_abs_tot = 0.0
@@ -866,6 +867,9 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      endif ! letape_th
   enddo !icell
 
+  ! nRE opacities are updated live and per cell (as grains are flagged in equilibrium), so we can not use a cell pointer here
+  !do icell=1, n_cell
+
 
   ! proba absorption sur une taille donnée
   if (lRE_nLTE .and. (.not.low_mem_th_emission_nLTE)) then
@@ -893,18 +897,24 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   ! fact =  pi * a * a * 149595.0
   ! les k_abs_XXX n'ont pas besoin d'etre normalise car tout est relatif
   fact = AU_to_cm * mum_to_cm**2
-  kappa(:,lambda) = kappa(:,lambda) * fact
 
-  if (lRE_LTE) kappa_abs_LTE(:,lambda) = kappa_abs_LTE(:,lambda) * fact
-  if (lRE_nLTE) kappa_abs_nLTE(:,lambda) = kappa_abs_nLTE(:,lambda) * fact
-  if (letape_th.and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact
+  ! Todo
+  rho0 = masse(icell)/volume(icell) ! normalising by density in 1st cell
+  if (rho0 < tiny_dp) call error("cannot normalise by density in first cell")
 
-  if (lscatt_ray_tracing) then
-     do thetaj=0,nang_scatt
-        angle = real(thetaj)/real(nang_scatt)*pi
-        !tab_cos_scatt(thetaj) = cos(angle)
-     enddo
+  if (lvariable_dust) then
+     kappa_factor(:) = 1.0_dp
+  else
+     kappa_factor(:) = masse(:)/volume(:) / rho0 ! ie rho / rho(icell=0)
   endif
+
+  ! We apply a corrective factor per cell --> to get kappa, we need to do kappa(icell,lambda) * kappa_factor(icell)
+  kappa(:,lambda) = kappa(:,lambda) * fact / kappa_factor(1:p_n_cells)
+
+  if (lRE_LTE) kappa_abs_LTE(:,lambda) = kappa_abs_LTE(:,lambda) * fact / kappa_factor(1:p_n_cells)
+  if (lRE_nLTE) kappa_abs_nLTE(:,lambda) = kappa_abs_nLTE(:,lambda) * fact / kappa_factor(1:p_n_cells)
+  if (letape_th.and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact / kappa_factor(1:p_n_cells)
+
 
 
   if (compute_scatt) then

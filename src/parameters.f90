@@ -87,7 +87,8 @@ module parametres
   ! Nombre de cellules azimuthales
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
-  integer :: n_cells, nrz, p_n_cells, icell_ref
+  integer :: n_cells, nrz, p_n_cells
+  integer, target :: icell_ref
   logical :: lregular_theta
   real :: theta_max
 

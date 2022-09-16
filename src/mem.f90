@@ -166,36 +166,33 @@ subroutine alloc_dynamique(n_cells_max)
   call allocate_thermal_energy(Nc)
 
   ! Tableaux relatifs aux prop optiques des cellules
-  ! todo : could be p_Nc ...
-  allocate(kappa(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), tab_albedo_pos(Nc,n_lambda), stat=alloc_status)
+  allocate(kappa(p_Nc,n_lambda), kappa_abs_LTE(p_Nc,n_lambda), tab_albedo_pos(p_Nc,n_lambda), kappa_factor(Nc), stat=alloc_status)
   kappa=0.0 ; kappa_abs_LTE=0.0 ; tab_albedo_pos = 0
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa and albedo'
      stop
   endif
 
-
   if (.not.(lonly_LTE.or.lonly_nLTE)) then
-     allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status) ; proba_abs_RE_LTE=0.0
+     allocate(proba_abs_RE_LTE(p_Nc,n_lambda),  stat=alloc_status) ; proba_abs_RE_LTE=0.0
      proba_abs_RE_LTE=0.0
   endif
   if (lRE_nLTE)  then
-     allocate(kappa_abs_nLTE(Nc,n_lambda), stat=alloc_status) ; kappa_abs_nLTE=0.0
+     allocate(kappa_abs_nLTE(p_Nc,n_lambda), stat=alloc_status) ; kappa_abs_nLTE=0.0
   endif
   if (lRE_nLTE.or.lnRE) then
-     allocate(proba_abs_RE_LTE_p_nLTE(Nc,n_lambda), stat=alloc_status) ; proba_abs_RE_LTE_p_nLTE=0.0
+     allocate(proba_abs_RE_LTE_p_nLTE(p_Nc,n_lambda), stat=alloc_status) ; proba_abs_RE_LTE_p_nLTE=0.0
   endif
-  if (lnRE) then
-     allocate(proba_abs_RE(Nc,n_lambda), kappa_abs_RE(Nc,n_lambda), stat=alloc_status) ; proba_abs_RE=0.0 ;kappa_abs_RE=0.0
+  if (lnRE) then ! those are updated live and per cell, so we cannot use a pointer
+     allocate(kappa_abs_RE(Nc,n_lambda), proba_abs_RE(Nc,n_lambda), stat=alloc_status) ; kappa_abs_RE=0.0 ; proba_abs_RE=0.0
   endif
   if (alloc_status > 0) call error('Allocation error kappa_abs')
 
   if (aniso_method==2) then
-     allocate(tab_g_pos(Nc,n_lambda),stat=alloc_status)
+     allocate(tab_g_pos(p_Nc,n_lambda),stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_albedo_pos, tab_g_pos')
      tab_g_pos = 0.0
   endif
-
 
   ! **************************************************
   ! Tableaux relatifs aux prop optiques des cellules ou des grains

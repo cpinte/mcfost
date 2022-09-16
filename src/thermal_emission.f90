@@ -416,7 +416,9 @@ subroutine init_reemission(lheating,dudt)
   logical, intent(in) :: lheating
   real, dimension(:), allocatable, intent(in), optional :: dudt
 
-  integer :: k,lambda,t, pop, icell, p_icell, id
+  integer :: k,lambda,t, pop, id
+  integer, target :: icell
+  integer, pointer :: p_icell
   real(kind=dp) :: integ, coeff_exp, cst_wl, cst, wl
   real(kind=dp) ::  temp, cst_E, delta_wl
   real(kind=dp), dimension(0:n_lambda) :: integ3
@@ -457,16 +459,21 @@ subroutine init_reemission(lheating,dudt)
   ! produit par opacite (abs seule) massique
   ! Todo : this loop is OK in 2D but takes ~ 5sec for 0.5 million cells in 3D
   !$omp parallel default(none) &
-  !$omp private(id,icell,T,lambda,integ, Qcool,Qcool0,extra_heating,Qcool_minus_extra_heating,Temp,u_o_dt) &
-  !$omp shared(cst_E,kappa_abs_LTE,volume,B,lextra_heating,xT_ech,log_Qcool_minus_extra_heating,J0) &
-  !$omp shared(n_T,n_cells,n_lambda,tab_Temp,ldudt_implicit,ufac_implicit,dudt,lRE_nLTE)
+  !$omp private(id,icell,p_icell,T,lambda,integ, Qcool,Qcool0,extra_heating,Qcool_minus_extra_heating,Temp,u_o_dt) &
+  !$omp shared(cst_E,kappa_abs_LTE,kappa_factor,volume,B,lextra_heating,xT_ech,log_Qcool_minus_extra_heating,J0) &
+  !$omp shared(n_T,n_cells,n_lambda,tab_Temp,ldudt_implicit,ufac_implicit,dudt,lRE_nLTE,lvariable_dust,icell_ref)
   id = 1 ! Pour code sequentiel
   !$ id = omp_get_thread_num() + 1
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   !$omp do
   do icell=1,n_cells
      ! this multiple loop is not needed when the dust grains are the same everywhere
-
      do T=1, n_T
         Temp = tab_Temp(T)
         integ=0.0
@@ -474,7 +481,7 @@ subroutine init_reemission(lheating,dudt)
            ! kappa en Au-1    \
            ! volume en AU3     >  pas de cst pour avoir E_em en SI
            ! B * cst_E en SI = W.m-2.sr-1 (.m-1 * m) cat delta_wl inclus
-           integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda,T)
+           integ = integ + kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell) * volume(icell) * B(lambda,T)
         enddo !lambda
 
         ! Proper normalization
@@ -519,6 +526,12 @@ subroutine init_reemission(lheating,dudt)
   !$omp enddo
   !$omp end parallel
 
+  ! We rallocate the pointer outside of parallel region
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   if (low_mem_th_emission) then
      do T=1, n_T
@@ -543,7 +556,7 @@ subroutine init_reemission(lheating,dudt)
               integ3(0) = 0.0
               do lambda=1, n_lambda
                  ! Pas besoin de cst , ni du volume (normalisation a 1)
-                 integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda,T)
+                 integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell) * dB_dT(lambda,T)
               enddo !l
 
               ! Normalisation a 1
@@ -561,13 +574,11 @@ subroutine init_reemission(lheating,dudt)
            integ3(0) = 0.0
            do lambda=1, n_lambda
               ! Pas besoin de cst , ni du volume (normalisation a 1)
-              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda,T)
+              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell) * dB_dT(lambda,T)
            enddo !l
 
            ! Normalisation a 1
            if (integ3(n_lambda) > tiny(0.0_dp)) then
-              p_icell = icell_ref ! When lvariable is off --> values stored in 1st cell
-
               do lambda=1, n_lambda
                  kdB_dT_CDF(lambda,T,p_icell) = integ3(lambda)/integ3(n_lambda)
               enddo !l
@@ -949,7 +960,7 @@ subroutine Temp_finale_nLTE()
 
   implicit none
 
-  integer :: T_int, T1, T2, icell
+  integer :: T_int, T1, T2,icell
   real(kind=dp) :: Temp, Temp1, Temp2, frac, log_E_abs, J_absorbe
 
   integer :: k, lambda
@@ -960,7 +971,7 @@ subroutine Temp_finale_nLTE()
   !$omp parallel &
   !$omp default(none) &
   !$omp private(log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
-  !$omp shared(J_absorbe,L_packet_th,Tdust,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
+  !$omp shared(J_absorbe,L_packet_th,Tdust,tab_Temp,n_cells,n_lambda) &
   !$omp shared(xJ_abs,densite_pouss,Tdust_1grain, xT_ech_1grain,log_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
   !$omp do schedule(dynamic,10)
@@ -1545,10 +1556,20 @@ subroutine update_proba_abs_nRE()
   ! puis P_LTE = P_LTE_old * k_RE_old / k_RE_new et P_abs_RE = k_RE_new / k_RE_old * P_abs_RE_old
 
   real(kind=dp) :: correct, correct_m1,  kappa_abs_RE_new,  kappa_abs_RE_old, delta_kappa_abs_qRE
-  integer :: l, lambda, icell
+  integer :: l, lambda
+  integer, target :: icell
+  integer, pointer :: p_icell
   logical :: lall_grains_eq
 
   write(*,*) "Setting grains at qRE and updating nRE pobabilities"
+
+  write(*,*) "TODO : this needs to be updated for the new pointers per cell !!!! make a separete loop in dust_prop for nRE case"
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   do lambda=1, n_lambda
      do icell=1,n_cells
@@ -1563,12 +1584,12 @@ subroutine update_proba_abs_nRE()
         enddo !l
 
         if (delta_kappa_abs_qRE > tiny_dp) then ! au moins 1 grain a change de status, on met a jour les differentes probabilites
-           kappa_abs_RE_old = kappa_abs_RE(icell,lambda)
+           kappa_abs_RE_old = kappa_abs_RE(icell,lambda) * kappa_factor(icell)
            kappa_abs_RE_new = kappa_abs_RE_old + delta_kappa_abs_qRE
            kappa_abs_RE(icell,lambda) = kappa_abs_RE_new
 
            if (kappa_abs_RE_old < tiny_dp) then
-              write(*,*) "Oups, opacity of equilibrium grains is 0, cannot perform correction"
+              write(*,*) "Oops, opacity of equilibrium grains is 0, cannot perform correction"
               write(*,*) "Something went wrong."
               write(*,*) "Having only grains out of equilibrium is not implemented yet."
               write(*,*) "Cell #", icell, " lambda #", lambda
@@ -1782,10 +1803,18 @@ subroutine repartition_energie(lambda)
 
   integer, intent(in) :: lambda
 
-  integer :: k, T, icell, alloc_status
+  integer :: k, T, alloc_status
+  integer, target :: icell
+  integer, pointer :: p_icell
   real(kind=dp) :: Temp, wl, cst_wl, E_star, surface, E_emise, cst_wl_max
   real(kind=dp) :: delta_T
   real(kind=dp), dimension(:), allocatable :: E_cell, E_cell_corrected
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_Icell => icell_ref
+  endif
 
   cst_wl_max = log(huge_real)-1.0e-4
 
@@ -1809,7 +1838,7 @@ subroutine repartition_energie(lambda)
            else
               cst_wl=cst_th/(Temp*wl)
               if (cst_wl < cst_wl_max) then
-                 E_cell(icell) = 4.0*kappa_abs_LTE(icell,lambda)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                 E_cell(icell) = 4.0*kappa_abs_LTE(p_icell,lambda)*kappa_factor(icell)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
               endif !cst_wl
            endif ! Temp==0.0
         else ! dark_zone
@@ -1950,25 +1979,34 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
 
   implicit none
 
-  integer, intent(in) :: lambda, icell, heating_method
+  integer, intent(in) :: lambda, heating_method
+  integer, intent(in), target :: icell
+  integer, pointer :: p_icell
   real, intent(in) :: aleat
   real(kind=dp) :: prob, CDF, norm
   integer :: kstart, kend
 
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
+
   ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
   if (heating_method == 1) then
-     norm =  kappa_abs_LTE(icell,lambda) / ( AU_to_cm * mum_to_cm**2 )
+     norm =  kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell) / ( AU_to_cm * mum_to_cm**2 )
      kstart = grain_RE_LTE_start ; kend = grain_RE_LTE_end
   else if (heating_method == 2) then
-     norm =  kappa_abs_nLTE(icell,lambda) / ( AU_to_cm * mum_to_cm**2 )
+     norm =  kappa_abs_nLTE(p_icell,lambda) * kappa_factor(icell) / ( AU_to_cm * mum_to_cm**2 )
      kstart = grain_RE_nLTE_start ; kend = grain_RE_nLTE_end
   else
      ! todo : maybe update with an extra variable kappa_abs_qRE
      if (lRE_nLTE) then
-        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda) - kappa_abs_nLTE(icell,lambda)) &
+        norm =  (kappa_abs_RE(icell, lambda) - &
+        (kappa_abs_LTE(p_icell,lambda) - kappa_abs_nLTE(p_icell,lambda)) * kappa_factor(icell)) &
              / ( AU_to_cm * mum_to_cm**2 )
      else
-        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda)) &
+        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell)) &
              / ( AU_to_cm * mum_to_cm**2 )
      endif
      kstart = grain_nRE_start ; kend = grain_nRE_end
