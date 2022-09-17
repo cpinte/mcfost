@@ -2074,7 +2074,7 @@ subroutine ecriture_J(step)
      filename = trim(data_dir)//"/J_step1.fits.gz"
      do lambda=1, n_lambda
         do icell=1, n_cells
-           Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * L_packet_th / volume(icell) &
+           Jio(icell,lambda) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * L_packet_th / volume(icell) &
                 * tab_lambda(lambda) / tab_delta_lambda(lambda)
         enddo
      enddo
@@ -2085,7 +2085,7 @@ subroutine ecriture_J(step)
         n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
         energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
         do icell=1, n_cells
-           Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
+           Jio(icell,lambda) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * energie_photon/volume(icell)
         enddo
      enddo
   endif
@@ -2270,7 +2270,7 @@ function compute_UV_field() result(G)
      n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
      energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes ! F_lambda here
      do icell=1, n_cells
-        J(lambda,icell) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
+        J(lambda,icell) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * energie_photon/volume(icell)
      enddo
   enddo
   lamb(:) = tab_lambda(:) * 1e-6 ! en m
