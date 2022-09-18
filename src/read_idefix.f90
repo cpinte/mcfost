@@ -8,6 +8,7 @@ module read_idefix
   use cylindrical_grid
   use density
   use stars, only : compute_stellar_parameters
+  use read_fargo3d, only : read_planet_files, n_planets_max
 
   implicit none
 
@@ -78,19 +79,21 @@ contains
     ! idefix data is ordered in x1 = r, x2 = theta, x3 = phi
 
     real, dimension(:,:,:), allocatable  :: rho, vx1, vx2, vx3
-    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_etoiles_old
+    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_planets, n_etoiles_old
 
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
 
-    real(dp) :: Ggrav_idefix, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
+    real(dp) :: Ggrav_idefix, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur, omega
     type(star_type), dimension(:), allocatable :: etoile_old
 
+    real(dp), dimension(n_planets_max) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
+
     ! Planet properties hard coded for now
-    real, parameter :: Mp = 1e-3
-    real, parameter :: Omega_p = 1.0
-    real, parameter :: x = 1.0, y=0.0, z=0.0
-    real, parameter :: vx=0.0, vy=1.0, vz=1.0
+    !real, parameter :: Mp = 1e-3
+    !real, parameter :: Omega_p = 1.0
+    !real, parameter :: x = 1.0, y=0.0, z=0.0
+    !real, parameter :: vx=0.0, vy=1.0, vz=1.0
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
@@ -116,77 +119,85 @@ contains
     udens = umass / ulength**3
     uvelocity = ulength / utime
 
+    call read_planet_files("./",ulength_au,uvelocity,usolarmass,utime,&
+         n_planets,x,y,z,vx,vy,vz,Mp,time,Omega_p)
+    idefix%corrotating_frame = (n_planets > 1)
+
+    if (idefix%corrotating_frame) then
+       Omega = Omega_p(which_planet)
+    else
+       Omega = 0.0_dp
+    endif
 
     ! --- copy/paste from read_fargo3d
-    n_etoiles_old = n_etoiles
-    n_etoiles = 2 ! Hard coded for now
+!    n_etoiles_old = n_etoiles
+!    n_etoiles = 2 ! Hard coded for now
+!
+!    if (lfix_star) then
+!       write(*,*) ""
+!       write(*,*) "Stellar parameters will not be updated, only the star positions, velocities and masses"
+!       if (n_etoiles /= n_etoiles_old) call error("Wrong number of stars in mcfost parameter files")
+!    else
+!       write(*,*) ""
+!       write(*,*) "Updating the stellar properties:"
+!       write(*,*) "There are now", n_etoiles, "stars in the model"
+!
+!       ! Saving if the accretion rate was forced
+!       allocate(etoile_old(n_etoiles_old))
+!       if (allocated(etoile)) then
+!          etoile_old(:) = etoile(:)
+!          deallocate(etoile)
+!       endif
+!       allocate(etoile(n_etoiles))
+!       do i=1, min(n_etoiles, n_etoiles_old)
+!          etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
+!          etoile(i)%Mdot = etoile_old(i)%Mdot
+!       enddo
+!       ! If we have new stars
+!       do i=n_etoiles_old,n_etoiles
+!          etoile(i)%force_Mdot = .false.
+!          etoile(i)%Mdot = 0.
+!       enddo
+!       deallocate(etoile_old)
+!       etoile(:)%find_spectrum = .true.
+!    endif
 
-    if (lfix_star) then
-       write(*,*) ""
-       write(*,*) "Stellar parameters will not be updated, only the star positions, velocities and masses"
-       if (n_etoiles /= n_etoiles_old) call error("Wrong number of stars in mcfost parameter files")
-    else
-       write(*,*) ""
-       write(*,*) "Updating the stellar properties:"
-       write(*,*) "There are now", n_etoiles, "stars in the model"
+    !n_etoiles = n_planets + 1
+    !do i=1,n_planets
+    !   ! x and y are oposite to fargo3d
+    !   etoile(i+1)%x = x(i) * ulength_au
+    !   etoile(i+1)%y = y(i) * ulength_au
+    !   etoile(i+1)%z = z(i) * ulength_au
+    !
+    !   ! -vx and -y as phi is defined differently in fargo3d
+    !   etoile(i+1)%vx = -vx(i) * uvelocity
+    !   etoile(i+1)%vy = -vy(i) * uvelocity
+    !   etoile(i+1)%vz =  vz(i) * uvelocity
+    !
+    !   etoile(i+1)%M = Mp(i) * usolarmass
+    !enddo
 
-       ! Saving if the accretion rate was forced
-       allocate(etoile_old(n_etoiles_old))
-       if (allocated(etoile)) then
-          etoile_old(:) = etoile(:)
-          deallocate(etoile)
-       endif
-       allocate(etoile(n_etoiles))
-       do i=1, min(n_etoiles, n_etoiles_old)
-          etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
-          etoile(i)%Mdot = etoile_old(i)%Mdot
-       enddo
-       ! If we have new stars
-       do i=n_etoiles_old,n_etoiles
-          etoile(i)%force_Mdot = .false.
-          etoile(i)%Mdot = 0.
-       enddo
-       deallocate(etoile_old)
-       etoile(:)%find_spectrum = .true.
-    endif
-
-    etoile(1)%x = 0_dp ; etoile(1)%y = 0_dp ; etoile(1)%z = 0_dp
-    etoile(1)%vx = 0_dp ; etoile(1)%vy = 0_dp ; etoile(1)%vz = 0_dp
-    etoile(1)%M = 1_dp * usolarmass
-
-    ! x and y are oposite to fargo3d
-    etoile(2)%x = x * ulength_au
-    etoile(2)%y = y * ulength_au
-    etoile(2)%z =  z * ulength_au
-
-    ! -vx and -y as phi is defined differently in fargo3d
-    etoile(2)%vx = -vx * uvelocity
-    etoile(2)%vy = -vy * uvelocity
-    etoile(2)%vz =  vz * uvelocity
-
-    etoile(2)%M = Mp * usolarmass
-
-    do i=1,n_etoiles
-       if (etoile(i)%M > 0.013) then
-          write(*,*) "Star   #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
-               real(etoile(i)%M), "Msun, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
-       else
-          write(*,*) "Planet #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
-               real(etoile(i)%M * GxMsun/GxMjup), "MJup, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
-       endif
-       if (i>1) write(*,*)  "       distance=", real(sqrt((etoile(i)%x - etoile(1)%x)**2 + &
-            (etoile(i)%y - etoile(1)%y)**2 + (etoile(i)%z - etoile(1)%z)**2)), "au"
-    enddo
-    if (.not.lfix_star) call compute_stellar_parameters()
-
-    if (lplanet_az) then
-       which_planet = 1 ! 1 planet for now
-       RT_n_az = 1
-       RT_az_min = planet_az + atan2(y, x) / deg_to_rad
-       RT_az_max = RT_az_min
-       write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
-       write(*,*) "WARNING: updating the azimuth to:", RT_az_min
-    endif
+!    do i=1,n_etoiles
+!       if (etoile(i)%M > 0.013) then
+!          write(*,*) "Star   #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
+!               real(etoile(i)%M), "Msun, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
+!       else
+!          write(*,*) "Planet #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
+!               real(etoile(i)%M * GxMsun/GxMjup), "MJup, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
+!       endif
+!       if (i>1) write(*,*)  "       distance=", real(sqrt((etoile(i)%x - etoile(1)%x)**2 + &
+!            (etoile(i)%y - etoile(1)%y)**2 + (etoile(i)%z - etoile(1)%z)**2)), "au"
+!    enddo
+!    if (.not.lfix_star) call compute_stellar_parameters()
+!
+!    if (lplanet_az) then
+!       which_planet = 1 ! 1 planet for now
+!       RT_n_az = 1
+!       RT_az_min = planet_az + atan2(y, x) / deg_to_rad
+!       RT_az_max = RT_az_min
+!       write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
+!       write(*,*) "WARNING: updating the azimuth to:", RT_az_min
+!    endif
     ! ---- end copy/paste from read_fargo3d
 
     ! reading data
@@ -222,7 +233,7 @@ contains
              densite_pouss(:,icell) = rho(i,jj,phik) * udens
 
              vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity ! vr
-             vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
              vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity ! vtheta
           enddo ! k
        enddo bz
