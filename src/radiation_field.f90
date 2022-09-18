@@ -50,7 +50,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
   endif
 
   if (letape_th) then
-     if (lRE_LTE) xKJ_abs(icell,id) = xKJ_abs(icell,id) + kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell) * l * Stokes(1)
+     if (lRE_LTE) xKJ_abs(icell,id) = xKJ_abs(icell,id) + kappa_abs_LTE(p_icell,lambda) * l * Stokes(1) ! kappa_factor(icell) is not included here
      if (lxJ_abs_step1) xJ_abs(icell,lambda,id) = xJ_abs(icell,lambda,id) + l * Stokes(1)
      if (lmcfost_lib) xN_abs(icell,1,id) = xN_abs(icell,1,id) + 1.0 ! We do not store the wl dependence
   else

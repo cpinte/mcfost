@@ -106,7 +106,7 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   if (alloc_status > 0) call error('Allocation error tab_Temp')
   tab_Temp = 0.0
 
-  allocate(log_Qcool_minus_extra_heating(n_T,Nc), stat=alloc_status)
+  allocate(log_Qcool_minus_extra_heating(n_T,p_Nc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error log_E_em')
   log_Qcool_minus_extra_heating = 0.0
 
@@ -461,7 +461,7 @@ subroutine init_reemission(lheating,dudt)
   !$omp parallel default(none) &
   !$omp private(id,icell,p_icell,T,lambda,integ, Qcool,Qcool0,extra_heating,Qcool_minus_extra_heating,Temp,u_o_dt) &
   !$omp shared(cst_E,kappa_abs_LTE,kappa_factor,volume,B,lextra_heating,xT_ech,log_Qcool_minus_extra_heating,J0) &
-  !$omp shared(n_T,n_cells,n_lambda,tab_Temp,ldudt_implicit,ufac_implicit,dudt,lRE_nLTE,lvariable_dust,icell_ref)
+  !$omp shared(n_T,n_cells,p_n_cells,n_lambda,tab_Temp,ldudt_implicit,ufac_implicit,dudt,lRE_nLTE,lvariable_dust,icell_ref)
   id = 1 ! Pour code sequentiel
   !$ id = omp_get_thread_num() + 1
 
@@ -472,8 +472,7 @@ subroutine init_reemission(lheating,dudt)
   endif
 
   !$omp do
-  do icell=1,n_cells
-     ! this multiple loop is not needed when the dust grains are the same everywhere
+  do icell=1,p_n_cells
      do T=1, n_T
         Temp = tab_Temp(T)
         integ=0.0
@@ -481,7 +480,7 @@ subroutine init_reemission(lheating,dudt)
            ! kappa en Au-1    \
            ! volume en AU3     >  pas de cst pour avoir E_em en SI
            ! B * cst_E en SI = W.m-2.sr-1 (.m-1 * m) cat delta_wl inclus
-           integ = integ + kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell) * volume(icell) * B(lambda,T)
+           integ = integ + kappa_abs_LTE(p_icell,lambda) * B(lambda,T)  ! kappa_factor, and volume are not included here
         enddo !lambda
 
         ! Proper normalization
@@ -499,9 +498,9 @@ subroutine init_reemission(lheating,dudt)
            if (ldudt_implicit) then
               u_o_dt = ufac_implicit * Temp ! u(T)/dt
               ! dudt is meant to be u^n/dt here
-              extra_heating = max(Qcool0, (u_o_dt - dudt(icell)) / AU_to_m**2 )
+              extra_heating = max(Qcool0, (u_o_dt - dudt(icell)) / (AU_to_m**2 * volume(icell) * kappa_factor(icell)))
            else
-              extra_heating = max(Qcool0, dudt(icell) / AU_to_m**2 )
+              extra_heating = max(Qcool0, dudt(icell) / (AU_to_m**2 * volume(icell) * kappa_factor(icell)) )
            endif
         endif
 
@@ -660,7 +659,7 @@ subroutine init_reemission(lheating,dudt)
   if (lextra_heating .and. ldudt_implicit) then
      ! as u(T) depends on T, we need to check that int kappa_nu.Bnu(T).dnu - (u(T) - u_n)/dt
      ! is still an increasing function of T
-     do icell=1, n_cells
+     do icell=1, p_n_cells
         do T=1,n_T-1
            if (log_Qcool_minus_extra_heating(T+1,icell) < log_Qcool_minus_extra_heating(T,icell)) then
               call error("Qrad_minus_dudt is not an increasing function of T")
@@ -693,28 +692,35 @@ subroutine Temp_LTE(icell, Ti, Temp)
   real, intent(out) :: Temp
 
   real(kind=dp) :: Qheat, log_Qheat, frac
+  integer :: p_icell
 
-  Qheat=sum(xKJ_abs(icell,:)) * L_packet_th
+  if (lvariable_dust) then
+     p_icell = icell
+  else
+     p_icell = icell_ref
+  endif
+
+  Qheat=sum(xKJ_abs(icell,:)) * L_packet_th / volume(icell)  ! does not include kappa_factor, same as log_Qcool
   if (Qheat < tiny_dp) then
      Temp = T_min ; Ti = 2
   else
      log_Qheat = log(Qheat)
 
-     if (log_Qheat <  log_Qcool_minus_extra_heating(1,icell)) then
+     if (log_Qheat <  log_Qcool_minus_extra_heating(1,p_icell)) then
         Temp = T_min ; Ti = 2
      else
         ! Temperature echantillonee juste sup. a la temperature de la cellule
         Ti = maxval(xT_ech(icell,:))
 
         ! On incremente eventuellement la zone de temperature
-        do while((log_Qcool_minus_extra_heating(Ti,icell) < log_Qheat).and.(Ti < n_T))
+        do while((log_Qcool_minus_extra_heating(Ti,p_icell) < log_Qheat).and.(Ti < n_T))
            Ti=Ti+1
         enddo  ! LIMITE MAX
 
         ! Interpolation lineaire entre energies emises pour des
         ! temperatures echantillonees voisines
-        frac=(log_Qheat-log_Qcool_minus_extra_heating(Ti-1,icell)) / &
-             (log_Qcool_minus_extra_heating(Ti,icell)-log_Qcool_minus_extra_heating(Ti-1,icell))
+        frac=(log_Qheat-log_Qcool_minus_extra_heating(Ti-1,p_icell)) / &
+             (log_Qcool_minus_extra_heating(Ti,p_icell)-log_Qcool_minus_extra_heating(Ti-1,p_icell))
         Temp=exp(log(tab_Temp(Ti))*frac+log(tab_Temp(Ti-1))*(1.0-frac))
      endif
   endif
