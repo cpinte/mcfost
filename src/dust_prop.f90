@@ -899,7 +899,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   fact = AU_to_cm * mum_to_cm**2
 
   ! Todo
-  rho0 = masse(icell)/volume(icell) ! normalising by density in 1st cell
+  rho0 = masse(icell_ref)/volume(icell_ref) ! normalising by density in 1st cell
   if (rho0 < tiny_dp) call error("cannot normalise by density in first cell")
 
   if (lvariable_dust) then
