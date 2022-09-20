@@ -180,8 +180,8 @@ contains
     fargo3d_density = 0.0_dp ; fargo3d_vx  = 0.0_dp ; fargo3d_vy = 0.0_dp ; fargo3d_vz = 0.0_dp
 
     ! Reading planet properties
-    call read_planet_files(trim(fargo3d%dir),ulength_au,uvelocity,usolarmass,utime,&
-         n_planets,x,y,z,vx,vy,vz,Mp,time,Omega_p)
+    call read_fargo3d_planets(trim(fargo3d%dir), n_planets,x,y,z,vx,vy,vz,Mp,time,Omega_p)
+    call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
 
     if (fargo3d%corrotating_frame) then
        if (n_planets < 1) then
@@ -301,18 +301,16 @@ contains
 
   end subroutine read_fargo3d_files
 
-  !-------
+  !---------------------------------------------
 
-  subroutine read_planet_files(dir,ulength_au,uvelocity,usolarmass,utime,&
-       n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p)
+  subroutine read_fargo3d_planets(dir, n_planets,x,y,z,vx,vy,vz,Mp,time,Omega_p)
 
     character(len=*), intent(in) :: dir
-    real(dp), intent(in) :: ulength_au, uvelocity,usolarmass,utime
     integer, intent(out) :: n_planets
     real(dp), dimension(n_planets_max), intent(out) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
 
     integer :: n_etoiles_old, iunit, ios, n_etoile_old, i, i_planet, id
-    type(star_type), dimension(:), allocatable :: etoile_old
+
     character(len=1) :: s
     character(len=128) :: filename
 
@@ -338,6 +336,23 @@ contains
 
     write(s,"(I1)") n_planets
     write(*,*) "Found "//s// " planets"
+
+    return
+
+  end subroutine read_fargo3d_planets
+
+  !---------------------------------------------
+
+  subroutine convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p, &
+       ulength_au,uvelocity,usolarmass,utime)
+
+    real(dp), intent(in) :: ulength_au, uvelocity,usolarmass,utime
+    integer, intent(in) :: n_planets
+    real(dp), dimension(n_planets_max), intent(in) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
+
+
+    integer :: n_etoiles_old, i
+    type(star_type), dimension(:), allocatable :: etoile_old
 
     if (n_planets > 0) then
        simu_time = time(n_planets) * utime
@@ -423,6 +438,6 @@ contains
 
     return
 
-  end subroutine read_planet_files
+  end subroutine convert_planets
 
 end module read_fargo3d

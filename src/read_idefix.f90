@@ -8,7 +8,7 @@ module read_idefix
   use cylindrical_grid
   use density
   use stars, only : compute_stellar_parameters
-  use read_fargo3d, only : read_planet_files, n_planets_max
+  use read_fargo3d, only : convert_planets, n_planets_max
 
   implicit none
 
@@ -119,9 +119,10 @@ contains
     udens = umass / ulength**3
     uvelocity = ulength / utime
 
-    call read_planet_files("./",ulength_au,uvelocity,usolarmass,utime,&
-         n_planets,x,y,z,vx,vy,vz,Mp,time,Omega_p)
-    idefix%corrotating_frame = (n_planets > 1)
+    call read_idefix_planets("./", n_planets,x,y,z,vx,vy,vz,Mp,time)
+    ! Omega from .ini
+    call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
+    idefix%corrotating_frame = (n_planets > 1) ! todo : from ini
 
     if (idefix%corrotating_frame) then
        Omega = Omega_p(which_planet)
@@ -268,7 +269,50 @@ contains
     ! -- end copy and paste from read_fargo3d
 
     write(*,*) "Done"
+    return
 
   end subroutine read_idefix_model
+
+  !---------------------------------------------
+
+  subroutine read_idefix_planets(dir, n_planets,x,y,z,vx,vy,vz,Mp,time)
+
+    character(len=*), intent(in) :: dir
+    integer, intent(out) :: n_planets
+    real(dp), dimension(n_planets_max), intent(out) :: x, y, z, vx, vy, vz, Mp, time
+
+    integer :: n_etoiles_old, iunit, ios, n_etoile_old, i, i_planet, id
+
+    character(len=1) :: s
+    character(len=128) :: filename
+
+    ios = 0
+    iunit = 1
+
+    n_planets = 0
+    planet_loop : do i_planet=1, n_planets_max
+       write(s,"(I1)") i_planet-1
+       filename=dir//"/planet"//s//".dat"
+       open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
+       if (ios /= 0) exit planet_loop
+       n_planets = n_planets+1
+       write(*,*) "Reading "//trim(filename)
+       read(fargo3d%id,*) id
+       do while(ios==0)
+          read(iunit,*) time(i_planet), x(i_planet), y(i_planet), z(i_planet), vx(i_planet), vy(i_planet), vz(i_planet), &
+               Mp(i_planet)
+          if (i==id) exit
+       enddo
+       close(iunit)
+    enddo planet_loop
+
+    write(s,"(I1)") n_planets
+    write(*,*) "Found "//s// " planets"
+
+    return
+
+  end subroutine read_idefix_planets
+
+  !---------------------------------------------
 
 end module read_idefix
