@@ -851,6 +851,8 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      endif
 
      if (letape_th) then
+        if (.not. lvariable_dust) write(*,*) "TODO : we need to complete the kappa_NRE", icell, lambda
+
         if (lnRE.and.(k_abs_tot > tiny_dp)) then
            kappa_abs_RE(icell,lambda) = k_abs_RE
            proba_abs_RE(icell,lambda) = k_abs_RE/k_abs_tot
@@ -913,7 +915,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
 
   if (lRE_LTE) kappa_abs_LTE(:,lambda) = kappa_abs_LTE(:,lambda) * fact / kappa_factor(1:p_n_cells)
   if (lRE_nLTE) kappa_abs_nLTE(:,lambda) = kappa_abs_nLTE(:,lambda) * fact / kappa_factor(1:p_n_cells)
-  if (letape_th.and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact / kappa_factor(1:p_n_cells)
+  if (letape_th.and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact
 
 
 
