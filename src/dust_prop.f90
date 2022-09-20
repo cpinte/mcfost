@@ -850,9 +850,9 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         k_abs_RE = k_abs_RE + kappa_abs_nLTE(icell,lambda)
      endif
 
+     ! Todo : kappa_abs_RE needs to be computed for all cells
+     ! nRE opacities are updated live and per cell (as grains are flagged in equilibrium), so we can not use a cell pointer here
      if (letape_th) then
-        if (.not. lvariable_dust) write(*,*) "TODO : we need to complete the kappa_NRE", icell, lambda
-
         if (lnRE.and.(k_abs_tot > tiny_dp)) then
            kappa_abs_RE(icell,lambda) = k_abs_RE
            proba_abs_RE(icell,lambda) = k_abs_RE/k_abs_tot
@@ -868,9 +868,6 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(icell,lambda) = 1.0 ! so far, might be updated if nRE --> qRE grains
      endif ! letape_th
   enddo !icell
-
-  ! nRE opacities are updated live and per cell (as grains are flagged in equilibrium), so we can not use a cell pointer here
-  !do icell=1, n_cell
 
 
   ! proba absorption sur une taille donnée
