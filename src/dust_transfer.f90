@@ -1099,7 +1099,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
      else ! Absorption
 
-
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre
            E_abs_nRE = E_abs_nRE + Stokes(1) * (1.0_dp - proba_abs_RE(icell,lambda))

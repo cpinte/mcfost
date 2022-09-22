@@ -1567,8 +1567,6 @@ subroutine update_proba_abs_nRE()
 
   write(*,*) "Setting grains at qRE and updating nRE pobabilities"
 
-  write(*,*) "TODO : this needs to be updated for the new pointers per cell !!!! make a separete loop in dust_prop for nRE case"
-
   do lambda=1, n_lambda
      do icell=1,n_cells
         delta_kappa_abs_qRE = 0.0_dp
@@ -1967,7 +1965,7 @@ end subroutine repartition_energie
 !**********************************************************************
 
 integer function select_absorbing_grain(lambda,icell, aleat, heating_method) result(k)
-  ! This routine will select randomly the scattering grain
+  ! This routine will select randomly the absorbing/emitting grain
   ! from the CDF of kabs
   ! Because we cannot store all the CDF for all cells
   ! (n_grains x ncells x n_lambda)
@@ -2001,10 +1999,10 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
      ! todo : maybe update with an extra variable kappa_abs_qRE
      if (lRE_nLTE) then
         norm =  (kappa_abs_RE(icell, lambda) - &
-        (kappa_abs_LTE(p_icell,lambda) - kappa_abs_nLTE(p_icell,lambda)) * kappa_factor(icell)) &
+        (kappa_abs_LTE(p_icell,lambda) + kappa_abs_nLTE(p_icell,lambda)) * kappa_factor(icell)) &
              / ( AU_to_cm * mum_to_cm**2 )
      else
-        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell) &
+        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell)) &
              / ( AU_to_cm * mum_to_cm**2 )
      endif
      kstart = grain_nRE_start ; kend = grain_nRE_end
@@ -2027,7 +2025,6 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
         enddo
      endif
   else ! Same thing but with lRE to only include dust grains that are at qRE
-     write(*,*) "kse=", kstart,kend, aleat
      if (aleat < 0.5) then ! We start from first grain
         prob = aleat * norm
         CDF = 0.0
@@ -2040,12 +2037,9 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
         CDF = 0.0
         do k=kend, kstart, -1
            if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * densite_pouss(k,icell)
-           write(*,*) k, icell, l_RE(k,icell), CDF, prob
-
            if (CDF > prob) exit
         enddo
      endif
-     write(*,*) "k=",k
   endif
 
 

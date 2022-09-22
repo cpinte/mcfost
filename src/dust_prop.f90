@@ -776,7 +776,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   logical, intent(in), optional :: no_scatt
 
   integer :: icell, k, thetaj
-  real(kind=dp) ::  density, fact, k_abs_RE, k_abs_tot, k_sca_tot, rho0
+  real(kind=dp) ::  density, fact, k_abs_RE, k_abs_LTE, k_abs_tot, k_sca_tot, rho0
   logical :: lcompute_obs,  ldens0, compute_scatt
 
 
@@ -809,18 +809,18 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   endif
 
   ! Calcul opacite et probabilite de diffusion
-  do icell=1, p_n_cells  ! Todo : this can be long when there are many cells --> skip loop when lvariable_dust is false
+  do icell=1, p_n_cells
      kappa(icell,lambda) = 0.0
      k_sca_tot = 0.0
-     k_abs_tot = 0.0
-     k_abs_RE = 0.0
+     !k_abs_tot = 0.0 ! we do not need the normalisation here --> next loop now
+     !k_abs_RE = 0.0
 
      do  k=1,n_grains_tot ! Expensive when n_cells is large
         density=densite_pouss(k,icell)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
 
         k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
-        k_abs_tot = k_abs_tot + C_abs(k,lambda) * density
+        !k_abs_tot = k_abs_tot + C_abs(k,lambda) * density
      enddo !k
 
      if (kappa(icell,lambda) > tiny_real) tab_albedo_pos(icell,lambda) = k_sca_tot/kappa(icell,lambda)
@@ -839,7 +839,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         do k=grain_RE_LTE_start,grain_RE_LTE_end   ! Expensive when n_cells is large
            kappa_abs_LTE(icell,lambda) =  kappa_abs_LTE(icell,lambda) + C_abs(k,lambda) * densite_pouss(k,icell)
         enddo
-        k_abs_RE = k_abs_RE + kappa_abs_LTE(icell,lambda)
+        !k_abs_RE = k_abs_RE + kappa_abs_LTE(icell,lambda)
      endif
 
      if (lRE_nLTE) then
@@ -847,27 +847,64 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
            kappa_abs_nLTE(icell,lambda) =  kappa_abs_nLTE(icell,lambda) + C_abs(k,lambda) * densite_pouss(k,icell)
         enddo
-        k_abs_RE = k_abs_RE + kappa_abs_nLTE(icell,lambda)
+        !k_abs_RE = k_abs_RE + kappa_abs_nLTE(icell,lambda)
      endif
 
-     ! Todo : kappa_abs_RE needs to be computed for all cells
+     ! This has been moved to next loop :
      ! nRE opacities are updated live and per cell (as grains are flagged in equilibrium), so we can not use a cell pointer here
-     if (letape_th) then
+   !  if (letape_th) then
+   !     if (lnRE.and.(k_abs_tot > tiny_dp)) then
+   !        kappa_abs_RE(icell,lambda) = k_abs_RE
+   !        proba_abs_RE(icell,lambda) = k_abs_RE/k_abs_tot
+   !     endif
+   !
+   !     if (.not. (lonly_LTE.or.lonly_nLTE)) then
+   !        if (k_abs_RE > tiny_dp) then
+   !           Proba_abs_RE_LTE(icell,lambda) = kappa_abs_LTE(icell,lambda) / (k_abs_RE)
+   !        else ! the cell is probably empty
+   !           Proba_abs_RE_LTE(icell,lambda) = 1.0
+   !        endif
+   !     endif
+   !     if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(icell,lambda) = 1.0 ! so far, might be updated if nRE --> qRE grains
+   !  endif ! letape_th
+
+  enddo ! p_icell
+
+  ! nRE opacities and probabilities are updated live and per cell
+  ! (as grains are flagged in quasi-equilibrium), so we can not use a cell pointer here
+  if ((letape_th) .and. (.not. lonly_LTE)) then
+     do icell = 1, n_cells
+        ! Calculating normalising opacities
+        k_abs_tot = 0.0
+        k_abs_RE = 0.0
+        k_abs_LTE = 0.0
+        do k=1, n_grains_tot
+           k_abs_tot = k_abs_tot + C_abs(k,lambda) * densite_pouss(k,icell)
+        enddo
+        do k=grain_RE_LTE_start,grain_RE_LTE_end
+           k_abs_LTE =  k_abs_LTE + C_abs(k,lambda) * densite_pouss(k,icell)
+        enddo
+        k_abs_RE = k_abs_LTE
+        do k=grain_RE_nLTE_start,grain_RE_nLTE_end
+           k_abs_RE =  k_abs_RE + C_abs(k,lambda) * densite_pouss(k,icell)
+        enddo
+
+        ! Computing probabilities
         if (lnRE.and.(k_abs_tot > tiny_dp)) then
            kappa_abs_RE(icell,lambda) = k_abs_RE
-           proba_abs_RE(icell,lambda) = k_abs_RE/k_abs_tot
+           proba_abs_RE(icell,lambda) = k_abs_RE / k_abs_tot
         endif
 
         if (.not. (lonly_LTE.or.lonly_nLTE)) then
            if (k_abs_RE > tiny_dp) then
-              Proba_abs_RE_LTE(icell,lambda) = kappa_abs_LTE(icell,lambda) / (k_abs_RE)
+              Proba_abs_RE_LTE(icell,lambda) = k_abs_LTE / k_abs_RE
            else ! the cell is probably empty
               Proba_abs_RE_LTE(icell,lambda) = 1.0
            endif
         endif
         if (lRE_nLTE) Proba_abs_RE_LTE_p_nLTE(icell,lambda) = 1.0 ! so far, might be updated if nRE --> qRE grains
-     endif ! letape_th
-  enddo !icell
+     enddo
+  endif ! letape_th and not onlyLTE
 
 
   ! proba absorption sur une taille donnée

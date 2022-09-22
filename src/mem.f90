@@ -172,19 +172,23 @@ subroutine alloc_dynamique(n_cells_max)
      write(*,*) 'Allocation error kappa and albedo'
      stop
   endif
+  if (lRE_nLTE)  then
+     allocate(kappa_abs_nLTE(p_Nc,n_lambda), stat=alloc_status)
+     kappa_abs_nLTE=0.0
+  endif
 
+  ! the following arrays are updated live per cell, so we cannot use a pointer
   if (.not.(lonly_LTE.or.lonly_nLTE)) then
-     allocate(proba_abs_RE_LTE(p_Nc,n_lambda),  stat=alloc_status) ; proba_abs_RE_LTE=0.0
+     allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status)
      proba_abs_RE_LTE=0.0
   endif
-  if (lRE_nLTE)  then
-     allocate(kappa_abs_nLTE(p_Nc,n_lambda), stat=alloc_status) ; kappa_abs_nLTE=0.0
-  endif
   if (lRE_nLTE.or.lnRE) then
-     allocate(proba_abs_RE_LTE_p_nLTE(p_Nc,n_lambda), stat=alloc_status) ; proba_abs_RE_LTE_p_nLTE=0.0
+     allocate(proba_abs_RE_LTE_p_nLTE(Nc,n_lambda), stat=alloc_status)
+     proba_abs_RE_LTE_p_nLTE=0.0
   endif
-  if (lnRE) then ! those are updated live and per cell, so we cannot use a pointer
-     allocate(kappa_abs_RE(Nc,n_lambda), proba_abs_RE(Nc,n_lambda), stat=alloc_status) ; kappa_abs_RE=0.0 ; proba_abs_RE=0.0
+  if (lnRE) then
+     allocate(kappa_abs_RE(Nc,n_lambda), proba_abs_RE(Nc,n_lambda), stat=alloc_status)
+     kappa_abs_RE=0.0 ; proba_abs_RE=0.0
   endif
   if (alloc_status > 0) call error('Allocation error kappa_abs')
 
