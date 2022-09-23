@@ -45,7 +45,6 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
   integer, pointer :: p_icell
 
-
   lstop = .false.
   flag_sortie = .false.
 
@@ -334,12 +333,9 @@ subroutine compute_column(type, column, lambda)
   integer, parameter :: n_directions = 4
   real, dimension(n_cells,n_directions), intent(out) :: column
 
-  integer :: icell, next_cell, previous_cell, direction
-  integer, target :: icell0
+  integer :: icell, next_cell, previous_cell, direction, icell0, p_icell
 
   real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w, l_contrib, l_void_before, CD_units, factor, sum
-
-  integer, pointer :: p_icell
 
   if (type==1) then
      CD_units = AU_to_m * masse_mol_gaz / (m_to_cm)**2 ! g/cm^-2 and AU_to_m factor as l_contrib is in AU
@@ -347,19 +343,13 @@ subroutine compute_column(type, column, lambda)
      CD_units = AU_to_m / (m_to_cm)**2 ! particle/cm^-2 and AU_to_m factor as l_contrib is in AU
   endif
 
-
-  if (lvariable_dust) then
-     p_icell => icell0
-  else
-     p_icell => icell_ref
-  endif
-
   column(:,:) = 0.0
   do direction = 1, n_directions
      !$omp parallel default(none) &
      !$omp shared(densite_gaz,tab_abundance,lVoronoi,Voronoi,direction,column,r_grid,z_grid,phi_grid,n_cells,cross_cell) &
-     !$omp shared(CD_units,kappa,kappa_factor,lambda,type,test_exit_grid) &
+     !$omp shared(CD_units,kappa,kappa_factor,lambda,type,test_exit_grid,icell_ref,lvariable_dust) &
      !$omp private(icell,previous_cell,next_cell,icell0,p_icell,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,factor,sum)
+     p_icell = icell_ref
      !$omp do
      do icell=1,n_cells
         if (lVoronoi) then
@@ -390,6 +380,7 @@ subroutine compute_column(type, column, lambda)
 
         sum = 0.
         inf_loop: do
+           if (lvariable_dust) p_icell = icell0
            previous_cell = icell0
            icell0 = next_cell
            x0 = x1 ; y0 = y1 ; z0 = z1

@@ -631,15 +631,8 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   integer, intent(in) :: lambda, ibin, iaz
 
   integer :: itype, iRT
-  integer, target :: icell
-  integer, pointer :: p_icell
+  integer :: icell, p_icell
   real(kind=dp) :: facteur, energie_photon, n_photons_envoyes, kappa_sca, kappa_ext
-
-  if (lvariable_dust) then
-     p_icell => icell
-  else
-     p_icell => icell_ref
-  endif
 
   iRT = RT2d_to_RT1d(ibin, iaz)
 
@@ -668,14 +661,12 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   !$omp private(icell,p_icell,facteur,kappa_sca,kappa_ext,itype,I_scatt) &
   !$omp shared(n_cells,energie_photon,volume,n_az_rt,n_theta_rt,kappa,kappa_factor,N_type_flux,lambda,iRT) &
   !$omp shared(J_th,xI_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes,nb_proc,tab_albedo_pos,lvariable_dust,icell_ref)
-  if (lvariable_dust) then
-     p_icell => icell
-  else
-     p_icell => icell_ref
-  endif
+
+  p_icell = icell_ref
 
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
+     if (lvariable_dust) p_icell = icell
      facteur = energie_photon / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
      kappa_ext = kappa(p_icell,lambda) * kappa_factor(icell)
      kappa_sca = kappa_ext * tab_albedo_pos(p_icell,lambda)
@@ -722,18 +713,10 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
 
 
   integer, intent(in) :: lambda, p_lambda,ibin
-  integer :: iscatt, dir
-  integer, target :: icell
-  integer, pointer :: p_icell
+  integer :: iscatt, dir, icell, p_icell
   real(kind=dp) :: kappa_ext
 
   real :: Q, U
-
-  if (lvariable_dust) then
-     p_icell => icell
-  else
-     p_icell => icell_ref
-  endif
 
   if (lmono0) then
      write(*,*) "i=", tab_RT_incl(ibin)
@@ -760,13 +743,11 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   !$omp shared(lambda,n_cells,nang_ray_tracing,eps_dust2,I_sca2,J_th,kappa,kappa_factor,eps_dust2_star,lsepar_pola) &
   !$omp shared(lsepar_contrib,n_Stokes,nang_ray_tracing_star,nb_proc,tab_albedo_pos,icell_ref,lvariable_dust) &
   !$omp private(icell,p_icell,dir,iscatt,Q,U,kappa_ext)
-    if (lvariable_dust) then
-     p_icell => icell
-  else
-     p_icell => icell_ref
-  endif
+  p_icell = icell_ref
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
+     if (lvariable_dust) p_icell = icell
+
      kappa_ext = kappa(p_icell,lambda) * kappa_factor(icell)
      if (kappa_ext > tiny_dp) then
         ! Boucle sur les directions de ray-tracing
@@ -823,9 +804,7 @@ subroutine calc_Jth(lambda)
   ! 25/09/08
 
   integer, intent(in) :: lambda
-  integer :: l, T
-  integer, target :: icell
-  integer, pointer :: p_icell
+  integer :: l, T, icell, p_icell
   real(kind=dp) ::  Temp, cst_wl, wl, coeff_exp, cst_E
 
   ! longueur d'onde en metre
@@ -833,11 +812,6 @@ subroutine calc_Jth(lambda)
 
   J_th(:) = 0.0
 
-  if (lvariable_dust) then
-     p_icell => icell
-  else
-     p_icell => icell_ref
-  endif
 
   ! Intensite specifique emission thermique
   if ((l_em_disk_image).or.(lsed)) then
@@ -848,13 +822,10 @@ subroutine calc_Jth(lambda)
         !$omp shared(n_cells,Tdust,wl,lambda,kappa_abs_LTE,kappa_factor,cst_E,J_th) &
         !$omp shared(lvariable_dust,icell_ref) &
         !$omp private(icell,p_icell,Temp,cst_wl,coeff_exp)
-        if (lvariable_dust) then
-           p_icell => icell
-        else
-           p_icell => icell_ref
-        endif
+        p_icell = icell_ref
         !$omp do
         do icell=1, n_cells
+           if (lvariable_dust) p_icell = icell
            Temp=Tdust(icell) ! que LTE pour le moment
            if (Temp*wl > 3.e-4) then
               cst_wl=cst_th/(Temp*wl)
@@ -930,9 +901,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   real(kind=dp), dimension(4,4) ::  M, ROP, RPO
 
   integer :: theta_I, phi_I, dir, iscatt, id
-  integer :: k, alloc_status, i1, i2
-  integer,target :: icell
-  integer, pointer :: p_icell
+  integer :: k, alloc_status, i1, i2, icell, p_icell
   real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
   real(kind=dp) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta
 
@@ -948,12 +917,6 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
   real, dimension(n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: s11_save
   real(kind=dp), dimension(n_theta_I,n_phi_I,nang_ray_tracing,0:1) :: tab_sinw, tab_cosw
-
-  if (lvariable_dust) then
-     p_icell => icell
-  else
-     p_icell => icell_ref
-  endif
 
   ! Direction observateur dans repere refence
   uv0 = tab_uv_rt(ibin) ; w0 = tab_w_rt(ibin) ! epsilon needed here
@@ -1148,9 +1111,11 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
      enddo ! dir
   endif ! .not.lvariable_dust
 
+  p_icell = icell_ref
   !$omp do schedule(static, n_cells/nb_proc)
   do icell = 1, n_cells
      !$ id = omp_get_thread_num() + 1
+     if (lvariable_dust) p_icell = icell
 
      ! Boucle sur les directions de ray-tracing
      do dir=0,1
@@ -1267,19 +1232,11 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 
   real(kind=dp), dimension(4,4) ::  M, ROP, RPO
 
-  integer :: k
-  integer, target :: icell
-  integer, pointer :: p_icell
+  integer :: k, icell, p_icell
   real :: s11, s12, s33, s34, cos_scatt
   real(kind=dp) :: omega, sinw, cosw, norme, energie_photon, n_photons_envoyes
 
   real(kind=dp), parameter :: prec = 0._dp
-
-  if (lvariable_dust) then
-     p_icell => icell
-  else
-     p_icell => icell_ref
-  endif
 
   if (lmono0) then ! image
      energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
@@ -1322,14 +1279,11 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   !$omp shared(energie_photon,volume,tab_albedo_pos,kappa,kappa_factor) &
   !$omp private(id,icell,p_icell,stokes,x,y,z,norme,u,v,w,dir,iscatt,cos_scatt,k,omega,cosw,sinw,RPO,ROP,S) &
   !$omp private(s11,s12,s33,s34,C,D,M,facteur,kappa_sca)
-  if (lvariable_dust) then
-     p_icell => icell
-  else
-     p_icell => icell_ref
-  endif
+  p_icell = icell_ref
   !$omp do
   do icell=1, n_cells
      !$ id = omp_get_thread_num() + 1
+     if (lvariable_dust) p_icell = icell
 
      ! Champ de radiation
      stokes(1) = sum(I_spec_star(icell,:))
