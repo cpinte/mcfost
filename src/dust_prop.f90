@@ -941,7 +941,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   if (lvariable_dust) then
      kappa_factor(:) = 1.0_dp
   else
-     kappa_factor(:) = masse(:)/volume(:) / rho0 ! ie rho / rho(icell=0)
+     kappa_factor(:) = masse(1:n_cells)/volume(:) / rho0 ! ie rho / rho(icell=0)
   endif
 
   ! We apply a corrective factor per cell --> to get kappa, we need to do kappa(icell,lambda) * kappa_factor(icell)
