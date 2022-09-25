@@ -856,7 +856,10 @@ subroutine init_dust_mol(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: iTrans, p_lambda, icell
+
+  integer :: iTrans, p_lambda
+  integer, target :: icell
+  integer, pointer :: p_icell
   real(kind=dp) :: freq!, Jnu
   real :: T, wl, kap
 
@@ -879,6 +882,12 @@ subroutine init_dust_mol(imol)
   lsepar_pola = .false.
   ltemp = .false.
   lmono = .true. ! equivalent au mode sed2
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   call realloc_dust_mol()
 
@@ -950,7 +959,7 @@ subroutine init_dust_mol(imol)
 
            T = Tdust(icell)
            ! On ne fait que du scattering isotropique dans les raies pour le moment ...
-           emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
+           emissivite_dust(icell,iTrans) = kappa_abs_LTE(p_icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
         enddo ! icell
      enddo ! itrans
 
