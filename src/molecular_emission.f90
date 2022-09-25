@@ -82,7 +82,7 @@ module molecular_emission
 
   real(kind=dp), dimension(:), allocatable :: tab_speed_rt
 
-  real, dimension(:,:), allocatable :: maser_map ! n_cells, n_trans
+  !real, dimension(:,:), allocatable :: maser_map ! n_cells, n_trans
 
   real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
@@ -312,12 +312,6 @@ subroutine opacite_mol_loc(icell,imol)
   integer :: iTrans
   real(kind=dp) :: nu, nl, kap, eps
 
-  logical, save :: lmaser = .false.
-
-  character(len=128) :: filename
-
-  filename = trim(data_dir2(imol))//"/maser_map.fits.gz"
-
   do iTrans=1,nTrans_tot
      nu = tab_nLevel(icell,iTransUpper(iTrans))
      nl = tab_nLevel(icell,iTransLower(iTrans))
@@ -327,11 +321,11 @@ subroutine opacite_mol_loc(icell,imol)
      eps =  nu*fAul(iTrans)
 
      if (kap < 0.) then
-        lmaser = .true.
-        ! inversion value (inversion population is > 1 )
-        maser_map(icell,iTrans) = (nu * poids_stat_g(iTransLower(iTrans))) / &
-             (poids_stat_g(iTransUpper(iTrans)) * nl)
         kap = 0.
+        !lmaser = .true.
+        ! inversion value (inversion population is > 1 )
+        !maser_map(icell,iTrans) = (nu * poids_stat_g(iTransLower(iTrans))) / &
+        !     (poids_stat_g(iTransUpper(iTrans)) * nl)
      endif
 
      ! longueur de vol en AU, a multiplier par le profil de raie

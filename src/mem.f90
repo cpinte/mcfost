@@ -381,12 +381,11 @@ subroutine realloc_dust_mol()
   kappa = 0.0 ; kappa_abs_LTE = 0.0 ; emissivite_dust = 0.0
 
   if (lRE_nLTE) then
-     allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
+     allocate(kappa_abs_nLTE(p_n_cells,n_lambda), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error kappa_abs_nLTE (realloc)')
      kappa_abs_nLTE = 0.0
   endif
 
-  ! todo : could be p_n_cells
   allocate(tab_albedo_pos(p_n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_albedo_pos (realloc)')
   tab_albedo_pos = 0
@@ -654,10 +653,10 @@ subroutine alloc_emission_mol(imol)
   tab_nLevel = 0.0
   tab_nLevel_old = 0.0
 
-  ! Todo : we don;t need this most of the time
-  allocate(maser_map(n_cells,nTrans_tot), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error maser_map')
-  maser_map = 0.0
+  ! Todo : we don't need this most of the time
+  !allocate(maser_map(n_cells,nTrans_tot), stat=alloc_status)
+  !if (alloc_status > 0) call error('Allocation error maser_map')
+  !maser_map = 0.0
 
   allocate(tab_v(-n_largeur_Doppler*n_speed:n_largeur_Doppler*n_speed), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_v')
