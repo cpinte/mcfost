@@ -941,8 +941,8 @@ subroutine Temp_finale_nLTE()
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell,J_absorbe) &
-  !$omp shared(L_packet_th,Tdust,tab_Temp,n_cells,n_lambda) &
+  !$omp private(J_absorbe,log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell) &
+  !$omp shared(L_packet_th,Tdust,tab_Temp,n_cells,n_lambda,kappa_abs_LTE) &
   !$omp shared(xJ_abs,densite_pouss,Tdust_1grain, xT_ech_1grain,log_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
   !$omp do schedule(dynamic,10)
