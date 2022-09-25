@@ -647,11 +647,9 @@ subroutine alloc_emission_mol(imol)
   kappa_mol_o_freq=0.0
   emissivite_mol_o_freq = 0.0
 
-  ! Todo : we do not always need both arrays
-  allocate(tab_nLevel(n_cells,nLevels), tab_nLevel_old(n_cells,nLevels), stat=alloc_status)
+  allocate(tab_nLevel(n_cells,nLevels), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_nLevel')
   tab_nLevel = 0.0
-  tab_nLevel_old = 0.0
 
   ! Todo : we don't need this most of the time
   !allocate(maser_map(n_cells,nTrans_tot), stat=alloc_status)
@@ -716,8 +714,8 @@ subroutine dealloc_emission_mol()
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
        iCollUpper,iCollLower)
 
-  deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, tab_nLevel_old, &
-       tab_v, stars_map, tab_Cmb_mol, Jmol, maser_map)
+  deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, &
+       tab_v, stars_map, tab_Cmb_mol, Jmol)
 
   call deallocate_mol_maps()
 

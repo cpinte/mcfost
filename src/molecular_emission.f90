@@ -36,7 +36,7 @@ module molecular_emission
   ! masse_mol_gaz sert uniquement pour convertir masse disque en desnite de particule
   real(kind=dp), dimension(:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_cells, nTrans
   real(kind=dp), dimension(:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_cells, nTrans
-  real, dimension(:,:), allocatable :: tab_nLevel, tab_nLevel2, tab_nLevel_old ! n_cells, nLevels
+  real, dimension(:,:), allocatable :: tab_nLevel, tab_nLevel2 ! n_cells, nLevels
 
   real, dimension(:), allocatable :: v_turb, v_line ! n_cells
 
