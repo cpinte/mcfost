@@ -915,6 +915,7 @@ subroutine init_dust_mol(imol)
 
            ! Multiplication par densite
            ! AU_to_cm**2 car on veut kappa_abs_LTE en AU-1
+           write(*,*) "TODO : the water benchmark 3 needs to be updated for cell pointer in opacity table"
            do icell=1,n_cells
               kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
                    gas_dust / cm_to_AU
@@ -959,7 +960,7 @@ subroutine init_dust_mol(imol)
 
            T = Tdust(icell)
            ! On ne fait que du scattering isotropique dans les raies pour le moment ...
-           emissivite_dust(icell,iTrans) = kappa_abs_LTE(p_icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
+           emissivite_dust(icell,iTrans) = kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
         enddo ! icell
      enddo ! itrans
 
