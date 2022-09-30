@@ -257,15 +257,17 @@ module collision_atom
     integer :: N !real number of lines
     integer :: Nread, status
     character(len=3) :: END_OF_FILE="END", key
-    character(len=Nmax_line_per_collision*10) :: inputline
+    character(len=Nmax_line_per_collision*10) :: inputline, FormatLine
 
     allocate(character(len=Nmax_line_per_collision) :: lines_in_file(Nmax_lines))
 
     n = 0
     !it is still important to read an END in the file
     key = "   "
+    write(FormatLine,'("(1"A,I5")")') "A", Nmax_line_per_collision*10
     do while(key /= END_OF_FILE)
-      read(unit,'(1A<Nmax_line_per_collision*10>)',iostat=status) inputline
+      ! read(unit,'(1A<Nmax_line_per_collision*10>)',iostat=status) inputline
+      read(unit,FormatLine,iostat=status) inputline
       key = adjustl(inputline)
       Nread = len(trim(inputline))
       if (inputline(1:1)=='#' .or. Nread==0) cycle
