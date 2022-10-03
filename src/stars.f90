@@ -940,7 +940,7 @@ end subroutine intersect_stars
          !vaccr is vr, the spherical r velocity component
          if (lvoronoi) then !always 3d
             vaccr = Voronoi(icell0)%vxyz(1)*x/rr + Voronoi(icell0)%vxyz(2)*y/rr + Voronoi(icell0)%vxyz(3) * z/rr
-            vmod2 = sum( Voronoi(icell0)%vxyz(:)**2 )
+            vmod2 = sum(  Voronoi(icell0)%vxyz(:)**2 )
          else
          	if (vfield_coord==1) then
                if (l3D) then !needed here if not 2.5d
@@ -955,7 +955,7 @@ end subroutine intersect_stars
                else
                   sign_z = sign(1.0_dp, z)
                endif
-               vaccr = vfield3d(icell0,1) * sqrt(1.0 - (z/rr)**2) + sign_z * vfield3d(icell0,2) * z/rr
+               vaccr = vfield3d(icell0,1) * sqrt(1.0 - (z/rr)**2) + sign_z * vfield3d(icell0,3) * z/rr
             else !spherical vector here
                vaccr = vfield3d(icell0,1) !always negative for accretion
             endif
