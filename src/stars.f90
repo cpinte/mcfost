@@ -940,7 +940,7 @@ end subroutine intersect_stars
          !vaccr is vr, the spherical r velocity component
          if (lvoronoi) then !always 3d
             vaccr = Voronoi(icell0)%vxyz(1)*x/rr + Voronoi(icell0)%vxyz(2)*y/rr + Voronoi(icell0)%vxyz(3) * z/rr
-            vmod2 = sum(  Voronoi(icell0)%vxyz(:)**2 )
+            vmod2 = sum( Voronoi(icell0)%vxyz(:)**2 )
          else
          	if (vfield_coord==1) then
                if (l3D) then !needed here if not 2.5d
