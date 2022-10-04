@@ -830,10 +830,13 @@ module see
         logical ::verbose, lconverged, rest_damping, lsecond_try, neg_pops
         real(kind=dp) :: d_damp, tmp_fact
 
+        integer :: n_cells_not_converged
+
         type (AtomType), pointer :: at
         integer :: n, nlev, i, j, kr, ip, jp
         real(kind=dp) ::delta_f, dfpop,dfne
 
+        n_cells_not_converged = 0
         verbose = .false.!debug mode
         tmp_fact = 1.0_dp
         if (lforce_lte) tmp_fact = 0.0_dp
@@ -994,12 +997,15 @@ module see
             if (n_iter > max_iter) then
                 if (lsecond_try) then
                     lconverged = .true.
-                    write(*,*) ""
-                    write(*,*) "-> (non-LTE ionisation): Not enough iterations to converge after second try"
-                    write(*,'("cell #"(1I7)"; proc #"(1I3)", niter #"(1I5))') icell, id, n_iter
-                    write(*,'("maxIter: "(1I5)"; damp="(1I4))')  max_iter, nint(d_damp)
-                    write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfpop="(1ES17.8E3)" dfne="(1ES17.8E3))') delta_f, dfpop, dfne
-                    write(*,*) ""
+                    if (n_cells_not_converged==0) then
+                        write(*,*) ""
+                        write(*,*) "-> (non-LTE ionisation): Not enough iterations to converge after second try"
+                        write(*,'("cell #"(1I7)"; proc #"(1I3)", niter #"(1I5))') icell, id, n_iter
+                        write(*,'("maxIter: "(1I5)"; damp="(1I4))')  max_iter, nint(d_damp)
+                        write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfpop="(1ES17.8E3)" dfne="(1ES17.8E3))') delta_f, dfpop, dfne
+                        write(*,*) ""
+                    endif
+                    n_cells_not_converged = n_cells_not_converged + 1
                     if (verbose) stop
                 else
                     lsecond_try = .true.
@@ -1038,7 +1044,11 @@ module see
         at => null()
 
         if (verbose) write(*,'("(DELTA) non-LTE ionisation dM="(1ES17.8E3)" dne="(1ES17.8E3) )') dM, dne
-
+        if (n_cells_not_converged>0) then
+            write(*,'("-> (non-LTE ionisation): There are "(1I6)" unconverged cells out of "(1I6)" ("(1F6.2)"%)")') &
+                n_cells_not_converged, size(pack(icompute_atomRT,mask=icompute_atomRT>0)), real(n_cells_not_converged) / &
+                real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))    
+        endif
 
         ne_new(icell) = ne(icell)
         ne(icell) = npop_dag(Neq_ne,id)
