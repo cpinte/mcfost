@@ -121,8 +121,8 @@ module Opacity_atom
          call calc_contopac()!needs continua(:)%alpha etc
       endif
 
-      write(*,'("allocate "(1F6.4)" GB for background opacities")') real(mem_loc) / 1024.0/1024./1024.0
-      if (mem_contopac>0) write(*,'("  -> with "(1F6.4)" GB for contopac.")') real(mem_contopac) / 1024.0/1024./1024.0
+      write(*,'("allocate "(1F6.2)" GB for background opacities")') real(mem_loc) / 1024.0/1024./1024.0
+      if (mem_contopac>0) write(*,'("  -> with "(1F6.2)" GB for contopac.")') real(mem_contopac) / 1024.0/1024./1024.0
 
       return
    end subroutine alloc_atom_opac
@@ -192,7 +192,7 @@ module Opacity_atom
       !$omp end do
       !$omp end parallel
       call progress_bar(50)
-      write(*,*) " " !for progress bar
+      !write(*,*) " " !for progress bar
 
       return
    end subroutine calc_contopac
