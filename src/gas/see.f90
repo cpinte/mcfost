@@ -995,7 +995,7 @@ module see
                 if (lsecond_try) then
                     lconverged = .true.
                     !! TO DO: add a warning here when verbose is .false.
-                    !! otherwise we don't know is there is a problem...
+                    !! otherwise we don't know if there is a problem...
                     !! and it is dangerous/unethical to hide that(?).
                     if (verbose) then
                         write(*,*) ""
