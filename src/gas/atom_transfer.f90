@@ -651,6 +651,10 @@ module atom_transfer
    end subroutine nlte_loop_mali
 
   subroutine compute_max_relative_velocity(dv)
+  !
+  ! TO DO: building, add maximum velocity difference between
+  !   all cells in all directions.
+  !   Compute mean velocity gradient for Sobolev
       use molecular_emission, only : v_proj
       ! use grid, only : cross_cell, test_exit_grid
       real(kind=dp), intent(out) :: dv
@@ -743,49 +747,49 @@ module atom_transfer
       ! return
 
       if (lvoronoi) then
-         dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
+         dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2,mask=icompute_atomRT>0) )
          if (dv == 0.0_dp) return
-         dv = 0.0_dp
 
-         !$omp parallel &
-         !$omp default(none) &
-         !$omp private(id,i1, i2,v1, v2)&
-         !$omp shared(dv, icompute_atomRT, Voronoi, n_Cells)
-         !$omp do schedule(dynamic,1)
-         do i1=1,n_cells
-            !$ id = omp_get_thread_num() + 1
-            v1 = sqrt(sum(Voronoi(i1)%vxyz**2))
-            do i2=1,n_cells
-               v2 = sqrt(sum(Voronoi(i2)%vxyz**2))
-               if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
-                  dv = max(dv,abs(v1-v2))
-               endif
-            enddo
-         enddo
-         !$omp end do
-         !$omp end parallel
+         ! dv = 0.0_dp
+         ! !$omp parallel &
+         ! !$omp default(none) &
+         ! !$omp private(id,i1, i2,v1, v2)&
+         ! !$omp shared(dv, icompute_atomRT, Voronoi, n_Cells)
+         ! !$omp do schedule(dynamic,1)
+         ! do i1=1,n_cells
+         !    !$ id = omp_get_thread_num() + 1
+         !    v1 = sqrt(sum(Voronoi(i1)%vxyz**2))
+         !    do i2=1,n_cells
+         !       v2 = sqrt(sum(Voronoi(i2)%vxyz**2))
+         !       if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+         !          dv = max(dv,abs(v1-v2))
+         !       endif
+         !    enddo
+         ! enddo
+         ! !$omp end do
+         ! !$omp end parallel
       else
-         dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+         dv = sqrt( maxval(sum(vfield3d**2,dim=2),mask=icompute_atomRT>0) )
          if (dv==0.0_dp) return
 
-         dv = 0.0_dp
-         !$omp parallel &
-         !$omp default(none) &
-         !$omp private(id,i1,i2,v1,v2)&
-         !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells)
-         !$omp do schedule(dynamic,1)
-         do i1=1,n_cells
-            !$ id = omp_get_thread_num() + 1
-            v1 = sqrt(sum(vfield3d(i1,:)**2))
-            do i2=1,n_cells
-               v2 = sqrt(sum(vfield3d(i2,:)**2))
-               if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
-                  dv = max(dv,abs(v1-v2))
-               endif
-            enddo
-         enddo
-         !$omp end do
-         !$omp end parallel
+      !    dv = 0.0_dp
+      !    !$omp parallel &
+      !    !$omp default(none) &
+      !    !$omp private(id,i1,i2,v1,v2)&
+      !    !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells)
+      !    !$omp do schedule(dynamic,1)
+      !    do i1=1,n_cells
+      !       !$ id = omp_get_thread_num() + 1
+      !       v1 = sqrt(sum(vfield3d(i1,:)**2))
+      !       do i2=1,n_cells
+      !          v2 = sqrt(sum(vfield3d(i2,:)**2))
+      !          if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+      !             dv = max(dv,abs(v1-v2))
+      !          endif
+      !       enddo
+      !    enddo
+      !    !$omp end do
+      !    !$omp end parallel
       endif
 
       write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
