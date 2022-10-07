@@ -1093,12 +1093,21 @@ module atom_transfer
       integer :: ri_RT, phi_RT
       logical :: lresolved
 
+      real :: u0,v0,w0,r0
       real(kind=dp) :: z1, z2
       integer, dimension(:), allocatable :: tab_pix_healpix
 
       write(*,*) "Vector to observer =", real(tab_u_rt(ibin,iaz)),real(tab_v_rt(ibin,iaz)),real(tab_w_rt(ibin))
       write(*,*) "i=", real(tab_RT_incl(ibin)), "az=", real(tab_RT_az(iaz))
 
+      r0 = sqrt(sum(image_offset_centre(:)**2))
+      if (r0>tiny_real) then
+         u0 = image_offset_centre(1)/r0
+         v0 = image_offset_centre(2)/r0
+         w0 = image_offset_centre(3)/r0
+      else
+         u0 = 0.0; v0 = 0.0; w0 = 0.0
+      endif
       u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
       uvw = (/u,v,w/) !vector position
 
@@ -1126,6 +1135,9 @@ module atom_transfer
 
       x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
       center(1) = x0 ; center(2) = y0 ; center(3) = z0
+      !image plane is from right to left +x
+      !               from top to bottom +y
+      ! center = center(:) - image_offset_centre(:) * x(:)
 
       ! Coin en bas gauche de l'image
       Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)

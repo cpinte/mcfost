@@ -201,6 +201,7 @@ subroutine set_default_variables()
   lidefix = .false.
   theta_max = 0.5*pi
   llinear_rgrid = .false.
+  image_offset_centre(:) = (/0.0,0.0,0.0/)
 
   tmp_dir = "./"
 
@@ -453,6 +454,16 @@ subroutine initialisation_mcfost()
         read(band,*,iostat=ios) wvl
         if (ios/=0) call error("wavelength needed for -img. Error #2")
         i_arg = i_arg+1
+     case("-img_offset")
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) call error("x0, y0 needed for image centre offset. Error #1)")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) image_offset_centre(1)
+        i_arg = i_arg+1
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) image_offset_centre(2)
+        i_arg = i_arg+1
+        image_offset_centre(3) = 0.0
      case("-op")
         limg=.true.
         lopacite_only=.true.
@@ -1799,6 +1810,7 @@ subroutine display_help()
   write(*,*) "        : -turn-off_planets : sink particles with id > 1 will not emit"
   write(*,*) "        : -turn-off_Lacc : ignore accretion on sink particles"
   write(*,*) "        : -turn-off_dust_subl : ignore dust sublimation"
+  write(*,*) "        : -img_offset <x0> <y0> : Centres the image plane in (x0,y0)"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
