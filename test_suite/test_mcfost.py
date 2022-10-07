@@ -28,7 +28,7 @@ def all_almost_equal(x,y,threshold=0.01):
     # test if all the values of two arrays are almost equal
     return (abs((x-y)) < threshold * x).all()
 
-def MC_similar(x,y,threshold=0.01,mask_threshold=1e-20):
+def MC_similar(x,y,threshold=0.01,mask_threshold=1e-25):
     # test if two arrays have the same at the 75% percentile
     # ignoring values that are very small as they are very noisy
 
