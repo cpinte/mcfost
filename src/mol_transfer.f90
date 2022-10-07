@@ -159,6 +159,7 @@ subroutine NLTE_mol_line_transfer(imol)
   integer :: etape, etape_start, etape_end, iray, n_rayons, icell
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed, n_cells_done, ibar
   integer, dimension(nb_proc) :: max_n_iter_loc
+  real, dimension(nLevels) :: tab_nLevel_old
 
   logical :: lfixed_Rays, lnotfixed_Rays, lconverged, lconverged_loc, lprevious_converged
 
@@ -277,6 +278,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
         n_cells_done = 0
         ibar = 0
+        max_n_iter_loc = 0
 
         if (lfixed_Rays) then
            ! On remet le generateur aleatoire a zero
@@ -286,33 +288,33 @@ subroutine NLTE_mol_line_transfer(imol)
            enddo
         endif
 
-        ! Sauvegarde des populations globales
-        tab_nLevel_old = tab_nLevel
-        max_n_iter_loc = 0
-
         ! Boucle sur les cellules
         call progress_bar(0)
         !$omp parallel &
         !$omp default(none) &
         !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
-        !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell,factor) &
+        !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell,factor,tab_nLevel_old) &
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(deltaVmax,ispeed,r_grid,z_grid,phi_grid,lcompute_molRT,lkeplerian,n_cells) &
         !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule) &
-        !$omp shared(nTrans_tot,tab_Trans,n_cells_done,ibar)
+        !$omp shared(nTrans_tot,tab_Trans,n_cells_done,ibar) &
+        !$omp reduction(max:maxdiff)
+
+        !$ id = omp_get_thread_num() + 1
+        maxdiff=0
+
         !$omp do schedule(static)
         do icell=1, n_cells
-           !$ id = omp_get_thread_num() + 1
-
-           ! Echantillonage uniforme du profil de raie
-           factor = deltaVmax(icell) / real(n_speed,kind=dp)
-           if (lfixed_rays) then
-              do iv=-n_speed, n_speed
-                 tab_speed(iv,id) =  factor * real(iv,kind=dp)
-              enddo ! iv
-           endif
-
            if (lcompute_molRT(icell)) then
+              tab_nLevel_old(1:n_level_comp) = tab_nLevel(icell,1:n_level_comp)
+
+              ! Echantillonage uniforme du profil de raie
+              factor = deltaVmax(icell) / real(n_speed,kind=dp)
+              if (lfixed_rays) then
+                 do iv=-n_speed, n_speed
+                    tab_speed(iv,id) =  factor * real(iv,kind=dp)
+                 enddo ! iv
+              endif
 
               ! Propagation des rayons
               do iray=iray_start, iray_start-1+n_rayons
@@ -406,6 +408,11 @@ subroutine NLTE_mol_line_transfer(imol)
 
               enddo ! while : convergence champ local
               if (n_iter_loc > max_n_iter_loc(id)) max_n_iter_loc(id) = n_iter_loc
+
+              diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(1:n_level_comp) ) / &
+                   tab_nLevel_old(1:n_level_comp) + 10*tiny_real)
+
+              if (diff > maxdiff) maxdiff = diff
            endif ! lcompute_molRT
 
            ! Progress bar
@@ -423,15 +430,6 @@ subroutine NLTE_mol_line_transfer(imol)
         call progress_bar(50)
 
         ! Critere de convergence totale
-        maxdiff = 0.0
-        do icell = 1, n_cells
-           if (lcompute_molRT(icell)) then
-              diff = maxval( abs( tab_nLevel(icell,1:n_level_comp) - tab_nLevel_old(icell,1:n_level_comp) ) / &
-                   tab_nLevel_old(icell,1:n_level_comp) + 10*tiny_real)
-              if (diff > maxdiff) maxdiff = diff
-           endif
-        enddo ! icell
-
         write(*,*) maxval(max_n_iter_loc), "sub-iterations"
         write(*,*) "Relative difference =", real(maxdiff)
         write(*,*) "Threshold =", precision*fac_etape
@@ -858,7 +856,10 @@ subroutine init_dust_mol(imol)
   implicit none
 
   integer, intent(in) :: imol
-  integer :: iTrans, p_lambda, icell
+
+  integer :: iTrans, p_lambda
+  integer, target :: icell
+  integer, pointer :: p_icell
   real(kind=dp) :: freq!, Jnu
   real :: T, wl, kap
 
@@ -881,6 +882,12 @@ subroutine init_dust_mol(imol)
   lsepar_pola = .false.
   ltemp = .false.
   lmono = .true. ! equivalent au mode sed2
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   call realloc_dust_mol()
 
@@ -908,6 +915,7 @@ subroutine init_dust_mol(imol)
 
            ! Multiplication par densite
            ! AU_to_cm**2 car on veut kappa_abs_LTE en AU-1
+           write(*,*) "TODO : the water benchmark 3 needs to be updated for cell pointer in opacity table"
            do icell=1,n_cells
               kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
                    gas_dust / cm_to_AU
@@ -952,7 +960,7 @@ subroutine init_dust_mol(imol)
 
            T = Tdust(icell)
            ! On ne fait que du scattering isotropique dans les raies pour le moment ...
-           emissivite_dust(icell,iTrans) = kappa_abs_LTE(icell,iTrans) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
+           emissivite_dust(icell,iTrans) = kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell) * Bnu(freq,T) ! + kappa_sca(iTrans,ri,zj,phik) * Jnu
         enddo ! icell
      enddo ! itrans
 

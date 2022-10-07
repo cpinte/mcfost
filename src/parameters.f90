@@ -87,12 +87,13 @@ module parametres
   ! Nombre de cellules azimuthales
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
-  integer :: n_cells, nrz, p_n_cells, icell_ref
+  integer :: n_cells, nrz, p_n_cells
+  integer, target :: icell_ref
   logical :: lregular_theta
   real :: theta_max
 
   logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt, lwall
-  logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, loptical_depth_map, lreemission_stats
+  logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, lwrite_velocity, loptical_depth_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, llinear_rgrid, lVoronoi, is_there_disk, lno_backup
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, lonly_diff_approx, lforce_diff_approx
   logical :: ldensity_file, lsigma_file, lvelocity_file, lphantom_file, lphantom_multi, lphantom_avg

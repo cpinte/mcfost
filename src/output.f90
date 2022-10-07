@@ -599,9 +599,7 @@ subroutine write_stokes_fits()
      call ftfiou(unit, status)
 
       !  Check for any error, and if so print out error messages
-     if (status > 0) then
-	call print_error(status)
-     end if
+     if (status > 0) call print_error(status)
   endif
 
 
@@ -725,11 +723,10 @@ subroutine write_stokes_fits()
   call ftfiou(unit, status)
 
   ! Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
+
 end subroutine write_stokes_fits
 
 !***********************************************************
@@ -953,9 +950,7 @@ subroutine ecriture_map_ray_tracing()
   endif
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
@@ -1069,9 +1064,7 @@ subroutine write_tau_surface(imol)
   deallocate(image)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
@@ -1166,11 +1159,10 @@ subroutine ecriture_sed_ray_tracing()
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
+
 end subroutine ecriture_sed_ray_tracing
 
 !**********************************************************************
@@ -1415,7 +1407,7 @@ end subroutine reemission_stats
 
 !********************************************************************************
 
-subroutine write_disk_struct(lparticle_density,lcolumn_density)
+subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 ! Ecrit les table de densite du gaz en g/cm^3
 ! de la poussiere en g/cm^3 et en particules
 ! + coordonnees r et z en AU
@@ -1425,7 +1417,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
 
   implicit none
 
-  logical, intent(in) :: lparticle_density, lcolumn_density
+  logical, intent(in) :: lparticle_density, lcolumn_density, lvelocity
 
   integer :: i, j, k, icell, jj
 
@@ -1502,9 +1494,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   if (lparticle_density) then
@@ -1631,9 +1621,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grain_sizes.fits.gz"
@@ -1675,9 +1663,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grain_sizes_min.fits.gz"
@@ -1719,9 +1705,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grain_sizes_max.fits.gz"
@@ -1763,9 +1747,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grain_masses.fits.gz"
@@ -1807,9 +1789,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/volume.fits.gz"
@@ -1865,9 +1845,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   ! ********************************************************************************
   filename = trim(root_dir)//"/data_disk/grid.fits.gz"
@@ -1960,9 +1938,97 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
+
+  ! ********************************************************************************
+  if (lvelocity) then
+     filename = trim(root_dir)//"/data_disk/velocity.fits.gz"
+
+     !  Get an unused Logical Unit Number to use to open the FITS file.
+     status=0
+     call ftgiou (unit,status)
+
+     !  Create the new empty FITS file.
+     blocksize=1
+     call ftinit(unit,trim(filename),blocksize,status)
+
+     !  Initialize parameters about the FITS image
+     simple=.true.
+     ! le signe - signifie que l'on ecrit des reels dans le fits
+     bitpix=-64
+     extend=.true.
+     group=1
+     fpixel=1
+
+     if (lVoronoi) then
+        naxis=2
+        naxes(1)=n_cells
+        naxes(2)=3 !xyz
+        nelements=naxes(1)*naxes(2)
+
+        !  Write the required header keywords.
+        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+        ! Write  optional keywords to the header
+        call ftpkys(unit,'UNIT',"m/s",' ',status)
+        call ftpkys(unit,'DIM_1',"x",' ',status)
+        call ftpkys(unit,'DIM_2',"y",' ',status)
+        call ftpkys(unit,'DIM_3',"z",' ',status)
+
+        do icell=1, n_cells
+           grid(icell,:,1,1) = vfield3d(icell,:)
+        enddo
+
+        ! le d signifie real*8
+        call ftpprd(unit,group,fpixel,nelements,grid,status)
+     else
+        naxis=4
+        naxes(1)=n_rad
+        if (l3D) then
+           naxes(2)=2*nz
+           naxes(3)=n_az
+           naxes(4)=3
+        else
+           naxes(2)=nz
+           naxes(3)=1
+           naxes(4)=2
+        endif
+        grid = 0.0
+        nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+        do i=1, n_rad
+           jj=0
+           do j=j_start,nz
+              if (j==0) cycle
+              jj=jj+1
+              do k=1, n_az
+                 icell = cell_map(i,j,k)
+                 grid(i,jj,k,:) = vfield3d(icell,:)
+              enddo
+           enddo
+        enddo
+
+        !  Write the required header keywords.
+        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+
+        ! Write  optional keywords to the header
+        call ftpkys(unit,'UNIT',"m/s",' ',status)
+        if (vfield_coord == 3) then! spherical
+           call ftpkys(unit,'DIM_1',"radial velocity",' ',status)
+           call ftpkys(unit,'DIM_2',"azimuthal velocity",' ',status)
+           if (l3D) call ftpkys(unit,'DIM_3',"meridional velocity",' ',status)
+        endif
+        ! le d signifie real*8
+        call ftpprd(unit,group,fpixel,nelements,grid,status)
+     endif ! lVoronoi
+
+     !  Close the file and free the unit number.
+     call ftclos(unit, status)
+     call ftfiou(unit, status)
+
+     !  Check for any error, and if so print out error messages
+     if (status > 0) call print_error(status)
+  endif
 
   ! Wrting the column density
   if (lcolumn_density) call write_column_density()
@@ -1971,7 +2037,6 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density)
      write(*,*) "Exiting"
      call exit(0)
   endif
-
   write(*,*) "Done"
 
   return
@@ -2009,7 +2074,7 @@ subroutine ecriture_J(step)
      filename = trim(data_dir)//"/J_step1.fits.gz"
      do lambda=1, n_lambda
         do icell=1, n_cells
-           Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * L_packet_th / volume(icell) &
+           Jio(icell,lambda) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * L_packet_th / volume(icell) &
                 * tab_lambda(lambda) / tab_delta_lambda(lambda)
         enddo
      enddo
@@ -2020,7 +2085,7 @@ subroutine ecriture_J(step)
         n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
         energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
         do icell=1, n_cells
-           Jio(icell,lambda) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
+           Jio(icell,lambda) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * energie_photon/volume(icell)
         enddo
      enddo
   endif
@@ -2205,7 +2270,7 @@ function compute_UV_field() result(G)
      n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
      energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes ! F_lambda here
      do icell=1, n_cells
-        J(lambda,icell) = sum(xJ_abs(icell,lambda,:) + J0(icell,lambda)) * energie_photon/volume(icell)
+        J(lambda,icell) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * energie_photon/volume(icell)
      enddo
   enddo
   lamb(:) = tab_lambda(:) * 1e-6 ! en m
@@ -2323,9 +2388,7 @@ subroutine ecriture_temperature(iTemperature)
      call ftfiou(unit, status)
 
      !  Check for any error, and if so print out error messages
-     if (status > 0) then
-        call print_error(status)
-     end if
+     if (status > 0) call print_error(status)
   endif
 
   if (lRE_nLTE) then
@@ -2387,9 +2450,7 @@ subroutine ecriture_temperature(iTemperature)
      call ftfiou(unit, status)
 
      !  Check for any error, and if so print out error messages
-     if (status > 0) then
-        call print_error(status)
-     end if
+     if (status > 0) call print_error(status)
   endif
 
   if (lnRE) then
@@ -2553,9 +2614,7 @@ subroutine ecriture_temperature(iTemperature)
      call ftfiou(unit, status)
 
      !  Check for any error, and if so print out error messages
-     if (status > 0) then
-        call print_error(status)
-     end if
+     if (status > 0) call print_error(status)
   endif
 
   return
@@ -2644,9 +2703,7 @@ subroutine ecriture_Tex(imol,ext)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   deallocate(Tex)
 
@@ -2722,9 +2779,7 @@ subroutine taille_moyenne_grains()
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
   return
 
@@ -2898,9 +2953,7 @@ subroutine ecriture_sed(ised)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  end if
+  if (status > 0) call print_error(status)
 
 !  write(*,*) "Nbre paquets recus", real(nbre_photons_loop)*real(nbre_photons_eq_th), sum(sed), sum(sed)/(real(nbre_photons_loop)*real(nbre_photons_eq_th))
 
@@ -3209,9 +3262,7 @@ subroutine ecriture_spectre(imol)
   call ftfiou(unit, status)
 
   !  Check for any error, and if so print out error messages
-  if (status > 0) then
-     call print_error(status)
-  endif
+  if (status > 0) call print_error(status)
 
   !------------------------------------------------------------------------------
   ! Origine
@@ -3258,10 +3309,7 @@ subroutine ecriture_spectre(imol)
      call ftfiou(unit, status)
 
      !  Check for any error, and if so print out error messages
-     if (status > 0) then
-        call print_error(status)
-     endif
-
+     if (status > 0) call print_error(status)
   endif ! lorigine
 
   return

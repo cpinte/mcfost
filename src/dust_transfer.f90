@@ -147,12 +147,12 @@ subroutine transfert_poussiere()
   if ((ldisk_struct).and.(.not. ldust_sublimation)) then
      ! We write it later if there is sublimation
      if (lastrochem) then
-        call write_disk_struct(.true.,.true.)
+        call write_disk_struct(.true.,.true.,.false.)
      else
         if (n_cells <= 1000000) then
-           call write_disk_struct(.true.,lwrite_column_density)
+           call write_disk_struct(.true.,lwrite_column_density,lwrite_velocity)
         else ! We do not write the density as the file is big
-           call write_disk_struct(.false.,lwrite_column_density)
+           call write_disk_struct(.false.,lwrite_column_density,lwrite_velocity)
         endif
      endif
   endif
@@ -287,7 +287,7 @@ subroutine transfert_poussiere()
            call define_grid()
            call define_dust_density()
 
-           if (ldisk_struct) call write_disk_struct(.false.,lwrite_column_density) ! We do now in cases where we computed the dust submination radius
+           if (ldisk_struct) call write_disk_struct(.false.,lwrite_column_density,lwrite_velocity)
 
            do lambda=1,n_lambda
               ! recalcul pour opacite 2 :peut etre eviter mais implique + meme : garder tab_s11 en mem
@@ -345,10 +345,9 @@ subroutine transfert_poussiere()
 
         call repartition_wl_em()
 
-        if (lnRE) call init_emissivite_nRE()
-
      endif ! lTemp.or.lsed_complete
 
+     if (lTemp.and.lnRE) call init_emissivite_nRE()
   endif ! lmono
 
   if (laverage_grain_size) call taille_moyenne_grains()
@@ -947,7 +946,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! - lom supprime !
 
   integer, intent(in) :: id
-  integer, intent(inout) :: lambda, p_lambda, icell
+  integer, intent(inout) :: lambda, p_lambda
+  integer, target, intent(inout) :: icell
   real(kind=dp), intent(inout) :: x,y,z,u,v,w
   real(kind=dp), dimension(4), intent(inout) :: stokes
 
@@ -955,7 +955,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   logical, intent(out) :: flag_scatt
 
   real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_icell, taille_grain, itheta
+  integer :: taille_grain, itheta
+  integer, pointer :: p_icell
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
@@ -969,7 +970,11 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      flag_direct_star = .false.
   endif
 
-  p_icell = icell_ref
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   ! Boucle sur les interactions du paquets:
   ! - on avance le paquet
@@ -999,8 +1004,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 !        write(*,*) flag_star,flag_direct_star,tau,dvol,flag_sortie
 !        write(*,*) "*********************"
 !     endif
-
-     if (lvariable_dust) p_icell = icell
 
      ! Sinon la vie du photon continue : il y a interaction
      ! Diffusion ou absorption
@@ -1100,7 +1103,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
         u = u1 ; v = v1 ; w = w1
 
      else ! Absorption
-
 
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre

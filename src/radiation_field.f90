@@ -3,7 +3,7 @@ module radiation_field
   use parametres
   use mcfost_env
   use constantes
-  use dust_prop, only : kappa_abs_LTE
+  use dust_prop, only : kappa_abs_LTE, kappa_factor
   use messages
   use wavelengths
 
@@ -32,7 +32,9 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
 
   use dust_ray_tracing, only : calc_xI_scatt, calc_xI_scatt_pola, n_az_rt, n_phi_I, n_theta_I, I_spec_star, I_spec
 
-  integer, intent(in) :: id,lambda,p_lambda,icell
+  integer, intent(in) :: id,lambda,p_lambda
+  integer, intent(in), target :: icell
+  integer, pointer :: p_icell
   real(kind=dp), dimension(4), intent(in) :: Stokes
   real(kind=dp) :: l, x0,y0,z0, x1,y1,z1, u,v,w
   logical, intent(in) :: flag_star, flag_direct_star
@@ -40,8 +42,15 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
   real(kind=dp) :: xm,ym,zm, phi_pos, phi_vol
   integer :: psup, phi_I, theta_I, phi_k
 
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
+
   if (letape_th) then
-     if (lRE_LTE) xKJ_abs(icell,id) = xKJ_abs(icell,id) + kappa_abs_LTE(icell,lambda) * l * Stokes(1)
+     if (lRE_LTE) xKJ_abs(icell,id) = xKJ_abs(icell,id) + kappa_abs_LTE(p_icell,lambda) * l * Stokes(1) ! kappa_factor(icell) is not included here
      if (lxJ_abs_step1) xJ_abs(icell,lambda,id) = xJ_abs(icell,lambda,id) + l * Stokes(1)
      if (lmcfost_lib) xN_abs(icell,1,id) = xN_abs(icell,1,id) + 1.0 ! We do not store the wl dependence
   else
