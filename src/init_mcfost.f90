@@ -1438,7 +1438,7 @@ subroutine initialisation_mcfost()
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
   if (lemission_atom.and.para_version < 2.11) call error("Atomic line RT only available for latest versions")
 
-  if (lno_T) ltemp = .false.
+  if (lno_T) lTemp = .false.
   if (lno_SED) then
      lsed = .false.
      lsed_complete = .false.

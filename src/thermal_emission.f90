@@ -106,7 +106,7 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   if (alloc_status > 0) call error('Allocation error tab_Temp')
   tab_Temp = 0.0
 
-  allocate(log_Qcool_minus_extra_heating(n_T,Nc), stat=alloc_status)
+  allocate(log_Qcool_minus_extra_heating(n_T,p_Nc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error log_E_em')
   log_Qcool_minus_extra_heating = 0.0
 
@@ -416,7 +416,7 @@ subroutine init_reemission(lheating,dudt)
   logical, intent(in) :: lheating
   real, dimension(:), allocatable, intent(in), optional :: dudt
 
-  integer :: k,lambda,t, pop, icell, p_icell, id
+  integer :: k,lambda,t, pop, id, icell
   real(kind=dp) :: integ, coeff_exp, cst_wl, cst, wl
   real(kind=dp) ::  temp, cst_E, delta_wl
   real(kind=dp), dimension(0:n_lambda) :: integ3
@@ -453,20 +453,17 @@ subroutine init_reemission(lheating,dudt)
      enddo !lambda
   enddo ! T
 
-
   ! produit par opacite (abs seule) massique
   ! Todo : this loop is OK in 2D but takes ~ 5sec for 0.5 million cells in 3D
   !$omp parallel default(none) &
   !$omp private(id,icell,T,lambda,integ, Qcool,Qcool0,extra_heating,Qcool_minus_extra_heating,Temp,u_o_dt) &
-  !$omp shared(cst_E,kappa_abs_LTE,volume,B,lextra_heating,xT_ech,log_Qcool_minus_extra_heating,J0) &
-  !$omp shared(n_T,n_cells,n_lambda,tab_Temp,ldudt_implicit,ufac_implicit,dudt,lRE_nLTE)
+  !$omp shared(cst_E,kappa_abs_LTE,kappa_factor,volume,B,lextra_heating,xT_ech,log_Qcool_minus_extra_heating,J0) &
+  !$omp shared(n_T,n_cells,p_n_cells,n_lambda,tab_Temp,ldudt_implicit,ufac_implicit,dudt,lRE_nLTE,lvariable_dust,icell_ref)
   id = 1 ! Pour code sequentiel
   !$ id = omp_get_thread_num() + 1
 
   !$omp do
-  do icell=1,n_cells
-     ! this multiple loop is not needed when the dust grains are the same everywhere
-
+  do icell=1,p_n_cells
      do T=1, n_T
         Temp = tab_Temp(T)
         integ=0.0
@@ -474,7 +471,7 @@ subroutine init_reemission(lheating,dudt)
            ! kappa en Au-1    \
            ! volume en AU3     >  pas de cst pour avoir E_em en SI
            ! B * cst_E en SI = W.m-2.sr-1 (.m-1 * m) cat delta_wl inclus
-           integ = integ + kappa_abs_LTE(icell,lambda) * volume(icell) * B(lambda,T)
+           integ = integ + kappa_abs_LTE(icell,lambda) * B(lambda,T)  ! kappa_factor, and volume are not included here
         enddo !lambda
 
         ! Proper normalization
@@ -492,9 +489,9 @@ subroutine init_reemission(lheating,dudt)
            if (ldudt_implicit) then
               u_o_dt = ufac_implicit * Temp ! u(T)/dt
               ! dudt is meant to be u^n/dt here
-              extra_heating = max(Qcool0, (u_o_dt - dudt(icell)) / AU_to_m**2 )
+              extra_heating = max(Qcool0, (u_o_dt - dudt(icell)) / (AU_to_m**2 * volume(icell) * kappa_factor(icell)))
            else
-              extra_heating = max(Qcool0, dudt(icell) / AU_to_m**2 )
+              extra_heating = max(Qcool0, dudt(icell) / (AU_to_m**2 * volume(icell) * kappa_factor(icell)) )
            endif
         endif
 
@@ -519,7 +516,6 @@ subroutine init_reemission(lheating,dudt)
   !$omp enddo
   !$omp end parallel
 
-
   if (low_mem_th_emission) then
      do T=1, n_T
         do k=grain_RE_LTE_start,grain_RE_LTE_end
@@ -537,43 +533,22 @@ subroutine init_reemission(lheating,dudt)
         enddo !k
      enddo ! T
   else  ! .not. low_mem_th_emission
-     if (lvariable_dust) then ! Calcul dans toutes les cellules
-        do icell=1,p_n_cells
-           do T=1, n_T
-              integ3(0) = 0.0
-              do lambda=1, n_lambda
-                 ! Pas besoin de cst , ni du volume (normalisation a 1)
-                 integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda,T)
-              enddo !l
-
-              ! Normalisation a 1
-              if (integ3(n_lambda) > tiny(0.0_dp)) then
-                 do lambda=1, n_lambda
-                    kdB_dT_CDF(lambda,T,icell) = integ3(lambda)/integ3(n_lambda)
-                 enddo !l
-              endif
-           enddo ! T
-        enddo !icell
-     else ! Pas de strat : on calcule ds une cellule non vide et on dit que ca
-        ! correspond a la cellule pour prob_delta_T (car idem pour toutes les cellules)
-        icell = icell_not_empty
+     do icell=1,p_n_cells
         do T=1, n_T
            integ3(0) = 0.0
            do lambda=1, n_lambda
               ! Pas besoin de cst , ni du volume (normalisation a 1)
-              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * dB_dT(lambda,T)
+              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * kappa_factor(icell) * dB_dT(lambda,T)
            enddo !l
 
            ! Normalisation a 1
            if (integ3(n_lambda) > tiny(0.0_dp)) then
-              p_icell = icell_ref ! When lvariable is off --> values stored in 1st cell
-
               do lambda=1, n_lambda
-                 kdB_dT_CDF(lambda,T,p_icell) = integ3(lambda)/integ3(n_lambda)
+                 kdB_dT_CDF(lambda,T,icell) = integ3(lambda)/integ3(n_lambda)
               enddo !l
            endif
         enddo ! T
-     endif !lvariable_dust
+     enddo !icell
   endif ! low_mem_th_emission
 
   if (lRE_nLTE) then
@@ -649,7 +624,7 @@ subroutine init_reemission(lheating,dudt)
   if (lextra_heating .and. ldudt_implicit) then
      ! as u(T) depends on T, we need to check that int kappa_nu.Bnu(T).dnu - (u(T) - u_n)/dt
      ! is still an increasing function of T
-     do icell=1, n_cells
+     do icell=1, p_n_cells
         do T=1,n_T-1
            if (log_Qcool_minus_extra_heating(T+1,icell) < log_Qcool_minus_extra_heating(T,icell)) then
               call error("Qrad_minus_dudt is not an increasing function of T")
@@ -682,28 +657,35 @@ subroutine Temp_LTE(icell, Ti, Temp)
   real, intent(out) :: Temp
 
   real(kind=dp) :: Qheat, log_Qheat, frac
+  integer :: p_icell
 
-  Qheat=sum(xKJ_abs(icell,:)) * L_packet_th
+  if (lvariable_dust) then
+     p_icell = icell
+  else
+     p_icell = icell_ref
+  endif
+
+  Qheat=sum(xKJ_abs(icell,:)) * L_packet_th / volume(icell)  ! does not include kappa_factor, same as log_Qcool
   if (Qheat < tiny_dp) then
      Temp = T_min ; Ti = 2
   else
      log_Qheat = log(Qheat)
 
-     if (log_Qheat <  log_Qcool_minus_extra_heating(1,icell)) then
+     if (log_Qheat <  log_Qcool_minus_extra_heating(1,p_icell)) then
         Temp = T_min ; Ti = 2
      else
         ! Temperature echantillonee juste sup. a la temperature de la cellule
         Ti = maxval(xT_ech(icell,:))
 
         ! On incremente eventuellement la zone de temperature
-        do while((log_Qcool_minus_extra_heating(Ti,icell) < log_Qheat).and.(Ti < n_T))
+        do while((log_Qcool_minus_extra_heating(Ti,p_icell) < log_Qheat).and.(Ti < n_T))
            Ti=Ti+1
         enddo  ! LIMITE MAX
 
         ! Interpolation lineaire entre energies emises pour des
         ! temperatures echantillonees voisines
-        frac=(log_Qheat-log_Qcool_minus_extra_heating(Ti-1,icell)) / &
-             (log_Qcool_minus_extra_heating(Ti,icell)-log_Qcool_minus_extra_heating(Ti-1,icell))
+        frac=(log_Qheat-log_Qcool_minus_extra_heating(Ti-1,p_icell)) / &
+             (log_Qcool_minus_extra_heating(Ti,p_icell)-log_Qcool_minus_extra_heating(Ti-1,p_icell))
         Temp=exp(log(tab_Temp(Ti))*frac+log(tab_Temp(Ti-1))*(1.0-frac))
      endif
   endif
@@ -949,7 +931,7 @@ subroutine Temp_finale_nLTE()
 
   implicit none
 
-  integer :: T_int, T1, T2, icell
+  integer :: T_int, T1, T2,icell
   real(kind=dp) :: Temp, Temp1, Temp2, frac, log_E_abs, J_absorbe
 
   integer :: k, lambda
@@ -1568,7 +1550,7 @@ subroutine update_proba_abs_nRE()
            kappa_abs_RE(icell,lambda) = kappa_abs_RE_new
 
            if (kappa_abs_RE_old < tiny_dp) then
-              write(*,*) "Oups, opacity of equilibrium grains is 0, cannot perform correction"
+              write(*,*) "Oops, opacity of equilibrium grains is 0, cannot perform correction"
               write(*,*) "Something went wrong."
               write(*,*) "Having only grains out of equilibrium is not implemented yet."
               write(*,*) "Cell #", icell, " lambda #", lambda
@@ -1729,7 +1711,6 @@ subroutine init_emissivite_nRE()
 
   implicit none
 
-
   integer :: lambda, k, icell
   real(kind=dp) :: E_emise, facteur, cst_wl, wl
   real(kind=dp) :: Temp, cst_wl_max, delta_wl
@@ -1782,10 +1763,18 @@ subroutine repartition_energie(lambda)
 
   integer, intent(in) :: lambda
 
-  integer :: k, T, icell, alloc_status
+  integer :: k, T, alloc_status
+  integer, target :: icell
+  integer, pointer :: p_icell
   real(kind=dp) :: Temp, wl, cst_wl, E_star, surface, E_emise, cst_wl_max
   real(kind=dp) :: delta_T
   real(kind=dp), dimension(:), allocatable :: E_cell, E_cell_corrected
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   cst_wl_max = log(huge_real)-1.0e-4
 
@@ -1809,7 +1798,7 @@ subroutine repartition_energie(lambda)
            else
               cst_wl=cst_th/(Temp*wl)
               if (cst_wl < cst_wl_max) then
-                 E_cell(icell) = 4.0*kappa_abs_LTE(icell,lambda)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                 E_cell(icell) = 4.0*kappa_abs_LTE(p_icell,lambda)*kappa_factor(icell)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
               endif !cst_wl
            endif ! Temp==0.0
         else ! dark_zone
@@ -1940,7 +1929,7 @@ end subroutine repartition_energie
 !**********************************************************************
 
 integer function select_absorbing_grain(lambda,icell, aleat, heating_method) result(k)
-  ! This routine will select randomly the scattering grain
+  ! This routine will select randomly the absorbing/emitting grain
   ! from the CDF of kabs
   ! Because we cannot store all the CDF for all cells
   ! (n_grains x ncells x n_lambda)
@@ -1950,25 +1939,33 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
 
   implicit none
 
-  integer, intent(in) :: lambda, icell, heating_method
+  integer, intent(in) :: lambda, heating_method, icell
+  integer :: p_icell
   real, intent(in) :: aleat
   real(kind=dp) :: prob, CDF, norm
   integer :: kstart, kend
 
+  if (lvariable_dust) then
+     p_icell = icell
+  else
+     p_icell = icell_ref
+  endif
+
   ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
   if (heating_method == 1) then
-     norm =  kappa_abs_LTE(icell,lambda) / ( AU_to_cm * mum_to_cm**2 )
+     norm =  kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell) / ( AU_to_cm * mum_to_cm**2 )
      kstart = grain_RE_LTE_start ; kend = grain_RE_LTE_end
   else if (heating_method == 2) then
-     norm =  kappa_abs_nLTE(icell,lambda) / ( AU_to_cm * mum_to_cm**2 )
+     norm =  kappa_abs_nLTE(p_icell,lambda) * kappa_factor(icell) / ( AU_to_cm * mum_to_cm**2 )
      kstart = grain_RE_nLTE_start ; kend = grain_RE_nLTE_end
   else
      ! todo : maybe update with an extra variable kappa_abs_qRE
      if (lRE_nLTE) then
-        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda) - kappa_abs_nLTE(icell,lambda)) &
+        norm =  (kappa_abs_RE(icell, lambda) - &
+        (kappa_abs_LTE(p_icell,lambda) + kappa_abs_nLTE(p_icell,lambda)) * kappa_factor(icell)) &
              / ( AU_to_cm * mum_to_cm**2 )
      else
-        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(icell,lambda)) &
+        norm =  (kappa_abs_RE(icell, lambda) -  kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell)) &
              / ( AU_to_cm * mum_to_cm**2 )
      endif
      kstart = grain_nRE_start ; kend = grain_nRE_end
@@ -2007,6 +2004,8 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
         enddo
      endif
   endif
+  !if (k < kstart) k=kstart
+  !if (k > kend)   k=kend
 
 
   return

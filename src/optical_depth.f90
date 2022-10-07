@@ -41,9 +41,12 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
   real(kind=dp) :: l, tau, opacite, l_contrib, l_void_before
-  integer :: icell_in, icell0, icell_old, next_cell, previous_cell, icell_star, i_star
+  integer :: icell_in, icell_old, next_cell, previous_cell, icell_star, i_star
+  integer, target :: icell0
 
   logical :: lcellule_non_vide, lstop, lintersect_stars
+
+  integer, pointer :: p_icell
 
   lstop = .false.
   flag_sortie = .false.
@@ -64,6 +67,12 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
   ! Will the packet intersect a star
   call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)
+
+  if (lvariable_dust) then
+     p_icell => icell0
+  else
+     p_icell => icell_ref
+  endif
 
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
@@ -91,7 +100,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
      ! Pour cas avec approximation de diffusion
      if (icell0 <= n_cells) then
         lcellule_non_vide=.true.
-        opacite=kappa(icell0,lambda)
+        opacite = kappa(p_icell,lambda) * kappa_factor(icell0)
 
         if (l_dark_zone(icell0)) then
            ! On renvoie le paquet dans l'autre sens
@@ -207,9 +216,9 @@ subroutine integ_tau(lambda)
 
   if (.not.lvariable_dust) then
      icell = icell_not_empty
-     if (kappa(icell,lambda) > tiny_real) then
+     if (kappa(icell_ref,lambda) * kappa_factor(icell) > tiny_real) then
         write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
-             (kappa(icell,lambda)/AU_to_cm))
+             (kappa(icell_ref,lambda) * kappa_factor(icell)/AU_to_cm))
      endif
   endif
 
@@ -225,9 +234,9 @@ subroutine integ_tau(lambda)
 
   if (.not.lvariable_dust) then
      icell = icell_not_empty
-     if (kappa(icell,lambda) > tiny_real) then
-        write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(1)*3.347929d39))/ &
-             (kappa(icell,lambda)/1.49597870691e13))
+     if (kappa(icell_ref,lambda) * kappa_factor(icell) > tiny_real) then
+        write(*,*) " Column density (g/cm�)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
+             (kappa(icell_ref,lambda) * kappa_factor(icell)/AU_to_cm))
      endif
   endif
 
@@ -256,8 +265,14 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
 
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
+<<<<<<< HEAD
 
   integer :: icell0, previous_cell, next_cell
+=======
+  integer :: previous_cell, next_cell
+  integer, target :: icell0
+  integer, pointer :: p_icell
+>>>>>>> master
 
   correct_plus = 1.0_dp + prec_grille
   correct_moins = 1.0_dp - prec_grille
@@ -271,6 +286,12 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
 
   next_cell = icell
   icell0 = 0 ! for previous_cell, just for Voronoi
+
+  if (lvariable_dust) then
+     p_icell => icell0
+  else
+     p_icell => icell_ref
+  endif
 
   ! Boucle infinie sur les cellules
   do ! Boucle infinie
@@ -287,7 +308,7 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
      endif
 
      if (icell0 <= n_cells) then
-        opacite=kappa(icell0,lambda)
+        opacite = kappa(p_icell,lambda) * kappa_factor(icell0)
      else
         opacite = 0.0_dp
      endif
@@ -322,7 +343,7 @@ subroutine compute_column(type, column, lambda)
   integer, parameter :: n_directions = 4
   real, dimension(n_cells,n_directions), intent(out) :: column
 
-  integer :: icell, icell0, next_cell, previous_cell, direction
+  integer :: icell, next_cell, previous_cell, direction, icell0, p_icell
 
   real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w, l_contrib, l_void_before, CD_units, factor, sum
 
@@ -336,8 +357,9 @@ subroutine compute_column(type, column, lambda)
   do direction = 1, n_directions
      !$omp parallel default(none) &
      !$omp shared(densite_gaz,tab_abundance,lVoronoi,Voronoi,direction,column,r_grid,z_grid,phi_grid,n_cells,cross_cell) &
-     !$omp shared(CD_units,kappa,lambda,type,test_exit_grid) &
-     !$omp private(icell,previous_cell,next_cell,icell0,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,factor,sum)
+     !$omp shared(CD_units,kappa,kappa_factor,lambda,type,test_exit_grid,icell_ref,lvariable_dust) &
+     !$omp private(icell,previous_cell,next_cell,icell0,p_icell,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,factor,sum)
+     p_icell = icell_ref
      !$omp do
      do icell=1,n_cells
         if (lVoronoi) then
@@ -368,6 +390,7 @@ subroutine compute_column(type, column, lambda)
 
         sum = 0.
         inf_loop: do
+           if (lvariable_dust) p_icell = icell0
            previous_cell = icell0
            icell0 = next_cell
            x0 = x1 ; y0 = y1 ; z0 = z1
@@ -381,7 +404,7 @@ subroutine compute_column(type, column, lambda)
               if (type==1) then
                  factor = CD_units * densite_gaz(icell0) ! column density
               else if (type==2) then
-                 factor = kappa(icell0,lambda) ! optical depth, kappa in AU^-1
+                 factor = kappa(p_icell,lambda) * kappa_factor(icell0)! optical depth, kappa in AU^-1
               else
                  factor = CD_units * densite_gaz(icell0) * tab_abundance(icell0) ! molecular column density
               endif
@@ -428,12 +451,15 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, dtau, dtau2, Snu, opacite
   real(kind=dp), dimension(ispeed(1):ispeed(2),nTrans) :: tau, tau2
   real(kind=dp), dimension(nTrans) :: tau_c
-  real(kind=dp) :: dtau_c, Snu_c
-  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell, icell_star, i_star
+  real(kind=dp) :: dtau_c, Snu_c, kappa_cont
+  integer :: i, iTrans, nbr_cell, next_cell, previous_cell, icell_star, i_star
+  integer, target :: icell
 
   real :: facteur_tau
 
   logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
+
+  integer, pointer :: p_icell
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -445,6 +471,13 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
 
   tau_c(:) = 0.0_dp
   I0c(:,iray,id) = 0.0_dp
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
+
 
   ! Will the ray intersect a star
   call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
@@ -490,16 +523,18 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
         do i=1,nTrans
            iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
-           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
+           kappa_cont = kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
+
+           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_cont
 
            ! Epaisseur optique
            dtau(:) =  l_contrib * opacite(:)
-           dtau_c = l_contrib * kappa_abs_LTE(icell,iTrans)
+           dtau_c = l_contrib * kappa_cont
 
            ! Fonction source
            Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) &
                 + emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-300_dp)
-           Snu_c = emissivite_dust(icell,iTrans) / (kappa_abs_LTE(icell,iTrans) + 1.0e-300_dp)
+           Snu_c = emissivite_dust(icell,iTrans) / (kappa_cont  + 1.0e-300_dp)
 
            ! Warning I0, I0c (and origine_mol) are smaller arrays (dimension nTrans)
            I0(:,i,iray,id) = I0(:,i,iray,id) + &
@@ -527,7 +562,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
            do i=1,nTrans
               iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
-              opacite(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
+              opacite(:) = kappa_mol_o_freq2(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
               dtau(:) =  l_contrib * opacite(:)
 
               ! Ajout emission en sortie de cellule (=debut car on va a l'envers) ponderee par
@@ -589,10 +624,13 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite
   real(kind=dp) :: tau_max, tau_previous
 
-  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell, iv
+  integer :: i, iTrans, nbr_cell, next_cell, previous_cell, iv
+  integer, target :: icell
 
   logical :: lcellule_non_vide, lstop
   logical, parameter :: lsubtract_avg = .false.
+
+  integer, pointer :: p_icell
 
   x1=x;y1=y;z1=z
   next_cell = icell_in
@@ -602,6 +640,12 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
   lstop = .false.
   flag_sortie = .false.
   tau_mol(:) = 0.0_dp
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
@@ -633,7 +677,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
 
         !do i=1,nTrans
         !iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
-        opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
+        opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
         ! Epaisseur optique
         dtau_mol(:) =  l_contrib * opacite(:)
@@ -702,10 +746,13 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite, I_mol, Snu, dI_mol
   real(kind=dp) :: I_max, I_previous
 
-  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell
+  integer :: i, iTrans, nbr_cell, next_cell, previous_cell
+  integer, target :: icell
 
   logical :: lcellule_non_vide, lstop
   logical, parameter :: lsubtract_avg = .false.
+
+  integer, pointer :: p_icell
 
   x1=x;y1=y;z1=z
   next_cell = icell_in
@@ -716,6 +763,12 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
   flag_sortie = .false.
   tau_mol(:) = 0.0_dp
   I_mol(:) = 0.0_dp
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   ! Boucle infinie sur les cellules
   infinie : do ! Boucle infinie
@@ -748,7 +801,7 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
         !do i=1,nTrans
         !iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
-        opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
+        opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
         ! Epaisseur optique
         dtau_mol(:) =  l_contrib * opacite(:)
@@ -959,11 +1012,14 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, dtau_mol, opacite
 
   real(kind=dp) :: dtau_c
-  integer :: i, iTrans, nbr_cell, icell, next_cell, previous_cell
+  integer :: i, iTrans, nbr_cell, next_cell, previous_cell
+  integer, target :: icell
 
   logical :: lcellule_non_vide
 
   logical, parameter :: lsubtract_avg = .false.
+
+  integer, pointer :: p_icell
 
   x1=x;y1=y;z1=z
   next_cell = icell_in
@@ -971,6 +1027,12 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
 
   tau_mol(:,:) = 0.0_dp
   tau_c(:) = 0.0_dp
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   !*** propagation dans la grille
 
@@ -1004,11 +1066,11 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
         do i=1,nTrans
            iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
-           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(icell,iTrans)
+           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
            ! Epaisseur optique
            dtau_mol(:) =  l_contrib * opacite(:)
-           dtau_c = l_contrib * kappa_abs_LTE(icell,iTrans)
+           dtau_c = l_contrib * kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
            ! Mise a jour profondeur optique pour cellule suivante
            ! Warning tau and  tau_c are smaller array (dimension nTrans)
@@ -1028,9 +1090,9 @@ end subroutine optical_length_tot_mol
    ! ------------------------------------------------------------------------------- !
    ! TO DO: merge integ_ray_atom + integ_ray_line
    ! Zeeman
-   ! scattering 
+   ! scattering
    ! level dissolution
-   ! dust   
+   ! dust
    ! ------------------------------------------------------------------------------- !
       integer, intent(in) :: id, icell_in, iray
       real(kind=dp), intent(in) :: u,v,w
@@ -1052,7 +1114,7 @@ end subroutine optical_length_tot_mol
       tau(:) = 0.0_dp
 
       Itot(:,iray,id) = 0.0_dp
-   
+
       ! Will the ray intersect a star
       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
       ! Boucle infinie sur les cellules (we go over the grid.)
@@ -1133,7 +1195,7 @@ end subroutine optical_length_tot_mol
 
          end if  ! lcellule_non_vide
 
-         icell_prev = icell 
+         icell_prev = icell
          !duplicate with previous_cell, but this avoid problem with Voronoi grid here
 
       end do infinie
@@ -1164,11 +1226,14 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   real(kind=dp), dimension(N_type_flux) :: integ_ray_dust
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, xm, ym, zm, l, l_contrib, l_void_before
-  integer :: icell, previous_cell, next_cell, icell_star, i_star
+  integer :: previous_cell, next_cell, icell_star, i_star
+  integer, target :: icell
 
   real(kind=dp) :: tau, dtau
 
   logical :: lcellule_non_vide, lintersect_stars
+
+  integer, pointer :: p_icell
 
   x1=x;y1=y;z1=z
   x0=x;y0=y;z0=z
@@ -1176,6 +1241,12 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
 
   tau = 0.0_dp
   integ_ray_dust(:) = 0.0_dp
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   ! Will the ray intersect a star
   call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
@@ -1205,7 +1276,7 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
 
      if (lcellule_non_vide) then
         ! Epaisseur optique de la cellule
-        dtau =  l_contrib * kappa(icell,lambda)
+        dtau =  l_contrib * kappa(p_icell,lambda) * kappa_factor(icell)
 
         ! Fct source au milieu du parcours dans la cellule
         xm = 0.5 * (x0 + x1)
@@ -1246,7 +1317,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
   integer, intent(in) :: lambda, p_lambda
   real, intent(in) :: tau_max
   logical, intent(in) :: ldiff_approx
-  integer :: i, j, pk, n, id, icell, jj
+  integer :: i, j, pk, n, id, jj
+  integer, target :: icell
   real(kind=dp) :: x0, y0, z0, u0, v0, w0
   real :: somme, angle, dvol1, phi, r0
 
@@ -1256,7 +1328,15 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
 
   real(kind=dp), dimension(4) :: Stokes
 
+  integer, pointer :: p_icell
+
   lpacket_alive = .true.
+
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   do pk=1, n_az
      ri_in_dark_zone(pk)=n_rad
@@ -1264,7 +1344,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
      ! étape 1 : radialement depuis le centre
      somme = 0.0
      do1 : do i=1,n_rad
-        somme=somme+kappa(cell_map(i,1,pk),lambda)*(r_lim(i)-r_lim(i-1))
+        icell = cell_map(i,1,pk)
+        somme=somme+kappa(p_icell,lambda)*kappa_factor(icell)*(r_lim(i)-r_lim(i-1))
         if (somme > tau_max) then
            ri_in_dark_zone(pk) = i
            exit do1
@@ -1274,7 +1355,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
      ! étape 2 : radialement depuis rout
      somme = 0.0
      do2 : do i=n_rad,1,-1
-        somme=somme+kappa(cell_map(i,1,pk),lambda)*(r_lim(i)-r_lim(i-1))
+        icell = cell_map(i,1,pk)
+        somme=somme+kappa(p_icell,lambda)*kappa_factor(icell)*(r_lim(i)-r_lim(i-1))
         if (somme > tau_max) then
            ri_out_dark_zone(pk) = i
            exit do2
@@ -1287,7 +1369,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
         do i=ri_in_dark_zone(pk), ri_out_dark_zone(pk)
            somme = 0.0
            do3 : do j=nz, 1, -1
-              somme=somme+kappa(cell_map(i,j,pk),lambda)*(z_lim(i,j+1)-z_lim(i,j))
+              icell = cell_map(i,j,pk)
+              somme=somme+kappa(p_icell,lambda)*kappa_factor(icell)*(z_lim(i,j+1)-z_lim(i,j))
               if (somme > tau_max) then
                  zj_sup_dark_zone(i,pk) = j
                  exit do3
@@ -1300,7 +1383,8 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
            do i=ri_in_dark_zone(pk), ri_out_dark_zone(pk)
               somme = 0.0
               do3_5 : do j=-nz, -1
-                 somme=somme+kappa(cell_map(i,j,pk),lambda)*(z_lim(i,abs(j)+1)-z_lim(i,abs(j)))
+                 icell = cell_map(i,j,pk)
+                 somme=somme+kappa(p_icell,lambda)*kappa_factor(icell)*(z_lim(i,abs(j)+1)-z_lim(i,abs(j)))
                  if (somme > tau_max) then
                     zj_inf_dark_zone(i,pk) = j
                     exit do3_5

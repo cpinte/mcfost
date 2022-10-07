@@ -360,10 +360,9 @@ subroutine transfert_poussiere()
 
         call repartition_wl_em()
 
-        if (lnRE) call init_emissivite_nRE()
-
      endif ! lTemp.or.lsed_complete
 
+     if (lTemp.and.lnRE) call init_emissivite_nRE()
   endif ! lmono
 
   if (laverage_grain_size) call taille_moyenne_grains()
@@ -962,7 +961,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! - lom supprime !
 
   integer, intent(in) :: id
-  integer, intent(inout) :: lambda, p_lambda, icell
+  integer, intent(inout) :: lambda, p_lambda
+  integer, target, intent(inout) :: icell
   real(kind=dp), intent(inout) :: x,y,z,u,v,w
   real(kind=dp), dimension(4), intent(inout) :: stokes
 
@@ -970,7 +970,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   logical, intent(out) :: flag_scatt
 
   real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_icell, taille_grain, itheta
+  integer :: taille_grain, itheta
+  integer, pointer :: p_icell
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
@@ -984,7 +985,11 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      flag_direct_star = .false.
   endif
 
-  p_icell = icell_ref
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   ! Boucle sur les interactions du paquets:
   ! - on avance le paquet
@@ -1014,8 +1019,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 !        write(*,*) flag_star,flag_direct_star,tau,dvol,flag_sortie
 !        write(*,*) "*********************"
 !     endif
-
-     if (lvariable_dust) p_icell = icell
 
      ! Sinon la vie du photon continue : il y a interaction
      ! Diffusion ou absorption
@@ -1115,7 +1118,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
         u = u1 ; v = v1 ; w = w1
 
      else ! Absorption
-
 
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre
