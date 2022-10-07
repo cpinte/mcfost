@@ -265,14 +265,9 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
 
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, ltot, tau, opacite, tau_tot, correct_plus, correct_moins, l_contrib, l_void_before
-<<<<<<< HEAD
-
-  integer :: icell0, previous_cell, next_cell
-=======
   integer :: previous_cell, next_cell
   integer, target :: icell0
   integer, pointer :: p_icell
->>>>>>> master
 
   correct_plus = 1.0_dp + prec_grille
   correct_moins = 1.0_dp - prec_grille
