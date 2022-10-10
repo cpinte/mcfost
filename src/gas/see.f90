@@ -1002,7 +1002,8 @@ module see
                         write(*,*) "-> (non-LTE ionisation): Not enough iterations to converge after second try"
                         write(*,'("cell #"(1I7)"; proc #"(1I3)", niter #"(1I5))') icell, id, n_iter
                         write(*,'("maxIter: "(1I5)"; damp="(1I4))')  max_iter, nint(d_damp)
-                        write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfpop="(1ES17.8E3)" dfne="(1ES17.8E3))') delta_f, dfpop, dfne
+                        write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfpop="(1ES17.8E3)" dfne="(1ES17.8E3))') &
+                             delta_f, dfpop, dfne
                         write(*,*) ""
                     endif
                     if (verbose) stop

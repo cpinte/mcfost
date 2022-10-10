@@ -1,4 +1,3 @@
-!To do, remove part that defines the grid and the dust_transfer!
 module dust_transfer
 
   use parametres
@@ -26,7 +25,6 @@ module dust_transfer
   use init_mcfost
   use SPH2mcfost
   use ML_ProDiMo
-  !use pluto_mod, only : setup_mhd_to_mcfost! :-)
   use read1d_models, only : read_grid_1d
   use mhd2mcfost, only : setup_mhd_to_mcfost, read_spheregrid_ascii, setup_model1d_to_mcfost
   use read_fargo3d, only : read_fargo3d_files
@@ -80,9 +78,6 @@ subroutine transfert_poussiere()
   integer :: time_1, time_2, time_RT, time_source_fct
 
   real, allocatable, dimension(:) :: extra_heating
-
-  !Default case for molecules and dust
-!   optical_length_tot => dust_and_mol_optical_length_tot
 
   time_source_fct = 0 ; time_RT = 0
 
@@ -360,10 +355,9 @@ subroutine transfert_poussiere()
 
         call repartition_wl_em()
 
-        if (lnRE) call init_emissivite_nRE()
-
      endif ! lTemp.or.lsed_complete
 
+     if (lTemp.and.lnRE) call init_emissivite_nRE()
   endif ! lmono
 
   if (laverage_grain_size) call taille_moyenne_grains()
@@ -962,7 +956,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! - lom supprime !
 
   integer, intent(in) :: id
-  integer, intent(inout) :: lambda, p_lambda, icell
+  integer, intent(inout) :: lambda, p_lambda
+  integer, target, intent(inout) :: icell
   real(kind=dp), intent(inout) :: x,y,z,u,v,w
   real(kind=dp), dimension(4), intent(inout) :: stokes
 
@@ -970,7 +965,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   logical, intent(out) :: flag_scatt
 
   real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
-  integer :: p_icell, taille_grain, itheta
+  integer :: taille_grain, itheta
+  integer, pointer :: p_icell
   real :: rand, rand2, tau, dvol
 
   logical :: flag_direct_star, flag_sortie
@@ -984,7 +980,11 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      flag_direct_star = .false.
   endif
 
-  p_icell = icell_ref
+  if (lvariable_dust) then
+     p_icell => icell
+  else
+     p_icell => icell_ref
+  endif
 
   ! Boucle sur les interactions du paquets:
   ! - on avance le paquet
@@ -1014,8 +1014,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 !        write(*,*) flag_star,flag_direct_star,tau,dvol,flag_sortie
 !        write(*,*) "*********************"
 !     endif
-
-     if (lvariable_dust) p_icell = icell
 
      ! Sinon la vie du photon continue : il y a interaction
      ! Diffusion ou absorption
@@ -1115,7 +1113,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
         u = u1 ; v = v1 ; w = w1
 
      else ! Absorption
-
 
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre
@@ -1378,7 +1375,6 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   ! Also save the projected location of the stars in the map (in arcsec)
 
   use utils, only : interp
-  !!!!use spectrum_type, only : NLTEspec
 
   integer, intent(in) :: lambda, ibin, iaz
   real(kind=dp), intent(in) :: u,v,w, taille_pix
@@ -1391,20 +1387,17 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   real(kind=dp), dimension(3) :: dx_screen, dy_screen, vec, xyz
   real(kind=dp) :: facteur, facteur2, lmin, lmax, norme, x, y, z, argmt, srw02, tau_avg
   real(kind=dp) :: delta, norm_screen2, offset_x, offset_y, fx, fy
-  real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi, factor_pix!!!!, tau_c
+  real :: cos_thet, rand, rand2, tau, pix_size, LimbDarkening, Pola_LimbDarkening, P, phi, factor_pix
   integer, dimension(n_etoiles) :: n_ray_star
   integer :: id, icell, iray, istar, i,j, x_center, y_center, alloc_status
   logical :: in_map, lpola, is_in_image
 
   integer, parameter :: nx_screen = 10
   real(kind=dp), dimension(-nx_screen:nx_screen,-nx_screen:nx_screen) :: tau_screen
-  !!!!real(kind=dp), dimension(-nx_screen:nx_screen,-nx_screen:nx_screen) :: tau_screen_c
 
   ! ToDo : this is not optimum as there can be many pixels & most of them do not contain a star
   ! allacatable array as it can be big and not fit in stack memory
   real, dimension(:,:,:), allocatable :: map_1star, Q_1star, U_1star
-  !for lemission_atom only. Polarization of the stellar continuum not included yet
-  !!!!real, dimension(:,:,:), allocatable :: mapc_1star!, Qc_1star, Uc_1star
 
   stars_map(:,:,:) = 0.0
   if (n_etoiles < 1) return
@@ -1807,7 +1800,7 @@ subroutine compute_tau_surface_map(lambda,tau,ibin,iaz)
 
   integer :: i,j, id, p_lambda, icell
 
-  real :: ltot, extrin
+  real :: ltot
   real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0
   logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
 

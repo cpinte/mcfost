@@ -36,7 +36,7 @@ module molecular_emission
   ! masse_mol_gaz sert uniquement pour convertir masse disque en desnite de particule
   real(kind=dp), dimension(:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_cells, nTrans
   real(kind=dp), dimension(:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_cells, nTrans
-  real, dimension(:,:), allocatable :: tab_nLevel, tab_nLevel2, tab_nLevel_old ! n_cells, nLevels
+  real, dimension(:,:), allocatable :: tab_nLevel, tab_nLevel2 ! n_cells, nLevels
 
   real, dimension(:), allocatable :: v_turb, v_line ! n_cells
 
@@ -82,7 +82,7 @@ module molecular_emission
 
   real(kind=dp), dimension(:), allocatable :: tab_speed_rt
 
-  real, dimension(:,:), allocatable :: maser_map ! n_cells, n_trans
+  !real, dimension(:,:), allocatable :: maser_map ! n_cells, n_trans
 
   real(kind=dp), dimension(:,:), allocatable :: emissivite_dust ! emissivite en SI (pour mol)
 
@@ -312,12 +312,6 @@ subroutine opacite_mol_loc(icell,imol)
   integer :: iTrans
   real(kind=dp) :: nu, nl, kap, eps
 
-  logical, save :: lmaser = .false.
-
-  character(len=128) :: filename
-
-  filename = trim(data_dir2(imol))//"/maser_map.fits.gz"
-
   do iTrans=1,nTrans_tot
      nu = tab_nLevel(icell,iTransUpper(iTrans))
      nl = tab_nLevel(icell,iTransLower(iTrans))
@@ -327,11 +321,11 @@ subroutine opacite_mol_loc(icell,imol)
      eps =  nu*fAul(iTrans)
 
      if (kap < 0.) then
-        lmaser = .true.
-        ! inversion value (inversion population is > 1 )
-        maser_map(icell,iTrans) = (nu * poids_stat_g(iTransLower(iTrans))) / &
-             (poids_stat_g(iTransUpper(iTrans)) * nl)
         kap = 0.
+        !lmaser = .true.
+        ! inversion value (inversion population is > 1 )
+        !maser_map(icell,iTrans) = (nu * poids_stat_g(iTransLower(iTrans))) / &
+        !     (poids_stat_g(iTransUpper(iTrans)) * nl)
      endif
 
      ! longueur de vol en AU, a multiplier par le profil de raie
@@ -721,8 +715,7 @@ function v_proj(icell,x,y,z,u,v,w) !
         v_proj = vx * u + vy * v + vz * w
 
      else ! Using analytical velocity field
-        if (lkeplerian.or.linfall) vitesse = vfield(icell)
-
+        vitesse = vfield(icell)
 
         if (lkeplerian) then
            r = sqrt(x*x+y*y)
@@ -798,7 +791,7 @@ function v_proj(icell,x,y,z,u,v,w) !
 		! 	else
 		! 		v_proj = 0.0_dp
 		! 	endif
-		else
+        else
            call error("velocity field not defined")
         endif
      endif ! ldensity_file

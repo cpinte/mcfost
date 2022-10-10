@@ -6,7 +6,7 @@ program BIGCRUNCH
   ! thermique et dans le gaz : raies moleculaires et atomiques
   ! Code parallèle OpenMP
   !
-  ! F. Menard, G. Duchene, C. Pinte et B. Tessore ( ? :-) )
+  ! F. Menard, G. Duchene, C. Pinte et B. Tessore
   ! Grenoble, Exeter, Grenoble, Santiago
   !
   !***********************************************************

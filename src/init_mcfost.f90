@@ -658,7 +658,7 @@ subroutine initialisation_mcfost()
         safe_stop_time = safe_stop_time * 86400.!convert in sec
         i_arg= i_arg+1
      case("-checkpoint")
-     	call error("option -checkpoint not yet")
+        call error("option -checkpoint not yet")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("Period needed for checkpoint!")
         lcheckpoint = .true.
@@ -673,7 +673,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         loutput_rates = .true.
      case("-electron_scatt") !force solving ne density even if provided in the model
-     	call error("option -electron_scatt not yet")
+        call error("option -electron_scatt not yet")
         i_arg = i_arg + 1
         lelectron_scattering = .true.
      case("-solve_ne") !force solving ne density even if provided in the model
@@ -692,9 +692,9 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) ndelay_iterate_ne
         i_arg= i_arg+1
      case("-calc_jnu_atom")
-     	call error("option -calc_jnu_atom not yet")
-     	i_arg = i_arg + 1
-     	lstop_after_jnu = .true.
+        call error("option -calc_jnu_atom not yet")
+        i_arg = i_arg + 1
+        lstop_after_jnu = .true.
      case("-puffed_up_rim")
         lpuffed_rim = .true.
         if (i_arg + 3 > nbr_arg) call error("rim parameters needed")
@@ -1440,7 +1440,7 @@ subroutine initialisation_mcfost()
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
   if (lemission_atom.and.para_version < 2.11) call error("Atomic line RT only available for latest versions")
 
-  if (lno_T) ltemp = .false.
+  if (lno_T) lTemp = .false.
   if (lno_SED) then
      lsed = .false.
      lsed_complete = .false.

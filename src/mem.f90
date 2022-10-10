@@ -166,36 +166,37 @@ subroutine alloc_dynamique(n_cells_max)
   call allocate_thermal_energy(Nc)
 
   ! Tableaux relatifs aux prop optiques des cellules
-  ! todo : could be p_Nc ...
-  allocate(kappa(Nc,n_lambda), kappa_abs_LTE(Nc,n_lambda), tab_albedo_pos(Nc,n_lambda), stat=alloc_status)
+  allocate(kappa(p_Nc,n_lambda), kappa_abs_LTE(p_Nc,n_lambda), tab_albedo_pos(p_Nc,n_lambda), kappa_factor(Nc), stat=alloc_status)
   kappa=0.0 ; kappa_abs_LTE=0.0 ; tab_albedo_pos = 0
   if (alloc_status > 0) then
      write(*,*) 'Allocation error kappa and albedo'
      stop
   endif
+  if (lRE_nLTE)  then
+     allocate(kappa_abs_nLTE(p_Nc,n_lambda), stat=alloc_status)
+     kappa_abs_nLTE=0.0
+  endif
 
-
+  ! the following arrays are updated live per cell, so we cannot use a pointer
   if (.not.(lonly_LTE.or.lonly_nLTE)) then
-     allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status) ; proba_abs_RE_LTE=0.0
+     allocate(proba_abs_RE_LTE(Nc,n_lambda),  stat=alloc_status)
      proba_abs_RE_LTE=0.0
   endif
-  if (lRE_nLTE)  then
-     allocate(kappa_abs_nLTE(Nc,n_lambda), stat=alloc_status) ; kappa_abs_nLTE=0.0
-  endif
   if (lRE_nLTE.or.lnRE) then
-     allocate(proba_abs_RE_LTE_p_nLTE(Nc,n_lambda), stat=alloc_status) ; proba_abs_RE_LTE_p_nLTE=0.0
+     allocate(proba_abs_RE_LTE_p_nLTE(Nc,n_lambda), stat=alloc_status)
+     proba_abs_RE_LTE_p_nLTE=0.0
   endif
   if (lnRE) then
-     allocate(proba_abs_RE(Nc,n_lambda), kappa_abs_RE(Nc,n_lambda), stat=alloc_status) ; proba_abs_RE=0.0 ;kappa_abs_RE=0.0
+     allocate(kappa_abs_RE(Nc,n_lambda), proba_abs_RE(Nc,n_lambda), stat=alloc_status)
+     kappa_abs_RE=0.0 ; proba_abs_RE=0.0
   endif
   if (alloc_status > 0) call error('Allocation error kappa_abs')
 
   if (aniso_method==2) then
-     allocate(tab_g_pos(Nc,n_lambda),stat=alloc_status)
+     allocate(tab_g_pos(p_Nc,n_lambda),stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_albedo_pos, tab_g_pos')
      tab_g_pos = 0.0
   endif
-
 
   ! **************************************************
   ! Tableaux relatifs aux prop optiques des cellules ou des grains
@@ -317,7 +318,7 @@ subroutine deallocate_em_th_mol()
 
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)
 
-  deallocate(kappa,kappa_abs_LTE)
+  deallocate(kappa,kappa_abs_LTE,kappa_factor)
   if (allocated(proba_abs_RE_LTE)) then
      deallocate(proba_abs_RE_LTE)
   endif
@@ -374,24 +375,23 @@ subroutine realloc_dust_mol()
   C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm = 0 ; tab_g = 0
 
   ! Tableaux relatifs aux prop optiques des cellules
-  allocate(kappa(n_cells,n_lambda),kappa_abs_LTE(n_cells,n_lambda), &
+  allocate(kappa(p_n_cells,n_lambda),kappa_abs_LTE(p_n_cells,n_lambda), kappa_factor(n_cells), &
        emissivite_dust(n_cells,n_lambda), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc)')
   kappa = 0.0 ; kappa_abs_LTE = 0.0 ; emissivite_dust = 0.0
 
   if (lRE_nLTE) then
-     allocate(kappa_abs_nLTE(n_cells,n_lambda), stat=alloc_status)
+     allocate(kappa_abs_nLTE(p_n_cells,n_lambda), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error kappa_abs_nLTE (realloc)')
      kappa_abs_nLTE = 0.0
   endif
 
-  ! todo : could be p_n_cells
-  allocate(tab_albedo_pos(n_cells,n_lambda),stat=alloc_status)
+  allocate(tab_albedo_pos(p_n_cells,n_lambda),stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_albedo_pos (realloc)')
   tab_albedo_pos = 0
 
   if (aniso_method==2) then
-     allocate(tab_g_pos(n_cells,n_lambda),stat=alloc_status)
+     allocate(tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_g_pos (realloc)')
      tab_g_pos = 0.0
   endif
@@ -571,16 +571,16 @@ subroutine realloc_step2()
      ksca_CDF = 0
   endif ! method
 
-  deallocate(kappa,kappa_abs_LTE)
+  deallocate(kappa,kappa_abs_LTE,kappa_factor)
   if (allocated(proba_abs_RE_LTE)) deallocate(proba_abs_RE_LTE)
   if (lRE_nLTE) deallocate(kappa_abs_nLTE)
   if (lRE_nLTE.or.lnRE) deallocate(proba_abs_RE_LTE_p_nLTE)
   if (lnRE) deallocate(proba_abs_RE,kappa_abs_RE)
-  allocate(kappa(n_cells,n_lambda2), kappa_abs_LTE(n_cells,n_lambda2), stat=alloc_status)
+  allocate(kappa(p_n_cells,n_lambda2), kappa_abs_LTE(p_n_cells,n_lambda2), kappa_factor(n_cells), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error kappa')
   kappa=0.0 ; kappa_abs_LTE=0.0
   if (lRE_nLTE) then
-     allocate(kappa_abs_nLTE(n_cells,n_lambda2))
+     allocate(kappa_abs_nLTE(p_n_cells,n_lambda2))
      if (alloc_status > 0) call error('Allocation error kappa_abs_nLTE')
      kappa_abs_nLTE=0.0
   endif
@@ -647,16 +647,14 @@ subroutine alloc_emission_mol(imol)
   kappa_mol_o_freq=0.0
   emissivite_mol_o_freq = 0.0
 
-  ! Todo : we do not always need both arrays
-  allocate(tab_nLevel(n_cells,nLevels), tab_nLevel_old(n_cells,nLevels), stat=alloc_status)
+  allocate(tab_nLevel(n_cells,nLevels), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_nLevel')
   tab_nLevel = 0.0
-  tab_nLevel_old = 0.0
 
-  ! Todo : we don;t need this most of the time
-  allocate(maser_map(n_cells,nTrans_tot), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error maser_map')
-  maser_map = 0.0
+  ! Todo : we don't need this most of the time
+  !allocate(maser_map(n_cells,nTrans_tot), stat=alloc_status)
+  !if (alloc_status > 0) call error('Allocation error maser_map')
+  !maser_map = 0.0
 
   allocate(tab_v(-n_largeur_Doppler*n_speed:n_largeur_Doppler*n_speed), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_v')
@@ -708,7 +706,7 @@ subroutine dealloc_emission_mol()
 
   ! Dealloue ce qui n'a pas ete libere par  clean_mem_dust_mol
   deallocate(tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup)
-  deallocate(kappa,kappa_abs_LTE,emissivite_dust)
+  deallocate(kappa,kappa_abs_LTE,kappa_factor,emissivite_dust)
 
   call deallocate_stellar_spectra()
 
@@ -716,8 +714,8 @@ subroutine dealloc_emission_mol()
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
        iCollUpper,iCollLower)
 
-  deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, tab_nLevel_old, &
-       tab_v, stars_map, tab_Cmb_mol, Jmol, maser_map)
+  deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, &
+       tab_v, stars_map, tab_Cmb_mol, Jmol)
 
   call deallocate_mol_maps()
 

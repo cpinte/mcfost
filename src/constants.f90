@@ -14,9 +14,9 @@ module constantes
   real(kind=dp), parameter :: pi_sur_deux = 0.5_dp * pi
   real(kind=dp), parameter :: un_tiers = 1.0_dp / 3.0_dp
 
-  real(kind=dp), parameter ::  SQRTPI=sqrt(pi)!1.77245385090551
+  real(kind=dp), parameter :: sqrtpi=sqrt(pi)!1.77245385090551
   ! --- 1/(2sqrt(2)), needed for anisotropy of radiation ---
-  real(kind=dp), parameter ::  TWOSQRTTWO = 0.35355339059327
+  real(kind=dp), parameter ::  twosqrttwo = 0.35355339059327
 
   ! Constantes en SI
   real(kind=dp), parameter :: hp = 6.626070040e-34_dp  ! Planck (J.s) CODATA 2014
@@ -36,16 +36,16 @@ module constantes
   real, parameter :: masse_mol_gaz = mu * masseH
   real, parameter :: T_Cmb = 2.7260                    ! K
 
-  real(kind=dp), parameter ::  E_ION_HMIN = 0.754 * electron_charge !Ionization energy (affinity) Hmin in [J]
+  real(kind=dp), parameter ::  e_ion_hmin = 0.754 * electron_charge !Ionization energy (affinity) Hmin in [J]
   real(kind=dp), parameter ::  epsilon_0=8.854187817d-12  !Vacuum permittivity [F/m]
-  real(kind=dp), parameter ::  RBOHR=5.29177349d-11  !Bohr radius [m]
-  real(kind=dp), parameter ::  E_RYDBERG=2.1798741d-18 !Ion. pot. Hydrogen [J]
-  real(kind=dp), parameter ::  THETA0 = 5.03974756d+3!log10(e) * eV/k [K^-1]
-  real(kind=dp), parameter ::  ABARH = 7.42d-41 !polarizabilty of Hydrogen in [Fm^2]
-  real(kind=dp), parameter ::  pia0squarex2 = deux_pi * RBOHR**2 !constant for collision Cross-sections
+  real(kind=dp), parameter ::  rBohr=5.29177349d-11  ! Bohr radius [m]
+  real(kind=dp), parameter ::  E_Rydberg=2.1798741d-18 ! Ion. pot. Hydrogen [J]
+  real(kind=dp), parameter ::  theta0 = 5.03974756d+3! log10(e) * eV/k [K^-1]
+  real(kind=dp), parameter ::  abarh = 7.42d-41 ! polarizabilty of Hydrogen in [Fm^2]
+  real(kind=dp), parameter ::  pia0squarex2 = deux_pi * rBohr**2 ! constant for collision Cross-sections
 
   !there is an error in LL04
-  real(kind=dp), parameter ::  LARMOR = (electron_charge / (quatre_pi*mel)) !s^-1 / T
+  real(kind=dp), parameter ::  Larmor = (electron_charge / (quatre_pi*mel)) !s^-1 / T
   !LamB = nuL/nu0 * lambda0 = nuL/(c/lambda0) * lambda0 = nuL/c * lambda0**2
   !lamD = lambda0 * vbroad/c --> vB = lamB/lamD = nuL/c * lambda0**2 * c / lambda0 / vbroad
   !vB = nuL * lambda0 / vbroad in T^-1
@@ -60,14 +60,14 @@ module constantes
   real(kind=dp), parameter :: deg_to_arcsec = 3600.
 
   ! Longueurs
-  real(kind=dp), parameter :: AU_to_m = 149597870700._dp ! IAU 2012 definition
-  real(kind=dp), parameter :: m_to_AU = 1.0_dp/AU_to_m
+  real(kind=dp), parameter :: au_to_m = 149597870700._dp ! IAU 2012 definition
+  real(kind=dp), parameter :: m_to_au = 1.0_dp/AU_to_m
 
-  real(kind=dp), parameter :: AU_to_cm = AU_to_m * 100._dp
-  real(kind=dp), parameter :: cm_to_AU = 1.0_dp/AU_to_cm
+  real(kind=dp), parameter :: au_to_cm = AU_to_m * 100._dp
+  real(kind=dp), parameter :: cm_to_au = 1.0_dp/AU_to_cm
 
-  real(kind=dp), parameter :: AU3_to_m3 = AU_to_m**3
-  real(kind=dp), parameter :: AU3_to_cm3 = AU_to_cm**3
+  real(kind=dp), parameter :: au3_to_m3 = AU_to_m**3
+  real(kind=dp), parameter :: au3_to_cm3 = AU_to_cm**3
 
   real(kind=dp), parameter :: mum_to_m = 1.0e-6_dp
   real(kind=dp), parameter :: m_to_mum = 1.0e6_dp
@@ -81,18 +81,17 @@ module constantes
   real(kind=dp), parameter :: cm_to_m = 1.0e-2_dp
   real(kind=dp), parameter :: m_to_km = 1.0e-3_dp
   real(kind=dp), parameter :: km_to_m = 1.0e3_dp
-  real(kind=dp), parameter ::  NM_TO_M =1.0d-9
-  real(kind=dp), parameter ::  M_TO_NM =1.0d9
-  !micron to nm is also km_to_m (and nm to micron m_to_km)
+  real(kind=dp), parameter ::  nm_to_m =1.0d-9
+  real(kind=dp), parameter ::  m_to_nm =1.0d9
 
   real(kind=dp), parameter :: Rsun = 6.957e8_dp ! IAU 2015 B3 definition, https://arxiv.org/abs/1605.09788
   real, parameter :: Teff_Sun = 5772.0 ! IAU 2015
-  real(kind=dp), parameter :: Rsun_to_AU = Rsun/AU_to_m
-  real(kind=dp), parameter :: Au_to_Rsun = 1.0_dp/Rsun_to_AU
+  real(kind=dp), parameter :: Rsun_to_au = Rsun/au_to_m
+  real(kind=dp), parameter :: au_to_Rsun = 1.0_dp/Rsun_to_au
 
-  real(kind=dp), parameter :: pc_to_AU = 648000_dp/pi ! IAU 2015 B2
+  real(kind=dp), parameter :: pc_to_au = 648000_dp/pi ! IAU 2015 B2
   real(kind=dp), parameter :: rad_to_sec = pc_to_AU
-  real(kind=dp), parameter :: AU_to_pc = 1.0/pc_to_AU
+  real(kind=dp), parameter :: au_to_pc = 1.0/pc_to_AU
   real(kind=dp), parameter :: sec_to_rad = AU_to_pc
 
   ! Energies
@@ -126,13 +125,13 @@ module constantes
   real(kind=dp), parameter :: kb_on_mH = kb/(amu*g_to_kg)  ! convert amu to kg
   real(kind=dp), parameter :: sigma_e = 8.0*pi/3.0 * (electron_charge/(sqrt(quatre_pi*EPSILON_0) *&
        (sqrt(mel)*c_light)))**4.d0 !Thomson cross-section
-  !Photoionisation Xsection of Hydrogen, at nu0, alpha0 = sigma0_H * g_bg(0) * neff / Z/Z
-  !Note an error in Hubeny Mihalas eq. 7.92. unit should be cm2 not cm^-2 !
-  real(kind=dp), parameter    :: sigma0_H = (32d0)/(3.0*pi*sqrt(3d0)) * EPSILON_0 * &
-       (HP**(3d0)) / (c_light * (Mel*electron_charge)**(2d0)) ! 7.904e-22 m^2
-  !here I have a problem if I try to compute sigma0_H_ff using 7.100 of Hubeny Mihalas with SI units value
-  !So I Take the cgs result and turn it to SI ...
-  !we multiply sigma0_H_ff by nion (m^-3) * ne(m^-3) to have chi in 1d-10 m^5 * m-3 * m^-3 in m^-1
+  ! Photoionisation Xsection of Hydrogen, at nu0, alpha0 = sigma0_H * g_bg(0) * neff / Z/Z
+  ! Note an error in Hubeny Mihalas eq. 7.92. unit should be cm2 not cm^-2 !
+  real(kind=dp), parameter    :: sigma0_h = (32d0)/(3.0*pi*sqrt(3d0)) * epsilon_0 * &
+       (hp**(3d0)) / (c_light * (mel*electron_charge)**(2d0)) ! 7.904e-22 m^2
+  ! Here I have a problem if I try to compute sigma0_H_ff using 7.100 of Hubeny Mihalas with SI units value
+  ! So I Take the cgs result and turn it to SI ...
+  ! we multiply sigma0_H_ff by nion (m^-3) * ne(m^-3) to have chi in 1d-10 m^5 * m-3 * m^-3 in m^-1
   real(kind=dp), parameter    :: sigma0_H_ff = 3.6923284d8 * 1d-10 ! cm^5 K^1/2 Hz^-3 -> m^5 K^1/2 Hz^-3
   !K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / sqrt(M_ELECTRON)
   !K0 = (K0**3) * 4./3. * sqrt(2*pi/3./KBOLTZMANN) / HPLANCK / CLIGHT
