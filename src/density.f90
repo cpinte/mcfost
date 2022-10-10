@@ -43,6 +43,7 @@ subroutine define_density()
 
 end subroutine define_density
 
+!*************************************************************
 
 subroutine define_gas_density()
   ! Calcule la table de densite: densite_gaz et masse_gaz

@@ -252,7 +252,6 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
 ! Grille a geometrie cylindrique
 ! C. Pinte
 ! 19/04/05
-! Modified by B. Tessore 29/11/2018 -> this is optical_length_tot()
 
   implicit none
 

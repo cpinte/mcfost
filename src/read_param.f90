@@ -121,7 +121,7 @@ contains
          write(*,*) "The new model includes atom settings"
          close(unit=1)
          call read_para4(para)
-         return        
+         return
        else
           close(unit=1)
           call error("Unsupported version of the parameter file")

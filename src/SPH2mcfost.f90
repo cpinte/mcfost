@@ -63,9 +63,6 @@ contains
           read_phantom_files => read_phantom_bin_files
        endif
 
-       !subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,particle_id,massgas,massdust,&
-       !rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ierr)
-
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz,T_gas, &
             particle_id, massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
             SPH_grainsizes,mask,n_SPH,ierr)

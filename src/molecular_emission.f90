@@ -715,8 +715,7 @@ function v_proj(icell,x,y,z,u,v,w) !
         v_proj = vx * u + vy * v + vz * w
 
      else ! Using analytical velocity field
-        if (lkeplerian.or.linfall) vitesse = vfield(icell)
-
+        vitesse = vfield(icell)
 
         if (lkeplerian) then
            r = sqrt(x*x+y*y)
@@ -792,7 +791,7 @@ function v_proj(icell,x,y,z,u,v,w) !
 		! 	else
 		! 		v_proj = 0.0_dp
 		! 	endif
-		else
+        else
            call error("velocity field not defined")
         endif
      endif ! ldensity_file
