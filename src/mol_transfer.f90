@@ -31,6 +31,10 @@ subroutine mol_line_transfer()
   integer :: imol, ibin, iaz
 
   if (lProDiMo2mcfost) ldust_mol = .true.
+  
+!   Default case for molecules and dust
+!   optical_length_tot => dust_and_mol_optical_length_tot
+
 
   ! Liberation memoire
   call deallocate_em_th_mol()
@@ -154,7 +158,7 @@ subroutine NLTE_mol_line_transfer(imol)
   integer, parameter :: n_rayons_max = n_rayons_start2 * (2**(n_iter2_max-1))
   integer :: n_level_comp
   real, parameter :: precision_sub = 1.0e-3
-  real, parameter :: precision = 1.0e-1
+  real, parameter :: precision = 1.0e-1 !1e-1
 
   integer :: etape, etape_start, etape_end, iray, n_rayons, icell
   integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status, iv, n_speed, n_cells_done, ibar
@@ -195,7 +199,7 @@ subroutine NLTE_mol_line_transfer(imol)
   if (lprecise_pop) then
      etape_end = 3
   else
-     etape_end = 1  ! 2
+     etape_end = 2  ! 1
   endif
 
   allocate(tab_speed(-n_speed:n_speed,nb_proc), stat=alloc_status)
@@ -432,6 +436,7 @@ subroutine NLTE_mol_line_transfer(imol)
         ! Critere de convergence totale
         write(*,*) maxval(max_n_iter_loc), "sub-iterations"
         write(*,*) "Relative difference =", real(maxdiff)
+
         write(*,*) "Threshold =", precision*fac_etape
 
         if (maxdiff < precision*fac_etape) then

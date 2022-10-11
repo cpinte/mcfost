@@ -59,7 +59,6 @@ module dust_ray_tracing
   real, dimension(:,:,:,:,:,:), allocatable :: tau_surface_map ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
   real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
 
-
   contains
 
 

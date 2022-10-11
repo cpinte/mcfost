@@ -26,7 +26,7 @@ contains
     integer, parameter :: nsinkproperties = 17
     integer(kind=8) :: number8(maxarraylengths)
     integer :: i,j,k,iblock,nums(ndatatypes,maxarraylengths)
-    integer :: nblocks,narraylengths,nblockarrays,number,idust
+    integer :: nblocks,narraylengths,nblockarrays,number,idust,ieos
     character(len=lentag) :: tag
     character(len=lenid)  :: fileid
     integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt,nptmass0,nptmass_j,nptmass_found
@@ -44,7 +44,6 @@ contains
     real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu,nucleation
     type(dump_h) :: hdr
     logical :: got_h,got_dustfrac,got_itype,tagged,matched,got_temperature,got_u,lpotential,do_nucleation
-
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
     ! We first read the number of particules in each phantom file
@@ -196,6 +195,7 @@ contains
        call extract('massoftype',massoftype(ifile,1:ntypes),hdr,ierr)
        call extract('hfact',hfact,hdr,ierr)
        call extract('gmw',gmw,hdr,ierr)
+       call extract('ieos',ieos,hdr,ierr)
        if (ierr /= 0) then
           write(*,*) "Using mcfost value instead : ", mu
           gmw=mu
@@ -267,8 +267,7 @@ contains
                             endif
                             read(iunit,iostat=ierr) dustfrac(ngrains,:)
                             got_dustfrac = .true.
-
-                            ! Nucleation
+                         ! Nucleation
                          case('K0')
                             read(iunit,iostat=ierr) tmp_dp ; nucleation(2,np0+1:np0+np) = tmp_dp
                          case('K1')
@@ -281,7 +280,6 @@ contains
                             read(iunit,iostat=ierr) tmp_dp ; nucleation(6,np0+1:np0+np) = tmp_dp
                          case('kappa')
                             read(iunit,iostat=ierr) tmp_dp ; nucleation(9,np0+1:np0+np) = tmp_dp
-
                          case default
                             matched = .false.
                             read(iunit,iostat=ierr)
@@ -428,7 +426,7 @@ contains
             vxyzu,gastemperature,itype,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass,vxyz_ptmass,&
             hfact,umass,utime,ulength,graindens,ndudt,dudt,ifiles, &
             n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
-            SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
+            SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,ieos)
        write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
     else
        n_SPH = 0
@@ -473,7 +471,7 @@ contains
 
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max
     integer :: np,ntypes,nptmass,dustfluidtype,ndudt
-    integer :: ndustsmall,ndustlarge
+    integer :: ndustsmall,ndustlarge,ieos
 
     integer, parameter :: maxtypes = 100
     integer, parameter :: nsinkproperties = 17
@@ -692,7 +690,7 @@ contains
          massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
          utime,ulength,graindens,ndudt,dudt,ifiles,   &
          n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id,SPH_grainsizes,     &
-         massgas,massdust,rhogas,rhodust,extra_heating)
+         massgas,massdust,rhogas,rhodust,extra_heating,ieos)
 
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
 
@@ -705,19 +703,17 @@ contains
 
   !*************************************************************************
 
+
   subroutine modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
     integer, intent(in) :: np, nptmass
     real(kind=dp), allocatable, dimension(:,:), intent(inout) :: xyzh, vxyzu
     real(kind=dp), allocatable, dimension(:,:), intent(inout) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: ulength
-
     real(kind=dp), dimension(3) :: centre
-
     logical, dimension(:), allocatable, intent(out) :: mask
 
     integer :: i
-
 
     ! Modifying SPH dump
     if (ldelete_Hill_sphere .or. ldelete_inside_rsph .or. ldelete_outside_rsph .or. ldelete_above_theta) then
@@ -755,7 +751,7 @@ contains
        vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
        utime, ulength,graindens,ndudt,dudt,ifiles, &
        n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
-       SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating)
+       SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating,ieos)
 
     ! Convert phantom quantities & units to mcfost quantities & units
     !
@@ -784,7 +780,7 @@ contains
     real(dp), dimension(:), intent(in) :: dudt
 
     ! Output arguments
-    integer, intent(out) :: n_SPH
+    integer, intent(out) :: n_SPH, ieos
     real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,h,vx,vy,vz,T_gas,rhogas,massgas ! massgas [Msun]
     integer, dimension(:),    allocatable, intent(out) :: particle_id
     real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
@@ -1023,9 +1019,20 @@ contains
              vx(i) = vr * cos_phi - vphi * sin_phi
              vy(i) = vr * sin_phi + vphi * cos_phi
           enddo
+          if (lemission_atom) then
+             !
+             ! solve for the gas temperature from the thermal energy
+             ! this should only be done if the temperature is NOT read from phantom
+             ! also: mu here should ideally be consistent with the abundances used for
+             ! the atomic transfer and the ionisation state, at the moment
+             ! we just assume everything is fully ionised to compute Tgas
+             !
+             rhogasi = rhogasi*g_to_kg/cm_to_m**3
+             T_gas(j) = get_temp_from_u(rhogasi,vxyzu(4,i)*uvelocity**2,0.6_dp,ieos)
+             if (mod(j,100000).eq.0) print*,i,T_gas(j),'vel=',vxi*uvelocity,vyi*uvelocity,vzi*uvelocity,'m/s'
+          endif
        endif
     endif
-
 
     if (lplanet_az) then
        if ((nptmass /= 2).and.(which_planet==0)) then
@@ -1126,5 +1133,56 @@ contains
   end subroutine phantom_2_mcfost
 
   !*************************************************************************
+
+  real(dp) function get_temp_from_u(rho,u,mu,ieos) result(temp)
+    ! routine to to compute temperature from
+    ! internal energy assuming a mix of gas and radiation
+    ! pressure, where Trad = Tgas. That is, we solve the
+    ! quartic equation
+    !
+    !  a*T^4 + 3/2*rho*kb*T/mu = rho*u
+    !
+    ! to determine the temperature from the supplied density
+    ! and internal energy (rho, u).
+    ! INPUT:
+    !    rho - density [kg/m3]
+    !    u - internal energy [J/kg]
+    ! OUTPUT:
+    !    temp - temperature [K]
+
+    use constantes, only:kb_on_mh,radconst
+    real(dp), intent(in) :: rho,u,mu
+    integer, intent(in) :: ieos
+    real(dp) :: ft,dft,dt
+    real(dp), parameter :: tol = 1.e-8
+    integer :: its
+
+    if (ieos==2) then
+       temp = u*mu/(1.5*kb_on_mh)
+       ! temp = (u*rho/radconst)**0.25
+    elseif (ieos==12) then
+       ! Take minimum of gas and radiation temperatures as initial guess
+       temp = min(u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25)
+       print*,'rho,u  = ',rho,u,' T =',u*mu/(1.5*kb_on_mh),(u*rho/radconst)**0.25,radconst,kb_on_mh
+
+       dt = huge(0.)
+       its = 0
+       do while (abs(dt) > tol*temp .and. its < 500)
+          its = its + 1
+          ft = u*rho - 1.5*kb_on_mh*temp*rho/mu - radconst*temp**4
+          dft = - 1.5*kb_on_mh*rho/mu - 4.*radconst*temp**3
+          dt = ft/dft ! Newton-Raphson
+          if (temp - dt > 1.2*temp) then
+             temp = 1.2*temp
+          elseif (temp - dt < 0.8*temp) then
+             temp = 0.8*temp
+          else
+             temp = temp - dt
+          endif
+       enddo
+       print*,'converged to T=',temp
+    endif
+
+  end function get_temp_from_u
 
 end module read_phantom

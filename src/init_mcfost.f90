@@ -13,8 +13,8 @@ module init_mcfost
   use utils
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters
+  use read1d_models, only : read_grid_1d
   use read_idefix, only : read_idefix_parameters
-
 
   implicit none
 
@@ -62,6 +62,43 @@ subroutine set_default_variables()
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
+  lcheckpoint = .false.
+  checkpoint_period = 15
+  llimit_mem = .false. !if true, contopac are computed locally.
+  !HEALpix
+  healpix_lorder = 1
+  healpix_lmin = 0
+  healpix_lmax = 7 !6 !5
+  ! Atomic lines Radiative Transfer (AL-RT)
+  lsafe_stop = .false.
+  safe_stop_time = 155520.0!1.8days in seconds, default
+  lemission_atom = .false.
+  lelectron_scattering = .false.
+  lstop_after_jnu = .false.
+  lsolve_for_ne = .false.
+  n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
+  ndelay_iterate_ne = 0
+  lmodel_1d = .false.
+  lmodel_ascii = .false.
+  lmhd_voronoi = .false.
+  lzeeman_polarisation = .false.
+  lforce_lte = .false.
+  ldissolve = .false.
+  lng_acceleration = .false.
+  Ng_Norder = 0
+  Ng_Nperiod = 5
+  istep_start = 1
+  ! AL-RT
+  laccurate_integ = .false.
+  N_rayons_mc = 100
+  loutput_rates = .false.
+  !
+  ! Max relative error in transfer. ATM only atomic line transfer
+  dpops_max_error = 1e-1
+  dpops_sub_max_error = 1e-2
+  art_hv = 0.0 !default is frac * min(vD)
+  art_hv_nlte = 0.0 !default is frac * min(vD)
+  !
   lpuffed_rim = .false.
   lno_backup = .false.
   loutput_UV_field = .false.
@@ -164,6 +201,7 @@ subroutine set_default_variables()
   lidefix = .false.
   theta_max = 0.5*pi
   llinear_rgrid = .false.
+  image_offset_centre(:) = (/0.0,0.0,0.0/)
 
   tmp_dir = "./"
 
@@ -416,6 +454,18 @@ subroutine initialisation_mcfost()
         read(band,*,iostat=ios) wvl
         if (ios/=0) call error("wavelength needed for -img. Error #2")
         i_arg = i_arg+1
+     case("-img_offset")
+        i_arg = i_arg+1
+        if (i_arg > nbr_arg) call error("(x0, y0, z0) needed for image centre offset. Error #1)")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) image_offset_centre(1)
+        i_arg = i_arg+1
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) image_offset_centre(2)
+        i_arg = i_arg+1
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) image_offset_centre(3)
+        i_arg = i_arg+1
      case("-op")
         limg=.true.
         lopacite_only=.true.
@@ -594,6 +644,57 @@ subroutine initialisation_mcfost()
      case("-mol")
         i_arg = i_arg+1
         lemission_mol=.true.
+     case("-limit_mem")
+        i_arg = i_arg + 1
+        llimit_mem = .true.
+     case("-safe_stop")
+        i_arg = i_arg + 1
+        lsafe_stop = .true.
+     case("-safe_stop_time")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("time needed (safe_stop)")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) safe_stop_time
+        safe_stop_time = safe_stop_time * 86400.!convert in sec
+        i_arg= i_arg+1
+     case("-checkpoint")
+        call error("option -checkpoint not yet")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Period needed for checkpoint!")
+        lcheckpoint = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) checkpoint_period !in iterations
+        i_arg= i_arg+1
+     case("-atom")
+        ! Option to solve for the RTE for atoms
+        i_arg = i_arg+1
+        lemission_atom=.true.
+     case("-output_rates")
+        i_arg = i_arg + 1
+        loutput_rates = .true.
+     case("-electron_scatt") !force solving ne density even if provided in the model
+        call error("option -electron_scatt not yet")
+        i_arg = i_arg + 1
+        lelectron_scattering = .true.
+     case("-solve_ne") !force solving ne density even if provided in the model
+        i_arg = i_arg + 1
+        lsolve_for_ne = .true.
+     case("-iterate_ne") !Iterate electron density in the NLTE loop
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ne period needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) n_iterate_ne
+        i_arg= i_arg+1
+     case("-Ndelay_iterate_ne")!number of iteration before solving for electron density
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ne delay needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) ndelay_iterate_ne
+        i_arg= i_arg+1
+     case("-calc_jnu_atom")
+        call error("option -calc_jnu_atom not yet")
+        i_arg = i_arg + 1
+        lstop_after_jnu = .true.
      case("-puffed_up_rim")
         lpuffed_rim = .true.
         if (i_arg + 3 > nbr_arg) call error("rim parameters needed")
@@ -674,6 +775,110 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         density_file = s
         i_arg = i_arg + 1
+     case("-start_step")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("1 or 2 needed for -start_step")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) istep_start
+        i_arg= i_arg+1
+     case("-mhd_voronoi")
+        i_arg = i_arg + 1
+        lmhd_voronoi = .true.
+        lVoronoi = .true.
+        l3D = .true.
+        ldensity_file = .false.
+        !later lpluto_file = .true.
+     case ("-model_1d")
+     	i_arg = i_arg + 1
+     	lmodel_1d = .true.
+     	lmodel_ascii = .false.
+      ldensity_file = .false.
+     case("-model_ascii")
+        i_arg = i_arg + 1
+        lmodel_ascii = .true.
+        ldensity_file = .false.
+     case("-zeeman_polarisation")
+     	call error("Zeeman polarisation not yet!")
+        i_arg = i_arg + 1
+        lzeeman_polarisation=.true.
+     case("-accurate_integ")
+        i_arg = i_arg + 1
+        laccurate_integ = .true.
+     case("-art_line_resol")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("resolution (km/s) needed with -art_line_resol !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) art_hv
+        i_arg= i_arg+1
+     case("-healpix_lorder")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("l value needed for healpix !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) healpix_lorder
+        i_arg= i_arg+1
+        if ( (healpix_lorder < 0).or.(healpix_lorder > 28) ) then
+         call error ("healpix l must be positive, below 28!")
+        endif
+        if ( (healpix_lorder > 7) ) then
+        	call warning("healpix l order > 7 resulting in a high number of rays!")
+        endif
+     case("-Ng_Norder")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ng'acc order needed with -Ng_Norder !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) Ng_Norder
+        i_arg= i_arg+1
+        if (Ng_Norder <= 1) then
+         call warning ("Ng Norder <= 1, turning off Ng'acceleration!")
+         lng_acceleration = .false.
+        else
+         lng_acceleration = .true.
+         write(*,*) " Ng's acceleration activated"
+        endif
+     case("-Ng_Nperiod")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Ng'acc period needed with -Ng_Nperiod !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) Ng_Nperiod
+        i_arg= i_arg+1
+        if (Ng_Nperiod < 0) then
+         call warning ("Ng Nperiod < 0 setting to abs!")
+         Ng_Nperiod = abs(Ng_Nperiod)
+        endif
+     case("-Nrays_mc_step")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("Number of rays needed with -Nrays_mc_step !")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) N_rayons_mc
+        i_arg= i_arg+1
+        if (N_rayons_mc <= 0) then
+         call error ("N_rayons_mc must be > 0")
+        endif
+     case("-max_err")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("relative error needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) dpops_max_error
+        i_arg= i_arg+1
+        if (dpops_max_error <= 0) then
+         call error ("MAx relative error has to be > 0")
+        endif
+     case("-max_err_sub")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("relative error sub needed")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) dpops_sub_max_error
+        i_arg= i_arg+1
+        if (dpops_sub_max_error <= 0) then
+         call error ("Max sub relative error has to be > 0")
+        endif
+     case("-see_lte")
+        i_arg = i_arg + 1
+        lforce_lte=.true.
+     case("-level_dissolution")
+     	call error("Level's dissolution not yet!")
+        i_arg = i_arg + 1
+        ldissolve =.true.
      case("-phantom")
         i_arg = i_arg + 1
         lphantom_file=.true.
@@ -1213,6 +1418,15 @@ subroutine initialisation_mcfost()
      disk_zone(1)%geometry = 2
      call read_athena_parameters(athena_file)
   endif
+  if (lmodel_1d) then
+   l3d = .false.
+   n_zones = 1
+   disk_zone(1)%geometry = 2
+   call warning("model_1d : reading 1d  stellar atmosphere model")
+   call read_grid_1d(density_file)
+  endif
+  if (lmodel_ascii .or. lmodel_1d) ldensity_file = .false. !because -df is used to
+                                                           !the pass the model to mcfost!
   if (lidefix) then
      l3D = .true.
      if (n_zones > 1) call error("athena mode only work with 1 zone")
@@ -1224,12 +1438,14 @@ subroutine initialisation_mcfost()
   if (n_zones > 1) lvariable_dust=.true.
 
   if (lemission_mol.and.para_version < 2.11) call error("parameter version must be larger than 2.10")
+  if (lemission_atom.and.para_version < 2.11) call error("Atomic line RT only available for latest versions")
 
   if (lno_T) lTemp = .false.
   if (lno_SED) then
      lsed = .false.
      lsed_complete = .false.
   endif
+
   if (map_size < tiny_real) call error("map size is set to 0")
 
   if (((.not.limg).and.(.not.ldust_prop)).and.lsepar_pola.and.lscatt_ray_tracing.and.(.not.lscatt_ray_tracing2)) then
@@ -1271,6 +1487,10 @@ subroutine initialisation_mcfost()
   endif
 
   write(*,*) 'Input file read successfully'
+
+  if ((lmodel_ascii.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
+   call error("Cannot use Phantom and MHD files at the same time presently.")
+  end if
 
   ! Correction sur les valeurs du .para
   if (lProDiMo) then
@@ -1402,7 +1622,8 @@ subroutine initialisation_mcfost()
      endif
   endif
 
-  if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.(.not.lstop_after_init)) then
+  if ((.not.limg).and.(.not.lsed).and.(.not.ltemp).and.(.not.lemission_mol).and.&
+       (.not.lemission_atom).and.(.not.lstop_after_init)) then
      write(*,*) "ERROR: Nothing to calculate!"
      write(*,*) "You can: "
      write(*,*) "- use the [-img wavelength] option to calculate an image"
@@ -1547,6 +1768,7 @@ subroutine display_help()
   write(*,*) " Main mcfost options"
   write(*,*) "        : -img <wavelength> (microns) : computes image at specified wavelength"
   write(*,*) "        : -mol : calculates molecular emission"
+  write(*,*) "        : -atom : calculates atomic lines emission"
   write(*,*) " "
   write(*,*) " Coupling with other codes"
   write(*,*) "        : -prodimo : creates required files for ProDiMo"
@@ -1555,6 +1777,9 @@ subroutine display_help()
   write(*,*) "        : -phantom <dump> : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -fargo3d <dir> <id> : reads a fargo3d model"
+  write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
+  write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
+  write(*,*) "        : -model_1d : interface with stellar atmosphere models."
   write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
   write(*,*) "        : -idefix <dump> : reads an idefix vtk file"
   write(*,*) " "
@@ -1587,6 +1812,7 @@ subroutine display_help()
   write(*,*) "        : -turn-off_planets : sink particles with id > 1 will not emit"
   write(*,*) "        : -turn-off_Lacc : ignore accretion on sink particles"
   write(*,*) "        : -turn-off_dust_subl : ignore dust sublimation"
+  write(*,*) "        : -img_offset <x0> <y0> <z0> : Centres the observer's los in (x0,y0,z0)"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
@@ -1658,6 +1884,7 @@ subroutine display_help()
   write(*,*) "        : -tau=1_surface"
   write(*,*) "        : -flux_fraction_surface <fraction>"
   write(*,*) " "
+  write(*,*) "        : -Nrays_mc_step <Nray> : Number of rays for angular quadrature in Monte Carlo step"
   write(*,*) " Options related to molecular emission"
   write(*,*) "        : -freeze-out <T>"
   write(*,*) "        : -freeze-out_depletion <relative depletion> between 0 and 1"
@@ -1670,6 +1897,31 @@ subroutine display_help()
   write(*,*) "        : -correct_Tgas <factor> : applies a factor to the gas temperature"
   write(*,*) "        : -chi_infall <value> : v_infall/v_kepler"
   write(*,*) "        : -cylindrical_rotation : forces Keplerian velocity independent of z"
+  write(*,*) " "
+  write(*,*) " Options related to atomic lines emission"
+  !healpix options missing. Waiting finle adaptive scheme.
+  write(*,*) "        : -start_step <int> : Select the first step for non-LTE loop (default 1)"
+!   write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
+  write(*,*) "        : -solve_ne : force the calculation of electron density"
+  write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
+  write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
+  write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
+!   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
+  write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
+  write(*,*) "        : -art_line_resol <v> : resolution of the non-LTE grid of art in km/s"
+  write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
+!   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
+!   write(*,*) "        : -calc_jnu_atom : Stop the code after Jnu_scattering has been computed and written. "
+!-> this one could also be use for mol tranfer, like Ng or tab_wavelength
+  write(*,*) "        : -max_err <max_err> : max relative error"
+  write(*,*) "        : -max_err_sub <max_err_sub> : max relative error for sub-iterations"
+  write(*,*) "        : -Ng_Norder <Norder> : Order of Ng's acceleration"
+  write(*,*) "        : -Ng_Nperiod <Nperiod> : Cycle of Ng's iteration"
+!   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
+  write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"
+  write(*,*) "        : -safe_stop_time <real> : calc_time_limit in days "
+  write(*,*) "        : -limit_mem : compute background continua on the fly."
+
   write(*,*) " "
   write(*,*) " Options related to phantom"
   write(*,*) "        : -limits_file or limits <limit-file> : x,y,z values used for the Voronoi tesselation"

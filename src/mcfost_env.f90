@@ -4,8 +4,8 @@ module mcfost_env
 
   implicit none
 
-  real, parameter :: mcfost_version = 3.0
-  character(8), parameter :: mcfost_release = "3.0.44"
+  real, parameter :: mcfost_version = 4.0
+  character(8), parameter :: mcfost_release = "4.0.00"
   real, parameter :: required_utils_version = 3.0
 
   character(len=128) :: web_server    = "http://ipag.osug.fr/public/pintec/"

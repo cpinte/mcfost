@@ -225,7 +225,7 @@ contains
     real(kind=dp) :: x,y,z, u,v,w
     real :: rand, time, cpu_time_begin, cpu_time_end
     integer :: n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i, lambda_seuil
-    integer :: itime, alloc_status
+    integer :: itime, ieos, alloc_status
     logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
@@ -253,7 +253,7 @@ contains
          vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),nucleation(:,:),massoftype2(1,1:ntypes),&
          xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating)
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,ieos)
 
     if (.not.lfix_star) call compute_stellar_parameters()
 

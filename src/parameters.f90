@@ -49,13 +49,40 @@ module parametres
 
   integer :: RT_sed_method ! cf routine dust_map pour def
 
-  ! Etapes de l'émission thermique
+  ! Etapes de l'Ã©mission thermique
   logical :: ltemp, lsed, lsed_complete, l_em_disk_image, lchauff_int, lextra_heating, lno_internal_energy
   character(len=512), dimension(:), allocatable :: indices
   character(len=512) :: tab_wavelength
 
+  !gas transfer here
+
   ! Emission moleculaire
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
+
+  ! Atomic line radiative transfer
+  logical :: lexit_after_nonlte_loop, lstop_after_jnu
+  logical :: lemission_atom, lelectron_scattering, lforce_lte,  &
+            	ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
+  integer :: N_rayons_mc, istep_start
+  
+  !HEALpix
+  integer :: healpix_lorder, healpix_lmin, healpix_lmax !lmin and lmax not yet (for local evaluation)
+  
+  logical :: lcheckpoint, lsafe_stop
+  !Convergence relative errors
+  real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time, art_hv_nlte
+  integer :: checkpoint_period
+  
+  !Ng's acceleration
+  logical :: lng_acceleration
+  integer :: Ng_Norder, Ng_Nperiod
+  
+  !electron density
+  logical :: lsolve_for_ne
+  integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
+  
+
+  logical :: lmodel_ascii, lmhd_voronoi, lmodel_1d, llimit_mem
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
@@ -67,18 +94,21 @@ module parametres
 
   ! Production d'images symetriques
   ! La symetrie est effectuee avant de choisir les pixels
-  ! le système est-il centrosymetrique
+  ! le systÃ¨me est-il centrosymetrique
   ! le systeme a-t-il une symetrie axiale (ne compte que si N_phi > 1)
   logical :: l_sym_ima, l_sym_centrale, l_sym_axiale
 
   ! Parametres des cartes
   integer :: N_thet, N_incl, N_phi, capt_interet, delta_capt, capt_inf, capt_sup, capt_debut, capt_fin
   integer ::  npix_x, npix_y, npix_x_save, npix_y_save
-  real :: angle_interet, zoom, tau_seuil, wl_seuil
+  real :: angle_interet, zoom, tau_seuil, wl_seuil, image_offset_centre(3)
 
   real  :: cutoff = 7.0
+  
+  !must be initialized to 0
+  integer(kind=8) :: mem_alloc_tot !total memory allocated dynamically or not in bytes
 
-  ! Résolution de la grille de densité
+  ! RÃ©solution de la grille de densitÃ©
   ! Nombre de cellules dans la direction r (echantillonage log)
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
   integer :: n_rad, n_rad_in  ! subdivision de la premiere cellule

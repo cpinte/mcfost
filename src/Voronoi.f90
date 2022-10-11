@@ -236,7 +236,6 @@ module Voronoi_grid
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
-
     if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 
     nb_proc_voro = min(16,nb_proc)
@@ -373,7 +372,7 @@ module Voronoi_grid
     !*************************
     ! Velocities
     !*************************
-    if (lemission_mol) then
+    if ((lemission_mol).or.(lemission_atom)) then
        do icell=1,n_cells_before_stars
           i = SPH_id(icell)
           Voronoi(icell)%vxyz(1) = vx(i)
@@ -525,7 +524,7 @@ module Voronoi_grid
        		n_average_neighb_stars = n_average_neighb_stars + 1
        	endif
     enddo
-    if (n_average_neighb_stars>0) write(*,'("mean number of stellar neighbours="(1I5))') &
+    if (n_average_neighb_stars>0) write(*,'(" Mean number of stellar neighbours = "(1I5))') &
     	int(real(size(pack(Voronoi(:)%is_star_neighbour,mask=Voronoi(:)%is_star_neighbour)))/real(n_etoiles))
 
 
@@ -823,7 +822,7 @@ module Voronoi_grid
     real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
     integer :: i, id_n, l, ifirst, ilast
 
-    integer :: i_star
+    integer :: i_star, check_cell
     real(kind=dp) :: d_to_star
     logical :: is_a_star_neighbour
 
@@ -914,36 +913,36 @@ module Voronoi_grid
        ! centered on the center of the cell
        delta_r = r - r_cell(:)
 
-       	b = dot_product(delta_r,k)
-       	c = dot_product(delta_r,delta_r) - (h * PS%cutting_distance_o_h)**2
-       	delta = b*b - c
+       b = dot_product(delta_r,k)
+       c = dot_product(delta_r,delta_r) - (h * PS%cutting_distance_o_h)**2
+       delta = b*b - c
 
-       	if (delta < 0.) then ! the packet never encounters the sphere
-         	 s_void_before = s
-          	s_contrib = 0.0_dp
-       	else ! the packet encounters the sphere
-          	rac = sqrt(delta)
-          	s1 = -b - rac
-          	s2 = -b + rac
+       if (delta < 0.) then ! the packet never encounters the sphere
+          s_void_before = s
+          s_contrib = 0.0_dp
+       else ! the packet encounters the sphere
+          rac = sqrt(delta)
+          s1 = -b - rac
+          s2 = -b + rac
 
-          	if (s1 < 0) then ! we already entered the sphere
-             	if (s2 < 0) then ! we already exited the sphere
-                	s_void_before = s
-                	s_contrib = 0.0_dp
-             	else ! We are still in the sphere and will exit it
-                	s_void_before = 0.0_dp
-                	s_contrib = min(s2,s)
-             	endif
-          	else ! We will enter in the sphere (both s1 and s2 are > 0)
-             	if (s1 < s) then ! We will enter the sphere in this cell
-                	s_void_before = s1
-                	s_contrib = min(s2,s) - s1
-             	else ! We will not enter the sphere in this sphere
-                	s_void_before = s
-                	s_contrib = 0.0_dp
-             	endif
-          	endif
-       	endif ! delta < 0
+          if (s1 < 0) then ! we already entered the sphere
+             if (s2 < 0) then ! we already exited the sphere
+                s_void_before = s
+                s_contrib = 0.0_dp
+             else ! We are still in the sphere and will exit it
+                s_void_before = 0.0_dp
+                s_contrib = min(s2,s)
+             endif
+          else ! We will enter in the sphere (both s1 and s2 are > 0)
+             if (s1 < s) then ! We will enter the sphere in this cell
+                s_void_before = s1
+                s_contrib = min(s2,s) - s1
+             else ! We will not enter the sphere in this sphere
+                s_void_before = s
+                s_contrib = 0.0_dp
+             endif
+          endif
+       endif ! delta < 0
     else ! the cell was not cut
        s_void_before = 0.0_dp
        s_contrib = s
@@ -954,7 +953,7 @@ module Voronoi_grid
        ! It is a neighbour so if the star is intersected (i_star>0) it might be the next cell.
        ! Otherwise, i_star == 0 (does not intersect the star in this direction (u,v,w)).
        if (i_star > 0) then
-          if (d_to_star < s) then !indeed a star, we use d_to_stars and set next_cell
+          if (d_to_star < s) then ! indeed a star, we use d_to_stars and set next_cell
              s_contrib = d_to_star
              next_cell = etoile(i_star)%icell
           endif

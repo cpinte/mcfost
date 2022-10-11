@@ -236,11 +236,11 @@ end subroutine indice_cellule_sph_theta
        ! on avance ou recule en r ? -> produit scalaire
        dotprod = b
        if (dotprod < 0.0_dp) then
-          ! on recule : on cherche rayon inférieur
+          ! on recule : on cherche rayon infï¿½rieur
           c=(r0_2-r_lim_2(ri0-1)*correct_moins)
           delta=b*b-c
-          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon inférieur
-             ! on cherche le rayon supérieur
+          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon infï¿½rieur
+             ! on cherche le rayon supï¿½rieur
              c=(r0_2-r_lim_2(ri0)*correct_plus)
              delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
              delta_rad=1
@@ -248,7 +248,7 @@ end subroutine indice_cellule_sph_theta
              delta_rad=-1
           endif
        else
-          ! on avance : on cherche le rayon supérieur
+          ! on avance : on cherche le rayon supï¿½rieur
           c=(r0_2-r_lim_2(ri0)*correct_plus)
           delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
           delta_rad=1
@@ -522,7 +522,6 @@ end subroutine indice_cellule_sph_theta
     logical, intent(out) :: lintersect
 
     real(kind=dp) :: x0, y0, z0, x1, y1, z1, r0_2, b, c, rac, delta, s1, delta_vol, correct_moins
-
 
     correct_moins = 1.0_dp - 1.0e-10_dp
 

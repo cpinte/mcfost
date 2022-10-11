@@ -8,6 +8,9 @@ module utils
 
   implicit none
 
+  real, parameter :: VACUUM_TO_AIR_LIMIT=200.0000
+  real, parameter :: AIR_TO_VACUUM_LIMIT=199.9352
+
   public :: interp
   interface interp
      module procedure  interp_sp
@@ -37,6 +40,44 @@ function span(xmin,xmax,n)
 
 end function span
 
+function span_dp(xmin,xmax,n, dk)
+
+  implicit none
+  integer, intent(in) ::dk
+  real(kind=dp), intent(in) :: xmin, xmax
+  integer, intent(in) :: n
+  real(kind=dp), dimension(n) :: span_dp
+  real(kind=dp) :: x1, x2
+  integer :: istart, iend, i0
+
+  integer :: i
+  real(kind=dp) :: delta_x
+
+  delta_x = (xmax-xmin)/real(n-1,kind=dp)
+  
+  if (dk < 0) then
+  	x1 = xmax
+  	x2 = xmin
+  	istart = N-1
+  	iend = 1
+  	i0 = N
+  else
+  	x1 = xmin
+  	x2 = xmax
+  	istart = 2
+  	iend = n
+  	i0 = 1
+  endif
+  
+  span_dp(i0) = x1
+  do i=istart,iend,dk
+     span_dp(i) = span_dp(i-dk) + dk * delta_x
+  enddo
+
+  return
+
+end function span_dp
+
 !************************************************************
 
 function spanl(xmin,xmax,n)
@@ -50,6 +91,18 @@ function spanl(xmin,xmax,n)
   spanl = exp(span(log(abs(xmin)), log(abs(xmax)), n))
 
 end function spanl
+
+function spanl_dp(xmin,xmax,n,dk)
+
+  implicit none
+  integer, intent(in) :: dk
+  real(kind=dp), intent(in) :: xmin, xmax
+  integer, intent(in) :: n
+  real(kind=dp), dimension(n) :: spanl_dp
+
+  spanl_dp = exp(span_dp(log(abs(xmin)), log(abs(xmax)), n, dk))
+
+end function spanl_dp
 
 !************************************************************
 
@@ -226,11 +279,11 @@ end subroutine GaussSlv
 subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
   ! Effectue une rotation du vecteur (xinit,yinit,zinit)
   ! Le resultat (xfin,yfin,zfin) est dans
-  ! le systeme de coordonnees où le vecteur (u1,v1,w1)=(1,0,0).
+  ! le systeme de coordonnees oï¿½ le vecteur (u1,v1,w1)=(1,0,0).
   ! ie applique la meme rotation que celle qui transforme
   ! (1,0,0) en (u1,v1,w1) sur (xinit,yinit,zinit)
   ! C. Pinte : 1/03/06
-  ! Nouvelle version d'une routine de F. Ménard
+  ! Nouvelle version d'une routine de F. Mï¿½nard
 
   implicit none
 
@@ -253,7 +306,7 @@ subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
    !     !c'est pas un atan mais un atan2 d'on le sign(u1)
    !     cost=sign(1.0/sqrt(1.0+x*x),u1)        !cos(atan(x)) = 1/(1+sqrt(x*x))
    !     sint=x*cost                            !sin(atan(x)) = x/(1+sqrt(x*x))
-        ! Equivalent  à  (~ meme tps cpu):
+        ! Equivalent  ï¿½  (~ meme tps cpu):
          theta=atan2(v1,u1)
          cost=cos(theta)
          sint=sin(theta)
@@ -351,6 +404,35 @@ function Bnu(nu,T)
   return
 
 end function Bnu
+
+!***********************************************************
+
+!-> note. Elemental function are too slow!
+Function Bpnu (N,lambda,T)
+! -----------------------------------------------------
+! Return an array of planck functions at all wavelengths
+! for the cell temperature.
+! Bnu in W/m2/Hz/sr
+! lambda in nm
+! -----------------------------------------------------
+integer, intent(in) :: N
+real(kind=dp), intent(in) :: T, lambda(N)
+real(kind=dp) :: hnu_kT, twohnu3_c2, Bpnu(N)
+integer la
+
+do la=1, N
+   twohnu3_c2 = 2.*HC / (NM_TO_M * lambda(la))**3
+   hnu_kT = hc_k / lambda(la) / T
+
+   if (hnu_kT > 100.0) then
+      Bpnu(la) = 0.0
+   else
+      Bpnu(la) = twohnu3_c2 / (exp(hnu_kT)-1.0)
+   end if 
+enddo
+
+return
+end function bpnu
 
 !***********************************************************
 
@@ -1286,7 +1368,7 @@ subroutine cdapres(cospsi, phi, u0, v0, w0, u1, v1, w1)
 !*
 !***************************************************
 ! 06/12/05 : - passage double car bug sous Icare
-!            - reduction nbre d'opérations
+!            - reduction nbre d'opï¿½rations
 !            (C. Pinte)
 !***************************************************
 
@@ -1343,5 +1425,280 @@ subroutine read_comments(iunit)
   return
 
 end subroutine read_comments
+
+subroutine read_line(unit,FMT,line,Nread,commentchar)
+   !
+   !Get next line which is not a comment line nor an empty line
+   !return that line and the len of the line Nread
+
+   character(len=*), intent(out) :: line
+   character(len=*), optional :: commentchar
+   character(len=1) :: com
+   integer, intent(out) :: Nread
+   integer, intent(in) :: unit
+   integer :: EOF
+   character(len=*), intent(in) :: FMT
+
+   Nread = 0
+   EOF = 0
+
+   com = "#"
+   if (present(commentchar)) then
+      com = commentchar
+   endif
+
+   do while (EOF == 0)
+      read(unit, FMT, IOSTAT=EOF) line !'(512A)'
+      Nread = len(trim(line))
+      !comment or empty ? -> go to next line
+      if ((line(1:1).eq.com).or.(Nread==0)) cycle 
+      ! line read exit ! to process it
+      exit
+   enddo ! if EOF > 0 reaches end of file, leaving
+
+   return
+end subroutine read_line
+
+function is_nan_infinity(y)
+   real(kind=dp), intent(in) :: y
+   integer :: is_nan_infinity
+
+   is_nan_infinity = 0
+   if (y /= y) then
+      write(*,*) "(Nan):", y
+      is_nan_infinity = 1
+      return
+   else if (y > 0 .and. (y==y*10)) then
+      write(*,*) "(infinity):", y
+      is_nan_infinity = 2
+      return
+   end if
+
+   return
+end function is_nan_infinity
+
+function is_nan_infinity_matrix(y)
+    real(kind=dp), intent(in) :: y(:,:)
+    integer :: is_nan_infinity_matrix, i, j
+
+    is_nan_infinity_matrix = 0
+    do i=1,size(y(:,1))
+       do j=1, size(y(1,:))
+          if (y(i,j) /= y(i,j)) then
+             write(*,*) "(Nan):", y(i,j), " i=", i, " j=",j
+             is_nan_infinity_matrix = 1
+             return
+          else if (y(i,j) > 0 .and. (y(i,j)==y(i,j)*10)) then
+             write(*,*) "(infinity):", y(i,j), y(i,j)*(1+0.1), " i=", i, " j=",j
+             is_nan_infinity_matrix = 2
+             return
+          end if
+       end do
+    end do
+    return
+end function is_nan_infinity_matrix
+
+function is_nan_infinity_vector(y)
+    real(kind=dp), intent(in) :: y(:)
+    integer :: is_nan_infinity_vector, i
+
+    is_nan_infinity_vector = 0
+    do i=1,size(y)
+       if (y(i) /= y(i)) then
+          write(*,*) "(Nan):", y(i), " i=", i, y(i)/=y(i)
+          is_nan_infinity_vector = 1
+          return
+       else if (y(i)>0 .and. (y(i)==y(i)*10)) then
+          write(*,*) "(infinity):", y(i), y(i)*(1+0.1), " i=", i, (y(i)==y(i)*10)
+          is_nan_infinity_vector = 2
+          return
+       end if
+    end do
+    return
+end function is_nan_infinity_vector
+
+function vacuum2air(Nlambda, lambda_vac) result(lambda_air)
+   !wavelength in nm
+   integer, intent(in) :: Nlambda
+   real(kind=dp), dimension(Nlambda), intent(in) :: lambda_vac
+   real(kind=dp), dimension(Nlambda) :: lambda_air
+   real(kind=dp), dimension(Nlambda) :: sqwave, reduction
+
+   where (lambda_vac >= VACUUM_TO_AIR_LIMIT)
+      sqwave = 1_dp/(lambda_vac**2)
+      reduction = 1.0 + 2.735182d-4 + &
+           (1.314182 + 2.76249d4 * sqwave) * sqwave
+      lambda_air = lambda_vac / reduction
+   else where(lambda_vac < VACUUM_TO_AIR_LIMIT)
+      lambda_air = lambda_vac
+   end where
+
+
+   return
+ end function vacuum2air
+
+ function air2vacuum(Nlambda, lambda_air) result(lambda_vac)
+   !wavelength in nm
+   integer, intent(in) :: Nlambda
+   real(kind=dp), dimension(Nlambda), intent(in) :: lambda_air
+   real(kind=dp), dimension(Nlambda) :: lambda_vac
+   real(kind=dp), dimension(Nlambda) :: sqwave, increase
+
+   where (lambda_air >= AIR_TO_VACUUM_LIMIT)
+      sqwave = (1.0d7 / lambda_air)**2
+      increase = 1.0000834213d+00 + &
+           2.406030d6/(1.30d10 - sqwave) + &
+           1.5997d4/(3.89d9 - sqwave)
+      lambda_vac = lambda_air * increase
+   else where(lambda_air < AIR_TO_VACUUM_LIMIT)
+      lambda_vac = lambda_air
+   end where
+
+   return
+ end function air2vacuum
+
+
+function locate(xx,x,mask)
+   !wrapper function to locate the position of x in array xx.
+   !the closest position is returned.
+   real(kind=dp), dimension(:), intent(in) :: xx
+   real(kind=dp), intent(in) :: x
+   logical, intent(in), dimension(:), optional :: mask
+   integer :: locate
+
+   if (present(mask)) then
+      locate = minloc((xx-x)**2,1,mask=mask)
+   else
+      ! 1D array
+      locate = minloc((xx-x)**2,1) !(xx(:)-x)*(xx(:)-x)
+   end if
+
+   return
+end function locate
+
+ function bilinear(N,xi,i0,M,yi,j0,f,xo,yo)
+   !bilinear interpolation of the function f(N,M)
+   !defined on points xi(N), yi(M) at real xo, real yo.
+   !too slow ? f***ck
+   real(kind=dp) :: bilinear
+   integer, intent(in) :: N, M
+   real(kind=dp), intent(in) :: xi(N),yi(M),f(N,M)
+   real(kind=dp), intent(in) :: xo,yo 
+   integer, intent(in) :: i0, j0
+   integer :: i, j
+   real(kind=dp) :: norm, f11, f21, f12, f22
+
+   !find closest point in i0 and j0
+   ! i0 = max(locate(xi,xo),2)
+   ! j0 = max(locate(yi,yo),2)
+
+   ! write(*,*) i0, j0
+
+   norm = ((xi(i0) - xi(i0-1)) * (yi(j0) - yi(j0-1)))
+   f11 = f(i0-1,j0-1)
+   f21 = f(i0,j0-1)
+   f12 = f(i0-1,j0)
+   f22 = f(i0,j0)
+
+   bilinear = ((f11 * (xi(i0) - xo) * (yi(j0) - yo) + &
+      f21 * (xo - xi(i0-1)) * (yi(j0) - yo) + &
+      f12 * (xi(i0) - xo) * (yo - yi(j0-1)) + &
+      f22 * (xo - xi(i0-1)) * (yo - yi(j0-1)))) / norm
+
+   return
+ end function bilinear
+
+ function linear_1D_sorted(n,x,y, np,xp)
+   ! assumes that both x and xp are in increasing order
+   ! We only loop once over the initial array, and we only perform 1 test per element
+   ! TO DO:
+   !  - the bounds are not well handled
+
+   integer, intent(in)                      :: n, np
+   real(kind=dp), dimension(n),  intent(in) :: x,y
+   real(kind=dp), dimension(np), intent(in) :: xp
+   real(kind=dp), dimension(np)             :: linear_1D_sorted
+
+   real(kind=dp) :: t
+   integer :: i, j, i0, j0
+
+   linear_1D_sorted(:) = 0.0_dp
+
+   j0=np+1
+   do j=1, np
+      if (xp(j) > x(1)) then
+         j0 = j
+         exit
+      endif
+   enddo
+   !write(*,*) "jstar=",j0, xp(j0), x(1)
+
+   ! We perform the 2nd pass where we do the actual interpolation
+   ! For points larger than x(n), value will stay at 0
+   i0 = 2
+   do j=j0, np
+      loop_i : do i=i0, n
+         if (x(i) > xp(j)) then
+            t = (xp(j) - x(i-1)) / (x(i) - x(i-1))
+            !write(*,*) j,i, t
+            linear_1D_sorted(j) = (1.0_dp - t) * y(i-1)  + t * y(i)
+            i0 = i
+            exit loop_i
+         endif
+      enddo loop_i
+   enddo
+
+
+   return
+ end function linear_1D_sorted
+
+ function E1 (x)
+   !First exponential integral
+   real(kind=dp), dimension(6) :: a6
+   real(kind=dp), dimension(4) :: a4, b4
+   real(kind=dp), intent(in) :: x
+   real(kind=dp) :: E1
+
+   a6(:) = 1.0_dp * (/-0.57721566,  0.99999193, -0.24991055,0.05519968, -0.00976004,  0.00107857 /)
+
+   a4(:) = 1.0_dp * (/ 8.5733287401, 18.0590169730, 8.6347608925,  0.2677737343 /)
+   b4(:) = 1.0_dp * (/9.5733223454, 25.6329561486, 21.0996530827,  3.9584969228/)
+
+   !Error here, should return an error!
+   if (x<=0.0) then
+      E1 = 0.0_dp
+      return
+   else if (x > 0 .and. x <= 1.0_dp) then
+      E1 = -log(x) + a6(1) + x*(a6(2) + x*(a6(3) + x*(a6(4) + x*(a6(5) + x*a6(6)))))
+   else if (x > 1.0_dp .and. x <= 80.0_dp) then
+      E1  = a4(4)/x +  a4(3) + x*(a4(2) + x*(a4(1) + x))
+      E1 = E1 / ( b4(4) + x*(b4(3) + x*(b4(2) + x*(b4(1) + x))) )
+      E1 = E1 * exp(-x);
+   else
+      E1 = 0.0_dp
+   end if
+
+   return
+ end function E1
+
+ function E2(x)
+   ! second exponential integral, using recurrence relation
+   ! En+1 = 1/n * ( exp(-x) -xEn(x))
+   real(kind=dp), intent(in) :: x
+   real(kind=dp) :: E2
+
+   if (x <= 0.0) then
+      E2 = 0.0_dp
+      return
+   endif
+
+   if (x > 0.0 .and. x <= 80.0) then
+      E2 = 1.0_dp * (exp(-x) - x * E1(x))
+   else
+      E2 = 0.0_dp
+   end if
+
+   return
+ end function E2
 
 end module utils

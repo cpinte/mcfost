@@ -32,7 +32,8 @@ def MC_similar(x,y,threshold=0.01,mask_threshold=1e-25):
     # test if two arrays have the same at the 75% percentile
     # ignoring values that are very small as they are very noisy
 
-    mask = (abs(x) < mask_threshold) | (abs(y) < mask_threshold) # Unit: W.m-2 or W.m-2/pixel
+    #mask = (abs(x) < mask_threshold) | (abs(y) < mask_threshold) # Unit: W.m-2 or W.m-2/pixel
+    mask = abs(x) < mask_threshold # Unit: W.m-2 or W.m-2/pixel : only using reference for the mask
     x_ma = np.ma.masked_where(mask, x)
     y_ma = np.ma.masked_where(mask, y)
 

@@ -5,6 +5,7 @@ module grid
   use grains
   use utils
   use sort, only : index_quicksort
+  use mcfost_env, only : dp
 
   use cylindrical_grid
   use spherical_grid
@@ -19,10 +20,86 @@ module grid
   procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
 
+  real(kind=dp) :: v_char, B_char
+  logical :: lcalc_ne, lmagnetized
+  !real(kind=dp), dimension(:), allocatable :: vfield_v1, vfield_v2, vfield_v3
+  real(kind=dp), dimension(:), allocatable :: ne, nHtot, T, nHmin, vturb ! n_cells
+  integer, dimension(:), allocatable :: icompute_atomRT !n_cells
   real, dimension(:,:), allocatable :: vfield3d ! n_cells x 3
   real, dimension(:), allocatable :: vfield ! n_cells
 
   contains
+
+  subroutine alloc_atomrt_grid()
+    integer(kind=8) :: mem_alloc_local = 0
+
+    !merge vturb and v_turb (molecular emission)
+    !TO DO: move vturb in molecular emission in grid.f90
+    !  use that vturb for atomRT
+    allocate(nHtot(n_cells), ne(n_cells), T(n_cells))
+    allocate(nHmin(n_cells), vturb(n_cells))
+
+    !here vfield3d are either R,z, phi or r,theta, phi.
+    !works onlt if lvelocity_file = .false.
+    if (allocated(vfield3d)) deallocate(vfield3d)
+    if (.not.lvoronoi) then
+       allocate(vfield3d(n_cells,3)); vfield3d = 0.0_dp
+    end if
+
+    lcalc_ne = .false.
+    T = 0.0
+    nHtot = 0.0
+    ne = 0.0
+    nHmin = 0.0
+    vturb = 0.0 !m/s
+
+    allocate(icompute_atomRT(n_cells))
+    icompute_atomRT = 0 !everything transparent at init.
+
+   ! mem_alloc_tot = mem_alloc_tot + mem_alloc_local
+   ! write(*,'("Total memory allocated in alloc_atomic_atmos:"(1ES17.8E3)" MB")') mem_alloc_local / 1024./1024.
+
+   return
+
+ end subroutine alloc_atomrt_grid
+
+ subroutine dealloc_atomrt_grid
+
+   deallocate(nHtot, ne, T, vturb)
+   if (allocated(nHmin)) deallocate(nHmin)
+   if (.not.lvoronoi) deallocate(vfield3d)
+   deallocate(icompute_atomRT)
+
+   return
+
+ end subroutine dealloc_atomrt_grid
+
+  subroutine check_for_zero_electronic_density()
+   integer :: N_fixed_ne, icell
+
+   lcalc_ne = .false.
+   icell_loop : do icell=1,n_cells
+      !check that in filled cells there is electron density otherwise we need to compute it
+      !from scratch.
+      if (icompute_atomRT(icell) > 0) then
+
+         if (ne(icell) <= 0.0_dp) then
+            write(*,*) "  ** No electron density found in the model! ** "
+            lcalc_ne = .true.
+            exit icell_loop
+         endif
+
+      endif
+   enddo icell_loop
+   N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
+   if (N_fixed_ne > 0) then
+      write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+           N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
+   endif
+
+   return
+
+ end subroutine check_for_zero_electronic_density
 
  subroutine order_zones()
    ! Order the various zones according to their Rin
@@ -286,6 +363,167 @@ subroutine setup_grid()
   return
 
 end subroutine setup_grid
+
+!to do
+!subroutine to find the neighbours of a cell.
+
+subroutine nnk_smooth(arr)
+  !Nearest Neighbours Kernel smoother for spherical and Voronoi grids.
+  !TO DO:
+  ! 	check Voronoi implementation
+  !   weight the value of the neighbours depending of their distance to icell
+  real(kind=dp), intent(inout) :: arr(n_cells)
+  real(kind=dp) :: A(n_cells)
+  integer :: i,j,k, icell
+  integer :: n_az_end
+  real(kind=dp) :: w0, w1, w2
+  integer :: ifirst, ilast, l, id_n
+
+  !in principle the weights can be function of the dimension
+  w0 = 1.0
+  w1 = w0 / 6.0
+  w2 = w1 / 6.0
+
+  !does not work if grid is cylindrical yet
+  if (lcylindrical) return
+
+  !building
+  if (lvoronoi) then
+     !for each Voronoi cell, loop over the nearest neighbours
+     do icell=1,n_cells
+        ifirst = Voronoi(icell)%first_neighbour
+        ilast = Voronoi(icell)%last_neighbour
+        l=0
+        A(icell) = w0 * arr(icell)
+        nb_loop : do i=ifirst,ilast
+           l = l+1
+           id_n = neighbours_list(i)
+           if (id_n==icell) cycle nb_loop
+
+           !is that correct with Voronoi ? id_n is the neigbour ?
+           !There should also be a way of using a weight depending on the distance of the neighbour
+           if (id_n > 0) then ! cellule
+              A(icell) = A(icell) + w0 * arr(id_n)
+           endif !no wall
+        enddo nb_loop
+        A(icell) = A(icell) / (w0 + l * w0)
+     enddo
+     arr = A
+  else !spherical only at the moment
+     if (l3d) then
+        !To Do. Computes the value of the edges
+        A = arr !copy array to temporarily handle the edges (which are not smoothed)!
+        if (n_az==1) then
+           !2.5d because z < 0 but phi = 0 everywhere
+           n_az_end = 1
+        else
+           !full 3d
+           n_az_end = n_az-1
+        endif
+        do i=2, n_rad-1
+           do j=j_start+1,nz-1
+              if (j==0) cycle
+              do k=1, n_az_end
+                 icell = cell_map(i,j,k)
+                 A(icell) = ( w0 * arr(icell) &
+                      + w1*arr(cell_map(i,j,k+1)) &
+                      + w1*arr(cell_map(i,j,k-1)) &
+                      + w1*arr(cell_map(i,j+1,k)) &
+                      + w2*arr(cell_map(i,j+1,k+1)) &
+                      + w2*arr(cell_map(i,j+1,k-1)) &
+                      + w1*arr(cell_map(i,j-1,k)) &
+                      + w2*arr(cell_map(i,j-1,k+1)) &
+                      + w2*arr(cell_map(i,j-1,k-1)) &
+                      + w1*arr(cell_map(i+1,j,k)) &
+                      + w1*arr(cell_map(i-1,j,k)) &
+                      + w2*arr(cell_map(i+1,j,k+1)) &
+                      + w2*arr(cell_map(i+1,j,k-1)) &
+                      + w2*arr(cell_map(i+1,j+1,k)) &
+                      + w2*arr(cell_map(i+1,j+1,k+1)) &
+                      + w2*arr(cell_map(i+1,j+1,k-1)) &
+                      + w2*arr(cell_map(i+1,j-1,k)) &
+                      + w2*arr(cell_map(i+1,j-1,k+1)) &
+                      + w2*arr(cell_map(i+1,j-1,k-1)) &
+                      + w2*arr(cell_map(i-1,j,k+1)) &
+                      + w2*arr(cell_map(i-1,j,k-1)) &
+                      + w2*arr(cell_map(i-1,j+1,k)) &
+                      + w2*arr(cell_map(i-1,j+1,k+1)) &
+                      + w2*arr(cell_map(i-1,j+1,k-1)) &
+                      + w2*arr(cell_map(i-1,j-1,k)) &
+                      + w2*arr(cell_map(i-1,j-1,k+1)) &
+                      + w2*arr(cell_map(i-1,j-1,k-1)) ) / (w0 + 6*w1 + 20*w2)
+              enddo
+           enddo
+        enddo
+     else
+        k = 1
+        do i=2, n_rad-1
+           do j=j_start+1,nz-1
+              if (j==0) cycle
+              icell = cell_map(i,j,k)
+              A(icell) = ( w0*arr(icell) &
+                   + w1*arr(cell_map(i,j+1,k)) &
+                   + w1*arr(cell_map(i,j-1,k)) &
+                   + w1*arr(cell_map(i+1,j,k)) &
+                   + w1*arr(cell_map(i-1,j,k)) &
+                   + w2*arr(cell_map(i+1,j+1,k)) &
+                   + w2*arr(cell_map(i+1,j-1,k)) &
+                   + w2*arr(cell_map(i-1,j+1,k)) &
+                   + w2*arr(cell_map(i-1,j-1,k)) ) / (w0 + 4 * w1 + 3 * w2)
+           enddo
+           !for all i, the edges j points
+           A(cell_map(i,j_start,k)) = ( w0*arr(cell_map(i,j_start,k)) + &
+                w1*arr(cell_map(i,j_start+1,k))+w1*arr(cell_map(i+1,j_start,k))+&
+                w2*arr(cell_map(i+1,j_start+1,k))+w1*arr(cell_map(i-1,j_start,k))+&
+                w2*arr(cell_map(i-1,j_start+1,k)) ) / (w0 + 3*w1+2*w2)
+
+           A(cell_map(i,nz,k)) = ( w0*arr(cell_map(i,nz,k)) + &
+                w1*arr(cell_map(i,nz-1,k))+w1*arr(cell_map(i+1,nz,k))+&
+                w2*arr(cell_map(i+1,nz-1,k))+w1*arr(cell_map(i-1,nz,k))+&
+                w2*arr(cell_map(i-1,nz-1,k)) ) / (w0 + 3*w1+2*w2)
+        enddo
+        !for all j, the edges in i
+        do j=j_start+1,nz-1
+           if (j==0) cycle
+           icell = cell_map(1,j,k)
+           A(icell) = ( w0*arr(icell) &
+                + w1*arr(cell_map(1,j+1,k)) &
+                + w1*arr(cell_map(1,j-1,k)) &
+                + w1*arr(cell_map(1+1,j,k)) &
+                + w2*arr(cell_map(1+1,j+1,k)) &
+                + w2*arr(cell_map(1+1,j-1,k)) ) / (w0 + 3*w1 + 2*w2)
+
+           icell = cell_map(n_rad,j,k)
+           A(icell) = ( w0*arr(icell) &
+                + w1*arr(cell_map(n_rad,j+1,k)) &
+                + w1*arr(cell_map(n_rad,j-1,k)) &
+                + w1*arr(cell_map(n_rad-1,j,k)) &
+                + w2*arr(cell_map(n_rad-1,j+1,k)) &
+                + w2*arr(cell_map(n_rad-1,j-1,k)) ) / (w0 + 3*w1 + 2*w2)
+        enddo
+        i = 1
+        !for edges in i and j
+        A(cell_map(i,j_start,k)) = ( w0*arr(cell_map(i,j_start,k)) + &
+             w1*arr(cell_map(i,j_start+1,k))+w1*arr(cell_map(i+1,j_start,k))+&
+             w2*arr(cell_map(i+1,j_start+1,k)) ) / (w0 + 2*w1 + w2)
+        A(cell_map(i,nz,k)) = ( w0*arr(cell_map(i,nz,k)) + &
+             w1*arr(cell_map(i,nz-1,k))+w1*arr(cell_map(i+1,nz,k))+&
+             w2*arr(cell_map(i+1,nz-1,k)) ) / (w0 + 2*w1 + w2)
+
+        i = n_rad
+        A(cell_map(i,j_start,k)) = ( w0*arr(cell_map(i,j_start,k)) + &
+             w1*arr(cell_map(i,j_start+1,k))+w1*arr(cell_map(i-1,j_start,k))+&
+             w2*arr(cell_map(i-1,j_start+1,k)) ) / (w0 + 2*w1 + w2)
+        A(cell_map(i,nz,k)) = ( w0*arr(cell_map(i,nz,k)) + &
+             w1*arr(cell_map(i,nz-1,k))+w1*arr(cell_map(i-1,nz,k))+&
+             w2*arr(cell_map(i-1,nz-1,k)) ) / (w0 + 2*w1 + w2)
+     endif !2d
+     arr = A !lspherical
+  endif
+
+  return
+
+end subroutine nnk_smooth
 
 !******************************************************************************
 

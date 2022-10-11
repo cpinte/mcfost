@@ -14,9 +14,11 @@ module output
   use grid
   use fits_utils, only : cfitsWrite, print_error
   use wavelengths
+  use wavelengths_gas, only : tab_lambda_nm
   use stars, only : E_stars
   use thermal_emission, only : L_packet_th
   use density
+  use atom_type, only : n_atoms, atoms, atomtype
 
   implicit none
   save
@@ -37,6 +39,7 @@ module output
   ! Line transfer
   real, dimension(:,:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,phi,x,y
   real, dimension(:,:,:,:,:), allocatable :: continu ! trans,thetai,phi,x,y
+  real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux_total !total flux  when line transfer ("high resolution SED")
 
 
   real(kind=dp) :: sin_disk, cos_disk
@@ -190,6 +193,67 @@ subroutine allocate_mol_maps(imol)
   return
 
 end subroutine allocate_mol_maps
+
+!**********************************************************************
+
+subroutine allocate_atom_maps()
+  !There is a single file for each transition
+  !because this file can be pretty large.
+  !The total flux is allocated also if the sed mode is on.
+
+  integer :: alloc_status, max_lambda, max_trans
+  integer :: n, k, ilevel, jlevel, kr
+
+  max_lambda = n_lambda!max lambda_per_line
+  max_trans = 1!maxval( atoms(:)%p%nTrans_raytracing )
+
+ if (RT_line_method > 1) then
+     if (RT_line_method==2) then
+      npix_x = npix_x_save ; npix_y = npix_y_save
+     else
+      !for testing
+      npix_x = 12*4**(healpix_lorder) ; npix_y = 1
+     endif
+     do n=1, n_atoms
+     	if (atoms(n)%p%lline) then
+     		do k=1, atoms(n)%p%nTrans_raytracing 
+     			ilevel = atoms(n)%p%i_Trans_rayTracing(k)
+         	jlevel = atoms(n)%p%j_Trans_rayTracing(k)
+            kr = atoms(n)%p%ij_to_trans(ilevel,jlevel)
+     			max_lambda = atoms(n)%p%lines(kr)%Nlambda
+     			allocate(atoms(n)%p%lines(kr)%map(npix_x,npix_y,max_lambda,RT_n_incl,RT_n_az),stat=alloc_status)
+     			atoms(n)%p%lines(kr)%map = 0.0_dp
+     		enddo
+     	endif
+     enddo
+  elseif (RT_line_method==1) then
+     allocate(flux_total(n_lambda, RT_n_incl, RT_n_az, nb_proc),stat=alloc_status)
+     flux_total = 0.0_dp
+  else
+   call error("(allocate_atom_maps) RT_line_method undefined!")
+  endif
+  if (alloc_status > 0) call error('Allocation error atom_maps')
+
+  return
+
+end subroutine allocate_atom_maps
+
+subroutine deallocate_atom_maps()
+	integer :: n,kr
+
+	if (allocated(flux_total)) deallocate(flux_total)
+	
+	do n=1,n_atoms
+		if (atoms(n)%p%lline) then
+			do kr=1, atoms(n)%p%Nline
+				if (allocated(atoms(n)%p%lines(kr)%map)) deallocate(atoms(n)%p%lines(kr)%map)
+			enddo
+		endif
+	enddo
+	
+	return
+	
+end subroutine deallocate_atom_maps
 
 !**********************************************************************
 
@@ -382,7 +446,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
         endif
 
         if (lsepar_contrib) then
-           if (flag_star) then ! photon étoile
+           if (flag_star) then ! photon ï¿½toile
               if (flag_scatt) then
                  STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
@@ -427,7 +491,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            endif
 
            if (lsepar_contrib) then
-              if (flag_star) then ! photon étoile
+              if (flag_star) then ! photon ï¿½toile
                  if (flag_scatt) then
                     STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                          STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + 0.5 * STOK(1)
@@ -456,7 +520,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            endif
 
            if (lsepar_contrib) then
-              if (flag_star) then ! photon étoile
+              if (flag_star) then ! photon ï¿½toile
                  if (flag_scatt) then
                     STOKEI_star_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) = &
                          STOKEI_star_scat(lambda,IMAP2,JMAP2,capt,c_phi,id) + 0.5 * STOK(1)
@@ -485,7 +549,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
            STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) = STOKEV(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(4)
         endif
         if (lsepar_contrib) then
-           if (flag_star) then ! photon étoile
+           if (flag_star) then ! photon ï¿½toile
               if (flag_scatt) then
                  STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) = &
                       STOKEI_star_scat(lambda,IMAP1,JMAP1,capt,c_phi,id) + STOK(1)
@@ -511,7 +575,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
      sed_u(lambda,capt,c_phi,id) = sed_u(lambda,capt,c_phi,id) + stok(3)
      sed_v(lambda,capt,c_phi,id) = sed_v(lambda,capt,c_phi,id) + stok(4)
      n_phot_sed(lambda,capt,c_phi,id) = n_phot_sed(lambda,capt,c_phi,id) + 1.0_dp
-     if (flag_star) then ! photon étoile
+     if (flag_star) then ! photon ï¿½toile
         if (flag_scatt) then
            sed_star_scat(lambda,capt,c_phi,id) = sed_star_scat(lambda,capt,c_phi,id) + stok(1)
         else
@@ -2189,9 +2253,9 @@ subroutine ecriture_UV_field()
 
   real, dimension(n_cells) :: G
 
-  ! D'après van Dishoeck et al. (2008) le champs FUV de Draine est de 2.67e-3 erg cm-2 s-1
+  ! D'aprï¿½s van Dishoeck et al. (2008) le champs FUV de Draine est de 2.67e-3 erg cm-2 s-1
   ! Soit 2.67e-6 W / m2
-  ! C'est entre 912 et 2000 Angströms (la borne supérieure varie un peu d'un papier à l'autre).
+  ! C'est entre 912 et 2000 Angstrï¿½ms (la borne supï¿½rieure varie un peu d'un papier ï¿½ l'autre).
 
   filename = trim(data_dir)//"/UV_field.fits.gz"
 
@@ -3315,6 +3379,221 @@ subroutine ecriture_spectre(imol)
   return
 
 end subroutine ecriture_spectre
+
+!**********************************************************************
+subroutine write_atomic_maps(atom)
+   use dust_ray_tracing, only  : tab_RT_az,tab_RT_incl
+   !wavelength are written in air.
+
+   !there is a test before on atom%lline
+   type (AtomType), intent(in) :: atom
+
+   integer :: status,unit,blocksize,bitpix,naxis
+   integer, dimension(6) :: naxes
+   integer, dimension(4) :: naxes_cont
+   integer :: group,fpixel,nelements
+   integer :: n, kr, i, j
+   logical :: simple, extend
+   character(len=10) :: transition
+   real :: pixel_scale_x, pixel_scale_y, lam0
+   real(kind=dp) :: lam0_air(1), lam0_vac(1)
+   real(kind=dp), allocatable :: lambda_loc(:)
+
+   write(*,*) "Writing atomic line Flux maps..."
+
+
+   blocksize=1
+   simple=.true.
+   extend=.false.
+   group=1
+   fpixel=1
+   bitpix=-64
+
+   naxis=5
+   naxes(1) = npix_x
+   naxes(2) = npix_y
+   !naxes(3) = Nlam
+   naxes(4)=RT_n_incl
+   naxes(5)=RT_n_az
+   nelements=naxes(1)*naxes(2)*naxes(4)*naxes(5)
+
+   if (lmagnetized) then
+      naxes(6) = 3
+   endif
+
+   !write maps only for those transitions in i_trans_raytracing and j_trans_raytracing
+
+
+   do n=1, atom%nTrans_raytracing
+      i = atom%i_Trans_rayTracing(n)
+      j = atom%j_Trans_rayTracing(n)
+      kr = atom%ij_to_trans(i,j)
+
+      status=0
+      call ftgiou (unit,status)
+
+      !for labelling, at the moment, use the wavelength. To DO
+      !                                                  add the name of the line. in the atomic file (or use trans index if no name)
+      ! write(transition, '(1I10)') kr !line kr that we follow among all lines.
+      lam0 = real(atom%lines(kr)%lambda0)
+      write(transition, '(1F6.4)') lam0*m_to_km !line j that we follow among all lines.
+      ! write(transition, '(1I6)') nint(lam0*10)
+      call ftinit(unit,trim(atom%ID)//"_line_"//trim(adjustl(transition))//".fits.gz",blocksize,status)
+
+      !In image mode, Nblue and Nred (so Nlambda) takes into account possible velocity shifts
+      ! naxes(3) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
+      naxes(3) = atom%lines(kr)%Nlambda
+      allocate(lambda_loc(naxes(3)))
+      lambda_loc(:) = vacuum2air(naxes(3),tab_lambda_nm(atom%lines(kr)%Nb:atom%lines(kr)%Nr))
+      lam0_vac(1) = atom%lines(kr)%lambda0
+      lam0_air(:) = vacuum2air(1,lam0_vac)
+
+      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+      if (status > 0) call print_error(status)
+      call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+      call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+      call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+      pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+      call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+
+      call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+      call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+      call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+      pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+      call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+
+      call ftpkys(unit,'BUNIT',"W/m2/Hz/pixel",'',status)
+
+      !linear in cos(i)
+      call ftpkye(unit,'imin',minval(tab_RT_incl),-7,'degress',status)
+      call ftpkye(unit,'imax',maxval(tab_RT_incl),-7,'degress',status)
+      !linear
+      call ftpkye(unit,'azmin',minval(tab_RT_az),-7,'degress',status)
+      call ftpkye(unit,'azmax',maxval(tab_RT_az),-7,'degress',status)
+
+      call ftpkyj(unit,'i',atom%lines(kr)%i,'',status)
+      call ftpkyj(unit,'j',atom%lines(kr)%j,'',status)
+      call ftpkyd(unit,'gi',atom%g(atom%lines(kr)%i),-7,'',status)
+      call ftpkyd(unit,'gj',atom%g(atom%lines(kr)%j),-7,'',status)
+      call ftpkyd(unit,'lambda0',lam0_air(1),-7,'nm (air)',status)
+      call ftpkyd(unit,'nu0',1d-6*c_light / atom%lines(kr)%lambda0,-7,'10^15 Hz',status)
+
+      !aspro compatibility
+      call ftpkyd(unit,'CRVAL3',lam0_air(1)*1d-3,-7,'micron',status)
+      call ftpkyd(unit,'CDELT3',1d-3*sum(lambda_loc(2:naxes(3))-lambda_loc(1:naxes(3)-1))/real(naxes(3)-1),-7,'micron',status)
+            !  call ftpprd(unit,group,fpixel,naxes(1)*nelements,atom%lines(kr)%map(:,:,:,:,:),status)
+      call ftpprd(unit,group,fpixel,naxes(3)*nelements,atom%lines(kr)%map,status)
+      if (status > 0) call print_error(status)
+
+      !new hdu for zeeman pol
+      !if (lmagnetized and atom%lines(kr)%polarizable) then ...
+
+      !create new hdu for lambda grid
+      call ftcrhd(unit, status)
+      if (status > 0) call print_error(status)
+      call ftphpr(unit,simple,bitpix,1,naxes(3),0,1,extend,status)
+      if (status > 0) call print_error(status)
+      call ftpkys(unit, "UNIT", "nm (air)", "", status)
+      call ftpprd(unit,group,fpixel,naxes(3),lambda_loc,status)
+      deallocate(lambda_loc)
+
+      call ftclos(unit, status)
+      if (status > 0) then
+         call print_error(status)
+      endif
+      call ftfiou(unit, status)
+      if (status > 0) then
+         call print_error(status)
+      endif
+
+   enddo !over all ray-traced transitions for that atom.
+
+   return
+end subroutine write_atomic_maps
+
+!**********************************************************************
+
+subroutine write_total_flux()
+   integer :: status,unit,blocksize,bitpix,naxis
+   integer, dimension(6) :: naxes
+   integer :: group,fpixel,nelements
+   logical :: simple, extend
+   real(kind=dp) :: lambda_air(N_lambda)
+
+   write(*,*) "Writing total Flux to fits..."
+
+   blocksize=1
+   simple=.true.
+   extend=.false.
+   group=1
+   fpixel=1
+   bitpix=-64
+
+   !  Get an unused Logical Unit Number to use to open the FITS file.
+   status=0
+   call ftgiou (unit,status)
+
+    !  Create the new empty FITS file.
+
+   call ftinit(unit,"flux.fits.gz",blocksize,status)
+
+   naxis = 3
+   naxes(1) = N_lambda
+   naxes(2) = RT_n_incl
+   naxes(3) = RT_n_az
+
+   nelements = naxes(1)*naxes(2)*naxes(3)
+
+   !  Write the required header keywords.
+   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+   if (status > 0) then
+      call print_error(status)
+   endif
+   call ftpkys(unit,'BUNIT',"W/m2/Hz/pixel",'Fnu',status)
+   call ftpkye(unit,'TIME',real(simu_time),-7,'s',status)
+
+   !  Write the array to the FITS file.
+   call ftpprd(unit,group,fpixel,nelements,sum(Flux_total(:,:,:,:),dim=4),status)
+   ! 	call ftpprd(unit,group,fpixel,nelements,Flux(:,:,:),status)
+   if (status > 0) then
+      call print_error(status)
+   endif
+
+   !write stokes flux
+
+
+   ! create new hdu for wavelength grid
+   call ftcrhd(unit, status)
+
+   if (status > 0) then
+      call print_error(status)
+   endif
+
+   lambda_air(:) = vacuum2air(N_lambda, tab_lambda_nm)
+
+   naxis = 1
+   naxes(1) = N_lambda
+   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+   call ftpkys(unit, "UNIT", "nm (air)", "", status)
+   call ftpprd(unit,group,fpixel,N_lambda,lambda_air,status)
+   if (status > 0) then
+      call print_error(status)
+   endif
+
+
+   ! Close the file and free the unit number.
+    call ftclos(unit, status)
+    if (status > 0) then
+       call print_error(status)
+    endif
+
+    call ftfiou(unit, status)
+    if (status > 0) then
+       call print_error(status)
+    endif
+
+   return
+end subroutine write_total_flux
 
 !**********************************************************************
 

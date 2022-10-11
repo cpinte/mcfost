@@ -3,6 +3,7 @@ module cylindrical_grid
   use constantes
   use parametres
   use messages
+  use read1d_models, only : tab_r_mod1d
 
   implicit none
 
@@ -113,7 +114,6 @@ contains
             msg2="I am missing some real cells")
        ! write(*,*) icell, ntot
     endif
-
 
     ! Virtual cell indices for when the packets are just around the grid
 
@@ -247,6 +247,7 @@ subroutine define_cylindrical_grid()
      allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error zmax, volume')
      zmax = 0.0 ; volume=0.0
+
   endif
   ! end allocation
 
@@ -366,6 +367,21 @@ subroutine define_cylindrical_grid()
      endif ! linear or log grid
   enddo ! ir
 
+  if (lmodel_1d) then
+     !Redfine the grid edge for the stellar atmosphere models (marcs, multi, kurucz, cmfgen etc)
+     ! istart = 1
+     ! n_cells_tmp = 0
+     tab_r(:) = tab_r_mod1d
+     tab_r2(:) = tab_r(:)*tab_r(:)
+     tab_r3(:) = tab_r(:)*tab_r2(:)
+     ! n_cells_tmp = istart+n_rad_region
+     ! istart = n_cells_tmp + 1
+     if (maxval(tab_r)-maxval(tab_r_mod1d) /= 0.0) then
+        call error("read 1d grid doesn't match the grid")
+     endif
+     deallocate(tab_r_mod1d)
+  endif
+
   do i=1,n_rad+1
      tab_r2(i) = tab_r(i) * tab_r(i)
      tab_r3(i) = tab_r2(i) * tab_r(i)
@@ -384,7 +400,7 @@ subroutine define_cylindrical_grid()
   if (lcylindrical) then
      ! Calcul volume des cellules (pour calculer leur masse)
      ! On prend ici le rayon au milieu de la cellule
-     ! facteur 2 car symétrie
+     ! facteur 2 car symÃ©trie
      ! tab_r est en cylindrique ici
 
      do i=1, n_rad
@@ -508,6 +524,7 @@ subroutine define_cylindrical_grid()
      enddo
 
   endif ! cylindrique ou spherique
+  phi_grid_tmp(:) = 0.0_dp
 
   ! Version 3D
   if (l3D) then
@@ -554,8 +571,6 @@ subroutine define_cylindrical_grid()
      z_grid(icell) = z_grid_tmp(i,j)
      phi_grid(icell) = phi_grid_tmp(k)
   enddo
-
-
   ! Pour Sebastien Charnoz
   if (lSeb_Charnoz) then
      write(*,*) "# n_rad nz"
@@ -877,11 +892,11 @@ end subroutine define_cylindrical_grid
        ! on avance ou recule en r ? -> produit scalaire
        dotprod=u*x0+v*y0  ! ~ b
        if (dotprod < 0.0_dp) then
-          ! on recule : on cherche rayon inférieur
+          ! on recule : on cherche rayon infÃ©rieur
           c=(r_2-r_lim_2(ri0-1)*correct_moins)*inv_a
           delta=b*b-c
-          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon inférieur
-             ! on cherche le rayon supérieur
+          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon infÃ©rieur
+             ! on cherche le rayon supÃ©rieur
              c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
              delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
              delta_rad=1
@@ -889,7 +904,7 @@ end subroutine define_cylindrical_grid
              delta_rad=-1
           endif
        else
-          ! on avance : on cherche le rayon supérieur
+          ! on avance : on cherche le rayon supÃ©rieur
           c=(r_2-r_lim_2(ri0)*correct_plus)*inv_a
           delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
           delta_rad=1
@@ -904,7 +919,7 @@ end subroutine define_cylindrical_grid
 
 
        ! 2) position interface verticale
-       ! on monte ou on descend par rapport au plan équatorial ?
+       ! on monte ou on descend par rapport au plan Ã©quatorial ?
        dotprod=w*z0
        if (dotprod == 0.0_dp) then
           t=1.0e10
@@ -1297,7 +1312,7 @@ end subroutine define_cylindrical_grid
        else
           z= -(z_lim(ri,-zj)+aleat2*(z_lim(ri,-zj+1)-z_lim(ri,-zj)))
        endif
-    else ! 2D : choix aléatoire du signe
+    else ! 2D : choix alÃ©atoire du signe
        if (aleat2 > 0.5_dp) then
           z=z_lim(ri,zj)+(2.0_dp*(aleat2-0.5_dp))*(z_lim(ri,abs(zj)+1)-z_lim(ri,zj))
        else

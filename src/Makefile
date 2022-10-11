@@ -180,28 +180,40 @@ ifeq ($(STATIC), yes)
     LDFLAGS+= $(STATIC_FLAGS)
 endif
 
+
 #------------------------------------------------------------------------------#
 # Sources and objects
+#gas transfer. (Only atoms at the moment)
+gdir=gas
 
-SOURCES = mcfost_env.f90 parameters.f90 constants.f90 sha.f90 messages.f90     \
+
+SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 messages.f90          \
           operating_system.f90 random_numbers.f90 utils.f90 sort.f90 fits_utils.f90 \
-          grains.f90 cylindrical_grid.f90 spherical_grid.f90 \
-	  kdtree2.f90 Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90 \
-	  Temperature.f90 density.f90 read_opacity.f90 scattering.f90          \
-	  read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90  \
-          readVTK.f90 read_idefix.f90 \
-          coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90       \
-          input.f90 benchmarks.f90 read_param.f90 dust_ray_tracing.f90         \
-          radiation_field.f90 thermal_emission.f90 diffusion.f90               \
-          io_prodimo.f90 disk_physics.f90 optical_depth.f90 ML_prodimo.f90     \
-          output.f90 mem.f90  init_mcfost.f90                  \
-	  io_phantom_infiles.f90 io_phantom_utils.f90  mess_up_SPH.f90 \
-	  read_phantom.f90 read_gadget2.f90 SPH2mcfost.f90 \
-          dust_transfer.f90 mol_transfer.f90
+          grains.f90 read1d_models.f90 cylindrical_grid.f90 spherical_grid.f90      \
+          kdtree2.f90 $(gdir)/elements_type.f90                                     \
+          Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90            \
+          Temperature.f90 density.f90 read_opacity.f90 scattering.f90               \
+          read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90          \
+           readVTK.f90 read_idefix.f90 \
+          coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90            \
+          input.f90 benchmarks.f90 $(gdir)/atom_type.f90  \
+          $(gdir)/wavelengths_gas.f90 $(gdir)/broad.f90                             \
+          read_param.f90 dust_ray_tracing.f90 uplow.f90 ${gdir}/abo.f90         \
+          $(gdir)/occupation_probability.f90 $(gdir)/lte.f90                        \
+          radiation_field.f90 thermal_emission.f90 diffusion.f90                    \
+          io_prodimo.f90 disk_physics.f90 $(gdir)/gas_contopac.f90 		    \
+          voigts.f90 $(gdir)/opacity_atom.f90					    \
+          optical_depth.f90 ML_prodimo.f90                                          \
+          output.f90 mem.f90  init_mcfost.f90 io_phantom_infiles.f90                \
+          io_phantom_utils.f90 mess_up_SPH.f90 read_phantom.f90      \
+          read_gadget2.f90 SPH2mcfost.f90 mhd2mcfost.f90 dust_transfer.f90          \
+          mol_transfer.f90 $(gdir)/collision_atom.f90 $(gdir)/io_atom.f90           \
+          $(gdir)/electron_density.f90 $(gdir)/see.f90                              \
+          $(gdir)/atom_transfer.f90
 
 OBJECTS= $(SOURCES:.f90=.o)
 
-#------------------------------------------------------------------------------#
+#---------	---------------------------------------------------------------------#
 # Compile
 main : mcfost
 
@@ -328,7 +340,7 @@ wardlaw :
 .PHONY : clean cleandata cleandata_dust cleanall
 
 clean :
-	rm -rf *.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a
+	rm -rf *.o $(gdir)/*.o *.mod _dust_prop*.tmp _voronoi.tmp *.i90 operating_system.f90 system.o libmcfost.a
 	if test $(MCFOST_GIT) = 1 ; then rm -rf sha.f90; fi
 
 cleandata :
@@ -339,6 +351,9 @@ cleandata_dust :
 
 cleanall : clean cleandata
 	rm -rf mcfost
+
+cleanGasmod :
+	rm -rf $(gdir)/*.o $(gdir)/*.mod
 
 #------------------------------------------------------------------------------#
 # Backup
@@ -387,4 +402,4 @@ checksys:
 	@echo "   in src/Makefile and try again"
 	@echo ""
 	@${MAKE} err;
-   endif
+endif

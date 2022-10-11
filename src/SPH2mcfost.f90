@@ -27,6 +27,7 @@ contains
     integer, parameter :: iunit = 1
 
     real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,SPH_grainsizes,T_gas
+    real(dp), allocatable, dimension(:) :: vturb,mass_ne_on_massgas,atomic_mask
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust
     real, allocatable, dimension(:) :: extra_heating
@@ -36,7 +37,6 @@ contains
     real(dp), dimension(6) :: SPH_limits
     real :: factor
     integer :: ndusttypes, ierr, i, ilen
-    character(len=100) :: line_buffer
     logical :: check_previous_tesselation
 
 
@@ -85,8 +85,6 @@ contains
        write(*,*) "Performing gadget2mcfost setup"
        write(*,*) "Reading Gadget-2 density file: "//trim(SPH_file)
        call read_gadget2_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
-       T_gas = x       !to allocate memory
-       T_gas = 2.74
     else if (lascii_SPH_file) then
        write(*,*) "Performing SPH2mcfost setup"
        write(*,*) "Reading SPH density file: "//trim(SPH_file)
@@ -112,10 +110,18 @@ contains
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
-    deallocate(massgas,rho)
     if (allocated(rhodust)) deallocate(rhodust,massdust)
 
-    ! Deleting partcles/cells in masked arreas (Hill sphere, etc)
+    ! setup needed for Atomic line transfer
+    if (lemission_atom) then
+       call hydro_to_Voronoi_atomic(n_SPH,T_gas,vturb,massgas,mass_ne_on_massgas,atomic_mask)
+    endif
+    deallocate(massgas,rho)
+    if (allocated(vturb)) deallocate(vturb)
+    if (allocated(mass_ne_on_massgas)) deallocate (mass_ne_on_massgas)
+    if (allocated(atomic_mask)) deallocate(atomic_mask)
+
+    ! Deleting particles/cells in masked areas (Hill sphere, etc)
     if (allocated(mask)) call delete_masked_particles()
 
     return
@@ -153,6 +159,22 @@ contains
   subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, T_gas, massgas,massdust,rho,rhodust,&
        SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, mask)
 
+    ! ************************************************************************************ !
+    ! n_sph : number of points in the input model
+    ! ndusttypes : number of dust species in the input model
+    ! particle_id : index of the particle / cell centre in the input model
+    ! x,y,z : coordinates of the particle / cell
+    ! h : smoothing length to cut elongated cells
+    ! vx,vy,vz : vector components of the velocity fields (cartesian) in the input model
+    ! massgas : total mass of the gas
+    ! massdust : total mass of the dust
+    ! rho : gas density
+    ! rhodust : dust density
+    ! sph_grainsizes : size of grains for sph models
+    ! sph_limits : limit of the input model box
+    ! check_previous_tesselation :
+    ! mask :
+    ! ************************************************************************************ !
     use Voronoi_grid
     use density, only : densite_gaz, masse_gaz, densite_pouss, masse
     use grains, only : n_grains_tot, M_grain
@@ -160,7 +182,8 @@ contains
     use mem
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,rho,massgas
+    real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
+    real(dp), dimension(:), allocatable, intent(inout) :: rho
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(:), allocatable, intent(in) :: T_gas
     integer, dimension(n_SPH), intent(in) :: particle_id
@@ -198,7 +221,11 @@ contains
     write(*,*) "y =", minval(y), maxval(y)
     write(*,*) "z =", minval(z), maxval(z)
 
-    write(*,*) "Found", n_SPH, " SPH particles with ", ndusttypes, "dust grains"
+    if (ndusttypes >= 1) then
+       write(*,*) "Found", n_SPH, " hydro sites with ", ndusttypes, "dust grains."
+    else
+       write(*,*) "Found", n_SPH, " hydro sites."
+    endif
 
     if (lwrite_ASCII) then
        !  Write the file for the grid version of mcfost
@@ -488,6 +515,8 @@ contains
     endif
 
     ! We eventually reduce density to avoid artefacts: superseeded by cell cutting
+    !massgas is also modified with the density factor for compatiblity with atomictransfer
+    !since massgas is inout.
     if (density_factor < 1.-1e-6) then
        ! Removing cells at the "surface" of the SPH model:
        ! density is reduced so that they do not appear in images or cast artificial shadows,
@@ -498,6 +527,7 @@ contains
           if (Voronoi(icell)%was_cut) then
              n_force_empty = n_force_empty + 1
              call reduce_density(icell, density_factor)
+             massgas(Voronoi(icell)%id) = massgas(Voronoi(icell)%id) * density_factor
              cycle cell_loop
           endif
 
@@ -507,6 +537,7 @@ contains
              if (id_n < 0) then
                 n_force_empty = n_force_empty + 1
                 call reduce_density(icell, density_factor)
+                massgas(Voronoi(icell)%id) = massgas(Voronoi(icell)%id) * density_factor
                 cycle cell_loop
              endif
           enddo
@@ -533,7 +564,126 @@ contains
 
   end subroutine SPH_to_Voronoi
 
-  !*********************************************************
+
+  !****************************************************************************
+  ! copy additional parameters from hydro code needed for atomic line transfer
+  !****************************************************************************
+  subroutine Hydro_to_Voronoi_atomic(n_SPH,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,mask)
+
+    ! ************************************************************************************ !
+    ! n_sph : number of points in the input model
+    ! particle_id : index of the particle / cell centre in the input model
+    ! T_tmp : temperature of the particle/ cell
+    ! vt_tmp : turbulent velocity in the particle / cell
+    ! massgas : total mass of the gas
+    ! rho : gas density
+    ! mask : -1 means skip, 0 means transparent, 1 means compute atomic transfer
+    ! ************************************************************************************ !
+    use parametres
+    use constantes,   only : masseH
+    use Voronoi_grid, only : Voronoi, volume
+    use disk_physics, only : compute_othin_sublimation_radius
+    use mem
+    use elements_type, only : wght_per_H, read_abundance
+   !  use mhd2mcfost, only : alloc_atomrt_grid, nHtot, ne, &
+   !     v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne
+    use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne, &
+         check_for_zero_electronic_density
+
+    integer, intent(in) :: n_SPH
+    real(dp), dimension(n_SPH), intent(in) :: T_tmp,mass_gas
+    real(dp), dimension(:), allocatable, intent(in) :: mass_ne_on_massgas ! not always allocated
+    real(dp), dimension(:), allocatable, intent(in) :: vt_tmp,mask
+
+    integer :: icell,voroindex
+    real(kind=dp) :: rho_to_nH, vxmax, vxmin, vymax, vymin, vzmax, vzmin, vmax
+    real, parameter :: Lextent = 1.01
+
+    !*******************************
+    ! Accomodating model
+    !*******************************
+    !alloc space for all physical quantities.
+    !Velocity field arrays not allocated because lvoronoi is true
+    !-> fills element abundances structures for elements
+    call alloc_atomrt_grid
+    call read_abundance
+    rho_to_nH = 1d3 / masseH / wght_per_H !convert from density to number density nHtot
+
+    Vxmax = 0
+    Vymax = 0
+    Vzmax = 0
+    Vxmin = 1d100
+    Vymin = 1d100
+    Vzmin = 1d00
+    Vmax = 0
+    icompute_atomRT(:) = 0
+    do icell=1,n_cells
+       voroindex = Voronoi(icell)%id
+       if (voroindex > 0) then
+          nHtot(icell)  = Msun_to_kg * rho_to_nH * mass_gas(voroindex) /  (volume(icell) * AU3_to_m3)
+
+          !store the ratio of mass electron on mass hydrogen
+          !to do the tesselation only on gas particle
+          !-> if ne is not present in the model, it is simply 0.
+          if (allocated(mass_ne_on_massgas)) then
+             ne(icell) = Msun_to_kg * mass_ne_on_massgas(voroindex) * mass_gas(voroindex) / (volume(icell) * AU3_to_m3)
+          endif
+
+          T(icell) = T_tmp(voroindex)
+
+          if (allocated(vt_tmp)) vturb(icell) = vt_tmp(voroindex)
+
+          if (allocated(mask)) then
+             icompute_atomRT(icell) = mask(voroindex)
+          else
+             icompute_atomRT(icell) = 1
+          endif
+          vxmax = max(vxmax, abs(Voronoi(icell)%vxyz(1)))
+          vxmin = min(vxmin, max(abs(Voronoi(icell)%vxyz(1)),0.0))
+          vymax = max(vymax, abs(Voronoi(icell)%vxyz(2)))
+          vymin = min(vymin,  max(abs(Voronoi(icell)%vxyz(2)),0.0))
+          vzmax = max(vzmax, abs(Voronoi(icell)%vxyz(3)))
+          vzmin = min(vzmin,  max(abs(Voronoi(icell)%vxyz(3)),0.0))
+
+          Vmax = max( vmax, sqrt(Voronoi(icell)%vxyz(1)**2 + Voronoi(icell)%vxyz(2)**2 + Voronoi(icell)%vxyz(3)**2) )
+       endif
+    end do
+
+    v_char = Vmax * Lextent
+
+    write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
+    write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
+    write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
+
+    ! 		if (lmagnetized) then
+    !
+    ! 		endif
+
+
+	call check_for_zero_electronic_density
+
+    write(*,*) "Maximum/minimum velocities in the model (km/s):"
+    write(*,*) "|Vx|", vxmax*1d-3, vxmin*1d-3
+    write(*,*) "|Vy|", vymax*1d-3, vymin*1d-3
+    write(*,*) "|Vz|", vzmax*1d-3, vzmin*1d-3
+
+    write(*,*) "Typical line extent due to V fields (km/s):"
+    write(*,*) v_char/1d3
+
+    write(*,*) "Maximum/minimum turbulent velocity (km/s):"
+    write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
+
+    write(*,*) "Maximum/minimum Temperature in the model (K):"
+    write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)
+    write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+    write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)
+    if (.not.lcalc_ne) then
+       write(*,*) "Maximum/minimum ne density in the model (m^-3):"
+       write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
+    endif
+
+  end subroutine hydro_to_Voronoi_atomic
+
 
   subroutine test_duplicate_particles(n_SPH, particle_id, x,y,z, massgas,massdust,rho,rhodust, is_ghost)
     ! Filtering particles at the same position
@@ -542,7 +692,8 @@ contains
 
     integer, intent(in) :: n_SPH
     integer, dimension(n_SPH), intent(in) :: particle_id
-    real(kind=dp), dimension(n_SPH), intent(inout) :: x, y, z, massgas, rho
+    real(kind=dp), dimension(n_SPH), intent(inout) :: x, y, z, massgas
+    real(kind=dp), dimension(:), allocatable, intent(inout) :: rho
     real(dp), dimension(:,:), allocatable, intent(inout) :: rhodust, massdust
 
     integer, dimension(:), allocatable, intent(out) :: is_ghost
@@ -573,10 +724,12 @@ contains
              nkill = nkill+1
 
              ! Adding ghost particle to main one
-             rho(ii) = rho(ii) + rho(jj)
              massgas(ii) = massgas(ii) + massgas(jj)
-             rhodust(:,ii) = rhodust(:,ii) + rhodust(:,jj)
-             massdust(:,ii) = massdust(:,ii) + massdust(:,jj)
+             if (.not.lignore_dust) then
+               rho(ii) = rho(ii) + rho(jj)
+               rhodust(:,ii) = rhodust(:,ii) + rhodust(:,jj)
+               massdust(:,ii) = massdust(:,ii) + massdust(:,jj)
+             endif
           else
              exit loop2
           endif
@@ -673,16 +826,14 @@ contains
 
   subroutine randomize_azimuth(n_points, x,y, vx,vy)
 
-    use naleat, only : seed, stream, gtype
+    use naleat, only : seed, stream
+    use stars
 #include "sprng_f.h"
-
 
     integer, intent(in) :: n_points
     real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
-
     integer, parameter :: nb_proc = 1
     integer :: i, id, istar
-
     real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
 
     particle_loop : do i=1, n_points
@@ -699,7 +850,6 @@ contains
        x_tmp = x(i) * cos_phi + y(i) * sin_phi
        y_tmp = -x(i) * sin_phi + y(i) * cos_phi
        x(i) = x_tmp ; y(i) = y_tmp
-
 
        !-- velocities
        x_tmp = vx(i) * cos_phi + vy(i) * sin_phi

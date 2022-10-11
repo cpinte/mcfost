@@ -6,6 +6,7 @@ module stars
   use messages
   use wavelengths
   use grid
+  use elements_type, only : wght_per_H
 
   implicit none
 
@@ -14,6 +15,8 @@ module stars
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
        repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra, &
        intersect_stars, distance_to_star, compute_stellar_parameters
+  !-> to move in parameters ?     
+  public :: star_rad, laccretion_shock, max_Tshock, min_Tshock, Taccretion 
 
   private
 
@@ -26,6 +29,11 @@ module stars
   real(kind=dp), dimension(3) :: centre_ISM  ! centre of the ISM emitting sphere
 
   real, dimension(:,:), allocatable :: ProDiMo_star_HR
+
+  !onto the star(s)
+  !to move in parameters ?? (also remove in public declaration)
+  logical :: laccretion_shock
+  real(kind=dp) :: Taccretion, max_Tshock = 0.0,min_Tshock = 1d8
 
   contains
 
@@ -65,7 +73,7 @@ end subroutine deallocate_stellar_spectra
 !**********************************************************************
 
 subroutine select_etoile(lambda,aleat,n_star)
-! Sélection d'étoile qui va émettre le photon
+! Sï¿½lection d'ï¿½toile qui va ï¿½mettre le photon
 ! C. Pinte
 ! 21/05/05
 
@@ -139,7 +147,7 @@ subroutine em_sphere_uniforme(id, i_star,aleat1,aleat2,aleat3,aleat4, icell,x,y,
   y = y * r_etoile
   z = z * r_etoile
 
-  ! Ajout position de l'étoile
+  ! Ajout position de l'ï¿½toile
   x=x+etoile(i_star)%x
   y=y+etoile(i_star)%y
   z=z+etoile(i_star)%z
@@ -184,7 +192,7 @@ end subroutine em_sphere_uniforme
 !  u = srw02 * cos(argmt)
 !  v = srw02 * sin(argmt)
 !
-!  ! Position de l'étoile
+!  ! Position de l'ï¿½toile
 !  x=etoile(n_star)%x
 !  y=etoile(n_star)%y
 !  z=etoile(n_star)%z
@@ -296,7 +304,7 @@ subroutine repartition_energie_etoiles()
 
   call find_spectra()
 
-  if (etoile(1)%lb_body) then ! les étoiles sont des corps noirs
+  if (etoile(1)%lb_body) then ! les ï¿½toiles sont des corps noirs
      ! Creation d'un corps a haute resolution en F_lambda
      ! R = 1Rsun et distance = 1pc
      n_lambda_spectre(:) = 1000
@@ -320,10 +328,10 @@ subroutine repartition_energie_etoiles()
 
      enddo !i
 
-  else ! les étoiles ne sont pas des corps noirs
+  else ! les ï¿½toiles ne sont pas des corps noirs
      ! On calcule 2 trucs en meme tps :
      ! - CDF_E_star : proba cumulee a lambda fixe d'emission en fonction de l'etoile
-     ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
+     ! - spectre_etoile : proba d'emettre a lambda pour toutes les ï¿½toiles
      ! Lecture des spectres
      n_lambda_spectre_max = 0
      do i=1, n_etoiles
@@ -481,7 +489,7 @@ subroutine repartition_energie_etoiles()
   !---------------------------------------------------------------------------
   ! On calcule 2 trucs en meme tps :
   ! - CDF_E_star : proba cumulee a lambda fixe d'emission en fonction de l'etoile
-  ! - spectre_etoile : proba d'emettre a lambda pour toutes les étoiles
+  ! - spectre_etoile : proba d'emettre a lambda pour toutes les ï¿½toiles
   !---------------------------------------------------------------------------
 
   !---------------------------------------------------
@@ -506,7 +514,7 @@ subroutine repartition_energie_etoiles()
 
         wl = tab_lambda(lambda)*1.e-6
         delta_wl=tab_delta_lambda(lambda)*1.e-6
-        ! delta_wl est la largeur du bin d'intégration
+        ! delta_wl est la largeur du bin d'intï¿½gration
         CDF_E_star(lambda,0) = 0.0
 
         wl_inf =  tab_lambda_inf(lambda)
@@ -871,6 +879,111 @@ end subroutine intersect_stars
 
 !***********************************************************
 
+   function star_rad(id,iray,i_star,icell0,x,y,z,u,v,w,N,lambda)
+   ! ---------------------------------------------------------------!
+   ! routine to manage the radiation of the stellar boundary
+   !
+   ! TO  DO: 
+   ! - add limb darkening
+   ! - add reading spectrum direclty (either flux or full CLV)
+   ! -------------------------------------------------------------- !
+      integer, intent(in) :: i_star, icell0, id, iray, N
+      real(kind=dp), intent(in) :: u, v, w, x, y, z, lambda(N)
+      real(kind=dp) :: Tchoc, mu
+      real(kind=dp) :: star_rad(N)
+
+      if (etoile(i_star)%T <= 1e-6) then !even with spots
+         star_rad(:) = 0.0_dp
+         return !no radiation from the star
+      endif
+
+
+      !cos(theta) = dot(r,n)/module(r)/module(n)
+      ! if (llimb_darkening) then
+      !    call ERROR("option for reading limb darkening not implemented")
+      !    mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
+      !    if (real(mu)>1d0) then !to avoid perecision error
+      !       write(*,*) "mu=",mu, x, y, z, u, v, w
+      !       call Error(" mu limb > 1!")
+      !    end if
+      ! else
+      !    LimbDarkening = 1.0_dp
+      ! end if
+
+      star_rad(:) = Bpnu(N,lambda,etoile(i_star)%T*1d0)
+
+      if (is_inshock(id, iray, i_star, icell0, x, y, z, Tchoc)) then
+         star_rad(:) = star_rad(:) + Bpnu(N,lambda,Tchoc)
+         return
+      endif
+
+      return
+   end function star_rad
+
+  function is_inshock(id, iray, i_star, icell0, x, y, z, Tout)
+   use grid, only : voronoi
+   use constantes, only : sigma, kb
+   logical :: is_inshock
+   integer :: i_star, icell0, id, iray
+   real(kind=dp), intent(out) :: Tout
+   real(kind=dp) :: enthalp,  x, y, z !u, v, w
+   real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
+
+   is_inshock = .false.
+   if (.not.laccretion_shock) return
+
+   if (icell0<=n_cells) then
+      if (icompute_atomRT(icell0) > 0) then
+         rr = sqrt( x*x + y*y + z*z)
+         enthalp = 2.5 * 1d3 * kb * T(icell0) / wght_per_H / masseH
+
+         !vaccr is vr, the spherical r velocity component
+         if (lvoronoi) then !always 3d
+            vaccr = Voronoi(icell0)%vxyz(1)*x/rr + Voronoi(icell0)%vxyz(2)*y/rr + Voronoi(icell0)%vxyz(3) * z/rr
+            vmod2 = sum( Voronoi(icell0)%vxyz(:)**2 )
+         else
+         	if (vfield_coord==1) then
+               if (l3D) then !needed here if not 2.5d
+                  sign_z = 1.0_dp
+               else
+                  sign_z = sign(1.0_dp, z)
+               endif
+         		vaccr = vfield3d(icell0,1) * x/rr + vfield3d(icell0,2) * y/rr + vfield3d(icell0,3) * z/rr * sign_z
+            elseif (vfield_coord==2) then
+               if (l3D) then !needed here if not 2.5d
+                  sign_z = 1.0_dp
+               else
+                  sign_z = sign(1.0_dp, z)
+               endif
+               vaccr = vfield3d(icell0,1) * sqrt(1.0 - (z/rr)**2) + sign_z * vfield3d(icell0,3) * z/rr
+            else !spherical vector here
+               vaccr = vfield3d(icell0,1) !always negative for accretion
+            endif
+            vmod2 = sum(vfield3d(icell0,:)**2)
+         endif
+
+
+         if (vaccr < 0.0_dp) then
+            ! Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell0)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25
+            Tchoc = ( 1d-3 * masseH * wght_per_H * nHtot(icell0)/sigma * 0.5 * abs(vaccr)**3 )**0.25
+            is_inshock = (Tchoc > 1000.0)
+            Tout = Taccretion
+            if (Taccretion<=0.0) then 
+               is_inshock = (abs(Taccretion) * Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
+               Tout = abs(Taccretion) * Tchoc
+            endif
+            max_Tshock = max(max_Tshock, Tout)
+            min_Tshock = min(min_Tshock, Tout)
+         endif
+
+      endif !icompute_atomRT
+   endif !laccretion_shock
+
+   return
+  end function is_inshock
+
+!***********************************************************
+
 subroutine find_spectra()
   ! Find an appropriate spectrum for all star based on the Teff, mass and radius (i.e. log(g))
 
@@ -988,7 +1101,6 @@ subroutine find_spectra()
   return
 
 end subroutine find_spectra
-
 
   !*********************************************************
 
