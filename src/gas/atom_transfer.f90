@@ -1126,6 +1126,7 @@ module atom_transfer
 
       x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
       center(1) = x0 ; center(2) = y0 ; center(3) = z0
+      center(:) = center(:) - image_offset_centre(:)
 
       ! Coin en bas gauche de l'image
       Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
