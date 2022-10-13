@@ -514,19 +514,24 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
            Doppler_P_x_freq(:,iray,id) = P(:)
         endif
 
+        ! surface superieure ou inf
+        facteur_tau = 1.0
+        if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
+        if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
+
         do i=1,nTrans
            iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
            kappa_cont = kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
-           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_cont
+           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) * facteur_tau + kappa_cont
 
            ! Epaisseur optique
            dtau(:) =  l_contrib * opacite(:)
            dtau_c = l_contrib * kappa_cont
 
            ! Fonction source
-           Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) &
+           Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) * facteur_tau &
                 + emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-300_dp)
            Snu_c = emissivite_dust(icell,iTrans) / (kappa_cont  + 1.0e-300_dp)
 
@@ -541,14 +546,9 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
                    exp(-tau(:,i)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
            endif
 
-           ! surface superieure ou inf
-           facteur_tau = 1.0
-           if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
-           if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
-
            ! Mise a jour profondeur optique pour cellule suivante
            ! Warning tau and  tau_c are smaller array (dimension nTrans)
-           tau(:,i) = tau(:,i) + dtau(:) * facteur_tau
+           tau(:,i) = tau(:,i) + dtau(:)
            tau_c(i) = tau_c(i) + dtau_c
         enddo ! i
 
@@ -616,7 +616,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ltot
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite
-  real(kind=dp) :: tau_max, tau_previous
+  real(kind=dp) :: tau_max, tau_previous, facteur_tau
 
   integer :: i, iTrans, nbr_cell, next_cell, previous_cell, iv
   integer, target :: icell
@@ -669,9 +669,15 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
         ! local line profile mutiplied by frequency
         P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,ispeed,tab_speed)
 
+        ! surface superieure ou inf
+        facteur_tau = 1.0
+        if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
+        if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
+
         !do i=1,nTrans
         !iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
-        opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
+        opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) * facteur_tau &
+             + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
         ! Epaisseur optique
         dtau_mol(:) =  l_contrib * opacite(:)
