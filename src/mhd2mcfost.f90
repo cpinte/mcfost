@@ -37,7 +37,7 @@ module mhd2mcfost
         real(kind=dp), allocatable, dimension(:,:) :: rhodust, massdust
         integer,       allocatable, dimension(:) :: is_ghost
 
-        integer, parameter                       :: Nheader = 3 !Add more, for ascii file
+        integer, parameter                       :: Nheader = 2 !Add more, for ascii file
         integer                                  :: syst_status, acspot, alloc_status
         character(len=512)                       :: inputline, FormatLine, cmd
         logical                                  :: check_previous_tesselation
@@ -218,7 +218,7 @@ module mhd2mcfost
     ! Read from ascii file a model to be used.
     ! ------------------------------------------- !
         character(len=*), intent(in)	:: filename
-        integer, parameter :: Nhead = 3 !Add more
+        integer, parameter :: Nhead = 2 !Add more
         integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
         character(len=512) :: inputline, FormatLine, cmd
         real(kind=dp) :: rr, zz, pp, Vmod
