@@ -100,8 +100,6 @@ module mhd2mcfost
            laccretion_shock =  (acspot == 1)
            if (Taccretion==0.0_dp) Taccretion = -1.0_dp
 
-           call read_line(1, FormatLine, inputline, Nread)
-
            allocate(h(n_points), stat=alloc_status)
            if (alloc_status > 0) then
               call error("Allocation error smoothing length h")
@@ -274,12 +272,6 @@ module mhd2mcfost
         if (acspot==1) laccretion_shock = .true.
         if (Taccretion==0.0_dp) Taccretion = -1.0_dp
 
-        call read_line(1, FormatLine, inputline, Nread)
-        ! read(inputline(1:Nread),*) thetai, thetao, tilt
-        ! thetai = thetai * pi/180.
-        ! thetao = thetao * pi/180.
-        ! tilt = tilt * pi/180.
-
         do i=1, n_rad
            do j=j_start,nz !j_start = -nz in 3D
               do k=1, n_az
@@ -303,6 +295,8 @@ module mhd2mcfost
                     ! !Bmag(icell), gammab(icell), chib(icell)
                  else
                     call read_line(1, FormatLine, inputline, Nread)
+                    write(*,*) inputline
+                    stop
                     read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
                          vfield3d(icell,1), vfield3d(icell,3), vfield3d(icell,2), vturb(icell), icompute_atomRT(icell)
                          ! vR                  vz/vtheta              vphi
