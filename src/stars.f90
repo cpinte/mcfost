@@ -889,26 +889,13 @@ end subroutine intersect_stars
    ! -------------------------------------------------------------- !
       integer, intent(in) :: i_star, icell0, id, iray, N
       real(kind=dp), intent(in) :: u, v, w, x, y, z, lambda(N)
-      real(kind=dp) :: Tchoc, mu
+      real(kind=dp) :: Tchoc
       real(kind=dp) :: star_rad(N)
 
       if (etoile(i_star)%T <= 1e-6) then !even with spots
          star_rad(:) = 0.0_dp
          return !no radiation from the star
       endif
-
-
-      !cos(theta) = dot(r,n)/module(r)/module(n)
-      ! if (llimb_darkening) then
-      !    call ERROR("option for reading limb darkening not implemented")
-      !    mu = abs(x*u + y*v + z*w)/sqrt(x**2+y**2+z**2) !n=(u,v,w) is normalised
-      !    if (real(mu)>1d0) then !to avoid perecision error
-      !       write(*,*) "mu=",mu, x, y, z, u, v, w
-      !       call Error(" mu limb > 1!")
-      !    end if
-      ! else
-      !    LimbDarkening = 1.0_dp
-      ! end if
 
       star_rad(:) = Bpnu(N,lambda,etoile(i_star)%T*1d0)
 

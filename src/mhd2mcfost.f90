@@ -37,7 +37,7 @@ module mhd2mcfost
         real(kind=dp), allocatable, dimension(:,:) :: rhodust, massdust
         integer,       allocatable, dimension(:) :: is_ghost
 
-        integer, parameter                       :: Nheader = 3 !Add more, for ascii file
+        integer, parameter                       :: Nheader = 2 !Add more, for ascii file
         integer                                  :: syst_status, acspot, alloc_status
         character(len=512)                       :: inputline, FormatLine, cmd
         logical                                  :: check_previous_tesselation
@@ -99,8 +99,6 @@ module mhd2mcfost
            read(inputline(1:Nread),*) Taccretion, acspot
            laccretion_shock =  (acspot == 1)
            if (Taccretion==0.0_dp) Taccretion = -1.0_dp
-
-           call read_line(1, FormatLine, inputline, Nread)
 
            allocate(h(n_points), stat=alloc_status)
            if (alloc_status > 0) then
@@ -220,7 +218,7 @@ module mhd2mcfost
     ! Read from ascii file a model to be used.
     ! ------------------------------------------- !
         character(len=*), intent(in)	:: filename
-        integer, parameter :: Nhead = 3 !Add more
+        integer, parameter :: Nhead = 2 !Add more
         integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
         character(len=512) :: inputline, FormatLine, cmd
         real(kind=dp) :: rr, zz, pp, Vmod
@@ -273,12 +271,6 @@ module mhd2mcfost
         laccretion_shock = .false.
         if (acspot==1) laccretion_shock = .true.
         if (Taccretion==0.0_dp) Taccretion = -1.0_dp
-
-        call read_line(1, FormatLine, inputline, Nread)
-        ! read(inputline(1:Nread),*) thetai, thetao, tilt
-        ! thetai = thetai * pi/180.
-        ! thetao = thetao * pi/180.
-        ! tilt = tilt * pi/180.
 
         do i=1, n_rad
            do j=j_start,nz !j_start = -nz in 3D
