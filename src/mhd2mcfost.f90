@@ -295,8 +295,6 @@ module mhd2mcfost
                     ! !Bmag(icell), gammab(icell), chib(icell)
                  else
                     call read_line(1, FormatLine, inputline, Nread)
-                    write(*,*) inputline
-                    stop
                     read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
                          vfield3d(icell,1), vfield3d(icell,3), vfield3d(icell,2), vturb(icell), icompute_atomRT(icell)
                          ! vR                  vz/vtheta              vphi
