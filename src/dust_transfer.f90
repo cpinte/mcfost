@@ -1409,11 +1409,6 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
   map_1star = 0.0
 
   alloc_status = 0
-!   if (lemission_atom) then
-!    stars_map_cont(:,:,:) = 0.0
-!    allocate(mapc_1star(npix_x,npix_y,nb_proc),stat=alloc_status)!)
-!    mapc_1star = 0.0
-!   end if
 
   lpola = .false.
   if (lsepar_pola.and.llimb_darkening) then
@@ -1440,10 +1435,8 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
         if (2*etoile(istar)%r > pix_size) then
            ! on average 100 rays per pixels
            n_ray_star(istar) = max(100 * int(4*pi*(etoile(istar)%r/pix_size)**2), n_ray_star_SED)
-           if (.not.lemission_atom) then
-              if (istar==1) write(*,*) ""
-              write(*,*) "Star is resolved, using",n_ray_star,"rays for the stellar disk"
-           endif
+           if (istar==1) write(*,*) ""
+           write(*,*) "Star is resolved, using",n_ray_star,"rays for the stellar disk"
         endif
      enddo
   endif
@@ -1473,12 +1466,10 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
            call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
 
            tau_screen(i,j) = tau
-!            if (lemission_atom) tau_screen_c(i,j) = NLTEspec%atmos%tau
         enddo ! j
      enddo ! i
 
      map_1star(:,:,:) = 0.0
-!      if (lemission_atom) mapc_1star(:,:,:) = 0.0
      if (lpola) then
         Q_1star(:,:,:) = 0.0
         U_1star(:,:,:) = 0.0
@@ -1500,7 +1491,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
      !$omp shared(stream,istar,n_ray_star,llimb_darkening,limb_darkening,mu_limb_darkening,lsepar_pola) &
      !$omp shared(pola_limb_darkening,lambda,u,v,w,tab_RT_az,lsed,etoile,l3D,RT_sed_method,lpola,lmono0) &
      !$omp shared(x_center,y_center,taille_pix,dx_map,dy_map,nb_proc,map_1star,Q_1star,U_1star,lresolved) &
-     !$omp shared(tau_screen,dx_screen,dy_screen,norm_screen2) &!!!$omp shared(mapc_1star, lemission_atom, tau_screen_c, tau_c) &
+     !$omp shared(tau_screen,dx_screen,dy_screen,norm_screen2) &
      !$omp private(id,i,j,iray,rand,rand2,x,y,z,srw02,argmt,cos_thet,LimbDarkening,Stokes,fx,fy,offset_x,offset_y,vec) &
      !$omp private(Pola_LimbDarkening,icell,tau,lmin,lmax,in_map,P,phi,is_in_image) &
      !$omp reduction(+:norme,tau_avg)
@@ -1561,12 +1552,6 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
            tau = 0.0_dp
         endif
 
-!         if (lemission_atom) then
-!            tau_c =  tau_screen_c(i,j)     * (1-fx) * (1-fy) &
-!                 + tau_screen_c(i+1,j)   * fx * (1-fy) &
-!                 + tau_screen_c(i,j+1)   * (1-fx) * fy &
-!                 + tau_screen_c(i+1,j+1) * fx * fy
-!         endif
 
         ! Average optical depth to the star
         if (lmono0) tau_avg = tau_avg + tau
@@ -1580,7 +1565,6 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
 
         if (in_map) then
            map_1star(i,j,id) = map_1star(i,j,id) + exp(-tau) * cos_thet * LimbDarkening
-!            if (lemission_atom) mapc_1star(i,j,id) = mapc_1star(i,j,id) + exp(-tau_c) * cos_thet * LimbDarkening
            if (lpola) then ! Average polarisation in the pixel
               P = exp(-tau) * cos_thet * LimbDarkening * Pola_LimbDarkening
 
@@ -1602,7 +1586,6 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
 
      do id=1, nb_proc
         stars_map(:,:,1) = stars_map(:,:,1) + map_1star(:,:,id) * facteur2
-!         if (lemission_atom) stars_map_cont(:,:,1) = stars_map_cont(:,:,1) + mapc_1star(:,:,id) * facteur2
      enddo
 
      if (lpola) then
@@ -1631,9 +1614,6 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
 
   deallocate(map_1star)
   if (lpola) deallocate(Q_1star, U_1star)
-!   if (lemission_atom) then
-!    deallocate(mapc_1star)
-!   end if
 
   return
 
