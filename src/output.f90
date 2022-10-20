@@ -3401,7 +3401,6 @@ subroutine write_atomic_maps(atom)
 
    write(*,*) "Writing "//atom%id//" line Flux maps..."
 
-
    blocksize=1
    simple=.true.
    extend=.false.
