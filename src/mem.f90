@@ -351,12 +351,17 @@ end subroutine deallocate_em_th_mol
 
 !******************************************************************************
 
-subroutine realloc_dust_mol()
+subroutine realloc_dust_mol(imol)
 
   use stars, only : allocate_stellar_spectra
 
-  integer :: alloc_status
+  integer, intent(in) :: imol
+
+  integer :: alloc_status, iTrans_min, iTrans_max
   real :: mem_size
+
+  iTrans_min = mol(imol)%iTrans_min
+  iTrans_max = mol(imol)%iTrans_max
 
   allocate(tab_lambda(n_lambda), tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), &
        tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), &
@@ -375,23 +380,23 @@ subroutine realloc_dust_mol()
   C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm = 0 ; tab_g = 0
 
   ! Tableaux relatifs aux prop optiques des cellules
-  allocate(kappa(p_n_cells,n_lambda),kappa_abs_LTE(p_n_cells,n_lambda), kappa_factor(n_cells), &
-       emissivite_dust(n_cells,n_lambda), stat=alloc_status)
+  allocate(kappa(p_n_cells,iTrans_min:iTrans_max),kappa_abs_LTE(p_n_cells,iTrans_min:iTrans_max), kappa_factor(n_cells), &
+       emissivite_dust(n_cells,iTrans_min:iTrans_max), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc)')
   kappa = 0.0 ; kappa_abs_LTE = 0.0 ; emissivite_dust = 0.0
 
   if (lRE_nLTE) then
-     allocate(kappa_abs_nLTE(p_n_cells,n_lambda), stat=alloc_status)
+     allocate(kappa_abs_nLTE(p_n_cells,iTrans_min:iTrans_max), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error kappa_abs_nLTE (realloc)')
      kappa_abs_nLTE = 0.0
   endif
 
-  allocate(tab_albedo_pos(p_n_cells,n_lambda),stat=alloc_status)
+  allocate(tab_albedo_pos(p_n_cells,iTrans_min:iTrans_max),stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_albedo_pos (realloc)')
   tab_albedo_pos = 0
 
   if (aniso_method==2) then
-     allocate(tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
+     allocate(tab_g_pos(p_n_cells,iTrans_min:iTrans_max),stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_g_pos (realloc)')
      tab_g_pos = 0.0
   endif
@@ -636,18 +641,38 @@ subroutine alloc_emission_mol(imol)
 
   integer, intent(in) :: imol
   integer :: alloc_status, n_speed
+  integer :: iTrans_min, iTrans_max, level_min, level_max
 
   alloc_status = 0
 
   n_speed = mol(imol)%n_speed_rt ! I use the same now
 
-  allocate(kappa_mol_o_freq(n_cells,nTrans_tot), emissivite_mol_o_freq(n_cells,nTrans_tot), &
+  if (lmol_LTE) then ! Reducing memory in LTE mode
+     iTrans_min = minval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
+     iTrans_max = maxval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
+
+     level_min = iTransLower(iTrans_min)
+     level_max = iTransUpper(iTrans_max)
+  else ! Todo : we can reduce memory here too, up to level_max
+     iTrans_min = 1
+     iTrans_max = nTrans_tot
+
+     level_min=1
+     level_max=nLevels
+  endif
+
+  mol(imol)%iTrans_min = iTrans_min
+  mol(imol)%iTrans_max = iTrans_max
+  mol(imol)%level_min = level_min
+  mol(imol)%level_max = level_max
+
+  allocate(kappa_mol_o_freq(n_cells,iTrans_min:iTrans_max), emissivite_mol_o_freq(n_cells,iTrans_min:iTrans_max), &
        stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error kappa_mol_o_freq')
   kappa_mol_o_freq=0.0
   emissivite_mol_o_freq = 0.0
 
-  allocate(tab_nLevel(n_cells,nLevels), stat=alloc_status)
+  allocate(tab_nLevel(n_cells,level_min:level_max), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_nLevel')
   tab_nLevel = 0.0
 
@@ -660,28 +685,31 @@ subroutine alloc_emission_mol(imol)
   if (alloc_status > 0) call error('Allocation error tab_v')
   tab_v=0.0
 
+  ! We can skip that in LTE too
   allocate(tab_Cmb_mol(nTrans_tot), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_Cmb_mol')
   tab_Cmb_mol = 0.0
 
-  allocate(Jmol(nTrans_tot,nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error Jmol')
-  Jmol = 0.0_dp
+  if (.not.lmol_LTE) then
+     allocate(Jmol(iTrans_min:iTrans_max,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error Jmol')
+     Jmol = 0.0_dp
 
-  if (ldouble_RT) then
-     allocate(kappa_mol_o_freq2(n_cells,nTrans_tot), emissivite_mol_o_freq2(n_cells,nTrans_tot),&
-          stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error kappa_mol2')
-     kappa_mol_o_freq2=0.0
-     emissivite_mol_o_freq2=0.0
+     if (ldouble_RT) then ! Todo : this seems to be turned off at the moment
+        allocate(kappa_mol_o_freq2(n_cells,nTrans_tot), emissivite_mol_o_freq2(n_cells,nTrans_tot),&
+             stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error kappa_mol2')
+        kappa_mol_o_freq2=0.0
+        emissivite_mol_o_freq2=0.0
 
-     allocate(tab_nLevel2(n_cells,nLevels), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error tab_nLevel2')
-     tab_nLevel2 = 0.0
+        allocate(tab_nLevel2(n_cells,nLevels), stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error tab_nLevel2')
+        tab_nLevel2 = 0.0
 
-     allocate(Jmol2(nTrans_tot,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error Jmol2')
-     Jmol2 = 0.0_dp
+        allocate(Jmol2(nTrans_tot,nb_proc), stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error Jmol2')
+        Jmol2 = 0.0_dp
+     endif
   endif
 
   call allocate_mol_maps(imol)
@@ -715,7 +743,8 @@ subroutine dealloc_emission_mol()
        iCollUpper,iCollLower)
 
   deallocate(kappa_mol_o_freq, emissivite_mol_o_freq, tab_nLevel, &
-       tab_v, stars_map, tab_Cmb_mol, Jmol)
+       tab_v, stars_map, tab_Cmb_mol)
+  if (allocated(Jmol)) deallocate(Jmol)
 
   call deallocate_mol_maps()
 
