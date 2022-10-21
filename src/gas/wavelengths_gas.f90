@@ -146,7 +146,7 @@ module wavelengths_gas
       if (.not.line%voigt) then
          !Only half the core points at the moment (compared to Voigt)
          !Still, add one point for force span_dp to goes to 0
-         line_lambda_grid(:) = (1.0 + span_dp(-vwing,vwing,Nlambda_line_w+mod(Nlambda_line_gauss+1,2),1)/c_light) * line%lambda0
+         line_lambda_grid(:) = (1.0 + span_dp(-vwing,vwing,Nlambda_line_gauss+mod(Nlambda_line_gauss+1,2),1)/c_light) * line%lambda0
          return !leave here for gaussian.
       endif
 
@@ -251,7 +251,7 @@ module wavelengths_gas
                if (atom%lines(kr)%voigt) then
                   atom%lines(kr)%Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
                else
-                  atom%lines(kr)%Nlambda = Nlambda_line_gauss + mod(Nlambda_line_w+1,2)
+                  atom%lines(kr)%Nlambda = Nlambda_line_gauss + mod(Nlambda_line_gauss+1,2)
                endif
             ! elseif (associated(subgrid_line,line_lambda_grid_dv)) then
             !    atom%lines(kr)%Nlambda = nint(2 * line%vmax / hv + 1)

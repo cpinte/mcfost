@@ -3399,8 +3399,7 @@ subroutine write_atomic_maps(atom)
    real(kind=dp) :: lam0_air(1), lam0_vac(1)
    real(kind=dp), allocatable :: lambda_loc(:)
 
-   write(*,*) "Writing atomic line Flux maps..."
-
+   write(*,*) "Writing "//atom%id//" line Flux maps..."
 
    blocksize=1
    simple=.true.
