@@ -356,6 +356,18 @@ module Opacity_atom
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Aji * phi0(1:Nlam) * atom%n(j,icell)
 
+!-> check Gaussian profile  and norm.
+! -> check Voigt profile, for Lyman alpha mainly.
+            ! if (kr==3 .and. atom%id=="H") then
+            !    open(1,file="prof.txt",status="unknown")
+            !    write(1,*) sqrtpi * vbroad(T(icell),Atom%weight, vturb(icell))
+            !    do j=1,Nlam
+            !       write(1,*) lambda(Nblue+j-1),phi0(j)
+            !    enddo
+            !    close(1)
+            !    stop
+            ! endif
+
 
             if ((iterate.and.atom%active)) then
                phi_loc(1:Nlam,atom%ij_to_trans(i,j),atom%activeindex,iray,id) = phi0(1:Nlam)
