@@ -317,7 +317,8 @@ module see
         ! call gaussslv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
 
         if ((maxval(atom%n(:,icell)) < 0.0)) then
-            write(*,*) atom%ID, id, icell
+            write(*,*) ""
+            write(*,*) atom%ID, " id=",id, " icell=",icell
             write(*,'("nstar: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel) !*ntotal
             write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel) !*ntotal
             write(*,'("b: "*(ES14.5E3))') (atom%n(l,icell)/ndag(l),l=1,atom%Nlevel) !*ntotal
@@ -626,7 +627,7 @@ module see
 ! if (kr==1) write(*,*) atom%lines(kr)%Rji(id), atom%lines(kr)%Aji, xcc_down * dOmega, Jbar_down * dOmega * atom%lines(kr)%Bji
             end do line_loop
 
-            do kr = 1, atom%Ncont
+            cont_loop : do kr = 1, atom%Ncont
 
                 i = atom%continua(kr)%i; j = atom%continua(kr)%j
 
@@ -730,7 +731,7 @@ module see
 ! write(*,*) "cont", kr, "x->down",xcc_down, " x->up", xcc_up
 ! write(*,*) " Jup", Jbar_up, " Jdown", Jbar_down, "uji = ", tab_Aji_cont(kr,nact,icell)
 
-            enddo
+            enddo cont_loop
             atom => NULL()
 
         end do atom_loop
@@ -1258,6 +1259,12 @@ module see
         ! *********************** !
 
         call GaussSlv(df,f,neq)
+        ! call bicgstab(df,f,neq)
+        if (is_nan_infinity_vector(f)>0) then
+         write(*,*) "fdag=", bdag
+         write(*,*) "f=", f
+         call error("(Newton-raphson) nan in (f,df) after GSLV")
+        endif
 
         ! *********************** !
         !compute difference between new solution and old one

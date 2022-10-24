@@ -475,8 +475,8 @@ module Opacity_atom
              else
                 wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
              endif
-             chi_down(la,:,:,id) =  chi_down(la,:,:,id)  * wl
-             chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl
+             chi_down(la,:,nact,id) =  chi_down(la,:,nact,id)  * wl
+             chi_up(la,:,nact,id) = chi_up(la,:,nact,id) * wl
          enddo
 
          line_loop : do kr = 1, aatom%Nline
