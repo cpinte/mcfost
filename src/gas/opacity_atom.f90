@@ -721,13 +721,13 @@ module Opacity_atom
       integer :: unit, unit2, status = 0
       integer :: alloc_status, id, icell, m, Nrec
       real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
-      character(len=11) :: filename_chi="chi_map.bin"
-      character(len=50) :: filename_eta="eta_map.bin"
-      character(len=18) :: filename_rho="magnetoopt_map.bin"
+      character(len=11) :: filename_chi="chi.bin"
+      character(len=50) :: filename_eta="eta.bin"
+      character(len=18) :: filename_rho="magnetoopt.bin"
 
-      call warning("opacity emissivity map bug here because of molecular emission and r=0!")
+      call warning("opacity emissivity map bug here because of molecular emission and r=0!")!???? 
 
-      write(*,*) " Writing emissivity and opacity map (rest frame) ..."
+      write(*,*) " Writing emissivity and opacity (rest frame)..."
       ! if (lmagnetized) then
       !    Nrec = 4
       !    allocate(rho_tmp(Nlambda,n_cells,Nrec-1),stat=alloc_status)
