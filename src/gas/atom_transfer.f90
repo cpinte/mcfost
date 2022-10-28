@@ -30,7 +30,7 @@ module atom_transfer
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
                                    tab_RT_az,tab_RT_incl
-   use stars, only               : intersect_stars, laccretion_shock, max_Tshock, min_Tshock
+   use stars, only               : intersect_stars, laccretion_shock, max_Tshock, min_Tshock, max_Thp, min_Thp, max_Facc, min_Facc
    use output, only : allocate_atom_maps, flux_total, write_total_flux, write_atomic_maps
    use mcfost_env, only          : dp, time_tick, time_max
    use molecular_emission, only  : ds
@@ -102,7 +102,6 @@ module atom_transfer
       labs = .true.
       id = 1
       if (lforce_lte) lsubiteration = .false.
-      l_iterate_ne = .false.
 
       !Use non-LTE pops for electrons and to write to file.
       do nact=1,NactiveAtoms
@@ -216,6 +215,8 @@ module atom_transfer
 
             max_n_iter_loc = 0
 
+            !init here, to be able to stop/start electronic density iterations within MALI iterations
+            l_iterate_ne = .false.
             if( n_iterate_ne > 0 ) then
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
                ! if (lforce_lte) l_iterate_ne = .false.
@@ -388,8 +389,8 @@ module atom_transfer
             if (l_iterate_ne) then
                id = 1
                dne = 0.0_dp
-               write(*,'("  OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
-                  minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
+               ! write(*,'("  OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+               !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                !$omp parallel &
                !$omp default(none) &
                !$omp private(id,icell,l_iterate,nact,ilevel,vth,nb,nr)&
@@ -429,9 +430,15 @@ module atom_transfer
                end do
                !$omp end do
                !$omp end parallel
-               write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
-                  minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
-               write(*,*) ''
+               ! write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
+               !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
+               ! write(*,*) ''
+               ! if (dne < 1d-2 * precision) then
+               !    write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
+               !    !stop iterating ne
+               !    n_iterate_ne = 0
+               !    !but should be able to restart it if change in diff are large.
+               ! endif
             end if
             !***********************************************************!
             ! ******************* checkpointing ************************!
@@ -834,8 +841,9 @@ module atom_transfer
       call alloc_atom_opac(n_lambda, tab_lambda_nm)
       call allocate_atom_maps()
       if (laccretion_shock) then
-         max_Tshock = 0.0
-         min_Tshock = 1d8
+         max_Tshock = 0.0; min_Tshock = 1d8
+         max_Thp = 0.0; min_Thp = 1d8
+         max_Facc = 0.0; min_Facc = 1d8
       endif
 
       !deallocated after non-LTE loops
@@ -942,7 +950,13 @@ module atom_transfer
       end do
 
       if (laccretion_shock) then
-         if (max_Tshock>0) write(*,'("max(Tshock)="(1I5)" K; min(Tshock)="(1I5)" K")') nint(max_Tshock), nint(min_Tshock)
+         !3 + lg(Facc) = lg(Facc) erg/cm2/s
+         if (max_Facc>0) write(*,'("max(lgFacc)="(1F7.3)" W/m^2; min(lgFacc)="(1F7.3)" W/m^2")') & 
+            log10(max_Facc), log10(min_Facc)
+         if (max_Tshock>0) write(*,'("max(Tshock)="(1I8)" K; min(Tshock)="(1I8)" K")') &
+            nint(max_Tshock), nint(min_Tshock)
+         if (max_Thp>0) write(*,'("max(Thp)="(1I6)" K; min(Thp)="(1I6)" K")') &
+            nint(max_Thp), nint(min_Thp)
       endif
 
       if (RT_line_method==1) then
@@ -1087,7 +1101,7 @@ module atom_transfer
       real(kind=dp), dimension(3,nb_proc) :: pixelcorner
       real(kind=dp):: taille_pix
       integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
-      integer, parameter :: n_rad_RT = 150, n_phi_RT = 360
+      integer, parameter :: n_rad_RT = 150, n_phi_RT = 128
       real(kind=dp), dimension(n_rad_RT) :: tab_r
       real(kind=dp):: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
       integer :: ri_RT, phi_RT
@@ -1280,7 +1294,7 @@ module atom_transfer
       ! the plan-parralel cos_theta is np.sqrt(1.0 - p**2) for p < 1.0.
       integer :: la, j, icell0, id
       logical :: lintersect, labs
-      integer, parameter :: Nimpact = 10
+      integer, parameter :: Nimpact = 30
       real(kind=dp) :: rr, u,v,w,u0,w0,v0,x0,y0,z0,x(3),y(3),uvw(3)
       real(kind=dp), allocatable :: cos_theta(:), weight_mu(:), p(:)
       real(kind=dp), allocatable ::I_1d(:,:)
@@ -1373,7 +1387,9 @@ module atom_transfer
       enddo
       close(1)
 
-      ! call write_opacity_emissivity_bin(n_lambda, tab_lambda_nm)
+      if (loutput_rates) then
+         call write_opacity_emissivity_bin(n_lambda, tab_lambda_nm)
+      endif
       deallocate(cos_theta, weight_mu, p, I_1d, Itot, tab_lambda_nm, tab_lambda)
 
    return

@@ -12,7 +12,7 @@ module mhd2mcfost
     use sph2mcfost, only : SPH_to_Voronoi, Hydro_to_Voronoi_atomic
     use sort, only : find_kth_smallest_inplace
     use elements_type
-    use stars, only : laccretion_shock, Taccretion
+    use stars, only : laccretion_shock, T_hp, T_preshock
 
     implicit none
 
@@ -96,9 +96,9 @@ module mhd2mcfost
            !-> .false. with Voronoi
            !read T shock and if accretion spots
            call read_line(1, FormatLine, inputline, Nread)
-           read(inputline(1:Nread),*) Taccretion, acspot
+           read(inputline(1:Nread),*) T_hp, T_preshock, acspot
            laccretion_shock =  (acspot == 1)
-           if (Taccretion==0.0_dp) Taccretion = -1.0_dp
+           if (T_hp==0.0_dp) T_hp = -1.0_dp
 
            allocate(h(n_points), stat=alloc_status)
            if (alloc_status > 0) then
@@ -267,10 +267,10 @@ module mhd2mcfost
 
         !read T shock and if accretion spots
         call read_line(1, FormatLine, inputline, Nread)
-        read(inputline(1:Nread),*) Taccretion, acspot
+        read(inputline(1:Nread),*) T_hp, T_preshock, acspot
         laccretion_shock = .false.
         if (acspot==1) laccretion_shock = .true.
-        if (Taccretion==0.0_dp) Taccretion = -1.0_dp
+        if (T_hp==0.0_dp) T_hp = -1.0_dp
 
         do i=1, n_rad
            do j=j_start,nz !j_start = -nz in 3D
