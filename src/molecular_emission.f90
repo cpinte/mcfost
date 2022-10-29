@@ -658,8 +658,6 @@ function v_proj(icell,x,y,z,u,v,w) !
   ! Vitesse projete en 1 point d'une cellule
   ! C. Pinte
   ! 13/07/07
-  ! Added projection for cylindrical and spherical velocity components
-  ! 28/01/2022; B. Tessore
 
   implicit none
 
@@ -748,49 +746,6 @@ function v_proj(icell,x,y,z,u,v,w) !
            else
               v_proj = 0.0_dp
            endif
-      !   else if (vfied) then!lmagnetoaccr
-      !      !here vfield_x, vfield_y and vfield_z are R, z, phi
-      !      r = sqrt(x*x+y*y)
-      !      vx = 0_dp; vy = 0_dp; vz = 0_dp
-      !      vz = vfield_y(icell)
-      !      !only if z strictly positive in the model (2D)
-      !      if ( (.not.l3D) .and. (z < 0_dp) ) vz = -vz
-      !      !!vz = v_z(icell) * sign(1.0_dp,z), in 3D models, this change of sign is taken care (??)
-
-      !      if (r > tiny_dp) then !rotational + wind, should work also with spherical wind of stars
-      !         norme = 1.0_dp/r
-
-      !         vx = vfield_x(icell) * x * norme - vfield_z(icell) * y * norme
-      !         vy = vfield_x(icell) * y * norme + vfield_z(icell) * x * norme
-
-      !         v_proj = vx*u + vy*v + vz*w
-      !     else
-      !     	  v_proj = vz*w!0.0_dp
-      !     endif
-		! else if (lvfield_sphere_coord) then
-      !      !here vfield_x, vfield_y and vfield_z are r, theta, phi
-		! 	r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
-		! 	vx = 0.; vy = 0.; vz = 0.;
-
-		! 	sign1 = 1_dp
-		! 	!because theta only from 0 to pi/2 if 2D. But velocity is negative in z < 0
-		!     if ( (.not.l3D) .and. (z < 0_dp) ) sign1 = -1_dp
-
-		! 	if (r2 > tiny_dp) then
-		! 		norme2 = 1.0_dp / r2
-		! 	else
-		! 		norme2 = 0.0_dp
-		! 	endif
-
-		! 	if (r > tiny_dp) then
-		! 		norme = 1.0_dp / r
-		! 		vx = vfield_x(icell) * x * norme - y * norme2 * vfield_z(icell) + norme2 * ( z * norme * x * vfield_y(icell) )
-		! 		vy = vfield_x(icell) * y * norme + x * norme2 * vfield_z(icell) + norme2 * ( z * norme * y * vfield_y(icell) )
-		! 		vz = vfield_x(icell) * z * norme - sign1 * r2 / r * vfield_y(icell)
-		! 		v_proj = vx * u + vy * v + vz * w
-		! 	else
-		! 		v_proj = 0.0_dp
-		! 	endif
         else
            call error("velocity field not defined")
         endif
