@@ -720,6 +720,7 @@ module Opacity_atom
       integer :: unit, unit2, status = 0
       integer :: alloc_status, id, icell, m, Nrec
       real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
+      real(kind=dp), allocatable, dimension(:,:,:) :: chic_tmp, etac_tmp
       character(len=11) :: filename_chi="chi.bin"
       character(len=50) :: filename_eta="eta.bin"
       character(len=18) :: filename_rho="magnetoopt.bin"
@@ -740,6 +741,10 @@ module Opacity_atom
       if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
       allocate(eta_tmp(Nlambda, n_cells, Nrec),stat=alloc_status)
       if (alloc_status /= 0) call error("Cannot allocate eta_tmp !")
+      allocate(chic_tmp(Nlambda, n_cells, 1),stat=alloc_status)
+      if (alloc_status /= 0) call error("Cannot allocate chic_tmp !")
+      allocate(etac_tmp(Nlambda, n_cells, 1),stat=alloc_status)
+      if (alloc_status /= 0) call error("Cannot allocate etac_tmp !")
 
 
       call ftgiou(unit,status)
@@ -751,6 +756,8 @@ module Opacity_atom
          !$ id = omp_get_thread_num() + 1
          if (icompute_atomRT(icell) > 0) then
             call contopac_atom_loc(icell,Nlambda,lambda,chi_tmp(:,icell,1),eta_tmp(:,icell,1))
+            chic_tmp(:,icell,1) = chi_tmp(:,icell,1)
+            etac_tmp(:,icell,1) = eta_tmp(:,icell,1)
             call opacity_atom_bb_loc(id,icell,1,1d0,zero_dp,zero_dp,1d0,zero_dp,zero_dp,u,v,w,&
                zero_dp,zero_dp,.false.,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
             ! do m=2,Nrec
@@ -764,16 +771,20 @@ module Opacity_atom
          else
             chi_tmp(:,icell,:) = 0.0
             eta_tmp(:,icell,:) = 0.0
+            chic_tmp(:,icell,:) = 0.0
+            etac_tmp(:,icell,:) = 0.0
          endif
       enddo
 
       write(unit,iostat=status) chi_tmp
+      write(unit,iostat=status) chic_tmp
       write(unit2,iostat=status) eta_tmp
+      write(unit2,iostat=status) etac_tmp
       ! if (lmagnetized) then
       !   write(unit, iostat=status) rho_tmp
       !   deallocate(rho_tmp)
       ! endif
-      deallocate(chi_tmp, eta_tmp)
+      deallocate(chi_tmp, eta_tmp, chic_tmp, etac_tmp)
       close(unit)
       close(unit2)
 
