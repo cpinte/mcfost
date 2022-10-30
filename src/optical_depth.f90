@@ -235,7 +235,7 @@ subroutine integ_tau(lambda)
   if (.not.lvariable_dust) then
      icell = icell_not_empty
      if (kappa(icell_ref,lambda) * kappa_factor(icell) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
+        write(*,*) " Column density (g/cmï¿½)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
              (kappa(icell_ref,lambda) * kappa_factor(icell)/AU_to_cm))
      endif
   endif
