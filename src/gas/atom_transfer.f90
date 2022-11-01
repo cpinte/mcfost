@@ -536,7 +536,7 @@ module atom_transfer
             enddo
             if (l_iterate_ne) then
                write(*,*) ""
-               write(*,'("                  "(1A2))') "Ne"
+               write(*,'("                  "(1A2))') "ne"
                write(*,'("   >>> dne="(1ES13.5E3))') dne
             endif
             write(*,*) ""
