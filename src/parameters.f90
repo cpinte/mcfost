@@ -62,7 +62,7 @@ module parametres
   ! Atomic line radiative transfer
   logical :: lexit_after_nonlte_loop, lstop_after_jnu
   logical :: lemission_atom, lelectron_scattering, lforce_lte,  &
-            	ldissolve, laccurate_integ, loutput_rates, lzeeman_polarisation
+            	ldissolve, lstop_after_step1, loutput_rates, lzeeman_polarisation
   integer :: N_rayons_mc, istep_start
   
   !HEALpix

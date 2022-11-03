@@ -122,19 +122,29 @@ module atom_transfer
 
       !How many steps and which one
       etape_start = istep_start
+      etape_end = 2
       n_rayons = healpix_npix(healpix_lorder)
-      n_rayons_sub = 1 !for allocation of phi and Itot on the maximum number of rays!
-      if (laccurate_integ) then
-         etape_end = 2
-         if (lsubiteration) n_rayons_sub = max(n_rayons,N_rayons_mc)
+      if (lsubiteration) then
+         n_rayons_sub =  N_rayons_mc !the max of the 2 steps
       else
+         n_rayons_sub = 1 !for allocation of phi and Itot on the maximum number of rays!
+      endif
+      if ((lstop_after_step1).and.(etape_start==1)) then
          etape_end = 1
          if (lsubiteration) n_rayons_sub = n_rayons
-         if (istep_start==2) then
-            etape_end = 2
-            if (lsubiteration) n_rayons_sub = N_rayons_mc
-         endif
       endif
+
+      ! if (laccurate_integ) then
+      !    etape_end = 2
+      !    if (lsubiteration) n_rayons_sub = max(n_rayons,N_rayons_mc)
+      ! else
+      !    etape_end = 1
+      !    if (lsubiteration) n_rayons_sub = n_rayons
+      !    if (istep_start==2) then
+      !       etape_end = 2
+      !       if (lsubiteration) n_rayons_sub = N_rayons_mc
+      !    endif
+      ! endif
 
       if (allocated(stream)) deallocate(stream)
       allocate(stream(nb_proc),stat=alloc_status)
