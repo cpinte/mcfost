@@ -356,6 +356,18 @@ module Opacity_atom
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Aji * phi0(1:Nlam) * atom%n(j,icell)
 
+!-> check Gaussian profile  and norm.
+! -> check Voigt profile, for Lyman alpha mainly.
+            ! if (kr==3 .and. atom%id=="H") then
+            !    open(1,file="prof.txt",status="unknown")
+            !    write(1,*) sqrtpi * vbroad(T(icell),Atom%weight, vturb(icell))
+            !    do j=1,Nlam
+            !       write(1,*) lambda(Nblue+j-1),phi0(j)
+            !    enddo
+            !    close(1)
+            !    stop
+            ! endif
+
 
             if ((iterate.and.atom%active)) then
                phi_loc(1:Nlam,atom%ij_to_trans(i,j),atom%activeindex,iray,id) = phi0(1:Nlam)
@@ -475,8 +487,8 @@ module Opacity_atom
              else
                 wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
              endif
-             chi_down(la,:,:,id) =  chi_down(la,:,:,id)  * wl
-             chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl
+             chi_down(la,:,nact,id) =  chi_down(la,:,nact,id)  * wl
+             chi_up(la,:,nact,id) = chi_up(la,:,nact,id) * wl
          enddo
 
          line_loop : do kr = 1, aatom%Nline
@@ -703,19 +715,20 @@ module Opacity_atom
    end function profile_art_i
 
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
-      !not para to be able to write while computing!
       integer, intent(in) :: Nlambda
       real(kind=dp), intent(in) :: lambda(Nlambda)
       integer :: unit, unit2, status = 0
       integer :: alloc_status, id, icell, m, Nrec
       real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
-      character(len=11) :: filename_chi="chi_map.bin"
-      character(len=50) :: filename_eta="eta_map.bin"
-      character(len=18) :: filename_rho="magnetoopt_map.bin"
+      real(kind=dp), allocatable, dimension(:,:,:) :: chic_tmp, etac_tmp
+      character(len=11) :: filename_chi="chi.bin"
+      character(len=50) :: filename_eta="eta.bin"
+      character(len=18) :: filename_rho="magnetoopt.bin"
+      real(kind=dp) :: zero_dp, u, v, w
 
-      call warning("opacity emissivity map bug here because of molecular emission and r=0!")
-
-      write(*,*) " Writing emissivity and opacity map (rest frame) ..."
+      zero_dp = 0.0_dp
+      u = zero_dp; v = zero_dp; w = zero_dp
+      write(*,*) " Writing emissivity and opacity (rest frame)..."
       ! if (lmagnetized) then
       !    Nrec = 4
       !    allocate(rho_tmp(Nlambda,n_cells,Nrec-1),stat=alloc_status)
@@ -728,6 +741,10 @@ module Opacity_atom
       if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
       allocate(eta_tmp(Nlambda, n_cells, Nrec),stat=alloc_status)
       if (alloc_status /= 0) call error("Cannot allocate eta_tmp !")
+      allocate(chic_tmp(Nlambda, n_cells, 1),stat=alloc_status)
+      if (alloc_status /= 0) call error("Cannot allocate chic_tmp !")
+      allocate(etac_tmp(Nlambda, n_cells, 1),stat=alloc_status)
+      if (alloc_status /= 0) call error("Cannot allocate etac_tmp !")
 
 
       call ftgiou(unit,status)
@@ -739,8 +756,10 @@ module Opacity_atom
          !$ id = omp_get_thread_num() + 1
          if (icompute_atomRT(icell) > 0) then
             call contopac_atom_loc(icell,Nlambda,lambda,chi_tmp(:,icell,1),eta_tmp(:,icell,1))
-            call opacity_atom_bb_loc(id,icell,1,0d0,0d0,0d0,0d0,0d0,0d0,0d0,0d0,0d0,&
-               0d0,0d0,.false.,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
+            chic_tmp(:,icell,1) = chi_tmp(:,icell,1)
+            etac_tmp(:,icell,1) = eta_tmp(:,icell,1)
+            call opacity_atom_bb_loc(id,icell,1,1d0,zero_dp,zero_dp,1d0,zero_dp,zero_dp,u,v,w,&
+               zero_dp,zero_dp,.false.,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
             ! do m=2,Nrec
             !    !m=1, unpolarized already filled.
             !    !etaQUV, chiQUV only for Q(=1), U, V
@@ -752,19 +771,20 @@ module Opacity_atom
          else
             chi_tmp(:,icell,:) = 0.0
             eta_tmp(:,icell,:) = 0.0
+            chic_tmp(:,icell,:) = 0.0
+            etac_tmp(:,icell,:) = 0.0
          endif
-         !for each cell, write all wavelengths and all records (only one if not pol, or 4 Stokes)
-         write(unit,iostat=status) chi_tmp(:,icell,:)
-         write(unit2,iostat=status) eta_tmp(:,icell,:)
-         !if lmagnetized write rho_tmp(:,icell,Nrec)
       enddo
 
-
+      write(unit,iostat=status) chi_tmp
+      write(unit,iostat=status) chic_tmp
+      write(unit2,iostat=status) eta_tmp
+      write(unit2,iostat=status) etac_tmp
       ! if (lmagnetized) then
       !   write(unit, iostat=status) rho_tmp
       !   deallocate(rho_tmp)
       ! endif
-      deallocate(chi_tmp, eta_tmp)
+      deallocate(chi_tmp, eta_tmp, chic_tmp, etac_tmp)
       close(unit)
       close(unit2)
 

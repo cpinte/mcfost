@@ -16,7 +16,7 @@ module stars
        repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra, &
        intersect_stars, distance_to_star, compute_stellar_parameters
   !-> to move in parameters ?     
-  public :: star_rad, laccretion_shock, max_Tshock, min_Tshock, Taccretion 
+  public :: star_rad, laccretion_shock, max_Tshock, min_Tshock, min_Thp, max_Thp, T_hp, max_Facc, min_Facc, T_preshock
 
   private
 
@@ -33,8 +33,11 @@ module stars
   !onto the star(s)
   !to move in parameters ?? (also remove in public declaration)
   logical :: laccretion_shock
-  real(kind=dp) :: Taccretion, max_Tshock = 0.0,min_Tshock = 1d8
-
+  real(kind=dp) :: T_hp, max_Thp = 0.0, min_Thp = 1d8 !photosphere heated.
+  real(kind=dp) :: max_Tshock = 0.0, min_Tshock = 1d8 !soft X-rays emission from the shock
+  real(kind=dp) :: max_Facc = 0.0, min_Facc = 1d8 !Accretion flux in W/m2
+  real(kind=dp) :: T_preshock !temperature of the opt-thin pre-shock region
+ 
   contains
 
 subroutine allocate_stellar_spectra(n_wl)
@@ -889,8 +892,9 @@ end subroutine intersect_stars
    ! -------------------------------------------------------------- !
       integer, intent(in) :: i_star, icell0, id, iray, N
       real(kind=dp), intent(in) :: u, v, w, x, y, z, lambda(N)
-      real(kind=dp) :: Tchoc
+      real(kind=dp) :: Tshock, Thp, Facc
       real(kind=dp) :: star_rad(N)
+      real(kind=dp) :: Icorona
 
       if (etoile(i_star)%T <= 1e-6) then !even with spots
          star_rad(:) = 0.0_dp
@@ -899,22 +903,53 @@ end subroutine intersect_stars
 
       star_rad(:) = Bpnu(N,lambda,etoile(i_star)%T*1d0)
 
-      if (is_inshock(id, iray, i_star, icell0, x, y, z, Tchoc)) then
-         star_rad(:) = star_rad(:) + Bpnu(N,lambda,Tchoc)
+      if (is_inshock(id, iray, i_star, icell0, x, y, z, Thp, Tshock, Facc)) then
+         if (T_preshock > 0.0 ) then
+            where (lambda > 364.2096)
+               star_rad(:) = star_rad(:) + Bpnu(N,lambda,Thp)
+            elsewhere (lambda <= 364.2096) !-> can be very large between ~ 40 and 91 nm.
+            ! elsewhere (lambda > 91.176 .and. lambda <= 364.2096)         
+               star_rad(:) = star_rad(:) + Bpnu(N,lambda,T_preshock)
+            endwhere
+         else
+            star_rad(:) = star_rad(:) +  Bpnu(N,lambda,Thp)
+         endif
          return
+      endif
+
+      ! add coronal illumination at the "unresolved" stellar surface 
+      ! At the moment, the EUV radiation is constant across the wl range.
+      ! Icorona in W/m2/Hz/sr. It is normalised such that
+      ! int (dOmega int( dnu Icorona ) ) = F_EUV in W/m2
+      ! **** At the moment, F_EUV is stored in etoile%fuv (W/m2) **** !
+      if ( etoile(i_star)%fuv > 0.0) then
+         Icorona = etoile(i_star)%fuv * 1d-9 * 911.76 / (pi*c_light*81.176)
+         where (lambda >= 10 .and. lambda <= 91.176)
+         ! Icorona = etoile(i_star)%fuv * 1d-9 * 504.0 / (pi*c_light*40.4)
+         ! where (lambda >= 10 .and. lambda <= 50.4)
+            star_rad(:) = star_rad(:) + Icorona
+         endwhere
       endif
 
       return
    end function star_rad
 
-  function is_inshock(id, iray, i_star, icell0, x, y, z, Tout)
+  function is_inshock(id, iray, i_star, icell0, x, y, z, Thp, Tshock, Facc)
+  !
+  ! Computes the temperature of the heated photosphere and of the
+  ! pre-shock region that will radiate away respectively 3/4 and 1/4 of the
+  ! black body radiation at Thp and Tshock respectively (with Tshock >> Thp).
+  !
+  ! Thp ~ (Facc/sigma)**0.25 = (0.5 * rho * vs**3 / sigma)**3 
+  ! Ts ~ 3/16 * mu * amu / kb * vs**2
+  !
    use grid, only : voronoi
    use constantes, only : sigma, kb
    logical :: is_inshock
    integer :: i_star, icell0, id, iray
-   real(kind=dp), intent(out) :: Tout
-   real(kind=dp) :: enthalp,  x, y, z !u, v, w
-   real(kind=dp) :: Tchoc, vaccr, vmod2, rr, sign_z
+   real(kind=dp), intent(out) :: Thp, Tshock, Facc
+   real(kind=dp) :: x, y, z
+   real(kind=dp) :: Tloc, vaccr, vmod2, rr, sign_z
 
    is_inshock = .false.
    if (.not.laccretion_shock) return
@@ -922,8 +957,6 @@ end subroutine intersect_stars
    if (icell0<=n_cells) then
       if (icompute_atomRT(icell0) > 0) then
          rr = sqrt( x*x + y*y + z*z)
-         enthalp = 2.5 * 1d3 * kb * T(icell0) / wght_per_H / masseH
-
          !vaccr is vr, the spherical r velocity component
          if (lvoronoi) then !always 3d
             vaccr = Voronoi(icell0)%vxyz(1)*x/rr + Voronoi(icell0)%vxyz(2)*y/rr + Voronoi(icell0)%vxyz(3) * z/rr
@@ -951,16 +984,20 @@ end subroutine intersect_stars
 
 
          if (vaccr < 0.0_dp) then
-            ! Tchoc = (1d-3 * masseH * wght_per_H * nHtot(icell0)/sigma * abs(vaccr) * (0.5 * vmod2 + enthalp))**0.25
-            Tchoc = ( 1d-3 * masseH * wght_per_H * nHtot(icell0)/sigma * 0.5 * abs(vaccr)**3 )**0.25
-            is_inshock = (Tchoc > 1000.0)
-            Tout = Taccretion
-            if (Taccretion<=0.0) then 
-               is_inshock = (abs(Taccretion) * Tchoc > 1.0*etoile(i_star)%T) !depends on the local value
-               Tout = abs(Taccretion) * Tchoc
+            !Facc = 1/2 rho vs^3 
+            Facc = 0.5 * (1d-3 * masseH * wght_per_H * nHtot(icell0)) * abs(vaccr)**3
+            Tloc = ( 0.75 * Facc / sigma )**0.25
+            is_inshock = (Tloc > 0.5 * etoile(i_star)%T)
+            Thp = T_hp
+            if (T_hp<=0.0) then 
+               is_inshock = (abs(T_hp) * Tloc > 1.0*etoile(i_star)%T) !depends on the local value
+               Thp = abs(T_hp) * Tloc
             endif
-            max_Tshock = max(max_Tshock, Tout)
-            min_Tshock = min(min_Tshock, Tout)
+            !assuming mu is 0.5
+            Tshock = 0.5 * (3.0/16.0) * (1d-3 * masseH) / kb * vaccr**2
+            max_Thp = max(max_Thp, Thp); min_Thp = min(min_Thp, Thp)
+            max_Tshock = max(max_Tshock, Tshock); min_Tshock = min(min_Tshock, Tshock)
+            max_Facc = max(max_Facc,Facc); min_Facc = min(min_Facc, Facc)
          endif
 
       endif !icompute_atomRT

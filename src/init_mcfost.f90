@@ -89,7 +89,7 @@ subroutine set_default_variables()
   Ng_Nperiod = 5
   istep_start = 1
   ! AL-RT
-  laccurate_integ = .false.
+  lstop_after_step1 = .false.
   N_rayons_mc = 100
   loutput_rates = .false.
   !
@@ -801,9 +801,9 @@ subroutine initialisation_mcfost()
      	call error("Zeeman polarisation not yet!")
         i_arg = i_arg + 1
         lzeeman_polarisation=.true.
-     case("-accurate_integ")
+     case("-healpix_nlte")
         i_arg = i_arg + 1
-        laccurate_integ = .true.
+        lstop_after_step1 = .true.
      case("-art_line_resol")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("resolution (km/s) needed with -art_line_resol !")
@@ -1907,7 +1907,7 @@ subroutine display_help()
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
 !   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
-  write(*,*) "        : -accurate_integ : increase the accuracy of the monte carlo angular integration"
+  write(*,*) "        : -healpix_nlte : stop the non-LTE loop after the first 1"
   write(*,*) "        : -art_line_resol <v> : resolution of the non-LTE grid of art in km/s"
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
 !   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"

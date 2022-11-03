@@ -3,10 +3,7 @@ module read1d_models
 ! Read 1d atmospheric models in ascii format.
 ! WARNING: the number of cells is then npoints - 1 where npoints
 ! is the number of radius in the atmospheric model.
-! TO DO: add a ghost point to prevent that ???
 !
-! In the future, atmos_type disappear which will simplify the dependency of the module
-! and brings clarity.
 !
 !!!
 	use parametres
@@ -50,7 +47,7 @@ module read1d_models
 			read(1,*) tab_r_mod1d(i), tab_T_mod1(i), tab_rho_mod1(i), tab_ne_mod1(i), &
 				tab_vt_mod1(i), tab_v_mod1(1,i), tab_v_mod1(2,i), tab_v_mod1(3,i), tab_zone_mod1(i)
 			! write(*,*) i, tab_r_mod1d(i), tab_T_mod1(i), tab_rho_mod1(i), tab_ne_mod1(i), &
-			! 	tab_vt_mod1(i), tab_v_mod1(1,i), tab_v_mod1(2,i), tab_v_mod1(3,i), tab_zone_mod1(i)
+				! tab_vt_mod1(i), tab_v_mod1(1,i), tab_v_mod1(2,i), tab_v_mod1(3,i), tab_zone_mod1(i)
 		enddo
 		call check_for_coronal_illumination()
 		if (lcoronal_illumination) then
@@ -81,6 +78,7 @@ module read1d_models
 		
 		n_etoiles = 1 !force
 		!it is not the star but the inner boundary of the model !
+		!Because the star is the model !
 		! Rmin = minval(tab_r_mod1d) * Rstar_mod * m_to_au
 		Rmin = minval(tab_r_mod1d) * Rstar_mod * m_to_au
 		Rmax = maxval(tab_r_mod1d,mask=(tab_zone_mod1>0)) * Rstar_mod * m_to_au
@@ -90,12 +88,13 @@ module read1d_models
 		etoile(1)%y = 0.0_dp
 		etoile(1)%z = 0.0_dp
 		!Temperature read from file
-		!etoile(1)%T = real(tab_T_mod1(1)) or 2 if there is a ghost point
+		etoile(1)%T = real(tab_T_mod1(1))
+		write(*,*) "Tbot (1d model)", etoile(1)%T, ' K'
 		!other elements not useful in 1d mode !
 		tab_r_mod1d = tab_r_mod1d * Rstar_mod * m_to_au
 
 		disk_zone(1)%rin  = Rmin
-		disk_zone(1)%edge=0.0
+		disk_zone(1)%edge = 0.0
 		disk_zone(1)%rmin = disk_zone(1)%rin
 		disk_zone(1)%rout = Rmax_c!Rmax
 		disk_zone(1)%rmax = disk_zone(1)%rout
@@ -103,7 +102,7 @@ module read1d_models
 		write(*,*) "WARNING distance and map size set to : "
 		distance = Rmax * au_to_pc !pc
 		map_size = 2.005 * Rmax !au
-		write(*,*) distance, ' pc', map_size * 1e3, 'mau'		
+		write(*,*) distance, ' pc', map_size * 1e3, 'mau'	
 	
 		return
 	end subroutine read_grid_1d
