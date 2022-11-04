@@ -97,7 +97,6 @@ subroutine set_default_variables()
   dpops_max_error = 1e-1
   dpops_sub_max_error = 1e-2
   art_hv = 0.0 !default is frac * min(vD)
-  art_hv_nlte = 0.0 !default is frac * min(vD)
   !
   lpuffed_rim = .false.
   lno_backup = .false.
@@ -1907,8 +1906,8 @@ subroutine display_help()
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
 !   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
-  write(*,*) "        : -healpix_nlte : stop the non-LTE loop after the first 1"
-  write(*,*) "        : -art_line_resol <v> : resolution of the non-LTE grid of art in km/s"
+  write(*,*) "        : -healpix_nlte : stop the non-LTE loop after the 1st step (uniform sampling)"
+  write(*,*) "        : -art_line_resol <v> : (Overwrite) resolution of the non-LTE grid of art in km/s"
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
 !   write(*,*) "        : -electron_scatt : Lambda-iterate the mean intensity with SEE"
 !   write(*,*) "        : -calc_jnu_atom : Stop the code after Jnu_scattering has been computed and written. "

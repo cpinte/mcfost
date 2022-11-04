@@ -70,7 +70,7 @@ module parametres
   
   logical :: lcheckpoint, lsafe_stop
   !Convergence relative errors
-  real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time, art_hv_nlte
+  real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time
   integer :: checkpoint_period
   
   !Ng's acceleration
