@@ -214,7 +214,7 @@ module atom_transfer
 
             n_iter = n_iter + 1
             !                    goes with maxIter
-            write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; theshold: "(1ES11.2E3))') n_iter, etape, precision
+            write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; threshold: "(1ES11.2E3))') n_iter, etape, precision
             ibar = 0
             n_cells_done = 0
 
