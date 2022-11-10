@@ -1,13 +1,13 @@
 module elements_type
     !Small module to keep track of data of elements either bound to molecules or in atoms
-    !sets the abundance of the model, used for atom rt and chemical equilibrium if 
+    !sets the abundance of the model, used for atom rt and chemical equilibrium if
     !molecules and atoms overlap.
 
     use mcfost_env, only : dp, mcfost_utils
-    use constantes, only : hp, c_light, cm_to_m
+    use constantes
     use utils !do not forget to add the math module un int
 
-    implicit none 
+    implicit none
 
     type Element
 
@@ -24,7 +24,7 @@ module elements_type
 
     type elemPointerArray
         type(Element), pointer :: p => NULL()
-    end type elemPointerArray  
+    end type elemPointerArray
 
 
     ! type (elemPointerArray), dimension(:), allocatable :: Elements
@@ -60,9 +60,9 @@ module elements_type
          190.2,192.2,195.1,197.0,200.6,204.4,207.2,209.0,      &
          210.0,211.0,222.0,223.0,226.1,227.1,232.0,231.0,      &
          238.0,237.0,244.0,243.0,247.0,247.0,251.0, 254.0/
-  
+
     character(len=2), dimension(NELEM_WEIGHTS) :: elemental_ID
-  
+
     DATA elemental_ID /'H ','He','Li','Be','B ','C ','N ','O ',    &
          'F ','Ne','Na','Mg','Al','Si','P ','S ','Cl', &
          'Ar','K ','Ca','Sc','Ti','V','Cr','Mn','Fe',  &
@@ -74,7 +74,7 @@ module elements_type
          'Hf','Ta','W ','Re','Os','Ir','Pt','Au','Hg', &
          'Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac', &
          'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es'/
-  
+
 
 
     contains
@@ -111,7 +111,7 @@ module elements_type
         real(kind=dp), allocatable, dimension(:,:) :: data_krz
         integer, parameter :: Nstage_max = 100
         integer :: NAXISPF(2)
-    
+
         eof = 0
         !Start reading partition function by first reading the grid
         !get unique unit number
@@ -129,7 +129,7 @@ module elements_type
            write(*,*) "exiting... !"
            stop
         end if
-    
+
         allocate(Tpf(Npf))
         !now read temperature grid
         call ftgpvd(unit,1,1,Npf,-999,Tpf,anynull,EOF) !d because double !!
@@ -140,11 +140,11 @@ module elements_type
 
         !do not close yet
         !will be closed after all data are read!
-    
-    
+
+
         !read abundances
         write(FormatLine,'("(1"A,I3")")') "A", 10
-    
+
         open(unit=1, file=TRIM(mcfost_utils)//TRIM(ABUNDANCE_FILE),status="old")
         call read_line(1, FormatLine, inputline, Nread)
         read(inputline,*) Nelem
@@ -157,22 +157,22 @@ module elements_type
         totalAbund = 0.0
         avgWeight = 0.0
         do n=1, Nelem !H is first, then He ect
-    
+
            call read_line(1, FormatLine, inputline, Nread)
            read(inputline,*) charID, A
-    
+
            elems(n)%weight=atomic_weights(n)
            elems(n)%ID = charID(1:2) !supposed to be lowercases!!!!!
            elems(n)%abund = 10.**(A-12.0)
-    
+
            if (A <= -99) elems(n)%abund = 0.0
-    
+
            elems(n)%abundance_set = .true.
 
            totalAbund = totalAbund+elems(n)%abund
            avgWeight = avgWeight+elems(n)%abund*elems(n)%weight
-    
-           !read pf data, the fits is not closed yet. 
+
+           !read pf data, the fits is not closed yet.
            call FTMAHD(unit,n+1,hdutype,EOF)
            if (EOF.ne.0) then
                 write(*,*) "error reading partition function"
@@ -185,7 +185,7 @@ module elements_type
             !j'arrive pas a lire ce string, but it is not necessary
             !but should asks christophe to know how to do
             !call ftgkyj(unit, "ELEM", AtomID, commentfits, EOF)
-     
+
             !write(*,*) "Nstage", Nstage, "Z=", Z, "for elem:", elemental_ID(code)
             !write(*,*) "Npf points = ", Npf
             !now read partition function
@@ -232,21 +232,21 @@ module elements_type
         ! free the unit number
         call ftfiou(unit, EOF)
         deallocate(data_krz)
-    
+
         wght_per_H = avgWeight
         avgWeight = avgWeight/totalAbund
         write(*,*) "Total Abundance in the atmosphere = ", totalAbund
         write(*,*) "Total average weight = ", avgWeight
         write(*,*) "Weight per Hydrogen = ", wght_per_H !i.e., per AMU = total mass
         write(*,*) ""
-    
+
         !store also the mass fraction of each element
         do n=1, Nelem
            elems(n)%massf = elems(n)%weight*elems(n)%Abund/wght_per_H
         enddo
 
         Max_ionisation_stage =  maxval(elems(:)%Nstage)
-    
+
         return
     end subroutine read_abundance
 
@@ -260,17 +260,17 @@ module elements_type
         ! beware He, is on the 18 column, because they are 16
         ! empty columns between H and He
         ! ---------------------------------------------------
-     
+
            integer i
            integer, intent(in) :: Z
            integer, intent(out) :: row, col
            integer :: istart(7)
-     
+
            row = 0
            col = 0
-     
+
            istart = (/1, 3, 11, 19, 37, 55, 87/) !first Z of each rows
-     
+
            ! -- find row
            do i=1,6
               if ((Z .ge. istart(i)) .and. (Z .lt. istart(i + 1))) then
@@ -281,10 +281,10 @@ module elements_type
            end do
            ! find column on the row
            col = Z - istart(i) + 1
-     
+
            ! for relative position just comment out the following lines
            ! or take col=col-10 (or-18 for He) for these cases.
-     
+
            ! special case of Z=2 for Helium because there are 16
            ! empty columns between Hydrogen and Helium
            if (Z.eq.2) then
@@ -304,7 +304,7 @@ module elements_type
         ! Interpolate the partition function of Element elem in ionisation stage
         ! j at temperature temp
         ! ----------------------------------------------------------------------!
-    
+
         type(Element), intent(in) :: elem
         integer, intent(in) :: j
         real(kind=dp), intent(in) :: temp
@@ -313,7 +313,7 @@ module elements_type
 
         ! Uk = exp( interp(elem%pf(:,j),Tpf,temp) )
         ! elem%pf(:,j) is ln(U)
-    
+
         !->faster
         !out of bound the function return 0 not the inner (outer) bound.
           tp(1) = temp
@@ -321,7 +321,7 @@ module elements_type
           Uk = exp(Uka(1))
           if( temp < Tpf(1) ) Uk = exp(elem%pf(1,j))
           if (temp > Tpf(Npf)) Uk = exp(elem%pf(Npf,j))
-    
+
         return
     end function get_pf
 
@@ -347,23 +347,23 @@ module elements_type
         real(kind=dp), intent(in) :: Ujl, Uj1l, ionpot
         C1 = 0.5*(HP**2 / (2.*PI*mel*kb))**1.5
         !C1 = (HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
-    
+
         !!ionpot = ionpot * 100.*HPLANCK*CLIGHT !cm1->J
         !! -> avoiding dividing by big numbers causing overflow.
         !!maximum argument is 600, exp(600) = 3.77e260
         expo = exp(min(600d0,ionpot/(kb*temp)))
         if (ionpot/(kb*temp) >= 600d0) expo = huge_dp
-    
+
         !if exp(300) it means phi is "infinity", exp(300) == 2e130 so that's enough
         phi_jl = C1 * (Ujl / Uj1l) * expo / (temp**1.5 + tiny_dp)
         if (phi_jl < phi_min_limit) phi_jl = 0d0 !tiny_dp ! or phi = 0d0 should be more correct ?
         ! but test to not divide by 0
-    
+
         if (is_nan_infinity(phi_jl)>0) then
            write(*,*) "error, phi_jl", phi_jl, temp
            stop
         endif
-    
+
         return
     end function phi_jl
 
@@ -384,11 +384,11 @@ module elements_type
         real(kind=dp), intent(in) :: NI, UI1, UI, chi, ne
         real(kind=dp) :: phi, NI1
         phi = phi_jl(temp, UI, UI1, chi) ! chi in J
-    
+
         !phi should be between phi_min_limit and exp(600)
         !and ne between ne_limit and nemax, so never nan nor infinity
         !further in General, a larg phi implies a ne close to 0, so the product remains small
-    
+
         if (ne > 0.0) then
            NI1 = NI/(phi*ne)
         else !all in ground state, phi->infinity if T->0 and phi->0 if T->infinty
@@ -396,7 +396,7 @@ module elements_type
            !meaning if ne->0 phi goes to infinity
            NI1 = 0.0
         endif
-    
+
         RETURN
     end function SahaEq
 

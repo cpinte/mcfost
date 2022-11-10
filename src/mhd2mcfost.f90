@@ -45,6 +45,10 @@ module mhd2mcfost
         real(kind=dp), dimension(6)              :: hydro_limits
         integer                                  :: ndusttypes !, voroindex, N_fixed_ne = 0
         real, parameter                          :: limit_factor = 1.005!, Lextent = 1.01
+        logical                                  :: ldust_moments
+        real(dp), dimension(:,:), allocatable    :: dust_moments
+
+        ldust_moments = .false.
 
 
         write(FormatLine,'("(1"A,I3")")') "A", 512
@@ -167,7 +171,8 @@ module mhd2mcfost
         !also work with grid-based code
         !massdust, rhodust, hydro_grainsizes not allocated if ndusttypes = 0 !
         call sph_to_voronoi(n_points-n_etoiles, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, &
-             T_tmp, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation, is_ghost)
+             T_tmp, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation, is_ghost, &
+             ldust_moments, dust_moments)
         ! -> correction for small density applied on mass_gas directly inside
 
         call hydro_to_Voronoi_atomic(n_points,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,dz)

@@ -11,24 +11,25 @@ module utils
   real, parameter :: VACUUM_TO_AIR_LIMIT=200.0000
   real, parameter :: AIR_TO_VACUUM_LIMIT=199.9352
 
-  public :: interp, integrate_trap, span, spanl, in_dir, Blambda, Bpnu, &
-       Bnu, appel_syst, get_NH, linear_1D_sorted, vacuum2air, is_file, is_dir, &
-       mcfost_update, get_mcfost_utils_version, is_nan_infinity_vector, &
-       is_nan_infinity_matrix, locate, gaussslv, cross_product, &
-       gauss_legendre_quadrature, progress_bar, rotation_3d, cdapres, &
-       mcfost_get_ref_para, mcfost_get_yorick, mcfost_history, mcfost_v, &
-       update_utils, indgen
-
-  private
-
+!  public :: interp, integrate_trap, span, spanl, in_dir, Blambda, Bpnu, &
+!       Bnu, appel_syst, get_NH, linear_1D_sorted, vacuum2air, is_file, is_dir, &
+!       mcfost_update, get_mcfost_utils_version, is_nan_infinity, is_nan_infinity_vector, &
+!       is_nan_infinity_matrix, locate, gaussslv, cross_product, &
+!       gauss_legendre_quadrature, progress_bar, rotation_3d, cdapres, &
+!       mcfost_get_ref_para, mcfost_get_yorick, mcfost_history, mcfost_v, &
+!       update_utils, indgen, is_diff, real_equality, span_dp, spanl_dp, bilinear, &
+!       read_comments, read_line, Blambda_dp
+!
+!  private
+!
   interface interp
      module procedure  interp_sp
      module procedure  interp_dp
   end interface
 
   abstract interface
-     pure real function func(x)
-       real, intent(in) :: x
+     pure real(8) function func(x)
+       real(8), intent(in) :: x
      end function func
   end interface
 
@@ -1579,8 +1580,8 @@ function vacuum2air(Nlambda, lambda_vac) result(lambda_air)
 
 
 function locate(xx,x,mask)
-   !wrapper function to locate the position of x in array xx.
-   !the closest position is returned.
+   ! wrapper function to locate the position of x in array xx.
+   ! the closest position is returned.
    real(kind=dp), dimension(:), intent(in) :: xx
    real(kind=dp), intent(in) :: x
    logical, intent(in), dimension(:), optional :: mask
@@ -1726,9 +1727,9 @@ end function locate
    !-------------------------------------------------------------------
    ! helper routine to integrate a function using the trapezoidal rule
    !-------------------------------------------------------------------
-   real, intent(in) :: xmin,xmax
+   real(dp), intent(in) :: xmin,xmax
    procedure(func) :: f
-   real :: fx,fprev,dx,x
+   real(dp) :: fx,fprev,dx,x
    integer, parameter :: npts = 128
    integer :: i
 
@@ -1749,7 +1750,7 @@ end function locate
    ! helper routine to integrate a function using the trapezoidal rule
    !-------------------------------------------------------------------
    integer, intent(in) :: n
-   real, intent(in) :: x(n),f(n)
+   real(dp), intent(in) :: x(n),f(n)
    integer :: i
 
    g = 0.

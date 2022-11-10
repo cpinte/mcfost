@@ -80,7 +80,7 @@ endif
 
 ifeq ($(SYSTEM), ifort)
     ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
-        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.12 -mdynamic-no-pic
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.13.6 -mdynamic-no-pic
 	STATIC_FLAGS= -static-intel -qopenmp-link static
     else
         ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512
@@ -206,7 +206,8 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 me
           optical_depth.f90 ML_prodimo.f90                                          \
           output.f90 mem.f90  init_mcfost.f90 io_phantom_infiles.f90                \
           io_phantom_utils.f90 mess_up_SPH.f90 read_phantom.f90      \
-          read_gadget2.f90 SPH2mcfost.f90 mhd2mcfost.f90 dust_transfer.f90          \
+          read_gadget2.f90 fsolve.f90 reconstruct_from_moments.f90 \
+          SPH2mcfost.f90 mhd2mcfost.f90 dust_transfer.f90          \
           mol_transfer.f90 $(gdir)/collision_atom.f90 $(gdir)/io_atom.f90           \
           $(gdir)/electron_density.f90 $(gdir)/see.f90                              \
           $(gdir)/atom_transfer.f90

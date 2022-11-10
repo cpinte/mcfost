@@ -29,7 +29,7 @@ contains
     real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,SPH_grainsizes,T_gas
     real(dp), allocatable, dimension(:) :: vturb,mass_ne_on_massgas,atomic_mask
     integer,  allocatable, dimension(:) :: particle_id
-    real(dp), allocatable, dimension(:,:) :: rhodust, massdust
+    real(dp), allocatable, dimension(:,:) :: rhodust, massdust, dust_moments
     real, allocatable, dimension(:) :: extra_heating
     logical, allocatable, dimension(:) :: mask ! size == np, not n_SPH, index is original SPH id
 
@@ -37,9 +37,9 @@ contains
     real(dp), dimension(6) :: SPH_limits
     real :: factor
     integer :: ndusttypes, ierr, i, ilen
-    logical :: check_previous_tesselation
+    logical :: check_previous_tesselation, ldust_moments
 
-
+    ldust_moments = .false.
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
        if (n_phantom_files==1) then
@@ -65,7 +65,7 @@ contains
 
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz,T_gas, &
             particle_id, massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
-            SPH_grainsizes,mask,n_SPH,ierr)
+            SPH_grainsizes,mask,n_SPH,ldust_moments,dust_moments,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
           factor = 1.0/n_phantom_files
@@ -106,7 +106,8 @@ contains
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
-         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, mask=mask)
+         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, &
+         ldust_moments, dust_moments, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -157,7 +158,7 @@ contains
   !*********************************************************
 
   subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, T_gas, massgas,massdust,rho,rhodust,&
-       SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, mask)
+       SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, ldust_moments, dust_moments, mask)
 
     ! ************************************************************************************ !
     ! n_sph : number of points in the input model
@@ -180,6 +181,7 @@ contains
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
+    use reconstruct_from_moments
 
     integer, intent(in) :: n_SPH, ndusttypes
     real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
@@ -187,11 +189,12 @@ contains
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(:), allocatable, intent(in) :: T_gas
     integer, dimension(n_SPH), intent(in) :: particle_id
-    real(dp), dimension(:,:), allocatable, intent(inout) :: rhodust, massdust ! ndusttypes,n_SPH
+    real(dp), dimension(:,:), allocatable, intent(inout) :: rhodust, massdust, dust_moments ! ndusttypes,n_SPH
     real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes ! ndusttypes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
     logical, dimension(:), allocatable, intent(in), optional :: mask
+    logical, intent(in) :: ldust_moments
 
     integer, dimension(:), allocatable, intent(out) :: is_ghost
 
@@ -199,12 +202,16 @@ contains
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
+    real(dp), allocatable, dimension(:) :: gsize, grainsize_f
+    real(dp), dimension(4) :: lambsol, lambguess
 
     real(dp) :: mass, somme, Mtot, Mtot_dust, facteur
     real :: f, limit_threshold, density_factor
-    integer :: icell, l, k, iSPH, n_force_empty, i, id_n
+    integer :: icell, l, k, iSPH, n_force_empty, i, id_n, ierr
 
     real(dp), dimension(6) :: limits
+
+    real(dp), parameter :: a0 = 1.28e-4 ! microns. Siess et al 2022
 
     if (lcorrect_density_elongated_cells) then
        density_factor = correct_density_factor_elongated_cells
@@ -355,7 +362,28 @@ contains
 
     ! Tableau de densite et masse de poussiere
     ! interpolation en taille
-    if (ndusttypes >= 1) then
+    if (ldust_moments) then
+       lvariable_dust = .true.
+       allocate(grainsize_f(n_grains_tot))
+       gsize(:) = r_grain(:)/a0 ! grain sizes, units should be ok
+
+       do icell=1,n_cells
+          iSPH = Voronoi(icell)%id
+          if (iSPH > 0) then
+
+             ! mass & density indices are shifted by 1
+             lambguess = [-log(sqrt(2*pi)),0._dp,0._dp,0._dp]
+
+             call reconstruct_maxent(dust_moments(:,iSPH),gsize,grainsize_f,lambsol,ierr,lambguess=lambguess)
+             if (ierr > 0) call error("reconstruct_maxent: "//fsolve_error(ierr))
+
+             densite_pouss(:,icell) = grainsize_f(:)
+          else ! iSPH == 0, star
+             densite_pouss(:,icell) = 0.
+          endif
+       enddo ! icell
+
+    elseif (ndusttypes >= 1) then
        lvariable_dust = .true.
 
        ! mcfost adds an extra grain size follwing the gas
@@ -931,7 +959,7 @@ subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle
        stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
     enddo
 
-	lignore_dust = .true.
+    lignore_dust = .true.
     ndusttypes = 0
     llimits_file = .false.
     limits_file = ""
