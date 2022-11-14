@@ -24,7 +24,7 @@ module atom_transfer
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
         lnon_lte_loop, vlabs, calc_contopac_loc
-   use see, only : ngpop, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
+   use see, only : ngpop, lcell_converged, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d
@@ -404,22 +404,24 @@ module atom_transfer
                !$omp parallel &
                !$omp default(none) &
                !$omp private(id,icell,l_iterate,nact,ilevel,vth,nb,nr)&
-               !$omp shared(T,vturb,nHmin,icompute_atomRT,ne, ne_new,n_cells)&
-               !$omp shared(tab_lambda_nm,atoms,n_atoms,dne,PassiveAtoms,NpassiveAtoms,Voigt)
+               !$omp shared(T,vturb,nHmin,icompute_atomRT,ne,n_cells,ngpop)&
+               !$omp shared(tab_lambda_nm,atoms,n_atoms,dne,PassiveAtoms,NactiveAtoms,NpassiveAtoms,Voigt)
                !$omp do schedule(dynamic,1)
                do icell=1,n_cells
                   !$ id = omp_get_thread_num() + 1
                   l_iterate = (icompute_atomRT(icell)==1)
                   if (l_iterate) then
-                     dne = max(dne, abs(1.0_dp - ne(icell)/ne_new(icell)))
-                     ne(icell) = ne_new(icell) !needed for lte pops !
+                     ! dne = max(dne, abs(1.0_dp - ne(icell)/ne_new(icell)))
+                     dne = max(dne, abs(1.0_dp - ne(icell)/ngpop(1,NactiveAtoms+1,icell,1)))
+                     ! ne(icell) = ne_new(icell) !needed for lte pops !
+                     ne(icell) = ngpop(1,NactiveAtoms+1,icell,1)
                      call LTEpops_H_loc(icell)
                      nHmin(icell) = nH_minus(icell)
                      do nact = 2, n_atoms
                         call LTEpops_atom_loc(icell,Atoms(nact)%p,.false.)
                      enddo
                      !update profiles only for passive atoms. For active atoms we need new non-LTE pops.
-                     !if LTE pops are not updated (so no ne_new) profiles of LTE elements are unchanged.
+                     !If LTE pops are not updated (so no ne_new) profiles of LTE elements are unchanged.
                      do nact = 1, NpassiveAtoms
                         do ilevel=1,PassiveAtoms(nact)%p%nline
                            if (.not.PassiveAtoms(nact)%p%lines(ilevel)%lcontrib) cycle
