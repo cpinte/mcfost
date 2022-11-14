@@ -61,7 +61,7 @@ module atom_transfer
       integer :: etape, etape_start, etape_end, iray, n_rayons
       integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
       integer, dimension(nb_proc) :: max_n_iter_loc
-      integer, parameter :: maxIter = 1000, maxIter_loc = 100
+      integer, parameter :: maxIter = 300, maxIter_loc = 100
       logical :: lfixed_Rays, lconverged, lconverged_loc, lprevious_converged
       real :: rand, rand2, rand3
       real(kind=dp) :: precision
