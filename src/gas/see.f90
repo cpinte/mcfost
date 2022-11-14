@@ -25,7 +25,7 @@ module see
 
 
     !variables for non-LTE H (+He) ionisation
-    integer :: Neq_ne
+    integer :: Neq_ne, Neq_ng
     integer, allocatable, dimension(:,:) :: gs_ion !index of the ground states of each ion
     real(kind=dp), allocatable :: gtot(:,:,:), gr_save(:,:,:,:), dgrdne(:,:,:), dgcdne(:,:,:)
     real(kind=dp), allocatable :: pops_ion(:,:,:), npop_dag(:,:)
@@ -75,17 +75,17 @@ module see
         ! NOTE: index 1 is always the current solution
         !   previous solution is 2, previous previous is 3 etc..
         !   size is NactiveAtoms + 1 for current iterate of electronic density (ne_new)
+        Neq_ng = 3
         if (lNg_acceleration) then
+            Neq_ng = Neq_ng + Ng_Norder !??
             !lsubiteration must be false ?
             if (lsubiteration) call error('subiter + Ng not yet!')
-            allocate(ngpop(NmaxLevel,NactiveAtoms+1,n_cells,Ng_Norder+2),stat=alloc_status)
-            if (alloc_Status > 0) call error("Allocation error ngpop (lng_acc)")
-        else
-            !even if no Ng acceleration (nor subiterations) allows for storing 2 previous solutions (2 + 1)
-            !   for the non-LTE populations: improve convergence criterion.
-            allocate(ngpop(NmaxLevel,NactiveAtoms+1,n_cells,3),stat=alloc_status)
-            if (alloc_Status > 0) call error("Allocation error ngpop")
         endif
+        !even if no Ng acceleration (nor subiterations) allows for storing Neq_ng previous solutions
+        !   for the non-LTE populations: TO DO improve convergence criterion.
+        allocate(ngpop(NmaxLevel,NactiveAtoms+1,n_cells,Neq_ng),stat=alloc_status)
+        if (alloc_Status > 0) call error("Allocation error ngpop")
+        
         !initialize electronic density
         ngpop(1,NactiveAtoms+1,:,1) = ne(:)
         write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024., " MB"

@@ -24,7 +24,7 @@ module atom_transfer
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
         lnon_lte_loop, vlabs, calc_contopac_loc
-   use see, only : ngpop, lcell_converged, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
+   use see, only : ngpop, Neq_ng, lcell_converged, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d
@@ -392,7 +392,7 @@ module atom_transfer
                !$omp parallel &
                !$omp default(none) &
                !$omp private(id,icell,l_iterate,nact,ilevel,vth,nb,nr)&
-               !$omp shared(T,vturb,nHmin,icompute_atomRT,ne,n_cells,ngpop)&
+               !$omp shared(T,vturb,nHmin,icompute_atomRT,ne,n_cells,ngpop,Neq_ng,n_iter)&
                !$omp shared(tab_lambda_nm,atoms,n_atoms,dne,PassiveAtoms,NactiveAtoms,NpassiveAtoms,Voigt)
                !$omp do schedule(dynamic,1)
                do icell=1,n_cells
@@ -401,8 +401,9 @@ module atom_transfer
                   if (l_iterate) then
                      ! dne = max(dne, abs(1.0_dp - ne(icell)/ne_new(icell)))
                      dne = max(dne, abs(1.0_dp - ne(icell)/ngpop(1,NactiveAtoms+1,icell,1)))
-                     ! ne(icell) = ne_new(icell) !needed for lte pops !
-                     ne(icell) = ngpop(1,NactiveAtoms+1,icell,1)
+                     ! -> needed for lte pops !
+                     ne(icell) = ngpop(1,NactiveAtoms+1,icell,1) !ne(icell) = ne_new(icell)
+                     ngpop(1,NactiveAtoms+1,icell,Neq_ng - mod(n_iter-1,Neq_ng)) = ne(icell)
                      call LTEpops_H_loc(icell)
                      nHmin(icell) = nH_minus(icell)
                      do nact = 2, n_atoms
@@ -453,7 +454,7 @@ module atom_transfer
             !$omp parallel &
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,atom,nb,nr,vth)&
-            !$omp shared(ngpop,Activeatoms,lcell_converged,vturb,T)&!diff, diff_cont, dM)&
+            !$omp shared(ngpop,Neq_ng,n_iter,Activeatoms,lcell_converged,vturb,T)&!diff,diff_cont,dM)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm,voigt) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
@@ -489,9 +490,13 @@ module atom_transfer
                   !Re init for next iteration if any
                   do nact=1, NactiveAtoms
                      atom => ActiveAtoms(nact)%p
+                     !first update the populations with the new value
                      atom%n(:,icell) = ngpop(1:atom%Nlevel,nact,icell,1)
-                     !store for two successive iterations.
-                     ! ngpop(1:atom%Nlevel,nact,icell,iter) = atom%n(:,icell)
+                     !Then, store Neq_ng previous iterations. index 1 is for the current one.
+                     !if Ng_neq = 3 :
+                     !  -> the oldest solutions stored is in 3 - mod(1-1,3) = 3
+                     !  -> the newest (current) one is in 3 - mod(3-1,3) = 1
+                     ngpop(1:atom%Nlevel,nact,icell,Neq_ng - mod(n_iter-1,Neq_ng)) = atom%n(:,icell)
 
                      !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next ieration.
                      !Only for Active Atoms here. PAssive Atoms are updated only if electronic density is iterated.
@@ -521,6 +526,8 @@ module atom_transfer
             end do cell_loop2 !icell
             !$omp end do
             !$omp end parallel
+            write(*,*) "n_iter=", n_iter, ' Ng_index=', Neq_ng - mod(n_iter-1,Neq_ng), maxval(ngpop(1,1,:,Neq_ng - mod(n_iter-1,Neq_ng)))
+
 
             if (n_iter > 1) then
                conv_speed = (diff - diff_old) !<0 converging.
