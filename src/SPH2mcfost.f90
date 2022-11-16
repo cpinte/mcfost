@@ -371,11 +371,15 @@ contains
           iSPH = Voronoi(icell)%id
           if (iSPH > 0) then
 
+             write(*,*) i, iSPH
              ! mass & density indices are shifted by 1
-             lambguess = [-log(sqrt(2*pi)),0._dp,0._dp,0._dp]
+             lambguess = [-log(sqrt(2*pi)) * dust_moments(1,iSPH) ,0._dp,0._dp,0._dp]
 
              call reconstruct_maxent(dust_moments(:,iSPH),gsize,grainsize_f,lambsol,ierr,lambguess=lambguess)
-             if (ierr > 0) call error("reconstruct_maxent: "//fsolve_error(ierr))
+             if (ierr > 0) then
+                write(*,*) iSPH, dust_moments(:,iSPH)
+                call error("reconstruct_maxent: "//fsolve_error(ierr))
+             endif
 
              densite_pouss(:,icell) = grainsize_f(:)
           else ! iSPH == 0, star
