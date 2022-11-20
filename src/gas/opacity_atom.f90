@@ -266,7 +266,7 @@ module Opacity_atom
                cycle tr_loop
             endif
 
-            ! dissolve(Nblue:Nred) = f_dissolve(T(icell), ne(icell), atom%continua(kr), lambda(Nblue:Nred)))
+            ! dissolve(Nblue:Nred) = f_dissolve(T(icell), ne(icell), hydrogen%n(1,icell), atom%continua(kr), Nblue-Nred+1, lambda(Nblue:Nred))
 
             !should be the same as directly exp(-hc_kT/lambda)
             chi(Nblue:Nred) = chi(Nblue:Nred) + atom%continua(kr)%alpha(:) * (atom%n(i,icell) - &

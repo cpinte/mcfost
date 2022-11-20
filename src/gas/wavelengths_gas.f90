@@ -50,8 +50,9 @@ module wavelengths_gas
    !
    ! Allocate cont%lambda.
    ! ----------------------------------------------------------------- !
-      real(kind=dp), dimension(Nlambda_cont_log) :: make_sub_wavelength_grid_cont_log_nu
+      ! real(kind=dp), dimension(Nlambda_cont_log) :: make_sub_wavelength_grid_cont_log_nu
       type (AtomicContinuum), intent(in) :: cont
+      real(kind=dp), dimension(cont%Nlambda) :: make_sub_wavelength_grid_cont_log_nu
       real(kind=dp) :: resol
       integer :: la, N1, N2
       real(kind=dp) :: l0, l1
