@@ -244,7 +244,8 @@ module Opacity_atom
       integer :: nat, Nred, Nblue, kr, i, j
       type(AtomType), pointer :: atom
       real(kind=dp) :: gij, ni_on_nj_star
-      real(kind=dp), dimension(N) :: ehnukt!, dissolve
+      real(kind=dp), dimension(N) :: ehnukt
+      ! real(kind=dp), dimension(Nlambda_max_cont) :: dissolve
 
       ehnukt(:) = exp(hnu_k/T(icell))!exphckT(icell)**(lambda_base/lambda(:))
 
@@ -266,7 +267,8 @@ module Opacity_atom
                cycle tr_loop
             endif
 
-            ! dissolve(Nblue:Nred) = f_dissolve(T(icell), ne(icell), hydrogen%n(1,icell), atom%continua(kr), Nblue-Nred+1, lambda(Nblue:Nred))
+            ! 1 if .not. ldissolve (lambdamax==lambda0)
+            ! dissolve(1:Nred-Nblue+1) = f_dissolve(T(icell), ne(icell), hydrogen%n(1,icell), atom%continua(kr), Nred-Nblue+1, lambda(Nblue:Nred))
 
             !should be the same as directly exp(-hc_kT/lambda)
             chi(Nblue:Nred) = chi(Nblue:Nred) + atom%continua(kr)%alpha(:) * (atom%n(i,icell) - &
