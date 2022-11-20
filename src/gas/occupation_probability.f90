@@ -1,7 +1,8 @@
 module occupation_probability
 
   use constantes
-  use atom_type, only : atomic_orbital_sqradius
+  use atom_type, only : atomic_orbital_sqradius, AtomicContinuum, hydrogen, helium
+  use elements_type, only : elems
 
    implicit none
 
@@ -9,13 +10,13 @@ module occupation_probability
 
 
   function keq9dot70(i)
-    real(kind=dp), intent(in) :: i
+    real, intent(in) :: i
     real(kind=dp) :: keq9dot70
 
     if (i <= 3.) then
        keq9dot70 = 1.0_dp
     else !16/3 * i * (i+1)**-2
-       keq9dot70 = 5.3333333333 * i / (i+1.0)**2.
+       keq9dot70 = 5.3333333333d0 * i / (i+1.0)**2.
     endif
 
     RETURN
@@ -32,7 +33,7 @@ module occupation_probability
     real(kind=dp), intent(in) :: t, ne
     real, intent(in)    :: Zr ! radiator charge
     real, intent(in)    :: Zp ! perturber (ions) charge
-    real(kind=dp), intent(in) :: n !principal quantum number
+    real, intent(in)    :: n !principal quantum number
     real(kind=dp), intent(in) :: nH1 !ground state neutral H
     real(kind=dp), optional :: nhe1
     real(kind=dp) :: wocc_n
@@ -44,9 +45,9 @@ module occupation_probability
     a0fourpi_three = (4./3.) * pi * RBOHR*RBOHR*RBOHR
 
     !n=1, l=0, Z=1 ground state of H I
-    rp1 = sqrt(atomic_orbital_sqradius(1.0_dp, 0, 1)) ! about 1.74 a0
+    rp1 = sqrt(atomic_orbital_sqradius(1.0, 0, 1)) ! about 1.74 a0
     !n=1, l=0, Z=1 ? ground state of He I
-    rp2 = sqrt(atomic_orbital_sqradius(1.0_dp, 0, 2)) !about 0.87 a0
+    rp2 = sqrt(atomic_orbital_sqradius(1.0, 0, 2)) !about 0.87 a0
 
     nl = 0. !need to be extracted from label
     nZ = int(Zr) + 1!?
@@ -87,113 +88,41 @@ module occupation_probability
     return
    end function wocc_n
 
-   function D_i(t, ne, i, Zr, Zp, lambda, lambda0, chi0, nH1)
+   function f_dissolve(t, ne, nH1, cont, N, lambda)
     !Dissolve fraction
     !Däppen, Anderson & Mihalas Apj 319, 195, 1987
     !chi0 is the ionisation potential of the ion on J
+    integer, intent(in) :: N
     real(kind=dp), intent(in) :: t, ne, nH1
-    real(kind=dp) :: D_i
-    real(kind=dp), intent(in) :: i, lambda,  lambda0, chi0!!, dEi !E(i+1) - E(i)
-    real, intent(in) :: Zr, Zp
-    real(kind=dp) :: m, w, hnu!!, taper, redcut
-    real(kind=dp) :: w1, wi
-    real :: Zsq
+    type (AtomicContinuum), intent(in) :: cont
+    real(kind=dp), intent(in) :: lambda(N)
+    real(kind=dp) :: f_dissolve(N)
+    real :: m(N), mp(N)
+    real(kind=dp) :: w1, chi0
+    real :: Zsq, neff, Zp, Zr
+    integer :: la
 
+    Zr = real(cont%atom%stage(cont%i)) + 1.0
+    Zp = 1.0
     Zsq = (Zr+1)*(Zr+1) ! 1 for H I
+    neff = real(cont%i)
+    chi0 = elems(cont%atom%periodic_table)%ionpot(cont%atom%stage(cont%j))
 
-    hnu = HP * C_LIGHT  /  (NM_TO_M * lambda)
-    m = 1.0/i/i - hnu / chi0 / Zsq !I'm not sure here, in Dam it is Z**2 * IonH
+    m = 1.0/neff/neff - hp * c_light / nm_to_m / lambda / chi0 / Zsq !I'm not sure here, in Dam it is Z**2 * IonH
     !doesn't change for Hydrogen
+    mp = 1.0 / sqrt(abs(m))
+   
+    w1 = wocc_n(t, ne, neff, Zr, Zp, nH1)
+    f_dissolve = 1.0_dp
 
-    w1 = wocc_n(t, ne, real(i,kind=dp), Zr, Zp, nH1)
+    do la=1, N
+      if ((lambda(la) > cont%lambda0).and.(m(la)>0.0)) then
+         f_dissolve(la) = 1.0 - wocc_n(t, ne, mp(la), Zr, Zp, nh1) / w1
+      endif
+    enddo 
 
-    if (lambda <= lambda0) then
-       D_i = 1.0_dp
-    else
-       if (m > 0) then
-          m = 1.0/sqrt(m)
-          wi = wocc_n(t, ne, m, Zr, Zp, nH1)
-          D_i = 1. - wi/w1
-       else
-          D_i = 1.0_dp
-       endif
-    endif
 
     return
-   end function D_i
-
-  !Building
-!   FUNCTION D_i_b(icell, m, Zr, Zp, lambda, lambda0)
-!     !Dissolve fraction
-!     !Similar to CMFGEN, SYNSPEC ?
-!     integer, intent(in) :: icell
-!     real(kind=dp) :: D_i_b
-!     real(kind=dp), intent(in) :: m, lambda,  lambda0
-!     real, intent(in) :: Zr, Zp
-!     real(kind=dp) :: w!!, taper, redcut
-
-!     ! ? in Hubeny Mihalas
-!     !m = 1.0/i/i - nu/nu0
-
-
-!     if (lambda <= lambda0) then
-!        D_i_b = 1.0_dp
-!     else
-!        if (m > 2*(Zr+1)) then
-!           D_i_b = 1. - wocc_n(icell, m, Zr, Zp,hydrogen%n(1,icell))
-!        else
-!           D_i_b = 0.0_dp
-!        endif
-!     endif
-
-!     RETURN
-!   END FUNCTION D_i_b
-
-  !still building but they suggest to use the DAM version anyway
-  !   FUNCTION D_i_hhl(icell, kc, Zr, Zp, atom)
-  !    !Hubeny, Hummer & Lanz A&A, 282, 151, 1994
-  !    !dissolve fraction
-  !    integer, intent(in) :: icell, kc
-  !    type(AtomType), intent(in) :: atom
-  !    real(kind=dp) :: D_i_hhl(atom%continua(kc)%Nlambda) !?
-  !    real, intent(in) :: Zr, Zp
-  !    integer :: la, Nl, Nb, Nr, kr, idl, lal
-  !    real(kind=dp) :: w, j, lambda, l0, l1
-  !
-  !    D_i_hhl(:) = 0.0_dp
-  !    Nb = atom%continua(kc)%Nblue
-  !    Nr = atom%continua(kc)%Nred
-  !    Nl = atom%continua(kc)%Nlambda
-  !
-  !    do la=1, Nl
-  !     idl = la+Nb-1
-  !     lambda = nltespec%lambda(idl)
-  !
-  !     if (lambda <= atom%continua(kc)%lambda0) then
-  !
-  !      D_i_hhl(la) = 1.0_dp !no extrapolation
-  !
-  !     else
-  !      do kr=1, atom%Nline
-  !       l0 = nltespec%lambda(atom%lines(kr)%Nblue)
-  !       l1 = nltespec%lambda(atom%lines(kr)%Nred)
-  !       if (l0 >= lambda .and. lambda <= l1) then
-  !
-  !         lal = idl + 1 - nltespec%lambda(atom%lines(kr)%Nblue)
-  !         w = wocc_n(icell, real(atom%lines(kr)%j,kind=dp), Zr, Zp)
-  !         D_i_hhl(la) = D_i_hhl(la) + (1.-w) * atom%lines(kr)%fosc * atom%lines(kr)%phi(lal,icell)
-  !
-  !       endif
-  !
-  !      enddo
-  !      D_i_hhl(la) = D_i_hhl(la) / atom%continua(kc)%alpha(la)
-  !
-  !     endif
-  !
-  !    enddo
-  !
-  !   RETURN
-  !   END FUNCTION D_i_hhl
-
+   end function f_dissolve
 
 END MODULE occupation_probability

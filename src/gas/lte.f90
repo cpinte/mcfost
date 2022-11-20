@@ -181,11 +181,11 @@ module lte
 
       if (ldissolve) then
          do i=2, hydrogen%Nlevel-1 !only for bound-levels ?
-            wocc = wocc_n(T(k), ne(k), real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1), hydrogen%nstar(1,k))
+            wocc = wocc_n(T(k), ne(k), real(i), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1), hydrogen%nstar(1,k))
 
             hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
          enddo
-         wocc = wocc_n(T(k), ne(k), real(1,kind=dp), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1), hydrogen%nstar(1,k))
+         wocc = wocc_n(T(k), ne(k), real(1), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1), hydrogen%nstar(1,k))
          hydrogen%nstar(1,k) = hydrogen%nstar(1,k) * wocc
       endif
 
@@ -332,7 +332,7 @@ module lte
       if (locupa_prob) then
          do i=1, atom%Nlevel-1
             n_eff = (atom%stage(i)+1) * sqrt(atom%Rydberg / (atom%E(atom%Nlevel) - atom%E(i)))
-            wocc = wocc_n(T(k), ne(k), n_eff, real(atom%stage(i)),real(atom%stage(i)+1), hydrogen%nstar(1,k))
+            wocc = wocc_n(T(k), ne(k), real(n_eff), real(atom%stage(i)),real(atom%stage(i)+1), hydrogen%nstar(1,k))
             atom%nstar(i,k) = atom%nstar(i,k) * wocc
          enddo
       endif
@@ -520,7 +520,7 @@ module lte
                !!sum = 0.0
                if (icompute_atomRT(k)>0) then
                   do i=2, hydrogen%Nlevel-1 !only for bound-levels ?
-                     wocc = wocc_n(T(k), ne(k), real(i,kind=dp), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1), &
+                     wocc = wocc_n(T(k), ne(k), real(i), real(hydrogen%stage(i)),real(hydrogen%stage(i)+1), &
                           hydrogen%nstar(1,k))
 
                      ! added to the continuum
@@ -530,7 +530,7 @@ module lte
                      hydrogen%nstar(i,k) = hydrogen%nstar(i,k) * wocc
 
                   enddo
-                  wocc = wocc_n(T(k), ne(k), real(1,kind=dp), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1), &
+                  wocc = wocc_n(T(k), ne(k), real(1), real(hydrogen%stage(1)),real(hydrogen%stage(1)+1), &
                        hydrogen%nstar(1,k))
                   hydrogen%nstar(1,k) = hydrogen%nstar(1,k) * wocc
                   !hydrogen%nstar(hydrogen%Nlevel,k) = hydrogen%nstar(hydrogen%Nlevel,k) + sum
@@ -720,7 +720,7 @@ module lte
             if (icompute_atomRT(k)>0) then
                do i=1, atom%Nlevel-1
                   n_eff = (atom%stage(i)+1) * sqrt(atom%Rydberg / (atom%E(atom%Nlevel) - atom%E(i)))
-                  wocc = wocc_n(T(k), ne(k), n_eff, real(atom%stage(i)),real(atom%stage(i)+1), hydrogen%nstar(1,k))
+                  wocc = wocc_n(T(k), ne(k), real(n_eff), real(atom%stage(i)),real(atom%stage(i)+1), hydrogen%nstar(1,k))
                   atom%nstar(i,k) = atom%nstar(i,k) * wocc
                enddo
             endif
@@ -840,7 +840,7 @@ module lte
             write(unit,*) "T=",real(T(k)), "ne(/cc)=", real(ne(k))*1e-6
             write(unit,*) "   i      w(i)     nstar(i;wi=1.0) (/cc)   nstar(i) (/cc)    g(i)"
             do i=1, atom%Nlevel-1
-               wocc = wocc_n(T(k), ne(k), real(i,kind=dp), real(atom%stage(i)),real(atom%stage(i)+1),hydrogen%nstar(1,k))
+               wocc = wocc_n(T(k), ne(k), real(i), real(atom%stage(i)),real(atom%stage(i)+1),hydrogen%nstar(1,k))
              !if (wocc < 0.95) then
                write(unit,"(1I3, 3E14.7, 1F14.7)") i, wocc, atom%nstar(i,k)/wocc * 1d-6, atom%nstar(i,k)*1d-6, atom%g(i)
              !endif
