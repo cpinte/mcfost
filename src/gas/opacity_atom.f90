@@ -244,7 +244,7 @@ module Opacity_atom
       integer :: nat, Nred, Nblue, kr, i, j
       type(AtomType), pointer :: atom
       real(kind=dp) :: gij, ni_on_nj_star
-      real(kind=dp), dimension(N) :: ehnukt, dissolve
+      real(kind=dp), dimension(N) :: ehnukt!, dissolve
 
       ehnukt(:) = exp(hnu_k/T(icell))!exphckT(icell)**(lambda_base/lambda(:))
 

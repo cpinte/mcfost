@@ -876,6 +876,7 @@ subroutine initialisation_mcfost()
         lforce_lte=.true.
      case("-level_dissolution")
         i_arg = i_arg + 1
+        call error("Continuum level dissolution not yet!")
         ldissolve =.true.
      case("-phantom")
         i_arg = i_arg + 1
@@ -1904,7 +1905,7 @@ subroutine display_help()
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
   write(*,*) "        : -Ndelay_iterate_ne <Ndelay> : Iterate ne with populations after Ndelay"
   write(*,*) "        : -see_lte : Force rate matrix to be at LTE"
-  write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
+!   write(*,*) "        : -level_dissolution : Level's dissolution of hydrogenic ions"
   write(*,*) "        : -healpix_nlte : stop the non-LTE loop after the 1st step (uniform sampling)"
   write(*,*) "        : -art_line_resol <v> : (Overwrite) resolution of the non-LTE grid of art in km/s"
   write(*,*) "        : -output_rates : write radiative rates, rate matrix and full opacities"
