@@ -8,7 +8,7 @@ module see
     use wavelengths, only         :  n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, &
          tab_lambda_cont, tab_lambda_nm
-    use utils, only               : gaussslv, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
+    use utils, only               : gaussslv, solve_lin, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
     use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, chi_tot, eta_tot
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
@@ -75,9 +75,8 @@ module see
         ! NOTE: index 1 is always the current solution
         !   previous solution is 2, previous previous is 3 etc..
         !   size is NactiveAtoms + 1 for current iterate of electronic density (ne_new)
-        Neq_ng = 3
+        Neq_ng = max(Ng_Norder+2,3) !storing 3 by default
         if (lNg_acceleration) then
-            Neq_ng = Neq_ng + Ng_Norder !??
             !lsubiteration must be false ?
             if (lsubiteration) call error('subiter + Ng not yet!')
         endif
@@ -309,9 +308,11 @@ module see
         wjac = 1.0_dp
         delta = atom%n(:,icell) - matmul(atom%Gamma(:,:,id), ndag)
 
-        call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
+        ! call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
+        call solve_lin(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
    	    atom%n(:,icell) = ndag(:) + wjac * delta(:)
         ! call gaussslv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
+        !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
 
         if ((maxval(atom%n(:,icell)) < 0.0)) then
             write(*,*) ""
@@ -1242,7 +1243,7 @@ module see
         real(kind=dp), intent(in) :: x(neq)
         real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
         integer :: ieq, jvar
-        real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
+        ! real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
 
         do ieq=1, neq
             f(ieq) = f(ieq) * -1.0_dp
@@ -1252,15 +1253,15 @@ module see
         enddo
 
         ! *********************** !
-        Adag(:,:) = df(:,:)
-        bdag(:) = f(:)
+        ! Adag(:,:) = df(:,:)
+        ! bdag(:) = f(:)
         ! *********************** !
 
-        call GaussSlv(df,f,neq)
-        ! call bicgstab(df,f,neq)
+        ! call GaussSlv(df,f,neq)
+        call solve_lin(df,f,neq)
         if (is_nan_infinity_vector(f)>0) then
-         write(*,*) "fdag=", bdag
-         write(*,*) "f=", f
+        !  write(*,*) "fdag=", bdag
+        !  write(*,*) "f=", f
          call error("(Newton-raphson) nan in (f,df) after GSLV")
         endif
 
@@ -1272,12 +1273,12 @@ module see
         !         res(ieq) = res(ieq) - Adag(ieq,jvar)*f(jvar)
         !     enddo
         ! enddo
-        res(:) = bdag(:) - matmul(Adag,f)
+        ! res(:) = bdag(:) - matmul(Adag,f)
 
-        !solve for the residual
-        call Gaussslv(Adag, res, Neq)
+        ! !solve for the residual
+        ! call Gaussslv(Adag, res, Neq)
 
-        f(:) = f(:) + res(:)
+        ! f(:) = f(:) + res(:)
         ! *********************** !
 
         return
