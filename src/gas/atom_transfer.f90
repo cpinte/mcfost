@@ -464,8 +464,8 @@ module atom_transfer
                         deallocate(ngtmp)
                         atom => NULL()
                      enddo
-                     ! Accelerate electrons ?
-                     ! call Accelerate(n_cells,Ng_Norder,ngpop(1,NactiveAtoms+1,:,:)) 
+                     ! Accelerate electrons ? but still needs rest of SEE+ne loop.
+                     call Accelerate(n_cells,Ng_Norder,ngpop(1,NactiveAtoms+1,:,:)) 
                      n_iter_accel = n_iter_accel + 1
                      ng_rest = (Ng_Nperiod > 0); iacc = 0
                   endif
