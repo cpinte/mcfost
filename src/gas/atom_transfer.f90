@@ -82,10 +82,11 @@ module atom_transfer
       logical :: l_iterate, l_iterate_ne
       
       !Ng's acceleration
-      integer, parameter :: Ng_Ndelay_init = 3 !minimal number of iterations before starting the cycle.
-                                               !If 0, the acceleration starts at the first iteration because
-                                               !conv_speed would be 0. At least 1 is required!
-      real(kind=dp), parameter :: conv_speed_limit = 5d-2 !1d-3
+      integer, parameter :: Ng_Ndelay_init = 1 !minimal number of iterations before starting the cycle.
+                                               !min is 1 (so that conv_speed can be evaluated)
+      real(kind=dp), parameter :: conv_speed_limit_healpix = 5d-2 !1d-3
+      real(kind=dp), parameter :: conv_speed_limit_mc = 1d1!1d-1
+      real(kind=dp) :: conv_speed_limit
       integer :: iorder, i0_rest, n_iter_accel, iacc
       integer :: Ng_Ndelay, ng_index
       logical :: lng_turned_on, ng_rest, lconverging, accelerated = .false.
@@ -181,6 +182,7 @@ module atom_transfer
                !only one etape, use dpops_max_error
                precision = dpops_max_error
             endif
+            conv_speed_limit = conv_speed_limit_healpix
          else if (etape==2) then
             precision = dpops_max_error
             n_rayons = N_rayons_mc
@@ -188,6 +190,7 @@ module atom_transfer
                  360.0 * sqrt(pi/real(n_rayons))/pi
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            conv_speed_limit = conv_speed_limit_mc
          else
             call error("(n_lte_loop_mali) etape unkown")
          end if
@@ -417,7 +420,7 @@ module atom_transfer
             if (lng_acceleration) then
           	!be sure we are converging before extrapolating
                lconverging = (conv_speed < 0) .and. (-conv_speed < conv_speed_limit)
-          	   if ( (n_iter>Ng_Ndelay_init).and.lconverging ) then
+          	   if ( (n_iter>max(Ng_Ndelay_init,1)).and.lconverging ) then
           		   if (.not.lng_turned_on) then
                      write(*,*) " +++ Activating Ng's acceleration +++ "
           			   lng_turned_on = .true.
