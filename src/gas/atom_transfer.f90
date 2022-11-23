@@ -90,7 +90,7 @@ module atom_transfer
       integer :: iorder, i0_rest, n_iter_accel, iacc
       integer :: Ng_Ndelay, ng_index
       logical :: lng_turned_on, ng_rest, lconverging, accelerated 
-      logical, parameter :: lextrapolate_electron = .false. !extrapolate electrons with populations
+      logical, parameter :: lextrapolate_electron = .true. !extrapolate electrons with populations
       real(kind=dp), dimension(:,:), allocatable :: ngtmp
 
       !convergence check
@@ -446,14 +446,6 @@ module atom_transfer
                   ng_index = Neq_Ng - mod(iacc-1,Neq_ng)
                   write(*,'(" -> Accumulate solutions... "(1I2)" /"(1I2))') iacc, Neq_ng
                   !index 1 is the running one in the main loop for new values.
-                  ! do nact=1,NactiveAtoms
-                  !    atom => ActiveAtoms(nact)%p
-                  !    ngpop(1:atom%Nlevel,nact,:,ng_index) = atom%n(:,:)
-                  !    atom => null()
-                  ! enddo
-                  ! ngpop(:,1:NactiveAtoms,:,ng_index) = ngpop(:,1:NactiveAtoms,:,1)
-                  !here electrons (change in the loop of ne metals)
-                  !ngpop(:,NactiveAtoms+1,:,ng_index) = ngpop(:,NactiveAtoms+1,:,1)
                   ngpop(:,:,:,ng_index) = ngpop(:,:,:,1)
                   accelerated = (iacc==Neq_ng)
 
