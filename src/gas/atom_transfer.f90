@@ -89,7 +89,8 @@ module atom_transfer
       real(kind=dp) :: conv_speed_limit
       integer :: iorder, i0_rest, n_iter_accel, iacc
       integer :: Ng_Ndelay, ng_index
-      logical :: lng_turned_on, ng_rest, lconverging, accelerated = .false.
+      logical :: lng_turned_on, ng_rest, lconverging, accelerated 
+      logical, parameter :: lextrapolate_electron = .false. !extrapolate electrons with populations
       real(kind=dp), dimension(:,:), allocatable :: ngtmp
 
       !convergence check
@@ -468,7 +469,8 @@ module atom_transfer
                         atom => NULL()
                      enddo
                      ! Accelerate electrons ? but still needs rest of SEE+ne loop.
-                     call Accelerate(n_cells,Ng_Norder,ngpop(1,NactiveAtoms+1,:,:)) 
+                     if ( lextrapolate_electron ) &
+                        call Accelerate(n_cells,Ng_Norder,ngpop(1,NactiveAtoms+1,:,:)) 
                      n_iter_accel = n_iter_accel + 1
                      ng_rest = (Ng_Nperiod > 0); iacc = 0
                   endif
