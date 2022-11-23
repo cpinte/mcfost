@@ -61,11 +61,11 @@ module atom_transfer
       integer :: etape, etape_start, etape_end, iray, n_rayons
       integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
       integer :: nact, imax, icell_max, icell_max_2
-      integer :: icell, ilevel, nb, nr
+      integer :: icell, ilevel, nb, nr, unconverged_cells
       integer, dimension(nb_proc) :: max_n_iter_loc
       integer, parameter :: maxIter = 300, maxIter_loc = 100
       logical :: lfixed_Rays, lconverged, lconverged_loc, lprevious_converged
-      real :: rand, rand2, rand3
+      real :: rand, rand2, rand3, unconverged_fraction
       real(kind=dp) :: precision, vth
       integer, parameter :: n_rayons_max = 1 !ray-by-ray except for subiterations
                                              !but in that case only itot and phi_loc and ds needs
@@ -208,6 +208,8 @@ module atom_transfer
          conv_acc = 0.0
          diff_old = 0.0
          time_iteration = 0.0
+         unconverged_fraction = 0.0
+         unconverged_cells = 0
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
@@ -429,6 +431,9 @@ module atom_transfer
                      n_iter_accel = 0; i0_rest = 0; ng_rest = .false.
           		   endif
             	endif
+               if (lng_turned_on) then
+                  if (unconverged_fraction < 15.0) lng_turned_on = .false.
+               endif
             endif
             !***********************************************************!
             ! ********************** GLOBAL NG's ***********************!
@@ -642,11 +647,9 @@ module atom_transfer
             write(*,'(" <<->> diff="(1ES13.5E3)," old="(1ES13.5E3))') diff, diff_old
             write(*,'("   ->> diffcont="(1ES13.5E3))') diff_cont
             write(*,'("   ->> speed="(1ES12.4E3)"; acc="(1ES12.4E3))') conv_speed, conv_acc
-            write(*,"('   ->> Unconverged cells #'(1I6)'; fraction:'(1F6.2)'%')")&!; lgeps:'1F4.1)") &
-               size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0))), &
-               100.*real(size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0)))) / &
-               real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))!, log10(precision)
-            ! write(*,'("   ->> threshold="(1ES11.2E3))'), precision
+            unconverged_cells = size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0)))
+            unconverged_fraction = 100.*real(unconverged_cells) / real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
+            write(*,"('   ->> Unconverged cells #'(1I6)'; fraction:'(1F6.2)'%')") unconverged_cells, unconverged_fraction
             write(*,*) "      -------------------------------------------------- "
             diff_old = diff
             conv_acc = conv_speed
