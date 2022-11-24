@@ -3480,7 +3480,8 @@ subroutine write_atomic_maps(atom)
       ! call ftpkyd(unit,'CRVAL3',lam0_air(1)*1d-3,-7,'',status)
       call ftpkyd(unit,'CRVAL3',lambda_loc(naxes(3))*1d-3,-7,'',status)
       call ftpkyj(unit,'CRPIX3',naxes(3),'',status)
-      call ftpkyd(unit,'CDELT3',1d-3*sum(lambda_loc(2:naxes(3))-lambda_loc(1:naxes(3)-1))/real(naxes(3)-1),-7,'delta_lambda [micron]',status)
+      call ftpkyd(unit,'CDELT3',1d-3*sum(lambda_loc(2:naxes(3))-lambda_loc(1:naxes(3)-1))/real(naxes(3)-1),&
+         -7,'delta_lambda [micron]',status)
       call ftpkys(unit,'CUNIT3',"micron",'',status)
 
       ! call ftpkys(unit,'CTYPE4',"cos(i)",'',status)
