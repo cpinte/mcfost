@@ -6,6 +6,7 @@ module Opacity_atom
    use parametres
    use broad, Only               : line_damping
    use voigts, only              : voigt
+   use occupation_probability, only : f_dissolve
    use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, &
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
@@ -240,16 +241,16 @@ module Opacity_atom
       integer, intent(in) :: icell, N
       real(kind=dp), intent(in), dimension(N) :: lambda
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
-      integer :: nat, Nred, Nblue, kr, i, j, idelem
+      integer :: nat, Nred, Nblue, kr, i, j
       type(AtomType), pointer :: atom
-      real(kind=dp) :: wi, wj, chi_ion, Diss, nn, gij, ni_on_nj_star
+      real(kind=dp) :: gij, ni_on_nj_star
       real(kind=dp), dimension(N) :: ehnukt
+      ! real(kind=dp), dimension(Nlambda_max_cont) :: dissolve
 
       ehnukt(:) = exp(hnu_k/T(icell))!exphckT(icell)**(lambda_base/lambda(:))
 
       atom_loop : do nat = 1, N_atoms
          atom => Atoms(nat)%p
-         idelem = atom%periodic_table
 
          tr_loop : do kr = 1,atom%Ncont
 
@@ -266,12 +267,15 @@ module Opacity_atom
                cycle tr_loop
             endif
 
+            ! 1 if .not. ldissolve (lambdamax==lambda0)
+            ! dissolve(1:Nred-Nblue+1) = f_dissolve(T(icell), ne(icell), hydrogen%n(1,icell), atom%continua(kr), Nred-Nblue+1, lambda(Nblue:Nred))
+
             !should be the same as directly exp(-hc_kT/lambda)
             chi(Nblue:Nred) = chi(Nblue:Nred) + atom%continua(kr)%alpha(:) * (atom%n(i,icell) - &
-               ni_on_nj_star * ehnukt(Nblue:Nred) * atom%n(j,icell))
+               ni_on_nj_star * ehnukt(Nblue:Nred) * atom%n(j,icell))! * dissolve(:)
 
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + atom%n(j,icell) * atom%continua(kr)%alpha(:) * atom%continua(kr)%twohnu3_c2(:) *&
-               ni_on_nj_star * ehnukt(Nblue:Nred)
+               ni_on_nj_star * ehnukt(Nblue:Nred)! * dissolve(:)
 
          end do tr_loop
 

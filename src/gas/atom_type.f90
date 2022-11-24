@@ -250,8 +250,8 @@ module atom_type
 
    function atomic_orbital_radius(n, l, Z)
       !return atomic orbital radius wrt the Bohr radius
-      real(kind=dp) :: atomic_orbital_radius
-      real(kind=dp) :: n ! quantum principal number
+      real :: atomic_orbital_radius
+      real :: n ! quantum principal number
       integer :: l ! orbital quantum number
       integer :: Z
 
@@ -262,9 +262,9 @@ module atom_type
 
    function atomic_orbital_sqradius(n, l, Z)
       !Bates-Damguard mean square radius
-      real(kind=dp) :: atomic_orbital_sqradius
+      real :: atomic_orbital_sqradius
       !in a0**2 units
-      real(kind=dp) :: n ! quantum principal number
+      real :: n ! quantum principal number
       integer :: l ! orbital quantum number
       integer :: Z ! charge : Z = 1 for H I
 

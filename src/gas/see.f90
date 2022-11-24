@@ -8,7 +8,7 @@ module see
     use wavelengths, only         :  n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, &
          tab_lambda_cont, tab_lambda_nm
-    use utils, only               : gaussslv, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
+    use utils, only               : gaussslv, solve_lin, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
     use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, chi_tot, eta_tot
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
@@ -19,14 +19,13 @@ module see
     !populations below that threshold not taken into account in convergence.
     real(kind=dp), parameter :: frac_limit_pops = 1d-10!1d-50
     !Variables for Non-LTE loop and MALI method
-    !TO DO: merge npgop and ne_new ?
     logical, allocatable :: lcell_converged(:)
-    real(kind=dp), allocatable ::  ne_new(:), ngpop(:,:,:,:)
+    real(kind=dp), allocatable ::  ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
 
 
     !variables for non-LTE H (+He) ionisation
-    integer :: Neq_ne
+    integer :: Neq_ne, Neq_ng
     integer, allocatable, dimension(:,:) :: gs_ion !index of the ground states of each ion
     real(kind=dp), allocatable :: gtot(:,:,:), gr_save(:,:,:,:), dgrdne(:,:,:), dgcdne(:,:,:)
     real(kind=dp), allocatable :: pops_ion(:,:,:), npop_dag(:,:)
@@ -73,24 +72,21 @@ module see
         enddo
 
         !-> allocate space for non-LTE only quantities !
-        allocate(ne_new(n_cells), stat=alloc_status)
-        ne_new(:) = ne(:)
-        if (alloc_status > 0) call error("Allocation error ne_new")
-        write(*,*) " size ne_new:", sizeof(ne_new) / 1024./1024.," MB"
-        !TODO: include new electronic density at the end ??
-        ! NOTE: index 1 is always the current solution ! Previously n_new.
+        ! NOTE: index 1 is always the current solution
+        !   previous solution is 2, previous previous is 3 etc..
+        !   size is NactiveAtoms + 1 for current iterate of electronic density (ne_new)
+        Neq_ng = max(Ng_Norder+2,3) !storing 3 by default
         if (lNg_acceleration) then
             !lsubiteration must be false ?
             if (lsubiteration) call error('subiter + Ng not yet!')
-            allocate(ngpop(NmaxLevel,NactiveAtoms,n_cells,Ng_Norder+2),stat=alloc_status)
-            if (alloc_Status > 0) call error("Allocation error ngpop (lng_acc)")
-        else
-            !even if no Ng acceleration nor subiterations allows for storing 2 previous solutions (2 + 1)
-            !for the non-LTE populations: improve convergence criterion
-            !1 is current, 2 is previous, 3 is previous previous
-            allocate(ngpop(NmaxLevel,NactiveAtoms,n_cells,3),stat=alloc_status)
-            if (alloc_Status > 0) call error("Allocation error ngpop")
         endif
+        !even if no Ng acceleration (nor subiterations) allows for storing Neq_ng previous solutions
+        !   for the non-LTE populations: TO DO improve convergence criterion.
+        allocate(ngpop(NmaxLevel,NactiveAtoms+1,n_cells,Neq_ng),stat=alloc_status)
+        if (alloc_Status > 0) call error("Allocation error ngpop")
+        
+        !initialize electronic density
+        ngpop(1,NactiveAtoms+1,:,1) = ne(:)
         write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024., " MB"
         allocate(psi(n_lambda, n_rayons_max, nb_proc), stat=alloc_status); psi(:,:,:) = 0.0_dp
         write(*,*) " size psi:", sizeof(psi) / 1024./1024.," MB"
@@ -125,7 +121,7 @@ module see
         write(*,*) " size phi_loc:", sizeof(phi_loc) / 1024./1024./1024.," GB"
 
         mem_alloc_local = mem_alloc_local + sizeof(psi) + sizeof(eta_atoms) + sizeof(Itot) + sizeof(phi_loc) + &
-            sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ne_new) + sizeof(lcell_converged) + sizeof(ngpop)
+            sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(lcell_converged) + sizeof(ngpop)
 
         allocate(tab_Aji_cont(NmaxCont,NactiveAtoms,n_cells))
         allocate(tab_Vij_cont(Nlambda_max_cont,NmaxCont,NactiveAtoms))
@@ -227,7 +223,7 @@ module see
         integer :: n, kr
         type (AtomType), pointer :: atom
 
-        deallocate(ne_new,psi,eta_atoms,chi_up,chi_down,uji_down,lcell_converged)
+        deallocate(psi,eta_atoms,chi_up,chi_down,uji_down,lcell_converged)
         deallocate(itot,phi_loc,ngpop)
 
         deallocate(tab_Aji_cont, tab_Vij_cont)
@@ -312,9 +308,11 @@ module see
         wjac = 1.0_dp
         delta = atom%n(:,icell) - matmul(atom%Gamma(:,:,id), ndag)
 
-        call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
+        ! call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
+        call solve_lin(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
    	    atom%n(:,icell) = ndag(:) + wjac * delta(:)
         ! call gaussslv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
+        !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
 
         if ((maxval(atom%n(:,icell)) < 0.0)) then
             write(*,*) ""
@@ -1046,7 +1044,8 @@ module see
 
         if (verbose) write(*,'("(DELTA) non-LTE ionisation dM="(1ES17.8E3)" dne="(1ES17.8E3) )') dM, dne
 
-        ne_new(icell) = ne(icell)
+        ! ne_new(icell) = ne(icell)
+        ngpop(1,NactiveAtoms+1,icell,1) = ne(icell)
         ne(icell) = npop_dag(Neq_ne,id)
 
 
@@ -1244,7 +1243,7 @@ module see
         real(kind=dp), intent(in) :: x(neq)
         real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
         integer :: ieq, jvar
-        real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
+        ! real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
 
         do ieq=1, neq
             f(ieq) = f(ieq) * -1.0_dp
@@ -1254,15 +1253,15 @@ module see
         enddo
 
         ! *********************** !
-        Adag(:,:) = df(:,:)
-        bdag(:) = f(:)
+        ! Adag(:,:) = df(:,:)
+        ! bdag(:) = f(:)
         ! *********************** !
 
-        call GaussSlv(df,f,neq)
-        ! call bicgstab(df,f,neq)
+        ! call GaussSlv(df,f,neq)
+        call solve_lin(df,f,neq)
         if (is_nan_infinity_vector(f)>0) then
-         write(*,*) "fdag=", bdag
-         write(*,*) "f=", f
+        !  write(*,*) "fdag=", bdag
+        !  write(*,*) "f=", f
          call error("(Newton-raphson) nan in (f,df) after GSLV")
         endif
 
@@ -1274,12 +1273,12 @@ module see
         !         res(ieq) = res(ieq) - Adag(ieq,jvar)*f(jvar)
         !     enddo
         ! enddo
-        res(:) = bdag(:) - matmul(Adag,f)
+        ! res(:) = bdag(:) - matmul(Adag,f)
 
-        !solve for the residual
-        call Gaussslv(Adag, res, Neq)
+        ! !solve for the residual
+        ! call Gaussslv(Adag, res, Neq)
 
-        f(:) = f(:) + res(:)
+        ! f(:) = f(:) + res(:)
         ! *********************** !
 
         return

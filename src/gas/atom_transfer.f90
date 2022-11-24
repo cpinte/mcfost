@@ -24,10 +24,10 @@ module atom_transfer
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
         lnon_lte_loop, vlabs, calc_contopac_loc
-   use see, only : ngpop, lcell_converged, ne_new, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
+   use see, only : ngpop, Neq_ng, lcell_converged, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
-   use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d
+   use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d, Ng_accelerate, Accelerate
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
                                    tab_RT_az,tab_RT_incl
    use stars, only               : intersect_stars, laccretion_shock, max_Tshock, min_Tshock, max_Thp, min_Thp, max_Facc, min_Facc
@@ -60,11 +60,13 @@ module atom_transfer
    ! ----------------------------------------------------------------------- !
       integer :: etape, etape_start, etape_end, iray, n_rayons
       integer :: n_iter, n_iter_loc, id, i, iray_start, alloc_status
+      integer :: nact, imax, icell_max, icell_max_2
+      integer :: icell, ilevel, nb, nr, unconverged_cells
       integer, dimension(nb_proc) :: max_n_iter_loc
-      integer, parameter :: maxIter = 1000, maxIter_loc = 100
+      integer, parameter :: maxIter = 300, maxIter_loc = 100
       logical :: lfixed_Rays, lconverged, lconverged_loc, lprevious_converged
-      real :: rand, rand2, rand3
-      real(kind=dp) :: precision
+      real :: rand, rand2, rand3, unconverged_fraction
+      real(kind=dp) :: precision, vth
       integer, parameter :: n_rayons_max = 1 !ray-by-ray except for subiterations
                                              !but in that case only itot and phi_loc and ds needs
                                              !to have n_rayons_sub size.
@@ -78,18 +80,25 @@ module atom_transfer
       !iray should be passed to the subroutines xoupling, integ_ray_line, accumulate_rates_mali.
       logical :: labs, lsubiteration = .false.
       logical :: l_iterate, l_iterate_ne
-      real(kind=dp) :: vth
-      ! logical :: accelerated, ng_rest, lng_turned_on
-      ! integer :: iorder, i0_rest, n_iter_accel, iacc
+      
+      !Ng's acceleration
+      integer, parameter :: Ng_Ndelay_init = 1 !minimal number of iterations before starting the cycle.
+                                               !min is 1 (so that conv_speed can be evaluated)
+      real(kind=dp), parameter :: conv_speed_limit_healpix = 5d-2 !1d-3
+      real(kind=dp), parameter :: conv_speed_limit_mc = 1d1!1d-1
+      real(kind=dp) :: conv_speed_limit
+      integer :: iorder, i0_rest, n_iter_accel, iacc
+      integer :: Ng_Ndelay, ng_index
+      logical :: lng_turned_on, ng_rest, lconverging, accelerated 
+      logical, parameter :: lextrapolate_electron = .true. !extrapolate electrons with populations
+      real(kind=dp), dimension(:,:), allocatable :: ngtmp
 
-      integer :: nact, imax, icell_max, icell_max_2
-      integer :: icell, ilevel, Ng_Ndelay, nb, nr
-      logical :: lng_turned_on
-
+      !convergence check
       type (AtomType), pointer :: atom
       integer(kind=8) :: mem_alloc_local
       real(kind=dp) :: diff_cont, conv_speed, conv_acc
 
+      !timing and checkpointing
       real :: time_iteration, time_nlte
       integer :: count_start, count_end
       integer :: ibar, n_cells_done
@@ -98,12 +107,12 @@ module atom_transfer
       ! -------------------------------- INITIALIZATION -------------------------------- !
       write(*,*) '-------------------------- NON-LTE LOOP ------------------------------ '
       !non-LTE mode
-      lnon_lte_loop = .true.
+      lnon_lte_loop = .true. !for substracting speed of reference cell.
       labs = .true.
       id = 1
       if (lforce_lte) lsubiteration = .false.
 
-      !Use non-LTE pops for electrons and to write to file.
+      !Use non-LTE pops for electrons and background opacities.
       do nact=1,NactiveAtoms
          if (.not.activeatoms(nact)%p%nltepops) activeatoms(nact)%p%nltepops = .true.
       enddo
@@ -125,7 +134,7 @@ module atom_transfer
       etape_end = 2
       n_rayons = healpix_npix(healpix_lorder)
       if (lsubiteration) then
-         n_rayons_sub =  N_rayons_mc !the max of the 2 steps
+         n_rayons_sub =  max(n_rayons,N_rayons_mc) !the max of the 2 steps
       else
          n_rayons_sub = 1 !for allocation of phi and Itot on the maximum number of rays!
       endif
@@ -133,18 +142,6 @@ module atom_transfer
          etape_end = 1
          if (lsubiteration) n_rayons_sub = n_rayons
       endif
-
-      ! if (laccurate_integ) then
-      !    etape_end = 2
-      !    if (lsubiteration) n_rayons_sub = max(n_rayons,N_rayons_mc)
-      ! else
-      !    etape_end = 1
-      !    if (lsubiteration) n_rayons_sub = n_rayons
-      !    if (istep_start==2) then
-      !       etape_end = 2
-      !       if (lsubiteration) n_rayons_sub = N_rayons_mc
-      !    endif
-      ! endif
 
       if (allocated(stream)) deallocate(stream)
       allocate(stream(nb_proc),stat=alloc_status)
@@ -170,6 +167,7 @@ module atom_transfer
       step_loop : do etape=etape_start, etape_end
 
          write(*,*) ""
+         !generate rays for a given step
          if (etape==1) then
             !use stepan if healpix_lorder < 2?
             allocate(xmux(n_rayons),xmu(n_rayons),xmuy(n_rayons),wmu(n_rayons))
@@ -185,6 +183,7 @@ module atom_transfer
                !only one etape, use dpops_max_error
                precision = dpops_max_error
             endif
+            conv_speed_limit = conv_speed_limit_healpix
          else if (etape==2) then
             precision = dpops_max_error
             n_rayons = N_rayons_mc
@@ -192,12 +191,14 @@ module atom_transfer
                  360.0 * sqrt(pi/real(n_rayons))/pi
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            conv_speed_limit = conv_speed_limit_mc
          else
             call error("(n_lte_loop_mali) etape unkown")
          end if
          write(*,*) ""
          call system_clock(count_start,count_rate=time_tick,count_max=time_max)
 
+         !common variables for a given step
          lconverged = .false.
          lprevious_converged = lforce_lte
          lcell_converged(:) = .false.
@@ -207,14 +208,23 @@ module atom_transfer
          conv_acc = 0.0
          diff_old = 0.0
          time_iteration = 0.0
+         unconverged_fraction = 0.0
+         unconverged_cells = 0
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
          do while (.not.lconverged)
 
             n_iter = n_iter + 1
+            !-> ng_index depends only on the value of n_iter for a given Neq_ng
+            ! it is the index of solutions stored in ngpop. ng_index is 1 for the current solution.
+            ! at which point we can accelerate. Therefore, ng_index if far from 1 at init.
+            ng_index = Neq_ng - mod(n_iter-1,Neq_ng) !overwritten if lng_acceleration.
+            ! NOTE :: the index 1 is hard-coded within the non-LTE loop as it stores the actual (running) value
+            !           of the populations and electronic density.
+            ! 
             !                    goes with maxIter
-            write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; theshold: "(1ES11.2E3))') n_iter, etape, precision
+            write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; threshold: "(1ES11.2E3))') n_iter, etape, precision
             ibar = 0
             n_cells_done = 0
 
@@ -237,9 +247,10 @@ module atom_transfer
             !$omp default(none) &
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff,lconverged_loc,n_iter_loc)&
-            !!$omp private(nact, atom) & !subiterations
+            !$omp private(nact, atom) & ! Acceleration of convergence
+            !$omp shared(lsubiteration,dpops_sub_max_error,ngpop,NactiveAtoms,ActiveAtoms)& ! Acceleration of convergence
+            !$omp shared( ng_index,Ng_Norder, accelerated, lng_turned_on) & ! Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
-            !!$omp shared(lsubiteration, dpops_sub_max_error, ngpop, NactiveAtoms, ActiveAtoms) & !subiterations
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,max_n_iter_loc) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size)
             !$omp do schedule(static,omp_chunk_size)
@@ -374,7 +385,20 @@ module atom_transfer
                   ! ! ! ************************** END! **************************!
 
                   ! ************************** NG's **************************!
-
+                  !building
+                  ! accelerate locally, cell-by-cell instead of all grid
+                  !ng_index not a good criterion if we have delay ? 
+                  ! if ((lng_turned_on).and.(ng_index==1)) then
+                  ! !not cswitch, not previous converged and if converging (~diff sufficiently low
+                  !    do nact=1, NactiveAtoms
+                  !       atom => Activeatoms(nact)%p
+                  !       accelerated = Ng_accelerate(atom%Nlevel, Ng_Norder, ngpop(1:atom%Nlevel,nact,icell,:))
+                  !       !Store the accelerated populations in ngpopg(:,:,:,1) !current index
+                  !       !need rest before accumulating new solutions
+                  !    enddo
+                  ! else
+                  !    accelerated = .false.
+                  ! endif
                   ! ************************** END! **************************!
 
                end if !icompute_atomRT
@@ -395,6 +419,63 @@ module atom_transfer
             write(*,*) " " !for progress bar
 
             !***********************************************************!
+            ! **********  Ng's acceleration administration *************!
+            if (lng_acceleration) then
+          	!be sure we are converging before extrapolating
+               lconverging = (conv_speed < 0) .and. (-conv_speed < conv_speed_limit)
+          	   if ( (n_iter>max(Ng_Ndelay_init,1)).and.lconverging ) then
+          		   if (.not.lng_turned_on) then
+                     write(*,*) " +++ Activating Ng's acceleration +++ "
+          			   lng_turned_on = .true.
+          			   Ng_Ndelay = n_iter; iacc = 0
+                     n_iter_accel = 0; i0_rest = 0; ng_rest = .false.
+          		   endif
+            	endif
+               if (lng_turned_on) then
+                  if (unconverged_fraction < 15.0) lng_turned_on = .false.
+               endif
+            endif
+            !***********************************************************!
+            ! ********************** GLOBAL NG's ***********************!
+            ! Here minimize Ncells x Nlevels x Ng_Norder per atoms.
+            accelerated = .false.
+            if ( (lNg_acceleration .and. lng_turned_on).and.(maxval_cswitch_atoms()==1.0_dp)&
+                  .and.(.not.lprevious_converged) ) then
+               iorder = n_iter - Ng_Ndelay
+               if (ng_rest) then
+                  write(*,'(" -> Acceleration relaxes... "(1I2)" /"(1I2))') iorder-i0_rest, Ng_Nperiod
+                  if (iorder-i0_rest == Ng_Nperiod) ng_rest = .false.
+               else
+                  i0_rest = iorder
+                  iacc = iacc + 1
+                  ng_index = Neq_Ng - mod(iacc-1,Neq_ng)
+                  write(*,'(" -> Accumulate solutions... "(1I2)" /"(1I2))') iacc, Neq_ng
+                  !index 1 is the running one in the main loop for new values.
+                  ngpop(:,:,:,ng_index) = ngpop(:,:,:,1)
+                  accelerated = (iacc==Neq_ng)
+
+                  if (accelerated) then
+                     do nact=1,NactiveAtoms
+                        atom => ActiveAtoms(nact)%p
+                        allocate(ngtmp(N_cells*atom%Nlevel,Neq_ng))
+                        !Flatten the array such that for each cell there are all levels
+                        ngtmp(:,:) = reshape(ngpop(1:atom%Nlevel,nact,:,:),(/n_cells*atom%Nlevel,Neq_ng/))
+                        call Accelerate(n_cells*atom%Nlevel,Ng_Norder,ngtmp) 
+                        ngpop(1:atom%Nlevel,nact,:,:) = reshape(ngtmp,(/atom%Nlevel,n_cells,Neq_ng/))
+                        deallocate(ngtmp)
+                        atom => NULL()
+                     enddo
+                     ! Accelerate electrons ? but still needs rest of SEE+ne loop.
+                     if ( lextrapolate_electron ) &
+                        call Accelerate(n_cells,Ng_Norder,ngpop(1,NactiveAtoms+1,:,:)) 
+                     n_iter_accel = n_iter_accel + 1
+                     ng_rest = (Ng_Nperiod > 0); iacc = 0
+                  endif
+               endif
+            endif
+            !***********************************************************!
+
+            !***********************************************************!
             ! *******************  update ne metals  *******************!
             if (l_iterate_ne) then
                id = 1
@@ -404,22 +485,26 @@ module atom_transfer
                !$omp parallel &
                !$omp default(none) &
                !$omp private(id,icell,l_iterate,nact,ilevel,vth,nb,nr)&
-               !$omp shared(T,vturb,nHmin,icompute_atomRT,ne, ne_new,n_cells)&
-               !$omp shared(tab_lambda_nm,atoms,n_atoms,dne,PassiveAtoms,NpassiveAtoms,Voigt)
+               !$omp shared(T,vturb,nHmin,icompute_atomRT,ne,n_cells,ngpop,ng_index,lng_acceleration)&
+               !$omp shared(tab_lambda_nm,atoms,n_atoms,dne,PassiveAtoms,NactiveAtoms,NpassiveAtoms,Voigt)
                !$omp do schedule(dynamic,1)
                do icell=1,n_cells
                   !$ id = omp_get_thread_num() + 1
                   l_iterate = (icompute_atomRT(icell)==1)
                   if (l_iterate) then
-                     dne = max(dne, abs(1.0_dp - ne(icell)/ne_new(icell)))
-                     ne(icell) = ne_new(icell) !needed for lte pops !
+                     ! dne = max(dne, abs(1.0_dp - ne(icell)/ne_new(icell)))
+                     dne = max(dne, abs(1.0_dp - ne(icell)/ngpop(1,NactiveAtoms+1,icell,1)))
+                     ! -> needed for lte pops !
+                     ne(icell) = ngpop(1,NactiveAtoms+1,icell,1) !ne(icell) = ne_new(icell)
+                     if (.not.lng_acceleration) &
+                        ngpop(1,NactiveAtoms+1,icell,ng_index) = ne(icell)
                      call LTEpops_H_loc(icell)
                      nHmin(icell) = nH_minus(icell)
                      do nact = 2, n_atoms
                         call LTEpops_atom_loc(icell,Atoms(nact)%p,.false.)
                      enddo
                      !update profiles only for passive atoms. For active atoms we need new non-LTE pops.
-                     !if LTE pops are not updated (so no ne_new) profiles of LTE elements are unchanged.
+                     !If LTE pops are not updated (so no ne_new) profiles of LTE elements are unchanged.
                      do nact = 1, NpassiveAtoms
                         do ilevel=1,PassiveAtoms(nact)%p%nline
                            if (.not.PassiveAtoms(nact)%p%lines(ilevel)%lcontrib) cycle
@@ -451,11 +536,9 @@ module atom_transfer
                ! endif
             end if
             !***********************************************************!
-            ! ******************* checkpointing ************************!
 
             !***********************************************************!
             ! ****************  Convergence checking  ******************!
-
             id = 1
             dM(:) = 0.0 !all pops
             diff_cont = 0.0
@@ -463,7 +546,7 @@ module atom_transfer
             !$omp parallel &
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,atom,nb,nr,vth)&
-            !$omp shared(ngpop,Activeatoms,lcell_converged,vturb,T)&!diff, diff_cont, dM)&
+            !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration)&!diff,diff_cont,dM)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm,voigt) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
@@ -499,9 +582,16 @@ module atom_transfer
                   !Re init for next iteration if any
                   do nact=1, NactiveAtoms
                      atom => ActiveAtoms(nact)%p
+                     !first update the populations with the new value
                      atom%n(:,icell) = ngpop(1:atom%Nlevel,nact,icell,1)
-                     !store for two successive iterations.
-                     ! ngpop(1:atom%Nlevel,nact,icell,iter) = atom%n(:,icell)
+                     !Then, store Neq_ng previous iterations. index 1 is for the current one.
+                     !if Ng_neq = 3 :
+                     !  -> the oldest solutions stored is in ng_index = 3 - mod(1-1,3) = 3
+                     !  -> the newest (current) one is in ng_index = 3 - mod(3-1,3) = 1
+                     ! cannot accumulate here if global Ng's
+                     ! !! if condition breaks if local Ng's !!
+                     if (.not.lng_acceleration) &
+                        ngpop(1:atom%Nlevel,nact,icell,ng_index) = atom%n(:,icell)
 
                      !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next ieration.
                      !Only for Active Atoms here. PAssive Atoms are updated only if electronic density is iterated.
@@ -539,6 +629,10 @@ module atom_transfer
 
             !                                     goes with maxIter_loc
             if (maxval(max_n_iter_loc)>1) write(*,'(" -> "(1I3)" sub-iterations")') maxval(max_n_iter_loc)
+            if (accelerated) then
+               ! write(*,'("            "(1A13))') "(Accelerated)"
+               write(*,'("            ("(1A11)" #"(1I4)")")') "Accelerated", n_iter_accel
+            endif
             do nact=1,NactiveAtoms
                write(*,'("                  "(1A2))') ActiveAtoms(nact)%p%ID
                ! write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%p%ID
@@ -553,11 +647,9 @@ module atom_transfer
             write(*,'(" <<->> diff="(1ES13.5E3)," old="(1ES13.5E3))') diff, diff_old
             write(*,'("   ->> diffcont="(1ES13.5E3))') diff_cont
             write(*,'("   ->> speed="(1ES12.4E3)"; acc="(1ES12.4E3))') conv_speed, conv_acc
-            write(*,"('   ->> Unconverged cells #'(1I6)'; fraction:'(1F6.2)'%')")&!; lgeps:'1F4.1)") &
-               size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0))), &
-               100.*real(size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0)))) / &
-               real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))!, log10(precision)
-            ! write(*,'("   ->> threshold="(1ES11.2E3))'), precision
+            unconverged_cells = size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0)))
+            unconverged_fraction = 100.*real(unconverged_cells) / real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
+            write(*,"('   ->> Unconverged cells #'(1I6)'; fraction:'(1F6.2)'%')") unconverged_cells, unconverged_fraction
             write(*,*) "      -------------------------------------------------- "
             diff_old = diff
             conv_acc = conv_speed
@@ -578,23 +670,10 @@ module atom_transfer
                   lconverged = .true.
                end if
             end if
-
             !***********************************************************!
-            ! **********  Ng's acceleration administration *************!
-
-            if (lng_acceleration) then
-          	!be sure we are converging before extrapolating
-          	   if ( (n_iter>1).and.(conv_speed <= 0).and.(-conv_speed < 1d-3) ) then
-          		   if (.not.lng_turned_on) then
-          			   lng_turned_on = .true.
-          			   Ng_Ndelay = n_iter
-          		   endif
-            	endif
-            endif
 
             !***********************************************************!
             ! ********** timing and checkpointing **********************!
-
             call system_clock(count_end,count_rate=time_tick,count_max=time_max)
             if (count_end < count_start) then
                time_nlte=real(count_end + (1.0 * time_max)- count_start)/real(time_tick)
@@ -622,6 +701,7 @@ module atom_transfer
                   exit step_loop
                endif
             endif
+            !***********************************************************!
 
          !***********************************************************!
          !***********************************************************!
@@ -952,7 +1032,7 @@ module atom_transfer
 
       !re alloc lambda here.
       call setup_image_grid()
-      write(*,*) "Computing emission flux map..."
+      write(*,*) "Computing emerging flux..."
       do ibin=1,RT_n_incl
          do iaz=1,RT_n_az
             call emission_line_map(ibin,iaz)
@@ -1111,7 +1191,7 @@ module atom_transfer
       real(kind=dp), dimension(3,nb_proc) :: pixelcorner
       real(kind=dp):: taille_pix
       integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
-      integer, parameter :: n_rad_RT = 150, n_phi_RT = 128
+      integer, parameter :: n_rad_RT = 200, n_phi_RT = 150
       real(kind=dp), dimension(n_rad_RT) :: tab_r
       real(kind=dp):: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
       integer :: ri_RT, phi_RT

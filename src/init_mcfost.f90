@@ -875,8 +875,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lforce_lte=.true.
      case("-level_dissolution")
-     	call error("Level's dissolution not yet!")
         i_arg = i_arg + 1
+        call error("Continuum level dissolution not yet!")
         ldissolve =.true.
      case("-phantom")
         i_arg = i_arg + 1
