@@ -951,11 +951,6 @@ module atom_transfer
       logical :: lelectron_read
       real(kind=dp) :: dne, v_char
 
-      write(*,*) " *** BIG WARNING **** "
-      write(*,*) " !!!!! CHECK FOR BILINEAR INTERP in utils.f90 ! !!!!"
-      write(*,*) "check solve ne"
-      write(*,*) " ******************** "
-
       lnon_lte_loop = .false.
       omp_chunk_size = max(nint( 0.01 * n_cells / nb_proc ),1)
       mem_alloc_tot = 0

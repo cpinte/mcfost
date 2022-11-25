@@ -1722,7 +1722,7 @@ end function locate
  function bilinear(N,xi,i0,M,yi,j0,f,xo,yo)
    !bilinear interpolation of the function f(N,M)
    !defined on points xi(N), yi(M) at real xo, real yo.
-   !too slow ? f***ck
+   !TO DO: add automatic finding of i0 and j0
    real(kind=dp) :: bilinear
    integer, intent(in) :: N, M
    real(kind=dp), intent(in) :: xi(N),yi(M),f(N,M)
@@ -1730,12 +1730,6 @@ end function locate
    integer, intent(in) :: i0, j0
    integer :: i, j
    real(kind=dp) :: norm, f11, f21, f12, f22
-
-   !find closest point in i0 and j0
-   ! i0 = max(locate(xi,xo),2)
-   ! j0 = max(locate(yi,yo),2)
-
-   ! write(*,*) i0, j0
 
    norm = ((xi(i0) - xi(i0-1)) * (yi(j0) - yi(j0-1)))
    f11 = f(i0-1,j0-1)
