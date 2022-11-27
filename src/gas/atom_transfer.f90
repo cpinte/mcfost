@@ -99,13 +99,16 @@ module atom_transfer
       real(kind=dp) :: diff_cont, conv_speed, conv_acc
 
       !timing and checkpointing
-      real :: time_iteration, time_nlte
-      integer :: count_start, count_end
+      real :: time_iteration, time_nlte, time_nlte_loop, time_nlte_cpu
+      real :: cpu_time_begin, cpu_time_end, time_nlte_loop_cpu
+      integer :: count_start, count_end, itime
       integer :: ibar, n_cells_done
       integer, parameter :: n_iter_counted = 1
 
       ! -------------------------------- INITIALIZATION -------------------------------- !
       write(*,*) '-------------------------- NON-LTE LOOP ------------------------------ '
+      time_nlte_loop = 0!total time in the non-LTE loop
+      time_nlte_loop_cpu = 0
       !non-LTE mode
       lnon_lte_loop = .true. !for substracting speed of reference cell.
       labs = .true.
@@ -197,6 +200,7 @@ module atom_transfer
          end if
          write(*,*) ""
          call system_clock(count_start,count_rate=time_tick,count_max=time_max)
+         call cpu_time(cpu_time_begin)
 
          !common variables for a given step
          lconverged = .false.
@@ -423,6 +427,8 @@ module atom_transfer
             if (lng_acceleration) then
           	!be sure we are converging before extrapolating
                lconverging = (conv_speed < 0) .and. (-conv_speed < conv_speed_limit)
+               !or if the number of iterations is too large
+               lconverging = lconverging .or. (n_iter > int(real(maxIter)/3.0))
           	   if ( (n_iter>max(Ng_Ndelay_init,1)).and.lconverging ) then
           		   if (.not.lng_turned_on) then
                      write(*,*) " +++ Activating Ng's acceleration +++ "
@@ -675,11 +681,15 @@ module atom_transfer
             !***********************************************************!
             ! ********** timing and checkpointing **********************!
             call system_clock(count_end,count_rate=time_tick,count_max=time_max)
+            call cpu_time(cpu_time_end)
             if (count_end < count_start) then
                time_nlte=real(count_end + (1.0 * time_max)- count_start)/real(time_tick)
             else
                time_nlte=real(count_end - count_start)/real(time_tick)
             endif
+            time_nlte_cpu = cpu_time_end - cpu_time_begin
+            time_nlte_loop = time_nlte_loop + time_nlte
+            time_nlte_loop_cpu = time_nlte_loop_cpu + time_nlte_cpu
 
             !average time of a single iteration for this step !
             if (n_iter <= n_iter_counted) then
@@ -742,6 +752,11 @@ module atom_transfer
 
       ! --------------------------------    END    ------------------------------------------ !
       lnon_lte_loop = .false.
+      if (mod(time_nlte_loop_cpu/60.,60.) > 1.0_dp) then
+         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop_cpu/60./60.,60.), " h"
+      else
+         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop_cpu/60.,60.), " min"
+      endif
       write(*,*) '-------------------------- ------------ ------------------------------ '
 
       return
