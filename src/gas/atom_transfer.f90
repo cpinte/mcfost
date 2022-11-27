@@ -428,7 +428,7 @@ module atom_transfer
           	!be sure we are converging before extrapolating
                lconverging = (conv_speed < 0) .and. (-conv_speed < conv_speed_limit)
                !or if the number of iterations is too large
-               lconverging = lconverging .or. (n_iter > int(real(maxIter)/3.0))
+               lconverging = lconverging .or. (n_iter > 50)!int(real(maxIter)/6.0))
           	   if ( (n_iter>max(Ng_Ndelay_init,1)).and.lconverging ) then
           		   if (.not.lng_turned_on) then
                      write(*,*) " +++ Activating Ng's acceleration +++ "
