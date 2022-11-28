@@ -77,6 +77,8 @@ module see
         !   size is NactiveAtoms + 1 for current iterate of electronic density (ne_new)
         Neq_ng = max(Ng_Norder+2,3) !storing 3 by default
         if (lNg_acceleration) then
+            !Automatically set if not provided (Ng_Nperiod = -1)
+            if (Ng_Nperiod == -1) Ng_Nperiod = Ng_Norder + 2
             !lsubiteration must be false ?
             if (lsubiteration) call error('subiter + Ng not yet!')
         endif

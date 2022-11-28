@@ -393,10 +393,8 @@ module Opacity_atom
    end subroutine opacity_atom_bb_loc
 
 
-   subroutine xcoupling(id, icell, iray, lupdate_psi)
-   !test: update_psi in case of local subiterations.
+   subroutine xcoupling(id, icell, iray)
       integer, intent(in) :: id, icell, iray
-      logical, intent(in) :: lupdate_psi
       integer :: nact, j, i, kr, Nb, Nr, la, Nl
       integer :: i0, j0, la0, N1, N2
       type (AtomType), pointer :: aatom
@@ -409,15 +407,6 @@ module Opacity_atom
       chi_up(:,:,:,id)   = 0.0_dp
 
       eta_atoms(:,:,id) = 0.0_dp
-      !-> can do better, not optimized
-      if (lupdate_psi) then
-         chi_tot(:) = 1d-50
-         ! call calc_contopac_loc(icell)
-         ! chi_tot(:) = linear_1D_sorted(n_lambda_cont,tab_lambda_cont,chi_cont(:,icell),n_lambda,tab_lambda_nm)
-         ! chi_tot(1) = chi_cont(1,icell)
-         ! chi_tot(n_lambda) = chi_cont(n_lambda_cont,icell)
-         ! call contopac_atom_loc(icell,n_lambda,tab_lambda_nm,chi_tot,eta_tot)
-      endif
 
       aatom_loop : do nact=1, Nactiveatoms
 
@@ -538,22 +527,51 @@ module Opacity_atom
 
 
             enddo freq2_loop
-            if (lupdate_psi) then
-               chi_tot(Nb:Nr) = chi_tot(Nb:Nr) + hc_fourPI * aatom%lines(kr)%Bij * &
-                    (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(1:Nl)
-            endif
 
          enddo line_loop
 
          aatom => null()
       enddo aatom_loop
 
-      if (lupdate_psi) then
-         psi(:,1,id) = (1.0_dp - exp(-ds(iray,id)*chi_tot))/chi_tot
-      endif
-
     return
    end subroutine xcoupling
+
+   subroutine psi_loc(id,icell,iray)
+   ! compute the local psi operator and local opacity
+   ! assuming ds and phi_loc are known.
+      integer, intent(in) :: id, icell, iray
+      real(kind=dp), dimension(n_lambda) :: chi, eta
+      type (AtomType), pointer :: aatom
+      integer :: Nb, Nr, i, j, Nl, kr, nact
+
+      ! call contopac_atom_loc(icell, n_lambda, tab_lambda_nm, chi, eta)
+      !compute line opacity neglecting LTE bound-bound
+      chi(:) = 0.0
+      eta(:) = 0.0
+      do nact=1, NactiveAtoms
+         aatom => ActiveAtoms(nact)%p
+         do kr=1, aatom%Nline
+            Nb = aatom%lines(kr)%Nb; Nr = aatom%lines(kr)%Nr
+            i = aatom%lines(kr)%i; j = aatom%lines(kr)%j
+            Nl = Nr - Nb + 1
+            chi(Nb:Nr) = chi(Nb:nR) + hc_fourPI * aatom%lines(kr)%Bij * &
+                    (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi_loc(1:Nl,kr,nact,iray,id)
+
+            !eta_atoms recomputed in a call of xcoupling for that cell
+            eta(Nb:Nr) = eta(Nb:Nr) + hc_fourPI * aatom%lines(kr)%Aji * aatom%n(j,icell) * phi_loc(1:Nl,kr,nact,iray,id)
+         enddo
+      enddo
+      aatom => null()
+
+      Itot(:,iray,id) = Itot(:,iray,id) - eta(:)/chi(:) * psi(:,iray,id)
+
+      !ray-by-ray local operator
+      psi(:,iray,id) = (1.0_dp - exp(-ds(iray,id)*chi(:))) / (1d-100 + chi(:))
+
+      Itot(:,iray,id) = Itot(:,iray,id) + eta(:)/chi(:) * psi(:,iray,id)
+
+      return
+   end subroutine psi_loc
 
    function profile_art(line,id,icell,iray,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
       ! phi = Voigt / sqrt(pi) / vbroad(icell)
