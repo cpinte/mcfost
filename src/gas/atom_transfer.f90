@@ -51,7 +51,6 @@ module atom_transfer
    contains
 
 !TO DO
-!      add Ng
 !      add Trad, Tion
 !      checkpointing
    subroutine nlte_loop_mali()

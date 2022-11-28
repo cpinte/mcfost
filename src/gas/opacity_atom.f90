@@ -537,6 +537,7 @@ module Opacity_atom
    end subroutine xcoupling
 
    subroutine psi_loc(id,icell,iray)
+   !building. Necessary for subiter
    ! compute the local psi operator and local opacity
    ! assuming ds and phi_loc are known.
       integer, intent(in) :: id, icell, iray
@@ -564,10 +565,9 @@ module Opacity_atom
       aatom => null()
 
       Itot(:,iray,id) = Itot(:,iray,id) - eta(:)/chi(:) * psi(:,iray,id)
-
       !ray-by-ray local operator
       psi(:,iray,id) = (1.0_dp - exp(-ds(iray,id)*chi(:))) / (1d-100 + chi(:))
-
+      !check it does not go negative ?
       Itot(:,iray,id) = Itot(:,iray,id) + eta(:)/chi(:) * psi(:,iray,id)
 
       return
