@@ -180,11 +180,10 @@ module atom_transfer
                  healpix_angular_resolution(healpix_lorder)
             call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
             if (etape_end > 1) then
-               !use that etape to have an initial solution already close to
-               !convergence for the next etape.
-               precision = 1d-1!min(1e-1,10.0*dpops_max_error)
+               !use that etape as an initial solution for step 2
+               ! precision = 1d-1
+               precision = min(1e-1,10.0*dpops_max_error)
             else
-               !only one etape, use dpops_max_error
                precision = dpops_max_error
             endif
             conv_speed_limit = conv_speed_limit_healpix
