@@ -181,8 +181,8 @@ module atom_transfer
             call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
             if (etape_end > 1) then
                !use that etape as an initial solution for step 2
-               ! precision = 1d-1
-               precision = min(1e-1,10.0*dpops_max_error)
+               precision = 1d-1
+               ! precision = min(1e-1,10.0*dpops_max_error)
             else
                precision = dpops_max_error
             endif
