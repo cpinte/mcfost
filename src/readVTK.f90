@@ -153,7 +153,28 @@ contains
     enddo
 
     ! convert cartesian to dedicated geometry
-    if(geometry==2) then
+    if(geometry==1) then
+       ! polar geometry
+       allocate(x1(dimensions(1)))
+       do i = 1, dimensions(1)
+          x1(i) = sqrt(x(i,1,1)**2 + y(i,1,1)**2)
+       enddo
+
+       nx1mid = (dimensions(1)-1)/2
+       nx3mid = (dimensions(3)-1)/2
+       allocate(x2(dimensions(2)))
+       do i = 1, dimensions(2)
+          x2(i) = atan2(y(nx1mid,i,nx3mid), x(nx1mid,i,nx3mid))
+          if(x2(i)< 0.0) then
+             x2(i) = x2(i) + 8.0*atan(1.0)
+          endif
+       enddo
+
+       allocate(x3(dimensions(3)))
+       do i = 1, dimensions(3)
+          x3(i) = z(1,1,i)
+       enddo
+    else if(geometry==2) then
        ! spherical geometry
        allocate(x1(dimensions(1)))
        do i = 1, dimensions(1)
