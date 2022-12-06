@@ -116,7 +116,7 @@ contains
     real q1, q2;
 
     integer position, lineSize, nPoints
-    integer i,j,k,n, nx1mid, nx2mid
+    integer i,j,k,n, nx1mid, nx2mid, nx3mid
 
 
     position = oldposition
@@ -233,11 +233,11 @@ contains
     newposition=position
   end subroutine readScalars
 
-  subroutine readVTK_header(filename, unit, position, dimensions, time, origin, x1, x2, x3)
+  subroutine readVTK_header(filename, unit, position, geometry, dimensions, time, origin, x1, x2, x3)
     ! read only the header of a VTK file and keepthe unit open
 
     character(len=*), intent(in) :: filename
-    integer, intent(out) :: unit
+    integer, intent(out) :: unit, geometry
     integer, dimension(3), intent(out) :: dimensions
     real, intent(out) :: time
     character(:), allocatable, intent(out) :: origin
@@ -247,7 +247,6 @@ contains
     character (3) :: varName
     integer :: position, newposition
     integer :: lineSize, nPoints
-    integer :: geometry
     integer, dimension(3) :: periodicity
 
     open(newunit=unit, file=filename,form="unformatted",access="stream",CONVERT='BIG_ENDIAN',status="old")

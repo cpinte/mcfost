@@ -25,7 +25,7 @@ contains
     real(dp) :: dx
 
     idefix%filename = filename
-    call readVTK_header(filename, idefix%iunit, idefix%position, dimensions, idefix%time, origin, x1, x2, x3)
+    call readVTK_header(filename, idefix%iunit, idefix%position, idefix%geometry, dimensions, idefix%time, origin, x1, x2, x3)
 
     idefix%origin = origin
     idefix%dimensions = dimensions
@@ -41,11 +41,11 @@ contains
     idefix%x1_max = x1(idefix%nx1)
     idefix%x2_min = x2(1)
     idefix%x2_max = x2(idefix%nx2)
-    idefix%x3_min = x3(1)           ! these values should be 0 to 2*pi,
-    idefix%x3_max = x3(idefix%nx3)  ! while fargo3d is -pi to pi
+    idefix%x3_min = x3(1)           ! in spherical: 0 to 2*pi, while fargo3d is -pi to pi
+    idefix%x3_max = x3(idefix%nx3)
 
     ! Updating mcfost parameters
-    grid_type = 2
+    grid_type = idefix%geometry
     n_rad = idefix%nx1-1
     n_rad_in = 1
     nz = (idefix%nx2-1)/2+1

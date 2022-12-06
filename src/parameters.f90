@@ -64,23 +64,23 @@ module parametres
   logical :: lemission_atom, lelectron_scattering, lforce_lte,  &
             	ldissolve, lstop_after_step1, loutput_rates, lzeeman_polarisation
   integer :: N_rayons_mc, istep_start
-  
+
   !HEALpix
   integer :: healpix_lorder, healpix_lmin, healpix_lmax !lmin and lmax not yet (for local evaluation)
-  
+
   logical :: lcheckpoint, lsafe_stop
   !Convergence relative errors
   real :: dpops_max_error, dpops_sub_max_error, art_hv, safe_stop_time
   integer :: checkpoint_period
-  
+
   !Ng's acceleration
   logical :: lng_acceleration
   integer :: Ng_Norder, Ng_Nperiod
-  
+
   !electron density
   logical :: lsolve_for_ne
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
-  
+
 
   logical :: lmodel_ascii, lmhd_voronoi, lmodel_1d, llimit_mem
 
@@ -104,7 +104,7 @@ module parametres
   real :: angle_interet, zoom, tau_seuil, wl_seuil, image_offset_centre(3)
 
   real  :: cutoff = 7.0
-  
+
   !must be initialized to 0
   integer(kind=8) :: mem_alloc_tot !total memory allocated dynamically or not in bytes
 
@@ -289,11 +289,10 @@ module parametres
   type(athena_model) :: athena
 
   type idefix_model
-     integer :: nx1, nx2, nx3, iunit, position
+     integer :: nx1, nx2, nx3, iunit, position, geometry
      integer, dimension(3) :: dimensions
      real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
      logical :: log_spacing, corrotating_frame
-
 
      real :: time
      character(len=128) :: filename
