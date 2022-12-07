@@ -347,13 +347,12 @@ function Ng_accelerate(m,n,x)
 end function Ng_accelerate
 
 
-subroutine Accelerate(m,n,x,check_negative_pops)
+subroutine Accelerate(m,n,x)
 !$ use omp_lib
 !
 ! Parallel version of Ng_accelerate that works for all cells
 ! at the same time.
 !
-   logical, optional, intent(in) :: check_negative_pops
    integer, intent(in) :: m, n
    real(kind=dp), intent(inout) :: x(m,*)
    integer :: i, j, k
@@ -369,8 +368,11 @@ subroutine Accelerate(m,n,x,check_negative_pops)
    !$omp shared(m,n,x,A,b,x0)
    !$omp do schedule(dynamic,1)
    do k=1, m
-      if (x(k,1) > 0.0) then
-         w = 1.0 / ( x0(k)**2 )
+      ! w = 1.0 / ( 1.0_dp + abs(x0(k)) )
+      if (x0(k) > 0.0) then
+         ! w = 1.0 / ( x0(k)**2 )
+         w = 1.0 / ( 1 + abs(x0(k)) )
+         ! w = 1.0 / x0(k)
          dy = x(k,2) - x0(k)
          do i=1, n
             di = w * (dy + x(k,i+1) - x(k,i+2))
@@ -384,8 +386,9 @@ subroutine Accelerate(m,n,x,check_negative_pops)
    !$omp end do
    !$omp end parallel
 
-   ! call Gaussslv(A, b, n)
-   call solve_lin(A,b,n)
+   call Gaussslv(A, b, n)
+   !-> useful to minimise the residual here ? or redundant
+   ! call solve_lin(A,b,n)
 
    !recombine into first (current) index.
    !x0 is needed otherwise x(:,1) is counted multiple time
@@ -393,26 +396,6 @@ subroutine Accelerate(m,n,x,check_negative_pops)
       x0(:) = x0(:) + b(i) * ( x(:,i+1) - x(:,1) )
    enddo
    x(:,1) = x0(:)
-
-   if (present(check_negative_pops)) then
-
-      if (check_negative_pops) then
-         max_sol = maxval(x(:,1))
-
-         npop_loop : do k=1,m
-            if (x(k,1) < 0) then
-               write(*,*) "ERROR negative pops sol in Ng's acceleration"
-               write(*,*) " This is likely to be a bug !"
-               write(*,*) k, "sol:", x(k,1), " relative to max:", x(k,1)/max_sol, &
-                     " relative to all:", x(k,1) / sum(abs(x(:,1)))
-               write(*,*) " leaving..!"
-               stop
-               exit npop_loop
-            endif
-         enddo npop_loop
-      endif
-
-   endif
 
    return
 end subroutine Accelerate
@@ -1837,5 +1820,37 @@ end function locate
 
    return
  end function E2
+
+   ! function flatten_n1n2(n1, n2, M)
+   ! !for each i in n1 write the n2 values of n1(i,:)
+   ! !In the flattened array, there are:
+   ! ! for each n1
+   ! !    write each n2
+   !    integer :: n1, n2, i, j
+   !    real(kind=dp) :: flatten_n1n2(n1*n2), M(n1,n2)
+
+   !    do i=1, n1
+   !       do j=1, n2
+   !          flatten_n1n2(n2*(i-1)+j) = M(i,j)
+   !       enddo
+   !    enddo
+
+   !    return
+   ! end function flatten_n1n2
+
+   ! function reform_n1xn2(n1, n2, F)
+   ! ! reverse process of flatten_12
+   !    integer :: n1, n2, i, j
+   !    real(kind=dp) :: F(n1*n2), reform_n1xn2(n1,n2)
+
+   !    do i=1, n1
+   !       do j=1, n2
+   !          reform_n1xn2(i,j) = F(n2*(i-1)+j)
+   !       enddo
+   !    enddo
+
+   !    return
+   ! end function reform_n1xn2
+
 
 end module utils

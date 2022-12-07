@@ -78,11 +78,11 @@ module see
         Neq_ng = max(Ng_Norder+2,3) !storing 3 by default
         if (lNg_acceleration) then
             !Automatically set if not provided (Ng_Nperiod = -1)
-            if (Ng_Nperiod == -1) Ng_Nperiod = Ng_Norder + 2 + 2 !accumulate Ng + 2, rest Ng + 2 + 2
+            if (Ng_Nperiod == -1) Ng_Nperiod = Ng_Norder + 2
             !lsubiteration must be false ?
             if (lsubiteration) call error('subiter + Ng not yet!')
         endif
-        !even if no Ng acceleration (nor subiterations) allows for storing Neq_ng previous solutions
+        !even if no Ng acceleration allows for storing Neq_ng previous solutions
         !   for the non-LTE populations: TO DO improve convergence criterion.
         allocate(ngpop(NmaxLevel,NactiveAtoms+1,n_cells,Neq_ng),stat=alloc_status)
         if (alloc_Status > 0) call error("Allocation error ngpop")
