@@ -53,6 +53,11 @@ contains
     lregular_theta = .true.
     theta_max = 0.5 * pi - idefix%x2_min
 
+    write(*,*) x1
+    write(*,*) x2
+    write(*,*) x3
+    stop
+
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
     else
