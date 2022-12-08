@@ -794,7 +794,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      icell = icell_ref
      if (maxval(densite_pouss(:,icell)) < tiny_real) then
         ldens0 = .true.
-        densite_pouss(:,icell) = nbre_grains(:)
+        densite_pouss(:,icell) = densite_pouss(:,icell_not_empty)
      endif
   endif
 
@@ -934,24 +934,20 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   ! les k_abs_XXX n'ont pas besoin d'etre normalise car tout est relatif
   fact = AU_to_cm * mum_to_cm**2
 
-  ! Todo
-  rho0 = masse(icell_ref)/volume(icell_ref) ! normalising by density in 1st cell
+  rho0 = masse(icell_not_empty)/volume(icell_not_empty) ! normalising by density in a non-empty cell
   if (rho0 < tiny_dp) call error("cannot normalise by density in first cell")
 
+  ! We apply a corrective factor per cell --> to get kappa, we need to do kappa(icell,lambda) * kappa_factor(icell)
   if (lvariable_dust) then
      kappa_factor(:) = 1.0_dp
   else
-     kappa_factor(:) = masse(1:n_cells)/volume(:) / rho0 ! ie rho / rho(icell=0)
+     kappa_factor(:) = masse(1:n_cells)/volume(:) / rho0 ! ie rho / rho(icell_not_empty)
   endif
+  kappa(:,lambda) = kappa(:,lambda) * fact ! this is kappa in cell # icell_not_empty or in all cells if lvariable_dust
 
-  ! We apply a corrective factor per cell --> to get kappa, we need to do kappa(icell,lambda) * kappa_factor(icell)
-  kappa(:,lambda) = kappa(:,lambda) * fact / kappa_factor(1:p_n_cells)
-
-  if (lRE_LTE) kappa_abs_LTE(:,lambda) = kappa_abs_LTE(:,lambda) * fact / kappa_factor(1:p_n_cells)
-  if (lRE_nLTE) kappa_abs_nLTE(:,lambda) = kappa_abs_nLTE(:,lambda) * fact / kappa_factor(1:p_n_cells)
+  if (lRE_LTE) kappa_abs_LTE(:,lambda) = kappa_abs_LTE(:,lambda) * fact
+  if (lRE_nLTE) kappa_abs_nLTE(:,lambda) = kappa_abs_nLTE(:,lambda) * fact
   if (letape_th.and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact
-
-
 
   if (compute_scatt) then
      if (scattering_method==2) then
@@ -995,13 +991,6 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   if (ldens0) then
      icell = icell_ref
      densite_pouss(:,icell) = 0.0_sp
-     kappa(icell,lambda) = 0.0_dp
-     if (lRE_LTE) then
-        kappa_abs_LTE(icell,lambda) = 0.0_dp
-     endif
-     if (lRE_nLTE) then
-        kabs_nLTE_CDF(:,icell,p_lambda) = 0.0
-     endif
   endif
 
   if ((ldust_prop).and.(lambda == n_lambda)) then
