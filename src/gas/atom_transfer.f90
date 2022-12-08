@@ -314,7 +314,7 @@ module atom_transfer
                   call update_populations(id, icell, (l_iterate_ne.and.icompute_atomRT(icell)==1), diff)
 
                   ! ************************** NG's **************************!
-                  ! accelerate locally, cell-by-cell instead of all grid
+                  ! accelerate locally, cell-by-cell for all levels only
                   ! ************************** END! **************************!
 
                end if !icompute_atomRT

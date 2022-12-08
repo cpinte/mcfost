@@ -319,8 +319,10 @@ function Ng_accelerate(m,n,x)
    A(:,:) = 0.0_dp; b(:) = 0.0_dp
    x0(:) = x(:,1)
 
+   ! a test on x0(k) > 0 is not necessary here
+   ! the knowledge of the value of x0 passed to the function is sufficient to prevent
+   ! division by 0.
    do k=1, m !long loop here
-      if (x(k,1) > 0.0) then
          w = 1.0 / ( 1.0_dp + abs(x0(k)) )
          dy = x(k,2) - x0(k)
          do i=1, n
@@ -330,7 +332,6 @@ function Ng_accelerate(m,n,x)
                A(i,j) = A(i,j) + di * (dy + x(k,j+2) - x(k,j+1))
             enddo
          enddo
-      endif
    enddo
 
    call solve_lin(A,b,n)
