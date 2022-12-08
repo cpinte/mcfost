@@ -232,7 +232,7 @@ module atom_transfer
             !$omp private(nact, at) & ! Acceleration of convergence
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on) & ! Ng's Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
-            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,max_n_iter_loc) &
+            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
