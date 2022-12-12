@@ -297,6 +297,9 @@ module parametres
      real :: time
      character(len=128) :: filename
      character(len=32) :: origin
+
+     real, dimension(:), allocatable :: x1, x2, x3
+
   end type idefix_model
 
   type(idefix_model) :: idefix

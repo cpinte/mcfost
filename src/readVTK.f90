@@ -160,6 +160,7 @@ contains
           x1(i) = sqrt(x(i,1,1)**2 + y(i,1,1)**2)
        enddo
 
+       ! phi
        nx1mid = (dimensions(1)-1)/2
        nx3mid = (dimensions(3)-1)/2
        allocate(x2(dimensions(2)))
@@ -170,6 +171,7 @@ contains
           endif
        enddo
 
+       ! z
        allocate(x3(dimensions(3)))
        do i = 1, dimensions(3)
           x3(i) = z(1,1,i)
@@ -177,10 +179,13 @@ contains
     else if(geometry==2) then
        ! spherical geometry
        allocate(x1(dimensions(1)))
+
+       ! r
        do i = 1, dimensions(1)
           x1(i) = sqrt(x(i,1,1)**2 + y(i,1,1)**2 + z(i,1,1)**2)
        enddo
 
+       ! theta
        nx1mid = (dimensions(1)-1)/2
        nx2mid = (dimensions(2)-1)/2
        allocate(x2(dimensions(2)))
@@ -188,6 +193,7 @@ contains
           x2(i) = acos( z(1,i,1) / sqrt(x(1,i,1)**2+y(1,i,1)**2+z(1,i,1)**2))
        enddo
 
+       ! phi
        allocate(x3(dimensions(3)))
        do i = 1, dimensions(3)
           x3(i) = atan2(y(nx1mid,nx2mid,i), x(nx1mid,nx2mid,i))

@@ -1428,7 +1428,6 @@ subroutine initialisation_mcfost()
   if (lidefix) then
      l3D = .true.
      if (n_zones > 1) call error("athena mode only work with 1 zone")
-     call warning("idefix : forcing spherical grid") ! only spherical grid is implemented for now
      disk_zone(1)%geometry = 2
      call read_idefix_parameters(idefix_file)
   endif
