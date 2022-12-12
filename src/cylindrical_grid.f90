@@ -502,11 +502,18 @@ subroutine define_cylindrical_grid()
         dtheta = theta_max / (nz-1)
 
         do j=1, nz-1
-           theta = j * dtheta
-           theta_lim(j) = theta
-           tan_theta_lim(j) = tan(theta)
-           w_lim(j) = sin(theta)
+           theta_lim(j) = j * dtheta
+        enddo
 
+        if (lidefix) then ! we replace the grid as it can be non uniform
+           do j=1, nz-1
+              theta_lim(j) =  0.5_dp * pi - idefix%x2(nz-j)
+           enddo
+        endif
+
+        do j=1, nz-1
+           tan_theta_lim(j) = tan(theta_lim(j))
+           w_lim(j) = sin(theta_lim(j))
            dcos_theta(j) = w_lim(j) - w_lim(j-1)
         enddo
         dcos_theta(nz) = w_lim(nz) - w_lim(nz-1)
