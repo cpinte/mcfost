@@ -122,6 +122,7 @@ module io_atom
       atom%Lorbit(:) = -99
       determined(:) = .false.
       parse_labs(:) = .false.
+      atom%vth_char = vbroad(minval(T,mask=T>0.0), atom%weight, minval(vturb,mask=T>0.0)) !m/s
 
       !Start reading energy levels
       do i=1,atom%Nlevel
@@ -160,6 +161,7 @@ module io_atom
 
          atom%lines(kr)%atom => atom
          atom%lines(kr)%polarizable = .false.
+         atom%lines(kr)%damp_max = 0.0_dp !in m/s
          atom%lines(kr)%g_lande_eff = -99.0
          atom%lines(kr)%glande_i = -99.0; atom%lines(kr)%glande_j = -99.0
 
@@ -180,13 +182,6 @@ module io_atom
          atom%ij_to_trans(atom%lines(kr)%i,atom%lines(kr)%j) = kr
          atom%i_trans(kr) = atom%lines(kr)%i
          atom%j_trans(kr) = atom%lines(kr)%j
-
-         if (atom%lines(kr)%qwing < 3.0) then
-
-            call Warning("qwing for line lower than 3! setting to 3")
-            atom%lines(kr)%qwing = 3.0
-
-         endif
 
          !because levels correspond to different transitions, 
          !we need to test if the level has already been indentified
@@ -251,6 +246,15 @@ module io_atom
                write(*,*) "Line profile shape", shapechar, " unknown, using voigt."
                atom%lines(kr)%Voigt = .true.
          end select
+         !use that for very opt thick lines ? or future deprecation ?
+         if (atom%lines(kr)%Voigt) then
+            if (atom%lines(kr)%qwing < 1.0) then
+               write(*,*) " ** WARNING: qwing for Voigt line", kr, ' of atom', atom%ID
+               write(*,*) "  ** ", atom%lines(kr)%qwing, " setting to 1!"
+            endif
+         else !Qwing not used for Gauss profile, and set to 1.0
+            atom%lines(kr)%qwing = 1.0
+         endif
 
 
          !Van der Waaks collision method
@@ -276,15 +280,8 @@ module io_atom
             case default
                atom%lines(kr)%vdWaals = "UNSOLD"
          end select
-
-         !define the extension of a line for non-LTE loop and images.
-         !here, limage is .false. vmax is computed from the atomic file
-         !and from the "natural" width of the line.
-         call compute_line_bound(atom%lines(kr),.false.)
-         !if limage is .true., vmax is atom%vmax_rt.
-         !with limage, line%Nlambda is also fixed by atom%n_speed_rt.
-
-
+         !-> move to make_wavelengths_nlte in wavlengths_gas
+         ! call compute_line_bound(atom%lines(kr),.false.)
       end do !end loop over bound-bound transitions
 
       ! ----------------------------------------- !

@@ -23,7 +23,7 @@ module atom_transfer
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
-        lnon_lte_loop, vlabs, calc_contopac_loc
+        lnon_lte_loop, vlabs, calc_contopac_loc, set_max_damping
    use see, only : ngpop, Neq_ng, lcell_converged, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
@@ -54,9 +54,14 @@ module atom_transfer
 !      add Trad, Tion
 !      checkpointing
    subroutine nlte_loop_mali()
-   ! ----------------------------------------------------------------------- !
-   ! Descriptor
-   ! ----------------------------------------------------------------------- !
+   ! ------------------------------------------------------------------------------------ !
+   ! Solve the set of statistical equilibrium equations (SEE) with the 
+   ! Multi-level Accelerated Lambda Iterations method (Rybicki & Hummer 92, Apj 202 209).
+   !
+   ! By default, the SEE are solved twice.
+   !  1) A first step with rays starting at the centre of each cell (healpix phase)
+   !  2) Randomly distributed rays for random distribution of points of each cell.
+   ! ------------------------------------------------------------------------------------ !
       integer :: etape, etape_start, etape_end, iray, n_rayons
       integer :: n_iter, id, i, iray_start, alloc_status
       integer :: nact, imax, icell_max, icell_max_2
@@ -935,6 +940,8 @@ module atom_transfer
       endif
 
       call ltepops_atoms()
+      !used for the extension of Voigt profiles
+      call set_max_damping()
 
       if( Nactiveatoms > 0) then
 
@@ -1434,26 +1441,3 @@ end module atom_transfer
          !    v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
          ! endif
          ! write(*,'("maximum gradv="(1F12.3)" km/s")') v_char*1d-3
-   ! subroutine write_local_intensity(id,icell,step,n_rayons,iloc,cntrb)
-   !    !write the intensity of cells for all directions
-   !    ! of the non-LTE loop.
-   !    !Binary format.
-   !    integer, intent(in) :: id, icell,n_rayons, step
-   !    integer :: unit, status, ir, ic
-   !    real(kind=8), intent(in) :: iloc(:,:,:), cntrb(:,:,:)
-   !    character(len=1) :: step_char
-
-   !    write(step_char, '(i0)') step
-
-   !    call ftgiou(unit,status)
-   !    open(unit, file="iloc_step"//step_char//".bin",form="unformatted",status='unknown',access="sequential",iostat=status)
-   !    write(unit,iostat=status) icell, id, size(iloc(:,1,id)), n_rayons
-   !    write(unit,iostat=status) tab_lambda_nm
-   !    write(unit,iostat=status) iloc(:,:,id) !total intensity at cell icell
-   !    write(unit,iostat=status) cntrb(:,:,id) !contribution of cell icell to intensity at icell
-   !    close(unit)
-   !    call ftfiou(unit, status)
-
-   !    stop
-   !    return
-   ! end subroutine write_local_intensity

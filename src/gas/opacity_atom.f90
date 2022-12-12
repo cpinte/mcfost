@@ -28,11 +28,42 @@ module Opacity_atom
 
    contains
 
+   function gmax_line(line)
+   !compute the damping max of a given line line.
+   !assumes that eletronic densities, populations and thermodynamics
+   !quantities are set
+      type (AtomicLine), intent(in) :: line
+      integer :: i
+      real(kind=dp) :: gmax_line
+   !could be para
+      gmax_line = 0.0_dp ! damping * vth
+      do i=1,n_cells
+         if (icompute_atomRT(i)>0.0) then
+            gmax_line = max(gmax_line,line_damping(i,line)*&
+                        vbroad(T(i),line%atom%weight, vturb(i)))
+         endif
+      enddo
+      return
+   end function gmax_line
+
+   subroutine set_max_damping()
+      integer :: nat, kr
+      do nat=1, n_atoms
+         do kr=1,atoms(nat)%p%nline
+            if (.not.atoms(nat)%p%lines(kr)%lcontrib) cycle
+            if (atoms(nat)%p%lines(kr)%Voigt) then
+               atoms(nat)%p%lines(kr)%damp_max = gmax_line(atoms(nat)%p%lines(kr))
+            endif
+         enddo
+      enddo
+      return
+   end subroutine set_max_damping
+
    !could be parralel
    subroutine alloc_atom_opac(N,x)
       integer, intent(in) :: N
       real(kind=dp), dimension(N) :: x
-      integer :: nat, kr, icell, nb, nr, nl_gauss
+      integer :: nat, kr, icell, nb, nr
       type(AtomType), pointer :: atm
       real(kind=dp) :: vth
       integer(kind=8) :: mem_loc, mem_contopac
@@ -49,7 +80,7 @@ module Opacity_atom
                if (.not.atm%lines(kr)%lcontrib) cycle
                if (atm%lines(kr)%Voigt) then
                   allocate(atm%lines(kr)%v(atm%lines(kr)%Nlambda),atm%lines(kr)%phi(atm%lines(kr)%Nlambda,n_cells))
-                  allocate(atm%lines(kr)%a(n_cells))
+                  allocate(atm%lines(kr)%a(n_cells)); atm%lines(kr)%a(:) = 0.0_dp
                   mem_loc = mem_loc + sizeof(atm%lines(kr)%a)+sizeof(atm%lines(kr)%phi)+sizeof(atm%lines(kr)%v)
                endif
          enddo
@@ -65,9 +96,11 @@ module Opacity_atom
                   nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
                   atm%lines(kr)%a(icell) = line_damping(icell,atm%lines(kr))
 
-                  atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth !unitless
-                  atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, atm%lines(kr)%a(icell), atm%lines(kr)%v(:)) &
-                       / (vth * sqrtpi)
+                  atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth
+                  atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, &
+                                                   atm%lines(kr)%a(icell), &
+                                                   atm%lines(kr)%v(:)) / (vth * sqrtpi)
+               ! else !gaussian profile, computed locally
                endif
             enddo
          enddo
@@ -360,18 +393,32 @@ module Opacity_atom
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Aji * phi0(1:Nlam) * atom%n(j,icell)
 
-!-> check Gaussian profile  and norm.
-! -> check Voigt profile, for Lyman alpha mainly.
-            ! if (kr==3 .and. atom%id=="H") then
-            !    open(1,file="prof.txt",status="unknown")
-            !    write(1,*) sqrtpi * vbroad(T(icell),Atom%weight, vturb(icell))
-            !    do j=1,Nlam
-            !       write(1,*) lambda(Nblue+j-1),phi0(j)
-            !    enddo
-            !    close(1)
-            !    stop
-            ! endif
-
+! !-> check Gaussian profile  and norm.
+! ! -> check Voigt profile, for Lyman alpha mainly.
+! ! -> write a voigt profile (kr) and a gaussian one (the same for all in principle!)
+!             if (kr==1 .and. atom%id=="H") then
+!                !-> try large damped lines to test the maximum extension of the line.
+!                ! phi0(1:Nlam) = Voigt(Nlam, 1d4, (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))
+!                !-> try pure gauss with the same grid as voigt (for testing low damping)
+!                ! phi0(1:Nlam) = exp(-( (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))**2)
+!                open(1,file="prof.txt",status="unknown")
+!                write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
+!                write(1,*) atom%lines(kr)%a(icell), maxval(atom%lines(kr)%a), minval(atom%lines(kr)%a,mask=nhtot>0)
+!                do j=1,Nlam
+!                   write(1,*) lambda(Nblue+j-1),phi0(j)
+!                enddo
+!                close(1)
+!             endif
+!             if (.not.atom%lines(kr)%voigt .and. atom%id=="H") then
+!                !maybe the similar grid for voigt is nice too ? core + wings ?
+!                open(1,file="profg.txt",status="unknown")
+!                write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
+!                do j=1,Nlam
+!                   write(1,*) lambda(Nblue+j-1),phi0(j)
+!                enddo
+!                close(1)
+!                stop
+!             endif
 
             if ((iterate.and.atom%active)) then
                phi_loc(1:Nlam,atom%ij_to_trans(i,j),atom%activeindex,iray,id) = phi0(1:Nlam)
@@ -674,7 +721,6 @@ module Opacity_atom
          if (lnon_lte_loop) omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(iray,id)
       endif
 
-!is it really necessary to invole 1/vth for the interpolation ? can do in velocity direclty
       if (line%voigt) then
          u1(:) = u0(:) - omegav(1)/vth
          uloc(:) = line%v(:) / vth
