@@ -248,10 +248,10 @@ module gas_contopac
       real(kind=dp) :: theta, lam
       integer :: icell, la, i
 
-      write(*,*) " ***WaRNING ****"
-      write(*,*) "elemental function should be changed. they are too slow!"
-      write(*,*) "if they are called often, like if bckgr opac is computed on the fly"
-      write(*,*) ""
+      ! " ***WaRNING ****"
+      ! "elemental function should be changed. they are too slow!"
+      ! "if they are called often, like if bckgr opac is computed on the fly"
+      ! ""
 
       allocate(Hray_lambda(N))
 
