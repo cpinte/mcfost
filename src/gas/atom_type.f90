@@ -39,7 +39,8 @@ module atom_type
       integer :: Nover_inf, Nover_sup !max index of overlap with another line
       real(kind=dp) :: lambda0, lambdamin, lambdamax
       real(kind=dp) :: Aji, Bji, Bij, Grad, cStark, fosc
-      real(kind=dp) :: twohnu3_c2, gij, vmax !m/s
+      real(kind=dp) :: twohnu3_c2, gij
+      real(kind=dp) :: vmax, damp_max !m/s and in units of vth
       real :: qwing
       real(kind=dp), allocatable, dimension(:)  :: Rij, Rji, Cij, Cji 
       real(kind=dp), dimension(4) :: cvdWaals
@@ -70,6 +71,7 @@ module atom_type
       !Compatibility with RH, stored the collision in character format!
       character(len=Nmax_line_per_collision), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
       real(kind=dp)                :: cswitch, Abund
+      real(kind=dp) :: vth_char ! typical Doppler width the gaussian lines.
       real :: weight, massf !mass fraction
       integer                      :: periodic_table, activeindex !order of the active atom in the
       character(len=ATOM_LABEL_WIDTH), allocatable, dimension(:)  :: label
