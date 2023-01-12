@@ -20,6 +20,7 @@ contains
     character(len=*), intent(in) :: para
 
     integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
+    integer :: nat, ntr
     real(kind=dp) :: somme, V_somme
 
     type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -54,9 +55,15 @@ contains
     lread_Misselt=.false.
     lread_DustEM=.false.
 
-    if (abs(para_version - 3.0) > 1.e-4) then
+    if (abs(para_version - 4.0) > 1.e-4) then
        write(*,*) "Wrong version of the parameter file."
-       if (abs(para_version-2.20) < 1.e-4) then
+       if (abs(para_version-3.0) < 1.e-4) then
+          write(*,*) "Trying to read 3.0 parameter file."
+          write(*,*) "Pbs can appear. Parameter file should be updated !!!"
+          close(unit=1)
+          call read_para3(para)
+          return
+       else if (abs(para_version-2.20) < 1.e-4) then
           write(*,*) "Trying to read 2.20 parameter file."
           write(*,*) "Pbs can appear. Parameter file should be updated !!!"
           close(unit=1)
@@ -116,12 +123,6 @@ contains
           close(unit=1)
           call read_para211(para)
           return
-       else if (abs(para_version-4.0) < 1.e-4) then ! read new version with atom setting
-         write(*,*) "Trying to read 4.0 parameter file."
-         write(*,*) "The new model includes atom settings"
-         close(unit=1)
-         call read_para4(para)
-         return
        else
           close(unit=1)
           call error("Unsupported version of the parameter file")
@@ -448,6 +449,37 @@ contains
        mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
     enddo
 
+    ! ---------------------
+    ! Atom RT settings
+    ! ---------------------
+    !To Do: this one replace atoms.input file.
+    NactiveAtoms = 0
+    NpassiveAtoms = 0
+    read(1,*) line_buffer
+    read(1,*) n_atoms
+    allocate(Atoms(n_atoms))
+    !reads the name of the model file, the initial solution
+    !and if the atom is treated in non-LTE or not.
+    !Also reads the transition to be outputed.
+    do nat=1, n_atoms
+       allocate(Atoms(nat)%p)!because it is a pointer
+       read(1,*) atoms(nat)%p%filename
+       read(1,*) atoms(nat)%p%active
+       if (atoms(nat)%p%active) then
+          NactiveAtoms = NactiveAtoms + 1
+       endif
+       read(1,*) atoms(nat)%p%initial
+       read(1,*) atoms(nat)%p%vmax_rt, atoms(nat)%p%n_speed_rt
+       read(1,*) atoms(nat)%p%lline, atoms(nat)%p%nTrans_raytracing
+       if (atoms(nat)%p%nTrans_raytracing>Nmax_Trans_raytracing) then
+          call error("number max of transitions for RT reached!")
+       endif
+       do ntr=1, atoms(nat)%p%nTrans_raytracing
+          read(1,*) atoms(nat)%p%j_Trans_rayTracing(ntr), atoms(nat)%p%i_Trans_rayTracing(ntr)
+       enddo
+    enddo
+    NpassiveAtoms = n_atoms - NactiveAtoms
+
     ! ---------------
     ! Star properties
     ! ---------------
@@ -495,14 +527,13 @@ contains
 
   !**********************************************************************
 
-  subroutine read_para4(para)
+  subroutine read_para3(para)
 
    implicit none
 
    character(len=*), intent(in) :: para
 
    integer :: i, j, k, alloc_status, ios, ind_pop, imol, status
-   integer :: nat, ntr
    real(kind=dp) :: somme, V_somme
 
    type(dust_pop_type), dimension(100) :: dust_pop_tmp
@@ -849,37 +880,6 @@ contains
       mol(imol)%n_extraV_rt = 0 ; mol(imol)%extra_deltaV_rt = 0.0
    enddo
 
-   ! ---------------------
-   ! Atom RT settings
-   ! ---------------------
-   !To Do: this one replace atoms.input file.
-   NactiveAtoms = 0
-   NpassiveAtoms = 0
-   read(1,*) line_buffer
-   read(1,*) n_atoms
-   allocate(Atoms(n_atoms))
-   !reads the name of the model file, the initial solution
-   !and if the atom is treated in non-LTE or not.
-   !Also reads the transition to be outputed.
-   do nat=1, n_atoms
-      allocate(Atoms(nat)%p)!because it is a pointer
-      read(1,*) atoms(nat)%p%filename
-      read(1,*) atoms(nat)%p%active
-      if (atoms(nat)%p%active) then
-         NactiveAtoms = NactiveAtoms + 1
-      endif
-      read(1,*) atoms(nat)%p%initial
-      read(1,*) atoms(nat)%p%vmax_rt, atoms(nat)%p%n_speed_rt
-      read(1,*) atoms(nat)%p%lline, atoms(nat)%p%nTrans_raytracing
-      if (atoms(nat)%p%nTrans_raytracing>Nmax_Trans_raytracing) then
-            call error("number max of transitions for RT reached!")
-      endif
-      do ntr=1, atoms(nat)%p%nTrans_raytracing
-         read(1,*) atoms(nat)%p%j_Trans_rayTracing(ntr), atoms(nat)%p%i_Trans_rayTracing(ntr)
-      enddo
-   enddo
-   NpassiveAtoms = n_atoms - NactiveAtoms
-
    ! ---------------
    ! Star properties
    ! ---------------
@@ -923,7 +923,7 @@ contains
 
    return
 
- end subroutine read_para4
+ end subroutine read_para3
 
 
   subroutine read_para220(para)

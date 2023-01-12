@@ -2,7 +2,7 @@
 # Makefile for Monte Carlo radiative transfer code MCFOST
 #------------------------------------------------------------------------------#
 # Linux compiling server
-LINUX_SERVER=ozstar
+LINUX_SERVER=gadi
 IPAG_SERVER=ipag-nfs
 
 KNOWN_SYSTEM=no
@@ -290,7 +290,7 @@ release : clean main
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/mac/mcfost.sha1
 	mv mcfost_bin.tgz web/mac/
-	ssh $(LINUX_SERVER) "cd mcfost/src && git pull origin master && git fetch --tags && git checkout release && export MCFOST_GIT=1 && export MAKEFLAGS= && make clean mcfost static=yes && git checkout master && \cp -f mcfost ~/mcfost_cigri && \cp -f mcfost mcfost_update && rm -f mcfost.sha1 && tar czf mcfost_bin.tgz mcfost_update --remove-files && sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
+	ssh $(LINUX_SERVER) "cd mcfost/src && git pull origin master && git fetch --tags --force && git checkout release && export MCFOST_GIT=1 && export MAKEFLAGS= && make clean mcfost static=yes && git checkout master && \cp -f mcfost ~/mcfost_cigri && \cp -f mcfost mcfost_update && rm -f mcfost.sha1 && tar czf mcfost_bin.tgz mcfost_update --remove-files && sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
 	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web

@@ -25,7 +25,7 @@ contains
     real(dp) :: dx
 
     idefix%filename = filename
-    call readVTK_header(filename, idefix%iunit, idefix%position, dimensions, idefix%time, origin, x1, x2, x3)
+    call readVTK_header(filename, idefix%iunit, idefix%position, idefix%geometry, dimensions, idefix%time, origin, x1, x2, x3)
 
     idefix%origin = origin
     idefix%dimensions = dimensions
@@ -37,21 +37,35 @@ contains
     idefix%log_spacing = (x1(idefix%nx1) - x1(idefix%nx1-1)) > 1.01 * (x1(2) - x1(1))
 
     ! Model boundaries
-    idefix%x1_min = x1(1)
+    idefix%x1_min = x1(1)           ! r
     idefix%x1_max = x1(idefix%nx1)
-    idefix%x2_min = x2(1)
+    idefix%x2_min = x2(1)           ! phi in cylindrical, theta in spherical
     idefix%x2_max = x2(idefix%nx2)
-    idefix%x3_min = x3(1)           ! these values should be 0 to 2*pi,
-    idefix%x3_max = x3(idefix%nx3)  ! while fargo3d is -pi to pi
+    idefix%x3_min = x3(1)           ! z in cylindrical, phi in spherical
+    idefix%x3_max = x3(idefix%nx3)
+    ! phi is 0 to 2*pi, while fargo3d is -pi to pi
+
+    allocate(idefix%x1(idefix%nx1), idefix%x2(idefix%nx2), idefix%x3(idefix%nx3))
+    idefix%x1 = x1 ; idefix%x2 = x2 ; idefix%x3 = x3
 
     ! Updating mcfost parameters
-    grid_type = 2
+    grid_type = idefix%geometry
     n_rad = idefix%nx1-1
     n_rad_in = 1
-    nz = (idefix%nx2-1)/2+1
-    n_az = idefix%nx3-1
-    lregular_theta = .true.
-    theta_max = 0.5 * pi - idefix%x2_min
+
+    if (idefix%geometry == 1) then
+       call warning("idefix : using cylindrical grid")
+       nz = (idefix%nx3-1)/2
+       n_az = idefix%nx2-1
+    else if (idefix%geometry ==2) then
+       call warning("idefix : using spherical grid")
+       nz = (idefix%nx2-1)/2+1
+       n_az = idefix%nx3-1
+       lregular_theta = .true.
+       theta_max = 0.5 * pi - idefix%x2_min
+    else
+       call error("idefix: unknow geometry")
+    endif
 
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
@@ -79,7 +93,7 @@ contains
     ! idefix data is ordered in x1 = r, x2 = theta, x3 = phi
 
     real, dimension(:,:,:), allocatable  :: rho, vx1, vx2, vx3
-    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_planets, n_etoiles_old
+    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_planets, n_etoiles_old, i2, i3
 
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
@@ -228,14 +242,24 @@ contains
           if (j==0) cycle bz
           jj = jj + 1
           do phik=1, n_az
+             ! Order of dimensions is not the same as mcfost depending on geometry
+             if (lcylindrical) then
+                i2 = phik
+                i3 = jj
+             else
+                i2 = jj
+                i3 = phik
+             endif
+
+
              icell = cell_map(i,j,phik)
 
-             densite_gaz(icell) = rho(i,jj,phik) * udens
-             densite_pouss(:,icell) = rho(i,jj,phik) * udens
+             densite_gaz(icell) = rho(i,i2,i3) * udens
+             densite_pouss(:,icell) = rho(i,i2,i3) * udens
 
-             vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity ! vr
-             vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
-             vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity ! vtheta
+             vfield3d(icell,1)  = vx1(i,i2,i3) * uvelocity ! vr
+             vfield3d(icell,2)  = (vx3(i,i2,i3) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,3)  = vx2(i,i2,i3) * uvelocity ! vtheta
           enddo ! k
        enddo bz
     enddo ! i

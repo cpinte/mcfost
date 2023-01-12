@@ -86,7 +86,7 @@ subroutine set_default_variables()
   ldissolve = .false.
   lng_acceleration = .false.
   Ng_Norder = 0
-  Ng_Nperiod = 5
+  Ng_Nperiod = -1
   istep_start = 1
   ! AL-RT
   lstop_after_step1 = .false.
@@ -841,8 +841,7 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) Ng_Nperiod
         i_arg= i_arg+1
         if (Ng_Nperiod < 0) then
-         call warning ("Ng Nperiod < 0 setting to abs!")
-         Ng_Nperiod = abs(Ng_Nperiod)
+         call error ("Ng Nperiod must be positive!")
         endif
      case("-Nrays_mc_step")
         i_arg = i_arg + 1
@@ -875,8 +874,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lforce_lte=.true.
      case("-level_dissolution")
-     	call error("Level's dissolution not yet!")
         i_arg = i_arg + 1
+        call error("Continuum level dissolution not yet!")
         ldissolve =.true.
      case("-phantom")
         i_arg = i_arg + 1
@@ -1429,7 +1428,6 @@ subroutine initialisation_mcfost()
   if (lidefix) then
      l3D = .true.
      if (n_zones > 1) call error("athena mode only work with 1 zone")
-     call warning("idefix : forcing spherical grid") ! only spherical grid is implemented for now
      disk_zone(1)%geometry = 2
      call read_idefix_parameters(idefix_file)
   endif

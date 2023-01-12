@@ -395,7 +395,7 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1, zj_sup_dark_zone(i,k) + delta_cell_dark_zone
            dr = r_grid(cell_map(i,j,1))-r_grid(cell_map(i-1,j,1))
-           dz = delta_z(i)
+           dz = delta_z(i,j)
            ! tab_dt(i,j,k) = min(dr,dz)**2/Dcoeff(i,j,k)
            tab_dt(i,j,k) = 1.0_dp/(Dcoeff(i,j,k)*(1.0_dp/dr**2 + 1.0_dp/dz**2))
         enddo !j
@@ -457,7 +457,7 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
 
            !d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_dp * delta_z(i)**2)
 
-           d2E_dz2  =   Dcoeff(i,j,k) * (DensE_m1(i,j+1,k) + DensE_m1(i,j-1,k) - 2.0 * DensE(i,j,k)) / (2.0 * delta_z(i)**2)
+           d2E_dz2  =   Dcoeff(i,j,k) * (DensE_m1(i,j+1,k) + DensE_m1(i,j-1,k) - 2.0 * DensE(i,j,k)) / (2.0 * delta_z(i,j)**2)
 
 
            ! Laplacien
@@ -520,7 +520,7 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
   ! pas de temps pour chacune des cellules
   tab_dt = huge_dp ! pour ne pas selectionner les cellules hors zone de diff
   do j=1, zj_sup_dark_zone(ri,k) + delta_cell_dark_zone
-     dz = delta_z(ri)
+     dz = delta_z(ri,j)
      tab_dt(j) = dz**2/Dcoeff(ri,j,k)
   enddo !j
 
@@ -551,7 +551,7 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
   !   Dcoeff_m =  Dcoeff(ri,j,k)
   !   d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_dp * delta_z(ri)**2)
 
-     d2E_dz2  =  Dcoeff(ri,j,k) * (dE_dz_p1 - dE_dz_m1) / (2.0_dp * delta_z(ri)**2)
+     d2E_dz2  =  Dcoeff(ri,j,k) * (dE_dz_p1 - dE_dz_m1) / (2.0_dp * delta_z(ri,j)**2)
 
 
   !   write(*,*) "****"

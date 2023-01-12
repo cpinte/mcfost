@@ -274,6 +274,149 @@ subroutine GaussSlv(a, b, n)
 
 end subroutine GaussSlv
 
+subroutine solve_lin(A, b, N)
+   ! Solve a system Ax=b with minimization of the residual
+   ! Wrapper around GaussSlv (any solver works).
+   integer, intent(in) :: N
+   real(kind=dp), intent(inout) :: A(N,N), b(N)
+   real(kind=dp) :: Adag(N,N), bdag(N), res(N)
+
+   bdag = b
+   Adag = A
+
+   call GaussSlv(A, b, n)
+
+   !compute the difference (residual) between the new solution and old one (bdag)
+   res(:) = bdag(:) - matmul(Adag(:,:),b(:))
+
+   !solve for the residual
+   call Gaussslv(Adag, res, N)
+
+   !correct the new solution with the residual
+   b(:) = b(:) + res(:)
+
+   return
+end subroutine solve_lin
+
+
+function Ng_accelerate(m,n,x)
+!
+! Extrapolate a solution x of an iterative system Ax=b based on N previous
+! iterations (solutions).
+! (m) represents the size of the vector to extrapolate (for instance Nlevel or NlevelxNcells)
+! (n) is the number of solutions (Ng_norder) ordered by increasing n : 1 most recent one, n oldest one.
+!
+! WARNING : dim(x(1,:)) should be n + 2 at least.
+!
+   integer, intent(in) :: m, n
+   logical :: Ng_accelerate
+   real(kind=dp), intent(inout) :: x(m,*)
+   integer :: i, j, k
+   real(kind=dp) :: x0(m), A(n, n), b(n), w, dy, di, max_sol
+
+   ng_accelerate = .false.
+
+   A(:,:) = 0.0_dp; b(:) = 0.0_dp
+   x0(:) = x(:,1)
+
+   do k=1, m !long loop here
+      if (x(k,1) > 0.0) then
+         w = 1.0 / ( 1.0_dp + abs(x0(k)) )
+         dy = x(k,2) - x0(k)
+         do i=1, n
+            di = w * (dy + x(k,i+2) - x(k,i+1))
+            b(i) = b(i) + di*dy
+            do j=1, n
+               A(i,j) = A(i,j) + di * (dy + x(k,j+2) - x(k,j+1))
+            enddo
+         enddo
+      endif
+   enddo
+
+   call solve_lin(A,b,n)
+
+   !recombine into first (current) index.
+   do i=1,n
+      x0(:) = x0(:) + b(i) * ( x(:,i+1) - x(:,1) )
+   enddo
+   x(:,1) = x0(:)
+
+   ng_accelerate = .true.
+
+   return
+end function Ng_accelerate
+
+
+subroutine Accelerate(m,n,x,check_negative_pops)
+!$ use omp_lib
+!
+! Parallel version of Ng_accelerate that works for all cells
+! at the same time.
+!
+   logical, optional, intent(in) :: check_negative_pops
+   integer, intent(in) :: m, n
+   real(kind=dp), intent(inout) :: x(m,*)
+   integer :: i, j, k
+   real(kind=dp) :: x0(m), A(n, n), b(n), w, dy, di, max_sol
+
+   A(:,:) = 0.0_dp; b(:) = 0.0_dp
+   x0(:) = x(:,1)
+
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(i,j,k)&
+   !$omp private(w,dy,di)&
+   !$omp shared(m,n,x,A,b,x0)
+   !$omp do schedule(dynamic,1)
+   do k=1, m
+      if (x(k,1) > 0.0) then
+         w = 1.0 / ( x0(k)**2 )
+         dy = x(k,2) - x0(k)
+         do i=1, n
+            di = w * (dy + x(k,i+1) - x(k,i+2))
+            b(i) = b(i) + di*dy
+            do j=1, n
+               A(i,j) = A(i,j) + di * (dy + x(k,j+1) - x(k,j+2))
+            enddo
+         enddo
+      endif
+   enddo
+   !$omp end do
+   !$omp end parallel
+
+   ! call Gaussslv(A, b, n)
+   call solve_lin(A,b,n)
+
+   !recombine into first (current) index.
+   !x0 is needed otherwise x(:,1) is counted multiple time
+   do i=1,n
+      x0(:) = x0(:) + b(i) * ( x(:,i+1) - x(:,1) )
+   enddo
+   x(:,1) = x0(:)
+
+   if (present(check_negative_pops)) then
+
+      if (check_negative_pops) then
+         max_sol = maxval(x(:,1))
+
+         npop_loop : do k=1,m
+            if (x(k,1) < 0) then
+               write(*,*) "ERROR negative pops sol in Ng's acceleration"
+               write(*,*) " This is likely to be a bug !"
+               write(*,*) k, "sol:", x(k,1), " relative to max:", x(k,1)/max_sol, &
+                     " relative to all:", x(k,1) / sum(abs(x(:,1)))
+               write(*,*) " leaving..!"
+               stop
+               exit npop_loop
+            endif
+         enddo npop_loop
+      endif
+
+   endif
+
+   return
+end subroutine Accelerate
+
 !***********************************************************
 
 subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
@@ -1579,7 +1722,7 @@ end function locate
  function bilinear(N,xi,i0,M,yi,j0,f,xo,yo)
    !bilinear interpolation of the function f(N,M)
    !defined on points xi(N), yi(M) at real xo, real yo.
-   !too slow ? f***ck
+   !TO DO: add automatic finding of i0 and j0
    real(kind=dp) :: bilinear
    integer, intent(in) :: N, M
    real(kind=dp), intent(in) :: xi(N),yi(M),f(N,M)
@@ -1587,12 +1730,6 @@ end function locate
    integer, intent(in) :: i0, j0
    integer :: i, j
    real(kind=dp) :: norm, f11, f21, f12, f22
-
-   !find closest point in i0 and j0
-   ! i0 = max(locate(xi,xo),2)
-   ! j0 = max(locate(yi,yo),2)
-
-   ! write(*,*) i0, j0
 
    norm = ((xi(i0) - xi(i0-1)) * (yi(j0) - yi(j0-1)))
    f11 = f(i0-1,j0-1)
