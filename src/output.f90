@@ -216,7 +216,7 @@ subroutine allocate_atom_maps()
      endif
      do n=1, n_atoms
      	if (atoms(n)%p%lline) then
-     		do k=1, atoms(n)%p%nTrans_raytracing 
+     		do k=1, atoms(n)%p%nTrans_raytracing
      			ilevel = atoms(n)%p%i_Trans_rayTracing(k)
          	jlevel = atoms(n)%p%j_Trans_rayTracing(k)
             kr = atoms(n)%p%ij_to_trans(ilevel,jlevel)
@@ -242,7 +242,7 @@ subroutine deallocate_atom_maps()
 	integer :: n,kr
 
 	if (allocated(flux_total)) deallocate(flux_total)
-	
+
 	do n=1,n_atoms
 		if (atoms(n)%p%lline) then
 			do kr=1, atoms(n)%p%Nline
@@ -250,9 +250,9 @@ subroutine deallocate_atom_maps()
 			enddo
 		endif
 	enddo
-	
+
 	return
-	
+
 end subroutine deallocate_atom_maps
 
 !**********************************************************************
@@ -805,7 +805,7 @@ subroutine ecriture_map_ray_tracing()
 
   character(len = 512) :: filename
   logical :: simple, extend
-  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U
+  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U, factor
   real(kind=dp) :: sin_disk, cos_disk, cos_disk_x2, sin_disk_x2
 
 
@@ -906,7 +906,11 @@ subroutine ecriture_map_ray_tracing()
      call ftpkyj(unit,'CRPIX4',0,'',status)
      call ftpkys(unit,'CUNIT4',"Hz",'',status)
   else
-     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
+     if (lJy) then
+        call ftpkys(unit,'BUNIT',"Jy.pixel-1",'F_nu',status)
+     else
+        call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
+     endif
   endif
 
   call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
@@ -952,6 +956,12 @@ subroutine ecriture_map_ray_tracing()
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,image_casa,status)
   else ! mode non casa
+     if (lJy) then
+        factor = 1e26 * (tab_lambda(lambda)*1e-6)/c_light;
+     else
+        factor = 1.0
+     endif
+
      type_loop : do itype=1,N_type_flux
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
@@ -959,17 +969,17 @@ subroutine ecriture_map_ray_tracing()
                  do i=1,npix_x
                     if (lsepar_pola) then
                        if (itype==2) then
-                          Q = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,2,:))
-                          U = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,3,:))
+                          Q = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,2,:)) * factor
+                          U = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,3,:)) * factor
                           image(i,j,ibin,iaz,2) = Q * cos_disk_x2 + U * sin_disk_x2
                           image(i,j,ibin,iaz,3) = - Q * sin_disk_x2 + U * cos_disk_x2
                        else if (itype==3) then ! itype 3 already done together with itype 2
                           cycle type_loop
                        else ! Other images do not need rotation
-                          image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                          image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:)) * factor
                        endif
                     else ! No need for rotation when there is no pola
-                       image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                       image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:)) * factor
                     endif
                  enddo !i
               enddo !j
@@ -1034,7 +1044,7 @@ subroutine write_tau_surface(imol)
 
   character(len = 512) :: filename
   logical :: simple, extend
-  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U
+  real :: pixel_scale_x, pixel_scale_y, Q, U
 
   ! Allocation dynamique pour passer en stack
   real, dimension(:,:,:,:,:), allocatable :: image
@@ -3104,7 +3114,7 @@ subroutine ecriture_spectre(imol)
 
   real, dimension(:,:,:), allocatable :: spectre_casa
 
-  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy
+  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, factor
 
   filename = trim(data_dir2(imol))//'/lines.fits.gz'
 
@@ -3178,7 +3188,12 @@ subroutine ecriture_spectre(imol)
      call ftpkyd(unit,'RESTFREQ',Transfreq(mol(imol)%indice_Trans_rayTracing(1)),-7,'',status)
      call ftpkys(unit,'BTYPE',"Intensity",' ',status)
   else
-     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'nu.F_nu',status)
+     if (lJy) then
+        call ftpkys(unit,'BUNIT',"JY/PIXEL",'',status)
+     else
+        call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'nu.F_nu',status)
+     endif
+
   endif
   !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
@@ -3220,11 +3235,18 @@ subroutine ecriture_spectre(imol)
      call ftppre(unit,group,fpixel,nelements,spectre_casa,status)
      deallocate(spectre_casa)
   else
+     if (lJy) then
+        factor = 1e26 / Transfreq(mol(imol)%indice_Trans_rayTracing(1))
+     else
+        factor = 1.0
+     endif
+
      !  Write the array to the FITS file.
-     call ftppre(unit,group,fpixel,nelements,spectre,status)
+     call ftppre(unit,group,fpixel,nelements,spectre * factor,status)
   endif
 
   if (.not.lcasa) then
+
      !------------------------------------------------------------------------------
      ! HDU 2 : Continuum map
      !------------------------------------------------------------------------------
@@ -3256,7 +3278,7 @@ subroutine ecriture_spectre(imol)
      endif ! l_sym_image
 
      !  Write the array to the FITS file.
-     call ftppre(unit,group,fpixel,nelements,continu,status)
+     call ftppre(unit,group,fpixel,nelements,continu * factor,status)
 
      !------------------------------------------------------------------------------
      ! HDU 3 : Transition numbers

@@ -36,7 +36,7 @@
 # MCFOST_XGBOOST   : a boolean flag ("yes" or "no") to
 #                  compile the XGBoost libraries.
 #                  If "yes", you also need to compile MCFOST
-#                  with MCFOST_XGBOOST=yes to use CGBoost.
+#                  with MCFOST_XGBOOST=yes to use XGBoost.
 #                  Optional, default value is "no".
 #
 # SKIP_HDF5      : a boolean flag ("yes" or "no") to

@@ -166,6 +166,7 @@ subroutine set_default_variables()
   ltau_surface=.false.
   lflux_fraction_surface=.false.
   lcasa=.false.
+  lJy = .false.
   lplanet_az = .false.
   which_planet = 0
   lML = .false.
@@ -1140,6 +1141,9 @@ subroutine initialisation_mcfost()
      case("-casa")
         i_arg = i_arg + 1
         lcasa=.true.
+     case("-Jy")
+        i_arg = i_arg + 1
+        lJy=.true.
      case("-cutoff")
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
@@ -1796,6 +1800,7 @@ subroutine display_help()
   write(*,*) "        : -old_PA : use old definition (PA of minor axis, red-shifted side to West for PA=0)"
   write(*,*) "        : -only_scatt : ignore dust thermal emission"
   write(*,*) "        : -casa : write an image ready for CASA"
+  write(*,*) "        : -Jy : write images in Jy/pixel instead of W/m2/pixel"
   write(*,*) "        : -nphot_img : overwrite the value in the parameter file"
   write(*,*) "        : -rt : use ray-tracing method to compute images or SEDs (on by default)"
   write(*,*) "        : -rt1 or -rt2 : use ray-tracing method and force ray-tracing method"
