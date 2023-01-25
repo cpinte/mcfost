@@ -104,7 +104,8 @@ module wavelengths_gas
       real(kind=dp) :: vB, vmax, vth_max
 
       if (limage) then
-         vmax = line%atom%vmax_rt*1d3
+         vmax = 1d3 * line%atom%vmax_rt! * line%qwing !extend line with qwing ?
+                                                     !change also the number of wavelenngths ?
       else !non-LTE
          if (line%polarizable) then
             vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
