@@ -246,7 +246,8 @@ module io_atom
                write(*,*) "Line profile shape", shapechar, " unknown, using voigt."
                atom%lines(kr)%Voigt = .true.
          end select
-         !use that for very opt thick lines ? or future deprecation ?
+         !Not use yet. Should be use to increase for some line the extent. But I'm not sure
+         !i don't like the parametric solution.
          if (atom%lines(kr)%Voigt) then
             if (atom%lines(kr)%qwing < 1.0) then
                write(*,*) " ** WARNING: qwing for Voigt line", kr, ' of atom', atom%ID

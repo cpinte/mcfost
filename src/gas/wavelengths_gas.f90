@@ -104,8 +104,7 @@ module wavelengths_gas
       real(kind=dp) :: vB, vmax, vth_max
 
       if (limage) then
-         vmax = 1d3 * line%atom%vmax_rt! * line%qwing !extend line with qwing ?
-                                                     !change also the number of wavelenngths ?
+         vmax = 1d3 * line%atom%vmax_rt
       else !non-LTE
          if (line%polarizable) then
             vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
@@ -114,8 +113,8 @@ module wavelengths_gas
          endif
          vth_max = vbroad(maxval(T), line%atom%weight, maxval(vturb))
          if (line%voigt) then
-         !qwing not needed. Here local profile only. For ray-tracing, the extension is in the param file.
-            vmax = vwing_on_vth * (vth_max + vb) + vwing_on_vth * line%damp_max
+         !increase wavelength number ?
+            vmax = vwing_on_vth * (vth_max + vb) + vwing_on_vth * line%damp_max * line%qwing !min = 1
             ! vmax = line%qwing * vwing_on_vth * (vth_max + vb) !to do
          else
             vmax = vwing_on_vth_gauss * vth_max
@@ -154,7 +153,7 @@ module wavelengths_gas
       vth_max = vbroad(maxval(T), line%atom%weight, maxval(vturb))
       vcore = vcore_on_vth * vth_max
       if (line%voigt) then
-         N_wing = Nlambda_line_w_log !*int(line%qwing/10), increase number of wing wavelengths
+         N_wing = Nlambda_line_w_log
          N_core = Nlambda_line_c_lin
       else ! gauss but asymmetric
          N_wing = Nlambda_line_gauss_log
