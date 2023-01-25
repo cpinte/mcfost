@@ -401,6 +401,54 @@ subroutine Accelerate(m,n,x)
    return
 end subroutine Accelerate
 
+subroutine check_ng_pops(m,n,o,x,xtot)
+!Normalise extrapolated populations x (Nlevels,Ncells,Neq_ng)
+!so that sum(x,dim=1) = xtot for each Neq_ng (mass conservation)
+!if x < 0; x = 0
+   integer, intent(in) :: m,n,o
+   real(kind=dp), intent(inout) :: x(m,n,o)
+   real(kind=dp), intent(in) :: xtot(n)
+   integer :: i, j, k
+   real(kind=dp) :: dum(o)
+
+   ! !handle negative has 0
+   ! do k=1,o
+   !    n_loop : do i=1,n
+   !       if (xtot(i) <= 0.0) cycle n_loop
+   !       ! do j=1,m
+   !       !    if (x(j,i,k)<0) then
+   !       !          write(*,*) "find neg pops"
+   !       !       endif
+   !       !       x(j,i,k) = x(j,i,k) * 0.0
+   !       !    endif
+   !       ! enddo
+   !       where (x(:,i,k)<0.0) x(:,i,k) = x(:,i,k) * 0.0
+   !       dum = sum(x(:,i,k))
+   !       x(:,i,k) = x(:,i,k) * xtot(i) / dum
+   !    enddo n_loop
+   ! enddo
+
+   !take absolute value
+
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(i,j,k,dum)&
+   !$omp shared(m,n,o,x,xtot)
+   !$omp do schedule(dynamic,1)
+   do i=1,n
+      if (xtot(i) <= 0.0) cycle
+      !sum of all levels for all solutions at cell i.
+      dum = sum(abs(x(:,i,:)),dim=1)
+      do j=1,m
+         x(j,i,:) = x(j,i,:) * xtot(i) / dum(:)
+      enddo
+   enddo
+   !$omp end do
+   !$omp end parallel
+
+   return
+end subroutine check_ng_pops
+
 !***********************************************************
 
 subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
