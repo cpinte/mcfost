@@ -95,7 +95,6 @@ subroutine set_default_variables()
   !
   ! Max relative error in transfer. ATM only atomic line transfer
   dpops_max_error = 1e-1
-  dpops_sub_max_error = 1e-2
   art_hv = 0.0 !default is frac * min(vD)
   !
   lpuffed_rim = .false.
@@ -860,16 +859,7 @@ subroutine initialisation_mcfost()
         read(s,*,iostat=ios) dpops_max_error
         i_arg= i_arg+1
         if (dpops_max_error <= 0) then
-         call error ("MAx relative error has to be > 0")
-        endif
-     case("-max_err_sub")
-        i_arg = i_arg + 1
-        if (i_arg > nbr_arg) call error("relative error sub needed")
-        call get_command_argument(i_arg,s)
-        read(s,*,iostat=ios) dpops_sub_max_error
-        i_arg= i_arg+1
-        if (dpops_sub_max_error <= 0) then
-         call error ("Max sub relative error has to be > 0")
+         call error ("Max relative error has to be > 0")
         endif
      case("-see_lte")
         i_arg = i_arg + 1
@@ -1916,7 +1906,6 @@ subroutine display_help()
 !   write(*,*) "        : -calc_jnu_atom : Stop the code after Jnu_scattering has been computed and written. "
 !-> this one could also be use for mol tranfer, like Ng or tab_wavelength
   write(*,*) "        : -max_err <max_err> : max relative error"
-  write(*,*) "        : -max_err_sub <max_err_sub> : max relative error for sub-iterations"
   write(*,*) "        : -Ng_Norder <Norder> : Order of Ng's acceleration"
   write(*,*) "        : -Ng_Nperiod <Nperiod> : Cycle of Ng's iteration"
 !   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."

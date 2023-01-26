@@ -319,8 +319,10 @@ function Ng_accelerate(m,n,x)
    A(:,:) = 0.0_dp; b(:) = 0.0_dp
    x0(:) = x(:,1)
 
+   ! a test on x0(k) > 0 is not necessary here
+   ! the knowledge of the value of x0 passed to the function is sufficient to prevent
+   ! division by 0.
    do k=1, m !long loop here
-      if (x(k,1) > 0.0) then
          w = 1.0 / ( 1.0_dp + abs(x0(k)) )
          dy = x(k,2) - x0(k)
          do i=1, n
@@ -330,7 +332,6 @@ function Ng_accelerate(m,n,x)
                A(i,j) = A(i,j) + di * (dy + x(k,j+2) - x(k,j+1))
             enddo
          enddo
-      endif
    enddo
 
    call solve_lin(A,b,n)
@@ -347,13 +348,12 @@ function Ng_accelerate(m,n,x)
 end function Ng_accelerate
 
 
-subroutine Accelerate(m,n,x,check_negative_pops)
+subroutine Accelerate(m,n,x)
 !$ use omp_lib
 !
 ! Parallel version of Ng_accelerate that works for all cells
 ! at the same time.
 !
-   logical, optional, intent(in) :: check_negative_pops
    integer, intent(in) :: m, n
    real(kind=dp), intent(inout) :: x(m,*)
    integer :: i, j, k
@@ -369,8 +369,11 @@ subroutine Accelerate(m,n,x,check_negative_pops)
    !$omp shared(m,n,x,A,b,x0)
    !$omp do schedule(dynamic,1)
    do k=1, m
-      if (x(k,1) > 0.0) then
-         w = 1.0 / ( x0(k)**2 )
+      ! w = 1.0 / ( 1.0_dp + abs(x0(k)) )
+      if (x0(k) > 0.0) then
+         ! w = 1.0 / ( x0(k)**2 )
+         w = 1.0 / ( 1 + abs(x0(k)) )
+         ! w = 1.0 / x0(k)
          dy = x(k,2) - x0(k)
          do i=1, n
             di = w * (dy + x(k,i+1) - x(k,i+2))
@@ -384,8 +387,9 @@ subroutine Accelerate(m,n,x,check_negative_pops)
    !$omp end do
    !$omp end parallel
 
-   ! call Gaussslv(A, b, n)
-   call solve_lin(A,b,n)
+   call Gaussslv(A, b, n)
+   !-> useful to minimise the residual here ? or redundant
+   ! call solve_lin(A,b,n)
 
    !recombine into first (current) index.
    !x0 is needed otherwise x(:,1) is counted multiple time
@@ -394,28 +398,56 @@ subroutine Accelerate(m,n,x,check_negative_pops)
    enddo
    x(:,1) = x0(:)
 
-   if (present(check_negative_pops)) then
-
-      if (check_negative_pops) then
-         max_sol = maxval(x(:,1))
-
-         npop_loop : do k=1,m
-            if (x(k,1) < 0) then
-               write(*,*) "ERROR negative pops sol in Ng's acceleration"
-               write(*,*) " This is likely to be a bug !"
-               write(*,*) k, "sol:", x(k,1), " relative to max:", x(k,1)/max_sol, &
-                     " relative to all:", x(k,1) / sum(abs(x(:,1)))
-               write(*,*) " leaving..!"
-               stop
-               exit npop_loop
-            endif
-         enddo npop_loop
-      endif
-
-   endif
-
    return
 end subroutine Accelerate
+
+subroutine check_ng_pops(m,n,o,x,xtot)
+!Normalise extrapolated populations x (Nlevels,Ncells,Neq_ng)
+!so that sum(x,dim=1) = xtot for each Neq_ng (mass conservation)
+!if x < 0; x = 0
+   integer, intent(in) :: m,n,o
+   real(kind=dp), intent(inout) :: x(m,n,o)
+   real(kind=dp), intent(in) :: xtot(n)
+   integer :: i, j, k
+   real(kind=dp) :: dum(o)
+
+   ! !handle negative has 0
+   ! do k=1,o
+   !    n_loop : do i=1,n
+   !       if (xtot(i) <= 0.0) cycle n_loop
+   !       ! do j=1,m
+   !       !    if (x(j,i,k)<0) then
+   !       !          write(*,*) "find neg pops"
+   !       !       endif
+   !       !       x(j,i,k) = x(j,i,k) * 0.0
+   !       !    endif
+   !       ! enddo
+   !       where (x(:,i,k)<0.0) x(:,i,k) = x(:,i,k) * 0.0
+   !       dum = sum(x(:,i,k))
+   !       x(:,i,k) = x(:,i,k) * xtot(i) / dum
+   !    enddo n_loop
+   ! enddo
+
+   !take absolute value
+
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(i,j,k,dum)&
+   !$omp shared(m,n,o,x,xtot)
+   !$omp do schedule(dynamic,1)
+   do i=1,n
+      if (xtot(i) <= 0.0) cycle
+      !sum of all levels for all solutions at cell i.
+      dum = sum(abs(x(:,i,:)),dim=1)
+      do j=1,m
+         x(j,i,:) = x(j,i,:) * xtot(i) / dum(:)
+      enddo
+   enddo
+   !$omp end do
+   !$omp end parallel
+
+   return
+end subroutine check_ng_pops
 
 !***********************************************************
 
@@ -1837,5 +1869,37 @@ end function locate
 
    return
  end function E2
+
+   ! function flatten_n1n2(n1, n2, M)
+   ! !for each i in n1 write the n2 values of n1(i,:)
+   ! !In the flattened array, there are:
+   ! ! for each n1
+   ! !    write each n2
+   !    integer :: n1, n2, i, j
+   !    real(kind=dp) :: flatten_n1n2(n1*n2), M(n1,n2)
+
+   !    do i=1, n1
+   !       do j=1, n2
+   !          flatten_n1n2(n2*(i-1)+j) = M(i,j)
+   !       enddo
+   !    enddo
+
+   !    return
+   ! end function flatten_n1n2
+
+   ! function reform_n1xn2(n1, n2, F)
+   ! ! reverse process of flatten_12
+   !    integer :: n1, n2, i, j
+   !    real(kind=dp) :: F(n1*n2), reform_n1xn2(n1,n2)
+
+   !    do i=1, n1
+   !       do j=1, n2
+   !          reform_n1xn2(i,j) = F(n2*(i-1)+j)
+   !       enddo
+   !    enddo
+
+   !    return
+   ! end function reform_n1xn2
+
 
 end module utils

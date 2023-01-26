@@ -34,11 +34,10 @@ module see
 
     contains
 
-    subroutine alloc_nlte_var(n_rayons_max, n_rayons_sub, lsubiteration)
+    subroutine alloc_nlte_var(n_rayons_max)
     !allocate space for non-lte loop (only)
-        integer, intent(in) :: n_rayons_max, n_rayons_sub
+        integer, intent(in) :: n_rayons_max
         integer :: Nmaxlevel,Nmaxline,Nmaxcont,NlevelTotal,Nmaxstage
-        logical, intent(in) :: lsubiteration
         integer :: alloc_status, mem_alloc_local
         integer :: kr, n, icell, l, i, j
         real(kind=dp) :: wl, anu1, e1, b1
@@ -78,11 +77,9 @@ module see
         Neq_ng = max(Ng_Norder+2,3) !storing 3 by default
         if (lNg_acceleration) then
             !Automatically set if not provided (Ng_Nperiod = -1)
-            if (Ng_Nperiod == -1) Ng_Nperiod = Ng_Norder + 2 + 2 !accumulate Ng + 2, rest Ng + 2 + 2
-            !lsubiteration must be false ?
-            if (lsubiteration) call error('subiter + Ng not yet!')
+            if (Ng_Nperiod == -1) Ng_Nperiod = Ng_Norder + 2
         endif
-        !even if no Ng acceleration (nor subiterations) allows for storing Neq_ng previous solutions
+        !even if no Ng acceleration allows for storing Neq_ng previous solutions
         !   for the non-LTE populations: TO DO improve convergence criterion.
         allocate(ngpop(NmaxLevel,NactiveAtoms+1,n_cells,Neq_ng),stat=alloc_status)
         if (alloc_Status > 0) call error("Allocation error ngpop")
@@ -107,18 +104,11 @@ module see
         if (alloc_Status > 0) call error("Allocation error lcell_converged")
         write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
 
-        if (lsubiteration) then
-            allocate(Itot(n_lambda,n_rayons_sub,nb_proc),stat=alloc_status)
-            if (alloc_Status > 0) call error("Allocation error Itot")
-            allocate(phi_loc(Nlambda_max_line,Nmaxline,NactiveAtoms,n_rayons_sub,nb_proc),stat=alloc_status)
-            if (alloc_Status > 0) call error("Allocation error phi_loc")
-            allocate(chi_tot(n_lambda),eta_tot(n_lambda))
-        else
-            allocate(Itot(n_lambda,n_rayons_max,nb_proc),stat=alloc_status)
-            if (alloc_Status > 0) call error("Allocation error Itot")
-            allocate(phi_loc(Nlambda_max_line,Nmaxline,NactiveAtoms,1,nb_proc),stat=alloc_status)
-            if (alloc_Status > 0) call error("Allocation error phi_loc")
-        endif
+        allocate(Itot(n_lambda,n_rayons_max,nb_proc),stat=alloc_status)
+        if (alloc_Status > 0) call error("Allocation error Itot")
+        allocate(phi_loc(Nlambda_max_line,Nmaxline,NactiveAtoms,1,nb_proc),stat=alloc_status)
+        if (alloc_Status > 0) call error("Allocation error phi_loc")
+
         write(*,*) " size Itot:", sizeof(Itot) / 1024./1024./1024.," GB"
         write(*,*) " size phi_loc:", sizeof(phi_loc) / 1024./1024./1024.," GB"
 
