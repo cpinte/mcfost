@@ -941,7 +941,8 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   if (lvariable_dust) then
      kappa_factor(:) = 1.0_dp
   else
-     kappa_factor(:) = masse(1:n_cells)/volume(:) / rho0 ! ie rho / rho(icell_not_empty)
+     !write(*,*) shape(kappa_factor), shape(masse), shape(volume)
+     kappa_factor(1:n_cells) = masse(1:n_cells)/volume(1:n_cells) / rho0 ! ie rho / rho(icell_not_empty)
   endif
   kappa(:,lambda) = kappa(:,lambda) * fact ! this is kappa in cell # icell_not_empty or in all cells if lvariable_dust
 
