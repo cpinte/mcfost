@@ -440,7 +440,7 @@ subroutine check_ng_pops(m,n,o,x,xtot)
       !sum of all levels for all solutions at cell i.
       dum = sum(abs(x(:,i,:)),dim=1)
       do j=1,m
-         x(j,i,:) = x(j,i,:) * xtot(i) / dum(:)
+         x(j,i,:) = abs(x(j,i,:)) * xtot(i) / dum(:)
       enddo
    enddo
    !$omp end do
