@@ -343,7 +343,7 @@ module atom_transfer
             ! **********  Ng's acceleration administration *************!
             if (lng_acceleration) then
           	!be sure we are converging before extrapolating
-               if (dpops_max_error >= 1d-2) then
+               if (dpops_max_error > 1d-2) then
                   lconverging = (conv_speed < 0) .and. (-conv_speed < conv_speed_limit)
                else
                   lconverging = (diff_old < 5d-2); Ng_Nperiod = 0
