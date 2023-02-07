@@ -1098,7 +1098,7 @@ subroutine read_density_file()
      etoile(i_etoile)%vz = vz_planet
      etoile(i_etoile)%M = M_planet * GxMJup/GxMsun ! Mplanet is given in MJup
 
-     call compute_stellar_parameters()
+     if (.not.lfix_star) call compute_stellar_parameters()
   endif
 
   lread_gas_velocity = read_gas_velocity >= 1
