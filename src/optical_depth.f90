@@ -134,16 +134,22 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
      tau = l_contrib * opacite ! opacite constante dans la cellule
 
-     ! Comparaison integrale avec tau
-     ! et ajustement longueur de vol eventuellement
-     if(tau > extr) then ! On a fini d'integrer
-        lstop = .true.
-        l_contrib = l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
-        l = l_void_before + l_contrib
-        ltot=ltot+l
-     else ! Il reste extr - tau a integrer dans la cellule suivante
-        extr=extr-tau
-        ltot=ltot+l
+     tau_R = l_contrib * Roseeland_opacity
+
+     if (tau_R > gamma) then
+        call cross_cell_MRW(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
+     else
+        ! Comparaison integrale avec tau
+        ! et ajustement longueur de vol eventuellement
+        if(tau > extr) then ! On a fini d'integrer
+           lstop = .true.
+           l_contrib = l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
+           l = l_void_before + l_contrib
+           ltot=ltot+l
+        else ! Il reste extr - tau a integrer dans la cellule suivante
+           extr=extr-tau
+           ltot=ltot+l
+        endif
      endif
 
      ! Stockage des champs de radiation
