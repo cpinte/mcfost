@@ -133,7 +133,7 @@ module parametres
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
   integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
 
-  logical :: lfargo3d, lathena, lidefix
+  logical :: lfargo3d, lathena, lidefix, lpluto
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -299,10 +299,23 @@ module parametres
      character(len=32) :: origin
 
      real, dimension(:), allocatable :: x1, x2, x3
-
   end type idefix_model
 
   type(idefix_model) :: idefix
 
+  type pluto_model
+     integer :: nx1, nx2, nx3, iunit, position, geometry
+     integer, dimension(3) :: dimensions
+     real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
+     logical :: log_spacing, corrotating_frame
+
+     real :: time
+     character(len=128) :: dir, id
+     character(len=32) :: origin
+
+     real, dimension(:), allocatable :: x1, x2, x3
+  end type pluto_model
+
+  type(pluto_model) :: pluto
 
 end module parametres
