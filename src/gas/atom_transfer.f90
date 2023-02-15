@@ -167,7 +167,7 @@ module atom_transfer
             if (etape_end > 1) then
                !use that etape as an initial solution for step 2
                precision = 1d-1
-               ! precision = min(1e-1,10.0*dpops_max_error)
+               precision = 0.1 * 1.0 / sqrt(real(N_rayons_mc))
             else
                precision = dpops_max_error
             endif
