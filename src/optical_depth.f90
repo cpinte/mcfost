@@ -1146,6 +1146,10 @@ end subroutine optical_length_tot_mol
             lcellule_non_vide = (icompute_atomRT(icell) > 0)
             if (icompute_atomRT(icell) < 0) then
                if (icompute_atomRT(icell) == -1) then
+                  !If the optically thick region (dark zone) has a temperature
+                  !add a black body emission and leave.
+                  if (T(icell) > 0.0_dp) Itot(:,iray,id) = Itot(:,iray,id) + &
+                                    exp(-tau) * Bpnu(N,lambda,T(icell))
                   return
                else
                   !Does not return but cell is empty (lcellule_non_vide is .false.)

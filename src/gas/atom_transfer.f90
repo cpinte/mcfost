@@ -167,7 +167,7 @@ module atom_transfer
             if (etape_end > 1) then
                !use that etape as an initial solution for step 2
                precision = 1d-1
-               ! precision = min(1e-1,10.0*dpops_max_error)
+               precision = 0.1 * 1.0 / sqrt(real(N_rayons_mc))
             else
                precision = dpops_max_error
             endif
@@ -343,10 +343,10 @@ module atom_transfer
             ! **********  Ng's acceleration administration *************!
             if (lng_acceleration) then
           	!be sure we are converging before extrapolating
-               if (dpops_max_error >= 1d-2) then
+               if (dpops_max_error > 1d-2) then
                   lconverging = (conv_speed < 0) .and. (-conv_speed < conv_speed_limit)
                else
-                  lconverging = (diff_old < 5d-2); Ng_Nperiod = 0
+                  lconverging = (diff_old < 5d-2)!; Ng_Nperiod = 0
                endif
                !or if the number of iterations is too large
                lconverging = lconverging .or. (n_iter > int(real(maxIter)/3.0)) !futur deprec of this one (non-local op)
