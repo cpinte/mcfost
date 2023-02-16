@@ -33,6 +33,8 @@ contains
     open(unit=iunit,file=trim(filename),status='old',form='formatted',iostat=ios)
     if (ios /= 0) call error("opening "//trim(filename))
 
+    write(*,*) "************ TMP : USING FARGO PAR FILE **************"
+
     ! On compte les lignes avec des donnees
     n_lines = 0
     infinity : do while(ios==0)
@@ -44,23 +46,23 @@ contains
        select case(trim(key))
           ! reading grid parameters
        case("NX")
-          read(val,*,iostat=ios) pluto%nx1
-       case("NY")
-          read(val,*,iostat=ios) pluto%nx2
-       case("NZ")
           read(val,*,iostat=ios) pluto%nx3
+       case("NY")
+          read(val,*,iostat=ios) pluto%nx1
+       case("NZ")
+          read(val,*,iostat=ios) pluto%nx2
        case("XMIN")
-          read(val,*,iostat=ios) pluto%x1_min
-       case("XMAX")
-          read(val,*,iostat=ios) pluto%x1_max
-       case("YMIN")
-          read(val,*,iostat=ios) pluto%x2_min
-       case("YMAX")
-          read(val,*,iostat=ios) pluto%x2_max
-       case("ZMIN")
           read(val,*,iostat=ios) pluto%x3_min
-       case("ZMAX")
+       case("XMAX")
           read(val,*,iostat=ios) pluto%x3_max
+       case("YMIN")
+          read(val,*,iostat=ios) pluto%x1_min
+       case("YMAX")
+          read(val,*,iostat=ios) pluto%x1_max
+       case("ZMIN")
+          read(val,*,iostat=ios) pluto%x2_min
+       case("ZMAX")
+          read(val,*,iostat=ios) pluto%x2_max
        case("SPACING")
           if ((val == "LOG").or.(val == "log").or.(val == "Log")) then
              pluto%log_spacing = .true.
@@ -79,7 +81,7 @@ contains
     write(*,*) "done"
 
     ! Updating mcfost parameters
-    grid_type = 2 ! only spherical grid in pluto so far
+    grid_type = 2
     n_rad = pluto%nx1
     n_rad_in = 1
     n_az = pluto%nx3
@@ -102,32 +104,6 @@ contains
     write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az
     write(*,*) "rin=", real(disk_zone(1)%rin), "rout=", real(disk_zone(1)%rout)
 
-
-    ! Updating mcfost parameters
-    write(*,*) "************ TMP : USING FARGO PAR FILE **************"
-    grid_type = 2
-    n_rad = pluto%nx2
-    n_rad_in = 1
-    n_az = pluto%nx1
-    nz = pluto%nx3/2 + 1
-    lregular_theta = .true.
-    theta_max = 0.5 * pi - pluto%x3_min
-
-    if (lscale_length_units) then
-       write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
-    else
-       scale_length_units_factor = 1.0
-    endif
-
-    disk_zone(1)%rin  = pluto%x2_min * scale_length_units_factor
-    disk_zone(1)%edge=0.0
-    disk_zone(1)%rmin = disk_zone(1)%rin
-    disk_zone(1)%rout = pluto%x2_max * scale_length_units_factor
-    disk_zone(1)%rmax = disk_zone(1)%rout
-
-    write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az
-    write(*,*) "rin=", real(disk_zone(1)%rin), "rout=", real(disk_zone(1)%rout)
-
     return
 
   end subroutine read_pluto_parameters
@@ -136,7 +112,7 @@ contains
 
   subroutine read_pluto_files()
 
-    ! pluto data is ordered in x = phi, y = r, z = theta (like idefix and athena++)
+    ! pluto data is ordered in x = r, y = theta, z = phi (like idefix and athena++)
 
     real(dp), dimension(:,:,:), allocatable  :: pluto_density, pluto_vx, pluto_vy, pluto_vz
     integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, n_planets, i2, i3
@@ -148,7 +124,6 @@ contains
 
     real(dp), dimension(n_planets_max) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
     real(dp) :: Omega
-
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
