@@ -48,7 +48,7 @@ contains
        case("NY")
           read(val,*,iostat=ios) pluto%nx2
        case("NZ")
-          read(val,*,iostat=ios) pluto%nx2
+          read(val,*,iostat=ios) pluto%nx3
        case("XMIN")
           read(val,*,iostat=ios) pluto%x1_min
        case("XMAX")
@@ -97,6 +97,32 @@ contains
     disk_zone(1)%edge=0.0
     disk_zone(1)%rmin = disk_zone(1)%rin
     disk_zone(1)%rout = pluto%x1_max * scale_length_units_factor
+    disk_zone(1)%rmax = disk_zone(1)%rout
+
+    write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az
+    write(*,*) "rin=", real(disk_zone(1)%rin), "rout=", real(disk_zone(1)%rout)
+
+
+    ! Updating mcfost parameters
+    write(*,*) "************ TMP : USING FARGO PAR FILE **************"
+    grid_type = 2
+    n_rad = pluto%nx2
+    n_rad_in = 1
+    n_az = pluto%nx1
+    nz = pluto%nx3/2 + 1
+    lregular_theta = .true.
+    theta_max = 0.5 * pi - pluto%x3_min
+
+    if (lscale_length_units) then
+       write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
+    else
+       scale_length_units_factor = 1.0
+    endif
+
+    disk_zone(1)%rin  = pluto%x2_min * scale_length_units_factor
+    disk_zone(1)%edge=0.0
+    disk_zone(1)%rmin = disk_zone(1)%rin
+    disk_zone(1)%rout = pluto%x2_max * scale_length_units_factor
     disk_zone(1)%rmax = disk_zone(1)%rout
 
     write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az

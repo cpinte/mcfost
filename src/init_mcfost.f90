@@ -1383,7 +1383,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
      case("-pluto")
         i_arg = i_arg + 1
-        lidefix = .true.
+        lpluto = .true.
         call get_command_argument(i_arg,pluto_dir)
         i_arg = i_arg + 1
         call get_command_argument(i_arg,pluto_id)
