@@ -226,7 +226,7 @@ contains
        case(3)
           if (ios /= 0) then
              call warning("opening fargo3d file:"//trim(filename))
-             fargo3d_vx = 0.0_dp
+             fargo3d_vy = 0.0_dp
              ios=0
           else
              read(iunit, rec=1, iostat=ios) fargo3d_vy ! vr

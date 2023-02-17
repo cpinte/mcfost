@@ -7,10 +7,9 @@ module read_pluto
   use cylindrical_grid
   use density
   use stars, only : compute_stellar_parameters
+  use read_fargo3d, only : convert_planets, n_planets_max
 
   implicit none
-
-  integer, parameter :: n_planets_max = 9
 
 contains
 
@@ -114,7 +113,7 @@ contains
 
     ! pluto data is ordered in x = r, y = theta, z = phi (like idefix and athena++)
 
-    real(dp), dimension(:,:,:), allocatable  :: pluto_density, pluto_vx, pluto_vy, pluto_vz
+    real(dp), dimension(:,:,:), allocatable  :: pluto_density, pluto_vx1, pluto_vx2, pluto_vx3
     integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, n_planets, i2, i3
 
     character(len=128) :: filename
@@ -124,6 +123,14 @@ contains
 
     real(dp), dimension(n_planets_max) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
     real(dp) :: Omega
+
+    ! Planet properties hard coded for now
+    n_planets = 1
+    x(1) = 1.0 ; y(1) = 0.0 ; z(1) = 0.0
+    vx(1) = 0.0 ; vy(1) = 1.0 ; vz(1) = 0.0
+    Mp(1) = 1e-3
+    Omega_p(1) = 1.0
+    time(1) = 0.0
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
@@ -149,14 +156,15 @@ contains
     udens = umass / ulength**3
     uvelocity = ulength / utime
 
+    call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
+
     ! dimensions are az, r, theta
-    allocate(pluto_density(pluto%nx1,pluto%nx2,pluto%nx3),pluto_vx(pluto%nx1,pluto%nx2,pluto%nx3), &
-         pluto_vy(pluto%nx1,pluto%nx2,pluto%nx3),pluto_vz(pluto%nx1,pluto%nx2,pluto%nx3),stat=alloc_status)
+    allocate(pluto_density(pluto%nx1,pluto%nx2,pluto%nx3),pluto_vx1(pluto%nx1,pluto%nx2,pluto%nx3), &
+         pluto_vx2(pluto%nx1,pluto%nx2,pluto%nx3),pluto_vx3(pluto%nx1,pluto%nx2,pluto%nx3),stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error when reading pluto files')
-    pluto_density = 0.0_dp ; pluto_vx  = 0.0_dp ; pluto_vy = 0.0_dp ; pluto_vz = 0.0_dp
+    pluto_density = 0.0_dp ; pluto_vx1  = 0.0_dp ; pluto_vx2 = 0.0_dp ; pluto_vx3 = 0.0_dp
 
     ! Reading planet properties
-    call read_pluto_planets(trim(pluto%dir), n_planets,x,y,z,vx,vy,vz,Mp,time,Omega_p)
     call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
 
     if (pluto%corrotating_frame) then
@@ -194,26 +202,26 @@ contains
        case(2)
           if (ios /= 0) then
              call warning("opening pluto file:"//trim(filename))
-             pluto_vx = 0.0_dp
+             pluto_vx1 = 0.0_dp
              ios=0
           else
-             read(iunit, rec=1, iostat=ios) pluto_vx ! vphi
+             read(iunit, rec=1, iostat=ios) pluto_vx1 ! vphi
           endif
        case(3)
           if (ios /= 0) then
              call warning("opening pluto file:"//trim(filename))
-             pluto_vx = 0.0_dp
+             pluto_vx2 = 0.0_dp
              ios=0
           else
-             read(iunit, rec=1, iostat=ios) pluto_vy ! vr
+             read(iunit, rec=1, iostat=ios) pluto_vx2 ! vr
           endif
        case(4)
           if (ios /= 0) then
              call warning("opening pluto file:"//trim(filename))
-             pluto_vz = 0.0_dp
+             pluto_vx3 = 0.0_dp
              ios=0
           else
-             read(iunit, rec=1, iostat=ios) pluto_vz ! vtheta
+             read(iunit, rec=1, iostat=ios) pluto_vx3 ! vtheta
           endif
        end select
        if (ios /= 0) call error("reading pluto file:"//trim(filename))
@@ -241,13 +249,13 @@ contains
              densite_gaz(icell) = pluto_density(i,i2,i3) * udens
              densite_pouss(:,icell) = pluto_density(i,i2,i3) * udens
 
-             vfield3d(icell,1)  = pluto_vy(i,i2,i3) * uvelocity! vr
-             vfield3d(icell,2)  = (pluto_vx(i,i2,i3) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
-             vfield3d(icell,3)  = pluto_vz(i,i2,i3) * uvelocity! vtheta
+             vfield3d(icell,1)  = pluto_vx1(i,i2,i3) * uvelocity! vr
+             vfield3d(icell,2)  = (pluto_vx3(i,i2,i3) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,3)  = pluto_vx2(i,i2,i3) * uvelocity! vtheta
           enddo ! k
        enddo bz
     enddo ! i
-    deallocate(pluto_density,pluto_vx,pluto_vy,pluto_vz)
+    deallocate(pluto_density,pluto_vx1,pluto_vx2,pluto_vx3)
 
     !write(*,*) maxval(vfield3d(:,1))/1000., maxval(vfield3d(:,2))/1000., maxval(vfield3d(:,3))/1000.
     !write(*,*) etoile(2)%vx/1000., etoile(2)%vy/1000., etoile(2)%vz/1000.
@@ -283,142 +291,5 @@ contains
   end subroutine read_pluto_files
 
   !---------------------------------------------
-
-  subroutine read_pluto_planets(dir, n_planets,x,y,z,vx,vy,vz,Mp,time,Omega_p)
-
-    character(len=*), intent(in) :: dir
-    integer, intent(out) :: n_planets
-    real(dp), dimension(n_planets_max), intent(out) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
-
-    integer :: n_etoiles_old, iunit, ios, n_etoile_old, i, i_planet, id
-
-    character(len=1) :: s
-    character(len=128) :: filename
-
-    ios = 0
-    iunit = 1
-
-    n_planets = 0
-    planet_loop : do i_planet=1, n_planets_max
-       write(s,"(I1)") i_planet-1
-       filename=dir//"/planet"//s//".dat"
-       open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
-       if (ios /= 0) exit planet_loop
-       n_planets = n_planets+1
-       write(*,*) "Reading "//trim(filename)
-       read(pluto%id,*) id
-       do while(ios==0)
-          read(iunit,*) i, x(i_planet), y(i_planet), z(i_planet), vx(i_planet), vy(i_planet), vz(i_planet), &
-               Mp(i_planet), time(i_planet), Omega_p(i_planet)
-          if (i==id) exit
-       enddo
-       close(iunit)
-    enddo planet_loop
-
-    write(s,"(I1)") n_planets
-    write(*,*) "Found "//s// " planets"
-
-    return
-
-  end subroutine read_pluto_planets
-
-  !---------------------------------------------
-
-  subroutine convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p, &
-       ulength_au,uvelocity,usolarmass,utime)
-
-    real(dp), intent(in) :: ulength_au, uvelocity,usolarmass,utime
-    integer, intent(in) :: n_planets
-    real(dp), dimension(n_planets_max), intent(in) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
-
-
-    integer :: n_etoiles_old, i
-    type(star_type), dimension(:), allocatable :: etoile_old
-
-    if (n_planets > 0) then
-       simu_time = time(n_planets) * utime
-    else
-       simu_time = 0 ! todo : eventually needs to find a better way to get the time
-    endif
-
-    ! Checking units :
-    ! Omega_p * uvelocity == 29.78 km/s : OK
-
-    n_etoiles_old = n_etoiles
-    n_etoiles = 1 + n_planets
-
-    if (lfix_star) then
-       write(*,*) ""
-       write(*,*) "Stellar parameters will not be updated, only the star positions, velocities and masses"
-       if (n_etoiles /= n_etoiles_old) call error("Wrong number of stars in mcfost parameter files")
-    else
-       write(*,*) ""
-       write(*,*) "Updating the stellar properties:"
-       write(*,*) "There are now", n_etoiles, "stars in the model"
-
-       ! Saving if the accretion rate was forced
-       allocate(etoile_old(n_etoiles_old))
-       if (allocated(etoile)) then
-          etoile_old(:) = etoile(:)
-          deallocate(etoile)
-       endif
-       allocate(etoile(n_etoiles))
-       do i=1, min(n_etoiles, n_etoiles_old)
-          etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
-          etoile(i)%Mdot = etoile_old(i)%Mdot
-       enddo
-       ! If we have new stars
-       do i=n_etoiles_old,n_etoiles
-          etoile(i)%force_Mdot = .false.
-          etoile(i)%Mdot = 0.
-       enddo
-       deallocate(etoile_old)
-       etoile(:)%find_spectrum = .true.
-    endif
-
-    etoile(1)%x = 0_dp ; etoile(1)%y = 0_dp ; etoile(1)%z = 0_dp
-    etoile(1)%vx = 0_dp ; etoile(1)%vy = 0_dp ; etoile(1)%vz = 0_dp
-    etoile(1)%M = 1_dp * usolarmass
-
-    do i=1, n_planets
-       ! -x and -y as phi is defined differently in pluto
-       etoile(i+1)%x = -x(i) * ulength_au
-       etoile(i+1)%y = -y(i) * ulength_au
-       etoile(i+1)%z =  z(i) * ulength_au
-
-       ! -vx and -y as phi is defined differently in pluto
-       etoile(i+1)%vx = -vx(i) * uvelocity
-       etoile(i+1)%vy = -vy(i) * uvelocity
-       etoile(i+1)%vz =  vz(i) * uvelocity
-
-       etoile(i+1)%M = Mp(i) * usolarmass
-    enddo
-
-    do i=1,n_etoiles
-       if (etoile(i)%M > 0.013) then
-          write(*,*) "Star   #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
-               real(etoile(i)%M), "Msun, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
-       else
-          write(*,*) "Planet #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
-               real(etoile(i)%M * GxMsun/GxMjup), "MJup, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
-       endif
-       if (i>1) write(*,*)  "       distance=", real(sqrt((etoile(i)%x - etoile(1)%x)**2 + &
-            (etoile(i)%y - etoile(1)%y)**2 + (etoile(i)%z - etoile(1)%z)**2)), "au"
-    enddo
-    if (.not.lfix_star) call compute_stellar_parameters()
-
-    if (which_planet==0) which_planet=1
-
-    if (lplanet_az) then
-       RT_n_az = 1
-       RT_az_min = planet_az + atan2(-y(which_planet), -x(which_planet)) / deg_to_rad
-       RT_az_max = RT_az_min
-       write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
-       write(*,*) "WARNING: updating the azimuth to:", RT_az_min
-    endif
-
-    return
-
-  end subroutine convert_planets
 
 end module read_pluto
