@@ -260,9 +260,9 @@ contains
              densite_gaz(icell) = fargo3d_density(phik,i,jj) * udens
              densite_pouss(:,icell) = fargo3d_density(phik,i,jj) * udens
 
-             vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity! vr
+             vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity ! vr
              vfield3d(icell,2)  = (fargo3d_vx(phik,i,jj) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
-             vfield3d(icell,3)  = fargo3d_vz(phik,i,jj) * uvelocity! vtheta
+             vfield3d(icell,3)  = fargo3d_vz(phik,i,jj) * uvelocity ! vtheta
           enddo ! k
        enddo bz
     enddo ! i

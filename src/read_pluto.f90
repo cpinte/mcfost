@@ -113,7 +113,7 @@ contains
 
     ! pluto data is ordered in x = r, y = theta, z = phi (like idefix and athena++)
 
-    real(dp), dimension(:,:,:), allocatable  :: pluto_density, pluto_vx1, pluto_vx2, pluto_vx3
+    real(dp), dimension(:,:,:), allocatable  :: rho, vx1, vx2, vx3
     integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, n_planets, i2, i3
 
     character(len=128) :: filename
@@ -129,7 +129,7 @@ contains
     x(1) = 1.0 ; y(1) = 0.0 ; z(1) = 0.0
     vx(1) = 0.0 ; vy(1) = 1.0 ; vz(1) = 0.0
     Mp(1) = 1e-3
-    Omega_p(1) = 1.0
+    Omega_p(1) = 1.00049987506246096
     time(1) = 0.0
 
     usolarmass = 1.0_dp
@@ -159,10 +159,10 @@ contains
     call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
 
     ! dimensions are az, r, theta
-    allocate(pluto_density(pluto%nx1,pluto%nx2,pluto%nx3),pluto_vx1(pluto%nx1,pluto%nx2,pluto%nx3), &
-         pluto_vx2(pluto%nx1,pluto%nx2,pluto%nx3),pluto_vx3(pluto%nx1,pluto%nx2,pluto%nx3),stat=alloc_status)
+    allocate(rho(pluto%nx1,pluto%nx2,pluto%nx3),vx1(pluto%nx1,pluto%nx2,pluto%nx3), &
+         vx2(pluto%nx1,pluto%nx2,pluto%nx3),vx3(pluto%nx1,pluto%nx2,pluto%nx3),stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error when reading pluto files')
-    pluto_density = 0.0_dp ; pluto_vx1  = 0.0_dp ; pluto_vx2 = 0.0_dp ; pluto_vx3 = 0.0_dp
+    rho = 0.0_dp ; vx1  = 0.0_dp ; vx2 = 0.0_dp ; vx3 = 0.0_dp
 
     ! Reading planet properties
     call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
@@ -198,30 +198,30 @@ contains
        select case(l)
        case(1)
           if (ios /= 0) call error("opening pluto file:"//trim(filename))
-          read(iunit, rec=1, iostat=ios) pluto_density
+          read(iunit, rec=1, iostat=ios) rho
        case(2)
           if (ios /= 0) then
              call warning("opening pluto file:"//trim(filename))
-             pluto_vx1 = 0.0_dp
+             vx1 = 0.0_dp
              ios=0
           else
-             read(iunit, rec=1, iostat=ios) pluto_vx1 ! vphi
+             read(iunit, rec=1, iostat=ios) vx1 ! vphi
           endif
        case(3)
           if (ios /= 0) then
              call warning("opening pluto file:"//trim(filename))
-             pluto_vx2 = 0.0_dp
+             vx2 = 0.0_dp
              ios=0
           else
-             read(iunit, rec=1, iostat=ios) pluto_vx2 ! vr
+             read(iunit, rec=1, iostat=ios) vx2 ! vr
           endif
        case(4)
           if (ios /= 0) then
              call warning("opening pluto file:"//trim(filename))
-             pluto_vx3 = 0.0_dp
+             vx3 = 0.0_dp
              ios=0
           else
-             read(iunit, rec=1, iostat=ios) pluto_vx3 ! vtheta
+             read(iunit, rec=1, iostat=ios) vx3 ! vtheta
           endif
        end select
        if (ios /= 0) call error("reading pluto file:"//trim(filename))
@@ -246,20 +246,16 @@ contains
 
              icell = cell_map(i,j,phik)
 
-             densite_gaz(icell) = pluto_density(i,i2,i3) * udens
-             densite_pouss(:,icell) = pluto_density(i,i2,i3) * udens
+             densite_gaz(icell) = rho(i,i2,i3) * udens
+             densite_pouss(:,icell) = rho(i,i2,i3) * udens
 
-             vfield3d(icell,1)  = pluto_vx1(i,i2,i3) * uvelocity! vr
-             vfield3d(icell,2)  = (pluto_vx3(i,i2,i3) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
-             vfield3d(icell,3)  = pluto_vx2(i,i2,i3) * uvelocity! vtheta
+             vfield3d(icell,1)  = vx1(i,i2,i3) * uvelocity! vr
+             vfield3d(icell,2)  = (vx3(i,i2,i3) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,3)  = vx2(i,i2,i3) * uvelocity! vtheta
           enddo ! k
        enddo bz
     enddo ! i
-    deallocate(pluto_density,pluto_vx1,pluto_vx2,pluto_vx3)
-
-    !write(*,*) maxval(vfield3d(:,1))/1000., maxval(vfield3d(:,2))/1000., maxval(vfield3d(:,3))/1000.
-    !write(*,*) etoile(2)%vx/1000., etoile(2)%vy/1000., etoile(2)%vz/1000.
-    !stop
+    deallocate(rho,vx1,vx2,vx3)
 
     ! Normalisation density : copy and paste from read_density_file for now : needs to go in subroutine
 
