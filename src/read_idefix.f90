@@ -9,6 +9,7 @@ module read_idefix
   use density
   use stars, only : compute_stellar_parameters
   use read_fargo3d, only : convert_planets, n_planets_max
+  use utils
 
   implicit none
 
@@ -18,14 +19,25 @@ contains
 
     character(len=*), intent(in) :: filename
 
-    integer :: geometry, time
+    character(len=128) :: name
+    character(len=1) :: sep
+    integer :: geometry, time, pos1,pos2, id
     integer, dimension(3) :: dimensions
     character(:), allocatable :: origin
     real, dimension(:), allocatable :: x1, x2, x3
     real(dp) :: dx
 
+    write(*,*) "Reading header: "//trim(filename)
     idefix%filename = filename
     call readVTK_header(filename, idefix%iunit, idefix%position, idefix%geometry, dimensions, idefix%time, origin, x1, x2, x3)
+
+    ! Extracting dump id number from filename
+    name=basename(filename)
+    sep = "."
+    pos1 = index(name, sep)
+    pos2 = index(name, sep, back=.true.)
+    name = name(pos1+1:pos2-1)
+    read(name, *) idefix%id
 
     idefix%origin = origin
     idefix%dimensions = dimensions
@@ -133,16 +145,24 @@ contains
     udens = umass / ulength**3
     uvelocity = ulength / utime
 
-    call read_idefix_planets("./", n_planets,x,y,z,vx,vy,vz,Mp,time)
-    ! Omega from .ini
-    call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
-    idefix%corrotating_frame = (n_planets > 0) ! todo : from ini
+    call read_idefix_planets(dirname(idefix%filename),idefix%id, n_planets,x,y,z,vx,vy,vz,Mp,time)
+    call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime, az_offset=180.)
+    ! Omega needs to be read from idefix.ini
+    call warning("Omega_p is hard-coded for now")
+    if (n_planets == 1) then
+       Omega_p(1) = 1.00049987506246096
+    else if (n_planets>1) then
+       call error("Omega_p not read from idefix")
+    endif
 
+    idefix%corrotating_frame = (n_planets > 0) ! todo : from ini
     if (idefix%corrotating_frame) then
        Omega = Omega_p(which_planet)
     else
        Omega = 0.0_dp
     endif
+
+    write(*,*)  "Omega=", Omega
 
     ! reading data
     write(*,*) "Reading Idefix data ..."
@@ -228,13 +248,15 @@ contains
 
   !---------------------------------------------
 
-  subroutine read_idefix_planets(dir, n_planets,x,y,z,vx,vy,vz,Mp,time)
+  subroutine read_idefix_planets(dir, id, n_planets,x,y,z,vx,vy,vz,Mp,time)
 
     character(len=*), intent(in) :: dir
+    integer, intent(in) :: id
     integer, intent(out) :: n_planets
     real(dp), dimension(n_planets_max), intent(out) :: x, y, z, vx, vy, vz, Mp, time
 
-    integer :: n_etoiles_old, iunit, ios, n_etoile_old, i, i_planet, id
+    integer :: n_etoiles_old, iunit, ios, n_etoile_old, i, i_planet
+    real :: timestep
 
     character(len=1) :: s
     character(len=128) :: filename
@@ -245,15 +267,17 @@ contains
     n_planets = 0
     planet_loop : do i_planet=1, n_planets_max
        write(s,"(I1)") i_planet-1
-       filename=dir//"/planet"//s//".dat"
+       filename=trim(dir)//"/planet"//s//".dat"
+       write(*,*) "Searching for "//trim(filename)
        open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
        if (ios /= 0) exit planet_loop
        n_planets = n_planets+1
        write(*,*) "Reading "//trim(filename)
-       read(fargo3d%id,*) id
+       i=0
        do while(ios==0)
-          read(iunit,*) time(i_planet), x(i_planet), y(i_planet), z(i_planet), vx(i_planet), vy(i_planet), vz(i_planet), &
-               Mp(i_planet)
+          i=i+1
+          read(iunit,*, iostat=ios) timestep, x(i_planet), y(i_planet), z(i_planet), vx(i_planet), vy(i_planet), vz(i_planet), &
+               Mp(i_planet), time(i_planet)
           if (i==id) exit
        enddo
        close(iunit)

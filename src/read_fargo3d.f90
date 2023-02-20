@@ -344,11 +344,12 @@ contains
   !---------------------------------------------
 
   subroutine convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p, &
-       ulength_au,uvelocity,usolarmass,utime)
+       ulength_au,uvelocity,usolarmass,utime,az_offset)
 
     real(dp), intent(in) :: ulength_au, uvelocity,usolarmass,utime
     integer, intent(in) :: n_planets
     real(dp), dimension(n_planets_max), intent(in) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
+    real, intent(in), optional :: az_offset
 
 
     integer :: n_etoiles_old, i
@@ -431,6 +432,7 @@ contains
     if (lplanet_az) then
        RT_n_az = 1
        RT_az_min = planet_az + atan2(-y(which_planet), -x(which_planet)) / deg_to_rad
+       if (present(az_offset))  RT_az_min =  RT_az_min + az_offset
        RT_az_max = RT_az_min
        write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
        write(*,*) "WARNING: updating the azimuth to:", RT_az_min
