@@ -131,6 +131,7 @@ contains
     Mp(1) = 1e-3
     Omega_p(1) = 1.00049987506246096
     time(1) = 0.0
+    which_planet = 1
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
@@ -163,9 +164,6 @@ contains
          vx2(pluto%nx1,pluto%nx2,pluto%nx3),vx3(pluto%nx1,pluto%nx2,pluto%nx3),stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error when reading pluto files')
     rho = 0.0_dp ; vx1  = 0.0_dp ; vx2 = 0.0_dp ; vx3 = 0.0_dp
-
-    ! Reading planet properties
-    call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
 
     if (pluto%corrotating_frame) then
        if (n_planets < 1) then

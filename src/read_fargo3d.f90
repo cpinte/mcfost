@@ -430,12 +430,12 @@ contains
     if (which_planet==0) which_planet=1
 
     if (lplanet_az) then
+       write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
+       write(*,*) "WARNING: updating the azimuth to:", RT_az_min
        RT_n_az = 1
        RT_az_min = planet_az + atan2(-y(which_planet), -x(which_planet)) / deg_to_rad
        if (present(az_offset))  RT_az_min =  RT_az_min + az_offset
        RT_az_max = RT_az_min
-       write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
-       write(*,*) "WARNING: updating the azimuth to:", RT_az_min
     endif
 
     return

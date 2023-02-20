@@ -1237,7 +1237,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
         read(s,*) which_planet
-        write(*,*) "PLANET", which_planet, "AZ=", planet_az
+        write(*,*) "Planet", which_planet, "azimuth=", planet_az
         i_arg = i_arg + 1
      case("-turn-off_planets")
         i_arg = i_arg + 1
