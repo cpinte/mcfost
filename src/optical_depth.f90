@@ -19,6 +19,67 @@ module optical_depth
 
   contains
 
+  subroutine diffusion_opacity(temp,icell,rosseland_opacity)
+   ! Compute current Planck reciprocal mean opacity for all cells
+   ! (note : diffusion coefficient needs to be defined with Rosseland opacity
+   ! in B&W mode)
+   ! Diffusion coefficient is D = 1/(rho * opacity)
+   ! This opacity/diffusion coefficient includes scattering
+   ! See Min et al 2009 and Robitaille et al 2010
+   use parametres
+   use constantes
+   use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
+   use Temperature, only : Tdust
+   use dust_prop, only : kappa
+   use Voronoi_grid, only : Voronoi
+   use cylindrical_grid, only : volume
+   use density, only : masse_gaz, densite_gaz
+
+   real, intent(in)  :: temp 
+   integer,  intent(in)  :: icell
+   real(dp), intent(out) :: rosseland_opacity ! cm2/g (ie per gram of gas)
+
+   integer :: lambda
+   real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl
+
+   integer, pointer :: p_icell
+   integer, target :: icell0
+
+   icell0 = icell
+
+   if ((temp > 1) .and. (Voronoi(icell)%original_id > 0)) then 
+
+      if (lvariable_dust) then
+         p_icell => icell0
+      else
+         p_icell => icell_ref
+      endif
+
+      somme  = 0.0_dp
+      somme2 = 0.0_dp
+      cst    = cst_th/temp
+      do lambda = 1,n_lambda
+         ! longueur d'onde en metre
+         wl       = tab_lambda(lambda)*1.e-6
+         delta_wl = tab_delta_lambda(lambda)*1.e-6
+         cst_wl   = cst/wl
+         if (cst_wl < 200.0) then 
+            coeff_exp = exp(cst_wl)
+            B = 1.0_dp/((wl**5)*(coeff_exp-1.0))*delta_wl
+            !dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
+         else 
+            B = 0.0_dp
+            !dB_dT = 0.0_dp
+         endif
+         somme  = somme  + B/(kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
+         somme2 = somme2 + B*delta_wl
+      enddo
+      rosseland_opacity = somme2/somme 
+   else 
+      rosseland_opacity = 0. 
+   endif
+ end subroutine diffusion_opacity
+
 subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,&
      extrin,ltot,flag_sortie,lpacket_alive)
   ! Integration par calcul de la position de l'interface entre cellules
@@ -187,6 +248,190 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
   return
 
 end subroutine physical_length
+
+subroutine physical_length_MRW(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,&
+   extrin,ltot,flag_sortie,lpacket_alive)
+ use Temperature, only : Tdust
+! Integration par calcul de la position de l'interface entre cellules
+! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
+! C. Pinte
+! 05/02/05
+
+implicit none
+
+integer, intent(in) :: id,lambda, p_lambda
+integer, intent(inout) :: icell
+real(kind=dp), dimension(4), intent(in) :: Stokes
+logical, intent(in) :: flag_star, flag_direct_star
+real(kind=dp), intent(inout) :: u,v,w
+real, intent(in) :: extrin
+real(kind=dp), intent(inout) :: xio,yio,zio
+real, intent(out) :: ltot
+logical, intent(out) :: flag_sortie
+logical, intent(inout) :: lpacket_alive
+real(dp) :: rosseland_opacity
+integer :: gamma_MRW
+
+real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
+real(kind=dp) :: l, tau, tau_R, opacite, l_contrib, l_void_before
+integer :: icell_in, icell_old, next_cell, previous_cell, icell_star, i_star
+integer, target :: icell0
+
+logical :: lcellule_non_vide, lstop, lintersect_stars
+
+integer, pointer :: p_icell
+
+gamma_MRW = 3
+tau_R = 0.
+
+lstop = .false.
+flag_sortie = .false.
+
+x0=xio;y0=yio;z0=zio
+x1=xio;y1=yio;z1=zio
+
+extr=extrin
+icell_in = icell
+
+next_cell = icell
+icell0 = 0 ! to define previous_cell
+
+ltot = 0.0
+
+! Calcule les angles de diffusion pour la direction de propagation donnee
+if ((.not.letape_th).and.lscatt_ray_tracing1) call angles_scatt_rt1(id,u,v,w)
+
+! Will the packet intersect a star
+call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)
+
+if (lvariable_dust) then
+   p_icell => icell0
+else
+   p_icell => icell_ref
+endif
+
+! Boucle infinie sur les cellules
+do ! Boucle infinie
+   ! Indice de la cellule
+   icell_old = icell0
+   x_old = x0 ; y_old = y0 ; z_old = z0
+
+   x0=x1 ; y0=y1 ; z0=z1
+   previous_cell = icell0
+   icell0 = next_cell
+
+   ! Test sortie
+   if (test_exit_grid(icell0, x0, y0, z0)) then
+      flag_sortie = .true.
+      return
+   endif
+   if (lintersect_stars) then
+      if (icell0 == icell_star) then
+         lpacket_alive = .false.
+         flag_sortie = .true.
+         return
+      endif
+   endif
+
+   ! Pour cas avec approximation de diffusion
+   if (icell0 <= n_cells) then
+      lcellule_non_vide=.true.
+      opacite = kappa(p_icell,lambda) * kappa_factor(icell0)
+
+      if (l_dark_zone(icell0)) then
+         ! On renvoie le paquet dans l'autre sens
+         u = -u ; v = -v ; w=-w
+         ! et on le renvoie au point de depart
+         icell = icell_old
+         xio = x_old ; yio = y_old ; zio = z_old
+         flag_sortie= .false.
+         return
+      endif
+   else
+      lcellule_non_vide=.false.
+      opacite = 0.0_dp
+   endif
+
+   ! Calcul longeur de vol et profondeur optique dans la cellule
+   call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
+
+! after getting rosseland_opacity. Apply conditions in MRW paper
+! Then use cross cell with new random directions
+
+   ! opacity wall
+   !---if (ri0 == 1) then
+   !---   ! Variation de hauteur du mur en cos(phi/2)
+   !---   phi = atan2(y0,x0)
+   !---   hh = h_wall * abs(cos(phi/2.))
+   !---   hhm = -h_wall * abs(cos((phi+pi)/2.))
+   !---
+   !---   ! Ajout de l'opacite du mur le cas echeant
+   !---   if ((z0 <= hh).and.(z0 >= hhm)) then
+   !---      opacite = opacite + kappa_wall
+   !---   endif
+   !---endif
+
+   tau = l_contrib * opacite ! opacite constante dans la cellule
+
+   if (Tdust(icell0) > 1) then
+      ! write(*,*) 'SR: Using MRW'
+      call diffusion_opacity(Tdust(icell0),icell0,rosseland_opacity)
+      tau_R = l_contrib * rosseland_opacity
+      ! write(*,*) 'SR: ', Tdust(icell0),icell0,rosseland_opacity
+   end if
+
+   if (tau_R > gamma_MRW) then
+      write(*,*) 'SR: need to use MRW for ', icell0
+   ! else
+   !    write(*,*) 'SR: DO NOT need to use MRW for ', icell0
+   endif
+   ! Comparaison integrale avec tau
+   ! et ajustement longueur de vol eventuellement
+   if(tau > extr) then ! On a fini d'integrer
+      lstop = .true.
+      l_contrib = l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
+      l = l_void_before + l_contrib
+      ltot=ltot+l
+   else ! Il reste extr - tau a integrer dans la cellule suivante
+      extr=extr-tau
+      ltot=ltot+l
+   endif
+
+   ! Stockage des champs de radiation
+   if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda, icell0, Stokes, l_contrib, &
+        x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
+
+   ! On a fini d'integrer : sortie de la routine
+   if (lstop) then
+      flag_sortie = .false.
+      xio=x0+l*u
+      yio=y0+l*v
+      zio=z0+l*w
+
+      icell = icell0
+
+      ! TODO : here
+      if (.not.lVoronoi) then
+         if (l3D) then
+            if (lcylindrical) call indice_cellule(xio,yio,zio, icell)
+          ! following lines are useless --> icell0 is not returned
+         !else
+         !   if (lcylindrical) then
+         !      call verif_cell_position_cyl(icell0, xio, yio, zio)
+         !   else if (lspherical) then
+         !      call verif_cell_position_sph(icell0, xio, yio, zio)
+         !   endif
+         endif
+      endif ! todo : on ne fait rien dans la cas Voronoi ???
+
+      return
+   endif ! lstop
+
+enddo ! boucle infinie
+write(*,*) "BUG"
+return
+
+end subroutine physical_length_MRW
 
 !********************************************************************
 

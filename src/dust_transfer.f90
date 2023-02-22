@@ -966,6 +966,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
   real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
   integer :: taille_grain, itheta
+  integer :: n_iterations
   integer, pointer :: p_icell
   real :: rand, rand2, tau, dvol
 
@@ -989,8 +990,9 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! Boucle sur les interactions du paquets:
   ! - on avance le paquet
   ! - on le fait interagir avec la poussiere si besoin
+  n_iterations = 0
   infinie : do
-
+     n_iterations = n_iterations + 1
      ! Longueur de vol
      rand = sprng(stream(id))
      if (rand == 1.0) then
@@ -1005,7 +1007,13 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
      !endif
-     call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
+
+     if (n_iterations > 5) then
+        call physical_length_MRW(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
+        n_iterations = 0
+     else
+        call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
+     endif
      if (flag_sortie) return ! Vie du photon terminee
 
 !     if ((icell>n_cells).and.(.not.flag_sortie)) then
