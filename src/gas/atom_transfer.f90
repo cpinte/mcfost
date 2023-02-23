@@ -167,7 +167,6 @@ module atom_transfer
             if (etape_end > 1) then
                !use that etape as an initial solution for step 2
                precision = 1d-1
-               precision = 0.1 * 1.0 / sqrt(real(N_rayons_mc))
             else
                precision = dpops_max_error
             endif
@@ -593,6 +592,14 @@ module atom_transfer
             diff_old = diff
             conv_acc = conv_speed
 
+            !force convergence if there are only few unconverged cells remaining
+            if ((n_iter > maxIter/2).and.(unconverged_fraction < 5.0)) then
+               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
+                  unconverged_fraction, n_iter
+               write(*,*) " -> forcing convergence"
+               lconverged = .true.
+            endif
+            !
             if ((diff < precision).and.maxval_cswitch_atoms()==1.0_dp)then
                if (lprevious_converged) then
                   lconverged = .true.
