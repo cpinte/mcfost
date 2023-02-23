@@ -195,11 +195,11 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
      tau = l_contrib * opacite ! opacite constante dans la cellule
 
-     tau_R = l_contrib * Roseeland_opacity
+   !   tau_R = l_contrib * Roseeland_opacity
 
-     if (tau_R > gamma) then
-        call cross_cell_MRW(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
-     else
+   !   if (tau_R > gamma) then
+   !      call cross_cell_MRW(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
+   !   else
         ! Comparaison integrale avec tau
         ! et ajustement longueur de vol eventuellement
         if(tau > extr) then ! On a fini d'integrer
@@ -211,7 +211,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
            extr=extr-tau
            ltot=ltot+l
         endif
-     endif
+   !   endif
 
      ! Stockage des champs de radiation
      if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda, icell0, Stokes, l_contrib, &
@@ -381,7 +381,7 @@ do ! Boucle infinie
    end if
 
    if (tau_R > gamma_MRW) then
-      write(*,*) 'SR: need to use MRW for ', icell0
+      ! write(*,*) 'SR: need to use MRW for ', icell0
    ! else
    !    write(*,*) 'SR: DO NOT need to use MRW for ', icell0
    endif
