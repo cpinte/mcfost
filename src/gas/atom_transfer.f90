@@ -262,7 +262,7 @@ module atom_transfer
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
-               if (etape==3) l_iterate = l_iterate.and.(.not.lcell_converged(icell))
+               ! if (etape==3) l_iterate = l_iterate.and.(.not.lcell_converged(icell))
 
                if (l_iterate) then
 
