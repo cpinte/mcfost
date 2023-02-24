@@ -62,17 +62,17 @@ module atom_transfer
    !  1) A first step with rays starting at the centre of each cell (healpix phase)
    !  2) Randomly distributed rays for random distribution of points of each cell.
    ! ------------------------------------------------------------------------------------ !
-      integer :: etape, etape_start, etape_end, iray, n_rayons
+      integer :: etape, etape_start, etape_end, iray
+      integer :: n_rayons, n_rayons_max
       integer :: n_iter, id, i, iray_start, alloc_status
       integer :: nact, imax, icell_max, icell_max_2
       integer :: icell, ilevel, nb, nr, unconverged_cells
-      integer, parameter :: maxIter = 150
+      integer, parameter :: maxIter = 150, maxIter3 = 10
+      !ray-by-ray integration of the SEE
+      integer, parameter :: one_ray = 1, n_rayons_start3 = 100
       logical :: lfixed_Rays, lconverged, lprevious_converged
       real :: rand, rand2, rand3, unconverged_fraction
       real(kind=dp) :: precision, vth
-      integer, parameter :: n_rayons_max = 1 !ray-by-ray except for subiterations
-                                             !but in that case only itot and phi_loc and ds needs
-                                             !to have n_rayons_sub size.
       real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy
       real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
       real(kind=dp) :: diff, diff_old, dne, dN, dN1, dNc
@@ -134,19 +134,24 @@ module atom_transfer
       !How many steps and which one
       etape_start = istep_start
       etape_end = 2
-      n_rayons = healpix_npix(healpix_lorder)
+      lprecise_pop = .true.
+      if (lprecise_pop) then
+      !iray_start reset to 1 we recompute with twice has much rays but from the start
+         etape_end = 3
+         n_rayons_max =  n_rayons_start3 * (2**(maxIter3-1))
+      endif
       if ((lstop_after_step1).and.(etape_start==1)) etape_end = 1
 
       if (allocated(stream)) deallocate(stream)
       allocate(stream(nb_proc),stat=alloc_status)
       if (alloc_status > 0) call error("Allocation error stream")
       if (allocated(ds)) deallocate(ds)
-      allocate(ds(n_rayons_max,nb_proc))
-      allocate(vlabs(n_rayons_max,nb_proc))
+      allocate(ds(one_ray,nb_proc))
+      allocate(vlabs(one_ray,nb_proc))
 
       !-> negligible
       mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
-      call alloc_nlte_var(n_rayons_max)
+      call alloc_nlte_var(one_ray)
 
       lfixed_rays = .true.
       iray_start = 1
@@ -159,6 +164,7 @@ module atom_transfer
          !generate rays for a given step
          if (etape==1) then
             !use stepan if healpix_lorder < 2?
+            n_rayons = healpix_npix(healpix_lorder)
             allocate(xmux(n_rayons),xmu(n_rayons),xmuy(n_rayons),wmu(n_rayons))
             wmu(:) = healpix_weight(healpix_lorder)
             write(*,'(" ****-> Using "(1I8)" pixels for healpix, resolution of "(1F12.3)" degrees")') n_rayons,  &
@@ -179,6 +185,15 @@ module atom_transfer
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
             conv_speed_limit = conv_speed_limit_mc
+         else if (etape==3) then
+         !or solution with fixed rays that increase after each iteration??
+            lfixed_rays = .false.
+            n_rayons = n_rayons_start3 !start, same as step 2
+            conv_speed_limit = conv_speed_limit_mc
+            precision = min(1d-1,10.0*dpops_max_error)
+            !only once for all iterations on this step
+            stream = 0.0
+            stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
          else
             call error("(n_lte_loop_mali) etape unkown")
          end if
@@ -212,13 +227,18 @@ module atom_transfer
             !           of the populations and electronic density.
             ! 
             !                    goes with maxIter
-            write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; threshold: "(1ES11.2E3))') n_iter, etape, precision
+            write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; threshold: "(1ES11.2E3)"; Nrays: "(1I5))') &
+                     n_iter, etape, precision, n_rayons
             ibar = 0
             n_cells_done = 0
 
             if (lfixed_rays) then
                stream = 0.0
                stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+            else
+               !update rays weight
+               if (allocated(wmu)) deallocate(wmu)
+               allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
             end if
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
@@ -236,12 +256,13 @@ module atom_transfer
             !$omp private(nact, at) & ! Acceleration of convergence
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on) & ! Ng's Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
-            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT) &
+            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
+               if (etape==3) l_iterate = l_iterate.and.(.not.lcell_converged(icell))
 
                if (l_iterate) then
 
@@ -281,7 +302,7 @@ module atom_transfer
                      enddo
 
 
-                  elseif ( etape == 2) then
+                  else
                    ! Position aleatoire dans la cellule
                      do iray=1,n_rayons
 
@@ -310,8 +331,7 @@ module atom_transfer
                            call accumulate_radrates_mali(id, icell,1, weight)
                         endif
                      enddo !iray
-                  else
-                     call error("etape inconnue")
+
                   end if !etape
 
                   !update populations of all atoms including electrons
@@ -611,10 +631,21 @@ module atom_transfer
                if ((lcswitch_enabled).and.(maxval_cswitch_atoms() > 1.0_dp)) then
                   call adjust_cswitch_atoms()
                endif
-               if (n_iter > maxIter) then
-                  call warning("not enough iterations to converge !!")
-                  lconverged = .true.
-               end if
+               if (lfixed_rays) then
+                  if (n_iter > maxIter) then
+                     call warning("not enough iterations to converge !!")
+                     lconverged = .true.
+                  end if
+               else
+                  n_rayons = n_rayons * 2
+                  if (n_iter >= maxIter3) then
+                     call warning("not enough rays to converge in step 3!!")
+                     lconverged = .true.
+                  endif
+              ! On continue en calculant 2 fois plus de rayons
+              ! On les ajoute a l'ensemble de ceux calcules precedemment
+!              iray_start = iray_start + n_rayons
+              endif
             end if
             !***********************************************************!
 
@@ -664,7 +695,7 @@ module atom_transfer
             write(*,'(" --> ~time step (cpu)="(1ES17.8E3)" min")') mod(n_iter * time_iteration * nb_proc/60.,60.)
          endif
 
-         if (etape==1) deallocate(xmux,xmuy,xmu)
+         if (allocated(xmu)) deallocate(xmux,xmuy,xmu)
          if (allocated(wmu)) deallocate(wmu)
 
          ! write(*,'("  <step #"(1I1)" done! :: threshold="(1ES17.8E3)">")') etape,  precision
