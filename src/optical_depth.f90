@@ -384,10 +384,9 @@ do ! Boucle infinie
    end if
 
    if (tau_R > gamma_MRW) then
-      call random_seed()
       call random_number(zeta_random)
-
       y_random = interp(y_MRW, zeta, zeta_random)
+!      write(*,*) 'MRW on cell: ', icell0, zeta_random, y_random
    endif
    ! Comparaison integrale avec tau
    ! et ajustement longueur de vol eventuellement
