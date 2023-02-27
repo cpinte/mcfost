@@ -135,15 +135,13 @@ module atom_transfer
 
       !How many steps and which one
       etape_start = istep_start
-      etape_end = 2
+      etape_end = istep_end
       ! lprecise_pop = .false.
       ! if (lprecise_pop) then
       ! !iray_start reset to 1 we recompute with twice has much rays but from the start
       !    etape_end = 3
       !    n_rayons_max =  n_rayons_start3 * (2**(maxIter3-1))
       ! endif
-      if ((lstop_after_step1).and.(etape_start==1)) etape_end = 1
-
       if (allocated(stream)) deallocate(stream)
       allocate(stream(nb_proc),stat=alloc_status)
       if (alloc_status > 0) call error("Allocation error stream")
@@ -153,9 +151,9 @@ module atom_transfer
       allocate(lcell_converged(n_cells),stat=alloc_status)
       if (alloc_Status > 0) call error("Allocation error lcell_converged")
       write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
-      ! allocate(diff_loc(n_cells),stat=alloc_status)
-      ! if (alloc_Status > 0) call error("Allocation error diff_loc")
-      ! write(*,*) " size diff_loc:", sizeof(diff_loc) / 1024./1024./1024.," GB"
+      allocate(diff_loc(n_cells),stat=alloc_status)
+      if (alloc_Status > 0) call error("Allocation error diff_loc")
+      write(*,*) " size diff_loc:", sizeof(diff_loc) / 1024./1024./1024.," GB"
       write(*,*) ""
 
       !-> negligible
@@ -211,6 +209,7 @@ module atom_transfer
          lconverged = .false.
          lprevious_converged = lforce_lte
          lcell_converged(:) = .false.
+         diff_loc(:) = 1d50
          lng_turned_on = .false.
          n_iter = 0
          conv_speed = 0.0
@@ -262,13 +261,14 @@ module atom_transfer
             !$omp private(nact, at) & ! Acceleration of convergence
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on) & ! Ng's Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
-            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged) &
-            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size)
+            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
+            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,dpops_max_error)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
                ! if(diff_loc(icell) < 0.1 * dpops_max_error) cycle
+               ! stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
 
                if (l_iterate) then
 
@@ -512,7 +512,7 @@ module atom_transfer
             !$omp parallel &
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
-            !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration)&!diff,diff_cont,dM)&
+            !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration,diff_loc)&!diff,diff_cont,dM)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm,voigt) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
@@ -543,7 +543,9 @@ module atom_transfer
                   !compare for all atoms and all cells
                   diff = max(diff, dN) ! pops
                   diff_cont = max(diff_cont,dNc)
-                  lcell_converged(icell) = (diff < precision)!.and.(dne < precision)
+                  !TO DO, TBC :: include also dne ??
+                  lcell_converged(icell) = (dN < precision) !(diff < precision)
+                  diff_loc(icell) = dN
 
                   !Re init for next iteration if any
                   do nact=1, NactiveAtoms
@@ -725,8 +727,8 @@ module atom_transfer
       if (loutput_rates) call write_rates()
 
       call dealloc_nlte_var()
-      deallocate(dM, dTM, Tex_ref, Tion_ref)
-      deallocate(stream,ds,vlabs,lcell_converged)
+      deallocate(dM, dTM, Tex_ref, Tion_ref, diff_loc)
+      deallocate(stream, ds, vlabs, lcell_converged)
 
       ! --------------------------------    END    ------------------------------------------ !
       lnon_lte_loop = .false.
