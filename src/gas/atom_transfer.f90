@@ -24,7 +24,7 @@ module atom_transfer
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
         lnon_lte_loop, vlabs, calc_contopac_loc, set_max_damping
-   use see, only : ngpop, Neq_ng, lcell_converged, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
+   use see, only : ngpop, Neq_ng, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d, Ng_accelerate, Accelerate, check_ng_pops
@@ -63,20 +63,21 @@ module atom_transfer
    !  2) Randomly distributed rays for random distribution of points of each cell.
    ! ------------------------------------------------------------------------------------ !
       integer :: etape, etape_start, etape_end, iray
-      integer :: n_rayons, n_rayons_max
-      integer :: n_iter, id, i, iray_start, alloc_status
+      integer :: n_iter, id, i, alloc_status, n_rayons
+      ! integer :: , iray_start, n_rayons_max
       integer :: nact, imax, icell_max, icell_max_2
       integer :: icell, ilevel, nb, nr, unconverged_cells
-      integer, parameter :: maxIter = 150, maxIter3 = 10
+      integer, parameter :: maxIter = 150!, maxIter3 = 10
       !ray-by-ray integration of the SEE
-      integer, parameter :: one_ray = 1, n_rayons_start3 = 100
+      integer, parameter :: one_ray = 1!, n_rayons_start3 = 100
       logical :: lfixed_Rays, lconverged, lprevious_converged
       real :: rand, rand2, rand3, unconverged_fraction
       real(kind=dp) :: precision, vth
-      real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy
+      real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy,diff_loc
       real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
       real(kind=dp) :: diff, diff_old, dne, dN, dN1, dNc
       real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
+      logical, allocatable :: lcell_converged(:)
 
       logical :: labs
       logical :: l_iterate, l_iterate_ne
@@ -112,6 +113,7 @@ module atom_transfer
       !non-LTE mode
       lnon_lte_loop = .true. !for substracting speed of reference cell.
       labs = .true.
+      lfixed_rays = .true.
       id = 1
 
       !Use non-LTE pops for electrons and background opacities.
@@ -134,12 +136,12 @@ module atom_transfer
       !How many steps and which one
       etape_start = istep_start
       etape_end = 2
-      lprecise_pop = .true.
-      if (lprecise_pop) then
-      !iray_start reset to 1 we recompute with twice has much rays but from the start
-         etape_end = 3
-         n_rayons_max =  n_rayons_start3 * (2**(maxIter3-1))
-      endif
+      ! lprecise_pop = .false.
+      ! if (lprecise_pop) then
+      ! !iray_start reset to 1 we recompute with twice has much rays but from the start
+      !    etape_end = 3
+      !    n_rayons_max =  n_rayons_start3 * (2**(maxIter3-1))
+      ! endif
       if ((lstop_after_step1).and.(etape_start==1)) etape_end = 1
 
       if (allocated(stream)) deallocate(stream)
@@ -148,13 +150,17 @@ module atom_transfer
       if (allocated(ds)) deallocate(ds)
       allocate(ds(one_ray,nb_proc))
       allocate(vlabs(one_ray,nb_proc))
+      allocate(lcell_converged(n_cells),stat=alloc_status)
+      if (alloc_Status > 0) call error("Allocation error lcell_converged")
+      write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
+      ! allocate(diff_loc(n_cells),stat=alloc_status)
+      ! if (alloc_Status > 0) call error("Allocation error diff_loc")
+      ! write(*,*) " size diff_loc:", sizeof(diff_loc) / 1024./1024./1024.," GB"
+      write(*,*) ""
 
       !-> negligible
       mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
       call alloc_nlte_var(one_ray)
-
-      lfixed_rays = .true.
-      iray_start = 1
 
       ! --------------------------- OUTER LOOP ON STEP --------------------------- !
 
@@ -185,15 +191,15 @@ module atom_transfer
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
             conv_speed_limit = conv_speed_limit_mc
-         else if (etape==3) then
-         !or solution with fixed rays that increase after each iteration??
-            lfixed_rays = .false.
-            n_rayons = n_rayons_start3 !start, same as step 2
-            conv_speed_limit = conv_speed_limit_mc
-            precision = min(1d-1,10.0*dpops_max_error)
-            !only once for all iterations on this step
-            stream = 0.0
-            stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+         ! else if (etape==3) then
+         ! !or solution with fixed rays that increase after each iteration??
+         !    lfixed_rays = .false.
+         !    n_rayons = n_rayons_start3 !start, same as step 2
+         !    conv_speed_limit = conv_speed_limit_mc
+         !    precision = min(1d-1,10.0*dpops_max_error)
+         !    !only once for all iterations on this step
+         !    stream = 0.0
+         !    stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
          else
             call error("(n_lte_loop_mali) etape unkown")
          end if
@@ -235,10 +241,10 @@ module atom_transfer
             if (lfixed_rays) then
                stream = 0.0
                stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
-            else
-               !update rays weight
-               if (allocated(wmu)) deallocate(wmu)
-               allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            ! else
+            !    !update rays weight
+            !    if (allocated(wmu)) deallocate(wmu)
+            !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
             end if
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
@@ -262,7 +268,7 @@ module atom_transfer
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
-               ! if (etape==3) l_iterate = l_iterate.and.(.not.lcell_converged(icell))
+               ! if(diff_loc(icell) < 0.1 * dpops_max_error) cycle
 
                if (l_iterate) then
 
@@ -636,15 +642,16 @@ module atom_transfer
                      call warning("not enough iterations to converge !!")
                      lconverged = .true.
                   end if
-               else
-                  n_rayons = n_rayons * 2
-                  if (n_iter >= maxIter3) then
-                     call warning("not enough rays to converge in step 3!!")
-                     lconverged = .true.
-                  endif
-              ! On continue en calculant 2 fois plus de rayons
-              ! On les ajoute a l'ensemble de ceux calcules precedemment
-!              iray_start = iray_start + n_rayons
+               ! else
+               !    !increase number of rays only if it converges already ?
+               !    n_rayons = n_rayons * 2
+               !       ! On continue en calculant 2 fois plus de rayons
+               !       ! On les ajoute a l'ensemble de ceux calcules precedemment
+               !       ! iray_start = iray_start + n_rayons
+               !    if (n_iter >= maxIter3) then
+               !       call warning("not enough rays to converge in step 3!!")
+               !       lconverged = .true.
+               !    endif
               endif
             end if
             !***********************************************************!
@@ -719,7 +726,7 @@ module atom_transfer
 
       call dealloc_nlte_var()
       deallocate(dM, dTM, Tex_ref, Tion_ref)
-      deallocate(stream,ds,vlabs)
+      deallocate(stream,ds,vlabs,lcell_converged)
 
       ! --------------------------------    END    ------------------------------------------ !
       lnon_lte_loop = .false.
