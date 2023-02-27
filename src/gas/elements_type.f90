@@ -303,6 +303,7 @@ module elements_type
         ! ----------------------------------------------------------------------!
         ! Interpolate the partition function of Element elem in ionisation stage
         ! j at temperature temp
+        ! 24/02/2023: added linear extrapolation for points outside range.
         ! ----------------------------------------------------------------------!
     
         type(Element), intent(in) :: elem
@@ -318,9 +319,21 @@ module elements_type
         !out of bound the function return 0 not the inner (outer) bound.
           tp(1) = temp
           Uka(:) = linear_1D_sorted(Npf, Tpf, elem%pf(:,j), 1, tp)
-          Uk = exp(Uka(1))
-          if( temp < Tpf(1) ) Uk = exp(elem%pf(1,j))
-          if (temp > Tpf(Npf)) Uk = exp(elem%pf(Npf,j))
+        !   Uk = exp(Uka(1))
+        !   if( temp < Tpf(1) ) Uk = exp(elem%pf(1,j))
+        !   if (temp > Tpf(Npf)) Uk = exp(elem%pf(Npf,j))
+
+          !linear extrapolation
+          ! TO DO: in linear_1D_sorted
+          if (temp < Tpf(1)) then
+            ! write(*,*) "xi=",temp, "x1=",Tpf(1), "x2=",Tpf(2), "y1=",elem%pf(1,j), "y2=",elem%pf(2,j)
+            Uk = exp( elem%pf(2,j) + (temp - Tpf(2))/(Tpf(1)-Tpf(2)) * (elem%pf(1,j)-elem%pf(2,j)) )
+          elseif (temp > Tpf(Npf)) then
+            ! write(*,*) "xi=",temp, "x1=",Tpf(Npf-1), "x2=",Tpf(Npf), "y1=",elem%pf(Npf-1,j), "y2=",elem%pf(Npf,j)
+            Uk = exp( elem%pf(Npf-1,j) + (temp - Tpf(Npf-1))/(Tpf(Npf)-Tpf(Npf-1)) * (elem%pf(Npf,j)-elem%pf(Npf-1,j)) )
+          else ! in range
+            Uk = exp(Uka(1))
+          endif
     
         return
     end function get_pf
