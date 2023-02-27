@@ -253,6 +253,7 @@ subroutine physical_length_MRW(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w
    extrin,ltot,flag_sortie,lpacket_alive)
  use Temperature, only : Tdust
  use zeta_MRW, only : zeta, y_MRW 
+ use utils
 ! Integration par calcul de la position de l'interface entre cellules
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
 ! C. Pinte
@@ -272,6 +273,7 @@ logical, intent(out) :: flag_sortie
 logical, intent(inout) :: lpacket_alive
 real(dp) :: rosseland_opacity
 integer :: gamma_MRW
+real(kind=dp) :: zeta_random, y_random
 
 real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
 real(kind=dp) :: l, tau, tau_R, opacite, l_contrib, l_void_before
@@ -382,9 +384,10 @@ do ! Boucle infinie
    end if
 
    if (tau_R > gamma_MRW) then
-      ! write(*,*) 'SR: need to use MRW for ', icell0
-   ! else
-   !    write(*,*) 'SR: DO NOT need to use MRW for ', icell0
+      call random_seed()
+      call random_number(zeta_random)
+
+      y_random = interp(y_MRW, zeta, zeta_random)
    endif
    ! Comparaison integrale avec tau
    ! et ajustement longueur de vol eventuellement
