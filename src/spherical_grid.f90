@@ -3,7 +3,7 @@ module spherical_grid
   use constantes
   use parametres
   use cylindrical_grid, only: cell2cylindrical, cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
-       delta_z, dr2_grid, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
+       delta_z, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
        volume, l_dark_zone, zmax
   use messages
 

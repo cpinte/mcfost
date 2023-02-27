@@ -774,7 +774,8 @@ contains
     real(dp), dimension(ndusttypes),    intent(in) :: graindens
     real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
     real(dp), intent(in) :: hfact,umass,utime,ulength
-    real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass, nucleation
+    real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
+    real(dp), dimension(:,:), intent(inout), allocatable :: nucleation
     real(dp), dimension(:), intent(in) :: gastemperature
     integer, intent(in) :: ndudt
     real(dp), dimension(:), intent(in) :: dudt

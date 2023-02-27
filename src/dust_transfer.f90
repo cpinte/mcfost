@@ -30,6 +30,7 @@ module dust_transfer
   use read_fargo3d, only : read_fargo3d_files
   use read_athena, only : read_athena_model
   use read_idefix, only : read_idefix_model
+  use read_pluto, only : read_pluto_files
   !$ use omp_lib
 
   implicit none
@@ -132,6 +133,8 @@ subroutine transfert_poussiere()
         call setup_model1d_to_mcfost()
      else if (lidefix) then
         call read_idefix_model()
+     else if (lpluto) then
+        call read_pluto_files()
      else
         if (lsigma_file) call read_sigma_file()
         call define_density()

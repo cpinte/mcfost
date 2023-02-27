@@ -64,23 +64,23 @@ module parametres
   logical :: lemission_atom, lelectron_scattering, lforce_lte,  &
             	ldissolve, loutput_rates, lzeeman_polarisation
   integer :: N_rayons_mc, istep_start, istep_end
-  
+ 
   !HEALpix
   integer :: healpix_lorder, healpix_lmin, healpix_lmax !lmin and lmax not yet (for local evaluation)
-  
+
   logical :: lcheckpoint, lsafe_stop
   !Convergence relative errors
   real :: dpops_max_error, art_hv, safe_stop_time
   integer :: checkpoint_period
-  
+
   !Ng's acceleration
   logical :: lng_acceleration
   integer :: Ng_Norder, Ng_Nperiod
-  
+
   !electron density
   logical :: lsolve_for_ne
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
-  
+
 
   logical :: lmodel_ascii, lmhd_voronoi, lmodel_1d, llimit_mem
 
@@ -104,7 +104,7 @@ module parametres
   real :: angle_interet, zoom, tau_seuil, wl_seuil, image_offset_centre(3)
 
   real  :: cutoff = 7.0
-  
+
   !must be initialized to 0
   integer(kind=8) :: mem_alloc_tot !total memory allocated dynamically or not in bytes
 
@@ -129,11 +129,11 @@ module parametres
   logical :: ldensity_file, lsigma_file, lvelocity_file, lphantom_file, lphantom_multi, lphantom_avg
   logical :: lgadget2_file, lascii_SPH_file, llimits_file, lforce_SPH_amin, lforce_SPH_amax, lmcfost_lib
   logical :: lweight_emission, lcorrect_density, lProDiMo2mcfost, lProDiMo2mcfost_test, lastrochem, lML
-  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa, lforce_Mgas
+  logical :: lspot, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium, lchange_Tmax_PAH, lISM_heating, lcasa, lJy, lforce_Mgas
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
   integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
 
-  logical :: lfargo3d, lathena, lidefix
+  logical :: lfargo3d, lathena, lidefix, lpluto
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -289,18 +289,33 @@ module parametres
   type(athena_model) :: athena
 
   type idefix_model
-     integer :: nx1, nx2, nx3, iunit, position
+     integer :: nx1, nx2, nx3, iunit, position, geometry, id
      integer, dimension(3) :: dimensions
      real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
      logical :: log_spacing, corrotating_frame
 
-
      real :: time
      character(len=128) :: filename
      character(len=32) :: origin
+
+     real, dimension(:), allocatable :: x1, x2, x3
   end type idefix_model
 
   type(idefix_model) :: idefix
 
+  type pluto_model
+     integer :: nx1, nx2, nx3, iunit, position, geometry
+     integer, dimension(3) :: dimensions
+     real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
+     logical :: log_spacing, corrotating_frame
+
+     real :: time
+     character(len=128) :: dir, id
+     character(len=32) :: origin
+
+     real, dimension(:), allocatable :: x1, x2, x3
+  end type pluto_model
+
+  type(pluto_model) :: pluto
 
 end module parametres

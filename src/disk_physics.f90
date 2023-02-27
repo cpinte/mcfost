@@ -199,10 +199,10 @@ subroutine equilibre_hydrostatique()
      do i=1, n_rad
         ln_rho(1) = 0.
         rho(1) = 1.
-        dz = delta_z(i)
         dz_m1 = 1.0/dz
         somme = rho(1)
         do j = 2, nz
+           dz = delta_z(i,j)
            icell = cell_map(i,j,k)
            icell_m1 = cell_map(i,j-1,k)
            dTdz = (Tdust(icell)-Tdust(icell_m1)) * dz_m1

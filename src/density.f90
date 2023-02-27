@@ -7,6 +7,7 @@ module density
   use grid
   use utils
   use messages
+  use stars, only : compute_stellar_parameters
 
   implicit none
   save
@@ -956,9 +957,12 @@ subroutine read_density_file()
   logical :: anynull, l3D_file
   character(len=80) :: comment
 
-  integer :: k, l, i, n_a, read_n_a, read_gas_density, read_gas_velocity, jj, icell, phik
+  integer :: k, l, i, n_a, read_n_a, read_gas_density, read_gas_velocity, jj, icell, phik, n_sink
   real(kind=dp) :: somme, mass, facteur
   real :: a, tmp, gas2dust
+
+  real :: m_star, x_star, y_star, z_star, vx_star, vy_star, vz_star
+  real :: m_planet, x_planet, y_planet, z_planet, vx_planet, vy_planet, vz_planet
 
   real, dimension(:,:,:,:), allocatable :: sph_dens ! (n_rad,nz,n_az,n_a)
   real, dimension(:,:,:), allocatable :: sph_gas_dens ! (n_rad,nz,n_az)
@@ -971,6 +975,9 @@ subroutine read_density_file()
   real(kind=dp) :: f
 
   logical :: lread_gas_density, lread_gas_velocity
+
+  type(star_type), dimension(:), allocatable :: etoile_old
+  integer  :: i_etoile, n_etoiles_old
 
   if (lplanet_az) then ! Planet is along x-axis by default in wakeflow
      RT_n_az = 1
@@ -1003,6 +1010,96 @@ subroutine read_density_file()
   call ftgkyj(unit,"read_gas_velocity",read_gas_velocity,comment,status)
   if (status /=0) read_gas_velocity = 0
   write(*,*) "read_gas_velocity =", read_gas_velocity
+
+  n_sink = 0
+  status = 0
+  call ftgkyj(unit,"N_sink",n_sink,comment,status)
+  if (status /=0) n_sink = 0
+
+  if (n_sink > 0) then
+     write(*,*) "Found",n_sink,"stars/planets"
+
+     if (n_sink /= 2) call error("Only case with 2 sinks implemented so far")
+
+     call ftgkye(unit,"M_star",M_star,comment,status)
+     call ftgkye(unit,"x_star",x_star,comment,status)
+     call ftgkye(unit,"y_star",y_star,comment,status)
+     call ftgkye(unit,"z_star",z_star,comment,status)
+     call ftgkye(unit,"vx_star",vx_star,comment,status)
+     call ftgkye(unit,"vy_star",vy_star,comment,status)
+     call ftgkye(unit,"vz_star",vz_star,comment,status)
+
+     call ftgkye(unit,"M_planet",M_planet,comment,status)
+     call ftgkye(unit,"x_planet",x_planet,comment,status)
+     call ftgkye(unit,"y_planet",y_planet,comment,status)
+     call ftgkye(unit,"z_planet",z_planet,comment,status)
+     call ftgkye(unit,"vx_planet",vx_planet,comment,status)
+     call ftgkye(unit,"vy_planet",vy_planet,comment,status)
+     call ftgkye(unit,"vz_planet",vz_planet,comment,status)
+
+     n_etoiles_old = n_etoiles
+     n_etoiles = n_sink
+
+     if (lfix_star) then
+        write(*,*) ""
+        write(*,*) "Stellar parameters will not be updated, only the star positions, velocities and masses"
+        if (n_etoiles > n_etoiles_old) then
+           write(*,*) "WARNING: sink with id >", n_etoiles_old, "will be ignored in the RT"
+           n_etoiles = n_etoiles_old
+        endif
+
+     else
+        write(*,*) ""
+        write(*,*) "Updating the stellar properties:"
+        write(*,*) "There are now", n_etoiles, "stars in the model"
+
+        ! Saving if the accretion rate was forced
+        allocate(etoile_old(n_etoiles_old))
+        if (allocated(etoile)) then
+           etoile_old(:) = etoile(:)
+           deallocate(etoile)
+        endif
+        allocate(etoile(n_etoiles))
+        do i=1, min(n_etoiles, n_etoiles_old)
+           etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
+           etoile(i)%Mdot = etoile_old(i)%Mdot
+        enddo
+        ! If we have new stars
+        do i=n_etoiles_old+1,n_etoiles
+           etoile(i)%force_Mdot = .false.
+           etoile(i)%Mdot = 0.
+        enddo
+        deallocate(etoile_old)
+
+        do i=1, n_etoiles
+           if (.not.etoile(i)%force_Mdot) then
+              etoile(i)%Mdot = 0. ! Accretion rate is in Msun/year
+           endif
+        enddo
+        etoile(:)%find_spectrum = .true.
+     endif
+
+     i_etoile = 1
+     etoile(i_etoile)%x = x_star
+     etoile(i_etoile)%y = y_star
+     etoile(i_etoile)%z = z_star
+     etoile(i_etoile)%vx = vx_star
+     etoile(i_etoile)%vy = vy_star
+     etoile(i_etoile)%vz = vz_star
+     etoile(i_etoile)%M = M_star
+
+     i_etoile = 2
+     etoile(i_etoile)%x = x_planet
+     etoile(i_etoile)%y = y_planet
+     etoile(i_etoile)%z = z_planet
+
+     etoile(i_etoile)%vx = vx_planet
+     etoile(i_etoile)%vy = vy_planet
+     etoile(i_etoile)%vz = vz_planet
+     etoile(i_etoile)%M = M_planet * GxMJup/GxMsun ! Mplanet is given in MJup
+
+     if (.not.lfix_star) call compute_stellar_parameters()
+  endif
 
   lread_gas_velocity = read_gas_velocity >= 1
   vfield_coord = read_gas_velocity ! 1 = cartesian, 2 = cylindrical, 3 = spherical
@@ -1514,6 +1611,8 @@ subroutine read_density_file()
   write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
   call normalize_dust_density()
   deallocate(sph_dens,a_sph)
+
+
 
   return
 

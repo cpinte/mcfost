@@ -2,7 +2,7 @@
 # Makefile for Monte Carlo radiative transfer code MCFOST
 #------------------------------------------------------------------------------#
 # Linux compiling server
-LINUX_SERVER=ozstar
+LINUX_SERVER=gadi
 IPAG_SERVER=ipag-nfs
 
 KNOWN_SYSTEM=no
@@ -84,7 +84,7 @@ ifeq ($(SYSTEM), ifort)
 	STATIC_FLAGS= -static-intel -qopenmp-link static
     else
         ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512
-	STATIC_FLAGS= -static
+	STATIC_FLAGS= -static-intel -qopenmp-link static -static-libstdc++
     endif
     FC= ifort
     FFLAGS= -fpp -O3 -no-prec-div -fp-model fast=2 -traceback $(ARCH)
@@ -185,31 +185,31 @@ endif
 # Sources and objects
 #gas transfer. (Only atoms at the moment)
 gdir=gas
+VPATH = $(gdir)/
 
-
-SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 messages.f90          \
+SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 messages.f90 \
           operating_system.f90 random_numbers.f90 utils.f90 sort.f90 fits_utils.f90 \
           grains.f90 read1d_models.f90 cylindrical_grid.f90 spherical_grid.f90      \
-          kdtree2.f90 $(gdir)/elements_type.f90                                     \
+          kdtree2.f90 elements_type.f90                                             \
           Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90            \
           Temperature.f90 density.f90 read_opacity.f90 scattering.f90               \
           read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90          \
-           readVTK.f90 read_idefix.f90 \
+          readVTK.f90 read_idefix.f90 read_pluto.f90 \
           coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90            \
-          input.f90 benchmarks.f90 $(gdir)/atom_type.f90  \
-          $(gdir)/wavelengths_gas.f90 $(gdir)/broad.f90                             \
-          read_param.f90 dust_ray_tracing.f90 uplow.f90 ${gdir}/abo.f90         \
-          $(gdir)/occupation_probability.f90 $(gdir)/lte.f90                        \
+          input.f90 benchmarks.f90 atom_type.f90  \
+          wavelengths_gas.f90 broad.f90                             \
+          read_param.f90 dust_ray_tracing.f90 uplow.f90 abo.f90     \
+          occupation_probability.f90 lte.f90                        \
           radiation_field.f90 thermal_emission.f90 diffusion.f90                    \
-          io_prodimo.f90 disk_physics.f90 $(gdir)/gas_contopac.f90 		    \
-          voigts.f90 $(gdir)/opacity_atom.f90					    \
+          io_prodimo.f90 disk_physics.f90 gas_contopac.f90 		     \
+          voigts.f90 opacity_atom.f90					    \
           optical_depth.f90 ML_prodimo.f90                                          \
           output.f90 mem.f90  init_mcfost.f90 io_phantom_infiles.f90                \
-          io_phantom_utils.f90 mess_up_SPH.f90 read_phantom.f90      \
+          io_phantom_utils.f90 mess_up_SPH.f90 read_phantom.f90     \
           read_gadget2.f90 SPH2mcfost.f90 mhd2mcfost.f90 dust_transfer.f90          \
-          mol_transfer.f90 $(gdir)/collision_atom.f90 $(gdir)/io_atom.f90           \
-          $(gdir)/electron_density.f90 $(gdir)/see.f90                              \
-          $(gdir)/atom_transfer.f90
+          mol_transfer.f90 collision_atom.f90 io_atom.f90           \
+          electron_density.f90 see.f90                              \
+          atom_transfer.f90
 
 OBJECTS= $(SOURCES:.f90=.o)
 
@@ -277,7 +277,7 @@ mcfost2prodimo :  mcfost mcfost2prodimo.o
 
 .PHONY : release release_mac release_utils fosti dmz wardlaw
 
-release : clean main
+release : main
 	- git tag -d release
 	git tag release
 	git push github
@@ -290,7 +290,7 @@ release : clean main
 	tar czvf mcfost_bin.tgz mcfost_update ; rm -rf mcfost_update
 	openssl sha1 mcfost_bin.tgz | awk '{print $$2}' > web/mac/mcfost.sha1
 	mv mcfost_bin.tgz web/mac/
-	ssh $(LINUX_SERVER) "cd mcfost/src && git pull origin master && git fetch --tags && git checkout release && export MCFOST_GIT=1 && export MAKEFLAGS= && make clean mcfost static=yes && git checkout master && \cp -f mcfost ~/mcfost_cigri && \cp -f mcfost mcfost_update && rm -f mcfost.sha1 && tar czf mcfost_bin.tgz mcfost_update --remove-files && sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
+	ssh $(LINUX_SERVER) "cd mcfost/src && git pull origin master && git fetch --tags --force && git checkout release && export MCFOST_GIT=1 && export MAKEFLAGS= && make clean mcfost static=yes && git checkout master && \cp -f mcfost ~/mcfost_cigri && \cp -f mcfost mcfost_update && rm -f mcfost.sha1 && tar czf mcfost_bin.tgz mcfost_update --remove-files && sha1sum mcfost_bin.tgz  | awk '{print $$1}' > mcfost.sha1"
 	scp $(LINUX_SERVER):mcfost/src/mcfost_bin.tgz web/linux/
 	scp $(LINUX_SERVER):mcfost/src/mcfost.sha1 web/linux/
 	cp `grep mcfost_version mcfost_env.f90 | awk '{print "ref"$$6".para ref"$$6"_multi.para ref"$$6"_3D.para"}' ` web
