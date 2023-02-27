@@ -40,7 +40,8 @@ module dust_transfer
 subroutine transfert_poussiere()
 
   use thermal_emission, only : frac_E_stars, frac_E_disk
-
+  use zeta_MRW, only : initialize_cumulative_zeta!, zeta, y_MRW
+  use utils 
   implicit none
 
 #include "sprng_f.h"
@@ -86,6 +87,9 @@ subroutine transfert_poussiere()
 
   ! Energie des paquets mise a 1
   E_paquet = 1.0_dp
+
+  ! Compute equation (7) of Min et al (2009) for Modified Random Walk
+  call initialize_cumulative_zeta()
 
   ! Building the wavelength & basic dust properties grid
   call init_lambda()

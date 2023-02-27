@@ -252,6 +252,7 @@ end subroutine physical_length
 subroutine physical_length_MRW(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,&
    extrin,ltot,flag_sortie,lpacket_alive)
  use Temperature, only : Tdust
+ use zeta_MRW, only : zeta, y_MRW 
 ! Integration par calcul de la position de l'interface entre cellules
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
 ! C. Pinte
