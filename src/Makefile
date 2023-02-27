@@ -202,7 +202,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 me
           occupation_probability.f90 lte.f90                        \
           radiation_field.f90 thermal_emission.f90 diffusion.f90                    \
           io_prodimo.f90 disk_physics.f90 gas_contopac.f90 		     \
-          voigts.f90 opacity_atom.f90					    \
+          voigts.f90 opacity_atom.f90 init_mrw.f90					    \
           optical_depth.f90 ML_prodimo.f90                                          \
           output.f90 mem.f90  init_mcfost.f90 io_phantom_infiles.f90                \
           io_phantom_utils.f90 mess_up_SPH.f90 read_phantom.f90     \
