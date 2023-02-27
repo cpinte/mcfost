@@ -840,6 +840,10 @@ subroutine freeze_out()
 
   write (*,*) "Freezing-out of molecules"
 
+  !$omp parallel default(none) &
+  !$omp private(icell,CD,ldeplete) &
+  !$omp shared(tab_abundance,freeze_out_depletion,T_freeze_out,lphoto_desorption,n_cells,Tdust)
+  !$omp do
   do icell=1,n_cells
      ldeplete = .false.
      if (Tdust(icell) < T_freeze_out)  then
@@ -856,6 +860,8 @@ subroutine freeze_out()
         if (ldeplete) tab_abundance(icell) = tab_abundance(icell) * freeze_out_depletion
      endif
   enddo
+  !$omp end do
+  !$omp end parallel
 
   return
 
@@ -879,12 +885,18 @@ subroutine photo_dissociation()
 
   write (*,*) "Photo-dissociating molecules ..."!, threshold_CD
 
+  !$omp parallel default(none) &
+  !$omp private(icell,CD) &
+  !$omp shared(tab_abundance,n_cells)
+  !$omp do
   do icell=1, n_cells
      CD = compute_vertical_CD(icell)
      if (CD < threshold_CD) then
         tab_abundance(icell) = tab_abundance(icell) * photo_dissocation_depletion
      endif
   enddo ! icell
+  !$omp end do
+  !$omp end parallel
 
   write(*,*) "Done"
 

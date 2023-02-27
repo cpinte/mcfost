@@ -15,6 +15,7 @@ module init_mcfost
   use read_athena, only : read_athena_parameters
   use read1d_models, only : read_grid_1d
   use read_idefix, only : read_idefix_parameters
+  use read_pluto, only : read_pluto_parameters
 
   implicit none
 
@@ -198,6 +199,7 @@ subroutine set_default_variables()
   lfargo3d = .false.
   lathena = .false.
   lidefix = .false.
+  lpluto = .false.
   theta_max = 0.5*pi
   llinear_rgrid = .false.
   image_offset_centre(:) = (/0.0,0.0,0.0/)
@@ -269,7 +271,7 @@ subroutine initialisation_mcfost()
 
   character(len=512) :: cmd, s, str_seed, para, base_para
   character(len=4) :: n_chiffres
-  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file, idefix_file
+  character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file, idefix_file, pluto_dir, pluto_id
 
   logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb, lold_PA
 
@@ -1235,7 +1237,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
         read(s,*) which_planet
-        write(*,*) "PLANET", which_planet, "AZ=", planet_az
+        write(*,*) "Planet", which_planet, "azimuth=", planet_az
         i_arg = i_arg + 1
      case("-turn-off_planets")
         i_arg = i_arg + 1
@@ -1378,7 +1380,16 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lidefix = .true.
         call get_command_argument(i_arg,idefix_file)
-         i_arg = i_arg + 1
+        i_arg = i_arg + 1
+     case("-pluto")
+        i_arg = i_arg + 1
+        lpluto = .true.
+        call get_command_argument(i_arg,pluto_dir)
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,pluto_id)
+        i_arg = i_arg + 1
+        read(pluto_id,*,iostat=ios) i
+        if (ios/=0) call error("pluto dump number needed")
      case("-old_PA")
         i_arg = i_arg + 1
         lold_PA = .true.
@@ -1421,9 +1432,16 @@ subroutine initialisation_mcfost()
                                                            !the pass the model to mcfost!
   if (lidefix) then
      l3D = .true.
-     if (n_zones > 1) call error("athena mode only work with 1 zone")
+     if (n_zones > 1) call error("idefix mode only work with 1 zone")
      disk_zone(1)%geometry = 2
      call read_idefix_parameters(idefix_file)
+  endif
+
+  if (lpluto) then
+     l3D = .true.
+     if (n_zones > 1) call error("pluto mode only work with 1 zone")
+     disk_zone(1)%geometry = 2
+     call read_pluto_parameters(pluto_dir, pluto_id)
   endif
 
   if (n_zones > 1) lvariable_dust=.true.
@@ -1761,18 +1779,23 @@ subroutine display_help()
   write(*,*) "        : -mol : calculates molecular emission"
   write(*,*) "        : -atom : calculates atomic lines emission"
   write(*,*) " "
-  write(*,*) " Coupling with other codes"
-  write(*,*) "        : -prodimo : creates required files for ProDiMo"
-  write(*,*) "        : -p2m : reads the results from ProDiMo"
-  write(*,*) "        : -astrochem : creates the files for astrochem"
+  write(*,*) " Reading hydrodynamics model"
   write(*,*) "        : -phantom <dump> : reads a phantom dump file"
   write(*,*) "        : -gadget : reads a gadget-2 dump file"
   write(*,*) "        : -fargo3d <dir> <id> : reads a fargo3d model"
+  write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
+  write(*,*) "        : -idefix <dump> : reads an idefix vtk file"
+  write(*,*) "        : -pluto <dir> <id> : reads a pluto model"
   write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
   write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
   write(*,*) "        : -model_1d : interface with stellar atmosphere models."
-  write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
-  write(*,*) "        : -idefix <dump> : reads an idefix vtk file"
+  write(*,*) " "
+  write(*,*) " Generating outputs for chemistry codes"
+  write(*,*) "        : -prodimo : creates required files for ProDiMo"
+  write(*,*) "        : -astrochem : creates the files for astrochem"
+  write(*,*) " "
+  write(*,*) " Reading chemistry model"
+  write(*,*) "        : -p2m : reads the results from ProDiMo"
   write(*,*) " "
   write(*,*) " Options related to data file organisation"
   write(*,*) "        : -seed <seed> : modifies seed for random number generator;"

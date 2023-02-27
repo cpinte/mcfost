@@ -54,7 +54,7 @@ function span_dp(xmin,xmax,n, dk)
   real(kind=dp) :: delta_x
 
   delta_x = (xmax-xmin)/real(n-1,kind=dp)
-  
+
   if (dk < 0) then
   	x1 = xmax
   	x2 = xmin
@@ -68,7 +68,7 @@ function span_dp(xmin,xmax,n, dk)
   	iend = n
   	i0 = 1
   endif
-  
+
   span_dp(i0) = x1
   do i=istart,iend,dk
      span_dp(i) = span_dp(i-dk) + dk * delta_x
@@ -404,29 +404,12 @@ end subroutine Accelerate
 subroutine check_ng_pops(m,n,o,x,xtot)
 !Normalise extrapolated populations x (Nlevels,Ncells,Neq_ng)
 !so that sum(x,dim=1) = xtot for each Neq_ng (mass conservation)
-!if x < 0; x = 0
+!if x < 0; x = abs(0)
    integer, intent(in) :: m,n,o
    real(kind=dp), intent(inout) :: x(m,n,o)
    real(kind=dp), intent(in) :: xtot(n)
    integer :: i, j, k
    real(kind=dp) :: dum(o)
-
-   ! !handle negative has 0
-   ! do k=1,o
-   !    n_loop : do i=1,n
-   !       if (xtot(i) <= 0.0) cycle n_loop
-   !       ! do j=1,m
-   !       !    if (x(j,i,k)<0) then
-   !       !          write(*,*) "find neg pops"
-   !       !       endif
-   !       !       x(j,i,k) = x(j,i,k) * 0.0
-   !       !    endif
-   !       ! enddo
-   !       where (x(:,i,k)<0.0) x(:,i,k) = x(:,i,k) * 0.0
-   !       dum = sum(x(:,i,k))
-   !       x(:,i,k) = x(:,i,k) * xtot(i) / dum
-   !    enddo n_loop
-   ! enddo
 
    !take absolute value
 
@@ -440,7 +423,7 @@ subroutine check_ng_pops(m,n,o,x,xtot)
       !sum of all levels for all solutions at cell i.
       dum = sum(abs(x(:,i,:)),dim=1)
       do j=1,m
-         x(j,i,:) = x(j,i,:) * xtot(i) / dum(:)
+         x(j,i,:) = abs(x(j,i,:)) * xtot(i) / dum(:)
       enddo
    enddo
    !$omp end do
@@ -603,7 +586,7 @@ do la=1, N
       Bpnu(la) = 0.0
    else
       Bpnu(la) = twohnu3_c2 / (exp(hnu_kT)-1.0)
-   end if 
+   end if
 enddo
 
 return
@@ -1626,7 +1609,7 @@ subroutine read_line(unit,FMT,line,Nread,commentchar)
       read(unit, FMT, IOSTAT=EOF) line !'(512A)'
       Nread = len(trim(line))
       !comment or empty ? -> go to next line
-      if ((line(1:1).eq.com).or.(Nread==0)) cycle 
+      if ((line(1:1).eq.com).or.(Nread==0)) cycle
       ! line read exit ! to process it
       exit
    enddo ! if EOF > 0 reaches end of file, leaving
@@ -1758,7 +1741,7 @@ end function locate
    real(kind=dp) :: bilinear
    integer, intent(in) :: N, M
    real(kind=dp), intent(in) :: xi(N),yi(M),f(N,M)
-   real(kind=dp), intent(in) :: xo,yo 
+   real(kind=dp), intent(in) :: xo,yo
    integer, intent(in) :: i0, j0
    integer :: i, j
    real(kind=dp) :: norm, f11, f21, f12, f22
@@ -1901,5 +1884,43 @@ end function locate
    !    return
    ! end function reform_n1xn2
 
+
+ function basename(filename)
+
+   character(len=*), intent(in) :: filename
+   character(len=512) :: basename
+
+   character(len=1),parameter :: sep ="/"
+   integer :: pos
+
+   pos = index(filename, sep, back=.true.)
+   if (pos>0) then
+      basename = filename(pos+1:)
+   else
+      basename = filename
+   endif
+
+   return
+
+ end function basename
+
+ function dirname(filename)
+
+   character(len=*), intent(in) :: filename
+   character(len=512) :: dirname
+
+   character(len=1),parameter :: sep ="/"
+   integer :: pos
+
+   pos = index(filename, sep, back=.true.)
+   if (pos>0) then
+      dirname = filename(:pos)
+   else
+      dirname = "./"
+   endif
+
+   return
+
+ end function dirname
 
 end module utils

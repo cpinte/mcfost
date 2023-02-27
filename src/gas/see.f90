@@ -322,6 +322,7 @@ module see
         if ((is_nan_infinity_vector(atom%n(:,icell))>0)) then
             write(*,*) atom%ID
             write(*,*) "(SEE) BUG pops", " id=",id, " icell=",icell
+            write(*,*) "T=", t(icell), ' ne=', ne(icell)," nH=", nHtot(icell)
             write(*,'("ilevel: "*(1I4))') (l, l=1, atom%Nlevel)
             write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
             write(*,'("ndag: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)

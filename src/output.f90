@@ -3231,18 +3231,17 @@ subroutine ecriture_spectre(imol)
 
      spectre_casa(:,:,:) = spectre(:,:,:,1,1,1) * W2m2_to_Jy
 
-     !  Write the array to the FITS file.
+     ! Write the array to the FITS file.
      call ftppre(unit,group,fpixel,nelements,spectre_casa,status)
      deallocate(spectre_casa)
   else
      if (lJy) then
         factor = 1e26 / Transfreq(mol(imol)%indice_Trans_rayTracing(1))
-     else
-        factor = 1.0
+        spectre = spectre * factor
      endif
 
-     !  Write the array to the FITS file.
-     call ftppre(unit,group,fpixel,nelements,spectre * factor,status)
+     ! Write the array to the FITS file.
+     call ftppre(unit,group,fpixel,nelements,spectre,status)
   endif
 
   if (.not.lcasa) then
