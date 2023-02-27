@@ -88,8 +88,8 @@ subroutine set_default_variables()
   Ng_Norder = 0
   Ng_Nperiod = -1
   istep_start = 1
+  istep_end = 2
   ! AL-RT
-  lstop_after_step1 = .false.
   N_rayons_mc = 100
   loutput_rates = .false.
   !
@@ -779,6 +779,13 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) istep_start
         i_arg= i_arg+1
+     case("-end_step")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("1 or 2 needed for -end_step")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) istep_end
+        if (istep_end > 2) call error("last step of non-LTE loop is caped at 2!")
+        i_arg= i_arg+1
      case("-mhd_voronoi")
         i_arg = i_arg + 1
         lmhd_voronoi = .true.
@@ -801,7 +808,8 @@ subroutine initialisation_mcfost()
         lzeeman_polarisation=.true.
      case("-healpix_nlte")
         i_arg = i_arg + 1
-        lstop_after_step1 = .true.
+        istep_end = 1
+        istep_start = 1
      case("-art_line_resol")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("resolution (km/s) needed with -art_line_resol !")
@@ -1889,6 +1897,7 @@ subroutine display_help()
   write(*,*) " Options related to atomic lines emission"
   !healpix options missing. Waiting finle adaptive scheme.
   write(*,*) "        : -start_step <int> : Select the first step for non-LTE loop (default 1)"
+  write(*,*) "        : -end_step <int> : Select the last step for non-LTE loop (default 2)"
 !   write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"
