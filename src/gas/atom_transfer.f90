@@ -237,14 +237,14 @@ module atom_transfer
             ibar = 0
             n_cells_done = 0
 
-            if (lfixed_rays) then
-               stream = 0.0
-               stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
-            ! else
-            !    !update rays weight
-            !    if (allocated(wmu)) deallocate(wmu)
-            !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
-            end if
+            ! if (lfixed_rays) then
+            !    stream = 0.0
+            !    stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+            ! ! else
+            ! !    !update rays weight
+            ! !    if (allocated(wmu)) deallocate(wmu)
+            ! !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            ! end if
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
             l_iterate_ne = .false.
@@ -267,8 +267,8 @@ module atom_transfer
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
-               ! if(diff_loc(icell) < 0.1 * dpops_max_error) cycle
-               ! stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
+               stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
+               if(diff_loc(icell) < 0.1 * dpops_max_error) cycle
 
                if (l_iterate) then
 
