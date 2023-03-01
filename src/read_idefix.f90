@@ -9,6 +9,7 @@ module read_idefix
   use density
   use stars, only : compute_stellar_parameters
   use read_fargo3d, only : convert_planets, n_planets_max
+  use utils
 
   implicit none
 
@@ -18,14 +19,25 @@ contains
 
     character(len=*), intent(in) :: filename
 
-    integer :: geometry, time
+    character(len=128) :: name
+    character(len=1) :: sep
+    integer :: geometry, time, pos1,pos2, id
     integer, dimension(3) :: dimensions
     character(:), allocatable :: origin
     real, dimension(:), allocatable :: x1, x2, x3
     real(dp) :: dx
 
+    write(*,*) "Reading header: "//trim(filename)
     idefix%filename = filename
-    call readVTK_header(filename, idefix%iunit, idefix%position, dimensions, idefix%time, origin, x1, x2, x3)
+    call readVTK_header(filename, idefix%iunit, idefix%position, idefix%geometry, dimensions, idefix%time, origin, x1, x2, x3)
+
+    ! Extracting dump id number from filename
+    name=basename(filename)
+    sep = "."
+    pos1 = index(name, sep)
+    pos2 = index(name, sep, back=.true.)
+    name = name(pos1+1:pos2-1)
+    read(name, *) idefix%id
 
     idefix%origin = origin
     idefix%dimensions = dimensions
@@ -37,21 +49,35 @@ contains
     idefix%log_spacing = (x1(idefix%nx1) - x1(idefix%nx1-1)) > 1.01 * (x1(2) - x1(1))
 
     ! Model boundaries
-    idefix%x1_min = x1(1)
+    idefix%x1_min = x1(1)           ! r
     idefix%x1_max = x1(idefix%nx1)
-    idefix%x2_min = x2(1)
+    idefix%x2_min = x2(1)           ! phi in cylindrical, theta in spherical
     idefix%x2_max = x2(idefix%nx2)
-    idefix%x3_min = x3(1)           ! these values should be 0 to 2*pi,
-    idefix%x3_max = x3(idefix%nx3)  ! while fargo3d is -pi to pi
+    idefix%x3_min = x3(1)           ! z in cylindrical, phi in spherical
+    idefix%x3_max = x3(idefix%nx3)
+    ! phi is 0 to 2*pi, while fargo3d is -pi to pi
+
+    allocate(idefix%x1(idefix%nx1), idefix%x2(idefix%nx2), idefix%x3(idefix%nx3))
+    idefix%x1 = x1 ; idefix%x2 = x2 ; idefix%x3 = x3
 
     ! Updating mcfost parameters
-    grid_type = 2
+    grid_type = idefix%geometry
     n_rad = idefix%nx1-1
     n_rad_in = 1
-    nz = (idefix%nx2-1)/2+1
-    n_az = idefix%nx3-1
-    lregular_theta = .true.
-    theta_max = 0.5 * pi - idefix%x2_min
+
+    if (idefix%geometry == 1) then
+       call warning("idefix : using cylindrical grid")
+       nz = (idefix%nx3-1)/2
+       n_az = idefix%nx2-1
+    else if (idefix%geometry ==2) then
+       call warning("idefix : using spherical grid")
+       nz = (idefix%nx2-1)/2+1
+       n_az = idefix%nx3-1
+       lregular_theta = .true.
+       theta_max = 0.5 * pi - idefix%x2_min
+    else
+       call error("idefix: unknow geometry")
+    endif
 
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
@@ -79,7 +105,7 @@ contains
     ! idefix data is ordered in x1 = r, x2 = theta, x3 = phi
 
     real, dimension(:,:,:), allocatable  :: rho, vx1, vx2, vx3
-    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_planets, n_etoiles_old
+    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_planets, n_etoiles_old, i2, i3
 
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
@@ -119,90 +145,26 @@ contains
     udens = umass / ulength**3
     uvelocity = ulength / utime
 
-    call read_idefix_planets("./", n_planets,x,y,z,vx,vy,vz,Mp,time)
-    ! Omega from .ini
-    call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
-    idefix%corrotating_frame = (n_planets > 1) ! todo : from ini
+    call read_idefix_planets(dirname(idefix%filename),idefix%id, n_planets,x,y,z,vx,vy,vz,Mp,time)
+    call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime, az_offset=180.)
+    ! Omega needs to be read from idefix.ini
+    call warning("Omega_p is hard-coded for now")
+    if (n_planets == 1) then
+       Omega_p(1) = 1.00049987506246096
+    else if (n_planets>1) then
+       call error("Omega_p not read from idefix")
+    endif
 
+    idefix%corrotating_frame = (n_planets > 0) ! todo : from ini
     if (idefix%corrotating_frame) then
        Omega = Omega_p(which_planet)
     else
        Omega = 0.0_dp
     endif
 
-    ! --- copy/paste from read_fargo3d
-!    n_etoiles_old = n_etoiles
-!    n_etoiles = 2 ! Hard coded for now
-!
-!    if (lfix_star) then
-!       write(*,*) ""
-!       write(*,*) "Stellar parameters will not be updated, only the star positions, velocities and masses"
-!       if (n_etoiles /= n_etoiles_old) call error("Wrong number of stars in mcfost parameter files")
-!    else
-!       write(*,*) ""
-!       write(*,*) "Updating the stellar properties:"
-!       write(*,*) "There are now", n_etoiles, "stars in the model"
-!
-!       ! Saving if the accretion rate was forced
-!       allocate(etoile_old(n_etoiles_old))
-!       if (allocated(etoile)) then
-!          etoile_old(:) = etoile(:)
-!          deallocate(etoile)
-!       endif
-!       allocate(etoile(n_etoiles))
-!       do i=1, min(n_etoiles, n_etoiles_old)
-!          etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
-!          etoile(i)%Mdot = etoile_old(i)%Mdot
-!       enddo
-!       ! If we have new stars
-!       do i=n_etoiles_old,n_etoiles
-!          etoile(i)%force_Mdot = .false.
-!          etoile(i)%Mdot = 0.
-!       enddo
-!       deallocate(etoile_old)
-!       etoile(:)%find_spectrum = .true.
-!    endif
-
-    !n_etoiles = n_planets + 1
-    !do i=1,n_planets
-    !   ! x and y are oposite to fargo3d
-    !   etoile(i+1)%x = x(i) * ulength_au
-    !   etoile(i+1)%y = y(i) * ulength_au
-    !   etoile(i+1)%z = z(i) * ulength_au
-    !
-    !   ! -vx and -y as phi is defined differently in fargo3d
-    !   etoile(i+1)%vx = -vx(i) * uvelocity
-    !   etoile(i+1)%vy = -vy(i) * uvelocity
-    !   etoile(i+1)%vz =  vz(i) * uvelocity
-    !
-    !   etoile(i+1)%M = Mp(i) * usolarmass
-    !enddo
-
-!    do i=1,n_etoiles
-!       if (etoile(i)%M > 0.013) then
-!          write(*,*) "Star   #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
-!               real(etoile(i)%M), "Msun, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
-!       else
-!          write(*,*) "Planet #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
-!               real(etoile(i)%M * GxMsun/GxMjup), "MJup, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
-!       endif
-!       if (i>1) write(*,*)  "       distance=", real(sqrt((etoile(i)%x - etoile(1)%x)**2 + &
-!            (etoile(i)%y - etoile(1)%y)**2 + (etoile(i)%z - etoile(1)%z)**2)), "au"
-!    enddo
-!    if (.not.lfix_star) call compute_stellar_parameters()
-!
-!    if (lplanet_az) then
-!       which_planet = 1 ! 1 planet for now
-!       RT_n_az = 1
-!       RT_az_min = planet_az + atan2(y, x) / deg_to_rad
-!       RT_az_max = RT_az_min
-!       write(*,*) "Moving planet #", which_planet, "to azimuth =", planet_az
-!       write(*,*) "WARNING: updating the azimuth to:", RT_az_min
-!    endif
-    ! ---- end copy/paste from read_fargo3d
+    write(*,*)  "Omega=", Omega
 
     ! reading data
-
     write(*,*) "Reading Idefix data ..."
     call readVTK_data(idefix%iunit, idefix%position, idefix%dimensions, rho, vx1, vx2, vx3)
     write(*,*) "Done"
@@ -228,14 +190,25 @@ contains
           if (j==0) cycle bz
           jj = jj + 1
           do phik=1, n_az
+             ! Order of dimensions is not the same as mcfost depending on geometry
+             if (lcylindrical) then
+                i2 = phik
+                i3 = jj
+             else
+                i2 = jj
+                i3 = phik
+             endif
+
+
              icell = cell_map(i,j,phik)
 
-             densite_gaz(icell) = rho(i,jj,phik) * udens
-             densite_pouss(:,icell) = rho(i,jj,phik) * udens
+             densite_gaz(icell) = rho(i,i2,i3) * udens
+             densite_pouss(:,icell) = rho(i,i2,i3) * udens
 
-             vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity ! vr
-             vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
-             vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity ! vtheta
+             ! todo : check in cyl
+             vfield3d(icell,1)  = vx1(i,i2,i3) * uvelocity ! vr
+             vfield3d(icell,2)  = (vx3(i,i2,i3) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
+             vfield3d(icell,3)  = vx2(i,i2,i3) * uvelocity ! vtheta
           enddo ! k
        enddo bz
     enddo ! i
@@ -275,13 +248,15 @@ contains
 
   !---------------------------------------------
 
-  subroutine read_idefix_planets(dir, n_planets,x,y,z,vx,vy,vz,Mp,time)
+  subroutine read_idefix_planets(dir, id, n_planets,x,y,z,vx,vy,vz,Mp,time)
 
     character(len=*), intent(in) :: dir
+    integer, intent(in) :: id
     integer, intent(out) :: n_planets
     real(dp), dimension(n_planets_max), intent(out) :: x, y, z, vx, vy, vz, Mp, time
 
-    integer :: n_etoiles_old, iunit, ios, n_etoile_old, i, i_planet, id
+    integer :: n_etoiles_old, iunit, ios, n_etoile_old, i, i_planet
+    real :: timestep
 
     character(len=1) :: s
     character(len=128) :: filename
@@ -292,15 +267,17 @@ contains
     n_planets = 0
     planet_loop : do i_planet=1, n_planets_max
        write(s,"(I1)") i_planet-1
-       filename=dir//"/planet"//s//".dat"
+       filename=trim(dir)//"/planet"//s//".dat"
+       write(*,*) "Searching for "//trim(filename)
        open(unit=iunit, file=filename, status="old", form="formatted", iostat=ios)
        if (ios /= 0) exit planet_loop
        n_planets = n_planets+1
        write(*,*) "Reading "//trim(filename)
-       read(fargo3d%id,*) id
+       i=0
        do while(ios==0)
-          read(iunit,*) time(i_planet), x(i_planet), y(i_planet), z(i_planet), vx(i_planet), vy(i_planet), vz(i_planet), &
-               Mp(i_planet)
+          i=i+1
+          read(iunit,*, iostat=ios) timestep, x(i_planet), y(i_planet), z(i_planet), vx(i_planet), vy(i_planet), vz(i_planet), &
+               Mp(i_planet), time(i_planet)
           if (i==id) exit
        enddo
        close(iunit)
