@@ -966,6 +966,83 @@ module Voronoi_grid
 
   !----------------------------------------
 
+  subroutine distance_to_closest_wall(x,y,z, icell, x1,y1,z1, s)
+
+    real(kind=dp), intent(in) :: x,y,z
+    real(kind=dp), intent(out) :: x1, y1, z1, s
+
+    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
+    real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
+    integer :: i, id_n, l, ifirst, ilast
+
+    integer :: i_star, check_cell
+    real(kind=dp) :: d_to_star
+    logical :: is_a_star_neighbour
+
+    real(kind=dp) :: b, c, delta, rac, s1, s2, h
+    real(kind=dp), dimension(3) :: delta_r
+
+    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
+    real, dimension(3) :: n, p, r, k, r_cell, r_neighbour
+    logical :: was_cut
+
+    r(1) = x ; r(2) = y ; r(3) = z
+
+
+    ! We do all the access to Voronoi(icell) now
+    r_cell = Voronoi(icell)%xyz(:)
+    ifirst = Voronoi(icell)%first_neighbour
+    ilast = Voronoi(icell)%last_neighbour
+    was_cut = Voronoi(icell)%was_cut
+    h = Voronoi(icell)%h
+
+    l=0
+    nb_loop : do i=ifirst,ilast
+       l = l+1
+       id_n = neighbours_list(i) ! id du voisin
+
+       if (id_n==previous_cell) cycle nb_loop
+
+       if (id_n > 0) then ! cellule
+          if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
+             r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
+          else
+             r_neighbour(:) = Voronoi_xyz(:,id_n)
+          endif
+
+          ! unnormalized vector to plane
+          n(:) = r_neighbour(:) - r_cell(:)
+          k(:) = n(:) ! We use the normal also as a direction
+
+          ! test direction
+          den = dot_product(n, k)
+
+          ! point on the plane
+          p(:) = 0.5 * (r_neighbour(:) + r_cell(:))
+          ! All of the above is the same for each step as long as we stay in the same cell
+
+
+          s_tmp = dot_product(n, p-r) / den
+
+          if (s_tmp < 0.) s_tmp = huge(1.0)
+       else ! id_n < 0 ; le voisin est un wall
+          s_tmp = distance_to_wall(x,y,z, u,v,w, -id_n) ;
+
+          ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardant le wall d'entree
+          if (s_tmp < 0.) s_tmp = huge(1.0)
+       endif
+
+       if (s_tmp < s) then
+          s = s_tmp
+          next_cell = id_n
+       endif
+
+    return
+
+  end subroutine distance_to_closest_wall
+
+  !----------------------------------------
+
   subroutine cross_Voronoi_cell_vect(x,y,z, u,v,w, icell, previous_cell, x1,y1,z1, next_cell, s, s_contrib, s_void_before)
 
     integer, intent(in) :: icell, previous_cell

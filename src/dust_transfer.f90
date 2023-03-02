@@ -40,8 +40,8 @@ module dust_transfer
 subroutine transfert_poussiere()
 
   use thermal_emission, only : frac_E_stars, frac_E_disk
-  use zeta_MRW, only : initialize_cumulative_zeta!, zeta, y_MRW
-  use utils 
+  use MRW, only : make_MRW_step
+  use utils
   implicit none
 
 #include "sprng_f.h"
@@ -999,7 +999,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! - on le fait interagir avec la poussiere si besoin
   n_iterations = 0
   infinie : do
-     n_iterations = n_iterations + 1
+
      ! Longueur de vol
      rand = sprng(stream(id))
      if (rand == 1.0) then
@@ -1015,12 +1015,27 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !   if (.not.flag_star) Stokes=0.
      !endif
 
-     if (n_iterations > 5) then
-        call physical_length_MRW(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
-        n_iterations = 0
-     else
-        call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
+     d = 0.
+     reciprocal_Plank_kappa = 1.
+     if ((n_iterations > 5) .and. Tdust(icell) > 1 .and. not an_externa cell) then
+        d = distance_to_closest_wall()
+        call diffusion_opacity()
      endif
+
+     do while  (d > gamma * reciprocal_Plank_kappa)
+        call make_MRW_step(id,icell, x,y,z,d, Stokes(1))
+        d = distance_to_closest_wall()
+        ! todo : do we update the rec_plack_kappa ???
+     enddo
+
+     icell_old = icell
+     call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
+     if (icell == icell_old) then
+        n_iterations = n_iterations + 1
+     else
+        n_iterations = 0
+     endif
+
      if (flag_sortie) return ! Vie du photon terminee
 
 !     if ((icell>n_cells).and.(.not.flag_sortie)) then

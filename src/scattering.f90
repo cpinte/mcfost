@@ -495,7 +495,6 @@ subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
   close(12)
   ! Fin lecture
 
-
   close(unit=1)
 
 

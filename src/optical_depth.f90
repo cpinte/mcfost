@@ -19,7 +19,7 @@ module optical_depth
 
   contains
 
-  subroutine diffusion_opacity(temp,icell,rosseland_opacity)
+  subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
    ! Compute current Planck reciprocal mean opacity for all cells
    ! (note : diffusion coefficient needs to be defined with Rosseland opacity
    ! in B&W mode)
@@ -35,7 +35,7 @@ module optical_depth
    use cylindrical_grid, only : volume
    use density, only : masse_gaz, densite_gaz
 
-   real, intent(in)  :: temp 
+   real, intent(in)  :: temp
    integer,  intent(in)  :: icell
    real(dp), intent(out) :: rosseland_opacity ! cm2/g (ie per gram of gas)
 
@@ -47,7 +47,8 @@ module optical_depth
 
    icell0 = icell
 
-   if ((temp > 1) .and. (Voronoi(icell)%original_id > 0)) then 
+   temp = Tdust(icell)
+   if ((temp > 1) .and. (Voronoi(icell)%original_id > 0)) then
 
       if (lvariable_dust) then
          p_icell => icell0
@@ -57,27 +58,32 @@ module optical_depth
 
       somme  = 0.0_dp
       somme2 = 0.0_dp
+      norm = 0.0_dp
       cst    = cst_th/temp
       do lambda = 1,n_lambda
          ! longueur d'onde en metre
          wl       = tab_lambda(lambda)*1.e-6
          delta_wl = tab_delta_lambda(lambda)*1.e-6
          cst_wl   = cst/wl
-         if (cst_wl < 200.0) then 
+         if (cst_wl < 200.0) then
             coeff_exp = exp(cst_wl)
             B = 1.0_dp/((wl**5)*(coeff_exp-1.0))*delta_wl
             !dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
-         else 
+         else
             B = 0.0_dp
             !dB_dT = 0.0_dp
          endif
          somme  = somme  + B/(kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
-         somme2 = somme2 + B*delta_wl
+         somme2  = somme2  + B * (kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
+         norm = norm + B*delta_wl
       enddo
-      rosseland_opacity = somme2/somme 
-   else 
-      rosseland_opacity = 0. 
+      rec_Planck_opacity = norm/somme
+      Planck_opacity = somme2/norm
+   else
+      rec_Planck_opacity = 0.
+      Planck_opacity = 0.
    endif
+
  end subroutine diffusion_opacity
 
 subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,&
@@ -252,7 +258,7 @@ end subroutine physical_length
 subroutine physical_length_MRW(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,&
    extrin,ltot,flag_sortie,lpacket_alive)
  use Temperature, only : Tdust
- use zeta_MRW, only : zeta, y_MRW 
+ use zeta_MRW, only : zeta, y_MRW
  use utils
 ! Integration par calcul de la position de l'interface entre cellules
 ! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
