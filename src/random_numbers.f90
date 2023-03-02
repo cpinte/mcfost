@@ -7,7 +7,11 @@ module naleat
 ! qui peut donner 1.0 -> BUG
 !**********************************************************
 
+  use mcfost_env, only : dp
+  use constantes, only : pi
+
   implicit none
+
   save
 
 #include "sprng_f.h"
@@ -22,5 +26,28 @@ module naleat
   ! 4 -> Multiplicative Lagged Fibonacci Generator
 
   SPRNG_POINTER, dimension(:), allocatable :: stream
+
+contains
+
+  subroutine random_isotropic_direction(id, u,v,w)
+    ! Generate a randomly distributed vector (u,w,w)
+
+    integer, intent(in) :: id
+    real(kind=dp), intent(out) :: u,v,w
+
+    real(kind=dp) :: uv, phi
+    real :: rand
+
+    rand = sprng(stream(id))
+    w = 2.0_dp * rand - 1.0_dp
+    uv = sqrt (1.0 - w*w)
+    rand = sprng(stream(id))
+    phi = pi * (2.0_dp * rand - 1.0_dp)
+    u = uv * cos(phi)
+    v = uv * sin(phi)
+
+    return
+
+  end subroutine random_isotropic_direction
 
 end module naleat

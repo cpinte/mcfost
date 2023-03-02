@@ -966,10 +966,11 @@ module Voronoi_grid
 
   !----------------------------------------
 
-  subroutine distance_to_closest_wall(x,y,z, icell, x1,y1,z1, s)
+  real(dp) function distance_to_closest_wall(id,icell,x,y,z) result(s)
 
+
+    integer, intent(in) :: id, icell
     real(kind=dp), intent(in) :: x,y,z
-    real(kind=dp), intent(out) :: x1, y1, z1, s
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
@@ -979,29 +980,29 @@ module Voronoi_grid
     real(kind=dp) :: d_to_star
     logical :: is_a_star_neighbour
 
-    real(kind=dp) :: b, c, delta, rac, s1, s2, h
     real(kind=dp), dimension(3) :: delta_r
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real, dimension(3) :: n, p, r, k, r_cell, r_neighbour
-    logical :: was_cut
+
+    if (Voronoi(icell)%was_cut) then
+       s=0
+       return
+    endif
 
     r(1) = x ; r(2) = y ; r(3) = z
 
+    s=1e30
 
     ! We do all the access to Voronoi(icell) now
     r_cell = Voronoi(icell)%xyz(:)
     ifirst = Voronoi(icell)%first_neighbour
     ilast = Voronoi(icell)%last_neighbour
-    was_cut = Voronoi(icell)%was_cut
-    h = Voronoi(icell)%h
 
     l=0
-    nb_loop : do i=ifirst,ilast
+    do i=ifirst,ilast
        l = l+1
        id_n = neighbours_list(i) ! id du voisin
-
-       if (id_n==previous_cell) cycle nb_loop
 
        if (id_n > 0) then ! cellule
           if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
@@ -1025,21 +1026,18 @@ module Voronoi_grid
           s_tmp = dot_product(n, p-r) / den
 
           if (s_tmp < 0.) s_tmp = huge(1.0)
-       else ! id_n < 0 ; le voisin est un wall
-          s_tmp = distance_to_wall(x,y,z, u,v,w, -id_n) ;
-
-          ! si c'est le wall d'entree : peut-etre a faire sauter en sauvegardant le wall d'entree
-          if (s_tmp < 0.) s_tmp = huge(1.0)
+       else ! id_n < 0 : neighbourgh is a wall
+          s_tmp = 0.0_dp ! so do not want to run the MRW in that case, so we set d=0
        endif
 
        if (s_tmp < s) then
           s = s_tmp
-          next_cell = id_n
        endif
+    enddo
 
     return
 
-  end subroutine distance_to_closest_wall
+  end function distance_to_closest_wall
 
   !----------------------------------------
 

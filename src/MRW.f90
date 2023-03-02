@@ -1,9 +1,12 @@
 module MRW
-    use mcfost_env, only : dp
-    implicit none
+  use mcfost_env, only : dp
+  use constantes, only : pi
+  use utils, only : interp
 
-    integer, parameter :: n = 10000
-    real(dp), dimension(n), save :: zeta, y_MRW
+  implicit none
+
+  integer, parameter :: n = 10000
+  real(dp), dimension(n), save :: zeta, y_MRW
 
 contains
 
@@ -36,12 +39,10 @@ contains
               zeta(i) = zeta(i) - term
            else
               zeta(i) = zeta(i) + term
-           end if
-        end do
-     end if
-
-!        write(*,*) i, j, y_MRW(i), 2*zeta(i)
-     end do
+           endif
+        enddo
+     endif
+  enddo
 
   zeta = zeta * 2._dp
 
@@ -51,9 +52,12 @@ contains
 
  !----------------------------------------------
 
- real(dp) function sample_zeta()
+ real(dp) function sample_zeta(id)
 
+   use naleat, only : stream
 #include "sprng_f.h"
+
+   integer, intent(in) :: id
 
    real(dp) :: zeta_random
 
@@ -68,21 +72,21 @@ contains
 
    integer, intent(in) :: id, icell
    integer, intent(inout) :: lambda
-   real(kind=dp), intent(inout) :: x,y,z,
+   real(kind=dp), intent(inout) :: x,y,z
    real(kind=dp), intent(in) :: R0, E
 
+   real(dp) :: u,v,w, ct
+
    ! Place photon randomly on sphere of radius R0 around current position
-   call random_direction(id, u,v,w)
+   call random_isotropic_direction(id, u,v,w)
    x = x + u*R0
    y = y + v* R0
    z = z + w*R0
 
    ! Select new direction : isotropic or emitting sphere ?
 
-
-
    ! sample P0
-   y = sample_zeta()
+   y = sample_zeta(id)
 
    ! Solve Eq. 8 of Min et al 2009
    ct = -log(y) / diff_coeff * (R0/pi)**2.

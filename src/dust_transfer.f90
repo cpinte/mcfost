@@ -927,14 +927,7 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
      call  pos_em_cellule(icell, rand,rand2,rand3,x0,y0,z0)
 
      ! Direction de vol (uniforme)
-     rand = sprng(stream(id))
-     W0 = 2.0 * rand - 1.0
-     W02 =  1.0 - W0*W0
-     SRW02 = sqrt (  W02 )
-     rand = sprng(stream(id))
-     ARGMT = PI * ( 2.0 * rand - 1.0 )
-     U0 = SRW02 * cos(ARGMT)
-     V0 = SRW02 * sin(ARGMT)
+     call random_isotropic_direction(id, u0,u0,w0)
 
      ! Parametres de stokes : lumi�re non polaris�e
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
@@ -1186,17 +1179,10 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
            endif
         endif ! only_LTE
 
-        ! Nouvelle direction de vol : emission isotrope
-        rand = sprng(stream(id))
-        w = 2.0 * rand - 1.0
-        w02 =  1.0 - w*w
-        srw02 = sqrt (w02)
-        rand = sprng(stream(id))
-        argmt = pi * ( 2.0 * rand - 1.0 )
-        u = srw02 * cos(argmt)
-        v = srw02 * sin(argmt)
+        ! New packet direction: isotropic emission
+        call random_isotropic_direction(id, u, v, w)
 
-        ! Emission non polaris�e : remise � 0 des parametres de Stokes
+        ! Dust emission is unpolarised, resetimg Stokes vector
         Stokes(2)=0.0 ; Stokes(3)=0.0 ; Stokes(4)=0.0
      endif ! tab_albedo_pos
 
