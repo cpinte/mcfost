@@ -93,9 +93,10 @@ contains
 
    ! Deposit energy using Planck mean opacity
 
-   ! Update temperature and dissuion coeeficient ?
+   ! Update temperature and diffusion coefficient ?
 
    ! Select new wavelength
+
 
    return
 
