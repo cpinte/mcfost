@@ -46,7 +46,8 @@ subroutine set_default_variables()
   l3D=.false.
   lopacite_only=.false.
   lseed=.false.
-  loptical_depth_map=.false.
+  ltau_map=.false.
+  loptical_depth_to_cell=.false.
   lreemission_stats=.false.
   n_az = 1
   root_dir = "."
@@ -627,9 +628,12 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
         ldust_prop=.true.
         lstop_after_init= .false.
-     case("-optical_depth_map","-od")
+     case("-optical_depth_map","-tau_map")
         i_arg = i_arg+1
-        loptical_depth_map=.true.
+        ltau_map=.true.
+     case("-optical_depth_to_cell","-tau_to_cell")
+        i_arg = i_arg+1
+        loptical_depth_to_cell=.true.
      case("-reemission_stats")
         i_arg = i_arg+1
         lreemission_stats=.true.
@@ -1884,9 +1888,12 @@ subroutine display_help()
   write(*,*) "        : -op <wavelength> (microns) : computes dust properties at"
   write(*,*) "                                    specified wavelength and stops"
   write(*,*) "        : -aggregate <GMM_input_file> <GMM_output_file>"
-  write(*,*) "        : -optical_depth_map : generates a map of integrated optical depth"
-  write(*,*) "          -od                along radial and vertical directions and stops;"
-  write(*,*) "                             results stored in optical_depth_map.fits.gz"
+  write(*,*) "        : -optical_depth_map ot -tau_map   : create an map of the optical depth"
+  write(*,*) "        : -tau=1_surface : creates a map of the tau=1 surface"
+  write(*,*) "        : -tau_surface <tau> : creates a map of the tau=<tau> surface"
+  write(*,*) "        : -optical_depth_to_cell : computes integrated optical depth to the center of each cell"
+  write(*,*) "           or -tau_to_cell         along radial and vertical directions and stops;"
+  write(*,*) "                                   results stored in optical_depth_to_cell.fits.gz"
   write(*,*) "        : -average_grain_size : computes average grain size in each cell,"
   write(*,*) "                             weighted by their geometrical cross-section;"
   write(*,*) "                             results stored in average_grain_size.fits.gz"
@@ -1896,7 +1903,6 @@ subroutine display_help()
   write(*,*) "        : -no_scattering : forces albedo = 0"
   write(*,*) "        : -qsca=qabs : forces albedo = 0.5"
   write(*,*) "        : -phase-function <s11.fits> : uses a tabulated phase function (rt2 only)"
-  write(*,*) "        : -tau=1_surface"
   write(*,*) "        : -flux_fraction_surface <fraction>"
   write(*,*) " "
   write(*,*) "        : -Nrays_mc_step <Nray> : Number of rays for angular quadrature in Monte Carlo step"
