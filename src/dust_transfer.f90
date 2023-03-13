@@ -1861,7 +1861,7 @@ subroutine compute_tau_surface_map(lambda,tau,ibin,iaz)
            lpacket_alive = .true.
            call physical_length(id,lambda,p_lambda,Stokes,icell,x0,y0,z0,u0,v0,w0, &
                 flag_star,flag_direct_star,tau,ltot,flag_sortie,lpacket_alive)
-           if (flag_sortie) then ! We do not reacopth the surface tau=1
+           if (flag_sortie) then ! We do not reach the surface tau=1
               tau_surface_map(i,j,ibin,iaz,:,id) = 0.0
            else
               tau_surface_map(i,j,ibin,iaz,1,id) = x0
@@ -1966,7 +1966,7 @@ subroutine compute_tau_map(lambda,ibin,iaz)
         call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
         if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
-           call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+           call optical_length_tot(id,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
            tau_map(i,j,ibin,iaz,id) = tau
         else ! We do not reach the disk
            tau_map(i,j,ibin,iaz,id) = 0.0
