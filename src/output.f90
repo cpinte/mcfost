@@ -8,7 +8,7 @@ module output
   use constantes
   use dust_prop
   use molecular_emission
-  use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface_map, stars_map
+  use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface_map, stars_map, tau_map
   use utils
   use Voronoi_grid
   use grid
@@ -1146,6 +1146,111 @@ end subroutine write_tau_surface
 
 !**********************************************************************
 
+subroutine write_tau_map(imol)
+
+  implicit none
+
+  integer, intent(in) :: imol
+
+  integer :: status,unit,blocksize,bitpix,naxis
+  integer, dimension(5) :: naxes
+  integer :: i,j,group,fpixel,nelements, alloc_status, xcenter, lambda, itype, ibin, iaz
+
+  character(len = 512) :: filename
+  logical :: simple, extend
+  real :: pixel_scale_x, pixel_scale_y, Q, U
+
+  ! Allocation dynamique pour passer en stack
+  real, dimension(:,:,:,:), allocatable :: image
+
+  allocate(image(npix_x, npix_y, RT_n_incl, RT_n_az), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error tau_map image')
+  image = 0.0 ;
+
+  lambda=1
+
+  filename = "tau_map.fits.gz"
+
+  if (imol==0) then ! continuum
+     filename = trim(data_dir)//"/"//trim(filename)
+  else
+     filename = trim(data_dir2(imol))//"/"//trim(filename)
+  endif
+  write(*,*) "Writing "//trim(filename)
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit, status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  group=1
+  fpixel=1
+  extend=.true.
+  bitpix=-32
+
+  naxis=4
+  naxes(1)=npix_x
+  naxes(2)=npix_y
+  naxes(3)= RT_n_incl
+  naxes(4)= RT_n_az
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  !  wavelength
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
+
+  ! RAC, DEC, reference pixel & pixel scale en degres
+  call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+  call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+  call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+  pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+
+  call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+  call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+  call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+  pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+
+  call ftpkys(unit,'BUNIT',"",'',status)
+
+  !----- Images
+  ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
+  do ibin=1,RT_n_incl
+     do iaz=1,RT_n_az
+        do j=1,npix_y
+           do i=1,npix_x
+              image(i,j,ibin,iaz) = sum(tau_map(i,j,ibin,iaz,:))
+           enddo !i
+        enddo !j
+     enddo ! iaz
+  enddo !ibin
+
+  call ftppre(unit,group,fpixel,nelements,image,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+  deallocate(image)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) call print_error(status)
+
+  return
+
+end subroutine write_tau_map
+
+!**********************************************************************
+
 subroutine ecriture_sed_ray_tracing()
 
   implicit none
@@ -1299,19 +1404,19 @@ end subroutine write_origin
 
 !**********************************************************************
 
-subroutine write_optical_depth_map(lambda)
+subroutine write_optical_depth_to_cell(lambda)
 
   integer, intent(in) :: lambda
 
   character(len=512) :: filename
 
-  write(*,*) "Writing optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sp), "microns"
-  filename = "!optical_depth_map.fits.gz"
+  write(*,*) "Writing disc optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sp), "microns"
+  filename = "!optical_depth_to_cell.fits.gz"
   call write_column(2, filename, lambda)
   write(*,*) "Done"
   call exit(0)
 
-end subroutine write_optical_depth_map
+end subroutine write_optical_depth_to_cell
 
 !***********************************************************
 

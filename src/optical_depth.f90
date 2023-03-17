@@ -205,7 +205,7 @@ subroutine integ_tau(lambda)
   w0 = 0.0 ; u0 = 1.0 ; v0 = 0.0
 
   call indice_cellule(x0,y0,z0, icell)
-  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
 
   !tau = 0.0
   !do i=1, n_rad
@@ -227,7 +227,7 @@ subroutine integ_tau(lambda)
   v0 = 0.0
 
   call indice_cellule(x0,y0,z0, icell)
-  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
 
   write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",E12.5)') angle, tau
 

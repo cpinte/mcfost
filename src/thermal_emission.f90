@@ -2087,11 +2087,11 @@ subroutine define_proba_weight_emission(lambda)
 !--        w0=sin(angle)
 !--
 !--        Stokes(:) = 0.0_dp ;
-!--        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+!--        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
 !--        if (tau < tau_min(icell)) tau_min(icell) = tau
 !--
 !--        x0 = 0.99999*r_lim(i)
-!--        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+!--        call optical_length_tot(id,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
 !--        if (tau < tau_min(icell)) tau_min(icell) = tau
 !--
 !--     enddo
