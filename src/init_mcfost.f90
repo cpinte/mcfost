@@ -16,6 +16,7 @@ module init_mcfost
   use read1d_models, only : read_grid_1d
   use read_idefix, only : read_idefix_parameters
   use read_pluto, only : read_pluto_parameters
+  use read_spherical_grid, only : read_spherical_grid_parameters
 
   implicit none
 
@@ -66,6 +67,7 @@ subroutine set_default_variables()
   lcheckpoint = .false.
   checkpoint_period = 15
   llimit_mem = .false. !if true, contopac are computed locally.
+  laccretion_shock = .false. !for magnetospheric accretion
   !HEALpix
   healpix_lorder = 1
   healpix_lmin = 0
@@ -80,7 +82,7 @@ subroutine set_default_variables()
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
   lmodel_1d = .false.
-  lmodel_ascii = .false.
+  lsphere_model = .false.
   lmhd_voronoi = .false.
   lzeeman_polarisation = .false.
   lforce_lte = .false.
@@ -794,17 +796,20 @@ subroutine initialisation_mcfost()
         lmhd_voronoi = .true.
         lVoronoi = .true.
         l3D = .true.
-        ldensity_file = .false.
-        !later lpluto_file = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
      case ("-model_1d")
-     	i_arg = i_arg + 1
-     	lmodel_1d = .true.
-     	lmodel_ascii = .false.
-      ldensity_file = .false.
-     case("-model_ascii")
         i_arg = i_arg + 1
-        lmodel_ascii = .true.
-        ldensity_file = .false.
+        lmodel_1d = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
+     case("-sphere_mesh")
+        i_arg = i_arg + 1
+        lsphere_model = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
      case("-zeeman_polarisation")
      	call error("Zeeman polarisation not yet!")
         i_arg = i_arg + 1
@@ -1435,8 +1440,13 @@ subroutine initialisation_mcfost()
    call warning("model_1d : reading 1d  stellar atmosphere model")
    call read_grid_1d(density_file)
   endif
-  if (lmodel_ascii .or. lmodel_1d) ldensity_file = .false. !because -df is used to
-                                                           !the pass the model to mcfost!
+  if (lsphere_model) then
+     !could be 3d or 2d (2.5d). Depends on flag l3D or N_az>1
+     n_zones = 1
+     disk_zone(1)%geometry = 2
+     call read_spherical_grid_parameters(density_file)
+  endif
+
   if (lidefix) then
      l3D = .true.
      if (n_zones > 1) call error("idefix mode only work with 1 zone")
@@ -1504,9 +1514,9 @@ subroutine initialisation_mcfost()
 
   write(*,*) 'Input file read successfully'
 
-  if ((lmodel_ascii.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
-   call error("Cannot use Phantom and MHD files at the same time presently.")
-  end if
+!   if ((lsphere_model.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
+!    call error("Cannot use Phantom and MHD files at the same time presently.")
+!   end if
 
   ! Correction sur les valeurs du .para
   if (lProDiMo) then
@@ -1793,9 +1803,9 @@ subroutine display_help()
   write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
   write(*,*) "        : -idefix <dump> : reads an idefix vtk file"
   write(*,*) "        : -pluto <dir> <id> : reads a pluto model"
-  write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
-  write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
-  write(*,*) "        : -model_1d : interface with stellar atmosphere models."
+  write(*,*) "        : -sphere_mesh <file> : read the <file> from ascii file"
+  write(*,*) "        : -mhd_voronoi <file> : interface between grid-based code and Voronoi mesh."
+  write(*,*) "        : -model_1d : <file> interface with stellar atmosphere models."
   write(*,*) " "
   write(*,*) " Generating outputs for chemistry codes"
   write(*,*) "        : -prodimo : creates required files for ProDiMo"

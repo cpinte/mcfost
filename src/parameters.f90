@@ -81,8 +81,7 @@ module parametres
   logical :: lsolve_for_ne
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
 
-
-  logical :: lmodel_ascii, lmhd_voronoi, lmodel_1d, llimit_mem
+  logical :: lmhd_voronoi, llimit_mem
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
@@ -133,7 +132,7 @@ module parametres
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
   integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
 
-  logical :: lfargo3d, lathena, lidefix, lpluto
+  logical :: lfargo3d, lathena, lidefix, lpluto, lsphere_model, lmodel_1d !future lsymspheric
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -226,6 +225,7 @@ module parametres
      character(len=512) :: spectre
      integer :: icell
   end type star_type
+  logical :: laccretion_shock
 
   integer :: n_etoiles
   type(star_type), dimension(:), allocatable :: etoile
@@ -317,5 +317,21 @@ module parametres
   end type pluto_model
 
   type(pluto_model) :: pluto
+
+  type symspheric_model
+   integer :: nr
+   real(kind=dp), dimension(:), allocatable :: r, T, rho, vt, ne
+   real(kind=dp), dimension(:,:), allocatable :: v
+   integer, dimension(:), allocatable :: iz
+
+   integer :: Ncorona
+   logical :: lcoronal_illumination
+   real(kind=dp), allocatable :: I_coro(:,:), x_coro(:)
+
+   real(kind=dp) :: rbot, rtop, rstar, s, E_corona
+
+  end type symspheric_model
+
+  type(symspheric_model) :: atmos_1d
 
 end module parametres

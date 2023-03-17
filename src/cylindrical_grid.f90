@@ -3,7 +3,6 @@ module cylindrical_grid
   use constantes
   use parametres
   use messages
-  use read1d_models, only : tab_r_mod1d
 
   implicit none
 
@@ -369,22 +368,6 @@ subroutine define_cylindrical_grid()
      ! test geometrie en r or replace with idefix%x1 ?
   endif
 
-
-  if (lmodel_1d) then
-     !Redfine the grid edge for the stellar atmosphere models (marcs, multi, kurucz, cmfgen etc)
-     ! istart = 1
-     ! n_cells_tmp = 0
-     tab_r(:) = tab_r_mod1d
-     tab_r2(:) = tab_r(:)*tab_r(:)
-     tab_r3(:) = tab_r(:)*tab_r2(:)
-     ! n_cells_tmp = istart+n_rad_region
-     ! istart = n_cells_tmp + 1
-     if (maxval(tab_r)-maxval(tab_r_mod1d) /= 0.0) then
-        call error("read 1d grid doesn't match the grid")
-     endif
-     deallocate(tab_r_mod1d)
-  endif
-
   do i=1,n_rad+1
      tab_r2(i) = tab_r(i) * tab_r(i)
      tab_r3(i) = tab_r2(i) * tab_r(i)
@@ -399,6 +382,28 @@ subroutine define_cylindrical_grid()
      r_lim_3(i)= tab_r3(i+1)
      if (r_lim(i) < r_lim(i-1)) call error("gridding: this is likely to be a bug")
   enddo !i
+
+  !redifine and use the r grid read
+  if (lsphere_model) then
+  !tab_r = r_lim ?
+    tab_r(:) = pluto%x1(1:n_rad+1) !1 -> n_rad + 1
+    r_lim(:) = pluto%x1(:) !from Rmin to Rmax, 0 to n_rad
+    r_lim_2(:) = r_lim(:) * r_lim(:)
+    r_lim_3(:) = r_lim(:) * r_lim_2(:)
+  endif
+
+  if (lmodel_1d) then
+     !Redfine the grid edge for the stellar atmosphere models (marcs, multi, kurucz, cmfgen etc)
+     tab_r(:) = atmos_1d%r(:)
+     r_lim(:) = atmos_1d%r(:) !from Rmin to Rmax, 0 to n_rad
+     tab_r2(:) = tab_r(:)*tab_r(:)
+     tab_r3(:) = tab_r(:)*tab_r2(:)
+     r_lim_2(:) = r_lim(:) * r_lim(:)
+     r_lim_3(:) = r_lim(:) * r_lim_2(:)
+     if (maxval(tab_r)-maxval(atmos_1d%r) /= 0.0) then
+        call error("read 1d grid doesn't match the grid")
+     endif
+  endif
 
   if (lcylindrical) then
      ! Calcul volume des cellules (pour calculer leur masse)
@@ -532,7 +537,28 @@ subroutine define_cylindrical_grid()
         ! test theta grid
 
      endif
+! write(*,*) "wlim1=", w_lim
+! write(*,*) "tlim1=", theta_lim
+! write(*,*) "dc1=", dcos_theta
+! write(*,*) "tantlim1=", tan_theta_lim
 
+
+      !redifine and use the theta grid read, still spherical
+      if (lsphere_model) then
+         w_lim(:) = pluto%x2(nz+1:1:-1) !one more cell
+         theta_lim(:) = asin(w_lim)
+         ! write(*,*) size(pluto%x2), nz, size(w_lim), size(theta_lim)
+         tan_theta_lim(0) = 1.0e-10_dp
+         tan_theta_lim(nz) = 1.e30_dp
+         tan_theta_lim(1:nz-1) = tan(theta_lim(1:nz-1))
+         dcos_theta(1:nz) = w_lim(1:nz) - w_lim(0:nz-1)
+
+         ! write(*,*) "w=",w_lim
+         ! write(*,*) "t=",theta_lim
+         ! write(*,*) dcos_theta
+         ! write(*,*) tan_theta_lim
+
+      endif
 
      do i=1, n_rad
         !rsph = 0.5*(r_lim(i) +r_lim(i-1))
@@ -570,6 +596,30 @@ subroutine define_cylindrical_grid()
            tan_phi_lim(k) = tan(phi)
         endif
      enddo !k
+
+     !redifine and use the phi grid from file
+   !   write(*,*) "phi1=", phi_grid_tmp
+   !   write(*,*) "tan_phi1=", tan_phi_lim
+   !   write(*,*) size(tan_phi_lim), n_az, size(pluto%x3), size(phi_grid_tmp)
+      if (lsphere_model) then
+         phi_grid_tmp(:) = 0.5*(pluto%x3(2:n_az+1) + pluto%x3(1:n_az))
+         ! do k=1, n_az
+         !    phi = pluto%x3(k+1)
+         !    if (abs(modulo(phi-0.5*pi,pi)) < 1.0e-6) then
+         !       tan_phi_lim(k) = 1.0d300
+         !    else
+         !       tan_phi_lim(k) = tan(phi)
+         !    endif
+         ! enddo
+         where (abs(modulo(pluto%x3(2:n_az+1)-0.5*pi,pi)) < 1.0e-6)
+            tan_phi_lim = 1.0d300
+         elsewhere
+            tan_phi_lim = tan(pluto%x3(2:n_az+1))
+         endwhere
+   !   write(*,*) "phi=", phi_grid_tmp
+   !   write(*,*) "tan_phi=", tan_phi_lim
+   !       stop
+      endif
 
      V(:,:) = V(:,:) * 0.5 / real(n_az)
 
