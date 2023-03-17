@@ -30,7 +30,7 @@ module atom_transfer
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d, Ng_accelerate, Accelerate, check_ng_pops
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
                                    tab_RT_az,tab_RT_incl
-   use stars, only               : intersect_stars, laccretion_shock, max_Tshock, min_Tshock, max_Thp, min_Thp, max_Facc, min_Facc
+   use stars, only               : intersect_stars, max_Tshock, min_Tshock, max_Thp, min_Thp, max_Facc, min_Facc
    use output, only : allocate_atom_maps, flux_total, write_total_flux, write_atomic_maps
    use mcfost_env, only          : dp, time_tick, time_max
    use molecular_emission, only  : ds
@@ -1465,7 +1465,7 @@ module atom_transfer
       enddo
 
       open(1,file="spectrum_1d.txt",status="unknown")
-      write(1,*) Nimpact, N_lambda
+      write(1,*) Nimpact, N_lambda!, atmos_1d%s
       write(1,'(*(1ES17.8E3))') (p(j), j=1,Nimpact)
       write(1,'(*(1ES17.8E3))') (cos_theta(j), j=1,Nimpact)
       write(1,'(*(1ES17.8E3))') (weight_mu(j), j=1,Nimpact)

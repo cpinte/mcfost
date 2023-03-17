@@ -13,7 +13,7 @@ module init_mcfost
   use utils
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters
-  use read1d_models, only : read_grid_1d
+  use read1d_models, only : read_model_1d
   use read_idefix, only : read_idefix_parameters
   use read_pluto, only : read_pluto_parameters
   use read_spherical_grid, only : read_spherical_grid_parameters
@@ -1438,7 +1438,10 @@ subroutine initialisation_mcfost()
    n_zones = 1
    disk_zone(1)%geometry = 2
    call warning("model_1d : reading 1d  stellar atmosphere model")
-   call read_grid_1d(density_file)
+   write(*,*) "------------------------------------------------"
+   call warning(" THERE ARE PROBABLY SOME CHECKS TO DO MORE ")
+   write(*,*) "------------------------------------------------"
+   call read_model_1d(density_file)
   endif
   if (lsphere_model) then
      !could be 3d or 2d (2.5d). Depends on flag l3D or N_az>1

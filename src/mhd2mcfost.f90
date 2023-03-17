@@ -12,7 +12,7 @@ module mhd2mcfost
     use sph2mcfost, only : SPH_to_Voronoi, Hydro_to_Voronoi_atomic
     use sort, only : find_kth_smallest_inplace
     use elements_type
-    use stars, only : laccretion_shock, T_hp, T_preshock
+    use stars, only : T_hp, T_preshock
 
     implicit none
 

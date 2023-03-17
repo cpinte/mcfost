@@ -13,7 +13,7 @@ module read_spherical_grid
     use messages
     use utils
     use cylindrical_grid
-    use stars, only : laccretion_shock, T_hp, T_preshock
+    use stars, only : T_hp, T_preshock
     use read1d_models, only : print_info_model
 
     implicit none

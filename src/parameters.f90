@@ -326,7 +326,7 @@ module parametres
 
    integer :: Ncorona
    logical :: lcoronal_illumination
-   real(kind=dp), allocatable :: I_coro(:,:), x_coro(:)
+   real(kind=dp), allocatable :: I_coro(:,:), x_coro(:), m(:)
 
    real(kind=dp) :: rbot, rtop, rstar, s, E_corona
 
