@@ -165,8 +165,9 @@ module read_spherical_grid
         ! nHtot = nHtot * 1d3 / masseH / wght_per_H
 
         ! --> explicit cell mapping of the 3d arrays
-        allocate(rho(pluto%nx1,pluto%nx2,pluto%nx3), ne_tmp(pluto%nx1,pluto%nx2,pluto%nx3),T_tmp(pluto%nx1,pluto%nx2,pluto%nx3), \
-            vt_tmp(pluto%nx1,pluto%nx2,pluto%nx3),dz(pluto%nx1,pluto%nx2,pluto%nx3),vtmp(pluto%nx1,pluto%nx2,pluto%nx3,3))
+        allocate(rho(pluto%nx1,pluto%nx2,pluto%nx3), ne_tmp(pluto%nx1,pluto%nx2,pluto%nx3), \
+                    T_tmp(pluto%nx1,pluto%nx2,pluto%nx3), vt_tmp(pluto%nx1,pluto%nx2,pluto%nx3), \
+                    dz(pluto%nx1,pluto%nx2,pluto%nx3),vtmp(pluto%nx1,pluto%nx2,pluto%nx3,3))
         read(1, iostat=ios) T_tmp(:,:,:)
         read(1, iostat=ios) rho(:,:,:)
         read(1, iostat=ios) ne_tmp(:,:,:)
