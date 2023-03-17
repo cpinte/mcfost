@@ -51,6 +51,16 @@ module read1d_models
 			! write(*,*) atmos_1d%r(i), atmos_1d%T(i), atmos_1d%rho(i), atmos_1d%ne(i), &
 				! atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,2), atmos_1d%iz(i)
 		enddo
+		!if corona will be zero at some point
+		! write(*,*) "T_limits (read):", atmos_1d%T(1), atmos_1d%T(atmos_1d%nr)
+		! write(*,*) "rho_limits (read):", atmos_1d%rho(1), atmos_1d%rho(atmos_1d%nr)
+		! write(*,*) "ne_limits (read):", atmos_1d%ne(1), atmos_1d%ne(atmos_1d%nr)
+		! write(*,*) "vturb_limits (read):", atmos_1d%vt(1), atmos_1d%vt(atmos_1d%nr)
+		! write(*,*) "vr_limits (read):", atmos_1d%v(1,1), atmos_1d%v(atmos_1d%nr,1)
+		! write(*,*) "vtheta_limits (read):", atmos_1d%v(1,2), atmos_1d%v(atmos_1d%nr,2)
+		! write(*,*) "vphi_limits (read):", atmos_1d%v(1,3), atmos_1d%v(atmos_1d%nr,3)
+
+
 		call check_for_coronal_illumination()
 		if (atmos_1d%lcoronal_illumination) then
 			write(*,*) " -> Reading (isotropic) coronal illumination from 1d model!"
@@ -112,7 +122,7 @@ module read1d_models
 		distance = Rmax * au_to_pc !pc
 		map_size = 2.005 * Rmax !au
 		write(*,*) distance, ' pc', map_size * 1e3, 'mau'	
-	
+
 		return
 	end subroutine read_model_1d
 
@@ -162,7 +172,14 @@ module read1d_models
 				vturb(icell) = 0.5 * (atmos_1d%vt(i) + atmos_1d%vt(i+1))
 				! write(*,*) i, icell, T(icell), nHtot(icell), ne(icell), icompute_atomRT(icell)
 			enddo
-		else !for debug better
+		else !for debug better, direct association points-to-cells
+			nrad_0 = n_rad
+			icell0 = n_cells
+			if (atmos_1d%lcoronal_illumination) then
+				nrad_0 = n_rad - 1 !avoid the coronal point
+				icell0 = n_cells - 1
+				icompute_atomRT(n_cells) = atmos_1d%iz(n_rad+1)
+			endif
 			etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ? 
 			icompute_atomRT(:) = atmos_1d%iz(2:n_cells+1)
 			T(:) = atmos_1d%T(2:n_cells+1)
