@@ -1152,7 +1152,8 @@ end subroutine optical_length_tot_mol
                   return
                else
                   !Does not return but cell is empty (lcellule_non_vide is .false.)
-                  coronal_irrad = linear_1D_sorted(atmos_1d%Ncorona,atmos_1d%x_coro,atmos_1d%I_coro(:,1),N,lambda)
+                  coronal_irrad = linear_1D_sorted(atmos_1d%Ncorona,atmos_1d%x_coro(:), &
+                                                   atmos_1d%I_coro(:,1),N,lambda)
                   Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * coronal_irrad
                endif
             endif

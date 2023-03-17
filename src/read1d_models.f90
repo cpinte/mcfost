@@ -17,6 +17,7 @@ module read1d_models
 
 	implicit none
 
+	!.false. mainly for debug
 	logical, parameter :: lcell_centered = .true.
 
 	contains
@@ -76,8 +77,10 @@ module read1d_models
 			enddo
 			if (atmos_1d%E_corona > 0) then!log10(F_SI) + 3 = log10(F_cgs)
 				atmos_1d%I_coro(:,1) = atmos_1d%I_coro(:,1) * atmos_1d%E_corona / Fnorm
-				write(*,'("lgFcorona="(1F12.4)" W/m^2; lgFcorona(old)="(1F12.4)" W/m^2")') log10(atmos_1d%E_corona), log10(Fnorm)
-				write(*,'("max(I)="(1ES14.5E3)" W/m^2/Hz/sr; min(I)="(ES14.5E3)" W/m^2/Hz/sr")') maxval(atmos_1d%I_coro), minval(atmos_1d%I_coro)
+				write(*,'("lgFcorona="(1F12.4)" W/m^2; lgFcorona(old)="(1F12.4)" W/m^2")') &
+					log10(atmos_1d%E_corona), log10(Fnorm)
+				write(*,'("max(I)="(1ES14.5E3)" W/m^2/Hz/sr; min(I)="(ES14.5E3)" W/m^2/Hz/sr")') &
+					maxval(atmos_1d%I_coro), minval(atmos_1d%I_coro)
 			else
 				write(*,'("lgFcorona="(1F12.4)" W/m^2")') log10(Fnorm)
 			endif
@@ -135,7 +138,7 @@ module read1d_models
 		call read_abundance
 		rho_to_nH = 1d3 / masseH / wght_per_H
 
-		!MCFOST is a cell centered radiative transfer code while the 1D spherically symmetric codes
+		!- MCFOST is a cell centered radiative transfer code while the 1D spherically symmetric codes
 		! are based on a set of points corresponding to the nodes of multi-dimensional models.
 		!Therefore, there is one cell less than the number of points in the model.
 		!If lcell_centered, the points in the file are interpreted at cell edges, and the value
@@ -143,7 +146,7 @@ module read1d_models
 		!This is more accurate, preserve the column mass, but makes it harder to benchmark with other 1D
 		!codes, as the point values does not correspond to the node values, hence the emission/absorption coefficients
 		!are different (while they should be equivalent for the same values of rho, T, ne, except for bugs).
-		!If not lcell_centered, the outermost cell (limit = Rmax) will be given the outermost point values (rho(nr), etc.).
+		!- If not lcell_centered, the outermost cell (limit = Rmax) will be given the outermost point values (rho(nr), etc.).
 		!The inner most point will be skipped (limit at Rmin). This option makes it easier to benchmark opacities and emissivities
 		!locally with other codes. USE that option for DEBUG (if the emerging flux/intensity are too much different from the reference).
 		!NOTE: because the last point is remove, its contribution to continuum and line is removed. While lines generally do not form
@@ -197,9 +200,11 @@ module read1d_models
 		!column mass
 		allocate(cm(n_cells))
 		cm(icell0) = au_to_m * (atmos_1d%r(icell0+1) - atmos_1d%r(icell0)) * nHtot(icell0) / rho_to_nH
-		write(*,*) "icell=", icell0, " T=", T(icell0), " nH=", nHtot(icell0), " ne=", ne(icell0), " iz=", icompute_atomRT(icell0)
+		write(*,*) "icell=", icell0, " T=", T(icell0), " nH=", nHtot(icell0), " ne=", ne(icell0), &
+				" iz=", icompute_atomRT(icell0)
 		do icell=icell0-1,1,-1
-			write(*,*) "icell=", icell, " T=", T(icell), " nH=", nHtot(icell), " ne=", ne(icell), " iz=", icompute_atomRT(icell)
+			write(*,*) "icell=", icell, " T=", T(icell), " nH=", nHtot(icell), " ne=", ne(icell), &
+				" iz=", icompute_atomRT(icell)
 			cm(icell) = cm(icell+1) +  au_to_m * (atmos_1d%r(icell+1) - atmos_1d%r(icell)) * nHtot(icell) / rho_to_nH
 			write(*,*) " cm = ", cm(icell), " model:", atmos_1d%m(icell)
 		enddo
