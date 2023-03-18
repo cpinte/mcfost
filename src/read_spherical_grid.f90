@@ -59,7 +59,7 @@ module read_spherical_grid
         !special, only 1 azimuth if not 3D (' no limits ')
         Nsize = pluto%nx3
         if (pluto%nx3 > 1) then
-            l3D = .true.
+            ! l3D = .true.
             Nsize = Nsize + 1
         endif
         allocate(pluto%x3(Nsize))
@@ -76,8 +76,8 @@ module read_spherical_grid
             call error("(spherical input grid) theta(1) must be the largest value (pi or pi/2)")
         endif
 
-        !either 2.5d or 3d
-        l3d = (minval(sin(pluto%x2)) < 0.0).or.(pluto%nx3 > 1)
+        !either 2.5d (min(sin(theta))=-1) or 3d (Nphi > 1)
+        l3d = (minval(pluto%x2) < 0.0).or.(pluto%nx3 > 1)
         write(*,*) "3d mode ? ", l3d
 
         laccretion_shock = (acc == 1)
