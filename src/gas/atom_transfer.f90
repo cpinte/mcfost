@@ -685,7 +685,7 @@ module atom_transfer
             call system_clock(cend_iter,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpuend_iter)
             time_iteration = real(cend_iter - cstart_iter)/real(time_tick)
-            write(*,'("  --> <time iteration>="(1F12.4)" min (cpu : "(1F8.4)")")') &
+            write(*,'("  --> time iteration="(1F12.4)" min (cpu : "(1F8.4)")")') &
                   mod(time_iteration/60.0,60.0), mod((cpuend_iter-cpustart_iter)/60.0,60.0)
             time_iter_avg = time_iter_avg + time_iteration
             ! -> will be averaged with the number of iterations done for this step
@@ -697,9 +697,9 @@ module atom_transfer
                   lprevious_converged = .true.
                   call warning("Time limit would be exceeded, leaving...")
                   write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
-                  write(*,*) " ~<time> etape:", mod(time_iter_avg/60.,60.), ' <time iter>=', &
+                  write(*,*) " time etape:", mod(time_iter_avg/60.,60.), ' <time iter>=', &
                                                 mod(time_iter_avg/real(n_iter)/60.,60.)," min"
-                  write(*,*) " ~<time> etape (cpu):", mod(time_iter_avg * nb_proc/60.,60.), " min"
+                  write(*,*) " time etape (cpu):", mod(time_iter_avg * nb_proc/60.,60.), " min"
                   write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
                   lexit_after_nonlte_loop = .true.
                   exit step_loop
