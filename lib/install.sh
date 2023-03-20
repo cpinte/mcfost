@@ -61,7 +61,7 @@ if [ ! $# = 0 ]; then SYSTEM=$1; fi
 
 set +u # personalized error messages
 if [ -z "$SYSTEM" ]; then
-    echo "error: SYSTEM need to be set (choose: ifort or gfortran)."
+    echo "error: SYSTEM need to be set (choose: ifort, ifx, or gfortran)."
     exit 1
 fi
 if [ -z "$MCFOST_INSTALL" ]; then
@@ -76,6 +76,12 @@ if [ "$SYSTEM" = "ifort" ]; then
     export FC=ifort
     export CXX=icpc
     export CFLAGS=""
+elif [ "$SYSTEM" = "ifx" ]; then
+    echo "Building MCFOST's libraries with ifx"
+    export CC=icx
+    export FC=ifx
+    export CXX=icpx
+    export CFLAGS="-std=gnu90"
 elif [ "$SYSTEM" = "gfortran" ]; then
     echo "Building MCFOST's libraries with gfortran"
     export CC=gcc
@@ -84,7 +90,7 @@ elif [ "$SYSTEM" = "gfortran" ]; then
     export CFLAGS="-m64"
 else
     echo "Unknown system to build MCFOST: $SYSTEM"
-    echo "Please choose ifort or gfortran"
+    echo "Please choose ifort, ifx, or gfortran"
     echo "install.sh <system>"
     echo "Exiting"
     exit 1
@@ -139,6 +145,9 @@ tar xzvf sprng2.0b.tar.gz
 if [ "$SYSTEM" = "gfortran" ] ; then
     \cp -f "$SYSTEM/primes_64.c" sprng2.0/SRC # recent gfortran has an issue with having duplicate symbols between primes_32 and primes_64
 fi
+if [ "$SYSTEM" = "ifx" ]; then
+    patch -p1 -d sprng2.0 < ifx/sprng2.0b.patch
+fi
 if [ "$os" = "macos" ]; then
     \cp -f macos/insertmenu.mac sprng2.0/SRC/insertmenu
 fi
@@ -170,6 +179,8 @@ echo "Done"
 echo "Compiling Voro++ ..."
 if [ "$SYSTEM" = "ifort" ]; then
     \cp -f ifort/config.mk voro
+elif [ "$SYSTEM" = "ifx" ]; then
+    \cp -f ifx/config.mk voro
 elif [ "$SYSTEM" = "gfortran" ]; then
     \cp -f gfortran/config.mk voro
 fi
