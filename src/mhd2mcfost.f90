@@ -12,20 +12,11 @@ module mhd2mcfost
     use sph2mcfost, only : SPH_to_Voronoi, Hydro_to_Voronoi_atomic
     use sort, only : find_kth_smallest_inplace
     use elements_type
-    use stars, only : laccretion_shock, T_hp, T_preshock
+    use stars, only : T_hp, T_preshock
 
     implicit none
 
     contains
-
-
-    subroutine read_pluto()
-        !read pluto format in hdf5
-
-        call error("Pluto interface not available yet!")
-
-        return
-    end subroutine read_pluto
 
     subroutine setup_mhd_to_mcfost()
         !here lmhd_voronoi ist true even with model ascii !
@@ -54,6 +45,8 @@ module mhd2mcfost
         !codes cannot be merged.
         !This is to be able to use read previous tesselation
 
+        call warning("check format of file with lmhd_voronoi!")
+
         lmagnetized = .false.
         lfix_star = .true.
         lphantom_file = .false.
@@ -72,12 +65,6 @@ module mhd2mcfost
         else
            call error("Dust not handled yet for pluto models!")
         endif
-
-      !   if (lpluto_file) then
-      !      write(*,*) "Voronoi tesselation on Pluto model..."
-      !      !read and convert to mcfost units
-      !      call read_pluto() ! to date empty
-        if (lmodel_ascii) then
 
            cmd = "wc -l "//trim(density_file)//" > ntest.txt"
            call appel_syst(cmd,syst_status)
@@ -141,10 +128,6 @@ module mhd2mcfost
                       mass_ne_on_massgas(icell), vx(icell), vy(icell), vz(icell), vt_tmp(icell), dz(icell), h(icell)
               endif
            enddo
-           !density_file
-        else
-           call error("lpluto_file or lmodel_ascii required for lmhd_voronoi!")
-        end if
 
         hydro_limits(:) = 0
 
@@ -179,196 +162,133 @@ module mhd2mcfost
         return
       end subroutine setup_mhd_to_mcfost
 
-      subroutine setup_model1d_to_mcfost()
-      use read1d_models, only : tab_r_mod1d, tab_T_mod1, tab_rho_mod1, tab_ne_mod1, &
-               tab_v_mod1, tab_vt_mod1, tab_zone_mod1
+   !  subroutine read_spheregrid_ascii(filename)
+   !  ! ------------------------------------------- !
+   !  ! Read from ascii file a model to be used.
+   !  ! deprecated
+   !  ! ------------------------------------------- !
+   !      character(len=*), intent(in)	:: filename
+   !      integer, parameter :: Nhead = 2 !Add more
+   !      integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
+   !      character(len=512) :: inputline, FormatLine, cmd
+   !      real(kind=dp) :: rr, zz, pp, Vmod
 
-         real(kind=dp) :: rho_to_nH
+   !      write(*,*) "**** WARNING CHECK THE VELOCIOTY IN VFIELD3D"
 
-		   call alloc_atomrt_grid()
-         call read_abundance
+   !      call alloc_atomrt_grid
+   !      call read_abundance
 
-         rho_to_nH = 1d3 / masseH / wght_per_H
+   !      lVoronoi = .false.
+   !      !deactivated at the moment. I'll put back Zeeman pol later
+   !      lvelocity_file = .true.
 
-         laccretion_shock = .false.
-		   lvoronoi = .false.
-		   lmagnetized = .false.
-		   lcalc_ne = .false.
+   !      write(FormatLine,'("(1"A,I3")")') "A", 512
 
-		   icompute_atomRT(:) = tab_zone_mod1(2:n_cells+1)
-		   T(:) = tab_T_mod1(2:n_cells+1)
-		   nHtot(:) = tab_rho_mod1(2:n_cells+1) * rho_to_nH
-		   ne(:) = tab_ne_mod1(2:n_cells+1)
-		   vfield3d(:,1) = tab_v_mod1(1,2:n_cells+1) !r
-		   vfield3d(:,2) = tab_v_mod1(3,2:n_cells+1) ! vphi
-		   vfield3d(:,3) = tab_v_mod1(2,2:n_cells+1) ! vtheta
-		   vturb(:) = tab_vt_mod1(2:n_cells+1)
+   !      !could add header with magnetic field and so on
+   !      !location of spots + lmagnetoaccretion flags if other kind of models with the use of spots
+   !      ! + Tschok
 
-         call check_for_zero_electronic_density()
-         call print_info_model()
+   !      cmd = "wc -l "//trim(filename)//" > ntest.txt"
+   !      call appel_syst(cmd,syst_status)
+   !      open(unit=1,file="ntest.txt",status="old")
+   !      read(1,*) N_points
+   !      close(unit=1)
+   !      !-N headers lines
+   !      write(*,*) "Found ", N_points - Nhead, " points and grid has", n_cells, " points"
+   !      if (N_points - Nhead/= n_cells) then
+   !         call error( "Should read a model for the exact same grid as mcfost !" )
+   !      end if
 
-
-		!tab_r_mod1d deallocated later in cylindrical grid
-		deallocate(tab_T_mod1,tab_rho_mod1,tab_ne_mod1,tab_v_mod1,tab_vt_mod1,tab_zone_mod1)
-      return
-    end subroutine setup_model1d_to_mcfost
-
-    subroutine read_spheregrid_ascii(filename)
-    ! ------------------------------------------- !
-    ! Read from ascii file a model to be used.
-    ! ------------------------------------------- !
-        character(len=*), intent(in)	:: filename
-        integer, parameter :: Nhead = 2 !Add more
-        integer :: icell, Nread, syst_status, N_points, k, i, j, acspot
-        character(len=512) :: inputline, FormatLine, cmd
-        real(kind=dp) :: rr, zz, pp, Vmod
-
-        write(*,*) "**** WARNING CHECK THE VELOCIOTY IN VFIELD3D"
-
-        call alloc_atomrt_grid
-        call read_abundance
-
-        lVoronoi = .false.
-        !deactivated at the moment. I'll put back Zeeman pol later
-        lvelocity_file = .true.
-
-        write(FormatLine,'("(1"A,I3")")') "A", 512
-
-        !could add header with magnetic field and so on
-        !location of spots + lmagnetoaccretion flags if other kind of models with the use of spots
-        ! + Tschok
-
-        cmd = "wc -l "//trim(filename)//" > ntest.txt"
-        call appel_syst(cmd,syst_status)
-        open(unit=1,file="ntest.txt",status="old")
-        read(1,*) N_points
-        close(unit=1)
-        !-N headers lines
-        write(*,*) "Found ", N_points - Nhead, " points and grid has", n_cells, " points"
-        if (N_points - Nhead/= n_cells) then
-           call error( "Should read a model for the exact same grid as mcfost !" )
-        end if
-
-        open(unit=1,file=filename, status="old")
-        call read_line(1, FormatLine, inputline, Nread)
-        read(inputline(1:Nread),*) vfield_coord
-        select case (vfield_coord )
-         case (1)
-            write(*,*) "-> Using cartesian velocity fields"
-         case (2)
-            write(*,*) "-> Using cylidnrical velocity fields"
-         case (3)
-            write(*,*) "-> Using spherical velocity fields"
-         case default
-            write(*,*) "value of vfield_coord", vfield_coord," unknown!"
-            stop
-         end select
+   !      open(unit=1,file=filename, status="old")
+   !      call read_line(1, FormatLine, inputline, Nread)
+   !      read(inputline(1:Nread),*) vfield_coord
+   !      select case (vfield_coord )
+   !       case (1)
+   !          write(*,*) "-> Using cartesian velocity fields"
+   !       case (2)
+   !          write(*,*) "-> Using cylidnrical velocity fields"
+   !       case (3)
+   !          write(*,*) "-> Using spherical velocity fields"
+   !       case default
+   !          write(*,*) "value of vfield_coord", vfield_coord," unknown!"
+   !          stop
+   !       end select
 
 
-        !read T shock and if accretion spots
-        call read_line(1, FormatLine, inputline, Nread)
-        read(inputline(1:Nread),*) T_hp, T_preshock, acspot
-        laccretion_shock = .false.
-        if (acspot==1) laccretion_shock = .true.
-        if (T_hp==0.0_dp) T_hp = -1.0_dp
+   !      !read T shock and if accretion spots
+   !      call read_line(1, FormatLine, inputline, Nread)
+   !      read(inputline(1:Nread),*) T_hp, T_preshock, acspot
+   !      laccretion_shock = .false.
+   !      if (acspot==1) laccretion_shock = .true.
+   !      if (T_hp==0.0_dp) T_hp = -1.0_dp
 
-        do i=1, n_rad
-           do j=j_start,nz !j_start = -nz in 3D
-              do k=1, n_az
-                 if (j==0) then !midplane
-                    !icell = cell_map(i,1,k)
-                    cycle
-                 else
-                    icell = cell_map(i,j,k)
-                 end if
-                 Nread = 0
-                 if (lmagnetized) then
-                    stop
-                    ! call getnextline(1, "#", FormatLine, inputline, Nread)
+   !      do i=1, n_rad
+   !         do j=j_start,nz !j_start = -nz in 3D
+   !            do k=1, n_az
+   !               if (j==0) then !midplane
+   !                  !icell = cell_map(i,1,k)
+   !                  cycle
+   !               else
+   !                  icell = cell_map(i,j,k)
+   !               end if
+   !               Nread = 0
+   !               if (lmagnetized) then
+   !                  stop
+   !                  ! call getnextline(1, "#", FormatLine, inputline, Nread)
 
-                    ! !In case of no polarisation, but magnetic field is present in the file, it is better to
-                    ! !read the mandatory variables and put the magnetic field at the end of the file
-                    ! read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
-                    !      vR(icell), V2(icell), Vphi(icell), vturb(icell), icompute_atomRT(icell), &
-                    !      Bmag(icell), gammab(icell), chib(icell)
-                    ! !BR(icell), B2(icell), Bphi(icell)
-                    ! !Bmag(icell), gammab(icell), chib(icell)
-                 else
-                    call read_line(1, FormatLine, inputline, Nread)
-                    read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
-                         vfield3d(icell,1), vfield3d(icell,3), vfield3d(icell,2), vturb(icell), icompute_atomRT(icell)
-                         ! vR                  vz/vtheta              vphi
-                         !beware vfield3d(2) is vphi and vfield3d(3) = vz or vtheta
+   !                  ! !In case of no polarisation, but magnetic field is present in the file, it is better to
+   !                  ! !read the mandatory variables and put the magnetic field at the end of the file
+   !                  ! read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
+   !                  !      vR(icell), V2(icell), Vphi(icell), vturb(icell), icompute_atomRT(icell), &
+   !                  !      Bmag(icell), gammab(icell), chib(icell)
+   !                  ! !BR(icell), B2(icell), Bphi(icell)
+   !                  ! !Bmag(icell), gammab(icell), chib(icell)
+   !               else
+   !                  call read_line(1, FormatLine, inputline, Nread)
+   !                  read(inputline(1:Nread),*) rr, zz, pp, T(icell), nHtot(icell), ne(icell), &
+   !                       vfield3d(icell,1), vfield3d(icell,3), vfield3d(icell,2), vturb(icell), icompute_atomRT(icell)
+   !                       ! vR                  vz/vtheta              vphi
+   !                       !beware vfield3d(2) is vphi and vfield3d(3) = vz or vtheta
 
-                 end if !magnetized
-              end do
-           end do
-        end do
-        close(unit=1)
+   !               end if !magnetized
+   !            end do
+   !         end do
+   !      end do
+   !      close(unit=1)
 
-        !rho -> nH
-        nHtot = nHtot * 1d3 / masseH / wght_per_H
+   !      !rho -> nH
+   !      nHtot = nHtot * 1d3 / masseH / wght_per_H
 
-        write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
-        write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
-        write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
+   !      write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
+   !      write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
+   !      write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
 
-        Vmod = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+   !      Vmod = sqrt( maxval(sum(vfield3d**2,dim=2)) )
 
-        v_char = Vmod
+   !      v_char = Vmod
 
-        !to change according to what B quantities are read!!
-        ! if (lmagnetized) then
-        !    gammaB = gammaB * pi / 180.0
-        !    chiB = chiB * pi / 180.0
-        !    B_char = maxval(abs(Bmag))
-        !    write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
-        !    if (B_char <= 0.0_dp) then
-        !       !    		deallocate(BR,Bphi)
-        !       !    		if (allocated(B_z)) deallocate(B_z)
-        !       !    		if (allocated(Btheta)) deallocate(Btheta)
-        !       deallocate(Bmag, gammab,chib)
-        !       lmagnetized = .false.
-        !    endif
-        ! endif
-
-
-		  call check_for_zero_electronic_density()
-        call print_info_model()
+   !      !to change according to what B quantities are read!!
+   !      ! if (lmagnetized) then
+   !      !    gammaB = gammaB * pi / 180.0
+   !      !    chiB = chiB * pi / 180.0
+   !      !    B_char = maxval(abs(Bmag))
+   !      !    write(*,*)  "Typical Magnetic field modulus (G)", B_char * 1d4
+   !      !    if (B_char <= 0.0_dp) then
+   !      !       !    		deallocate(BR,Bphi)
+   !      !       !    		if (allocated(B_z)) deallocate(B_z)
+   !      !       !    		if (allocated(Btheta)) deallocate(Btheta)
+   !      !       deallocate(Bmag, gammab,chib)
+   !      !       lmagnetized = .false.
+   !      !    endif
+   !      ! endif
 
 
-        return
-      end subroutine read_spheregrid_ascii
+	! 	  call check_for_zero_electronic_density()
+   !      call print_info_model()
 
 
-   subroutine print_info_model
-      real(kind=dp) :: v_char
-
-      v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
-
-      write(*,*) "Maximum/minimum velocities in the model (km/s):"
-      write(*,*) " V1 = ", 1e-3 * maxval(abs(vfield3d(:,1))), 1d-3*minval(abs(vfield3d(:,1)),mask=icompute_atomRT>0)
-      write(*,*) " V2 = ",  1d-3 * maxval(abs(vfield3d(:,2))), 1d-3*minval(abs(vfield3d(:,2)),mask=icompute_atomRT>0)
-      write(*,*) " V3 = ",  1d-3 * maxval(abs(vfield3d(:,3))), 1d-3*minval(abs(vfield3d(:,3)),mask=icompute_atomRT>0)
-
-
-      write(*,*) "Typical line extent due to V fields (km/s):"
-      write(*,*) v_char/1d3
-
-      write(*,*) "Maximum/minimum turbulent velocity (km/s):"
-      write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
-
-      write(*,*) "Maximum/minimum Temperature in the model (K):"
-      write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
-      write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-      write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
-      if (.not.lcalc_ne) then
-         write(*,*) "Maximum/minimum ne density in the model (m^-3):"
-         write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
-      endif
-
-   return
-   end subroutine print_info_model
+   !      return
+   !    end subroutine read_spheregrid_ascii
 
 
 end module mhd2mcfost

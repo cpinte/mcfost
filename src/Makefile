@@ -21,6 +21,10 @@ ifeq ($(ifort), yes)
     SYSTEM=ifort
 endif
 
+ifeq ($(ifx), yes)
+    SYSTEM=ifx
+endif
+
 ifndef OPENMP
     OPENMP=yes
 endif
@@ -100,6 +104,30 @@ ifeq ($(SYSTEM), ifort)
     COMPFLAGS= -fopenmp
     LIBCXX= -cxxlib
     LIBS= $(LIB)/ifort
+endif
+
+ifeq ($(SYSTEM), ifx)
+    ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.12 -mdynamic-no-pic
+        STATIC_FLAGS= -static-intel -qopenmp-link static
+    else
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512
+        STATIC_FLAGS= -static-intel -qopenmp-link static -static-libstdc++
+    endif
+    FC= ifx
+    FFLAGS= -fpp -O3 -fp-model fast=2 -traceback $(ARCH)
+    DBLFLAG= -r8
+    DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
+               -warn uninitialized -warn unused -warn truncated_source
+    KNOWN_SYSTEM= yes
+    FOMPFLAGS= -qopenmp
+    IPOFLAGS= -ipo
+    CC= icx
+    CXX=icpx -std=c++11
+    CCFLAGS= -O3 -fp-model fast=2 -traceback $(ARCH)
+    COMPFLAGS= -qopenmp
+    LIBCXX= -cxxlib
+    LIBS= $(LIB)/ifx
 endif
 
 ifeq ($(SYSTEM), gfortran)
@@ -189,12 +217,12 @@ VPATH = $(gdir)/
 
 SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 messages.f90 \
           operating_system.f90 random_numbers.f90 utils.f90 sort.f90 fits_utils.f90 \
-          grains.f90 read1d_models.f90 cylindrical_grid.f90 spherical_grid.f90      \
-          kdtree2.f90 elements_type.f90                                             \
-          Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 read_DustEM.f90            \
-          Temperature.f90 density.f90 read_opacity.f90 scattering.f90               \
-          read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90          \
-          readVTK.f90 read_idefix.f90 read_pluto.f90 \
+          grains.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90 \
+          elements_type.f90 Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 \
+          read_DustEM.f90 Temperature.f90 density.f90 read_opacity.f90 scattering.f90 \
+          read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90	\
+          readVTK.f90 read_idefix.f90 read_pluto.f90	\
+          read1d_models.f90 read_spherical_grid.f90	\
           coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90            \
           input.f90 benchmarks.f90 atom_type.f90  \
           wavelengths_gas.f90 broad.f90                             \

@@ -31,8 +31,6 @@ module stars
   real, dimension(:,:), allocatable :: ProDiMo_star_HR
 
   !onto the star(s)
-  !to move in parameters ?? (also remove in public declaration)
-  logical :: laccretion_shock
   real(kind=dp) :: T_hp, max_Thp = 0.0, min_Thp = 1d8 !photosphere heated.
   real(kind=dp) :: max_Tshock = 0.0, min_Tshock = 1d8 !soft X-rays emission from the shock
   real(kind=dp) :: max_Facc = 0.0, min_Facc = 1d8 !Accretion flux in W/m2

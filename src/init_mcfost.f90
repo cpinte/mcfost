@@ -13,9 +13,10 @@ module init_mcfost
   use utils
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters
-  use read1d_models, only : read_grid_1d
+  use read1d_models, only : read_model_1d
   use read_idefix, only : read_idefix_parameters
   use read_pluto, only : read_pluto_parameters
+  use read_spherical_grid, only : read_spherical_grid_parameters
 
   implicit none
 
@@ -67,6 +68,7 @@ subroutine set_default_variables()
   lcheckpoint = .false.
   checkpoint_period = 15
   llimit_mem = .false. !if true, contopac are computed locally.
+  laccretion_shock = .false. !for magnetospheric accretion
   !HEALpix
   healpix_lorder = 1
   healpix_lmin = 0
@@ -81,7 +83,7 @@ subroutine set_default_variables()
   n_iterate_ne = -1 !negative means never updated after/during non-LTE loop.
   ndelay_iterate_ne = 0
   lmodel_1d = .false.
-  lmodel_ascii = .false.
+  lsphere_model = .false.
   lmhd_voronoi = .false.
   lzeeman_polarisation = .false.
   lforce_lte = .false.
@@ -90,8 +92,8 @@ subroutine set_default_variables()
   Ng_Norder = 0
   Ng_Nperiod = -1
   istep_start = 1
+  istep_end = 2
   ! AL-RT
-  lstop_after_step1 = .false.
   N_rayons_mc = 100
   loutput_rates = .false.
   !
@@ -786,29 +788,39 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) istep_start
         i_arg= i_arg+1
+     case("-end_step")
+        i_arg = i_arg + 1
+        if (i_arg > nbr_arg) call error("1 or 2 needed for -end_step")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) istep_end
+        if (istep_end > 2) call error("last step of non-LTE loop is capped at 2!")
+        i_arg= i_arg+1
      case("-mhd_voronoi")
         i_arg = i_arg + 1
         lmhd_voronoi = .true.
         lVoronoi = .true.
         l3D = .true.
-        ldensity_file = .false.
-        !later lpluto_file = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
      case ("-model_1d")
-     	i_arg = i_arg + 1
-     	lmodel_1d = .true.
-     	lmodel_ascii = .false.
-      ldensity_file = .false.
-     case("-model_ascii")
         i_arg = i_arg + 1
-        lmodel_ascii = .true.
-        ldensity_file = .false.
+        lmodel_1d = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
+     case("-sphere_mesh")
+        i_arg = i_arg + 1
+        lsphere_model = .true.
+        call get_command_argument(i_arg,s)
+        density_file = s
+        i_arg = i_arg + 1
      case("-zeeman_polarisation")
      	call error("Zeeman polarisation not yet!")
         i_arg = i_arg + 1
         lzeeman_polarisation=.true.
      case("-healpix_nlte")
         i_arg = i_arg + 1
-        lstop_after_step1 = .true.
+        istep_start = 1; istep_end = 1
      case("-art_line_resol")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("resolution (km/s) needed with -art_line_resol !")
@@ -1430,10 +1442,18 @@ subroutine initialisation_mcfost()
    n_zones = 1
    disk_zone(1)%geometry = 2
    call warning("model_1d : reading 1d  stellar atmosphere model")
-   call read_grid_1d(density_file)
+   write(*,*) "------------------------------------------------"
+   call warning(" THERE ARE PROBABLY SOME CHECKS TO DO MORE ")
+   write(*,*) "------------------------------------------------"
+   call read_model_1d(density_file)
   endif
-  if (lmodel_ascii .or. lmodel_1d) ldensity_file = .false. !because -df is used to
-                                                           !the pass the model to mcfost!
+  if (lsphere_model) then
+     !could be 3d or 2d (2.5d). Depends on flag l3D or N_az>1
+     n_zones = 1
+     disk_zone(1)%geometry = 2
+     call read_spherical_grid_parameters(density_file)
+  endif
+
   if (lidefix) then
      l3D = .true.
      if (n_zones > 1) call error("idefix mode only work with 1 zone")
@@ -1501,9 +1521,9 @@ subroutine initialisation_mcfost()
 
   write(*,*) 'Input file read successfully'
 
-  if ((lmodel_ascii.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
-   call error("Cannot use Phantom and MHD files at the same time presently.")
-  end if
+!   if ((lsphere_model.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
+!    call error("Cannot use Phantom and MHD files at the same time presently.")
+!   end if
 
   ! Correction sur les valeurs du .para
   if (lProDiMo) then
@@ -1790,9 +1810,9 @@ subroutine display_help()
   write(*,*) "        : -athena++ <dump> : reads an athena++ athdf file"
   write(*,*) "        : -idefix <dump> : reads an idefix vtk file"
   write(*,*) "        : -pluto <dir> <id> : reads a pluto model"
-  write(*,*) "        : -model_ascii_atom <file> : read the <file> from ascii file"
-  write(*,*) "        : -mhd_voronoi : interface between grid-based code and Voronoi mesh."
-  write(*,*) "        : -model_1d : interface with stellar atmosphere models."
+  write(*,*) "        : -sphere_mesh <file> : reads the model <file> from a binary file"
+  write(*,*) "        : -mhd_voronoi <file> : interface between grid-based code and Voronoi mesh"
+  write(*,*) "        : -model_1d <file> : reads 1d spherically symmetric model <file>"
   write(*,*) " "
   write(*,*) " Generating outputs for chemistry codes"
   write(*,*) "        : -prodimo : creates required files for ProDiMo"
@@ -1922,6 +1942,7 @@ subroutine display_help()
   write(*,*) " Options related to atomic lines emission"
   !healpix options missing. Waiting finle adaptive scheme.
   write(*,*) "        : -start_step <int> : Select the first step for non-LTE loop (default 1)"
+  write(*,*) "        : -end_step <int>   : Select the last step for non-LTE loop (default 2)"
 !   write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
   write(*,*) "        : -solve_ne : force the calculation of electron density"
   write(*,*) "        : -iterate_ne <Nperiod> : Iterate ne with populations every Nperiod"

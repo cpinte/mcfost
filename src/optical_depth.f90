@@ -10,7 +10,6 @@ module optical_depth
   use cylindrical_grid
   use radiation_field, only : save_radiation_field
   use density
-  use read1d_models, only :  Icorona, xcorona!from above
   use stars, only : intersect_stars, star_rad
   use opacity_atom, only : opacity_atom_bb_loc, contopac_atom_loc, Itot, psi
 
@@ -1413,7 +1412,8 @@ end subroutine optical_length_tot_mol
                   return
                else
                   !Does not return but cell is empty (lcellule_non_vide is .false.)
-                  coronal_irrad = linear_1D_sorted(size(xcorona),xcorona,Icorona(:,1),N,lambda)
+                  coronal_irrad = linear_1D_sorted(atmos_1d%Ncorona,atmos_1d%x_coro(:), &
+                                                   atmos_1d%I_coro(:,1),N,lambda)
                   Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * coronal_irrad
                endif
             endif

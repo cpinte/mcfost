@@ -19,7 +19,6 @@ module see
     !populations below that threshold not taken into account in convergence.
     real(kind=dp), parameter :: frac_limit_pops = 1d-10!1d-50
     !Variables for Non-LTE loop and MALI method
-    logical, allocatable :: lcell_converged(:)
     real(kind=dp), allocatable ::  ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
 
@@ -100,9 +99,6 @@ module see
         if (alloc_Status > 0) call error("Allocation error chi_down")
         allocate(chi_up(n_lambda,Nmaxlevel,NactiveAtoms,nb_proc),stat=alloc_status)
         if (alloc_Status > 0) call error("Allocation error chi_up")
-        allocate(lcell_converged(n_cells),stat=alloc_status)
-        if (alloc_Status > 0) call error("Allocation error lcell_converged")
-        write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
 
         allocate(Itot(n_lambda,n_rayons_max,nb_proc),stat=alloc_status)
         if (alloc_Status > 0) call error("Allocation error Itot")
@@ -113,7 +109,7 @@ module see
         write(*,*) " size phi_loc:", sizeof(phi_loc) / 1024./1024./1024.," GB"
 
         mem_alloc_local = mem_alloc_local + sizeof(psi) + sizeof(eta_atoms) + sizeof(Itot) + sizeof(phi_loc) + &
-            sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(lcell_converged) + sizeof(ngpop)
+            sizeof(uji_down)+sizeof(chi_down)+sizeof(chi_up) + sizeof(ngpop)
 
         allocate(tab_Aji_cont(NmaxCont,NactiveAtoms,n_cells))
         allocate(tab_Vij_cont(Nlambda_max_cont,NmaxCont,NactiveAtoms))
@@ -215,7 +211,7 @@ module see
         integer :: n, kr
         type (AtomType), pointer :: atom
 
-        deallocate(psi,eta_atoms,chi_up,chi_down,uji_down,lcell_converged)
+        deallocate(psi,eta_atoms,chi_up,chi_down,uji_down)
         deallocate(itot,phi_loc,ngpop)
 
         deallocate(tab_Aji_cont, tab_Vij_cont)

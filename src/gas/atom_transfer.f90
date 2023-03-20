@@ -24,13 +24,13 @@ module atom_transfer
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
         lnon_lte_loop, vlabs, calc_contopac_loc, set_max_damping
-   use see, only : ngpop, Neq_ng, lcell_converged, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
+   use see, only : ngpop, Neq_ng, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d, Ng_accelerate, Accelerate, check_ng_pops
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
                                    tab_RT_az,tab_RT_incl
-   use stars, only               : intersect_stars, laccretion_shock, max_Tshock, min_Tshock, max_Thp, min_Thp, max_Facc, min_Facc
+   use stars, only               : intersect_stars, max_Tshock, min_Tshock, max_Thp, min_Thp, max_Facc, min_Facc
    use output, only : allocate_atom_maps, flux_total, write_total_flux, write_atomic_maps
    use mcfost_env, only          : dp, time_tick, time_max
    use molecular_emission, only  : ds
@@ -63,20 +63,21 @@ module atom_transfer
    !  2) Randomly distributed rays for random distribution of points of each cell.
    ! ------------------------------------------------------------------------------------ !
       integer :: etape, etape_start, etape_end, iray
-      integer :: n_rayons, n_rayons_max
-      integer :: n_iter, id, i, iray_start, alloc_status
+      integer :: n_iter, id, i, alloc_status, n_rayons
+      ! integer :: , iray_start, n_rayons_max
       integer :: nact, imax, icell_max, icell_max_2
       integer :: icell, ilevel, nb, nr, unconverged_cells
-      integer, parameter :: maxIter = 150, maxIter3 = 10
+      integer, parameter :: maxIter = 150!, maxIter3 = 10
       !ray-by-ray integration of the SEE
-      integer, parameter :: one_ray = 1, n_rayons_start3 = 100
+      integer, parameter :: one_ray = 1!, n_rayons_start3 = 100
       logical :: lfixed_Rays, lconverged, lprevious_converged
       real :: rand, rand2, rand3, unconverged_fraction
       real(kind=dp) :: precision, vth
-      real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy
+      real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy,diff_loc
       real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
       real(kind=dp) :: diff, diff_old, dne, dN, dN1, dNc
       real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
+      logical, allocatable :: lcell_converged(:)
 
       logical :: labs
       logical :: l_iterate, l_iterate_ne
@@ -99,19 +100,24 @@ module atom_transfer
       real(kind=dp) :: diff_cont, conv_speed, conv_acc
 
       !timing and checkpointing
-      real :: time_iteration, time_nlte, time_nlte_loop, time_nlte_cpu
+      ! NOTE: cpu time does not take multiprocessing (= nb_proc x the real exec time.)
+      !-> overall the non-LTE loop
+      real :: time_nlte, time_nlte_loop, time_nlte_cpu
       real :: cpu_time_begin, cpu_time_end, time_nlte_loop_cpu
       integer :: count_start, count_end, itime
-      integer :: ibar, n_cells_done
-      integer, parameter :: n_iter_counted = 1
+      !-> for a single iteration
+      integer :: cstart_iter, cend_iter
+      real :: time_iteration, cpustart_iter, cpuend_iter, time_iter_avg
+      integer :: ibar, n_cells_done, n_cells_remaining
 
       ! -------------------------------- INITIALIZATION -------------------------------- !
       write(*,*) '-------------------------- NON-LTE LOOP ------------------------------ '
-      time_nlte_loop = 0!total time in the non-LTE loop
+      time_nlte_loop = 0!total time in the non-LTE loop for all steps
       time_nlte_loop_cpu = 0
       !non-LTE mode
       lnon_lte_loop = .true. !for substracting speed of reference cell.
       labs = .true.
+      lfixed_rays = .true.
       id = 1
 
       !Use non-LTE pops for electrons and background opacities.
@@ -133,28 +139,30 @@ module atom_transfer
 
       !How many steps and which one
       etape_start = istep_start
-      etape_end = 2
-      lprecise_pop = .true.
-      if (lprecise_pop) then
-      !iray_start reset to 1 we recompute with twice has much rays but from the start
-         etape_end = 3
-         n_rayons_max =  n_rayons_start3 * (2**(maxIter3-1))
-      endif
-      if ((lstop_after_step1).and.(etape_start==1)) etape_end = 1
-
+      etape_end = istep_end
+      ! lprecise_pop = .false.
+      ! if (lprecise_pop) then
+      ! !iray_start reset to 1 we recompute with twice has much rays but from the start
+      !    etape_end = 3
+      !    n_rayons_max =  n_rayons_start3 * (2**(maxIter3-1))
+      ! endif
       if (allocated(stream)) deallocate(stream)
       allocate(stream(nb_proc),stat=alloc_status)
       if (alloc_status > 0) call error("Allocation error stream")
       if (allocated(ds)) deallocate(ds)
       allocate(ds(one_ray,nb_proc))
       allocate(vlabs(one_ray,nb_proc))
+      allocate(lcell_converged(n_cells),stat=alloc_status)
+      if (alloc_Status > 0) call error("Allocation error lcell_converged")
+      write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
+      allocate(diff_loc(n_cells),stat=alloc_status)
+      if (alloc_Status > 0) call error("Allocation error diff_loc")
+      write(*,*) " size diff_loc:", sizeof(diff_loc) / 1024./1024./1024.," GB"
+      write(*,*) ""
 
       !-> negligible
       mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
       call alloc_nlte_var(one_ray)
-
-      lfixed_rays = .true.
-      iray_start = 1
 
       ! --------------------------- OUTER LOOP ON STEP --------------------------- !
 
@@ -185,15 +193,15 @@ module atom_transfer
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
             conv_speed_limit = conv_speed_limit_mc
-         else if (etape==3) then
-         !or solution with fixed rays that increase after each iteration??
-            lfixed_rays = .false.
-            n_rayons = n_rayons_start3 !start, same as step 2
-            conv_speed_limit = conv_speed_limit_mc
-            precision = min(1d-1,10.0*dpops_max_error)
-            !only once for all iterations on this step
-            stream = 0.0
-            stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+         ! else if (etape==3) then
+         ! !or solution with fixed rays that increase after each iteration??
+         !    lfixed_rays = .false.
+         !    n_rayons = n_rayons_start3 !start, same as step 2
+         !    conv_speed_limit = conv_speed_limit_mc
+         !    precision = min(1d-1,10.0*dpops_max_error)
+         !    !only once for all iterations on this step
+         !    stream = 0.0
+         !    stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
          else
             call error("(n_lte_loop_mali) etape unkown")
          end if
@@ -205,18 +213,23 @@ module atom_transfer
          lconverged = .false.
          lprevious_converged = lforce_lte
          lcell_converged(:) = .false.
+         diff_loc(:) = 1d50
          lng_turned_on = .false.
          n_iter = 0
          conv_speed = 0.0
          conv_acc = 0.0
          diff_old = 0.0
-         time_iteration = 0.0
+         time_iter_avg = 0.0
          unconverged_fraction = 0.0
          unconverged_cells = 0
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
          do while (.not.lconverged)
+            ! evaluate the time for an iteration independently of nb_proc
+            ! time of a single iteration for this step
+            call system_clock(cstart_iter,count_rate=time_tick,count_max=time_max)
+            call cpu_time(cpustart_iter)
 
             n_iter = n_iter + 1
             !-> ng_index depends only on the value of n_iter for a given Neq_ng
@@ -232,14 +245,14 @@ module atom_transfer
             ibar = 0
             n_cells_done = 0
 
-            if (lfixed_rays) then
-               stream = 0.0
-               stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
-            else
-               !update rays weight
-               if (allocated(wmu)) deallocate(wmu)
-               allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
-            end if
+            ! if (lfixed_rays) then
+            !    stream = 0.0
+            !    stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+            ! ! else
+            ! !    !update rays weight
+            ! !    if (allocated(wmu)) deallocate(wmu)
+            ! !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            ! end if
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
             l_iterate_ne = .false.
@@ -255,14 +268,15 @@ module atom_transfer
             !$omp private(l_iterate,weight,diff)&
             !$omp private(nact, at) & ! Acceleration of convergence
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on) & ! Ng's Acceleration of convergence
-            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
-            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged) &
-            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size)
+            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,n_cells_remaining) &
+            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
+            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,dpops_max_error)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
-               ! if (etape==3) l_iterate = l_iterate.and.(.not.lcell_converged(icell))
+               stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
+               if(diff_loc(icell) < 0.1 * dpops_max_error) cycle
 
                if (l_iterate) then
 
@@ -346,6 +360,8 @@ module atom_transfer
                ! Progress bar
                !$omp atomic
                n_cells_done = n_cells_done + 1
+               n_cells_remaining = size(pack(diff_loc, &
+                                    mask=(diff_loc < 0.1 * dpops_max_error)))
                if (real(n_cells_done) > 0.02*ibar*n_cells) then
              	   call progress_bar(ibar)
              	   !$omp atomic
@@ -506,7 +522,7 @@ module atom_transfer
             !$omp parallel &
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
-            !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration)&!diff,diff_cont,dM)&
+            !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration,diff_loc)&!diff,diff_cont,dM)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm,voigt) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
@@ -537,7 +553,9 @@ module atom_transfer
                   !compare for all atoms and all cells
                   diff = max(diff, dN) ! pops
                   diff_cont = max(diff_cont,dNc)
-                  lcell_converged(icell) = (diff < precision)!.and.(dne < precision)
+                  !TO DO, TBC :: include also dne ??
+                  lcell_converged(icell) = (dN < precision) !(diff < precision)
+                  diff_loc(icell) = dN
 
                   !Re init for next iteration if any
                   do nact=1, NactiveAtoms
@@ -636,21 +654,23 @@ module atom_transfer
                      call warning("not enough iterations to converge !!")
                      lconverged = .true.
                   end if
-               else
-                  n_rayons = n_rayons * 2
-                  if (n_iter >= maxIter3) then
-                     call warning("not enough rays to converge in step 3!!")
-                     lconverged = .true.
-                  endif
-              ! On continue en calculant 2 fois plus de rayons
-              ! On les ajoute a l'ensemble de ceux calcules precedemment
-!              iray_start = iray_start + n_rayons
+               ! else
+               !    !increase number of rays only if it converges already ?
+               !    n_rayons = n_rayons * 2
+               !       ! On continue en calculant 2 fois plus de rayons
+               !       ! On les ajoute a l'ensemble de ceux calcules precedemment
+               !       ! iray_start = iray_start + n_rayons
+               !    if (n_iter >= maxIter3) then
+               !       call warning("not enough rays to converge in step 3!!")
+               !       lconverged = .true.
+               !    endif
               endif
             end if
             !***********************************************************!
 
             !***********************************************************!
             ! ********** timing and checkpointing **********************!
+            ! count time from the start of the step, at each iteration
             call system_clock(count_end,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpu_time_end)
             if (count_end < count_start) then
@@ -659,24 +679,27 @@ module atom_transfer
                time_nlte=real(count_end - count_start)/real(time_tick)
             endif
             time_nlte_cpu = cpu_time_end - cpu_time_begin
-            time_nlte_loop = time_nlte_loop + time_nlte
-            time_nlte_loop_cpu = time_nlte_loop_cpu + time_nlte_cpu
 
-            !average time of a single iteration for this step !
-            if (n_iter <= n_iter_counted) then
-               time_iteration = time_iteration + time_nlte / real(n_iter_counted)
-            endif
+            ! evaluate the time for an iteration independently of nb_proc
+            ! time of a single iteration for this step
+            call system_clock(cend_iter,count_rate=time_tick,count_max=time_max)
+            call cpu_time(cpuend_iter)
+            time_iteration = real(cend_iter - cstart_iter)/real(time_tick)
+            write(*,'("  --> time iteration="(1F12.4)" min (cpu : "(1F8.4)")")') &
+                  mod(time_iteration/60.0,60.0), mod((cpuend_iter-cpustart_iter)/60.0,60.0)
+            time_iter_avg = time_iter_avg + time_iteration
+            ! -> will be averaged with the number of iterations done for this step
 
 
             if (lsafe_stop) then
-               if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= n_iter_counted)) then
+               if ((time_nlte + time_iteration >=  safe_stop_time)) then
                   lconverged = .true.
                   lprevious_converged = .true.
                   call warning("Time limit would be exceeded, leaving...")
                   write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
-                  write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', &
-                                                mod(time_iteration/60.,60.)," min"
-                  write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+                  write(*,*) " time etape:", mod(time_iter_avg/60.,60.), ' <time iter>=', &
+                                                mod(time_iter_avg/real(n_iter)/60.,60.)," min"
+                  write(*,*) " time etape (cpu):", mod(time_iter_avg * nb_proc/60.,60.), " min"
                   write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
                   lexit_after_nonlte_loop = .true.
                   exit step_loop
@@ -688,12 +711,15 @@ module atom_transfer
          !***********************************************************!
 
          end do !while
+         !combine all steps
+         time_nlte_loop = time_nlte_loop + time_nlte
+         time_nlte_loop_cpu = time_nlte_loop_cpu + time_nlte_cpu
+         !-> for this step
+         time_iter_avg = time_iter_avg / real(n_iter)
 
-         if (n_iter >= n_iter_counted) then
-            write(*,'("<time iteration>="(1ES17.8E3)" min; <time step>="(1ES17.8E3)" min")') mod(time_iteration/60.,60.), &
-                 mod(n_iter * time_iteration/60.,60.)
-            write(*,'(" --> ~time step (cpu)="(1ES17.8E3)" min")') mod(n_iter * time_iteration * nb_proc/60.,60.)
-         endif
+         write(*,'("<time iteration>="(1F8.4)" min; <time step>="(1F8.4)" min")') mod(time_iter_avg/60.,60.), &
+                 mod(n_iter * time_iter_avg/60.,60.)
+         write(*,'(" --> ~time step (cpu)="(1F8.4)" min")') mod(n_iter * time_iter_avg * nb_proc/60.,60.)
 
          if (allocated(xmu)) deallocate(xmux,xmuy,xmu)
          if (allocated(wmu)) deallocate(wmu)
@@ -718,15 +744,15 @@ module atom_transfer
       if (loutput_rates) call write_rates()
 
       call dealloc_nlte_var()
-      deallocate(dM, dTM, Tex_ref, Tion_ref)
-      deallocate(stream,ds,vlabs)
+      deallocate(dM, dTM, Tex_ref, Tion_ref, diff_loc)
+      deallocate(stream, ds, vlabs, lcell_converged)
 
       ! --------------------------------    END    ------------------------------------------ !
       lnon_lte_loop = .false.
-      if (mod(time_nlte_loop_cpu/60./60.,60.) > 1.0_dp) then
-         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop_cpu/60./60.,60.), " h"
+      if (mod(time_nlte_loop/60./60.,60.) > 1.0_dp) then
+         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop/60./60.,60.), " h"
       else
-         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop_cpu/60.,60.), " min"
+         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop/60.,60.), " min"
       endif
       write(*,*) '-------------------------- ------------ ------------------------------ '
 
@@ -1456,7 +1482,7 @@ module atom_transfer
       enddo
 
       open(1,file="spectrum_1d.txt",status="unknown")
-      write(1,*) Nimpact, N_lambda
+      write(1,*) Nimpact, N_lambda!, atmos_1d%s
       write(1,'(*(1ES17.8E3))') (p(j), j=1,Nimpact)
       write(1,'(*(1ES17.8E3))') (cos_theta(j), j=1,Nimpact)
       write(1,'(*(1ES17.8E3))') (weight_mu(j), j=1,Nimpact)
