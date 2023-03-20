@@ -100,15 +100,19 @@ module atom_transfer
       real(kind=dp) :: diff_cont, conv_speed, conv_acc
 
       !timing and checkpointing
-      real :: time_iteration, time_nlte, time_nlte_loop, time_nlte_cpu
+      ! NOTE: cpu time does not take multiprocessing (= nb_proc x the real exec time.)
+      !-> overall the non-LTE loop
+      real :: time_nlte, time_nlte_loop, time_nlte_cpu
       real :: cpu_time_begin, cpu_time_end, time_nlte_loop_cpu
       integer :: count_start, count_end, itime
-      integer :: ibar, n_cells_done
-      integer, parameter :: n_iter_counted = 1
+      !-> for a single iteration
+      integer :: cstart_iter, cend_iter
+      real :: time_iteration, cpustart_iter, cpuend_iter, time_iter_avg
+      integer :: ibar, n_cells_done, n_cells_remaining
 
       ! -------------------------------- INITIALIZATION -------------------------------- !
       write(*,*) '-------------------------- NON-LTE LOOP ------------------------------ '
-      time_nlte_loop = 0!total time in the non-LTE loop
+      time_nlte_loop = 0!total time in the non-LTE loop for all steps
       time_nlte_loop_cpu = 0
       !non-LTE mode
       lnon_lte_loop = .true. !for substracting speed of reference cell.
@@ -215,13 +219,17 @@ module atom_transfer
          conv_speed = 0.0
          conv_acc = 0.0
          diff_old = 0.0
-         time_iteration = 0.0
+         time_iter_avg = 0.0
          unconverged_fraction = 0.0
          unconverged_cells = 0
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
          do while (.not.lconverged)
+            ! evaluate the time for an iteration independently of nb_proc
+            ! time of a single iteration for this step
+            call system_clock(cstart_iter,count_rate=time_tick,count_max=time_max)
+            call cpu_time(cpustart_iter)
 
             n_iter = n_iter + 1
             !-> ng_index depends only on the value of n_iter for a given Neq_ng
@@ -260,7 +268,7 @@ module atom_transfer
             !$omp private(l_iterate,weight,diff)&
             !$omp private(nact, at) & ! Acceleration of convergence
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on) & ! Ng's Acceleration of convergence
-            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
+            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,n_cells_remaining) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,dpops_max_error)
             !$omp do schedule(static,omp_chunk_size)
@@ -352,6 +360,8 @@ module atom_transfer
                ! Progress bar
                !$omp atomic
                n_cells_done = n_cells_done + 1
+               n_cells_remaining = size(pack(diff_loc, &
+                                    mask=(diff_loc < 0.1 * dpops_max_error)))
                if (real(n_cells_done) > 0.02*ibar*n_cells) then
              	   call progress_bar(ibar)
              	   !$omp atomic
@@ -660,6 +670,7 @@ module atom_transfer
 
             !***********************************************************!
             ! ********** timing and checkpointing **********************!
+            ! count time from the start of the step, at each iteration
             call system_clock(count_end,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpu_time_end)
             if (count_end < count_start) then
@@ -668,24 +679,27 @@ module atom_transfer
                time_nlte=real(count_end - count_start)/real(time_tick)
             endif
             time_nlte_cpu = cpu_time_end - cpu_time_begin
-            time_nlte_loop = time_nlte_loop + time_nlte
-            time_nlte_loop_cpu = time_nlte_loop_cpu + time_nlte_cpu
 
-            !average time of a single iteration for this step !
-            if (n_iter <= n_iter_counted) then
-               time_iteration = time_iteration + time_nlte / real(n_iter_counted)
-            endif
+            ! evaluate the time for an iteration independently of nb_proc
+            ! time of a single iteration for this step
+            call system_clock(cend_iter,count_rate=time_tick,count_max=time_max)
+            call cpu_time(cpuend_iter)
+            time_iteration = real(cend_iter - cstart_iter)/real(time_tick)
+            write(*,'("  --> <time iteration>="(1F12.4)" min (cpu : "(1F8.4)")")') &
+                  mod(time_iteration/60.0,60.0), mod((cpuend_iter-cpustart_iter)/60.0,60.0)
+            time_iter_avg = time_iter_avg + time_iteration
+            ! -> will be averaged with the number of iterations done for this step
 
 
             if (lsafe_stop) then
-               if ((time_nlte + time_iteration >=  safe_stop_time).and.(n_iter >= n_iter_counted)) then
+               if ((time_nlte + time_iteration >=  safe_stop_time)) then
                   lconverged = .true.
                   lprevious_converged = .true.
                   call warning("Time limit would be exceeded, leaving...")
                   write(*,*) " time limit:", mod(safe_stop_time/60.,60.) ," min"
-                  write(*,*) " ~<time> etape:", mod(n_iter * time_iteration/60.,60.), ' <time iter>=', &
-                                                mod(time_iteration/60.,60.)," min"
-                  write(*,*) " ~<time> etape (cpu):", mod(n_iter * time_iteration * nb_proc/60.,60.), " min"
+                  write(*,*) " ~<time> etape:", mod(time_iter_avg/60.,60.), ' <time iter>=', &
+                                                mod(time_iter_avg/real(n_iter)/60.,60.)," min"
+                  write(*,*) " ~<time> etape (cpu):", mod(time_iter_avg * nb_proc/60.,60.), " min"
                   write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
                   lexit_after_nonlte_loop = .true.
                   exit step_loop
@@ -697,12 +711,15 @@ module atom_transfer
          !***********************************************************!
 
          end do !while
+         !combine all steps
+         time_nlte_loop = time_nlte_loop + time_nlte
+         time_nlte_loop_cpu = time_nlte_loop_cpu + time_nlte_cpu
+         !-> for this step
+         time_iter_avg = time_iter_avg / real(n_iter)
 
-         if (n_iter >= n_iter_counted) then
-            write(*,'("<time iteration>="(1ES17.8E3)" min; <time step>="(1ES17.8E3)" min")') mod(time_iteration/60.,60.), &
-                 mod(n_iter * time_iteration/60.,60.)
-            write(*,'(" --> ~time step (cpu)="(1ES17.8E3)" min")') mod(n_iter * time_iteration * nb_proc/60.,60.)
-         endif
+         write(*,'("<time iteration>="(1F8.4)" min; <time step>="(1F8.4)" min")') mod(time_iter_avg/60.,60.), &
+                 mod(n_iter * time_iter_avg/60.,60.)
+         write(*,'(" --> ~time step (cpu)="(1F8.4)" min")') mod(n_iter * time_iter_avg * nb_proc/60.,60.)
 
          if (allocated(xmu)) deallocate(xmux,xmuy,xmu)
          if (allocated(wmu)) deallocate(wmu)
@@ -732,10 +749,10 @@ module atom_transfer
 
       ! --------------------------------    END    ------------------------------------------ !
       lnon_lte_loop = .false.
-      if (mod(time_nlte_loop_cpu/60./60.,60.) > 1.0_dp) then
-         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop_cpu/60./60.,60.), " h"
+      if (mod(time_nlte_loop/60./60.,60.) > 1.0_dp) then
+         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop/60./60.,60.), " h"
       else
-         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop_cpu/60.,60.), " min"
+         write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop/60.,60.), " min"
       endif
       write(*,*) '-------------------------- ------------ ------------------------------ '
 
