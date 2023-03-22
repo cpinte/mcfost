@@ -3552,12 +3552,9 @@ subroutine write_atomic_maps(atom)
    !write maps only for those transitions in i_trans_raytracing and j_trans_raytracing
 
    if (lsepar_ori) then
-      nelements = naxes(1)*naxes(2)
-      naxis = 3
-      if (lmagnetized) then
-         naxes(4) = 3
-         naxis = 4
-      endif
+      naxes(4)=1
+      naxes(5)=1
+      nelements=naxes(1)*naxes(2)*naxes(4)*naxes(5)
       do n=1, atom%nTrans_raytracing
          i = atom%i_Trans_rayTracing(n)
          j = atom%j_Trans_rayTracing(n)
