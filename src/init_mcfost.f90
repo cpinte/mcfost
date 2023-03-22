@@ -802,6 +802,7 @@ subroutine initialisation_mcfost()
         l3D = .true.
         call get_command_argument(i_arg,s)
         density_file = s
+        i_arg = i_arg + 1
      case ("-model_1d")
         i_arg = i_arg + 1
         lmodel_1d = .true.
