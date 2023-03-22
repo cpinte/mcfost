@@ -134,6 +134,7 @@ module elements_type
         !now read temperature grid
         call ftgpvd(unit,1,1,Npf,-999,Tpf,anynull,EOF) !d because double !!
         shape_pf(1) = Npf+1
+        shape_pf(2) = Nstage_max
 
         allocate(data_krz(Npf+1,Nstage_max))
         data_krz = 0.0
@@ -206,14 +207,18 @@ module elements_type
             ! remember: pf(:,1) =  ion potentials
             !           pf(:,2:) = partition functions for all ion pots.
 
-            shape_pf(2) = elems(n)%Nstage
-            call FTG2Dd(unit,1,-999,shape_pf,Npf+1,elems(n)%Nstage,data_krz(:,1:elems(n)%Nstage),anynull,EOF)
+            ! shape_pf(2) = elems(n)%Nstage
+            ! call FTG2Dd(unit,1,-999,shape_pf,Npf+1,elems(n)%Nstage,data_krz(:,1:elems(n)%Nstage),anynull,EOF)
+            call FTG2Dd(unit,1,-999,shape_pf,Npf+1,elems(n)%Nstage,data_krz(:,:),anynull,EOF)
             !do i=1,Nstage
             ! write(*,*) "potential in cm-1 for elem ", elemental_ID(code),":", &
             !            data_krz(1,i)
             !fill ionpot array and pf array for that elem
             ! store value in Joule
-            elems(n)%ionpot(:) = data_krz(1,:) * hp*c_light / (CM_TO_M)
+            elems(n)%ionpot(:) = data_krz(1,1:elems(n)%Nstage) * hp*c_light / (CM_TO_M)
+            ! write(*,*) n, 'ionpot:', elems(n)%ionpot(:) / 1.6e-19
+            ! write(*,*) ""
+            ! if (n==20)stop
             !write(*,*) "chi(i) = ", data_krz(1,i)
             !do not forget to write partition function has (Nstage,Npf)
             !instead of (Npf, Nstage) as read by FTG2D

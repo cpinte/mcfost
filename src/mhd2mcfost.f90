@@ -45,7 +45,7 @@ module mhd2mcfost
         !codes cannot be merged.
         !This is to be able to use read previous tesselation
 
-        call warning("check format of file with lmhd_voronoi!")
+        call warning("Using old (ascii) file format with lmhd_voronoi!")
 
         lmagnetized = .false.
         lfix_star = .true.
