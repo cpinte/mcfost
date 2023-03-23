@@ -406,8 +406,10 @@ module elecdensity
       niter = niter + 1
       if (dne <= MAX_ELECTRON_ERROR) then
          if (ne(k) < nHtot(k)*ne_min_limit) then
-               ne(k) = ne_one
                write(*,*) " (Solve ne) ne < ne_min_limit, setting cell transparent!", k
+               write(*,*) "T=", T(k), ' nHtot=', nHtot(k), " ne=", ne(k)
+               write(*,*) " -> setting ne to ", ne_one, " m^-3"
+               ne(k) = ne_one
                icompute_atomRT(k) = 0
          endif
          exit
