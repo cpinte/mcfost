@@ -102,6 +102,7 @@ module elements_type
 
         integer :: EOF, n, blocksize, unit, i, j, syst_status
         integer :: NAXIST(1), naxis_found, hdutype,  Nread
+        ! integer :: cursor_init
         character(len=256) :: some_comments
         logical :: anynull
         character(len=4) :: charID
@@ -146,13 +147,24 @@ module elements_type
         !read abundances
         write(FormatLine,'("(1"A,I3")")') "A", 10
     
-        open(unit=1, file=TRIM(mcfost_utils)//TRIM(ABUNDANCE_FILE),status="old")
-        call read_line(1, FormatLine, inputline, Nread)
-        read(inputline,*) Nelem
+        open(unit=1, file=TRIM(mcfost_utils)//TRIM(ABUNDANCE_FILE),status="old")!,access="stream",form='formatted')
+        !count number of elemental abundances and rewind to the first element in the file
+        ! inquire(1, pos=cursor_init)
+        Nelem = 0
+        do
+            read(1, *, iostat=eof)
+            if (eof /= 0) exit
+            Nelem = Nelem + 1
+        enddo
+        !rewind:
+        rewind(1)
+        ! read (1,"()", advance='NO', pos=cursor_init)
+
+        ! call read_line(1, FormatLine, inputline, Nread)
+        ! read(inputline,*) Nelem
         write(*,*) " Reading abundances of ", Nelem, " elements..."
         if (Nelem < 3) write(*,*) " WARNING:, not that using Nelem < 3 will cause problem", &
              " in solvene.f90 or other functions assuming abundances of metal of to 26 are known!!"
-
 
         allocate(elems(Nelem))
         totalAbund = 0.0
@@ -161,6 +173,7 @@ module elements_type
     
            call read_line(1, FormatLine, inputline, Nread)
            read(inputline,*) charID, A
+           write(*,*) n, charID, A
     
            elems(n)%weight=atomic_weights(n)
            elems(n)%ID = charID(1:2) !supposed to be lowercases!!!!!
