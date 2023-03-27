@@ -253,6 +253,8 @@ module read1d_models
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
+		write(*,'("-- Solving RTE for "(1F6.2)" % of cells")') &
+			100.0*real(size(pack(icompute_atomRT,mask=icompute_atomRT>0))) / real(n_cells)
 
 		return
 	end subroutine print_info_model
