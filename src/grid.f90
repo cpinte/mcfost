@@ -375,7 +375,7 @@ subroutine nn_ksmooth(arr)
   real(kind=dp), dimension(:), allocatable :: A
   integer :: i,j,k, icell
   integer :: n_az_end, n_az_start
-  real(kind=dp) :: w8, w4, w2, w1, w0, norm
+  real(kind=dp) :: w8, w4, w2, w1, w0, norm, total
 
   w0 = 0.0; w1 = 1.0; w2 = 2.0
   w4 = w2 * w2
@@ -390,6 +390,7 @@ subroutine nn_ksmooth(arr)
   endif
 
 
+  total = sum(arr)
   allocate(A(n_cells))
   A = arr !copy array to temporarily handle the edges (which are not smoothed)!
   if (n_az==1) then
@@ -431,7 +432,7 @@ subroutine nn_ksmooth(arr)
     enddo bz
   enddo
   !copy back and output
-  arr = A
+  arr = A * total / sum(A)
   deallocate(A)
 
   return
