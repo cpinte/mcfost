@@ -371,7 +371,7 @@ subroutine nn_ksmooth(arr)
   ! 	- Voronoi, cylindrical, spherical 2D (l3d = .false.)
   !
   !   - Edges of the grid are not smoothed yet
-  real(kind=dp), intent(inout) :: arr(*)
+  real(kind=dp), intent(inout) :: arr(n_cells)
   real(kind=dp), dimension(:), allocatable :: A
   integer :: i,j,k, icell
   integer :: n_az_end, n_az_start
@@ -391,7 +391,7 @@ subroutine nn_ksmooth(arr)
 
 
   allocate(A(n_cells))
-  A(:) = arr(1:n_cells) !copy array to temporarily handle the edges (which are not smoothed)!
+  A = arr !copy array to temporarily handle the edges (which are not smoothed)!
   if (n_az==1) then
     !2.5d because z < 0 but phi = 0 everywhere
     n_az_end = 1
@@ -430,6 +430,8 @@ subroutine nn_ksmooth(arr)
       enddo
     enddo bz
   enddo
+  !copy back and output
+  arr = A
   deallocate(A)
 
   return
