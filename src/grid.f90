@@ -371,10 +371,10 @@ subroutine nn_ksmooth(arr)
   ! 	- Voronoi, cylindrical, spherical 2D (l3d = .false.)
   !
   !   - Edges of the grid are not smoothed yet
-  real(kind=dp), intent(inout) :: arr(n_cells)
-  real(kind=dp) :: A(n_cells)
+  real(kind=dp), intent(inout) :: arr(*)
+  real(kind=dp), dimension(:), allocatable :: A
   integer :: i,j,k, icell
-  integer :: n_az_end
+  integer :: n_az_end, n_az_start
   real(kind=dp) :: w8, w4, w2, w1, w0, norm
 
   w0 = 0.0; w1 = 1.0; w2 = 2.0
@@ -390,29 +390,30 @@ subroutine nn_ksmooth(arr)
   endif
 
 
-  A = arr !copy array to temporarily handle the edges (which are not smoothed)!
+  allocate(A(n_cells))
+  A(:) = arr(1:n_cells) !copy array to temporarily handle the edges (which are not smoothed)!
   if (n_az==1) then
     !2.5d because z < 0 but phi = 0 everywhere
     n_az_end = 1
+    n_az_start = 1
    else
     !full 3d
     n_az_end = n_az-1
+    n_az_start = min(2,n_az-1)
   endif
   do i=2, n_rad-1
-    do j=j_start+1,nz-1
-      if (j==0) cycle
-      do k=1, n_az_end
+    bz : do j=j_start+1+1,nz-1-1
+      if (j==0) cycle bz
+      do k=n_az_start, n_az_end
         icell = cell_map(i,j,k)
         if (icompute_atomRT(icell) <= 0) cycle
 
-                   !1
-        A(icell) = ( w8 * arr(icell) + &
-         !6
+         A(icell) = ( w8 * arr(icell) + &
+
          w4 * ( arr(cell_map(i,j,k+1)) +  arr(cell_map(i,j+1,k)) + &
             arr(cell_map(i+1,j,k)) + arr(cell_map(i,j,k-1)) + &
             arr(cell_map(i,j-1,k)) + arr(cell_map(i-1,j,k)) ) + &
 
-         !12
          w2 * ( arr(cell_map(i,j+1,k+1)) + arr(cell_map(i,j+1,k-1)) + &
             arr(cell_map(i,j-1,k+1)) + arr(cell_map(i,j-1,k-1)) + &
             arr(cell_map(i+1,j+1,k)) + arr(cell_map(i+1,j-1,k)) + &
@@ -420,16 +421,16 @@ subroutine nn_ksmooth(arr)
             arr(cell_map(i-1,j,k+1)) + arr(cell_map(i-1,j,k-1)) + &
             arr(cell_map(i+1,j-1,k)) + arr(cell_map(i-1,j+1,k)) ) + &
 
-         !8
          w1 * ( arr(cell_map(i+1,j+1,k+1)) + arr(cell_map(i-1,j-1,k-1)) + &
-            arr(cell_map(i+1,j-1,k+1) + arr(cell_map(i+1,j-1,k-1))) + &
+            arr(cell_map(i+1,j-1,k+1)) + arr(cell_map(i+1,j-1,k-1)) + &
             arr(cell_map(i-1,j+1,k-1)) + arr(cell_map(i-1,j+1,k+1)) + &
             arr(cell_map(i-1,j-1,k+1)) + arr(cell_map(i+1,j+1,k-1)) ) ) / norm
 
          ! write(*,*) icell," input=", arr(icell), " smooth:", A(icell)
       enddo
-    enddo
+    enddo bz
   enddo
+  deallocate(A)
 
   return
 
