@@ -84,7 +84,7 @@ module parametres
   logical :: lmhd_voronoi, llimit_mem
 
   ! Decomposition image
-  logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet
+  logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet, lsepar_ori
   integer :: N_type_flux
   ! les flux sont I, (Q,U,V), (star, scatt, disk th, disk th scatt.)
 

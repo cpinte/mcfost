@@ -102,6 +102,7 @@ module elements_type
 
         integer :: EOF, n, blocksize, unit, i, j, syst_status
         integer :: NAXIST(1), naxis_found, hdutype,  Nread
+        ! integer :: cursor_init
         character(len=256) :: some_comments
         logical :: anynull
         character(len=4) :: charID
@@ -134,6 +135,7 @@ module elements_type
         !now read temperature grid
         call ftgpvd(unit,1,1,Npf,-999,Tpf,anynull,EOF) !d because double !!
         shape_pf(1) = Npf+1
+        shape_pf(2) = Nstage_max
 
         allocate(data_krz(Npf+1,Nstage_max))
         data_krz = 0.0
@@ -145,13 +147,24 @@ module elements_type
         !read abundances
         write(FormatLine,'("(1"A,I3")")') "A", 10
     
-        open(unit=1, file=TRIM(mcfost_utils)//TRIM(ABUNDANCE_FILE),status="old")
-        call read_line(1, FormatLine, inputline, Nread)
-        read(inputline,*) Nelem
+        open(unit=1, file=TRIM(mcfost_utils)//TRIM(ABUNDANCE_FILE),status="old")!,access="stream",form='formatted')
+        !count number of elemental abundances and rewind to the first element in the file
+        ! inquire(1, pos=cursor_init)
+        Nelem = 0
+        do
+            read(1, *, iostat=eof)
+            if (eof /= 0) exit
+            Nelem = Nelem + 1
+        enddo
+        !rewind:
+        rewind(1)
+        ! read (1,"()", advance='NO', pos=cursor_init)
+
+        ! call read_line(1, FormatLine, inputline, Nread)
+        ! read(inputline,*) Nelem
         write(*,*) " Reading abundances of ", Nelem, " elements..."
         if (Nelem < 3) write(*,*) " WARNING:, not that using Nelem < 3 will cause problem", &
              " in solvene.f90 or other functions assuming abundances of metal of to 26 are known!!"
-
 
         allocate(elems(Nelem))
         totalAbund = 0.0
@@ -160,6 +173,7 @@ module elements_type
     
            call read_line(1, FormatLine, inputline, Nread)
            read(inputline,*) charID, A
+           write(*,*) n, charID, A
     
            elems(n)%weight=atomic_weights(n)
            elems(n)%ID = charID(1:2) !supposed to be lowercases!!!!!
@@ -206,14 +220,18 @@ module elements_type
             ! remember: pf(:,1) =  ion potentials
             !           pf(:,2:) = partition functions for all ion pots.
 
-            shape_pf(2) = elems(n)%Nstage
-            call FTG2Dd(unit,1,-999,shape_pf,Npf+1,elems(n)%Nstage,data_krz(:,1:elems(n)%Nstage),anynull,EOF)
+            ! shape_pf(2) = elems(n)%Nstage
+            ! call FTG2Dd(unit,1,-999,shape_pf,Npf+1,elems(n)%Nstage,data_krz(:,1:elems(n)%Nstage),anynull,EOF)
+            call FTG2Dd(unit,1,-999,shape_pf,Npf+1,elems(n)%Nstage,data_krz(:,:),anynull,EOF)
             !do i=1,Nstage
             ! write(*,*) "potential in cm-1 for elem ", elemental_ID(code),":", &
             !            data_krz(1,i)
             !fill ionpot array and pf array for that elem
             ! store value in Joule
-            elems(n)%ionpot(:) = data_krz(1,:) * hp*c_light / (CM_TO_M)
+            elems(n)%ionpot(:) = data_krz(1,1:elems(n)%Nstage) * hp*c_light / (CM_TO_M)
+            ! write(*,*) n, 'ionpot:', elems(n)%ionpot(:) / 1.6e-19
+            ! write(*,*) ""
+            ! if (n==20)stop
             !write(*,*) "chi(i) = ", data_krz(1,i)
             !do not forget to write partition function has (Nstage,Npf)
             !instead of (Npf, Nstage) as read by FTG2D

@@ -15,7 +15,8 @@ contains
 
     integer,               intent(in) :: iunit, n_files
     character(len=*),dimension(n_files), intent(in) :: filenames
-    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h, vx,vy,vz, rhogas,massgas,SPH_grainsizes,T_gas
+    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,vx,vy,vz
+    real(dp), intent(out), dimension(:),   allocatable :: rhogas,massgas,SPH_grainsizes,T_gas
     integer,  intent(out), dimension(:),   allocatable :: particle_id
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
     logical, dimension(:), allocatable, intent(out) :: mask
@@ -29,7 +30,7 @@ contains
     integer :: nblocks,narraylengths,nblockarrays,number,idust,ieos
     character(len=lentag) :: tag
     character(len=lenid)  :: fileid
-    integer :: np,ntypes,nptmass,ipos,ngrains,dustfluidtype,ndudt,nptmass0,nptmass_j,nptmass_found
+    integer :: np,ntypes,nptmass,ngrains,dustfluidtype,ndudt,nptmass0,nptmass_j,nptmass_found
     integer, parameter :: maxtypes = 6
     integer, parameter :: maxfiles = 3
     integer, parameter :: maxinblock = 128
@@ -37,13 +38,14 @@ contains
     integer, allocatable, dimension(:) :: npartoftype
     real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
     real(dp) :: hfact,umass,utime,ulength,gmw,x2,mass_per_H
-    integer(kind=1), allocatable, dimension(:) :: itype, ifiles
+    integer(kind=1), allocatable, dimension(:) :: itype,ifiles
     real(4),  allocatable, dimension(:) :: tmp
-    real(dp), allocatable, dimension(:) :: grainsize, graindens
-    real(dp), allocatable, dimension(:) :: dudt, tmp_dp,gastemperature
+    real(dp), allocatable, dimension(:) :: grainsize,graindens
+    real(dp), allocatable, dimension(:) :: dudt,tmp_dp,gastemperature
     real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu,nucleation
     type(dump_h) :: hdr
-    logical :: got_h,got_dustfrac,got_itype,tagged,matched,got_temperature,got_u,lpotential,do_nucleation
+    logical :: got_h,got_dustfrac,got_itype,tagged,matched
+    logical :: got_temperature,got_u,lpotential,do_nucleation
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
     ! We first read the number of particules in each phantom file
@@ -862,7 +864,7 @@ contains
     SPH_grainsizes(:) = grainsize(:) * ulength_scaled * cm_to_mum
     ! graindens * udens is in g/cm3
 
-    if (lemission_mol) then
+    if (lemission_mol .or. lemission_atom) then
        allocate(vx(n_SPH),vy(n_SPH),vz(n_SPH),stat=alloc_status)
        if (alloc_status /=0) then
           write(*,*) "Allocation error velocities in phanton_2_mcfost"
@@ -893,7 +895,7 @@ contains
              y(j) = yi * ulength_au
              z(j) = zi * ulength_au
              h(j) = hi * ulength_au
-             if (lemission_mol) then
+             if (lemission_mol .or. lemission_atom) then
                 vx(j) = vxi * uvelocity
                 vy(j) = vyi * uvelocity
                 vz(j) = vzi * uvelocity
@@ -912,7 +914,7 @@ contains
              y(j) = yi * ulength_au
              z(j) = zi * ulength_au
              h(j) = hi * ulength_au
-             if (lemission_mol) then
+             if (lemission_mol .or. lemission_atom) then
                 vx(j) = vxi * uvelocity
                 vy(j) = vyi * uvelocity
                 vz(j) = vzi * uvelocity
@@ -1092,15 +1094,17 @@ contains
        enddo
        deallocate(etoile_old)
 
-       etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
-       etoile(:)%y = xyzmh_ptmass(2,:) * ulength_au
-       etoile(:)%z = xyzmh_ptmass(3,:) * ulength_au
+       if (n_etoiles > 0) then
+          etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
+          etoile(:)%y = xyzmh_ptmass(2,:) * ulength_au
+          etoile(:)%z = xyzmh_ptmass(3,:) * ulength_au
 
-       etoile(:)%vx = vxyz_ptmass(1,:) * uvelocity
-       etoile(:)%vy = vxyz_ptmass(2,:) * uvelocity
-       etoile(:)%vz = vxyz_ptmass(3,:) * uvelocity
+          etoile(:)%vx = vxyz_ptmass(1,:) * uvelocity
+          etoile(:)%vy = vxyz_ptmass(2,:) * uvelocity
+          etoile(:)%vz = vxyz_ptmass(3,:) * uvelocity
 
-       etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
+          etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
+       endif
 
        do i=1, n_etoiles
           if (.not.etoile(i)%force_Mdot) then

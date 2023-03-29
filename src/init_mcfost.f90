@@ -74,6 +74,7 @@ subroutine set_default_variables()
   healpix_lmin = 0
   healpix_lmax = 7 !6 !5
   ! Atomic lines Radiative Transfer (AL-RT)
+  lsepar_ori = .false.
   lsafe_stop = .false.
   safe_stop_time = 155520.0!1.8days in seconds, default
   lemission_atom = .false.
@@ -459,6 +460,7 @@ subroutine initialisation_mcfost()
         if (ios/=0) call error("wavelength needed for -img. Error #2")
         i_arg = i_arg+1
      case("-img_offset")
+       call warning("IMAGE OFFSET NOT YET")
         i_arg = i_arg+1
         if (i_arg > nbr_arg) call error("(x0, y0, z0) needed for image centre offset. Error #1)")
         call get_command_argument(i_arg,s)
@@ -470,6 +472,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*,iostat=ios) image_offset_centre(3)
         i_arg = i_arg+1
+     case("-split_image")
+         lsepar_ori = .true.
+         i_arg = i_arg + 1            
      case("-op")
         limg=.true.
         lopacite_only=.true.
@@ -802,6 +807,7 @@ subroutine initialisation_mcfost()
         l3D = .true.
         call get_command_argument(i_arg,s)
         density_file = s
+        i_arg = i_arg + 1
      case ("-model_1d")
         i_arg = i_arg + 1
         lmodel_1d = .true.
@@ -1852,6 +1858,7 @@ subroutine display_help()
   write(*,*) "        : -turn-off_Lacc : ignore accretion on sink particles"
   write(*,*) "        : -turn-off_dust_subl : ignore dust sublimation"
   write(*,*) "        : -img_offset <x0> <y0> <z0> : Centres the observer's los in (x0,y0,z0)"
+  write(*,*) "        : -split_image : Split a fits image in a fits file for each orienation (incl,azim)"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"

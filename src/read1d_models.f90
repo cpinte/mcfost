@@ -227,9 +227,12 @@ module read1d_models
 		v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
 
 		write(*,*) "Maximum/minimum velocities in the model (km/s):"
-		write(*,*) " V1 = ", 1e-3 * maxval(abs(vfield3d(:,1))), 1d-3*minval(abs(vfield3d(:,1)),mask=icompute_atomRT>0)
-		write(*,*) " V2 = ",  1d-3 * maxval(abs(vfield3d(:,2))), 1d-3*minval(abs(vfield3d(:,2)),mask=icompute_atomRT>0)
-		write(*,*) " V3 = ",  1d-3 * maxval(abs(vfield3d(:,3))), 1d-3*minval(abs(vfield3d(:,3)),mask=icompute_atomRT>0)
+		write(*,*) " Vfield(1) = ", &
+			1e-3 * maxval(abs(vfield3d(:,1))), 1d-3*minval(abs(vfield3d(:,1)),mask=icompute_atomRT>0)
+		write(*,*) " Vfield(2) = ",  &
+			1d-3 * maxval(abs(vfield3d(:,2))), 1d-3*minval(abs(vfield3d(:,2)),mask=icompute_atomRT>0)
+		write(*,*) " Vfield(3) = ",  &
+			1d-3 * maxval(abs(vfield3d(:,3))), 1d-3*minval(abs(vfield3d(:,3)),mask=icompute_atomRT>0)
 
 
 		write(*,*) "Typical line extent due to V fields (km/s):"
@@ -246,6 +249,12 @@ module read1d_models
 			write(*,*) "Maximum/minimum ne density in the model (m^-3):"
 			write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
 		endif
+
+        write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
+        write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
+        write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
+		write(*,'("-- Solving RTE for "(1F6.2)" % of cells")') &
+			100.0*real(size(pack(icompute_atomRT,mask=icompute_atomRT>0))) / real(n_cells)
 
 		return
 	end subroutine print_info_model
