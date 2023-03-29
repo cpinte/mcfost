@@ -39,6 +39,9 @@ module elecdensity
    integer, parameter :: N_MAX_ELEMENT=26!stops at Iron.
    real(kind=dp) :: min_f_HII, max_f_HII
    character(len=10) :: ne_filename = "ne.fits.gz"
+   real(kind=dp), parameter :: ne_min_limit = 1d-10 ! ne_min_limit * nHtot = electron per cubic meters.
+   !if ne is below ne_min_limit, we set it to 1 electron per cc (ne_one) !
+   real(kind=dp), parameter :: ne_one = 1.0_dp !one electron per cubic meters.
 
    !Introducing a lock for ne iterations with icompute_atomRT == 2
    !the transfer (and opacity) is solved for icompute_atomRT > 0
@@ -394,16 +397,19 @@ module elecdensity
       if (is_nan_infinity(ne(k))>0) then
          write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, " sum=", sum
          call error("electron density is nan or inf!")
-      else if (ne(k) < 0.0) then
-         write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, sum
+      else if (ne(k) <= 0.0) then
+         write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), " ne0=", ne_init
+         write(*,*) "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, "sum=", sum
          call error("Negative electron density!")
       endif
 
       niter = niter + 1
       if (dne <= MAX_ELECTRON_ERROR) then
-         if (ne(k) < 1d-100) then
-               ne(k) = 0.0_dp !or ne(k) = ne_min_limit
+         if (ne(k) < nHtot(k)*ne_min_limit) then
                write(*,*) " (Solve ne) ne < ne_min_limit, setting cell transparent!", k
+               write(*,*) "T=", T(k), ' nHtot=', nHtot(k), " ne=", ne(k)
+               write(*,*) " -> setting ne to ", ne_one, " m^-3"
+               ne(k) = ne_one
                icompute_atomRT(k) = 0
          endif
          exit
@@ -414,7 +420,7 @@ module elecdensity
                     "max(err)=", MAX_ELECTRON_ERROR, "ne=",ne(k), "T=",T(k)," nH=",nHtot(k)
                !set articially ne to some value ?
                if (dne >= 1.0) then
-                  ne(k) = ne_init !already tested if < ne_min_limit
+                  ne(k) = ne_init
                   write(*,*) " -> Setting ne to initial variable "
                endif
          end if
@@ -496,9 +502,7 @@ module elecdensity
        !compute that value in any case of the starting solution
        !Metal
        Zm = 11
-
        Uk = get_pf(Elems(ZM), 1, T(k))
-
        Ukp1 = get_pf(Elems(ZM), 2, T(k))
        ne_oldM = ne_Metal(T(k),nHtot(k), Uk, Ukp1, elems(ZM)%ionpot(1),elems(ZM)%Abund)
 
@@ -523,10 +527,7 @@ module elecdensity
           !if Abund << 1. and chiM << chiH then
           ! ne (H+M) = ne(H) + ne(M)
           ne0 = ne0 + ne_oldM
-          !to avoid having very low values, between say tiny_dp and 1e-100
-          !just set to 0 if < 0: crude ?
-          ! 			if (ne_oldM < ne_min_limit) ne_oldM = 0d0
-          if (ne0 < 1d-100) ne0 = 0.0_dp
+          if (ne0 < nHtot(k)*ne_min_limit) ne0 = ne_one
 
        end if
 
@@ -560,10 +561,11 @@ module elecdensity
        write(*,*) " ---------------------------------------------------- "
        write(*,'("ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
        write(*,'("   >>>  Diff to previous solution="(1ES13.5E3)" at cell "(1I7))') epsilon, ik_max
-      !  write(*,'("   >>>  Diff to previous solution="(1ES17.8E3)" at cell "(1I7))') epsilon, ik_max
        write(*,*) " T = ", T(ik_max)," nH = ", nHtot(ik_max)
        write(*,*) " "
        write(*,'("Ionisation fraction of HII "(1ES13.5E3, 1ES13.5E3))') max_f_HII, min_f_HII
+      !  write(*,*) nHtot(locate(ne/(1d-50+nHtot),maxval(ne/(1d-50+nHtot))))
+       write(*,'("ne/nH "(1ES13.5E3, 1ES13.5E3))') maxval(ne/nHtot,mask=nHtot>0), minval(ne/nHtot,mask=nHtot>0)
        ! 			call show_electron_given_per_elem(0, 0, max_fjk)
        write(*,*) " ---------------------------------------------------- "
     endif

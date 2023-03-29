@@ -76,6 +76,8 @@ module molecular_emission
      character(len=512) :: abundance_file, filename
      character(len=32) :: name
      integer, dimension(100) :: indice_Trans_rayTracing
+
+     integer ::  iTrans_min, iTrans_max, level_min, level_max ! transitions and levels used in practice
   end type molecule
 
   type(molecule), dimension(:), allocatable :: mol
@@ -312,7 +314,7 @@ subroutine opacite_mol_loc(icell,imol)
   integer :: iTrans
   real(kind=dp) :: nu, nl, kap, eps
 
-  do iTrans=1,nTrans_tot
+  do iTrans=mol(imol)%iTrans_min,mol(imol)%iTrans_max
      nu = tab_nLevel(icell,iTransUpper(iTrans))
      nl = tab_nLevel(icell,iTransLower(iTrans))
 
@@ -366,7 +368,7 @@ end subroutine opacite_mol_loc
 
 !***********************************************************
 
-subroutine equilibre_LTE_mol()
+subroutine equilibre_LTE_mol(imol)
   ! Calcul les niveaux d'une molecule dans le cas LTE
   ! Pour initialisation
   ! Calcule au passage le nombre total de mol dans chaque cellule
@@ -376,18 +378,26 @@ subroutine equilibre_LTE_mol()
 
   implicit none
 
-  integer :: l, icell
+  integer, intent(in) :: imol
+
+  integer :: l, icell, lmin, lmax
+
+  real, dimension(nLevels) :: pop_levels ! local population levels to a cell
+  real(kind=dp) :: norm
+
+  lmin=mol(imol)%level_min
+  lmax=mol(imol)%level_max
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(l,icell) &
-  !$omp shared(n_cells,nLevels,tab_nLevel,poids_stat_g,Transfreq,Tcin,densite_gaz,tab_abundance)
+  !$omp private(l,icell,pop_levels,norm) &
+  !$omp shared(lmin,lmax,n_cells,nLevels,tab_nLevel,poids_stat_g,Transfreq,Tcin,densite_gaz,tab_abundance)
   !$omp do
   do icell=1, n_cells
-     tab_nLevel(icell,1) = 1.0
+     pop_levels(1) = 1.0
      do l=2, nLevels
         ! Utilisation de la temperature de la poussiere comme temperature LTE
-        tab_nLevel(icell,l) = tab_nLevel(icell,l-1) * poids_stat_g(l)/poids_stat_g(l-1) * &
+        pop_levels(l) = pop_levels(l-1) * poids_stat_g(l)/poids_stat_g(l-1) * &
              exp(- hp * Transfreq(l-1)/ (kb*Tcin(icell)))
      enddo
      ! Teste OK : (Nu*Bul) / (Nl*Blu) = exp(-hnu/kT)
@@ -395,7 +405,13 @@ subroutine equilibre_LTE_mol()
      ! read(*,*)
 
      ! Normalisation
-     tab_nLevel(icell,:) = densite_gaz(icell) * tab_abundance(icell) * tab_nLevel(icell,:)  / sum(tab_nLevel(icell,:))
+     norm = (densite_gaz(icell) * tab_abundance(icell)  / sum(pop_levels(:)))
+     pop_levels(:) = pop_levels(:) * norm
+
+     ! Saving a fraction of the array for the transition we consider
+     do l=lmin,lmax
+        tab_nLevel(icell,l) = pop_levels(l)
+     enddo
   enddo!icell
   !$omp end do
   !$omp  end parallel
@@ -658,8 +674,6 @@ function v_proj(icell,x,y,z,u,v,w) !
   ! Vitesse projete en 1 point d'une cellule
   ! C. Pinte
   ! 13/07/07
-  ! Added projection for cylindrical and spherical velocity components
-  ! 28/01/2022; B. Tessore
 
   implicit none
 
@@ -748,49 +762,6 @@ function v_proj(icell,x,y,z,u,v,w) !
            else
               v_proj = 0.0_dp
            endif
-      !   else if (vfied) then!lmagnetoaccr
-      !      !here vfield_x, vfield_y and vfield_z are R, z, phi
-      !      r = sqrt(x*x+y*y)
-      !      vx = 0_dp; vy = 0_dp; vz = 0_dp
-      !      vz = vfield_y(icell)
-      !      !only if z strictly positive in the model (2D)
-      !      if ( (.not.l3D) .and. (z < 0_dp) ) vz = -vz
-      !      !!vz = v_z(icell) * sign(1.0_dp,z), in 3D models, this change of sign is taken care (??)
-
-      !      if (r > tiny_dp) then !rotational + wind, should work also with spherical wind of stars
-      !         norme = 1.0_dp/r
-
-      !         vx = vfield_x(icell) * x * norme - vfield_z(icell) * y * norme
-      !         vy = vfield_x(icell) * y * norme + vfield_z(icell) * x * norme
-
-      !         v_proj = vx*u + vy*v + vz*w
-      !     else
-      !     	  v_proj = vz*w!0.0_dp
-      !     endif
-		! else if (lvfield_sphere_coord) then
-      !      !here vfield_x, vfield_y and vfield_z are r, theta, phi
-		! 	r = sqrt(x*x + y*y + z*z); r2 = sqrt(x*x + y*y) !Rcyl
-		! 	vx = 0.; vy = 0.; vz = 0.;
-
-		! 	sign1 = 1_dp
-		! 	!because theta only from 0 to pi/2 if 2D. But velocity is negative in z < 0
-		!     if ( (.not.l3D) .and. (z < 0_dp) ) sign1 = -1_dp
-
-		! 	if (r2 > tiny_dp) then
-		! 		norme2 = 1.0_dp / r2
-		! 	else
-		! 		norme2 = 0.0_dp
-		! 	endif
-
-		! 	if (r > tiny_dp) then
-		! 		norme = 1.0_dp / r
-		! 		vx = vfield_x(icell) * x * norme - y * norme2 * vfield_z(icell) + norme2 * ( z * norme * x * vfield_y(icell) )
-		! 		vy = vfield_x(icell) * y * norme + x * norme2 * vfield_z(icell) + norme2 * ( z * norme * y * vfield_y(icell) )
-		! 		vz = vfield_x(icell) * z * norme - sign1 * r2 / r * vfield_y(icell)
-		! 		v_proj = vx * u + vy * v + vz * w
-		! 	else
-		! 		v_proj = 0.0_dp
-		! 	endif
         else
            call error("velocity field not defined")
         endif
@@ -869,6 +840,10 @@ subroutine freeze_out()
 
   write (*,*) "Freezing-out of molecules"
 
+  !$omp parallel default(none) &
+  !$omp private(icell,CD,ldeplete) &
+  !$omp shared(tab_abundance,freeze_out_depletion,T_freeze_out,lphoto_desorption,n_cells,Tdust)
+  !$omp do
   do icell=1,n_cells
      ldeplete = .false.
      if (Tdust(icell) < T_freeze_out)  then
@@ -885,6 +860,8 @@ subroutine freeze_out()
         if (ldeplete) tab_abundance(icell) = tab_abundance(icell) * freeze_out_depletion
      endif
   enddo
+  !$omp end do
+  !$omp end parallel
 
   return
 
@@ -908,12 +885,18 @@ subroutine photo_dissociation()
 
   write (*,*) "Photo-dissociating molecules ..."!, threshold_CD
 
+  !$omp parallel default(none) &
+  !$omp private(icell,CD) &
+  !$omp shared(tab_abundance,n_cells)
+  !$omp do
   do icell=1, n_cells
      CD = compute_vertical_CD(icell)
      if (CD < threshold_CD) then
         tab_abundance(icell) = tab_abundance(icell) * photo_dissocation_depletion
      endif
   enddo ! icell
+  !$omp end do
+  !$omp end parallel
 
   write(*,*) "Done"
 

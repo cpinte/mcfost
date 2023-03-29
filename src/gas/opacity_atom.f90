@@ -6,6 +6,7 @@ module Opacity_atom
    use parametres
    use broad, Only               : line_damping
    use voigts, only              : voigt
+   use occupation_probability, only : f_dissolve
    use gas_contopac, only        : H_bf_Xsection, alloc_gas_contopac, background_continua_lambda, &
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
@@ -27,11 +28,42 @@ module Opacity_atom
 
    contains
 
+   function gmax_line(line)
+   !compute the damping max of a given line line.
+   !assumes that eletronic densities, populations and thermodynamics
+   !quantities are set
+      type (AtomicLine), intent(in) :: line
+      integer :: i
+      real(kind=dp) :: gmax_line
+   !could be para
+      gmax_line = 0.0_dp ! damping * vth
+      do i=1,n_cells
+         if (icompute_atomRT(i)>0.0) then
+            gmax_line = max(gmax_line,line_damping(i,line)*&
+                        vbroad(T(i),line%atom%weight, vturb(i)))
+         endif
+      enddo
+      return
+   end function gmax_line
+
+   subroutine set_max_damping()
+      integer :: nat, kr
+      do nat=1, n_atoms
+         do kr=1,atoms(nat)%p%nline
+            if (.not.atoms(nat)%p%lines(kr)%lcontrib) cycle
+            if (atoms(nat)%p%lines(kr)%Voigt) then
+               atoms(nat)%p%lines(kr)%damp_max = gmax_line(atoms(nat)%p%lines(kr))
+            endif
+         enddo
+      enddo
+      return
+   end subroutine set_max_damping
+
    !could be parralel
    subroutine alloc_atom_opac(N,x)
       integer, intent(in) :: N
       real(kind=dp), dimension(N) :: x
-      integer :: nat, kr, icell, nb, nr, nl_gauss
+      integer :: nat, kr, icell, nb, nr
       type(AtomType), pointer :: atm
       real(kind=dp) :: vth
       integer(kind=8) :: mem_loc, mem_contopac
@@ -48,7 +80,7 @@ module Opacity_atom
                if (.not.atm%lines(kr)%lcontrib) cycle
                if (atm%lines(kr)%Voigt) then
                   allocate(atm%lines(kr)%v(atm%lines(kr)%Nlambda),atm%lines(kr)%phi(atm%lines(kr)%Nlambda,n_cells))
-                  allocate(atm%lines(kr)%a(n_cells))
+                  allocate(atm%lines(kr)%a(n_cells)); atm%lines(kr)%a(:) = 0.0_dp
                   mem_loc = mem_loc + sizeof(atm%lines(kr)%a)+sizeof(atm%lines(kr)%phi)+sizeof(atm%lines(kr)%v)
                endif
          enddo
@@ -64,9 +96,11 @@ module Opacity_atom
                   nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
                   atm%lines(kr)%a(icell) = line_damping(icell,atm%lines(kr))
 
-                  atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth !unitless
-                  atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, atm%lines(kr)%a(icell), atm%lines(kr)%v(:)) &
-                       / (vth * sqrtpi)
+                  atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth
+                  atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, &
+                                                   atm%lines(kr)%a(icell), &
+                                                   atm%lines(kr)%v(:)) / (vth * sqrtpi)
+               ! else !gaussian profile, computed locally
                endif
             enddo
          enddo
@@ -240,16 +274,16 @@ module Opacity_atom
       integer, intent(in) :: icell, N
       real(kind=dp), intent(in), dimension(N) :: lambda
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
-      integer :: nat, Nred, Nblue, kr, i, j, idelem
+      integer :: nat, Nred, Nblue, kr, i, j
       type(AtomType), pointer :: atom
-      real(kind=dp) :: wi, wj, chi_ion, Diss, nn, gij, ni_on_nj_star
+      real(kind=dp) :: gij, ni_on_nj_star
       real(kind=dp), dimension(N) :: ehnukt
+      ! real(kind=dp), dimension(Nlambda_max_cont) :: dissolve
 
       ehnukt(:) = exp(hnu_k/T(icell))!exphckT(icell)**(lambda_base/lambda(:))
 
       atom_loop : do nat = 1, N_atoms
          atom => Atoms(nat)%p
-         idelem = atom%periodic_table
 
          tr_loop : do kr = 1,atom%Ncont
 
@@ -266,12 +300,15 @@ module Opacity_atom
                cycle tr_loop
             endif
 
+            ! 1 if .not. ldissolve (lambdamax==lambda0)
+            ! dissolve(1:Nred-Nblue+1) = f_dissolve(T(icell), ne(icell), hydrogen%n(1,icell), atom%continua(kr), Nred-Nblue+1, lambda(Nblue:Nred))
+
             !should be the same as directly exp(-hc_kT/lambda)
             chi(Nblue:Nred) = chi(Nblue:Nred) + atom%continua(kr)%alpha(:) * (atom%n(i,icell) - &
-               ni_on_nj_star * ehnukt(Nblue:Nred) * atom%n(j,icell))
+               ni_on_nj_star * ehnukt(Nblue:Nred) * atom%n(j,icell))! * dissolve(:)
 
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + atom%n(j,icell) * atom%continua(kr)%alpha(:) * atom%continua(kr)%twohnu3_c2(:) *&
-               ni_on_nj_star * ehnukt(Nblue:Nred)
+               ni_on_nj_star * ehnukt(Nblue:Nred)! * dissolve(:)
 
          end do tr_loop
 
@@ -356,6 +393,32 @@ module Opacity_atom
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Aji * phi0(1:Nlam) * atom%n(j,icell)
 
+! !-> check Gaussian profile  and norm.
+! ! -> check Voigt profile, for Lyman alpha mainly.
+! ! -> write a voigt profile (kr) and a gaussian one (the same for all in principle!)
+!             if (kr==1 .and. atom%id=="H") then
+!                !-> try large damped lines to test the maximum extension of the line.
+!                ! phi0(1:Nlam) = Voigt(Nlam, 1d4, (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))
+!                !-> try pure gauss with the same grid as voigt (for testing low damping)
+!                ! phi0(1:Nlam) = exp(-( (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))**2)
+!                open(1,file="prof.txt",status="unknown")
+!                write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
+!                write(1,*) atom%lines(kr)%a(icell), maxval(atom%lines(kr)%a), minval(atom%lines(kr)%a,mask=nhtot>0)
+!                do j=1,Nlam
+!                   write(1,*) lambda(Nblue+j-1),phi0(j)
+!                enddo
+!                close(1)
+!             endif
+!             if (.not.atom%lines(kr)%voigt .and. atom%id=="H") then
+!                !maybe the similar grid for voigt is nice too ? core + wings ?
+!                open(1,file="profg.txt",status="unknown")
+!                write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
+!                do j=1,Nlam
+!                   write(1,*) lambda(Nblue+j-1),phi0(j)
+!                enddo
+!                close(1)
+!                stop
+!             endif
 
             if ((iterate.and.atom%active)) then
                phi_loc(1:Nlam,atom%ij_to_trans(i,j),atom%activeindex,iray,id) = phi0(1:Nlam)
@@ -377,10 +440,8 @@ module Opacity_atom
    end subroutine opacity_atom_bb_loc
 
 
-   subroutine xcoupling(id, icell, iray, lupdate_psi)
-   !test: update_psi in case of local subiterations.
+   subroutine xcoupling(id, icell, iray)
       integer, intent(in) :: id, icell, iray
-      logical, intent(in) :: lupdate_psi
       integer :: nact, j, i, kr, Nb, Nr, la, Nl
       integer :: i0, j0, la0, N1, N2
       type (AtomType), pointer :: aatom
@@ -393,15 +454,6 @@ module Opacity_atom
       chi_up(:,:,:,id)   = 0.0_dp
 
       eta_atoms(:,:,id) = 0.0_dp
-      !-> can do better, not optimized
-      if (lupdate_psi) then
-         chi_tot(:) = 1d-50
-         ! call calc_contopac_loc(icell)
-         ! chi_tot(:) = linear_1D_sorted(n_lambda_cont,tab_lambda_cont,chi_cont(:,icell),n_lambda,tab_lambda_nm)
-         ! chi_tot(1) = chi_cont(1,icell)
-         ! chi_tot(n_lambda) = chi_cont(n_lambda_cont,icell)
-         ! call contopac_atom_loc(icell,n_lambda,tab_lambda_nm,chi_tot,eta_tot)
-      endif
 
       aatom_loop : do nact=1, Nactiveatoms
 
@@ -475,8 +527,8 @@ module Opacity_atom
              else
                 wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
              endif
-             chi_down(la,:,:,id) =  chi_down(la,:,:,id)  * wl
-             chi_up(la,:,:,id) = chi_up(la,:,:,id) * wl
+             chi_down(la,:,nact,id) =  chi_down(la,:,nact,id)  * wl
+             chi_up(la,:,nact,id) = chi_up(la,:,nact,id) * wl
          enddo
 
          line_loop : do kr = 1, aatom%Nline
@@ -522,19 +574,11 @@ module Opacity_atom
 
 
             enddo freq2_loop
-            if (lupdate_psi) then
-               chi_tot(Nb:Nr) = chi_tot(Nb:Nr) + hc_fourPI * aatom%lines(kr)%Bij * &
-                    (aatom%n(i,icell) - aatom%lines(kr)%gij*aatom%n(j,icell)) * phi0(1:Nl)
-            endif
 
          enddo line_loop
 
          aatom => null()
       enddo aatom_loop
-
-      if (lupdate_psi) then
-         psi(:,1,id) = (1.0_dp - exp(-ds(iray,id)*chi_tot))/chi_tot
-      endif
 
     return
    end subroutine xcoupling
@@ -677,7 +721,6 @@ module Opacity_atom
          if (lnon_lte_loop) omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(iray,id)
       endif
 
-!is it really necessary to invole 1/vth for the interpolation ? can do in velocity direclty
       if (line%voigt) then
          u1(:) = u0(:) - omegav(1)/vth
          uloc(:) = line%v(:) / vth
@@ -703,19 +746,20 @@ module Opacity_atom
    end function profile_art_i
 
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
-      !not para to be able to write while computing!
       integer, intent(in) :: Nlambda
       real(kind=dp), intent(in) :: lambda(Nlambda)
       integer :: unit, unit2, status = 0
       integer :: alloc_status, id, icell, m, Nrec
       real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
-      character(len=11) :: filename_chi="chi_map.bin"
-      character(len=50) :: filename_eta="eta_map.bin"
-      character(len=18) :: filename_rho="magnetoopt_map.bin"
+      real(kind=dp), allocatable, dimension(:,:,:) :: chic_tmp, etac_tmp
+      character(len=11) :: filename_chi="chi.bin"
+      character(len=50) :: filename_eta="eta.bin"
+      character(len=18) :: filename_rho="magnetoopt.bin"
+      real(kind=dp) :: zero_dp, u, v, w
 
-      call warning("opacity emissivity map bug here because of molecular emission and r=0!")
-
-      write(*,*) " Writing emissivity and opacity map (rest frame) ..."
+      zero_dp = 0.0_dp
+      u = zero_dp; v = zero_dp; w = zero_dp
+      write(*,*) " Writing emissivity and opacity (rest frame)..."
       ! if (lmagnetized) then
       !    Nrec = 4
       !    allocate(rho_tmp(Nlambda,n_cells,Nrec-1),stat=alloc_status)
@@ -728,6 +772,10 @@ module Opacity_atom
       if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
       allocate(eta_tmp(Nlambda, n_cells, Nrec),stat=alloc_status)
       if (alloc_status /= 0) call error("Cannot allocate eta_tmp !")
+      allocate(chic_tmp(Nlambda, n_cells, 1),stat=alloc_status)
+      if (alloc_status /= 0) call error("Cannot allocate chic_tmp !")
+      allocate(etac_tmp(Nlambda, n_cells, 1),stat=alloc_status)
+      if (alloc_status /= 0) call error("Cannot allocate etac_tmp !")
 
 
       call ftgiou(unit,status)
@@ -739,8 +787,10 @@ module Opacity_atom
          !$ id = omp_get_thread_num() + 1
          if (icompute_atomRT(icell) > 0) then
             call contopac_atom_loc(icell,Nlambda,lambda,chi_tmp(:,icell,1),eta_tmp(:,icell,1))
-            call opacity_atom_bb_loc(id,icell,1,0d0,0d0,0d0,0d0,0d0,0d0,0d0,0d0,0d0,&
-               0d0,0d0,.false.,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
+            chic_tmp(:,icell,1) = chi_tmp(:,icell,1)
+            etac_tmp(:,icell,1) = eta_tmp(:,icell,1)
+            call opacity_atom_bb_loc(id,icell,1,1d0,zero_dp,zero_dp,1d0,zero_dp,zero_dp,u,v,w,&
+               zero_dp,zero_dp,.false.,Nlambda,lambda,chi_tmp(:,icell,1), eta_tmp(:,icell,1))
             ! do m=2,Nrec
             !    !m=1, unpolarized already filled.
             !    !etaQUV, chiQUV only for Q(=1), U, V
@@ -752,19 +802,20 @@ module Opacity_atom
          else
             chi_tmp(:,icell,:) = 0.0
             eta_tmp(:,icell,:) = 0.0
+            chic_tmp(:,icell,:) = 0.0
+            etac_tmp(:,icell,:) = 0.0
          endif
-         !for each cell, write all wavelengths and all records (only one if not pol, or 4 Stokes)
-         write(unit,iostat=status) chi_tmp(:,icell,:)
-         write(unit2,iostat=status) eta_tmp(:,icell,:)
-         !if lmagnetized write rho_tmp(:,icell,Nrec)
       enddo
 
-
+      write(unit,iostat=status) chi_tmp
+      write(unit,iostat=status) chic_tmp
+      write(unit2,iostat=status) eta_tmp
+      write(unit2,iostat=status) etac_tmp
       ! if (lmagnetized) then
       !   write(unit, iostat=status) rho_tmp
       !   deallocate(rho_tmp)
       ! endif
-      deallocate(chi_tmp, eta_tmp)
+      deallocate(chi_tmp, eta_tmp, chic_tmp, etac_tmp)
       close(unit)
       close(unit2)
 

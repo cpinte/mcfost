@@ -363,9 +363,9 @@ Grain properties
   dimension spanning the grain size distribution); for out-of-equilibrium
   grains, none of them is true (value: 3, typical for PAH grains)
 
-* ``amin``: minimum grain size, in microns
+* ``amin``: minimum grain radius, in microns
 
-* ``amax``: maximum grain size, in microns
+* ``amax``: maximum grain radius, in microns
 
 * ``aexp``: power law index of the grain size distribution dN(a)/da
 

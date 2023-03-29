@@ -31,7 +31,7 @@ subroutine mol_line_transfer()
   integer :: imol, ibin, iaz
 
   if (lProDiMo2mcfost) ldust_mol = .true.
-  
+
 !   Default case for molecules and dust
 !   optical_length_tot => dust_and_mol_optical_length_tot
 
@@ -96,7 +96,7 @@ subroutine mol_line_transfer()
         if (ldouble_RT) call equilibre_othin_mol_pop2()
 
         ! Condition initiale : population a l'ETL
-        call equilibre_LTE_mol()
+        call equilibre_LTE_mol(imol)
      endif
 
      call opacite_mol(imol)
@@ -873,6 +873,11 @@ subroutine init_dust_mol(imol)
   real, parameter :: gas_dust = 100
   real, parameter :: delta_lambda = 0.025
 
+  integer :: iTrans_min, iTrans_max
+
+  iTrans_min = mol(imol)%iTrans_min
+  iTrans_max = mol(imol)%iTrans_max
+
   cst_E=2.0*hp*c_light**2
 
   ! Reallocation des tableaux de proprietes de poussiere
@@ -894,11 +899,11 @@ subroutine init_dust_mol(imol)
      p_icell => icell_ref
   endif
 
-  call realloc_dust_mol()
+  call realloc_dust_mol(imol)
 
   if (ldust_mol) then
      ! Tableau de longeur d'onde
-     do iTrans=1,nTrans_tot
+     do iTrans=iTrans_min,iTrans_max
         tab_lambda(iTrans) = c_light/Transfreq(iTrans) * 1.0e6 ! en microns
         tab_lambda_sup(iTrans)= tab_lambda(iTrans)*delta_lambda
         tab_lambda_inf(iTrans)= tab_lambda(iTrans)/delta_lambda
@@ -936,7 +941,7 @@ subroutine init_dust_mol(imol)
 
         ! On recalcule les proprietes optiques
         write(*,*) "Computing dust properties for", nTrans_tot, "wavelength"
-        do iTrans=1,nTrans_tot
+        do iTrans=iTrans_min,iTrans_max
            call prop_grains(iTrans)
            call opacite(iTrans, iTrans, no_scatt=.true.)
         enddo
@@ -949,7 +954,7 @@ subroutine init_dust_mol(imol)
      !kappa_abs_eg = kappa_abs_eg * m_to_AU
 
      ! calcul de l'emissivite de la poussiere
-     do iTrans=1,nTrans_tot
+     do iTrans=iTrans_min,iTrans_max
         freq = Transfreq(iTrans)
 
         ! TODO : accelerer cette boucle via routine Bnu_disk (ca prend du tps ???)

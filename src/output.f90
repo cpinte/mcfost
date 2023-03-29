@@ -8,7 +8,7 @@ module output
   use constantes
   use dust_prop
   use molecular_emission
-  use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface_map, stars_map
+  use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface_map, stars_map, tau_map
   use utils
   use Voronoi_grid
   use grid
@@ -216,7 +216,7 @@ subroutine allocate_atom_maps()
      endif
      do n=1, n_atoms
      	if (atoms(n)%p%lline) then
-     		do k=1, atoms(n)%p%nTrans_raytracing 
+     		do k=1, atoms(n)%p%nTrans_raytracing
      			ilevel = atoms(n)%p%i_Trans_rayTracing(k)
          	jlevel = atoms(n)%p%j_Trans_rayTracing(k)
             kr = atoms(n)%p%ij_to_trans(ilevel,jlevel)
@@ -242,7 +242,7 @@ subroutine deallocate_atom_maps()
 	integer :: n,kr
 
 	if (allocated(flux_total)) deallocate(flux_total)
-	
+
 	do n=1,n_atoms
 		if (atoms(n)%p%lline) then
 			do kr=1, atoms(n)%p%Nline
@@ -250,9 +250,9 @@ subroutine deallocate_atom_maps()
 			enddo
 		endif
 	enddo
-	
+
 	return
-	
+
 end subroutine deallocate_atom_maps
 
 !**********************************************************************
@@ -805,7 +805,7 @@ subroutine ecriture_map_ray_tracing()
 
   character(len = 512) :: filename
   logical :: simple, extend
-  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U
+  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U, factor
   real(kind=dp) :: sin_disk, cos_disk, cos_disk_x2, sin_disk_x2
 
 
@@ -906,7 +906,11 @@ subroutine ecriture_map_ray_tracing()
      call ftpkyj(unit,'CRPIX4',0,'',status)
      call ftpkys(unit,'CUNIT4',"Hz",'',status)
   else
-     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
+     if (lJy) then
+        call ftpkys(unit,'BUNIT',"Jy.pixel-1",'F_nu',status)
+     else
+        call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'lambda.F_lambda',status)
+     endif
   endif
 
   call ftpkys(unit,'FLUX_1',"I = total flux",' ',status)
@@ -952,6 +956,12 @@ subroutine ecriture_map_ray_tracing()
      ! le e signifie real*4
      call ftppre(unit,group,fpixel,nelements,image_casa,status)
   else ! mode non casa
+     if (lJy) then
+        factor = 1e26 * (tab_lambda(lambda)*1e-6)/c_light;
+     else
+        factor = 1.0
+     endif
+
      type_loop : do itype=1,N_type_flux
         do ibin=1,RT_n_incl
            do iaz=1,RT_n_az
@@ -959,17 +969,17 @@ subroutine ecriture_map_ray_tracing()
                  do i=1,npix_x
                     if (lsepar_pola) then
                        if (itype==2) then
-                          Q = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,2,:))
-                          U = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,3,:))
+                          Q = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,2,:)) * factor
+                          U = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,3,:)) * factor
                           image(i,j,ibin,iaz,2) = Q * cos_disk_x2 + U * sin_disk_x2
                           image(i,j,ibin,iaz,3) = - Q * sin_disk_x2 + U * cos_disk_x2
                        else if (itype==3) then ! itype 3 already done together with itype 2
                           cycle type_loop
                        else ! Other images do not need rotation
-                          image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                          image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:)) * factor
                        endif
                     else ! No need for rotation when there is no pola
-                       image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:))
+                       image(i,j,ibin,iaz,itype) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:)) * factor
                     endif
                  enddo !i
               enddo !j
@@ -1034,7 +1044,7 @@ subroutine write_tau_surface(imol)
 
   character(len = 512) :: filename
   logical :: simple, extend
-  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, Q, U
+  real :: pixel_scale_x, pixel_scale_y, Q, U
 
   ! Allocation dynamique pour passer en stack
   real, dimension(:,:,:,:,:), allocatable :: image
@@ -1133,6 +1143,111 @@ subroutine write_tau_surface(imol)
   return
 
 end subroutine write_tau_surface
+
+!**********************************************************************
+
+subroutine write_tau_map(imol)
+
+  implicit none
+
+  integer, intent(in) :: imol
+
+  integer :: status,unit,blocksize,bitpix,naxis
+  integer, dimension(5) :: naxes
+  integer :: i,j,group,fpixel,nelements, alloc_status, xcenter, lambda, itype, ibin, iaz
+
+  character(len = 512) :: filename
+  logical :: simple, extend
+  real :: pixel_scale_x, pixel_scale_y, Q, U
+
+  ! Allocation dynamique pour passer en stack
+  real, dimension(:,:,:,:), allocatable :: image
+
+  allocate(image(npix_x, npix_y, RT_n_incl, RT_n_az), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error tau_map image')
+  image = 0.0 ;
+
+  lambda=1
+
+  filename = "tau_map.fits.gz"
+
+  if (imol==0) then ! continuum
+     filename = trim(data_dir)//"/"//trim(filename)
+  else
+     filename = trim(data_dir2(imol))//"/"//trim(filename)
+  endif
+  write(*,*) "Writing "//trim(filename)
+
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  status=0
+  call ftgiou (unit, status)
+
+  !  Create the new empty FITS file.
+  blocksize=1
+  call ftinit(unit,trim(filename),blocksize,status)
+
+  !  Initialize parameters about the FITS image
+  simple=.true.
+  group=1
+  fpixel=1
+  extend=.true.
+  bitpix=-32
+
+  naxis=4
+  naxes(1)=npix_x
+  naxes(2)=npix_y
+  naxes(3)= RT_n_incl
+  naxes(4)= RT_n_az
+  nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+
+  !  Write the required header keywords.
+  call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+  !call ftphps(unit,simple,bitpix,naxis,naxes,status)
+
+  ! Write  optional keywords to the header
+  !  wavelength
+  call ftpkyd(unit,'WAVE',tab_lambda(lambda),-7,'wavelength [microns]',status)
+
+  ! RAC, DEC, reference pixel & pixel scale en degres
+  call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+  call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+  call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+  pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+  call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+
+  call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+  call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+  call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+  pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+  call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+
+  call ftpkys(unit,'BUNIT',"",'',status)
+
+  !----- Images
+  ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
+  do ibin=1,RT_n_incl
+     do iaz=1,RT_n_az
+        do j=1,npix_y
+           do i=1,npix_x
+              image(i,j,ibin,iaz) = sum(tau_map(i,j,ibin,iaz,:))
+           enddo !i
+        enddo !j
+     enddo ! iaz
+  enddo !ibin
+
+  call ftppre(unit,group,fpixel,nelements,image,status)
+
+  !  Close the file and free the unit number.
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+  deallocate(image)
+
+  !  Check for any error, and if so print out error messages
+  if (status > 0) call print_error(status)
+
+  return
+
+end subroutine write_tau_map
 
 !**********************************************************************
 
@@ -1289,19 +1404,19 @@ end subroutine write_origin
 
 !**********************************************************************
 
-subroutine write_optical_depth_map(lambda)
+subroutine write_optical_depth_to_cell(lambda)
 
   integer, intent(in) :: lambda
 
   character(len=512) :: filename
 
-  write(*,*) "Writing optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sp), "microns"
-  filename = "!optical_depth_map.fits.gz"
+  write(*,*) "Writing disc optical_depth_map.fits.gz for wl=", real(tab_lambda(lambda),kind=sp), "microns"
+  filename = "!optical_depth_to_cell.fits.gz"
   call write_column(2, filename, lambda)
   write(*,*) "Done"
   call exit(0)
 
-end subroutine write_optical_depth_map
+end subroutine write_optical_depth_to_cell
 
 !***********************************************************
 
@@ -3104,7 +3219,7 @@ subroutine ecriture_spectre(imol)
 
   real, dimension(:,:,:), allocatable :: spectre_casa
 
-  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy
+  real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, factor
 
   filename = trim(data_dir2(imol))//'/lines.fits.gz'
 
@@ -3178,7 +3293,12 @@ subroutine ecriture_spectre(imol)
      call ftpkyd(unit,'RESTFREQ',Transfreq(mol(imol)%indice_Trans_rayTracing(1)),-7,'',status)
      call ftpkys(unit,'BTYPE',"Intensity",' ',status)
   else
-     call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'nu.F_nu',status)
+     if (lJy) then
+        call ftpkys(unit,'BUNIT',"JY/PIXEL",'',status)
+     else
+        call ftpkys(unit,'BUNIT',"W.m-2.pixel-1",'nu.F_nu',status)
+     endif
+
   endif
   !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
@@ -3216,15 +3336,21 @@ subroutine ecriture_spectre(imol)
 
      spectre_casa(:,:,:) = spectre(:,:,:,1,1,1) * W2m2_to_Jy
 
-     !  Write the array to the FITS file.
+     ! Write the array to the FITS file.
      call ftppre(unit,group,fpixel,nelements,spectre_casa,status)
      deallocate(spectre_casa)
   else
-     !  Write the array to the FITS file.
+     if (lJy) then
+        factor = 1e26 / Transfreq(mol(imol)%indice_Trans_rayTracing(1))
+        spectre = spectre * factor
+     endif
+
+     ! Write the array to the FITS file.
      call ftppre(unit,group,fpixel,nelements,spectre,status)
   endif
 
   if (.not.lcasa) then
+
      !------------------------------------------------------------------------------
      ! HDU 2 : Continuum map
      !------------------------------------------------------------------------------
@@ -3256,7 +3382,7 @@ subroutine ecriture_spectre(imol)
      endif ! l_sym_image
 
      !  Write the array to the FITS file.
-     call ftppre(unit,group,fpixel,nelements,continu,status)
+     call ftppre(unit,group,fpixel,nelements,continu * factor,status)
 
      !------------------------------------------------------------------------------
      ! HDU 3 : Transition numbers
@@ -3384,8 +3510,8 @@ end subroutine ecriture_spectre
 subroutine write_atomic_maps(atom)
    use dust_ray_tracing, only  : tab_RT_az,tab_RT_incl
    !wavelength are written in air.
-
-   !there is a test before on atom%lline
+   ! no symmetry at the moment.
+   !there is a test before on atom%lline.
    type (AtomType), intent(in) :: atom
 
    integer :: status,unit,blocksize,bitpix,naxis
@@ -3398,13 +3524,14 @@ subroutine write_atomic_maps(atom)
    real :: pixel_scale_x, pixel_scale_y, lam0
    real(kind=dp) :: lam0_air(1), lam0_vac(1)
    real(kind=dp), allocatable :: lambda_loc(:)
+   integer :: iaz, ii
+   character(len=20) :: im_ori
 
-   write(*,*) "Writing atomic line Flux maps..."
-
+   write(*,*) "Writing "//trim(atom%id)//" lines Flux maps..."
 
    blocksize=1
    simple=.true.
-   extend=.false.
+   extend=.true.
    group=1
    fpixel=1
    bitpix=-64
@@ -3419,94 +3546,211 @@ subroutine write_atomic_maps(atom)
 
    if (lmagnetized) then
       naxes(6) = 3
+      !naxis = 6
    endif
 
    !write maps only for those transitions in i_trans_raytracing and j_trans_raytracing
 
+   if (lsepar_ori) then
+      naxes(4)=1
+      naxes(5)=1
+      nelements=naxes(1)*naxes(2)*naxes(4)*naxes(5)
+      do n=1, atom%nTrans_raytracing
+         i = atom%i_Trans_rayTracing(n)
+         j = atom%j_Trans_rayTracing(n)
+         kr = atom%ij_to_trans(i,j)
 
-   do n=1, atom%nTrans_raytracing
-      i = atom%i_Trans_rayTracing(n)
-      j = atom%j_Trans_rayTracing(n)
-      kr = atom%ij_to_trans(i,j)
+         lam0 = real(atom%lines(kr)%lambda0)
+         write(transition, '(1F6.4)') lam0*m_to_km !line j that we follow among all lines.
 
-      status=0
-      call ftgiou (unit,status)
+         !In image mode, Nblue and Nred (so Nlambda) takes into account possible velocity shifts
+         ! naxes(3) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
+         naxes(3) = atom%lines(kr)%Nlambda
+         allocate(lambda_loc(naxes(3)))
+         lambda_loc(:) = vacuum2air(naxes(3),tab_lambda_nm(atom%lines(kr)%Nb:atom%lines(kr)%Nr))
+         lam0_vac(1) = atom%lines(kr)%lambda0
+         lam0_air(:) = vacuum2air(1,lam0_vac)
 
-      !for labelling, at the moment, use the wavelength. To DO
-      !                                                  add the name of the line. in the atomic file (or use trans index if no name)
-      ! write(transition, '(1I10)') kr !line kr that we follow among all lines.
-      lam0 = real(atom%lines(kr)%lambda0)
-      write(transition, '(1F6.4)') lam0*m_to_km !line j that we follow among all lines.
-      ! write(transition, '(1I6)') nint(lam0*10)
-      call ftinit(unit,trim(atom%ID)//"_line_"//trim(adjustl(transition))//".fits.gz",blocksize,status)
+         ! a lots of informations is duplicated for each transition.
+         do ii=1, RT_n_incl
+            do iaz=1, RT_n_az
 
-      !In image mode, Nblue and Nred (so Nlambda) takes into account possible velocity shifts
-      ! naxes(3) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
-      naxes(3) = atom%lines(kr)%Nlambda
-      allocate(lambda_loc(naxes(3)))
-      lambda_loc(:) = vacuum2air(naxes(3),tab_lambda_nm(atom%lines(kr)%Nb:atom%lines(kr)%Nr))
-      lam0_vac(1) = atom%lines(kr)%lambda0
-      lam0_air(:) = vacuum2air(1,lam0_vac)
+               write(im_ori, '("_i="(1F5.1)"a="(1F5.1))') tab_rt_incl(ii), tab_rt_az(iaz)
 
-      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
-      if (status > 0) call print_error(status)
-      call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
-      call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
-      call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
-      pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
-      call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+               status=0
+               call ftgiou (unit,status)
 
-      call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
-      call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
-      call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
-      pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
-      call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
 
-      call ftpkys(unit,'BUNIT',"W/m2/Hz/pixel",'',status)
+               call ftinit(unit,trim(atom%ID)//"_line_"//trim(adjustl(transition))//&
+                                    trim(adjustl(im_ori))//".fits.gz",blocksize,status)
 
-      !linear in cos(i)
-      call ftpkye(unit,'imin',minval(tab_RT_incl),-7,'degress',status)
-      call ftpkye(unit,'imax',maxval(tab_RT_incl),-7,'degress',status)
-      !linear
-      call ftpkye(unit,'azmin',minval(tab_RT_az),-7,'degress',status)
-      call ftpkye(unit,'azmax',maxval(tab_RT_az),-7,'degress',status)
+               call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+               if (status > 0) call print_error(status)
+               call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+               call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+               call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+               pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+               call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+               call ftpkys(unit,'CUNIT1',"deg",'',status)
 
-      call ftpkyj(unit,'i',atom%lines(kr)%i,'',status)
-      call ftpkyj(unit,'j',atom%lines(kr)%j,'',status)
-      call ftpkyd(unit,'gi',atom%g(atom%lines(kr)%i),-7,'',status)
-      call ftpkyd(unit,'gj',atom%g(atom%lines(kr)%j),-7,'',status)
-      call ftpkyd(unit,'lambda0',lam0_air(1),-7,'nm (air)',status)
-      call ftpkyd(unit,'nu0',1d-6*c_light / atom%lines(kr)%lambda0,-7,'10^15 Hz',status)
+               call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+               call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+               call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+               pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+               call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+               call ftpkys(unit,'CUNIT2',"deg",'',status)
 
-      !aspro compatibility
-      call ftpkyd(unit,'CRVAL3',lam0_air(1)*1d-3,-7,'micron',status)
-      call ftpkyd(unit,'CDELT3',1d-3*sum(lambda_loc(2:naxes(3))-lambda_loc(1:naxes(3)-1))/real(naxes(3)-1),-7,'micron',status)
-            !  call ftpprd(unit,group,fpixel,naxes(1)*nelements,atom%lines(kr)%map(:,:,:,:,:),status)
-      call ftpprd(unit,group,fpixel,naxes(3)*nelements,atom%lines(kr)%map,status)
-      if (status > 0) call print_error(status)
+               call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
 
-      !new hdu for zeeman pol
-      !if (lmagnetized and atom%lines(kr)%polarizable) then ...
+               call ftpkye(unit,'imin',tab_RT_incl(ii),-7,'degress',status)
+               call ftpkye(unit,'imax',tab_RT_incl(ii),-7,'degress',status)
 
-      !create new hdu for lambda grid
-      call ftcrhd(unit, status)
-      if (status > 0) call print_error(status)
-      call ftphpr(unit,simple,bitpix,1,naxes(3),0,1,extend,status)
-      if (status > 0) call print_error(status)
-      call ftpkys(unit, "UNIT", "nm (air)", "", status)
-      call ftpprd(unit,group,fpixel,naxes(3),lambda_loc,status)
-      deallocate(lambda_loc)
+               call ftpkye(unit,'azmin',tab_RT_az(iaz),-7,'degress',status)
+               call ftpkye(unit,'azmax',tab_RT_az(iaz),-7,'degress',status)
 
-      call ftclos(unit, status)
-      if (status > 0) then
-         call print_error(status)
-      endif
-      call ftfiou(unit, status)
-      if (status > 0) then
-         call print_error(status)
-      endif
+               call ftpkyj(unit,'i',atom%lines(kr)%i,'',status)
+               call ftpkyj(unit,'j',atom%lines(kr)%j,'',status)
+               call ftpkyd(unit,'gi',atom%g(atom%lines(kr)%i),-7,'',status)
+               call ftpkyd(unit,'gj',atom%g(atom%lines(kr)%j),-7,'',status)
+               call ftpkyd(unit,'lambda0',lam0_air(1),-7,'nm (air)',status)
+               call ftpkyd(unit,'nu0',1d-6*c_light / atom%lines(kr)%lambda0,-7,'10^15 Hz',status)
 
-   enddo !over all ray-traced transitions for that atom.
+               call ftpkys(unit,'CTYPE3',"LAMBDA",'[nm]',status)
+               call ftpkyd(unit,'CRVAL3',lambda_loc(naxes(3))*1d-3,-7,'',status)
+               call ftpkyj(unit,'CRPIX3',naxes(3),'',status)
+               call ftpkyd(unit,'CDELT3',1d-3*sum(lambda_loc(2:naxes(3))-lambda_loc(1:naxes(3)-1))/&
+                                       real(naxes(3)-1),-7,'delta_lambda [micron]',status)
+               call ftpkys(unit,'CUNIT3',"micron",'',status)
+
+
+               call ftpprd(unit,group,fpixel,naxes(3)*nelements,atom%lines(kr)%map(:,:,:,ii,iaz),status)
+               if (status > 0) call print_error(status)
+
+               !new hdu for zeeman pol
+               !if (lmagnetized and atom%lines(kr)%polarizable) then ...
+
+               !create new hdu for lambda grid
+               call ftcrhd(unit, status)
+               if (status > 0) call print_error(status)
+               call ftphpr(unit,simple,bitpix,1,naxes(3),0,1,extend,status)
+               if (status > 0) call print_error(status)
+               call ftpkys(unit, "UNIT", "nm (air)", "", status)
+               call ftpprd(unit,group,fpixel,naxes(3),lambda_loc,status)
+
+               call ftclos(unit, status)
+               if (status > 0) then
+                  call print_error(status)
+               endif
+               call ftfiou(unit, status)
+               if (status > 0) then
+                  call print_error(status)
+               endif
+
+            enddo !N_az
+         enddo !N_incl
+         deallocate(lambda_loc)
+      enddo !over all ray-traced transitions for that atom.
+   else
+   !write all orientation to a single fits file
+      do n=1, atom%nTrans_raytracing
+         i = atom%i_Trans_rayTracing(n)
+         j = atom%j_Trans_rayTracing(n)
+         kr = atom%ij_to_trans(i,j)
+
+         status=0
+         call ftgiou (unit,status)
+
+         ! write(transition, '(1I10)') kr !line kr that we follow among all lines.
+         lam0 = real(atom%lines(kr)%lambda0)
+         write(transition, '(1F6.4)') lam0*m_to_km !line j that we follow among all lines.
+         ! write(transition, '(1I6)') nint(lam0*10)
+         call ftinit(unit,trim(atom%ID)//"_line_"//trim(adjustl(transition))//".fits.gz",blocksize,status)
+
+         !In image mode, Nblue and Nred (so Nlambda) takes into account possible velocity shifts
+         ! naxes(3) = atom%lines(kr)%Nred+dk_max - atom%lines(kr)%Nblue-dk_min +1
+         naxes(3) = atom%lines(kr)%Nlambda
+         allocate(lambda_loc(naxes(3)))
+         lambda_loc(:) = vacuum2air(naxes(3),tab_lambda_nm(atom%lines(kr)%Nb:atom%lines(kr)%Nr))
+         lam0_vac(1) = atom%lines(kr)%lambda0
+         lam0_air(:) = vacuum2air(1,lam0_vac)
+
+         call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
+         if (status > 0) call print_error(status)
+         call ftpkys(unit,'CTYPE1',"RA---TAN",' ',status)
+         call ftpkye(unit,'CRVAL1',0.,-7,'RAD',status)
+         call ftpkyj(unit,'CRPIX1',npix_x/2+1,'',status)
+         pixel_scale_x = -map_size / (npix_x * distance * zoom) * arcsec_to_deg ! astronomy oriented (negative)
+         call ftpkye(unit,'CDELT1',pixel_scale_x,-7,'pixel scale x [deg]',status)
+         call ftpkys(unit,'CUNIT1',"deg",'',status)
+
+         call ftpkys(unit,'CTYPE2',"DEC--TAN",' ',status)
+         call ftpkye(unit,'CRVAL2',0.,-7,'DEC',status)
+         call ftpkyj(unit,'CRPIX2',npix_y/2+1,'',status)
+         pixel_scale_y = map_size / (npix_y * distance * zoom) * arcsec_to_deg
+         call ftpkye(unit,'CDELT2',pixel_scale_y,-7,'pixel scale y [deg]',status)
+         call ftpkys(unit,'CUNIT2',"deg",'',status)
+
+         call ftpkys(unit,'BUNIT',"W.m-2.Hz-1.pixel-1",'F_nu',status)
+
+         !linear in cos(i)
+         call ftpkye(unit,'imin',minval(tab_RT_incl),-7,'degress',status)
+         call ftpkye(unit,'imax',maxval(tab_RT_incl),-7,'degress',status)
+         !linear
+         call ftpkye(unit,'azmin',minval(tab_RT_az),-7,'degress',status)
+         call ftpkye(unit,'azmax',maxval(tab_RT_az),-7,'degress',status)
+
+         call ftpkyj(unit,'i',atom%lines(kr)%i,'',status)
+         call ftpkyj(unit,'j',atom%lines(kr)%j,'',status)
+         call ftpkyd(unit,'gi',atom%g(atom%lines(kr)%i),-7,'',status)
+         call ftpkyd(unit,'gj',atom%g(atom%lines(kr)%j),-7,'',status)
+         call ftpkyd(unit,'lambda0',lam0_air(1),-7,'nm (air)',status)
+         call ftpkyd(unit,'nu0',1d-6*c_light / atom%lines(kr)%lambda0,-7,'10^15 Hz',status)
+
+         call ftpkys(unit,'CTYPE3',"LAMBDA",'[nm]',status)
+         ! call ftpkyd(unit,'CRVAL3',lam0_air(1)*1d-3,-7,'',status)
+         call ftpkyd(unit,'CRVAL3',lambda_loc(naxes(3))*1d-3,-7,'',status)
+         call ftpkyj(unit,'CRPIX3',naxes(3),'',status)
+         call ftpkyd(unit,'CDELT3',1d-3*sum(lambda_loc(2:naxes(3))-&
+                  lambda_loc(1:naxes(3)-1))/real(naxes(3)-1),-7,'delta_lambda [micron]',status)
+         call ftpkys(unit,'CUNIT3',"micron",'',status)
+
+         ! call ftpkys(unit,'CTYPE4',"cos(i)",'',status)
+         ! call ftpkye(unit,'CRVAL4',0.0,-7,'',status)
+         ! call ftpkyj(unit,'CRPIX4',size(tab_rt_incl),'',status)
+         ! call ftpkyd(unit,'CDELT4',abs(cos(tab_rt_incl(1))-cos(tab_rt_incl(2))),-7,'delta_cos(i)',status)
+         ! call ftpkys(unit,'CUNIT4'," ",'',status)
+         ! call ftpkys(unit,'CTYPE5',"azim",'',status)
+         ! call ftpkye(unit,'CRVAL5',0.0,-7,'',status)
+         ! call ftpkyj(unit,'CRPIX5',size(tab_rt_az),'',status)
+         ! call ftpkyd(unit,'CDELT5',abs(tab_rt_az(1)-tab_rt_az(2)),-7,'delta_azim',status)
+         ! call ftpkys(unit,'CUNIT5'," ",'',status)
+
+         call ftpprd(unit,group,fpixel,naxes(3)*nelements,atom%lines(kr)%map,status)
+         if (status > 0) call print_error(status)
+
+         !new hdu for zeeman pol
+         !if (lmagnetized and atom%lines(kr)%polarizable) then ...
+
+         !create new hdu for lambda grid
+         call ftcrhd(unit, status)
+         if (status > 0) call print_error(status)
+         call ftphpr(unit,simple,bitpix,1,naxes(3),0,1,extend,status)
+         if (status > 0) call print_error(status)
+         call ftpkys(unit, "UNIT", "nm (air)", "", status)
+         call ftpprd(unit,group,fpixel,naxes(3),lambda_loc,status)
+         deallocate(lambda_loc)
+
+         call ftclos(unit, status)
+         if (status > 0) then
+            call print_error(status)
+         endif
+         call ftfiou(unit, status)
+         if (status > 0) then
+            call print_error(status)
+         endif
+
+      enddo !over all ray-traced transitions for that atom.
+   endif !lsepar_ori
 
    return
 end subroutine write_atomic_maps

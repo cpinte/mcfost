@@ -10,7 +10,6 @@ module optical_depth
   use cylindrical_grid
   use radiation_field, only : save_radiation_field
   use density
-  use read1d_models, only :  Icorona, xcorona!from above
   use stars, only : intersect_stars, star_rad
   use opacity_atom, only : opacity_atom_bb_loc, contopac_atom_loc, Itot, psi
 
@@ -206,7 +205,7 @@ subroutine integ_tau(lambda)
   w0 = 0.0 ; u0 = 1.0 ; v0 = 0.0
 
   call indice_cellule(x0,y0,z0, icell)
-  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
 
   !tau = 0.0
   !do i=1, n_rad
@@ -228,14 +227,14 @@ subroutine integ_tau(lambda)
   v0 = 0.0
 
   call indice_cellule(x0,y0,z0, icell)
-  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
 
   write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",E12.5)') angle, tau
 
   if (.not.lvariable_dust) then
      icell = icell_not_empty
      if (kappa(icell_ref,lambda) * kappa_factor(icell) > tiny_real) then
-        write(*,*) " Column density (g/cm²)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
+        write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
              (kappa(icell_ref,lambda) * kappa_factor(icell)/AU_to_cm))
      endif
   endif
@@ -514,19 +513,24 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
            Doppler_P_x_freq(:,iray,id) = P(:)
         endif
 
+        ! surface superieure ou inf
+        facteur_tau = 1.0
+        if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
+        if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
+
         do i=1,nTrans
            iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
 
            kappa_cont = kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
-           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_cont
+           opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) * facteur_tau + kappa_cont
 
            ! Epaisseur optique
            dtau(:) =  l_contrib * opacite(:)
            dtau_c = l_contrib * kappa_cont
 
            ! Fonction source
-           Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) &
+           Snu(:) = ( emissivite_mol_o_freq(icell,iTrans) * P(:) * facteur_tau &
                 + emissivite_dust(icell,iTrans) ) / (opacite(:) + 1.0e-300_dp)
            Snu_c = emissivite_dust(icell,iTrans) / (kappa_cont  + 1.0e-300_dp)
 
@@ -541,14 +545,9 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
                    exp(-tau(:,i)) * (1.0_dp - exp(-dtau(:))) * Snu(:)
            endif
 
-           ! surface superieure ou inf
-           facteur_tau = 1.0
-           if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
-           if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
-
            ! Mise a jour profondeur optique pour cellule suivante
            ! Warning tau and  tau_c are smaller array (dimension nTrans)
-           tau(:,i) = tau(:,i) + dtau(:) * facteur_tau
+           tau(:,i) = tau(:,i) + dtau(:)
            tau_c(i) = tau_c(i) + dtau_c
         enddo ! i
 
@@ -616,7 +615,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ltot
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite
-  real(kind=dp) :: tau_max, tau_previous
+  real(kind=dp) :: tau_max, tau_previous, facteur_tau
 
   integer :: i, iTrans, nbr_cell, next_cell, previous_cell, iv
   integer, target :: icell
@@ -669,9 +668,15 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
         ! local line profile mutiplied by frequency
         P(:) = local_line_profile(icell,lsubtract_avg,x0,y0,z0,x1,y1,z1,u,v,w,l_void_before,l_contrib,ispeed,tab_speed)
 
+        ! surface superieure ou inf
+        facteur_tau = 1.0
+        if (lonly_top    .and. z0 < 0.) facteur_tau = 0.0
+        if (lonly_bottom .and. z0 > 0.) facteur_tau = 0.0
+
         !do i=1,nTrans
         !iTrans = tab_Trans(i) ! selecting the proper transition for ray-tracing
-        opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
+        opacite(:) = kappa_mol_o_freq(icell,iTrans) * P(:) * facteur_tau &
+             + kappa_abs_LTE(p_icell,iTrans) * kappa_factor(icell)
 
         ! Epaisseur optique
         dtau_mol(:) =  l_contrib * opacite(:)
@@ -1140,10 +1145,15 @@ end subroutine optical_length_tot_mol
             lcellule_non_vide = (icompute_atomRT(icell) > 0)
             if (icompute_atomRT(icell) < 0) then
                if (icompute_atomRT(icell) == -1) then
+                  !If the optically thick region (dark zone) has a temperature
+                  !add a black body emission and leave.
+                  if (T(icell) > 0.0_dp) Itot(:,iray,id) = Itot(:,iray,id) + &
+                                    exp(-tau) * Bpnu(N,lambda,T(icell))
                   return
                else
                   !Does not return but cell is empty (lcellule_non_vide is .false.)
-                  coronal_irrad = linear_1D_sorted(size(xcorona),xcorona,Icorona(:,1),N,lambda)
+                  coronal_irrad = linear_1D_sorted(atmos_1d%Ncorona,atmos_1d%x_coro(:), &
+                                                   atmos_1d%I_coro(:,1),N,lambda)
                   Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * coronal_irrad
                endif
             endif
