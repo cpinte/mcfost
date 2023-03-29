@@ -16,7 +16,6 @@ module gas_contopac
    use grid, only : T, ne, nHmin, nHtot, icompute_atomrt
    use constantes
    use utils, only : bilinear, linear_1D_sorted, Bpnu, locate
-   use occupation_probability, only : D_i, wocc_n
    use parametres, only : ldissolve, n_cells
    use messages, only : error
    use wavelengths_gas, only : tab_lambda_cont, n_lambda_cont
@@ -249,10 +248,10 @@ module gas_contopac
       real(kind=dp) :: theta, lam
       integer :: icell, la, i
 
-      write(*,*) " ***WaRNING ****"
-      write(*,*) "elemental function should be changed. they are too slow!"
-      write(*,*) "if they are called often, like if bckgr opac is computed on the fly"
-      write(*,*) ""
+      ! " ***WaRNING ****"
+      ! "elemental function should be changed. they are too slow!"
+      ! "if they are called often, like if bckgr opac is computed on the fly"
+      ! ""
 
       allocate(Hray_lambda(N))
 

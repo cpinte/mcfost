@@ -38,7 +38,7 @@ module voigts
         do i = 1, n
 
             z = cmplx(a,-v(i))
-            s = dabs(v(i)) + a
+            s = abs(v(i)) + a
             u = z*z
 
             if (s >= 15.d0) then
@@ -47,7 +47,7 @@ module voigts
             elseif (s >= 5.5) then
           ! Region II
                 w4 = z*(1.410474d0+u*0.5641896d0)/(0.75d0+u*(3.d0+u))
-            elseif (a >= 0.195d0*dabs(v(i))-0.176d0) then
+            elseif (a >= 0.195d0*abs(v(i))-0.176d0) then
           ! Region III
                 w4 = (16.4955d0+z*(20.20933d0+z*(11.96482d0+z*(3.778987d0+z*0.5642236d0)))) / &
                     (16.4955d0+z*(38.82363d0+z*(39.27121d0+z*(21.69274d0+z*(6.699398d0+z)))))

@@ -10,7 +10,6 @@ module optical_depth
   use cylindrical_grid
   use radiation_field, only : save_radiation_field
   use density
-  use read1d_models, only :  Icorona, xcorona!from above
   use stars, only : intersect_stars, star_rad
   use opacity_atom, only : opacity_atom_bb_loc, contopac_atom_loc, Itot, psi
 
@@ -206,7 +205,7 @@ subroutine integ_tau(lambda)
   w0 = 0.0 ; u0 = 1.0 ; v0 = 0.0
 
   call indice_cellule(x0,y0,z0, icell)
-  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
 
   !tau = 0.0
   !do i=1, n_rad
@@ -228,14 +227,14 @@ subroutine integ_tau(lambda)
   v0 = 0.0
 
   call indice_cellule(x0,y0,z0, icell)
-  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,y0,u0,v0,w0,tau,lmin,lmax)
+  call optical_length_tot(1,lambda,Stokes,icell,x0,y0,z0,u0,v0,w0,tau,lmin,lmax)
 
   write(*,fmt='(" Integ tau (i =",f4.1," deg)   = ",E12.5)') angle, tau
 
   if (.not.lvariable_dust) then
      icell = icell_not_empty
      if (kappa(icell_ref,lambda) * kappa_factor(icell) > tiny_real) then
-        write(*,*) " Column density (g/cm�)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
+        write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
              (kappa(icell_ref,lambda) * kappa_factor(icell)/AU_to_cm))
      endif
   endif
@@ -1146,10 +1145,15 @@ end subroutine optical_length_tot_mol
             lcellule_non_vide = (icompute_atomRT(icell) > 0)
             if (icompute_atomRT(icell) < 0) then
                if (icompute_atomRT(icell) == -1) then
+                  !If the optically thick region (dark zone) has a temperature
+                  !add a black body emission and leave.
+                  if (T(icell) > 0.0_dp) Itot(:,iray,id) = Itot(:,iray,id) + &
+                                    exp(-tau) * Bpnu(N,lambda,T(icell))
                   return
                else
                   !Does not return but cell is empty (lcellule_non_vide is .false.)
-                  coronal_irrad = linear_1D_sorted(size(xcorona),xcorona,Icorona(:,1),N,lambda)
+                  coronal_irrad = linear_1D_sorted(atmos_1d%Ncorona,atmos_1d%x_coro(:), &
+                                                   atmos_1d%I_coro(:,1),N,lambda)
                   Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * coronal_irrad
                endif
             endif

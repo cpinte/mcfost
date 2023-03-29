@@ -57,6 +57,7 @@ module dust_ray_tracing
   real, dimension(:,:,:), allocatable :: star_vr
 
   real, dimension(:,:,:,:,:,:), allocatable :: tau_surface_map ! nx, ny, RT_n_incl, RT_n_az, 3, ncpus
+  real, dimension(:,:,:,:,:), allocatable :: tau_map ! nx, ny, RT_n_incl, RT_n_az, ncpus
   real, dimension(:,:,:), allocatable :: stars_map ! nx, ny, 4
 
   contains
@@ -130,8 +131,14 @@ subroutine alloc_ray_tracing()
 
   if (ltau_surface) then
      allocate(tau_surface_map(npix_x,npix_y,RT_n_incl,RT_n_az,3,nb_proc), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error tau_surface')
+     if (alloc_status > 0) call error('Allocation error tau_surface_mao')
      tau_surface_map = 0.0
+  endif
+
+  if (ltau_map) then
+     allocate(tau_map(npix_x,npix_y,RT_n_incl,RT_n_az,nb_proc), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tau_map')
+     tau_map = 0.0
   endif
 
   allocate(J_th(n_cells), stat=alloc_status)

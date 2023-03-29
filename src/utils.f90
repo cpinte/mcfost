@@ -295,6 +295,164 @@ subroutine GaussSlv(a, b, n)
 
 end subroutine GaussSlv
 
+subroutine solve_lin(A, b, N)
+   ! Solve a system Ax=b with minimization of the residual
+   ! Wrapper around GaussSlv (any solver works).
+   integer, intent(in) :: N
+   real(kind=dp), intent(inout) :: A(N,N), b(N)
+   real(kind=dp) :: Adag(N,N), bdag(N), res(N)
+
+   bdag = b
+   Adag = A
+
+   call GaussSlv(A, b, n)
+
+   !compute the difference (residual) between the new solution and old one (bdag)
+   res(:) = bdag(:) - matmul(Adag(:,:),b(:))
+
+   !solve for the residual
+   call Gaussslv(Adag, res, N)
+
+   !correct the new solution with the residual
+   b(:) = b(:) + res(:)
+
+   return
+end subroutine solve_lin
+
+
+function Ng_accelerate(m,n,x)
+!
+! Extrapolate a solution x of an iterative system Ax=b based on N previous
+! iterations (solutions).
+! (m) represents the size of the vector to extrapolate (for instance Nlevel or NlevelxNcells)
+! (n) is the number of solutions (Ng_norder) ordered by increasing n : 1 most recent one, n oldest one.
+!
+! WARNING : dim(x(1,:)) should be n + 2 at least.
+!
+   integer, intent(in) :: m, n
+   logical :: Ng_accelerate
+   real(kind=dp), intent(inout) :: x(m,*)
+   integer :: i, j, k
+   real(kind=dp) :: x0(m), A(n, n), b(n), w, dy, di, max_sol
+
+   ng_accelerate = .false.
+
+   A(:,:) = 0.0_dp; b(:) = 0.0_dp
+   x0(:) = x(:,1)
+
+   ! a test on x0(k) > 0 is not necessary here
+   ! the knowledge of the value of x0 passed to the function is sufficient to prevent
+   ! division by 0.
+   do k=1, m !long loop here
+         w = 1.0 / ( 1.0_dp + abs(x0(k)) )
+         dy = x(k,2) - x0(k)
+         do i=1, n
+            di = w * (dy + x(k,i+2) - x(k,i+1))
+            b(i) = b(i) + di*dy
+            do j=1, n
+               A(i,j) = A(i,j) + di * (dy + x(k,j+2) - x(k,j+1))
+            enddo
+         enddo
+   enddo
+
+   call solve_lin(A,b,n)
+
+   !recombine into first (current) index.
+   do i=1,n
+      x0(:) = x0(:) + b(i) * ( x(:,i+1) - x(:,1) )
+   enddo
+   x(:,1) = x0(:)
+
+   ng_accelerate = .true.
+
+   return
+end function Ng_accelerate
+
+
+subroutine Accelerate(m,n,x)
+!$ use omp_lib
+!
+! Parallel version of Ng_accelerate that works for all cells
+! at the same time.
+!
+   integer, intent(in) :: m, n
+   real(kind=dp), intent(inout) :: x(m,*)
+   integer :: i, j, k
+   real(kind=dp) :: x0(m), A(n, n), b(n), w, dy, di, max_sol
+
+   A(:,:) = 0.0_dp; b(:) = 0.0_dp
+   x0(:) = x(:,1)
+
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(i,j,k)&
+   !$omp private(w,dy,di)&
+   !$omp shared(m,n,x,A,b,x0)
+   !$omp do schedule(dynamic,1)
+   do k=1, m
+      ! w = 1.0 / ( 1.0_dp + abs(x0(k)) )
+      if (x0(k) > 0.0) then
+         ! w = 1.0 / ( x0(k)**2 )
+         w = 1.0 / ( 1 + abs(x0(k)) )
+         ! w = 1.0 / x0(k)
+         dy = x(k,2) - x0(k)
+         do i=1, n
+            di = w * (dy + x(k,i+1) - x(k,i+2))
+            b(i) = b(i) + di*dy
+            do j=1, n
+               A(i,j) = A(i,j) + di * (dy + x(k,j+1) - x(k,j+2))
+            enddo
+         enddo
+      endif
+   enddo
+   !$omp end do
+   !$omp end parallel
+
+   call Gaussslv(A, b, n)
+   !-> useful to minimise the residual here ? or redundant
+   ! call solve_lin(A,b,n)
+
+   !recombine into first (current) index.
+   !x0 is needed otherwise x(:,1) is counted multiple time
+   do i=1,n
+      x0(:) = x0(:) + b(i) * ( x(:,i+1) - x(:,1) )
+   enddo
+   x(:,1) = x0(:)
+
+   return
+end subroutine Accelerate
+
+subroutine check_ng_pops(m,n,o,x,xtot)
+!Normalise extrapolated populations x (Nlevels,Ncells,Neq_ng)
+!so that sum(x,dim=1) = xtot for each Neq_ng (mass conservation)
+!if x < 0; x = abs(0)
+   integer, intent(in) :: m,n,o
+   real(kind=dp), intent(inout) :: x(m,n,o)
+   real(kind=dp), intent(in) :: xtot(n)
+   integer :: i, j, k
+   real(kind=dp) :: dum(o)
+
+   !take absolute value
+
+   !$omp parallel &
+   !$omp default(none) &
+   !$omp private(i,j,k,dum)&
+   !$omp shared(m,n,o,x,xtot)
+   !$omp do schedule(dynamic,1)
+   do i=1,n
+      if (xtot(i) <= 0.0) cycle
+      !sum of all levels for all solutions at cell i.
+      dum = sum(abs(x(:,i,:)),dim=1)
+      do j=1,m
+         x(j,i,:) = abs(x(j,i,:)) * xtot(i) / dum(:)
+      enddo
+   enddo
+   !$omp end do
+   !$omp end parallel
+
+   return
+end subroutine check_ng_pops
+
 !***********************************************************
 
 subroutine rotation(xinit,yinit,zinit,u1,v1,w1,xfin,yfin,zfin)
@@ -1600,7 +1758,7 @@ end function locate
  function bilinear(N,xi,i0,M,yi,j0,f,xo,yo)
    !bilinear interpolation of the function f(N,M)
    !defined on points xi(N), yi(M) at real xo, real yo.
-   !too slow ? f***ck
+   !TO DO: add automatic finding of i0 and j0
    real(kind=dp) :: bilinear
    integer, intent(in) :: N, M
    real(kind=dp), intent(in) :: xi(N),yi(M),f(N,M)
@@ -1608,12 +1766,6 @@ end function locate
    integer, intent(in) :: i0, j0
    integer :: i, j
    real(kind=dp) :: norm, f11, f21, f12, f22
-
-   !find closest point in i0 and j0
-   ! i0 = max(locate(xi,xo),2)
-   ! j0 = max(locate(yi,yo),2)
-
-   ! write(*,*) i0, j0
 
    norm = ((xi(i0) - xi(i0-1)) * (yi(j0) - yi(j0-1)))
    f11 = f(i0-1,j0-1)
@@ -1759,5 +1911,75 @@ end function locate
    enddo
 
 end function integrate_trap_array
+
+   ! function flatten_n1n2(n1, n2, M)
+   ! !for each i in n1 write the n2 values of n1(i,:)
+   ! !In the flattened array, there are:
+   ! ! for each n1
+   ! !    write each n2
+   !    integer :: n1, n2, i, j
+   !    real(kind=dp) :: flatten_n1n2(n1*n2), M(n1,n2)
+
+   !    do i=1, n1
+   !       do j=1, n2
+   !          flatten_n1n2(n2*(i-1)+j) = M(i,j)
+   !       enddo
+   !    enddo
+
+   !    return
+   ! end function flatten_n1n2
+
+   ! function reform_n1xn2(n1, n2, F)
+   ! ! reverse process of flatten_12
+   !    integer :: n1, n2, i, j
+   !    real(kind=dp) :: F(n1*n2), reform_n1xn2(n1,n2)
+
+   !    do i=1, n1
+   !       do j=1, n2
+   !          reform_n1xn2(i,j) = F(n2*(i-1)+j)
+   !       enddo
+   !    enddo
+
+   !    return
+   ! end function reform_n1xn2
+
+
+ function basename(filename)
+
+   character(len=*), intent(in) :: filename
+   character(len=512) :: basename
+
+   character(len=1),parameter :: sep ="/"
+   integer :: pos
+
+   pos = index(filename, sep, back=.true.)
+   if (pos>0) then
+      basename = filename(pos+1:)
+   else
+      basename = filename
+   endif
+
+   return
+
+ end function basename
+
+ function dirname(filename)
+
+   character(len=*), intent(in) :: filename
+   character(len=512) :: dirname
+
+   character(len=1),parameter :: sep ="/"
+   integer :: pos
+
+   pos = index(filename, sep, back=.true.)
+   if (pos>0) then
+      dirname = filename(:pos)
+   else
+      dirname = "./"
+   endif
+
+   return
+
+ end function dirname
 
 end module utils

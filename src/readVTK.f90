@@ -116,7 +116,7 @@ contains
     real q1, q2;
 
     integer position, lineSize, nPoints
-    integer i,j,k,n, nx1mid, nx2mid
+    integer i,j,k,n, nx1mid, nx2mid, nx3mid
 
 
     position = oldposition
@@ -153,13 +153,39 @@ contains
     enddo
 
     ! convert cartesian to dedicated geometry
-    if(geometry==2) then
+    if(geometry==1) then
+       ! polar geometry
+       allocate(x1(dimensions(1)))
+       do i = 1, dimensions(1)
+          x1(i) = sqrt(x(i,1,1)**2 + y(i,1,1)**2)
+       enddo
+
+       ! phi
+       nx1mid = (dimensions(1)-1)/2
+       nx3mid = (dimensions(3)-1)/2
+       allocate(x2(dimensions(2)))
+       do i = 1, dimensions(2)
+          x2(i) = atan2(y(nx1mid,i,nx3mid), x(nx1mid,i,nx3mid))
+          if(x2(i)< 0.0) then
+             x2(i) = x2(i) + 8.0*atan(1.0)
+          endif
+       enddo
+
+       ! z
+       allocate(x3(dimensions(3)))
+       do i = 1, dimensions(3)
+          x3(i) = z(1,1,i)
+       enddo
+    else if(geometry==2) then
        ! spherical geometry
        allocate(x1(dimensions(1)))
+
+       ! r
        do i = 1, dimensions(1)
           x1(i) = sqrt(x(i,1,1)**2 + y(i,1,1)**2 + z(i,1,1)**2)
        enddo
 
+       ! theta
        nx1mid = (dimensions(1)-1)/2
        nx2mid = (dimensions(2)-1)/2
        allocate(x2(dimensions(2)))
@@ -167,6 +193,7 @@ contains
           x2(i) = acos( z(1,i,1) / sqrt(x(1,i,1)**2+y(1,i,1)**2+z(1,i,1)**2))
        enddo
 
+       ! phi
        allocate(x3(dimensions(3)))
        do i = 1, dimensions(3)
           x3(i) = atan2(y(nx1mid,nx2mid,i), x(nx1mid,nx2mid,i))
@@ -212,11 +239,11 @@ contains
     newposition=position
   end subroutine readScalars
 
-  subroutine readVTK_header(filename, unit, position, dimensions, time, origin, x1, x2, x3)
+  subroutine readVTK_header(filename, unit, position, geometry, dimensions, time, origin, x1, x2, x3)
     ! read only the header of a VTK file and keepthe unit open
 
     character(len=*), intent(in) :: filename
-    integer, intent(out) :: unit
+    integer, intent(out) :: unit, geometry
     integer, dimension(3), intent(out) :: dimensions
     real, intent(out) :: time
     character(:), allocatable, intent(out) :: origin
@@ -226,7 +253,6 @@ contains
     character (3) :: varName
     integer :: position, newposition
     integer :: lineSize, nPoints
-    integer :: geometry
     integer, dimension(3) :: periodicity
 
     open(newunit=unit, file=filename,form="unformatted",access="stream",CONVERT='BIG_ENDIAN',status="old")

@@ -18,13 +18,16 @@ module wavelengths_gas
    !continuum wavelength double for level dissolution !
    integer, parameter :: Nlambda_cont = 101
    integer, parameter :: Nlambda_cont_log = 31
-   integer, parameter :: Nlambda_line_w = 14
-   integer, parameter :: Nlambda_line_c_log = 12
-   integer, parameter :: Nlambda_line_gauss = 11
-   real, parameter    :: vwing_on_vth_gauss = 3.0 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
-   real, parameter    :: vwing_on_vth = 5.0 !local (Voigt) line goes from 0 to vwing_on_vth * vth km/s
-   !-> for Gaussian and Voigt profiles
+   integer, parameter :: Nlambda_line_w_log = 14 !log wings
+   integer, parameter :: Nlambda_line_c_lin = 12 ! linear core
    real, parameter    :: vcore_on_vth = 0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
+   real, parameter    :: vwing_on_vth = 10.0 ! 5.0!local (Voigt) line goes from 0 to vwing_on_vth * vth km/s
+!make assym gauss
+   ! integer, parameter :: Nlambda_line_gauss = 21 !11 !if linear
+   integer, parameter :: Nlambda_line_gauss_log = 5 !log wings
+   integer, parameter :: Nlambda_line_gauss_lin = 5 ! linear core
+   real, parameter    :: vcore_on_vth_gauss = 0.5
+   real, parameter    :: vwing_on_vth_gauss = 4!3 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
    real               :: hv
    !number max of lambda for all lines
    integer            :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans, Nlambda_max_line_vel
@@ -50,8 +53,9 @@ module wavelengths_gas
    !
    ! Allocate cont%lambda.
    ! ----------------------------------------------------------------- !
-      real(kind=dp), dimension(Nlambda_cont_log) :: make_sub_wavelength_grid_cont_log_nu
+      ! real(kind=dp), dimension(Nlambda_cont_log) :: make_sub_wavelength_grid_cont_log_nu
       type (AtomicContinuum), intent(in) :: cont
+      real(kind=dp), dimension(cont%Nlambda) :: make_sub_wavelength_grid_cont_log_nu
       real(kind=dp) :: resol
       integer :: la, N1, N2
       real(kind=dp) :: l0, l1
@@ -88,25 +92,34 @@ module wavelengths_gas
       ! ------------------------------------------------------------ !
       ! Compute the line bounds : lamndamin and lambdamax
       ! the total extent of line in the atom's frame (no velocity).
+      ! if limage is .false. : 
+      !  vmax is computed from the maximum thermal width of the line.
+      ! and from the "natural" width of the line.
+      ! if limage is .true :
+      !  vmax is atom%vmax_rt.
+      !  line%Nlambda is also fixed by atom%n_speed_rt.
       ! ------------------------------------------------------------ !
       type (AtomicLine), intent(inout) :: line
       logical, intent(in) :: limage
-      real(kind=dp) :: vB, vmax, vth
+      real(kind=dp) :: vB, vmax, vth_max
 
-
-      if (line%polarizable) then
-         vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
-      else
-         vB = 0.0_dp
+      if (limage) then
+         vmax = 1d3 * line%atom%vmax_rt
+      else !non-LTE
+         if (line%polarizable) then
+            vB = B_char * LARMOR * (line%lambda0*NM_TO_M) * abs(line%g_lande_eff)
+         else
+            vB = 0.0_dp
+         endif
+         vth_max = vbroad(maxval(T), line%atom%weight, maxval(vturb))
+         if (line%voigt) then
+         !increase wavelength number ?
+            vmax = vwing_on_vth * (vth_max + vb) + vwing_on_vth * line%damp_max * line%qwing !min = 1
+            ! vmax = line%qwing * vwing_on_vth * (vth_max + vb) !to do
+         else
+            vmax = vwing_on_vth_gauss * vth_max
+         endif
       endif
-      vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
-      ! vmax = line%qwing * (vth + vB)
-      if (line%voigt) then
-         vmax = vwing_on_vth * (vth + vb) !qwing not needed. Here local profile only. For ray-tracing, the extension is in the param file.
-      else
-         vmax = vwing_on_vth_gauss * vth
-      endif
-      if (limage) vmax = line%atom%vmax_rt*1d3
 
 
       line%lambdamin = line%lambda0*(1.0-vmax/C_LIGHT)
@@ -127,32 +140,31 @@ module wavelengths_gas
    end subroutine compute_line_bound
 
    function line_lambda_grid(line,Nlambda)
-      !integer, parameter :: Nlambda = (2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1)
+      !integer, parameter :: Nlambda = (2 * (Nlambda_line_w_log + Nlambda_line_c_lin - 1) - 1)
       integer, intent(in) :: nlambda
       real(kind=dp), dimension(Nlambda) :: line_lambda_grid
       type (atomicline), intent(inout) :: line
-      real(kind=dp) ::  vcore, vwing, vth
+      real(kind=dp) ::  vcore, vwing, vth_max
       integer :: la, Nmid
+      integer :: N_wing, N_core
 
 
       vwing = line%vmax
-      vth = vbroad(maxval(T), line%atom%weight, maxval(vturb))
-      vcore = vcore_on_vth * vth
-
-
+      vth_max = vbroad(maxval(T), line%atom%weight, maxval(vturb))
+      vcore = vcore_on_vth * vth_max
+      if (line%voigt) then
+         N_wing = Nlambda_line_w_log
+         N_core = Nlambda_line_c_lin
+      else ! gauss but asymmetric
+         N_wing = Nlambda_line_gauss_log
+         N_core = Nlambda_line_gauss_lin
+         vcore = vcore_on_vth_gauss * vth_max
+      endif
       line_lambda_grid = 0.0_dp
 
-      !completely linear for Gaussian
-      if (.not.line%voigt) then
-         !Only half the core points at the moment (compared to Voigt)
-         !Still, add one point for force span_dp to goes to 0
-         line_lambda_grid(:) = (1.0 + span_dp(-vwing,vwing,Nlambda_line_gauss+mod(Nlambda_line_gauss+1,2),1)/c_light) * line%lambda0
-         return !leave here for gaussian.
-      endif
+      line_lambda_grid(N_wing:1:-1) = -spanl_dp(vcore, vwing, N_wing, -1)
 
-      line_lambda_grid(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
-
-      line_lambda_grid(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
+      line_lambda_grid(N_wing:N_wing+N_core-1) = span_dp(-vcore, 0.0_dp, N_core, 1)
 
       Nmid = Nlambda/2 + 1
 
@@ -160,11 +172,32 @@ module wavelengths_gas
       line_lambda_grid(Nmid+1:Nlambda) = -line_lambda_grid(Nmid-1:1:-1)
 
       line_lambda_grid = (1.0 + line_lambda_grid/c_light) * line%lambda0
-
-      ! line%lambdamin = (1.0 + minval(line_lambda_grid)/c_light) * line%lambda0
-      ! line%lambdamax = (1.0 + maxval(line_lambda_grid)/c_light) * line%lambda0
-
       return
+      ! line_lambda_grid = 0.0_dp
+
+      ! !completely linear for Gaussian
+      ! if (.not.line%voigt) then
+      !    !Only half the core points at the moment (compared to Voigt)
+      !    !Still, add one point for force span_dp to goes to 0
+      !    line_lambda_grid(:) = (1.0 + span_dp(-vwing,vwing,Nlambda_line_gauss+mod(Nlambda_line_gauss+1,2),1)/c_light) * line%lambda0
+      !    return !leave here for gaussian.
+      ! endif
+
+      ! line_lambda_grid(Nlambda_line_w_log:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w_log, -1)
+
+      ! line_lambda_grid(Nlambda_line_w_log:Nlambda_line_c_lin+Nlambda_line_w_log-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_lin, 1)
+
+      ! Nmid = Nlambda/2 + 1
+
+      ! line_lambda_grid(1:Nmid) = line_lambda_grid(1:Nmid)
+      ! line_lambda_grid(Nmid+1:Nlambda) = -line_lambda_grid(Nmid-1:1:-1)
+
+      ! line_lambda_grid = (1.0 + line_lambda_grid/c_light) * line%lambda0
+
+      ! ! line%lambdamin = (1.0 + minval(line_lambda_grid)/c_light) * line%lambda0
+      ! ! line%lambdamax = (1.0 + maxval(line_lambda_grid)/c_light) * line%lambda0
+
+      ! return
    end function line_lambda_grid
 
    function line_lambda_grid_dv(line,Nlambda)
@@ -172,7 +205,7 @@ module wavelengths_gas
       integer, intent(in) :: nlambda
       real(kind=dp), dimension(Nlambda) :: line_lambda_grid_dv
       type (atomicline), intent(inout) :: line
-      real(kind=dp) ::  vwing, vth
+      real(kind=dp) ::  vwing
       integer :: la, Nmid
 
       !not the exact width at a given cell, but the maximum extent!
@@ -214,7 +247,7 @@ module wavelengths_gas
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
       integer, dimension(:), allocatable :: sorted_indexes
-      real(kind=dp) :: max_cont, l0, l1, dvmin, vth_max
+      real(kind=dp) :: max_cont, l0, l1, dvmin
       real :: hv_loc !like hv
       real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
       logical :: check_for_overlap
@@ -247,11 +280,13 @@ module wavelengths_gas
             Nlambda_cont = Nlambda_cont + atom%continua(kr)%Nlambda
          enddo
          do kr=1,atom%Nline
+            call compute_line_bound(atom%lines(kr),.false.)
             if (associated(subgrid_line,line_lambda_grid)) then
                if (atom%lines(kr)%voigt) then
-                  atom%lines(kr)%Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+                  atom%lines(kr)%Nlambda = 2 * (Nlambda_line_w_log + Nlambda_line_c_lin - 1) - 1
                else
-                  atom%lines(kr)%Nlambda = Nlambda_line_gauss + mod(Nlambda_line_gauss+1,2)
+                  ! atom%lines(kr)%Nlambda = Nlambda_line_gauss + mod(Nlambda_line_gauss+1,2)
+                  atom%lines(kr)%Nlambda = 2 * (Nlambda_line_gauss_log + Nlambda_line_gauss_lin - 1) - 1
                endif
             ! elseif (associated(subgrid_line,line_lambda_grid_dv)) then
             !    atom%lines(kr)%Nlambda = nint(2 * line%vmax / hv + 1)
@@ -713,7 +748,6 @@ module wavelengths_gas
             !Does not change Nlambda -> represent local line.
             if (check_for_overlap) then
 
-               vth_max= vbroad(maxval(T),atom%weight,maxval(vturb))
                inner_atom_loop : do nb = 1, n_atoms
                   inner_line_loop : do krr=1, atoms(nb)%p%Nline
 
@@ -723,7 +757,7 @@ module wavelengths_gas
                      l0 = atom%lines(kr)%lambda0
                      l1 = atoms(nb)%p%lines(krr)%lambda0
 
-                     dvmin = c_light * abs(l1-l0)/l0 - atom%lines(kr)%vmax!vwing_on_vth*vth_max
+                     dvmin = c_light * abs(l1-l0)/l0 - atom%lines(kr)%vmax
                      !-> no overlap du to motion of cells
                      if (dvmin >  abs(vmax_overlap)) cycle inner_line_loop
 
@@ -736,17 +770,17 @@ module wavelengths_gas
 
                         if ((abs(ib-atom%lines(kr)%Nb) <= 5) .and. (abs(ir-atom%lines(kr)%Nr) <= 5)) cycle inner_line_loop
 
-                        write(*,*) "d_line-to-line (km/s)=", 1d-3*dvmin, " maxshift=", 1d-3*abs(vmax_overlap)
-                        write(*,*) "l0 ref=", l0, " l1=", l1
+                        ! write(*,*) "d_line-to-line (km/s)=", 1d-3*dvmin, " maxshift=", 1d-3*abs(vmax_overlap)
+                        ! write(*,*) "l0 ref=", l0, " l1=", l1
 
                         Noverlap = Noverlap + 1
                         atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, ir)
                         atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, ib)
-                        write(*,*) "overlap of line", kr, atom%lines(kr)%lambda0, " of atom ", atom%ID, &
+                        write(*,*) "--> overlap of line", kr, atom%lines(kr)%lambda0, " of atom ", atom%ID, &
                            " with line", krr, atoms(nb)%p%lines(krr)%lambda0, " of atom ", atoms(nb)%p%ID, " N0 = ", &
                            locate(lambda, atoms(nb)%p%lines(krr)%lambda0), " dvmin=", dvmin *1d-3
-                        write(*,*) " no overlap bounds on the grid:", atom%lines(kr)%Nb,atom%lines(kr)%Nr
-                        write(*,*) " bounds wtih overlap the grid:", atom%lines(kr)%Nover_inf,atom%lines(kr)%Nover_sup
+                        write(*,*) "  ** no overlap bounds on the grid:", atom%lines(kr)%Nb,atom%lines(kr)%Nr
+                        write(*,*) "  ** bounds wtih overlap the grid:", atom%lines(kr)%Nover_inf,atom%lines(kr)%Nover_sup
                         Nlambda_max_line_vel  = max(Nlambda_max_line_vel,atom%lines(kr)%Nover_sup-atom%lines(kr)%Nover_inf + 1)
                      endif
 
@@ -1613,7 +1647,7 @@ module wavelengths_gas
    ! function line_u_grid_loc(k, line, N)
    !    !return for line line and cell k, the paramer:
    !    ! u = (lambda - lambda0) / lambda0 * c_light / vth
-   !    integer, parameter :: Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+   !    integer, parameter :: Nlambda = 2 * (Nlambda_line_w_log + Nlambda_line_c_lin - 1) - 1
    !    integer, intent(in) :: k
    !    integer, intent(out) :: N
    !    real(kind=dp), dimension(Nlambda) :: line_u_grid_loc
@@ -1636,9 +1670,9 @@ module wavelengths_gas
    !    line_u_grid_loc = 0.0_dp
 
 
-   !    line_u_grid_loc(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
+   !    line_u_grid_loc(Nlambda_line_w_log:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w_log, -1)
 
-   !    line_u_grid_loc(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
+   !    line_u_grid_loc(Nlambda_line_w_log:Nlambda_line_c_lin+Nlambda_line_w_log-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_lin, 1)
 
    !    Nmid = Nlambda/2 + 1
 
@@ -1654,7 +1688,7 @@ module wavelengths_gas
 
 !    subroutine  define_local_gauss_profile_grid (atom)
 !       type (AtomType), intent(inout) :: atom
-!       real(kind=dp), dimension(2*(Nlambda_line_c_log+Nlambda_line_w-1)-1) :: vel
+!       real(kind=dp), dimension(2*(Nlambda_line_c_lin+Nlambda_line_w_log-1)-1) :: vel
 !       real(kind=dp) ::  vcore, vwing, v0, v1, vbroad
 !       integer :: Nlambda, la, Nmid, kr
 !  !     real, parameter :: fw = 7.0, fc = 4.0
@@ -1669,10 +1703,10 @@ module wavelengths_gas
 !       vel = 0.0_dp
 
 
-!       vel(Nlambda_line_w:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w, -1)
-!       vel(Nlambda_line_w:Nlambda_line_c_log+Nlambda_line_w-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_log, 1)
+!       vel(Nlambda_line_w_log:1:-1) = -spanl_dp(vcore, vwing, Nlambda_line_w_log, -1)
+!       vel(Nlambda_line_w_log:Nlambda_line_c_lin+Nlambda_line_w_log-1) = span_dp(-vcore, 0.0_dp, Nlambda_line_c_lin, 1)
 
-!       Nlambda = 2 * (Nlambda_line_w + Nlambda_line_c_log - 1) - 1
+!       Nlambda = 2 * (Nlambda_line_w_log + Nlambda_line_c_lin - 1) - 1
 
 !       Nmid = Nlambda/2 + 1
 

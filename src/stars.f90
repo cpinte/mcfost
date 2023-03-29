@@ -31,8 +31,6 @@ module stars
   real, dimension(:,:), allocatable :: ProDiMo_star_HR
 
   !onto the star(s)
-  !to move in parameters ?? (also remove in public declaration)
-  logical :: laccretion_shock
   real(kind=dp) :: T_hp, max_Thp = 0.0, min_Thp = 1d8 !photosphere heated.
   real(kind=dp) :: max_Tshock = 0.0, min_Tshock = 1d8 !soft X-rays emission from the shock
   real(kind=dp) :: max_Facc = 0.0, min_Facc = 1d8 !Accretion flux in W/m2
@@ -901,10 +899,12 @@ end subroutine intersect_stars
          return !no radiation from the star
       endif
 
+      !Stellar "surface" contribution
       star_rad(:) = Bpnu(N,lambda,etoile(i_star)%T*1d0)
 
       if (is_inshock(id, iray, i_star, icell0, x, y, z, Thp, Tshock, Facc)) then
          if (T_preshock > 0.0 ) then
+            star_rad(:) = 0.0_dp !set to zero before accumulation
             where (lambda > 364.2096)
                star_rad(:) = star_rad(:) + Bpnu(N,lambda,Thp)
             elsewhere (lambda <= 364.2096) !-> can be very large between ~ 40 and 91 nm.
@@ -912,7 +912,7 @@ end subroutine intersect_stars
                star_rad(:) = star_rad(:) + Bpnu(N,lambda,T_preshock)
             endwhere
          else
-            star_rad(:) = star_rad(:) +  Bpnu(N,lambda,Thp)
+            star_rad(:) = Bpnu(N,lambda,Thp) !no contribution from the star
          endif
          return
       endif
@@ -987,10 +987,11 @@ end subroutine intersect_stars
             !Facc = 1/2 rho vs^3 
             Facc = 0.5 * (1d-3 * masseH * wght_per_H * nHtot(icell0)) * abs(vaccr)**3
             Tloc = ( 0.75 * Facc / sigma )**0.25
-            is_inshock = (Tloc > 0.5 * etoile(i_star)%T)
+            ! is_inshock = (Tloc > 0.5 * etoile(i_star)%T)
+            is_inshock = (T_hp > 1.0_dp * etoile(i_star)%T)
             Thp = T_hp
             if (T_hp<=0.0) then 
-               is_inshock = (abs(T_hp) * Tloc > 1.0*etoile(i_star)%T) !depends on the local value
+               is_inshock = (abs(T_hp) * Tloc > 1.0_dp*etoile(i_star)%T) !depends on the local value
                Thp = abs(T_hp) * Tloc
             endif
             !assuming mu is 0.5
