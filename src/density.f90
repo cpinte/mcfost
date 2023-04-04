@@ -1739,6 +1739,7 @@ subroutine read_Sigma_file()
   status=0
   !  Get an unused Logical Unit Number to use to open the FITS file.
   call ftgiou(unit,status)
+  if (status /= 0) call error("surface density file, cannot get a free unit")
   write(*,*) "Reading surface density file : "//trim(sigma_file)
 
   if (n_zones > 1) then
@@ -1755,10 +1756,11 @@ subroutine read_Sigma_file()
   nullval=-999
 
   ! determine the size of density file
+  nfound = 0 ! to fix ifort bug
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if (nfound > 2) then
      write(*,*) "nfound = ", nfound, "instead of 1 or 2"
-     call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
+     call error('failed to read the NAXISn keywords of '//trim(sigma_file)//' file.')
   endif
 
   if ((naxes(1) /= n_rad)) then

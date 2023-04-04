@@ -21,6 +21,10 @@ ifeq ($(ifort), yes)
     SYSTEM=ifort
 endif
 
+ifeq ($(ifx), yes)
+    SYSTEM=ifx
+endif
+
 ifndef OPENMP
     OPENMP=yes
 endif
@@ -100,6 +104,30 @@ ifeq ($(SYSTEM), ifort)
     COMPFLAGS= -fopenmp
     LIBCXX= -cxxlib
     LIBS= $(LIB)/ifort
+endif
+
+ifeq ($(SYSTEM), ifx)
+    ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.12 -mdynamic-no-pic
+        STATIC_FLAGS= -static-intel -qopenmp-link static
+    else
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512
+        STATIC_FLAGS= -static-intel -qopenmp-link static -static-libstdc++
+    endif
+    FC= ifx
+    FFLAGS= -fpp -O3 -fp-model fast=2 -traceback $(ARCH)
+    DBLFLAG= -r8
+    DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
+               -warn uninitialized -warn unused -warn truncated_source
+    KNOWN_SYSTEM= yes
+    FOMPFLAGS= -qopenmp
+    IPOFLAGS= -ipo
+    CC= icx
+    CXX=icpx -std=c++11
+    CCFLAGS= -O3 -fp-model fast=2 -traceback $(ARCH)
+    COMPFLAGS= -qopenmp
+    LIBCXX= -cxxlib
+    LIBS= $(LIB)/ifx
 endif
 
 ifeq ($(SYSTEM), gfortran)
