@@ -45,7 +45,7 @@ Make sure you have increased the stacksize::
 Geometry
 --------
 
-The disc orientation is correct, but the red and blue shifted side are flipped.
+The disc orientation is correct, but the red and blue shifted sides are flipped.
 ^^^^^^^^^^^^^^^^^^^
 
 The easiest way to change the sign of the rotation without changing the orientation is to change the inclunation i to 180-i and the PA to PA+180.
