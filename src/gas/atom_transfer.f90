@@ -733,6 +733,7 @@ module atom_transfer
 
       if (n_iterate_ne > 0) then
          write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+         write(*,'("nH/ne "(1ES13.5E3, 1ES13.5E3))') maxval(nHtot/ne,mask=nhtot*ne>0), minval(nHtot/ne,mask=nHtot*ne>0)
          call write_electron
       endif
 
