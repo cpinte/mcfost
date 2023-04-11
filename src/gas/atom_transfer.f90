@@ -131,6 +131,8 @@ module atom_transfer
       allocate(Tion_ref(Nactiveatoms)); Tion_ref=0d0 !keep tracks of max Tion for all cells for each cont of each atom
       diff_old = 1.0_dp
       dM(:) = 1.0_dp
+      !init in case l_iterate_ne  is .false. (does not change a thing if l_iterate_ne)
+      dne = 0.0_dp
 
       !-> negligible
       mem_alloc_local = 0
@@ -523,7 +525,7 @@ module atom_transfer
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
             !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration,diff_loc)&!diff,diff_cont,dM)&
-            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm,voigt) &
+            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm,voigt,dne) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
@@ -555,7 +557,7 @@ module atom_transfer
                   diff_cont = max(diff_cont,dNc)
                   !TO DO, TBC :: include also dne ??
                   lcell_converged(icell) = (dN < precision) !(diff < precision)
-                  diff_loc(icell) = dN
+                  diff_loc(icell) = max(dN, dne)
 
                   !Re init for next iteration if any
                   do nact=1, NactiveAtoms
