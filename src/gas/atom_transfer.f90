@@ -278,7 +278,7 @@ module atom_transfer
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
                stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               ! if(diff_loc(icell) < 0.1 * dpops_max_error) cycle
+               if(diff_loc(icell) < 0.1 * dpops_max_error) cycle
 
                if (l_iterate) then
 
@@ -556,7 +556,7 @@ module atom_transfer
                   diff = max(diff, dN) ! pops
                   diff_cont = max(diff_cont,dNc)
                   !TO DO, TBC :: include also dne ??
-                  lcell_converged(icell) = (dN < precision) !(diff < precision)
+                  lcell_converged(icell) = (dN < precision).and.(dne < precision) !(diff < precision)
                   diff_loc(icell) = max(dN, dne)
 
                   !Re init for next iteration if any
