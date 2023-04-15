@@ -23,7 +23,7 @@ module atom_transfer
    use init_mcfost, only :  nb_proc
    use gas_contopac, only : background_continua_lambda
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
-        lnon_lte_loop, vlabs, calc_contopac_loc, set_max_damping
+        lnon_lte_loop, vlabs, calc_contopac_loc, set_max_damping, deactivate_lines, activate_lines, activate_continua, deactivate_continua
    use see, only : ngpop, Neq_ng, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
@@ -67,13 +67,13 @@ module atom_transfer
       ! integer :: , iray_start, n_rayons_max
       integer :: nact, imax, icell_max, icell_max_2
       integer :: icell, ilevel, nb, nr, unconverged_cells
-      integer, parameter :: maxIter = 150!, maxIter3 = 10
+      integer, parameter :: maxIter = 1000!150!, maxIter3 = 10
       !ray-by-ray integration of the SEE
       integer, parameter :: one_ray = 1!, n_rayons_start3 = 100
       logical :: lfixed_Rays, lconverged, lprevious_converged
       real :: rand, rand2, rand3, unconverged_fraction
       real(kind=dp) :: precision, vth
-      real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy,diff_loc
+      real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy,diff_loc, dne_loc
       real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
       real(kind=dp) :: diff, diff_old, dne, dN, dN1, dNc
       real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
@@ -157,9 +157,15 @@ module atom_transfer
       allocate(lcell_converged(n_cells),stat=alloc_status)
       if (alloc_Status > 0) call error("Allocation error lcell_converged")
       write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
-      allocate(diff_loc(n_cells),stat=alloc_status)
-      if (alloc_Status > 0) call error("Allocation error diff_loc")
-      write(*,*) " size diff_loc:", sizeof(diff_loc) / 1024./1024./1024.," GB"
+      if (n_iterate_ne > 0) then
+         allocate(diff_loc(n_cells), dne_loc(n_cells),stat=alloc_status)
+         if (alloc_Status > 0) call error("Allocation error diff/dne_loc")
+         write(*,*) " size diff_loc:", 2*sizeof(diff_loc) / 1024./1024./1024.," GB"
+      else
+         allocate(diff_loc(n_cells),stat=alloc_status)
+         if (alloc_Status > 0) call error("Allocation error diff_loc")
+         write(*,*) " size diff_loc:", sizeof(diff_loc) / 1024./1024./1024.," GB"
+      endif
       write(*,*) ""
 
       !-> negligible
@@ -216,6 +222,7 @@ module atom_transfer
          lprevious_converged = lforce_lte
          lcell_converged(:) = .false.
          diff_loc(:) = 1d50
+         dne_loc(:) = 0.0_dp
          lng_turned_on = .false.
          n_iter = 0
          conv_speed = 0.0
@@ -244,6 +251,9 @@ module atom_transfer
             !                    goes with maxIter
             write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; threshold: "(1ES11.2E3)"; Nrays: "(1I5))') &
                      n_iter, etape, precision, n_rayons
+            write(*,'("  -- min(diff_loc)="(1ES13.5E3))') minval(diff_loc,mask=icompute_atomRT>0)
+            if (n_iterate_ne > 0) &
+               write(*,'("  -- min(dne_loc)="(1ES13.5E3))') minval(dne_loc,mask=icompute_atomRT>0)
             ibar = 0
             n_cells_done = 0
 
@@ -457,7 +467,8 @@ module atom_transfer
             ! *******************  update ne metals  *******************!
             if (l_iterate_ne) then
                id = 1
-               dne = 0.0_dp
+               dne = 0.0_dp !=max(dne_loc)
+               dne_loc(:) = abs(1.0_dp - ne(:)/(1d-100 + ngpop(1,NactiveAtoms+1,:,1)))
                ! write(*,'("  OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
                !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                !$omp parallel &
@@ -525,7 +536,7 @@ module atom_transfer
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
             !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration,diff_loc)&!diff,diff_cont,dM)&
-            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm,voigt,dne) &
+            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,llimit_mem,tab_lambda_nm,voigt,dne_loc) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
@@ -555,9 +566,9 @@ module atom_transfer
                   !compare for all atoms and all cells
                   diff = max(diff, dN) ! pops
                   diff_cont = max(diff_cont,dNc)
-                  !TO DO, TBC :: include also dne ??
-                  lcell_converged(icell) = (dN < precision).and.(dne < precision) !(diff < precision)
-                  diff_loc(icell) = max(dN, dne)
+
+                  lcell_converged(icell) = (dN < precision).and.(dne_loc(icell) < precision) !(diff < precision)
+                  diff_loc(icell) = max(dN, dne_loc(icell))
 
                   !Re init for next iteration if any
                   do nact=1, NactiveAtoms
@@ -748,6 +759,7 @@ module atom_transfer
 
       call dealloc_nlte_var()
       deallocate(dM, dTM, Tex_ref, Tion_ref, diff_loc)
+      if (n_iterate_ne > 0) deallocate(dne_loc)
       deallocate(stream, ds, vlabs, lcell_converged)
 
       ! --------------------------------    END    ------------------------------------------ !
@@ -761,6 +773,46 @@ module atom_transfer
 
       return
    end subroutine nlte_loop_mali
+
+   subroutine solve_for_nlte_pops()
+      ! Wrapper to solve for the non-LTE populations.
+      ! First solve the continuum radiative transfer, 
+      ! then for the continuum + gas lines.
+      ! In the continuum radiative transfer, bound-bound
+      ! transitions are in zero radiation field limits.
+
+      !allocate cont grid only first to speed up
+      !remove Collision rates and Aji for lines also (?)
+
+      ! call deactivate_lines()
+         ! deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
+         ! call make_wavelengths_nlte(tab_lambda_nm,vmax_overlap=v_char)
+         ! n_lambda = size(tab_lambda_nm)
+         ! tab_lambda = tab_lambda_nm * m_to_km
+
+         ! !allocate quantities in space and for this frequency grid
+         ! call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      ! call nlte_loop_mali()
+      ! call activate_lines()
+         ! deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
+         ! call make_wavelengths_nlte(tab_lambda_nm,vmax_overlap=v_char)
+         ! n_lambda = size(tab_lambda_nm)
+         ! tab_lambda = tab_lambda_nm * m_to_km
+
+         ! !allocate quantities in space and for this frequency grid
+         ! call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      ! Ndelay_iterate_ne = max(Ndelay_iterate_ne,3)
+      ! call nlte_loop_mali()
+call dealloc_atom_opac()
+call deactivate_continua()
+call alloc_atom_opac(n_lambda, tab_lambda_nm)
+call nlte_loop_mali()
+call dealloc_atom_opac
+call activate_continua
+call alloc_atom_opac(n_lambda, tab_lambda_nm)
+call nlte_loop_mali
+      return
+   end subroutine solve_for_nlte_pops
 
   subroutine compute_max_relative_velocity(dv)
   !
@@ -1031,6 +1083,7 @@ module atom_transfer
          call alloc_atom_opac(n_lambda, tab_lambda_nm)
 
          call nlte_loop_mali()
+         ! call solve_for_nlte_pops
          if (lexit_after_nonlte_loop) return
 
       end if !active atoms
