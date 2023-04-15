@@ -59,6 +59,43 @@ module Opacity_atom
       return
    end subroutine set_max_damping
 
+   subroutine deactivate_lines()
+      integer :: nact, kr
+      do nact=1, N_Atoms
+         do kr=1, Atoms(nact)%p%Nline
+            atoms(nact)%p%lines(kr)%lcontrib = .false.
+         enddo
+      enddo
+      return 
+   end subroutine deactivate_lines
+   subroutine activate_lines()
+      integer :: nact, kr
+      do nact=1, N_Atoms
+         do kr=1, Atoms(nact)%p%Nline
+            atoms(nact)%p%lines(kr)%lcontrib = .true.
+         enddo
+      enddo
+      return 
+   end subroutine activate_lines
+   subroutine deactivate_continua()
+      integer :: nact, kr
+      do nact=1, N_Atoms
+         do kr=1, Atoms(nact)%p%Ncont
+            atoms(nact)%p%continua(kr)%lcontrib = .false.
+         enddo
+      enddo
+      return 
+   end subroutine deactivate_continua
+   subroutine activate_continua()
+      integer :: nact, kr
+      do nact=1, N_Atoms
+         do kr=1, Atoms(nact)%p%ncont
+            atoms(nact)%p%continua(kr)%lcontrib = .true.
+         enddo
+      enddo
+      return 
+   end subroutine activate_continua
+
    !could be parralel
    subroutine alloc_atom_opac(N,x)
       integer, intent(in) :: N
