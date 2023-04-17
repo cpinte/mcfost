@@ -113,6 +113,7 @@ module see
 
         allocate(tab_Aji_cont(NmaxCont,NactiveAtoms,n_cells))
         allocate(tab_Vij_cont(Nlambda_max_cont,NmaxCont,NactiveAtoms))
+        tab_Aji_cont = 0.0_dp; tab_Vij_cont = 0.0_dp
         write(*,*) " size tab_Aji_cont:", sizeof(tab_Aji_cont) / 1024./1024./1024.," GB"
         write(*,*) " size tab_Vij_cont:", sizeof(tab_Vij_cont) / 1024./1024./1024.," GB"
         !integrate in frequency Uji which is fourpi/h * anu * 2hnu3/c2 * exp(-hnu/kT)
@@ -120,7 +121,8 @@ module see
         mem_alloc_local = mem_alloc_local + sizeof(tab_Aji_cont) + sizeof(tab_Vij_cont)
         do n=1, NactiveAtoms
             atom => ActiveAtoms(n)%p
-            do kr=1,atom%Ncont
+            ct_loop : do kr=1,atom%Ncont
+                if (.not.atom%continua(kr)%lcontrib) cycle ct_loop
                 i = atom%Continua(kr)%i
                 j = atom%continua(kr)%j
                 if (atom%continua(kr)%hydrogenic) then
@@ -173,7 +175,7 @@ module see
                         enddo
                     endif
                 enddo
-            enddo
+            enddo ct_loop
         enddo
         atom => null()
 
@@ -498,12 +500,17 @@ module see
             i = atom%continua(kr)%i; j = atom%continua(kr)%j
             atom%continua(kr)%Rij(id) = 0.0_dp
             !updated value of ni and nj!
+            !-> 0 if cont does not contribute to opac.
             atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
                  atom%nstar(i,icell)/atom%nstar(j,icell)
         enddo
 
         do kr=1,atom%Nline
             atom%lines(kr)%Rij(id) = 0.0_dp
+            if (.not.atom%lines(kr)%lcontrib) then
+                atom%lines(kr)%Rji(id) = 0.0_dp
+                cycle
+            endif
             atom%lines(kr)%Rji(id) = nlte_fact * atom%lines(kr)%Aji
         enddo
 
@@ -531,13 +538,15 @@ module see
         integer :: kr, i, j, Nl, Nr, Nb, ip, jp, Nrp, Nbp
         integer :: i0, l, nact, krr
         real(kind=dp) :: jbar_up, jbar_down, xcc_down, xcc_up
-        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star
+        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star, gij
         real(kind=dp) :: ehnukt, ehnukt1
 ! write(*,*) icell, T(icell)
         atom_loop : do nact = 1, Nactiveatoms
             atom => ActiveAtoms(nact)%p
 
             line_loop : do kr=1, atom%Nline
+
+                if (.not.atom%lines(kr)%lcontrib) cycle line_loop
 
                 Nr = atom%lines(kr)%Nr;Nb = atom%lines(kr)%Nb
                 i = atom%lines(kr)%i
@@ -547,6 +556,8 @@ module see
                 i0 = Nb - 1
 
                 phi0(1:Nl) = phi_loc(1:Nl,kr,nact,iray,id)
+                !-> otherwise phi_loc is 0 and there are normalisation issues with wphi
+                if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle line_loop
 
                 Jbar_up = 0.0
                 xcc_down = 0.0
@@ -615,11 +626,14 @@ module see
             end do line_loop
 
             cont_loop : do kr = 1, atom%Ncont
+                if (.not.atom%continua(kr)%lcontrib) cycle cont_loop
 
                 i = atom%continua(kr)%i; j = atom%continua(kr)%j
 
           !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
                 ni_on_nj_star = atom%nstar(i,icell)/atom%nstar(j,icell)
+                gij = ni_on_nj_star * exp(-hc_k/T(icell)/atom%continua(kr)%lambda0)
+                if ((atom%n(i,icell) - atom%n(j,icell) * gij) <= 0.0_dp) cycle cont_loop
 
                 Nb = atom%continua(kr)%Nb; Nr = atom%continua(kr)%Nr
                 Nl = Nr-Nb + 1
