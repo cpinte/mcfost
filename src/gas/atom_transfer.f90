@@ -251,9 +251,9 @@ module atom_transfer
             !                    goes with maxIter
             write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; threshold: "(1ES11.2E3)"; Nrays: "(1I5))') &
                      n_iter, etape, precision, n_rayons
-            write(*,'("  -- min(diff_loc)="(1ES13.5E3))') minval(diff_loc,mask=icompute_atomRT>0)
-            if (n_iterate_ne > 0) &
-               write(*,'("  -- min(dne_loc)="(1ES13.5E3))') minval(dne_loc,mask=icompute_atomRT>0)
+            ! write(*,'("  -- min(diff_loc)="(1ES13.5E3))') minval(diff_loc,mask=(icompute_atomRT>0).and.(diff_loc >= 1d-2 * precision))
+            ! if (n_iterate_ne > 0) &
+            !    write(*,'("  -- min(dne_loc)="(1ES13.5E3))') minval(dne_loc,mask=(icompute_atomRT>0).and.(dne_loc >= 1d-2 * precision))
             ibar = 0
             n_cells_done = 0
 
@@ -288,7 +288,7 @@ module atom_transfer
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
                stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               if(diff_loc(icell) < 0.1 * dpops_max_error) cycle
+               ! if(diff_loc(icell) < 1d-2 * dpops_max_error) cycle
 
                if (l_iterate) then
 
@@ -779,38 +779,18 @@ module atom_transfer
       ! First solve the continuum radiative transfer, 
       ! then for the continuum + gas lines.
       ! In the continuum radiative transfer, bound-bound
-      ! transitions are in zero radiation field limits.
+      ! transitions are in LTE (only cij and cji).
 
-      !allocate cont grid only first to speed up
-      !remove Collision rates and Aji for lines also (?)
+      ! TO DO allocate cont grid only first to speed up
 
-      ! call deactivate_lines()
-         ! deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
-         ! call make_wavelengths_nlte(tab_lambda_nm,vmax_overlap=v_char)
-         ! n_lambda = size(tab_lambda_nm)
-         ! tab_lambda = tab_lambda_nm * m_to_km
-
-         ! !allocate quantities in space and for this frequency grid
-         ! call alloc_atom_opac(n_lambda, tab_lambda_nm)
-      ! call nlte_loop_mali()
-      ! call activate_lines()
-         ! deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
-         ! call make_wavelengths_nlte(tab_lambda_nm,vmax_overlap=v_char)
-         ! n_lambda = size(tab_lambda_nm)
-         ! tab_lambda = tab_lambda_nm * m_to_km
-
-         ! !allocate quantities in space and for this frequency grid
-         ! call alloc_atom_opac(n_lambda, tab_lambda_nm)
-      ! Ndelay_iterate_ne = max(Ndelay_iterate_ne,3)
-      ! call nlte_loop_mali()
-call dealloc_atom_opac()
-call deactivate_continua()
-call alloc_atom_opac(n_lambda, tab_lambda_nm)
-call nlte_loop_mali()
-call dealloc_atom_opac
-call activate_continua
-call alloc_atom_opac(n_lambda, tab_lambda_nm)
-call nlte_loop_mali
+      call deactivate_lines()
+      call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      call nlte_loop_mali()
+      call activate_lines()
+      call dealloc_atom_opac()
+      call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      Ndelay_iterate_ne = max(Ndelay_iterate_ne,3)
+      call nlte_loop_mali()
       return
    end subroutine solve_for_nlte_pops
 
@@ -1079,11 +1059,11 @@ call nlte_loop_mali
          n_lambda = size(tab_lambda_nm)
          tab_lambda = tab_lambda_nm * m_to_km
 
-         !allocate quantities in space and for this frequency grid
-         call alloc_atom_opac(n_lambda, tab_lambda_nm)
+         ! !allocate quantities in space and for this frequency grid
+         ! call alloc_atom_opac(n_lambda, tab_lambda_nm)
 
-         call nlte_loop_mali()
-         ! call solve_for_nlte_pops
+         ! call nlte_loop_mali()
+         call solve_for_nlte_pops
          if (lexit_after_nonlte_loop) return
 
       end if !active atoms
