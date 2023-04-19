@@ -282,13 +282,13 @@ module atom_transfer
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on) & ! Ng's Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,n_cells_remaining) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
-            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,dpops_max_error)
+            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,precision)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
                stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               ! if(diff_loc(icell) < 1d-2 * dpops_max_error) cycle
+               if(diff_loc(icell) < 1d-2 * precision) cycle
 
                if (l_iterate) then
 
@@ -373,7 +373,7 @@ module atom_transfer
                !$omp atomic
                n_cells_done = n_cells_done + 1
                n_cells_remaining = size(pack(diff_loc, &
-                                    mask=(diff_loc < 0.1 * dpops_max_error)))
+                                    mask=(diff_loc < 1d-2 * precision)))
                if (real(n_cells_done) > 0.02*ibar*n_cells) then
              	   call progress_bar(ibar)
              	   !$omp atomic
@@ -517,12 +517,12 @@ module atom_transfer
                ! write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
                !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                ! write(*,*) ''
-               ! if (dne < 1d-2 * precision) then
-               !    write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
-               !    !stop iterating ne
-               !    n_iterate_ne = 0
-               !    !but should be able to restart it if change in diff are large.
-               ! endif
+               if (dne < 1d-2 * precision) then
+                  !Or compare with 3 previous values of dne ? that should be below 1e-2 precision
+                  !Do we need to restart it eventually ?
+                  write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
+                  n_iterate_ne = 0
+               endif
             end if
             !***********************************************************!
 
@@ -1063,9 +1063,11 @@ module atom_transfer
          tab_lambda = tab_lambda_nm * m_to_km
 
          ! !allocate quantities in space and for this frequency grid
-         ! call alloc_atom_opac(n_lambda, tab_lambda_nm)
-
-         ! call nlte_loop_mali()
+         call alloc_atom_opac(n_lambda, tab_lambda_nm)
+         llocal_coupling_only = .true.
+         call nlte_loop_mali()
+         llocal_coupling_only = .false.
+         call nlte_loop_mali()
          call solve_for_nlte_pops
          if (lexit_after_nonlte_loop) return
 
