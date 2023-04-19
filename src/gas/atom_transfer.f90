@@ -1068,7 +1068,7 @@ module atom_transfer
          call nlte_loop_mali()
          llocal_coupling_only = .false.
          call nlte_loop_mali()
-         call solve_for_nlte_pops
+         ! call solve_for_nlte_pops
          if (lexit_after_nonlte_loop) return
 
       end if !active atoms
