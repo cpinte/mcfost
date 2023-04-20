@@ -1160,7 +1160,6 @@ end subroutine optical_length_tot_mol
          endif
 
          nbr_cell = nbr_cell + 1
-         if ((llocal_coupling_only.and.labs).and.nbr_cell>1) lcellule_non_vide=.false.
 
          ! Calcul longeur de vol et profondeur optique dans la cellule
          previous_cell = 0 ! unused, just for Voronoi

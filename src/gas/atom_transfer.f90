@@ -67,7 +67,7 @@ module atom_transfer
       ! integer :: , iray_start, n_rayons_max
       integer :: nact, imax, icell_max, icell_max_2
       integer :: icell, ilevel, nb, nr, unconverged_cells
-      integer, parameter :: maxIter = 1000!150!, maxIter3 = 10
+      integer, parameter :: maxIter = 300!150!, maxIter3 = 10
       !ray-by-ray integration of the SEE
       integer, parameter :: one_ray = 1!, n_rayons_start3 = 100
       logical :: lfixed_Rays, lconverged, lprevious_converged
@@ -1064,9 +1064,7 @@ module atom_transfer
 
          ! !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm)
-         llocal_coupling_only = .true.
-         call nlte_loop_mali()
-         llocal_coupling_only = .false.
+
          call nlte_loop_mali()
          ! call solve_for_nlte_pops
          if (lexit_after_nonlte_loop) return
