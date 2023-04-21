@@ -506,7 +506,7 @@ module atom_type
          endif
       enddo
 
-      if (print_message) write(*,'(" cswitch for next iteration: "(1ES17.8E3))') new_cs
+      if (print_message) write(*,'(" ** cswitch for next iteration: "(1ES17.8E3))') new_cs
 
 
       return

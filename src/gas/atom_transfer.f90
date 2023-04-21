@@ -157,15 +157,9 @@ module atom_transfer
       allocate(lcell_converged(n_cells),stat=alloc_status)
       if (alloc_Status > 0) call error("Allocation error lcell_converged")
       write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
-      if (n_iterate_ne > 0) then
-         allocate(diff_loc(n_cells), dne_loc(n_cells),stat=alloc_status)
-         if (alloc_Status > 0) call error("Allocation error diff/dne_loc")
-         write(*,*) " size diff_loc:", 2*sizeof(diff_loc) / 1024./1024./1024.," GB"
-      else
-         allocate(diff_loc(n_cells),stat=alloc_status)
-         if (alloc_Status > 0) call error("Allocation error diff_loc")
-         write(*,*) " size diff_loc:", sizeof(diff_loc) / 1024./1024./1024.," GB"
-      endif
+      allocate(diff_loc(n_cells), dne_loc(n_cells),stat=alloc_status)
+      if (alloc_Status > 0) call error("Allocation error diff/dne_loc")
+      write(*,*) " size diff_loc:", 2*sizeof(diff_loc) / 1024./1024./1024.," GB"
       write(*,*) ""
 
       !-> negligible
@@ -240,6 +234,14 @@ module atom_transfer
             call system_clock(cstart_iter,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpustart_iter)
 
+            if (lcswitch_enabled) then
+               !deactivate
+               if (maxval_cswitch_atoms()==1.0_dp) then
+                  write(*,*) " ** cswitch off."
+                  lcswitch_enabled = .false.
+               endif
+            endif
+
             n_iter = n_iter + 1
             !-> ng_index depends only on the value of n_iter for a given Neq_ng
             ! it is the index of solutions stored in ngpop. ng_index is 1 for the current solution.
@@ -282,13 +284,13 @@ module atom_transfer
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on) & ! Ng's Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,n_cells_remaining) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
-            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,precision)
+            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,precision,lcswitch_enabled)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
                stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               if(diff_loc(icell) < 1d-2 * precision) cycle
+               if( (diff_loc(icell) < 1d-2 * precision).and..not.lcswitch_enabled ) cycle
 
                if (l_iterate) then
 
@@ -412,8 +414,8 @@ module atom_transfer
             !***********************************************************!
             ! ********************** GLOBAL NG's ***********************!
             ! Here minimize Ncells x Nlevels x Ng_Norder per atoms.
-            accelerated = .false.
-            if ( (lNg_acceleration .and. lng_turned_on).and.(maxval_cswitch_atoms()==1.0_dp)&
+            accelerated = .false.!(maxval_cswitch_atoms()==1.0_dp)
+            if ( (lNg_acceleration .and. lng_turned_on).and.(.not.lcswitch_enabled)&
                   .and.(.not.lprevious_converged) ) then
                iorder = n_iter - Ng_Ndelay
                if (ng_rest) then
@@ -517,7 +519,7 @@ module atom_transfer
                ! write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
                !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                ! write(*,*) ''
-               if (dne < 1d-2 * precision) then
+               if ((dne < 1d-2 * precision).and.(.not.lcswitch_enabled)) then
                   !Or compare with 3 previous values of dne ? that should be below 1e-2 precision
                   !Do we need to restart it eventually ?
                   write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
@@ -651,7 +653,7 @@ module atom_transfer
                lconverged = .true.
             endif
             !
-            if ((diff < precision).and.maxval_cswitch_atoms()==1.0_dp)then
+            if ((diff < precision).and.(.not.lcswitch_enabled))then!maxval_cswitch_atoms()==1.0_dp
             ! if ( (unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp)then
             ! if ( ((unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp).or.&
                !  ((diff < precision).and.maxval_cswitch_atoms()==1.0_dp) )then
@@ -761,8 +763,8 @@ module atom_transfer
       if (loutput_rates) call write_rates()
 
       call dealloc_nlte_var()
-      deallocate(dM, dTM, Tex_ref, Tion_ref, diff_loc)
-      if (n_iterate_ne > 0) deallocate(dne_loc)
+      deallocate(dM, dTM, Tex_ref, Tion_ref)
+      deallocate(diff_loc, dne_loc)
       deallocate(stream, ds, vlabs, lcell_converged)
 
       ! --------------------------------    END    ------------------------------------------ !
@@ -785,6 +787,8 @@ module atom_transfer
       ! transitions are in LTE (only cij and cji).
 
       ! TO DO allocate cont grid only first to speed up
+
+      ! add sobolev/escape here ?
 
       call deactivate_lines()
       call alloc_atom_opac(n_lambda, tab_lambda_nm)
