@@ -957,7 +957,7 @@ module see
                 do j=1,at%Nlevel
                     at%n(j,icell) = at%n(j,icell) * ( 1.0_dp + fvar((i-1)+j,id)/(1.0_dp + d_damp * abs(fvar((i-1)+j,id))) )
                     if (at%n(j,icell) < 0.0) neg_pops = .true.
-                    ! if (at%n(j,icell) < frac_limit_pops * sum(npop_dag(1:at%Nlevel,id)) )then
+                    ! if (at%n(j,icell) < frac_limit_pops * at%Abund*nHtot(icell) )then
                     !     write(*,*) "small pops for level ", j
                     ! endif
                 enddo
@@ -969,6 +969,7 @@ module see
             if (verbose)write(*,*) ( 1.0 + fvar(neq_ne,id)/(1.0_dp + d_damp * abs(fvar(neq_ne,id))) )
             if (verbose)write(*,*) fvar(neq_ne,id), d_damp
             !                       1d-16
+            ! if (ne(icell) < frac_limit_pops * nhtot(icell)) write(*,*) "** small ne at cell ", icell
             if ( (ne(icell) < frac_limit_pops * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
             !-> here pops_ion has the old values !
             !restart with more iterations and larger damping (more stable, slower convergence)
