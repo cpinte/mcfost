@@ -519,12 +519,12 @@ module atom_transfer
                ! write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
                !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                ! write(*,*) ''
-               if ((dne < 1d-2 * precision).and.(.not.lcswitch_enabled)) then
-                  !Or compare with 3 previous values of dne ? that should be below 1e-2 precision
-                  !Do we need to restart it eventually ?
-                  write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
-                  n_iterate_ne = 0
-               endif
+               ! if ((dne < 1d-2 * precision).and.(.not.lcswitch_enabled)) then
+               !    !Or compare with 3 previous values of dne ? that should be below 1e-2 precision
+               !    !Do we need to restart it eventually ?
+               !    write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
+               !    n_iterate_ne = 0
+               ! endif
             end if
             !***********************************************************!
 
