@@ -970,6 +970,7 @@ module see
             if (verbose)write(*,*) fvar(neq_ne,id), d_damp
             !                       1d-16
             ! if (ne(icell) < frac_limit_pops * nhtot(icell)) write(*,*) "** small ne at cell ", icell
+            ! if ( (ne(icell) < frac_limit_pops * nHtot(icell)).or.(neg_pops) ) rest_damping = .true.
             if ( (ne(icell) < frac_limit_pops * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
             !-> here pops_ion has the old values !
             !restart with more iterations and larger damping (more stable, slower convergence)
@@ -1096,6 +1097,23 @@ module see
     return
   end subroutine ionisation_frac_lte
 
+  function jions(id)
+  !sum of ions times charge for nlte ions
+    real(kind=dp) :: jions
+    integer, intent(in) :: id
+    real(kind=dp) :: sum_ions
+    integer :: n, j
+
+    jions = 0
+    do n=1,Nactiveatoms
+        do j=1, activeatoms(n)%p%Nstage-1
+            jions = jions + j * pops_ion(j,n,id)
+        enddo
+    enddo
+
+    return
+  endfunction jions
+
     subroutine non_lte_charge_conservation (id,icell, neq, x, f, df)
     !F_cc = 1.0 - 1/ne * (np + nHeII + 2*nHeIII) = 0
     !F_cc = 1.0 - 1/ne * (sum_atom pops_ion(atom)*stage(ion)) = 0
@@ -1109,12 +1127,13 @@ module see
         real(kind=dp) :: akj, sum_ions, st
         real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
 
-        sum_ions = 0
-        do n=1,Nactiveatoms
-            do j=1, activeatoms(n)%p%Nstage-1
-                sum_ions = sum_ions + j * pops_ion(j,n,id)
-            enddo
-        enddo
+        ! sum_ions = 0
+        ! do n=1,Nactiveatoms
+        !     do j=1, activeatoms(n)%p%Nstage-1
+        !         sum_ions = sum_ions + j * pops_ion(j,n,id)
+        !     enddo
+        ! enddo
+        sum_ions = jions(id)
 
         !derivative of CC to ne
         f(neq) = 1.0_dp - sum_ions / x(neq) !factor 2 for nHeIII included (1 for np and nheII)
