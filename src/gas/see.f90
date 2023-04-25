@@ -17,7 +17,7 @@ module see
     implicit none
 
     !populations below that threshold not taken into account in convergence.
-    real(kind=dp), parameter :: frac_limit_pops = 1d-10!1d-50
+    real(kind=dp), parameter :: frac_limit_pops = 1d-15!1d-50
     !Variables for Non-LTE loop and MALI method
     real(kind=dp), allocatable ::  ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
@@ -957,6 +957,9 @@ module see
                 do j=1,at%Nlevel
                     at%n(j,icell) = at%n(j,icell) * ( 1.0_dp + fvar((i-1)+j,id)/(1.0_dp + d_damp * abs(fvar((i-1)+j,id))) )
                     if (at%n(j,icell) < 0.0) neg_pops = .true.
+                    ! if (at%n(j,icell) < frac_limit_pops * sum(npop_dag(1:at%Nlevel,id)) )then
+                    !     write(*,*) "small pops for level ", j
+                    ! endif
                 enddo
                 i = i + at%Nlevel
             enddo
