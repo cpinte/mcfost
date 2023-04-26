@@ -311,7 +311,6 @@ end subroutine BHMIE
 
 !***************************************************
 
-
 subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
 !***************************************************************
 ! calcule les elements de la matrice de diffusion a partir de
@@ -409,6 +408,26 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
   return
 
 end subroutine mueller_Mie
+
+!***************************************************
+
+subroutine overwrite_s12(Pmax)
+
+  real, intent(in) :: Pmax
+
+  real :: dtheta, theta
+  integer :: j
+
+  dtheta = pi/real(nang_scatt)
+  do j=0,nang_scatt
+     theta = real(j)*dtheta
+     tab_s12(j,:,:) = - Pmax * (1-(cos(theta))**2)
+  enddo
+
+  return
+
+end subroutine overwrite_s12
+
 
 !***************************************************
 

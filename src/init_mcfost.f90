@@ -207,6 +207,7 @@ subroutine set_default_variables()
   theta_max = 0.5*pi
   llinear_rgrid = .false.
   image_offset_centre(:) = (/0.0,0.0,0.0/)
+  loverwrite_s12 = .false.
 
   tmp_dir = "./"
 
@@ -474,7 +475,7 @@ subroutine initialisation_mcfost()
         i_arg = i_arg+1
      case("-split_image")
          lsepar_ori = .true.
-         i_arg = i_arg + 1            
+         i_arg = i_arg + 1
      case("-op")
         limg=.true.
         lopacite_only=.true.
@@ -1415,6 +1416,12 @@ subroutine initialisation_mcfost()
      case("-old_PA")
         i_arg = i_arg + 1
         lold_PA = .true.
+     case("-Pmax")
+        loverwrite_s12 = .true.
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) Pmax
+        i_arg = i_arg + 1
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1859,6 +1866,7 @@ subroutine display_help()
   write(*,*) "        : -turn-off_dust_subl : ignore dust sublimation"
   write(*,*) "        : -img_offset <x0> <y0> <z0> : Centres the observer's los in (x0,y0,z0)"
   write(*,*) "        : -split_image : Split a fits image in a fits file for each orienation (incl,azim)"
+  write(*,*) "        : -Pmax <calue> : force s12 to be a bell shape peaking at Pmax (between 0 and 1)"
   write(*,*) " "
   write(*,*) " Options related to temperature equilibrium"
   write(*,*) "        : -no_T : skip temperature calculations, force ltemp to F"
