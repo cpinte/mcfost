@@ -64,7 +64,7 @@ module parametres
   logical :: lemission_atom, lelectron_scattering, lforce_lte,  &
             	ldissolve, loutput_rates, lzeeman_polarisation
   integer :: N_rayons_mc, istep_start, istep_end
- 
+
   !HEALpix
   integer :: healpix_lorder, healpix_lmin, healpix_lmax !lmin and lmax not yet (for local evaluation)
 
@@ -161,6 +161,10 @@ module parametres
   ! Disk parameters
   real :: distance ! Distance du disque en pc
   real(kind=dp) :: map_size
+
+  ! Polarisation
+  logical :: loverwrite_s12
+  real :: Pmax
 
   integer :: n_zones, n_regions
 
