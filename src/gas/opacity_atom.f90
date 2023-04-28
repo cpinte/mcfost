@@ -783,20 +783,21 @@ module Opacity_atom
    end function profile_art_i
 
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
+   !To do: store opacity in 3d arrays in space instead of icell
       integer, intent(in) :: Nlambda
       real(kind=dp), intent(in) :: lambda(Nlambda)
       integer :: unit, unit2, status = 0
       integer :: alloc_status, id, icell, m, Nrec
       real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
       real(kind=dp), allocatable, dimension(:,:,:) :: chic_tmp, etac_tmp
-      character(len=11) :: filename_chi="chi.bin"
-      character(len=50) :: filename_eta="eta.bin"
-      character(len=18) :: filename_rho="magnetoopt.bin"
+      character(len=11) :: filename_chi="chi.b"
+      character(len=50) :: filename_eta="eta.b"
+      character(len=18) :: filename_rho="magnetoopt.b"
       real(kind=dp) :: zero_dp, u, v, w
 
       zero_dp = 0.0_dp
       u = zero_dp; v = zero_dp; w = zero_dp
-      write(*,*) " Writing emissivity and opacity (rest frame)..."
+      write(*,*) " ** Writing emissivity and opacity (zero-velocity)..."
       ! if (lmagnetized) then
       !    Nrec = 4
       !    allocate(rho_tmp(Nlambda,n_cells,Nrec-1),stat=alloc_status)
@@ -806,19 +807,23 @@ module Opacity_atom
          Nrec = 1
       ! endif
       allocate(chi_tmp(Nlambda, n_cells, Nrec),stat=alloc_status)
-      if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
+      if (alloc_status /= 0) call error("(write_opac_bin) Cannot allocate chi_tmp !")
       allocate(eta_tmp(Nlambda, n_cells, Nrec),stat=alloc_status)
-      if (alloc_status /= 0) call error("Cannot allocate eta_tmp !")
+      if (alloc_status /= 0) call error("(write_opac_bin) Cannot allocate eta_tmp !")
       allocate(chic_tmp(Nlambda, n_cells, 1),stat=alloc_status)
-      if (alloc_status /= 0) call error("Cannot allocate chic_tmp !")
+      if (alloc_status /= 0) call error("(write_opac_bin) Cannot allocate chic_tmp !")
       allocate(etac_tmp(Nlambda, n_cells, 1),stat=alloc_status)
-      if (alloc_status /= 0) call error("Cannot allocate etac_tmp !")
+      if (alloc_status /= 0) call error("(write_opac_bin) Cannot allocate etac_tmp !")
 
+      chi_tmp = 0.0; eta_tmp = 0.0; chic_tmp = 0.0; etac_tmp = 0.0
 
       call ftgiou(unit,status)
       call ftgiou(unit2,status)
       open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="sequential",iostat=status)
       open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="sequential",iostat=status)
+      !write wavelength first
+      write(unit,iostat=status) lambda
+      write(unit2,iostat=status) lambda
       id = 1
       do icell=1, n_cells
          !$ id = omp_get_thread_num() + 1
@@ -836,11 +841,6 @@ module Opacity_atom
             !    !only QUV for rho_p
             !    rho_tmp(:,m-1,icell) = rho_p(:,m-1,id)
             ! enddo
-         else
-            chi_tmp(:,icell,:) = 0.0
-            eta_tmp(:,icell,:) = 0.0
-            chic_tmp(:,icell,:) = 0.0
-            etac_tmp(:,icell,:) = 0.0
          endif
       enddo
 
