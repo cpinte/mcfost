@@ -23,6 +23,8 @@ module init_mcfost
 contains
 
 subroutine set_default_variables()
+  ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+  ! 20/04/2023
 
   ! Pour code sequentiel
   nb_proc=1 ; lpara=.false.
@@ -44,6 +46,8 @@ subroutine set_default_variables()
   limg=.false.
   lorigine=.false.
   laggregate=.false.
+  lmueller=.false.
+  lper_size = .false.
   l3D=.false.
   lopacite_only=.false.
   lseed=.false.
@@ -266,6 +270,8 @@ end subroutine get_mcfost_utils_dir
 !**********************************************
 
 subroutine initialisation_mcfost()
+! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! 20/04/2023
 
   implicit none
 
@@ -508,11 +514,30 @@ subroutine initialisation_mcfost()
      case("-aggregate")
         laggregate=.true.
         i_arg = i_arg+1
+        if (lmueller) call error ("You can't use both -aggregate and -mueller options")
+        if (lper_size) call error ("You can't use both -aggregate and -mueller_size options")
         if (i_arg > nbr_arg) call error("GMM input file needed")
         call get_command_argument(i_arg,aggregate_file)
         i_arg = i_arg+1
         if (i_arg > nbr_arg) call error("GMM input file needed")
         call get_command_argument(i_arg,mueller_aggregate_file)
+     case("-mueller")
+        lmueller=.true.
+        i_arg = i_arg+1
+        if (laggregate) call error ("You can't use both  -mueller and -aggregate options")
+        if (lper_size) call error ("You can't use both -mueller and -mueller_size options")
+        if (i_arg > nbr_arg) call error("Mueller input file needed")
+        call get_command_argument(i_arg,mueller_file)
+        i_arg = i_arg+1
+     case("-mueller_size")
+        lper_size = .true.
+        i_arg = i_arg+1
+        if (laggregate) call error ("You can't use both -mueller_size and -aggregate options")
+        if (lmueller) call error ("You can't use both -mueller_size and -mueller options")
+        lmueller=.true.
+        if (i_arg > nbr_arg) call error("Mueller input pathfile needed")
+        call get_command_argument(i_arg,mueller_file)
+        i_arg = i_arg+1
      case("-3D")
         l3D=.true.
         i_arg = i_arg+1
@@ -1797,6 +1822,8 @@ end subroutine initialisation_mcfost
 !********************************************************************
 
 subroutine display_help()
+! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! 20/04/2023
 
   implicit none
 
@@ -1923,6 +1950,30 @@ subroutine display_help()
   write(*,*) "        : -op <wavelength> (microns) : computes dust properties at"
   write(*,*) "                                    specified wavelength and stops"
   write(*,*) "        : -aggregate <GMM_input_file> <GMM_output_file>"
+  write(*,*) "        : -mueller <Mueller_input_file> "
+  write(*,*) "     "
+  write(*,*) "        Mueller_input_file contain the mean mueller matrix averaged"
+  write(*,*) "        over the size distribution. Every element is divided by s11."
+  write(*,*) "        The format of the input file must be the following."
+  write(*,*) "     "
+  write(*,*) "             Qext        Qsca        <cos(theta)> "
+  write(*,*) "          Qext_value  Qsca_value  <cos(theta)>_value "
+  write(*,*) "     "
+  write(*,*) "     "
+  write(*,*) "                               Mueller Scattering Matrix "
+  write(*,*) "       an_value   s11_value   s12_value   s13_value    s14_value "
+  write(*,*) "                  s21_value   s22_value   s23_value    s24_value "
+  write(*,*) "                  s31_value   s32_value   s33_value    s34_value "
+  write(*,*) "                  s41_value   s42_value   s43_value    s44_value "
+  write(*,*) "       an_value   s11_value   s12_value   s13_value    s14_value "
+  write(*,*) "                  s21_value   s22_value   s23_value    s24_value "
+  write(*,*) "     ....... "
+  write(*,*) "     "
+  write(*,*) "        : -mueller_size <Mueller_input_pathfile> "
+  write(*,*) "                   Argument pathfile contain the size of each grain, and the path"
+  write(*,*) "                   for each associated matrix for every grain size, sorted" 
+  write(*,*) "                   from the first to the last grain size considered."
+  write(*,*) "     "
   write(*,*) "        : -optical_depth_map ot -tau_map   : create an map of the optical depth"
   write(*,*) "        : -tau=1_surface : creates a map of the tau=1 surface"
   write(*,*) "        : -tau_surface <tau> : creates a map of the tau=<tau> surface"
