@@ -509,7 +509,7 @@ subroutine calc_xI_scatt(id,lambda,p_lambda,icell, phik,psup,l,stokes,flag_star)
         it = itheta_rt1(ibin,iaz,id)
         if (lmueller) then
            flux = l * stokes * tab_mueller_pos(1,1,it,p_icell,p_lambda)
-        else 
+        else
            flux = l * stokes * tab_s11_pos(it,p_icell,p_lambda) !* sin_scatt_rt1(ibin,id)
         endif
         ! TODO : est-ce qu'il ne faut pas moyenner par le sin de l'angle de scatt dans la cellule azimuthale ???
@@ -586,7 +586,7 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
            M(4,:) = -M(4,:)
            M(1,1) = s11
            !On passe à l'opposé la quatrième collonne et ligne à cause de la convention
-        
+
         else
 
            s11 = tab_s11_pos(it,p_icell,p_lambda)
@@ -595,7 +595,7 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
            s34 = -s11 * tab_s34_o_s11_pos(it,p_icell,p_lambda)
            M(1,1) = s11 ; M(2,2) = s11 ; M(1,2) = s12 ; M(2,1) = s12
            M(3,3) = s33 ; M(4,4) = s33 ; M(3,4) = -s34 ; M(4,3) = s34
-        
+
         endif
 
         ! Matrices de rotation
@@ -612,7 +612,7 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
         ROP(3,3) = cosw
 
         !  STOKE FINAL = RPO * M * ROP * STOKE INITIAL
-        
+
         if (lmueller) then
            ! 1ere rotation
            C(2:3) = matmul(ROP(2:3,2:3),stokes(2:3))
@@ -626,7 +626,7 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
            S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
            S(1)=D(1)
            S(4)=D(4)
-           
+
         else
            ! 1ere rotation
            C(2:3) = matmul(ROP(2:3,2:3),stokes(2:3))
@@ -1179,7 +1179,8 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                        do i1 = 1, N_super
                           k = tab_k(i1,i2,theta_I,phi_I,iscatt,dir)
                           if (lmueller) then
-                             s11 = s11 + tab_mueller_pos(1,1,k,p_icell,p_lambda) * tab_sin_scatt_norm(i1,i2,theta_I,phi_I,iscatt,dir)
+                             s11 = s11 + tab_mueller_pos(1,1,k,p_icell,p_lambda) * &
+                                  tab_sin_scatt_norm(i1,i2,theta_I,phi_I,iscatt,dir)
                           else
                              s11 = s11 + tab_s11_pos(k,p_icell,p_lambda) * tab_sin_scatt_norm(i1,i2,theta_I,phi_I,iscatt,dir)
                           endif !lmueller
@@ -1209,29 +1210,29 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     ROP(3,3) = cosw
 
                    if (lmueller) then
-                    
+
                        ! Champ de radiation
                        stokes(:) = Inu(1:4,theta_I,phi_I,icell)
-                    
+
                        M(:,:) = tab_mueller_pos(:,:,k,p_icell,p_lambda)*(-s11)
                        M(:,4) = -M(:,4)
                        M(4,:) = -M(4,:)
                        M(1,1) = s11
                        !On passe à l'opposé la quatrième collonne et ligne à cause de la convention
-                    
+
                     else
 
                        s12 = - s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda)
                        s33 = - s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
                        s34 = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda)
-                    
+
 
                        ! Champ de radiation
                        stokes(:) = Inu(1:4,theta_I,phi_I,icell)
 
                        M(1,1) = s11 ; M(2,2) = s11 ; M(1,2) = s12 ; M(2,1) = s12
                        M(3,3) = s33 ; M(4,4) = s33 ; M(3,4) = -s34 ; M(4,3) = s34
-                    
+
                     endif
 
                     !  STOKE FINAL = RPO * M * ROP * STOKE INITIAL
@@ -1250,7 +1251,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                        S(1)=D(1)
                        S(4)=D(4)
                        S(3)=-S(3)
-                       
+
                     else
 
                        ! 1ere rotation
@@ -1460,7 +1461,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
               ROP(3,3) = COSW
 
               ! Matrice de Mueller
-              
+
               if (lmueller) then
                  s11 = tab_mueller_pos(1,1,k,p_icell,p_lambda)
                  M(:,:) = tab_mueller_pos(:,:,k,p_icell,p_lambda)*(-s11)
@@ -1468,7 +1469,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
                  M(4,:) = -M(4,:)
                  M(1,1) = s11
                  !On passe à l'opposé la quatrième collonne et ligne à cause de la convention
-              
+
               else
                  s11 = tab_s11_pos(k,p_icell,p_lambda)
                  s12 = - s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda)
@@ -1503,7 +1504,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
                  S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
                  S(1)=D(1)
                  S(4)=D(4)
-              
+
               else
 
                  ! 1ere rotation
@@ -1519,7 +1520,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
                  S(2:3)=matmul(RPO(2:3,2:3),D(2:3))
                  S(1)=D(1)
                  S(4)=D(4)
-                 
+
               endif
 
               eps_dust2_star(:,iscatt,dir,icell) =  eps_dust2_star(:,iscatt,dir,icell) + S(:)
