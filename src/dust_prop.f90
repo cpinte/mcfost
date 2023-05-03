@@ -1114,7 +1114,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            ! (for ray-tracing)
            tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * dtheta / (k_sca_tot * deux_pi)
 
-           if (loverwrite_s12) then
+           if (lsepar_pola .and. loverwrite_s12) then
               do l=0,nang_scatt
                  theta = real(l)*dtheta
                  tab_s12_o_s11_pos(l,icell,p_lambda) = - Pmax * (1-(cos(theta))**2)
