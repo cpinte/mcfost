@@ -18,7 +18,7 @@ contains
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
 
     use read_gadget2, only : read_gadget2_file
-    use dump_utils, only : get_error_text
+    use io_phantom_utils, only : get_error_text
     use utils, only : read_comments
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
