@@ -134,6 +134,23 @@ if [ "$MCFOST_XGBOOST" = "yes" ]; then
     git clone git@github.com:dmlc/rabit.git
     cd ..
 fi
+git clone https://github.com/cpinte/astrochem
+
+
+#---------------------------------------------
+# Astrochem (does not compile with sundials 6)
+#---------------------------------------------
+conda create --name astrochem -c conda-forge sundials=5.7.0 python cython numpy matplotlib h5py autoconf automake libtool
+conda activate astrochem
+cd astrochem
+autoupdate
+./bootstrap
+./configure CPPFLAGS="-I$CONDA_PREFIX/include" LDFLAGS="-Wl,-rpath,$CONDA_PREFIX/lib -L/$CONDA_PREFIX/lib"  --prefix=$CONDA_PREFIX
+make
+\cp ./src/.libs/libastrochem.a ../lib
+\cp ./src/libastrochem.h ../include
+cd ~
+conda deactivate
 
 #-------------------------------------------
 # SPRNG
