@@ -443,6 +443,8 @@ subroutine transfert_poussiere()
               lambda0 = 1 ; p_lambda => lambda0
            endif
 
+           call setup_scattering()
+
            ! reorganisation memoire
            call realloc_step2()
 
@@ -476,8 +478,8 @@ subroutine transfert_poussiere()
         lambda = ind_etape - first_etape_obs + 1
 
         if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
-           if (lmueller) then 
-              call calc_local_scattering_matrices_mueller(lambda, p_lambda)
+           if (lmueller) then
+              call calc_local_scattering_matrices_mueller(lambda, p_lambda) ! Todo : this is not good, we compute this twice
            else
               call calc_local_scattering_matrices(lambda, p_lambda)
            endif
@@ -1117,13 +1119,13 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               ! Nouveaux param�tres de Stokes
-              if (lsepar_pola) then 
+              if (lsepar_pola) then
                  if (lmueller) then
                     call new_stokes_mueller_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
-                 else 
+                 else
                     call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
 		 endif
-	      endif 
+	      endif
            else ! fonction de phase HG
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
               if (lisotropic)  then ! Diffusion isotrope
