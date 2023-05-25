@@ -8,10 +8,10 @@ module scattering
   use read_opacity
 
   implicit none
-  save
+
+  procedure(get_Mueller_matrix_per_grain), pointer :: get_Mueller_matrix => null()
 
   contains
-
 
 subroutine setup_scattering()
 
@@ -1035,7 +1035,7 @@ end subroutine mueller_opacity_file
 !**********************************************************************
 
 subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
-  ! convention astronomique utilisee: angle de position
+  ! Convention astronomique utilisee: angle de position
   ! calcule antihoraire a partir du nord celeste
   !
   ! Francois Menard, Montreal, 15 Fevrier 1989
@@ -1133,7 +1133,7 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   ROP(4,4) = 1.0
 
   S1_0 = S(1)
-  ! Stoke final = rpo M * rop * stoke initial
+  ! Stoke final = RPO * M * ROP * Stoke initial
   C=matmul(ROP,S)
   D=matmul(M,C)
   S=matmul(RPO,D)
@@ -1141,7 +1141,7 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
   ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
   ! I sortant = I entrant * s11 si diff uniforme
-  S(:) = S(:) * M(1,1) * S1_0/S(1)
+  if (S(1) > tiny_real) S(:) = S(:) * M(1,1)*S1_0/S(1)
 
   return
 
@@ -1150,819 +1150,57 @@ end subroutine update_Stokes
 
 !**********************************************************************
 
+subroutine get_Mueller_matrix_per_grain(lambda,itheta,frac,taille_grain, M)
 
-
-subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
-!***********************************************************
-!--------CALCUL LES QUATRES PARAMETRES DE STOKES------------
-!
-!     CONVENTION ASTRONOMIQUE UTILISEE: ANGLE DE POSITION
-!     CALCULE ANTIHORAIRE A PARTIR DU NORD CELESTE
-!
-!        STOK(1,1) = I
-!        STOK(2,1) = Q
-!        STOK(3,1) = U
-!        STOK(4,1) = V
-!
-!      FRANCOIS MENARD, MONTREAL, 15 FEVRIER 1989
-! Modif 22/12/03 (C. Pinte) : indice l de taille du grain diffuseur
-! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-!***********************************************************
-
-  implicit none
-
-  real, intent(in) :: frac
-  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
   integer, intent(in) :: lambda,itheta,taille_grain
-  real(kind=dp), dimension(4), intent(inout) :: stok
-
-  real :: sinw, cosw, omega, theta, costhet,  xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) :: v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=dp), dimension(4) :: C, D
-
-  frac_m1 = 1.0 - frac
-
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-!
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
-
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-!
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
-  else
-     COSTHET = -1.0*V1PJ / XNYP
-  endif
-!
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-!
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-!
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-!
-  THETA = THETA + 1.570796327
-!
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-!
-  OMEGA = 2.0 * THETA
-!
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-!
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-!
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-!
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-!
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-!
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(1,2) = 0.0
-  ROP(2,1) = 0.0
-  RPO(1,3) = 0.0
-  ROP(3,1) = 0.0
-  RPO(2,1) = 0.0
-  ROP(1,2) = 0.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(3,2) = SINW
-  RPO(3,1) = 0.0
-  ROP(1,3) = 0.0
-  RPO(3,2) = -1.0 * SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
-  RPO(1,4) = 0.0
-  RPO(2,4) = 0.0
-  RPO(3,4) = 0.0
-  RPO(4,1) = 0.0
-  RPO(4,2) = 0.0
-  RPO(4,3) = 0.0
-  ROP(1,4) = 0.0
-  ROP(2,4) = 0.0
-  ROP(3,4) = 0.0
-  ROP(4,1) = 0.0
-  ROP(4,2) = 0.0
-  ROP(4,3) = 0.0
-
-!
-!     MATRICE DE MUELLER
-!     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
-!             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-  XMUL(1,1) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(2,2) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(1,2) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(2,1) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(3,3) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(4,4) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(3,4) = -tab_s34(itheta,taille_grain,lambda)* frac - tab_s34(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(4,3) = tab_s34(itheta,taille_grain,lambda) * frac + tab_s34(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(1,3) = 0.0
-  XMUL(1,4) = 0.0
-  XMUL(2,3) = 0.0
-  XMUL(2,4) = 0.0
-  XMUL(3,1) = 0.0
-  XMUL(3,2) = 0.0
-  XMUL(4,1) = 0.0
-  XMUL(4,2) = 0.0
-
-! -------- CALCUL DE LA POLARISATION ---------
-
-  stok_I0 = stok(1)
-!  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  C=matmul(ROP,STOK)
-! LE RESULTAT EST C(4,1)
-
-  D=matmul(XMUL,C)
-! LE RESULTAT EST D(4,1)
-
-  stok=matmul(RPO,D)
-
-! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-! STOKES FINAUX
-
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
-
-!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
-  norme=(tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1) &
-       * (stok_I0/stok(1))
-  do i=1,4
-     stok(i)=stok(i)*norme
-  enddo
-
-
-  return
-end subroutine new_stokes
-
-!***********************************************************
-
-subroutine new_stokes_gmm(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
-  ! Routine derivee de stokes pour les agregats calcule par gmm
-  ! C. Pinte
-
-  implicit none
-
   real, intent(in) :: frac
-  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda,itheta,taille_grain
-  real(kind=dp), dimension(4,1), intent(inout) :: stok
+  real(kind=dp), dimension(4,4), intent(out) :: M
 
-  real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) ::  v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=dp), dimension(4,1) :: C, D
+  real :: frac_m1
 
   frac_m1 = 1.0 - frac
 
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-!
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
-
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-!
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
-  else
-     COSTHET = -1.0*V1PJ / XNYP
-  endif
-!
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-!
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-!
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-!
-  THETA = THETA + 1.570796327
-!
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-!
-  OMEGA = 2.0 * THETA
-!
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-!
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-!
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-!
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(1,2) = 0.0
-  ROP(2,1) = 0.0
-  RPO(1,3) = 0.0
-  ROP(3,1) = 0.0
-  RPO(2,1) = 0.0
-  ROP(1,2) = 0.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(3,2) = SINW
-  RPO(3,1) = 0.0
-  ROP(1,3) = 0.0
-  RPO(3,2) = -1.0 * SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
-  RPO(1,4) = 0.0
-  RPO(2,4) = 0.0
-  RPO(3,4) = 0.0
-  RPO(4,1) = 0.0
-  RPO(4,2) = 0.0
-  RPO(4,3) = 0.0
-  ROP(1,4) = 0.0
-  ROP(2,4) = 0.0
-  ROP(3,4) = 0.0
-  ROP(4,1) = 0.0
-  ROP(4,2) = 0.0
-  ROP(4,3) = 0.0
-
-!     MATRICE DE MUELLER
-  xmul(:,:) = tab_mueller(:,:,itheta,taille_grain,lambda) * frac + tab_mueller(:,:,itheta-1,taille_grain,lambda) * frac_m1
-
-
-! -------- CALCUL DE LA POLARISATION ---------
-
-  stok_I0 = stok(1,1)
-!  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  C=matmul(ROP,STOK)
-! LE RESULTAT EST C(4,1)
-
-  D=matmul(XMUL,C)
-! LE RESULTAT EST D(4,1)
-
-  stok=matmul(RPO,D)
-
-! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-! STOKES FINAUX
-
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
-
-!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
-  norme=(tab_mueller(1,1,itheta,taille_grain,lambda)*frac + tab_mueller(1,1,itheta-1,taille_grain,lambda)*frac_m1 ) &
-  * (stok_I0/stok(1,1))
-  do i=1,4
-     stok(i,1)=stok(i,1)*norme
-  enddo
+  M(:,:) = 0.0_dp
+  M(1,1) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
+  M(2,2) = tab_s22(itheta,taille_grain,lambda) * frac + tab_s22(itheta-1,taille_grain,lambda) * frac_m1
+  M(1,2) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
+  M(2,1) = M(1,2)
+  M(3,3) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
+  M(4,4) = tab_s44(itheta,taille_grain,lambda) * frac + tab_s44(itheta-1,taille_grain,lambda) * frac_m1
+  M(3,4) = -tab_s34(itheta,taille_grain,lambda)* frac - tab_s34(itheta-1,taille_grain,lambda) * frac_m1
+  M(4,3) = -M(3,4)
 
   return
-end subroutine new_stokes_gmm
 
-!***********************************************************
+end subroutine get_Mueller_matrix_per_grain
 
-subroutine new_stokes_mueller(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
-  ! Routine derivee de stokes_gmm pour les matrices de mueller en entrée
-  ! F.Malaval 20/04/2023
+!**********************************************************************
 
-  implicit none
+subroutine get_Mueller_matrix_per_cell(lambda,itheta,frac,icell, M)
 
+  integer, intent(in) :: lambda,itheta,icell
   real, intent(in) :: frac
-  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda,itheta,taille_grain
-  real(kind=dp), dimension(4), intent(inout) :: stok
+  real(kind=dp), dimension(4,4), intent(out) :: M
 
-  real :: sinw, cosw, omega, theta, costhet,  xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) :: v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=dp), dimension(4) :: C, D
+  real :: frac_m1
 
   frac_m1 = 1.0 - frac
 
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-!
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
-
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-!
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
-  else
-     COSTHET = -1.0*V1PJ / XNYP
-  endif
-!
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-!
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-!
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-!
-  THETA = THETA + 1.570796327
-!
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-!
-  OMEGA = 2.0 * THETA
-!
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-!
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-!
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-!
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-!
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-!
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(1,2) = 0.0
-  ROP(2,1) = 0.0
-  RPO(1,3) = 0.0
-  ROP(3,1) = 0.0
-  RPO(2,1) = 0.0
-  ROP(1,2) = 0.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(3,2) = SINW
-  RPO(3,1) = 0.0
-  ROP(1,3) = 0.0
-  RPO(3,2) = -1.0 * SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
-  RPO(1,4) = 0.0
-  RPO(2,4) = 0.0
-  RPO(3,4) = 0.0
-  RPO(4,1) = 0.0
-  RPO(4,2) = 0.0
-  RPO(4,3) = 0.0
-  ROP(1,4) = 0.0
-  ROP(2,4) = 0.0
-  ROP(3,4) = 0.0
-  ROP(4,1) = 0.0
-  ROP(4,2) = 0.0
-  ROP(4,3) = 0.0
-
-!
-!     MATRICE DE MUELLER
-!     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
-!             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-  xmul(:,:) = tab_mueller(:,:,itheta,taille_grain,lambda) * frac + tab_mueller(:,:,itheta-1,taille_grain,lambda) * frac_m1
-  xmul(4,:) = -xmul(4,:)
-  xmul(:,4) = -xmul(:,4)
-
-
-! -------- CALCUL DE LA POLARISATION ---------
-
-  stok_I0 = stok(1)
-!  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  C=matmul(ROP,STOK)
-! LE RESULTAT EST C(4,1)
-
-  D=matmul(XMUL,C)
-! LE RESULTAT EST D(4,1)
-
-  stok=matmul(RPO,D)
-
-! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-! STOKES FINAUX
-
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
-
-!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
-  norme=(tab_mueller(1,1,itheta,taille_grain,lambda) * frac + tab_mueller(1,1,itheta-1,taille_grain,lambda) * frac_m1) &
-       * (stok_I0/stok(1))
-  do i=1,4
-     stok(i)=stok(i)*norme
-  enddo
-
-
-  return
-end subroutine new_stokes_mueller
-
-!***********************************************************
-
-subroutine new_stokes_pos(lambda,itheta,frac, icell, u0,v0,w0,u1,v1,w1,stok)
-  ! Routine derivee de stokes
-  ! C. Pinte
-  ! 9/01/05 : Prop des grains par cellule
-
-  implicit none
-
-  real, intent(in) :: frac
-  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda, itheta, icell
-  real(kind=dp), dimension(4), intent(inout) :: stok
-
-  real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) :: v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=dp), dimension(4) :: C, D
-
-  frac_m1 = 1.0 - frac
-
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
-
-
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
-  else
-     COSTHET = -1.0*V1PJ / XNYP
-  endif
-
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-  THETA = THETA + 1.570796327
-
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-  OMEGA = 2.0 * THETA
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-!
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-!
-
-  ROP = 0.0
-  RPO = 0.0
-
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,2) = -1.0 * SINW
-  ROP(3,2) = SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
-
-!
-!     MATRICE DE MUELLER
-!     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
-!             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-
-  XMUL=0.0
-  XMUL(1,1) = 1.0 ! Mueller matrix is normalized to 1.0 as we select the scattering angle
-  XMUL(2,2) = XMUL(1,1)
-  XMUL(1,2) = tab_s12_o_s11_pos(itheta,icell,lambda) * frac +  tab_s12_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  XMUL(2,1) = XMUL(1,2)
-  XMUL(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  XMUL(4,4) = XMUL(3,3)
-  XMUL(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  XMUL(4,3) = -XMUL(3,4)
-
-  ! -------- CALCUL DE LA POLARISATION ---------
-
-  stok_I0 = stok(1)
-  !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  !  C=matmul(ROP,STOK)
-  C(2:3) = matmul(ROP(2:3,2:3),STOK(2:3))
-  C(1)=stok(1)
-  C(4)=stok(4)
-  ! LE RESULTAT EST C(4,1)
-
-  ! LE RESULTAT EST D(4,1)
-  !  D=matmul(XMUL,C)
-  D(1:2)=matmul(XMUL(1:2,1:2),C(1:2))
-  D(3:4)=matmul(XMUL(3:4,3:4),C(3:4))
-
-  !  stok=matmul(RPO,D)
-  stok(2:3)=matmul(RPO(2:3,2:3),D(2:3))
-  stok(1)=D(1)
-  stok(4)=D(4)
-
-  ! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-  ! STOKES FINAUX
-
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
-
-  !  norme=tab_albedo(l)*tab_s11(l,itheta)*(stok_I0/stok(1,1))
-  if (stok(1) > tiny_real) then
-     norme= XMUL(1,1) * (stok_I0/stok(1))
-     do i=1,4
-        stok(i)=stok(i)*norme
-     enddo
-  else
-     stok(:)=0.0
-  endif
+  M(:,:) = 0.0
+  M(1,1) = 1.0 ! Mueller matrix is normalized to 1.0 as we select the scattering angle
+  M(2,2) = tab_s22_o_s11_pos(itheta,icell,lambda) * frac +  tab_s22_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(1,2) = tab_s12_o_s11_pos(itheta,icell,lambda) * frac +  tab_s12_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(2,1) = M(1,2)
+  M(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(4,4) = tab_s44_o_s11_pos(itheta,icell,lambda) * frac +  tab_s44_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(4,3) = -M(3,4)
 
   return
 
-end subroutine new_stokes_pos
+end subroutine get_Mueller_matrix_per_cell
 
-!***********************************************************
-
-subroutine new_stokes_mueller_pos(lambda,itheta,frac, icell, u0,v0,w0,u1,v1,w1,stok)
-  ! Routine derivee de stokes_pos
-  ! F.Malaval 20/04/2023
-
-  implicit none
-
-  real, intent(in) :: frac
-  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda, itheta, icell
-  real(kind=dp), dimension(4), intent(inout) :: stok
-
-  real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) :: v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=dp), dimension(4) :: C, D
-
-  frac_m1 = 1.0 - frac
-
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
-
-
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
-  else
-     COSTHET = -1.0*V1PJ / XNYP
-  endif
-
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-  THETA = THETA + 1.570796327
-
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-  OMEGA = 2.0 * THETA
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-!
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-!
-
-  ROP = 0.0
-  RPO = 0.0
-
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,2) = -1.0 * SINW
-  ROP(3,2) = SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
-
-!
-!     MATRICE DE MUELLER
-!     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
-!             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-
-  XMUL=0.0
-  XMUL(:,:) = tab_mueller_pos(:,:,itheta,icell,lambda) * frac + tab_mueller_pos(:,:,itheta-1,icell,lambda) * frac_m1
-  XMUL(1,1) = 1.0 ! Comme on a déjà choisi l'angle de diffusion, on met s11=1.0 à chaque angle
-  !! on inverse le signe pour respecter la convention astronomique
-  XMUL(4,:) = -XMUL(4,:)
-  xmul(:,4) = -XMUL(:,4)
-
-  ! -------- CALCUL DE LA POLARISATION ---------
-
-
- stok_I0 = stok(1)
-  !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  !  C=matmul(ROP,STOK)
-  C(2:3) = matmul(ROP(2:3,2:3),STOK(2:3))
-  C(1)=stok(1)
-  C(4)=stok(4)
-  ! LE RESULTAT EST C(4,1)
-
-  ! LE RESULTAT EST D(4,1)
-  D=matmul(XMUL,C)
-  ! D(1:2)=matmul(XMUL(1:2,1:2),C(1:2))
-  ! D(3:4)=matmul(XMUL(3:4,3:4),C(3:4))
-
-  !  stok=matmul(RPO,D)
-  stok(2:3)=matmul(RPO(2:3,2:3),D(2:3))
-  stok(1)=D(1)
-  stok(4)=D(4)
-
-  ! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-  ! STOKES FINAUX
-
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
-
-  !  norme=tab_albedo(l)*tab_s11(l,itheta)*(stok_I0/stok(1,1))
-  if (stok(1) > tiny_real) then
-     norme= XMUL(1,1) * (stok_I0/stok(1))
-     do i=1,4
-        stok(i)=stok(i)*norme
-     enddo
-  else
-     stok(:)=0.0
-  endif
-
-  return
-
-end subroutine new_stokes_mueller_pos
-
-!***********************************************************
+!**********************************************************************
 
 integer function seuil_n_dif(lambda)
 
