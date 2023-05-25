@@ -563,7 +563,12 @@ subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
         mueller(:,:,j) = mueller(:,:,j) / norme
      endif
 
-     tab_mueller(:,:,j,taille_grain,lambda) = mueller(:,:,j)
+     tab_s11(j,taille_grain,lambda) = mueller(1,1,j)
+     tab_s12(j,taille_grain,lambda) = mueller(1,2,j)
+     tab_s22(j,taille_grain,lambda) = mueller(2,2,j)
+     tab_s33(j,taille_grain,lambda) = mueller(3,3,j)
+     tab_s34(j,taille_grain,lambda) = mueller(3,4,j)
+     tab_s44(j,taille_grain,lambda) = mueller(4,4,j)
   enddo
 
   gsca = assym
@@ -576,7 +581,7 @@ end subroutine mueller_GMM
 
 !***************************************************
 
-subroutine mueller_input(lambda,taille_grain, qext,qsca,gsca)
+subroutine Fresnel_input(lambda,taille_grain, qext,qsca,gsca)
 
 !***************************************************************
 ! Routine dérivé de Mueller_GMM.
@@ -631,70 +636,71 @@ subroutine mueller_input(lambda,taille_grain, qext,qsca,gsca)
   read(12,*)  !'Matrice de mueller (4X4 coefficients pour chaque angle):'
   read(12,*) string
   do i=0,nang_scatt
-	read(12,*) dang(i),mueller(1,1,i),mueller(1,2,i),mueller(1,3,i),mueller(1,4,i)
-	read(12,*)         mueller(2,1,i),mueller(2,2,i),mueller(2,3,i),mueller(2,4,i)
-	read(12,*)         mueller(3,1,i),mueller(3,2,i),mueller(3,3,i),mueller(3,4,i)
-	read(12,*)         mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
+     read(12,*) dang(i),mueller(1,1,i),mueller(1,2,i),mueller(1,3,i),mueller(1,4,i)
+     read(12,*)         mueller(2,1,i),mueller(2,2,i),mueller(2,3,i),mueller(2,4,i)
+     read(12,*)         mueller(3,1,i),mueller(3,2,i),mueller(3,3,i),mueller(3,4,i)
+     read(12,*)         mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
   enddo
   close(12)
   ! Fin lecture
-
   close(unit=1)
 
   if (scattering_method == 1) then
-	  ! Integration de S11 pour tirer angle
-	  ! Condition initiale : sin(0)=0
-	  prob_s11(lambda,taille_grain,0)=0.0
-	  dtheta = pi/real(nang_scatt)
+     ! Integration de S11 pour tirer angle
+     ! Condition initiale : sin(0)=0
+     prob_s11(lambda,taille_grain,0)=0.0
+     dtheta = pi/real(nang_scatt)
 
-	  do j=1,nang_scatt
-	     theta = real(j)*dtheta
-	     prob_s11(lambda, taille_grain,j)=prob_s11(lambda, taille_grain,j-1)+&
-		  mueller(1,1,j)*sin(theta)*dtheta
-	  enddo
+     do j=1,nang_scatt
+        theta = real(j)*dtheta
+        prob_s11(lambda, taille_grain,j)=prob_s11(lambda, taille_grain,j-1)+&
+             mueller(1,1,j)*sin(theta)*dtheta
+     enddo
 
 	  ! Normalisation
-	  somme_prob = prob_s11(lambda, taille_grain,nang_scatt)
-	  prob_s11(lambda, taille_grain,:)=prob_s11(lambda, taille_grain,:)/somme_prob
-
-
+     somme_prob = prob_s11(lambda, taille_grain,nang_scatt)
+     prob_s11(lambda, taille_grain,:)=prob_s11(lambda, taille_grain,:)/somme_prob
   else  !on va avoir besoin des valeurs non normalisés
-  	do i=1, 4
-  	   do j=1, 4
-  	      if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
-  	   enddo
-  	enddo
-  	!on calcul maintenant l'intégrale de s11
-  	somme_prob=0.0
-	dtheta = pi/real(nang_scatt)
-  	do j=1,nang_scatt
-  	   theta = real(j)*dtheta
-	   somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
-  	enddo
+     do i=1, 4
+        do j=1, 4
+           if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
+        enddo
+     enddo
+     !on calcul maintenant l'intégrale de s11
+     somme_prob=0.0
+     dtheta = pi/real(nang_scatt)
+     do j=1,nang_scatt
+        theta = real(j)*dtheta
+        somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
+     enddo
   endif !scatt_meth
 
-
   do J=0,NANG_scatt
-        if (scattering_method==1) then ! Matrice de Mueller par grain
+     if (scattering_method==1) then ! Matrice de Mueller par grain
         ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
         ! on ne normalise que S11 car les données sont déjà normalisées
-           norme=mueller(1,1,j)
-           if (norme > tiny_real) then
-              mueller(1,1,j) = mueller(1,1,j) / norme
-           else
-              write (*,*) "at angle", real(j)*pi/real(nang_scatt)
-              call error ("s11=0.0")
-           endif
-        else ! Sinon normalisation a Qsca. On utilise somme_prob.
-           norme = somme_prob/sca
-           if (norme > tiny_real) then
-              mueller(:,:,j) = mueller(:,:,j)/norme
-           else
-              call error ("Error : s11 is normalised to 0")
-           endif
+        norme=mueller(1,1,j)
+        if (norme > tiny_real) then
+           mueller(1,1,j) = mueller(1,1,j) / norme
+        else
+           write (*,*) "at angle", real(j)*pi/real(nang_scatt)
+           call error ("s11=0.0")
         endif
+     else ! Sinon normalisation a Qsca. On utilise somme_prob.
+        norme = somme_prob/sca
+        if (norme > tiny_real) then
+           mueller(:,:,j) = mueller(:,:,j)/norme
+        else
+           call error ("Error : s11 is normalised to 0")
+        endif
+     endif
 
-        tab_mueller(:,:,j,taille_grain,lambda) = mueller(:,:,j)
+     tab_s11(j,taille_grain,lambda) = mueller(1,1,j)
+     tab_s12(j,taille_grain,lambda) = mueller(1,2,j)
+     tab_s22(j,taille_grain,lambda) = mueller(2,2,j)
+     tab_s33(j,taille_grain,lambda) = mueller(3,3,j)
+     tab_s34(j,taille_grain,lambda) = mueller(3,4,j)
+     tab_s44(j,taille_grain,lambda) = mueller(4,4,j)
   enddo
   qext = ext
   qsca = sca
@@ -704,12 +710,11 @@ subroutine mueller_input(lambda,taille_grain, qext,qsca,gsca)
 
   return
 
-end subroutine mueller_input
-
+end subroutine Fresnel_input
 
 !***************************************************
 
- subroutine mueller_input_size(lambda,taille_grain, qext,qsca,gsca)
+ subroutine Fresnel_input_size(lambda,taille_grain, qext,qsca,gsca)
 
 !***************************************************************
 ! Routine dérivé de Mueller_GMM.
@@ -758,7 +763,6 @@ end subroutine mueller_input
 
   if (aniso_method == 2) call error ("You shoudn't use a hg function option when putting Mueller matrix in input")
 
-
   open(unit=13, file = mueller_file, status = 'old')
   !Dans ce cas, mueller_file contient les chemins vers les fichiers de chaque matrice,
   !triés dans l'ordre croissant suivant la taille de grain.
@@ -767,8 +771,8 @@ end subroutine mueller_input
   enddo
   close(unit=13)
   if (abs(size-r_grain(taille_grain))>r_grain(taille_grain)*0.00001) then
-      write(*,*) "error, graine size in file is", size, "while expecting", r_grain(taille_grain)
-      call error("The graine sizes does not match")
+     write(*,*) "error, grain size in file is", size, "while expecting", r_grain(taille_grain)
+     call error("Grain sizes do not match")
   endif
 
   ! Lecture du fichier d'entrée :
@@ -779,10 +783,10 @@ end subroutine mueller_input
   read(12,*)  !'Matrice de mueller (4X4 coefficients pour chaque angle):'
   read(12,*) string
   do i=0,nang_scatt
-	read(12,*) dang(i),mueller(1,1,i),mueller(1,2,i),mueller(1,3,i),mueller(1,4,i)
-	read(12,*)   mueller(2,1,i),mueller(2,2,i),mueller(2,3,i),mueller(2,4,i)
-	read(12,*)   mueller(3,1,i),mueller(3,2,i),mueller(3,3,i),mueller(3,4,i)
-	read(12,*)   mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
+     read(12,*) dang(i),mueller(1,1,i),mueller(1,2,i),mueller(1,3,i),mueller(1,4,i)
+     read(12,*)   mueller(2,1,i),mueller(2,2,i),mueller(2,3,i),mueller(2,4,i)
+     read(12,*)   mueller(3,1,i),mueller(3,2,i),mueller(3,3,i),mueller(3,4,i)
+     read(12,*)   mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
   enddo
   close(12)
   ! Fin lecture
@@ -790,59 +794,62 @@ end subroutine mueller_input
   close(unit=1)
 
   if (scattering_method == 1) then
-	  ! Integration S11 pour tirer angle
-	  ! Condition initiale : sin(0)=0
-	  prob_s11(lambda,taille_grain,0)=0.0
-	  dtheta = pi/real(nang_scatt)
+     ! Integration S11 pour tirer angle
+     ! Condition initiale : sin(0)=0
+     prob_s11(lambda,taille_grain,0)=0.0
+     dtheta = pi/real(nang_scatt)
 
-	  do j=1,nang_scatt
-	     theta = real(j)*dtheta
-	     prob_s11(lambda, taille_grain,j)=prob_s11(lambda, taille_grain,j-1)+&
-		  mueller(1,1,j)*sin(theta)*dtheta
-	  enddo
+     do j=1,nang_scatt
+        theta = real(j)*dtheta
+        prob_s11(lambda, taille_grain,j)=prob_s11(lambda, taille_grain,j-1)+&
+             mueller(1,1,j)*sin(theta)*dtheta
+     enddo
 
-	  ! Normalisation
-	  somme_prob= prob_s11(lambda, taille_grain,nang_scatt)
-	  prob_s11(lambda, taille_grain,:)=prob_s11(lambda, taille_grain,:)/somme_prob
-
-
+     ! Normalisation
+     somme_prob= prob_s11(lambda, taille_grain,nang_scatt)
+     prob_s11(lambda, taille_grain,:)=prob_s11(lambda, taille_grain,:)/somme_prob
   else  !on va avoir besoin des valeurs non normalisés
-  	do i=1, 4
-  	   do j=1, 4
-  	      if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
-  	   enddo
-  	enddo
-  	!on calcul maintenant l'intégrale de s11
-  	somme_prob=0.0
-	dtheta = pi/real(nang_scatt)
-  	do j=1,nang_scatt
-  	   theta = real(j)*dtheta
-	   somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
-  	enddo
+     do i=1, 4
+        do j=1, 4
+           if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
+        enddo
+     enddo
+     !on calcul maintenant l'intégrale de s11
+     somme_prob=0.0
+     dtheta = pi/real(nang_scatt)
+     do j=1,nang_scatt
+        theta = real(j)*dtheta
+        somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
+     enddo
   endif !scatt_meth
 
 
   do J=0,NANG_scatt
-        if (scattering_method==1) then ! Matrice de Mueller par grain
+     if (scattering_method==1) then ! Matrice de Mueller par grain
         ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
         ! on ne normalise que S11 car les données sont déjà normalisées
-           norme=mueller(1,1,j)
-           if (norme > tiny_real) then
-              mueller(1,1,j) = mueller(1,1,j) / norme
-           else
-              write (*,*) "at angle", real(j)*pi/real(nang_scatt)
-              call error ("s11=0.0")
-           endif
-        else ! Sinon normalisation a Qsca. On utilise somme_prob.
-           norme = somme_prob/sca
-           if (norme > tiny_real) then
-              mueller(:,:,j) = mueller(:,:,j)/norme
-           else
-              call error ("Error : s11 is normalised to 0")
-           endif
+        norme=mueller(1,1,j)
+        if (norme > tiny_real) then
+           mueller(1,1,j) = mueller(1,1,j) / norme
+        else
+           write (*,*) "at angle", real(j)*pi/real(nang_scatt)
+           call error ("s11=0.0")
         endif
+     else ! Sinon normalisation a Qsca. On utilise somme_prob.
+        norme = somme_prob/sca
+        if (norme > tiny_real) then
+           mueller(:,:,j) = mueller(:,:,j)/norme
+        else
+           call error ("Error : s11 is normalised to 0")
+        endif
+     endif
 
-        tab_mueller(:,:,j,taille_grain,lambda) = mueller(:,:,j)
+     tab_s11(j,taille_grain,lambda) = mueller(1,1,j)
+     tab_s12(j,taille_grain,lambda) = mueller(1,2,j)
+     tab_s22(j,taille_grain,lambda) = mueller(2,2,j)
+     tab_s33(j,taille_grain,lambda) = mueller(3,3,j)
+     tab_s34(j,taille_grain,lambda) = mueller(3,4,j)
+     tab_s44(j,taille_grain,lambda) = mueller(4,4,j)
   enddo
   qext = ext
   qsca = sca
@@ -852,11 +859,9 @@ end subroutine mueller_input
 
   return
 
-end subroutine mueller_input_size
-
+end subroutine Fresnel_input_size
 
 !***************************************************
-
 
 subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
   ! interpolation bi-lineaire (en log-log) des sections efficaces
@@ -1440,13 +1445,8 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
   p=Ip/I
 
   ! polarisabilite
-  if (lmueller) then
-     pp= (tab_mueller(1,2,itheta,taille_grain,lambda) * frac + tab_mueller(1,2,itheta-1,taille_grain,lambda) * frac_m1) &
-  / (tab_mueller(1,1,itheta,taille_grain,lambda) * frac + tab_mueller(1,1,itheta-1,taille_grain,lambda) * frac_m1)
-  else
-     pp= (tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1) &
-  / (tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1)
-  endif
+  pp= (tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1) &
+       / (tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1)
 
   ppp=p*pp
 !  write(*,*) p,pp,ppp

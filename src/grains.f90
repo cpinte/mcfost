@@ -57,14 +57,11 @@ module grains
   logical :: lforce_HG
   real :: forced_g
 
-  ! aggregats
-  real, dimension(:,:,:,:,:), allocatable :: tab_mueller !4,4, 180, n_grains,n_lambda
 
   ! Parametres de diffusion des cellules
   real, dimension(:,:), allocatable :: tab_albedo_pos, tab_g_pos ! n_cells,n_lambda
   real, dimension(:,:,:), allocatable :: tab_s11_pos, tab_s12_o_s11_pos, tab_s33_o_s11_pos, tab_s34_o_s11_pos, &
        tab_s22_o_s11_pos, tab_s44_o_s11_pos, prob_s11_pos ! 0:180, n_cells,n_lambda
-  real, dimension(:,:,:,:,:), allocatable :: tab_mueller_pos ! 4,4,0:180, n_cells,n_lambda
 
   character(len=512) :: aggregate_file, mueller_aggregate_file, mueller_file
   real :: R_sph_same_M

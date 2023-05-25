@@ -568,7 +568,7 @@ subroutine prop_grains(lambda)
   !$omp default(none) &
   !$omp private(k,a,x,qext,qsca,gsca,amu1,amu2,pop) &
   !$omp shared(r_grain,C_ext,C_sca,C_abs,C_abs_norm,wavel,aexp,tab_albedo,lambda,tab_g,grain) &
-  !$omp shared(laggregate, lmueller, lper_size, tab_amu1,tab_amu2,n_grains_tot,S_grain) &
+  !$omp shared(laggregate, lFresnel, lFresnel_per_size, tab_amu1,tab_amu2,n_grains_tot,S_grain) &
   !$omp shared(tab_amu1_coating,tab_amu2_coating,amu1_coat,amu2_coat) &
   !$omp shared(dust_pop)
   !$omp do schedule(dynamic,1)
@@ -583,13 +583,13 @@ subroutine prop_grains(lambda)
         x = 2.0 * pi * a / wavel
         if (laggregate) then
            call Mueller_GMM(lambda,k,qext,qsca,gsca)
-        else if (lmueller) then 
+        else if (lFresnel) then
            ! on désactive la parallélisation pour lire le fichier
            !$omp critical (read)
-           if (lper_size) then
-	      call mueller_input_size(lambda,k,qext,qsca,gsca)
+           if (lFresnel_per_size) then
+	      call Fresnel_input_size(lambda,k,qext,qsca,gsca)
            else
-	      call mueller_input(lambda,k,qext,qsca,gsca)
+	      call Fresnel_input(lambda,k,qext,qsca,gsca)
 	   endif
 	   !$omp end critical (read)
         else
@@ -686,15 +686,10 @@ subroutine save_dust_prop(letape_th)
   endif
 
   open(1,file=filename,status='replace',form='unformatted')
-  if (lmueller.or.laggregate) then
-     write(1) para_version, scattering_method, dust_pop, grain, .true., &
+  write(1) para_version, scattering_method, dust_pop, grain, &
        n_lambda, lambda_min, lambda_max, tab_wavelength, &
-       C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, prob_s11, tab_mueller
-  else
-     write(1) para_version, scattering_method, dust_pop, grain, .false., &
-       n_lambda, lambda_min, lambda_max, tab_wavelength, &
-       C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34
-  endif
+       C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, &
+       prob_s11, tab_s11, tab_s12, tab_s22, tab_s33, tab_s34, tab_s44
   close(unit=1)
 
   return
@@ -717,7 +712,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   real :: lambda_min_save, lambda_max_save, para_version_save
 
   integer :: i, pop, ios
-  logical :: ok, lmue
+  logical :: ok
 
   lcompute = .true.
   if (lread_Misselt.or.lread_DustEM) return
@@ -737,22 +732,12 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
   endif
 
   ! read the saved dust properties
-  if (lmueller.or.laggregate) then
-     read(1,iostat=ios) para_version_save, scattering_method_save, dust_pop_save, grain_save, lmue, &
+  read(1,iostat=ios) para_version_save, scattering_method_save, dust_pop_save, grain_save, &
        n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save, &
-       C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, prob_s11, tab_mueller
-     if (.not.lmue) ok = .false.
-  else
-     read(1,iostat=ios) para_version_save, scattering_method_save, dust_pop_save, grain_save, lmue, &
-       n_lambda_save, lambda_min_save, lambda_max_save, tab_wavelength_save, &
-       C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, prob_s11, tab_s11, tab_s12, tab_s33, tab_s34
-     if (lmue) ok = .false.
-  endif
+       C_ext, C_sca, C_abs, C_abs_norm, tab_g, tab_albedo, &
+       prob_s11, tab_s11, tab_s12, tab_s22, tab_s33, tab_s34, tab_s44
   close(unit=1)
-  if (ios /= 0) then ! if some dimension changed
-     return
-  endif
-  if (.not.ok) return ! To not merge spherical and non-spherical data
+  if (ios /= 0) return ! if some dimension changed
 
   ! The parameter version has to be the same for safety
   ! in case something important was modified between 2 versions
@@ -986,11 +971,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
 
   if (compute_scatt) then
      if (scattering_method==2) then
-        if (lmueller) then
-           call calc_local_scattering_matrices_mueller(lambda, p_lambda)
-        else 
-           call calc_local_scattering_matrices(lambda, p_lambda)
-        endif
+        call calc_local_scattering_matrices(lambda, p_lambda)
      else ! scattering_method ==1
         if (.not.low_mem_scattering) then ! we precompute the CDF (otherwise, we recalculate it live)
            do icell=1, p_n_cells
@@ -1213,153 +1194,6 @@ end subroutine calc_local_scattering_matrices
 
 !******************************************************************************
 
-subroutine calc_local_scattering_matrices_mueller(lambda, p_lambda)
-
-!*************************************************************
-! Routine derivee de calc_local_scattering_matrices
-! Adaptee pour la matrice de mueller complete
-! F.Malaval 20/04/2023
-!*************************************************************
-
-  integer, intent(in) :: lambda, p_lambda
-
-  real(kind=dp), parameter :: dtheta = pi/real(nang_scatt)
-  real(kind=dp) :: density, theta, norme, fact, k_sca_tot
-  real :: mu, g, g2, s11
-
-  integer :: icell, k, l
-
-  fact = AU_to_cm * mum_to_cm**2
-  !write(*,*) "Computing local scattering properties", lambda, p_lambda
-
-  !$omp parallel &
-  !$omp default(none) &
-  !$omp shared(tab_mueller, tab_mueller_pos) &
-  !$omp shared(lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos) &
-  !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells,fact) &
-  !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
-  !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,lphase_function_file,s11_file) &
-  !$omp private(icell,k,density,norme,theta,k_sca_tot,mu,g,g2, s11)
-  !$omp do schedule(dynamic,1)
-  do icell=1, p_n_cells
-     if (aniso_method==1) then
-        tab_mueller_pos(:,:,:,icell,p_lambda) = 0.
-     endif
-
-     do  k=1,n_grains_tot
-        density=densite_pouss(k,icell)
-        if (aniso_method==1) then
-           ! Moyennage matrice de mueller (long en cpu ) (le dernier indice est l'angle)
-           ! tab_s11 est normalisee a Qsca --> facteur S_grain * density pour que
-           ! tab_s11_pos soit normalisee a k_sca_tot
-           if (lsepar_pola) then
-              tab_mueller_pos(:,:,:,icell,p_lambda) = tab_mueller_pos(:,:,:,icell,p_lambda) + &
-               tab_mueller(:,:,:,k,lambda) * S_grain(k) * density
-           else !on a seulement besoin de S11
-              tab_mueller_pos(1,1,:,icell,p_lambda) = tab_mueller_pos(1,1,:,icell,p_lambda) + &
-               tab_mueller(1,1,:,k,lambda) * S_grain(k) * density
-           endif
-        endif !aniso_method
-     enddo !k
-
-     k_sca_tot = kappa(icell,lambda) * tab_albedo_pos(icell,lambda) / fact ! We renormalize to remove the factor from opacity
-
-     ! Over-riding phase function
-     if (lphase_function_file)  then
-        tab_mueller_pos(1,1,:,icell,p_lambda) = s11_file(:)
-
-        ! Normalisation of phase-function to k_sca_tot, ie like the internal routines
-        norme = 0.0
-        do l=1,nang_scatt-1 ! on saute j=0 & nang_scatt car sin(theta) = 0
-           theta = real(l)*dtheta
-           norme = norme + tab_mueller_pos(1,1,l,icell,p_lambda)*sin(theta)*dtheta
-        enddo
-        tab_mueller_pos(1,1,:,icell,p_lambda) = tab_mueller_pos(1,1,:,icell,p_lambda) * k_sca_tot / norme
-     endif
-
-     if (k_sca_tot > tiny_real) then
-
-        if (aniso_method==1) then ! full phase function
-           ! Propri\E9t\E9s optiques des cellules
-           prob_s11_pos(0,icell,p_lambda)=0.0
-
-           do l=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
-              theta = real(l)*dtheta
-              prob_s11_pos(l,icell,p_lambda)=prob_s11_pos(l-1,icell,p_lambda)+ &
-                   tab_mueller_pos(1,1,l,icell,p_lambda)*sin(theta)*dtheta
-           enddo
-
-           ! tab_mueller_pos(1,1) est calculee telle que la normalisation soit: k_sca_tot
-           ! car tab_mueller(1,1) est normalisé à Qsca
-           prob_s11_pos(1:nang_scatt,icell,p_lambda) = prob_s11_pos(1:nang_scatt,icell,p_lambda) + &
-                k_sca_tot - prob_s11_pos(nang_scatt,icell,p_lambda)
-           
-           
-           ! Normalisation de la proba cumulee a 1
-           prob_s11_pos(:,icell,p_lambda)=prob_s11_pos(:,icell,p_lambda)/k_sca_tot
-           
-           ! Normalisation des matrices de Mueller (idem que dans mueller_Mie)
-           do l=0,nang_scatt
-              if (tab_mueller_pos(1,1,l,icell,p_lambda) > tiny_real) then
-                 s11 = tab_mueller_pos(1,1,l,icell,p_lambda)
-                 norme=1.0/s11
-                 if (lsepar_pola) then
-                    tab_mueller_pos(:,:,l,icell,p_lambda)= tab_mueller_pos(:,:,l,icell,p_lambda) *norme
-                    tab_mueller_pos(1,1,l,icell,p_lambda) = s11
-                 endif
-              else 
-                 write (*,*) "Error : at angle", real(l)*pi/real(nang_scatt)
-                 call error ("local s11 = 0.0")
-              endif
-           enddo
-
-
-           ! Normalisation : on veut que l'energie total diffusee sur [0,pi] en theta et [0,2pi] en phi = 1
-           ! (for ray-tracing)
-           tab_mueller_pos(1,1,:,icell,p_lambda) = tab_mueller_pos(1,1,:,icell,p_lambda) * dtheta / (k_sca_tot * deux_pi)
-
-
-           ! -- ! aniso_method = 2 --> HG
-           ! -- gsca = tab_g_pos(icell,lambda)
-           ! -- tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_ray_tracing(:,icell,lambda) / (k_sca_tot * deux_pi)
-           ! --
-           ! -- if (lisotropic) tab_s11_ray_tracing(:,icell,lambda) = 1.0 / (4.* nang_scatt)
-        else !aniso_method == 2 : HG
-
-           call error ("You shoudn't use a hg function option when putting Mueller matrix in input")
-        endif !aniso_method
-
-
-        ! todo :
-        ! utiliser tab_s11_pos pour raie tracing et tab_s12_o_s11
-        ! 1) normaliser les tab_s12_o_s11
-        ! 2) normaliser les tab_s11 avec  norme = dtheta / (k_sca_tot * deux_pi)
-
-        ! Multi ou mono-lambda : mono-lambda si 180 * p_n_cells * p_n_lambda >> 1
-        ! 1) p_n_lambda = n_lambda au step 1
-        ! 2) p_n_lambda = 1 au step 2 si p_n_cells > 1, sinon on peut utiliser n_lambda
-        ! 3) on ne recalcule pas si fait au step 1
-
-     else ! k_sca_tot = 0.0
-        tab_albedo_pos(icell,lambda)=0.0
-        ! Propri\E9t\E9s optiques des cellules
-        prob_s11_pos(:,icell,p_lambda)=1.0
-        prob_s11_pos(0,icell,p_lambda)=0.0
-        ! Normalisation (idem que dans mueller)
-        tab_mueller_pos(:,:,:,icell,p_lambda)=0.0
-        tab_mueller_pos(1,1,:,icell,p_lambda)=1.0
-
-     endif ! k_sca_tot > or = 0
-  enddo !icell
-  !$omp enddo
-  !$omp end parallel
-
-  return
-
-end subroutine calc_local_scattering_matrices_mueller
-
-!******************************************************************************
-
 integer function select_grainsize_high_mem(lambda,aleat, icell) result(k)
 !-----------------------------------------------------
 !  Nouvelle version : janvier 04
@@ -1490,21 +1324,13 @@ subroutine write_dust_prop()
   call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
 
   do l=1, n_lambda
-     if (lmueller) then
-        S11_lambda_theta(l,:)= tab_mueller_pos(1,1,:,p_icell,l)
-     else
         S11_lambda_theta(l,:)= tab_s11_pos(:,p_icell,l)
-     endif
   enddo
   call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
   if (lsepar_pola) then
      do l=1, n_lambda
-        if (lmueller) then
-           pol_lambda_theta(l,:) = -tab_mueller_pos(1,2,:,p_icell,l) ! Deja normalise par S11
-        else
            pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,p_icell,l) ! Deja normalise par S11
-        endif
      enddo
      call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
   endif
