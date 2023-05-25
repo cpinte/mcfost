@@ -50,7 +50,7 @@ module grains
   real, dimension(:,:), allocatable :: amin, amax, aexp ! n_zones, n_especes
 
   ! Parametres de diffusion des grains
-  real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34, prob_s11 !n_lambda,n_grains,180
+  real, dimension(:,:,:), allocatable :: tab_s11, tab_s12, tab_s33, tab_s34, tab_s22, tab_s44, prob_s11 !n_lambda,n_grains,180
   real, dimension(:,:), allocatable :: tab_g, tab_albedo, C_ext, C_sca, C_abs, C_abs_norm !n_grains, n_lambda
   !real, dimension(:), allocatable :: q_geo ! n_grains section geometrique en m^2
 
@@ -62,7 +62,8 @@ module grains
 
   ! Parametres de diffusion des cellules
   real, dimension(:,:), allocatable :: tab_albedo_pos, tab_g_pos ! n_cells,n_lambda
-  real, dimension(:,:,:), allocatable :: tab_s11_pos, tab_s12_o_s11_pos, tab_s33_o_s11_pos, tab_s34_o_s11_pos, prob_s11_pos ! 0:180, n_cells,n_lambda
+  real, dimension(:,:,:), allocatable :: tab_s11_pos, tab_s12_o_s11_pos, tab_s33_o_s11_pos, tab_s34_o_s11_pos, &
+       tab_s22_o_s11_pos, tab_s44_o_s11_pos, prob_s11_pos ! 0:180, n_cells,n_lambda
   real, dimension(:,:,:,:,:), allocatable :: tab_mueller_pos ! 4,4,0:180, n_cells,n_lambda
 
   character(len=512) :: aggregate_file, mueller_aggregate_file, mueller_file
