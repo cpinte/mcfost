@@ -1071,10 +1071,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   enddo ! dir
 
 
-!$omp parallel &
+  !$omp parallel &
   !$omp default(none) &
-  !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes) &
-  !$omp shared(tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos,icell_ref,energie_photon,volume) &
+  !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,icell_ref,energie_photon,volume) &
+  !$omp shared(tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
   !$omp shared(lsepar_pola,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
   !$omp shared(s11_save,tab_cosw,tab_sinw,nb_proc,kappa,kappa_factor,tab_albedo_pos) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,i1,i2,u,v,w,cos_scatt,sin_scatt) &
@@ -1284,8 +1284,8 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   !$omp default(none) &
   !$omp shared(n_cells,lambda,p_lambda,ibin,I_spec_star,nang_ray_tracing_star,cos_thet_ray_tracing_star) &
   !$omp shared(lvariable_dust,r_grid,z_grid,icell_ref,omega_ray_tracing_star,lsepar_pola) &
-  !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos,eps_dust2_star) &
-  !$omp shared(energie_photon,volume,tab_albedo_pos,kappa,kappa_factor) &
+  !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
+  !$omp shared(energie_photon,volume,tab_albedo_pos,kappa,kappa_factor,eps_dust2_star) &
   !$omp private(id,icell,p_icell,stokes,x,y,z,norme,u,v,w,dir,iscatt,cos_scatt,k,omega,cosw,sinw,RPO,ROP,S) &
   !$omp private(s11,s22,s12,s33,s34,s44,C,D,M,facteur,kappa_sca)
   p_icell = icell_ref
