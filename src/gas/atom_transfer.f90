@@ -50,6 +50,20 @@ module atom_transfer
 
    contains
 
+   subroutine io_write_convergence_maps(lmap, map)
+      real(kind=dp), intent(in) :: map(n_cells)
+      logical, intent(in) :: lmap(n_cells)
+      integer :: unit, status
+
+      write(*,*) " ** writing convergence maps..."
+      unit = 100
+      open(unit, file="dloc.b",form="unformatted",status='unknown',access="sequential",iostat=status)
+      write(unit,iostat=status) lmap
+      write(unit,iostat=status) map
+      close(unit)
+
+      return
+   end subroutine io_write_convergence_maps
 !TO DO
 !      add Trad, Tion
 !      checkpointing
@@ -98,6 +112,7 @@ module atom_transfer
       type (AtomType), pointer :: at
       integer(kind=8) :: mem_alloc_local
       real(kind=dp) :: diff_cont, conv_speed, conv_acc
+      real(kind=dp), allocatable :: Jnu(:,:)
 
       !timing and checkpointing
       ! NOTE: cpu time does not take multiprocessing (= nb_proc x the real exec time.)
@@ -164,7 +179,9 @@ module atom_transfer
 
       !-> negligible
       mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
-      call alloc_nlte_var(one_ray)
+      ! allocate(jnu(n_lambda,n_cells))
+      ! mem_alloc_local = mem_alloc_local + sizeof(jnu)
+      call alloc_nlte_var(one_ray,mem=mem_alloc_local)
 
       ! --------------------------- OUTER LOOP ON STEP --------------------------- !
 
@@ -259,14 +276,14 @@ module atom_transfer
             ibar = 0
             n_cells_done = 0
 
-            ! if (lfixed_rays) then
-            !    stream = 0.0
-            !    stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
-            ! ! else
-            ! !    !update rays weight
-            ! !    if (allocated(wmu)) deallocate(wmu)
-            ! !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
-            ! end if
+            if (lfixed_rays) then
+               stream = 0.0
+               stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+            ! else
+            !    !update rays weight
+            !    if (allocated(wmu)) deallocate(wmu)
+            !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            end if
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
             l_iterate_ne = .false.
@@ -274,14 +291,14 @@ module atom_transfer
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
                ! if (lforce_lte) l_iterate_ne = .false.
             endif
-
+            ! Jnu = 0.0_dp
             call progress_bar(0)
             !$omp parallel &
             !$omp default(none) &
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff)&
             !$omp private(nact, at) & ! Acceleration of convergence
-            !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on) & ! Ng's Acceleration of convergence
+            !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on, Jnu) & ! Ng's Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,n_cells_remaining) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,precision,lcswitch_enabled)
@@ -289,8 +306,8 @@ module atom_transfer
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
-               stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               if( (diff_loc(icell) < 1d-2 * precision).and..not.lcswitch_enabled ) cycle
+               ! stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
+               ! if( (diff_loc(icell) < 1d-2 * precision).and..not.lcswitch_enabled ) cycle
 
                if (l_iterate) then
 
@@ -326,6 +343,7 @@ module atom_transfer
                            call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,1,labs,n_lambda,tab_lambda_nm)
                            call xcoupling(id, icell,1)
                            call accumulate_radrates_mali(id, icell,1, weight)
+                           ! Jnu(:,icell) = Jnu(:,icell) + weight * Itot(:,1,id)
                         endif
                      enddo
 
@@ -357,6 +375,7 @@ module atom_transfer
                            call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,1,labs,n_lambda,tab_lambda_nm)
                            call xcoupling(id,icell,1)
                            call accumulate_radrates_mali(id, icell,1, weight)
+                           ! Jnu(:,icell) = Jnu(:,icell) + weight * Itot(:,1,id)
                         endif
                      enddo !iray
 
@@ -762,6 +781,11 @@ module atom_transfer
 
       if (loutput_rates) call write_rates()
 
+      ! call io_write_convergence_maps(lcell_converged, diff_loc)
+      ! open(100, file="jnu.b",form="unformatted",status='unknown',access="sequential")
+      ! write(100) tab_lambda_nm
+      ! write(100) Jnu
+      ! deallocate(Jnu); close(150)
       call dealloc_nlte_var()
       deallocate(dM, dTM, Tex_ref, Tion_ref)
       deallocate(diff_loc, dne_loc)
@@ -1071,6 +1095,7 @@ module atom_transfer
 
          call nlte_loop_mali()
          ! call solve_for_nlte_pops
+         call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
          if (lexit_after_nonlte_loop) return
 
       end if !active atoms
