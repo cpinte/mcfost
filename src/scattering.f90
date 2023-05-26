@@ -312,15 +312,12 @@ end subroutine BHMIE
 !***************************************************
 
 subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
-!***************************************************************
-! calcule les elements de la matrice de diffusion a partir de
-! la sous-routine bhmie (grains spheriques)
-!     GRAINS SPHERIQUES.
-!
-!        CALCULE AUSSI "G" = LE PARAMETRE D'ASYMETRIE
-!
-! C. Pinte Fevrier 2004
-!****************************************************************
+  !***************************************************************
+  ! Calcule les elements de la matrice de diffusion a partir de
+  ! la sous-routine bhmie (grains spheriques)
+  !
+  ! C. Pinte Fevrier 2004
+  !****************************************************************
 
   implicit none
   integer, intent(in) :: lambda, taille_grain
@@ -352,8 +349,8 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
   if (lforce_HG) gsca = forced_g
   if (lisotropic) gsca = 0.0
 
-  ! La normalisation de bhmie est 0.5*x**2*Qsca
-  ! --> correction par 0.5*x**2 pour avoir normalisation a Qsa
+  ! The normalisation of bhmie for s11 is 0.5*x**2*Qsca
+  ! --> We correct by 0.5*x**2 to have a normalisation to Qsca Qsa
   factor = 1 / (0.5 * x**2)
 
   ! Passage des valeurs dans les tableaux de mcfost
@@ -380,6 +377,91 @@ end subroutine mueller_Mie
 
 !***************************************************
 
+subroutine Mueller_input(lambda, qext,qsca,gsca)
+
+  integer, intent(in) :: lambda
+  real, intent(out) :: qext, qsca, gsca
+
+  character(len=128) :: string, filename
+
+  integer :: EoF, alloc_status,iformat,nlam,nmu,ilam,iline,iang,nang, l
+  logical :: lscat
+  real(dp), dimension(:), allocatable :: angles,wl,kabs,ksca,g
+  real(dp), dimension(:,:), allocatable :: f11,f12,f22,f33,f34,f44
+
+
+  qext = 0
+  qsca = 0
+  gsca = 0
+
+  alloc_status = 0
+  EOF=0
+  open(unit=1,file=filename,status='old')
+
+  ! Skip lines starting with "#"
+  do while(EoF==0)
+     read(1,*,iostat=EoF) string
+     if (string(1:1) /= '#') exit
+  enddo
+
+  ! First read the format number. Do so from the above read string.
+  read(string,*) iformat
+  if(iformat == 3) then
+     lscat = .false.
+  else if(iformat == 0) then
+     lscat = .true.
+  endif
+
+  ! Read the number of wavelengths
+  read(1,*) nlam
+
+  ! Read the number of scattering angles
+  if (lscat) read(1,*) nang
+
+  ! Allocate arrays
+  alloc_status = 0
+  allocate(wl(nlam),kabs(nlam),ksca(nlam),g(nlam), stat = alloc_status)
+
+  ! Read the frequencywavelength and the absorption and scattering opacities.
+  ! Also read the gfactor.
+  do ilam=1,nlam
+     read(1,*) wl(l), kabs(l), ksca(l), g(l)
+  enddo
+
+  if (lscat) then
+     allocate(angles(nang), f11(nlam,nang),f12(nlam,nang),f22(nlam,nang),&
+          f33(nlam,nang),f34(nlam,nang),f44(nlam,nang), stat = alloc_status)
+
+     ! Read the angular grid
+     do iang=1,nang
+        read(1,*) angles(iang)
+     enddo
+
+     ! Read the scattering matrix.
+     do ilam=1,nlam
+        do iang=1,nang
+           read(1,*) f11(ilam,iang),f12(ilam,iang), f22(ilam,iang), f33(ilam,iang), f34(ilam,iang), f44(ilam,iang)
+        enddo
+     enddo
+  endif
+  close(1)
+
+  ! Deallocate arrays
+  print *,wl(1),kabs(1),ksca(1),g(1)
+  print *,f11(1,1),f44(1,1)
+  print *,f11(nlam,nang),f44(nlam,nang)
+  deallocate(wl,kabs,ksca,g)
+  if (lscat) then
+     deallocate(angles)
+     deallocate(f11,f12,f22,f33,f34,f44)
+  endif
+
+  return
+
+end subroutine Mueller_input
+
+!***************************************************
+
 subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, qsca)
 
   integer, intent(in) :: lambda,taille_grain
@@ -398,7 +480,6 @@ subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44
         prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
      enddo
 
-     ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
      ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
      ! On rate le pic de diffraction (en particulier entre 0 et 1)
      somme_prob = qsca
