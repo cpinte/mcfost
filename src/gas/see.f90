@@ -33,17 +33,22 @@ module see
 
     contains
 
-    subroutine alloc_nlte_var(n_rayons_max)
+    subroutine alloc_nlte_var(n_rayons_max,mem)
     !allocate space for non-lte loop (only)
         integer, intent(in) :: n_rayons_max
+        integer(kind=8), intent(in), optional :: mem
         integer :: Nmaxlevel,Nmaxline,Nmaxcont,NlevelTotal,Nmaxstage
-        integer :: alloc_status, mem_alloc_local
+        integer :: alloc_status
+        integer(kind=8) :: mem_alloc_local
         integer :: kr, n, icell, l, i, j
         real(kind=dp) :: wl, anu1, e1, b1
         real(kind=dp) :: anu2, e2, b2!higher prec integ
         type(AtomType), pointer :: atom
 
         mem_alloc_local = 0
+        if (present(mem)) then
+            mem_alloc_local = mem_alloc_local + mem
+        endif
         NmaxLevel = 0 !maximum number of levels
         NlevelTotal = 0 !sum of all levels among all active atoms
         NmaxLine = 0 !maximum number of lines
