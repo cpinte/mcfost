@@ -40,7 +40,7 @@ module atom_type
       real(kind=dp) :: lambda0, lambdamin, lambdamax
       real(kind=dp) :: Aji, Bji, Bij, Grad, cStark, fosc
       real(kind=dp) :: twohnu3_c2, gij
-      real(kind=dp) :: vmax, damp_max !m/s and in units of vth
+      real(kind=dp) :: vmax, damp_max, damp_min !m/s
       real :: qwing
       real(kind=dp), allocatable, dimension(:)  :: Rij, Rji, Cij, Cji 
       real(kind=dp), dimension(4) :: cvdWaals

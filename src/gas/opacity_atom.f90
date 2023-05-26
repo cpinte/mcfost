@@ -11,7 +11,7 @@ module Opacity_atom
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
    use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, &
-                                    Nlambda_max_line_vel, vwing_on_vth_gauss
+                                    Nlambda_max_line_vel
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
@@ -45,14 +45,34 @@ module Opacity_atom
       enddo
       return
    end function gmax_line
+   function gmin_line(line)
+   !compute the damping min of a given line line.
+   !assumes that eletronic densities, populations and thermodynamics
+   !quantities are set
+      type (AtomicLine), intent(in) :: line
+      integer :: i
+      real(kind=dp) :: gmin_line
+   !could be para
+      gmin_line = 1d50 ! damping * vth
+      do i=1,n_cells
+         if (icompute_atomRT(i)>0.0) then
+            gmin_line = min(gmin_line,line_damping(i,line)*&
+                        vbroad(T(i),line%atom%weight, vturb(i)))
+         endif
+      enddo
+      return
+   end function gmin_line
 
    subroutine set_max_damping()
+   !sets also the minimum
+   !result in m/s
       integer :: nat, kr
       do nat=1, n_atoms
          do kr=1,atoms(nat)%p%nline
             if (.not.atoms(nat)%p%lines(kr)%lcontrib) cycle
             if (atoms(nat)%p%lines(kr)%Voigt) then
                atoms(nat)%p%lines(kr)%damp_max = gmax_line(atoms(nat)%p%lines(kr))
+               atoms(nat)%p%lines(kr)%damp_min = gmin_line(atoms(nat)%p%lines(kr))
             endif
          enddo
       enddo
@@ -419,7 +439,7 @@ module Opacity_atom
                Nlam = Nred - Nblue + 1
             endif
 
-            phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
+            phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
 
@@ -433,29 +453,29 @@ module Opacity_atom
 ! !-> check Gaussian profile  and norm.
 ! ! -> check Voigt profile, for Lyman alpha mainly.
 ! ! -> write a voigt profile (kr) and a gaussian one (the same for all in principle!)
-!             if (kr==1 .and. atom%id=="H") then
-!                !-> try large damped lines to test the maximum extension of the line.
-!                ! phi0(1:Nlam) = Voigt(Nlam, 1d4, (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))
-!                !-> try pure gauss with the same grid as voigt (for testing low damping)
-!                ! phi0(1:Nlam) = exp(-( (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))**2)
-!                open(1,file="prof.txt",status="unknown")
-!                write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
-!                write(1,*) atom%lines(kr)%a(icell), maxval(atom%lines(kr)%a), minval(atom%lines(kr)%a,mask=nhtot>0)
-!                do j=1,Nlam
-!                   write(1,*) lambda(Nblue+j-1),phi0(j)
-!                enddo
-!                close(1)
-!             endif
-!             if (.not.atom%lines(kr)%voigt .and. atom%id=="H") then
-!                !maybe the similar grid for voigt is nice too ? core + wings ?
-!                open(1,file="profg.txt",status="unknown")
-!                write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
-!                do j=1,Nlam
-!                   write(1,*) lambda(Nblue+j-1),phi0(j)
-!                enddo
-!                close(1)
-!                stop
-!             endif
+            ! if (kr==1 .and. atom%id=="H") then
+            !    !-> try large damped lines to test the maximum extension of the line.
+            !    ! phi0(1:Nlam) = Voigt(Nlam, 1d4, (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))
+            !    !-> try pure gauss with the same grid as voigt (for testing low damping)
+            !    ! phi0(1:Nlam) = exp(-( (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))**2)
+            !    open(1,file="prof.txt",status="unknown")
+            !    write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
+            !    write(1,*) atom%lines(kr)%a(icell), maxval(atom%lines(kr)%a), minval(atom%lines(kr)%a,mask=nhtot>0)
+            !    do j=1,Nlam
+            !       write(1,*) lambda(Nblue+j-1),phi0(j)
+            !    enddo
+            !    close(1)
+            ! endif
+            ! if (.not.atom%lines(kr)%voigt .and. atom%id=="H") then
+            !    !maybe the similar grid for voigt is nice too ? core + wings ?
+            !    open(1,file="profg.txt",status="unknown")
+            !    write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
+            !    do j=1,Nlam
+            !       write(1,*) lambda(Nblue+j-1),phi0(j)
+            !    enddo
+            !    close(1)
+            !    stop
+            ! endif
 
             if ((iterate.and.atom%active)) then
                phi_loc(1:Nlam,atom%ij_to_trans(i,j),atom%activeindex,iray,id) = phi0(1:Nlam)
@@ -621,6 +641,7 @@ module Opacity_atom
    end subroutine xcoupling
 
    function profile_art(line,id,icell,iray,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   use voigts, only : VoigtThomson
       ! phi = Voigt / sqrt(pi) / vbroad(icell)
       integer, intent(in)                    :: id, icell, N, iray
       type (AtomicLine), intent(in)          :: line
@@ -681,11 +702,24 @@ module Opacity_atom
 
       if (line%voigt) then
          u1(:) = u0(:) - omegav(1)/vth
-         profile_art(:) = Voigt(N, line%a(icell), u1(:))
-         do nv=2, Nvspace
-            u1(:) = u0(:) - omegav(nv)/vth
-            profile_art(:) = profile_art(:) + Voigt(N, line%a(icell), u1(:))
-         enddo
+         ! profile_art(:) = Voigt(N, line%a(icell), u1(:))
+         ! do nv=2, Nvspace
+         !    u1(:) = u0(:) - omegav(nv)/vth
+         !    profile_art(:) = profile_art(:) + Voigt(N, line%a(icell), u1(:))
+         ! enddo
+         if (lnon_lte_loop) then!approximate for non-LTE
+            profile_art(:) = VoigtThomson(N,line%a(icell), u1(:),vth)
+            do nv=2, Nvspace
+               u1(:) = u0(:) - omegav(nv)/vth
+               profile_art(:) = profile_art + VoigtThomson(N,line%a(icell), u1(:),vth)
+            enddo
+         else!accurate for images
+            profile_art(:) = Voigt(N, line%a(icell), u1(:))
+            do nv=2, Nvspace
+               u1(:) = u0(:) - omegav(nv)/vth
+               profile_art(:) = profile_art(:) + Voigt(N, line%a(icell), u1(:))
+            enddo
+         endif
 
       else
          u0sq(:) = u0(:)*u0(:)

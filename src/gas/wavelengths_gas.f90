@@ -18,16 +18,19 @@ module wavelengths_gas
    !continuum wavelength double for level dissolution !
    integer, parameter :: Nlambda_cont = 101
    integer, parameter :: Nlambda_cont_log = 31
-   integer, parameter :: Nlambda_line_w_log = 14 !log wings
-   integer, parameter :: Nlambda_line_c_lin = 12 ! linear core
+   integer, parameter :: Nlambda_line_w_log = 17!14 !log wings
+   integer, parameter :: Nlambda_line_c_lin = 13!12 ! linear core
    real, parameter    :: vcore_on_vth = 0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
-   real, parameter    :: vwing_on_vth = 10.0 ! 5.0!local (Voigt) line goes from 0 to vwing_on_vth * vth km/s
+   real, parameter    :: peak_voigt_limit = 1e-6 ! the profile expands up to peak * peak_voigt_limit
+   ! real, parameter    :: vwing_on_vth = 10.0 ! 5.0!local (Voigt) line goes from 0 to vwing_on_vth * vth km/s
 !make assym gauss
    ! integer, parameter :: Nlambda_line_gauss = 21 !11 !if linear
    integer, parameter :: Nlambda_line_gauss_log = 5 !log wings
-   integer, parameter :: Nlambda_line_gauss_lin = 5 ! linear core
-   real, parameter    :: vcore_on_vth_gauss = 0.5
-   real, parameter    :: vwing_on_vth_gauss = 4!3 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
+   integer, parameter :: Nlambda_line_gauss_lin = 7 ! linear core
+   real, parameter    :: vcore_on_vth_gauss = 0.6
+   ! real, parameter    :: peak_gauss_limit = 1e-5 ! the profile expands up to peak * peak_gauss_limit
+   real, parameter    :: vwing_on_vth_gauss = 3!4!3 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
+   real, parameter    :: peak_gauss_limit = exp(-vwing_on_vth_gauss**2) ! the profile expands up to peak * peak_gauss_limit
    real               :: hv
    !number max of lambda for all lines
    integer            :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans, Nlambda_max_line_vel
@@ -89,6 +92,7 @@ module wavelengths_gas
    end function make_sub_wavelength_grid_cont_log_nu
 
    subroutine compute_line_bound(line,limage)
+   use voigts, only : max_voigt_profile, dmax_voigt, dmax_lorentz
       ! ------------------------------------------------------------ !
       ! Compute the line bounds : lamndamin and lambdamax
       ! the total extent of line in the atom's frame (no velocity).
@@ -102,6 +106,7 @@ module wavelengths_gas
       type (AtomicLine), intent(inout) :: line
       logical, intent(in) :: limage
       real(kind=dp) :: vB, vmax, vth_max
+      real(kind=dp) :: peak_g, adamp
 
       if (limage) then
          vmax = 1d3 * line%atom%vmax_rt
@@ -113,11 +118,26 @@ module wavelengths_gas
          endif
          vth_max = vbroad(maxval(T), line%atom%weight, maxval(vturb))
          if (line%voigt) then
+         !BEWARE: line%damp_max is in m/s (while line_damping() returns damping/vth.)
          !increase wavelength number ?
-            vmax = vwing_on_vth * (vth_max + vb) + vwing_on_vth * line%damp_max * line%qwing !min = 1
-            ! vmax = line%qwing * vwing_on_vth * (vth_max + vb) !to do
+            ! vmax = vwing_on_vth * (vth_max + vb) + vwing_on_vth * line%damp_max * line%qwing !min = 1
+            !! vmax = line%qwing * vwing_on_vth * (vth_max + vb) !to do
+            ! -> LTE estimates
+            adamp = line%damp_min/vth_max ! line%damp_max/vth_max
+            write(*,*) "peak:",max_voigt_profile(vth_max, adamp), " vth=",vth_max, &
+               " a/vth=", adamp
+            vmax = dmax_voigt(vth_max,adamp,peak_voigt_limit)
+            write(*,*) "vmax voigt (thomson)", vmax, vmax/c_light
+            vmax = dmax_lorentz(vth_max,adamp,peak_voigt_limit)
+            peak_g = max_voigt_profile(vth_max,adamp) * peak_voigt_limit
+            write(*,*) "vmax voigt (Lorentz)", vmax, vmax/c_light
+            write(*,*) "vmax voigt (gaussian)", vth_max * sqrt(-log(peak_g * sqrt(pi) * vth_max)), &
+               vth_max * sqrt(-log(peak_g * sqrt(pi) * vth_max)) / c_light
          else
-            vmax = vwing_on_vth_gauss * vth_max
+            !! vmax = vwing_on_vth_gauss * vth_max
+            ! peak_gauss_limit = exp(-vwing_on_vth_gauss**2) !we reach that fraction at vwing_on_vth_gauss times vth_max.
+            peak_g = peak_gauss_limit / sqrt(pi) / vth_max
+            vmax = vth_max * sqrt(-log(peak_g * sqrt(pi) * vth_max))
          endif
       endif
 
@@ -125,6 +145,7 @@ module wavelengths_gas
       line%lambdamin = line%lambda0*(1.0-vmax/C_LIGHT)
       line%lambdamax = line%lambda0*(1.0+vmax/C_LIGHT)
       line%vmax = vmax
+      if (vmax > 0.7 * c_light) call warning("(line_bound) Line vmax is close or above to c!")
 
       !avoid to print too much info. all lines are kept for lmodel_1d spectra.
       !to remove after debug ?
@@ -247,7 +268,7 @@ module wavelengths_gas
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
       integer, dimension(:), allocatable :: sorted_indexes
-      real(kind=dp) :: max_cont, l0, l1, dvmin
+      real(kind=dp) :: max_cont, l0, l1, dvmin, min_lines, min_cont
       real :: hv_loc !like hv
       real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
       logical :: check_for_overlap
@@ -265,6 +286,7 @@ module wavelengths_gas
       Nlambda_cont = 0
       Ncont = 0
       hv = 1d30
+      min_lines = 1d50 !the bluest wavelength among all lines
       do n=1, N_atoms
          atom => atoms(n)%p
          !km/s
@@ -281,6 +303,7 @@ module wavelengths_gas
          enddo
          do kr=1,atom%Nline
             call compute_line_bound(atom%lines(kr),.false.)
+            min_lines = min(min_lines, atom%lines(kr)%lambdamin)
             if (associated(subgrid_line,line_lambda_grid)) then
                if (atom%lines(kr)%voigt) then
                   atom%lines(kr)%Nlambda = 2 * (Nlambda_line_w_log + Nlambda_line_c_lin - 1) - 1
@@ -363,6 +386,11 @@ module wavelengths_gas
       endif
       deallocate(tmp_grid)
       max_cont = maxval(tab_lambda_cont)
+      min_cont = minval(tab_lambda_cont)
+      if (min_lines < min_cont) then
+         write(*,*) " *** Bluest line's wavelength below bluest cont' wavelength"
+         write(*,*) "  -- adding one more continuum point to avoid extrapolation."
+      endif
       Nlambda_cont = Nlambda_cont - Nremoved
       ! ********************** ***************** ********************** !
 
@@ -555,13 +583,28 @@ module wavelengths_gas
                Nmore_cont_freq = Nmore_cont_freq + 1
             endif
 
+            !and below first bound-free if the bluest line wavelength is below 
+            !the lower continuum wavelength !
+            if (l0 < min_cont) then
+               Nmore_cont_freq = Nmore_cont_freq + 1
+               write(*,*) "warn check, adding cont below the bluest cont waves!"
+            endif
+            if (l1 < min_cont) then
+               Nmore_cont_freq = Nmore_cont_freq + 1
+               write(*,*) "warn check, adding cont below the bluest cont waves!"
+            endif
+            if (0.5*(l0+l1) < min_cont) then
+               Nmore_cont_freq = Nmore_cont_freq + 1
+               write(*,*) "warn check, adding cont below the bluest cont waves!"
+            endif
          enddo
 
          check_new_freq = Nmore_cont_freq
          if (Nmore_cont_freq > 0) then
-            write(*,*) "Adding new wavelength points for lines beyond continuum max!"
+            write(*,*) "Adding new wavelength points for lines beyond continuum wavelengths!"
             write(*,*) "  -> Adding ", Nmore_cont_freq," points"
             write(*,*) "max cont, max line", max_cont, maxval(tmp_grid)
+            write(*,*) "min cont, min line", min_cont, minval(tmp_grid)
             allocate(tmp_grid2(Nlambda_cont))
             tmp_grid2 = tab_lambda_cont
             deallocate(tab_lambda_cont)
@@ -575,6 +618,7 @@ module wavelengths_gas
             do n=1, N_groups
                l0 = group_blue(n)
                l1 = group_red(n)
+               !add wavelength above the last "pure" continuum wavelength
                if (l0 > max_cont) then
                   Nmore_cont_freq = Nmore_cont_freq + 1
                   tmp_grid2(Nmore_cont_freq) = l0
@@ -584,6 +628,19 @@ module wavelengths_gas
                   tmp_grid2(Nmore_cont_freq) = 0.5 * (l0+l1)
                endif
                if (l1 > max_cont) then
+                  Nmore_cont_freq = Nmore_cont_freq + 1
+                  tmp_grid2(Nmore_cont_freq) = l1
+               endif
+               !and below the first continuum wavelength
+               if (l0 < min_cont) then
+                  Nmore_cont_freq = Nmore_cont_freq + 1
+                  tmp_grid2(Nmore_cont_freq) = l0
+               endif
+               if (0.5*(l0+l1) < min_cont) then
+                  Nmore_cont_freq = Nmore_cont_freq + 1
+                  tmp_grid2(Nmore_cont_freq) = 0.5 * (l0+l1)
+               endif
+               if (l1 < min_cont) then
                   Nmore_cont_freq = Nmore_cont_freq + 1
                   tmp_grid2(Nmore_cont_freq) = l1
                endif
