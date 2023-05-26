@@ -328,14 +328,13 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
   real, intent(in) :: x ! 2*pi*a/wl
   real, intent(out) :: qext, qsca, gsca
 
-  integer :: j, nang
+  integer :: j, jj, nang
 
   complex, dimension(nang_scatt+1) :: S1,S2
 
-  real :: vi1, vi2, qback, norme, somme_prob, theta, dtheta
-  complex :: refrel
-  real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
-
+  real :: vi1, vi2, qback, factor
+  complex :: s, refrel
+  real, dimension(0:nang_scatt) ::  s11,s12,s33,s34
 
   refrel = cmplx(amu1,amu2)
 
@@ -353,64 +352,82 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
   if (lforce_HG) gsca = forced_g
   if (lisotropic) gsca = 0.0
 
+  ! La normalisation de bhmie est 0.5*x**2*Qsca
+  ! --> correction par 0.5*x**2 pour avoir normalisation a Qsa
+  factor = 1 / (0.5 * x**2)
+
   ! Passage des valeurs dans les tableaux de mcfost
   if (aniso_method==1) then
-
-     !  QABS=QEXT-QSCA
      ! Calcul des elements de la matrice de diffusion
      ! indices decales de 1 par rapport a bhmie
-     do J=0,nang_scatt
-        vi1 = cabs(S2(J+1))*cabs(S2(J+1))
-        vi2 = cabs(S1(J+1))*cabs(S1(J+1))
-        s11(j) = 0.5*(vi1 + vi2)
-        s12(j) = 0.5*(vi1 - vi2)
-        s33(j)=real(S2(J+1)*conjg(S1(J+1)))
-        s34(j)=aimag(S2(J+1)*conjg(S1(J+1)))
+     do j=0,nang_scatt
+        jj=j+1
+        vi1 = cabs(S2(jj))*cabs(S2(jj))
+        vi2 = cabs(S1(jj))*cabs(S1(jj))
+        s11(j) = 0.5*(vi1 + vi2) * factor
+        s12(j) = 0.5*(vi1 - vi2) * factor
+        s = S2(jj)*conjg(S1(jj))
+        s33(j)=real(s) * factor
+        s34(j)=aimag(s) * factor
      enddo !j
 
-     ! Integration S11 pour tirer angle
-     if (scattering_method==1) then
-        prob_s11(lambda,taille_grain,0)=0.0
-        dtheta = pi/real(nang_scatt)
-        do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
-           theta = real(j)*dtheta
-           prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
-        enddo
-
-        ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
-        ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
-        ! On rate le pic de diffraction (en particulier entre 0 et 1)
-        somme_prob = 0.5*x**2*qsca
-        prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
-             somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
-
-        ! Normalisation de la proba cumulee a 1
-        prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
-     endif ! scattering_method==1
-
-     do j=0,nang_scatt
-        if (scattering_method==1) then ! Matrice de Mueller par grain
-           ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
-           norme=s11(j)
-        else ! Sinon normalisation a Qsca
-           ! La normalisation par default : 0.5*x**2*Qsca --> correction par 0.5*x**2
-           norme = 0.5 * x**2
-        endif
-
-        tab_s11(j,taille_grain,lambda) = s11(j) / norme
-        tab_s12(j,taille_grain,lambda) = s12(j) / norme
-        tab_s33(j,taille_grain,lambda) = s33(j) / norme
-        tab_s34(j,taille_grain,lambda) = s34(j) / norme
-
-        tab_s22(j,taille_grain,lambda) = tab_s11(j,taille_grain,lambda)
-        tab_s44(j,taille_grain,lambda) = tab_s33(j,taille_grain,lambda)
-     enddo
-
-  endif ! aniso_method ==1
+     call normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s11,s33,s34,s33, qsca)
+  endif
 
   return
 
 end subroutine mueller_Mie
+
+!***************************************************
+
+subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, qsca)
+
+  integer, intent(in) :: lambda,taille_grain
+  real, dimension(0:nang_scatt), intent(in) ::  s11,s12,s22,s33,s34,s44
+  real, intent(in) :: qsca
+
+  integer :: j
+  real :: norm, somme_prob, theta, dtheta
+
+  ! Integration S11 pour tirer angle
+  if (scattering_method==1) then
+     prob_s11(lambda,taille_grain,0)=0.0
+     dtheta = pi/real(nang_scatt)
+     do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+        theta = real(j)*dtheta
+        prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
+     enddo
+
+     ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
+     ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
+     ! On rate le pic de diffraction (en particulier entre 0 et 1)
+     somme_prob = qsca
+     prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
+          somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
+
+     ! Normalisation de la proba cumulee a 1
+     prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
+  endif ! scattering_method==1
+
+  do j=0,nang_scatt
+     if (scattering_method==1) then ! Matrice de Mueller par grain
+        ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
+        norm = 1./s11(j)
+     else ! Sinon normalisation a Qsca
+        norm = 1.
+     endif
+
+     tab_s11(j,taille_grain,lambda) = s11(j) * norm
+     tab_s12(j,taille_grain,lambda) = s12(j) * norm
+     tab_s22(j,taille_grain,lambda) = s22(j) * norm
+     tab_s33(j,taille_grain,lambda) = s33(j) * norm
+     tab_s34(j,taille_grain,lambda) = s34(j) * norm
+     tab_s44(j,taille_grain,lambda) = s44(j) * norm
+  enddo
+
+  return
+
+end subroutine normalise_Mueller_matrix
 
 !***************************************************
 
@@ -1151,7 +1168,6 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   return
 
 end subroutine update_Stokes
-
 
 !**********************************************************************
 
