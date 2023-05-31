@@ -521,13 +521,14 @@ module atom_transfer
                            if (PassiveAtoms(nact)%p%lines(ilevel)%Voigt) then
                               nb = PassiveAtoms(nact)%p%lines(ilevel)%nb; nr = PassiveAtoms(nact)%p%lines(ilevel)%nr
                               PassiveAtoms(nact)%p%lines(ilevel)%a(icell) = line_damping(icell,PassiveAtoms(nact)%p%lines(ilevel))
+                              !-> do not allocate if thomson and humlicek profiles !
                               !tmp because of vbroad!
-                              vth = vbroad(T(icell),PassiveAtoms(nact)%p%weight, vturb(icell))
-                              !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
-                              PassiveAtoms(nact)%p%lines(ilevel)%phi(:,icell) = &
-                                   Voigt(PassiveAtoms(nact)%p%lines(ilevel)%Nlambda, PassiveAtoms(nact)%p%lines(ilevel)%a(icell), &
-                                   PassiveAtoms(nact)%p%lines(ilevel)%v(:)/vth)&
-                                    / (vth * sqrtpi)
+                              ! vth = vbroad(T(icell),PassiveAtoms(nact)%p%weight, vturb(icell))
+                              ! !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
+                              ! PassiveAtoms(nact)%p%lines(ilevel)%phi(:,icell) = &
+                              !      Voigt(PassiveAtoms(nact)%p%lines(ilevel)%Nlambda, PassiveAtoms(nact)%p%lines(ilevel)%a(icell), &
+                              !      PassiveAtoms(nact)%p%lines(ilevel)%v(:)/vth)&
+                              !       / (vth * sqrtpi)
                            endif
                         enddo
                      enddo !over passive atoms
@@ -613,12 +614,13 @@ module atom_transfer
                         if (at%lines(ilevel)%Voigt) then
                            nb = at%lines(ilevel)%nb; nr = at%lines(ilevel)%nr
                            at%lines(ilevel)%a(icell) = line_damping(icell,at%lines(ilevel))
+                           !-> do not allocate if thomson and humlicek profiles !
                            !tmp because of vbroad!
-                           vth = vbroad(T(icell),at%weight, vturb(icell))
-                           !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
-                           at%lines(ilevel)%phi(:,icell) = &
-                                Voigt(at%lines(ilevel)%Nlambda, at%lines(ilevel)%a(icell), at%lines(ilevel)%v(:)/vth) &
-                                / (vth * sqrtpi)
+                           ! vth = vbroad(T(icell),at%weight, vturb(icell))
+                           ! !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
+                           ! at%lines(ilevel)%phi(:,icell) = &
+                           !      Voigt(at%lines(ilevel)%Nlambda, at%lines(ilevel)%a(icell), at%lines(ilevel)%v(:)/vth) &
+                           !      / (vth * sqrtpi)
                         endif
                      enddo
                   end do
@@ -1095,7 +1097,10 @@ module atom_transfer
 
          call nlte_loop_mali()
          ! call solve_for_nlte_pops
-         call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
+
+         !-> here on the non-LTE frequency grid
+         ! call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
+
          if (lexit_after_nonlte_loop) return
 
       end if !active atoms
