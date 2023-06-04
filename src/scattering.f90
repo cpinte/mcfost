@@ -377,21 +377,21 @@ end subroutine mueller_Mie
 
 !***************************************************
 
-subroutine Mueller_input(lambda, qext,qsca,gsca)
+subroutine Mueller_input(lambda, k_abs,k_sca,gsca)
 
   integer, intent(in) :: lambda
-  real, intent(out) :: qext, qsca, gsca
+  real, intent(out) :: k_abs, k_sca, gsca
 
   character(len=128) :: string, filename
 
   integer :: EoF, alloc_status,iformat,nlam,nmu,ilam,iline,iang,nang, l
   logical :: lscat
-  real(dp), dimension(:), allocatable :: angles,wl,kabs,ksca,g
+  real(dp), dimension(:), allocatable :: angles,wavel,kabs,ksca,g
   real(dp), dimension(:,:), allocatable :: f11,f12,f22,f33,f34,f44
+  real(dp) :: wl, frac, frac_m1
 
+  real, dimension(0:nang_scatt) ::  s11,s12,s22,s33,s34,s44
 
-  qext = 0
-  qsca = 0
   gsca = 0
 
   alloc_status = 0
@@ -404,11 +404,11 @@ subroutine Mueller_input(lambda, qext,qsca,gsca)
      if (string(1:1) /= '#') exit
   enddo
 
-  ! First read the format number. Do so from the above read string.
+  ! Read the format number.
   read(string,*) iformat
   if(iformat == 3) then
      lscat = .false.
-  else if(iformat == 0) then
+  else if(iformat == 1) then
      lscat = .true.
   endif
 
@@ -420,13 +420,33 @@ subroutine Mueller_input(lambda, qext,qsca,gsca)
 
   ! Allocate arrays
   alloc_status = 0
-  allocate(wl(nlam),kabs(nlam),ksca(nlam),g(nlam), stat = alloc_status)
+  allocate(wavel(nlam),kabs(nlam),ksca(nlam),g(nlam), stat = alloc_status)
 
-  ! Read the frequencywavelength and the absorption and scattering opacities.
-  ! Also read the gfactor.
+  ! Read wavelengths, opacities and g
   do ilam=1,nlam
-     read(1,*) wl(l), kabs(l), ksca(l), g(l)
+     read(1,*) wavel(l), kabs(l), ksca(l), g(l)
   enddo
+
+  wl = tab_lambda(wl)
+  if (wl < minval(wavel)) call error("Mueller matrices: wavelength is smaller than tabulated")
+  if (wl > maxval(wavel)) call error("Mueller matrices: wavelength is larger than tabulated")
+
+  if (wavel(2) >  wavel(1)) then ! increasing order
+     do ilam=1,nlam
+        if  (wavel(l) > wl) then
+           frac = (wavel(l) - wl) / (wavel(l) - wavel(l-1))
+           exit
+        endif
+     enddo
+  else ! decreasing order
+     do ilam=1,nlam
+        if  (wavel(l) < wl) then
+           frac = (wl - wavel(l)) / (wavel(l-1) - wavel(l))
+           exit
+        endif
+     enddo
+  endif
+  if ((frac > 1) .or. (frac < 0)) call error("Mueller matrices: interpolation error")
 
   if (lscat) then
      allocate(angles(nang), f11(nlam,nang),f12(nlam,nang),f22(nlam,nang),&
@@ -446,11 +466,22 @@ subroutine Mueller_input(lambda, qext,qsca,gsca)
   endif
   close(1)
 
+  ! Interpolate at correct wavelength
+  ! todo : find ilam
+
+  k_abs = kabs(ilam-1) * frac + kabs(ilam) * frac_m1
+  k_sca = ksca(ilam-1) * frac + ksca(ilam) * frac_m1
+  gsca = ksca(ilam-1) * frac + ksca(ilam) * frac_m1
+
+  s11(:) = f11(ilam-1,:) * frac + f11(ilam,:) * frac_m1
+  s12(:) = f11(ilam-1,:) * frac + f12(ilam,:) * frac_m1
+  s22(:) = f11(ilam-1,:) * frac + f22(ilam,:) * frac_m1
+  s33(:) = f11(ilam-1,:) * frac + f33(ilam,:) * frac_m1
+  s34(:) = f11(ilam-1,:) * frac + f34(ilam,:) * frac_m1
+  s44(:) = f11(ilam-1,:) * frac + f44(ilam,:) * frac_m1
+
   ! Deallocate arrays
-  print *,wl(1),kabs(1),ksca(1),g(1)
-  print *,f11(1,1),f44(1,1)
-  print *,f11(nlam,nang),f44(nlam,nang)
-  deallocate(wl,kabs,ksca,g)
+  deallocate(wavel,kabs,ksca,g)
   if (lscat) then
      deallocate(angles)
      deallocate(f11,f12,f22,f33,f34,f44)
