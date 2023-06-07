@@ -18,18 +18,18 @@ module wavelengths_gas
    !continuum wavelength double for level dissolution !
    integer, parameter :: Nlambda_cont = 101
    integer, parameter :: Nlambda_cont_log = 31
-   integer, parameter :: Nlambda_line_w_log = 17!14 !log wings
-   integer, parameter :: Nlambda_line_c_lin = 13!12 ! linear core
-   real, parameter    :: vcore_on_vth = 0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
-   real, parameter    :: peak_voigt_limit = 1e-6 ! the profile expands up to peak * peak_voigt_limit
+   integer, parameter :: Nlambda_line_w_log = 21!17!14 !log wings
+   integer, parameter :: Nlambda_line_c_lin = 15!13!12 ! linear core
+   real, parameter    :: vcore_on_vth = 0.9!0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
+   real, parameter    :: peak_voigt_limit = 1e-10 ! the profile expands up to peak * peak_voigt_limit
    ! real, parameter    :: vwing_on_vth = 10.0 ! 5.0!local (Voigt) line goes from 0 to vwing_on_vth * vth km/s
 !make assym gauss
    ! integer, parameter :: Nlambda_line_gauss = 21 !11 !if linear
-   integer, parameter :: Nlambda_line_gauss_log = 5 !log wings
-   integer, parameter :: Nlambda_line_gauss_lin = 7 ! linear core
+   integer, parameter :: Nlambda_line_gauss_log = 15!5 !log wings
+   integer, parameter :: Nlambda_line_gauss_lin = 13!7 ! linear core
    real, parameter    :: vcore_on_vth_gauss = 0.6
    ! real, parameter    :: peak_gauss_limit = 1e-5 ! the profile expands up to peak * peak_gauss_limit
-   real, parameter    :: vwing_on_vth_gauss = 3!4!3 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
+   real, parameter    :: vwing_on_vth_gauss = 6!3 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
    real, parameter    :: peak_gauss_limit = exp(-vwing_on_vth_gauss**2) ! the profile expands up to peak * peak_gauss_limit
    real               :: hv
    !number max of lambda for all lines
@@ -124,20 +124,23 @@ module wavelengths_gas
             !! vmax = line%qwing * vwing_on_vth * (vth_max + vb) !to do
             ! -> LTE estimates
             adamp = line%damp_min/vth_max ! line%damp_max/vth_max
-            write(*,*) "peak:",max_voigt_profile(vth_max, adamp), " vth=",vth_max, &
-               " a/vth=", adamp
-            vmax = dmax_voigt(vth_max,adamp,peak_voigt_limit)
-            write(*,*) "vmax voigt (thomson)", vmax, vmax/c_light
+            ! write(*,*) "peak:",max_voigt_profile(vth_max, adamp), " vth=",vth_max, &
+            !    " a/vth=", adamp
+            ! vmax = dmax_voigt(vth_max,adamp,peak_voigt_limit)
+            ! write(*,*) "vmax voigt (thomson)", vmax, vmax/c_light
+            !assuming at large distance, the profile is lorentzian even at low damping.
             vmax = dmax_lorentz(vth_max,adamp,peak_voigt_limit)
-            peak_g = max_voigt_profile(vth_max,adamp) * peak_voigt_limit
-            write(*,*) "vmax voigt (Lorentz)", vmax, vmax/c_light
-            write(*,*) "vmax voigt (gaussian)", vth_max * sqrt(-log(peak_g * sqrt(pi) * vth_max)), &
-               vth_max * sqrt(-log(peak_g * sqrt(pi) * vth_max)) / c_light
+            ! peak_g = max_voigt_profile(vth_max,adamp) * peak_voigt_limit
+            ! write(*,*) "vmax voigt (Lorentz)", vmax*1e-3," km/s", vmax/c_light, " c"
+            ! write(*,*) "vmax voigt (gaussian)", vth_max * sqrt(-log(peak_g * sqrt(pi) * vth_max)), &
+               ! vth_max * sqrt(-log(peak_g * sqrt(pi) * vth_max)) / c_light
+            vmax = min(1d-2 * c_light, vmax)
          else
             !! vmax = vwing_on_vth_gauss * vth_max
             ! peak_gauss_limit = exp(-vwing_on_vth_gauss**2) !we reach that fraction at vwing_on_vth_gauss times vth_max.
             peak_g = peak_gauss_limit / sqrt(pi) / vth_max
             vmax = vth_max * sqrt(-log(peak_g * sqrt(pi) * vth_max))
+            ! write(*,*) "vmax gaussian", vmax*1e-3," km/s", vmax/c_light, " c"
          endif
       endif
 
@@ -147,9 +150,7 @@ module wavelengths_gas
       line%vmax = vmax
       if (vmax > 0.7 * c_light) call warning("(line_bound) Line vmax is close or above to c!")
 
-      !avoid to print too much info. all lines are kept for lmodel_1d spectra.
-      !to remove after debug ?
-      if (limage.and..not.lmodel_1d) then
+      if (limage) then
          write(*,'("line "(1I2)"->"(1I2)"; Vmax (Ray-Trace)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
          write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
       ! else
@@ -184,8 +185,9 @@ module wavelengths_gas
       line_lambda_grid = 0.0_dp
 
       line_lambda_grid(N_wing:1:-1) = -spanl_dp(vcore, vwing, N_wing, -1)
-
+      ! line_lambda_grid(1:N_wing) = span_dp(-vwing, -vcore, N_wing, 1)
       line_lambda_grid(N_wing:N_wing+N_core-1) = span_dp(-vcore, 0.0_dp, N_core, 1)
+
 
       Nmid = Nlambda/2 + 1
 
@@ -193,6 +195,17 @@ module wavelengths_gas
       line_lambda_grid(Nmid+1:Nlambda) = -line_lambda_grid(Nmid-1:1:-1)
 
       line_lambda_grid = (1.0 + line_lambda_grid/c_light) * line%lambda0
+      ! if (line%voigt) then
+      !    do la=1, Nlambda
+      !       write(*,*) line_lambda_grid(la) - line%lambda0
+      !    enddo
+      !    stop
+      ! endif
+      ! !completely linear for Gaussian
+      if (.not.line%voigt) then
+         line_lambda_grid(:) = (1.0 + span_dp(-vwing,vwing,N_core+N_wing+mod(N_core+N_wing+1,2),1)/c_light) * line%lambda0
+         return !leave here for gaussian.
+      endif
       return
       ! line_lambda_grid = 0.0_dp
 
@@ -308,8 +321,9 @@ module wavelengths_gas
                if (atom%lines(kr)%voigt) then
                   atom%lines(kr)%Nlambda = 2 * (Nlambda_line_w_log + Nlambda_line_c_lin - 1) - 1
                else
-                  ! atom%lines(kr)%Nlambda = Nlambda_line_gauss + mod(Nlambda_line_gauss+1,2)
-                  atom%lines(kr)%Nlambda = 2 * (Nlambda_line_gauss_log + Nlambda_line_gauss_lin - 1) - 1
+                  atom%lines(kr)%Nlambda = (Nlambda_line_gauss_log + Nlambda_line_gauss_lin) + &
+                     mod(Nlambda_line_gauss_log + Nlambda_line_gauss_lin+1,2)
+                  ! atom%lines(kr)%Nlambda = 2 * (Nlambda_line_gauss_log + Nlambda_line_gauss_lin - 1) - 1
                endif
             ! elseif (associated(subgrid_line,line_lambda_grid_dv)) then
             !    atom%lines(kr)%Nlambda = nint(2 * line%vmax / hv + 1)
@@ -803,46 +817,56 @@ module wavelengths_gas
             atom%lines(kr)%Nover_inf = atom%lines(kr)%Nb
             atom%lines(kr)%Nover_sup = atom%lines(kr)%Nr
             !Does not change Nlambda -> represent local line.
+            !during the non-LTE loop the integration of I is done over a profile centered on 0.
             if (check_for_overlap) then
+               ir = locate(lambda, atom%lines(kr)%lambdamax*(1.0 + abs(vmax_overlap)/c_light))
+               ib = locate(lambda, atom%lines(kr)%lambdamin*(1.0 - abs(vmax_overlap)/c_light))
 
-               inner_atom_loop : do nb = 1, n_atoms
-                  inner_line_loop : do krr=1, atoms(nb)%p%Nline
+               atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, ir)
+               atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, ib)
 
-                     !Nover_inf/sup = Nb/r
-                     if ( (nb==n).and.(kr==krr) ) cycle inner_line_loop
+               Nlambda_max_line_vel  = max(Nlambda_max_line_vel,atom%lines(kr)%Nover_sup-atom%lines(kr)%Nover_inf + 1)
+               Nlambda_max_line = max(Nlambda_max_line, Nlambda_max_line_vel)
 
-                     l0 = atom%lines(kr)%lambda0
-                     l1 = atoms(nb)%p%lines(krr)%lambda0
+               ! inner_atom_loop : do nb = 1, n_atoms
+               !    inner_line_loop : do krr=1, atoms(nb)%p%Nline
 
-                     dvmin = c_light * abs(l1-l0)/l0 - atom%lines(kr)%vmax
-                     !-> no overlap du to motion of cells
-                     if (dvmin >  abs(vmax_overlap)) cycle inner_line_loop
+               !       !Nover_inf/sup = Nb/r
+               !       if ( (nb==n).and.(kr==krr) ) cycle inner_line_loop
 
-                     if ( dvmin <= abs(vmax_overlap)) then
-                        ir = locate(lambda, atom%lines(kr)%lambda0*(1.0 +  dvmin/c_light))
-                        ib = locate(lambda, atom%lines(kr)%lambda0*(1.0 -  dvmin/c_light))
-                        !if only few pixels no need to shift
-                        if (abs(ib-atom%lines(kr)%Nb) <= 5) ib = atom%lines(kr)%Nb
-                        if (abs(ir-atom%lines(kr)%Nr) <= 5) ir = atom%lines(kr)%Nr
+               !       l0 = atom%lines(kr)%lambda0
+               !       l1 = atoms(nb)%p%lines(krr)%lambda0
 
-                        if ((abs(ib-atom%lines(kr)%Nb) <= 5) .and. (abs(ir-atom%lines(kr)%Nr) <= 5)) cycle inner_line_loop
+               !       dvmin = c_light * abs(l1-l0)/l0 - atom%lines(kr)%vmax
+               !       !-> no overlap du to motion of cells
+               !       if (dvmin >  abs(vmax_overlap)) cycle inner_line_loop
 
-                        ! write(*,*) "d_line-to-line (km/s)=", 1d-3*dvmin, " maxshift=", 1d-3*abs(vmax_overlap)
-                        ! write(*,*) "l0 ref=", l0, " l1=", l1
+               !       if ( dvmin <= abs(vmax_overlap)) then
+               !          ir = locate(lambda, atom%lines(kr)%lambda0*(1.0 +  dvmin/c_light))
+               !          ib = locate(lambda, atom%lines(kr)%lambda0*(1.0 -  dvmin/c_light))
+               !          if (ir < ib) call error("ir < ib!")
+               !          !if only few pixels no need to shift
+               !          if (abs(ib-atom%lines(kr)%Nb) <= 5) ib = atom%lines(kr)%Nb
+               !          if (abs(ir-atom%lines(kr)%Nr) <= 5) ir = atom%lines(kr)%Nr
 
-                        Noverlap = Noverlap + 1
-                        atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, ir)
-                        atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, ib)
-                        write(*,*) "--> overlap of line", kr, atom%lines(kr)%lambda0, " of atom ", atom%ID, &
-                           " with line", krr, atoms(nb)%p%lines(krr)%lambda0, " of atom ", atoms(nb)%p%ID, " N0 = ", &
-                           locate(lambda, atoms(nb)%p%lines(krr)%lambda0), " dvmin=", dvmin *1d-3
-                        write(*,*) "  ** no overlap bounds on the grid:", atom%lines(kr)%Nb,atom%lines(kr)%Nr
-                        write(*,*) "  ** bounds wtih overlap the grid:", atom%lines(kr)%Nover_inf,atom%lines(kr)%Nover_sup
-                        Nlambda_max_line_vel  = max(Nlambda_max_line_vel,atom%lines(kr)%Nover_sup-atom%lines(kr)%Nover_inf + 1)
-                     endif
+               !          if ((abs(ib-atom%lines(kr)%Nb) <= 5) .and. (abs(ir-atom%lines(kr)%Nr) <= 5)) cycle inner_line_loop
 
-                  enddo inner_line_loop
-               enddo inner_atom_loop
+               !          ! write(*,*) "d_line-to-line (km/s)=", 1d-3*dvmin, " maxshift=", 1d-3*abs(vmax_overlap)
+               !          ! write(*,*) "l0 ref=", l0, " l1=", l1
+
+               !          Noverlap = Noverlap + 1
+               !          atom%lines(kr)%Nover_sup = max(atom%lines(kr)%Nover_sup, ir)
+               !          atom%lines(kr)%Nover_inf = min(atom%lines(kr)%Nover_inf, ib)
+               !          write(*,*) "--> overlap of line", kr, atom%lines(kr)%lambda0, " of atom ", atom%ID, &
+               !             " with line", krr, atoms(nb)%p%lines(krr)%lambda0, " of atom ", atoms(nb)%p%ID, " N0 = ", &
+               !             locate(lambda, atoms(nb)%p%lines(krr)%lambda0), " dvmin=", dvmin *1d-3
+               !          write(*,*) "  ** no overlap bounds on the grid:", atom%lines(kr)%Nb,atom%lines(kr)%Nr
+               !          write(*,*) "  ** bounds wtih overlap the grid:", atom%lines(kr)%Nover_inf,atom%lines(kr)%Nover_sup
+               !          Nlambda_max_line_vel  = max(Nlambda_max_line_vel,atom%lines(kr)%Nover_sup-atom%lines(kr)%Nover_inf + 1)
+               !       endif
+
+               !    enddo inner_line_loop
+               ! enddo inner_atom_loop
 
             endif !check for overlap
          enddo

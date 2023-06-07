@@ -112,7 +112,7 @@ module atom_transfer
       type (AtomType), pointer :: at
       integer(kind=8) :: mem_alloc_local
       real(kind=dp) :: diff_cont, conv_speed, conv_acc
-      real(kind=dp), allocatable :: Jnu(:,:)
+      real(kind=dp), allocatable :: Jnu(:,:), iloc(:,:,:)
 
       !timing and checkpointing
       ! NOTE: cpu time does not take multiprocessing (= nb_proc x the real exec time.)
@@ -180,7 +180,11 @@ module atom_transfer
       !-> negligible
       mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
       ! allocate(jnu(n_lambda,n_cells))
+      ! write(*,*) " size Jnu:", sizeof(Jnu) / 1024./1024./1024.," GB"
       ! mem_alloc_local = mem_alloc_local + sizeof(jnu)
+      ! allocate(iloc(n_lambda,healpix_npix(healpix_lorder),n_cells))
+      ! write(*,*) " size Iloc:", sizeof(iloc) / 1024./1024./1024.," GB"
+      ! mem_alloc_local = mem_alloc_local + sizeof(iloc)
       call alloc_nlte_var(one_ray,mem=mem_alloc_local)
 
       ! --------------------------- OUTER LOOP ON STEP --------------------------- !
@@ -276,14 +280,14 @@ module atom_transfer
             ibar = 0
             n_cells_done = 0
 
-            if (lfixed_rays) then
-               stream = 0.0
-               stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
-            ! else
-            !    !update rays weight
-            !    if (allocated(wmu)) deallocate(wmu)
-            !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
-            end if
+            ! if (lfixed_rays) then
+            !    stream = 0.0
+            !    stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+            ! ! else
+            ! !    !update rays weight
+            ! !    if (allocated(wmu)) deallocate(wmu)
+            ! !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            ! end if
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
             l_iterate_ne = .false.
@@ -298,7 +302,7 @@ module atom_transfer
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff)&
             !$omp private(nact, at) & ! Acceleration of convergence
-            !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on, Jnu) & ! Ng's Acceleration of convergence
+            !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on, Jnu, iloc) & ! Ng's Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,n_cells_remaining) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,precision,lcswitch_enabled)
@@ -306,8 +310,8 @@ module atom_transfer
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
-               ! stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               ! if( (diff_loc(icell) < 1d-2 * precision).and..not.lcswitch_enabled ) cycle
+               stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
+               if( (diff_loc(icell) < 1d-1 * precision).and..not.lcswitch_enabled ) cycle
 
                if (l_iterate) then
 
@@ -345,6 +349,7 @@ module atom_transfer
                            call accumulate_radrates_mali(id, icell,1, weight)
                            ! Jnu(:,icell) = Jnu(:,icell) + weight * Itot(:,1,id)
                         endif
+                        ! iloc(:,iray,icell) = Itot(:,1,id)
                      enddo
 
 
@@ -394,7 +399,7 @@ module atom_transfer
                !$omp atomic
                n_cells_done = n_cells_done + 1
                n_cells_remaining = size(pack(diff_loc, &
-                                    mask=(diff_loc < 1d-2 * precision)))
+                                    mask=(diff_loc < 1d-1 * precision)))
                if (real(n_cells_done) > 0.02*ibar*n_cells) then
              	   call progress_bar(ibar)
              	   !$omp atomic
@@ -787,7 +792,12 @@ module atom_transfer
       ! open(100, file="jnu.b",form="unformatted",status='unknown',access="sequential")
       ! write(100) tab_lambda_nm
       ! write(100) Jnu
-      ! deallocate(Jnu); close(150)
+      ! close(100); deallocate(jnu)
+      ! open(100, file="inu.b",form="unformatted",status='unknown',access="sequential")
+      ! write(100) tab_lambda_nm
+      ! write(100) healpix_weight(healpix_lorder)
+      ! write(100) iloc
+      ! deallocate(iloc); close(100)
       call dealloc_nlte_var()
       deallocate(dM, dTM, Tex_ref, Tion_ref)
       deallocate(diff_loc, dne_loc)

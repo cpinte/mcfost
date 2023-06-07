@@ -422,21 +422,22 @@ module Opacity_atom
 
             if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle tr_loop
 
-            if (abs(dv)>atom%lines(kr)%vmax) then
-               !move the profile to the red edge up to Nover_sup
-               !change Nlam ??
-               if (dv > 0) then
-                  ! Nblue = Nred
-                  Nred = atom%lines(kr)%Nover_sup
-                  Nblue =  Nred - Nlam + 1
-               !move to the blue edge down to Nover_inf
-               else
-                  ! Nred = Nblue
-                  Nblue =  atom%lines(kr)%Nover_inf
-                  Nred = Nlam + Nblue - 1
-               endif
-               ! Nred = atom%lines(kr)%Nover_sup
-               ! Nblue = atom%lines(kr)%Nover_inf
+            ! if (abs(dv)>atom%lines(kr)%vmax) then
+            !    !move the profile to the red edge up to Nover_sup
+            !    !change Nlam ??
+            !    if (dv > 0) then
+            !       ! Nblue = Nred
+            !       Nred = atom%lines(kr)%Nover_sup
+            !       Nblue =  Nred - Nlam + 1
+            !    !move to the blue edge down to Nover_inf
+            !    else
+            !       ! Nred = Nblue
+            !       Nblue =  atom%lines(kr)%Nover_inf
+            !       Nred = Nlam + Nblue - 1
+            !    endif
+            if (abs(dv)>1.0*vbroad(T(icell),Atom%weight, vturb(icell))) then
+               Nred = atom%lines(kr)%Nover_sup
+               Nblue = atom%lines(kr)%Nover_inf
                Nlam = Nred - Nblue + 1
             endif
 
