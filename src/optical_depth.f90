@@ -1207,6 +1207,126 @@ end subroutine optical_length_tot_mol
       return
    end subroutine integ_ray_atom
 
+subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,flag_sortie)
+  ! Copmputes position where a given optical depth is reached
+  ! This is simplified version of integ_ray_atom (also inspired by physical_length, physical_length_mol)
+  ! only computes optical depth and stopes where given tau_max is reached
+
+  integer, intent(in) :: icell_in, N, id
+  real(kind=dp), intent(inout), dimension(N) :: x,y,z !depends on the frequency
+  real(kind=dp), intent(in) :: u,v,w
+  real :: tau_threshold
+  real(kind=dp), dimension(N), intent(in) :: lambda
+  logical, intent(out) :: flag_sortie
+
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ltot(N)
+  real(kind=dp), dimension(N) :: tau, dtau, chi, eta, tau_previous
+  real(kind=dp) :: tau_max, facteur_tau
+
+  integer :: nbr_cell, next_cell, previous_cell, icell, icell_star, i_star
+
+  logical :: lcellule_non_vide, lstop(N), lintersect_stars
+  logical, parameter :: lsubtract_avg = .false. !images and vlabs = 0, so iray and labs not needed!
+
+   !they are the same at init.
+   x1=x(1);y1=y(1);z1=z(1)
+   x0=x(1);y0=y(1);z0=z(1)
+   next_cell = icell_in
+   nbr_cell = 0
+
+   tau(:) = 0.0_dp
+   ltot = 0.0_dp
+   lstop = .false.
+   flag_sortie = .false.
+
+   ! Will the ray intersect a star
+   call intersect_stars(x(1),y(1),z(1), u,v,w, lintersect_stars, i_star, icell_star)
+   ! Boucle infinie sur les cellules (we go over the grid.)
+   infinie : do ! Boucle infinie
+   ! Indice de la cellule
+      icell = next_cell
+      x0=x1 ; y0=y1 ; z0=z1
+
+      lcellule_non_vide = (icell <= n_cells)
+
+      ! Test sortie ! "The ray has reach the end of the grid"
+      if (test_exit_grid(icell, x0, y0, z0)) then
+         flag_sortie = .true.
+         return
+      endif
+
+      if (lintersect_stars) then !"will interesct"
+         if (icell == icell_star) then!"has intersected"
+            flag_sortie = .true.         
+            return
+         end if
+      endif
+
+      if (icell <= n_cells) then
+         lcellule_non_vide = (icompute_atomRT(icell) > 0)
+         if (icompute_atomRT(icell) < 0) then
+            flag_sortie = .true.
+         endif
+      endif
+
+      nbr_cell = nbr_cell + 1
+
+      ! Calcul longeur de vol et profondeur optique dans la cellule
+      previous_cell = 0 ! unused, just for Voronoi
+      call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+      !count opacity only if the cell is filled, else go to next cell
+      if (lcellule_non_vide) then
+
+         call contopac_atom_loc(icell, N, lambda, chi, eta)
+         call opacity_atom_bb_loc(id,icell,1,x0,y0,z0,x1,y1,z1,u,v,w,&
+               l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,eta)
+
+         dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m
+         tau(:) = tau(:) + dtau(:) !for next cell
+        ! Mise a jour profondeur optique pour cellule suivante
+
+        where (tau > tau_threshold)
+            lstop = .true.
+            tau_previous = tau - dtau
+            ltot = ltot+l_void_before+l_contrib*(tau_threshold-tau + dtau)/dtau
+        elsewhere
+           ltot = ltot+l
+        endwhere
+      else
+         ltot = ltot + l 
+      end if  ! lcellule_non_vide
+
+     ! On a fini d'integrer : sortie de la routine
+     where(lstop)
+        x=x0+l*u
+        y=y0+l*v
+        z=z0+l*w
+     endwhere
+     if (any(lstop)) then
+      flag_sortie = .false.
+      return
+     endif
+   !    if (lstop) then
+   !      flag_sortie = .false.
+   !      ! we recompute the position
+   !      x=x0+l*u
+   !      y=y0+l*v
+   !      z=z0+l*w
+
+   !      if (.not.lVoronoi) then
+   !         if (l3D) then
+   !            if (lcylindrical) call indice_cellule(x,y,z, previous_cell)
+   !         endif
+   !      endif ! todo : on ne fait rien dans la cas Voronoi ???
+
+   !      return
+   !   endif ! lstop
+   end do infinie
+
+   return
+end subroutine physical_length_atom
+
 !********************************************************************
 
 function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)

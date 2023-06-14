@@ -47,8 +47,48 @@ module atom_transfer
 #include "sprng_f.h"
    integer :: omp_chunk_size
    real(kind=dp), allocatable, dimension(:) :: tab_lambda_Sed
+   real(kind=dp), dimension(:,:,:,:,:,:), allocatable, private :: tau_surface_map
 
    contains
+
+   subroutine alloc_tau_surface_map()
+
+      ! write(*,*) "-- Computing tau=",tau," map for atomic lines..."
+      write(*,*) "  allocating ",n_lambda*rt_n_incl*rt_n_az*3*nb_proc*npix_x*npix_y/1024.**3," GB for tau map"
+      allocate(tau_surface_map(npix_x,npix_y,n_lambda,rt_n_incl,rt_n_az,3))
+
+      return
+   end subroutine alloc_tau_surface_map
+   subroutine dealloc_tau_surface_map()
+      integer :: ibin,iaz,i,j,la
+      ! real(kind=dp), allocatable :: image(:,:,:,:,:,:)
+
+      ! allocate(image(npix_x,npix_y,n_lambda,rt_n_incl,rt_n_az,3))
+
+      !write the map to bin at the moment and dealloc
+      open(100, file="tau_map.b",form="unformatted",status='unknown',access="sequential")
+      write(100) shape(tau_surface_map)
+      ! write(100) shape(image)
+      write(100) tab_lambda_nm
+      ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
+      ! do ibin=1,RT_n_incl
+      !    do iaz=1,RT_n_az
+      !       do j=1,npix_y
+      !          do i=1,npix_x
+      !             do la=1,n_lambda
+      !                image(i,j,la,ibin,iaz,:) = sum(tau_surface_map(i,j,la,ibin,iaz,:,:), dim=2)
+      !             enddo
+      !          enddo !i
+      !       enddo !j
+      !    enddo ! iaz
+      ! enddo !ibin
+      ! write(100) image
+      write(100) tau_surface_map
+      close(100)
+      deallocate(tau_surface_map)!,image)
+
+      return
+   end subroutine dealloc_tau_surface_map
 
    subroutine io_write_convergence_maps(lmap, map)
       real(kind=dp), intent(in) :: map(n_cells)
@@ -815,28 +855,6 @@ module atom_transfer
       return
    end subroutine nlte_loop_mali
 
-   subroutine solve_for_nlte_pops()
-      ! Wrapper to solve for the non-LTE populations.
-      ! First solve the continuum radiative transfer, 
-      ! then for the continuum + gas lines.
-      ! In the continuum radiative transfer, bound-bound
-      ! transitions are in LTE (only cij and cji).
-
-      ! TO DO allocate cont grid only first to speed up
-
-      ! add sobolev/escape here ?
-
-      call deactivate_lines()
-      call alloc_atom_opac(n_lambda, tab_lambda_nm)
-      call nlte_loop_mali()
-      call activate_lines()
-      call dealloc_atom_opac()
-      call alloc_atom_opac(n_lambda, tab_lambda_nm)
-      Ndelay_iterate_ne = max(Ndelay_iterate_ne,3)
-      call nlte_loop_mali()
-      return
-   end subroutine solve_for_nlte_pops
-
   subroutine compute_max_relative_velocity(dv)
   !
   ! TO DO: building, add maximum velocity difference between
@@ -1106,8 +1124,6 @@ module atom_transfer
          call alloc_atom_opac(n_lambda, tab_lambda_nm)
 
          call nlte_loop_mali()
-         ! call solve_for_nlte_pops
-
          !-> here on the non-LTE frequency grid
          ! call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
 
@@ -1125,11 +1141,18 @@ module atom_transfer
       !re alloc lambda here.
       call setup_image_grid()
       write(*,*) "Computing emerging flux..."
+
+      ! if (ltau_surface) call 
+      call alloc_tau_surface_map()
       do ibin=1,RT_n_incl
          do iaz=1,RT_n_az
             call emission_line_map(ibin,iaz)
+            ! if (ltau_surface) call 
+            call emission_line_tau_surface_map(ibin,iaz,1.0)
          end do
       end do
+      ! if (ltau_surface) call 
+      call dealloc_tau_surface_map()
 
       if (laccretion_shock) then
          !3 + lg(Facc) = lg(Facc) erg/cm2/s
@@ -1466,6 +1489,92 @@ module atom_transfer
 
       return
    end subroutine emission_line_map
+
+   subroutine emission_line_tau_surface_map(ibin,iaz,tau)
+   use optical_depth, only : physical_length_atom
+      integer, intent(in) :: ibin, iaz
+      real, intent(in) :: tau
+      real(kind=dp) :: x0(n_lambda),y0(n_lambda),z0(n_lambda),l,u,v,w,u0,v0,w0
+      real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
+      real(kind=dp), dimension(3,nb_proc) :: pixelcenter
+      real(kind=dp):: taille_pix
+      integer :: i,j, id, icell
+      logical :: lintersect, flag_sortie
+
+      !vlabs(:,id) is 0 here in principle as well as iray is 1. And labs is .false. (mode image/LTE).
+
+      u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin)
+      uvw = (/u,v,w/) !vector position
+
+      x = (/cos(tab_RT_az(iaz) * deg_to_rad),sin(tab_RT_az(iaz) * deg_to_rad),0._dp/)
+
+      if (abs(ang_disque) > tiny_real) then
+         x_plan_image = rotation_3d(uvw, ang_disque, x)
+      else
+         x_plan_image = x
+      endif
+
+      ! Vecteur y image avec PA : orthogonal a x_plan_image et uvw
+      y_plan_image = -cross_product(x_plan_image, uvw)
+
+      l = 10.*Rmax
+
+      x0 = u * l  ;  y0 = v * l  ;  z0 = w * l
+      !at init they are the same everywhere
+      center(1) = x0(1) ; center(2) = y0(1) ; center(3) = z0(1)
+      center(:) = center(:) - image_offset_centre(:)
+
+      taille_pix = (map_size/zoom) / real(max(npix_x,npix_y),kind=dp) ! en AU
+
+      dx(:) = x_plan_image * taille_pix
+      dy(:) = y_plan_image * taille_pix
+
+      ! Coin en bas gauche de l'image
+      Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
+
+
+
+      !$omp parallel &
+      !$omp default(none) &
+      !$omp private(i,j,id,icell,x0,y0,z0,flag_sortie,lintersect,u0,v0,w0) &
+      !$omp shared(Icorner,dx,dy,u,v,w,npix_x,npix_y,tau) &
+      !$omp shared(ibin,iaz,tau_surface_map,move_to_grid,pixelcenter,tab_lambda_nm,n_lambda)
+
+      ! loop on pixels
+      id = 1 ! pour code sequentiel
+      !$omp do schedule(dynamic,1)
+      do i = 1,npix_x
+         !$ id = omp_get_thread_num() + 1
+         do j = 1,npix_y
+        
+            pixelcenter(:,id) = Icorner(:) + (i-0.5_dp) * dx(:) + (j-0.5_dp) * dy(:)
+
+            x0(:) = pixelcenter(1,id)
+            y0(:) = pixelcenter(2,id)
+            z0(:) = pixelcenter(3,id)
+
+            u0 = -u ; v0 = -v ; w0 = -w
+            !at init x0 is the same everywhere
+            call move_to_grid(id, x0(1),y0(1),z0(1),u0,v0,w0, icell,lintersect)
+            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+               call physical_length_atom(id,icell,x0,y0,z0,u0,v0,w0,n_lambda,tab_lambda_nm,tau,flag_sortie)
+               if (flag_sortie) then
+                  tau_surface_map(i,j,:,ibin,iaz,:) = 0.0
+               else
+                  tau_surface_map(i,j,:,ibin,iaz,1) = x0
+                  tau_surface_map(i,j,:,ibin,iaz,2) = y0
+                  tau_surface_map(i,j,:,ibin,iaz,3) = z0
+               endif
+            else
+               tau_surface_map(i,j,:,ibin,iaz,:) = 0.0
+            endif
+         end do !j
+      end do !i
+      !$omp end do
+      !$omp end parallel
+
+      return
+   end subroutine emission_line_tau_surface_map
 
    subroutine spectrum_1d()
       !TO DO log rays
