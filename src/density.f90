@@ -792,7 +792,9 @@ subroutine define_dust_density()
                     density =  cst_pous(pop) * ( (rcyl/dz%Rc)**(-2*dz%surf) + (rcyl/dz%Rc)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
                          exp( - (abs(z -z0)/h)**dz%vert_exponent)
                  endif
-                 densite_pouss(:,icell) = density * nbre_grains(:)
+                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    densite_pouss(l,icell) = density * nbre_grains(l)
+                 enddo
               enddo !k
            enddo bz_debris !j
         enddo !i

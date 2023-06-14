@@ -39,6 +39,8 @@ module dust_transfer
   contains
 
 subroutine transfert_poussiere()
+! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! 20/04/2023
 
   use thermal_emission, only : frac_E_stars, frac_E_disk
 
@@ -211,8 +213,13 @@ subroutine transfert_poussiere()
      p_icell = icell_ref
      if (aniso_method==2) write(*,*) "g             ", tab_g_pos(p_icell,1)
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
-     if (lsepar_pola.and.(scattering_method == 2)) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
-
+     if (lsepar_pola.and.(scattering_method == 2)) then
+        if (lmueller) then
+           write(*,*) "polarisability", maxval(-tab_mueller_pos(1,2,:,p_icell,1))
+        else
+           write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
+        endif
+     endif
      if (lopacite_only) call exit(0)
 
      if (l_em_disk_image) then ! le disque �met
@@ -436,6 +443,8 @@ subroutine transfert_poussiere()
               lambda0 = 1 ; p_lambda => lambda0
            endif
 
+           call setup_scattering()
+
            ! reorganisation memoire
            call realloc_step2()
 
@@ -468,7 +477,13 @@ subroutine transfert_poussiere()
 
         lambda = ind_etape - first_etape_obs + 1
 
-        if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) call calc_local_scattering_matrices(lambda, p_lambda)
+        if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
+           if (lmueller) then
+              call calc_local_scattering_matrices_mueller(lambda, p_lambda) ! Todo : this is not good, we compute this twice
+           else
+              call calc_local_scattering_matrices(lambda, p_lambda)
+           endif
+        endif
 
         if (lspherical.or.l3D) then
            call no_dark_zone()
@@ -957,6 +972,8 @@ end subroutine emit_packet
 subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
   ! C. Pinte
   ! 27/05/09
+  ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+  ! 20/04/2023
 
   ! - flag_star_direct et flag_scatt a initialiser : on a besoin des 2
   ! - separer 1ere diffusion et reste
@@ -1065,8 +1082,10 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               if (lsepar_pola) then
                  ! Nouveaux param�tres de Stokes
-                 if (laggregate) then
-                    call new_stokes_gmm(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
+                 if (lmueller) then
+                    call new_stokes_mueller(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
+                 else if (laggregate) then
+                    call  new_stokes_gmm(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
                  else
                     call new_stokes(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
                  endif
@@ -1100,7 +1119,13 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               ! Nouveaux param�tres de Stokes
-              if (lsepar_pola) call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
+              if (lsepar_pola) then
+                 if (lmueller) then
+                    call new_stokes_mueller_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
+                 else
+                    call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
+		 endif
+	      endif
            else ! fonction de phase HG
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
               if (lisotropic)  then ! Diffusion isotrope

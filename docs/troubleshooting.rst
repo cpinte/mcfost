@@ -39,3 +39,13 @@ Make sure you have increased the stacksize::
 .. note::
 
    There is a hard limit at 64kB for the stacksize on MacOS. This will prevent post-processing of large phantom dumps (more than 2 millions particles). The solution is either to move to linux, or to re-compile the code with gfortran (which relies less on the stack than ifort), but this will result in some speed penalties.
+
+
+
+Geometry
+--------
+
+The disc orientation is correct, but the red and blue shifted sides are flipped.
+^^^^^^^^^^^^^^^^^^^
+
+The easiest way to change the sign of the rotation without changing the orientation is to change the inclunation i to 180-i and the PA to PA+180.
