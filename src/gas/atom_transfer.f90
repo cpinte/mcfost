@@ -712,7 +712,7 @@ module atom_transfer
             conv_acc = conv_speed
 
             !force convergence if there are only few unconverged cells remaining
-            if ((n_iter > min(maxIter/2,50)).and.(unconverged_fraction < 5.0)) then
+            if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
                write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
                   unconverged_fraction, n_iter
                write(*,*) " -> forcing convergence"
