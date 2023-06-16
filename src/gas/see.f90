@@ -17,7 +17,7 @@ module see
     implicit none
 
     !populations below that threshold not taken into account in convergence.
-    real(kind=dp), parameter :: frac_limit_pops = 1d-10!1d-50
+    real(kind=dp), parameter :: frac_limit_pops = 1d-15!1d-50
     !Variables for Non-LTE loop and MALI method
     real(kind=dp), allocatable ::  ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
@@ -33,17 +33,22 @@ module see
 
     contains
 
-    subroutine alloc_nlte_var(n_rayons_max)
+    subroutine alloc_nlte_var(n_rayons_max,mem)
     !allocate space for non-lte loop (only)
         integer, intent(in) :: n_rayons_max
+        integer(kind=8), intent(in), optional :: mem
         integer :: Nmaxlevel,Nmaxline,Nmaxcont,NlevelTotal,Nmaxstage
-        integer :: alloc_status, mem_alloc_local
+        integer :: alloc_status
+        integer(kind=8) :: mem_alloc_local
         integer :: kr, n, icell, l, i, j
         real(kind=dp) :: wl, anu1, e1, b1
         real(kind=dp) :: anu2, e2, b2!higher prec integ
         type(AtomType), pointer :: atom
 
         mem_alloc_local = 0
+        if (present(mem)) then
+            mem_alloc_local = mem_alloc_local + mem
+        endif
         NmaxLevel = 0 !maximum number of levels
         NlevelTotal = 0 !sum of all levels among all active atoms
         NmaxLine = 0 !maximum number of lines
@@ -113,6 +118,7 @@ module see
 
         allocate(tab_Aji_cont(NmaxCont,NactiveAtoms,n_cells))
         allocate(tab_Vij_cont(Nlambda_max_cont,NmaxCont,NactiveAtoms))
+        tab_Aji_cont = 0.0_dp; tab_Vij_cont = 0.0_dp
         write(*,*) " size tab_Aji_cont:", sizeof(tab_Aji_cont) / 1024./1024./1024.," GB"
         write(*,*) " size tab_Vij_cont:", sizeof(tab_Vij_cont) / 1024./1024./1024.," GB"
         !integrate in frequency Uji which is fourpi/h * anu * 2hnu3/c2 * exp(-hnu/kT)
@@ -120,7 +126,8 @@ module see
         mem_alloc_local = mem_alloc_local + sizeof(tab_Aji_cont) + sizeof(tab_Vij_cont)
         do n=1, NactiveAtoms
             atom => ActiveAtoms(n)%p
-            do kr=1,atom%Ncont
+            ct_loop : do kr=1,atom%Ncont
+                if (.not.atom%continua(kr)%lcontrib) cycle ct_loop
                 i = atom%Continua(kr)%i
                 j = atom%continua(kr)%j
                 if (atom%continua(kr)%hydrogenic) then
@@ -173,7 +180,7 @@ module see
                         enddo
                     endif
                 enddo
-            enddo
+            enddo ct_loop
         enddo
         atom => null()
 
@@ -498,12 +505,17 @@ module see
             i = atom%continua(kr)%i; j = atom%continua(kr)%j
             atom%continua(kr)%Rij(id) = 0.0_dp
             !updated value of ni and nj!
+            !-> 0 if cont does not contribute to opac.
             atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
                  atom%nstar(i,icell)/atom%nstar(j,icell)
         enddo
 
         do kr=1,atom%Nline
             atom%lines(kr)%Rij(id) = 0.0_dp
+            if (.not.atom%lines(kr)%lcontrib) then
+                atom%lines(kr)%Rji(id) = 0.0_dp
+                cycle
+            endif
             atom%lines(kr)%Rji(id) = nlte_fact * atom%lines(kr)%Aji
         enddo
 
@@ -531,13 +543,15 @@ module see
         integer :: kr, i, j, Nl, Nr, Nb, ip, jp, Nrp, Nbp
         integer :: i0, l, nact, krr
         real(kind=dp) :: jbar_up, jbar_down, xcc_down, xcc_up
-        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star
+        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star, gij
         real(kind=dp) :: ehnukt, ehnukt1
 ! write(*,*) icell, T(icell)
         atom_loop : do nact = 1, Nactiveatoms
             atom => ActiveAtoms(nact)%p
 
             line_loop : do kr=1, atom%Nline
+
+                if (.not.atom%lines(kr)%lcontrib) cycle line_loop
 
                 Nr = atom%lines(kr)%Nr;Nb = atom%lines(kr)%Nb
                 i = atom%lines(kr)%i
@@ -547,6 +561,8 @@ module see
                 i0 = Nb - 1
 
                 phi0(1:Nl) = phi_loc(1:Nl,kr,nact,iray,id)
+                !-> otherwise phi_loc is 0 and there are normalisation issues with wphi
+                if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle line_loop
 
                 Jbar_up = 0.0
                 xcc_down = 0.0
@@ -615,11 +631,14 @@ module see
             end do line_loop
 
             cont_loop : do kr = 1, atom%Ncont
+                if (.not.atom%continua(kr)%lcontrib) cycle cont_loop
 
                 i = atom%continua(kr)%i; j = atom%continua(kr)%j
 
           !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
                 ni_on_nj_star = atom%nstar(i,icell)/atom%nstar(j,icell)
+                gij = ni_on_nj_star * exp(-hc_k/T(icell)/atom%continua(kr)%lambda0)
+                if ((atom%n(i,icell) - atom%n(j,icell) * gij) <= 0.0_dp) cycle cont_loop
 
                 Nb = atom%continua(kr)%Nb; Nr = atom%continua(kr)%Nr
                 Nl = Nr-Nb + 1
@@ -943,6 +962,9 @@ module see
                 do j=1,at%Nlevel
                     at%n(j,icell) = at%n(j,icell) * ( 1.0_dp + fvar((i-1)+j,id)/(1.0_dp + d_damp * abs(fvar((i-1)+j,id))) )
                     if (at%n(j,icell) < 0.0) neg_pops = .true.
+                    ! if (at%n(j,icell) < frac_limit_pops * at%Abund*nHtot(icell) )then
+                    !     write(*,*) "small pops for level ", j
+                    ! endif
                 enddo
                 i = i + at%Nlevel
             enddo
@@ -952,6 +974,8 @@ module see
             if (verbose)write(*,*) ( 1.0 + fvar(neq_ne,id)/(1.0_dp + d_damp * abs(fvar(neq_ne,id))) )
             if (verbose)write(*,*) fvar(neq_ne,id), d_damp
             !                       1d-16
+            ! if (ne(icell) < frac_limit_pops * nhtot(icell)) write(*,*) "** small ne at cell ", icell
+            ! if ( (ne(icell) < frac_limit_pops * nHtot(icell)).or.(neg_pops) ) rest_damping = .true.
             if ( (ne(icell) < frac_limit_pops * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
             !-> here pops_ion has the old values !
             !restart with more iterations and larger damping (more stable, slower convergence)
@@ -1078,6 +1102,23 @@ module see
     return
   end subroutine ionisation_frac_lte
 
+  function jions(id)
+  !sum of ions times charge for nlte ions
+    real(kind=dp) :: jions
+    integer, intent(in) :: id
+    real(kind=dp) :: sum_ions
+    integer :: n, j
+
+    jions = 0
+    do n=1,Nactiveatoms
+        do j=1, activeatoms(n)%p%Nstage-1
+            jions = jions + j * pops_ion(j,n,id)
+        enddo
+    enddo
+
+    return
+  endfunction jions
+
     subroutine non_lte_charge_conservation (id,icell, neq, x, f, df)
     !F_cc = 1.0 - 1/ne * (np + nHeII + 2*nHeIII) = 0
     !F_cc = 1.0 - 1/ne * (sum_atom pops_ion(atom)*stage(ion)) = 0
@@ -1091,12 +1132,13 @@ module see
         real(kind=dp) :: akj, sum_ions, st
         real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
 
-        sum_ions = 0
-        do n=1,Nactiveatoms
-            do j=1, activeatoms(n)%p%Nstage-1
-                sum_ions = sum_ions + j * pops_ion(j,n,id)
-            enddo
-        enddo
+        ! sum_ions = 0
+        ! do n=1,Nactiveatoms
+        !     do j=1, activeatoms(n)%p%Nstage-1
+        !         sum_ions = sum_ions + j * pops_ion(j,n,id)
+        !     enddo
+        ! enddo
+        sum_ions = jions(id)
 
         !derivative of CC to ne
         f(neq) = 1.0_dp - sum_ions / x(neq) !factor 2 for nHeIII included (1 for np and nheII)

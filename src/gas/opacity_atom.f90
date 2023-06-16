@@ -11,7 +11,7 @@ module Opacity_atom
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
    use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, &
-                                    Nlambda_max_line_vel, vwing_on_vth_gauss
+                                    Nlambda_max_line_vel
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
@@ -45,19 +45,76 @@ module Opacity_atom
       enddo
       return
    end function gmax_line
+   function gmin_line(line)
+   !compute the damping min of a given line line.
+   !assumes that eletronic densities, populations and thermodynamics
+   !quantities are set
+      type (AtomicLine), intent(in) :: line
+      integer :: i
+      real(kind=dp) :: gmin_line
+   !could be para
+      gmin_line = 1d50 ! damping * vth
+      do i=1,n_cells
+         if (icompute_atomRT(i)>0.0) then
+            gmin_line = min(gmin_line,line_damping(i,line)*&
+                        vbroad(T(i),line%atom%weight, vturb(i)))
+         endif
+      enddo
+      return
+   end function gmin_line
 
    subroutine set_max_damping()
+   !sets also the minimum
+   !result in m/s
       integer :: nat, kr
       do nat=1, n_atoms
          do kr=1,atoms(nat)%p%nline
             if (.not.atoms(nat)%p%lines(kr)%lcontrib) cycle
             if (atoms(nat)%p%lines(kr)%Voigt) then
                atoms(nat)%p%lines(kr)%damp_max = gmax_line(atoms(nat)%p%lines(kr))
+               atoms(nat)%p%lines(kr)%damp_min = gmin_line(atoms(nat)%p%lines(kr))
             endif
          enddo
       enddo
       return
    end subroutine set_max_damping
+
+   subroutine deactivate_lines()
+      integer :: nact, kr
+      do nact=1, N_Atoms
+         do kr=1, Atoms(nact)%p%Nline
+            atoms(nact)%p%lines(kr)%lcontrib = .false.
+         enddo
+      enddo
+      return 
+   end subroutine deactivate_lines
+   subroutine activate_lines()
+      integer :: nact, kr
+      do nact=1, N_Atoms
+         do kr=1, Atoms(nact)%p%Nline
+            atoms(nact)%p%lines(kr)%lcontrib = .true.
+         enddo
+      enddo
+      return 
+   end subroutine activate_lines
+   subroutine deactivate_continua()
+      integer :: nact, kr
+      do nact=1, N_Atoms
+         do kr=1, Atoms(nact)%p%Ncont
+            atoms(nact)%p%continua(kr)%lcontrib = .false.
+         enddo
+      enddo
+      return 
+   end subroutine deactivate_continua
+   subroutine activate_continua()
+      integer :: nact, kr
+      do nact=1, N_Atoms
+         do kr=1, Atoms(nact)%p%ncont
+            atoms(nact)%p%continua(kr)%lcontrib = .true.
+         enddo
+      enddo
+      return 
+   end subroutine activate_continua
 
    !could be parralel
    subroutine alloc_atom_opac(N,x)
@@ -79,9 +136,10 @@ module Opacity_atom
          do kr=1,atm%nline
                if (.not.atm%lines(kr)%lcontrib) cycle
                if (atm%lines(kr)%Voigt) then
-                  allocate(atm%lines(kr)%v(atm%lines(kr)%Nlambda),atm%lines(kr)%phi(atm%lines(kr)%Nlambda,n_cells))
+               !-> do not allocate if using thomson and humlicek profiles
+                  ! allocate(atm%lines(kr)%v(atm%lines(kr)%Nlambda),atm%lines(kr)%phi(atm%lines(kr)%Nlambda,n_cells))
                   allocate(atm%lines(kr)%a(n_cells)); atm%lines(kr)%a(:) = 0.0_dp
-                  mem_loc = mem_loc + sizeof(atm%lines(kr)%a)+sizeof(atm%lines(kr)%phi)+sizeof(atm%lines(kr)%v)
+                  mem_loc = mem_loc + sizeof(atm%lines(kr)%a)!+sizeof(atm%lines(kr)%phi)+sizeof(atm%lines(kr)%v)
                endif
          enddo
 
@@ -95,24 +153,24 @@ module Opacity_atom
                if (atm%lines(kr)%Voigt) then
                   nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
                   atm%lines(kr)%a(icell) = line_damping(icell,atm%lines(kr))
-
-                  atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth
-                  atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, &
-                                                   atm%lines(kr)%a(icell), &
-                                                   atm%lines(kr)%v(:)) / (vth * sqrtpi)
-               ! else !gaussian profile, computed locally
+               !-> do not allocate if using thomson and humlicek profiles
+                  ! atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 / vth
+                  ! atm%lines(kr)%phi(:,icell) = Voigt(atm%lines(kr)%Nlambda, &
+                  !                                  atm%lines(kr)%a(icell), &
+                  !                                  atm%lines(kr)%v(:)) / (vth * sqrtpi)
                endif
             enddo
          enddo
 
-         do kr=1,atm%nline
-            if (.not.atm%lines(kr)%lcontrib) cycle
-            if (atm%lines(kr)%Voigt) then
-               nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
-               !-> will not change during the non-LTE loop.
-               atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 !m/s
-            endif
-         enddo
+         !-> do not allocate if using thomson and humlicek profiles
+         ! do kr=1,atm%nline
+         !    if (.not.atm%lines(kr)%lcontrib) cycle
+         !    if (atm%lines(kr)%Voigt) then
+         !       nb = atm%lines(kr)%nb; nr = atm%lines(kr)%nr
+         !       !-> will not change during the non-LTE loop.
+         !       atm%lines(kr)%v(:) = c_light * (x(nb:nr)-atm%lines(kr)%lambda0)/atm%lines(kr)%lambda0 !m/s
+         !    endif
+         ! enddo
 
          do kr = 1, atm%Ncont
             if (.not.atm%continua(kr)%lcontrib) cycle
@@ -364,25 +422,26 @@ module Opacity_atom
 
             if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle tr_loop
 
-            if (abs(dv)>atom%lines(kr)%vmax) then
-               !move the profile to the red edge up to Nover_sup
-               !change Nlam ??
-               if (dv > 0) then
-                  ! Nblue = Nred
-                  Nred = atom%lines(kr)%Nover_sup
-                  Nblue =  Nred - Nlam + 1
-               !move to the blue edge down to Nover_inf
-               else
-                  ! Nred = Nblue
-                  Nblue =  atom%lines(kr)%Nover_inf
-                  Nred = Nlam + Nblue - 1
-               endif
-               ! Nred = atom%lines(kr)%Nover_sup
-               ! Nblue = atom%lines(kr)%Nover_inf
+            ! if (abs(dv)>atom%lines(kr)%vmax) then
+            !    !move the profile to the red edge up to Nover_sup
+            !    !change Nlam ??
+            !    if (dv > 0) then
+            !       ! Nblue = Nred
+            !       Nred = atom%lines(kr)%Nover_sup
+            !       Nblue =  Nred - Nlam + 1
+            !    !move to the blue edge down to Nover_inf
+            !    else
+            !       ! Nred = Nblue
+            !       Nblue =  atom%lines(kr)%Nover_inf
+            !       Nred = Nlam + Nblue - 1
+            !    endif
+            if (abs(dv)>1.0*vbroad(T(icell),Atom%weight, vturb(icell))) then
+               Nred = atom%lines(kr)%Nover_sup
+               Nblue = atom%lines(kr)%Nover_inf
                Nlam = Nred - Nblue + 1
             endif
 
-            phi0(1:Nlam) = profile_art_i(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
+            phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
 
@@ -396,29 +455,29 @@ module Opacity_atom
 ! !-> check Gaussian profile  and norm.
 ! ! -> check Voigt profile, for Lyman alpha mainly.
 ! ! -> write a voigt profile (kr) and a gaussian one (the same for all in principle!)
-!             if (kr==1 .and. atom%id=="H") then
-!                !-> try large damped lines to test the maximum extension of the line.
-!                ! phi0(1:Nlam) = Voigt(Nlam, 1d4, (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))
-!                !-> try pure gauss with the same grid as voigt (for testing low damping)
-!                ! phi0(1:Nlam) = exp(-( (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))**2)
-!                open(1,file="prof.txt",status="unknown")
-!                write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
-!                write(1,*) atom%lines(kr)%a(icell), maxval(atom%lines(kr)%a), minval(atom%lines(kr)%a,mask=nhtot>0)
-!                do j=1,Nlam
-!                   write(1,*) lambda(Nblue+j-1),phi0(j)
-!                enddo
-!                close(1)
-!             endif
-!             if (.not.atom%lines(kr)%voigt .and. atom%id=="H") then
-!                !maybe the similar grid for voigt is nice too ? core + wings ?
-!                open(1,file="profg.txt",status="unknown")
-!                write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
-!                do j=1,Nlam
-!                   write(1,*) lambda(Nblue+j-1),phi0(j)
-!                enddo
-!                close(1)
-!                stop
-!             endif
+            ! if (kr==1 .and. atom%id=="H") then
+            !    !-> try large damped lines to test the maximum extension of the line.
+            !    ! phi0(1:Nlam) = Voigt(Nlam, 1d4, (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))
+            !    !-> try pure gauss with the same grid as voigt (for testing low damping)
+            !    ! phi0(1:Nlam) = exp(-( (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))**2)
+            !    open(1,file="prof.txt",status="unknown")
+            !    write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
+            !    write(1,*) atom%lines(kr)%a(icell), maxval(atom%lines(kr)%a), minval(atom%lines(kr)%a,mask=nhtot>0)
+            !    do j=1,Nlam
+            !       write(1,*) lambda(Nblue+j-1),phi0(j)
+            !    enddo
+            !    close(1)
+            ! endif
+            ! if (.not.atom%lines(kr)%voigt .and. atom%id=="H") then
+            !    !maybe the similar grid for voigt is nice too ? core + wings ?
+            !    open(1,file="profg.txt",status="unknown")
+            !    write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
+            !    do j=1,Nlam
+            !       write(1,*) lambda(Nblue+j-1),phi0(j)
+            !    enddo
+            !    close(1)
+            !    stop
+            ! endif
 
             if ((iterate.and.atom%active)) then
                phi_loc(1:Nlam,atom%ij_to_trans(i,j),atom%activeindex,iray,id) = phi0(1:Nlam)
@@ -584,6 +643,7 @@ module Opacity_atom
    end subroutine xcoupling
 
    function profile_art(line,id,icell,iray,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   use voigts, only : VoigtThomson
       ! phi = Voigt / sqrt(pi) / vbroad(icell)
       integer, intent(in)                    :: id, icell, N, iray
       type (AtomicLine), intent(in)          :: line
@@ -644,11 +704,24 @@ module Opacity_atom
 
       if (line%voigt) then
          u1(:) = u0(:) - omegav(1)/vth
-         profile_art(:) = Voigt(N, line%a(icell), u1(:))
-         do nv=2, Nvspace
-            u1(:) = u0(:) - omegav(nv)/vth
-            profile_art(:) = profile_art(:) + Voigt(N, line%a(icell), u1(:))
-         enddo
+         ! profile_art(:) = Voigt(N, line%a(icell), u1(:))
+         ! do nv=2, Nvspace
+         !    u1(:) = u0(:) - omegav(nv)/vth
+         !    profile_art(:) = profile_art(:) + Voigt(N, line%a(icell), u1(:))
+         ! enddo
+         if (lnon_lte_loop) then!approximate for non-LTE
+            profile_art(:) = VoigtThomson(N,line%a(icell), u1(:),vth)
+            do nv=2, Nvspace
+               u1(:) = u0(:) - omegav(nv)/vth
+               profile_art(:) = profile_art + VoigtThomson(N,line%a(icell), u1(:),vth)
+            enddo
+         else!accurate for images
+            profile_art(:) = Voigt(N, line%a(icell), u1(:))
+            do nv=2, Nvspace
+               u1(:) = u0(:) - omegav(nv)/vth
+               profile_art(:) = profile_art(:) + Voigt(N, line%a(icell), u1(:))
+            enddo
+         endif
 
       else
          u0sq(:) = u0(:)*u0(:)
@@ -746,20 +819,21 @@ module Opacity_atom
    end function profile_art_i
 
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
+   !To do: store opacity in 3d arrays in space instead of icell
       integer, intent(in) :: Nlambda
       real(kind=dp), intent(in) :: lambda(Nlambda)
       integer :: unit, unit2, status = 0
       integer :: alloc_status, id, icell, m, Nrec
       real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
       real(kind=dp), allocatable, dimension(:,:,:) :: chic_tmp, etac_tmp
-      character(len=11) :: filename_chi="chi.bin"
-      character(len=50) :: filename_eta="eta.bin"
-      character(len=18) :: filename_rho="magnetoopt.bin"
+      character(len=11) :: filename_chi="chi.b"
+      character(len=50) :: filename_eta="eta.b"
+      character(len=18) :: filename_rho="magnetoopt.b"
       real(kind=dp) :: zero_dp, u, v, w
 
       zero_dp = 0.0_dp
       u = zero_dp; v = zero_dp; w = zero_dp
-      write(*,*) " Writing emissivity and opacity (rest frame)..."
+      write(*,*) " ** Writing emissivity and opacity (zero-velocity)..."
       ! if (lmagnetized) then
       !    Nrec = 4
       !    allocate(rho_tmp(Nlambda,n_cells,Nrec-1),stat=alloc_status)
@@ -769,19 +843,23 @@ module Opacity_atom
          Nrec = 1
       ! endif
       allocate(chi_tmp(Nlambda, n_cells, Nrec),stat=alloc_status)
-      if (alloc_status /= 0) call error("Cannot allocate chi_tmp !")
+      if (alloc_status /= 0) call error("(write_opac_bin) Cannot allocate chi_tmp !")
       allocate(eta_tmp(Nlambda, n_cells, Nrec),stat=alloc_status)
-      if (alloc_status /= 0) call error("Cannot allocate eta_tmp !")
+      if (alloc_status /= 0) call error("(write_opac_bin) Cannot allocate eta_tmp !")
       allocate(chic_tmp(Nlambda, n_cells, 1),stat=alloc_status)
-      if (alloc_status /= 0) call error("Cannot allocate chic_tmp !")
+      if (alloc_status /= 0) call error("(write_opac_bin) Cannot allocate chic_tmp !")
       allocate(etac_tmp(Nlambda, n_cells, 1),stat=alloc_status)
-      if (alloc_status /= 0) call error("Cannot allocate etac_tmp !")
+      if (alloc_status /= 0) call error("(write_opac_bin) Cannot allocate etac_tmp !")
 
+      chi_tmp = 0.0; eta_tmp = 0.0; chic_tmp = 0.0; etac_tmp = 0.0
 
       call ftgiou(unit,status)
       call ftgiou(unit2,status)
       open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="sequential",iostat=status)
       open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="sequential",iostat=status)
+      !write wavelength first
+      write(unit,iostat=status) lambda
+      write(unit2,iostat=status) lambda
       id = 1
       do icell=1, n_cells
          !$ id = omp_get_thread_num() + 1
@@ -799,11 +877,6 @@ module Opacity_atom
             !    !only QUV for rho_p
             !    rho_tmp(:,m-1,icell) = rho_p(:,m-1,id)
             ! enddo
-         else
-            chi_tmp(:,icell,:) = 0.0
-            eta_tmp(:,icell,:) = 0.0
-            chic_tmp(:,icell,:) = 0.0
-            etac_tmp(:,icell,:) = 0.0
          endif
       enddo
 

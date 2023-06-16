@@ -950,12 +950,15 @@ end subroutine intersect_stars
    real(kind=dp), intent(out) :: Thp, Tshock, Facc
    real(kind=dp) :: x, y, z
    real(kind=dp) :: Tloc, vaccr, vmod2, rr, sign_z
+   real :: alpha_1 = 0.75
+   real :: alpha_2 = 0.25
 
    is_inshock = .false.
    if (.not.laccretion_shock) return
 
    if (icell0<=n_cells) then
-      if (icompute_atomRT(icell0) > 0) then
+      if (nHtot(icell0) > 0.0) then
+      ! if (icompute_atomRT(icell0) > 0) then
          rr = sqrt( x*x + y*y + z*z)
          !vaccr is vr, the spherical r velocity component
          if (lvoronoi) then !always 3d
@@ -986,7 +989,7 @@ end subroutine intersect_stars
          if (vaccr < 0.0_dp) then
             !Facc = 1/2 rho vs^3 
             Facc = 0.5 * (1d-3 * masseH * wght_per_H * nHtot(icell0)) * abs(vaccr)**3
-            Tloc = ( 0.75 * Facc / sigma )**0.25
+            Tloc = ( alpha_1 * Facc / sigma )**0.25
             ! is_inshock = (Tloc > 0.5 * etoile(i_star)%T)
             is_inshock = (T_hp > 1.0_dp * etoile(i_star)%T)
             Thp = T_hp

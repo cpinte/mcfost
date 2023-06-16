@@ -48,9 +48,9 @@ module read1d_models
 		! write(*,*) "Nradii = ", Nr
 		do i=1, atmos_1d%nr
 			read(1,*) atmos_1d%r(i), atmos_1d%T(i), atmos_1d%rho(i), atmos_1d%ne(i), &
-				atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,2), atmos_1d%iz(i)
+				atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,3), atmos_1d%iz(i)
 			! write(*,*) atmos_1d%r(i), atmos_1d%T(i), atmos_1d%rho(i), atmos_1d%ne(i), &
-				! atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,2), atmos_1d%iz(i)
+				! atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,3), atmos_1d%iz(i)
 		enddo
 		!if corona will be zero at some point
 		! write(*,*) "T_limits (read):", atmos_1d%T(1), atmos_1d%T(atmos_1d%nr)
@@ -250,6 +250,10 @@ module read1d_models
 			write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
 		endif
 
+		if (maxval(icompute_atomRT)<=0) then
+			call warning(" There is no gas density zone in the model!")
+			return
+		endif
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
