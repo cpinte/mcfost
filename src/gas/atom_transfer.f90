@@ -28,7 +28,8 @@ module atom_transfer
    use see, only : ngpop, Neq_ng, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
-   use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d, Ng_accelerate, Accelerate, check_ng_pops
+   use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d, vacuum2air, &
+         Ng_accelerate, Accelerate, check_ng_pops
    use dust_ray_tracing, only    : RT_n_incl, RT_n_az, init_directions_ray_tracing,tab_u_RT, tab_v_RT, tab_w_RT, &
                                    tab_RT_az,tab_RT_incl
    use stars, only               : intersect_stars, max_Tshock, min_Tshock, max_Thp, min_Thp, max_Facc, min_Facc
@@ -48,29 +49,32 @@ module atom_transfer
 #include "sprng_f.h"
    integer :: omp_chunk_size
    real(kind=dp), allocatable, dimension(:) :: tab_lambda_Sed
-   real(kind=dp), dimension(:,:,:,:,:,:), allocatable, private :: tau_surface_map
+   real(kind=dp), dimension(:,:,:,:,:,:), allocatable, private :: tau_surface_map !private to avoid conflict with mol_transfer.
 
    contains
 
    subroutine alloc_tau_surface_map()
 
       ! write(*,*) "-- Computing tau=",tau," map for atomic lines..."
-      write(*,*) "  allocating ",n_lambda*rt_n_incl*rt_n_az*3*nb_proc*npix_x*npix_y/1024.**3," GB for tau map"
+      write(*,*) "  -- allocating ",n_lambda*rt_n_incl*rt_n_az*3*nb_proc*npix_x*npix_y/1024.**3," GB for tau map"
       allocate(tau_surface_map(npix_x,npix_y,n_lambda,rt_n_incl,rt_n_az,3))
 
       return
    end subroutine alloc_tau_surface_map
    subroutine dealloc_tau_surface_map()
       integer :: ibin,iaz,i,j,la
+      character(len=50) :: filename
       ! real(kind=dp), allocatable :: image(:,:,:,:,:,:)
+
+      filename = "tau="//trim(stau_surface)//"_surface.b"
 
       ! allocate(image(npix_x,npix_y,n_lambda,rt_n_incl,rt_n_az,3))
 
       !write the map to bin at the moment and dealloc
-      open(100, file="tau_map.b",form="unformatted",status='unknown',access="sequential")
+      open(100, file=filename,form="unformatted",status='unknown',access="stream")
       write(100) shape(tau_surface_map)
       ! write(100) shape(image)
-      write(100) tab_lambda_nm
+      write(100) vacuum2air(n_lambda,tab_lambda_nm)
       ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
       ! do ibin=1,RT_n_incl
       !    do iaz=1,RT_n_az
@@ -1143,17 +1147,14 @@ module atom_transfer
       call setup_image_grid()
       write(*,*) "Computing emerging flux..."
 
-      ! if (ltau_surface) call 
-      call alloc_tau_surface_map()
+      if (ltau_surface) call alloc_tau_surface_map()
       do ibin=1,RT_n_incl
          do iaz=1,RT_n_az
             call emission_line_map(ibin,iaz)
-            ! if (ltau_surface) call 
-            call emission_line_tau_surface_map(ibin,iaz,1.0)
+            if (ltau_surface) call emission_line_tau_surface_map(tau_surface,ibin,iaz)
          end do
       end do
-      ! if (ltau_surface) call 
-      call dealloc_tau_surface_map()
+      if (ltau_surface) call dealloc_tau_surface_map()
 
       if (laccretion_shock) then
          !3 + lg(Facc) = lg(Facc) erg/cm2/s
@@ -1491,7 +1492,7 @@ module atom_transfer
       return
    end subroutine emission_line_map
 
-   subroutine emission_line_tau_surface_map(ibin,iaz,tau)
+   subroutine emission_line_tau_surface_map(tau,ibin,iaz)
    use optical_depth, only : physical_length_atom
       integer, intent(in) :: ibin, iaz
       real, intent(in) :: tau
@@ -1559,6 +1560,7 @@ module atom_transfer
             call move_to_grid(id, x0(1),y0(1),z0(1),u0,v0,w0, icell,lintersect)
             if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
                call physical_length_atom(id,icell,x0,y0,z0,u0,v0,w0,n_lambda,tab_lambda_nm,tau,flag_sortie)
+               !flag_sortie always .false. at the moment. x0,y0,z0 set to 0 before integrating.
                if (flag_sortie) then
                   tau_surface_map(i,j,:,ibin,iaz,:) = 0.0
                else
