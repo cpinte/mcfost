@@ -84,7 +84,7 @@ endif
 
 ifeq ($(SYSTEM), ifort)
     ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
-        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.12 -mdynamic-no-pic
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.13 -mdynamic-no-pic
 	STATIC_FLAGS= -static-intel -qopenmp-link static
     else
         ARCH= -axSSE2,SSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512
@@ -108,7 +108,7 @@ endif
 
 ifeq ($(SYSTEM), ifx)
     ifeq ($(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN),1)
-        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.12 -mdynamic-no-pic
+        ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2 -mmacosx-version-min=10.13 -mdynamic-no-pic
         STATIC_FLAGS= -static-intel -qopenmp-link static
     else
         ARCH= -axSSSE3,SSE4.1,SSE4.2,AVX,CORE-AVX2,CORE-AVX512
