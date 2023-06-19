@@ -272,9 +272,9 @@ module see
         real(kind=dp), intent(out) :: dM
         real(kind=dp), dimension(atom%Nlevel) :: ndag, delta
         real(kind=dp) :: ntotal, Gamma_dag(atom%Nlevel,atom%Nlevel) !debug
-        real(kind=dp) :: dn_n, wjac
+        real(kind=dp) :: dn_n
 
-    !if molecules (or H-, ntotal must be different from A*nHtot)
+    !if molecules (or H-), ntotal must be different from A*nHtot)
         ntotal = atom%Abund*nHtot(icell) !in atomic form here. Could be stored on mem.
 
         ndag(:) = atom%n(:,icell) / ntotal
@@ -300,12 +300,11 @@ module see
         atom%Gamma(imaxpop,:,id) = 1.0_dp
 
     !solve for residual
-        wjac = 1.0_dp
         delta = atom%n(:,icell) - matmul(atom%Gamma(:,:,id), ndag)
 
         ! call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
         call solve_lin(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
-   	    atom%n(:,icell) = ndag(:) + wjac * delta(:)
+   	    atom%n(:,icell) = ndag(:) + delta(:)
         ! call gaussslv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
         !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
 
