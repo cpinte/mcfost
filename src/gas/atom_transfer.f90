@@ -796,7 +796,7 @@ module atom_transfer
 
       if (loutput_rates) call write_rates()
 
-      ! call io_write_convergence_maps(lcell_converged, diff_loc)
+      call io_write_convergence_maps(lcell_converged, diff_loc)
       open(100, file="jnu.b",form="unformatted",status='unknown',access="stream")
       write(100) n_lambda, n_cells
       write(100) tab_lambda_nm
@@ -1008,6 +1008,7 @@ module atom_transfer
          time_iter_avg = 0.0
          unconverged_fraction = 0.0
          unconverged_cells = 0
+         ! Jnu = 0.0_dp
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
@@ -1057,7 +1058,7 @@ module atom_transfer
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
                ! if (lforce_lte) l_iterate_ne = .false.
             endif
-            ! Jnu = 0.0_dp
+
             call progress_bar(0)
             !$omp parallel &
             !$omp default(none) &
@@ -1551,13 +1552,19 @@ module atom_transfer
       if (loutput_rates) call write_rates()
 
       ! call io_write_convergence_maps(lcell_converged, diff_loc)
-      ! open(100, file="jnu.b",form="unformatted",status='unknown',access="sequential")
+      ! open(100, file="jnu.b",form="unformatted",status='unknown',access="stream")
+      ! write(100) n_lambda, n_cells
       ! write(100) tab_lambda_nm
       ! write(100) Jnu
       ! close(100); deallocate(jnu)
-      ! open(100, file="inu.b",form="unformatted",status='unknown',access="sequential")
+      ! open(100, file="inu.b",form="unformatted",status='unknown',access="stream")
+      ! write(100) n_lambda,n_rayons_max,n_cells
       ! write(100) tab_lambda_nm
-      ! write(100) healpix_weight(healpix_lorder)
+      ! if (lhealpix) then
+      !    write(100) healpix_weight(healpix_lorder)
+      ! else
+      !    write(100) 1.0/real(n_rayons,kind=dp)!n_rayons is max here at the moment
+      ! endif
       ! write(100) iloc
       ! deallocate(iloc); close(100)
       call dealloc_nlte_var()
@@ -1845,9 +1852,9 @@ module atom_transfer
          ! !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm)
 
-         call nlte_loop_mali()
+         call nlte_loop_mali_2()
          !-> here on the non-LTE frequency grid
-         ! call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
+         call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
 
          if (lexit_after_nonlte_loop) return
 
