@@ -221,9 +221,9 @@ module atom_transfer
 
       !-> negligible
       mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
-      allocate(jnu(n_lambda,n_cells))
-      write(*,*) " size Jnu:", sizeof(Jnu) / 1024./1024./1024.," GB"
-      mem_alloc_local = mem_alloc_local + sizeof(jnu)
+      ! allocate(jnu(n_lambda,n_cells))
+      ! write(*,*) " size Jnu:", sizeof(Jnu) / 1024./1024./1024.," GB"
+      ! mem_alloc_local = mem_alloc_local + sizeof(jnu)
       ! allocate(iloc(n_lambda,n_rayons_max,n_cells))
       ! write(*,*) " size Iloc:", sizeof(iloc) / 1024./1024./1024.," GB"
       ! mem_alloc_local = mem_alloc_local + sizeof(iloc)
@@ -254,7 +254,8 @@ module atom_transfer
          if (i1==i0) then
             precision = dpops_max_error
          else
-            precision = (dpops_max_error - 1d-1) * ( real(istep - i0) / real(i1 - i0) )**2.0 + 1d-1 
+            !better to fall faster at low number of rays ? 
+            precision = (dpops_max_error - 1d-1) * ( real(istep - i0) / real(i1 - i0) )**0.1 + 1d-1 
          endif
          write(*,*) ""
          call system_clock(count_start,count_rate=time_tick,count_max=time_max)
@@ -274,7 +275,7 @@ module atom_transfer
          time_iter_avg = 0.0
          unconverged_fraction = 0.0
          unconverged_cells = 0
-         Jnu = 0.0_dp
+         ! Jnu = 0.0_dp
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
@@ -370,7 +371,7 @@ module atom_transfer
                            call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,1,labs,n_lambda,tab_lambda_nm)
                            call xcoupling(id, icell,1)
                            call accumulate_radrates_mali(id, icell,1, weight)
-                           Jnu(:,icell) = Jnu(:,icell) + weight * Itot(:,1,id)
+                           ! Jnu(:,icell) = Jnu(:,icell) + weight * Itot(:,1,id)
                         endif
                         ! iloc(:,iray,icell) = Itot(:,1,id)
                      enddo
@@ -403,7 +404,7 @@ module atom_transfer
                            call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,1,labs,n_lambda,tab_lambda_nm)
                            call xcoupling(id,icell,1)
                            call accumulate_radrates_mali(id, icell,1, weight)
-                           Jnu(:,icell) = Jnu(:,icell) + weight * Itot(:,1,id)
+                           ! Jnu(:,icell) = Jnu(:,icell) + weight * Itot(:,1,id)
                         endif
                      enddo !iray
 
@@ -796,12 +797,12 @@ module atom_transfer
 
       if (loutput_rates) call write_rates()
 
-      call io_write_convergence_maps(lcell_converged, diff_loc)
-      open(100, file="jnu.b",form="unformatted",status='unknown',access="stream")
-      write(100) n_lambda, n_cells
-      write(100) tab_lambda_nm
-      write(100) Jnu
-      close(100); deallocate(jnu)
+      ! call io_write_convergence_maps(lcell_converged, diff_loc)
+      ! open(100, file="jnu.b",form="unformatted",status='unknown',access="stream")
+      ! write(100) n_lambda, n_cells
+      ! write(100) tab_lambda_nm
+      ! write(100) Jnu
+      ! close(100); deallocate(jnu)
       ! open(100, file="inu.b",form="unformatted",status='unknown',access="stream")
       ! write(100) n_lambda,n_rayons_max,n_cells
       ! write(100) tab_lambda_nm
@@ -1854,7 +1855,7 @@ module atom_transfer
 
          call nlte_loop_mali_2()
          !-> here on the non-LTE frequency grid
-         call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
+         ! call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
 
          if (lexit_after_nonlte_loop) return
 
