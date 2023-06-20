@@ -256,6 +256,7 @@ module atom_transfer
          else
             !better to fall faster at low number of rays ? 
             precision = (dpops_max_error - 1d-1) * ( real(istep - i0) / real(i1 - i0) )**0.1 + 1d-1 
+            ! precision = exp(log(1d-1) + istep*(log(dpops_max_error)-log(1d-1))/real(i1-i0))
          endif
          write(*,*) ""
          call system_clock(count_start,count_rate=time_tick,count_max=time_max)
