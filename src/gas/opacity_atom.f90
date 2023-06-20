@@ -855,9 +855,11 @@ module Opacity_atom
 
       call ftgiou(unit,status)
       call ftgiou(unit2,status)
-      open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="sequential",iostat=status)
-      open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="sequential",iostat=status)
+      open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="stream",iostat=status)
+      open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="stream",iostat=status)
       !write wavelength first
+      write(unit,iostat=status) shape(chi_tmp)
+      write(unit2,iostat=status) shape(eta_tmp)
       write(unit,iostat=status) lambda
       write(unit2,iostat=status) lambda
       id = 1
