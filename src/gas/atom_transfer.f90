@@ -255,7 +255,7 @@ module atom_transfer
             precision = dpops_max_error
          else
             !better to fall faster at low number of rays ? 
-            precision = (dpops_max_error - 1d-1) * ( real(istep - i0) / real(i1 - i0) )**0.1 + 1d-1 
+            precision = (dpops_max_error - 1d-1) * ( real(istep - i0) / real(i1 - i0) )**0.1 + 1d-1
             ! precision = exp(log(1d-1) + istep*(log(dpops_max_error)-log(1d-1))/real(i1-i0))
          endif
          write(*,*) ""
@@ -277,6 +277,7 @@ module atom_transfer
          unconverged_fraction = 0.0
          unconverged_cells = 0
          ! Jnu = 0.0_dp
+         if (istep > i0) Ndelay_iterate_ne = 0
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
@@ -2034,7 +2035,7 @@ module atom_transfer
       real(kind=dp), dimension(3,nb_proc) :: pixelcorner
       real(kind=dp):: taille_pix
       integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
-      integer, parameter :: n_rad_RT = 200, n_phi_RT = 150
+      integer, parameter :: n_rad_RT = 300, n_phi_RT = 200
       real(kind=dp), dimension(n_rad_RT) :: tab_r
       real(kind=dp):: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
       integer :: ri_RT, phi_RT
@@ -2091,7 +2092,7 @@ module atom_transfer
          j = 1
          lresolved = .false.
 
-         rmin_RT = 0.001_dp * Rmin!max(w*0.9_dp,0.05_dp) * Rmin
+         rmin_RT = 1d-6 !max(w*0.9_dp,0.05_dp) * Rmin
          rmax_RT = Rmax * 1.0_dp ! Rmax  * 2.0_dp
 
          tab_r(1) = rmin_RT
