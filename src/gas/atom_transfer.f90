@@ -458,9 +458,9 @@ module atom_transfer
                      n_iter_accel = 0; i0_rest = 0; ng_rest = .false.
           		   endif
             	endif
-               if (lng_turned_on) then
-                  if (unconverged_fraction < 15.0) lng_turned_on = .false.
-               endif
+               ! if (lng_turned_on) then
+               !    if (unconverged_fraction < 15.0) lng_turned_on = .false.
+               ! endif
             endif
             !***********************************************************!
             ! ********************** GLOBAL NG's ***********************!
