@@ -140,7 +140,7 @@ module atom_transfer
       logical :: l_iterate, l_iterate_ne
       
       !Ng's acceleration
-      integer, parameter :: Ng_Ndelay_init = 1 !minimal number of iterations before starting the cycle.
+      integer, parameter :: Ng_Ndelay_init = 5 !minimal number of iterations before starting the cycle.
                                                !min is 1 (so that conv_speed can be evaluated)
       real(kind=dp), parameter :: conv_speed_limit_healpix = 5d-2 !1d-3
       real(kind=dp), parameter :: conv_speed_limit_mc = 1d1!1d-1
@@ -698,14 +698,6 @@ module atom_transfer
             diff_old = diff
             conv_acc = conv_speed
 
-            !force convergence if there are only few unconverged cells remaining
-            if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
-               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
-                  unconverged_fraction, n_iter
-               write(*,*) " -> forcing convergence"
-               lconverged = .true.
-            endif
-            !
             if ((diff < precision).and.(.not.lcswitch_enabled))then!maxval_cswitch_atoms()==1.0_dp
             ! if ( (unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp)then
             ! if ( ((unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp).or.&
@@ -748,6 +740,15 @@ module atom_transfer
                   mod(time_iteration/60.0,60.0), mod((cpuend_iter-cpustart_iter)/60.0,60.0)
             time_iter_avg = time_iter_avg + time_iteration
             ! -> will be averaged with the number of iterations done for this step
+
+            !force convergence if there are only few unconverged cells remaining
+            if ( (n_iter > maxIter/4).and.(unconverged_fraction < 5.0).or.&
+               ((unconverged_fraction < 5.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
+               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
+                  unconverged_fraction, n_iter
+               write(*,*) " -> forcing convergence"
+               lconverged = .true.
+            endif
 
 
             if (lsafe_stop) then
@@ -863,7 +864,7 @@ module atom_transfer
       logical :: l_iterate, l_iterate_ne
       
       !Ng's acceleration
-      integer, parameter :: Ng_Ndelay_init = 1 !minimal number of iterations before starting the cycle.
+      integer, parameter :: Ng_Ndelay_init = 5 !minimal number of iterations before starting the cycle.
                                                !min is 1 (so that conv_speed can be evaluated)
       real(kind=dp), parameter :: conv_speed_limit_healpix = 5d-2 !1d-3
       real(kind=dp), parameter :: conv_speed_limit_mc = 1d1!1d-1
@@ -1438,14 +1439,6 @@ module atom_transfer
             diff_old = diff
             conv_acc = conv_speed
 
-            !force convergence if there are only few unconverged cells remaining
-            if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
-               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
-                  unconverged_fraction, n_iter
-               write(*,*) " -> forcing convergence"
-               lconverged = .true.
-            endif
-            !
             if ((diff < precision).and.(.not.lcswitch_enabled))then!maxval_cswitch_atoms()==1.0_dp
             ! if ( (unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp)then
             ! if ( ((unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp).or.&
@@ -1500,6 +1493,16 @@ module atom_transfer
                   mod(time_iteration/60.0,60.0), mod((cpuend_iter-cpustart_iter)/60.0,60.0)
             time_iter_avg = time_iter_avg + time_iteration
             ! -> will be averaged with the number of iterations done for this step
+
+            !force convergence if there are only few unconverged cells remaining
+            ! if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
+            if ( (n_iter > maxIter/4).and.(unconverged_fraction < 5.0).or.&
+               ((unconverged_fraction < 5.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
+               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
+                  unconverged_fraction, n_iter
+               write(*,*) " -> forcing convergence"
+               lconverged = .true.
+            endif
 
 
             if (lsafe_stop) then
