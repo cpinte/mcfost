@@ -48,4 +48,4 @@ Geometry
 The disc orientation is correct, but the red and blue shifted sides are flipped.
 ^^^^^^^^^^^^^^^^^^^
 
-The easiest way to change the sign of the rotation without changing the orientation is to change the inclunation i to 180-i and the PA to PA+180.
+The easiest way to change the sign of the rotation without changing the orientation is to change the inclination i to 180-i and the PA to PA+180, and if the model is 3d, the azimuth (or planet_azimuth) should be changed at 180-azimuth.
