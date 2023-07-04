@@ -1211,6 +1211,10 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
   ! Copmputes position where a given optical depth is reached
   ! This is simplified version of integ_ray_atom (also inspired by physical_length, physical_length_mol)
   ! only computes optical depth and stopes where given tau_max is reached
+  !
+  !
+  ! B. Tessore: Cannot leave until the propagation is done, as we follow many (uncorrelated) frequencies.
+  ! for all frequencies, (x(Nfreq),y(Nfreq),z(Nfreq)) will be filled until tau > tau_threshold.
 
   integer, intent(in) :: icell_in, N, id
   real(kind=dp), intent(inout), dimension(N) :: x,y,z !depends on the frequency
@@ -1239,8 +1243,11 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
    lstop = .false.
    flag_sortie = .false.
 
+   !flag_sortie = .true. not useful. By default, (x,y,z) are 0 if we don't reach the surface.
+   x = 0.0; y = 0.0; z = 0.0
+
    ! Will the ray intersect a star
-   call intersect_stars(x(1),y(1),z(1), u,v,w, lintersect_stars, i_star, icell_star)
+   call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)
    ! Boucle infinie sur les cellules (we go over the grid.)
    infinie : do ! Boucle infinie
    ! Indice de la cellule
@@ -1251,22 +1258,16 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
 
       ! Test sortie ! "The ray has reach the end of the grid"
       if (test_exit_grid(icell, x0, y0, z0)) then
-         flag_sortie = .true.
          return
       endif
 
       if (lintersect_stars) then !"will interesct"
-         if (icell == icell_star) then!"has intersected"
-            flag_sortie = .true.         
-            return
-         end if
+         if (icell == icell_star) return
       endif
 
       if (icell <= n_cells) then
          lcellule_non_vide = (icompute_atomRT(icell) > 0)
-         if (icompute_atomRT(icell) < 0) then
-            flag_sortie = .true.
-         endif
+         if (icompute_atomRT(icell) < 0) return
       endif
 
       nbr_cell = nbr_cell + 1
@@ -1286,42 +1287,26 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
          tau(:) = tau(:) + dtau(:) !for next cell
         ! Mise a jour profondeur optique pour cellule suivante
 
-        where (tau > tau_threshold)
+        !follow many frequencies
+        where ((tau > tau_threshold).and..not.lstop)
             lstop = .true.
             tau_previous = tau - dtau
-            ltot = ltot+l_void_before+l_contrib*(tau_threshold-tau + dtau)/dtau
-        elsewhere
-           ltot = ltot+l
-        endwhere
+            ltot = ltot+l_void_before+l_contrib*(tau_threshold-tau_previous)/dtau
+            x=x0+l*u
+            y=y0+l*v
+            z=z0+l*w
+         elsewhere
+            ltot = ltot+l
+         endwhere
       else
          ltot = ltot + l 
       end if  ! lcellule_non_vide
 
-     ! On a fini d'integrer : sortie de la routine
-     where(lstop)
-        x=x0+l*u
-        y=y0+l*v
-        z=z0+l*w
-     endwhere
-     if (any(lstop)) then
-      flag_sortie = .false.
-      return
-     endif
-   !    if (lstop) then
-   !      flag_sortie = .false.
-   !      ! we recompute the position
-   !      x=x0+l*u
-   !      y=y0+l*v
-   !      z=z0+l*w
+      if (all(lstop)) then
+         !no need to integrate anymore
+         return
+      endif
 
-   !      if (.not.lVoronoi) then
-   !         if (l3D) then
-   !            if (lcylindrical) call indice_cellule(x,y,z, previous_cell)
-   !         endif
-   !      endif ! todo : on ne fait rien dans la cas Voronoi ???
-
-   !      return
-   !   endif ! lstop
    end do infinie
 
    return
