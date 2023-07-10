@@ -1859,7 +1859,7 @@ module atom_transfer
          ! !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm)
 
-         call nlte_loop_mali_2()
+         call nlte_loop_mali()
          !-> here on the non-LTE frequency grid
          ! call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
 
