@@ -107,8 +107,9 @@ module read1d_models
 		allocate(atmos_1d%m(atmos_1d%nr))
 		nrad_0 = atmos_1d%nr
 		if (atmos_1d%lcoronal_illumination) nrad_0 = atmos_1d%nr - 1
-		atmos_1d%m(nrad_0) = 0.5 * (atmos_1d%rho(nrad_0-1)+atmos_1d%rho(nrad_0)) * &
-									au_to_m * (atmos_1d%r(nrad_0) - atmos_1d%r(nrad_0-1))
+		! atmos_1d%m(nrad_0) = 0.5 * (atmos_1d%rho(nrad_0-1)+atmos_1d%rho(nrad_0)) * &
+		! 							au_to_m * (atmos_1d%r(nrad_0) - atmos_1d%r(nrad_0-1))
+		atmos_1d%m(nrad_0) = 0.0
 		do i=nrad_0-1,1,-1
 			atmos_1d%m(i) = atmos_1d%m(i+1) + 0.5 * (atmos_1d%rho(i)+atmos_1d%rho(i+1)) * &
 							au_to_m * (atmos_1d%r(i+1) - atmos_1d%r(i))
