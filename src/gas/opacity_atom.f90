@@ -195,6 +195,7 @@ module Opacity_atom
                atm%continua(kr)%alpha(:) = linear_1D_sorted(size(atm%continua(kr)%alpha_file),&
                     atm%continua(kr)%lambda_file,atm%continua(kr)%alpha_file,atm%continua(kr)%Nlambdac,&
                     tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
+               atm%continua(kr)%alpha(atm%continua(kr)%Nlambdac) = atm%continua(kr)%alpha_file(size(atm%continua(kr)%alpha_file))
                !to chheck the edge
             endif
 

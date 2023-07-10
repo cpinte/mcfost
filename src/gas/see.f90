@@ -137,6 +137,7 @@ module see
                     tab_Vij_cont(1:atom%continua(kr)%Nlambda,kr,n) = linear_1D_sorted(size(atom%continua(kr)%alpha_file),&
                          atom%continua(kr)%lambda_file,atom%continua(kr)%alpha_file,atom%continua(kr)%Nlambda,&
                          tab_lambda_nm(atom%continua(kr)%Nb:atom%continua(kr)%Nr))
+                    tab_Vij_cont(atom%continua(kr)%Nlambda,kr,n) = atom%continua(kr)%alpha_file(size(atom%continua(kr)%alpha_file))
                 endif
                 !loop for all cells here can be long
                 !could be para
