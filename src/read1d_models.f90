@@ -154,7 +154,8 @@ module read1d_models
 		!at the bottom of the photosphere, it can slighly modify the continuum emission. Playing with the inner boundary irradiation
 		!allows to properly balance that effect.
 		if (lcell_centered) then
-			etoile(1)%T = real(	atmos_1d%T(1) ) ! + something else here 
+			!core temperature, read from file as "Tstar"
+			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + something else here 
 			icell = n_cells + 1
 			nrad_0 = n_rad
 			icell0 = n_cells
@@ -184,7 +185,8 @@ module read1d_models
 				icell0 = n_cells - 1
 				icompute_atomRT(n_cells) = atmos_1d%iz(n_rad+1)
 			endif
-			etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ? 
+			!core temperature, read from file as "Tstar"
+			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ? 
 			icompute_atomRT(:) = atmos_1d%iz(2:n_cells+1)
 			T(:) = atmos_1d%T(2:n_cells+1)
 			nHtot(:) = atmos_1d%rho(2:n_cells+1) * rho_to_nH
