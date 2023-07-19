@@ -360,12 +360,15 @@ subroutine repartition_energie_etoiles()
         if (status /= 0) call error("cannot open fits file "//trim(filename))
 
         !  determine the size of the image
-        call ftgknj(unit(i),'NAXIS',1,10,naxes,nfound,status)
+        call ftgknj(unit(i),'NAXIS',1,2,naxes,nfound,status)
         if (status /= 0) call error("reading axes of "//trim(filename))
         !  check that it found both NAXIS1 and NAXIS2 keywords
         if (nfound /= 2) call error("failed to read the NAXISn keywords in "//trim(filename))
 
-        if (naxes(2) /= 3) call error(trim(filename)//" does not have the right shape")
+        if (naxes(2) /= 3) then
+           write(*,*) "NAXIS2 =", naxes(2)
+           call error(trim(filename)//" does not have the right shape")
+        endif
 
         ! We first read the length of the spectrum
         n_lambda_spectre(i) = naxes(1)
