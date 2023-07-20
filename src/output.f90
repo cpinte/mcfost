@@ -3331,6 +3331,7 @@ subroutine ecriture_spectre(imol)
      endif ! lkeplerian
   endif ! l_sym_image
 
+  factor = 1.0
   if (lcasa) then
      W2m2_to_Jy = 1e26 / Transfreq(mol(imol)%indice_Trans_rayTracing(1))
 
