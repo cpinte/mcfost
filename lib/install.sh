@@ -8,7 +8,8 @@
 #  - SPRNG
 #  - CFITSIO
 #  - Voro++
-#  - XGBoost and dependencies
+#  - XGBoost and dependencies (optional)
+#  - astrochem and dependencies (optional)
 #  - HDF5
 #
 # It is likely that you some of the libaries already
@@ -37,6 +38,12 @@
 #                  compile the XGBoost libraries.
 #                  If "yes", you also need to compile MCFOST
 #                  with MCFOST_XGBOOST=yes to use XGBoost.
+#                  Optional, default value is "no".
+#
+# MCFOST_ASTROCHEM : a boolean flag ("yes" or "no") to
+#                  compile the astrochem libraries.
+#                  If "yes", you also need to compile MCFOST
+#                  with MCFOST_ASTROCHEM=yes to use astrochem.
 #                  Optional, default value is "no".
 #
 # SKIP_HDF5      : a boolean flag ("yes" or "no") to
@@ -108,6 +115,9 @@ fi
 #-- Check if SKIP_HDF5 is set, if not, set to 'no'
 if [ -z ${SKIP_HDF5+x} ]; then SKIP_HDF5=no; fi
 
+#-- Check if MCFOST_ASTROCHEM is set, if not, set to 'no'
+if [ -z ${MCFOST_ASTROCHEM+x} ]; then MCFOST_ASTROCHEM=no; fi
+
 #-- Check if MCFOST_XGBOOST is set, if not, set to 'no'
 if [ -z ${MCFOST_XGBOOST+x} ]; then MCFOST_XGBOOST=no; fi
 
@@ -120,7 +130,7 @@ pushd .
 
 #-- Downloading libraries
 wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
-wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-3.47.tar.gz
+wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.3.0.tar.gz
 git clone https://github.com/cpinte/voro
 if [ "$SKIP_HDF5" != "yes" ]; then
     wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
@@ -134,23 +144,9 @@ if [ "$MCFOST_XGBOOST" = "yes" ]; then
     git clone git@github.com:dmlc/rabit.git
     cd ..
 fi
-git clone https://github.com/cpinte/astrochem
-
-
-#---------------------------------------------
-# Astrochem (does not compile with sundials 6)
-#---------------------------------------------
-conda create --name astrochem -c conda-forge sundials=5.7.0 python cython numpy matplotlib h5py autoconf automake libtool
-conda activate astrochem
-cd astrochem
-autoupdate
-./bootstrap
-./configure CPPFLAGS="-I$CONDA_PREFIX/include" LDFLAGS="-Wl,-rpath,$CONDA_PREFIX/lib -L/$CONDA_PREFIX/lib"  --prefix=$CONDA_PREFIX
-make
-\cp ./src/.libs/libastrochem.a ../lib
-\cp ./src/libastrochem.h ../include
-cd ~
-conda deactivate
+if [ "$MCFOST_ASTROCHEM" = "yes" ]; then
+    git clone https://github.com/cpinte/astrochem
+fi
 
 #-------------------------------------------
 # SPRNG
@@ -180,8 +176,8 @@ echo "Done"
 # CFITSIO
 #-------------------------------------------
 echo "Compiling CFITSIO ..."
-tar xzvf cfitsio-3.47.tar.gz
-mv cfitsio-3.47 cfitsio
+tar xzvf cfitsio-4.3.0.tar.gz
+mv cfitsio-4.3.0 cfitsio
 cd cfitsio
 ./configure --enable-ssse3 --disable-curl
 
@@ -258,6 +254,26 @@ else
     echo "Skipping XGBoost ..."
     echo "Make sure that MCFOST_XGBOOST is not set yes when compiling MCFOST"
 fi
+
+#---------------------------------------------
+# Astrochem (does not compile with sundials 6)
+#---------------------------------------------
+if [ "$MCFOST_ASTROCHEM" = "yes" ]; then
+    conda create --name astrochem -c conda-forge sundials=5.7.0 python cython numpy matplotlib h5py autoconf automake libtool
+    conda activate astrochem
+    cd astrochem
+    autoupdate
+    ./bootstrap
+    ./configure CPPFLAGS="-I$CONDA_PREFIX/include" LDFLAGS="-Wl,-rpath,$CONDA_PREFIX/lib -L/$CONDA_PREFIX/lib"  --prefix=$CONDA_PREFIX
+    make
+    \cp ./src/.libs/libastrochem.a ../lib
+    \cp ./src/libastrochem.h ../include
+    cd ~
+    conda deactivate
+else
+    echo "Skipping Astrochem"
+fi
+
 
 #---------------------------------------------
 # HDF5
