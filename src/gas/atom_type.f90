@@ -522,4 +522,21 @@ module atom_type
       return
     end function vbroad
 
+   function ntotal_ions(icell)
+      real(kind=dp) :: ntotal_ions
+      integer, intent(in) :: icell
+      integer :: n, j, il
+
+      ntotal_ions = 0.0
+      do n=1,n_atoms
+         do il=1, Atoms(n)%p%Nlevel
+            if (atoms(n)%p%stage(il)>0) then
+               ntotal_ions = ntotal_ions + atoms(n)%p%n(il,icell)*atoms(n)%p%stage(il)
+            endif
+         enddo
+      enddo
+
+      return
+   end function ntotal_ions
+
 end module atom_type
