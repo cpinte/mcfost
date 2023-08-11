@@ -76,10 +76,11 @@ http://ipag.osug.fr/public/pintec/mcfost/mac/mcfost.tgz
 Installation from source
 ------------------------
 
-mcfost source code is hosted on github (as a private directory, public release will be made soon).
+mcfost source code is hosted on github:
 
+https://github.com/cpinte/mcfost
 
-1. Clone the repository (ask Christophe for access).
+1. Clone the repository.
 
 2. Set the following environment variables::
 
@@ -118,8 +119,8 @@ mcfost source code is hosted on github (as a private directory, public release w
    On some MacOS installation, this last step does not seem to work, but you can link by hand, for instance with::
 
      $ cd /usr/local/bin
-     $ ln -s gcc-11 gcc
-     $ ln -s g++-11 g++
+     $ ln -s gcc-13 gcc
+     $ ln -s g++-13 g++
 
   (depending on your gcc/g++ version).
 
@@ -190,6 +191,14 @@ mcfost source code is hosted on github (as a private directory, public release w
 
 
 .. note:: mcfost uses the xgboost machine learning library to predict chemical abundances. This features is experimental and xgboost is sometimes tricky to compile with the intel compiler. You can turn the feature off by seting the environement variable `MCFOST_NO_XGBOOST` to yes.
+
+
+Homebrew installation
+---------------------
+Aternatively, on MacOS, you can install mcfost with homebrew with::
+
+  $ brew tap danieljprice/all
+  $ brew install mcfost
 
 
 MCFOST_UTILS Environment variable
