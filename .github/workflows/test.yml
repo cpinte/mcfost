@@ -53,6 +53,7 @@ jobs:
 
     - name: test mcfost
       run: |
+        export MCFOST_UTILS=$PWD/utils
         cd test_suite
         curl http://ipag.osug.fr/public/pintec/mcfost/test_data/discF_00500 -o ./test_data/discF_00500/discF_00500
         ./compute_test_suite.sh
