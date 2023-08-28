@@ -70,6 +70,10 @@ jobs:
         cd test_suite
         ./compute_test_suite.sh
 
+    - name: install pytest
+      run: |
+        pip install pytest
+
     - name: test current commit against reference data
       run: |
         export MCFOST_UTILS=$PWD/utils
