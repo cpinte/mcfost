@@ -64,8 +64,14 @@ jobs:
         curl http://ipag.osug.fr/public/pintec/mcfost/test_data/discF_00500 -o ./test_data/discF_00500/discF_00500
         cd ..
 
-    - name: test mcfost
+    - name: generate reference data (currently using current commit!)
       run: |
         export MCFOST_UTILS=$PWD/utils
         cd test_suite
         ./compute_test_suite.sh
+
+    - name: test current commit against reference data
+      run: |
+        export MCFOST_UTILS=$PWD/utils
+        cd test_suite
+        pytest -v
