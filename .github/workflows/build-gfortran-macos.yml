@@ -37,6 +37,10 @@ jobs:
           /usr/local/Cellar/sprng2/2.0
         key: ${{ runner.os }}-build-${{ env.cache-name }}
 
+    - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
+      name: update path if cache exists
+      run: export PATH="$PATH:/usr/local/Cellar/gcc/13.1.0"
+
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install gfortran
       run: brew reinstall gcc
