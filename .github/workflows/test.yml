@@ -53,6 +53,7 @@ jobs:
 
     - name: run mcfost set up (downloads additional files)
       run: |
+        export MCFOST_UTILS=$PWD/utils
         cd src
         ./mcfost -setup
         cd ..
