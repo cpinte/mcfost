@@ -54,7 +54,7 @@ jobs:
     - name: run mcfost set up (downloads additional files)
       run: |
         cd src
-        mcfost -setup
+        ./mcfost -setup
         cd ..
 
     - name: download files for test suite
