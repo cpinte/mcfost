@@ -23,31 +23,43 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: install gfortran
+    - name: cache dependencies
+      id: cache-deps
+      uses: john-shaffer/cache@main     # Needed to add sudo on ubuntu runner - maybe not on macos?
+      env:
+        cache-name: cache-mcfost-dependencies
+      with:
+        path: |
+          /usr/local/Cellar/gcc/13.1.0
+          /usr/local/Cellar/hdf5/1.14.1
+          /usr/local/Cellar/cfitsio/4.3.0
+          /usr/local/Cellar/voro-dev/0.4.6+
+          /usr/local/Cellar/sprng2/2.0
+        key: ${{ runner.os }}-build-${{ env.cache-name }}
+
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install gfortran
       run: brew reinstall gcc
 
-    - name: install hdf5
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install hdf5
       run: brew install hdf5
 
-    - name: install cfitsio
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install cfitsio
       run: brew install cfitsio
 
-    - name: get custom taps needed for mcfost
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: get custom taps needed for mcfost
       run: brew tap danieljprice/all
 
-    - name: install voro++
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install voro++
       run: brew install voro-dev
 
-    - name: install sprng2
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install sprng2
       run: brew install sprng2
-
-    - name: get install locations
-      run: |
-        brew info gcc
-        brew info hdf5
-        brew info cfitsio
-        brew info voro-dev
-        brew info sprng2
 
     - name: compile mcfost
       env:
