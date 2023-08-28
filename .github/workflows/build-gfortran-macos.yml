@@ -41,6 +41,14 @@ jobs:
     - name: install sprng2
       run: brew install sprng2
 
+    - name: get install locations
+      run: |
+        brew info gcc
+        brew info hdf5
+        brew info cfitsio
+        brew info voro-dev
+        brew info sprng2
+
     - name: compile mcfost
       env:
            MCFOST_INSTALL: "/usr/local"
