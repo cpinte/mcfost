@@ -72,10 +72,10 @@ jobs:
 
     - name: install pytest
       run: |
-        pip install pytest
+        python3 -m pip install pytest
 
     - name: test current commit against reference data
       run: |
         export MCFOST_UTILS=$PWD/utils
         cd test_suite
-        pytest -v
+        python3 -m pytest -v
