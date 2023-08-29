@@ -35,8 +35,8 @@ jobs:
     - name: install gfortran
       run: sudo apt-get install gfortran
 
-    - name: prepare HDF5 environment
-      run: sudo apt-get build-dep hdf5
+    # - name: prepare HDF5 environment
+    #   run: sudo apt-get build-dep hdf5
 
     - name: install HDF5
       run: sudo apt-get install libhdf5-serial-dev
@@ -47,8 +47,8 @@ jobs:
     - name: install voro++
       run: sudo apt install voro++
 
-    - name: install sprng2
-      run: sudo apt-get install libsprng2
+    # - name: install sprng2
+    #   run: sudo apt-get install libsprng2
 
     - name: compile mcfost
       env:
@@ -56,9 +56,12 @@ jobs:
            MCFOST_NO_XGBOOST: "yes"
            SYSTEM: "gfortran"
            MCFOST_GIT: "1"
+      # run: |
+      #      cd src
+      #      make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
       run: |
-           cd src
-           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+           cd lib
+           ./install.sh
       
 
       
