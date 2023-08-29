@@ -75,17 +75,17 @@ jobs:
            gcc --version
            gfortran --version
 
-    # - name: prepare mcfost env
-    #   run: |
-    #        cd lib
-    #        ./install.sh
-    #        cd ..
+    - name: prepare mcfost env
+      run: |
+           cd lib
+           ./install.sh
+           cd ..
 
-    # - name: compile mcfost
-    #   run: |
-    #        cd src
-    #        # make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
-    #        make all
+    - name: compile mcfost
+      run: |
+           cd src
+           # make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+           make all
 
       
 
