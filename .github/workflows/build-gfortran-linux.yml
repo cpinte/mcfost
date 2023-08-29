@@ -20,7 +20,7 @@ jobs:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     env:
-      MCFOST_INSTALL: "$HOME"
+      MCFOST_INSTALL: "~"
       MCFOST_NO_XGBOOST: "yes"
       SYSTEM: "gfortran"
       MCFOST_GIT: "1"
