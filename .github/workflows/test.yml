@@ -72,7 +72,7 @@ jobs:
 
     - name: install pytest
       run: |
-        python3 -m pip install pytest
+        python3 -m pip install pytest numpy astropy
 
     - name: test current commit against reference data
       run: |
