@@ -64,6 +64,8 @@ jobs:
       run: sudo apt install gcc-12
     - name: check gcc version
       run: gcc --version
+    - name: update alternative gcc
+      run: sudo update-alternatives --config gcc
 
     # - name: prepare mcfost env
     #   run: |
