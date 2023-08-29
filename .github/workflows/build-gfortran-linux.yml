@@ -58,7 +58,8 @@ jobs:
            MCFOST_GIT: "1"
       run: |
            cd lib
-           ./install.sh
+           sudo -E bash -c 'echo $SYSTEM'
+           sudo ./install.sh
       # run: |
       #      cd src
       #      make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
