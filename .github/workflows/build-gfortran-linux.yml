@@ -25,4 +25,16 @@ jobs:
 
     - name: install gfortran
       run: sudo apt-get install gfortran
-# 
+
+    - name: install hdf5
+      run: sudo apt-get build-dep hdf5
+
+    - name: install cfitsio
+      run: sudo apt install libcfitsio-dev
+
+    - name: install voro++
+      run: sudo apt install voro++
+
+      
+
+      
