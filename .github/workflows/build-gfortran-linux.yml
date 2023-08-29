@@ -23,11 +23,14 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: install gfortran
-      run: sudo apt-get install gfortran
+    - name: update apt-get
+      run: sudo apt-get update
 
     - name: install build-essential
       run: sudo apt-get install build-essential
+      
+    - name: install gfortran
+      run: sudo apt-get install gfortran
 
     - name: install hdf5
       run: sudo apt-get build-dep hdf5
