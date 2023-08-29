@@ -41,7 +41,9 @@ jobs:
       name: add symbolic links if cache exists
       run: |
         ln -s /usr/local/Cellar/gcc/13.1.0/bin/gfortran /usr/local/bin/gfortran
-        ln -s /usr/local/Cellar/sprng2 /usr/local/sprng2
+        ln -s /usr/local/Cellar/sprng2/2.0/include /usr/local/include
+        brew install tree
+        tree /usr/local/include
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install gfortran
