@@ -41,7 +41,8 @@ jobs:
       name: update path if cache exists
       run: |
         export PATH="$PATH:/usr/local/Cellar/gcc/13.1.0/bin/"
-        ls /usr/local/Cellar/gcc/13.1.0/bin/
+        echo $PATH
+        ls -lsa /usr/local/Cellar/gcc/13.1.0/bin/
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install gfortran
