@@ -16,6 +16,7 @@ env:
   MCFOST_NO_XGBOOST: "yes"
   SYSTEM: "gfortran"
   MCFOST_GIT: "1"
+  MCFOST_UTILS: ${{ github.workspace }}/utils
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -53,7 +54,6 @@ jobs:
 
     - name: run mcfost set up (downloads additional files)
       run: |
-        export MCFOST_UTILS=$PWD/utils
         cd src
         ./mcfost -setup
         cd ..
@@ -78,6 +78,5 @@ jobs:
 
     - name: test current commit against reference data
       run: |
-        export MCFOST_UTILS=$PWD/utils
         cd test_suite
         python3 -m pytest -v
