@@ -47,6 +47,18 @@ jobs:
     - name: install voro++
       run: sudo apt install voro++
 
+    - name: install sprng2
+      run: sudo apt-get install libsprng2
+
+    - name: compile mcfost
+      env:
+           MCFOST_INSTALL: "/usr/local"
+           MCFOST_NO_XGBOOST: "yes"
+           SYSTEM: "gfortran"
+           MCFOST_GIT: "1"
+      run: |
+           cd src
+           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
       
 
       
