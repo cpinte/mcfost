@@ -58,17 +58,24 @@ jobs:
     # - name: check path
     #   run: pwd
 
-    - name: prepare mcfost env
-      run: |
-           cd lib
-           ./install.sh
-           cd ..
+    - name: check gcc version
+      run: gcc --version
+    - name: install gcc-12
+      run: sudo apt install gcc-12
+    - name: check gcc version
+      run: gcc --version
 
-    - name: compile mcfost
-      run: |
-           cd src
-           # make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
-           make all
+    # - name: prepare mcfost env
+    #   run: |
+    #        cd lib
+    #        ./install.sh
+    #        cd ..
+
+    # - name: compile mcfost
+    #   run: |
+    #        cd src
+    #        # make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+    #        make all
 
       
 
