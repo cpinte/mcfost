@@ -20,7 +20,7 @@ jobs:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     env:
-      MCFOST_INSTALL: "/home/runner/work/"
+      MCFOST_INSTALL: "/home/runner/work"
       MCFOST_NO_XGBOOST: "yes"
       SYSTEM: "gfortran"
       MCFOST_GIT: "1"
@@ -28,41 +28,41 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: remove "#" from all deb-scr lines
-      run: sudo sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list
+    # - name: remove "#" from all deb-scr lines
+    #   run: sudo sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list
 
-    - name: update apt-get
-      run: sudo apt-get update
+    # - name: update apt-get
+    #   run: sudo apt-get update
 
-    - name: install build-essential
-      run: sudo apt-get install build-essential
+    # - name: install build-essential
+    #   run: sudo apt-get install build-essential
       
-    - name: install gfortran
-      run: sudo apt-get install gfortran
+    # - name: install gfortran
+    #   run: sudo apt-get install gfortran
 
-    - name: prepare HDF5 environment
-      run: sudo apt-get build-dep hdf5
+    # - name: prepare HDF5 environment
+    #   run: sudo apt-get build-dep hdf5
 
-    - name: install HDF5
-      run: sudo apt-get install libhdf5-serial-dev
+    # - name: install HDF5
+    #   run: sudo apt-get install libhdf5-serial-dev
 
-    - name: install cfitsio
-      run: sudo apt install libcfitsio-dev
+    # - name: install cfitsio
+    #   run: sudo apt install libcfitsio-dev
 
-    - name: install voro++
-      run: sudo apt install voro++
+    # - name: install voro++
+    #   run: sudo apt install voro++
 
-    - name: install sprng2
-      run: sudo apt-get install libsprng2
+    # - name: install sprng2
+    #   run: sudo apt-get install libsprng2
 
     # - name: check path
     #   run: pwd
 
-    # - name: prepare mcfost env
-    #   run: |
-    #        cd lib
-    #        ./install.sh
-    #        cd ..
+    - name: prepare mcfost env
+      run: |
+           cd lib
+           ./install.sh
+           cd ..
 
     - name: compile mcfost
       run: |
