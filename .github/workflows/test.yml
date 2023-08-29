@@ -64,11 +64,13 @@ jobs:
         curl http://ipag.osug.fr/public/pintec/mcfost/test_data/discF_00500 -o ./test_data/discF_00500/discF_00500
         cd ..
 
-    - name: generate reference data (currently using current commit!)
+    - name: download reference data for test suite
       run: |
-        export MCFOST_UTILS=$PWD/utils
         cd test_suite
-        ./compute_test_suite.sh
+        wget http://136.186.108.129/test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        rm -rf test_data
+        tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        cd ..
 
     - name: install pytest
       run: |
