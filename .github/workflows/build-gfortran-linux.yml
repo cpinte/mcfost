@@ -58,7 +58,7 @@ jobs:
            MCFOST_GIT: "1"
       run: |
            cd lib
-           sudo -E bash -c 'echo $SYSTEM'
+           sudo export SYSTEM=gfortran
            sudo ./install.sh
       # run: |
       #      cd src
