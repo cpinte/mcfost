@@ -61,8 +61,7 @@ jobs:
            MCFOST_GIT: "1"
       run: |
            cd lib
-           sudo export SYSTEM=gfortran
-           sudo ./install.sh
+           ./install.sh
       # run: |
       #      cd src
       #      make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
