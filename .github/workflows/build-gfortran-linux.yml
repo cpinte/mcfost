@@ -23,11 +23,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    # - name: remove "#" from all deb-scr lines
-    #   run: sudo sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list
+    - name: remove "#" from all deb-scr lines
+      run: sudo sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list
 
-    # - name: update apt-get
-    #   run: sudo apt-get update
+    - name: update apt-get
+      run: sudo apt-get update
 
     - name: install build-essential
       run: sudo apt-get install build-essential
@@ -35,8 +35,8 @@ jobs:
     - name: install gfortran
       run: sudo apt-get install gfortran
 
-    # - name: prepare HDF5 environment
-    #   run: sudo apt-get build-dep hdf5
+    - name: prepare HDF5 environment
+      run: sudo apt-get build-dep hdf5
 
     # - name: install HDF5
     #   run: sudo apt-get install libhdf5-serial-dev
