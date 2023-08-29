@@ -58,12 +58,12 @@ jobs:
     # - name: check path
     #   run: pwd
 
-    - name: check gcc version
-      run: gcc --version
-    - name: install gcc-12
-      run: sudo apt install gcc-12
-    - name: check gcc version
-      run: gcc --version
+    - name: check gfortran version
+      run: gfortran --version
+    - name: install gfortran-12
+      run: sudo apt -y install gfortran-12
+    - name: check gfortran version
+      run: gfortran --version
     - name: update alternative gcc
       run: |
            sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
@@ -72,17 +72,17 @@ jobs:
     - name: check gcc version
       run: gcc --version
 
-    - name: prepare mcfost env
-      run: |
-           cd lib
-           ./install.sh
-           cd ..
+    # - name: prepare mcfost env
+    #   run: |
+    #        cd lib
+    #        ./install.sh
+    #        cd ..
 
-    - name: compile mcfost
-      run: |
-           cd src
-           # make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
-           make all
+    # - name: compile mcfost
+    #   run: |
+    #        cd src
+    #        # make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+    #        make all
 
       
 
