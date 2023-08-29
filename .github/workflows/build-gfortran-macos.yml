@@ -46,6 +46,7 @@ jobs:
         which gfortran
         which gfortran-13
         ln -s /usr/local/Cellar/gcc/13.1.0/bin/gfortran /usr/local/lib/gfortran
+        gfortran --version
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install gfortran
