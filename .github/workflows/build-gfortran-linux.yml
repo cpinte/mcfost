@@ -23,8 +23,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: update URIs in sources.list
-      run: sudo cp /etc/apt/sources.list /etc/apt/sources.list~
+    - name: remove "#" from all deb-scr lines
       run: sudo sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list
 
     - name: update apt-get
