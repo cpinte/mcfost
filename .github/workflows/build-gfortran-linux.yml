@@ -22,3 +22,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+
+    - name: install gfortran
+      run: sudo apt-get install gfortran
