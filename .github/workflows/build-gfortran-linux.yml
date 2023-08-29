@@ -29,8 +29,8 @@ jobs:
     # - name: update apt-get
     #   run: sudo apt-get update
 
-    # - name: install build-essential
-    #   run: sudo apt-get install build-essential
+    - name: install build-essential
+      run: sudo apt-get install build-essential
       
     - name: install gfortran
       run: sudo apt-get install gfortran
@@ -56,12 +56,13 @@ jobs:
            MCFOST_NO_XGBOOST: "yes"
            SYSTEM: "gfortran"
            MCFOST_GIT: "1"
-      # run: |
-      #      cd src
-      #      make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
       run: |
            cd lib
            sudo ./install.sh
+      # run: |
+      #      cd src
+      #      make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+
       
 
       
