@@ -69,6 +69,8 @@ jobs:
            sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
            sudo update-alternatives --config gcc
+    - name: check gcc version
+      run: gcc --version
 
     # - name: prepare mcfost env
     #   run: |
