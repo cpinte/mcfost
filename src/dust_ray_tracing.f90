@@ -584,8 +584,10 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
            M(:,:) = tab_mueller_pos(:,:,it,p_icell,p_lambda)*(-s11)
            M(:,4) = -M(:,4)
            M(4,:) = -M(4,:)
+           M(2,2) = -M(2,2)
            M(1,1) = s11
            !On passe à l'opposé la quatrième collonne et ligne à cause de la convention
+           !Le - M(2,2) est pour être cohérent avec les opérations effectuées dans le cas mie
 
         else
 
@@ -1217,8 +1219,10 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                        M(:,:) = tab_mueller_pos(:,:,k,p_icell,p_lambda)*(-s11)
                        M(:,4) = -M(:,4)
                        M(4,:) = -M(4,:)
+                       M(2,2) = -M(2,2)
                        M(1,1) = s11
                        !On passe à l'opposé la quatrième collonne et ligne à cause de la convention
+                       !Le - M(2,2) est pour être cohérent avec les opérations effectuées dans le cas mie
 
                     else
 
@@ -1467,8 +1471,10 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
                  M(:,:) = tab_mueller_pos(:,:,k,p_icell,p_lambda)*(-s11)
                  M(:,4) = -M(:,4)
                  M(4,:) = -M(4,:)
+                 M(2,2) = -M(2,2)
                  M(1,1) = s11
                  !On passe à l'opposé la quatrième collonne et ligne à cause de la convention
+                 !Le - M(2,2) est pour être cohérent avec les opérations effectuées dans le cas mie
 
               else
                  s11 = tab_s11_pos(k,p_icell,p_lambda)
