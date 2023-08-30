@@ -44,8 +44,7 @@ jobs:
         ln -s /usr/local/Cellar/sprng2/2.0/include/* /usr/local/include
         ln -s /usr/local/Cellar/sprng2/2.0/lib/* /usr/local/lib
         ln -s /usr/local/Cellar/voro-dev/0.4.6+/include/* /usr/local/include
-        brew install tree
-        tree /usr/local/Cellar/hdf5
+        ln -s /usr/local/Cellar/hdf5/1.14.1/include* /usr/local/include
 
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
