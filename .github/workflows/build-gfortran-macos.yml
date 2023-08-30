@@ -46,6 +46,8 @@ jobs:
         ln -s /usr/local/Cellar/voro-dev/0.4.6+/include/* /usr/local/include
         ln -s /usr/local/Cellar/hdf5/1.14.1/include/* /usr/local/include
         ln -s /usr/local/Cellar/cfitsio/4.3.0/lib/cfitsio* /usr/local/lib
+        brew install tree
+        tree /usr/local/Cellar/cfitsio
 
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
