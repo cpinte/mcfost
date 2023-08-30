@@ -82,4 +82,4 @@ jobs:
            MCFOST_GIT: "1"
       run: |
            cd src
-           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib -j 2
