@@ -195,6 +195,7 @@ module Opacity_atom
                atm%continua(kr)%alpha(:) = linear_1D_sorted(size(atm%continua(kr)%alpha_file),&
                     atm%continua(kr)%lambda_file,atm%continua(kr)%alpha_file,atm%continua(kr)%Nlambdac,&
                     tab_lambda_cont(atm%continua(kr)%Nbc:atm%continua(kr)%Nrc))
+               atm%continua(kr)%alpha(atm%continua(kr)%Nlambdac) = atm%continua(kr)%alpha_file(size(atm%continua(kr)%alpha_file))
                !to chheck the edge
             endif
 
@@ -855,9 +856,11 @@ module Opacity_atom
 
       call ftgiou(unit,status)
       call ftgiou(unit2,status)
-      open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="sequential",iostat=status)
-      open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="sequential",iostat=status)
+      open(unit, file=trim(filename_chi),form="unformatted",status='unknown',access="stream",iostat=status)
+      open(unit2, file=trim(filename_eta),form="unformatted",status='unknown',access="stream",iostat=status)
       !write wavelength first
+      write(unit,iostat=status) shape(chi_tmp)
+      write(unit2,iostat=status) shape(eta_tmp)
       write(unit,iostat=status) lambda
       write(unit2,iostat=status) lambda
       id = 1

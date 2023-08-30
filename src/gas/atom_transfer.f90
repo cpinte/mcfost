@@ -54,6 +54,7 @@ module atom_transfer
    contains
 
    subroutine alloc_tau_surface_map()
+   !TO DO: only at the centre of lines
 
       ! write(*,*) "-- Computing tau=",tau," map for atomic lines..."
       write(*,*) "  -- allocating ",n_lambda*rt_n_incl*rt_n_az*3*nb_proc*npix_x*npix_y/1024.**3," GB for tau map"
@@ -61,7 +62,9 @@ module atom_transfer
 
       return
    end subroutine alloc_tau_surface_map
+
    subroutine dealloc_tau_surface_map()
+   !TO DO: only at the centre of lines
       integer :: ibin,iaz,i,j,la
       character(len=50) :: filename
       ! real(kind=dp), allocatable :: image(:,:,:,:,:,:)
@@ -102,16 +105,15 @@ module atom_transfer
 
       write(*,*) " ** writing convergence maps..."
       unit = 100
-      open(unit, file="dloc.b",form="unformatted",status='unknown',access="sequential",iostat=status)
+      open(unit, file="dloc.b",form="unformatted",status='unknown',access="stream",iostat=status)
+      write(unit,iostat=status) n_cells
       write(unit,iostat=status) lmap
       write(unit,iostat=status) map
       close(unit)
 
       return
    end subroutine io_write_convergence_maps
-!TO DO
-!      add Trad, Tion
-!      checkpointing
+
    subroutine nlte_loop_mali()
    ! ------------------------------------------------------------------------------------ !
    ! Solve the set of statistical equilibrium equations (SEE) with the 
@@ -142,7 +144,7 @@ module atom_transfer
       logical :: l_iterate, l_iterate_ne
       
       !Ng's acceleration
-      integer, parameter :: Ng_Ndelay_init = 1 !minimal number of iterations before starting the cycle.
+      integer, parameter :: Ng_Ndelay_init = 5 !minimal number of iterations before starting the cycle.
                                                !min is 1 (so that conv_speed can be evaluated)
       real(kind=dp), parameter :: conv_speed_limit_healpix = 5d-2 !1d-3
       real(kind=dp), parameter :: conv_speed_limit_mc = 1d1!1d-1
@@ -291,6 +293,7 @@ module atom_transfer
          time_iter_avg = 0.0
          unconverged_fraction = 0.0
          unconverged_cells = 0
+         ! Jnu = 0.0_dp
 
          !***********************************************************!
          ! *************** Main convergence loop ********************!
@@ -340,7 +343,7 @@ module atom_transfer
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
                ! if (lforce_lte) l_iterate_ne = .false.
             endif
-            ! Jnu = 0.0_dp
+
             call progress_bar(0)
             !$omp parallel &
             !$omp default(none) &
@@ -716,14 +719,6 @@ module atom_transfer
             diff_old = diff
             conv_acc = conv_speed
 
-            !force convergence if there are only few unconverged cells remaining
-            if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
-               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
-                  unconverged_fraction, n_iter
-               write(*,*) " -> forcing convergence"
-               lconverged = .true.
-            endif
-            !
             if ((diff < precision).and.(.not.lcswitch_enabled))then!maxval_cswitch_atoms()==1.0_dp
             ! if ( (unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp)then
             ! if ( ((unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp).or.&
@@ -778,6 +773,16 @@ module atom_transfer
                   mod(time_iteration/60.0,60.0), mod((cpuend_iter-cpustart_iter)/60.0,60.0)
             time_iter_avg = time_iter_avg + time_iteration
             ! -> will be averaged with the number of iterations done for this step
+
+            !force convergence if there are only few unconverged cells remaining
+            ! if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
+            if ( (n_iter > maxIter/4).and.(unconverged_fraction < 5.0).or.&
+               ((unconverged_fraction < 5.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
+               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
+                  unconverged_fraction, n_iter
+               write(*,*) " -> forcing convergence"
+               lconverged = .true.
+            endif
 
 
             if (lsafe_stop) then
@@ -834,13 +839,19 @@ module atom_transfer
       if (loutput_rates) call write_rates()
 
       ! call io_write_convergence_maps(lcell_converged, diff_loc)
-      ! open(100, file="jnu.b",form="unformatted",status='unknown',access="sequential")
+      ! open(100, file="jnu.b",form="unformatted",status='unknown',access="stream")
+      ! write(100) n_lambda, n_cells
       ! write(100) tab_lambda_nm
       ! write(100) Jnu
       ! close(100); deallocate(jnu)
-      ! open(100, file="inu.b",form="unformatted",status='unknown',access="sequential")
+      ! open(100, file="inu.b",form="unformatted",status='unknown',access="stream")
+      ! write(100) n_lambda,n_rayons_max,n_cells
       ! write(100) tab_lambda_nm
-      ! write(100) healpix_weight(healpix_lorder)
+      ! if (lhealpix) then
+      !    write(100) healpix_weight(healpix_lorder)
+      ! else
+      !    write(100) 1.0/real(n_rayons,kind=dp)!n_rayons is max here at the moment
+      ! endif
       ! write(100) iloc
       ! deallocate(iloc); close(100)
       call dealloc_nlte_var()
@@ -1308,7 +1319,7 @@ module atom_transfer
       real(kind=dp), dimension(3,nb_proc) :: pixelcorner
       real(kind=dp):: taille_pix
       integer :: i,j, id, npix_x_max, n_iter_min, n_iter_max
-      integer, parameter :: n_rad_RT = 200, n_phi_RT = 150
+      integer, parameter :: n_rad_RT = 300, n_phi_RT = 200
       real(kind=dp), dimension(n_rad_RT) :: tab_r
       real(kind=dp):: rmin_RT, rmax_RT, fact_r, r, phi, fact_A, cst_phi
       integer :: ri_RT, phi_RT
@@ -1365,7 +1376,7 @@ module atom_transfer
          j = 1
          lresolved = .false.
 
-         rmin_RT = 0.001_dp * Rmin!max(w*0.9_dp,0.05_dp) * Rmin
+         rmin_RT = 1d-6 !max(w*0.9_dp,0.05_dp) * Rmin
          rmax_RT = Rmax * 1.0_dp ! Rmax  * 2.0_dp
 
          tab_r(1) = rmin_RT
