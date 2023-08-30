@@ -46,6 +46,7 @@ jobs:
         ln -s /usr/local/Cellar/voro-dev/0.4.6+/include/* /usr/local/include
         ln -s /usr/local/Cellar/voro-dev/0.4.6+/lib/libvoro++* /usr/local/lib
         ln -s /usr/local/Cellar/hdf5/1.14.1/include/* /usr/local/include
+        ln -s /usr/local/Cellar/hdf5/1.14.1/lib/lib* /usr/local/lib
         ln -s /usr/local/Cellar/cfitsio/4.3.0/lib/libcfitsio* /usr/local/lib
 
 
