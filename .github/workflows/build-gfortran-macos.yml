@@ -45,6 +45,7 @@ jobs:
         ln -s /usr/local/Cellar/sprng2/2.0/lib/* /usr/local/lib
         mkdir /usr/local/include/voro++
         ln -s /usr/local/Cellar/voro-dev/0.4.6+/include/* /usr/local/include/voro++/
+        ls -lsa /usr/local/Cellar/voro-dev/0.4.6+/include/
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install gfortran
