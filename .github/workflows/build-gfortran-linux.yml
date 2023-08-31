@@ -55,6 +55,18 @@ jobs:
     # - name: install sprng2
     #   run: sudo apt-get install libsprng2
 
+    # Cache dependencies for mcfost to avoid downloading/installing them each time this workflow runs
+    - name: cache dependencies
+      id: cache-deps
+      uses: john-shaffer/cache@main     # Need this version to unpack the cache tar with sudo
+      env:
+        cache-name: cache-mcfost-dependencies
+      with:
+        path: |
+          /home/runner/work/include
+          /home/runner/work/lib
+        key: ${{ runner.os }}-build-${{ env.cache-name }}
+
     - name: update gcc to v12 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
       run: |
            sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
@@ -67,7 +79,9 @@ jobs:
     #        gcc --version
     #        gfortran --version
 
-    - name: prepare mcfost environment
+    # Only do this (lengthy) setup if dependency cache not found
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: prepare mcfost environment
       run: |
            cd lib
            ./install.sh
