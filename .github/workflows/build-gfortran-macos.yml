@@ -43,7 +43,6 @@ jobs:
           /usr/local/Cellar/cfitsio/4.3.0
           /usr/local/Cellar/voro-dev/0.4.6+
           /usr/local/Cellar/sprng2/2.0
-          ~/.cache/pip
         key: ${{ runner.os }}-build-${{ env.cache-name }}
 
       # Restoring the brew installs from cache doesn't put files where mcfost expects
@@ -110,8 +109,12 @@ jobs:
         tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
         cd ..
 
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
     - name: install pytest
-      run: pip install pytest numpy astropy
+      run: python3 -m pip install pytest numpy astropy
 
     - name: test current commit against reference data
       run: |
