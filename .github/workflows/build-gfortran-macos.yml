@@ -115,7 +115,7 @@ jobs:
         cache: 'pip'
 
     - name: install pytest requirements
-      run: python3 -m pip install test_suite/requirements.txt
+      run: python3 -m pip install -r test_suite/requirements.txt
 
     - name: test current commit against reference data
       run: |
