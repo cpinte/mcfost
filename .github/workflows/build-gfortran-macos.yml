@@ -49,8 +49,7 @@ jobs:
     - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
       name: add brew links if cache exists
       run: |
-        brew link gcc
-        brew link gfortran
+        brew unlink gcc && brew link gcc
         brew link cfitsio
         brew link voro-dev
         brew link sprng2
