@@ -59,29 +59,29 @@ jobs:
         ln -s /usr/local/Cellar/hdf5/1.14.1/lib/lib* /usr/local/lib
         ln -s /usr/local/Cellar/cfitsio/4.3.0/lib/libcfitsio* /usr/local/lib
 
-      # Only do these install steps if no cache is found
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install gfortran
-      run: brew reinstall gcc
+    #   # Only do these install steps if no cache is found
+    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+    #   name: install gfortran
+    #   run: brew reinstall gcc
 
-    - name: install hdf5
-      run: brew install hdf5
+    # - name: install hdf5
+    #   run: brew install hdf5
 
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install cfitsio
-      run: brew install cfitsio
+    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+    #   name: install cfitsio
+    #   run: brew install cfitsio
 
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: get custom taps needed for mcfost
-      run: brew tap danieljprice/all
+    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+    #   name: get custom taps needed for mcfost
+    #   run: brew tap danieljprice/all
 
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install voro++
-      run: brew install voro-dev
+    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+    #   name: install voro++
+    #   run: brew install voro-dev
 
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install sprng2
-      run: brew install sprng2
+    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+    #   name: install sprng2
+    #   run: brew install sprng2
 
     # - name: compile mcfost
     #   run: |
