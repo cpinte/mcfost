@@ -6,9 +6,9 @@ name: build-gfortran-linux
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    # branches: [ master ]
+    branches: [ master ]
   pull_request:
-    # branches: [ master ]
+    branches: [ master ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -28,33 +28,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    # - name: remove "#" from all deb-scr lines
-    #   run: sudo sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list
-
-    # - name: update apt-get
-    #   run: sudo apt-get update
-
-    # - name: install build-essential
-    #   run: sudo apt-get install build-essential
-      
-    # - name: install gfortran
-    #   run: sudo apt-get install gfortran
-
-    # - name: prepare HDF5 environment
-    #   run: sudo apt-get build-dep hdf5
-
-    # - name: install HDF5
-    #   run: sudo apt-get install libhdf5-serial-dev
-
-    # - name: install cfitsio
-    #   run: sudo apt install libcfitsio-dev
-
-    # - name: install voro++
-    #   run: sudo apt install voro++
-
-    # - name: install sprng2
-    #   run: sudo apt-get install libsprng2
-
     # Cache dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
       id: cache-deps
@@ -73,11 +46,6 @@ jobs:
            sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
            sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-12 12
            sudo update-alternatives --config gcc
-           
-    # - name: check gcc version
-    #   run: |
-    #        gcc --version
-    #        gfortran --version
 
     # Only do this (lengthy) setup if dependency cache not found
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
@@ -91,7 +59,3 @@ jobs:
       run: |
            cd src
            make all
-
-      
-
-      
