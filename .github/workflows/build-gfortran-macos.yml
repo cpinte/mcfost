@@ -39,7 +39,6 @@ jobs:
       with:
         path: |
           /usr/local/Cellar/gcc/13.1.0
-          /usr/local/Cellar/hdf5/1.14.1
           /usr/local/Cellar/cfitsio/4.3.0
           /usr/local/Cellar/voro-dev/0.4.6+
           /usr/local/Cellar/sprng2/2.0
