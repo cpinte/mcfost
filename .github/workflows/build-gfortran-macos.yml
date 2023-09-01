@@ -112,9 +112,13 @@ jobs:
         tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
         cd ..
 
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip' # caching pip dependencies
+
     - name: install pytest
-      run: |
-        python3 -m pip install pytest numpy astropy
+      run: pip install pytest numpy astropy
 
     - name: test current commit against reference data
       run: |
