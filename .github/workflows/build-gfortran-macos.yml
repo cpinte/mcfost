@@ -59,55 +59,55 @@ jobs:
         ln -s /usr/local/Cellar/hdf5/1.14.1/lib/lib* /usr/local/lib
         ln -s /usr/local/Cellar/cfitsio/4.3.0/lib/libcfitsio* /usr/local/lib
 
-    #   # Only do these install steps if no cache is found
-    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-    #   name: install gfortran
-    #   run: brew reinstall gcc
+      # Only do these install steps if no cache is found
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install gfortran
+      run: brew reinstall gcc
 
-    # - name: install hdf5
-    #   run: brew install hdf5
+    - name: install hdf5
+      run: brew install hdf5
 
-    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-    #   name: install cfitsio
-    #   run: brew install cfitsio
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install cfitsio
+      run: brew install cfitsio
 
-    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-    #   name: get custom taps needed for mcfost
-    #   run: brew tap danieljprice/all
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: get custom taps needed for mcfost
+      run: brew tap danieljprice/all
 
-    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-    #   name: install voro++
-    #   run: brew install voro-dev
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install voro++
+      run: brew install voro-dev
 
-    # - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-    #   name: install sprng2
-    #   run: brew install sprng2
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install sprng2
+      run: brew install sprng2
 
-    # - name: compile mcfost
-    #   run: |
-    #     cd src
-    #     make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
-    #     cd ..
+    - name: compile mcfost
+      run: |
+        cd src
+        make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+        cd ..
 
-    # - name: run mcfost set up (downloads additional files)
-    #   run: |
-    #     cd src
-    #     ./mcfost -setup
-    #     cd ..
+    - name: run mcfost set up (downloads additional files)
+      run: |
+        cd src
+        ./mcfost -setup
+        cd ..
 
-    # - name: download files for test suite
-    #   run: |
-    #     cd test_suite
-    #     curl http://ipag.osug.fr/public/pintec/mcfost/test_data/discF_00500 -o ./test_data/discF_00500/discF_00500
-    #     cd ..
+    - name: download files for test suite
+      run: |
+        cd test_suite
+        curl http://ipag.osug.fr/public/pintec/mcfost/test_data/discF_00500 -o ./test_data/discF_00500/discF_00500
+        cd ..
 
-    # - name: download reference data for test suite
-    #   run: |
-    #     cd test_suite
-    #     wget http://136.186.108.129/test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
-    #     rm -rf test_data
-    #     tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
-    #     cd ..
+    - name: download reference data for test suite
+      run: |
+        cd test_suite
+        wget http://136.186.108.129/test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        rm -rf test_data
+        tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        cd ..
 
     - uses: actions/setup-python@v4
       with:
