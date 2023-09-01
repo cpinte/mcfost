@@ -50,6 +50,7 @@ jobs:
       name: add brew links if cache exists
       run: |
         brew link gcc
+        brew link gfortran
         brew link cfitsio
         brew link voro-dev
         brew link sprng2
