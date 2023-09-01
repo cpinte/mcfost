@@ -46,6 +46,10 @@ jobs:
           /usr/local/Cellar/szip/2.1.1_1
         key: ${{ runner.os }}-build-${{ env.cache-name }}
 
+    - name: debug
+      run: |
+        ls -latrh /usr/local/Cellar/szip
+
       # Restoring the brew installs from cache doesn't put files where mcfost expects
       # Manually create symlinks so the compiler can find everything
     - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
