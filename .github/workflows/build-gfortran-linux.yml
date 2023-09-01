@@ -42,20 +42,20 @@ jobs:
 
     - name: update gcc to v12 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
       run: |
-           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
-           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
-           sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-12 12
-           sudo update-alternatives --config gcc
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
+        sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-12 12
+        sudo update-alternatives --config gcc
 
     # Only do this (lengthy) setup if dependency cache not found
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: prepare mcfost environment
       run: |
-           cd lib
-           ./install.sh
-           cd ..
+        cd lib
+        ./install.sh
+        cd ..
 
     - name: compile mcfost
       run: |
-           cd src
-           make all
+        cd src
+        make all
