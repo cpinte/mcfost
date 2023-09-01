@@ -79,10 +79,10 @@ jobs:
 
     - name: compile mcfost
       env:
-           MCFOST_INSTALL: "/usr/local"
-           MCFOST_NO_XGBOOST: "yes"
-           SYSTEM: "gfortran"
-           MCFOST_GIT: "1"
+        MCFOST_INSTALL: "/usr/local"
+        MCFOST_NO_XGBOOST: "yes"
+        SYSTEM: "gfortran"
+        MCFOST_GIT: "1"
       run: |
-           cd src
-           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+        cd src
+        make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
