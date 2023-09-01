@@ -11,6 +11,13 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+env:
+  MCFOST_INSTALL: "/usr/local"
+  MCFOST_NO_XGBOOST: "yes"
+  SYSTEM: "gfortran"
+  MCFOST_GIT: "1"
+  MCFOST_UTILS: ${{ github.workspace }}/utils
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
@@ -78,11 +85,36 @@ jobs:
       run: brew install sprng2
 
     - name: compile mcfost
-      env:
-        MCFOST_INSTALL: "/usr/local"
-        MCFOST_NO_XGBOOST: "yes"
-        SYSTEM: "gfortran"
-        MCFOST_GIT: "1"
       run: |
         cd src
         make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+        cd ..
+
+    - name: run mcfost set up (downloads additional files)
+      run: |
+        cd src
+        ./mcfost -setup
+        cd ..
+
+    - name: download files for test suite
+      run: |
+        cd test_suite
+        curl http://ipag.osug.fr/public/pintec/mcfost/test_data/discF_00500 -o ./test_data/discF_00500/discF_00500
+        cd ..
+
+    - name: download reference data for test suite
+      run: |
+        cd test_suite
+        wget http://136.186.108.129/test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        rm -rf test_data
+        tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        cd ..
+
+    - name: install pytest
+      run: |
+        python3 -m pip install pytest numpy astropy
+
+    - name: test current commit against reference data
+      run: |
+        cd test_suite
+        python3 -m pytest -v
