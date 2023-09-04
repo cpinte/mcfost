@@ -19,9 +19,11 @@ jobs:
 
   linux:
     runs-on: ubuntu-latest
-    container: quay.io/pypa/manylinux2014_x86_64
+    container: quay.io/pypa/manylinux_2_28_x86_64
     steps:
       - uses: actions/checkout@v2
-      - run: dnf install gcc-toolset-12 sudo
+      - run: dnf install -y sudo wget epel-release
+      - run: dnf update -y
+      - run: dnf install -y hdf5-static
       - uses: ./.github/actions/build/linux
       - uses: ./.github/actions/test

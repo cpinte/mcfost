@@ -2,6 +2,7 @@ name: "linux"
 description: "Build linux"
 
 # Note: needs GCC > 12, and sudo, wherever you're building
+# Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
 
 runs:
   using: "composite"
@@ -18,14 +19,6 @@ runs:
           /home/runner/work/lib
         key: ${{ runner.os }}-build-${{ env.cache-name }}
 
-    - name: update gcc to v12 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
-      shell: bash
-      run: |
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
-        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
-        sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-12 12
-        sudo update-alternatives --config gcc
-
     # Only do this (lengthy) setup if dependency cache not found
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: prepare mcfost environment
@@ -37,7 +30,7 @@ runs:
         MCFOST_GIT: "1"
       run: |
         cd lib
-        ./install.sh
+        SKIP_HDF5=yes ./install.sh
         cd ..
 
     - name: compile mcfost
