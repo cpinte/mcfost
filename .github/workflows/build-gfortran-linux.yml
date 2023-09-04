@@ -50,7 +50,7 @@ jobs:
 
     # Only do this (lengthy) setup if dependency cache not found
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: prepare mcfost environment
+      name: install mcfost dependencies
       run: |
         cd lib
         ./install.sh
@@ -61,11 +61,11 @@ jobs:
         cd src
         make all
 
-        - name: run mcfost set up (downloads additional files)
-        run: |
-          cd src
-          ./mcfost -setup
-          cd ..
+    - name: run mcfost set up (downloads additional files)
+      run: |
+        cd src
+        ./mcfost -setup
+        cd ..
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: download reference data for test suite
