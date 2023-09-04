@@ -1,4 +1,4 @@
-name: build-gfortran-macos
+name: gfortran-macos
 
 # Controls when the action will run.
 on:
@@ -20,9 +20,7 @@ env:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  build-test:
     runs-on: macos-latest
 
     steps:
