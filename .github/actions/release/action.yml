@@ -1,0 +1,27 @@
+name: "release"
+description: "release"
+
+inputs:
+  arch_name:
+    description: "architecture name"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Add binary to release
+      if: ${{ github.event_name == 'release' }}
+      uses: shogo82148/actions-upload-release-asset@v1.6.6
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: src/mcfost
+        asset_name: ${{ join(format('mcfost {0}'', inputs.arch_name), '_') }}
+
+    - name: Add library to release
+      if: ${{ github.event_name == 'release' }}
+      uses: shogo82148/actions-upload-release-asset@v1.6.6
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: src/libmcfost.a
+        asset_name: ${{ format('{0}.a', join(format('libmcfost {0}', inputs.arch_name), '_')) }}
