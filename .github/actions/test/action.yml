@@ -15,12 +15,14 @@ runs:
         key: test-reference
 
     - name: run mcfost set up (downloads additional files)
+      shell: bash
       run: |
         cd src
         ./mcfost -setup
         cd ..
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      shell: bash
       name: download reference data for test suite
       run: |
         cd test_suite
@@ -35,9 +37,11 @@ runs:
         cache: 'pip'
 
     - name: install pytest requirements
+      shell: bash
       run: python3 -m pip install -r test_suite/requirements.txt
 
     - name: test current commit against reference data
+      shell: bash
       run: |
         cd test_suite
         python3 -m pytest -v

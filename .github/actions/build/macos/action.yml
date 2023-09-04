@@ -23,6 +23,7 @@ runs:
       # Symlinks to the path need to be created again after the cache is restored
     - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
       name: add brew links if cache exists
+      shell: bash
       run: |
         brew unlink gcc && brew link gcc
         brew link cfitsio
