@@ -28,6 +28,11 @@ runs:
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: prepare mcfost environment
       shell: bash
+      env:
+        MCFOST_INSTALL: "/home/runner/work"
+        MCFOST_NO_XGBOOST: "yes"
+        SYSTEM: "gfortran"
+        MCFOST_GIT: "1"
       run: |
         cd lib
         ./install.sh
@@ -35,6 +40,11 @@ runs:
 
     - name: compile mcfost
       shell: bash
+      env:
+        MCFOST_INSTALL: "/home/runner/work"
+        MCFOST_NO_XGBOOST: "yes"
+        SYSTEM: "gfortran"
+        MCFOST_GIT: "1"
       run: |
         cd src
         make all
