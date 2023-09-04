@@ -13,6 +13,8 @@ runs:
 
     - name: run mcfost set up (downloads additional files)
       shell: bash
+      env:
+        MCFOST_UTILS: ${{ github.workspace }}/utils
       run: |
         cd src
         ./mcfost -setup
@@ -39,6 +41,8 @@ runs:
 
     - name: test current commit against reference data
       shell: bash
+      env:
+        MCFOST_UTILS: ${{ github.workspace }}/utils
       run: |
         cd test_suite
         python3 -m pytest -v
