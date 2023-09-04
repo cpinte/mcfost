@@ -10,13 +10,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-macos:
+  macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/build/macos
 
-  build-linux:
+  linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
