@@ -1,6 +1,8 @@
 name: "linux"
 description: "Build linux"
 
+# Note: needs GCC > 12, and sudo, wherever you're building
+
 runs:
   using: "composite"
   steps:
@@ -19,10 +21,10 @@ runs:
     - name: update gcc to v12 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
       shell: bash
       run: |
-        update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
-        update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
-        update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-12 12
-        update-alternatives --config gcc
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
+        sudo update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-12 12
+        sudo update-alternatives --config gcc
 
     # Only do this (lengthy) setup if dependency cache not found
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
