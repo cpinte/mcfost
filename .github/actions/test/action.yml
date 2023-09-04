@@ -1,0 +1,48 @@
+name: "test"
+description: "Test mcfost"
+
+runs:
+  using: "composite"
+  steps:
+    - name: cache reference data
+      id: cache-deps
+      uses: actions/cache@v3
+      with:
+        path: test_suite/test_data
+        key: test-reference
+
+    - name: run mcfost set up (downloads additional files)
+      shell: bash
+      env:
+        MCFOST_UTILS: ${{ github.workspace }}/utils
+      run: |
+        cd src
+        ./mcfost -setup
+        cd ..
+
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      shell: bash
+      name: download reference data for test suite
+      run: |
+        cd test_suite
+        wget http://136.186.108.129/test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        rm -rf test_data
+        tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        cd ..
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: install pytest requirements
+      shell: bash
+      run: python3 -m pip install -r test_suite/requirements.txt
+
+    - name: test current commit against reference data
+      shell: bash
+      env:
+        MCFOST_UTILS: ${{ github.workspace }}/utils
+      run: |
+        cd test_suite
+        python3 -m pytest -v

@@ -1,4 +1,4 @@
-name: build
+name: build-test
 
 on:
   push:
@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/build/macos
+      - uses: ./.github/actions/test
 
   linux:
     runs-on: ubuntu-latest
@@ -23,3 +24,4 @@ jobs:
       - uses: actions/checkout@v2
       - run: dnf install gcc-toolset-12 sudo
       - uses: ./.github/actions/build/linux
+      - uses: ./.github/actions/test
