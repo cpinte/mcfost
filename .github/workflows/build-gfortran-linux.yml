@@ -1,3 +1,5 @@
+# This is a basic workflow to help you get started with Actions
+
 name: build-gfortran-linux
 
 # Controls when the action will run.
@@ -7,8 +9,6 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-  release:
-    types: [ published ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -59,19 +59,3 @@ jobs:
       run: |
         cd src
         make all
-
-    - name: add binary to release
-      if: ${{ github.event_name == 'release' }}
-      uses: shogo82148/actions-upload-release-asset@v1.6.6
-      with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: src/mcfost
-          asset_name: mcfost_linux-x86_64
-
-    - name: add library to release
-      if: ${{ github.event_name == 'release' }}
-      uses: shogo82148/actions-upload-release-asset@v1.6.6
-      with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: src/libmcfost.a
-          asset_name: libmcfost_linux-x86_64.a
