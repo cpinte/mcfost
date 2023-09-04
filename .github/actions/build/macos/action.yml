@@ -15,26 +15,19 @@ runs:
       with:
         path: |
           /usr/local/Cellar/gcc/13.1.0
-          /usr/local/Cellar/hdf5/1.14.1
           /usr/local/Cellar/cfitsio/4.3.0
           /usr/local/Cellar/voro-dev/0.4.6+
           /usr/local/Cellar/sprng2/2.0
         key: ${{ runner.os }}-build-${{ env.cache-name }}
 
-      # Restoring the brew installs from cache doesn't put files where mcfost expects
-      # Manually create symlinks so the compiler can find everything
+      # Symlinks to the path need to be created again after the cache is restored
     - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
-      name: add symbolic links if cache exists
-      shell: bash
+      name: add brew links if cache exists
       run: |
-        ln -s /usr/local/Cellar/gcc/13.1.0/bin/gfortran /usr/local/bin/gfortran
-        ln -s /usr/local/Cellar/sprng2/2.0/include/* /usr/local/include
-        ln -s /usr/local/Cellar/sprng2/2.0/lib/* /usr/local/lib
-        ln -s /usr/local/Cellar/voro-dev/0.4.6+/include/* /usr/local/include
-        ln -s /usr/local/Cellar/voro-dev/0.4.6+/lib/libvoro++* /usr/local/lib
-        ln -s /usr/local/Cellar/hdf5/1.14.1/include/* /usr/local/include
-        ln -s /usr/local/Cellar/hdf5/1.14.1/lib/lib* /usr/local/lib
-        ln -s /usr/local/Cellar/cfitsio/4.3.0/lib/libcfitsio* /usr/local/lib
+        brew unlink gcc && brew link gcc
+        brew link cfitsio
+        brew link voro-dev
+        brew link sprng2
 
       # Only do these install steps if no cache is found
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
@@ -42,8 +35,7 @@ runs:
       shell: bash
       run: brew reinstall gcc
 
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install hdf5
+    - name: install hdf5
       shell: bash
       run: brew install hdf5
 
