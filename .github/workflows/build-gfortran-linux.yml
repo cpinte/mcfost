@@ -1,12 +1,12 @@
 # This is a basic workflow to help you get started with Actions
 
-name: build-gfortran-linux
+name: gfortran-linux
 
 # Controls when the action will run.
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   push:
-    branches: [ master ]
+    # branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -16,7 +16,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build:
+  build-test:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     env:
@@ -38,6 +38,7 @@ jobs:
         path: |
           /home/runner/work/include
           /home/runner/work/lib
+          test_suite/test_data
         key: ${{ runner.os }}-build-${{ env.cache-name }}
 
     - name: update gcc to v12 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
@@ -59,3 +60,31 @@ jobs:
       run: |
         cd src
         make all
+
+        - name: run mcfost set up (downloads additional files)
+        run: |
+          cd src
+          ./mcfost -setup
+          cd ..
+
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: download reference data for test suite
+      run: |
+        cd test_suite
+        wget http://136.186.108.129/test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        rm -rf test_data
+        tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        cd ..
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: install pytest requirements
+      run: python3 -m pip install -r test_suite/requirements.txt
+
+    - name: test current commit against reference data
+      run: |
+        cd test_suite
+        python3 -m pytest -v
