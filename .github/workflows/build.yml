@@ -14,10 +14,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: ./.github/actions/build-macos
+      - uses: ./.github/actions/build/macos
 
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: ./.github/actions/build-linux
+      - uses: ./.github/actions/build/linux

@@ -1,5 +1,5 @@
-name: "build-linux"
-description: "build linux"
+name: "linux"
+description: "Build linux"
 
 runs:
   using: "composite"
