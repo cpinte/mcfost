@@ -8,10 +8,7 @@ runs:
       id: cache-deps
       uses: actions/cache@v3
       with:
-        path: |
-          /home/runner/work/include
-          /home/runner/work/lib
-          test_suite/test_data
+        path: test_suite/test_data
         key: test-reference
 
     - name: run mcfost set up (downloads additional files)
