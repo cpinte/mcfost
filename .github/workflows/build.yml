@@ -2,7 +2,7 @@ name: build-test
 
 on:
   push:
-    branches: [ master ]
+    # branches: [ master ] TODO: uncomment this
   pull_request:
     branches: [ master ]
 
