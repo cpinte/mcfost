@@ -24,6 +24,7 @@ jobs:
       MCFOST_NO_XGBOOST: "yes"
       SYSTEM: "gfortran"
       MCFOST_GIT: "1"
+      MCFOST_UTILS: ${{ github.workspace }}/utils
 
     steps:
     - uses: actions/checkout@v2
