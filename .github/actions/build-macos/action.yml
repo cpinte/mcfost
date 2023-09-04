@@ -25,6 +25,7 @@ runs:
       # Manually create symlinks so the compiler can find everything
     - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
       name: add symbolic links if cache exists
+      shell: bash
       run: |
         ln -s /usr/local/Cellar/gcc/13.1.0/bin/gfortran /usr/local/bin/gfortran
         ln -s /usr/local/Cellar/sprng2/2.0/include/* /usr/local/include
@@ -38,26 +39,32 @@ runs:
       # Only do these install steps if no cache is found
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install gfortran
+      shell: bash
       run: brew reinstall gcc
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install hdf5
+      shell: bash
       run: brew install hdf5
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install cfitsio
+      shell: bash
       run: brew install cfitsio
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: get custom taps needed for mcfost
+      shell: bash
       run: brew tap danieljprice/all
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install voro++
+      shell: bash
       run: brew install voro-dev
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install sprng2
+      shell: bash
       run: brew install sprng2
 
     - name: compile mcfost
@@ -66,6 +73,7 @@ runs:
         MCFOST_NO_XGBOOST: "yes"
         SYSTEM: "gfortran"
         MCFOST_GIT: "1"
+      shell: bash
       run: |
         cd src
         make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
