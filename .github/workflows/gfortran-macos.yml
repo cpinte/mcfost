@@ -43,8 +43,7 @@ jobs:
           test_suite/test_data
         key: ${{ runner.os }}-build-${{ env.cache-name }}
 
-      # Restoring the brew installs from cache doesn't put files where mcfost expects
-      # Manually create symlinks so the compiler can find everything
+      # Symlinks to the path need to be created again after the cache is restored
     - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
       name: add brew links if cache exists
       run: |
