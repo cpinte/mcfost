@@ -1,4 +1,4 @@
-name: build-gfortran-macos
+name: gfortran-macos
 
 # Controls when the action will run.
 on:
@@ -11,11 +11,16 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+env:
+  MCFOST_INSTALL: "/usr/local"
+  MCFOST_NO_XGBOOST: "yes"
+  SYSTEM: "gfortran"
+  MCFOST_GIT: "1"
+  MCFOST_UTILS: ${{ github.workspace }}/utils
+
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  build-test:
     runs-on: macos-latest
 
     steps:
@@ -32,33 +37,27 @@ jobs:
       with:
         path: |
           /usr/local/Cellar/gcc/13.1.0
-          /usr/local/Cellar/hdf5/1.14.1
           /usr/local/Cellar/cfitsio/4.3.0
           /usr/local/Cellar/voro-dev/0.4.6+
           /usr/local/Cellar/sprng2/2.0
+          test_suite/test_data
         key: ${{ runner.os }}-build-${{ env.cache-name }}
 
-      # Restoring the brew installs from cache doesn't put files where mcfost expects
-      # Manually create symlinks so the compiler can find everything
+      # Symlinks to the path need to be created again after the cache is restored
     - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
-      name: add symbolic links if cache exists
+      name: add brew links if cache exists
       run: |
-        ln -s /usr/local/Cellar/gcc/13.1.0/bin/gfortran /usr/local/bin/gfortran
-        ln -s /usr/local/Cellar/sprng2/2.0/include/* /usr/local/include
-        ln -s /usr/local/Cellar/sprng2/2.0/lib/* /usr/local/lib
-        ln -s /usr/local/Cellar/voro-dev/0.4.6+/include/* /usr/local/include
-        ln -s /usr/local/Cellar/voro-dev/0.4.6+/lib/libvoro++* /usr/local/lib
-        ln -s /usr/local/Cellar/hdf5/1.14.1/include/* /usr/local/include
-        ln -s /usr/local/Cellar/hdf5/1.14.1/lib/lib* /usr/local/lib
-        ln -s /usr/local/Cellar/cfitsio/4.3.0/lib/libcfitsio* /usr/local/lib
+        brew unlink gcc && brew link gcc
+        brew link cfitsio
+        brew link voro-dev
+        brew link sprng2
 
       # Only do these install steps if no cache is found
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       name: install gfortran
       run: brew reinstall gcc
 
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install hdf5
+    - name: install hdf5
       run: brew install hdf5
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
@@ -78,11 +77,35 @@ jobs:
       run: brew install sprng2
 
     - name: compile mcfost
-      env:
-           MCFOST_INSTALL: "/usr/local"
-           MCFOST_NO_XGBOOST: "yes"
-           SYSTEM: "gfortran"
-           MCFOST_GIT: "1"
       run: |
-           cd src
-           make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+        cd src
+        make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+        cd ..
+
+    - name: run mcfost set up (downloads additional files)
+      run: |
+        cd src
+        ./mcfost -setup
+        cd ..
+
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: download reference data for test suite
+      run: |
+        cd test_suite
+        wget http://136.186.108.129/test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        rm -rf test_data
+        tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        cd ..
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: install pytest requirements
+      run: python3 -m pip install -r test_suite/requirements.txt
+
+    - name: test current commit against reference data
+      run: |
+        cd test_suite
+        python3 -m pytest -v
