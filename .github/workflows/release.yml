@@ -1,0 +1,51 @@
+name: release
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/build/macos
+
+      - name: add binary to release
+        if: ${{ github.event_name == 'release' }}
+        uses: shogo82148/actions-upload-release-asset@v1.6.6
+        with:
+            upload_url: ${{ github.event.release.upload_url }}
+            asset_path: src/mcfost
+            asset_name: mcfost_macos
+
+      - name: add library to release
+        if: ${{ github.event_name == 'release' }}
+        uses: shogo82148/actions-upload-release-asset@v1.6.6
+        with:
+            upload_url: ${{ github.event.release.upload_url }}
+            asset_path: src/libmcfost.a
+            asset_name: libmcfost_macos.a
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/actions/build/linux
+
+      - name: add binary to release
+        if: ${{ github.event_name == 'release' }}
+        uses: shogo82148/actions-upload-release-asset@v1.6.6
+        with:
+            upload_url: ${{ github.event.release.upload_url }}
+            asset_path: src/mcfost
+            asset_name: mcfost_linux-x86_64
+
+      - name: add library to release
+        if: ${{ github.event_name == 'release' }}
+        uses: shogo82148/actions-upload-release-asset@v1.6.6
+        with:
+            upload_url: ${{ github.event.release.upload_url }}
+            asset_path: src/libmcfost.a
+            asset_name: libmcfost_linux-x86_64.a
