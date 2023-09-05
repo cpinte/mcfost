@@ -20,26 +20,17 @@ runs:
         key: ${{ runner.os }}-build-${{ env.cache-name }}
 
     # Only do this (lengthy) setup if dependency cache not found
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: prepare mcfost environment
+    - name: prepare mcfost environment
+      if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       shell: bash
-      env:
-        MCFOST_INSTALL: "/home/runner/work"
-        MCFOST_NO_XGBOOST: "yes"
-        SYSTEM: "gfortran"
-        MCFOST_GIT: "1"
       run: |
-        cd lib
-        SKIP_HDF5=yes ./install.sh
-        cd ..
+        export MCFOST_INSTALL=$PWD
+        cd lib/
+        ./install.sh
 
     - name: compile mcfost
       shell: bash
-      env:
-        MCFOST_INSTALL: "/home/runner/work"
-        MCFOST_NO_XGBOOST: "yes"
-        SYSTEM: "gfortran"
-        MCFOST_GIT: "1"
       run: |
-        cd src
+        export MCFOST_INSTALL=$PWD
+        cd src/
         make all

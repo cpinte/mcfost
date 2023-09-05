@@ -9,6 +9,12 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+env:
+  MCFOST_NO_XGBOOST: yes
+  SYSTEM: gfortran
+  MCFOST_GIT: "1"
+  SKIP_HDF5: yes
+
 jobs:
   macos:
     runs-on: macos-latest
@@ -22,7 +28,8 @@ jobs:
     container: quay.io/pypa/manylinux_2_28_x86_64
     steps:
       - uses: actions/checkout@v2
-      - run: |
+      - name: install hdf5
+        run: |
           dnf install -y sudo wget epel-release
           dnf install -y hdf5-static
       - uses: ./.github/actions/build/linux
