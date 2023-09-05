@@ -26,11 +26,15 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux_2_28_x86_64
+    env:
+      HDF5_DIR: /usr
     steps:
       - uses: actions/checkout@v2
       - name: install hdf5
         run: |
           dnf install -y sudo wget epel-release
           dnf install -y hdf5-static
+          cd /usr/include
+          ln -s /usr/lib64/gfortran/modules/* .
       - uses: ./.github/actions/build/linux
       - uses: ./.github/actions/test
