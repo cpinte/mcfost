@@ -36,5 +36,6 @@ jobs:
           dnf install -y hdf5-static
           cd /usr/include
           ln -s /usr/lib64/gfortran/modules/* .
+      - run: git config --global --add safe.directory $PWD
       - uses: ./.github/actions/build/linux
       - uses: ./.github/actions/test
