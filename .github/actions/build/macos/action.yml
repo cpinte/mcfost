@@ -10,60 +10,42 @@ runs:
     - name: cache dependencies
       id: cache-deps
       uses: actions/cache@v3
-      env:
-        cache-name: cache-mcfost-dependencies
       with:
         path: |
-          /usr/local/Cellar/gcc/13.1.0
-          /usr/local/Cellar/cfitsio/4.3.0
-          /usr/local/Cellar/voro-dev/0.4.6+
-          /usr/local/Cellar/sprng2/2.0
-        key: ${{ runner.os }}-build-${{ env.cache-name }}
+          /usr/local/Cellar/gcc/
+          /usr/local/Cellar/cfitsio/
+          /usr/local/Cellar/voro-dev/
+          /usr/local/Cellar/sprng2/
+        key: mcfost-deps-${{ runner.os }}
 
       # Symlinks to the path need to be created again after the cache is restored
-    - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
-      name: add brew links if cache exists
+    - name: add brew links
+      if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
       shell: bash
       run: |
-        brew unlink gcc && brew link gcc
+        brew unlink gcc
+        brew link gcc
         brew link cfitsio
         brew link voro-dev
         brew link sprng2
 
       # Only do these install steps if no cache is found
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install gfortran
-      shell: bash
-      run: brew reinstall gcc
-
-    - name: install hdf5
-      shell: bash
-      run: brew install hdf5
-
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install cfitsio
-      shell: bash
-      run: brew install cfitsio
-
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: get custom taps needed for mcfost
-      shell: bash
-      run: brew tap danieljprice/all
-
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install voro++
-      shell: bash
-      run: brew install voro-dev
-
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      name: install sprng2
-      shell: bash
-      run: brew install sprng2
-
-    - name: compile mcfost
-      env:
-        MCFOST_INSTALL: "/usr/local"
+    - name: install deps
+      if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        cd src
-        make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+        brew tap danieljprice/all
+        brew reinstall gcc
+        brew install cfitsio voro-dev sprng2
+
+    # Always install hdf5, it's too problematic to cache (because it has dependencies)
+    - name: install hdf5
+      shell: bash
+      run:  brew install hdf5
+
+    - name: compile mcfost
+      shell: bash
+      working-directory: src
+      env:
+        MCFOST_INSTALL: /usr/local
+      run: make all

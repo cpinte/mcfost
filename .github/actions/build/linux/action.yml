@@ -1,6 +1,12 @@
 name: "linux"
 description: "Build linux"
 
+inputs:
+  MCFOST_INSTALL:
+    description: "Location where mcfost dependencies will be installed/looked for"
+    required: false
+    default: /opt/local/
+
 # Note: needs GCC > 12, and sudo, wherever you're building
 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
 
@@ -10,27 +16,23 @@ runs:
     # Cache dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
       id: cache-deps
-      uses: john-shaffer/cache@main # Need this version to unpack the cache tar with sudo
-      env:
-        cache-name: cache-mcfost-dependencies
+      uses: actions/cache@v3
       with:
-        path: |
-          /home/runner/work/include
-          /home/runner/work/lib
-        key: ${{ runner.os }}-build-${{ env.cache-name }}
+        path: ${{ inputs.MCFOST_INSTALL }}
+        key: mcfost-deps-${{ runner.os }}
 
     # Only do this (lengthy) setup if dependency cache not found
     - name: prepare mcfost environment
       if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       shell: bash
-      run: |
-        export MCFOST_INSTALL=$PWD
-        cd lib/
-        ./install.sh
+      working-directory: lib
+      env:
+        MCFOST_INSTALL: ${{ inputs.MCFOST_INSTALL }}
+      run: ./install.sh
 
     - name: compile mcfost
       shell: bash
-      run: |
-        export MCFOST_INSTALL=$PWD
-        cd src/
-        make all
+      working-directory: src
+      env:
+        MCFOST_INSTALL: ${{ inputs.MCFOST_INSTALL }}
+      run: make all
