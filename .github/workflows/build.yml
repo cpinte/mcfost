@@ -2,7 +2,7 @@ name: build-test
 
 on:
   push:
-    # branches: [ master ] TODO: uncomment this
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ./.github/actions/build/macos
-      # - uses: ./.github/actions/test TODO: uncomment this
+      - uses: ./.github/actions/test
 
   linux:
     runs-on: ubuntu-latest
@@ -40,4 +40,4 @@ jobs:
           cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
       - run: git config --global --add safe.directory $PWD
       - uses: ./.github/actions/build/linux
-      # - uses: ./.github/actions/test TODO: uncomment this
+      - uses: ./.github/actions/test
