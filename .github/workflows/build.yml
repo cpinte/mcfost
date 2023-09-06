@@ -36,7 +36,7 @@ jobs:
       - name: install hdf5
         run: |
           dnf install -y sudo wget epel-release
-          dnf install -y hdf5-static
+          dnf install -y hdf5-static redhat-lsb-core
           cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
       - run: git config --global --add safe.directory $PWD
       - uses: ./.github/actions/build/linux
