@@ -27,17 +27,17 @@ runs:
         rm -rf test_data
         tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
 
+    # Only do this if not in manylinux docker container
     - uses: actions/setup-python@v4
+      if: env.AUDITWHEEL_PLAT == ''
       with:
-        python-version: '3.11'
-
-    - name: install pytest requirements
-      shell: bash
-      run: pip install -r test_suite/requirements.txt
+        python-version: "3.11"
 
     - name: test current commit against reference data
       shell: bash
-      working-directory: test_suite
-      env:
-        MCFOST_UTILS: ${{ github.workspace }}/utils
-      run: python -m pytest -v
+      run: |
+        export MCFOST_UTILS=$PWD/utils
+        export PATH=/opt/python/cp311-cp311/bin/:$PATH
+        cd test_suite
+        pip install -r requirements.txt
+        python -m pytest -v
