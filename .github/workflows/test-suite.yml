@@ -1,0 +1,63 @@
+name: test-suite
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  MCFOST_NO_XGBOOST: yes
+  SYSTEM: gfortran
+  MCFOST_GIT: "1"
+  SKIP_HDF5: yes
+
+jobs:
+  macos:
+    runs-on: macos-12
+    env:
+      HDF5_DIR: /usr/local
+      MCFOST_INSTALL: /usr/local
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: install dependencies
+        uses: ./.github/actions/dependencies/macos
+
+      - name: compile mcfost
+        working-directory: src
+        run: make all
+
+      - name: test
+        uses: ./.github/actions/test
+
+  linux:
+    runs-on: ubuntu-22.04
+    container: quay.io/pypa/manylinux_2_28_x86_64
+    env:
+      HDF5_DIR: /usr
+      MCFOST_INSTALL: /opt/local
+    steps:
+      - uses: actions/checkout@v2
+
+      # hdf5.mod file is located at /usr/lib64/gfortran/modules/ on almalinux
+      - name: install hdf5
+        run: |
+          dnf install -y sudo wget epel-release
+          dnf install -y hdf5-static redhat-lsb-core
+          cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
+
+      - run: git config --global --add safe.directory $PWD
+
+      - name: build and install dependencies
+        uses: ./.github/actions/dependencies/linux
+
+      - name: compile mcfost
+        working-directory: src
+        run: make all
+
+      - name: test
+        uses: ./.github/actions/test
