@@ -42,10 +42,3 @@ runs:
     - name: install hdf5
       shell: bash
       run:  brew install hdf5
-
-    - name: compile mcfost
-      shell: bash
-      working-directory: src
-      env:
-        MCFOST_INSTALL: /usr/local
-      run: make all

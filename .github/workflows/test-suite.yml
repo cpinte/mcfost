@@ -20,11 +20,16 @@ jobs:
     runs-on: macos-latest
     env:
       HDF5_DIR: /usr/local
+      MCFOST_INSTALL: /usr/local
     steps:
       - uses: actions/checkout@v2
 
-      - name: build
+      - name: install dependencies
         uses: ./.github/actions/build/macos
+
+      - name: compile mcfost
+        working-directory: src
+        run: make all
 
       - name: test
         uses: ./.github/actions/test
@@ -34,6 +39,7 @@ jobs:
     container: quay.io/pypa/manylinux_2_28_x86_64
     env:
       HDF5_DIR: /usr
+      MCFOST_INSTALL: /opt/local
     steps:
       - uses: actions/checkout@v2
 
@@ -46,8 +52,12 @@ jobs:
 
       - run: git config --global --add safe.directory $PWD
 
-      - name: build
+      - name: build and install dependencies
         uses: ./.github/actions/build/linux
+
+      - name: compile mcfost
+        working-directory: src
+        run: make all
 
       - name: test
         uses: ./.github/actions/test

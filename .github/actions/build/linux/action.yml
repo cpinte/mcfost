@@ -1,12 +1,6 @@
 name: "linux"
 description: "Build linux"
 
-inputs:
-  MCFOST_INSTALL:
-    description: "Location where mcfost dependencies will be installed/looked for"
-    required: false
-    default: /opt/local/
-
 # Note: needs GCC > 12, and sudo, wherever you're building
 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
 
@@ -18,7 +12,7 @@ runs:
       id: cache-deps
       uses: actions/cache@v3
       with:
-        path: ${{ inputs.MCFOST_INSTALL }}
+        path: ${{ env.MCFOST_INSTALL }}
         key: mcfost-deps-${{ runner.os }}
 
     # Only do this (lengthy) setup if dependency cache not found
@@ -26,13 +20,4 @@ runs:
       if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       shell: bash
       working-directory: lib
-      env:
-        MCFOST_INSTALL: ${{ inputs.MCFOST_INSTALL }}
       run: ./install.sh
-
-    - name: compile mcfost
-      shell: bash
-      working-directory: src
-      env:
-        MCFOST_INSTALL: ${{ inputs.MCFOST_INSTALL }}
-      run: make all
