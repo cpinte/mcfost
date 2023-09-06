@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: install dependencies
-        uses: ./.github/actions/build/macos
+        uses: ./.github/actions/dependencies/macos
 
       - name: compile mcfost
         working-directory: src
@@ -53,7 +53,7 @@ jobs:
       - run: git config --global --add safe.directory $PWD
 
       - name: build and install dependencies
-        uses: ./.github/actions/build/linux
+        uses: ./.github/actions/dependencies/linux
 
       - name: compile mcfost
         working-directory: src

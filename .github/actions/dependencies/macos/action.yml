@@ -1,5 +1,5 @@
 name: "macos"
-description: "Build macos"
+description: "macos dependencies"
 
 runs:
   using: "composite"
