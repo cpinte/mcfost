@@ -1,0 +1,111 @@
+name: gfortran-macos
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  MCFOST_INSTALL: "/usr/local"
+  MCFOST_NO_XGBOOST: "yes"
+  SYSTEM: "gfortran"
+  MCFOST_GIT: "1"
+  MCFOST_UTILS: ${{ github.workspace }}/utils
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build-test:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+      # Check if the dependency cache exists
+      # If it does, restore those paths; otherwise these paths are cached at the end of the workflow
+      # NOTE: Cache can be cleared manually from the Github actions webpage
+    - name: cache dependencies
+      id: cache-deps
+      uses: actions/cache@v3
+      env:
+        cache-name: cache-mcfost-dependencies
+      with:
+        path: |
+          /usr/local/Cellar/gcc/13.1.0
+          /usr/local/Cellar/cfitsio/4.3.0
+          /usr/local/Cellar/voro-dev/0.4.6+
+          /usr/local/Cellar/sprng2/2.0
+          test_suite/test_data
+        key: ${{ runner.os }}-build-${{ env.cache-name }}
+
+      # Symlinks to the path need to be created again after the cache is restored
+    - if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
+      name: add brew links if cache exists
+      run: |
+        brew unlink gcc && brew link gcc
+        brew link cfitsio
+        brew link voro-dev
+        brew link sprng2
+
+      # Only do these install steps if no cache is found
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install gfortran
+      run: brew reinstall gcc
+
+    - name: install hdf5
+      run: brew install hdf5
+
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install cfitsio
+      run: brew install cfitsio
+
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: get custom taps needed for mcfost
+      run: brew tap danieljprice/all
+
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install voro++
+      run: brew install voro-dev
+
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: install sprng2
+      run: brew install sprng2
+
+    - name: compile mcfost
+      run: |
+        cd src
+        make all INCLUDE=-I/usr/local/include LIBS=/usr/local/lib
+        cd ..
+
+    - name: run mcfost set up (downloads additional files)
+      run: |
+        cd src
+        ./mcfost -setup
+        cd ..
+
+    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      name: download reference data for test suite
+      run: |
+        cd test_suite
+        wget http://136.186.108.129/test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        rm -rf test_data
+        tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        cd ..
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: install pytest requirements
+      run: python3 -m pip install -r test_suite/requirements.txt
+
+    - name: test current commit against reference data
+      run: |
+        cd test_suite
+        python3 -m pytest -v
