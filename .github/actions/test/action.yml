@@ -13,22 +13,19 @@ runs:
 
     - name: run mcfost set up (downloads additional files)
       shell: bash
+      working-directory: src
       env:
         MCFOST_UTILS: ${{ github.workspace }}/utils
-      run: |
-        cd src
-        ./mcfost -setup
-        cd ..
+      run: ./mcfost -setup
 
     - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       shell: bash
       name: download reference data for test suite
+      working-directory: test_suite
       run: |
-        cd test_suite
         wget http://136.186.108.129/test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
         rm -rf test_data
         tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
-        cd ..
 
     - uses: actions/setup-python@v4
       with:
@@ -36,12 +33,11 @@ runs:
 
     - name: install pytest requirements
       shell: bash
-      run: python3 -m pip install -r test_suite/requirements.txt
+      run: pip install -r test_suite/requirements.txt
 
     - name: test current commit against reference data
       shell: bash
+      working-directory: test_suite
       env:
         MCFOST_UTILS: ${{ github.workspace }}/utils
-      run: |
-        cd test_suite
-        python3 -m pytest -v
+      run: python -m pytest -v
