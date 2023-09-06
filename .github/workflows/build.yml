@@ -22,8 +22,12 @@ jobs:
       HDF5_DIR: /usr/local
     steps:
       - uses: actions/checkout@v2
-      - uses: ./.github/actions/build/macos
-      - uses: ./.github/actions/test
+
+      - name: build
+        uses: ./.github/actions/build/macos
+
+      - name: test
+        uses: ./.github/actions/test
 
   linux:
     runs-on: ubuntu-latest
@@ -32,12 +36,18 @@ jobs:
       HDF5_DIR: /usr
     steps:
       - uses: actions/checkout@v2
+
       # hdf5.mod file is located at /usr/lib64/gfortran/modules/ on almalinux
       - name: install hdf5
         run: |
           dnf install -y sudo wget epel-release
           dnf install -y hdf5-static redhat-lsb-core
           cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
+
       - run: git config --global --add safe.directory $PWD
-      - uses: ./.github/actions/build/linux
-      - uses: ./.github/actions/test
+
+      - name: build
+        uses: ./.github/actions/build/linux
+
+      - name: test
+        uses: ./.github/actions/test
