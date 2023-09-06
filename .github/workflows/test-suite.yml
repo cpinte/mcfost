@@ -17,7 +17,7 @@ env:
 
 jobs:
   macos:
-    runs-on: macos-latest
+    runs-on: macos-12
     env:
       HDF5_DIR: /usr/local
       MCFOST_INSTALL: /usr/local
@@ -35,7 +35,7 @@ jobs:
         uses: ./.github/actions/test
 
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     container: quay.io/pypa/manylinux_2_28_x86_64
     env:
       HDF5_DIR: /usr
