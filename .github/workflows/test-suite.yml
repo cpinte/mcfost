@@ -26,7 +26,8 @@ jobs:
           brew reinstall gcc
           cd /usr/local/bin
           GCC_VERSION=$(for item in gcc-??; do $item -dumpversion; done | sort -hr | head -1)
-          for item in g*-${GCC_VERSION}; do ln -s $item $(echo $item | sed "s/-${GCC_VERSION}//g") || true ; done
+          ln -vfs gcc-${GCC_VERSION} gcc
+          ln -vfs g++-${GCC_VERSION} g++
 
       - name: build and install dependencies
         uses: ./.github/actions/dependencies/linux
