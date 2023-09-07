@@ -13,18 +13,16 @@ env:
   MCFOST_NO_XGBOOST: yes
   SYSTEM: gfortran
   MCFOST_GIT: "1"
+  MCFOST_INSTALL: /opt/local
 
 jobs:
   macos:
     runs-on: macos-12
-    env:
-      HDF5_DIR: /usr/local
-      MCFOST_INSTALL: /usr/local
     steps:
       - uses: actions/checkout@v2
 
-      - name: install dependencies
-        uses: ./.github/actions/dependencies/macos
+      - name: build and install dependencies
+        uses: ./.github/actions/dependencies/linux
 
       - name: compile mcfost
         working-directory: src
@@ -36,14 +34,13 @@ jobs:
   linux:
     runs-on: ubuntu-22.04
     container: quay.io/pypa/manylinux_2_28_x86_64
-    env:
-      MCFOST_INSTALL: /opt/local
     steps:
       - uses: actions/checkout@v2
 
-      - run: dnf install -y redhat-lsb-core wget
-
-      - run: git config --global --add safe.directory $PWD
+      - name: install deps missing in container
+        run: |
+          dnf install -y redhat-lsb-core wget
+          git config --global --add safe.directory $PWD
 
       - name: build and install dependencies
         uses: ./.github/actions/dependencies/linux

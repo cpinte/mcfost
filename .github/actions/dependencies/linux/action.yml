@@ -1,5 +1,5 @@
-name: "linux"
-description: "linux dependencies"
+name: "dependencies"
+description: "installs mcfost dependencies"
 
 # Note: needs GCC > 12, and sudo, wherever you're building
 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
