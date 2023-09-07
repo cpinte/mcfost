@@ -20,4 +20,6 @@ runs:
       if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       shell: bash
       working-directory: lib
-      run: ./install.sh
+      run: |
+        sudo apt install -y intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic intel-oneapi-compiler-fortran
+        ./install.sh
