@@ -13,7 +13,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ env.MCFOST_INSTALL }}
-        key: mcfost-deps-${{ runner.os }}-${{ hashFiles('lib/install.sh') }}
+        key: mcfost-deps-${{ runner.os }}-${{ hashFiles('lib/install.sh') }}-with-hdf5-${{ env.SKIP_HDF5 == 'yes' && 'no' || 'yes' }}
 
     # Only do this (lengthy) setup if dependency cache not found
     - name: prepare mcfost environment
