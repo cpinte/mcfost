@@ -5,6 +5,9 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  release:
+    types:
+      - published
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -34,10 +37,15 @@ jobs:
 
       - name: build
         working-directory: src
-        run: make all
+        run: make all static=yes
 
       - name: test
         uses: ./.github/actions/test
+
+      - name: upload binary
+        uses: ./.github/actions/release
+        with:
+          arch_name: macos-12
 
   linux:
     runs-on: ubuntu-22.04
@@ -55,7 +63,12 @@ jobs:
 
       - name: build
         working-directory: src
-        run: make all
+        run: make all static=yes
 
       - name: test
         uses: ./.github/actions/test
+
+      - name: upload binary
+        uses: ./.github/actions/release
+        with:
+          arch_name: linux-x86_64
