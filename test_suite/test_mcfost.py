@@ -13,8 +13,8 @@ _mcfost_bin = "../src/mcfost"
 model_list = glob.glob1("test_data/","*")
 
 # If running on CI, only test ref3.0
-if os.environ.get('CI', None) == 'true':
-    model_list = ["ref3.0"]
+#if os.environ.get('CI', None) == 'true':
+#    model_list = ["ref3.0"]
 
 wl_list = ["1.0","10","100","1000"]
 wl_list_pola = ["1.0","1000"]
@@ -162,8 +162,8 @@ def test_contrib(model_name, wl):
 
     # Skip test on CI because it currently fails
     # TODO: fix this test failure
-    if os.environ.get('CI', None) == 'true':
-        pytest.skip("CI")
+    #if os.environ.get('CI', None) == 'true':
+    #    pytest.skip("CI")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"

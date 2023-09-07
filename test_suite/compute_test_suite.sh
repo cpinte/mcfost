@@ -1,5 +1,6 @@
 #!/bin/bash
 #export mcfost=$MCFOST_INSTALL/../src/mcfost
+export OMP_NUM_THREADS=1
 export mcfost=$(pwd)/../src/mcfost
 
 for dir in test_data/*; do
