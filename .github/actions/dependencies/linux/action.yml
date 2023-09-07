@@ -32,4 +32,5 @@ runs:
         EOF
         sudo mv /tmp/oneAPI.repo /etc/yum.repos.d/
         sudo dnf install -y intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic intel-oneapi-compiler-fortran
+        source /opt/intel/oneapi/setvars.sh
         ./install.sh
