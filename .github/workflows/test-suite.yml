@@ -13,7 +13,6 @@ env:
   MCFOST_NO_XGBOOST: yes
   SYSTEM: gfortran
   MCFOST_GIT: "1"
-  SKIP_HDF5: yes
 
 jobs:
   macos:
@@ -38,17 +37,11 @@ jobs:
     runs-on: ubuntu-22.04
     container: quay.io/pypa/manylinux_2_28_x86_64
     env:
-      HDF5_DIR: /usr
       MCFOST_INSTALL: /opt/local
     steps:
       - uses: actions/checkout@v2
 
-      # hdf5.mod file is located at /usr/lib64/gfortran/modules/ on almalinux
-      - name: install hdf5
-        run: |
-          dnf install -y sudo wget epel-release
-          dnf install -y hdf5-static redhat-lsb-core
-          cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
+      - run: dnf install -y redhat-lsb-core wget
 
       - run: git config --global --add safe.directory $PWD
 
