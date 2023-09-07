@@ -21,6 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: ensure GNU gcc is used, not clang
+        run: |
+          brew reinstall gcc
+          cd /usr/local/bin
+          GCC_VERSION=$(for item in gcc-??; do $item -dumpversion; done | sort -hr | head -1)
+          for item in g*-${GCC_VERSION}; do ln -s $item $(echo $item | sed "s/-${GCC_VERSION}//g"); done
+
       - name: build and install dependencies
         uses: ./.github/actions/dependencies/linux
 
