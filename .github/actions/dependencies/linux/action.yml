@@ -21,5 +21,6 @@ runs:
       shell: bash
       working-directory: lib
       run: |
-        sudo apt install -y intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic intel-oneapi-compiler-fortran
+        sudo cp ./.github/actions/dependencies/linux/oneAPI.repo /etc/yum.repos.d/
+        sudo dnf install intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic intel-oneapi-compiler-fortran
         ./install.sh
