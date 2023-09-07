@@ -21,8 +21,8 @@ runs:
       shell: bash
       working-directory: lib
       run: |
-        dnf install tree
+        dnf install -y tree
         tree .
         sudo cp ./.github/actions/dependencies/linux/oneAPI.repo /etc/yum.repos.d/
-        sudo dnf install intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic intel-oneapi-compiler-fortran
+        sudo dnf install -y intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic intel-oneapi-compiler-fortran
         ./install.sh
