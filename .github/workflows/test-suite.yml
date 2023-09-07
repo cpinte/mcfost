@@ -13,7 +13,7 @@ env:
   MCFOST_NO_XGBOOST: yes
   SYSTEM: gfortran
   MCFOST_GIT: "1"
-  MCFOST_INSTALL: /opt/local
+  MCFOST_INSTALL: /tmp/mcfost-deps
 
 jobs:
   macos:
