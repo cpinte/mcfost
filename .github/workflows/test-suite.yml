@@ -29,10 +29,10 @@ jobs:
           ln -vfs g++-13 g++
           ln -vfs gfortran-13 gfortran
 
-      - name: build and install dependencies
-        uses: ./.github/actions/dependencies/linux
+      - name: dependencies
+        uses: ./.github/actions/dependencies
 
-      - name: compile mcfost
+      - name: build
         working-directory: src
         run: make all
 
@@ -45,15 +45,15 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: install deps missing in container
+      - name: missing deps
         run: |
           dnf install -y redhat-lsb-core wget
           git config --global --add safe.directory $PWD
 
-      - name: build and install dependencies
-        uses: ./.github/actions/dependencies/linux
+      - name: dependencies
+        uses: ./.github/actions/dependencies
 
-      - name: compile mcfost
+      - name: build
         working-directory: src
         run: make all
 
