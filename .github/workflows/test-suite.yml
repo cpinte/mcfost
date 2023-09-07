@@ -23,10 +23,11 @@ jobs:
 
       - name: ensure GNU gcc is used, not clang
         run: |
-          brew install gcc@13
+          brew reinstall gcc@13
           cd /usr/local/bin
           ln -vfs gcc-13 gcc
           ln -vfs g++-13 g++
+          ln -vfs gfortran-13 gfortran
 
       - name: build and install dependencies
         uses: ./.github/actions/dependencies/linux
