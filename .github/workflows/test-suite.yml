@@ -35,7 +35,7 @@ jobs:
           sudo wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
           hdiutil attach m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
           tree /Volumes
-          sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/install.sh --silent --eula accept
+          sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
           hdiutil detach m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
       - name: install dependencies
         uses: ./.github/actions/dependencies/macos
@@ -77,9 +77,10 @@ jobs:
           add-apt-repository universe
           apt-get update
           apt-get install -y libhdf5-dev
+          dpkg -L libhdf5-dev
           cp "/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a" "/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_fortran.a" /usr/lib/
-          cp "/usr/include/hdf5/serial/*.h" /usr/include/hdf5/
-          cp "/usr/include/hdf5/serial/*.mod" /usr/include/
+          cp "/home/runner/work/include/hdf5/serial/*.h" /usr/include/hdf5/
+          cp "/home/runner/work/include/hdf5/serial/*.mod" /usr/include/
           
 
       - run: git config --global --add safe.directory $PWD
