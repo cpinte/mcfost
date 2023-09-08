@@ -1076,7 +1076,7 @@ module atom_transfer
       real(kind=dp) :: dne, v_char
 
       lnon_lte_loop = .false.
-      omp_chunk_size = max(nint( 0.01 * n_cells / nb_proc ),1)
+      omp_chunk_size = 1!max(nint( 0.01 * n_cells / nb_proc ),1)
       mem_alloc_tot = 0
       if (lsed) then
          allocate(tab_lambda_sed(size(tab_lambda)))
