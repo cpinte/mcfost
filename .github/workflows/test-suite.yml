@@ -43,9 +43,8 @@ jobs:
         uses: ./.github/actions/test
 
       - name: upload binary
+        if: ${{ github.event_name == 'release' }}
         uses: ./.github/actions/release
-        with:
-          arch_name: macos-12
 
   linux:
     runs-on: ubuntu-22.04
@@ -69,6 +68,5 @@ jobs:
         uses: ./.github/actions/test
 
       - name: upload binary
+        if: ${{ github.event_name == 'release' }}
         uses: ./.github/actions/release
-        with:
-          arch_name: linux-x86_64
