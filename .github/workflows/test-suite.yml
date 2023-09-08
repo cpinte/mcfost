@@ -12,6 +12,7 @@ on:
 env:
   MCFOST_NO_XGBOOST: yes
   MCFOST_GIT: "1"
+  SKIP_HDF5: yes
 
 jobs:
   macos:
@@ -24,7 +25,6 @@ jobs:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
       MCFOST_INSTALL: /usr/local
-      SKIP_HDF5: yes
     steps:
       - uses: actions/checkout@v2
 
@@ -42,8 +42,8 @@ jobs:
     strategy:
       matrix:
         toolchain: 
-          - {compiler: gfortran, container: quay.io/pypa/manylinux_2_28_x86_64, skiphdf5: 'yes'}
-          - {compiler: ifort, container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04", skiphdf5: 'no'}
+          - {compiler: gfortran, container: quay.io/pypa/manylinux_2_28_x86_64}
+          - {compiler: ifort, container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"}
     
     runs-on: ubuntu-22.04
     container: ${{ matrix.toolchain.container }}
@@ -51,7 +51,6 @@ jobs:
       SYSTEM: ${{ matrix.toolchain.compiler }}
       HDF5_DIR: /usr
       MCFOST_INSTALL: /opt/local
-      SKIP_HDF5: ${{ matrix.toolchain.skiphdf5 }}
     steps:
       - uses: actions/checkout@v2
 
@@ -62,6 +61,11 @@ jobs:
           dnf install -y sudo wget epel-release
           dnf install -y hdf5-static redhat-lsb-core
           cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
+
+      - name: install hdf5 for intel build
+        if: ${{ matrix.toolchain.compiler == 'ifort' }}
+        run: |
+          sudo apt install -y libhdf5-dev
 
       - run: git config --global --add safe.directory $PWD
 
