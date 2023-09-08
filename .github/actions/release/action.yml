@@ -4,12 +4,6 @@ description: "release"
 runs:
   using: "composite"
   steps:
-    - name: prepare binary
-      if: ${{ runner.os }} == 'macOS'
-      working-directory: src
-      shell: bash
-      run: xattr -dr com.apple.quarantine mcfost
-
     - name: prepare tarball
       working-directory: src
       shell: bash
