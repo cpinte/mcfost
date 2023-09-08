@@ -23,7 +23,7 @@ module Opacity_atom
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
    real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:), eta_tot(:)
-   integer, parameter 		   :: NvspaceMax = 151
+   integer, parameter 		   :: NvspaceMax = 2!151
    logical 		               :: lnon_lte_loop
 
    contains
