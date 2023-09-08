@@ -33,5 +33,7 @@ runs:
         sudo mv /tmp/oneAPI.repo /etc/yum.repos.d/
         sudo dnf install -y intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic intel-oneapi-compiler-fortran
         source /opt/intel/oneapi/setvars.sh
+        sudo dnf install -y tree
+        tree -a /opt/
         ln -s /opt/intel/oneapi/compiler/2023.2.1/linux/bin/intel64/ifort /opt/local/include/
         ./install.sh
