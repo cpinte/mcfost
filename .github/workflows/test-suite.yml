@@ -40,6 +40,7 @@ jobs:
         run: make all static=yes
 
       - name: test
+        if: ${{ github.event_name != 'release' }}
         uses: ./.github/actions/test
 
       - name: upload binary
@@ -65,6 +66,7 @@ jobs:
         run: make all static=yes
 
       - name: test
+        if: ${{ github.event_name != 'release' }}
         uses: ./.github/actions/test
 
       - name: upload binary
