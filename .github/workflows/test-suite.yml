@@ -43,7 +43,7 @@ jobs:
       matrix:
         toolchain: 
           - {compiler: gfortran, container: quay.io/pypa/manylinux_2_28_x86_64}
-          - {compiler: ifort, container: intel/oneapi-hpckit:2023.2-devel-ubuntu22.04}
+          - {compiler: ifort, container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"}
     
     runs-on: ubuntu-22.04
     container: ${{ matrix.toolchain.container }}
