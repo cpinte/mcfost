@@ -36,6 +36,11 @@ jobs:
           hdiutil attach m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
           tree /Volumes
           sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
+          cp $(find /opt/intel/oneapi/compiler/ | grep "ifort$") /usr/local/include
+          
+          
+        #cp $(find /opt/intel/oneapi/compiler/ | grep "icc$") /usr/local/include
+
       - name: install dependencies
         uses: ./.github/actions/dependencies/macos
 
@@ -78,8 +83,8 @@ jobs:
           apt-get install -y libhdf5-dev
           dpkg -L libhdf5-dev
           cp "/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a" "/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_fortran.a" /usr/lib/
-          cp "/usr/include/hdf5/serial/*.h" /usr/include/hdf5/
-          cp "/usr/include/hdf5/serial/*.mod" /usr/include/
+          cp /usr/include/hdf5/serial/*.h /usr/include/hdf5/
+          cp /usr/include/hdf5/serial/*.mod /usr/include/
           
 
       - run: git config --global --add safe.directory $PWD
