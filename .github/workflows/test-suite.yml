@@ -41,12 +41,14 @@ jobs:
   linux:
     strategy:
       matrix:
-        compiler: [gfortran, ifort]
+        toolchain: 
+          - {compiler: gfortran, container: quay.io/pypa/manylinux_2_28_x86_64}
+          - {compiler: ifort, container: intel/oneapi-hpckit}
     
     runs-on: ubuntu-22.04
-    container: quay.io/pypa/manylinux_2_28_x86_64
+    container: ${{ matrix.toolchain.container }}
     env:
-      SYSTEM: ${{ matrix.compiler }}
+      SYSTEM: ${{ matrix.toolchain.compiler }}
       HDF5_DIR: /usr
       MCFOST_INSTALL: /opt/local
     steps:
