@@ -36,6 +36,7 @@ jobs:
           sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
           cp $(find /opt/intel/oneapi/compiler/ | grep "ifort$") /usr/local/include
           ls /usr/local/include
+          export PATH=$PATH:$(find /opt/intel/oneapi/compiler/ | grep "ifort$")
           
           
         #cp $(find /opt/intel/oneapi/compiler/ | grep "icc$") /usr/local/include
