@@ -69,7 +69,8 @@ jobs:
       - name: install hdf5 for intel build
         if: ${{ matrix.toolchain.compiler == 'ifort' }}
         run: |
-          apt-get install -y libhdf5-dev
+          apt search hdf5
+          apt install -y libhdf5-dev
 
       - run: git config --global --add safe.directory $PWD
 
