@@ -67,7 +67,9 @@ jobs:
       - run: git config --global --add safe.directory $PWD
 
       - name: zlib check
-        run: which zlib
+        run: |
+          apt install zlib1g -y
+          which zlib
 
       - name: build and install dependencies
         uses: ./.github/actions/dependencies/linux
