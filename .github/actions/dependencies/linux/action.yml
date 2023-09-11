@@ -1,5 +1,9 @@
 name: "linux"
 description: "linux dependencies"
+inputs:
+  compiler:
+    description: Which compiler to use (gnu or intel?)
+    required: true
 
 # Note: needs GCC > 12, and sudo, wherever you're building
 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
@@ -13,7 +17,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ env.MCFOST_INSTALL }}
-        key: TESTmcfost-deps-${{ runner.os }}-${{ hashFiles('lib/install.sh') }}
+        key: mcfost-deps-${{ runner.os }}-${{ inputs.compiler }}
 
     # Only do this (lengthy) setup if dependency cache not found
     - name: prepare mcfost environment
@@ -22,3 +26,31 @@ runs:
       working-directory: lib
       run: |
         ./install.sh
+
+    # hdf5.mod file is located at /usr/lib64/gfortran/modules/ on almalinux
+    - name: install hdf5 for gnu build
+      if: ${{ matrix.toolchain.compiler == 'gfortran' }}
+      run: |
+        dnf install -y sudo wget epel-release
+        dnf install -y hdf5-static redhat-lsb-core
+        cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
+
+    - name: install hdf5 for intel build
+      if: ${{ matrix.toolchain.compiler == 'ifort' }}
+      run: |
+        export CC=icc
+        export FC=ifort
+        export CXX=icpc
+        export CFLAGS=""
+        wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
+        echo "Compiling HDF5 ..."
+        tar xjvf hdf5-1.10.5.tar.bz2
+        cd hdf5-1.10.5
+        mkdir -p "$HOME/hdf5_install_tmp"
+        ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
+        make install
+        \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" /usr/lib/
+        mkdir /usr/include/hdf5
+        \cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
+        \cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
+        echo "Done"

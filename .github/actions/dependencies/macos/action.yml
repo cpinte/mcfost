@@ -1,5 +1,9 @@
 name: "macos"
 description: "macos dependencies"
+inputs:
+  compiler:
+    description: Which compiler to use (gnu or intel?)
+    required: true
 
 runs:
   using: "composite"
@@ -16,7 +20,7 @@ runs:
           /usr/local/Cellar/cfitsio/
           /usr/local/Cellar/voro-dev/
           /usr/local/Cellar/sprng2/
-        key: TESTmcfost-deps-${{ runner.os }}
+        key: mcfost-deps-${{ runner.os }}-${{ inputs.compiler }}
 
       # Symlinks to the path need to be created again after the cache is restored
     - name: add brew links
@@ -39,7 +43,15 @@ runs:
         brew install cfitsio voro-dev sprng2
 
     # Always install hdf5, it's too problematic to cache (because it has dependencies)
-    - name: install hdf5
+    - name: install hdf5 (gfortran)
+      if: ${{ inputs.compiler == 'gfortran' }}
+      shell: bash
+      run: |
+        brew install hdf5
+
+    # Brew installs the gcc version. Intel requires some more work
+    - name: install hdf5 (ifort)
+      if: ${{ inputs.compiler == 'ifort' }}
       shell: bash
       run: |
         export CC=icc
@@ -58,4 +70,3 @@ runs:
         \cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
         \cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
         echo "Done" 
-      # brew install hdf5
