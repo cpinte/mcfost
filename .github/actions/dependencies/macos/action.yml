@@ -9,7 +9,7 @@ runs:
   using: "composite"
   steps:
     - name: install intel compilers
-      if: ${{ input.compiler == 'ifort' }}
+      if: ${{ inputs.compiler == 'ifort' }}
       shell: bash
       run: |
         sudo wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
