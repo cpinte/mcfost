@@ -66,6 +66,9 @@ jobs:
 
       - run: git config --global --add safe.directory $PWD
 
+      - name: zlib version
+        run: zlib --version
+
       - name: build and install dependencies
         uses: ./.github/actions/dependencies/linux
         with:

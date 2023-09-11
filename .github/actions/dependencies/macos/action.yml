@@ -72,7 +72,6 @@ runs:
         export CFLAGS=""
         source /opt/intel/oneapi/setvars.sh 
         wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
-        echo "Compiling HDF5 ..."
         tar xjvf hdf5-1.10.5.tar.bz2
         cd hdf5-1.10.5
         ls -lsh /usr
