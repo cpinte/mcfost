@@ -47,7 +47,7 @@ module atom_transfer
    implicit none
 
 #include "sprng_f.h"
-   integer :: omp_chunk_size
+   integer, parameter :: omp_chunk_size = 1!max(nint( 0.01 * n_cells / nb_proc ),1)
    real(kind=dp), allocatable, dimension(:) :: tab_lambda_Sed
    real(kind=dp), dimension(:,:,:,:,:,:), allocatable, private :: tau_surface_map !private to avoid conflict with mol_transfer.
 
@@ -353,7 +353,7 @@ module atom_transfer
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on, Jnu, iloc) & ! Ng's Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,n_cells_remaining) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
-            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,omp_chunk_size,precision,lcswitch_enabled)
+            !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
@@ -1076,7 +1076,6 @@ module atom_transfer
       real(kind=dp) :: dne, v_char
 
       lnon_lte_loop = .false.
-      omp_chunk_size = 1!max(nint( 0.01 * n_cells / nb_proc ),1)
       mem_alloc_tot = 0
       if (lsed) then
          allocate(tab_lambda_sed(size(tab_lambda)))
