@@ -30,6 +30,7 @@ runs:
     # hdf5.mod file is located at /usr/lib64/gfortran/modules/ on almalinux
     - name: install hdf5 for gnu build
       if: ${{ matrix.toolchain.compiler == 'gfortran' }}
+      shell: bash
       run: |
         dnf install -y sudo wget epel-release
         dnf install -y hdf5-static redhat-lsb-core
@@ -37,6 +38,7 @@ runs:
 
     - name: install hdf5 for intel build
       if: ${{ matrix.toolchain.compiler == 'ifort' }}
+      shell: bash
       run: |
         export CC=icc
         export FC=ifort
