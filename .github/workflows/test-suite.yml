@@ -68,7 +68,7 @@ jobs:
 
       - name: zlib check
         run: |
-          apt install zlib1g -y
+          apt-get install zlib1g -y
           which zlib
 
       - name: build and install dependencies
