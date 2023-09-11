@@ -67,6 +67,7 @@ jobs:
       - run: git config --global --add safe.directory $PWD
 
       - name: zlib check
+        if: ${{ matrix.toolchain.compiler == 'ifort' }}
         run: |
           apt-get install zlib1g -y
           which zlib
