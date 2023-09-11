@@ -70,7 +70,7 @@ jobs:
         if: ${{ matrix.toolchain.compiler == 'ifort' }}
         run: |
           apt-get install zlib1g -y
-          which zlib
+          dpkg -L zlib1g
 
       - name: build and install dependencies
         uses: ./.github/actions/dependencies/linux
