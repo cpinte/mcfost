@@ -8,6 +8,17 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: install intel compilers
+        if: ${{ input.compiler == 'ifort' }}
+        run: |
+          sudo wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
+          sudo wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebba13f8-1690-4d30-9d43-1e2fa2d536cd/m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg
+          hdiutil attach m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
+          sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
+          hdiutil attach m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg
+          sudo /Volumes/m_cpp-compiler-classic_p_2023.2.0.48999_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
+          cp /opt/intel/oneapi/compiler/2023.2.0/mac/bin/intel64/ifort /usr/local/include
+    
     # Check if the dependency cache exists
     # If it does, restore those paths; otherwise these paths are cached at the end of the workflow
     # NOTE: Cache can be cleared manually from the Github actions webpage
@@ -58,6 +69,7 @@ runs:
         export FC=ifort
         export CXX=icpc
         export CFLAGS=""
+        source /opt/intel/oneapi/setvars.sh 
         wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
         echo "Compiling HDF5 ..."
         tar xjvf hdf5-1.10.5.tar.bz2
