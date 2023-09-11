@@ -75,11 +75,12 @@ runs:
         echo "Compiling HDF5 ..."
         tar xjvf hdf5-1.10.5.tar.bz2
         cd hdf5-1.10.5
-        mkdir /usr/hdf5_install_tmp
+        ls -lsh /usr
+        sudo mkdir /usr/hdf5_install_tmp
         ./configure --prefix=/usr/hdf5_install_tmp --enable-fortran --disable-shared
         make install
-        cp /usr/hdf5_install_tmp/lib/libhdf5.a /usr/hdf5_install_tmp/lib/libhdf5_fortran.a /usr/lib/
-        mkdir /usr/include/hdf5
-        cp /usr/hdf5_install_tmp/include/*.h /usr/include/hdf5/
-        cp /usr/hdf5_install_tmp/include/*.mod /usr/include/
+        sudo cp /usr/hdf5_install_tmp/lib/libhdf5.a /usr/hdf5_install_tmp/lib/libhdf5_fortran.a /usr/lib/
+        sudo mkdir /usr/include/hdf5
+        sudo cp /usr/hdf5_install_tmp/include/*.h /usr/include/hdf5/
+        sudo cp /usr/hdf5_install_tmp/include/*.mod /usr/include/
         echo "Done" 
