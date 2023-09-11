@@ -395,7 +395,7 @@ module Opacity_atom
    !to do: remove lambda dep since it must be consistent with Nr, Nb
       integer, intent(in) :: id, icell, iray,N
       logical, intent(in) :: iterate
-      real(kind=dp), intent(in), dimension(N) :: lambda, tau
+      real(kind=dp), intent(in), dimension(N) :: lambda
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
       real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
       integer :: nat, Nred, Nblue, kr, i, j, Nlam
