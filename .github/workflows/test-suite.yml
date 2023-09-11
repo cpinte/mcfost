@@ -34,7 +34,7 @@ jobs:
           sudo wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
           hdiutil attach m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
           sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
-          cp $(find /opt/intel/oneapi/compiler/ | grep "ifort$") /usr/local/include
+          cp /opt/intel/oneapi/compiler/2023.2.0/mac/bin/intel64/ifort /usr/local/include
           source /opt/intel/oneapi/setvars.sh 
           echo "Do we have ifort?"
           which ifort
@@ -47,7 +47,10 @@ jobs:
 
       - name: compile mcfost
         working-directory: src
-        run: make all
+        run: |
+          which ifort
+          source /opt/intel/oneapi/setvars.sh
+          make all
 
       - name: test
         uses: ./.github/actions/test
@@ -90,9 +93,9 @@ jobs:
           mkdir -p "$HOME/hdf5_install_tmp"
           ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
           make install
-          \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" lib/
-          \cp "$HOME"/hdf5_install_tmp/include/*.h include/hdf5/
-          \cp "$HOME"/hdf5_install_tmp/include/*.mod "include/$SYSTEM"
+          \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" /usr/lib/
+          \cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
+          \cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
           echo "Done"
 
 
