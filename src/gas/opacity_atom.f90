@@ -395,7 +395,7 @@ module Opacity_atom
    !to do: remove lambda dep since it must be consistent with Nr, Nb
       integer, intent(in) :: id, icell, iray,N
       logical, intent(in) :: iterate
-      real(kind=dp), intent(in), dimension(N) :: lambda
+      real(kind=dp), intent(in), dimension(N) :: lambda, tau
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
       real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
       integer :: nat, Nred, Nblue, kr, i, j, Nlam
@@ -423,23 +423,14 @@ module Opacity_atom
 
             if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle tr_loop
 
-            ! if (abs(dv)>atom%lines(kr)%vmax) then
-            !    !move the profile to the red edge up to Nover_sup
-            !    !change Nlam ??
-            !    if (dv > 0) then
-            !       ! Nblue = Nred
-            !       Nred = atom%lines(kr)%Nover_sup
-            !       Nblue =  Nred - Nlam + 1
-            !    !move to the blue edge down to Nover_inf
-            !    else
-            !       ! Nred = Nblue
-            !       Nblue =  atom%lines(kr)%Nover_inf
-            !       Nred = Nlam + Nblue - 1
-            !    endif
-            if (abs(dv)>1.0*vbroad(T(icell),Atom%weight, vturb(icell))) then
-               Nred = atom%lines(kr)%Nover_sup
-               Nblue = atom%lines(kr)%Nover_inf
-               Nlam = Nred - Nblue + 1
+            !Expand the edge of a profile during the non-LTE loop if necessary.
+            !the condition is only possibly reached if dv > 0 (lnon_lte_loop = .true.)
+            if (lnon_lte_loop) then
+               if (abs(dv)>1.0*vbroad(T(icell),Atom%weight, vturb(icell))) then
+                  Nred = atom%lines(kr)%Nover_sup
+                  Nblue = atom%lines(kr)%Nover_inf
+                  Nlam = Nred - Nblue + 1
+               endif
             endif
 
             phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
@@ -452,33 +443,6 @@ module Opacity_atom
 
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Aji * phi0(1:Nlam) * atom%n(j,icell)
-
-! !-> check Gaussian profile  and norm.
-! ! -> check Voigt profile, for Lyman alpha mainly.
-! ! -> write a voigt profile (kr) and a gaussian one (the same for all in principle!)
-            ! if (kr==1 .and. atom%id=="H") then
-            !    !-> try large damped lines to test the maximum extension of the line.
-            !    ! phi0(1:Nlam) = Voigt(Nlam, 1d4, (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))
-            !    !-> try pure gauss with the same grid as voigt (for testing low damping)
-            !    ! phi0(1:Nlam) = exp(-( (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))**2)
-            !    open(1,file="prof.txt",status="unknown")
-            !    write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
-            !    write(1,*) atom%lines(kr)%a(icell), maxval(atom%lines(kr)%a), minval(atom%lines(kr)%a,mask=nhtot>0)
-            !    do j=1,Nlam
-            !       write(1,*) lambda(Nblue+j-1),phi0(j)
-            !    enddo
-            !    close(1)
-            ! endif
-            ! if (.not.atom%lines(kr)%voigt .and. atom%id=="H") then
-            !    !maybe the similar grid for voigt is nice too ? core + wings ?
-            !    open(1,file="profg.txt",status="unknown")
-            !    write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
-            !    do j=1,Nlam
-            !       write(1,*) lambda(Nblue+j-1),phi0(j)
-            !    enddo
-            !    close(1)
-            !    stop
-            ! endif
 
             if ((iterate.and.atom%active)) then
                phi_loc(1:Nlam,atom%ij_to_trans(i,j),atom%activeindex,iray,id) = phi0(1:Nlam)
