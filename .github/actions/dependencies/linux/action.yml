@@ -55,4 +55,5 @@ runs:
       shell: bash
       working-directory: lib
       run: |
+        export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/lib/x86_64-linux-gnu/
         ./install.sh
