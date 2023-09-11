@@ -39,17 +39,20 @@ jobs:
           echo "Do we have ifort?"
           which ifort
 
-
-        #cp $(find /opt/intel/oneapi/compiler/ | grep "icc$") /usr/local/include
-
       - name: install dependencies
         uses: ./.github/actions/dependencies/macos
 
       - name: compile mcfost
+        if: ${{ matrix.compiler == 'gfortran' }}
+        working-directory: src
+        run: make all
+
+      - name: compile mcfost (intel)
+        if: ${{ matrix.compiler == 'ifort' }}
         working-directory: src
         run: |
           which ifort
-          source /opt/intel/oneapi/setvars.sh
+          source /opt/intel/oneapi/setvars.sh 
           make all
 
       - name: test
