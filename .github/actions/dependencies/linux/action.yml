@@ -11,21 +11,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    # Cache dependencies for mcfost to avoid downloading/installing them each time this workflow runs
-    - name: cache dependencies
-      id: cache-deps
-      uses: actions/cache@v3
-      with:
-        path: ${{ env.MCFOST_INSTALL }}
-        key: mcfost-deps-${{ runner.os }}-${{ inputs.compiler }}
-
-    # Only do this (lengthy) setup if dependency cache not found
-    - name: prepare mcfost environment
-      if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      shell: bash
-      working-directory: lib
-      run: |
-        ./install.sh
 
     # hdf5.mod file is located at /usr/lib64/gfortran/modules/ on almalinux
     - name: install hdf5 for gnu build
@@ -56,3 +41,19 @@ runs:
         \cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
         \cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
         echo "Done"
+
+    # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
+    - name: cache dependencies
+      id: cache-deps
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.MCFOST_INSTALL }}
+        key: mcfost-deps-${{ runner.os }}-${{ inputs.compiler }}
+
+    # Only do this (lengthy) setup if dependency cache not found
+    - name: prepare mcfost environment
+      if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+      shell: bash
+      working-directory: lib
+      run: |
+        ./install.sh

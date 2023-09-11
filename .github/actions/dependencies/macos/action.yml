@@ -78,8 +78,8 @@ runs:
         mkdir -p "$HOME/hdf5_install_tmp"
         ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
         make install
-        \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" /usr/lib/
+        sudo cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" /usr/lib/
         mkdir /usr/include/hdf5
-        \cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
-        \cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
+        sudo cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
+        sudo cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
         echo "Done" 
