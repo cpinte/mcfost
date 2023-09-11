@@ -51,7 +51,6 @@ jobs:
         if: ${{ matrix.compiler == 'ifort' }}
         working-directory: src
         run: |
-          which ifort
           source /opt/intel/oneapi/setvars.sh 
           make all
 
@@ -97,6 +96,7 @@ jobs:
           ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
           make install
           \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" /usr/lib/
+          mkdir /usr/include/hdf5
           \cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
           \cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
           echo "Done"
