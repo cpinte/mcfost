@@ -37,6 +37,8 @@ jobs:
           tree /Volumes
           sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
           cp $(find /opt/intel/oneapi/compiler/ | grep "ifort$") /usr/local/include
+          echo "Do we have ifort?"
+          which ifort
           
           
         #cp $(find /opt/intel/oneapi/compiler/ | grep "icc$") /usr/local/include
@@ -78,13 +80,22 @@ jobs:
       - name: install hdf5 for intel build
         if: ${{ matrix.toolchain.compiler == 'ifort' }}
         run: |
-          add-apt-repository universe
-          apt-get update
-          apt-get install -y libhdf5-dev
-          dpkg -L libhdf5-dev
-          cp "/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.a" "/usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_fortran.a" /usr/lib/
-          cp /usr/include/hdf5/serial/*.h /usr/include/hdf5/
-          cp /usr/include/hdf5/serial/*.mod /usr/include/
+          export CC=icc
+          export FC=ifort
+          export CXX=icpc
+          export CFLAGS=""
+          wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
+          echo "Compiling HDF5 ..."
+          tar xjvf hdf5-1.10.5.tar.bz2
+          cd hdf5-1.10.5
+          mkdir -p "$HOME/hdf5_install_tmp"
+          ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
+          make install
+          cd ~1
+          \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" lib/
+          \cp "$HOME"/hdf5_install_tmp/include/*.h include/hdf5/
+          \cp "$HOME"/hdf5_install_tmp/include/*.mod "include/$SYSTEM"
+          echo "Done"
           
 
       - run: git config --global --add safe.directory $PWD
