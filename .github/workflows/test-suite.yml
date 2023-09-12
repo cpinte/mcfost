@@ -69,15 +69,15 @@ jobs:
       - name: zlib check
         if: ${{ matrix.toolchain.compiler == 'ifort' }}
         run: |
-          apt-get install zlib1g -y
-          dpkg -L zlib1g
+          apt-get install zlib1g-dev -y
+          dpkg -L zlib1g-dev
           echo "char inflateEnd ();" >> ctest.c
           echo "int main (void)" >> ctest.c
           echo "{" >> ctest.c
           echo "       return inflateEnd ();" >> ctest.c
           echo "}" >> ctest.c
           cat ctest.c
-          gcc ctest.c -o testcompile -lz -L/lib/x86_64-linux-gnu
+          gcc ctest.c -o testcompile -lz
 
       - name: cfitsio test
         if: ${{ matrix.toolchain.compiler == 'ifort' }}
