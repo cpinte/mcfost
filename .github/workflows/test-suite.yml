@@ -64,8 +64,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: check python
-        run: python --version
+      - name: setup python
+        uses: actions/setup-python@v4
+
+      - name: check python and pip
+        run: |
+          python --version
+          pip --version
 
       - run: git config --global --add safe.directory $PWD
 
