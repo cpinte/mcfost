@@ -4,13 +4,6 @@ description: "Test mcfost"
 runs:
   using: "composite"
   steps:
-    - name: cache reference data
-      id: cache-deps
-      uses: actions/cache@v3
-      with:
-        path: test_suite/test_data
-        key: test-reference
-
     - name: run mcfost set up (downloads additional files)
       shell: bash
       working-directory: src
@@ -18,9 +11,8 @@ runs:
         MCFOST_UTILS: ${{ github.workspace }}/utils
       run: ./mcfost -setup
 
-    - if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
+    - name: download reference data for test suite
       shell: bash
-      name: download reference data for test suite
       working-directory: test_suite
       run: |
         wget http://136.186.108.129/test_data_seq_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
