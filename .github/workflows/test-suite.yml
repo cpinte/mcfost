@@ -77,7 +77,7 @@ jobs:
           echo "       return inflateEnd ();" >> ctest.c
           echo "}" >> ctest.c
           cat ctest.c
-          gcc ctest.c -o testcompile -lz
+          gcc ctest.c -o testcompile -lz -L/lib/x86_64-linux-gnu
 
       - name: cfitsio test
         if: ${{ matrix.toolchain.compiler == 'ifort' }}
