@@ -66,6 +66,8 @@ jobs:
 
       - name: setup python
         uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
 
       - name: check python and pip
         run: |
