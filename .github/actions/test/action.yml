@@ -17,7 +17,7 @@ runs:
       run: |
         wget http://136.186.108.129/test_data_seq_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
         rm -rf test_data
-        tar xzf test_data_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
+        tar xzf test_data_seq_dc5250a157a48a63fbea11f7822888130db64198.tar.gz
 
     # Only do this if not in manylinux docker container
     - uses: actions/setup-python@v4
