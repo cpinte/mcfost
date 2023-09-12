@@ -74,6 +74,7 @@ jobs:
         if: ${{ matrix.toolchain.compiler == 'ifort' }}
         run: |
           python --version
+          python -m ensurepip --upgrade
           pip --version
 
       - run: git config --global --add safe.directory $PWD
