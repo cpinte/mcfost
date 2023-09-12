@@ -64,6 +64,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: check python
+        run: python --version
+
       - run: git config --global --add safe.directory $PWD
 
       - name: build and install dependencies
