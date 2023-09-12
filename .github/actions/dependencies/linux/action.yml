@@ -1,9 +1,5 @@
 name: "linux"
 description: "linux dependencies"
-inputs:
-  compiler:
-    description: Which compiler to use (gnu or intel?)
-    required: true
 
 # Note: needs GCC > 12, and sudo, wherever you're building
 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
@@ -21,6 +17,7 @@ runs:
         dnf install -y hdf5-static redhat-lsb-core
         cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
 
+    # hdf5 needs to be built from sources.
     - name: install hdf5 for intel build
       if: ${{ matrix.toolchain.compiler == 'ifort' }}
       shell: bash
@@ -39,6 +36,11 @@ runs:
         mkdir /usr/include/hdf5
         \cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
         \cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
+    
+    - name: get zlib dev libraries
+      if: ${{ matrix.toolchain.compiler == 'ifort' }}
+      shell: bash
+      run: |
         apt-get update
         apt-get install zlib1g-dev -y
 
@@ -48,7 +50,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ env.MCFOST_INSTALL }}
-        key: mcfost-deps-${{ runner.os }}-${{ inputs.compiler }}
+        key: mcfost-deps-${{ runner.os }}-${{ matrix.toolchain.compiler }}
 
     # Only do this (lengthy) setup if dependency cache not found
     - name: prepare mcfost environment

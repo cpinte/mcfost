@@ -40,4 +40,6 @@ runs:
         export PATH=/opt/python/cp311-cp311/bin/:$PATH
         cd test_suite
         pip install -r requirements.txt
+        echo here
+        python --version
         python -m pytest -v

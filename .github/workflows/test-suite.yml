@@ -68,8 +68,6 @@ jobs:
 
       - name: build and install dependencies
         uses: ./.github/actions/dependencies/linux
-        with:
-          compiler: ${{ matrix.toolchain.compiler }}
 
       - name: compile mcfost
         working-directory: src
