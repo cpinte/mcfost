@@ -39,7 +39,6 @@ runs:
         mkdir /usr/include/hdf5
         \cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
         \cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
-        apt install zlib1g -y
 
     # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
@@ -55,5 +54,5 @@ runs:
       shell: bash
       working-directory: lib
       run: |
-        export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/lib/x86_64-linux-gnu/
+        cp /lib/x86_64-linux-gnu/libz* /usr/lib/
         ./install.sh
