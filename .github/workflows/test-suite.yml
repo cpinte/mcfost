@@ -81,7 +81,7 @@ jobs:
           tar xzvf cfitsio-4.3.0.tar.gz
           mv cfitsio-4.3.0 cfitsio
           cd cfitsio
-          export LDFLAGS = /lib/x86_64-linux-gnu
+          export LDFLAGS=/lib/x86_64-linux-gnu
           ./configure --enable-ssse3 --disable-curl
           
           make
