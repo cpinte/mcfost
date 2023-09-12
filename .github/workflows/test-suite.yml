@@ -69,6 +69,7 @@ jobs:
       - name: zlib check
         if: ${{ matrix.toolchain.compiler == 'ifort' }}
         run: |
+          apt-get update
           apt-get install zlib1g-dev -y
           dpkg -L zlib1g-dev
           echo "char inflateEnd ();" >> ctest.c
