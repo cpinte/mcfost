@@ -18,9 +18,13 @@ env:
 jobs:
   macos:
     runs-on: macos-12
+    strategy:
+      matrix:
+        openmp: [yes, no]
     env:
       HDF5_DIR: /usr/local
       MCFOST_INSTALL: /usr/local
+      OPENMP: ${{ matrix.openmp }}
     steps:
       - uses: actions/checkout@v2
 
@@ -36,10 +40,14 @@ jobs:
 
   linux:
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        openmp: [yes, no]
     container: quay.io/pypa/manylinux_2_28_x86_64
     env:
       HDF5_DIR: /usr
       MCFOST_INSTALL: /opt/local
+      OPENMP: ${{ matrix.openmp }}
     steps:
       - uses: actions/checkout@v2
 
