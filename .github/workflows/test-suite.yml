@@ -77,6 +77,7 @@ jobs:
           apt-get update
           apt-get install python3-pip -y
           pip --version
+          which pip
 
       - run: git config --global --add safe.directory $PWD
 
