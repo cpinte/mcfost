@@ -50,7 +50,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ env.MCFOST_INSTALL }}
-        key: mcfost-deps-${{ runner.os }}-${{ matrix.toolchain.compiler }}
+        key: mcfost-deps-${{ runner.os }}-${{ matrix.toolchain.compiler }}-${{ hashFiles('lib/install.sh') }}
 
     # Only do this (lengthy) setup if dependency cache not found
     - name: prepare mcfost environment
