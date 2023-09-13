@@ -1,9 +1,5 @@
 name: "macos"
 description: "macos dependencies"
-inputs:
-  compiler:
-    description: Which compiler to use (gnu or intel?)
-    required: true
 
 runs:
   using: "composite"
@@ -66,20 +62,12 @@ runs:
       if: ${{ inputs.compiler == 'ifort' }}
       shell: bash
       run: |
-        export CC=icc
-        export FC=ifort
-        export CXX=icpc
-        export CFLAGS=""
-        source /opt/intel/oneapi/setvars.sh 
-        wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
-        tar xjvf hdf5-1.10.5.tar.bz2
-        cd hdf5-1.10.5
-        ls -lsh /usr
-        sudo mkdir /usr/hdf5_install_tmp
-        ./configure --prefix=/usr/hdf5_install_tmp --enable-fortran --disable-shared
-        make install
-        sudo cp /usr/hdf5_install_tmp/lib/libhdf5.a /usr/hdf5_install_tmp/lib/libhdf5_fortran.a /usr/lib/
-        sudo mkdir /usr/include/hdf5
-        sudo cp /usr/hdf5_install_tmp/include/*.h /usr/include/hdf5/
-        sudo cp /usr/hdf5_install_tmp/include/*.mod /usr/include/
-        echo "Done" 
+          export CFLAGS=""
+          source /opt/intel/oneapi/setvars.sh 
+          wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
+          tar xjvf hdf5-1.10.5.tar.bz2
+          cd hdf5-1.10.5
+          sudo CC=icc FC=ifort CXX=icpc ./configure --prefix=/usr/local --enable-fortran  --enable-cxx
+          sudo make
+          sudo make install
+

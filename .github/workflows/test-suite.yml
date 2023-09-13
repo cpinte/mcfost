@@ -30,8 +30,6 @@ jobs:
 
       - name: install dependencies
         uses: ./.github/actions/dependencies/macos
-        with:
-          compiler: ${{ matrix.compiler }}
 
       - name: compile mcfost
         if: ${{ matrix.compiler == 'gfortran' }}
