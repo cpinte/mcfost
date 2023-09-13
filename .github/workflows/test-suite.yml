@@ -31,7 +31,7 @@ jobs:
       - name: install dependencies
         uses: ./.github/actions/dependencies/macos
 
-      - name: compile mcfost
+      - name: compile mcfost (gnu)
         if: ${{ matrix.compiler == 'gfortran' }}
         working-directory: src
         run: make all
