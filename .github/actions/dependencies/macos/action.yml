@@ -8,8 +8,8 @@ runs:
       if: ${{ matrix.compiler == 'ifort' }}
       shell: bash
       run: |
-        sudo wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
-        sudo wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebba13f8-1690-4d30-9d43-1e2fa2d536cd/m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg
+        wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
+        wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebba13f8-1690-4d30-9d43-1e2fa2d536cd/m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg
         hdiutil attach m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
         sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
         hdiutil attach m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg
