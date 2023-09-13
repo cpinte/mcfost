@@ -5,7 +5,7 @@ runs:
   using: "composite"
   steps:
     - name: install intel compilers
-      if: ${{ inputs.compiler == 'ifort' }}
+      if: ${{ matrix.compiler == 'ifort' }}
       shell: bash
       run: |
         sudo wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
@@ -28,7 +28,7 @@ runs:
           /usr/local/Cellar/cfitsio/
           /usr/local/Cellar/voro-dev/
           /usr/local/Cellar/sprng2/
-        key: mcfost-deps-${{ runner.os }}-${{ inputs.compiler }}
+        key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}
 
       # Symlinks to the path need to be created again after the cache is restored
     - name: add brew links
@@ -52,14 +52,14 @@ runs:
 
     # Always install hdf5, it's too problematic to cache (because it has dependencies)
     - name: install hdf5 (gfortran)
-      if: ${{ inputs.compiler == 'gfortran' }}
+      if: ${{ matrix.compiler == 'gfortran' }}
       shell: bash
       run: |
         brew install hdf5
 
     # Brew installs the gcc version. Intel requires some more work
     - name: install hdf5 (ifort)
-      if: ${{ inputs.compiler == 'ifort' }}
+      if: ${{ matrix.compiler == 'ifort' }}
       shell: bash
       run: |
           export CFLAGS=""
