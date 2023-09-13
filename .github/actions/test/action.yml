@@ -40,7 +40,7 @@ runs:
         export PATH=/opt/python/cp311-cp311/bin/:$PATH
         cd test_suite
         echo checkpoint1
-        pip --version
+        python -m pip --version
         echo checkpoint2
-        pip install -r requirements.txt
+        python -m pip install -r requirements.txt
         python -m pytest -v
