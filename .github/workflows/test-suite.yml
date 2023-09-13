@@ -64,21 +64,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: setup python
-        if: ${{ matrix.toolchain.compiler == 'ifort' }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: check python and pip
-        if: ${{ matrix.toolchain.compiler == 'ifort' }}
-        run: |
-          python --version
-          apt-get update
-          apt-get install python3-pip -y
-          pip --version
-          which pip
-
       - run: git config --global --add safe.directory $PWD
 
       - name: build and install dependencies

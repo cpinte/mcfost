@@ -39,8 +39,5 @@ runs:
         export MCFOST_UTILS=$PWD/utils
         export PATH=/opt/python/cp311-cp311/bin/:$PATH
         cd test_suite
-        echo checkpoint1
-        python -m pip --version
-        echo checkpoint2
         python -m pip install -r requirements.txt
         python -m pytest -v

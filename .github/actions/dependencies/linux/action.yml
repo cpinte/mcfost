@@ -17,7 +17,7 @@ runs:
         dnf install -y hdf5-static redhat-lsb-core
         cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
 
-    # hdf5 needs to be built from sources.
+    # hdf5 needs to be built from sources for intel compilers
     - name: install hdf5 for intel build
       if: ${{ matrix.toolchain.compiler == 'ifort' }}
       shell: bash
