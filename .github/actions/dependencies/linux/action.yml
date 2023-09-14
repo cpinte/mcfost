@@ -21,11 +21,12 @@ runs:
     - name: install hdf5 for intel build
       if: ${{ matrix.toolchain.compiler == 'ifort' }}
       shell: bash
+      env:
+        CC: icc
+        FC: ifort
+        CXX: icpc
+        CFLAGS: ""
       run: |
-        export CC=icc
-        export FC=ifort
-        export CXX=icpc
-        export CFLAGS=""
         wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
         tar xjvf hdf5-1.10.5.tar.bz2
         cd hdf5-1.10.5
