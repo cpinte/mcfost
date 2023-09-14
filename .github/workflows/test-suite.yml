@@ -19,11 +19,8 @@ jobs:
     strategy:
       matrix:
         compiler: [gfortran, ifort]
-
-    runs-on: macos-12
-    strategy:
-      matrix:
         openmp: [yes, no]
+    runs-on: macos-12
     env:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
@@ -44,7 +41,7 @@ jobs:
         if: ${{ matrix.compiler == 'ifort' }}
         working-directory: src
         run: |
-          source /opt/intel/oneapi/setvars.sh 
+          source /opt/intel/oneapi/setvars.sh
           make all
 
       - name: test
@@ -57,7 +54,6 @@ jobs:
           - {compiler: gfortran, container: quay.io/pypa/manylinux_2_28_x86_64}
           - {compiler: ifort, container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"}
         openmp: [yes, no]
-
     runs-on: ubuntu-22.04
     container: ${{ matrix.toolchain.container }}
     env:
