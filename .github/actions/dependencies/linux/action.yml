@@ -29,14 +29,9 @@ runs:
         wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
         tar xjvf hdf5-1.10.5.tar.bz2
         cd hdf5-1.10.5
-        mkdir -p "$HOME/hdf5_install_tmp"
-        ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
+        ./configure --prefix="/usr/local" --enable-fortran --disable-shared
         make install
-        \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" /usr/lib/
-        mkdir /usr/include/hdf5
-        \cp "$HOME"/hdf5_install_tmp/include/*.h /usr/include/hdf5/
-        \cp "$HOME"/hdf5_install_tmp/include/*.mod /usr/include/
-    
+
     - name: get zlib dev libraries
       if: ${{ matrix.toolchain.compiler == 'ifort' }}
       shell: bash
