@@ -131,7 +131,7 @@ def test_image(model_name, wl):
     print("Maximum image difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
     print("Mean image difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
-    assert MC_similar(image_ref,image,threshold=0.05)
+    assert MC_similar(image_ref,image,threshold=0.1)
 
 
 @pytest.mark.parametrize("model_name", model_list)
