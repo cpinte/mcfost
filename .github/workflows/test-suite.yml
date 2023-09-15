@@ -20,22 +20,21 @@ jobs:
       matrix:
         os: 
           - {name: linux, version: ubuntu-22.04}
-          - {name: macos, version: macos-12}
+          - {name: macos, version: macos-12, container: null}
         compiler: [gfortran, ifort]
         openmp: [yes, no]
 
         # Linux runs both need a container to set up dependencies properly
         include:
-          - container: null
           - os.name: linux
             compiler: gfortran
-            container: "quay.io/pypa/manylinux_2_28_x86_64"
+            os.container: "quay.io/pypa/manylinux_2_28_x86_64"
           - os.name: linux
             compiler: ifort
-            container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"
+            os.container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"
 
     runs-on: ${{ matrix.os.version }}
-    container: ${{ matrix.container }}
+    container: ${{ matrix.os.container }}
     env:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
