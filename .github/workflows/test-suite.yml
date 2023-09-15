@@ -19,23 +19,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: 
-          - {name: linux, version: ubuntu-22.04}
-          - {name: macos, version: macos-12}
+        os: [linux, macos]
         compiler: [gfortran, ifort]
         openmp: [yes, no]
 
         # Linux runs both need a container to set up dependencies properly
         include:
+          - os: linux
+            os-version: ubuntu-22.04
+          - os: macos
+            os-version: macos-12
           - container: null
-          - os.name: linux
+          - os: linux
             compiler: gfortran
             container: "quay.io/pypa/manylinux_2_28_x86_64"
-          - os.name: linux
+          - os: linux
             compiler: ifort
             container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"
 
-    runs-on: ${{ matrix.os.version }}
+    runs-on: ${{ matrix.os-version }}
     container: null
     env:
       SYSTEM: ${{ matrix.compiler }}
@@ -57,18 +59,18 @@ jobs:
 
       # Actions doesn't seem to have a way to evaluate expressions in paths these 'uses' are hardcoded in
       - name: build and install dependencies
-        if: matrix.os.name == 'linux'
+        if: matrix.os == 'linux'
         uses: ./.github/actions/dependencies/linux
 
-      - if: matrix.os.name == 'macos'
+      - if: matrix.os == 'macos'
         uses: ./.github/actions/dependencies/macos
 
       - name: compile mcfost
-        if: ${{ !(matrix.os.name == 'macos' && matrix.compiler == 'ifort') }}
+        if: ${{ !(matrix.os == 'macos' && matrix.compiler == 'ifort') }}
         working-directory: src
         run: make all
 
-      - if: ${{ matrix.os.name == 'macos' && matrix.compiler == 'ifort' }}
+      - if: ${{ matrix.os == 'macos' && matrix.compiler == 'ifort' }}
         working-directory: src
         run: |
           source /opt/intel/oneapi/setvars.sh
