@@ -53,11 +53,12 @@ jobs:
       - run: git config --global --add safe.directory $PWD
 
       # Actions doesn't seem to have a way to evaluate expressions in paths these 'uses' are hardcoded in
-      - name: build and install dependencies
+      - name: build and install dependencies (linux)
         if: matrix.os == 'linux'
         uses: ./.github/actions/dependencies/linux
 
-      - if: matrix.os == 'macos'
+      - name: build and install dependencies (macos)
+        if: matrix.os == 'macos'
         uses: ./.github/actions/dependencies/macos
 
       - name: compile mcfost
@@ -65,7 +66,8 @@ jobs:
         working-directory: src
         run: make all
 
-      - if: ${{ matrix.os == 'macos' && matrix.compiler == 'ifort' }}
+      - name: compile mcfost (macos w/ ifort)
+        if: ${{ matrix.os == 'macos' && matrix.compiler == 'ifort' }}
         working-directory: src
         run: |
           source /opt/intel/oneapi/setvars.sh
