@@ -16,6 +16,8 @@ runs:
         dnf install -y sudo wget epel-release
         dnf install -y hdf5-static redhat-lsb-core
         cd $HDF5_DIR/include && ln -s /usr/lib64/gfortran/modules/* .
+        dnf install -y tree
+        tree $HDF5_DIR/include
 
     # hdf5 needs to be built from sources for intel compilers
     - name: install hdf5 for intel build
