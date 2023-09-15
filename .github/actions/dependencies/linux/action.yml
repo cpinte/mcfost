@@ -32,6 +32,8 @@ runs:
         cd hdf5-1.10.5
         ./configure --prefix="/usr/local" --enable-fortran --disable-shared
         make install
+        apt install tree
+        tree /usr/local/
 
     - name: get zlib dev libraries
       if: ${{ matrix.compiler == 'ifort' }}
