@@ -15,63 +15,63 @@ env:
   SKIP_HDF5: yes
 
 jobs:
-  macos:
+  build-and-test:
     strategy:
+      fail-fast: false
       matrix:
+        os: [linux, macos]
         compiler: [gfortran, ifort]
         openmp: [yes, no]
-    runs-on: macos-12
+
+        include:
+          # Associate specific os versions with our os tags
+          - os: linux
+            os-version: ubuntu-22.04
+          - os: macos
+            os-version: macos-12
+          
+          # macos needs null container to avoid loading docker; set linux containers as desired
+          - container: null
+          - os: linux
+            compiler: gfortran
+            container: "quay.io/pypa/manylinux_2_28_x86_64"
+          - os: linux
+            compiler: ifort
+            container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"
+
+    runs-on: ${{ matrix.os-version }}
+    container: ${{ matrix.container }}
     env:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
       MCFOST_INSTALL: /usr/local
       OPENMP: ${{ matrix.openmp }}
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: install dependencies
-        uses: ./.github/actions/dependencies/macos
-
-      - name: compile mcfost (gnu)
-        if: ${{ matrix.compiler == 'gfortran' }}
-        working-directory: src
-        run: make all
-
-      - name: compile mcfost (intel)
-        if: ${{ matrix.compiler == 'ifort' }}
-        working-directory: src
-        run: |
-          source /opt/intel/oneapi/setvars.sh
-          make all
-
-      - name: test
-        uses: ./.github/actions/test
-
-  linux:
-    strategy:
-      matrix:
-        toolchain:
-          - {compiler: gfortran, container: quay.io/pypa/manylinux_2_28_x86_64}
-          - {compiler: ifort, container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"}
-        openmp: [yes, no]
-    runs-on: ubuntu-22.04
-    container: ${{ matrix.toolchain.container }}
-    env:
-      SYSTEM: ${{ matrix.toolchain.compiler }}
-      HDF5_DIR: /usr
-      MCFOST_INSTALL: /opt/local
-      OPENMP: ${{ matrix.openmp }}
+    
     steps:
       - uses: actions/checkout@v2
 
       - run: git config --global --add safe.directory $PWD
 
-      - name: build and install dependencies
+      # Actions doesn't seem to have a way to evaluate expressions in paths these 'uses' are hardcoded in
+      - name: build and install dependencies (linux)
+        if: matrix.os == 'linux'
         uses: ./.github/actions/dependencies/linux
 
+      - name: build and install dependencies (macos)
+        if: matrix.os == 'macos'
+        uses: ./.github/actions/dependencies/macos
+
       - name: compile mcfost
+        if: ${{ !(matrix.os == 'macos' && matrix.compiler == 'ifort') }}
         working-directory: src
         run: make all
+
+      - name: compile mcfost (macos w/ ifort)
+        if: ${{ matrix.os == 'macos' && matrix.compiler == 'ifort' }}
+        working-directory: src
+        run: |
+          source /opt/intel/oneapi/setvars.sh
+          make all   
 
       - name: test
         uses: ./.github/actions/test
