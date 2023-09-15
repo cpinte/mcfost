@@ -36,7 +36,7 @@ jobs:
             container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"
 
     runs-on: ${{ matrix.os.version }}
-    container: ${{ matrix.container }}
+    container: null
     env:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
