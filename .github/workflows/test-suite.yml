@@ -55,7 +55,7 @@ jobs:
         uses: ./.github/actions/dependencies/macos
 
       - name: compile mcfost
-        if: ! ${{ matrix.os.name == 'macos' && matrix.compiler == 'ifort' }}
+        if: ${{ !(matrix.os.name == 'macos' && matrix.compiler == 'ifort') }}
         working-directory: src
         run: make all
 
