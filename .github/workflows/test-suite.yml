@@ -27,7 +27,7 @@ jobs:
 
         # Linux runs both need a container to set up dependencies properly
         include:
-          - container: 'null'
+          - container: null
           - os.name: linux
             compiler: gfortran
             container: "quay.io/pypa/manylinux_2_28_x86_64"
@@ -44,6 +44,13 @@ jobs:
       OPENMP: ${{ matrix.openmp }}
     
     steps:
+      - name: verify matrix options
+        run: |
+          echo ${{ matrix.os }}
+          echo ${{ matrix.compiler }}
+          echo ${{ matrix.openmp }}
+          echo ${{ matrix.container }}
+
       - uses: actions/checkout@v2
 
       - run: git config --global --add safe.directory $PWD
