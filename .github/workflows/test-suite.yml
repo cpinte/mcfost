@@ -15,63 +15,116 @@ env:
   SKIP_HDF5: yes
 
 jobs:
-  macos:
+  build-and-test:
     strategy:
       matrix:
+        os: 
+          - {name: linux, version: ubuntu-22.04}
+          - {name: macos, version: macos-12}
         compiler: [gfortran, ifort]
         openmp: [yes, no]
-    runs-on: macos-12
+
+        # Linux runs both need a container to set up dependencies properly
+        include:
+          - os.name: linux
+            compiler: gfortran
+            container: "quay.io/pypa/manylinux_2_28_x86_64"
+          - os.name: linux
+            compiler: ifort
+            container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"
+
+    runs-on: ${{ matrix.os.version }}
+    container: ${{ matrix.container }}
     env:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
       MCFOST_INSTALL: /usr/local
       OPENMP: ${{ matrix.openmp }}
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: install dependencies
-        uses: ./.github/actions/dependencies/macos
-
-      - name: compile mcfost (gnu)
-        if: ${{ matrix.compiler == 'gfortran' }}
-        working-directory: src
-        run: make all
-
-      - name: compile mcfost (intel)
-        if: ${{ matrix.compiler == 'ifort' }}
-        working-directory: src
-        run: |
-          source /opt/intel/oneapi/setvars.sh
-          make all
-
-      - name: test
-        uses: ./.github/actions/test
-
-  linux:
-    strategy:
-      matrix:
-        toolchain:
-          - {compiler: gfortran, container: quay.io/pypa/manylinux_2_28_x86_64}
-          - {compiler: ifort, container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"}
-        openmp: [yes, no]
-    runs-on: ubuntu-22.04
-    container: ${{ matrix.toolchain.container }}
-    env:
-      SYSTEM: ${{ matrix.toolchain.compiler }}
-      HDF5_DIR: /usr
-      MCFOST_INSTALL: /opt/local
-      OPENMP: ${{ matrix.openmp }}
+    
     steps:
       - uses: actions/checkout@v2
 
       - run: git config --global --add safe.directory $PWD
 
+      # Actions doesn't seem to have a way to evaluate expressions in paths these 'uses' are hardcoded in
       - name: build and install dependencies
+        if: matrix.os.name == 'linux'
         uses: ./.github/actions/dependencies/linux
 
+      - if: matrix.os.name == 'macos'
+        uses: ./.github/actions/dependencies/macos
+
       - name: compile mcfost
+        if: ! ${{ matrix.os.name == 'macos' && matrix.compiler == 'ifort' }}
         working-directory: src
         run: make all
 
+      - if: ${{ matrix.os.name == 'macos' && matrix.compiler == 'ifort' }}
+        working-directory: src
+        run: |
+          source /opt/intel/oneapi/setvars.sh
+          make all   
+
       - name: test
         uses: ./.github/actions/test
+
+  # macos:
+  #   strategy:
+  #     matrix:
+  #       compiler: [gfortran, ifort]
+  #       openmp: [yes, no]
+  #   runs-on: macos-12
+  #   env:
+  #     SYSTEM: ${{ matrix.compiler }}
+  #     HDF5_DIR: /usr/local
+  #     MCFOST_INSTALL: /usr/local
+  #     OPENMP: ${{ matrix.openmp }}
+  #   steps:
+  #     - uses: actions/checkout@v2
+
+  #     - name: install dependencies
+  #       uses: ./.github/actions/dependencies/macos
+
+  #     - name: compile mcfost (gnu)
+  #       if: ${{ matrix.compiler == 'gfortran' }}
+  #       working-directory: src
+  #       run: make all
+
+  #     - name: compile mcfost (intel)
+  #       if: ${{ matrix.compiler == 'ifort' }}
+  #       working-directory: src
+  #       run: |
+  #         source /opt/intel/oneapi/setvars.sh
+  #         make all
+
+  #     - name: test
+  #       uses: ./.github/actions/test
+
+  # linux:
+  #   strategy:
+  #     matrix:
+  #       toolchain:
+  #         - {compiler: gfortran, container: quay.io/pypa/manylinux_2_28_x86_64}
+  #         - {compiler: ifort, container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"}
+  #       openmp: [yes, no]
+  #   runs-on: ubuntu-22.04
+  #   container: ${{ matrix.toolchain.container }}
+  #   env:
+  #     SYSTEM: ${{ matrix.toolchain.compiler }}
+  #     HDF5_DIR: /usr
+  #     MCFOST_INSTALL: /opt/local
+  #     OPENMP: ${{ matrix.openmp }}
+  #   steps:
+  #     - uses: actions/checkout@v2
+
+  #     - run: git config --global --add safe.directory $PWD
+
+  #     - name: build and install dependencies
+  #       uses: ./.github/actions/dependencies/linux
+
+  #     - name: compile mcfost
+  #       working-directory: src
+  #       run: make all
+
+  #     - name: test
+  #       uses: ./.github/actions/test

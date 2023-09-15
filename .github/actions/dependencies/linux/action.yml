@@ -10,7 +10,7 @@ runs:
 
     # hdf5.mod file is located at /usr/lib64/gfortran/modules/ on almalinux
     - name: install hdf5 for gnu build
-      if: ${{ matrix.toolchain.compiler == 'gfortran' }}
+      if: ${{ matrix.compiler == 'gfortran' }}
       shell: bash
       run: |
         dnf install -y sudo wget epel-release
@@ -19,7 +19,7 @@ runs:
 
     # hdf5 needs to be built from sources for intel compilers
     - name: install hdf5 for intel build
-      if: ${{ matrix.toolchain.compiler == 'ifort' }}
+      if: ${{ matrix.compiler == 'ifort' }}
       shell: bash
       env:
         CC: icc
@@ -34,7 +34,7 @@ runs:
         make install
 
     - name: get zlib dev libraries
-      if: ${{ matrix.toolchain.compiler == 'ifort' }}
+      if: ${{ matrix.compiler == 'ifort' }}
       shell: bash
       run: |
         apt-get update
@@ -46,7 +46,7 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ env.MCFOST_INSTALL }}
-        key: mcfost-deps-${{ runner.os }}-${{ matrix.toolchain.compiler }}-${{ hashFiles('lib/install.sh') }}
+        key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
     # Only do this (lengthy) setup if dependency cache not found
     - name: prepare mcfost environment

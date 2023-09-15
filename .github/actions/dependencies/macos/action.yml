@@ -28,7 +28,7 @@ runs:
           /usr/local/Cellar/cfitsio/
           /usr/local/Cellar/voro-dev/
           /usr/local/Cellar/sprng2/
-        key: mcfost-deps-${{ runner.os }}-${{ matrix.toolchain.compiler }}-${{ hashFiles('lib/install.sh') }}
+        key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
       # Symlinks to the path need to be created again after the cache is restored
     - name: add brew links
