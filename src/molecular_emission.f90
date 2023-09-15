@@ -713,6 +713,7 @@ function v_proj(icell,x,y,z,u,v,w) !
 
            cos_theta = rcyl/r
            sin_theta = z/r
+           if ((.not.l3d).and.(z < 0)) sin_theta = -sin_theta
 
            cos_phi = x/rcyl
            sin_phi = y/rcyl
