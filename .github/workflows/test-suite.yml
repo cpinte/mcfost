@@ -11,14 +11,18 @@ on:
 
 env:
   MCFOST_NO_XGBOOST: yes
-  SYSTEM: gfortran
   MCFOST_GIT: "1"
   SKIP_HDF5: yes
 
 jobs:
   macos:
+    strategy:
+      matrix:
+        compiler: [gfortran, ifort]
+
     runs-on: macos-12
     env:
+      SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
       MCFOST_INSTALL: /usr/local
     steps:
@@ -27,28 +31,36 @@ jobs:
       - name: install dependencies
         uses: ./.github/actions/dependencies/macos
 
-      - name: compile mcfost
+      - name: compile mcfost (gnu)
+        if: ${{ matrix.compiler == 'gfortran' }}
         working-directory: src
         run: make all
+
+      - name: compile mcfost (intel)
+        if: ${{ matrix.compiler == 'ifort' }}
+        working-directory: src
+        run: |
+          source /opt/intel/oneapi/setvars.sh 
+          make all
 
       - name: test
         uses: ./.github/actions/test
 
   linux:
+    strategy:
+      matrix:
+        toolchain:
+          - {compiler: gfortran, container: quay.io/pypa/manylinux_2_28_x86_64}
+          - {compiler: ifort, container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"}
+
     runs-on: ubuntu-22.04
-    container: quay.io/pypa/manylinux_2_28_x86_64
+    container: ${{ matrix.toolchain.container }}
     env:
+      SYSTEM: ${{ matrix.toolchain.compiler }}
       HDF5_DIR: /usr
       MCFOST_INSTALL: /opt/local
     steps:
       - uses: actions/checkout@v2
-
-      # hdf5.mod file is located at /usr/lib64/gfortran/modules/ on almalinux
-      - name: install hdf5
-        run: |
-          dnf install -y sudo wget epel-release
-          dnf install -y hdf5-static redhat-lsb-core
-          cd /usr/include && ln -s /usr/lib64/gfortran/modules/* .
 
       - run: git config --global --add safe.directory $PWD
 
