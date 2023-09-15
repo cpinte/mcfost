@@ -26,6 +26,7 @@ jobs:
 
         # Linux runs both need a container to set up dependencies properly
         include:
+          - container: null
           - os.name: linux
             compiler: gfortran
             container: "quay.io/pypa/manylinux_2_28_x86_64"
