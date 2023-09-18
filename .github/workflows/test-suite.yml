@@ -52,9 +52,6 @@ jobs:
 
       - run: git config --global --add safe.directory $PWD
 
-      - name: show GITHUB_ENV
-        run: echo $GITHUB_ENV
-
       # Actions doesn't seem to have a way to evaluate expressions in paths these 'uses' are hardcoded in
       - name: build and install dependencies (linux)
         if: matrix.os == 'linux'
@@ -64,16 +61,11 @@ jobs:
         if: matrix.os == 'macos'
         uses: ./.github/actions/dependencies/macos
 
-      - name: set up intel compiler env if needed
-        if: ${{ matrix.os == 'macos' && matrix.compiler == 'ifort' }}
-        working-directory: src
-        run: |
-          source /opt/intel/oneapi/setvars.sh
-          echo $GITHUB_ENV
-
       - name: compile mcfost
         working-directory: src
-        run: make all
+        run: |
+          source /opt/intel/oneapi/setvars.sh || true
+          make all
 
       - name: test
         uses: ./.github/actions/test
