@@ -63,9 +63,8 @@ jobs:
 
       - name: compile mcfost
         working-directory: src
-        shell: bash
+        shell: bash {0}
         run: |
-          set +o pipefail
           source /opt/intel/oneapi/setvars.sh || true
           make all
 
