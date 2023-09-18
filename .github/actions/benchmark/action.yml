@@ -17,7 +17,7 @@ runs:
       shell: bash
       run: |
         wget http://ipag.osug.fr/public/pintec/mcfost/test_data/discF_00500
-        mv discF_00500 test_data/discF_00500
+        mv discF_00500 test_suite/test_data/discF_00500
 
     - name: run benchmark
       shell: bash
