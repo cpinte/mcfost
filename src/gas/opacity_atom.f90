@@ -401,7 +401,9 @@ module Opacity_atom
       integer :: nat, Nred, Nblue, kr, i, j, Nlam
       real(kind=dp) :: dv
       type(AtomType), pointer :: atom
-      real(kind=dp), dimension(Nlambda_max_line) :: phi0
+      real(kind=dp), dimension(Nlambda_max_line) :: phi0, vline
+      real(kind=dp), dimension(N_gauss) :: v_gauss, phi_gauss
+
 
       dv = 0.0_dp
       if (lnon_lte_loop.and..not.iterate) then !not iterate but non-LTE
@@ -410,6 +412,19 @@ module Opacity_atom
 
       atom_loop : do nat = 1, N_Atoms
          atom => Atoms(nat)%p
+
+         vth = vbroad(T(icell),Atom%weight, vturb(icell))
+
+         !any line of that atom with a Gaussian profile ? 
+         !use the same profile for all
+         !TO DO: before each mode (nlte, image/flux)
+         if (atom%lany_gauss_prof) then
+            peak_g = peak_gauss_limit / sqrt(pi) / vth
+            vg_max = vth * sqrt(-log(peak_g * sqrt(pi) * vth))
+            v_gauss = span_dp(-vg_max,vg_max,N_gauss,1)
+            phi_gauss = gauss_profile(id,icell,iray,iterate,N_gauss,v_gauss,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+            v_gauss = v_gauss - dv
+         endif
 
          tr_loop : do kr = 1,atom%Nline
 
