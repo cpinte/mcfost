@@ -22,5 +22,5 @@ runs:
     
     - name: report results
       run: |
-      echo ${{ matrix.compiler }}
-      cat benchmark-${{ matrix.compiler }}.tim
+        echo ${{ matrix.compiler }}
+        cat benchmark-${{ matrix.compiler }}.tim
