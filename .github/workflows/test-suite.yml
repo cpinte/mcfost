@@ -69,7 +69,7 @@ jobs:
         working-directory: src
         run: |
           source /opt/intel/oneapi/setvars.sh
-          echo something
+          echo $GITHUB_ENV
 
       - name: compile mcfost
         working-directory: src
