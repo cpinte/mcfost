@@ -23,7 +23,7 @@ module Opacity_atom
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
    real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:), eta_tot(:)
-   integer, parameter 		   :: NvspaceMax = 151
+   integer, parameter 		   :: NvspaceMax = 151, N_gauss = 101
    logical 		               :: lnon_lte_loop
 
    contains
@@ -436,7 +436,26 @@ module Opacity_atom
             phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
-
+               !they don't have necessary the same number of points for all lines
+               !due to overlap etc. Still, should be an increase in speed as I do 1 interpolations instead of Nvspace.
+               !TO DO: how to have the same number of points ! for Gauss line
+               ! write(*,*) "********", dv
+               ! phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
+               !                   x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+               ! do la=1, Nlam
+               !    write(*,*) lambda(Nblue-1+la), phi0(la)
+               ! enddo 
+               ! write(*,*) "phi0g (ex) = ", phi0(1), phi0(Nlam), maxval(phi0(1:Nlam))
+               vline(1:Nlam) = c_light * (lambda(Nblue:Nred) - atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 - dv
+               ! write(*,*) "vl=",vline
+               ! write(*,*) "vg=",v_gauss
+               phi0(1:Nlam) = linear_1D_sorted(N_gauss,v_gauss,phi_gauss,Nlam,vline(1:Nlam))
+               !phi0(1) = phi_gauss(1); phi0(Nlam) = phi_gauss(N_gauss)
+               ! write(*,*) "phi0g = ", phi0(1), phi0(Nlam), maxval(phi0(1:Nlam))
+               ! do la=1, Nlam
+               !    write(*,*) lambda(Nblue-1+la), phi0(la)
+               ! enddo 
+               ! if (dv /= 0) stop
 
             chi(Nblue:Nred) = chi(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Bij * phi0(1:Nlam) * (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell))
