@@ -433,8 +433,10 @@ module Opacity_atom
                endif
             endif
 
-            phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
+            if (atom%lines(kr)%voigt) then
+               phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+            else
             !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
                !they don't have necessary the same number of points for all lines
                !due to overlap etc. Still, should be an increase in speed as I do 1 interpolations instead of Nvspace.
@@ -456,6 +458,7 @@ module Opacity_atom
                !    write(*,*) lambda(Nblue-1+la), phi0(la)
                ! enddo 
                ! if (dv /= 0) stop
+            endif
 
             chi(Nblue:Nred) = chi(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Bij * phi0(1:Nlam) * (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell))
