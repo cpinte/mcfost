@@ -11,7 +11,7 @@ module Opacity_atom
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
    use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, &
-                                    Nlambda_max_line_vel
+                                    Nlambda_max_line_vel, peak_gauss_limit
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
@@ -399,7 +399,7 @@ module Opacity_atom
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
       real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
       integer :: nat, Nred, Nblue, kr, i, j, Nlam
-      real(kind=dp) :: dv
+      real(kind=dp) :: dv, vg_max, vth, peak_g
       type(AtomType), pointer :: atom
       real(kind=dp), dimension(Nlambda_max_line) :: phi0, vline
       real(kind=dp), dimension(N_gauss) :: v_gauss, phi_gauss

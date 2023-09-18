@@ -284,6 +284,8 @@ module io_atom
          !-> move to make_wavelengths_nlte in wavlengths_gas
          ! call compute_line_bound(atom%lines(kr),.false.)
       end do !end loop over bound-bound transitions
+      atom%lany_gauss_prof = .false.
+      if (any(atom%lines(:)%voigt)) atom%lany_gauss_prof = .true.
 
       ! ----------------------------------------- !
       ! starts reading bound-free transitions
