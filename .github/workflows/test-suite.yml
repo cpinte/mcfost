@@ -63,10 +63,9 @@ jobs:
 
       - name: compile mcfost
         working-directory: src
+        shell: bash
         run: |
-          set +e
-          source /opt/intel/oneapi/setvars.sh
-          set -e
+          source /opt/intel/oneapi/setvars.sh || true
           make all
 
       - name: test
