@@ -302,6 +302,9 @@ module wavelengths_gas
       min_lines = 1d50 !the bluest wavelength among all lines
       do n=1, N_atoms
          atom => atoms(n)%p
+         !all lines contribute in non-LTE
+         atom%lany_gauss_prof = .false.
+         if (any(.not.atom%lines(:)%voigt)) atom%lany_gauss_prof = .true.
          !km/s
          !TO DO: define one hv per atom !
          hv = min(hv, 1d-3 * 0.46*vbroad(minval(T,mask=T>0),atom%weight,minval(vturb,mask=T>0)))
@@ -956,6 +959,9 @@ module wavelengths_gas
          Ntrans = Ntrans + atom%Ntr
          ! Nlines = Nlines + atom%Nline
          Ncont = Ncont + atom%Ncont
+         !Check Gaussian line among ray-traced lines.
+         atom%lany_gauss_prof = .false.
+         if (any(.not.atom%lines(:)%voigt).and.any(atom%lines(:)%lcontrib)) atom%lany_gauss_prof = .true.
       enddo
       atom => null()
 
@@ -1190,6 +1196,10 @@ module wavelengths_gas
                         ((atom%lines(kr)%lambdamin > group_blue(lac)).and.&
                            (atom%lines(kr)%lambdamin < group_red(lac))) ) then
                      atom%lines(kr)%lcontrib = .true.
+                     !check for potential overlap with a gaussian line.
+                     if (.not.atom%lany_gauss_prof) then
+                        if (.not.atom%lines(kr)%voigt) atom%lany_gauss_prof = .true.
+                     endif
                      write(*,*) " *** line transition ", kr, " of atom ", &
                         atom%ID, " overlaps with another line"
                      write(*,*) "    -> in group ", lac, group_blue(lac), group_red(lac)
@@ -1258,6 +1268,10 @@ module wavelengths_gas
             Ntrans = Ntrans + atom%Ntr
             Nlines = Nlines + atom%Nline
             Ncont = Ncont + atom%Ncont
+            !Check Gaussian line among ray-traced lines.
+            !in flux mode all lines are kept.
+            atom%lany_gauss_prof = .false.
+            if (any(.not.atom%lines(:)%voigt)) atom%lany_gauss_prof = .true.
          enddo
          atom => null()
 
@@ -1614,6 +1628,10 @@ module wavelengths_gas
             do kr=1,atoms(n)%p%Nline
                call compute_line_bound(atoms(n)%p%lines(kr),.true.)
             enddo
+            !Check Gaussian line among ray-traced lines.
+            !in flux mode all not all lines are kept.
+            atoms(n)%p%lany_gauss_prof = .false.
+            if (any(.not.atoms(n)%p%lines(:)%voigt)) atoms(n)%p%lany_gauss_prof = .true.
          enddo
       endif
 
