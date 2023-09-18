@@ -75,3 +75,29 @@ jobs:
 
       - name: test
         uses: ./.github/actions/test
+
+  benchmark:
+    strategy:
+      matrix:
+        compiler: [gfortran, ifort]
+    runs-on: macos-12
+    env:
+      SYSTEM: ${{ matrix.compiler }}
+      HDF5_DIR: /usr/local
+      MCFOST_INSTALL: /usr/local
+      OPENMP: yes
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: install dependencies
+        uses: ./.github/actions/dependencies/macos
+
+      - name: compile mcfost
+        working-directory: src
+        shell: bash {0}
+        run: |
+          source /opt/intel/oneapi/setvars.sh || true
+          make
+
+      - name: benchmark
+        uses: ./.github/actions/benchmark

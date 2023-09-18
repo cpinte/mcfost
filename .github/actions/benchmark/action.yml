@@ -1,0 +1,26 @@
+name: "benchmark"
+description: "run performance benchmark (for macos only)"
+
+# TODO: if any other runs fail then don't save benchmark results (if the benchmark somehow runs e.g. linux-only bug)
+
+runs:
+  using: "composite"
+  steps:
+  - name: run mcfost set up (downloads additional files)
+    shell: bash
+    working-directory: src
+    env:
+      MCFOST_UTILS: ${{ github.workspace }}/utils
+    run: ./mcfost -setup
+
+  - name: run benchmark
+    shell: bash
+    working-directory: src
+    run: |
+      brew install gnu-time
+      gtime -o benchmark-${{ matrix.compiler }}.tim -p ./mcfost ../test_suite/test_data/ref3.0/ref3.0.para
+  
+  - name: report results
+    run: |
+    echo ${{ matrix.compiler }}
+    cat benchmark-${{ matrix.compiler }}.tim
