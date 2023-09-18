@@ -65,6 +65,7 @@ jobs:
         working-directory: src
         shell: bash
         run: |
+          set +o pipefail
           source /opt/intel/oneapi/setvars.sh || true
           make all
 
