@@ -65,7 +65,7 @@ jobs:
         working-directory: src
         shell: bash -e {0}
         run: |
-          source /opt/intel/oneapi/setvars.sh || true
+          test -f /opt/intel/oneapi/setvars.sh && source /opt/intel/oneapi/setvars.sh
           make all
 
       - name: test
