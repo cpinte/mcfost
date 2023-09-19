@@ -1052,7 +1052,7 @@ module atom_transfer
       n_lambda = size(tab_lambda_nm)
       tab_lambda = tab_lambda_nm * nm_to_m!micron
 
-      call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      call alloc_atom_opac(n_lambda, tab_lambda_nm, .true.)
       call allocate_atom_maps()
       if (laccretion_shock) then
          max_Tshock = 0.0; min_Tshock = 1d8
@@ -1136,7 +1136,7 @@ module atom_transfer
          tab_lambda = tab_lambda_nm * m_to_km
 
          ! !allocate quantities in space and for this frequency grid
-         call alloc_atom_opac(n_lambda, tab_lambda_nm)
+         call alloc_atom_opac(n_lambda, tab_lambda_nm, .false.)
 
          call nlte_loop_mali()
          !-> here on the non-LTE frequency grid
@@ -1624,7 +1624,7 @@ module atom_transfer
       endif
       n_lambda = size(tab_lambda_nm)
       tab_lambda = tab_lambda_nm * m_to_km
-      call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      call alloc_atom_opac(n_lambda, tab_lambda_nm, .true.)
       !should not be allocated already
       allocate(Itot(N_lambda,Nimpact,nb_proc),stat=alloc_status); Itot = 0.0_dp
       if (alloc_status > 0) call error("spectrum_1d: cannot allocate Itot")

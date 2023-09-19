@@ -11,7 +11,7 @@ module Opacity_atom
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
    use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, &
-                                    Nlambda_max_line_vel, peak_gauss_limit
+                                    peak_gauss_limit, Nlambda_line_gauss_log, Nlambda_line_gauss_lin
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
@@ -23,8 +23,9 @@ module Opacity_atom
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
    real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:), eta_tot(:)
-   integer, parameter 		   :: NvspaceMax = 151, N_gauss = 101
+   integer, parameter 		   :: NvspaceMax = 151
    logical 		               :: lnon_lte_loop
+   integer                    :: N_gauss
 
    contains
 
@@ -117,9 +118,10 @@ module Opacity_atom
    end subroutine activate_continua
 
    !could be parralel
-   subroutine alloc_atom_opac(N,x)
+   subroutine alloc_atom_opac(N,x,limage)
       integer, intent(in) :: N
       real(kind=dp), dimension(N) :: x
+      logical, intent(in) :: limage
       integer :: nat, kr, icell, nb, nr
       type(AtomType), pointer :: atm
       real(kind=dp) :: vth
@@ -130,6 +132,14 @@ module Opacity_atom
       ! call alloc_gas_contopac(N,x)
       !-> on a small grid and interpolated later
       call alloc_gas_contopac(n_lambda_cont,tab_lambda_cont)
+      if (limage) then
+         N_gauss = 0
+         do nat=1, n_Atoms
+            N_gauss = max(N_gauss, atoms(nat)%p%n_speed_rt)
+         enddo
+      else
+         N_gauss = (Nlambda_line_gauss_log + Nlambda_line_gauss_lin) + mod(Nlambda_line_gauss_log + Nlambda_line_gauss_lin+1,2)
+      endif
 
       do nat=1, n_atoms
          atm => atoms(nat)%p
@@ -402,6 +412,7 @@ module Opacity_atom
       real(kind=dp) :: dv, vg_max, vth, peak_g
       type(AtomType), pointer :: atom
       real(kind=dp), dimension(Nlambda_max_line) :: phi0, vline
+      integer :: nvel_rt
       real(kind=dp), dimension(N_gauss) :: v_gauss, phi_gauss
 
 
@@ -419,10 +430,19 @@ module Opacity_atom
          !use the same profile for all
          !TO DO: before each mode (nlte, image/flux)
          if (atom%lany_gauss_prof) then
-            peak_g = peak_gauss_limit / sqrt(pi) / vth
-            vg_max = vth * sqrt(-log(peak_g * sqrt(pi) * vth))
-            v_gauss = span_dp(-vg_max,vg_max,N_gauss,1)
-            phi_gauss = gauss_profile(id,icell,iray,iterate,N_gauss,v_gauss,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+            if (lnon_lte_loop) then               
+            !completely linear for Gaussian with the sum of Ngauss_log and Ngauss_lin (see line_lambda_grid in gas/wavelengths_gas.f90)
+               nvel_rt = N_gauss
+               peak_g = peak_gauss_limit / sqrt(pi) / vth
+               vg_max = vth * sqrt(-log(peak_g * sqrt(pi) * vth))
+            else 
+            !image mode or flux, linear grid in hv
+               nvel_rt = atom%n_speed_rt
+               vg_max = 1d3 * atom%vmax_rt!vth * sqrt(-log(peak_g * sqrt(pi) * vth))
+               ! v_gauss(1:nvel_rt) = span_dp(-vg_max,vg_max,nvel_rt,1)
+            endif
+            v_gauss(1:nvel_rt) = span_dp(-vg_max,vg_max,nvel_rt,1)
+            phi_gauss(1:nvel_rt) = gauss_profile(id,icell,iray,iterate,nvel_rt,v_gauss,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
          endif
 
          tr_loop : do kr = 1,atom%Nline
@@ -451,7 +471,9 @@ module Opacity_atom
                phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
             else
-            !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
+               if (Nlam==nvel_rt) then
+                  phi0(1:Nlam) = phi_gauss(1:Nlam)
+               else
                !they don't have necessary the same number of points for all lines
                !due to overlap etc. Still, should be an increase in speed as I do 1 interpolations instead of Nvspace.
                !TO DO: how to have the same number of points ! for Gauss line
@@ -462,17 +484,19 @@ module Opacity_atom
                !    write(*,*) lambda(Nblue-1+la), phi0(la)
                ! enddo 
                ! write(*,*) "phi0g (ex) = ", phi0(1), phi0(Nlam), maxval(phi0(1:Nlam))
-               vline(1:Nlam) = c_light * (lambda(Nblue:Nred) - atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0
+                  vline(1:Nlam) = c_light * (lambda(Nblue:Nred) - atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0
                ! write(*,*) "vl=",vline
                ! write(*,*) "vg=",v_gauss
-               phi0(1:Nlam) = linear_1D_sorted(N_gauss,v_gauss,phi_gauss,Nlam,vline(1:Nlam))
+                  phi0(1:Nlam) = linear_1D_sorted(nvel_rt,v_gauss,phi_gauss(1:nvel_rt),Nlam,vline(1:Nlam))
                !phi0(1) = phi_gauss(1); phi0(Nlam) = phi_gauss(N_gauss)
                ! write(*,*) "phi0g = ", phi0(1), phi0(Nlam), maxval(phi0(1:Nlam))
                ! do la=1, Nlam
                !    write(*,*) lambda(Nblue-1+la), phi0(la)
                ! enddo 
                ! if (dv /= 0) stop
+               endif
             endif
+            !TO DO: compare the local interp with master and clean
 
             chi(Nblue:Nred) = chi(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Bij * phi0(1:Nlam) * (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell))
