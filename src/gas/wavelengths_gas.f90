@@ -1268,10 +1268,6 @@ module wavelengths_gas
             Ntrans = Ntrans + atom%Ntr
             Nlines = Nlines + atom%Nline
             Ncont = Ncont + atom%Ncont
-            !Check Gaussian line among ray-traced lines.
-            !in flux mode all lines are kept.
-            atom%lany_gauss_prof = .false.
-            if (any(.not.atom%lines(:)%voigt)) atom%lany_gauss_prof = .true.
          enddo
          atom => null()
 
@@ -1718,7 +1714,9 @@ module wavelengths_gas
                if (atom%lines(kr)%Nlambda < 3) atom%lines(kr)%lcontrib = .false.
             endif
          enddo
-
+         !Check Gaussian line among ray-traced lines.
+         atom%lany_gauss_prof = .false.
+         if (any(.not.atom%lines(:)%voigt).and.any(atom%lines(:)%lcontrib)) atom%lany_gauss_prof = .true.
          atom => NULL()
       enddo
       write(*,*) "Number of max freq points for all lines resolution :", Nlambda_max_line
