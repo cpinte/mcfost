@@ -423,7 +423,6 @@ module Opacity_atom
             vg_max = vth * sqrt(-log(peak_g * sqrt(pi) * vth))
             v_gauss = span_dp(-vg_max,vg_max,N_gauss,1)
             phi_gauss = gauss_profile(id,icell,iray,iterate,N_gauss,v_gauss,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
-            v_gauss = v_gauss - dv
          endif
 
          tr_loop : do kr = 1,atom%Nline
@@ -463,7 +462,7 @@ module Opacity_atom
                !    write(*,*) lambda(Nblue-1+la), phi0(la)
                ! enddo 
                ! write(*,*) "phi0g (ex) = ", phi0(1), phi0(Nlam), maxval(phi0(1:Nlam))
-               vline(1:Nlam) = c_light * (lambda(Nblue:Nred) - atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 - dv
+               vline(1:Nlam) = c_light * (lambda(Nblue:Nred) - atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0
                ! write(*,*) "vl=",vline
                ! write(*,*) "vg=",v_gauss
                phi0(1:Nlam) = linear_1D_sorted(N_gauss,v_gauss,phi_gauss,Nlam,vline(1:Nlam))
@@ -819,6 +818,78 @@ module Opacity_atom
 
       return
    end function profile_art_i
+
+   function gauss_profile(id,icell,iray,lsubstract_avg,N,vel,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   use voigts, only : VoigtThomson
+      ! phi = Voigt / sqrt(pi) / vbroad(icell)
+      integer, intent(in)                    :: id,icell, iray,N
+      logical, intent(in)                    :: lsubstract_avg
+      real(kind=dp), dimension(N), intent(in):: vel
+      real(kind=dp), intent(in)              :: x,y,z,u,v,w,& !positions and angles used to project
+                                             x1,y1,z1, &      ! velocity field and magnetic field
+                                             l_void_before,l_contrib, & !physical length of the cell
+                                             vth
+      integer 											:: Nvspace
+      real(kind=dp), dimension(NvspaceMax)   :: Omegav
+      real(kind=dp)                          :: norm
+      real(kind=dp)                          :: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
+                                                dv, omegav_mean
+      integer                                :: nv
+      real(kind=dp), dimension(N)            :: u0, gauss_profile, u1, u0sq
+
+      Nvspace = NvspaceMax
+
+      u0(:) = vel/vth
+
+      v0 = v_proj(icell,x,y,z,u,v,w)
+      if (lvoronoi) then
+         omegav(1) = v0
+         Nvspace = 1
+         omegav_mean = v0
+      else
+
+         Omegav = 0.0
+         omegav(1) = v0
+         v1 = v_proj(icell,x1,y1,z1,u,v,w)
+
+         dv = abs(v1-v0)
+         Nvspace = min(max(2,nint(dv/vth*20.)),NvspaceMax)
+
+         do nv=2, Nvspace-1
+            delta_vol_phi = l_void_before + (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
+            xphi=x+delta_vol_phi*u
+            yphi=y+delta_vol_phi*v
+            zphi=z+delta_vol_phi*w
+            omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+         enddo
+         omegav(Nvspace) = v1
+         omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
+      endif
+      !in non-LTE:
+      !the actual cell icell_nlte must be centered on 0 (moving at vmean).
+      !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte)
+      if (lsubstract_avg) then!labs == .true.
+         omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+         vlabs(iray,id) = omegav_mean
+      else
+         if (lnon_lte_loop) omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(iray,id)
+      endif
+
+   
+      u0sq(:) = u0(:)*u0(:)
+      !Note: u1 = (u0 - omegav(nv)/vth)**2
+      u1(:) = u0sq(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
+      gauss_profile(:) = exp(-u1(:))
+      do nv=2, Nvspace
+         u1(:) = u0sq(:) + (omegav(nv)/vth)*(omegav(nv)/vth) - 2*u0(:) * omegav(nv)/vth
+         gauss_profile(:) = gauss_profile(:) + exp(-u1(:))
+      enddo
+
+      norm = Nvspace * vth * sqrtpi
+      gauss_profile(:) = gauss_profile(:) / norm
+
+      return
+   end function gauss_profile
 
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
    !To do: store opacity in 3d arrays in space instead of icell
