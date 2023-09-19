@@ -102,3 +102,8 @@ jobs:
 
       - name: benchmark
         uses: ./.github/actions/benchmark
+      
+      - name: report benchmark results
+        run: |
+          echo ${{ matrix.compiler }} $(cat benchmark-${{ matrix.compiler }}.tim)
+          
