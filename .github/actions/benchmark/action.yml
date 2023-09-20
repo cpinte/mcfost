@@ -26,4 +26,4 @@ runs:
         MCFOST_UTILS: ${{ github.workspace }}/utils
       run: |
         brew install gnu-time
-        gtime -o ../benchmark-${{ matrix.compiler }}.tim --format=%E ./mcfost ../test_suite/test_data/discF_00500/discF_00500.para -phantom ../test_suite/test_data/discF_00500/discF_00500
+        gtime -o ../benchmark-${{ matrix.compiler }}.tim --format=%E ./mcfost ../test_suite/test_data/discF_00500/discF_00500.para -phantom ../test_suite/test_data/discF_00500/discF_00500 -mol
