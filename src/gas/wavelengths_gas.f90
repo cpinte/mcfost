@@ -18,6 +18,7 @@ module wavelengths_gas
    !continuum wavelength double for level dissolution !
    integer, parameter :: Nlambda_cont = 101
    integer, parameter :: Nlambda_cont_log = 31
+   !-> half-size of each region
    integer, parameter :: Nlambda_line_w_log = 21!17!14 !log wings
    integer, parameter :: Nlambda_line_c_lin = 15!13!12 ! linear core
    real, parameter    :: vcore_on_vth = 0.9!0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
@@ -25,6 +26,7 @@ module wavelengths_gas
    ! real, parameter    :: vwing_on_vth = 10.0 ! 5.0!local (Voigt) line goes from 0 to vwing_on_vth * vth km/s
 !make assym gauss
    ! integer, parameter :: Nlambda_line_gauss = 21 !11 !if linear
+   !-> if Gauss is linear it is the sum of the two, and it is the full size ! (not half)
    integer, parameter :: Nlambda_line_gauss_log = 15!5 !log wings
    integer, parameter :: Nlambda_line_gauss_lin = 13!7 ! linear core
    real, parameter    :: vcore_on_vth_gauss = 0.6

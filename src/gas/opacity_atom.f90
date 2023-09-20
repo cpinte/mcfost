@@ -438,8 +438,7 @@ module Opacity_atom
             else 
             !image mode or flux, linear grid in hv
                nvel_rt = atom%n_speed_rt
-               vg_max = 1d3 * atom%vmax_rt!vth * sqrt(-log(peak_g * sqrt(pi) * vth))
-               ! v_gauss(1:nvel_rt) = span_dp(-vg_max,vg_max,nvel_rt,1)
+               vg_max = 1d3 * atom%vmax_rt
             endif
             v_gauss(1:nvel_rt) = span_dp(-vg_max,vg_max,nvel_rt,1)
             phi_gauss(1:nvel_rt) = gauss_profile(id,icell,iray,iterate,nvel_rt,v_gauss,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
@@ -497,6 +496,7 @@ module Opacity_atom
                endif
             endif
             !TO DO: compare the local interp with master and clean
+            !reduce the number of wavelenghts to
 
             chi(Nblue:Nred) = chi(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Bij * phi0(1:Nlam) * (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell))
