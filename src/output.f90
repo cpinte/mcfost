@@ -3283,7 +3283,7 @@ subroutine ecriture_spectre(imol)
   call ftpkys(unit,'CUNIT2',"deg",'',status)
 
   call ftpkys(unit,'CTYPE3',"VELO-LSR",'[km/s]',status)
-  call ftpkye(unit,'CRVAL3',0.,-7,'',status)
+  call ftpkye(unit,'CRVAL3',v_syst,-7,'',status)
   call ftpkyj(unit,'CRPIX3',mol(imol)%n_speed_rt+1,'',status)
   call ftpkye(unit,'CDELT3',real(mol(imol)%vmax_center_rt/mol(imol)%n_speed_rt * m_to_km),-7,'delta_V [km/s]',status)
   call ftpkys(unit,'CUNIT3',"km/s",'',status)
@@ -3442,7 +3442,7 @@ subroutine ecriture_spectre(imol)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      !  Write the array to the FITS file.
-     call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt),status)
+     call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt) + v_syst,status)
   endif ! lcasa
 
   ! extra hdu with star positions

@@ -40,7 +40,7 @@ module molecular_emission
 
   real, dimension(:), allocatable :: v_turb, v_line ! n_cells
 
-  real ::  vitesse_turb, dv, dnu
+  real ::  vitesse_turb, dv, dnu, v_syst
   integer, parameter :: n_largeur_Doppler = 15
   real(kind=dp), dimension(:), allocatable :: tab_v ! n_speed
 
