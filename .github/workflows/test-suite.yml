@@ -16,7 +16,6 @@ env:
 
 jobs:
   build-and-test:
-    concurrency: test_then_benchmark
     strategy:
       fail-fast: false
       matrix:
@@ -73,7 +72,7 @@ jobs:
         uses: ./.github/actions/test
 
   benchmark:
-    concurrency: test_then_benchmark
+    needs: build-and-test
     strategy:
       matrix:
         compiler: [gfortran, ifort]
