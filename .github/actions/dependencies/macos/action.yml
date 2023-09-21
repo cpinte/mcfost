@@ -28,7 +28,7 @@ runs:
           /usr/local/Cellar/cfitsio/
           /usr/local/Cellar/voro-dev/
           /usr/local/Cellar/sprng2/
-        key: mcfost-deps-${{ runner.os }}-${{ matrix.toolchain.compiler }}-${{ hashFiles('lib/install.sh') }}
+        key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
       # Symlinks to the path need to be created again after the cache is restored
     - name: add brew links
@@ -67,7 +67,7 @@ runs:
           wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
           tar xjvf hdf5-1.10.5.tar.bz2
           cd hdf5-1.10.5
-          sudo CC=icc FC=ifort CXX=icpc ./configure --prefix=/usr/local --enable-fortran  --enable-cxx
+          sudo CC=icc FC=ifort CXX=icpc ./configure --prefix=$HDF5_DIR --enable-fortran  --enable-cxx
           sudo make
           sudo make install
 
