@@ -52,7 +52,7 @@ jobs:
 
       - run: git config --global --add safe.directory $PWD
 
-      # Actions doesn't seem to have a way to evaluate expressions in paths these 'uses' are hardcoded in
+      # Actions doesn't seem to have a way to evaluate expressions in paths so these 'uses' are hardcoded in
       - name: build and install dependencies (linux)
         if: matrix.os == 'linux'
         uses: ./.github/actions/dependencies/linux
@@ -70,10 +70,10 @@ jobs:
 
       # We can save some time in the benchmark job by cacheing everything so it doesn't need rebuilding
       - name: cache mcfost build
-        if: matrix.os == 'macos'
+        if: matrix.os == 'macos' && matrix.openmp == 'yes'
         uses: actions/cache@v3
         with:
-          path: ${{ env.MCFOST_INSTALL }}
+          path: ${{ env.MCFOST_INSTALL }}/mcfost
           key: mcfost-build-${{ runner.os }}-${{ matrix.compiler }}-${{ github.run_number }}-${{ github.run_attempt }}
 
       - name: test
