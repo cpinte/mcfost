@@ -441,7 +441,8 @@ module Opacity_atom
                vg_max = 1d3 * atom%vmax_rt
             endif
             v_gauss(1:nvel_rt) = span_dp(-vg_max,vg_max,nvel_rt,1)
-            phi_gauss(1:nvel_rt) = gauss_profile(id,icell,iray,iterate,nvel_rt,v_gauss,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+            phi_gauss(1:nvel_rt) = gauss_profile(id,icell,iray,iterate,nvel_rt,v_gauss,vth,&
+                                    x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
          endif
 
          tr_loop : do kr = 1,atom%Nline
