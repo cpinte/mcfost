@@ -90,7 +90,7 @@ module see
         
         !initialize electronic density
         ngpop(1,NactiveAtoms+1,:,1) = ne(:)
-        write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024., " MB"
+        write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024./1024., " GB"
         allocate(psi(n_lambda, n_rayons_max, nb_proc), stat=alloc_status); psi(:,:,:) = 0.0_dp
         write(*,*) " size psi:", sizeof(psi) / 1024./1024.," MB"
         if (alloc_Status > 0) call error("Allocation error psi in nlte loop")

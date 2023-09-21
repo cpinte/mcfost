@@ -170,7 +170,7 @@ module atom_transfer
       !-> for a single iteration
       integer :: cstart_iter, cend_iter
       real :: time_iteration, cpustart_iter, cpuend_iter, time_iter_avg
-      integer :: ibar, n_cells_done, n_cells_remaining
+      integer :: ibar, n_cells_done
 
       ! -------------------------------- INITIALIZATION -------------------------------- !
       write(*,*) '-------------------------- NON-LTE LOOP ------------------------------ '
@@ -351,7 +351,7 @@ module atom_transfer
             !$omp private(l_iterate,weight,diff)&
             !$omp private(nact, at) & ! Acceleration of convergence
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on, Jnu, iloc) & ! Ng's Acceleration of convergence
-            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,n_cells_remaining) &
+            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,omp_chunk_size)
@@ -446,8 +446,8 @@ module atom_transfer
                ! Progress bar
                !$omp atomic
                n_cells_done = n_cells_done + 1
-               n_cells_remaining = size(pack(diff_loc, &
-                                    mask=(diff_loc < 1d-1 * precision)))
+               ! n_cells_remaining = size(pack(diff_loc, &
+               !                      mask=(diff_loc < 1d-1 * precision)))
                if (real(n_cells_done) > 0.02*ibar*n_cells) then
              	   call progress_bar(ibar)
              	   !$omp atomic
@@ -1052,7 +1052,7 @@ module atom_transfer
       n_lambda = size(tab_lambda_nm)
       tab_lambda = tab_lambda_nm * nm_to_m!micron
 
-      call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      call alloc_atom_opac(n_lambda, tab_lambda_nm, .true.)
       call allocate_atom_maps()
       if (laccretion_shock) then
          max_Tshock = 0.0; min_Tshock = 1d8
@@ -1136,7 +1136,7 @@ module atom_transfer
          tab_lambda = tab_lambda_nm * m_to_km
 
          ! !allocate quantities in space and for this frequency grid
-         call alloc_atom_opac(n_lambda, tab_lambda_nm)
+         call alloc_atom_opac(n_lambda, tab_lambda_nm, .false.)
 
          call nlte_loop_mali()
          !-> here on the non-LTE frequency grid
@@ -1624,7 +1624,7 @@ module atom_transfer
       endif
       n_lambda = size(tab_lambda_nm)
       tab_lambda = tab_lambda_nm * m_to_km
-      call alloc_atom_opac(n_lambda, tab_lambda_nm)
+      call alloc_atom_opac(n_lambda, tab_lambda_nm, .true.)
       !should not be allocated already
       allocate(Itot(N_lambda,Nimpact,nb_proc),stat=alloc_status); Itot = 0.0_dp
       if (alloc_status > 0) call error("spectrum_1d: cannot allocate Itot")
