@@ -27,8 +27,8 @@ module wavelengths_gas
 !make assym gauss
    ! integer, parameter :: Nlambda_line_gauss = 21 !11 !if linear
    !-> if Gauss is linear it is the sum of the two, and it is the full size ! (not half)
-   integer, parameter :: Nlambda_line_gauss_log = 15!5 !log wings
-   integer, parameter :: Nlambda_line_gauss_lin = 13!7 ! linear core
+   integer, parameter :: Nlambda_line_gauss_log = 1!15!5 !log wings
+   integer, parameter :: Nlambda_line_gauss_lin = 6!13!7 ! linear core
    real, parameter    :: vcore_on_vth_gauss = 0.6
    ! real, parameter    :: peak_gauss_limit = 1e-5 ! the profile expands up to peak * peak_gauss_limit
    real, parameter    :: vwing_on_vth_gauss = 6!3 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
