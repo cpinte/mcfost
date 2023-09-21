@@ -67,15 +67,6 @@ jobs:
         run: |
           [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
           make all
-          pwd
-
-      # We can save some time in the benchmark job by cacheing everything so it doesn't need rebuilding
-      - name: cache mcfost build
-        if: matrix.os == 'macos' && matrix.openmp == 'yes'
-        uses: actions/cache@v3
-        with:
-          path: .
-          key: mcfost-build-${{ runner.os }}-${{ matrix.compiler }}-${{ github.run_number }}-${{ github.run_attempt }}
 
       - name: test
         uses: ./.github/actions/test
@@ -94,12 +85,15 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      # This should match the cache created by the previous job, restoring that build on the new runner
-      - name: cache mcfost build
-        uses: actions/cache@v3
-        with:
-          path: .
-          key: mcfost-build-${{ runner.os }}-${{ matrix.compiler }}-${{ github.run_number }}-${{ github.run_attempt }}
+      - name: install dependencies
+        uses: ./.github/actions/dependencies/macos
+
+      - name: compile mcfost
+        working-directory: src
+        shell: bash -e {0}
+        run: |
+          [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
+          make
 
       - name: benchmark
         uses: ./.github/actions/benchmark
