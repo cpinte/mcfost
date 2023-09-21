@@ -473,30 +473,12 @@ module Opacity_atom
                if (Nlam==nvel_rt) then
                   phi0(1:Nlam) = phi_gauss(1:Nlam)
                else
-               !they don't have necessary the same number of points for all lines
-               !due to overlap etc. Still, should be an increase in speed as I do 1 interpolations instead of Nvspace.
-               !TO DO: how to have the same number of points ! for Gauss line
-               ! write(*,*) "********", dv
-               ! phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
-               !                   x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
-               ! do la=1, Nlam
-               !    write(*,*) lambda(Nblue-1+la), phi0(la)
-               ! enddo 
-               ! write(*,*) "phi0g (ex) = ", phi0(1), phi0(Nlam), maxval(phi0(1:Nlam))
+                  !TO DO: compare the local interp with master and clean. The profile is already shifted
+                  ! we just want to interpolate it on another grid. Check that we don't apply the shift twice.
                   vline(1:Nlam) = c_light * (lambda(Nblue:Nred) - atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0
-               ! write(*,*) "vl=",vline
-               ! write(*,*) "vg=",v_gauss
                   phi0(1:Nlam) = linear_1D_sorted(nvel_rt,v_gauss,phi_gauss(1:nvel_rt),Nlam,vline(1:Nlam))
-               !phi0(1) = phi_gauss(1); phi0(Nlam) = phi_gauss(N_gauss)
-               ! write(*,*) "phi0g = ", phi0(1), phi0(Nlam), maxval(phi0(1:Nlam))
-               ! do la=1, Nlam
-               !    write(*,*) lambda(Nblue-1+la), phi0(la)
-               ! enddo 
-               ! if (dv /= 0) stop
                endif
             endif
-            !TO DO: compare the local interp with master and clean
-            !reduce the number of wavelenghts to
 
             chi(Nblue:Nred) = chi(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Bij * phi0(1:Nlam) * (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell))
