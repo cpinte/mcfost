@@ -87,7 +87,6 @@ jobs:
 
       - name: install dependencies
         uses: ./.github/actions/dependencies/macos
-
       - name: compile mcfost
         working-directory: src
         shell: bash -e {0}
