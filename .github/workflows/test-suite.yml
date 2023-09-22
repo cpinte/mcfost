@@ -29,7 +29,7 @@ jobs:
             os-version: ubuntu-22.04
           - os: macos
             os-version: macos-12
-          
+
           # macos needs null container to avoid loading docker; set linux containers as desired
           - container: null
           - os: linux
@@ -46,7 +46,7 @@ jobs:
       HDF5_DIR: /usr/local
       MCFOST_INSTALL: /usr/local
       OPENMP: ${{ matrix.openmp }}
-    
+
     steps:
       - uses: actions/checkout@v2
 
@@ -87,6 +87,7 @@ jobs:
 
       - name: install dependencies
         uses: ./.github/actions/dependencies/macos
+
       - name: compile mcfost
         working-directory: src
         shell: bash -e {0}
@@ -96,8 +97,7 @@ jobs:
 
       - name: benchmark
         uses: ./.github/actions/benchmark
-      
+
       - name: report benchmark results
         run: |
           echo ${{ matrix.compiler }} $(cat benchmark-${{ matrix.compiler }}.tim)
-          
