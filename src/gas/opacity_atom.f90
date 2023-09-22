@@ -11,7 +11,7 @@ module Opacity_atom
                                      dealloc_gas_contopac, hnu_k
    use wavelengths, only         :  n_lambda
    use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, &
-                                    Nlambda_max_line_vel
+                                    peak_gauss_limit, Nlambda_line_gauss_log, Nlambda_line_gauss_lin
    use constantes, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
@@ -25,6 +25,7 @@ module Opacity_atom
    real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:), eta_tot(:)
    integer, parameter 		   :: NvspaceMax = 151
    logical 		               :: lnon_lte_loop
+   integer                    :: N_gauss
 
    contains
 
@@ -117,9 +118,10 @@ module Opacity_atom
    end subroutine activate_continua
 
    !could be parralel
-   subroutine alloc_atom_opac(N,x)
+   subroutine alloc_atom_opac(N,x,limage)
       integer, intent(in) :: N
       real(kind=dp), dimension(N) :: x
+      logical, intent(in) :: limage
       integer :: nat, kr, icell, nb, nr
       type(AtomType), pointer :: atm
       real(kind=dp) :: vth
@@ -130,6 +132,14 @@ module Opacity_atom
       ! call alloc_gas_contopac(N,x)
       !-> on a small grid and interpolated later
       call alloc_gas_contopac(n_lambda_cont,tab_lambda_cont)
+      if (limage) then
+         N_gauss = 0
+         do nat=1, n_Atoms
+            N_gauss = max(N_gauss, atoms(nat)%p%n_speed_rt)
+         enddo
+      else
+         N_gauss = (Nlambda_line_gauss_log + Nlambda_line_gauss_lin) + mod(Nlambda_line_gauss_log + Nlambda_line_gauss_lin+1,2)
+      endif
 
       do nat=1, n_atoms
          atm => atoms(nat)%p
@@ -399,9 +409,12 @@ module Opacity_atom
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
       real(kind=dp), intent(in) :: x, y, z, x1, y1, z1, u, v, w, l_void_before,l_contrib
       integer :: nat, Nred, Nblue, kr, i, j, Nlam
-      real(kind=dp) :: dv
+      real(kind=dp) :: dv, vg_max, vth, peak_g
       type(AtomType), pointer :: atom
-      real(kind=dp), dimension(Nlambda_max_line) :: phi0
+      real(kind=dp), dimension(Nlambda_max_line) :: phi0, vline
+      integer :: nvel_rt
+      real(kind=dp), dimension(N_gauss) :: v_gauss, phi_gauss
+
 
       dv = 0.0_dp
       if (lnon_lte_loop.and..not.iterate) then !not iterate but non-LTE
@@ -410,6 +423,27 @@ module Opacity_atom
 
       atom_loop : do nat = 1, N_Atoms
          atom => Atoms(nat)%p
+
+         vth = vbroad(T(icell),Atom%weight, vturb(icell))
+
+         !any line of that atom with a Gaussian profile ? 
+         !use the same profile for all
+         !TO DO: before each mode (nlte, image/flux)
+         if (atom%lany_gauss_prof) then
+            if (lnon_lte_loop) then               
+            !completely linear for Gaussian with the sum of Ngauss_log and Ngauss_lin (see line_lambda_grid in gas/wavelengths_gas.f90)
+               nvel_rt = N_gauss
+               peak_g = peak_gauss_limit / sqrt(pi) / vth
+               vg_max = vth * sqrt(-log(peak_g * sqrt(pi) * vth))
+            else 
+            !image mode or flux, linear grid in hv
+               nvel_rt = atom%n_speed_rt
+               vg_max = 1d3 * atom%vmax_rt
+            endif
+            v_gauss(1:nvel_rt) = span_dp(-vg_max,vg_max,nvel_rt,1)
+            phi_gauss(1:nvel_rt) = gauss_profile(id,icell,iray,iterate,nvel_rt,v_gauss,vth,&
+                                    x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+         endif
 
          tr_loop : do kr = 1,atom%Nline
 
@@ -423,62 +457,35 @@ module Opacity_atom
 
             if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle tr_loop
 
-            ! if (abs(dv)>atom%lines(kr)%vmax) then
-            !    !move the profile to the red edge up to Nover_sup
-            !    !change Nlam ??
-            !    if (dv > 0) then
-            !       ! Nblue = Nred
-            !       Nred = atom%lines(kr)%Nover_sup
-            !       Nblue =  Nred - Nlam + 1
-            !    !move to the blue edge down to Nover_inf
-            !    else
-            !       ! Nred = Nblue
-            !       Nblue =  atom%lines(kr)%Nover_inf
-            !       Nred = Nlam + Nblue - 1
-            !    endif
-            if (abs(dv)>1.0*vbroad(T(icell),Atom%weight, vturb(icell))) then
-               Nred = atom%lines(kr)%Nover_sup
-               Nblue = atom%lines(kr)%Nover_inf
-               Nlam = Nred - Nblue + 1
+            !Expand the edge of a profile during the non-LTE loop if necessary.
+            !the condition is only possibly reached if dv > 0 (lnon_lte_loop = .true.)
+            if (lnon_lte_loop) then
+               if (abs(dv)>1.0*vbroad(T(icell),Atom%weight, vturb(icell))) then
+                  Nred = atom%lines(kr)%Nover_sup
+                  Nblue = atom%lines(kr)%Nover_inf
+                  Nlam = Nred - Nblue + 1
+               endif
             endif
 
-            phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
+            if (atom%lines(kr)%voigt) then
+               phi0(1:Nlam) = profile_art(atom%lines(kr),id,icell,iray,iterate,Nlam,lambda(Nblue:Nred),&
                                  x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
-            !to interpolate the profile we need to find the index of the first lambda on the grid and then increment
-
+            else
+               if (Nlam==nvel_rt) then
+                  phi0(1:Nlam) = phi_gauss(1:Nlam)
+               else
+                  !TO DO: compare the local interp with master and clean. The profile is already shifted
+                  ! we just want to interpolate it on another grid. Check that we don't apply the shift twice.
+                  vline(1:Nlam) = c_light * (lambda(Nblue:Nred) - atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0
+                  phi0(1:Nlam) = linear_1D_sorted(nvel_rt,v_gauss,phi_gauss(1:nvel_rt),Nlam,vline(1:Nlam))
+               endif
+            endif
 
             chi(Nblue:Nred) = chi(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Bij * phi0(1:Nlam) * (atom%n(i,icell) - atom%lines(kr)%gij*atom%n(j,icell))
 
             Snu(Nblue:Nred) = Snu(Nblue:Nred) + &
                hc_fourPI * atom%lines(kr)%Aji * phi0(1:Nlam) * atom%n(j,icell)
-
-! !-> check Gaussian profile  and norm.
-! ! -> check Voigt profile, for Lyman alpha mainly.
-! ! -> write a voigt profile (kr) and a gaussian one (the same for all in principle!)
-            ! if (kr==1 .and. atom%id=="H") then
-            !    !-> try large damped lines to test the maximum extension of the line.
-            !    ! phi0(1:Nlam) = Voigt(Nlam, 1d4, (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))
-            !    !-> try pure gauss with the same grid as voigt (for testing low damping)
-            !    ! phi0(1:Nlam) = exp(-( (lambda(Nblue:Nred)-atom%lines(kr)%lambda0)/atom%lines(kr)%lambda0 * C_LIGHT / vbroad(T(icell),Atom%weight, vturb(icell)))**2)
-            !    open(1,file="prof.txt",status="unknown")
-            !    write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
-            !    write(1,*) atom%lines(kr)%a(icell), maxval(atom%lines(kr)%a), minval(atom%lines(kr)%a,mask=nhtot>0)
-            !    do j=1,Nlam
-            !       write(1,*) lambda(Nblue+j-1),phi0(j)
-            !    enddo
-            !    close(1)
-            ! endif
-            ! if (.not.atom%lines(kr)%voigt .and. atom%id=="H") then
-            !    !maybe the similar grid for voigt is nice too ? core + wings ?
-            !    open(1,file="profg.txt",status="unknown")
-            !    write(1,*) vbroad(T(icell),Atom%weight, vturb(icell)), atom%lines(kr)%lambda0
-            !    do j=1,Nlam
-            !       write(1,*) lambda(Nblue+j-1),phi0(j)
-            !    enddo
-            !    close(1)
-            !    stop
-            ! endif
 
             if ((iterate.and.atom%active)) then
                phi_loc(1:Nlam,atom%ij_to_trans(i,j),atom%activeindex,iray,id) = phi0(1:Nlam)
@@ -818,6 +825,78 @@ module Opacity_atom
 
       return
    end function profile_art_i
+
+   function gauss_profile(id,icell,iray,lsubstract_avg,N,vel,vth,x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
+   use voigts, only : VoigtThomson
+      ! phi = Voigt / sqrt(pi) / vbroad(icell)
+      integer, intent(in)                    :: id,icell, iray,N
+      logical, intent(in)                    :: lsubstract_avg
+      real(kind=dp), dimension(N), intent(in):: vel
+      real(kind=dp), intent(in)              :: x,y,z,u,v,w,& !positions and angles used to project
+                                             x1,y1,z1, &      ! velocity field and magnetic field
+                                             l_void_before,l_contrib, & !physical length of the cell
+                                             vth
+      integer 											:: Nvspace
+      real(kind=dp), dimension(NvspaceMax)   :: Omegav
+      real(kind=dp)                          :: norm
+      real(kind=dp)                          :: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
+                                                dv, omegav_mean
+      integer                                :: nv
+      real(kind=dp), dimension(N)            :: u0, gauss_profile, u1, u0sq
+
+      Nvspace = NvspaceMax
+
+      u0(:) = vel/vth
+
+      v0 = v_proj(icell,x,y,z,u,v,w)
+      if (lvoronoi) then
+         omegav(1) = v0
+         Nvspace = 1
+         omegav_mean = v0
+      else
+
+         Omegav = 0.0
+         omegav(1) = v0
+         v1 = v_proj(icell,x1,y1,z1,u,v,w)
+
+         dv = abs(v1-v0)
+         Nvspace = min(max(2,nint(dv/vth*20.)),NvspaceMax)
+
+         do nv=2, Nvspace-1
+            delta_vol_phi = l_void_before + (real(nv,kind=dp))/(real(Nvspace,kind=dp)) * l_contrib
+            xphi=x+delta_vol_phi*u
+            yphi=y+delta_vol_phi*v
+            zphi=z+delta_vol_phi*w
+            omegav(nv) = v_proj(icell,xphi,yphi,zphi,u,v,w)
+         enddo
+         omegav(Nvspace) = v1
+         omegav_mean = sum(omegav(1:Nvspace))/real(Nvspace,kind=dp)
+      endif
+      !in non-LTE:
+      !the actual cell icell_nlte must be centered on 0 (moving at vmean).
+      !the other cells icell crossed must be centered in v(icell) - vmean(icell_nlte)
+      if (lsubstract_avg) then!labs == .true.
+         omegav(1:Nvspace) = omegav(1:Nvspace) - omegav_mean
+         vlabs(iray,id) = omegav_mean
+      else
+         if (lnon_lte_loop) omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(iray,id)
+      endif
+
+   
+      u0sq(:) = u0(:)*u0(:)
+      !Note: u1 = (u0 - omegav(nv)/vth)**2
+      u1(:) = u0sq(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
+      gauss_profile(:) = exp(-u1(:))
+      do nv=2, Nvspace
+         u1(:) = u0sq(:) + (omegav(nv)/vth)*(omegav(nv)/vth) - 2*u0(:) * omegav(nv)/vth
+         gauss_profile(:) = gauss_profile(:) + exp(-u1(:))
+      enddo
+
+      norm = Nvspace * vth * sqrtpi
+      gauss_profile(:) = gauss_profile(:) / norm
+
+      return
+   end function gauss_profile
 
    subroutine write_opacity_emissivity_bin(Nlambda,lambda)
    !To do: store opacity in 3d arrays in space instead of icell

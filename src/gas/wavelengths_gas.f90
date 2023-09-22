@@ -18,6 +18,7 @@ module wavelengths_gas
    !continuum wavelength double for level dissolution !
    integer, parameter :: Nlambda_cont = 101
    integer, parameter :: Nlambda_cont_log = 31
+   !-> half-size of each region
    integer, parameter :: Nlambda_line_w_log = 21!17!14 !log wings
    integer, parameter :: Nlambda_line_c_lin = 15!13!12 ! linear core
    real, parameter    :: vcore_on_vth = 0.9!0.7 !line core goes from -vcore_on_vth * vth to vcore_on_vth * vth km/s.
@@ -25,8 +26,9 @@ module wavelengths_gas
    ! real, parameter    :: vwing_on_vth = 10.0 ! 5.0!local (Voigt) line goes from 0 to vwing_on_vth * vth km/s
 !make assym gauss
    ! integer, parameter :: Nlambda_line_gauss = 21 !11 !if linear
-   integer, parameter :: Nlambda_line_gauss_log = 15!5 !log wings
-   integer, parameter :: Nlambda_line_gauss_lin = 13!7 ! linear core
+   !-> if Gauss is linear it is the sum of the two, and it is the full size ! (not half)
+   integer, parameter :: Nlambda_line_gauss_log = 1!15!5 !log wings
+   integer, parameter :: Nlambda_line_gauss_lin = 6!13!7 ! linear core
    real, parameter    :: vcore_on_vth_gauss = 0.6
    ! real, parameter    :: peak_gauss_limit = 1e-5 ! the profile expands up to peak * peak_gauss_limit
    real, parameter    :: vwing_on_vth_gauss = 6!3 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
@@ -302,6 +304,9 @@ module wavelengths_gas
       min_lines = 1d50 !the bluest wavelength among all lines
       do n=1, N_atoms
          atom => atoms(n)%p
+         !all lines contribute in non-LTE
+         atom%lany_gauss_prof = .false.
+         if (any(.not.atom%lines(:)%voigt)) atom%lany_gauss_prof = .true.
          !km/s
          !TO DO: define one hv per atom !
          hv = min(hv, 1d-3 * 0.46*vbroad(minval(T,mask=T>0),atom%weight,minval(vturb,mask=T>0)))
@@ -956,6 +961,9 @@ module wavelengths_gas
          Ntrans = Ntrans + atom%Ntr
          ! Nlines = Nlines + atom%Nline
          Ncont = Ncont + atom%Ncont
+         !Check Gaussian line among ray-traced lines.
+         atom%lany_gauss_prof = .false.
+         if (any(.not.atom%lines(:)%voigt).and.any(atom%lines(:)%lcontrib)) atom%lany_gauss_prof = .true.
       enddo
       atom => null()
 
@@ -1190,6 +1198,10 @@ module wavelengths_gas
                         ((atom%lines(kr)%lambdamin > group_blue(lac)).and.&
                            (atom%lines(kr)%lambdamin < group_red(lac))) ) then
                      atom%lines(kr)%lcontrib = .true.
+                     !check for potential overlap with a gaussian line.
+                     if (.not.atom%lany_gauss_prof) then
+                        if (.not.atom%lines(kr)%voigt) atom%lany_gauss_prof = .true.
+                     endif
                      write(*,*) " *** line transition ", kr, " of atom ", &
                         atom%ID, " overlaps with another line"
                      write(*,*) "    -> in group ", lac, group_blue(lac), group_red(lac)
@@ -1614,6 +1626,10 @@ module wavelengths_gas
             do kr=1,atoms(n)%p%Nline
                call compute_line_bound(atoms(n)%p%lines(kr),.true.)
             enddo
+            !Check Gaussian line among ray-traced lines.
+            !in flux mode all not all lines are kept.
+            atoms(n)%p%lany_gauss_prof = .false.
+            if (any(.not.atoms(n)%p%lines(:)%voigt)) atoms(n)%p%lany_gauss_prof = .true.
          enddo
       endif
 
@@ -1700,7 +1716,9 @@ module wavelengths_gas
                if (atom%lines(kr)%Nlambda < 3) atom%lines(kr)%lcontrib = .false.
             endif
          enddo
-
+         !Check Gaussian line among ray-traced lines.
+         atom%lany_gauss_prof = .false.
+         if (any(.not.atom%lines(:)%voigt).and.any(atom%lines(:)%lcontrib)) atom%lany_gauss_prof = .true.
          atom => NULL()
       enddo
       write(*,*) "Number of max freq points for all lines resolution :", Nlambda_max_line
