@@ -1,8 +1,6 @@
 name: "benchmark"
 description: "run performance benchmark (for macos only)"
 
-# TODO: if any other runs fail then don't save benchmark results (if the benchmark somehow runs e.g. linux-only bug)
-
 runs:
   using: "composite"
   steps:
