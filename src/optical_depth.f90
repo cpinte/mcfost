@@ -1173,8 +1173,8 @@ end subroutine optical_length_tot_mol
 
             ! call contopac_atom_loc(icell, N, lambda, chi, Snu)
             chi(:) = chic_big(:,icell); Snu = etac_big(:,icell)
-            ! call opacity_atom_bb_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,&
-            !    l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,Snu)
+            call opacity_atom_bb_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,&
+               l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,Snu)
 
             dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m
 
