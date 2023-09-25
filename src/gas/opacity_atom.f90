@@ -22,7 +22,7 @@ module Opacity_atom
    real(kind=dp), allocatable, dimension(:,:) :: chi_cont, eta_cont
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
-   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:), eta_tot(:)
+   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:)
    integer, parameter 		   :: NvspaceMax = 151
    logical 		               :: lnon_lte_loop
    integer                    :: N_gauss
