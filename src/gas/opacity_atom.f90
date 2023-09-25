@@ -22,7 +22,7 @@ module Opacity_atom
    real(kind=dp), allocatable, dimension(:,:) :: chi_cont, eta_cont
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
-   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:), eta_tot(:)
+   real(kind=dp), allocatable :: eta_atoms(:,:,:), Uji_down(:,:,:,:), chi_up(:,:,:,:), chi_down(:,:,:,:), chi_tot(:), eta_tot(:), chic_big(:,:), etac_big(:,:)
    integer, parameter 		   :: NvspaceMax = 151
    logical 		               :: lnon_lte_loop
    integer                    :: N_gauss
@@ -221,6 +221,8 @@ module Opacity_atom
          allocate(chi_cont(n_lambda_cont,n_cells), eta_cont(n_lambda_cont,n_cells))
          mem_contopac = 2 * sizeof(chi_cont)
          mem_loc = mem_loc + mem_contopac
+         allocate(chic_big(n_lambda,n_cells),etac_big(n_lambda,n_cells))
+         mem_loc = mem_loc + 2 * sizeof(chic_big)
          call calc_contopac()!needs continua(:)%alpha etc
       endif
 
@@ -236,6 +238,7 @@ module Opacity_atom
 
       call dealloc_gas_contopac()
       if (allocated(chi_cont)) deallocate(chi_cont,eta_cont)
+      if (allocated(chic_big)) deallocate(chic_big,etac_big)
 
       do nat=1, n_atoms
          atm => atoms(nat)%p
@@ -278,11 +281,13 @@ module Opacity_atom
       !$omp parallel &
       !$omp default(none) &
       !$omp private(icell) &
+      !$omp shared(n_lambda,tab_lambda_nm,chic_big,etac_big)&
       !$omp shared(ibar,n_cells_done,n_cells,icompute_atomrt)
       !$omp do schedule(dynamic,1)
       do icell=1, n_Cells
          if (icompute_atomRT(icell)>0) then
             call calc_contopac_loc(icell)
+            call contopac_atom_loc(icell,n_lambda,tab_lambda_nm,chic_big(:,icell),etac_big(:,icell))
             !$omp atomic
             n_cells_done = n_cells_done + 1
             if (real(n_cells_done) > 0.02*ibar*n_cells) then
