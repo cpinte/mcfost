@@ -29,7 +29,7 @@ jobs:
             os-version: ubuntu-22.04
           - os: macos
             os-version: macos-12
-          
+
           # macos needs null container to avoid loading docker; set linux containers as desired
           - container: null
           - os: linux
@@ -46,13 +46,13 @@ jobs:
       HDF5_DIR: /usr/local
       MCFOST_INSTALL: /usr/local
       OPENMP: ${{ matrix.openmp }}
-    
+
     steps:
       - uses: actions/checkout@v2
 
       - run: git config --global --add safe.directory $PWD
 
-      # Actions doesn't seem to have a way to evaluate expressions in paths these 'uses' are hardcoded in
+      # Actions doesn't seem to have a way to evaluate expressions in paths so these 'uses' are hardcoded in
       - name: build and install dependencies (linux)
         if: matrix.os == 'linux'
         uses: ./.github/actions/dependencies/linux
@@ -70,3 +70,34 @@ jobs:
 
       - name: test
         uses: ./.github/actions/test
+
+  benchmark:
+    needs: build-and-test
+    strategy:
+      matrix:
+        compiler: [gfortran, ifort]
+    runs-on: macos-12
+    env:
+      SYSTEM: ${{ matrix.compiler }}
+      HDF5_DIR: /usr/local
+      MCFOST_INSTALL: /usr/local
+      OPENMP: yes
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: install dependencies
+        uses: ./.github/actions/dependencies/macos
+
+      - name: compile mcfost
+        working-directory: src
+        shell: bash -e {0}
+        run: |
+          [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
+          make
+
+      - name: benchmark
+        uses: ./.github/actions/benchmark
+
+      - name: report benchmark results
+        run: |
+          echo ${{ matrix.compiler }} $(cat benchmark-${{ matrix.compiler }}.tim)
