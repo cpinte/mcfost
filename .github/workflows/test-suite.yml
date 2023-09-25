@@ -12,7 +12,7 @@ on:
 env:
   MCFOST_NO_XGBOOST: yes
   MCFOST_GIT: "1"
-  SKIP_HDF5: yes
+  SKIP_HDF5: no
 
 jobs:
   build-and-test:

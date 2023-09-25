@@ -33,6 +33,6 @@ runs:
       shell: bash -e {0}
       working-directory: lib
       run: |
-      [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
-      ./install.sh
+        [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
+        ./install.sh
 
