@@ -23,51 +23,14 @@ runs:
       id: cache-deps
       uses: actions/cache@v3
       with:
-        path: |
-          /usr/local/Cellar/gcc/
-          /usr/local/Cellar/cfitsio/
-          /usr/local/Cellar/voro-dev/
-          /usr/local/Cellar/sprng2/
+        path: ${{ env.MCFOST_INSTALL }}
         key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
-      # Symlinks to the path need to be created again after the cache is restored
-    - name: add brew links
-      if: ${{ steps.cache-deps.outputs.cache-hit == 'true' }}
-      shell: bash
-      run: |
-        brew unlink gcc
-        brew link gcc
-        brew link cfitsio
-        brew link voro-dev
-        brew link sprng2
 
       # Only do these install steps if no cache is found
     - name: install deps
       if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
       shell: bash
-      run: |
-        brew tap danieljprice/all
-        brew reinstall gcc
-        brew install cfitsio voro-dev sprng2
-
-    # Always install hdf5, it's too problematic to cache (because it has dependencies)
-    - name: install hdf5 (gfortran)
-      if: ${{ matrix.compiler == 'gfortran' }}
-      shell: bash
-      run: |
-        brew install hdf5
-
-    # Brew installs the gcc version. Intel requires some more work
-    - name: install hdf5 (ifort)
-      if: ${{ matrix.compiler == 'ifort' }}
-      shell: bash
-      run: |
-          export CFLAGS=""
-          source /opt/intel/oneapi/setvars.sh 
-          wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
-          tar xjvf hdf5-1.10.5.tar.bz2
-          cd hdf5-1.10.5
-          sudo CC=icc FC=ifort CXX=icpc ./configure --prefix=$HDF5_DIR --enable-fortran  --enable-cxx
-          sudo make
-          sudo make install
+      working-directory: lib
+      run: ./install.sh
 
