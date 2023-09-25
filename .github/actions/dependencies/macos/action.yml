@@ -16,10 +16,10 @@ runs:
         sudo /Volumes/m_cpp-compiler-classic_p_2023.2.0.48999_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
         cp /opt/intel/oneapi/compiler/2023.2.0/mac/bin/intel64/ifort /usr/local/include
     
-    - name: fix gcc issue on the runner
-      if: ${{ matrix.compiler == 'gfortran' }}
-      shell: bash
-      run: brew reinstall gcc
+    # - name: fix gcc issue on the runner
+    #   if: ${{ matrix.compiler == 'gfortran' }}
+    #   shell: bash
+    #   run: brew reinstall gcc
     
     # Check if the dependency cache exists
     # If it does, restore those paths; otherwise these paths are cached at the end of the workflow
@@ -38,5 +38,6 @@ runs:
       shell: bash
       working-directory: lib
       run: |
+        brew reinstall gcc
         ./install.sh
 
