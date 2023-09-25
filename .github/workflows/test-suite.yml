@@ -66,10 +66,18 @@ jobs:
         shell: bash -e {0}
         run: |
           [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
-          make all
+          make static=yes all 
 
       - name: test
         uses: ./.github/actions/test
+
+      - name: save binary for benchmarking
+        if: matrix.os == 'macos'
+        uses: actions/upload-artifact@v3
+        with:
+          name: mcfost-binary-${{ matrix.compiler }}
+          path: src/mcfost
+
 
   benchmark:
     needs: build-and-test
@@ -85,15 +93,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: install dependencies
-        uses: ./.github/actions/dependencies/macos
-
-      - name: compile mcfost
-        working-directory: src
-        shell: bash -e {0}
-        run: |
-          [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
-          make
+      - name: restore binary artifact
+        uses: actions/download-artifact@v3
+        with: 
+          name: mcfost-binary-${{ matrix.compiler }}
 
       - name: benchmark
         uses: ./.github/actions/benchmark
