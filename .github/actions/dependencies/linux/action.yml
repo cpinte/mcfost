@@ -8,23 +8,17 @@ runs:
   using: "composite"
   steps:
 
-    # hdf5.mod file is located at /usr/lib64/gfortran/modules/ on almalinux
-    # - name: install hdf5 for gnu build
-    #   if: ${{ matrix.compiler == 'gfortran' }}
-    #   shell: bash
-    #   run: |
-    #     dnf install -y sudo wget epel-release
-    #     dnf install -y hdf5-static redhat-lsb-core
-    #     cd $HDF5_DIR/include && ln -s /usr/lib64/gfortran/modules/* .
+    - name: install wget for gnu build
+      if: ${{ matrix.compiler == 'gfortran' }}
+      shell: bash
+      run: dnf install -y sudo wget epel-release
 
-
-
-    # - name: get zlib dev libraries
-    #   if: ${{ matrix.compiler == 'ifort' }}
-    #   shell: bash
-    #   run: |
-    #     apt-get update
-    #     apt-get install zlib1g-dev -y
+    - name: get zlib dev libraries
+      if: ${{ matrix.compiler == 'ifort' }}
+      shell: bash
+      run: |
+        apt-get update
+        apt-get install zlib1g-dev -y
 
     # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies

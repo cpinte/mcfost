@@ -72,7 +72,7 @@ jobs:
         uses: ./.github/actions/test
 
       - name: save binary for benchmarking
-        if: matrix.os == 'macos'
+        if: matrix.os == 'macos' && matrix.openmp == 'yes'
         uses: actions/upload-artifact@v3
         with:
           name: mcfost-binary-${{ matrix.compiler }}
