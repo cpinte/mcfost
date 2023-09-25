@@ -35,9 +35,12 @@ runs:
       # Only do these install steps if no cache is found
     - name: install deps
       if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      shell: bash
+      shell: bash -e {0}
       working-directory: lib
       run: |
-        brew reinstall gcc
+        export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+        export LIBRARY_PATH="$LIBRARY_PATH:$SDKROOT/usr/lib"
+        echo $SDKROOT
+        [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
         ./install.sh
 
