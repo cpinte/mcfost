@@ -14,13 +14,15 @@ runs:
         sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
         hdiutil attach m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg
         sudo /Volumes/m_cpp-compiler-classic_p_2023.2.0.48999_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
-        cp /opt/intel/oneapi/compiler/2023.2.0/mac/bin/intel64/ifort /usr/local/include
-    
-    # - name: fix gcc issue on the runner
-    #   if: ${{ matrix.compiler == 'gfortran' }}
-    #   shell: bash
-    #   run: brew reinstall gcc
-    
+
+    - name: fix gcc issue on the runner
+      if: ${{ matrix.compiler == 'gfortran' }}
+      shell: bash
+      run: |
+        brew reinstall gcc@13
+        ln -s /usr/local/bin/gcc-13 /usr/local/bin/gcc
+        ln -s /usr/local/bin/g++-13 /usr/local/bin/g++
+
     # Check if the dependency cache exists
     # If it does, restore those paths; otherwise these paths are cached at the end of the workflow
     # NOTE: Cache can be cleared manually from the Github actions webpage
@@ -38,9 +40,5 @@ runs:
       shell: bash -e {0}
       working-directory: lib
       run: |
-        export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
-        export LIBRARY_PATH="$LIBRARY_PATH:$SDKROOT/usr/lib"
-        echo $SDKROOT
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
         ./install.sh
-
