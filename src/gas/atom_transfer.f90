@@ -682,7 +682,12 @@ module atom_transfer
                   !if electronic density is not updated, it is not necessary
                   !to compute the lte continous opacities.
                   !but the overhead should be negligible at this point.
-                  if (.not.llimit_mem) call calc_contopac_loc(icell)
+                  select case (limit_mem)
+                     case (0)
+                        call calc_contopac_loc(icell,n_lambda,tab_lambda_nm)
+                     case (1)
+                        call calc_contopac_loc(icell,n_lambda_cont,tab_lambda_cont)
+                  end select
 
                end if !if l_iterate
             end do cell_loop2 !icell

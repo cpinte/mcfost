@@ -71,7 +71,7 @@ subroutine set_default_variables()
   lemission_mol=.false.
   lcheckpoint = .false.
   checkpoint_period = 15
-  llimit_mem = .false. !if true, contopac are computed locally.
+  limit_mem = 0 ! {0, 1, 2}
   laccretion_shock = .false. !for magnetospheric accretion
   !HEALpix
   healpix_lorder = 1
@@ -686,7 +686,11 @@ subroutine initialisation_mcfost()
         lemission_mol=.true.
      case("-limit_mem")
         i_arg = i_arg + 1
-        llimit_mem = .true.
+        if (i_arg > nbr_arg) call error("limit_mem switch value need!")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) limit_mem
+        if (limit_mem > 2) call error("limit_mem switch must be <= 2!")
+        i_arg= i_arg+1
      case("-safe_stop")
         i_arg = i_arg + 1
         lsafe_stop = .true.
@@ -2034,7 +2038,7 @@ subroutine display_help()
 !   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"
   write(*,*) "        : -safe_stop_time <real> : calc_time_limit in days "
-  write(*,*) "        : -limit_mem : compute background continua on the fly."
+  write(*,*) "        : -limit_mem <val> : switch for limiting memory usage (atomic transfer) in {0, 1, 2} (default 0)."
   write(*,*) "        : -v_syst <v_syst> : systemic velocity [km/s]."
 
   write(*,*) " "
