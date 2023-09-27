@@ -53,7 +53,7 @@ jobs:
       - run: git config --global --add safe.directory $PWD
 
       - name: build and install dependencies
-        uses: ./.github/actions/dependencies/
+        uses: ./.github/actions/dependencies
 
       - name: compile mcfost
         working-directory: src
