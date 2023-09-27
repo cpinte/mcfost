@@ -40,7 +40,8 @@ module molecular_emission
 
   real, dimension(:), allocatable :: v_turb, v_line ! n_cells
 
-  real ::  vitesse_turb, dv, dnu
+  real ::  vitesse_turb, dv, dnu, v_syst
+  character(len=8) :: v_turb_unit
   integer, parameter :: n_largeur_Doppler = 15
   real(kind=dp), dimension(:), allocatable :: tab_v ! n_speed
 
@@ -71,8 +72,8 @@ module molecular_emission
 
   type molecule
      integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, nTrans_raytracing, iLevel_max
-     real :: vmax_center_rt, extra_deltaV_rt, abundance
-     logical :: lcst_abundance, lline
+     real :: vmin_center_rt, vmax_center_rt, extra_deltaV_rt, abundance
+     logical :: lcst_abundance, lline, l_sym_ima
      character(len=512) :: abundance_file, filename
      character(len=32) :: name
      integer, dimension(100) :: indice_Trans_rayTracing
