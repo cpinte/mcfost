@@ -52,14 +52,8 @@ jobs:
 
       - run: git config --global --add safe.directory $PWD
 
-      # Actions doesn't seem to have a way to evaluate expressions in paths so these 'uses' are hardcoded in
-      - name: build and install dependencies (linux)
-        if: matrix.os == 'linux'
-        uses: ./.github/actions/dependencies/linux
-
-      - name: build and install dependencies (macos)
-        if: matrix.os == 'macos'
-        uses: ./.github/actions/dependencies/macos
+      - name: build and install dependencies
+        uses: ./.github/actions/dependencies/
 
       - name: compile mcfost
         working-directory: src
