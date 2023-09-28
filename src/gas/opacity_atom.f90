@@ -642,7 +642,7 @@ module Opacity_atom
          freq_loop : do la=1, Nl
             if (la==1) then
                 wl = 0.5*(tab_lambda_nm(Nb+la)-tab_lambda_nm(Nb+la-1)) / tab_lambda_nm(Nb+la-1)
-            elseif (la==n_lambda) then
+            elseif (la==Nl) then
                 wl = 0.5*(tab_lambda_nm(Nb+la-1)-tab_lambda_nm(Nb+la-2)) / tab_lambda_nm(Nb+la-2)
             else
                 wl = 0.5*(tab_lambda_nm(Nb+la)-tab_lambda_nm(Nb+la-2)) / tab_lambda_nm(Nb+la-1)
@@ -741,6 +741,7 @@ module Opacity_atom
 
       enddo cont_loop
 
+      !adjust wavelength integration weights
       do la=1, n_lambda
          if (la==1) then
             wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la)) / tab_lambda_nm(la)
