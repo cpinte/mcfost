@@ -13,7 +13,7 @@ runs:
       shell: bash
       run: dnf install -y sudo wget epel-release
 
-    - name: get zlib dev libraries (intel / linux)
+    - name: install intel compilers (intel / linux)
       if: matrix.compiler == 'ifort' && matrix.os == 'linux'
       shell: bash
       run: |
@@ -24,7 +24,7 @@ runs:
         ./l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
         chmod +x l_fortran-compiler_p_2023.2.1.8_offline.sh
         ./l_fortran-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
-        echo "INTEL_PATH=/opt/intel/oneapi" >> "$GITHUB_ENV"
+        echo "INTEL_PATH=/home/runner/intel/oneapi" >> "$GITHUB_ENV"
 
     - name: fix gcc issue on the runner (GNU / macos)
       if: matrix.compiler == 'gfortran' && matrix.os == 'macos'
@@ -45,7 +45,7 @@ runs:
         sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
         hdiutil attach m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg
         sudo /Volumes/m_cpp-compiler-classic_p_2023.2.0.48999_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
-        echo "INTEL_PATH=/home/runner/intel/oneapi" >> "$GITHUB_ENV"
+        echo "INTEL_PATH=/opt/intel/oneapi" >> "$GITHUB_ENV"
 
     # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
