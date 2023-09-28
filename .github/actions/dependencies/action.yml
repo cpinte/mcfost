@@ -17,13 +17,14 @@ runs:
       if: matrix.compiler == 'ifort' && matrix.os == 'linux'
       shell: bash
       run: |
-        wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebf5d9aa-17a7-46a4-b5df-ace004227c0e/l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh &
-        wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/0d65c8d4-f245-4756-80c4-6712b43cf835/l_fortran-compiler_p_2023.2.1.8_offline.sh &
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebf5d9aa-17a7-46a4-b5df-ace004227c0e/l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh &
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/0d65c8d4-f245-4756-80c4-6712b43cf835/l_fortran-compiler_p_2023.2.1.8_offline.sh &
         wait
         chmod +x l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh
         ./l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
         chmod +x l_fortran-compiler_p_2023.2.1.8_offline.sh
         ./l_fortran-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
+        echo "INTEL_PATH=/opt/intel/oneapi" >> "$GITHUB_ENV"
 
     - name: fix gcc issue on the runner (GNU / macos)
       if: matrix.compiler == 'gfortran' && matrix.os == 'macos'
@@ -37,13 +38,14 @@ runs:
       if: matrix.compiler == 'ifort' && matrix.os == 'macos'
       shell: bash
       run: |
-        wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg &
-        wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebba13f8-1690-4d30-9d43-1e2fa2d536cd/m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg &
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg &
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebba13f8-1690-4d30-9d43-1e2fa2d536cd/m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg &
         wait
         hdiutil attach m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
         sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
         hdiutil attach m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg
         sudo /Volumes/m_cpp-compiler-classic_p_2023.2.0.48999_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
+        echo "INTEL_PATH=/home/runner/intel/oneapi" >> "$GITHUB_ENV"
 
     # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
