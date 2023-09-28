@@ -19,6 +19,7 @@ module Opacity_atom
 
    implicit none
 
+   procedure (cross_coupling_cont), pointer :: xcoupling_cont => cross_coupling_cont
    real(kind=dp), allocatable, dimension(:,:) :: chi_cont, eta_cont
    !local profile for cell id in direction iray for all atoms and b-b trans
    real(kind=dp), allocatable :: Itot(:,:,:), psi(:,:,:), phi_loc(:,:,:,:,:), vlabs(:,:)
@@ -221,6 +222,7 @@ module Opacity_atom
 
          atm => null()
       enddo
+      deallocate(xp)
 
       mem_contopac = 0
       if (limit_mem < 2) then
@@ -286,17 +288,16 @@ module Opacity_atom
 
       select case (limit_mem)
          case (0)
-            n = n_lambda_cont
-            lam = tab_lambda_cont
-         case (1)
             n = n_lambda
             lam = tab_lambda_nm
+         case (1)
+            n = n_lambda_cont
+            lam = tab_lambda_cont
       end select
 
       !$omp parallel &
       !$omp default(none) &
       !$omp private(icell) &
-      !$omp shared(n_lambda,tab_lambda_nm,chic_big,etac_big)&
       !$omp shared(ibar,n_cells_done,n_cells,icompute_atomrt)&
       !$omp shared(n,lam)
       !$omp do schedule(dynamic,1)
@@ -535,93 +536,11 @@ module Opacity_atom
       return
    end subroutine opacity_atom_bb_loc
 
-   subroutine xcoupling_atom_cont(id,icell,at)
-   !must be diffent if limit_mem = 0 or not
-      integer, intent(in) :: id, icell
-      type(AtomType), intent(in), pointer :: at
-
-      ! cont_loop : do kr = 1, at%Ncont
-
-      !       if (.not.at%continua(kr)%lcontrib) cycle cont_loop
-
-      !       j = at%continua(kr)%j
-      !       i = at%continua(kr)%i
-      !       Nb = at%continua(kr)%Nbc; Nr = at%continua(kr)%Nrc
-      !       Nl = Nr-Nb+1
-      !       N1 = at%continua(kr)%Nb; N2 = at%continua(kr)%Nr
-
-      !       !ni_on_nj_star = ne(icell) * phi_T(icell, at%g(i)/at%g(j), at%E(j)-at%E(i))
-      !       ni_on_nj_star = at%nstar(i,icell)/(at%nstar(j,icell) + 1d-100)
-
-
-      !       gij = ni_on_nj_star * exp(-hc_k/T(icell)/at%continua(kr)%lambda0)
-
-
-      !       if (at%n(i,icell) - gij*at%n(j,icell) <= 0.0_dp) cycle cont_loop
-
-      !       !The wavelength integration weight cannot be used in that loop because we interpolate after.
-      !       freq_loop : do la=1, Nl
-      !          gij = ni_on_nj_star * exp(hnu_k(Nb-1+la)/T(icell))
-      !          term1(la) = fourpi_h * at%continua(kr)%alpha(la) * (at%n(i,icell) - gij*at%n(j,icell))
-      !          term2(la) = at%continua(kr)%alpha(la) * at%continua(kr)%twohnu3_c2(la) * gij
-      !          term3(la) = at%continua(kr)%alpha(la) * at%continua(kr)%twohnu3_c2(la) * gij * at%n(j,icell)
-      !       enddo freq_loop
-      !       !linear interpolation + adding wavelength integration weight
-      !       !wl = 0.5*(tab_lambda_nm(N1+1)-tab_lambda_nm(N1)) / tab_lambda_nm(N1)
-      !       ! chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1)! * wl
-      !       ! chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1)! * wl
-      !       ! Uji_down(n1,j,nact,id) = Uji_down(N1,j,nact,id) + term2(1)
-      !       ! eta_atoms(N1,nact,id) = eta_atoms(N1,nact,id) + term3(1)
-      !       i0 = 2
-      !       do la=N1,N2
-      !          ! if (la>1) then
-      !          !    wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
-      !          ! !otherwise, wl is the previous one, first point of the grid
-      !          ! endif
-      !          loop_i : do la0=i0, Nl
-      !             if (tab_lambda_cont(Nb+la0-1) > tab_lambda_nm(la)) then
-      !                wt = (tab_lambda_nm(la) - tab_lambda_cont(Nb+la0-2)) / (tab_lambda_cont(Nb+la0-1) - tab_lambda_cont(Nb+la0-2))
-
-      !                chi_down(la,j,nact,id) = chi_down(la,j,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) )!*wl
-      !                chi_up(la,i,nact,id) = chi_up(la,i,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) )!*wl
-      !                Uji_down(la,j,nact,id) = Uji_down(la,j,nact,id) + (1.0_dp - wt) *term2(la0-1)  + wt * term2(la0)
-      !                eta_atoms(la,nact,id) = eta_atoms(la,nact,id) + (1.0_dp - wt) *term3(la0-1)  + wt * term3(la0)
-
-      !                i0 = la0
-      !                exit loop_i
-      !             endif
-      !          enddo loop_i
-      !       enddo
-      !       ! wl = 0.5*(tab_lambda_nm(N2)-tab_lambda_nm(N2-1)) / tab_lambda_nm(N2-1)
-      !       chi_down(n2,j,nact,id) = chi_down(n2,j,nact,id) + term1(Nl)! * wl
-      !       chi_up(n2,i,nact,id) = chi_up(n2,i,nact,id) + term1(Nl)! * wl
-      !       Uji_down(n2,j,nact,id) = Uji_down(n2,j,nact,id) + term2(Nl)
-      !       eta_atoms(n2,nact,id) = eta_atoms(n2,nact,id) + term3(Nl)
-
-      !    enddo cont_loop
-
-      !    do la=1, n_lambda
-      !        if (la==1) then
-      !           wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la)) / tab_lambda_nm(la)
-      !        elseif (la==n_lambda) then
-      !           wl = 0.5*(tab_lambda_nm(la)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
-      !        else
-      !           wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
-      !        endif
-      !        chi_down(la,:,nact,id) =  chi_down(la,:,nact,id)  * wl
-      !        chi_up(la,:,nact,id) = chi_up(la,:,nact,id) * wl
-      !    enddo
-
-      return
-   end subroutine xcoupling_atom_cont
-
    subroutine xcoupling(id, icell, iray)
       integer, intent(in) :: id, icell, iray
       integer :: nact, j, i, kr, Nb, Nr, la, Nl
-      integer :: i0, j0, la0, N1, N2
       type (AtomType), pointer :: at
-      real(kind=dp) :: gij, chicc, wl, ni_on_nj_star, wphi, twohnu3_c2, wt
-      real(kind=dp) :: term1(Nlambda_max_cont), term2(Nlambda_max_cont), term3(Nlambda_max_cont)
+      real(kind=dp) :: chicc, wl, wphi
       real(kind=dp), dimension(Nlambda_max_line) :: phi0, wei_line
 
       Uji_down(:,:,:,id) = 0.0_dp
@@ -634,7 +553,7 @@ module Opacity_atom
 
          at => ActiveAtoms(nact)%p
 
-         call xcoupling_atom_cont(id,icell,at)
+         call xcoupling_cont(id,icell,at)
 
          line_loop : do kr = 1, at%Nline
 
@@ -687,6 +606,155 @@ module Opacity_atom
 
     return
    end subroutine xcoupling
+
+   subroutine cross_coupling_cont(id,icell,at)
+   !case limit_mem == 0
+      integer, intent(in) :: id, icell
+      type(AtomType), intent(in), pointer :: at
+      integer :: nact, j, i, kr, Nb, Nr, la, Nl
+      real(kind=dp) :: gij_0, wl, ni_on_nj_star, chicc
+      real(kind=dp), dimension(Nlambda_max_cont) :: gij
+      ! real(kind=dp) :: w_cont(Nlambda_max_cont)
+
+      nact = at%activeindex
+
+      cont_loop : do kr = 1, at%Ncont
+
+         if (.not.at%continua(kr)%lcontrib) cycle cont_loop
+
+         j = at%continua(kr)%j
+         i = at%continua(kr)%i
+         Nb = at%continua(kr)%Nbc; Nr = at%continua(kr)%Nrc
+         Nl = Nr-Nb+1
+
+         !ni_on_nj_star = ne(icell) * phi_T(icell, at%g(i)/at%g(j), at%E(j)-at%E(i))
+         ni_on_nj_star = at%nstar(i,icell)/(at%nstar(j,icell) + 1d-100)
+
+
+         gij_0 = ni_on_nj_star * exp(-hc_k/T(icell)/at%continua(kr)%lambda0)
+         gij(1:Nl) = ni_on_nj_star * exp(hnu_k(Nb:Nr)/T(icell))
+
+         if (at%n(i,icell) - gij_0*at%n(j,icell) <= 0.0_dp) cycle cont_loop
+
+         ! w_cont(1:Nl) = (tab_lambda_nm(Nb+1:Nr) - tab_lambda_nm(Nb:Nr-1)) / tab_lambda_nm(Nb:Nr-1)
+
+         !how to avoid the loop, here the array have the good shape
+         freq_loop : do la=1, Nl
+            if (la==1) then
+                wl = 0.5*(tab_lambda_nm(Nb+la)-tab_lambda_nm(Nb+la-1)) / tab_lambda_nm(Nb+la-1)
+            elseif (la==n_lambda) then
+                wl = 0.5*(tab_lambda_nm(Nb+la-1)-tab_lambda_nm(Nb+la-2)) / tab_lambda_nm(Nb+la-2)
+            else
+                wl = 0.5*(tab_lambda_nm(Nb+la)-tab_lambda_nm(Nb+la-2)) / tab_lambda_nm(Nb+la-1)
+            endif
+            ! gij = ni_on_nj_star * exp(hnu_k(Nb-1+la)/T(icell))
+
+            chicc = wl * fourpi_h * at%continua(kr)%alpha(la) * (at%n(i,icell) - gij(la)*at%n(j,icell))
+
+            chi_up(Nb+la-1,i,nact,id) = chi_up(Nb+la-1,i,nact,id) + chicc
+            chi_down(Nb+la-1,j,nact,id) = chi_down(Nb+la-1,j,nact,id) + chicc
+
+            Uji_down(Nb+la-1,j,nact,id) = Uji_down(Nb+la-1,j,nact,id) + &
+               at%continua(kr)%alpha(la) * at%continua(kr)%twohnu3_c2(la) * gij(la)
+            eta_atoms(Nb+la-1,nact,id) = eta_atoms(Nb+la-1,nact,id) + &
+               at%continua(kr)%alpha(la) * at%continua(kr)%twohnu3_c2(la) * gij(la) * at%n(j,icell)
+
+         enddo freq_loop
+         ! Uji_down(Nb:Nr,j,nact,id) = Uji_down(Nb:Nr,j,nact,id) + &
+         !    at%continua(kr)%alpha(:) * at%continua(kr)%twohnu3_c2(:) * ni_on_nj_star * exp(hnu_k(Nb:Nr)/T(icell))
+         ! eta_atoms(Nb:Nr,nact,id) = eta_atoms(Nb:Nr,nact,id) + &
+         !    at%continua(kr)%alpha(:) * at%continua(kr)%twohnu3_c2(:) * ni_on_nj_star * exp(hnu_k(Nb:Nr)/T(icell)) * at%n(j,icell)
+   
+      enddo cont_loop
+
+      return
+   end subroutine cross_coupling_cont
+
+   subroutine cross_coupling_cont_i(id,icell,at)
+   !case limit_mem > 0
+      integer, intent(in) :: id, icell
+      type(AtomType), intent(in), pointer :: at
+      integer :: nact, j, i, kr, Nb, Nr, la, Nl
+      integer :: i0, la0, N1, N2
+      real(kind=dp) :: gij, chicc, wl, ni_on_nj_star, wt
+      real(kind=dp) :: term1(Nlambda_max_cont), term2(Nlambda_max_cont), term3(Nlambda_max_cont)
+
+      nact = at%activeindex
+
+      cont_loop : do kr = 1, at%Ncont
+
+         if (.not.at%continua(kr)%lcontrib) cycle cont_loop
+
+         j = at%continua(kr)%j
+         i = at%continua(kr)%i
+         Nb = at%continua(kr)%Nbc; Nr = at%continua(kr)%Nrc
+         Nl = Nr-Nb+1
+         N1 = at%continua(kr)%Nb; N2 = at%continua(kr)%Nr
+
+         !ni_on_nj_star = ne(icell) * phi_T(icell, at%g(i)/at%g(j), at%E(j)-at%E(i))
+         ni_on_nj_star = at%nstar(i,icell)/(at%nstar(j,icell) + 1d-100)
+
+
+         gij = ni_on_nj_star * exp(-hc_k/T(icell)/at%continua(kr)%lambda0)
+
+
+         if (at%n(i,icell) - gij*at%n(j,icell) <= 0.0_dp) cycle cont_loop
+
+         !The wavelength integration weight cannot be used in that loop because we interpolate after.
+         freq_loop : do la=1, Nl
+            gij = ni_on_nj_star * exp(hnu_k(Nb-1+la)/T(icell))
+            term1(la) = fourpi_h * at%continua(kr)%alpha(la) * (at%n(i,icell) - gij*at%n(j,icell))
+            term2(la) = at%continua(kr)%alpha(la) * at%continua(kr)%twohnu3_c2(la) * gij
+            term3(la) = at%continua(kr)%alpha(la) * at%continua(kr)%twohnu3_c2(la) * gij * at%n(j,icell)
+         enddo freq_loop
+         !linear interpolation + adding wavelength integration weight
+         !wl = 0.5*(tab_lambda_nm(N1+1)-tab_lambda_nm(N1)) / tab_lambda_nm(N1)
+         ! chi_down(N1,j,nact,id) = chi_down(N1,j,nact,id) + term1(1)! * wl
+         ! chi_up(n1,i,nact,id) = chi_up(n1,i,nact,id) + term1(1)! * wl
+         ! Uji_down(n1,j,nact,id) = Uji_down(N1,j,nact,id) + term2(1)
+         ! eta_atoms(N1,nact,id) = eta_atoms(N1,nact,id) + term3(1)
+         i0 = 2
+         do la=N1,N2
+            ! if (la>1) then
+            !    wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
+            ! !otherwise, wl is the previous one, first point of the grid
+            ! endif
+            loop_i : do la0=i0, Nl
+               if (tab_lambda_cont(Nb+la0-1) > tab_lambda_nm(la)) then
+                  wt = (tab_lambda_nm(la) - tab_lambda_cont(Nb+la0-2)) / (tab_lambda_cont(Nb+la0-1) - tab_lambda_cont(Nb+la0-2))
+
+                  chi_down(la,j,nact,id) = chi_down(la,j,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) )!*wl
+                  chi_up(la,i,nact,id) = chi_up(la,i,nact,id) + ( (1.0_dp - wt) *term1(la0-1)  + wt * term1(la0) )!*wl
+                  Uji_down(la,j,nact,id) = Uji_down(la,j,nact,id) + (1.0_dp - wt) *term2(la0-1)  + wt * term2(la0)
+                  eta_atoms(la,nact,id) = eta_atoms(la,nact,id) + (1.0_dp - wt) *term3(la0-1)  + wt * term3(la0)
+
+                  i0 = la0
+                  exit loop_i
+               endif
+            enddo loop_i
+         enddo
+         ! wl = 0.5*(tab_lambda_nm(N2)-tab_lambda_nm(N2-1)) / tab_lambda_nm(N2-1)
+         chi_down(n2,j,nact,id) = chi_down(n2,j,nact,id) + term1(Nl)! * wl
+         chi_up(n2,i,nact,id) = chi_up(n2,i,nact,id) + term1(Nl)! * wl
+         Uji_down(n2,j,nact,id) = Uji_down(n2,j,nact,id) + term2(Nl)
+         eta_atoms(n2,nact,id) = eta_atoms(n2,nact,id) + term3(Nl)
+
+      enddo cont_loop
+
+      do la=1, n_lambda
+         if (la==1) then
+            wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la)) / tab_lambda_nm(la)
+         elseif (la==n_lambda) then
+            wl = 0.5*(tab_lambda_nm(la)-tab_lambda_nm(la-1)) / tab_lambda_nm(la-1)
+         else
+            wl = 0.5*(tab_lambda_nm(la+1)-tab_lambda_nm(la-1)) / tab_lambda_nm(la)
+         endif
+         chi_down(la,:,nact,id) =  chi_down(la,:,nact,id)  * wl
+         chi_up(la,:,nact,id) = chi_up(la,:,nact,id) * wl
+      enddo
+
+      return
+   end subroutine cross_coupling_cont_i
 
    function profile_art(line,id,icell,iray,lsubstract_avg,N,lambda, x,y,z,x1,y1,z1,u,v,w,l_void_before,l_contrib)
    use voigts, only : VoigtThomson
