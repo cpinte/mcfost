@@ -1616,7 +1616,6 @@ module wavelengths_gas
             allocate(lambda(Nwaves),stat=alloc_status)
             if (alloc_status>0) call error("allocation error lambda, in pure cont!")
             lambda = tab_lambda_cont
-            deallocate(tab_lambda_cont)
             Nlambda = 0
          endif !there is lines
       else
