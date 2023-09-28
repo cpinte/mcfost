@@ -65,4 +65,4 @@ runs:
       working-directory: lib
       run: |
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
-        ./install.sh
+        sudo ./install.sh
