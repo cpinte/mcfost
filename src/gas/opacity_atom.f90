@@ -325,28 +325,58 @@ module Opacity_atom
       integer, intent(in) :: icell, N
       real(kind=dp), intent(in), dimension(N) :: lambda
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
-      !could create a sperate routine to not overload the memory with that kind of static alloc.
+      !could create a separate routine to not overload the memory with that kind of static alloc.
       real(kind=dp), dimension(N_lambda_cont) :: chic, snuc
       integer :: la, lac, i0
       real(kind=dp) :: w
 
-      if (limit_mem > 0) then
-         !n_lambda_cont
-         if (limit_mem == 2) then
-            !init continuous opacity with background gas continuum.
+      ! if (limit_mem > 0) then
+      !    !n_lambda_cont
+      !    if (limit_mem == 2) then
+      !       !init continuous opacity with background gas continuum.
+      !       call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+      !       !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
+      !       !accumulate b-f
+      !       call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+      !    else 
+      !       chic(:) = chi_cont(:,icell)
+      !       snuc(:) = eta_cont(:,icell)
+      !    endif
+      ! else
+      !    chi = chi_cont(:,icell) !n_lambda
+      !    snu = eta_cont(:,icell) !n_lambda
+      !    return
+      ! endif
+      ! if (limit_mem == 2) then
+      !    !n_lambda_cont
+      !    !init continuous opacity with background gas continuum.
+      !    call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+      !    !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
+      !    !accumulate b-f
+      !    call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+      ! elseif (limit_mem == 1) tehn 
+      !    chic(:) = chi_cont(:,icell)
+      !    snuc(:) = eta_cont(:,icell)
+      ! elseif (limit_mem == 0)
+      !    chi = chi_cont(:,icell) !n_lambda
+      !    snu = eta_cont(:,icell) !n_lambda
+      !    return
+      ! endif
+
+      select case (limit_mem)
+         case (0)
+            chi = chi_cont(:,icell) !n_lambda
+            snu = eta_cont(:,icell) !n_lambda
+            return  
+         case (1)
+            chic(:) = chi_cont(:,icell)
+            snuc(:) = eta_cont(:,icell)
+         case (2)
             call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
             !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
             !accumulate b-f
-            call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
-         else 
-            chic(:) = chi_cont(:,icell)
-            snuc(:) = eta_cont(:,icell)
-         endif
-      else
-         chi = chi_cont(:,icell) !n_lambda
-         snu = eta_cont(:,icell) !n_lambda
-         return
-      endif
+            call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)  
+      end select   
 
       !linear interpolation from tab_lambda_cont to lambda
       i0 = 2
@@ -388,7 +418,6 @@ module Opacity_atom
 
             if (.not.atom%continua(kr)%lcontrib) cycle
 
-            !beware Nc here, assumed tab_lambda_cont
             Nred = atom%continua(kr)%Nrc; Nblue = atom%continua(kr)%Nbc
             i = atom%continua(kr)%i; j = atom%continua(kr)%j
             !ni_on_nj_star = ne(icell) * phi_T(icell, at%g(i)/at%g(j), at%E(j)-at%E(i))
