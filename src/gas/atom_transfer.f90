@@ -611,7 +611,8 @@ module atom_transfer
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
             !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration,diff_loc)&!diff,diff_cont,dM)&
-            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,limit_mem,n_lambda,tab_lambda_nm,voigt,dne_loc,n_lambda_cont,tab_lambda_cont) &
+            !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,voigt,dne_loc)&
+            !$omp shared(limit_mem,n_lambda,tab_lambda_nm,n_lambda_cont,tab_lambda_cont) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
