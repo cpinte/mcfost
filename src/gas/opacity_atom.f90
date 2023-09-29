@@ -376,7 +376,7 @@ module Opacity_atom
             !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
             !accumulate b-f
             call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)  
-      end select   
+      end select
 
       !linear interpolation from tab_lambda_cont to lambda
       i0 = 2
