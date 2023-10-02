@@ -62,7 +62,7 @@ jobs:
       - name: check directory tree on linux
         if: matrix.os == 'linux' && matrix.compiler == 'ifort'
         run: |
-          apt-get install tree
+          sudo apt-get install tree
           tree -L 2 --du -h $MCFOST_INSTALL
 
       - name: test
