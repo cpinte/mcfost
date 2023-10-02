@@ -803,6 +803,13 @@ module wavelengths_gas
                   endif
                endif
             endif
+            !can change for limit_mem == 2 in the future!
+            if (limit_mem == 0) then
+            !alias in case we keep everything on the whole grid!
+               atom%continua(kr)%Nbc = atom%continua(kr)%Nb
+               atom%continua(kr)%Nrc = atom%continua(kr)%Nr
+               atom%continua(kr)%Nlambdac = atom%continua(kr)%Nlambda
+            endif
             Nlambda_max_cont = max(Nlambda_max_cont,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1)
 
          enddo
@@ -1609,7 +1616,6 @@ module wavelengths_gas
             allocate(lambda(Nwaves),stat=alloc_status)
             if (alloc_status>0) call error("allocation error lambda, in pure cont!")
             lambda = tab_lambda_cont
-            deallocate(tab_lambda_cont)
             Nlambda = 0
          endif !there is lines
       else
@@ -1650,7 +1656,7 @@ module wavelengths_gas
             atom%continua(kr)%Nbc = locate(tab_lambda_cont, atom%continua(kr)%lambdamin)
             atom%continua(kr)%Nrc = locate(tab_lambda_cont, atom%continua(kr)%lambdamax)
             atom%continua(kr)%Nlambdac = atom%continua(kr)%Nrc - atom%continua(kr)%Nbc + 1
-
+!-> this one in inverted here ???
             if (lfrom_file) then
                atom%continua(kr)%Nb = locate(tab_lambda_nm, atom%continua(kr)%lambdamin)
                atom%continua(kr)%Nr = locate(tab_lambda_nm, atom%continua(kr)%lambdamax)
@@ -1693,6 +1699,11 @@ module wavelengths_gas
                      endif
                   endif
                endif
+            endif
+            if (limit_mem == 0) then
+               atom%continua(kr)%Nbc = atom%continua(kr)%Nb
+               atom%continua(kr)%Nrc = atom%continua(kr)%Nr
+               atom%continua(kr)%Nlambdac = atom%continua(kr)%Nlambda
             endif
             Nlambda_max_cont = max(Nlambda_max_cont,atom%continua(kr)%Nr-atom%continua(kr)%Nb+1)
 

@@ -18,10 +18,6 @@ module gas_contopac
    use utils, only : bilinear, linear_1D_sorted, Bpnu, locate
    use parametres, only : ldissolve, n_cells
    use messages, only : error
-   use wavelengths_gas, only : tab_lambda_cont, n_lambda_cont
-                              !allocate and compute gas_contopac on a small grid
-                              !and interpolate on tab_lambda ?
-                              !do the same for bound-free ? 
 
    implicit none
 	
