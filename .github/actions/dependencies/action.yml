@@ -65,5 +65,5 @@ runs:
       working-directory: lib
       run: |
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
-        sudo chmod g+w /usr/local/include
+        sudo chmod o+w /usr/local/include
         ./install.sh
