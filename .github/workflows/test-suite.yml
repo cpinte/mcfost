@@ -60,7 +60,7 @@ jobs:
           make static=yes all 
 
       - name: check directory tree on linux
-        if: matrix.os = 'linux' && matrix.compiler == 'intel'
+        if: matrix.os == 'linux' && matrix.compiler == 'intel'
         run: |
           apt-get install tree
           tree -L 2 --du -h $MCFOST_INSTALL
