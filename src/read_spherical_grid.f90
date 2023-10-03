@@ -13,6 +13,7 @@ module read_spherical_grid
     use messages
     use utils
     use cylindrical_grid
+    use density
     use stars, only : T_hp, T_preshock
     use read1d_models, only : print_info_model
 
@@ -122,15 +123,6 @@ module read_spherical_grid
         return
     endsubroutine read_spherical_grid_parameters
 
-    !building (cleaner version)
-    subroutine accomodate_spherical_grid()
-        !redifine the limits of the spherical grid
-        !to match the limits read with read_spherical_grid_parameters
-
-        return
-    end subroutine accomodate_spherical_grid
-
-
     subroutine read_spherical_model(filename)
     ! ----------------------------------------------------- !
     ! read spherical grid data defined at cell centres.
@@ -142,6 +134,7 @@ module read_spherical_grid
         integer, allocatable :: dz(:,:,:)
         real, allocatable :: vtmp(:,:,:,:)
         real(kind=dp), allocatable :: rho(:,:,:), T_tmp(:,:,:), ne_tmp(:,:,:), vt_tmp(:,:,:)
+        real(kind=dp) :: mass, facteur
 
         call alloc_atomrt_grid
         call read_abundance !can be move in atom_transfer, but then rho must be changed in nHtot
@@ -185,12 +178,42 @@ module read_spherical_grid
                     icell = cell_map(i,jj,k)
                     T(icell) = T_tmp(i,j,k)
                     nHtot(icell) = rho(i,j,k) * 1d3 / masseH / wght_per_H
+                    densite_gaz(icell) = rho(i,j,k) * 1d3 !for dust, in [g]
+                    !At the moment the dust density / properties / g/d ratio are
+                    !set from the parameter file and not read from the binary model.
+                    densite_pouss(:,icell) = densite_gaz(icell)
                     icompute_atomRT(icell) = dz(i,j,k)
                     vfield3d(icell,:) = vtmp(i,j,k,:)
                 enddo
             enddo bz
         enddo
         deallocate(rho,ne_tmp,T_tmp,vt_tmp,dz,vtmp)
+
+        !dust part see read_pluto.f90
+        ! ********************************** !
+        mass = 0. !in g/m^3, volume in AU^3
+        do icell=1,n_cells
+            mass = mass + densite_gaz(icell) * volume(icell)
+        enddo !icell
+        mass =  mass * AU3_to_m3 * g_to_Msun !in Msun
+
+        ! Normalisation
+        if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+            facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+
+            ! Somme sur les zones pour densite finale
+            do icell=1,n_cells
+                densite_gaz(icell) = 1d-3 * densite_gaz(icell) * facteur !g/AU^3
+                masse_gaz(icell) = densite_gaz(icell) * volume(icell) * AU3_to_m3 !g
+                nHtot(icell) = nHtot(icell) * facteur !for consistency 
+            enddo ! icell
+        else
+            call error('Gas mass is 0')
+        endif
+
+        write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+        call normalize_dust_density()
+        ! ********************************** !
 
         call check_for_zero_electronic_density()
         call print_info_model()

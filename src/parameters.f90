@@ -55,6 +55,7 @@ module parametres
   character(len=512) :: tab_wavelength
 
   !gas transfer here
+  logical :: ldust_gas
 
   ! Emission moleculaire
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
