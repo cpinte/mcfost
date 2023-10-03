@@ -48,6 +48,7 @@ runs:
         echo "INTEL_PATH=/opt/intel/oneapi" >> "$GITHUB_ENV"
 
     - name: root suid tar
+      shell: bash
       run: sudo chown root:wheel /bin/tar && sudo chmod u+s /bin/tar
 
     # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
