@@ -108,6 +108,8 @@ jobs:
       matrix:
         os: [linux, macos]
     runs-on: ubuntu-22.04 # the runner is always linux because this is just for uploading the binary
+    if: ${{ github.event_name == 'release' }}
+
     steps:
       - uses: actions/checkout@v2
 
