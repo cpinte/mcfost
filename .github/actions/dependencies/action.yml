@@ -58,6 +58,11 @@ runs:
           ${{ env.MCFOST_INSTALL }}/lib/${{ matrix.compiler }}
         key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
+    - name: unset setuid bit for tar if cache not found
+      if: matrix.compiler == 'ifort' && matrix.os == 'linux' && steps.cache-deps.outputs.cache-hit != 'true'
+      shell: bash
+      run: sudo chmod u-s /bin/tar
+
     # Only do this (lengthy) setup if dependency cache not found
     - name: prepare mcfost environment
       if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
@@ -66,5 +71,4 @@ runs:
       run: |
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
         sudo chmod o+w /usr/local/include /usr/local/lib
-        sudo chmod u-s /bin/tar # unset the stuid bit so that tar no longer runs as root (which breaks the install script)
         ./install.sh
