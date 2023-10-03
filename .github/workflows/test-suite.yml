@@ -60,18 +60,18 @@ jobs:
         shell: bash -e {0}
         run: |
           [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
-          make static=yes all 
+          make static=yes all
 
       - name: test
         if: ${{ github.event_name != 'release' }}
         uses: ./.github/actions/test
 
       # Saving the binaries from the macos builds since the runner is the same for both compilers -> might be more consistent
-      - name: save binary for benchmarking
-        if: matrix.os == 'macos' && matrix.openmp == 'yes'
+      - name: save binary for benchmarking and release
+        if: matrix.openmp == 'yes'
         uses: actions/upload-artifact@v3
         with:
-          name: mcfost-binary-${{ matrix.compiler }}
+          name: mcfost-binary-${{ matrix.os }}-${{ matrix.compiler }}
           path: src/mcfost
 
   benchmark:
@@ -90,7 +90,7 @@ jobs:
 
       - name: restore binary artifact
         uses: actions/download-artifact@v3
-        with: 
+        with:
           name: mcfost-binary-${{ matrix.compiler }}
           path: src/
 
@@ -101,13 +101,21 @@ jobs:
         run: |
           echo ${{ matrix.compiler }} $(cat benchmark-${{ matrix.compiler }}.tim)
 
-      - name: build
-        working-directory: src
-        run: make all static=yes
 
-      - name: test
-        if: ${{ github.event_name != 'release' }}
-        uses: ./.github/actions/test
+  release:
+    needs: build-and-test
+    strategy:
+      matrix:
+        os: [linux, macos]
+    runs-on: ubuntu-22.04 # the runner is always linux because this is just for uploading the binary
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: restore binary artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: mcfost-binary-${{ matrix.os }}-ifort # use ifort for binary release
+          path: src/
 
       - name: upload binary
         if: ${{ github.event_name == 'release' }}
