@@ -9,7 +9,9 @@ runs:
       working-directory: src
       env:
         MCFOST_UTILS: ${{ github.workspace }}/utils
-      run: ./mcfost -setup
+      run: |
+        chmod +x mcfost
+        ./mcfost -setup
 
     - name: download phantom input file
       shell: bash
