@@ -25,7 +25,7 @@ runs:
         chmod +x l_fortran-compiler_p_2023.2.1.8_offline.sh
         ./l_fortran-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
         echo "INTEL_PATH=/home/runner/intel/oneapi" >> "$GITHUB_ENV"
-        sudo chown root /bin/tar && sudo chmod u+s /bin/tar
+        sudo chown root /bin/tar && sudo chmod u+s /bin/tar # tar needs to run as root to extract when restoring the cache
 
     - name: fix gcc issue on the runner (GNU / macos)
       if: matrix.compiler == 'gfortran' && matrix.os == 'macos'
@@ -66,4 +66,5 @@ runs:
       run: |
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
         sudo chmod o+w /usr/local/include /usr/local/lib
+        sudo chmod u-s /bin/tar # unset the stuid bit so that tar no longer runs as root (which breaks the install script)
         ./install.sh
