@@ -153,6 +153,7 @@ fi
 #-------------------------------------------
 echo "Compiling SPRNG ..."
 tar xzvf sprng2.0b.tar.gz
+ls -latrh
 \cp -f "$SYSTEM/make.CHOICES" sprng2.0
 \cp -f "$SYSTEM/make.INTEL" sprng2.0/SRC
 if [ "$SYSTEM" = "gfortran" ] ; then
