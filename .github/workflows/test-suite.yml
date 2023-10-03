@@ -12,7 +12,7 @@ on:
 env:
   MCFOST_NO_XGBOOST: yes
   MCFOST_GIT: "1"
-  SKIP_HDF5: yes
+  SKIP_HDF5: no
 
 jobs:
   build-and-test:
@@ -35,9 +35,6 @@ jobs:
           - os: linux
             compiler: gfortran
             container: "quay.io/pypa/manylinux_2_28_x86_64"
-          - os: linux
-            compiler: ifort
-            container: "intel/oneapi-hpckit:2023.2-devel-ubuntu22.04"
 
     runs-on: ${{ matrix.os-version }}
     container: ${{ matrix.container }}
@@ -52,24 +49,26 @@ jobs:
 
       - run: git config --global --add safe.directory $PWD
 
-      # Actions doesn't seem to have a way to evaluate expressions in paths so these 'uses' are hardcoded in
-      - name: build and install dependencies (linux)
-        if: matrix.os == 'linux'
-        uses: ./.github/actions/dependencies/linux
-
-      - name: build and install dependencies (macos)
-        if: matrix.os == 'macos'
-        uses: ./.github/actions/dependencies/macos
+      - name: build and install dependencies
+        uses: ./.github/actions/dependencies
 
       - name: compile mcfost
         working-directory: src
         shell: bash -e {0}
         run: |
-          [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
-          make all
+          [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
+          make static=yes all 
 
       - name: test
         uses: ./.github/actions/test
+
+      # Saving the binaries from the macos builds since the runner is the same for both compilers -> might be more consistent
+      - name: save binary for benchmarking
+        if: matrix.os == 'macos' && matrix.openmp == 'yes'
+        uses: actions/upload-artifact@v3
+        with:
+          name: mcfost-binary-${{ matrix.compiler }}
+          path: src/mcfost
 
   benchmark:
     needs: build-and-test
@@ -85,15 +84,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: install dependencies
-        uses: ./.github/actions/dependencies/macos
-
-      - name: compile mcfost
-        working-directory: src
-        shell: bash -e {0}
-        run: |
-          [ ! "$SETVARS_COMPLETED" == 1 ] && test -f /opt/intel/oneapi/setvars.sh && . /opt/intel/oneapi/setvars.sh
-          make
+      - name: restore binary artifact
+        uses: actions/download-artifact@v3
+        with: 
+          name: mcfost-binary-${{ matrix.compiler }}
+          path: src/
 
       - name: benchmark
         uses: ./.github/actions/benchmark
