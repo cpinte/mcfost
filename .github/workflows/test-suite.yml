@@ -70,13 +70,6 @@ jobs:
           name: mcfost-binary-${{ matrix.compiler }}
           path: src/mcfost
 
-      - name: what is so big in this cache? 
-        if: matrix.os == 'linux' && matrix.compiler == 'ifort'
-        run: |
-          sudo apt-get install tree
-          tree -L 2 --du -h $MCFOST_INSTALL
-
-
   benchmark:
     needs: build-and-test
     strategy:
