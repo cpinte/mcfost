@@ -49,7 +49,9 @@ runs:
 
     - name: give write permissions for include and lib directories
       shell: bash
-      run: sudo chmod -R o+wx ${{ env.MCFOST_INSTALL }}/include ${{ env.MCFOST_INSTALL }}/lib
+      run: |
+        ls -lsh /usr/local/include/node
+        sudo chmod o+wx ${{ env.MCFOST_INSTALL }}/include ${{ env.MCFOST_INSTALL }}/lib
 
     # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
