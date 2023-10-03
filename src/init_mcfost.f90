@@ -71,7 +71,7 @@ subroutine set_default_variables()
   lemission_mol=.false.
   lcheckpoint = .false.
   checkpoint_period = 15
-  llimit_mem = .false. !if true, contopac are computed locally.
+  limit_mem = 0 ! {0, 1, 2}
   laccretion_shock = .false. !for magnetospheric accretion
   !HEALpix
   healpix_lorder = 1
@@ -226,6 +226,8 @@ subroutine set_default_variables()
   SPH_keep_particles = 0.999
 
   vfield_coord = 0
+
+  v_syst = 0.0_dp
 
   return
 
@@ -684,7 +686,11 @@ subroutine initialisation_mcfost()
         lemission_mol=.true.
      case("-limit_mem")
         i_arg = i_arg + 1
-        llimit_mem = .true.
+        if (i_arg > nbr_arg) call error("limit_mem switch value need!")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) limit_mem
+        if (limit_mem > 2) call error("limit_mem switch must be <= 2!")
+        i_arg= i_arg+1
      case("-safe_stop")
         i_arg = i_arg + 1
         lsafe_stop = .true.
@@ -1447,6 +1453,11 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) Pmax
         i_arg = i_arg + 1
+     case("-v_syst")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) v_syst
+        i_arg = i_arg + 1
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1971,7 +1982,7 @@ subroutine display_help()
   write(*,*) "     "
   write(*,*) "        : -mueller_size <Mueller_input_pathfile> "
   write(*,*) "                   Argument pathfile contain the size of each grain, and the path"
-  write(*,*) "                   for each associated matrix for every grain size, sorted" 
+  write(*,*) "                   for each associated matrix for every grain size, sorted"
   write(*,*) "                   from the first to the last grain size considered."
   write(*,*) "     "
   write(*,*) "        : -optical_depth_map ot -tau_map   : create an map of the optical depth"
@@ -2027,7 +2038,8 @@ subroutine display_help()
 !   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"
   write(*,*) "        : -safe_stop_time <real> : calc_time_limit in days "
-  write(*,*) "        : -limit_mem : compute background continua on the fly."
+  write(*,*) "        : -limit_mem <val> : switch for limiting memory usage (atomic transfer) in {0, 1, 2} (default 0)."
+  write(*,*) "        : -v_syst <v_syst> : systemic velocity [km/s]."
 
   write(*,*) " "
   write(*,*) " Options related to phantom"

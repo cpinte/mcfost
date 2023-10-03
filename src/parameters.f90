@@ -81,7 +81,13 @@ module parametres
   logical :: lsolve_for_ne
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
 
-  logical :: lmhd_voronoi, llimit_mem
+  logical :: lmhd_voronoi
+  integer :: limit_mem !if limit_mem == 0: try to keep a maximum of quantities on ram (faster but very ram-consuming)
+  					   !                    currently it means that background and continua are stored on the full wavelength grid for non-LTE transfer.
+  					   !if limit_mem == 1: the continua are stored on a small frequency grid and interpolated locally on the full grid.
+  					   !					This approach is faster than computing the continua for each wavelength point, and is relatively cheap in ram.
+  					   !					-> good trade-off between 0 and 2.
+  					   !if limit_mem == 2: everything is computed locally on the full grid. Slow but cheap in memory. 
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet, lsepar_ori

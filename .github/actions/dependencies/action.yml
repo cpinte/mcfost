@@ -1,5 +1,5 @@
 name: "dependencies"
-description: "installs mcfost dependencies"
+description: "macos and linux dependencies"
 
 # Note: needs GCC > 12, and sudo, wherever you're building
 # Using gcc-11 will return a bug when compiling gas/wavelengths_gas.f90
@@ -7,17 +7,63 @@ description: "installs mcfost dependencies"
 runs:
   using: "composite"
   steps:
-    # Cache dependencies for mcfost to avoid downloading/installing them each time this workflow runs
+    # Each OS has some quirk for each compiler, so these 4 steps deal with those
+    - name: install wget (GNU / linux)
+      if: matrix.compiler == 'gfortran' && matrix.os == 'linux'
+      shell: bash
+      run: dnf install -y sudo wget epel-release
+
+    - name: install intel compilers (intel / linux)
+      if: matrix.compiler == 'ifort' && matrix.os == 'linux'
+      shell: bash
+      run: |
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebf5d9aa-17a7-46a4-b5df-ace004227c0e/l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh &
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/0d65c8d4-f245-4756-80c4-6712b43cf835/l_fortran-compiler_p_2023.2.1.8_offline.sh &
+        wait
+        chmod +x l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh
+        ./l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
+        chmod +x l_fortran-compiler_p_2023.2.1.8_offline.sh
+        ./l_fortran-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
+        echo "INTEL_PATH=/home/runner/intel/oneapi" >> "$GITHUB_ENV"
+        sudo chown root /bin/tar && sudo chmod u+s /bin/tar
+
+    - name: fix gcc issue on the runner (GNU / macos)
+      if: matrix.compiler == 'gfortran' && matrix.os == 'macos'
+      shell: bash
+      run: |
+        brew reinstall gcc@13
+        ln -s /usr/local/bin/gcc-13 /usr/local/bin/gcc
+        ln -s /usr/local/bin/g++-13 /usr/local/bin/g++
+
+    - name: install intel compilers (intel / macos)
+      if: matrix.compiler == 'ifort' && matrix.os == 'macos'
+      shell: bash
+      run: |
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg &
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebba13f8-1690-4d30-9d43-1e2fa2d536cd/m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg &
+        wait
+        hdiutil attach m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg
+        sudo /Volumes/m_fortran-compiler-classic_p_2023.2.0.49001_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
+        hdiutil attach m_cpp-compiler-classic_p_2023.2.0.48999_offline.dmg
+        sudo /Volumes/m_cpp-compiler-classic_p_2023.2.0.48999_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
+        echo "INTEL_PATH=/opt/intel/oneapi" >> "$GITHUB_ENV"
+
+    # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
       id: cache-deps
       uses: actions/cache@v3
       with:
-        path: ${{ env.MCFOST_INSTALL }}
-        key: mcfost-deps-${{ runner.os }}-${{ hashFiles('lib/install.sh') }}-with-hdf5-${{ env.SKIP_HDF5 == 'yes' && 'no' || 'yes' }}
+        path: |
+          ${{ env.MCFOST_INSTALL }}/include
+          ${{ env.MCFOST_INSTALL }}/lib/${{ matrix.compiler }}
+        key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
     # Only do this (lengthy) setup if dependency cache not found
     - name: prepare mcfost environment
       if: ${{ steps.cache-deps.outputs.cache-hit != 'true' }}
-      shell: bash
+      shell: bash -e {0}
       working-directory: lib
-      run: ./install.sh
+      run: |
+        [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
+        sudo chmod o+w /usr/local/include /usr/local/lib
+        ./install.sh

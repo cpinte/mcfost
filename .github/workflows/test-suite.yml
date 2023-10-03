@@ -14,52 +14,92 @@ on:
 
 env:
   MCFOST_NO_XGBOOST: yes
-  SYSTEM: gfortran
   MCFOST_GIT: "1"
-  MCFOST_INSTALL: /tmp/mcfost-deps
+  SKIP_HDF5: no
 
 jobs:
-  macos:
-    runs-on: macos-12
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, macos]
+        compiler: [gfortran, ifort]
+        openmp: [yes, no]
+
+        include:
+          # Associate specific os versions with our os tags
+          - os: linux
+            os-version: ubuntu-22.04
+          - os: macos
+            os-version: macos-12
+
+          # macos needs null container to avoid loading docker; set linux containers as desired
+          - container: null
+          - os: linux
+            compiler: gfortran
+            container: "quay.io/pypa/manylinux_2_28_x86_64"
+
+    runs-on: ${{ matrix.os-version }}
+    container: ${{ matrix.container }}
+    env:
+      SYSTEM: ${{ matrix.compiler }}
+      HDF5_DIR: /usr/local
+      MCFOST_INSTALL: /usr/local
+      OPENMP: ${{ matrix.openmp }}
+
     steps:
       - uses: actions/checkout@v2
 
-      - name: ensure GNU gcc is used, not clang
-        run: |
-          brew reinstall gcc@13
-          cd /usr/local/bin
-          ln -vfs gcc-13 gcc
-          ln -vfs g++-13 g++
-          ln -vfs gfortran-13 gfortran
+      - run: git config --global --add safe.directory $PWD
 
-      - name: dependencies
+      - name: build and install dependencies
         uses: ./.github/actions/dependencies
 
-      - name: build
+      - name: compile mcfost
         working-directory: src
-        run: make all static=yes
+        shell: bash -e {0}
+        run: |
+          [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
+          make static=yes all 
 
       - name: test
         if: ${{ github.event_name != 'release' }}
         uses: ./.github/actions/test
 
-      - name: upload binary
-        if: ${{ github.event_name == 'release' }}
-        uses: ./.github/actions/release
+      # Saving the binaries from the macos builds since the runner is the same for both compilers -> might be more consistent
+      - name: save binary for benchmarking
+        if: matrix.os == 'macos' && matrix.openmp == 'yes'
+        uses: actions/upload-artifact@v3
+        with:
+          name: mcfost-binary-${{ matrix.compiler }}
+          path: src/mcfost
 
-  linux:
-    runs-on: ubuntu-22.04
-    container: quay.io/pypa/manylinux_2_28_x86_64
+  benchmark:
+    needs: build-and-test
+    strategy:
+      matrix:
+        compiler: [gfortran, ifort]
+    runs-on: macos-12
+    env:
+      SYSTEM: ${{ matrix.compiler }}
+      HDF5_DIR: /usr/local
+      MCFOST_INSTALL: /usr/local
+      OPENMP: yes
     steps:
       - uses: actions/checkout@v2
 
-      - name: missing deps
-        run: |
-          dnf install -y redhat-lsb-core wget
-          git config --global --add safe.directory $PWD
+      - name: restore binary artifact
+        uses: actions/download-artifact@v3
+        with: 
+          name: mcfost-binary-${{ matrix.compiler }}
+          path: src/
 
-      - name: dependencies
-        uses: ./.github/actions/dependencies
+      - name: benchmark
+        uses: ./.github/actions/benchmark
+
+      - name: report benchmark results
+        run: |
+          echo ${{ matrix.compiler }} $(cat benchmark-${{ matrix.compiler }}.tim)
 
       - name: build
         working-directory: src

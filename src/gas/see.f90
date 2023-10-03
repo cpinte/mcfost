@@ -5,11 +5,11 @@ module see
     use grid
     use parametres
     use gas_contopac, only        : H_bf_Xsection
-    use wavelengths, only         :  n_lambda
+    use wavelengths, only         : n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, &
          tab_lambda_cont, tab_lambda_nm
     use utils, only               : gaussslv, solve_lin, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
-    use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, chi_tot, eta_tot
+    use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, xcoupling_cont, cross_coupling_cont_i
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
     use fits_utils, only : print_error
@@ -90,7 +90,7 @@ module see
         
         !initialize electronic density
         ngpop(1,NactiveAtoms+1,:,1) = ne(:)
-        write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024., " MB"
+        write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024./1024., " GB"
         allocate(psi(n_lambda, n_rayons_max, nb_proc), stat=alloc_status); psi(:,:,:) = 0.0_dp
         write(*,*) " size psi:", sizeof(psi) / 1024./1024.," MB"
         if (alloc_Status > 0) call error("Allocation error psi in nlte loop")
@@ -208,7 +208,7 @@ module see
             mem_alloc_local = mem_alloc_local + sizeof(gs_ion) + sizeof(pops_ion)
         endif
 
-
+        if (limit_mem > 0) xcoupling_cont => cross_coupling_cont_i
         write(*,'("  Total memory allocated in NLTEloop:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
 
         return
@@ -237,8 +237,6 @@ module see
             enddo
             atom => null()
         enddo
-
-        if (allocated(chi_tot)) deallocate(chi_tot,eta_tot)
 
         if (n_iterate_ne > 0) then
             deallocate(gtot,gr_save,dgrdne,dgcdne)

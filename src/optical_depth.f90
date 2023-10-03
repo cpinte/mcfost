@@ -1185,12 +1185,6 @@ end subroutine optical_length_tot_mol
                ds(iray,id) = l_contrib * AU_to_m
             endif
 
-            ! if (lorigine) then
-            !    if (maxval(ori(:,icell,id))==0.0_dp) then
-            !       ori(:,icell,id) = ori(:,icell,id) + eta(:,id) * exp(-tau(:))
-            !       tet(:,icell,id) = tet(:,icell,id) + tau(:) * exp(-tau(:))
-            !    endif
-            ! endif
 
             Snu = Snu / chi
 
