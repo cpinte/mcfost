@@ -58,6 +58,7 @@ module atom_type
       character(len=ATOM_ID_WIDTH) :: ID
       character(len=28) :: filename
       logical :: active, lline !non-lte ?, images ?
+      logical :: lany_gauss_prof
       integer :: initial, nTrans_raytracing
       !initial:
       !0->LTE; 1->OLD_POPULATIONS; 2->ZERO_RADIATION; 3->CSWITCH; 4->SOBOLEV/CEP 
