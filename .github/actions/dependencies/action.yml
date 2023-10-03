@@ -54,7 +54,7 @@ runs:
       with:
         path: |
           ${{ env.MCFOST_INSTALL }}/include
-          ${{ env.MCFOST_INSTALL }}/lib/ifort
+          ${{ env.MCFOST_INSTALL }}/lib/${{ matrix.compiler }}
         key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
     # Only do this (lengthy) setup if dependency cache not found
