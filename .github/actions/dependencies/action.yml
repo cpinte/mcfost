@@ -47,6 +47,10 @@ runs:
         sudo /Volumes/m_cpp-compiler-classic_p_2023.2.0.48999_offline/bootstrapper.app/Contents/MacOS/install.sh --silent --eula accept
         echo "INTEL_PATH=/opt/intel/oneapi" >> "$GITHUB_ENV"
 
+    - name: give write permissions for include and lib directories
+      shell: bash
+      run: sudo chmod o+w ${{ env.MCFOST_INSTALL }}/include ${{ env.MCFOST_INSTALL }}/lib
+
     # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
       id: cache-deps
@@ -64,5 +68,4 @@ runs:
       working-directory: lib
       run: |
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
-        sudo chmod o+w /usr/local/include /usr/local/lib
         ./install.sh
