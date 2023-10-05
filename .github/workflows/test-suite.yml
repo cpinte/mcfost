@@ -125,5 +125,4 @@ jobs:
           ./src/mcfost -h
 
       - name: upload binary
-        if: ${{ github.event_name == 'release' }}
         uses: ./.github/actions/release
