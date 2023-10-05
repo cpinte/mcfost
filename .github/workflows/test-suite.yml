@@ -108,8 +108,6 @@ jobs:
       matrix:
         os: [linux, macos]
     runs-on: ubuntu-22.04 # the runner is always linux because this is just for uploading the binary
-    env:
-      MCFOST_UTILS: ${{ github.workspace }}/mcfost-utils # needed to run mcfost, but not actually used
     if: ${{ github.event_name == 'release' }}
 
     steps:
@@ -122,7 +120,10 @@ jobs:
           path: src/
 
       - name: simple check to make sure the binary runs in a clean environment
+        shell: bash
         working-directory: src
+        env:
+          MCFOST_UTILS: ${{ github.workspace }}/utils
         run: |
           chmod +x mcfost
           mcfost -h
