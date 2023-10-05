@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux, macos]
-        compiler: [gfortran, ifort]
+        compiler: [gfortran]
         openmp: [yes, no]
 
         include:
@@ -78,7 +78,7 @@ jobs:
     needs: build-and-test
     strategy:
       matrix:
-        compiler: [gfortran, ifort]
+        compiler: [gfortran]
     runs-on: macos-12
     env:
       SYSTEM: ${{ matrix.compiler }}
@@ -116,7 +116,7 @@ jobs:
       - name: restore binary artifact
         uses: actions/download-artifact@v3
         with:
-          name: mcfost-binary-${{ matrix.os }}-ifort # use ifort for binary release
+          name: mcfost-binary-${{ matrix.os }}-gfortran # use ifort for binary release
           path: src/
 
       - name: simple check to make sure the binary runs in a clean environment
