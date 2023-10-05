@@ -91,7 +91,7 @@ jobs:
       - name: restore binary artifact
         uses: actions/download-artifact@v3
         with:
-          name: mcfost-binary-${{ matrix.compiler }}
+          name: mcfost-binary-macos-${{ matrix.compiler }}
           path: src/
 
       - name: benchmark
