@@ -107,6 +107,8 @@ module io_atom
       allocate(parse_labs(atom%Nlevel))
       !atomic level's population at LTE (n^*)
       allocate(atom%nstar(atom%Nlevel,n_cells))
+      allocate(atom%ni_on_nj_star(atom%Nlevel-1,n_cells)); atom%ni_on_nj_star = 0.0_dp
+      write(*,*) "size ni*/nj*=", sizeof(atom%ni_on_nj_star)/1024.**3, " GB"
       !total number of transitions for this model
       atom%Ntr = atom%Nline + atom%Ncont
       !-> to remove tab_trans ??

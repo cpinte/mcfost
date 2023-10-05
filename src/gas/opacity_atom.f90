@@ -421,7 +421,8 @@ module Opacity_atom
             Nred = atom%continua(kr)%Nrc; Nblue = atom%continua(kr)%Nbc
             i = atom%continua(kr)%i; j = atom%continua(kr)%j
             !ni_on_nj_star = ne(icell) * phi_T(icell, at%g(i)/at%g(j), at%E(j)-at%E(i))
-            ni_on_nj_star = atom%nstar(i,icell)/(atom%nstar(j,icell) + 1d-100)
+            ! ni_on_nj_star = atom%nstar(i,icell)/atom%nstar(j,icell)
+            ni_on_nj_star = atom%ni_on_nj_star(i,icell)
 
             gij = ni_on_nj_star * exp(-hc_k/T(icell)/atom%continua(kr)%lambda0)
             if ((atom%n(i,icell) - atom%n(j,icell) * gij) <= 0.0_dp) then
@@ -657,7 +658,8 @@ module Opacity_atom
          Nl = Nr-Nb+1
 
          !ni_on_nj_star = ne(icell) * phi_T(icell, at%g(i)/at%g(j), at%E(j)-at%E(i))
-         ni_on_nj_star = at%nstar(i,icell)/(at%nstar(j,icell) + 1d-100)
+         ! ni_on_nj_star = at%nstar(i,icell)/at%nstar(j,icell)
+         ni_on_nj_star = at%ni_on_nj_star(i,icell)
 
 
          gij_0 = ni_on_nj_star * exp(-hc_k/T(icell)/at%continua(kr)%lambda0)
@@ -721,7 +723,8 @@ module Opacity_atom
          N1 = at%continua(kr)%Nb; N2 = at%continua(kr)%Nr
 
          !ni_on_nj_star = ne(icell) * phi_T(icell, at%g(i)/at%g(j), at%E(j)-at%E(i))
-         ni_on_nj_star = at%nstar(i,icell)/(at%nstar(j,icell) + 1d-100)
+         ! ni_on_nj_star = at%nstar(i,icell)/at%nstar(j,icell)
+         ni_on_nj_star = at%ni_on_nj_star(i,icell)
 
 
          gij = ni_on_nj_star * exp(-hc_k/T(icell)/at%continua(kr)%lambda0)
