@@ -63,7 +63,6 @@ jobs:
           make static=yes all
 
       - name: test
-        if: ${{ github.event_name != 'release' }}
         uses: ./.github/actions/test
 
       # Saving the binaries from the macos builds since the runner is the same for both compilers -> might be more consistent
