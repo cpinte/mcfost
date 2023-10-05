@@ -107,7 +107,15 @@ jobs:
     strategy:
       matrix:
         os: [linux, macos]
-    runs-on: ubuntu-22.04 # the runner is always linux because this is just for uploading the binary
+
+        include:
+          # Associate specific os versions with our os tags
+          - os: linux
+            os-version: ubuntu-22.04
+          - os: macos
+            os-version: macos-12
+
+    runs-on: ${{ matrix.os-version }}
     if: ${{ github.event_name == 'release' }}
 
     steps:
