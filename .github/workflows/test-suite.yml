@@ -122,9 +122,10 @@ jobs:
           path: src/
 
       - name: simple check to make sure the binary runs in a clean environment
+        working-directory: src
         run: |
           chmod +x mcfost
-          ./src/mcfost -h
+          mcfost -h
 
       - name: upload binary
         uses: ./.github/actions/release
