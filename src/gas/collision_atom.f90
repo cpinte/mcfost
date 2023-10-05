@@ -37,8 +37,9 @@ module collision_atom
       call Johnson_CI(icell, CI) !bound-free i->Nlevel
       j = hydrogen%Nlevel
       do i=1, j-1
-         !ni_on_nj_star = ne(icell) * phi_T(icell, hydrogen%g(i)/hydrogen%g(hydrogen%Nlevel), hydrogen%E(hydrogen%Nlevel)-hydrogen%E(i))
-         ni_on_nj_star = hydrogen%nstar(i,icell) / hydrogen%nstar(j,icell)
+         ! ni_on_nj_star = ne(icell) * phi_T(T(icell), hydrogen%g(i), hydrogen%g(j), hydrogen%E(j)-hydrogen%E(i))
+         ! ni_on_nj_star = hydrogen%nstar(i,icell) / hydrogen%nstar(j,icell)
+         ni_on_nj_star = hydrogen%ni_on_nj_star(i,icell)
          kr = hydrogen%ij_to_trans(i,j) - hydrogen%Nline
          hydrogen%continua(kr)%Cij(id) = ne(icell) * CI(i) !deriv = Cij/ne
          hydrogen%continua(kr)%Cji(id) = ne(icell) * CI(i) * ni_on_nj_star !deriv = 2*Cji/ne
