@@ -123,6 +123,7 @@ jobs:
 
       - name: simple check to make sure the binary runs in a clean environment
         run: |
+          chmod +x mcfost
           ./src/mcfost -h
 
       - name: upload binary
