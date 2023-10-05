@@ -633,7 +633,7 @@ module see
 
                 i = atom%continua(kr)%i; j = atom%continua(kr)%j
 
-          !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
+                ! ni_on_nj_star = ne(icell) * phi_T(T(icell), atom%g(i), atom%g(j), atom%E(j)-atom%E(i))
                 ! ni_on_nj_star = atom%nstar(i,icell)/atom%nstar(j,icell)
                 ni_on_nj_star = atom%ni_on_nj_star(i,icell)
                 gij = ni_on_nj_star * exp(-hc_k/T(icell)/atom%continua(kr)%lambda0)
