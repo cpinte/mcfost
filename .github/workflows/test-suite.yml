@@ -126,7 +126,7 @@ jobs:
           MCFOST_UTILS: ${{ github.workspace }}/utils
         run: |
           chmod +x mcfost
-          mcfost -h
+          ./mcfost -h
 
       - name: upload binary
         uses: ./.github/actions/release
