@@ -148,7 +148,7 @@ module lte
       hydrogen%nstar(1,k) = hydrogen%Abund*nHtot(k)/sum
 
       !test positivity, can be 0
-      if ((hydrogen%nstar(1,k) < tiny_dp)) then
+      if ((hydrogen%nstar(1,k) < nsmall)) then
          write(*,*) " ************************************* "
          write(*,*) "Warning too small gs pop", hydrogen%ID, hydrogen%nstar(i,k)
          write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -159,7 +159,7 @@ module lte
       do i=2,hydrogen%Nlevel !debug
          hydrogen%nstar(i,k) = hydrogen%nstar(i,k)*hydrogen%nstar(1,k)
 
-         if (hydrogen%nstar(i,k) < tiny_dp) then
+         if (hydrogen%nstar(i,k) < nsmall) then
          !--> debug
             ! write(*,*) " ************************************* "
             ! write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), " lower than", &
@@ -306,7 +306,7 @@ module lte
       atom%nstar(1,k) = atom%Abund*nHtot(k)/sum
 
          !test positivity, can be 0
-      if (atom%nstar(1,k) < tiny_dp) then
+      if (atom%nstar(1,k) < nsmall) then
          write(*,*) " ************************************* "
          write(*,*) "Warning too small ground state population ", atom%ID, "n0=", atom%nstar(1,k)
          write(*,*) "cell=",k, atom%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -315,7 +315,7 @@ module lte
       end if
       do i=2,atom%Nlevel !debug
          atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
-         if (atom%nstar(i,k) < tiny_dp) then
+         if (atom%nstar(i,k) < nsmall) then
          !--> debug
             ! write(*,*) " ************************************* "
             ! write(*,*) "Warning population of atom ", atom%ID, "lvl=", i, "nstar=",atom%nstar(i,k), " lower than", &
@@ -500,7 +500,7 @@ module lte
             hydrogen%nstar(1,k) = hydrogen%Abund*nHtot(k)/sum
 
             !test positivity, can be 0
-            if ((hydrogen%nstar(1,k) < tiny_dp)) then
+            if ((hydrogen%nstar(1,k) < nsmall)) then
                write(*,*) " ************************************* "
                write(*,*) "Warning too small gs pop", hydrogen%ID, hydrogen%nstar(i,k)
                write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -511,7 +511,7 @@ module lte
             do i=2,hydrogen%Nlevel !debug
                hydrogen%nstar(i,k) = hydrogen%nstar(i,k)*hydrogen%nstar(1,k)
 
-               if (hydrogen%nstar(i,k) < tiny_dp) then
+               if (hydrogen%nstar(i,k) < nsmall) then
                   write(*,*) " ************************************* "
                   write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), &
                        " lower than tiny_dp."
@@ -696,7 +696,7 @@ module lte
          atom%nstar(1,k) = atom%Abund*nHtot(k)/sum
 
          !test positivity, can be 0
-         if (atom%nstar(1,k) < tiny_dp) then
+         if (atom%nstar(1,k) < nsmall) then
             write(*,*) " ************************************* "
             write(*,*) "Warning too small ground state population ", atom%ID, "n0=", atom%nstar(1,k)
             write(*,*) "cell=",k, atom%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -706,7 +706,7 @@ module lte
          end if
          do i=2,atom%Nlevel !debug
             atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
-            if (atom%nstar(i,k) < tiny_dp) then
+            if (atom%nstar(i,k) < nsmall) then
                write(*,*) " ************************************* "
                write(*,*) "Warning population of atom ", atom%ID, "lvl=", i, "nstar=",atom%nstar(i,k), " lower than", &
                   " tiny_dp."! Replacing by tiny_dp"
