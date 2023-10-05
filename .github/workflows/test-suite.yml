@@ -62,9 +62,8 @@ jobs:
           [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
           make static=yes all
 
-      # Temporarily disabled
-      # - name: test
-      #   uses: ./.github/actions/test
+      - name: test
+        uses: ./.github/actions/test
 
       # Saving the binaries from the macos builds since the runner is the same for both compilers -> might be more consistent
       - name: save binary for benchmarking and release
