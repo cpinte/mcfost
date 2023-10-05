@@ -7,7 +7,7 @@ runs:
     - name: prepare tarball
       working-directory: src
       shell: bash
-      run: tar -cvzf mcfost-{{ matrix.os }}.tar.gz mcfost
+      run: tar -cvzf mcfost-${{ matrix.os }}.tar.gz mcfost
 
     - name: Add binary to release
       uses: shogo82148/actions-upload-release-asset@v1.6.6
