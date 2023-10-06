@@ -25,6 +25,7 @@ jobs:
         os: [linux, macos]
         compiler: [gfortran, ifort]
         openmp: [yes, no]
+        release: [yes, no]
 
         include:
           # Associate specific os versions with our os tags
@@ -60,14 +61,15 @@ jobs:
         shell: bash -e {0}
         run: |
           [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
-          make static=yes all
+          make release=${{ matrix.release }} static=yes all
 
       - name: test
         uses: ./.github/actions/test
 
       # Saving the binaries from the macos builds since the runner is the same for both compilers -> might be more consistent
+      # Only benchmark+release the 'release' builds, never the 'march=native' builds
       - name: save binary for benchmarking and release
-        if: matrix.openmp == 'yes'
+        if: matrix.openmp == 'yes' && matrix.release == 'yes'
         uses: actions/upload-artifact@v3
         with:
           name: mcfost-binary-${{ matrix.os }}-${{ matrix.compiler }}
