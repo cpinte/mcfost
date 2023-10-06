@@ -40,6 +40,7 @@ jobs:
             compiler: gfortran
             container: "quay.io/pypa/manylinux_2_28_x86_64"
 
+    name: build+test (${{ matrix.os }}, ${{ matrix.compiler }}, openmp=${{ matrix.openmp }}, release=${{ matrix.release }})
     runs-on: ${{ matrix.os-version }}
     container: ${{ matrix.container }}
     env:
