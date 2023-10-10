@@ -25,7 +25,7 @@ runs:
         chmod +x l_fortran-compiler_p_2023.2.1.8_offline.sh
         ./l_fortran-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
         echo "INTEL_PATH=/home/runner/intel/oneapi" >> "$GITHUB_ENV"
-        sudo chown root /bin/tar && sudo chmod u+s /bin/tar
+        sudo chown root /bin/tar && sudo chmod u+s /bin/tar # tar needs to run as root to extract when restoring the cache
 
     - name: fix gcc issue on the runner (GNU / macos)
       if: matrix.compiler == 'gfortran' && matrix.os == 'macos'
@@ -57,6 +57,11 @@ runs:
           ${{ env.MCFOST_INSTALL }}/include
           ${{ env.MCFOST_INSTALL }}/lib/${{ matrix.compiler }}
         key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
+
+    - name: unset setuid bit for tar if cache not found
+      if: matrix.compiler == 'ifort' && matrix.os == 'linux' && steps.cache-deps.outputs.cache-hit != 'true'
+      shell: bash
+      run: sudo chmod u-s /bin/tar
 
     # Only do this (lengthy) setup if dependency cache not found
     - name: prepare mcfost environment
