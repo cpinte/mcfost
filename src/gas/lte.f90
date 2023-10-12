@@ -155,20 +155,21 @@ module lte
          write(*,*) " ************************************* "
          stop
       end if
+      if (hydrogen%nstar(1,k) < nsmall) hydrogen%nstar(1,k) = nsmall 
 
       do i=2,hydrogen%Nlevel !debug
-         hydrogen%nstar(i,k) = hydrogen%nstar(i,k)*hydrogen%nstar(1,k)
+         hydrogen%nstar(i,k) = max(hydrogen%nstar(i,k)*hydrogen%nstar(1,k), nsmall)
 
-         if (hydrogen%nstar(i,k) < 0) then
-         !--> debug
-            write(*,*) " ************************************* "
-            write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), " negative!"
-            write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k), &
-                  " n0=", hydrogen%nstar(1,k)
-            write(*,*) " ************************************* "
-            stop
-            ! hydrogen%nstar(i,k) = nsmall
-         end if
+         ! if (hydrogen%nstar(i,k) < 0) then
+         ! !--> debug
+         !    write(*,*) " ************************************* "
+         !    write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), " negative!"
+         !    write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k), &
+         !          " n0=", hydrogen%nstar(1,k)
+         !    write(*,*) " ************************************* "
+         !    stop
+         ! end if
+         ! if (hydrogen%nstar(i,k) < nsmall) hydrogen%nstar(i,k) = nsmall
       end do
 
       if (maxval(hydrogen%nstar(:,k)) > huge_dp) then
@@ -305,7 +306,7 @@ module lte
        !     write(*,*) "ntot", ntotal_atom(k,atom), " nHtot=",nHtot(k)
       atom%nstar(1,k) = atom%Abund*nHtot(k)/sum
 
-         !test positivity, can be 0
+      !test positivity, can be 0
       if (atom%nstar(1,k) < 0) then
          write(*,*) " ************************************* "
          write(*,*) "Error negative ground state population ", atom%ID, "n0=", atom%nstar(1,k)
@@ -313,18 +314,21 @@ module lte
          write(*,*) " ************************************* "
          stop
       end if
+      if (atom%nstar(1,k) < nsmall) atom%nstar(1,k) = nsmall
+
       do i=2,atom%Nlevel !debug
-         atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
-         if (atom%nstar(i,k) < 0) then
-         !--> debug
-            write(*,*) " ************************************* "
-            write(*,*) "Warning population of atom ", atom%ID, "lvl=", i, "nstar=",atom%nstar(i,k), " negative !"
-            write(*,*) "cell=",k, atom%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k), &
-               " n0=", atom%nstar(1,k)
-            write(*,*) " ************************************* "
-            stop
-            atom%nstar(i,k) = nsmall
-         end if
+         atom%nstar(i,k) = max(atom%nstar(i,k)*atom%nstar(1,k), nsmall)
+         ! if (atom%nstar(i,k) < 0) then
+         ! !--> debug
+         !    write(*,*) " ************************************* "
+         !    write(*,*) "Warning population of atom ", atom%ID, "lvl=", i, "nstar=",atom%nstar(i,k), " negative !"
+         !    write(*,*) "cell=",k, atom%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k), &
+         !       " n0=", atom%nstar(1,k)
+         !    write(*,*) " ************************************* "
+         !    stop
+         !    atom%nstar(i,k) = nsmall
+         ! end if
+         ! if (atom%nstar(i,k) < nsmall) atom%nstar(i,k) = nsmall
       end do
 
       if (maxval(atom%nstar(:,k)) > huge_dp) then
@@ -422,6 +426,8 @@ module lte
       return
    end subroutine ltepops_atoms
 
+!-> TO DO: need to handle very low populations + atom%ni_on_nj_star
+!-> not used
    subroutine LTEpops_H()
       ! -------------------------------------------------------------- !
       ! computed wrt the ground state of H I
@@ -575,6 +581,8 @@ module lte
          return
    end subroutine LTEpops_H
 
+!-> TO DO: need to handle very low populations + atom%ni_on_nj_star
+!-> not used
    subroutine LTEpops_atom(atom, debye)
    ! -------------------------------------------------------------- !
    ! Computes LTE populations of each level of the atom.
@@ -762,6 +770,8 @@ module lte
       return
    end subroutine LTEpops_atom
 
+!-> TO DO: need to handle very low populations + atom%ni_on_nj_star
+!-> not used
    subroutine ltepops_atoms_1 ()
    ! -------------------------------------------------------------- !
    ! Computes LTE populations for each atom

@@ -16,7 +16,7 @@ module atom_transfer
    use elecdensity, only : solve_ne, write_electron, read_electron
    use grid, only : T, vturb,nHtot, nHmin, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, &
         ne, Voronoi, r_grid, phi_grid, z_grid
-   use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
+   use lte, only : ltepops_atoms, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
    use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, passiveAtoms, npassiveatoms, &
         hydrogen, helium, adjust_cswitch_atoms, &
                            maxval_cswitch_atoms, lcswitch_enabled, vbroad
