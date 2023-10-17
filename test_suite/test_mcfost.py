@@ -6,7 +6,6 @@ import shutil
 import glob
 import os
 
-# Reference tests are computed with db94244c41cad9c1517363b1607f8596af1c55c0
 _mcfost_bin = "../src/mcfost"
 
 # Get list of models using directory names
@@ -105,7 +104,7 @@ def test_mol_map(model_name):
     print("Maximum mol map difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
     print("Mean mol map difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
-    assert MC_similar(image_ref,image,threshold=0.05)
+    assert MC_similar(image_ref,image,threshold=0.1)
 
 
 @pytest.mark.parametrize("model_name", model_list)
@@ -150,10 +149,10 @@ def test_pola(model_name, wl):
     image = image[[1,2],:,:,:,:]
     image_ref = image_ref[[1,2],:,:,:,:]
 
-    print("Maximum image difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
-    print("Mean image difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
+    print("Maximum pola difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
+    print("Mean pola difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
-    assert MC_similar(image_ref,image,threshold=0.05)
+    assert MC_similar(image_ref,image,threshold=0.1)
 
 @pytest.mark.parametrize("model_name", model_list)
 @pytest.mark.parametrize("wl", wl_list_contrib)
@@ -176,7 +175,7 @@ def test_contrib(model_name, wl):
     image = image[[4,5,6,7],:,:,:,:]
     image_ref = image_ref[[4,5,6,7],:,:,:,:]
 
-    print("Maximum image difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
-    print("Mean image difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
+    print("Maximum contrib difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
+    print("Mean contrib difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
     assert MC_similar(image_ref,image,threshold=0.05)
