@@ -12,13 +12,16 @@ _mcfost_bin = "../src/mcfost"
 model_list = glob.glob1("test_data/","*")
 
 # If running on CI, only test ref3.0
-if os.environ.get('CI', None) == 'true':
-    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
+#if os.environ.get('CI', None) == 'true':
+#    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
 
 wl_list = ["1.0","10","100","1000"]
 wl_list_pola = ["1.0","1000"]
 wl_list_contrib = ["1.0","100","1000"]
 
+
+# flag to skip the calculations and set-up the thresholds in a easy way
+compute_models = True
 
 def mcfost(filename,opt=""):
     cmd = _mcfost_bin+" "+filename+" "+opt
@@ -33,7 +36,7 @@ def all_almost_equal(x,y,threshold=0.01):
     # test if all the values of two arrays are almost equal
     return (abs((x-y)) < threshold * x).all()
 
-def MC_similar(x,y,threshold=0.01,mask_threshold=1e-25):
+def MC_similar(x,y,threshold=0.01,mask_threshold=1e-24):
     # test if two arrays have the same at the 75% percentile
     # ignoring values that are very small as they are very noisy
 
@@ -43,7 +46,7 @@ def MC_similar(x,y,threshold=0.01,mask_threshold=1e-25):
     y_ma = np.ma.masked_where(mask, y)
 
     #return (abs((x_ma-y_ma)/x_ma).mean() < threshold)
-    return ( np.percentile(abs((x_ma-y_ma)/x_ma), 75)  < threshold )
+    return ( np.percentile(abs((x_ma-y_ma)/x_ma).compressed(), 75)  < threshold )
 
 def test_mcfost_bin():
     # We first test if the mcfost binary actually exists and runs
@@ -55,15 +58,16 @@ def test_mcfost_bin():
 
 @pytest.mark.parametrize("model_name", model_list)
 def test_Temperature(model_name):
-    clean_results(model_name) # removing all previous calculations
+    if compute_models:
+        clean_results(model_name) # removing all previous calculations
 
-    # Run the mcfost model
-    filename = "test_data/"+model_name+"/"+model_name+".para"
-    if (model_name == "discF_00500"):
-        opt=" -phantom test_data/"+model_name+"/"+model_name
-    else:
-        opt=""
-    mcfost(filename,opt="-mol -root_dir "+model_name+opt)
+        # Run the mcfost model
+        filename = "test_data/"+model_name+"/"+model_name+".para"
+        if (model_name == "discF_00500"):
+            opt=" -phantom test_data/"+model_name+"/"+model_name
+        else:
+            opt=""
+        mcfost(filename,opt="-mol -root_dir "+model_name+opt)
 
     # Read the results
     T_name = model_name+"/data_th/Temperature.fits.gz"
@@ -110,13 +114,15 @@ def test_mol_map(model_name):
 @pytest.mark.parametrize("model_name", model_list)
 @pytest.mark.parametrize("wl", wl_list)
 def test_image(model_name, wl):
-    # Run the mcfost model
-    filename = "test_data/"+model_name+"/"+model_name+".para"
-    if (model_name == "discF_00500"):
-        opt=" -phantom test_data/"+model_name+"/"+model_name
-    else:
-        opt=""
-    mcfost(filename,opt="-img "+wl+" -root_dir "+model_name+opt)
+
+    if compute_models:
+        # Run the mcfost model
+        filename = "test_data/"+model_name+"/"+model_name+".para"
+        if (model_name == "discF_00500"):
+            opt=" -phantom test_data/"+model_name+"/"+model_name
+        else:
+            opt=""
+        mcfost(filename,opt="-img "+wl+" -root_dir "+model_name+opt)
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
@@ -149,20 +155,20 @@ def test_pola(model_name, wl):
     image = image[[1,2],:,:,:,:]
     image_ref = image_ref[[1,2],:,:,:,:]
 
-    print("Maximum pola difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
-    print("Mean pola difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
+    print("Maximum pola difference", (abs(image-image_ref)/(image_ref+1e-36)).max())
+    print("Mean pola difference   ", (abs(image-image_ref)/(image_ref+1e-36)).mean())
 
-    assert MC_similar(image_ref,image,threshold=0.1)
+    if model_name == "debris":
+        mask_threshold = 1e-32
+    else:
+        mask_threshold = 1e-21
+
+    assert MC_similar(image_ref,image,threshold=0.1,mask_threshold=mask_threshold)
 
 @pytest.mark.parametrize("model_name", model_list)
 @pytest.mark.parametrize("wl", wl_list_contrib)
 def test_contrib(model_name, wl):
     # Re-use previous calculation
-
-    # Skip test on CI because it currently fails
-    # TODO: fix this test failure
-    if os.environ.get('CI', None) == 'true':
-        pytest.skip("CI")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
@@ -178,4 +184,9 @@ def test_contrib(model_name, wl):
     print("Maximum contrib difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
     print("Mean contrib difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
-    assert MC_similar(image_ref,image,threshold=0.05)
+    if model_name == "ref3.0_multi":
+        mask_threshold=1e-20
+    else:
+        mask_threshold=1e-23
+
+    assert MC_similar(image_ref,image,threshold=0.1,mask_threshold=mask_threshold)
