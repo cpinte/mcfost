@@ -570,6 +570,8 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
 
+  l_sym_ima_mol = mol(imol)%l_sym_ima
+
   if (RT_line_method == 1) then ! method 1 : echantillonanage log
      ! Pas de sous-pixel car les pixels ne sont pas carres
      n_iter_min = 1
@@ -595,7 +597,6 @@ subroutine emission_line_map(imol,ibin,iaz)
 
      fact_A = sqrt(pi * (fact_r - 1.0_dp/fact_r)  / n_phi_RT )
 
-     l_sym_ima_mol = mol(imol)%l_sym_ima
      ! Boucle sur les rayons d'echantillonnage
      !$omp parallel &
      !$omp default(none) &
