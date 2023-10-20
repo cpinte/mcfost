@@ -480,7 +480,7 @@ module atom_transfer
           		   endif
             	endif
                if (lng_turned_on) then
-                  if (unconverged_fraction < 15.0) lng_turned_on = .false.
+                  if (unconverged_fraction < 10.0) lng_turned_on = .false.
                endif
             endif
             !***********************************************************!
@@ -783,8 +783,8 @@ module atom_transfer
 
             !force convergence if there are only few unconverged cells remaining
             ! if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
-            if ( (n_iter > maxIter/4).and.(unconverged_fraction < 5.0).or.&
-               ((unconverged_fraction < 5.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
+            if ( (n_iter > maxIter/4).and.(unconverged_fraction < 3.0).or.&
+               ((unconverged_fraction < 3.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
                write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
                   unconverged_fraction, n_iter
                write(*,*) " -> forcing convergence"
