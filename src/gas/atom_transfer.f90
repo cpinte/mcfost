@@ -359,7 +359,7 @@ module atom_transfer
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
                stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               if( (diff_loc(icell) < 1d-1 * precision).and..not.lcswitch_enabled ) cycle
+               if( (diff_loc(icell) < 5d-2 * precision).and..not.lcswitch_enabled ) cycle
 
                if (l_iterate) then
 
@@ -447,7 +447,7 @@ module atom_transfer
                !$omp atomic
                n_cells_done = n_cells_done + 1
                ! n_cells_remaining = size(pack(diff_loc, &
-               !                      mask=(diff_loc < 1d-1 * precision)))
+               !                      mask=(diff_loc < 5d-2 * precision)))
                if (real(n_cells_done) > 0.02*ibar*n_cells) then
              	   call progress_bar(ibar)
              	   !$omp atomic
