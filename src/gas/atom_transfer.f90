@@ -726,10 +726,7 @@ module atom_transfer
             diff_old = diff
             conv_acc = conv_speed
 
-            if ((diff < precision).and.(.not.lcswitch_enabled))then!maxval_cswitch_atoms()==1.0_dp
-            ! if ( (unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp)then
-            ! if ( ((unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp).or.&
-               !  ((diff < precision).and.maxval_cswitch_atoms()==1.0_dp) )then
+            if ((diff < precision).and.(.not.lcswitch_enabled))then
                if (lprevious_converged) then
                   lconverged = .true.
                else
