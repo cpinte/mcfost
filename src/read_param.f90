@@ -463,7 +463,7 @@ contains
        mol(imol)%vmin_center_rt = (mol(imol)%vmin_center_rt - v_syst) * km_to_m ! Conversion en m.s-1
        mol(imol)%vmax_center_rt = (mol(imol)%vmax_center_rt - v_syst) * km_to_m ! Conversion en m.s-1
        mol(imol)%l_sym_ima = .false.
-       if (l_sym_ima) then
+       if (l_sym_ima) then ! we check for PA later as this can be changed by command line
           ! Molecular maps are only symmetrical if velocity range is symmetrical around vsyst
           if (abs(mol(imol)%vmax_center_rt + mol(imol)%vmin_center_rt) < 1e-5) mol(imol)%l_sym_ima = .true.
        endif
