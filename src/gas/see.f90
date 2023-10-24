@@ -504,8 +504,11 @@ module see
             atom%continua(kr)%Rij(id) = 0.0_dp
             !updated value of ni and nj!
             !-> 0 if cont does not contribute to opac.
+            ! atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
+            !      atom%nstar(i,icell)/atom%nstar(j,icell)
             atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
-                 atom%nstar(i,icell)/atom%nstar(j,icell)
+                 atom%ni_on_nj_star(i,icell)
+            !check ratio ni_on_nj_star for the continua when there are multiple ionisation states (works for H, test for He)
         enddo
 
         do kr=1,atom%Nline
@@ -951,6 +954,9 @@ module see
             call particle_conservation (icell, Neq_ne, xvar(:,id), fvar(:,id), dfvar(:,:,id))
 
             !newton raphson!
+                    write(*,*) "T=", T(icell), ne(icell), nHtot(icell)
+                    write(*,*) "nstar=", hydrogen%nstar(:,icell)
+                    write(*,*) "n=", hydrogen%n(:,icell)
             call multivariate_newton_raphson (neq_ne, dfvar(:,:,id), fvar(:,id), xvar(:,id))
 
             !update atomic populations and ne
@@ -1288,6 +1294,8 @@ module see
         ! *********************** !
 
         ! call GaussSlv(df,f,neq)
+        write(*,*) "f=", f
+        write(*,*) "df=", df
         call solve_lin(df,f,neq)
         if (is_nan_infinity_vector(f)>0) then
         !  write(*,*) "fdag=", bdag

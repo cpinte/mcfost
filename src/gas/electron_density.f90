@@ -39,9 +39,7 @@ module elecdensity
    integer, parameter :: N_MAX_ELEMENT=26!stops at Iron.
    real(kind=dp) :: min_f_HII, max_f_HII
    character(len=10) :: ne_filename = "ne.fits.gz"
-   real(kind=dp), parameter :: ne_min_limit = 1d-10 ! ne_min_limit * nHtot = electron per cubic meters.
-   !if ne is below ne_min_limit, we set it to 1 electron per cc (ne_one) !
-   real(kind=dp), parameter :: ne_one = 1.0_dp !one electron per cubic meters.
+   real(kind=dp), parameter :: ne_small = 1d0 ! [m^-3]
 
    !Introducing a lock for ne iterations with icompute_atomRT == 2
    !the transfer (and opacity) is solved for icompute_atomRT > 0
@@ -397,7 +395,7 @@ module elecdensity
       if (is_nan_infinity(ne(k))>0) then
          write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, " sum=", sum
          call error("electron density is nan or inf!")
-      else if (ne(k) <= 0.0) then
+      else if (ne(k) < 0.0) then
          write(*,*) niter, "icell=",k," T=",T(k)," nH=",nHtot(k), " ne0=", ne_init
          write(*,*) "dne = ",dne, " ne=",ne(k), " nedag = ", ne_old, "sum=", sum
          call error("Negative electron density!")
@@ -405,12 +403,12 @@ module elecdensity
 
       niter = niter + 1
       if (dne <= MAX_ELECTRON_ERROR) then
-         if (ne(k) < nHtot(k)*ne_min_limit) then
-               write(*,*) " (Solve ne) ne < ne_min_limit, setting cell transparent!", k
+         if (ne(k) < ne_small) then
+               write(*,*) " (Solve ne) ne < ne_small at cell",k!, " ; setting cell transparent!"
                write(*,*) "T=", T(k), ' nHtot=', nHtot(k), " ne=", ne(k)
-               write(*,*) " -> setting ne to ", ne_one, " m^-3"
-               ne(k) = ne_one
-               icompute_atomRT(k) = 0
+               write(*,*) " -> setting ne to ", ne_small, " m^-3"
+               ne(k) = ne_small
+               ! icompute_atomRT(k) = 0
          endif
          exit
       else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
@@ -527,17 +525,18 @@ module elecdensity
           !if Abund << 1. and chiM << chiH then
           ! ne (H+M) = ne(H) + ne(M)
           ne0 = ne0 + ne_oldM
-          if (ne0 < nHtot(k)*ne_min_limit) ne0 = ne_one
+          ne0 = max(ne0, ne_small)
 
        end if
 
-       if (t(k) > 1d6) then
-       !fully ionised
-         ne(k) = 1.2 * nHtot(k)
-       else
-       !Loop starts
-         call solve_ne_loc(k, ne0)
-       endif
+      !  if (t(k) > 1d6) then
+      !  !fully ionised
+      !    ne(k) = 1.2 * nHtot(k)
+      !  else
+      !  !Loop starts
+      !    call solve_ne_loc(k, ne0)
+      !  endif
+      call solve_ne_loc(k, ne0)
       
  
       if (abs(1.0_dp - ne0 / ne(k)) > eps_id(id)) then
@@ -560,7 +559,7 @@ module elecdensity
     !$omp end parallel
     call progress_bar(50)
     epsilon = maxval(eps_id)
-    ik_max = ik_max_id(locate(eps_id, epsilon))
+    ik_max = max(ik_max_id(locate(eps_id, epsilon)),1)
 
     if (verbose) then
        write(*,*) " ---------------------------------------------------- "

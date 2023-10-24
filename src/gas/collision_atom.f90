@@ -54,7 +54,11 @@ module collision_atom
       do i=1,hydrogen%Nlevel
          do j=i+1,hydrogen%Nlevel-1
             kr = hydrogen%ij_to_trans(i,j)
-            ni_on_nj_star = hydrogen%nstar(i,icell) / hydrogen%nstar(j,icell)
+            if (hydrogen%nstar(j,icell)>0.0) then
+               ni_on_nj_star = hydrogen%nstar(i,icell) / hydrogen%nstar(j,icell)
+            else
+               ni_on_nj_star = 0.0 !correct ?
+            endif
             hydrogen%lines(kr)%Cij(id) = ne(icell) * CE(i,j) !deriv = Cij/ne
             hydrogen%lines(kr)%Cji(id) = ne(icell) * CE(i,j) * ni_on_nj_star !deriv = 2*Cji/ne
          enddo

@@ -16,7 +16,7 @@ module lte
    implicit none
 
    integer, dimension(101) :: ndebye
-   real(kind=dp), parameter :: nsmall = 1.0! [m^-3], small LTE populations are replaced by this.
+   real(kind=dp), parameter :: nsmall = 1d0 ! [m^-3], small LTE populations are replaced by this.
 
    contains
 
@@ -107,7 +107,7 @@ module lte
    ! -------------------------------------------------------------- !
       integer, intent(in) :: k
       logical :: locupa_prob
-      real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
+      real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin, ntotal
       real(kind=dp) :: n_eff, wocc, chi0, wocc0, E00, E, Egs
       integer :: Z, dZ, i, m
 
@@ -118,6 +118,7 @@ module lte
       sum = 1.0
       phik = ne(k)*phi_jl(T(k),1.d0,1.d0,0.d0)
       !a constant of the temperature and electron density
+      ntotal = hydrogen%Abund*nHtot(k)
 
       do i=2, hydrogen%Nlevel
 
@@ -142,10 +143,13 @@ module lte
             endif
          end do
 
+         !handle very low populations + mass conservation
+         if (hydrogen%nstar(i,k) < 1d-50 * ntotal) hydrogen%nstar(i,k) = 0.0
+
          sum = sum+hydrogen%nstar(i,k)
       end do
 
-      hydrogen%nstar(1,k) = hydrogen%Abund*nHtot(k)/sum
+      hydrogen%nstar(1,k) = ntotal/sum
 
       !test positivity, can be 0
       if ((hydrogen%nstar(1,k) < 0)) then
@@ -155,22 +159,25 @@ module lte
          write(*,*) " ************************************* "
          stop
       end if
-      if (hydrogen%nstar(1,k) < nsmall) hydrogen%nstar(1,k) = nsmall 
+      !-> never 0 by construction
+      ! if (hydrogen%nstar(1,k) < nsmall) hydrogen%nstar(1,k) = nsmall 
 
-      do i=2,hydrogen%Nlevel !debug
-         hydrogen%nstar(i,k) = max(hydrogen%nstar(i,k)*hydrogen%nstar(1,k), nsmall)
 
-         ! if (hydrogen%nstar(i,k) < 0) then
-         ! !--> debug
-         !    write(*,*) " ************************************* "
-         !    write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), " negative!"
-         !    write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k), &
-         !          " n0=", hydrogen%nstar(1,k)
-         !    write(*,*) " ************************************* "
-         !    stop
-         ! end if
-         ! if (hydrogen%nstar(i,k) < nsmall) hydrogen%nstar(i,k) = nsmall
-      end do
+      hydrogen%nstar(:,k) = hydrogen%nstar(:,k)*hydrogen%nstar(1,k)
+      ! do i=2,hydrogen%Nlevel !debug
+      !    hydrogen%nstar(i,k) = max(hydrogen%nstar(i,k)*hydrogen%nstar(1,k), nsmall)
+
+      !    ! if (hydrogen%nstar(i,k) < 0) then
+      !    ! !--> debug
+      !    !    write(*,*) " ************************************* "
+      !    !    write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), " negative!"
+      !    !    write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k), &
+      !    !          " n0=", hydrogen%nstar(1,k)
+      !    !    write(*,*) " ************************************* "
+      !    !    stop
+      !    ! end if
+      !    ! if (hydrogen%nstar(i,k) < nsmall) hydrogen%nstar(i,k) = nsmall
+      ! end do
 
       if (maxval(hydrogen%nstar(:,k)) > huge_dp) then
          write(*,*) " ************************************* "
