@@ -529,15 +529,7 @@ module elecdensity
 
        end if
 
-      !  if (t(k) > 1d6) then
-      !  !fully ionised
-      !    ne(k) = 1.2 * nHtot(k)
-      !  else
-      !  !Loop starts
-      !    call solve_ne_loc(k, ne0)
-      !  endif
-      call solve_ne_loc(k, ne0)
-      
+      call solve_ne_loc(k, ne0)      
  
       if (abs(1.0_dp - ne0 / ne(k)) > eps_id(id)) then
          eps_id(id) = abs(1.0_dp - ne0 / ne(k))

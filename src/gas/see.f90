@@ -17,7 +17,7 @@ module see
     implicit none
 
     !populations below that threshold not taken into account in convergence.
-    real(kind=dp), parameter :: frac_limit_pops = 1d-15!1d-50
+    real(kind=dp), parameter :: small_nlte_fraction = 1d-15!1d-50
     !Variables for Non-LTE loop and MALI method
     real(kind=dp), allocatable ::  ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
@@ -357,7 +357,7 @@ module see
         do l=1,atom%Nlevel
             atom%n(l,icell) = atom%n(l,icell) * ntotal
 
-            if (atom%n(l,icell) < frac_limit_pops * ntotal) then
+            if (atom%n(l,icell) < small_nlte_fraction * ntotal) then
                 Nsmall_pops = Nsmall_pops + 1
                 level_index(lp) = l
                 lp = lp + 1
@@ -967,7 +967,7 @@ module see
                 do j=1,at%Nlevel
                     at%n(j,icell) = at%n(j,icell) * ( 1.0_dp + fvar((i-1)+j,id)/(1.0_dp + d_damp * abs(fvar((i-1)+j,id))) )
                     if (at%n(j,icell) < 0.0) neg_pops = .true.
-                    ! if (at%n(j,icell) < frac_limit_pops * at%Abund*nHtot(icell) )then
+                    ! if (at%n(j,icell) < small_nlte_fraction * at%Abund*nHtot(icell) )then
                     !     write(*,*) "small pops for level ", j
                     ! endif
                 enddo
@@ -979,9 +979,9 @@ module see
             if (verbose)write(*,*) ( 1.0 + fvar(neq_ne,id)/(1.0_dp + d_damp * abs(fvar(neq_ne,id))) )
             if (verbose)write(*,*) fvar(neq_ne,id), d_damp
             !                       1d-16
-            ! if (ne(icell) < frac_limit_pops * nhtot(icell)) write(*,*) "** small ne at cell ", icell
-            ! if ( (ne(icell) < frac_limit_pops * nHtot(icell)).or.(neg_pops) ) rest_damping = .true.
-            if ( (ne(icell) < frac_limit_pops * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
+            ! if (ne(icell) < small_nlte_fraction * nhtot(icell)) write(*,*) "** small ne at cell ", icell
+            ! if ( (ne(icell) < small_nlte_fraction * nHtot(icell)).or.(neg_pops) ) rest_damping = .true.
+            if ( (ne(icell) < small_nlte_fraction * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
             !-> here pops_ion has the old values !
             !restart with more iterations and larger damping (more stable, slower convergence)
             if (rest_damping .and. d_damp < (damp_char + 1.0)) then
