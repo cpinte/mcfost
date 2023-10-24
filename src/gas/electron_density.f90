@@ -39,7 +39,7 @@ module elecdensity
    integer, parameter :: N_MAX_ELEMENT=26!stops at Iron.
    real(kind=dp) :: min_f_HII, max_f_HII
    character(len=10) :: ne_filename = "ne.fits.gz"
-   real(kind=dp), parameter :: ne_small = 1d0 ! [m^-3]
+   real(kind=dp), parameter :: ne_small = 1d3 ! [m^-3]
 
    !Introducing a lock for ne iterations with icompute_atomRT == 2
    !the transfer (and opacity) is solved for icompute_atomRT > 0
@@ -403,13 +403,14 @@ module elecdensity
 
       niter = niter + 1
       if (dne <= MAX_ELECTRON_ERROR) then
-         if (ne(k) < ne_small) then
-               write(*,*) " (Solve ne) ne < ne_small at cell",k!, " ; setting cell transparent!"
-               write(*,*) "T=", T(k), ' nHtot=', nHtot(k), " ne=", ne(k)
-               write(*,*) " -> setting ne to ", ne_small, " m^-3"
-               ne(k) = ne_small
-               ! icompute_atomRT(k) = 0
-         endif
+      !set transparent ? dark ? 
+         ! if (ne(k) < ne_small) then
+         !       write(*,*) " (Solve ne) ne < ne_small at cell",k!, " ; setting cell transparent!"
+         !       write(*,*) "T=", T(k), ' nHtot=', nHtot(k), " ne=", ne(k)
+         !       write(*,*) " -> setting ne to ", ne_small, " m^-3"
+         !       ne(k) = ne_small
+         !       icompute_atomRT(k) = 0
+         ! endif
          exit
       else if (niter >= N_MAX_ELECTRON_ITERATIONS) then
          if (dne > 0.0) then !shows the warning only if dne is actually greater than 1
@@ -565,6 +566,7 @@ module elecdensity
        ! 			call show_electron_given_per_elem(0, 0, max_fjk)
        write(*,*) " ---------------------------------------------------- "
     endif
+   !  where (ne < ne_small) ne = 0.0
 
     !that's because I use the sum as a variable so the function doesn't exist.
     do k=2, nb_proc

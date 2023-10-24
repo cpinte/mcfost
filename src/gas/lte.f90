@@ -16,7 +16,7 @@ module lte
    implicit none
 
    integer, dimension(101) :: ndebye
-   real(kind=dp), parameter :: small_lte_fraction = 1d-10
+   real(kind=dp), parameter :: small_lte_fraction = 1d-15
 
    contains
 
@@ -144,7 +144,7 @@ module lte
          end do
 
          !handle very low populations + mass conservation
-         if (hydrogen%nstar(i,k) < small_lte_fraction * ntotal) hydrogen%nstar(i,k) = 0.0
+         if (hydrogen%nstar(i,k) < small_lte_fraction) hydrogen%nstar(i,k) = 0.0
 
          sum = sum+hydrogen%nstar(i,k)
       end do
@@ -284,7 +284,7 @@ module lte
                atom%nstar(i,k) = 0d0
             endif
          end do
-         if (atom%nstar(i,k) < small_lte_fraction * ntotal) atom%nstar(i,k) = 0.0
+         if (atom%nstar(i,k) < small_lte_fraction) atom%nstar(i,k) = 0.0
 
          sum = sum+atom%nstar(i,k) !compute total pop = Sum_jSum_i nij
             !with Sum_i nij = Nj
