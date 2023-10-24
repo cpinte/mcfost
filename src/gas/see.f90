@@ -8,7 +8,8 @@ module see
     use wavelengths, only         : n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, &
          tab_lambda_cont, tab_lambda_nm
-    use utils, only               : gaussslv, solve_lin, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
+    use utils, only               : gaussslv, solve_lin, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix, &
+        matdiag, jacobi_sparse
     use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, xcoupling_cont, cross_coupling_cont_i
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
@@ -954,11 +955,12 @@ module see
             call particle_conservation (icell, Neq_ne, xvar(:,id), fvar(:,id), dfvar(:,:,id))
 
             !newton raphson!
-                    write(*,*) "T=", T(icell), ne(icell), nHtot(icell)
-                    write(*,*) "nstar=", hydrogen%nstar(:,icell)
-                    write(*,*) "n=", hydrogen%n(:,icell)
+                    ! write(*,*) id, icell, "T=", T(icell), ne(icell), nHtot(icell)
+                    ! write(*,*) "nstar=", hydrogen%nstar(:,icell)
+                    ! write(*,*) "n=", hydrogen%n(:,icell)
             call multivariate_newton_raphson (neq_ne, dfvar(:,:,id), fvar(:,id), xvar(:,id))
-
+! write(*,*) fvar(:,id)
+! stop 
             !update atomic populations and ne
             neg_pops = .false.
             i = 1
@@ -1052,7 +1054,7 @@ module see
         i = 1
         do n=1,NactiveAtoms
             at => Activeatoms(n)%p
-            dM = max(dM,maxval(abs(1.0 - npop_dag(i:(i-1)+at%Nlevel,id)/at%n(:,icell))))
+            dM = max(dM,maxval(abs(1.0 - npop_dag(i:(i-1)+at%Nlevel,id)/at%n(:,icell)),at%n(:,icell)>0))
             ngpop(1:at%Nlevel,at%activeindex,icell,1) = at%n(:,icell)
             !reset
             at%n(:,icell) = npop_dag(i:(i-1)+at%Nlevel,id) !the first value before iterations
@@ -1279,6 +1281,7 @@ module see
         real(kind=dp), intent(in) :: x(neq)
         real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
         integer :: ieq, jvar
+        real(kind=dp) :: xp(neq), diag(neq)
         ! real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
 
         do ieq=1, neq
@@ -1288,14 +1291,24 @@ module see
             enddo
         enddo
 
+        !check sparsity
+        diag(:) = abs(matdiag(df,neq))
+        if (minval(diag)==0.0_dp) then
+            ! call warning("(Newton-Raphson) df is sparse!")
+            xp(:) = x(:)
+            call Jacobi_sparse(df,f,xp,neq)
+            f(:) = xp(:)
+            return
+        endif
+
         ! *********************** !
         ! Adag(:,:) = df(:,:)
         ! bdag(:) = f(:)
         ! *********************** !
 
         ! call GaussSlv(df,f,neq)
-        write(*,*) "f=", f
-        write(*,*) "df=", df
+        ! write(*,*) "f=", f
+        ! write(*,*) "df=", df
         call solve_lin(df,f,neq)
         if (is_nan_infinity_vector(f)>0) then
         !  write(*,*) "fdag=", bdag
