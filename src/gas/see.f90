@@ -955,12 +955,8 @@ module see
             call particle_conservation (icell, Neq_ne, xvar(:,id), fvar(:,id), dfvar(:,:,id))
 
             !newton raphson!
-                    ! write(*,*) id, icell, "T=", T(icell), ne(icell), nHtot(icell)
-                    ! write(*,*) "nstar=", hydrogen%nstar(:,icell)
-                    ! write(*,*) "n=", hydrogen%n(:,icell)
             call multivariate_newton_raphson (neq_ne, dfvar(:,:,id), fvar(:,id), xvar(:,id))
-! write(*,*) fvar(:,id)
-! stop 
+
             !update atomic populations and ne
             neg_pops = .false.
             i = 1
