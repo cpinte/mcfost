@@ -16,7 +16,7 @@ module atom_transfer
    use elecdensity, only : solve_ne, write_electron, read_electron
    use grid, only : T, vturb,nHtot, nHmin, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, &
         ne, Voronoi, r_grid, phi_grid, z_grid
-   use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
+   use lte, only : ltepops_atoms, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
    use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, passiveAtoms, npassiveatoms, &
         hydrogen, helium, adjust_cswitch_atoms, &
                            maxval_cswitch_atoms, lcswitch_enabled, vbroad
@@ -25,7 +25,7 @@ module atom_transfer
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
         lnon_lte_loop, vlabs, calc_contopac_loc, set_max_damping, deactivate_lines, activate_lines, &
         activate_continua, deactivate_continua
-   use see, only : ngpop, Neq_ng, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
+   use see, only : ngpop, Neq_ng, ngpop, alloc_nlte_var, dealloc_nlte_var, small_nlte_fraction, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d, vacuum2air, &
@@ -359,7 +359,7 @@ module atom_transfer
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
                stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               if( (diff_loc(icell) < 1d-1 * precision).and..not.lcswitch_enabled ) cycle
+               if( (diff_loc(icell) < 5d-2 * precision).and..not.lcswitch_enabled ) cycle
 
                if (l_iterate) then
 
@@ -447,7 +447,7 @@ module atom_transfer
                !$omp atomic
                n_cells_done = n_cells_done + 1
                ! n_cells_remaining = size(pack(diff_loc, &
-               !                      mask=(diff_loc < 1d-1 * precision)))
+               !                      mask=(diff_loc < 5d-2 * precision)))
                if (real(n_cells_done) > 0.02*ibar*n_cells) then
              	   call progress_bar(ibar)
              	   !$omp atomic
@@ -480,7 +480,7 @@ module atom_transfer
           		   endif
             	endif
                if (lng_turned_on) then
-                  if (unconverged_fraction < 15.0) lng_turned_on = .false.
+                  if (unconverged_fraction < 10.0) lng_turned_on = .false.
                endif
             endif
             !***********************************************************!
@@ -592,12 +592,12 @@ module atom_transfer
                ! write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
                !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                ! write(*,*) ''
-               ! if ((dne < 1d-2 * precision).and.(.not.lcswitch_enabled)) then
-               !    !Or compare with 3 previous values of dne ? that should be below 1e-2 precision
-               !    !Do we need to restart it eventually ?
-               !    write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
-               !    n_iterate_ne = 0
-               ! endif
+               if ((dne < 1d-4 * precision).and.(.not.lcswitch_enabled)) then
+                  !Do we need to restart it eventually ?
+                  write(*,*) " *** dne", dne
+                  write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
+                  n_iterate_ne = 0
+               endif
             end if
             !***********************************************************!
 
@@ -628,7 +628,7 @@ module atom_transfer
                      at => ActiveAtoms(nact)%p
 
                      do ilevel=1,at%Nlevel
-                        if ( ngpop(ilevel,nact,icell,1) >= frac_limit_pops * at%Abund*nHtot(icell) ) then
+                        if ( ngpop(ilevel,nact,icell,1) >= small_nlte_fraction * at%Abund*nHtot(icell) ) then
                            dN1 = abs(1d0-at%n(ilevel,icell)/ngpop(ilevel,nact,icell,1))
                            dN = max(dN1, dN)
                            dM(nact) = max(dM(nact), dN1)
@@ -726,10 +726,7 @@ module atom_transfer
             diff_old = diff
             conv_acc = conv_speed
 
-            if ((diff < precision).and.(.not.lcswitch_enabled))then!maxval_cswitch_atoms()==1.0_dp
-            ! if ( (unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp)then
-            ! if ( ((unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp).or.&
-               !  ((diff < precision).and.maxval_cswitch_atoms()==1.0_dp) )then
+            if ((diff < precision).and.(.not.lcswitch_enabled))then
                if (lprevious_converged) then
                   lconverged = .true.
                else
@@ -783,8 +780,8 @@ module atom_transfer
 
             !force convergence if there are only few unconverged cells remaining
             ! if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
-            if ( (n_iter > maxIter/4).and.(unconverged_fraction < 5.0).or.&
-               ((unconverged_fraction < 5.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
+            if ( (n_iter > maxIter/4).and.(unconverged_fraction < 3.0).or.&
+               ((unconverged_fraction < 3.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
                write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
                   unconverged_fraction, n_iter
                write(*,*) " -> forcing convergence"

@@ -8,7 +8,8 @@ module see
     use wavelengths, only         : n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, &
          tab_lambda_cont, tab_lambda_nm
-    use utils, only               : gaussslv, solve_lin, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
+    use utils, only               : gaussslv, solve_lin, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix, &
+        matdiag, jacobi_sparse
     use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, xcoupling_cont, cross_coupling_cont_i
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
@@ -17,7 +18,7 @@ module see
     implicit none
 
     !populations below that threshold not taken into account in convergence.
-    real(kind=dp), parameter :: frac_limit_pops = 1d-15!1d-50
+    real(kind=dp), parameter :: small_nlte_fraction = 1d-15!1d-50
     !Variables for Non-LTE loop and MALI method
     real(kind=dp), allocatable ::  ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
@@ -357,7 +358,7 @@ module see
         do l=1,atom%Nlevel
             atom%n(l,icell) = atom%n(l,icell) * ntotal
 
-            if (atom%n(l,icell) < frac_limit_pops * ntotal) then
+            if (atom%n(l,icell) < small_nlte_fraction * ntotal) then
                 Nsmall_pops = Nsmall_pops + 1
                 level_index(lp) = l
                 lp = lp + 1
@@ -504,8 +505,11 @@ module see
             atom%continua(kr)%Rij(id) = 0.0_dp
             !updated value of ni and nj!
             !-> 0 if cont does not contribute to opac.
+            ! atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
+            !      atom%nstar(i,icell)/atom%nstar(j,icell)
             atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
-                 atom%nstar(i,icell)/atom%nstar(j,icell)
+                 atom%ni_on_nj_star(i,icell)
+            !check ratio ni_on_nj_star for the continua when there are multiple ionisation states (works for H, test for He)
         enddo
 
         do kr=1,atom%Nline
@@ -961,7 +965,7 @@ module see
                 do j=1,at%Nlevel
                     at%n(j,icell) = at%n(j,icell) * ( 1.0_dp + fvar((i-1)+j,id)/(1.0_dp + d_damp * abs(fvar((i-1)+j,id))) )
                     if (at%n(j,icell) < 0.0) neg_pops = .true.
-                    ! if (at%n(j,icell) < frac_limit_pops * at%Abund*nHtot(icell) )then
+                    ! if (at%n(j,icell) < small_nlte_fraction * at%Abund*nHtot(icell) )then
                     !     write(*,*) "small pops for level ", j
                     ! endif
                 enddo
@@ -973,9 +977,9 @@ module see
             if (verbose)write(*,*) ( 1.0 + fvar(neq_ne,id)/(1.0_dp + d_damp * abs(fvar(neq_ne,id))) )
             if (verbose)write(*,*) fvar(neq_ne,id), d_damp
             !                       1d-16
-            ! if (ne(icell) < frac_limit_pops * nhtot(icell)) write(*,*) "** small ne at cell ", icell
-            ! if ( (ne(icell) < frac_limit_pops * nHtot(icell)).or.(neg_pops) ) rest_damping = .true.
-            if ( (ne(icell) < frac_limit_pops * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
+            ! if (ne(icell) < small_nlte_fraction * nhtot(icell)) write(*,*) "** small ne at cell ", icell
+            ! if ( (ne(icell) < small_nlte_fraction * nHtot(icell)).or.(neg_pops) ) rest_damping = .true.
+            if ( (ne(icell) < small_nlte_fraction * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
             !-> here pops_ion has the old values !
             !restart with more iterations and larger damping (more stable, slower convergence)
             if (rest_damping .and. d_damp < (damp_char + 1.0)) then
@@ -1046,7 +1050,7 @@ module see
         i = 1
         do n=1,NactiveAtoms
             at => Activeatoms(n)%p
-            dM = max(dM,maxval(abs(1.0 - npop_dag(i:(i-1)+at%Nlevel,id)/at%n(:,icell))))
+            dM = max(dM,maxval(abs(1.0 - npop_dag(i:(i-1)+at%Nlevel,id)/at%n(:,icell)),at%n(:,icell)>0))
             ngpop(1:at%Nlevel,at%activeindex,icell,1) = at%n(:,icell)
             !reset
             at%n(:,icell) = npop_dag(i:(i-1)+at%Nlevel,id) !the first value before iterations
@@ -1273,6 +1277,7 @@ module see
         real(kind=dp), intent(in) :: x(neq)
         real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
         integer :: ieq, jvar
+        real(kind=dp) :: xp(neq), diag(neq)
         ! real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
 
         do ieq=1, neq
@@ -1282,12 +1287,24 @@ module see
             enddo
         enddo
 
+        !check sparsity
+        diag(:) = abs(matdiag(df,neq))
+        if (minval(diag)==0.0_dp) then
+            ! call warning("(Newton-Raphson) df is sparse!")
+            xp(:) = x(:)
+            call Jacobi_sparse(df,f,xp,neq)
+            f(:) = xp(:)
+            return
+        endif
+
         ! *********************** !
         ! Adag(:,:) = df(:,:)
         ! bdag(:) = f(:)
         ! *********************** !
 
         ! call GaussSlv(df,f,neq)
+        ! write(*,*) "f=", f
+        ! write(*,*) "df=", df
         call solve_lin(df,f,neq)
         if (is_nan_infinity_vector(f)>0) then
         !  write(*,*) "fdag=", bdag

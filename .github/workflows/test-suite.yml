@@ -4,7 +4,9 @@ on:
   push:
     branches: [ master ]
   pull_request:
-    branches: [ master ]
+  release:
+    types:
+      - published
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -22,6 +24,7 @@ jobs:
         os: [linux, macos]
         compiler: [gfortran, ifort]
         openmp: [yes, no]
+        release: [yes, no]
 
         include:
           # Associate specific os versions with our os tags
@@ -36,6 +39,7 @@ jobs:
             compiler: gfortran
             container: "quay.io/pypa/manylinux_2_28_x86_64"
 
+    name: build+test (${{ matrix.os }}, ${{ matrix.compiler }}, openmp=${{ matrix.openmp }}, release=${{ matrix.release }})
     runs-on: ${{ matrix.os-version }}
     container: ${{ matrix.container }}
     env:
@@ -57,17 +61,18 @@ jobs:
         shell: bash -e {0}
         run: |
           [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
-          make static=yes all 
+          make release=${{ matrix.release }} static=yes all
 
       - name: test
         uses: ./.github/actions/test
 
       # Saving the binaries from the macos builds since the runner is the same for both compilers -> might be more consistent
-      - name: save binary for benchmarking
-        if: matrix.os == 'macos' && matrix.openmp == 'yes'
+      # Only benchmark+release the 'release' builds, never the 'march=native' builds
+      - name: save binary for benchmarking and release
+        if: matrix.openmp == 'yes' && matrix.release == 'yes'
         uses: actions/upload-artifact@v3
         with:
-          name: mcfost-binary-${{ matrix.compiler }}
+          name: mcfost-binary-${{ matrix.os }}-${{ matrix.compiler }}
           path: src/mcfost
 
   benchmark:
@@ -86,8 +91,8 @@ jobs:
 
       - name: restore binary artifact
         uses: actions/download-artifact@v3
-        with: 
-          name: mcfost-binary-${{ matrix.compiler }}
+        with:
+          name: mcfost-binary-macos-${{ matrix.compiler }}
           path: src/
 
       - name: benchmark
@@ -96,3 +101,41 @@ jobs:
       - name: report benchmark results
         run: |
           echo ${{ matrix.compiler }} $(cat benchmark-${{ matrix.compiler }}.tim)
+
+
+  release:
+    needs: build-and-test
+    strategy:
+      matrix:
+        os: [linux, macos]
+
+        include:
+          # Associate specific os versions with our os tags
+          - os: linux
+            os-version: ubuntu-22.04
+          - os: macos
+            os-version: macos-12
+
+    runs-on: ${{ matrix.os-version }}
+    if: ${{ github.event_name == 'release' }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: restore binary artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: mcfost-binary-${{ matrix.os }}-ifort # use ifort for binary release
+          path: src/
+
+      - name: simple check to make sure the binary runs in a clean environment
+        shell: bash
+        working-directory: src
+        env:
+          MCFOST_UTILS: ${{ github.workspace }}/utils
+        run: |
+          chmod +x mcfost
+          ./mcfost -h
+
+      - name: upload binary
+        uses: ./.github/actions/release
