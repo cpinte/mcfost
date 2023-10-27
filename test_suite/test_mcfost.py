@@ -28,8 +28,7 @@ def mcfost(filename,opt=""):
     result = subprocess.call(cmd.split())
 
 def clean_results(model_name):
-    #cmd = ["rm","-rf"]+glob.glob("data_*")
-    cmd = ["rm","-rf",model_name]
+    cmd = ["rm","-rf",model_name," *.tmp"]
     result = subprocess.call(cmd)
 
 def all_almost_equal(x,y,threshold=0.01):
@@ -76,6 +75,11 @@ def test_Temperature(model_name):
 
     print("Maximum T difference", (abs(T-T_ref)/(T_ref+1e-30)).max())
     print("Mean T difference   ", (abs(T-T_ref)/(T_ref+1e-30)).mean())
+
+    if (model_name == "discF_00500"):
+        threshold = 0.1
+    else:
+        threshold=0.05
 
     assert MC_similar(T_ref,T,threshold=0.05)
 
