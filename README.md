@@ -5,10 +5,10 @@ The MCFOST radiative transfer code
 ==================================
 
 - Code: <https://github.com/cpinte/mcfost>
-- Docs: <https://mcfost.readthedocs.io/>
+- Docs: <https://mcfost.readthedocs.io>
 
 [![test-suite](https://github.com/cpinte/mcfost/actions/workflows/test-suite.yml/badge.svg)](https://github.com/cpinte/mcfost/actions/workflows/test-suite.yml)
-[![Documentation Status](https://readthedocs.org/projects/mcfost/badge/?version=stable)](https://mcfost.readthedocs.io/en/stable/?badge=stable)
+[![Documentation Status](https://readthedocs.org/projects/mcfost/badge/?version=latest)](https://mcfost.readthedocs.io/en/latest/)
 
 About
 -----
