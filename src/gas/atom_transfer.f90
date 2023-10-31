@@ -39,9 +39,11 @@ module atom_transfer
    use messages, only : error, warning
    use voigts, only : Voigt
    use broad, only : line_damping
+   use density, only : densite_pouss
    use temperature, only : Tdust
-   use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol
+   use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol,emissivite_dust
    use dust_prop, only : prop_grains, opacite, init_indices_optiques, kappa_abs_lte, kappa, kappa_factor
+   use scattering
 
    use healpix_mod
    !$ use omp_lib
@@ -1211,7 +1213,6 @@ module atom_transfer
    end subroutine atom_line_transfer
 
    subroutine init_dust_temperature()
-   use density, only : densite_pouss
       !lowering too much the treshold might create some convergence issues in the non-LTE pops or in 
       ! the electronic density calculations (0 division mainly for low values).
       real(kind=dp), parameter :: T_formation = 1500.0 ! [K]
@@ -1232,7 +1233,6 @@ module atom_transfer
    end subroutine init_dust_temperature
 
    subroutine init_dust_atom()
-   use scattering
    !see mol_transfer.f90 / init_dust_mol() for TO DOs.
       integer :: la, p_lambda
       integer, target :: icell
@@ -1271,6 +1271,12 @@ module atom_transfer
       do la=1, n_lambda !works also for ray-traced lines
          call prop_grains(la)
          call opacite(la, la, no_scatt=.true.)
+      enddo
+
+      do icell=1, n_cells
+         if (sum(densite_pouss(:,icell)) <= 0.0_dp) cycle
+         emissivite_dust(:,icell) = kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * &
+            m_to_AU * Bpnu(n_lambda,tab_lambda_nm,T(icell)) ! [W m^-3 Hz^-1 sr^-1]
       enddo
 
       call clean_mem_dust_mol()

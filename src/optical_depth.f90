@@ -1087,11 +1087,10 @@ end subroutine optical_length_tot_mol
 !********************************************************************
    subroutine integ_ray_atom(id,icell_in,x,y,z,u,v,w,iray,labs,N,lambda)
    ! ------------------------------------------------------------------------------- !
-   ! TO DO: merge integ_ray_atom + integ_ray_line
+   ! TO DO: merge integ_ray_atom + integ_ray_mol
    ! Zeeman
    ! scattering
    ! level dissolution
-   ! dust
    ! ------------------------------------------------------------------------------- !
       integer, intent(in) :: id, icell_in, iray
       real(kind=dp), intent(in) :: u,v,w
@@ -1174,7 +1173,8 @@ end subroutine optical_length_tot_mol
             ! do not initialize chi, Snu in background but update them instead.
             if (ldust_atom) then
                chi = chi + kappa(p_icell,:) * kappa_factor(icell) * m_to_AU ! [m^-1]
-               Snu = Snu + kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * m_to_AU * Bpnu(N,lambda,T(icell)) ! [W m^-3 Hz^-1 sr^-1]
+               ! Snu = Snu + kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * m_to_AU * Bpnu(N,lambda,T(icell)) ! [W m^-3 Hz^-1 sr^-1]
+               Snu = Snu + emissivite_dust(:,icell) ! [W m^-3 Hz^-1 sr^-1]
             endif
 
             dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m

@@ -483,8 +483,14 @@ subroutine realloc_dust_atom()
   allocate(kappa(p_n_cells,n_lambda),kappa_abs_LTE(p_n_cells,n_lambda), kappa_factor(n_cells), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc atom)')
   kappa = 0.0 ; kappa_abs_LTE = 0.0
-  !emissivite_dust(n_cells,n_lambda),emissivite_dust = 0.0
-  !I don't store the dust emissivity in a separate array.
+  !mind the shape of the array compared to the others.
+  if (allocated(emissivite_dust)) deallocate(emissivite_dust)
+  allocate(emissivite_dust(n_lambda,n_cells),stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc atom)')
+  if (sizeof(emissivite_dust)/1024.**3 > 5) then
+     write(*,*) " WARNING: using ", sizeof(emissivite_dust)/1024.**3, " GB for emissivite_dust"
+  endif
+  emissivite_dust = 0.0
 
   if (lRE_nLTE) then
      if (allocated(kappa_abs_nlte)) deallocate(kappa_abs_nlte)
