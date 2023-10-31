@@ -39,7 +39,6 @@ module atom_transfer
    use messages, only : error, warning
    use voigts, only : Voigt
    use broad, only : line_damping
-   use density, only : densite_pouss
    use temperature, only : Tdust
    use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol
    use dust_prop, only : prop_grains, opacite, init_indices_optiques, kappa_abs_lte, kappa, kappa_factor
@@ -1093,7 +1092,7 @@ module atom_transfer
 
       !associate the temperature in the regions where the dusty of dust is non-zero (if any) to the dust
       !temperature.
-      if (maxval(densite_pouss)>0.0_dp) then
+      if (ldust_atom) then
          call deallocate_em_th_mol()
          lscatt_ray_tracing = .false. ! tmp : scatt ray-tracing has no sense yet for atomic emssion
          call init_dust_temperature()
@@ -1212,6 +1211,7 @@ module atom_transfer
    end subroutine atom_line_transfer
 
    subroutine init_dust_temperature()
+   use density, only : densite_pouss
       !lowering too much the treshold might create some convergence issues in the non-LTE pops or in 
       ! the electronic density calculations (0 division mainly for low values).
       real(kind=dp), parameter :: T_formation = 1500.0 ! [K]
@@ -1234,15 +1234,15 @@ module atom_transfer
    subroutine init_dust_atom()
    use scattering
    !see mol_transfer.f90 / init_dust_mol() for TO DOs.
-      logical :: ldust_atom
       integer :: la, p_lambda
       integer, target :: icell
       integer, pointer :: p_icell
 
-      ldust_atom = (maxval(densite_pouss) > 0.0_dp)
-
-      if (.not.ldust_atom) return ! not dust
-      !init anyways the dust opac ? ?
+      if (.not.ldust_atom) then
+         !still add kappa etc in the total contopac to not care about testing if dust
+         !in the propagation (+limit_mem options).
+         return ! no dust
+      endif
 
       ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
       ! -> pas de polarisation, on utilise une HG
@@ -1266,18 +1266,12 @@ module atom_transfer
       call init_indices_optiques()
 
       ! Computing optical dust properties
+      ! TO DO: limit_mem options.
       write(*,*) " *** Computing dust properties for", n_lambda, "wavelengths..."
       do la=1, n_lambda !works also for ray-traced lines
          call prop_grains(la)
          call opacite(la, la, no_scatt=.true.)
       enddo
-!introduce switch for continuum
-      ! cell_loop : do icell=1, n_cells
-      !    if (maxval(densite_pouss(:,icell)) <= 0.0) cycle cell_loop
-      !    !here T (icell) is Tdust(icell)
-      !    ! chi_c(:,icell) = kappa(p_icell,:) ! [m^-1]
-      !    eta_cont(:,icell) = kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * Bpnu(n_lambda,tab_lambda_nm,T(icell)) ![W/m^3/Hz/sr]
-      ! enddo cell_loop
 
       call clean_mem_dust_mol()
       write(*,*) " *** done."
@@ -1375,16 +1369,16 @@ module atom_transfer
       ! Prise en compte de la surface du pixel (en sr)
 
       ! Flux out of a pixel in W/m2/Hz/pix
-      normF = ( pixelsize / (distance*pc_to_AU) )**2
+      normF = c_light / nm_to_m  * ( pixelsize / (distance*pc_to_AU) )**2
 
       if (RT_line_method==1) then
-         Flux_total(:,ibin,iaz,id) = Flux_total(:,ibin,iaz,id) + I0(:) * normF
+         Flux_total(:,ibin,iaz,id) = Flux_total(:,ibin,iaz,id) + I0(:) * normF / tab_lambda_nm
       else
          do nat=1,N_atoms
             atom => atoms(nat)%p
             do kr=1,atom%nTrans_rayTracing
                krr = atom%ij_to_trans(atom%i_Trans_rayTracing(kr),atom%j_Trans_rayTracing(kr))
-               atom%lines(krr)%map(ipix,jpix,:,ibin,iaz) = I0(atom%lines(krr)%nb:atom%lines(krr)%nr)*normF
+               atom%lines(krr)%map(ipix,jpix,:,ibin,iaz) = I0(atom%lines(krr)%nb:atom%lines(krr)%nr)*normF/ tab_lambda_nm(atom%lines(krr)%nb:atom%lines(krr)%nr)
             enddo
             atom => NULL()
          enddo

@@ -1141,6 +1141,7 @@ end subroutine optical_length_tot_mol
          endif
 
          !Special handling of coronal irradiation from "above".
+         !mainly for 1d stellar atmosphere
          if (lcellule_non_vide) then
             if (icompute_atomRT(icell) == -2) then
                !Does not return but cell is empty (lcellule_non_vide is .false.)
@@ -1160,8 +1161,7 @@ end subroutine optical_length_tot_mol
          !count opacity only if the cell is filled, else go to next cell
          if (lcellule_non_vide) then
             lsubtract_avg = ((nbr_cell == 1).and.labs)
-            chi(:) = 1d-300
-            Snu(:) = 0.0
+            chi(:) = 1d-300; Snu(:) = 0.0_dp
             ! opacities in m^-1, l_contrib in au
 
             if (icompute_atomRT(icell) > 0) then
@@ -1170,9 +1170,11 @@ end subroutine optical_length_tot_mol
                call opacity_atom_bb_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,&
                   l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,Snu)
             endif
-            if (maxval(densite_pouss(:,icell))>0) then
-               chi(:) = chi(:) + kappa(p_icell,:) * kappa_factor(icell) * m_to_AU ! [m^-1]
-               Snu(:) = Snu(:) + kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * m_to_AU * Bpnu(N,lambda,T(icell)) ! [W m^-3 Hz^-1 sr^-1]
+            !TO DO: move to the total contopac & 
+            ! do not initialize chi, Snu in background but update them instead.
+            if (ldust_atom) then
+               chi = chi + kappa(p_icell,:) * kappa_factor(icell) * m_to_AU ! [m^-1]
+               Snu = Snu + kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * m_to_AU * Bpnu(N,lambda,T(icell)) ! [W m^-3 Hz^-1 sr^-1]
             endif
 
             dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m
@@ -1188,7 +1190,7 @@ end subroutine optical_length_tot_mol
 
             Snu = Snu / chi
 
-            Itot(:,iray,id) = Itot(:,iray,id) + Snu!exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
+            Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
             tau(:) = tau(:) + dtau(:) !for next cell
 
          end if  ! lcellule_non_vide

@@ -216,6 +216,8 @@ module read_spherical_grid
         if (disk_dust_mass > 0.0_dp) then
             dust_pop(:)%masse = disk_dust_mass
             call normalize_dust_density(disk_dust_mass)
+            ldust_atom = .false. !tmp here, to move once opacity are added to contopac (adding 0 if no dust)
+            if (lemission_atom) ldust_atom = .true.
         endif
         ! ********************************** !
 
