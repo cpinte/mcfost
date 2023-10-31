@@ -153,49 +153,4 @@ module voigts
     return
    end function dmax_lorentz
 
-    !building
-    function VoigtAller(N,a,v)
-        integer, intent(in) :: N
-        real(kind=dp), intent(in) :: a, v(N)
-        real(kind=dp) :: VoigtAller(N)
-        integer :: i,j
-        real(kind=dp) :: sum1, base
-        complex(kind=dp) :: ksi, sum2
-                
-        if (a <= 0.1) then
-            do i=1,N
-                if (abs(v(i)) >= 2.5) then
-                    base = (1.0+a*a*(1-2*v(i)**2))*exp(-v(i)**2)
-                    sum1 = 0
-                    do j=1,7
-                        sum1 = sum1 + cj(j)*v(i)**(-2*(j-1))
-                    enddo
-                    VoigtAller(i) = a/v(i)/v(i) * sum1 + base
-                else
-                    ksi = cmplx(a, -v(i))
-                    sum1 = 0
-                    sum2 = ksi**7
-                    do j=1,7
-                        sum1 = sum1 + Aj(j)*ksi**(j-1)
-                        sum2 = sum2 + Bj(j)*ksi**(j-1) 
-                    enddo
-                    VoigtAller(i) = real(sum1/sum2, kind=dp)
-                endif	
-            enddo
-        else
-            do i=1,N
-                ksi = cmplx(a, -v(i))
-                sum1 = 0
-                sum2 = ksi**7
-                do j=1,7
-                    sum1 = sum1 + Aj(j)*ksi**(j-1)
-                    sum2 = sum2 + Bj(j)*ksi**(j-1) 
-                enddo
-                VoigtAller(i) = real(sum1/sum2, kind=dp)
-            enddo
-        endif
-    
-        return
-    end function VoigtAller
-
 end module voigts
