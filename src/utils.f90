@@ -783,7 +783,7 @@ subroutine mcfost_setup()
        //trim(mcfost_utils)//"/.last_update"
   call appel_syst(cmd, syst_status)
 
-  ! We do not need to download the parameter file if we use the sources
+  ! We do not need to download the parameter files if we use the sources
   call get_environment_variable('MCFOST_GIT',s)
   if (s/="") then
      read(s,*) mcfost_git
