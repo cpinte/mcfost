@@ -1101,7 +1101,9 @@ end subroutine optical_length_tot_mol
       real(kind=dp), dimension(N), intent(in) :: lambda
       real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
       real(kind=dp), dimension(N) :: Snu, tau, dtau, chi, coronal_irrad
-      integer :: nbr_cell, icell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
+      integer, target :: icell
+      integer, pointer :: p_icell
+      integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
       logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
       x1=x;y1=y;z1=z
@@ -1114,6 +1116,9 @@ end subroutine optical_length_tot_mol
 
       Itot(:,iray,id) = 0.0_dp
 
+      p_icell => icell_ref
+      if (lvariable_dust) p_icell => icell
+
       ! Will the ray intersect a star
       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
       ! Boucle infinie sur les cellules (we go over the grid.)
@@ -1123,11 +1128,6 @@ end subroutine optical_length_tot_mol
          x0=x1 ; y0=y1 ; z0=z1
 
          lcellule_non_vide = (icell <= n_cells)
-         ! if (icell <= n_cells) then
-         !    lcellule_non_vide=.true.
-         ! else
-         !    lcellule_non_vide=.false.
-         ! endif
 
          ! Test sortie ! "The ray has reach the end of the grid"
          if (test_exit_grid(icell, x0, y0, z0)) return
@@ -1139,23 +1139,15 @@ end subroutine optical_length_tot_mol
                return
             end if
          endif
-         !With the Voronoi grid, somme cells can have a negative index
-         !therefore we need to test_exit_grid before using icompute_atom_rt
-         if (icell <= n_cells) then
-            lcellule_non_vide = (icompute_atomRT(icell) > 0)
-            if (icompute_atomRT(icell) < 0) then
-               if (icompute_atomRT(icell) == -1) then
-                  !If the optically thick region (dark zone) has a temperature
-                  !add a black body emission and leave.
-                  if (T(icell) > 0.0_dp) Itot(:,iray,id) = Itot(:,iray,id) + &
-                                    exp(-tau) * Bpnu(N,lambda,T(icell))
-                  return
-               else
-                  !Does not return but cell is empty (lcellule_non_vide is .false.)
-                  coronal_irrad = linear_1D_sorted(atmos_1d%Ncorona,atmos_1d%x_coro(:), &
+
+         !Special handling of coronal irradiation from "above".
+         if (lcellule_non_vide) then
+            if (icompute_atomRT(icell) == -2) then
+               !Does not return but cell is empty (lcellule_non_vide is .false.)
+               coronal_irrad = linear_1D_sorted(atmos_1d%Ncorona,atmos_1d%x_coro(:), &
                                                    atmos_1d%I_coro(:,1),N,lambda)
-                  Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * coronal_irrad
-               endif
+               Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * coronal_irrad
+               lcellule_non_vide = .false.
             endif
          endif
 
@@ -1168,12 +1160,20 @@ end subroutine optical_length_tot_mol
          !count opacity only if the cell is filled, else go to next cell
          if (lcellule_non_vide) then
             lsubtract_avg = ((nbr_cell == 1).and.labs)
+            chi(:) = 1d-300
+            Snu(:) = 0.0
             ! opacities in m^-1, l_contrib in au
 
-
-            call contopac_atom_loc(icell, N, lambda, chi, Snu)
-            call opacity_atom_bb_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,&
-               l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,Snu)
+            if (icompute_atomRT(icell) > 0) then
+               !re-init chi
+               call contopac_atom_loc(icell, N, lambda, chi, Snu)
+               call opacity_atom_bb_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,&
+                  l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,Snu)
+            endif
+            if (maxval(densite_pouss(:,icell))>0) then
+               chi(:) = chi(:) + kappa(p_icell,:) * kappa_factor(icell) * m_to_AU ! [m^-1]
+               Snu(:) = Snu(:) + kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * m_to_AU * Bpnu(N,lambda,T(icell)) ! [W m^-3 Hz^-1 sr^-1]
+            endif
 
             dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m
 
@@ -1188,7 +1188,7 @@ end subroutine optical_length_tot_mol
 
             Snu = Snu / chi
 
-            Itot(:,iray,id) = Itot(:,iray,id) + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
+            Itot(:,iray,id) = Itot(:,iray,id) + Snu!exp(-tau) * (1.0_dp - exp(-dtau)) * Snu
             tau(:) = tau(:) + dtau(:) !for next cell
 
          end if  ! lcellule_non_vide

@@ -181,9 +181,17 @@ subroutine lect_Temperature()
   integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, hdutype
   real :: nullval
   integer, dimension(5) :: naxes
-  logical :: anynull
+  logical :: anynull, there_is_dust
 
-  if (lemission_atom) return   !B. Tessore., Temporary
+  !future: lgas_transfer. Dust could not always be present in the gas RT.  
+  if (lemission_atom) then
+     !note sure the test on ltemp is necessary here
+     there_is_dust = (maxval(densite_pouss) > 0_dp)
+     if ( (.not.ltemp).and.(.not.there_is_dust) ) then
+        call warning("(lect_Temperature) Do not attempt to read Tdust file when there is not dust!")
+        return
+     endif
+  endif
 
   if (lRE_LTE) then
      status=0

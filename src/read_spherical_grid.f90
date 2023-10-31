@@ -14,6 +14,7 @@ module read_spherical_grid
     use utils
     use cylindrical_grid
     use density
+    use dust_prop, only : dust_pop
     use stars, only : T_hp, T_preshock
     use read1d_models, only : print_info_model
 
@@ -40,6 +41,7 @@ module read_spherical_grid
         vfield_coord = 3 ! spherical
         grid_type = 2
         n_rad_in = 1
+        n_zones = 1
 
         open(unit=1, file=trim(filename), status="old",access="stream",form='unformatted')
         !read size along each direction + cell limits (size + 1) 
@@ -105,14 +107,14 @@ module read_spherical_grid
         if (l3d) then
             nz = pluto%nx2/2
             if (mod(pluto%nx2,2)>0) call warning("odd nx2")
-            ! dphi = pluto%x3(2) - pluto%x3(1)
-            ! do i=2, size(pluto%x3)
-            !     if ( abs((pluto%x3(i) - pluto%x3(i-1)) - dphi) > 1e-6 ) then
-            !         write(*,*) dphi, (pluto%x3(i) - pluto%x3(i-1)),abs((pluto%x3(i) - pluto%x3(i-1)) - dphi)
-            !         call error("(spherical input grid) Non-linear phi space is not allowed!")
-            !     endif
-            !     dphi = pluto%x3(i) - pluto%x3(i-1)
-            ! enddo
+            dphi = pluto%x3(2) - pluto%x3(1)
+            do i=2, size(pluto%x3)
+                if ( abs((pluto%x3(i) - pluto%x3(i-1)) - dphi) > 1e-6 ) then
+                    write(*,*) dphi, (pluto%x3(i) - pluto%x3(i-1)),abs((pluto%x3(i) - pluto%x3(i-1)) - dphi)
+                    call error("(spherical input grid) Non-linear phi space is not allowed!")
+                endif
+                dphi = pluto%x3(i) - pluto%x3(i-1)
+            enddo
         endif
 
         Nsize = pluto%nx2 * pluto%nx3 * pluto%nx1
@@ -130,11 +132,12 @@ module read_spherical_grid
         character(len=*), intent(in) :: filename
         integer :: ios, i, Nsize
         
-        integer :: j, k, jj, icell
+        integer :: j, k, jj, icell, read_dust
         integer, allocatable :: dz(:,:,:)
         real, allocatable :: vtmp(:,:,:,:)
-        real(kind=dp), allocatable :: rho(:,:,:), T_tmp(:,:,:), ne_tmp(:,:,:), vt_tmp(:,:,:)
-        real(kind=dp) :: mass, facteur
+        real(kind=dp), allocatable :: rho(:,:,:), rho_dust(:,:,:)
+        real(kind=dp), allocatable :: T_tmp(:,:,:), ne_tmp(:,:,:), vt_tmp(:,:,:)
+        real(kind=dp) :: mass, disk_dust_mass
 
         call alloc_atomrt_grid
         call read_abundance !can be move in atom_transfer, but then rho must be changed in nHtot
@@ -167,8 +170,15 @@ module read_spherical_grid
         read(1, iostat=ios) vtmp(:,:,:,:)
         read(1, iostat=ios) vt_tmp(:,:,:)
         read(1, iostat=ios) dz(:,:,:)
+        read(1, iostat=ios) read_dust
+        !read total dust density
+        if (read_dust > 0) then
+            allocate(rho_dust(pluto%nx1,pluto%nx2,pluto%nx3))
+            read(1, iostat=ios) rho_dust(:,:,:)
+        endif
         close(unit=1)
 
+        densite_pouss = 0.0_dp ! init just in case.
         do i=1, n_rad
             j = 0
             bz : do jj=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
@@ -177,42 +187,36 @@ module read_spherical_grid
                 do k=1, n_az
                     icell = cell_map(i,jj,k)
                     T(icell) = T_tmp(i,j,k)
-                    nHtot(icell) = rho(i,j,k) * 1d3 / masseH / wght_per_H
-                    densite_gaz(icell) = rho(i,j,k) * 1d3 !for dust, in [g]
-                    !At the moment the dust density / properties / g/d ratio are
-                    !set from the parameter file and not read from the binary model.
-                    densite_pouss(:,icell) = densite_gaz(icell)
+                    nHtot(icell) = rho(i,j,k) * 1d3 / masseH / wght_per_H ! [m^-3]
                     icompute_atomRT(icell) = dz(i,j,k)
                     vfield3d(icell,:) = vtmp(i,j,k,:)
+
+                    !-> wrapper for dust RT.
+                    densite_gaz(icell) = nHtot(icell) * wght_per_H
+                    if (read_dust > 0) densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / masseH ! [m^-3]
                 enddo
             enddo bz
         enddo
         deallocate(rho,ne_tmp,T_tmp,vt_tmp,dz,vtmp)
+        if (allocated(rho_dust)) deallocate(rho_dust)
 
         !dust part see read_pluto.f90
         ! ********************************** !
-        mass = 0. !in g/m^3, volume in AU^3
-        do icell=1,n_cells
-            mass = mass + densite_gaz(icell) * volume(icell)
-        enddo !icell
-        mass =  mass * AU3_to_m3 * g_to_Msun !in Msun
+        !technically is it masseH or masse_mol_gaz for H2 ? 
+        mass = sum(densite_gaz * volume) * AU3_to_m3 * masseH * g_to_Msun
+        if (mass <= 0.0) call error('Gas mass is 0')
+        masse_gaz(:) = masseH * densite_gaz(:) * volume(:) * AU3_to_m3 ! [g]
 
-        ! Normalisation
-        if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
-            facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+        disk_dust_mass = sum(densite_pouss(1,:)*volume) * AU3_to_m3 * masseH * g_to_Msun
 
-            ! Somme sur les zones pour densite finale
-            do icell=1,n_cells
-                densite_gaz(icell) = 1d-3 * densite_gaz(icell) * facteur !g/AU^3
-                masse_gaz(icell) = densite_gaz(icell) * volume(icell) * AU3_to_m3 !g
-                nHtot(icell) = nHtot(icell) * facteur !for consistency 
-            enddo ! icell
-        else
-            call error('Gas mass is 0')
-        endif
+        !--> no normalisation of density. The dust and gas densities are provided in the model.
 
         write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
-        call normalize_dust_density()
+        ! write(*,*) 'Total  dust mass in model:', real(disk_dust_mass),' Msun'
+        if (disk_dust_mass > 0.0_dp) then
+            dust_pop(:)%masse = disk_dust_mass
+            call normalize_dust_density(disk_dust_mass)
+        endif
         ! ********************************** !
 
         call check_for_zero_electronic_density()

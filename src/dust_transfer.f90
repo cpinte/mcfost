@@ -763,7 +763,7 @@ subroutine transfert_poussiere()
            call ecriture_temperature(1)
            call ecriture_sed(1)
 
-           if (lapprox_diffusion.and.l_is_dark_zone.and.(lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx)) then
+           if (lapprox_diffusion.and.l_is_dark_zone.and.(lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx.or.lemission_atom)) then
               call Temp_approx_diffusion_vertical()
               ! call Temp_approx_diffusion()
               call diffusion_approx_nLTE_nRE()

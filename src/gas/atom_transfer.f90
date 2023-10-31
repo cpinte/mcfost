@@ -39,6 +39,10 @@ module atom_transfer
    use messages, only : error, warning
    use voigts, only : Voigt
    use broad, only : line_damping
+   use density, only : densite_pouss
+   use temperature, only : Tdust
+   use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol
+   use dust_prop, only : prop_grains, opacite, init_indices_optiques, kappa_abs_lte, kappa, kappa_factor
 
    use healpix_mod
    !$ use omp_lib
@@ -1027,7 +1031,7 @@ module atom_transfer
    !keep somewhere tab_lambda_sed = tab_lambda because tab_lambda is overwritten in non-LTE
       integer :: kr, nat
 
-      call deallocate_wavelengths_gasrt(tab_lambda)
+      call deallocate_wavelengths_gasrt()
       call dealloc_atom_opac()
       call init_directions_ray_tracing()
 
@@ -1054,8 +1058,9 @@ module atom_transfer
          call make_wavelengths_raytracing(tab_lambda_nm)
       endif
       n_lambda = size(tab_lambda_nm)
-      tab_lambda = tab_lambda_nm * nm_to_m!micron
+      tab_lambda = tab_lambda_nm * m_to_km ! [mic]
 
+      call init_dust_atom() !even in 1d mode.
       call alloc_atom_opac(n_lambda, tab_lambda_nm, .true.)
       call allocate_atom_maps()
       if (laccretion_shock) then
@@ -1086,6 +1091,14 @@ module atom_transfer
          tab_lambda_sed = tab_lambda
       endif
 
+      !associate the temperature in the regions where the dusty of dust is non-zero (if any) to the dust
+      !temperature.
+      if (maxval(densite_pouss)>0.0_dp) then
+         call deallocate_em_th_mol()
+         lscatt_ray_tracing = .false. ! tmp : scatt ray-tracing has no sense yet for atomic emssion
+         call init_dust_temperature()
+      endif
+      !before LTE pops, electronic density and eventually chemical equilibrium.
       !read atomic models
       call read_atomic_Models()
 
@@ -1134,10 +1147,12 @@ module atom_transfer
          !Even if we split the transfer un group of wavelength that's probably best to keep indexes.
          !otherwise, we pass group wavelength and check contributing opacities for each group
          !but it is like indexes at the end?
-         deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
+         call deallocate_wavelengths_gasrt()
          call make_wavelengths_nlte(tab_lambda_nm,vmax_overlap=v_char)
          n_lambda = size(tab_lambda_nm)
-         tab_lambda = tab_lambda_nm * m_to_km
+         tab_lambda = tab_lambda_nm * m_to_km ! [micron]
+
+         call init_dust_atom()
 
          ! !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm, .false.)
@@ -1196,6 +1211,78 @@ module atom_transfer
       return
    end subroutine atom_line_transfer
 
+   subroutine init_dust_temperature()
+      !lowering too much the treshold might create some convergence issues in the non-LTE pops or in 
+      ! the electronic density calculations (0 division mainly for low values).
+      real(kind=dp), parameter :: T_formation = 1500.0 ! [K]
+      write(*,*) " *** Associating the dust temperature in the model..."
+      !If the dust temperature is above T_formation the gas will follow that temperature
+      !and atomic opacities will be considered.
+      write(*,*) "Tdust:", maxval(Tdust), minval(Tdust)
+      where(sum(densite_pouss,dim=1) > 0.0_dp) T(:) = Tdust(:)
+      if (any(T < T_formation)) call warning('(atom_transfer) Setting the gas transparent where T < 1500 K.')
+      where (T < T_formation) icompute_atomRT = 0
+      if (any(icompute_atomRT>0)) then
+         write(*,*) "T:", maxval(T,icompute_atomRT>0), minval(T,icompute_atomRT>0)
+      else
+         call warning("(init_dust_temperature) The (atomic) gas is all transparent in dusty regions !")
+      endif
+      write(*,*) " *** done."
+      return
+   end subroutine init_dust_temperature
+
+   subroutine init_dust_atom()
+   use scattering
+   !see mol_transfer.f90 / init_dust_mol() for TO DOs.
+      logical :: ldust_atom
+      integer :: la, p_lambda
+      integer, target :: icell
+      integer, pointer :: p_icell
+
+      ldust_atom = (maxval(densite_pouss) > 0.0_dp)
+
+      if (.not.ldust_atom) return ! not dust
+      !init anyways the dust opac ? ?
+
+      ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
+      ! -> pas de polarisation, on utilise une HG
+      scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
+      aniso_method = 2 ; lmethod_aniso1 = .false.
+      lsepar_pola = .false.
+      ltemp = .false.
+      lmono = .true. ! equivalent au mode sed2
+
+      if (lvariable_dust) then
+         p_icell => icell
+      else
+         p_icell => icell_ref
+      endif
+
+      call realloc_dust_atom()
+
+      !BEWARE: by default tab_lambda is associated to tab_lambda_nm which can be long.
+      !        Consider using tab_lambda_cont and then interpolate on tab_lambda_nm
+      write(*,*) " *** initialising optical indices"
+      call init_indices_optiques()
+
+      ! Computing optical dust properties
+      write(*,*) " *** Computing dust properties for", n_lambda, "wavelengths..."
+      do la=1, n_lambda !works also for ray-traced lines
+         call prop_grains(la)
+         call opacite(la, la, no_scatt=.true.)
+      enddo
+!introduce switch for continuum
+      ! cell_loop : do icell=1, n_cells
+      !    if (maxval(densite_pouss(:,icell)) <= 0.0) cycle cell_loop
+      !    !here T (icell) is Tdust(icell)
+      !    ! chi_c(:,icell) = kappa(p_icell,:) ! [m^-1]
+      !    eta_cont(:,icell) = kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * Bpnu(n_lambda,tab_lambda_nm,T(icell)) ![W/m^3/Hz/sr]
+      ! enddo cell_loop
+
+      call clean_mem_dust_mol()
+      write(*,*) " *** done."
+      return
+   end subroutine init_dust_atom
 
   subroutine intensite_pixel_atom(id,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
    ! -------------------------------------------------------------- !
@@ -1619,7 +1706,7 @@ module atom_transfer
       allocate(cos_theta(Nimpact), weight_mu(Nimpact), p(Nimpact))
       !prepare wavelength grid and indexes for continua and lines
       !including max extension due to velocity shiftS.
-      call deallocate_wavelengths_gasrt(tab_lambda)
+      call deallocate_wavelengths_gasrt()
       call dealloc_atom_opac()
       if (lsed) then
          call make_wavelengths_flux(tab_lambda_sed,.true.)

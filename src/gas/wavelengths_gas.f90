@@ -258,9 +258,13 @@ module wavelengths_gas
       return
    end function line_lambda_grid_dv
 
-   subroutine deallocate_wavelengths_gasrt(lambda)
-      real(kind=dp), intent(inout), allocatable, dimension(:) :: lambda
-      if (allocated(lambda)) deallocate(lambda)
+   subroutine deallocate_wavelengths_gasrt()!(lambda)
+   use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
+      ! real(kind=dp), intent(inout), allocatable, dimension(:) :: lambda
+      if (allocated(tab_lambda)) then !lambda
+         deallocate(tab_lambda) !lambda
+         deallocate(tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
+      endif
       if (allocated(tab_lambda_nm)) deallocate(tab_lambda_cont, tab_lambda_nm)
       !deallocate atom grid..
       !deallocate group..
