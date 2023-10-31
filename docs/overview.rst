@@ -71,7 +71,7 @@ constraints on the derived parameters.
 
 
 Github discussions
---------------
+------------------
 
 If you decide to use MCFOST, have questions on how to use the code, or request for new features, please head to
 https://github.com/cpinte/mcfost/discussions. This is a collaborative space

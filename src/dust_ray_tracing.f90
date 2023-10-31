@@ -764,7 +764,6 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
 
   if (lmono0) then
      write(*,*) "i=", tab_RT_incl(ibin)
-     write(*,*) "Vector to observer =", real(tab_u_rt(ibin,1)),real(tab_v_rt(ibin,1)),real(tab_w_rt(ibin))
      write(*,*) "Scattered specific intensity ..."
   endif
 
