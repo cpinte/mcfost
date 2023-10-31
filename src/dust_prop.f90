@@ -583,7 +583,7 @@ subroutine prop_grains(lambda)
         x = 2.0 * pi * a / wavel
         if (laggregate) then
            call Mueller_GMM(lambda,k,qext,qsca,gsca)
-        else if (lmueller) then 
+        else if (lmueller) then
            ! on désactive la parallélisation pour lire le fichier
            !$omp critical (read)
            if (lper_size) then
@@ -736,6 +736,7 @@ subroutine read_saved_dust_prop(letape_th, lcompute)
      return
   endif
 
+  ok = .true.
   ! read the saved dust properties
   if (lmueller.or.laggregate) then
      read(1,iostat=ios) para_version_save, scattering_method_save, dust_pop_save, grain_save, lmue, &
@@ -988,7 +989,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      if (scattering_method==2) then
         if (lmueller) then
            call calc_local_scattering_matrices_mueller(lambda, p_lambda)
-        else 
+        else
            call calc_local_scattering_matrices(lambda, p_lambda)
         endif
      else ! scattering_method ==1
@@ -1293,11 +1294,11 @@ subroutine calc_local_scattering_matrices_mueller(lambda, p_lambda)
            ! car tab_mueller(1,1) est normalisé à Qsca
            prob_s11_pos(1:nang_scatt,icell,p_lambda) = prob_s11_pos(1:nang_scatt,icell,p_lambda) + &
                 k_sca_tot - prob_s11_pos(nang_scatt,icell,p_lambda)
-           
-           
+
+
            ! Normalisation de la proba cumulee a 1
            prob_s11_pos(:,icell,p_lambda)=prob_s11_pos(:,icell,p_lambda)/k_sca_tot
-           
+
            ! Normalisation des matrices de Mueller (idem que dans mueller_Mie)
            do l=0,nang_scatt
               if (tab_mueller_pos(1,1,l,icell,p_lambda) > tiny_real) then
@@ -1307,7 +1308,7 @@ subroutine calc_local_scattering_matrices_mueller(lambda, p_lambda)
                     tab_mueller_pos(:,:,l,icell,p_lambda)= tab_mueller_pos(:,:,l,icell,p_lambda) *norme
                     tab_mueller_pos(1,1,l,icell,p_lambda) = s11
                  endif
-              else 
+              else
                  write (*,*) "Error : at angle", real(l)*pi/real(nang_scatt)
                  call error ("local s11 = 0.0")
               endif
