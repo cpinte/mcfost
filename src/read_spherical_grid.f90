@@ -129,15 +129,16 @@ module read_spherical_grid
     ! ----------------------------------------------------- !
     ! read spherical grid data defined at cell centres.
     ! ----------------------------------------------------- !
+    ! use grains, only : M_Grain
         character(len=*), intent(in) :: filename
         integer :: ios, i, Nsize
         
-        integer :: j, k, jj, icell, read_dust
+        integer :: j, k, jj, icell
         integer, allocatable :: dz(:,:,:)
         real, allocatable :: vtmp(:,:,:,:)
         real(kind=dp), allocatable :: rho(:,:,:), rho_dust(:,:,:)
         real(kind=dp), allocatable :: T_tmp(:,:,:), ne_tmp(:,:,:), vt_tmp(:,:,:)
-        real(kind=dp) :: mass, disk_dust_mass
+        real(kind=dp) :: mass
 
         call alloc_atomrt_grid
         call read_abundance !can be move in atom_transfer, but then rho must be changed in nHtot
@@ -170,15 +171,16 @@ module read_spherical_grid
         read(1, iostat=ios) vtmp(:,:,:,:)
         read(1, iostat=ios) vt_tmp(:,:,:)
         read(1, iostat=ios) dz(:,:,:)
-        read(1, iostat=ios) read_dust
+        read(1, iostat=ios) disk_zone(1)%gas_to_dust
+        write(*,*) "Gas/Dust from model:", real(disk_zone(1)%gas_to_dust)
         !read total dust density
-        if (read_dust > 0) then
-            allocate(rho_dust(pluto%nx1,pluto%nx2,pluto%nx3))
-            read(1, iostat=ios) rho_dust(:,:,:)
-        endif
+        allocate(rho_dust(pluto%nx1,pluto%nx2,pluto%nx3))
+        read(1, iostat=ios) rho_dust(:,:,:)
         close(unit=1)
 
         densite_pouss = 0.0_dp ! init just in case.
+        masse_gaz = 0.0_dp
+        disk_zone(1)%diskmass = 0.0
         do i=1, n_rad
             j = 0
             bz : do jj=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
@@ -192,38 +194,54 @@ module read_spherical_grid
                     vfield3d(icell,:) = vtmp(i,j,k,:)
 
                     !-> wrapper for dust RT.
-                    densite_gaz(icell) = nHtot(icell) * wght_per_H
-                    if (read_dust > 0) densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / masseH ! [m^-3]
+                    !-> taking into account proper weights assuming only molecular gas in dusty regions
+                    if (rho_dust(i,j,k) > 0.0) then ! dusty region
+                        densite_gaz(icell) = rho(i,j,k) * 1d3 / masse_mol_gaz !total molecular gas density in H2/m^3
+                        densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / masse_mol_gaz ! [m^-3]
+                        disk_zone(1)%diskmass = disk_zone(1)%diskmass + rho_dust(i,j,k) * volume(icell)
+                    else !No dust.
+                        densite_gaz(icell) = nHtot(icell) * wght_per_H !total atomic gas density in H/m^3
+                    endif
+                    masse_gaz(icell) = rho(i,j,k) * volume(icell)
                 enddo
             enddo bz
         enddo
+        masse_gaz = masse_gaz * AU3_to_m3 * 1d3 ! [g]
         deallocate(rho,ne_tmp,T_tmp,vt_tmp,dz,vtmp)
+        !total dust mass
+        disk_zone(1)%diskmass = disk_zone(1)%diskmass * AU3_to_m3 * kg_to_Msun
         if (allocated(rho_dust)) deallocate(rho_dust)
 
         !dust part see read_pluto.f90
         ! ********************************** !
-        !technically is it masseH or masse_mol_gaz for H2 ? 
-        mass = sum(densite_gaz * volume) * AU3_to_m3 * masseH * g_to_Msun
+        mass = sum(masse_gaz) * g_to_Msun
+        ! mass = sum(densite_gaz * volume) * AU3_to_m3 * masseH * g_to_Msun
         if (mass <= 0.0) call error('Gas mass is 0')
-        masse_gaz(:) = masseH * densite_gaz(:) * volume(:) * AU3_to_m3 ! [g]
-
-        disk_dust_mass = sum(densite_pouss(1,:)*volume) * AU3_to_m3 * masseH * g_to_Msun
+        ! masse_gaz(:) = masseH * densite_gaz(:) * volume(:) * AU3_to_m3 ! [g]
 
         !--> no normalisation of density. The dust and gas densities are provided in the model.
 
         write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
-        ! write(*,*) 'Total  dust mass in model:', real(disk_dust_mass),' Msun'
-        if (disk_dust_mass > 0.0_dp) then
-            dust_pop(:)%masse = disk_dust_mass
-            call normalize_dust_density(disk_dust_mass)
-            ldust_atom = .false. !tmp here, to move once opacity are added to contopac (adding 0 if no dust)
+        ! write(*,*) 'Total  dust mass in model:', real(disk_zone(1)%diskmass),' Msun'
+        if (disk_zone(1)%diskmass > 0.0_dp) then
+            dust_pop(:)%masse = disk_zone(1)%diskmass
+            !here the densite_pouss gets normalise such that sum(densite_pouss) = 1 [units less]
+            call normalize_dust_density()
+            !the units of densite_pouss comes from M_grain in g/cm^3, normalize to give the dust mass if summed.
+            !the density of grains is M_grain x densite_pouss
             if (lemission_atom) ldust_atom = .true.
         endif
         ! ********************************** !
 
         call check_for_zero_electronic_density()
         call print_info_model()
-
+!         mass = 0
+!         do icell=1, n_cells
+!             mass = mass + sum(M_grain(:) * densite_pouss(:,icell)) * volume(icell) 
+!         enddo
+! write(*,*) sum(masse) * g_to_Msun 
+! write(*,*) mass* AU3_to_cm3 * g_to_Msun
+! stop
         return
     endsubroutine read_spherical_model
 
