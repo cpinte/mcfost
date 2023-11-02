@@ -1172,7 +1172,7 @@ end subroutine optical_length_tot_mol
             !TO DO: move to the total contopac & 
             ! do not initialize chi, Snu in background but update them instead.
             if (ldust_atom) then
-               chi = chi + kappa(p_icell,:) * kappa_factor(icell) * m_to_AU ! [m^-1]
+               chi = chi + kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * m_to_AU ! [m^-1]
                ! Snu = Snu + kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * m_to_AU * Bpnu(N,lambda,T(icell)) ! [W m^-3 Hz^-1 sr^-1]
                Snu = Snu + emissivite_dust(:,icell) ! [W m^-3 Hz^-1 sr^-1]
             endif
