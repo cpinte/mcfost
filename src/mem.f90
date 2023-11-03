@@ -487,7 +487,7 @@ subroutine realloc_dust_atom()
   if (allocated(emissivite_dust)) deallocate(emissivite_dust)
   allocate(emissivite_dust(n_lambda,n_cells),stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc atom)')
-  if (sizeof(emissivite_dust)/1024.**3 > 5) then
+  if (lvariable_dust.or.(sizeof(emissivite_dust)/1024.**3 > 5)) then
      write(*,*) " WARNING: using ", sizeof(emissivite_dust)/1024.**3, " GB for emissivite_dust"
   endif
   emissivite_dust = 0.0
