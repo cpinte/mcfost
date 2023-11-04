@@ -63,7 +63,7 @@ def test_Temperature(model_name):
         # Run the mcfost model
         filename = "test_data/"+model_name+"/"+model_name+".para"
         if (model_name == "discF_00500"):
-            opt=" -phantom test_data/"+model_name+"/"+model_name
+            opt=" -phantom test_data/"+model_name+"/"+model_name+" -not_random_Voronoi"
         else:
             opt=""
         mcfost(filename,opt="-mol -root_dir "+model_name+opt)
@@ -77,11 +77,11 @@ def test_Temperature(model_name):
     print("Mean T difference   ", (abs(T-T_ref)/(T_ref+1e-30)).mean())
 
     if (model_name == "discF_00500"):
-        threshold = 0.1
+        threshold=0.05
     else:
         threshold=0.05
 
-    assert MC_similar(T_ref,T,threshold=0.05)
+    assert MC_similar(T_ref,T,threshold=threshold)
 
 @pytest.mark.parametrize("model_name", model_list)
 def test_SED(model_name):

@@ -212,6 +212,7 @@ subroutine set_default_variables()
   llinear_rgrid = .false.
   image_offset_centre(:) = (/0.0,0.0,0.0/)
   loverwrite_s12 = .false.
+  lnot_random_Voronoi = .false.
 
   tmp_dir = "./"
 
@@ -1458,6 +1459,9 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) v_syst
         i_arg = i_arg + 1
+     case("-not_random_Voronoi")
+        i_arg = i_arg + 1
+        lnot_random_Voronoi = .true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -2067,6 +2071,7 @@ subroutine display_help()
   write(*,*) "        : -SPH_amax <size> [mum] : force the grain size that follow the dust"
   write(*,*) "                                   (only works with 1 grain size dump)"
   write(*,*) "        : -force_Mgas : force the gas mass to be the value given the mcfost parameter file"
+  write(*,*) "        : -not_random_Voronoi : force the particle order to remain the same"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

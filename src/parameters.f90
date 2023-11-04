@@ -87,7 +87,7 @@ module parametres
   					   !if limit_mem == 1: the continua are stored on a small frequency grid and interpolated locally on the full grid.
   					   !					This approach is faster than computing the continua for each wavelength point, and is relatively cheap in ram.
   					   !					-> good trade-off between 0 and 2.
-  					   !if limit_mem == 2: everything is computed locally on the full grid. Slow but cheap in memory. 
+  					   !if limit_mem == 2: everything is computed locally on the full grid. Slow but cheap in memory.
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet, lsepar_ori
@@ -161,7 +161,7 @@ module parametres
   logical :: ldelete_inside_rsph, ldelete_outside_rsph, ldelete_above_theta
   real(kind=dp) :: ufac_implicit,scale_length_units_factor,scale_mass_units_factor,correct_density_factor_elongated_cells
   real(kind=dp) :: SPH_amin, SPH_amax, fluffyness, gap_factor, rsph_min, rsph_max
-  logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy
+  logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy, lnot_random_Voronoi
   integer :: isink_centre
 
   ! Disk parameters
