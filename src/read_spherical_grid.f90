@@ -149,17 +149,6 @@ module read_spherical_grid
 
         Nsize =  pluto%nx1*pluto%nx2*pluto%nx3
         write(*,*) "n_cells=", n_cells, Nsize
-        ! --> implicit cell mapping (does not work if the data is not well ordered)
-        ! read(1, iostat=ios) T(:)
-        ! read(1, iostat=ios) nHtot(:)
-        ! read(1, iostat=ios) ne(:)
-        ! read(1, iostat=ios) vfield3d(:,:)
-        ! read(1, iostat=ios) vturb(:)
-        ! read(1, iostat=ios) icompute_atomRT(:)
-        ! close(unit=1)
-        ! ! stop
-        ! !rho -> nH
-        ! nHtot = nHtot * 1d3 / masseH / wght_per_H
 
         ! --> explicit cell mapping of the 3d arrays
         allocate(rho(pluto%nx1,pluto%nx2,pluto%nx3), ne_tmp(pluto%nx1,pluto%nx2,pluto%nx3), &
@@ -189,7 +178,7 @@ module read_spherical_grid
                 do k=1, n_az
                     icell = cell_map(i,jj,k)
                     T(icell) = T_tmp(i,j,k)
-                    nHtot(icell) = rho(i,j,k) * 1d3 / masseH / wght_per_H ! [m^-3]
+                    nHtot(icell) = rho(i,j,k) * 1d3 / masseH / wght_per_H ! [H/m^3]
                     icompute_atomRT(icell) = dz(i,j,k)
                     vfield3d(icell,:) = vtmp(i,j,k,:)
 
@@ -200,12 +189,12 @@ module read_spherical_grid
                         densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / masse_mol_gaz ! [m^-3]
                         disk_zone(1)%diskmass = disk_zone(1)%diskmass + rho_dust(i,j,k) * volume(icell)
                     else !No dust.
-                        densite_gaz(icell) = nHtot(icell) * wght_per_H !total atomic gas density in H/m^3
+                        densite_gaz(icell) = nHtot(icell) * wght_per_H !total atomic gas density in [m^-3]
                     endif
                     masse_gaz(icell) = rho(i,j,k) * volume(icell)
-                enddo
-            enddo bz
-        enddo
+                enddo ! phi
+            enddo bz ! theta
+        enddo ! r
         masse_gaz = masse_gaz * AU3_to_m3 * 1d3 ! [g]
         deallocate(rho,ne_tmp,T_tmp,vt_tmp,dz,vtmp)
         !total dust mass
@@ -225,7 +214,7 @@ module read_spherical_grid
         ! write(*,*) 'Total  dust mass in model:', real(disk_zone(1)%diskmass),' Msun'
         if (disk_zone(1)%diskmass > 0.0_dp) then
             dust_pop(:)%masse = disk_zone(1)%diskmass
-            !here the densite_pouss gets normalise such that sum(densite_pouss) = 1 [units less]
+            !here the densite_pouss gets normalised such that sum(densite_pouss) = 1 [units less]
             call normalize_dust_density()
             !the units of densite_pouss comes from M_grain in g/cm^3, normalize to give the dust mass if summed.
             !the density of grains is M_grain x densite_pouss
@@ -235,13 +224,7 @@ module read_spherical_grid
 
         call check_for_zero_electronic_density()
         call print_info_model()
-!         mass = 0
-!         do icell=1, n_cells
-!             mass = mass + sum(M_grain(:) * densite_pouss(:,icell)) * volume(icell) 
-!         enddo
-! write(*,*) sum(masse) * g_to_Msun 
-! write(*,*) mass* AU3_to_cm3 * g_to_Msun
-! stop
+
         return
     endsubroutine read_spherical_model
 
