@@ -14,6 +14,8 @@ module read1d_models
     use elements_type
     use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, &
          lcalc_ne, check_for_zero_electronic_density
+	use density, only : densite_pouss
+	use grains, only : M_grain
 
 	implicit none
 
@@ -226,10 +228,12 @@ module read1d_models
 
 	subroutine print_info_model
 		real(kind=dp) :: v_char
+		real(kind=dp) ::  dust_dens_max, dust_dens_min, rho_d
+		integer :: icell
 
 		v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
 
-		write(*,*) "Maximum/minimum velocities in the model (km/s):"
+		write(*,*) "Maximum/minimum velocities in the model [km s^-1]:"
 		write(*,*) " Vfield(1) = ", &
 			1e-3 * maxval(abs(vfield3d(:,1))), 1d-3*minval(abs(vfield3d(:,1)),mask=icompute_atomRT>0)
 		write(*,*) " Vfield(2) = ",  &
@@ -238,18 +242,32 @@ module read1d_models
 			1d-3 * maxval(abs(vfield3d(:,3))), 1d-3*minval(abs(vfield3d(:,3)),mask=icompute_atomRT>0)
 
 
-		write(*,*) "Typical line extent due to V fields (km/s):"
+		write(*,*) "Typical line extent due to V fields [km s^-1]:"
 		write(*,*) v_char/1d3
 
-		write(*,*) "Maximum/minimum turbulent velocity (km/s):"
+		write(*,*) "Maximum/minimum turbulent velocity [km s^-1]:"
 		write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
 
-		write(*,*) "Maximum/minimum Temperature in the model (K):"
+		write(*,*) "Maximum/minimum Temperature in the model [K]:"
 		write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
-		write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+		! write(*,*) " --> Density average of the Temperature [K]:"
+		! write(*,*) real(sum(T*nHtot,(sum(densite_pouss,dim=1)==0.0).and.(icompute_atomRT>0)) / &
+		! 	sum(nHtot,(sum(densite_pouss,dim=1)==0.0).and.(icompute_atomRT>0)))
+		write(*,*) "Maximum/minimum Hydrogen total density in the model [m^-3]:"
 		write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
+		if (ldust_atom) then
+			dust_dens_max = 0d0; dust_dens_min = 1d30
+			do icell=1, n_cells
+				rho_d = sum(densite_pouss(:,icell) * M_grain(:))
+				if (rho_d<=0.0) cycle
+				dust_dens_min = min(dust_dens_min,rho_d)
+				dust_dens_max = max(dust_dens_max,rho_d)
+			enddo
+			write(*,*) "Maximum/minimum dust total density in the model [kg m^-3]:"
+			write(*,*) 1d3*dust_dens_max, 1d3*dust_dens_min
+		endif
 		if (.not.lcalc_ne) then
-			write(*,*) "Maximum/minimum ne density in the model (m^-3):"
+			write(*,*) "Maximum/minimum ne density in the model [m^-3]:"
 			write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
 		endif
 
@@ -259,7 +277,7 @@ module read1d_models
 		endif
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
-        write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
+        ! write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
 		write(*,'("-- Solving RTE for "(1F6.2)" % of cells")') &
 			100.0*real(size(pack(icompute_atomRT,mask=icompute_atomRT>0))) / real(n_cells)
 
