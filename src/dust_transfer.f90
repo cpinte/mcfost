@@ -246,8 +246,6 @@ subroutine transfert_poussiere()
      else
         etape_i=2
         letape_th=.false.
-!B. Tessore: !i ltemp == False (don't compute T) but we don't have dust so we don't want to read dust T
-!or dust T is in the model, we need to leave here
         if (.not.(ldust_prop.and.lstop_after_init)) then ! we do not need the temperature if we only compute the dust prop
            call lect_Temperature()
         endif
