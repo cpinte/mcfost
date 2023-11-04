@@ -456,6 +456,10 @@ subroutine realloc_dust_atom()
   integer :: alloc_status
   real :: mem_size
 
+  if (lvariable_dust) then
+     write(*,*) " WARNING: sizes of dust transfer could be very big !"
+     !TO DO: better storing of quantities / recuction of n_lambda
+  endif
 	
   !Note: tab_lambda(n_lambda) is already allocated in atomic_transfer
   !	the tab_lambda_* or tab_delta_lambda should be de-allocated when tab_lambda is allocated in atom_rt.
@@ -488,7 +492,7 @@ subroutine realloc_dust_atom()
   allocate(emissivite_dust(n_lambda,n_cells),stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc atom)')
   if (lvariable_dust.or.(sizeof(emissivite_dust)/1024.**3 > 5)) then
-     write(*,*) " WARNING: using ", sizeof(emissivite_dust)/1024.**3, " GB for emissivite_dust"
+     write(*,*) "  *** WARNING: using ", sizeof(emissivite_dust)/1024.**3, " GB for emissivite_dust"
   endif
   emissivite_dust = 0.0
 
