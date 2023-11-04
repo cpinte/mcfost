@@ -23,6 +23,12 @@ wl_list_contrib = ["1.0","100","1000"]
 # flag to skip the calculations and set-up the thresholds in a easy way
 compute_models = True
 
+# change this to test results downloaded from other machines
+test_dir = "."
+
+if test_dir != ".":
+    compute_models = False
+
 def mcfost(filename,opt=""):
     cmd = _mcfost_bin+" "+filename+" "+opt
     result = subprocess.call(cmd.split())
@@ -70,18 +76,13 @@ def test_Temperature(model_name):
 
     # Read the results
     T_name = model_name+"/data_th/Temperature.fits.gz"
-    T = fits.getdata(T_name)
+    T = fits.getdata(test_dir+"/"+T_name)
     T_ref = fits.getdata("test_data/"+T_name)
 
     print("Maximum T difference", (abs(T-T_ref)/(T_ref+1e-30)).max())
     print("Mean T difference   ", (abs(T-T_ref)/(T_ref+1e-30)).mean())
 
-    if (model_name == "discF_00500"):
-        threshold=0.05
-    else:
-        threshold=0.05
-
-    assert MC_similar(T_ref,T,threshold=threshold)
+    assert MC_similar(T_ref,T,threshold=0.05)
 
 @pytest.mark.parametrize("model_name", model_list)
 def test_SED(model_name):
@@ -91,7 +92,7 @@ def test_SED(model_name):
     SED_name = model_name+"/data_th/sed_rt.fits.gz"
     if (not os.path.isfile(SED_name)):
         pytest.skip("No SED")
-    SED = fits.getdata(SED_name)
+    SED = fits.getdata(test_dir+"/"+SED_name)
     SED_ref = fits.getdata("test_data/"+SED_name)
 
     print("Maximum SED difference", (abs(SED-SED_ref)/(SED_ref+1e-30)).max())
@@ -106,7 +107,7 @@ def test_mol_map(model_name):
 
     # Read the results
     image_name = model_name+"/data_CO/lines.fits.gz"
-    image = fits.getdata(image_name)
+    image = fits.getdata(test_dir+"/"+image_name)
     image_ref = fits.getdata("test_data/"+image_name)
 
     print("Maximum mol map difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
@@ -130,7 +131,7 @@ def test_image(model_name, wl):
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
-    image = fits.getdata(image_name)
+    image = fits.getdata(test_dir+"/"+image_name)
     image_ref = fits.getdata("test_data/"+image_name)
 
     # We just keep intensity
@@ -150,7 +151,7 @@ def test_pola(model_name, wl):
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
-    image = fits.getdata(image_name)
+    image = fits.getdata(test_dir+"/"+image_name)
     if ((image.shape[0] != 4) & (image.shape[0] != 8)):
         pytest.skip("No pola")
     image_ref = fits.getdata("test_data/"+image_name)
@@ -176,7 +177,7 @@ def test_contrib(model_name, wl):
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
-    image = fits.getdata(image_name)
+    image = fits.getdata(test_dir+"/"+image_name)
     if ((image.shape[0] != 5) & (image.shape[0] != 8)):
         pytest.skip("No contrib")
     image_ref = fits.getdata("test_data/"+image_name)
