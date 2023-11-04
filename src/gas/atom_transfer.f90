@@ -1224,7 +1224,7 @@ module atom_transfer
       if (any(T < T_formation)) call warning('(atom_transfer) Setting the gas transparent where T < 1500 K.')
       where (T < T_formation) icompute_atomRT = 0
       if (any(icompute_atomRT>0)) then
-         write(*,*) "T:", maxval(T,icompute_atomRT>0), minval(T,icompute_atomRT>0)
+         write(*,*) "T:", real(maxval(T,icompute_atomRT>0)), real(minval(T,icompute_atomRT>0))
       else
          call warning("(init_dust_temperature) The (atomic) gas is all transparent in dusty regions !")
       endif
