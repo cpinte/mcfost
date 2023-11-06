@@ -561,9 +561,8 @@ module elecdensity
        write(*,*) " T = ", T(ik_max)," nH = ", nHtot(ik_max)
        write(*,*) " "
        write(*,'("Ionisation fraction of HII "(1ES13.5E3, 1ES13.5E3))') max_f_HII, min_f_HII
-      !  write(*,*) nHtot(locate(ne/(1d-50+nHtot),maxval(ne/(1d-50+nHtot))))
-       write(*,'("nH/ne "(1ES13.5E3, 1ES13.5E3))') maxval(nHtot/ne,mask=ne>0), minval(nHtot/ne,mask=ne>0)
-       ! 			call show_electron_given_per_elem(0, 0, max_fjk)
+      !  write(*,'("nH/ne "(1ES13.5E3, 1ES13.5E3))') maxval(nHtot/ne,mask=ne>0), minval(nHtot/ne,mask=ne>0)
+      ! call show_electron_given_per_elem(0, 0, max_fjk)
        write(*,*) " ---------------------------------------------------- "
     endif
    !  where (ne < ne_small) ne = 0.0
