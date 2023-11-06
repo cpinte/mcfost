@@ -85,7 +85,7 @@ module read_spherical_grid
 
         !either 2.5d (min(sin(theta))=-1) or 3d (Nphi > 1)
         l3d = (minval(pluto%x2) < 0.0).or.(pluto%nx3 > 1)
-        write(*,*) "3d mode ? ", l3d
+        ! write(*,*) "3d mode ? ", l3d
 
         laccretion_shock = (acc == 1)
         if (T_hp == 0.0_dp) T_hp = -1.0_dp
