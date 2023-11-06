@@ -1,7 +1,5 @@
 !
-! Read model generated on a structured spherical mesh (e.g. with numpy.meshgrid).
-! The model is in binary format generated with scipy.io.FortranFile.write_record()
-!
+! Read model generated on a structured spherical mesh (e.g. with numpy.meshgrid).!
 !
 module read_spherical_grid
 
@@ -35,7 +33,7 @@ module read_spherical_grid
     ! ----------------------------------------------------- !
         character(len=*), intent(in) :: filename
         integer :: ios, Nsize, acc, i, ipos
-        real :: dphi
+        real :: dphi,theta_0, theta_1
 
         lvelocity_file = .true.
         vfield_coord = 3 ! spherical
@@ -49,26 +47,31 @@ module read_spherical_grid
         allocate(pluto%x1(pluto%nx1+1))
         read(1,iostat=ios) pluto%x1(:)
         pluto%x1_min = minval(pluto%x1); pluto%x1_max = maxval(pluto%x1)
-        write(*,*) "r_limits (read)=",pluto%x1(:)! / etoile(1)%r
+        ! write(*,*) "r_limits [Rstar(1)] (read)=", pluto%x1(:) / etoile(1)%r
+        write(*,*) "r_limits [Rstar(1)] (read)=", pluto%x1(1) / etoile(1)%r, pluto%x1(pluto%nx1+1) / etoile(1)%r
         read(1,iostat=ios) pluto%nx2
         allocate(pluto%x2(pluto%nx2+1))
         read(1,iostat=ios) pluto%x2(:)
         pluto%x2_min = minval(pluto%x2); pluto%x2_max = maxval(pluto%x2)
-        write(*,*) "sin(theta)_limits (read)=", pluto%x2(:)
+        ! write(*,*) "sin(theta)_limits (read)=", pluto%x2(:)
+        write(*,*) "sin(theta)_limits (read)=", pluto%x2(1), pluto%x2(pluto%nx2+1)
         !correct prec error ? 
         ! if (pluto%x2(1)-0.5*pi < 1e-6) pluto%x2(1) = 0.5*pi
-        write(*,*) "theta_limits (read)=",180.0 * real(asin(real(pluto%x2(:),kind=dp))) / pi
+        theta_0 = 180.0 * real(asin(real(pluto%x2(1),kind=dp))) / pi
+        theta_1 = 180.0 * real(asin(real(pluto%x2(pluto%nx2+1),kind=dp))) / pi
+        ! write(*,*) "theta_limits [°] (read)=",180.0 * real(asin(real(pluto%x2(:),kind=dp))) / pi
+        write(*,*) "theta_limits [°] (read)=", theta_0, theta_1
         read(1,iostat=ios) pluto%nx3
         !special, only 1 azimuth if not 3D (' no limits ')
         Nsize = pluto%nx3
         if (pluto%nx3 > 1) then
-            ! l3D = .true.
             Nsize = Nsize + 1
         endif
         allocate(pluto%x3(Nsize))
         read(1,iostat=ios) pluto%x3(:)
         pluto%x3_min = minval(pluto%x3); pluto%x3_max = maxval(pluto%x3)
-        write(*,*) "phi_limits (read)=",180.0 * pluto%x3(:) / pi
+        ! write(*,*) "phi_limits [rad] (read)=", pluto%x3(:)
+        write(*,*) "phi_limits [°] (read)=", 180.0 * pluto%x3(1) / pi, 180.0 * pluto%x3(size(pluto%x3)) / pi
 
         read(1, iostat=ios) acc
         read(1, iostat=ios) T_hp
@@ -94,7 +97,7 @@ module read_spherical_grid
         theta_max = pluto%x2_max
 
         disk_zone(1)%rin  = pluto%x1_min
-        disk_zone(1)%edge=0.0
+        disk_zone(1)%edge = 0.0
         disk_zone(1)%rmin = disk_zone(1)%rin
 
         disk_zone(1)%rout = pluto%x1_max
@@ -120,7 +123,7 @@ module read_spherical_grid
         Nsize = pluto%nx2 * pluto%nx3 * pluto%nx1
         write(*,*) "Nsize=", Nsize, " nx1=", pluto%nx1, " nx2=", pluto%nx2," nx3=", pluto%nx3
         write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az
-        write(*,*) "rin=", real(disk_zone(1)%rin), "rout=", real(disk_zone(1)%rout)
+        write(*,*) "rin=", real(disk_zone(1)%rin), "[au]; ", "rout=", real(disk_zone(1)%rout), "[au]"
 
         return
     endsubroutine read_spherical_grid_parameters
