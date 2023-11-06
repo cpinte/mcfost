@@ -1216,19 +1216,27 @@ module atom_transfer
       !lowering too much the treshold might create some convergence issues in the non-LTE pops or in 
       ! the electronic density calculations (0 division mainly for low values).
       real(kind=dp), parameter :: T_formation = 1500.0 ! [K]
+      logical, dimension(:), allocatable :: ldust
+      allocate(ldust(n_cells)); ldust = (sum(densite_pouss,dim=1)>0.0_dp)
       write(*,*) " *** Associating the dust temperature in the model..."
+      !force dust_sublimation
+      ! TO DO:
+      ! call sublimate_dust()
+      write(*,*) "Tdust:", maxval(Tdust), minval(Tdust)
+      write(*,*) "Tdust (rho_dust >0 ):", maxval(Tdust,ldust), minval(Tdust,ldust)
       !If the dust temperature is above T_formation the gas will follow that temperature
       !and atomic opacities will be considered.
-      write(*,*) "Tdust:", maxval(Tdust), minval(Tdust)
-      where(sum(densite_pouss,dim=1) > 0.0_dp) T(:) = Tdust(:)
+      where(ldust) T(:) = Tdust(:)
       if (any(T < T_formation)) call warning('(atom_transfer) Setting the gas transparent where T < 1500 K.')
       where (T < T_formation) icompute_atomRT = 0
       if (any(icompute_atomRT>0)) then
          write(*,*) "T:", real(maxval(T,icompute_atomRT>0)), real(minval(T,icompute_atomRT>0))
+         write(*,*) "T (rho_dust = 0):", real(maxval(T,(icompute_atomRT>0).and..not.ldust)), real(minval(T,(icompute_atomRT>0).and..not.ldust))
       else
-         call warning("(init_dust_temperature) The (atomic) gas is all transparent in dusty regions !")
+         call warning("(init_dust_temperature) The (atomic) gas is all transparent !")
       endif
       write(*,*) " *** done."
+      deallocate(ldust)
       return
    end subroutine init_dust_temperature
 
