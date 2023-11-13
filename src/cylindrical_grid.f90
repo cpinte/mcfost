@@ -385,7 +385,6 @@ subroutine define_cylindrical_grid()
 
   !redifine and use the r grid read
   if (lsphere_model) then
-  !tab_r = r_lim ?
     tab_r(:) = pluto%x1(1:n_rad+1) !1 -> n_rad + 1
     r_lim(:) = pluto%x1(:) !from Rmin to Rmax, 0 to n_rad
     r_lim_2(:) = r_lim(:) * r_lim(:)
@@ -537,27 +536,18 @@ subroutine define_cylindrical_grid()
         ! test theta grid
 
      endif
-! write(*,*) "wlim1=", w_lim
-! write(*,*) "tlim1=", theta_lim
-! write(*,*) "dc1=", dcos_theta
-! write(*,*) "tantlim1=", tan_theta_lim
-
 
       !redifine and use the theta grid read, still spherical
       if (lsphere_model) then
-         w_lim(:) = pluto%x2(nz+1:1:-1) !one more cell
-         theta_lim(:) = asin(w_lim)
-         ! write(*,*) size(pluto%x2), nz, size(w_lim), size(theta_lim)
+         !pluto%x2 goes from the max value of theta (pi/2 or pi if 3D) to 0.
+         !It has been re-ordered such that it goes from 0 to pi/2 (or pi):
+         !  %x2(1) = 0; %x2(nz+1) = pi/2 even in 3d (%x2(2*nz+1)=pi).
+         theta_lim(:) = pluto%x2(1:nz+1)
+         w_lim(:) = sin(theta_lim)
          tan_theta_lim(0) = 1.0e-10_dp
          tan_theta_lim(nz) = 1.e30_dp
          tan_theta_lim(1:nz-1) = tan(theta_lim(1:nz-1))
          dcos_theta(1:nz) = w_lim(1:nz) - w_lim(0:nz-1)
-
-         ! write(*,*) "w=",w_lim
-         ! write(*,*) "t=",theta_lim
-         ! write(*,*) dcos_theta
-         ! write(*,*) tan_theta_lim
-
       endif
 
      do i=1, n_rad
@@ -597,11 +587,9 @@ subroutine define_cylindrical_grid()
         endif
      enddo !k
 
-     !redifine and use the phi grid from file
-   !   write(*,*) "phi1=", phi_grid_tmp
-   !   write(*,*) "tan_phi1=", tan_phi_lim
-   !   write(*,*) size(tan_phi_lim), n_az, size(pluto%x3), size(phi_grid_tmp)
-      if (lsphere_model) then
+      !handle 2.5d (l3d but n_az==1) and pure 3d (n_az > 1).
+      if ((lsphere_model).and.(n_az>1)) then
+      !redifine and use the phi grid from file
          phi_grid_tmp(:) = 0.5*(pluto%x3(2:n_az+1) + pluto%x3(1:n_az))
          ! do k=1, n_az
          !    phi = pluto%x3(k+1)
@@ -616,9 +604,6 @@ subroutine define_cylindrical_grid()
          elsewhere
             tan_phi_lim = tan(pluto%x3(2:n_az+1))
          endwhere
-   !   write(*,*) "phi=", phi_grid_tmp
-   !   write(*,*) "tan_phi=", tan_phi_lim
-   !       stop
       endif
 
      V(:,:) = V(:,:) * 0.5 / real(n_az)

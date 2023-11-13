@@ -33,7 +33,7 @@ module read_spherical_grid
     ! ----------------------------------------------------- !
         character(len=*), intent(in) :: filename
         integer :: ios, Nsize, acc, i, ipos
-        real :: dphi,theta_0, theta_1
+        real :: dphi
 
         lvelocity_file = .true.
         vfield_coord = 3 ! spherical
@@ -46,21 +46,17 @@ module read_spherical_grid
         read(1,iostat=ios) pluto%nx1
         allocate(pluto%x1(pluto%nx1+1))
         read(1,iostat=ios) pluto%x1(:)
+        !Rmin to Rmax
         pluto%x1_min = minval(pluto%x1); pluto%x1_max = maxval(pluto%x1)
         ! write(*,*) "r_limits [Rstar(1)] (read)=", pluto%x1(:) / etoile(1)%r
         write(*,*) "r_limits [Rstar(1)] (read)=", pluto%x1(1) / etoile(1)%r, pluto%x1(pluto%nx1+1) / etoile(1)%r
         read(1,iostat=ios) pluto%nx2
         allocate(pluto%x2(pluto%nx2+1))
         read(1,iostat=ios) pluto%x2(:)
+        !pi to 0 or pi/2 to 0 if 2d.
         pluto%x2_min = minval(pluto%x2); pluto%x2_max = maxval(pluto%x2)
-        ! write(*,*) "sin(theta)_limits (read)=", pluto%x2(:)
-        write(*,*) "sin(theta)_limits (read)=", pluto%x2(1), pluto%x2(pluto%nx2+1)
-        !correct prec error ? 
-        ! if (pluto%x2(1)-0.5*pi < 1e-6) pluto%x2(1) = 0.5*pi
-        theta_0 = 180.0 * real(asin(real(pluto%x2(1),kind=dp))) / pi
-        theta_1 = 180.0 * real(asin(real(pluto%x2(pluto%nx2+1),kind=dp))) / pi
-        ! write(*,*) "theta_limits [°] (read)=",180.0 * real(asin(real(pluto%x2(:),kind=dp))) / pi
-        write(*,*) "theta_limits [°] (read)=", theta_0, theta_1
+        ! write(*,*) "theta_limits [°] (read)=", pluto%x2(:)
+        write(*,*) "theta_limits [°] (read)=", pluto%x2(1), pluto%x2(pluto%nx2+1)
         read(1,iostat=ios) pluto%nx3
         !special, only 1 azimuth if not 3D (' no limits ')
         Nsize = pluto%nx3
@@ -69,6 +65,7 @@ module read_spherical_grid
         endif
         allocate(pluto%x3(Nsize))
         read(1,iostat=ios) pluto%x3(:)
+        !0 to 2pi
         pluto%x3_min = minval(pluto%x3); pluto%x3_max = maxval(pluto%x3)
         ! write(*,*) "phi_limits [rad] (read)=", pluto%x3(:)
         write(*,*) "phi_limits [°] (read)=", 180.0 * pluto%x3(1) / pi, 180.0 * pluto%x3(size(pluto%x3)) / pi
@@ -82,10 +79,11 @@ module read_spherical_grid
         if (pluto%x2(1) < pluto%x2(pluto%nx2)) then
             call error("(spherical input grid) theta(1) must be the largest value (pi or pi/2)")
         endif
+        !re-order pluto%x2 such that it goes from 0 to pi/2 from 1 to nz+1
+        pluto%x2(:) = pluto%x2(pluto%nx2+1:1:-1)
 
-        !either 2.5d (min(sin(theta))=-1) or 3d (Nphi > 1)
-        l3d = (minval(pluto%x2) < 0.0).or.(pluto%nx3 > 1)
-        ! write(*,*) "3d mode ? ", l3d
+        !           3d                           2.5d
+        l3d = (pluto%nx3 > 1).or.(abs(maxval(pluto%x2) - 0.5 * pi) > 1e-6)
 
         laccretion_shock = (acc == 1)
         if (T_hp == 0.0_dp) T_hp = -1.0_dp
@@ -94,22 +92,27 @@ module read_spherical_grid
         n_rad = pluto%nx1
         n_az = pluto%nx3
         nz = pluto%nx2
-        theta_max = pluto%x2_max
+        !but not used anyway
+        theta_max = 0.5_dp * pi ! should always be pi/2 (?) ! pluto%x2_max
 
+        !beware pluto%x1_min must not overlap with the core (star, planet etc).
         disk_zone(1)%rin  = pluto%x1_min
         disk_zone(1)%edge = 0.0
         disk_zone(1)%rmin = disk_zone(1)%rin
 
         disk_zone(1)%rout = pluto%x1_max
-        ! if (maxval(pluto%x1) == pluto%x1_max) then
-        !     pluto%x1_max = pluto%x1_max + pluto%x1(pluto%nx1) - pluto%x1(pluto%nx1-1)
-        ! endif
         disk_zone(1)%rmax = disk_zone(1)%rout
 
-        !change nz to two hemispheres and check that the grid of phi is linear.
         if (l3d) then
+            !handle the case 2.5d where Np=1 but %x2 goes to pi to 0.
+            !In those cases we have to give half the points in nz.
             nz = pluto%nx2/2
             if (mod(pluto%nx2,2)>0) call warning("odd nx2")
+        endif
+
+        !test on nx3 in the envtuallity of 2.5d
+        if (pluto%nx3 > 1) then
+            !check phi grid is pluto%nx3 > 1
             dphi = pluto%x3(2) - pluto%x3(1)
             do i=2, size(pluto%x3)
                 if ( abs((pluto%x3(i) - pluto%x3(i-1)) - dphi) > 1e-6 ) then
