@@ -176,13 +176,48 @@ module read_spherical_grid
         densite_pouss = 0.0_dp ! init just in case.
         masse_gaz = 0.0_dp
         disk_zone(1)%diskmass = 0.0
+        ! do i=1, n_rad
+        !     j = 0
+        !     bz : do jj=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
+        !     if (jj==0) cycle bz
+        !         j = j + 1
+        !         do k=1, n_az
+        !             icell = cell_map(i,jj,k)
+        !             T(icell) = T_tmp(i,j,k)
+        !             nHtot(icell) = rho(i,j,k) * 1d3 / masseH / wght_per_H ! [H/m^3]
+        !             icompute_atomRT(icell) = dz(i,j,k)
+        !             vfield3d(icell,:) = vtmp(i,j,k,:)
+
+        !             !-> wrapper for dust RT.
+        !             !-> taking into account proper weights assuming only molecular gas in dusty regions
+        !             if (rho_dust(i,j,k) > 0.0) then ! dusty region
+        !                 densite_gaz(icell) = rho(i,j,k) * 1d3 / masse_mol_gaz !total molecular gas density in H2/m^3
+        !                 densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / masse_mol_gaz ! [m^-3]
+        !                 disk_zone(1)%diskmass = disk_zone(1)%diskmass + rho_dust(i,j,k) * volume(icell)
+        !             else !No dust.
+        !                 densite_gaz(icell) = nHtot(icell) * wght_per_H !total atomic gas density in [m^-3]
+        !             endif
+        !             masse_gaz(icell) = rho(i,j,k) * volume(icell)
+        !         enddo ! phi
+        !     enddo bz ! theta
+        ! enddo ! r
         do i=1, n_rad
-            j = 0
-            bz : do jj=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
-            if (jj==0) cycle bz
-                j = j + 1
+           bz : do jj=min(0,j_start),nz
                 do k=1, n_az
-                    icell = cell_map(i,jj,k)
+                    if (jj==0) then
+                        icell = cell_map(i,1,k)
+                        j = 1
+                    else
+                        j = jj
+                        if (l3d) then
+                            if (jj > 0) then
+                                j = jj + nz
+                            else
+                                j = nz + 1 + jj
+                            endif
+                        endif
+                        icell = cell_map(i,jj,k)
+                    endif
                     T(icell) = T_tmp(i,j,k)
                     nHtot(icell) = rho(i,j,k) * 1d3 / masseH / wght_per_H ! [H/m^3]
                     icompute_atomRT(icell) = dz(i,j,k)
@@ -227,6 +262,8 @@ module read_spherical_grid
             if (lemission_atom) ldust_atom = .true.
         endif
         ! ********************************** !
+        ! write(*,*) "icell_not_empty:", icell_not_empty
+        ! write(*,*) "rho(icell_not_empty)", maxval(densite_pouss(:,icell_not_empty)), densite_gaz(icell_not_empty)
 
         call check_for_zero_electronic_density()
         call print_info_model()
