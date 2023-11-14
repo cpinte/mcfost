@@ -1382,16 +1382,17 @@ module atom_transfer
       ! Prise en compte de la surface du pixel (en sr)
 
       ! Flux out of a pixel in W/m2/Hz/pix
-      normF = c_light / nm_to_m  * ( pixelsize / (distance*pc_to_AU) )**2
+      normF = ( pixelsize / (distance*pc_to_AU) )**2
+      !to nu.Fnu -> normF * c_light / nm_to_m; flux -> flux / tab_lambda_nm
 
       if (RT_line_method==1) then
-         Flux_total(:,ibin,iaz,id) = Flux_total(:,ibin,iaz,id) + I0(:) * normF / tab_lambda_nm
+         Flux_total(:,ibin,iaz,id) = Flux_total(:,ibin,iaz,id) + I0(:) * normF
       else
          do nat=1,N_atoms
             atom => atoms(nat)%p
             do kr=1,atom%nTrans_rayTracing
                krr = atom%ij_to_trans(atom%i_Trans_rayTracing(kr),atom%j_Trans_rayTracing(kr))
-               atom%lines(krr)%map(ipix,jpix,:,ibin,iaz) = I0(atom%lines(krr)%nb:atom%lines(krr)%nr)*normF/ tab_lambda_nm(atom%lines(krr)%nb:atom%lines(krr)%nr)
+               atom%lines(krr)%map(ipix,jpix,:,ibin,iaz) = I0(atom%lines(krr)%nb:atom%lines(krr)%nr)*normF
             enddo
             atom => NULL()
          enddo
