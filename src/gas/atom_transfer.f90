@@ -1214,7 +1214,7 @@ module atom_transfer
    subroutine init_dust_temperature()
       !lowering too much the treshold might create some convergence issues in the non-LTE pops or in 
       ! the electronic density calculations (0 division mainly for low values).
-      real(kind=dp), parameter :: T_formation = 1500.0 ! [K]
+      real(kind=dp), parameter :: T_formation = 2000.0 ! [K]
       logical, dimension(:), allocatable :: ldust
       allocate(ldust(n_cells)); ldust = (sum(densite_pouss,dim=1)>0.0_dp)
       write(*,*) " *** Associating the dust temperature in the model..."
@@ -1226,8 +1226,9 @@ module atom_transfer
       !If the dust temperature is above T_formation the gas will follow that temperature
       !and atomic opacities will be considered.
       where(ldust) T(:) = Tdust(:)
-      if (any(T < T_formation)) call warning('(atom_transfer) Setting the gas transparent where T < 1500 K.')
+      if (any(T < T_formation)) call warning('(atom_transfer) Setting the gas transparent where T < 2000 K.')
       where (T < T_formation) icompute_atomRT = 0
+      !or set the atomic gas temperature to 0 in dust regions ? 
       if (any(icompute_atomRT>0)) then
          write(*,*) "T:", real(maxval(T,icompute_atomRT>0)), real(minval(T,icompute_atomRT>0))
          write(*,*) "T (rho_dust = 0):", real(maxval(T,(icompute_atomRT>0).and..not.ldust)), real(minval(T,(icompute_atomRT>0).and..not.ldust))
