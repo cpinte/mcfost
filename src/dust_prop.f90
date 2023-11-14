@@ -1062,6 +1062,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   real :: mu, g, g2
 
   integer :: icell, k, l
+  logical :: ldens0
 
   fact = AU_to_cm * mum_to_cm**2
   !write(*,*) "Computing local scattering properties", lambda, p_lambda
