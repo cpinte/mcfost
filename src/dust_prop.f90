@@ -1063,9 +1063,23 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   real :: mu, g, g2
 
   integer :: icell, k, l
+  logical :: ldens0
 
   fact = AU_to_cm * mum_to_cm**2
   !write(*,*) "Computing local scattering properties", lambda, p_lambda
+  
+  ! see opacite()
+  ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
+  ! on la met à nbre_grains et on effacera apres
+  ! c'est pour les prop de diffusion en relatif donc la veleur exacte n'a pas d'importante
+  ldens0 = .false.
+  if (.not.lvariable_dust) then
+     icell = icell_ref
+     if (maxval(densite_pouss(:,icell)) < tiny_real) then
+        ldens0 = .true.
+        densite_pouss(:,icell) = densite_pouss(:,icell_not_empty)
+     endif
+  endif
 
   !$omp parallel &
   !$omp default(none) &
@@ -1207,6 +1221,13 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   enddo !icell
   !$omp enddo
   !$omp end parallel
+
+  ! see opacite()
+  ! On remet la densite à zéro si besoin
+  if (ldens0) then
+     icell = icell_ref
+     densite_pouss(:,icell) = 0.0_sp
+  endif
 
   return
 
