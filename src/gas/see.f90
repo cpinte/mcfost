@@ -571,7 +571,8 @@ module see
                 wphi = 0.0
 
                 !(Psi - Psi^\ast) eta
-                Ieff(1:Nl) = Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id)
+                !-> cannot be negative. At worst, it is 0 if the emission is entirely local
+                Ieff(1:Nl) = max(Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id),0.0_dp)
 
                 ! do l=2, nl
                 !     wl = c_light * (tab_lambda_nm(i0+l) - tab_lambda_nm(i0+l-1))/atom%lines(kr)%lambda0
@@ -651,7 +652,7 @@ module see
                 Jbar_up = 0.0
                 xcc_down = 0.0
 
-                Ieff(1:Nl) = Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id)
+                Ieff(1:Nl) = max(Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id),0.0_dp)
                 ! write(*,*) Itot(Nb:Nr,iray,id)
                 ! write(*,*) Psi(Nb:Nr,1,id)*eta_atoms(Nb:Nr,nact,id)
                 ! write(*,*) Psi(Nb:Nr,1,id)
