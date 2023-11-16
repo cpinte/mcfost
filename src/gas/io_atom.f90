@@ -795,6 +795,8 @@ module io_atom
    logical :: extend, simple, anynull, show_warning = .true.
    integer :: nelements, naxis2(4), Nl, naxis_found, hdutype, l, icell
    character(len=256) :: some_comments, popsF
+   integer :: i, k
+   real(kind=dp) :: ntotal
 
    status = 0
    call ftgiou(unit,status)
@@ -967,6 +969,21 @@ module io_atom
       write(*,*) "error cannot free file unit!"
       call print_error(status)
    endif
+
+
+   !Set ni/nj ratio for continuum transitions in case ne-> 0 and nj ->0
+   !should be ok for lines (the ratio for lines is used only in the collision)
+   !TO DO: para
+   do k=1, n_cells
+      ntotal = sum(atom%nstar(:,k)) ! nHtot(k) * atom%Abund
+      do i=1, atom%Ncont
+         if (atom%nstar(atom%continua(i)%j,k)>1d-15*ntotal) then
+            atom%ni_on_nj_star(atom%continua(i)%i,k) = atom%nstar(atom%continua(i)%i,k)/atom%nstar(atom%continua(i)%j,k)
+         else
+            atom%ni_on_nj_star(atom%continua(i)%i,k) = 0.0
+         endif
+      enddo
+   enddo
 
 
    do l=1,atom%Nlevel
