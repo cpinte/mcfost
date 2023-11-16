@@ -253,12 +253,7 @@ module atom_transfer
             write(*,'(" ****-> Using "(1I8)" pixels for healpix, resolution of "(1F12.3)" degrees")') n_rayons,  &
                  healpix_angular_resolution(healpix_lorder)
             call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
-            if (etape_end > 1) then
-               !use that etape as an initial solution for step 2
-               precision = 1d-1
-            else
-               precision = dpops_max_error
-            endif
+            precision = dpops_max_error
             conv_speed_limit = conv_speed_limit_healpix
          else if (etape==2) then
             precision = dpops_max_error
@@ -268,6 +263,12 @@ module atom_transfer
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
             conv_speed_limit = conv_speed_limit_mc
+            if (etape_start == 1) then
+               !use that etape to increase the angular sampling, at lower convergence ?
+               precision = 1d-1
+            else
+               precision = dpops_max_error
+            endif
          ! else if (etape==3) then
          ! !or solution with fixed rays that increase after each iteration??
          !    lfixed_rays = .false.
