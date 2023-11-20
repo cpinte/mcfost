@@ -240,7 +240,7 @@ module atom_transfer
       call alloc_nlte_var(one_ray,mem=mem_alloc_local)
 
       ! --------------------------- OUTER LOOP ON STEP --------------------------- !
-
+      precision = dpops_max_error
       step_loop : do etape=etape_start, etape_end
 
          write(*,*) ""
@@ -253,22 +253,14 @@ module atom_transfer
             write(*,'(" ****-> Using "(1I8)" pixels for healpix, resolution of "(1F12.3)" degrees")') n_rayons,  &
                  healpix_angular_resolution(healpix_lorder)
             call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
-            precision = dpops_max_error
             conv_speed_limit = conv_speed_limit_healpix
          else if (etape==2) then
-            precision = dpops_max_error
             n_rayons = N_rayons_mc
             write(*,'(" ****-> Using "(1I4)" rays for Monte-Carlo step, ~resolution of "(1F12.3)" degrees")') n_rayons, &
                  360.0 * sqrt(pi/real(n_rayons))/pi
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
             conv_speed_limit = conv_speed_limit_mc
-            if (etape_start == 1) then
-               !use that etape to increase the angular sampling, at lower convergence ?
-               precision = 1d-1
-            else
-               precision = dpops_max_error
-            endif
          ! else if (etape==3) then
          ! !or solution with fixed rays that increase after each iteration??
          !    lfixed_rays = .false.
