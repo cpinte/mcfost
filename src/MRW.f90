@@ -75,7 +75,7 @@ contains
    real(kind=dp), intent(inout) :: x,y,z
    real(kind=dp), intent(in) :: R0, E
 
-   real(dp) :: u,v,w, ct
+   real(dp) :: u,v,w, ct, diff_coeff
 
    ! Place photon randomly on sphere of radius R0 around current position
    call random_isotropic_direction(id, u,v,w)

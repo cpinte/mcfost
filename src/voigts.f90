@@ -75,27 +75,85 @@ module voigts
         real(kind=dp), intent(in) :: a, vbroad, v(N)
         real(kind=dp) :: VoigtThomson(N)
         integer :: i
-        real(kind=dp) :: aeff, ratio, eta, al
+        real(kind=dp) :: f, rr, eta, ap
 
-        al = a * vbroad
+        ap = a * vbroad
 
-        aeff = (vbroad**5. + 2.69269*vbroad**4. * aL + 2.42843*vbroad**3. * aL**2. + &
-         4.47163*vbroad**2. *aL**3. + 0.07842*vbroad*aL**4. + aL**5.)**(0.2)
+        f = (vbroad**5. + 2.69269*vbroad**4. * ap + 2.42843*vbroad**3. * ap**2. + &
+         4.47163*vbroad**2. *ap**3. + 0.07842*vbroad*ap**4. + ap**5.)**(0.2)
 
+        rr = ap/f
+        eta = 1.36603*rr - 0.47719*rr*rr + 0.11116*rr*rr*rr
 
+        ! VoigtThomson = eta * ( f/pi / ((vbroad*v)**2 + f**2) ) + &
+        !     (1.0_dp - eta) * exp(-(v*vbroad/f)**2) / f / sqrtpi
 
-        ratio = aL/aeff
-        eta = 1.36603*ratio - 0.47719*(ratio*ratio) + 0.11116*(ratio*ratio*ratio)
-
-
-        VoigtThomson = eta * ( aeff/pi * (v**2 + aeff**2)**(-1.0) ) + &
-         (1.0_dp - eta) * exp(-(v/aeff)**2) / aeff / sqrtpi
-
-
+        !because Thomson is in units of 1/vbroad/sqrtpi already
+        VoigtThomson = eta * ( vbroad * f / pi / sqrtpi / ((vbroad*v)**2 + f**2) ) + &
+            (1.0_dp - eta) * exp(-(v*vbroad/f)**2) * vbroad / f
+    
         return
     end function VoigtThomson
 
-    
+   function max_voigt_profile(vth,a)
+   !Evaluate the maximum of the voigt function, using the Thomson approximation.
+      real(kind=dp) :: max_voigt_profile
+      real(kind=dp), intent(in) :: vth, a
+      real(kind=dp) :: f, ap, eta
+
+      ap = vth * a
+      f = (vth**5 + 2.69269*vth**4 * ap + 2.42843*vth**3 * ap**2 + &
+         4.47163*vth**2*ap**3 + 0.07842*vth*ap**4 + ap**5)**(1./5.)
+	
+      eta = 1.36603*(ap/f) - 0.47719*(ap/f)**2+0.11116*(ap/f)**3
+      max_voigt_profile = eta / f / pi + (1.0-eta) / sqrt(pi) / f
+
+      return 
+   end function max_voigt_profile
+
+   function dmax_voigt(vth,a,eps)
+   !Evaluate the distance in units of vth, at which the voigt profile
+   ! reaches "eps * d" value : the value of the voigt profile in units of 
+   ! its peak. The Thomson approximation is used.
+    real(kind=dp) :: dmax_voigt
+    real, intent(in) :: eps
+    real(kind=dp), intent(in) :: vth, a
+    real(kind=dp) :: peak_frac
+    real(kind=dp) :: f, ap, eta
+
+    ap = vth * a
+    peak_frac = max_voigt_profile(vth,a) * eps
+
+	f = (vth**5 + 2.69269*vth**4 * ap + 2.42843*vth**3 * ap**2 + &
+	    4.47163*vth**2*ap**3 + 0.07842*vth*ap**4 + ap**5)**(1./5.)
+	
+	eta = 1.36603*(ap/f) - 0.47719*(ap/f)**2+0.11116*(ap/f)**3
+	
+	dmax_voigt = eta * sqrt(f/pi/peak_frac - f**2) + (1.0 - eta) * f * sqrt(-log(sqrt(pi)*f*peak_frac))
+    ! write(*,*) "eta=", eta
+    ! write(*,*) "xp(L) = ", sqrt(f/pi/peak_frac - f**2)
+    ! write(*,*) "xp(G) = ", f * sqrt(-log(sqrt(pi)*f*peak_frac))
+
+    return
+   end function dmax_voigt
+
+   function dmax_lorentz(vth, a, eps)
+   !assuming at large x, the Voigt profile collapse to a Lorentzian
+   !even for small a
+    real(kind=dp) :: dmax_lorentz
+    real(kind=dp), intent(in) :: vth, a
+    real, intent(in) :: eps
+    real(kind=dp) :: peak_frac
+
+    !note the peak of a Voigt and not a Lorentzian
+    peak_frac = max_voigt_profile(vth,a) * eps
+
+    dmax_lorentz = vth * sqrt(a/sqrtpi/vth/peak_frac - a*a)
+
+    return
+   end function dmax_lorentz
+
+    !building
     function VoigtAller(N,a,v)
         integer, intent(in) :: N
         real(kind=dp), intent(in) :: a, v(N)

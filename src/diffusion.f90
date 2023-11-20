@@ -620,4 +620,73 @@ subroutine diffusion_approx_nLTE_nRE()
 
 end subroutine diffusion_approx_nLTE_nRE
 
+!************************************************************
+
+subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
+  ! Compute current Planck reciprocal mean opacity for all cells
+  ! (note : diffusion coefficient needs to be defined with Rosseland opacity
+  ! in B&W mode)
+  ! Diffusion coefficient is D = 1/(rho * opacity)
+  ! This opacity/diffusion coefficient includes scattering
+  ! See Min et al 2009 and Robitaille et al 2010
+  use parametres
+  use constantes
+  use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
+  use Temperature, only : Tdust
+  use dust_prop, only : kappa
+  use Voronoi_grid, only : Voronoi
+  use cylindrical_grid, only : volume
+  use density, only : masse_gaz, densite_gaz
+
+  real, intent(in)  :: temp
+  integer,  intent(in)  :: icell
+  real(dp), intent(out) :: rosseland_opacity ! cm2/g (ie per gram of gas)
+
+  integer :: lambda
+  real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl
+
+  integer, pointer :: p_icell
+  integer, target :: icell0
+
+  icell0 = icell
+
+  temp = Tdust(icell)
+  if ((temp > 1) .and. (Voronoi(icell)%original_id > 0)) then
+
+     if (lvariable_dust) then
+        p_icell => icell0
+     else
+        p_icell => icell_ref
+     endif
+
+     somme  = 0.0_dp
+     somme2 = 0.0_dp
+     norm = 0.0_dp
+     cst    = cst_th/temp
+     do lambda = 1,n_lambda
+        ! longueur d'onde en metre
+        wl       = tab_lambda(lambda)*1.e-6
+        delta_wl = tab_delta_lambda(lambda)*1.e-6
+        cst_wl   = cst/wl
+        if (cst_wl < 200.0) then
+           coeff_exp = exp(cst_wl)
+           B = 1.0_dp/((wl**5)*(coeff_exp-1.0))*delta_wl
+           !dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
+        else
+           B = 0.0_dp
+           !dB_dT = 0.0_dp
+        endif
+        somme  = somme  + B/(kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
+        somme2  = somme2  + B * (kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
+        norm = norm + B*delta_wl
+     enddo
+     rec_Planck_opacity = norm/somme
+     Planck_opacity = somme2/norm
+  else
+     rec_Planck_opacity = 0.
+     Planck_opacity = 0.
+  endif
+
+end subroutine diffusion_opacity
+
 end module diffusion

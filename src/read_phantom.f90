@@ -1,7 +1,7 @@
 module read_phantom
 
   use parametres
-  use dump_utils
+  use io_phantom_utils
   use messages
   use constantes
   use mess_up_SPH

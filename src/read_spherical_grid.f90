@@ -18,7 +18,7 @@ module read_spherical_grid
 
     implicit none
 
-    integer, parameter :: Nskip = 9
+    integer :: header_pos
 
     contains
 
@@ -32,7 +32,7 @@ module read_spherical_grid
     ! in pluto%x1, pluto%x2, pluto%x3.
     ! ----------------------------------------------------- !
         character(len=*), intent(in) :: filename
-        integer :: ios, Nsize, acc, i
+        integer :: ios, Nsize, acc, i, ipos
         real :: dphi
 
         lvelocity_file = .true.
@@ -40,7 +40,7 @@ module read_spherical_grid
         grid_type = 2
         n_rad_in = 1
 
-        open(unit=1, file=trim(filename), status="old",access="sequential",form='unformatted')
+        open(unit=1, file=trim(filename), status="old",access="stream",form='unformatted')
         !read size along each direction + cell limits (size + 1) 
         read(1,iostat=ios) pluto%nx1
         allocate(pluto%x1(pluto%nx1+1))
@@ -70,6 +70,7 @@ module read_spherical_grid
         read(1, iostat=ios) acc
         read(1, iostat=ios) T_hp
         read(1, iostat=ios) T_preshock
+        inquire(1,pos=header_pos) !position at which to start reading data.
         close(unit=1)
 
         if (pluto%x2(1) < pluto%x2(pluto%nx2)) then
@@ -145,11 +146,9 @@ module read_spherical_grid
         call alloc_atomrt_grid
         call read_abundance !can be move in atom_transfer, but then rho must be changed in nHtot
 
-        open(unit=1, file=trim(filename), status="old",access="sequential",form='unformatted')
+        open(unit=1, file=trim(filename), status="old",access="stream",form='unformatted')
         !skip header and read data
-        do i=1,Nskip
-            read(1, iostat=ios)
-        enddo
+        read (1,iostat=ios,pos=header_pos)
 
         Nsize =  pluto%nx1*pluto%nx2*pluto%nx3
         write(*,*) "n_cells=", n_cells, Nsize
@@ -161,7 +160,8 @@ module read_spherical_grid
         ! read(1, iostat=ios) vturb(:)
         ! read(1, iostat=ios) icompute_atomRT(:)
         ! close(unit=1)
-        !rho -> nH
+        ! ! stop
+        ! !rho -> nH
         ! nHtot = nHtot * 1d3 / masseH / wght_per_H
 
         ! --> explicit cell mapping of the 3d arrays
@@ -175,7 +175,7 @@ module read_spherical_grid
         read(1, iostat=ios) vt_tmp(:,:,:)
         read(1, iostat=ios) dz(:,:,:)
         close(unit=1)
- 
+
         do i=1, n_rad
             j = 0
             bz : do jj=j_start+1,nz-1 ! 1 extra empty cell in theta on each side

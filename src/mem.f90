@@ -55,6 +55,8 @@ end subroutine deallocate_densities
 !*****************************************************************
 
 subroutine alloc_dust_prop()
+ ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+ ! 20/04/2023
 
   integer ::  alloc_status
 
@@ -75,26 +77,26 @@ subroutine alloc_dust_prop()
   ! **************************************************
   ! tableaux relatifs aux prop optiques des grains
   ! **************************************************
-  allocate(tab_s11(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_s11')
-  tab_s11 = 0
-
-  allocate(tab_s12(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_s12')
-  tab_s12 = 0
-
-  allocate(tab_s33(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_s33')
-  tab_s33 = 0
-
-  allocate(tab_s34(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_s34')
-  tab_s34 = 0
-
-  if (laggregate) then
+  if (laggregate.or.lmueller) then
      allocate(tab_mueller(4,4,0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_mueller')
      tab_mueller = 0
+  else 
+     allocate(tab_s11(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_s11')
+     tab_s11 = 0
+
+     allocate(tab_s12(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_s12')
+     tab_s12 = 0
+
+     allocate(tab_s33(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_s33')
+     tab_s33 = 0
+
+     allocate(tab_s34(0:nang_scatt,n_grains_tot,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_s34')
+     tab_s34 = 0
   endif
 
   allocate(prob_s11(n_lambda,n_grains_tot,0:nang_scatt), stat=alloc_status)
@@ -110,9 +112,11 @@ end subroutine alloc_dust_prop
 subroutine alloc_dynamique(n_cells_max)
   ! Alloue les tableaux dynamiquement en fonction de l'organisation
   ! des calculs, de la presence de stratification ...
-  ! Permet d'optimiser la taille mémoire
+  ! Permet d'optimiser la taille mÃ©moire
   ! C. Pinte
   ! 12/05/05
+  ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+  ! 20/04/2023
 
   use stars, only : allocate_stellar_spectra
   use thermal_emission, only : allocate_temperature, allocate_thermal_emission, &
@@ -209,23 +213,29 @@ subroutine alloc_dynamique(n_cells_max)
      endif
      if (mem_size > 1) write(*,*) "Trying to allocate", mem_size, "GB for scattering matrices"
 
-     allocate(tab_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error tab_s11_pos')
-     tab_s11_pos = 0
-
      allocate(prob_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error prob_s11_pos')
      prob_s11_pos = 0
 
-     if (lsepar_pola) then
-        allocate(tab_s12_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
-             tab_s33_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
-             tab_s34_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
-             stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error tab_s12_o_s11_pos')
-        tab_s12_o_s11_pos = 0
-        tab_s33_o_s11_pos = 0
-        tab_s34_o_s11_pos = 0
+     if (lmueller) then 
+     	allocate(tab_mueller_pos(4,4,0:nang_scatt, p_Nc, p_n_lambda_pos), stat=alloc_status)
+     	if (alloc_status > 0) call error('Allocation error tab_mueller_pos')
+     	tab_mueller_pos = 0
+     else 
+	allocate(tab_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), stat=alloc_status)
+	if (alloc_status > 0) call error('Allocation error tab_s11_pos')
+	tab_s11_pos = 0
+
+	if (lsepar_pola) then
+	   allocate(tab_s12_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
+		    tab_s33_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
+		    tab_s34_o_s11_pos(0:nang_scatt, p_Nc, p_n_lambda_pos), &
+		    stat=alloc_status)
+	   if (alloc_status > 0) call error('Allocation error tab_s12_o_s11_pos')
+	   tab_s12_o_s11_pos = 0
+	   tab_s33_o_s11_pos = 0
+	   tab_s34_o_s11_pos = 0
+	endif
      endif
   else ! scattering method==1 --> prop par grains
      mem_size = (1.0 * n_grains_tot) * p_Nc * n_lambda * 4. / 1024.**3
@@ -304,6 +314,8 @@ end subroutine alloc_dynamique
 !**********************************************************************
 
 subroutine deallocate_em_th_mol()
+ ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+ ! 20/04/2023
 
   use thermal_emission, only : deallocate_thermal_emission
   use stars, only : deallocate_stellar_spectra
@@ -331,13 +343,21 @@ subroutine deallocate_em_th_mol()
   if (allocated(tab_g_pos)) deallocate(tab_g_pos)
 
   if (scattering_method == 2) then ! prop par cellule
-     deallocate(tab_s11_pos,prob_s11_pos)
-     if (lsepar_pola) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
+     if (lmueller) then
+        deallocate(tab_mueller_pos,prob_s11_pos)
+     else
+        deallocate(tab_s11_pos,prob_s11_pos)
+        if (lsepar_pola) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
+     endif
   else ! prop par grains
      if (allocated(ksca_CDF)) deallocate(ksca_CDF)
   endif ! method
 
-  deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
+  if (lmueller.or.laggregate) then
+     deallocate (tab_mueller, prob_s11)
+  else
+     deallocate(tab_s11,tab_s12,tab_s33,tab_s34,prob_s11)
+  endif
 
   if (lorigine) call deallocate_origin()
 
@@ -427,6 +447,8 @@ end subroutine clean_mem_dust_mol
 !******************************************************************************
 
 subroutine realloc_step2()
+! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! 20/04/2023
 
   use dust_ray_tracing, only : select_scattering_method
   use radiation_field, only : allocate_radiation_field_step2
@@ -513,31 +535,31 @@ subroutine realloc_step2()
      tab_g_pos = 0
   endif
 
-  deallocate(tab_s11)
-  allocate(tab_s11(0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_s11')
-  tab_s11 = 0
-
-  deallocate(tab_s12)
-  allocate(tab_s12(0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_s12')
-  tab_s12 = 0
-
-  deallocate(tab_s33)
-  allocate(tab_s33(0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_s33')
-  tab_s33 = 0
-
-  deallocate(tab_s34)
-  allocate(tab_s34(0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_s34')
-  tab_s34 = 0
-
-  if (laggregate) then
+  if (laggregate.or.lmueller) then
      deallocate(tab_mueller)
      allocate(tab_mueller(4,4,0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_mueller')
      tab_mueller = 0
+  else 
+     deallocate(tab_s11)
+     allocate(tab_s11(0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_s11')
+     tab_s11 = 0
+
+     deallocate(tab_s12)
+     allocate(tab_s12(0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_s12')
+     tab_s12 = 0
+
+     deallocate(tab_s33)
+     allocate(tab_s33(0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_s33')
+     tab_s33 = 0
+
+     deallocate(tab_s34)
+     allocate(tab_s34(0:nang_scatt,n_grains_tot,n_lambda2), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_s34')
+     tab_s34 = 0
   endif
 
   deallocate(prob_s11)
@@ -546,20 +568,27 @@ subroutine realloc_step2()
   prob_s11 = 0
 
   if (scattering_method == 2) then
-     if (allocated(tab_s11_pos)) deallocate(tab_s11_pos)
-     allocate(tab_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error tab_s11_pos')
+     if (lmueller) then
+        if (allocated(tab_mueller_pos)) deallocate(tab_mueller_pos)
+        allocate(tab_mueller_pos(4,4,0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error tab_mueller_pos')
+        tab_mueller_pos = 0
+     else
+        if (allocated(tab_s11_pos)) deallocate(tab_s11_pos)
+        allocate(tab_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error tab_s11_pos')
 
-     if (lsepar_pola) then
-        if (allocated(tab_s12_o_s11_pos)) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
-        allocate(tab_s12_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
-             tab_s33_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
-             tab_s34_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
-             stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error tab_s12_o_s11_pos')
-        tab_s12_o_s11_pos = 0
-        tab_s33_o_s11_pos = 0
-        tab_s34_o_s11_pos = 0
+        if (lsepar_pola) then
+           if (allocated(tab_s12_o_s11_pos)) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
+           allocate(tab_s12_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
+                tab_s33_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
+                tab_s34_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
+                stat=alloc_status)
+           if (alloc_status > 0) call error('Allocation error tab_s12_o_s11_pos')
+           tab_s12_o_s11_pos = 0
+           tab_s33_o_s11_pos = 0
+           tab_s34_o_s11_pos = 0
+        endif
      endif
 
      if (allocated(prob_s11_pos)) deallocate(prob_s11_pos)
@@ -599,7 +628,9 @@ end subroutine realloc_step2
 !**********************************************************************
 
 subroutine realloc_ray_tracing_scattering_matrix()
-
+! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! 20/04/2023
+ 
   integer, parameter :: p_n_lambda2_pos = 1
   integer :: alloc_status
 
@@ -608,21 +639,28 @@ subroutine realloc_ray_tracing_scattering_matrix()
   write(*,fmt='(" Using scattering method ",i1)') scattering_method
   lscattering_method1 = (scattering_method==1)
 
-  if (allocated(tab_s11_pos)) deallocate(tab_s11_pos)
-  allocate(tab_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error tab_s11_pos')
-  tab_s11_pos = 0
+  if (lmueller) then
+     if (allocated(tab_mueller_pos)) deallocate(tab_mueller_pos)
+     allocate(tab_mueller_pos(4,4,0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_mueller_pos')
+     tab_mueller_pos = 0
+  else
+     if (allocated(tab_s11_pos)) deallocate(tab_s11_pos)
+     allocate(tab_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_s11_pos')
+     tab_s11_pos = 0
 
-  if (lsepar_pola) then
-     if (allocated(tab_s12_o_s11_pos)) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
-     allocate(tab_s12_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
-          tab_s33_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
-          tab_s34_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
-          stat=alloc_status)
-     if (alloc_status > 0) call error('Allocation error tab_s12_o_s11_pos')
-     tab_s12_o_s11_pos = 0
-     tab_s33_o_s11_pos = 0
-     tab_s34_o_s11_pos = 0
+     if (lsepar_pola) then
+        if (allocated(tab_s12_o_s11_pos)) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
+        allocate(tab_s12_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
+             tab_s33_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
+             tab_s34_o_s11_pos(0:nang_scatt,p_n_cells,p_n_lambda2_pos), &
+             stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error tab_s12_o_s11_pos')
+        tab_s12_o_s11_pos = 0
+        tab_s33_o_s11_pos = 0
+        tab_s34_o_s11_pos = 0
+     endif
   endif
 
   if (allocated(prob_s11_pos)) deallocate(prob_s11_pos)

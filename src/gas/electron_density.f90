@@ -531,8 +531,13 @@ module elecdensity
 
        end if
 
+       if (t(k) > 1d6) then
+       !fully ionised
+         ne(k) = 1.2 * nHtot(k)
+       else
        !Loop starts
-       call solve_ne_loc(k, ne0)
+         call solve_ne_loc(k, ne0)
+       endif
       
  
       if (abs(1.0_dp - ne0 / ne(k)) > eps_id(id)) then
@@ -565,7 +570,7 @@ module elecdensity
        write(*,*) " "
        write(*,'("Ionisation fraction of HII "(1ES13.5E3, 1ES13.5E3))') max_f_HII, min_f_HII
       !  write(*,*) nHtot(locate(ne/(1d-50+nHtot),maxval(ne/(1d-50+nHtot))))
-       write(*,'("ne/nH "(1ES13.5E3, 1ES13.5E3))') maxval(ne/nHtot,mask=nHtot>0), minval(ne/nHtot,mask=nHtot>0)
+       write(*,'("nH/ne "(1ES13.5E3, 1ES13.5E3))') maxval(nHtot/ne,mask=ne>0), minval(nHtot/ne,mask=ne>0)
        ! 			call show_electron_given_per_elem(0, 0, max_fjk)
        write(*,*) " ---------------------------------------------------- "
     endif

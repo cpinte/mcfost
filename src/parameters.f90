@@ -64,7 +64,7 @@ module parametres
   logical :: lemission_atom, lelectron_scattering, lforce_lte,  &
             	ldissolve, loutput_rates, lzeeman_polarisation
   integer :: N_rayons_mc, istep_start, istep_end
- 
+
   !HEALpix
   integer :: healpix_lorder, healpix_lmin, healpix_lmax !lmin and lmax not yet (for local evaluation)
 
@@ -81,7 +81,13 @@ module parametres
   logical :: lsolve_for_ne
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
 
-  logical :: lmhd_voronoi, llimit_mem
+  logical :: lmhd_voronoi
+  integer :: limit_mem !if limit_mem == 0: try to keep a maximum of quantities on ram (faster but very ram-consuming)
+  					   !                    currently it means that background and continua are stored on the full wavelength grid for non-LTE transfer.
+  					   !if limit_mem == 1: the continua are stored on a small frequency grid and interpolated locally on the full grid.
+  					   !					This approach is faster than computing the continua for each wavelength point, and is relatively cheap in ram.
+  					   !					-> good trade-off between 0 and 2.
+  					   !if limit_mem == 2: everything is computed locally on the full grid. Slow but cheap in memory. 
 
   ! Decomposition image
   logical :: lsepar_contrib, lsepar_pola, lonly_capt_interet, lsepar_ori
@@ -121,7 +127,7 @@ module parametres
   logical :: lregular_theta
   real :: theta_max
 
-  logical :: letape_th, limg, lorigine, laggregate, l3D, lremove, lwarp, lcavity, ltilt, lwall
+  logical :: letape_th, limg, lorigine, laggregate, lmueller, lper_size, l3D, lremove, lwarp, lcavity, ltilt, lwall
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, lwrite_velocity, loptical_depth_to_cell, ltau_map, lreemission_stats
   logical :: lapprox_diffusion, lcylindrical, lspherical, llinear_rgrid, lVoronoi, is_there_disk, lno_backup
   logical :: laverage_grain_size, lisotropic, lno_scattering, lqsca_equal_qabs, lonly_diff_approx, lforce_diff_approx
@@ -161,6 +167,10 @@ module parametres
   ! Disk parameters
   real :: distance ! Distance du disque en pc
   real(kind=dp) :: map_size
+
+  ! Polarisation
+  logical :: loverwrite_s12
+  real :: Pmax
 
   integer :: n_zones, n_regions
 

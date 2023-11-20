@@ -18,73 +18,6 @@ module optical_depth
 
   contains
 
-  subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
-   ! Compute current Planck reciprocal mean opacity for all cells
-   ! (note : diffusion coefficient needs to be defined with Rosseland opacity
-   ! in B&W mode)
-   ! Diffusion coefficient is D = 1/(rho * opacity)
-   ! This opacity/diffusion coefficient includes scattering
-   ! See Min et al 2009 and Robitaille et al 2010
-   use parametres
-   use constantes
-   use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
-   use Temperature, only : Tdust
-   use dust_prop, only : kappa
-   use Voronoi_grid, only : Voronoi
-   use cylindrical_grid, only : volume
-   use density, only : masse_gaz, densite_gaz
-
-   real, intent(in)  :: temp
-   integer,  intent(in)  :: icell
-   real(dp), intent(out) :: rosseland_opacity ! cm2/g (ie per gram of gas)
-
-   integer :: lambda
-   real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl
-
-   integer, pointer :: p_icell
-   integer, target :: icell0
-
-   icell0 = icell
-
-   temp = Tdust(icell)
-   if ((temp > 1) .and. (Voronoi(icell)%original_id > 0)) then
-
-      if (lvariable_dust) then
-         p_icell => icell0
-      else
-         p_icell => icell_ref
-      endif
-
-      somme  = 0.0_dp
-      somme2 = 0.0_dp
-      norm = 0.0_dp
-      cst    = cst_th/temp
-      do lambda = 1,n_lambda
-         ! longueur d'onde en metre
-         wl       = tab_lambda(lambda)*1.e-6
-         delta_wl = tab_delta_lambda(lambda)*1.e-6
-         cst_wl   = cst/wl
-         if (cst_wl < 200.0) then
-            coeff_exp = exp(cst_wl)
-            B = 1.0_dp/((wl**5)*(coeff_exp-1.0))*delta_wl
-            !dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
-         else
-            B = 0.0_dp
-            !dB_dT = 0.0_dp
-         endif
-         somme  = somme  + B/(kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
-         somme2  = somme2  + B * (kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
-         norm = norm + B*delta_wl
-      enddo
-      rec_Planck_opacity = norm/somme
-      Planck_opacity = somme2/norm
-   else
-      rec_Planck_opacity = 0.
-      Planck_opacity = 0.
-   endif
-
- end subroutine diffusion_opacity
-
 subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,&
      extrin,ltot,flag_sortie,lpacket_alive)
   ! Integration par calcul de la position de l'interface entre cellules
@@ -200,23 +133,17 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
 
      tau = l_contrib * opacite ! opacite constante dans la cellule
 
-   !   tau_R = l_contrib * Roseeland_opacity
-
-   !   if (tau_R > gamma) then
-   !      call cross_cell_MRW(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
-   !   else
-        ! Comparaison integrale avec tau
-        ! et ajustement longueur de vol eventuellement
-        if(tau > extr) then ! On a fini d'integrer
-           lstop = .true.
-           l_contrib = l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
-           l = l_void_before + l_contrib
-           ltot=ltot+l
-        else ! Il reste extr - tau a integrer dans la cellule suivante
-           extr=extr-tau
-           ltot=ltot+l
-        endif
-   !   endif
+     ! Comparaison integrale avec tau
+     ! et ajustement longueur de vol eventuellement
+     if(tau > extr) then ! On a fini d'integrer
+        lstop = .true.
+        l_contrib = l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
+        l = l_void_before + l_contrib
+        ltot=ltot+l
+     else ! Il reste extr - tau a integrer dans la cellule suivante
+        extr=extr-tau
+        ltot=ltot+l
+     endif
 
      ! Stockage des champs de radiation
      if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda, icell0, Stokes, l_contrib, &
@@ -253,193 +180,6 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
   return
 
 end subroutine physical_length
-
-subroutine physical_length_MRW(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,flag_star,flag_direct_star,&
-   extrin,ltot,flag_sortie,lpacket_alive)
- use Temperature, only : Tdust
- use zeta_MRW, only : zeta, y_MRW
- use utils
-! Integration par calcul de la position de l'interface entre cellules
-! Ne met a jour xio, ... que si le photon ne sort pas de la nebuleuse (flag_sortie=1)
-! C. Pinte
-! 05/02/05
-
-implicit none
-
-integer, intent(in) :: id,lambda, p_lambda
-integer, intent(inout) :: icell
-real(kind=dp), dimension(4), intent(in) :: Stokes
-logical, intent(in) :: flag_star, flag_direct_star
-real(kind=dp), intent(inout) :: u,v,w
-real, intent(in) :: extrin
-real(kind=dp), intent(inout) :: xio,yio,zio
-real, intent(out) :: ltot
-logical, intent(out) :: flag_sortie
-logical, intent(inout) :: lpacket_alive
-real(dp) :: rosseland_opacity
-integer :: gamma_MRW
-real(kind=dp) :: zeta_random, y_random
-
-real(kind=dp) :: x0, y0, z0, x1, y1, z1, x_old, y_old, z_old, extr
-real(kind=dp) :: l, tau, tau_R, opacite, l_contrib, l_void_before
-integer :: icell_in, icell_old, next_cell, previous_cell, icell_star, i_star
-integer, target :: icell0
-
-logical :: lcellule_non_vide, lstop, lintersect_stars
-
-integer, pointer :: p_icell
-
-gamma_MRW = 3
-tau_R = 0.
-
-lstop = .false.
-flag_sortie = .false.
-
-x0=xio;y0=yio;z0=zio
-x1=xio;y1=yio;z1=zio
-
-extr=extrin
-icell_in = icell
-
-next_cell = icell
-icell0 = 0 ! to define previous_cell
-
-ltot = 0.0
-
-! Calcule les angles de diffusion pour la direction de propagation donnee
-if ((.not.letape_th).and.lscatt_ray_tracing1) call angles_scatt_rt1(id,u,v,w)
-
-! Will the packet intersect a star
-call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)
-
-if (lvariable_dust) then
-   p_icell => icell0
-else
-   p_icell => icell_ref
-endif
-
-! Boucle infinie sur les cellules
-do ! Boucle infinie
-   ! Indice de la cellule
-   icell_old = icell0
-   x_old = x0 ; y_old = y0 ; z_old = z0
-
-   x0=x1 ; y0=y1 ; z0=z1
-   previous_cell = icell0
-   icell0 = next_cell
-
-   ! Test sortie
-   if (test_exit_grid(icell0, x0, y0, z0)) then
-      flag_sortie = .true.
-      return
-   endif
-   if (lintersect_stars) then
-      if (icell0 == icell_star) then
-         lpacket_alive = .false.
-         flag_sortie = .true.
-         return
-      endif
-   endif
-
-   ! Pour cas avec approximation de diffusion
-   if (icell0 <= n_cells) then
-      lcellule_non_vide=.true.
-      opacite = kappa(p_icell,lambda) * kappa_factor(icell0)
-
-      if (l_dark_zone(icell0)) then
-         ! On renvoie le paquet dans l'autre sens
-         u = -u ; v = -v ; w=-w
-         ! et on le renvoie au point de depart
-         icell = icell_old
-         xio = x_old ; yio = y_old ; zio = z_old
-         flag_sortie= .false.
-         return
-      endif
-   else
-      lcellule_non_vide=.false.
-      opacite = 0.0_dp
-   endif
-
-   ! Calcul longeur de vol et profondeur optique dans la cellule
-   call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
-
-! after getting rosseland_opacity. Apply conditions in MRW paper
-! Then use cross cell with new random directions
-
-   ! opacity wall
-   !---if (ri0 == 1) then
-   !---   ! Variation de hauteur du mur en cos(phi/2)
-   !---   phi = atan2(y0,x0)
-   !---   hh = h_wall * abs(cos(phi/2.))
-   !---   hhm = -h_wall * abs(cos((phi+pi)/2.))
-   !---
-   !---   ! Ajout de l'opacite du mur le cas echeant
-   !---   if ((z0 <= hh).and.(z0 >= hhm)) then
-   !---      opacite = opacite + kappa_wall
-   !---   endif
-   !---endif
-
-   tau = l_contrib * opacite ! opacite constante dans la cellule
-
-   if (Tdust(icell0) > 1) then
-      ! write(*,*) 'SR: Using MRW'
-      call diffusion_opacity(Tdust(icell0),icell0,rosseland_opacity)
-      tau_R = l_contrib * rosseland_opacity
-      ! write(*,*) 'SR: ', Tdust(icell0),icell0,rosseland_opacity
-   end if
-
-   if (tau_R > gamma_MRW) then
-      call random_number(zeta_random)
-      y_random = interp(y_MRW, zeta, zeta_random)
-!      write(*,*) 'MRW on cell: ', icell0, zeta_random, y_random
-   endif
-   ! Comparaison integrale avec tau
-   ! et ajustement longueur de vol eventuellement
-   if(tau > extr) then ! On a fini d'integrer
-      lstop = .true.
-      l_contrib = l_contrib * (extr/tau) ! on rescale l_contrib pour que tau=extr et on ajoute la longeur de vol dans le vide
-      l = l_void_before + l_contrib
-      ltot=ltot+l
-   else ! Il reste extr - tau a integrer dans la cellule suivante
-      extr=extr-tau
-      ltot=ltot+l
-   endif
-
-   ! Stockage des champs de radiation
-   if (lcellule_non_vide) call save_radiation_field(id,lambda,p_lambda, icell0, Stokes, l_contrib, &
-        x0,y0,z0, x1,y1,z1, u,v,w, flag_star, flag_direct_star)
-
-   ! On a fini d'integrer : sortie de la routine
-   if (lstop) then
-      flag_sortie = .false.
-      xio=x0+l*u
-      yio=y0+l*v
-      zio=z0+l*w
-
-      icell = icell0
-
-      ! TODO : here
-      if (.not.lVoronoi) then
-         if (l3D) then
-            if (lcylindrical) call indice_cellule(xio,yio,zio, icell)
-          ! following lines are useless --> icell0 is not returned
-         !else
-         !   if (lcylindrical) then
-         !      call verif_cell_position_cyl(icell0, xio, yio, zio)
-         !   else if (lspherical) then
-         !      call verif_cell_position_sph(icell0, xio, yio, zio)
-         !   endif
-         endif
-      endif ! todo : on ne fait rien dans la cas Voronoi ???
-
-      return
-   endif ! lstop
-
-enddo ! boucle infinie
-write(*,*) "BUG"
-return
-
-end subroutine physical_length_MRW
 
 !********************************************************************
 
@@ -1445,12 +1185,6 @@ end subroutine optical_length_tot_mol
                ds(iray,id) = l_contrib * AU_to_m
             endif
 
-            ! if (lorigine) then
-            !    if (maxval(ori(:,icell,id))==0.0_dp) then
-            !       ori(:,icell,id) = ori(:,icell,id) + eta(:,id) * exp(-tau(:))
-            !       tet(:,icell,id) = tet(:,icell,id) + tau(:) * exp(-tau(:))
-            !    endif
-            ! endif
 
             Snu = Snu / chi
 
@@ -1466,6 +1200,111 @@ end subroutine optical_length_tot_mol
 
       return
    end subroutine integ_ray_atom
+
+subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,flag_sortie)
+  ! Copmputes position where a given optical depth is reached
+  ! This is simplified version of integ_ray_atom (also inspired by physical_length, physical_length_mol)
+  ! only computes optical depth and stopes where given tau_max is reached
+  !
+  !
+  ! B. Tessore: Cannot leave until the propagation is done, as we follow many (uncorrelated) frequencies.
+  ! for all frequencies, (x(Nfreq),y(Nfreq),z(Nfreq)) will be filled until tau > tau_threshold.
+
+  integer, intent(in) :: icell_in, N, id
+  real(kind=dp), intent(inout), dimension(N) :: x,y,z !depends on the frequency
+  real(kind=dp), intent(in) :: u,v,w
+  real :: tau_threshold
+  real(kind=dp), dimension(N), intent(in) :: lambda
+  logical, intent(out) :: flag_sortie
+
+  real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ltot(N)
+  real(kind=dp), dimension(N) :: tau, dtau, chi, eta, tau_previous
+  real(kind=dp) :: tau_max, facteur_tau
+
+  integer :: nbr_cell, next_cell, previous_cell, icell, icell_star, i_star
+
+  logical :: lcellule_non_vide, lstop(N), lintersect_stars
+  logical, parameter :: lsubtract_avg = .false. !images and vlabs = 0, so iray and labs not needed!
+
+   !they are the same at init.
+   x1=x(1);y1=y(1);z1=z(1)
+   x0=x(1);y0=y(1);z0=z(1)
+   next_cell = icell_in
+   nbr_cell = 0
+
+   tau(:) = 0.0_dp
+   ltot = 0.0_dp
+   lstop = .false.
+   flag_sortie = .false.
+
+   !flag_sortie = .true. not useful. By default, (x,y,z) are 0 if we don't reach the surface.
+   x = 0.0; y = 0.0; z = 0.0
+
+   ! Will the ray intersect a star
+   call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)
+   ! Boucle infinie sur les cellules (we go over the grid.)
+   infinie : do ! Boucle infinie
+   ! Indice de la cellule
+      icell = next_cell
+      x0=x1 ; y0=y1 ; z0=z1
+
+      lcellule_non_vide = (icell <= n_cells)
+
+      ! Test sortie ! "The ray has reach the end of the grid"
+      if (test_exit_grid(icell, x0, y0, z0)) then
+         return
+      endif
+
+      if (lintersect_stars) then !"will interesct"
+         if (icell == icell_star) return
+      endif
+
+      if (icell <= n_cells) then
+         lcellule_non_vide = (icompute_atomRT(icell) > 0)
+         if (icompute_atomRT(icell) < 0) return
+      endif
+
+      nbr_cell = nbr_cell + 1
+
+      ! Calcul longeur de vol et profondeur optique dans la cellule
+      previous_cell = 0 ! unused, just for Voronoi
+      call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+      !count opacity only if the cell is filled, else go to next cell
+      if (lcellule_non_vide) then
+
+         call contopac_atom_loc(icell, N, lambda, chi, eta)
+         call opacity_atom_bb_loc(id,icell,1,x0,y0,z0,x1,y1,z1,u,v,w,&
+               l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,eta)
+
+         dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m
+         tau(:) = tau(:) + dtau(:) !for next cell
+        ! Mise a jour profondeur optique pour cellule suivante
+
+        !follow many frequencies
+        where ((tau > tau_threshold).and..not.lstop)
+            lstop = .true.
+            tau_previous = tau - dtau
+            ltot = ltot+l_void_before+l_contrib*(tau_threshold-tau_previous)/dtau
+            x=x0+l*u
+            y=y0+l*v
+            z=z0+l*w
+         elsewhere
+            ltot = ltot+l
+         endwhere
+      else
+         ltot = ltot + l
+      end if  ! lcellule_non_vide
+
+      if (all(lstop)) then
+         !no need to integrate anymore
+         return
+      endif
+
+   end do infinie
+
+   return
+end subroutine physical_length_atom
 
 !********************************************************************
 

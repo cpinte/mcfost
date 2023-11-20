@@ -48,9 +48,9 @@ module read1d_models
 		! write(*,*) "Nradii = ", Nr
 		do i=1, atmos_1d%nr
 			read(1,*) atmos_1d%r(i), atmos_1d%T(i), atmos_1d%rho(i), atmos_1d%ne(i), &
-				atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,2), atmos_1d%iz(i)
+				atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,3), atmos_1d%iz(i)
 			! write(*,*) atmos_1d%r(i), atmos_1d%T(i), atmos_1d%rho(i), atmos_1d%ne(i), &
-				! atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,2), atmos_1d%iz(i)
+				! atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,3), atmos_1d%iz(i)
 		enddo
 		!if corona will be zero at some point
 		! write(*,*) "T_limits (read):", atmos_1d%T(1), atmos_1d%T(atmos_1d%nr)
@@ -107,8 +107,9 @@ module read1d_models
 		allocate(atmos_1d%m(atmos_1d%nr))
 		nrad_0 = atmos_1d%nr
 		if (atmos_1d%lcoronal_illumination) nrad_0 = atmos_1d%nr - 1
-		atmos_1d%m(nrad_0) = 0.5 * (atmos_1d%rho(nrad_0-1)+atmos_1d%rho(nrad_0)) * &
-									au_to_m * (atmos_1d%r(nrad_0) - atmos_1d%r(nrad_0-1))
+		! atmos_1d%m(nrad_0) = 0.5 * (atmos_1d%rho(nrad_0-1)+atmos_1d%rho(nrad_0)) * &
+		! 							au_to_m * (atmos_1d%r(nrad_0) - atmos_1d%r(nrad_0-1))
+		atmos_1d%m(nrad_0) = 0.0
 		do i=nrad_0-1,1,-1
 			atmos_1d%m(i) = atmos_1d%m(i+1) + 0.5 * (atmos_1d%rho(i)+atmos_1d%rho(i+1)) * &
 							au_to_m * (atmos_1d%r(i+1) - atmos_1d%r(i))
@@ -153,7 +154,8 @@ module read1d_models
 		!at the bottom of the photosphere, it can slighly modify the continuum emission. Playing with the inner boundary irradiation
 		!allows to properly balance that effect.
 		if (lcell_centered) then
-			etoile(1)%T = real(	atmos_1d%T(1) ) ! + something else here 
+			!core temperature, read from file as "Tstar"
+			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + something else here 
 			icell = n_cells + 1
 			nrad_0 = n_rad
 			icell0 = n_cells
@@ -183,7 +185,8 @@ module read1d_models
 				icell0 = n_cells - 1
 				icompute_atomRT(n_cells) = atmos_1d%iz(n_rad+1)
 			endif
-			etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ? 
+			!core temperature, read from file as "Tstar"
+			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ? 
 			icompute_atomRT(:) = atmos_1d%iz(2:n_cells+1)
 			T(:) = atmos_1d%T(2:n_cells+1)
 			nHtot(:) = atmos_1d%rho(2:n_cells+1) * rho_to_nH
@@ -250,6 +253,10 @@ module read1d_models
 			write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
 		endif
 
+		if (maxval(icompute_atomRT)<=0) then
+			call warning(" There is no gas density zone in the model!")
+			return
+		endif
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"

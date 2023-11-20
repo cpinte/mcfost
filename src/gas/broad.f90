@@ -202,7 +202,8 @@ module broad
       Z = 1.0 + line%atom%stage(line%i)
 
       !include proton ?
-      nelectric = 1d-6 * (ne(icell) + 0.0 * hydrogen%n(hydrogen%Nlevel,icell)) !cm^-3
+      nelectric = 1d-6 * ne(icell) !cm^-3
+      ! nelectric = 1d-6 * (ne(icell) + ntotal_ions(icell)) !cm^-3
 
       n_lower = sqrt(line%atom%g(line%i)/2.)
       n_upper = sqrt(line%atom%g(line%j)/2.) !works because stark linear only for Hydrogen.
