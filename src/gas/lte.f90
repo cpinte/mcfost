@@ -16,6 +16,7 @@ module lte
    implicit none
 
    integer, dimension(101) :: ndebye
+   real(kind=dp), parameter :: small_lte_fraction = 1d-15
 
    contains
 
@@ -106,7 +107,7 @@ module lte
    ! -------------------------------------------------------------- !
       integer, intent(in) :: k
       logical :: locupa_prob
-      real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
+      real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin, ntotal
       real(kind=dp) :: n_eff, wocc, chi0, wocc0, E00, E, Egs
       integer :: Z, dZ, i, m
 
@@ -117,6 +118,7 @@ module lte
       sum = 1.0
       phik = ne(k)*phi_jl(T(k),1.d0,1.d0,0.d0)
       !a constant of the temperature and electron density
+      ntotal = hydrogen%Abund*nHtot(k)
 
       do i=2, hydrogen%Nlevel
 
@@ -141,35 +143,29 @@ module lte
             endif
          end do
 
+         !handle very low populations + mass conservation
+         if (hydrogen%nstar(i,k) < small_lte_fraction) hydrogen%nstar(i,k) = 0.0
+
          sum = sum+hydrogen%nstar(i,k)
       end do
 
-      hydrogen%nstar(1,k) = hydrogen%Abund*nHtot(k)/sum
+      hydrogen%nstar(1,k) = ntotal/sum
+      !denorm the other levels
+      hydrogen%nstar(2:hydrogen%Nlevel,k) = hydrogen%nstar(2:hydrogen%Nlevel,k)*hydrogen%nstar(1,k)
 
-      !test positivity, can be 0
-      if ((hydrogen%nstar(1,k) < 0)) then !<= tiny_dp) then
+      !test positivity. Must be > 0.
+      !sum is either 1 (all in ground state) or infinity (fully ionised). And ntotal here > 0.
+      if ((hydrogen%nstar(1,k) < 0)) then
          write(*,*) " ************************************* "
-         write(*,*) "Warning too small gs pop", hydrogen%ID, hydrogen%nstar(i,k)
+         write(*,*) "error negative gs pop", hydrogen%ID, hydrogen%nstar(i,k)
          write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
          write(*,*) " ************************************* "
          stop
       end if
+      !never set to 0 the ground-state population.
 
-      do i=2,hydrogen%Nlevel !debug
-         hydrogen%nstar(i,k) = hydrogen%nstar(i,k)*hydrogen%nstar(1,k)
-
-         if (hydrogen%nstar(i,k) < 0) then !<= tiny_dp) then
-            write(*,*) " ************************************* "
-            write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), " lower than", &
-                  " tiny_dp."
-            write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k), &
-                  " n0=", hydrogen%nstar(1,k)
-            write(*,*) " ************************************* "
-            stop
-         end if
-      end do
-
-      if (maxval(hydrogen%nstar(:,k)) >= huge_dp) then
+      !sanity check
+      if (maxval(hydrogen%nstar(:,k)) > huge_dp) then
          write(*,*) " ************************************* "
          write(*,*) "ERROR, populations of hydrogen larger than huge_dp"
          write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -189,6 +185,16 @@ module lte
          hydrogen%nstar(1,k) = hydrogen%nstar(1,k) * wocc
       endif
 
+      !Set ni/nj ratio for continuum transitions in case ne-> 0 and nj ->0
+      !should be ok for lines (the ratio for lines is used only in the collision)
+      do i=1, hydrogen%Ncont
+         if (hydrogen%nstar(hydrogen%continua(i)%j,k)>small_lte_fraction*ntotal) then
+            hydrogen%ni_on_nj_star(hydrogen%continua(i)%i,k) = &
+               hydrogen%nstar(hydrogen%continua(i)%i,k)/hydrogen%nstar(hydrogen%continua(i)%j,k)
+         else
+            hydrogen%ni_on_nj_star(hydrogen%continua(i)%i,k) = 0.0
+         endif
+      enddo   
 
       return
    end subroutine LTEpops_H_loc
@@ -205,7 +211,7 @@ module lte
       logical, intent(in) :: debye
       logical :: locupa_prob, print_diff
       real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
-      real(kind=dp) :: n_eff, wocc, chi0, wocc0
+      real(kind=dp) :: n_eff, wocc, chi0, wocc0, ntotal
       integer :: Z, dZ, i, m
 
       ! debye shielding activated:
@@ -236,6 +242,7 @@ module lte
       sum = 1.0
       phik = ne(k)*phi_jl(T(k),1.d0,1.d0,0.d0)
       !a constant of the temperature and electron density
+      ntotal = atom%Abund*nHtot(k)
 
       do i=2, atom%Nlevel
 
@@ -277,6 +284,7 @@ module lte
                atom%nstar(i,k) = 0d0
             endif
          end do
+         if (atom%nstar(i,k) < small_lte_fraction) atom%nstar(i,k) = 0.0
 
          sum = sum+atom%nstar(i,k) !compute total pop = Sum_jSum_i nij
             !with Sum_i nij = Nj
@@ -291,31 +299,21 @@ module lte
        !     write(*,*) "-------------------"
        !     write(*,*) "Atom=",atom%ID, " A=", atom%Abund
        !     write(*,*) "ntot", ntotal_atom(k,atom), " nHtot=",nHtot(k)
-      atom%nstar(1,k) = atom%Abund*nHtot(k)/sum
+      atom%nstar(1,k) = ntotal/sum
+      !denorm the other levels
+      atom%nstar(2:atom%Nlevel,k) = atom%nstar(2:atom%Nlevel,k)*atom%nstar(1,k)
 
-         !test positivity, can be 0
-      if (atom%nstar(1,k) < 0) then !<= tiny_dp) then
+      !test positivity. Must be > 0
+      if (atom%nstar(1,k) < 0) then
          write(*,*) " ************************************* "
-         write(*,*) "Warning too small ground state population ", atom%ID, "n0=", atom%nstar(1,k)
+         write(*,*) "Error negative ground state population ", atom%ID, "n0=", atom%nstar(1,k)
          write(*,*) "cell=",k, atom%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
-            !atom%nstar(1,k) = tiny_dp
          write(*,*) " ************************************* "
-         stop !only if we test >= 0
+         stop
       end if
-      do i=2,atom%Nlevel !debug
-         atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
-         if (atom%nstar(i,k) < 0) then !<= tiny_dp) then
-            write(*,*) " ************************************* "
-            write(*,*) "Warning population of atom ", atom%ID, "lvl=", i, "nstar=",atom%nstar(i,k), " lower than", &
-               " tiny_dp."! Replacing by tiny_dp"
-            write(*,*) "cell=",k, atom%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k), &
-               " n0=", atom%nstar(1,k)
-            write(*,*) " ************************************* "
-            stop
-         end if
-      end do
+      !never set to 0 the ground-state population.
 
-      if (maxval(atom%nstar(:,k)) >= huge_dp) then
+      if (maxval(atom%nstar(:,k)) > huge_dp) then
          write(*,*) " ************************************* "
          write(*,*) "ERROR, populations of atom larger than huge_dp"
          write(*,*) "cell=",k, atom%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -336,6 +334,16 @@ module lte
             atom%nstar(i,k) = atom%nstar(i,k) * wocc
          enddo
       endif
+
+      !Set ni/nj ratio for continuum transitions in case ne-> 0 and nj ->0
+      !should be ok for lines (the ratio for lines is used only in the collision)
+      do i=1, atom%Ncont
+         if (atom%nstar(atom%continua(i)%j,k)>small_lte_fraction*ntotal) then
+            atom%ni_on_nj_star(atom%continua(i)%i,k) = atom%nstar(atom%continua(i)%i,k)/atom%nstar(atom%continua(i)%j,k)
+         else
+            atom%ni_on_nj_star(atom%continua(i)%i,k) = 0.0
+         endif
+      enddo  
 
       return
    end subroutine LTEpops_atom_loc
@@ -400,6 +408,8 @@ module lte
       return
    end subroutine ltepops_atoms
 
+!-> TO DO: need to handle very low populations + atom%ni_on_nj_star
+!-> not used
    subroutine LTEpops_H()
       ! -------------------------------------------------------------- !
       ! computed wrt the ground state of H I
@@ -478,7 +488,7 @@ module lte
             hydrogen%nstar(1,k) = hydrogen%Abund*nHtot(k)/sum
 
             !test positivity, can be 0
-            if ((hydrogen%nstar(1,k) < 0)) then !<= tiny_dp) then
+            if ((hydrogen%nstar(1,k) < 0.0)) then
                write(*,*) " ************************************* "
                write(*,*) "Warning too small gs pop", hydrogen%ID, hydrogen%nstar(i,k)
                write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -489,7 +499,7 @@ module lte
             do i=2,hydrogen%Nlevel !debug
                hydrogen%nstar(i,k) = hydrogen%nstar(i,k)*hydrogen%nstar(1,k)
 
-               if (hydrogen%nstar(i,k) < 0) then !<= tiny_dp) then
+               if (hydrogen%nstar(i,k) < 0.0) then
                   write(*,*) " ************************************* "
                   write(*,*) "Warning population of hydrogen ", hydrogen%ID, "lvl=", i, "nstar=",hydrogen%nstar(i,k), &
                        " lower than tiny_dp."
@@ -500,7 +510,7 @@ module lte
                end if
             end do
 
-            if (maxval(hydrogen%nstar(:,k)) >= huge_dp) then
+            if (maxval(hydrogen%nstar(:,k)) > huge_dp) then
                write(*,*) " ************************************* "
                write(*,*) "ERROR, populations of hydrogen larger than huge_dp"
                write(*,*) "cell=",k, hydrogen%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -553,6 +563,8 @@ module lte
          return
    end subroutine LTEpops_H
 
+!-> TO DO: need to handle very low populations + atom%ni_on_nj_star
+!-> not used
    subroutine LTEpops_atom(atom, debye)
    ! -------------------------------------------------------------- !
    ! Computes LTE populations of each level of the atom.
@@ -674,7 +686,7 @@ module lte
          atom%nstar(1,k) = atom%Abund*nHtot(k)/sum
 
          !test positivity, can be 0
-         if (atom%nstar(1,k) < 0) then !<= tiny_dp) then
+         if (atom%nstar(1,k) < 0.0) then
             write(*,*) " ************************************* "
             write(*,*) "Warning too small ground state population ", atom%ID, "n0=", atom%nstar(1,k)
             write(*,*) "cell=",k, atom%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -684,7 +696,7 @@ module lte
          end if
          do i=2,atom%Nlevel !debug
             atom%nstar(i,k) = atom%nstar(i,k)*atom%nstar(1,k)
-            if (atom%nstar(i,k) < 0) then !<= tiny_dp) then
+            if (atom%nstar(i,k) < 0.0) then
                write(*,*) " ************************************* "
                write(*,*) "Warning population of atom ", atom%ID, "lvl=", i, "nstar=",atom%nstar(i,k), " lower than", &
                   " tiny_dp."! Replacing by tiny_dp"
@@ -695,7 +707,7 @@ module lte
             end if
          end do
 
-         if (maxval(atom%nstar(:,k)) >= huge_dp) then
+         if (maxval(atom%nstar(:,k)) > huge_dp) then
             write(*,*) " ************************************* "
             write(*,*) "ERROR, populations of atom larger than huge_dp"
             write(*,*) "cell=",k, atom%ID, "dark?=",icompute_atomRT(k), "T=",T(k), "nH=",nHtot(k), "ne=",ne(k)
@@ -740,6 +752,8 @@ module lte
       return
    end subroutine LTEpops_atom
 
+!-> TO DO: need to handle very low populations + atom%ni_on_nj_star
+!-> not used
    subroutine ltepops_atoms_1 ()
    ! -------------------------------------------------------------- !
    ! Computes LTE populations for each atom
