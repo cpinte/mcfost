@@ -70,6 +70,8 @@ contains
 
  subroutine make_MRW_step(id,icell,lambda, x,y,z,R0, E)
 
+   use naleat, only : random_isotropic_direction
+
    integer, intent(in) :: id, icell
    integer, intent(inout) :: lambda
    real(kind=dp), intent(inout) :: x,y,z
@@ -80,7 +82,7 @@ contains
    ! Place photon randomly on sphere of radius R0 around current position
    call random_isotropic_direction(id, u,v,w)
    x = x + u*R0
-   y = y + v* R0
+   y = y + v*R0
    z = z + w*R0
 
    ! Select new direction : isotropic or emitting sphere ?

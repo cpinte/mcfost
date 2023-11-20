@@ -43,7 +43,7 @@ subroutine transfert_poussiere()
 ! 20/04/2023
 
   use thermal_emission, only : frac_E_stars, frac_E_disk
-  use MRW, only : make_MRW_step
+  use MRW, only : make_MRW_step, initialize_cumulative_zeta
   use utils
   implicit none
 
@@ -1029,26 +1029,26 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !   if (.not.flag_star) Stokes=0.
      !endif
 
-     d = 0.
-     reciprocal_Plank_kappa = 1.
-     if ((n_iterations > 5) .and. Tdust(icell) > 1 .and. not an_externa cell) then
-        d = distance_to_closest_wall()
-        call diffusion_opacity()
-     endif
+!     d = 0.
+!     reciprocal_Plank_kappa = 1.
+!     if ((n_iterations > 5) .and. Tdust(icell) > 1) then
+!        d = distance_to_closest_wall()
+!        call diffusion_opacity()
+!     endif
+!
+!     do while  (d > gamma_MRW * reciprocal_Plank_kappa)
+!        call make_MRW_step(id,icell, x,y,z,d, Stokes(1))
+!        d = distance_to_closest_wall()
+!        ! todo : do we update the rec_plack_kappa ???
+!     enddo
 
-     do while  (d > gamma * reciprocal_Plank_kappa)
-        call make_MRW_step(id,icell, x,y,z,d, Stokes(1))
-        d = distance_to_closest_wall()
-        ! todo : do we update the rec_plack_kappa ???
-     enddo
-
-     icell_old = icell
+ !    icell_old = icell
      call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
-     if (icell == icell_old) then
-        n_iterations = n_iterations + 1
-     else
-        n_iterations = 0
-     endif
+ !    if (icell == icell_old) then
+ !       n_iterations = n_iterations + 1
+ !    else
+ !       n_iterations = 0
+ !    endif
 
      if (flag_sortie) return ! Vie du photon terminee
 

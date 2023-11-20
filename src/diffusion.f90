@@ -638,12 +638,11 @@ subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
   use cylindrical_grid, only : volume
   use density, only : masse_gaz, densite_gaz
 
-  real, intent(in)  :: temp
   integer,  intent(in)  :: icell
-  real(dp), intent(out) :: rosseland_opacity ! cm2/g (ie per gram of gas)
+  real(dp), intent(out) :: Planck_opacity,rec_Planck_opacity ! cm2/g (ie per gram of gas)
 
   integer :: lambda
-  real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl
+  real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl, norm, Temp
 
   integer, pointer :: p_icell
   integer, target :: icell0
@@ -688,5 +687,7 @@ subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
   endif
 
 end subroutine diffusion_opacity
+
+!************************************************************
 
 end module diffusion
