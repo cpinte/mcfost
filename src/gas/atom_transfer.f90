@@ -1224,7 +1224,8 @@ module atom_transfer
       !or set the atomic gas temperature to 0 in dust regions ? 
       if (any(icompute_atomRT>0)) then
          write(*,*) "T:", real(maxval(T,icompute_atomRT>0)), real(minval(T,icompute_atomRT>0))
-         write(*,*) "T (rho_dust = 0):", real(maxval(T,(icompute_atomRT>0).and..not.ldust)), real(minval(T,(icompute_atomRT>0).and..not.ldust))
+         write(*,*) "T (rho_dust = 0):", real(maxval(T,(icompute_atomRT>0).and..not.ldust)), &
+                                          real(minval(T,(icompute_atomRT>0).and..not.ldust))
       else
          call warning("(init_dust_temperature) The (atomic) gas is all transparent !")
       endif
