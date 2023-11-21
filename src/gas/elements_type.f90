@@ -43,6 +43,7 @@ module elements_type
     real(kind=dp), parameter :: phi_min_limit = 1d-100!tiny_dp!1d-100 !1d-50, tiny_dp
     integer :: Max_ionisation_stage
 
+    real(kind=dp), parameter :: CI = 0.5*(HP**2 / (2.*PI*mel*kb))**1.5
 
   ! Atomic properties constants
 
@@ -358,6 +359,17 @@ module elements_type
         return
     end function get_pf
 
+    function phi_T(temp, gi, gj, dE)!Ui_on_Uj,
+    !Similar to phi_jl with less tests.
+    !Mainly here for on-fly calculations of ni*/nj* for continua which is
+    !also equal to ne * phi_T. This prevents divding by 0.
+        real(kind=dp) :: phi_T
+        real(kind=dp), intent(in) :: temp, dE, gi, gj!, Ui_on_Uj
+  
+        phi_T = gi/gj * CI * temp**(-1.5) * exp(dE / ( kb*temp ))!* Ui_on_Uj *
+  
+        return
+    end function phi_T
 
     function phi_jl(temp, Ujl, Uj1l, ionpot)
         ! -------------------------------------------------------------- !
@@ -376,10 +388,8 @@ module elements_type
         ! -------------------------------------------------------------- !
         real(kind=dp), intent(in) :: temp
         real(kind=dp) :: phi_jl
-        real(kind=dp) ::  C1, expo
+        real(kind=dp) ::  expo
         real(kind=dp), intent(in) :: Ujl, Uj1l, ionpot
-        C1 = 0.5*(HP**2 / (2.*PI*mel*kb))**1.5
-        !C1 = (HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
     
         !!ionpot = ionpot * 100.*HPLANCK*CLIGHT !cm1->J
         !! -> avoiding dividing by big numbers causing overflow.
@@ -388,7 +398,7 @@ module elements_type
         if (ionpot/(kb*temp) >= 600d0) expo = huge_dp
     
         !if exp(300) it means phi is "infinity", exp(300) == 2e130 so that's enough
-        phi_jl = C1 * (Ujl / Uj1l) * expo / (temp**1.5 + tiny_dp)
+        phi_jl = CI * (Ujl / Uj1l) * expo / (temp**1.5 + tiny_dp)
         if (phi_jl < phi_min_limit) phi_jl = 0d0 !tiny_dp ! or phi = 0d0 should be more correct ?
         ! but test to not divide by 0
     

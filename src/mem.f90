@@ -444,6 +444,83 @@ subroutine clean_mem_dust_mol()
 
 end subroutine clean_mem_dust_mol
 
+subroutine realloc_dust_atom()
+!this routine should be the mirror of the mol one, except for the tab_lambda which is allocated
+!when the gas atom RT grid is defined (from reading the atomic species).
+!Still, the test on the allocation and the call of clean_mem_dust_mol in init_dust_atom means
+!that theya re not deallocated after temperature calculation. What am I missing ? 
+
+!   use stars, only : allocate_stellar_spectra !-> not use yet in atom transfer.
+
+
+  integer :: alloc_status
+  real :: mem_size
+
+  if (lvariable_dust) then
+     write(*,*) " WARNING: sizes of dust transfer could be very big !"
+     !TO DO: better storing of quantities / recuction of n_lambda
+  endif
+	
+  !Note: tab_lambda(n_lambda) is already allocated in atomic_transfer
+  !	the tab_lambda_* or tab_delta_lambda should be de-allocated when tab_lambda is allocated in atom_rt.
+  allocate(tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), &
+       tab_amu1(n_lambda, n_pop), tab_amu2(n_lambda, n_pop), &
+       tab_amu1_coating(n_lambda, n_pop), tab_amu2_coating(n_lambda, n_pop), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error tab_lambda (realloc)')
+!   tab_lambda=0.0
+  tab_lambda_inf = 0.0 ; tab_lambda_sup = 0.0 ; tab_delta_lambda= 0.0 ;
+  tab_amu1=0.0 ; tab_amu2=0.0 ; tab_amu1_coating=0.0 ; tab_amu2_coating=0.0
+
+  allocate(tab_albedo(n_grains_tot,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error tab_albedo (realloc)')
+  tab_albedo = 0
+
+  allocate(C_ext(n_grains_tot,n_lambda), C_sca(n_grains_tot,n_lambda), &
+       C_abs(n_grains_tot,n_lambda),  C_abs_norm(n_grains_tot,n_lambda), tab_g(n_grains_tot,n_lambda), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error C_ext (realloc)')
+  C_ext = 0 ; C_sca = 0 ; C_abs = 0 ; C_abs_norm = 0 ; tab_g = 0
+
+  ! Tableaux relatifs aux prop optiques des cellules
+  if (allocated(kappa)) deallocate(kappa)
+  if (allocated(kappa_abs_LTE)) deallocate(kappa_abs_LTE)
+  if (allocated(kappa_factor)) deallocate(kappa_factor)
+  allocate(kappa(p_n_cells,n_lambda),kappa_abs_LTE(p_n_cells,n_lambda), kappa_factor(n_cells), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc atom)')
+  kappa = 0.0 ; kappa_abs_LTE = 0.0
+  !mind the shape of the array compared to the others.
+  if (allocated(emissivite_dust)) deallocate(emissivite_dust)
+  allocate(emissivite_dust(n_lambda,n_cells),stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error emissivite_dust (realloc atom)')
+  if (lvariable_dust.or.(sizeof(emissivite_dust)/1024.**3 > 5)) then
+     write(*,*) "  *** WARNING: using ", sizeof(emissivite_dust)/1024.**3, " GB for emissivite_dust"
+  endif
+  emissivite_dust = 0.0
+
+  if (lRE_nLTE) then
+     if (allocated(kappa_abs_nlte)) deallocate(kappa_abs_nlte)
+     allocate(kappa_abs_nLTE(p_n_cells,n_lambda), stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error kappa_abs_nLTE (realloc atom)')
+     kappa_abs_nLTE = 0.0
+  endif
+
+  allocate(tab_albedo_pos(p_n_cells,n_lambda),stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error tab_albedo_pos (realloc atom)')
+  tab_albedo_pos = 0
+
+  if (aniso_method==2) then
+     allocate(tab_g_pos(p_n_cells,n_lambda),stat=alloc_status)
+     if (alloc_status > 0) call error('Allocation error tab_g_pos (realloc atom)')
+     tab_g_pos = 0.0
+  endif
+
+!   call allocate_stellar_spectra(n_lambda)
+
+  return
+
+end subroutine realloc_dust_atom
+
+!******************************************************************************
+
 !******************************************************************************
 
 subroutine realloc_step2()

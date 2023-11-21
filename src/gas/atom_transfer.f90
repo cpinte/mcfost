@@ -16,7 +16,7 @@ module atom_transfer
    use elecdensity, only : solve_ne, write_electron, read_electron
    use grid, only : T, vturb,nHtot, nHmin, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, &
         ne, Voronoi, r_grid, phi_grid, z_grid
-   use lte, only : ltepops_atoms, ltepops_atoms_1, print_pops, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
+   use lte, only : ltepops_atoms, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
    use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, passiveAtoms, npassiveatoms, &
         hydrogen, helium, adjust_cswitch_atoms, &
                            maxval_cswitch_atoms, lcswitch_enabled, vbroad
@@ -25,7 +25,7 @@ module atom_transfer
    use opacity_atom, only : alloc_atom_opac, Itot, psi, dealloc_atom_opac, xcoupling, write_opacity_emissivity_bin, &
         lnon_lte_loop, vlabs, calc_contopac_loc, set_max_damping, deactivate_lines, activate_lines, &
         activate_continua, deactivate_continua
-   use see, only : ngpop, Neq_ng, ngpop, alloc_nlte_var, dealloc_nlte_var, frac_limit_pops, &
+   use see, only : ngpop, Neq_ng, ngpop, alloc_nlte_var, dealloc_nlte_var, small_nlte_fraction, &
                   init_rates, update_populations, accumulate_radrates_mali, write_rates, init_radrates_atom
    use optical_depth, only : integ_ray_atom
    use utils, only : cross_product, gauss_legendre_quadrature, progress_bar, rotation_3d, vacuum2air, &
@@ -39,6 +39,11 @@ module atom_transfer
    use messages, only : error, warning
    use voigts, only : Voigt
    use broad, only : line_damping
+   use density, only : densite_pouss
+   use temperature, only : Tdust
+   use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol,emissivite_dust
+   use dust_prop, only : prop_grains, opacite, init_indices_optiques, kappa_abs_lte, kappa, kappa_factor
+   use scattering
 
    use healpix_mod
    !$ use omp_lib
@@ -235,7 +240,7 @@ module atom_transfer
       call alloc_nlte_var(one_ray,mem=mem_alloc_local)
 
       ! --------------------------- OUTER LOOP ON STEP --------------------------- !
-
+      precision = dpops_max_error
       step_loop : do etape=etape_start, etape_end
 
          write(*,*) ""
@@ -248,15 +253,8 @@ module atom_transfer
             write(*,'(" ****-> Using "(1I8)" pixels for healpix, resolution of "(1F12.3)" degrees")') n_rayons,  &
                  healpix_angular_resolution(healpix_lorder)
             call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
-            if (etape_end > 1) then
-               !use that etape as an initial solution for step 2
-               precision = 1d-1
-            else
-               precision = dpops_max_error
-            endif
             conv_speed_limit = conv_speed_limit_healpix
          else if (etape==2) then
-            precision = dpops_max_error
             n_rayons = N_rayons_mc
             write(*,'(" ****-> Using "(1I4)" rays for Monte-Carlo step, ~resolution of "(1F12.3)" degrees")') n_rayons, &
                  360.0 * sqrt(pi/real(n_rayons))/pi
@@ -359,7 +357,7 @@ module atom_transfer
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
                stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               if( (diff_loc(icell) < 1d-1 * precision).and..not.lcswitch_enabled ) cycle
+               if( (diff_loc(icell) < 5d-2 * precision).and..not.lcswitch_enabled ) cycle
 
                if (l_iterate) then
 
@@ -447,7 +445,7 @@ module atom_transfer
                !$omp atomic
                n_cells_done = n_cells_done + 1
                ! n_cells_remaining = size(pack(diff_loc, &
-               !                      mask=(diff_loc < 1d-1 * precision)))
+               !                      mask=(diff_loc < 5d-2 * precision)))
                if (real(n_cells_done) > 0.02*ibar*n_cells) then
              	   call progress_bar(ibar)
              	   !$omp atomic
@@ -480,7 +478,7 @@ module atom_transfer
           		   endif
             	endif
                if (lng_turned_on) then
-                  if (unconverged_fraction < 15.0) lng_turned_on = .false.
+                  if (unconverged_fraction < 10.0) lng_turned_on = .false.
                endif
             endif
             !***********************************************************!
@@ -592,12 +590,12 @@ module atom_transfer
                ! write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
                !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                ! write(*,*) ''
-               ! if ((dne < 1d-2 * precision).and.(.not.lcswitch_enabled)) then
-               !    !Or compare with 3 previous values of dne ? that should be below 1e-2 precision
-               !    !Do we need to restart it eventually ?
-               !    write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
-               !    n_iterate_ne = 0
-               ! endif
+               if ((dne < 1d-4 * precision).and.(.not.lcswitch_enabled)) then
+                  !Do we need to restart it eventually ?
+                  write(*,*) " *** dne", dne
+                  write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
+                  n_iterate_ne = 0
+               endif
             end if
             !***********************************************************!
 
@@ -628,7 +626,7 @@ module atom_transfer
                      at => ActiveAtoms(nact)%p
 
                      do ilevel=1,at%Nlevel
-                        if ( ngpop(ilevel,nact,icell,1) >= frac_limit_pops * at%Abund*nHtot(icell) ) then
+                        if ( ngpop(ilevel,nact,icell,1) >= small_nlte_fraction * at%Abund*nHtot(icell) ) then
                            dN1 = abs(1d0-at%n(ilevel,icell)/ngpop(ilevel,nact,icell,1))
                            dN = max(dN1, dN)
                            dM(nact) = max(dM(nact), dN1)
@@ -726,10 +724,7 @@ module atom_transfer
             diff_old = diff
             conv_acc = conv_speed
 
-            if ((diff < precision).and.(.not.lcswitch_enabled))then!maxval_cswitch_atoms()==1.0_dp
-            ! if ( (unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp)then
-            ! if ( ((unconverged_fraction < 3.0).and.maxval_cswitch_atoms()==1.0_dp).or.&
-               !  ((diff < precision).and.maxval_cswitch_atoms()==1.0_dp) )then
+            if ((diff < precision).and.(.not.lcswitch_enabled))then
                if (lprevious_converged) then
                   lconverged = .true.
                else
@@ -783,8 +778,8 @@ module atom_transfer
 
             !force convergence if there are only few unconverged cells remaining
             ! if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
-            if ( (n_iter > maxIter/4).and.(unconverged_fraction < 5.0).or.&
-               ((unconverged_fraction < 5.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
+            if ( (n_iter > maxIter/4).and.(unconverged_fraction < 3.0).or.&
+               ((unconverged_fraction < 3.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
                write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
                   unconverged_fraction, n_iter
                write(*,*) " -> forcing convergence"
@@ -834,7 +829,6 @@ module atom_transfer
 
       if (n_iterate_ne > 0) then
          write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
-         write(*,'("nH/ne "(1ES13.5E3, 1ES13.5E3))') maxval(nHtot/ne,mask=nhtot*ne>0), minval(nHtot/ne,mask=nHtot*ne>0)
          call write_electron
       endif
 
@@ -1030,7 +1024,7 @@ module atom_transfer
    !keep somewhere tab_lambda_sed = tab_lambda because tab_lambda is overwritten in non-LTE
       integer :: kr, nat
 
-      call deallocate_wavelengths_gasrt(tab_lambda)
+      call deallocate_wavelengths_gasrt()
       call dealloc_atom_opac()
       call init_directions_ray_tracing()
 
@@ -1057,8 +1051,9 @@ module atom_transfer
          call make_wavelengths_raytracing(tab_lambda_nm)
       endif
       n_lambda = size(tab_lambda_nm)
-      tab_lambda = tab_lambda_nm * nm_to_m!micron
+      tab_lambda = tab_lambda_nm * m_to_km ! [mic]
 
+      call init_dust_atom() !even in 1d mode.
       call alloc_atom_opac(n_lambda, tab_lambda_nm, .true.)
       call allocate_atom_maps()
       if (laccretion_shock) then
@@ -1089,6 +1084,14 @@ module atom_transfer
          tab_lambda_sed = tab_lambda
       endif
 
+      !associate the temperature in the regions where the dusty of dust is non-zero (if any) to the dust
+      !temperature.
+      if (ldust_atom) then
+         call deallocate_em_th_mol()
+         lscatt_ray_tracing = .false. ! tmp : scatt ray-tracing has no sense yet for atomic emssion
+         call init_dust_temperature()
+      endif
+      !before LTE pops, electronic density and eventually chemical equilibrium.
       !read atomic models
       call read_atomic_Models()
 
@@ -1137,10 +1140,12 @@ module atom_transfer
          !Even if we split the transfer un group of wavelength that's probably best to keep indexes.
          !otherwise, we pass group wavelength and check contributing opacities for each group
          !but it is like indexes at the end?
-         deallocate(tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda)
+         call deallocate_wavelengths_gasrt()
          call make_wavelengths_nlte(tab_lambda_nm,vmax_overlap=v_char)
          n_lambda = size(tab_lambda_nm)
-         tab_lambda = tab_lambda_nm * m_to_km
+         tab_lambda = tab_lambda_nm * m_to_km ! [micron]
+
+         call init_dust_atom()
 
          ! !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm, .false.)
@@ -1199,6 +1204,87 @@ module atom_transfer
       return
    end subroutine atom_line_transfer
 
+   subroutine init_dust_temperature()
+      !lowering too much the treshold might create some convergence issues in the non-LTE pops or in 
+      ! the electronic density calculations (0 division mainly for low values).
+      real(kind=dp), parameter :: T_formation = 2000.0 ! [K]
+      logical, dimension(:), allocatable :: ldust
+      allocate(ldust(n_cells)); ldust = (sum(densite_pouss,dim=1)>0.0_dp)
+      write(*,*) " *** Associating the dust temperature in the model..."
+      !force dust_sublimation
+      ! TO DO:
+      ! call sublimate_dust()
+      write(*,*) "Tdust:", maxval(Tdust), minval(Tdust)
+      write(*,*) "Tdust (rho_dust >0 ):", maxval(Tdust,ldust), minval(Tdust,ldust)
+      !If the dust temperature is above T_formation the gas will follow that temperature
+      !and atomic opacities will be considered.
+      where(ldust) T(:) = Tdust(:)
+      if (any(T < T_formation)) call warning('(atom_transfer) Setting the gas transparent where T < 2000 K.')
+      where (T < T_formation) icompute_atomRT = 0
+      !or set the atomic gas temperature to 0 in dust regions ? 
+      if (any(icompute_atomRT>0)) then
+         write(*,*) "T:", real(maxval(T,icompute_atomRT>0)), real(minval(T,icompute_atomRT>0))
+         write(*,*) "T (rho_dust = 0):", real(maxval(T,(icompute_atomRT>0).and..not.ldust)), &
+                                          real(minval(T,(icompute_atomRT>0).and..not.ldust))
+      else
+         call warning("(init_dust_temperature) The (atomic) gas is all transparent !")
+      endif
+      write(*,*) " *** done."
+      deallocate(ldust)
+      return
+   end subroutine init_dust_temperature
+
+   subroutine init_dust_atom()
+   !see mol_transfer.f90 / init_dust_mol() for TO DOs.
+      integer :: la, p_lambda
+      integer, target :: icell
+      integer, pointer :: p_icell
+
+      if (.not.ldust_atom) then
+         !still add kappa etc in the total contopac to not care about testing if dust
+         !in the propagation (+limit_mem options).
+         return ! no dust
+      endif
+
+      ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
+      ! -> pas de polarisation, on utilise une HG
+      scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
+      aniso_method = 2 ; lmethod_aniso1 = .false.
+      lsepar_pola = .false.
+      ltemp = .false.
+      lmono = .true. ! equivalent au mode sed2
+
+      if (lvariable_dust) then
+         p_icell => icell
+      else
+         p_icell => icell_ref
+      endif
+
+      call realloc_dust_atom()
+
+      !BEWARE: by default tab_lambda is associated to tab_lambda_nm which can be long.
+      !        Consider using tab_lambda_cont and then interpolate on tab_lambda_nm
+      write(*,*) " *** initialising optical indices"
+      call init_indices_optiques()
+
+      ! Computing optical dust properties
+      ! TO DO: limit_mem options.
+      write(*,*) " *** Computing dust properties for", n_lambda, "wavelengths..."
+      do la=1, n_lambda !works also for ray-traced lines
+         call prop_grains(la)
+         call opacite(la, la, no_scatt=.true.)
+      enddo
+
+      do icell=1, n_cells
+         if (sum(densite_pouss(:,icell)) <= 0.0_dp) cycle
+         emissivite_dust(:,icell) = kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * &
+            m_to_AU * Bpnu(n_lambda,tab_lambda_nm,T(icell)) ! [W m^-3 Hz^-1 sr^-1]
+      enddo
+
+      call clean_mem_dust_mol()
+      write(*,*) " *** done."
+      return
+   end subroutine init_dust_atom
 
   subroutine intensite_pixel_atom(id,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,pixelcorner,pixelsize,dx,dy,u,v,w)
    ! -------------------------------------------------------------- !
@@ -1292,6 +1378,7 @@ module atom_transfer
 
       ! Flux out of a pixel in W/m2/Hz/pix
       normF = ( pixelsize / (distance*pc_to_AU) )**2
+      !to nu.Fnu -> normF * c_light / nm_to_m; flux -> flux / tab_lambda_nm
 
       if (RT_line_method==1) then
          Flux_total(:,ibin,iaz,id) = Flux_total(:,ibin,iaz,id) + I0(:) * normF
@@ -1622,7 +1709,7 @@ module atom_transfer
       allocate(cos_theta(Nimpact), weight_mu(Nimpact), p(Nimpact))
       !prepare wavelength grid and indexes for continua and lines
       !including max extension due to velocity shiftS.
-      call deallocate_wavelengths_gasrt(tab_lambda)
+      call deallocate_wavelengths_gasrt()
       call dealloc_atom_opac()
       if (lsed) then
          call make_wavelengths_flux(tab_lambda_sed,.true.)
