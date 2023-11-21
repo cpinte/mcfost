@@ -9,7 +9,7 @@ module cylindrical_grid
   public :: cell2cylindrical, cross_cylindrical_cell, pos_em_cellule_cyl, indice_cellule_cyl, test_exit_grid_cyl, &
        move_to_grid_cyl, define_cylindrical_grid, build_cylindrical_cell_mapping,  cell_map, cell_map_i, cell_map_j,&
        cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, delta_z, r_grid, z_grid, phi_grid, tab_region, &
-       z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, volume, l_dark_zone, zmax, delta_cell_dark_zone, &
+       z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, cos_phi_lim, sin_phi_lim, volume, l_dark_zone, zmax, delta_cell_dark_zone, &
        ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone
 
   real(kind=dp), parameter, public :: prec_grille=1.0e-14_dp
@@ -27,7 +27,7 @@ module cylindrical_grid
   real(kind=dp), dimension(:), allocatable :: r_lim, r_lim_2, r_lim_3 ! lim rad sup de la cellule (**2) !0:n_rad
   real(kind=dp), dimension(:,:), allocatable :: z_lim ! lim vert inf de la cellule !n_rad,nz+1
   real(kind=dp), dimension(:), allocatable :: tan_phi_lim, cos_phi_lim, sin_phi_lim ! lim azimuthale de la cellule ! n_az
-  real(kind=dp), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
+  real(kind=dp), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim, cos_theta_lim ! lim theta sup de la cellule ! 0:nz
   integer, dimension(:), allocatable :: tab_region ! n_rad : indice de region pour chaque cellule
 
   integer, dimension(:,:,:), allocatable :: cell_map
@@ -235,11 +235,12 @@ subroutine define_cylindrical_grid()
      if (alloc_status > 0) call error('Allocation error z_lim')
      z_lim = 0.0
 
-     allocate(w_lim(0:nz),  theta_lim(0:nz),tan_theta_lim(0:nz),tan_phi_lim(n_az),cos_phi_lim(n_az),sin_phi_lim(n_az), stat=alloc_status)
+     allocate(w_lim(0:nz),theta_lim(0:nz),tan_theta_lim(0:nz),cos_theta_lim(0:nz),tan_phi_lim(n_az),cos_phi_lim(n_az),sin_phi_lim(n_az), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tan_phi_lim')
      w_lim = 0.0
      theta_lim=0.0
      tan_theta_lim = 0.0
+     cos_theta_lim = 0.0
      tan_phi_lim = 0.0
      cos_phi_lim = 0.0
      sin_phi_lim = 0.0
@@ -497,10 +498,12 @@ subroutine define_cylindrical_grid()
      w_lim(0) = 0.0_dp
      theta_lim(0) = 0.0_dp
      tan_theta_lim(0) = 1.0e-10_dp
+     cos_theta_lim(0) = 1.0_dp
 
      w_lim(nz) = 1.0_dp
      theta_lim(nz) = pi/2.
      tan_theta_lim(nz) = 1.e30_dp
+     cos_theta_lim(nz) = 0_dp
 
      if (lregular_theta) then
         ! uniform distribution in theta up to theta max (nz-1 cells), then 1 extra cell up to pi/2
@@ -520,6 +523,7 @@ subroutine define_cylindrical_grid()
         do j=1, nz-1
            tan_theta_lim(j) = tan(theta_lim(j))
            w_lim(j) = sin(theta_lim(j))
+           cos_theta_lim(j) = cos(theta_lim(j))
            dcos_theta(j) = w_lim(j) - w_lim(j-1)
         enddo
         dcos_theta(nz) = w_lim(nz) - w_lim(nz-1)
@@ -529,7 +533,8 @@ subroutine define_cylindrical_grid()
         do j=1, nz-1
            w= real(j,kind=dp)/real(nz,kind=dp)
            w_lim(j) = w
-           tan_theta_lim(j) = w / sqrt(1.0_dp - w*w)
+           cos_theta_lim(j) = sqrt(1.0_dp - w*w)
+           tan_theta_lim(j) = w / cos_theta_lim(j)
            theta_lim(j) = atan(tan_theta_lim(j))
         enddo
      endif
@@ -546,6 +551,7 @@ subroutine define_cylindrical_grid()
          !  %x2(1) = 0; %x2(nz+1) = pi/2 even in 3d (%x2(2*nz+1)=pi).
          theta_lim(:) = pluto%x2(1:nz+1)
          w_lim(:) = sin(theta_lim)
+         cos_theta_lim(:) = cos(theta_lim(:))
          tan_theta_lim(0) = 1.0e-10_dp
          tan_theta_lim(nz) = 1.e30_dp
          tan_theta_lim(1:nz-1) = tan(theta_lim(1:nz-1))
@@ -739,7 +745,6 @@ end subroutine define_cylindrical_grid
     write(*,*) "DONE"
     call exit(0)
     return
-
 
   end subroutine test_convert
 
