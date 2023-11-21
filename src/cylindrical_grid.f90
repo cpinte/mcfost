@@ -1201,6 +1201,20 @@ end subroutine define_cylindrical_grid
 
     if (l3D) then
        ! phi walls
+       !
+       ! Distance between a line with equation a*x+by+c=0, ie y=-a/b*x-c/b and point (x0,y0) is:
+       !
+       ! d = |a*x0+b*y0+c|/sqrt(a**2+b**2)
+       !
+       ! In case of phi walls, we have y = x * tan(phi) so:
+       !
+       ! a = -sin(phi)
+       ! b = cos(phi)
+       ! c = 0
+       !
+       ! and therefore
+       !
+       ! d = |x0*sin(phi) - y0*cos(theta)| / sqrt[cos^2 + sin^2]
        s5 = abs(x*sin_phi_lim(k0) - y*cos_phi_lim(k0))
        s6 = abs(x*sin_phi_lim(k0-1) - y*cos_phi_lim(k0-1))
        s = min(s1,s2,s3,s4,s5,s6)
