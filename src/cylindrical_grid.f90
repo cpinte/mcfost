@@ -26,7 +26,7 @@ module cylindrical_grid
   real(kind=dp), dimension(:), allocatable :: phi_grid
   real(kind=dp), dimension(:), allocatable :: r_lim, r_lim_2, r_lim_3 ! lim rad sup de la cellule (**2) !0:n_rad
   real(kind=dp), dimension(:,:), allocatable :: z_lim ! lim vert inf de la cellule !n_rad,nz+1
-  real(kind=dp), dimension(:), allocatable :: tan_phi_lim ! lim azimuthale de la cellule ! n_az
+  real(kind=dp), dimension(:), allocatable :: tan_phi_lim, cos_phi_lim, sin_phi_lim ! lim azimuthale de la cellule ! n_az
   real(kind=dp), dimension(:), allocatable :: w_lim, theta_lim, tan_theta_lim ! lim theta sup de la cellule ! 0:nz
   integer, dimension(:), allocatable :: tab_region ! n_rad : indice de region pour chaque cellule
 
@@ -235,12 +235,14 @@ subroutine define_cylindrical_grid()
      if (alloc_status > 0) call error('Allocation error z_lim')
      z_lim = 0.0
 
-     allocate(w_lim(0:nz),  theta_lim(0:nz),tan_theta_lim(0:nz),tan_phi_lim(n_az), stat=alloc_status)
+     allocate(w_lim(0:nz),  theta_lim(0:nz),tan_theta_lim(0:nz),tan_phi_lim(n_az),cos_phi_lim(n_az),sin_phi_lim(n_az), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tan_phi_lim')
      w_lim = 0.0
      theta_lim=0.0
      tan_theta_lim = 0.0
      tan_phi_lim = 0.0
+     cos_phi_lim = 0.0
+     sin_phi_lim = 0.0
 
      allocate(zmax(n_rad),volume(n_cells), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error zmax, volume')
@@ -537,7 +539,7 @@ subroutine define_cylindrical_grid()
 
      endif
 
-      !redifine and use the theta grid read, still spherical
+      !redefine and use the theta grid read, still spherical
       if (lsphere_model) then
          !pluto%x2 goes from the max value of theta (pi/2 or pi if 3D) to 0.
          !It has been re-ordered such that it goes from 0 to pi/2 (or pi):
@@ -582,8 +584,12 @@ subroutine define_cylindrical_grid()
         phi = delta_phi * real(k)
         if (abs(modulo(phi-0.5*pi,pi)) < 1.0e-6) then
            tan_phi_lim(k) = 1.0d300
+           cos_phi_lim(k) = 0.0_dp
+           sin_phi_lim(k) = 1.0d300
         else
            tan_phi_lim(k) = tan(phi)
+           cos_phi_lim(k) = cos(phi)
+           sin_phi_lim(k) = sin(phi)
         endif
      enddo !k
 
@@ -601,8 +607,12 @@ subroutine define_cylindrical_grid()
          ! enddo
          where (abs(modulo(pluto%x3(2:n_az+1)-0.5*pi,pi)) < 1.0e-6)
             tan_phi_lim = 1.0d300
+            cos_phi_lim = 0.0_dp
+            sin_phi_lim = 1.0d300
          elsewhere
             tan_phi_lim = tan(pluto%x3(2:n_az+1))
+            cos_phi_lim = cos(pluto%x3(2:n_az+1))
+            sin_phi_lim = sin(pluto%x3(2:n_az+1))
          endwhere
       endif
 
@@ -1158,6 +1168,43 @@ end subroutine define_cylindrical_grid
     return
 
   end subroutine cross_cylindrical_cell
+
+  !***********************************************************
+
+  real(dp) function distance_to_closest_wall_cyl(id,icell,x,y,z) result(s)
+
+    integer, intent(in) :: id, icell
+    real(kind=dp), intent(in) :: x,y,z
+
+    real(dp) :: r,s1,s2,s3,s4,s5,s6,z0
+    integer :: ri0,zj0,k0
+
+    ! 3D cell indices
+    call cell2cylindrical(icell, ri0,zj0,k0)
+
+    ! cyclindrical walls
+    r = sqrt(x*x+y*y)
+    s1 = r_lim(ri0)-r
+    s2 = r - r_lim(ri0-1)
+
+    ! z walls
+    z0 = abs(z)
+    zj0 = abs(zj0)
+    s3 = z_lim(ri0,abs(zj0)+1) - z
+    s4 = z - z_lim(ri0,abs(zj0))
+
+    if (l3D) then
+       ! phi walls
+       s5 = abs(x*sin_phi_lim(k0) - y*cos_phi_lim(k0))
+       s6 = abs(x*sin_phi_lim(k0-1) - y*cos_phi_lim(k0-1))
+       s = min(s1,s2,s3,s4,s5,s6)
+    else
+       s = min(s1,s2,s3,s4)
+    endif
+
+    return
+
+  end function distance_to_closest_wall_cyl
 
   !***********************************************************
 

@@ -966,7 +966,7 @@ module Voronoi_grid
 
   !----------------------------------------
 
-  real(dp) function distance_to_closest_wall(id,icell,x,y,z) result(s)
+  real(dp) function distance_to_closest_wall_Voronoi(id,icell,x,y,z) result(s)
 
 
     integer, intent(in) :: id, icell
@@ -1037,7 +1037,7 @@ module Voronoi_grid
 
     return
 
-  end function distance_to_closest_wall
+  end function distance_to_closest_wall_Voronoi
 
   !----------------------------------------
 

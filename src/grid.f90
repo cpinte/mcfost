@@ -19,6 +19,7 @@ module grid
   procedure(indice_cellule_cyl), pointer :: indice_cellule => null()
   procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
+  procedure(distance_to_closest_wall_Voronoi), pointer :: distance_to_closest_wall => null()
 
   real(kind=dp) :: v_char, B_char
   logical :: lcalc_ne, lmagnetized
@@ -307,6 +308,7 @@ subroutine setup_grid()
      indice_cellule => indice_cellule_Voronoi
      test_exit_grid => test_exit_grid_Voronoi
      define_grid => define_Voronoi_grid
+     distance_to_closest_wall => distance_to_closest_wall_Voronoi
   else
      if (lvariable_dust) then
         p_n_rad=n_rad ; p_nz = nz
