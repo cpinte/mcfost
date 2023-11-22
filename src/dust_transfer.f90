@@ -947,7 +947,7 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
      call  pos_em_cellule(icell, rand,rand2,rand3,x0,y0,z0)
 
      ! Direction de vol (uniforme)
-     call random_isotropic_direction(id, u0,u0,w0)
+     call random_isotropic_direction(id, u0,v0,w0)
 
      ! Parametres de stokes : lumi�re non polaris�e
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
