@@ -1295,7 +1295,7 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
             ltot = ltot+l
          endwhere
       else
-         ltot = ltot + l 
+         ltot = ltot + l
       end if  ! lcellule_non_vide
 
       if (all(lstop)) then
