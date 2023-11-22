@@ -40,7 +40,7 @@ contains
 
     rand = sprng(stream(id))
     w = 2.0_dp * rand - 1.0_dp
-    uv = sqrt (1.0 - w*w)
+    uv = sqrt (1.0_dp - w*w)
     rand = sprng(stream(id))
     phi = pi * (2.0_dp * rand - 1.0_dp)
     u = uv * cos(phi)
