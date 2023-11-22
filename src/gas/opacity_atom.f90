@@ -363,7 +363,7 @@ module Opacity_atom
       !    snu = eta_cont(:,icell) !n_lambda
       !    return
       ! endif
-
+!TO DO: use pointer function
       select case (limit_mem)
          case (0)
             chi = chi_cont(:,icell) !n_lambda
