@@ -1877,12 +1877,12 @@ module see
                 !cell centre
                 if (lvoronoi) then
                     x0 = Voronoi(icell)%xyz(1)
-                   	y0 = Voronoi(icell)%xyz(2)
-                   	z0 = Voronoi(icell)%xyz(3)
+                    y0 = Voronoi(icell)%xyz(2)
+                    z0 = Voronoi(icell)%xyz(3)
                 else
                     x0 = r_grid(icell)*cos(phi_grid(icell))
-                   	y0 = r_grid(icell)*sin(phi_grid(icell))
-                   	z0 = z_grid(icell)
+                    y0 = r_grid(icell)*sin(phi_grid(icell))
+                    z0 = z_grid(icell)
                 endif
 
 
