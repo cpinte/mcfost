@@ -63,15 +63,9 @@ module see
             NmaxLine = max(NmaxLine,atom%Nline)
             NlevelTotal = NlevelTotal + atom%Nlevel
             Nmaxstage = max(NmaxStage,atom%Nstage)
-            allocate(atom%Gamma(atom%Nlevel,atom%Nlevel,nb_proc))
-            do kr=1, atom%Nline
-                allocate(atom%lines(kr)%Rij(nb_proc),atom%lines(kr)%Rji(nb_proc))
-                allocate(atom%lines(kr)%Cij(nb_proc),atom%lines(kr)%Cji(nb_proc))
-            enddo
-            do kr=1, atom%Ncont
-                allocate(atom%continua(kr)%Rij(nb_proc),atom%continua(kr)%Rji(nb_proc))
-                allocate(atom%continua(kr)%Cij(nb_proc),atom%continua(kr)%Cji(nb_proc))
-            enddo
+            !allocate %Gamma, %line%Rij,Rji, %cont%Rij,Rji
+            call alloc_rates_atom(atom,nb_proc)
+            mem_alloc_local = mem_alloc_local + sizeof(atom%Gamma) + 2*(atom%Ncont+atom%Nline)*sizeof(atom%lines(1)%Rij)
             atom => null()
         enddo
 
@@ -215,6 +209,62 @@ module see
         return
     end subroutine alloc_nlte_var
 
+    subroutine alloc_rates_atom(atom,nelements)
+        integer, intent(in) :: nelements
+        type (AtomType), pointer, intent(inout) :: atom
+
+        allocate(atom%Gamma(atom%Nlevel,atom%Nlevel,nelements))
+        call alloc_radrates_atom(atom,nelements)
+        call alloc_colrates_atom(atom,nelements)
+
+        return
+    end subroutine alloc_rates_atom
+
+    subroutine alloc_radrates_atom(atom,nelements)
+        integer, intent(in) :: nelements
+        type (AtomType), pointer, intent(inout) :: atom
+        integer :: kr
+
+        do kr=1, atom%Nline
+            allocate(atom%lines(kr)%Rij(nelements),atom%lines(kr)%Rji(nelements))
+        enddo
+        do kr=1, atom%Ncont
+            allocate(atom%continua(kr)%Rij(nelements),atom%continua(kr)%Rji(nelements))
+        enddo
+
+        return
+    end subroutine alloc_radrates_atom
+
+    subroutine alloc_colrates_atom(atom,nelements)
+        integer, intent(in) :: nelements
+        type (AtomType), pointer, intent(inout) :: atom
+        integer :: kr
+
+        do kr=1, atom%Nline
+            allocate(atom%lines(kr)%Cij(nelements),atom%lines(kr)%Cji(nelements))
+        enddo
+        do kr=1, atom%Ncont
+            allocate(atom%continua(kr)%Cij(nelements),atom%continua(kr)%Cji(nelements))
+        enddo
+
+        return
+    end subroutine alloc_colrates_atom
+
+    subroutine dealloc_rates_atom(atom)
+        type (AtomType), intent(inout), pointer :: atom
+        integer :: kr
+        if (allocated(atom%Gamma)) deallocate(atom%Gamma)
+        do kr=1, atom%Nline
+            if (allocated(atom%lines(kr)%Rij))deallocate(atom%lines(kr)%Rij,atom%lines(kr)%Rji)
+            if (allocated(atom%lines(kr)%Cij))deallocate(atom%lines(kr)%Cij,atom%lines(kr)%Cji)
+        enddo
+        do kr=1, atom%Ncont
+            if (allocated(atom%continua(kr)%Rij))deallocate(atom%continua(kr)%Rij,atom%continua(kr)%Rji)
+            if (allocated(atom%continua(kr)%Cij))deallocate(atom%continua(kr)%Cij,atom%continua(kr)%Cji)
+        enddo
+        return
+    end subroutine dealloc_rates_atom 
+
     subroutine dealloc_nlte_var()
     !free space after non-lte loop.
         integer :: n, kr
@@ -227,15 +277,7 @@ module see
 
         do n=1, NactiveAtoms
             atom => ActiveAtoms(n)%p
-            deallocate(atom%Gamma)
-            do kr=1, atom%Nline
-                deallocate(atom%lines(kr)%Rij,atom%lines(kr)%Rji)
-                deallocate(atom%lines(kr)%Cij,atom%lines(kr)%Cji)
-            enddo
-            do kr=1, atom%Ncont
-                deallocate(atom%continua(kr)%Rij,atom%continua(kr)%Rji)
-                deallocate(atom%continua(kr)%Cij,atom%continua(kr)%Cji)
-            enddo
+            call dealloc_rates_atom(atom)
             atom => null()
         enddo
 
@@ -1388,31 +1430,27 @@ module see
 
 
     subroutine write_rates()
-    !From the rates, the collisional, radiative and total rates matrices can be easily
-    ! built.
         integer :: n
 
+        !For the radiative rates we need to solve the RT eq. again.
+        !Here, we store the radiative rates on the whole space !not per proc
+        call solve_for_rates()
+
         do n=1, NactiveAtoms
+            !deallocated in solve_for_rates. For nb_proc here ! computed locally
+            call alloc_colrates_atom(ActiveAtoms(n)%p,nb_proc)
+            !implies several loops on all cells for each atom / type of rates
             call write_collisional_rates_atom(ActiveAtoms(n)%p)
-            !call write_radiative_rates_atom(ActiveAtoms(n)%p)
+            call write_radiative_rates_atom(ActiveAtoms(n)%p)
+            !Do not wait to leave non-LTE loop. Free space now as %Rji can be large.
+            call dealloc_rates_atom(ActiveAtoms(n)%p)
         enddo
 
         return
     end subroutine write_rates
 
-    !TO DO
-    subroutine write_radiative_rates_atom(atom)
-        type(AtomType), intent(inout) :: atom
-        integer :: icell, id, kr, i, j, kr_start
-        real(kind=dp), dimension(:,:,:), allocatable :: rates
-        integer :: naxis, naxes(3), unit, status, nelements
-        real(kind=dp) :: nu0
-
-        return
-    end subroutine write_radiative_rates_atom
-
     subroutine write_collisional_rates_atom(atom)
-    !change axes order ?
+    !$ use omp_lib
         type(AtomType), intent(inout) :: atom
         integer :: icell, id, kr, i, j, kr_start
         real(kind=dp), dimension(:,:,:), allocatable :: rates
@@ -1424,8 +1462,13 @@ module see
         if (status>0) call error("(write_collisional_rates_atom) Cannot allocate rates!")
 
         id = 1
-        !could be para
+        !$omp parallel &
+        !$omp default(none) &
+        !$omp private(id,icell,kr)&
+        !$omp shared(n_cells,rates,atom,icompute_atomRT)
+        !$omp do schedule(dynamic,1)
         do icell=1, n_cells
+            !$ id = omp_get_thread_num() + 1
             if (icompute_atomRT(icell) > 0) then
                 if (atom%id=='H') then
                     call collision_rates_hydrogen_loc(id,icell)
@@ -1443,6 +1486,8 @@ module see
                 enddo
             endif
         enddo
+        !$omp end do
+        !$omp end parallel
 
         !get unique unit number
         call ftgiou(unit,status)
@@ -1529,6 +1574,377 @@ module see
         return
     end subroutine write_collisional_rates_atom
 
+    subroutine write_radiative_rates_atom(atom)
+    !$ use omp_lib
+        type(AtomType), intent(inout) :: atom
+        integer :: icell, id, kr, i, j, kr_start
+        real(kind=dp), dimension(:,:,:), allocatable :: rates
+        integer :: naxis, naxes(4), unit, status, nelements
+        real(kind=dp) :: nu0
 
+        allocate(rates(atom%Ntr,n_cells,2),stat=status)
+        rates(:,:,:) = 0.0_dp
+        if (status>0) call error("(write_radiative_rates_atom) Cannot allocate rates!")
+
+        id = 1
+        !$omp parallel &
+        !$omp default(none) &
+        !$omp private(id,icell,kr)&
+        !$omp shared(n_cells,rates,atom,icompute_atomRT)
+        !$omp do schedule(dynamic,1)
+        do icell=1, n_cells
+            !$ id = omp_get_thread_num() + 1
+            if (icompute_atomRT(icell) > 0) then
+                do kr=1, atom%Nline
+                    rates(kr,icell,1) = atom%lines(kr)%Rij(icell)
+                    rates(kr,icell,2) = atom%lines(kr)%Rji(icell)
+                enddo
+                do kr=atom%Ntr_line+1, atom%Ntr
+                    rates(kr,icell,1) = atom%continua(kr-atom%Ntr_line)%Rij(icell)
+                    rates(kr,icell,2) = atom%continua(kr-atom%Ntr_line)%Rji(icell)
+                enddo
+            endif
+        enddo
+        !$omp end do
+        !$omp end parallel
+
+        !get unique unit number
+        call ftgiou(unit,status)
+        if (status > 0) call print_error(status)
+
+        if (lVoronoi) then
+            naxis = 2
+            naxes(1) = n_cells
+            naxes(2) = 2
+            nelements = naxes(1) * naxes(2)
+        else
+            if (l3D) then
+                naxis = 4
+                naxes(1) = n_rad
+                naxes(2) = 2*nz
+                naxes(3) = n_az
+                naxes(4) = 2
+                nelements = naxes(1) * naxes(2) * naxes(3) * naxes(4)
+            else
+                naxis = 3
+                naxes(1) = n_rad
+                naxes(2) = nz
+                naxes(3) = 2
+                nelements = naxes(1) * naxes(2) * naxes(3)
+            end if
+        end if
+
+
+        !separate the rates in individual HDU for more clarity
+
+        call ftinit(unit,trim(atom%ID)//"_radrate.fits.gz",1,status)
+        if (status > 0) call print_error(status)
+        call ftphpr(unit,.true.,-64,naxis,naxes,0,1,.true.,status)
+        if (status > 0) call print_error(status)
+        kr = 1
+        i = atom%i_trans(kr)
+        j = atom%j_trans(kr)
+        call ftpkyj(unit, "j", j,'', status)
+        call ftpkyj(unit, "i", i, ' ', status)
+        if (atom%Nline > 1) then
+            nu0 = c_light / nm_to_m / atom%lines(kr)%lambda0
+            kr_start = atom%Ntr_line + 1
+        else
+            nu0 = c_light / nm_to_m / atom%continua(kr)%lambda0
+            kr_start = 2
+        endif
+        call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
+        call ftpprd(unit,1,1,nelements,rates(kr,:,:),status)
+
+        do kr=2, atom%Nline
+            call ftcrhd(unit, status)
+            if (status > 0) call print_error(status)
+            call ftphpr(unit,.true.,-64,naxis,naxes,0,1,.true.,status)
+            if (status > 0) call print_error(status)
+            i = atom%lines(kr)%i
+            j = atom%lines(kr)%j
+            call ftpkyj(unit, "j", j,'', status)
+            call ftpkyj(unit, "i", i, ' ', status)
+            nu0 = c_light / nm_to_m / atom%lines(kr)%lambda0
+            call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
+            call ftpprd(unit,1,1,nelements,rates(kr,:,:),status)
+        enddo
+
+        do kr=kr_start, atom%Ntr
+            call ftcrhd(unit, status)
+            if (status > 0) call print_error(status)
+            call ftphpr(unit,.true.,-64,naxis,naxes,0,1,.true.,status)
+            if (status > 0) call print_error(status)
+            i = atom%continua(kr - atom%Ntr_line)%i
+            j = atom%continua(kr - atom%Ntr_line)%j
+            call ftpkyj(unit, "j", j,'', status)
+            call ftpkyj(unit, "i", i, ' ', status)
+            nu0 = c_light / nm_to_m / atom%continua(kr-atom%Ntr_line)%lambda0
+            call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
+            call ftpprd(unit,1,1,nelements,rates(kr,:,:),status)
+        enddo
+
+        call ftclos(unit, status)
+        call ftfiou(unit, status)
+
+        if (status > 0) call print_error(status)
+
+        deallocate(rates)
+        return
+    end subroutine write_radiative_rates_atom
+
+    subroutine radrates_1ray(id,icell,iray,domega)
+    !computes radiative rates with given radiation field
+        integer, intent(in) :: id, icell, iray
+        real(kind=dp), intent(in) :: dOmega
+        real(kind=dp), dimension(Nlambda_max_trans) :: Ieff, xl
+        real(kind=dp), dimension(Nlambda_max_line) :: phi0
+        type(AtomType), pointer :: atom
+        integer :: kr, i, j, Nl, Nr, Nb, nact
+        real(kind=dp) :: jbar_up, jbar_down
+        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star, gij
+        real(kind=dp) :: ehnukt
+
+        atom_loop : do nact = 1, Nactiveatoms
+            atom => ActiveAtoms(nact)%p
+
+            line_loop : do kr=1, atom%Nline
+                if (.not.atom%lines(kr)%lcontrib) cycle line_loop
+
+                Nr = atom%lines(kr)%Nr;Nb = atom%lines(kr)%Nb
+                i = atom%lines(kr)%i
+                j = atom%lines(kr)%j
+
+                Nl = Nr - Nb + 1
+
+                phi0(1:Nl) = phi_loc(1:Nl,kr,nact,iray,id)
+                xl(1:Nl) = tab_lambda_nm(Nb:Nr)
+
+                if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle line_loop
+
+                Jbar_up = 0.0
+                wphi = 0.0
+
+                Ieff(1:Nl) = Itot(Nb:Nr,iray,id)
+!put back the explicit sum to preserve the accuracy of the integral
+                !the factor 0.5 and c_light / atom%lines(kr)%lambda0 simplfy on Jbar/wphi
+                wphi = sum( (phi0(2:Nl) + phi0(1:Nl-1)) * (xl(2:Nl) - xl(1:Nl-1))  )
+                Jbar_up = sum( (Ieff(2:Nl)*phi0(2:Nl) + Ieff(1:Nl-1)*phi0(1:Nl-1))* &
+                                (xl(2:Nl) - xl(1:Nl-1)) ) / wphi
+                jbar_down = jbar_up
+
+                !init at Aji
+                atom%lines(kr)%Rji(icell) = atom%lines(kr)%Rji(icell) + dOmega * Jbar_down * atom%lines(kr)%Bji
+                atom%lines(kr)%Rij(icell) = atom%lines(kr)%Rij(icell) + dOmega * Jbar_up * atom%lines(kr)%Bij
+
+            end do line_loop
+
+            cont_loop : do kr = 1, atom%Ncont
+                if (.not.atom%continua(kr)%lcontrib) cycle cont_loop
+
+                i = atom%continua(kr)%i; j = atom%continua(kr)%j
+
+                ni_on_nj_star = atom%ni_on_nj_star(i,icell)
+                gij = ni_on_nj_star * exp(-hc_k/T(icell)/atom%continua(kr)%lambda0)
+                if ((atom%n(i,icell) - atom%n(j,icell) * gij) <= 0.0_dp) cycle cont_loop
+
+                Nb = atom%continua(kr)%Nb; Nr = atom%continua(kr)%Nr
+                Nl = Nr-Nb + 1
+
+                Jbar_down = 0.0
+                Jbar_up = 0.0
+
+                Ieff(1:Nl) = Itot(Nb:Nr,iray,id)
+                xl(1:Nl) = tab_lambda_nm(Nb:nr)
+
+!put back the explicit sum to preserve the accuracy of the integral
+                Jbar_up = 0.5 * sum ( &
+                    (tab_vij_cont(1:Nl-1,kr,nact)*Ieff(1:Nl-1)/xl(1:Nl-1) + tab_vij_cont(2:Nl,kr,nact)*Ieff(2:Nl)/xl(2:Nl)) * &
+                    (xl(2:Nl)-xl(1:Nl-1)) &
+                )
+                Jbar_down = 0.5 * sum ( &
+                    (tab_vij_cont(1:Nl-1,kr,nact)*Ieff(1:Nl-1)/xl(1:Nl-1) * exp(-hc_k/T(icell)/xl(1:Nl-1)) + &
+                    tab_vij_cont(2:Nl,kr,nact)*Ieff(2:Nl)/xl(2:Nl) * exp(-hc_k/T(icell)/xl(2:Nl))) * &
+                    (xl(2:Nl)-xl(1:Nl-1)) &
+                )
+
+
+                ! do l=1, Nl
+                !     if (l==1) then
+                !         wl = 0.5*(tab_lambda_nm(Nb+1)-tab_lambda_nm(Nb)) / tab_lambda_nm(Nb)
+                !     elseif (l==n_lambda) then
+                !         wl = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) / tab_lambda_nm(Nr)
+                !     else
+                !         wl = 0.5*(tab_lambda_nm(i0+l+1)-tab_lambda_nm(i0+l-1)) / tab_lambda_nm(i0+l)
+                !     endif
+                !     anu = tab_Vij_cont(l,kr,nact)
+
+                !     Jbar_up = Jbar_up + anu*Ieff(l)*wl
+
+                !     ehnukt = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l))
+
+                !     Jbar_down = jbar_down + anu*Ieff(l)*ehnukt*wl
+
+                ! enddo
+
+
+                atom%continua(kr)%Rij(icell) = atom%continua(kr)%Rij(icell) + dOmega*fourpi_h * Jbar_up
+                !init at tab_Aji_cont(kr,nact,icell) <=> Aji
+                atom%continua(kr)%Rji(icell) = atom%continua(kr)%Rji(icell) + dOmega*fourpi_h * Jbar_down * ni_on_nj_star
+
+            enddo cont_loop
+            atom => NULL()
+
+        end do atom_loop
+
+        return
+    end subroutine radrates_1ray
+
+    subroutine solve_for_rates ()
+    !$ use omp_lib
+    use healpix_mod
+    use naleat, only : seed, stream, gtype
+    use optical_depth, only : integ_ray_atom
+    !For a given set of atomic populations computes and stores
+    !the different radiative rates of each atom by solving for
+    !the radiative transfer equation one more time for all directions.
+!IMPORTANT WARNING
+    !we are in the non-LTE loop. Some quantities are therefore assumed to be allocated
+    !for simplicity. If moved outside, some quantities might be required to be allocated
+    !local profiles, stream etc.
+#include "sprng_f.h"
+        integer :: icell, n, id, etape, n_rayons, iray
+        type (AtomType), pointer :: atom
+        logical :: labs, lfixed_rays
+        real :: rand, rand2, rand3
+        real(kind=dp), dimension(:), allocatable :: xmu,wmu,xmux,xmuy
+        real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
+
+        integer :: ibar, n_cells_done
+
+        write(*,*) " *** Computing radiative rates..."
+
+        id = 1
+        labs = .true. !We need the local profile. 
+                      !all non-LTE quantities (psi, phi_loc) are not freed yet.
+        !use the last step
+        etape = istep_end
+        lfixed_rays = .true.
+        if (etape==1) then
+            n_rayons = healpix_npix(healpix_lorder)
+            allocate(xmux(n_rayons),xmu(n_rayons),xmuy(n_rayons),wmu(n_rayons))
+            wmu(:) = healpix_weight(healpix_lorder)
+            call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
+        else if (etape==2) then
+            n_rayons = N_rayons_mc
+            allocate(wmu(n_rayons))
+            wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+        endif
+
+        ! first allocate the rates on the whole grid
+        do n=1, NactiveAtoms
+            atom => ActiveAtoms(n)%p
+            !Collisional rates are deallocated but we will recompute them.
+            !Gamma is not needed, we store the rates not the total rate matrix.
+            call dealloc_rates_atom(atom)
+            !only the radiative rates here are needed.
+            call alloc_radrates_atom(atom,n_cells)
+            atom => null()
+        enddo
+
+        ibar = 0
+        n_cells_done = 0
+        call progress_bar(0)
+        !$omp parallel &
+        !$omp default(none) &
+        !$omp private(weight,n,id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
+        !$omp shared(etape,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,NactiveAtoms) &
+        !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm,icompute_atomRT,activeatoms,seed,nb_proc,gtype) &
+        !$omp shared(stream,lvoronoi,ibar,n_cells_done,Itot)
+        !$omp do schedule(static,1)
+        do icell=1, n_cells
+            !$ id = omp_get_thread_num() + 1
+            stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
+            if (icompute_atomRT(icell) <= 0) cycle
+
+            do n=1, NactiveAtoms
+                call init_radrates_atom(icell,icell,ActiveAtoms(n)%p)
+            enddo
+
+            !accumulate radiative rates ray-by-ray by solving the RT eq.
+            if (etape==1) then
+
+                !cell centre
+                if (lvoronoi) then
+                    x0 = Voronoi(icell)%xyz(1)
+                   	y0 = Voronoi(icell)%xyz(2)
+                   	z0 = Voronoi(icell)%xyz(3)
+                else
+                    x0 = r_grid(icell)*cos(phi_grid(icell))
+                   	y0 = r_grid(icell)*sin(phi_grid(icell))
+                   	z0 = z_grid(icell)
+                endif
+
+
+                do iray=1, n_rayons
+
+                    w0 = xmu(iray)
+                    u0 = xmux(iray)
+                    v0 = xmuy(iray)
+
+                    weight = wmu(iray)
+
+                    !for one ray even at LTE (force-LTE)
+                    call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,1,labs,n_lambda,tab_lambda_nm)
+                    call radrates_1ray(id,icell,1,weight)
+                enddo
+
+            else
+                ! Position aleatoire dans la cellule
+                do iray=1,n_rayons
+
+                    rand  = sprng(stream(id))
+                    rand2 = sprng(stream(id))
+                    rand3 = sprng(stream(id))
+
+                    call pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+
+                    ! Direction de propagation aleatoire
+                    rand = sprng(stream(id))
+                    W0 = 2.0_dp * rand - 1.0_dp !nz
+                    W02 =  1.0_dp - W0*W0 !1-mu**2 = sin(theta)**2
+                    SRW02 = sqrt(W02)
+                    rand = sprng(stream(id))
+                    ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+                    U0 = SRW02 * cos(ARGMT) !nx = sin(theta)*cos(phi)
+                    V0 = SRW02 * sin(ARGMT) !ny = sin(theta)*sin(phi)
+
+                    weight = wmu(iray)
+
+                    !see comments on the previous step. Here even if lforce_LTE, we want the radrates
+                    call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,1,labs,n_lambda,tab_lambda_nm)
+                    call radrates_1ray(id,icell,1,weight)
+                enddo !iray
+
+            end if !etape
+
+            ! Progress bar
+            !$omp atomic
+            n_cells_done = n_cells_done + 1
+            if (real(n_cells_done) > 0.02*ibar*n_cells) then
+             	call progress_bar(ibar)
+             	!$omp atomic
+             	ibar = ibar+1
+            endif
+
+        enddo !over cells
+        !$omp end do
+        !$omp end parallel
+        call progress_bar(50)
+        write(*,*) " " !for progress bar
+        !at this point, the radiative rates have been computed for all cells for all active atoms.
+        deallocate(xmu,wmu,xmux,xmuy)
+        return
+    end subroutine solve_for_rates
 
 end module see
