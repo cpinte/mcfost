@@ -1223,7 +1223,9 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
   real(kind=dp), dimension(N) :: tau, dtau, chi, eta, tau_previous
   real(kind=dp) :: tau_max, facteur_tau
 
-  integer :: nbr_cell, next_cell, previous_cell, icell, icell_star, i_star
+  integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star
+  integer, target :: icell
+  integer, pointer :: p_icell
 
   logical :: lcellule_non_vide, lstop(N), lintersect_stars
   logical, parameter :: lsubtract_avg = .false. !images and vlabs = 0, so iray and labs not needed!
@@ -1242,6 +1244,9 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
    !flag_sortie = .true. not useful. By default, (x,y,z) are 0 if we don't reach the surface.
    x = 0.0; y = 0.0; z = 0.0
 
+   p_icell => icell_ref
+   if (lvariable_dust) p_icell => icell
+
    ! Will the ray intersect a star
    call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)
    ! Boucle infinie sur les cellules (we go over the grid.)
@@ -1253,17 +1258,14 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
       lcellule_non_vide = (icell <= n_cells)
 
       ! Test sortie ! "The ray has reach the end of the grid"
-      if (test_exit_grid(icell, x0, y0, z0)) then
-         return
-      endif
+      if (test_exit_grid(icell, x0, y0, z0)) return
 
       if (lintersect_stars) then !"will interesct"
          if (icell == icell_star) return
       endif
 
-      if (icell <= n_cells) then
-         lcellule_non_vide = (icompute_atomRT(icell) > 0)
-         if (icompute_atomRT(icell) < 0) return
+      if (lcellule_non_vide) then
+         if (icompute_atomRT(icell) == -2) lcellule_non_vide = .false.
       endif
 
       nbr_cell = nbr_cell + 1
@@ -1275,9 +1277,15 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
       !count opacity only if the cell is filled, else go to next cell
       if (lcellule_non_vide) then
 
-         call contopac_atom_loc(icell, N, lambda, chi, eta)
-         call opacity_atom_bb_loc(id,icell,1,x0,y0,z0,x1,y1,z1,u,v,w,&
-               l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,eta)
+         chi = 0.0
+         if (icompute_atomRT(icell)>0) then
+            call contopac_atom_loc(icell, N, lambda, chi, eta)
+            call opacity_atom_bb_loc(id,icell,1,x0,y0,z0,x1,y1,z1,u,v,w,&
+                  l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,eta)
+         endif
+         if (ldust_atom) then
+            chi = chi + kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * m_to_AU ! [m^-1]
+         endif
 
          dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m
          tau(:) = tau(:) + dtau(:) !for next cell
