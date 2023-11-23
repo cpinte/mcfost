@@ -24,17 +24,20 @@ subroutine setDiffusion_coeff(i)
   integer, intent(in) :: i
 
   real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
-  integer :: j, k, lambda, icell
+  integer :: j, k, lambda, icell, p_icell
 
   real(kind=dp), parameter :: precision = 1.0e-1_dp ! Variation de temperature au dela de laquelle le coeff de diff et mis a jour
   ! le mettre a 0, evite le drole de BUG
 
-  cst_Dcoeff = c_light*pi/(12.*sigma)
+  cst_Dcoeff = pi/(12.*sigma)
+
+  p_icell = icell_ref
 
   do k=1,n_az
      do j=j_start, nz
         if (j==0) cycle
         icell = cell_map(i,j,k)
+        if (lvariable_dust) p_icell = icell
         !Temp=Tdust(i,j,k)
         if (abs(DensE(i,j,k) - DensE_m1(i,j,k)) > precision * DensE_m1(i,j,k)) then
            ! On met a jour le coeff
@@ -54,7 +57,7 @@ subroutine setDiffusion_coeff(i)
               else
                  dB_dT = 0.0_dp
               endif
-              somme = somme + dB_dT/kappa(icell,lambda) * delta_wl
+              somme = somme + dB_dT/(kappa(p_icell,lambda) * kappa_factor(icell))  * delta_wl
            enddo
            ! kappa_R = 4.*sigma * Temp**3 / (pi * somme)
            ! Dcoeff = c_light/(3kappa_R) car kappa volumique
@@ -83,14 +86,17 @@ subroutine setDiffusion_coeff0(i)
   integer, intent(in) :: i
 
   real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
-  integer :: j, k, lambda, icell
+  integer :: j, k, lambda, icell, p_icell
 
-  cst_Dcoeff = c_light*pi/(12.*sigma)
+  cst_Dcoeff = pi/(12.*sigma)
+
+  p_icell = icell_ref
 
   do k=1,n_az
      do j=j_start,nz
         if (j==0) cycle
         icell = cell_map(i,j,k)
+        if (lvariable_dust) p_icell = icell
         Temp=Tdust(icell)
         cst=cst_th/Temp
         somme=0.0_dp
@@ -105,7 +111,7 @@ subroutine setDiffusion_coeff0(i)
            else
               dB_dT = 0.0_dp
            endif
-           somme = somme + dB_dT/kappa(icell,lambda) * delta_wl
+           somme = somme + dB_dT/(kappa(p_icell,lambda)*kappa_factor(icell)) * delta_wl
         enddo
         ! kappa_R = 4.*sigma * Temp**3 / (pi * somme)
         ! Dcoeff = c_light/(3kappa_R) car kappa volumique
