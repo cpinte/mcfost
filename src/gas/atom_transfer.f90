@@ -47,7 +47,7 @@ module atom_transfer
 
    use healpix_mod
    !$ use omp_lib
-   use  naleat, only : seed, stream, gtype
+   use naleat, only : seed, stream, gtype
 
    implicit none
 
@@ -873,12 +873,9 @@ module atom_transfer
    end subroutine nlte_loop_mali
 
   subroutine compute_max_relative_velocity(dv)
-  !
-  ! TO DO: building, add maximum velocity difference between
-  !   all cells in all directions.
-  !   Compute mean velocity gradient for Sobolev
+  ! Compute the maximum velocity difference between pairs of cells.
       use molecular_emission, only : v_proj
-      ! use grid, only : cross_cell, test_exit_grid
+      use grid, only : cross_cell, test_exit_grid
       real(kind=dp), intent(out) :: dv
       real(kind=dp) :: v1,v2
       integer :: i1, i2, id
@@ -891,20 +888,22 @@ module atom_transfer
       ! real(kind=dp) :: u, v, w, x0, y0, z0, x, y, z, x1, y1, z1
       ! real(kind=dp) :: w02, srw02, argmt,l, l_contrib, l_void_before
 
+      ! ! Evaluate the max velocity gradient between pairs of cells directly from
+      ! ! different rays crossing pairs of cells.
+
+      ! !first evaluate max velocity (module)
       ! if (lvoronoi) then
       !    dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
       ! else
       !    dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
       ! endif
 
+      ! !avoid complicated calculations if there is not velocity fields.
       ! if (dv==0.0_dp) return
 
       ! if (allocated(stream)) deallocate(stream)
       ! allocate(stream(nb_proc))
-      ! stream = 0.0
-      ! do i=1,nb_proc
-      !    stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-      ! end do
+      ! stream = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
 
       ! id = 1
       ! dv = 0.0_dp
@@ -945,9 +944,8 @@ module atom_transfer
       !          if (lintersect_stars) then
       !             if (i2 == icell_star) exit infinie
       !          end if
-      !          if (i2 <= n_cells) then
-      !             lcellule_non_vide = (icompute_atomRT(i2) > 0)
-      !             if (icompute_atomRT(i2) < 0) exit infinie
+      !          if (lcellule_non_vide) then
+      !             if (icompute_atomRT(i2) <= 0) exit infinie
       !          endif
 
       !          call cross_cell(x0,y0,z0, u,v,w, i2, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
@@ -968,50 +966,53 @@ module atom_transfer
 
       ! return
 
+      ! Evaluate the max velocity gradient between pairs of cells directly from
+      ! the velocity of each cell.
+
       if (lvoronoi) then
          dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2,mask=icompute_atomRT>0) )
          if (dv == 0.0_dp) return
 
-         ! dv = 0.0_dp
-         ! !$omp parallel &
-         ! !$omp default(none) &
-         ! !$omp private(id,i1, i2,v1, v2)&
-         ! !$omp shared(dv, icompute_atomRT, Voronoi, n_Cells)
-         ! !$omp do schedule(dynamic,1)
-         ! do i1=1,n_cells
-         !    !$ id = omp_get_thread_num() + 1
-         !    v1 = sqrt(sum(Voronoi(i1)%vxyz**2))
-         !    do i2=1,n_cells
-         !       v2 = sqrt(sum(Voronoi(i2)%vxyz**2))
-         !       if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
-         !          dv = max(dv,abs(v1-v2))
-         !       endif
-         !    enddo
-         ! enddo
-         ! !$omp end do
-         ! !$omp end parallel
+         dv = 0.0_dp
+         !$omp parallel &
+         !$omp default(none) &
+         !$omp private(id,i1, i2,v1, v2)&
+         !$omp shared(dv, icompute_atomRT, Voronoi, n_Cells)
+         !$omp do schedule(dynamic,1)
+         do i1=1,n_cells
+            !$ id = omp_get_thread_num() + 1
+            v1 = sqrt(sum(Voronoi(i1)%vxyz**2))
+            do i2=1,n_cells
+               v2 = sqrt(sum(Voronoi(i2)%vxyz**2))
+               if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+                  dv = max(dv,abs(v1-v2))
+               endif
+            enddo
+         enddo
+         !$omp end do
+         !$omp end parallel
       else
          dv = sqrt( maxval(sum(vfield3d**2,dim=2),mask=icompute_atomRT>0) )
          if (dv==0.0_dp) return
 
-      !    dv = 0.0_dp
-      !    !$omp parallel &
-      !    !$omp default(none) &
-      !    !$omp private(id,i1,i2,v1,v2)&
-      !    !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells)
-      !    !$omp do schedule(dynamic,1)
-      !    do i1=1,n_cells
-      !       !$ id = omp_get_thread_num() + 1
-      !       v1 = sqrt(sum(vfield3d(i1,:)**2))
-      !       do i2=1,n_cells
-      !          v2 = sqrt(sum(vfield3d(i2,:)**2))
-      !          if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
-      !             dv = max(dv,abs(v1-v2))
-      !          endif
-      !       enddo
-      !    enddo
-      !    !$omp end do
-      !    !$omp end parallel
+         dv = 0.0_dp
+         !$omp parallel &
+         !$omp default(none) &
+         !$omp private(id,i1,i2,v1,v2)&
+         !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells)
+         !$omp do schedule(dynamic,1)
+         do i1=1,n_cells
+            !$ id = omp_get_thread_num() + 1
+            v1 = sqrt(sum(vfield3d(i1,:)**2))
+            do i2=1,n_cells
+               v2 = sqrt(sum(vfield3d(i2,:)**2))
+               if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+                  dv = max(dv,abs(v1-v2))
+               endif
+            enddo
+         enddo
+         !$omp end do
+         !$omp end parallel
       endif
 
       write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
@@ -1129,7 +1130,8 @@ module atom_transfer
       call ltepops_atoms()
       !used for the extension of Voigt profiles
       call set_max_damping()
-
+         call compute_max_relative_velocity(v_char)
+         stop
       if( Nactiveatoms > 0) then
 
          call compute_max_relative_velocity(v_char)
