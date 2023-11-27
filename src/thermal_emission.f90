@@ -701,7 +701,7 @@ subroutine Temp_LTE(id, icell, Ti, Temp, frac)
   endif
 
   ! Save pour prochaine reemission et/ou T finale
-  xT_ech(icell,id) = Ti
+  if (id>0) xT_ech(icell,id) = Ti
 
   return
 
