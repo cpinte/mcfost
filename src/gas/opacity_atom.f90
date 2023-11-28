@@ -20,6 +20,7 @@ module Opacity_atom
 
    implicit none
 
+   procedure(contopac_atom_loc_mem0), pointer :: contopac_atom_loc => contopac_atom_loc_mem0
    procedure (cross_coupling_cont), pointer :: xcoupling_cont => cross_coupling_cont
    real(kind=dp), allocatable, dimension(:,:) :: chi_cont, eta_cont
    !local profile for cell id in direction iray for all atoms and b-b trans
@@ -137,6 +138,11 @@ module Opacity_atom
          !-> on a small grid and interpolated later
          np = n_lambda_cont
          xp = tab_lambda_cont
+         if (limit_mem==1) then
+            contopac_atom_loc => contopac_atom_loc_mem1
+         else
+            contopac_atom_loc => contopac_atom_loc_mem2
+         endif
       !FOR NOW:
       !limit_mem == 2 ==> computed locally on tab_lambda_cont and interpolated locally on tab_lambda_nm.
       !if faster compute it direclty on tab_lambda_nm but I think local computation on tab_lambda_cont + interp is faster.
@@ -144,6 +150,7 @@ module Opacity_atom
       else !computed and stored on tab_lambda_nm
          np = n
          xp = x
+         contopac_atom_loc => contopac_atom_loc_mem0
       endif
       !always allocated enven with limit_mem = 2 but they are very small!!!
       call alloc_gas_contopac(np,xp)
@@ -322,7 +329,45 @@ module Opacity_atom
       return
    end subroutine calc_contopac
 
-   subroutine contopac_atom_loc(icell,N,lambda,chi,snu)
+   subroutine contopac_atom_loc_mem0(icell,N,lambda,chi,snu)
+      integer, intent(in) :: icell, N
+      real(kind=dp), intent(in), dimension(N) :: lambda
+      real(kind=dp), intent(inout), dimension(N) :: chi, Snu
+
+      chi = chi_cont(:,icell) !n_lambda
+      snu = eta_cont(:,icell) !n_lambda
+      return  
+ 
+   end subroutine contopac_atom_loc_mem0
+
+   subroutine contopac_atom_loc_mem1(icell,N,lambda,chi,snu)
+      integer, intent(in) :: icell, N
+      real(kind=dp), intent(in), dimension(N) :: lambda
+      real(kind=dp), intent(inout), dimension(N) :: chi, Snu
+      !could create a separate routine to not overload the memory with that kind of static alloc.
+      integer :: la, lac, i0
+      real(kind=dp) :: w
+
+      !linear interpolation from tab_lambda_cont to lambda
+      i0 = 2
+      do la=1, N
+         loop_i : do lac=i0, n_lambda_cont
+            if (tab_lambda_cont(lac) > lambda(la)) then
+               w = (lambda(la) - tab_lambda_cont(lac-1)) / (tab_lambda_cont(lac) - tab_lambda_cont(lac-1))
+               chi(la) = (1.0_dp - w) * chi_cont(lac-1,icell)  + w * chi_cont(lac,icell)
+               snu(la) = (1.0_dp - w) * eta_cont(lac-1,icell)  + w * eta_cont(lac,icell)
+               i0 = lac
+               exit loop_i
+            endif
+         enddo loop_i
+      enddo
+      chi(N) = chi_cont(n_lambda_cont,icell)
+      snu(N) = eta_cont(n_lambda_cont,icell)
+
+      return
+   end subroutine contopac_atom_loc_mem1
+
+   subroutine contopac_atom_loc_mem2(icell,N,lambda,chi,snu)
       integer, intent(in) :: icell, N
       real(kind=dp), intent(in), dimension(N) :: lambda
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
@@ -331,53 +376,11 @@ module Opacity_atom
       integer :: la, lac, i0
       real(kind=dp) :: w
 
-      ! if (limit_mem > 0) then
-      !    !n_lambda_cont
-      !    if (limit_mem == 2) then
-      !       !init continuous opacity with background gas continuum.
-      !       call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
-      !       !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
-      !       !accumulate b-f
-      !       call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
-      !    else 
-      !       chic(:) = chi_cont(:,icell)
-      !       snuc(:) = eta_cont(:,icell)
-      !    endif
-      ! else
-      !    chi = chi_cont(:,icell) !n_lambda
-      !    snu = eta_cont(:,icell) !n_lambda
-      !    return
-      ! endif
-      ! if (limit_mem == 2) then
-      !    !n_lambda_cont
-      !    !init continuous opacity with background gas continuum.
-      !    call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
-      !    !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
-      !    !accumulate b-f
-      !    call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
-      ! elseif (limit_mem == 1) tehn 
-      !    chic(:) = chi_cont(:,icell)
-      !    snuc(:) = eta_cont(:,icell)
-      ! elseif (limit_mem == 0)
-      !    chi = chi_cont(:,icell) !n_lambda
-      !    snu = eta_cont(:,icell) !n_lambda
-      !    return
-      ! endif
-!TO DO: use pointer function
-      select case (limit_mem)
-         case (0)
-            chi = chi_cont(:,icell) !n_lambda
-            snu = eta_cont(:,icell) !n_lambda
-            return  
-         case (1)
-            chic(:) = chi_cont(:,icell)
-            snuc(:) = eta_cont(:,icell)
-         case (2)
-            call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
-            !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
-            !accumulate b-f
-            call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)  
-      end select
+
+      call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
+      !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
+      !accumulate b-f
+      call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)  
 
       !linear interpolation from tab_lambda_cont to lambda
       i0 = 2
@@ -396,7 +399,8 @@ module Opacity_atom
       snu(N) = snuc(n_lambda_cont)
 
       return
-   end subroutine contopac_atom_loc
+   end subroutine contopac_atom_loc_mem2
+
 !change the index such that they point to diffezrent values if limit>0 or not
 !only for the non-LTE mode and the flux mode ? for the ray-tracing of lines tab_lambda_nm=tab_lambda_cont already
    subroutine opacity_atom_bf_loc(icell,N,lambda,chi,Snu)
