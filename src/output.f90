@@ -324,7 +324,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
   u1=uin ; v1=vin ; w1=win
   stok=stokin
 
-  !*     utilisation de la symetrie centrale
+  ! Utilisation de la symetrie centrale
   if (w1 < 0.0) then
      if (l_sym_centrale) then
         x1 = -x1
