@@ -344,7 +344,6 @@ module Opacity_atom
       integer, intent(in) :: icell, N
       real(kind=dp), intent(in), dimension(N) :: lambda
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
-      !could create a separate routine to not overload the memory with that kind of static alloc.
       integer :: la, lac, i0
       real(kind=dp) :: w
 
@@ -371,7 +370,6 @@ module Opacity_atom
       integer, intent(in) :: icell, N
       real(kind=dp), intent(in), dimension(N) :: lambda
       real(kind=dp), intent(inout), dimension(N) :: chi, Snu
-      !could create a separate routine to not overload the memory with that kind of static alloc.
       real(kind=dp), dimension(N_lambda_cont) :: chic, snuc
       integer :: la, lac, i0
       real(kind=dp) :: w
