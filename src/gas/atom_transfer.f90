@@ -44,6 +44,7 @@ module atom_transfer
    use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol,emissivite_dust
    use dust_prop, only : prop_grains, opacite, init_indices_optiques, kappa_abs_lte, kappa, kappa_factor
    use scattering
+   use escape, only : alloc_escape_variables, mean_velocity_gradient
 
    use healpix_mod
    !$ use omp_lib
@@ -880,94 +881,99 @@ module atom_transfer
       real(kind=dp) :: v1,v2
       integer :: i1, i2, id
 
-      ! integer, parameter :: n_rayons = 10000
-      ! integer :: i, next_cell, previous_cell
-      ! integer :: i_star, icell_star
-      ! logical :: lintersect_stars, lcellule_non_vide
-      ! real :: rand, rand2, rand3
-      ! real(kind=dp) :: u, v, w, x0, y0, z0, x, y, z, x1, y1, z1
-      ! real(kind=dp) :: w02, srw02, argmt,l, l_contrib, l_void_before
-
-      ! ! Evaluate the max velocity gradient between pairs of cells directly from
-      ! ! different rays crossing pairs of cells.
-
-      ! !first evaluate max velocity (module)
-      ! if (lvoronoi) then
-      !    dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
-      ! else
-      !    dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
-      ! endif
-
-      ! !avoid complicated calculations if there is not velocity fields.
-      ! if (dv==0.0_dp) return
-
-      ! if (allocated(stream)) deallocate(stream)
-      ! allocate(stream(nb_proc))
-      ! stream = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
-
-      ! id = 1
-      ! dv = 0.0_dp
-      ! !$omp parallel &
-      ! !$omp default(none) &
-      ! !$omp private(id,i1,i2,v1,v2,rand,rand2,rand3,u,v,w,x0,y0,z0,argmt,w02,srw02,x,y,z,i_star,icell_star)&
-      ! !$omp private(i,x1,y1,z1,l,l_contrib,l_void_before,next_cell,previous_cell,lcellule_non_vide,lintersect_stars)&
-      ! !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells,stream,cross_cell,pos_em_cellule, test_exit_grid)
-      ! !$omp do schedule(static,1)
-      ! do i1=1,n_cells
-      !    !$ id = omp_get_thread_num() + 1
-      !    if (icompute_atomRT(i1) <= 0) cycle
-      !    !compute velocity gradient between all cells in the ray path from i1
-      !    do i=1, n_rayons
-      !       rand  = sprng(stream(id))
-      !       rand2 = sprng(stream(id))
-      !       rand3 = sprng(stream(id))
-      !       call pos_em_cellule(i1,rand,rand2,rand3,x,y,z)
-      !       rand = sprng(stream(id))
-      !       W = 2.0_dp * rand - 1.0_dp
-      !       W02 =  1.0_dp - W*W
-      !       SRW02 = sqrt(W02)
-      !       rand = sprng(stream(id))
-      !       ARGMT = PI * (2.0_dp * rand - 1.0_dp)
-      !       U = SRW02 * cos(ARGMT)
-      !       V = SRW02 * sin(ARGMT)
-
-      !       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-      !       x1=x;y1=y;z1=z
-      !       x0=x;y0=y;z0=z
-      !       next_cell = i1
-      !       v1 = v_proj(i1,x0,y0,z0,u,v,w)
-      !       infinie : do ! Boucle infinie
-      !          i2 = next_cell
-      !          x0=x1 ; y0=y1 ; z0=z1
-      !          lcellule_non_vide = (i2 <= n_cells)
-      !          if (test_exit_grid(i2, x0, y0, z0)) exit infinie
-      !          if (lintersect_stars) then
-      !             if (i2 == icell_star) exit infinie
-      !          end if
-      !          if (lcellule_non_vide) then
-      !             if (icompute_atomRT(i2) <= 0) exit infinie
-      !          endif
-
-      !          call cross_cell(x0,y0,z0, u,v,w, i2, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-
-      !          !compute velocity gradient between cell i1 and crossed cells i2
-      !          if (lcellule_non_vide) then
-      !             v2 = v_proj(i2,x0,y0,z0,u,v,w)
-      !             dv = max(dv,abs(v2-v1))
-      !          endif
-
-      !       enddo infinie
-      !    enddo
-      ! enddo
-      ! !$omp end do
-      ! !$omp end parallel
-      ! deallocate(stream)
-      ! write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
-
-      ! return
+      integer, parameter :: n_rayons = 1000
+      integer :: i, next_cell, previous_cell
+      integer :: i_star, icell_star
+      logical :: lintersect_stars, lcellule_non_vide
+      real :: rand, rand2, rand3
+      real(kind=dp) :: u, v, w, x0, y0, z0, x, y, z, x1, y1, z1
+      real(kind=dp) :: w02, srw02, argmt,l, l_contrib, l_void_before
 
       ! Evaluate the max velocity gradient between pairs of cells directly from
-      ! the velocity of each cell.
+      ! different rays crossing pairs of cells. Takes into account the sign of the projected velocity.
+
+      !first evaluate max velocity (module)
+      if (lvoronoi) then
+         dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
+      else
+         dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+      endif
+
+      !avoid complicated calculations if there is not velocity fields.
+      if (dv==0.0_dp) return
+
+      if (allocated(stream)) deallocate(stream)
+      allocate(stream(nb_proc))
+      stream = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+
+!***
+!*** Is it normal that the max shift can be over the velocity max from vfield or %vxyz ??
+!*** Simply comment, and uses the other approach
+      id = 1
+      dv = 0.0_dp
+      !$omp parallel &
+      !$omp default(none) &
+      !$omp private(id,i1,i2,v1,v2,rand,rand2,rand3,u,v,w,x0,y0,z0,argmt,w02,srw02,x,y,z,i_star,icell_star)&
+      !$omp private(i,x1,y1,z1,l,l_contrib,l_void_before,next_cell,previous_cell,lcellule_non_vide,lintersect_stars)&
+      !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells,stream,cross_cell,pos_em_cellule, test_exit_grid)
+      !$omp do schedule(static,1)
+      do i1=1,n_cells
+         !$ id = omp_get_thread_num() + 1
+         if (icompute_atomRT(i1) <= 0) cycle
+         !compute velocity gradient between all cells in the ray path from i1
+         do i=1, n_rayons
+            rand  = sprng(stream(id))
+            rand2 = sprng(stream(id))
+            rand3 = sprng(stream(id))
+            call pos_em_cellule(i1,rand,rand2,rand3,x,y,z)
+            rand = sprng(stream(id))
+            W = 2.0_dp * rand - 1.0_dp
+            W02 =  1.0_dp - W*W
+            SRW02 = sqrt(W02)
+            rand = sprng(stream(id))
+            ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+            U = SRW02 * cos(ARGMT)
+            V = SRW02 * sin(ARGMT)
+
+            call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+            x1=x;y1=y;z1=z
+            x0=x;y0=y;z0=z
+            next_cell = i1
+            v1 = v_proj(i1,x0,y0,z0,u,v,w)
+            infinie : do ! Boucle infinie
+               i2 = next_cell
+               x0=x1 ; y0=y1 ; z0=z1
+               lcellule_non_vide = (i2 <= n_cells)
+               if (test_exit_grid(i2, x0, y0, z0)) exit infinie
+               if (lintersect_stars) then
+                  if (i2 == icell_star) exit infinie
+               end if
+               if (lcellule_non_vide) then
+                  if (icompute_atomRT(i2) == -2) exit infinie
+               endif
+
+               call cross_cell(x0,y0,z0, u,v,w, i2, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+               !compute velocity gradient between cell i1 and crossed cells i2
+               if (lcellule_non_vide) then
+                  if (icompute_atomRT(i2)>0) then
+                     v2 = v_proj(i2,x1,y1,z1,u,v,w)
+                     dv = max(dv,abs(v2-v1))
+                  endif
+               endif
+
+            enddo infinie
+         enddo
+      enddo
+      !$omp end do
+      !$omp end parallel
+      deallocate(stream)
+      write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
+
+      return
+
+      ! Evaluate the max velocity gradient between pairs of cells directly from
+      ! the velocity of each cell. The sign of the projected velocity is ignored
 
       if (lvoronoi) then
          dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2,mask=icompute_atomRT>0) )
@@ -1130,8 +1136,13 @@ module atom_transfer
       call ltepops_atoms()
       !used for the extension of Voigt profiles
       call set_max_damping()
-         call compute_max_relative_velocity(v_char)
+
+         call alloc_escape_variables()
+         call mean_velocity_gradient()
          stop
+
+
+
       if( Nactiveatoms > 0) then
 
          call compute_max_relative_velocity(v_char)

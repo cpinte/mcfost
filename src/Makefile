@@ -248,7 +248,7 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 me
           io_phantom_utils.f90 mess_up_SPH.f90 read_phantom.f90     \
           read_gadget2.f90 SPH2mcfost.f90 mhd2mcfost.f90 dust_transfer.f90          \
           mol_transfer.f90 collision_atom.f90 io_atom.f90           \
-          electron_density.f90 see.f90                              \
+          electron_density.f90 see.f90 escape.f90                             \
           atom_transfer.f90
 
 OBJECTS= $(SOURCES:.f90=.o)
