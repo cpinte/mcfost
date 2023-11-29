@@ -1945,7 +1945,8 @@ module see
         call progress_bar(50)
         write(*,*) " " !for progress bar
         !at this point, the radiative rates have been computed for all cells for all active atoms.
-        deallocate(xmu,wmu,xmux,xmuy)
+        deallocate(wmu)
+        if (allocated(xmu)) deallocate(xmu,xmux,xmuy)
         return
     end subroutine solve_for_rates
 
