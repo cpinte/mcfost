@@ -232,7 +232,7 @@ module Voronoi_grid
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     character(len=2) :: unit
 
-    logical, parameter :: lrandom = .true.
+    logical :: lrandom
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
@@ -298,6 +298,10 @@ module Voronoi_grid
     n_cells_before_stars = icell
     n_cells = icell
     n_cells_per_cpu = (1.0*n_cells) / nb_proc_voro + 1
+
+
+    lrandom = .true.
+    if (lnot_random_Voronoi) lrandom = .false.
 
     ! Randomizing particles
     if (lrandom) then
