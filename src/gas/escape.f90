@@ -11,7 +11,17 @@ module escape
     use stars, only : is_inshock, intersect_stars, star_rad
     use mem, only : emissivite_dust
     use dust_prop, only : kappa_abs_lte, kappa, kappa_factor
-    use opacity_atom, only : contopac_atom_loc
+    use opacity_atom, only : contopac_atom_loc, vlabs, Itot, calc_contopac_loc
+    use atom_type, only : n_atoms, Atoms, ActiveAtoms, atomtype, NactiveAtoms, &
+        lcswitch_enabled, vbroad, maxval_cswitch_atoms, NpassiveAtoms, PassiveAtoms, adjust_cswitch_atoms
+    use see, only : alloc_nlte_var, neq_ng, ngpop, small_nlte_fraction, tab_Aji_cont, tab_Vij_cont, &
+        dealloc_nlte_var, update_populations, init_colrates_atom
+    use wavelengths, only : n_lambda
+    use wavelengths_gas, only : tab_lambda_nm, tab_lambda_cont, n_lambda_cont, Nlambda_max_trans, Nlambda_max_line
+    use lte, only : ltepops_atoms, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
+    use broad, only : line_damping
+    use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
+    use voigts, only : voigt
 
    !$ use omp_lib
 
@@ -21,8 +31,58 @@ module escape
 
     real(kind=dp), allocatable, dimension(:,:) :: d_to_star, wdi, domega_star, domega_core, domega_shock, dv_proj
     real(kind=dp), allocatable, dimension(:) :: mean_grad_v, mean_length_scale
+    real(kind=dp), allocatable, dimension(:,:,:,:) :: I0_line
 
     contains
+
+    subroutine init_rates_escape(id,icell)
+        integer, intent(in) :: id, icell
+        integer :: n
+
+        do n=1,NactiveAtoms
+            call init_radrates_escape_atom(id,icell,ActiveAtoms(n)%p)
+
+            !x ne included. Derivatives to ne not included.
+            if (activeatoms(n)%p%id=='H') then
+                ! call init_colrates_atom(id,ActiveAtoms(n)%p)
+                call collision_rates_hydrogen_loc(id,icell)
+            else
+                call init_colrates_atom(id,ActiveAtoms(n)%p)
+                call collision_rates_atom_loc(id,icell,ActiveAtoms(n)%p)
+            endif
+        enddo
+
+        return
+    end subroutine init_rates_escape
+
+    subroutine init_radrates_escape_atom(id,icell,atom)
+        integer, intent(in) :: id, icell
+        type (atomtype), intent(inout) :: atom
+        integer :: kr, i, j
+        real(kind=dp) :: nlte_fact
+        nlte_fact = 1.0_dp
+        if (lforce_lte) nlte_fact = 0.0_dp
+
+        do kr=1,atom%Ncont
+            i = atom%continua(kr)%i; j = atom%continua(kr)%j
+            atom%continua(kr)%Rij(id) = 0.0_dp
+            !updated value of ni and nj!
+            !-> 0 if cont does not contribute to opac.
+            ! atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
+            !      atom%nstar(i,icell)/atom%nstar(j,icell)
+            atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
+                 atom%ni_on_nj_star(i,icell)
+            !check ratio ni_on_nj_star for the continua when there are multiple ionisation states (works for H, test for He)
+        enddo
+
+        do kr=1,atom%Nline
+            atom%lines(kr)%Rij(id) = 0.0_dp
+            atom%lines(kr)%Rji(id) = 0.0_dp !no init at Aji
+        enddo
+
+        return
+
+    end subroutine init_radrates_escape_atom
 
     subroutine alloc_escape_variables()
 
@@ -91,7 +151,7 @@ module escape
         !$omp private(l1,l2,l3,xa,xb,xc,xa1,xb1,xc1,icell_in,Tchoc,F1,T1,lintersect) &
         !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average)&
         !$omp shared(phi_grid,r_grid,z_grid,pos_em_cellule,ibar, n_cells_done,stream,n_cells)&
-        !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT)&
+        !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles)&
         !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock)
         !$omp do schedule(static,1)
         do icell=1, n_cells
@@ -228,7 +288,7 @@ module escape
     !   - optically thin excitation with no lines for continua
     !   - MC rays (no healpix)
         integer :: iray, n_iter, id, i, alloc_status
-        integer, parameter :: n_rayons = 1000
+        integer, parameter :: n_rayons = 100
         integer :: nact, imax, icell_max, icell_max_2
         integer :: icell, ilevel, nb, nr, unconverged_cells
         integer, parameter :: maxIter = 300
@@ -241,6 +301,7 @@ module escape
         real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
         real(kind=dp) :: diff, diff_old, dne, dN, dN1, dNc
         real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
+        integer :: NmaxLine
         logical, allocatable :: lcell_converged(:)
 
         logical :: labs
@@ -274,19 +335,20 @@ module escape
         integer :: ibar, n_cells_done
 
         ! -------------------------------- INITIALIZATION -------------------------------- !
-        write(*,*) '-------------------------- NON-LTE LOOP ------------------------------ '
+        write(*,*) '---------------------- SOBOLEV NON-LTE LOOP -------------------------- '
         time_nlte_loop = 0!total time in the non-LTE loop for all steps
         time_nlte_loop_cpu = 0
-        !non-LTE mode
-        lnon_lte_loop = .true. !for substracting speed of reference cell.
         labs = .true.
         lfixed_rays = .true.
         id = 1
 
         !Use non-LTE pops for electrons and background opacities.
+        NmaxLine = 0
         do nact=1,NactiveAtoms
             if (.not.activeatoms(nact)%p%nltepops) activeatoms(nact)%p%nltepops = .true.
+            Nmaxline = max(NmaxLine,activeatoms(nact)%p%nline)
         enddo
+        allocate(I0_line(Nlambda_max_line,NmaxLine,NactiveAtoms,nb_proc)); I0_line = 0.0_dp
 
         allocate(dM(Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
         allocate(dTM(Nactiveatoms)); dTM=0d0 !keep tracks of Tex for all cells for each atom
@@ -307,6 +369,7 @@ module escape
         if (allocated(ds)) deallocate(ds)
         allocate(ds(one_ray,nb_proc))
         allocate(vlabs(one_ray,nb_proc))
+        allocate(dv_proj(one_ray,nb_proc))
         allocate(lcell_converged(n_cells),stat=alloc_status)
         if (alloc_Status > 0) call error("Allocation error lcell_converged")
         write(*,*) " size lcell_converged:", sizeof(lcell_converged) / 1024./1024./1024.," GB"
@@ -389,20 +452,29 @@ module escape
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff)&
             !$omp private(nact, at) & ! Acceleration of convergence
-            !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on, Jnu, iloc) & ! Ng's Acceleration of convergence
-            !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
+            !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on,wmu) & ! Ng's Acceleration of convergence
+            !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
-            !$omp do schedule(static,omp_chunk_size)
+            !$omp do schedule(static,1)
             do icell=1, n_cells
                 !$ id = omp_get_thread_num() + 1
                 stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-                if (icompute_atomRT(icell)<=0) cycle
+                if (icompute_atomRT(icell)<=0) then
+                    !$omp atomic
+                    n_cells_done = n_cells_done + 1
+                    if (real(n_cells_done) > 0.02*ibar*n_cells) then
+                        call progress_bar(ibar)
+             	        !$omp atomic
+             	        ibar = ibar+1
+                    endif
+                    cycle
+                endif
                 ! if( (diff_loc(icell) < 5d-2 * precision).and..not.lcswitch_enabled ) cycle
 
                 !Init upward radiative rates to 0 and downward radiative rates to Aji or "Aji_cont"
                 !Init collisional rates
-                call init_rates(id,icell)
+                call init_rates_escape(id,icell)
 
                 ! Position aleatoire dans la cellule
                 do iray=1,n_rayons
@@ -426,8 +498,9 @@ module escape
                     weight = wmu(iray)
 
                     !for one ray, if lforce_lte we don't enter here
-                    - soblev intens
-                    - accumulate rate sobolev in that direction
+                    !TO DO: use only continuum wavelength in this one ???
+                    Itot(:,1,id) = I_sobolev_1ray(id,icell,x0,y0,z0,u0,v0,w0,1,n_lambda,tab_lambda_nm)
+                    call accumulate_radrates_sobolev_1ray(id,icell,1,weight)
                 enddo !iray
 
 
@@ -475,7 +548,7 @@ module escape
             !***********************************************************!
             ! ********************** GLOBAL NG's ***********************!
             ! Here minimize Ncells x Nlevels x Ng_Norder per atoms.
-            ! accelerated = .false.!(maxval_cswitch_atoms()==1.0_dp)
+            accelerated = .false.!(maxval_cswitch_atoms()==1.0_dp)
             ! if ( (lNg_acceleration .and. lng_turned_on).and.(.not.lcswitch_enabled)&
             !       .and.(.not.lprevious_converged) ) then
             !    iorder = n_iter - Ng_Ndelay
@@ -779,7 +852,7 @@ module escape
                   write(*,*) " time etape (cpu):", mod(time_iter_avg * nb_proc/60.,60.), " min"
                   write(*,*) ' time =',mod(time_nlte/60.,60.), " min"
                   lexit_after_nonlte_loop = .true.
-                  exit step_loop
+                  exit
                endif
             endif
             !***********************************************************!
@@ -798,11 +871,7 @@ module escape
                  mod(n_iter * time_iter_avg/60.,60.)
          write(*,'(" --> ~time step (cpu)="(1F8.4)" min")') mod(n_iter * time_iter_avg * nb_proc/60.,60.)
 
-         if (allocated(xmu)) deallocate(xmux,xmuy,xmu)
          if (allocated(wmu)) deallocate(wmu)
-
-         ! write(*,'("  <step #"(1I1)" done! :: threshold="(1ES17.8E3)">")') etape,  precision
-         write(*,'("  <step #"(1I1)" done!>")') etape
 
 
       ! -------------------------------- CLEANING ------------------------------------------ !
@@ -820,12 +889,11 @@ module escape
     !   if (loutput_rates) call write_rates()
 
       call dealloc_nlte_var()
-      deallocate(dM, dTM, Tex_ref, Tion_ref)
-      deallocate(diff_loc, dne_loc)
+      deallocate(dM, dTM, Tex_ref, Tion_ref, dv_proj)
+      deallocate(diff_loc, dne_loc,I0_line)
       deallocate(stream, ds, vlabs, lcell_converged)
 
       ! --------------------------------    END    ------------------------------------------ !
-      lnon_lte_loop = .false.
       if (mod(time_nlte_loop/60./60.,60.) > 1.0_dp) then
          write(*,*) ' (non-LTE loop) time =',mod(time_nlte_loop/60./60.,60.), " h"
       else
@@ -837,97 +905,118 @@ module escape
     end subroutine nlte_loop_sobolev
 
 
-!     subroutine calc_rates_sobolev_1ray(id, icell, iray, dOmega)
-!         integer, intent(in) :: id, icell, iray
-!         real(kind=dp), intent(in) :: dOmega
-!         real, parameter :: fact_tau = 1.0 !>0; could be 3.0 for mcfost
-!         real(kind=dp), parameter :: prec_vel = 1.0 / Rsun ! [s^-1]
-!         integer :: nact, i, j, kc, kr, n0
-!         real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds, F
-!         type(AtomType), pointer :: at
-!         real(kind=dp) :: ni_on_nj_star, tau_escape
+    subroutine accumulate_radrates_sobolev_1ray(id, icell, iray, dOmega)
+        integer, intent(in) :: id, icell, iray
+        real(kind=dp), intent(in) :: dOmega
+        real, parameter :: fact_tau = 3.0
+        real(kind=dp), parameter :: prec_vel = 1.0 / Rsun ! [s^-1]
+        integer :: nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
+        real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds, F
+        type(AtomType), pointer :: at
+        real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij, jbar_down, jbar_up, ehnukt, anu
+        real(kind=dp), dimension(Nlambda_max_trans) :: Ieff, xl
 
-!         dvds = abs(dv_proj(iray,id)) / ds(iray,id)
+        dvds = abs(dv_proj(iray,id)) / ds(iray,id)
 
-!         !-> no overlapping transitions and background continua
-!         at_loop : do nact = 1, Nactiveatoms
-!             at => ActiveAtoms(nact)%p
+        !-> no overlapping transitions and background continua
+        at_loop : do nact = 1, Nactiveatoms
+            at => ActiveAtoms(nact)%p
 
+            vth = vbroad(T(icell),at%weight, vturb(icell))
 
-!             !-> purely local
-!             atr_loop : do kr = 1, at%nline
+            !-> purely local
+            atr_loop : do kr = 1, at%nline
 
-!                 i = at%lines(kr)%i
-!                 j = at%lines(kr)%j
-!                 n0 = (at%lines(kr)%Nred - at%lines(kr)%Nblue - 1) / 2
+                i = at%lines(kr)%i
+                j = at%lines(kr)%j
+                n0 = (at%lines(kr)%Nr - at%lines(kr)%Nb + 1) / 2
 
-!                 !pops inversions
-!                 if (at%n(i,icell)-at%lines(kc)%gij*at%n(j,icell) <= 0.0) cycle atr_loop
+                !pops inversions
+                if (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell) <= 0.0) cycle atr_loop
          
-!                 !assumes the underlying radiation is flat across the line.
-!                 !or take n0 as a function of velocity
-!                 Icore = Itot(n0,iray,id)
+                !assumes the underlying radiation is flat across the line.
+                !or take n0 as a function of velocity
+                Icore = maxval(I0_line(:,kr,nact,id))
    
-!                 !could be stored in mem.
-!                 chi_ij = hc_fourPI * at%lines(kc)%Bij * (at%n(i,icell)-at%lines(kc)%gij*at%n(j,icell))
-!                 tau_escape = fact_tau * chi_ij * ds(iray,id) / at%vbroad(icell)
-!                 if (dvds > prec_vel) then
-!                     !s^-1
-!                     tau0 = fact_tau * chi_ij / dvds
-!                     if (tau0 > tau_escape) tau0 = tau_escape
-!                 else !escape probability
-!                     tau0 = tau_escape
-!                 endif
-!                 beta = min((1.0 - exp(-tau0))/tau0,1.0_dp)
+                !could be stored in mem.
+                chi_ij = hc_fourPI * at%lines(kr)%Bij * (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell))
+                tau_escape = fact_tau * chi_ij * ds(iray,id) / vth
+                if (dvds > prec_vel) then
+                    !s^-1
+                    tau0 = fact_tau * chi_ij / dvds
+                    if (tau0 > tau_escape) tau0 = tau_escape
+                else !escape probability
+                    tau0 = tau_escape
+                endif
+                beta = min((1.0 - exp(-tau0))/tau0,1.0_dp)
 
-!                 at%lines(kc)%Rji(id) = at%lines(kc)%Rji(id) + dOmega * ( beta * at%lines(kr)%Aji + beta * at%lines(kr)%Bji * Icore )
-!                 at%lines(kc)%Rij(id) = at%lines(kc)%Rij(id) + dOmega * beta * at%lines(kr)%Bij * Icore
-
-
-!             enddo atr_loop
-
-!             !-> opt thin excitation for the continua
-!             ctr_loop : do kr = 1, at%ncont
-!                 if (.not.at%continua(kr)%lcontrib) cycle ctr_loop
-
-!                 i = at%continua(kr)%i; j = at%continua(kr)%j
-
-!                 ni_on_nj_star = at%ni_on_nj_star(i,icell)
-!                 gij = ni_on_nj_star * exp(-hc_k/T(icell)/at%continua(kr)%lambda0)
-!                 if ((at%n(i,icell) - at%n(j,icell) * gij) <= 0.0_dp) cycle ctr_loop
-
-!                 Nb = at%continua(kr)%Nb; Nr = at%continua(kr)%Nr
-!                 Nl = Nr-Nb + 1
-
-!                 Jbar_down = 0.0
-!                 Jbar_up = 0.0
-
-!                 Ieff(1:Nl) = Itot(Nb:Nr,iray,id)
-!                 xl(1:Nl) = tab_lambda_nm(Nb:nr)
+                at%lines(kr)%Rji(id) = at%lines(kr)%Rji(id) + dOmega * ( beta * at%lines(kr)%Aji + beta * at%lines(kr)%Bji * Icore )
+                at%lines(kr)%Rij(id) = at%lines(kr)%Rij(id) + dOmega * beta * at%lines(kr)%Bij * Icore
 
 
-!                 Jbar_up = 0.5 * sum ( &
-!                     (tab_vij_cont(1:Nl-1,kr,nact)*Ieff(1:Nl-1)/xl(1:Nl-1) + tab_vij_cont(2:Nl,kr,nact)*Ieff(2:Nl)/xl(2:Nl)) * &
-!                     (xl(2:Nl)-xl(1:Nl-1)) &
-!                 )
-!                 Jbar_down = 0.5 * sum ( &
-!                     (tab_vij_cont(1:Nl-1,kr,nact)*Ieff(1:Nl-1)/xl(1:Nl-1) * exp(-hc_k/T(icell)/xl(1:Nl-1)) + &
-!                     tab_vij_cont(2:Nl,kr,nact)*Ieff(2:Nl)/xl(2:Nl) * exp(-hc_k/T(icell)/xl(2:Nl))) * &
-!                     (xl(2:Nl)-xl(1:Nl-1)) &
-!                 )
+            enddo atr_loop
 
-!                 at%continua(kr)%Rij(icell) = at%continua(kr)%Rij(icell) + dOmega*fourpi_h * Jbar_up
-!                 !init at tab_Aji_cont(kr,nact,icell) <=> Aji
-!                 at%continua(kr)%Rji(icell) = at%continua(kr)%Rji(icell) + dOmega*fourpi_h * Jbar_down * ni_on_nj_star
+            !-> opt thin excitation for the continua
+            ctr_loop : do kr = 1, at%ncont
+                if (.not.at%continua(kr)%lcontrib) cycle ctr_loop
 
-!             enddo ctr_loop
+                i = at%continua(kr)%i; j = at%continua(kr)%j
 
-!             at => NULL()
+                ni_on_nj_star = at%ni_on_nj_star(i,icell)
+                gij = ni_on_nj_star * exp(-hc_k/T(icell)/at%continua(kr)%lambda0)
+                if ((at%n(i,icell) - at%n(j,icell) * gij) <= 0.0_dp) cycle ctr_loop
 
-!         end do at_loop
+                Nb = at%continua(kr)%Nb; Nr = at%continua(kr)%Nr
+                Nl = Nr - Nb + 1
+                i0 = Nb - 1
 
-!         return
-!     end subroutine calc_rates_sobolev_1ray
+                Jbar_down = 0.0
+                Jbar_up = 0.0
+
+                Ieff(1:Nl) = Itot(Nb:Nr,1,id)
+                ! xl(1:Nl) = tab_lambda_nm(Nb:nr)
+
+
+                ! Jbar_up = 0.5 * sum ( &
+                !     (tab_vij_cont(1:Nl-1,kr,nact)*Ieff(1:Nl-1)/xl(1:Nl-1) + tab_vij_cont(2:Nl,kr,nact)*Ieff(2:Nl)/xl(2:Nl)) * &
+                !     (xl(2:Nl)-xl(1:Nl-1)) &
+                ! )
+                ! Jbar_down = 0.5 * sum ( &
+                !     (tab_vij_cont(1:Nl-1,kr,nact)*Ieff(1:Nl-1)/xl(1:Nl-1) * exp(-hc_k/T(icell)/xl(1:Nl-1)) + &
+                !     tab_vij_cont(2:Nl,kr,nact)*Ieff(2:Nl)/xl(2:Nl) * exp(-hc_k/T(icell)/xl(2:Nl))) * &
+                !     (xl(2:Nl)-xl(1:Nl-1)) &
+                ! )
+
+                do l=1, Nl
+                    if (l==1) then
+                        xl(l) = 0.5*(tab_lambda_nm(Nb+1)-tab_lambda_nm(Nb)) / tab_lambda_nm(Nb)
+                    elseif (l==n_lambda) then
+                        xl(l) = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) / tab_lambda_nm(Nr)
+                    else
+                        xl(l) = 0.5*(tab_lambda_nm(i0+l+1)-tab_lambda_nm(i0+l-1)) / tab_lambda_nm(i0+l)
+                    endif
+                    anu = tab_Vij_cont(l,kr,nact)
+
+                    Jbar_up = Jbar_up + anu*Ieff(l)*xl(l)
+
+                    ehnukt = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l))
+
+                    Jbar_down = jbar_down + anu*Ieff(l)*ehnukt*xl(l)
+
+                enddo
+
+                at%continua(kr)%Rij(id) = at%continua(kr)%Rij(id) + dOmega*fourpi_h * Jbar_up
+                !init at tab_Aji_cont(kr,nact,icell) <=> Aji
+                at%continua(kr)%Rji(id) = at%continua(kr)%Rji(id) + dOmega*fourpi_h * Jbar_down * ni_on_nj_star
+
+            enddo ctr_loop
+
+            at => NULL()
+
+        end do at_loop
+
+        return
+    end subroutine accumulate_radrates_sobolev_1ray
 
    function I_sobolev_1ray(id,icell_in,x,y,z,u,v,w,iray,N,lambda)
    ! ------------------------------------------------------------------------------- !
@@ -937,12 +1026,13 @@ module escape
       real(kind=dp), intent(in) :: x,y,z
       integer, intent(in) :: N
       real(kind=dp), dimension(N), intent(in) :: lambda
-      real(kind=dp), dimension(N) :: I_sobolev_1ray
+      real(kind=dp), dimension(N) :: I_sobolev_1ray, Icore(N)
       real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
       real(kind=dp), dimension(N) :: Snu, tau, dtau, chi, coronal_irrad
+      integer :: kr, nat, nl
       integer, target :: icell
       integer, pointer :: p_icell
-      integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
+      integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star, icell_prev
       logical :: lcellule_non_vide, lintersect_stars
 
       x1=x;y1=y;z1=z
@@ -973,8 +1063,14 @@ module escape
 
          if (lintersect_stars) then !"will interesct"
             if (icell == icell_star) then!"has intersected"
-               I_sobolev_1ray = I_sobolev_1ray + exp(-tau(:)) * &
-                  star_rad(id,iray,i_star,icell_prev,x0,y0,z0,u,v,w,N,lambda)
+                Icore(:) = star_rad(id,iray,i_star,icell_prev,x0,y0,z0,u,v,w,N,lambda)
+                I_sobolev_1ray = I_sobolev_1ray + exp(-tau(:)) * Icore
+                do nat=1, NactiveAtoms
+                    do kr=1, ActiveAtoms(nat)%p%nline
+                        nl = ActiveAtoms(nat)%p%lines(kr)%Nr - ActiveAtoms(nat)%p%lines(kr)%Nb + 1
+                        I0_line(1:nl,kr,nat,id) = Icore(ActiveAtoms(nat)%p%lines(kr)%Nb:ActiveAtoms(nat)%p%lines(kr)%Nr) 
+                    enddo
+                enddo
                return
             end if
          endif
@@ -1019,7 +1115,7 @@ module escape
                dv_proj(iray,id) = v_proj(icell,x1,y1,z1,u,v,w) - v_proj(icell,x0,y0,z0,y,v,w)
             endif
 
-            I_sobolev_1ray = I_sobolev_1ray + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu / chi
+            ! I_sobolev_1ray = I_sobolev_1ray + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu / chi
             tau(:) = tau(:) + dtau(:) !for next cell
 
          end if  ! lcellule_non_vide

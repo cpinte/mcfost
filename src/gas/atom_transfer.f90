@@ -44,7 +44,7 @@ module atom_transfer
    use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol,emissivite_dust
    use dust_prop, only : prop_grains, opacite, init_indices_optiques, kappa_abs_lte, kappa, kappa_factor
    use scattering
-   use escape, only : alloc_escape_variables, mean_velocity_gradient
+   use escape, only : alloc_escape_variables, mean_velocity_gradient, nlte_loop_sobolev
 
    use healpix_mod
    !$ use omp_lib
@@ -1137,12 +1137,6 @@ module atom_transfer
       !used for the extension of Voigt profiles
       call set_max_damping()
 
-         call alloc_escape_variables()
-         call mean_velocity_gradient()
-         stop
-
-
-
       if( Nactiveatoms > 0) then
 
          call compute_max_relative_velocity(v_char)
@@ -1163,6 +1157,7 @@ module atom_transfer
          ! !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm, .false.)
 
+         call nlte_loop_sobolev()
          call nlte_loop_mali()
          !-> here on the non-LTE frequency grid
          ! call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
