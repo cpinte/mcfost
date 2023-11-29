@@ -1156,9 +1156,11 @@ module see
     integer :: n, j
 
     jions = 0
+    sum_ions = 0
     do n=1,Nactiveatoms
         do j=1, activeatoms(n)%p%Nstage-1
             jions = jions + j * pops_ion(j,n,id)
+            sum_ions = sum_ions + pops_ion(j,n,id)
         enddo
     enddo
 
