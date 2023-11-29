@@ -82,6 +82,7 @@ subroutine set_default_variables()
   lsafe_stop = .false.
   safe_stop_time = 155520.0!1.8days in seconds, default
   lemission_atom = .false.
+  ldust_atom = .false. !coupling dust and atomic RT
   lelectron_scattering = .false.
   lstop_after_jnu = .false.
   lsolve_for_ne = .false.

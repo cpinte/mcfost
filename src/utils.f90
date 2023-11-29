@@ -226,6 +226,102 @@ real(kind=dp) function interp_dp(y, x, xp)
 end function interp_dp
 
 !**********************************************************************
+function matdiag(A,n)
+   !return the diagonal of a square matrix A(N,N)
+   !as a vector of length n.
+   integer, intent(in) :: n
+   real(kind=dp), intent(in) :: A(n*n)
+   ! real(kind=dp), intent(in) :: A(n,n)
+   real(kind=dp) :: matdiag(n)
+   integer :: i
+
+   ! do i = 1, n
+   !    matdiag(i) = A(i,i)
+   ! end do
+   matdiag(:) = A(1::n+1)
+
+   return
+end function matdiag
+
+subroutine Jacobi(a,b,x,n)
+!solve a system Ax=b with the iterative jacobi method
+   integer, intent(in) :: n
+   real(kind=dp) :: a(n,n), b(n)
+   real(kind=dp), intent(inout) :: x(n)
+
+   real(kind=dp), parameter :: tol = 1d-10 ! Convergence tolerance
+   !eventually, omega would be defined as a function of the eigen values of A
+   real(kind=dp), parameter :: omega = 1.0 ! Damping factor (0 < omega < 1)
+   integer, parameter :: nIterMax = 20000
+
+   integer :: niter, i
+   real(kind=dp) :: diff
+
+   logical :: lconverged
+   real(kind=dp) :: diag(n), x_new(n)
+
+   diff = 0
+   niter = 0
+   lconverged = .false.
+   do while (.not. lconverged)
+      niter = niter + 1
+
+      ! Calculate the new x values using the damped Jacobi method
+      diag(:) = matdiag(A,n)
+      x_new(:) = omega * (b(:) - matmul(A,x) + x(:) * diag(:)) / diag(:) + &
+            (1.0_dp - omega) * x(:)
+
+      diff = maxval(abs((x_new - x)/x_new))
+      lconverged = (diff < tol)
+
+      x = x_new
+      if (niter > nIterMax) exit
+
+   end do
+
+   return
+end subroutine jacobi
+
+subroutine Jacobi_sparse(a,b,x,n)
+!solve a system Ax=b with the iterative jacobi method for a sparse A matrix.
+!This routine only iterates over x where diag(a) is != 0.
+   integer, intent(in) :: n
+   real(kind=dp) :: a(n,n), b(n)
+   real(kind=dp), intent(inout) :: x(n)
+
+   real(kind=dp), parameter :: tol = 1d-10 ! Convergence tolerance
+   !eventually, omega would be defined as a function of the eigen values of A
+   real(kind=dp), parameter :: omega = 1.0 ! Damping factor (0 < omega < 1)
+   integer, parameter :: nIterMax = 20000
+
+   integer :: niter, i
+   real(kind=dp) :: diff
+
+   logical :: lconverged
+   real(kind=dp) :: diag(n), x_new(n)
+
+   diff = 0
+   niter = 0
+   lconverged = .false.
+   do while (.not. lconverged)
+      niter = niter + 1
+
+      ! Calculate the new x values using the damped Jacobi method
+      diag(:) = matdiag(A,n)
+      where (diag /= 0.0)
+         x_new(:) = omega * (b(:) - matmul(A,x) + x(:) * diag(:)) / diag(:) + &
+               (1.0_dp - omega) * x(:)
+      endwhere
+      diff = maxval(abs((x_new - x)/x_new),x_new > 0.0)
+      lconverged = (diff < tol)
+
+      x = x_new
+      if (niter > nIterMax) exit
+
+   end do
+
+   return
+end subroutine jacobi_sparse
 
 subroutine GaussSlv(a, b, n)
   ! Resolution d'un systeme d'equation par methode de Gauss
@@ -687,7 +783,7 @@ subroutine mcfost_setup()
        //trim(mcfost_utils)//"/.last_update"
   call appel_syst(cmd, syst_status)
 
-  ! We do not need to download the parameter file if we use the sources
+  ! We do not need to download the parameter files if we use the sources
   call get_environment_variable('MCFOST_GIT',s)
   if (s/="") then
      read(s,*) mcfost_git

@@ -4,7 +4,7 @@ module spherical_grid
   use parametres
   use cylindrical_grid, only: cell2cylindrical, cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
        delta_z, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
-       volume, l_dark_zone, zmax
+       volume, l_dark_zone, zmax, cos_phi_lim, sin_phi_lim
   use messages
 
   implicit none
@@ -178,7 +178,6 @@ subroutine indice_cellule_sph_theta(xin,yin,zin,thetaj_out,phik_out)
 end subroutine indice_cellule_sph_theta
 
 !******************************************************************************
-
 
   subroutine cross_spherical_cell(x0,y0,z0, u,v,w,  cell, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
 
@@ -445,6 +444,59 @@ end subroutine indice_cellule_sph_theta
     return
 
   end subroutine cross_spherical_cell
+
+
+  !***********************************************************
+
+  real(dp) function distance_to_closest_wall_sph(id,icell,x,y,z) result(s)
+
+    integer, intent(in) :: id, icell
+    real(kind=dp), intent(in) :: x,y,z
+
+    real(dp) :: r,s1,s2,s3,s4,s5,s6,r2_cyl,rcyl,z0
+    integer :: ri0,thetaj0,k0
+
+    ! 3D cell indices
+    call cell2cylindrical(icell, ri0,thetaj0,k0)
+
+    ! cyclindrical walls
+    r2_cyl = x*x+y*y
+    rcyl = sqrt(r2_cyl)
+    r = sqrt(r2_cyl+z*z)
+    s1 = r_lim(ri0) - r
+    s2 = r - r_lim(ri0-1)
+
+    ! theta walls (same method as phi)
+    z0 = abs(z)
+    s3 = abs(rcyl*w_lim(thetaj0) - z0*cos_phi_lim(thetaj0))
+    s4 = abs(rcyl*w_lim(thetaj0-1) - z0*cos_phi_lim(thetaj0-1))
+
+    if (l3D) then
+       ! phi walls
+       !
+       ! Distance between a line with equation a*x+by+c=0, ie y=-a/b*x-c/b and point (x0,y0) is:
+       !
+       ! d = |a*x0+b*y0+c|/sqrt(a**2+b**2)
+       !
+       ! In case of phi walls, we have y = x * tan(phi) so:
+       !
+       ! a = -sin(phi)
+       ! b = cos(phi)
+       ! c = 0
+       !
+       ! and therefore
+       !
+       ! d = |x0*sin(phi) - y0*cos(theta)| / sqrt[cos^2 + sin^2]
+       s5 = abs(x*sin_phi_lim(k0) - y*cos_phi_lim(k0))
+       s6 = abs(x*sin_phi_lim(k0-1) - y*cos_phi_lim(k0-1))
+       s = min(s1,s2,s3,s4,s5,s6)
+    else
+       s = min(s1,s2,s3,s4)
+    endif
+
+    return
+
+  end function distance_to_closest_wall_sph
 
 !***********************************************************
 

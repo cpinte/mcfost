@@ -55,6 +55,7 @@ module parametres
   character(len=512) :: tab_wavelength
 
   !gas transfer here
+  logical :: ldust_gas
 
   ! Emission moleculaire
   logical :: lemission_mol,  lpop, lprecise_pop, lmol_LTE, ldust_mol, lonly_top, lonly_bottom
@@ -62,7 +63,7 @@ module parametres
   ! Atomic line radiative transfer
   logical :: lexit_after_nonlte_loop, lstop_after_jnu
   logical :: lemission_atom, lelectron_scattering, lforce_lte,  &
-            	ldissolve, loutput_rates, lzeeman_polarisation
+            	ldissolve, loutput_rates, lzeeman_polarisation, ldust_atom
   integer :: N_rayons_mc, istep_start, istep_end
 
   !HEALpix
