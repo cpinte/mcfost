@@ -124,7 +124,7 @@ def test_image(model_name, wl):
         # Run the mcfost model
         filename = "test_data/"+model_name+"/"+model_name+".para"
         if (model_name == "discF_00500"):
-            opt=" -phantom test_data/"+model_name+"/"+model_name
+            opt=" -phantom test_data/"+model_name+"/"+model_name+" -not_random_Voronoi"
         else:
             opt=""
         mcfost(filename,opt="-img "+wl+" -root_dir "+model_name+opt)
