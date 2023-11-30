@@ -23,6 +23,7 @@ module escape
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
     use voigts, only : voigt
     use gas_contopac, only : background_continua_lambda
+    use elecdensity, only : solve_ne
 
    !$ use omp_lib
 
@@ -32,6 +33,7 @@ module escape
 
     type (atomPointerArray), dimension(:), allocatable :: sob_atoms
     integer :: Nsob_atoms
+    integer, allocatable, dimension(:) :: sob_atom_to_activeatoms
 
     real(kind=dp), allocatable, dimension(:,:) :: d_to_star, wdi, domega_star, domega_core, domega_shock, dv_proj
     real(kind=dp), allocatable, dimension(:) :: mean_grad_v, mean_length_scale, Tchoc_average
@@ -274,7 +276,7 @@ module escape
         do i_star=1, n_etoiles
             write(*,*) "star #", i_star
             !it is like domega_core, but here I'm assuming all rays "would" hit the star.
-            !it uses the average distance to the star as reference point in the cell. 
+            !it uses the average distance to the star as reference point in the cell.
             where (d_to_star(:,i_star) > 0) wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
             write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
             write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
@@ -352,17 +354,19 @@ module escape
         call alloc_escape_variables
         call mean_velocity_gradient
 
+!TO DO:
         !Only loop on atoms that have initial solution Sobolev / escape
         Nsob_atoms = 0
         do i=1, NactiveAtoms
-            if (ActiveAtoms(i)%p%%initial == 4)  Nsob_atoms =  Nsob_atoms + 1
+            if (ActiveAtoms(i)%p%initial == 4)  Nsob_atoms =  Nsob_atoms + 1
         enddo
-        allocate(sob_atoms(Nsob_atoms))
+        allocate(sob_atoms(Nsob_atoms),sob_atom_to_activeatoms(Nsob_atoms))
         i = 0
         do nact=1, NactiveAtoms
-            if (ActiveAtoms(nact)%p%%initial == 4)  then
+            if (ActiveAtoms(nact)%p%initial == 4)  then
                 i = i + 1
                 sob_atoms(i)%p => ActiveAtoms(nact)%p
+                sob_atom_to_activeatoms(i) = nact
             endif
         enddo
 
@@ -487,10 +491,10 @@ module escape
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
             l_iterate_ne = .false.
-            if( n_iterate_ne > 0 ) then
-               l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
-               ! if (lforce_lte) l_iterate_ne = .false.
-            endif
+            ! if( n_iterate_ne > 0 ) then
+            !    l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
+            !    ! if (lforce_lte) l_iterate_ne = .false.
+            ! endif
 
             call progress_bar(0)
             !$omp parallel &
@@ -664,10 +668,9 @@ module escape
                   !$ id = omp_get_thread_num() + 1
                   l_iterate = (icompute_atomRT(icell)==1)
                   if (l_iterate) then
-                     ! dne = max(dne, abs(1.0_dp - ne(icell)/ne_new(icell)))
                      dne = max(dne, abs(1.0_dp - ne(icell)/ngpop(1,NactiveAtoms+1,icell,1)))
                      ! -> needed for lte pops !
-                     ne(icell) = ngpop(1,NactiveAtoms+1,icell,1) !ne(icell) = ne_new(icell)
+                     ne(icell) = ngpop(1,NactiveAtoms+1,icell,1)
                      if (.not.lng_acceleration) &
                         ngpop(1,NactiveAtoms+1,icell,ng_index) = ne(icell)
                      call LTEpops_H_loc(icell)
@@ -924,7 +927,8 @@ module escape
       ! -------------------------------- CLEANING ------------------------------------------ !
 
       if (n_iterate_ne > 0) then
-         write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+        call Solve_ne(1, .true., dne)
+        write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
         !  call write_electron
       endif
 
@@ -940,7 +944,7 @@ module escape
       deallocate(diff_loc, dne_loc, I0_line, Jext)
       deallocate(stream, ds, vlabs, lcell_converged, Istar)
       if (allocated(Ishock)) deallocate(Ishock)
-      deallocate(sob_atoms)
+      deallocate(sob_atoms,sob_atom_to_activeatoms)
 
       ! --------------------------------    END    ------------------------------------------ !
       if (mod(time_nlte_loop/60./60.,60.) > 1.0_dp) then
@@ -957,15 +961,14 @@ module escape
         integer, intent(in) :: id, icell
         real, parameter :: fact_tau = 3.0
         real(kind=dp), parameter :: prec_vel = 1.0 / Rsun ! [s^-1]
-        integer :: nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
+        integer :: ns, nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
         real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds
         type(AtomType), pointer :: at
-        real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij, s, chi0(1), eta0(1)
+        real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij, chi0(1), eta0(1)
         real(kind=dp) :: jbar_down, jbar_up, ehnukt, anu, tau_max
         real(kind=dp), dimension(Nlambda_max_trans) :: Ieff, xl
 
         dvds = mean_grad_v(icell)
-        s = mean_length_scale(icell)
 
         Itot(:,1,id) = 0.0
         if (laccretion_shock) then
@@ -979,8 +982,11 @@ module escape
         endif
 
         !-> no overlapping transitions and background continua
-        at_loop : do nact = 1, Nactiveatoms
-            at => ActiveAtoms(nact)%p
+        ! at_loop : do nact = 1, Nactiveatoms
+        !     at => ActiveAtoms(nact)%p
+        at_loop : do ns = 1, Nsob_atoms
+            nact = sob_atom_to_activeatoms(ns)
+            at => sob_atoms(ns)%p
 
             vth = vbroad(T(icell),at%weight, vturb(icell))
 
@@ -1205,7 +1211,7 @@ module escape
         real(kind=dp), intent(in) :: dOmega
         real, parameter :: fact_tau = 3.0
         real(kind=dp), parameter :: prec_vel = 1.0 / Rsun ! [s^-1]
-        integer :: nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
+        integer :: ns, nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
         real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds, tau_max
         type(AtomType), pointer :: at
         real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij, jbar_down, jbar_up, ehnukt, anu
@@ -1214,8 +1220,11 @@ module escape
         dvds = abs(dv_proj(iray,id)) / ds(iray,id)
 
         !-> no overlapping transitions and background continua
-        at_loop : do nact = 1, Nactiveatoms
-            at => ActiveAtoms(nact)%p
+        ! at_loop : do nact = 1, Nactiveatoms
+        !     at => ActiveAtoms(nact)%p
+        at_loop : do ns = 1, Nsob_atoms
+            nact = sob_atom_to_activeatoms(ns)
+            at => sob_atoms(ns)%p
 
             vth = vbroad(T(icell),at%weight, vturb(icell))
 
@@ -1267,7 +1276,7 @@ module escape
 
                 !not only active continua but passive (but no dust here)
                 ! call contopac_atom_loc(icell, N, lambda, chi0, Snu0)
-                tau_max = mean_length_scale(icell) * maxval(tab_Vij_cont(1:Nl,kr,nact)) * (at%n(i,icell) - at%n(j,icell) * gij)
+                tau_max = mean_length_scale(icell) * tab_Vij_cont(Nl,kr,nact) * (at%n(i,icell) - at%n(j,icell) * gij)
                 if (tau_max > 10.0) then
                     at%continua(kr)%Rij(id) = 0.0_dp; at%continua(kr)%Rji(id) = 0.0_dp
                     cycle ctr_loop !force LTE (only collisions)

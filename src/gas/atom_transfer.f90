@@ -881,7 +881,7 @@ module atom_transfer
       real(kind=dp) :: v1,v2
       integer :: i1, i2, id
 
-      integer, parameter :: n_rayons = 1000
+      integer, parameter :: n_rayons = 100
       integer :: i, next_cell, previous_cell
       integer :: i_star, icell_star
       logical :: lintersect_stars, lcellule_non_vide

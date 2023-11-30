@@ -410,17 +410,14 @@ module io_atom
                atom%set_ltepops = .false. !read from file, no need to compute.
             case (2)
                call error("initial solution == 2 (opt thin) not implemented yet!")
-               atom%set_ltepops = .true.
             case (3)
-               atom%set_ltepops = .true.
                if (.not. lforce_lte) then !otherwise cswitch is not LTE
                   write(*,*) " -> Setting initial solution to LTE with CSWITCH "
                   atom%cswitch = cswitch_val
                   if (.not. lcswitch_enabled) lcswitch_enabled = .true. !we need at least one
                endif
             case (4)
-               call error("initial solution == 4 (ESCAPE/LVG/Sobolev) not implemented yet!")
-               atom%set_ltepops = .true.
+               write(*,*) " -> Setting initial solution to ESCAPE probability (Sobolev/LVG) "
             case default
                write(*,*) "Active atom: initial = ", atom%initial
                call error("Initial solution unknown!")
