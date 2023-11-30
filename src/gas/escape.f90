@@ -489,7 +489,7 @@ module escape
             ibar = 0
             n_cells_done = 0
 
-            !init here, to be able to stop/start electronic density iterations within MALI iterations
+            !For the moment, in escape mode, the electronic density is evaluated once convergence is achieved.
             l_iterate_ne = .false.
             ! if( n_iterate_ne > 0 ) then
             !    l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
