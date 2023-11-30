@@ -556,11 +556,11 @@ module elecdensity
 
     if (verbose) then
        write(*,*) " ---------------------------------------------------- "
-       write(*,'("ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+       write(*,'("ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') real(minval(ne,mask=icompute_atomRT>0)), real(maxval(ne))
        write(*,'("   >>>  Diff to previous solution="(1ES13.5E3)" at cell "(1I7))') epsilon, ik_max
-       write(*,*) " T = ", T(ik_max)," nH = ", nHtot(ik_max)
+       write(*,*) " T = ", real(T(ik_max))," nH = ", real(nHtot(ik_max))
        write(*,*) " "
-       write(*,'("Ionisation fraction of HII "(1ES13.5E3, 1ES13.5E3))') max_f_HII, min_f_HII
+       write(*,'("Ionisation fraction of HII "(1ES13.5E3, 1ES13.5E3))') real(max_f_HII), real(min_f_HII)
       !  write(*,'("nH/ne "(1ES13.5E3, 1ES13.5E3))') maxval(nHtot/ne,mask=ne>0), minval(nHtot/ne,mask=ne>0)
       ! call show_electron_given_per_elem(0, 0, max_fjk)
        write(*,*) " ---------------------------------------------------- "
