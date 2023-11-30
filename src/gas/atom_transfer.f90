@@ -204,7 +204,7 @@ module atom_transfer
 
       !-> negligible
       mem_alloc_local = 0
-      mem_alloc_local = mem_alloc_local + sizeof(dM)+sizeof(dTm)+sizeof(Tex_ref)+sizeof(Tion_ref)
+      mem_alloc_local = mem_alloc_local + 4*sizeof(dM)
 
 
       !How many steps and which one
@@ -231,7 +231,7 @@ module atom_transfer
       write(*,*) ""
 
       !-> negligible
-      mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
+      mem_alloc_local = mem_alloc_local + 2*sizeof(ds) + sizeof(stream)
       ! allocate(jnu(n_lambda,n_cells))
       ! write(*,*) " size Jnu:", sizeof(Jnu) / 1024./1024./1024.," GB"
       ! mem_alloc_local = mem_alloc_local + sizeof(jnu)

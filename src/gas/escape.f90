@@ -23,7 +23,6 @@ module escape
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
     use voigts, only : voigt
     use gas_contopac, only : background_continua_lambda
-    use elecdensity, only : solve_ne
 
    !$ use omp_lib
 
@@ -309,24 +308,13 @@ module escape
         real(kind=dp), dimension(:), allocatable :: wmu, diff_loc, dne_loc
         real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, weight
         real(kind=dp) :: diff, diff_old, dne, dN, dN1, dNc
-        real(kind=dp), allocatable :: dTM(:), dM(:), Tion_ref(:), Tex_ref(:)
-        integer :: NmaxLine
+        real(kind=dp), allocatable :: dM(:)
+        integer :: NmaxLine, ng_index
         logical, allocatable :: lcell_converged(:)
 
         logical :: labs
         logical :: l_iterate, l_iterate_ne
       
-        !Ng's acceleration
-        integer, parameter :: Ng_Ndelay_init = 5 !minimal number of iterations before starting the cycle.
-                                               !min is 1 (so that conv_speed can be evaluated)
-        real(kind=dp), parameter :: conv_speed_limit_mc = 1d1!1d-1
-        real(kind=dp) :: conv_speed_limit
-        integer :: iorder, i0_rest, n_iter_accel, iacc
-        integer :: Ng_Ndelay, ng_index
-        logical :: lng_turned_on, ng_rest, lconverging, accelerated 
-        logical, parameter :: lextrapolate_electron = .false. !extrapolate electrons with populations
-        real(kind=dp), dimension(:,:), allocatable :: ngtmp
-
         !convergence check
         type (AtomType), pointer :: at
         integer(kind=8) :: mem_alloc_local
@@ -376,6 +364,7 @@ module escape
             if (.not.activeatoms(nact)%p%nltepops) activeatoms(nact)%p%nltepops = .true.
             Nmaxline = max(NmaxLine,activeatoms(nact)%p%nline)
         enddo
+        !Radiation field
         allocate(I0_line(Nlambda_max_line,NmaxLine,NactiveAtoms,nb_proc)); I0_line = 0.0_dp
         allocate(Jext(n_lambda, nb_proc)) !or n_lambda_cont if I only uses cont wavelengths
         allocate(Istar(n_lambda, n_etoiles))
@@ -401,9 +390,6 @@ module escape
         endif
 
         allocate(dM(Nactiveatoms)); dM=0d0 !keep tracks of dpops for all cells for each atom
-        allocate(dTM(Nactiveatoms)); dTM=0d0 !keep tracks of Tex for all cells for each atom
-        allocate(Tex_ref(Nactiveatoms)); Tex_ref=0d0 !keep tracks of max Tex for all cells for each line of each atom
-        allocate(Tion_ref(Nactiveatoms)); Tion_ref=0d0 !keep tracks of max Tion for all cells for each cont of each atom
         diff_old = 1.0_dp
         dM(:) = 1.0_dp
         !init in case l_iterate_ne  is .false. (does not change a thing if l_iterate_ne)
@@ -411,7 +397,7 @@ module escape
 
         !-> negligible
         mem_alloc_local = 0
-        mem_alloc_local = mem_alloc_local + sizeof(dM)+sizeof(dTm)+sizeof(Tex_ref)+sizeof(Tion_ref)
+        mem_alloc_local = mem_alloc_local + sizeof(dM)
 
         if (allocated(stream)) deallocate(stream)
         allocate(stream(nb_proc),stat=alloc_status)
@@ -429,7 +415,7 @@ module escape
         write(*,*) ""
 
         !-> negligible
-        mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
+        mem_alloc_local = mem_alloc_local +3*sizeof(ds) + sizeof(stream)
 
         call alloc_nlte_var(one_ray,mem=mem_alloc_local)
 
@@ -440,7 +426,6 @@ module escape
 
         allocate(wmu(n_rayons))
         wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
-        conv_speed_limit = conv_speed_limit_mc
         write(*,*) ""
         call system_clock(count_start,count_rate=time_tick,count_max=time_max)
         call cpu_time(cpu_time_begin)
@@ -450,7 +435,6 @@ module escape
         lcell_converged(:) = .false.
         diff_loc(:) = 1d50
         dne_loc(:) = 0.0_dp
-        lng_turned_on = .false.
         n_iter = 0
         conv_speed = 0.0
         conv_acc = 0.0
@@ -467,6 +451,7 @@ module escape
             call system_clock(cstart_iter,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpustart_iter)
 
+            !in principle we don't need that if only atoms with Sobolev itterated
             if (lcswitch_enabled) then
                !deactivate
                if (maxval_cswitch_atoms()==1.0_dp) then
@@ -476,12 +461,7 @@ module escape
             endif
 
             n_iter = n_iter + 1
-            !-> ng_index depends only on the value of n_iter for a given Neq_ng
-            ! it is the index of solutions stored in ngpop. ng_index is 1 for the current solution.
-            ! at which point we can accelerate. Therefore, ng_index if far from 1 at init.
-            ng_index = Neq_ng - mod(n_iter-1,Neq_ng) !overwritten if lng_acceleration.
-            ! NOTE :: the index 1 is hard-coded within the non-LTE loop as it stores the actual (running) value
-            !           of the populations and electronic density.
+            ng_index = Neq_ng - mod(n_iter-1,Neq_ng)
             ! 
             !                    goes with maxIter
             write(*,'(" *** Iteration #"(1I4)"; threshold: "(1ES11.2E3)"; Nrays: "(1I5))') &
@@ -491,19 +471,17 @@ module escape
 
             !For the moment, in escape mode, the electronic density is evaluated once convergence is achieved.
             l_iterate_ne = .false.
-            ! if( n_iterate_ne > 0 ) then
-            !    l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
-            !    ! if (lforce_lte) l_iterate_ne = .false.
-            ! endif
+            if( n_iterate_ne > 0 ) then
+               l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
+               ! if (lforce_lte) l_iterate_ne = .false.
+            endif
 
             call progress_bar(0)
             !$omp parallel &
             !$omp default(none) &
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff)&
-            !$omp private(nact, at) & ! Acceleration of convergence
-            !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on,wmu) & ! Ng's Acceleration of convergence
-            !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,Jext) &
+            !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,Jext,wmu) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,1)
@@ -573,82 +551,6 @@ module escape
             call progress_bar(50)
             write(*,*) " " !for progress bar
 
-            !***********************************************************!
-            ! **********  Ng's acceleration administration *************!
-            ! if (lng_acceleration) then
-          	! !be sure we are converging before extrapolating
-            !    if (dpops_max_error > 1d-2) then
-            !       lconverging = (conv_speed < 0) .and. (-conv_speed < conv_speed_limit)
-            !    else
-            !       lconverging = (diff_old < 5d-2)!; Ng_Nperiod = 0
-            !    endif
-            !    !or if the number of iterations is too large
-            !    lconverging = lconverging .or. (n_iter > int(real(maxIter)/3.0)) !futur deprec of this one (non-local op)
-          	!    if ( (n_iter>max(Ng_Ndelay_init,1)).and.lconverging ) then
-          	! 	   if (.not.lng_turned_on) then
-            !          write(*,*) " +++ Activating Ng's acceleration +++ "
-          	! 		   lng_turned_on = .true.
-          	! 		   Ng_Ndelay = n_iter; iacc = 0
-            !          n_iter_accel = 0; i0_rest = 0; ng_rest = .false.
-          	! 	   endif
-            ! 	endif
-            !    if (lng_turned_on) then
-            !       if (unconverged_fraction < 10.0) lng_turned_on = .false.
-            !    endif
-            ! endif
-            !***********************************************************!
-            ! ********************** GLOBAL NG's ***********************!
-            ! Here minimize Ncells x Nlevels x Ng_Norder per atoms.
-            accelerated = .false.!(maxval_cswitch_atoms()==1.0_dp)
-            ! if ( (lNg_acceleration .and. lng_turned_on).and.(.not.lcswitch_enabled)&
-            !       .and.(.not.lprevious_converged) ) then
-            !    iorder = n_iter - Ng_Ndelay
-            !    if (ng_rest) then
-            !       write(*,'(" -> Acceleration relaxes... "(1I2)" / "(1I2))') iorder-i0_rest, Ng_Nperiod
-            !       if (iorder-i0_rest == Ng_Nperiod) ng_rest = .false.
-            !    else
-            !       i0_rest = iorder
-            !       iacc = iacc + 1
-            !       ng_index = Neq_Ng - mod(iacc-1,Neq_ng)
-            !       write(*,'(" -> Accumulate solutions... "(1I2)" / "(1I2))') iacc, Neq_ng
-            !       !index 1 is the running one in the main loop for new values.
-            !       ngpop(:,:,:,ng_index) = ngpop(:,:,:,1)
-            !       accelerated = (iacc==Neq_ng)
-
-            !       if (accelerated) then
-            !          do nact=1,NactiveAtoms
-            !             at => ActiveAtoms(nact)%p
-            !             allocate(ngtmp(N_cells*at%Nlevel,Neq_ng))
-            !             !Flatten the array such that for each cell there are all levels
-            !             ngtmp(:,:) = reshape(ngpop(1:at%Nlevel,nact,:,:),(/n_cells*at%Nlevel,Neq_ng/))
-            !             !Flatten the array such that for each level there are all cells.
-            !             ! ngtmp(:,:) = reshape(& ! first transpose to (N_cells,Nlevel,Neq_ng)
-            !             !    reshape(ngpop(1:at%Nlevel,nact,:,:),shape=[n_cells,at%Nlevel,Neq_ng],order=[2,1,3]),&!then flatten
-            !             !    (/n_cells*at%Nlevel,Neq_ng/))
-
-            !             call Accelerate(n_cells*at%Nlevel,Ng_Norder,ngtmp) 
-
-            !             !reform in (Nlevel,N_cells,Neq_ng)
-            !             ngpop(1:at%Nlevel,nact,:,:) = reshape(ngtmp,(/at%Nlevel,n_cells,Neq_ng/))
-            !             ! ngpop(1:at%Nlevel,nact,:,:) = reshape(&!first reform
-            !             !    reshape(ngtmp(:,:),shape=[n_cells,at%Nlevel,Neq_Ng]),&!then tranpose back
-            !             !    shape=[at%Nlevel,n_cells,Neq_ng],order=[2,1,3])
-            !             deallocate(ngtmp)
-            !             !check negative populations and mass conservation for that atom
-            !             call check_ng_pops(at%Nlevel,n_cells,Neq_ng,ngpop(1:at%Nlevel,nact,:,:),at%Abund*nHtot(:))
-            !             at => NULL()
-            !          enddo
-            !          ! Accelerate electrons ? but still needs rest of SEE+ne loop.
-            !          if ( (lextrapolate_electron).and.(l_iterate_ne) ) then
-            !             write(*,*) " -- extrapolating electrons..."
-            !             call Accelerate(n_cells,Ng_Norder,ngpop(1,NactiveAtoms+1,:,:))
-            !          endif
-            !          n_iter_accel = n_iter_accel + 1
-            !          ng_rest = (Ng_Nperiod > 0); iacc = 0
-            !       endif
-            !    endif
-            ! endif
-            !***********************************************************!
 
             !***********************************************************!
             ! *******************  update ne metals  *******************!
@@ -656,8 +558,6 @@ module escape
                id = 1
                dne = 0.0_dp !=max(dne_loc)
                dne_loc(:) = abs(1.0_dp - ne(:)/(1d-100 + ngpop(1,NactiveAtoms+1,:,1)))
-               ! write(*,'("  OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
-               !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                !$omp parallel &
                !$omp default(none) &
                !$omp private(id,icell,l_iterate,nact,ilevel,vth,nb,nr)&
@@ -701,9 +601,6 @@ module escape
                end do
                !$omp end do
                !$omp end parallel
-               ! write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
-               !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
-               ! write(*,*) ''
                if ((dne < 1d-4 * precision).and.(.not.lcswitch_enabled)) then
                   !Do we need to restart it eventually ?
                   write(*,*) " *** dne", dne
@@ -764,13 +661,7 @@ module escape
                      !first update the populations with the new value
                      at%n(:,icell) = ngpop(1:at%Nlevel,nact,icell,1)
                      !Then, store Neq_ng previous iterations. index 1 is for the current one.
-                     !if Ng_neq = 3 :
-                     !  -> the oldest solutions stored is in ng_index = 3 - mod(1-1,3) = 3
-                     !  -> the newest (current) one is in ng_index = 3 - mod(3-1,3) = 1
-                     ! cannot accumulate here if global Ng's
-                     ! !! if condition breaks if local Ng's !!
-                     if (.not.lng_acceleration) &
-                        ngpop(1:at%Nlevel,nact,icell,ng_index) = at%n(:,icell)
+                     ngpop(1:at%Nlevel,nact,icell,ng_index) = at%n(:,icell)
 
                      !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next ieration.
                      !Only for Active Atoms here. PAssive Atoms are updated only if electronic density is iterated.
@@ -813,13 +704,8 @@ module escape
                conv_acc = conv_speed - conv_acc !>0 accelerating
             endif
 
-            if (accelerated) then
-               ! write(*,'("            "(1A13))') "(Accelerated)"
-               write(*,'("            ("(1A11)" #"(1I4)")")') "Accelerated", n_iter_accel
-            endif
             do nact=1,NactiveAtoms
                write(*,'("                  "(1A2))') ActiveAtoms(nact)%p%ID
-               ! write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%p%ID
                write(*,'("   >>> dpop="(1ES13.5E3))') dM(nact)
             enddo
             if (l_iterate_ne) then
@@ -927,7 +813,6 @@ module escape
       ! -------------------------------- CLEANING ------------------------------------------ !
 
       if (n_iterate_ne > 0) then
-        call Solve_ne(1, .true., dne)
         write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
         !  call write_electron
       endif
@@ -940,9 +825,8 @@ module escape
     !   if (loutput_rates) call write_rates()
 
       call dealloc_nlte_var()
-      deallocate(dM, dTM, Tex_ref, Tion_ref, dv_proj)
-      deallocate(diff_loc, dne_loc, I0_line, Jext)
-      deallocate(stream, ds, vlabs, lcell_converged, Istar)
+      deallocate(dM, diff_loc, dne_loc, I0_line, Jext)
+      deallocate(dv_proj, stream, ds, vlabs, lcell_converged, Istar)
       if (allocated(Ishock)) deallocate(Ishock)
       deallocate(sob_atoms,sob_atom_to_activeatoms)
 
@@ -1042,15 +926,19 @@ module escape
                 !-> length x chi at lambda0 (beware if dissociation)
                 ! call background_continua_lambda(icell, 1, (/at%continua(kr)%lambda0/), chi0(:), eta0(:))
                 tau_max = mean_length_scale(icell) * (tab_Vij_cont(Nl,kr,nact) * (at%n(i,icell) - at%n(j,icell) * gij) + chi0(1))
-                if (tau_max > 10.0) then
-                    at%continua(kr)%Rij(id) = 0.0_dp; at%continua(kr)%Rji(id) = 0.0_dp
-                    cycle ctr_loop !force LTE (only collisions)
-                endif
+                ! if (tau_max > 10.0) then
+                !     at%continua(kr)%Rij(id) = 0.0_dp; at%continua(kr)%Rji(id) = 0.0_dp
+                !     cycle ctr_loop !force LTE (only collisions)
+                ! endif
 
                 Jbar_down = 0.0
                 Jbar_up = 0.0
 
                 Ieff(1:Nl) = Itot(nb:nr,1,id)
+                if (tau_max > 10.0) then
+                    Ieff(1:Nl) = at%n(j,icell) * (twohc / tab_lambda_nm(nb:nr)**3) * ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr))
+                    Ieff(1:Nl) = Ieff(1:Nl) / (at%n(i,icell) - ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr)) * at%n(j,icell))
+                endif
                 ! xl(1:Nl) = tab_lambda_nm(Nb:nr)
 
 
