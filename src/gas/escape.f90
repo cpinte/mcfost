@@ -451,6 +451,7 @@ module escape
             call system_clock(cstart_iter,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpustart_iter)
 
+            !TO DO:
             !in principle we don't need that if only atoms with Sobolev itterated
             if (lcswitch_enabled) then
                !deactivate
@@ -732,6 +733,7 @@ module escape
                endif
             else
                lprevious_converged = .false.
+               !TO DO: remove cswitch in Sobolev ??
                if ((lcswitch_enabled).and.(maxval_cswitch_atoms() > 1.0_dp)) then
                   call adjust_cswitch_atoms()
                endif
@@ -925,20 +927,20 @@ module escape
                 !not only active continua but passive (but no dust here)
                 !-> length x chi at lambda0 (beware if dissociation)
                 ! call background_continua_lambda(icell, 1, (/at%continua(kr)%lambda0/), chi0(:), eta0(:))
-                tau_max = mean_length_scale(icell) * (tab_Vij_cont(Nl,kr,nact) * (at%n(i,icell) - at%n(j,icell) * gij) + chi0(1))
-                ! if (tau_max > 10.0) then
-                !     at%continua(kr)%Rij(id) = 0.0_dp; at%continua(kr)%Rji(id) = 0.0_dp
-                !     cycle ctr_loop !force LTE (only collisions)
-                ! endif
+                tau_max = mean_length_scale(icell) * tab_Vij_cont(Nl,kr,nact) * (at%n(i,icell) - at%n(j,icell) * gij)! + chi0(1))
+                if (tau_max > 10.0) then
+                    at%continua(kr)%Rij(id) = 0.0_dp; at%continua(kr)%Rji(id) = 0.0_dp
+                    cycle ctr_loop !force LTE (only collisions)
+                endif
 
                 Jbar_down = 0.0
                 Jbar_up = 0.0
 
                 Ieff(1:Nl) = Itot(nb:nr,1,id)
-                if (tau_max > 10.0) then
-                    Ieff(1:Nl) = at%n(j,icell) * (twohc / tab_lambda_nm(nb:nr)**3) * ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr))
-                    Ieff(1:Nl) = Ieff(1:Nl) / (at%n(i,icell) - ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr)) * at%n(j,icell))
-                endif
+                ! if (tau_max > 10.0) then
+                !     Ieff(1:Nl) = at%n(j,icell) * (twohc / tab_lambda_nm(nb:nr)**3) * ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr))
+                !     Ieff(1:Nl) = Ieff(1:Nl) / (at%n(i,icell) - ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr)) * at%n(j,icell))
+                ! endif
                 ! xl(1:Nl) = tab_lambda_nm(Nb:nr)
 
 
