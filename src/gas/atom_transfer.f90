@@ -1158,7 +1158,7 @@ module atom_transfer
          call alloc_atom_opac(n_lambda, tab_lambda_nm, .false.)
 
          call nlte_loop_sobolev()
-         call nlte_loop_mali()
+         ! call nlte_loop_mali()
          !-> here on the non-LTE frequency grid
          ! call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
 
