@@ -11,7 +11,7 @@ module escape
     use stars, only : is_inshock, intersect_stars, star_rad, T_preshock
     use mem, only : emissivite_dust
     use dust_prop, only : kappa_abs_lte, kappa, kappa_factor
-    use opacity_atom, only : contopac_atom_loc, vlabs, Itot, calc_contopac_loc
+    use opacity_atom, only : contopac_atom_loc, vlabs, Itot, calc_contopac_loc, psi, cross_coupling_cont
     use atom_type, only : n_atoms, Atoms, ActiveAtoms, atomtype, NactiveAtoms, atomPointerArray, &
         lcswitch_enabled, vbroad, maxval_cswitch_atoms, NpassiveAtoms, PassiveAtoms, adjust_cswitch_atoms
     use see, only : alloc_nlte_var, neq_ng, ngpop, small_nlte_fraction, tab_Aji_cont, tab_Vij_cont, &
@@ -299,7 +299,7 @@ module escape
         integer, parameter :: n_rayons = 100
         integer :: nact, imax, icell_max, icell_max_2
         integer :: icell, ilevel, nb, nr, unconverged_cells
-        integer, parameter :: maxIter = 300
+        integer, parameter :: maxIter = 80
         !ray-by-ray integration of the SEE
         integer, parameter :: one_ray = 1
         logical :: lfixed_Rays, lconverged, lprevious_converged
@@ -364,6 +364,7 @@ module escape
             if (.not.activeatoms(nact)%p%nltepops) activeatoms(nact)%p%nltepops = .true.
             Nmaxline = max(NmaxLine,activeatoms(nact)%p%nline)
         enddo
+!TO DO: use n_lambda_cont instead of full lambda.
         !Radiation field
         allocate(I0_line(Nlambda_max_line,NmaxLine,NactiveAtoms,nb_proc)); I0_line = 0.0_dp
         allocate(Jext(n_lambda, nb_proc)) !or n_lambda_cont if I only uses cont wavelengths
@@ -451,6 +452,7 @@ module escape
             call system_clock(cstart_iter,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpustart_iter)
 
+!use less in Sobolev ?
             !TO DO:
             !in principle we don't need that if only atoms with Sobolev itterated
             if (lcswitch_enabled) then
@@ -463,14 +465,11 @@ module escape
 
             n_iter = n_iter + 1
             ng_index = Neq_ng - mod(n_iter-1,Neq_ng)
-            ! 
-            !                    goes with maxIter
             write(*,'(" *** Iteration #"(1I4)"; threshold: "(1ES11.2E3)"; Nrays: "(1I5))') &
                      n_iter, precision, n_rayons
             ibar = 0
             n_cells_done = 0
 
-            !For the moment, in escape mode, the electronic density is evaluated once convergence is achieved.
             l_iterate_ne = .false.
             if( n_iterate_ne > 0 ) then
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
@@ -501,7 +500,7 @@ module escape
                 endif
                 ! if( (diff_loc(icell) < 5d-2 * precision).and..not.lcswitch_enabled ) cycle
 
-                !Init upward radiative rates to 0 and downward radiative rates to Aji or "Aji_cont"
+                !Init upward radiative rates to 0 and downward radiative rates to 0 or "Aji_cont" for Sobolev.
                 !Init collisional rates
                 call init_rates_escape(id,icell)
                 ! Jext(:,id) = 0.0
@@ -526,10 +525,12 @@ module escape
 
                 !     weight = wmu(iray)
 
-                !     !for one ray, if lforce_lte we don't enter here
-                !     !TO DO: use only continuum wavelength in this one ???
+                !     !TO DO: use only continuum wavelength in this one to speed up calc
+                !     !and assumes no feed back of lines on continua and spectrally flat core radiation for lines.
                 !     Itot(:,1,id) = I_sobolev_1ray(id,icell,x0,y0,z0,u0,v0,w0,1,n_lambda,tab_lambda_nm)
                 !     Jext(:,id) = Jext(:,id) + weight * Itot(:,1,id)
+                !     !using Itot iray too
+                !     call partial_coupling_cont(id,icell,weight)
                 !     ! call accumulate_radrates_sobolev_1ray(id,icell,1,weight)
                 ! enddo !iray
                 call radrates_sobolev_average(id, icell)
@@ -562,7 +563,7 @@ module escape
                !$omp parallel &
                !$omp default(none) &
                !$omp private(id,icell,l_iterate,nact,ilevel,vth,nb,nr)&
-               !$omp shared(T,vturb,nHmin,icompute_atomRT,ne,n_cells,ngpop,ng_index,lng_acceleration)&
+               !$omp shared(T,vturb,nHmin,icompute_atomRT,ne,n_cells,ngpop,ng_index)&
                !$omp shared(tab_lambda_nm,atoms,n_atoms,dne,PassiveAtoms,NactiveAtoms,NpassiveAtoms,Voigt)
                !$omp do schedule(dynamic,1)
                do icell=1,n_cells
@@ -571,14 +572,14 @@ module escape
                   if (l_iterate) then
                      dne = max(dne, abs(1.0_dp - ne(icell)/ngpop(1,NactiveAtoms+1,icell,1)))
                      ! -> needed for lte pops !
-                     ne(icell) = ngpop(1,NactiveAtoms+1,icell,1)
-                     if (.not.lng_acceleration) &
-                        ngpop(1,NactiveAtoms+1,icell,ng_index) = ne(icell)
+                    ne(icell) = ngpop(1,NactiveAtoms+1,icell,1)
+                    ngpop(1,NactiveAtoms+1,icell,ng_index) = ne(icell)
                      call LTEpops_H_loc(icell)
                      nHmin(icell) = nH_minus(icell)
                      do nact = 2, n_atoms
                         call LTEpops_atom_loc(icell,Atoms(nact)%p,.false.)
                      enddo
+!use less in Sobolev ?
                      !update profiles only for passive atoms. For active atoms we need new non-LTE pops.
                      !If LTE pops are not updated (so no ne_new) profiles of LTE elements are unchanged.
                      do nact = 1, NpassiveAtoms
@@ -620,7 +621,7 @@ module escape
             !$omp parallel &
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
-            !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration,diff_loc)&!diff,diff_cont,dM)&
+            !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,diff_loc)&!diff,diff_cont,dM)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,voigt,dne_loc)&
             !$omp shared(limit_mem,n_lambda,tab_lambda_nm,n_lambda_cont,tab_lambda_cont) &
             !$omp reduction(max:dM,diff,diff_cont)
@@ -663,7 +664,7 @@ module escape
                      at%n(:,icell) = ngpop(1:at%Nlevel,nact,icell,1)
                      !Then, store Neq_ng previous iterations. index 1 is for the current one.
                      ngpop(1:at%Nlevel,nact,icell,ng_index) = at%n(:,icell)
-
+!use less in Sobolev ?
                      !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next ieration.
                      !Only for Active Atoms here. PAssive Atoms are updated only if electronic density is iterated.
                      !Also need to change if profile interp is used or not! (a and phi)
@@ -683,7 +684,7 @@ module escape
                      enddo
                   end do
                   at => null()
-
+!use less in Sobolev ?
                   !if electronic density is not updated, it is not necessary
                   !to compute the lte continous opacities.
                   !but the overhead should be negligible at this point.
@@ -842,6 +843,33 @@ module escape
 
       return
     end subroutine nlte_loop_sobolev
+!building
+    subroutine partial_coupling_cont(id,icell,domega)
+    use opacity_atom, only : eta_atoms, Uji_down, chi_up, chi_down
+        integer, intent(in) :: id, icell
+        real(kind=dp), intent(in) :: domega
+        integer :: ns
+        type (AtomType), pointer :: at
+
+        Uji_down(:,:,:,id) = 0.0_dp
+        chi_down(:,:,:,id) = 0.0_dp
+        chi_up(:,:,:,id)   = 0.0_dp
+
+        eta_atoms(:,:,id) = 0.0_dp
+
+        do ns=1, Nsob_atoms
+            at => sob_atoms(ns)%p
+            call cross_coupling_cont(id,icell,at) !limit_mem == 0 because we will use the tab_lambda_cont in the future
+        enddo
+
+        !accumulate rates
+        do ns=1, Nsob_atoms
+            at => sob_atoms(ns)%p
+
+        enddo
+        at => null()
+        return
+    end subroutine partial_coupling_cont
 
     subroutine radrates_sobolev_average(id, icell)
         integer, intent(in) :: id, icell
@@ -932,11 +960,13 @@ module escape
                     at%continua(kr)%Rij(id) = 0.0_dp; at%continua(kr)%Rji(id) = 0.0_dp
                     cycle ctr_loop !force LTE (only collisions)
                 endif
+                Ieff(1:Nl) = Itot(nb:nr,1,id) !from the core, opt thin
 
                 Jbar_down = 0.0
                 Jbar_up = 0.0
 
-                Ieff(1:Nl) = Itot(nb:nr,1,id)
+                !TO DO MALI precondition only in the trans
+                ! Ieff(1:Nl) = Jext(nb:nr,id)
                 ! if (tau_max > 10.0) then
                 !     Ieff(1:Nl) = at%n(j,icell) * (twohc / tab_lambda_nm(nb:nr)**3) * ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr))
                 !     Ieff(1:Nl) = Ieff(1:Nl) / (at%n(i,icell) - ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr)) * at%n(j,icell))
@@ -985,7 +1015,6 @@ module escape
         return
     end subroutine radrates_sobolev_average
 
-!building
     function I_sobolev_1ray(id,icell_in,x,y,z,u,v,w,iray,N,lambda)
     ! ------------------------------------------------------------------------------- !
     ! ------------------------------------------------------------------------------- !
@@ -1080,10 +1109,11 @@ module escape
 
             if (nbr_cell==1) then
                ds(iray,id) = l_contrib * AU_to_m
+               psi(:,1,id) = (1_dp - exp(-dtau) ) / chi
                dv_proj(iray,id) = v_proj(icell,x1,y1,z1,u,v,w) - v_proj(icell,x0,y0,z0,y,v,w)
             endif
 
-            ! I_sobolev_1ray = I_sobolev_1ray + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu / chi
+            I_sobolev_1ray = I_sobolev_1ray + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu / chi
             tau(:) = tau(:) + dtau(:) !for next cell
 
          end if  ! lcellule_non_vide
@@ -1095,7 +1125,7 @@ module escape
 
         return
     end function I_sobolev_1ray
-!building
+
     subroutine accumulate_radrates_sobolev_1ray(id, icell, iray, dOmega)
         integer, intent(in) :: id, icell, iray
         real(kind=dp), intent(in) :: dOmega
@@ -1175,6 +1205,7 @@ module escape
                 Jbar_down = 0.0
                 Jbar_up = 0.0
 
+!TO DO: MALI ?? for cont
                 Ieff(1:Nl) = Itot(Nb:Nr,1,id)
                 ! xl(1:Nl) = tab_lambda_nm(Nb:nr)
 
