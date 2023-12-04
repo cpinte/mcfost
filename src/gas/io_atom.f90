@@ -18,6 +18,7 @@ module io_atom
 
    character(len=*), parameter :: path_to_atoms = "/Atoms/"
    real(kind=dp), parameter :: C1 = deux_pi * (electron_charge/EPSILON_0) * (electron_charge/mel / C_light)
+   logical :: lany_init4 = .false.
 
    contains
 
@@ -374,6 +375,12 @@ module io_atom
       !non-LTE pops in electronic density ? write non-LTE pops to file ? 
       atom%NLTEpops = .false. ! set to true during non-LTE loop (initial /= 1).
                               ! true if read from file (initial==1).
+
+      if (lescape_prob) then
+         write(*,*) " WARNING: forcing initial Solution of atom ", atom%id," to ESCAPE!"
+         atom%initial = 4
+      endif
+      if (.not.lany_init4 .and. atom%initial==4) lany_init4 = .true.
 
       ! allocate some space
       if (atom%initial>1) then

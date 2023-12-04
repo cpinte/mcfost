@@ -9,7 +9,7 @@ module atom_transfer
    use parametres
    use input, only               : lkeplerian, linfall, limb_darkening, mu_limb_darkening, RT_line_method
    use constantes, only : nm_to_m, m_to_km, km_to_m, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au, sqrtpi, c_light
-   use io_atom, only : read_atomic_models, write_pops_atom
+   use io_atom, only : read_atomic_models, write_pops_atom, lany_init4
    use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
    use wavelengths_gas, only : make_wavelengths_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
                                  deallocate_wavelengths_gasrt, make_wavelengths_raytracing, make_wavelengths_flux, Nlambda_max_line
@@ -1157,7 +1157,18 @@ module atom_transfer
          ! !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm, .false.)
 
-         call nlte_loop_sobolev()
+
+         if (lany_init4) then
+            call  nlte_loop_sobolev()
+            ! MALI step after Sobolev step
+            if (.not.lescape_prob) then
+               !to preserve ray-resolution ?
+               istep_start = 2
+               istep_end = min(istep_start,istep_end)
+            endif
+         endif
+         !Works also if initial solution different from ESCAPE.
+         if (.not.lescape_prob) call nlte_loop_mali()
          ! call nlte_loop_mali()
          !-> here on the non-LTE frequency grid
          ! call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)

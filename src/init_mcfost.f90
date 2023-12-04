@@ -69,6 +69,7 @@ subroutine set_default_variables()
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
+  lescape_prob = .false.
   lcheckpoint = .false.
   checkpoint_period = 15
   limit_mem = 0 ! {0, 1, 2}
@@ -685,6 +686,9 @@ subroutine initialisation_mcfost()
      case("-mol")
         i_arg = i_arg+1
         lemission_mol=.true.
+     case("-escape_prob")
+        i_arg = i_arg + 1
+        lescape_prob = .true.
      case("-limit_mem")
         i_arg = i_arg + 1
         if (i_arg > nbr_arg) call error("limit_mem switch value need!")
@@ -2022,6 +2026,7 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
   !healpix options missing. Waiting finle adaptive scheme.
+  write(*,*) "        : -escape_prob : Force solution on the non-LTE problem to the escape probability (or Sobolev)"
   write(*,*) "        : -start_step <int> : Select the first step for non-LTE loop (default 1)"
   write(*,*) "        : -end_step <int>   : Select the last step for non-LTE loop (default 2)"
 !   write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
