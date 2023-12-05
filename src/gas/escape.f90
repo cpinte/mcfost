@@ -119,7 +119,7 @@ module escape
         real(kind=dp) :: x0,y0,z0,x1,y1,z1,u,v,w
         real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
         integer :: next_cell, iray, icell_in
-        integer, parameter :: n_rayons = 1000!0
+        integer, parameter :: n_rayons = 1000
         real :: rand, rand2, rand3
         real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1
         integer :: n_rays_shock(n_etoiles)
@@ -127,6 +127,8 @@ module escape
         integer :: ibar, n_cells_done
         integer :: i_star, icell_star
         logical :: lintersect_stars, lintersect
+        real :: time_gradient
+        integer :: count_start, count_end
 
         write(*,*) " *** computing mean velocity gradient for each cell.."
         !but also mean solid angle subtended by each cell to the different stars, including
@@ -155,6 +157,7 @@ module escape
         stream = 0.0
         stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
 
+        call system_clock(count_start,count_rate=time_tick,count_max=time_max)
         call progress_bar(0)
         !$omp parallel &
         !$omp default(none) &
@@ -266,6 +269,8 @@ module escape
         !$omp end do
         !$omp end parallel
         call progress_bar(50)
+        call system_clock(count_end,count_rate=time_tick,count_max=time_max)
+
         if (laccretion_shock) then
             ! Tchoc_average = Tchoc_average / real(n_rays_shock)
             Tchoc_average = Tchoc_average / rho_shock
@@ -288,6 +293,13 @@ module escape
             endif
         enddo
         if (allocated(stream)) deallocate(stream)
+        if (count_end < count_start) then
+            time_gradient=real(count_end + (1.0 * time_max)- count_start)/real(time_tick)
+        else
+            time_gradient=real(count_end - count_start)/real(time_tick)
+        endif
+        write(*,*) ' (Velocity Gradient) time =',mod(time_gradient/60.,60.), " min"
+        write(*,*) ""
         return
     end subroutine mean_velocity_gradient
 
