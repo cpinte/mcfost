@@ -15,9 +15,9 @@ runs:
       shell: bash
       working-directory: test_suite
       run: |
-        wget https://ipag.osug.fr/~pintec/mcfost/test_data_ee572a652377a58197232071980657f7f7fbc3f9.tar.gz
+        wget -nv https://ipag.osug.fr/~pintec/mcfost/test_data_0c484a1a905c13bea4c3bc0494ba288daddbe779.tgz
         rm -rf test_data
-        tar xzf test_data_ee572a652377a58197232071980657f7f7fbc3f9.tar.gz
+        tar xzf test_data_0c484a1a905c13bea4c3bc0494ba288daddbe779.tgz
 
     # Only do this if not in manylinux docker container
     - uses: actions/setup-python@v4
