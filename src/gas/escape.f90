@@ -118,7 +118,7 @@ module escape
         real(kind=dp) :: x0,y0,z0,x1,y1,z1,u,v,w
         real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
         integer :: next_cell, iray, icell_in
-        integer, parameter :: n_rayons = 10000
+        integer, parameter :: n_rayons = 100!00
         real :: rand, rand2, rand3
         real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1
         integer :: n_rays_shock(n_etoiles)
@@ -290,6 +290,7 @@ module escape
         return
     end subroutine mean_velocity_gradient
 
+!TO DO: remove cswitch in Sobolev as we loop only on initsol = 4 or we start from LTE.
     subroutine nlte_loop_sobolev()
     !Large velocity gradient / supersonic approximation
     !   - local Sobolev with no background continua for lines
@@ -567,35 +568,35 @@ module escape
                   !$ id = omp_get_thread_num() + 1
                   l_iterate = (icompute_atomRT(icell)==1)
                   if (l_iterate) then
-                     dne = max(dne, abs(1.0_dp - ne(icell)/ngpop(1,NactiveAtoms+1,icell,1)))
+                    dne = max(dne, abs(1.0_dp - ne(icell)/ngpop(1,NactiveAtoms+1,icell,1)))
                      ! -> needed for lte pops !
                     ne(icell) = ngpop(1,NactiveAtoms+1,icell,1)
                     ngpop(1,NactiveAtoms+1,icell,ng_index) = ne(icell)
-                     call LTEpops_H_loc(icell)
-                     nHmin(icell) = nH_minus(icell)
-                     do nact = 2, n_atoms
+                    call LTEpops_H_loc(icell)
+                    nHmin(icell) = nH_minus(icell)
+                    do nact = 2, n_atoms
                         call LTEpops_atom_loc(icell,Atoms(nact)%p,.false.)
-                     enddo
-!use less in Sobolev ?
-                     !update profiles only for passive atoms. For active atoms we need new non-LTE pops.
-                     !If LTE pops are not updated (so no ne_new) profiles of LTE elements are unchanged.
-                     do nact = 1, NpassiveAtoms
-                        do ilevel=1,PassiveAtoms(nact)%p%nline
-                           if (.not.PassiveAtoms(nact)%p%lines(ilevel)%lcontrib) cycle
-                           if (PassiveAtoms(nact)%p%lines(ilevel)%Voigt) then
-                              nb = PassiveAtoms(nact)%p%lines(ilevel)%nb; nr = PassiveAtoms(nact)%p%lines(ilevel)%nr
-                              PassiveAtoms(nact)%p%lines(ilevel)%a(icell) = line_damping(icell,PassiveAtoms(nact)%p%lines(ilevel))
-                              !-> do not allocate if thomson and humlicek profiles !
-                              !tmp because of vbroad!
-                              ! vth = vbroad(T(icell),PassiveAtoms(nact)%p%weight, vturb(icell))
-                              ! !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
-                              ! PassiveAtoms(nact)%p%lines(ilevel)%phi(:,icell) = &
-                              !      Voigt(PassiveAtoms(nact)%p%lines(ilevel)%Nlambda, PassiveAtoms(nact)%p%lines(ilevel)%a(icell), &
-                              !      PassiveAtoms(nact)%p%lines(ilevel)%v(:)/vth)&
-                              !       / (vth * sqrtpi)
-                           endif
-                        enddo
-                     enddo !over passive atoms
+                    enddo
+! !use less in Sobolev ?
+!                      !update profiles only for passive atoms. For active atoms we need new non-LTE pops.
+!                      !If LTE pops are not updated (so no ne_new) profiles of LTE elements are unchanged.
+!                      do nact = 1, NpassiveAtoms
+!                         do ilevel=1,PassiveAtoms(nact)%p%nline
+!                            if (.not.PassiveAtoms(nact)%p%lines(ilevel)%lcontrib) cycle
+!                            if (PassiveAtoms(nact)%p%lines(ilevel)%Voigt) then
+!                               nb = PassiveAtoms(nact)%p%lines(ilevel)%nb; nr = PassiveAtoms(nact)%p%lines(ilevel)%nr
+!                               PassiveAtoms(nact)%p%lines(ilevel)%a(icell) = line_damping(icell,PassiveAtoms(nact)%p%lines(ilevel))
+!                               !-> do not allocate if thomson and humlicek profiles !
+!                               !tmp because of vbroad!
+!                               ! vth = vbroad(T(icell),PassiveAtoms(nact)%p%weight, vturb(icell))
+!                               ! !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
+!                               ! PassiveAtoms(nact)%p%lines(ilevel)%phi(:,icell) = &
+!                               !      Voigt(PassiveAtoms(nact)%p%lines(ilevel)%Nlambda, PassiveAtoms(nact)%p%lines(ilevel)%a(icell), &
+!                               !      PassiveAtoms(nact)%p%lines(ilevel)%v(:)/vth)&
+!                               !       / (vth * sqrtpi)
+!                            endif
+!                         enddo
+!                      enddo !over passive atoms
                   end if !if l_iterate
                end do
                !$omp end do
@@ -661,30 +662,30 @@ module escape
                      at%n(:,icell) = ngpop(1:at%Nlevel,nact,icell,1)
                      !Then, store Neq_ng previous iterations. index 1 is for the current one.
                      ngpop(1:at%Nlevel,nact,icell,ng_index) = at%n(:,icell)
-!use less in Sobolev ?
-                     !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next ieration.
-                     !Only for Active Atoms here. PAssive Atoms are updated only if electronic density is iterated.
-                     !Also need to change if profile interp is used or not! (a and phi)
-                     do ilevel=1,at%nline
-                        if (.not.at%lines(ilevel)%lcontrib) cycle
-                        if (at%lines(ilevel)%Voigt) then
-                           nb = at%lines(ilevel)%nb; nr = at%lines(ilevel)%nr
-                           at%lines(ilevel)%a(icell) = line_damping(icell,at%lines(ilevel))
-                           !-> do not allocate if thomson and humlicek profiles !
-                           !tmp because of vbroad!
-                           ! vth = vbroad(T(icell),at%weight, vturb(icell))
-                           ! !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
-                           ! at%lines(ilevel)%phi(:,icell) = &
-                           !      Voigt(at%lines(ilevel)%Nlambda, at%lines(ilevel)%a(icell), at%lines(ilevel)%v(:)/vth) &
-                           !      / (vth * sqrtpi)
-                        endif
-                     enddo
+! !use less in Sobolev ?
+!                      !Recompute damping and profiles once with have set the new non-LTE pops (and new ne) for next ieration.
+!                      !Only for Active Atoms here. PAssive Atoms are updated only if electronic density is iterated.
+!                      !Also need to change if profile interp is used or not! (a and phi)
+!                      do ilevel=1,at%nline
+!                         if (.not.at%lines(ilevel)%lcontrib) cycle
+!                         if (at%lines(ilevel)%Voigt) then
+!                            nb = at%lines(ilevel)%nb; nr = at%lines(ilevel)%nr
+!                            at%lines(ilevel)%a(icell) = line_damping(icell,at%lines(ilevel))
+!                            !-> do not allocate if thomson and humlicek profiles !
+!                            !tmp because of vbroad!
+!                            ! vth = vbroad(T(icell),at%weight, vturb(icell))
+!                            ! !-> beware, temporary array here. because line%v(:) is fixed! only vth changes
+!                            ! at%lines(ilevel)%phi(:,icell) = &
+!                            !      Voigt(at%lines(ilevel)%Nlambda, at%lines(ilevel)%a(icell), at%lines(ilevel)%v(:)/vth) &
+!                            !      / (vth * sqrtpi)
+!                         endif
+!                      enddo
                   end do
                   at => null()
-!use less in Sobolev ?
                   !if electronic density is not updated, it is not necessary
                   !to compute the lte continous opacities.
                   !but the overhead should be negligible at this point.
+                !needed for contopac_atom_loc in the propagation routine for cont RT.
                   select case (limit_mem)
                      case (0)
                         call calc_contopac_loc(icell,n_lambda,tab_lambda_nm)
@@ -731,7 +732,7 @@ module escape
                endif
             else
                lprevious_converged = .false.
-               !TO DO: remove cswitch in Sobolev ??
+!TO DO: remove cswitch in Sobolev ??
                if ((lcswitch_enabled).and.(maxval_cswitch_atoms() > 1.0_dp)) then
                   call adjust_cswitch_atoms()
                endif
