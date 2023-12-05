@@ -881,7 +881,7 @@ module atom_transfer
       real(kind=dp) :: v1,v2
       integer :: i1, i2, id
 
-      integer, parameter :: n_rayons = 100
+      integer, parameter :: n_rayons = 10 !50 !100
       integer :: i, next_cell, previous_cell
       integer :: i_star, icell_star
       logical :: lintersect_stars, lcellule_non_vide
@@ -1159,15 +1159,15 @@ module atom_transfer
 
 
          if (lany_init4) then
-            call  nlte_loop_sobolev()
-            ! MALI step after Sobolev step
+            call nlte_loop_sobolev()
+            ! MALI step after Sobolev step ? 
             if (.not.lescape_prob) then
                !to preserve ray-resolution ?
                istep_start = 2
                istep_end = min(istep_start,istep_end)
             endif
          endif
-         !Works also if initial solution different from ESCAPE.
+         !Works also if the initial solution is different from ESCAPE.
          if (.not.lescape_prob) call nlte_loop_mali()
          ! call nlte_loop_mali()
          !-> here on the non-LTE frequency grid

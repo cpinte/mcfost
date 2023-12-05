@@ -11,8 +11,9 @@ module escape
     use stars, only : is_inshock, intersect_stars, star_rad, T_preshock
     use mem, only : emissivite_dust
     use dust_prop, only : kappa_abs_lte, kappa, kappa_factor
-    use opacity_atom, only : contopac_atom_loc, vlabs, Itot, calc_contopac_loc, psi, cross_coupling_cont
-    use atom_type, only : n_atoms, Atoms, ActiveAtoms, atomtype, NactiveAtoms, atomPointerArray, &
+    use opacity_atom, only : contopac_atom_loc, vlabs, Itot, calc_contopac_loc, psi, cross_coupling_cont, &
+        eta_atoms, Uji_down, chi_up, chi_down, opacity_atom_bf_loc
+    use atom_type, only : n_atoms, Atoms, ActiveAtoms, atomtype, AtomicContinuum, NactiveAtoms, atomPointerArray, &
         lcswitch_enabled, vbroad, maxval_cswitch_atoms, NpassiveAtoms, PassiveAtoms, adjust_cswitch_atoms
     use see, only : alloc_nlte_var, neq_ng, ngpop, small_nlte_fraction, tab_Aji_cont, tab_Vij_cont, &
         dealloc_nlte_var, update_populations, init_colrates_atom
@@ -32,11 +33,10 @@ module escape
 
     type (atomPointerArray), dimension(:), allocatable :: sob_atoms
     integer :: Nsob_atoms
-    integer, allocatable, dimension(:) :: sob_atom_to_activeatoms
 
     real(kind=dp), allocatable, dimension(:,:) :: d_to_star, wdi, domega_star, domega_core, domega_shock, dv_proj
     real(kind=dp), allocatable, dimension(:) :: mean_grad_v, mean_length_scale, Tchoc_average
-    real(kind=dp), allocatable :: I0_line(:,:,:,:), Jext(:,:), Istar(:,:), Ishock(:,:)
+    real(kind=dp), allocatable :: I0_line(:,:,:,:), Istar(:,:), Ishock(:,:), chitot(:,:), etatot(:,:)
 
     contains
 
@@ -118,7 +118,7 @@ module escape
         real(kind=dp) :: x0,y0,z0,x1,y1,z1,u,v,w
         real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
         integer :: next_cell, iray, icell_in
-        integer, parameter :: n_rayons = 1000
+        integer, parameter :: n_rayons = 10000
         real :: rand, rand2, rand3
         real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1
         integer :: n_rays_shock(n_etoiles)
@@ -348,13 +348,13 @@ module escape
         do i=1, NactiveAtoms
             if (ActiveAtoms(i)%p%initial == 4)  Nsob_atoms =  Nsob_atoms + 1
         enddo
-        allocate(sob_atoms(Nsob_atoms),sob_atom_to_activeatoms(Nsob_atoms))
+        allocate(sob_atoms(Nsob_atoms))
         i = 0
         do nact=1, NactiveAtoms
             if (ActiveAtoms(nact)%p%initial == 4)  then
                 i = i + 1
                 sob_atoms(i)%p => ActiveAtoms(nact)%p
-                sob_atom_to_activeatoms(i) = nact
+                ! sob_atom_to_activeatoms(i) = nact
             endif
         enddo
 
@@ -365,9 +365,9 @@ module escape
             Nmaxline = max(NmaxLine,activeatoms(nact)%p%nline)
         enddo
 !TO DO: use n_lambda_cont instead of full lambda.
+        allocate(chitot(n_lambda, nb_proc),etatot(n_lambda,nb_proc))
         !Radiation field
         allocate(I0_line(Nlambda_max_line,NmaxLine,NactiveAtoms,nb_proc)); I0_line = 0.0_dp
-        allocate(Jext(n_lambda, nb_proc)) !or n_lambda_cont if I only uses cont wavelengths
         allocate(Istar(n_lambda, n_etoiles))
         !see stars/star_rad()
         do i=1, n_etoiles
@@ -481,7 +481,7 @@ module escape
             !$omp default(none) &
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff)&
-            !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,Jext,wmu) &
+            !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,wmu) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,1)
@@ -503,7 +503,6 @@ module escape
                 !Init upward radiative rates to 0 and downward radiative rates to 0 or "Aji_cont" for Sobolev.
                 !Init collisional rates
                 call init_rates_escape(id,icell)
-                ! Jext(:,id) = 0.0
                 ! ! Position aleatoire dans la cellule
                 ! do iray=1,n_rayons
 
@@ -528,11 +527,9 @@ module escape
                 !     !TO DO: use only continuum wavelength in this one to speed up calc
                 !     !and assumes no feed back of lines on continua and spectrally flat core radiation for lines.
                 !     Itot(:,1,id) = I_sobolev_1ray(id,icell,x0,y0,z0,u0,v0,w0,1,n_lambda,tab_lambda_nm)
-                !     Jext(:,id) = Jext(:,id) + weight * Itot(:,1,id)
-                !     !using Itot iray too
-                !     call partial_coupling_cont(id,icell,weight)
-                !     ! call accumulate_radrates_sobolev_1ray(id,icell,1,weight)
+                !     call xccont(id,icell,1,weight,rates=.true.)
                 ! enddo !iray
+                !reset Itot to 0.
                 call radrates_sobolev_average(id, icell)
 
                 !update populations of all atoms including electrons
@@ -828,10 +825,10 @@ module escape
     !   if (loutput_rates) call write_rates()
 
       call dealloc_nlte_var()
-      deallocate(dM, diff_loc, dne_loc, I0_line, Jext)
+      deallocate(dM, diff_loc, dne_loc, I0_line, chitot, etatot)
       deallocate(dv_proj, stream, ds, vlabs, lcell_converged, Istar)
       if (allocated(Ishock)) deallocate(Ishock)
-      deallocate(sob_atoms,sob_atom_to_activeatoms)
+      deallocate(sob_atoms)
 
       ! --------------------------------    END    ------------------------------------------ !
       if (mod(time_nlte_loop/60./60.,60.) > 1.0_dp) then
@@ -843,33 +840,6 @@ module escape
 
       return
     end subroutine nlte_loop_sobolev
-!building
-    subroutine partial_coupling_cont(id,icell,domega)
-    use opacity_atom, only : eta_atoms, Uji_down, chi_up, chi_down
-        integer, intent(in) :: id, icell
-        real(kind=dp), intent(in) :: domega
-        integer :: ns
-        type (AtomType), pointer :: at
-
-        Uji_down(:,:,:,id) = 0.0_dp
-        chi_down(:,:,:,id) = 0.0_dp
-        chi_up(:,:,:,id)   = 0.0_dp
-
-        eta_atoms(:,:,id) = 0.0_dp
-
-        do ns=1, Nsob_atoms
-            at => sob_atoms(ns)%p
-            call cross_coupling_cont(id,icell,at) !limit_mem == 0 because we will use the tab_lambda_cont in the future
-        enddo
-
-        !accumulate rates
-        do ns=1, Nsob_atoms
-            at => sob_atoms(ns)%p
-
-        enddo
-        at => null()
-        return
-    end subroutine partial_coupling_cont
 
     subroutine radrates_sobolev_average(id, icell)
         integer, intent(in) :: id, icell
@@ -878,7 +848,7 @@ module escape
         integer :: ns, nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
         real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds
         type(AtomType), pointer :: at
-        real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij, chi0(1), eta0(1)
+        real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij
         real(kind=dp) :: jbar_down, jbar_up, ehnukt, anu, tau_max
         real(kind=dp), dimension(Nlambda_max_trans) :: Ieff, xl
 
@@ -895,12 +865,13 @@ module escape
             enddo
         endif
 
+
         !-> no overlapping transitions and background continua
         ! at_loop : do nact = 1, Nactiveatoms
         !     at => ActiveAtoms(nact)%p
         at_loop : do ns = 1, Nsob_atoms
-            nact = sob_atom_to_activeatoms(ns)
             at => sob_atoms(ns)%p
+            nact = sob_atoms(ns)%p%activeindex
 
             vth = vbroad(T(icell),at%weight, vturb(icell))
 
@@ -937,6 +908,18 @@ module escape
 
             enddo atr_loop
 
+            ! using MALI continua (I could solve the full cont RT problem for few frequencies)
+            ! call contopac_atom_loc(icell, n_lambda, tab_lambda_nm, chitot(:,id), etatot(:,id))
+            chitot(:,id) = 0.0_dp; etatot(:,id) = 0.0_dp
+            call opacity_atom_bf_loc(icell, n_lambda, tab_lambda_nm, chitot(:,id), etatot(:,id))
+            ! -> local + external excitation from the core.
+            ! Psi(:,1,id) = (1.0_dp - exp(-mean_length_scale(icell) * chitot(:,id))) / chitot(:,id)
+            ! Itot(:,1,id) = Itot(:,1,id) * exp(-mean_length_scale(icell) * chitot(:,id)) + Psi(:,1,id) * etatot(:,id)
+            ! call xccont(id,icell,1,1.0_dp,rates=.true.)
+            ! cycle at_loop
+            !simplify to use only in the opt thick case (psi = 1/chi, Ieff = 0, lambda - lambda* = 0)
+            call xccont(id,icell,1,1.0_dp,rates=.false.)
+
             !-> opt thin excitation for the continua
             !-> if the continuum is optically thick, let the rates to 0 (LTE approx.)
             ctr_loop : do kr = 1, at%ncont
@@ -952,28 +935,19 @@ module escape
                 Nl = Nr - Nb + 1
                 i0 = Nb - 1
 
-                !not only active continua but passive (but no dust here)
-                !-> length x chi at lambda0 (beware if dissociation)
-                ! call background_continua_lambda(icell, 1, (/at%continua(kr)%lambda0/), chi0(:), eta0(:))
-                tau_max = mean_length_scale(icell) * tab_Vij_cont(Nl,kr,nact) * (at%n(i,icell) - at%n(j,icell) * gij)! + chi0(1))
+                tau_max = mean_length_scale(icell) * tab_Vij_cont(Nl,kr,nact) * (at%n(i,icell) - at%n(j,icell) * gij)
                 if (tau_max > 10.0) then
-                    at%continua(kr)%Rij(id) = 0.0_dp; at%continua(kr)%Rji(id) = 0.0_dp
+                    ! at%continua(kr)%Rij(id) = 0.0_dp; at%continua(kr)%Rji(id) = 0.0_dp
+                    call opt_thick_mali_rates_cont(id,icell,at%continua(kr)) !do not set Rji to 0 in that case!
                     cycle ctr_loop !force LTE (only collisions)
                 endif
+                ! -> opt thin
                 Ieff(1:Nl) = Itot(nb:nr,1,id) !from the core, opt thin
 
                 Jbar_down = 0.0
                 Jbar_up = 0.0
 
-                !TO DO MALI precondition only in the trans
-                ! Ieff(1:Nl) = Jext(nb:nr,id)
-                ! if (tau_max > 10.0) then
-                !     Ieff(1:Nl) = at%n(j,icell) * (twohc / tab_lambda_nm(nb:nr)**3) * ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr))
-                !     Ieff(1:Nl) = Ieff(1:Nl) / (at%n(i,icell) - ni_on_nj_star * exp(-hc_k/T(icell)/tab_lambda_nm(nb:nr)) * at%n(j,icell))
-                ! endif
                 ! xl(1:Nl) = tab_lambda_nm(Nb:nr)
-
-
                 ! Jbar_up = 0.5 * sum ( &
                 !     (tab_vij_cont(1:Nl-1,kr,nact)*Ieff(1:Nl-1)/xl(1:Nl-1) + tab_vij_cont(2:Nl,kr,nact)*Ieff(2:Nl)/xl(2:Nl)) * &
                 !     (xl(2:Nl)-xl(1:Nl-1)) &
@@ -1015,6 +989,7 @@ module escape
         return
     end subroutine radrates_sobolev_average
 
+!TO DO: only cont frequencies
     function I_sobolev_1ray(id,icell_in,x,y,z,u,v,w,iray,N,lambda)
     ! ------------------------------------------------------------------------------- !
     ! ------------------------------------------------------------------------------- !
@@ -1060,6 +1035,7 @@ module escape
 
          if (lintersect_stars) then !"will interesct"
             if (icell == icell_star) then!"has intersected"
+            !spectrally flat across each line intensities for ray-by-ray Sobolev.
                 Icore(:) = star_rad(id,iray,i_star,icell_prev,x0,y0,z0,u,v,w,N,lambda)
                 I_sobolev_1ray = I_sobolev_1ray + exp(-tau(:)) * Icore
                 do nat=1, NactiveAtoms
@@ -1143,8 +1119,8 @@ module escape
         ! at_loop : do nact = 1, Nactiveatoms
         !     at => ActiveAtoms(nact)%p
         at_loop : do ns = 1, Nsob_atoms
-            nact = sob_atom_to_activeatoms(ns)
             at => sob_atoms(ns)%p
+            nact = sob_atoms(ns)%p%activeindex
 
             vth = vbroad(T(icell),at%weight, vturb(icell))
 
@@ -1180,6 +1156,11 @@ module escape
 
             enddo atr_loop
 
+
+            !using MALI continua
+            cycle at_loop
+            !-> not accurate enough with electronic density
+
             !-> opt thin excitation for the continua
             ctr_loop : do kr = 1, at%ncont
                 if (.not.at%continua(kr)%lcontrib) cycle ctr_loop
@@ -1205,11 +1186,9 @@ module escape
                 Jbar_down = 0.0
                 Jbar_up = 0.0
 
-!TO DO: MALI ?? for cont
                 Ieff(1:Nl) = Itot(Nb:Nr,1,id)
+
                 ! xl(1:Nl) = tab_lambda_nm(Nb:nr)
-
-
                 ! Jbar_up = 0.5 * sum ( &
                 !     (tab_vij_cont(1:Nl-1,kr,nact)*Ieff(1:Nl-1)/xl(1:Nl-1) + tab_vij_cont(2:Nl,kr,nact)*Ieff(2:Nl)/xl(2:Nl)) * &
                 !     (xl(2:Nl)-xl(1:Nl-1)) &
@@ -1251,5 +1230,188 @@ module escape
 
         return
     end subroutine accumulate_radrates_sobolev_1ray
+
+!building
+!TO DO: use only the cont frequencies
+    subroutine xccont(id,icell,iray,domega,rates)
+        integer, intent(in) :: id, icell, iray
+        real(kind=dp), intent(in) :: domega
+        logical, intent(in), optional :: rates
+        integer :: ns, nact
+        type (AtomType), pointer :: at
+        integer :: kr, i, j, ip, jp, krr, Nbp, Nrp, i0, Nl, Nb, Nr, l
+        real(kind=dp) :: ni_on_nj_star, gij, wl, ehnukt, anu
+        real(kind=dp) :: jbar_down, jbar_up, xcc_down, xcc_up
+        real(kind=dp), dimension(Nlambda_max_trans) :: Ieff, dtau
+
+
+        !first loop to get the contributions from the different transitions
+        do ns=1, Nsob_atoms
+            at => sob_atoms(ns)%p
+            nact = at%activeindex
+            Uji_down(:,:,nact,id) = 0.0_dp
+            chi_down(:,:,nact,id) = 0.0_dp
+            chi_up(:,:,nact,id) = 0.0_dp
+            eta_atoms(:,nact,id) = 0.0_dp
+            !full coupling here
+            call cross_coupling_cont(id,icell,at) !limit_mem == 0 because we will use the tab_lambda_cont in the future
+            !or get only the partial coupling using only the actual transitions
+        enddo
+
+        if (present(rates)) then
+            if (.not.rates) return
+        else !not present, return, equivalent to .false.
+            return 
+        endif
+
+        !accumulate rates
+        do ns=1, Nsob_atoms
+            at => sob_atoms(ns)%p
+            nact = at%activeindex
+            cont_loop : do kr = 1, at%Ncont
+                if (.not.at%continua(kr)%lcontrib) cycle cont_loop
+
+                i = at%continua(kr)%i; j = at%continua(kr)%j
+
+                ni_on_nj_star = at%ni_on_nj_star(i,icell)
+                gij = ni_on_nj_star * exp(-hc_k/T(icell)/at%continua(kr)%lambda0)
+                if ((at%n(i,icell) - at%n(j,icell) * gij) <= 0.0_dp) cycle cont_loop
+
+                Nb = at%continua(kr)%Nb; Nr = at%continua(kr)%Nr
+                Nl = Nr-Nb + 1
+                i0 = Nb - 1
+
+                Jbar_down = 0.0
+                Jbar_up = 0.0
+                xcc_down = 0.0
+
+                Ieff(1:Nl) = max(Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id),0.0_dp)
+
+                do l=1, Nl
+                    if (l==1) then
+                        wl = 0.5*(tab_lambda_nm(Nb+1)-tab_lambda_nm(Nb)) / tab_lambda_nm(Nb)
+                    elseif (l==n_lambda) then
+                        wl = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) / tab_lambda_nm(Nr)
+                    else
+                        wl = 0.5*(tab_lambda_nm(i0+l+1)-tab_lambda_nm(i0+l-1)) / tab_lambda_nm(i0+l)
+                    endif
+                    anu = tab_Vij_cont(l,kr,nact)
+
+                    Jbar_up = Jbar_up + anu*Ieff(l)*wl
+
+                    ehnukt = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l))
+
+                    Jbar_down = jbar_down + anu*Ieff(l)*ehnukt*wl
+
+                    xcc_down = xcc_down + chi_up(i0+l,i,nact,id)*Uji_down(i0+l,j,nact,id)*psi(i0+l,1,id)
+                enddo
+
+
+                at%continua(kr)%Rij(id) = at%continua(kr)%Rij(id) + dOmega*fourpi_h * Jbar_up
+                !init at tab_Aji_cont(kr,nact,icell) <=> Aji
+                at%continua(kr)%Rji(id) = at%continua(kr)%Rji(id) + dOmega*fourpi_h * Jbar_down * ni_on_nj_star
+
+
+                !cross-coupling terms
+                xcc_up = 0.0_dp
+                ! do krr=1, at%Nline
+                !     ip = at%lines(krr)%i
+                !     jp = at%lines(krr)%j
+                !     Nbp = at%lines(krr)%Nb
+                !     Nrp = at%lines(krr)%Nr
+                !     if (jp==i) then !i upper level of another transitions
+                !         xcc_up = xcc_up + sum(chi_down(Nbp:Nrp,j,nact,id)*psi(Nbp:Nrp,1,id)*Uji_down(Nbp:Nrp,i,nact,id))
+                !     endif
+                ! enddo
+                do krr=1, at%Ncont
+                    ip = at%continua(krr)%i
+                    jp = at%continua(krr)%j
+                    Nbp = at%continua(krr)%Nb
+                    Nrp = at%continua(krr)%Nr
+                    if (jp==i) then !i upper level of another transitions
+                        xcc_up = xcc_up + sum(chi_down(Nbp:Nrp,j,nact,id)*psi(Nbp:Nrp,1,id)*Uji_down(Nbp:Nrp,i,nact,id))
+                    endif
+                enddo
+
+                at%continua(kr)%Rji(id) = at%continua(kr)%Rji(id) - xcc_down * dOmega
+                at%continua(kr)%Rij(id) = at%continua(kr)%Rij(id) + xcc_up * dOmega
+            enddo cont_loop
+        enddo ! atom
+        at => null()
+        return
+    end subroutine xccont
+
+
+    subroutine opt_thick_mali_rates_cont(id,icell,cont)
+
+        integer, intent(in) :: id,icell
+        type (AtomicContinuum), intent(inout) :: cont
+        integer :: i, j, nact, kr
+        real(kind=dp) :: ni_on_nj_star, Jbar_down, Jbar_up, xcc_down, xcc_up
+        real(kind=dp) :: ehnukt, anu, wl
+        integer :: Nb, Nr, Nl, i0, l
+        integer :: ip, jp, krr, Nrp, Nbp
+
+        !cont%Rji init at tab_Aji_cont
+
+        nact = cont%atom%activeindex
+        kr = cont%i !or pass kr directly, if multiple ions ??
+        !for single ion, continua are labelled from 1 to Nlevel-1, so %i
+
+        i = cont%i; j = cont%j
+
+        ni_on_nj_star = cont%atom%ni_on_nj_star(i,icell)
+
+        Nb = cont%Nb; Nr = cont%Nr
+        Nl = Nr-Nb + 1
+        i0 = Nb - 1
+        
+        ! xcc_down = 0.0
+        ! do l=1, Nl
+        !     if (l==1) then
+        !         wl = 0.5*(tab_lambda_nm(Nb+1)-tab_lambda_nm(Nb)) / tab_lambda_nm(Nb)
+        !     elseif (l==n_lambda) then
+        !         wl = 0.5*(tab_lambda_nm(Nr)-tab_lambda_nm(Nr-1)) / tab_lambda_nm(Nr)
+        !     else
+        !         wl = 0.5*(tab_lambda_nm(i0+l+1)-tab_lambda_nm(i0+l-1)) / tab_lambda_nm(i0+l)
+        !     endif
+        !     anu = tab_Vij_cont(l,kr,nact)
+
+        !     ehnukt = exp(-hc_k/T(icell)/tab_lambda_nm(i0+l))
+
+        !     xcc_down = xcc_down + wl * anu * twohc / tab_lambda_nm(i0+l)**3 * ehnukt
+        ! enddo
+        ! cont%Rji = cont%Rji - xcc_down * fourpi_h * ni_on_nj_star
+
+        ! return
+
+        Jbar_down = 0.0
+        Jbar_up = 0.0
+        xcc_down = 0.0
+
+        ! cont%Rij(id) = fourpi_h * Jbar_up
+        !init at tab_Aji_cont(kr,nact,icell) <=> Aji
+        ! cont%Rji(id) = cont%Rji(id) + fourpi_h * Jbar_down * ni_on_nj_star
+
+
+        !cross-coupling terms
+        xcc_down = sum(chi_up(Nb:Nr,i,nact,id)*Uji_down(Nb:Nr,j,nact,id)/chitot(Nb:Nr,id))
+        xcc_up = 0.0_dp
+        do krr=1, cont%atom%Ncont
+            ip = cont%atom%continua(krr)%i
+            jp = cont%atom%continua(krr)%j
+            Nbp = cont%atom%continua(krr)%Nb
+            Nrp = cont%atom%continua(krr)%Nr
+            if (jp==i) then !i upper level of another transitions
+                xcc_up = xcc_up + sum(chi_down(Nbp:Nrp,j,nact,id)*Uji_down(Nbp:Nrp,i,nact,id)/chitot(:,id))
+            endif
+        enddo
+
+        cont%Rji(id) = cont%Rji(id) - xcc_down
+        cont%Rij(id) = cont%Rij(id) + xcc_up
+
+
+        return
+    end subroutine opt_thick_mali_rates_cont
 
 end module escape
