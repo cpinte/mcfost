@@ -316,6 +316,8 @@ module escape
 
         logical :: labs
         logical :: l_iterate, l_iterate_ne
+        integer :: n_xc
+        real(kind=dp), dimension(:), pointer :: tab_xc
       
         !convergence check
         type (AtomType), pointer :: at
@@ -340,6 +342,18 @@ module escape
         labs = .true.
         lfixed_rays = .true.
         id = 1
+
+        if (n_iterate_ne > 0) then
+            select case (limit_mem)
+                case (0)
+                    n_xc = n_lambda
+                    tab_xc => tab_lambda_nm
+                case (1)
+                    n_xc = n_lambda_cont
+                    tab_xc => tab_lambda_cont
+                !case (2) evaluated on-the-fly.
+            end select
+        endif
 
         call alloc_escape_variables
         call mean_velocity_gradient
@@ -620,9 +634,9 @@ module escape
             !$omp parallel &
             !$omp default(none) &
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
-            !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,diff_loc)&!diff,diff_cont,dM)&
+            !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,diff_loc)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,voigt,dne_loc)&
-            !$omp shared(limit_mem,n_lambda,tab_lambda_nm,n_lambda_cont,tab_lambda_cont) &
+            !$omp shared(limit_mem,l_iterate_ne,tab_xc,n_xc) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
@@ -683,17 +697,10 @@ module escape
 !                      enddo
                   end do
                   at => null()
-                  !if electronic density is not updated, it is not necessary
-                  !to compute the lte continous opacities.
-                  !but the overhead should be negligible at this point.
-                !needed for contopac_atom_loc in the propagation routine for cont RT.
-                  select case (limit_mem)
-                     case (0)
-                        call calc_contopac_loc(icell,n_lambda,tab_lambda_nm)
-                     case (1)
-                        call calc_contopac_loc(icell,n_lambda_cont,tab_lambda_cont)
-                     !case (2) evaluated on-the-fly.
-                  end select
+
+                  if (l_iterate_ne) then     
+                        call calc_contopac_loc(icell,n_xc,tab_xc)     
+                  endif                    
 
                end if !if l_iterate
             end do cell_loop2 !icell
@@ -817,6 +824,7 @@ module escape
       if (n_iterate_ne > 0) then
         write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
         !  call write_electron
+        tab_xc => null()
       endif
 
     !   do nact=1,N_atoms

@@ -42,7 +42,7 @@ module wavelengths_gas
    real(kind=dp), dimension(:), allocatable :: group_blue, group_red
    integer, dimension(:), allocatable :: Nline_per_group, Nlambda_per_group
    !non-lte freq grid
-   real(kind=dp), allocatable :: tab_lambda_cont(:), tab_lambda_nm(:)
+   real(kind=dp), allocatable, target :: tab_lambda_cont(:), tab_lambda_nm(:)
 
    !generator of grid for specific transitions
    procedure(make_sub_wavelength_grid_cont_log_nu), pointer :: subgrid_cont => make_sub_wavelength_grid_cont_log_nu

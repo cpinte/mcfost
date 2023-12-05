@@ -148,6 +148,8 @@ module atom_transfer
 
       logical :: labs
       logical :: l_iterate, l_iterate_ne
+      integer :: n_xc
+      real(kind=dp), dimension(:), pointer :: tab_xc
       
       !Ng's acceleration
       integer, parameter :: Ng_Ndelay_init = 5 !minimal number of iterations before starting the cycle.
@@ -239,6 +241,18 @@ module atom_transfer
       ! write(*,*) " size Iloc:", sizeof(iloc) / 1024./1024./1024.," GB"
       ! mem_alloc_local = mem_alloc_local + sizeof(iloc)
       call alloc_nlte_var(one_ray,mem=mem_alloc_local)
+
+      if (n_iterate_ne > 0) then
+         select case (limit_mem)
+            case (0)
+               n_xc = n_lambda
+               tab_xc => tab_lambda_nm
+            case (1)
+               n_xc = n_lambda_cont
+               tab_xc => tab_lambda_cont
+            !case (2) evaluated on-the-fly.
+         end select
+      endif
 
       ! --------------------------- OUTER LOOP ON STEP --------------------------- !
       precision = dpops_max_error
@@ -611,7 +625,7 @@ module atom_transfer
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
             !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration,diff_loc)&!diff,diff_cont,dM)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,voigt,dne_loc)&
-            !$omp shared(limit_mem,n_lambda,tab_lambda_nm,n_lambda_cont,tab_lambda_cont) &
+            !$omp shared(limit_mem,l_iterate_ne,n_xc,tab_xc) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
@@ -679,16 +693,9 @@ module atom_transfer
                   end do
                   at => null()
 
-                  !if electronic density is not updated, it is not necessary
-                  !to compute the lte continous opacities.
-                  !but the overhead should be negligible at this point.
-                  select case (limit_mem)
-                     case (0)
-                        call calc_contopac_loc(icell,n_lambda,tab_lambda_nm)
-                     case (1)
-                        call calc_contopac_loc(icell,n_lambda_cont,tab_lambda_cont)
-                     !case (2) evaluated on-the-fly.
-                  end select
+                  if (l_iterate_ne) then
+                     call calc_contopac_loc(icell,n_xc,tab_xc)
+                  endif
 
                end if !if l_iterate
             end do cell_loop2 !icell
@@ -831,6 +838,7 @@ module atom_transfer
       if (n_iterate_ne > 0) then
          write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
          call write_electron
+         tab_xc => null()
       endif
 
       do nact=1,N_atoms
