@@ -21,7 +21,7 @@ module escape
     use wavelengths_gas, only : tab_lambda_nm, tab_lambda_cont, n_lambda_cont, Nlambda_max_trans, Nlambda_max_line
     use lte, only : ltepops_atoms, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
     use broad, only : line_damping
-    use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
+    use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc, init_colrates_coeff_hydrogen
     use voigts, only : voigt
     use gas_contopac, only : background_continua_lambda
 
@@ -50,6 +50,7 @@ module escape
             !x ne included. Derivatives to ne not included.
             if (activeatoms(n)%p%id=='H') then
                 ! call init_colrates_atom(id,ActiveAtoms(n)%p)
+                call init_colrates_coeff_hydrogen(id,icell)
                 call collision_rates_hydrogen_loc(id,icell)
             else
                 call init_colrates_atom(id,ActiveAtoms(n)%p)
