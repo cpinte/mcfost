@@ -12,7 +12,7 @@ module see
         matdiag, jacobi_sparse
     use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, xcoupling_cont, cross_coupling_cont_i
     use messages, only : warning, error
-    use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
+    use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc, init_colrates_coeff_hydrogen, CE_hydrogen, CI_hydrogen
     use fits_utils, only : print_error
 
     implicit none
@@ -68,6 +68,12 @@ module see
             mem_alloc_local = mem_alloc_local + sizeof(atom%Gamma) + 2*(atom%Ncont+atom%Nline)*sizeof(atom%lines(1)%Rij)
             atom => null()
         enddo
+
+        if (hydrogen%active) then
+            allocate(CE_hydrogen(hydrogen%Nlevel,hydrogen%nlevel,nb_proc))
+            allocate(CI_hydrogen(hydrogen%nlevel,nb_proc))
+            mem_alloc_local = mem_alloc_local + sizeof(CE_hydrogen) + sizeof(CI_hydrogen)
+        endif
 
         !-> allocate space for non-LTE only quantities !
         ! NOTE: index 1 is always the current solution
@@ -201,6 +207,10 @@ module see
             allocate(xvar(Neq_ne,nb_proc),fvar(Neq_ne,nb_proc),dfvar(Neq_ne,Neq_ne,nb_proc),npop_dag(Neq_ne,nb_proc))
             mem_alloc_local = mem_alloc_local + sizeof(xvar)*3 + sizeof(dfvar)+3*sizeof(gtot)+sizeof(gr_save)
             mem_alloc_local = mem_alloc_local + sizeof(gs_ion) + sizeof(pops_ion)
+            call alloc_local_saha_factor_elems(nb_proc)
+            do n=1, Nelem
+                mem_alloc_local = mem_alloc_local + sizeof(Elems(n)%saha_fact)
+            enddo
         endif
 
         if (limit_mem > 0) xcoupling_cont => cross_coupling_cont_i
@@ -254,6 +264,7 @@ module see
         type (AtomType), intent(inout), pointer :: atom
         integer :: kr
         if (allocated(atom%Gamma)) deallocate(atom%Gamma)
+        if (allocated(CE_hydrogen)) deallocate(CE_hydrogen,CI_hydrogen)
         do kr=1, atom%Nline
             if (allocated(atom%lines(kr)%Rij))deallocate(atom%lines(kr)%Rij,atom%lines(kr)%Rji)
             if (allocated(atom%lines(kr)%Cij))deallocate(atom%lines(kr)%Cij,atom%lines(kr)%Cji)
@@ -287,6 +298,7 @@ module see
             do n=1,NactiveAtoms
                 deallocate(activeAtoms(n)%p%dgdne)
             enddo
+            call dealloc_local_saha_factor_elems()
         endif
 
         return
@@ -506,6 +518,7 @@ module see
             !x ne included. Derivatives to ne not included.
             if (activeatoms(n)%p%id=='H') then
                 ! call init_colrates_atom(id,ActiveAtoms(n)%p)
+                call init_colrates_coeff_hydrogen(id,icell)
                 call collision_rates_hydrogen_loc(id,icell)
             else
                 call init_colrates_atom(id,ActiveAtoms(n)%p)
@@ -904,6 +917,9 @@ module see
         gr_save(:,:,:,id) = 0.0_dp
         npop_dag(:,id) = 0.0_dp
 
+        !fix during the iterative loop (depends only on T)
+        call init_local_saha_factor_elems(id,T(icell))
+
         !gather informations for all active atoms in the same arrays
         !store populations and densities of the cell icell of this MALI iteration.
         npop_dag(Neq_ne,id) = ne(icell)
@@ -958,6 +974,7 @@ module see
                 ! write(*,*) pops_ion(at%Nstage-1,n,id),  at%n(at%Nlevel,icell)
                 if (at%ID=='H') then
                     ! call init_colrates_atom(id,at)
+                    ! with fixed Johnson coefficients, initialized for that cell with call init_rates()
                     call collision_rates_hydrogen_loc(id,icell)
                 else
                     call init_colrates_atom(id,at)
@@ -1111,13 +1128,13 @@ module see
         return
     end subroutine see_atoms_ne
 
-  subroutine ionisation_frac_lte(elem, k, ne, fjk, dfjk)
+  subroutine ionisation_frac_lte(id,elem, k, ne, fjk, dfjk)
   !special version that forces ionisation fraction at LTE.
     real(kind=dp), intent(in) :: ne
-    integer, intent(in) :: k
+    integer, intent(in) :: k, id
     type (Element), intent(in) :: Elem
     real(kind=dp), dimension(:), intent(inout) :: fjk, dfjk
-    real(kind=dp) :: Uk, Ukp1, sum1, sum2
+    real(kind=dp) :: sum1, sum2
     integer :: j,  Nstage
     !return Nj / Ntot
     !for neutral j * Nj/Ntot = 0
@@ -1127,18 +1144,14 @@ module see
     dfjk(1)=0.
     sum1 = 1.
     sum2 = 0.
-    Uk = get_pf(elem,1,T(k))
     do j=2,Elem%Nstage
-       Ukp1 = get_pf(elem,j,T(k))
-       fjk(j) = Sahaeq(T(k),fjk(j-1),Ukp1,Uk,elem%ionpot(j-1),ne)
-       !fjk(j) = ne * cste, der = cste  fjk(j) / ne
+        !inverse of saha factor
+        fjk(j) = fjk(j-1) * elem%saha_fact(j,id) / ne
 
-       dfjk(j) = -(j-1)*fjk(j)/ne
+        dfjk(j) = -(j-1)*fjk(j)/ne
 
-       sum1 = sum1 + fjk(j)
-       sum2 = sum2 + dfjk(j)
-
-       Uk = Ukp1
+        sum1 = sum1 + fjk(j)
+        sum2 = sum2 + dfjk(j)
     end do
 
     fjk(:)=fjk(:)/sum1
@@ -1147,6 +1160,43 @@ module see
 
     return
   end subroutine ionisation_frac_lte
+
+!   subroutine ionisation_frac_lte(id,elem, k, ne, fjk, dfjk)
+!   !special version that forces ionisation fraction at LTE.
+!     real(kind=dp), intent(in) :: ne
+!     integer, intent(in) :: k, id
+!     type (Element), intent(in) :: Elem
+!     real(kind=dp), dimension(:), intent(inout) :: fjk, dfjk
+!     real(kind=dp) :: Uk, Ukp1, sum1, sum2
+!     integer :: j,  Nstage
+!     !return Nj / Ntot
+!     !for neutral j * Nj/Ntot = 0
+
+!     !fjk(1) is N(1) / ntot !N(1) = sum_j=1 sum_i=1^N(j) n(i)
+!     fjk(1)=1.
+!     dfjk(1)=0.
+!     sum1 = 1.
+!     sum2 = 0.
+!     ! Uk = get_pf(elem,1,T(k))
+!     do j=2,Elem%Nstage
+!     !    Ukp1 = get_pf(elem,j,T(k))
+!        fjk(j) = fjk(j-1) * elem%saha_fact(j,id) / ne!Sahaeq(T(k),fjk(j-1),Ukp1,Uk,elem%ionpot(j-1),ne)
+!        !fjk(j) = ne * cste, der = cste  fjk(j) / ne
+
+!        dfjk(j) = -(j-1)*fjk(j)/ne
+
+!        sum1 = sum1 + fjk(j)
+!        sum2 = sum2 + dfjk(j)
+
+!     !    Uk = Ukp1
+!     end do
+
+!     fjk(:)=fjk(:)/sum1
+!     dfjk(:)=(dfjk(:)-fjk(:)*sum2)/sum1
+
+
+!     return
+!   end subroutine ionisation_frac_lte
 
   function jions(id)
   !sum of ions times charge for nlte ions
@@ -1176,7 +1226,7 @@ module see
         real(kind=dp), intent(in) :: x(neq)
         real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
         integer :: n, j, i, k
-        type (element) :: elem
+        type (element), pointer :: elem
         real(kind=dp) :: akj, sum_ions, st
         real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
 
@@ -1218,12 +1268,12 @@ module see
         ! df(neq,:) = 0.0
         !now contribution from bacgrkound atoms.
         lte_elem_loop : do n=1, 26 !for 26 elements, can go up to Nelem(size(Elems)) in principle!
-            elem = Elems(n)
+            elem => Elems(n)
             if (elem%nm>0) then
                 if (atoms(elem%nm)%p%active) cycle lte_elem_loop
             endif
 
-            call ionisation_frac_lte(elem, icell, x(neq), fjk, dfjk)
+            call ionisation_frac_lte(id,elem, icell, x(neq), fjk, dfjk)
 
             do j=2, elem%Nstage
                 !pure LTE term j = 1 corresponds to the first ionisation stage always

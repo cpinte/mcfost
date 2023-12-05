@@ -17,7 +17,8 @@ module elements_type
         integer, allocatable, dimension(:)  :: mol_index !track molecules in which Element is present
         real(kind=dp) :: weight, abund, massf
         real(kind=dp), allocatable, dimension(:)  :: ionpot
-        real(kind=dp), allocatable, dimension(:,:)  :: pf
+        real(kind=dp), allocatable, dimension(:,:)  :: pf !table of partition function on Tpf grid
+        real(kind=dp), allocatable, dimension(:,:)  :: saha_fact !Saha factor at the temperature T, interpolated (one per processor).
         integer :: nm = 0 !-> index in Atoms, of a given elements if any (>0)!
 
     end type Element
@@ -28,7 +29,7 @@ module elements_type
 
 
     ! type (elemPointerArray), dimension(:), allocatable :: Elements
-    type (Element), dimension(:), allocatable :: elems
+    type (Element), dimension(:), allocatable, target :: elems
 
     !file where the abundance of all elements are
     integer, parameter :: NELEM_WEIGHTS = 99
@@ -91,6 +92,43 @@ module elements_type
         ! enddo
         return
     end subroutine dealloc_elements
+
+    subroutine alloc_local_saha_factor_elems(nelements)
+        integer, intent(in) :: nelements
+        integer :: n
+        do n=1,Nelem
+            allocate(elems(n)%saha_fact(elems(n)%Nstage,nelements))
+        enddo
+        return
+    end subroutine alloc_local_saha_factor_elems
+
+    subroutine dealloc_local_saha_factor_elems
+        integer :: n
+        do n=1,Nelem
+            deallocate(elems(n)%saha_fact)
+        enddo
+        return
+    end subroutine dealloc_local_saha_factor_elems
+
+    subroutine init_local_saha_factor_elems(i, temp)
+    !init saha factor.
+    !WARNING: it is actually 1 / phi_jl  !
+        integer, intent(in) :: i
+        real(kind=dp), intent(in) :: temp
+        integer :: n, j
+        real(kind=dp) :: uk, ukp1
+        do n=1,Nelem
+            elems(n)%saha_fact(1,i) = 1.0_dp
+            uk = get_pf(elems(n),1,temp)
+            do j=1, elems(n)%Nstage
+                ukp1 = get_pf(elems(n),j,temp)
+                elems(n)%saha_fact(j,i) = 1.0_dp / phi_jl(temp,Uk,Ukp1,elems(n)%ionpot(j-1))
+                !fjk(j) = fjk(j-1) * elems(n)%saha_fact(j,i) / ne
+                uk = ukp1
+            enddo
+        enddo
+        return
+    end subroutine init_local_saha_factor_elems
 
     !to do, add a more flexible partition function.
     subroutine read_abundance()
