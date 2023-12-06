@@ -29,7 +29,7 @@ module elements_type
 
 
     ! type (elemPointerArray), dimension(:), allocatable :: Elements
-    type (Element), dimension(:), allocatable, target :: elems
+    type (Element), dimension(:), allocatable :: elems
 
     !file where the abundance of all elements are
     integer, parameter :: NELEM_WEIGHTS = 99

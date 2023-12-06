@@ -14,6 +14,7 @@ module see
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc, init_colrates_coeff_hydrogen, CE_hydrogen, CI_hydrogen
     use fits_utils, only : print_error
+    use lte, only : LTEpops_atom_loc, LTEpops_H_loc
 
     implicit none
 
@@ -70,8 +71,8 @@ module see
         enddo
 
         if (hydrogen%active) then
-            allocate(CE_hydrogen(hydrogen%Nlevel,hydrogen%nlevel,nb_proc))
-            allocate(CI_hydrogen(hydrogen%nlevel,nb_proc))
+            allocate(CE_hydrogen(hydrogen%Nlevel,hydrogen%nlevel,nb_proc)); CE_hydrogen = 0.0
+            allocate(CI_hydrogen(hydrogen%nlevel,nb_proc)); CI_hydrogen = 0.0
             mem_alloc_local = mem_alloc_local + sizeof(CE_hydrogen) + sizeof(CI_hydrogen)
         endif
 
@@ -1054,6 +1055,12 @@ module see
                 lconverged = .false.
             endif
 
+            !update LTE populations of Active atoms.
+            call LTEpops_H_loc(icell)
+            do n = 2, NactiveAtoms
+                call LTEpops_atom_loc(icell,ActiveAtoms(n)%p,.false.)
+            enddo
+
             !should be fractional
             delta_f = maxval(abs(fvar(:,id)))
             dfpop = maxval(abs(fvar(1:Neq_ne-1,id)))
@@ -1226,7 +1233,6 @@ module see
         real(kind=dp), intent(in) :: x(neq)
         real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
         integer :: n, j, i, k
-        type (element), pointer :: elem
         real(kind=dp) :: akj, sum_ions, st
         real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
 
@@ -1268,17 +1274,16 @@ module see
         ! df(neq,:) = 0.0
         !now contribution from bacgrkound atoms.
         lte_elem_loop : do n=1, 26 !for 26 elements, can go up to Nelem(size(Elems)) in principle!
-            elem => Elems(n)
-            if (elem%nm>0) then
-                if (atoms(elem%nm)%p%active) cycle lte_elem_loop
+            if (Elems(n)%nm>0) then
+                if (atoms(Elems(n)%nm)%p%active) cycle lte_elem_loop
             endif
 
-            call ionisation_frac_lte(id,elem, icell, x(neq), fjk, dfjk)
+            call ionisation_frac_lte(id,Elems(n), icell, x(neq), fjk, dfjk)
 
-            do j=2, elem%Nstage
+            do j=2, Elems(n)%Nstage
                 !pure LTE term j = 1 corresponds to the first ionisation stage always
                 !unlike in solve_ne where this loop is also for non-LTE models (with non-LTE ionisation fraction, still)
-                akj = (j-1) * elem%abund * nhtot(icell) !(j-1) = 0 for neutrals and 1 for singly ionised
+                akj = (j-1) * Elems(n)%abund * nhtot(icell) !(j-1) = 0 for neutrals and 1 for singly ionised
                 f(neq) = f(neq) - akj * fjk(j) / x(neq)
                 df(neq,neq) = df(neq,neq) + akj * fjk(j) / x(neq)**2 - akj / x(neq) * dfjk(j)
             end do
