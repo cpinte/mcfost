@@ -119,7 +119,7 @@ module escape
         real(kind=dp) :: x0,y0,z0,x1,y1,z1,u,v,w
         real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
         integer :: next_cell, iray, icell_in
-        integer, parameter :: n_rayons = 1000
+        integer, parameter :: n_rayons = 33333
         real :: rand, rand2, rand3
         real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1
         integer :: n_rays_shock(n_etoiles)
@@ -355,17 +355,15 @@ module escape
         lfixed_rays = .true.
         id = 1
 
-        if (n_iterate_ne > 0) then
-            select case (limit_mem)
-                case (0)
-                    n_xc = n_lambda
-                    tab_xc => tab_lambda_nm
-                case (1)
-                    n_xc = n_lambda_cont
-                    tab_xc => tab_lambda_cont
-                !case (2) evaluated on-the-fly.
-            end select
-        endif
+        select case (limit_mem)
+            case (0)
+                n_xc = n_lambda
+                tab_xc => tab_lambda_nm
+            case (1)
+                n_xc = n_lambda_cont
+                tab_xc => tab_lambda_cont
+            !case (2) evaluated on-the-fly.
+        end select
 
         call alloc_escape_variables
         call mean_velocity_gradient
@@ -710,9 +708,10 @@ module escape
                   end do
                   at => null()
 
-                  if (l_iterate_ne) then     
-                        call calc_contopac_loc(icell,n_xc,tab_xc)     
-                  endif                    
+                  !TO DO: update background opac only l_iterate_ne   
+                  if (limit_mem < 2) then 
+                    call calc_contopac_loc(icell,n_xc,tab_xc)  
+                  endif   
 
                end if !if l_iterate
             end do cell_loop2 !icell

@@ -242,17 +242,15 @@ module atom_transfer
       ! mem_alloc_local = mem_alloc_local + sizeof(iloc)
       call alloc_nlte_var(one_ray,mem=mem_alloc_local)
 
-      if (n_iterate_ne > 0) then
-         select case (limit_mem)
-            case (0)
-               n_xc = n_lambda
-               tab_xc => tab_lambda_nm
-            case (1)
-               n_xc = n_lambda_cont
-               tab_xc => tab_lambda_cont
-            !case (2) evaluated on-the-fly.
-         end select
-      endif
+      select case (limit_mem)
+         case (0)
+            n_xc = n_lambda
+            tab_xc => tab_lambda_nm
+         case (1)
+            n_xc = n_lambda_cont
+            tab_xc => tab_lambda_cont
+         !case (2) evaluated on-the-fly.
+      end select
 
       ! --------------------------- OUTER LOOP ON STEP --------------------------- !
       precision = dpops_max_error
@@ -693,8 +691,10 @@ module atom_transfer
                   end do
                   at => null()
 
-                  if (l_iterate_ne) then
-                     call calc_contopac_loc(icell,n_xc,tab_xc)
+                  ! always, as we also updated the non-LTE bound-free
+                  ! TO DO: update background opacities only if l_iterate_ne
+                  if (limit_mem < 2) then
+                     call calc_contopac_loc(icell,n_xc,tab_xc)!,bckgr_opac=.true.)
                   endif
 
                end if !if l_iterate
@@ -1169,11 +1169,11 @@ module atom_transfer
          if (lany_init4) then
             call nlte_loop_sobolev()
             ! MALI step after Sobolev step ? 
-            if (.not.lescape_prob) then
-               !to preserve ray-resolution ?
-               istep_start = 2
-               istep_end = min(istep_start,istep_end)
-            endif
+            ! if (.not.lescape_prob) then
+            !    !to preserve ray-resolution ?
+            !    istep_start = 2
+            !    istep_end = min(istep_start,istep_end)
+            ! endif
          endif
          !Works also if the initial solution is different from ESCAPE.
          if (.not.lescape_prob) call nlte_loop_mali()
