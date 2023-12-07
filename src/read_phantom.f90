@@ -933,7 +933,7 @@ contains
                 vz(j) = vzi * uvelocity
              endif
 
-             if (ldust_moments) dust_moments(:,j) = nucleation(1:4,i)
+             if (ldust_moments) dust_moments(:,j) = nucleation(2:5,i)
 
              T_gas(j) = T_gasi
              rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
