@@ -5,11 +5,12 @@ module see
     use grid
     use parametres
     use gas_contopac, only        : H_bf_Xsection
-    use wavelengths, only         :  n_lambda
+    use wavelengths, only         : n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, &
          tab_lambda_cont, tab_lambda_nm
-    use utils, only               : gaussslv, solve_lin, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix
-    use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, chi_tot, eta_tot
+    use utils, only               : gaussslv, solve_lin, is_nan_infinity_vector, linear_1D_sorted, is_nan_infinity_matrix, &
+        matdiag, jacobi_sparse
+    use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, xcoupling_cont, cross_coupling_cont_i
     use messages, only : warning, error
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc
     use fits_utils, only : print_error
@@ -17,7 +18,7 @@ module see
     implicit none
 
     !populations below that threshold not taken into account in convergence.
-    real(kind=dp), parameter :: frac_limit_pops = 1d-10!1d-50
+    real(kind=dp), parameter :: small_nlte_fraction = 1d-15!1d-50
     !Variables for Non-LTE loop and MALI method
     real(kind=dp), allocatable ::  ngpop(:,:,:,:)
     real(kind=dp), allocatable :: tab_Aji_cont(:,:,:), tab_Vij_cont(:,:,:)
@@ -33,17 +34,22 @@ module see
 
     contains
 
-    subroutine alloc_nlte_var(n_rayons_max)
+    subroutine alloc_nlte_var(n_rayons_max,mem)
     !allocate space for non-lte loop (only)
         integer, intent(in) :: n_rayons_max
+        integer(kind=8), intent(in), optional :: mem
         integer :: Nmaxlevel,Nmaxline,Nmaxcont,NlevelTotal,Nmaxstage
-        integer :: alloc_status, mem_alloc_local
+        integer :: alloc_status
+        integer(kind=8) :: mem_alloc_local
         integer :: kr, n, icell, l, i, j
         real(kind=dp) :: wl, anu1, e1, b1
         real(kind=dp) :: anu2, e2, b2!higher prec integ
         type(AtomType), pointer :: atom
 
         mem_alloc_local = 0
+        if (present(mem)) then
+            mem_alloc_local = mem_alloc_local + mem
+        endif
         NmaxLevel = 0 !maximum number of levels
         NlevelTotal = 0 !sum of all levels among all active atoms
         NmaxLine = 0 !maximum number of lines
@@ -85,7 +91,7 @@ module see
         
         !initialize electronic density
         ngpop(1,NactiveAtoms+1,:,1) = ne(:)
-        write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024., " MB"
+        write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024./1024., " GB"
         allocate(psi(n_lambda, n_rayons_max, nb_proc), stat=alloc_status); psi(:,:,:) = 0.0_dp
         write(*,*) " size psi:", sizeof(psi) / 1024./1024.," MB"
         if (alloc_Status > 0) call error("Allocation error psi in nlte loop")
@@ -113,6 +119,7 @@ module see
 
         allocate(tab_Aji_cont(NmaxCont,NactiveAtoms,n_cells))
         allocate(tab_Vij_cont(Nlambda_max_cont,NmaxCont,NactiveAtoms))
+        tab_Aji_cont = 0.0_dp; tab_Vij_cont = 0.0_dp
         write(*,*) " size tab_Aji_cont:", sizeof(tab_Aji_cont) / 1024./1024./1024.," GB"
         write(*,*) " size tab_Vij_cont:", sizeof(tab_Vij_cont) / 1024./1024./1024.," GB"
         !integrate in frequency Uji which is fourpi/h * anu * 2hnu3/c2 * exp(-hnu/kT)
@@ -120,7 +127,8 @@ module see
         mem_alloc_local = mem_alloc_local + sizeof(tab_Aji_cont) + sizeof(tab_Vij_cont)
         do n=1, NactiveAtoms
             atom => ActiveAtoms(n)%p
-            do kr=1,atom%Ncont
+            ct_loop : do kr=1,atom%Ncont
+                if (.not.atom%continua(kr)%lcontrib) cycle ct_loop
                 i = atom%Continua(kr)%i
                 j = atom%continua(kr)%j
                 if (atom%continua(kr)%hydrogenic) then
@@ -130,6 +138,7 @@ module see
                     tab_Vij_cont(1:atom%continua(kr)%Nlambda,kr,n) = linear_1D_sorted(size(atom%continua(kr)%alpha_file),&
                          atom%continua(kr)%lambda_file,atom%continua(kr)%alpha_file,atom%continua(kr)%Nlambda,&
                          tab_lambda_nm(atom%continua(kr)%Nb:atom%continua(kr)%Nr))
+                    tab_Vij_cont(atom%continua(kr)%Nlambda,kr,n) = atom%continua(kr)%alpha_file(size(atom%continua(kr)%alpha_file))
                 endif
                 !loop for all cells here can be long
                 !could be para
@@ -173,7 +182,7 @@ module see
                         enddo
                     endif
                 enddo
-            enddo
+            enddo ct_loop
         enddo
         atom => null()
 
@@ -200,7 +209,7 @@ module see
             mem_alloc_local = mem_alloc_local + sizeof(gs_ion) + sizeof(pops_ion)
         endif
 
-
+        if (limit_mem > 0) xcoupling_cont => cross_coupling_cont_i
         write(*,'("  Total memory allocated in NLTEloop:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
 
         return
@@ -229,8 +238,6 @@ module see
             enddo
             atom => null()
         enddo
-
-        if (allocated(chi_tot)) deallocate(chi_tot,eta_tot)
 
         if (n_iterate_ne > 0) then
             deallocate(gtot,gr_save,dgrdne,dgcdne)
@@ -265,9 +272,9 @@ module see
         real(kind=dp), intent(out) :: dM
         real(kind=dp), dimension(atom%Nlevel) :: ndag, delta
         real(kind=dp) :: ntotal, Gamma_dag(atom%Nlevel,atom%Nlevel) !debug
-        real(kind=dp) :: dn_n, wjac
+        real(kind=dp) :: dn_n
 
-    !if molecules (or H-, ntotal must be different from A*nHtot)
+    !if molecules (or H-), ntotal must be different from A*nHtot)
         ntotal = atom%Abund*nHtot(icell) !in atomic form here. Could be stored on mem.
 
         ndag(:) = atom%n(:,icell) / ntotal
@@ -293,12 +300,11 @@ module see
         atom%Gamma(imaxpop,:,id) = 1.0_dp
 
     !solve for residual
-        wjac = 1.0_dp
         delta = atom%n(:,icell) - matmul(atom%Gamma(:,:,id), ndag)
 
         ! call GaussSlv(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
         call solve_lin(atom%Gamma(:,:,id), delta(:), atom%Nlevel)
-   	    atom%n(:,icell) = ndag(:) + wjac * delta(:)
+   	    atom%n(:,icell) = ndag(:) + delta(:)
         ! call gaussslv(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
         !call solve_lin(atom%Gamma(:,:,id), atom%n(:,icell), atom%Nlevel)
 
@@ -352,7 +358,7 @@ module see
         do l=1,atom%Nlevel
             atom%n(l,icell) = atom%n(l,icell) * ntotal
 
-            if (atom%n(l,icell) < frac_limit_pops * ntotal) then
+            if (atom%n(l,icell) < small_nlte_fraction * ntotal) then
                 Nsmall_pops = Nsmall_pops + 1
                 level_index(lp) = l
                 lp = lp + 1
@@ -498,12 +504,20 @@ module see
             i = atom%continua(kr)%i; j = atom%continua(kr)%j
             atom%continua(kr)%Rij(id) = 0.0_dp
             !updated value of ni and nj!
+            !-> 0 if cont does not contribute to opac.
+            ! atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
+            !      atom%nstar(i,icell)/atom%nstar(j,icell)
             atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
-                 atom%nstar(i,icell)/atom%nstar(j,icell)
+                 atom%ni_on_nj_star(i,icell)
+            !check ratio ni_on_nj_star for the continua when there are multiple ionisation states (works for H, test for He)
         enddo
 
         do kr=1,atom%Nline
             atom%lines(kr)%Rij(id) = 0.0_dp
+            if (.not.atom%lines(kr)%lcontrib) then
+                atom%lines(kr)%Rji(id) = 0.0_dp
+                cycle
+            endif
             atom%lines(kr)%Rji(id) = nlte_fact * atom%lines(kr)%Aji
         enddo
 
@@ -531,13 +545,15 @@ module see
         integer :: kr, i, j, Nl, Nr, Nb, ip, jp, Nrp, Nbp
         integer :: i0, l, nact, krr
         real(kind=dp) :: jbar_up, jbar_down, xcc_down, xcc_up
-        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star
+        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star, gij
         real(kind=dp) :: ehnukt, ehnukt1
 ! write(*,*) icell, T(icell)
         atom_loop : do nact = 1, Nactiveatoms
             atom => ActiveAtoms(nact)%p
 
             line_loop : do kr=1, atom%Nline
+
+                if (.not.atom%lines(kr)%lcontrib) cycle line_loop
 
                 Nr = atom%lines(kr)%Nr;Nb = atom%lines(kr)%Nb
                 i = atom%lines(kr)%i
@@ -547,13 +563,16 @@ module see
                 i0 = Nb - 1
 
                 phi0(1:Nl) = phi_loc(1:Nl,kr,nact,iray,id)
+                !-> otherwise phi_loc is 0 and there are normalisation issues with wphi
+                if ((atom%n(i,icell) - atom%n(j,icell)*atom%lines(kr)%gij) <= 0.0_dp) cycle line_loop
 
                 Jbar_up = 0.0
                 xcc_down = 0.0
                 wphi = 0.0
 
                 !(Psi - Psi^\ast) eta
-                Ieff(1:Nl) = Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id)
+                !-> cannot be negative. At worst, it is 0 if the emission is entirely local
+                Ieff(1:Nl) = max(Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id),0.0_dp)
 
                 ! do l=2, nl
                 !     wl = c_light * (tab_lambda_nm(i0+l) - tab_lambda_nm(i0+l-1))/atom%lines(kr)%lambda0
@@ -615,11 +634,15 @@ module see
             end do line_loop
 
             cont_loop : do kr = 1, atom%Ncont
+                if (.not.atom%continua(kr)%lcontrib) cycle cont_loop
 
                 i = atom%continua(kr)%i; j = atom%continua(kr)%j
 
-          !ni_on_nj_star = ne(icell) * phi_T(icell, aatom%g(i)/aatom%g(j), aatom%E(j)-aatom%E(i))
-                ni_on_nj_star = atom%nstar(i,icell)/atom%nstar(j,icell)
+                ! ni_on_nj_star = ne(icell) * phi_T(T(icell), atom%g(i), atom%g(j), atom%E(j)-atom%E(i))
+                ! ni_on_nj_star = atom%nstar(i,icell)/atom%nstar(j,icell)
+                ni_on_nj_star = atom%ni_on_nj_star(i,icell)
+                gij = ni_on_nj_star * exp(-hc_k/T(icell)/atom%continua(kr)%lambda0)
+                if ((atom%n(i,icell) - atom%n(j,icell) * gij) <= 0.0_dp) cycle cont_loop
 
                 Nb = atom%continua(kr)%Nb; Nr = atom%continua(kr)%Nr
                 Nl = Nr-Nb + 1
@@ -629,7 +652,7 @@ module see
                 Jbar_up = 0.0
                 xcc_down = 0.0
 
-                Ieff(1:Nl) = Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id)
+                Ieff(1:Nl) = max(Itot(Nb:Nr,iray,id) - Psi(Nb:Nr,1,id) * eta_atoms(Nb:Nr,nact,id),0.0_dp)
                 ! write(*,*) Itot(Nb:Nr,iray,id)
                 ! write(*,*) Psi(Nb:Nr,1,id)*eta_atoms(Nb:Nr,nact,id)
                 ! write(*,*) Psi(Nb:Nr,1,id)
@@ -943,6 +966,9 @@ module see
                 do j=1,at%Nlevel
                     at%n(j,icell) = at%n(j,icell) * ( 1.0_dp + fvar((i-1)+j,id)/(1.0_dp + d_damp * abs(fvar((i-1)+j,id))) )
                     if (at%n(j,icell) < 0.0) neg_pops = .true.
+                    ! if (at%n(j,icell) < small_nlte_fraction * at%Abund*nHtot(icell) )then
+                    !     write(*,*) "small pops for level ", j
+                    ! endif
                 enddo
                 i = i + at%Nlevel
             enddo
@@ -952,7 +978,9 @@ module see
             if (verbose)write(*,*) ( 1.0 + fvar(neq_ne,id)/(1.0_dp + d_damp * abs(fvar(neq_ne,id))) )
             if (verbose)write(*,*) fvar(neq_ne,id), d_damp
             !                       1d-16
-            if ( (ne(icell) < frac_limit_pops * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
+            ! if (ne(icell) < small_nlte_fraction * nhtot(icell)) write(*,*) "** small ne at cell ", icell
+            ! if ( (ne(icell) < small_nlte_fraction * nHtot(icell)).or.(neg_pops) ) rest_damping = .true.
+            if ( (ne(icell) < small_nlte_fraction * sum(pops_ion(:,:,id))).or.(neg_pops) ) rest_damping = .true.
             !-> here pops_ion has the old values !
             !restart with more iterations and larger damping (more stable, slower convergence)
             if (rest_damping .and. d_damp < (damp_char + 1.0)) then
@@ -1023,7 +1051,7 @@ module see
         i = 1
         do n=1,NactiveAtoms
             at => Activeatoms(n)%p
-            dM = max(dM,maxval(abs(1.0 - npop_dag(i:(i-1)+at%Nlevel,id)/at%n(:,icell))))
+            dM = max(dM,maxval(abs(1.0 - npop_dag(i:(i-1)+at%Nlevel,id)/at%n(:,icell)),at%n(:,icell)>0))
             ngpop(1:at%Nlevel,at%activeindex,icell,1) = at%n(:,icell)
             !reset
             at%n(:,icell) = npop_dag(i:(i-1)+at%Nlevel,id) !the first value before iterations
@@ -1078,6 +1106,23 @@ module see
     return
   end subroutine ionisation_frac_lte
 
+  function jions(id)
+  !sum of ions times charge for nlte ions
+    real(kind=dp) :: jions
+    integer, intent(in) :: id
+    real(kind=dp) :: sum_ions
+    integer :: n, j
+
+    jions = 0
+    do n=1,Nactiveatoms
+        do j=1, activeatoms(n)%p%Nstage-1
+            jions = jions + j * pops_ion(j,n,id)
+        enddo
+    enddo
+
+    return
+  endfunction jions
+
     subroutine non_lte_charge_conservation (id,icell, neq, x, f, df)
     !F_cc = 1.0 - 1/ne * (np + nHeII + 2*nHeIII) = 0
     !F_cc = 1.0 - 1/ne * (sum_atom pops_ion(atom)*stage(ion)) = 0
@@ -1091,12 +1136,13 @@ module see
         real(kind=dp) :: akj, sum_ions, st
         real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
 
-        sum_ions = 0
-        do n=1,Nactiveatoms
-            do j=1, activeatoms(n)%p%Nstage-1
-                sum_ions = sum_ions + j * pops_ion(j,n,id)
-            enddo
-        enddo
+        ! sum_ions = 0
+        ! do n=1,Nactiveatoms
+        !     do j=1, activeatoms(n)%p%Nstage-1
+        !         sum_ions = sum_ions + j * pops_ion(j,n,id)
+        !     enddo
+        ! enddo
+        sum_ions = jions(id)
 
         !derivative of CC to ne
         f(neq) = 1.0_dp - sum_ions / x(neq) !factor 2 for nHeIII included (1 for np and nheII)
@@ -1232,6 +1278,7 @@ module see
         real(kind=dp), intent(in) :: x(neq)
         real(kind=dp), intent(inout) :: df(neq,neq), f(neq)
         integer :: ieq, jvar
+        real(kind=dp) :: xp(neq), diag(neq)
         ! real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
 
         do ieq=1, neq
@@ -1241,12 +1288,24 @@ module see
             enddo
         enddo
 
+        !check sparsity
+        diag(:) = abs(matdiag(df,neq))
+        if (minval(diag)==0.0_dp) then
+            ! call warning("(Newton-Raphson) df is sparse!")
+            xp(:) = x(:)
+            call Jacobi_sparse(df,f,xp,neq)
+            f(:) = xp(:)
+            return
+        endif
+
         ! *********************** !
         ! Adag(:,:) = df(:,:)
         ! bdag(:) = f(:)
         ! *********************** !
 
         ! call GaussSlv(df,f,neq)
+        ! write(*,*) "f=", f
+        ! write(*,*) "df=", df
         call solve_lin(df,f,neq)
         if (is_nan_infinity_vector(f)>0) then
         !  write(*,*) "fdag=", bdag

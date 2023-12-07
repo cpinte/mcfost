@@ -178,11 +178,11 @@ subroutine allocate_mol_maps(imol)
      npix_x = npix_x_save ; npix_y = npix_y_save ! we update the value after the SED calculation
 
      write(*,*) "WARNING : memory size if lots of pixels"
-     allocate(spectre(npix_x,npix_y,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
+     allocate(spectre(npix_x,npix_y,n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
           continu(npix_x,npix_y,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(npix_x,npix_y,1), stat=alloc_status)
   else
      RT_line_method = 1 ! utilisation de pixels circulaires
-     allocate(spectre(1,1,-n_speed_rt:n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
+     allocate(spectre(1,1,n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
           continu(1,1,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(1,1,1), stat=alloc_status)
   endif
   if (alloc_status > 0) call error('Allocation error spectre')
@@ -324,7 +324,7 @@ subroutine capteur(id,lambda,icell,xin,yin,zin,uin,vin,win,stokin,flag_star,flag
   u1=uin ; v1=vin ; w1=win
   stok=stokin
 
-  !*     utilisation de la symetrie centrale
+  ! Utilisation de la symetrie centrale
   if (w1 < 0.0) then
      if (l_sym_centrale) then
         x1 = -x1
@@ -3245,7 +3245,7 @@ subroutine ecriture_spectre(imol)
      naxis=3
      naxes(1)=npix_x
      naxes(2)=npix_y
-     naxes(3)= 2*mol(imol)%n_speed_rt+1 ! velocity
+     naxes(3)=mol(imol)%n_speed_rt ! velocity
      nelements=naxes(1)*naxes(2)*naxes(3)
      allocate(spectre_casa(naxes(1),naxes(2),naxes(3)))
   else
@@ -3257,7 +3257,7 @@ subroutine ecriture_spectre(imol)
         naxes(1)=npix_x
         naxes(2)=npix_y
      endif
-     naxes(3)=2*mol(imol)%n_speed_rt+1
+     naxes(3)=mol(imol)%n_speed_rt
      naxes(4)=mol(imol)%nTrans_rayTracing
      naxes(5)=RT_n_incl
      naxes(6)=RT_n_az
@@ -3283,9 +3283,10 @@ subroutine ecriture_spectre(imol)
   call ftpkys(unit,'CUNIT2',"deg",'',status)
 
   call ftpkys(unit,'CTYPE3',"VELO-LSR",'[km/s]',status)
-  call ftpkye(unit,'CRVAL3',0.,-7,'',status)
-  call ftpkyj(unit,'CRPIX3',mol(imol)%n_speed_rt+1,'',status)
-  call ftpkye(unit,'CDELT3',real(mol(imol)%vmax_center_rt/mol(imol)%n_speed_rt * m_to_km),-7,'delta_V [km/s]',status)
+  call ftpkye(unit,'CRVAL3',real(mol(imol)%vmin_center_rt * m_to_km + v_syst),-7,'',status)
+  call ftpkyj(unit,'CRPIX3',1,'',status)
+  call ftpkye(unit,'CDELT3',real((mol(imol)%vmax_center_rt-mol(imol)%vmin_center_rt) &
+       /(mol(imol)%n_speed_rt-1) * m_to_km),-7,'delta_V [km/s]',status)
   call ftpkys(unit,'CUNIT3',"km/s",'',status)
 
   if (lcasa) then
@@ -3302,14 +3303,14 @@ subroutine ecriture_spectre(imol)
   endif
   !  call ftpkye(unit,'vmax_center',mol(imol)%vmax_center_output,-8,'m/s',status)
 
-  if (l_sym_ima) then ! BUG : ca inverse aussi la pente du Cmb mais c'est pas tres grave
+  if (mol(imol)%l_sym_ima) then ! BUG : ca inverse aussi la pente du Cmb mais c'est pas tres grave
      if (RT_line_method==1) then
         ! On ajoute les 2 parties du spectres
         do iv = -mol(imol)%n_speed_rt, -1
            spectre(1,1,iv,:,:,:) = spectre(1,1,iv,:,:,:) + spectre(1,1,-iv,:,:,:)
         enddo
         ! On symetrise
-        do iv =1, mol(imol)%n_speed_rt
+        do iv = 1, mol(imol)%n_speed_rt
            spectre(1,1,iv,:,:,:) = spectre(1,1,-iv,:,:,:)
         enddo
         spectre(1,1,0,:,:,:) = spectre(1,1,0,:,:,:) * 2.
@@ -3318,9 +3319,10 @@ subroutine ecriture_spectre(imol)
      else
         xcenter = npix_x/2 + modulo(npix_x,2)
         if (lkeplerian) then ! profil de raie inverse des 2 cotes
+           !iv_center = mol(imol)%n_speed_rt/2
            do i=xcenter+1,npix_x
-              do iv=-mol(imol)%n_speed_rt,mol(imol)%n_speed_rt
-                 spectre(i,:,iv,:,:,:) = spectre(npix_x-i+1,:,-iv,:,:,:)
+              do iv=1, mol(imol)%n_speed_rt
+                 spectre(i,:,iv,:,:,:) = spectre(npix_x-i+1,:,mol(imol)%n_speed_rt-iv+1,:,:,:)
               enddo
            enddo
         else ! infall : meme profil de raie des 2 cotes
@@ -3331,6 +3333,7 @@ subroutine ecriture_spectre(imol)
      endif ! lkeplerian
   endif ! l_sym_image
 
+  factor = 1.0
   if (lcasa) then
      W2m2_to_Jy = 1e26 / Transfreq(mol(imol)%indice_Trans_rayTracing(1))
 
@@ -3431,7 +3434,7 @@ subroutine ecriture_spectre(imol)
      !------------------------------------------------------------------------------
      bitpix=-32
      naxis = 1
-     naxes(1) = 2*mol(imol)%n_speed_rt+1
+     naxes(1) = mol(imol)%n_speed_rt
      nelements = naxes(1)
 
      ! create new hdu
@@ -3441,7 +3444,7 @@ subroutine ecriture_spectre(imol)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      !  Write the array to the FITS file.
-     call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt),status)
+     call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt) + v_syst,status)
   endif ! lcasa
 
   ! extra hdu with star positions
@@ -3458,7 +3461,7 @@ subroutine ecriture_spectre(imol)
   ! Origine
   !------------------------------------------------------------------------------
   if (lorigine) then
-     allocate(O(-mol(imol)%n_speed_rt:mol(imol)%n_speed_rt,mol(imol)%nTrans_rayTracing,n_cells))
+     allocate(O(mol(imol)%n_speed_rt,mol(imol)%nTrans_rayTracing,n_cells))
      O = 0.0;
      do i=1, nb_proc
         O(:,:,:) =  O(:,:,:) +  origine_mol(:,:,:,i)
@@ -3480,7 +3483,7 @@ subroutine ecriture_spectre(imol)
      extend=.true.
 
      naxis=4
-     naxes(1)=2*mol(imol)%n_speed_rt+1
+     naxes(1)=mol(imol)%n_speed_rt
      naxes(2)=mol(imol)%nTrans_rayTracing
      naxes(3)=n_cells
 

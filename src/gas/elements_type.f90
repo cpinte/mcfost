@@ -43,6 +43,7 @@ module elements_type
     real(kind=dp), parameter :: phi_min_limit = 1d-100!tiny_dp!1d-100 !1d-50, tiny_dp
     integer :: Max_ionisation_stage
 
+    real(kind=dp), parameter :: CI = 0.5*(HP**2 / (2.*PI*mel*kb))**1.5
 
   ! Atomic properties constants
 
@@ -335,12 +336,6 @@ module elements_type
         !out of bound the function return 0 not the inner (outer) bound.
           tp(1) = temp
           Uka(:) = linear_1D_sorted(Npf, Tpf, elem%pf(:,j), 1, tp)
-<<<<<<< HEAD
-          Uk = exp(Uka(1))
-          if( temp < Tpf(1) ) Uk = exp(elem%pf(1,j))
-          if (temp > Tpf(Npf)) Uk = exp(elem%pf(Npf,j))
-
-=======
         !   Uk = exp(Uka(1))
         !   if( temp < Tpf(1) ) Uk = exp(elem%pf(1,j))
         !   if (temp > Tpf(Npf)) Uk = exp(elem%pf(Npf,j))
@@ -348,19 +343,31 @@ module elements_type
           !linear extrapolation
           ! TO DO: in linear_1D_sorted
           if (temp < Tpf(1)) then
+            ! write(*,*) "(pf) extrapolate down"
             ! write(*,*) "xi=",temp, "x1=",Tpf(1), "x2=",Tpf(2), "y1=",elem%pf(1,j), "y2=",elem%pf(2,j)
             Uk = exp( elem%pf(2,j) + (temp - Tpf(2))/(Tpf(1)-Tpf(2)) * (elem%pf(1,j)-elem%pf(2,j)) )
           elseif (temp > Tpf(Npf)) then
+            ! write(*,*) "(pf) extrapolate up"
             ! write(*,*) "xi=",temp, "x1=",Tpf(Npf-1), "x2=",Tpf(Npf), "y1=",elem%pf(Npf-1,j), "y2=",elem%pf(Npf,j)
             Uk = exp( elem%pf(Npf-1,j) + (temp - Tpf(Npf-1))/(Tpf(Npf)-Tpf(Npf-1)) * (elem%pf(Npf,j)-elem%pf(Npf-1,j)) )
           else ! in range
             Uk = exp(Uka(1))
           endif
 
->>>>>>> master
-        return
+          return
     end function get_pf
 
+    function phi_T(temp, gi, gj, dE)!Ui_on_Uj,
+    !Similar to phi_jl with less tests.
+    !Mainly here for on-fly calculations of ni*/nj* for continua which is
+    !also equal to ne * phi_T. This prevents divding by 0.
+        real(kind=dp) :: phi_T
+        real(kind=dp), intent(in) :: temp, dE, gi, gj!, Ui_on_Uj
+
+        phi_T = gi/gj * CI * temp**(-1.5) * exp(dE / ( kb*temp ))!* Ui_on_Uj *
+
+        return
+    end function phi_T
 
     function phi_jl(temp, Ujl, Uj1l, ionpot)
         ! -------------------------------------------------------------- !
@@ -379,11 +386,8 @@ module elements_type
         ! -------------------------------------------------------------- !
         real(kind=dp), intent(in) :: temp
         real(kind=dp) :: phi_jl
-        real(kind=dp) ::  C1, expo
+        real(kind=dp) ::  expo
         real(kind=dp), intent(in) :: Ujl, Uj1l, ionpot
-        C1 = 0.5*(HP**2 / (2.*PI*mel*kb))**1.5
-        !C1 = (HPLANCK**2 / (2.*PI*M_ELECTRON*KBOLTZMANN))**1.5
-
         !!ionpot = ionpot * 100.*HPLANCK*CLIGHT !cm1->J
         !! -> avoiding dividing by big numbers causing overflow.
         !!maximum argument is 600, exp(600) = 3.77e260
@@ -391,7 +395,7 @@ module elements_type
         if (ionpot/(kb*temp) >= 600d0) expo = huge_dp
 
         !if exp(300) it means phi is "infinity", exp(300) == 2e130 so that's enough
-        phi_jl = C1 * (Ujl / Uj1l) * expo / (temp**1.5 + tiny_dp)
+        phi_jl = CI * (Ujl / Uj1l) * expo / (temp**1.5 + tiny_dp)
         if (phi_jl < phi_min_limit) phi_jl = 0d0 !tiny_dp ! or phi = 0d0 should be more correct ?
         ! but test to not divide by 0
 

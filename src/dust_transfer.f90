@@ -39,9 +39,12 @@ module dust_transfer
   contains
 
 subroutine transfert_poussiere()
+! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+! 20/04/2023
 
   use thermal_emission, only : frac_E_stars, frac_E_disk
-
+  use MRW, only : make_MRW_step, initialize_cumulative_zeta
+  use utils
   implicit none
 
 #include "sprng_f.h"
@@ -87,6 +90,9 @@ subroutine transfert_poussiere()
 
   ! Energie des paquets mise a 1
   E_paquet = 1.0_dp
+
+  ! Compute equation (7) of Min et al (2009) for Modified Random Walk
+  call initialize_cumulative_zeta()
 
   ! Building the wavelength & basic dust properties grid
   call init_lambda()
@@ -211,8 +217,13 @@ subroutine transfert_poussiere()
      p_icell = icell_ref
      if (aniso_method==2) write(*,*) "g             ", tab_g_pos(p_icell,1)
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
-     if (lsepar_pola.and.(scattering_method == 2)) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
-
+     if (lsepar_pola.and.(scattering_method == 2)) then
+        if (lmueller) then
+           write(*,*) "polarisability", maxval(-tab_mueller_pos(1,2,:,p_icell,1))
+        else
+           write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
+        endif
+     endif
      if (lopacite_only) call exit(0)
 
      if (l_em_disk_image) then ! le disque �met
@@ -436,6 +447,8 @@ subroutine transfert_poussiere()
               lambda0 = 1 ; p_lambda => lambda0
            endif
 
+           call setup_scattering()
+
            ! reorganisation memoire
            call realloc_step2()
 
@@ -468,7 +481,13 @@ subroutine transfert_poussiere()
 
         lambda = ind_etape - first_etape_obs + 1
 
-        if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) call calc_local_scattering_matrices(lambda, p_lambda)
+        if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
+           if (lmueller) then
+              call calc_local_scattering_matrices_mueller(lambda, p_lambda) ! Todo : this is not good, we compute this twice
+           else
+              call calc_local_scattering_matrices(lambda, p_lambda)
+           endif
+        endif
 
         if (lspherical.or.l3D) then
            call no_dark_zone()
@@ -746,7 +765,8 @@ subroutine transfert_poussiere()
            call ecriture_temperature(1)
            call ecriture_sed(1)
 
-           if (lapprox_diffusion.and.l_is_dark_zone.and.(lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx)) then
+           if (lapprox_diffusion.and.l_is_dark_zone.and.&
+            (lemission_mol.or.lprodimo.or.lML.or.lforce_diff_approx.or.lemission_atom)) then
               call Temp_approx_diffusion_vertical()
               ! call Temp_approx_diffusion()
               call diffusion_approx_nLTE_nRE()
@@ -927,14 +947,7 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
      call  pos_em_cellule(icell, rand,rand2,rand3,x0,y0,z0)
 
      ! Direction de vol (uniforme)
-     rand = sprng(stream(id))
-     W0 = 2.0 * rand - 1.0
-     W02 =  1.0 - W0*W0
-     SRW02 = sqrt (  W02 )
-     rand = sprng(stream(id))
-     ARGMT = PI * ( 2.0 * rand - 1.0 )
-     U0 = SRW02 * cos(ARGMT)
-     V0 = SRW02 * sin(ARGMT)
+     call random_isotropic_direction(id, u0,v0,w0)
 
      ! Parametres de stokes : lumi�re non polaris�e
      Stokes(1) = E_paquet ; Stokes(2) = 0.0 ; Stokes(3) = 0.0 ; Stokes(4) = 0.0
@@ -957,6 +970,8 @@ end subroutine emit_packet
 subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_star,flag_ISM,flag_scatt,lpacket_alive)
   ! C. Pinte
   ! 27/05/09
+  ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
+  ! 20/04/2023
 
   ! - flag_star_direct et flag_scatt a initialiser : on a besoin des 2
   ! - separer 1ere diffusion et reste
@@ -973,6 +988,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
   real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
   integer :: taille_grain, itheta
+  integer :: n_iterations
   integer, pointer :: p_icell
   real :: rand, rand2, tau, dvol
 
@@ -996,6 +1012,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! Boucle sur les interactions du paquets:
   ! - on avance le paquet
   ! - on le fait interagir avec la poussiere si besoin
+  n_iterations = 0
   infinie : do
 
      ! Longueur de vol
@@ -1012,7 +1029,28 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !if (.not.letape_th) then
      !   if (.not.flag_star) Stokes=0.
      !endif
+
+!     d = 0.
+!     reciprocal_Plank_kappa = 1.
+!     if ((n_iterations > 5) .and. Tdust(icell) > 1) then
+!        d = distance_to_closest_wall()
+!        call diffusion_opacity()
+!     endif
+!
+!     do while  (d > gamma_MRW * reciprocal_Plank_kappa)
+!        call make_MRW_step(id,icell, x,y,z,d, Stokes(1))
+!        d = distance_to_closest_wall()
+!        ! todo : do we update the rec_plack_kappa ???
+!     enddo
+
+ !    icell_old = icell
      call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
+ !    if (icell == icell_old) then
+ !       n_iterations = n_iterations + 1
+ !    else
+ !       n_iterations = 0
+ !    endif
+
      if (flag_sortie) return ! Vie du photon terminee
 
 !     if ((icell>n_cells).and.(.not.flag_sortie)) then
@@ -1065,8 +1103,10 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               if (lsepar_pola) then
                  ! Nouveaux param�tres de Stokes
-                 if (laggregate) then
-                    call new_stokes_gmm(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
+                 if (lmueller) then
+                    call new_stokes_mueller(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
+                 else if (laggregate) then
+                    call  new_stokes_gmm(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
                  else
                     call new_stokes(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
                  endif
@@ -1100,7 +1140,13 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               ! Nouveaux param�tres de Stokes
-              if (lsepar_pola) call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
+              if (lsepar_pola) then
+                 if (lmueller) then
+                    call new_stokes_mueller_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
+                 else
+                    call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
+		 endif
+	      endif
            else ! fonction de phase HG
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
               if (lisotropic)  then ! Diffusion isotrope
@@ -1163,17 +1209,10 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
            endif
         endif ! only_LTE
 
-        ! Nouvelle direction de vol : emission isotrope
-        rand = sprng(stream(id))
-        w = 2.0 * rand - 1.0
-        w02 =  1.0 - w*w
-        srw02 = sqrt (w02)
-        rand = sprng(stream(id))
-        argmt = pi * ( 2.0 * rand - 1.0 )
-        u = srw02 * cos(argmt)
-        v = srw02 * sin(argmt)
+        ! New packet direction: isotropic emission
+        call random_isotropic_direction(id, u, v, w)
 
-        ! Emission non polaris�e : remise � 0 des parametres de Stokes
+        ! Dust emission is unpolarised, resetimg Stokes vector
         Stokes(2)=0.0 ; Stokes(3)=0.0 ; Stokes(4)=0.0
      endif ! tab_albedo_pos
 

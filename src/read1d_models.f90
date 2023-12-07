@@ -14,6 +14,8 @@ module read1d_models
     use elements_type
     use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, &
          lcalc_ne, check_for_zero_electronic_density
+	use density, only : densite_pouss
+	use grains, only : M_grain
 
 	implicit none
 
@@ -48,9 +50,9 @@ module read1d_models
 		! write(*,*) "Nradii = ", Nr
 		do i=1, atmos_1d%nr
 			read(1,*) atmos_1d%r(i), atmos_1d%T(i), atmos_1d%rho(i), atmos_1d%ne(i), &
-				atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,2), atmos_1d%iz(i)
+				atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,3), atmos_1d%iz(i)
 			! write(*,*) atmos_1d%r(i), atmos_1d%T(i), atmos_1d%rho(i), atmos_1d%ne(i), &
-				! atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,2), atmos_1d%iz(i)
+				! atmos_1d%vt(i), atmos_1d%v(i,1), atmos_1d%v(i,2), atmos_1d%v(i,3), atmos_1d%iz(i)
 		enddo
 		!if corona will be zero at some point
 		! write(*,*) "T_limits (read):", atmos_1d%T(1), atmos_1d%T(atmos_1d%nr)
@@ -107,8 +109,9 @@ module read1d_models
 		allocate(atmos_1d%m(atmos_1d%nr))
 		nrad_0 = atmos_1d%nr
 		if (atmos_1d%lcoronal_illumination) nrad_0 = atmos_1d%nr - 1
-		atmos_1d%m(nrad_0) = 0.5 * (atmos_1d%rho(nrad_0-1)+atmos_1d%rho(nrad_0)) * &
-									au_to_m * (atmos_1d%r(nrad_0) - atmos_1d%r(nrad_0-1))
+		! atmos_1d%m(nrad_0) = 0.5 * (atmos_1d%rho(nrad_0-1)+atmos_1d%rho(nrad_0)) * &
+		! 							au_to_m * (atmos_1d%r(nrad_0) - atmos_1d%r(nrad_0-1))
+		atmos_1d%m(nrad_0) = 0.0
 		do i=nrad_0-1,1,-1
 			atmos_1d%m(i) = atmos_1d%m(i+1) + 0.5 * (atmos_1d%rho(i)+atmos_1d%rho(i+1)) * &
 							au_to_m * (atmos_1d%r(i+1) - atmos_1d%r(i))
@@ -153,7 +156,8 @@ module read1d_models
 		!at the bottom of the photosphere, it can slighly modify the continuum emission. Playing with the inner boundary irradiation
 		!allows to properly balance that effect.
 		if (lcell_centered) then
-			etoile(1)%T = real(	atmos_1d%T(1) ) ! + something else here 
+			!core temperature, read from file as "Tstar"
+			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + something else here 
 			icell = n_cells + 1
 			nrad_0 = n_rad
 			icell0 = n_cells
@@ -183,7 +187,8 @@ module read1d_models
 				icell0 = n_cells - 1
 				icompute_atomRT(n_cells) = atmos_1d%iz(n_rad+1)
 			endif
-			etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ? 
+			!core temperature, read from file as "Tstar"
+			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ? 
 			icompute_atomRT(:) = atmos_1d%iz(2:n_cells+1)
 			T(:) = atmos_1d%T(2:n_cells+1)
 			nHtot(:) = atmos_1d%rho(2:n_cells+1) * rho_to_nH
@@ -223,10 +228,12 @@ module read1d_models
 
 	subroutine print_info_model
 		real(kind=dp) :: v_char
+		real(kind=dp) ::  dust_dens_max, dust_dens_min, rho_d
+		integer :: icell
 
 		v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
 
-		write(*,*) "Maximum/minimum velocities in the model (km/s):"
+		write(*,*) "Maximum/minimum velocities in the model [km s^-1]:"
 		write(*,*) " Vfield(1) = ", &
 			1e-3 * maxval(abs(vfield3d(:,1))), 1d-3*minval(abs(vfield3d(:,1)),mask=icompute_atomRT>0)
 		write(*,*) " Vfield(2) = ",  &
@@ -235,24 +242,42 @@ module read1d_models
 			1d-3 * maxval(abs(vfield3d(:,3))), 1d-3*minval(abs(vfield3d(:,3)),mask=icompute_atomRT>0)
 
 
-		write(*,*) "Typical line extent due to V fields (km/s):"
+		write(*,*) "Typical line extent due to V fields [km s^-1]:"
 		write(*,*) v_char/1d3
 
-		write(*,*) "Maximum/minimum turbulent velocity (km/s):"
+		write(*,*) "Maximum/minimum turbulent velocity [km s^-1]:"
 		write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
 
-		write(*,*) "Maximum/minimum Temperature in the model (K):"
+		write(*,*) "Maximum/minimum Temperature in the model [K]:"
 		write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
-		write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
+		! write(*,*) " --> Density average of the Temperature [K]:"
+		! write(*,*) real(sum(T*nHtot,(sum(densite_pouss,dim=1)==0.0).and.(icompute_atomRT>0)) / &
+		! 	sum(nHtot,(sum(densite_pouss,dim=1)==0.0).and.(icompute_atomRT>0)))
+		write(*,*) "Maximum/minimum Hydrogen total density in the model [m^-3]:"
 		write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
+		if (ldust_atom) then
+			dust_dens_max = 0d0; dust_dens_min = 1d30
+			do icell=1, n_cells
+				rho_d = sum(densite_pouss(:,icell) * M_grain(:))
+				if (rho_d<=0.0) cycle
+				dust_dens_min = min(dust_dens_min,rho_d)
+				dust_dens_max = max(dust_dens_max,rho_d)
+			enddo
+			write(*,*) "Maximum/minimum dust total density in the model [kg m^-3]:"
+			write(*,*) 1d3*dust_dens_max, 1d3*dust_dens_min
+		endif
 		if (.not.lcalc_ne) then
-			write(*,*) "Maximum/minimum ne density in the model (m^-3):"
+			write(*,*) "Maximum/minimum ne density in the model [m^-3]:"
 			write(*,*) real(maxval(ne)), real(minval(ne,mask=icompute_atomRT>0))
 		endif
 
+		if (maxval(icompute_atomRT)<=0) then
+			call warning(" There is no gas density zone in the model!")
+			return
+		endif
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
-        write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
+        ! write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
 		write(*,'("-- Solving RTE for "(1F6.2)" % of cells")') &
 			100.0*real(size(pack(icompute_atomRT,mask=icompute_atomRT>0))) / real(n_cells)
 

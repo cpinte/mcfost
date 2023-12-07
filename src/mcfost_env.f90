@@ -4,11 +4,11 @@ module mcfost_env
 
   implicit none
 
-  real, parameter :: mcfost_version = 4.0
-  character(8), parameter :: mcfost_release = "4.0.00"
+  real, parameter :: mcfost_version = 4.1
+  character(8), parameter :: mcfost_release = "4.1.01"
   real, parameter :: required_utils_version = 4.0
 
-  character(len=128) :: web_server    = "http://ipag.osug.fr/public/pintec/"
+  character(len=128) :: web_server    = "https://ipag.osug.fr/public/pintec/"
   character(len=128) :: webpage       = "/mcfost/"
   character(len=128) :: utils_webpage = "/mcfost_utils/"
   character(len=128) :: doc_webpage   = "https://mcfost.readthedocs.io/"

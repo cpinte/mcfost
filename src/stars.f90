@@ -6,7 +6,6 @@ module stars
   use messages
   use wavelengths
   use grid
-  use elements_type, only : wght_per_H
 
   implicit none
 
@@ -15,7 +14,7 @@ module stars
   public :: allocate_stellar_spectra, deallocate_stellar_spectra, em_sphere_uniforme, emit_packet_ism, &
        repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra, &
        intersect_stars, distance_to_star, compute_stellar_parameters
-  !-> to move in parameters ?     
+  !-> to move in parameters ?
   public :: star_rad, laccretion_shock, max_Tshock, min_Tshock, min_Thp, max_Thp, T_hp, max_Facc, min_Facc, T_preshock
 
   private
@@ -35,7 +34,7 @@ module stars
   real(kind=dp) :: max_Tshock = 0.0, min_Tshock = 1d8 !soft X-rays emission from the shock
   real(kind=dp) :: max_Facc = 0.0, min_Facc = 1d8 !Accretion flux in W/m2
   real(kind=dp) :: T_preshock !temperature of the opt-thin pre-shock region
- 
+
   contains
 
 subroutine allocate_stellar_spectra(n_wl)
@@ -360,11 +359,15 @@ subroutine repartition_energie_etoiles()
         if (status /= 0) call error("cannot open fits file "//trim(filename))
 
         !  determine the size of the image
-        call ftgknj(unit(i),'NAXIS',1,10,naxes,nfound,status)
+        call ftgknj(unit(i),'NAXIS',1,2,naxes,nfound,status)
+        if (status /= 0) call error("reading axes of "//trim(filename))
         !  check that it found both NAXIS1 and NAXIS2 keywords
         if (nfound /= 2) call error("failed to read the NAXISn keywords in "//trim(filename))
 
-        if (naxes(2) /= 3) call error(trim(filename)//" does not have the right shape")
+        if (naxes(2) /= 3) then
+           write(*,*) "NAXIS2 =", naxes(2)
+           call error(trim(filename)//" does not have the right shape")
+        endif
 
         ! We first read the length of the spectrum
         n_lambda_spectre(i) = naxes(1)
@@ -884,7 +887,7 @@ end subroutine intersect_stars
    ! ---------------------------------------------------------------!
    ! routine to manage the radiation of the stellar boundary
    !
-   ! TO  DO: 
+   ! TO  DO:
    ! - add limb darkening
    ! - add reading spectrum direclty (either flux or full CLV)
    ! -------------------------------------------------------------- !
@@ -908,7 +911,7 @@ end subroutine intersect_stars
             where (lambda > 364.2096)
                star_rad(:) = star_rad(:) + Bpnu(N,lambda,Thp)
             elsewhere (lambda <= 364.2096) !-> can be very large between ~ 40 and 91 nm.
-            ! elsewhere (lambda > 91.176 .and. lambda <= 364.2096)         
+            ! elsewhere (lambda > 91.176 .and. lambda <= 364.2096)
                star_rad(:) = star_rad(:) + Bpnu(N,lambda,T_preshock)
             endwhere
          else
@@ -917,7 +920,7 @@ end subroutine intersect_stars
          return
       endif
 
-      ! add coronal illumination at the "unresolved" stellar surface 
+      ! add coronal illumination at the "unresolved" stellar surface
       ! At the moment, the EUV radiation is constant across the wl range.
       ! Icorona in W/m2/Hz/sr. It is normalised such that
       ! int (dOmega int( dnu Icorona ) ) = F_EUV in W/m2
@@ -940,24 +943,30 @@ end subroutine intersect_stars
   ! pre-shock region that will radiate away respectively 3/4 and 1/4 of the
   ! black body radiation at Thp and Tshock respectively (with Tshock >> Thp).
   !
-  ! Thp ~ (Facc/sigma)**0.25 = (0.5 * rho * vs**3 / sigma)**3 
+  ! Thp ~ (Facc/sigma)**0.25 = (0.5 * rho * vs**3 / sigma)**3
   ! Ts ~ 3/16 * mu * amu / kb * vs**2
   !
    use grid, only : voronoi
    use constantes, only : sigma, kb
+   use elements_type, only : wght_per_H
+   ! use density, only : densite_gaz
    logical :: is_inshock
    integer :: i_star, icell0, id, iray
    real(kind=dp), intent(out) :: Thp, Tshock, Facc
-   real(kind=dp) :: x, y, z
+   real(kind=dp) :: x, y, z, rho
    real(kind=dp) :: Tloc, vaccr, vmod2, rr, sign_z
+   real :: alpha_1 = 0.75
+   real :: alpha_2 = 0.25
 
    is_inshock = .false.
    if (.not.laccretion_shock) return
 
    if (icell0<=n_cells) then
-      if (icompute_atomRT(icell0) > 0) then
+   !TO DO: densite_gaz(icell0) instead of nHtot
+      rho = nHtot(icell0) * wght_per_H
+      if (rho > 0.0) then ! even if icompute_atomRT(icell0) /= 0 
          rr = sqrt( x*x + y*y + z*z)
-         !vaccr is vr, the spherical r velocity component
+         ! Get vaccr : the accretion velocity above the shock.
          if (lvoronoi) then !always 3d
             vaccr = Voronoi(icell0)%vxyz(1)*x/rr + Voronoi(icell0)%vxyz(2)*y/rr + Voronoi(icell0)%vxyz(3) * z/rr
             vmod2 = sum( Voronoi(icell0)%vxyz(:)**2 )
@@ -984,14 +993,15 @@ end subroutine intersect_stars
 
 
          if (vaccr < 0.0_dp) then
-            !Facc = 1/2 rho vs^3 
-            Facc = 0.5 * (1d-3 * masseH * wght_per_H * nHtot(icell0)) * abs(vaccr)**3
-            Tloc = ( 0.75 * Facc / sigma )**0.25
+            !Facc = 1/2 rho vs^3
+            Facc = 0.5 * (1d-3 * masseH * rho) * abs(vaccr)**3
+            Tloc = ( alpha_1 * Facc / sigma )**0.25
             ! is_inshock = (Tloc > 0.5 * etoile(i_star)%T)
             is_inshock = (T_hp > 1.0_dp * etoile(i_star)%T)
             Thp = T_hp
-            if (T_hp<=0.0) then 
-               is_inshock = (abs(T_hp) * Tloc > 1.0_dp*etoile(i_star)%T) !depends on the local value
+            if (T_hp<=0.0) then
+               !depends on the local value
+               is_inshock = (abs(T_hp) * Tloc > 1.0_dp*etoile(i_star)%T)
                Thp = abs(T_hp) * Tloc
             endif
             !assuming mu is 0.5

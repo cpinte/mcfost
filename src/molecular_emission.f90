@@ -40,7 +40,8 @@ module molecular_emission
 
   real, dimension(:), allocatable :: v_turb, v_line ! n_cells
 
-  real ::  vitesse_turb, dv, dnu
+  real ::  vitesse_turb, dv, dnu, v_syst
+  character(len=8) :: v_turb_unit
   integer, parameter :: n_largeur_Doppler = 15
   real(kind=dp), dimension(:), allocatable :: tab_v ! n_speed
 
@@ -71,8 +72,8 @@ module molecular_emission
 
   type molecule
      integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, nTrans_raytracing, iLevel_max
-     real :: vmax_center_rt, extra_deltaV_rt, abundance
-     logical :: lcst_abundance, lline
+     real :: vmin_center_rt, vmax_center_rt, extra_deltaV_rt, abundance
+     logical :: lcst_abundance, lline, l_sym_ima
      character(len=512) :: abundance_file, filename
      character(len=32) :: name
      integer, dimension(100) :: indice_Trans_rayTracing
@@ -682,7 +683,7 @@ function v_proj(icell,x,y,z,u,v,w) !
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
   real(kind=dp) :: vitesse, vx, vy, vz, v_r, v_phi, v_theta, v_rcyl, norme, r, phi, rcyl, rcyl2, r2
-  real(kind=dp) :: cos_phi, sin_phi, cos_theta, sin_theta, sign1, norme2
+  real(kind=dp) :: cos_phi, sin_phi, cos_theta, sin_theta, norme2
 
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)
@@ -705,6 +706,7 @@ function v_proj(icell,x,y,z,u,v,w) !
         else ! vfield == 3 --> spherical
            ! Convert the velocity field from spherical to Cartesian coordinates
            v_r = vfield3d(icell,1) ; v_phi = vfield3d(icell,2) ;  v_theta = vfield3d(icell,3)
+           if ((.not.l3d).and.(z < 0)) v_theta = -v_theta
 
            rcyl2 = x*x + y*y
            r2 = rcyl2 + z*z
@@ -718,12 +720,11 @@ function v_proj(icell,x,y,z,u,v,w) !
            sin_phi = y/rcyl
            ! write(*,*) cos_phi, cos(atan2(y, x)) ! OK
 
-           vz = v_theta * cos_theta + v_r * sin_theta
+           vz = -v_theta * cos_theta + v_r * sin_theta
            v_rcyl = v_theta * sin_theta + v_r * cos_theta
 
            vx = v_rcyl * cos_phi - v_phi * sin_phi
            vy = v_rcyl * sin_phi + v_phi * cos_phi
-           if ((.not.l3d).and.(z < 0)) vz = -vz
         endif
 
         v_proj = vx * u + vy * v + vz * w
