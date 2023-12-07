@@ -38,6 +38,9 @@ module escape
     real(kind=dp), allocatable, dimension(:) :: mean_grad_v, mean_length_scale, Tchoc_average
     real(kind=dp), allocatable :: I0_line(:,:,:,:), Istar(:,:), Ishock(:,:), chitot(:,:), etatot(:,:)
 
+    integer, parameter :: n_rayons_sob_step = 30000 !full probabilistic solution
+    integer, parameter :: n_rayons_init4 = 1000 !initial solution
+
     contains
 
     subroutine init_rates_escape(id,icell)
@@ -118,8 +121,7 @@ module escape
         integer :: icell, id, i, previous_cell
         real(kind=dp) :: x0,y0,z0,x1,y1,z1,u,v,w
         real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
-        integer :: next_cell, iray, icell_in
-        integer, parameter :: n_rayons = 30000
+        integer :: next_cell, iray, icell_in, n_rayons
         real :: rand, rand2, rand3
         real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1
         integer :: n_rays_shock(n_etoiles)
@@ -129,6 +131,14 @@ module escape
         logical :: lintersect_stars, lintersect
         real :: time_gradient
         integer :: count_start, count_end
+
+        if (lescape_prob) then
+        !Using more rays if the escape mode is used to provide the full solution of the non-LTE problem.
+            n_rayons = n_rayons_sob_step
+        else
+        !Using less rays if the escape mode is used as initial condition.
+            n_rayons = n_rayons_init4
+        endif
 
         write(*,*) " *** computing mean velocity gradient for each cell.."
         !but also mean solid angle subtended by each cell to the different stars, including
@@ -168,7 +178,7 @@ module escape
         !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot)&
         !$omp shared(phi_grid,r_grid,z_grid,pos_em_cellule,ibar, n_cells_done,stream,n_cells)&
         !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles)&
-        !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock)
+        !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock,n_rayons)
         !$omp do schedule(static,1)
         do icell=1, n_cells
             !$ id = omp_get_thread_num() + 1
@@ -309,8 +319,7 @@ module escape
     !   - local Sobolev with no background continua for lines
     !   - optically thin excitation with no lines for continua
     !   - MC rays (no healpix)
-        integer :: iray, n_iter, id, i, alloc_status
-        integer, parameter :: n_rayons = 100
+        integer :: iray, n_iter, id, i, alloc_status, n_rayons
         integer :: nact, imax, icell_max, icell_max_2
         integer :: icell, ilevel, nb, nr, unconverged_cells
         integer, parameter :: maxIter = 80
@@ -354,6 +363,7 @@ module escape
         labs = .true.
         lfixed_rays = .true.
         id = 1
+        n_rayons = N_rayons_mc
 
         select case (limit_mem)
             case (0)
@@ -507,7 +517,7 @@ module escape
             !$omp default(none) &
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff)&
-            !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,wmu) &
+            !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,wmu,n_rayons) &
             !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,1)
