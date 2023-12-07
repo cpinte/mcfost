@@ -120,7 +120,7 @@ module elements_type
         do n=1,Nelem
             elems(n)%saha_fact(1,i) = 1.0_dp
             uk = get_pf(elems(n),1,temp)
-            do j=1, elems(n)%Nstage
+            do j=2, elems(n)%Nstage
                 ukp1 = get_pf(elems(n),j,temp)
                 elems(n)%saha_fact(j,i) = 1.0_dp / phi_jl(temp,Uk,Ukp1,elems(n)%ionpot(j-1))
                 !fjk(j) = fjk(j-1) * elems(n)%saha_fact(j,i) / ne
