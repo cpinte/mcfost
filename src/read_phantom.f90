@@ -984,23 +984,26 @@ contains
        ldudt_implicit = .false.
     endif
 
-    write(*,*) "# Stars/planets:"
-    n_etoiles_old = n_etoiles
-    n_etoiles = 0
-    do i=1,nptmass
-       n_etoiles = n_etoiles + 1
-       if (real(xyzmh_ptmass(4,i)) * scale_mass_units_factor > 0.013) then
-          write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
-               real(xyzmh_ptmass(4,i) * usolarmass), "Msun, Mdot=", &
-               real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
-       else
-          write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
-               real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * usolarmass), "Mjup, Mdot=", &
-               real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
-       endif
-       if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))*ulength_au), "au"
-    enddo
-
+    if (lignore_sink) then
+       n_etoiles = 0
+    else
+       write(*,*) "# Stars/planets:"
+       n_etoiles_old = n_etoiles
+       n_etoiles = 0
+       do i=1,nptmass
+          n_etoiles = n_etoiles + 1
+          if (real(xyzmh_ptmass(4,i)) * scale_mass_units_factor > 0.013) then
+             write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
+                  real(xyzmh_ptmass(4,i) * usolarmass), "Msun, Mdot=", &
+                  real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+          else
+             write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
+                  real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * usolarmass), "Mjup, Mdot=", &
+                  real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+          endif
+          if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))*ulength_au), "au"
+       enddo
+    endif
 
     if (lupdate_velocities) then
        if (lno_vz) vz(:) = 0.
