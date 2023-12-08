@@ -839,7 +839,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
   write(*,*) "Checking last version ..."
   syst_status = 0
   !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
-  cmd = "curl "//trim(webpage)//"version.txt -O -s"
+  !cmd = "curl "//trim(webpage)//"version.txt -O -s"
+  cmd = "curl "//trim(version_file)//' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "ERROR: Cannot connect to MCFOST server."
@@ -854,6 +855,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Cannot read version file."
+     write(*,*) trim(webpage)
      call exit_update(lmanual, n_days, lupdate)
      return
   endif
@@ -867,7 +869,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      lupdate = .true.
   endif
   if (lforce_update) then
-     write(*,*) "Forcing update"
+     write(*,*) "Forcing update to ", trim(last_version)
      lupdate = .true.
   endif
   write(*,*) " "
@@ -875,11 +877,11 @@ function mcfost_update(lforce_update, lmanual, n_days)
   if (lupdate) then
      ! get the correct url corresponding to the system
      if (operating_system=="Linux ") then
-        url = trim(webpage)//"linux/mcfost_bin.tgz"
-        url_sha1 = trim(webpage)//"linux/mcfost.sha1"
+        url = trim(webpage)//"mcfost_Linux-X64.tar.gz"
+        url_sha1 = trim(webpage)//"mcfost_Linux-X64.sha1"
      else if (operating_system=="Darwin") then
-        url = trim(webpage)//"macos/mcfost_bin.tgz"
-        url_sha1 = trim(webpage)//"macos/mcfost.sha1"
+        url = trim(webpage)//"mcfost_macOS-X64.tar.gz"
+        url_sha1 = trim(webpage)//"mcfost_macOS-X64.sha1"
      else
         write(*,*) "Unknown operating system : error 2"
         write(*,*) "Cannot download new binary"
@@ -891,8 +893,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
-     cmd = "curl "//trim(url)//" -o mcfost_bin.tgz -s"    ; call appel_syst(cmd, syst_status)
-     cmd = "curl "//trim(url_sha1)//" -o mcfost.sha1 -s" ; call appel_syst(cmd, syst_status)
+     cmd = "curl -L "//trim(url)//" -o mcfost_bin.tgz -s"    ; call appel_syst(cmd, syst_status)
+     cmd = "curl -L "//trim(url_sha1)//" -o mcfost.sha1 -s"  ; call appel_syst(cmd, syst_status)
      if (syst_status==0) then
         write(*,*) "Done"
      else
