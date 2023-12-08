@@ -9,7 +9,7 @@ runs:
       shell: bash
       run: |
         tar -cvzf mcfost.tar.gz mcfost
-        shasum  mcfost_tar.tgz > mcfost_update.sha1
+        shasum -a 1 mcfost_tar.gz > mcfost_update.sha1
 
     - name: Add binary to release
       uses: shogo82148/actions-upload-release-asset@v1.6.6
