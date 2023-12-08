@@ -935,7 +935,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      else
         write(*,*) "Done"
         write(*,'(a25, $)') "Decompressing binary ..."
-        cmd = "tar xzf mcfost_bin.tgz ; rm -rf mcfost_bin.tgz"
+        cmd = "mkdir -p mcfost_update ; tar xzf mcfost_bin.tgz -C mcfost_update ; rm -rf mcfost_bin.tgz"
         call appel_syst(cmd, syst_status)
         write(*,*) "Done"
      endif
@@ -963,9 +963,9 @@ function mcfost_update(lforce_update, lmanual, n_days)
         endif
      endif
 
-     ! make binary executable
+     ! make binary executable and update it
      write(*,'(a20, $)') "Updating binary ..."
-     cmd = "chmod a+x mcfost_update ; mv mcfost_update "//trim(current_binary)
+     cmd = "chmod a+x mcfost_update/mcfost ; mv mcfost_update/mcfost "//trim(current_binary)//" ; rm -rf mcfost_update"
      call appel_syst(cmd, syst_status)
      if (syst_status /= 0) then
         write(*,*) "ERROR : the update failed for some unknown reason"
