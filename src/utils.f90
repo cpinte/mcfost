@@ -840,7 +840,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   syst_status = 0
   !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
   !cmd = "curl "//trim(webpage)//"version.txt -O -s"
-  cmd = "curl "//trim(version_file)//' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
+  cmd = "curl "//trim(raw_webpage)//trim(version_file)//' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "ERROR: Cannot connect to MCFOST server."
@@ -872,7 +872,6 @@ function mcfost_update(lforce_update, lmanual, n_days)
      write(*,*) "Forcing update to ", trim(last_version)
      lupdate = .true.
   endif
-  write(*,*) " "
 
   if (lupdate) then
      ! get the correct url corresponding to the system
@@ -935,7 +934,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      else
         write(*,*) "Done"
         write(*,'(a25, $)') "Decompressing binary ..."
-        cmd = "tar xzf mcfost_bin.tgz ; rm -rf mcfost_bin.tgz"
+        cmd = "mkdir -p mcfost_update ; tar xzf mcfost_bin.tgz -C mcfost_update ; rm -rf mcfost_bin.tgz"
         call appel_syst(cmd, syst_status)
         write(*,*) "Done"
      endif
@@ -963,9 +962,9 @@ function mcfost_update(lforce_update, lmanual, n_days)
         endif
      endif
 
-     ! make binary executable
+     ! make binary executable and update it
      write(*,'(a20, $)') "Updating binary ..."
-     cmd = "chmod a+x mcfost_update ; mv mcfost_update "//trim(current_binary)
+     cmd = "chmod a+x mcfost_update/mcfost ; mv mcfost_update/mcfost "//trim(current_binary)//" ; rm -rf mcfost_update"
      call appel_syst(cmd, syst_status)
      if (syst_status /= 0) then
         write(*,*) "ERROR : the update failed for some unknown reason"
@@ -1061,11 +1060,11 @@ subroutine mcfost_get_ref_para()
 
 
   write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi//" & "//ref_file_3D
-  cmd = "curl "//trim(webpage)//ref_file//" -O -s"
+  cmd = "curl "//trim(raw_webpage)//ref_file//" -O -s"
   call appel_syst(cmd, syst_status)
-  cmd = "curl "//trim(webpage)//ref_file_multi//" -O -s"
+  cmd = "curl "//trim(raw_webpage)//ref_file_multi//" -O -s"
   call appel_syst(cmd, syst_status)
-  cmd = "curl "//trim(webpage)//ref_file_3D//" -O -s"
+  cmd = "curl "//trim(raw_webpage)//ref_file_3D//" -O -s"
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) call error("Cannot get MCFOST reference file")
   write(*,*) "Done"
@@ -1122,7 +1121,7 @@ subroutine mcfost_v()
 
   ! Last version
   write(*,*) "Checking last version ..."
-  cmd = "curl "//trim(webpage)//"version.txt -O -s"
+  cmd = "curl "//trim(raw_webpage)//trim(version_file)//' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) &
        call error("Cannot get MCFOST last version number (Error 1)","'"//trim(cmd)//"' did not run as expected.")
