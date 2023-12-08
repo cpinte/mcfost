@@ -982,12 +982,12 @@ module escape
                   end do
                   at => null()
 
-                  !TO DO: update background opac only l_iterate_ne   
-                  call opacity_atom_bf_loc(icell, n_xc, tab_xc, chi_cont(:,icell), eta_cont(:,icell))
+                  !TO DO: takes time with large grid
+                !   call opacity_atom_bf_loc(icell, n_xc, tab_xc, chi_cont(:,icell), eta_cont(:,icell))
 !background continua not needed if no continuum RT
-                !   if (limit_mem < 2) then 
-                !     call calc_contopac_loc(icell,n_xc,tab_xc)  
-                !   endif   
+                  if (limit_mem < 2) then 
+                    call calc_contopac_loc(icell,n_xc,tab_xc)  
+                  endif   
 
                end if !if l_iterate
             end do cell_loop2 !icell
