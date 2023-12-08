@@ -322,9 +322,9 @@ subroutine initialisation_mcfost()
   call set_default_variables()
 
   ! Setting up web-server
-  call get_environment_variable('MCFOST_WEB_SERVER',s) ; if  (s/="") web_server = s
-  webpage = trim(web_server)//trim(webpage)
-  utils_webpage = trim(web_server)//trim(utils_webpage)
+  !call get_environment_variable('MCFOST_WEB_SERVER',s) ; if  (s/="") web_server = s
+  !webpage = trim(web_server)//trim(webpage)
+  !utils_webpage = trim(web_server)//trim(utils_webpage)
 
   ! Looking for the mcfost utils directory
   call get_mcfost_utils_dir()
