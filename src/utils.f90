@@ -840,7 +840,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
   syst_status = 0
   !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
   !cmd = "curl "//trim(webpage)//"version.txt -O -s"
-  cmd = "curl "//trim(raw_webpage)//trim(version_file)//' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
+  cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
+       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "ERROR: Cannot connect to MCFOST server."
@@ -1121,7 +1122,8 @@ subroutine mcfost_v()
 
   ! Last version
   write(*,*) "Checking last version ..."
-  cmd = "curl "//trim(raw_webpage)//trim(version_file)//' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
+  cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
+       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) &
        call error("Cannot get MCFOST last version number (Error 1)","'"//trim(cmd)//"' did not run as expected.")
