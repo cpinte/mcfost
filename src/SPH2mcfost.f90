@@ -205,7 +205,7 @@ contains
     real(dp), allocatable, dimension(:) :: gsize, grainsize_f
     real(dp), dimension(4) :: lambsol, lambguess
 
-    real(dp) :: mass, somme, Mtot, Mtot_dust, facteur
+    real(dp) :: mass, somme, Mtot, Mtot_dust, facteur, a
     real :: f, limit_threshold, density_factor
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n, ierr
 
@@ -369,23 +369,35 @@ contains
 
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
+
           if (iSPH > 0) then
 
-             write(*,*) i, iSPH
-             ! mass & density indices are shifted by 1
-             lambguess = [-log(sqrt(2*pi)) * dust_moments(1,iSPH) ,0._dp,0._dp,0._dp]
+             !! mass & density indices are shifted by 1
+             !lambguess = [-log(sqrt(2*pi)) * dust_moments(1,iSPH) ,0._dp,0._dp,0._dp]
+             !
+             !call reconstruct_maxent(dust_moments(:,iSPH),gsize,grainsize_f,lambsol,ierr,lambguess=lambguess)
+             !if (ierr > 0) then
+             !   write(*,*) iSPH, dust_moments(:,iSPH)
+             !   call error("reconstruct_maxent: "//fsolve_error(ierr))
+             !endif
+             !densite_pouss(:,icell) = grainsize_f(:)
 
-             call reconstruct_maxent(dust_moments(:,iSPH),gsize,grainsize_f,lambsol,ierr,lambguess=lambguess)
-             if (ierr > 0) then
-                write(*,*) iSPH, dust_moments(:,iSPH)
-                call error("reconstruct_maxent: "//fsolve_error(ierr))
+             densite_pouss(:,icell) = 0.
+             if (dust_moments(1,iSPH) > tiny_dp) then
+                ! Simple approximation
+                a = a0 * dust_moments(2,iSPH)/dust_moments(1,iSPH)
+                i = locate(1.0_dp*r_grain(:),a)
+                densite_pouss(i,icell) = dust_moments(1,iSPH)
              endif
 
-             densite_pouss(:,icell) = grainsize_f(:)
           else ! iSPH == 0, star
              densite_pouss(:,icell) = 0.
           endif
        enddo ! icell
+
+       ! Using the parameter file gas-to-dust ratio for now
+       ! until phantom provides a proper grain size distribution
+       call normalize_dust_density( sum(masse_gaz) * g_to_Msun / disk_zone(1)%gas_to_dust)
 
     elseif (ndusttypes >= 1) then
        lvariable_dust = .true.
@@ -505,6 +517,10 @@ contains
        ! Using the parameter file gas-to-dust ratio for now
        ! until phantom provides a proper grain size distribution
        call normalize_dust_density( sum(masse_gaz) * g_to_Msun / disk_zone(1)%gas_to_dust)
+
+
+
+
     else ! ndusttypes = 0 : using the gas density
        lvariable_dust = .false.
        write(*,*) "Using gas-to-dust ratio in mcfost parameter file"
