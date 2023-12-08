@@ -4,15 +4,16 @@ module escape
 
     use parametres
     use grid
+    use cylindrical_grid, only : cell_map_i, cell_map_j, cell_map_k
     use utils, only : progress_bar, Bpnu
     use molecular_emission, only : v_proj, ds
     use naleat, only  : seed, stream, gtype
     use mcfost_env, only  : time_begin, time_end, time_tick, time_max
-    use stars, only : is_inshock, intersect_stars, star_rad, T_preshock
+    use stars, only : is_inshock, intersect_stars, star_rad, T_preshock, em_sphere_uniforme
     use mem, only : emissivite_dust
     use dust_prop, only : kappa_abs_lte, kappa, kappa_factor
     use opacity_atom, only : contopac_atom_loc, vlabs, Itot, calc_contopac_loc, psi, cross_coupling_cont, &
-        eta_atoms, Uji_down, chi_up, chi_down, opacity_atom_bf_loc
+        eta_atoms, Uji_down, chi_up, chi_down, opacity_atom_bf_loc, chi_cont, eta_cont
     use atom_type, only : n_atoms, Atoms, ActiveAtoms, atomtype, AtomicContinuum, NactiveAtoms, atomPointerArray, &
         lcswitch_enabled, vbroad, maxval_cswitch_atoms, NpassiveAtoms, PassiveAtoms, adjust_cswitch_atoms
     use see, only : alloc_nlte_var, neq_ng, ngpop, small_nlte_fraction, tab_Aji_cont, tab_Vij_cont, &
@@ -38,7 +39,7 @@ module escape
     real(kind=dp), allocatable, dimension(:) :: mean_grad_v, mean_length_scale, Tchoc_average
     real(kind=dp), allocatable :: I0_line(:,:,:,:), Istar(:,:), Ishock(:,:), chitot(:,:), etatot(:,:)
 
-    integer, parameter :: n_rayons_sob_step = 30000 !full probabilistic solution
+    integer, parameter :: n_rayons_sob_step = 100000!30000 !full probabilistic solution
     integer, parameter :: n_rayons_init4 = 1000 !initial solution
 
     contains
@@ -116,6 +117,266 @@ module escape
         return
     end subroutine dealloc_escape_variables
 
+    subroutine count_neighbours(n)
+    ! return the number max of neighbours for all cells
+        integer, intent(out) :: n
+        integer :: p, icell, i0, j0, k0, i, j, k, m
+        integer, parameter :: order = 1
+
+        if ((lcylindrical)) then
+            call warning("(count_neighbours) Not tested for cylindrical grid yet") 
+        endif
+
+        if ((lvoronoi)) then
+            call error("(count_neighbours) Not working for voronoi grid yet") 
+        endif
+
+        !spherical grid
+        p = 2
+        if (l3d) p = 3
+        if (lmodel_1d) p = 1
+        n = 3**p - 1
+
+        n = 0
+        do icell=1, n_cells
+            m = -1 !removing the cell (i,j,k)
+            i0 = cell_map_i(icell); j0 = cell_map_j(icell); k0 = cell_map_k(icell)
+            if (j0==0) cycle
+            do i=max(i0-order,1),min(i0+order,n_rad), 1
+                bz : do j=max(j0-order,j_start),min(j0+order,nz), 1
+                    if (j==0) cycle bz
+                    do k=max(k0-order,1),min(k0+order,n_az),1
+                        m = m + 1
+                    enddo
+                enddo bz
+            enddo
+            n = max(m,n)
+        enddo
+
+        return
+    end subroutine count_neighbours
+
+    function index_neighbours(N,icell0)
+        integer, intent(in) :: n, icell0
+        integer, dimension(n) :: index_neighbours
+        integer :: i0, j0, k0, icell
+        integer :: i, j, k, ix
+        integer, parameter :: order = 1
+
+        index_neighbours = 0
+        i0 = cell_map_i(icell0)
+        j0 = cell_map_j(icell0)
+        k0 = cell_map_k(icell0)
+
+        ix = 0
+        !and the midplane ?
+        do i=max(i0-order,1),min(i0+order,n_rad), 1
+            bz : do j=max(j0-order,j_start),min(j0+order,nz), 1
+                if (j==0) cycle bz
+                do k=max(k0-order,1),min(k0+order,n_az),1
+                    icell = cell_map(i,j,k)
+                    if (icell==icell0) cycle
+                    ix = ix + 1
+                    index_neighbours(ix) = icell
+                enddo
+            enddo bz
+        enddo
+
+
+        return
+    end function index_neighbours
+
+    subroutine mean_velocity_gradient_faster()
+    !TO DO: include dust in the dOmega and also background opacities
+        integer :: icell, id, i_cell, j_cell, k_cell, i
+        real(kind=dp) :: v0, v1, r0,  F1, T1
+        real(kind=dp) :: Tchoc, rho_shock(n_etoiles), sfrac(n_etoiles)
+        real(kind=dp) :: x0, y0, z0, x1, y1, z1, u, v, w, w2, dist
+        integer :: ibar, n_cells_done, n_rays_shock(n_etoiles)
+        integer :: i_star, icell_star, n_neighbours, iray
+        real :: time_gradient, rand, rand2, rand3, rand4
+        integer :: count_start, count_end
+        integer :: n_max_neighbours
+        integer, allocatable :: cell_neighbours(:)
+        logical :: lintersect
+        integer :: previous_cell, next_cell
+        real(kind=dp) :: l, l_contrib, l_void_before
+
+        if (lvoronoi) then
+            call error('lvoronoi not yet for mean_velocity_gradient')
+        endif
+        write(*,*) " *** computing mean velocity gradient for each cell.."
+        call count_neighbours(n_max_neighbours)
+        allocate(cell_neighbours(n_max_neighbours))
+        !but also mean solid angle subtended by each cell to the different stars, including
+        !shock regions if any. These are used to weight the contributions from the star in the escape prob.
+        !SEE.
+        !TO DO: occulation by dust should be included somehow.
+
+        ibar = 0
+        n_cells_done = 0
+
+        mean_grad_v = tiny_dp!0.0 !un-signed v gradient of the projected velocity.
+        mean_length_scale = 0.0
+        domega_core = 0.0
+        d_to_star = 0.0
+        wdi = 0.0
+
+        id = 1
+
+        call system_clock(count_start,count_rate=time_tick,count_max=time_max)
+        call progress_bar(0)
+        !$omp parallel &
+        !$omp default(none) &
+        !$omp private(id,icell,x0,y0,z0,j_cell,i_cell,k_cell,cell_neighbours) &
+        !$omp private(i_star,icell_star,v0,v1,r0,n_neighbours)&
+        !$omp private(Tchoc,F1,T1,x1,y1,z1,u,v,w,dist,l,l_contrib, l_void_before, previous_cell, next_cell) &
+        !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot)&
+        !$omp shared(phi_grid,r_grid,z_grid,ibar, n_cells_done,n_cells,lvoronoi,cell_map_i,cell_map_j,cell_map_k)&
+        !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles,Voronoi,vfield3d)&
+        !$omp shared(laccretion_shock,domega_shock,domega_star,n_max_neighbours)
+        !$omp do schedule(static,1)
+        do icell=1, n_cells
+            !$ id = omp_get_thread_num() + 1
+            if (icompute_atomRT(icell) <= 0) cycle  !non-empty cells or dusty regions (with no atomic gas)
+                                                    ! are not counted yet.
+                                                    ! Simply change the condition to < 0 or set the regions to 1.
+
+            !cell centre
+            if (lvoronoi) then
+                x0 = Voronoi(icell)%xyz(1)
+                y0 = Voronoi(icell)%xyz(2)
+                z0 = Voronoi(icell)%xyz(3)
+                v0 = sqrt(Voronoi(icell)%vxyz(1)**2+Voronoi(icell)%vxyz(2)**2+Voronoi(icell)%vxyz(3)**2)
+            else
+                x0 = r_grid(icell)*cos(phi_grid(icell))
+                y0 = r_grid(icell)*sin(phi_grid(icell))
+                z0 = z_grid(icell)
+                v0 = sqrt(sum(vfield3d(icell,:)**2))
+            endif
+
+            do i_star = 1, n_etoiles
+                r0 = sqrt((x0-etoile(i_star)%x)**2 + (y0-etoile(i_star)%y)**2 + (z0-etoile(i_star)%z)**2)
+                d_to_star(icell,i_star) = r0
+                dOmega_core(icell,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(icell,i_star))**2))
+            enddo
+
+
+            i_cell = cell_map_i(icell)
+            j_cell = cell_map_j(icell)
+            k_cell = cell_map_k(icell)
+            ! loop over neighbour points
+            cell_neighbours = index_neighbours(n_max_neighbours,icell)
+            n_neighbours = 0
+            !does not count empty cell
+            do i=1, n_max_neighbours
+                if (cell_neighbours(i)==0) cycle
+                n_neighbours = n_neighbours + 1
+                if (lvoronoi) then
+                    x1 = Voronoi(cell_neighbours(i))%xyz(1)
+                    y1 = Voronoi(cell_neighbours(i))%xyz(2)
+                    z1 = Voronoi(cell_neighbours(i))%xyz(3)
+                    ! v1 = sqrt(Voronoi(cell_neighbours(i))%vxyz(1)**2+Voronoi(cell_neighbours(i))%vxyz(2)**2+Voronoi(cell_neighbours(i))%vxyz(3)**2)
+                else
+                    x1 = r_grid(cell_neighbours(i))*cos(phi_grid(cell_neighbours(i)))
+                    y1 = r_grid(cell_neighbours(i))*sin(phi_grid(cell_neighbours(i)))
+                    z1 = z_grid(cell_neighbours(i))
+                    ! v1 = sqrt(sum(vfield3d(cell_neighbours(i),:)**2))
+                endif
+                dist = sqrt((x0-x1)**2+(y1-y0)**2+(z0-z1)**2)
+                u = (x1 - x0) / dist; v = (y1 - y0) / dist; w = (z1 - z0) / dist !direction vector
+                v0 = v_proj(icell,x0,y0,z0,u,v,w)
+                !move only to the edge in principle, not the centre
+                call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+                dist = l_contrib !corect the distance
+                v1 = v_proj(icell,x1,y1,z1,u,v,w)
+                mean_length_scale(icell) = mean_length_scale(icell) + dist * AU_to_m
+                mean_grad_v(icell) = mean_grad_v(icell) + abs(v1 - v0) / dist * m_to_AU
+            enddo
+            mean_length_scale(icell) = mean_length_scale(icell) / real(n_neighbours)
+            mean_grad_v(icell) = mean_grad_v(icell) / real(n_neighbours)
+
+            ! Progress bar
+            !$omp atomic
+            n_cells_done = n_cells_done + 1
+            if (real(n_cells_done) > 0.02*ibar*n_cells) then
+                call progress_bar(ibar)
+                !$omp atomic
+                ibar = ibar+1
+            endif             
+        enddo
+        !$omp end do
+        !$omp end parallel
+        call progress_bar(50)
+        call system_clock(count_end,count_rate=time_tick,count_max=time_max)
+
+        !estimate fraction of the star covered by the shock if any
+        if (laccretion_shock) then
+            if (.not.allocated(stream)) allocate(stream(nb_proc))
+            stream = 0.0
+            stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+            n_rays_shock = 0 !actual rays touching the shock
+            sfrac(:) = 0.0
+            domega_shock = 0.0; Tchoc_average = 0.0; domega_star = 0.0
+            rho_shock(:) = 1d-100
+            id = 1
+            do i_star = 1, n_etoiles
+                icell_star = etoile(i_star)%icell
+                rays_loop : do iray=1, n_rayons_sob_step
+
+                    rand  = sprng(stream(id))
+                    rand2 = sprng(stream(id))
+                    rand3 = sprng(stream(id))
+                    rand4 = sprng(stream(id))
+
+                    call em_sphere_uniforme(id,i_star,rand,rand2,rand3,rand4,icell,x0,y0,z0,u,v,w,w2,lintersect)
+                    call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+                    icell = next_cell
+
+                    if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then 
+                        !fraction actually because all rays touch the star here
+                        Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell)
+                        n_rays_shock(i_star) = n_rays_shock(i_star) + 1
+                        rho_shock(i_star) = rho_shock(i_star) + nHtot(icell)
+                        sfrac(i_star) = sfrac(i_star) + 1.0_dp / real(n_rayons_sob_step)
+                    endif
+                enddo rays_loop !rays
+                dOmega_star(:,i_star) = dOmega_core(:,i_star) * (1.0_dp - sfrac(i_star))
+                dOmega_shock(:,i_star) = dOmega_core(:,i_star) * sfrac(i_star)
+                Tchoc_average(i_star) = Tchoc_average(i_star) / rho_shock(i_star)
+            enddo ! stars
+            deallocate(stream)
+        endif
+      
+        write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
+        write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
+        do i_star=1, n_etoiles
+            write(*,*) "star #", i_star
+            !it is like domega_core, but here I'm assuming all rays "would" hit the star.
+            !it uses the average distance to the star as reference point in the cell.
+            where (d_to_star(:,i_star) > 0) wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
+            write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
+            write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
+            write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
+            if (laccretion_shock) then
+                write(*,*) " Shock covers ", 100.0 * sfrac(i_star), " % of star #", i_star
+                write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
+                write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
+                write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
+            endif
+        enddo
+
+        deallocate(cell_neighbours)
+        if (count_end < count_start) then
+            time_gradient=real(count_end + (1.0 * time_max)- count_start)/real(time_tick)
+        else
+            time_gradient=real(count_end - count_start)/real(time_tick)
+        endif
+        write(*,*) ' (Velocity Gradient) time =',mod(time_gradient/60.,60.), " min"
+        write(*,*) ""
+        return
+    end subroutine mean_velocity_gradient_faster
+
     subroutine mean_velocity_gradient()
     !TO DO: include dust in the dOmega and also background opacities
         integer :: icell, id, i, previous_cell
@@ -124,7 +385,7 @@ module escape
         integer :: next_cell, iray, icell_in, n_rayons
         real :: rand, rand2, rand3
         real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1
-        integer :: n_rays_shock(n_etoiles)
+        integer :: n_rays_shock(n_etoiles), n_rays_star(n_etoiles)
         real(kind=dp) :: l,l_contrib, l_void_before, Tchoc, rho_shock(n_etoiles)
         integer :: ibar, n_cells_done
         integer :: i_star, icell_star
@@ -157,7 +418,7 @@ module escape
 
         if (laccretion_shock) then
             domega_shock = 0.0; Tchoc_average = 0.0; domega_star = 0.0
-            n_rays_shock(:) = 0
+            n_rays_shock(:) = 0;  n_rays_star(:) = 0
             rho_shock(:) = 0.0
         endif
 
@@ -178,7 +439,7 @@ module escape
         !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot)&
         !$omp shared(phi_grid,r_grid,z_grid,pos_em_cellule,ibar, n_cells_done,stream,n_cells)&
         !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles)&
-        !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock,n_rayons)
+        !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock,n_rayons,n_rays_star)
         !$omp do schedule(static,1)
         do icell=1, n_cells
             !$ id = omp_get_thread_num() + 1
@@ -229,6 +490,7 @@ module escape
                 if (lintersect_stars) then !"will interesct"
                     dOmega_core(icell,i_star) = dOmega_core(icell,i_star) + wei
                     icell_in = icell
+                    n_rays_star(i_star) = n_rays_star(i_star) + 1
                     !can I move directly at the stellar surface ?
                     ! call move_to_grid(id,x0,y0,z0,u,v,w,next_cell,lintersect)
                     if (laccretion_shock) then !will intersect the shock?
@@ -297,6 +559,7 @@ module escape
             write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
             write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
             if (laccretion_shock) then
+                write(*,*) " Shock covers ", 100.0 * real(n_rays_shock(i_star)) / real(n_rays_star(i_star)), " % of star #", i_star
                 write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
                 write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
                 write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
@@ -376,7 +639,8 @@ module escape
         end select
 
         call alloc_escape_variables
-        call mean_velocity_gradient
+        ! call mean_velocity_gradient
+        call mean_velocity_gradient_faster
 
 !TO DO:
         !Only loop on atoms that have initial solution Sobolev / escape
@@ -656,7 +920,7 @@ module escape
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
             !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,diff_loc)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,voigt,dne_loc)&
-            !$omp shared(limit_mem,l_iterate_ne,tab_xc,n_xc) &
+            !$omp shared(limit_mem,l_iterate_ne,tab_xc,n_xc,chi_cont,eta_cont) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
@@ -719,9 +983,11 @@ module escape
                   at => null()
 
                   !TO DO: update background opac only l_iterate_ne   
-                  if (limit_mem < 2) then 
-                    call calc_contopac_loc(icell,n_xc,tab_xc)  
-                  endif   
+                  call opacity_atom_bf_loc(icell, n_xc, tab_xc, chi_cont(:,icell), eta_cont(:,icell))
+!background continua not needed if no continuum RT
+                !   if (limit_mem < 2) then 
+                !     call calc_contopac_loc(icell,n_xc,tab_xc)  
+                !   endif   
 
                end if !if l_iterate
             end do cell_loop2 !icell

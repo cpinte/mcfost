@@ -692,9 +692,9 @@ module atom_transfer
                   at => null()
 
                   ! always, as we also updated the non-LTE bound-free
-                  ! TO DO: update background opacities only if l_iterate_ne
+                  ! TO DO: this takes time on large grid !
                   if (limit_mem < 2) then
-                     call calc_contopac_loc(icell,n_xc,tab_xc)!,bckgr_opac=.true.)
+                     call calc_contopac_loc(icell,n_xc,tab_xc)
                   endif
 
                end if !if l_iterate
@@ -906,6 +906,8 @@ module atom_transfer
       else
          dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
       endif
+   write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
+   return
 
       !avoid complicated calculations if there is not velocity fields.
       if (dv==0.0_dp) return
