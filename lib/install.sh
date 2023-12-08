@@ -141,7 +141,7 @@ if [ "$MCFOST_XGBOOST" = "yes" ]; then
     git checkout v0.90
     # We need to install rabit manually as the submodule was removed
     \rm -rf rabit
-    git clone git@github.com:dmlc/rabit.git
+    git clone https://github.com/dmlc/rabit
     cd ..
 fi
 if [ "$MCFOST_ASTROCHEM" = "yes" ]; then
