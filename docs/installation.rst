@@ -25,16 +25,16 @@ be optmized for most architectures. The binary also updates itself regularly (un
 https://github.com/cpinte/mcfost/releases/latest/download/mcfost_Linux-X64.tar.gz
 https://github.com/cpinte/mcfost/releases/latest/download/mcfost_macOS-X64.tar.gz
 
+2. Extract the file and make it executable::
+
+     $ tar -xvzf mcfost_*-X64.tgz
+     $ chmod +x mcfost
+
 .. note:: On macOS, if you download the archive from your web browser, you might need to bypass macOS security with::
 
           $ xattr -dr com.apple.quarantine mcfost
 
           Alternatively, you can download from link above with wget or curl (which do not add the `quarantine` attribute).
-
-2. Extract the file and make it executable::
-
-     $ tar -xvzf mcfost_*-X64.tgz
-     $ chmod +x mcfost
 
 3. Make a directory where you wish move mcfost (or move mcfost in any directory defined in your shell path)::
 
