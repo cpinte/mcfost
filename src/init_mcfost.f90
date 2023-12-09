@@ -214,6 +214,7 @@ subroutine set_default_variables()
   image_offset_centre(:) = (/0.0,0.0,0.0/)
   loverwrite_s12 = .false.
   lnot_random_Voronoi = .false.
+  lignore_sink=.false.
 
   tmp_dir = "./"
 
@@ -322,9 +323,9 @@ subroutine initialisation_mcfost()
   call set_default_variables()
 
   ! Setting up web-server
-  call get_environment_variable('MCFOST_WEB_SERVER',s) ; if  (s/="") web_server = s
-  webpage = trim(web_server)//trim(webpage)
-  utils_webpage = trim(web_server)//trim(utils_webpage)
+  !call get_environment_variable('MCFOST_WEB_SERVER',s) ; if  (s/="") web_server = s
+  !webpage = trim(web_server)//trim(webpage)
+  !utils_webpage = trim(web_server)//trim(utils_webpage)
 
   ! Looking for the mcfost utils directory
   call get_mcfost_utils_dir()
@@ -1463,6 +1464,9 @@ subroutine initialisation_mcfost()
      case("-not_random_Voronoi")
         i_arg = i_arg + 1
         lnot_random_Voronoi = .true.
+     case("-ignore_sink")
+        i_arg = i_arg + 1
+        lignore_sink=.true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -2073,6 +2077,7 @@ subroutine display_help()
   write(*,*) "                                   (only works with 1 grain size dump)"
   write(*,*) "        : -force_Mgas : force the gas mass to be the value given the mcfost parameter file"
   write(*,*) "        : -not_random_Voronoi : force the particle order to remain the same"
+  write(*,*) "        : -ignore_sink : forces nptmass to 0, ie not stars in mcfost"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

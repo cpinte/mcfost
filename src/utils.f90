@@ -11,11 +11,32 @@ module utils
   real, parameter :: VACUUM_TO_AIR_LIMIT=200.0000
   real, parameter :: AIR_TO_VACUUM_LIMIT=199.9352
 
-  public :: interp
+!  public :: interp, integrate_trap, span, spanl, in_dir, Blambda, Bpnu, &
+!       Bnu, appel_syst, get_NH, linear_1D_sorted, vacuum2air, is_file, is_dir, &
+!       mcfost_update, get_mcfost_utils_version, is_nan_infinity, is_nan_infinity_vector, &
+!       is_nan_infinity_matrix, locate, gaussslv, cross_product, &
+!       gauss_legendre_quadrature, progress_bar, rotation_3d, cdapres, &
+!       mcfost_get_ref_para, mcfost_get_yorick, mcfost_history, mcfost_v, &
+!       update_utils, indgen, is_diff, real_equality, span_dp, spanl_dp, bilinear, &
+!       read_comments, read_line, Blambda_dp
+!
+!  private
+!
   interface interp
      module procedure  interp_sp
      module procedure  interp_dp
   end interface
+
+  abstract interface
+     pure real(8) function func(x)
+       real(8), intent(in) :: x
+     end function func
+  end interface
+
+  interface integrate_trap
+     module procedure integrate_trap_func
+     module procedure integrate_trap_array
+  end interface integrate_trap
 
 contains
 
@@ -818,7 +839,9 @@ function mcfost_update(lforce_update, lmanual, n_days)
   write(*,*) "Checking last version ..."
   syst_status = 0
   !cmd = "wget "//trim(webpage)//"/version.txt -q -T 5 -t 3"
-  cmd = "curl "//trim(webpage)//"version.txt -O -s"
+  !cmd = "curl "//trim(webpage)//"version.txt -O -s"
+  cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
+       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) then
      write(*,*) "ERROR: Cannot connect to MCFOST server."
@@ -833,6 +856,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   if ( (ios/=0) .or. (.not.is_digit(last_version(1:1)))) then
      write(*,*) "ERROR: Cannot get MCFOST last version number."
      write(*,*) "Cannot read version file."
+     write(*,*) trim(webpage)
      call exit_update(lmanual, n_days, lupdate)
      return
   endif
@@ -846,19 +870,18 @@ function mcfost_update(lforce_update, lmanual, n_days)
      lupdate = .true.
   endif
   if (lforce_update) then
-     write(*,*) "Forcing update"
+     write(*,*) "Forcing update to ", trim(last_version)
      lupdate = .true.
   endif
-  write(*,*) " "
 
   if (lupdate) then
      ! get the correct url corresponding to the system
      if (operating_system=="Linux ") then
-        url = trim(webpage)//"linux/mcfost_bin.tgz"
-        url_sha1 = trim(webpage)//"linux/mcfost.sha1"
+        url = trim(webpage)//"mcfost_Linux-X64.tar.gz"
+        url_sha1 = trim(webpage)//"mcfost_Linux-X64.sha1"
      else if (operating_system=="Darwin") then
-        url = trim(webpage)//"macos/mcfost_bin.tgz"
-        url_sha1 = trim(webpage)//"macos/mcfost.sha1"
+        url = trim(webpage)//"mcfost_macOS-X64.tar.gz"
+        url_sha1 = trim(webpage)//"mcfost_macOS-X64.sha1"
      else
         write(*,*) "Unknown operating system : error 2"
         write(*,*) "Cannot download new binary"
@@ -870,8 +893,8 @@ function mcfost_update(lforce_update, lmanual, n_days)
 
      ! Download
      write(*,'(a32, $)') "Downloading the new version ..."
-     cmd = "curl "//trim(url)//" -o mcfost_bin.tgz -s"    ; call appel_syst(cmd, syst_status)
-     cmd = "curl "//trim(url_sha1)//" -o mcfost.sha1 -s" ; call appel_syst(cmd, syst_status)
+     cmd = "curl -L "//trim(url)//" -o mcfost_bin.tgz -s"    ; call appel_syst(cmd, syst_status)
+     cmd = "curl -L "//trim(url_sha1)//" -o mcfost.sha1 -s"  ; call appel_syst(cmd, syst_status)
      if (syst_status==0) then
         write(*,*) "Done"
      else
@@ -912,7 +935,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
      else
         write(*,*) "Done"
         write(*,'(a25, $)') "Decompressing binary ..."
-        cmd = "tar xzf mcfost_bin.tgz ; rm -rf mcfost_bin.tgz"
+        cmd = "mkdir -p mcfost_update ; tar xzf mcfost_bin.tgz -C mcfost_update ; rm -rf mcfost_bin.tgz"
         call appel_syst(cmd, syst_status)
         write(*,*) "Done"
      endif
@@ -940,9 +963,9 @@ function mcfost_update(lforce_update, lmanual, n_days)
         endif
      endif
 
-     ! make binary executable
+     ! make binary executable and update it
      write(*,'(a20, $)') "Updating binary ..."
-     cmd = "chmod a+x mcfost_update ; mv mcfost_update "//trim(current_binary)
+     cmd = "chmod a+x mcfost_update/mcfost ; mv mcfost_update/mcfost "//trim(current_binary)//" ; rm -rf mcfost_update"
      call appel_syst(cmd, syst_status)
      if (syst_status /= 0) then
         write(*,*) "ERROR : the update failed for some unknown reason"
@@ -1038,11 +1061,11 @@ subroutine mcfost_get_ref_para()
 
 
   write(*,*) "Getting MCFOST reference files: "//ref_file//" & "//ref_file_multi//" & "//ref_file_3D
-  cmd = "curl "//trim(webpage)//ref_file//" -O -s"
+  cmd = "curl "//trim(raw_webpage)//ref_file//" -O -s"
   call appel_syst(cmd, syst_status)
-  cmd = "curl "//trim(webpage)//ref_file_multi//" -O -s"
+  cmd = "curl "//trim(raw_webpage)//ref_file_multi//" -O -s"
   call appel_syst(cmd, syst_status)
-  cmd = "curl "//trim(webpage)//ref_file_3D//" -O -s"
+  cmd = "curl "//trim(raw_webpage)//ref_file_3D//" -O -s"
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) call error("Cannot get MCFOST reference file")
   write(*,*) "Done"
@@ -1099,7 +1122,8 @@ subroutine mcfost_v()
 
   ! Last version
   write(*,*) "Checking last version ..."
-  cmd = "curl "//trim(webpage)//"version.txt -O -s"
+  cmd = "curl "//trim(raw_webpage)//trim(version_file)//&
+       ' -s | grep mcfost_release | awk ''NF>1{print $NF}'' | sed s/\"//g > version.txt'
   call appel_syst(cmd, syst_status)
   if (syst_status/=0) &
        call error("Cannot get MCFOST last version number (Error 1)","'"//trim(cmd)//"' did not run as expected.")
@@ -1813,8 +1837,8 @@ function vacuum2air(Nlambda, lambda_vac) result(lambda_air)
 
 
 function locate(xx,x,mask)
-   !wrapper function to locate the position of x in array xx.
-   !the closest position is returned.
+   ! wrapper function to locate the position of x in array xx.
+   ! the closest position is returned.
    real(kind=dp), dimension(:), intent(in) :: xx
    real(kind=dp), intent(in) :: x
    logical, intent(in), dimension(:), optional :: mask
@@ -1948,6 +1972,44 @@ end function locate
 
    return
  end function E2
+
+
+ pure real function integrate_trap_func(f,xmin,xmax) result(g)
+   !-------------------------------------------------------------------
+   ! helper routine to integrate a function using the trapezoidal rule
+   !-------------------------------------------------------------------
+   real(dp), intent(in) :: xmin,xmax
+   procedure(func) :: f
+   real(dp) :: fx,fprev,dx,x
+   integer, parameter :: npts = 128
+   integer :: i
+
+   g = 0.
+   dx = (xmax-xmin)/(npts)
+   fprev = f(xmin)
+   do i=2,npts
+      x = xmin + i*dx
+      fx = f(x)
+      g = g + 0.5*dx*(fx + fprev)
+      fprev = fx
+   enddo
+
+ end function integrate_trap_func
+
+ pure real function integrate_trap_array(n,x,f) result(g)
+   !-------------------------------------------------------------------
+   ! helper routine to integrate a function using the trapezoidal rule
+   !-------------------------------------------------------------------
+   integer, intent(in) :: n
+   real(dp), intent(in) :: x(n),f(n)
+   integer :: i
+
+   g = 0.
+   do i=2,n
+      g = g + 0.5*(x(i)-x(i-1))*(f(i) + f(i-1))
+   enddo
+
+end function integrate_trap_array
 
    ! function flatten_n1n2(n1, n2, M)
    ! !for each i in n1 write the n2 values of n1(i,:)

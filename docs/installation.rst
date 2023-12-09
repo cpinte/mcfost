@@ -11,9 +11,6 @@ The following environment is required for the binaries:
 -  a 64-bits Unix system, including Linux or MacOS X,
 -  any data analysis software capable of handling FITS files.
 
-MCFOST is also available for Xeon Phi but performance is not optimal
-yet. Stay tuned.
-
 
 
 Binary Installation Procedure
@@ -25,15 +22,21 @@ be optmized for most architectures. The binary also updates itself regularly (un
 
 1. Download the tar ball with the pre-compiled binary:
 
-http://ipag.osug.fr/public/pintec/mcfost/linux/mcfost.tgz
-http://ipag.osug.fr/public/pintec/mcfost/mac/mcfost.tgz
+https://github.com/cpinte/mcfost/releases/latest/download/mcfost_Linux-X64.tar.gz
+https://github.com/cpinte/mcfost/releases/latest/download/mcfost_macOS-X64.tar.gz
 
 2. Extract the file and make it executable::
 
-     $ tar -xvzf mcfost.tgz
+     $ tar -xvzf mcfost_*-X64.tgz
      $ chmod +x mcfost
 
-3. Make a directory where you move mcfost (or move mcfost in any directory defined in your shell path)::
+.. note:: On macOS, if you download the archive from your web browser, you might need to bypass macOS security with::
+
+          $ xattr -dr com.apple.quarantine mcfost
+
+          Alternatively, you can download from link above with wget or curl (which do not add the `quarantine` attribute).
+
+3. Make a directory where you wish move mcfost (or move mcfost in any directory defined in your shell path)::
 
      $ mkdir -p ~/mcfost/bin
      $ mv mcfost ~/mcfost/bin
