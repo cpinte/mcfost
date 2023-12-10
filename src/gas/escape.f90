@@ -17,7 +17,7 @@ module escape
     use atom_type, only : n_atoms, Atoms, ActiveAtoms, atomtype, AtomicContinuum, NactiveAtoms, atomPointerArray, &
         lcswitch_enabled, vbroad, maxval_cswitch_atoms, NpassiveAtoms, PassiveAtoms, adjust_cswitch_atoms
     use see, only : alloc_nlte_var, neq_ng, ngpop, small_nlte_fraction, tab_Aji_cont, tab_Vij_cont, &
-        dealloc_nlte_var, update_populations, init_colrates_atom
+        dealloc_nlte_var, update_populations, init_colrates_atom, write_rates
     use wavelengths, only : n_lambda
     use wavelengths_gas, only : tab_lambda_nm, tab_lambda_cont, n_lambda_cont, Nlambda_max_trans, Nlambda_max_line
     use lte, only : ltepops_atoms, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
@@ -25,6 +25,8 @@ module escape
     use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc, init_colrates_coeff_hydrogen
     use voigts, only : voigt
     use gas_contopac, only : background_continua_lambda
+    use elecdensity, only : write_electron
+    use io_atom, only : write_pops_atom
 
    !$ use omp_lib
 
@@ -39,7 +41,7 @@ module escape
     real(kind=dp), allocatable, dimension(:) :: mean_grad_v, mean_length_scale, Tchoc_average
     real(kind=dp), allocatable :: I0_line(:,:,:,:), Istar(:,:), Ishock(:,:), chitot(:,:), etatot(:,:)
 
-    integer, parameter :: n_rayons_sob_step = 100000!30000 !full probabilistic solution
+    integer, parameter :: n_rayons_sob_step = 100000 !full probabilistic solution
     integer, parameter :: n_rayons_init4 = 1000 !initial solution
 
     contains
@@ -1110,16 +1112,17 @@ module escape
 
       if (n_iterate_ne > 0) then
         write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
-        !  call write_electron
         tab_xc => null()
       endif
 
-    !   do nact=1,N_atoms
-    !      call write_pops_atom(Atoms(nact)%p)
-    !   end do
+      if (lescape_prob) then
+        do nact=1,N_atoms
+            call write_pops_atom(Atoms(nact)%p)
+        end do
 
-
-    !   if (loutput_rates) call write_rates()
+        if (n_iterate_ne > 0) call write_electron()
+        if (loutput_rates) call write_rates()
+      endif
 
       call dealloc_nlte_var()
       deallocate(dM, diff_loc, dne_loc, I0_line, chitot, etatot)
