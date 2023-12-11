@@ -13,7 +13,7 @@ model_list = glob.glob1("test_data/","*")
 
 # If running on CI, only test ref3.0
 if os.environ.get('CI', None) == 'true':
-    model_list = ["ref3.0_multi"]#["ref3.0","ref3.0_multi","debris"]
+    model_list = ["discF_00500"]#["ref3.0","ref3.0_multi","debris"]
 
 wl_list = ["1.0","10","100","1000"]
 wl_list_pola = ["1.0","1000"]
@@ -124,6 +124,7 @@ def test_image(model_name, wl):
         # Run the mcfost model
         filename = "test_data/"+model_name+"/"+model_name+".para"
         if (model_name == "discF_00500"):
+            pytest.skip("No image")
             opt=" -phantom test_data/"+model_name+"/"+model_name+" -not_random_Voronoi"
         else:
             opt=""
@@ -148,6 +149,9 @@ def test_image(model_name, wl):
 @pytest.mark.parametrize("wl", wl_list_pola)
 def test_pola(model_name, wl):
     # Re-use previous calculation
+
+    if (model_name == "discF_00500"):
+        pytest.skip("No pola")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
@@ -174,6 +178,9 @@ def test_pola(model_name, wl):
 @pytest.mark.parametrize("wl", wl_list_contrib)
 def test_contrib(model_name, wl):
     # Re-use previous calculation
+
+    if (model_name == "discF_00500"):
+        pytest.skip("No pola")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
