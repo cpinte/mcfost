@@ -280,7 +280,9 @@ module escape
                     x1 = Voronoi(cell_neighbours(i))%xyz(1)
                     y1 = Voronoi(cell_neighbours(i))%xyz(2)
                     z1 = Voronoi(cell_neighbours(i))%xyz(3)
-                    v1 = sqrt(Voronoi(cell_neighbours(i))%vxyz(1)**2+Voronoi(cell_neighbours(i))%vxyz(2)**2+Voronoi(cell_neighbours(i))%vxyz(3)**2)
+                    v1 = sqrt(Voronoi(cell_neighbours(i))%vxyz(1)**2+&
+                            Voronoi(cell_neighbours(i))%vxyz(2)**2+&
+                            Voronoi(cell_neighbours(i))%vxyz(3)**2)
                 else
                     x1 = r_grid(cell_neighbours(i))*cos(phi_grid(cell_neighbours(i)))
                     y1 = r_grid(cell_neighbours(i))*sin(phi_grid(cell_neighbours(i)))
