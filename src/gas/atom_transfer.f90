@@ -897,6 +897,14 @@ module atom_transfer
       real(kind=dp) :: u, v, w, x0, y0, z0, x, y, z, x1, y1, z1
       real(kind=dp) :: w02, srw02, argmt,l, l_contrib, l_void_before
 
+      ! if (lvoronoi) then
+      !    dv = 2*sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
+      ! else
+      !    dv = 2*sqrt( maxval(sum(vfield3d**2,dim=2)) )
+      ! endif
+      ! write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
+      ! return
+
       ! Evaluate the max velocity gradient between pairs of cells directly from
       ! different rays crossing pairs of cells. Takes into account the sign of the projected velocity.
 
@@ -906,8 +914,6 @@ module atom_transfer
       else
          dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
       endif
-   write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
-   return
 
       !avoid complicated calculations if there is not velocity fields.
       if (dv==0.0_dp) return

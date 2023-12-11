@@ -192,9 +192,9 @@ module escape
     !TO DO: include dust in the dOmega and also background opacities
         integer :: icell, id, i_cell, j_cell, k_cell, i
         real(kind=dp) :: v0, v1, r0,  F1, T1
-        real(kind=dp) :: Tchoc, rho_shock(n_etoiles), sfrac(n_etoiles)
+        real(kind=dp) :: Tchoc, rho_shock(n_etoiles), f_shock(n_etoiles)
         real(kind=dp) :: x0, y0, z0, x1, y1, z1, u, v, w, w2, dist
-        integer :: ibar, n_cells_done, n_rays_shock(n_etoiles)
+        integer :: ibar, n_cells_done, n_rays_shock(n_etoiles), n_rays_star(n_etoiles)
         integer :: i_star, icell_star, n_neighbours, iray
         real :: time_gradient, rand, rand2, rand3, rand4
         integer :: count_start, count_end
@@ -255,12 +255,14 @@ module escape
                 y0 = r_grid(icell)*sin(phi_grid(icell))
                 z0 = z_grid(icell)
                 v0 = sqrt(sum(vfield3d(icell,:)**2))
+                ! cell_surface = 
             endif
 
             do i_star = 1, n_etoiles
                 r0 = sqrt((x0-etoile(i_star)%x)**2 + (y0-etoile(i_star)%y)**2 + (z0-etoile(i_star)%z)**2)
                 d_to_star(icell,i_star) = r0
                 dOmega_core(icell,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(icell,i_star))**2))
+                ! dOmega_core(icell,i_star) = cell_surface / r0 / r0
             enddo
 
 
@@ -278,25 +280,26 @@ module escape
                     x1 = Voronoi(cell_neighbours(i))%xyz(1)
                     y1 = Voronoi(cell_neighbours(i))%xyz(2)
                     z1 = Voronoi(cell_neighbours(i))%xyz(3)
-                    ! v1 = sqrt(Voronoi(cell_neighbours(i))%vxyz(1)**2+Voronoi(cell_neighbours(i))%vxyz(2)**2+Voronoi(cell_neighbours(i))%vxyz(3)**2)
+                    v1 = sqrt(Voronoi(cell_neighbours(i))%vxyz(1)**2+Voronoi(cell_neighbours(i))%vxyz(2)**2+Voronoi(cell_neighbours(i))%vxyz(3)**2)
                 else
                     x1 = r_grid(cell_neighbours(i))*cos(phi_grid(cell_neighbours(i)))
                     y1 = r_grid(cell_neighbours(i))*sin(phi_grid(cell_neighbours(i)))
                     z1 = z_grid(cell_neighbours(i))
-                    ! v1 = sqrt(sum(vfield3d(cell_neighbours(i),:)**2))
+                    v1 = sqrt(sum(vfield3d(cell_neighbours(i),:)**2))
                 endif
+                ! dist = 0.5 * sqrt((x0-x1)**2+(y1-y0)**2+(z0-z1)**2)
                 dist = sqrt((x0-x1)**2+(y1-y0)**2+(z0-z1)**2)
                 u = (x1 - x0) / dist; v = (y1 - y0) / dist; w = (z1 - z0) / dist !direction vector
-                v0 = v_proj(icell,x0,y0,z0,u,v,w)
                 !move only to the edge in principle, not the centre
                 call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
                 dist = l_contrib !corect the distance
-                v1 = v_proj(icell,x1,y1,z1,u,v,w)
+                ! v0 = v_proj(icell,x0,y0,z0,u,v,w)
+                ! v1 = v_proj(icell,x1,y1,z1,u,v,w)
                 mean_length_scale(icell) = mean_length_scale(icell) + dist * AU_to_m
                 mean_grad_v(icell) = mean_grad_v(icell) + abs(v1 - v0) / dist * m_to_AU
             enddo
-            mean_length_scale(icell) = mean_length_scale(icell) / real(n_neighbours)
-            mean_grad_v(icell) = mean_grad_v(icell) / real(n_neighbours)
+            mean_length_scale(icell) = mean_length_scale(icell) / real(n_neighbours,kind=dp)
+            mean_grad_v(icell) = mean_grad_v(icell) / real(n_neighbours,kind=dp)
 
             ! Progress bar
             !$omp atomic
@@ -318,7 +321,8 @@ module escape
             stream = 0.0
             stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
             n_rays_shock = 0 !actual rays touching the shock
-            sfrac(:) = 0.0
+            n_rays_star = 0 !should be  n_rayons_sob_step in that case
+            f_shock(:) = 0.0
             domega_shock = 0.0; Tchoc_average = 0.0; domega_star = 0.0
             rho_shock(:) = 1d-100
             id = 1
@@ -332,19 +336,22 @@ module escape
                     rand4 = sprng(stream(id))
 
                     call em_sphere_uniforme(id,i_star,rand,rand2,rand3,rand4,icell,x0,y0,z0,u,v,w,w2,lintersect)
-                    call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-                    icell = next_cell
-
-                    if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then 
-                        !fraction actually because all rays touch the star here
-                        Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell)
-                        n_rays_shock(i_star) = n_rays_shock(i_star) + 1
-                        rho_shock(i_star) = rho_shock(i_star) + nHtot(icell)
-                        sfrac(i_star) = sfrac(i_star) + 1.0_dp / real(n_rayons_sob_step)
+                    ! call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+                    ! icell = next_cell
+                    ! lintersect = .true.
+                    if (lintersect) then
+                        n_rays_star(i_star) = n_rays_star(i_star) + 1
+                        if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then 
+                            !fraction actually because all rays touch the star here
+                            Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell)
+                            n_rays_shock(i_star) = n_rays_shock(i_star) + 1
+                            rho_shock(i_star) = rho_shock(i_star) + nHtot(icell)
+                            f_shock(i_star) = f_shock(i_star) + 1.0_dp / real(n_rayons_sob_step,kind=dp)
+                        endif
                     endif
                 enddo rays_loop !rays
-                dOmega_star(:,i_star) = dOmega_core(:,i_star) * (1.0_dp - sfrac(i_star))
-                dOmega_shock(:,i_star) = dOmega_core(:,i_star) * sfrac(i_star)
+                dOmega_star(:,i_star) = dOmega_core(:,i_star) * (1.0_dp - f_shock(i_star))
+                dOmega_shock(:,i_star) = dOmega_core(:,i_star) * f_shock(i_star)
                 Tchoc_average(i_star) = Tchoc_average(i_star) / rho_shock(i_star)
             enddo ! stars
             deallocate(stream)
@@ -361,7 +368,7 @@ module escape
             write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
             write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
             if (laccretion_shock) then
-                write(*,*) " Shock covers ", 100.0 * sfrac(i_star), " % of star #", i_star
+                write(*,*) " Shock covers ", 100.0 * f_shock(i_star), " % of star #", i_star
                 write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
                 write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
                 write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
@@ -379,14 +386,15 @@ module escape
         return
     end subroutine mean_velocity_gradient_faster
 
+!there is a bug here in the shock area
     subroutine mean_velocity_gradient()
     !TO DO: include dust in the dOmega and also background opacities
         integer :: icell, id, i, previous_cell
         real(kind=dp) :: x0,y0,z0,x1,y1,z1,u,v,w
         real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
         integer :: next_cell, iray, icell_in, n_rayons
-        real :: rand, rand2, rand3
-        real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1
+        real :: rand, rand2, rand3, rand4
+        real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1, f_shock(n_etoiles)
         integer :: n_rays_shock(n_etoiles), n_rays_star(n_etoiles)
         real(kind=dp) :: l,l_contrib, l_void_before, Tchoc, rho_shock(n_etoiles)
         integer :: ibar, n_cells_done
@@ -421,7 +429,7 @@ module escape
         if (laccretion_shock) then
             domega_shock = 0.0; Tchoc_average = 0.0; domega_star = 0.0
             n_rays_shock(:) = 0;  n_rays_star(:) = 0
-            rho_shock(:) = 0.0
+            rho_shock(:) = 0.0; f_shock(:) = 0.0_dp
         endif
 
         !uses only Monte Carlo to estimate these quantities
@@ -440,7 +448,7 @@ module escape
         !$omp private(l1,l2,l3,xa,xb,xc,xa1,xb1,xc1,icell_in,Tchoc,F1,T1,lintersect) &
         !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot)&
         !$omp shared(phi_grid,r_grid,z_grid,pos_em_cellule,ibar, n_cells_done,stream,n_cells)&
-        !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles)&
+        !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles,f_shock)&
         !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock,n_rayons,n_rays_star)
         !$omp do schedule(static,1)
         do icell=1, n_cells
@@ -457,7 +465,7 @@ module escape
                 rand3 = sprng(stream(id))
 
 
-                call  pos_em_cellule(icell,rand,rand2,rand3,x0,y0,z0)
+                call pos_em_cellule(icell,rand,rand2,rand3,x0,y0,z0)
                 do i_star = 1, n_etoiles
                     r0 = sqrt((x0-etoile(i_star)%x)**2 + (y0-etoile(i_star)%y)**2 + (z0-etoile(i_star)%z)**2)
                     !distance and solid-angle to the star assuming that all cells can see a star.
@@ -492,7 +500,6 @@ module escape
                 if (lintersect_stars) then !"will interesct"
                     dOmega_core(icell,i_star) = dOmega_core(icell,i_star) + wei
                     icell_in = icell
-                    n_rays_star(i_star) = n_rays_star(i_star) + 1
                     !can I move directly at the stellar surface ?
                     ! call move_to_grid(id,x0,y0,z0,u,v,w,next_cell,lintersect)
                     if (laccretion_shock) then !will intersect the shock?
@@ -511,6 +518,8 @@ module escape
                                 else
                                     dOmega_star(icell,i_star) = domega_star(icell,i_star) + wei
                                 endif
+                                !rays hitting the stellar surface irrespective of the position.
+                                n_rays_star(i_star) = n_rays_star(i_star) + 1
                                 exit inf !because we touch the star
                             endif
                             icell_in = next_cell
@@ -522,8 +531,6 @@ module escape
                             xa = xa1; xb = xb1; xc = xc1
                         enddo inf
                     endif!shock surface
-                    !thus, dOmega_shock = f_shock * dOmega_core
-                    !dOmega_core  *= (1.0 - f_shock)
                 end if !touch star, computes dOmega_core
 
                 !average for all rays
@@ -548,6 +555,7 @@ module escape
         if (laccretion_shock) then
             ! Tchoc_average = Tchoc_average / real(n_rays_shock)
             Tchoc_average = Tchoc_average / rho_shock
+            f_shock = real(n_rays_shock) / real(n_rays_star)
         endif
       
         write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
@@ -561,7 +569,7 @@ module escape
             write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
             write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
             if (laccretion_shock) then
-                write(*,*) " Shock covers ", 100.0 * real(n_rays_shock(i_star)) / real(n_rays_star(i_star)), " % of star #", i_star
+                write(*,*) " Shock covers ", 100.0 * f_shock(i_star), " % of star #", i_star
                 write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
                 write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
                 write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
