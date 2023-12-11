@@ -162,7 +162,7 @@ module parametres
   logical :: ldelete_inside_rsph, ldelete_outside_rsph, ldelete_above_theta
   real(kind=dp) :: ufac_implicit,scale_length_units_factor,scale_mass_units_factor,correct_density_factor_elongated_cells
   real(kind=dp) :: SPH_amin, SPH_amax, fluffyness, gap_factor, rsph_min, rsph_max
-  logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy, lnot_random_Voronoi
+  logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy, lnot_random_Voronoi, lignore_sink
   integer :: isink_centre
 
   ! Disk parameters

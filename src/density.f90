@@ -1651,7 +1651,7 @@ subroutine normalize_dust_density(disk_dust_mass)
         if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
-     densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
+     if (somme > tiny_dp) densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
   enddo !l
 
   ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
