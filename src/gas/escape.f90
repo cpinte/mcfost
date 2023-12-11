@@ -357,20 +357,28 @@ module escape
             deallocate(stream)
         endif
       
-        write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
-        write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
+        write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') &
+            maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
+        write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') &
+            maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
         do i_star=1, n_etoiles
             write(*,*) "star #", i_star
             !it is like domega_core, but here I'm assuming all rays "would" hit the star.
             !it uses the average distance to the star as reference point in the cell.
-            where (d_to_star(:,i_star) > 0) wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
-            write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
-            write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
-            write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
+            where (d_to_star(:,i_star) > 0) &
+                wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
+            write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') &
+                maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
+            write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') &
+                maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
+            write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') &
+                maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
             if (laccretion_shock) then
                 write(*,*) " Shock covers ", 100.0 * f_shock(i_star), " % of star #", i_star
-                write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
-                write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
+                write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') &
+                    maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
+                write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') &
+                    maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
                 write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
             endif
         enddo
@@ -558,20 +566,28 @@ module escape
             f_shock = real(n_rays_shock) / real(n_rays_star)
         endif
       
-        write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
-        write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
+        write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') &
+            maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
+        write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') &
+            maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
         do i_star=1, n_etoiles
             write(*,*) "star #", i_star
             !it is like domega_core, but here I'm assuming all rays "would" hit the star.
             !it uses the average distance to the star as reference point in the cell.
-            where (d_to_star(:,i_star) > 0) wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
-            write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
-            write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
-            write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
+            where (d_to_star(:,i_star) > 0) &
+                wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
+            write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') &
+                maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
+            write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') &
+                maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
+            write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') &
+                maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
             if (laccretion_shock) then
                 write(*,*) " Shock covers ", 100.0 * f_shock(i_star), " % of star #", i_star
-                write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
-                write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
+                write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') &
+                    maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
+                write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') &
+                    maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
                 write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
             endif
         enddo
