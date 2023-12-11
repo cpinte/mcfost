@@ -79,7 +79,7 @@ module parametres
   integer :: Ng_Norder, Ng_Nperiod
 
   !electron density
-  logical :: lsolve_for_ne
+  logical :: lsolve_for_ne, lescape_prob
   integer :: ndelay_iterate_ne, n_iterate_ne !0 means once SEE is solved. Otherwise, > 1, iterated every n_iterate_ne during the nlte_loop
 
   logical :: lmhd_voronoi

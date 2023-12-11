@@ -19,6 +19,7 @@ module collision_atom
    real(kind=dp), parameter :: C0 = ((E_RYDBERG/sqrt(mel)) * PI*(RBOHR)**2) * sqrt(8.0/(PI*KB))
    integer, parameter :: Max_size_elements = 100
    integer, parameter :: Nmax_lines = 10000 !number max of lines for all collision data
+   real(kind=dp), allocatable :: CI_hydrogen(:,:), CE_hydrogen(:,:,:)
 
    contains
 
@@ -34,7 +35,8 @@ module collision_atom
       ! return
 
       Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
-      call Johnson_CI(icell, CI) !bound-free i->Nlevel
+      ! call Johnson_CI(T(icell), CI) !bound-free i->Nlevel
+      CI(:) = CI_hydrogen(:,id)
       j = hydrogen%Nlevel
       do i=1, j-1
          ! ni_on_nj_star = ne(icell) * phi_T(T(icell), hydrogen%g(i), hydrogen%g(j), hydrogen%E(j)-hydrogen%E(i))
@@ -47,7 +49,8 @@ module collision_atom
 
       if (hydrogen%Nline==0) return
 
-      call Johnson_CE(icell, CE) !among all levels
+      ! call Johnson_CE(T(icell), CE) !among all levels
+      CE(:,:) = CE_hydrogen(:,:,id)
 
       !bound-levels
       !i-> hydrogen%Nlevel already filled
@@ -69,8 +72,14 @@ module collision_atom
     RETURN
    end subroutine collision_rates_hydrogen_loc
 
+   subroutine init_colrates_coeff_hydrogen(id,icell)
+      integer, intent(in) :: id, icell
+      call Johnson_CI(T(icell), CI_hydrogen(:,id)) !bound-free i->Nlevel
+      call Johnson_CE(T(icell), CE_hydrogen(:,:,id)) !among all levels
+      return
+   endsubroutine init_colrates_coeff_hydrogen
 
-   subroutine Johnson_CI(icell, Cik)
+   subroutine Johnson_CI(temp, Cik)
    ! --------------------------------------------------- !
    ! Ionisation rate coefficient for Hydrogen atom
    ! from lower level i to the continuum level k
@@ -83,7 +92,7 @@ module collision_atom
    !
    ! return C(i,k) with k = Nlevel (bound-free)
    ! --------------------------------------------------- !
-      integer, intent(in) :: icell
+      real(kind=dp), intent(in) :: temp
       real(kind=dp), intent(out), dimension(:) :: Cik
       integer :: i, j, Nl
       !real(kind=dp) :: x0 = 1 - (n/n0)**2 with n0 -> infinity
@@ -91,7 +100,7 @@ module collision_atom
 
       deltam = 1. + mel / (hydrogen%weight * AMU_kg)
 
-      C0 = sqrt(8.*KB*T(icell) / pi / mel)
+      C0 = sqrt(8.*KB*temp / pi / mel)
 
       Cik(:) = 0.0_dp
 
@@ -111,7 +120,7 @@ module collision_atom
 
          ! in Joules
          En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV: En = 13.6/n**2
-         yn = En / KB / T(icell)
+         yn = En / KB / temp
          !     An = 32. / 3. / sqrt(3d0) / pi * n  * (g0(n)/3. + g1(n)/4. + g2(n)/5.)
          An = 32. / 3. / sqrt(3d0) / pi * n  * (g0(i)/3. + g1(i)/4. + g2(i)/5.)
          Bnp = 2./3. * n*n * (5. + bn)
@@ -135,13 +144,13 @@ module collision_atom
    endsubroutine Johnson_CI
 
 
-   subroutine Johnson_CE(icell, Cij)
+   subroutine Johnson_CE(temp, Cij)
    ! ----------------------------------------------------- !
    ! Excitation rate coefficient for
    ! Hydrogen atom, from
    ! ApJ 74:227-236, 1972 May 15; eq. 36
    ! ----------------------------------------------------- !
-      integer, intent(in) :: icell
+      real(kind=dp), intent(in) :: temp
       real(kind=dp), intent(out), dimension(:,:) :: Cij
       integer :: i, j, Nl
       real(kind=dp) :: C0, rn, bn, n, Ennp, y, z, S, Bnnp, En
@@ -149,7 +158,7 @@ module collision_atom
 
       deltam = 1. + Mel/ (hydrogen%weight * AMU_kg)
 
-      C0 = sqrt(8.*KB*T(icell) / pi / MEL)
+      C0 = sqrt(8.*KB*temp / pi / MEL)
 
       Nl = hydrogen%Nlevel
 
@@ -174,7 +183,7 @@ module collision_atom
             Annp = 2.0 * n*n*fnnp/x
             ! in Joules
             En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV = ionisation E of n
-            y = x * En / KB / T(icell) !x = ratio of E/En
+            y = x * En / KB / temp !x = ratio of E/En
             Bnnp = 4d0 * (n**4)/(np**3) / x / x * (1. + 4./(3.0 * x) + bn/x/x)
             z = rnnp + y
 

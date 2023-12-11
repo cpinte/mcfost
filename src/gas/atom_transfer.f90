@@ -9,7 +9,7 @@ module atom_transfer
    use parametres
    use input, only               : lkeplerian, linfall, limb_darkening, mu_limb_darkening, RT_line_method
    use constantes, only : nm_to_m, m_to_km, km_to_m, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au, sqrtpi, c_light
-   use io_atom, only : read_atomic_models, write_pops_atom
+   use io_atom, only : read_atomic_models, write_pops_atom, lany_init4
    use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
    use wavelengths_gas, only : make_wavelengths_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
                                  deallocate_wavelengths_gasrt, make_wavelengths_raytracing, make_wavelengths_flux, Nlambda_max_line
@@ -44,10 +44,11 @@ module atom_transfer
    use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol,emissivite_dust
    use dust_prop, only : prop_grains, opacite, init_indices_optiques, kappa_abs_lte, kappa, kappa_factor
    use scattering
+   use escape, only : alloc_escape_variables, mean_velocity_gradient, nlte_loop_sobolev
 
    use healpix_mod
    !$ use omp_lib
-   use  naleat, only : seed, stream, gtype
+   use naleat, only : seed, stream, gtype
 
    implicit none
 
@@ -147,6 +148,8 @@ module atom_transfer
 
       logical :: labs
       logical :: l_iterate, l_iterate_ne
+      integer :: n_xc
+      real(kind=dp), dimension(:), pointer :: tab_xc
       
       !Ng's acceleration
       integer, parameter :: Ng_Ndelay_init = 5 !minimal number of iterations before starting the cycle.
@@ -203,7 +206,7 @@ module atom_transfer
 
       !-> negligible
       mem_alloc_local = 0
-      mem_alloc_local = mem_alloc_local + sizeof(dM)+sizeof(dTm)+sizeof(Tex_ref)+sizeof(Tion_ref)
+      mem_alloc_local = mem_alloc_local + 4*sizeof(dM)
 
 
       !How many steps and which one
@@ -230,7 +233,7 @@ module atom_transfer
       write(*,*) ""
 
       !-> negligible
-      mem_alloc_local = mem_alloc_local + sizeof(ds) + sizeof(stream)
+      mem_alloc_local = mem_alloc_local + 2*sizeof(ds) + sizeof(stream)
       ! allocate(jnu(n_lambda,n_cells))
       ! write(*,*) " size Jnu:", sizeof(Jnu) / 1024./1024./1024.," GB"
       ! mem_alloc_local = mem_alloc_local + sizeof(jnu)
@@ -238,6 +241,16 @@ module atom_transfer
       ! write(*,*) " size Iloc:", sizeof(iloc) / 1024./1024./1024.," GB"
       ! mem_alloc_local = mem_alloc_local + sizeof(iloc)
       call alloc_nlte_var(one_ray,mem=mem_alloc_local)
+
+      select case (limit_mem)
+         case (0)
+            n_xc = n_lambda
+            tab_xc => tab_lambda_nm
+         case (1)
+            n_xc = n_lambda_cont
+            tab_xc => tab_lambda_cont
+         !case (2) evaluated on-the-fly.
+      end select
 
       ! --------------------------- OUTER LOOP ON STEP --------------------------- !
       precision = dpops_max_error
@@ -610,7 +623,7 @@ module atom_transfer
             !$omp private(id,icell,l_iterate,dN1,dN,dNc,ilevel,nact,at,nb,nr,vth)&
             !$omp shared(ngpop,Neq_ng,ng_index,Activeatoms,lcell_converged,vturb,T,lng_acceleration,diff_loc)&!diff,diff_cont,dM)&
             !$omp shared(icompute_atomRT,n_cells,precision,NactiveAtoms,nhtot,voigt,dne_loc)&
-            !$omp shared(limit_mem,n_lambda,tab_lambda_nm,n_lambda_cont,tab_lambda_cont) &
+            !$omp shared(limit_mem,l_iterate_ne,n_xc,tab_xc) &
             !$omp reduction(max:dM,diff,diff_cont)
             !$omp do schedule(dynamic,1)
             cell_loop2 : do icell=1,n_cells
@@ -678,16 +691,11 @@ module atom_transfer
                   end do
                   at => null()
 
-                  !if electronic density is not updated, it is not necessary
-                  !to compute the lte continous opacities.
-                  !but the overhead should be negligible at this point.
-                  select case (limit_mem)
-                     case (0)
-                        call calc_contopac_loc(icell,n_lambda,tab_lambda_nm)
-                     case (1)
-                        call calc_contopac_loc(icell,n_lambda_cont,tab_lambda_cont)
-                     !case (2) evaluated on-the-fly.
-                  end select
+                  ! always, as we also updated the non-LTE bound-free
+                  ! TO DO: this takes time on large grid !
+                  if (limit_mem < 2) then
+                     call calc_contopac_loc(icell,n_xc,tab_xc)
+                  endif
 
                end if !if l_iterate
             end do cell_loop2 !icell
@@ -830,6 +838,7 @@ module atom_transfer
       if (n_iterate_ne > 0) then
          write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
          call write_electron
+         tab_xc => null()
       endif
 
       do nact=1,N_atoms
@@ -873,145 +882,159 @@ module atom_transfer
    end subroutine nlte_loop_mali
 
   subroutine compute_max_relative_velocity(dv)
-  !
-  ! TO DO: building, add maximum velocity difference between
-  !   all cells in all directions.
-  !   Compute mean velocity gradient for Sobolev
+  ! Compute the maximum velocity difference between pairs of cells.
       use molecular_emission, only : v_proj
-      ! use grid, only : cross_cell, test_exit_grid
+      use grid, only : cross_cell, test_exit_grid
       real(kind=dp), intent(out) :: dv
       real(kind=dp) :: v1,v2
       integer :: i1, i2, id
 
-      ! integer, parameter :: n_rayons = 10000
-      ! integer :: i, next_cell, previous_cell
-      ! integer :: i_star, icell_star
-      ! logical :: lintersect_stars, lcellule_non_vide
-      ! real :: rand, rand2, rand3
-      ! real(kind=dp) :: u, v, w, x0, y0, z0, x, y, z, x1, y1, z1
-      ! real(kind=dp) :: w02, srw02, argmt,l, l_contrib, l_void_before
+      integer, parameter :: n_rayons = 10 !50 !100
+      integer :: i, next_cell, previous_cell
+      integer :: i_star, icell_star
+      logical :: lintersect_stars, lcellule_non_vide
+      real :: rand, rand2, rand3
+      real(kind=dp) :: u, v, w, x0, y0, z0, x, y, z, x1, y1, z1
+      real(kind=dp) :: w02, srw02, argmt,l, l_contrib, l_void_before
 
       ! if (lvoronoi) then
-      !    dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
+      !    dv = 2*sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
       ! else
-      !    dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+      !    dv = 2*sqrt( maxval(sum(vfield3d**2,dim=2)) )
       ! endif
-
-      ! if (dv==0.0_dp) return
-
-      ! if (allocated(stream)) deallocate(stream)
-      ! allocate(stream(nb_proc))
-      ! stream = 0.0
-      ! do i=1,nb_proc
-      !    stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-      ! end do
-
-      ! id = 1
-      ! dv = 0.0_dp
-      ! !$omp parallel &
-      ! !$omp default(none) &
-      ! !$omp private(id,i1,i2,v1,v2,rand,rand2,rand3,u,v,w,x0,y0,z0,argmt,w02,srw02,x,y,z,i_star,icell_star)&
-      ! !$omp private(i,x1,y1,z1,l,l_contrib,l_void_before,next_cell,previous_cell,lcellule_non_vide,lintersect_stars)&
-      ! !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells,stream,cross_cell,pos_em_cellule, test_exit_grid)
-      ! !$omp do schedule(static,1)
-      ! do i1=1,n_cells
-      !    !$ id = omp_get_thread_num() + 1
-      !    if (icompute_atomRT(i1) <= 0) cycle
-      !    !compute velocity gradient between all cells in the ray path from i1
-      !    do i=1, n_rayons
-      !       rand  = sprng(stream(id))
-      !       rand2 = sprng(stream(id))
-      !       rand3 = sprng(stream(id))
-      !       call pos_em_cellule(i1,rand,rand2,rand3,x,y,z)
-      !       rand = sprng(stream(id))
-      !       W = 2.0_dp * rand - 1.0_dp
-      !       W02 =  1.0_dp - W*W
-      !       SRW02 = sqrt(W02)
-      !       rand = sprng(stream(id))
-      !       ARGMT = PI * (2.0_dp * rand - 1.0_dp)
-      !       U = SRW02 * cos(ARGMT)
-      !       V = SRW02 * sin(ARGMT)
-
-      !       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
-      !       x1=x;y1=y;z1=z
-      !       x0=x;y0=y;z0=z
-      !       next_cell = i1
-      !       v1 = v_proj(i1,x0,y0,z0,u,v,w)
-      !       infinie : do ! Boucle infinie
-      !          i2 = next_cell
-      !          x0=x1 ; y0=y1 ; z0=z1
-      !          lcellule_non_vide = (i2 <= n_cells)
-      !          if (test_exit_grid(i2, x0, y0, z0)) exit infinie
-      !          if (lintersect_stars) then
-      !             if (i2 == icell_star) exit infinie
-      !          end if
-      !          if (i2 <= n_cells) then
-      !             lcellule_non_vide = (icompute_atomRT(i2) > 0)
-      !             if (icompute_atomRT(i2) < 0) exit infinie
-      !          endif
-
-      !          call cross_cell(x0,y0,z0, u,v,w, i2, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-
-      !          !compute velocity gradient between cell i1 and crossed cells i2
-      !          if (lcellule_non_vide) then
-      !             v2 = v_proj(i2,x0,y0,z0,u,v,w)
-      !             dv = max(dv,abs(v2-v1))
-      !          endif
-
-      !       enddo infinie
-      !    enddo
-      ! enddo
-      ! !$omp end do
-      ! !$omp end parallel
-      ! deallocate(stream)
       ! write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
-
       ! return
+
+      ! Evaluate the max velocity gradient between pairs of cells directly from
+      ! different rays crossing pairs of cells. Takes into account the sign of the projected velocity.
+
+      !first evaluate max velocity (module)
+      if (lvoronoi) then
+         dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2) )
+      else
+         dv = sqrt( maxval(sum(vfield3d**2,dim=2)) )
+      endif
+
+      !avoid complicated calculations if there is not velocity fields.
+      if (dv==0.0_dp) return
+
+      if (allocated(stream)) deallocate(stream)
+      allocate(stream(nb_proc))
+      stream = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+
+!***
+!*** Is it normal that the max shift can be over the velocity max from vfield or %vxyz ??
+!*** Simply comment, and uses the other approach
+      id = 1
+      dv = 0.0_dp
+      !$omp parallel &
+      !$omp default(none) &
+      !$omp private(id,i1,i2,v1,v2,rand,rand2,rand3,u,v,w,x0,y0,z0,argmt,w02,srw02,x,y,z,i_star,icell_star)&
+      !$omp private(i,x1,y1,z1,l,l_contrib,l_void_before,next_cell,previous_cell,lcellule_non_vide,lintersect_stars)&
+      !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells,stream,cross_cell,pos_em_cellule, test_exit_grid)
+      !$omp do schedule(static,1)
+      do i1=1,n_cells
+         !$ id = omp_get_thread_num() + 1
+         if (icompute_atomRT(i1) <= 0) cycle
+         !compute velocity gradient between all cells in the ray path from i1
+         do i=1, n_rayons
+            rand  = sprng(stream(id))
+            rand2 = sprng(stream(id))
+            rand3 = sprng(stream(id))
+            call pos_em_cellule(i1,rand,rand2,rand3,x,y,z)
+            rand = sprng(stream(id))
+            W = 2.0_dp * rand - 1.0_dp
+            W02 =  1.0_dp - W*W
+            SRW02 = sqrt(W02)
+            rand = sprng(stream(id))
+            ARGMT = PI * (2.0_dp * rand - 1.0_dp)
+            U = SRW02 * cos(ARGMT)
+            V = SRW02 * sin(ARGMT)
+
+            call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
+            x1=x;y1=y;z1=z
+            x0=x;y0=y;z0=z
+            next_cell = i1
+            v1 = v_proj(i1,x0,y0,z0,u,v,w)
+            infinie : do ! Boucle infinie
+               i2 = next_cell
+               x0=x1 ; y0=y1 ; z0=z1
+               lcellule_non_vide = (i2 <= n_cells)
+               if (test_exit_grid(i2, x0, y0, z0)) exit infinie
+               if (lintersect_stars) then
+                  if (i2 == icell_star) exit infinie
+               end if
+               if (lcellule_non_vide) then
+                  if (icompute_atomRT(i2) == -2) exit infinie
+               endif
+
+               call cross_cell(x0,y0,z0, u,v,w, i2, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+
+               !compute velocity gradient between cell i1 and crossed cells i2
+               if (lcellule_non_vide) then
+                  if (icompute_atomRT(i2)>0) then
+                     v2 = v_proj(i2,x1,y1,z1,u,v,w)
+                     dv = max(dv,abs(v2-v1))
+                  endif
+               endif
+
+            enddo infinie
+         enddo
+      enddo
+      !$omp end do
+      !$omp end parallel
+      deallocate(stream)
+      write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
+
+      return
+
+      ! Evaluate the max velocity gradient between pairs of cells directly from
+      ! the velocity of each cell. The sign of the projected velocity is ignored
 
       if (lvoronoi) then
          dv = sqrt( maxval(Voronoi(:)%vxyz(1)**2+Voronoi(:)%vxyz(2)**2+Voronoi(:)%vxyz(3)**2,mask=icompute_atomRT>0) )
          if (dv == 0.0_dp) return
 
-         ! dv = 0.0_dp
-         ! !$omp parallel &
-         ! !$omp default(none) &
-         ! !$omp private(id,i1, i2,v1, v2)&
-         ! !$omp shared(dv, icompute_atomRT, Voronoi, n_Cells)
-         ! !$omp do schedule(dynamic,1)
-         ! do i1=1,n_cells
-         !    !$ id = omp_get_thread_num() + 1
-         !    v1 = sqrt(sum(Voronoi(i1)%vxyz**2))
-         !    do i2=1,n_cells
-         !       v2 = sqrt(sum(Voronoi(i2)%vxyz**2))
-         !       if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
-         !          dv = max(dv,abs(v1-v2))
-         !       endif
-         !    enddo
-         ! enddo
-         ! !$omp end do
-         ! !$omp end parallel
+         dv = 0.0_dp
+         !$omp parallel &
+         !$omp default(none) &
+         !$omp private(id,i1, i2,v1, v2)&
+         !$omp shared(dv, icompute_atomRT, Voronoi, n_Cells)
+         !$omp do schedule(dynamic,1)
+         do i1=1,n_cells
+            !$ id = omp_get_thread_num() + 1
+            v1 = sqrt(sum(Voronoi(i1)%vxyz**2))
+            do i2=1,n_cells
+               v2 = sqrt(sum(Voronoi(i2)%vxyz**2))
+               if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+                  dv = max(dv,abs(v1-v2))
+               endif
+            enddo
+         enddo
+         !$omp end do
+         !$omp end parallel
       else
          dv = sqrt( maxval(sum(vfield3d**2,dim=2),mask=icompute_atomRT>0) )
          if (dv==0.0_dp) return
 
-      !    dv = 0.0_dp
-      !    !$omp parallel &
-      !    !$omp default(none) &
-      !    !$omp private(id,i1,i2,v1,v2)&
-      !    !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells)
-      !    !$omp do schedule(dynamic,1)
-      !    do i1=1,n_cells
-      !       !$ id = omp_get_thread_num() + 1
-      !       v1 = sqrt(sum(vfield3d(i1,:)**2))
-      !       do i2=1,n_cells
-      !          v2 = sqrt(sum(vfield3d(i2,:)**2))
-      !          if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
-      !             dv = max(dv,abs(v1-v2))
-      !          endif
-      !       enddo
-      !    enddo
-      !    !$omp end do
-      !    !$omp end parallel
+         dv = 0.0_dp
+         !$omp parallel &
+         !$omp default(none) &
+         !$omp private(id,i1,i2,v1,v2)&
+         !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells)
+         !$omp do schedule(dynamic,1)
+         do i1=1,n_cells
+            !$ id = omp_get_thread_num() + 1
+            v1 = sqrt(sum(vfield3d(i1,:)**2))
+            do i2=1,n_cells
+               v2 = sqrt(sum(vfield3d(i2,:)**2))
+               if ((icompute_atomRT(i1)>0).and.(icompute_atomRT(i2)>0)) then
+                  dv = max(dv,abs(v1-v2))
+               endif
+            enddo
+         enddo
+         !$omp end do
+         !$omp end parallel
       endif
 
       write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
@@ -1150,7 +1173,19 @@ module atom_transfer
          ! !allocate quantities in space and for this frequency grid
          call alloc_atom_opac(n_lambda, tab_lambda_nm, .false.)
 
-         call nlte_loop_mali()
+
+         if (lany_init4) then
+            call nlte_loop_sobolev()
+            ! MALI step after Sobolev step ? 
+            ! if (.not.lescape_prob) then
+            !    !to preserve ray-resolution ?
+            !    istep_start = 2
+            !    istep_end = min(istep_start,istep_end)
+            ! endif
+         endif
+         !Works also if the initial solution is different from ESCAPE.
+         if (.not.lescape_prob) call nlte_loop_mali()
+         ! call nlte_loop_mali()
          !-> here on the non-LTE frequency grid
          ! call write_opacity_emissivity_bin(n_lambda,tab_lambda_nm)
 

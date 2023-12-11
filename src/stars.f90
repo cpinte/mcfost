@@ -15,7 +15,7 @@ module stars
        repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra, &
        intersect_stars, distance_to_star, compute_stellar_parameters
   !-> to move in parameters ?
-  public :: star_rad, laccretion_shock, max_Tshock, min_Tshock, min_Thp, max_Thp, T_hp, max_Facc, min_Facc, T_preshock
+  public :: star_rad, is_inshock, laccretion_shock, max_Tshock, min_Tshock, min_Thp, max_Thp, T_hp, max_Facc, min_Facc, T_preshock
 
   private
 

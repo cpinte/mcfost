@@ -18,6 +18,7 @@ module io_atom
 
    character(len=*), parameter :: path_to_atoms = "/Atoms/"
    real(kind=dp), parameter :: C1 = deux_pi * (electron_charge/EPSILON_0) * (electron_charge/mel / C_light)
+   logical :: lany_init4 = .false.
 
    contains
 
@@ -375,6 +376,12 @@ module io_atom
       atom%NLTEpops = .false. ! set to true during non-LTE loop (initial /= 1).
                               ! true if read from file (initial==1).
 
+      if (lescape_prob) then
+         write(*,*) " WARNING: forcing initial Solution of atom ", atom%id," to ESCAPE!"
+         atom%initial = 4
+      endif
+      if (.not.lany_init4 .and. atom%initial==4) lany_init4 = .true.
+
       ! allocate some space
       if (atom%initial>1) then
          if (.not.atom%active) then
@@ -410,17 +417,14 @@ module io_atom
                atom%set_ltepops = .false. !read from file, no need to compute.
             case (2)
                call error("initial solution == 2 (opt thin) not implemented yet!")
-               atom%set_ltepops = .true.
             case (3)
-               atom%set_ltepops = .true.
                if (.not. lforce_lte) then !otherwise cswitch is not LTE
                   write(*,*) " -> Setting initial solution to LTE with CSWITCH "
                   atom%cswitch = cswitch_val
                   if (.not. lcswitch_enabled) lcswitch_enabled = .true. !we need at least one
                endif
             case (4)
-               call error("initial solution == 4 (ESCAPE/LVG/Sobolev) not implemented yet!")
-               atom%set_ltepops = .true.
+               write(*,*) " -> Setting initial solution to ESCAPE probability (Sobolev/LVG) "
             case default
                write(*,*) "Active atom: initial = ", atom%initial
                call error("Initial solution unknown!")

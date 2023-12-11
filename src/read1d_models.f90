@@ -235,15 +235,13 @@ module read1d_models
 
 		write(*,*) "Maximum/minimum velocities in the model [km s^-1]:"
 		write(*,*) " Vfield(1) = ", &
-			1e-3 * maxval(abs(vfield3d(:,1))), 1d-3*minval(abs(vfield3d(:,1)),mask=icompute_atomRT>0)
+			1e-3 * maxval(abs(vfield3d(:,1))), 1e-3*minval(abs(vfield3d(:,1)),mask=icompute_atomRT>0)
 		write(*,*) " Vfield(2) = ",  &
-			1d-3 * maxval(abs(vfield3d(:,2))), 1d-3*minval(abs(vfield3d(:,2)),mask=icompute_atomRT>0)
+			1e-3 * maxval(abs(vfield3d(:,2))), 1e-3*minval(abs(vfield3d(:,2)),mask=icompute_atomRT>0)
 		write(*,*) " Vfield(3) = ",  &
-			1d-3 * maxval(abs(vfield3d(:,3))), 1d-3*minval(abs(vfield3d(:,3)),mask=icompute_atomRT>0)
+			1e-3 * maxval(abs(vfield3d(:,3))), 1e-3*minval(abs(vfield3d(:,3)),mask=icompute_atomRT>0)
 
-
-		write(*,*) "Typical line extent due to V fields [km s^-1]:"
-		write(*,*) v_char/1d3
+		write(*,*) "Maximum V field: ", real(v_char/1d3), "[km s^-1]"
 
 		write(*,*) "Maximum/minimum turbulent velocity [km s^-1]:"
 		write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
