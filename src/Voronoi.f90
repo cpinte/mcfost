@@ -277,7 +277,7 @@ module Voronoi_grid
 
                       if (min(dx,dy,dz) < etoile(istar)%r) then
                          dist2 = dx**2 + dy**2 + dz**2
-                         if (dist2 < etoile(istar)%r**2) then
+                         if (dist2 < 4.0*etoile(istar)%r**2) then
                             is_outside_stars = .false.
                             n_sublimate = n_sublimate + 1
                             exit loop_stars
@@ -328,8 +328,8 @@ module Voronoi_grid
     endif
 
     if (n_sublimate > 0) then
-       write(*,*) n_sublimate, "particles are located inside the stars"
-       write(*,*) "Not implemented yet : MCFOST will probably crash !!!!"
+       write(*,*) "Warning", n_sublimate, "particles are located too close to the stars,"
+       write(*,*) "e.g. < 2*Rstar, and will be deleted."
     endif
 
     ! Filtering stars outside the limits

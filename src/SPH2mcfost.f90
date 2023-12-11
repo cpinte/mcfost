@@ -364,7 +364,7 @@ contains
     ! interpolation en taille
     if (ldust_moments) then
        lvariable_dust = .true.
-       allocate(grainsize_f(n_grains_tot))
+       allocate(grainsize_f(n_grains_tot),gsize(n_grains_tot))
        gsize(:) = r_grain(:)/a0 ! grain sizes, units should be ok
 
        do icell=1,n_cells
@@ -382,7 +382,7 @@ contains
              !endif
              !densite_pouss(:,icell) = grainsize_f(:)
 
-             densite_pouss(:,icell) = 0.
+             densite_pouss(:,icell) = 0._dp
              if (dust_moments(1,iSPH) > tiny_dp) then
                 ! Simple approximation
                 a = a0 * dust_moments(2,iSPH)/dust_moments(1,iSPH)
@@ -391,13 +391,13 @@ contains
              endif
 
           else ! iSPH == 0, star
-             densite_pouss(:,icell) = 0.
+             densite_pouss(:,icell) = 0._dp
           endif
        enddo ! icell
 
        ! Using the parameter file gas-to-dust ratio for now
        ! until phantom provides a proper grain size distribution
-       call normalize_dust_density( sum(masse_gaz) * g_to_Msun / disk_zone(1)%gas_to_dust)
+       if (maxval(densite_pouss) > tiny_dp) call normalize_dust_density( sum(masse_gaz) * g_to_Msun / disk_zone(1)%gas_to_dust)
 
     elseif (ndusttypes >= 1) then
        lvariable_dust = .true.
