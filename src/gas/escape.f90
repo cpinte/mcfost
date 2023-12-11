@@ -255,14 +255,14 @@ module escape
                 y0 = r_grid(icell)*sin(phi_grid(icell))
                 z0 = z_grid(icell)
                 v0 = sqrt(sum(vfield3d(icell,:)**2))
-                ! cell_surface = 
             endif
 
             do i_star = 1, n_etoiles
                 r0 = sqrt((x0-etoile(i_star)%x)**2 + (y0-etoile(i_star)%y)**2 + (z0-etoile(i_star)%z)**2)
                 d_to_star(icell,i_star) = r0
                 dOmega_core(icell,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(icell,i_star))**2))
-                ! dOmega_core(icell,i_star) = cell_surface / r0 / r0
+                !TO DO: use cell surface
+                ! dOmega_core(icell,i_star) = surface(icell) / r0 / r0
             enddo
 
 
