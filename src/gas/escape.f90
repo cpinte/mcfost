@@ -233,7 +233,7 @@ module escape
         !$omp private(id,icell,x0,y0,z0,j_cell,i_cell,k_cell,cell_neighbours) &
         !$omp private(i_star,icell_star,v0,v1,r0,n_neighbours)&
         !$omp private(Tchoc,F1,T1,x1,y1,z1,u,v,w,dist,l,l_contrib, l_void_before, previous_cell, next_cell) &
-        !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot)&
+        !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot,cross_cell)&
         !$omp shared(phi_grid,r_grid,z_grid,ibar, n_cells_done,n_cells,lvoronoi,cell_map_i,cell_map_j,cell_map_k)&
         !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles,Voronoi,vfield3d)&
         !$omp shared(laccretion_shock,domega_shock,domega_star,n_max_neighbours)
@@ -456,7 +456,7 @@ module escape
         !$omp private(wei,i_star,icell_star,lintersect_stars,v0,v1,r0)&
         !$omp private(l_contrib,l_void_before,l,W02,SRW02,ARGMT,previous_cell,next_cell) &
         !$omp private(l1,l2,l3,xa,xb,xc,xa1,xb1,xc1,icell_in,Tchoc,F1,T1,lintersect) &
-        !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot)&
+        !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot,cross_cell,test_exit_grid)&
         !$omp shared(phi_grid,r_grid,z_grid,pos_em_cellule,ibar, n_cells_done,stream,n_cells)&
         !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles,f_shock)&
         !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock,n_rayons,n_rays_star)
