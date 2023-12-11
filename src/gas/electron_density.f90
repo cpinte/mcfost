@@ -556,7 +556,8 @@ module elecdensity
 
     if (verbose) then
        write(*,*) " ---------------------------------------------------- "
-       write(*,'("ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') real(minval(ne,mask=icompute_atomRT>0)), real(maxval(ne))
+       write(*,'("ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
+         real(minval(ne,mask=icompute_atomRT>0)), real(maxval(ne))
        write(*,'("   >>>  Diff to previous solution="(1ES13.5E3)" at cell "(1I7))') epsilon, ik_max
        write(*,*) " T = ", real(T(ik_max))," nH = ", real(nHtot(ik_max))
        write(*,*) " "
