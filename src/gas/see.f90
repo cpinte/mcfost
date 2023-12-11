@@ -12,7 +12,8 @@ module see
         matdiag, jacobi_sparse
     use opacity_atom, only : phi_loc, psi, chi_up, chi_down, uji_down, Itot, eta_atoms, xcoupling_cont, cross_coupling_cont_i
     use messages, only : warning, error
-    use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc, init_colrates_coeff_hydrogen, CE_hydrogen, CI_hydrogen
+    use collision_atom, only : collision_rates_atom_loc, collision_rates_hydrogen_loc, init_colrates_coeff_hydrogen, &
+        CE_hydrogen, CI_hydrogen
     use fits_utils, only : print_error
     use lte, only : LTEpops_atom_loc, LTEpops_H_loc
 
