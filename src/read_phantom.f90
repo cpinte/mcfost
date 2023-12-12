@@ -338,10 +338,14 @@ contains
                             read(iunit,iostat=ierr) xyzmh_ptmass(4,nptmass0:nptmass_found)
                          case('h')
                             read(iunit,iostat=ierr) xyzmh_ptmass(5,nptmass0:nptmass_found)
+                         case('hsoft')
+                            read(iunit,iostat=ierr) xyzmh_ptmass(6,nptmass0:nptmass_found)
                          case('lum')
                             read(iunit,iostat=ierr) xyzmh_ptmass(12,nptmass0:nptmass_found)
                          case('Teff')
                             read(iunit,iostat=ierr) xyzmh_ptmass(13,nptmass0:nptmass_found)
+                         case('Reff')
+                            read(iunit,iostat=ierr) xyzmh_ptmass(14,nptmass0:nptmass_found)
                          case('mdotav')
                             read(iunit,iostat=ierr) xyzmh_ptmass(16,nptmass0:nptmass_found)
                          case('vx')
@@ -647,6 +651,7 @@ contains
        call read_from_hdf5(xyzmh_ptmass(1:3,:),'xyz',hdf5_group_id,got,ierr)
        call read_from_hdf5(xyzmh_ptmass(4,:),'m',hdf5_group_id,got,ierr)
        call read_from_hdf5(xyzmh_ptmass(5,:),'h',hdf5_group_id,got,ierr)
+       call read_from_hdf5(xyzmh_ptmass(6,:),'hsoft',hdf5_group_id,got,ierr)
        call read_from_hdf5(vxyz_ptmass(:,:),'vxyz',hdf5_group_id,got,ierr)
 
        if (ierr /= 0)  call error("cannot read Phantom HDF sinks group in "//trim(filename))
@@ -798,11 +803,11 @@ contains
     type(star_type), dimension(:), allocatable :: etoile_old
     integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile
     real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
-    real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
+    real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
     real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
 
     logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
-
+    logical :: lupdate_photosphere
 
     ! We check the units by recomputing G
     G_phantom = ulength**3 / (utime**2 * umass)
@@ -827,6 +832,7 @@ contains
     udens = umass_scaled/ulength_scaled**3
     uerg_per_s = umass_scaled*ulength_scaled**2/utime_scaled**3
     uWatt = uerg_per_s * erg_to_J
+    ulength_m = ulength_scaled / (m_to_cm)
     ulength_au = ulength_scaled / (au_to_cm)
     uvelocity =  ulength_scaled / (m_to_cm) / utime_scaled ! m/s
     usolarmass = umass_scaled / Msun_to_g
@@ -984,11 +990,11 @@ contains
        ldudt_implicit = .false.
     endif
 
+    n_etoiles_old = n_etoiles
     if (lignore_sink) then
        n_etoiles = 0
     else
        write(*,*) "# Stars/planets:"
-       n_etoiles_old = n_etoiles
        n_etoiles = 0
        do i=1,nptmass
           n_etoiles = n_etoiles + 1
@@ -1091,9 +1097,10 @@ contains
           etoile(i_etoile)%M = xyzmh_ptmass(4,i_etoile) * usolarmass
        enddo
     else
+
        write(*,*) ""
        write(*,*) "Updating the stellar properties:"
-       write(*,*) "There are now", n_etoiles, "stars in the model"
+       write(*,*) "There are now", n_etoiles, "stars in the model", n_etoiles_old
 
        ! Saving if the accretion rate was forced
        allocate(etoile_old(n_etoiles_old))
@@ -1123,33 +1130,52 @@ contains
           etoile(:)%vz = vxyz_ptmass(3,:) * uvelocity
 
           etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
-       endif
 
-       do i=1, n_etoiles
-          if (.not.etoile(i)%force_Mdot) then
-             etoile(i)%Mdot = xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
-          endif
-       enddo
-       etoile(:)%find_spectrum = .true.
-
-       if (ldust_moments) then
-          etoile(:)%T = xyzmh_ptmass(13,:)
-          ! deriving radius from luminosity (Reff is not correct in dump)
-          etoile(:)%r = sqrt(xyzmh_ptmass(12,:) * uWatt / Lsun) * (Tsun/etoile(:)%T)**2 / 2.5
-
-          write(*,*) "******************  TMP : correcting stellar radius"
-
-          lfix_star = .true.
-
-          write(*,*) "Using Teff and Rstar from phantom:"
-          do i=1,n_etoiles
-             write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", real(etoile(i)%r), "Rsun"
+          do i=1, n_etoiles
+             if (.not.etoile(i)%force_Mdot) then
+                etoile(i)%Mdot = xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
+             endif
           enddo
+          etoile(:)%find_spectrum = .true.
 
-          ! Passage rayon en AU
-          etoile(:)%r = etoile(:)%r * Rsun_to_AU
+          lupdate_photosphere = .false.
+          if (maxval(xyzmh_ptmass(13,:)) > tiny_real) then
+             ! sink particle Teff is defined
+             write(*,*) "Using Teff and Lum from phantom:"
+             lupdate_photosphere = .true.
+             etoile(:)%T = xyzmh_ptmass(13,:)
+             ! deriving radius from luminosity (Reff is not correct in dump)
+             etoile(:)%r = sqrt(xyzmh_ptmass(12,:) * uWatt / Lsun) * (Tsun/etoile(:)%T)**2
+          else if (maxval(xyzmh_ptmass(14,:)) > tiny_real) then
+             ! sink particle Reff is defined
+             write(*,*) "Using Reff and Lum from phantom:"
+             lupdate_photosphere = .true.
+             etoile(:)%r = xyzmh_ptmass(14,:) * ulength_m / Rsun
+             etoile(:)%T =  Tsun * (xyzmh_ptmass(12,:) * uWatt / Lsun)**0.25 / sqrt(etoile(:)%r)
+          else if (maxval(xyzmh_ptmass(12,:)) > tiny_real) then
+             ! We use the luminosity and a radius estimate
+             write(*,*) "Using Lum from phantom + effective radius from sink:"
+             do i=1,n_etoiles
+                etoile(i)%T = 100
+                etoile(i)%r = 0.01
+                if (xyzmh_ptmass(12,i) > tiny_real) then
+                   etoile(i)%r = max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun
+                   if (etoile(i)%r > 0.) etoile(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(etoile(i)%r)
+                endif
+             enddo
+          endif
+
+          if (lupdate_photosphere) then
+             lfix_star = .true.
+             do i=1,n_etoiles
+                write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", real(etoile(i)%r), "Rsun"
+             enddo
+             ! Convert radius to au
+             etoile(:)%r = etoile(:)%r * Rsun_to_AU
+
+             etoile(:)%lb_body=.true.
+          endif
        endif
-
     endif
 
     return

@@ -245,7 +245,7 @@ extern "C"
               cutting_distance = d_to_star - stellar_radius[i_star];
               if (cutting_distance < 0)
               {
-                std::cout << "Error : cell " << pid << " is inside star " << i_star << std::endl;
+                std::cout << "Voro++ error : cell " << pid << " is inside star " << i_star << std::endl;
                 std::cout << "Exiting" << std::endl;
                 ierr = 1;
                 exit(1);
