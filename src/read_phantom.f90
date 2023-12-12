@@ -1138,7 +1138,7 @@ contains
           enddo
           etoile(:)%find_spectrum = .true.
 
-          lupdate_photosphere = .true.
+          lupdate_photosphere = .false.
           if (maxval(xyzmh_ptmass(13,:)) > tiny_real) then
              ! sink particle Teff is defined
              write(*,*) "Using Teff and Lum from phantom:"
@@ -1172,6 +1172,8 @@ contains
              enddo
              ! Convert radius to au
              etoile(:)%r = etoile(:)%r * Rsun_to_AU
+
+             etoile(:)%lb_body=.true.
           endif
        endif
     endif
