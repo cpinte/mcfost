@@ -161,9 +161,14 @@ ifeq ($(RELEASE), yes)
     STATIC = yes
     FFLAGS += $(ARCH)
     CCFLAGS += $(ARCH)
-#else
-    #FFLAGS += -march=native
-    #CCFLAGS += -march=native
+else
+    ifeq ($(SYSTEM), gfortran)
+	FFLAGS += -march=native
+        CCFLAGS += -march=native
+    else
+	FFLAGS += -xHOST #-march=native
+        CCFLAGS += -xHOST #-march=native
+    endif
 endif
 
 ifeq ($(DEBUG), yes)
