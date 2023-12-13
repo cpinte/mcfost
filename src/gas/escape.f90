@@ -193,7 +193,7 @@ module escape
         integer :: icell, id, i_cell, j_cell, k_cell, i
         real(kind=dp) :: v0, v1, r0,  F1, T1
         real(kind=dp) :: Tchoc, rho_shock(n_etoiles), f_shock(n_etoiles)
-        real(kind=dp) :: x0, y0, z0, x1, y1, z1, u, v, w, w2, dist
+        real(kind=dp) :: x0, y0, z0, x1, y1, z1, u, v, w, w2, dist, max_Tchoc(n_etoiles)
         integer :: ibar, n_cells_done, n_rays_shock(n_etoiles), n_rays_star(n_etoiles)
         integer :: i_star, icell_star, n_neighbours, iray
         real :: time_gradient, rand, rand2, rand3, rand4
@@ -327,6 +327,7 @@ module escape
             f_shock(:) = 0.0
             domega_shock = 0.0; Tchoc_average = 0.0; domega_star = 0.0
             rho_shock(:) = 1d-100
+            max_Tchoc(:) = 0.0
             id = 1
             do i_star = 1, n_etoiles
                 icell_star = etoile(i_star)%icell
@@ -338,9 +339,9 @@ module escape
                     rand4 = sprng(stream(id))
 
                     call em_sphere_uniforme(id,i_star,rand,rand2,rand3,rand4,icell,x0,y0,z0,u,v,w,w2,lintersect)
-                    ! call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-                    ! icell = next_cell
-                    ! lintersect = .true.
+                    call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+                    icell = next_cell
+                    lintersect = .true.
                     if (lintersect) then
                         n_rays_star(i_star) = n_rays_star(i_star) + 1
                         if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then 
@@ -349,6 +350,7 @@ module escape
                             n_rays_shock(i_star) = n_rays_shock(i_star) + 1
                             rho_shock(i_star) = rho_shock(i_star) + nHtot(icell)
                             f_shock(i_star) = f_shock(i_star) + 1.0_dp / real(n_rayons_sob_step,kind=dp)
+                            max_Tchoc(i_star) = max(max_Tchoc(i_star), Tchoc)
                         endif
                     endif
                 enddo rays_loop !rays
@@ -356,6 +358,7 @@ module escape
                 dOmega_shock(:,i_star) = dOmega_core(:,i_star) * f_shock(i_star)
                 Tchoc_average(i_star) = Tchoc_average(i_star) / rho_shock(i_star)
             enddo ! stars
+            ! Tchoc_average = max_Tchoc
             deallocate(stream)
         endif
       
