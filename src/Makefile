@@ -94,7 +94,7 @@ ifeq ($(SYSTEM), ifort)
         STATIC_FLAGS += -static-libstdc++
     endif
     FC= ifort
-    FFLAGS= -fpp -O3 -no-prec-div -traceback #-fp-model fast=2 -traceback
+    FFLAGS= -fpp -O3 -no-prec-div -fp-model fast=2 -traceback
     DBLFLAG= -r8
     DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
                -warn uninitialized -warn unused -warn truncated_source
@@ -161,9 +161,9 @@ ifeq ($(RELEASE), yes)
     STATIC = yes
     FFLAGS += $(ARCH)
     CCFLAGS += $(ARCH)
-else
-    FFLAGS += -march=native
-    CCFLAGS += -march=native
+#else
+    #FFLAGS += -march=native
+    #CCFLAGS += -march=native
 endif
 
 ifeq ($(DEBUG), yes)
