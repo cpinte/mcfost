@@ -1100,7 +1100,7 @@ contains
 
        write(*,*) ""
        write(*,*) "Updating the stellar properties:"
-       write(*,*) "There are now", n_etoiles, "stars in the model", n_etoiles_old
+       write(*,*) "There are now", n_etoiles, "stars in the model"
 
        ! Saving if the accretion rate was forced
        allocate(etoile_old(n_etoiles_old))
@@ -1139,31 +1139,36 @@ contains
           etoile(:)%find_spectrum = .true.
 
           lupdate_photosphere = .false.
-          if (maxval(xyzmh_ptmass(13,:)) > tiny_real) then
-             ! sink particle Teff is defined
-             write(*,*) "Using Teff and Lum from phantom:"
-             lupdate_photosphere = .true.
-             etoile(:)%T = xyzmh_ptmass(13,:)
-             ! deriving radius from luminosity (Reff is not correct in dump)
-             etoile(:)%r = sqrt(xyzmh_ptmass(12,:) * uWatt / Lsun) * (Tsun/etoile(:)%T)**2
-          else if (maxval(xyzmh_ptmass(14,:)) > tiny_real) then
-             ! sink particle Reff is defined
-             write(*,*) "Using Reff and Lum from phantom:"
-             lupdate_photosphere = .true.
-             etoile(:)%r = xyzmh_ptmass(14,:) * ulength_m / Rsun
-             etoile(:)%T =  Tsun * (xyzmh_ptmass(12,:) * uWatt / Lsun)**0.25 / sqrt(etoile(:)%r)
-          else if (maxval(xyzmh_ptmass(12,:)) > tiny_real) then
-             ! We use the luminosity and a radius estimate
-             write(*,*) "Using Lum from phantom + effective radius from sink:"
-             do i=1,n_etoiles
-                etoile(i)%T = 100
-                etoile(i)%r = 0.01
+          do i=1,n_etoiles
+             if (xyzmh_ptmass(13,i) > tiny_real) then
+                ! sink particle Teff is defined
+                write(*,*) "Using Teff and Lum from phantom:"
+                lupdate_photosphere = .true.
+                etoile(i)%T = max(xyzmh_ptmass(13,i),100.)
+                ! deriving radius from luminosity (Reff is not correct in dump)
+                etoile(i)%r = sqrt(xyzmh_ptmass(12,i) * uWatt / Lsun) * (Tsun/etoile(i)%T)**2
+             else if (xyzmh_ptmass(14,i) > tiny_real) then
+                ! sink particle Reff is defined
+                write(*,*) "Using Reff and Lum from phantom:"
+                lupdate_photosphere = .true.
+                etoile(i)%r = xyzmh_ptmass(14,i) * ulength_m / Rsun
+                etoile(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(etoile(i)%r)
+             else if (xyzmh_ptmass(12,i) > tiny_real) then
+                ! We use the luminosity and a radius estimate
+                write(*,*) "Using Lum from phantom + effective radius from sink:"
+                etoile(i)%T = 100.
+                etoile(i)%r = 0.001
                 if (xyzmh_ptmass(12,i) > tiny_real) then
                    etoile(i)%r = max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun
                    if (etoile(i)%r > 0.) etoile(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(etoile(i)%r)
                 endif
-             enddo
-          endif
+             else
+                if (lupdate_photosphere) then ! if we updated the 1st sink
+                   etoile(i)%r = max(max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun * 50, 0.001)
+                   etoile(i)%T = 2000
+                endif
+             endif
+          enddo
 
           if (lupdate_photosphere) then
              lfix_star = .true.
