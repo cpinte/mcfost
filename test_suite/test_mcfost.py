@@ -13,7 +13,7 @@ model_list = glob.glob1("test_data/","*")
 
 # If running on CI, only test ref3.0
 if os.environ.get('CI', None) == 'true':
-    model_list = ["discF_00500"]#["ref3.0","ref3.0_multi","debris"]
+    model_list = ["ref3.0","discF_00500"]#["ref3.0","ref3.0_multi","debris"]
 
 wl_list = ["1.0","10","100","1000"]
 wl_list_pola = ["1.0","1000"]
@@ -91,7 +91,7 @@ def test_SED(model_name):
     # Read the results
     SED_name = model_name+"/data_th/sed_rt.fits.gz"
     if (not os.path.isfile(SED_name)):
-        pytest.skip("No SED")
+        pytest.skip("No SED found")
     SED = fits.getdata(test_dir+"/"+SED_name)
     SED_ref = fits.getdata("test_data/"+SED_name)
 
@@ -120,11 +120,15 @@ def test_mol_map(model_name):
 @pytest.mark.parametrize("wl", wl_list)
 def test_image(model_name, wl):
 
+    if os.environ.get('CI', None) == 'true':
+        if (model_name == "discF_00500"):
+            # This requires too much memory on CI
+            pytest.skip("Skipping images on phantom dump on CI")
+
     if compute_models:
         # Run the mcfost model
         filename = "test_data/"+model_name+"/"+model_name+".para"
         if (model_name == "discF_00500"):
-            pytest.skip("No image")
             opt=" -phantom test_data/"+model_name+"/"+model_name+" -not_random_Voronoi"
         else:
             opt=""
@@ -150,14 +154,16 @@ def test_image(model_name, wl):
 def test_pola(model_name, wl):
     # Re-use previous calculation
 
-    if (model_name == "discF_00500"):
-        pytest.skip("No pola")
+    if os.environ.get('CI', None) == 'true':
+        if (model_name == "discF_00500"):
+            # This requires too much memory on CI
+            pytest.skip("Skipping images on phantom dump on CI")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
     image = fits.getdata(test_dir+"/"+image_name)
     if ((image.shape[0] != 4) & (image.shape[0] != 8)):
-        pytest.skip("No pola")
+        pytest.skip("No polarisation found")
     image_ref = fits.getdata("test_data/"+image_name)
 
     # We just keep Stokes Q, U
@@ -179,14 +185,16 @@ def test_pola(model_name, wl):
 def test_contrib(model_name, wl):
     # Re-use previous calculation
 
-    if (model_name == "discF_00500"):
-        pytest.skip("No pola")
+    if os.environ.get('CI', None) == 'true':
+        if (model_name == "discF_00500"):
+            # This requires too much memory on CI
+            pytest.skip("Skipping images on phantom dump on CI")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
     image = fits.getdata(test_dir+"/"+image_name)
     if ((image.shape[0] != 5) & (image.shape[0] != 8)):
-        pytest.skip("No contrib")
+        pytest.skip("No contrib found")
     image_ref = fits.getdata("test_data/"+image_name)
 
     # We just keep separate contributions
