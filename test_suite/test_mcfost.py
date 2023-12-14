@@ -13,7 +13,7 @@ model_list = glob.glob1("test_data/","*")
 
 # If running on CI, only test ref3.0
 if os.environ.get('CI', None) == 'true':
-    model_list = ["ref3.0","debris","discF_00500"]
+    model_list = ["ref3.0_multi"]#,"debris","discF_00500"]
 
 wl_list = ["1.0","10","100","1000"]
 wl_list_pola = ["1.0","1000"]
