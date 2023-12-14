@@ -1164,8 +1164,8 @@ contains
                 endif
              else
                 if (lupdate_photosphere) then ! if we updated the 1st sink
-                   etoile(i)%r = max(max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun * 50, 0.001)
-                   etoile(i)%T = 2000
+                   etoile(i)%r = max(max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun, 0.001)
+                   etoile(i)%T = 100
                 endif
              endif
           enddo
