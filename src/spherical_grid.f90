@@ -206,7 +206,7 @@ end subroutine indice_cellule_sph_theta
     ! et ne pas etre pile-poil dessus
     correct_moins = 1.0_dp - prec_grille_sph
     correct_plus = 1.0_dp + prec_grille_sph
-    precision = 1.0e-20_dp ! pour g95
+    precision = 1.0e-15_dp ! pour g95
 
     uv = sqrt(u*u + v*v)
     ! end     ! Todo : can be calculated outside
