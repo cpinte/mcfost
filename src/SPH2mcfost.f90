@@ -398,7 +398,7 @@ contains
        ! Using the parameter file gas-to-dust ratio for now
        ! until phantom provides a proper grain size distribution
        if (maxval(densite_pouss) > tiny_dp) call normalize_dust_density( sum(masse_gaz) * &
-            g_to_Msun / disk_zone(1)%gas_to_dust * 0.001)
+            g_to_Msun / disk_zone(1)%gas_to_dust * 100)
 
     elseif (ndusttypes >= 1) then
        lvariable_dust = .true.
