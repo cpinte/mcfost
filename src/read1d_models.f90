@@ -205,13 +205,13 @@ module read1d_models
 		!column mass
 		allocate(cm(n_cells))
 		cm(icell0) = au_to_m * (atmos_1d%r(icell0+1) - atmos_1d%r(icell0)) * nHtot(icell0) / rho_to_nH
-		write(*,*) "icell=", icell0, " T=", T(icell0), " nH=", nHtot(icell0), " ne=", ne(icell0), &
-				" iz=", icompute_atomRT(icell0)
+		! write(*,*) "icell=", icell0, " T=", T(icell0), " nH=", nHtot(icell0), " ne=", ne(icell0), &
+		! 		" iz=", icompute_atomRT(icell0)
 		do icell=icell0-1,1,-1
-			write(*,*) "icell=", icell, " T=", T(icell), " nH=", nHtot(icell), " ne=", ne(icell), &
-				" iz=", icompute_atomRT(icell)
+			! write(*,*) "icell=", icell, " T=", T(icell), " nH=", nHtot(icell), " ne=", ne(icell), &
+			! 	" iz=", icompute_atomRT(icell)
 			cm(icell) = cm(icell+1) +  au_to_m * (atmos_1d%r(icell+1) - atmos_1d%r(icell)) * nHtot(icell) / rho_to_nH
-			write(*,*) " cm = ", cm(icell), " model:", atmos_1d%m(icell)
+			! write(*,*) " cm = ", cm(icell), " model:", atmos_1d%m(icell)
 		enddo
 		write(*,*) "cm in MCFOST:", maxval(cm), " cm in model: ", maxval(atmos_1d%m)
 
