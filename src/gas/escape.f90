@@ -832,7 +832,6 @@ module escape
                     endif
                     cycle
                 endif
-                ! if( (diff_loc(icell) < 5d-2 * precision).and..not.lcswitch_enabled ) cycle
 
                 !Init upward radiative rates to 0 and downward radiative rates to 0 or "Aji_cont" for Sobolev.
                 !Init collisional rates
