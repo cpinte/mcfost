@@ -804,6 +804,9 @@ module escape
             ibar = 0
             n_cells_done = 0
 
+            stream = 0.0
+            stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+ 
             l_iterate_ne = .false.
             if( n_iterate_ne > 0 ) then
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
@@ -821,7 +824,6 @@ module escape
             !$omp do schedule(static,1)
             do icell=1, n_cells
                 !$ id = omp_get_thread_num() + 1
-                stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
                 if (icompute_atomRT(icell)<=0) then
                     !$omp atomic
                     n_cells_done = n_cells_done + 1
