@@ -183,6 +183,8 @@ module io_atom
          atom%lines(kr)%i = min(i,j)
          atom%lines(kr)%j = max(i,j)
          atom%ij_to_trans(atom%lines(kr)%i,atom%lines(kr)%j) = kr
+         !reverse j->i is the same transition
+         atom%ij_to_trans(atom%lines(kr)%j,atom%lines(kr)%i) = kr
          atom%i_trans(kr) = atom%lines(kr)%i
          atom%j_trans(kr) = atom%lines(kr)%j
 
@@ -307,6 +309,8 @@ module io_atom
          atom%continua(kr)%j = max(i,j)
          atom%continua(kr)%i = min(i,j)
          atom%ij_to_trans(atom%continua(kr)%i,atom%continua(kr)%j) = kr+atom%Ntr_line
+         !reverse j->i is the same transition
+         atom%ij_to_trans(atom%continua(kr)%j,atom%continua(kr)%i) = kr+atom%Ntr_line
          atom%i_trans(kr+atom%Ntr_line) = atom%continua(kr)%i
          atom%j_trans(kr+atom%Ntr_line) = atom%continua(kr)%j
 
