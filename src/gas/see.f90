@@ -72,8 +72,9 @@ module see
         enddo
 
         if (hydrogen%active) then
-            allocate(CE_hydrogen(hydrogen%Nlevel,hydrogen%nlevel,nb_proc)); CE_hydrogen = 0.0
-            allocate(CI_hydrogen(hydrogen%nlevel,nb_proc)); CI_hydrogen = 0.0
+        !allocated in alloc_rates_atom (colrates)
+            ! allocate(CE_hydrogen(hydrogen%Nlevel,hydrogen%nlevel,nb_proc)); CE_hydrogen = 0.0
+            ! allocate(CI_hydrogen(hydrogen%nlevel,nb_proc)); CI_hydrogen = 0.0
             mem_alloc_local = mem_alloc_local + sizeof(CE_hydrogen) + sizeof(CI_hydrogen)
         endif
 
@@ -253,6 +254,12 @@ module see
         integer :: kr
 
         allocate(atom%col_mat(atom%Nlevel,atom%Nlevel,nelements))
+
+        if (associated(hydrogen,atom)) then
+        !if that atom is hydrogen
+            allocate(CE_hydrogen(hydrogen%Nlevel,hydrogen%nlevel,nelements)); CE_hydrogen = 0.0
+            allocate(CI_hydrogen(hydrogen%nlevel,nelements)); CI_hydrogen = 0.0
+        endif
 
         do kr=1, atom%Nline
             allocate(atom%lines(kr)%Cij(nelements),atom%lines(kr)%Cji(nelements))
