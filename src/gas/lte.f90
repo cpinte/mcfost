@@ -16,7 +16,7 @@ module lte
    implicit none
 
    integer, dimension(101) :: ndebye
-   real(kind=dp), parameter :: small_lte_fraction = 1d-15
+   real(kind=dp), parameter :: small_lte_fraction = tiny_dp!1d-15
 
    contains
 
