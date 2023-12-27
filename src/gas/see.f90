@@ -458,7 +458,7 @@ module see
         integer :: nact
 
         do nact=1, NactiveAtoms
-            call rate_matrix_atom_alt(id, ActiveAtoms(nact)%p)
+            call rate_matrix_atom(id, ActiveAtoms(nact)%p)
         enddo
 
         return
@@ -523,7 +523,10 @@ module see
         type (AtomType), intent(inout) :: atom
         integer :: kr, l, i, j
 
+        !all collision even if no radiative transition
         atom%Gamma(:,:,id) = -atom%col_mat(:,:,id) * atom%cswitch
+
+        !radiative rates
 
         do kr=1, atom%Nline
 
@@ -549,7 +552,6 @@ module see
             atom%Gamma(l,l,id) = sum(-atom%Gamma(:,l,id)) !positive
         end do
 
-! stop
         return
     end subroutine rate_matrix_atom_alt
 

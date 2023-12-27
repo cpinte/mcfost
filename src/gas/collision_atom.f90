@@ -1057,15 +1057,6 @@ module collision_atom
          atom%col_mat(j,i,id) = atom%col_mat(j,i,id) + Cup
       endif
 
-      ! if (atom%ID=="He") then
-      !    if(i==1 .and. j==2) then
-      !       write(*,*) kr
-      !       write(*,*) atom%col_mat(i,j,id)
-      !       write(*,*) atom%col_mat(j,i,id)
-      !       stop
-      !    endif
-      ! endif
-
     end do loop_lines_in_file
 
     ! 		deallocate(TGRID, coeff)
