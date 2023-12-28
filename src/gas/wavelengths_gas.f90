@@ -1211,10 +1211,9 @@ module wavelengths_gas
                !the line bounds are unchanged (look at the continuum)
                loop_group_b : do lac=1,n_groups
                !the shift is added to check if the line will overlap a group
-                  if ( ((atom%lines(kr)%lambdamax < group_red(lac)).and.&
-                        (atom%lines(kr)%lambdamax > group_blue(lac))).or.&
-                        ((atom%lines(kr)%lambdamin > group_blue(lac)).and.&
-                           (atom%lines(kr)%lambdamin < group_red(lac))) ) then
+                  if ( (atom%lines(kr)%lambdamax - group_blue(lac)>=0.0).and.&
+                        (group_red(lac) - atom%lines(kr)%lambdamin>=0.0)) then
+
                      atom%lines(kr)%lcontrib = .true.
                      !check for potential overlap with a gaussian line.
                      if (.not.atom%lany_gauss_prof) then
