@@ -265,10 +265,11 @@ module io_atom
 
          !Van der Waals collision method
          !line%a allocated in opacity_atom.f90
-         atom%lines(kr)%cvdWaals(4) = 0.
-         atom%lines(kr)%cvdWaals(2) = 0.
-         atom%lines(kr)%cvdWaals(1) = 0.
-         atom%lines(kr)%cvdWaals(3) = 0.
+!-> do not reset here otherwise what's read from file is set to 0
+         ! atom%lines(kr)%cvdWaals(4) = 0.
+         ! atom%lines(kr)%cvdWaals(2) = 0.
+         ! atom%lines(kr)%cvdWaals(1) = 0. !First coeff for H
+         ! atom%lines(kr)%cvdWaals(3) = 0. !First coeff for He
          select case (vdwchar)
             case ("BARKLEM")
                atom%lines(kr)%vdWaals = "BARKLEM"
@@ -280,8 +281,8 @@ module io_atom
                        " broadening."
                   write(*,*) "using UNSOLD"
                   atom%lines(kr)%vdWaals = "UNSOLD"
-                  atom%lines(kr)%cvdWaals(4) = 0.
-                  atom%lines(kr)%cvdWaals(2) = 0.
+                  atom%lines(kr)%cvdWaals(4) = 0. !second coeff for He
+                  atom%lines(kr)%cvdWaals(2) = 0. !second coeff for H
                end if
             case default
                atom%lines(kr)%vdWaals = "UNSOLD"
