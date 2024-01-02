@@ -466,6 +466,7 @@ module see
 
         do nact=1, NactiveAtoms
             call rate_matrix_atom(id, ActiveAtoms(nact)%p)
+            ! call rate_matrix_atom_alt(id, ActiveAtoms(nact)%p)
         enddo
 
         return
