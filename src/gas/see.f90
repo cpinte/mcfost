@@ -67,7 +67,8 @@ module see
             Nmaxstage = max(NmaxStage,atom%Nstage)
             !allocate %Gamma, %line%Rij,Rji, %cont%Rij,Rji
             call alloc_rates_atom(atom,nb_proc)
-            mem_alloc_local = mem_alloc_local + sizeof(atom%Gamma) + 2*(atom%Ncont+atom%Nline)*sizeof(atom%lines(1)%Rij)
+            mem_alloc_local = mem_alloc_local + sizeof(atom%Gamma) + &
+                2*(atom%Ncont+atom%Nline)*sizeof(atom%lines(1)%Rij) + sizeof(atom%col_mat)
             atom => null()
         enddo
 
