@@ -1192,9 +1192,15 @@ module atom_transfer
       end if !active atoms
 
       if (lmodel_1d) then
-         call spectrum_1d()
-         !deallocate and exit code
-         return !from atomic transfer!
+         call compute_max_relative_velocity(v_char)
+         if (v_char > 0.0) then
+            write(*,*) " (spectrum_1d) WARNING: "
+            write(*,*) " ==> Using default image/flux mode with non-zero velocity fields!"
+         else
+            call spectrum_1d()
+            !deallocate and exit code
+            return !from atomic transfer!
+         endif
       endif
 
 
@@ -1726,18 +1732,12 @@ module atom_transfer
       integer :: la, j, icell0, id
       logical :: lintersect, labs
       integer, parameter :: Nimpact = 30
-      real(kind=dp) :: rr, u,v,w,u0,w0,v0,x0,y0,z0,x(3),y(3),uvw(3), v_char
+      real(kind=dp) :: rr, u,v,w,u0,w0,v0,x0,y0,z0,x(3),y(3),uvw(3)
       real(kind=dp), allocatable :: cos_theta(:), weight_mu(:), p(:)
       real(kind=dp), allocatable ::I_1d(:,:)
       integer :: n_rays_done, ibar, alloc_status
 
       write(*,*) "**** computing CLV intensity for 1d model..."
-      call compute_max_relative_velocity(v_char)
-      if (v_char > 0.0) then
-         write(*,*) "WARNING spectrum_1d():"
-         write(*,*) " velocity fields are present, but Inu(p) is "
-         write(*,*) " computed for a single radius of the stellar disc!!"
-      endif
 
       allocate(cos_theta(Nimpact), weight_mu(Nimpact), p(Nimpact))
       !prepare wavelength grid and indexes for continua and lines
