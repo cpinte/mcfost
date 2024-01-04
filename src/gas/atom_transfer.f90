@@ -606,6 +606,7 @@ module atom_transfer
                   write(*,*) " *** dne", dne
                   write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
                   n_iterate_ne = 0
+                  !beware, it is stopped for all subsequent steps or calls of the subroutine.
                endif
             end if
             !***********************************************************!
