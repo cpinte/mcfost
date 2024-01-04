@@ -935,12 +935,14 @@ module escape
                end do
                !$omp end do
                !$omp end parallel
-               if ((dne < 1d-4 * precision).and.(.not.lcswitch_enabled)) then
-                  !Do we need to restart it eventually ?
-                  write(*,*) " *** dne", dne
-                  write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
-                  n_iterate_ne = 0
-               endif
+               if (lescape_prob) then
+                if ((dne < 1d-4 * precision).and.(.not.lcswitch_enabled)) then
+                    !Do we need to restart it eventually ?
+                    write(*,*) " *** dne", dne
+                    write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
+                    n_iterate_ne = 0
+                endif
+               endif 
             end if
             !***********************************************************!
 
