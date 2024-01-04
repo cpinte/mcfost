@@ -1723,15 +1723,12 @@ module atom_transfer
    end subroutine emission_line_tau_surface_map
 
    subroutine spectrum_1d()
-      !TO DO log rays
-      !TO DO fits format
-
       !NOTE: cos_theta in that case is minimum at Rmax which is not the limb.
       ! the limb is at p = 1.0 (rr=Rstar). In plan geomtry, cos_theta is minimum at the limb.
       ! the plan-parralel cos_theta is np.sqrt(1.0 - p**2) for p < 1.0.
       integer :: la, j, icell0, id
       logical :: lintersect, labs
-      integer, parameter :: Nimpact = 30
+      integer, parameter :: Nimpact = 50
       real(kind=dp) :: rr, u,v,w,u0,w0,v0,x0,y0,z0,x(3),y(3),uvw(3)
       real(kind=dp), allocatable :: cos_theta(:), weight_mu(:), p(:)
       real(kind=dp), allocatable ::I_1d(:,:)
