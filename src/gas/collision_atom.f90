@@ -839,11 +839,11 @@ module collision_atom
          !if not a bound-free the ratio is not defined yet
          !so I cannot yet use atom%ni_on_nj_star
          ni_on_nj = atom%nstar(i,icell) / atom%nstar(j,icell)
-         nj_on_ni = 1_dp / ni_on_nj
+         nj_on_ni = 1.0_dp / ni_on_nj
          ! ni_on_nj = 1d100
          ! nj_on_ni = 1d100
          ! if (atom%nstar(j,icell) > 0.0) ni_on_nj = atom%nstar(i,icell) / atom%nstar(j,icell)
-         ! if (ni_on_nj > 0.0) nj_on_ni = 1_dp / ni_on_nj
+         ! if (ni_on_nj > 0.0) nj_on_ni = 1.0_dp / ni_on_nj
           !here Nitem is NTMP !
           if (Nitem /= NTMP) call error("Error, Nitem should be NTMP!")
 

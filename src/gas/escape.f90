@@ -1420,7 +1420,7 @@ module escape
 
             if (nbr_cell==1) then
                ds(iray,id) = l_contrib * AU_to_m
-               psi(:,1,id) = (1_dp - exp(-dtau) ) / chi
+               psi(:,1,id) = (1.0_dp - exp(-dtau) ) / chi
                dv_proj(iray,id) = v_proj(icell,x1,y1,z1,u,v,w) - v_proj(icell,x0,y0,z0,y,v,w)
             endif
 

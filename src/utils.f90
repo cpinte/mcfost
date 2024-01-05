@@ -1803,14 +1803,13 @@ function vacuum2air(Nlambda, lambda_vac) result(lambda_air)
    real(kind=dp), dimension(Nlambda) :: sqwave, reduction
 
    where (lambda_vac >= VACUUM_TO_AIR_LIMIT)
-      sqwave = 1_dp/(lambda_vac**2)
-      reduction = 1.0 + 2.735182d-4 + &
+      sqwave = 1.0_dp /(lambda_vac**2)
+      reduction = 1.0_dp + 2.735182d-4 + &
            (1.314182 + 2.76249d4 * sqwave) * sqwave
       lambda_air = lambda_vac / reduction
-   else where(lambda_vac < VACUUM_TO_AIR_LIMIT)
+   elsewhere(lambda_vac < VACUUM_TO_AIR_LIMIT)
       lambda_air = lambda_vac
    end where
-
 
    return
  end function vacuum2air
