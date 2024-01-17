@@ -175,7 +175,7 @@ def test_pola(model_name, wl):
 
     if model_name == "debris":
         mask_threshold = 1e-32
-    else if model_name == "debris":
+    elif model_name == "ref3.0_multi":
         mask_threshold = 1e-19
     else:
         mask_threshold = 1e-21
