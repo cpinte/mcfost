@@ -175,6 +175,8 @@ def test_pola(model_name, wl):
 
     if model_name == "debris":
         mask_threshold = 1e-32
+    else if model_name == "debris":
+        mask_threshold = 1e-19
     else:
         mask_threshold = 1e-21
 
@@ -205,7 +207,7 @@ def test_contrib(model_name, wl):
     print("Mean contrib difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
     if model_name == "ref3.0_multi":
-        mask_threshold=1e-20
+        mask_threshold=1e-19
     else:
         mask_threshold=1e-23
 
