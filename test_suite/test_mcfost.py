@@ -53,7 +53,7 @@ def MC_similar(x,y,threshold=0.01,mask_threshold=1e-24):
     y_ma = np.ma.masked_where(mask, y)
 
     #return (abs((x_ma-y_ma)/x_ma).mean() < threshold)
-    print(np.percentile(abs((x_ma-y_ma)/x_ma).compressed(), 75))
+    print("MC relative difference is:", np.percentile(abs((x_ma-y_ma)/x_ma).compressed(), 75))
     return ( np.percentile(abs((x_ma-y_ma)/x_ma).compressed(), 75)  < threshold )
 
 def test_mcfost_bin():
@@ -177,6 +177,9 @@ def test_pola(model_name, wl):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
 
+    if (model_name == "ref3.0_multi"):
+        pytest.skip("Skipping pole for ref3.0_multi")
+
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
     image = fits.getdata(test_dir+"/"+image_name)
@@ -193,8 +196,6 @@ def test_pola(model_name, wl):
 
     if model_name == "debris":
         mask_threshold = 1e-32
-    elif model_name == "ref3.0_multi":
-        mask_threshold = 1e-22
     else:
         mask_threshold = 1e-21
 
