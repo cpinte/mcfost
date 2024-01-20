@@ -166,8 +166,8 @@ else
 	FFLAGS += -march=native
         CCFLAGS += -march=native
     else
-	FFLAGS += -xHOST #-march=native
-        CCFLAGS += -xHOST #-march=native
+	FFLAGS += #-xHOST #-march=native
+        CCFLAGS += #-xHOST #-march=native
     endif
 endif
 
