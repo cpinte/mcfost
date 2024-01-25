@@ -52,6 +52,11 @@ We welcome contributions, including (but not limited to):
 2. Documentation, also by [pull request](https://github.com/cpinte/mcfost/pulls). Docs can be edited in the docs/ directory of the main code.
 3. Suggestions for features or bug reports, via the [issue tracker](https://github.com/cpinte/mcfost/issues/new). Please file bugs via github rather than by email.
 
+Questions?
+----------
+
+Discussions about the code and its use have moved [here](https://github.com/cpinte/mcfost/discussions).
+
 Visualising your results
 ------------------------
 We suggest to use [pymcfost](https://github.com/cpinte/pymcfost). Alternative options are discussed in the [documentation](https://mcfost.readthedocs.io/en/latest/tools.html).
