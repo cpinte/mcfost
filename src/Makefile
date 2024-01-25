@@ -162,8 +162,13 @@ ifeq ($(RELEASE), yes)
     FFLAGS += $(ARCH)
     CCFLAGS += $(ARCH)
 else
-    FFLAGS += -march=native
-    CCFLAGS += -march=native
+    ifeq ($(SYSTEM), gfortran)
+	FFLAGS += -march=native
+        CCFLAGS += -march=native
+    else
+	FFLAGS += -xHOST #-march=native
+        CCFLAGS += -xHOST #-march=native
+    endif
 endif
 
 ifeq ($(DEBUG), yes)
@@ -175,13 +180,13 @@ ifeq ($(PROFILING), yes)
     FFLAGS+= -g3
 endif
 
-
 ifeq ($(DEV), yes)
     FFLAGS:= $(FFLAGS:-O3=-O1)
 endif
 
 ifeq ($(OPENMP), yes)
     FFLAGS+= ${FOMPFLAGS}
+    CCLAGS+= ${FOMPFLAGS}
 endif
 
 ifeq ($(IPO), yes)
