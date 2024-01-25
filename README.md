@@ -4,6 +4,12 @@
 The MCFOST radiative transfer code
 ==================================
 
+<p align='center'>
+  <br/>
+  <img src="https://github.com/cpinte/mcfost/blob/master/logo/mcfost_logo.png" width="300" height="300">
+  <br/>
+</p>
+
 - Code: <https://github.com/cpinte/mcfost>
 - Docs: <https://mcfost.readthedocs.io>
 
