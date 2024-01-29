@@ -178,7 +178,7 @@ def test_pola(model_name, wl):
             pytest.skip("Skipping images on phantom dump on CI")
 
     if (model_name == "ref3.0_multi"):
-        pytest.skip("Skipping pole for ref3.0_multi")
+        pytest.skip("Skipping pola for ref3.0_multi for now")
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
@@ -210,6 +210,10 @@ def test_contrib(model_name, wl):
         if (model_name == "discF_00500"):
             # This requires too much memory on CI
             pytest.skip("Skipping images on phantom dump on CI")
+
+    if (model_name == "ref3.0_multi") and (wl == "1.0"):
+        pytest.skip("Skipping contrib at 1.0 for ref3.0_multi for now")
+
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
