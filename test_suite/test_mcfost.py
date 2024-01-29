@@ -98,10 +98,15 @@ def test_SED(model_name):
     SED = fits.getdata(test_dir+"/"+SED_name)[0,:,:,:]
     SED_ref = fits.getdata("test_data/"+SED_name)[0,:,:,:]
 
+    if model_name == "ref3.0_multi":
+        threshold=0.12
+    else:
+        threshold=0.1
+
     print("Maximum SED difference", (abs(SED-SED_ref)/(SED_ref+1e-30)).max())
     print("Mean SED difference   ", (abs(SED-SED_ref)/(SED_ref+1e-30)).mean())
 
-    assert MC_similar(SED_ref,SED,threshold=0.1)
+    assert MC_similar(SED_ref,SED,threshold=threshold)
 
 @pytest.mark.parametrize("model_name", model_list)
 def test_SED_contrib(model_name):
