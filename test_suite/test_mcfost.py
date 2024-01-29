@@ -214,7 +214,6 @@ def test_contrib(model_name, wl):
     if (model_name == "ref3.0_multi") and (wl == "1.0"):
         pytest.skip("Skipping contrib at 1.0 for ref3.0_multi for now")
 
-
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
     image = fits.getdata(test_dir+"/"+image_name)
