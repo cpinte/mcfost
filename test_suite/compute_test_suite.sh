@@ -1,4 +1,11 @@
 #!/bin/bash
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=14
+#SBATCH --mem-per-cpu=4g
+#SBATCH --time=160:00:00
+#SBATCH --job-name=mcfost
+#SBATCH --mail-type=ALL
+
 
 # results to be uploaded to ipag-nfs.u-ga.fr:webpage/mcfost/
 #export mcfost=$MCFOST_INSTALL/../src/mcfost
