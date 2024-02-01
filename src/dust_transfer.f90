@@ -1482,7 +1482,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
            ! on average 100 rays per pixels
            n_ray_star(istar) = max(100 * int(4*pi*(etoile(istar)%r/pix_size)**2), n_ray_star_SED)
            if (istar==1) write(*,*) ""
-           write(*,*) "Star is resolved, using",n_ray_star,"rays for the stellar disk"
+           write(*,*) "Star #",istar,"is resolved, using",n_ray_star(istar),"rays for the stellar disk"
         endif
      enddo
   endif
@@ -1580,6 +1580,9 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
         !Stokes = 0.0_dp
         !call optical_length_tot(id,lambda,Stokes,icell,x,y,z,u,v,w,tau,lmin,lmax)
 
+        ! Todo : we need to add a test to check if that ray will intersect another star
+
+
         ! Interpolation of optical depth : bilinear interpolation on the precomputed screen
         ! offset in in # of screen pixels (dx_screen is propto delta, so there is a delta**2 normlization)
         is_in_image = .true.
@@ -1627,7 +1630,7 @@ subroutine compute_stars_map(lambda, ibin, iaz, u,v,w, taille_pix, dx_map, dy_ma
      !$omp end do
      !$omp end parallel
 
-     ! Normalizing map and Adding all the stars
+     ! Normalizing map and adding all the stars
      facteur2 =  (facteur * prob_E_star(lambda,istar)) / norme
 
      do id=1, nb_proc
