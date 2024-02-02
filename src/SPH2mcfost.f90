@@ -38,6 +38,7 @@ contains
     real :: factor
     integer :: ndusttypes, ierr, i, ilen
     logical :: check_previous_tesselation, ldust_moments
+    real(dp) :: mass_per_H
 
     ldust_moments = .false.
     if (lphantom_file) then
@@ -65,7 +66,7 @@ contains
 
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz,T_gas, &
             particle_id, massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
-            SPH_grainsizes,mask,n_SPH,ldust_moments,dust_moments,ierr)
+            SPH_grainsizes,mask,n_SPH,ldust_moments,dust_moments,mass_per_H,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
           factor = 1.0/n_phantom_files
@@ -107,7 +108,7 @@ contains
     check_previous_tesselation = (.not. lrandomize_Voronoi)
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
          T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, &
-         ldust_moments, dust_moments, mask=mask)
+         ldust_moments, dust_moments, mass_per_H, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -157,8 +158,20 @@ contains
 
   !*********************************************************
 
+  subroutine print_moments(ki,a0,rhoi)
+
+    real(dp), intent(in) :: ki(0:3),a0,rhoi
+
+    print "(2x,a,1pg0.4,a)",         'a) number density of dust = ',ki(0),' cm^-3'
+    print "(2x,a,1pg0.4,a,1pg0.2,a)",'b) average grain radius   = ',ki(1)/ki(0),' times a0, or ',ki(1)/ki(0)*a0, ' '
+    print "(2x,a,1pg0.4,a,1pg0.2,a)",'c) average grain area     = ',4.*pi*a0**2*ki(2)/ki(0),' '
+    print "(2x,a,1pg0.4,a,1pg0.2,a)",'d) average particle size  = ',ki(3)/ki(0),' monomers'
+    print "(2x,a,1pg0.4,a,1pg0.2,a)",'e) opacity at Td=100      = ',ki(3)*pi*a0**3/rhoi*6.7*100. / mum_to_cm**3  ! Eq (42-43) of Siess et al. 2022
+
+  end subroutine print_moments
+
   subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, T_gas, massgas,massdust,rho,rhodust,&
-       SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, ldust_moments, dust_moments, mask)
+       SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, ldust_moments, dust_moments, mass_per_H, mask)
 
     ! ************************************************************************************ !
     ! n_sph : number of points in the input model
@@ -195,6 +208,7 @@ contains
     logical, intent(in) :: check_previous_tesselation
     logical, dimension(:), allocatable, intent(in), optional :: mask
     logical, intent(in) :: ldust_moments
+    real(dp), intent(in) :: mass_per_H
 
     integer, dimension(:), allocatable, intent(out) :: is_ghost
 
@@ -212,6 +226,11 @@ contains
     real(dp), dimension(6) :: limits
 
     real(dp), parameter :: a0 = 1.28e-4 ! microns. Siess et al 2022
+
+    real(dp), dimension(4) :: ki, err
+    real(dp) ::rhoi
+
+
 
     if (lcorrect_density_elongated_cells) then
        density_factor = correct_density_factor_elongated_cells
@@ -370,7 +389,24 @@ contains
        do icell=1,n_cells
           iSPH = Voronoi(icell)%id
 
+
+
           if (iSPH > 0) then
+
+
+             rhoi =  densite_gaz(icell) * cm_to_m**3 ! check that it is in cgs
+             ki = rhoi * dust_moments(:,iSPH) !/ mass_per_H
+
+             call reconstruct_gamma_dist(ki,lambsol,err,ierr)
+
+
+             if (iSPH==1) then
+                write(*,*) iSPH, dust_moments(:,iSPH)
+                write(*,*) "ki", ki
+                call print_moments(ki,a0,rhoi)
+
+                read*
+             endif
 
              !! mass & density indices are shifted by 1
              !lambguess = [-log(sqrt(2*pi)) * dust_moments(1,iSPH) ,0._dp,0._dp,0._dp]
