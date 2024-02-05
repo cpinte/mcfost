@@ -387,6 +387,8 @@ contains
        gsize(:) = r_grain(:)/a0 ! grain sizes, units should be ok
 
        do icell=1,n_cells
+          !write(*,*) icell
+
           iSPH = Voronoi(icell)%id
 
 
@@ -405,7 +407,7 @@ contains
                 write(*,*) "ki", ki
                 call print_moments(ki,a0,rhoi)
 
-                read*
+                !read*
              endif
 
              !! mass & density indices are shifted by 1
