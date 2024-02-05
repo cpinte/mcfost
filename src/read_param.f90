@@ -493,6 +493,9 @@ contains
        read(1,*) atoms(nat)%p%initial
        read(1,*) atoms(nat)%p%vmax_rt, atoms(nat)%p%n_speed_rt
        read(1,*) atoms(nat)%p%lline, atoms(nat)%p%nTrans_raytracing
+       !ray-tracing mode but no line ? set to false.
+       if (atoms(nat)%p%lline .and. (atoms(nat)%p%nTrans_raytracing==0)) &
+         atoms(nat)%p%lline = .false.
        if (atoms(nat)%p%nTrans_raytracing>Nmax_Trans_raytracing) then
           call error("number max of transitions for RT reached!")
        endif

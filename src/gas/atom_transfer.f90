@@ -339,14 +339,14 @@ module atom_transfer
             ibar = 0
             n_cells_done = 0
 
-            ! if (lfixed_rays) then
-            !    stream = 0.0
-            !    stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
-            ! ! else
-            ! !    !update rays weight
-            ! !    if (allocated(wmu)) deallocate(wmu)
-            ! !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
-            ! end if
+            if (lfixed_rays) then
+               stream = 0.0
+               stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+            ! else
+            !    !update rays weight
+            !    if (allocated(wmu)) deallocate(wmu)
+            !    allocate(wmu(n_rayons));wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            end if
 
             !init here, to be able to stop/start electronic density iterations within MALI iterations
             l_iterate_ne = .false.
@@ -369,8 +369,6 @@ module atom_transfer
             do icell=1, n_cells
                !$ id = omp_get_thread_num() + 1
                l_iterate = (icompute_atomRT(icell)>0)
-               stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
-               if( (diff_loc(icell) < 5d-2 * precision).and..not.lcswitch_enabled ) cycle
 
                if (l_iterate) then
 
@@ -608,6 +606,7 @@ module atom_transfer
                   write(*,*) " *** dne", dne
                   write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
                   n_iterate_ne = 0
+                  !beware, it is stopped for all subsequent steps or calls of the subroutine.
                endif
             end if
             !***********************************************************!
@@ -1194,9 +1193,15 @@ module atom_transfer
       end if !active atoms
 
       if (lmodel_1d) then
-         call spectrum_1d()
-         !deallocate and exit code
-         return !from atomic transfer!
+         call compute_max_relative_velocity(v_char)
+         if (v_char > 0.0) then
+            write(*,*) " (spectrum_1d) WARNING: "
+            write(*,*) " ==> Using default image/flux mode with non-zero velocity fields!"
+         else
+            call spectrum_1d()
+            !deallocate and exit code
+            return !from atomic transfer!
+         endif
       endif
 
 
@@ -1719,27 +1724,18 @@ module atom_transfer
    end subroutine emission_line_tau_surface_map
 
    subroutine spectrum_1d()
-      !TO DO log rays
-      !TO DO fits format
-
       !NOTE: cos_theta in that case is minimum at Rmax which is not the limb.
       ! the limb is at p = 1.0 (rr=Rstar). In plan geomtry, cos_theta is minimum at the limb.
       ! the plan-parralel cos_theta is np.sqrt(1.0 - p**2) for p < 1.0.
       integer :: la, j, icell0, id
       logical :: lintersect, labs
-      integer, parameter :: Nimpact = 30
-      real(kind=dp) :: rr, u,v,w,u0,w0,v0,x0,y0,z0,x(3),y(3),uvw(3), v_char
+      integer, parameter :: Nimpact = 50
+      real(kind=dp) :: rr, u,v,w,u0,w0,v0,x0,y0,z0,x(3),y(3),uvw(3)
       real(kind=dp), allocatable :: cos_theta(:), weight_mu(:), p(:)
       real(kind=dp), allocatable ::I_1d(:,:)
       integer :: n_rays_done, ibar, alloc_status
 
       write(*,*) "**** computing CLV intensity for 1d model..."
-      call compute_max_relative_velocity(v_char)
-      if (v_char > 0.0) then
-         write(*,*) "WARNING spectrum_1d():"
-         write(*,*) " velocity fields are present, but Inu(p) is "
-         write(*,*) " computed for a single radius of the stellar disc!!"
-      endif
 
       allocate(cos_theta(Nimpact), weight_mu(Nimpact), p(Nimpact))
       !prepare wavelength grid and indexes for continua and lines

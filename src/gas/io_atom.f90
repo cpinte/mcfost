@@ -183,6 +183,8 @@ module io_atom
          atom%lines(kr)%i = min(i,j)
          atom%lines(kr)%j = max(i,j)
          atom%ij_to_trans(atom%lines(kr)%i,atom%lines(kr)%j) = kr
+         !reverse j->i is the same transition
+         atom%ij_to_trans(atom%lines(kr)%j,atom%lines(kr)%i) = kr
          atom%i_trans(kr) = atom%lines(kr)%i
          atom%j_trans(kr) = atom%lines(kr)%j
 
@@ -263,10 +265,11 @@ module io_atom
 
          !Van der Waals collision method
          !line%a allocated in opacity_atom.f90
-         atom%lines(kr)%cvdWaals(4) = 0.
-         atom%lines(kr)%cvdWaals(2) = 0.
-         atom%lines(kr)%cvdWaals(1) = 0.
-         atom%lines(kr)%cvdWaals(3) = 0.
+!-> do not reset here otherwise what's read from file is set to 0
+         ! atom%lines(kr)%cvdWaals(4) = 0.
+         ! atom%lines(kr)%cvdWaals(2) = 0.
+         ! atom%lines(kr)%cvdWaals(1) = 0. !First coeff for H
+         ! atom%lines(kr)%cvdWaals(3) = 0. !First coeff for He
          select case (vdwchar)
             case ("BARKLEM")
                atom%lines(kr)%vdWaals = "BARKLEM"
@@ -278,8 +281,8 @@ module io_atom
                        " broadening."
                   write(*,*) "using UNSOLD"
                   atom%lines(kr)%vdWaals = "UNSOLD"
-                  atom%lines(kr)%cvdWaals(4) = 0.
-                  atom%lines(kr)%cvdWaals(2) = 0.
+                  atom%lines(kr)%cvdWaals(4) = 0. !second coeff for He
+                  atom%lines(kr)%cvdWaals(2) = 0. !second coeff for H
                end if
             case default
                atom%lines(kr)%vdWaals = "UNSOLD"
@@ -307,6 +310,8 @@ module io_atom
          atom%continua(kr)%j = max(i,j)
          atom%continua(kr)%i = min(i,j)
          atom%ij_to_trans(atom%continua(kr)%i,atom%continua(kr)%j) = kr+atom%Ntr_line
+         !reverse j->i is the same transition
+         atom%ij_to_trans(atom%continua(kr)%j,atom%continua(kr)%i) = kr+atom%Ntr_line
          atom%i_trans(kr+atom%Ntr_line) = atom%continua(kr)%i
          atom%j_trans(kr+atom%Ntr_line) = atom%continua(kr)%j
 

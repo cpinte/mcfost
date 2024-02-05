@@ -33,7 +33,7 @@ module wavelengths_gas
    ! real, parameter    :: peak_gauss_limit = 1e-5 ! the profile expands up to peak * peak_gauss_limit
    real, parameter    :: vwing_on_vth_gauss = 6!3 !local Gauss line goes from 0 to vwing_on_vth * vth km/s
    real, parameter    :: peak_gauss_limit = exp(-vwing_on_vth_gauss**2) ! the profile expands up to peak * peak_gauss_limit
-   real               :: hv
+   real, private      :: hv !km/s
    !number max of lambda for all lines
    integer            :: Nlambda_max_line, Nlambda_max_cont, Nlambda_max_trans, Nlambda_max_line_vel
 
@@ -153,8 +153,9 @@ module wavelengths_gas
       if (vmax > 0.7 * c_light) call warning("(line_bound) Line vmax is close or above to c!")
 
       if (limage) then
-         write(*,'("line "(1I2)"->"(1I2)"; Vmax (Ray-Trace)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
-         write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
+         write(*,*) 'Atom ', line%atom%id
+         write(*,'("  line "(1I2)"->"(1I2)"; Vmax (Ray-Trace)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
+         write(*,'("   lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
       ! else
       !    write(*,'("line "(1I2)"->"(1I2)"; Vmax (non-LTE)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
       !    write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
@@ -237,6 +238,7 @@ module wavelengths_gas
    end function line_lambda_grid
 
    function line_lambda_grid_dv(line,Nlambda)
+   !NOTE: hv is a global variable, private to this module in km/s
       !integer, parameter :: Nlambda = nint( (2*line%vmax)/hv + 1 )
       integer, intent(in) :: nlambda
       real(kind=dp), dimension(Nlambda) :: line_lambda_grid_dv
@@ -312,7 +314,9 @@ module wavelengths_gas
          atom%lany_gauss_prof = .false.
          if (any(.not.atom%lines(:)%voigt)) atom%lany_gauss_prof = .true.
          !km/s
-         !TO DO: define one hv per atom !
+!TO DO: define one hv per atom (and remove the test on hv_loc!) !
+         !At the moment, if the grid for the non-LTE loop is linear in velocity
+         !use the same hv for all lines.
          hv = min(hv, 1d-3 * 0.46*vbroad(minval(T,mask=T>0),atom%weight,minval(vturb,mask=T>0)))
          do kr=1,atom%Ncont
             if (atom%continua(kr)%hydrogenic) then
@@ -349,12 +353,14 @@ module wavelengths_gas
       atom => null()
       if (associated(subgrid_line,line_lambda_grid_dv)) then
          if (art_hv > 0.0) then
+         !eventually overwrite with a user defined resol.
             write(*,'("R="(1F7.3)" km/s; optimal:"(1F7.3)" km/s")') art_hv, hv
             hv = art_hv
          else
             write(*,'("R="(1F7.3)" km/s")') hv
          endif
       else
+         !doesn't matter, irregular grid
          hv = 0.0
       endif
       ! ********************** Pure continuum RT ********************** !
@@ -515,6 +521,7 @@ module wavelengths_gas
             do kr=1,atom%Nline
 
                if (hv>0.0) then
+!hv is important only if subgrid_line is associated to line_lambda_grid_dv
                   !use one hv per atom here (?)
                   atom%lines(kr)%Nlambda = nint(2 * 1d-3 * atom%lines(kr)%vmax / hv + 1)
                   ! write(*,*) "Nlambda line hv>0:", nint(2 * 1d-3 * atom%lines(kr)%vmax / hv + 1)
@@ -943,8 +950,7 @@ module wavelengths_gas
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
       integer, dimension(:), allocatable :: sorted_indexes
-      real :: hv_loc !like hv
-      real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
+      ! real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
 
       Ntrans = 0
       Nlines = 0 !ray-tracing
@@ -953,6 +959,7 @@ module wavelengths_gas
       do n=1, N_atoms
          atom => atoms(n)%p
          !km/s
+!There is one hv per atom here !
          hv = 2.0 * atom%vmax_rt / (real(atom%n_speed_rt) - 1.0)
          do kr=1,atom%Ncont
             atom%continua(kr)%lcontrib = .false.
@@ -1072,6 +1079,8 @@ module wavelengths_gas
          do kr=1,atom%Nline
             if (.not.atom%lines(kr)%lcontrib) cycle
 
+!function of atom here ! (globa, private, need to be defined for each atom)
+            hv = 2.0 * atom%vmax_rt / (real(atom%n_speed_rt) - 1.0)
             tmp_grid(lac:atom%lines(kr)%Nlambda+lac-1) = line_lambda_grid_dv(atom%lines(kr),atom%lines(kr)%Nlambda)
             lac = lac + atom%lines(kr)%Nlambda
 
@@ -1094,20 +1103,18 @@ module wavelengths_gas
       tmp_grid2(1) = tmp_grid(1)
       Nremoved = 0
 
-      !here we will remove points that are also below hv so as to preserve the grid resolutin.
-      !however we keep points with hv_loc above hv as it means we are comparing lambda of different
-      !line groups.
-      !TO DO: check that when hv_loc >> hv it is indeed  because we change group.
-      if (hv>0.0) then
-         do la = 2, Nlambda
-            hv_loc = ceiling ( real (1d-3 * c_light * (tmp_grid(la)-tmp_grid(la-1)) / tmp_grid(la) ) )
-            if (abs(hv_loc - hv) >= prec_vel) then !hv or more.
-               tmp_grid2(la) = tmp_grid(la)
-            else!below grid resolution, remove.
-               Nremoved = Nremoved + 1
-            endif
-         enddo
-      else
+   !->Cannot test hv and hv_loc as hv is not the same per atom..
+      ! if (hv>0.0) then
+      !    do la = 2, Nlambda
+      !       hv_loc = ceiling ( real (1d-3 * c_light * (tmp_grid(la)-tmp_grid(la-1)) / tmp_grid(la) ) )
+      !       if (abs(hv_loc - hv) >= prec_vel) then !hv or more.
+      !          tmp_grid2(la) = tmp_grid(la)
+      !       else!below grid resolution, remove.
+      !          Nremoved = Nremoved + 1
+      !       endif
+      !    enddo
+      ! else
+   !-> so just make sure there is no overlap!
          do la = 2, Nlambda
             if (tmp_grid(la) > tmp_grid(la-1)) then
                tmp_grid2(la) = tmp_grid(la)
@@ -1115,7 +1122,7 @@ module wavelengths_gas
                Nremoved = Nremoved + 1
             endif
          enddo
-      endif
+      ! endif
       if (Nremoved > 0) then
          write(*,*) " ->", Nremoved, " duplicate frequencies in lines"
          deallocate(tmp_grid)
@@ -1204,10 +1211,9 @@ module wavelengths_gas
                !the line bounds are unchanged (look at the continuum)
                loop_group_b : do lac=1,n_groups
                !the shift is added to check if the line will overlap a group
-                  if ( ((atom%lines(kr)%lambdamax < group_red(lac)).and.&
-                        (atom%lines(kr)%lambdamax > group_blue(lac))).or.&
-                        ((atom%lines(kr)%lambdamin > group_blue(lac)).and.&
-                           (atom%lines(kr)%lambdamin < group_red(lac))) ) then
+                  if ( (atom%lines(kr)%lambdamax - group_blue(lac)>=0.0).and.&
+                        (group_red(lac) - atom%lines(kr)%lambdamin>=0.0)) then
+
                      atom%lines(kr)%lcontrib = .true.
                      !check for potential overlap with a gaussian line.
                      if (.not.atom%lany_gauss_prof) then
@@ -1247,8 +1253,7 @@ module wavelengths_gas
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
       integer, dimension(:), allocatable :: sorted_indexes
       real(kind=dp) :: max_cont, l0, l1, lr
-      real :: hv_loc !like hv
-      real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
+      ! real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
 
       if (.not.lfrom_file) then
 
@@ -1432,6 +1437,8 @@ module wavelengths_gas
             do n=1, N_atoms
                atom => atoms(n)%p
 
+               !function of atom
+               hv = 2.0 * atom%vmax_rt / (real(atom%n_speed_rt) - 1.0)
                do kr=1,atom%Nline
 
                   tmp_grid(lac:atom%lines(kr)%Nlambda+lac-1) = line_lambda_grid_dv(atom%lines(kr),atom%lines(kr)%Nlambda)
@@ -1456,28 +1463,15 @@ module wavelengths_gas
             tmp_grid2(1) = tmp_grid(1)
             Nremoved = 0
 
-            !here we will remove points that are also below hv so as to preserve the grid resolutin.
-            !however we keep points with hv_loc above hv as it means we are comparing lambda of different
-            !line groups.
-            !TO DO: check that when hv_loc >> hv it is indeed  because we change group.
-            if (hv>0.0) then
-               do la = 2, Nlambda
-                  hv_loc = ceiling ( real (1d-3 * c_light * (tmp_grid(la)-tmp_grid(la-1)) / tmp_grid(la) ) )
-                  if (abs(hv_loc - hv) >= prec_vel) then !hv or more.
-                     tmp_grid2(la) = tmp_grid(la)
-                  else!below grid resolution, remove.
-                     Nremoved = Nremoved + 1
-                  endif
-               enddo
-            else
-               do la = 2, Nlambda
-                  if (tmp_grid(la) > tmp_grid(la-1)) then
-                     tmp_grid2(la) = tmp_grid(la)
-                  else
-                     Nremoved = Nremoved + 1
-                  endif
-               enddo
-            endif
+         !see make_wavelengths_raytracing for this test here!
+            do la = 2, Nlambda
+               if (tmp_grid(la) > tmp_grid(la-1)) then
+                  tmp_grid2(la) = tmp_grid(la)
+               else
+                  Nremoved = Nremoved + 1
+               endif
+            enddo
+
             if (Nremoved > 0) then
                write(*,*) " ->", Nremoved, " duplicate frequencies in lines"
                deallocate(tmp_grid)

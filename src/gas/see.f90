@@ -67,13 +67,15 @@ module see
             Nmaxstage = max(NmaxStage,atom%Nstage)
             !allocate %Gamma, %line%Rij,Rji, %cont%Rij,Rji
             call alloc_rates_atom(atom,nb_proc)
-            mem_alloc_local = mem_alloc_local + sizeof(atom%Gamma) + 2*(atom%Ncont+atom%Nline)*sizeof(atom%lines(1)%Rij)
+            mem_alloc_local = mem_alloc_local + sizeof(atom%Gamma) + &
+                2*(atom%Ncont+atom%Nline)*sizeof(atom%lines(1)%Rij) + sizeof(atom%col_mat)
             atom => null()
         enddo
 
         if (hydrogen%active) then
-            allocate(CE_hydrogen(hydrogen%Nlevel,hydrogen%nlevel,nb_proc)); CE_hydrogen = 0.0
-            allocate(CI_hydrogen(hydrogen%nlevel,nb_proc)); CI_hydrogen = 0.0
+        !allocated in alloc_rates_atom (colrates)
+            ! allocate(CE_hydrogen(hydrogen%Nlevel,hydrogen%nlevel,nb_proc)); CE_hydrogen = 0.0
+            ! allocate(CI_hydrogen(hydrogen%nlevel,nb_proc)); CI_hydrogen = 0.0
             mem_alloc_local = mem_alloc_local + sizeof(CE_hydrogen) + sizeof(CI_hydrogen)
         endif
 
@@ -252,6 +254,14 @@ module see
         type (AtomType), pointer, intent(inout) :: atom
         integer :: kr
 
+        allocate(atom%col_mat(atom%Nlevel,atom%Nlevel,nelements))
+
+        if (associated(hydrogen,atom)) then
+        !if that atom is hydrogen
+            allocate(CE_hydrogen(hydrogen%Nlevel,hydrogen%nlevel,nelements)); CE_hydrogen = 0.0
+            allocate(CI_hydrogen(hydrogen%nlevel,nelements)); CI_hydrogen = 0.0
+        endif
+
         do kr=1, atom%Nline
             allocate(atom%lines(kr)%Cij(nelements),atom%lines(kr)%Cji(nelements))
         enddo
@@ -267,6 +277,7 @@ module see
         integer :: kr
         if (allocated(atom%Gamma)) deallocate(atom%Gamma)
         if (allocated(CE_hydrogen)) deallocate(CE_hydrogen,CI_hydrogen)
+        if (allocated(atom%col_mat)) deallocate(atom%col_mat)
         do kr=1, atom%Nline
             if (allocated(atom%lines(kr)%Rij))deallocate(atom%lines(kr)%Rij,atom%lines(kr)%Rji)
             if (allocated(atom%lines(kr)%Cij))deallocate(atom%lines(kr)%Cij,atom%lines(kr)%Cji)
@@ -456,6 +467,7 @@ module see
 
         do nact=1, NactiveAtoms
             call rate_matrix_atom(id, ActiveAtoms(nact)%p)
+            ! call rate_matrix_atom_alt(id, ActiveAtoms(nact)%p)
         enddo
 
         return
@@ -509,6 +521,48 @@ module see
 ! stop
         return
     end subroutine rate_matrix_atom
+    subroutine rate_matrix_atom_alt(id, atom)
+    !see Hubeny & Mihalas 2014 eq. 14.8a to 14.8c for the rate matrix elements.
+    !Rij and Rji are 0 if lte.
+    !atom%cswitch is 1.0 by default
+    ! If lforce_lte (-see_lte) radiative rates are initialized at 0 and never updated.
+    !TO DO:
+    ! occupation probability
+        integer, intent(in) :: id
+        type (AtomType), intent(inout) :: atom
+        integer :: kr, l, i, j
+
+        !all collision even if no radiative transition
+        atom%Gamma(:,:,id) = -atom%col_mat(:,:,id) * atom%cswitch
+
+        !radiative rates
+
+        do kr=1, atom%Nline
+
+            i = atom%lines(kr)%i; j = atom%lines(kr)%j
+            atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - atom%lines(kr)%Rij(id)
+            atom%Gamma(i,j,id) = atom%Gamma(i,j,id) - atom%lines(kr)%Rji(id)
+
+        enddo
+
+        do kr=1, atom%Ncont
+
+            i = atom%continua(kr)%i; j = atom%continua(kr)%j
+            atom%Gamma(j,i,id) = atom%Gamma(j,i,id) - atom%continua(kr)%Rij(id)
+            atom%Gamma(i,j,id) = atom%Gamma(i,j,id) - atom%continua(kr)%Rji(id)
+
+        enddo
+
+
+        do l = 1, atom%Nlevel
+            atom%Gamma(l,l,id) = 0.0_dp
+            !Gamma(j,i) = -(Rij + Cij); Gamma(i,j) = -(Rji + Cji)
+            !Gamma(i,i) = Rij + Cij = -sum(Gamma(j,i))
+            atom%Gamma(l,l,id) = sum(-atom%Gamma(:,l,id)) !positive
+        end do
+
+        return
+    end subroutine rate_matrix_atom_alt
 
     subroutine init_rates(id,icell)
         integer, intent(in) :: id, icell
@@ -535,6 +589,8 @@ module see
         integer, intent(in) :: id
         type (atomtype), intent(inout) :: atom
         integer :: kr
+
+        atom%col_mat(:,:,id) = 0.0_dp
 
         do kr=1,atom%Ncont
             atom%continua(kr)%Cij(id) = 0.0_dp
@@ -567,6 +623,7 @@ module see
             atom%continua(kr)%Rji(id) = nlte_fact * tab_Aji_cont(kr,atom%activeindex,icell) * &
                  atom%ni_on_nj_star(i,icell)
             !check ratio ni_on_nj_star for the continua when there are multiple ionisation states (works for H, test for He)
+            !should be okey as i goes from 1 to Nlevel-1 and one i is associated to only one continuum state.
         enddo
 
         do kr=1,atom%Nline
@@ -1515,20 +1572,48 @@ module see
         integer :: naxis, naxes(4), unit, status, nelements
         real(kind=dp) :: nu0
 
-        allocate(rates(atom%Ntr,n_cells,2),stat=status)
+        integer, parameter :: N_missing_max = 300
+        integer :: N_missing, krmiss
+        integer, dimension(N_missing_max) :: i_miss, j_miss
+        real(kind=dp), dimension(N_missing_max) :: nu0_miss
+
+        !count the number of missing transitions for which we have collision data in the atomic file.
+        !these transitions are written at the end of the file after the other transitions.
+        N_missing = 0
+        i_loop : do i=1, atom%Nlevel
+            do j=i+1, atom%Nlevel
+                if (atom%ij_to_trans(i,j) == -1) then
+                     N_missing = N_missing + 1
+                     if (N_missing > N_missing_max) exit i_loop
+                     i_miss(N_missing) = i
+                     j_miss(N_missing) = j
+                     nu0_miss(N_missing) = (atom%E(j) - atom%E(i)) / j_to_cm1 / hp
+                     !if j==find_continuum(atom,i) or atom%stage(j) == atom%stage(i)+1 then it is a continuum
+                endif
+            enddo
+        enddo i_loop
+        if (N_missing > 0) then
+            write(*,*) " ** There are ", N_missing, ' collisional transitions '
+            write(*,*) '    not associated with radiative transitions for atom ', atom%ID
+            if (N_missing > N_missing_max) call warning("*** too much, not all are written", &
+                'consider changing your atomic model!')
+        endif
+
+        allocate(rates(atom%Ntr + min(N_missing,N_missing_max),n_cells,2),stat=status)
         rates(:,:,:) = 0.0_dp
         if (status>0) call error("(write_collisional_rates_atom) Cannot allocate rates!")
 
         id = 1
         !$omp parallel &
         !$omp default(none) &
-        !$omp private(id,icell,kr)&
-        !$omp shared(n_cells,rates,atom,icompute_atomRT)
+        !$omp private(id,icell,kr,i,j,krmiss)&
+        !$omp shared(n_cells,rates,atom,icompute_atomRT,N_missing,i_miss,j_miss)
         !$omp do schedule(dynamic,1)
         do icell=1, n_cells
             !$ id = omp_get_thread_num() + 1
             if (icompute_atomRT(icell) > 0) then
                 if (atom%id=='H') then
+                    call init_colrates_coeff_hydrogen(id,icell)
                     call collision_rates_hydrogen_loc(id,icell)
                 else
                     call init_colrates_atom(id,atom)
@@ -1542,8 +1627,23 @@ module see
                     rates(kr,icell,1) = atom%continua(kr-atom%Ntr_line)%Cij(id)
                     rates(kr,icell,2) = atom%continua(kr-atom%Ntr_line)%Cji(id)
                 enddo
-            endif
-        enddo
+                !alternate way
+                ! do kr=1, atom%Ntr !only if the radiative transition exists
+                !     i = atom%i_trans(kr)
+                !     j = atom%j_trans(kr)
+                !     rates(kr,icell,1) = atom%col_mat(j,i,id)
+                !     rates(kr,icell,2) = atom%col_mat(i,j,id)
+                ! enddo
+                !Now the missing transitions if any
+                if (N_missing==0) cycle !go to next point
+                krmiss = 0
+                do kr=atom%Ntr+1, atom%Ntr + min(N_missing,N_missing_max)
+                    krmiss = krmiss + 1
+                    rates(kr,icell,1) = atom%col_mat(j_miss(krmiss),i_miss(krmiss),id)
+                    rates(kr,icell,2) = atom%col_mat(i_miss(krmiss),j_miss(krmiss),id)
+                enddo
+            endif !non-zerto
+        enddo !cell
         !$omp end do
         !$omp end parallel
 
@@ -1619,6 +1719,23 @@ module see
             call ftpkyj(unit, "j", j,'', status)
             call ftpkyj(unit, "i", i, ' ', status)
             nu0 = c_light / nm_to_m / atom%continua(kr-atom%Ntr_line)%lambda0
+            call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
+            call ftpprd(unit,1,1,nelements,rates(kr,:,:),status)
+        enddo
+
+        !writing missing transitions
+        krmiss = 0
+        do kr=atom%Ntr+1,atom%Ntr + min(N_missing,N_missing_max)
+            krmiss = krmiss + 1
+            call ftcrhd(unit, status)
+            if (status > 0) call print_error(status)
+            call ftphpr(unit,.true.,-64,naxis,naxes,0,1,.true.,status)
+            if (status > 0) call print_error(status)
+            i = i_miss(krmiss)
+            j = j_miss(krmiss)
+            call ftpkyj(unit, "j", j,'', status)
+            call ftpkyj(unit, "i", i, ' ', status)
+            nu0 = nu0_miss(krmiss)
             call ftpkyd(unit, "nu0", nu0, -14, "Hz", status)
             call ftpprd(unit,1,1,nelements,rates(kr,:,:),status)
         enddo
@@ -1871,7 +1988,7 @@ module see
     !for simplicity. If moved outside, some quantities might be required to be allocated
     !local profiles, stream etc.
 #include "sprng_f.h"
-        integer :: icell, n, id, etape, n_rayons, iray
+        integer :: icell, n, id, etape, n_rayons, iray, i
         type (AtomType), pointer :: atom
         logical :: labs, lfixed_rays
         real :: rand, rand2, rand3
@@ -1897,6 +2014,8 @@ module see
             n_rayons = N_rayons_mc
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
+            stream = 0.0
+            stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
         endif
 
         ! first allocate the rates on the whole grid
@@ -1922,7 +2041,6 @@ module see
         !$omp do schedule(static,1)
         do icell=1, n_cells
             !$ id = omp_get_thread_num() + 1
-            stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
             if (icompute_atomRT(icell) <= 0) cycle
 
             do n=1, NactiveAtoms

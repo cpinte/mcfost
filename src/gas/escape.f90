@@ -193,7 +193,7 @@ module escape
         integer :: icell, id, i_cell, j_cell, k_cell, i
         real(kind=dp) :: v0, v1, r0,  F1, T1
         real(kind=dp) :: Tchoc, rho_shock(n_etoiles), f_shock(n_etoiles)
-        real(kind=dp) :: x0, y0, z0, x1, y1, z1, u, v, w, w2, dist
+        real(kind=dp) :: x0, y0, z0, x1, y1, z1, u, v, w, w2, dist, max_Tchoc(n_etoiles)
         integer :: ibar, n_cells_done, n_rays_shock(n_etoiles), n_rays_star(n_etoiles)
         integer :: i_star, icell_star, n_neighbours, iray
         real :: time_gradient, rand, rand2, rand3, rand4
@@ -327,9 +327,9 @@ module escape
             f_shock(:) = 0.0
             domega_shock = 0.0; Tchoc_average = 0.0; domega_star = 0.0
             rho_shock(:) = 1d-100
+            max_Tchoc(:) = 0.0
             id = 1
             do i_star = 1, n_etoiles
-                icell_star = etoile(i_star)%icell
                 rays_loop : do iray=1, n_rayons_sob_step
 
                     rand  = sprng(stream(id))
@@ -338,27 +338,33 @@ module escape
                     rand4 = sprng(stream(id))
 
                     call em_sphere_uniforme(id,i_star,rand,rand2,rand3,rand4,icell,x0,y0,z0,u,v,w,w2,lintersect)
-                    ! call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
-                    ! icell = next_cell
-                    ! lintersect = .true.
-                    if (lintersect) then
-                        n_rays_star(i_star) = n_rays_star(i_star) + 1
-                        if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then 
-                            !fraction actually because all rays touch the star here
-                            Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell)
-                            n_rays_shock(i_star) = n_rays_shock(i_star) + 1
-                            rho_shock(i_star) = rho_shock(i_star) + nHtot(icell)
-                            f_shock(i_star) = f_shock(i_star) + 1.0_dp / real(n_rayons_sob_step,kind=dp)
-                        endif
-                    endif
+                    !lintersect is .true. but icell > n_cells (so is_inshock return .false.) ...
+                    call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
+                    x0 = x1
+                    y0 = y1
+                    z0 = z1
+                    icell = next_cell
+                    ! if (.not.lintersect) cycle
+                    ! if (lintersect) then
+                    n_rays_star(i_star) = n_rays_star(i_star) + 1
+                    if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then 
+                        !fraction actually because all rays touch the star here
+                        Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell)
+                        n_rays_shock(i_star) = n_rays_shock(i_star) + 1
+                        rho_shock(i_star) = rho_shock(i_star) + nHtot(icell)
+                        f_shock(i_star) = f_shock(i_star) + 1.0_dp / real(n_rayons_sob_step,kind=dp)
+                        max_Tchoc(i_star) = max(max_Tchoc(i_star), Tchoc)
+                     endif
+                    ! endif
                 enddo rays_loop !rays
                 dOmega_star(:,i_star) = dOmega_core(:,i_star) * (1.0_dp - f_shock(i_star))
                 dOmega_shock(:,i_star) = dOmega_core(:,i_star) * f_shock(i_star)
                 Tchoc_average(i_star) = Tchoc_average(i_star) / rho_shock(i_star)
             enddo ! stars
+            ! Tchoc_average = max_Tchoc
             deallocate(stream)
         endif
-      
+
         write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') &
             maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
         write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') &
@@ -798,6 +804,9 @@ module escape
             ibar = 0
             n_cells_done = 0
 
+            stream = 0.0
+            stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
+ 
             l_iterate_ne = .false.
             if( n_iterate_ne > 0 ) then
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
@@ -815,7 +824,6 @@ module escape
             !$omp do schedule(static,1)
             do icell=1, n_cells
                 !$ id = omp_get_thread_num() + 1
-                stream(id) = init_sprng(gtype, id-1,nb_proc,seed,SPRNG_DEFAULT)
                 if (icompute_atomRT(icell)<=0) then
                     !$omp atomic
                     n_cells_done = n_cells_done + 1
@@ -826,7 +834,6 @@ module escape
                     endif
                     cycle
                 endif
-                ! if( (diff_loc(icell) < 5d-2 * precision).and..not.lcswitch_enabled ) cycle
 
                 !Init upward radiative rates to 0 and downward radiative rates to 0 or "Aji_cont" for Sobolev.
                 !Init collisional rates
@@ -928,12 +935,14 @@ module escape
                end do
                !$omp end do
                !$omp end parallel
-               if ((dne < 1d-4 * precision).and.(.not.lcswitch_enabled)) then
-                  !Do we need to restart it eventually ?
-                  write(*,*) " *** dne", dne
-                  write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
-                  n_iterate_ne = 0
-               endif
+               if (lescape_prob) then
+                if ((dne < 1d-4 * precision).and.(.not.lcswitch_enabled)) then
+                    !Do we need to restart it eventually ?
+                    write(*,*) " *** dne", dne
+                    write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
+                    n_iterate_ne = 0
+                endif
+               endif 
             end if
             !***********************************************************!
 
@@ -1411,7 +1420,7 @@ module escape
 
             if (nbr_cell==1) then
                ds(iray,id) = l_contrib * AU_to_m
-               psi(:,1,id) = (1_dp - exp(-dtau) ) / chi
+               psi(:,1,id) = (1.0_dp - exp(-dtau) ) / chi
                dv_proj(iray,id) = v_proj(icell,x1,y1,z1,u,v,w) - v_proj(icell,x0,y0,z0,y,v,w)
             endif
 

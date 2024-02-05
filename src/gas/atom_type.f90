@@ -71,6 +71,7 @@ module atom_type
       integer, allocatable, dimension(:,:) :: ij_to_trans !from i and j return the index of a transiton
       !Compatibility with RH, stored the collision in character format!
       character(len=Nmax_line_per_collision), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
+      real(kind=dp), allocatable :: col_mat(:,:,:) !Collision matrix C(i,j) = Col j->i (Cji)
       real(kind=dp)                :: cswitch, Abund
       real(kind=dp) :: vth_char ! typical Doppler width the gaussian lines.
       real :: weight, massf !mass fraction
