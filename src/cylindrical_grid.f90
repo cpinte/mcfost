@@ -1177,9 +1177,9 @@ end subroutine define_cylindrical_grid
 
   !***********************************************************
 
-  real(dp) function distance_to_closest_wall_cyl(id,icell,x,y,z) result(s)
+  real(dp) function distance_to_closest_wall_cyl(icell,x,y,z) result(s)
 
-    integer, intent(in) :: id, icell
+    integer, intent(in) :: icell
     real(kind=dp), intent(in) :: x,y,z
 
     real(dp) :: r,s1,s2,s3,s4,s5,s6,z0

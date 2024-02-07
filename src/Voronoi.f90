@@ -970,10 +970,10 @@ module Voronoi_grid
 
   !----------------------------------------
 
-  real(dp) function distance_to_closest_wall_Voronoi(id,icell,x,y,z) result(s)
+  real(dp) function distance_to_closest_wall_Voronoi(icell,x,y,z) result(s)
 
 
-    integer, intent(in) :: id, icell
+    integer, intent(in) :: icell
     real(kind=dp), intent(in) :: x,y,z
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
