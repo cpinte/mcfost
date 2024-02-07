@@ -9,6 +9,7 @@ module MRW
   real(dp), dimension(n), save :: zeta, y_MRW
 
   real, parameter :: gamma_MRW = 2.0
+  real(dp), parameter :: cst_ct = 3 / pi**2
 
 contains
 
@@ -70,13 +71,13 @@ contains
 
  !----------------------------------------------
 
- subroutine make_MRW_step(id,icell, x,y,z,E, d, diff_coeff)
+ subroutine make_MRW_step(id,icell, x,y,z,E, d, rec_Planck_opacity)
 
    use naleat, only : random_isotropic_direction
 
    integer, intent(in) :: id, icell
    real(kind=dp), intent(inout) :: x,y,z
-   real(kind=dp), intent(in) :: E, d, diff_coeff
+   real(kind=dp), intent(in) :: E, d, rec_Planck_opacity
 
    real(dp) :: u,v,w, ct
 
@@ -92,7 +93,9 @@ contains
    y = sample_zeta(id)
 
    ! Solve Eq. 8 of Min et al 2009
-   ct = -log(y) / diff_coeff * (d/pi)**2.
+   ! D = 1/(3*rec_Planck_opacity)
+   ! cst_ct = 3/pi**3
+   ct = -log(y) * cst_ct * rec_Planck_opacity * d**2.
 
 
    ! Steps that needs to be done

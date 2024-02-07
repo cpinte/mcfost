@@ -1039,9 +1039,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      endif
 
      do while  (d > gamma_MRW * rec_Planck_opacity)
-        diff_coeff = rec_Planck_opacity
-
-        call make_MRW_step(id,icell, x,y,z,Stokes(1), d, diff_coeff)
+        call make_MRW_step(id,icell, x,y,z,Stokes(1), d, rec_Planck_opacity)
         d = distance_to_closest_wall(icell,x,y,z)
         ! todo : do we update the rec_plack_opacity ???
         call diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
