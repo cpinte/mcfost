@@ -10,7 +10,7 @@ module spherical_grid
   implicit none
 
   public :: cross_spherical_cell, pos_em_cellule_sph, indice_cellule_sph, test_exit_grid_sph, &
-       move_to_grid_sph
+       move_to_grid_sph, distance_to_closest_wall_sph
 
 
   private
