@@ -648,15 +648,15 @@ subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
   real(dp), intent(out) :: Planck_opacity,rec_Planck_opacity ! cm2/g (ie per gram of gas)
 
   integer :: lambda
-  real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl, norm, Temp
+  real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl, norm, T
 
   integer, pointer :: p_icell
   integer, target :: icell0
 
   icell0 = icell
 
-  temp = Tdust(icell)
-  if ((temp > 1) .and. (Voronoi(icell)%original_id > 0)) then
+  T = Tdust(icell)
+  if ((T > 1) .and. (Voronoi(icell)%original_id > 0)) then
 
      if (lvariable_dust) then
         p_icell => icell0
@@ -667,7 +667,7 @@ subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
      somme  = 0.0_dp
      somme2 = 0.0_dp
      norm = 0.0_dp
-     cst    = cst_th/temp
+     cst    = cst_th/T
      do lambda = 1,n_lambda
         ! longueur d'onde en metre
         wl       = tab_lambda(lambda)*1.e-6
@@ -681,12 +681,12 @@ subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
            B = 0.0_dp
            !dB_dT = 0.0_dp
         endif
-        somme  = somme  + B/(kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
-        somme2  = somme2  + B * (kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
+        somme  = somme  + B/kappa(p_icell,lambda)
+        somme2  = somme2  + B * kappa(p_icell,lambda)
         norm = norm + B*delta_wl
      enddo
-     rec_Planck_opacity = norm/somme
-     Planck_opacity = somme2/norm
+     rec_Planck_opacity = norm/somme * kappa_factor(icell0)
+     Planck_opacity = somme2/norm * kappa_factor(icell0)
   else
      rec_Planck_opacity = 0.
      Planck_opacity = 0.
