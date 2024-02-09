@@ -628,7 +628,7 @@ end subroutine diffusion_approx_nLTE_nRE
 
 !************************************************************
 
-subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
+subroutine compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
   ! Compute current Planck reciprocal mean opacity for all cells
   ! (note : diffusion coefficient needs to be defined with Rosseland opacity
   ! in B&W mode)
@@ -655,9 +655,10 @@ subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
 
   icell0 = icell
 
-  T = Tdust(icell)
-  if ((T > 1) .and. (Voronoi(icell)%original_id > 0)) then
-
+  T = Tdust(icell) ! WARNING : this is 0 until Temp_finale
+  T = 20
+!  if ((T > 1) .and. (Voronoi(icell)%original_id > 0)) then
+  if (T > 1) then
      if (lvariable_dust) then
         p_icell => icell0
      else
@@ -688,11 +689,11 @@ subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
      rec_Planck_opacity = norm/somme * kappa_factor(icell0)
      Planck_opacity = somme2/norm * kappa_factor(icell0)
   else
-     rec_Planck_opacity = 0.
-     Planck_opacity = 0.
+     rec_Planck_opacity = 1e-30
+     Planck_opacity = 1e-30
   endif
 
-end subroutine diffusion_opacity
+end subroutine compute_Planck_opacities
 
 !************************************************************
 

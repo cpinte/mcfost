@@ -1197,8 +1197,8 @@ end subroutine define_cylindrical_grid
     ! z walls
     z0 = abs(z)
     zj0 = abs(zj0)
-    s3 = z_lim(ri0,abs(zj0)+1) - z
-    s4 = z - z_lim(ri0,abs(zj0))
+    s3 = z_lim(ri0,abs(zj0)+1) - z0
+    s4 = z0 - z_lim(ri0,abs(zj0))
 
     if (l3D) then
        ! phi walls

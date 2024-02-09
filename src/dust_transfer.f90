@@ -990,7 +990,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
 
   real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt, Planck_opacity, rec_Planck_opacity, d, diff_coeff
   integer :: taille_grain, itheta
-  integer :: n_iteractions_in_cell
+  integer :: n_iteractions_in_cell, icell_old
   integer, pointer :: p_icell
   real :: rand, rand2, tau, dvol
 
@@ -1032,26 +1032,35 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !   if (.not.flag_star) Stokes=0.
      !endif
 
-     d = 0.
-     if ((n_iteractions_in_cell > 5) .and. Tdust(icell) > 1) then
-        d = distance_to_closest_wall(icell,x,y,z)
-        call diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
-     endif
+     ! Do we need to perform a MRW ?
+    if ((n_iteractions_in_cell > 5)) then
+       d = distance_to_closest_wall(icell,x,y,z)
+       call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
 
-     do while  (d > gamma_MRW * rec_Planck_opacity)
-        call make_MRW_step(id,icell, x,y,z,Stokes(1), d, rec_Planck_opacity)
-        d = distance_to_closest_wall(icell,x,y,z)
-        ! todo : do we update the rec_plack_opacity ???
-        call diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
-     enddo
+       !write(*,*) icell, d, rec_Planck_opacity,  d * rec_Planck_opacity, gamma_MRW
+       !read(*,*)
 
- !    icell_old = icell
+       do while  (d * rec_Planck_opacity > gamma_MRW )
+          write(*,*) "MRW"
+          call make_MRW_step(id,icell, x,y,z,Stokes(1), d, rec_Planck_opacity)
+          d = distance_to_closest_wall(icell,x,y,z)
+          ! todo : do we update the rec_plack_opacity ???
+          !call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
+       enddo
+
+       ! MRW is finished, we choose wl and direction
+
+    endif
+
+     ! now that MRW is done, we perform the normal propagation
+     icell_old = icell
      call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
- !    if (icell == icell_old) then
- !       n_iterations = n_iterations + 1
- !    else
- !       n_iterations = 0
- !    endif
+     if (icell == icell_old) then
+        n_iteractions_in_cell = n_iteractions_in_cell + 1
+        !write(*,*) "icell=", icell, n_iteractions_in_cell
+     else
+        n_iteractions_in_cell = 0
+     endif
 
      if (flag_sortie) return ! Vie du photon terminee
 
