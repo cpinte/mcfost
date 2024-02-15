@@ -32,6 +32,10 @@ Radiative transfer in atomic lines:
 - Tessore et al. 2021 : https://ui.adsabs.harvard.edu/abs/2021A%26A...647A..27T/abstract
 
 
+Code of conduct
+---------------
+If you wish to use the code, you agree to follow the [code of conduct](https://github.com/cpinte/mcfost?tab=coc-ov-file)
+
 Licence
 -------
 
