@@ -11,7 +11,7 @@ module read_phantom
 contains
 
   subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,particle_id,massgas,massdust,&
-       rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ldust_moments,dust_moments,ierr)
+       rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ldust_moments,dust_moments,mass_per_h,ierr)
 
     integer,               intent(in) :: iunit, n_files
     character(len=*),dimension(n_files), intent(in) :: filenames
@@ -23,7 +23,7 @@ contains
     real, intent(out), dimension(:), allocatable :: extra_heating
     integer, intent(out) :: ndusttypes,n_SPH,ierr
     logical, intent(out) :: ldust_moments
-
+    real(dp), intent(out) :: mass_per_H
     integer, parameter :: maxarraylengths = 12
     integer, parameter :: nsinkproperties = 17
     integer(kind=8) :: number8(maxarraylengths)
@@ -38,7 +38,7 @@ contains
     integer, parameter :: n_nucleation = 6
     integer, allocatable, dimension(:) :: npartoftype
     real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
-    real(dp) :: hfact,umass,utime,ulength,gmw,x2,mass_per_H
+    real(dp) :: hfact,umass,utime,ulength,gmw,x2
     integer(kind=1), allocatable, dimension(:) :: itype,ifiles
     real(4),  allocatable, dimension(:) :: tmp
     real(dp), allocatable, dimension(:) :: grainsize,graindens
@@ -451,7 +451,7 @@ contains
   subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,&
        particle_id,massgas,massdust,rhogas,rhodust, &
        extra_heating,ndusttypes,SPH_grainsizes,     &
-       mask,n_SPH,ldust_moments,dust_moments,ierr)
+       mask,n_SPH,ldust_moments,dust_moments,mass_per_H,ierr)
 
     use utils_hdf5, only:open_hdf5file,    &
          close_hdf5file,   &
@@ -472,6 +472,7 @@ contains
     real, intent(out), dimension(:), allocatable :: extra_heating
     integer, intent(out) :: ndusttypes,n_SPH,ierr
     logical, intent(out) :: ldust_moments
+    real(dp), intent(out) :: mass_per_H
 
     character(len=200) :: filename
 
@@ -939,7 +940,13 @@ contains
                 vz(j) = vzi * uvelocity
              endif
 
-             if (ldust_moments) dust_moments(:,j) = nucleation(2:5,i)
+
+
+             if (ldust_moments) dust_moments(:,j) = nucleation(1:4,i) ! indexing is different from phantom as I read starting at k0
+
+             if (i==1) then
+                write(*,*) "read", i, j, dust_moments(:,j)
+             endif
 
              T_gas(j) = T_gasi
              rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
