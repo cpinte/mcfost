@@ -38,6 +38,7 @@ module mhd2mcfost
         real, parameter                          :: limit_factor = 1.005!, Lextent = 1.01
         logical                                  :: ldust_moments
         real(dp), dimension(:,:), allocatable    :: dust_moments
+        real(dp) :: mass_per_H
 
         ldust_moments = .false.
 
@@ -155,7 +156,7 @@ module mhd2mcfost
         !massdust, rhodust, hydro_grainsizes not allocated if ndusttypes = 0 !
         call sph_to_voronoi(n_points-n_etoiles, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, &
              T_tmp, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation, is_ghost, &
-             ldust_moments, dust_moments)
+             ldust_moments, dust_moments, mass_per_H)
         ! -> correction for small density applied on mass_gas directly inside
 
         call hydro_to_Voronoi_atomic(n_points,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,dz)
