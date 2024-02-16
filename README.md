@@ -23,7 +23,7 @@ MCFOST is a 3D continuum and line radiative transfer code based on an hybrid Mon
 
 Code of conduct
 ---------------
-If you wish to use the code, you agree to follow the [code of conduct](https://github.com/cpinte/mcfost?tab=coc-ov-file).
+If you wish to use the code, please make sure you agree to adhere to the [code of conduct](https://github.com/cpinte/mcfost?tab=coc-ov-file).
 
 Code Papers
 -----------
