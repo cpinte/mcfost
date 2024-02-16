@@ -1,67 +1,61 @@
 !--------------------------------------------------------------------------!
 ! The Phantom Smoothed Particle Hydrodynamics code, by Daniel Price et al. !
-! Copyright (c) 2007-2015 The Authors (see AUTHORS)                        !
+! Copyright (c) 2007-2023 The Authors (see AUTHORS)                        !
 ! See LICENCE file for usage and distribution conditions                   !
-! http://users.monash.edu.au/~dprice/phantom                               !
+! http://phantomsph.bitbucket.io/                                          !
 !--------------------------------------------------------------------------!
-!+
-!  MODULE: infile_utils
+module io_phantom_infiles
 !
-!  DESCRIPTION:
-!  This module contains utility routines for reading
+! This module contains utility routines for reading
 !  and writing of input files
 !
-!  REFERENCES: None
+! :References: None
 !
-!  OWNER: Daniel Price
+! :Owner: Daniel Price
 !
-!  $Id: c6605fb5e52e85f6ceb0a05c9b113eb64d61eb9d $
+! :Runtime parameters: None
 !
-!  RUNTIME PARAMETERS: None
+! :Dependencies: None
 !
-!  DEPENDENCIES: None
-!+
-!--------------------------------------------------------------------------
-module infile_utils
  implicit none
  public :: write_inopt, read_inopt
  public :: read_next_inopt, get_inopt
- public :: write_infile_series, check_infile, contains_loop
-
+ public :: write_infile_series, check_infile, contains_loop, get_optstring
 !
 ! generic interface write_inopt to write an input option of any type
 !
  interface write_inopt
   module procedure write_inopt_int,write_inopt_real4,write_inopt_real8,write_inopt_string,write_inopt_logical
- end interface
+ end interface write_inopt
 !
 ! generic interface read_inopt to read an input option of any type
 !
  interface read_inopt
   module procedure read_inopt_int,read_inopt_real,read_inopt_string,read_inopt_logical
- end interface
+ end interface read_inopt
 
 !
 ! generic interface get_inopt to read a specific input variable
 !
  interface get_inopt
   module procedure get_inopt_int,get_inopt_real,get_inopt_string,get_inopt_logical
- end interface
+ end interface get_inopt
 !
 ! maximum length for input strings
 ! (if you change this, must also change format statements below)
 !
  integer, parameter, private :: maxlen = 20 ! max length of string containing variable
+ integer, parameter, private :: maxlenval = 100 ! max length of string containing value
  integer, parameter, private :: maxlenstring = 120  ! max length of string variable
  integer, parameter, private :: maxlenline   = 120  ! maximum line length
 !
 ! structure for input options database
 !
  type inopts
-   character(len=maxlen) :: tag
-   character(len=maxlen) :: val
-   logical :: retrieved
- end type
+    character(len=maxlen)    :: tag
+    character(len=maxlenval) :: val
+    logical :: retrieved
+ end type inopts
 
  public :: inopts,open_db_from_file,close_db,errtext
 
@@ -510,7 +504,7 @@ end subroutine read_inopt_real
 
 !-----------------------------------------------------------------
 !+
-!  read a real variable from an input options database
+!  read a string variable from an input options database
 !+
 !-----------------------------------------------------------------
 subroutine read_inopt_string(valstring,tag,db,err,errcount)
@@ -612,6 +606,7 @@ subroutine read_next_inopt(tag,valstring,iunit,ierr,nlinesread)
  tag = ' '
  valstring = ' '
  line = ' '
+ ierr = 0
  if (present(nlinesread)) nlinesread = 0
  do while((len_trim(line)==0 .or. line(1:1)=='#') .and. ierr==0)
     if (present(nlinesread)) nlinesread = nlinesread + 1
@@ -678,8 +673,8 @@ subroutine read_inopt_from_line(line,name,valstring,ierr,comment)
     nsec = 0
     read(valstring,"(i3.3,1x,i2.2,1x,i2.2)",iostat=ierr) nhr,nmin,nsec
     if (ierr/=0) then
-      read(valstring,"(i2.2,1x,i2.2,1x,i2.2)",iostat=ierr) nhr,nmin,nsec
-    end if
+       read(valstring,"(i2.2,1x,i2.2,1x,i2.2)",iostat=ierr) nhr,nmin,nsec
+    endif
     !print*,'hh,mm,ss=',nhr,nmin,nsec,((nhr*60. + nmin)*60. + nsec),ierr
     write(valstring,"(es11.4)",iostat=ierr) ((nhr*60. + nmin)*60. + nsec)
  endif
@@ -859,9 +854,9 @@ subroutine get_loopinfo_real(valstring,rvalstart,rvalend,rstep,njobs,log,ierr)
     read(valstring(ito+4:istep-1),*,iostat=ierr) rvalend
 
     if (instep > 0) then
-    !
-    !--here the number of steps between the end points has been specified
-    !
+       !
+       !--here the number of steps between the end points has been specified
+       !
        read(valstring(istep+7:),*,iostat=ierr) njobs
        if (njobs > 1) then
           rstep = (rvalend - rvalstart)/real(njobs-1)
@@ -869,9 +864,9 @@ subroutine get_loopinfo_real(valstring,rvalstart,rvalend,rstep,njobs,log,ierr)
           rstep = 0.
        endif
     elseif (inlogstep > 0) then
-    !
-    !--here the number of steps is specified and the loop is in log space
-    !
+       !
+       !--here the number of steps is specified and the loop is in log space
+       !
        read(valstring(istep+10:),*,iostat=ierr) njobs
        log = .true.
        if (njobs > 1) then
@@ -880,9 +875,9 @@ subroutine get_loopinfo_real(valstring,rvalstart,rvalend,rstep,njobs,log,ierr)
           rstep = 0.
        endif
     elseif (ilogstep > 0) then
-    !
-    !--here the step interval has been specified in log space
-    !
+       !
+       !--here the step interval has been specified in log space
+       !
        read(valstring(istep+9:),*,iostat=ierr) rstep
        log = .true.
        if (rvalend <= rvalstart) then
@@ -891,9 +886,9 @@ subroutine get_loopinfo_real(valstring,rvalstart,rvalend,rstep,njobs,log,ierr)
           njobs = int((log10(rvalend) - log10(rvalstart) + tiny(0.))/rstep) + 1
        endif
     else
-    !
-    !--here the step interval has been specified
-    !
+       !
+       !--here the step interval has been specified
+       !
        read(valstring(istep+6:),*,iostat=ierr) rstep
        if (rvalend <= rvalstart) then
           njobs = 0
@@ -986,14 +981,14 @@ logical function isintloop(valstring)
     do inum=1,3
        select case(inum)
        case(1)
-         i1 = 1
-         i2 = ito-1
+          i1 = 1
+          i2 = ito-1
        case(2)
-         i1 = ito+4
-         i2 = istep
+          i1 = ito+4
+          i2 = istep
        case(3)
-         i1 = istep+6
-         i2 = len(valstring)
+          i1 = istep+6
+          i2 = len(valstring)
        end select
        do i=i1,i2
           select case(valstring(i:i))
@@ -1232,4 +1227,37 @@ subroutine write_infile_lines(iunit,infilenew,infiledata,linenum,nameval,comment
 
 end subroutine write_infile_lines
 
-end module infile_utils
+!---------------------------------------------------------------------------
+!
+! Creates a string out of a list of options
+!
+!---------------------------------------------------------------------------
+subroutine get_optstring(nopts,optstring,string,maxlen)
+ integer,          intent(in)  :: nopts
+ character(len=*), intent(in)  :: optstring(nopts)
+ character(len=*), intent(out) :: string
+ integer,          intent(in), optional :: maxlen
+ character(len=len(string)) :: temp
+ integer            :: i,maxl,ierr
+
+ if (present(maxlen)) then
+    maxl = max(maxlen,1)
+ else
+    maxl = 4
+ endif
+
+ string = ''
+ do i=1,nopts
+    temp = optstring(i)
+    if (i==nopts) then
+       write(string(len_trim(string)+1:),"(i2,'=',a)",iostat=ierr) i,trim(temp(1:maxl))
+    elseif (i < 10) then
+       write(string(len_trim(string)+1:),"(i1,'=',a,',')",iostat=ierr) i,trim(temp(1:maxl))
+    else
+       write(string(len_trim(string)+1:),"(i2,'=',a,',')",iostat=ierr) i,trim(temp(1:maxl))
+    endif
+ enddo
+
+end subroutine get_optstring
+
+end module io_phantom_infiles

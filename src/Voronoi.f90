@@ -232,7 +232,7 @@ module Voronoi_grid
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     character(len=2) :: unit
 
-    logical, parameter :: lrandom = .true.
+    logical :: lrandom
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
@@ -277,7 +277,7 @@ module Voronoi_grid
 
                       if (min(dx,dy,dz) < etoile(istar)%r) then
                          dist2 = dx**2 + dy**2 + dz**2
-                         if (dist2 < etoile(istar)%r**2) then
+                         if (dist2 < 4.0*etoile(istar)%r**2) then
                             is_outside_stars = .false.
                             n_sublimate = n_sublimate + 1
                             exit loop_stars
@@ -298,6 +298,10 @@ module Voronoi_grid
     n_cells_before_stars = icell
     n_cells = icell
     n_cells_per_cpu = (1.0*n_cells) / nb_proc_voro + 1
+
+
+    lrandom = .true.
+    if (lnot_random_Voronoi) lrandom = .false.
 
     ! Randomizing particles
     if (lrandom) then
@@ -324,8 +328,8 @@ module Voronoi_grid
     endif
 
     if (n_sublimate > 0) then
-       write(*,*) n_sublimate, "particles are located inside the stars"
-       write(*,*) "Not implemented yet : MCFOST will probably crash !!!!"
+       write(*,*) "Warning", n_sublimate, "particles are located too close to the stars,"
+       write(*,*) "e.g. < 2*Rstar, and will be deleted."
     endif
 
     ! Filtering stars outside the limits
@@ -963,6 +967,81 @@ module Voronoi_grid
     return
 
   end subroutine cross_Voronoi_cell
+
+  !----------------------------------------
+
+  real(dp) function distance_to_closest_wall_Voronoi(id,icell,x,y,z) result(s)
+
+
+    integer, intent(in) :: id, icell
+    real(kind=dp), intent(in) :: x,y,z
+
+    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
+    real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
+    integer :: i, id_n, l, ifirst, ilast
+
+    integer :: i_star, check_cell
+    real(kind=dp) :: d_to_star
+    logical :: is_a_star_neighbour
+
+    real(kind=dp), dimension(3) :: delta_r
+
+    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
+    real, dimension(3) :: n, p, r, k, r_cell, r_neighbour
+
+    if (Voronoi(icell)%was_cut) then
+       s=0
+       return
+    endif
+
+    r(1) = x ; r(2) = y ; r(3) = z
+
+    s=1e30
+
+    ! We do all the access to Voronoi(icell) now
+    r_cell = Voronoi(icell)%xyz(:)
+    ifirst = Voronoi(icell)%first_neighbour
+    ilast = Voronoi(icell)%last_neighbour
+
+    l=0
+    do i=ifirst,ilast
+       l = l+1
+       id_n = neighbours_list(i) ! id du voisin
+
+       if (id_n > 0) then ! cellule
+          if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
+             r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
+          else
+             r_neighbour(:) = Voronoi_xyz(:,id_n)
+          endif
+
+          ! unnormalized vector to plane
+          n(:) = r_neighbour(:) - r_cell(:)
+          k(:) = n(:) ! We use the normal also as a direction
+
+          ! test direction
+          den = dot_product(n, k)
+
+          ! point on the plane
+          p(:) = 0.5 * (r_neighbour(:) + r_cell(:))
+          ! All of the above is the same for each step as long as we stay in the same cell
+
+
+          s_tmp = dot_product(n, p-r) / den
+
+          if (s_tmp < 0.) s_tmp = huge(1.0)
+       else ! id_n < 0 : neighbourgh is a wall
+          s_tmp = 0.0_dp ! so do not want to run the MRW in that case, so we set d=0
+       endif
+
+       if (s_tmp < s) then
+          s = s_tmp
+       endif
+    enddo
+
+    return
+
+  end function distance_to_closest_wall_Voronoi
 
   !----------------------------------------
 

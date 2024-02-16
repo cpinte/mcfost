@@ -1,0 +1,141 @@
+name: test-suite
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  release:
+    types:
+      - published
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  MCFOST_NO_XGBOOST: yes
+  MCFOST_GIT: "1"
+  SKIP_HDF5: no
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, macos]
+        compiler: [gfortran, ifort]
+        openmp: [yes, no]
+        release: [yes, no]
+
+        include:
+          # Associate specific os versions with our os tags
+          - os: linux
+            os-version: ubuntu-22.04
+          - os: macos
+            os-version: macos-12
+
+          # macos needs null container to avoid loading docker; set linux containers as desired
+          - container: null
+          - os: linux
+            compiler: gfortran
+            container: "quay.io/pypa/manylinux_2_28_x86_64"
+
+    name: build+test (${{ matrix.os }}, ${{ matrix.compiler }}, openmp=${{ matrix.openmp }}, release=${{ matrix.release }})
+    runs-on: ${{ matrix.os-version }}
+    container: ${{ matrix.container }}
+    env:
+      SYSTEM: ${{ matrix.compiler }}
+      HDF5_DIR: /usr/local
+      MCFOST_INSTALL: /usr/local
+      OPENMP: ${{ matrix.openmp }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - run: git config --global --add safe.directory $PWD
+
+      - name: build and install dependencies
+        uses: ./.github/actions/dependencies
+
+      - name: compile mcfost
+        working-directory: src
+        shell: bash -e {0}
+        run: |
+          [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
+          make release=${{ matrix.release }} static=yes all
+
+      - name: test
+        uses: ./.github/actions/test
+
+      # Saving the binaries from the macos builds since the runner is the same for both compilers -> might be more consistent
+      # Only benchmark+release the 'release' builds, never the 'march=native' builds
+      - name: save binary for benchmarking and release
+        if: matrix.openmp == 'yes' && matrix.release == 'yes'
+        uses: actions/upload-artifact@v3
+        with:
+          name: mcfost-binary-${{ matrix.os }}-${{ matrix.compiler }}
+          path: src/mcfost
+
+  benchmark:
+    needs: build-and-test
+    strategy:
+      matrix:
+        compiler: [gfortran, ifort]
+    runs-on: macos-12
+    env:
+      SYSTEM: ${{ matrix.compiler }}
+      HDF5_DIR: /usr/local
+      MCFOST_INSTALL: /usr/local
+      OPENMP: yes
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: restore binary artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: mcfost-binary-macos-${{ matrix.compiler }}
+          path: src/
+
+      - name: benchmark
+        uses: ./.github/actions/benchmark
+
+      - name: report benchmark results
+        run: |
+          echo ${{ matrix.compiler }} $(cat benchmark-${{ matrix.compiler }}.tim)
+
+
+  release:
+    needs: build-and-test
+    strategy:
+      matrix:
+        os: [linux, macos]
+
+        include:
+          # Associate specific os versions with our os tags
+          - os: linux
+            os-version: ubuntu-22.04
+          - os: macos
+            os-version: macos-12
+
+    runs-on: ${{ matrix.os-version }}
+    if: ${{ github.event_name == 'release' }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: restore binary artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: mcfost-binary-${{ matrix.os }}-ifort # use ifort for binary release
+          path: src/
+
+      - name: simple check to make sure the binary runs in a clean environment
+        shell: bash
+        working-directory: src
+        env:
+          MCFOST_UTILS: ${{ github.workspace }}/utils
+        run: |
+          chmod +x mcfost
+          ./mcfost -h
+
+      - name: upload binary
+        uses: ./.github/actions/release

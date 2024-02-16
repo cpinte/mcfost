@@ -11,9 +11,6 @@ The following environment is required for the binaries:
 -  a 64-bits Unix system, including Linux or MacOS X,
 -  any data analysis software capable of handling FITS files.
 
-MCFOST is also available for Xeon Phi but performance is not optimal
-yet. Stay tuned.
-
 
 
 Binary Installation Procedure
@@ -25,15 +22,21 @@ be optmized for most architectures. The binary also updates itself regularly (un
 
 1. Download the tar ball with the pre-compiled binary:
 
-http://ipag.osug.fr/public/pintec/mcfost/linux/mcfost.tgz
-http://ipag.osug.fr/public/pintec/mcfost/mac/mcfost.tgz
+https://github.com/cpinte/mcfost/releases/latest/download/mcfost_Linux-X64.tar.gz
+https://github.com/cpinte/mcfost/releases/latest/download/mcfost_macOS-X64.tar.gz
 
 2. Extract the file and make it executable::
 
-     $ tar -xvzf mcfost.tgz
+     $ tar -xvzf mcfost_*-X64.tgz
      $ chmod +x mcfost
 
-3. Make a directory where you move mcfost (or move mcfost in any directory defined in your shell path)::
+.. note:: On macOS, if you download the archive from your web browser, you might need to bypass macOS security with::
+
+          $ xattr -dr com.apple.quarantine mcfost
+
+          Alternatively, you can download from link above with wget or curl (which do not add the `quarantine` attribute).
+
+3. Make a directory where you wish move mcfost (or move mcfost in any directory defined in your shell path)::
 
      $ mkdir -p ~/mcfost/bin
      $ mv mcfost ~/mcfost/bin
@@ -76,10 +79,11 @@ http://ipag.osug.fr/public/pintec/mcfost/mac/mcfost.tgz
 Installation from source
 ------------------------
 
-mcfost source code is hosted on github (as a private directory, public release will be made soon).
+mcfost source code is hosted on github:
 
+https://github.com/cpinte/mcfost
 
-1. Clone the repository (ask Christophe for access).
+1. Clone the repository.
 
 2. Set the following environment variables::
 
@@ -118,8 +122,8 @@ mcfost source code is hosted on github (as a private directory, public release w
    On some MacOS installation, this last step does not seem to work, but you can link by hand, for instance with::
 
      $ cd /usr/local/bin
-     $ ln -s gcc-11 gcc
-     $ ln -s g++-11 g++
+     $ ln -s gcc-13 gcc
+     $ ln -s g++-13 g++
 
   (depending on your gcc/g++ version).
 
@@ -190,6 +194,14 @@ mcfost source code is hosted on github (as a private directory, public release w
 
 
 .. note:: mcfost uses the xgboost machine learning library to predict chemical abundances. This features is experimental and xgboost is sometimes tricky to compile with the intel compiler. You can turn the feature off by seting the environement variable `MCFOST_NO_XGBOOST` to yes.
+
+
+Homebrew installation
+---------------------
+Aternatively, on MacOS, you can install mcfost with homebrew with::
+
+  $ brew tap danieljprice/all
+  $ brew install mcfost
 
 
 MCFOST_UTILS Environment variable

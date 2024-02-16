@@ -27,7 +27,7 @@
   1	                  1=Mie, 2=hg (2 implies the loss of polarizarion)
 
 #Symetries
-  T	                  image symmetry
+  F	                  image symmetry
   T	                  central symmetry
   T	                  axial symmetry (important only if N_phi > 1)
 

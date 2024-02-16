@@ -199,9 +199,7 @@ contains
     integer, parameter :: n_files = 1 ! the library only works on 1 set of phantom particles
     integer(kind=1), dimension(np) :: ifiles
 
-    ! Tmp : do_nucleation and nucleation will need to be intent(in)
-    logical, parameter :: do_nucleation = .false.
-    real(kind=dp), dimension(:,:), allocatable :: nucleation
+    real(kind=dp), dimension(:,:), allocatable :: nucleation, dust_moments
 
     logical, intent(in), optional :: write_T_files
 
@@ -229,16 +227,17 @@ contains
 
     real(kind=dp), dimension(4) :: Stokes
     real(kind=dp) :: nnfot2
-    real(kind=dp) :: x,y,z, u,v,w
+    real(kind=dp) :: x,y,z, u,v,w, mass_per_H
     real :: rand, time, cpu_time_begin, cpu_time_end
     integer :: n_SPH, icell, nbre_phot2, ibar, id, nnfot1_cumul, i_SPH, i, lambda_seuil
     integer :: itime, ieos, alloc_status
-    logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM
+    logical :: lpacket_alive, lintersect, laffichage, flag_star, flag_scatt, flag_ISM, ldust_moments
     integer, target :: lambda, lambda0
     integer, pointer, save :: p_lambda
 
     logical, save :: lfirst_time = .true.
 
+    ldust_moments = .false. ! for now
 
     ! We use the phantom_2_mcfost interface with 1 file
     ifiles(:) = 1 ; massoftype2(1,:) = massoftype(:)
@@ -256,17 +255,18 @@ contains
     ierr = 0
     mu_gas = mu ! Molecular weight
 
-    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,do_nucleation,n_files,dustfluidtype,xyzh,&
+    call phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,ldust_moments,n_files,dustfluidtype,xyzh,&
          vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),nucleation,massoftype2(1,1:ntypes),&
          xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,ieos)
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos)
 
     if (.not.lfix_star) call compute_stellar_parameters()
 
     ! Performing the Voronoi tesselation & defining density arrays
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH, &
-         massgas,massdust,rhogas,rhodust,SPH_grainsizes, SPH_limits, .false., is_ghost)
+         massgas,massdust,rhogas,rhodust,SPH_grainsizes, SPH_limits, .false., is_ghost, &
+         ldust_moments, dust_moments, mass_per_H)
 
     call setup_grid()
     call setup_scattering()

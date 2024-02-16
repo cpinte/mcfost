@@ -792,7 +792,9 @@ subroutine define_dust_density()
                     density =  cst_pous(pop) * ( (rcyl/dz%Rc)**(-2*dz%surf) + (rcyl/dz%Rc)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
                          exp( - (abs(z -z0)/h)**dz%vert_exponent)
                  endif
-                 densite_pouss(:,icell) = density * nbre_grains(:)
+                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                    densite_pouss(l,icell) = density * nbre_grains(l)
+                 enddo
               enddo !k
            enddo bz_debris !j
         enddo !i
@@ -1630,15 +1632,15 @@ subroutine normalize_dust_density(disk_dust_mass)
   real(kind=dp), intent(in), optional :: disk_dust_mass
   integer :: icell, l, k, i, j, izone, pop
 
-  real(kind=dp) :: somme, mass, facteur, total_dust_mass
+  real(kind=dp) :: somme, mass, facteur, f
 
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: d_p
 
   if (present(disk_dust_mass)) then
-     total_dust_mass = disk_dust_mass
+     f = disk_dust_mass/diskmass ! scaling factor compared to value in parameter file
   else
-     total_dust_mass = diskmass ! using the parameter file value
+     f = 1.0_dp ! using the parameter file value
   endif
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
@@ -1649,7 +1651,7 @@ subroutine normalize_dust_density(disk_dust_mass)
         if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
-     densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
+     if (somme > tiny_dp) densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
   enddo !l
 
   ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
@@ -1669,7 +1671,7 @@ subroutine normalize_dust_density(disk_dust_mass)
         mass =  mass * AU3_to_cm3 * g_to_Msun
 
         if (mass > tiny_dp) then
-           facteur = d_p%masse / mass
+           facteur = d_p%masse / mass * f
 
            mass = 0.0_dp
            do icell=1,n_cells
@@ -1684,7 +1686,7 @@ subroutine normalize_dust_density(disk_dust_mass)
 
   masse(:) = masse(:) * AU3_to_cm3
 
-  write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+  !write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
   if (sum(masse) < tiny_dp) call error("Something went wrong, there is no dust in the disk")
 
   if (lcorrect_density) then
@@ -1703,7 +1705,7 @@ subroutine normalize_dust_density(disk_dust_mass)
         endif
      enddo
 
-     write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+     !write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
   endif
 
   ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
@@ -1739,6 +1741,7 @@ subroutine read_Sigma_file()
   status=0
   !  Get an unused Logical Unit Number to use to open the FITS file.
   call ftgiou(unit,status)
+  if (status /= 0) call error("surface density file, cannot get a free unit")
   write(*,*) "Reading surface density file : "//trim(sigma_file)
 
   if (n_zones > 1) then
@@ -1755,10 +1758,11 @@ subroutine read_Sigma_file()
   nullval=-999
 
   ! determine the size of density file
+  nfound = 0 ! to fix ifort bug
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
   if (nfound > 2) then
      write(*,*) "nfound = ", nfound, "instead of 1 or 2"
-     call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
+     call error('failed to read the NAXISn keywords of '//trim(sigma_file)//' file.')
   endif
 
   if ((naxes(1) /= n_rad)) then

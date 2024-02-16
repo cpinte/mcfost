@@ -24,17 +24,20 @@ subroutine setDiffusion_coeff(i)
   integer, intent(in) :: i
 
   real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
-  integer :: j, k, lambda, icell
+  integer :: j, k, lambda, icell, p_icell
 
   real(kind=dp), parameter :: precision = 1.0e-1_dp ! Variation de temperature au dela de laquelle le coeff de diff et mis a jour
   ! le mettre a 0, evite le drole de BUG
 
-  cst_Dcoeff = c_light*pi/(12.*sigma)
+  cst_Dcoeff = pi/(12.*sigma)
+
+  p_icell = icell_ref
 
   do k=1,n_az
      do j=j_start, nz
         if (j==0) cycle
         icell = cell_map(i,j,k)
+        if (lvariable_dust) p_icell = icell
         !Temp=Tdust(i,j,k)
         if (abs(DensE(i,j,k) - DensE_m1(i,j,k)) > precision * DensE_m1(i,j,k)) then
            ! On met a jour le coeff
@@ -54,7 +57,7 @@ subroutine setDiffusion_coeff(i)
               else
                  dB_dT = 0.0_dp
               endif
-              somme = somme + dB_dT/kappa(icell,lambda) * delta_wl
+              somme = somme + dB_dT/(kappa(p_icell,lambda) * kappa_factor(icell))  * delta_wl
            enddo
            ! kappa_R = 4.*sigma * Temp**3 / (pi * somme)
            ! Dcoeff = c_light/(3kappa_R) car kappa volumique
@@ -83,14 +86,17 @@ subroutine setDiffusion_coeff0(i)
   integer, intent(in) :: i
 
   real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
-  integer :: j, k, lambda, icell
+  integer :: j, k, lambda, icell, p_icell
 
-  cst_Dcoeff = c_light*pi/(12.*sigma)
+  cst_Dcoeff = pi/(12.*sigma)
+
+  p_icell = icell_ref
 
   do k=1,n_az
      do j=j_start,nz
         if (j==0) cycle
         icell = cell_map(i,j,k)
+        if (lvariable_dust) p_icell = icell
         Temp=Tdust(icell)
         cst=cst_th/Temp
         somme=0.0_dp
@@ -105,7 +111,7 @@ subroutine setDiffusion_coeff0(i)
            else
               dB_dT = 0.0_dp
            endif
-           somme = somme + dB_dT/kappa(icell,lambda) * delta_wl
+           somme = somme + dB_dT/(kappa(p_icell,lambda)*kappa_factor(icell)) * delta_wl
         enddo
         ! kappa_R = 4.*sigma * Temp**3 / (pi * somme)
         ! Dcoeff = c_light/(3kappa_R) car kappa volumique
@@ -619,5 +625,75 @@ subroutine diffusion_approx_nLTE_nRE()
   return
 
 end subroutine diffusion_approx_nLTE_nRE
+
+!************************************************************
+
+subroutine diffusion_opacity(icell, Planck_opacity,rec_Planck_opacity)
+  ! Compute current Planck reciprocal mean opacity for all cells
+  ! (note : diffusion coefficient needs to be defined with Rosseland opacity
+  ! in B&W mode)
+  ! Diffusion coefficient is D = 1/(rho * opacity)
+  ! This opacity/diffusion coefficient includes scattering
+  ! See Min et al 2009 and Robitaille et al 2010
+  use parametres
+  use constantes
+  use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
+  use Temperature, only : Tdust
+  use dust_prop, only : kappa
+  use Voronoi_grid, only : Voronoi
+  use cylindrical_grid, only : volume
+  use density, only : masse_gaz, densite_gaz
+
+  integer,  intent(in)  :: icell
+  real(dp), intent(out) :: Planck_opacity,rec_Planck_opacity ! cm2/g (ie per gram of gas)
+
+  integer :: lambda
+  real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl, norm, Temp
+
+  integer, pointer :: p_icell
+  integer, target :: icell0
+
+  icell0 = icell
+
+  temp = Tdust(icell)
+  if ((temp > 1) .and. (Voronoi(icell)%original_id > 0)) then
+
+     if (lvariable_dust) then
+        p_icell => icell0
+     else
+        p_icell => icell_ref
+     endif
+
+     somme  = 0.0_dp
+     somme2 = 0.0_dp
+     norm = 0.0_dp
+     cst    = cst_th/temp
+     do lambda = 1,n_lambda
+        ! longueur d'onde en metre
+        wl       = tab_lambda(lambda)*1.e-6
+        delta_wl = tab_delta_lambda(lambda)*1.e-6
+        cst_wl   = cst/wl
+        if (cst_wl < 200.0) then
+           coeff_exp = exp(cst_wl)
+           B = 1.0_dp/((wl**5)*(coeff_exp-1.0))*delta_wl
+           !dB_dT = cst_wl*coeff_exp/((wl**5)*(coeff_exp-1.0)**2)
+        else
+           B = 0.0_dp
+           !dB_dT = 0.0_dp
+        endif
+        somme  = somme  + B/(kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
+        somme2  = somme2  + B * (kappa(p_icell,lambda) * kappa_factor(icell0))*delta_wl
+        norm = norm + B*delta_wl
+     enddo
+     rec_Planck_opacity = norm/somme
+     Planck_opacity = somme2/norm
+  else
+     rec_Planck_opacity = 0.
+     Planck_opacity = 0.
+  endif
+
+end subroutine diffusion_opacity
+
+!************************************************************
 
 end module diffusion

@@ -1,0 +1,26 @@
+name: "release"
+description: "release"
+
+runs:
+  using: "composite"
+  steps:
+    - name: prepare tarball and checksum
+      working-directory: src
+      shell: bash
+      run: |
+        tar -cvzf mcfost.tar.gz mcfost
+        shasum -a 1 mcfost.tar.gz | awk '{print $1}' > mcfost_update.sha1
+
+    - name: Add binary to release
+      uses: shogo82148/actions-upload-release-asset@v1.6.6
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: src/mcfost.tar.gz
+        asset_name: ${{ format('mcfost_{0}-{1}.tar.gz', runner.os, runner.arch) }}
+
+    - name: Add sha1 to release
+      uses: shogo82148/actions-upload-release-asset@v1.6.6
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: src/mcfost_update.sha1
+        asset_name: ${{ format('mcfost_{0}-{1}.sha1', runner.os, runner.arch) }}

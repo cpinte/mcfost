@@ -18,7 +18,7 @@ contains
   subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
 
     use read_gadget2, only : read_gadget2_file
-    use dump_utils, only : get_error_text
+    use io_phantom_utils, only : get_error_text
     use utils, only : read_comments
 
     character(len=512), intent(in) :: SPH_file, SPH_limits_file
@@ -29,7 +29,7 @@ contains
     real(dp), allocatable, dimension(:) :: x,y,z,h,vx,vy,vz,rho,massgas,SPH_grainsizes,T_gas
     real(dp), allocatable, dimension(:) :: vturb,mass_ne_on_massgas,atomic_mask
     integer,  allocatable, dimension(:) :: particle_id
-    real(dp), allocatable, dimension(:,:) :: rhodust, massdust
+    real(dp), allocatable, dimension(:,:) :: rhodust, massdust, dust_moments
     real, allocatable, dimension(:) :: extra_heating
     logical, allocatable, dimension(:) :: mask ! size == np, not n_SPH, index is original SPH id
 
@@ -37,9 +37,10 @@ contains
     real(dp), dimension(6) :: SPH_limits
     real :: factor
     integer :: ndusttypes, ierr, i, ilen
-    logical :: check_previous_tesselation
+    logical :: check_previous_tesselation, ldust_moments
+    real(dp) :: mass_per_H
 
-
+    ldust_moments = .false.
     if (lphantom_file) then
        write(*,*) "Performing phantom2mcfost setup"
        if (n_phantom_files==1) then
@@ -65,7 +66,7 @@ contains
 
        call read_phantom_files(iunit,n_phantom_files,density_files, x,y,z,h,vx,vy,vz,T_gas, &
             particle_id, massgas,massdust,rho,rhodust,extra_heating,ndusttypes, &
-            SPH_grainsizes,mask,n_SPH,ierr)
+            SPH_grainsizes,mask,n_SPH,ldust_moments,dust_moments,mass_per_H,ierr)
 
        if (lphantom_avg) then ! We are averaging the dump
           factor = 1.0/n_phantom_files
@@ -106,7 +107,8 @@ contains
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
-         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, mask=mask)
+         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, &
+         ldust_moments, dust_moments, mass_per_H, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -156,8 +158,22 @@ contains
 
   !*********************************************************
 
+  subroutine print_moments(ki,a0,rhoi)
+
+    real(dp), intent(in) :: ki(0:3),a0,rhoi
+
+    print "(2x,a,1pg0.4,a)",         'a) number density of dust = ',ki(0),' cm^-3'
+    print "(2x,a,1pg0.4,a,1pg0.2,a)",'b) average grain radius   = ',ki(1)/ki(0),' times a0, or ',ki(1)/ki(0)*a0, ' '
+    print "(2x,a,1pg0.4,a,1pg0.2,a)",'c) average grain area     = ',4.*pi*a0**2*ki(2)/ki(0),' '
+    print "(2x,a,1pg0.4,a,1pg0.2,a)",'d) average particle size  = ',ki(3)/ki(0),' monomers'
+    print "(2x,a,1pg0.4,a,1pg0.2,a)",'e) opacity at Td=100      = ',ki(3)*pi*a0**3/rhoi*6.7*100. / mum_to_cm**3  ! Eq (42-43) of Siess et al. 2022
+
+  end subroutine print_moments
+
+  !*********************************************************
+
   subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, T_gas, massgas,massdust,rho,rhodust,&
-       SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, mask)
+       SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, ldust_moments, dust_moments, mass_per_H, mask)
 
     ! ************************************************************************************ !
     ! n_sph : number of points in the input model
@@ -180,6 +196,8 @@ contains
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
+    use reconstruct_from_moments
+    use, intrinsic :: ieee_arithmetic
 
     integer, intent(in) :: n_SPH, ndusttypes
     real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
@@ -187,24 +205,36 @@ contains
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(:), allocatable, intent(in) :: T_gas
     integer, dimension(n_SPH), intent(in) :: particle_id
-    real(dp), dimension(:,:), allocatable, intent(inout) :: rhodust, massdust ! ndusttypes,n_SPH
+    real(dp), dimension(:,:), allocatable, intent(inout) :: rhodust, massdust, dust_moments ! ndusttypes,n_SPH
     real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes ! ndusttypes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
     logical, dimension(:), allocatable, intent(in), optional :: mask
+    logical, intent(in) :: ldust_moments
+    real(dp), intent(in) :: mass_per_H
 
     integer, dimension(:), allocatable, intent(out) :: is_ghost
 
 
     logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
+    logical :: use_single_grain
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
+    real(dp), allocatable, dimension(:) :: gsize, grainsize_f, dN_ds, N_monomers, rho_monomers
+    real(dp), dimension(4) :: lambsol, lambguess
 
-    real(dp) :: mass, somme, Mtot, Mtot_dust, facteur
+    real(dp) :: mass, somme, Mtot, Mtot_dust, facteur, a, mass_factor
     real :: f, limit_threshold, density_factor
-    integer :: icell, l, k, iSPH, n_force_empty, i, id_n
+    integer :: icell, l, k, iSPH, n_force_empty, i, id_n, ierr, N_pb
 
     real(dp), dimension(6) :: limits
+
+    real(dp), parameter :: a0 = 1.28e-4 ! microns. Siess et al 2022
+
+    real(dp), dimension(4) :: ki, err
+    real(dp) ::rhoi, norm, mdust, mdust_tot, factor
+
+
 
     if (lcorrect_density_elongated_cells) then
        density_factor = correct_density_factor_elongated_cells
@@ -352,10 +382,97 @@ contains
        endif
     endif
 
-
     ! Tableau de densite et masse de poussiere
     ! interpolation en taille
-    if (ndusttypes >= 1) then
+    if (ldust_moments) then
+       write(*,*) "Reconstructing grain size distribution from moments ..."
+
+       mass = 0.0
+       do icell=1,n_cells
+          iSPH = Voronoi(icell)%id
+          mass = mass +  massgas(iSPH) * dust_moments(3,iSPH) * 12.*amu/mass_per_H
+       enddo
+       write(*,*) "Dust mass in phantom dump is ", real(mass), "Msun"
+
+       lvariable_dust = .true.
+       allocate(grainsize_f(n_grains_tot),gsize(n_grains_tot),dN_ds(n_grains_tot),&
+            N_monomers(n_grains_tot),rho_monomers(n_grains_tot))
+
+       N_monomers(:) = (r_grain(:)/a0)**3 ! number of monomers
+       dN_ds(:) = 3*r_grain(:)**2/a0**3
+
+       mass_factor = 12.*amu/mass_per_H
+
+       N_pb = 0
+       !$omp parallel &
+       !$omp default(none) &
+       !$omp private(icell,iSPH,use_single_grain,rhoi,ki,err,ierr,lambsol,rho_monomers,a,i,norm,mdust) &
+       !$omp shared(n_cells,Voronoi,densite_gaz,n_grains_tot,r_grain,mass_factor,dN_ds,N_monomers) &
+       !$omp shared(densite_pouss,dust_moments,masse_gaz,volume) &
+       !$omp reduction(+:N_pb)
+       !$omp do schedule(dynamic,1)
+       do icell=1,n_cells
+          iSPH = Voronoi(icell)%id
+          if (iSPH > 0) then
+             use_single_grain = .false.
+
+             !rhoi =  densite_gaz(icell) * cm_to_m**3 ! check that it is in cgs
+             ki = dust_moments(:,iSPH) !/ mass_per_H
+
+             call reconstruct_gamma_dist(ki,lambsol,err,ierr)
+             if (ierr/=1) N_pb = N_pb+1 ! 1 means no error!!!
+
+             do i=1,n_grains_tot
+                rho_monomers(i) = gamma_func_from_moments(N_monomers(i),ki(1:2),lambsol(1:2))
+                if (.not. ieee_is_finite(rho_monomers(i))) then
+                   use_single_grain = .true.
+                   exit
+                endif
+             enddo
+
+             densite_pouss(:,icell) = rho_monomers(:) * dN_ds(:)
+
+             ! Simple approximation : we assume 1 single grain size
+             if (use_single_grain) then
+                densite_pouss(:,icell) = 0._dp
+                if (dust_moments(1,iSPH) > tiny_dp) then
+                   a = a0 * dust_moments(2,iSPH)/dust_moments(1,iSPH)
+                   i = locate(1.0_dp*r_grain(:),a)
+                   densite_pouss(i,icell) = 1.0
+                endif
+             endif
+          else ! iSPH == 0, star
+             densite_pouss(:,icell) = 0._dp
+          endif
+       enddo ! icell
+       !$omp end do
+       !$omp end parallel
+
+       write(*,*) "Done"
+       if (N_pb > 0) write(*,*) "N cells with pb", N_pb, "/", n_cells
+
+       ! We normalise to the total dust mass in the dump
+       mdust_tot = 0.0_dp
+       do icell=1,n_cells
+          iSPH = Voronoi(icell)%id
+
+          mass = 0.0_dp
+          do l=1,n_grains_tot
+             mass=mass + (densite_pouss(l,icell) *1.0_dp) * M_grain(l)
+          enddo !l
+          mass = mass * volume(icell)
+
+          mdust =  massgas(iSPH) * dust_moments(3,iSPH) * 12.*amu/mass_per_H
+          mdust_tot = mdust_tot + mdust
+
+          if (mass > tiny_dp) then
+             factor = mdust/ mass
+             densite_pouss(:,icell) = densite_pouss(:,icell) * factor
+          endif
+       enddo !icell
+       call normalize_dust_density(mdust_tot) ! this should only calculates the array masse
+
+    elseif (ndusttypes >= 1) then
        lvariable_dust = .true.
 
        ! mcfost adds an extra grain size follwing the gas
@@ -473,6 +590,7 @@ contains
        ! Using the parameter file gas-to-dust ratio for now
        ! until phantom provides a proper grain size distribution
        call normalize_dust_density( sum(masse_gaz) * g_to_Msun / disk_zone(1)%gas_to_dust)
+
     else ! ndusttypes = 0 : using the gas density
        lvariable_dust = .false.
        write(*,*) "Using gas-to-dust ratio in mcfost parameter file"
@@ -546,9 +664,6 @@ contains
             (1.0*n_force_empty)/n_cells * 100, "% of cells"
     endif
 
-    write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'
-    write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
-
     search_not_empty : do k=1,n_grains_tot
        do icell=1, n_cells
           if (densite_pouss(k,icell) > 0.0_sp) then
@@ -559,6 +674,9 @@ contains
     enddo search_not_empty
 
     if (ndusttypes >= 1) deallocate(a_SPH,log_a_SPH,rho_dust)
+
+    write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'
+    write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
 
     return
 
@@ -931,7 +1049,7 @@ subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle
        stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
     enddo
 
-	lignore_dust = .true.
+    lignore_dust = .true.
     ndusttypes = 0
     llimits_file = .false.
     limits_file = ""

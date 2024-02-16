@@ -70,11 +70,11 @@ constraints on the derived parameters.
              bugs.
 
 
-Slack channel
--------------
+Github discussions
+------------------
 
-If you decide to use MCFOST, you should sign up to the `slack channel <https://mcfost.slack.com/>`__ in
-order to be informed of new releases, bugs. This is also a collaborative space
+If you decide to use MCFOST, have questions on how to use the code, or request for new features, please head to
+https://github.com/cpinte/mcfost/discussions. This is a collaborative space
 to discuss issues and future developments of MCFOST.
 
 

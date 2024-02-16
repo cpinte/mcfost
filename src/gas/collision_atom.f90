@@ -19,6 +19,7 @@ module collision_atom
    real(kind=dp), parameter :: C0 = ((E_RYDBERG/sqrt(mel)) * PI*(RBOHR)**2) * sqrt(8.0/(PI*KB))
    integer, parameter :: Max_size_elements = 100
    integer, parameter :: Nmax_lines = 10000 !number max of lines for all collision data
+   real(kind=dp), allocatable :: CI_hydrogen(:,:), CE_hydrogen(:,:,:)
 
    contains
 
@@ -34,28 +35,39 @@ module collision_atom
       ! return
 
       Cij(:,:) = 0d0; CI = 0d0; CE(:,:) = 0d0
-      call Johnson_CI(icell, CI) !bound-free i->Nlevel
+      ! call Johnson_CI(T(icell), CI) !bound-free i->Nlevel
+      CI(:) = CI_hydrogen(:,id)
       j = hydrogen%Nlevel
       do i=1, j-1
-         !ni_on_nj_star = ne(icell) * phi_T(icell, hydrogen%g(i)/hydrogen%g(hydrogen%Nlevel), hydrogen%E(hydrogen%Nlevel)-hydrogen%E(i))
-         ni_on_nj_star = hydrogen%nstar(i,icell) / hydrogen%nstar(j,icell)
+         ! ni_on_nj_star = ne(icell) * phi_T(T(icell), hydrogen%g(i), hydrogen%g(j), hydrogen%E(j)-hydrogen%E(i))
+         ! ni_on_nj_star = hydrogen%nstar(i,icell) / hydrogen%nstar(j,icell)
+         ni_on_nj_star = hydrogen%ni_on_nj_star(i,icell)
          kr = hydrogen%ij_to_trans(i,j) - hydrogen%Nline
          hydrogen%continua(kr)%Cij(id) = ne(icell) * CI(i) !deriv = Cij/ne
          hydrogen%continua(kr)%Cji(id) = ne(icell) * CI(i) * ni_on_nj_star !deriv = 2*Cji/ne
+         hydrogen%col_mat(i,j,id) = ne(icell) * CI(i) * ni_on_nj_star
+         hydrogen%col_mat(j,i,id) = ne(icell) * CI(i)
       enddo
 
       if (hydrogen%Nline==0) return
 
-      call Johnson_CE(icell, CE) !among all levels
+      ! call Johnson_CE(T(icell), CE) !among all levels
+      CE(:,:) = CE_hydrogen(:,:,id)
 
       !bound-levels
       !i-> hydrogen%Nlevel already filled
       do i=1,hydrogen%Nlevel
          do j=i+1,hydrogen%Nlevel-1
             kr = hydrogen%ij_to_trans(i,j)
-            ni_on_nj_star = hydrogen%nstar(i,icell) / hydrogen%nstar(j,icell)
+            if (hydrogen%nstar(j,icell)>0.0) then
+               ni_on_nj_star = hydrogen%nstar(i,icell) / hydrogen%nstar(j,icell)
+            else
+               ni_on_nj_star = 0.0 !correct ?
+            endif
             hydrogen%lines(kr)%Cij(id) = ne(icell) * CE(i,j) !deriv = Cij/ne
             hydrogen%lines(kr)%Cji(id) = ne(icell) * CE(i,j) * ni_on_nj_star !deriv = 2*Cji/ne
+            hydrogen%col_mat(i,j,id) = ne(icell) * CE(i,j) * ni_on_nj_star
+            hydrogen%col_mat(j,i,id) = ne(icell) * CE(i,j)
          enddo
       enddo
 
@@ -64,8 +76,14 @@ module collision_atom
     RETURN
    end subroutine collision_rates_hydrogen_loc
 
+   subroutine init_colrates_coeff_hydrogen(id,icell)
+      integer, intent(in) :: id, icell
+      call Johnson_CI(T(icell), CI_hydrogen(:,id)) !bound-free i->Nlevel
+      call Johnson_CE(T(icell), CE_hydrogen(:,:,id)) !among all levels
+      return
+   endsubroutine init_colrates_coeff_hydrogen
 
-   subroutine Johnson_CI(icell, Cik)
+   subroutine Johnson_CI(temp, Cik)
    ! --------------------------------------------------- !
    ! Ionisation rate coefficient for Hydrogen atom
    ! from lower level i to the continuum level k
@@ -78,7 +96,7 @@ module collision_atom
    !
    ! return C(i,k) with k = Nlevel (bound-free)
    ! --------------------------------------------------- !
-      integer, intent(in) :: icell
+      real(kind=dp), intent(in) :: temp
       real(kind=dp), intent(out), dimension(:) :: Cik
       integer :: i, j, Nl
       !real(kind=dp) :: x0 = 1 - (n/n0)**2 with n0 -> infinity
@@ -86,7 +104,7 @@ module collision_atom
 
       deltam = 1. + mel / (hydrogen%weight * AMU_kg)
 
-      C0 = sqrt(8.*KB*T(icell) / pi / mel)
+      C0 = sqrt(8.*KB*temp / pi / mel)
 
       Cik(:) = 0.0_dp
 
@@ -106,7 +124,7 @@ module collision_atom
 
          ! in Joules
          En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV: En = 13.6/n**2
-         yn = En / KB / T(icell)
+         yn = En / KB / temp
          !     An = 32. / 3. / sqrt(3d0) / pi * n  * (g0(n)/3. + g1(n)/4. + g2(n)/5.)
          An = 32. / 3. / sqrt(3d0) / pi * n  * (g0(i)/3. + g1(i)/4. + g2(i)/5.)
          Bnp = 2./3. * n*n * (5. + bn)
@@ -130,13 +148,13 @@ module collision_atom
    endsubroutine Johnson_CI
 
 
-   subroutine Johnson_CE(icell, Cij)
+   subroutine Johnson_CE(temp, Cij)
    ! ----------------------------------------------------- !
    ! Excitation rate coefficient for
    ! Hydrogen atom, from
    ! ApJ 74:227-236, 1972 May 15; eq. 36
    ! ----------------------------------------------------- !
-      integer, intent(in) :: icell
+      real(kind=dp), intent(in) :: temp
       real(kind=dp), intent(out), dimension(:,:) :: Cij
       integer :: i, j, Nl
       real(kind=dp) :: C0, rn, bn, n, Ennp, y, z, S, Bnnp, En
@@ -144,7 +162,7 @@ module collision_atom
 
       deltam = 1. + Mel/ (hydrogen%weight * AMU_kg)
 
-      C0 = sqrt(8.*KB*T(icell) / pi / MEL)
+      C0 = sqrt(8.*KB*temp / pi / MEL)
 
       Nl = hydrogen%Nlevel
 
@@ -169,7 +187,7 @@ module collision_atom
             Annp = 2.0 * n*n*fnnp/x
             ! in Joules
             En = E_RYDBERG /deltam / n / n !energie of level with different quantum number in 13.6eV = ionisation E of n
-            y = x * En / KB / T(icell) !x = ratio of E/En
+            y = x * En / KB / temp !x = ratio of E/En
             Bnnp = 4d0 * (n**4)/(np**3) / x / x * (1. + 4./(3.0 * x) + bn/x/x)
             z = rnnp + y
 
@@ -256,8 +274,9 @@ module collision_atom
    !  character(len=Nmax_line_per_collision), dimension(Nmax_lines) :: lines_in_file !check len char matches the one in atom%
     character(len=:), dimension(:), allocatable :: lines_in_file !check len char matches the one in atom%
     integer :: N !real number of lines
-    integer :: Nread, status
+    integer :: Nread, status, k, i1, i2, i, j, N_missing_trans
     character(len=3) :: END_OF_FILE="END", key
+    character(len=8) :: key_bis
     character(len=Nmax_line_per_collision*10) :: inputline, FormatLine
 
     allocate(character(len=Nmax_line_per_collision) :: lines_in_file(Nmax_lines))
@@ -286,6 +305,30 @@ module collision_atom
    !  if (atom%ID=="He")stop
 
     deallocate(lines_in_file)
+
+    !count missing transitions
+    N = size(atom%collision_lines)
+    N_missing_trans = 0
+    do k=1, N
+      inputline = atom%collision_lines(k)
+      key_bis = adjustl(inputline(1:len(key_bis)))
+      if ((key_bis=='TEMP').or.(key_bis==END_OF_FILE)) cycle
+      ! write(*,*) key_bis
+      ! write(*,*) inputline(1:len(key_bis)+8)
+      read(inputline(len(key_bis):len(key_bis)+8),*) i1, i2
+      i = min(i1,i2) + 1; j = max(i1,i2) + 1
+      ! write(*,*) "i=",i-1, "j=",j-1
+      !missing radiative (-99) but collisional present (-1)
+      !must remain <= 0 if no radiative
+      if (atom%ij_to_trans(i,j)==-99) then
+         ! write(*,*) "*** missing", i, j
+         atom%ij_to_trans(i,j) = -1
+         !reverse j->i is the same transition
+         atom%ij_to_trans(j,i) = -1
+         N_missing_trans = N_missing_trans + 1
+      endif
+    enddo
+   !  write(*,*) "N missing trans at reading:", N_missing_trans
 
     return
   end subroutine read_collisions
@@ -596,7 +639,7 @@ module collision_atom
     real(kind=dp) :: t0sh, t1sh, summrs, tg, cdn, ccup
     real(kind=dp) :: ar85t1, ar85t2, ar85a, ar85b, ar85c, ar85d, t4
     real(kind=dp) :: de,zz,betab,cbar,dekt,dekti,wlog,wb,sumscl
-    real(kind=dp) :: ni_on_nj
+    real(kind=dp) :: ni_on_nj, nj_on_ni
 
     sumscl = 0.0
     kr = 0 ; i = 0 ;j = 0
@@ -787,13 +830,20 @@ module collision_atom
        ! -- END of reading data for key, now computing collision rates -- !
        ! Still in the loop over the lines in the atomic file.
 
-       cdown = 0.0; Cup = 0.0
        if ((key.eq."OMEGA") .or. (key.eq."CE") .or. &
             (key.eq."CI") .or. (key.eq."CP") .or. &
             (key.eq."CH0") .or. (key.eq."CH+") .or. &
             (key.eq."CH").or.(key.eq."CR")) then
+         cdown = 0.0; Cup = 0.0
 
-
+         !if not a bound-free the ratio is not defined yet
+         !so I cannot yet use atom%ni_on_nj_star
+         ni_on_nj = atom%nstar(i,icell) / atom%nstar(j,icell)
+         nj_on_ni = 1.0_dp / ni_on_nj
+         ! ni_on_nj = 1d100
+         ! nj_on_ni = 1d100
+         ! if (atom%nstar(j,icell) > 0.0) ni_on_nj = atom%nstar(i,icell) / atom%nstar(j,icell)
+         ! if (ni_on_nj > 0.0) nj_on_ni = 1.0_dp / ni_on_nj
           !here Nitem is NTMP !
           if (Nitem /= NTMP) call error("Error, Nitem should be NTMP!")
 
@@ -813,7 +863,8 @@ module collision_atom
           !Cdown means from j->i
          Cdown = C0 * ne(icell) * CC / (atom%g(j)*sqrt(T(icell)))
          !cup means i->j
-         Cup = Cdown * atom%nstar(j,icell)/atom%nstar(i,icell)
+         ! Cup = Cdown * atom%nstar(j,icell)/atom%nstar(i,icell)
+         Cup = Cdown * nj_on_ni
 
        else if (key.eq."CE") then
           ! -- Collisional excitation of neutrals
@@ -823,7 +874,8 @@ module collision_atom
           Cdown = CC * ne(icell) * gij * sqrt(T(icell)) !CE(RH)=CE*gj/gi*ni/nj / sqrt(T)=CC
           !write(*,*) key, "k=",k, "Cdown = ", Cdown, C(k)
           !write(*,*) "ne=",ne(k), gij, "sqrt(T)=",sqrt(T(k))
-          Cup = Cdown * atom%nstar(j,icell)/atom%nstar(i,icell)
+         !  Cup = Cdown * atom%nstar(j,icell)/atom%nstar(i,icell)
+          Cup = Cdown * nj_on_ni
 
        else if (key.eq."CI") then
           ! -- Collisional ionisation
@@ -831,7 +883,8 @@ module collision_atom
           Cup = CC * ne(icell) * exp(-deltaE/(KB*T(icell))) *sqrt(T(icell))
           !write(*,*) key, "k=",k, "Cup = ", Cup, C(k)
           !write(*,*) "dE=",deltaE," exp()=",exp(-deltaE/(kb*T(k)))
-          Cdown = Cup * atom%nstar(i,icell)/atom%nstar(j,icell)
+         !  Cdown = Cup * atom%nstar(i,icell)/atom%nstar(j,icell)
+          Cdown = Cup * ni_on_nj
 
 
        else if (key.eq."CR") then
@@ -844,11 +897,14 @@ module collision_atom
           ! protons are the last level of Hydrogen atoms
           np = Hydrogen%n(Hydrogen%Nlevel,icell)
           Cdown = np * CC
-          Cup = Cdown * atom%nstar(j,icell) / atom%nstar(i,icell)
+         !  Cup = Cdown * atom%nstar(j,icell) / atom%nstar(i,icell)
+          Cup = Cdown * nj_on_ni
+
        else if (key.eq."CH") then
           ! -- Collisions with neutral hydrogen
           Cup = Hydrogen%n(1,icell) * CC
-          Cdown = Cup * atom%nstar(i,icell) / atom%nstar(j,icell)
+         !  Cdown = Cup * atom%nstar(i,icell) / atom%nstar(j,icell)
+          Cdown = Cup * ni_on_nj
        else if (key.eq."CH0") then
           ! -- Charge exchange with neutral hydrogen
           Cdown = Hydrogen%n(1,icell)*CC
@@ -874,7 +930,8 @@ module collision_atom
           cdn = cdn * ne(icell) * (CM_TO_M)**3
           cup = cup*ne(icell) * (CM_TO_M)**3
           ! -- 3-body recombination (high density limit)
-          cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
+         !  cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
+          cdn = cdn + cup*ni_on_nj
           !write(*,*) "k=",k, " cdn = ", cdn
           Cdown = cdn
        else if (key.eq."BADNELL") then
@@ -893,9 +950,11 @@ module collision_atom
           !write(*,*) "k=",k, " cdn = ", cdn, " summrs = ",summrs, "cdn=", cdn
           ! -- convert from cm3/s to m3/s
           cdn = cdn *ne(icell) * summrs * (CM_TO_M)**3
-          cup = cdn * atom%nstar(j,icell)/atom%nstar(i,icell)
+         !  cup = cdn * atom%nstar(j,icell)/atom%nstar(i,icell)
+         !  cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
 
-          cdn = cdn + cup*atom%nstar(i,icell)/atom%nstar(j,icell)
+          cup = cdn * nj_on_ni
+          cdn = cdn + cup * ni_on_nj
 
           Cdown = cdn
 
@@ -916,7 +975,8 @@ module collision_atom
           end do
           if (cup < 0.0_dp) cup = 0.0_dp
           cup = cup * ne(icell)
-          cdn = cup * atom%nstar(i,icell)/atom%nstar(j,icell)
+         !  cdn = cup * atom%nstar(i,icell)/atom%nstar(j,icell)
+          cdn = cup * ni_on_nj
           Cdown = cdn
        else if (key.eq."AR85-CEA") then
           ! -- Autoionisation
@@ -973,7 +1033,8 @@ module collision_atom
           cup = 2.1715d-8 * cbar * (13.6/de)**(1.5d0) * sqrt(dekt) * E1(dekt) * wb * ne(icell) * (CM_TO_M)**3
           ! -- Fudge factor
           cup = cup * coeff(1)
-          cdn = cup * atom%nstar(i,icell) / atom%nstar(j,icell)
+         !  cdn = cup * atom%nstar(i,icell) / atom%nstar(j,icell)
+          cdn = cup * ni_on_nj
           write(*,*) "BRUGESS, cdn=", cdn, " cup=", cup
           Cdown = Cdn
        end if
@@ -986,6 +1047,14 @@ module collision_atom
             atom%lines(kr)%Cji(id) = atom%lines(kr)%Cji(id) + Cdown
             atom%lines(kr)%Cij(id) = atom%lines(kr)%Cij(id) + cup
          endif
+      endif
+
+      !In case some collision data exists for absent radiative transitions (form some reasons),
+      !write the collision data without the need of a radiative transition (kr > 0).
+      if (key /= "TEMP") then ! otherwise i and j are 0
+         ! -1 (no radiative but collisional) is to distangle with -99 (no radiative and no collisional)
+         atom%col_mat(i,j,id) = atom%col_mat(i,j,id) + Cdown
+         atom%col_mat(j,i,id) = atom%col_mat(j,i,id) + Cup
       endif
 
     end do loop_lines_in_file

@@ -206,8 +206,7 @@ subroutine NLTE_mol_line_transfer(imol)
   if (alloc_status > 0) call error('Allocation error tab_speed')
   tab_speed = 0.0_dp
 
-  allocate(I0(-n_speed:n_speed,nTrans_tot,n_rayons_start,nb_proc), &
-       I0c(nTrans_tot,n_rayons_start,nb_proc), stat=alloc_status)
+  allocate(I0(-n_speed:n_speed,nTrans_tot,n_rayons_start,nb_proc), I0c(nTrans_tot,n_rayons_start,nb_proc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error I0')
   I0 = 0.0_dp
   I0c = 0.0_dp
@@ -506,8 +505,8 @@ subroutine emission_line_map(imol,ibin,iaz)
   integer :: ri_RT, phi_RT, nTrans_raytracing
 
   integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, lambda, iv
-  real :: vmax_center_rt, extra_deltaV_rt
-  logical :: lresolved
+  real :: vmin_center_rt, vmax_center_rt, extra_deltaV_rt
+  logical :: lresolved, l_sym_ima_mol
 
  ! Direction de visee pour le ray-tracing
   u = tab_u_RT(ibin,iaz) ;  v = tab_v_RT(ibin,iaz) ;  w = tab_w_RT(ibin) ;
@@ -518,26 +517,25 @@ subroutine emission_line_map(imol,ibin,iaz)
   n_extraV_rt = mol(imol)%n_extraV_rt
 
   vmax_center_rt = mol(imol)%vmax_center_rt
+  vmin_center_rt = mol(imol)%vmin_center_rt
   extra_deltaV_rt = mol(imol)%extra_deltaV_rt
 
   nTrans_raytracing = mol(imol)%nTrans_raytracing
 
   if ((ibin == 1).and.(iaz==1)) then
-     allocate(I0(-n_speed_rt:n_speed_rt,nTrans_raytracing,1,nb_proc), &
-          I0c(nTrans_raytracing,1,nb_proc))
-
-     allocate(tab_speed_rt(-n_speed_rt:n_speed_rt))
+     allocate(I0(n_speed_rt,nTrans_raytracing,1,nb_proc),I0c(nTrans_raytracing,1,nb_proc))
+     allocate(tab_speed_rt(n_speed_rt))
 
      ! centre de la raie
-     tab_speed_rt(-n_speed_center_rt:n_speed_center_rt) = span(-vmax_center_rt,vmax_center_rt,2*n_speed_center_rt+1)
-     ! ailes de la raie
-     tab_speed_rt(n_speed_center_rt+1:n_speed_rt) = indgen(n_extraV_rt) * extra_deltaV_rt + vmax_center_rt
-     do i = -n_speed_rt, -n_speed_center_rt-1
-        tab_speed_rt(i) = (i+n_speed_center_rt) * extra_deltaV_rt - vmax_center_rt
-     enddo
+     tab_speed_rt(1:n_speed_center_rt) = span(vmin_center_rt,vmax_center_rt,n_speed_center_rt)
+     !! ailes de la raie
+     !tab_speed_rt(n_speed_center_rt+1:n_speed_rt) = indgen(n_extraV_rt) * extra_deltaV_rt + vmax_center_rt
+     !do i = -n_speed_rt, -n_speed_center_rt-1
+     !   tab_speed_rt(i) = (i+n_speed_center_rt) * extra_deltaV_rt - vmax_center_rt
+     !enddo
 
      if (lorigine) then
-        allocate(origine_mol(-n_speed_rt:n_speed_rt,nTrans_raytracing,n_cells,nb_proc))
+        allocate(origine_mol(n_speed_rt,nTrans_raytracing,n_cells,nb_proc))
         origine_mol = 0.0
      endif
   endif
@@ -572,6 +570,8 @@ subroutine emission_line_map(imol,ibin,iaz)
   ! Coin en bas gauche de l'image
   Icorner(:) = center(:) - 0.5 * map_size * (x_plan_image + y_plan_image)
 
+  l_sym_ima_mol = mol(imol)%l_sym_ima
+
   if (RT_line_method == 1) then ! method 1 : echantillonanage log
      ! Pas de sous-pixel car les pixels ne sont pas carres
      n_iter_min = 1
@@ -602,10 +602,10 @@ subroutine emission_line_map(imol,ibin,iaz)
      !$omp default(none) &
      !$omp private(ri_RT,id,r,taille_pix,phi_RT,phi,pixelcorner) &
      !$omp shared(tab_r,fact_A,x_plan_image,y_plan_image,center,dx,dy,u,v,w,i,j) &
-     !$omp shared(n_iter_min,n_iter_max,l_sym_ima,cst_phi,imol,ibin,iaz)
+     !$omp shared(n_iter_min,n_iter_max,l_sym_ima_mol,cst_phi,imol,ibin,iaz)
      id =1 ! pour code sequentiel
 
-     if (l_sym_ima) then
+     if (l_sym_ima_mol) then
         cst_phi = pi  / real(n_phi_RT,kind=dp)
      else
         cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
@@ -636,7 +636,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      dx(:) = x_plan_image * taille_pix
      dy(:) = y_plan_image * taille_pix
 
-     if (l_sym_ima) then
+     if (l_sym_ima_mol) then
         npix_x_max = npix_x/2 + modulo(npix_x,2)
      else
         npix_x_max = npix_x
@@ -675,7 +675,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      lambda =  mol(imol)%indice_Trans_raytracing(i) ! == iTrans
      call compute_stars_map(lambda, ibin, iaz, u, v, w, taille_pix, dx, dy, lresolved)
 
-     do iv =  -n_speed_rt, n_speed_rt
+     do iv = 1, n_speed_rt
         spectre(:,:,iv,i,ibin,iaz) = spectre(:,:,iv,i,ibin,iaz) + stars_map(:,:,1)
      enddo
      continu(:,:,i,ibin,iaz) = continu(:,:,i,ibin,iaz) + stars_map(:,:,1)
@@ -721,9 +721,9 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   n_speed_rt = mol(imol)%n_speed_rt
   nTrans_raytracing = mol(imol)%nTrans_raytracing
 
-  allocate(IP(-n_speed_rt:n_speed_rt,nTrans_raytracing), IP_old(-n_speed_rt:n_speed_rt,nTrans_raytracing), IPc(nTrans_raytracing))
+  allocate(IP(n_speed_rt,nTrans_raytracing), IP_old(n_speed_rt,nTrans_raytracing), IPc(nTrans_raytracing))
 
-  ispeed(1) = -n_speed_rt ; ispeed(2) = n_speed_rt
+  ispeed(1) = 1 ; ispeed(2) = n_speed_rt
 
 
   labs = .false.
@@ -1145,7 +1145,7 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
 
   ! Tableau vitesse
   !nTrans_raytracing = mol(imol)%nTrans_raytracing
-  ispeed(1) = -mol(imol)%n_speed_rt ; ispeed(2) = mol(imol)%n_speed_rt
+  ispeed(1) = 1 ; ispeed(2) = mol(imol)%n_speed_rt
 
   ! Boucle sur les pixels de l'image
   !$omp parallel &
@@ -1258,7 +1258,7 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
 
   ! Tableau vitesse
   !nTrans_raytracing = mol(imol)%nTrans_raytracing
-  ispeed(1) = -mol(imol)%n_speed_rt ; ispeed(2) = mol(imol)%n_speed_rt
+  ispeed(1) = 1 ; ispeed(2) = mol(imol)%n_speed_rt
 
   ! Boucle sur les pixels de l'image
   !$omp parallel &

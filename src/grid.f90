@@ -19,6 +19,7 @@ module grid
   procedure(indice_cellule_cyl), pointer :: indice_cellule => null()
   procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
+  procedure(distance_to_closest_wall_Voronoi), pointer :: distance_to_closest_wall => null()
 
   real(kind=dp) :: v_char, B_char
   logical :: lcalc_ne, lmagnetized
@@ -307,6 +308,7 @@ subroutine setup_grid()
      indice_cellule => indice_cellule_Voronoi
      test_exit_grid => test_exit_grid_Voronoi
      define_grid => define_Voronoi_grid
+     distance_to_closest_wall => distance_to_closest_wall_Voronoi
   else
      if (lvariable_dust) then
         p_n_rad=n_rad ; p_nz = nz
@@ -363,81 +365,6 @@ subroutine setup_grid()
   return
 
 end subroutine setup_grid
-
-
-subroutine nn_ksmooth(arr)
-  !Nearest Neighbours Kernel smoother.
-  !TO DO:
-  ! 	- Voronoi, cylindrical, spherical 2D (l3d = .false.)
-  !
-  !   - Edges of the grid are not smoothed yet
-  real(kind=dp), intent(inout) :: arr(n_cells)
-  real(kind=dp), dimension(:), allocatable :: A
-  integer :: i,j,k, icell
-  integer :: n_az_end, n_az_start
-  real(kind=dp) :: w8, w4, w2, w1, w0, norm, total
-
-  w0 = 0.0; w1 = 1.0; w2 = 2.0
-  w4 = w2 * w2
-  w8 = w2 * w4
-!   w2 = w1; w4 = w1; w8 = w1
-  norm = 1.0 * w8 + 6.0 * w4 + 12.0 * w2 + 8.0 * w1
-
-  !does not work if grid is cylindrical yet
-  if ((lcylindrical).or.(.not.l3d).or.(lvoronoi)) then
-   write(*,*) " No smoothing in that geometry..."   
-   return
-  endif
-
-
-  total = sum(arr)
-  allocate(A(n_cells))
-  A = arr !copy array to temporarily handle the edges (which are not smoothed)!
-  if (n_az==1) then
-    !2.5d because z < 0 but phi = 0 everywhere
-    n_az_end = 1
-    n_az_start = 1
-   else
-    !full 3d
-    n_az_end = n_az-1
-    n_az_start = min(2,n_az-1)
-  endif
-  do i=2, n_rad-1
-    bz : do j=j_start+1+1,nz-1-1
-      if (j==0) cycle bz
-      do k=n_az_start, n_az_end
-        icell = cell_map(i,j,k)
-        if (icompute_atomRT(icell) <= 0) cycle
-
-         A(icell) = ( w8 * arr(icell) + &
-
-         w4 * ( arr(cell_map(i,j,k+1)) +  arr(cell_map(i,j+1,k)) + &
-            arr(cell_map(i+1,j,k)) + arr(cell_map(i,j,k-1)) + &
-            arr(cell_map(i,j-1,k)) + arr(cell_map(i-1,j,k)) ) + &
-
-         w2 * ( arr(cell_map(i,j+1,k+1)) + arr(cell_map(i,j+1,k-1)) + &
-            arr(cell_map(i,j-1,k+1)) + arr(cell_map(i,j-1,k-1)) + &
-            arr(cell_map(i+1,j+1,k)) + arr(cell_map(i+1,j-1,k)) + &
-            arr(cell_map(i+1,j,k+1)) + arr(cell_map(i+1,j,k-1)) +  &
-            arr(cell_map(i-1,j,k+1)) + arr(cell_map(i-1,j,k-1)) + &
-            arr(cell_map(i+1,j-1,k)) + arr(cell_map(i-1,j+1,k)) ) + &
-
-         w1 * ( arr(cell_map(i+1,j+1,k+1)) + arr(cell_map(i-1,j-1,k-1)) + &
-            arr(cell_map(i+1,j-1,k+1)) + arr(cell_map(i+1,j-1,k-1)) + &
-            arr(cell_map(i-1,j+1,k-1)) + arr(cell_map(i-1,j+1,k+1)) + &
-            arr(cell_map(i-1,j-1,k+1)) + arr(cell_map(i+1,j+1,k-1)) ) ) / norm
-
-         ! write(*,*) icell," input=", arr(icell), " smooth:", A(icell)
-      enddo
-    enddo bz
-  enddo
-  !copy back and output
-  arr = A * total / sum(A)
-  deallocate(A)
-
-  return
-
-end subroutine nn_ksmooth
 
 !******************************************************************************
 
