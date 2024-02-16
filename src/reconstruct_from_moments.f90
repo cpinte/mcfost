@@ -177,7 +177,7 @@ contains
 
        gamma_func = beta * p / Gamma(d_on_p) * x**(d-1) * ((theta)**(-d) * (expterm))
     endif
-    if (isnan(gamma_func)) print*,gamma_func,beta,p, Gamma(d_on_p), x**(d-1), ((theta)**(-d) * (expterm))
+    !if (isnan(gamma_func)) write(*,*) gamma_func,beta,p, Gamma(d_on_p), x**(d-1), ((theta)**(-d) * (expterm))
 
   end function gamma_func
 
