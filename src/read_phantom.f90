@@ -729,6 +729,9 @@ contains
 
     ! Modifying SPH dump
     if (ldelete_Hill_sphere .or. ldelete_inside_rsph .or. ldelete_outside_rsph .or. ldelete_above_theta) then
+       write(*,*) "MODIFY DUMP"
+       read(*,*)
+
        allocate(mask(np))
        mask(:) = .false.
     endif
@@ -819,14 +822,10 @@ contains
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
        ulength_scaled = ulength * scale_length_units_factor
-    else
-       scale_length_units_factor = 1.0
     endif
     if (lscale_mass_units) then
        write(*,*) 'Mass are rescaled by ', real(scale_mass_units_factor)
        umass_scaled = umass * scale_mass_units_factor
-    else
-       scale_mass_units_factor = 1.0
     endif
     utime_scaled = sqrt(ulength_scaled**3/(G_phantom*umass_scaled))
 
