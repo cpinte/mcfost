@@ -183,7 +183,9 @@ subroutine set_default_variables()
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
   lscale_length_units = .false.
+  scale_length_units_factor = 1.0
   lscale_mass_units = .false.
+  scale_mass_units_factor = 1.0
   lignore_dust = .false.
   lupdate_velocities = .false.
   lno_vr = .false.
