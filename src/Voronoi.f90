@@ -236,10 +236,11 @@ module Voronoi_grid
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
-    if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
+    !if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 
     nb_proc_voro = min(16,nb_proc)
     allocate(n_neighbours(nb_proc_voro))
+    write(*,*) "Using ",nb_proc_voro," cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
