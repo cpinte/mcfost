@@ -4,6 +4,7 @@ module mess_up_SPH
 
   implicit none
 
+  ! mask is set to 1 for hide particle == opacity set to 0, and set to 2 to delete particle before tesselation
   public :: mask_Hill_sphere, randomize_azimuth, randomize_gap, mask_inside_rsph, mask_outside_rsph, mask_above_theta
 
   private
@@ -22,7 +23,7 @@ contains
     real(kind=dp), dimension(:,:), intent(in) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: udist
 
-    logical, dimension(np), intent(inout) :: mask
+    integer, dimension(np), intent(inout) :: mask
 
     integer :: i_planet, i, n_delete
     real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz
@@ -53,7 +54,7 @@ contains
           ! We then test on the sphere itself
           d2 = dx**2 + dy**2 + dz**2
           if (d2 < r_Hill2) then ! particle is in Hill sphere
-             mask(i) = .true.
+             mask(i) = 1
              n_delete = n_delete + 1
           endif
        enddo particle_loop
@@ -73,7 +74,7 @@ contains
     real(kind=dp), dimension(:,:), intent(in) :: xyzh
     real(kind=dp), intent(in) :: udist, rsph
 
-    logical, dimension(np), intent(inout) :: mask
+    integer, dimension(np), intent(inout) :: mask
 
     integer :: i, n_delete
     real(kind=dp) :: d2, r, r2, dx, dy, dz, ulength_au
@@ -95,7 +96,7 @@ contains
        ! We then test on the sphere itself
        d2 = dx**2 + dy**2 + dz**2
        if (d2 < r2) then ! particle is inside rsph
-          mask(i) = .true.
+          mask(i) = 1
           n_delete = n_delete + 1
        endif
     enddo particle_loop
@@ -113,26 +114,27 @@ contains
     real(kind=dp), dimension(:,:), intent(in) :: xyzh
     real(kind=dp), intent(in) :: udist, rsph
 
-    logical, dimension(np), intent(inout) :: mask
+    integer, dimension(np), intent(inout) :: mask
 
     integer :: i, n_delete
     real(kind=dp) :: d2, r, r2, ulength_au
 
+
     ulength_au = udist * scale_length_units_factor  / au_to_cm
     r = rsph /  ulength_au  ! converting back to phantom code units
-
     r2 = r * r
 
     n_delete = 0
     particle_loop : do i=1, np
        d2 = sum(xyzh(1:3,i)**2)
        if (d2 > r2) then ! particle is outside rsph
-          mask(i) = .true.
+          mask(i) = 2
           n_delete = n_delete + 1
        endif
     enddo particle_loop
 
     write(*,*) n_delete, "particles were deleted outside rsph=", rsph
+
     return
 
   end subroutine mask_outside_rsph
@@ -146,7 +148,7 @@ contains
     real(kind=dp), intent(in) :: udist
     real, intent(in) :: theta_max
 
-    logical, dimension(np), intent(inout) :: mask
+    integer, dimension(np), intent(inout) :: mask
 
     integer :: i, n_delete
     real(kind=dp) :: r, tan_theta_max, tan_theta
@@ -159,7 +161,7 @@ contains
        tan_theta = abs(xyzh(3,i)/r)
 
        if (tan_theta > tan_theta_max) then ! particle is above theta_max
-          mask(i) = .true.
+          mask(i) = 1
           n_delete = n_delete + 1
        endif
     enddo particle_loop
@@ -211,13 +213,13 @@ contains
 
     integer, intent(in) :: np
     real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
-    logical, dimension(np), intent(in), optional :: mask
+    integer, dimension(np), intent(in), optional :: mask
     real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
     integer :: i
 
     particle_loop : do i=1, np
        if (present(mask)) then
-          if (.not.mask(i)) cycle particle_loop
+          if (mask(i)>0) cycle particle_loop
        endif
        call random_number(phi)
        phi = 2.*pi*phi
@@ -252,14 +254,14 @@ contains
     real(kind=dp), intent(in) :: udist, factor
     logical, intent(in) :: inside
 
-    logical, dimension(np) :: mask ! true for the particles in the gaps
+    integer, dimension(np) :: mask ! true for the particles in the gaps
 
     integer :: i_planet, i, n_inside
     real(kind=dp) :: r_Hill2, r_hill, r_planet, r_minus2, r_plus2, r2
 
     ! We assume that the 1st sink particle is the actual star
     ! and the following sink particles are planets
-    mask(:) = .false.
+    mask(:) = 0
     do i_planet=2, nptmass
        n_inside = 0
 
@@ -277,7 +279,7 @@ contains
 
           if (r2 < r_plus2) then
              if (r2 > r_minus2) then
-                mask(i) = .true.
+                mask(i) = 1
                 n_inside = n_inside + 1
              endif
           end if
@@ -287,7 +289,7 @@ contains
     enddo
 
     if (.not.inside) then
-       mask(:) = .not.mask(:)
+       mask(:) = 1 - mask(:)
     endif
 
     call randomize_azimuth(np, xyzh, vxyzu, mask)

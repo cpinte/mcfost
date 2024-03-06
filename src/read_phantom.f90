@@ -19,7 +19,7 @@ contains
     real(dp), intent(out), dimension(:),   allocatable :: rhogas,massgas,SPH_grainsizes,T_gas
     integer,  intent(out), dimension(:),   allocatable :: particle_id
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust, dust_moments
-    logical, dimension(:), allocatable, intent(out) :: mask
+    integer, dimension(:), allocatable, intent(out) :: mask
     real, intent(out), dimension(:), allocatable :: extra_heating
     integer, intent(out) :: ndusttypes,n_SPH,ierr
     logical, intent(out) :: ldust_moments
@@ -468,7 +468,7 @@ contains
          SPH_grainsizes
     integer,  intent(out), dimension(:),   allocatable :: particle_id
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust,dust_moments
-    logical, dimension(:), allocatable, intent(out) :: mask
+    integer, dimension(:), allocatable, intent(out) :: mask
     real, intent(out), dimension(:), allocatable :: extra_heating
     integer, intent(out) :: ndusttypes,n_SPH,ierr
     logical, intent(out) :: ldust_moments
@@ -723,17 +723,14 @@ contains
     real(kind=dp), allocatable, dimension(:,:), intent(inout) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: ulength
     real(kind=dp), dimension(3) :: centre
-    logical, dimension(:), allocatable, intent(out) :: mask
+    integer, dimension(:), allocatable, intent(out) :: mask
 
     integer :: i
 
     ! Modifying SPH dump
     if (ldelete_Hill_sphere .or. ldelete_inside_rsph .or. ldelete_outside_rsph .or. ldelete_above_theta) then
-       write(*,*) "MODIFY DUMP"
-       read(*,*)
-
        allocate(mask(np))
-       mask(:) = .false.
+       mask(:) = 0
     endif
 
     if (ldelete_Hill_sphere)  call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,ulength, mask)
