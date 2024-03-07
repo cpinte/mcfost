@@ -264,8 +264,10 @@ module Voronoi_grid
     k=1
     if (allocated(mask)) then  ! we delete particles with mask==2
        do i=1, n_points
-          if (mask(i)==2) do_tesselation(i) = .false.
-          k=k+1
+          if (mask(i)==2) then
+             do_tesselation(i) = .false.
+             k=k+1
+          endif
        enddo
     end if
 
