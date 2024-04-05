@@ -4,17 +4,26 @@
 The MCFOST radiative transfer code
 ==================================
 
-- Code: <https://github.com/cpinte/mcfost>
-- Docs: <https://mcfost.readthedocs.io/>
+<p align='center'>
+  <br/>
+  <img src="https://github.com/cpinte/mcfost/blob/main/logo/mcfost_logo.png" width="300" height="300">
+  <br/>
+</p>
 
-[![build-gfortran-macos](https://github.com/cpinte/mcfost/actions/workflows/build-gfortran-macos.yml/badge.svg)](https://github.com/cpinte/mcfost/actions/workflows/build-gfortran-macos.yml) 
-[![Documentation Status](https://readthedocs.org/projects/mcfost/badge/?version=stable)](https://mcfost.readthedocs.io/en/stable/?badge=stable)
+- Code: <https://github.com/cpinte/mcfost>
+- Docs: <https://mcfost.readthedocs.io>
+
+[![test-suite](https://github.com/cpinte/mcfost/actions/workflows/test-suite.yml/badge.svg)](https://github.com/cpinte/mcfost/actions/workflows/test-suite.yml)
+[![Documentation Status](https://readthedocs.org/projects/mcfost/badge/?version=latest)](https://mcfost.readthedocs.io/en/latest/)
 
 About
 -----
 
 MCFOST is a 3D continuum and line radiative transfer code based on an hybrid Monte Carlo and ray-tracing method. It is mainly designed to study the circumstellar environment of young stellar objects, but has been used for a wide range of astrophysical problems. The calculations are done exactly within the limitations of the Monte Carlo noise and machine precision, i.e. no approximation are used in the calculations. The code has been strongly optimized for speed.
 
+Code of conduct
+---------------
+If you wish to use the code, please make sure you agree to adhere to the [code of conduct](https://github.com/cpinte/mcfost?tab=coc-ov-file).
 
 Code Papers
 -----------
@@ -45,6 +54,11 @@ We welcome contributions, including (but not limited to):
 1. Code, via [pull request](https://github.com/cpinte/mcfost/pulls). Please read developer section of user guide for guidelines.
 2. Documentation, also by [pull request](https://github.com/cpinte/mcfost/pulls). Docs can be edited in the docs/ directory of the main code.
 3. Suggestions for features or bug reports, via the [issue tracker](https://github.com/cpinte/mcfost/issues/new). Please file bugs via github rather than by email.
+
+Questions?
+----------
+
+Discussions about the code and its use have moved [here](https://github.com/cpinte/mcfost/discussions).
 
 Visualising your results
 ------------------------

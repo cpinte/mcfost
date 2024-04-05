@@ -69,9 +69,10 @@ subroutine set_default_variables()
   lDutrey94 = .false.
   lHH30mol = .false.
   lemission_mol=.false.
+  lescape_prob = .false.
   lcheckpoint = .false.
   checkpoint_period = 15
-  llimit_mem = .false. !if true, contopac are computed locally.
+  limit_mem = 0 ! {0, 1, 2}
   laccretion_shock = .false. !for magnetospheric accretion
   !HEALpix
   healpix_lorder = 1
@@ -82,6 +83,7 @@ subroutine set_default_variables()
   lsafe_stop = .false.
   safe_stop_time = 155520.0!1.8days in seconds, default
   lemission_atom = .false.
+  ldust_atom = .false. !coupling dust and atomic RT
   lelectron_scattering = .false.
   lstop_after_jnu = .false.
   lsolve_for_ne = .false.
@@ -181,7 +183,9 @@ subroutine set_default_variables()
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
   lscale_length_units = .false.
+  scale_length_units_factor = 1.0
   lscale_mass_units = .false.
+  scale_mass_units_factor = 1.0
   lignore_dust = .false.
   lupdate_velocities = .false.
   lno_vr = .false.
@@ -212,6 +216,8 @@ subroutine set_default_variables()
   llinear_rgrid = .false.
   image_offset_centre(:) = (/0.0,0.0,0.0/)
   loverwrite_s12 = .false.
+  lnot_random_Voronoi = .false.
+  lignore_sink=.false.
 
   tmp_dir = "./"
 
@@ -226,6 +232,8 @@ subroutine set_default_variables()
   SPH_keep_particles = 0.999
 
   vfield_coord = 0
+
+  v_syst = 0.0_dp
 
   return
 
@@ -318,9 +326,9 @@ subroutine initialisation_mcfost()
   call set_default_variables()
 
   ! Setting up web-server
-  call get_environment_variable('MCFOST_WEB_SERVER',s) ; if  (s/="") web_server = s
-  webpage = trim(web_server)//trim(webpage)
-  utils_webpage = trim(web_server)//trim(utils_webpage)
+  !call get_environment_variable('MCFOST_WEB_SERVER',s) ; if  (s/="") web_server = s
+  !webpage = trim(web_server)//trim(webpage)
+  !utils_webpage = trim(web_server)//trim(utils_webpage)
 
   ! Looking for the mcfost utils directory
   call get_mcfost_utils_dir()
@@ -676,9 +684,16 @@ subroutine initialisation_mcfost()
      case("-mol")
         i_arg = i_arg+1
         lemission_mol=.true.
+     case("-escape_prob")
+        i_arg = i_arg + 1
+        lescape_prob = .true.
      case("-limit_mem")
         i_arg = i_arg + 1
-        llimit_mem = .true.
+        if (i_arg > nbr_arg) call error("limit_mem switch value need!")
+        call get_command_argument(i_arg,s)
+        read(s,*,iostat=ios) limit_mem
+        if (limit_mem > 2) call error("limit_mem switch must be <= 2!")
+        i_arg= i_arg+1
      case("-safe_stop")
         i_arg = i_arg + 1
         lsafe_stop = .true.
@@ -1441,6 +1456,17 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) Pmax
         i_arg = i_arg + 1
+     case("-v_syst")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) v_syst
+        i_arg = i_arg + 1
+     case("-not_random_Voronoi")
+        i_arg = i_arg + 1
+        lnot_random_Voronoi = .true.
+     case("-ignore_sink")
+        i_arg = i_arg + 1
+        lignore_sink=.true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1748,9 +1774,12 @@ subroutine initialisation_mcfost()
      write (*,'(" Sequential code")')
   endif
 
-  if ((l_sym_ima).and.(abs(ang_disque) > 1e-6)) then
+  if ((l_sym_ima).and.(abs(ang_disque+90) > 1e-6)) then
      call warning("PA different from zero: removing image symetry")
      l_sym_ima=.false.
+     do imol=1,n_molecules
+        mol(imol)%l_sym_ima = .false.
+     enddo
   endif
 
   cmd = 'date'
@@ -1942,7 +1971,7 @@ subroutine display_help()
   write(*,*) "        : -op <wavelength> (microns) : computes dust properties at"
   write(*,*) "                                    specified wavelength and stops"
   write(*,*) "        : -aggregate <GMM_input_file> <GMM_output_file>"
-  write(*,*) "        : -Fresnel <Mueller_matrix_input_file> "
+  write(*,*) "        : -Fresnel <Mueller_matrix_input_file>  Uses a Mueller matrix from the Fresnel database"
   write(*,*) "        : -Fresnel_per_size <Mueller_matricesinput_pathfile> "
 !  write(*,*) "                   Argument pathfile contain the size of each grain, and the path"
 !  write(*,*) "                   for each associated matrix for every grain size, sorted"
@@ -1981,6 +2010,7 @@ subroutine display_help()
   write(*,*) " "
   write(*,*) " Options related to atomic lines emission"
   !healpix options missing. Waiting finle adaptive scheme.
+  write(*,*) "        : -escape_prob : Force solution on the non-LTE problem to the escape probability (or Sobolev)"
   write(*,*) "        : -start_step <int> : Select the first step for non-LTE loop (default 1)"
   write(*,*) "        : -end_step <int>   : Select the last step for non-LTE loop (default 2)"
 !   write(*,*) "        : -checkpoint <int> : activate checkpointing of non-LTE populations every <int> iterations"
@@ -2001,7 +2031,8 @@ subroutine display_help()
 !   write(*,*) "        : -zeeman_polarisation : Stokes profiles Zeeman."
   write(*,*) "        : -safe_stop : stop calculation if time > calc_time_limit"
   write(*,*) "        : -safe_stop_time <real> : calc_time_limit in days "
-  write(*,*) "        : -limit_mem : compute background continua on the fly."
+  write(*,*) "        : -limit_mem <val> : switch for limiting memory usage (atomic transfer) in {0, 1, 2} (default 0)."
+  write(*,*) "        : -v_syst <v_syst> : systemic velocity [km/s]."
 
   write(*,*) " "
   write(*,*) " Options related to phantom"
@@ -2026,6 +2057,8 @@ subroutine display_help()
   write(*,*) "        : -SPH_amax <size> [mum] : force the grain size that follow the dust"
   write(*,*) "                                   (only works with 1 grain size dump)"
   write(*,*) "        : -force_Mgas : force the gas mass to be the value given the mcfost parameter file"
+  write(*,*) "        : -not_random_Voronoi : force the particle order to remain the same"
+  write(*,*) "        : -ignore_sink : forces nptmass to 0, ie not stars in mcfost"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

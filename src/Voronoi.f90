@@ -26,7 +26,7 @@ module Voronoi_grid
      integer :: id, original_id, first_neighbour, last_neighbour
      logical(kind=lp) :: exist, is_star, was_cut
      logical :: is_star_neighbour!.true. if .not.is_star and a star's neighbour! default is .false..
-     logical :: masked
+     integer :: masked ! 1 if transparent, 2 if deleted before tesselation
   end type Voronoi_cell
 
   type Voronoi_wall
@@ -194,7 +194,7 @@ module Voronoi_grid
 
     !************************************************************************
 
-  subroutine Voronoi_tesselation(n_points, particle_id, x,y,z,h, vx,vy,vz, is_ghost, limits, check_previous_tesselation)
+  subroutine Voronoi_tesselation(n_points, particle_id, x,y,z,h, vx,vy,vz, is_ghost, mask, limits, check_previous_tesselation)
 
     use iso_fortran_env
     use, intrinsic :: iso_c_binding, only : c_bool
@@ -204,6 +204,7 @@ module Voronoi_grid
     real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h
     real(kind=dp), dimension(:), allocatable, intent(in) :: vx,vy,vz
     integer, dimension(:), allocatable, intent(in) :: is_ghost
+    integer, dimension(:), allocatable, intent(in) :: mask
     integer, dimension(n_points), intent(in) :: particle_id
     real(kind=dp), dimension(6), intent(in) :: limits
     logical, intent(in) :: check_previous_tesselation
@@ -222,6 +223,7 @@ module Voronoi_grid
     integer, dimension(:), allocatable :: n_neighbours ! nb_proc
     logical(c_bool), dimension(:), allocatable :: was_cell_cut, was_cell_cut_tmp
     logical(c_bool), dimension(:), allocatable :: star_neighb_tmp, star_neighb
+    logical, dimension(:), allocatable :: do_tesselation
 
     logical :: is_outside_stars, lcompute
 
@@ -232,14 +234,15 @@ module Voronoi_grid
     real(kind=dp), parameter :: threshold = 3 ! defines at how many h cells will be cut
     character(len=2) :: unit
 
-    logical, parameter :: lrandom = .true.
+    logical :: lrandom
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
-    if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
+    !if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 
     nb_proc_voro = min(16,nb_proc)
     allocate(n_neighbours(nb_proc_voro))
+    write(*,*) "Using ",nb_proc_voro," cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
@@ -253,14 +256,34 @@ module Voronoi_grid
 
     alloc_status = 0
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
-         SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), stat=alloc_status)
+         SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), do_tesselation(n_points), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
+
+    ! Pre-filter to check if we need to do the tesselation for each particle
+    do_tesselation(:) = .true.
+    k=1
+    if (allocated(mask)) then  ! we delete particles with mask==2
+       do i=1, n_points
+          if (mask(i)==2) then
+             do_tesselation(i) = .false.
+             k=k+1
+          endif
+       enddo
+    end if
+
+    do i=1, n_points ! we delete ghost particles
+       if (is_ghost(i) /= 0) then
+          do_tesselation(i) = .false.
+          k = k+1
+       endif
+    enddo
+    write(*,*) k, "particles have been deleted before tesselation"
 
     ! Filtering particles outside the limits
     icell = 0
     n_sublimate = 0
     do i=1, n_points
-       if (is_ghost(i) == 0) then
+       if (do_tesselation(i)) then
           ! We test if the point is in the model volume
           !-> Voronoi cells are now cut at the surface of the star. We only need to test if a particle is below Rstar.
           if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
@@ -277,7 +300,7 @@ module Voronoi_grid
 
                       if (min(dx,dy,dz) < etoile(istar)%r) then
                          dist2 = dx**2 + dy**2 + dz**2
-                         if (dist2 < etoile(istar)%r**2) then
+                         if (dist2 < 4.0*etoile(istar)%r**2) then
                             is_outside_stars = .false.
                             n_sublimate = n_sublimate + 1
                             exit loop_stars
@@ -290,14 +313,18 @@ module Voronoi_grid
                       SPH_id(icell) = i ; SPH_original_id(icell) = particle_id(i)
                       x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(icell) = h(i)
                    endif
-                endif
-             endif
-          endif
-       endif
+                endif ! z
+             endif ! y
+          endif ! x
+       endif ! do_tesselation
     enddo
     n_cells_before_stars = icell
     n_cells = icell
     n_cells_per_cpu = (1.0*n_cells) / nb_proc_voro + 1
+
+
+    lrandom = .true.
+    if (lnot_random_Voronoi) lrandom = .false.
 
     ! Randomizing particles
     if (lrandom) then
@@ -324,8 +351,8 @@ module Voronoi_grid
     endif
 
     if (n_sublimate > 0) then
-       write(*,*) n_sublimate, "particles are located inside the stars"
-       write(*,*) "Not implemented yet : MCFOST will probably crash !!!!"
+       write(*,*) "Warning", n_sublimate, "particles are located too close to the stars,"
+       write(*,*) "e.g. < 2*Rstar, and will be deleted."
     endif
 
     ! Filtering stars outside the limits
@@ -963,6 +990,81 @@ module Voronoi_grid
     return
 
   end subroutine cross_Voronoi_cell
+
+  !----------------------------------------
+
+  real(dp) function distance_to_closest_wall_Voronoi(id,icell,x,y,z) result(s)
+
+
+    integer, intent(in) :: id, icell
+    real(kind=dp), intent(in) :: x,y,z
+
+    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
+    real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
+    integer :: i, id_n, l, ifirst, ilast
+
+    integer :: i_star, check_cell
+    real(kind=dp) :: d_to_star
+    logical :: is_a_star_neighbour
+
+    real(kind=dp), dimension(3) :: delta_r
+
+    ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
+    real, dimension(3) :: n, p, r, k, r_cell, r_neighbour
+
+    if (Voronoi(icell)%was_cut) then
+       s=0
+       return
+    endif
+
+    r(1) = x ; r(2) = y ; r(3) = z
+
+    s=1e30
+
+    ! We do all the access to Voronoi(icell) now
+    r_cell = Voronoi(icell)%xyz(:)
+    ifirst = Voronoi(icell)%first_neighbour
+    ilast = Voronoi(icell)%last_neighbour
+
+    l=0
+    do i=ifirst,ilast
+       l = l+1
+       id_n = neighbours_list(i) ! id du voisin
+
+       if (id_n > 0) then ! cellule
+          if (l <= n_saved_neighbours) then ! we used an ordered array to limit cache misses
+             r_neighbour(:) = Voronoi_neighbour_xyz(:,l,icell)
+          else
+             r_neighbour(:) = Voronoi_xyz(:,id_n)
+          endif
+
+          ! unnormalized vector to plane
+          n(:) = r_neighbour(:) - r_cell(:)
+          k(:) = n(:) ! We use the normal also as a direction
+
+          ! test direction
+          den = dot_product(n, k)
+
+          ! point on the plane
+          p(:) = 0.5 * (r_neighbour(:) + r_cell(:))
+          ! All of the above is the same for each step as long as we stay in the same cell
+
+
+          s_tmp = dot_product(n, p-r) / den
+
+          if (s_tmp < 0.) s_tmp = huge(1.0)
+       else ! id_n < 0 : neighbourgh is a wall
+          s_tmp = 0.0_dp ! so do not want to run the MRW in that case, so we set d=0
+       endif
+
+       if (s_tmp < s) then
+          s = s_tmp
+       endif
+    enddo
+
+    return
+
+  end function distance_to_closest_wall_Voronoi
 
   !----------------------------------------
 

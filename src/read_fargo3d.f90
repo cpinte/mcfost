@@ -108,8 +108,6 @@ contains
 
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
-    else
-       scale_length_units_factor = 1.0
     endif
 
     disk_zone(1)%rin  = fargo3d%ymin * scale_length_units_factor
@@ -154,16 +152,13 @@ contains
     Ggrav_fargo3d = 1.0_dp
 
     if (lscale_length_units) then
+       write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
        ulength_au = ulength_au * scale_length_units_factor
-    else
-       scale_length_units_factor = 1.0
     endif
 
     if (lscale_mass_units) then
-       write(*,*) 'Mass are rescaled by ', real(scale_mass_units_factor)
+       write(*,*) 'Masses are rescaled by ', real(scale_mass_units_factor)
        usolarmass = usolarmass * scale_mass_units_factor
-    else
-       scale_mass_units_factor = 1.0
     endif
 
     umass = usolarmass *  Msun_to_kg

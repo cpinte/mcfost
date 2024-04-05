@@ -40,7 +40,7 @@ module atom_type
       real(kind=dp) :: lambda0, lambdamin, lambdamax
       real(kind=dp) :: Aji, Bji, Bij, Grad, cStark, fosc
       real(kind=dp) :: twohnu3_c2, gij
-      real(kind=dp) :: vmax, damp_max !m/s and in units of vth
+      real(kind=dp) :: vmax, damp_max, damp_min !m/s
       real :: qwing
       real(kind=dp), allocatable, dimension(:)  :: Rij, Rji, Cij, Cji 
       real(kind=dp), dimension(4) :: cvdWaals
@@ -58,6 +58,7 @@ module atom_type
       character(len=ATOM_ID_WIDTH) :: ID
       character(len=28) :: filename
       logical :: active, lline !non-lte ?, images ?
+      logical :: lany_gauss_prof
       integer :: initial, nTrans_raytracing
       !initial:
       !0->LTE; 1->OLD_POPULATIONS; 2->ZERO_RADIATION; 3->CSWITCH; 4->SOBOLEV/CEP 
@@ -70,6 +71,7 @@ module atom_type
       integer, allocatable, dimension(:,:) :: ij_to_trans !from i and j return the index of a transiton
       !Compatibility with RH, stored the collision in character format!
       character(len=Nmax_line_per_collision), allocatable, dimension(:) :: collision_lines !to keep all remaning lines in atomic file
+      real(kind=dp), allocatable :: col_mat(:,:,:) !Collision matrix C(i,j) = Col j->i (Cji)
       real(kind=dp)                :: cswitch, Abund
       real(kind=dp) :: vth_char ! typical Doppler width the gaussian lines.
       real :: weight, massf !mass fraction
@@ -86,6 +88,7 @@ module atom_type
       logical                :: NLTEpops, set_ltepops
       real(kind=dp), allocatable :: Gamma(:,:,:), dgdne(:,:,:) !derivative of Gamma to ne (n_iterate_ne>0)
       real(kind=dp), dimension(:,:), pointer :: n, nstar
+      real(kind=dp), dimension(:,:), allocatable :: ni_on_nj_star
       ! real(kind=dp), dimension(:,:) :: phi_T !such that nexphi_T = ni/nj
       type (AtomicLine), allocatable, dimension(:)         :: lines
       type (AtomicContinuum) , allocatable, dimension(:)   :: continua
@@ -506,7 +509,7 @@ module atom_type
          endif
       enddo
 
-      if (print_message) write(*,'(" cswitch for next iteration: "(1ES17.8E3))') new_cs
+      if (print_message) write(*,'(" ** cswitch for next iteration: "(1ES17.8E3))') new_cs
 
 
       return
@@ -521,5 +524,22 @@ module atom_type
   
       return
     end function vbroad
+
+   function ntotal_ions(icell)
+      real(kind=dp) :: ntotal_ions
+      integer, intent(in) :: icell
+      integer :: n, j, il
+
+      ntotal_ions = 0.0
+      do n=1,n_atoms
+         do il=1, Atoms(n)%p%Nlevel
+            if (atoms(n)%p%stage(il)>0) then
+               ntotal_ions = ntotal_ions + atoms(n)%p%n(il,icell)*atoms(n)%p%stage(il)
+            endif
+         enddo
+      enddo
+
+      return
+   end function ntotal_ions
 
 end module atom_type

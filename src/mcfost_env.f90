@@ -4,14 +4,16 @@ module mcfost_env
 
   implicit none
 
-  real, parameter :: mcfost_version = 4.0
-  character(8), parameter :: mcfost_release = "4.0.01"
+  real, parameter :: mcfost_version = 4.1
+  character(8), parameter :: mcfost_release = "4.1.03"
   real, parameter :: required_utils_version = 4.0
 
-  character(len=128) :: web_server    = "http://ipag.osug.fr/public/pintec/"
-  character(len=128) :: webpage       = "/mcfost/"
-  character(len=128) :: utils_webpage = "/mcfost_utils/"
+  !character(len=128) :: web_server    = "https://ipag.osug.fr/public/pintec/"
+  character(len=128) :: webpage       = "https://github.com/cpinte/mcfost/releases/latest/download/"
+  character(len=128) :: utils_webpage = "https://ipag.osug.fr/public/pintec/mcfost_utils/"
   character(len=128) :: doc_webpage   = "https://mcfost.readthedocs.io/"
+  character(len=128) :: raw_webpage  = "https://raw.githubusercontent.com/cpinte/mcfost/master/src/"
+  character(len=32)  :: version_file  = "mcfost_env.f90"
 
   ! Système
   integer :: nb_proc
