@@ -31,7 +31,7 @@ contains
     integer,  allocatable, dimension(:) :: particle_id
     real(dp), allocatable, dimension(:,:) :: rhodust, massdust, dust_moments
     real, allocatable, dimension(:) :: extra_heating
-    logical, allocatable, dimension(:) :: mask ! size == np, not n_SPH, index is original SPH id
+    integer, allocatable, dimension(:) :: mask ! size == np, not n_SPH, index is original SPH id (update, I think it is id)
 
     integer, dimension(:), allocatable :: is_ghost
     real(dp), dimension(6) :: SPH_limits
@@ -189,7 +189,7 @@ contains
     ! sph_grainsizes : size of grains for sph models
     ! sph_limits : limit of the input model box
     ! check_previous_tesselation :
-    ! mask :
+    ! mask : integer array, 1 if a SPH particle will be made transparent, 2 if deleted before tesselation
     ! ************************************************************************************ !
     use Voronoi_grid
     use density, only : densite_gaz, masse_gaz, densite_pouss, masse
@@ -209,7 +209,7 @@ contains
     real(dp), dimension(:), allocatable, intent(in) :: SPH_grainsizes ! ndusttypes
     real(dp), dimension(6), intent(in) :: SPH_limits
     logical, intent(in) :: check_previous_tesselation
-    logical, dimension(:), allocatable, intent(in), optional :: mask
+    integer, dimension(:), allocatable, intent(in), optional :: mask
     logical, intent(in) :: ldust_moments
     real(dp), intent(in) :: mass_per_H
 
@@ -233,7 +233,6 @@ contains
 
     real(dp), dimension(4) :: ki, err
     real(dp) ::rhoi, norm, mdust, mdust_tot, factor
-
 
 
     if (lcorrect_density_elongated_cells) then
@@ -322,21 +321,29 @@ contains
        limits(:) = SPH_limits(:)
     endif
 
+    if (ldelete_outside_rSPH) then
+       limits(1) = max(-rsph_max,limits(1))
+       limits(3) = max(-rsph_max,limits(3))
+       limits(5) = max(-rsph_max,limits(5))
+
+       limits(2) = min(rsph_max,limits(2))
+       limits(4) = min(rsph_max,limits(4))
+       limits(6) = min(rsph_max,limits(6))
+    endif
+
     write(*,*) "# Model limits :"
     write(*,*) "x =", limits(1), limits(2)
     write(*,*) "y =", limits(3), limits(4)
     write(*,*) "z =", limits(5), limits(6)
-
 
     call test_duplicate_particles(n_SPH, particle_id, x,y,z, massgas,massdust,rho,rhodust, is_ghost)
 
     !*******************************
     ! Voronoi tesselation
     !*******************************
-    call Voronoi_tesselation(n_SPH, particle_id, x,y,z,h,vx,vy,vz, is_ghost, limits, check_previous_tesselation)
+    call Voronoi_tesselation(n_SPH, particle_id, x,y,z,h,vx,vy,vz, is_ghost, mask, limits, check_previous_tesselation)
     !deallocate(x,y,z)
     write(*,*) "Using n_cells =", n_cells
-
 
     !*************************
     ! Densities
@@ -614,21 +621,21 @@ contains
     if (present(mask)) then
        if (allocated(mask)) then
           do icell=1,n_cells
-             iSPH = Voronoi(icell)%original_id
+             iSPH = Voronoi(icell)%id
              if (iSPH > 0) then
                 Voronoi(icell)%masked = mask(iSPH)
              else
-                Voronoi(icell)%masked = .false.
+                Voronoi(icell)%masked = 0
              endif
           enddo
        else
           do icell=1,n_cells
-             Voronoi(icell)%masked = .false.
+             Voronoi(icell)%masked = 0
           enddo
        endif
     else
        do icell=1,n_cells
-          Voronoi(icell)%masked = .false.
+          Voronoi(icell)%masked = 0
        enddo
     endif
 
@@ -876,7 +883,7 @@ contains
 
     k=0
     do icell=1, n_cells
-       if (Voronoi(icell)%masked) then
+       if (Voronoi(icell)%masked == 1) then
           k=k+1
           masse_gaz(icell)       = 0.
           densite_gaz(icell)     = 0.
@@ -939,45 +946,6 @@ contains
     return
 
   end subroutine delete_Hill_sphere
-
-  !*********************************************************
-
-  subroutine randomize_azimuth(n_points, x,y, vx,vy)
-
-    use naleat, only : seed, stream
-    use stars
-#include "sprng_f.h"
-
-    integer, intent(in) :: n_points
-    real(kind=dp), dimension(n_points), intent(inout) :: x, y, vx,vy
-    integer, parameter :: nb_proc = 1
-    integer :: i, id, istar
-    real(kind=dp) :: cos_phi, sin_phi, phi, x_tmp, y_tmp
-
-    particle_loop : do i=1, n_points
-       ! We do not touch the sink particles
-       do istar=1, n_etoiles
-          if (i == etoile(istar)%icell) cycle particle_loop
-       enddo
-
-       call random_number(phi)
-       phi = 2*pi*phi
-       cos_phi = cos(phi) ; sin_phi = sin(phi)
-
-       !-- position
-       x_tmp = x(i) * cos_phi + y(i) * sin_phi
-       y_tmp = -x(i) * sin_phi + y(i) * cos_phi
-       x(i) = x_tmp ; y(i) = y_tmp
-
-       !-- velocities
-       x_tmp = vx(i) * cos_phi + vy(i) * sin_phi
-       y_tmp = -vx(i) * sin_phi + vy(i) * cos_phi
-       vx(i) = x_tmp ; vy(i) = y_tmp
-    enddo particle_loop
-
-    return
-
-  end subroutine randomize_azimuth
 
   !*********************************************************
 
