@@ -1,7 +1,7 @@
 module wavelengths
 
   use mcfost_env, only : dp, band
-  use parametres, only : n_pop
+  use parametres
   use messages
 
   implicit none
@@ -64,6 +64,10 @@ subroutine init_lambda()
 
   endif
 
+  if (loutput_UV_field .and. lsed_complete .and. (tab_lambda_inf(1) > 0.0912)) then ! 0.2
+     call warning("Shortest wavelengths is larger than 0.0912mum, UV field won't be properly estimated !!!")
+  endif
+
 end subroutine init_lambda
 
 !**********************************************************************
@@ -82,6 +86,10 @@ subroutine init_lambda2()
      tab_lambda_sup(i)= tab_lambda2_sup(i)
      tab_delta_lambda(i)= tab_delta_lambda2(i)
   enddo
+
+  if (loutput_UV_field .and. (tab_lambda_inf(1) > 0.0912)) then ! 0.2
+     call warning("Shortest wavelengths is larger than 0.0912mum, UV field won;t be properly estimated !!!")
+  endif
 
   return
 

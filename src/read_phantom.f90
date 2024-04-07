@@ -936,8 +936,6 @@ contains
                 vz(j) = vzi * uvelocity
              endif
 
-
-
              if (ldust_moments) dust_moments(:,j) = nucleation(1:4,i) ! indexing is different from phantom as I read starting at k0
 
              T_gas(j) = T_gasi
