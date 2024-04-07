@@ -123,6 +123,7 @@ subroutine alloc_dynamique(n_cells_max)
   use stars, only : allocate_stellar_spectra
   use thermal_emission, only : allocate_temperature, allocate_thermal_emission, &
        allocate_weight_proba_emission, allocate_thermal_energy
+  use radiation_field, only :  allocate_radiation_field_step1
   use output, only : allocate_origin
 
   integer, intent(in), optional :: n_cells_max
@@ -269,6 +270,8 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   if (lTemp) call allocate_thermal_emission(Nc, p_Nc)
 
+  call allocate_radiation_field_step1(Nc)
+
   ! **************************************************
   ! Tableaux relatifs aux SEDs
   ! **************************************************
@@ -370,7 +373,6 @@ subroutine realloc_dust_mol(imol)
   integer, intent(in) :: imol
 
   integer :: alloc_status, iTrans_min, iTrans_max
-  real :: mem_size
 
   iTrans_min = mol(imol)%iTrans_min
   iTrans_max = mol(imol)%iTrans_max
@@ -436,23 +438,23 @@ subroutine clean_mem_dust_mol()
 
 end subroutine clean_mem_dust_mol
 
+!******************************************************************************
+
 subroutine realloc_dust_atom()
-!this routine should be the mirror of the mol one, except for the tab_lambda which is allocated
-!when the gas atom RT grid is defined (from reading the atomic species).
-!Still, the test on the allocation and the call of clean_mem_dust_mol in init_dust_atom means
-!that theya re not deallocated after temperature calculation. What am I missing ? 
+  ! This routine should be the mirror of the mol one, except for the tab_lambda which is allocated
+  ! when the gas atom RT grid is defined (from reading the atomic species).
+  ! Still, the test on the allocation and the call of clean_mem_dust_mol in init_dust_atom means
+  ! that they are not deallocated after temperature calculation. What am I missing ?
 
-!   use stars, only : allocate_stellar_spectra !-> not use yet in atom transfer.
-
+  !   use stars, only : allocate_stellar_spectra !-> not use yet in atom transfer.
 
   integer :: alloc_status
-  real :: mem_size
 
   if (lvariable_dust) then
      write(*,*) " WARNING: sizes of dust transfer could be very big !"
      !TO DO: better storing of quantities / recuction of n_lambda
   endif
-	
+
   !Note: tab_lambda(n_lambda) is already allocated in atomic_transfer
   !	the tab_lambda_* or tab_delta_lambda should be de-allocated when tab_lambda is allocated in atom_rt.
   allocate(tab_lambda_inf(n_lambda), tab_lambda_sup(n_lambda), tab_delta_lambda(n_lambda), &
@@ -510,8 +512,6 @@ subroutine realloc_dust_atom()
   return
 
 end subroutine realloc_dust_atom
-
-!******************************************************************************
 
 !******************************************************************************
 

@@ -2392,17 +2392,23 @@ subroutine ecriture_UV_field()
   bitpix=-32
   extend=.true.
 
-  if (l3D) then
-     naxis=3
-     naxes(1)=n_rad
-     naxes(2)=2*nz
-     naxes(3)=n_az
-     nelements=naxes(1)*naxes(2)*naxes(3)
+  if (lVoronoi) then
+     naxis=1
+     naxes(1)=n_cells
+     nelements=naxes(1)
   else
-     naxis=2
-     naxes(1)=n_rad
-     naxes(2)=nz
-     nelements=naxes(1)*naxes(2)
+     if (l3D) then
+        naxis=3
+        naxes(1)=n_rad
+        naxes(2)=2*nz
+        naxes(3)=n_az
+        nelements=naxes(1)*naxes(2)*naxes(3)
+     else
+        naxis=2
+        naxes(1)=n_rad
+        naxes(2)=nz
+        nelements=naxes(1)*naxes(2)
+     endif
   endif
 
   !  Write the required header keywords.
@@ -2434,16 +2440,20 @@ end subroutine ecriture_UV_field
 
 function compute_UV_field() result(G)
 
-  real, dimension(n_cells) :: G
+  real, dimension(:), allocatable :: G
 
   integer :: lambda, l, icell
   integer, parameter :: n=200
 
   real(kind=dp) :: n_photons_envoyes, energie_photon
-  real(kind=dp), dimension(n_lambda,n_cells) :: J
+  real(kind=dp), dimension(:,:), allocatable :: J ! n_lambda,n_cells
   real(kind=dp), dimension(n) :: wl, J_interp
   real(kind=dp), dimension(n_lambda) :: lamb
   real(kind=dp) :: delta_wl
+  integer :: alloc_status
+
+  allocate(J(n_lambda,n_cells), G(n_cells), stat=alloc_status)
+  if (alloc_status /= 0) call error("allocation error in compute_UV_field")
 
   do lambda=1, n_lambda
      n_photons_envoyes = sum(n_phot_envoyes(lambda,:))

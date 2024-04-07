@@ -114,8 +114,6 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   if (alloc_status > 0) call error('Allocation error kappa_abs_1grain')
   DensE = 0.0 ; DensE_m1 = 0.0
 
-  call allocate_radiation_field_step1(Nc)
-
   allocate(xT_ech(Nc,nb_proc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error xT_ech')
   xT_ech = 2
