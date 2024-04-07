@@ -427,7 +427,7 @@ subroutine Mueller_input(lambda, k_abs,k_sca,gsca)
      read(1,*) wavel(l), kabs(l), ksca(l), g(l)
   enddo
 
-  wl = tab_lambda(wl)
+  wl = tab_lambda(lambda)
   if (wl < minval(wavel)) call error("Mueller matrices: wavelength is smaller than tabulated")
   if (wl > maxval(wavel)) call error("Mueller matrices: wavelength is larger than tabulated")
 
