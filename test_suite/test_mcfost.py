@@ -11,9 +11,9 @@ _mcfost_bin = "../src/mcfost"
 # Get list of models using directory names
 model_list = glob.glob1("test_data/","*")
 
-# If running on CI, only test ref3.0
-if os.environ.get('CI', None) == 'true':
-    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
+# If running on CI, only run some of the tests
+#if os.environ.get('CI', None) == 'true':
+#    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
 
 #model_list = ["ref3.0_multi"]#,"debris","discF_00500"]
 
