@@ -940,10 +940,6 @@ contains
 
              if (ldust_moments) dust_moments(:,j) = nucleation(1:4,i) ! indexing is different from phantom as I read starting at k0
 
-             if (i==1) then
-                write(*,*) "read", i, j, dust_moments(:,j)
-             endif
-
              T_gas(j) = T_gasi
              rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
              dustfraci = sum(dustfrac(:,i))
