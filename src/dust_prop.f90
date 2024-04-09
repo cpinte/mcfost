@@ -1064,8 +1064,8 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos) &
-  !$omp shared(tab_s11,tab_s12,tab_s33,tab_s34,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos) &
+  !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
+  !$omp shared(tab_s11,tab_s12,tab_s22,tab_s33,tab_s34,tab_s44,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos) &
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells,fact) &
   !$omp shared(C_ext,C_sca,densite_pouss,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
   !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,lphase_function_file,s11_file,loverwrite_s12,Pmax) &
@@ -1076,8 +1076,10 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
         tab_s11_pos(:,icell,p_lambda) = 0.
         if (lsepar_pola) then
            tab_s12_o_s11_pos(:,icell,p_lambda) = 0.
+           tab_s22_o_s11_pos(:,icell,p_lambda) = 0.
            tab_s33_o_s11_pos(:,icell,p_lambda) = 0.
            tab_s34_o_s11_pos(:,icell,p_lambda) = 0.
+           tab_s44_o_s11_pos(:,icell,p_lambda) = 0.
         endif
      endif
 
@@ -1090,8 +1092,10 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) + tab_s11(:,k,lambda) * S_grain(k) * density
            if (lsepar_pola) then
               tab_s12_o_s11_pos(:,icell,p_lambda) = tab_s12_o_s11_pos(:,icell,p_lambda) + tab_s12(:,k,lambda) * S_grain(k) * density
+              tab_s22_o_s11_pos(:,icell,p_lambda) = tab_s22_o_s11_pos(:,icell,p_lambda) + tab_s22(:,k,lambda) * S_grain(k) * density
               tab_s33_o_s11_pos(:,icell,p_lambda) = tab_s33_o_s11_pos(:,icell,p_lambda) + tab_s33(:,k,lambda) * S_grain(k) * density
               tab_s34_o_s11_pos(:,icell,p_lambda) = tab_s34_o_s11_pos(:,icell,p_lambda) + tab_s34(:,k,lambda) * S_grain(k) * density
+              tab_s44_o_s11_pos(:,icell,p_lambda) = tab_s44_o_s11_pos(:,icell,p_lambda) + tab_s44(:,k,lambda) * S_grain(k) * density
            endif
         endif !aniso_method
      enddo !k
@@ -1136,8 +1140,10 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
                  norme=1.0/tab_s11_pos(l,icell,p_lambda)
                  if (lsepar_pola) then
                     tab_s12_o_s11_pos(l,icell,p_lambda)=tab_s12_o_s11_pos(l,icell,p_lambda)*norme
+                    tab_s22_o_s11_pos(l,icell,p_lambda)=tab_s22_o_s11_pos(l,icell,p_lambda)*norme
                     tab_s33_o_s11_pos(l,icell,p_lambda)=tab_s33_o_s11_pos(l,icell,p_lambda)*norme
                     tab_s34_o_s11_pos(l,icell,p_lambda)=tab_s34_o_s11_pos(l,icell,p_lambda)*norme
+                    tab_s44_o_s11_pos(l,icell,p_lambda)=tab_s44_o_s11_pos(l,icell,p_lambda)*norme
                  endif
               endif
            enddo
@@ -1170,8 +1176,10 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
 
            if (lsepar_pola) then
               tab_s12_o_s11_pos(:,icell,p_lambda)=0.0
+              tab_s22_o_s11_pos(:,icell,p_lambda)=0.0
               tab_s33_o_s11_pos(:,icell,p_lambda)=0.0
               tab_s34_o_s11_pos(:,icell,p_lambda)=0.0
+              tab_s44_o_s11_pos(:,icell,p_lambda)=0.0
            endif
         endif !aniso_method
 
@@ -1194,8 +1202,10 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
         tab_s11_pos(:,icell,p_lambda)=1.0
         if (lsepar_pola) then
            tab_s12_o_s11_pos(:,icell,p_lambda)=0.0
+           tab_s22_o_s11_pos(:,icell,p_lambda)=0.0
            tab_s33_o_s11_pos(:,icell,p_lambda)=0.0
            tab_s34_o_s11_pos(:,icell,p_lambda)=0.0
+           tab_s44_o_s11_pos(:,icell,p_lambda)=0.0
         endif
 
      endif ! k_sca_tot > or = 0
@@ -1328,17 +1338,8 @@ subroutine write_dust_prop()
   icell = icell_not_empty
   p_icell = icell_ref
 
-  write(*,*) "*********************", icell_not_empty, icell_ref
-
   kappa_lambda=real((kappa(icell,:)*kappa_factor(icell)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)
-
-  write(*,*)  kappa_lambda
-  write(*,*) " "
-
-  write(*,*)  albedo_lambda
-
-
 
   call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))
   call cfitsWrite("!data_dust/kappa.fits.gz",kappa_lambda,shape(kappa_lambda))
@@ -1355,13 +1356,13 @@ subroutine write_dust_prop()
   call cfitsWrite("!data_dust/kappa_grain.fits.gz",kappa_grain,shape(kappa_grain)) ! lambda, n_grains
 
   do l=1, n_lambda
-        S11_lambda_theta(l,:)= tab_s11_pos(:,p_icell,l)
+     S11_lambda_theta(l,:)= tab_s11_pos(:,p_icell,l)
   enddo
   call cfitsWrite("!data_dust/phase_function.fits.gz",S11_lambda_theta,shape(S11_lambda_theta))
 
   if (lsepar_pola) then
      do l=1, n_lambda
-           pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,p_icell,l) ! Deja normalise par S11
+        pol_lambda_theta(l,:) = -tab_s12_o_s11_pos(:,p_icell,l) ! Deja normalise par S11
      enddo
      call cfitsWrite("!data_dust/polarizability.fits.gz",pol_lambda_theta,shape(pol_lambda_theta))
   endif

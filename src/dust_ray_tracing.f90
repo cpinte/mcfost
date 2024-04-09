@@ -571,7 +571,7 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
 
         s11 = tab_s11_pos(it,p_icell,p_lambda)
         s12 = -s11 * tab_s12_o_s11_pos(it,p_icell,p_lambda)
-        s22 = -s22 * tab_s22_o_s11_pos(it,p_icell,p_lambda)
+        s22 = -s11 * tab_s22_o_s11_pos(it,p_icell,p_lambda)
         s33 = -s11 * tab_s33_o_s11_pos(it,p_icell,p_lambda)
         s34 = -s11 * tab_s34_o_s11_pos(it,p_icell,p_lambda)
         s44 = -s11 * tab_s44_o_s11_pos(it,p_icell,p_lambda)

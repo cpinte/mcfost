@@ -331,7 +331,7 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
 
   real :: vi1, vi2, qback, factor
   complex :: s, refrel
-  real, dimension(0:nang_scatt) ::  s11,s12,s33,s34
+  real, dimension(0:nang_scatt) ::  s11,s12,s22,s33,s34,s44
 
   refrel = cmplx(amu1,amu2)
 
@@ -368,7 +368,10 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
         s34(j)=aimag(s) * factor
      enddo !j
 
-     call normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s11,s33,s34,s33, qsca)
+     s22(:) = s11(:)
+     s44(:) = s33(:)
+
+     call normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, qsca)
   endif
 
   return
@@ -559,7 +562,6 @@ subroutine overwrite_s12(Pmax)
   return
 
 end subroutine overwrite_s12
-
 
 !***************************************************
 
@@ -1008,7 +1010,7 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
   real :: frac_a, frac_a_m1, frac_lambda, fact1, fact2, fact3, fact4
   integer :: i, j, pop, N
 
-  real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
+  real, dimension(0:nang_scatt) ::  s11,s12,s22,s33,s34,s44
   real :: norme, somme_prob, log_a, log_wavel, wl_min, wl_max, theta, dtheta
 
   log_a=log(r_grain(taille_grain))
@@ -1120,7 +1122,7 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
      enddo
 
      ! Polarisabilite nulle
-     s12=0.0 ; s33 = 0.0 ; s34 = 0.0
+     s12=0.0 ; s22 = 0.0 ; s33 = 0.0 ; s34 = 0.0 ; s44 = 0.0
 
      if (scattering_method==1) then
         prob_s11(lambda,taille_grain,0)=0.0
@@ -1156,8 +1158,10 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
 
         tab_s11(j,taille_grain,lambda) = s11(j) / norme
         tab_s12(j,taille_grain,lambda) = s12(j) / norme
+        tab_s22(j,taille_grain,lambda) = s22(j) / norme
         tab_s33(j,taille_grain,lambda) = s33(j) / norme
         tab_s34(j,taille_grain,lambda) = s34(j) / norme
+        tab_s44(j,taille_grain,lambda) = s44(j) / norme
      enddo
 
   endif ! aniso_method ==1
@@ -1319,7 +1323,7 @@ subroutine get_Mueller_matrix_per_cell(lambda,itheta,frac,icell, M)
 
   frac_m1 = 1.0 - frac
 
-  M(:,:) = 0.0
+  M(:,:) = 0.0_dp
   M(1,1) = 1.0 ! Mueller matrix is normalized to 1.0 as we select the scattering angle
   M(2,2) = tab_s22_o_s11_pos(itheta,icell,lambda) * frac +  tab_s22_o_s11_pos(itheta-1,icell,lambda) * frac_m1
   M(1,2) = tab_s12_o_s11_pos(itheta,icell,lambda) * frac +  tab_s12_o_s11_pos(itheta-1,icell,lambda) * frac_m1
