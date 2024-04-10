@@ -571,7 +571,7 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
 
         s11 = tab_s11_pos(it,p_icell,p_lambda)
         s12 = -s11 * tab_s12_o_s11_pos(it,p_icell,p_lambda)
-        s22 = -s11 * tab_s22_o_s11_pos(it,p_icell,p_lambda)
+        s22 = s11 * tab_s22_o_s11_pos(it,p_icell,p_lambda)
         s33 = -s11 * tab_s33_o_s11_pos(it,p_icell,p_lambda)
         s34 = -s11 * tab_s34_o_s11_pos(it,p_icell,p_lambda)
         s44 = -s11 * tab_s44_o_s11_pos(it,p_icell,p_lambda)
@@ -1163,17 +1163,18 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     RPO(3,3) = cosw
                     ROP(3,3) = cosw
 
+                    ! Mueller matrix : I am still confused about the - signs
                     s12 = - s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda)
-                    s22 = - s11 * tab_s22_o_s11_pos(k,p_icell,p_lambda)
+                    s22 = s11 * tab_s22_o_s11_pos(k,p_icell,p_lambda)
                     s33 = - s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
                     s34 = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda)
                     s44 = - s11 * tab_s44_o_s11_pos(k,p_icell,p_lambda)
 
-                    ! Champ de radiation
-                    stokes(:) = Inu(1:4,theta_I,phi_I,icell)
-
                     M(1,1) = s11 ; M(2,2) = s22 ; M(1,2) = s12 ; M(2,1) = s12
                     M(3,3) = s33 ; M(4,4) = s44 ; M(3,4) = -s34 ; M(4,3) = s34
+
+                    ! Champ de radiation
+                    stokes(:) = Inu(1:4,theta_I,phi_I,icell)
 
                     !  STOKE FINAL = RPO * M * ROP * STOKE INITIAL
                     ! 1ere rotation
@@ -1379,10 +1380,10 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
               RPO(3,3) = -COSW
               ROP(3,3) = COSW
 
-              ! Matrice de Mueller
+              ! Mueller matrix : I am still confused about the - signs
               s11 = tab_s11_pos(k,p_icell,p_lambda)
               s12 = - s11 * tab_s12_o_s11_pos(k,p_icell,p_lambda)
-              s22 = - s11 * tab_s22_o_s11_pos(k,p_icell,p_lambda)
+              s22 = s11 * tab_s22_o_s11_pos(k,p_icell,p_lambda)
               s33 = - s11 * tab_s33_o_s11_pos(k,p_icell,p_lambda)
               s34 = - s11 * tab_s34_o_s11_pos(k,p_icell,p_lambda)
               s44 = - s11 * tab_s44_o_s11_pos(k,p_icell,p_lambda)
