@@ -1235,7 +1235,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 
   integer, intent(in) :: lambda, p_lambda, ibin
 
-  integer :: p_ri, p_zj, dir, iscatt, id
+  integer :: dir, iscatt, id
   real(kind=dp), dimension(4) :: Stokes, S, C, D
   real(kind=dp) :: x, y, z, u, v, w, facteur, kappa_sca
 
@@ -1261,6 +1261,17 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
      write(*,*) " if extra stars/planets emit significantly"
   endif
 
+  ! Boucle sur les cellules
+  !$omp parallel &
+  !$omp default(none) &
+  !$omp shared(n_cells,lambda,p_lambda,ibin,I_spec_star,nang_ray_tracing_star,cos_thet_ray_tracing_star) &
+  !$omp shared(lvariable_dust,r_grid,z_grid,icell_ref,omega_ray_tracing_star,lsepar_pola) &
+  !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
+  !$omp shared(energie_photon,volume,tab_albedo_pos,kappa,kappa_factor,eps_dust2_star) &
+  !$omp private(id,icell,p_icell,stokes,x,y,z,norme,u,v,w,dir,iscatt,cos_scatt,k,omega,cosw,sinw,RPO,ROP,S) &
+  !$omp private(s11,s22,s12,s33,s34,s44,C,D,M,facteur,kappa_sca)
+  id = 1 ! sequentiel
+
   ! Matrice de Mueller
   M = 0.0_dp
 
@@ -1274,21 +1285,9 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   ROP(4,4) = 1.0_dp
 
   stokes(:) = 0.0_dp
-  p_ri = 1
-  p_zj = 1
 
-  id = 1 ! sequentiel
-
-  ! Boucle sur les cellules
-  !$omp parallel &
-  !$omp default(none) &
-  !$omp shared(n_cells,lambda,p_lambda,ibin,I_spec_star,nang_ray_tracing_star,cos_thet_ray_tracing_star) &
-  !$omp shared(lvariable_dust,r_grid,z_grid,icell_ref,omega_ray_tracing_star,lsepar_pola) &
-  !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
-  !$omp shared(energie_photon,volume,tab_albedo_pos,kappa,kappa_factor,eps_dust2_star) &
-  !$omp private(id,icell,p_icell,stokes,x,y,z,norme,u,v,w,dir,iscatt,cos_scatt,k,omega,cosw,sinw,RPO,ROP,S) &
-  !$omp private(s11,s22,s12,s33,s34,s44,C,D,M,facteur,kappa_sca)
   p_icell = icell_ref
+
   !$omp do
   do icell=1, n_cells
      !$ id = omp_get_thread_num() + 1
