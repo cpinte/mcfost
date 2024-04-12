@@ -61,7 +61,7 @@ jobs:
         shell: bash -e {0}
         run: |
           [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
-          make release=${{ matrix.release }} static=yes all
+          make release=${{ matrix.release }} static=yes debug=yes all
 
       - name: test
         uses: ./.github/actions/test
