@@ -15,7 +15,7 @@ model_list = glob.glob1("test_data/","*")
 #if os.environ.get('CI', None) == 'true':
 #    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
 
-model_list = ["ref3.0"]#,"debris","discF_00500"]
+#model_list = ["ref3.0_multi"]#,"debris","discF_00500"]
 
 wl_list = ["1.0","10","100","1000"]
 wl_list_pola = ["1.0","1000"]
@@ -165,9 +165,6 @@ def test_image(model_name, wl):
     # We just keep intensity
     image = image[0,:,:,:,:]
     image_ref = image_ref[0,:,:,:,:]
-
-    print("ref", image_ref.min(), image_ref.max())
-    print("image", image.min(), image.max())
 
     print("Maximum image difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
     print("Mean image difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
