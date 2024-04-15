@@ -94,7 +94,7 @@ ifeq ($(SYSTEM), ifort)
         STATIC_FLAGS += -static-libstdc++
     endif
     FC= ifort
-    FFLAGS= -fpp -O3 -no-prec-div -fp-model fast=1 -traceback
+    FFLAGS= -fpp -O3 -no-prec-div -fp-model consistent -traceback
     DBLFLAG= -r8
     DEBUGFLAG= -check all -C -g -fpe0 -traceback -no-ftz \
                -warn uninitialized -warn unused -warn truncated_source
@@ -103,7 +103,7 @@ ifeq ($(SYSTEM), ifort)
     IPOFLAGS= -ipo
     CC= icc
     CXX=icpc -std=c++11
-    CCFLAGS= -O3 -no-prec-div -fp-model fast=2 -traceback
+    CCFLAGS= -O3 -no-prec-div -fp-model consistent -traceback
     COMPFLAGS= -fopenmp
     LIBCXX= -cxxlib
     LIBS= $(LIB)/ifort
