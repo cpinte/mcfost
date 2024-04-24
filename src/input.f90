@@ -41,7 +41,8 @@ subroutine read_molecules_names(imol)
   open(unit=1, file=filename, status="old")
 
   read(1,*) junk
-  read(1,'(a)') mol(imol)%name
+  read(1,'(a)') junk
+  mol(imol)%name = trim(adjustl(junk))
   close(unit=1)
 
   return
@@ -80,7 +81,8 @@ subroutine readmolecule(imol)
   open(unit=1, file=filename, status="old")
 
   read(1,*) junk
-  read(1,'(a)') mol(imol)%name
+  read(1,'(a)') junk
+  mol(imol)%name = trim(adjustl(junk))
 
   read(1,*) junk
   read(1,*) molecularWeight
@@ -94,7 +96,6 @@ subroutine readmolecule(imol)
   read(1,*) junk
   do i = 1, nLevels
      read(1,*) j, Level_energy(i), poids_stat_g(i) , j_qnb(i)
- !    read(1,*) j, Level_energy(i), poids_stat_g(i) !, buffer
      Level_energy(i) = Level_energy(i) / 8065.541  ! per cm to ev
   enddo
 
@@ -183,7 +184,7 @@ subroutine lect_Temperature()
   integer, dimension(5) :: naxes
   logical :: anynull, there_is_dust
 
-  !future: lgas_transfer. Dust could not always be present in the gas RT.  
+  !future: lgas_transfer. Dust could not always be present in the gas RT.
   if (lemission_atom) then
      there_is_dust = (maxval(densite_pouss) > 0_dp)
      if ( .not.there_is_dust ) then
