@@ -1,6 +1,17 @@
 #!/bin/bash
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=14
+#SBATCH --mem-per-cpu=4g
+#SBATCH --time=160:00:00
+#SBATCH --job-name=mcfost
+#SBATCH --mail-type=ALL
+
+
+# results to be uploaded to ipag-nfs.u-ga.fr:webpage/mcfost/
 #export mcfost=$MCFOST_INSTALL/../src/mcfost
+export OMP_NUM_THREADS=1
 export mcfost=$(pwd)/../src/mcfost
+export MCFOST_UTILS=$(pwd)/../utils
 
 for dir in test_data/*; do
     param=`basename "$dir".para`
@@ -10,9 +21,9 @@ for dir in test_data/*; do
     pwd
     echo "---------------------------------------------"
 
-    rm -rf data_*
+    rm -rf data_* *.tmp
     if [ "$param" == "discF_00500.para" ]; then
-        opt="-phantom discF_00500"
+        opt="-phantom discF_00500 -not_random_Voronoi"
     else
         opt=""
     fi

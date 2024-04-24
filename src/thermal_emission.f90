@@ -114,8 +114,6 @@ subroutine allocate_thermal_emission(Nc,p_Nc)
   if (alloc_status > 0) call error('Allocation error kappa_abs_1grain')
   DensE = 0.0 ; DensE_m1 = 0.0
 
-  call allocate_radiation_field_step1(Nc)
-
   allocate(xT_ech(Nc,nb_proc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error xT_ech')
   xT_ech = 2
@@ -648,15 +646,16 @@ end subroutine init_reemission
 
 !********************************************************************
 
-subroutine Temp_LTE(icell, Ti, Temp)
+subroutine Temp_LTE(id, icell, Ti, Temp, frac)
 
   use radiation_field, only : xKJ_abs
 
-  integer, intent(in) :: icell
+  integer, intent(in) :: id, icell
   integer, intent(out) :: Ti
   real, intent(out) :: Temp
+  real(kind=dp), intent(out) :: frac
 
-  real(kind=dp) :: Qheat, log_Qheat, frac
+  real(kind=dp) :: Qheat, log_Qheat
   integer :: p_icell
 
   if (lvariable_dust) then
@@ -665,7 +664,12 @@ subroutine Temp_LTE(icell, Ti, Temp)
      p_icell = icell_ref
   endif
 
-  Qheat=sum(xKJ_abs(icell,:)) * L_packet_th / volume(icell)  ! does not include kappa_factor, same as log_Qcool
+  if (id==0) then
+     Qheat=sum(xKJ_abs(icell,:)) * L_packet_th / volume(icell)
+  else
+     Qheat=xKJ_abs(icell,id) * nb_proc * L_packet_th / volume(icell)  ! does not include kappa_factor, same as log_Qcool
+  endif
+
   if (Qheat < tiny_dp) then
      Temp = T_min ; Ti = 2
   else
@@ -675,7 +679,11 @@ subroutine Temp_LTE(icell, Ti, Temp)
         Temp = T_min ; Ti = 2
      else
         ! Temperature echantillonee juste sup. a la temperature de la cellule
-        Ti = maxval(xT_ech(icell,:))
+        if (id==0) then
+           Ti = minval(xT_ech(icell,:))
+        else
+           Ti = xT_ech(icell,id)
+        endif
 
         ! On incremente eventuellement la zone de temperature
         do while((log_Qcool_minus_extra_heating(Ti,p_icell) < log_Qheat).and.(Ti < n_T))
@@ -689,6 +697,9 @@ subroutine Temp_LTE(icell, Ti, Temp)
         Temp=exp(log(tab_Temp(Ti))*frac+log(tab_Temp(Ti-1))*(1.0-frac))
      endif
   endif
+
+  ! Save pour prochaine reemission et/ou T finale
+  if (id>0) xT_ech(icell,id) = Ti
 
   return
 
@@ -714,16 +725,13 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
 
   if (lreemission_stats) nbre_reemission(icell,id) = nbre_reemission(icell,id) + 1.0_dp
 
-  call Temp_LTE(icell, Ti, Temp)
-
-  ! Save pour prochaine reemission et/ou T finale
-  xT_ech(icell,id) = Ti
+  call Temp_LTE(id, icell, Ti, Temp, frac_T2)
 
   !**********************************************************************
   ! Choix de la longeur d'onde de reemission
   ! Dichotomie, la loi de proba est obtenue par interpolation lineaire en T
   T2 = Ti ; T1 = Ti-1
-  Frac_T2=(Temp-tab_Temp(T1))/(tab_temp(T2)-tab_Temp(T1))
+  !Frac_T2=(Temp-tab_Temp(T1))/(tab_temp(T2)-tab_Temp(T1))
   frac_T1=1.0-frac_T2
 
   l1=0
@@ -872,15 +880,19 @@ subroutine Temp_finale()
   implicit none
 
   real :: Temp
-  integer :: Ti, icell
+  integer :: Ti, icell, id
+
+  real(dp) :: frac
+
+  id=0 ! as we will sum the results from all threads
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(icell,Temp,Ti) &
-  !$omp shared(Tdust,n_cells)
+  !$omp private(icell,Temp,Ti,frac) &
+  !$omp shared(id,Tdust,n_cells)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
-     call Temp_LTE(icell, Ti, Temp)
+     call Temp_LTE(id,icell, Ti, Temp, frac)
      Tdust(icell) = Temp
   enddo !icell
   !$omp enddo

@@ -1632,15 +1632,15 @@ subroutine normalize_dust_density(disk_dust_mass)
   real(kind=dp), intent(in), optional :: disk_dust_mass
   integer :: icell, l, k, i, j, izone, pop
 
-  real(kind=dp) :: somme, mass, facteur, total_dust_mass
+  real(kind=dp) :: somme, mass, facteur, f
 
   type(disk_zone_type) :: dz
   type(dust_pop_type), pointer :: d_p
 
   if (present(disk_dust_mass)) then
-     total_dust_mass = disk_dust_mass
+     f = disk_dust_mass/diskmass ! scaling factor compared to value in parameter file
   else
-     total_dust_mass = diskmass ! using the parameter file value
+     f = 1.0_dp ! using the parameter file value
   endif
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
@@ -1651,7 +1651,7 @@ subroutine normalize_dust_density(disk_dust_mass)
         if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
-     densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
+     if (somme > tiny_dp) densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
   enddo !l
 
   ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
@@ -1671,7 +1671,7 @@ subroutine normalize_dust_density(disk_dust_mass)
         mass =  mass * AU3_to_cm3 * g_to_Msun
 
         if (mass > tiny_dp) then
-           facteur = d_p%masse / mass
+           facteur = d_p%masse / mass * f
 
            mass = 0.0_dp
            do icell=1,n_cells
@@ -1686,7 +1686,7 @@ subroutine normalize_dust_density(disk_dust_mass)
 
   masse(:) = masse(:) * AU3_to_cm3
 
-  write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+  !write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
   if (sum(masse) < tiny_dp) call error("Something went wrong, there is no dust in the disk")
 
   if (lcorrect_density) then
@@ -1705,7 +1705,7 @@ subroutine normalize_dust_density(disk_dust_mass)
         endif
      enddo
 
-     write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+     !write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
   endif
 
   ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0

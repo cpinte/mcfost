@@ -6,7 +6,6 @@ module stars
   use messages
   use wavelengths
   use grid
-  use elements_type, only : wght_per_H
 
   implicit none
 
@@ -16,7 +15,7 @@ module stars
        repartition_energie_ism, repartition_energie_etoiles, select_etoile, stars_cell_indices, find_spectra, &
        intersect_stars, distance_to_star, compute_stellar_parameters
   !-> to move in parameters ?
-  public :: star_rad, laccretion_shock, max_Tshock, min_Tshock, min_Thp, max_Thp, T_hp, max_Facc, min_Facc, T_preshock
+  public :: star_rad, is_inshock, laccretion_shock, max_Tshock, min_Tshock, min_Thp, max_Thp, T_hp, max_Facc, min_Facc, T_preshock
 
   private
 
@@ -360,12 +359,15 @@ subroutine repartition_energie_etoiles()
         if (status /= 0) call error("cannot open fits file "//trim(filename))
 
         !  determine the size of the image
-        call ftgknj(unit(i),'NAXIS',1,10,naxes,nfound,status)
+        call ftgknj(unit(i),'NAXIS',1,2,naxes,nfound,status)
         if (status /= 0) call error("reading axes of "//trim(filename))
         !  check that it found both NAXIS1 and NAXIS2 keywords
         if (nfound /= 2) call error("failed to read the NAXISn keywords in "//trim(filename))
 
-        if (naxes(2) /= 3) call error(trim(filename)//" does not have the right shape")
+        if (naxes(2) /= 3) then
+           write(*,*) "NAXIS2 =", naxes(2)
+           call error(trim(filename)//" does not have the right shape")
+        endif
 
         ! We first read the length of the spectrum
         n_lambda_spectre(i) = naxes(1)
@@ -946,10 +948,12 @@ end subroutine intersect_stars
   !
    use grid, only : voronoi
    use constantes, only : sigma, kb
+   use elements_type, only : wght_per_H
+   ! use density, only : densite_gaz
    logical :: is_inshock
    integer :: i_star, icell0, id, iray
    real(kind=dp), intent(out) :: Thp, Tshock, Facc
-   real(kind=dp) :: x, y, z
+   real(kind=dp) :: x, y, z, rho
    real(kind=dp) :: Tloc, vaccr, vmod2, rr, sign_z
    real :: alpha_1 = 0.75
    real :: alpha_2 = 0.25
@@ -958,10 +962,11 @@ end subroutine intersect_stars
    if (.not.laccretion_shock) return
 
    if (icell0<=n_cells) then
-      if (nHtot(icell0) > 0.0) then
-      ! if (icompute_atomRT(icell0) > 0) then
+   !TO DO: densite_gaz(icell0) instead of nHtot
+      rho = nHtot(icell0) * wght_per_H
+      if (rho > 0.0) then ! even if icompute_atomRT(icell0) /= 0 
          rr = sqrt( x*x + y*y + z*z)
-         !vaccr is vr, the spherical r velocity component
+         ! Get vaccr : the accretion velocity above the shock.
          if (lvoronoi) then !always 3d
             vaccr = Voronoi(icell0)%vxyz(1)*x/rr + Voronoi(icell0)%vxyz(2)*y/rr + Voronoi(icell0)%vxyz(3) * z/rr
             vmod2 = sum( Voronoi(icell0)%vxyz(:)**2 )
@@ -989,13 +994,14 @@ end subroutine intersect_stars
 
          if (vaccr < 0.0_dp) then
             !Facc = 1/2 rho vs^3
-            Facc = 0.5 * (1d-3 * masseH * wght_per_H * nHtot(icell0)) * abs(vaccr)**3
+            Facc = 0.5 * (1d-3 * masseH * rho) * abs(vaccr)**3
             Tloc = ( alpha_1 * Facc / sigma )**0.25
             ! is_inshock = (Tloc > 0.5 * etoile(i_star)%T)
             is_inshock = (T_hp > 1.0_dp * etoile(i_star)%T)
             Thp = T_hp
             if (T_hp<=0.0) then
-               is_inshock = (abs(T_hp) * Tloc > 1.0_dp*etoile(i_star)%T) !depends on the local value
+               !depends on the local value
+               is_inshock = (abs(T_hp) * Tloc > 1.0_dp*etoile(i_star)%T)
                Thp = abs(T_hp) * Tloc
             endif
             !assuming mu is 0.5

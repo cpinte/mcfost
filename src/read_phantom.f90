@@ -11,18 +11,19 @@ module read_phantom
 contains
 
   subroutine read_phantom_bin_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,particle_id,massgas,massdust,&
-       rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ierr)
+       rhogas,rhodust,extra_heating,ndusttypes,SPH_grainsizes,mask,n_SPH,ldust_moments,dust_moments,mass_per_h,ierr)
 
     integer,               intent(in) :: iunit, n_files
     character(len=*),dimension(n_files), intent(in) :: filenames
     real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,vx,vy,vz
     real(dp), intent(out), dimension(:),   allocatable :: rhogas,massgas,SPH_grainsizes,T_gas
     integer,  intent(out), dimension(:),   allocatable :: particle_id
-    real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
-    logical, dimension(:), allocatable, intent(out) :: mask
+    real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust, dust_moments
+    integer, dimension(:), allocatable, intent(out) :: mask
     real, intent(out), dimension(:), allocatable :: extra_heating
     integer, intent(out) :: ndusttypes,n_SPH,ierr
-
+    logical, intent(out) :: ldust_moments
+    real(dp), intent(out) :: mass_per_H
     integer, parameter :: maxarraylengths = 12
     integer, parameter :: nsinkproperties = 17
     integer(kind=8) :: number8(maxarraylengths)
@@ -34,10 +35,10 @@ contains
     integer, parameter :: maxtypes = 6
     integer, parameter :: maxfiles = 3
     integer, parameter :: maxinblock = 128
-    integer, parameter :: n_nucleation = 10
+    integer, parameter :: n_nucleation = 6
     integer, allocatable, dimension(:) :: npartoftype
     real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
-    real(dp) :: hfact,umass,utime,ulength,gmw,x2,mass_per_H
+    real(dp) :: hfact,umass,utime,ulength,gmw,x2
     integer(kind=1), allocatable, dimension(:) :: itype,ifiles
     real(4),  allocatable, dimension(:) :: tmp
     real(dp), allocatable, dimension(:) :: grainsize,graindens
@@ -98,9 +99,9 @@ contains
        call extract('mass_per_H',mass_per_h,hdr,ierr)
        if (ierr /= 0) then
           ! No dust nucleation
-          do_nucleation = .false.
+          ldust_moments = .false.
        else
-          do_nucleation = .true.
+          ldust_moments = .true.
        endif
 
        call free_header(hdr, ierr)
@@ -112,7 +113,7 @@ contains
     allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot),gastemperature(np_tot))
     allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
     allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
-    if (do_nucleation) allocate(nucleation(n_nucleation,np_tot))
+    if (ldust_moments) allocate(nucleation(n_nucleation,np_tot))
 
     np0 = 0
     ntypes0 = 0
@@ -271,17 +272,17 @@ contains
                             got_dustfrac = .true.
                          ! Nucleation
                          case('K0')
-                            read(iunit,iostat=ierr) tmp_dp ; nucleation(2,np0+1:np0+np) = tmp_dp
+                            read(iunit,iostat=ierr) tmp_dp ; nucleation(1,np0+1:np0+np) = tmp_dp
                          case('K1')
-                            read(iunit,iostat=ierr) tmp_dp ; nucleation(3,np0+1:np0+np) = tmp_dp
+                            read(iunit,iostat=ierr) tmp_dp ; nucleation(2,np0+1:np0+np) = tmp_dp
                          case('K2')
-                            read(iunit,iostat=ierr) tmp_dp ; nucleation(4,np0+1:np0+np) = tmp_dp
+                            read(iunit,iostat=ierr) tmp_dp ; nucleation(3,np0+1:np0+np) = tmp_dp
                          case('K3')
-                            read(iunit,iostat=ierr) tmp_dp ; nucleation(5,np0+1:np0+np) = tmp_dp
+                            read(iunit,iostat=ierr) tmp_dp ; nucleation(4,np0+1:np0+np) = tmp_dp
                          case('mu')
-                            read(iunit,iostat=ierr) tmp_dp ; nucleation(6,np0+1:np0+np) = tmp_dp
+                            read(iunit,iostat=ierr) tmp_dp ; nucleation(5,np0+1:np0+np) = tmp_dp
                          case('kappa')
-                            read(iunit,iostat=ierr) tmp_dp ; nucleation(9,np0+1:np0+np) = tmp_dp
+                            read(iunit,iostat=ierr) tmp_dp ; nucleation(6,np0+1:np0+np) = tmp_dp
                          case default
                             matched = .false.
                             read(iunit,iostat=ierr)
@@ -337,10 +338,14 @@ contains
                             read(iunit,iostat=ierr) xyzmh_ptmass(4,nptmass0:nptmass_found)
                          case('h')
                             read(iunit,iostat=ierr) xyzmh_ptmass(5,nptmass0:nptmass_found)
+                         case('hsoft')
+                            read(iunit,iostat=ierr) xyzmh_ptmass(6,nptmass0:nptmass_found)
                          case('lum')
                             read(iunit,iostat=ierr) xyzmh_ptmass(12,nptmass0:nptmass_found)
                          case('Teff')
                             read(iunit,iostat=ierr) xyzmh_ptmass(13,nptmass0:nptmass_found)
+                         case('Reff')
+                            read(iunit,iostat=ierr) xyzmh_ptmass(14,nptmass0:nptmass_found)
                          case('mdotav')
                             read(iunit,iostat=ierr) xyzmh_ptmass(16,nptmass0:nptmass_found)
                          case('vx')
@@ -424,11 +429,11 @@ contains
     if (got_h) then
        call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
-       call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,do_nucleation,n_files,dustfluidtype,xyzh,&
+       call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,ldust_moments,n_files,dustfluidtype,xyzh,&
             vxyzu,gastemperature,itype,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass,vxyz_ptmass,&
             hfact,umass,utime,ulength,graindens,ndudt,dudt,ifiles, &
             n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
-            SPH_grainsizes,massgas,massdust,rhogas,rhodust,extra_heating,ieos)
+            SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos)
        write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
     else
        n_SPH = 0
@@ -446,7 +451,7 @@ contains
   subroutine read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,&
        particle_id,massgas,massdust,rhogas,rhodust, &
        extra_heating,ndusttypes,SPH_grainsizes,     &
-       mask,n_SPH,ierr)
+       mask,n_SPH,ldust_moments,dust_moments,mass_per_H,ierr)
 
     use utils_hdf5, only:open_hdf5file,    &
          close_hdf5file,   &
@@ -462,10 +467,12 @@ contains
          rhogas,massgas, &
          SPH_grainsizes
     integer,  intent(out), dimension(:),   allocatable :: particle_id
-    real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust
-    logical, dimension(:), allocatable, intent(out) :: mask
+    real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust,dust_moments
+    integer, dimension(:), allocatable, intent(out) :: mask
     real, intent(out), dimension(:), allocatable :: extra_heating
     integer, intent(out) :: ndusttypes,n_SPH,ierr
+    logical, intent(out) :: ldust_moments
+    real(dp), intent(out) :: mass_per_H
 
     character(len=200) :: filename
 
@@ -490,7 +497,9 @@ contains
     integer(HID_T) :: hdf5_file_id
     integer(HID_T) :: hdf5_group_id
 
-    logical :: got, do_nucleation=.false.
+    logical :: got
+
+    ldust_moments=.false.
 
     ierr = 0
     np_tot = 0
@@ -643,6 +652,7 @@ contains
        call read_from_hdf5(xyzmh_ptmass(1:3,:),'xyz',hdf5_group_id,got,ierr)
        call read_from_hdf5(xyzmh_ptmass(4,:),'m',hdf5_group_id,got,ierr)
        call read_from_hdf5(xyzmh_ptmass(5,:),'h',hdf5_group_id,got,ierr)
+       call read_from_hdf5(xyzmh_ptmass(6,:),'hsoft',hdf5_group_id,got,ierr)
        call read_from_hdf5(vxyz_ptmass(:,:),'vxyz',hdf5_group_id,got,ierr)
 
        if (ierr /= 0)  call error("cannot read Phantom HDF sinks group in "//trim(filename))
@@ -687,12 +697,12 @@ contains
 
     call modify_dump(np, nptmass, xyzh, vxyzu, xyzmh_ptmass, ulength, mask)
 
-    call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,do_nucleation,n_files,      &
+    call phantom_2_mcfost(np_tot,nptmass,ntypes_max,ndusttypes,ldust_moments,n_files,      &
          dustfluidtype,xyzh,vxyzu,gastemperature,itype,grainsize,dustfrac,nucleation, &
          massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
          utime,ulength,graindens,ndudt,dudt,ifiles,   &
          n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id,SPH_grainsizes,     &
-         massgas,massdust,rhogas,rhodust,extra_heating,ieos)
+         massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos)
 
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
 
@@ -713,14 +723,14 @@ contains
     real(kind=dp), allocatable, dimension(:,:), intent(inout) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: ulength
     real(kind=dp), dimension(3) :: centre
-    logical, dimension(:), allocatable, intent(out) :: mask
+    integer, dimension(:), allocatable, intent(out) :: mask
 
     integer :: i
 
     ! Modifying SPH dump
     if (ldelete_Hill_sphere .or. ldelete_inside_rsph .or. ldelete_outside_rsph .or. ldelete_above_theta) then
        allocate(mask(np))
-       mask(:) = .false.
+       mask(:) = 0
     endif
 
     if (ldelete_Hill_sphere)  call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,ulength, mask)
@@ -749,11 +759,11 @@ contains
 
   !*************************************************************************
 
-  subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,do_nucleation,n_files,dustfluidtype,xyzh, &
+  subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,ldust_moments,n_files,dustfluidtype,xyzh, &
        vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
        utime, ulength,graindens,ndudt,dudt,ifiles, &
        n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
-       SPH_grainsizes, massgas,massdust, rhogas,rhodust,extra_heating,ieos)
+       SPH_grainsizes, massgas,massdust, rhogas,rhodust,dust_moments,extra_heating,ieos)
 
     ! Convert phantom quantities & units to mcfost quantities & units
     !
@@ -768,7 +778,7 @@ contains
 
     ! Input arguments
     integer, intent(in) :: np,nptmass,ntypes,ndusttypes, n_files,dustfluidtype
-    logical, intent(in) :: do_nucleation
+    logical, intent(in) :: ldust_moments
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
     integer(kind=1), dimension(np), intent(in) :: iphase, ifiles
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
@@ -786,18 +796,19 @@ contains
     integer, intent(out) :: n_SPH, ieos
     real(dp), dimension(:),   allocatable, intent(out) :: x,y,z,h,vx,vy,vz,T_gas,rhogas,massgas ! massgas [Msun]
     integer, dimension(:),    allocatable, intent(out) :: particle_id
-    real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust
+    real(dp), dimension(:,:), allocatable, intent(out) :: rhodust,massdust,dust_moments
     real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
     real, dimension(:), allocatable, intent(out) :: extra_heating
+
 
     type(star_type), dimension(:), allocatable :: etoile_old
     integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile
     real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
-    real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,usolarmass,uvelocity
+    real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
     real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
 
     logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
-
+    logical :: lupdate_photosphere
 
     ! We check the units by recomputing G
     G_phantom = ulength**3 / (utime**2 * umass)
@@ -808,20 +819,17 @@ contains
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
        ulength_scaled = ulength * scale_length_units_factor
-    else
-       scale_length_units_factor = 1.0
     endif
     if (lscale_mass_units) then
        write(*,*) 'Mass are rescaled by ', real(scale_mass_units_factor)
        umass_scaled = umass * scale_mass_units_factor
-    else
-       scale_mass_units_factor = 1.0
     endif
     utime_scaled = sqrt(ulength_scaled**3/(G_phantom*umass_scaled))
 
     udens = umass_scaled/ulength_scaled**3
     uerg_per_s = umass_scaled*ulength_scaled**2/utime_scaled**3
     uWatt = uerg_per_s * erg_to_J
+    ulength_m = ulength_scaled / (m_to_cm)
     ulength_au = ulength_scaled / (au_to_cm)
     uvelocity =  ulength_scaled / (m_to_cm) / utime_scaled ! m/s
     usolarmass = umass_scaled / Msun_to_g
@@ -868,6 +876,14 @@ contains
        allocate(vx(n_SPH),vy(n_SPH),vz(n_SPH),stat=alloc_status)
        if (alloc_status /=0) then
           write(*,*) "Allocation error velocities in phanton_2_mcfost"
+          write(*,*) "Exiting"
+       endif
+    endif
+
+    if (ldust_moments) then
+       allocate(dust_moments(4,n_SPH), stat=alloc_status)
+       if (alloc_status /=0) then
+          write(*,*) "Allocation error dust_moments in phanton_2_mcfost"
           write(*,*) "Exiting"
        endif
     endif
@@ -919,6 +935,9 @@ contains
                 vy(j) = vyi * uvelocity
                 vz(j) = vzi * uvelocity
              endif
+
+             if (ldust_moments) dust_moments(:,j) = nucleation(1:4,i) ! indexing is different from phantom as I read starting at k0
+
              T_gas(j) = T_gasi
              rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
              dustfraci = sum(dustfrac(:,i))
@@ -968,23 +987,26 @@ contains
        ldudt_implicit = .false.
     endif
 
-    write(*,*) "# Stars/planets:"
     n_etoiles_old = n_etoiles
-    n_etoiles = 0
-    do i=1,nptmass
-       n_etoiles = n_etoiles + 1
-       if (real(xyzmh_ptmass(4,i)) * scale_mass_units_factor > 0.013) then
-          write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
-               real(xyzmh_ptmass(4,i) * usolarmass), "Msun, Mdot=", &
-               real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
-       else
-          write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
-               real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * usolarmass), "Mjup, Mdot=", &
-               real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
-       endif
-       if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))*ulength_au), "au"
-    enddo
-
+    if (lignore_sink) then
+       n_etoiles = 0
+    else
+       write(*,*) "# Stars/planets:"
+       n_etoiles = 0
+       do i=1,nptmass
+          n_etoiles = n_etoiles + 1
+          if (real(xyzmh_ptmass(4,i)) * scale_mass_units_factor > 0.013) then
+             write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
+                  real(xyzmh_ptmass(4,i) * usolarmass), "Msun, Mdot=", &
+                  real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+          else
+             write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
+                  real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * usolarmass), "Mjup, Mdot=", &
+                  real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+          endif
+          if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))*ulength_au), "au"
+       enddo
+    endif
 
     if (lupdate_velocities) then
        if (lno_vz) vz(:) = 0.
@@ -1072,6 +1094,7 @@ contains
           etoile(i_etoile)%M = xyzmh_ptmass(4,i_etoile) * usolarmass
        enddo
     else
+
        write(*,*) ""
        write(*,*) "Updating the stellar properties:"
        write(*,*) "There are now", n_etoiles, "stars in the model"
@@ -1104,33 +1127,57 @@ contains
           etoile(:)%vz = vxyz_ptmass(3,:) * uvelocity
 
           etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
-       endif
 
-       do i=1, n_etoiles
-          if (.not.etoile(i)%force_Mdot) then
-             etoile(i)%Mdot = xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
-          endif
-       enddo
-       etoile(:)%find_spectrum = .true.
+          do i=1, n_etoiles
+             if (.not.etoile(i)%force_Mdot) then
+                etoile(i)%Mdot = xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
+             endif
+          enddo
+          etoile(:)%find_spectrum = .true.
 
-       if (do_nucleation) then
-          etoile(:)%T = xyzmh_ptmass(13,:)
-          ! deriving radius from luminosity (Reff is not correct in dump)
-          etoile(:)%r = sqrt(xyzmh_ptmass(12,:) * uWatt / Lsun) * (Tsun/etoile(:)%T)**2 / 2.5
-
-          write(*,*) "TMP : correcting radius"
-
-          lfix_star = .true.
-
-          write(*,*) "Using Teff and Rstar from phantom:"
+          lupdate_photosphere = .false.
           do i=1,n_etoiles
-             write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", real(etoile(i)%r), "Rsun"
+             if (xyzmh_ptmass(13,i) > tiny_real) then
+                ! sink particle Teff is defined
+                write(*,*) "Using Teff and Lum from phantom:"
+                lupdate_photosphere = .true.
+                etoile(i)%T = max(xyzmh_ptmass(13,i),100.)
+                ! deriving radius from luminosity (Reff is not correct in dump)
+                etoile(i)%r = sqrt(xyzmh_ptmass(12,i) * uWatt / Lsun) * (Tsun/etoile(i)%T)**2
+             else if (xyzmh_ptmass(14,i) > tiny_real) then
+                ! sink particle Reff is defined
+                write(*,*) "Using Reff and Lum from phantom:"
+                lupdate_photosphere = .true.
+                etoile(i)%r = xyzmh_ptmass(14,i) * ulength_m / Rsun
+                etoile(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(etoile(i)%r)
+             else if (xyzmh_ptmass(12,i) > tiny_real) then
+                ! We use the luminosity and a radius estimate
+                write(*,*) "Using Lum from phantom + effective radius from sink:"
+                etoile(i)%T = 100.
+                etoile(i)%r = 0.001
+                if (xyzmh_ptmass(12,i) > tiny_real) then
+                   etoile(i)%r = max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun
+                   if (etoile(i)%r > 0.) etoile(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(etoile(i)%r)
+                endif
+             else
+                if (lupdate_photosphere) then ! if we updated the 1st sink
+                   etoile(i)%r = max(max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun, 0.001)
+                   etoile(i)%T = 100
+                endif
+             endif
           enddo
 
-          ! Passage rayon en AU
-          etoile(:)%r = etoile(:)%r * Rsun_to_AU
-       endif
+          if (lupdate_photosphere) then
+             lfix_star = .true.
+             do i=1,n_etoiles
+                write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", real(etoile(i)%r), "Rsun"
+             enddo
+             ! Convert radius to au
+             etoile(:)%r = etoile(:)%r * Rsun_to_AU
 
+             etoile(:)%lb_body=.true.
+          endif
+       endif
     endif
 
     return

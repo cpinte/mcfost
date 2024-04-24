@@ -9,14 +9,10 @@ the goal is to ensure that mcfost calculations remain consistent with results fr
 
 The test suite is performed in 2 steps.
 
-1. Calculations of the reference solution::
+1. Downloading the the reference solution::
 
-     $ cd ~/mcfost/src
-     $ git checkout db94244c41cad9c1517363b1607f8596af1c55c0
-     $ make
-     $ cd ../test_suite
-     $ curl http://ipag.osug.fr/public/pintec/mcfost/test_data/discF_00500 -o ./test_data/discF_00500/discF_00500
-     $ ./compute_test_suite.sh
+     $ cd ~/mcfost/test_suite
+     $ ./get_test_data.sh
 
 2. Calculations of the same models with the current version and validation of results::
 
