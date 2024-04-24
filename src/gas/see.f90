@@ -1277,7 +1277,7 @@ module see
         ! real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
 
         do ieq=1, neq
-            f(ieq) = f(ieq) * -1.0_dp
+            f(ieq) = f(ieq) * (-1.0_dp)
             do jvar=1, neq
                 df(ieq,jvar) = df(ieq,jvar) * x(jvar)
             enddo

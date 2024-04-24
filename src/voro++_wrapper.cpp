@@ -103,7 +103,7 @@ extern "C"
 
     int n_neighbours_cell, first_neighbour, last_neighbour;
     int max_size_list = max_neighbours * n;
-    double cx, cy, cz, cutting_distance, delta_edge, f, d_to_star;
+    double cutting_distance, delta_edge, f, d_to_star;
 
     n_neighbours[cpu_id] = 0;
     last_neighbour = -1;
