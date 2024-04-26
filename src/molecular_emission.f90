@@ -13,7 +13,8 @@ module molecular_emission
   logical :: ldouble_RT
 
   real, dimension(:), allocatable :: Level_energy
-  character(len=5), dimension(:), allocatable :: j_qnb
+  character(len=12), dimension(:), allocatable ::  j_qnb
+
   ! g est dp car les calculs utilisant g sont en dp
   real(kind=dp), dimension(:), allocatable :: poids_stat_g
   integer :: nTrans_tot
