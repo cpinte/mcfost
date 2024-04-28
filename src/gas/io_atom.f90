@@ -353,7 +353,7 @@ module io_atom
                !!tmp
                write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') &
                   atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
-               write(*,'(" -> lower edge cut at "(1F12.5)" nm !")'), atom%continua(kr)%lambdamin
+               write(*,'(" -> lower edge cut at "(1F12.5)" nm !")') atom%continua(kr)%lambdamin
      
                if (atom%continua(kr)%lambdamin>=atom%continua(kr)%lambda0) then
                   write(*,*) "Minimum wavelength for continuum is larger than continuum edge."
@@ -997,7 +997,7 @@ module io_atom
 
    do l=1,atom%Nlevel
       write(*,"('Level #'(1I3))") l
-      write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') , &
+      write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') &
            minval(atom%n(l,:),mask=(atom%n(l,:)>0)), maxval(atom%n(l,:))
       write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  &
            minval(atom%nstar(l,:),mask=(atom%nstar(l,:)>0)), maxval(atom%nstar(l,:))

@@ -14,6 +14,7 @@ module molecular_emission
 
   real, dimension(:), allocatable :: Level_energy
   character(len=12), dimension(:), allocatable ::  j_qnb
+
   ! g est dp car les calculs utilisant g sont en dp
   real(kind=dp), dimension(:), allocatable :: poids_stat_g
   integer :: nTrans_tot
