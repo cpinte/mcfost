@@ -960,7 +960,7 @@ subroutine integ_tau_mol(imol)
      iTrans = mol(imol)%indice_Trans_rayTracing(it)
 
      write(*,*) "-------------------------------"
-     write(*,*) "Transition J=", j_qnb(itransUpper(iTrans)), "-", j_qnb(itransLower(iTrans))
+     write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans)))
      write(*,*) "tau_mol = ", real(tau_mol(0,it))
      write(*,*) "tau_dust=", real(tau_dust(it))
 
@@ -1169,7 +1169,7 @@ end subroutine optical_length_tot_mol
                call opacity_atom_bb_loc(id,icell,iray,x0,y0,z0,x1,y1,z1,u,v,w,&
                   l_void_before,l_contrib,lsubtract_avg,N,lambda,chi,Snu)
             endif
-            !TO DO: move to the total contopac & 
+            !TO DO: move to the total contopac &
             ! do not initialize chi, Snu in background but update them instead.
             if (ldust_atom) then
                chi = chi + kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * m_to_AU ! [m^-1]
