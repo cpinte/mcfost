@@ -26,7 +26,7 @@ module Voronoi_grid
      integer :: id, original_id, first_neighbour, last_neighbour
      logical(kind=lp) :: exist, is_star, was_cut
      logical :: is_star_neighbour!.true. if .not.is_star and a star's neighbour! default is .false..
-     logical :: masked
+     integer :: masked ! 1 if transparent, 2 if deleted before tesselation
   end type Voronoi_cell
 
   type Voronoi_wall
@@ -194,7 +194,7 @@ module Voronoi_grid
 
     !************************************************************************
 
-  subroutine Voronoi_tesselation(n_points, particle_id, x,y,z,h, vx,vy,vz, is_ghost, limits, check_previous_tesselation)
+  subroutine Voronoi_tesselation(n_points, particle_id, x,y,z,h, vx,vy,vz, is_ghost, mask, limits, check_previous_tesselation)
 
     use iso_fortran_env
     use, intrinsic :: iso_c_binding, only : c_bool
@@ -204,6 +204,7 @@ module Voronoi_grid
     real(kind=dp), dimension(n_points), intent(in) :: x, y, z, h
     real(kind=dp), dimension(:), allocatable, intent(in) :: vx,vy,vz
     integer, dimension(:), allocatable, intent(in) :: is_ghost
+    integer, dimension(:), allocatable, intent(in) :: mask
     integer, dimension(n_points), intent(in) :: particle_id
     real(kind=dp), dimension(6), intent(in) :: limits
     logical, intent(in) :: check_previous_tesselation
@@ -222,6 +223,7 @@ module Voronoi_grid
     integer, dimension(:), allocatable :: n_neighbours ! nb_proc
     logical(c_bool), dimension(:), allocatable :: was_cell_cut, was_cell_cut_tmp
     logical(c_bool), dimension(:), allocatable :: star_neighb_tmp, star_neighb
+    logical, dimension(:), allocatable :: do_tesselation
 
     logical :: is_outside_stars, lcompute
 
@@ -236,10 +238,11 @@ module Voronoi_grid
     integer, dimension(:), allocatable :: order,SPH_id2,SPH_original_id2
     real(kind=dp), dimension(:), allocatable :: x_tmp2,y_tmp2,z_tmp2,h_tmp2
 
-    if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
+    !if (nb_proc > 16) write(*,*) "Using 16 cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 
     nb_proc_voro = min(16,nb_proc)
     allocate(n_neighbours(nb_proc_voro))
+    write(*,*) "Using ",nb_proc_voro," cores for Voronoi tesselation" ! Overheads dominate above 16 cores
 
     ! Defining Platonic solid that will be used to cut the wierly shaped Voronoi cells
     call init_Platonic_Solid(12, threshold)
@@ -253,14 +256,34 @@ module Voronoi_grid
 
     alloc_status = 0
     allocate(x_tmp(n_points+n_etoiles), y_tmp(n_points+n_etoiles), z_tmp(n_points+n_etoiles), h_tmp(n_points+n_etoiles), &
-         SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), stat=alloc_status)
+         SPH_id(n_points+n_etoiles), SPH_original_id(n_points+n_etoiles), do_tesselation(n_points), stat=alloc_status)
     if (alloc_status /=0) call error("Allocation error Voronoi temp arrays")
+
+    ! Pre-filter to check if we need to do the tesselation for each particle
+    do_tesselation(:) = .true.
+    k=1
+    if (allocated(mask)) then  ! we delete particles with mask==2
+       do i=1, n_points
+          if (mask(i)==2) then
+             do_tesselation(i) = .false.
+             k=k+1
+          endif
+       enddo
+    end if
+
+    do i=1, n_points ! we delete ghost particles
+       if (is_ghost(i) /= 0) then
+          do_tesselation(i) = .false.
+          k = k+1
+       endif
+    enddo
+    write(*,*) k, "particles have been deleted before tesselation"
 
     ! Filtering particles outside the limits
     icell = 0
     n_sublimate = 0
     do i=1, n_points
-       if (is_ghost(i) == 0) then
+       if (do_tesselation(i)) then
           ! We test if the point is in the model volume
           !-> Voronoi cells are now cut at the surface of the star. We only need to test if a particle is below Rstar.
           if ((x(i) > limits(1)).and.(x(i) < limits(2))) then
@@ -290,10 +313,10 @@ module Voronoi_grid
                       SPH_id(icell) = i ; SPH_original_id(icell) = particle_id(i)
                       x_tmp(icell) = x(i) ; y_tmp(icell) = y(i) ; z_tmp(icell) = z(i) ;  h_tmp(icell) = h(i)
                    endif
-                endif
-             endif
-          endif
-       endif
+                endif ! z
+             endif ! y
+          endif ! x
+       endif ! do_tesselation
     enddo
     n_cells_before_stars = icell
     n_cells = icell

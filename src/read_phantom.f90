@@ -19,7 +19,7 @@ contains
     real(dp), intent(out), dimension(:),   allocatable :: rhogas,massgas,SPH_grainsizes,T_gas
     integer,  intent(out), dimension(:),   allocatable :: particle_id
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust, dust_moments
-    logical, dimension(:), allocatable, intent(out) :: mask
+    integer, dimension(:), allocatable, intent(out) :: mask
     real, intent(out), dimension(:), allocatable :: extra_heating
     integer, intent(out) :: ndusttypes,n_SPH,ierr
     logical, intent(out) :: ldust_moments
@@ -468,7 +468,7 @@ contains
          SPH_grainsizes
     integer,  intent(out), dimension(:),   allocatable :: particle_id
     real(dp), intent(out), dimension(:,:), allocatable :: rhodust,massdust,dust_moments
-    logical, dimension(:), allocatable, intent(out) :: mask
+    integer, dimension(:), allocatable, intent(out) :: mask
     real, intent(out), dimension(:), allocatable :: extra_heating
     integer, intent(out) :: ndusttypes,n_SPH,ierr
     logical, intent(out) :: ldust_moments
@@ -723,14 +723,14 @@ contains
     real(kind=dp), allocatable, dimension(:,:), intent(inout) :: xyzmh_ptmass
     real(kind=dp), intent(in) :: ulength
     real(kind=dp), dimension(3) :: centre
-    logical, dimension(:), allocatable, intent(out) :: mask
+    integer, dimension(:), allocatable, intent(out) :: mask
 
     integer :: i
 
     ! Modifying SPH dump
     if (ldelete_Hill_sphere .or. ldelete_inside_rsph .or. ldelete_outside_rsph .or. ldelete_above_theta) then
        allocate(mask(np))
-       mask(:) = .false.
+       mask(:) = 0
     endif
 
     if (ldelete_Hill_sphere)  call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,ulength, mask)
@@ -819,14 +819,10 @@ contains
     if (lscale_length_units) then
        write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
        ulength_scaled = ulength * scale_length_units_factor
-    else
-       scale_length_units_factor = 1.0
     endif
     if (lscale_mass_units) then
        write(*,*) 'Mass are rescaled by ', real(scale_mass_units_factor)
        umass_scaled = umass * scale_mass_units_factor
-    else
-       scale_mass_units_factor = 1.0
     endif
     utime_scaled = sqrt(ulength_scaled**3/(G_phantom*umass_scaled))
 
@@ -940,13 +936,7 @@ contains
                 vz(j) = vzi * uvelocity
              endif
 
-
-
              if (ldust_moments) dust_moments(:,j) = nucleation(1:4,i) ! indexing is different from phantom as I read starting at k0
-
-             if (i==1) then
-                write(*,*) "read", i, j, dust_moments(:,j)
-             endif
 
              T_gas(j) = T_gasi
              rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
