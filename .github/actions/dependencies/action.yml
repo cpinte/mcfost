@@ -17,13 +17,13 @@ runs:
       if: matrix.compiler == 'ifort' && matrix.os == 'linux'
       shell: bash
       run: |
-        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2e562b6e-5d0f-4001-8121-350a828332fb/l_dpcpp-cpp-compiler_p_2024.1.0.468_offline.sh &
-        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/fd9342bd-7d50-442c-a3e4-f41974e14396/l_fortran-compiler_p_2024.1.0.465_offline.sh &
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/ebf5d9aa-17a7-46a4-b5df-ace004227c0e/l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh &
+        wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/0d65c8d4-f245-4756-80c4-6712b43cf835/l_fortran-compiler_p_2023.2.1.8_offline.sh &
         wait
-        chmod +x l_dpcpp-cpp-compiler_p_2024.1.0.468_offline.sh
-        ./l_dpcpp-cpp-compiler_p_2024.1.0.468_offline.sh -a --silent --eula accept
-        chmod +x l_fortran-compiler_p_2024.1.0.465_offline.sh
-        ./l_fortran-compiler_p_2024.1.0.465_offline.sh -a --silent --eula accept
+        chmod +x l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh
+        ./l_dpcpp-cpp-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
+        chmod +x l_fortran-compiler_p_2023.2.1.8_offline.sh
+        ./l_fortran-compiler_p_2023.2.1.8_offline.sh -a --silent --eula accept
         echo "INTEL_PATH=/home/runner/intel/oneapi" >> "$GITHUB_ENV"
         sudo chown root /bin/tar && sudo chmod u+s /bin/tar # tar needs to run as root to extract when restoring the cache
 
