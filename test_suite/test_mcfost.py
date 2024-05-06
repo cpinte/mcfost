@@ -167,16 +167,21 @@ def test_image(model_name, wl):
         image = fits.getdata(test_dir+"/"+image_name)
         image_ref = fits.getdata("test_data/"+image_name)
 
+        print("-- i=", i)
         print(image.shape)
         print(image_ref.shape)
 
         image = image[0,:,i,:,:]
         image_ref = image_ref[0,:,i,:,:]
 
+        print("Min ref", image_ref.min(), image_ref.max())
+        print("Min    ", image.min(), image.max())
+
         print("Maximum image difference", i, (abs(image-image_ref)/(image_ref+1e-30)).max())
         print("Mean image difference   ", i, (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
         print("MC similar", MC_similar(image_ref,image,threshold=0.1))
+        print("-------------")
 
     image = fits.getdata(test_dir+"/"+image_name)
     image_ref = fits.getdata("test_data/"+image_name)
