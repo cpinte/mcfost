@@ -161,10 +161,9 @@ def test_image(model_name, wl):
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
 
 
-
     # We just keep intensity
     for i in range(5):
-        image = fits.getdata(test_dir+"/"+image_name)
+        image = np.nan_to_num(fits.getdata(test_dir+"/"+image_name))
         image_ref = fits.getdata("test_data/"+image_name)
 
         print("-- i=", i)
