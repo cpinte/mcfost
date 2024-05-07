@@ -8,8 +8,10 @@ module read_athena
   use density
   use stars, only : compute_stellar_parameters
   use hdf5
+  use utils, only : meshgrid_3d, volumegrid_3d, to_cartesian
   use utils_hdf5 ! mentiplay
   use hdf5_utils ! needed to read attributes, need to merge everything
+  use arb2mcfost
   !use h5lt ! we can use this instead, official hdf5 high level library
 
   implicit none
@@ -33,6 +35,7 @@ contains
     alloc_status=0
 
     athena%filename = filename
+    athena%arb_grid = .true.
 
     call open_hdf5file(filename,file_id,ierr)
     if (ierr /= 0) call error("cannot open athena HDF file "//trim(filename))
@@ -43,15 +46,37 @@ contains
 
     ! Reading attributes :
     call hdf_read_attribute(group_id,"", "Coordinates",coord)
-    if (trim(coord) /= "spherical_polar") call error("mcfost can only read spherical_polar athena++ grids for now")
 
-    call hdf_read_attribute(group_id,"", "DatasetNames",DatasetNames)
-    if (trim(DatasetNames) /= "prim") call error("mcfost can only read prim athena++ grids for now")
+    if (trim(coord) == "cartesian") then
+      athena%coord = 0
+    else if (trim(coord) == "cylindrical") then
+      athena%coord = 1
+    else if (trim(coord) == "spherical_polar") then
+      athena%coord = 2
+    else
+      call error("Unknown athena++ grid. Exiting")
+    endif
 
+
+    ! call hdf_read_attribute(group_id,"", "DatasetNames",DatasetNames)
+    ! if (trim(DatasetNames) /= "prim") call error("mcfost can only read prim athena++ grids for now")
+
+    athena%maxlevel = 0
     call hdf_read_attribute(group_id,"", "MaxLevel",Maxlevel)
-    if (MaxLevel > 0) call error("mcfost can only read athena++ grids with MaxLevel=0 for now")
+    if (MaxLevel > 0)  then
+      athena%maxlevel = MaxLevel
+      write(*,*) "Mesh refinment detected in athena++ model. "
+      ! call error("mcfost can only read athena++ grids with MaxLevel=0 for now")
+    else
+      if (athena%coord == 1) then
+        athena%arb_grid = .false.
+      endif
+    endif
 
-    call hdf_read_attribute(group_id,"", "RootGridSize",RootGridSize) ! nr, ntheta, naz
+    ! nr, ntheta, naz
+    ! x, y, z
+    ! nr, ntheta, nphi
+    call hdf_read_attribute(group_id,"", "RootGridSize",RootGridSize)
     athena%nx1=RootGridSize(1)
     athena%nx2=RootGridSize(2)
     athena%nx3=RootGridSize(3)
@@ -77,29 +102,36 @@ contains
 !    call hdf_read_attribute(group_id,"", "VariableNames",VariableNames) ! No interface yet for array of strings
 !    if (trim(VariableNames) /= "rho") call error("mcfost cannot read VariableNames in athena++ dump")
 
-    ! Updating mcfost parameters
-    grid_type = 2
-    n_rad = athena%nx1
-    n_rad_in = 1
-    n_az = athena%nx3
-    nz = athena%nx2/2 + 1
-    lregular_theta = .true.
-    theta_max = 0.5 * pi - athena%x2_min
+    if (athena%arb_grid) then
+      return
 
-    if (lscale_length_units) then
-       write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
-    endif
+    else
+      ! Updating mcfost parameters
+      grid_type = 2
+      n_rad = athena%nx1
+      n_rad_in = 1
+      n_az = athena%nx3
+      nz = athena%nx2/2 + 1
+      lregular_theta = .true.
+      theta_max = 0.5 * pi - athena%x2_min
 
-    disk_zone(1)%rin  = athena%x1_min * scale_length_units_factor
-    disk_zone(1)%edge=0.0
-    disk_zone(1)%rmin = disk_zone(1)%rin
-    disk_zone(1)%rout = athena%x1_max * scale_length_units_factor
-    disk_zone(1)%rmax = disk_zone(1)%rout
+      if (lscale_length_units) then
+         write(*,*) 'Lengths are rescaled by ', real(scale_length_units_factor)
+      else
+         scale_length_units_factor = 1.0
+      endif
 
-    write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az
-    write(*,*) "rin=", real(disk_zone(1)%rin), "rout=", real(disk_zone(1)%rout)
+      disk_zone(1)%rin  = athena%x1_min * scale_length_units_factor
+      disk_zone(1)%edge=0.0
+      disk_zone(1)%rmin = disk_zone(1)%rin
+      disk_zone(1)%rout = athena%x1_max * scale_length_units_factor
+      disk_zone(1)%rmax = disk_zone(1)%rout
 
-    return
+      write(*,*) "n_rad=", n_rad, "nz=", nz, "n_az=", n_az
+      write(*,*) "rin=", real(disk_zone(1)%rin), "rout=", real(disk_zone(1)%rout)
+
+      return
+    end if
 
   end subroutine read_athena_parameters
 
@@ -116,13 +148,19 @@ contains
 
     integer, dimension(3) :: block_size
 
+    integer, dimension(:), allocatable :: n_variables_1
     integer, dimension(:,:), allocatable :: logical_locations
     real, dimension(:,:,:,:,:), allocatable :: data
 
-    real, dimension(:,:,:), allocatable :: rho, vx1, vx2, vx3 ! todo : we can save memory and only data to directly pass it to mcfost
+    real(kind=dp), dimension(:,:,:), allocatable :: rho, vx1, vx2, vx3 ! todo : we can save memory and only data to directly pass it to mcfost
+    real(kind=dp), dimension(:,:,:), allocatable :: rho_tmp, vx1_tmp, vx2_tmp, vx3_tmp, x1_tmp, x2_tmp, x3_tmp, v_tmp
+    real(kind=dp), dimension(:), allocatable :: rho_a, vx1_a, vx2_a, vx3_a, x1_a, x2_a, x3_a, v_a, x1f_tmp, x2f_tmp, x3f_tmp ! For the arbitrary grids where we need position to be passed to voronoi
+    real(kind=dp), dimension(:), allocatable :: xx, yy, zz, vxx, vyy, vzz, mass_gas, h
+    integer, dimension(:), allocatable :: particle_id
+    real, dimension(:,:), allocatable :: x1f, x2f, x3f, x1v, x2v, x3v
 
     integer :: nx1, nx2, nx3, bs1, bs2, bs3
-    integer :: i, iblock, il, jl, kl, iu, ju, ku, j, jj, phik, icell
+    integer :: i, iblock, il, jl, kl, iu, ju, ku, j, jj, phik, icell, it, jt, kt
 
     real(dp) :: Ggrav_athena, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
     type(star_type), dimension(:), allocatable :: etoile_old
@@ -130,7 +168,7 @@ contains
     ! Planet properties hard coded for now
     real, parameter :: Mp = 1e-3
     real, parameter :: Omega_p = 1.0
-    real, parameter :: x = 1.0, y=0.0, z=0.0
+    real, parameter :: x = 6.0, y=0.0, z=0.0
     real, parameter :: vx=0.0, vy=1.0, vz=1.0
 
     usolarmass = 1.0_dp
@@ -158,7 +196,7 @@ contains
 
     ! --- copy/paste from read_fargo3d
     n_etoiles_old = n_etoiles
-    n_etoiles = 2 ! Hard coded for now
+    n_etoiles = 1 ! Hard coded for now
 
     if (lfix_star) then
        write(*,*) ""
@@ -193,17 +231,17 @@ contains
     etoile(1)%vx = 0_dp ; etoile(1)%vy = 0_dp ; etoile(1)%vz = 0_dp
     etoile(1)%M = 1_dp * usolarmass
 
-    ! -x and -y as phi is defined differently in fargo3d
-    etoile(2)%x = -x * ulength_au
-    etoile(2)%y = -y * ulength_au
-    etoile(2)%z =  z * ulength_au
-
-    ! -vx and -y as phi is defined differently in fargo3d
-    etoile(2)%vx = -vx * uvelocity
-    etoile(2)%vy = -vy * uvelocity
-    etoile(2)%vz =  vz * uvelocity
-
-    etoile(2)%M = Mp * usolarmass
+    ! ! -x and -y as phi is defined differently in fargo3d
+    ! etoile(2)%x = -x * ulength_au
+    ! etoile(2)%y = -y * ulength_au
+    ! etoile(2)%z =  z * ulength_au
+    !
+    ! ! -vx and -y as phi is defined differently in fargo3d
+    ! etoile(2)%vx = -vx * uvelocity
+    ! etoile(2)%vy = -vy * uvelocity
+    ! etoile(2)%vz =  vz * uvelocity
+    !
+    ! etoile(2)%M = Mp * usolarmass
 
     do i=1,n_etoiles
        if (etoile(i)%M > 0.013) then
@@ -237,6 +275,7 @@ contains
     if (ierr /= 0) call error("cannot open athena '/' group")
 
     call hdf_read_attribute(group_id,"", "NumVariables",n_variables) ! rho, press, vel1, vel2, vel3
+
     if (n_variables /= 5) call error("mcfost can only read athena++ grids with NumVariables=5 for now")
 
     call hdf_read_attribute(group_id,"", "MeshBlockSize",block_size)
@@ -250,113 +289,207 @@ contains
     allocate(data(bs1,bs2,bs3,n_blocks,n_variables), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error athena++ data')
 
-    nx1 = athena%nx1 ; nx2 = athena%nx2 ; nx3 = athena%nx3
-    allocate(rho(nx1,nx2,nx3), vx1(nx1,nx2,nx3), vx2(nx1,nx2,nx3), vx3(nx1,nx2,nx3), stat=alloc_status)
+    if (athena%arb_grid) then
+      nx1 = n_blocks * bs1 * bs2 * bs3
+      allocate(rho_a(nx1), vx1_a(nx1), vx2_a(nx1), vx3_a(nx1), x1_a(nx1), x2_a(nx1), x3_a(nx1), v_a(nx1), stat=alloc_status)
+      allocate(x1f(n_blocks, bs1+1), x2f(n_blocks, bs2+1), x3f(n_blocks, bs3+1), x1v(n_blocks, bs1), x2v(n_blocks, bs2), x3v(n_blocks, bs3), stat=alloc_status)
+      allocate(x1_tmp(bs1, bs2, bs3), x2_tmp(bs1, bs2, bs3), x3_tmp(bs1, bs2, bs3), v_tmp(bs1, bs2, bs3), stat=alloc_status)
+      allocate(x1f_tmp(bs1), x2f_tmp(bs2), x3f_tmp(bs3), stat=alloc_status)
+      allocate(particle_id(nx1), stat=alloc_status)
+      particle_id(:) = 0
+
+      call hdf_read_dataset(group_id,"x1f",x1f)
+      call hdf_read_dataset(group_id,"x2f",x2f)
+      call hdf_read_dataset(group_id,"x3f",x3f)
+      call hdf_read_dataset(group_id,"x1v",x1v)
+      call hdf_read_dataset(group_id,"x2v",x2v)
+      call hdf_read_dataset(group_id,"x3v",x3v)
+    else
+      nx1 = athena%nx1 ; nx2 = athena%nx2 ; nx3 = athena%nx3
+      allocate(rho(nx1,nx2,nx3), vx1(nx1,nx2,nx3), vx2(nx1,nx2,nx3), vx3(nx1,nx2,nx3), stat=alloc_status)
+    endif
     if (alloc_status > 0) call error('Allocation error athena++ rho')
+
 
     ! Levels is always if MaxLevel=0, we do not read it
     call hdf_read_dataset(group_id,"LogicalLocations",logical_locations)
 
-    ! compare with python --> ok
-    !write(*,*) logical_locations(:,1)
-    !write(*,*) logical_locations(:,2)
-    !write(*,*) logical_locations(:,3)
-    !write(*,*) "..."
-    !write(*,*) logical_locations(:,n_blocks-2)
-    !write(*,*) logical_locations(:,n_blocks-1)
-    !write(*,*) logical_locations(:,n_blocks)
-
     call hdf_read_dataset(group_id,"prim",data)
-    ! compare with python raw data --> ok
-    !write(*,*) data(1,1,1,1,:)
-    !write(*,*) data(2,1,1,1,:)
-    !write(*,*) data(1,1,1,2,:)
 
     call close_hdf5file(file_id,ierr)
     write(*,*) "Athena++ file read sucessfully"
 
-    ! Convert to non-raw data, ie merge all blocks
-    do iblock=1, n_blocks
-       ! Calculate destination indices
-       il = logical_locations(1,iblock) * bs1
-       jl = logical_locations(2,iblock) * bs2
-       kl = logical_locations(3,iblock) * bs3
+    write(*,*) "logical_locations", shape(logical_locations)
 
-       iu = il + bs1
-       ju = jl + bs2
-       ku = kl + bs3
+    ! allocate(tmp_flatten(bs1*bs2*bs3), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error athena++ rho')
 
-       rho(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,1)
-       vx1(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,3) ! vr
-       vx2(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,4) ! vtheta
-       vx3(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,5) ! vphi
-    enddo
-    deallocate(data)
+    if (athena%arb_grid) then
+      ! Now... What do we do here...
+      i = 1
+      do iblock=1, n_blocks
+         iu = iblock*bs1*bs2*bs3
+         il = iu - bs1*bs2*bs3 + 1
 
-    !write(*,*) rho(1,1,1), rho(1,1,2), rho(1,2,1), rho(2,1,1) ! test ok with python
-    !write(*,*) rho(101,101,101) ! test ok with python
+         rho_a(il:iu) = reshape(data(:,:,:,iblock,1), (/size(data(:,:,:,iblock,1))/) )
+         vx1_a(il:iu) = reshape(data(:,:,:,iblock,2), (/size(data(:,:,:,iblock,2))/) )
+         vx2_a(il:iu) = reshape(data(:,:,:,iblock,3), (/size(data(:,:,:,iblock,3))/) )
+         vx3_a(il:iu) = reshape(data(:,:,:,iblock,4), (/size(data(:,:,:,iblock,4))/) )
 
-    !-----------------------------------
-    ! Passing data to mcfost
-    !-----------------------------------
-    write(*,*) "Converting athena++ model to mcfost ..."
-    lvelocity_file = .true.
-    vfield_coord = 3 ! spherical
+         ! write(*,*), "sizes", size(x1v(iblock, :)), size(x2v(iblock, :)), size(x3v(iblock, :)), size(x1_tmp), size(x2_tmp), size(x3_tmp)
 
-    allocate(vfield3d(n_cells,3), stat=alloc_status)
-    if (alloc_status /= 0) call error("memory allocation error athena++ vfield3d")
+         call meshgrid_3d(x1v(iblock, :), x2v(iblock, :), x3v(iblock, :), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
 
-    write(*,*) "Constant spatial distribution"
+         ! write(*,*), "outside of meshgrid_3d"
 
-    do i=1, n_rad
-       jj= 0
-       bz : do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
-          if (j==0) cycle bz
-          jj = jj + 1
-          do phik=1, n_az
-             icell = cell_map(i,j,phik)
+         x1_a(il:iu) = reshape(x1_tmp, (/size(x1_tmp)/) )
+         x2_a(il:iu) = reshape(x2_tmp, (/size(x2_tmp)/) )
+         x3_a(il:iu) = reshape(x3_tmp, (/size(x3_tmp)/) )
 
-             densite_gaz(icell) =  rho(i,jj,phik) * udens
-             densite_pouss(:,icell) = rho(i,jj,phik) * udens
 
-             vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
-             vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
-             vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
-          enddo ! k
-       enddo bz
-    enddo ! i
-    deallocate(rho,vx1,vx2,vx3)
 
-    ! -- another copy and paste from read_fargo3d
-    ! Normalisation density : copy and paste from read_density_file for now : needs to go in subroutine
+         call volumegrid_3d(x1f(iblock, :), x2f(iblock, :), x3f(iblock, :), v_tmp, coord=athena%coord)
 
-    ! Calcul de la masse de gaz de la zone
-    mass = 0.
-    do icell=1,n_cells
-       mass = mass + densite_gaz(icell) *  masse_mol_gaz * volume(icell)
-    enddo !icell
-    mass =  mass * AU3_to_m3 * g_to_Msun
+         v_a(il:iu) = reshape(v_tmp, (/size(v_tmp)/) )
 
-    ! Normalisation
-    if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
-       facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+      enddo
+      write(*,*) "Data successfully reshaped and read "
+      deallocate(data, x1v, x2v, x3v, x1_tmp, x2_tmp, x3_tmp, v_tmp, x1f, x2f, x3f)
 
-       ! Somme sur les zones pour densite finale
-       do icell=1,n_cells
-          densite_gaz(icell) = densite_gaz(icell) * facteur
-          masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
-       enddo ! icell
+      ! Need to convert from density to mass
+      mass_gas = rho_a*v_a
+
+      ! now that v_a is no longer needed, it will become h
+      h = v_a**1/3
+
+      do i=1, 10
+        write(*,*), "h", h(i)
+      enddo
+
+      ! Convert coordinates and velocities to Cartesian if necessary
+      if (.not. athena%coord==0) then
+        ! coordinates
+        allocate(xx(size(x1_a)), yy(size(x1_a)), zz(size(x1_a)))
+        call to_cartesian(x1_a, x2_a, x3_a, xx, yy, zz, athena%coord)
+
+        ! velocites
+        allocate(vxx(size(vx1_a)), vyy(size(vx1_a)), vzz(size(vx1_a)))
+        call to_cartesian_velocities(vx1_a, vx2_a, vx3_a, vxx, vyy, vzz, x1_a, x2_a, x3_a, athena%coord)
+        ! call to_cartesian(vx1_a, vx2_a, vx3_a, vx, vy, vz, athena%coord)
+      else
+        xx = x1_a
+        yy = x2_a
+        zz = x3_a
+
+        vxx = vx1_a
+        vyy = vx2_a
+        vzz = vx3_a
+      endif
+      write(*,*) "Data successfully converted to cartesian "
+
+      deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
+
+      call setup_arb_to_mcfost(xx, yy, zz, h, vxx, vyy, vzz, mass_gas, particle_id)
+
+
+
+    ! call   read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,&
+    !        particle_id,massgas,massdust,rhogas,rhodust, &
+    !        extra_heating,ndusttypes,SPH_grainsizes,     &
+    !        mask,n_SPH,ierr)
+
+      ! do i=1, nx1
+      !
+      ! enddo
+      return
+      write(*,*), "this shound't print"
     else
-       call error('Gas mass is 0')
+      write(*,*), "this shound't print"
+
+      ! Convert to non-raw data, ie merge all blocks
+      do iblock=1, n_blocks
+         ! Calculate destination indices
+         il = logical_locations(1,iblock) * bs1
+         jl = logical_locations(2,iblock) * bs2
+         kl = logical_locations(3,iblock) * bs3
+         write(*,*), il, jl, kl
+
+         iu = il + bs1
+         ju = jl + bs2
+         ku = kl + bs3
+
+         rho(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,1)
+         vx1(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,3) ! vr
+         vx2(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,4) ! vtheta
+         vx3(il+1:iu,jl+1:ju,kl+1:ku) = data(:,:,:,iblock,5) ! vphi
+      enddo
+      deallocate(data)
+
+      !write(*,*) rho(1,1,1), rho(1,1,2), rho(1,2,1), rho(2,1,1) ! test ok with python
+      !write(*,*) rho(101,101,101) ! test ok with python
+
+      !-----------------------------------
+      ! Passing data to mcfost
+      !-----------------------------------
+      write(*,*) "Converting athena++ model to mcfost ..."
+      lvelocity_file = .true.
+      vfield_coord = 3 ! spherical
+
+      allocate(vfield3d(n_cells,3), stat=alloc_status)
+      if (alloc_status /= 0) call error("memory allocation error athena++ vfield3d")
+
+      write(*,*) "Constant spatial distribution"
+
+      do i=1, n_rad
+         jj= 0
+         bz : do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
+            if (j==0) cycle bz
+            jj = jj + 1
+            do phik=1, n_az
+               icell = cell_map(i,j,phik)
+
+               densite_gaz(icell) =  rho(i,jj,phik) * udens
+               densite_pouss(:,icell) = rho(i,jj,phik) * udens
+
+               vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
+               vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
+               vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
+            enddo ! k
+         enddo bz
+      enddo ! i
+      deallocate(rho,vx1,vx2,vx3)
+
+      ! -- another copy and paste from read_fargo3d
+      ! Normalisation density : copy and paste from read_density_file for now : needs to go in subroutine
+
+      ! Calcul de la masse de gaz de la zone
+      mass = 0.
+      do icell=1,n_cells
+         mass = mass + densite_gaz(icell) *  masse_mol_gaz * volume(icell)
+      enddo !icell
+      mass =  mass * AU3_to_m3 * g_to_Msun
+
+      ! Normalisation
+      if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+         facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+
+         ! Somme sur les zones pour densite finale
+         do icell=1,n_cells
+            densite_gaz(icell) = densite_gaz(icell) * facteur
+            masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+         enddo ! icell
+      else
+         call error('Gas mass is 0')
+      endif
+
+      write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+      call normalize_dust_density()
+      ! -- end copy and paste from read_fargo3d
+
+      write(*,*) "Done"
+
+      return
     endif
-
-    write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
-    call normalize_dust_density()
-    ! -- end copy and paste from read_fargo3d
-
-    write(*,*) "Done"
-
-    return
 
   end subroutine read_athena_model
 

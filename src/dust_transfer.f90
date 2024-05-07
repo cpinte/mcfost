@@ -107,13 +107,20 @@ subroutine transfert_poussiere()
   ! Building the dust grain population
   call build_grain_size_distribution()
 
+  write(*,*), "**********", larg_voronoi, lathena
+
+  print*, lphantom_file, density_file, limits_file
+
   if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
      call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
      call setup_grid()
   else if (lmhd_voronoi) then
      call setup_mhd_to_mcfost() !uses sph_to_voronoi
      call setup_grid()
-  else
+  else if (lathena) then
+    call read_athena_model()
+    call setup_grid()
+  else if (larg_voronoi) then
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
@@ -121,7 +128,7 @@ subroutine transfert_poussiere()
 
   laffichage=.true.
 
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi)) then ! already done by setup_SPH2mcfost
+  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi .or. larg_voronoi)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()
@@ -483,7 +490,7 @@ subroutine transfert_poussiere()
 
         if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
            if (lmueller) then
-              call calc_local_scattering_matrices_mueller(lambda, p_lambda) ! Todo : this is not good, we compute this twice
+              call calc_local_scattering_matrices_mueller(lambda, p_lambda)
            else
               call calc_local_scattering_matrices(lambda, p_lambda)
            endif
