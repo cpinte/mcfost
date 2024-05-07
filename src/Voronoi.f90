@@ -470,20 +470,20 @@ module Voronoi_grid
        allocate(V_tmp(n_cells), was_cell_cut_tmp(n_cells), star_neighb_tmp(n_cells), stat=alloc_status)
        if (alloc_status /=0) call error("Allocation error before voro++ call")
 
-       write(*,*), "about to enter voro"
-
-       write(*,*), "ncells",n_cells,"max neighbours", max_neighbours,"limits", limits, "threshold", threshold, "faces", PS%n_faces,"vectors", PS%vectors
-       write(*,*), "PS%cutting_distance_o_h", PS%cutting_distance_o_h, "icell_start-1", icell_start-1, "icell_end-1", icell_end-1
-       write(*,*), "nb_proc_voro", nb_proc_voro, "n_cells_per_cpu", n_cells_per_cpu, "n_in", n_in, "n_etoiles", n_etoiles
-       write(*,*),  "etoile(:)%icell-1", etoile(:)%icell-1 ,"etoile(:)%r", etoile(:)%r
-
-       i = 1
-       do i=1, 5
-         write(*,*), "x_tmp", x_tmp(i), "y_tmp", y_tmp(i), "z_tmp", z_tmp(i), "h_tmp", h_tmp(i), "V_tmp", V_tmp(i), "neighbours_list_loc", neighbours_list_loc(i)
-         write(*,*), "first_neighbours", first_neighbours(i), "last_neighbours", last_neighbours(i), "neighbours_list_loc", neighbours_list_loc(i), \
-                      "last_neighbours", last_neighbours(i), "was_cell_cut_tmp", was_cell_cut_tmp(i), "star_neighb_tmp", star_neighb_tmp(i)
-
-      enddo
+      !  write(*,*), "about to enter voro"
+      !
+      !  write(*,*), "ncells",n_cells,"max neighbours", max_neighbours,"limits", limits, "threshold", threshold, "faces", PS%n_faces,"vectors", PS%vectors
+      !  write(*,*), "PS%cutting_distance_o_h", PS%cutting_distance_o_h, "icell_start-1", icell_start-1, "icell_end-1", icell_end-1
+      !  write(*,*), "nb_proc_voro", nb_proc_voro, "n_cells_per_cpu", n_cells_per_cpu, "n_in", n_in, "n_etoiles", n_etoiles
+      !  write(*,*),  "etoile(:)%icell-1", etoile(:)%icell-1 ,"etoile(:)%r", etoile(:)%r
+      !
+      !  i = 1
+      !  do i=1, 5
+      !    write(*,*), "x_tmp", x_tmp(i), "y_tmp", y_tmp(i), "z_tmp", z_tmp(i), "h_tmp", h_tmp(i), "V_tmp", V_tmp(i), "neighbours_list_loc", neighbours_list_loc(i)
+      !    write(*,*), "first_neighbours", first_neighbours(i), "last_neighbours", last_neighbours(i), "neighbours_list_loc", neighbours_list_loc(i), \
+      !                 "last_neighbours", last_neighbours(i), "was_cell_cut_tmp", was_cell_cut_tmp(i), "star_neighb_tmp", star_neighb_tmp(i)
+      !
+      ! enddo
 
        call voro(n_cells,max_neighbours,limits,x_tmp,y_tmp,z_tmp,h_tmp, threshold, PS%n_faces, &
             PS%vectors, PS%cutting_distance_o_h, icell_start-1,icell_end-1, id-1,nb_proc_voro,n_cells_per_cpu, &
@@ -723,6 +723,7 @@ module Voronoi_grid
        close(unit=1)
        return
     endif
+
     ! read the saved Voronoi mesh
     read(1,iostat=ios) voronoi_sha1_saved, limits_saved, n_in, n_neighbours_tot
     mem = 4. * n_neighbours_tot
@@ -733,6 +734,7 @@ module Voronoi_grid
        mem = mem / 1024**2
        unit = "MB"
     endif
+
     alloc_status = 0
     write(*,*) "Trying to allocate", mem, unit//" for neighbours list"
     allocate(neighbours_list(n_neighbours_tot), stat=alloc_status)

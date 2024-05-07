@@ -170,6 +170,10 @@ contains
     real, parameter :: Omega_p = 1.0
     real, parameter :: x = 6.0, y=0.0, z=0.0
     real, parameter :: vx=0.0, vy=1.0, vz=1.0
+    logical :: print_messages
+
+    print_messages = .true.
+    call hdf_set_print_messages(print_messages)
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
@@ -292,7 +296,8 @@ contains
     if (athena%arb_grid) then
       nx1 = n_blocks * bs1 * bs2 * bs3
       allocate(rho_a(nx1), vx1_a(nx1), vx2_a(nx1), vx3_a(nx1), x1_a(nx1), x2_a(nx1), x3_a(nx1), v_a(nx1), stat=alloc_status)
-      allocate(x1f(n_blocks, bs1+1), x2f(n_blocks, bs2+1), x3f(n_blocks, bs3+1), x1v(n_blocks, bs1), x2v(n_blocks, bs2), x3v(n_blocks, bs3), stat=alloc_status)
+      ! allocate(x1f(n_blocks, bs1+1), x2f(n_blocks, bs2+1), x3f(n_blocks, bs3+1), x1v(n_blocks, bs1), x2v(n_blocks, bs2), x3v(n_blocks, bs3), stat=alloc_status)
+      allocate(x1f(bs1+1, n_blocks), x2f(bs2+1, n_blocks), x3f(bs3+1, n_blocks), x1v(bs1, n_blocks), x2v(bs2, n_blocks), x3v(bs3, n_blocks), stat=alloc_status)
       allocate(x1_tmp(bs1, bs2, bs3), x2_tmp(bs1, bs2, bs3), x3_tmp(bs1, bs2, bs3), v_tmp(bs1, bs2, bs3), stat=alloc_status)
       allocate(x1f_tmp(bs1), x2f_tmp(bs2), x3f_tmp(bs3), stat=alloc_status)
       allocate(particle_id(nx1), stat=alloc_status)
@@ -327,6 +332,10 @@ contains
     if (athena%arb_grid) then
       ! Now... What do we do here...
       i = 1
+      write(*,*), "x1f shape", shape(x1f)
+      write(*,*), "x1f",  x1f
+      write(*,*), "x1f(1, :)", x1f(1, :)
+      write(*,*), "x1f(:, 1)", x1f(:, 1)
       do iblock=1, n_blocks
          iu = iblock*bs1*bs2*bs3
          il = iu - bs1*bs2*bs3 + 1
@@ -336,9 +345,14 @@ contains
          vx2_a(il:iu) = reshape(data(:,:,:,iblock,3), (/size(data(:,:,:,iblock,3))/) )
          vx3_a(il:iu) = reshape(data(:,:,:,iblock,4), (/size(data(:,:,:,iblock,4))/) )
 
-         ! write(*,*), "sizes", size(x1v(iblock, :)), size(x2v(iblock, :)), size(x3v(iblock, :)), size(x1_tmp), size(x2_tmp), size(x3_tmp)
+         ! ! write(*,*), "sizes", size(x1v(iblock, :)), size(x2v(iblock, :)), size(x3v(iblock, :)), size(x1_tmp), size(x2_tmp), size(x3_tmp)
+         ! write(*,*), "x1v(iblock, :)", x1v(iblock, :)
+         ! write(*,*), "x1f(iblock, :)", x1f(iblock, :)
+         ! write(*,*), "x2v(iblock, :)", x2v(iblock, :)
+         ! write(*,*), "x3v(iblock, :)", x3v(iblock, :)
 
-         call meshgrid_3d(x1v(iblock, :), x2v(iblock, :), x3v(iblock, :), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
+         ! call meshgrid_3d(x1v(iblock, :), x2v(iblock, :), x3v(iblock, :), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
+         call meshgrid_3d(x1v(:, iblock), x2v(:, iblock), x3v(:, iblock), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
 
          ! write(*,*), "outside of meshgrid_3d"
 
@@ -348,7 +362,7 @@ contains
 
 
 
-         call volumegrid_3d(x1f(iblock, :), x2f(iblock, :), x3f(iblock, :), v_tmp, coord=athena%coord)
+         call volumegrid_3d(x1f(:, iblock), x2f(:, iblock), x3f(:, iblock), v_tmp, coord=athena%coord)
 
          v_a(il:iu) = reshape(v_tmp, (/size(v_tmp)/) )
 
@@ -361,10 +375,6 @@ contains
 
       ! now that v_a is no longer needed, it will become h
       h = v_a**1/3
-
-      do i=1, 10
-        write(*,*), "h", h(i)
-      enddo
 
       ! Convert coordinates and velocities to Cartesian if necessary
       if (.not. athena%coord==0) then
@@ -388,6 +398,10 @@ contains
       write(*,*) "Data successfully converted to cartesian "
 
       deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
+
+      do i=1, 10
+        write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
+      enddo
 
       call setup_arb_to_mcfost(xx, yy, zz, h, vxx, vyy, vzz, mass_gas, particle_id)
 
