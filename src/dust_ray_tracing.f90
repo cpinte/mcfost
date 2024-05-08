@@ -275,9 +275,13 @@ subroutine init_directions_ray_tracing()
   do ibin=1, RT_n_incl
      ! 0 est remplace par un epsilon car il faut donner un axe de reference
      ! pour les differentes directions de ray-tracing utilisees dans le RT2
-     tab_uv_rt(ibin) = sin( sign(max(abs(tab_RT_incl(ibin)),1e-20), tab_RT_incl(ibin)) *deg_to_rad ) ! uv_rt mais v_rt = 0 ici
-     tab_w_rt(ibin) = sqrt(1.0_dp - tab_uv_rt(ibin)*tab_uv_rt(ibin))
-     if (abs(tab_RT_incl(ibin)) > 90.) tab_w_rt(ibin) = - tab_w_rt(ibin)
+     if (abs(tab_RT_incl(ibin)) > 1e-20) then
+        tab_uv_RT(ibin) = sin(tab_RT_incl(ibin) * deg_to_rad)
+        tab_w_RT(ibin)  = cos(tab_RT_incl(ibin) * deg_to_rad)
+     else
+        tab_uv_RT(ibin) = sign(1e-20,  tab_RT_incl(ibin))
+        tab_w_RT(ibin) = 1.0
+     endif
 
      ! phi = 0 correspond a -v
      do iaz =1, RT_n_az
@@ -285,6 +289,12 @@ subroutine init_directions_ray_tracing()
         tab_v_rt(ibin,iaz) =   - tab_uv_rt(ibin) * cos(tab_RT_az(iaz)*deg_to_rad)
      enddo
   enddo
+
+
+  do ibin=1, RT_n_incl
+     write(*,*) ibin, tab_RT_incl(ibin), -tab_uv_rt(ibin), tab_w_rt(ibin)
+  enddo
+
 
   if (.not. allocated(star_position)) then
      allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), star_vr(n_etoiles,RT_n_incl,RT_n_az), stat=alloc_status)
