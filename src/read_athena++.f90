@@ -294,6 +294,7 @@ contains
     if (alloc_status > 0) call error('Allocation error athena++ data')
 
     if (athena%arb_grid) then
+      lVoronoi = .true.
       nx1 = n_blocks * bs1 * bs2 * bs3
       allocate(rho_a(nx1), vx1_a(nx1), vx2_a(nx1), vx3_a(nx1), x1_a(nx1), x2_a(nx1), x3_a(nx1), v_a(nx1), stat=alloc_status)
       ! allocate(x1f(n_blocks, bs1+1), x2f(n_blocks, bs2+1), x3f(n_blocks, bs3+1), x1v(n_blocks, bs1), x2v(n_blocks, bs2), x3v(n_blocks, bs3), stat=alloc_status)
@@ -332,10 +333,10 @@ contains
     if (athena%arb_grid) then
       ! Now... What do we do here...
       i = 1
-      write(*,*), "x1f shape", shape(x1f)
-      write(*,*), "x1f",  x1f
-      write(*,*), "x1f(1, :)", x1f(1, :)
-      write(*,*), "x1f(:, 1)", x1f(:, 1)
+      ! write(*,*), "x1f shape", shape(x1f)
+      ! write(*,*), "x1f",  x1f
+      ! write(*,*), "x1f(1, :)", x1f(1, :)
+      ! write(*,*), "x1f(:, 1)", x1f(:, 1)
       do iblock=1, n_blocks
          iu = iblock*bs1*bs2*bs3
          il = iu - bs1*bs2*bs3 + 1
@@ -371,7 +372,11 @@ contains
       deallocate(data, x1v, x2v, x3v, x1_tmp, x2_tmp, x3_tmp, v_tmp, x1f, x2f, x3f)
 
       ! Need to convert from density to mass
-      mass_gas = rho_a*v_a
+      mass_gas = rho_a*udens*v_a !* AU3_to_m3  * g_to_Msun
+      write(*,*), "AU3_to_m3 * g_to_Msun", AU3_to_m3 * g_to_Msun
+      write(*,*), "masse_mol_gaz", masse_mol_gaz
+      write(*,*), "udens", udens
+
 
       ! now that v_a is no longer needed, it will become h
       h = v_a**1/3
@@ -391,15 +396,27 @@ contains
         yy = x2_a
         zz = x3_a
 
-        vxx = vx1_a
-        vyy = vx2_a
-        vzz = vx3_a
+        vxx = vx1_a*uvelocity
+        vyy = vx2_a*uvelocity
+        vzz = vx3_a*uvelocity
       endif
       write(*,*) "Data successfully converted to cartesian "
 
       deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
 
       do i=1, 10
+        write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
+      enddo
+
+      write(*,*), "second lot"
+
+      do i=200000, 200010
+        write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
+      enddo
+
+      write(*,*), "third lot"
+
+      do i=3900000, 3900010
         write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
       enddo
 
@@ -416,9 +433,7 @@ contains
       !
       ! enddo
       return
-      write(*,*), "this shound't print"
     else
-      write(*,*), "this shound't print"
 
       ! Convert to non-raw data, ie merge all blocks
       do iblock=1, n_blocks

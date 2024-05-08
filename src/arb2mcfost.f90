@@ -137,11 +137,12 @@ module arb2mcfost
         ! -> correction for small density applied on mass_gas directly inside
 
 
-        call hydro_to_Voronoi_atomic(n_points,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,dz)
-    ! 	call empty_cells
+        ! call hydro_to_Voronoi_atomic(n_points,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,dz)
+        ! 	call empty_cells
 
         !deallocating temporary variables from input file.
-        deallocate(h,vx,vy,vz,mass_gas, mass_ne_on_massgas, x,y,z,T_tmp, vt_tmp, dz)
+        ! deallocate(h,vx,vy,vz,mass_gas, mass_ne_on_massgas, x,y,z,T_tmp, vt_tmp, dz)
+        deallocate(h,vx,vy,vz,mass_gas, x,y,z)
 
         return
       end subroutine setup_arb_to_mcfost

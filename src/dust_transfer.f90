@@ -107,6 +107,8 @@ subroutine transfert_poussiere()
   ! Building the dust grain population
   call build_grain_size_distribution()
 
+write(*,*),"********###########", "larg_voronoi", larg_voronoi, "lathena", lathena
+
   if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
      call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
      call setup_grid()
@@ -121,6 +123,8 @@ subroutine transfert_poussiere()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
   endif
+
+write(*,*),"********###########", "larg_voronoi", larg_voronoi, "lathena", lathena
 
   laffichage=.true.
 
