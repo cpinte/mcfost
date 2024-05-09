@@ -172,8 +172,8 @@ contains
     real, parameter :: vx=0.0, vy=1.0, vz=1.0
     logical :: print_messages
 
-    print_messages = .true.
-    call hdf_set_print_messages(print_messages)
+    ! print_messages = .true.
+    ! call hdf_set_print_messages(print_messages)
 
     usolarmass = 1.0_dp
     ulength_au = 1.0_dp
@@ -373,9 +373,11 @@ contains
 
       ! Need to convert from density to mass
       mass_gas = rho_a*udens*v_a !* AU3_to_m3  * g_to_Msun
-      write(*,*), "AU3_to_m3 * g_to_Msun", AU3_to_m3 * g_to_Msun
-      write(*,*), "masse_mol_gaz", masse_mol_gaz
+      ! write(*,*), "AU3_to_m3 * g_to_Msun", AU3_to_m3 * g_to_Msun
+      ! write(*,*), "masse_mol_gaz", masse_mol_gaz
       write(*,*), "udens", udens
+      write(*,*), "uvelocity", uvelocity
+      write(*,*), "ulength", ulength
 
 
       ! now that v_a is no longer needed, it will become h
@@ -396,29 +398,33 @@ contains
         yy = x2_a
         zz = x3_a
 
-        vxx = vx1_a*uvelocity
-        vyy = vx2_a*uvelocity
-        vzz = vx3_a*uvelocity
+        vxx = vx1_a!*uvelocity
+        vyy = vx2_a!*uvelocity
+        vzz = vx3_a!*uvelocity
       endif
       write(*,*) "Data successfully converted to cartesian "
 
       deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
 
-      do i=1, 10
-        write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
-      enddo
+      ! do i=1, 10
+      !   write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
+      ! enddo
+      !
+      ! write(*,*), "second lot"
 
-      write(*,*), "second lot"
+      ! do i=115480, 115490
+      !   write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i), "vxx", vxx(i), "vyy", vyy(i),  "vzz", vzz(i)
+      ! enddo
 
-      do i=200000, 200010
-        write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
-      enddo
+      ! write(*,*), "third lot"
+      !
+      ! do i=3900000, 3900010
+      !   write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
+      ! enddo
 
-      write(*,*), "third lot"
-
-      do i=3900000, 3900010
-        write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
-      enddo
+      vxx = vxx*uvelocity
+      vyy = vyy*uvelocity
+      vzz = vzz*uvelocity
 
       call setup_arb_to_mcfost(xx, yy, zz, h, vxx, vyy, vzz, mass_gas, particle_id)
 

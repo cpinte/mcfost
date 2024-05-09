@@ -117,8 +117,10 @@ write(*,*),"********###########", "larg_voronoi", larg_voronoi, "lathena", lathe
      call setup_grid()
   else if (lathena) then
     call read_athena_model()
-    call setup_grid()
-  else if (larg_voronoi) then
+    if (larg_voronoi) then
+      call setup_grid()
+    endif
+  else
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
@@ -138,8 +140,8 @@ write(*,*),"********###########", "larg_voronoi", larg_voronoi, "lathena", lathe
         call densite_Seb_Charnoz2()
      else if (lfargo3d) then
         call read_fargo3d_files()
-     else if (lathena) then
-        call read_athena_model()
+     ! else if (lathena) then
+     !    call read_athena_model()
      else if (lsphere_model) then
         !on a structured spherical grid
         call read_spherical_model(density_file)

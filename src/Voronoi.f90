@@ -354,6 +354,12 @@ module Voronoi_grid
        write(*,*) "e.g. < 2*Rstar, and will be deleted."
     endif
 
+
+    ! do i=115480, 115490
+    !   write(*,*), "h", h(i), "x", x(i), "y", y(i), "z", z(i), "vx", vx(i), "vy", vy(i),  "vz", vz(i)
+    ! enddo
+
+
     ! Filtering stars outside the limits
     etoile(:)%out_model = .true.
     etoile(:)%icell = 0
