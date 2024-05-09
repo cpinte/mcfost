@@ -964,7 +964,7 @@ end subroutine intersect_stars
    if (icell0<=n_cells) then
    !TO DO: densite_gaz(icell0) instead of nHtot
       rho = nHtot(icell0) * wght_per_H
-      if (rho > 0.0) then ! even if icompute_atomRT(icell0) /= 0 
+      if (rho > 0.0) then ! even if icompute_atomRT(icell0) /= 0
          rr = sqrt( x*x + y*y + z*z)
          ! Get vaccr : the accretion velocity above the shock.
          if (lvoronoi) then !always 3d
