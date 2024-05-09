@@ -2093,7 +2093,7 @@ end function integrate_trap_array
      n = size(y)
      b = size(z)
 
-     ! write(*,*), m, n, b
+     ! write(*,*) m, n, b
 
      ! Check if dimensions match
      if (size(xx, 1) /= m .or. size(xx, 2) /= n .or. size(xx, 3) /= b .or. &
@@ -2130,10 +2130,10 @@ end function integrate_trap_array
      n = size(y)
      b = size(z)
 
-     ! write(*,*), "sizes of input arrays are ", m, n, b
-     ! write(*,*), "x is ", x
-     ! write(*,*), "y is ", y
-     ! write(*,*), "z is ", z
+     ! write(*,*) "sizes of input arrays are ", m, n, b
+     ! write(*,*) "x is ", x
+     ! write(*,*) "y is ", y
+     ! write(*,*) "z is ", z
 
      ! ! Check if dimensions match
      ! if (size(v, 1) /= m .or. size(v, 2) /= n .or. size(v, 3) /= b) then
@@ -2158,7 +2158,7 @@ end function integrate_trap_array
                else if (coord == 2) then
                  ! Spherical polar
                  if (y(j) < 0 ) then
-                    write(*,*), "y less than 0 in spherical polar"
+                    write(*,*) "y less than 0 in spherical polar"
                  endif
                  v(i, j, k) = abs((x(i) + dx/2)**2*sin((y(j) + dy/2))*dx*dy*dz)
                endif

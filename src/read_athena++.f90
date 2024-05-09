@@ -333,10 +333,10 @@ contains
     if (athena%arb_grid) then
       ! Now... What do we do here...
       i = 1
-      ! write(*,*), "x1f shape", shape(x1f)
-      ! write(*,*), "x1f",  x1f
-      ! write(*,*), "x1f(1, :)", x1f(1, :)
-      ! write(*,*), "x1f(:, 1)", x1f(:, 1)
+      ! write(*,*) "x1f shape", shape(x1f)
+      ! write(*,*) "x1f",  x1f
+      ! write(*,*) "x1f(1, :)", x1f(1, :)
+      ! write(*,*) "x1f(:, 1)", x1f(:, 1)
       do iblock=1, n_blocks
          iu = iblock*bs1*bs2*bs3
          il = iu - bs1*bs2*bs3 + 1
@@ -346,16 +346,16 @@ contains
          vx2_a(il:iu) = reshape(data(:,:,:,iblock,3), (/size(data(:,:,:,iblock,3))/) )
          vx3_a(il:iu) = reshape(data(:,:,:,iblock,4), (/size(data(:,:,:,iblock,4))/) )
 
-         ! ! write(*,*), "sizes", size(x1v(iblock, :)), size(x2v(iblock, :)), size(x3v(iblock, :)), size(x1_tmp), size(x2_tmp), size(x3_tmp)
-         ! write(*,*), "x1v(iblock, :)", x1v(iblock, :)
-         ! write(*,*), "x1f(iblock, :)", x1f(iblock, :)
-         ! write(*,*), "x2v(iblock, :)", x2v(iblock, :)
-         ! write(*,*), "x3v(iblock, :)", x3v(iblock, :)
+         ! ! write(*,*) "sizes", size(x1v(iblock, :)), size(x2v(iblock, :)), size(x3v(iblock, :)), size(x1_tmp), size(x2_tmp), size(x3_tmp)
+         ! write(*,*) "x1v(iblock, :)", x1v(iblock, :)
+         ! write(*,*) "x1f(iblock, :)", x1f(iblock, :)
+         ! write(*,*) "x2v(iblock, :)", x2v(iblock, :)
+         ! write(*,*) "x3v(iblock, :)", x3v(iblock, :)
 
          ! call meshgrid_3d(x1v(iblock, :), x2v(iblock, :), x3v(iblock, :), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
          call meshgrid_3d(x1v(:, iblock), x2v(:, iblock), x3v(:, iblock), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
 
-         ! write(*,*), "outside of meshgrid_3d"
+         ! write(*,*) "outside of meshgrid_3d"
 
          x1_a(il:iu) = reshape(x1_tmp, (/size(x1_tmp)/) )
          x2_a(il:iu) = reshape(x2_tmp, (/size(x2_tmp)/) )
@@ -373,11 +373,11 @@ contains
 
       ! Need to convert from density to mass
       mass_gas = rho_a*udens*v_a !* AU3_to_m3  * g_to_Msun
-      ! write(*,*), "AU3_to_m3 * g_to_Msun", AU3_to_m3 * g_to_Msun
-      ! write(*,*), "masse_mol_gaz", masse_mol_gaz
-      write(*,*), "udens", udens
-      write(*,*), "uvelocity", uvelocity
-      write(*,*), "ulength", ulength
+      ! write(*,*) "AU3_to_m3 * g_to_Msun", AU3_to_m3 * g_to_Msun
+      ! write(*,*) "masse_mol_gaz", masse_mol_gaz
+      write(*,*) "udens", udens
+      write(*,*) "uvelocity", uvelocity
+      write(*,*) "ulength", ulength
 
 
       ! now that v_a is no longer needed, it will become h
@@ -407,19 +407,19 @@ contains
       deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
 
       ! do i=1, 10
-      !   write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
+      !   write(*,*) "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
       ! enddo
       !
-      ! write(*,*), "second lot"
+      ! write(*,*) "second lot"
 
       ! do i=115480, 115490
-      !   write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i), "vxx", vxx(i), "vyy", vyy(i),  "vzz", vzz(i)
+      !   write(*,*) "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i), "vxx", vxx(i), "vyy", vyy(i),  "vzz", vzz(i)
       ! enddo
 
-      ! write(*,*), "third lot"
+      ! write(*,*) "third lot"
       !
       ! do i=3900000, 3900010
-      !   write(*,*), "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
+      !   write(*,*) "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
       ! enddo
 
       vxx = vxx*uvelocity
@@ -447,7 +447,7 @@ contains
          il = logical_locations(1,iblock) * bs1
          jl = logical_locations(2,iblock) * bs2
          kl = logical_locations(3,iblock) * bs3
-         write(*,*), il, jl, kl
+         write(*,*) il, jl, kl
 
          iu = il + bs1
          ju = jl + bs2

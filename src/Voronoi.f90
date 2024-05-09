@@ -356,7 +356,7 @@ module Voronoi_grid
 
 
     ! do i=115480, 115490
-    !   write(*,*), "h", h(i), "x", x(i), "y", y(i), "z", z(i), "vx", vx(i), "vy", vy(i),  "vz", vz(i)
+    !   write(*,*) "h", h(i), "x", x(i), "y", y(i), "z", z(i), "vx", vx(i), "vy", vy(i),  "vz", vz(i)
     ! enddo
 
 
@@ -456,7 +456,7 @@ module Voronoi_grid
        if (alloc_status /=0) call error("Allocation error neighbours_list_loc")
        neighbours_list_loc = 0
 
-       write(*,*), "allocated neighbours_list", n_cells_per_cpu * max_neighbours * nb_proc_voro
+       write(*,*) "allocated neighbours_list", n_cells_per_cpu * max_neighbours * nb_proc_voro
 
        n_in = 0 ! We initialize value at 0 as we have a reduction + clause
        !$omp parallel default(none) num_threads(nb_proc_voro) &
@@ -476,17 +476,17 @@ module Voronoi_grid
        allocate(V_tmp(n_cells), was_cell_cut_tmp(n_cells), star_neighb_tmp(n_cells), stat=alloc_status)
        if (alloc_status /=0) call error("Allocation error before voro++ call")
 
-      !  write(*,*), "about to enter voro"
+      !  write(*,*) "about to enter voro"
       !
-      !  write(*,*), "ncells",n_cells,"max neighbours", max_neighbours,"limits", limits, "threshold", threshold, "faces", PS%n_faces,"vectors", PS%vectors
-      !  write(*,*), "PS%cutting_distance_o_h", PS%cutting_distance_o_h, "icell_start-1", icell_start-1, "icell_end-1", icell_end-1
-      !  write(*,*), "nb_proc_voro", nb_proc_voro, "n_cells_per_cpu", n_cells_per_cpu, "n_in", n_in, "n_etoiles", n_etoiles
-      !  write(*,*),  "etoile(:)%icell-1", etoile(:)%icell-1 ,"etoile(:)%r", etoile(:)%r
+      !  write(*,*) "ncells",n_cells,"max neighbours", max_neighbours,"limits", limits, "threshold", threshold, "faces", PS%n_faces,"vectors", PS%vectors
+      !  write(*,*) "PS%cutting_distance_o_h", PS%cutting_distance_o_h, "icell_start-1", icell_start-1, "icell_end-1", icell_end-1
+      !  write(*,*) "nb_proc_voro", nb_proc_voro, "n_cells_per_cpu", n_cells_per_cpu, "n_in", n_in, "n_etoiles", n_etoiles
+      !  write(*,*)  "etoile(:)%icell-1", etoile(:)%icell-1 ,"etoile(:)%r", etoile(:)%r
       !
       !  i = 1
       !  do i=1, 5
-      !    write(*,*), "x_tmp", x_tmp(i), "y_tmp", y_tmp(i), "z_tmp", z_tmp(i), "h_tmp", h_tmp(i), "V_tmp", V_tmp(i), "neighbours_list_loc", neighbours_list_loc(i)
-      !    write(*,*), "first_neighbours", first_neighbours(i), "last_neighbours", last_neighbours(i), "neighbours_list_loc", neighbours_list_loc(i), \
+      !    write(*,*) "x_tmp", x_tmp(i), "y_tmp", y_tmp(i), "z_tmp", z_tmp(i), "h_tmp", h_tmp(i), "V_tmp", V_tmp(i), "neighbours_list_loc", neighbours_list_loc(i)
+      !    write(*,*) "first_neighbours", first_neighbours(i), "last_neighbours", last_neighbours(i), "neighbours_list_loc", neighbours_list_loc(i), \
       !                 "last_neighbours", last_neighbours(i), "was_cell_cut_tmp", was_cell_cut_tmp(i), "star_neighb_tmp", star_neighb_tmp(i)
       !
       ! enddo

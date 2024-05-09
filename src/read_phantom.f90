@@ -214,9 +214,9 @@ contains
        call extract('time',simu_time,hdr,ierr)
 
 
-       ! write(*,*), "udens",  umass / ulength**3
-       ! write(*,*), "uvelocity", ulength / utime
-       ! write(*,*), "ulength", ulength
+       ! write(*,*) "udens",  umass / ulength**3
+       ! write(*,*) "uvelocity", ulength / utime
+       ! write(*,*) "ulength", ulength
        !
 
        read (iunit, iostat=ierr) number
