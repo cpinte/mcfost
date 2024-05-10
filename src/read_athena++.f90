@@ -1,12 +1,14 @@
 module read_athena
 
+  use mem, only : allocate_densities
   use parametres
   use messages
   use mcfost_env
   use grid
-  use cylindrical_grid
+  ! use cylindrical_grid
+  ! use spherical_grid
   use density
-  use stars, only : compute_stellar_parameters
+  use stars, only : compute_stellar_parameters, stars_cell_indices
   use hdf5
   use utils, only : meshgrid_3d, volumegrid_3d, to_cartesian
   use utils_hdf5 ! mentiplay
@@ -46,6 +48,7 @@ contains
 
     ! Reading attributes :
     call hdf_read_attribute(group_id,"", "Coordinates",coord)
+    write(*,*) "Coordinates is ", coord
 
     if (trim(coord) == "cartesian") then
       athena%coord = 0
@@ -68,7 +71,7 @@ contains
       write(*,*) "Mesh refinment detected in athena++ model. "
       ! call error("mcfost can only read athena++ grids with MaxLevel=0 for now")
     else
-      if (athena%coord == 1) then
+      if (athena%coord == 1 .or. athena%coord == 2) then
         athena%arb_grid = .false.
       endif
     endif
@@ -107,11 +110,18 @@ contains
 
     else
       ! Updating mcfost parameters
-      grid_type = 2
+      ! call warning("athena : forcing spherical grid") ! only spherical grid is implemented for now
+      grid_type = athena%coord
       n_rad = athena%nx1
       n_rad_in = 1
-      n_az = athena%nx3
-      nz = athena%nx2/2 + 1
+      if (grid_type == 3) then
+        n_az = athena%nx3
+        nz = athena%nx2/2 + 1
+      else if (grid_type == 2) then
+        n_az = athena%nx2
+        nz = athena%nx3/2 + 1
+      endif
+      
       lregular_theta = .true.
       theta_max = 0.5 * pi - athena%x2_min
 
@@ -121,8 +131,9 @@ contains
          scale_length_units_factor = 1.0
       endif
 
+      disk_zone(1)%geometry = grid_type
       disk_zone(1)%rin  = athena%x1_min * scale_length_units_factor
-      disk_zone(1)%edge=0.0
+      disk_zone(1)%edge = 0.0
       disk_zone(1)%rmin = disk_zone(1)%rin
       disk_zone(1)%rout = athena%x1_max * scale_length_units_factor
       disk_zone(1)%rmax = disk_zone(1)%rout
@@ -296,10 +307,14 @@ contains
     if (athena%arb_grid) then
       lVoronoi = .true.
       nx1 = n_blocks * bs1 * bs2 * bs3
-      allocate(rho_a(nx1), vx1_a(nx1), vx2_a(nx1), vx3_a(nx1), x1_a(nx1), x2_a(nx1), x3_a(nx1), v_a(nx1), stat=alloc_status)
-      ! allocate(x1f(n_blocks, bs1+1), x2f(n_blocks, bs2+1), x3f(n_blocks, bs3+1), x1v(n_blocks, bs1), x2v(n_blocks, bs2), x3v(n_blocks, bs3), stat=alloc_status)
-      allocate(x1f(bs1+1, n_blocks), x2f(bs2+1, n_blocks), x3f(bs3+1, n_blocks), x1v(bs1, n_blocks), x2v(bs2, n_blocks), x3v(bs3, n_blocks), stat=alloc_status)
-      allocate(x1_tmp(bs1, bs2, bs3), x2_tmp(bs1, bs2, bs3), x3_tmp(bs1, bs2, bs3), v_tmp(bs1, bs2, bs3), stat=alloc_status)
+      allocate(rho_a(nx1), vx1_a(nx1), vx2_a(nx1), vx3_a(nx1), x1_a(nx1), x2_a(nx1), \
+              x3_a(nx1), v_a(nx1), stat=alloc_status)
+      ! allocate(x1f(n_blocks, bs1+1), x2f(n_blocks, bs2+1), x3f(n_blocks, bs3+1), \
+      !          x1v(n_blocks, bs1), x2v(n_blocks, bs2), x3v(n_blocks, bs3), stat=alloc_status)
+      allocate(x1f(bs1+1, n_blocks), x2f(bs2+1, n_blocks), x3f(bs3+1, n_blocks), \
+                  x1v(bs1, n_blocks), x2v(bs2, n_blocks), x3v(bs3, n_blocks), stat=alloc_status)
+      allocate(x1_tmp(bs1, bs2, bs3), x2_tmp(bs1, bs2, bs3), x3_tmp(bs1, bs2, bs3), \
+                  v_tmp(bs1, bs2, bs3), stat=alloc_status)
       allocate(x1f_tmp(bs1), x2f_tmp(bs2), x3f_tmp(bs3), stat=alloc_status)
       allocate(particle_id(nx1), stat=alloc_status)
       particle_id(:) = 0
@@ -333,10 +348,6 @@ contains
     if (athena%arb_grid) then
       ! Now... What do we do here...
       i = 1
-      ! write(*,*) "x1f shape", shape(x1f)
-      ! write(*,*) "x1f",  x1f
-      ! write(*,*) "x1f(1, :)", x1f(1, :)
-      ! write(*,*) "x1f(:, 1)", x1f(:, 1)
       do iblock=1, n_blocks
          iu = iblock*bs1*bs2*bs3
          il = iu - bs1*bs2*bs3 + 1
@@ -346,12 +357,6 @@ contains
          vx2_a(il:iu) = reshape(data(:,:,:,iblock,3), (/size(data(:,:,:,iblock,3))/) )
          vx3_a(il:iu) = reshape(data(:,:,:,iblock,4), (/size(data(:,:,:,iblock,4))/) )
 
-         ! ! write(*,*) "sizes", size(x1v(iblock, :)), size(x2v(iblock, :)), size(x3v(iblock, :)), size(x1_tmp), size(x2_tmp), size(x3_tmp)
-         ! write(*,*) "x1v(iblock, :)", x1v(iblock, :)
-         ! write(*,*) "x1f(iblock, :)", x1f(iblock, :)
-         ! write(*,*) "x2v(iblock, :)", x2v(iblock, :)
-         ! write(*,*) "x3v(iblock, :)", x3v(iblock, :)
-
          ! call meshgrid_3d(x1v(iblock, :), x2v(iblock, :), x3v(iblock, :), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
          call meshgrid_3d(x1v(:, iblock), x2v(:, iblock), x3v(:, iblock), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
 
@@ -360,8 +365,6 @@ contains
          x1_a(il:iu) = reshape(x1_tmp, (/size(x1_tmp)/) )
          x2_a(il:iu) = reshape(x2_tmp, (/size(x2_tmp)/) )
          x3_a(il:iu) = reshape(x3_tmp, (/size(x3_tmp)/) )
-
-
 
          call volumegrid_3d(x1f(:, iblock), x2f(:, iblock), x3f(:, iblock), v_tmp, coord=athena%coord)
 
@@ -392,8 +395,11 @@ contains
         ! velocites
         allocate(vxx(size(vx1_a)), vyy(size(vx1_a)), vzz(size(vx1_a)))
         call to_cartesian_velocities(vx1_a, vx2_a, vx3_a, vxx, vyy, vzz, x1_a, x2_a, x3_a, athena%coord)
+        vfield_coord = 1
         ! call to_cartesian(vx1_a, vx2_a, vx3_a, vx, vy, vz, athena%coord)
+        write(*,*) "Data successfully converted to cartesian "
       else
+        ! Already in cartesian coordinates
         xx = x1_a
         yy = x2_a
         zz = x3_a
@@ -402,7 +408,6 @@ contains
         vyy = vx2_a!*uvelocity
         vzz = vx3_a!*uvelocity
       endif
-      write(*,*) "Data successfully converted to cartesian "
 
       deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
 
@@ -428,18 +433,13 @@ contains
 
       call setup_arb_to_mcfost(xx, yy, zz, h, vxx, vyy, vzz, mass_gas, particle_id)
 
-
-
-    ! call   read_phantom_hdf_files(iunit,n_files, filenames, x,y,z,h,vx,vy,vz,T_gas,&
-    !        particle_id,massgas,massdust,rhogas,rhodust, &
-    !        extra_heating,ndusttypes,SPH_grainsizes,     &
-    !        mask,n_SPH,ierr)
-
-      ! do i=1, nx1
-      !
-      ! enddo
       return
     else
+      call setup_grid()
+      call define_grid()
+      call stars_cell_indices()
+
+      call allocate_densities()
 
       ! Convert to non-raw data, ie merge all blocks
       do iblock=1, n_blocks
@@ -468,30 +468,56 @@ contains
       !-----------------------------------
       write(*,*) "Converting athena++ model to mcfost ..."
       lvelocity_file = .true.
-      vfield_coord = 3 ! spherical
 
       allocate(vfield3d(n_cells,3), stat=alloc_status)
       if (alloc_status /= 0) call error("memory allocation error athena++ vfield3d")
 
       write(*,*) "Constant spatial distribution"
 
-      do i=1, n_rad
-         jj= 0
-         bz : do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
-            if (j==0) cycle bz
-            jj = jj + 1
-            do phik=1, n_az
-               icell = cell_map(i,j,phik)
+      ! Athena cartesian: x, y, z,
+      ! Athena cylindrical: r, phi, z
+      ! Athena spherical: r, theta, phi
+      ! MCFOST: 1 = cartesian, 2 = cylindrical, 3 = spherical
+      vfield_coord = disk_zone(1)%geometry + 1
+      if (vfield_coord == 3) then
+        do i=1, n_rad
+           jj= 0
+           bz : do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
+              if (j==0) cycle bz
+              jj = jj + 1
+              do phik=1, n_az
+                 icell = cell_map(i,j,phik)
 
-               densite_gaz(icell) =  rho(i,jj,phik) * udens
-               densite_pouss(:,icell) = rho(i,jj,phik) * udens
+                 densite_gaz(icell) =  rho(i,jj,phik) * udens
+                 densite_pouss(:,icell) = rho(i,jj,phik) * udens
 
-               vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
-               vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
-               vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
-            enddo ! k
-         enddo bz
-      enddo ! i
+                 vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
+                 ! I guess the below line is only true if the simulation is done in a co-rotating frame
+                 vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
+                 ! vfield3d(icell,2)  = vx3(i,jj,phik) * uvelocity ! vphi : planet at r=1
+                 vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
+              enddo ! k
+           enddo bz
+        enddo ! i
+      else if (vfield_coord == 2) then
+        do i=1, n_rad
+           ! jj= 0
+           do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
+              jj = jj + 1
+              do phik=1, n_az
+                 icell = cell_map(i,j,phik)
+
+                 densite_gaz(icell) =  rho(i,jj,phik) * udens
+                 densite_pouss(:,icell) = rho(i,jj,phik) * udens
+
+                 vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity ! vr
+                 vfield3d(icell,2)  = vx2(i,jj,phik) * uvelocity ! vphi
+                 vfield3d(icell,3)  = vx3(i,jj,phik) * uvelocity ! vz
+              enddo ! k
+           enddo
+        enddo ! i
+      endif
+
       deallocate(rho,vx1,vx2,vx3)
 
       ! -- another copy and paste from read_fargo3d

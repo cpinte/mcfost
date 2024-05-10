@@ -130,7 +130,7 @@ write(*,*) "********###########", "larg_voronoi", larg_voronoi, "lathena", lathe
 
   laffichage=.true.
 
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi .or. larg_voronoi)) then ! already done by setup_SPH2mcfost
+  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi .or. larg_voronoi .or. lathena)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()
