@@ -1432,8 +1432,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lathena = .true.
         call get_command_argument(i_arg,athena_file)
-        n_files = 1
-        allocate(density_files(n_files))
+        n_arb_files = 1
+        allocate(density_files(n_arb_files))
         density_files(1) = athena_file
         i_arg = i_arg + 1
      case("-idefix")

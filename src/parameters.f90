@@ -227,7 +227,7 @@ module parametres
 
   character(len=512) :: density_file, sigma_file, grain_size_file, limits_file
   character(len=512), dimension(:), allocatable :: density_files
-  integer :: n_phantom_files, n_files
+  integer :: n_phantom_files, n_arb_files
 
   ! Stars
   type star_type
