@@ -15,7 +15,7 @@ model_list = glob.glob1("test_data/","*")
 #if os.environ.get('CI', None) == 'true':
 #    model_list = ["ref3.0","ref3.0_multi","debris","discF_00500"]
 
-#model_list = ["ref3.0_multi"]#,"debris","discF_00500"]
+#model_list = ["ref3.0"]#,"debris","discF_00500"]
 
 wl_list = ["1.0","10","100","1000"]
 wl_list_pola = ["1.0","1000"]
@@ -159,15 +159,34 @@ def test_image(model_name, wl):
 
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
+
+
+    # We just keep intensity
+    for i in range(5):
+        image = np.nan_to_num(fits.getdata(test_dir+"/"+image_name))
+        image_ref = fits.getdata("test_data/"+image_name)
+
+        print("-- i=", i)
+        print(image.shape)
+        print(image_ref.shape)
+
+        image = image[0,:,i,:,:]
+        image_ref = image_ref[0,:,i,:,:]
+
+        print("Min ref", image_ref.min(), image_ref.max())
+        print("Min    ", image.min(), image.max())
+
+        print("Maximum image difference", i, (abs(image-image_ref)/(image_ref+1e-30)).max())
+        print("Mean image difference   ", i, (abs(image-image_ref)/(image_ref+1e-30)).mean())
+
+        print("MC similar", MC_similar(image_ref,image,threshold=0.1))
+        print("-------------")
+
     image = fits.getdata(test_dir+"/"+image_name)
     image_ref = fits.getdata("test_data/"+image_name)
 
-    # We just keep intensity
     image = image[0,:,:,:,:]
     image_ref = image_ref[0,:,:,:,:]
-
-    print("Maximum image difference", (abs(image-image_ref)/(image_ref+1e-30)).max())
-    print("Mean image difference   ", (abs(image-image_ref)/(image_ref+1e-30)).mean())
 
     assert MC_similar(image_ref,image,threshold=0.1)
 
