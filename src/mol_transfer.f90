@@ -901,6 +901,8 @@ subroutine init_dust_mol(imol)
 
   call realloc_dust_mol(imol)
 
+  tab_lambda = 1e-30 ! to avoid error in stars.f90
+
   if (ldust_mol) then
      ! Tableau de longeur d'onde
      do iTrans=iTrans_min,iTrans_max

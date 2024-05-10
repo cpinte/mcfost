@@ -226,13 +226,7 @@ write(*,*) "********###########", "larg_voronoi", larg_voronoi, "lathena", lathe
      p_icell = icell_ref
      if (aniso_method==2) write(*,*) "g             ", tab_g_pos(p_icell,1)
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
-     if (lsepar_pola.and.(scattering_method == 2)) then
-        if (lmueller) then
-           write(*,*) "polarisability", maxval(-tab_mueller_pos(1,2,:,p_icell,1))
-        else
-           write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
-        endif
-     endif
+     if (lsepar_pola.and.(scattering_method == 2)) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
      if (lopacite_only) call exit(0)
 
      if (l_em_disk_image) then ! le disque �met
@@ -491,11 +485,7 @@ write(*,*) "********###########", "larg_voronoi", larg_voronoi, "lathena", lathe
         lambda = ind_etape - first_etape_obs + 1
 
         if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
-           if (lmueller) then
-              call calc_local_scattering_matrices_mueller(lambda, p_lambda)
-           else
-              call calc_local_scattering_matrices(lambda, p_lambda)
-           endif
+           call calc_local_scattering_matrices(lambda, p_lambda) ! Todo : this is not good, we compute this twice
         endif
 
         if (lspherical.or.l3D) then
@@ -995,6 +985,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   logical, intent(inout) :: flag_star, flag_ISM, lpacket_alive
   logical, intent(out) :: flag_scatt
 
+  real(kind=dp), dimension(4,4) :: M
   real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
   integer :: taille_grain, itheta
   integer :: n_iterations
@@ -1111,14 +1102,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               if (lsepar_pola) then
-                 ! Nouveaux param�tres de Stokes
-                 if (lmueller) then
-                    call new_stokes_mueller(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                 else if (laggregate) then
-                    call  new_stokes_gmm(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                 else
-                    call new_stokes(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                 endif
+                 call get_Mueller_matrix_per_grain(lambda,itheta,rand2,taille_grain, M)
+                 call update_Stokes(Stokes,u,v,w,u1,v1,w1,M)
               endif
            else ! fonction de phase HG
               call hg(tab_g(taille_grain,lambda),rand, itheta, COSPSI) !HG
@@ -1131,7 +1116,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               PHI = PI * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Param�tres de Stokes non modifi�s
            endif
 
         else ! methode 2 : diffusion sur la population de grains
@@ -1148,13 +1132,9 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               PHI = PI * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Nouveaux param�tres de Stokes
               if (lsepar_pola) then
-                 if (lmueller) then
-                    call new_stokes_mueller_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
-                 else
-                    call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
-		 endif
+                 call get_Mueller_matrix_per_cell(lambda,itheta,rand2,p_icell, M)
+                 call update_Stokes(Stokes,u,v,w,u1,v1,w1,M)
 	      endif
            else ! fonction de phase HG
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
@@ -1167,7 +1147,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               phi = pi * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Param�tres de Stokes non modifi�s
            endif
         endif
 
