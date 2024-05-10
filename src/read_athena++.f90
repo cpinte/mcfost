@@ -121,7 +121,7 @@ contains
         n_az = athena%nx2
         nz = athena%nx3/2 + 1
       endif
-      
+
       lregular_theta = .true.
       theta_max = 0.5 * pi - athena%x2_min
 
@@ -307,14 +307,13 @@ contains
     if (athena%arb_grid) then
       lVoronoi = .true.
       nx1 = n_blocks * bs1 * bs2 * bs3
-      allocate(rho_a(nx1), vx1_a(nx1), vx2_a(nx1), vx3_a(nx1), x1_a(nx1), x2_a(nx1), \
-              x3_a(nx1), v_a(nx1), stat=alloc_status)
+      allocate(rho_a(nx1), vx1_a(nx1), vx2_a(nx1), vx3_a(nx1), stat=alloc_status)
+      allocate(x1_a(nx1), x2_a(nx1), x3_a(nx1), v_a(nx1), stat=alloc_status)
       ! allocate(x1f(n_blocks, bs1+1), x2f(n_blocks, bs2+1), x3f(n_blocks, bs3+1), \
       !          x1v(n_blocks, bs1), x2v(n_blocks, bs2), x3v(n_blocks, bs3), stat=alloc_status)
-      allocate(x1f(bs1+1, n_blocks), x2f(bs2+1, n_blocks), x3f(bs3+1, n_blocks), \
-                  x1v(bs1, n_blocks), x2v(bs2, n_blocks), x3v(bs3, n_blocks), stat=alloc_status)
-      allocate(x1_tmp(bs1, bs2, bs3), x2_tmp(bs1, bs2, bs3), x3_tmp(bs1, bs2, bs3), \
-                  v_tmp(bs1, bs2, bs3), stat=alloc_status)
+      allocate(x1f(bs1+1, n_blocks), x2f(bs2+1, n_blocks), x3f(bs3+1, n_blocks), stat=alloc_status)
+      allocate(x1v(bs1, n_blocks), x2v(bs2, n_blocks), x3v(bs3, n_blocks), stat=alloc_status)
+      allocate(x1_tmp(bs1, bs2, bs3), x2_tmp(bs1, bs2, bs3), x3_tmp(bs1, bs2, bs3), v_tmp(bs1, bs2, bs3), stat=alloc_status)
       allocate(x1f_tmp(bs1), x2f_tmp(bs2), x3f_tmp(bs3), stat=alloc_status)
       allocate(particle_id(nx1), stat=alloc_status)
       particle_id(:) = 0
@@ -478,6 +477,7 @@ contains
       ! Athena cylindrical: r, phi, z
       ! Athena spherical: r, theta, phi
       ! MCFOST: 1 = cartesian, 2 = cylindrical, 3 = spherical
+      ! TO DO: Add parameter for co-rotating frame
       vfield_coord = disk_zone(1)%geometry + 1
       if (vfield_coord == 3) then
         do i=1, n_rad
