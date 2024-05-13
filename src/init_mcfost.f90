@@ -218,7 +218,7 @@ subroutine set_default_variables()
   loverwrite_s12 = .false.
   lnot_random_Voronoi = .false.
   lignore_sink = .false.
-  lcorrotating_frame = .false.
+  lcorotating_frame = .false.
 
   tmp_dir = "./"
 
@@ -1471,9 +1471,9 @@ subroutine initialisation_mcfost()
      case("-ignore_sink")
         i_arg = i_arg + 1
         lignore_sink=.true.
-     case("-corrotating_frame")
+     case("-corotating_frame")
        i_arg = i_arg + 1
-       lcorrotating_frame = .true.
+       lcorotating_frame = .true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1497,6 +1497,7 @@ subroutine initialisation_mcfost()
   endif
   if (lathena) then
      l3D = .true.
+     athena%corotating_frame = lcorotating_frame
      ! if (n_zones > 1) call error("athena mode only work with 1 zone")
      ! call warning("athena : forcing spherical grid") ! only spherical grid is implemented for now
      ! disk_zone(1)%geometry = 2

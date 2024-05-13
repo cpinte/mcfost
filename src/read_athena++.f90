@@ -97,7 +97,6 @@ contains
     athena%x3_max=RootGridX3(2)
 
     athena%log_spacing = (RootGridX1(3) > 1.0)
-    athena%corrotating_frame = lcorrotating_frame
 
     call hdf_read_attribute(group_id,"", "Time",time)
     athena%time = time
@@ -165,7 +164,7 @@ contains
 
     real(kind=dp), dimension(:,:,:), allocatable :: rho, vx1, vx2, vx3 ! todo : we can save memory and only data to directly pass it to mcfost
     real(kind=dp), dimension(:,:,:), allocatable :: rho_tmp, vx1_tmp, vx2_tmp, vx3_tmp, x1_tmp, x2_tmp, x3_tmp, v_tmp
-    real(kind=dp), dimension(:), allocatable :: rho_a, vx1_a, vx2_a, vx3_a, x1_a, x2_a, x3_a, v_a, x1f_tmp, x2f_tmp, x3f_tmp ! For the arbitrary grids where we need position to be passed to voronoi
+    real(kind=dp), dimension(:), allocatable :: rho_a, vx1_a, vx2_a, vx3_a, x1_a, x2_a, x3_a, v_a, x1f_tmp, x2f_tmp, x3f_tmp, vel_tmp ! For the arbitrary grids where we need position to be passed to voronoi
     real(kind=dp), dimension(:), allocatable :: xx, yy, zz, vxx, vyy, vzz, mass_gas, h
     integer, dimension(:), allocatable :: particle_id
     real, dimension(:,:), allocatable :: x1f, x2f, x3f, x1v, x2v, x3v
@@ -175,7 +174,7 @@ contains
 
     real(dp) :: Ggrav_athena, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
     type(star_type), dimension(:), allocatable :: etoile_old
-    character(*) :: coord_name
+    character(12) :: coord_name
 
     ! Planet properties hard coded for now
     real, parameter :: Mp = 1e-3
@@ -387,21 +386,21 @@ contains
       ! First need to correct for corrotating frame, and difference between athena and mcfost coordinate ordering
       if (athena%coord==1) then
         ! cylindrical: vx1_a = vr,  vx2_a = vphi, vx3_a = vz
-        if (athena%corrotating_frame) then
+        if (athena%corotating_frame) then
           vx2_a  = vx2_a + x1_a/ulength_au * Omega_p ! corotating frame removed: Not sure if units are right
         endif
         coord_name = "cylindrical"
       else if (athena%coord==2) then
-        allocate(v_tmp(size(vx2_a)), stat=alloc_status)
+        allocate(vel_tmp(size(vx2_a)), stat=alloc_status)
         if (alloc_status > 0) call error('Allocation error athena++ temp sph velocity array')
-        v_tmp = vx2_a
-        if (athena%corrotating_frame) then
+        vel_tmp = vx2_a
+        if (athena%corotating_frame) then
           vx2_a  = vx3_a + x1_a/ulength_au * Omega_p ! corotating frame removed: Not sure if units are right
         else
           vx2_a = vx3_a
         endif
-        vx3_a = v_tmp
-        deallocate(v_tmp)
+        vx3_a = vel_tmp
+        deallocate(vel_tmp)
         coord_name = "spherical"
       endif
 
@@ -434,7 +433,7 @@ contains
 
       vxx = vxx * uvelocity
       vyy = vyy * uvelocity
-      vzz = vzz * uvelocity 
+      vzz = vzz * uvelocity
 
       deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
 
@@ -499,13 +498,18 @@ contains
       allocate(vfield3d(n_cells,3), stat=alloc_status)
       if (alloc_status /= 0) call error("memory allocation error athena++ vfield3d")
 
-      write(*,*) "Constant spatial distribution"
+      ! write(*,*) "Constant spatial distribution"
+      ! write(*,*) "athena corotating frame", athena%corotating_frame
+      ! write(*,*) densite_gaz(10), densite_pouss(1,1), rho(1, 1, 1), cell_map(1,1,1)
+      ! write(*,*) udens, uvelocity
+      ! write(*,*) vfield_coord, disk_zone(1)%geometry
+      ! write(*,*) vx1(2,2,2), vx2(2,2,2), vx3(2,2,2)
+      ! write(*,*) "ok"
 
       ! Athena cartesian: x, y, z,
       ! Athena cylindrical: r, phi, z
       ! Athena spherical: r, theta, phi
       ! MCFOST: 1 = cartesian, 2 = cylindrical, 3 = spherical
-      ! TO DO: Add parameter for co-rotating frame
       vfield_coord = disk_zone(1)%geometry + 1
       if (vfield_coord == 2) then
         do i=1, n_rad
@@ -519,7 +523,8 @@ contains
                  densite_pouss(:,icell) = rho(i,jj,phik) * udens
 
                  vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity ! vr
-                 if (athena%corrotating_frame) then
+
+                 if (athena%corotating_frame) then
                    vfield3d(icell,2)  = (vx2(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity
                  else
                    vfield3d(icell,2)  = vx2(i,jj,phik) * uvelocity ! vphi
@@ -542,7 +547,7 @@ contains
 
                  vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
                  ! I guess the below line is only true if the simulation is done in a co-rotating frame
-                 if (athena%corrotating_frame) then
+                 if (athena%corotating_frame) then
                    vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
                  else
                    vfield3d(icell,2)  = vx3(i,jj,phik) * uvelocity ! vphi
