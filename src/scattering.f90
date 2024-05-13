@@ -497,13 +497,17 @@ end subroutine Mueller_input
 !***************************************************
 
 subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, normalisation)
+  ! read in the matrix elements, calculate the cumulative s11, niormnaklise and fill up tab_s11, etc
 
   integer, intent(in) :: lambda,taille_grain
   real, dimension(0:nang_scatt), intent(in) ::  s11,s12,s22,s33,s34,s44
   real, intent(in), optional :: normalisation
+  ! "normalisation" is the integral of S11(theta) sin(theta) dtheta if known
+  ! The missing "flux" from the numerical integration is placed between 0 and 1 degree (or first scattering angle)
+  ! as we assume it is mostly diffraction that has been missed by the sampling
 
   integer :: j
-  real :: norm, somme_prob, theta, dtheta
+  real(kind=dp) :: norm, somme_prob, theta, dtheta
 
   ! Integration S11 pour tirer angle
   if (scattering_method==1) then
