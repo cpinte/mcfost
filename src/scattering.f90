@@ -371,7 +371,7 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
      s22(:) = s11(:)
      s44(:) = s33(:)
 
-     call normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, qsca)
+     call normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, normalisation=qsca)
   endif
 
   return
@@ -496,11 +496,11 @@ end subroutine Mueller_input
 
 !***************************************************
 
-subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, qsca)
+subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, normalisation)
 
   integer, intent(in) :: lambda,taille_grain
   real, dimension(0:nang_scatt), intent(in) ::  s11,s12,s22,s33,s34,s44
-  real, intent(in) :: qsca
+  real, intent(in), optional :: normalisation
 
   integer :: j
   real :: norm, somme_prob, theta, dtheta
@@ -509,6 +509,7 @@ subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44
   if (scattering_method==1) then
      prob_s11(lambda,taille_grain,0)=0.0
      dtheta = pi/real(nang_scatt)
+
      do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
         theta = real(j)*dtheta
         prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
@@ -516,12 +517,17 @@ subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44
 
      ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
      ! On rate le pic de diffraction (en particulier entre 0 et 1)
-     somme_prob = qsca
-     prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
-          somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
+     if (present(normalisation)) then
+        if (normalisation > prob_s11(lambda,taille_grain,nang_scatt)) then
+           prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
+                normalisation - prob_s11(lambda,taille_grain,nang_scatt)
+        else
+           call error("normalise_Mueller_matrix: exact normalisation is smaller than numerical integration")
+        endif
+     endif
 
      ! Normalisation de la proba cumulee a 1
-     prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
+     prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/prob_s11(lambda,taille_grain,nang_scatt)
   endif ! scattering_method==1
 
   do j=0,nang_scatt
@@ -788,7 +794,7 @@ subroutine Fresnel_input(lambda,taille_grain, qext,qsca,gsca)
              mueller(1,1,j)*sin(theta)*dtheta
      enddo
 
-	  ! Normalisation
+     ! Normalisation
      somme_prob = prob_s11(lambda, taille_grain,nang_scatt)
      prob_s11(lambda, taille_grain,:)=prob_s11(lambda, taille_grain,:)/somme_prob
   else  !on va avoir besoin des valeurs non normalisés
