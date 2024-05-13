@@ -217,7 +217,8 @@ subroutine set_default_variables()
   image_offset_centre(:) = (/0.0,0.0,0.0/)
   loverwrite_s12 = .false.
   lnot_random_Voronoi = .false.
-  lignore_sink=.false.
+  lignore_sink = .false.
+  lcorrotating_frame = .false.
 
   tmp_dir = "./"
 
@@ -1470,6 +1471,9 @@ subroutine initialisation_mcfost()
      case("-ignore_sink")
         i_arg = i_arg + 1
         lignore_sink=.true.
+     case("-corrotating_frame")
+       i_arg = i_arg + 1
+       lcorrotating_frame = .true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"

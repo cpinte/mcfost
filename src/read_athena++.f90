@@ -97,7 +97,7 @@ contains
     athena%x3_max=RootGridX3(2)
 
     athena%log_spacing = (RootGridX1(3) > 1.0)
-    athena%corrotating_frame = .true.
+    athena%corrotating_frame = lcorrotating_frame
 
     call hdf_read_attribute(group_id,"", "Time",time)
     athena%time = time
@@ -175,6 +175,7 @@ contains
 
     real(dp) :: Ggrav_athena, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
     type(star_type), dimension(:), allocatable :: etoile_old
+    character(*) :: coord_name
 
     ! Planet properties hard coded for now
     real, parameter :: Mp = 1e-3
@@ -309,8 +310,6 @@ contains
       nx1 = n_blocks * bs1 * bs2 * bs3
       allocate(rho_a(nx1), vx1_a(nx1), vx2_a(nx1), vx3_a(nx1), stat=alloc_status)
       allocate(x1_a(nx1), x2_a(nx1), x3_a(nx1), v_a(nx1), stat=alloc_status)
-      ! allocate(x1f(n_blocks, bs1+1), x2f(n_blocks, bs2+1), x3f(n_blocks, bs3+1), \
-      !          x1v(n_blocks, bs1), x2v(n_blocks, bs2), x3v(n_blocks, bs3), stat=alloc_status)
       allocate(x1f(bs1+1, n_blocks), x2f(bs2+1, n_blocks), x3f(bs3+1, n_blocks), stat=alloc_status)
       allocate(x1v(bs1, n_blocks), x2v(bs2, n_blocks), x3v(bs3, n_blocks), stat=alloc_status)
       allocate(x1_tmp(bs1, bs2, bs3), x2_tmp(bs1, bs2, bs3), x3_tmp(bs1, bs2, bs3), v_tmp(bs1, bs2, bs3), stat=alloc_status)
@@ -370,7 +369,7 @@ contains
          v_a(il:iu) = reshape(v_tmp, (/size(v_tmp)/) )
 
       enddo
-      write(*,*) "Data successfully reshaped and read "
+      write(*,*) "Athena++ data successfully read and reshaped. "
       deallocate(data, x1v, x2v, x3v, x1_tmp, x2_tmp, x3_tmp, v_tmp, x1f, x2f, x3f)
 
       ! Need to convert from density to mass
@@ -381,11 +380,32 @@ contains
       write(*,*) "uvelocity", uvelocity
       write(*,*) "ulength", ulength
 
-
-      ! now that v_a is no longer needed, it will become h
+      ! Estimate h
       h = v_a**1/3
 
       ! Convert coordinates and velocities to Cartesian if necessary
+      ! First need to correct for corrotating frame, and difference between athena and mcfost coordinate ordering
+      if (athena%coord==1) then
+        ! cylindrical: vx1_a = vr,  vx2_a = vphi, vx3_a = vz
+        if (athena%corrotating_frame) then
+          vx2_a  = vx2_a + x1_a/ulength_au * Omega_p ! corotating frame removed: Not sure if units are right
+        endif
+        coord_name = "cylindrical"
+      else if (athena%coord==2) then
+        allocate(v_tmp(size(vx2_a)), stat=alloc_status)
+        if (alloc_status > 0) call error('Allocation error athena++ temp sph velocity array')
+        v_tmp = vx2_a
+        if (athena%corrotating_frame) then
+          vx2_a  = vx3_a + x1_a/ulength_au * Omega_p ! corotating frame removed: Not sure if units are right
+        else
+          vx2_a = vx3_a
+        endif
+        vx3_a = v_tmp
+        deallocate(v_tmp)
+        coord_name = "spherical"
+      endif
+
+      ! Now actually convert
       if (.not. athena%coord==0) then
         ! coordinates
         allocate(xx(size(x1_a)), yy(size(x1_a)), zz(size(x1_a)))
@@ -395,18 +415,26 @@ contains
         allocate(vxx(size(vx1_a)), vyy(size(vx1_a)), vzz(size(vx1_a)))
         call to_cartesian_velocities(vx1_a, vx2_a, vx3_a, vxx, vyy, vzz, x1_a, x2_a, x3_a, athena%coord)
         vfield_coord = 1
-        ! call to_cartesian(vx1_a, vx2_a, vx3_a, vx, vy, vz, athena%coord)
-        write(*,*) "Data successfully converted to cartesian "
+        write(*,*) "Data successfully from " , coord_name, " to Cartesian "
       else
-        ! Already in cartesian coordinates
+        ! Already in Cartesian
         xx = x1_a
         yy = x2_a
         zz = x3_a
 
-        vxx = vx1_a!*uvelocity
-        vyy = vx2_a!*uvelocity
-        vzz = vx3_a!*uvelocity
+        vxx = vx1_a
+        vyy = vx2_a
+        vzz = vx3_a
       endif
+
+      ! Not sure if I should convert out of code units ...
+      xx = xx * ulength
+      yy = yy * ulength
+      zz = zz * ulength
+
+      vxx = vxx * uvelocity
+      vyy = vyy * uvelocity
+      vzz = vzz * uvelocity 
 
       deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
 
@@ -479,7 +507,28 @@ contains
       ! MCFOST: 1 = cartesian, 2 = cylindrical, 3 = spherical
       ! TO DO: Add parameter for co-rotating frame
       vfield_coord = disk_zone(1)%geometry + 1
-      if (vfield_coord == 3) then
+      if (vfield_coord == 2) then
+        do i=1, n_rad
+           ! jj= 0
+           do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
+              jj = jj + 1
+              do phik=1, n_az
+                 icell = cell_map(i,j,phik)
+
+                 densite_gaz(icell) =  rho(i,jj,phik) * udens
+                 densite_pouss(:,icell) = rho(i,jj,phik) * udens
+
+                 vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity ! vr
+                 if (athena%corrotating_frame) then
+                   vfield3d(icell,2)  = (vx2(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity
+                 else
+                   vfield3d(icell,2)  = vx2(i,jj,phik) * uvelocity ! vphi
+                 endif
+                 vfield3d(icell,3)  = vx3(i,jj,phik) * uvelocity ! vz
+              enddo ! k
+           enddo
+        enddo ! i
+      else if (vfield_coord == 3) then
         do i=1, n_rad
            jj= 0
            bz : do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
@@ -493,29 +542,17 @@ contains
 
                  vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
                  ! I guess the below line is only true if the simulation is done in a co-rotating frame
-                 vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
-                 ! vfield3d(icell,2)  = vx3(i,jj,phik) * uvelocity ! vphi : planet at r=1
+                 if (athena%corrotating_frame) then
+                   vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
+                 else
+                   vfield3d(icell,2)  = vx3(i,jj,phik) * uvelocity ! vphi
+                 endif
                  vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
               enddo ! k
            enddo bz
         enddo ! i
-      else if (vfield_coord == 2) then
-        do i=1, n_rad
-           ! jj= 0
-           do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
-              jj = jj + 1
-              do phik=1, n_az
-                 icell = cell_map(i,j,phik)
 
-                 densite_gaz(icell) =  rho(i,jj,phik) * udens
-                 densite_pouss(:,icell) = rho(i,jj,phik) * udens
 
-                 vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity ! vr
-                 vfield3d(icell,2)  = vx2(i,jj,phik) * uvelocity ! vphi
-                 vfield3d(icell,3)  = vx3(i,jj,phik) * uvelocity ! vz
-              enddo ! k
-           enddo
-        enddo ! i
       endif
 
       deallocate(rho,vx1,vx2,vx3)
