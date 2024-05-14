@@ -180,10 +180,13 @@ contains
 
     ! Planet properties hard coded for now
     real, parameter :: Mp = 1e-3
-    real, parameter :: Omega_p = 1.0
     real, parameter :: x = 6.0, y=0.0, z=0.0
+    real, parameter :: Omega_p = (1.0/(x**2.0 + y**2.0)**(3.0/2.0))**(1.0/2.0)! 0.06804138174397717 ! (1.0/6.0)**(2/3) ! 1.0
     real, parameter :: vx=0.0, vy=1.0, vz=1.0
     logical :: print_messages
+
+    write(*,*) "Omega_p is ", Omega_p
+    write(*,*), "x and y are ", x, y
 
     ! print_messages = .true.
     ! call hdf_set_print_messages(print_messages)
@@ -382,7 +385,8 @@ contains
       write(*,*) "ulength", ulength
 
       ! Estimate h
-      h = v_a**1/3
+      write(*,*), "$$$$$$###### 1/3 is ", 1/3, 0.3**(1./3.), 0.5/2
+      h = v_a**1./3.
 
       ! Convert coordinates and velocities to Cartesian if necessary
       ! First need to correct for corrotating frame, and difference between athena and mcfost coordinate ordering
@@ -402,9 +406,9 @@ contains
           ! vx2_a  = 1/x1_a**1/2
         else
           ! vx2_a = vx3_a
-          vx2_a  = 1/x1_a**1/2
+          vx2_a  = 1./x1_a**1./2.
         endif
-        vx3_a = 0 ! vel_tmp
+        vx3_a = 0. ! vel_tmp
         deallocate(vel_tmp)
         coord_name = "spherical"
       endif
@@ -436,9 +440,9 @@ contains
       yy = yy ! * ulength
       zz = zz ! * ulength
 
-      vxx = vxx !* uvelocity
-      vyy = vyy !* uvelocity
-      vzz = vzz !* uvelocity
+      vxx = vxx * uvelocity
+      vyy = vyy * uvelocity
+      vzz = vzz * uvelocity
 
       deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
 
@@ -504,10 +508,6 @@ contains
       if (alloc_status /= 0) call error("memory allocation error athena++ vfield3d")
 
       write(*,*) "Constant spatial distribution"
-      write(*,*) "athena corotating frame", athena%corotating_frame
-      write(*,*) densite_gaz(10), densite_pouss(1,1), rho(1, 1, 1), cell_map(1,1,1)
-      write(*,*) udens, uvelocity
-      write(*,*) vfield_coord, disk_zone(1)%geometry
       write(*,*) vx1(2,2,2), vx2(2,2,2), vx3(2,2,2)
       write(*,*) "ok"
 
@@ -528,18 +528,19 @@ contains
                  densite_gaz(icell) =  rho(i,jj,phik) * udens
                  densite_pouss(:,icell) = rho(i,jj,phik) * udens
 
-                 vfield3d(icell,1)  = vx1(i,jj,phik) ! * uvelocity ! vr
+                 vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity ! vr
 
                  if (athena%corotating_frame) then
-                   vfield3d(icell,2)  = (vx2(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) ! * uvelocity
+                   vfield3d(icell,2)  = (vx2(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity
                  else
-                   vfield3d(icell,2)  = vx2(i,jj,phik) ! * uvelocity ! vphi
+                   vfield3d(icell,2)  = vx2(i,jj,phik) * uvelocity ! vphi
                  endif
-                 vfield3d(icell,3)  = vx3(i,jj,phik) ! * uvelocity ! vz
+                 vfield3d(icell,3)  = vx3(i,jj,phik) * uvelocity ! vz
               enddo ! k
            enddo
         enddo ! i
       else if (vfield_coord == 3) then
+
         do i=1, n_rad
            jj= 0
            bz : do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
@@ -551,15 +552,16 @@ contains
                  densite_gaz(icell) =  rho(i,jj,phik) * udens
                  densite_pouss(:,icell) = rho(i,jj,phik) * udens
 
-                 vfield3d(icell,1)  = vx1(i,jj,phik) ! * uvelocity! vr
+                 vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
                  ! I guess the below line is only true if the simulation is done in a co-rotating frame
                  if (athena%corotating_frame) then
-                   ! vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) ! * uvelocity ! vphi : planet at r=1
-                   vfield3d(icell,2)  = 1/r_grid(icell)**1/2
+                   vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p)  * uvelocity ! vphi
+                   ! vfield3d(icell,2)  = (vx3(i,jj,phik) )  * uvelocity ! vphi : planet at r=1
+                   ! vfield3d(icell,2)  = 1/r_grid(icell)**1/2 * uvelocity
                  else
-                   vfield3d(icell,2)  = vx3(i,jj,phik) ! * uvelocity ! vphi
+                   vfield3d(icell,2)  = 1./r_grid(icell)**1./2. * uvelocity ! vx3(i,jj,phik) ! * uvelocity ! vphi
                  endif
-                 vfield3d(icell,3)  = vx2(i,jj,phik) ! * uvelocity! vtheta
+                 vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
               enddo ! k
            enddo bz
         enddo ! i
