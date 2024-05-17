@@ -70,7 +70,7 @@ jobs:
       # Only benchmark+release the 'release' builds, never the 'march=native' builds
       - name: save binary for benchmarking and release
         if: matrix.openmp == 'yes' && matrix.release == 'yes'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mcfost-binary-${{ matrix.os }}-${{ matrix.compiler }}
           path: src/mcfost
