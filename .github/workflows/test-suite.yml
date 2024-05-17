@@ -49,7 +49,7 @@ jobs:
       OPENMP: ${{ matrix.openmp }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - run: git config --global --add safe.directory $PWD
 
@@ -87,7 +87,7 @@ jobs:
       MCFOST_INSTALL: /usr/local
       OPENMP: yes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: restore binary artifact
         uses: actions/download-artifact@v3
@@ -120,7 +120,7 @@ jobs:
     if: ${{ github.event_name == 'release' }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: restore binary artifact
         uses: actions/download-artifact@v3
