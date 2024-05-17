@@ -52,7 +52,7 @@ runs:
     # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
       id: cache-deps
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ${{ env.MCFOST_INSTALL }}/include
