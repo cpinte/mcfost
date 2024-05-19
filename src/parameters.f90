@@ -165,6 +165,9 @@ module parametres
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy, lnot_random_Voronoi, lignore_sink
   integer :: isink_centre
 
+  ! Other model parameters
+  logical :: larg_voronoi, lcorotating_frame
+
   ! Disk parameters
   real :: distance ! Distance du disque en pc
   real(kind=dp) :: map_size
@@ -224,7 +227,7 @@ module parametres
 
   character(len=512) :: density_file, sigma_file, grain_size_file, limits_file
   character(len=512), dimension(:), allocatable :: density_files
-  integer :: n_phantom_files
+  integer :: n_phantom_files, n_arb_files
 
   ! Stars
   type star_type
@@ -280,7 +283,7 @@ module parametres
   type fargo3d_model
      integer :: nx, ny, nz, realtype
      real(kind=dp) :: xmin,xmax, ymin,ymax, zmin,zmax
-     logical :: log_spacing, corrotating_frame
+     logical :: log_spacing, corotating_frame
 
      real(kind=dp) :: dt, aspect_ratio, nu, gamma, cs
      character(len=128) :: dir, id, planetconfig
@@ -289,9 +292,9 @@ module parametres
   type(fargo3d_model) :: fargo3d
 
   type athena_model
-     integer :: nx1, nx2, nx3
+     integer :: nx1, nx2, nx3, coord, maxlevel
      real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
-     logical :: log_spacing, corrotating_frame
+     logical :: log_spacing, corotating_frame, arb_grid
 
      real(kind=dp) :: time
      character(len=128) :: filename
@@ -303,7 +306,7 @@ module parametres
      integer :: nx1, nx2, nx3, iunit, position, geometry, id
      integer, dimension(3) :: dimensions
      real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
-     logical :: log_spacing, corrotating_frame
+     logical :: log_spacing, corotating_frame
 
      real :: time
      character(len=128) :: filename
@@ -318,7 +321,7 @@ module parametres
      integer :: nx1, nx2, nx3, iunit, position, geometry
      integer, dimension(3) :: dimensions
      real(kind=dp) :: x1_min,x1_max, x2_min,x2_max, x3_min,x3_max
-     logical :: log_spacing, corrotating_frame
+     logical :: log_spacing, corotating_frame
 
      real :: time
      character(len=128) :: dir, id

@@ -213,6 +213,12 @@ contains
        call extract('udist',ulength,hdr,ierr)
        call extract('time',simu_time,hdr,ierr)
 
+
+       ! write(*,*) "udens",  umass / ulength**3
+       ! write(*,*) "uvelocity", ulength / utime
+       ! write(*,*) "ulength", ulength
+       !
+
        read (iunit, iostat=ierr) number
        if (ierr /= 0) return
        narraylengths = number/nblocks
