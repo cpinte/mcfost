@@ -166,7 +166,8 @@ contains
 
     real(kind=dp), dimension(:,:,:), allocatable :: rho, vx1, vx2, vx3 ! todo : we can save memory and only data to directly pass it to mcfost
     real(kind=dp), dimension(:,:,:), allocatable :: rho_tmp, vx1_tmp, vx2_tmp, vx3_tmp, x1_tmp, x2_tmp, x3_tmp, v_tmp
-    real(kind=dp), dimension(:), allocatable :: rho_a, vx1_a, vx2_a, vx3_a, x1_a, x2_a, x3_a, v_a, x1f_tmp, x2f_tmp, x3f_tmp, vel_tmp ! For the arbitrary grids where we need position to be passed to voronoi
+    real(kind=dp), dimension(:), allocatable :: rho_a, vx1_a, vx2_a, vx3_a, x1_a, x2_a, x3_a, v_a, &
+         x1f_tmp, x2f_tmp, x3f_tmp, vel_tmp ! For the arbitrary grids where we need position to be passed to voronoi
     real(kind=dp), dimension(:), allocatable :: xx, yy, zz, vxx, vyy, vzz, mass_gas, h
     integer, dimension(:), allocatable :: particle_id
     real, dimension(:,:), allocatable :: x1f, x2f, x3f, x1v, x2v, x3v
