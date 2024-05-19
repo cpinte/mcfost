@@ -217,7 +217,8 @@ subroutine set_default_variables()
   image_offset_centre(:) = (/0.0,0.0,0.0/)
   loverwrite_s12 = .false.
   lnot_random_Voronoi = .false.
-  lignore_sink=.false.
+  lignore_sink = .false.
+  lcorotating_frame = .false.
 
   tmp_dir = "./"
 
@@ -1432,6 +1433,9 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lathena = .true.
         call get_command_argument(i_arg,athena_file)
+        n_arb_files = 1
+        allocate(density_files(n_arb_files))
+        density_files(1) = athena_file
         i_arg = i_arg + 1
      case("-idefix")
         i_arg = i_arg + 1
@@ -1467,6 +1471,9 @@ subroutine initialisation_mcfost()
      case("-ignore_sink")
         i_arg = i_arg + 1
         lignore_sink=.true.
+     case("-corotating_frame")
+       i_arg = i_arg + 1
+       lcorotating_frame = .true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1490,9 +1497,10 @@ subroutine initialisation_mcfost()
   endif
   if (lathena) then
      l3D = .true.
-     if (n_zones > 1) call error("athena mode only work with 1 zone")
-     call warning("athena : forcing spherical grid") ! only spherical grid is implemented for now
-     disk_zone(1)%geometry = 2
+     athena%corotating_frame = lcorotating_frame
+     ! if (n_zones > 1) call error("athena mode only work with 1 zone")
+     ! call warning("athena : forcing spherical grid") ! only spherical grid is implemented for now
+     ! disk_zone(1)%geometry = 2
      call read_athena_parameters(athena_file)
   endif
   if (lmodel_1d) then

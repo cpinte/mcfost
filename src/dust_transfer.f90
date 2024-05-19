@@ -107,21 +107,30 @@ subroutine transfert_poussiere()
   ! Building the dust grain population
   call build_grain_size_distribution()
 
+write(*,*) "********###########", "larg_voronoi", larg_voronoi, "lathena", lathena
+
   if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
      call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
      call setup_grid()
   else if (lmhd_voronoi) then
      call setup_mhd_to_mcfost() !uses sph_to_voronoi
      call setup_grid()
+  else if (lathena) then
+    call read_athena_model()
+    if (larg_voronoi) then
+      call setup_grid()
+    endif
   else
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
   endif
 
+write(*,*) "********###########", "larg_voronoi", larg_voronoi, "lathena", lathena
+
   laffichage=.true.
 
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi)) then ! already done by setup_SPH2mcfost
+  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi .or. larg_voronoi .or. lathena)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()
@@ -131,8 +140,8 @@ subroutine transfert_poussiere()
         call densite_Seb_Charnoz2()
      else if (lfargo3d) then
         call read_fargo3d_files()
-     else if (lathena) then
-        call read_athena_model()
+     ! else if (lathena) then
+     !    call read_athena_model()
      else if (lsphere_model) then
         !on a structured spherical grid
         call read_spherical_model(density_file)

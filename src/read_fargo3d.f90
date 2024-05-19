@@ -70,9 +70,9 @@ contains
           endif
        case("FRAME")
           if ((val == "C").or.(val == "c")) then
-             fargo3d%corrotating_frame = .true.
+             fargo3d%corotating_frame = .true.
           else
-             fargo3d%corrotating_frame = .false.
+             fargo3d%corotating_frame = .false.
           endif
        case("REALTYPE")
           if ((val == "float64").or.(val == "FLOAT64")) then
@@ -178,7 +178,7 @@ contains
     call read_fargo3d_planets(trim(fargo3d%dir), n_planets,x,y,z,vx,vy,vz,Mp,time,Omega_p)
     call convert_planets(n_planets, x,y,z,vx,vy,vz,Mp,time,Omega_p,ulength_au,uvelocity,usolarmass,utime)
 
-    if (fargo3d%corrotating_frame) then
+    if (fargo3d%corotating_frame) then
        if (n_planets < 1) then
           Omega = 1.00049987506246096_dp
           write(*,*) "Forcing corotating frame as there is no planet"

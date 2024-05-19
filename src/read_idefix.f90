@@ -152,8 +152,8 @@ contains
        call error("Omega_p not read from idefix")
     endif
 
-    idefix%corrotating_frame = (n_planets > 0) ! todo : from ini
-    if (idefix%corrotating_frame) then
+    idefix%corotating_frame = (n_planets > 0) ! todo : from ini
+    if (idefix%corotating_frame) then
        Omega = Omega_p(which_planet)
     else
        Omega = 0.0_dp

@@ -2080,4 +2080,155 @@ end function integrate_trap_array
 
  end function dirname
 
+ subroutine meshgrid_3d(x, y, z, xx, yy, zz)
+     real, dimension(:), intent(in) :: x, y, z
+     real(kind=dp), dimension(:,:,:), intent(out) :: xx, yy, zz
+     integer :: m, n, b, i, j, k
+
+     ! print *, "Entering meshgrid_3d"
+
+
+     ! Infer dimensions
+     m = size(x)
+     n = size(y)
+     b = size(z)
+
+     ! write(*,*) m, n, b
+
+     ! Check if dimensions match
+     if (size(xx, 1) /= m .or. size(xx, 2) /= n .or. size(xx, 3) /= b .or. &
+         size(yy, 1) /= m .or. size(yy, 2) /= n .or. size(yy, 3) /= b .or. &
+         size(zz, 1) /= m .or. size(zz, 2) /= n .or. size(zz, 3) /= b) then
+         print *, "Error: Output array dimensions do not match input array dimensions"
+         return
+     endif
+
+     ! Generate meshgrid
+     do k = 1, b
+         do j = 1, n
+             do i = 1, m
+               ! print*, i
+                 xx(i, j, k) = x(i)
+                 yy(i, j, k) = y(j)
+                 zz(i, j, k) = z(k)
+             end do
+         end do
+     end do
+     ! print *, "finished"
+ end subroutine meshgrid_3d
+
+ subroutine volumegrid_3d(x, y, z, v, coord)
+     real, dimension(:), intent(in) :: x, y, z
+     real(kind=dp), dimension(:,:,:), intent(out) :: v
+     integer, intent(in) :: coord
+     real(kind=dp)   :: dx, dy, dz
+     integer :: m, n, b, i, j, k
+     ! print *, "Entering volumegrid_3d"
+
+     ! Infer dimensions
+     m = size(x)
+     n = size(y)
+     b = size(z)
+
+     ! write(*,*) "sizes of input arrays are ", m, n, b
+     ! write(*,*) "x is ", x
+     ! write(*,*) "y is ", y
+     ! write(*,*) "z is ", z
+
+     ! ! Check if dimensions match
+     ! if (size(v, 1) /= m .or. size(v, 2) /= n .or. size(v, 3) /= b) then
+     !     print *, "Error: Output array dimensions do not match input array dimensions"
+     !     return
+     ! endif
+
+     ! Generate meshgrid
+     do k = 1, b-1
+         do j = 1, n-1
+             do i = 1, m-1
+               ! print *, "i", i
+               dx = abs(x(i+1)-x(i))
+               dy = abs(y(j+1)-y(j))
+               dz = abs(z(k+1)-z(k))
+               if (coord == 0) then
+                 ! Cartesian volume element
+                 v(i, j, k) = dx*dy*dx
+               else if (coord == 1) then
+                 ! Cylindrical
+                 v(i, j, k) = (abs(x(i)) + dx/2)*dx*dy*dz
+               else if (coord == 2) then
+                 ! Spherical polar
+                 if (y(j) < 0 ) then
+                    write(*,*) "y less than 0 in spherical polar"
+                 endif
+                 v(i, j, k) = abs((x(i) + dx/2)**2*sin((y(j) + dy/2))*dx*dy*dz)
+               endif
+             end do
+         end do
+     end do
+ end subroutine volumegrid_3d
+
+ subroutine to_cartesian(r, theta, phi, x, y, z, coord)
+     real(kind=dp), dimension(:), intent(in) :: r, theta, phi
+     real(kind=dp), dimension(:), intent(out) :: x, y, z
+     integer, intent(in) :: coord
+     integer :: i
+
+     ! print *, "Entering to_cartesian"
+
+     ! Check if the input coordinates are cylindrical or spherical
+     if (coord == 1) then
+         ! Convert cylindrical coordinates to Cartesian
+         do i = 1, size(r)
+             x(i) = r(i) * cos(theta(i))
+             y(i) = r(i) * sin(theta(i))
+             z(i) = phi(i)
+         end do
+     else if (coord == 2) then
+         ! Convert spherical coordinates to Cartesian
+         do i = 1, size(r)
+             x(i) = r(i) * sin(theta(i)) * cos(phi(i))
+             y(i) = r(i) * sin(theta(i)) * sin(phi(i))
+             z(i) = r(i) * cos(theta(i))
+         end do
+     else
+         call error("Error: Invalid coordinate system. Valid values are 1 (cylindrical) or 2 (spherical).")
+     end if
+ end subroutine to_cartesian
+
+ subroutine to_cartesian_velocities(vr, vtheta, vphi, vx, vy, vz, r, theta, phi, coord)
+     integer, intent(in) :: coord
+     real(kind=dp), dimension(:), intent(in) :: vr, vtheta, vphi, r, theta, phi
+     real(kind=dp), dimension(:), intent(out) :: vx, vy, vz
+     integer :: i
+
+     print *, "Entering to_cartesian_velocities"
+
+     ! Check if the input velocities correspond to cylindrical or spherical coordinates
+     if (coord == 1) then
+         ! Convert cylindrical velocities to Cartesian
+         do i = 1, size(vr)
+             vx(i) = vr(i) * cos(theta(i)) - vtheta(i) * r(i) * sin(theta(i))
+             vy(i) = vr(i) * sin(theta(i)) + vtheta(i) * r(i) * cos(theta(i))
+             vz(i) = vphi(i)
+         end do
+     else if (coord == 2) then
+         ! Convert spherical velocities to Cartesian
+         do i = 1, size(vr)
+             vx(i) = vr(i) * sin(theta(i)) * cos(phi(i)) + &
+                     vtheta(i) * r(i) * cos(theta(i)) * cos(phi(i)) - &
+                     vphi(i) * r(i) * sin(theta(i)) * sin(phi(i))
+
+             vy(i) = vr(i) * sin(theta(i)) * sin(phi(i)) + &
+                     vtheta(i) * r(i) * cos(theta(i)) * sin(phi(i)) + &
+                     vphi(i) * r(i) * sin(theta(i)) * cos(phi(i))
+
+             vz(i) = vr(i) * cos(theta(i)) - vtheta(i) * r(i) * sin(theta(i))
+         end do
+     else
+         call error("Error: Invalid coordinate system. Valid values are 1 (cylindrical) or 2 (spherical).")
+     end if
+ end subroutine to_cartesian_velocities
+
+
+
 end module utils
