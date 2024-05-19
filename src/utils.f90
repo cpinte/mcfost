@@ -2085,21 +2085,16 @@ end function integrate_trap_array
      real(kind=dp), dimension(:,:,:), intent(out) :: xx, yy, zz
      integer :: m, n, b, i, j, k
 
-     ! print *, "Entering meshgrid_3d"
-
-
      ! Infer dimensions
      m = size(x)
      n = size(y)
      b = size(z)
 
-     ! write(*,*) m, n, b
-
      ! Check if dimensions match
      if (size(xx, 1) /= m .or. size(xx, 2) /= n .or. size(xx, 3) /= b .or. &
          size(yy, 1) /= m .or. size(yy, 2) /= n .or. size(yy, 3) /= b .or. &
          size(zz, 1) /= m .or. size(zz, 2) /= n .or. size(zz, 3) /= b) then
-         print *, "Error: Output array dimensions do not match input array dimensions"
+         call error("meshgrid_3: Output array dimensions do not match input array dimensions")
          return
      endif
 
@@ -2107,17 +2102,18 @@ end function integrate_trap_array
      do k = 1, b
          do j = 1, n
              do i = 1, m
-               ! print*, i
                  xx(i, j, k) = x(i)
                  yy(i, j, k) = y(j)
                  zz(i, j, k) = z(k)
              end do
          end do
      end do
-     ! print *, "finished"
- end subroutine meshgrid_3d
 
- subroutine volumegrid_3d(x, y, z, v, coord)
+     return
+
+   end subroutine meshgrid_3d
+
+subroutine volumegrid_3d(x, y, z, v, coord)
      real, dimension(:), intent(in) :: x, y, z
      real(kind=dp), dimension(:,:,:), intent(out) :: v
      integer, intent(in) :: coord
