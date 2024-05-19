@@ -31,7 +31,7 @@ jobs:
           - os: linux
             os-version: ubuntu-22.04
           - os: macos
-            os-version: macos-14
+            os-version: macos-12
 
           # macos needs null container to avoid loading docker; set linux containers as desired
           - container: null
