@@ -180,7 +180,7 @@ contains
 
     ! Planet properties hard coded for now
     real, parameter :: Mp = 1e-3
-    real, parameter :: x = 6.0, y=0.0, z=0.0
+    real, parameter :: x = 1.0, y=0.0, z=0.0
     real, parameter :: Omega_p = (1.0/(x**2.0 + y**2.0)**(3.0/2.0))**(1.0/2.0)! 0.06804138174397717 ! (1.0/6.0)**(2/3) ! 1.0
     real, parameter :: vx=0.0, vy=1.0, vz=1.0
     logical :: print_messages
@@ -482,7 +482,7 @@ contains
          il = logical_locations(1,iblock) * bs1
          jl = logical_locations(2,iblock) * bs2
          kl = logical_locations(3,iblock) * bs3
-         write(*,*) il, jl, kl
+         ! write(*,*) il, jl, kl
 
          iu = il + bs1
          ju = jl + bs2
