@@ -970,10 +970,12 @@ subroutine read_density_file()
   real, dimension(:,:,:), allocatable :: sph_gas_dens ! (n_rad,nz,n_az)
   real, dimension(:,:,:,:), allocatable :: sph_V ! (n_rad,nz,n_az,3)
   real, dimension(:), allocatable :: a_sph, n_a_sph, log_a_sph, log_n_a_sph ! n_a
+  real, dimension(:,:), allocatable :: xyz_sph
 
   real(kind=dp), dimension(:,:,:,:), allocatable :: sph_dens_dp, sph_V_dp
   real(kind=dp), dimension(:,:,:), allocatable :: sph_gas_dens_dp
   real(kind=dp), dimension(:), allocatable :: a_sph_dp
+  real(kind=dp), dimension(:,:), allocatable :: xyz_sph_dp
   real(kind=dp) :: f
 
   logical :: lread_gas_density, lread_gas_velocity
@@ -1114,55 +1116,66 @@ subroutine read_density_file()
   !  determine the size of density file
   write(*,*) "Reading dust density ..."
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if ((nfound /= 3) .and. (nfound /= 4)) then
-     write(*,*) "I found", nfound, "axis instead of 3 or 4"
+  if ((nfound /= 1) .and. (nfound /= 3) .and. (nfound /= 4)) then
+     write(*,*) "I found", nfound, "axis instead of 1, 3 or 4"
      call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_file)//' file')
   endif
 
-  if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az) ) then
-     write(*,*) "# fits_file vs mcfost_grid"
-     write(*,*) naxes(1), n_rad
-     write(*,*) naxes(2), nz
-     write(*,*) naxes(3), n_az
-     !write(*,*) naxes(4), n_a
-     call error(trim(density_file)//" does not have the right dimensions in HDU 1.")
-  endif
+  if (nfound == 1) then ! Voronoi mesh
+     write(*,*) "Found 1D density structure, using a Voronoi mesh"
+     lVoronoi = .true.
+     l3D = .true.
+     n_cells = naxes(1)
+     npixels = naxes(1)
+     n_a = 1 ! for now
 
-  if (nfound == 3) then
-     n_a = 1
-     write(*,*) "No grain size found"
-     npixels=naxes(1)*naxes(2)*naxes(3)
-  else
-     if (.not.lvariable_dust) then
-        call warning("Forcing variable dust")
-        lvariable_dust = .true.
+     allocate(sph_dens(n_cells,1,1,n_a))
+  else ! Structured grid
+     if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az) ) then
+        write(*,*) "# fits_file vs mcfost_grid"
+        write(*,*) naxes(1), n_rad
+        write(*,*) naxes(2), nz
+        write(*,*) naxes(3), n_az
+        !write(*,*) naxes(4), n_a
+        call error(trim(density_file)//" does not have the right dimensions in HDU 1.")
      endif
-     n_a = naxes(4)
-     write(*,*) n_a, "grain sizes found"
-     npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
-  endif
 
-  if (lvariable_dust) then
-     p_n_cells = n_cells
-     p_n_rad=n_rad ; p_nz = nz
-  else
-     p_n_cells = 1
-     p_n_rad=1 ;  p_nz=1
-  endif
+     if (nfound == 3) then
+        n_a = 1
+        write(*,*) "No grain size found"
+        npixels=naxes(1)*naxes(2)*naxes(3)
+     else
+        if (.not.lvariable_dust) then
+           call warning("Forcing variable dust")
+           lvariable_dust = .true.
+        endif
+        n_a = naxes(4)
+        write(*,*) n_a, "grain sizes found"
+        npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
+     endif
 
-  if (naxes(2) == 2*nz) then
-     l3D_file = .true.
-  else
-     write(*,*) "The density file only has positive z, making it symmetric"
-     l3D_file = .false.
-  endif
+     if (lvariable_dust) then
+        p_n_cells = n_cells
+        p_n_rad=n_rad ; p_nz = nz
+     else
+        p_n_cells = 1
+        p_n_rad=1 ;  p_nz=1
+     endif
 
-  if (l3D_file) then
-     allocate(sph_dens(n_rad,2*nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
-  else
-     allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+     if (naxes(2) == 2*nz) then
+        l3D_file = .true.
+     else
+        write(*,*) "The density file only has positive z, making it symmetric"
+        l3D_file = .false.
+     endif
+
+     if (l3D_file) then
+        allocate(sph_dens(n_rad,2*nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+     else
+        allocate(sph_dens(n_rad,nz,n_az,n_a), a_sph(n_a), n_a_sph(n_a))
+     endif
+     sph_dens = 0.0 ; a_sph = 0.0 ; n_a_sph = 0.0
   endif
-  sph_dens = 0.0 ; a_sph = 0.0 ; n_a_sph = 0.0
 
   bitpix = 0
   call ftgkyj(unit,"bitpix",bitpix,comment,status)
@@ -1171,10 +1184,14 @@ subroutine read_density_file()
   if (bitpix==-32) then
      call ftgpve(unit,group,firstpix,npixels,nullval,sph_dens,anynull,status)
   else if (bitpix==-64) then
-     if (l3D_file) then
-        allocate(sph_dens_dp(n_rad,2*nz,n_az,n_a))
+     if (lVoronoi) then
+        allocate(sph_dens_dp(n_cells,1,1,n_a))
      else
-        allocate(sph_dens_dp(n_rad,nz,n_az,n_a))
+        if (l3D_file) then
+           allocate(sph_dens_dp(n_rad,2*nz,n_az,n_a))
+        else
+           allocate(sph_dens_dp(n_rad,nz,n_az,n_a))
+        endif
      endif
      sph_dens_dp = 0.0_dp
      call ftgpvd(unit,group,firstpix,npixels,nullval,sph_dens_dp,anynull,status)
@@ -1189,6 +1206,49 @@ subroutine read_density_file()
   ! Au cas ou : on elimine les valeurs a 0
   sph_dens = sph_dens/maxval(sph_dens) ! normalization avant d'ajouter une constante
   sph_dens = max(sph_dens,1e10*tiny_real)
+
+
+  if (lVoronoi) then
+     !---------------------------------------------------------
+     ! hdu2 is particle positions
+     !---------------------------------------------------------
+     !  move to next hdu
+     call ftmrhd(unit,1,hdutype,status)
+     nfound=1
+     ! Check dimensions
+     naxes(:) = 0
+     call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+     if (nfound /= 2) then
+        write(*,*) 'HDU 2 has', nfound, 'dimensions.'
+        call error('did not find 2 dimension in HDU 2')
+     endif
+     if ((naxes(1) /= 3)) then
+        write(*,*) "HDU2 dim 1 is ", naxes(1), "instead of 3"
+        call error("HDU 2 does not have the right dimension")
+     endif
+     if ((naxes(2) /= n_cells)) then
+        write(*,*) "HDU2 dim 2 is ", naxes(3), "instead of ",n_cells
+        call error("HDU 2 does not have the right dimension")
+     endif
+
+     npixels=naxes(1)*naxes(2)
+
+     bitpix=0
+     call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+     ! read_image
+     if (bitpix==-32) then
+        allocate(xyz_sph(3,n_cells),xyz_sph_dp(3,n_cells))
+        call ftgpve(unit,group,firstpix,npixels,nullval,xyz_sph,anynull,status)
+        xyz_sph_dp = real(xyz_sph,kind=dp)
+        deallocate(xyz_sph)
+     else if (bitpix==-64) then
+        allocate(xyz_sph_dp(3,n_cells))
+        call ftgpvd(unit,group,firstpix,npixels,nullval,xyz_sph_dp,anynull,status)
+     else
+        call error("cannot read bitpix in fits file")
+     endif
+  endif
 
   if (n_a > 1) then
      write(*,*) "Reading grain sizes ..."
