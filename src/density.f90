@@ -16,12 +16,10 @@ module density
   integer, public :: species_removed
   real, public :: T_rm
 
-  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, densite_pouss, masse, icell_not_empty
-
-  public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
+  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, densite_pouss, masse, icell_not_empty, &
+       define_density, define_density_wall3d, define_dust_density, read_density_file, is_density_file_Voronoi, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_species, read_sigma_file, normalize_dust_density, &
        reduce_density
-
 
   private
 
@@ -940,6 +938,40 @@ end subroutine define_density_wall3D
 
 !********************************************************************
 
+subroutine is_density_file_Voronoi()
+
+  integer :: unit, status, nfound, readwrite, blocksize
+  integer, dimension(4) :: naxes
+
+  status=0
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  call ftgiou(unit,status)
+
+  ! Opening file
+  readwrite=0
+  call ftopen(unit,density_file,readwrite,blocksize,status)
+  if (status /= 0) call error("density file needed")
+
+  nfound=0
+  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+  ! Closing file
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  if (status /= 0) call error("error reading density file")
+
+  if (nfound == 1) then
+     lVoronoi = .true.
+  else
+     lVoronoi = .false.
+  endif
+
+  return
+
+end subroutine is_density_file_Voronoi
+
+!********************************************************************
+
 subroutine read_density_file()
   ! Nouvelle routine pour lire les grilles de densite
   ! calculees par Yorick directement a partir des donnees SPH (ou autre)
@@ -1116,6 +1148,7 @@ subroutine read_density_file()
   !  determine the size of density file
   write(*,*) "Reading dust density ..."
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+
   if ((nfound /= 1) .and. (nfound /= 3) .and. (nfound /= 4)) then
      write(*,*) "I found", nfound, "axis instead of 1, 3 or 4"
      call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_file)//' file')
@@ -1129,7 +1162,7 @@ subroutine read_density_file()
      npixels = naxes(1)
      n_a = 1 ! for now
 
-     allocate(sph_dens(n_cells,1,1,n_a))
+     allocate(sph_dens(n_cells,1,1,n_a), a_sph(n_a), n_a_sph(n_a))
   else ! Structured grid
      if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az) ) then
         write(*,*) "# fits_file vs mcfost_grid"

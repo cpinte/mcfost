@@ -107,21 +107,25 @@ subroutine transfert_poussiere()
   ! Building the dust grain population
   call build_grain_size_distribution()
 
-  if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
-     call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
-     call setup_grid()
-  else if (lmhd_voronoi) then
-     call setup_mhd_to_mcfost() !uses sph_to_voronoi
+  laffichage=.true.
+
+  if (ldensity_file) call is_density_file_Voronoi()
+
+  write(*,*) lVoronoi
+
+  if (lVoronoi) then
+     if (lmhd_voronoi) then
+        call setup_mhd_to_mcfost() !uses sph_to_voronoi
+     else
+        call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
+     endif
      call setup_grid()
   else
+     ! Setting up a regular grid
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
-  endif
 
-  laffichage=.true.
-
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()
