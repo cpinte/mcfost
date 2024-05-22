@@ -949,6 +949,7 @@ subroutine is_density_file_Voronoi()
 
   ! Opening file
   readwrite=0
+  write(*,*) "Checking "//trim(density_file)
   call ftopen(unit,density_file,readwrite,blocksize,status)
   if (status /= 0) call error("density file needed")
 
@@ -961,8 +962,12 @@ subroutine is_density_file_Voronoi()
   if (status /= 0) call error("error reading density file")
 
   if (nfound == 1) then
+     write(*,*) "Found 1D density structure, using a Voronoi mesh"
      lVoronoi = .true.
+     l3D = .true.
+     n_cells = naxes(1)
   else
+     write(*,*) "Found a structured mesh"
      lVoronoi = .false.
   endif
 
@@ -1155,7 +1160,6 @@ subroutine read_density_file()
   endif
 
   if (nfound == 1) then ! Voronoi mesh
-     write(*,*) "Found 1D density structure, using a Voronoi mesh"
      lVoronoi = .true.
      l3D = .true.
      n_cells = naxes(1)
@@ -1558,38 +1562,51 @@ subroutine read_density_file()
   call ftclos(unit, status)
   call ftfiou(unit, status)
 
-  ! Passing the densities and velocities to mcfost arrays
-  do k=1, n_az
-     do j=j_start,nz
-        if (l3D_file) then
-           jj = j
-           if (jj > 0) then
-              jj = nz + jj
-           else
-              jj = nz+1 + jj
-           endif
-        else
-           jj = abs(j)
-        endif
-        if (j==0) then
-           !densite_gaz(cell_map(i,j,k)) =0.0
-        else
-           do i=1, n_rad
-              icell = cell_map(i,j,k)
-              if (lread_gas_density) then
-                 densite_gaz(icell) = sph_gas_dens(i,jj,k)
-              else
-                 densite_gaz(icell) = sph_dens(i,jj,k,1) ! gaz = plus petites particules
-              endif
 
-              if (lread_gas_velocity) then
-                 vfield3d(icell,:) = sph_V(i,jj,k,:)
-                 if ((.not.l3D_file).and.(j<0)) vfield3d(icell,3) = - vfield3d(icell,3)
+  ! Passing the densities and velocities to mcfost arrays
+  if (lVoronoi) then
+     if (lread_gas_density) then
+        do icell=1,n_cells
+           densite_gaz(icell) = sph_gas_dens(icell,1,1)
+        enddo
+     else
+        do icell=1,n_cells
+           densite_gaz(icell) = sph_dens(icell,1,1,1)
+        enddo
+     endif
+  else
+     do k=1, n_az
+        do j=j_start,nz
+           if (l3D_file) then
+              jj = j
+              if (jj > 0) then
+                 jj = nz + jj
+              else
+                 jj = nz+1 + jj
               endif
-           enddo ! i
-        endif ! j==0
-     enddo !j
-  enddo ! k
+           else
+              jj = abs(j)
+           endif
+           if (j==0) then
+              !densite_gaz(cell_map(i,j,k)) =0.0
+           else
+              do i=1, n_rad
+                 icell = cell_map(i,j,k)
+                 if (lread_gas_density) then
+                    densite_gaz(icell) = sph_gas_dens(i,jj,k)
+                 else
+                    densite_gaz(icell) = sph_dens(i,jj,k,1) ! gaz = plus petites particules
+                 endif
+
+                 if (lread_gas_velocity) then
+                    vfield3d(icell,:) = sph_V(i,jj,k,:)
+                    if ((.not.l3D_file).and.(j<0)) vfield3d(icell,3) = - vfield3d(icell,3)
+                 endif
+              enddo ! i
+           endif ! j==0
+        enddo !j
+     enddo ! k
+  endif
 
   ! Calcul de la masse de gaz de la zone
   mass = 0.

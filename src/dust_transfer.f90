@@ -111,8 +111,6 @@ subroutine transfert_poussiere()
 
   if (ldensity_file) call is_density_file_Voronoi()
 
-  write(*,*) lVoronoi
-
   if (lVoronoi) then
      if (lmhd_voronoi) then
         call setup_mhd_to_mcfost() !uses sph_to_voronoi

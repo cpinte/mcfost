@@ -90,6 +90,8 @@ contains
        write(*,*) "Performing SPH2mcfost setup"
        write(*,*) "Reading SPH density file: "//trim(SPH_file)
        call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,vx,vy,vz,T_gas,massgas,rho,rhodust,particle_id, ndusttypes,n_SPH,ierr)
+    else
+       call error("Unknown SPH structure.")
     endif
     write(*,*) "Done"
 
