@@ -940,7 +940,8 @@ end subroutine define_density_wall3D
 
 subroutine is_density_file_Voronoi()
 
-  integer :: unit, status, nfound, readwrite, blocksize
+  integer :: unit, status, naxis, readwrite, blocksize, nfound
+  character(len=8) :: comment
   integer, dimension(4) :: naxes
 
   status=0
@@ -953,23 +954,27 @@ subroutine is_density_file_Voronoi()
   call ftopen(unit,density_file,readwrite,blocksize,status)
   if (status /= 0) call error("density file needed")
 
-  nfound=0
-  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  ! Closing file
-  call ftclos(unit, status)
-  call ftfiou(unit, status)
-
+  !nfound=0
+  call ftgkyj(unit,'NAXIS',naxis,comment,status)
   if (status /= 0) call error("error reading density file")
 
-  if (nfound == 1) then
+  nfound=0
+  call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
+
+  if (naxis == 1) then
      write(*,*) "Found 1D density structure, using a Voronoi mesh"
      lVoronoi = .true.
      l3D = .true.
+
      n_cells = naxes(1)
   else
      write(*,*) "Found a structured mesh"
      lVoronoi = .false.
   endif
+
+  ! Closing file
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
 
   return
 
@@ -1621,7 +1626,7 @@ subroutine read_density_file()
      n_points = n_cells
      allocate(x(n_points),y(n_points),z(n_points),vx(n_points),vy(n_points),vz(n_points), &
           h(n_points), is_ghost(n_points), mask(n_points), particle_id(n_points))
-     vx = 0.0 ; vy = 0.0 ; vz = 0.0 ; h=0.0
+     vx = 0.0 ; vy = 0.0 ; vz = 0.0 ; h=1e30
 
      do i=1,n_points
         particle_id(i) = i
@@ -1631,12 +1636,18 @@ subroutine read_density_file()
      enddo
 
      mask = 0
-     is_ghost = 0
+     !call test_duplicate_particles(n_points, particle_id, x,y,z, massgas,massdust,rho,rhodust, is_ghost)
+
 
      ! We do not trum particles for now
      limits(1) = minval(x) ; limits(2) = maxval(x)
-     limits(3) = minval(y) ; limits(2) = maxval(y)
-     limits(5) = minval(z) ; limits(2) = maxval(z)
+     limits(3) = minval(y) ; limits(4) = maxval(y)
+     limits(5) = minval(z) ; limits(6) = maxval(z)
+
+     write(*,*) "# Model limits :"
+     write(*,*) "x =", limits(1), limits(2)
+     write(*,*) "y =", limits(3), limits(4)
+     write(*,*) "z =", limits(5), limits(6)
 
      check_previous_tesselation = .false.
 
