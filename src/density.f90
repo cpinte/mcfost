@@ -1020,6 +1020,12 @@ subroutine read_density_file()
   type(star_type), dimension(:), allocatable :: etoile_old
   integer  :: i_etoile, n_etoiles_old
 
+  real(dp), dimension(6) :: limits
+  real(dp), dimension(:), allocatable :: x,y,z, vx,vy,vz, h
+  integer, dimension(:), allocatable :: is_ghost, mask, particle_id
+  logical :: check_previous_tesselation
+  integer :: n_points
+
   if (lplanet_az) then ! Planet is along x-axis by default in wakeflow
      RT_n_az = 1
      RT_az_min = planet_az
@@ -1563,6 +1569,8 @@ subroutine read_density_file()
   call ftfiou(unit, status)
 
 
+  write(*,*) "lVoronoi", lVoronoi
+
   ! Passing the densities and velocities to mcfost arrays
   if (lVoronoi) then
      if (lread_gas_density) then
@@ -1608,6 +1616,37 @@ subroutine read_density_file()
      enddo ! k
   endif
 
+  ! Performing tesselation
+  if (lVoronoi) then
+     n_points = n_cells
+     allocate(x(n_points),y(n_points),z(n_points),vx(n_points),vy(n_points),vz(n_points), &
+          h(n_points), is_ghost(n_points), mask(n_points), particle_id(n_points))
+     vx = 0.0 ; vy = 0.0 ; vz = 0.0 ; h=0.0
+
+     do i=1,n_points
+        particle_id(i) = i
+        x(i) = xyz_sph_dp(1,i)
+        y(i) = xyz_sph_dp(2,i)
+        z(i) = xyz_sph_dp(3,i)
+     enddo
+
+     mask = 0
+     is_ghost = 0
+
+     ! We do not trum particles for now
+     limits(1) = minval(x) ; limits(2) = maxval(x)
+     limits(3) = minval(y) ; limits(2) = maxval(y)
+     limits(5) = minval(z) ; limits(2) = maxval(z)
+
+     check_previous_tesselation = .false.
+
+     call Voronoi_tesselation(n_points, particle_id, x,y,z,h,vx,vy,vz, is_ghost, mask, limits, check_previous_tesselation)
+     !deallocate(x,y,z)
+     write(*,*) "Using n_cells =", n_cells
+  endif
+
+
+
   ! Calcul de la masse de gaz de la zone
   mass = 0.
   do icell=1,n_cells
@@ -1631,6 +1670,7 @@ subroutine read_density_file()
   do icell=1,n_cells
      masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
   enddo ! icell
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
 
   if (lvariable_dust) then
      write(*,*) "Differential spatial distribution"
@@ -1720,11 +1760,8 @@ subroutine read_density_file()
      enddo ! k
   endif  !lvariable_dust
 
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
   call normalize_dust_density()
   deallocate(sph_dens,a_sph)
-
-
 
   return
 
