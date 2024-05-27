@@ -2184,6 +2184,7 @@ end function integrate_trap_array
              z(i) = phi(i)
          end do
      else if (coord == 2) then
+       write (*,*) "################ converting to cartesian from spherical!!"
          ! Convert spherical coordinates to Cartesian
          do i = 1, size(r)
              x(i) = r(i) * sin(theta(i)) * cos(phi(i))
@@ -2207,22 +2208,22 @@ end function integrate_trap_array
      if (coord == 1) then
          ! Convert cylindrical velocities to Cartesian
          do i = 1, size(vr)
-             vx(i) = vr(i) * cos(theta(i)) - vtheta(i) * r(i) * sin(theta(i))
-             vy(i) = vr(i) * sin(theta(i)) + vtheta(i) * r(i) * cos(theta(i))
+             vx(i) = vr(i) * cos(theta(i)) - vtheta(i) * sin(theta(i))
+             vy(i) = vr(i) * sin(theta(i)) + vtheta(i) * cos(theta(i))
              vz(i) = vphi(i)
          end do
      else if (coord == 2) then
          ! Convert spherical velocities to Cartesian
          do i = 1, size(vr)
              vx(i) = vr(i) * sin(theta(i)) * cos(phi(i)) + &
-                     vtheta(i) * r(i) * cos(theta(i)) * cos(phi(i)) - &
-                     vphi(i) * r(i) * sin(theta(i)) * sin(phi(i))
+                     vtheta(i) * cos(theta(i)) * cos(phi(i)) - &
+                     vphi(i)  * sin(theta(i)) * sin(phi(i))
 
              vy(i) = vr(i) * sin(theta(i)) * sin(phi(i)) + &
-                     vtheta(i) * r(i) * cos(theta(i)) * sin(phi(i)) + &
-                     vphi(i) * r(i) * sin(theta(i)) * cos(phi(i))
+                     vtheta(i) * cos(theta(i)) * sin(phi(i)) + &
+                     vphi(i) * sin(theta(i)) * cos(phi(i))
 
-             vz(i) = vr(i) * cos(theta(i)) - vtheta(i) * r(i) * sin(theta(i))
+             vz(i) = vr(i) * cos(theta(i)) - vtheta(i) * sin(theta(i))
          end do
      else
          call error("Error: Invalid coordinate system. Valid values are 1 (cylindrical) or 2 (spherical).")

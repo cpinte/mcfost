@@ -72,7 +72,7 @@ contains
       ! call error("mcfost can only read athena++ grids with MaxLevel=0 for now")
     else
       if (athena%coord == 1 .or. athena%coord == 2) then
-        athena%arb_grid = .false.
+        athena%arb_grid = .true.
       endif
     endif
 
@@ -166,13 +166,14 @@ contains
 
     real(kind=dp), dimension(:,:,:), allocatable :: rho, vx1, vx2, vx3 ! todo : we can save memory and only data to directly pass it to mcfost
     real(kind=dp), dimension(:,:,:), allocatable :: rho_tmp, vx1_tmp, vx2_tmp, vx3_tmp, x1_tmp, x2_tmp, x3_tmp, v_tmp
-    real(kind=dp), dimension(:), allocatable :: rho_a, vx1_a, vx2_a, vx3_a, x1_a, x2_a, x3_a, v_a! For the arbitrary grids where we need position to be passed to voronoi
-    real(kind=dp), dimension(:), allocatable :: x1f_tmp, x2f_tmp, x3f_tmp, vel_tmp 
+    real(kind=dp), dimension(:), allocatable :: rho_a, vx1_a, vx2_a, vx3_a, x1_a, x2_a, x3_a, v_a ! For the arbitrary grids where we need position to be passed to voronoi
+    real(kind=dp), dimension(:), allocatable :: dx, dy, dz
+    real(kind=dp), dimension(:), allocatable :: x1f_tmp, x2f_tmp, x3f_tmp, vel_tmp
     real(kind=dp), dimension(:), allocatable :: xx, yy, zz, vxx, vyy, vzz, mass_gas, h
     integer, dimension(:), allocatable :: particle_id
     real, dimension(:,:), allocatable :: x1f, x2f, x3f, x1v, x2v, x3v
 
-    integer :: nx1, nx2, nx3, bs1, bs2, bs3
+    integer :: nx1, nx2, nx3, bs1, bs2, bs3, unit
     integer :: i, iblock, il, jl, kl, iu, ju, ku, j, jj, phik, icell, it, jt, kt
 
     real(dp) :: Ggrav_athena, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
@@ -181,13 +182,13 @@ contains
 
     ! Planet properties hard coded for now
     real, parameter :: Mp = 1e-3
-    real, parameter :: x = 1.0, y=0.0, z=0.0
+    real, parameter :: x = 6.0, y=0.0, z=0.0
     real, parameter :: Omega_p = (1.0/(x**2.0 + y**2.0)**(3.0/2.0))**(1.0/2.0)! 0.06804138174397717 ! (1.0/6.0)**(2/3) ! 1.0
     real, parameter :: vx=0.0, vy=1.0, vz=1.0
-    logical :: print_messages
+    logical :: print_messages, test
 
     write(*,*) "Omega_p is ", Omega_p
-    write(*,*), "x and y are ", x, y
+    write(*,*) "x and y are ", x, y
 
     ! print_messages = .true.
     ! call hdf_set_print_messages(print_messages)
@@ -311,8 +312,12 @@ contains
     if (alloc_status > 0) call error('Allocation error athena++ data')
 
     if (athena%arb_grid) then
+      ! write(*,*) "number of cells in mcfost grid 912384"
+      ! write(*,*), "ncells in voronoi 884737"
+
       lVoronoi = .true.
       nx1 = n_blocks * bs1 * bs2 * bs3
+      write(*,*) "number of cells in raw file", nx1
       allocate(rho_a(nx1), vx1_a(nx1), vx2_a(nx1), vx3_a(nx1), stat=alloc_status)
       allocate(x1_a(nx1), x2_a(nx1), x3_a(nx1), v_a(nx1), stat=alloc_status)
       allocate(x1f(bs1+1, n_blocks), x2f(bs2+1, n_blocks), x3f(bs3+1, n_blocks), stat=alloc_status)
@@ -343,8 +348,6 @@ contains
     call close_hdf5file(file_id,ierr)
     write(*,*) "Athena++ file read sucessfully"
 
-    write(*,*) "logical_locations", shape(logical_locations)
-
     ! allocate(tmp_flatten(bs1*bs2*bs3), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error athena++ rho')
 
@@ -355,15 +358,20 @@ contains
          iu = iblock*bs1*bs2*bs3
          il = iu - bs1*bs2*bs3 + 1
 
+         ! write(*,*) x1v(:, iblock)
+         ! write(*,*) x1f(:, iblock)
+
+         do j=1, size(x1v(:, iblock))
+           write(*,*) x1v(j, iblock), x1f(j, iblock) + (x1f(j+1, iblock) - x1f(j, iblock))/2
+         enddo
+
          rho_a(il:iu) = reshape(data(:,:,:,iblock,1), (/size(data(:,:,:,iblock,1))/) )
-         vx1_a(il:iu) = reshape(data(:,:,:,iblock,2), (/size(data(:,:,:,iblock,2))/) )
-         vx2_a(il:iu) = reshape(data(:,:,:,iblock,3), (/size(data(:,:,:,iblock,3))/) )
-         vx3_a(il:iu) = reshape(data(:,:,:,iblock,4), (/size(data(:,:,:,iblock,4))/) )
+         vx1_a(il:iu) = reshape(data(:,:,:,iblock,3), (/size(data(:,:,:,iblock,3))/) )
+         vx2_a(il:iu) = reshape(data(:,:,:,iblock,4), (/size(data(:,:,:,iblock,4))/) )
+         vx3_a(il:iu) = reshape(data(:,:,:,iblock,5), (/size(data(:,:,:,iblock,5))/) )
 
          ! call meshgrid_3d(x1v(iblock, :), x2v(iblock, :), x3v(iblock, :), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
          call meshgrid_3d(x1v(:, iblock), x2v(:, iblock), x3v(:, iblock), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
-
-         ! write(*,*) "outside of meshgrid_3d"
 
          x1_a(il:iu) = reshape(x1_tmp, (/size(x1_tmp)/) )
          x2_a(il:iu) = reshape(x2_tmp, (/size(x2_tmp)/) )
@@ -376,17 +384,49 @@ contains
       enddo
       write(*,*) "Athena++ data successfully read and reshaped. "
       deallocate(data, x1v, x2v, x3v, x1_tmp, x2_tmp, x3_tmp, v_tmp, x1f, x2f, x3f)
+      write(*,*) 'Total grid volume ', real(sum(v_a))
 
       ! Need to convert from density to mass
       mass_gas = rho_a*udens*v_a !* AU3_to_m3  * g_to_Msun
-      ! write(*,*) "AU3_to_m3 * g_to_Msun", AU3_to_m3 * g_to_Msun
+      write(*,*) 'Total  gas mass in model:', real(sum(mass_gas) ),' Msun'
+      write(*,*) "AU3_to_m3 * g_to_Msun", AU3_to_m3 * g_to_Msun
       ! write(*,*) "masse_mol_gaz", masse_mol_gaz
       write(*,*) "udens", udens
       write(*,*) "uvelocity", uvelocity
       write(*,*) "ulength", ulength
 
+      ! Normalize the mass in the simulation
+      mass = 0.
+      do i=1,size(mass_gas)
+         mass = mass + mass_gas(i)
+      enddo !icell
+      ! mass =  mass * AU3_to_m3 * g_to_Msun
+      write(*,*) 'Total original gas mass in model:', mass
+      write(*,*) "Desired mass:", disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust
+
+      ! Normalisation
+      if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+         facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+
+         ! Somme sur les zones pour densite finale
+         do i=1,size(mass_gas)
+            ! densite_gaz(icell) = densite_gaz(icell) * facteur
+            ! masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+            mass_gas(i) = mass_gas(i) * facteur ! * AU3_to_m3 * masse_mol_gaz
+         enddo ! icell
+      else
+         call error('Gas mass is 0')
+      endif
+
+      write(*,*) 'Total  gas mass in model:', real(sum(mass_gas)),' Msun' !  * g_to_Msun
+
+
+
+
+
+
+
       ! Estimate h
-      write(*,*), "$$$$$$###### 1/3 is ", 1/3, 0.3**(1./3.), 0.5/2
       h = v_a**1./3.
 
       ! Convert coordinates and velocities to Cartesian if necessary
@@ -399,20 +439,11 @@ contains
         coord_name = "cylindrical"
       else if (athena%coord==2) then
         ! spherical: vx1_a = vr, vx2_a = vtheta, vx3_a = vphi
-        allocate(vel_tmp(size(vx2_a)), stat=alloc_status)
-        if (alloc_status > 0) call error('Allocation error athena++ temp sph velocity array')
-        vel_tmp = vx2_a
         if (athena%corotating_frame) then
-          vx2_a  = vx3_a + x1_a * Omega_p ! corotating frame removed: Not sure if units are right
-          ! vx2_a  = 1/x1_a**1/2
-        else
-          ! vx2_a = vx3_a
-          vx2_a  = 1./x1_a**1./2.
+          vx3_a  = vx3_a + x1_a * Omega_p ! corotating frame removed: Not sure if units are right
         endif
-        vx3_a = 0. ! vel_tmp
-        deallocate(vel_tmp)
         coord_name = "spherical"
-      endif
+      endif ! athena%coord==1
 
       ! Now actually convert
       if (.not. athena%coord==0) then
@@ -420,11 +451,19 @@ contains
         allocate(xx(size(x1_a)), yy(size(x1_a)), zz(size(x1_a)))
         call to_cartesian(x1_a, x2_a, x3_a, xx, yy, zz, athena%coord)
 
+
         ! velocites
         allocate(vxx(size(vx1_a)), vyy(size(vx1_a)), vzz(size(vx1_a)))
         call to_cartesian_velocities(vx1_a, vx2_a, vx3_a, vxx, vyy, vzz, x1_a, x2_a, x3_a, athena%coord)
-        vfield_coord = 1
-        write(*,*) "Data successfully from " , coord_name, " to Cartesian "
+
+        ! if (athena%coord==1) then
+        !   call to_cartesian_velocities(vx1_a, vx2_a, vx3_a, vxx, vyy, vzz, x1_a, x2_a, x3_a, athena%coord)
+        ! else
+        !   ! Athena orders spherical coords like: vr, vtheta, vphi
+        !   call to_cartesian_velocities(vx1_a, vx2_a, vx3_a, vxx, vyy, vzz, x1_a, x2_a, x3_a, athena%coord)
+        ! endif
+        vfield_coord = 0
+        write(*,*) "Data successfully from " , coord_name, " to Cartesian ", athena%coord
       else
         ! Already in Cartesian
         xx = x1_a
@@ -446,26 +485,6 @@ contains
       vzz = vzz * uvelocity
 
       deallocate(x1_a, x2_a, x3_a, vx1_a, vx2_a, vx3_a, rho_a, v_a)
-
-      ! do i=1, 10
-      !   write(*,*) "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
-      ! enddo
-      !
-      ! write(*,*) "second lot"
-
-      ! do i=115480, 115490
-      !   write(*,*) "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i), "vxx", vxx(i), "vyy", vyy(i),  "vzz", vzz(i)
-      ! enddo
-
-      ! write(*,*) "third lot"
-      !
-      ! do i=3900000, 3900010
-      !   write(*,*) "h", h(i), "x", xx(i), "y", yy(i), "z", zz(i)
-      ! enddo
-
-      ! vxx = vxx*uvelocity
-      ! vyy = vyy*uvelocity
-      ! vzz = vzz*uvelocity
 
       call setup_arb_to_mcfost(xx, yy, zz, h, vxx, vyy, vzz, mass_gas, particle_id)
 
@@ -556,11 +575,12 @@ contains
                  vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
                  ! I guess the below line is only true if the simulation is done in a co-rotating frame
                  if (athena%corotating_frame) then
-                   vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p)  * uvelocity ! vphi
+                   vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi
                    ! vfield3d(icell,2)  = (vx3(i,jj,phik) )  * uvelocity ! vphi : planet at r=1
                    ! vfield3d(icell,2)  = 1/r_grid(icell)**1/2 * uvelocity
                  else
-                   vfield3d(icell,2)  = 1./r_grid(icell)**1./2. * uvelocity ! vx3(i,jj,phik) ! * uvelocity ! vphi
+                   vfield3d(icell,2)  =  vx3(i,jj,phik)  * uvelocity
+                   ! vfield3d(icell,2)  = 1./r_grid(icell)**1./2. * uvelocity ! vx3(i,jj,phik) ! * uvelocity ! vphi
                  endif
                  vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
               enddo ! k
@@ -613,6 +633,8 @@ contains
       else
          call error('Gas mass is 0')
       endif
+
+      write(*,*) 'Total grid volume ', real(sum(volume))
 
       write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
       call normalize_dust_density()
