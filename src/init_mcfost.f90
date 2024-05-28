@@ -133,7 +133,6 @@ subroutine set_default_variables()
   lforce_Mgas = .false.
   lforce_SPH_amin = .false.
   lforce_SPH_amax = .false.
-  lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
   lsigma_file = .false.
@@ -959,16 +958,6 @@ subroutine initialisation_mcfost()
            density_files(i) = s
         enddo
         if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-ascii_SPH")
-        i_arg = i_arg + 1
-        lascii_SPH_file = .true.
-        lVoronoi = .true.
-        l3D = .true.
-        call get_command_argument(i_arg,s)
-        allocate(density_files(1))
-        density_files(1) = s
-        i_arg = i_arg + 1
-        if (.not.llimits_file) limits_file = "phantom.limits"
      case("-SPH_amin")
         lforce_SPH_amin = .true.
         i_arg = i_arg + 1
@@ -1585,10 +1574,6 @@ subroutine initialisation_mcfost()
   endif
 
   write(*,*) 'Input file read successfully'
-
-!   if ((lsphere_model.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
-!    call error("Cannot use Phantom and MHD files at the same time presently.")
-!   end if
 
   ! Correction sur les valeurs du .para
   if (lProDiMo) then

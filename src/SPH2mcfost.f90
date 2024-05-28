@@ -84,11 +84,6 @@ contains
        write(*,*) "Performing gadget2mcfost setup"
        write(*,*) "Reading Gadget-2 density file: "//trim(density_files(1))
        call read_gadget2_file(iunit,density_files(1), x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
-    else if (lascii_SPH_file) then
-       write(*,*) "Performing SPH2mcfost setup"
-       write(*,*) "Reading SPH density file: "//trim(density_files(1))
-       call read_ascii_SPH_file(iunit,density_files(1), x,y,z,h,vx,vy,vz,T_gas,massgas,rho,rhodust,&
-            particle_id, ndusttypes,n_SPH,ierr)
     else if (ldensity_file) then
        call read_Voronoi_fits_file(density_files(1), x,y,z,h,vx,vy,vz,particle_id,massgas,n_SPH)
     else
@@ -763,6 +758,7 @@ contains
 
   end subroutine hydro_to_Voronoi_atomic
 
+  !*********************************************************
 
   subroutine test_duplicate_particles(n_SPH, particle_id, x,y,z, massgas,massdust,rho,rhodust, is_ghost)
     ! Filtering particles at the same position
@@ -818,7 +814,7 @@ contains
 
     if (nkill > 0) then
        write(*,*)
-       write(*,*) nkill, "SPH particles were flagged as ghosts and merged"
+       write(*,*) nkill, "hydro sites were flagged as ghosts and merged"
        write(*,*)
     endif
 
@@ -900,51 +896,6 @@ contains
     return
 
   end subroutine delete_Hill_sphere
-
-  !*********************************************************
-
-  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id, ndusttypes,n_SPH,ierr)
-
-    integer,               intent(in) :: iunit
-    character(len=*),      intent(in) :: filename
-    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas,vx,vy,vz,T_gas
-    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
-    integer, intent(out), dimension(:), allocatable :: particle_id
-    integer, intent(out) :: ndusttypes, n_SPH,ierr
-
-    integer :: syst_status, alloc_status, ios, i
-    character(len=512) :: cmd
-
-    ierr = 0
-
-    cmd = "wc -l "//trim(filename)//" > ntest.txt"
-    call appel_syst(cmd,syst_status)
-    open(unit=1,file="ntest.txt",status="old")
-    read(1,*) n_SPH
-    close(unit=1)
-    ndusttypes = 1
-
-    write(*,*) "n_SPH read_test_ascii_file = ", n_SPH
-
-    alloc_status = 0
-    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), rhodust(ndusttypes,n_SPH), &
-    	vx(n_sph), vy(n_sph), vz(n_sph), T_gas(n_sph), stat=alloc_status)
-    if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
-
-    open(unit=1, file=filename, status='old', iostat=ios)
-    do i=1, n_SPH
-       read(1,*) x(i), y(i), z(i), h(i), T_gas(i), massgas(i), vx(i), vy(i), vz(i)
-       rhogas(i) = massgas(i)
-       particle_id(i) = i
-    enddo
-
-    write(*,*) "MinMax=", minval(massgas), maxval(massgas)
-
-    write(*,*) "Using stars from mcfost parameter file"
-
-    return
-
-  end subroutine read_ascii_SPH_file
 
   !*********************************************************
 
