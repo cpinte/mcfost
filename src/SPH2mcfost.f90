@@ -15,14 +15,12 @@ module SPH2mcfost
 
 contains
 
-  subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
+  subroutine setup_SPH2mcfost(extra_heating)
 
     use read_gadget2, only : read_gadget2_file
     use io_phantom_utils, only : get_error_text
     use utils, only : read_comments
 
-    character(len=512), intent(in) :: SPH_file, SPH_limits_file
-    integer, intent(out) :: n_SPH
 
     integer, parameter :: iunit = 1
 
@@ -36,7 +34,7 @@ contains
     integer, dimension(:), allocatable :: is_ghost
     real(dp), dimension(6) :: SPH_limits
     real :: factor
-    integer :: ndusttypes, ierr, i, ilen
+    integer :: ndusttypes, ierr, i, ilen, n_SPH
     logical :: check_previous_tesselation, ldust_moments
     real(dp) :: mass_per_H
 
@@ -84,15 +82,15 @@ contains
        endif
     else if (lgadget2_file) then
        write(*,*) "Performing gadget2mcfost setup"
-       write(*,*) "Reading Gadget-2 density file: "//trim(SPH_file)
-       call read_gadget2_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+       write(*,*) "Reading Gadget-2 density file: "//trim(density_files(1))
+       call read_gadget2_file(iunit,density_files(1), x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
     else if (lascii_SPH_file) then
        write(*,*) "Performing SPH2mcfost setup"
-       write(*,*) "Reading SPH density file: "//trim(SPH_file)
-       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,vx,vy,vz,T_gas,massgas,rho,rhodust,&
+       write(*,*) "Reading SPH density file: "//trim(density_files(1))
+       call read_ascii_SPH_file(iunit,density_files(1), x,y,z,h,vx,vy,vz,T_gas,massgas,rho,rhodust,&
             particle_id, ndusttypes,n_SPH,ierr)
     else if (ldensity_file) then
-       call read_Voronoi_fits_file(SPH_file, x,y,z,h,vx,vy,vz,particle_id,massgas,n_SPH)
+       call read_Voronoi_fits_file(density_files(1), x,y,z,h,vx,vy,vz,particle_id,massgas,n_SPH)
     else
        call error("Unknown SPH structure.")
     endif
@@ -107,7 +105,7 @@ contains
     if (.not.lfix_star) call compute_stellar_parameters()
 
     ! Model limits
-    call read_SPH_limits_file(SPH_limits_file, SPH_limits)
+    call read_SPH_limits_file(limits_file, SPH_limits)
 
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
@@ -205,7 +203,7 @@ contains
     use, intrinsic :: ieee_arithmetic
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
+    real(dp), dimension(:), allocatable, intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
     real(dp), dimension(:), allocatable, intent(inout) :: rho
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(:), allocatable, intent(in) :: T_gas
@@ -380,6 +378,7 @@ contains
     mass =  mass * g_to_Msun
 
     if (lforce_Mgas) then ! Todo : testing for now, use a routine to avoid repeting code
+       write(*,*) "Forcing gas mass to value in parameter file rather"
        ! Normalisation
        if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
           facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
@@ -387,10 +386,10 @@ contains
           ! Somme sur les zones pour densite finale
           do icell=1,n_cells
              densite_gaz(icell) = densite_gaz(icell) * facteur
-             masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+             masse_gaz(icell) = masse_gaz(icell) * facteur
           enddo ! icell
        else
-          call error('Gas mass is 0')
+          call error('Gas mass is 0 in hydero file')
        endif
     endif
 

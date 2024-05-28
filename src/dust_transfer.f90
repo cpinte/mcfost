@@ -115,7 +115,7 @@ subroutine transfert_poussiere()
      if (lmhd_voronoi) then
         call setup_mhd_to_mcfost() !uses sph_to_voronoi
      else
-        call setup_SPH2mcfost(density_files(1), limits_file, n_SPH, extra_heating)
+        call setup_SPH2mcfost(extra_heating)
      endif
      call setup_grid()
   else ! Setting up a regular grid

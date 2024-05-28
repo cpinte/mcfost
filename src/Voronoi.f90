@@ -210,7 +210,7 @@ module Voronoi_grid
     logical, intent(in) :: check_previous_tesselation
 
 
-    integer, parameter :: max_neighbours = 100  ! maximum number of neighbours per cell (to build temporary neighbours list)
+    integer, parameter :: max_neighbours = 30  ! maximum number of neighbours per cell (to build temporary neighbours list)
 
     real(kind=dp), dimension(:), allocatable :: x_tmp, y_tmp, z_tmp, h_tmp
     integer, dimension(:), allocatable :: SPH_id, SPH_original_id

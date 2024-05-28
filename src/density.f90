@@ -1710,7 +1710,7 @@ subroutine read_Voronoi_fits_file(filename, x,y,z,h,vx,vy,vz,particle_id, massga
   npixels = naxes(1)
 
   allocate(massgas(n_points), x(n_points),y(n_points),z(n_points), h(n_points), particle_id(n_points))
-  h = 0.0_dp
+  h = 1e-6 * huge_dp
 
   bitpix = 0
   call ftgkyj(unit,"bitpix",bitpix,comment,status)
@@ -1776,6 +1776,7 @@ subroutine read_Voronoi_fits_file(filename, x,y,z,h,vx,vy,vz,particle_id, massga
   do i=1,n_points
      particle_id(i) = i
   enddo
+  SPH_keep_particles = 1.0
 
   return
 
