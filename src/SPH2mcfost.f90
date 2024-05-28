@@ -638,12 +638,10 @@ contains
 
   end subroutine SPH_to_Voronoi
 
+  !****************************************************************************
 
-  !****************************************************************************
-  ! copy additional parameters from hydro code needed for atomic line transfer
-  !****************************************************************************
   subroutine Hydro_to_Voronoi_atomic(n_SPH,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,mask)
-
+    ! copy additional parameters from hydro code needed for atomic line transfer
     ! ************************************************************************************ !
     ! n_sph : number of points in the input model
     ! particle_id : index of the particle / cell centre in the input model
@@ -659,8 +657,6 @@ contains
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
     use elements_type, only : wght_per_H, read_abundance
-   !  use mhd2mcfost, only : alloc_atomrt_grid, nHtot, ne, &
-   !     v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne
     use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne, &
          check_for_zero_electronic_density
 
@@ -729,12 +725,7 @@ contains
     write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
     write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
 
-    ! 		if (lmagnetized) then
-    !
-    ! 		endif
-
-
-	call check_for_zero_electronic_density
+    call check_for_zero_electronic_density()
 
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
     write(*,*) "|Vx|", vxmax*1d-3, vxmin*1d-3
@@ -748,13 +739,15 @@ contains
     write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
 
     write(*,*) "Maximum/minimum Temperature in the model (K):"
-    write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)
+    write(*,*) maxval(T), minval(T,mask=icompute_atomRT>0)
     write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-    write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)
+    write(*,*) maxval(nHtot), minval(nHtot,mask=icompute_atomRT>0)
     if (.not.lcalc_ne) then
        write(*,*) "Maximum/minimum ne density in the model (m^-3):"
-       write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
+       write(*,*) maxval(ne), minval(ne,mask=icompute_atomRT>0)
     endif
+
+    return
 
   end subroutine hydro_to_Voronoi_atomic
 
