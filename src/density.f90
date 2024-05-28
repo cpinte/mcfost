@@ -1773,6 +1773,9 @@ subroutine read_Voronoi_fits_file(filename, x,y,z,h,vx,vy,vz,particle_id, massga
      call error("cannot read bitpix in fits file")
   endif
 
+  ! Defining a smoothing length
+  h = 0.02 * sqrt(x*x+y*y+z*z)
+
   do i=1,n_points
      particle_id(i) = i
   enddo
