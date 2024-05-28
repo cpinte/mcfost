@@ -114,11 +114,8 @@ subroutine transfert_poussiere()
   if (lVoronoi) then
      if (lmhd_voronoi) then
         call setup_mhd_to_mcfost() !uses sph_to_voronoi
-     else if (ldensity_file) then
-        call allocate_densities(n_cells + n_etoiles)
-        call read_density_file()
      else
-        call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
+        call setup_SPH2mcfost(density_files(1), limits_file, n_SPH, extra_heating)
      endif
      call setup_grid()
   else ! Setting up a regular grid
@@ -139,7 +136,7 @@ subroutine transfert_poussiere()
         call read_athena_model()
      else if (lsphere_model) then
         !on a structured spherical grid
-        call read_spherical_model(density_file)
+        call read_spherical_model(density_files(1))
      else if (lmodel_1d) then !1d spherically symmetric "stellar atmosphere" models
         call setup_model1d_to_mcfost()
      else if (lidefix) then

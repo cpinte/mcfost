@@ -820,7 +820,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         ldensity_file=.true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-start_step")
         i_arg = i_arg + 1
@@ -841,19 +842,22 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case ("-model_1d")
         i_arg = i_arg + 1
         lmodel_1d = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-sphere_mesh")
         i_arg = i_arg + 1
         lsphere_model = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-zeeman_polarisation")
      	call error("Zeeman polarisation not yet!")
@@ -961,7 +965,8 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "phantom.limits"
      case("-SPH_amin")
@@ -985,7 +990,8 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "gadget2.limits"
      case("-limits_file","-limits")
@@ -1118,7 +1124,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lread_Seb_Charnoz2=.true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-only_top")
         i_arg = i_arg+1
@@ -1503,13 +1510,13 @@ subroutine initialisation_mcfost()
    write(*,*) "------------------------------------------------"
    call warning(" THERE ARE PROBABLY SOME CHECKS TO DO MORE ")
    write(*,*) "------------------------------------------------"
-   call read_model_1d(density_file)
+   call read_model_1d(density_files(1))
   endif
   if (lsphere_model) then
      !could be 3d or 2d (2.5d). Depends on flag l3D or N_az>1
      n_zones = 1
      disk_zone(1)%geometry = 2
-     call read_spherical_grid_parameters(density_file)
+     call read_spherical_grid_parameters(density_files(1))
   endif
 
   if (lidefix) then

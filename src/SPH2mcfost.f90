@@ -4,7 +4,7 @@ module SPH2mcfost
   use constantes
   use utils
   use sort, only : find_kth_smallest_inplace
-  use density, only : normalize_dust_density, reduce_density
+  use density, only : normalize_dust_density, reduce_density, read_Voronoi_fits_file
   use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
   use sort, only : index_quicksort
   use stars, only : compute_stellar_parameters
@@ -89,7 +89,10 @@ contains
     else if (lascii_SPH_file) then
        write(*,*) "Performing SPH2mcfost setup"
        write(*,*) "Reading SPH density file: "//trim(SPH_file)
-       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,vx,vy,vz,T_gas,massgas,rho,rhodust,particle_id, ndusttypes,n_SPH,ierr)
+       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,vx,vy,vz,T_gas,massgas,rho,rhodust,&
+            particle_id, ndusttypes,n_SPH,ierr)
+    else if (ldensity_file) then
+       call read_Voronoi_fits_file(SPH_file, x,y,z,h,vx,vy,vz,particle_id,massgas,n_SPH)
     else
        call error("Unknown SPH structure.")
     endif
@@ -101,7 +104,7 @@ contains
        if (allocated(massdust)) deallocate(massdust)
     endif
 
-    if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
+    if (.not.lfix_star) call compute_stellar_parameters()
 
     ! Model limits
     call read_SPH_limits_file(SPH_limits_file, SPH_limits)
@@ -109,8 +112,8 @@ contains
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
-         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, &
-         ldust_moments, dust_moments, mass_per_H, mask=mask)
+         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, &
+         is_ghost, ldust_moments, dust_moments, mass_per_H, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
