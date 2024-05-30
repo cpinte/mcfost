@@ -16,12 +16,10 @@ module density
   integer, public :: species_removed
   real, public :: T_rm
 
-  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, densite_pouss, masse, icell_not_empty
-
-  public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
+  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, densite_pouss, masse, icell_not_empty, &
+       define_density, define_density_wall3d, define_dust_density, read_density_file, is_density_file_Voronoi, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_species, read_sigma_file, normalize_dust_density, &
-       reduce_density
-
+       reduce_density, read_Voronoi_fits_file
 
   private
 
@@ -940,6 +938,50 @@ end subroutine define_density_wall3D
 
 !********************************************************************
 
+subroutine is_density_file_Voronoi()
+
+  integer :: unit, status, naxis, readwrite, blocksize, nfound
+  character(len=8) :: comment
+  integer, dimension(4) :: naxes
+
+  status=0
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  call ftgiou(unit,status)
+
+  ! Opening file
+  readwrite=0
+  write(*,*) "Checking "//trim(density_files(1))
+  call ftopen(unit,density_files(1),readwrite,blocksize,status)
+  if (status /= 0) call error("density file needed")
+
+  !nfound=0
+  call ftgkyj(unit,'NAXIS',naxis,comment,status)
+  if (status /= 0) call error("error reading density file")
+
+  nfound=0
+  call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
+
+  if (naxis == 1) then
+     write(*,*) "Found 1D density structure, using a Voronoi mesh"
+     lVoronoi = .true.
+     l3D = .true.
+
+     n_cells = naxes(1)
+  else
+     write(*,*) "Found a structured mesh"
+     lVoronoi = .false.
+  endif
+
+  ! Closing file
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  return
+
+end subroutine is_density_file_Voronoi
+
+!********************************************************************
+
 subroutine read_density_file()
   ! Nouvelle routine pour lire les grilles de densite
   ! calculees par Yorick directement a partir des donnees SPH (ou autre)
@@ -994,10 +1036,10 @@ subroutine read_density_file()
   !  Get an unused Logical Unit Number to use to open the FITS file.
   call ftgiou(unit,status)
 
-  write(*,*) "Reading density file : "//trim(density_file)
+  write(*,*) "Reading density file : "//trim(density_files(1))
 
   readwrite=0
-  call ftopen(unit,density_file,readwrite,blocksize,status)
+  call ftopen(unit,density_files(1),readwrite,blocksize,status)
   if (status /= 0) call error("density file needed")
 
   ! Do we read the gas density ?
@@ -1114,9 +1156,10 @@ subroutine read_density_file()
   !  determine the size of density file
   write(*,*) "Reading dust density ..."
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+
   if ((nfound /= 3) .and. (nfound /= 4)) then
      write(*,*) "I found", nfound, "axis instead of 3 or 4"
-     call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_file)//' file')
+     call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_files(1))//' file')
   endif
 
   if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az) ) then
@@ -1125,7 +1168,7 @@ subroutine read_density_file()
      write(*,*) naxes(2), nz
      write(*,*) naxes(3), n_az
      !write(*,*) naxes(4), n_a
-     call error(trim(density_file)//" does not have the right dimensions in HDU 1.")
+     call error(trim(density_files(1))//" does not have the right dimensions in HDU 1.")
   endif
 
   if (nfound == 3) then
@@ -1176,6 +1219,7 @@ subroutine read_density_file()
      else
         allocate(sph_dens_dp(n_rad,nz,n_az,n_a))
      endif
+
      sph_dens_dp = 0.0_dp
      call ftgpvd(unit,group,firstpix,npixels,nullval,sph_dens_dp,anynull,status)
      sph_dens = real(sph_dens_dp,kind=sp)
@@ -1350,7 +1394,7 @@ subroutine read_density_file()
      if (nfound /= 3) then
         write(*,*) 'Gas density:'
         write(*,*) "I found", nfound, "axis instead of 3, status=", status
-        call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
+        call error('failed to read the NAXISn keywords of '//trim(density_files(1)))
      endif
 
      if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az) ) then
@@ -1358,7 +1402,7 @@ subroutine read_density_file()
         write(*,*) naxes(1), n_rad
         write(*,*) naxes(2), nz
         write(*,*) naxes(3), n_az
-        call error(trim(density_file)//" does not have the right dimensions.")
+        call error(trim(density_files(1))//" does not have the right dimensions.")
      endif
      npixels=naxes(1)*naxes(2)*naxes(3)
 
@@ -1423,7 +1467,7 @@ subroutine read_density_file()
      if (nfound /= 4) then
         write(*,*) 'Gas velocity:'
         write(*,*) "I found", nfound, "axis instead of 4"
-        call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
+        call error('failed to read the NAXISn keywords of '//trim(density_files(1))//' file.')
      endif
 
      if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az).or.(naxes(4) /= 3) ) then
@@ -1432,7 +1476,7 @@ subroutine read_density_file()
         write(*,*) naxes(2), nz
         write(*,*) naxes(3), n_az
         write(*,*) naxes(4), 3
-        call error(trim(density_file)//" does not have the right dimensions.")
+        call error(trim(density_files(1))//" does not have the right dimensions.")
      endif
      npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
@@ -1464,6 +1508,7 @@ subroutine read_density_file()
 
   call ftclos(unit, status)
   call ftfiou(unit, status)
+
 
   ! Passing the densities and velocities to mcfost arrays
   do k=1, n_az
@@ -1521,6 +1566,7 @@ subroutine read_density_file()
   do icell=1,n_cells
      masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
   enddo ! icell
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
 
   if (lvariable_dust) then
      write(*,*) "Differential spatial distribution"
@@ -1610,15 +1656,134 @@ subroutine read_density_file()
      enddo ! k
   endif  !lvariable_dust
 
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
   call normalize_dust_density()
   deallocate(sph_dens,a_sph)
-
-
 
   return
 
 end subroutine read_density_file
+
+!**********************************************************
+
+subroutine read_Voronoi_fits_file(filename, x,y,z,h,vx,vy,vz,particle_id, massgas,n_points)
+
+
+  character(len=*), intent(in) :: filename
+
+  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,vx,vy,vz,massgas
+  integer, intent(out), dimension(:),   allocatable :: particle_id
+  integer, intent(out) :: n_points
+
+  real, dimension(:,:), allocatable :: xyz_sp
+  real(kind=dp), dimension(:,:), allocatable :: xyz_dp
+  real, dimension(:), allocatable :: mass_sp
+
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,hdutype, bitpix, nullval, i
+  logical :: anynull
+  character(len=80) :: comment
+  integer, dimension(4) :: naxes
+
+
+  write(*,*) "Reading Voronoi fits file: "//trim(filename)
+
+  ! Lecture donnees
+  status=0
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  call ftgiou(unit,status)
+
+  readwrite=0
+  call ftopen(unit,filename,readwrite,blocksize,status)
+  if (status /= 0) call error("density file needed")
+
+  status = 0
+  group=1
+  firstpix=1
+  nullval=-999
+  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+
+  if ((nfound /= 1)) then
+     write(*,*) "I found", nfound, "axis instead of 1"
+     call error('failed to read the NAXIS keyword in HDU 1 of '//trim(filename))
+  endif
+
+  n_points = naxes(1)
+  npixels = naxes(1)
+
+  allocate(massgas(n_points), x(n_points),y(n_points),z(n_points), h(n_points), particle_id(n_points))
+  h = 1e-6 * huge_dp
+
+  bitpix = 0
+  call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+  if (bitpix==-32) then
+     allocate(mass_sp(n_points))
+     call ftgpve(unit,group,firstpix,npixels,nullval,mass_sp,anynull,status)
+     massgas = mass_sp
+     deallocate(mass_sp)
+  else if (bitpix==-64) then
+     call ftgpvd(unit,group,firstpix,npixels,nullval,massgas,anynull,status)
+  else
+     call error("cannot read bitpix in fits file")
+  endif
+
+
+  !---------------------------------------------------------
+  ! hdu2 is particle positions
+  !---------------------------------------------------------
+  !  move to next hdu
+  call ftmrhd(unit,1,hdutype,status)
+  nfound=1
+  ! Check dimensions
+  naxes(:) = 0
+  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+  if (nfound /= 2) then
+     write(*,*) 'HDU 2 has', nfound, 'dimensions.'
+     call error('did not find 2 dimension in HDU 2')
+  endif
+  if ((naxes(1) /= 3)) then
+     write(*,*) "HDU2 dim 1 is ", naxes(1), "instead of 3"
+     call error("HDU 2 does not have the right dimension")
+  endif
+  if ((naxes(2) /= n_points)) then
+     write(*,*) "HDU2 dim 2 is ", naxes(3), "instead of ", n_points
+     call error("HDU 2 does not have the right dimension")
+  endif
+
+  npixels=naxes(1)*naxes(2)
+
+  bitpix=0
+  call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+  ! read_image
+  if (bitpix==-32) then
+     allocate(xyz_sp(3,n_cells))
+     call ftgpve(unit,group,firstpix,npixels,nullval,xyz_sp,anynull,status)
+     x = xyz_sp(1,:)
+     y = xyz_sp(2,:)
+     z = xyz_sp(3,:)
+     deallocate(xyz_sp)
+  else if (bitpix==-64) then
+     allocate(xyz_dp(3,n_cells))
+     call ftgpvd(unit,group,firstpix,npixels,nullval,xyz_dp,anynull,status)
+     x = xyz_dp(1,:)
+     y = xyz_dp(2,:)
+     z = xyz_dp(3,:)
+     deallocate(xyz_dp)
+  else
+     call error("cannot read bitpix in fits file")
+  endif
+
+  ! Defining a smoothing length
+  h = 0.02 * sqrt(x*x+y*y+z*z)
+
+  do i=1,n_points
+     particle_id(i) = i
+  enddo
+  SPH_keep_particles = 1.0
+
+  return
+
+end subroutine read_Voronoi_fits_file
 
 !**********************************************************
 
@@ -1939,10 +2104,10 @@ subroutine densite_Seb_Charnoz2()
   call ftgiou(unit,status)
 
   write(*,*) "Density structure from Seb. Charnoz" ;
-  write(*,*) "Reading density file : "//trim(density_file)
+  write(*,*) "Reading density file : "//trim(density_files(1))
 
   readwrite=0
-  call ftopen(unit,density_file,readwrite,blocksize,status)
+  call ftopen(unit,density_files(1),readwrite,blocksize,status)
   if (status /= 0) call error("density file needed")
 
   group=1
@@ -1951,13 +2116,13 @@ subroutine densite_Seb_Charnoz2()
 
   !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound /= 2) call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
+  if (nfound /= 2) call error('failed to read the NAXISn keywords of '//trim(density_files(1))//' file.')
 
   if ((naxes(1) /= n_rad).or.(naxes(2) /= nz) ) then
      write(*,*) "# fits_file vs mcfost_grid"
      write(*,*) naxes(1), n_rad
      write(*,*) naxes(2), nz
-     call error(trim(density_file)//" does not have the right dimensions.")
+     call error(trim(density_files(1))//" does not have the right dimensions.")
   endif
 
   npixels=naxes(1)*naxes(2)

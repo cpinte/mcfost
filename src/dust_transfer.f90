@@ -107,21 +107,22 @@ subroutine transfert_poussiere()
   ! Building the dust grain population
   call build_grain_size_distribution()
 
-  if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
-     call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
+  laffichage=.true.
+
+  if (ldensity_file) call is_density_file_Voronoi()
+
+  if (lVoronoi) then
+     if (lmhd_voronoi) then
+        call setup_mhd_to_mcfost() !uses sph_to_voronoi
+     else
+        call setup_SPH2mcfost(extra_heating)
+     endif
      call setup_grid()
-  else if (lmhd_voronoi) then
-     call setup_mhd_to_mcfost() !uses sph_to_voronoi
-     call setup_grid()
-  else
+  else ! Setting up a regular grid
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
-  endif
 
-  laffichage=.true.
-
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()
@@ -135,7 +136,7 @@ subroutine transfert_poussiere()
         call read_athena_model()
      else if (lsphere_model) then
         !on a structured spherical grid
-        call read_spherical_model(density_file)
+        call read_spherical_model(density_files(1))
      else if (lmodel_1d) then !1d spherically symmetric "stellar atmosphere" models
         call setup_model1d_to_mcfost()
      else if (lidefix) then
