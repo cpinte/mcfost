@@ -1,16 +1,38 @@
 
-Running a 3D model
-==================
+Running mcfost on a hydro model
+===============================
 
 MCFOST is completely 3D and can be used with any density structure.
 Interfaces for hydrodynamics codes can be built on demand if there are
-specific needs. There is also a default interface using FITS file to
+specific needs. Current interfaces where mcfost can natively read dumps exist for
+
+* phantom
+* fargo-3d
+* athena++
+* idefix
+
+
+ Generic interface (via fits files)
+###################################
+
+There is also a default interface using FITS file to
 input MCFOST with any arbitrary density structure. This interface is
 likely to fulfill most of the needs.
 
-It can be used with the command::
+It can be used with either a structure or unstructed grid.
+
+Structured grid
+---------------
+
+For a structured grid, the fits interface can be used as
 
 $ mcfost <parameter_file> -density_file <your_density_file.fits.gz> -3D (+ any other option)
+
+or
+
+$ mcfost <parameter_file> -density_file <your_surface_density_file.fits.gz> (+ any other option)
+
+The `-sigma_file` option works in a similar way as the `-density_file` option but without the vertical dimension. mcfost use the scale height and flaring index provided in the parameter file to reconstruct the 3D density structure.
 
 
 .. important:: When using the `-density_file` or `-sigma_file` options, the number of zones must be set to 1 in mcfost
@@ -23,7 +45,7 @@ The option ``-density_file`` also works in the 2D version of the code, ie
 without ``-3D``. In that case the density file still requires 4 dimensions,
 but with n_az = 1 : ``density(1:n_rad, 1:nz, 1, 1:n_grains)``
 
-.. note:: the spatial grid is not currently passed to MCFOST in the
+.. important:: the spatial grid is not currently passed to MCFOST in the
           FITS file. Instead, ``n_rad``, ``nz`` and ``n_az`` must match the values
           provided in the parameter file. MCFOST will build the spatial grid
           from the parameter file (the grid can be cylindrical or spherical) and
@@ -108,4 +130,20 @@ coordinates. The velocity is given in m/s.
           options).
 
 
-An alternative option `-sigma_file` works in a similar way with the vertical dimension and passes only the surface density. mcfost use the scale height and flaring index provided in the parameter file to reconstruct the 3D density structure.
+Unstructured set of points
+--------------------------
+
+mcfost can also read an arbitrary set of points, in which case mcfost will perform a Voronoi tesselation on the provided points (as for SPH calculations, for instance with the `-phantom` option)
+The syntax is the same as above:
+
+$ mcfost <parameter_file> -density_file <your_file.fits.gz>
+
+mcfost will automatically detect if the data is structured or unstructured.
+
+The fits file needs to have at least 2 hdus:
+
+* the first will contain the *mass* of each "particle" as a 1D array of size ``n_points``.
+
+.. note:: because the volume of a Voronoi cell can be different from the initial volume in the hydro model, the mass and not the density of each particle is required.
+
+* the 2nd hdu must be 2D with dimensions of ``3 x n_points``, and provide the x,y,z coordinates for all the data points
