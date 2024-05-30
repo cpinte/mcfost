@@ -109,8 +109,6 @@ subroutine transfert_poussiere()
 
   laffichage=.true.
 
-  if (ldensity_file) call is_density_file_Voronoi()
-
   if (lVoronoi) then
      if (lmhd_voronoi) then
         call setup_mhd_to_mcfost() !uses sph_to_voronoi

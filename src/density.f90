@@ -965,7 +965,6 @@ subroutine is_density_file_Voronoi()
      write(*,*) "Found 1D density structure, using a Voronoi mesh"
      lVoronoi = .true.
      l3D = .true.
-
      n_cells = naxes(1)
   else
      write(*,*) "Found a structured mesh"
