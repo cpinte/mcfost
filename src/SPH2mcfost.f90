@@ -86,6 +86,8 @@ contains
        call read_gadget2_file(iunit,density_files(1), x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
     else if (ldensity_file) then
        call read_Voronoi_fits_file(density_files(1), x,y,z,h,vx,vy,vz,particle_id,massgas,n_SPH)
+       ldust_moments = .false.
+       ndusttypes=0
     else
        call error("Unknown SPH structure.")
     endif
@@ -116,7 +118,8 @@ contains
     if (lemission_atom) then
        call hydro_to_Voronoi_atomic(n_SPH,T_gas,vturb,massgas,mass_ne_on_massgas,atomic_mask)
     endif
-    deallocate(massgas,rho)
+    deallocate(massgas)
+    if (allocated(rho)) deallocate(rho)
     if (allocated(vturb)) deallocate(vturb)
     if (allocated(mass_ne_on_massgas)) deallocate (mass_ne_on_massgas)
     if (allocated(atomic_mask)) deallocate(atomic_mask)
