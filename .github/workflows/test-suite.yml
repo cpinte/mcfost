@@ -2,7 +2,7 @@ name: test-suite
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
   release:
     types:
@@ -49,7 +49,7 @@ jobs:
       OPENMP: ${{ matrix.openmp }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - run: git config --global --add safe.directory $PWD
 
@@ -70,7 +70,7 @@ jobs:
       # Only benchmark+release the 'release' builds, never the 'march=native' builds
       - name: save binary for benchmarking and release
         if: matrix.openmp == 'yes' && matrix.release == 'yes'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mcfost-binary-${{ matrix.os }}-${{ matrix.compiler }}
           path: src/mcfost
@@ -87,10 +87,10 @@ jobs:
       MCFOST_INSTALL: /usr/local
       OPENMP: yes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: restore binary artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: mcfost-binary-macos-${{ matrix.compiler }}
           path: src/
@@ -120,10 +120,10 @@ jobs:
     if: ${{ github.event_name == 'release' }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: restore binary artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: mcfost-binary-${{ matrix.os }}-ifort # use ifort for binary release
           path: src/

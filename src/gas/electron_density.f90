@@ -810,7 +810,7 @@ module elecdensity
 
    !call FTG2Dd(unit,1,-999,shape(ne),naxes(1),naxes(2),ne,anynull,EOF)
 
-   write(*,'("  -- min(ne)="(1ES20.7E3)" m^-3; max(ne)="(1ES20.7E3)" m^-3")') , &
+   write(*,'("  -- min(ne)="(1ES20.7E3)" m^-3; max(ne)="(1ES20.7E3)" m^-3")') &
       real(minval(ne,mask=(ne>0))), real(maxval(ne))
 
    return

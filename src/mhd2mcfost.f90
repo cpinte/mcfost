@@ -61,8 +61,6 @@ module mhd2mcfost
         n_points = 0 ! to avoid compiler warning
 
         !needed for Voronoi
-        if (allocated(density_files)) deallocate(density_files)
-        allocate(density_files(1)); density_files(1) = density_file
 
         if (lignore_dust) then
            ndusttypes = 0
@@ -71,7 +69,7 @@ module mhd2mcfost
            call error("Dust not handled yet for pluto models!")
         endif
 
-           cmd = "wc -l "//trim(density_file)//" > ntest.txt"
+           cmd = "wc -l "//trim(density_files(1))//" > ntest.txt"
            call appel_syst(cmd,syst_status)
            open(unit=1,file="ntest.txt",status="old")
            read(1,*) N_points
@@ -81,7 +79,7 @@ module mhd2mcfost
 
            N_points = N_points + n_etoiles
 
-           open(unit=1,file=density_file, status="old")
+           open(unit=1,file=density_files(1), status="old")
            call read_line(1, FormatLine, inputline, Nread)
 
            lvelocity_file = .false.

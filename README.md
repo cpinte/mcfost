@@ -6,14 +6,14 @@ The MCFOST radiative transfer code
 
 <p align='center'>
   <br/>
-  <img src="https://github.com/cpinte/mcfost/blob/master/logo/mcfost_logo.png" width="300" height="300">
+  <img src="https://github.com/cpinte/mcfost/blob/main/logo/mcfost_logo.png" width="300" height="300">
   <br/>
 </p>
 
 - Code: <https://github.com/cpinte/mcfost>
 - Docs: <https://mcfost.readthedocs.io>
 
-[![test-suite](https://github.com/cpinte/mcfost/actions/workflows/test-suite.yml/badge.svg)](https://github.com/cpinte/mcfost/actions/workflows/test-suite.yml)
+[![test-suite](https://github.com/cpinte/mcfost/actions/workflows/test-suite.yml/badge.svg)](https://github.com/cpinte/mcfost/actions/workflows/test-suite.yml?query=branch%3Amain++)
 [![Documentation Status](https://readthedocs.org/projects/mcfost/badge/?version=latest)](https://mcfost.readthedocs.io/en/latest/)
 
 About
@@ -51,8 +51,15 @@ Contributing
 ------------
 We welcome contributions, including (but not limited to):
 
-1. Code, via [pull request](https://github.com/cpinte/mcfost/pulls). Please read developer section of user guide for guidelines.
-2. Documentation, also by [pull request](https://github.com/cpinte/mcfost/pulls). Docs can be edited in the docs/ directory of the main code.
+1. Code, via [pull request](https://github.com/cpinte/mcfost/pulls). Please read the developer section of the user guide for guidelines. 
+We use the [pre-commit](https://pre-commit.com) framework to automatically fix
+some coding bad practices.
+It is recommended to install pre-commit by running the following commands from the top level of the repo
+```shell
+python3 -m pip install pre-commit
+pre-commit install
+```
+2. Documentation, also by [pull request](https://github.com/cpinte/mcfost/pulls). Docs can be edited in the docs/ directory of the main code. 
 3. Suggestions for features or bug reports, via the [issue tracker](https://github.com/cpinte/mcfost/issues/new). Please file bugs via github rather than by email.
 
 Questions?

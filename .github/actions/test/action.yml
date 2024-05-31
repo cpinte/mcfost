@@ -20,7 +20,7 @@ runs:
         tar xzf test_data_0c484a1a905c13bea4c3bc0494ba288daddbe779.tgz
 
     # Only do this if not in manylinux docker container
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       if: env.AUDITWHEEL_PLAT == ''
       with:
         python-version: "3.11"

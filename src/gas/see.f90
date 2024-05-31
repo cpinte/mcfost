@@ -92,7 +92,7 @@ module see
         !   for the non-LTE populations: TO DO improve convergence criterion.
         allocate(ngpop(NmaxLevel,NactiveAtoms+1,n_cells,Neq_ng),stat=alloc_status)
         if (alloc_Status > 0) call error("Allocation error ngpop")
-        
+
         !initialize electronic density
         ngpop(1,NactiveAtoms+1,:,1) = ne(:)
         write(*,*) " size ngpop:", sizeof(ngpop)/1024./1024./1024., " GB"
@@ -287,7 +287,7 @@ module see
             if (allocated(atom%continua(kr)%Cij))deallocate(atom%continua(kr)%Cij,atom%continua(kr)%Cji)
         enddo
         return
-    end subroutine dealloc_rates_atom 
+    end subroutine dealloc_rates_atom
 
     subroutine dealloc_nlte_var()
     !free space after non-lte loop.
@@ -1439,7 +1439,7 @@ module see
         ! real(kind=dp) :: Adag(neq,neq), bdag(neq), res(neq)
 
         do ieq=1, neq
-            f(ieq) = f(ieq) * -1.0_dp
+            f(ieq) = -f(ieq)
             do jvar=1, neq
                 df(ieq,jvar) = df(ieq,jvar) * x(jvar)
             enddo
@@ -2000,7 +2000,7 @@ module see
         write(*,*) " *** Computing radiative rates..."
 
         id = 1
-        labs = .true. !We need the local profile. 
+        labs = .true. !We need the local profile.
                       !all non-LTE quantities (psi, phi_loc) are not freed yet.
         !use the last step
         etape = istep_end

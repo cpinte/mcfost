@@ -8,10 +8,10 @@ module scattering
   use read_opacity
 
   implicit none
-  save
+
+  procedure(get_Mueller_matrix_per_grain), pointer :: get_Mueller_matrix => null()
 
   contains
-
 
 subroutine setup_scattering()
 
@@ -312,15 +312,12 @@ end subroutine BHMIE
 !***************************************************
 
 subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
-!***************************************************************
-! calcule les elements de la matrice de diffusion a partir de
-! la sous-routine bhmie (grains spheriques)
-!     GRAINS SPHERIQUES.
-!
-!        CALCULE AUSSI "G" = LE PARAMETRE D'ASYMETRIE
-!
-! C. Pinte Fevrier 2004
-!****************************************************************
+  !***************************************************************
+  ! Calcule les elements de la matrice de diffusion a partir de
+  ! la sous-routine bhmie (grains spheriques)
+  !
+  ! C. Pinte Fevrier 2004
+  !****************************************************************
 
   implicit none
   integer, intent(in) :: lambda, taille_grain
@@ -328,14 +325,13 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
   real, intent(in) :: x ! 2*pi*a/wl
   real, intent(out) :: qext, qsca, gsca
 
-  integer :: j, nang
+  integer :: j, jj, nang
 
   complex, dimension(nang_scatt+1) :: S1,S2
 
-  real :: vi1, vi2, qback, norme, somme_prob, theta, dtheta
-  complex :: refrel
-  real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
-
+  real :: vi1, vi2, qback, factor
+  complex :: s, refrel
+  real, dimension(0:nang_scatt) ::  s11,s12,s22,s33,s34,s44
 
   refrel = cmplx(amu1,amu2)
 
@@ -353,61 +349,210 @@ subroutine mueller_Mie(lambda,taille_grain,x,amu1,amu2, qext,qsca,gsca)
   if (lforce_HG) gsca = forced_g
   if (lisotropic) gsca = 0.0
 
+  ! The normalisation of bhmie for s11 is 0.5*x**2*Qsca
+  ! --> We correct by 0.5*x**2 to have a normalisation to Qsca Qsa
+  factor = 1 / (0.5 * x**2)
+
   ! Passage des valeurs dans les tableaux de mcfost
   if (aniso_method==1) then
-
-     !  QABS=QEXT-QSCA
      ! Calcul des elements de la matrice de diffusion
      ! indices decales de 1 par rapport a bhmie
-     do J=0,nang_scatt
-        vi1 = cabs(S2(J+1))*cabs(S2(J+1))
-        vi2 = cabs(S1(J+1))*cabs(S1(J+1))
-        s11(j) = 0.5*(vi1 + vi2)
-        s12(j) = 0.5*(vi1 - vi2)
-        s33(j)=real(S2(J+1)*conjg(S1(J+1)))
-        s34(j)=aimag(S2(J+1)*conjg(S1(J+1)))
+     do j=0,nang_scatt
+        jj=j+1
+        vi1 = cabs(S2(jj))*cabs(S2(jj))
+        vi2 = cabs(S1(jj))*cabs(S1(jj))
+        s11(j) = 0.5*(vi1 + vi2) * factor
+        s12(j) = 0.5*(vi1 - vi2) * factor
+        s = S2(jj)*conjg(S1(jj))
+        s33(j)=real(s) * factor
+        s34(j)=aimag(s) * factor
      enddo !j
 
-     ! Integration S11 pour tirer angle
-     if (scattering_method==1) then
-        prob_s11(lambda,taille_grain,0)=0.0
-        dtheta = pi/real(nang_scatt)
-        do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
-           theta = real(j)*dtheta
-           prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
-        enddo
+     s22(:) = s11(:)
+     s44(:) = s33(:)
 
-        ! s11 est calculee telle que la normalisation soit: 0.5*x**2*qsca
-        ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
-        ! On rate le pic de diffraction (en particulier entre 0 et 1)
-        somme_prob = 0.5*x**2*qsca
-        prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
-             somme_prob - prob_s11(lambda,taille_grain,nang_scatt)
-
-        ! Normalisation de la proba cumulee a 1
-        prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/somme_prob
-     endif ! scattering_method==1
-
-     do j=0,nang_scatt
-        if (scattering_method==1) then ! Matrice de Mueller par grain
-           ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
-           norme=s11(j)
-        else ! Sinon normalisation a Qsca
-           ! La normalisation par default : 0.5*x**2*Qsca --> correction par 0.5*x**2
-           norme = 0.5 * x**2
-        endif
-
-        tab_s11(j,taille_grain,lambda) = s11(j) / norme
-        tab_s12(j,taille_grain,lambda) = s12(j) / norme
-        tab_s33(j,taille_grain,lambda) = s33(j) / norme
-        tab_s34(j,taille_grain,lambda) = s34(j) / norme
-     enddo
-
-  endif ! aniso_method ==1
+     call normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, normalisation=qsca)
+  endif
 
   return
 
 end subroutine mueller_Mie
+
+!***************************************************
+
+subroutine Mueller_input(lambda, k_abs,k_sca,gsca)
+
+  integer, intent(in) :: lambda
+  real, intent(out) :: k_abs, k_sca, gsca
+
+  character(len=128) :: string, filename
+
+  integer :: EoF, alloc_status,iformat,nlam,nmu,ilam,iline,iang,nang, l
+  logical :: lscat
+  real(dp), dimension(:), allocatable :: angles,wavel,kabs,ksca,g
+  real(dp), dimension(:,:), allocatable :: f11,f12,f22,f33,f34,f44
+  real(dp) :: wl, frac, frac_m1
+
+  real, dimension(0:nang_scatt) ::  s11,s12,s22,s33,s34,s44
+
+  gsca = 0
+
+  alloc_status = 0
+  EOF=0
+  open(unit=1,file=filename,status='old')
+
+  ! Skip lines starting with "#"
+  do while(EoF==0)
+     read(1,*,iostat=EoF) string
+     if (string(1:1) /= '#') exit
+  enddo
+
+  ! Read the format number.
+  read(string,*) iformat
+  if(iformat == 3) then
+     lscat = .false.
+  else if(iformat == 1) then
+     lscat = .true.
+  endif
+
+  ! Read the number of wavelengths
+  read(1,*) nlam
+
+  ! Read the number of scattering angles
+  if (lscat) read(1,*) nang
+
+  ! Allocate arrays
+  alloc_status = 0
+  allocate(wavel(nlam),kabs(nlam),ksca(nlam),g(nlam), stat = alloc_status)
+
+  ! Read wavelengths, opacities and g
+  do ilam=1,nlam
+     read(1,*) wavel(l), kabs(l), ksca(l), g(l)
+  enddo
+
+  wl = tab_lambda(lambda)
+  if (wl < minval(wavel)) call error("Mueller matrices: wavelength is smaller than tabulated")
+  if (wl > maxval(wavel)) call error("Mueller matrices: wavelength is larger than tabulated")
+
+  if (wavel(2) >  wavel(1)) then ! increasing order
+     do ilam=1,nlam
+        if  (wavel(l) > wl) then
+           frac = (wavel(l) - wl) / (wavel(l) - wavel(l-1))
+           exit
+        endif
+     enddo
+  else ! decreasing order
+     do ilam=1,nlam
+        if  (wavel(l) < wl) then
+           frac = (wl - wavel(l)) / (wavel(l-1) - wavel(l))
+           exit
+        endif
+     enddo
+  endif
+  if ((frac > 1) .or. (frac < 0)) call error("Mueller matrices: interpolation error")
+
+  if (lscat) then
+     allocate(angles(nang), f11(nlam,nang),f12(nlam,nang),f22(nlam,nang),&
+          f33(nlam,nang),f34(nlam,nang),f44(nlam,nang), stat = alloc_status)
+
+     ! Read the angular grid
+     do iang=1,nang
+        read(1,*) angles(iang)
+     enddo
+
+     ! Read the scattering matrix.
+     do ilam=1,nlam
+        do iang=1,nang
+           read(1,*) f11(ilam,iang),f12(ilam,iang), f22(ilam,iang), f33(ilam,iang), f34(ilam,iang), f44(ilam,iang)
+        enddo
+     enddo
+  endif
+  close(1)
+
+  ! Interpolate at correct wavelength
+  ! todo : find ilam
+
+  k_abs = kabs(ilam-1) * frac + kabs(ilam) * frac_m1
+  k_sca = ksca(ilam-1) * frac + ksca(ilam) * frac_m1
+  gsca = ksca(ilam-1) * frac + ksca(ilam) * frac_m1
+
+  s11(:) = f11(ilam-1,:) * frac + f11(ilam,:) * frac_m1
+  s12(:) = f11(ilam-1,:) * frac + f12(ilam,:) * frac_m1
+  s22(:) = f11(ilam-1,:) * frac + f22(ilam,:) * frac_m1
+  s33(:) = f11(ilam-1,:) * frac + f33(ilam,:) * frac_m1
+  s34(:) = f11(ilam-1,:) * frac + f34(ilam,:) * frac_m1
+  s44(:) = f11(ilam-1,:) * frac + f44(ilam,:) * frac_m1
+
+  ! Deallocate arrays
+  deallocate(wavel,kabs,ksca,g)
+  if (lscat) then
+     deallocate(angles)
+     deallocate(f11,f12,f22,f33,f34,f44)
+  endif
+
+  return
+
+end subroutine Mueller_input
+
+!***************************************************
+
+subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44, normalisation)
+  ! read in the matrix elements, calculate the cumulative s11, niormnaklise and fill up tab_s11, etc
+
+  integer, intent(in) :: lambda,taille_grain
+  real, dimension(0:nang_scatt), intent(in) ::  s11,s12,s22,s33,s34,s44
+  real, intent(in), optional :: normalisation
+  ! "normalisation" is the integral of S11(theta) sin(theta) dtheta if known
+  ! The missing "flux" from the numerical integration is placed between 0 and 1 degree (or first scattering angle)
+  ! as we assume it is mostly diffraction that has been missed by the sampling
+
+  integer :: j
+  real(kind=dp) :: norm, somme_prob, theta, dtheta
+
+  ! Integration S11 pour tirer angle
+  if (scattering_method==1) then
+     prob_s11(lambda,taille_grain,0)=0.0
+     dtheta = pi/real(nang_scatt)
+
+     do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
+        theta = real(j)*dtheta
+        prob_s11(lambda,taille_grain,j)=prob_s11(lambda,taille_grain,j-1)+s11(j)*sin(theta)*dtheta
+     enddo
+
+     ! il y a un soucis numerique quand x >> 1 car la resolution en angle n'est pas suffisante
+     ! On rate le pic de diffraction (en particulier entre 0 et 1)
+     if (present(normalisation)) then
+        if (normalisation > prob_s11(lambda,taille_grain,nang_scatt)) then
+           prob_s11(lambda,taille_grain,1:nang_scatt) = prob_s11(lambda,taille_grain,1:nang_scatt) + &
+                normalisation - prob_s11(lambda,taille_grain,nang_scatt)
+        else
+           call error("normalise_Mueller_matrix: exact normalisation is smaller than numerical integration")
+        endif
+     endif
+
+     ! Normalisation de la proba cumulee a 1
+     prob_s11(lambda,taille_grain,:)=prob_s11(lambda,taille_grain,:)/prob_s11(lambda,taille_grain,nang_scatt)
+  endif ! scattering_method==1
+
+  do j=0,nang_scatt
+     if (scattering_method==1) then ! Matrice de Mueller par grain
+        ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
+        norm = 1./s11(j)
+     else ! Sinon normalisation a Qsca
+        norm = 1.
+     endif
+
+     tab_s11(j,taille_grain,lambda) = s11(j) * norm
+     tab_s12(j,taille_grain,lambda) = s12(j) * norm
+     tab_s22(j,taille_grain,lambda) = s22(j) * norm
+     tab_s33(j,taille_grain,lambda) = s33(j) * norm
+     tab_s34(j,taille_grain,lambda) = s34(j) * norm
+     tab_s44(j,taille_grain,lambda) = s44(j) * norm
+  enddo
+
+  return
+
+end subroutine normalise_Mueller_matrix
 
 !***************************************************
 
@@ -427,7 +572,6 @@ subroutine overwrite_s12(Pmax)
   return
 
 end subroutine overwrite_s12
-
 
 !***************************************************
 
@@ -513,7 +657,6 @@ subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
   endif
   close(12)
   ! Fin lecture
-
   close(unit=1)
 
 
@@ -561,7 +704,12 @@ subroutine mueller_GMM(lambda,taille_grain, qext,qsca,gsca)
         mueller(:,:,j) = mueller(:,:,j) / norme
      endif
 
-     tab_mueller(:,:,j,taille_grain,lambda) = mueller(:,:,j)
+     tab_s11(j,taille_grain,lambda) = mueller(1,1,j)
+     tab_s12(j,taille_grain,lambda) = mueller(1,2,j)
+     tab_s22(j,taille_grain,lambda) = mueller(2,2,j)
+     tab_s33(j,taille_grain,lambda) = mueller(3,3,j)
+     tab_s34(j,taille_grain,lambda) = mueller(3,4,j)
+     tab_s44(j,taille_grain,lambda) = mueller(4,4,j)
   enddo
 
   gsca = assym
@@ -574,12 +722,12 @@ end subroutine mueller_GMM
 
 !***************************************************
 
-subroutine mueller_input(lambda,taille_grain, qext,qsca,gsca)
+subroutine Fresnel_input(lambda,taille_grain, qext,qsca,gsca)
 
 !***************************************************************
 ! Routine dérivé de Mueller_GMM.
 ! Calcule les elements de la matrice de diffusion a partir d'un
-! fichier ascii contenant divers informations : 
+! fichier ascii contenant divers informations :
 ! La matrice de Mueller à chaque angle de diffraction de 0 à 180°,
 ! Qsca, Qext et le facteur d'assymétrie
 ! Voici un exemple de fichier :
@@ -605,114 +753,114 @@ subroutine mueller_input(lambda,taille_grain, qext,qsca,gsca)
 
   integer, intent(in) :: lambda, taille_grain
   real, intent(out) :: qext, qsca, gsca
-  
+
   integer :: j, i
 
   real :: norme, somme_prob, theta, dtheta
   real :: ext,sca,assym
-  
+
   real, dimension(0:nang_scatt) :: dang
 
   real, dimension(4,4,0:nang_scatt) :: mueller
 
   character(len=128) :: string
-  
+
   if (modulo(nang_scatt,2) == 1) call error("nang_scatt must be an EVEN number")
-  
+
   if (aniso_method == 2) call error ("You shoudn't use a hg function option when putting Mueller matrix in input")
 
   ! Lecture du fichier d'entrée :
   open(unit=12,file=mueller_file,status='old')
   read(12,*) string
-  read(12,*) ext,sca,assym 
+  read(12,*) ext,sca,assym
   read(12,*)
   read(12,*)  !'Matrice de mueller (4X4 coefficients pour chaque angle):'
   read(12,*) string
   do i=0,nang_scatt
-	read(12,*) dang(i),mueller(1,1,i),mueller(1,2,i),mueller(1,3,i),mueller(1,4,i)
-	read(12,*)         mueller(2,1,i),mueller(2,2,i),mueller(2,3,i),mueller(2,4,i)
-	read(12,*)         mueller(3,1,i),mueller(3,2,i),mueller(3,3,i),mueller(3,4,i)
-	read(12,*)         mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
+     read(12,*) dang(i),mueller(1,1,i),mueller(1,2,i),mueller(1,3,i),mueller(1,4,i)
+     read(12,*)         mueller(2,1,i),mueller(2,2,i),mueller(2,3,i),mueller(2,4,i)
+     read(12,*)         mueller(3,1,i),mueller(3,2,i),mueller(3,3,i),mueller(3,4,i)
+     read(12,*)         mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
   enddo
   close(12)
   ! Fin lecture
-
   close(unit=1)
 
   if (scattering_method == 1) then
-	  ! Integration de S11 pour tirer angle
-	  ! Condition initiale : sin(0)=0
-	  prob_s11(lambda,taille_grain,0)=0.0
-	  dtheta = pi/real(nang_scatt)
+     ! Integration de S11 pour tirer angle
+     ! Condition initiale : sin(0)=0
+     prob_s11(lambda,taille_grain,0)=0.0
+     dtheta = pi/real(nang_scatt)
 
-	  do j=1,nang_scatt  
-	     theta = real(j)*dtheta
-	     prob_s11(lambda, taille_grain,j)=prob_s11(lambda, taille_grain,j-1)+&
-		  mueller(1,1,j)*sin(theta)*dtheta
-	  enddo
-	  
-	  ! Normalisation
-	  somme_prob = prob_s11(lambda, taille_grain,nang_scatt)
-	  prob_s11(lambda, taille_grain,:)=prob_s11(lambda, taille_grain,:)/somme_prob
-  
-  
+     do j=1,nang_scatt
+        theta = real(j)*dtheta
+        prob_s11(lambda, taille_grain,j)=prob_s11(lambda, taille_grain,j-1)+&
+             mueller(1,1,j)*sin(theta)*dtheta
+     enddo
+
+     ! Normalisation
+     somme_prob = prob_s11(lambda, taille_grain,nang_scatt)
+     prob_s11(lambda, taille_grain,:)=prob_s11(lambda, taille_grain,:)/somme_prob
   else  !on va avoir besoin des valeurs non normalisés
-  	do i=1, 4 
-  	   do j=1, 4
-  	      if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
-  	   enddo
-  	enddo
-  	!on calcul maintenant l'intégrale de s11
-  	somme_prob=0.0
-	dtheta = pi/real(nang_scatt)
-  	do j=1,nang_scatt
-  	   theta = real(j)*dtheta
-	   somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
-  	enddo
+     do i=1, 4
+        do j=1, 4
+           if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
+        enddo
+     enddo
+     !on calcul maintenant l'intégrale de s11
+     somme_prob=0.0
+     dtheta = pi/real(nang_scatt)
+     do j=1,nang_scatt
+        theta = real(j)*dtheta
+        somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
+     enddo
   endif !scatt_meth
 
-
   do J=0,NANG_scatt
-        if (scattering_method==1) then ! Matrice de Mueller par grain
+     if (scattering_method==1) then ! Matrice de Mueller par grain
         ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
         ! on ne normalise que S11 car les données sont déjà normalisées
-           norme=mueller(1,1,j)
-           if (norme > tiny_real) then
-              mueller(1,1,j) = mueller(1,1,j) / norme 
-           else 
-              write (*,*) "at angle", real(j)*pi/real(nang_scatt)
-              call error ("s11=0.0")
-           endif
-        else ! Sinon normalisation a Qsca. On utilise somme_prob.
-           norme = somme_prob/sca
-           if (norme > tiny_real) then 
-              mueller(:,:,j) = mueller(:,:,j)/norme
-           else 
-              call error ("Error : s11 is normalised to 0")
-           endif 
+        norme=mueller(1,1,j)
+        if (norme > tiny_real) then
+           mueller(1,1,j) = mueller(1,1,j) / norme
+        else
+           write (*,*) "at angle", real(j)*pi/real(nang_scatt)
+           call error ("s11=0.0")
         endif
-        
-        tab_mueller(:,:,j,taille_grain,lambda) = mueller(:,:,j)
+     else ! Sinon normalisation a Qsca. On utilise somme_prob.
+        norme = somme_prob/sca
+        if (norme > tiny_real) then
+           mueller(:,:,j) = mueller(:,:,j)/norme
+        else
+           call error ("Error : s11 is normalised to 0")
+        endif
+     endif
+
+     tab_s11(j,taille_grain,lambda) = mueller(1,1,j)
+     tab_s12(j,taille_grain,lambda) = mueller(1,2,j)
+     tab_s22(j,taille_grain,lambda) = mueller(2,2,j)
+     tab_s33(j,taille_grain,lambda) = mueller(3,3,j)
+     tab_s34(j,taille_grain,lambda) = mueller(3,4,j)
+     tab_s44(j,taille_grain,lambda) = mueller(4,4,j)
   enddo
   qext = ext
   qsca = sca
   gsca = assym
   if (lforce_HG)  gsca = forced_g
-  if (lisotropic)  gsca = 0.0 
+  if (lisotropic)  gsca = 0.0
 
   return
 
-end subroutine mueller_input
-
+end subroutine Fresnel_input
 
 !***************************************************
-  
- subroutine mueller_input_size(lambda,taille_grain, qext,qsca,gsca)
+
+ subroutine Fresnel_input_size(lambda,taille_grain, qext,qsca,gsca)
 
 !***************************************************************
 ! Routine dérivé de Mueller_GMM.
 ! Calcule les elements de la matrice de diffusion a partir d'un
-! fichier ascii par taille de grain contenant divers informations : 
+! fichier ascii par taille de grain contenant divers informations :
 ! La matrice de Mueller à chaque angle de diffraction de 0 à 180°
 ! Qsca, Qext, le facteur d'assymétrie
 ! Voici un exemple de fichier :
@@ -740,121 +888,121 @@ end subroutine mueller_input
 
   integer, intent(in) :: lambda, taille_grain
   real, intent(out) :: qext, qsca, gsca
-  
+
   integer :: j, i
 
   real :: norme, somme_prob, theta, dtheta
   real :: ext,sca,assym, size
-  
+
   real, dimension(0:nang_scatt) :: dang
 
   real, dimension(4,4,0:nang_scatt) :: mueller
-  
+
   character(len=128) :: string, path
-  
+
   if (modulo(nang_scatt,2) == 1) call error("nang_scatt must be an EVEN number")
-  
+
   if (aniso_method == 2) call error ("You shoudn't use a hg function option when putting Mueller matrix in input")
-  
-  
-  open(unit=13, file = mueller_file, status = 'old') 
-  !Dans ce cas, mueller_file contient les chemins vers les fichiers de chaque matrice, 
+
+  open(unit=13, file = mueller_file, status = 'old')
+  !Dans ce cas, mueller_file contient les chemins vers les fichiers de chaque matrice,
   !triés dans l'ordre croissant suivant la taille de grain.
   do j=1, taille_grain
      read(13, *) size, path
   enddo
   close(unit=13)
   if (abs(size-r_grain(taille_grain))>r_grain(taille_grain)*0.00001) then
-      write(*,*) "error, graine size in file is", size, "while expecting", r_grain(taille_grain)
-      call error("The graine sizes does not match") 
+     write(*,*) "error, grain size in file is", size, "while expecting", r_grain(taille_grain)
+     call error("Grain sizes do not match")
   endif
 
   ! Lecture du fichier d'entrée :
   open(unit=12,file=path,status='old')
   read(12,*) string
-  read(12,*) ext,sca,assym 
+  read(12,*) ext,sca,assym
   read(12,*)
   read(12,*)  !'Matrice de mueller (4X4 coefficients pour chaque angle):'
   read(12,*) string
   do i=0,nang_scatt
-	read(12,*) dang(i),mueller(1,1,i),mueller(1,2,i),mueller(1,3,i),mueller(1,4,i)
-	read(12,*)   mueller(2,1,i),mueller(2,2,i),mueller(2,3,i),mueller(2,4,i)
-	read(12,*)   mueller(3,1,i),mueller(3,2,i),mueller(3,3,i),mueller(3,4,i)
-	read(12,*)   mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
+     read(12,*) dang(i),mueller(1,1,i),mueller(1,2,i),mueller(1,3,i),mueller(1,4,i)
+     read(12,*)   mueller(2,1,i),mueller(2,2,i),mueller(2,3,i),mueller(2,4,i)
+     read(12,*)   mueller(3,1,i),mueller(3,2,i),mueller(3,3,i),mueller(3,4,i)
+     read(12,*)   mueller(4,1,i),mueller(4,2,i),mueller(4,3,i),mueller(4,4,i)
   enddo
   close(12)
   ! Fin lecture
 
   close(unit=1)
-  
-  if (scattering_method == 1) then
-	  ! Integration S11 pour tirer angle
-	  ! Condition initiale : sin(0)=0
-	  prob_s11(lambda,taille_grain,0)=0.0
-	  dtheta = pi/real(nang_scatt)
 
-	  do j=1,nang_scatt
-	     theta = real(j)*dtheta
-	     prob_s11(lambda, taille_grain,j)=prob_s11(lambda, taille_grain,j-1)+&
-		  mueller(1,1,j)*sin(theta)*dtheta
-	  enddo
-	  
-	  ! Normalisation
-	  somme_prob= prob_s11(lambda, taille_grain,nang_scatt)
-	  prob_s11(lambda, taille_grain,:)=prob_s11(lambda, taille_grain,:)/somme_prob
-  
-  
+  if (scattering_method == 1) then
+     ! Integration S11 pour tirer angle
+     ! Condition initiale : sin(0)=0
+     prob_s11(lambda,taille_grain,0)=0.0
+     dtheta = pi/real(nang_scatt)
+
+     do j=1,nang_scatt
+        theta = real(j)*dtheta
+        prob_s11(lambda, taille_grain,j)=prob_s11(lambda, taille_grain,j-1)+&
+             mueller(1,1,j)*sin(theta)*dtheta
+     enddo
+
+     ! Normalisation
+     somme_prob= prob_s11(lambda, taille_grain,nang_scatt)
+     prob_s11(lambda, taille_grain,:)=prob_s11(lambda, taille_grain,:)/somme_prob
   else  !on va avoir besoin des valeurs non normalisés
-  	do i=1, 4 
-  	   do j=1, 4
-  	      if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
-  	   enddo
-  	enddo
-  	!on calcul maintenant l'intégrale de s11
-  	somme_prob=0.0
-	dtheta = pi/real(nang_scatt)
-  	do j=1,nang_scatt
-  	   theta = real(j)*dtheta
-	   somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
-  	enddo
+     do i=1, 4
+        do j=1, 4
+           if (i*j>1) mueller(i,j,:) = mueller(i,j,:)*mueller(1,1,:)
+        enddo
+     enddo
+     !on calcul maintenant l'intégrale de s11
+     somme_prob=0.0
+     dtheta = pi/real(nang_scatt)
+     do j=1,nang_scatt
+        theta = real(j)*dtheta
+        somme_prob = somme_prob + mueller(1,1,j)*sin(theta)*dtheta
+     enddo
   endif !scatt_meth
 
 
   do J=0,NANG_scatt
-        if (scattering_method==1) then ! Matrice de Mueller par grain
+     if (scattering_method==1) then ! Matrice de Mueller par grain
         ! Normalisation pour diffusion selon fonction de phase (tab_s11=1.0 sert dans stokes)
         ! on ne normalise que S11 car les données sont déjà normalisées
-           norme=mueller(1,1,j)
-           if (norme > tiny_real) then
-              mueller(1,1,j) = mueller(1,1,j) / norme 
-           else 
-              write (*,*) "at angle", real(j)*pi/real(nang_scatt)
-              call error ("s11=0.0")
-           endif
-        else ! Sinon normalisation a Qsca. On utilise somme_prob.
-           norme = somme_prob/sca
-           if (norme > tiny_real) then 
-              mueller(:,:,j) = mueller(:,:,j)/norme
-           else 
-              call error ("Error : s11 is normalised to 0")
-           endif 
+        norme=mueller(1,1,j)
+        if (norme > tiny_real) then
+           mueller(1,1,j) = mueller(1,1,j) / norme
+        else
+           write (*,*) "at angle", real(j)*pi/real(nang_scatt)
+           call error ("s11=0.0")
         endif
-        
-        tab_mueller(:,:,j,taille_grain,lambda) = mueller(:,:,j)
+     else ! Sinon normalisation a Qsca. On utilise somme_prob.
+        norme = somme_prob/sca
+        if (norme > tiny_real) then
+           mueller(:,:,j) = mueller(:,:,j)/norme
+        else
+           call error ("Error : s11 is normalised to 0")
+        endif
+     endif
+
+     tab_s11(j,taille_grain,lambda) = mueller(1,1,j)
+     tab_s12(j,taille_grain,lambda) = mueller(1,2,j)
+     tab_s22(j,taille_grain,lambda) = mueller(2,2,j)
+     tab_s33(j,taille_grain,lambda) = mueller(3,3,j)
+     tab_s34(j,taille_grain,lambda) = mueller(3,4,j)
+     tab_s44(j,taille_grain,lambda) = mueller(4,4,j)
   enddo
   qext = ext
   qsca = sca
   gsca = assym
   if (lforce_HG)  gsca = forced_g
-  if (lisotropic)  gsca = 0.0 
+  if (lisotropic)  gsca = 0.0
 
   return
 
-end subroutine mueller_input_size
-
+end subroutine Fresnel_input_size
 
 !***************************************************
-
 
 subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
   ! interpolation bi-lineaire (en log-log) des sections efficaces
@@ -872,7 +1020,7 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
   real :: frac_a, frac_a_m1, frac_lambda, fact1, fact2, fact3, fact4
   integer :: i, j, pop, N
 
-  real, dimension(0:nang_scatt) ::  S11,S12,S33,S34
+  real, dimension(0:nang_scatt) ::  s11,s12,s22,s33,s34,s44
   real :: norme, somme_prob, log_a, log_wavel, wl_min, wl_max, theta, dtheta
 
   log_a=log(r_grain(taille_grain))
@@ -984,7 +1132,7 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
      enddo
 
      ! Polarisabilite nulle
-     s12=0.0 ; s33 = 0.0 ; s34 = 0.0
+     s12=0.0 ; s22 = 0.0 ; s33 = 0.0 ; s34 = 0.0 ; s44 = 0.0
 
      if (scattering_method==1) then
         prob_s11(lambda,taille_grain,0)=0.0
@@ -1020,8 +1168,10 @@ subroutine mueller_opacity_file(lambda,taille_grain, qext,qsca,gsca)
 
         tab_s11(j,taille_grain,lambda) = s11(j) / norme
         tab_s12(j,taille_grain,lambda) = s12(j) / norme
+        tab_s22(j,taille_grain,lambda) = s22(j) / norme
         tab_s33(j,taille_grain,lambda) = s33(j) / norme
         tab_s34(j,taille_grain,lambda) = s34(j) / norme
+        tab_s44(j,taille_grain,lambda) = s44(j) / norme
      enddo
 
   endif ! aniso_method ==1
@@ -1032,817 +1182,172 @@ end subroutine mueller_opacity_file
 
 !**********************************************************************
 
-subroutine new_stokes(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
-!***********************************************************
-!--------CALCUL LES QUATRES PARAMETRES DE STOKES------------
-!
-!     CONVENTION ASTRONOMIQUE UTILISEE: ANGLE DE POSITION
-!     CALCULE ANTIHORAIRE A PARTIR DU NORD CELESTE
-!
-!        STOK(1,1) = I
-!        STOK(2,1) = Q
-!        STOK(3,1) = U
-!        STOK(4,1) = V
-!
-!      FRANCOIS MENARD, MONTREAL, 15 FEVRIER 1989
-! Modif 22/12/03 (C. Pinte) : indice l de taille du grain diffuseur
-! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-!***********************************************************
+subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
+  ! Convention astronomique utilisee: angle de position
+  ! calcule antihoraire a partir du nord celeste
+  !
+  ! Francois Menard, Montreal, 15 Fevrier 1989
+  !
+  ! C. Pinte
+  !  - Modif 22/12/03 (C. Pinte) : indice l de taille du grain diffuseur
+  !  - Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
+  !
+  ! Coordonnees des diffuseurs
+  !  - x est vers l'observateur
+  !  - y et z forme une base droite(dans le bon sens)
+  !   - y vers la droite et z vers le haut
+  !
+  ! Calcul de l'angle omega entre le plan de diffusion
+  ! et le nord celeste projete(coord. equatoriale)
+  !
+  ! Dans le systeme de coord de la nebuleuse
+  !    vecteur 1 (du point "0" au point "1") = (u0,v0,w0)
+  !    vecteur 2 (du point "1" au point "2") = (u1,v1,w1)
+  !
+  !  On transforme pour que v2prime = (1,0,0)
+  !  L'observateur est alors a +x dans le nouveau systeme
 
   implicit none
 
-  real, intent(in) :: frac
   real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda,itheta,taille_grain
-  real(kind=dp), dimension(4), intent(inout) :: stok
+  real(kind=dp), dimension(4,4), intent(in) :: M
+  real(kind=dp), dimension(4), intent(inout) :: S
 
   real :: sinw, cosw, omega, theta, costhet,  xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) :: v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
+  real(kind=dp) :: v1pi, v1pj, v1pk, S1_0
+  real(kind=dp), dimension(4,4) :: ROP, RPO
   real(kind=dp), dimension(4) :: C, D
 
-  frac_m1 = 1.0 - frac
 
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-!
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
+  ! Transformation pour v1prime
+  call rotation(u0,v0,w0,u1,v1,w1,v1pi,v1pj,v1pk)
 
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-!
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
+  !  Calcul des angles pour la rotation
+  !  La normale yprime est le produit vectoriel de v1prime x v2prime
+  !
+  !  yprimei = 0.0
+  !  yprimej = v1pk
+  !  yprimek = -v1pj
+  xnyp = sqrt(v1pk*v1pk + v1pj*v1pj)
+  if (xnyp < 1e-10) then
+     xnyp = 0.0
+     costhet = 1.0
   else
-     COSTHET = -1.0*V1PJ / XNYP
+     costhet = -1.0*v1pj / xnyp
   endif
-!
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-!
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-!
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-!
-  THETA = THETA + 1.570796327
-!
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-!
-  OMEGA = 2.0 * THETA
-!
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-!
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-!
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-!
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-!
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-!
+
+  ! calcul de l'angle entre la normale et l'axe z (theta)
+  theta = acos(costhet)
+  if (theta >= pi) theta = 0.0
+
+  ! le plan de diffusion est a +ou- 90deg de la normale
+  theta = theta + pi_sur_deux
+
+  ! Dans les matrices de rotation l'angle est omega = 2 * theta
+  omega = 2.0 * theta
+
+  !  prochain if car l'arccos va de 0 a pi seulement
+  !   Le +/- pour faire la difference dans le sens de rotation
+  if (v1pk < 0.0) omega = -1.0 * omega
+
+  ! Calcul des elements des matrices de rotation
+  !
+  ! RPO = rotation du point vers le systeme original
+  ! ROP = rotation du systeme original vers le point
+  ! (amene l'axe z dans le plan de diffusion)
+  cosw = cos(omega)
+  sinw = sin(omega)
+
+  if (abs(cosw) < 1e-06) cosw = 0.0
+  if (abs(sinw) < 1e-06) sinw = 0.0
+
+  RPO(:,:) = 0.0
+  ROP(:,:) = 0.0
+
   RPO(1,1) = 1.0
   ROP(1,1) = 1.0
-  RPO(1,2) = 0.0
-  ROP(2,1) = 0.0
-  RPO(1,3) = 0.0
-  ROP(3,1) = 0.0
-  RPO(2,1) = 0.0
-  ROP(1,2) = 0.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(3,2) = SINW
-  RPO(3,1) = 0.0
-  ROP(1,3) = 0.0
-  RPO(3,2) = -1.0 * SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
+  RPO(2,2) = cosw
+  ROP(2,2) = cosw
+
+
+  RPO(2,3) = sinw
+  ROP(3,2) = sinw
+  RPO(3,2) = -1.0 * sinw
+  ROP(2,3) = -1.0 * sinw
+
+  RPO(3,3) = cosw
+  ROP(3,3) = cosw
   RPO(4,4) = 1.0
   ROP(4,4) = 1.0
-  RPO(1,4) = 0.0
-  RPO(2,4) = 0.0
-  RPO(3,4) = 0.0
-  RPO(4,1) = 0.0
-  RPO(4,2) = 0.0
-  RPO(4,3) = 0.0
-  ROP(1,4) = 0.0
-  ROP(2,4) = 0.0
-  ROP(3,4) = 0.0
-  ROP(4,1) = 0.0
-  ROP(4,2) = 0.0
-  ROP(4,3) = 0.0
 
-!
-!     MATRICE DE MUELLER
-!     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
-!             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-  XMUL(1,1) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(2,2) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(1,2) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(2,1) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(3,3) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(4,4) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(3,4) = -tab_s34(itheta,taille_grain,lambda)* frac - tab_s34(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(4,3) = tab_s34(itheta,taille_grain,lambda) * frac + tab_s34(itheta-1,taille_grain,lambda) * frac_m1
-  XMUL(1,3) = 0.0
-  XMUL(1,4) = 0.0
-  XMUL(2,3) = 0.0
-  XMUL(2,4) = 0.0
-  XMUL(3,1) = 0.0
-  XMUL(3,2) = 0.0
-  XMUL(4,1) = 0.0
-  XMUL(4,2) = 0.0
-
-! -------- CALCUL DE LA POLARISATION ---------
-
-  stok_I0 = stok(1)
-!  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  C=matmul(ROP,STOK)
-! LE RESULTAT EST C(4,1)
-
-  D=matmul(XMUL,C)
-! LE RESULTAT EST D(4,1)
-
-  stok=matmul(RPO,D)
-
-! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-! STOKES FINAUX
+  S1_0 = S(1)
+  ! Stoke final = RPO * M * ROP * Stoke initial
+  C=matmul(ROP,S)
+  D=matmul(M,C)
+  S=matmul(RPO,D)
 
   ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
   ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
   ! I sortant = I entrant * s11 si diff uniforme
-
-!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
-  norme=(tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1) &
-       * (stok_I0/stok(1))
-  do i=1,4
-     stok(i)=stok(i)*norme
-  enddo
-
+  if (S(1) > tiny_real) S(:) = S(:) * M(1,1)*S1_0/S(1)
 
   return
-end subroutine new_stokes
 
-!***********************************************************
+end subroutine update_Stokes
 
-subroutine new_stokes_gmm(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
-  ! Routine derivee de stokes pour les agregats calcule par gmm
-  ! C. Pinte
+!**********************************************************************
 
-  implicit none
+subroutine get_Mueller_matrix_per_grain(lambda,itheta,frac,taille_grain, M)
 
-  real, intent(in) :: frac
-  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
   integer, intent(in) :: lambda,itheta,taille_grain
-  real(kind=dp), dimension(4,1), intent(inout) :: stok
-
-  real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) ::  v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=dp), dimension(4,1) :: C, D
-
-  frac_m1 = 1.0 - frac
-
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-!
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
-
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-!
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
-  else
-     COSTHET = -1.0*V1PJ / XNYP
-  endif
-!
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-!
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-!
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-!
-  THETA = THETA + 1.570796327
-!
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-!
-  OMEGA = 2.0 * THETA
-!
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-!
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-!
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-!
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(1,2) = 0.0
-  ROP(2,1) = 0.0
-  RPO(1,3) = 0.0
-  ROP(3,1) = 0.0
-  RPO(2,1) = 0.0
-  ROP(1,2) = 0.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(3,2) = SINW
-  RPO(3,1) = 0.0
-  ROP(1,3) = 0.0
-  RPO(3,2) = -1.0 * SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
-  RPO(1,4) = 0.0
-  RPO(2,4) = 0.0
-  RPO(3,4) = 0.0
-  RPO(4,1) = 0.0
-  RPO(4,2) = 0.0
-  RPO(4,3) = 0.0
-  ROP(1,4) = 0.0
-  ROP(2,4) = 0.0
-  ROP(3,4) = 0.0
-  ROP(4,1) = 0.0
-  ROP(4,2) = 0.0
-  ROP(4,3) = 0.0
-
-!     MATRICE DE MUELLER
-  xmul(:,:) = tab_mueller(:,:,itheta,taille_grain,lambda) * frac + tab_mueller(:,:,itheta-1,taille_grain,lambda) * frac_m1
-
-
-! -------- CALCUL DE LA POLARISATION ---------
-
-  stok_I0 = stok(1,1)
-!  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  C=matmul(ROP,STOK)
-! LE RESULTAT EST C(4,1)
-
-  D=matmul(XMUL,C)
-! LE RESULTAT EST D(4,1)
-
-  stok=matmul(RPO,D)
-
-! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-! STOKES FINAUX
-
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
-
-!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
-  norme=(tab_mueller(1,1,itheta,taille_grain,lambda)*frac + tab_mueller(1,1,itheta-1,taille_grain,lambda)*frac_m1 ) &
-  * (stok_I0/stok(1,1))
-  do i=1,4
-     stok(i,1)=stok(i,1)*norme
-  enddo
-
-  return
-end subroutine new_stokes_gmm
-
-!***********************************************************
-
-subroutine new_stokes_mueller(lambda,itheta,frac,taille_grain,u0,v0,w0,u1,v1,w1,stok)
-  ! Routine derivee de stokes_gmm pour les matrices de mueller en entrée
-  ! F.Malaval 20/04/2023
-
-  implicit none
-
   real, intent(in) :: frac
-  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda,itheta,taille_grain
-  real(kind=dp), dimension(4), intent(inout) :: stok
+  real(kind=dp), dimension(4,4), intent(out) :: M
 
-  real :: sinw, cosw, omega, theta, costhet,  xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) :: v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=dp), dimension(4) :: C, D
+  real :: frac_m1
 
   frac_m1 = 1.0 - frac
 
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-!
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
-
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-!
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
-  else
-     COSTHET = -1.0*V1PJ / XNYP
-  endif
-!
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-!
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-!
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-!
-  THETA = THETA + 1.570796327
-!
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-!
-  OMEGA = 2.0 * THETA
-!
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-!
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-!
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-!
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-!
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-!
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(1,2) = 0.0
-  ROP(2,1) = 0.0
-  RPO(1,3) = 0.0
-  ROP(3,1) = 0.0
-  RPO(2,1) = 0.0
-  ROP(1,2) = 0.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(3,2) = SINW
-  RPO(3,1) = 0.0
-  ROP(1,3) = 0.0
-  RPO(3,2) = -1.0 * SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
-  RPO(1,4) = 0.0
-  RPO(2,4) = 0.0
-  RPO(3,4) = 0.0
-  RPO(4,1) = 0.0
-  RPO(4,2) = 0.0
-  RPO(4,3) = 0.0
-  ROP(1,4) = 0.0
-  ROP(2,4) = 0.0
-  ROP(3,4) = 0.0
-  ROP(4,1) = 0.0
-  ROP(4,2) = 0.0
-  ROP(4,3) = 0.0
-
-!
-!     MATRICE DE MUELLER
-!     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
-!             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-  xmul(:,:) = tab_mueller(:,:,itheta,taille_grain,lambda) * frac + tab_mueller(:,:,itheta-1,taille_grain,lambda) * frac_m1
-  xmul(4,:) = -xmul(4,:)
-  xmul(:,4) = -xmul(:,4)
-
-
-! -------- CALCUL DE LA POLARISATION ---------
-
-  stok_I0 = stok(1)
-!  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  C=matmul(ROP,STOK)
-! LE RESULTAT EST C(4,1)
-
-  D=matmul(XMUL,C)
-! LE RESULTAT EST D(4,1)
-
-  stok=matmul(RPO,D)
-
-! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-! STOKES FINAUX
-
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
-
-!  norme=tab_albedo(l)*tab_s11(itheta,taille_grain,lambda)*(stok_I0/stok(1,1))
-!  write(*,*) tab_s11(itheta,taille_grain,lambda), stok_I0, stok(1,1)
-  norme=(tab_mueller(1,1,itheta,taille_grain,lambda) * frac + tab_mueller(1,1,itheta-1,taille_grain,lambda) * frac_m1) &
-       * (stok_I0/stok(1))
-  do i=1,4
-     stok(i)=stok(i)*norme
-  enddo
-
+  M(:,:) = 0.0_dp
+  M(1,1) = tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1
+  M(2,2) = tab_s22(itheta,taille_grain,lambda) * frac + tab_s22(itheta-1,taille_grain,lambda) * frac_m1
+  M(1,2) = tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1
+  M(2,1) = M(1,2)
+  M(3,3) = tab_s33(itheta,taille_grain,lambda) * frac + tab_s33(itheta-1,taille_grain,lambda) * frac_m1
+  M(4,4) = tab_s44(itheta,taille_grain,lambda) * frac + tab_s44(itheta-1,taille_grain,lambda) * frac_m1
+  M(3,4) = -tab_s34(itheta,taille_grain,lambda)* frac - tab_s34(itheta-1,taille_grain,lambda) * frac_m1
+  M(4,3) = -M(3,4)
 
   return
-end subroutine new_stokes_mueller
 
-!***********************************************************
+end subroutine get_Mueller_matrix_per_grain
 
-subroutine new_stokes_pos(lambda,itheta,frac, icell, u0,v0,w0,u1,v1,w1,stok)
-  ! Routine derivee de stokes
-  ! C. Pinte
-  ! 9/01/05 : Prop des grains par cellule
+!**********************************************************************
 
-  implicit none
+subroutine get_Mueller_matrix_per_cell(lambda,itheta,frac,icell, M)
 
+  integer, intent(in) :: lambda,itheta,icell
   real, intent(in) :: frac
-  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda, itheta, icell
-  real(kind=dp), dimension(4), intent(inout) :: stok
+  real(kind=dp), dimension(4,4), intent(out) :: M
 
-  real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) :: v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=dp), dimension(4) :: C, D
+  real :: frac_m1
 
   frac_m1 = 1.0 - frac
 
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
-
-
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
-  else
-     COSTHET = -1.0*V1PJ / XNYP
-  endif
-
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-  THETA = THETA + 1.570796327
-
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-  OMEGA = 2.0 * THETA
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-!
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-!
-
-  ROP = 0.0
-  RPO = 0.0
-
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,2) = -1.0 * SINW
-  ROP(3,2) = SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
-
-!
-!     MATRICE DE MUELLER
-!     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
-!             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-
-  XMUL=0.0
-  XMUL(1,1) = 1.0 ! Mueller matrix is normalized to 1.0 as we select the scattering angle
-  XMUL(2,2) = XMUL(1,1)
-  XMUL(1,2) = tab_s12_o_s11_pos(itheta,icell,lambda) * frac +  tab_s12_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  XMUL(2,1) = XMUL(1,2)
-  XMUL(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  XMUL(4,4) = XMUL(3,3)
-  XMUL(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
-  XMUL(4,3) = -XMUL(3,4)
-
-  ! -------- CALCUL DE LA POLARISATION ---------
-
-  stok_I0 = stok(1)
-  !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  !  C=matmul(ROP,STOK)
-  C(2:3) = matmul(ROP(2:3,2:3),STOK(2:3))
-  C(1)=stok(1)
-  C(4)=stok(4)
-  ! LE RESULTAT EST C(4,1)
-
-  ! LE RESULTAT EST D(4,1)
-  !  D=matmul(XMUL,C)
-  D(1:2)=matmul(XMUL(1:2,1:2),C(1:2))
-  D(3:4)=matmul(XMUL(3:4,3:4),C(3:4))
-
-  !  stok=matmul(RPO,D)
-  stok(2:3)=matmul(RPO(2:3,2:3),D(2:3))
-  stok(1)=D(1)
-  stok(4)=D(4)
-
-  ! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-  ! STOKES FINAUX
-
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
-
-  !  norme=tab_albedo(l)*tab_s11(l,itheta)*(stok_I0/stok(1,1))
-  if (stok(1) > tiny_real) then
-     norme= XMUL(1,1) * (stok_I0/stok(1))
-     do i=1,4
-        stok(i)=stok(i)*norme
-     enddo
-  else
-     stok(:)=0.0
-  endif
+  M(:,:) = 0.0_dp
+  M(1,1) = 1.0 ! Mueller matrix is normalized to 1.0 as we select the scattering angle
+  M(2,2) = tab_s22_o_s11_pos(itheta,icell,lambda) * frac +  tab_s22_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(1,2) = tab_s12_o_s11_pos(itheta,icell,lambda) * frac +  tab_s12_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(2,1) = M(1,2)
+  M(3,3) = tab_s33_o_s11_pos(itheta,icell,lambda) * frac +  tab_s33_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(4,4) = tab_s44_o_s11_pos(itheta,icell,lambda) * frac +  tab_s44_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(3,4) = -tab_s34_o_s11_pos(itheta,icell,lambda)* frac -  tab_s34_o_s11_pos(itheta-1,icell,lambda) * frac_m1
+  M(4,3) = -M(3,4)
 
   return
 
-end subroutine new_stokes_pos
+end subroutine get_Mueller_matrix_per_cell
 
-!***********************************************************
-
-subroutine new_stokes_mueller_pos(lambda,itheta,frac, icell, u0,v0,w0,u1,v1,w1,stok)
-  ! Routine derivee de stokes_pos
-  ! F.Malaval 20/04/2023
-
-  implicit none
-
-  real, intent(in) :: frac
-  real(kind=dp), intent(in) ::  u0,v0,w0,u1,v1,w1
-  integer, intent(in) :: lambda, itheta, icell
-  real(kind=dp), dimension(4), intent(inout) :: stok
-
-  real :: sinw, cosw, omega, theta, costhet, xnyp, stok_I0, norme, frac_m1
-  real(kind=dp) :: v1pi, v1pj, v1pk
-  integer :: i
-  real(kind=dp), dimension(4,4) :: ROP, RPO, XMUL
-  real(kind=dp), dimension(4) :: C, D
-
-  frac_m1 = 1.0 - frac
-
-!*****
-!     COORDONNEES DES DIFFUSEURS
-!         - X EST VERS L'OBSERVATEUR
-!         - Y ET Z FORME UNE BASE DROITE(DANS LE BON SENS)
-!         - Y VERS LA DROITE ET Z VERS LE HAUT
-!*****
-!
-!--------CALCUL DE L'ANGLE OMEGA ENTRE LE PLAN DE DIFFUSION-------
-!----------ET LE NORD CELESTE PROJETE(COORD. EQUATORIALE)----------
-!
-!         DANS LE SYSTEME DE COORD DE LA NEBULEUSE
-!    VECTEUR 1 (DU POINT "0" AU POINT "1") = (U0,V0,W0)!
-!    VECTEUR 2 (DU POINT "1" AU POINT "2") = (U1,V1,W1)!
-!
-!     ON TRANSFORME POUR QUE V2PRIME = (1,0,0)
-!     L'OBSERV. EST ALORS A +X DANS LE NOUVEAU SYSTEME
-!
-!     TRANSFORMATION POUR V1PRIME
-  call ROTATION(U0,V0,W0,u1,v1,w1,V1PI,V1PJ,V1PK)
-
-
-!      CALCUL DES ANGLES POUR LA ROTATION
-!
-!  LA NORMALE YPRIME C'EST LE PRODUIT VECTORIEL DE V1PRIME X V2PRIME
-!
-!     YPRIMEI = 0.0
-!     YPRIMEJ = V1PK
-!     YPRIMEK = -V1PJ
-  XNYP = sqrt(V1PK*V1PK + V1PJ*V1PJ)
-  if (XNYP < 1E-10) then
-     XNYP = 0.0
-     COSTHET = 1.0
-  else
-     COSTHET = -1.0*V1PJ / XNYP
-  endif
-
-! CALCUL DE L'ANGLE ENTRE LA NORMALE ET L'AXE Z (THETA)
-  THETA = acos(COSTHET)
-  if (THETA >= PI) THETA = 0.0
-
-!     LE PLAN DE DIFFUSION EST A +OU- 90DEG DE LA NORMALE
-  THETA = THETA + 1.570796327
-
-!----DANS LES MATRICES DE ROTATION L'ANGLE EST OMEGA = 2 * THETA-----
-  OMEGA = 2.0 * THETA
-!     PROCHAIN IF CAR L'ARCCOS VA DE 0 A PI SEULEMENT
-!     LE +/- POUR FAIRE LA DIFFERENCE DANS LE SENS DE ROTATION
-  if (V1PK < 0.0) OMEGA = -1.0 * OMEGA
-
-! CALCUL DES ELEMENTS DES MATRICES DE ROTATION
-!
-!      RPO = ROTATION DU POINT VERS LE SYSTEME ORIGINAL
-!      ROP = ROTATION DU SYSTEME ORIGINAL VERS LE POINT
-!            (AMENE L'AXE Z DANS LE PLAN DE DIFFUSION)
-  COSW = cos(OMEGA)
-  SINW = sin(OMEGA)
-!
-  if (abs(COSW) < 1E-06) COSW = 0.0
-  if (abs(SINW) < 1E-06) SINW = 0.0
-!
-
-  ROP = 0.0
-  RPO = 0.0
-
-  RPO(1,1) = 1.0
-  ROP(1,1) = 1.0
-  RPO(2,2) = COSW
-  ROP(2,2) = COSW
-  RPO(2,3) = SINW
-  ROP(2,3) = -1.0 * SINW
-  RPO(3,2) = -1.0 * SINW
-  ROP(3,2) = SINW
-  RPO(3,3) = COSW
-  ROP(3,3) = COSW
-  RPO(4,4) = 1.0
-  ROP(4,4) = 1.0
-
-!
-!     MATRICE DE MUELLER
-!     DIFFERENCE DE SIGNE AVEC B&H POUR RESPECTER LA CONVENTION ASTRONOMIQUE
-!             ANGLE = ANTIHORAIRE A PARTIR DU POLE NORD CELESTE
-
-  XMUL=0.0
-  XMUL(:,:) = tab_mueller_pos(:,:,itheta,icell,lambda) * frac + tab_mueller_pos(:,:,itheta-1,icell,lambda) * frac_m1
-  XMUL(1,1) = 1.0 ! Comme on a déjà choisi l'angle de diffusion, on met s11=1.0 à chaque angle
-  !! on inverse le signe pour respecter la convention astronomique
-  XMUL(4,:) = -XMUL(4,:)
-  xmul(:,4) = -XMUL(:,4)
-
-  ! -------- CALCUL DE LA POLARISATION ---------
-
-  
- stok_I0 = stok(1)
-  !  STOKE FINAL = RPO * XMUL * ROP * STOKE INITIAL
-  !  C=matmul(ROP,STOK)
-  C(2:3) = matmul(ROP(2:3,2:3),STOK(2:3))
-  C(1)=stok(1)
-  C(4)=stok(4)
-  ! LE RESULTAT EST C(4,1)
-
-  ! LE RESULTAT EST D(4,1)
-  D=matmul(XMUL,C)
-  ! D(1:2)=matmul(XMUL(1:2,1:2),C(1:2))
-  ! D(3:4)=matmul(XMUL(3:4,3:4),C(3:4))
-
-  !  stok=matmul(RPO,D)
-  stok(2:3)=matmul(RPO(2:3,2:3),D(2:3))
-  stok(1)=D(1)
-  stok(4)=D(4)
-
-  ! LE RESULTAT EST STOK(4,1): LES PARAMETRES DE
-  ! STOKES FINAUX
-
-  ! Normalisation de l'energie : le photon repart avec l'energie avec laquelle il est entré
-  ! I sortant = I entrant si diff selon s11  (tab_s11=1.0 normalisé dans mueller2)
-  ! I sortant = I entrant * s11 si diff uniforme
-
-  !  norme=tab_albedo(l)*tab_s11(l,itheta)*(stok_I0/stok(1,1))
-  if (stok(1) > tiny_real) then
-     norme= XMUL(1,1) * (stok_I0/stok(1))
-     do i=1,4
-        stok(i)=stok(i)*norme
-     enddo
-  else
-     stok(:)=0.0
-  endif
-
-  return
-
-end subroutine new_stokes_mueller_pos
-
-!***********************************************************
+!**********************************************************************
 
 integer function seuil_n_dif(lambda)
 
@@ -2082,13 +1587,8 @@ subroutine angle_diff_phi(lambda,taille_grain, I, Q, U, itheta, frac, aleat, phi
   p=Ip/I
 
   ! polarisabilite
-  if (lmueller) then
-     pp= (tab_mueller(1,2,itheta,taille_grain,lambda) * frac + tab_mueller(1,2,itheta-1,taille_grain,lambda) * frac_m1) &
-  / (tab_mueller(1,1,itheta,taille_grain,lambda) * frac + tab_mueller(1,1,itheta-1,taille_grain,lambda) * frac_m1)
-  else
-     pp= (tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1) &
-  / (tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1)
-  endif
+  pp= (tab_s12(itheta,taille_grain,lambda) * frac + tab_s12(itheta-1,taille_grain,lambda) * frac_m1) &
+       / (tab_s11(itheta,taille_grain,lambda) * frac + tab_s11(itheta-1,taille_grain,lambda) * frac_m1)
 
   ppp=p*pp
 !  write(*,*) p,pp,ppp

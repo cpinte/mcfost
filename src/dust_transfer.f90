@@ -107,21 +107,20 @@ subroutine transfert_poussiere()
   ! Building the dust grain population
   call build_grain_size_distribution()
 
-  if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
-     call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
+  laffichage=.true.
+
+  if (lVoronoi) then
+     if (lmhd_voronoi) then
+        call setup_mhd_to_mcfost() !uses sph_to_voronoi
+     else
+        call setup_SPH2mcfost(extra_heating)
+     endif
      call setup_grid()
-  else if (lmhd_voronoi) then
-     call setup_mhd_to_mcfost() !uses sph_to_voronoi
-     call setup_grid()
-  else
+  else ! Setting up a regular grid
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
-  endif
 
-  laffichage=.true.
-
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()
@@ -135,7 +134,7 @@ subroutine transfert_poussiere()
         call read_athena_model()
      else if (lsphere_model) then
         !on a structured spherical grid
-        call read_spherical_model(density_file)
+        call read_spherical_model(density_files(1))
      else if (lmodel_1d) then !1d spherically symmetric "stellar atmosphere" models
         call setup_model1d_to_mcfost()
      else if (lidefix) then
@@ -217,13 +216,7 @@ subroutine transfert_poussiere()
      p_icell = icell_ref
      if (aniso_method==2) write(*,*) "g             ", tab_g_pos(p_icell,1)
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
-     if (lsepar_pola.and.(scattering_method == 2)) then
-        if (lmueller) then
-           write(*,*) "polarisability", maxval(-tab_mueller_pos(1,2,:,p_icell,1))
-        else
-           write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
-        endif
-     endif
+     if (lsepar_pola.and.(scattering_method == 2)) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
      if (lopacite_only) call exit(0)
 
      if (l_em_disk_image) then ! le disque �met
@@ -482,11 +475,7 @@ subroutine transfert_poussiere()
         lambda = ind_etape - first_etape_obs + 1
 
         if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
-           if (lmueller) then
-              call calc_local_scattering_matrices_mueller(lambda, p_lambda) ! Todo : this is not good, we compute this twice
-           else
-              call calc_local_scattering_matrices(lambda, p_lambda)
-           endif
+           call calc_local_scattering_matrices(lambda, p_lambda) ! Todo : this is not good, we compute this twice
         endif
 
         if (lspherical.or.l3D) then
@@ -988,7 +977,9 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   logical, intent(inout) :: flag_star, flag_ISM, lpacket_alive
   logical, intent(out) :: flag_scatt
 
+  real(kind=dp), dimension(4,4) :: M
   real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt, Planck_opacity, rec_Planck_opacity, d, diff_coeff
+  real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
   integer :: taille_grain, itheta
   integer :: n_iteractions_in_cell, icell_old
   integer, pointer :: p_icell
@@ -1113,14 +1104,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               if (lsepar_pola) then
-                 ! Nouveaux param�tres de Stokes
-                 if (lmueller) then
-                    call new_stokes_mueller(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                 else if (laggregate) then
-                    call  new_stokes_gmm(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                 else
-                    call new_stokes(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                 endif
+                 call get_Mueller_matrix_per_grain(lambda,itheta,rand2,taille_grain, M)
+                 call update_Stokes(Stokes,u,v,w,u1,v1,w1,M)
               endif
            else ! fonction de phase HG
               call hg(tab_g(taille_grain,lambda),rand, itheta, COSPSI) !HG
@@ -1133,7 +1118,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               PHI = PI * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Param�tres de Stokes non modifi�s
            endif
 
         else ! methode 2 : diffusion sur la population de grains
@@ -1150,13 +1134,9 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               PHI = PI * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Nouveaux param�tres de Stokes
               if (lsepar_pola) then
-                 if (lmueller) then
-                    call new_stokes_mueller_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
-                 else
-                    call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
-		 endif
+                 call get_Mueller_matrix_per_cell(lambda,itheta,rand2,p_icell, M)
+                 call update_Stokes(Stokes,u,v,w,u1,v1,w1,M)
 	      endif
            else ! fonction de phase HG
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
@@ -1169,7 +1149,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               phi = pi * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Param�tres de Stokes non modifi�s
            endif
         endif
 

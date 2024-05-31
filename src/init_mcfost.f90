@@ -3,7 +3,7 @@ module init_mcfost
   use parametres
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use density, only : species_removed, T_rm
+  use density, only : species_removed, T_rm, is_density_file_Voronoi
   use molecular_emission
   !$ use omp_lib
   use benchmarks
@@ -46,8 +46,8 @@ subroutine set_default_variables()
   limg=.false.
   lorigine=.false.
   laggregate=.false.
-  lmueller=.false.
-  lper_size = .false.
+  lFresnel=.false.
+  lFresnel_per_size = .false.
   l3D=.false.
   lopacite_only=.false.
   lseed=.false.
@@ -133,7 +133,6 @@ subroutine set_default_variables()
   lforce_Mgas = .false.
   lforce_SPH_amin = .false.
   lforce_SPH_amax = .false.
-  lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
   lsigma_file = .false.
@@ -183,7 +182,9 @@ subroutine set_default_variables()
   lcorrect_density_elongated_cells=.false.
   lfix_star = .false.
   lscale_length_units = .false.
+  scale_length_units_factor = 1.0
   lscale_mass_units = .false.
+  scale_mass_units_factor = 1.0
   lignore_dust = .false.
   lupdate_velocities = .false.
   lno_vr = .false.
@@ -520,27 +521,21 @@ subroutine initialisation_mcfost()
      case("-aggregate")
         laggregate=.true.
         i_arg = i_arg+1
-        if (lmueller) call error ("You can't use both -aggregate and -mueller options")
-        if (lper_size) call error ("You can't use both -aggregate and -mueller_size options")
         if (i_arg > nbr_arg) call error("GMM input file needed")
         call get_command_argument(i_arg,aggregate_file)
         i_arg = i_arg+1
         if (i_arg > nbr_arg) call error("GMM input file needed")
         call get_command_argument(i_arg,mueller_aggregate_file)
-     case("-mueller")
-        lmueller=.true.
+     case("-Fresnel")
+        lFresnel=.true.
         i_arg = i_arg+1
-        if (laggregate) call error ("You can't use both  -mueller and -aggregate options")
-        if (lper_size) call error ("You can't use both -mueller and -mueller_size options")
         if (i_arg > nbr_arg) call error("Mueller input file needed")
         call get_command_argument(i_arg,mueller_file)
         i_arg = i_arg+1
-     case("-mueller_size")
-        lper_size = .true.
+     case("-Fresnel_size")
+        lFresnel_per_size = .true.
         i_arg = i_arg+1
-        if (laggregate) call error ("You can't use both -mueller_size and -aggregate options")
-        if (lmueller) call error ("You can't use both -mueller_size and -mueller options")
-        lmueller=.true.
+        lFresnel=.true.
         if (i_arg > nbr_arg) call error("Mueller input pathfile needed")
         call get_command_argument(i_arg,mueller_file)
         i_arg = i_arg+1
@@ -824,7 +819,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         ldensity_file=.true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-start_step")
         i_arg = i_arg + 1
@@ -845,19 +841,22 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case ("-model_1d")
         i_arg = i_arg + 1
         lmodel_1d = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-sphere_mesh")
         i_arg = i_arg + 1
         lsphere_model = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-zeeman_polarisation")
      	call error("Zeeman polarisation not yet!")
@@ -959,15 +958,6 @@ subroutine initialisation_mcfost()
            density_files(i) = s
         enddo
         if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-ascii_SPH")
-        i_arg = i_arg + 1
-        lascii_SPH_file = .true.
-        lVoronoi = .true.
-        l3D = .true.
-        call get_command_argument(i_arg,s)
-        density_file = s
-        i_arg = i_arg + 1
-        if (.not.llimits_file) limits_file = "phantom.limits"
      case("-SPH_amin")
         lforce_SPH_amin = .true.
         i_arg = i_arg + 1
@@ -989,7 +979,8 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "gadget2.limits"
      case("-limits_file","-limits")
@@ -1122,7 +1113,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lread_Seb_Charnoz2=.true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-only_top")
         i_arg = i_arg+1
@@ -1485,6 +1477,8 @@ subroutine initialisation_mcfost()
      call read_para(para)
   endif
 
+  if (ldensity_file) call is_density_file_Voronoi()
+
   if (lfargo3d) then
      l3D = .true.
      if (n_zones > 1) call error("fargo3d mode only work with 1 zone")
@@ -1507,13 +1501,13 @@ subroutine initialisation_mcfost()
    write(*,*) "------------------------------------------------"
    call warning(" THERE ARE PROBABLY SOME CHECKS TO DO MORE ")
    write(*,*) "------------------------------------------------"
-   call read_model_1d(density_file)
+   call read_model_1d(density_files(1))
   endif
   if (lsphere_model) then
      !could be 3d or 2d (2.5d). Depends on flag l3D or N_az>1
      n_zones = 1
      disk_zone(1)%geometry = 2
-     call read_spherical_grid_parameters(density_file)
+     call read_spherical_grid_parameters(density_files(1))
   endif
 
   if (lidefix) then
@@ -1582,10 +1576,6 @@ subroutine initialisation_mcfost()
   endif
 
   write(*,*) 'Input file read successfully'
-
-!   if ((lsphere_model.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
-!    call error("Cannot use Phantom and MHD files at the same time presently.")
-!   end if
 
   ! Correction sur les valeurs du .para
   if (lProDiMo) then
@@ -1849,8 +1839,6 @@ end subroutine initialisation_mcfost
 !********************************************************************
 
 subroutine display_help()
-! Ajout du cas ou les matrices de Mueller sont donnees en entrees
-! 20/04/2023
 
   implicit none
 
@@ -1977,29 +1965,11 @@ subroutine display_help()
   write(*,*) "        : -op <wavelength> (microns) : computes dust properties at"
   write(*,*) "                                    specified wavelength and stops"
   write(*,*) "        : -aggregate <GMM_input_file> <GMM_output_file>"
-  write(*,*) "        : -mueller <Mueller_input_file> "
-  write(*,*) "     "
-  write(*,*) "        Mueller_input_file contain the mean mueller matrix averaged"
-  write(*,*) "        over the size distribution. Every element is divided by s11."
-  write(*,*) "        The format of the input file must be the following."
-  write(*,*) "     "
-  write(*,*) "             Qext        Qsca        <cos(theta)> "
-  write(*,*) "          Qext_value  Qsca_value  <cos(theta)>_value "
-  write(*,*) "     "
-  write(*,*) "     "
-  write(*,*) "                               Mueller Scattering Matrix "
-  write(*,*) "       an_value   s11_value   s12_value   s13_value    s14_value "
-  write(*,*) "                  s21_value   s22_value   s23_value    s24_value "
-  write(*,*) "                  s31_value   s32_value   s33_value    s34_value "
-  write(*,*) "                  s41_value   s42_value   s43_value    s44_value "
-  write(*,*) "       an_value   s11_value   s12_value   s13_value    s14_value "
-  write(*,*) "                  s21_value   s22_value   s23_value    s24_value "
-  write(*,*) "     ....... "
-  write(*,*) "     "
-  write(*,*) "        : -mueller_size <Mueller_input_pathfile> "
-  write(*,*) "                   Argument pathfile contain the size of each grain, and the path"
-  write(*,*) "                   for each associated matrix for every grain size, sorted"
-  write(*,*) "                   from the first to the last grain size considered."
+  write(*,*) "        : -Fresnel <Mueller_matrix_input_file>  Uses a Mueller matrix from the Fresnel database"
+  write(*,*) "        : -Fresnel_per_size <Mueller_matricesinput_pathfile> "
+!  write(*,*) "                   Argument pathfile contain the size of each grain, and the path"
+!  write(*,*) "                   for each associated matrix for every grain size, sorted"
+!  write(*,*) "                   from the first to the last grain size considered."
   write(*,*) "     "
   write(*,*) "        : -optical_depth_map ot -tau_map   : create an map of the optical depth"
   write(*,*) "        : -tau=1_surface : creates a map of the tau=1 surface"

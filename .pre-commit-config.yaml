@@ -1,0 +1,12 @@
+repos:
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace  # auto-fix trailing whitespaces
+      - id: end-of-file-fixer  # add EOF "\n" if missing
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=100'] # prevent files larger than 100kB from being commited (exclude git lfs files)
+      - id: detect-private-key
