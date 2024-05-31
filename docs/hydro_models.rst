@@ -10,27 +10,28 @@ specific needs. Current interfaces where mcfost can natively read dumps exist fo
 * fargo-3d
 * athena++
 * idefix
+* pluto
 
 
- Generic interface (via fits files)
-###################################
+Generic interface (via fits files)
+##################################
 
 There is also a default interface using FITS file to
 input MCFOST with any arbitrary density structure. This interface is
-likely to fulfill most of the needs.
+likely to fulfill most of the needs if you are not using one the hydro codes above.
 
-It can be used with either a structure or unstructed grid.
+It can be used with either a structured or unstructed grid.
 
 Structured grid
 ---------------
 
-For a structured grid, the fits interface can be used as
+For a structured grid, the fits interface can be used as::
 
-$ mcfost <parameter_file> -density_file <your_density_file.fits.gz> -3D (+ any other option)
+    $ mcfost <parameter_file> -density_file <your_density_file.fits.gz> -3D (+ any other option)
 
-or
+or::
 
-$ mcfost <parameter_file> -density_file <your_surface_density_file.fits.gz> (+ any other option)
+    $ mcfost <parameter_file> -density_file <your_surface_density_file.fits.gz> (+ any other option)
 
 The `-sigma_file` option works in a similar way as the `-density_file` option but without the vertical dimension. mcfost use the scale height and flaring index provided in the parameter file to reconstruct the 3D density structure.
 
@@ -147,3 +148,117 @@ The fits file needs to have at least 2 hdus:
 .. note:: because the volume of a Voronoi cell can be different from the initial volume in the hydro model, the mass and not the density of each particle is required.
 
 * the 2nd hdu must be 2D with dimensions of ``3 x n_points``, and provide the x,y,z coordinates for all the data points
+
+
+
+Phantom interface
+#################
+
+MCFOST can read both the standard and hdf5 phantom dump formats.
+Typical syntax for reading a phantom file is:``mcfost <para_file> -phantom <phantom_dump>``
+Any additional option can be used in conjonction with the `-phantom` option.
+
+When reading a phantom dump, sections of the parameter file will be ignored, in particular any section describing the disc density, model grid and stellar properties (unless the stellar properties are forced).
+
+Idefix, pluto, fargo3d and athena++ interfaces
+##############################################
+
+MCFOST can also read native dumps from idefix, pluto, fargo3d, athena++ if they are on a regular grid. The mcfost grid will be matched eactly to the hydro grid, which means mcfost can used the density in each cell, rather than the mass (as for a set of points or a SPH model). Syntax is the similar to the phantom case.
+
+For idefix::
+
+  $ mcfost <para_file> -idefix <idefix_vyk_file>
+
+For pluto::
+
+   $ mcfost <para_file> -pluto <pluto_dump>
+
+For athena++::
+
+   $ mcfost <para_file> -athena++ <athena_adhf_file>
+
+For fargo3d::
+
+   $ mcfost <para_file> -fargo3d <fargo3d_directory> <dump_number>
+
+
+
+
+Scaling units
+#############
+
+Values in hydro simulations might be provided in code units rather than physical units. They can be rescaled with the options ``-scale_length_units <factor>`` and  ``-scale_mass_units <factor>``.
+
+
+
+
+Important sections in parameter file
+####################################
+
+Here are some important sections to consider for post-processing hydro dump files.
+
+Number of photons for temperature and image calculation
+-------------------------------------------------------
+
+You may need to use more photons than for a 2D model to compute the temperature. As a rule of thumb, you should use at least 100 more packets than SPH particles or grid cells, ie the section is the parameter file should be something similar to
+
+::
+
+ #Number of photon packages
+   1.28e8                  nbr_photons_eq_th  : T computation
+   1.28e3                  nbr_photons_lambda : SED computation
+   1.28e6                  nbr_photons_image  : images computation
+
+
+
+Turn off SED computation
+------------------------
+
+You probably don't want to compute an SED if you have a hydro file. Turning it off will save computtation time.
+
+::
+
+   T F T                   compute temperature?, compute sed?, use default wavelength grid for ouput ?
+
+
+Turn off image symmetries
+-------------------------
+
+You don't want image symmetries if you are processing an hydrodynamical dump.
+
+::
+
+ #Symetries
+   F                       image symmetry
+   F                       central symmetry
+   F                       axial symmetry (important only if N_phi > 1)
+
+Can ignore the following, they come from the hydro dump
+-------------------------------------------------------
+
+::
+
+ #Grid geometry and size
+ #Disk physics
+ #Number of zones : 1 zone = 1 density structure + corresponding grain properties
+
+Density structure
+-----------------
+
+The density structure comes from the hydro dump, so can ignore "#Density structure" however you need
+to set "gas-to-dust mass ratio" in your model does not have dust:
+
+::
+
+   1.e-3    100.           dust mass,  gas-to-dust mass ratio
+
+
+.. note:: You can force the gas mass to the value in the parameter file using the option ``-force_Mgas``.
+
+
+Star properties
+---------------
+
+By default, mcfost will use the properties (ie mass) of the sink particles to estimate the brightness temperature and luminosity.
+mcfost will do so by interpolating through isochrones, assuming an age of 3Myr by default. The age can be change with the ``-age`` option.
+The stellar properties can be fixed to the values in the parameter files with ``-fix_stars``. Note that in that case, the number of stars in the mcfost parameter file must matches the number of sink particles in the hydro dump.
