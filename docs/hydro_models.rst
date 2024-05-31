@@ -135,9 +135,9 @@ Unstructured set of points
 --------------------------
 
 mcfost can also read an arbitrary set of points, in which case mcfost will perform a Voronoi tesselation on the provided points (as for SPH calculations, for instance with the `-phantom` option)
-The syntax is the same as above:
+The syntax is the same as above::
 
-$ mcfost <parameter_file> -density_file <your_file.fits.gz>
+  $ mcfost <parameter_file> -density_file <your_file.fits.gz>
 
 mcfost will automatically detect if the data is structured or unstructured.
 
