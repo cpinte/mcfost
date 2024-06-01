@@ -160,9 +160,11 @@ def test_image(model_name, wl):
     # Read the results
     image_name = model_name+"/data_"+wl+"/RT.fits.gz"
 
+    hdr = fits.getheader("test_data/"+image_name)
+    n_incl = hdr['NAXIS3']
 
     # We just keep intensity
-    for i in range(5):
+    for i in range(n_incl):
         image = np.nan_to_num(fits.getdata(test_dir+"/"+image_name))
         image_ref = fits.getdata("test_data/"+image_name)
 
