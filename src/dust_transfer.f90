@@ -1023,24 +1023,23 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !endif
 
      ! Do we need to perform a MRW ?
-    if ((n_iteractions_in_cell > 5)) then
-       d = distance_to_closest_wall(icell,x,y,z)
-       call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
-
-       !write(*,*) icell, d, rec_Planck_opacity,  d * rec_Planck_opacity, gamma_MRW
-       !read(*,*)
-
-       do while  (d * rec_Planck_opacity > gamma_MRW )
-          write(*,*) "MRW"
-          call make_MRW_step(id,icell, x,y,z,Stokes(1), d, rec_Planck_opacity)
-          d = distance_to_closest_wall(icell,x,y,z)
-          ! todo : do we update the rec_plack_opacity ???
-          !call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
-       enddo
-
-       ! MRW is finished, we choose wl and direction
-
-    endif
+     !if ((n_iteractions_in_cell > 5)) then
+     !   d = distance_to_closest_wall(icell,x,y,z)
+     !   call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
+     !
+     !   !write(*,*) icell, d, rec_Planck_opacity,  d * rec_Planck_opacity, gamma_MRW
+     !   !read(*,*)
+     !
+     !   do while  (d * rec_Planck_opacity > gamma_MRW )
+     !      write(*,*) "MRW"
+     !      call make_MRW_step(id,icell, x,y,z,Stokes(1), d, rec_Planck_opacity)
+     !      d = distance_to_closest_wall(icell,x,y,z)
+     !      ! todo : do we update the rec_plack_opacity ???
+     !      !call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
+     !   enddo
+     !
+     !   ! MRW is finished, we choose wl and direction
+     !endif
 
      ! now that MRW is done, we perform the normal propagation
      icell_old = icell
