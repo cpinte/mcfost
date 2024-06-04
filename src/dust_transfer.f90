@@ -43,7 +43,7 @@ subroutine transfert_poussiere()
 ! 20/04/2023
 
   use thermal_emission, only : frac_E_stars, frac_E_disk
-  use MRW, only : make_MRW_step, initialize_cumulative_zeta
+  use MRW, only : initialize_cumulative_zeta
   use utils
   implicit none
 
@@ -966,6 +966,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! - separer 1ere diffusion et reste
   ! - lom supprime !
 
+  use MRW, only : make_MRW_step, gamma_MRW
+
   integer, intent(in) :: id
   integer, intent(inout) :: lambda, p_lambda
   integer, target, intent(inout) :: icell
@@ -976,9 +978,9 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   logical, intent(out) :: flag_scatt
 
   real(kind=dp), dimension(4,4) :: M
-  real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
+  real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt, Planck_opacity, rec_Planck_opacity, d, diff_coeff
   integer :: taille_grain, itheta
-  integer :: n_iterations
+  integer :: n_iteractions_in_cell, icell_old
   integer, pointer :: p_icell
   real :: rand, rand2, tau, dvol
 
@@ -1002,7 +1004,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! Boucle sur les interactions du paquets:
   ! - on avance le paquet
   ! - on le fait interagir avec la poussiere si besoin
-  n_iterations = 0
+  n_iteractions_in_cell = 0
   infinie : do
 
      ! Longueur de vol
@@ -1020,26 +1022,34 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !   if (.not.flag_star) Stokes=0.
      !endif
 
-!     d = 0.
-!     reciprocal_Plank_kappa = 1.
-!     if ((n_iterations > 5) .and. Tdust(icell) > 1) then
-!        d = distance_to_closest_wall()
-!        call diffusion_opacity()
-!     endif
-!
-!     do while  (d > gamma_MRW * reciprocal_Plank_kappa)
-!        call make_MRW_step(id,icell, x,y,z,d, Stokes(1))
-!        d = distance_to_closest_wall()
-!        ! todo : do we update the rec_plack_kappa ???
-!     enddo
+     ! Do we need to perform a MRW ?
+     !if ((n_iteractions_in_cell > 5)) then
+     !   d = distance_to_closest_wall(icell,x,y,z)
+     !   call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
+     !
+     !   !write(*,*) icell, d, rec_Planck_opacity,  d * rec_Planck_opacity, gamma_MRW
+     !   !read(*,*)
+     !
+     !   do while  (d * rec_Planck_opacity > gamma_MRW )
+     !      write(*,*) "MRW"
+     !      call make_MRW_step(id,icell, x,y,z,Stokes(1), d, rec_Planck_opacity)
+     !      d = distance_to_closest_wall(icell,x,y,z)
+     !      ! todo : do we update the rec_plack_opacity ???
+     !      !call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
+     !   enddo
+     !
+     !   ! MRW is finished, we choose wl and direction
+     !endif
 
- !    icell_old = icell
+     ! now that MRW is done, we perform the normal propagation
+     icell_old = icell
      call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
- !    if (icell == icell_old) then
- !       n_iterations = n_iterations + 1
- !    else
- !       n_iterations = 0
- !    endif
+     if (icell == icell_old) then
+        n_iteractions_in_cell = n_iteractions_in_cell + 1
+        !write(*,*) "icell=", icell, n_iteractions_in_cell
+     else
+        n_iteractions_in_cell = 0
+     endif
 
      if (flag_sortie) return ! Vie du photon terminee
 
@@ -1074,7 +1084,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      endif ! lmono
 
 
-     if (rand < tab_albedo_pos(p_icell,lambda)) then ! Diffusion
+     if (rand < tab_albedo_pos(p_icell,lambda)) then ! Scatttering event
         flag_scatt=.true.
         flag_direct_star = .false.
 
@@ -1143,7 +1153,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
         ! Mise a jour direction de vol
         u = u1 ; v = v1 ; w = w1
 
-     else ! Absorption
+     else ! Absorption + eventual re-emission
 
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre

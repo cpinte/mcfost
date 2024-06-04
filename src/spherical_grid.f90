@@ -10,7 +10,7 @@ module spherical_grid
   implicit none
 
   public :: cross_spherical_cell, pos_em_cellule_sph, indice_cellule_sph, test_exit_grid_sph, &
-       move_to_grid_sph
+       move_to_grid_sph, distance_to_closest_wall_sph
 
 
   private
@@ -448,9 +448,9 @@ end subroutine indice_cellule_sph_theta
 
   !***********************************************************
 
-  real(dp) function distance_to_closest_wall_sph(id,icell,x,y,z) result(s)
+  real(dp) function distance_to_closest_wall_sph(icell,x,y,z) result(s)
 
-    integer, intent(in) :: id, icell
+    integer, intent(in) :: icell
     real(kind=dp), intent(in) :: x,y,z
 
     real(dp) :: r,s1,s2,s3,s4,s5,s6,r2_cyl,rcyl,z0
