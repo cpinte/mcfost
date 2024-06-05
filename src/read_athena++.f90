@@ -361,9 +361,9 @@ contains
          ! write(*,*) x1v(:, iblock)
          ! write(*,*) x1f(:, iblock)
 
-         do j=1, size(x1v(:, iblock))
-           write(*,*) x1v(j, iblock), x1f(j, iblock) + (x1f(j+1, iblock) - x1f(j, iblock))/2
-         enddo
+         ! do j=1, size(x1v(:, iblock))
+         !   write(*,*) x1v(j, iblock), x1f(j, iblock) + (x1f(j+1, iblock) - x1f(j, iblock))/2
+         ! enddo
 
          rho_a(il:iu) = reshape(data(:,:,:,iblock,1), (/size(data(:,:,:,iblock,1))/) )
          vx1_a(il:iu) = reshape(data(:,:,:,iblock,3), (/size(data(:,:,:,iblock,3))/) )
@@ -420,12 +420,6 @@ contains
 
       write(*,*) 'Total  gas mass in model:', real(sum(mass_gas)),' Msun' !  * g_to_Msun
 
-
-
-
-
-
-
       ! Estimate h
       h = v_a**1./3.
 
@@ -474,6 +468,31 @@ contains
         vyy = vx2_a
         vzz = vx3_a
       endif
+
+      ! Open a file
+      open(unit=10, file='density.txt', status='replace', action='write')
+      ! Write each float to the file in scientific notation
+      do i = 1, size(mass_gas)
+          write(10, '(E15.8)') mass_gas(i)
+      end do
+      ! Close the file
+      close(10)
+
+      ! Open a file
+      open(unit=10, file='xyz.txt', status='replace', action='write')
+      ! Write each float to the file in scientific notation
+      do i = 1, size(mass_gas)
+          write(10, '(E15.8,",",E15.8,",",E15.8)') xx(i), yy(i), zz(i)
+      end do
+      ! Close the file
+      close(10)
+
+
+
+
+
+
+
 
       ! Not sure if I should convert out of code units ...
       xx = xx ! * ulength
