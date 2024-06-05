@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=4g
 #SBATCH --time=160:00:00
 #SBATCH --job-name=mcfost
@@ -9,7 +9,7 @@
 
 # results to be uploaded to ipag-nfs.u-ga.fr:webpage/mcfost/
 #export mcfost=$MCFOST_INSTALL/../src/mcfost
-export OMP_NUM_THREADS=16
+export OMP_NUM_THREADS=1 # 1 cpu to compute reference
 export mcfost=$(pwd)/../src/mcfost
 export MCFOST_UTILS=$(pwd)/../utils
 

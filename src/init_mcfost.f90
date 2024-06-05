@@ -1498,9 +1498,7 @@ subroutine initialisation_mcfost()
   if (lathena) then
      l3D = .true.
      athena%corotating_frame = lcorotating_frame
-     ! if (n_zones > 1) call error("athena mode only work with 1 zone")
-     ! call warning("athena : forcing spherical grid") ! only spherical grid is implemented for now
-     ! disk_zone(1)%geometry = 2
+     if (n_zones > 1) call error("athena mode only work with 1 zone")
      call read_athena_parameters(athena_file)
   endif
   if (lmodel_1d) then
