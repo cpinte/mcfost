@@ -97,8 +97,10 @@ module arb2mcfost
         larg_voronoi = .true.
         lignore_dust = .true.
         lrandomize_voronoi = .false.
-        check_previous_tesselation = (.not.lrandomize_voronoi)
+        check_previous_tesselation = (.not. lrandomize_voronoi)
         n_points = size(x)
+
+        SPH_keep_particles = 1.0
 
         ! !needed for Voronoi
         ! if (allocated(density_files)) deallocate(density_files)
@@ -116,32 +118,22 @@ module arb2mcfost
 
         hydro_limits(:) = 0
 
-        k = 1
-        hydro_limits(1) = find_kth_smallest_inplace(k,real(x))*limit_factor
-        hydro_limits(3) = find_kth_smallest_inplace(k,real(y))*limit_factor
-        hydro_limits(5) = find_kth_smallest_inplace(k,real(z))*limit_factor
-
-        k = n_points
-        hydro_limits(2) = find_kth_smallest_inplace(k,real(x))*limit_factor
-        hydro_limits(4) = find_kth_smallest_inplace(k,real(y))*limit_factor
-        hydro_limits(6) = find_kth_smallest_inplace(k,real(z))*limit_factor
+        ! k = 1
+        ! hydro_limits(1) = find_kth_smallest_inplace(k,real(x))*limit_factor
+        ! hydro_limits(3) = find_kth_smallest_inplace(k,real(y))*limit_factor
+        ! hydro_limits(5) = find_kth_smallest_inplace(k,real(z))*limit_factor
+        !
+        ! k = n_points
+        ! hydro_limits(2) = find_kth_smallest_inplace(k,real(x))*limit_factor
+        ! hydro_limits(4) = find_kth_smallest_inplace(k,real(y))*limit_factor
+        ! hydro_limits(6) = find_kth_smallest_inplace(k,real(z))*limit_factor
 
         !also work with grid-based code
         !massdust, rhodust, hydro_grainsizes not allocated if ndusttypes = 0 !
         call sph_to_voronoi(n_points, ndusttypes, particle_id, x, y, z, h, vx, vy, vz, &
              T_tmp, mass_gas, massdust, rho, rhodust, hydro_grainsizes, hydro_limits, check_previous_tesselation, is_ghost, &
              ldust_moments, dust_moments, mass_per_H, mask)
-       ! subroutine SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, T_gas, massgas,massdust,rho,rhodust,&
-       !      SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, ldust_moments, dust_moments, mass_per_H, mask)
 
-        ! -> correction for small density applied on mass_gas directly inside
-
-
-        ! call hydro_to_Voronoi_atomic(n_points,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,dz)
-        ! 	call empty_cells
-
-        !deallocating temporary variables from input file.
-        ! deallocate(h,vx,vy,vz,mass_gas, mass_ne_on_massgas, x,y,z,T_tmp, vt_tmp, dz)
         deallocate(h,vx,vy,vz,mass_gas, x,y,z)
 
         return

@@ -38,6 +38,7 @@ contains
 
     athena%filename = filename
     athena%arb_grid = .true.
+    lVoronoi = .true.
 
     call open_hdf5file(filename,file_id,ierr)
     if (ierr /= 0) call error("cannot open athena HDF file "//trim(filename))
@@ -73,6 +74,7 @@ contains
     else
       if (athena%coord == 1 .or. athena%coord == 2) then
         athena%arb_grid = .true.
+        lVoronoi = .true.
       endif
     endif
 
@@ -312,9 +314,6 @@ contains
     if (alloc_status > 0) call error('Allocation error athena++ data')
 
     if (athena%arb_grid) then
-      ! write(*,*) "number of cells in mcfost grid 912384"
-      ! write(*,*), "ncells in voronoi 884737"
-
       lVoronoi = .true.
       nx1 = n_blocks * bs1 * bs2 * bs3
       write(*,*) "number of cells in raw file", nx1
@@ -420,9 +419,6 @@ contains
 
       write(*,*) 'Total  gas mass in model:', real(sum(mass_gas)),' Msun' !  * g_to_Msun
 
-      ! Estimate h
-      h = v_a**1./3.
-
       ! Convert coordinates and velocities to Cartesian if necessary
       ! First need to correct for corrotating frame, and difference between athena and mcfost coordinate ordering
       if (athena%coord==1) then
@@ -469,27 +465,30 @@ contains
         vzz = vx3_a
       endif
 
-      ! Open a file
-      open(unit=10, file='density.txt', status='replace', action='write')
-      ! Write each float to the file in scientific notation
-      do i = 1, size(mass_gas)
-          write(10, '(E15.8)') mass_gas(i)
-      end do
-      ! Close the file
-      close(10)
-
-      ! Open a file
-      open(unit=10, file='xyz.txt', status='replace', action='write')
-      ! Write each float to the file in scientific notation
-      do i = 1, size(mass_gas)
-          write(10, '(E15.8,",",E15.8,",",E15.8)') xx(i), yy(i), zz(i)
-      end do
-      ! Close the file
-      close(10)
-
-
+      ! ! Open a file
+      ! open(unit=10, file='density.txt', status='replace', action='write')
+      ! ! Write each float to the file in scientific notation
+      ! do i = 1, size(mass_gas)
+      !     write(10, '(E15.8)') mass_gas(i)
+      ! end do
+      ! ! Close the file
+      ! close(10)
+      !
+      ! ! Open a file
+      ! open(unit=10, file='xyz.txt', status='replace', action='write')
+      ! ! Write each float to the file in scientific notation
+      ! do i = 1, size(mass_gas)
+      !     write(10, '(E15.8,",",E15.8,",",E15.8)') xx(i), yy(i), zz(i)
+      ! end do
+      ! ! Close the file
+      ! close(10)
 
 
+
+      ! Estimate h
+      ! h = v_a**1./3.
+      ! Defining a smoothing length
+      h = 0.02 * sqrt(xx*xx+yy*yy+zz*zz)
 
 
 

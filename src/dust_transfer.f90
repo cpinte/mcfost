@@ -109,26 +109,22 @@ subroutine transfert_poussiere()
 
   laffichage=.true.
 
+write(*,*) "######lVoronoi", lVoronoi 
+
   if (lVoronoi) then
      if (lmhd_voronoi) then
         call setup_mhd_to_mcfost() !uses sph_to_voronoi
-     else
+     else if (lphantom_file .or. lgadget2_file) then
         call setup_SPH2mcfost(extra_heating)
+     else if (lathena) then
+        call read_athena_model()
      endif
      call setup_grid()
-  else if (lathena) then
-    call read_athena_model()
-    if (larg_voronoi) then
-      call setup_grid()
-    endif
   else ! Setting up a regular grid
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
 
-  laffichage=.true.
-
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi .or. larg_voronoi .or. lathena)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()
