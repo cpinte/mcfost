@@ -3,7 +3,7 @@ module init_mcfost
   use parametres
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use density, only : species_removed, T_rm
+  use density, only : species_removed, T_rm, is_density_file_Voronoi
   use molecular_emission
   !$ use omp_lib
   use benchmarks
@@ -133,7 +133,6 @@ subroutine set_default_variables()
   lforce_Mgas = .false.
   lforce_SPH_amin = .false.
   lforce_SPH_amax = .false.
-  lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
   lsigma_file = .false.
@@ -821,7 +820,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         ldensity_file=.true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-start_step")
         i_arg = i_arg + 1
@@ -842,19 +842,22 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case ("-model_1d")
         i_arg = i_arg + 1
         lmodel_1d = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-sphere_mesh")
         i_arg = i_arg + 1
         lsphere_model = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-zeeman_polarisation")
      	call error("Zeeman polarisation not yet!")
@@ -956,15 +959,6 @@ subroutine initialisation_mcfost()
            density_files(i) = s
         enddo
         if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-ascii_SPH")
-        i_arg = i_arg + 1
-        lascii_SPH_file = .true.
-        lVoronoi = .true.
-        l3D = .true.
-        call get_command_argument(i_arg,s)
-        density_file = s
-        i_arg = i_arg + 1
-        if (.not.llimits_file) limits_file = "phantom.limits"
      case("-SPH_amin")
         lforce_SPH_amin = .true.
         i_arg = i_arg + 1
@@ -986,7 +980,8 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "gadget2.limits"
      case("-limits_file","-limits")
@@ -1119,7 +1114,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lread_Seb_Charnoz2=.true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-only_top")
         i_arg = i_arg+1
@@ -1488,6 +1484,8 @@ subroutine initialisation_mcfost()
      call read_para(para)
   endif
 
+  if (ldensity_file) call is_density_file_Voronoi()
+
   if (lfargo3d) then
      l3D = .true.
      if (n_zones > 1) call error("fargo3d mode only work with 1 zone")
@@ -1509,13 +1507,13 @@ subroutine initialisation_mcfost()
    write(*,*) "------------------------------------------------"
    call warning(" THERE ARE PROBABLY SOME CHECKS TO DO MORE ")
    write(*,*) "------------------------------------------------"
-   call read_model_1d(density_file)
+   call read_model_1d(density_files(1))
   endif
   if (lsphere_model) then
      !could be 3d or 2d (2.5d). Depends on flag l3D or N_az>1
      n_zones = 1
      disk_zone(1)%geometry = 2
-     call read_spherical_grid_parameters(density_file)
+     call read_spherical_grid_parameters(density_files(1))
   endif
 
   if (lidefix) then
@@ -1584,10 +1582,6 @@ subroutine initialisation_mcfost()
   endif
 
   write(*,*) 'Input file read successfully'
-
-!   if ((lsphere_model.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
-!    call error("Cannot use Phantom and MHD files at the same time presently.")
-!   end if
 
   ! Correction sur les valeurs du .para
   if (lProDiMo) then

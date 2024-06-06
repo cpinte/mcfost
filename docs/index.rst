@@ -12,8 +12,7 @@ Welcome to MCFOST's documentation
    parameter_file
    input
    options
-   3D_models
-   mcfost+phantom
+   hydro_models
    tools
    test_suite
    troubleshooting

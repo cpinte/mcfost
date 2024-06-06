@@ -19,7 +19,7 @@ module grid
   procedure(indice_cellule_cyl), pointer :: indice_cellule => null()
   procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
-  procedure(distance_to_closest_wall_Voronoi), pointer :: distance_to_closest_wall => null()
+  procedure(distance_to_closest_wall_cyl), pointer :: distance_to_closest_wall => null()
 
   real(kind=dp) :: v_char, B_char
   logical :: lcalc_ne, lmagnetized
@@ -343,6 +343,7 @@ subroutine setup_grid()
         indice_cellule => indice_cellule_cyl
         test_exit_grid => test_exit_grid_cyl
         define_grid => define_cylindrical_grid
+        distance_to_closest_wall => distance_to_closest_wall_cyl
      else if (grid_type == 2) then
         lcylindrical = .false.
         lspherical = .true.
@@ -352,6 +353,7 @@ subroutine setup_grid()
         indice_cellule => indice_cellule_sph
         test_exit_grid => test_exit_grid_sph
         define_grid => define_cylindrical_grid ! same routine at the moment
+        distance_to_closest_wall => distance_to_closest_wall_sph
      else
         call error("Unknown grid type")
      endif

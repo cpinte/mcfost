@@ -4,7 +4,7 @@ module SPH2mcfost
   use constantes
   use utils
   use sort, only : find_kth_smallest_inplace
-  use density, only : normalize_dust_density, reduce_density
+  use density, only : normalize_dust_density, reduce_density, read_Voronoi_fits_file
   use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
   use sort, only : index_quicksort
   use stars, only : compute_stellar_parameters
@@ -15,14 +15,12 @@ module SPH2mcfost
 
 contains
 
-  subroutine setup_SPH2mcfost(SPH_file,SPH_limits_file, n_SPH, extra_heating)
+  subroutine setup_SPH2mcfost(extra_heating)
 
     use read_gadget2, only : read_gadget2_file
     use io_phantom_utils, only : get_error_text
     use utils, only : read_comments
 
-    character(len=512), intent(in) :: SPH_file, SPH_limits_file
-    integer, intent(out) :: n_SPH
 
     integer, parameter :: iunit = 1
 
@@ -36,7 +34,7 @@ contains
     integer, dimension(:), allocatable :: is_ghost
     real(dp), dimension(6) :: SPH_limits
     real :: factor
-    integer :: ndusttypes, ierr, i, ilen
+    integer :: ndusttypes, ierr, i, ilen, n_SPH
     logical :: check_previous_tesselation, ldust_moments
     real(dp) :: mass_per_H
 
@@ -84,12 +82,14 @@ contains
        endif
     else if (lgadget2_file) then
        write(*,*) "Performing gadget2mcfost setup"
-       write(*,*) "Reading Gadget-2 density file: "//trim(SPH_file)
-       call read_gadget2_file(iunit,SPH_file, x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
-    else if (lascii_SPH_file) then
-       write(*,*) "Performing SPH2mcfost setup"
-       write(*,*) "Reading SPH density file: "//trim(SPH_file)
-       call read_ascii_SPH_file(iunit,SPH_file, x,y,z,h,vx,vy,vz,T_gas,massgas,rho,rhodust,particle_id, ndusttypes,n_SPH,ierr)
+       write(*,*) "Reading Gadget-2 density file: "//trim(density_files(1))
+       call read_gadget2_file(iunit,density_files(1), x,y,z,h,massgas,rho,rhodust,ndusttypes,n_SPH,ierr)
+    else if (ldensity_file) then
+       call read_Voronoi_fits_file(density_files(1), x,y,z,h,vx,vy,vz,particle_id,massgas,n_SPH)
+       ldust_moments = .false.
+       ndusttypes=0
+    else
+       call error("Unknown SPH structure.")
     endif
     write(*,*) "Done"
 
@@ -99,16 +99,16 @@ contains
        if (allocated(massdust)) deallocate(massdust)
     endif
 
-    if ((.not.lfix_star).and.(lphantom_file .or. lgadget2_file)) call compute_stellar_parameters()
+    if (.not.lfix_star) call compute_stellar_parameters()
 
     ! Model limits
-    call read_SPH_limits_file(SPH_limits_file, SPH_limits)
+    call read_SPH_limits_file(limits_file, SPH_limits)
 
     ! Voronoi tesselation
     check_previous_tesselation = (.not. lrandomize_Voronoi)
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x,y,z,h, vx,vy,vz, &
-         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, is_ghost, &
-         ldust_moments, dust_moments, mass_per_H, mask=mask)
+         T_gas, massgas,massdust,rho,rhodust,SPH_grainsizes, SPH_limits, check_previous_tesselation, &
+         is_ghost, ldust_moments, dust_moments, mass_per_H, mask=mask)
 
     deallocate(x,y,z,h)
     if (allocated(vx)) deallocate(vx,vy,vz)
@@ -118,7 +118,8 @@ contains
     if (lemission_atom) then
        call hydro_to_Voronoi_atomic(n_SPH,T_gas,vturb,massgas,mass_ne_on_massgas,atomic_mask)
     endif
-    deallocate(massgas,rho)
+    deallocate(massgas)
+    if (allocated(rho)) deallocate(rho)
     if (allocated(vturb)) deallocate(vturb)
     if (allocated(mass_ne_on_massgas)) deallocate (mass_ne_on_massgas)
     if (allocated(atomic_mask)) deallocate(atomic_mask)
@@ -200,7 +201,7 @@ contains
     use, intrinsic :: ieee_arithmetic
 
     integer, intent(in) :: n_SPH, ndusttypes
-    real(dp), dimension(n_SPH), intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
+    real(dp), dimension(:), allocatable, intent(inout) :: x,y,z,h,massgas!,rho, !move rho to allocatable, assuming not always allocated
     real(dp), dimension(:), allocatable, intent(inout) :: rho
     real(dp), dimension(:), allocatable, intent(inout) :: vx,vy,vz ! dimension n_SPH or 0
     real(dp), dimension(:), allocatable, intent(in) :: T_gas
@@ -215,8 +216,6 @@ contains
 
     integer, dimension(:), allocatable, intent(out) :: is_ghost
 
-
-    logical :: lwrite_ASCII = .false. ! produce an ASCII file for yorick
     logical :: use_single_grain
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
@@ -254,54 +253,6 @@ contains
        write(*,*) "Found", n_SPH, " hydro sites with ", ndusttypes, "dust grains."
     else
        write(*,*) "Found", n_SPH, " hydro sites."
-    endif
-
-    if (lwrite_ASCII) then
-       !  Write the file for the grid version of mcfost
-       !- N_part: total number of particles
-       !  - r_in: disk inner edge in AU
-       !  - r_out: disk outer edge in AU
-       !  - p: surface density exponent, Sigma=Sigma_0*(r/r_0)^(-p), p>0
-       !  - q: temperature exponent, T=T_0*(r/r_0)^(-q), q>0
-       !  - m_star: star mass in solar masses
-       !  - m_disk: disk mass in solar masses (99% gas + 1% dust)
-       !  - H_0: disk scale height at 100 AU, in AU
-       !  - rho_d: dust density in g.cm^-3
-       !  - flag_ggrowth: T with grain growth, F without
-       !
-       !
-       !    N_part lines containing:
-       !  - x,y,z: coordinates of each particle in AU
-       !  - h: smoothing length of each particle in AU
-       !  - s: grain size of each particle in �m
-       !
-       !  Without grain growth: 2 lines containing:
-       !  - n_sizes: number of grain sizes
-       !  - (s(i),i=1,n_sizes): grain sizes in �m
-       !  OR
-       !  With grain growth: 1 line containing:
-       !  - s_min,s_max: smallest and largest grain size in �m
-
-       open(unit=1,file="SPH_phantom.txt",status="replace")
-       write(1,*) size(x)
-       write(1,*) minval(sqrt(x**2 + y**2))
-       write(1,*) maxval(sqrt(x**2 + y**2))
-       write(1,*) 1 ! p
-       write(1,*) 0.5 ! q
-       write(1,*) 1.0 ! mstar
-       write(1,*) 1.e-3 !mdisk
-       write(1,*) 10 ! h0
-       write(1,*) 3.5 ! rhod
-       write(1,*) .false.
-       !rhoi = massoftype(itypei)*(hfact/hi)**3  * udens ! g/cm**3
-
-       do icell=1,size(x)
-          write(1,*) x(icell), y(icell), z(icell), 1.0, 1.0
-       enddo
-
-       write(1,*) 1
-       write(1,*) 1.0
-       close(unit=1)
     endif
 
     if (abs(maxval(SPH_limits)) < tiny_real) then
@@ -375,6 +326,7 @@ contains
     mass =  mass * g_to_Msun
 
     if (lforce_Mgas) then ! Todo : testing for now, use a routine to avoid repeting code
+       write(*,*) "Forcing gas mass to value in parameter file rather"
        ! Normalisation
        if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
           facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
@@ -382,10 +334,10 @@ contains
           ! Somme sur les zones pour densite finale
           do icell=1,n_cells
              densite_gaz(icell) = densite_gaz(icell) * facteur
-             masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+             masse_gaz(icell) = masse_gaz(icell) * facteur
           enddo ! icell
        else
-          call error('Gas mass is 0')
+          call error('Gas mass is 0 in hydero file')
        endif
     endif
 
@@ -399,7 +351,7 @@ contains
           iSPH = Voronoi(icell)%id
           mass = mass +  massgas(iSPH) * dust_moments(3,iSPH) * 12.*amu/mass_per_H
        enddo
-       write(*,*) "Dust mass in phantom dump is ", real(mass), "Msun"
+       write(*,*) "Dust mass in hydro model is ", real(mass), "Msun"
 
        lvariable_dust = .true.
        allocate(grainsize_f(n_grains_tot),gsize(n_grains_tot),dN_ds(n_grains_tot),&
@@ -486,7 +438,7 @@ contains
        ! this is required if ndusttypes == 1, but I do it in any case
        allocate(a_SPH(ndusttypes+1),log_a_SPH(ndusttypes+1),rho_dust(ndusttypes+1))
 
-       write(*,*) "Found the following grain sizes in SPH calculation:"
+       write(*,*) "Found the following grain sizes in hydro calculations:"
        do l=1, ndusttypes
           if (dust_pop(1)%porosity > tiny_real) then
              if (l==1) call warning("Grain sizes are adjusted for porosity")
@@ -689,12 +641,10 @@ contains
 
   end subroutine SPH_to_Voronoi
 
+  !****************************************************************************
 
-  !****************************************************************************
-  ! copy additional parameters from hydro code needed for atomic line transfer
-  !****************************************************************************
   subroutine Hydro_to_Voronoi_atomic(n_SPH,T_tmp,vt_tmp,mass_gas,mass_ne_on_massgas,mask)
-
+    ! copy additional parameters from hydro code needed for atomic line transfer
     ! ************************************************************************************ !
     ! n_sph : number of points in the input model
     ! particle_id : index of the particle / cell centre in the input model
@@ -710,8 +660,6 @@ contains
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
     use elements_type, only : wght_per_H, read_abundance
-   !  use mhd2mcfost, only : alloc_atomrt_grid, nHtot, ne, &
-   !     v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne
     use grid, only : alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, lcalc_ne, &
          check_for_zero_electronic_density
 
@@ -780,12 +728,7 @@ contains
     write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
     write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
 
-    ! 		if (lmagnetized) then
-    !
-    ! 		endif
-
-
-	call check_for_zero_electronic_density
+    call check_for_zero_electronic_density()
 
     write(*,*) "Maximum/minimum velocities in the model (km/s):"
     write(*,*) "|Vx|", vxmax*1d-3, vxmin*1d-3
@@ -799,16 +742,19 @@ contains
     write(*,*) maxval(vturb)/1d3, minval(vturb, mask=icompute_atomRT>0)/1d3
 
     write(*,*) "Maximum/minimum Temperature in the model (K):"
-    write(*,*) MAXVAL(T), MINVAL(T,mask=icompute_atomRT>0)
+    write(*,*) maxval(T), minval(T,mask=icompute_atomRT>0)
     write(*,*) "Maximum/minimum Hydrogen total density in the model (m^-3):"
-    write(*,*) MAXVAL(nHtot), MINVAL(nHtot,mask=icompute_atomRT>0)
+    write(*,*) maxval(nHtot), minval(nHtot,mask=icompute_atomRT>0)
     if (.not.lcalc_ne) then
        write(*,*) "Maximum/minimum ne density in the model (m^-3):"
-       write(*,*) MAXVAL(ne), MINVAL(ne,mask=icompute_atomRT>0)
+       write(*,*) maxval(ne), minval(ne,mask=icompute_atomRT>0)
     endif
+
+    return
 
   end subroutine hydro_to_Voronoi_atomic
 
+  !*********************************************************
 
   subroutine test_duplicate_particles(n_SPH, particle_id, x,y,z, massgas,massdust,rho,rhodust, is_ghost)
     ! Filtering particles at the same position
@@ -864,7 +810,7 @@ contains
 
     if (nkill > 0) then
        write(*,*)
-       write(*,*) nkill, "SPH particles were flagged as ghosts and merged"
+       write(*,*) nkill, "hydro sites were flagged as ghosts and merged"
        write(*,*)
     endif
 
@@ -946,125 +892,6 @@ contains
     return
 
   end subroutine delete_Hill_sphere
-
-  !*********************************************************
-
-  subroutine read_ascii_SPH_file(iunit,filename,x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id, ndusttypes,n_SPH,ierr)
-
-    integer,               intent(in) :: iunit
-    character(len=*),      intent(in) :: filename
-    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas,vx,vy,vz,T_gas
-    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
-    integer, intent(out), dimension(:), allocatable :: particle_id
-    integer, intent(out) :: ndusttypes, n_SPH,ierr
-
-    integer :: syst_status, alloc_status, ios, i
-    character(len=512) :: cmd
-
-    ierr = 0
-
-    cmd = "wc -l "//trim(filename)//" > ntest.txt"
-    call appel_syst(cmd,syst_status)
-    open(unit=1,file="ntest.txt",status="old")
-    read(1,*) n_SPH
-    close(unit=1)
-    ndusttypes = 1
-
-    write(*,*) "n_SPH read_test_ascii_file = ", n_SPH
-
-    alloc_status = 0
-    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), rhodust(ndusttypes,n_SPH), &
-    	vx(n_sph), vy(n_sph), vz(n_sph), T_gas(n_sph), stat=alloc_status)
-    if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
-
-    open(unit=1, file=filename, status='old', iostat=ios)
-    do i=1, n_SPH
-       read(1,*) x(i), y(i), z(i), h(i), T_gas(i), massgas(i), vx(i), vy(i), vz(i)
-       rhogas(i) = massgas(i)
-       particle_id(i) = i
-    enddo
-
-    write(*,*) "MinMax=", minval(massgas), maxval(massgas)
-
-    write(*,*) "Using stars from mcfost parameter file"
-
-    return
-
-  end subroutine read_ascii_SPH_file
-
-
-subroutine test_voro_star(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id,ndusttypes,n_sph)
-    use naleat, only : seed, stream, gtype
-#include "sprng_f.h"
-
-    real :: rand, rand2, rand3
-    real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,rhogas,massgas,vx,vy,vz,T_gas
-    real(dp), intent(out), dimension(:,:), allocatable :: rhodust
-    integer, intent(out), dimension(:), allocatable :: particle_id
-    integer, intent(out) :: ndusttypes, n_SPH
-	real, parameter :: rmi = 2.2, rmo = 3.0 !unit of etoile(1)%r
-    integer :: alloc_status, i, id
-    real(kind=dp) :: rr, tt, pp, sintt, costt, vol
-
-
-    !force nb_proc to 1 here, but we don't want to set nb_proc = 1 for the rest of the calc.
-    if (allocated(stream)) deallocate(stream)
-    allocate(stream(1))
-    stream = 0.0
-    do i=1, 1
-       !write(*,*) gtype, i-1,nb_proc,seed,SPRNG_DEFAULT
-       !init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-       stream(i) = init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT)
-    enddo
-
-    lignore_dust = .true.
-    ndusttypes = 0
-    llimits_file = .false.
-    limits_file = ""
-    lascii_sph_file = .false.
-    lphantom_file = .false.
-    lgadget2_file = .false.
-
-    if (allocated(x)) then
-    	deallocate(x,y,z,h,vx,vy,vz,T_gas,massgas,rhogas,rhodust,particle_id)
-    endif
-
-    n_sph = 100000
-
-    alloc_status = 0
-    allocate(x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),particle_id(n_sph), &
-    	vx(n_sph), vy(n_sph), vz(n_sph), T_gas(n_sph), stat=alloc_status)
-    if (alloc_status /=0) call error("Allocation error in phanton_2_mcfost")
-
-    id = 1
-    do i=1, n_sph
-       particle_id(i) = i
-       rand  = sprng(stream(id))
-       rand2 = sprng(stream(id))
-       rand3 = sprng(stream(id))
-       costt = (2*rand2-1)
-       sintt = sqrt(1.0 - costt*costt)
-       pp = pi * (2*rand3-1)
-       rr = ( rmi + (rmo - rmi) * rand )! * sintt*sintt
-       x(i) = rr * sintt * cos(pp) * etoile(1)%r
-       y(i) = rr * sintt * sin(pp) * etoile(1)%r
-       z(i) = rr * costt * etoile(1)%r
-       vol = (rand + 1) * 0.025 * etoile(1)%r**3 * (4.0/3.0) * pi
-       vx(i) = 0.0
-       vy(i) = 0.0
-       vz(i) = 0.0
-       T_gas(i) = 1000.0
-       massgas(i) = 1d-10 * (vol * AU_to_m**3) * kg_to_Msun!Msun
-       rhogas(i) = massgas(i)
-       h(i) = 3.0 * rmo * etoile(1)%r
-    enddo
-
-
-    deallocate(stream)
-
-
-return
-end subroutine
 
   !*********************************************************
 
