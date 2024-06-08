@@ -73,8 +73,8 @@ contains
       ! call error("mcfost can only read athena++ grids with MaxLevel=0 for now")
     else
       if (athena%coord == 1 .or. athena%coord == 2) then
-        athena%arb_grid = .true.
-        lVoronoi = .true.
+        athena%arb_grid = .false.
+        lVoronoi = .false.
       endif
     endif
 
