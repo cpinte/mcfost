@@ -184,13 +184,11 @@ contains
 
     ! Planet properties hard coded for now
     real, parameter :: Mp = 1e-3
-    real, parameter :: x = 6.0, y=0.0, z=0.0
+    real, parameter :: x = 1.0, y=0.0, z=0.0
     real, parameter :: Omega_p = (1.0/(x**2.0 + y**2.0)**(3.0/2.0))**(1.0/2.0)! 0.06804138174397717 ! (1.0/6.0)**(2/3) ! 1.0
     real, parameter :: vx=0.0, vy=1.0, vz=1.0
     logical :: print_messages, test
 
-    write(*,*) "Omega_p is ", Omega_p
-    write(*,*) "x and y are ", x, y
 
     ! print_messages = .true.
     ! call hdf_set_print_messages(print_messages)
@@ -357,20 +355,6 @@ contains
          iu = iblock*bs1*bs2*bs3
          il = iu - bs1*bs2*bs3 + 1
 
-         write(*,*) "iu is ", iu, "il is ", il
-
-         ! write(*,*) x1v(:, iblock)
-         ! write(*,*) "x1f", x1f(:, iblock)
-         ! write(*,*) "x2f", x2f(:, iblock)
-         ! write(*,*) "x3f", x3f(:, iblock)
-
-         ! do j=1, size(x1v(:, iblock))
-         !   write(*,*) x1v(j, iblock), x1f(j, iblock) + (x1f(j+1, iblock) - x1f(j, iblock))/2
-         ! enddo
-
-         write(*,*) "THE DATA SHAPE IS ", shape(data(:,:,:,iblock,1))
-         write(*,*) "THE FULL DATA SHAPE IS ", shape(data)
-
          rho_a(il:iu) = reshape(data(:,:,:,iblock,1), (/size(data(:,:,:,iblock,1))/) )
          vx1_a(il:iu) = reshape(data(:,:,:,iblock,3), (/size(data(:,:,:,iblock,3))/) )
          vx2_a(il:iu) = reshape(data(:,:,:,iblock,4), (/size(data(:,:,:,iblock,4))/) )
@@ -388,65 +372,15 @@ contains
 
       enddo
 
-      write(*,*) "THE SHAPES ARE ", shape(x1v), shape(x2v), shape(x3v)
-      ! Open a file
-      open(10, file='dens_rtheta.txt', status='replace', action='write')
-      do i = 1, size(x1v(:, 1))
-          do j = 1, size(x2v(:, 1)) - 1
-              ! write(*,*) data(i, j, 0, 1, 1), ','
-              write(10, '(*(E15.8, ","))', advance='no') data(i, j, 1, 1, 1)
-          end do
-          ! write(*,*) data(i, size(x2f(:, 1)), 0, 1, 1)
-          write(10, '(*(E15.8))') data(i, size(x2v(:, 1)), 1, 1, 1)
-      end do
-      close(10)
-
-      open(unit=10, file='r.txt', status='replace', action='write')
-      do i = 1, size(x1v(:, 1))
-          do j = 1, size(x2v(:, 1)) - 1
-              write(10, '(*(E15.8, ","))', advance='no') x1v(i, 1) * sin(x2v(j, 1))
-          end do
-          write(10, '(*(E15.8))') x1v(i, 1) * sin(x2v(size(x2v(:, 1)), 1))
-      enddo
-      close(10)
-
-      open(unit=10, file='z.txt', status='replace', action='write')
-      do i = 1, size(x1v(:, 1))
-          do j = 1, size(x2v(:, 1)) - 1
-              write(10, '(*(E15.8, ","))', advance='no') x1v(i, 1) * cos(x2v(j, 1))
-          end do
-          write(10, '(*(E15.8))') x1v(i, 1) * cos(x2v(size(x2v(:, 1)), 1))
-      enddo
-      close(10)
-
-
-      open(unit=10, file='rs.txt', status='replace', action='write')
-      do i = 1, size(x1v(:, 1))
-            write(10, '(E15.8)') x1v(i, 1)
-      enddo
-      close(10)
-
-      open(unit=10, file='theta.txt', status='replace', action='write')
-        do j = 1, size(x2v(:, 1))
-            write(10, '(E15.8)') x2v(j, 1)
-        end do
-      close(10)
-
-
       write(*,*) "Athena++ data successfully read and reshaped. "
       deallocate(data, x1v, x2v, x3v, x1_tmp, x2_tmp, x3_tmp, v_tmp, x1f, x2f, x3f)
       write(*,*) 'Total grid volume ', real(sum(v_a))
 
       ! Need to convert from density to mass
-      ! mass_gas = rho_a*udens*v_a !* AU3_to_m3  * g_to_Msun
-      mass_gas = rho_a*udens !* AU3_to_m3  * g_to_Msun
+      mass_gas = rho_a*udens*v_a ! * AU3_to_m3  * g_to_Msun
+      ! mass_gas = rho_a*udens !* AU3_to_m3  * g_to_Msun
       ! mass_gas = rho_a
       write(*,*) 'Total  gas mass in model:', real(sum(mass_gas) ),' Msun'
-      write(*,*) "AU3_to_m3 * g_to_Msun", AU3_to_m3 * g_to_Msun
-      ! write(*,*) "masse_mol_gaz", masse_mol_gaz
-      write(*,*) "udens", udens
-      write(*,*) "uvelocity", uvelocity
-      write(*,*) "ulength", ulength
 
       ! Normalize the mass in the simulation
       mass = 0.
@@ -458,13 +392,9 @@ contains
       write(*,*) "Desired mass:", disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust
 
       ! Normalisation
-      if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
+      if (mass > 0.0) then
          facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
-
-         ! Somme sur les zones pour densite finale
          do i=1,size(mass_gas)
-            ! densite_gaz(icell) = densite_gaz(icell) * facteur
-            ! masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
             mass_gas(i) = mass_gas(i) * facteur ! * AU3_to_m3 * masse_mol_gaz
          enddo ! icell
       else
@@ -473,10 +403,6 @@ contains
 
       write(*,*) 'Total  gas mass in model:', real(sum(mass_gas)),' Msun' !  * g_to_Msun
 
-      ! M = sum rho_i V_i
-      ! fact = M_d/M
-      ! M_d = fact M
-      ! M_d = fact sum rho_i V_i
       ! Convert coordinates and velocities to Cartesian if necessary
       ! First need to correct for corrotating frame, and difference between athena and mcfost coordinate ordering
       if (athena%coord==1) then
@@ -499,17 +425,10 @@ contains
         allocate(xx(size(x1_a)), yy(size(x1_a)), zz(size(x1_a)))
         call to_cartesian(x1_a, x2_a, x3_a, xx, yy, zz, athena%coord)
 
-
         ! velocites
         allocate(vxx(size(vx1_a)), vyy(size(vx1_a)), vzz(size(vx1_a)))
         call to_cartesian_velocities(vx1_a, vx2_a, vx3_a, vxx, vyy, vzz, x1_a, x2_a, x3_a, athena%coord)
 
-        ! if (athena%coord==1) then
-        !   call to_cartesian_velocities(vx1_a, vx2_a, vx3_a, vxx, vyy, vzz, x1_a, x2_a, x3_a, athena%coord)
-        ! else
-        !   ! Athena orders spherical coords like: vr, vtheta, vphi
-        !   call to_cartesian_velocities(vx1_a, vx2_a, vx3_a, vxx, vyy, vzz, x1_a, x2_a, x3_a, athena%coord)
-        ! endif
         vfield_coord = 0
         write(*,*) "Data successfully from " , coord_name, " to Cartesian ", athena%coord
       else
@@ -523,35 +442,10 @@ contains
         vzz = vx3_a
       endif
 
-      ! Open a file
-      ! AU3_to_m3 * g_to_Msun
-      open(unit=10, file='density.txt', status='replace', action='write')
-      ! Write each float to the file in scientific notation
-      write(*,*) "AU3_to_m3 / g_to_Msun / 1e6", AU3_to_m3 , g_to_Msun , 1e6
-      do i = 1, size(mass_gas)
-          write(10, '(E15.8)') mass_gas(i) * AU3_to_m3 * g_to_Msun / 1e6
-      end do
-      ! Close the file
-      close(10)
-
-      ! Open a file
-      open(unit=10, file='xyz.txt', status='replace', action='write')
-      ! Write each float to the file in scientific notation
-      do i = 1, size(mass_gas)
-          write(10, '(E15.8,",",E15.8,",",E15.8)') xx(i), yy(i), zz(i)
-      end do
-      ! Close the file
-      close(10)
-
-
-
       ! Estimate h
       ! h = v_a**1./3.
       ! Defining a smoothing length
       h = 0.02 * sqrt(xx*xx+yy*yy+zz*zz)
-
-
-
 
       ! Not sure if I should convert out of code units ...
       xx = xx ! * ulength
