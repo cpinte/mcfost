@@ -2098,6 +2098,8 @@ end function integrate_trap_array
          return
      endif
 
+     write(*,*) "SIZES IN MESHGRID", m, n, b
+
      ! Generate meshgrid
      do k = 1, b
          do j = 1, n
@@ -2109,6 +2111,8 @@ end function integrate_trap_array
          end do
      end do
 
+     write(*,*) "OUT SIZES IN MESHGRID", shape(xx), shape(yy), shape(zz)
+
      return
 
    end subroutine meshgrid_3d
@@ -2117,7 +2121,6 @@ subroutine volumegrid_3d(x, y, z, v, coord)
      real, dimension(:), intent(in) :: x, y, z
      real(kind=dp), dimension(:,:,:), intent(out) :: v
      integer, intent(in) :: coord
-     real(kind=dp)   :: dx, dy, dz
      integer :: m, n, b, i, j, k
      ! print *, "Entering volumegrid_3d"
 
@@ -2126,41 +2129,31 @@ subroutine volumegrid_3d(x, y, z, v, coord)
      n = size(y)
      b = size(z)
 
-     ! write(*,*) "sizes of input arrays are ", m, n, b
-     ! write(*,*) "x is ", x
-     ! write(*,*) "y is ", y
-     ! write(*,*) "z is ", z
-
      ! ! Check if dimensions match
      ! if (size(v, 1) /= m .or. size(v, 2) /= n .or. size(v, 3) /= b) then
      !     print *, "Error: Output array dimensions do not match input array dimensions"
      !     return
      ! endif
 
-     ! Generate meshgrid
      do k = 1, b-1
          do j = 1, n-1
              do i = 1, m-1
-               ! print *, "i", i
-               dx = abs(x(i+1)-x(i))
-               dy = abs(y(j+1)-y(j))
-               dz = abs(z(k+1)-z(k))
                if (coord == 0) then
                  ! Cartesian volume element
-                 v(i, j, k) = dx*dy*dx
+                 v(i, j, k) = abs(x(i+1)-x(i)) * abs(y(j+1)-y(j)) * abs(z(k+1)-z(k))
                else if (coord == 1) then
                  ! Cylindrical
-                 v(i, j, k) = (abs(x(i)) + dx/2)*dx*dy*dz
+                 v(i, j, k) = abs(x(i+1)**2 - x(i)**2)/2.0 * abs(y(j+1) - y(j)) * abs(z(k+1)-z(k))
                else if (coord == 2) then
                  ! Spherical polar
-                 if (y(j) < 0 ) then
-                    write(*,*) "y less than 0 in spherical polar"
-                 endif
-                 v(i, j, k) = abs((x(i) + dx/2)**2*sin((y(j) + dy/2))*dx*dy*dz)
+                 v(i, j, k) =  abs(x(i+1)**3 - x(i)**3)/3.0 * &
+                                abs(cos(y(j)) - cos(y(j+1))) * &
+                                abs(z(k+1) - z(k))
                endif
              end do
          end do
      end do
+ write(*,*) "VOUME SHAPE IN VOLUME3D", shape(v)
  end subroutine volumegrid_3d
 
  subroutine to_cartesian(r, theta, phi, x, y, z, coord)

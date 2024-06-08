@@ -357,19 +357,25 @@ contains
          iu = iblock*bs1*bs2*bs3
          il = iu - bs1*bs2*bs3 + 1
 
+         write(*,*) "iu is ", iu, "il is ", il
+
          ! write(*,*) x1v(:, iblock)
-         ! write(*,*) x1f(:, iblock)
+         ! write(*,*) "x1f", x1f(:, iblock)
+         ! write(*,*) "x2f", x2f(:, iblock)
+         ! write(*,*) "x3f", x3f(:, iblock)
 
          ! do j=1, size(x1v(:, iblock))
          !   write(*,*) x1v(j, iblock), x1f(j, iblock) + (x1f(j+1, iblock) - x1f(j, iblock))/2
          ! enddo
+
+         write(*,*) "THE DATA SHAPE IS ", shape(data(:,:,:,iblock,1))
+         write(*,*) "THE FULL DATA SHAPE IS ", shape(data)
 
          rho_a(il:iu) = reshape(data(:,:,:,iblock,1), (/size(data(:,:,:,iblock,1))/) )
          vx1_a(il:iu) = reshape(data(:,:,:,iblock,3), (/size(data(:,:,:,iblock,3))/) )
          vx2_a(il:iu) = reshape(data(:,:,:,iblock,4), (/size(data(:,:,:,iblock,4))/) )
          vx3_a(il:iu) = reshape(data(:,:,:,iblock,5), (/size(data(:,:,:,iblock,5))/) )
 
-         ! call meshgrid_3d(x1v(iblock, :), x2v(iblock, :), x3v(iblock, :), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
          call meshgrid_3d(x1v(:, iblock), x2v(:, iblock), x3v(:, iblock), x1_tmp, x2_tmp, x3_tmp)  ! (x, y, z, xx, yy, zz)
 
          x1_a(il:iu) = reshape(x1_tmp, (/size(x1_tmp)/) )
@@ -381,12 +387,60 @@ contains
          v_a(il:iu) = reshape(v_tmp, (/size(v_tmp)/) )
 
       enddo
+
+      write(*,*) "THE SHAPES ARE ", shape(x1v), shape(x2v), shape(x3v)
+      ! Open a file
+      open(10, file='dens_rtheta.txt', status='replace', action='write')
+      do i = 1, size(x1v(:, 1))
+          do j = 1, size(x2v(:, 1)) - 1
+              ! write(*,*) data(i, j, 0, 1, 1), ','
+              write(10, '(*(E15.8, ","))', advance='no') data(i, j, 1, 1, 1)
+          end do
+          ! write(*,*) data(i, size(x2f(:, 1)), 0, 1, 1)
+          write(10, '(*(E15.8))') data(i, size(x2v(:, 1)), 1, 1, 1)
+      end do
+      close(10)
+
+      open(unit=10, file='r.txt', status='replace', action='write')
+      do i = 1, size(x1v(:, 1))
+          do j = 1, size(x2v(:, 1)) - 1
+              write(10, '(*(E15.8, ","))', advance='no') x1v(i, 1) * sin(x2v(j, 1))
+          end do
+          write(10, '(*(E15.8))') x1v(i, 1) * sin(x2v(size(x2v(:, 1)), 1))
+      enddo
+      close(10)
+
+      open(unit=10, file='z.txt', status='replace', action='write')
+      do i = 1, size(x1v(:, 1))
+          do j = 1, size(x2v(:, 1)) - 1
+              write(10, '(*(E15.8, ","))', advance='no') x1v(i, 1) * cos(x2v(j, 1))
+          end do
+          write(10, '(*(E15.8))') x1v(i, 1) * cos(x2v(size(x2v(:, 1)), 1))
+      enddo
+      close(10)
+
+
+      open(unit=10, file='rs.txt', status='replace', action='write')
+      do i = 1, size(x1v(:, 1))
+            write(10, '(E15.8)') x1v(i, 1)
+      enddo
+      close(10)
+
+      open(unit=10, file='theta.txt', status='replace', action='write')
+        do j = 1, size(x2v(:, 1))
+            write(10, '(E15.8)') x2v(j, 1)
+        end do
+      close(10)
+
+
       write(*,*) "Athena++ data successfully read and reshaped. "
       deallocate(data, x1v, x2v, x3v, x1_tmp, x2_tmp, x3_tmp, v_tmp, x1f, x2f, x3f)
       write(*,*) 'Total grid volume ', real(sum(v_a))
 
       ! Need to convert from density to mass
-      mass_gas = rho_a*udens*v_a !* AU3_to_m3  * g_to_Msun
+      ! mass_gas = rho_a*udens*v_a !* AU3_to_m3  * g_to_Msun
+      mass_gas = rho_a*udens !* AU3_to_m3  * g_to_Msun
+      ! mass_gas = rho_a
       write(*,*) 'Total  gas mass in model:', real(sum(mass_gas) ),' Msun'
       write(*,*) "AU3_to_m3 * g_to_Msun", AU3_to_m3 * g_to_Msun
       ! write(*,*) "masse_mol_gaz", masse_mol_gaz
@@ -419,6 +473,10 @@ contains
 
       write(*,*) 'Total  gas mass in model:', real(sum(mass_gas)),' Msun' !  * g_to_Msun
 
+      ! M = sum rho_i V_i
+      ! fact = M_d/M
+      ! M_d = fact M
+      ! M_d = fact sum rho_i V_i
       ! Convert coordinates and velocities to Cartesian if necessary
       ! First need to correct for corrotating frame, and difference between athena and mcfost coordinate ordering
       if (athena%coord==1) then
@@ -465,23 +523,25 @@ contains
         vzz = vx3_a
       endif
 
-      ! ! Open a file
-      ! open(unit=10, file='density.txt', status='replace', action='write')
-      ! ! Write each float to the file in scientific notation
-      ! do i = 1, size(mass_gas)
-      !     write(10, '(E15.8)') mass_gas(i)
-      ! end do
-      ! ! Close the file
-      ! close(10)
-      !
-      ! ! Open a file
-      ! open(unit=10, file='xyz.txt', status='replace', action='write')
-      ! ! Write each float to the file in scientific notation
-      ! do i = 1, size(mass_gas)
-      !     write(10, '(E15.8,",",E15.8,",",E15.8)') xx(i), yy(i), zz(i)
-      ! end do
-      ! ! Close the file
-      ! close(10)
+      ! Open a file
+      ! AU3_to_m3 * g_to_Msun
+      open(unit=10, file='density.txt', status='replace', action='write')
+      ! Write each float to the file in scientific notation
+      write(*,*) "AU3_to_m3 / g_to_Msun / 1e6", AU3_to_m3 , g_to_Msun , 1e6
+      do i = 1, size(mass_gas)
+          write(10, '(E15.8)') mass_gas(i) * AU3_to_m3 * g_to_Msun / 1e6
+      end do
+      ! Close the file
+      close(10)
+
+      ! Open a file
+      open(unit=10, file='xyz.txt', status='replace', action='write')
+      ! Write each float to the file in scientific notation
+      do i = 1, size(mass_gas)
+          write(10, '(E15.8,",",E15.8,",",E15.8)') xx(i), yy(i), zz(i)
+      end do
+      ! Close the file
+      close(10)
 
 
 
