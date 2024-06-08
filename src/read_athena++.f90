@@ -73,8 +73,8 @@ contains
       ! call error("mcfost can only read athena++ grids with MaxLevel=0 for now")
     else
       if (athena%coord == 1 .or. athena%coord == 2) then
-        athena%arb_grid = .false.
-        lVoronoi = .false.
+        athena%arb_grid = .true.
+        lVoronoi = .true.
       endif
     endif
 
@@ -448,9 +448,9 @@ contains
       h = 0.02 * sqrt(xx*xx+yy*yy+zz*zz)
 
       ! Not sure if I should convert out of code units ...
-      xx = xx ! * ulength
-      yy = yy ! * ulength
-      zz = zz ! * ulength
+      xx = xx * ulength_au
+      yy = yy * ulength_au
+      zz = zz * ulength_au
 
       vxx = vxx * uvelocity
       vyy = vyy * uvelocity
