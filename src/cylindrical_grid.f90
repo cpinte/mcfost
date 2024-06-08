@@ -10,7 +10,8 @@ module cylindrical_grid
        move_to_grid_cyl, define_cylindrical_grid, build_cylindrical_cell_mapping,  cell_map, cell_map_i, cell_map_j,&
        cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, delta_z, r_grid, z_grid, phi_grid, tab_region, &
        z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, cos_phi_lim, sin_phi_lim, volume, l_dark_zone, zmax, &
-       delta_cell_dark_zone, ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone
+       delta_cell_dark_zone, ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone, &
+       distance_to_closest_wall_cyl
 
   real(kind=dp), parameter, public :: prec_grille=1.0e-14_dp
 
@@ -1177,9 +1178,9 @@ end subroutine define_cylindrical_grid
 
   !***********************************************************
 
-  real(dp) function distance_to_closest_wall_cyl(id,icell,x,y,z) result(s)
+  real(dp) function distance_to_closest_wall_cyl(icell,x,y,z) result(s)
 
-    integer, intent(in) :: id, icell
+    integer, intent(in) :: icell
     real(kind=dp), intent(in) :: x,y,z
 
     real(dp) :: r,s1,s2,s3,s4,s5,s6,z0
@@ -1196,8 +1197,8 @@ end subroutine define_cylindrical_grid
     ! z walls
     z0 = abs(z)
     zj0 = abs(zj0)
-    s3 = z_lim(ri0,abs(zj0)+1) - z
-    s4 = z - z_lim(ri0,abs(zj0))
+    s3 = z_lim(ri0,abs(zj0)+1) - z0
+    s4 = z0 - z_lim(ri0,abs(zj0))
 
     if (l3D) then
        ! phi walls
