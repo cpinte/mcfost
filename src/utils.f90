@@ -2098,8 +2098,6 @@ end function integrate_trap_array
          return
      endif
 
-     write(*,*) "SIZES IN MESHGRID", m, n, b
-
      ! Generate meshgrid
      do k = 1, b
          do j = 1, n
@@ -2110,8 +2108,6 @@ end function integrate_trap_array
              end do
          end do
      end do
-
-     write(*,*) "OUT SIZES IN MESHGRID", shape(xx), shape(yy), shape(zz)
 
      return
 
@@ -2153,7 +2149,6 @@ subroutine volumegrid_3d(x, y, z, v, coord)
              end do
          end do
      end do
- write(*,*) "VOUME SHAPE IN VOLUME3D", shape(v)
  end subroutine volumegrid_3d
 
  subroutine to_cartesian(r, theta, phi, x, y, z, coord)
@@ -2190,8 +2185,6 @@ subroutine volumegrid_3d(x, y, z, v, coord)
      real(kind=dp), dimension(:), intent(in) :: vr, vtheta, vphi, r, theta, phi
      real(kind=dp), dimension(:), intent(out) :: vx, vy, vz
      integer :: i
-
-     print *, "Entering to_cartesian_velocities"
 
      ! Check if the input velocities correspond to cylindrical or spherical coordinates
      if (coord == 1) then

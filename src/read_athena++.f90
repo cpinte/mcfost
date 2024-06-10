@@ -73,8 +73,8 @@ contains
       ! call error("mcfost can only read athena++ grids with MaxLevel=0 for now")
     else
       if (athena%coord == 1 .or. athena%coord == 2) then
-        athena%arb_grid = .true.
-        lVoronoi = .true.
+        athena%arb_grid = .false.
+        lVoronoi = .false.
       endif
     endif
 
@@ -548,35 +548,13 @@ contains
                  ! I guess the below line is only true if the simulation is done in a co-rotating frame
                  if (athena%corotating_frame) then
                    vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi
-                   ! vfield3d(icell,2)  = (vx3(i,jj,phik) )  * uvelocity ! vphi : planet at r=1
-                   ! vfield3d(icell,2)  = 1/r_grid(icell)**1/2 * uvelocity
                  else
                    vfield3d(icell,2)  =  vx3(i,jj,phik)  * uvelocity
-                   ! vfield3d(icell,2)  = 1./r_grid(icell)**1./2. * uvelocity ! vx3(i,jj,phik) ! * uvelocity ! vphi
                  endif
                  vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
               enddo ! k
            enddo bz
         enddo ! i
-
-        ! do i=1, n_rad
-        !    jj= 0
-        !    bz : do j=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
-        !       if (j==0) cycle bz
-        !       jj = jj + 1
-        !       do phik=1, n_az
-        !          icell = cell_map(i,j,phik)
-        !
-        !          densite_gaz(icell) =  rho(i,jj,phik) * udens
-        !          densite_pouss(:,icell) = rho(i,jj,phik) * udens
-        !
-        !          vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
-        !          vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
-        !          vfield3d(icell,3)  = vx2(i,jj,phik) * uvelocity! vtheta
-        !       enddo ! k
-        !    enddo bz
-        ! enddo ! i
-
 
 
       endif
