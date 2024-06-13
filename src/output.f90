@@ -801,7 +801,7 @@ subroutine ecriture_map_ray_tracing()
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, xcenter, lambda, itype, ibin, iaz
+  integer :: i,j,group,fpixel,nelements, alloc_status, xcenter, lambda, itype, ntypes, ibin, iaz
 
   character(len = 512) :: filename
   logical :: simple, extend
@@ -815,7 +815,11 @@ subroutine ecriture_map_ray_tracing()
   real, dimension(:,:,:,:), allocatable :: image_casa
 
   if (lcasa) then
-     allocate(image_casa(npix_x, npix_y, 1, 1), stat=alloc_status) ! 3eme axe : pola, 4eme axe : frequence
+     if (lsepar_pola) then
+        allocate(image_casa(npix_x, npix_y, 4, 1), stat=alloc_status) ! 3eme axe : pola, 4eme axe : frequence
+     else
+        allocate(image_casa(npix_x, npix_y, 1, 1), stat=alloc_status) ! 3eme axe : pola, 4eme axe : frequence
+     endif
      if (alloc_status > 0) call error('Allocation error RT image_casa')
      image_casa = 0.0 ;
   else
@@ -936,20 +940,33 @@ subroutine ecriture_map_ray_tracing()
   !----- Images
   ! Boucles car ca ne passe pas avec sum directement (ifort sur mac)
   if (lcasa) then
-     itype=1 ; ibin=1 ; iaz = 1
+     if (lsepar_pola) then
+        ntypes=4 ;
+     else
+        ntypes=1
+     endif
+        ibin=1 ; iaz = 1
 
      W2m2_to_Jy = 1e26 * (tab_lambda(lambda)*1e-6)/c_light;
 
-     do j=1,npix_y
-        do i=1,npix_x
-           image_casa(i,j,1,1) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:)) * W2m2_to_Jy
-        enddo !i
-     enddo !j
+     do itype=1,ntypes
+        do j=1,npix_y
+           do i=1,npix_x
+              image_casa(i,j,itype,1) = sum(Stokes_ray_tracing(lambda,i,j,ibin,iaz,itype,:)) * W2m2_to_Jy
+           enddo !i
+        enddo !j
+     enddo ! itype
 
      if (l_sym_ima) then
         xcenter = npix_x/2 + modulo(npix_x,2)
         do i=xcenter+1,npix_x
            image_casa(i,:,1,1) = image_casa(npix_x-i+1,:,1,1)
+
+           if (lsepar_pola) then
+              image_casa(i,:,2,1) = image_casa(npix_x-i+1,:,2,1)
+              image_casa(i,:,3,1) = - image_casa(npix_x-i+1,:,3,1)
+              image_casa(i,:,4,1) = image_casa(npix_x-i+1,:,4,1)
+           endif
         enddo
      endif
 
