@@ -1269,7 +1269,7 @@ end subroutine find_spectra
 
        ! Pas de fUV et pas de spectre stellaire pour le moment
        etoile(i)%fUV = 0.0 ; etoile(i)%slope_UV = 0.0 ;
-       !etoile(i)%lb_body = .false. ! We do not update anymore as it is an command line option
+       etoile(i)%lb_body = .false. ! Not a bb by default
        etoile(i)%spectre = "None"
 
        write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", real(etoile(i)%r), "Rsun"
@@ -1277,6 +1277,9 @@ end subroutine find_spectra
 
     ! Passage rayon en AU
     etoile(:)%r = etoile(:)%r * Rsun_to_AU
+
+    ! We force again a black-body if needed
+    if (lstar_bb) etoile(:)%lb_body = .true.
 
     return
 
