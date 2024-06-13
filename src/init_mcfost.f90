@@ -217,6 +217,7 @@ subroutine set_default_variables()
   loverwrite_s12 = .false.
   lnot_random_Voronoi = .false.
   lignore_sink=.false.
+  lstar_bb = .false.
 
   tmp_dir = "./"
 
@@ -244,7 +245,7 @@ subroutine get_mcfost_utils_dir()
 
   integer :: i, n_dir
 
- ! Test if MCFOST_UTILS is defined
+  ! Test if MCFOST_UTILS is defined
   call get_environment_variable('MCFOST_UTILS',mcfost_utils)
   if (mcfost_utils == "") call error("environnement variable MCFOST_UTILS is not defined.")
   call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
@@ -291,7 +292,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file, idefix_file, pluto_dir, pluto_id
 
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb, lold_PA
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lold_PA
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -316,7 +317,6 @@ subroutine initialisation_mcfost()
   lno_T = .false.
   lno_SED = .false.
   lpola = .false.
-  lstar_bb = .false.
   star_force_Mdot(:) = .false.
   star_Mdot(:) = 0.0
   lold_PA = .false.
