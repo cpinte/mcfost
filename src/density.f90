@@ -25,7 +25,7 @@ module density
 
   real(kind=dp), dimension(:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
   real(kind=dp), dimension(:), allocatable :: densite_gaz_midplane   ! densite_gaz gives the midplane density for j=0
-  real(kind=dp), dimension(:), allocatable :: Surface_density
+  real(kind=dp), dimension(:,:), allocatable :: Surface_density
 
   real(kind=dp), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
   real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
@@ -172,9 +172,9 @@ subroutine define_gas_density()
               enddo bz2
               if (somme > tiny_dp) then
                  do j=min(1,j_start),nz
-                    densite_gaz_tmp(cell_map(i,j,1)) = densite_gaz_tmp(cell_map(i,j,1)) * Surface_density(i)/somme
+                    densite_gaz_tmp(cell_map(i,j,1)) = densite_gaz_tmp(cell_map(i,j,1)) * Surface_density(i,k)/somme
                  enddo ! j
-                 densite_gaz_midplane_tmp(i) = densite_gaz_midplane_tmp(i) * Surface_density(i)/somme
+                 densite_gaz_midplane_tmp(i) = densite_gaz_midplane_tmp(i) * Surface_density(i,k)/somme
               endif
            endif
         enddo ! i
@@ -536,7 +536,7 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          densite_pouss(l,icell) = densite_pouss(l,icell)  * Surface_density(i)/somme * nbre_grains(l)
+                          densite_pouss(l,icell) = densite_pouss(l,icell)  * Surface_density(i,k)/somme * nbre_grains(l)
                        enddo ! j
                     endif
                  enddo ! l
@@ -1899,7 +1899,7 @@ subroutine read_Sigma_file()
   integer, dimension(2) :: naxes
   logical :: anynull
   character(len=80) :: comment
-  real, dimension(:), allocatable :: sigma_sp
+  real, dimension(:,:), allocatable :: sigma_sp
 
   ! Lecture donnees
   status=0
@@ -1923,8 +1923,8 @@ subroutine read_Sigma_file()
 
   ! determine the size of density file
   nfound = 0 ! to fix ifort bug
-  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound > 2) then
+  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  if ((nfound < 1).or.(nfound > 2)) then
      write(*,*) "nfound = ", nfound, "instead of 1 or 2"
      call error('failed to read the NAXISn keywords of '//trim(sigma_file)//' file.')
   endif
@@ -1950,12 +1950,12 @@ subroutine read_Sigma_file()
   call ftgkyj(unit,"bitpix",bitpix,comment,status)
 
   ! read_image
-  allocate(Surface_density(n_rad), stat=alloc_status)
+  allocate(Surface_density(n_rad,n_az), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error Sigma')
   Surface_density = 0.0_dp
 
   if (bitpix==-32) then
-     allocate(sigma_sp(n_rad))
+     allocate(sigma_sp(n_rad,n_az))
      sigma_sp = 0.0_dp
      call ftgpve(unit,group,firstpix,npixels,nullval,sigma_sp,anynull,status)
      surface_density = real(sigma_sp,kind=dp)
