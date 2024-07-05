@@ -168,7 +168,7 @@ subroutine define_gas_density()
               ! todo : only works for k = 1
               somme = 0.0
               bz2 : do j=min(1,j_start),nz
-                 somme = somme + densite_gaz_tmp(cell_map(i,j,1)) *  (z_lim(i,j+1) - z_lim(i,j))
+                 somme = somme + densite_gaz_tmp(cell_map(i,j,1)) *  (z_lim(i,abs(j)+1) - z_lim(i,abs(j)))
               enddo bz2
               if (somme > tiny_dp) then
                  do j=min(1,j_start),nz
@@ -530,7 +530,7 @@ subroutine define_dust_density()
                     do j=j_start,nz
                        if (j==0) cycle
                        icell = cell_map(i,j,k)
-                       somme = somme + densite_pouss(l,icell)  *  (z_lim(i,j+1) - z_lim(i,j))
+                       somme = somme + densite_pouss(l,icell)  *  (z_lim(i,abs(j)+1) - z_lim(i,abs(j)))
                     enddo ! j
                     if (somme > tiny_dp) then
                        do j=j_start,nz
