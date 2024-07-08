@@ -1768,8 +1768,8 @@ subroutine initialisation_mcfost()
      write (*,'(" Sequential code")')
   endif
 
-  if ((l_sym_ima).and.(abs(ang_disque+90) > 1e-6)) then
-     call warning("PA different from zero: removing image symetry")
+  if ((l_sym_ima).and.(abs(ang_disque) > 1e-6)) then
+     call warning("Disque is not horizontal: removing image symetry")
      l_sym_ima=.false.
      do imol=1,n_molecules
         mol(imol)%l_sym_ima = .false.
