@@ -243,6 +243,8 @@ module parametres
 
   integer :: n_etoiles
   type(star_type), dimension(:), allocatable :: etoile
+  logical :: lstar_bb
+
 
   ! Spot
   real :: T_spot, surf_fraction_spot, theta_spot, phi_spot
