@@ -36,7 +36,7 @@ subroutine allocate_densities(n_cells_max)
   if (alloc_status > 0) call error('Allocation error densite_pouss')
   densite_pouss = 0.0
 
-  allocate(densite_gaz(Nc), densite_gaz_midplane(n_rad), masse_gaz(Nc), stat=alloc_status)
+  allocate(densite_gaz(Nc), densite_gaz_midplane(n_rad,n_az), masse_gaz(Nc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error densite_gaz')
   densite_gaz = 0.0 ; densite_gaz_midplane = 0.0 ; masse_gaz = 0.0
 
