@@ -2117,7 +2117,6 @@ subroutine volumegrid_3d(x, y, z, v, coord)
      real, dimension(:), intent(in) :: x, y, z
      real(kind=dp), dimension(:,:,:), intent(out) :: v
      integer, intent(in) :: coord
-     real(kind=dp)   :: dx, dy, dz
      integer :: m, n, b, i, j, k
      ! print *, "Entering volumegrid_3d"
 
@@ -2126,37 +2125,26 @@ subroutine volumegrid_3d(x, y, z, v, coord)
      n = size(y)
      b = size(z)
 
-     ! write(*,*) "sizes of input arrays are ", m, n, b
-     ! write(*,*) "x is ", x
-     ! write(*,*) "y is ", y
-     ! write(*,*) "z is ", z
-
      ! ! Check if dimensions match
      ! if (size(v, 1) /= m .or. size(v, 2) /= n .or. size(v, 3) /= b) then
      !     print *, "Error: Output array dimensions do not match input array dimensions"
      !     return
      ! endif
 
-     ! Generate meshgrid
      do k = 1, b-1
          do j = 1, n-1
              do i = 1, m-1
-               ! print *, "i", i
-               dx = abs(x(i+1)-x(i))
-               dy = abs(y(j+1)-y(j))
-               dz = abs(z(k+1)-z(k))
                if (coord == 0) then
                  ! Cartesian volume element
-                 v(i, j, k) = dx*dy*dx
+                 v(i, j, k) = abs(x(i+1)-x(i)) * abs(y(j+1)-y(j)) * abs(z(k+1)-z(k))
                else if (coord == 1) then
                  ! Cylindrical
-                 v(i, j, k) = (abs(x(i)) + dx/2)*dx*dy*dz
+                 v(i, j, k) = abs(x(i+1)**2 - x(i)**2)/2.0 * abs(y(j+1) - y(j)) * abs(z(k+1)-z(k))
                else if (coord == 2) then
                  ! Spherical polar
-                 if (y(j) < 0 ) then
-                    write(*,*) "y less than 0 in spherical polar"
-                 endif
-                 v(i, j, k) = abs((x(i) + dx/2)**2*sin((y(j) + dy/2))*dx*dy*dz)
+                 v(i, j, k) =  abs(x(i+1)**3 - x(i)**3)/3.0 * &
+                                abs(cos(y(j)) - cos(y(j+1))) * &
+                                abs(z(k+1) - z(k))
                endif
              end do
          end do
@@ -2180,6 +2168,7 @@ subroutine volumegrid_3d(x, y, z, v, coord)
              z(i) = phi(i)
          end do
      else if (coord == 2) then
+       write (*,*) "################ converting to cartesian from spherical!!"
          ! Convert spherical coordinates to Cartesian
          do i = 1, size(r)
              x(i) = r(i) * sin(theta(i)) * cos(phi(i))
@@ -2197,28 +2186,26 @@ subroutine volumegrid_3d(x, y, z, v, coord)
      real(kind=dp), dimension(:), intent(out) :: vx, vy, vz
      integer :: i
 
-     print *, "Entering to_cartesian_velocities"
-
      ! Check if the input velocities correspond to cylindrical or spherical coordinates
      if (coord == 1) then
          ! Convert cylindrical velocities to Cartesian
          do i = 1, size(vr)
-             vx(i) = vr(i) * cos(theta(i)) - vtheta(i) * r(i) * sin(theta(i))
-             vy(i) = vr(i) * sin(theta(i)) + vtheta(i) * r(i) * cos(theta(i))
+             vx(i) = vr(i) * cos(theta(i)) - vtheta(i) * sin(theta(i))
+             vy(i) = vr(i) * sin(theta(i)) + vtheta(i) * cos(theta(i))
              vz(i) = vphi(i)
          end do
      else if (coord == 2) then
          ! Convert spherical velocities to Cartesian
          do i = 1, size(vr)
              vx(i) = vr(i) * sin(theta(i)) * cos(phi(i)) + &
-                     vtheta(i) * r(i) * cos(theta(i)) * cos(phi(i)) - &
-                     vphi(i) * r(i) * sin(theta(i)) * sin(phi(i))
+                     vtheta(i) * cos(theta(i)) * cos(phi(i)) - &
+                     vphi(i)  * sin(theta(i)) * sin(phi(i))
 
              vy(i) = vr(i) * sin(theta(i)) * sin(phi(i)) + &
-                     vtheta(i) * r(i) * cos(theta(i)) * sin(phi(i)) + &
-                     vphi(i) * r(i) * sin(theta(i)) * cos(phi(i))
+                     vtheta(i) * cos(theta(i)) * sin(phi(i)) + &
+                     vphi(i) * sin(theta(i)) * cos(phi(i))
 
-             vz(i) = vr(i) * cos(theta(i)) - vtheta(i) * r(i) * sin(theta(i))
+             vz(i) = vr(i) * cos(theta(i)) - vtheta(i) * sin(theta(i))
          end do
      else
          call error("Error: Invalid coordinate system. Valid values are 1 (cylindrical) or 2 (spherical).")

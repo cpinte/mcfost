@@ -4,10 +4,6 @@
 
 IS_DARWIN := $(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN)
 
-# Linux compiling server
-LINUX_SERVER=gadi
-IPAG_SERVER=ipag-nfs
-
 KNOWN_SYSTEM=no
 
 LIB= $(MCFOST_INSTALL)/lib
@@ -335,18 +331,6 @@ release_utils :
 	scp -r mcfost_utils.tgz mcfost_utils.sha1 ../utils/Version $(IPAG_SERVER):/user/publicdir/pintec/mcfost_utils/
 	rm -f mcfost_utils.tgz mcfost_utils.sha1
 
-fosti :
-	rsync -Pur *.f90 Makefile fosti:mcfost/src
-	ssh fosti "cd mcfost/src ; make clean mcfost fostino=yes; \cp -f mcfost ~/mcfost_cigri/"
-
-dmz :
-	rsync -Pur *.f90 Makefile dmz:mcfost/src
-	ssh dmz "cd mcfost/src ; make clean mcfost"
-
-wardlaw :
-	rsync -Pur *.f90 Makefile wardlaw:mcfost/src
-	ssh wardlaw "source .login ; cd mcfost/src ; make clean mcfost ; \cp -f mcfost ~/bin/"
-
 #------------------------------------------------------------------------------#
 # Cleaning
 
@@ -367,15 +351,6 @@ cleanall : clean cleandata
 
 cleanGasmod :
 	rm -rf $(gdir)/*.o $(gdir)/*.mod
-
-#------------------------------------------------------------------------------#
-# Backup
-
-.PHONY : save
-
-save :
-	git push bitbucket --all
-	git push github --all
 
 #------------------------------------------------------------------------------#
 # Testing

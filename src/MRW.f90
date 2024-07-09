@@ -8,6 +8,9 @@ module MRW
   integer, parameter :: n = 10000
   real(dp), dimension(n), save :: zeta, y_MRW
 
+  real, parameter :: gamma_MRW = 2.0
+  real(dp), parameter :: cst_ct = 3 / pi**2
+
 contains
 
  subroutine initialize_cumulative_zeta()
@@ -68,22 +71,21 @@ contains
 
  !----------------------------------------------
 
- subroutine make_MRW_step(id,icell,lambda, x,y,z,R0, E)
+ subroutine make_MRW_step(id,icell, x,y,z,E, d, rec_Planck_opacity)
 
    use naleat, only : random_isotropic_direction
 
    integer, intent(in) :: id, icell
-   integer, intent(inout) :: lambda
    real(kind=dp), intent(inout) :: x,y,z
-   real(kind=dp), intent(in) :: R0, E
+   real(kind=dp), intent(in) :: E, d, rec_Planck_opacity
 
-   real(dp) :: u,v,w, ct, diff_coeff
+   real(dp) :: u,v,w, ct
 
    ! Place photon randomly on sphere of radius R0 around current position
    call random_isotropic_direction(id, u,v,w)
-   x = x + u*R0
-   y = y + v*R0
-   z = z + w*R0
+   x = x + u*d
+   y = y + v*d
+   z = z + w*d
 
    ! Select new direction : isotropic or emitting sphere ?
 
@@ -91,13 +93,21 @@ contains
    y = sample_zeta(id)
 
    ! Solve Eq. 8 of Min et al 2009
-   ct = -log(y) / diff_coeff * (R0/pi)**2.
+   ! D = 1/(3*rec_Planck_opacity)
+   ! cst_ct = 3/pi**3
+   ct = -log(y) * cst_ct * rec_Planck_opacity * d**2.
 
+
+   ! Steps that needs to be done
    ! Deposit energy using Planck mean opacity
 
    ! Update temperature and diffusion coefficient ?
 
+
+   ! Only at end of MRW, to switch to MC
    ! Select new wavelength
+
+   ! Select new photon direction
 
 
    return
