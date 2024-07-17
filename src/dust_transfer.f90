@@ -109,11 +109,15 @@ subroutine transfert_poussiere()
 
   laffichage=.true.
 
+write(*,*) "######lVoronoi", lVoronoi 
+
   if (lVoronoi) then
      if (lmhd_voronoi) then
         call setup_mhd_to_mcfost() !uses sph_to_voronoi
-     else
+     else if (lphantom_file .or. lgadget2_file) then
         call setup_SPH2mcfost(extra_heating)
+     else if (lathena) then
+        call read_athena_model()
      endif
      call setup_grid()
   else ! Setting up a regular grid
@@ -130,8 +134,6 @@ subroutine transfert_poussiere()
         call densite_Seb_Charnoz2()
      else if (lfargo3d) then
         call read_fargo3d_files()
-     else if (lathena) then
-        call read_athena_model()
      else if (lsphere_model) then
         !on a structured spherical grid
         call read_spherical_model(density_files(1))

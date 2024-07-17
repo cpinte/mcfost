@@ -71,9 +71,9 @@ contains
           endif
        case("FRAME")
           if ((val == "C").or.(val == "c")) then
-             pluto%corrotating_frame = .true.
+             pluto%corotating_frame = .true.
           else
-             pluto%corrotating_frame = .false.
+             pluto%corotating_frame = .false.
           endif
        end select
     end do infinity
@@ -162,7 +162,7 @@ contains
     if (alloc_status > 0) call error('Allocation error when reading pluto files')
     rho = 0.0_dp ; vx1  = 0.0_dp ; vx2 = 0.0_dp ; vx3 = 0.0_dp
 
-    if (pluto%corrotating_frame) then
+    if (pluto%corotating_frame) then
        if (n_planets < 1) then
           Omega = 1.00049987506246096_dp
           write(*,*) "Forcing corotating frame as there is no planet"

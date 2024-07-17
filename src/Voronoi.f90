@@ -270,7 +270,6 @@ module Voronoi_grid
           endif
        enddo
     end if
-
     do i=1, n_points ! we delete ghost particles
        if (is_ghost(i) /= 0) then
           do_tesselation(i) = .false.
@@ -450,7 +449,6 @@ module Voronoi_grid
        allocate(neighbours_list_loc(n_cells_per_cpu * max_neighbours * nb_proc_voro), stat=alloc_status)
        if (alloc_status /=0) call error("Allocation error neighbours_list_loc")
        neighbours_list_loc = 0
-
        n_in = 0 ! We initialize value at 0 as we have a reduction + clause
        !$omp parallel default(none) num_threads(nb_proc_voro) &
        !$omp shared(n_cells,limits,x_tmp,y_tmp,z_tmp,h_tmp,nb_proc_voro,n_cells_per_cpu,etoile) &
