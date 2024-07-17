@@ -880,8 +880,13 @@ function mcfost_update(lforce_update, lmanual, n_days)
         url = trim(webpage)//"mcfost_Linux-X64.tar.gz"
         url_sha1 = trim(webpage)//"mcfost_Linux-X64.sha1"
      else if (operating_system=="Darwin") then
-        url = trim(webpage)//"mcfost_macOS-X64.tar.gz"
-        url_sha1 = trim(webpage)//"mcfost_macOS-X64.sha1"
+        if (architecture == "arm64") then
+           url = trim(webpage)//"mcfost_macOS-ARM64.tar.gz"
+           url_sha1 = trim(webpage)//"mcfost_macOS-ARM64.sha1"
+        else
+           url = trim(webpage)//"mcfost_macOS-X64.tar.gz"
+           url_sha1 = trim(webpage)//"mcfost_macOS-X64.sha1"
+        endif
      else
         write(*,*) "Unknown operating system : error 2"
         write(*,*) "Cannot download new binary"

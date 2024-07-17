@@ -306,8 +306,11 @@ endif
 
 operating_system.f90 : sha.o
 	printf "module os\n  implicit none\n" > operating_system.f90
-	uname | awk \
+	uname -s | awk \
 		'{print "  character(len=7), parameter :: operating_system = \""$$1"\""}' \
+		>> operating_system.f90
+	uname -m | awk \
+		'{print "  character(len=7), parameter :: architecture = \""$$1"\""}' \
 		>> operating_system.f90
 	printf "end module os\n" >> operating_system.f90
 
