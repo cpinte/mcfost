@@ -72,5 +72,6 @@ runs:
       working-directory: lib
       run: |
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
+        sudo mkdir -p /usr/local/include /usr/local/lib
         sudo chmod o+w /usr/local/include /usr/local/lib
         ./install.sh
