@@ -28,7 +28,7 @@ runs:
         sudo chown root /bin/tar && sudo chmod u+s /bin/tar # tar needs to run as root to extract when restoring the cache
 
     - name: fix gcc issue on the runner (GNU / macos)
-      if: matrix.compiler == 'gfortran' && matrix.os == 'macos'
+      if: matrix.compiler == 'gfortran' && (matrix.os == 'macos' || matrix.os == 'macos-arm')
       shell: bash
       run: |
         brew reinstall gcc@13
