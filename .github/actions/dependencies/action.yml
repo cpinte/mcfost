@@ -37,7 +37,6 @@ runs:
         ln -s /usr/local/bin/g++-13 /usr/local/bin/g++
         ln -s /usr/local/bin/gfortran-13 /usr/local/bin/gfortran
 
-
     - name: install intel compilers (intel / macos)
       if: matrix.compiler == 'ifort' && matrix.os == 'macos'
       shell: bash
