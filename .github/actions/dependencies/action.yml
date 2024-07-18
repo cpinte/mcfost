@@ -58,7 +58,7 @@ runs:
         path: |
           ${{ env.MCFOST_INSTALL }}/include
           ${{ env.MCFOST_INSTALL }}/lib/${{ matrix.compiler }}
-        key: mcfost-deps-${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
+        key: mcfost-TEST-deps-${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
     - name: unset setuid bit for tar if cache not found
       if: matrix.compiler == 'ifort' && matrix.os == 'linux' && steps.cache-deps.outputs.cache-hit != 'true'
