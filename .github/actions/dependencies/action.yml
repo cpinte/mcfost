@@ -33,9 +33,10 @@ runs:
       run: |
        sudo chown runner:admin /usr/local
         brew reinstall gcc@13
-        ln -s /usr/local/bin/gcc-13 /usr/local/bin/gcc
-        ln -s /usr/local/bin/g++-13 /usr/local/bin/g++
-        ln -s /usr/local/bin/gfortran-13 /usr/local/bin/gfortran
+        ln -s /opt/homebrew/bin/gcc-13 /usr/local/bin/gcc
+        ln -s /opt/homebrew/bin/g++-13 /usr/local/bin/g++
+        ln -s /opt/homebrew/bin/gfortran-13 /usr/local/bin/gfortran
+
         export PATH=/usr/local/sbin:/usr/local/bin:${PATH}
         echo "---------- TEST ---------------"
         which gcc-13
@@ -44,10 +45,12 @@ runs:
         gcc-13 -v
         g++-13 -v
         gfortran-13 -v
-        echo "ALIAS"
-        alias gcc="gcc-13"
-        alias g++="g++-13"
-        alias gfortran="gfortran-13"
+
+
+        echo "---------- TEST2 ---------------"
+        which gcc
+        which g++
+        which gfortran
         gcc -v
         g++ -v
         gfortran -v
