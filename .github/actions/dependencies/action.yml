@@ -37,9 +37,17 @@ runs:
         ln -s /usr/local/bin/g++-13 /usr/local/bin/g++
         ln -s /usr/local/bin/gfortran-13 /usr/local/bin/gfortran
         export PATH=/usr/local/sbin:/usr/local/bin:${PATH}
-        alias gcc=gcc-13
-        alias g++=g++-13
-        alias gfortran=gfortran-13
+        echo "---------- TEST ---------------"
+        which gcc-13
+        which g++-13
+        which gfortran-13
+        gcc-13 -v
+        g++-13 -v
+        gfortran-13 -v
+        echo "ALIAS"
+        alias gcc="gcc-13"
+        alias g++="g++-13"
+        alias gfortran="gfortran-13"
         gcc -v
         g++ -v
         gfortran -v
