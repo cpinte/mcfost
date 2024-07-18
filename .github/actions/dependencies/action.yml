@@ -36,10 +36,10 @@ runs:
         ln -s /usr/local/bin/gcc-13 /usr/local/bin/gcc
         ln -s /usr/local/bin/g++-13 /usr/local/bin/g++
         ln -s /usr/local/bin/gfortran-13 /usr/local/bin/gfortran
+        echo $PATH
         gcc -v
         g++ -v
         gfortran -v
-        echo $PATH
 
 
     - name: install intel compilers (intel / macos)
