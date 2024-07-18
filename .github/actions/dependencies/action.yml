@@ -31,9 +31,19 @@ runs:
       if: matrix.compiler == 'gfortran' && (matrix.os == 'macos' || matrix.os == 'armmac')
       shell: bash
       run: |
+       sudo chown runner:admin /usr/local
+        brew reinstall gcc@13
+        ln -s /usr/local/bin/gcc-13 /usr/local/bin/gcc
+        ln -s /usr/local/bin/g++-13 /usr/local/bin/g++
+        ln -s /usr/local/bin/gfortran-13 /usr/local/bin/gfortran
+        export PATH=/usr/local/sbin:/usr/local/bin:${PATH}
         alias gcc=gcc-13
         alias g++=g++-13
         alias gfortran=gfortran-13
+        gcc -v
+        g++ -v
+        gfortran -v
+
 
     - name: install intel compilers (intel / macos)
       if: matrix.compiler == 'ifort' && matrix.os == 'macos'
