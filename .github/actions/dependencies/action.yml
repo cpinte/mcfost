@@ -39,6 +39,7 @@ runs:
         gcc -v
         g++ -v
         gfortran -v
+        echo $PATH
 
 
     - name: install intel compilers (intel / macos)

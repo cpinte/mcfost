@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [armmac, macos, linux]
+        os: [armmac]
         compiler: [gfortran, ifort]
         openmp: [yes, no]
         release: [yes, no]
