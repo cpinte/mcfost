@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-arm, macos, linux]
+        os: [armmac, macos, linux]
         compiler: [gfortran, ifort]
         openmp: [yes, no]
         release: [yes, no]
@@ -32,7 +32,7 @@ jobs:
             os-version: ubuntu-22.04
           - os: macos
             os-version: macos-12
-          - os: macos-arm
+          - os: armmac
             os-version: macos-14
 
           # macos needs null container to avoid loading docker; set linux containers as desired
@@ -42,7 +42,7 @@ jobs:
             container: "quay.io/pypa/manylinux_2_28_x86_64"
 
         exclude:
-          - os: macos-arm
+          - os: armmac
             compiler: ifort
 
     name: build+test (${{ matrix.os }}, ${{ matrix.compiler }}, openmp=${{ matrix.openmp }}, release=${{ matrix.release }})
@@ -113,7 +113,7 @@ jobs:
     needs: build-and-test
     strategy:
       matrix:
-        os: [linux, macos]
+        os: [linux, macos, armmac]
 
         include:
           # Associate specific os versions with our os tags
@@ -121,6 +121,8 @@ jobs:
             os-version: ubuntu-22.04
           - os: macos
             os-version: macos-12
+          - os: armmac
+            os-version: macos-14
 
     runs-on: ${{ matrix.os-version }}
     if: ${{ github.event_name == 'release' }}
