@@ -40,8 +40,11 @@ runs:
         export PATH=/usr/local/sbin:/usr/local/bin:${PATH}
         echo "---------- TEST ---------------"
         which gcc-13
+        ls -l `which gcc-13`
         which g++-13
+        ls -l `which g++-13`
         which gfortran-13
+        ls -l `which gfortran-13`
         gcc-13 -v
         g++-13 -v
         gfortran-13 -v
