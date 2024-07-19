@@ -27,8 +27,17 @@ runs:
         echo "INTEL_PATH=/home/runner/intel/oneapi" >> "$GITHUB_ENV"
         sudo chown root /bin/tar && sudo chmod u+s /bin/tar # tar needs to run as root to extract when restoring the cache
 
-    - name: fix gcc issue on the runner (GNU / macos)
-      if: matrix.compiler == 'gfortran' && (matrix.os == 'macos' || matrix.os == 'armmac')
+    - name: fix gcc issue on the runner (GNU / macos intel)
+      if: matrix.compiler == 'gfortran' && matrix.os == 'macos-intel'
+      shell: bash
+      run: |
+        brew reinstall gcc@13
+        ln -s /usr/local/bin/gcc-13 /usr/local/bin/gcc
+        ln -s /usr/local/bin/g++-13 /usr/local/bin/g++
+        ln -s /usr/local/bin/gfortran-13 /usr/local/bin/gfortran
+
+    - name: fix gcc issue on the runner (GNU / macos arm)
+      if: matrix.compiler == 'gfortran' && matrix.os == 'macos-arm'
       shell: bash
       run: |
        sudo chown runner:admin /usr/local
@@ -36,8 +45,7 @@ runs:
         ln -s /opt/homebrew/bin/gcc-13 /usr/local/bin/gcc
         ln -s /opt/homebrew/bin/g++-13 /usr/local/bin/g++
         ln -s /opt/homebrew/bin/gfortran-13 /usr/local/bin/gfortran
-
-        export PATH=/usr/local/sbin:/usr/local/bin:${PATH}
+        export PATH=/usr/local/bin:${PATH}
         echo "---------- TEST ---------------"
         which gcc-13
         ls -l `which gcc-13`
@@ -52,15 +60,19 @@ runs:
 
         echo "---------- TEST2 ---------------"
         which gcc
+        ls -l `which gcc`
         which g++
+        ls -l `which g++`
         which gfortran
+        ls -l `which gfortran`
+
         gcc -v
         g++ -v
         gfortran -v
 
 
     - name: install intel compilers (intel / macos)
-      if: matrix.compiler == 'ifort' && matrix.os == 'macos'
+      if: matrix.compiler == 'ifort' && matrix.os == 'macos-intel'
       shell: bash
       run: |
         wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg &
