@@ -198,6 +198,8 @@ elif [ "$SYSTEM" = "gfortran" ]; then
     \cp -f gfortran/config.mk voro
 fi
 
+which g++
+g++ -v
 cd voro
 # Allowing for up to 1e8 particles (1e7 by default)
 \cp -f ../voro++/config.hh src/
