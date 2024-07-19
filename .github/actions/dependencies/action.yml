@@ -40,7 +40,7 @@ runs:
       if: matrix.compiler == 'gfortran' && matrix.os == 'macos-arm'
       shell: bash
       run: |
-       sudo chown runner:admin /usr/local
+        sudo chown runner:admin /usr/local
         brew reinstall gcc@13
         ln -s /opt/homebrew/bin/gcc-13 /usr/local/bin/gcc
         ln -s /opt/homebrew/bin/g++-13 /usr/local/bin/g++
@@ -108,4 +108,4 @@ runs:
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
         sudo mkdir -p /usr/local/include /usr/local/lib
         sudo chmod o+w /usr/local/include /usr/local/lib
-        ./install.sh
+        sudo ./install.sh
