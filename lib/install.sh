@@ -203,7 +203,7 @@ cd voro
 \cp -f ../voro++/config.hh src/
 cd src
 pwd
-make
+make libvoro++.a
 cd -
 \cp src/libvoro++.a ../lib
 mkdir -p ../include/voro++
