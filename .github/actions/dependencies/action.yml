@@ -40,36 +40,12 @@ runs:
       if: matrix.compiler == 'gfortran' && matrix.os == 'macos-arm'
       shell: bash
       run: |
-        sudo chown runner:admin /usr/local
+        sudo chown -R $(whoami) /usr/local
         brew reinstall gcc@13
         ln -s /opt/homebrew/bin/gcc-13 /usr/local/bin/gcc
         ln -s /opt/homebrew/bin/g++-13 /usr/local/bin/g++
         ln -s /opt/homebrew/bin/gfortran-13 /usr/local/bin/gfortran
         export PATH=/usr/local/bin:${PATH}
-        echo "---------- TEST ---------------"
-        which gcc-13
-        ls -l `which gcc-13`
-        which g++-13
-        ls -l `which g++-13`
-        which gfortran-13
-        ls -l `which gfortran-13`
-        gcc-13 -v
-        g++-13 -v
-        gfortran-13 -v
-
-
-        echo "---------- TEST2 ---------------"
-        which gcc
-        ls -l `which gcc`
-        which g++
-        ls -l `which g++`
-        which gfortran
-        ls -l `which gfortran`
-
-        gcc -v
-        g++ -v
-        gfortran -v
-
 
     - name: install intel compilers (intel / macos)
       if: matrix.compiler == 'ifort' && matrix.os == 'macos-intel'
@@ -106,6 +82,7 @@ runs:
       working-directory: lib
       run: |
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
-        sudo mkdir -p /usr/local/include /usr/local/lib
-        sudo chmod o+w /usr/local/include /usr/local/lib
+        sudo chown -R $(whoami) /usr/local
+        mkdir -p /usr/local/include /usr/local/lib
+        chmod o+w /usr/local/include /usr/local/lib
         sudo --preserve-env ./install.sh
