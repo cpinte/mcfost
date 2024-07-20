@@ -142,7 +142,7 @@ ifeq ($(SYSTEM), gfortran)
     CXX= g++
     CCFLAGS= -Wall -pedantic -m64 -O3 -funroll-loops -ffinite-math-only -fno-trapping-math
     COMPFLAGS= -fopenmp
-    LIBCXX= -lstdc++ -no-pie
+    LIBCXX= -lstdc++ -Wl,-ld_classic
     ifneq ($(shell $(CC) -v 2>&1 | grep -c "clang"), 0)
         LIBCXX= -lc++
     endif
