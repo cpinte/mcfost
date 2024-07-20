@@ -3,6 +3,7 @@
 #------------------------------------------------------------------------------#
 
 IS_DARWIN := $(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN)
+cpu =  $(shell uname -m)
 
 KNOWN_SYSTEM=no
 
@@ -142,7 +143,11 @@ ifeq ($(SYSTEM), gfortran)
     CXX= g++
     CCFLAGS= -Wall -pedantic -m64 -O3 -funroll-loops -ffinite-math-only -fno-trapping-math
     COMPFLAGS= -fopenmp
-    LIBCXX= -lstdc++ -Wl,-ld_classic
+    ifeq ($(cpu),arm64)
+        LIBCXX= -lstdc++ -Wl,-ld_classic # for github action
+    else
+        LIBCXX= -lstdc++
+    endif
     ifneq ($(shell $(CC) -v 2>&1 | grep -c "clang"), 0)
         LIBCXX= -lc++
     endif
