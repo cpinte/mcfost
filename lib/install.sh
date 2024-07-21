@@ -189,7 +189,7 @@ echo "Done"
 #-------------------------------------------
 # Voro++
 #-------------------------------------------
-echo "Compiling Voro++ ..."
+echo "Compiling Voro++ library ..."
 if [ "$SYSTEM" = "ifort" ]; then
     \cp -f ifort/config.mk voro
 elif [ "$SYSTEM" = "ifx" ]; then
@@ -201,7 +201,10 @@ fi
 cd voro
 # Allowing for up to 1e8 particles (1e7 by default)
 \cp -f ../voro++/config.hh src/
-make
+cd src
+pwd
+make libvoro++.a
+cd -
 \cp src/libvoro++.a ../lib
 mkdir -p ../include/voro++
 \cp src/*.hh ../include/voro++/

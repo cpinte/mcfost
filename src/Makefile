@@ -3,6 +3,7 @@
 #------------------------------------------------------------------------------#
 
 IS_DARWIN := $(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN)
+cpu =  $(shell uname -m)
 
 KNOWN_SYSTEM=no
 
@@ -142,7 +143,11 @@ ifeq ($(SYSTEM), gfortran)
     CXX= g++
     CCFLAGS= -Wall -pedantic -m64 -O3 -funroll-loops -ffinite-math-only -fno-trapping-math
     COMPFLAGS= -fopenmp
-    LIBCXX= -lstdc++
+    ifeq ($(cpu),arm64)
+        LIBCXX= -lstdc++ -Wl,-ld_classic # for github action
+    else
+        LIBCXX= -lstdc++
+    endif
     ifneq ($(shell $(CC) -v 2>&1 | grep -c "clang"), 0)
         LIBCXX= -lc++
     endif
@@ -306,8 +311,11 @@ endif
 
 operating_system.f90 : sha.o
 	printf "module os\n  implicit none\n" > operating_system.f90
-	uname | awk \
+	uname -s | awk \
 		'{print "  character(len=7), parameter :: operating_system = \""$$1"\""}' \
+		>> operating_system.f90
+	uname -m | awk \
+		'{print "  character(len=7), parameter :: architecture = \""$$1"\""}' \
 		>> operating_system.f90
 	printf "end module os\n" >> operating_system.f90
 
