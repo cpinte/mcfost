@@ -133,12 +133,7 @@ jobs:
       - name: restore binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: mcfost-binary-${{ matrix.os }}-${{ matrix.os == 'macos-arm'  && 'gfortran' || 'ifort' }}
-          path: src/
-
-        uses: actions/download-artifact@v4
-        with:
-          name: mcfost-binary-${{ matrix.os }}-ifort # use ifort for binary release
+          name: mcfost-binary-${{ matrix.os }}-${{ matrix.os == 'macos-arm'  && 'gfortran' || 'ifort' }} # use ifort for binary release
           path: src/
 
       - name: simple check to make sure the binary runs in a clean environment
