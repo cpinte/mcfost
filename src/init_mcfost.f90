@@ -200,6 +200,7 @@ subroutine set_default_variables()
   lrandomize_gap = .false.
   lrandomize_outside_gap = .false.
   lcentre_on_sink = .false.
+  lexpand_z = .false.
   lwrite_column_density = .false.
   lwrite_mol_column_density = .false.
   lwrite_velocity = .false.
@@ -1385,6 +1386,12 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) gap_factor
         i_arg = i_arg + 1
+     case("-expand_z","-expand-z","-ez")
+        i_arg = i_arg + 1
+        lexpand_z = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) expand_z_factor
+        i_arg = i_arg + 1
      case("-cd","-column_density")
         i_arg = i_arg + 1
         lwrite_column_density = .true.
@@ -2047,6 +2054,7 @@ subroutine display_help()
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
   write(*,*) "        : -centre_on_sink <number> : centre the model on the sink particle"
+  write(*,*) "        : -expand_z <factor> : multipky all z values by factor"
   write(*,*) "        : -SPH_amin <size> [mum] : force the grain size that follow the gas"
   write(*,*) "        : -SPH_amax <size> [mum] : force the grain size that follow the dust"
   write(*,*) "                                   (only works with 1 grain size dump)"

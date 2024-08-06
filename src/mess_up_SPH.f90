@@ -5,7 +5,7 @@ module mess_up_SPH
   implicit none
 
   ! mask is set to 1 for hide particle == opacity set to 0, and set to 2 to delete particle before tesselation
-  public :: mask_Hill_sphere, randomize_azimuth, randomize_gap, mask_inside_rsph, mask_outside_rsph, mask_above_theta
+  public :: mask_Hill_sphere, randomize_azimuth, randomize_gap, mask_inside_rsph, mask_outside_rsph, mask_above_theta, expand_z
 
   private
 
@@ -239,6 +239,25 @@ contains
     return
 
   end subroutine randomize_azimuth
+
+  !*********************************************************
+
+  subroutine expand_z(np, xyzh, vxyzu, factor)
+
+    integer, intent(in) :: np
+    real(kind=dp), dimension(:,:), intent(inout) :: xyzh, vxyzu
+    real(kind=dp) :: factor
+
+    integer :: i
+
+    do i=1, np
+       xyzh(3,i) = xyzh(3,i) * factor
+       vxyzu(3,i) = vxyzu(3,i) * factor
+    enddo
+
+    return
+
+  end subroutine expand_z
 
   !*********************************************************
 

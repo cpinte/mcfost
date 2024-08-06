@@ -753,6 +753,8 @@ contains
        enddo
     endif
 
+    if (lexpand_z) call expand_z(np, xyzh, vxyzu, expand_z_factor)
+
     return
 
   end subroutine modify_dump
