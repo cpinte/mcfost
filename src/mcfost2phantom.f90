@@ -237,6 +237,8 @@ contains
 
     logical, save :: lfirst_time = .true.
 
+    integer, dimension(:), allocatable :: mask ! not allocated as we do not mask particle in live RT hydro
+
     ldust_moments = .false. ! for now
 
     ! We use the phantom_2_mcfost interface with 1 file
@@ -266,7 +268,7 @@ contains
     ! Performing the Voronoi tesselation & defining density arrays
     call SPH_to_Voronoi(n_SPH, ndusttypes, particle_id, x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH, &
          massgas,massdust,rhogas,rhodust,SPH_grainsizes, SPH_limits, .false., is_ghost, &
-         ldust_moments, dust_moments, mass_per_H)
+         ldust_moments, dust_moments, mass_per_H, mask=mask)
 
     call setup_grid()
     call setup_scattering()
