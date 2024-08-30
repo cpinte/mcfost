@@ -127,6 +127,15 @@ https://github.com/cpinte/mcfost
 
   (depending on your gcc/g++ version).
 
+.. note:: Incompatiablities may present between mcfost and the latest gcc/gfortran versions (v14 or later).
+  If you encounter such compilation errors, consider manually fixing the versions of the related packages. For example, for anaconda users, try running::
+
+    $ conda create -n mcfost_make make cfitsio=4.3.0 hdf5 gcc=13.3.0 gxx=13.3.0 gfortran=13.3.0 autoconf zlib libgcc=13.3.0 libgfortran=13.3.0 conda-gcc-specs
+    
+    $ conda activate mcfost_make
+  
+  before continuing.
+
 4. If you wish to compile mcfost with the chemistry emulator, you also need to set::
 
      $ export MCFOST_XGBOOST=yes
