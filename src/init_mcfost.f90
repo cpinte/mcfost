@@ -177,6 +177,8 @@ subroutine set_default_variables()
   lcasa=.false.
   lJy = .false.
   lplanet_az = .false.
+  delta_planet_az = 0
+  idelta_planet_az = 0
   which_planet = 0
   lML = .false.
   lcorrect_density_elongated_cells=.false.
@@ -1287,6 +1289,14 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) planet_az
         i_arg = i_arg + 1
+     case("-delta_planet_az")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) idelta_planet_az
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) delta_planet_az
+        i_arg = i_arg + 1
      case("-planet")
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
@@ -1908,6 +1918,7 @@ subroutine display_help()
   write(*,*) "        : -n_MC_bins <n_inclinations> <n_azimuth> (default : 10 1)"
   write(*,*) "        : -planet_az <angle> [deg] : adjust the model azimuth so that the planet is at"
   write(*,*) "                                     desired azimuth in the map"
+  write(*,*) "        : -delta_planet_az <n> <angle> [deg] : add n azimuth directions around planet_az"
   write(*,*) "        : -planet <sink_particle_number> : select the sink particle used to"
   write(*,*) "                                           perform the dump rotation"
   write(*,*) "        : -turn-off_planets : sink particles with id > 1 will not emit"

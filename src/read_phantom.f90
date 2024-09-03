@@ -775,7 +775,8 @@ contains
     ! extra_heating is in W
 
     use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad, Ggrav
-    use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az
+    use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az, &
+         idelta_planet_az, delta_planet_az
     use parametres, only : lscale_length_units,scale_length_units_factor,lscale_mass_units,scale_mass_units_factor
 
     ! Input arguments
@@ -1068,13 +1069,21 @@ contains
        if (nptmass == 2) which_planet=2
        if (which_planet > nptmass) call error("specified sink particle does not exist")
 
-       RT_n_az = 1
+
        RT_az_min = planet_az + atan2(xyzmh_ptmass(2,which_planet) - xyzmh_ptmass(2,1), &
             xyzmh_ptmass(1,which_planet) - xyzmh_ptmass(1,1)) &
             / deg_to_rad
-       RT_az_max = RT_az_min
        write(*,*) "Moving sink particle #", which_planet, "to azimuth =", planet_az
        write(*,*) "WARNING: updating the azimuth to:", RT_az_min
+
+       if (idelta_planet_az == 0) then
+          RT_n_az = 1
+          RT_az_max = RT_az_min
+       else
+          RT_n_az = 2 * idelta_planet_az+1
+          RT_az_min = RT_az_min - delta_planet_az
+          RT_az_max = RT_az_min + 2*delta_planet_az
+       endif
     endif
 
     if (lfix_star) then
