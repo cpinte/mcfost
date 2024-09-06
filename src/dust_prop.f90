@@ -955,7 +955,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   fact = AU_to_cm * mum_to_cm**2
 
   rho0 = masse(icell_not_empty)/volume(icell_not_empty) ! normalising by density in a non-empty cell
-  if (rho0 < tiny_dp) call error("cannot normalise by density in first cell")
+  if (rho0 < tiny_dp) call error("cannot normalise by density in first non-empty cell")
 
   ! We apply a corrective factor per cell --> to get kappa, we need to do kappa(icell,lambda) * kappa_factor(icell)
   if (lvariable_dust) then
