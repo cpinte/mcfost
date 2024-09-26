@@ -1896,11 +1896,13 @@ subroutine find_non_empty_cell()
   integer :: icell
 
   search_not_empty : do icell=1,n_cells
-     if (masse(icell) > 0.0_sp) then
+     if (masse(icell) > tiny_real) then
         icell_not_empty = icell
         exit search_not_empty
      endif
   enddo search_not_empty
+
+  write(*,*) "Reference cell is #", icell_not_empty
 
   return
 
