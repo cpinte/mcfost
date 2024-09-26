@@ -4,7 +4,7 @@ module SPH2mcfost
   use constantes
   use utils
   use sort, only : find_kth_smallest_inplace
-  use density, only : normalize_dust_density, reduce_density, read_Voronoi_fits_file
+  use density, only : normalize_dust_density, reduce_density, read_Voronoi_fits_file, find_non_empty_cell
   use read_phantom, only : read_phantom_bin_files, read_phantom_hdf_files
   use sort, only : index_quicksort
   use stars, only : compute_stellar_parameters
@@ -126,6 +126,8 @@ contains
 
     ! Deleting particles/cells in masked areas (Hill sphere, etc)
     if (allocated(mask)) call delete_masked_particles()
+
+    call find_non_empty_cell()
 
     return
 
@@ -622,15 +624,6 @@ contains
        write(*,*) "Density was reduced by", density_factor, "in", n_force_empty, "cells surrounding the model, ie",&
             (1.0*n_force_empty)/n_cells * 100, "% of cells"
     endif
-
-    search_not_empty : do k=1,n_grains_tot
-       do icell=1, n_cells
-          if (densite_pouss(k,icell) > 0.0_sp) then
-             icell_not_empty = icell
-             exit search_not_empty
-          endif
-       enddo !icell
-    enddo search_not_empty
 
     if (ndusttypes >= 1) deallocate(a_SPH,log_a_SPH,rho_dust)
 

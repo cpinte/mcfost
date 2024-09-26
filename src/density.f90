@@ -19,7 +19,7 @@ module density
   public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, densite_pouss, masse, icell_not_empty, &
        define_density, define_density_wall3d, define_dust_density, read_density_file, is_density_file_Voronoi, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_species, read_sigma_file, normalize_dust_density, &
-       reduce_density, read_Voronoi_fits_file
+       reduce_density, read_Voronoi_fits_file, find_non_empty_cell
 
   private
 
@@ -1883,6 +1883,18 @@ subroutine normalize_dust_density(disk_dust_mass)
   ! Valable que dans le cas cylindrique mais pas de pb dans le cas spherique
   ! if (lcylindrical) densite_pouss(:,nz+1,:,:) = densite_pouss(:,nz,:,:)
 
+  call find_non_empty_cell()
+
+  return
+
+end subroutine normalize_dust_density
+
+!**********************************************************
+
+subroutine find_non_empty_cell()
+
+  integer :: icell
+
   search_not_empty : do icell=1,n_cells
      if (masse(icell) > 0.0_sp) then
         icell_not_empty = icell
@@ -1892,7 +1904,7 @@ subroutine normalize_dust_density(disk_dust_mass)
 
   return
 
-end subroutine normalize_dust_density
+end subroutine find_non_empty_cell
 
 !**********************************************************
 
@@ -2071,15 +2083,9 @@ subroutine densite_Seb_Charnoz()
 
   masse(:) = masse(:) * AU3_to_cm3 * 1600./3500 ! TMP
 
-  search_not_empty : do icell=1,n_cells
-     if (masse(icell) > 0.0_sp) then
-        icell_not_empty = icell
-        exit search_not_empty
-     endif
-  enddo search_not_empty
-
-
   write(*,*) 'Total dust mass in model  :', real(sum(masse)*g_to_Msun),'Msun'
+
+  call find_non_empty_cell()
 
   write(*,*) "Done"
   write(*,*) "***********************************************"
@@ -2183,14 +2189,10 @@ subroutine densite_Seb_Charnoz2()
 
   masse(:) = masse(:) * AU3_to_cm3
 
-  search_not_empty : do icell=1,n_cells
-     if (masse(icell) > 0.0_sp) then
-        icell_not_empty = icell
-        exit search_not_empty
-     endif
-  enddo search_not_empty
-
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
+
+  call find_non_empty_cell()
+
   write(*,*) "Density from Seb. Charnoz set up OK"
 
   return
