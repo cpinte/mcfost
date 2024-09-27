@@ -728,15 +728,18 @@ contains
     integer :: i
 
     ! Modifying SPH dump
-    if (ldelete_Hill_sphere .or. ldelete_inside_rsph .or. ldelete_outside_rsph .or. ldelete_above_theta) then
+    if (ldelete_Hill_sphere .or. lmask_inside_rsph .or. lmask_outside_rsph .or. lmask_above_theta .or. &
+         ldelete_outside_rsph .or. ldelete_above_theta) then
        allocate(mask(np))
        mask(:) = 0
     endif
 
     if (ldelete_Hill_sphere)  call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,ulength, mask)
-    if (ldelete_inside_rsph)  call mask_inside_rsph(np, xyzh, ulength, rsph_min, mask)
-    if (ldelete_outside_rsph) call mask_outside_rsph(np, xyzh, ulength, rsph_max, mask)
-    if (ldelete_above_theta)  call mask_above_theta(np, xyzh, ulength, theta_max, mask)
+    if (lmask_inside_rsph)  call mask_inside_rsph(np, xyzh, ulength, rsph_min, mask)
+    if (lmask_outside_rsph) call mask_outside_rsph(np, xyzh, ulength, rsph_max, mask)
+    if (ldelete_outside_rsph) call delete_outside_rsph(np, xyzh, ulength, rsph_mask_max, mask)
+    if (ldelete_above_theta)  call delete_above_theta(np, xyzh, ulength, theta_max, mask)
+    if (lmask_above_theta)  call mask_above_theta(np, xyzh, ulength, theta_mask_max, mask)
 
     if (lrandomize_azimuth)     call randomize_azimuth(np, xyzh, vxyzu, mask)
     if (lrandomize_gap)         call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,ulength, gap_factor, .true.)
