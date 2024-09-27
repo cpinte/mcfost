@@ -5,7 +5,8 @@ module mess_up_SPH
   implicit none
 
   ! mask is set to 1 for hide particle == opacity set to 0, and set to 2 to delete particle before tesselation
-  public :: mask_Hill_sphere, randomize_azimuth, randomize_gap, mask_inside_rsph, mask_outside_rsph, mask_above_theta, expand_z
+  public :: mask_Hill_sphere, randomize_azimuth, randomize_gap, mask_inside_rsph, mask_outside_rsph, &
+       mask_above_theta, delete_outside_rsph, delete_above_theta, expand_z
 
   private
 
@@ -101,14 +102,47 @@ contains
        endif
     enddo particle_loop
 
-    write(*,*) n_delete, "particles were deleted indide rsph=", rsph
+    write(*,*) n_delete, "particles were masked indide rsph=", rsph
     return
 
   end subroutine mask_inside_rsph
 
 !*********************************************************
 
-  subroutine mask_outside_rsph(np, xyzh,udist, rsph, mask)
+  subroutine mask_outside_rsph(np, xyzh, udist, rsph, mask)
+
+    integer, intent(in) :: np
+    real(kind=dp), dimension(:,:), intent(in) :: xyzh
+    real(kind=dp), intent(in) :: udist, rsph
+
+    integer, dimension(np), intent(inout) :: mask
+
+    integer :: i, n_delete
+    real(kind=dp) :: d2, r, r2, ulength_au
+
+
+    ulength_au = udist * scale_length_units_factor  / au_to_cm
+    r = rsph /  ulength_au  ! converting back to phantom code units
+    r2 = r * r
+
+    n_delete = 0
+    particle_loop : do i=1, np
+       d2 = sum(xyzh(1:3,i)**2)
+       if (d2 > r2) then ! particle is outside rsph
+          mask(i) = 1
+          n_delete = n_delete + 1
+       endif
+    enddo particle_loop
+
+    write(*,*) n_delete, "particles were masked outside rsph=", rsph
+
+    return
+
+  end subroutine mask_outside_rsph
+
+  !*********************************************************
+
+  subroutine delete_outside_rsph(np, xyzh, udist, rsph, mask)
 
     integer, intent(in) :: np
     real(kind=dp), dimension(:,:), intent(in) :: xyzh
@@ -137,7 +171,7 @@ contains
 
     return
 
-  end subroutine mask_outside_rsph
+  end subroutine delete_outside_rsph
 
   !*********************************************************
 
@@ -166,10 +200,42 @@ contains
        endif
     enddo particle_loop
 
-    write(*,*) n_delete, "particles were deleted above theta=", theta_max, "rad"
+    write(*,*) n_delete, "particles were masked above theta=", theta_max, "rad"
     return
 
   end subroutine mask_above_theta
+
+  !*********************************************************
+
+    subroutine delete_above_theta(np, xyzh,udist, theta_max, mask)
+
+    integer, intent(in) :: np
+    real(kind=dp), dimension(:,:), intent(in) :: xyzh
+    real(kind=dp), intent(in) :: udist
+    real, intent(in) :: theta_max
+
+    integer, dimension(np), intent(inout) :: mask
+
+    integer :: i, n_delete
+    real(kind=dp) :: r, tan_theta_max, tan_theta
+
+    n_delete = 0
+    tan_theta_max = tan(theta_max)
+
+    particle_loop : do i=1, np
+       r = sqrt(xyzh(1,i)**2 + xyzh(2,i)**2)
+       tan_theta = abs(xyzh(3,i)/r)
+
+       if (tan_theta > tan_theta_max) then ! particle is above theta_max
+          mask(i) = 2
+          n_delete = n_delete + 1
+       endif
+    enddo particle_loop
+
+    write(*,*) n_delete, "particles were deleted above theta=", theta_max, "rad"
+    return
+
+  end subroutine delete_above_theta
 
   !*********************************************************
 

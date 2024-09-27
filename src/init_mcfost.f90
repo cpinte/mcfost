@@ -194,9 +194,11 @@ subroutine set_default_variables()
   lvphi_Kep = .false.
   lfluffy = .false.
   ldelete_hill_sphere = .false.
-  ldelete_inside_rsph = .false.
+  lmask_inside_rsph = .false.
   ldelete_outside_rsph = .false.
   ldelete_above_theta = .false.
+  lmask_outside_rsph = .false.
+  lmask_above_theta = .false.
   lrandomize_Voronoi = .false.
   lrandomize_azimuth = .false.
   lrandomize_gap = .false.
@@ -1360,11 +1362,23 @@ subroutine initialisation_mcfost()
      case("-delete_Hill_sphere")
         i_arg = i_arg + 1
         ldelete_Hill_sphere = .true.
-     case("-delete_inside_rsph")
+     case("-mask_inside_rsph")
         i_arg = i_arg + 1
-        ldelete_inside_rsph = .true.
+        lmask_inside_rsph = .true.
         call get_command_argument(i_arg,s)
         read(s,*) rsph_min
+        i_arg = i_arg + 1
+     case("-mask_outside_rsph")
+        i_arg = i_arg + 1
+        lmask_outside_rsph = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) rsph_mask_max
+        i_arg = i_arg + 1
+     case("-mask_above_latitude")
+        i_arg = i_arg + 1
+        lmask_above_theta = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) theta_mask_max
         i_arg = i_arg + 1
      case("-delete_outside_rsph")
         i_arg = i_arg + 1
