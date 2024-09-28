@@ -575,7 +575,7 @@ contains
     if (present(mask)) then
        if (allocated(mask)) then
           do icell=1,n_cells
-             iSPH = Voronoi(icell)%id
+             iSPH = Voronoi(icell)%original_id
              if (iSPH > 0) then
                 Voronoi(icell)%masked = mask(iSPH)
              else
@@ -822,7 +822,7 @@ contains
 
     k=0
     do icell=1, n_cells
-       if (Voronoi(icell)%masked == 1) then
+       if (Voronoi(icell)%masked == 1) then ! 1 is transparent
           k=k+1
           masse_gaz(icell)       = 0.
           densite_gaz(icell)     = 0.
