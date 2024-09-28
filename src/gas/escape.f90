@@ -126,11 +126,11 @@ module escape
         integer, parameter :: order = 1
 
         if ((lcylindrical)) then
-            call warning("(count_neighbours) Not tested for cylindrical grid yet") 
+            call warning("(count_neighbours) Not tested for cylindrical grid yet")
         endif
 
         if ((lvoronoi)) then
-            call error("(count_neighbours) Not working for voronoi grid yet") 
+            call error("(count_neighbours) Not working for voronoi grid yet")
         endif
 
         !spherical grid
@@ -310,7 +310,7 @@ module escape
                 call progress_bar(ibar)
                 !$omp atomic
                 ibar = ibar+1
-            endif             
+            endif
         enddo
         !$omp end do
         !$omp end parallel
@@ -347,7 +347,7 @@ module escape
                     ! if (.not.lintersect) cycle
                     ! if (lintersect) then
                     n_rays_star(i_star) = n_rays_star(i_star) + 1
-                    if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then 
+                    if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then
                         !fraction actually because all rays touch the star here
                         Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell)
                         n_rays_shock(i_star) = n_rays_shock(i_star) + 1
@@ -503,7 +503,7 @@ module escape
 
                 call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)!will intersect
 
-                !to do propagate along the ray to get dv_max    
+                !to do propagate along the ray to get dv_max
 
                 previous_cell = 0 ! unused, just for Voronoi
                 call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
@@ -526,7 +526,7 @@ module escape
                         inf : do
                             if (next_cell==icell_star) then
                                 !in shock ??
-                                if (is_inshock(id, iray, i_star, icell_in, xa, xb, xc, Tchoc, F1, T1)) then 
+                                if (is_inshock(id, iray, i_star, icell_in, xa, xb, xc, Tchoc, F1, T1)) then
                                     dOmega_shock(icell,i_star) = dOmega_shock(icell,i_star) + wei
                                     Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell_in)
                                     n_rays_shock(i_star) = n_rays_shock(i_star) + 1
@@ -561,7 +561,7 @@ module escape
                 call progress_bar(ibar)
                 !$omp atomic
                 ibar = ibar+1
-            endif             
+            endif
         enddo
         !$omp end do
         !$omp end parallel
@@ -573,7 +573,7 @@ module escape
             Tchoc_average = Tchoc_average / rho_shock
             f_shock = real(n_rays_shock) / real(n_rays_star)
         endif
-      
+
         write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') &
             maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
         write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') &
@@ -636,7 +636,7 @@ module escape
         logical :: l_iterate, l_iterate_ne
         integer :: n_xc
         real(kind=dp), dimension(:), pointer :: tab_xc
-      
+
         !convergence check
         type (AtomType), pointer :: at
         integer(kind=8) :: mem_alloc_local
@@ -806,7 +806,7 @@ module escape
 
             stream = 0.0
             stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
- 
+
             l_iterate_ne = .false.
             if( n_iterate_ne > 0 ) then
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
@@ -942,7 +942,7 @@ module escape
                     write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
                     n_iterate_ne = 0
                 endif
-               endif 
+               endif
             end if
             !***********************************************************!
 
@@ -1022,9 +1022,9 @@ module escape
                   !TO DO: takes time with large grid
                 !   call opacity_atom_bf_loc(icell, n_xc, tab_xc, chi_cont(:,icell), eta_cont(:,icell))
 !background continua not needed if no continuum RT
-                  if (limit_mem < 2) then 
-                    call calc_contopac_loc(icell,n_xc,tab_xc)  
-                  endif   
+                  if (limit_mem < 2) then
+                    call calc_contopac_loc(icell,n_xc,tab_xc)
+                  endif
 
                end if !if l_iterate
             end do cell_loop2 !icell
@@ -1219,12 +1219,12 @@ module escape
 
                 !pops inversions
                 if (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell) <= 0.0) cycle atr_loop
-         
+
                 !assumes the underlying radiation is flat across the line.
                 !or take n0 as a function of velocity
                 Icore = Itot(n0,1,id)
 
-   
+
                 !could be stored in mem.
                 chi_ij = hc_fourPI * at%lines(kr)%Bij * (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell))
                 tau_escape = fact_tau * chi_ij * mean_length_scale(icell) / vth
@@ -1352,7 +1352,7 @@ module escape
 
       I_sobolev_1ray(:) = 0.0_dp
 
-      p_icell => icell_ref
+      p_icell => icell1
       if (lvariable_dust) p_icell => icell
 
       ! Will the ray intersect a star
@@ -1376,7 +1376,7 @@ module escape
                 do nat=1, NactiveAtoms
                     do kr=1, ActiveAtoms(nat)%p%nline
                         nl = ActiveAtoms(nat)%p%lines(kr)%Nr - ActiveAtoms(nat)%p%lines(kr)%Nb + 1
-                        I0_line(1:nl,kr,nat,id) = Icore(ActiveAtoms(nat)%p%lines(kr)%Nb:ActiveAtoms(nat)%p%lines(kr)%Nr) 
+                        I0_line(1:nl,kr,nat,id) = Icore(ActiveAtoms(nat)%p%lines(kr)%Nb:ActiveAtoms(nat)%p%lines(kr)%Nr)
                     enddo
                 enddo
                return
@@ -1468,11 +1468,11 @@ module escape
 
                 !pops inversions
                 if (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell) <= 0.0) cycle atr_loop
-         
+
                 !assumes the underlying radiation is flat across the line.
                 !or take n0 as a function of velocity
                 Icore = maxval(I0_line(:,kr,nact,id)) !shock + star weighted by the solid angle
-   
+
                 !could be stored in mem.
                 chi_ij = hc_fourPI * at%lines(kr)%Bij * (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell))
                 tau_escape = fact_tau * chi_ij * ds(iray,id) / vth
@@ -1596,7 +1596,7 @@ module escape
         if (present(rates)) then
             if (.not.rates) return
         else !not present, return, equivalent to .false.
-            return 
+            return
         endif
 
         !accumulate rates
@@ -1700,7 +1700,7 @@ module escape
         Nb = cont%Nb; Nr = cont%Nr
         Nl = Nr-Nb + 1
         i0 = Nb - 1
-        
+
         ! xcc_down = 0.0
         ! do l=1, Nl
         !     if (l==1) then

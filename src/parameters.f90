@@ -124,7 +124,7 @@ module parametres
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
   integer :: n_cells, nrz, p_n_cells
-  integer, target :: icell_ref
+  integer, target :: icell1 = 1
   logical :: lregular_theta
   real :: theta_max, theta_mask_max
 

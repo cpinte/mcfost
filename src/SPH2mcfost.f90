@@ -244,7 +244,7 @@ contains
 
     limit_threshold = (1.0 - SPH_keep_particles) * 0.5 ;
 
-    icell_ref = 1
+    icell1 = 1
 
     write(*,*) "# Farthest particules :"
     write(*,*) "x =", minval(x), maxval(x)

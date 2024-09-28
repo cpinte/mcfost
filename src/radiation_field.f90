@@ -46,7 +46,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   if (letape_th) then
