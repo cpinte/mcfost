@@ -212,8 +212,8 @@ subroutine transfert_poussiere()
      if (loptical_depth_to_cell) call write_optical_depth_to_cell(1)
 
      write(*,*) ""
-     write(*,*) "Dust properties in cell #", icell_ref
-     p_icell = icell_ref
+     write(*,*) "Dust properties in cell #", icell_not_empty
+     p_icell = icell_not_empty
      if (aniso_method==2) write(*,*) "g             ", tab_g_pos(p_icell,1)
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
      if (lsepar_pola.and.(scattering_method == 2)) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
@@ -998,7 +998,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   ! Boucle sur les interactions du paquets:

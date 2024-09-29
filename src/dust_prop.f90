@@ -811,10 +811,9 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   ! c'est pour les prop de diffusion en relatif donc la veleur exacte n'a pas d'importante
   ldens0 = .false.
   if (.not.lvariable_dust) then
-     icell = icell_ref
-     if (maxval(densite_pouss(:,icell)) < tiny_real) then
+     if (icell_not_empty > icell1) then ! icell1==1
         ldens0 = .true.
-        densite_pouss(:,icell) = densite_pouss(:,icell_not_empty)
+        densite_pouss(:,icell1) = densite_pouss(:,icell_not_empty)
      endif
   endif
 
@@ -1010,8 +1009,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
 
   ! On remet la densite à zéro si besoin
   if (ldens0) then
-     icell = icell_ref
-     densite_pouss(:,icell) = 0.0_sp
+     densite_pouss(:,icell1) = 0.0_sp
   endif
 
   if ((ldust_prop).and.(lambda == n_lambda)) then
@@ -1055,10 +1053,9 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   ! c'est pour les prop de diffusion en relatif donc la veleur exacte n'a pas d'importante
   ldens0 = .false.
   if (.not.lvariable_dust) then
-     icell = icell_ref
-     if (maxval(densite_pouss(:,icell)) < tiny_real) then
+     if (icell_not_empty > icell1) then
         ldens0 = .true.
-        densite_pouss(:,icell) = densite_pouss(:,icell_not_empty)
+        densite_pouss(:,icell1) = densite_pouss(:,icell_not_empty)
      endif
   endif
 
@@ -1216,8 +1213,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   ! see opacite()
   ! On remet la densite à zéro si besoin
   if (ldens0) then
-     icell = icell_ref
-     densite_pouss(:,icell) = 0.0_sp
+     densite_pouss(:,icell1) = 0.0_sp
   endif
 
   return
@@ -1335,8 +1331,14 @@ subroutine write_dust_prop()
   allocate(S11_lambda_theta(n_lambda,0:nang_scatt),pol_lambda_theta(n_lambda,0:nang_scatt))
   allocate(kappa_grain(n_lambda,n_grains_tot))
 
-  icell = icell_not_empty
-  p_icell = icell_ref
+  if (lvariable_dust) then
+     write(*,*) "Warning: dust is not uniform, picking cell #",  icell_not_empty
+     icell = icell_not_empty
+     p_icell = icell_not_empty
+  else
+     icell  = icell_not_empty
+     p_icell = 1
+  endif
 
   kappa_lambda=real((kappa(icell,:)*kappa_factor(icell)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)

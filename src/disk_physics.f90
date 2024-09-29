@@ -31,7 +31,7 @@ subroutine compute_othin_sublimation_radius()
   cst=cst_th/dust_pop(1)%T_sub
   cst=cst_th/1500.
 
-  icell = icell_ref
+  icell = icell1
 
   do lambda=1, n_lambda
      ! longueur d'onde en metre

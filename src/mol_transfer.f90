@@ -896,7 +896,7 @@ subroutine init_dust_mol(imol)
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   call realloc_dust_mol(imol)

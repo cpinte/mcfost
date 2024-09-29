@@ -70,7 +70,7 @@ subroutine physical_length(id,lambda,p_lambda,Stokes,icell,xio,yio,zio,u,v,w,fla
   if (lvariable_dust) then
      p_icell => icell0
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   ! Boucle infinie sur les cellules
@@ -215,9 +215,9 @@ subroutine integ_tau(lambda)
 
   if (.not.lvariable_dust) then
      icell = icell_not_empty
-     if (kappa(icell_ref,lambda) * kappa_factor(icell) > tiny_real) then
+     if (kappa(icell1,lambda) * kappa_factor(icell) > tiny_real) then
         write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
-             (kappa(icell_ref,lambda) * kappa_factor(icell)/AU_to_cm))
+             (kappa(icell1,lambda) * kappa_factor(icell)/AU_to_cm))
      endif
   endif
 
@@ -233,9 +233,9 @@ subroutine integ_tau(lambda)
 
   if (.not.lvariable_dust) then
      icell = icell_not_empty
-     if (kappa(icell_ref,lambda) * kappa_factor(icell) > tiny_real) then
+     if (kappa(icell1,lambda) * kappa_factor(icell) > tiny_real) then
         write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
-             (kappa(icell_ref,lambda) * kappa_factor(icell)/AU_to_cm))
+             (kappa(icell1,lambda) * kappa_factor(icell)/AU_to_cm))
      endif
   endif
 
@@ -283,7 +283,7 @@ subroutine optical_length_tot(id,lambda,Stokes,icell,xi,yi,zi,u,v,w,tau_tot_out,
   if (lvariable_dust) then
      p_icell => icell0
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   ! Boucle infinie sur les cellules
@@ -350,9 +350,9 @@ subroutine compute_column(type, column, lambda)
   do direction = 1, n_directions
      !$omp parallel default(none) &
      !$omp shared(densite_gaz,tab_abundance,lVoronoi,Voronoi,direction,column,r_grid,z_grid,phi_grid,n_cells,cross_cell) &
-     !$omp shared(CD_units,kappa,kappa_factor,lambda,type,test_exit_grid,icell_ref,lvariable_dust) &
+     !$omp shared(CD_units,kappa,kappa_factor,lambda,type,test_exit_grid,icell1,lvariable_dust) &
      !$omp private(icell,previous_cell,next_cell,icell0,p_icell,x0,y0,z0,x1,y1,z1,norme,u,v,w,l,l_contrib,l_void_before,factor,sum)
-     p_icell = icell_ref
+     p_icell = icell1
      !$omp do
      do icell=1,n_cells
         if (lVoronoi) then
@@ -468,7 +468,7 @@ subroutine integ_ray_mol(id,imol,icell_in,x,y,z,u,v,w,iray,labs, ispeed,tab_spee
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
 
@@ -637,7 +637,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   ! Boucle infinie sur les cellules
@@ -766,7 +766,7 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   ! Boucle infinie sur les cellules
@@ -1030,7 +1030,7 @@ subroutine optical_length_tot_mol(imol,icell_in,x,y,z,u,v,w, ispeed, tab_speed, 
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   !*** propagation dans la grille
@@ -1115,7 +1115,7 @@ end subroutine optical_length_tot_mol
 
       Itot(:,iray,id) = 0.0_dp
 
-      p_icell => icell_ref
+      p_icell => icell1
       if (lvariable_dust) p_icell => icell
 
       ! Will the ray intersect a star
@@ -1244,7 +1244,7 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
    !flag_sortie = .true. not useful. By default, (x,y,z) are 0 if we don't reach the surface.
    x = 0.0; y = 0.0; z = 0.0
 
-   p_icell => icell_ref
+   p_icell => icell1
    if (lvariable_dust) p_icell => icell
 
    ! Will the ray intersect a star
@@ -1358,7 +1358,7 @@ function integ_ray_dust(lambda,icell_in,x,y,z,u,v,w)
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   ! Will the ray intersect a star
@@ -1448,7 +1448,7 @@ subroutine define_dark_zone(lambda,p_lambda,tau_max,ldiff_approx)
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   do pk=1, n_az
