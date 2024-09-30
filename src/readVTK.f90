@@ -311,6 +311,7 @@ contains
     position = old_position
     do
        call readLine(unit, position, line, newposition)
+       write(*,*) "Position=",position, " new position",newposition, " line:", line
        if(newposition<0) exit
        if(line(1:9) == "CELL_DATA") then
           ! we're entering the meat
@@ -318,6 +319,7 @@ contains
           position=newposition+1
        else if(line(1:7) == "SCALARS") then
           call readScalars(unit, position, dimensions, array, varName, position)
+          write(*,*) "Loading ",varName
           if(varName=="RHO") then
              rho = array
           else if(varName=="VX1") then
