@@ -31,7 +31,7 @@ subroutine setDiffusion_coeff(i)
 
   cst_Dcoeff = pi/(12.*sigma)
 
-  p_icell = icell_ref
+  p_icell = icell1
 
   do k=1,n_az
      do j=j_start, nz
@@ -90,7 +90,7 @@ subroutine setDiffusion_coeff0(i)
 
   cst_Dcoeff = pi/(12.*sigma)
 
-  p_icell = icell_ref
+  p_icell = icell1
 
   do k=1,n_az
      do j=j_start,nz
@@ -662,7 +662,7 @@ subroutine compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
      if (lvariable_dust) then
         p_icell => icell0
      else
-        p_icell => icell_ref
+        p_icell => icell1
      endif
 
      somme  = 0.0_dp
@@ -686,8 +686,8 @@ subroutine compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
         somme2  = somme2  + B * kappa(p_icell,lambda)
         norm = norm + B*delta_wl
      enddo
-     rec_Planck_opacity = norm/somme * kappa_factor(icell0)
-     Planck_opacity = somme2/norm * kappa_factor(icell0)
+     rec_Planck_opacity = norm/somme * kappa_factor(icell)
+     Planck_opacity = somme2/norm * kappa_factor(icell)
   else
      rec_Planck_opacity = 1e-30
      Planck_opacity = 1e-30
