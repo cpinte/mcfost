@@ -289,19 +289,21 @@ subroutine define_gas_density()
      ! Normalisation
      if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
         facteur = dz%diskmass * dz%gas_to_dust / mass
-        !     write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
+             write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
 
         ! Somme sur les zones pour densite finale
         do i=1,n_rad
-           bz_gas_mass2 : do j=min(1,j_start),nz
-              if (j==0) cycle
-              do k=1, n_az
+           do k=1, n_az
+              bz_gas_mass2 : do j=min(1,j_start),nz
+                 if (j==0) cycle bz_gas_mass2
                  icell = cell_map(i,j,k)
                  densite_gaz(icell) = densite_gaz(icell) + densite_gaz_tmp(icell) * facteur
-                 densite_gaz_midplane(i,k) = densite_gaz_midplane(i,k) + densite_gaz_midplane_tmp(i,k) * facteur
-              enddo !k
-           enddo bz_gas_mass2
+              enddo bz_gas_mass2
+
+              densite_gaz_midplane(i,k) = densite_gaz_midplane(i,k) + densite_gaz_midplane_tmp(i,k) * facteur
+           enddo !k
         enddo ! i
+
      endif
   enddo ! n_zones
 
@@ -1819,7 +1821,7 @@ subroutine normalize_dust_density(disk_dust_mass)
   do l=1,n_grains_tot
      somme=0.0_dp
      do icell=1,n_cells
-        if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp
+        if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = tiny_real
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
      if (somme > tiny_dp) densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
