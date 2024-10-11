@@ -1486,6 +1486,7 @@ subroutine initialisation_mcfost()
      case("-v_syst")
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
+        read(s,*) v_syst
         i_arg = i_arg + 1
      case("-not_random_Voronoi")
         i_arg = i_arg + 1
