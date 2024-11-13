@@ -65,7 +65,7 @@ module molecular_emission
   logical, dimension(:), allocatable :: lcompute_molRT ! n_cells
 
   logical ::  lfreeze_out, lphoto_dissociation, lphoto_desorption
-  real :: T_freeze_out, freeze_out_depletion
+  real :: T_freeze_out, freeze_out_depletion, photodissociation_factor
 
   real(kind=dp), dimension(:,:,:,:), allocatable ::  origine_mol ! nv, nTrans, n_cells, nb_proc
 
@@ -889,11 +889,11 @@ subroutine photo_dissociation()
 
   !$omp parallel default(none) &
   !$omp private(icell,CD) &
-  !$omp shared(tab_abundance,n_cells)
+  !$omp shared(tab_abundance,n_cells, photodissociation_factor)
   !$omp do
   do icell=1, n_cells
      CD = compute_vertical_CD(icell)
-     if (CD < threshold_CD) then
+     if (CD < threshold_CD * photodissociation_factor) then
         tab_abundance(icell) = tab_abundance(icell) * photo_dissocation_depletion
      endif
   enddo ! icell
