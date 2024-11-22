@@ -157,6 +157,9 @@ subroutine init_Doppler_profiles(imol)
      ! Utilisation de la temperature LTE de la poussiere comme temperature cinetique
      ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
      ! Consistent avec benchmark
+     if (trim(v_turb_unit) == "cs") then
+        v_turb(icell) = sqrt((kb*Tcin(icell) / (masse_mol_gaz * g_to_kg))) * v_turb(icell)
+     endif
      sigma2 =  2.0_dp * (kb*Tcin(icell) / (masse_mol * g_to_kg)) + v_turb(icell)**2
      v_line(icell) = sqrt(sigma2)
 
