@@ -780,6 +780,13 @@ subroutine initialisation_mcfost()
      case("-photodissociation","-photo_dissociation","-photo-dissociation")
         i_arg = i_arg + 1
         lphoto_dissociation=.true.
+        photodissociation_factor = 1.0
+     case("-photodissociation-factor","-photo_dissociation_factor","-photo-dissociation-factor")
+        i_arg = i_arg + 1
+        lphoto_dissociation=.true.
+        call get_command_argument(i_arg,s)
+        i_arg= i_arg+1
+        read(s,*,iostat=ios) photodissociation_factor
      case("-photodesorption","-photo_desorption","-photo-desorption")
         i_arg = i_arg + 1
         lphoto_desorption=.true.
@@ -2025,6 +2032,7 @@ subroutine display_help()
   write(*,*) "        : -freeze-out <T>"
   write(*,*) "        : -freeze-out_depletion <relative depletion> between 0 and 1"
   write(*,*) "        : -photo-dissociation"
+  write(*,*) "        : -photo-dissociation-factor <factor> : factor aplied to CD at which photo-dissociation happens"
   write(*,*) "        : -photo-desorption"
   write(*,*) "        : -prodimo"
   write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo"

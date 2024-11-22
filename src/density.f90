@@ -1821,7 +1821,7 @@ subroutine normalize_dust_density(disk_dust_mass)
   do l=1,n_grains_tot
      somme=0.0_dp
      do icell=1,n_cells
-        if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp
+        if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp !tiny_real *  nbre_grains(l)
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
      if (somme > tiny_dp) densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque

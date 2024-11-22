@@ -200,7 +200,7 @@ contains
              icell = cell_map(i,j,phik)
 
              densite_gaz(icell) = rho(i,i2,i3) * udens
-             densite_pouss(:,icell) = rho(i,i2,i3) * udens
+             densite_pouss(:,icell) = rho(i,i2,i3) * udens  ! flat dust distribution
 
              ! todo : check in cyl
              vfield3d(icell,1)  = vx1(i,i2,i3) * uvelocity ! vr
