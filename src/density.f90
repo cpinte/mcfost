@@ -298,9 +298,8 @@ subroutine define_gas_density()
                  if (j==0) cycle bz_gas_mass2
                  icell = cell_map(i,j,k)
                  densite_gaz(icell) = densite_gaz(icell) + densite_gaz_tmp(icell) * facteur
-                 densite_gaz_midplane(i,k) = densite_gaz_midplane(i,k) + densite_gaz_midplane_tmp(i,k) * facteur
               enddo bz_gas_mass2
-
+              densite_gaz_midplane(i,k) = densite_gaz_midplane(i,k) + densite_gaz_midplane_tmp(i,k) * facteur
            enddo !k
         enddo ! i
 
