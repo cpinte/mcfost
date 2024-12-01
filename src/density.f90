@@ -476,7 +476,6 @@ subroutine define_dust_density()
 
                  rho0 = densite_gaz_midplane(i,k) ! midplane density (j=0)
 
-
                  ! Warp analytique
                  if (lwarp) then
                     z0 = z_warp * (rcyl/dz%rref)**3 * cos(phi)
@@ -1820,7 +1819,11 @@ subroutine normalize_dust_density(disk_dust_mass)
   do l=1,n_grains_tot
      somme=0.0_dp
      do icell=1,n_cells
-        if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp !tiny_real *  nbre_grains(l)
+        if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp
+
+        ! exoALMA benchmark fix
+        if (icell==1) densite_pouss(l,icell) = tiny_real
+
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
      if (somme > tiny_dp) densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
@@ -1858,7 +1861,7 @@ subroutine normalize_dust_density(disk_dust_mass)
 
   masse(:) = masse(:) * AU3_to_cm3
 
-  !write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+  write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
   if (sum(masse) < tiny_dp) call error("Something went wrong, there is no dust in the disk")
 
   if (lcorrect_density) then
@@ -1877,7 +1880,7 @@ subroutine normalize_dust_density(disk_dust_mass)
         endif
      enddo
 
-     !write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+     write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
   endif
 
   ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
