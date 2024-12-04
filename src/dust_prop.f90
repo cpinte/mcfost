@@ -944,6 +944,16 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      endif !.not.lmono
   endif !lnLTE
 
+  rho0 = masse(icell_not_empty)/volume(icell_not_empty) ! normalising by density in a non-empty cell
+  if (rho0 < tiny_dp) call error("cannot normalise by density in first non-empty cell")
+
+  ! We apply a corrective factor per cell --> to get kappa, we need to do kappa(icell,lambda) * kappa_factor(icell)
+  if (lvariable_dust) then
+     kappa_factor(:) = 1.0_dp
+  else
+     kappa_factor(1:n_cells) = masse(1:n_cells)/volume(1:n_cells) / rho0 ! ie rho / rho(icell_not_empty)
+  endif
+
   ! Normalisation des opacites kappa_abs pour etre en AU^-1
   ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
   ! a² microns² -> 1e-8 cm²             \
@@ -953,18 +963,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   ! les k_abs_XXX n'ont pas besoin d'etre normalise car tout est relatif
   fact = AU_to_cm * mum_to_cm**2
 
-  rho0 = masse(icell_not_empty)/volume(icell_not_empty) ! normalising by density in a non-empty cell
-  if (rho0 < tiny_dp) call error("cannot normalise by density in first non-empty cell")
-
-  ! We apply a corrective factor per cell --> to get kappa, we need to do kappa(icell,lambda) * kappa_factor(icell)
-  if (lvariable_dust) then
-     kappa_factor(:) = 1.0_dp
-  else
-     !write(*,*) shape(kappa_factor), shape(masse), shape(volume)
-     kappa_factor(1:n_cells) = masse(1:n_cells)/volume(1:n_cells) / rho0 ! ie rho / rho(icell_not_empty)
-  endif
   kappa(:,lambda) = kappa(:,lambda) * fact ! this is kappa in cell # icell_not_empty or in all cells if lvariable_dust
-
   if (lRE_LTE) kappa_abs_LTE(:,lambda) = kappa_abs_LTE(:,lambda) * fact
   if (lRE_nLTE) kappa_abs_nLTE(:,lambda) = kappa_abs_nLTE(:,lambda) * fact
   if (letape_th.and.lnRE) kappa_abs_RE(:,lambda) =  kappa_abs_RE(:,lambda) * fact

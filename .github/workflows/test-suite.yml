@@ -31,7 +31,7 @@ jobs:
           - os: linux
             os-version: ubuntu-22.04
           - os: macos-intel
-            os-version: macos-12
+            os-version: macos-13
           - os: macos-arm
             os-version: macos-14
 
@@ -86,7 +86,7 @@ jobs:
     strategy:
       matrix:
         compiler: [gfortran, ifort]
-    runs-on: macos-12
+    runs-on: macos-13
     env:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
@@ -120,7 +120,7 @@ jobs:
           - os: linux
             os-version: ubuntu-22.04
           - os: macos-intel
-            os-version: macos-12
+            os-version: macos-13
           - os: macos-arm
             os-version: macos-14
 
