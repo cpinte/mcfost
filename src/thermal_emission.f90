@@ -535,8 +535,8 @@ subroutine init_reemission(lheating,dudt)
         do T=1, n_T
            integ3(0) = 0.0
            do lambda=1, n_lambda
-              ! Pas besoin de cst , ni du volume (normalisation a 1)
-              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda) * kappa_factor(icell) * dB_dT(lambda,T)
+              ! Pas besoin de cst , ni du volume, ni kappa factor (normalisation a 1)
+              integ3(lambda) = integ3(lambda-1) + kappa_abs_LTE(icell,lambda)  * dB_dT(lambda,T)
            enddo !l
 
            ! Normalisation a 1

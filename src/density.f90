@@ -53,7 +53,7 @@ subroutine define_gas_density()
   integer :: i,j, k, izone, alloc_status, icell
   real(kind=dp), dimension(n_zones) :: cst_gaz
   real(kind=dp) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C, somme
-  real(kind=dp) :: rcyl2, z2, rin2, rmax2, rmin2, rsph0, rcyl, coeff_exp
+  real(kind=dp) :: rcyl2, z2, rin2, rmax2, rmin2, rcyl, coeff_exp
 
   type(disk_zone_type) :: dz
 
@@ -349,16 +349,15 @@ subroutine define_dust_density()
 
   integer :: i,j, k, icell, l, izone, pop
   real(kind=dp), dimension(n_pop) :: cst, cst_pous
-  real(kind=dp) :: rcyl, rsph, mass
+  real(kind=dp) :: rcyl, rsph
   real(kind=dp) :: z, fact_exp, coeff_exp, density, OmegaTau, h_H2
-  real(kind=dp) :: puffed, facteur, z0, phi, surface, norme
+  real(kind=dp) :: puffed, z0, phi, surface, norme
 
   real(kind=dp), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
 
-  real(kind=dp) :: rho0, ztilde, Dtilde, h, s_opt, somme, rcyl2, z2, rmin2, rin2, rmax2, rsph0
+  real(kind=dp) :: rho0, ztilde, Dtilde, h, s_opt, somme, rcyl2, z2, rmin2, rin2, rmax2
 
   type(disk_zone_type) :: dz
-  type(dust_pop_type), pointer :: d_p
 
   ! Pour simus Seb
   real, parameter :: Sc = 1.5 ! nbre de Schmidt
@@ -1008,7 +1007,7 @@ subroutine read_density_file()
   character(len=80) :: comment
 
   integer :: k, l, i, n_a, read_n_a, read_gas_density, read_gas_velocity, jj, icell, phik, n_sink
-  real(kind=dp) :: somme, mass, facteur
+  real(kind=dp) :: mass, facteur
   real :: a, tmp, gas2dust
 
   real :: m_star, x_star, y_star, z_star, vx_star, vy_star, vz_star
@@ -1820,10 +1819,6 @@ subroutine normalize_dust_density(disk_dust_mass)
      somme=0.0_dp
      do icell=1,n_cells
         if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp
-
-        ! exoALMA benchmark fix
-        if (icell==1) densite_pouss(l,icell) = tiny_real
-
         somme=somme+densite_pouss(l,icell)*volume(icell)
      enddo !icell
      if (somme > tiny_dp) densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
