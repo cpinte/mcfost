@@ -44,6 +44,8 @@ jobs:
         exclude:
           - os: macos-arm
             compiler: ifort
+          - os: macos-intel
+            compiler: ifort # not compiling on macos13 for now
 
     name: build+test (${{ matrix.os }}, ${{ matrix.compiler }}, openmp=${{ matrix.openmp }}, release=${{ matrix.release }})
     runs-on: ${{ matrix.os-version }}
@@ -133,7 +135,7 @@ jobs:
       - name: restore binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: mcfost-binary-${{ matrix.os }}-${{ matrix.os == 'macos-arm'  && 'gfortran' || 'ifort' }} # use ifort for binary release
+          name: mcfost-binary-${{ matrix.os }}-${{ {matrix.os == 'linux'  && 'ifort' || 'gfortran' }} # use ifort for binary release
           path: src/
 
       - name: simple check to make sure the binary runs in a clean environment
