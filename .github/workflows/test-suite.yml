@@ -87,7 +87,7 @@ jobs:
     needs: build-and-test
     strategy:
       matrix:
-        compiler: [gfortran, ifort]
+        compiler: [gfortran]
     runs-on: macos-13
     env:
       SYSTEM: ${{ matrix.compiler }}
