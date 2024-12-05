@@ -21,7 +21,6 @@ program BIGCRUNCH
 
   integer :: itime
   real :: time, cpu_time_begin, cpu_time_end
-  logical :: lgas_transfer = .false.
 
   ! debut de l'execution
   call system_clock(time_begin,count_rate=time_tick,count_max=time_max)

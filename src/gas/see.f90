@@ -45,7 +45,6 @@ module see
         integer(kind=8) :: mem_alloc_local
         integer :: kr, n, icell, l, i, j
         real(kind=dp) :: wl, anu1, e1, b1
-        real(kind=dp) :: anu2, e2, b2!higher prec integ
         type(AtomType), pointer :: atom
 
         mem_alloc_local = 0
@@ -291,7 +290,7 @@ module see
 
     subroutine dealloc_nlte_var()
     !free space after non-lte loop.
-        integer :: n, kr
+        integer :: n
         type (AtomType), pointer :: atom
 
         deallocate(psi,eta_atoms,chi_up,chi_down,uji_down)
@@ -655,12 +654,12 @@ module see
         real(kind=dp), intent(in) :: dOmega
         real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
         real(kind=dp), dimension(Nlambda_max_line) :: phi0
-        type(AtomType), pointer :: atom, atom2
+        type(AtomType), pointer :: atom
         integer :: kr, i, j, Nl, Nr, Nb, ip, jp, Nrp, Nbp
         integer :: i0, l, nact, krr
         real(kind=dp) :: jbar_up, jbar_down, xcc_down, xcc_up
-        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star, gij
-        real(kind=dp) :: ehnukt, ehnukt1
+        real(kind=dp) :: wl, wphi, anu, ni_on_nj_star, gij
+        real(kind=dp) :: ehnukt
 ! write(*,*) icell, T(icell)
         atom_loop : do nact = 1, Nactiveatoms
             atom => ActiveAtoms(nact)%p
@@ -1200,7 +1199,7 @@ module see
     type (Element), intent(in) :: Elem
     real(kind=dp), dimension(:), intent(inout) :: fjk, dfjk
     real(kind=dp) :: sum1, sum2
-    integer :: j,  Nstage
+    integer :: j
     !return Nj / Ntot
     !for neutral j * Nj/Ntot = 0
 
@@ -1877,8 +1876,7 @@ module see
         type(AtomType), pointer :: atom
         integer :: kr, i, j, Nl, Nr, Nb, nact
         real(kind=dp) :: jbar_up, jbar_down
-        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star, gij
-        real(kind=dp) :: ehnukt
+        real(kind=dp) :: wphi, ni_on_nj_star, gij
 
         atom_loop : do nact = 1, Nactiveatoms
             atom => ActiveAtoms(nact)%p
