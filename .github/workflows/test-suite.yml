@@ -31,7 +31,7 @@ jobs:
           - os: linux
             os-version: ubuntu-22.04
           - os: macos-intel
-            os-version: macos-12
+            os-version: macos-13
           - os: macos-arm
             os-version: macos-14
 
@@ -44,6 +44,8 @@ jobs:
         exclude:
           - os: macos-arm
             compiler: ifort
+          - os: macos-intel
+            compiler: ifort # not compiling on macos13 for now
 
     name: build+test (${{ matrix.os }}, ${{ matrix.compiler }}, openmp=${{ matrix.openmp }}, release=${{ matrix.release }})
     runs-on: ${{ matrix.os-version }}
@@ -86,7 +88,7 @@ jobs:
     strategy:
       matrix:
         compiler: [gfortran, ifort]
-    runs-on: macos-12
+    runs-on: macos-13
     env:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
@@ -120,7 +122,7 @@ jobs:
           - os: linux
             os-version: ubuntu-22.04
           - os: macos-intel
-            os-version: macos-12
+            os-version: macos-13
           - os: macos-arm
             os-version: macos-14
 
@@ -133,7 +135,7 @@ jobs:
       - name: restore binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: mcfost-binary-${{ matrix.os }}-${{ matrix.os == 'macos-arm'  && 'gfortran' || 'ifort' }} # use ifort for binary release
+          name: mcfost-binary-${{ matrix.os }}-${{ {matrix.os == 'linux'  && 'ifort'} || 'gfortran' }} # use ifort for binary release
           path: src/
 
       - name: simple check to make sure the binary runs in a clean environment
