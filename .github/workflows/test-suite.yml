@@ -87,7 +87,7 @@ jobs:
     needs: build-and-test
     strategy:
       matrix:
-        compiler: [gfortran, ifort]
+        compiler: [gfortran]
     runs-on: macos-13
     env:
       SYSTEM: ${{ matrix.compiler }}
@@ -135,7 +135,7 @@ jobs:
       - name: restore binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: mcfost-binary-${{ matrix.os }}-${{ {matrix.os == 'linux'  && 'ifort'} || 'gfortran' }} # use ifort for binary release
+          name: mcfost-binary-${{ matrix.os }}-${{ matrix.os == 'linux'  && 'ifort' || 'gfortran' }} # use ifort for binary release
           path: src/
 
       - name: simple check to make sure the binary runs in a clean environment
