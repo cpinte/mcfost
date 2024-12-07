@@ -173,7 +173,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
   real(kind=dp), dimension(nLevels,nb_proc)  :: pop, pop_old
 
-  logical :: labs, laffichage
+  logical :: labs
 
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(:,:), allocatable :: tab_speed
@@ -862,7 +862,7 @@ subroutine init_dust_mol(imol)
 
   integer, intent(in) :: imol
 
-  integer :: iTrans, p_lambda
+  integer :: iTrans
   integer, target :: icell
   integer, pointer :: p_icell
   real(kind=dp) :: freq!, Jnu
@@ -886,7 +886,7 @@ subroutine init_dust_mol(imol)
 
   ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
   ! -> pas de polarisation, on utilise une HG
-  scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
+  scattering_method=1 ; lscattering_method1 = .true.
   aniso_method = 2 ; lmethod_aniso1 = .false.
 
   lsepar_pola = .false.
@@ -1102,7 +1102,7 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=dp), dimension(3,nb_proc) :: pixelcenter
 
-  integer :: i,j, id, p_lambda, icell, iTrans
+  integer :: i,j, id, icell, iTrans
   real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0
   logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
@@ -1211,8 +1211,8 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=dp), dimension(3,nb_proc) :: pixelcenter
 
-  integer :: i,j, id, p_lambda, icell, iTrans, iiTrans
-  real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0, Flux, pixelsize, factor
+  integer :: i,j, id, icell, iTrans, iiTrans
+  real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0, Flux, factor
   logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
 

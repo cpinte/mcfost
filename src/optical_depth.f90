@@ -617,7 +617,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite
   real(kind=dp) :: tau_max, tau_previous, facteur_tau
 
-  integer :: i, iTrans, nbr_cell, next_cell, previous_cell, iv
+  integer :: iTrans, nbr_cell, next_cell, previous_cell, iv
   integer, target :: icell
 
   logical :: lcellule_non_vide, lstop
@@ -745,7 +745,7 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite, I_mol, Snu, dI_mol
   real(kind=dp) :: I_max, I_previous
 
-  integer :: i, iTrans, nbr_cell, next_cell, previous_cell
+  integer :: iTrans, nbr_cell, next_cell, previous_cell
   integer, target :: icell
 
   logical :: lcellule_non_vide, lstop
@@ -934,8 +934,8 @@ subroutine integ_tau_mol(imol)
 
   integer, intent(in) :: imol
 
-  real ::  norme, norme1, vmax
-  integer :: i, j, iTrans, n_speed, icell, it
+  real ::  norme
+  integer :: i, j, iTrans, icell, it
 
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(0:0) :: tab_speed, P
@@ -1098,11 +1098,11 @@ end subroutine optical_length_tot_mol
       logical, intent(in) :: labs
       integer, intent(in) :: N
       real(kind=dp), dimension(N), intent(in) :: lambda
-      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
+      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
       real(kind=dp), dimension(N) :: Snu, tau, dtau, chi, coronal_irrad
       integer, target :: icell
       integer, pointer :: p_icell
-      integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
+      integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star, icell_prev
       logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
       x1=x;y1=y;z1=z
@@ -1221,7 +1221,6 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ltot(N)
   real(kind=dp), dimension(N) :: tau, dtau, chi, eta, tau_previous
-  real(kind=dp) :: tau_max, facteur_tau
 
   integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star
   integer, target :: icell
