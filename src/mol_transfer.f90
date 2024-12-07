@@ -1104,7 +1104,7 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
 
   integer :: i,j, id, icell, iTrans
   real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0
-  logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
+  logical :: lintersect, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
 
   ! Direction de visee pour le ray-tracing
@@ -1153,7 +1153,7 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
-  !$omp private(flag_star,flag_direct_star,flag_sortie,lpacket_alive,pixelcenter) &
+  !$omp private(flag_sortie,lpacket_alive,pixelcenter) &
   !$omp shared(tau,Icorner,imol,iTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid)
   id = 1 ! pour code sequentiel
@@ -1213,7 +1213,7 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
 
   integer :: i,j, id, icell, iTrans, iiTrans
   real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0, Flux, factor
-  logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
+  logical :: lintersect, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
 
   ! Direction de visee pour le ray-tracing
@@ -1266,7 +1266,7 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
-  !$omp private(flag_star,flag_direct_star,flag_sortie,lpacket_alive,pixelcenter,Flux) &
+  !$omp private(flag_sortie,lpacket_alive,pixelcenter,Flux) &
   !$omp shared(flux_fraction,Icorner,imol,iTrans,iiTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid,spectre,factor)
   id = 1 ! pour code sequentiel

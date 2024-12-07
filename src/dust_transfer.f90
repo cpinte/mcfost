@@ -976,7 +976,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   logical, intent(out) :: flag_scatt
 
   real(kind=dp), dimension(4,4) :: M
-  real(kind=dp) :: u1,v1,w1, phi, cospsi, Planck_opacity, rec_Planck_opacity, d, diff_coeff
+  real(kind=dp) :: u1,v1,w1, phi, cospsi
+  !real(kind=dp) :: Planck_opacity, rec_Planck_opacity, d, diff_coeff
   integer :: taille_grain, itheta
   integer :: n_iteractions_in_cell, icell_old
   integer, pointer :: p_icell

@@ -32,7 +32,6 @@ module grid
   contains
 
   subroutine alloc_atomrt_grid()
-    integer(kind=8) :: mem_alloc_local = 0
 
     !merge vturb and v_turb (molecular emission)
     !TO DO: move vturb in molecular emission in grid.f90
@@ -274,7 +273,6 @@ end subroutine define_physical_zones
 subroutine setup_grid()
 
   logical, save :: lfirst = .true.
-  integer :: mem_size
 
   if (.not.lVoronoi) then
      nrz = n_rad * nz
