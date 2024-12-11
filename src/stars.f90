@@ -992,7 +992,7 @@ end subroutine intersect_stars
 
          if (vaccr < 0.0_dp) then
             !Facc = 1/2 rho vs^3
-            Facc = 0.5 * (1d-3 * masseH * rho) * abs(vaccr)**3
+            Facc = 0.5 * (1d-3 * mH * rho) * abs(vaccr)**3
             Tloc = ( 0.75 * Facc / sigma )**0.25
             ! is_inshock = (Tloc > 0.5 * etoile(i_star)%T)
             is_inshock = (T_hp > 1.0_dp * etoile(i_star)%T)
@@ -1003,7 +1003,7 @@ end subroutine intersect_stars
                Thp = abs(T_hp) * Tloc
             endif
             !assuming mu is 0.5
-            Tshock = 0.5 * (3.0/16.0) * (1d-3 * masseH) / kb * vaccr**2
+            Tshock = 0.5 * (3.0/16.0) * (1d-3 * mH) / kb * vaccr**2
             max_Thp = max(max_Thp, Thp); min_Thp = min(min_Thp, Thp)
             max_Tshock = max(max_Tshock, Tshock); min_Tshock = min(min_Tshock, Tshock)
             max_Facc = max(max_Facc,Facc); min_Facc = min(min_Facc, Facc)

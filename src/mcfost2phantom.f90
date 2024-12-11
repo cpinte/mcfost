@@ -569,7 +569,7 @@ contains
           somme2 = somme2 + B*delta_wl
        enddo
        kappa_diffusion = somme2/somme &
-          *cm_to_AU/(densite_gaz(icell)*masse_mol_gaz*(cm_to_m)**3) ! cm^2/g
+          *cm_to_AU/(densite_gaz(icell)*mu_mH*(cm_to_m)**3) ! cm^2/g
        ! check : somme2/somme * cm_to_AU /(masse_gaz(icell)/(volume(icell)*AU_to_cm**3))
     else
        kappa_diffusion = 0.

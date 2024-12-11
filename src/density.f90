@@ -88,7 +88,7 @@ subroutine define_gas_density()
 
      ! Facteur multiplicatif pour passer en masse de gaz
      ! puis en nH2/AU**3 puis en nH2/m**3
-     cst_gaz(izone) = C * dz%diskmass * dz%gas_to_dust / masse_mol_gaz * Msun_to_g / AU3_to_m3
+     cst_gaz(izone) = C * dz%diskmass * dz%gas_to_dust / mu_mH * Msun_to_g / AU3_to_m3
   enddo
 
   do izone=1, n_zones
@@ -282,7 +282,7 @@ subroutine define_gas_density()
      ! Calcul de la masse de gaz de la zone
      mass = 0.
      do icell = 1, n_cells
-        mass = mass + densite_gaz_tmp(icell) *  masse_mol_gaz * volume(icell)
+        mass = mass + densite_gaz_tmp(icell) *  mu_mH * volume(icell)
      enddo
      mass =  mass * AU3_to_m3 * g_to_Msun
 
@@ -318,7 +318,7 @@ subroutine define_gas_density()
 
   ! Tableau de masse de gaz
   do icell=1,n_cells
-     masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+     masse_gaz(icell) =  densite_gaz(icell) * mu_mH * volume(icell) * AU3_to_m3
   enddo
   write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
 
@@ -442,7 +442,7 @@ subroutine define_dust_density()
 
         do i=1, n_rad
 
-           !write(*,*) "     ", rcyl, rho0*masse_mol_gaz*cm_to_m**2, dust_pop(pop)%rho1g_avg
+           !write(*,*) "     ", rcyl, rho0*mu_mH*cm_to_m**2, dust_pop(pop)%rho1g_avg
            !write(*,*) "s_opt", rcyl, s_opt/1000.
 
            bz : do j=j_start,nz
@@ -678,11 +678,11 @@ subroutine define_dust_density()
               do k=1, n_az
                  rho0 = densite_gaz(cell_map(i,1,k)) ! pour dependance en R : pb en coord sperique
                  !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
-                 !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+                 !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * mu_mH/m_to_cm**3 * H*AU_to_cm)
                  icell = cell_map(i,1,k)
                  rcyl = r_grid(icell)
                  H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
-                 s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
+                 s_opt = (rho0*mu_mH*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
 
                  !write(*,*) "r=", rcyl, "a_migration =", s_opt
 
@@ -1551,7 +1551,7 @@ subroutine read_density_file()
   ! Calcul de la masse de gaz de la zone
   mass = 0.
   do icell=1,n_cells
-     mass = mass + densite_gaz(icell) *  masse_mol_gaz * volume(icell)
+     mass = mass + densite_gaz(icell) *  mu_mH * volume(icell)
   enddo !icell
   mass =  mass * AU3_to_m3 * g_to_Msun
 
@@ -1569,7 +1569,7 @@ subroutine read_density_file()
 
   ! Tableau de masse de gaz
   do icell=1,n_cells
-     masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+     masse_gaz(icell) =  densite_gaz(icell) * mu_mH * volume(icell) * AU3_to_m3
   enddo ! icell
   write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
 
@@ -2010,7 +2010,7 @@ real(kind=dp) function omega_tau(rho,H,l)
   ipop = grain(l)%pop
   !write(*,*) ipop, dust_pop(ipop)%rho1g_avg, rho
   if (rho > tiny_dp) then
-     omega_tau = dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+     omega_tau = dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * mu_mH/m_to_cm**3 * H*AU_to_cm)
   else
      omega_tau = huge_dp
   endif

@@ -341,7 +341,7 @@ subroutine compute_column(type, column, lambda)
   real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w, l_contrib, l_void_before, CD_units, factor, sum
 
   if (type==1) then
-     CD_units = AU_to_m * masse_mol_gaz / (m_to_cm)**2 ! g/cm^-2 and AU_to_m factor as l_contrib is in AU
+     CD_units = AU_to_m * mu_mH / (m_to_cm)**2 ! g/cm^-2 and AU_to_m factor as l_contrib is in AU
   else if (type==3) then
      CD_units = AU_to_m / (m_to_cm)**2 ! particle/cm^-2 and AU_to_m factor as l_contrib is in AU
   endif

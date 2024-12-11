@@ -195,7 +195,7 @@ contains
           feature_Tgas(2,:) = z_grid(:)
        endif
        feature_Tgas(3,:) = Tdust(:)
-       feature_Tgas(4,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
+       feature_Tgas(4,:) = densite_gaz(:) * mu_mH / m3_to_cm3 ! g.cm^3
        feature_Tgas(5:43,:) = J_ML(:,:)
        feature_Tgas(44:47,:) = N_grains(:,:)
        do i=1,n_directions
@@ -203,7 +203,7 @@ contains
        enddo
     else if (n_features == 45) then
        feature_Tgas(1,:) = Tdust(:)
-       feature_Tgas(2,:) = densite_gaz(:) * masse_mol_gaz / m3_to_cm3 ! g.cm^3
+       feature_Tgas(2,:) = densite_gaz(:) * mu_mH / m3_to_cm3 ! g.cm^3
        feature_Tgas(3:41,:) = J_ML(:,:)
        feature_Tgas(42:45,:) = N_grains(:,:)
     endif

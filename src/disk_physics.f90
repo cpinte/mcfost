@@ -191,7 +191,7 @@ subroutine equilibre_hydrostatique()
   real, parameter :: gas_dust = 100
 
   M_etoiles = sum(etoile(:)%M) * Msun_to_kg
-  M_mol = masse_mol_gaz * g_to_kg
+  M_mol = mu_mH * g_to_kg
 
   cst = Ggrav * M_etoiles * M_mol / (kb * AU_to_m**2)
 

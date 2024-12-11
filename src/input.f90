@@ -86,7 +86,7 @@ subroutine readmolecule(imol)
 
   read(1,*) junk
   read(1,*) molecularWeight
-  masse_mol = masseH * molecularWeight
+  mol(imol)%molecularWeight = molecularWeight
 
   read(1,*) junk
   read(1,*) nLevels

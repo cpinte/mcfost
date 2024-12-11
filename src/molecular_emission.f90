@@ -33,8 +33,7 @@ module molecular_emission
   real :: correct_Tgas
   logical :: lcorrect_Tgas
 
-  real :: nH2, masse_mol
-  ! masse_mol_gaz sert uniquement pour convertir masse disque en desnite de particule
+  real :: nH2, masse_mol ! masse_mol is the mass of the current molecule
   real(kind=dp), dimension(:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_cells, nTrans
   real(kind=dp), dimension(:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_cells, nTrans
   real, dimension(:,:), allocatable :: tab_nLevel, tab_nLevel2 ! n_cells, nLevels
@@ -73,7 +72,7 @@ module molecular_emission
 
   type molecule
      integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, nTrans_raytracing, iLevel_max
-     real :: vmin_center_rt, vmax_center_rt, extra_deltaV_rt, abundance
+     real :: vmin_center_rt, vmax_center_rt, extra_deltaV_rt, abundance, molecularWeight
      logical :: lcst_abundance, lline, l_sym_ima
      character(len=512) :: abundance_file, filename
      character(len=32) :: name
@@ -158,9 +157,9 @@ subroutine init_Doppler_profiles(imol)
      ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
      ! Consistent avec benchmark
      if (trim(v_turb_unit) == "cs") then
-        v_turb(icell) = sqrt((kb*Tcin(icell) / (masse_mol_gaz * g_to_kg))) * v_turb(icell)
+        v_turb(icell) = sqrt((kb*Tcin(icell) / (mu_mH * g_to_kg))) * v_turb(icell)
      endif
-     sigma2 =  2.0_dp * (kb*Tcin(icell) / (masse_mol * g_to_kg)) + v_turb(icell)**2
+     sigma2 =  2.0_dp * (kb*Tcin(icell) / (mol(imol)%molecularWeight * mH  * g_to_kg)) + v_turb(icell)**2
      v_line(icell) = sqrt(sigma2)
 
      !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
@@ -421,8 +420,8 @@ subroutine equilibre_LTE_mol(imol)
   !$omp end do
   !$omp  end parallel
 
-  ! write(*,*) real( (sum(masse) * g_to_kg * gas_dust / masse_mol_gaz) / (4.*pi/3. * (rout * AU_to_cm)**3 ) )
-  ! write(*,*) (sum(masse) * g_to_kg * gas_dust / masse_mol_gaz) * abundance * fAul(1) * hp * transfreq(1)
+  ! write(*,*) real( (sum(masse) * g_to_kg * gas_dust / mu_mH) / (4.*pi/3. * (rout * AU_to_cm)**3 ) )
+  ! write(*,*) (sum(masse) * g_to_kg * gas_dust / mu_mH) * abundance * fAul(1) * hp * transfreq(1)
 
   return
 

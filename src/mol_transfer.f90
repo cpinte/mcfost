@@ -929,7 +929,7 @@ subroutine init_dust_mol(imol)
            ! AU_to_cm**2 car on veut kappa_abs_LTE en AU-1
            write(*,*) "TODO : the water benchmark 3 needs to be updated for cell pointer in opacity table"
            do icell=1,n_cells
-              kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
+              kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * mu_mH / &
                    gas_dust / cm_to_AU
            enddo
 

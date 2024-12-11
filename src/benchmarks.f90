@@ -177,8 +177,7 @@ subroutine readMolecule_benchmark2()
 
   read(1,'(a)') mol(1)%name
 
-  read(1,*) molecularWeight
-  masse_mol = masseH * molecularWeight
+  read(1,*) mol(1)%molecularWeight
 
   read(1,*) nLevels, nTrans_tot
 
@@ -304,7 +303,7 @@ subroutine init_benchmark_vanZadelhoff1()
   Tcin = 20._dp
   vfield(:) = 0.0
 
-  masse_mol = 1.0
+  mol(1)%molecularWeight = 1.0
 
   linfall = .true.
   lkeplerian = .false.

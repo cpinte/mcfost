@@ -789,7 +789,7 @@ contains
     do ri=1, n_rad
        do zj=1,nz
           icell = cell_map(ri,zj,1)
-          dens(ri,zj) =  densite_gaz(icell) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
+          dens(ri,zj) =  densite_gaz(icell) * mu_mH / m3_to_cm3 ! g.cm^-3
        enddo
     enddo
 
