@@ -42,7 +42,7 @@ module atom_type
       real(kind=dp) :: twohnu3_c2, gij
       real(kind=dp) :: vmax, damp_max, damp_min !m/s
       real :: qwing
-      real(kind=dp), allocatable, dimension(:)  :: Rij, Rji, Cij, Cji 
+      real(kind=dp), allocatable, dimension(:)  :: Rij, Rji, Cij, Cji
       real(kind=dp), dimension(4) :: cvdWaals
       real(kind=dp), dimension(:), allocatable :: a
       real(kind=dp), dimension(:,:,:,:,:), allocatable :: map !2d flux in the line
@@ -61,7 +61,7 @@ module atom_type
       logical :: lany_gauss_prof
       integer :: initial, nTrans_raytracing
       !initial:
-      !0->LTE; 1->OLD_POPULATIONS; 2->ZERO_RADIATION; 3->CSWITCH; 4->SOBOLEV/CEP 
+      !0->LTE; 1->OLD_POPULATIONS; 2->ZERO_RADIATION; 3->CSWITCH; 4->SOBOLEV/CEP
       !only for lines !
       integer :: j_Trans_rayTracing(Nmax_Trans_raytracing), i_Trans_rayTracing(Nmax_Trans_raytracing)
       real :: vmax_rt !km/s !!
@@ -108,12 +108,12 @@ module atom_type
    real(kind=dp), parameter :: cswitch_val = 1d6!1d12
    real(kind=dp), parameter :: cswitch_down_scaling_factor = 10.0!ceil(exp(log(cswitch_val)/cswitch_niter))
    logical :: lcswitch_enabled = .false. !if only one atom has cswith, it is True.
-   
+
    contains
 
    function trans_number(atom, ilevel,jlevel)
       !from lower level i and upper level j
-      !return the transition number from the first line 1 
+      !return the transition number from the first line 1
       !to the last continuum = atom%Ntrans
       !
       !
@@ -121,7 +121,7 @@ module atom_type
       !        define an independent function not relying on atom%ij_to_trans
       type (AtomType), intent(in) :: atom
       integer, intent(in) :: ilevel, jlevel
-      integer :: i, j, k , trans_number
+      integer :: trans_number
 
       trans_number = atom%ij_to_trans(ilevel,jlevel)
 
@@ -405,13 +405,13 @@ module atom_type
       logical, intent(out) :: determined
       integer, intent(out) :: L
       real, intent(out) :: J, S
-    
-    
+
+
       logical :: unknown_orbital
       character(len=ATOM_LABEL_WIDTH+1) :: multiplet
       character(len=1) :: orbit
       integer :: i, Nl, parity, dk
-    
+
       multiplet = trim(label)
       Nl = len(multiplet)
 
@@ -519,16 +519,16 @@ module atom_type
       real(kind=dp), intent(in) :: temp, xi
       real, intent(in) :: w
       real(kind=dp) :: vbroad
-  
+
       vbroad = sqrt( Vtherm*temp/w + xi*xi )
-  
+
       return
     end function vbroad
 
    function ntotal_ions(icell)
       real(kind=dp) :: ntotal_ions
       integer, intent(in) :: icell
-      integer :: n, j, il
+      integer :: n, il
 
       ntotal_ions = 0.0
       do n=1,n_atoms

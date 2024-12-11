@@ -60,7 +60,6 @@ contains
     integer, intent(in) :: file, oldposition
     integer, intent(out) :: geometry
     integer, dimension(3), intent(out) :: periodicity
-    integer geo1, geo2
     real, intent(out) :: time
     integer, intent(out) :: newposition
 
@@ -113,7 +112,6 @@ contains
 
     real, allocatable :: pts(:)
     real, dimension(:,:,:), allocatable :: x, y, z
-    real q1, q2;
 
     integer position, lineSize, nPoints
     integer i,j,k,n, nx1mid, nx2mid, nx3mid
@@ -250,9 +248,8 @@ contains
     real, dimension(:), allocatable, intent(out) :: x1, x2, x3
 
     character (:), allocatable :: line
-    character (3) :: varName
     integer :: position, newposition
-    integer :: lineSize, nPoints
+    integer :: lineSize
     integer, dimension(3) :: periodicity
 
     open(newunit=unit, file=filename,form="unformatted",access="stream",CONVERT='BIG_ENDIAN',status="old")

@@ -73,7 +73,7 @@ module abo
    subroutine dealloc_barklem(barklem)
       type(barklem_cross_data), intent(inout) :: barklem
       deallocate(barklem%neff1, barklem%neff2, barklem%cross,barklem%alpha)
-      return 
+      return
    end subroutine dealloc_barklem
 
 
@@ -168,9 +168,8 @@ module abo
       real(kind=dp) :: neff1, neff2, nefftmp
       real(kind=dp) :: findex1, findex2, mu, vmean, sqa0
       real(kind=dp) :: cross, E_Rydberg2, deltaEi, deltaEj, expo
-      integer :: Li, Lj, i, j, Z, ic, k, index, index1
+      integer :: Li, Lj, i, j, Z, ic, index, index1
       character(len=ATOM_LABEL_WIDTH) :: label_i, label_j
-      real(kind=dp) :: testcc
 
       i = Atom%lines(kr)%i
       j = Atom%lines(kr)%j
@@ -211,7 +210,7 @@ module abo
             write(*,*) "WARNING: Barklem, cannot parse label, using Unsold !"
             res = .false.
             return
-         endif 
+         endif
          !write(*,'("Si="(1F2.2)", Li="(1I2)", Ji="(1F2.2))') Si, Li, Ji
          !write(*,'("Sj="(1F2.2)", Lj="(1I2)", Jj="(1F2.2))') Sj, Lj, Jj
 
@@ -227,7 +226,7 @@ module abo
          end if
 
          if (.not. res ) then
-            write(*,*) "WARNING: Barklem, cannot get data, using Unsold !"          
+            write(*,*) "WARNING: Barklem, cannot get data, using Unsold !"
             return
          endif
          lread_from_table = .true.
@@ -262,7 +261,7 @@ module abo
             !write(*,*) neff2, bs%neff2(1), bs%neff2(bs%N2)
             write(*,*) "neff outside domain, use Unsold"
             res = .false.
-            return       
+            return
          end if
 
          index = locate(bs%neff1,neff1)!minloc(abs(bs%neff1 - neff1), 1)
@@ -293,15 +292,15 @@ module abo
          atom%lines(kr)%cvdWaals(2) = &
             bilinear(bs%N1,bs%neff1,index1,bs%N2,bs%neff2,index,bs%alpha,neff1,neff2)
 
-            
+
       endif !read from table
 
       !comptue the actual cross-section with T factorised out.
 
       cross = 2.0*sqa0 * (4.0/pi)**(0.5*atom%lines(kr)%cvdWaals(2)) *  &
-         vmean * (vmean/vref)**(-atom%lines(kr)%cvdWaals(2)) 
+         vmean * (vmean/vref)**(-atom%lines(kr)%cvdWaals(2))
 
-      atom%lines(kr)%cvdWaals(1) = atom%lines(kr)%cvdWaals(1) * cross * & 
+      atom%lines(kr)%cvdWaals(1) = atom%lines(kr)%cvdWaals(1) * cross * &
          exp(gammln(2.0-0.5*atom%lines(kr)%cvdWaals(2)))
 
       res = .true.

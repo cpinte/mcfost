@@ -185,7 +185,7 @@ subroutine equilibre_hydrostatique()
   implicit none
 
   real, dimension(nz) :: rho, ln_rho
-  real :: dz, dz_m1, dTdz, fac, fac1, fac2, M_etoiles, M_mol, somme, cst
+  real :: dz, dz_m1, dTdz, fac1, fac2, M_etoiles, M_mol, somme, cst
   integer :: i,j, k, icell, icell_m1
 
   real, parameter :: gas_dust = 100

@@ -222,9 +222,9 @@ contains
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp), allocatable, dimension(:) :: gsize, grainsize_f, dN_ds, N_monomers, rho_monomers
-    real(dp), dimension(4) :: lambsol, lambguess
+    real(dp), dimension(4) :: lambsol
 
-    real(dp) :: mass, somme, Mtot, Mtot_dust, facteur, a, mass_factor
+    real(dp) :: mass, Mtot, Mtot_dust, facteur, a, mass_factor
     real :: f, limit_threshold, density_factor
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n, ierr, N_pb
 

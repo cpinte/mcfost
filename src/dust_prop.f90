@@ -553,7 +553,7 @@ subroutine prop_grains(lambda)
   implicit none
 
   integer, intent(in) :: lambda
-  real :: a, wavel, x, qext, qsca, gsca, amu1, amu2, amu1_coat, amu2_coat, Cext, Csca
+  real :: a, wavel, x, qext, qsca, gsca, amu1, amu2, amu1_coat, amu2_coat
   integer :: k, pop
 
   qext=0.0
@@ -795,7 +795,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   integer, intent(in) :: lambda, p_lambda
   logical, intent(in), optional :: no_scatt
 
-  integer :: icell, k, thetaj
+  integer :: icell, k
   real(kind=dp) ::  density, fact, k_abs_RE, k_abs_LTE, k_abs_tot, k_sca_tot, rho0
   logical :: lcompute_obs,  ldens0, compute_scatt
 

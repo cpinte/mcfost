@@ -4551,7 +4551,7 @@ end subroutine read_para215
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop, status, imol
+    integer :: i, j, alloc_status, ios, ind_pop, status, imol
 
     real(kind=dp) :: size_neb_tmp, somme
     real :: gas_dust

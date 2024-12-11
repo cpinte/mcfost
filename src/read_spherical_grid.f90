@@ -32,7 +32,7 @@ module read_spherical_grid
     ! in pluto%x1, pluto%x2, pluto%x3.
     ! ----------------------------------------------------- !
         character(len=*), intent(in) :: filename
-        integer :: ios, Nsize, acc, i, ipos
+        integer :: ios, Nsize, acc, i
         real :: dphi
 
         lvelocity_file = .true.
@@ -42,7 +42,7 @@ module read_spherical_grid
         n_zones = 1
 
         open(unit=1, file=trim(filename), status="old",access="stream",form='unformatted')
-        !read size along each direction + cell limits (size + 1) 
+        !read size along each direction + cell limits (size + 1)
         read(1,iostat=ios) pluto%nx1
         allocate(pluto%x1(pluto%nx1+1))
         read(1,iostat=ios) pluto%x1(:)
@@ -138,7 +138,7 @@ module read_spherical_grid
     ! use grains, only : M_Grain
         character(len=*), intent(in) :: filename
         integer :: ios, i, Nsize
-        
+
         integer :: j, k, jj, icell
         integer, allocatable :: dz(:,:,:)
         real, allocatable :: vtmp(:,:,:,:)

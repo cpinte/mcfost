@@ -21,11 +21,10 @@ contains
 
     character(len=128) :: name
     character(len=1) :: sep
-    integer :: geometry, time, pos1,pos2, id
+    integer :: pos1,pos2
     integer, dimension(3) :: dimensions
     character(:), allocatable :: origin
     real, dimension(:), allocatable :: x1, x2, x3
-    real(dp) :: dx
 
     write(*,*) "Reading header: "//trim(filename)
     idefix%filename = filename
@@ -105,14 +104,8 @@ contains
     ! idefix data is ordered in x1 = r, x2 = theta, x3 = phi
 
     real, dimension(:,:,:), allocatable  :: rho, vx1, vx2, vx3
-    integer :: ios, iunit, alloc_status, l, recl, i,j, jj, phik, icell, id, n_planets, n_etoiles_old, i2, i3
-
-    character(len=128) :: filename
-    character(len=16), dimension(4) :: file_types
-
+    integer :: alloc_status, i,j, jj, phik, icell, n_planets, i2, i3
     real(dp) :: Ggrav_idefix, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur, omega
-    type(star_type), dimension(:), allocatable :: etoile_old
-
     real(dp), dimension(n_planets_max) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
 
     ! Planet properties hard coded for now
@@ -252,7 +245,7 @@ contains
     integer, intent(out) :: n_planets
     real(dp), dimension(n_planets_max), intent(out) :: x, y, z, vx, vy, vz, Mp, time
 
-    integer :: n_etoiles_old, iunit, ios, n_etoile_old, i, i_planet
+    integer :: iunit, ios, i, i_planet
     real :: timestep
 
     character(len=1) :: s

@@ -186,6 +186,7 @@ contains
     file_types(2) = "vx1"
     file_types(3) = "vx2"
     file_types(4) = "vx3"
+    iunit=1
     do l=1, 4
        filename = trim(pluto%dir)//"/"//trim(file_types(l))//"."//trim(trim(pluto%id))//".dbl"
        write(*,*) "Reading "//trim(filename)

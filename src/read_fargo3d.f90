@@ -202,6 +202,7 @@ contains
     file_types(2) = "gasvx"
     file_types(3) = "gasvy"
     file_types(4) = "gasvz"
+    iunit=1
     do l=1, 4
        filename = trim(fargo3d%dir)//"/"//trim(file_types(l))//trim(trim(fargo3d%id))//".dat"
        write(*,*) "Reading "//trim(filename)
@@ -304,7 +305,7 @@ contains
     integer, intent(out) :: n_planets
     real(dp), dimension(n_planets_max), intent(out) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
 
-    integer :: n_etoiles_old, iunit, ios, n_etoile_old, i, i_planet, id
+    integer :: iunit, ios, i, i_planet, id
 
     character(len=1) :: s
     character(len=128) :: filename

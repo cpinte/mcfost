@@ -687,7 +687,7 @@ function v_proj(icell,x,y,z,u,v,w) !
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
   real(kind=dp) :: vitesse, vx, vy, vz, v_r, v_phi, v_theta, v_rcyl, norme, r, phi, rcyl, rcyl2, r2
-  real(kind=dp) :: cos_phi, sin_phi, cos_theta, sin_theta, norme2
+  real(kind=dp) :: cos_phi, sin_phi, cos_theta, sin_theta
 
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)

@@ -95,9 +95,8 @@ contains
     ! avant et apres le calcul du champ ISM
 
     use dust_ray_tracing, only : n_phot_envoyes
-    use radiation_field, only : xJ_abs, xN_abs
+    use radiation_field, only : xJ_abs
     use prodimo, only : chi_ISM, R_ISM, T_ISM_stars, Wdil, Tcmb
-    use parametres, only : Rmax
     use temperature, only : E_disk
     use cylindrical_grid, only : volume
     use wavelengths, only : tab_lambda
@@ -151,7 +150,7 @@ contains
     use optical_depth, only : compute_column
     use density, only : densite_pouss
     use cylindrical_grid, only : r_grid, z_grid
-    use molecular_emission, only : densite_gaz, Tcin
+    use molecular_emission, only : densite_gaz
     use temperature, only : Tdust
     use Voronoi_grid, only : Voronoi
 

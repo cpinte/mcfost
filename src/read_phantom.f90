@@ -46,7 +46,7 @@ contains
     real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu,nucleation
     type(dump_h) :: hdr
     logical :: got_h,got_dustfrac,got_itype,tagged,matched
-    logical :: got_temperature,got_u,lpotential,do_nucleation
+    logical :: got_temperature,got_u,lpotential
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
     ! We first read the number of particules in each phantom file

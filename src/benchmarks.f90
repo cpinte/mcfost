@@ -14,7 +14,7 @@ module benchmarks
 
 subroutine init_Pascucci_benchmark()
 
-  character(len=32) :: filename = "Pascucci_optSi.dat"
+  !character(len=32) :: filename = "Pascucci_optSi.dat"
 
   write(*,*) "------------------------------------------------"
   write(*,*) "| Setting up the Pascucci et al 2004 benchmark |"
