@@ -905,6 +905,31 @@ subroutine photo_dissociation()
 
 end subroutine photo_dissociation
 
+
+!***********************************************************
+
+subroutine write_abundance(imol)
+
+  use fits_utils, only : cfitsWrite
+
+  integer, intent(in) :: imol
+  character(len=512) :: filename
+
+  filename = trim(data_dir2(imol))//"/abundance.fits"
+  if (.not.lVoronoi) then
+     if (l3D) then
+        call cfitsWrite(trim(filename),tab_abundance,[n_rad,2*nz,n_az])
+     else
+        call cfitsWrite(trim(filename),tab_abundance,[n_rad,nz])
+     endif
+  else
+     call cfitsWrite(trim(filename),tab_abundance,[n_cells])
+  endif
+
+  return
+
+end subroutine write_abundance
+
 !***********************************************************
 
 function compute_vertical_CD(icell) result(CD)

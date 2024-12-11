@@ -223,6 +223,7 @@ subroutine set_default_variables()
   lnot_random_Voronoi = .false.
   lignore_sink=.false.
   lstar_bb = .false.
+  lwrite_abundance = .false.
 
   tmp_dir = "./"
 
@@ -1501,6 +1502,9 @@ subroutine initialisation_mcfost()
      case("-ignore_sink")
         i_arg = i_arg + 1
         lignore_sink=.true.
+     case("-write_abundance")
+        i_arg = i_arg + 1
+        lwrite_abundance=.true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
