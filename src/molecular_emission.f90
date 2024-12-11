@@ -38,8 +38,9 @@ module molecular_emission
   real(kind=dp), dimension(:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_cells, nTrans
   real, dimension(:,:), allocatable :: tab_nLevel, tab_nLevel2 ! n_cells, nLevels
 
-  real, dimension(:), allocatable :: v_turb, v_line ! n_cells
+  real, dimension(:), allocatable :: v_turb2, dv_line ! n_cells, v_turb2 is (v_turb in m/s)**2
 
+  logical :: lvturb_in_cs
   real ::  vitesse_turb, dv, dnu, v_syst
   character(len=8) :: v_turb_unit
   integer, parameter :: n_largeur_Doppler = 15
@@ -147,7 +148,7 @@ subroutine init_Doppler_profiles(imol)
 
   integer, intent(in) :: imol
 
-  real(kind=dp) :: sigma2, sigma2_m1, vmax
+  real(kind=dp) :: sigma2, sigma2_m1
   integer :: icell, n_speed
 
   n_speed = mol(imol)%n_speed_rt
@@ -156,11 +157,8 @@ subroutine init_Doppler_profiles(imol)
      ! Utilisation de la temperature LTE de la poussiere comme temperature cinetique
      ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
      ! Consistent avec benchmark
-     if (trim(v_turb_unit) == "cs") then
-        v_turb(icell) = sqrt((kb*Tcin(icell) / (mu_mH * g_to_kg))) * v_turb(icell)
-     endif
-     sigma2 =  2.0_dp * (kb*Tcin(icell) / (mol(imol)%molecularWeight * mH  * g_to_kg)) + v_turb(icell)**2
-     v_line(icell) = sqrt(sigma2)
+     sigma2 =  2.0_dp * (kb*Tcin(icell) / (mol(imol)%molecularWeight * mH  * g_to_kg)) + v_turb2(icell)
+     dv_line(icell) = sqrt(sigma2)
 
      !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
      sigma2_m1 = 1.0_dp / sigma2
@@ -172,9 +170,8 @@ subroutine init_Doppler_profiles(imol)
      ! Echantillonage du profil de vitesse dans la cellule
      ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de
      ! sa valeur au centre : exp(-2.15^2) = 0.01
-     vmax = sqrt(sigma2)
-     tab_dnu_o_freq(icell) = largeur_profile * vmax / (real(n_speed))
-     deltaVmax(icell) = largeur_profile * vmax !* 2.0_dp  ! facteur 2 pour tirage aleatoire
+     tab_dnu_o_freq(icell) = largeur_profile * dv_line(icell) / (real(n_speed))
+     deltaVmax(icell) = largeur_profile * dv_line(icell) !* 2.0_dp  ! facteur 2 pour tirage aleatoire
   enddo !icell
 
   return

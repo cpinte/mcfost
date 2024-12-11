@@ -997,6 +997,7 @@ subroutine init_molecular_disk(imol)
   integer, intent(in) :: imol
 
   logical, save :: lfirst_time = .true.
+  real(dp) :: factor
   integer :: icell
 
   ldust_mol  = .true.
@@ -1024,7 +1025,15 @@ subroutine init_molecular_disk(imol)
            enddo
         endif
      endif
-     v_turb = vitesse_turb
+
+     if (lvturb_in_cs) then
+        factor = vitesse_turb**2
+        do icell=1, n_cells
+           v_turb2(icell) =  (kb*Tcin(icell) / (mu_mH * g_to_kg)) * factor  ! cs**2 * factor
+        enddo
+     else
+        v_turb2(:) = vitesse_turb**2 ! constant vturb
+     endif
   endif ! lfirst_time
 
   ! Abondance

@@ -890,7 +890,7 @@ function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l_void_
 
      ! Nbre de points d'integration en fct du differentiel de vitesse
      ! compare a la largeur de raie de la cellule de depart
-     n_vpoints  = min(max(2,nint(dv/v_line(icell)*20.)),n_vpoints_max)
+     n_vpoints  = min(max(2,nint(dv/dv_line(icell)*20.)),n_vpoints_max)
 
      ! Vitesse projete le long du trajet dans la cellule
      do ivpoint=2, n_vpoints-1
