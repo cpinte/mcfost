@@ -139,7 +139,7 @@ module parametres
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
   integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
 
-  logical :: lfargo3d, lathena, lidefix, lpluto, lsphere_model, lmodel_1d !future lsymspheric
+  logical :: lfargo3d, lathena, lidefix, lpluto, lsphere_model, lmodel_1d, lheader_only !future lsymspheric
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol

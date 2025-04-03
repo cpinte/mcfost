@@ -1194,6 +1194,8 @@ contains
        endif
     endif
 
+    if (lheader_only) stop
+
     return
 
   end subroutine phantom_2_mcfost
