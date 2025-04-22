@@ -846,7 +846,7 @@ subroutine dealloc_emission_mol()
 
   call deallocate_stellar_spectra()
 
-  deallocate(Level_energy,poids_stat_g,j_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
+  deallocate(Level_energy,poids_stat_g,j_qnb,v_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
        iCollUpper,iCollLower)
 

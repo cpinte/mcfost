@@ -2083,4 +2083,38 @@ end function integrate_trap_array
 
  end function dirname
 
+
+ subroutine split_line(line, tokens, numTokens)
+   character(len=*), intent(in) :: line
+   character(len=20), intent(out) :: tokens(10)
+   integer, intent(out) :: numTokens
+
+   integer :: i, p1, p2, len_line
+
+   len_line = len_trim(line)
+   numTokens = 0
+   p1 = 1
+
+   do while (p1 <= len_line)
+      ! Skip leading spaces
+      do while (p1 <= len_line .and. line(p1:p1) == ' ')
+         p1 = p1 + 1
+      end do
+      if (p1 > len_line) exit
+
+      p2 = p1
+      do while (p2 <= len_line .and. line(p2:p2) /= ' ')
+         p2 = p2 + 1
+      end do
+
+      numTokens = numTokens + 1
+      if (numTokens <= 10) then
+         tokens(numTokens) = line(p1:p2-1)
+      end if
+
+      p1 = p2 + 1
+   end do
+ end subroutine split_line
+
+
 end module utils

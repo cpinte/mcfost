@@ -960,8 +960,13 @@ subroutine integ_tau_mol(imol)
      iTrans = mol(imol)%indice_Trans_rayTracing(it)
 
      write(*,*) "-------------------------------"
-     write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans)))
-     write(*,*) "tau_mol = ", real(tau_mol(0,it))
+     if (lrovib) then
+        write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans))), &
+             ", v= ", trim(v_qnb(itransUpper(iTrans))), " - ", trim(v_qnb(itransLower(iTrans)))
+     else
+        write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans)))
+     endif
+        write(*,*) "tau_mol = ", real(tau_mol(0,it))
      write(*,*) "tau_dust=", real(tau_dust(it))
 
      ! Compute altitude at which tau=1 is reached

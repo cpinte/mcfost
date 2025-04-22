@@ -10,10 +10,10 @@ module molecular_emission
   implicit none
   save
 
-  logical :: ldouble_RT
+  logical :: ldouble_RT, lrovib
 
   real, dimension(:), allocatable :: Level_energy
-  character(len=12), dimension(:), allocatable ::  j_qnb
+  character(len=12), dimension(:), allocatable ::  j_qnb, v_qnb
 
   ! g est dp car les calculs utilisant g sont en dp
   real(kind=dp), dimension(:), allocatable :: poids_stat_g
