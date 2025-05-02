@@ -962,9 +962,11 @@ subroutine integ_tau_mol(imol)
      write(*,*) "-------------------------------"
      if (lrovib) then
         write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans))), &
-             ", v= ", trim(v_qnb(itransUpper(iTrans))), " - ", trim(v_qnb(itransLower(iTrans)))
+             ", v= ", trim(v_qnb(itransUpper(iTrans))), " - ", trim(v_qnb(itransLower(iTrans))), &
+             ", nu =", Transfreq(iTrans)/1e9, "Ghz"
      else
-        write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans)))
+        write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans))), &
+             ", nu =", Transfreq(iTrans)/1e9, "Ghz"
      endif
         write(*,*) "tau_mol = ", real(tau_mol(0,it))
      write(*,*) "tau_dust=", real(tau_dust(it))
@@ -980,11 +982,11 @@ subroutine integ_tau_mol(imol)
                  P(:) = phiProf(icell,ispeed,tab_speed)
                  norme=norme+kappa_mol_o_freq(icell,iTrans)*(z_lim(i,j+1)-z_lim(i,j))*P(0)
                  if (norme > 1.0) then
-                    write(*,*) "Vertical Tau_mol=1 (for r=100 au) at z=", real(z_grid(icell)), "au"
+                    write(*,*) "Vertical tau_mol=1 (at r=100 au) at z=", real(z_grid(icell)), "au"
                     exit loop_z
                  endif
               enddo loop_z
-              if (norme < 1.0) write(*,*) "Vertical Tau_mol=1 (for r=100 au) not reached, tau_max=", norme
+              if (norme < 1.0) write(*,*) "Vertical tau_mol=1 (at r=100 au) not reached, tau_max=", norme
               exit loop_r
            endif
         enddo loop_r
