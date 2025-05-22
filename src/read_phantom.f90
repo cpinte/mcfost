@@ -808,7 +808,7 @@ contains
 
     type(star_type), dimension(:), allocatable :: etoile_old
     integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile,n_skip,nsinkproperties
-    real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi,tbirth
+    real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
     real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
     real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
     real(dp), allocatable :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
