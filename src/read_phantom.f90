@@ -1004,7 +1004,7 @@ contains
        n_etoiles = 0
        n_skip    = 0
        do i=1,nptmass
-          if (xyzmh_ptmass_in(4,i) < 0.001 .or. xyzmh_ptmass_in(5,i)>0.01) then
+          if (xyzmh_ptmass_in(4,i) < 0.) then
              n_skip = n_skip + 1
           else
              n_etoiles = n_etoiles + 1

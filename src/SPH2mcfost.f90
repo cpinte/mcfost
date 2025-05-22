@@ -623,7 +623,6 @@ contains
        write(*,*) "Density was reduced by", density_factor, "in", n_force_empty, "cells surrounding the model, ie",&
             (1.0*n_force_empty)/n_cells * 100, "% of cells"
     endif
-    print*,"LVARIABLEDUST:",lvariable_dust
 
     if (ndusttypes >= 1) deallocate(a_SPH,log_a_SPH,rho_dust)
 
