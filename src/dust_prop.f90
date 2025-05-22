@@ -944,6 +944,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      endif !.not.lmono
   endif !lnLTE
 
+  if (icell_not_empty <= 0) call error("could not find a non empty cell")
   rho0 = masse(icell_not_empty)/volume(icell_not_empty) ! normalising by density in a non-empty cell
   if (rho0 < tiny_dp) call error("cannot normalise by density in first non-empty cell")
 

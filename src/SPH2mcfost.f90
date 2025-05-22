@@ -127,7 +127,6 @@ contains
     ! Deleting particles/cells in masked areas (Hill sphere, etc)
     if (allocated(mask)) call delete_masked_particles()
 
-    call find_non_empty_cell()
 
     return
 
@@ -624,11 +623,14 @@ contains
        write(*,*) "Density was reduced by", density_factor, "in", n_force_empty, "cells surrounding the model, ie",&
             (1.0*n_force_empty)/n_cells * 100, "% of cells"
     endif
+    print*,"LVARIABLEDUST:",lvariable_dust
 
     if (ndusttypes >= 1) deallocate(a_SPH,log_a_SPH,rho_dust)
 
     write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
+
+    call find_non_empty_cell()
 
     return
 
