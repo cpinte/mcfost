@@ -127,7 +127,6 @@ contains
     ! Deleting particles/cells in masked areas (Hill sphere, etc)
     if (allocated(mask)) call delete_masked_particles()
 
-    call find_non_empty_cell()
 
     return
 
@@ -629,6 +628,8 @@ contains
 
     write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
+
+    call find_non_empty_cell()
 
     return
 
