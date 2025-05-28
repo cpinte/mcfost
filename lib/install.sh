@@ -94,7 +94,7 @@ elif [ "$SYSTEM" = "gfortran" ]; then
     export CC=gcc
     export FC=gfortran
     export CXX=g++
-    export CFLAGS="-m64 -fpermisive"
+    export CFLAGS="-m64"
 else
     echo "Unknown system to build MCFOST: $SYSTEM"
     echo "Please choose ifort, ifx, or gfortran"
@@ -288,6 +288,7 @@ if [ "$SKIP_HDF5" != "yes" ]; then
     cd hdf5-1.10.5
     mkdir -p "$HOME/hdf5_install_tmp"
     ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
+    export CFLAGS="-m64 -fpermisive"
     make install
     cd ~1
     \cp "$HOME/hdf5_install_tmp/lib/libhdf5.a" "$HOME/hdf5_install_tmp/lib/libhdf5_fortran.a" lib/
