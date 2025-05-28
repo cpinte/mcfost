@@ -94,7 +94,7 @@ elif [ "$SYSTEM" = "gfortran" ]; then
     export CC=gcc
     export FC=gfortran
     export CXX=g++
-    export CFLAGS="-m64"
+    export CFLAGS="-m64 -fpermisive"
 else
     echo "Unknown system to build MCFOST: $SYSTEM"
     echo "Please choose ifort, ifx, or gfortran"
