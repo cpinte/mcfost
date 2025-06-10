@@ -127,7 +127,6 @@ contains
     ! Deleting particles/cells in masked areas (Hill sphere, etc)
     if (allocated(mask)) call delete_masked_particles()
 
-
     return
 
   end subroutine setup_SPH2mcfost

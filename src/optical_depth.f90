@@ -215,7 +215,6 @@ subroutine integ_tau(lambda)
 
   if (.not.lvariable_dust) then
      icell = icell_not_empty
-     if (icell <= 0) call error("icell_not_empty is out of bounds.")
      if (kappa(icell1,lambda) * kappa_factor(icell) > tiny_real) then
         write(*,*) " Column density (g/cm^2)   = ", real(tau*(masse(icell)/(volume(icell)*AU_to_cm**3))/ &
              (kappa(icell1,lambda) * kappa_factor(icell)/AU_to_cm))
