@@ -2,10 +2,6 @@
 FROM debian:bookworm-slim
 
 # Set environment variables for MCFOST installation and runtime
-# MCFOST_INSTALL: Directory where MCFOST will be installed
-# MCFOST_UTILS: Directory for MCFOST's data files (stellar spectra, etc.)
-# MCFOST_GIT, MCFOST_AUTO_UPDATE: Settings for source installation as per MCFOST docs
-# OMP_STACKSIZE: Recommended OpenMP stack size for performance
 ENV MCFOST_INSTALL="/opt/mcfost" \
     MCFOST_UTILS="/opt/mcfost_utils" \
     MCFOST_GIT=1 \
@@ -20,12 +16,13 @@ RUN mkdir -p ${MCFOST_INSTALL}/bin \
            ${MCFOST_UTILS}
 
 # Install build dependencies:
-# - git: To clone the MCFOST repository
+# - git: To clone repositories
 # - gfortran: The Fortran compiler for MCFOST
-# - make, build-essential: For compiling the code
+# - make, build-essential: For compiling code
 # - wget: Potentially used by some scripts for downloads
-# - libhdf5-dev: HDF5 library development files, a common dependency for scientific software
-# - python3, python3-pip: For Python utilities like pre-commit or if xgboost is used
+# - libhdf5-dev: HDF5 library development files, essential for h5py (pymcfost dependency)
+# - python3, python3-pip: For Python and its package manager
+# - python3-venv: Useful for managing Python environments, though not strictly required for this direct install
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     git \
@@ -35,7 +32,8 @@ RUN apt-get update && \
     build-essential \
     libhdf5-dev \
     python3 \
-    python3-pip && \
+    python3-pip \
+    python3-venv && \
     rm -rf /var/lib/apt/lists/*
 
 # Clone the MCFOST repository from GitHub
@@ -53,6 +51,20 @@ WORKDIR /
 # These files are stored in the directory specified by MCFOST_UTILS
 RUN mcfost -setup
 
+# --- pymcfost installation ---
+# Clone the pymcfost repository
+RUN git clone https://github.com/cpinte/pymcfost.git /usr/local/src/pymcfost
+
+# Install pymcfost using pip.
+# This will also install its Python dependencies (numpy, scipy, matplotlib, astropy, h5py).
+# Using --no-cache-dir to prevent caching pip packages, which helps keep the image size down.
+WORKDIR /usr/local/src/pymcfost
+RUN pip3 install . --no-cache-dir
+
+# --- End of pymcfost installation ---
+
 # Set the default command to execute when the container runs
-# This will display the MCFOST help message
+# This will display the MCFOST help message.
+# You could change this to start a Python interpreter if you primarily plan to use pymcfost,
+# e.g., CMD ["python3"]
 CMD ["mcfost", "--help"]
