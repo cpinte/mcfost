@@ -447,7 +447,7 @@ contains
     if (trim(v_turb_unit) == "cs") then
        lvturb_in_cs = .true.
     else
-       lvturb_in_cs = .true.
+       lvturb_in_cs = .false.
        if (v_turb_unit(1:1) /= "m") then
           if (v_turb_unit(1:2) == "km") then
              vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
