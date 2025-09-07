@@ -100,6 +100,8 @@ subroutine define_gas_density()
      rmin2 = dz%rmin**2
      rmax2 = dz%rmax**2
 
+     mass = 0.0_dp
+
      !$omp parallel default(none) &
      !$omp private(i,j,k,icell,rcyl,rcyl2,z,z2,rsph,phi,H,puffed,fact_exp,coeff_exp,z0,density,somme) &
      !$omp shared(rin2,rmin2,rmax2) &
@@ -300,7 +302,6 @@ subroutine define_gas_density()
      ! Normalisation masse de gaz par zone
      !----------------------------------------
      ! Calcul de la masse de gaz de la zone
-     mass = 0.
      !$omp do schedule(static)
      do icell = 1, n_cells
         mass = mass + densite_gaz_tmp(icell) * volume(icell)
