@@ -96,9 +96,13 @@ subroutine define_gas_density()
      dz=disk_zone(izone)
      densite_gaz_tmp = 0.0
 
+     rin2 = dz%rin**2
+     rmin2 = dz%rmin**2
+     rmax2 = dz%rmax**2
+
      !$omp parallel default(none) &
-     !$omp private(i,j,k,icell,rcyl,rcyl2,z,z2,rsph,phi,H,puffed,fact_exp,coeff_exp,z0,density) &
-     !$omp shared(rin2,rmin2,rmax2,somme,surface) &
+     !$omp private(i,j,k,icell,rcyl,rcyl2,z,z2,rsph,phi,H,puffed,fact_exp,coeff_exp,z0,density,somme) &
+     !$omp shared(rin2,rmin2,rmax2) &
      !$omp shared(n_zones,izone,dz,disk_zone,n_rad,nz,n_az,j_start,cell_map,densite_gaz_tmp) &
      !$omp shared(densite_gaz_midplane_tmp) &
      !$omp shared(lwarp,r_grid,z_grid,phi_grid,lpuffed_rim,puffed_rim_h,puffed_rim_r,puffed_rim_delta_r) &
@@ -198,9 +202,6 @@ subroutine define_gas_density()
         !$omp end do
 
      else if (dz%geometry == 3) then ! envelope
-        rin2 = dz%rin**2
-        rmin2 = dz%rmin**2
-        rmax2 = dz%rmax**2
 
         !$omp do schedule(dynamic)
         do i=1, n_rad
@@ -353,7 +354,7 @@ subroutine define_gas_density()
            densite_gaz(icell) = 0.0_dp
         endif
      enddo
-     ! $ omp end do
+     !$omp end do
   endif
 
   ! Tableau de masse de gaz
