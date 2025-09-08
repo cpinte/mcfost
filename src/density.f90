@@ -463,7 +463,7 @@ subroutine define_dust_density()
   enddo
 
   ! Corrective factor for dust stratification
-  correct_strat(l) = 1.0 ! for no settling
+  correct_strat(:) = 1.0 ! for no settling
   if (lvariable_dust.and.(settling_type == 1)) then ! we can precalculate in the case of a power-law
      do  l=1,n_grains_tot
         a_strat = max(a_strat,minval(r_grain))
