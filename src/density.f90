@@ -462,10 +462,10 @@ subroutine define_dust_density()
      cst_pous(i) = cst(i)/dust_pop(i)%avg_grain_mass
   enddo
 
-  do  l=1,n_grains_tot
-     ! Correction stratification
-     if (lvariable_dust.and.(settling_type == 1)) then
-        ! loi de puissance
+  ! Corrective factor for dust stratification
+  correct_strat(l) = 1.0 ! for no settling
+  if (lvariable_dust.and.(settling_type == 1)) then ! we can precalculate in the case of a power-law
+     do  l=1,n_grains_tot
         a_strat = max(a_strat,minval(r_grain))
         if (r_grain(l) > a_strat) then
            correct_strat(l) = (r_grain(l)/a_strat)**exp_strat   ! (h_gas/h_dust)^2
@@ -474,10 +474,8 @@ subroutine define_dust_density()
         endif
         ! loi exponentielle (Garaud , Barriere 2004)
         ! correct_strat(k) = exp(r_grain(k)*fact_strat)/exp(amin*fact_strat)
-     else
-        correct_strat(l) = 1.0
-     endif
-  enddo !k
+     enddo !k
+  endif
 
   ! Pour normalisation apres migration radiale
   N_tot(:) = 0.0 ; N_tot2(:) = 0.0 ;
