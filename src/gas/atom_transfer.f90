@@ -39,7 +39,7 @@ module atom_transfer
    use messages, only : error, warning
    use voigts, only : Voigt
    use broad, only : line_damping
-   use density, only : densite_pouss
+   use density, only : dust_density
    use temperature, only : Tdust
    use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol,emissivite_dust
    use dust_prop, only : prop_grains, opacite, init_indices_optiques, kappa_abs_lte, kappa, kappa_factor
@@ -1248,7 +1248,7 @@ module atom_transfer
       ! the electronic density calculations (0 division mainly for low values).
       real(kind=dp), parameter :: T_formation = 2000.0 ! [K]
       logical, dimension(:), allocatable :: ldust
-      allocate(ldust(n_cells)); ldust = (sum(densite_pouss,dim=1)>0.0_dp)
+      allocate(ldust(n_cells)); ldust = (sum(dust_density,dim=1)>0.0_dp)
       write(*,*) " *** Associating the dust temperature in the model..."
       !force dust_sublimation
       ! TO DO:
@@ -1315,7 +1315,7 @@ module atom_transfer
       enddo
 
       do icell=1, n_cells
-         if (sum(densite_pouss(:,icell)) <= 0.0_dp) cycle
+         if (sum(dust_density(:,icell)) <= 0.0_dp) cycle
          emissivite_dust(:,icell) = kappa_abs_LTE(p_icell,:) * kappa_factor(icell) * &
             m_to_AU * Bpnu(n_lambda,tab_lambda_nm,T(icell)) ! [W m^-3 Hz^-1 sr^-1]
       enddo

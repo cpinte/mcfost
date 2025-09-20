@@ -193,7 +193,7 @@ contains
     ! mask : integer array, 1 if a SPH particle will be made transparent, 2 if deleted before tesselation
     ! ************************************************************************************ !
     use Voronoi_grid
-    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
+    use density, only : densite_gaz, masse_gaz, dust_density, masse
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
@@ -367,7 +367,7 @@ contains
        !$omp default(none) &
        !$omp private(icell,iSPH,use_single_grain,rhoi,ki,err,ierr,lambsol,rho_monomers,a,i,norm,mdust) &
        !$omp shared(n_cells,Voronoi,densite_gaz,n_grains_tot,r_grain,mass_factor,dN_ds,N_monomers) &
-       !$omp shared(densite_pouss,dust_moments,masse_gaz,volume) &
+       !$omp shared(dust_density,nbre_grains,dust_moments,masse_gaz,volume) &
        !$omp reduction(+:N_pb)
        !$omp do schedule(dynamic,1)
        do icell=1,n_cells
@@ -389,19 +389,19 @@ contains
                 endif
              enddo
 
-             densite_pouss(:,icell) = rho_monomers(:) * dN_ds(:)
+             dust_density(:,icell) = rho_monomers(:) * dN_ds(:)
 
              ! Simple approximation : we assume 1 single grain size
              if (use_single_grain) then
-                densite_pouss(:,icell) = 0._dp
+                dust_density(:,icell) = 0._dp
                 if (dust_moments(1,iSPH) > tiny_dp) then
                    a = a0 * dust_moments(2,iSPH)/dust_moments(1,iSPH)
                    i = locate(1.0_dp*r_grain(:),a)
-                   densite_pouss(i,icell) = 1.0
+                   dust_density(i,icell) = 1.0
                 endif
              endif
           else ! iSPH == 0, star
-             densite_pouss(:,icell) = 0._dp
+             dust_density(:,icell) = 0._dp
           endif
        enddo ! icell
        !$omp end do
@@ -417,7 +417,7 @@ contains
 
           mass = 0.0_dp
           do l=1,n_grains_tot
-             mass=mass + (densite_pouss(l,icell) *1.0_dp) * M_grain(l)
+             mass=mass + (dust_density(l,icell) * nbre_grains(l) *1.0_dp) * M_grain(l)
           enddo !l
           mass = mass * volume(icell)
 
@@ -426,7 +426,7 @@ contains
 
           if (mass > tiny_dp) then
              factor = mdust/ mass
-             densite_pouss(:,icell) = densite_pouss(:,icell) * factor
+             dust_density(:,icell) = dust_density(:,icell) * factor
           endif
        enddo !icell
        call normalize_dust_density(mdust_tot) ! this should only calculates the array masse
@@ -532,17 +532,17 @@ contains
              l=1
              do k=1,n_grains_tot
                 if (r_grain(k) < a_SPH(1)) then ! small grains
-                   densite_pouss(k,icell) = rho_dust(1)
+                   dust_density(k,icell) = rho_dust(1) / nbre_grains(k)
                 else if (r_grain(k) > a_SPH(ndusttypes+1)) then ! large grains
-                   densite_pouss(k,icell) = rho_dust(ndusttypes+1)
+                   dust_density(k,icell) = rho_dust(ndusttypes+1) / nbre_grains(k)
                 else ! interpolation
                    if (r_grain(k) > a_sph(l+1)) l = l+1
                    f = (log(r_grain(k))-log_a_sph(l))/(log_a_sph(l+1)-log_a_sph(l))
-                   densite_pouss(k,icell) = rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))
+                   dust_density(k,icell) = (rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))) / nbre_grains(k)
                 endif
              enddo !k
           else ! iSPH == 0, star
-             densite_pouss(:,icell) = 0.
+             dust_density(:,icell) = 0.
           endif
        enddo ! icell
 
@@ -557,13 +557,13 @@ contains
        do icell=1,n_cells
           masse(icell) = 0.
           do k=1,n_grains_tot
-             densite_pouss(k,icell) = densite_gaz(icell) * nbre_grains(k)
-             masse(icell) = masse(icell) + densite_pouss(k,icell) * M_grain(k) * volume(icell)
+             dust_density(k,icell) = densite_gaz(icell)
+             masse(icell) = masse(icell) + dust_density(k,icell) * nbre_grains(k) * M_grain(k) * volume(icell)
           enddo
        enddo
        masse(:) = masse(:) * AU3_to_cm3
        f = 1./disk_zone(1)%gas_to_dust * sum(masse_gaz)/sum(masse)
-       densite_pouss(:,:) = densite_pouss(:,:) * f
+       dust_density(:,:) = dust_density(:,:) * f
        masse(:) = masse(:) * f
     endif ! ndusttypes == 0
 
@@ -816,7 +816,7 @@ contains
   subroutine delete_masked_particles()
 
     use Voronoi_grid
-    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
+    use density, only : densite_gaz, masse_gaz, dust_density, masse
 
     integer :: icell, k
 
@@ -827,7 +827,7 @@ contains
           masse_gaz(icell)       = 0.
           densite_gaz(icell)     = 0.
           masse(icell)           = 0.
-          densite_pouss(:,icell) = 0.
+          dust_density(:,icell) = 0.
        endif
     enddo
 
@@ -842,7 +842,7 @@ contains
   subroutine delete_Hill_sphere()
 
     use Voronoi_grid
-    use density, only : densite_gaz, masse_gaz, densite_pouss, masse
+    use density, only : densite_gaz, masse_gaz, dust_density, masse
 
     integer :: istar, icell, n_delete
     real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz
@@ -874,7 +874,7 @@ contains
              masse_gaz(icell)    = 0.
              densite_gaz(icell) = 0.
              masse(icell) = 0.
-             densite_pouss(:,icell) = 0.
+             dust_density(:,icell) = 0.
              n_delete = n_delete + 1
           endif
        enddo cell_loop
