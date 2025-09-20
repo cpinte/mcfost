@@ -7,15 +7,15 @@ module read1d_models
 ! TO DO:
 !	direct interface with these different codes (and format)
 !
-	use parametres
-	use messages
-	use mcfost_env
-	use constantes
-    use elements_type
-    use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, &
-         lcalc_ne, check_for_zero_electronic_density
-	use density, only : densite_pouss
-	use grains, only : M_grain
+        use parametres
+        use messages
+        use mcfost_env
+        use constantes
+        use elements_type
+        use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, &
+             lcalc_ne, check_for_zero_electronic_density
+	use density, only : dust_density
+	use grains, only : M_grain, nbre_grains
 
 	implicit none
 
@@ -256,7 +256,7 @@ module read1d_models
 		if (ldust_atom) then
 			dust_dens_max = 0d0; dust_dens_min = 1d30
 			do icell=1, n_cells
-				rho_d = sum(densite_pouss(:,icell) * M_grain(:))
+				rho_d = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:))
 				if (rho_d<=0.0) cycle
 				dust_dens_min = min(dust_dens_min,rho_d)
 				dust_dens_max = max(dust_dens_max,rho_d)

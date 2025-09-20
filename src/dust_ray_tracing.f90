@@ -857,7 +857,7 @@ subroutine calc_Jth(lambda)
                  cst_wl=cst_th/(Temp*wl)
                  coeff_exp=exp(cst_wl)
                  J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                      C_abs_norm(l,lambda) * densite_pouss(l,icell)
+                      C_abs_norm(l,lambda) * dust_density(l,icell) * nbre_grains(l)
               endif
            enddo ! l
         enddo ! icell
@@ -872,7 +872,7 @@ subroutine calc_Jth(lambda)
                     cst_wl=cst_th/(Temp*wl)
                     coeff_exp=exp(cst_wl)
                     J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                         C_abs_norm(l,lambda)*densite_pouss(l,icell)
+                         C_abs_norm(l,lambda) * dust_density(l,icell) * nbre_grains(l)
                  endif !cst_wl
               else ! ! la grain a une proba de T
                  do T=1,n_T
@@ -881,7 +881,7 @@ subroutine calc_Jth(lambda)
                        cst_wl=cst_th/(Temp*wl)
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(l,lambda)*densite_pouss(l,icell) * Proba_Tdust(T,l,icell)
+                            C_abs_norm(l,lambda) * dust_density(l,icell) * nbre_grains(l) * Proba_Tdust(T,l,icell)
                     endif !cst_wl
                  enddo ! T
               endif ! l_RE
