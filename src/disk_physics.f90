@@ -160,7 +160,7 @@ subroutine sublimate_dust()
         do k=1,n_az
            icell = cell_map(i,j,k)
            do l=1,n_grains_tot
-              mass=mass + dust_density(l,icell) * nbre_grains(k) * M_grain(l) * (volume(icell) * AU3_to_cm3)
+              mass=mass + dust_density(l,icell) * nbre_grains(l) * M_grain(l) * (volume(icell) * AU3_to_cm3)
            enddo
         enddo
      enddo
