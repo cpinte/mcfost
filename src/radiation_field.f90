@@ -190,18 +190,18 @@ subroutine deallocate_radiation_field()
 end subroutine deallocate_radiation_field
 
 !*************************************************************************************
-
+! Added checks for allocated array in radiation field
 subroutine reset_radiation_field()
-
+  
   if (lRE_LTE) then
-     xKJ_abs(:,:) = 0.0_dp
-     E0 = 0.0_dp
+     if (allocated(xKJ_abs)) xKJ_abs(:,:) = 0.0_dp
+     if (allocated(E0)) E0 = 0.0_dp
   endif
   if (lRE_nLTE .or. lnRE) then
-     xJ_abs(:,:,:) = 0.0_dp
-     J0 = 0.0_dp
+     if (allocated(xJ_abs)) xJ_abs(:,:,:) = 0.0_dp
+     if (allocated(J0)) J0 = 0.0_dp
   endif
-  if (lmcfost_lib) xN_abs(:,:,:) = 0.0_dp
+  if (lmcfost_lib .and. allocated(xN_abs)) xN_abs(:,:,:) = 0.0_dp
 
 !  E_stars = 0.0 ; E_disk = 0.0 ; E_ISM = 0.0
 !
