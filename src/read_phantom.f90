@@ -765,7 +765,8 @@ contains
   !*************************************************************************
 
   subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,ldust_moments,n_files,dustfluidtype,xyzh, &
-       vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass_in,vxyz_ptmass_in,hfact,umass, &
+       vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype, apr_level, &
+       xyzmh_ptmass_in,vxyz_ptmass_in,hfact,umass, &
        utime, ulength,graindens,ndudt,dudt,ifiles, &
        n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
        SPH_grainsizes, massgas,massdust, rhogas,rhodust,dust_moments,extra_heating,ieos)
@@ -791,6 +792,7 @@ contains
     real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
     real(dp), dimension(ndusttypes),    intent(in) :: graindens
     real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
+    integer(kind=1), dimension(:), intent(in), optional :: apr_level
     real(dp), intent(in) :: hfact,umass,utime,ulength
     real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass_in, vxyz_ptmass_in
     real(dp), dimension(:,:), intent(inout), allocatable :: nucleation
@@ -812,7 +814,7 @@ contains
     real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
     real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
     real(dp), allocatable :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
-
+    real :: apr_fac
     logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
     logical :: lupdate_photosphere
 
@@ -961,6 +963,18 @@ contains
        endif
     enddo
     n_SPH = j
+
+    ! Update the masses if apr is used
+    if (present(apr_level)) then
+      write(*,*) "Size of apr_level array:" size(apr_level)
+      do i=1, n_SPH
+         apr_fac = 1. / (2. ** apr_level(i))
+         rhogas(i) = rhogas(i) * apr_fac
+         rhodust(i) = rhodust(i) * apr_fac
+         massgas(i) = massgas(i) * apr_fac
+         massdust(i) = massdust(i) * apr_fac
+      enddo
+    endif
 
     if (sum(massgas) == 0.) call error('Using old phantom dumpfile without gas-to-dust ratio on dust particles.', &
          msg2='Set use_dust_particles = .false. (read_phantom.f90) and compile and run again.')
