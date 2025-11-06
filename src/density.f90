@@ -8,6 +8,7 @@ module density
   use utils
   use messages
   use stars, only : compute_stellar_parameters
+  !$ use omp_lib
 
   implicit none
   save
@@ -95,7 +96,24 @@ subroutine define_gas_density()
      dz=disk_zone(izone)
      densite_gaz_tmp = 0.0
 
+     rin2 = dz%rin**2
+     rmin2 = dz%rmin**2
+     rmax2 = dz%rmax**2
+
+     mass = 0.0_dp
+
+     !$omp parallel default(none) &
+     !$omp private(i,j,k,icell,rcyl,rcyl2,z,z2,rsph,phi,H,puffed,fact_exp,coeff_exp,z0,density,somme) &
+     !$omp shared(rin2,rmin2,rmax2) &
+     !$omp shared(n_zones,izone,dz,disk_zone,n_rad,nz,n_az,j_start,cell_map,densite_gaz_tmp) &
+     !$omp shared(densite_gaz_midplane_tmp) &
+     !$omp shared(lwarp,r_grid,z_grid,phi_grid,lpuffed_rim,puffed_rim_h,puffed_rim_r,puffed_rim_delta_r) &
+     !$omp shared(z_warp,ltilt,tilt_angle,lsigma_file,cst_gaz,z_lim,lgap_gaussian,f_gap_gaussian) &
+     !$omp shared(r_gap_gaussian,sigma_gap_gaussian,n_cells,z_scaling_env,surface_density,volume) &
+     !$omp reduction(+: mass)
+
      if (dz%geometry <= 2) then ! Disque
+        !$omp do schedule(dynamic)
         do i=1, n_rad
            bz : do j=min(0,j_start),nz
               !if (j==0) cycle bz
@@ -183,12 +201,11 @@ subroutine define_gas_density()
               enddo !k
            endif
         enddo ! i
+        !$omp end do
 
      else if (dz%geometry == 3) then ! envelope
-        rin2 = dz%rin**2
-        rmin2 = dz%rmin**2
-        rmax2 = dz%rmax**2
 
+        !$omp do schedule(dynamic)
         do i=1, n_rad
            do j=j_start,nz
               do k=1, n_az
@@ -225,9 +242,10 @@ subroutine define_gas_density()
               enddo !k
            enddo !j
         enddo !i
+        !$omp end do
 
      else if (dz%geometry == 4) then ! debris
-        k=1
+        !$omp do schedule(dynamic)
         do i=1, n_rad
            bz_debris : do j=j_start,nz
               if (j==0) cycle bz_debris
@@ -264,34 +282,47 @@ subroutine define_gas_density()
               enddo ! k
            enddo bz_debris !j
         enddo !i
+        !$omp end do
 
      endif ! dz%geometry
 
      if (lgap_Gaussian) then
         write(*,*) "GAP", f_gap_gaussian, r_gap_gaussian, sigma_gap_gaussian
+        !$omp do schedule(dynamic)
         do icell=1, n_cells
            densite_gaz_tmp(icell) = densite_gaz_tmp(icell) * (1.0 - f_gap_Gaussian * &
                 exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
         enddo
+        !$omp end do
      endif
+
+
 
      !----------------------------------------
      ! Normalisation masse de gaz par zone
      !----------------------------------------
-
      ! Calcul de la masse de gaz de la zone
-     mass = 0.
+     !$omp do schedule(static)
      do icell = 1, n_cells
-        mass = mass + densite_gaz_tmp(icell) *  mu_mH * volume(icell)
+        mass = mass + densite_gaz_tmp(icell) * volume(icell)
      enddo
-     mass =  mass * AU3_to_m3 * g_to_Msun
+     !$omp end do
+     ! End parallel for reduction + on mass
+     !$omp end parallel
 
-     ! Normalisation
+     mass =  mass * mu_mH * AU3_to_m3 * g_to_Msun
+
+     !$omp parallel default(none) &
+     !$omp private(i,k,j,icell) &
+     !$omp shared(dz,mass, facteur,volume,lcavity,cavity,masse_gaz,n_rad,nz,n_az,j_start) &
+     !$omp shared(lcorrect_density,densite_gaz,densite_gaz_tmp,densite_gaz_midplane,densite_gaz_midplane_tmp) &
+     !$omp shared(correct_density_Rin,correct_density_Rout,correct_density_factor,cell_map)
+
+     ! Adding zone density to total density
      if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
         facteur = dz%diskmass * dz%gas_to_dust / mass
-             !write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
-
-        ! Somme sur les zones pour densite finale
+        !write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
+        !$omp do schedule(dynamic)
         do i=1,n_rad
            do k=1, n_az
               bz_gas_mass2 : do j=min(1,j_start),nz
@@ -302,35 +333,53 @@ subroutine define_gas_density()
               densite_gaz_midplane(i,k) = densite_gaz_midplane(i,k) + densite_gaz_midplane_tmp(i,k) * facteur
            enddo !k
         enddo ! i
-
+        !$omp end do
      endif
+     !$omp end parallel
+
   enddo ! n_zones
+
+
+  facteur = (mu_mH * AU3_to_m3)
+  !$omp parallel default(none) &
+  !$omp private(icell,surface) &
+  !$omp shared(lcavity,cavity,r_grid,densite_gaz,correct_density_Rin,correct_density_Rout,correct_density_factor) &
+  !$omp shared(masse_gaz,volume,n_cells,z_grid,lcorrect_density, facteur)
 
   ! Ajout cavite vide
   if (lcavity) then
+     !$omp do schedule(static)
      do icell=1, n_cells
         surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
         if (abs(z_grid(icell)) > surface) then
            densite_gaz(icell) = 0.0_dp
         endif
      enddo
+     !$omp end do
   endif
 
   ! Tableau de masse de gaz
+  !$omp do schedule(static)
   do icell=1,n_cells
-     masse_gaz(icell) =  densite_gaz(icell) * mu_mH * volume(icell) * AU3_to_m3
+     masse_gaz(icell) =  densite_gaz(icell) * volume(icell) * facteur
   enddo
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+  !$omp end do
 
   if (lcorrect_density) then
      write(*,*) "Correcting density ..."
+     !$omp do schedule(static)
      do icell=1, n_cells
         if ((r_grid(icell) >= correct_density_Rin).and.(r_grid(icell) <= correct_density_Rout)) then
            densite_gaz(icell) = densite_gaz(icell) *  correct_density_factor
            masse_gaz(icell) = masse_gaz(icell) *  correct_density_factor
         endif
      enddo
+     !$omp end do
   end if
+
+  !$omp end parallel
+
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
 
   return
 
@@ -413,10 +462,10 @@ subroutine define_dust_density()
      cst_pous(i) = cst(i)/dust_pop(i)%avg_grain_mass
   enddo
 
-  do  l=1,n_grains_tot
-     ! Correction stratification
-     if (lvariable_dust.and.(settling_type == 1)) then
-        ! loi de puissance
+  ! Corrective factor for dust stratification
+  correct_strat(:) = 1.0 ! for no settling
+  if (lvariable_dust.and.(settling_type == 1)) then ! we can precalculate in the case of a power-law
+     do  l=1,n_grains_tot
         a_strat = max(a_strat,minval(r_grain))
         if (r_grain(l) > a_strat) then
            correct_strat(l) = (r_grain(l)/a_strat)**exp_strat   ! (h_gas/h_dust)^2
@@ -424,15 +473,15 @@ subroutine define_dust_density()
            correct_strat(l) = 1.0
         endif
         ! loi exponentielle (Garaud , Barriere 2004)
-        !        correct_strat(k) = exp(r_grain(k)*fact_strat)/exp(amin*fact_strat)
-     else
-        correct_strat(l) = 1.0
-     endif
-  enddo !k
+        ! correct_strat(k) = exp(r_grain(k)*fact_strat)/exp(amin*fact_strat)
+     enddo !k
+  endif
 
   ! Pour normalisation apres migration radiale
   N_tot(:) = 0.0 ; N_tot2(:) = 0.0 ;
 
+  ! TODO : this section is slow when there are many cells, need to do a variable split like for the opacity
+  ! (indeed much faster with only 1 grain size)
   ! Boucle pop a l'exterieur pour pouvoir superposer differente pop
   do pop=1, n_pop
      izone=dust_pop(pop)%zone
@@ -807,6 +856,7 @@ subroutine define_dust_density()
 
   enddo ! pop
 
+
   ! Ajout cavite vide
   if (lcavity) then
      do icell=1,n_cells
@@ -824,6 +874,7 @@ subroutine define_dust_density()
      enddo
   endif
 
+  ! TODO : this is slow too when using many cells
   call normalize_dust_density()
 
   return
