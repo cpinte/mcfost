@@ -157,7 +157,7 @@ contains
   !*************************************************************************
 
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype, &
-       npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
+       npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype, apr_level,&
        xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
        Tphantom, n_packets,mu_gas,ierr,write_T_files,ISM,T_gas)
 
@@ -201,6 +201,7 @@ contains
 
     real(kind=dp), dimension(:,:), allocatable :: nucleation, dust_moments
 
+    integer(kind=1), dimension(:), intent(in), optional :: apr_level
     logical, intent(in), optional :: write_T_files
 
     logical, intent(in) :: compute_Frad ! does mcfost need to compute the radiation pressure
