@@ -111,7 +111,7 @@ end subroutine alloc_dust_prop
 
 !*****************************************************************
 
-subroutine alloc_dynamique(n_cells_max)
+subroutine alloc_dynamique(n_cells_max, first_time)
   ! Alloue les tableaux dynamiquement en fonction de l'organisation
   ! des calculs, de la presence de stratification ...
   ! Permet d'optimiser la taille mémoire
@@ -127,9 +127,11 @@ subroutine alloc_dynamique(n_cells_max)
   use output, only : allocate_origin
 
   integer, intent(in), optional :: n_cells_max
+  logical, intent(in), optional :: first_time
 
   integer ::  alloc_status, Nc, p_Nc
   real :: mem_size
+  logical :: lfirst_time
 
   if (present(n_cells_max)) then
      if (n_cells_max < n_cells) then
@@ -148,27 +150,50 @@ subroutine alloc_dynamique(n_cells_max)
      p_Nc = p_n_cells
   endif
 
-  allocate(stream(nb_proc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error random number stream')
+  if (present(first_time)) then
+    lfirst_time = first_time
+  else
+    lfirst_time = .true.   ! I don't want to mess with default behaviors elsewhere..
+  endif
+  
+  ! We want to dynamically allocate everything that depends on n_cell or n_SPH
+  ! in case the total particle count changes (i.e. APR)
+  ! Everything else is considered "static" in the sense they don't depend on n_cell
+  if (lfirst_time) then
+    allocate(stream(nb_proc), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error random number stream')
 
-  allocate(n_phot_envoyes(n_lambda,nb_proc),  stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error n_phot_envoyes')
-  n_phot_envoyes = 0.0
+    allocate(n_phot_envoyes(n_lambda,nb_proc),  stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error n_phot_envoyes')
+    n_phot_envoyes = 0.0
 
-  allocate(l_dark_zone(Nc), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
-          zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error l_dark_zone')
-  l_is_dark_zone = .false.
-  l_dark_zone = .false.
-  ri_in_dark_zone=0
-  ri_out_dark_zone=0
-  zj_sup_dark_zone=0
-  if (l3D) zj_inf_dark_zone=0
+   allocate(l_dark_zone(Nc), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
+            zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
+   if (alloc_status > 0) call error('Allocation error l_dark_zone')
+   l_is_dark_zone = .false.
+   l_dark_zone = .false.
+   ri_in_dark_zone=0
+   ri_out_dark_zone=0
+   zj_sup_dark_zone=0
+   if (l3D) zj_inf_dark_zone=0
 
-  ! **************************************************
-  ! Tableaux relatifs aux prop en fct de lambda
-  ! **************************************************
-  call allocate_stellar_spectra(n_lambda)
+   ! **************************************************
+   ! Tableaux relatifs aux prop en fct de lambda
+   ! **************************************************
+   call allocate_stellar_spectra(n_lambda)
+
+
+   ! **************************************************
+   ! Tableaux relatifs aux SEDs
+   ! **************************************************
+   if (lTemp.or.lsed) call allocate_sed()
+
+   ! **************************************************
+   ! Tableaux relatifs aux images
+   ! **************************************************
+   if (lmono0.and.loutput_mc) call allocate_mc_images()
+
+  endif ! lfirst_time
 
   call allocate_thermal_energy(Nc)
 
@@ -273,16 +298,6 @@ subroutine alloc_dynamique(n_cells_max)
   call allocate_radiation_field_step1(Nc)
 
   ! **************************************************
-  ! Tableaux relatifs aux SEDs
-  ! **************************************************
-  if (lTemp.or.lsed) call allocate_sed()
-
-  ! **************************************************
-  ! Tableaux relatifs aux images
-  ! **************************************************
-  if (lmono0.and.loutput_mc) call allocate_mc_images()
-
-  ! **************************************************
   ! Tableaux relatifs a l'emission moleculaire
   ! **************************************************
   if (lemission_mol) then
@@ -316,6 +331,81 @@ end subroutine alloc_dynamique
 
 !**********************************************************************
 
+! Variables that need to be deallocated when using APR:
+! ·kappa                          ·kappa_abs_LTE
+! ·tab_albedo_pos                 ·kappa_factor
+! ·prob_s11_pos                   ·tab_s11_pos
+! ·E_disk                         ·prob_E_cell
+! ·Tdust                          ·xKJ_abs
+! ·spectre_emission_cumul         ·tab_Temp
+! ·log_Qcool_minus_extra_heating  ·DensE
+! ·xT_ech                         ·kdB_dT_CDF
+subroutine deallocate_dynamique()
+   use thermal_emission, only : deallocate_thermal_emission, deallocate_weight_proba_emission,&
+                               deallocate_temperature, deallocate_thermal_energy
+   use radiation_field, only :  deallocate_radiation_field
+   use output, only : deallocate_origin
+
+   ! Since some dellocations take place in realloc_step2. We cannot deallocate all of them at once
+   if (allocated(kappa))          deallocate(kappa)
+   if (allocated(kappa_abs_LTE))  deallocate(kappa_abs_LTE)
+   if (allocated(tab_albedo_pos)) deallocate(tab_albedo_pos)
+   if (allocated(kappa_factor))   deallocate(kappa_factor)
+
+   if (lRE_nLTE) then
+      if (allocated(kappa_abs_nLTE)) deallocate(kappa_abs_nLTE)
+   endif
+
+   if (.not.(lonly_LTE.or.lonly_nLTE)) then
+      if (allocated(proba_abs_RE_LTE)) deallocate(proba_abs_RE_LTE)
+   endif
+
+   if (lRE_nLTE.or.lnRE) then
+      if (allocated(proba_abs_RE_LTE_p_nLTE)) deallocate(proba_abs_RE_LTE_p_nLTE)
+   endif
+
+   if (lnRE) then
+      if (allocated(kappa_abs_RE)) deallocate(kappa_abs_RE, proba_abs_RE)
+   endif
+
+   if (aniso_method == 2) then
+      if (allocated(tab_g_pos)) deallocate(tab_g_pos)
+   endif
+
+   ! Scattering
+   if (scattering_method == 2) then
+      if (allocated(prob_s11_pos)) deallocate(prob_s11_pos)
+      if (allocated(tab_s11_pos)) deallocate(tab_s11_pos)
+
+      if (lsepar_pola) then
+         if (allocated(tab_s12_o_s11_pos)) deallocate(tab_s12_o_s11_pos, tab_s33_o_s11_pos, tab_s34_o_s11_pos, &
+                     tab_s22_o_s11_pos, tab_s44_o_s11_pos)
+      endif
+
+   else
+      if (.not. low_mem_scattering) then
+         if (allocated(ksca_CDF)) deallocate(ksca_CDF)
+      endif
+   endif
+
+   ! Emission
+   call deallocate_thermal_energy()
+   call deallocate_temperature()
+   call deallocate_radiation_field()
+   if (lweight_emission) call deallocate_weight_proba_emission()
+   if (lTemp)            call deallocate_thermal_emission()
+
+   ! Emission moléculaire
+   if (lemission_mol) then
+      if (allocated(tab_abundance)) deallocate(tab_abundance, Tcin, lcompute_molRT)
+      if (allocated(vfield)) deallocate(vfield)
+      if (allocated(v_turb2)) deallocate(v_turb2, dv_line, deltaVmax)
+      if (allocated(tab_dnu_o_freq)) deallocate(tab_dnu_o_freq)
+      if (allocated(norme_phiProf_m1)) deallocate(norme_phiProf_m1, sigma2_phiProf_m1)
+   endif
+end subroutine deallocate_dynamique
+!**********************************************************************
+
 subroutine deallocate_em_th_mol()
  ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
  ! 20/04/2023
@@ -328,7 +418,6 @@ subroutine deallocate_em_th_mol()
 
   deallocate(tab_albedo,C_ext,C_sca,C_abs,C_abs_norm,tab_g) ! q_geo
 
-  !deallocate(E_stars,E_disk,frac_E_stars,E_totale)
   call deallocate_stellar_spectra()
 
   deallocate(tab_lambda,tab_lambda_inf,tab_lambda_sup,tab_delta_lambda,tab_amu1,tab_amu2,tab_amu1_coating,tab_amu2_coating)

@@ -274,13 +274,13 @@ contains
     call setup_scattering()
 
     ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
-    if (lfirst_time) then
-       call alloc_dynamique(n_cells_max = n_SPH + n_etoiles)
+    !if (lfirst_time) then
+       call alloc_dynamique(n_cells_max = n_SPH + n_etoiles, first_time= lfirst_time)
        alloc_status = 0
        allocate(xN_abs(n_SPH + n_etoiles,1,nb_proc),  stat=alloc_status)
        if (alloc_status /= 0) call error("Allocation error xN_abs")
        lfirst_time = .false.
-    endif
+    !endif
     call no_dark_zone()
     lapprox_diffusion=.false.
 
@@ -473,13 +473,16 @@ contains
   subroutine reset_mcfost_phantom()
 
     use Voronoi_grid,     only:deallocate_Voronoi
-    use mem,              only:deallocate_densities
-    use radiation_field,  only:reset_radiation_field
+    use mem,              only:deallocate_densities, deallocate_dynamique
+    use radiation_field,  only:reset_radiation_field, xN_abs
     use thermal_emission, only:reset_temperature
 
     ! Freeing memory : todo : can we avoid to do that to speed things up
     call deallocate_Voronoi()
     call deallocate_densities()
+    call deallocate_dynamique()
+
+    if (allocated(xN_abs)) deallocate(xN_abs)
 
     ! Reset energy and temperature arrays
     call reset_radiation_field()
