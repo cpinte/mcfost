@@ -765,11 +765,11 @@ contains
   !*************************************************************************
 
   subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,ldust_moments,n_files,dustfluidtype,xyzh, &
-       vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype, apr_level, &
+       vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype, &
        xyzmh_ptmass_in,vxyz_ptmass_in,hfact,umass, &
        utime, ulength,graindens,ndudt,dudt,ifiles, &
        n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
-       SPH_grainsizes, massgas,massdust, rhogas,rhodust,dust_moments,extra_heating,ieos)
+       SPH_grainsizes, massgas,massdust, rhogas,rhodust,dust_moments,extra_heating,ieos, apr_level)
 
     ! Convert phantom quantities & units to mcfost quantities & units
     !
@@ -966,13 +966,13 @@ contains
 
     ! Update the masses if apr is used
     if (present(apr_level)) then
-      write(*,*) "Size of apr_level array:" size(apr_level)
+      write(*,*) "Size of apr_level array:", size(apr_level)
       do i=1, n_SPH
          apr_fac = 1. / (2. ** apr_level(i))
          rhogas(i) = rhogas(i) * apr_fac
-         rhodust(i) = rhodust(i) * apr_fac
+         rhodust(:, i) = rhodust(:, i) * apr_fac
          massgas(i) = massgas(i) * apr_fac
-         massdust(i) = massdust(i) * apr_fac
+         massdust(:, i) = massdust(:, i) * apr_fac
       enddo
     endif
 
