@@ -155,7 +155,7 @@ subroutine alloc_dynamique(n_cells_max, first_time)
   else
     lfirst_time = .true.   ! I don't want to mess with default behaviors elsewhere..
   endif
-  
+
   ! We want to dynamically allocate everything that depends on n_cell or n_SPH
   ! in case the total particle count changes (i.e. APR)
   ! Everything else is considered "static" in the sense they don't depend on n_cell
@@ -167,9 +167,6 @@ subroutine alloc_dynamique(n_cells_max, first_time)
     if (alloc_status > 0) call error('Allocation error n_phot_envoyes')
     n_phot_envoyes = 0.0
 
-   allocate(l_dark_zone(Nc), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
-            zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
-   if (alloc_status > 0) call error('Allocation error l_dark_zone')
    l_is_dark_zone = .false.
    l_dark_zone = .false.
    ri_in_dark_zone=0
@@ -194,6 +191,10 @@ subroutine alloc_dynamique(n_cells_max, first_time)
    if (lmono0.and.loutput_mc) call allocate_mc_images()
 
   endif ! lfirst_time
+
+  allocate(l_dark_zone(Nc), ri_in_dark_zone(n_az), ri_out_dark_zone(n_az),&
+            zj_sup_dark_zone(n_rad,n_az), zj_inf_dark_zone(n_rad,n_az), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error l_dark_zone')
 
   call allocate_thermal_energy(Nc)
 
@@ -351,6 +352,12 @@ subroutine deallocate_dynamique()
    if (allocated(kappa_abs_LTE))  deallocate(kappa_abs_LTE)
    if (allocated(tab_albedo_pos)) deallocate(tab_albedo_pos)
    if (allocated(kappa_factor))   deallocate(kappa_factor)
+
+    if (allocated(l_dark_zone))       deallocate(l_dark_zone)
+    if (allocated(ri_in_dark_zone))   deallocate(ri_in_dark_zone)
+    if (allocated(ri_out_dark_zone))  deallocate(ri_out_dark_zone)
+    if (allocated(zj_sup_dark_zone))  deallocate(zj_sup_dark_zone)
+    if (allocated(zj_inf_dark_zone))  deallocate(zj_inf_dark_zone)
 
    if (lRE_nLTE) then
       if (allocated(kappa_abs_nLTE)) deallocate(kappa_abs_nLTE)
