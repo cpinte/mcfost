@@ -968,7 +968,7 @@ contains
     if (present(apr_level)) then
       write(*,*) "Size of apr_level array:", size(apr_level)
       do i=1, n_SPH
-         apr_fac = 1. / (2. ** apr_level(i))
+         apr_fac = 1. / (2 ** (apr_level(i) - 1))
          rhogas(i) = rhogas(i) * apr_fac
          rhodust(:, i) = rhodust(:, i) * apr_fac
          massgas(i) = massgas(i) * apr_fac
