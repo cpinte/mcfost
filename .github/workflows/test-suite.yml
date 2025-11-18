@@ -29,7 +29,7 @@ jobs:
         include:
           # Associate specific os versions with our os tags
           - os: linux
-            os-version: ubuntu-22.04
+            os-version: ubuntu-24.04
           - os: macos-intel
             os-version: macos-15-intel
           - os: macos-arm
@@ -120,7 +120,7 @@ jobs:
         include:
           # Associate specific os versions with our os tags
           - os: linux
-            os-version: ubuntu-22.04
+            os-version: ubuntu-24.04
           - os: macos-intel
             os-version: macos-15-intel
           - os: macos-arm
