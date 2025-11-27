@@ -159,7 +159,7 @@ contains
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype, &
        npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
        xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-       Tphantom, n_packets,mu_gas,ierr,write_T_files,ISM,T_gas)
+       Tphantom, n_packets,mu_gas,ierr,write_T_files,ISM,T_gas,apr_level)
 
     use parametres
     use constantes, only : mu
@@ -189,7 +189,7 @@ contains
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
     real(dp), dimension(np), intent(in) :: T_gas
 !    real(dp), dimension(maxirad,np), intent(inout) :: radiation
-    integer(kind=1), dimension(np), intent(in) :: iphase
+    integer(kind=1), dimension(np), intent(in) :: iphase,apr_level
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize, graindens
     real(dp), dimension(ntypes), intent(in) :: massoftype
@@ -261,7 +261,7 @@ contains
          vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),nucleation,massoftype2(1,1:ntypes),&
          xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos)
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
 
     if (.not.lfix_star) call compute_stellar_parameters()
 
