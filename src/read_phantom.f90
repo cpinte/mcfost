@@ -645,8 +645,9 @@ contains
        call read_from_hdf5(xyzh(4,np0+1:np0+np),'h',hdf5_group_id,got,ierr)
        call read_from_hdf5(vxyzu(1:3,np0+1:np0+np),'vxyz',hdf5_group_id,got,ierr)
        call read_from_hdf5(dustfrac(1:ndusttypes,np0+1:np0+np),'dustfrac',hdf5_group_id,got,ierr)
-       call read_from_hdf5(apr_level(np0+1:np0+np),'apr_level',hdf5_group_id,got,ierr)
        if (got) got_dustfrac = .true.
+       call read_from_hdf5(apr_level(np0+1:np0+np),'apr_level',hdf5_group_id,got,ierr)
+       if (got) got_apr = .true.
 
        if (ierr /= 0) call error("cannot read Phantom HDF particles group in "//trim(filename))
 
