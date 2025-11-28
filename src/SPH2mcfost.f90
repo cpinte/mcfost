@@ -127,8 +127,6 @@ contains
     ! Deleting particles/cells in masked areas (Hill sphere, etc)
     if (allocated(mask)) call delete_masked_particles()
 
-    call find_non_empty_cell()
-
     return
 
   end subroutine setup_SPH2mcfost
@@ -222,9 +220,9 @@ contains
 
     real, allocatable, dimension(:) :: a_SPH, log_a_SPH, rho_dust
     real(dp), allocatable, dimension(:) :: gsize, grainsize_f, dN_ds, N_monomers, rho_monomers
-    real(dp), dimension(4) :: lambsol, lambguess
+    real(dp), dimension(4) :: lambsol
 
-    real(dp) :: mass, somme, Mtot, Mtot_dust, facteur, a, mass_factor
+    real(dp) :: mass, Mtot, Mtot_dust, facteur, a, mass_factor
     real :: f, limit_threshold, density_factor
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n, ierr, N_pb
 
@@ -304,8 +302,8 @@ contains
     call allocate_densities(n_cells_max = n_SPH + n_etoiles) ! we allocate all the SPH particule for libmcfost
     ! Tableau de densite et masse de gaz
     !do icell=1,n_cells
-    !   densite_gaz(icell) = rho(icell) / masse_mol_gaz * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
-    !   masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell)
+    !   densite_gaz(icell) = rho(icell) / mu_mH * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
+    !   masse_gaz(icell) =  densite_gaz(icell) * mu_mH * volume(icell)
     !enddo
     !masse_gaz(:) = masse_gaz(:) * AU3_to_cm3
 
@@ -314,7 +312,7 @@ contains
        iSPH = Voronoi(icell)%id
        if (iSPH > 0) then
           masse_gaz(icell)    = massgas(iSPH) * Msun_to_g ! en g
-          densite_gaz(icell)  = masse_gaz(icell) /  (masse_mol_gaz * volume(icell) * AU3_to_m3)
+          densite_gaz(icell)  = masse_gaz(icell) /  (mu_mH * volume(icell) * AU3_to_m3)
        else ! star
           masse_gaz(icell)    = 0.
           densite_gaz(icell)  = 0.
@@ -630,6 +628,8 @@ contains
     write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'
     write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
 
+    call find_non_empty_cell()
+
     return
 
   end subroutine SPH_to_Voronoi
@@ -648,7 +648,7 @@ contains
     ! mask : -1 means skip, 0 means transparent, 1 means compute atomic transfer
     ! ************************************************************************************ !
     use parametres
-    use constantes,   only : masseH
+    use constantes,   only : mH
     use Voronoi_grid, only : Voronoi, volume
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
@@ -673,7 +673,7 @@ contains
     !-> fills element abundances structures for elements
     call alloc_atomrt_grid
     call read_abundance
-    rho_to_nH = 1d3 / masseH / wght_per_H !convert from density to number density nHtot
+    rho_to_nH = 1d3 / mH / wght_per_H !convert from density to number density nHtot
 
     Vxmax = 0
     Vymax = 0

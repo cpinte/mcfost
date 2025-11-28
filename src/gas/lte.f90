@@ -67,7 +67,6 @@ module lte
       real(kind=dp) :: BoltzmannEq4dot20b
       real(kind=dp) :: kT
       real(kind=dp), intent(in) ::  gi, gi1, Ei, temp
-      integer :: k
 
       kT = KB * temp
       BoltzmannEq4dot20b = (gi1/gi) * exp(-Ei/kT) !ni1/ni
@@ -80,7 +79,7 @@ module lte
    function nH_minus(icell)
    !Saha Ionisation equation applied to H-
       integer :: icell
-      real(kind=dp) :: nH_minus, nH, UH, UHm, n00
+      real(kind=dp) :: nH_minus, nH, UH, UHm
 
       UH = 2.0
       !UH = get_pf(elements(1), 1, T(icell))
@@ -106,10 +105,8 @@ module lte
    ! TO DO: introduce nH-
    ! -------------------------------------------------------------- !
       integer, intent(in) :: k
-      logical :: locupa_prob
-      real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin, ntotal
-      real(kind=dp) :: n_eff, wocc, chi0, wocc0, E00, E, Egs
-      integer :: Z, dZ, i, m
+      real(kind=dp) :: dE, sum, phik, ntotal, wocc, chi0, E00, E, Egs
+      integer :: dZ, i, m
 
       E00 = 1.0 * 3e-11 * electron_charge ! Joules
       Egs = hydrogen%E(1)
@@ -194,7 +191,7 @@ module lte
          else
             hydrogen%ni_on_nj_star(hydrogen%continua(i)%i,k) = 0.0
          endif
-      enddo   
+      enddo
 
       return
    end subroutine LTEpops_H_loc
@@ -209,10 +206,9 @@ module lte
       integer, intent(in) :: k
       type (Atomtype), intent(inout) :: atom
       logical, intent(in) :: debye
-      logical :: locupa_prob, print_diff
-      real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
-      real(kind=dp) :: n_eff, wocc, chi0, wocc0, ntotal
-      integer :: Z, dZ, i, m
+      logical :: locupa_prob
+      real(kind=dp) :: dEion, dE, sum, c2, phik, n_eff, wocc, ntotal
+      integer :: dZ, i, m
 
       ! debye shielding activated:
       ! It lowers the ionisation potential taking into account the charge of all levels
@@ -343,7 +339,7 @@ module lte
          else
             atom%ni_on_nj_star(atom%continua(i)%i,k) = 0.0
          endif
-      enddo  
+      enddo
 
       return
    end subroutine LTEpops_atom_loc
@@ -429,7 +425,7 @@ module lte
          logical :: locupa_prob
          real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
          real(kind=dp) :: n_eff, wocc, chi0, wocc0, E00, E, Egs
-         integer :: Z, dZ, k, i, m
+         integer :: dZ, k, i, m
          logical :: print_diff
          real(kind=dp) :: max_nstar(hydrogen%Nlevel), min_nstar(hydrogen%Nlevel)
 
@@ -576,8 +572,8 @@ module lte
       logical, intent(in) :: debye
       logical :: locupa_prob, print_diff
       real(kind=dp) :: dEion, dE, sum, c2, phik, phiHmin
-      real(kind=dp) :: n_eff, wocc, chi0, wocc0
-      integer :: Z, dZ, k, i, m
+      real(kind=dp) :: n_eff, wocc
+      integer :: dZ, k, i, m
       real(kind=dp), dimension(atom%Nlevel) :: max_nstar, min_nstar !old_values
 
       ! debye shielding activated:
@@ -906,7 +902,6 @@ module lte
    integer, intent(in) :: unit
    integer, intent(in), optional :: delta_k
    integer :: dk, k, i, j, Nstage, Nj, ip
-   real(kind=dp) :: wocc
 
    if (present(delta_k)) then
       dk = delta_k

@@ -20,7 +20,7 @@ module gas_contopac
    use messages, only : error
 
    implicit none
-	
+
    real, parameter :: lambda_limit_HI_rayleigh = 91.1763062831680!102.6 !nm
    real, parameter :: lambda_limit_HeI_rayleigh = 140.0 !
    real(kind=dp), dimension(:), allocatable :: Hray_lambda, HeIray_lambda
@@ -30,7 +30,7 @@ module gas_contopac
    real(kind=dp), dimension(N_geltman) :: lambdai_geltman, alphai_geltman
    real(kind=dp), dimension(:,:), allocatable :: john_hminus_term2, john_hminus_term1
    real(kind=dp) :: john_an(6), john_an2(4), john_bn(6), john_bn2(4),john_cn(6), john_cn2(4), &
-      john_dn(6), john_dn2(4), john_en(6), john_en2(4), john_fn(6), john_fn2(4)   
+      john_dn(6), john_dn2(4), john_en(6), john_en2(4), john_fn(6), john_fn2(4)
    real(kind=dp), dimension(:), allocatable :: j0_theta_bell_berr
    integer :: i0_lam_bell_berr
    real(kind=dp), allocatable :: alphai_bell_berr_part(:,:)
@@ -217,7 +217,7 @@ module gas_contopac
    end function Thomson
 
    function HI_rayleigh(icell)
-      integer, intent(in) :: icell 
+      integer, intent(in) :: icell
       real(kind=dp) :: HI_rayleigh(size(Hray_lambda))
 
       HI_rayleigh = sigma_e * Hray_lambda(:) * Hydrogen%n(1,icell)
@@ -240,7 +240,7 @@ module gas_contopac
    !could be para, at least the cell part.
       integer, intent(in) :: N
       real(kind=dp), intent(in) :: Lambda(N)
-      real(kind=dp), allocatable, dimension(:) :: tab_lambda_ang
+      real(kind=dp), dimension(N) :: tab_lambda_ang
       real(kind=dp) :: theta, lam
       integer :: icell, la, i
 
@@ -256,7 +256,7 @@ module gas_contopac
           (148.d0/lambda)**4d0)*(96.6d0/lambda)**4d0
       elsewhere
          Hray_lambda = 0.0
-      end where  
+      end where
 
       if (associated(helium)) then
          allocate(HeIray_lambda(N))
@@ -265,7 +265,7 @@ module gas_contopac
               (64.1d0/lambda)**4d0)*(37.9d0/lambda)**4d0
          elsewhere
             HeIray_lambda = 0.0
-         end where 
+         end where
       endif
 
       !cheap !
@@ -283,7 +283,6 @@ module gas_contopac
       do i=1,11
          alphai_bell_berr_part(:,i) = linear_1D_sorted(23,lambdai_bell_berr,alphai_bell_berr(:,i),n,tab_lambda_ang)
       enddo
-      deallocate(tab_lambda_ang)
       i0_lam_bell_berr = max(locate(lambdai_bell_berr, 10*lambda(1)),2)!all wavelengths are contiguous. We only need the index of the first one
 
       !we only need term1 of John H- free-free since, bell_berr routine is used.
@@ -314,7 +313,7 @@ module gas_contopac
 		! write(*,'("allocate "(1F6.4)" GB for exp(-hc/kT)")') real(sizeof(exphckT))/1024./1024./1024.
 		! write(*,'(" -> max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
 
-      return 
+      return
    end subroutine alloc_gas_contopac
 
    subroutine dealloc_gas_contopac
@@ -335,7 +334,7 @@ module gas_contopac
 
       return
    end subroutine dealloc_gas_contopac
-  
+
    elemental function Gaunt_bf(u, n_eff)
       ! M. J. Seaton (1960), Rep. Prog. Phys. 23, 313
       ! See also Menzel & Pekeris 1935
@@ -381,7 +380,7 @@ module gas_contopac
    elemental function  H_bf_Xsection(cont, lambda) result(alpha)
       Type (AtomicContinuum), intent(in) :: cont
       real(kind=dp), intent(in) :: lambda
-      real(kind=dp) :: n_eff, g_bf, u, Z, u0, g_bf0, alpha, u1
+      real(kind=dp) :: n_eff, g_bf, u, Z, alpha
 
 
       Z = real(cont%atom%stage(cont%i) + 1,kind=dp)
@@ -411,11 +410,11 @@ module gas_contopac
 
       return
    end function H_bf_Xsection
-  
+
 
    elemental function  H_ff_Xsection(Z, T, lambda) result(alpha)
       real(kind=dp), intent(in) :: lambda, T
-      real(kind=dp) :: g_ff, nu3, alpha, K0
+      real(kind=dp) :: g_ff, nu3, alpha
       integer, intent(in) :: Z
 
     !    K0 = (Q_ELECTRON**2)/(4.0*PI*EPSILON_0) / sqrt(M_ELECTRON)
@@ -440,8 +439,7 @@ module gas_contopac
       integer, intent(in) :: icell, N
       real(kind=dp), intent(in) :: lambda(N)
       real(kind=dp), intent(out) :: chi(N)
-      integer :: la
-      real(kind=dp) :: stim, np, arg_exp, exp_val, C0, alpha
+      real(kind=dp) :: np
 
       np = Hydrogen%n(Hydrogen%Nlevel,icell) !nH+=Nion H
       !should be nstar instead of %n ?
@@ -470,7 +468,7 @@ module gas_contopac
     return
    end subroutine Hydrogen_ff
 
-  
+
    subroutine atom_ff
 
       return
@@ -489,7 +487,7 @@ module gas_contopac
       real(kind=dp) :: lam, lambda0, alpha, sigma, flambda, Cn(6)
       real(kind=dp) :: diff, stm, funit, cte, pe
       integer :: la
-      real(kind=dp) :: arg_exp, nH
+      real(kind=dp) :: nH
       real(kind=dp), dimension(N), intent(out) :: chi, eta
 
       chi(:) = 0.0_dp
@@ -644,7 +642,7 @@ module gas_contopac
       !tab 3b, lambda > 0.1823 micron and < 0.3645 micron, size of 4 isntead 5, because the last two rows are 0
       real(kind=dp), dimension(4) :: An2, Bn2, Cn2, Dn2, En2, Fn2
       real(kind=dp) :: funit, K, kappa
-      integer :: la, n
+      integer :: n
       real(kind=dp) :: chi
       real(kind=dp) :: lam, theta, nH
 
@@ -700,9 +698,8 @@ module gas_contopac
    !-----------------------------------------------------------------
       integer, intent(in) :: icell, N
       real(kind=dp), dimension(N), intent(in) :: lambda
-      integer :: la
       real(kind=dp), dimension(N), intent(out) :: chi
-      real(kind=dp) :: lam, theta!, nH
+      real(kind=dp) :: theta
 
       chi(:) = 0.0_dp
 
@@ -761,7 +758,7 @@ module gas_contopac
       integer :: la
       real(kind=dp), dimension(N), intent(out) :: chi
       integer :: i0, j0
-      real(kind=dp) :: lam, stm, sigma(N), theta, pe, nH, tt
+      real(kind=dp) :: lam, sigma(N), theta, pe, nH, tt
 
       chi(:) = 0.0_dp
       theta = 5040. / T(icell)

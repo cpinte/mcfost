@@ -71,6 +71,8 @@ program BIGCRUNCH
      itime = int(time)
      write (*,'(" Processing complete in ", F5.2, "s")')  time
   endif
+
+  ! CPU time
   call cpu_time(cpu_time_end)
   time = cpu_time_end - cpu_time_begin
   if (time > 60) then

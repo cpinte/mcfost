@@ -341,7 +341,7 @@ subroutine compute_column(type, column, lambda)
   real(kind=dp) :: x0,y0,z0, x1,y1,z1, norme, l, u,v,w, l_contrib, l_void_before, CD_units, factor, sum
 
   if (type==1) then
-     CD_units = AU_to_m * masse_mol_gaz / (m_to_cm)**2 ! g/cm^-2 and AU_to_m factor as l_contrib is in AU
+     CD_units = AU_to_m * mu_mH / (m_to_cm)**2 ! g/cm^-2 and AU_to_m factor as l_contrib is in AU
   else if (type==3) then
      CD_units = AU_to_m / (m_to_cm)**2 ! particle/cm^-2 and AU_to_m factor as l_contrib is in AU
   endif
@@ -617,7 +617,7 @@ subroutine physical_length_mol(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, tab_spe
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite
   real(kind=dp) :: tau_max, tau_previous, facteur_tau
 
-  integer :: i, iTrans, nbr_cell, next_cell, previous_cell, iv
+  integer :: iTrans, nbr_cell, next_cell, previous_cell, iv
   integer, target :: icell
 
   logical :: lcellule_non_vide, lstop
@@ -745,7 +745,7 @@ subroutine physical_length_mol_Flux(imol,iTrans,icell_in,x,y,z,u,v,w, ispeed, ta
   real(kind=dp), dimension(ispeed(1):ispeed(2)) :: P, tau_mol, dtau_mol, opacite, I_mol, Snu, dI_mol
   real(kind=dp) :: I_max, I_previous
 
-  integer :: i, iTrans, nbr_cell, next_cell, previous_cell
+  integer :: iTrans, nbr_cell, next_cell, previous_cell
   integer, target :: icell
 
   logical :: lcellule_non_vide, lstop
@@ -890,7 +890,7 @@ function local_line_profile(icell,lsubtract_avg, x0,y0,z0,x1,y1,z1,u,v,w,l_void_
 
      ! Nbre de points d'integration en fct du differentiel de vitesse
      ! compare a la largeur de raie de la cellule de depart
-     n_vpoints  = min(max(2,nint(dv/v_line(icell)*20.)),n_vpoints_max)
+     n_vpoints  = min(max(2,nint(dv/dv_line(icell)*20.)),n_vpoints_max)
 
      ! Vitesse projete le long du trajet dans la cellule
      do ivpoint=2, n_vpoints-1
@@ -934,8 +934,8 @@ subroutine integ_tau_mol(imol)
 
   integer, intent(in) :: imol
 
-  real ::  norme, norme1, vmax
-  integer :: i, j, iTrans, n_speed, icell, it
+  real ::  norme
+  integer :: i, j, iTrans, icell, it
 
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(0:0) :: tab_speed, P
@@ -960,8 +960,15 @@ subroutine integ_tau_mol(imol)
      iTrans = mol(imol)%indice_Trans_rayTracing(it)
 
      write(*,*) "-------------------------------"
-     write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans)))
-     write(*,*) "tau_mol = ", real(tau_mol(0,it))
+     if (lrovib) then
+        write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans))), &
+             ", v= ", trim(v_qnb(itransUpper(iTrans))), " - ", trim(v_qnb(itransLower(iTrans))), &
+             ", nu =", Transfreq(iTrans)/1e9, "Ghz"
+     else
+        write(*,*) "Transition J= ", trim(j_qnb(itransUpper(iTrans))), " - ", trim(j_qnb(itransLower(iTrans))), &
+             ", nu =", Transfreq(iTrans)/1e9, "Ghz"
+     endif
+        write(*,*) "tau_mol = ", real(tau_mol(0,it))
      write(*,*) "tau_dust=", real(tau_dust(it))
 
      ! Compute altitude at which tau=1 is reached
@@ -975,11 +982,11 @@ subroutine integ_tau_mol(imol)
                  P(:) = phiProf(icell,ispeed,tab_speed)
                  norme=norme+kappa_mol_o_freq(icell,iTrans)*(z_lim(i,j+1)-z_lim(i,j))*P(0)
                  if (norme > 1.0) then
-                    write(*,*) "Vertical Tau_mol=1 (for r=100 au) at z=", real(z_grid(icell)), "au"
+                    write(*,*) "Vertical tau_mol=1 (at r=100 au) at z=", real(z_grid(icell)), "au"
                     exit loop_z
                  endif
               enddo loop_z
-              if (norme < 1.0) write(*,*) "Vertical Tau_mol=1 (for r=100 au) not reached, tau_max=", norme
+              if (norme < 1.0) write(*,*) "Vertical tau_mol=1 (at r=100 au) not reached, tau_max=", norme
               exit loop_r
            endif
         enddo loop_r
@@ -1098,11 +1105,11 @@ end subroutine optical_length_tot_mol
       logical, intent(in) :: labs
       integer, intent(in) :: N
       real(kind=dp), dimension(N), intent(in) :: lambda
-      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
+      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
       real(kind=dp), dimension(N) :: Snu, tau, dtau, chi, coronal_irrad
       integer, target :: icell
       integer, pointer :: p_icell
-      integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star, la, icell_prev
+      integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star, icell_prev
       logical :: lcellule_non_vide, lsubtract_avg, lintersect_stars
 
       x1=x;y1=y;z1=z
@@ -1221,7 +1228,6 @@ subroutine physical_length_atom(id,icell_in,x,y,z,u,v,w,N,lambda,tau_threshold,f
 
   real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, ltot(N)
   real(kind=dp), dimension(N) :: tau, dtau, chi, eta, tau_previous
-  real(kind=dp) :: tau_max, facteur_tau
 
   integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star
   integer, target :: icell

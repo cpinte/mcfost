@@ -139,7 +139,7 @@ module parametres
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
   integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
 
-  logical :: lfargo3d, lathena, lidefix, lpluto, lsphere_model, lmodel_1d !future lsymspheric
+  logical :: lfargo3d, lathena, lidefix, lpluto, lsphere_model, lmodel_1d, lheader_only !future lsymspheric
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -151,7 +151,7 @@ module parametres
 
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM
   logical :: lread_grain_size_distrib, lphase_function_file,ltau_surface, lflux_fraction_surface
-  logical :: lwrite_column_density, lwrite_mol_column_density
+  logical :: lwrite_column_density, lwrite_mol_column_density, lwrite_abundance
   character(len=8) :: sflux_fraction, stau_surface
   real(kind=dp) :: flux_fraction
   real :: tau_surface

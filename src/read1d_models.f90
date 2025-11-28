@@ -23,13 +23,13 @@ module read1d_models
 	logical, parameter :: lcell_centered = .true.
 
 	contains
-	
-	
+
+
 	subroutine read_model_1d(mod_file)
 		character(len=*), intent(in) :: mod_file
 		integer :: i, nrad_0
 		real(kind=dp) :: Fnorm, dnu, Rmax_c
-		
+
 		grid_type = 2
 		n_rad_in = 1
 		n_az = 1
@@ -40,7 +40,7 @@ module read1d_models
 		vfield_coord = 3
 		lmagnetized = .false.
 		lcalc_ne = .false.
-		
+
 		open(unit=1,file=mod_file, status="old")
 		read(1,*) atmos_1d%rstar
 		read(1,*) atmos_1d%nr
@@ -91,7 +91,7 @@ module read1d_models
 
 		n_rad = atmos_1d%nr - 1
 		n_cells = n_rad
-		n_etoiles = 1 !force		
+		n_etoiles = 1 !force
 
 		Rmin = minval(atmos_1d%r) * atmos_1d%rstar * m_to_au
 		Rmax = maxval(atmos_1d%r,mask=(atmos_1d%iz>0)) * atmos_1d%rstar* m_to_au
@@ -127,7 +127,7 @@ module read1d_models
 		write(*,*) "WARNING distance and map size set to : "
 		distance = Rmax * au_to_pc !pc
 		map_size = 2.005 * Rmax !au
-		write(*,*) distance, ' pc', map_size * 1e3, 'mau'	
+		write(*,*) distance, ' pc', map_size * 1e3, 'mau'
 
 		return
 	end subroutine read_model_1d
@@ -139,7 +139,7 @@ module read1d_models
 
 		call alloc_atomrt_grid()
 		call read_abundance
-		rho_to_nH = 1d3 / masseH / wght_per_H
+		rho_to_nH = 1d3 / mH / wght_per_H
 
 		!- MCFOST is a cell centered radiative transfer code while the 1D spherically symmetric codes
 		! are based on a set of points corresponding to the nodes of multi-dimensional models.
@@ -157,7 +157,7 @@ module read1d_models
 		!allows to properly balance that effect.
 		if (lcell_centered) then
 			!core temperature, read from file as "Tstar"
-			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + something else here 
+			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + something else here
 			icell = n_cells + 1
 			nrad_0 = n_rad
 			icell0 = n_cells
@@ -188,7 +188,7 @@ module read1d_models
 				icompute_atomRT(n_cells) = atmos_1d%iz(n_rad+1)
 			endif
 			!core temperature, read from file as "Tstar"
-			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ? 
+			! etoile(1)%T = real(	atmos_1d%T(1) ) ! + irrad ?
 			icompute_atomRT(:) = atmos_1d%iz(2:n_cells+1)
 			T(:) = atmos_1d%T(2:n_cells+1)
 			nHtot(:) = atmos_1d%rho(2:n_cells+1) * rho_to_nH
@@ -299,5 +299,5 @@ module read1d_models
 
 		return
 	end subroutine check_for_coronal_illumination
-	
+
 end module read1d_models

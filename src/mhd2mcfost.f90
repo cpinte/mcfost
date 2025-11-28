@@ -261,7 +261,7 @@ module mhd2mcfost
    !      close(unit=1)
 
    !      !rho -> nH
-   !      nHtot = nHtot * 1d3 / masseH / wght_per_H
+   !      nHtot = nHtot * 1d3 / mH / wght_per_H
 
    !      write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
    !      write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"

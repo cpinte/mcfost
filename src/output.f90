@@ -1057,11 +1057,11 @@ subroutine write_tau_surface(imol)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, xcenter, lambda, itype, ibin, iaz
+  integer :: i,j,group,fpixel,nelements, alloc_status, lambda, ibin, iaz
 
   character(len = 512) :: filename
   logical :: simple, extend
-  real :: pixel_scale_x, pixel_scale_y, Q, U
+  real :: pixel_scale_x, pixel_scale_y
 
   ! Allocation dynamique pour passer en stack
   real, dimension(:,:,:,:,:), allocatable :: image
@@ -1171,11 +1171,11 @@ subroutine write_tau_map(imol)
 
   integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(5) :: naxes
-  integer :: i,j,group,fpixel,nelements, alloc_status, xcenter, lambda, itype, ibin, iaz
+  integer :: i,j,group,fpixel,nelements, alloc_status, lambda, ibin, iaz
 
   character(len = 512) :: filename
   logical :: simple, extend
-  real :: pixel_scale_x, pixel_scale_y, Q, U
+  real :: pixel_scale_x, pixel_scale_y
 
   ! Allocation dynamique pour passer en stack
   real, dimension(:,:,:,:), allocatable :: image
@@ -1680,7 +1680,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   dens = 0.0
 
-  dens(:) = densite_gaz(1:n_cells) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+  dens(:) = densite_gaz(1:n_cells) * mu_mH / m3_to_cm3 ! nH2/m**3 --> g/cm**3
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -3177,7 +3177,7 @@ subroutine ecriture_pops(imol,ext)
   character(len=32), intent(in), optional :: ext
 
   character(len=512) :: filename
-  integer :: status,unit,blocksize,bitpix,naxis,icell
+  integer :: status,unit,blocksize,bitpix,naxis
   integer, dimension(3) :: naxes
   integer :: group,fpixel,nelements
   logical :: simple, extend
@@ -3546,7 +3546,6 @@ subroutine write_atomic_maps(atom)
 
    integer :: status,unit,blocksize,bitpix,naxis
    integer, dimension(6) :: naxes
-   integer, dimension(4) :: naxes_cont
    integer :: group,fpixel,nelements
    integer :: n, kr, i, j
    logical :: simple, extend

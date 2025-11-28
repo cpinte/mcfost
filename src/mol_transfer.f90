@@ -79,6 +79,7 @@ subroutine mol_line_transfer()
      ! Freeze-out & photo-dissociation eventuels
      if (lfreeze_out) call freeze_out()
      if (lphoto_dissociation) call photo_dissociation()
+     if (lwrite_abundance) call write_abundance(imol)
 
      if (lProDiMo2mcfost) call read_ProDiMo2mcfost(imol)
 
@@ -173,7 +174,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
   real(kind=dp), dimension(nLevels,nb_proc)  :: pop, pop_old
 
-  logical :: labs, laffichage
+  logical :: labs
 
   integer, dimension(2) :: ispeed
   real(kind=dp), dimension(:,:), allocatable :: tab_speed
@@ -862,7 +863,7 @@ subroutine init_dust_mol(imol)
 
   integer, intent(in) :: imol
 
-  integer :: iTrans, p_lambda
+  integer :: iTrans
   integer, target :: icell
   integer, pointer :: p_icell
   real(kind=dp) :: freq!, Jnu
@@ -886,7 +887,7 @@ subroutine init_dust_mol(imol)
 
   ! On n'est interesse que par les prop d'abs : pas besoin des matrices de mueller
   ! -> pas de polarisation, on utilise une HG
-  scattering_method=1 ; lscattering_method1 = .true. ; p_lambda = 1
+  scattering_method=1 ; lscattering_method1 = .true.
   aniso_method = 2 ; lmethod_aniso1 = .false.
 
   lsepar_pola = .false.
@@ -929,7 +930,7 @@ subroutine init_dust_mol(imol)
            ! AU_to_cm**2 car on veut kappa_abs_LTE en AU-1
            write(*,*) "TODO : the water benchmark 3 needs to be updated for cell pointer in opacity table"
            do icell=1,n_cells
-              kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * masse_mol_gaz / &
+              kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * mu_mH / &
                    gas_dust / cm_to_AU
            enddo
 
@@ -997,6 +998,7 @@ subroutine init_molecular_disk(imol)
   integer, intent(in) :: imol
 
   logical, save :: lfirst_time = .true.
+  real(dp) :: factor
   integer :: icell
 
   ldust_mol  = .true.
@@ -1024,7 +1026,15 @@ subroutine init_molecular_disk(imol)
            enddo
         endif
      endif
-     v_turb = vitesse_turb
+
+     if (lvturb_in_cs) then
+        factor = vitesse_turb**2
+        do icell=1, n_cells
+           v_turb2(icell) =  (kb*Tcin(icell) / (mu_mH * g_to_kg)) * factor  ! cs**2 * factor
+        enddo
+     else
+        v_turb2(:) = vitesse_turb**2 ! constant vturb
+     endif
   endif ! lfirst_time
 
   ! Abondance
@@ -1102,9 +1112,9 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=dp), dimension(3,nb_proc) :: pixelcenter
 
-  integer :: i,j, id, p_lambda, icell, iTrans
+  integer :: i,j, id, icell, iTrans
   real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0
-  logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
+  logical :: lintersect, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
 
   ! Direction de visee pour le ray-tracing
@@ -1153,7 +1163,7 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
-  !$omp private(flag_star,flag_direct_star,flag_sortie,lpacket_alive,pixelcenter) &
+  !$omp private(flag_sortie,lpacket_alive,pixelcenter) &
   !$omp shared(tau,Icorner,imol,iTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid)
   id = 1 ! pour code sequentiel
@@ -1211,9 +1221,9 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   real(kind=dp), dimension(3) :: uvw, x_plan_image, x, y_plan_image, center, dx, dy, Icorner
   real(kind=dp), dimension(3,nb_proc) :: pixelcenter
 
-  integer :: i,j, id, p_lambda, icell, iTrans, iiTrans
-  real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0, Flux, pixelsize, factor
-  logical :: lintersect, flag_star, flag_direct_star, flag_sortie, lpacket_alive
+  integer :: i,j, id, icell, iTrans, iiTrans
+  real(kind=dp) :: l, taille_pix, x0, y0, z0, u0, v0, w0, Flux, factor
+  logical :: lintersect, flag_sortie, lpacket_alive
   integer, dimension(4) :: ispeed
 
   ! Direction de visee pour le ray-tracing
@@ -1266,7 +1276,7 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   !$omp parallel &
   !$omp default(none) &
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
-  !$omp private(flag_star,flag_direct_star,flag_sortie,lpacket_alive,pixelcenter,Flux) &
+  !$omp private(flag_sortie,lpacket_alive,pixelcenter,Flux) &
   !$omp shared(flux_fraction,Icorner,imol,iTrans,iiTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
   !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid,spectre,factor)
   id = 1 ! pour code sequentiel

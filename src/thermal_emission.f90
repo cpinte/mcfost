@@ -711,8 +711,6 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
 ! Calcul de la temperature de la cellule et stokage energie recue + T
 ! Reemission d'un photon a la bonne longeur d'onde
 
-  use radiation_field, only : xKJ_abs, E0
-
   implicit none
 
   integer, intent(in) :: id, icell, p_icell
@@ -874,8 +872,6 @@ subroutine Temp_finale()
 ! Cas de l'"absoprtion continue"
 ! C. Pinte
 ! 24/01/05
-
-  use radiation_field, only : xKJ_abs, E0
 
   implicit none
 

@@ -1,6 +1,7 @@
 module read_athena
 
   use parametres
+  use constantes
   use messages
   use mcfost_env
   use grid
@@ -333,7 +334,7 @@ contains
     ! Calcul de la masse de gaz de la zone
     mass = 0.
     do icell=1,n_cells
-       mass = mass + densite_gaz(icell) *  masse_mol_gaz * volume(icell)
+       mass = mass + densite_gaz(icell) *  mu_mH * volume(icell)
     enddo !icell
     mass =  mass * AU3_to_m3 * g_to_Msun
 
@@ -344,7 +345,7 @@ contains
        ! Somme sur les zones pour densite finale
        do icell=1,n_cells
           densite_gaz(icell) = densite_gaz(icell) * facteur
-          masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+          masse_gaz(icell) = densite_gaz(icell) * mu_mH * volume(icell) * AU3_to_m3
        enddo ! icell
     else
        call error('Gas mass is 0')

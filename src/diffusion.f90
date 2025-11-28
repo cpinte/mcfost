@@ -640,15 +640,12 @@ subroutine compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
   use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
   use Temperature, only : Tdust
   use dust_prop, only : kappa
-  use Voronoi_grid, only : Voronoi
-  use cylindrical_grid, only : volume
-  use density, only : masse_gaz, densite_gaz
 
   integer,  intent(in)  :: icell
   real(dp), intent(out) :: Planck_opacity,rec_Planck_opacity ! cm2/g (ie per gram of gas)
 
   integer :: lambda
-  real(dp) :: somme, somme2, cst, cst_wl, B, dB_dT, coeff_exp, wl, delta_wl, norm, T
+  real(dp) :: somme, somme2, cst, cst_wl, B, coeff_exp, wl, delta_wl, norm, T !dB_dT
 
   integer, pointer :: p_icell
   integer, target :: icell0

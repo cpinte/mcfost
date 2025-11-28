@@ -90,7 +90,7 @@ module Opacity_atom
             atoms(nact)%p%lines(kr)%lcontrib = .false.
          enddo
       enddo
-      return 
+      return
    end subroutine deactivate_lines
    subroutine activate_lines()
       integer :: nact, kr
@@ -99,7 +99,7 @@ module Opacity_atom
             atoms(nact)%p%lines(kr)%lcontrib = .true.
          enddo
       enddo
-      return 
+      return
    end subroutine activate_lines
    subroutine deactivate_continua()
       integer :: nact, kr
@@ -108,7 +108,7 @@ module Opacity_atom
             atoms(nact)%p%continua(kr)%lcontrib = .false.
          enddo
       enddo
-      return 
+      return
    end subroutine deactivate_continua
    subroutine activate_continua()
       integer :: nact, kr
@@ -117,7 +117,7 @@ module Opacity_atom
             atoms(nact)%p%continua(kr)%lcontrib = .true.
          enddo
       enddo
-      return 
+      return
    end subroutine activate_continua
 
    !could be parralel
@@ -137,6 +137,7 @@ module Opacity_atom
       if (limit_mem > 0) then !computed and stored on tab_lambda_cont and interpolated locally on tab_lambda_nm
          !-> on a small grid and interpolated later
          np = n_lambda_cont
+         allocate(xp(np))
          xp = tab_lambda_cont
          if (limit_mem==1) then
             contopac_atom_loc => contopac_atom_loc_mem1
@@ -149,6 +150,7 @@ module Opacity_atom
       !a linear interpolation is faster than the evaluation of the continua (and they are mostly flat...).
       else !computed and stored on tab_lambda_nm
          np = n
+         allocate(xp(np))
          xp = x
          contopac_atom_loc => contopac_atom_loc_mem0
       endif
@@ -336,8 +338,8 @@ module Opacity_atom
 
       chi = chi_cont(:,icell) !n_lambda
       snu = eta_cont(:,icell) !n_lambda
-      return  
- 
+      return
+
    end subroutine contopac_atom_loc_mem0
 
    subroutine contopac_atom_loc_mem1(icell,N,lambda,chi,snu)
@@ -378,7 +380,7 @@ module Opacity_atom
       call background_continua_lambda(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
       !Snu = Snu + scat(lambda, icell) * Jnu(:,icell)
       !accumulate b-f
-      call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)  
+      call opacity_atom_bf_loc(icell, n_lambda_cont, tab_lambda_cont, chic, Snuc)
 
       !linear interpolation from tab_lambda_cont to lambda
       i0 = 2
@@ -489,16 +491,16 @@ module Opacity_atom
 
          vth = vbroad(T(icell),Atom%weight, vturb(icell))
 
-         !any line of that atom with a Gaussian profile ? 
+         !any line of that atom with a Gaussian profile ?
          !use the same profile for all
          !TO DO: before each mode (nlte, image/flux)
          if (atom%lany_gauss_prof) then
-            if (lnon_lte_loop) then               
+            if (lnon_lte_loop) then
             !completely linear for Gaussian with the sum of Ngauss_log and Ngauss_lin (see line_lambda_grid in gas/wavelengths_gas.f90)
                nvel_rt = N_gauss
                peak_g = peak_gauss_limit / sqrt(pi) / vth
                vg_max = vth * sqrt(-log(peak_g * sqrt(pi) * vth))
-            else 
+            else
             !image mode or flux, linear grid in hv
                nvel_rt = atom%n_speed_rt
                vg_max = 1d3 * atom%vmax_rt
@@ -698,7 +700,7 @@ module Opacity_atom
          !    at%continua(kr)%alpha(:) * at%continua(kr)%twohnu3_c2(:) * ni_on_nj_star * exp(hnu_k(Nb:Nr)/T(icell))
          ! eta_atoms(Nb:Nr,nact,id) = eta_atoms(Nb:Nr,nact,id) + &
          !    at%continua(kr)%alpha(:) * at%continua(kr)%twohnu3_c2(:) * ni_on_nj_star * exp(hnu_k(Nb:Nr)/T(icell)) * at%n(j,icell)
-   
+
       enddo cont_loop
 
       return
@@ -710,7 +712,7 @@ module Opacity_atom
       type(AtomType), intent(in), pointer :: at
       integer :: nact, j, i, kr, Nb, Nr, la, Nl
       integer :: i0, la0, N1, N2
-      real(kind=dp) :: gij, chicc, wl, ni_on_nj_star, wt
+      real(kind=dp) :: gij, wl, ni_on_nj_star, wt
       real(kind=dp) :: term1(Nlambda_max_cont), term2(Nlambda_max_cont), term3(Nlambda_max_cont)
 
       nact = at%activeindex
@@ -899,7 +901,7 @@ module Opacity_atom
                                              l_void_before,l_contrib !physical length of the cell
       integer 											:: Nvspace
       real(kind=dp), dimension(NvspaceMax)   :: Omegav
-      real(kind=dp)                          :: norm, vth
+      real(kind=dp)                          :: vth
       real(kind=dp)                          :: v0, v1, delta_vol_phi, xphi, yphi, zphi, &
                                                 dv, omegav_mean
       type (AtomicLine), intent(in)          :: line
@@ -1024,7 +1026,7 @@ module Opacity_atom
          if (lnon_lte_loop) omegav(1:Nvspace) = omegav(1:Nvspace) - vlabs(iray,id)
       endif
 
-   
+
       u0sq(:) = u0(:)*u0(:)
       !Note: u1 = (u0 - omegav(nv)/vth)**2
       u1(:) = u0sq(:) + (omegav(1)/vth)*(omegav(1)/vth) - 2*u0(:) * omegav(1)/vth
@@ -1045,12 +1047,11 @@ module Opacity_atom
       integer, intent(in) :: Nlambda
       real(kind=dp), intent(in) :: lambda(Nlambda)
       integer :: unit, unit2, status = 0
-      integer :: alloc_status, id, icell, m, Nrec
-      real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp, rho_tmp
+      integer :: alloc_status, id, icell, Nrec
+      real(kind=dp), allocatable, dimension(:,:,:) :: chi_tmp, eta_tmp
       real(kind=dp), allocatable, dimension(:,:,:) :: chic_tmp, etac_tmp
       character(len=11) :: filename_chi="chi.b"
       character(len=50) :: filename_eta="eta.b"
-      character(len=18) :: filename_rho="magnetoopt.b"
       real(kind=dp) :: zero_dp, u, v, w
 
       zero_dp = 0.0_dp

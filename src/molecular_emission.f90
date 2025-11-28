@@ -10,10 +10,10 @@ module molecular_emission
   implicit none
   save
 
-  logical :: ldouble_RT
+  logical :: ldouble_RT, lrovib
 
   real, dimension(:), allocatable :: Level_energy
-  character(len=12), dimension(:), allocatable ::  j_qnb
+  character(len=12), dimension(:), allocatable ::  j_qnb, v_qnb
 
   ! g est dp car les calculs utilisant g sont en dp
   real(kind=dp), dimension(:), allocatable :: poids_stat_g
@@ -33,14 +33,14 @@ module molecular_emission
   real :: correct_Tgas
   logical :: lcorrect_Tgas
 
-  real :: nH2, masse_mol
-  ! masse_mol_gaz sert uniquement pour convertir masse disque en desnite de particule
+  real :: nH2, masse_mol ! masse_mol is the mass of the current molecule
   real(kind=dp), dimension(:,:), allocatable :: kappa_mol_o_freq, kappa_mol_o_freq2 ! n_cells, nTrans
   real(kind=dp), dimension(:,:), allocatable :: emissivite_mol_o_freq,  emissivite_mol_o_freq2 ! n_cells, nTrans
   real, dimension(:,:), allocatable :: tab_nLevel, tab_nLevel2 ! n_cells, nLevels
 
-  real, dimension(:), allocatable :: v_turb, v_line ! n_cells
+  real, dimension(:), allocatable :: v_turb2, dv_line ! n_cells, v_turb2 is (v_turb in m/s)**2
 
+  logical :: lvturb_in_cs
   real ::  vitesse_turb, dv, dnu, v_syst
   character(len=8) :: v_turb_unit
   integer, parameter :: n_largeur_Doppler = 15
@@ -73,7 +73,7 @@ module molecular_emission
 
   type molecule
      integer :: n_speed_rt, n_speed_center_rt, n_extraV_rt, nTrans_raytracing, iLevel_max
-     real :: vmin_center_rt, vmax_center_rt, extra_deltaV_rt, abundance
+     real :: vmin_center_rt, vmax_center_rt, extra_deltaV_rt, abundance, molecularWeight
      logical :: lcst_abundance, lline, l_sym_ima
      character(len=512) :: abundance_file, filename
      character(len=32) :: name
@@ -148,7 +148,7 @@ subroutine init_Doppler_profiles(imol)
 
   integer, intent(in) :: imol
 
-  real(kind=dp) :: sigma2, sigma2_m1, vmax
+  real(kind=dp) :: sigma2, sigma2_m1
   integer :: icell, n_speed
 
   n_speed = mol(imol)%n_speed_rt
@@ -157,11 +157,8 @@ subroutine init_Doppler_profiles(imol)
      ! Utilisation de la temperature LTE de la poussiere comme temperature cinetique
      ! WARNING : c'est pas un sigma mais un delta, cf Cours de Boisse p47
      ! Consistent avec benchmark
-     if (trim(v_turb_unit) == "cs") then
-        v_turb(icell) = sqrt((kb*Tcin(icell) / (masse_mol_gaz * g_to_kg))) * v_turb(icell)
-     endif
-     sigma2 =  2.0_dp * (kb*Tcin(icell) / (masse_mol * g_to_kg)) + v_turb(icell)**2
-     v_line(icell) = sqrt(sigma2)
+     sigma2 =  2.0_dp * (kb*Tcin(icell) / (mol(imol)%molecularWeight * mH  * g_to_kg)) + v_turb2(icell)
+     dv_line(icell) = sqrt(sigma2)
 
      !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
      sigma2_m1 = 1.0_dp / sigma2
@@ -173,9 +170,8 @@ subroutine init_Doppler_profiles(imol)
      ! Echantillonage du profil de vitesse dans la cellule
      ! 2.15 correspond a l'enfroit ou le profil de la raie faut 1/100 de
      ! sa valeur au centre : exp(-2.15^2) = 0.01
-     vmax = sqrt(sigma2)
-     tab_dnu_o_freq(icell) = largeur_profile * vmax / (real(n_speed))
-     deltaVmax(icell) = largeur_profile * vmax !* 2.0_dp  ! facteur 2 pour tirage aleatoire
+     tab_dnu_o_freq(icell) = largeur_profile * dv_line(icell) / (real(n_speed))
+     deltaVmax(icell) = largeur_profile * dv_line(icell) !* 2.0_dp  ! facteur 2 pour tirage aleatoire
   enddo !icell
 
   return
@@ -421,8 +417,8 @@ subroutine equilibre_LTE_mol(imol)
   !$omp end do
   !$omp  end parallel
 
-  ! write(*,*) real( (sum(masse) * g_to_kg * gas_dust / masse_mol_gaz) / (4.*pi/3. * (rout * AU_to_cm)**3 ) )
-  ! write(*,*) (sum(masse) * g_to_kg * gas_dust / masse_mol_gaz) * abundance * fAul(1) * hp * transfreq(1)
+  ! write(*,*) real( (sum(masse) * g_to_kg * gas_dust / mu_mH) / (4.*pi/3. * (rout * AU_to_cm)**3 ) )
+  ! write(*,*) (sum(masse) * g_to_kg * gas_dust / mu_mH) * abundance * fAul(1) * hp * transfreq(1)
 
   return
 
@@ -687,7 +683,7 @@ function v_proj(icell,x,y,z,u,v,w) !
   real(kind=dp), intent(in) :: x,y,z,u,v,w
 
   real(kind=dp) :: vitesse, vx, vy, vz, v_r, v_phi, v_theta, v_rcyl, norme, r, phi, rcyl, rcyl2, r2
-  real(kind=dp) :: cos_phi, sin_phi, cos_theta, sin_theta, norme2
+  real(kind=dp) :: cos_phi, sin_phi, cos_theta, sin_theta
 
   if (lVoronoi) then
      vx = Voronoi(icell)%vxyz(1)
@@ -909,6 +905,31 @@ subroutine photo_dissociation()
 
 end subroutine photo_dissociation
 
+
+!***********************************************************
+
+subroutine write_abundance(imol)
+
+  use fits_utils, only : cfitsWrite
+
+  integer, intent(in) :: imol
+  character(len=512) :: filename
+
+  filename = trim(data_dir2(imol))//"/abundance.fits"
+  if (.not.lVoronoi) then
+     if (l3D) then
+        call cfitsWrite(trim(filename),tab_abundance,[n_rad,2*nz,n_az])
+     else
+        call cfitsWrite(trim(filename),tab_abundance,[n_rad,nz])
+     endif
+  else
+     call cfitsWrite(trim(filename),tab_abundance,[n_cells])
+  endif
+
+  return
+
+end subroutine write_abundance
+
 !***********************************************************
 
 function compute_vertical_CD(icell) result(CD)
@@ -945,7 +966,7 @@ function compute_vertical_CD(icell) result(CD)
      icell0 = next_cell
      x0 = x1 ; y0 = y1 ; z0 = z1
      call cross_cell(x0,y0,z0, u,v,w,  icell0, previous_cell, x1,y1,z1, next_cell, l, l_contrib, l_void_before)
-     CD = CD + (l_contrib * AU_to_m) * densite_gaz(icell) ! part.m^-2
+     CD = CD + (l_contrib * AU_to_m) * densite_gaz(icell0) ! part.m^-2
   enddo
 
   return
