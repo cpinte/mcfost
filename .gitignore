@@ -26,3 +26,5 @@ my_utils/
 
 #parameter files
 *.para
+*.dat
+utils/*
