@@ -3471,7 +3471,7 @@ subroutine ecriture_spectre(imol)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      !  Write the array to the FITS file.
-     call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt) + v_syst,status)
+     call ftppre(unit,group,fpixel,nelements,real(tab_speed_rt + v_syst * km_to_m),status)
   endif ! lcasa
 
   ! extra hdu with star positions
