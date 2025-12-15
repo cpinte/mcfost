@@ -31,9 +31,9 @@ jobs:
           - os: linux
             os-version: ubuntu-22.04
           - os: macos-intel
-            os-version: macos-13
+            os-version: macos-15-intel
           - os: macos-arm
-            os-version: macos-14
+            os-version: macos-15
 
           # macos needs null container to avoid loading docker; set linux containers as desired
           - container: null
@@ -88,7 +88,7 @@ jobs:
     strategy:
       matrix:
         compiler: [gfortran]
-    runs-on: macos-13
+    runs-on: macos-15-intel
     env:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
@@ -122,9 +122,9 @@ jobs:
           - os: linux
             os-version: ubuntu-22.04
           - os: macos-intel
-            os-version: macos-13
+            os-version: macos-15-intel
           - os: macos-arm
-            os-version: macos-14
+            os-version: macos-15
 
     runs-on: ${{ matrix.os-version }}
     if: ${{ github.event_name == 'release' }}
