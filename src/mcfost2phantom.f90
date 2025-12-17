@@ -159,7 +159,7 @@ contains
   subroutine run_mcfost_phantom(np,nptmass,ntypes,ndusttypes,dustfluidtype, &
        npoftype,xyzh,vxyzu,iphase,grainsize,graindens,dustfrac,massoftype,&
        xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,ndudt,dudt,compute_Frad,SPH_limits,&
-       Tphantom, n_packets,mu_gas,ierr,write_T_files,ISM,T_gas)
+       Tphantom, n_packets,mu_gas,ierr,write_T_files,ISM,T_gas,apr_level,use_apr)
 
     use parametres
     use constantes, only : mu
@@ -189,7 +189,7 @@ contains
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
     real(dp), dimension(np), intent(in) :: T_gas
 !    real(dp), dimension(maxirad,np), intent(inout) :: radiation
-    integer(kind=1), dimension(np), intent(in) :: iphase
+    integer(kind=1), dimension(np), intent(in) :: iphase,apr_level
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes), intent(in) :: grainsize, graindens
     real(dp), dimension(ntypes), intent(in) :: massoftype
@@ -204,6 +204,7 @@ contains
     logical, intent(in), optional :: write_T_files
 
     logical, intent(in) :: compute_Frad ! does mcfost need to compute the radiation pressure
+    logical, intent(in) :: use_apr
     real(dp), dimension(6), intent(in) :: SPH_limits ! not used yet, llimits_file is set to false
 
     integer, intent(in) :: ndudt
@@ -261,7 +262,7 @@ contains
          vxyzu,T_gas,iphase,grainsize,dustfrac(1:ndusttypes,np),nucleation,massoftype2(1,1:ntypes),&
          xyzmh_ptmass,vxyz_ptmass,hfact,umass,utime,udist,graindens,ndudt,dudt,ifiles,&
          n_SPH,x_SPH,y_SPH,z_SPH,h_SPH,vx_SPH,vy_SPH,vz_SPH,Tgas_SPH,particle_id,&
-         SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos)
+         SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
 
     if (.not.lfix_star) call compute_stellar_parameters()
 
@@ -275,7 +276,11 @@ contains
 
     ! We allocate the total number of SPH cells as the number of Voronoi cells mays vary
     if (lfirst_time) then
-       call alloc_dynamique(n_cells_max = n_SPH + n_etoiles)
+       if (use_apr) then
+          call alloc_dynamique(n_cells_max = n_SPH*8 + n_etoiles) ! this is the value currently used
+       else                                                       ! in Phantom (config.F90)
+          call alloc_dynamique(n_cells_max = n_SPH + n_etoiles)
+       endif
        alloc_status = 0
        allocate(xN_abs(n_SPH + n_etoiles,1,nb_proc),  stat=alloc_status)
        if (alloc_status /= 0) call error("Allocation error xN_abs")
