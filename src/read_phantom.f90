@@ -925,6 +925,12 @@ contains
 
        itypei = abs(iphase(i))
        if (hi > 0.) then
+          ! calculate particle mass
+          pmassi = massoftype(ifile,itypei)
+         
+          ! rescale by apr - if there's no apr this does nothing
+          pmassi = pmassi / (2.**(apr_level(i) - 1))
+          
           if (use_dust_particles .and. dustfluidtype==2 .and. ndusttypes==1 .and. itypei==2) then
              j = j + 1
              particle_id(j) = i
@@ -937,11 +943,8 @@ contains
                 vy(j) = vyi * uvelocity
                 vz(j) = vzi * uvelocity
              endif
+             
              T_gas(j) = T_gasi
-             pmassi = massoftype(ifile,itypei)
-
-             ! rescale by apr - if there's no apr this does nothing
-             pmassi = pmassi / (2.**(apr_level(i) - 1))
 
              rhodusti = pmassi * (hfact/hi)**3  * udens ! g/cm**3
              gasfraci = dustfrac(1,i)
@@ -965,10 +968,6 @@ contains
              if (ldust_moments) dust_moments(:,j) = nucleation(1:4,i) ! indexing is different from phantom as I read starting at k0
 
              T_gas(j) = T_gasi
-             pmassi = massoftype(ifile,itypei)
-
-             ! rescale by apr - if there's no apr this does nothing
-             pmassi = pmassi / (2.**(apr_level(i) - 1))
 
              rhogasi = pmassi *(hfact/hi)**3  * udens ! g/cm**3
              dustfraci = sum(dustfrac(:,i))
