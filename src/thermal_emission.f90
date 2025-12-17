@@ -26,7 +26,7 @@ module thermal_emission
        im_reemission_qre, init_emissivite_nre, init_reemission, select_wl_em, &
        select_cellule, temp_finale, temp_finale_nlte, temp_nre, update_proba_abs_nre, &
        repartition_wl_em, repartition_energie, allocate_thermal_energy, set_min_temperature, &
-       reset_temperature
+       reset_temperature, deallocate_weight_proba_emission, deallocate_temperature, deallocate_thermal_energy
 
   private
 
@@ -86,6 +86,13 @@ subroutine allocate_thermal_energy(Nc)
   return
 
 end subroutine allocate_thermal_energy
+
+subroutine deallocate_thermal_energy()
+
+  if (allocated(E_disk)) deallocate(E_disk, frac_E_stars, frac_E_disk, E_totale)
+  if (allocated(prob_E_cell)) deallocate(prob_E_cell)
+
+end subroutine deallocate_thermal_energy
 
 !***************************************************
 
@@ -212,10 +219,49 @@ subroutine deallocate_thermal_emission()
 
   use radiation_field, only : deallocate_radiation_field
 
-  deallocate(tab_Temp)
+  if (allocated(spectre_emission_cumul)) deallocate(spectre_emission_cumul)
+  if (allocated(tab_Temp)) deallocate(tab_Temp)
+  if (allocated(log_Qcool_minus_extra_heating)) deallocate(log_Qcool_minus_extra_heating)
+  if (allocated(DensE)) deallocate(DensE, DensE_m1, Dcoeff)
+  if (allocated(xT_ech)) deallocate(xT_ech)
+
+  if (lreemission_stats) then
+     if (allocated(nbre_reemission)) deallocate(nbre_reemission)
+  endif
+
+  if (.not.low_mem_th_emission) then
+     if (allocated(kdB_dT_CDF)) deallocate(kdB_dT_CDF)
+  else
+     if (allocated(kdB_dT_1grain_LTE_CDF)) deallocate(kdB_dT_1grain_LTE_CDF)
+  endif
+
+  if (lRE_nLTE) then
+     if (.not.low_mem_th_emission_nLTE) then
+        if (allocated(kabs_nLTE_CDF)) deallocate(kabs_nLTE_CDF)
+     endif
+
+     if (allocated(kdB_dT_1grain_nLTE_CDF)) deallocate(kdB_dT_1grain_nLTE_CDF)
+     if (allocated(log_E_em_1grain)) deallocate(log_E_em_1grain)
+     if (allocated(xT_ech_1grain)) deallocate(xT_ech_1grain)
+  endif
+
+  if (lnRE) then
+     if (allocated(E_em_1grain_nRE)) deallocate(E_em_1grain_nRE, log_E_em_1grain_nRE)
+     if (allocated(Tdust_1grain_nRE_old)) deallocate(Tdust_1grain_nRE_old)
+     if (allocated(Tpeak_old)) deallocate(Tpeak_old, maxP_old)
+     if (allocated(xT_ech_1grain_nRE)) deallocate(xT_ech_1grain_nRE)
+     if (allocated(kdB_dT_1grain_nRE_CDF)) deallocate(kdB_dT_1grain_nRE_CDF)
+
+     if (lRE_nlTE) then
+        if (allocated(Tdust_1grain_old)) deallocate(Tdust_1grain_old)
+     endif
+
+     if (allocated(Emissivite_nRE_old)) deallocate(Emissivite_nRE_old)
+  endif
+  !----------------------
   if (lsed_complete) then
-     deallocate(log_Qcool_minus_extra_heating)
-     deallocate(DensE, DensE_m1, Dcoeff)
+     if (allocated(log_Qcool_minus_extra_heating)) deallocate(log_Qcool_minus_extra_heating)
+     if (allocated(DensE)) deallocate(DensE, DensE_m1, Dcoeff)
      call deallocate_radiation_field()
      if (allocated(nbre_reemission)) deallocate(nbre_reemission)
      if (allocated(kdB_dT_CDF)) deallocate(xT_ech,kdB_dT_CDF)
@@ -310,6 +356,25 @@ subroutine allocate_temperature(Nc)
 
 end subroutine allocate_temperature
 
+subroutine deallocate_temperature()
+
+  if (allocated(Tdust)) deallocate(Tdust, Tdust_old)
+
+  if (lRE_nLTE) then
+     if (allocated(Tdust_1grain)) deallocate(Tdust_1grain)
+  endif
+
+  if (lnRE) then
+     if ((.not.ltemp) .and. (lsed .or. lmono0 .or. lProDiMo .or. lProDiMo2mcfost)) then
+        if (allocated(tab_Temp)) deallocate(tab_Temp)
+     endif
+
+     if (allocated(Proba_Tdust)) deallocate(Proba_Tdust, Tdust_1grain_nRE)
+     if (allocated(l_RE)) deallocate(l_RE, lchange_nRE)
+  endif
+
+end subroutine deallocate_temperature
+
 !***************************************************
 
 subroutine repartition_wl_em()
@@ -328,7 +393,7 @@ subroutine repartition_wl_em()
 
   if (lTemp) then
      spectre_emission_cumul(0) = 0.0
-     ! Fonction de répartition émssion
+     ! Fonction de rï¿½partition ï¿½mssion
      do lambda=1,n_lambda
         delta_wl=tab_delta_lambda(lambda)*1.e-6
         spectre_emission_cumul(lambda)=spectre_emission_cumul(lambda-1) + &
@@ -365,7 +430,7 @@ subroutine select_wl_em(aleat,lambda)
 ! Choix de la longueur d'onde dans le corps noir precedemment cree
 ! Dichotomie
 ! lambda est l'indice de la longueur d'onde
-! Utilise les résultats de  repartition_wl_em
+! Utilise les rï¿½sultats de  repartition_wl_em
 ! C. Pinte
 
   implicit none
@@ -481,7 +546,7 @@ subroutine init_reemission(lheating,dudt)
         ! We solve Q+ = int kappa.Jnu.dnu = Q- - extra_heating = int kappa.Bnu.dnu - extra_heating
         ! Here we conpute the extra_heating term
         if (.not.lextra_heating) then
-           ! Energie venant de l'equilibre avec nuage à T_min
+           ! Energie venant de l'equilibre avec nuage ï¿½ T_min
            extra_heating = Qcool0
         else
            if (ldudt_implicit) then
@@ -1758,7 +1823,7 @@ subroutine repartition_energie(lambda)
 ! Calcule la repartition de l'energie emise a la longuer d'onde consideree
 ! entre l'etoile et les differentes cellules du disque
 !  - frac_E_star donne fraction emise par etoile
-!  - prob_E_cell donne la proba d'emission cumulée des cellules
+!  - prob_E_cell donne la proba d'emission cumulï¿½e des cellules
 !  - E_totale donne energie totale emise (pour calibration des images)
 ! Utilise une table de temperature pretabulee
 ! Pour version du code monochromatique avec scattering + em th
@@ -2023,7 +2088,7 @@ end function select_absorbing_grain
 !**********************************************************************
 
 subroutine select_cellule(lambda,aleat, icell)
-  ! Sélection de la cellule qui va émettre le photon
+  ! Sï¿½lection de la cellule qui va ï¿½mettre le photon
   ! C. Pinte
   ! 04/02/05
   ! Modif 3D 10/06/05
@@ -2132,18 +2197,24 @@ subroutine allocate_weight_proba_emission(Nc)
 
 end subroutine allocate_weight_proba_emission
 
+subroutine deallocate_weight_proba_emission()
+  if (allocated(weight_proba_emission)) deallocate(weight_proba_emission, correct_E_emission)
+end subroutine deallocate_weight_proba_emission
+
 !***********************************************************
 
 subroutine reset_temperature()
 
   use radiation_field, only : xKJ_abs, xJ_abs
 
-  if (lRE_LTE) then
+  if (lRE_LTE .and. allocated(xKJ_abs)) then
      xKJ_abs(:,:) = 0.0_dp
   endif
-  if (lRE_nLTE .or. lnRE) xJ_abs(:,:,:) = 0.0_dp
-  xT_ech = 2
-  Tdust = 1.0
+  if ((lRE_nLTE .or. lnRE) .and. allocated(xJ_abs)) then
+      xJ_abs(:,:,:) = 0.0_dp
+   endif
+  if (allocated(xT_ech)) xT_ech = 2
+  if (allocated(Tdust)) Tdust = 1.0
 
   return
 
