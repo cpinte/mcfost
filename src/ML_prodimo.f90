@@ -146,9 +146,9 @@ contains
 
   subroutine xgb_compute_features()
 
-    use grains, only : grain, r_grain, n_grains_tot
+    use grains, only : grain, r_grain, n_grains_tot, nbre_grains
     use optical_depth, only : compute_column
-    use density, only : densite_pouss
+    use density, only : dust_density
     use cylindrical_grid, only : r_grid, z_grid
     use molecular_emission, only : densite_gaz
     use temperature, only : Tdust
@@ -166,12 +166,12 @@ contains
     !--- Moments de la distribution de grain
     mask_not_PAH(:) = .not.grain(:)%is_PAH
     do icell=1, n_cells
-       N = sum(densite_pouss(:,icell),mask=mask_not_PAH)
+       N = sum(dust_density(:,icell) * nbre_grains(:),mask=mask_not_PAH)
        N_grains(0,icell) = N
        if (N > 0) then
-          N_grains(1,icell) = sum(densite_pouss(:,icell) * r_grain(:),mask=mask_not_PAH) / N
-          N_grains(2,icell) = sum(densite_pouss(:,icell) * r_grain(:)**2,mask=mask_not_PAH) / N
-          N_grains(3,icell) = sum(densite_pouss(:,icell) * r_grain(:)**3,mask=mask_not_PAH) / N
+          N_grains(1,icell) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:),mask=mask_not_PAH) / N
+          N_grains(2,icell) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
+          N_grains(3,icell) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
        else
           N_grains(1,icell) = 0.0
           N_grains(2,icell) = 0.0

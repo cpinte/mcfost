@@ -1746,7 +1746,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
      ! le d signifie real*8
      dust_dens(:,:) = 0.0
      do icell=1,n_cells
-        dust_dens(icell,:) = densite_pouss(:,icell) * m3_to_cm3  ! Todo : inverting dimensions is not a good idea
+        dust_dens(icell,:) = dust_density(:,icell) * nbre_grains(:) * m3_to_cm3  ! Todo : inverting dimensions is not a good idea
      enddo !icell
      call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
 
@@ -1808,7 +1808,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   ! le d signifie real*8
   dens(:) = 0.0
   do icell=1,n_cells
-     dens(icell) = sum(densite_pouss(:,icell) * M_grain(:)) ! M_grain en g
+     dens(icell) = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:)) ! M_grain en g
   enddo
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
@@ -2942,8 +2942,8 @@ subroutine taille_moyenne_grains()
   do icell=1, n_cells
      somme=0.0
      do l=1, n_grains_tot
-        a_moyen(icell) = a_moyen(icell) + densite_pouss(l,icell) * r_grain(l)**2
-        somme = somme + densite_pouss(l,icell)
+        a_moyen(icell) = a_moyen(icell) + dust_density(l,icell) * nbre_grains(l) * r_grain(l)**2
+        somme = somme + dust_density(l,icell)  * nbre_grains(l)
      enddo
      a_moyen(icell) = a_moyen(icell) / somme
   enddo
