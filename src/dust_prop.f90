@@ -941,7 +941,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         do icell=1, n_cells
            kabs_nLTE_CDF(grain_RE_nLTE_start-1,icell,lambda)=0.0
            do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
-              density=dust_density(k,icell) * nbre_grains(k)
+              density=dust_density(p_k,icell) * nbre_grains(k)
               kabs_nLTE_CDF(k,icell,lambda) = kabs_nLTE_CDF(k-1,icell,lambda) + &
                    C_abs(k,lambda) * density
            enddo !k
@@ -1291,7 +1291,7 @@ integer function select_scattering_grain(lambda,icell, aleat) result(k)
 
   integer, intent(in) :: lambda, icell
   real, intent(in) :: aleat
-  real :: prob, CDF, norm
+  real :: prob, CDF, norm, density
 
   if (low_mem_scattering) then
      ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
@@ -1301,14 +1301,24 @@ integer function select_scattering_grain(lambda,icell, aleat) result(k)
         prob = aleat * norm
         CDF = 0.0
         do k=1, n_grains_tot
-           CDF = CDF + C_sca(k,lambda) * dust_density(k,icell) * nbre_grains(k)
+           if (lvariable_dust) then
+              density = dust_density(k,icell) * nbre_grains(k)
+           else
+              density = dust_density(1,icell) * nbre_grains(k)
+           endif
+           CDF = CDF + C_sca(k,lambda) * density
            if (CDF > prob) exit
         enddo
      else ! We start from the end of the grain size distribution
         prob = (1.0-aleat) * norm
         CDF = 0.0
         do k=n_grains_tot, 1, -1
-           CDF = CDF + C_sca(k,lambda) * dust_density(k,icell) * nbre_grains(k)
+           if (lvariable_dust) then
+              density = dust_density(k,icell) * nbre_grains(k)
+           else
+              density = dust_density(1,icell) * nbre_grains(k)
+           endif
+           CDF = CDF + C_sca(k,lambda) * density
            if (CDF > prob) exit
         enddo
      endif

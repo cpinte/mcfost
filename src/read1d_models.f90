@@ -256,8 +256,12 @@ module read1d_models
 		if (ldust_atom) then
 			dust_dens_max = 0d0; dust_dens_min = 1d30
 			do icell=1, n_cells
-				rho_d = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:))
-				if (rho_d<=0.0) cycle
+                                if (lvariable_dust) then
+                                        rho_d = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:))
+                                else
+                                        rho_d = sum(dust_density(1,icell) * nbre_grains(:) * M_grain(:))
+                                endif
+                                if (rho_d<=0.0) cycle
 				dust_dens_min = min(dust_dens_min,rho_d)
 				dust_dens_max = max(dust_dens_max,rho_d)
 			enddo
