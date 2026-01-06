@@ -621,7 +621,7 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          somme = somme + dust_density(l,icell)*nbre_grains(l)  *  (z_lim(i,abs(j)+1) - z_lim(i,abs(j)))
+                          somme = somme + dust_density(l,icell)  *  (z_lim(i,abs(j)+1) - z_lim(i,abs(j)))
                        enddo ! j
 
                        if (somme > tiny_dp) then
@@ -671,7 +671,7 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          norme = norme + nbre_grains(l) * dust_density(l,icell)
+                          norme = norme + dust_density(l,icell)
                        enddo !j
 
                        ! Si tous les grains sont sedimentes, on les met dans le plan median
@@ -1946,12 +1946,15 @@ subroutine normalize_dust_density(disk_dust_mass)
         somme=0.0_dp
         do icell=1,n_cells
            if (dust_density(l,icell) <= 0.0_dp) dust_density(l,icell) = 0.0_dp
-           somme=somme+dust_density(l,icell)*nbre_grains(l)*volume(icell)
+           somme=somme+dust_density(l,icell)*volume(icell)
         enddo !icell
-        if (somme > tiny_dp) dust_density(l,:) = dust_density(l,:) / somme  ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
+        if (somme > tiny_dp) dust_density(l,:) = dust_density(l,:) / somme  ! Sum densite_pouss = 1  dans le disque
      enddo !l
   else
-     somme = sum(dust_density(1,:))
+     somme = 0.0_dp
+     do icell=1,n_cells
+        somme = somme + dust_density(1,icell) * volume(icell)
+     enddo
      if (somme > tiny_dp) dust_density(1,:) = dust_density(1,:) / somme
   endif
 
@@ -1985,7 +1988,11 @@ subroutine normalize_dust_density(disk_dust_mass)
               enddo ! icell
            endif
         else
-           mass = sum(dust_density(1,:)) * d_p%avg_grain_mass * AU3_to_cm3 * g_to_Msun
+           somme = 0.0_dp
+           do icell=1,n_cells
+              somme = somme + dust_density(1,icell) * volume(icell)
+           enddo
+           mass = somme * d_p%avg_grain_mass * AU3_to_cm3 * g_to_Msun
 
            if (mass > tiny_dp) then
               facteur = d_p%masse / mass * f
@@ -2219,7 +2226,11 @@ subroutine densite_Seb_Charnoz()
   ! les methodes de chauffages etc, ne changent pas
 
   do k=1, n_grains_tot
-     N_grains(k) = sum(dust_density(k,:))
+     somme = 0.0_dp
+     do icell=1,n_cells
+        somme = somme + dust_density(k,icell) * volume(icell)
+     enddo
+     N_grains(k) = somme
   enddo
   nbre_grains(:) = N_grains(:)/sum(N_grains(:))
 
