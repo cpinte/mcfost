@@ -265,7 +265,7 @@ subroutine repartition_energie_etoiles()
 
   real(kind=dp) :: wl_spectre_max, wl_spectre_min, wl_spectre_avg, wl_deviation
 
-  integer :: status, readwrite, blocksize,nfound,group,firstpix,nbuffer,npixels, naxes1_ref
+  integer :: status, readwrite, blocksize,nfound,group,firstpix,nbuffer,npixels
   real :: nullval
   integer, dimension(2) :: naxes
   logical :: anynull
@@ -955,8 +955,6 @@ end subroutine intersect_stars
    real(kind=dp), intent(out) :: Thp, Tshock, Facc
    real(kind=dp) :: x, y, z, rho
    real(kind=dp) :: Tloc, vaccr, vmod2, rr, sign_z
-   real :: alpha_1 = 0.75
-   real :: alpha_2 = 0.25
 
    is_inshock = .false.
    if (.not.laccretion_shock) return
@@ -994,8 +992,8 @@ end subroutine intersect_stars
 
          if (vaccr < 0.0_dp) then
             !Facc = 1/2 rho vs^3
-            Facc = 0.5 * (1d-3 * masseH * rho) * abs(vaccr)**3
-            Tloc = ( alpha_1 * Facc / sigma )**0.25
+            Facc = 0.5 * (1d-3 * mH * rho) * abs(vaccr)**3
+            Tloc = ( 0.75 * Facc / sigma )**0.25
             ! is_inshock = (Tloc > 0.5 * etoile(i_star)%T)
             is_inshock = (T_hp > 1.0_dp * etoile(i_star)%T)
             Thp = T_hp
@@ -1005,7 +1003,7 @@ end subroutine intersect_stars
                Thp = abs(T_hp) * Tloc
             endif
             !assuming mu is 0.5
-            Tshock = 0.5 * (3.0/16.0) * (1d-3 * masseH) / kb * vaccr**2
+            Tshock = 0.5 * (3.0/16.0) * (1d-3 * mH) / kb * vaccr**2
             max_Thp = max(max_Thp, Thp); min_Thp = min(min_Thp, Thp)
             max_Tshock = max(max_Tshock, Tshock); min_Tshock = min(min_Tshock, Tshock)
             max_Facc = max(max_Facc,Facc); min_Facc = min(min_Facc, Facc)
@@ -1148,7 +1146,7 @@ end subroutine find_spectra
     character(len=1)   :: s_age
 
     character(len=2) :: SpT
-    real :: L, R, T, M, minM, maxM, logg, minM_Allard, maxM_Allard, minM_Siess, maxM_Siess
+    real :: L, R, T, M, maxM, logg, minM_Allard, maxM_Allard, minM_Siess, maxM_Siess
     real(kind=dp) :: Gcm_to_Rsun
     integer :: age, k
 

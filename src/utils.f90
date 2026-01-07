@@ -254,7 +254,6 @@ function matdiag(A,n)
    real(kind=dp), intent(in) :: A(n*n)
    ! real(kind=dp), intent(in) :: A(n,n)
    real(kind=dp) :: matdiag(n)
-   integer :: i
 
    ! do i = 1, n
    !    matdiag(i) = A(i,i)
@@ -275,7 +274,7 @@ subroutine Jacobi(a,b,x,n)
    real(kind=dp), parameter :: omega = 1.0 ! Damping factor (0 < omega < 1)
    integer, parameter :: nIterMax = 20000
 
-   integer :: niter, i
+   integer :: niter
    real(kind=dp) :: diff
 
    logical :: lconverged
@@ -315,7 +314,7 @@ subroutine Jacobi_sparse(a,b,x,n)
    real(kind=dp), parameter :: omega = 1.0 ! Damping factor (0 < omega < 1)
    integer, parameter :: nIterMax = 20000
 
-   integer :: niter, i
+   integer :: niter
    real(kind=dp) :: diff
 
    logical :: lconverged
@@ -429,7 +428,7 @@ function Ng_accelerate(m,n,x)
    logical :: Ng_accelerate
    real(kind=dp), intent(inout) :: x(m,*)
    integer :: i, j, k
-   real(kind=dp) :: x0(m), A(n, n), b(n), w, dy, di, max_sol
+   real(kind=dp) :: x0(m), A(n, n), b(n), w, dy, di
 
    ng_accelerate = .false.
 
@@ -474,7 +473,7 @@ subroutine Accelerate(m,n,x)
    integer, intent(in) :: m, n
    real(kind=dp), intent(inout) :: x(m,*)
    integer :: i, j, k
-   real(kind=dp) :: x0(m), A(n, n), b(n), w, dy, di, max_sol
+   real(kind=dp) :: x0(m), A(n, n), b(n), w, dy, di
 
    A(:,:) = 0.0_dp; b(:) = 0.0_dp
    x0(:) = x(:,1)
@@ -525,14 +524,14 @@ subroutine check_ng_pops(m,n,o,x,xtot)
    integer, intent(in) :: m,n,o
    real(kind=dp), intent(inout) :: x(m,n,o)
    real(kind=dp), intent(in) :: xtot(n)
-   integer :: i, j, k
+   integer :: i, j
    real(kind=dp) :: dum(o)
 
    !take absolute value
 
    !$omp parallel &
    !$omp default(none) &
-   !$omp private(i,j,k,dum)&
+   !$omp private(i,j,dum)&
    !$omp shared(m,n,o,x,xtot)
    !$omp do schedule(dynamic,1)
    do i=1,n
@@ -830,7 +829,7 @@ function mcfost_update(lforce_update, lmanual, n_days)
   integer, intent(in), optional :: n_days
   logical :: lupdate, mcfost_update
 
-  character(len=512) :: cmd, url, url_sha1, last_version, current_binary, s
+  character(len=512) :: cmd, url, url_sha1, last_version, current_binary
   character(len=40) :: mcfost_sha1, mcfost_update_sha1
   integer ::  syst_status, ios
 
@@ -1867,7 +1866,6 @@ end function locate
    real(kind=dp), intent(in) :: xi(N),yi(M),f(N,M)
    real(kind=dp), intent(in) :: xo,yo
    integer, intent(in) :: i0, j0
-   integer :: i, j
    real(kind=dp) :: norm, f11, f21, f12, f22
 
    norm = ((xi(i0) - xi(i0-1)) * (yi(j0) - yi(j0-1)))
@@ -2084,5 +2082,39 @@ end function integrate_trap_array
    return
 
  end function dirname
+
+
+ subroutine split_line(line, tokens, numTokens)
+   character(len=*), intent(in) :: line
+   character(len=20), intent(out) :: tokens(10)
+   integer, intent(out) :: numTokens
+
+   integer :: i, p1, p2, len_line
+
+   len_line = len_trim(line)
+   numTokens = 0
+   p1 = 1
+
+   do while (p1 <= len_line)
+      ! Skip leading spaces
+      do while (p1 <= len_line .and. line(p1:p1) == ' ')
+         p1 = p1 + 1
+      end do
+      if (p1 > len_line) exit
+
+      p2 = p1
+      do while (p2 <= len_line .and. line(p2:p2) /= ' ')
+         p2 = p2 + 1
+      end do
+
+      numTokens = numTokens + 1
+      if (numTokens <= 10) then
+         tokens(numTokens) = line(p1:p2-1)
+      end if
+
+      p1 = p2 + 1
+   end do
+ end subroutine split_line
+
 
 end module utils

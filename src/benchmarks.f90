@@ -14,7 +14,7 @@ module benchmarks
 
 subroutine init_Pascucci_benchmark()
 
-  character(len=32) :: filename = "Pascucci_optSi.dat"
+  !character(len=32) :: filename = "Pascucci_optSi.dat"
 
   write(*,*) "------------------------------------------------"
   write(*,*) "| Setting up the Pascucci et al 2004 benchmark |"
@@ -177,8 +177,7 @@ subroutine readMolecule_benchmark2()
 
   read(1,'(a)') mol(1)%name
 
-  read(1,*) molecularWeight
-  masse_mol = masseH * molecularWeight
+  read(1,*) mol(1)%molecularWeight
 
   read(1,*) nLevels, nTrans_tot
 
@@ -285,7 +284,7 @@ subroutine init_HH_30_mol()
      vfield(icell) = 2.0 * (r_grid(icell)/100.)**(-0.55)
   enddo
 
-  v_turb = 230.
+  v_turb2 = 230.**2
 
   return
 
@@ -299,12 +298,12 @@ subroutine init_benchmark_vanZadelhoff1()
 
   ldust_mol = .false.
 
-  v_turb = 150._dp !m.s-1
+  v_turb2 = 150._dp**2 !m.s-1
   Tdust = 20.
   Tcin = 20._dp
   vfield(:) = 0.0
 
-  masse_mol = 1.0
+  mol(1)%molecularWeight = 1.0
 
   linfall = .true.
   lkeplerian = .false.
@@ -383,13 +382,13 @@ subroutine init_benchmark_vanzadelhoff2()
         Tdust(icell) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
         Tcin(icell) = tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
         vfield(icell) = tmp_v(l-1) + frac * (tmp_v(l) - tmp_v(l-1))
-        v_turb(icell) = tmp_vturb(l-1) + frac * (tmp_vturb(l) - tmp_vturb(l-1))
+        v_turb2(icell) = (tmp_vturb(l-1) + frac * (tmp_vturb(l) - tmp_vturb(l-1)))**2
      enddo
   enddo
 
   ! Conversion vitesses en m.s-1
   vfield = vfield * 1.0e3
-  v_turb = v_turb * 1.0e3
+  v_turb2 = v_turb2 * 1.0e6
 
   ! Conversion part.m-3
   densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3
@@ -417,7 +416,7 @@ subroutine init_benchmark_water1()
   densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
   Tcin = 40.
   vfield = 0.0
-  v_turb = 0.0
+  v_turb2 = 0.0
 
   linfall = .true.
   lkeplerian = .false.
@@ -446,7 +445,7 @@ subroutine init_benchmark_water2()
 
   densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
   Tcin = 40.
-  v_turb = 0.0
+  v_turb2 = 0.0
 
   do icell=1, n_cells
      vfield(icell) = 1e5 * sqrt(r_grid(icell)**2 + z_grid(icell)**2) * AU_to_pc
@@ -544,10 +543,10 @@ subroutine init_benchmark_water3()
 
            if (rayon < 5.95) then
               vfield(icell) = 0.0
-              v_turb(icell) = 3.
+              v_turb2(icell) = 9.
            else
               vfield(icell) =  exp( log_tmp_v(l-1) + frac * (log_tmp_v(l) - log_tmp_v(l-1)) )
-              v_turb(icell) = 1.
+              v_turb2(icell) = 1.
            endif
         enddo
      endif
@@ -555,11 +554,11 @@ subroutine init_benchmark_water3()
   enddo
 
   ! Conversion FWHM ---> vitesse
-  v_turb = v_turb / (2.*sqrt(log(2.)))
+  v_turb2 = v_turb2 / (2.*sqrt(log(2.)))**2
 
   ! Conversion vitesses en m.s-1
   vfield = vfield * 1.0e3
-  v_turb = v_turb * 1.0e3
+  v_turb2 = v_turb2 * 1.0e6
 
   ! Conversion part.m-3
   densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3

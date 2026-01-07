@@ -305,7 +305,7 @@ module elecdensity
    !solve for electronic density locally (one point).
    integer, intent(in) :: k
    real(kind=dp), intent(in) :: ne_init
-   real(kind=dp) :: delta, ne_old, akj, sum, Uk, Ukp1, dne
+   real(kind=dp) :: delta, ne_old, akj, sum, dne
    real(kind=dp):: PhiHmin, n0
    real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
    !!real(kind=dp), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk, min_fjk !Negative ions from -N_neg to 0 (H-), then from 1 to Nelem positive ions
@@ -316,7 +316,7 @@ module elecdensity
    !difference between ne(k) and ne_init gives the different to the initial solution
    !not the criterion of convergence
    ne_old = ne_init
-   
+
    !Loop starts
    ne(k) = ne_old
    niter=0
@@ -403,7 +403,7 @@ module elecdensity
 
       niter = niter + 1
       if (dne <= MAX_ELECTRON_ERROR) then
-      !set transparent ? dark ? 
+      !set transparent ? dark ?
          ! if (ne(k) < ne_small) then
          !       write(*,*) " (Solve ne) ne < ne_small at cell",k!, " ; setting cell transparent!"
          !       write(*,*) "T=", T(k), ' nHtot=', nHtot(k), " ne=", ne(k)
@@ -430,7 +430,7 @@ module elecdensity
    return
   end subroutine solve_ne_loc
 
-  
+
   subroutine solve_ne(initial, verbose, epsilon)
     ! ----------------------------------------------------------------------!
     ! Solve for electron density for a set of elements
@@ -458,16 +458,15 @@ module elecdensity
     logical, intent(in) :: verbose
     !difference wrt the initial solution, not criterion of convergence (dne)
     real(kind=dp), intent(inout) :: epsilon
-    real(kind=dp):: ne_oldM, UkM, PhiHmin, ne0, Uk, Ukp1, eps_id(nb_proc)
-    real(kind=dp), dimension(max_ionisation_stage) :: fjk, dfjk
-    real(kind=dp), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk, min_fjk !Negative ions from -N_neg to 0 (H-), then from 1 to Nelem positive ions
+    real(kind=dp):: ne_oldM, ne0, Uk, Ukp1, eps_id(nb_proc)
+    real(kind=dp), dimension(-N_negative_ions:N_MAX_ELEMENT) :: max_fjk !Negative ions from -N_neg to 0 (H-), then from 1 to Nelem positive ions
     integer :: k, ZM, id, ibar, n_cells_done, n_cells_skipped
     integer :: unconverged_cells(nb_proc), ik_max, ik_max_id(nb_proc)
 
     ibar = 0
     n_cells_done = 0
     n_cells_skipped = 0!size(pack(icompute_atomRT,mask=icompute_atomRT /= 1))
-    
+
     unconverged_cells(:) = 0
     eps_id(:) = 0.0
     ik_max_id = 0.0
@@ -530,14 +529,14 @@ module elecdensity
 
        end if
 
-      call solve_ne_loc(k, ne0)      
- 
+      call solve_ne_loc(k, ne0)
+
       if (abs(1.0_dp - ne0 / ne(k)) > eps_id(id)) then
          eps_id(id) = abs(1.0_dp - ne0 / ne(k))
          ik_max_id(id) = k
       endif
 
-       
+
        ! Progress bar
        !$omp atomic
        n_cells_done = n_cells_done + 1
@@ -580,7 +579,7 @@ module elecdensity
   end subroutine solve_ne
 
 
-  
+
 
 
 
@@ -592,7 +591,7 @@ module elecdensity
    ! ------------------------------------ !
    integer :: unit, EOF = 0, blocksize, naxes(4), naxis,group, bitpix, fpixel
    logical :: extend, simple
-   integer :: nelements, nfirst,sys_status
+   integer :: nelements,sys_status
    character(len=512) :: cmd
 
 

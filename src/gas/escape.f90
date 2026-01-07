@@ -409,7 +409,7 @@ module escape
         real(kind=dp) :: x0,y0,z0,x1,y1,z1,u,v,w
         real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
         integer :: next_cell, iray, icell_in, n_rayons
-        real :: rand, rand2, rand3, rand4
+        real :: rand, rand2, rand3
         real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1, f_shock(n_etoiles)
         integer :: n_rays_shock(n_etoiles), n_rays_star(n_etoiles)
         real(kind=dp) :: l,l_contrib, l_void_before, Tchoc, rho_shock(n_etoiles)
@@ -617,7 +617,7 @@ module escape
     !   - optically thin excitation with no lines for continua
     !   - MC rays (no healpix)
         integer :: iray, n_iter, id, i, alloc_status, n_rayons
-        integer :: nact, imax, icell_max, icell_max_2
+        integer :: nact
         integer :: icell, ilevel, nb, nr, unconverged_cells
         integer, parameter :: maxIter = 80
         !ray-by-ray integration of the SEE
@@ -647,7 +647,7 @@ module escape
         !-> overall the non-LTE loop
         real :: time_nlte, time_nlte_loop, time_nlte_cpu
         real :: cpu_time_begin, cpu_time_end, time_nlte_loop_cpu
-        integer :: count_start, count_end, itime
+        integer :: count_start, count_end
         !-> for a single iteration
         integer :: cstart_iter, cend_iter
         real :: time_iteration, cpustart_iter, cpuend_iter, time_iter_avg
@@ -1180,8 +1180,8 @@ module escape
         integer, intent(in) :: id, icell
         real, parameter :: fact_tau = 3.0
         real(kind=dp), parameter :: prec_vel = 1.0 / Rsun ! [s^-1]
-        integer :: ns, nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
-        real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds
+        integer :: ns, nact, i, j, kr, n0, nb, nr, Nl, l, i0
+        real(kind=dp) :: tau0, beta, chi_ij, Icore, dvds
         type(AtomType), pointer :: at
         real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij
         real(kind=dp) :: jbar_down, jbar_up, ehnukt, anu, tau_max
@@ -1334,7 +1334,7 @@ module escape
       integer, intent(in) :: N
       real(kind=dp), dimension(N), intent(in) :: lambda
       real(kind=dp), dimension(N) :: I_sobolev_1ray, Icore(N)
-      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
+      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
       real(kind=dp), dimension(N) :: Snu, tau, dtau, chi, coronal_irrad
       integer :: kr, nat, nl
       integer, target :: icell
@@ -1442,8 +1442,8 @@ module escape
         real(kind=dp), intent(in) :: dOmega
         real, parameter :: fact_tau = 3.0
         real(kind=dp), parameter :: prec_vel = 1.0 / Rsun ! [s^-1]
-        integer :: ns, nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
-        real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds, tau_max
+        integer :: ns, nact, i, j, kr, n0, nb, nr, Nl, l, i0
+        real(kind=dp) :: tau0, beta, chi_ij, Icore, dvds, tau_max
         type(AtomType), pointer :: at
         real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij, jbar_down, jbar_up, ehnukt, anu
         real(kind=dp), dimension(Nlambda_max_trans) :: Ieff, xl
@@ -1577,7 +1577,7 @@ module escape
         integer :: kr, i, j, ip, jp, krr, Nbp, Nrp, i0, Nl, Nb, Nr, l
         real(kind=dp) :: ni_on_nj_star, gij, wl, ehnukt, anu
         real(kind=dp) :: jbar_down, jbar_up, xcc_down, xcc_up
-        real(kind=dp), dimension(Nlambda_max_trans) :: Ieff, dtau
+        real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
 
 
         !first loop to get the contributions from the different transitions
@@ -1683,8 +1683,7 @@ module escape
         type (AtomicContinuum), intent(inout) :: cont
         integer :: i, j, nact, kr
         real(kind=dp) :: ni_on_nj_star, Jbar_down, Jbar_up, xcc_down, xcc_up
-        real(kind=dp) :: ehnukt, anu, wl
-        integer :: Nb, Nr, Nl, i0, l
+        integer :: Nb, Nr, Nl, i0
         integer :: ip, jp, krr, Nrp, Nbp
 
         !cont%Rji init at tab_Aji_cont

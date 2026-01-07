@@ -78,11 +78,9 @@ module elements_type
          'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es'/
 
 
-
     contains
 
     subroutine dealloc_elements()
-        integer :: n
 
         deallocate(Tpf)
         deallocate(elems)
@@ -139,7 +137,7 @@ module elements_type
         !
         ! Also read partition function
 
-        integer :: EOF, n, blocksize, unit, i, j, syst_status
+        integer :: EOF, n, blocksize, unit, i, j
         integer :: NAXIST(1), naxis_found, hdutype,  Nread
         ! integer :: cursor_init
         character(len=256) :: some_comments

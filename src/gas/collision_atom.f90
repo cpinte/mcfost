@@ -98,7 +98,7 @@ module collision_atom
    ! --------------------------------------------------- !
       real(kind=dp), intent(in) :: temp
       real(kind=dp), intent(out), dimension(:) :: Cik
-      integer :: i, j, Nl
+      integer :: i, Nl
       !real(kind=dp) :: x0 = 1 - (n/n0)**2 with n0 -> infinity
       real(kind=dp) :: C0, rn, bn, n, An, En, yn, zn, S, Bnp, deltaM
 
@@ -157,7 +157,7 @@ module collision_atom
       real(kind=dp), intent(in) :: temp
       real(kind=dp), intent(out), dimension(:,:) :: Cij
       integer :: i, j, Nl
-      real(kind=dp) :: C0, rn, bn, n, Ennp, y, z, S, Bnnp, En
+      real(kind=dp) :: C0, rn, bn, n, y, z, S, Bnnp, En
       real(kind=dp) :: np, x, fnnp, rnnp, Annp, Gaunt_bf, deltam
 
       deltam = 1. + Mel/ (hydrogen%weight * AMU_kg)
@@ -622,8 +622,8 @@ module collision_atom
     ! --------------------------------------------------------------------------- !
     type (AtomType), intent(inout) :: atom
     integer, intent(in) :: icell, id
-    integer :: ij, k, Nread, countline=0, colunit
-    integer :: NTMP, n, m, ii, Nitem, i1, i2, i, j, ji, Nitem2
+    integer :: ij, k, Nread, countline=0
+    integer :: NTMP, m, ii, Nitem, i1, i2, i, j, ji
     character(len=3) :: END_OF_FILE="END"
     integer, parameter :: max_len_key = 8!set by the maximum length of a keyword!!
     character(len=max_len_key) :: key
@@ -636,7 +636,7 @@ module collision_atom
     integer :: Ncoef, Nrow, Nlines, k1, kr
     character(len=Nmax_line_per_collision) :: inputline, FormatLine
     real(kind=dp) :: acolsh, tcolsh, aradsh, xradsh, adish, bdish
-    real(kind=dp) :: t0sh, t1sh, summrs, tg, cdn, ccup
+    real(kind=dp) :: t0sh, t1sh, summrs, tg, cdn
     real(kind=dp) :: ar85t1, ar85t2, ar85a, ar85b, ar85c, ar85d, t4
     real(kind=dp) :: de,zz,betab,cbar,dekt,dekti,wlog,wb,sumscl
     real(kind=dp) :: ni_on_nj, nj_on_ni

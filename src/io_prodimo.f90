@@ -789,7 +789,7 @@ contains
     do ri=1, n_rad
        do zj=1,nz
           icell = cell_map(ri,zj,1)
-          dens(ri,zj) =  densite_gaz(icell) * masse_mol_gaz / m3_to_cm3 ! g.cm^-3
+          dens(ri,zj) =  densite_gaz(icell) * mu_mH / m3_to_cm3 ! g.cm^-3
        enddo
     enddo
 
@@ -1962,16 +1962,15 @@ contains
     ! Vitesse Doppler
     do i=1, n_rad
        do j=1, nz
-          if (lCII) sigma2 =  dvCII(i,j)**2 !/ (2 * log(2.))
-          if (lOI) sigma2 =  dvOI(i,j)**2
-          if (lCO) sigma2 =  dvCO(i,j)**2
-          if (loH2O) sigma2 =  dvoH2O(i,j)**2
-          if (lpH2O) sigma2 =  dvpH2O(i,j)**2
           icell = cell_map(i,j,1)
-          v_line(icell) = sqrt(sigma2)
 
-          !  write(*,*) "FWHM", sqrt(sigma2 * log(2.)) * 2.  ! Teste OK bench water 1
-          if (sigma2 <=0.) call error("ProDiMo data, dv = 0")
+          if (lCII)  dv_line(icell) =  dvCII(i,j)**2 !/ (2 * log(2.))
+          if (lOI)  dv_line(icell) =  dvOI(i,j)**2
+          if (lCO)  dv_line(icell) =  dvCO(i,j)**2
+          if (loH2O)  dv_line(icell) =  dvoH2O(i,j)**2
+          if (lpH2O)  dv_line(icell) =  dvpH2O(i,j)**2
+
+          sigma2 = dv_line(icell)**2
 
           sigma2_m1 = 1.0_dp / sigma2
           sigma2_phiProf_m1(icell) = sigma2_m1

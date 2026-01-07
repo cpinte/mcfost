@@ -7,7 +7,7 @@
   G(:) = compute_UV_field() ! Habing
 
   ! unit conversions for astrochem :
-  gas_density(:) = densite_gaz(1:n_cells) * masse_mol_gaz / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+  gas_density(:) = densite_gaz(1:n_cells) * mu_mH / m3_to_cm3 ! nH2/m**3 --> g/cm**3
 
   do icell=1,n_cells
      dust_mass_density(icell) = sum(densite_pouss(:,icell) * M_grain(:)) ! M_grain en g

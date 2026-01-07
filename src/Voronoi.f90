@@ -846,10 +846,10 @@ module Voronoi_grid
 
     real(kind=dp), parameter :: prec = 1e-5
 
-    real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
+    real(kind=dp) :: s_tmp, den
     integer :: i, id_n, l, ifirst, ilast
 
-    integer :: i_star, check_cell
+    integer :: i_star
     real(kind=dp) :: d_to_star
     logical :: is_a_star_neighbour
 
@@ -1000,14 +1000,8 @@ module Voronoi_grid
     real(kind=dp), intent(in) :: x,y,z
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
-    real(kind=dp) :: s_tmp, den, num, s_entry, s_exit
+    real(kind=dp) :: s_tmp, den
     integer :: i, id_n, l, ifirst, ilast
-
-    integer :: i_star, check_cell
-    real(kind=dp) :: d_to_star
-    logical :: is_a_star_neighbour
-
-    real(kind=dp), dimension(3) :: delta_r
 
     ! n = normale a la face, p = point sur la face, r = position du photon, k = direction de vol
     real, dimension(3) :: n, p, r, k, r_cell, r_neighbour
@@ -1091,7 +1085,7 @@ module Voronoi_grid
     real :: s_tmp_wall, den1
     real(kind=dp) :: b, c, delta, rac, s1, s2, h
 
-    integer :: n_neighbours, n_wall, ifirst, ilast, id_min, id_max
+    integer :: n_neighbours, ifirst, ilast
 
     logical :: lhit_wall, was_cut
 

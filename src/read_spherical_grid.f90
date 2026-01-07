@@ -32,7 +32,7 @@ module read_spherical_grid
     ! in pluto%x1, pluto%x2, pluto%x3.
     ! ----------------------------------------------------- !
         character(len=*), intent(in) :: filename
-        integer :: ios, Nsize, acc, i, ipos
+        integer :: ios, Nsize, acc, i
         real :: dphi
 
         lvelocity_file = .true.
@@ -42,7 +42,7 @@ module read_spherical_grid
         n_zones = 1
 
         open(unit=1, file=trim(filename), status="old",access="stream",form='unformatted')
-        !read size along each direction + cell limits (size + 1) 
+        !read size along each direction + cell limits (size + 1)
         read(1,iostat=ios) pluto%nx1
         allocate(pluto%x1(pluto%nx1+1))
         read(1,iostat=ios) pluto%x1(:)
@@ -138,7 +138,7 @@ module read_spherical_grid
     ! use grains, only : M_Grain
         character(len=*), intent(in) :: filename
         integer :: ios, i, Nsize
-        
+
         integer :: j, k, jj, icell
         integer, allocatable :: dz(:,:,:)
         real, allocatable :: vtmp(:,:,:,:)
@@ -184,15 +184,15 @@ module read_spherical_grid
         !         do k=1, n_az
         !             icell = cell_map(i,jj,k)
         !             T(icell) = T_tmp(i,j,k)
-        !             nHtot(icell) = rho(i,j,k) * 1d3 / masseH / wght_per_H ! [H/m^3]
+        !             nHtot(icell) = rho(i,j,k) * 1d3 / mH / wght_per_H ! [H/m^3]
         !             icompute_atomRT(icell) = dz(i,j,k)
         !             vfield3d(icell,:) = vtmp(i,j,k,:)
 
         !             !-> wrapper for dust RT.
         !             !-> taking into account proper weights assuming only molecular gas in dusty regions
         !             if (rho_dust(i,j,k) > 0.0) then ! dusty region
-        !                 densite_gaz(icell) = rho(i,j,k) * 1d3 / masse_mol_gaz !total molecular gas density in H2/m^3
-        !                 densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / masse_mol_gaz ! [m^-3]
+        !                 densite_gaz(icell) = rho(i,j,k) * 1d3 / mu_mH !total molecular gas density in H2/m^3
+        !                 densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / mu_mH ! [m^-3]
         !                 disk_zone(1)%diskmass = disk_zone(1)%diskmass + rho_dust(i,j,k) * volume(icell)
         !             else !No dust.
         !                 densite_gaz(icell) = nHtot(icell) * wght_per_H !total atomic gas density in [m^-3]
@@ -219,15 +219,15 @@ module read_spherical_grid
                         icell = cell_map(i,jj,k)
                     endif
                     T(icell) = T_tmp(i,j,k)
-                    nHtot(icell) = rho(i,j,k) * 1d3 / masseH / wght_per_H ! [H/m^3]
+                    nHtot(icell) = rho(i,j,k) * 1d3 / mH / wght_per_H ! [H/m^3]
                     icompute_atomRT(icell) = dz(i,j,k)
                     vfield3d(icell,:) = vtmp(i,j,k,:)
 
                     !-> wrapper for dust RT.
                     !-> taking into account proper weights assuming only molecular gas in dusty regions
                     if (rho_dust(i,j,k) > 0.0) then ! dusty region
-                        densite_gaz(icell) = rho(i,j,k) * 1d3 / masse_mol_gaz !total molecular gas density in H2/m^3
-                        densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / masse_mol_gaz ! [m^-3]
+                        densite_gaz(icell) = rho(i,j,k) * 1d3 / mu_mH !total molecular gas density in H2/m^3
+                        densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / mu_mH ! [m^-3]
                         disk_zone(1)%diskmass = disk_zone(1)%diskmass + rho_dust(i,j,k) * volume(icell)
                     else !No dust.
                         densite_gaz(icell) = nHtot(icell) * wght_per_H !total atomic gas density in [m^-3]
@@ -245,9 +245,9 @@ module read_spherical_grid
         !dust part see read_pluto.f90
         ! ********************************** !
         mass = sum(masse_gaz) * g_to_Msun
-        ! mass = sum(densite_gaz * volume) * AU3_to_m3 * masseH * g_to_Msun
+        ! mass = sum(densite_gaz * volume) * AU3_to_m3 * mH * g_to_Msun
         if (mass <= 0.0) call error('Gas mass is 0')
-        ! masse_gaz(:) = masseH * densite_gaz(:) * volume(:) * AU3_to_m3 ! [g]
+        ! masse_gaz(:) = mH * densite_gaz(:) * volume(:) * AU3_to_m3 ! [g]
 
         !--> no normalisation of density. The dust and gas densities are provided in the model.
 

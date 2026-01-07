@@ -71,7 +71,7 @@ module atom_transfer
 
    subroutine dealloc_tau_surface_map()
    !TO DO: only at the centre of lines
-      integer :: ibin,iaz,i,j,la
+
       character(len=50) :: filename
       ! real(kind=dp), allocatable :: image(:,:,:,:,:,:)
 
@@ -132,7 +132,7 @@ module atom_transfer
       integer :: etape, etape_start, etape_end, iray
       integer :: n_iter, id, i, alloc_status, n_rayons
       ! integer :: , iray_start, n_rayons_max
-      integer :: nact, imax, icell_max, icell_max_2
+      integer :: nact
       integer :: icell, ilevel, nb, nr, unconverged_cells
       integer, parameter :: maxIter = 300!150!, maxIter3 = 10
       !ray-by-ray integration of the SEE
@@ -174,7 +174,7 @@ module atom_transfer
       !-> overall the non-LTE loop
       real :: time_nlte, time_nlte_loop, time_nlte_cpu
       real :: cpu_time_begin, cpu_time_end, time_nlte_loop_cpu
-      integer :: count_start, count_end, itime
+      integer :: count_start, count_end
       !-> for a single iteration
       integer :: cstart_iter, cend_iter
       real :: time_iteration, cpustart_iter, cpuend_iter, time_iter_avg
@@ -1044,7 +1044,6 @@ module atom_transfer
    subroutine setup_image_grid()
    !to do lmono -limg
    !keep somewhere tab_lambda_sed = tab_lambda because tab_lambda is overwritten in non-LTE
-      integer :: kr, nat
 
       call deallocate_wavelengths_gasrt()
       call dealloc_atom_opac()
@@ -1458,8 +1457,7 @@ module atom_transfer
       integer :: ri_RT, phi_RT
       logical :: lresolved
 
-      real(kind=dp) :: z1, z2
-      integer, dimension(:), allocatable :: tab_pix_healpix
+      !integer, dimension(:), allocatable :: tab_pix_healpix
 
       write(*,*) "Vector to observer =", real(tab_u_rt(ibin,iaz)),real(tab_v_rt(ibin,iaz)),real(tab_w_rt(ibin))
       write(*,*) "i=", real(tab_RT_incl(ibin)), "az=", real(tab_RT_az(iaz))

@@ -223,6 +223,8 @@ subroutine set_default_variables()
   lnot_random_Voronoi = .false.
   lignore_sink=.false.
   lstar_bb = .false.
+  lwrite_abundance = .false.
+  lheader_only = .false.
 
   tmp_dir = "./"
 
@@ -780,6 +782,13 @@ subroutine initialisation_mcfost()
      case("-photodissociation","-photo_dissociation","-photo-dissociation")
         i_arg = i_arg + 1
         lphoto_dissociation=.true.
+        photodissociation_factor = 1.0
+     case("-photodissociation-factor","-photo_dissociation_factor","-photo-dissociation-factor")
+        i_arg = i_arg + 1
+        lphoto_dissociation=.true.
+        call get_command_argument(i_arg,s)
+        i_arg= i_arg+1
+        read(s,*,iostat=ios) photodissociation_factor
      case("-photodesorption","-photo_desorption","-photo-desorption")
         i_arg = i_arg + 1
         lphoto_desorption=.true.
@@ -1474,6 +1483,10 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         read(pluto_id,*,iostat=ios) i
         if (ios/=0) call error("pluto dump number needed")
+     case("-header_only")
+        i_arg = i_arg + 1
+        lheader_only = .true.
+        lstop_after_init = .true.
      case("-old_PA")
         i_arg = i_arg + 1
         lold_PA = .true.
@@ -1494,6 +1507,9 @@ subroutine initialisation_mcfost()
      case("-ignore_sink")
         i_arg = i_arg + 1
         lignore_sink=.true.
+     case("-write_abundance")
+        i_arg = i_arg + 1
+        lwrite_abundance=.true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -2025,6 +2041,7 @@ subroutine display_help()
   write(*,*) "        : -freeze-out <T>"
   write(*,*) "        : -freeze-out_depletion <relative depletion> between 0 and 1"
   write(*,*) "        : -photo-dissociation"
+  write(*,*) "        : -photo-dissociation-factor <factor> : factor aplied to CD at which photo-dissociation happens"
   write(*,*) "        : -photo-desorption"
   write(*,*) "        : -prodimo"
   write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo"
@@ -2086,6 +2103,7 @@ subroutine display_help()
   write(*,*) "        : -force_Mgas : force the gas mass to be the value given the mcfost parameter file"
   write(*,*) "        : -not_random_Voronoi : force the particle order to remain the same"
   write(*,*) "        : -ignore_sink : forces nptmass to 0, ie not stars in mcfost"
+  write(*,*) "        : -header_only : only read the data and print some basic information"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

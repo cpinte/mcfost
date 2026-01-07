@@ -31,9 +31,9 @@ jobs:
           - os: linux
             os-version: ubuntu-22.04
           - os: macos-intel
-            os-version: macos-12
+            os-version: macos-15-intel
           - os: macos-arm
-            os-version: macos-14
+            os-version: macos-15
 
           # macos needs null container to avoid loading docker; set linux containers as desired
           - container: null
@@ -44,6 +44,8 @@ jobs:
         exclude:
           - os: macos-arm
             compiler: ifort
+          - os: macos-intel
+            compiler: ifort # not compiling on macos13 for now
 
     name: build+test (${{ matrix.os }}, ${{ matrix.compiler }}, openmp=${{ matrix.openmp }}, release=${{ matrix.release }})
     runs-on: ${{ matrix.os-version }}
@@ -85,8 +87,8 @@ jobs:
     needs: build-and-test
     strategy:
       matrix:
-        compiler: [gfortran, ifort]
-    runs-on: macos-12
+        compiler: [gfortran]
+    runs-on: macos-15-intel
     env:
       SYSTEM: ${{ matrix.compiler }}
       HDF5_DIR: /usr/local
@@ -120,9 +122,9 @@ jobs:
           - os: linux
             os-version: ubuntu-22.04
           - os: macos-intel
-            os-version: macos-12
+            os-version: macos-15-intel
           - os: macos-arm
-            os-version: macos-14
+            os-version: macos-15
 
     runs-on: ${{ matrix.os-version }}
     if: ${{ github.event_name == 'release' }}
@@ -133,7 +135,7 @@ jobs:
       - name: restore binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: mcfost-binary-${{ matrix.os }}-${{ matrix.os == 'macos-arm'  && 'gfortran' || 'ifort' }} # use ifort for binary release
+          name: mcfost-binary-${{ matrix.os }}-${{ matrix.os == 'linux'  && 'ifort' || 'gfortran' }} # use ifort for binary release
           path: src/
 
       - name: simple check to make sure the binary runs in a clean environment

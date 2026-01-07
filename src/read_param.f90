@@ -444,12 +444,17 @@ contains
     read(1,*) lpop, lprecise_pop, lmol_LTE
     largeur_profile = 15.
     read(1,*) vitesse_turb, v_turb_unit
-    if (v_turb_unit(1:2) == "km") then
-       vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
-    else if (trim(v_turb_unit) == "cs") then
-       call error("Turbulence velocity as a fraction of sound speed not implemented yet")
+    if (trim(v_turb_unit) == "cs") then
+       lvturb_in_cs = .true.
     else
-       call error("Turbulence velocity unit not recognised")
+       lvturb_in_cs = .false.
+       if (v_turb_unit(1:1) /= "m") then
+          if (v_turb_unit(1:2) == "km") then
+             vitesse_turb = vitesse_turb * km_to_m ! Conversion en m.s-1
+          else
+             call error("Turbulence velocity unit not recognised")
+          endif
+       endif
     endif
 
     read(1,*) n_molecules
@@ -4553,7 +4558,7 @@ end subroutine read_para215
 
     character(len=*), intent(in) :: para
 
-    integer :: i, j, alloc_status, ios, tmpint, ind_pop, status, imol
+    integer :: i, j, alloc_status, ios, ind_pop, status, imol
 
     real(kind=dp) :: size_neb_tmp, somme
     real :: gas_dust

@@ -130,10 +130,11 @@ pushd .
 
 #-- Downloading libraries
 wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
-wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.3.0.tar.gz
+#wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.3.0.tar.gz
+wget  -O cfitsio-4.3.0.tar.gz --no-check-certificate  "https://drive.usercontent.google.com/download?export=download&id=1qIz6nr1sv40FjvVooiYIuCpnJoDyUGTg&confirm=t" # temporary due to issues on heasarc
 git clone https://github.com/cpinte/voro
 if [ "$SKIP_HDF5" != "yes" ]; then
-    wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
+    wget -N https://support.hdfgroup.org/releases/hdf5/v1_14/v1_14_6/downloads/hdf5-1.14.6.tar.gz
 fi
 if [ "$MCFOST_XGBOOST" = "yes" ]; then
     git clone --recursive https://github.com/dmlc/xgboost
@@ -282,10 +283,9 @@ fi
 # HDF5
 #---------------------------------------------
 if [ "$SKIP_HDF5" != "yes" ]; then
-    wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
     echo "Compiling HDF5 ..."
-    tar xjvf hdf5-1.10.5.tar.bz2
-    cd hdf5-1.10.5
+    tar xzvf hdf5-1.14.6.tar.gz
+    cd hdf5-1.14.6
     mkdir -p "$HOME/hdf5_install_tmp"
     ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
     make install

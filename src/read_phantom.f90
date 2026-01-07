@@ -46,7 +46,7 @@ contains
     real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu,nucleation
     type(dump_h) :: hdr
     logical :: got_h,got_dustfrac,got_itype,tagged,matched
-    logical :: got_temperature,got_u,lpotential,do_nucleation
+    logical :: got_temperature,got_u,lpotential
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
     ! We first read the number of particules in each phantom file
@@ -765,7 +765,7 @@ contains
   !*************************************************************************
 
   subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,ldust_moments,n_files,dustfluidtype,xyzh, &
-       vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
+       vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass_in,vxyz_ptmass_in,hfact,umass, &
        utime, ulength,graindens,ndudt,dudt,ifiles, &
        n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
        SPH_grainsizes, massgas,massdust, rhogas,rhodust,dust_moments,extra_heating,ieos)
@@ -792,7 +792,7 @@ contains
     real(dp), dimension(ndusttypes),    intent(in) :: graindens
     real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
     real(dp), intent(in) :: hfact,umass,utime,ulength
-    real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
+    real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass_in, vxyz_ptmass_in
     real(dp), dimension(:,:), intent(inout), allocatable :: nucleation
     real(dp), dimension(:), intent(in) :: gastemperature
     integer, intent(in) :: ndudt
@@ -806,12 +806,12 @@ contains
     real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
     real, dimension(:), allocatable, intent(out) :: extra_heating
 
-
     type(star_type), dimension(:), allocatable :: etoile_old
-    integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile
+    integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile,n_skip,nsinkproperties
     real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
     real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
     real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
+    real(dp), allocatable :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
 
     logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
     logical :: lupdate_photosphere
@@ -993,25 +993,40 @@ contains
        ldudt_implicit = .false.
     endif
 
+    allocate(xyzmh_ptmass,source=xyzmh_ptmass_in)
+    allocate(vxyz_ptmass,source=vxyz_ptmass_in)
+    nsinkproperties = size(xyzmh_ptmass_in,dim=1)
     n_etoiles_old = n_etoiles
     if (lignore_sink) then
        n_etoiles = 0
     else
        write(*,*) "# Stars/planets:"
        n_etoiles = 0
+       n_skip    = 0
        do i=1,nptmass
-          n_etoiles = n_etoiles + 1
-          if (real(xyzmh_ptmass(4,i)) * scale_mass_units_factor > 0.013) then
-             write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
-                  real(xyzmh_ptmass(4,i) * usolarmass), "Msun, Mdot=", &
-                  real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+          if (xyzmh_ptmass_in(4,i) < 0.) then
+             n_skip = n_skip + 1
           else
-             write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
-                  real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * usolarmass), "Mjup, Mdot=", &
-                  real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+             n_etoiles = n_etoiles + 1
+             if (n_etoiles /= i) then
+                ! Move live particle to front of array
+                xyzmh_ptmass(:,n_etoiles) = xyzmh_ptmass_in(:,i)
+                vxyz_ptmass(:,n_etoiles)  = vxyz_ptmass_in(:,i)
+             endif
+             if (real(xyzmh_ptmass_in(4,i)) * usolarmass > 0.013) then
+                write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass_in(1:3,i) * ulength_au), "au, M=", &
+                      real(xyzmh_ptmass_in(4,i) * usolarmass), "Msun, Mdot=", &
+                      real(xyzmh_ptmass_in(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+             else
+                write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass_in(1:3,i) * ulength_au), "au, M=", &
+                      real(xyzmh_ptmass_in(4,i) * GxMsun/GxMjup * usolarmass), "Mjup, Mdot=", &
+                      real(xyzmh_ptmass_in(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+             endif
+             if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass_in(1:3,i) - xyzmh_ptmass_in(1:3,1))*ulength_au), "au"
           endif
-          if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))*ulength_au), "au"
        enddo
+       if (n_skip > 0) write(*,*) "Skipped ", n_skip," dead sink particles..."
+       if (n_etoiles_old == 0) n_etoiles_old = n_etoiles
     endif
 
     if (lupdate_velocities) then
@@ -1132,15 +1147,15 @@ contains
        deallocate(etoile_old)
 
        if (n_etoiles > 0) then
-          etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
-          etoile(:)%y = xyzmh_ptmass(2,:) * ulength_au
-          etoile(:)%z = xyzmh_ptmass(3,:) * ulength_au
-
-          etoile(:)%vx = vxyz_ptmass(1,:) * uvelocity
-          etoile(:)%vy = vxyz_ptmass(2,:) * uvelocity
-          etoile(:)%vz = vxyz_ptmass(3,:) * uvelocity
-
-          etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
+         do i=1,n_etoiles
+             etoile(i)%x = xyzmh_ptmass(1,i) * ulength_au
+             etoile(i)%y = xyzmh_ptmass(2,i) * ulength_au
+             etoile(i)%z = xyzmh_ptmass(3,i) * ulength_au
+             etoile(i)%vx = vxyz_ptmass(1,i) * uvelocity
+             etoile(i)%vy = vxyz_ptmass(2,i) * uvelocity
+             etoile(i)%vz = vxyz_ptmass(3,i) * uvelocity
+             etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
+         enddo
 
           do i=1, n_etoiles
              if (.not.etoile(i)%force_Mdot) then
@@ -1193,6 +1208,11 @@ contains
           endif
        endif
     endif
+
+    if (lheader_only) stop
+
+    if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
+    if (allocated(vxyz_ptmass)) deallocate(vxyz_ptmass)
 
     return
 
