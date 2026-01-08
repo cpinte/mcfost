@@ -91,9 +91,9 @@ elif [ "$SYSTEM" = "ifx" ]; then
     export CFLAGS="-std=gnu90"
 elif [ "$SYSTEM" = "gfortran" ]; then
     echo "Building MCFOST's libraries with gfortran"
-    export CC=gcc-12
+    export CC=gcc
     export FC=gfortran
-    export CXX=g++-12
+    export CXX=g++
     export CFLAGS="-m64"
 else
     echo "Unknown system to build MCFOST: $SYSTEM"

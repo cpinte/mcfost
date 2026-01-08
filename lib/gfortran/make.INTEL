@@ -3,7 +3,7 @@ ARFLAGS = cr
 #If your system does not have ranlib, then replace next statement with
 #RANLIB = echo
 RANLIB = ranlib
-CC = gcc-12
+CC = gcc
 CLD = $(CC)
 # Set f77 to echo if you do not have a FORTRAN compiler
 F77 = gfortran
