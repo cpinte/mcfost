@@ -1746,8 +1746,9 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
      ! le d signifie real*8
      dust_dens(:,:) = 0.0
      do icell=1,n_cells
-        dust_dens(icell,:) = dust_density(:,icell) * nbre_grains(:) * m3_to_cm3  ! Todo : inverting dimensions is not a good idea
+        dust_dens(icell,:) = dust_density(:,icell) * nbre_grains(:) * m3_to_cm3 ! dust_density dim1 is either 1 or n_grains_tot
      enddo !icell
+
      call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
 
      !  Close the file and free the unit number.
@@ -1808,7 +1809,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   ! le d signifie real*8
   dens(:) = 0.0
   do icell=1,n_cells
-     dens(icell) = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:)) ! M_grain en g
+     dens(icell) = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:)) ! M_grain en g, dust_density dim1 is either 1 or n_grains_tot
   enddo
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
@@ -2925,35 +2926,39 @@ subroutine taille_moyenne_grains()
 
   real(kind=dp) :: somme
   integer :: l, icell
-  real, dimension(n_cells) :: a_moyen
+  real, dimension(:), allocatable :: a_moyen
 
-  integer :: status,unit,blocksize,bitpix,naxis
+  integer :: nc,status,unit,blocksize,bitpix,naxis
   integer, dimension(4) :: naxes
   integer :: group,fpixel,nelements
 
   logical :: simple, extend
   character(len=512) :: filename
 
-
   write(*,*) "Writing average_grain_size.fits.gz"
 
+  if (lvariable_dust) then
+     nc = n_cells
+  else ! we only need to do the calculation in 1 cell
+     nc = 1
+  endif
+  allocate(a_moyen(nc))
   a_moyen(:) = 0.
 
-  do icell=1, n_cells
+  do icell=1, nc
      somme=0.0
      do l=1, n_grains_tot
         a_moyen(icell) = a_moyen(icell) + dust_density(l,icell) * nbre_grains(l) * r_grain(l)**2
         somme = somme + dust_density(l,icell)  * nbre_grains(l)
      enddo
-     a_moyen(icell) = a_moyen(icell) / somme
+     a_moyen(icell) = sqrt(a_moyen(icell) / somme)
   enddo
-  a_moyen = sqrt(a_moyen)
 
   filename = "average_grain_size.fits.gz"
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   status=0
-  call ftgiou (unit,status)
+  call ftgiou(unit,status)
 
   !  Create the new empty FITS file.
   blocksize=1
@@ -2966,7 +2971,7 @@ subroutine taille_moyenne_grains()
   extend=.true.
 
   naxis=1
-  naxes(1)=n_cells
+  naxes(1)=nc
 
   !  Write the required header keywords.
   call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)

@@ -10,6 +10,7 @@ module input
   use messages
   use wavelengths
   use temperature
+  use density, only : dust_density
 
   implicit none
 

@@ -1,4 +1,4 @@
-module read1d_models
+module read_1d_models
 !
 ! Interface with stellar atmosphere models such as MARCS, Kurucz, CMFGEN and MULTI.
 ! The input file is in a format which is common to all of these codes (that have very different formatting).
@@ -256,10 +256,10 @@ module read1d_models
 		if (ldust_atom) then
 			dust_dens_max = 0d0; dust_dens_min = 1d30
 			do icell=1, n_cells
-				rho_d = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:))
-				if (rho_d<=0.0) cycle
+                                rho_d = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:)) ! dust_density dim1 is either 1 or n_grains_tot
+                                if (rho_d<=0.0) cycle
 				dust_dens_min = min(dust_dens_min,rho_d)
-				dust_dens_max = max(dust_dens_max,rho_d)
+                                dust_dens_max = max(dust_dens_max,rho_d)
 			enddo
 			write(*,*) "Maximum/minimum dust total density in the model [kg m^-3]:"
 			write(*,*) 1d3*dust_dens_max, 1d3*dust_dens_min
@@ -300,4 +300,4 @@ module read1d_models
 		return
 	end subroutine check_for_coronal_illumination
 
-end module read1d_models
+end module read_1d_models

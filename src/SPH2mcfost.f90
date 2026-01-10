@@ -556,9 +556,9 @@ contains
 
        do icell=1,n_cells
           masse(icell) = 0.
+          dust_density(1,icell) = densite_gaz(icell)
           do k=1,n_grains_tot
-             dust_density(k,icell) = densite_gaz(icell)
-             masse(icell) = masse(icell) + dust_density(k,icell) * nbre_grains(k) * M_grain(k) * volume(icell)
+             masse(icell) = masse(icell) + dust_density(1,icell) * nbre_grains(k) * M_grain(k) * volume(icell)
           enddo
        enddo
        masse(:) = masse(:) * AU3_to_cm3

@@ -813,14 +813,16 @@ subroutine calc_Jth(lambda)
   ! 25/09/08
 
   integer, intent(in) :: lambda
-  integer :: l, T, icell, p_icell
+
   real(kind=dp) ::  Temp, cst_wl, wl, coeff_exp, cst_E
+  integer, target :: l, l0
+  integer :: T, icell, p_icell
+  integer, pointer :: p_l
 
   ! longueur d'onde en metre
   wl = tab_lambda(lambda)*1.e-6
 
   J_th(:) = 0.0
-
 
   ! Intensite specifique emission thermique
   if ((l_em_disk_image).or.(lsed)) then
@@ -848,6 +850,13 @@ subroutine calc_Jth(lambda)
         !$omp end parallel
      endif !lRE_LTE
 
+     if (lvariable_dust) then
+        p_l => l
+     else
+        l0 = 1
+        p_l => l0
+     endif
+
      if (lRE_nLTE) then
         cst_E=2.0*hp*c_light**2
         do icell=1,n_cells
@@ -857,7 +866,7 @@ subroutine calc_Jth(lambda)
                  cst_wl=cst_th/(Temp*wl)
                  coeff_exp=exp(cst_wl)
                  J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                      C_abs_norm(l,lambda) * dust_density(l,icell) * nbre_grains(l)
+                      C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
               endif
            enddo ! l
         enddo ! icell
@@ -872,21 +881,22 @@ subroutine calc_Jth(lambda)
                     cst_wl=cst_th/(Temp*wl)
                     coeff_exp=exp(cst_wl)
                     J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                         C_abs_norm(l,lambda) * dust_density(l,icell) * nbre_grains(l)
+                         C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
                  endif !cst_wl
-              else ! ! la grain a une proba de T
+              else ! ! la grain a une proba de T  ---> todo: we can compute BB outside of loop
                  do T=1,n_T
                     temp=tab_Temp(T)
                     if (Temp*wl > 3.e-4) then
                        cst_wl=cst_th/(Temp*wl)
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(l,lambda) * dust_density(l,icell) * nbre_grains(l) * Proba_Tdust(T,l,icell)
+                            C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l) * Proba_Tdust(T,l,icell)
                     endif !cst_wl
                  enddo ! T
               endif ! l_RE
            enddo ! l
         enddo ! icell
+
      endif !lnRE
 
   endif ! lsed or lemission_disk
