@@ -1036,8 +1036,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   real :: mu, g, g2
 
   integer :: icell, l
-  integer, target :: k, k1
-  integer, pointer :: p_K
+  integer :: k, p_k
   logical :: ldens0
 
   fact = AU_to_cm * mum_to_cm**2
@@ -1063,14 +1062,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells,fact,lvariable_dust,nbre_grains) &
   !$omp shared(C_ext,C_sca,dust_density,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
   !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,lphase_function_file,s11_file,loverwrite_s12,Pmax) &
-  !$omp private(icell,k,k1,p_k,density,norme,theta,k_sca_tot,mu,g,g2,d1)
-
-  if (lvariable_dust) then
-     p_k => k
-  else
-     k1 = 1
-     p_k => k1
-  endif
+  !$omp private(icell,k,p_k,density,norme,theta,k_sca_tot,mu,g,g2,d1)
 
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells
@@ -1086,6 +1078,8 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
      endif
 
      do  k=1,n_grains_tot
+        ! Use integer index instead of pointer to avoid ifort OpenMP issues
+        p_k = merge(k, 1, lvariable_dust)
         density=dust_density(p_k,icell) * nbre_grains(k)
         if (aniso_method==1) then
            ! Moyennage matrice de mueller (long en cpu ) (le dernier indice est l'angle)
