@@ -39,14 +39,14 @@ contains
     integer, allocatable, dimension(:) :: npartoftype
     real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
     real(dp) :: hfact,umass,utime,ulength,gmw,x2
-    integer(kind=1), allocatable, dimension(:) :: itype,ifiles
+    integer(kind=1), allocatable, dimension(:) :: itype,ifiles,apr_level
     real(4),  allocatable, dimension(:) :: tmp
     real(dp), allocatable, dimension(:) :: grainsize,graindens
     real(dp), allocatable, dimension(:) :: dudt,tmp_dp,gastemperature
     real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu,nucleation
     type(dump_h) :: hdr
     logical :: got_h,got_dustfrac,got_itype,tagged,matched
-    logical :: got_temperature,got_u,lpotential
+    logical :: got_temperature,got_u,lpotential,got_apr
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
     ! We first read the number of particules in each phantom file
@@ -110,7 +110,7 @@ contains
        write(*,*) "---- Done"
     enddo ! ifile
 
-    allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot),gastemperature(np_tot))
+    allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot),gastemperature(np_tot),apr_level(np_tot))
     allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
     allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
     if (ldust_moments) allocate(nucleation(n_nucleation,np_tot))
@@ -222,6 +222,7 @@ contains
        got_itype = .false.
        got_temperature = .false.
        got_u = .false.
+       got_apr = .false.
        ! skip each block that is too small
        nblockarrays = narraylengths*nblocks
 
@@ -313,6 +314,10 @@ contains
                             got_itype = .true.
                             read(iunit,iostat=ierr) itype(np0+1:np0+np)
                             itype(np0+1:np0+np) = itype(np0+1:np0+np) + ntypes0 ! shifting types for succesive files
+                         case('apr_level')
+                            matched = .true.
+                            got_apr = .true.
+                            read(iunit,iostat=ierr) apr_level(np0+1:np0+np)
                          case default
                             read(iunit,iostat=ierr)
                          end select
@@ -370,6 +375,9 @@ contains
              enddo
           enddo
        enddo ! block
+
+       ! for backwards compatibility with pre-apr files
+       if (.not.got_apr) apr_level(:) = int(1,kind=1)
 
        if (lpotential) then
           call extract('x2',xyzmh_ptmass(1,nptmass_found+1),hdr,ierr)
@@ -433,7 +441,7 @@ contains
             vxyzu,gastemperature,itype,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass,vxyz_ptmass,&
             hfact,umass,utime,ulength,graindens,ndudt,dudt,ifiles, &
             n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
-            SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos)
+            SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
        write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
     else
        n_SPH = 0
@@ -441,7 +449,7 @@ contains
     endif
 
     write(*,*) "Phantom dump file processed ok"
-    deallocate(xyzh,itype,vxyzu)
+    deallocate(xyzh,itype,vxyzu,apr_level)
     if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass,vxyz_ptmass)
 
   end subroutine read_phantom_bin_files
@@ -476,7 +484,7 @@ contains
 
     character(len=200) :: filename
 
-    logical :: got_dustfrac,got_itype
+    logical :: got_dustfrac,got_itype,got_apr
 
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max
     integer :: np,ntypes,nptmass,dustfluidtype,ndudt
@@ -485,7 +493,7 @@ contains
     integer, parameter :: maxtypes = 100
     integer, parameter :: nsinkproperties = 17
 
-    integer(kind=1), allocatable, dimension(:) :: itype, ifiles
+    integer(kind=1), allocatable, dimension(:) :: itype, ifiles, apr_level
     real(4),  allocatable, dimension(:)   :: tmp, tmp_header
     real(dp), allocatable, dimension(:)   :: dudt, tmp_dp,gastemperature
     real(dp), allocatable, dimension(:)   :: grainsize, graindens
@@ -558,7 +566,8 @@ contains
          dudt(np_tot),                          &
          ifiles(np_tot),                        &
          massoftype(n_files,ntypes_max),        &
-         npartoftype(ntypes_tot))
+         npartoftype(ntypes_tot),               &
+         apr_level(np_tot))
 
     ! Read file data
     np0 = 0
@@ -626,6 +635,7 @@ contains
 
        got_dustfrac = .false.
        got_itype = .false.
+       got_apr = .false.
        ndudt = 0
 
        ! TODO: read particle arrays
@@ -636,8 +646,13 @@ contains
        call read_from_hdf5(vxyzu(1:3,np0+1:np0+np),'vxyz',hdf5_group_id,got,ierr)
        call read_from_hdf5(dustfrac(1:ndusttypes,np0+1:np0+np),'dustfrac',hdf5_group_id,got,ierr)
        if (got) got_dustfrac = .true.
+       call read_from_hdf5(apr_level(np0+1:np0+np),'apr_level',hdf5_group_id,got,ierr)
+       if (got) got_apr = .true.
 
        if (ierr /= 0) call error("cannot read Phantom HDF particles group in "//trim(filename))
+
+       ! for backwards compatibilty with pre-apr files
+       if (.not.got_apr) apr_level(:) = int(1,kind=1)
 
        ! close the particles group
        call close_hdf5group(hdf5_group_id,ierr)
@@ -702,13 +717,13 @@ contains
          massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
          utime,ulength,graindens,ndudt,dudt,ifiles,   &
          n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id,SPH_grainsizes,     &
-         massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos)
+         massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
 
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
 
     write(*,*) "Phantom dump file processed ok"
     ierr = 0
-    deallocate(xyzh,itype,vxyzu)
+    deallocate(xyzh,itype,vxyzu,apr_level)
     if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass,vxyz_ptmass)
 
   end subroutine read_phantom_hdf_files
@@ -768,7 +783,7 @@ contains
        vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass_in,vxyz_ptmass_in,hfact,umass, &
        utime, ulength,graindens,ndudt,dudt,ifiles, &
        n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
-       SPH_grainsizes, massgas,massdust, rhogas,rhodust,dust_moments,extra_heating,ieos)
+       SPH_grainsizes, massgas,massdust, rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
 
     ! Convert phantom quantities & units to mcfost quantities & units
     !
@@ -786,7 +801,7 @@ contains
     integer, intent(in) :: np,nptmass,ntypes,ndusttypes, n_files,dustfluidtype
     logical, intent(in) :: ldust_moments
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
-    integer(kind=1), dimension(np), intent(in) :: iphase, ifiles
+    integer(kind=1), dimension(np), intent(in) :: iphase, ifiles, apr_level
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
     real(dp), dimension(ndusttypes),    intent(in) :: graindens
@@ -808,7 +823,7 @@ contains
 
     type(star_type), dimension(:), allocatable :: etoile_old
     integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile,n_skip,nsinkproperties
-    real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
+    real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi,pmassi
     real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
     real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
     real(dp), allocatable :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
@@ -910,6 +925,12 @@ contains
 
        itypei = abs(iphase(i))
        if (hi > 0.) then
+          ! calculate particle mass
+          pmassi = massoftype(ifile,itypei)
+         
+          ! rescale by apr - if there's no apr this does nothing
+          pmassi = pmassi / (2.**(apr_level(i) - 1))
+          
           if (use_dust_particles .and. dustfluidtype==2 .and. ndusttypes==1 .and. itypei==2) then
              j = j + 1
              particle_id(j) = i
@@ -922,11 +943,13 @@ contains
                 vy(j) = vyi * uvelocity
                 vz(j) = vzi * uvelocity
              endif
+             
              T_gas(j) = T_gasi
-             rhodusti = massoftype(ifile,itypei) * (hfact/hi)**3  * udens ! g/cm**3
+
+             rhodusti = pmassi * (hfact/hi)**3  * udens ! g/cm**3
              gasfraci = dustfrac(1,i)
              rhodust(1,j) = rhodusti
-             massdust(1,j) = massoftype(ifile,itypei) * usolarmass ! Msun
+             massdust(1,j) = pmassi * usolarmass ! Msun
              rhogas(j) = gasfraci*rhodusti
              massgas(j) = gasfraci*massdust(1,j)
           elseif (.not. use_dust_particles .and. itypei==1) then
@@ -945,14 +968,15 @@ contains
              if (ldust_moments) dust_moments(:,j) = nucleation(1:4,i) ! indexing is different from phantom as I read starting at k0
 
              T_gas(j) = T_gasi
-             rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
+
+             rhogasi = pmassi *(hfact/hi)**3  * udens ! g/cm**3
              dustfraci = sum(dustfrac(:,i))
              if (dustfluidtype==1) then
                 rhogas(j) = rhogasi
              else
                 rhogas(j) = (1 - dustfraci)*rhogasi
              endif
-             massgas(j) =  massoftype(ifile,itypei) * usolarmass ! Msun
+             massgas(j) =  pmassi * usolarmass ! Msun
              do k=1,ndusttypes
                 rhodust(k,j) = dustfrac(k,i)*rhogasi
                 massdust(k,j) = dustfrac(k,i)*massgas(j)
