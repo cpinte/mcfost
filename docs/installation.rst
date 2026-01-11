@@ -1,24 +1,21 @@
 Requirements and Installation
 =============================
 
-MCFOST is written in Fortran 90 (with a few functions in C++) and parallelized with the Open MP
-protocol, i.e. it can use several processors and/or cores on a single
-machine. For simplicity, we provide pre-compiled binaries which are statically linked and do not
-have any dependencies. Source code is available on github and acces can also be provided if needed.
+MCFOST is written in Fortran 90 (with a few functions in C++) and parallelized with the Open MP protocol, i.e. it can use several processors and/or cores on a single machine. For simplicity, we provide pre-compiled binaries which are statically linked.
 
 The following environment is required for the binaries:
 
 -  a 64-bits Unix system, including Linux or MacOS X,
 -  any data analysis software capable of handling FITS files.
 
+All the required libraries are statically linked, so no additional installation are required. MCFOST only requires basic unix tools when it makes system calls (e.g. wc, grep, sha1sum or openssl, date, curl).
 
 
 Binary Installation Procedure
 -----------------------------
 
-Unless you need to dig into the source, this is the recommended installation
-procedure. The binaries have been compiled with the Intel compiler and should
-be optmized for most architectures. The binary also updates itself regularly (unless this options is truened off) making sure you have an up-to-date version.
+Unless you need to dig into the source or need an optimised version for your architecture, this is the recommended installation procedure. The binaries have been compiled with the Intel compiler for linux and intel-based macs and with gfortran for apple silicon and should be optmized for most architectures. The binary also updates itself regularly (unless this option is truened off) making sure the user always has an up-to-date version.
+
 
 1. Download the tar ball with the pre-compiled binary:
 
@@ -131,9 +128,9 @@ https://github.com/cpinte/mcfost
   If you encounter such compilation errors, consider manually fixing the versions of the related packages. For example, for anaconda users, try running::
 
     $ conda create -n mcfost_make make cfitsio=4.3.0 hdf5 gcc=13.3.0 gxx=13.3.0 gfortran=13.3.0 autoconf zlib libgcc=13.3.0 libgfortran=13.3.0 conda-gcc-specs
-    
+
     $ conda activate mcfost_make
-  
+
   before continuing.
 
 4. If you wish to compile mcfost with the chemistry emulator, you also need to set::
