@@ -955,93 +955,49 @@ subroutine Temp_finale_nLTE()
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
-     if (lvariable_dust) then
-        do k=grain_RE_nLTE_start, grain_RE_nLTE_end
-           if (dust_density(k,icell) > tiny_dp) then
-              J_absorbe=0.0
-              do lambda=1, n_lambda
-                 J_absorbe =  J_absorbe + C_abs_norm(k,lambda)  * (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
-              enddo ! lambda
+     do k=grain_RE_nLTE_start, grain_RE_nLTE_end
+        p_k = merge(k,1,lvariable_dust)
+        if (dust_density(p_k,icell) > tiny_dp) then
+           J_absorbe=0.0
+           do lambda=1, n_lambda
+              J_absorbe =  J_absorbe + C_abs_norm(k,lambda)  * (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
+           enddo ! lambda
 
-              ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans E_em_1grain
-              J_absorbe = J_absorbe*L_packet_th/volume(icell)
-              if (J_absorbe < tiny_dp) then
-                 Tdust_1grain(k,icell) = T_min
-              else
-                 log_E_abs=log(J_absorbe)
-
-                 if (log_E_abs <  log_E_em_1grain(k,1)) then
-                    Tdust_1grain(k,icell) = T_min
-                 else
-                    ! Temperature echantillonee juste sup. a la temperature de la cellule
-                    T_int=maxval(xT_ech_1grain(k,icell,:))
-
-                    ! On incremente eventuellement la zone de temperature
-                    do while((log_E_em_1grain(k,T_int) < log_E_abs).and.(T_int < n_T))
-                       T_int=T_int+1
-                    enddo  ! LIMITE MAX
-
-                    ! Interpolation lineaire entre energies emises pour des
-                    ! temperatures echantillonees voisines
-                    T2=T_int
-                    Temp2=tab_Temp(T2)
-                    T1=T_int-1
-                    Temp1=tab_Temp(T1)
-                    frac=(log_E_abs-log_E_em_1grain(k,T1))/(log_E_em_1grain(k,T2)-log_E_em_1grain(k,T1))
-                    Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
-
-                    ! Save
-                    Tdust_1grain(k,icell)=Temp
-                 endif
-              endif
+           ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans E_em_1grain
+           J_absorbe = J_absorbe*L_packet_th/volume(icell)
+           if (J_absorbe < tiny_dp) then
+              Tdust_1grain(k,icell) = T_min
            else
-              Tdust_1grain(k,icell)=0.0
-           endif
-        enddo !k
-     else
-        if (dust_density(1,icell) > tiny_dp) then
-           do k=grain_RE_nLTE_start, grain_RE_nLTE_end
-              J_absorbe=0.0
-              do lambda=1, n_lambda
-                 J_absorbe =  J_absorbe + C_abs_norm(k,lambda)  * (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
-              enddo ! lambda
+              log_E_abs=log(J_absorbe)
 
-              ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans E_em_1grain
-              J_absorbe = J_absorbe*L_packet_th/volume(icell)
-              if (J_absorbe < tiny_dp) then
+              if (log_E_abs <  log_E_em_1grain(k,1)) then
                  Tdust_1grain(k,icell) = T_min
               else
-                 log_E_abs=log(J_absorbe)
+                 ! Temperature echantillonee juste sup. a la temperature de la cellule
+                 T_int=maxval(xT_ech_1grain(k,icell,:))
 
-                 if (log_E_abs <  log_E_em_1grain(k,1)) then
-                    Tdust_1grain(k,icell) = T_min
-                 else
-                    ! Temperature echantillonee juste sup. a la temperature de la cellule
-                    T_int=maxval(xT_ech_1grain(k,icell,:))
+                 ! On incremente eventuellement la zone de temperature
+                 do while((log_E_em_1grain(k,T_int) < log_E_abs).and.(T_int < n_T))
+                    T_int=T_int+1
+                 enddo
 
-                    ! On incremente eventuellement la zone de temperature
-                    do while((log_E_em_1grain(k,T_int) < log_E_abs).and.(T_int < n_T))
-                       T_int=T_int+1
-                    enddo  ! LIMITE MAX
+                 ! Interpolation lineaire entre energies emises pour des
+                 ! temperatures echantillonees voisines
+                 T2=T_int
+                 Temp2=tab_Temp(T2)
+                 T1=T_int-1
+                 Temp1=tab_Temp(T1)
+                 frac=(log_E_abs-log_E_em_1grain(k,T1))/(log_E_em_1grain(k,T2)-log_E_em_1grain(k,T1))
+                 Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
 
-                    ! Interpolation lineaire entre energies emises pour des
-                    ! temperatures echantillonees voisines
-                    T2=T_int
-                    Temp2=tab_Temp(T2)
-                    T1=T_int-1
-                    Temp1=tab_Temp(T1)
-                    frac=(log_E_abs-log_E_em_1grain(k,T1))/(log_E_em_1grain(k,T2)-log_E_em_1grain(k,T1))
-                    Temp=exp(log(Temp2)*frac+log(Temp1)*(1.0-frac))
-
-                    ! Save
-                    Tdust_1grain(k,icell)=Temp
-                 endif
+                 ! Save
+                 Tdust_1grain(k,icell)=Temp
               endif
-           enddo !k
+           endif
         else
-           Tdust_1grain(grain_RE_nLTE_start:grain_RE_nLTE_end,icell)=0.0
+           Tdust_1grain(k,icell)=0.0
         endif
-     endif
+     enddo !k
   enddo !icell
   !$omp enddo
   !$omp end parallel
@@ -1580,7 +1536,7 @@ subroutine update_proba_abs_nRE()
   ! --> donne k_RE = k_LTE_p_nLTE + k_qRE
   ! puis P_LTE = P_LTE_old * k_RE_old / k_RE_new et P_abs_RE = k_RE_new / k_RE_old * P_abs_RE_old
 
-  real(kind=dp) :: correct, correct_m1,  kappa_abs_RE_new,  kappa_abs_RE_old, delta_kappa_abs_qRE, d1
+  real(kind=dp) :: correct, correct_m1,  kappa_abs_RE_new,  kappa_abs_RE_old, delta_kappa_abs_qRE
   integer :: l, lambda, icell, p_l
   logical :: lall_grains_eq
 
@@ -1590,24 +1546,14 @@ subroutine update_proba_abs_nRE()
      do icell=1,n_cells
         delta_kappa_abs_qRE = 0.0_dp
         lall_grains_eq = .true.
-        if (lvariable_dust) then
-           do l=grain_nRE_start,grain_nRE_end
-              if (lchange_nRE(l,icell)) then ! 1 grain a change de status a cette iteration
-                 delta_kappa_abs_qRE =  C_abs_norm(l,lambda) * dust_density(l,icell) * nbre_grains(l)
-              else
-                 if (.not.l_RE(l,icell)) lall_grains_eq = .false. ! il reste des grains qui ne sont pas a l'equilibre
-              endif
-           enddo !l
-        else
-           d1 = dust_density(1,icell)
-           do l=grain_nRE_start,grain_nRE_end
-              if (lchange_nRE(l,icell)) then ! 1 grain a change de status a cette iteration
-                 delta_kappa_abs_qRE =  C_abs_norm(l,lambda) * d1 * nbre_grains(l)
-              else
-                 if (.not.l_RE(l,icell)) lall_grains_eq = .false. ! il reste des grains qui ne sont pas a l'equilibre
-              endif
-           enddo !l
-        endif
+        do l=grain_nRE_start,grain_nRE_end
+           p_l = merge(l,1,lvariable_dust)
+           if (lchange_nRE(l,icell)) then ! 1 grain a change de status a cette iteration
+              delta_kappa_abs_qRE =  C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+           else
+              if (.not.l_RE(l,icell)) lall_grains_eq = .false. ! il reste des grains qui ne sont pas a l'equilibre
+           endif
+        enddo !l
 
         if (delta_kappa_abs_qRE > tiny_dp) then ! au moins 1 grain a change de status, on met a jour les differentes probabilites
            kappa_abs_RE_old = kappa_abs_RE(icell,lambda)
@@ -1659,8 +1605,8 @@ subroutine emission_nRE()
   implicit none
 
   integer :: k, T, lambda, icell, p_k
-  real(kind=dp) :: Temp, cst_wl, cst_wl_max, wl, delta_wl, fn, d_k, d1
-  real(kind=dp) :: E_emise, frac_E_abs_nRE, Delta_E
+  real(kind=dp) :: Temp, cst_wl, cst_wl_max, wl, delta_wl, fn
+  real(kind=dp) :: E_emise, frac_E_abs_nRE, Delta_E, d_k
   real(kind=dp), dimension(n_cells) :: E_cell, E_cell_old
 
   ! proba emission en fct lambda puis pour chaque lambda proba en fct position
@@ -1698,67 +1644,43 @@ subroutine emission_nRE()
      ! Emission par cellule des PAHs
 
      !$omp parallel default(none) &
-     !$omp private(k,E_emise,Temp,cst_wl,T,icell,p_k,d_k,d1) &
+     !$omp private(k,E_emise,Temp,cst_wl,T,icell,p_k,d_k) &
      !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end) &
      !$omp shared(n_cells,l_RE, Tdust_1grain_nRE,n_T,C_abs_norm,dust_density,nbre_grains,volume,tab_Temp,Proba_Tdust) &
      !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE,lvariable_dust)
      !$omp do
      do icell=1,n_cells
         E_emise = 0.0
-        if (lvariable_dust) then
-           do k=grain_nRE_start,grain_nRE_end
-              if (l_RE(k,icell)) then ! le grain a une temperature
-                 if (lchange_nRE(k,icell)) then ! la grain passe en qRE a cette iteration : il faut le compter
-                    d_k = dust_density(k,icell)
-                    if (d_k > tiny_dp) then
-                       Temp = Tdust_1grain_nRE(k,icell)
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < cst_wl_max) then
-                          E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d_k*nbre_grains(k)* &
-                               volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
-                       endif
-                    endif
-                 endif ! le grain etait en qRE avant, il est traite en re-emission immediate
-              else ! densite de proba de Temperature
-                 d_k = dust_density(k,icell)
+
+        do k=grain_nRE_start,grain_nRE_end
+           p_k = merge(k,1,lvariable_dust)
+           if (l_RE(k,icell)) then ! le grain a une temperature
+              if (lchange_nRE(k,icell)) then ! la grain passe en qRE a cette iteration : il faut le compter
+                 d_k = dust_density(p_k,icell)
                  if (d_k > tiny_dp) then
-                    do T=1,n_T
-                       temp=tab_Temp(T)
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < cst_wl_max) then
-                          E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d_k*nbre_grains(k) &
-                               * volume(icell)/ ((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell) * delta_wl
-                       endif !cst_wl
-                    enddo !T
+                    Temp = Tdust_1grain_nRE(k,icell)
+                    cst_wl=cst_th/(Temp*wl)
+                    if (cst_wl < cst_wl_max) then
+                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d_k*nbre_grains(k)* &
+                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
+                    endif
                  endif
+              endif ! le grain etait en qRE avant, il est traite en re-emission immediate
+           else ! densite de proba de Temperature
+              d_k = dust_density(p_k,icell)
+              if (d_k > tiny_dp) then
+                 do T=1,n_T
+                    temp=tab_Temp(T)
+                    cst_wl=cst_th/(Temp*wl)
+                    if (cst_wl < cst_wl_max) then
+                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d_k*nbre_grains(k) &
+                            * volume(icell)/ ((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell) * delta_wl
+                    endif !cst_wl
+                 enddo !T
               endif
-           enddo !k
-        else
-           d1 = dust_density(1,icell)
-           if (d1 > tiny_dp) then
-              do k=grain_nRE_start,grain_nRE_end
-                 if (l_RE(k,icell)) then ! le grain a une temperature
-                    if (lchange_nRE(k,icell)) then ! la grain passe en qRE a cette iteration : il faut le compter
-                       Temp = Tdust_1grain_nRE(k,icell)
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < cst_wl_max) then
-                          E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d1*nbre_grains(k)* &
-                               volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
-                       endif
-                    endif ! le grain etait en qRE avant, il est traite en re-emission immediate
-                 else ! densite de proba de Temperature
-                    do T=1,n_T
-                       temp=tab_Temp(T)
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < cst_wl_max) then
-                          E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d1*nbre_grains(k) &
-                               * volume(icell)/ ((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell) * delta_wl
-                       endif !cst_wl
-                    enddo !T
-                 endif
-              enddo !k
            endif
-        endif
+        enddo !k
+
         E_cell(icell) =   E_emise
         ! Recup et mise a jour de l'ancienne emmissivite
         E_cell_old(icell) = Emissivite_nRE_old(icell,lambda)
@@ -1810,7 +1732,7 @@ subroutine init_emissivite_nRE()
   implicit none
 
   integer :: lambda, k, icell, p_k
-  real(kind=dp) :: E_emise, facteur, cst_wl, wl, d1
+  real(kind=dp) :: E_emise, facteur, cst_wl, wl
   real(kind=dp) :: Temp, cst_wl_max, delta_wl
 
   cst_wl_max = log(huge_real)-1.0e-4
@@ -1830,18 +1752,11 @@ subroutine init_emissivite_nRE()
      ! Emission par cellule des PAHs
      do icell=1,n_cells
         E_emise = 0.0_dp
-        if (lvariable_dust) then
-           do k=grain_nRE_start,grain_nRE_end
-              E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(k,icell)*nbre_grains(k)* volume(icell) * facteur !* Proba_Tdust = 1 pour Tmin
-           enddo !k
-        else
-           d1 = dust_density(1,icell)
-           if (d1 > tiny_dp) then
-              do k=grain_nRE_start,grain_nRE_end
-                 E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d1*nbre_grains(k)* volume(icell) * facteur !* Proba_Tdust = 1 pour Tmin
-              enddo !k
-           endif
-        endif
+
+        do k=grain_nRE_start,grain_nRE_end
+           p_k = merge(k,1,lvariable_dust)
+           E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*nbre_grains(k)* volume(icell) * facteur !* Proba_Tdust = 1 pour Tmin
+        enddo !k
         Emissivite_nRE_old(icell,lambda) = E_emise
      enddo !icell
 
@@ -1873,7 +1788,7 @@ subroutine repartition_energie(lambda)
   integer :: k, T, alloc_status, p_k
   integer, target :: icell
   integer, pointer :: p_icell
-  real(kind=dp) :: Temp, wl, cst_wl, E_star, surface, E_emise, cst_wl_max, d1
+  real(kind=dp) :: Temp, wl, cst_wl, E_star, surface, E_emise, cst_wl_max
   real(kind=dp) :: delta_T
   real(kind=dp), dimension(:), allocatable :: E_cell, E_cell_corrected
 
@@ -1919,32 +1834,17 @@ subroutine repartition_energie(lambda)
      do icell=1,n_cells
         E_emise = 0.0
         if (.not.l_dark_zone(icell)) then
-           if (lvariable_dust) then
-              do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-                 Temp=Tdust_1grain(k,icell)
-                 if (Temp > tiny_real) then
-                    cst_wl=cst_th/(Temp*wl)
-                    if (cst_wl < cst_wl_max) then
-                       E_emise = E_emise +   4.0*C_abs_norm(k,lambda) * dust_density(k,icell)*nbre_grains(k)* &
-                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
-                    endif !cst_wl
-                 endif ! Temp==0.0
-              enddo !k
-           else
-              d1 = dust_density(1,icell)
-              if (d1 > tiny_dp) then
-                 do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-                    Temp=Tdust_1grain(k,icell)
-                    if (Temp > tiny_real) then
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < cst_wl_max) then
-                          E_emise = E_emise +   4.0*C_abs_norm(k,lambda) * d1 * nbre_grains(k)* &
-                               volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
-                       endif !cst_wl
-                    endif ! Temp==0.0
-                 enddo !k
-              endif
-           endif
+           do k=grain_RE_nLTE_start,grain_RE_nLTE_end
+              p_k = merge(k,1,lvariable_dust)
+              Temp=Tdust_1grain(k,icell)
+              if (Temp > tiny_real) then
+                 cst_wl=cst_th/(Temp*wl)
+                 if (cst_wl < cst_wl_max) then
+                    E_emise = E_emise +   4.0*C_abs_norm(k,lambda) * dust_density(p_k,icell)*nbre_grains(k)* &
+                         volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                 endif !cst_wl
+              endif ! Temp==0.0
+           enddo !k
         endif
         E_cell(icell) = E_cell(icell) + E_emise
      enddo !icell
@@ -1966,50 +1866,27 @@ subroutine repartition_energie(lambda)
      do icell=1,n_cells
         E_emise = 0.0
         if (.not.l_dark_zone(icell)) then
-           if (lvariable_dust) then
-              do k=grain_nRE_start,grain_nRE_end
-                 if (l_RE(k,icell)) then ! le grain a une temperature
-                    temp=Tdust_1grain_nRE(k,icell)
+
+           do k=grain_nRE_start,grain_nRE_end
+              p_k = merge(k,1,lvariable_dust)
+              if (l_RE(k,icell)) then ! le grain a une temperature
+                 temp=Tdust_1grain_nRE(k,icell)
+                 cst_wl=cst_th/(Temp*wl)
+                 if (cst_wl < cst_wl_max) then
+                    E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*nbre_grains(k)* &
+                         volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                 endif !cst_wl
+              else ! la grain a une proba de T
+                 do T=1,n_T
+                    temp=tab_Temp(T)
                     cst_wl=cst_th/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
-                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(k,icell)*nbre_grains(k)* &
-                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
+                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*nbre_grains(k)* &
+                            volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell)
                     endif !cst_wl
-                 else ! la grain a une proba de T
-                    do T=1,n_T
-                       temp=tab_Temp(T)
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < cst_wl_max) then
-                          E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(k,icell)*nbre_grains(k)* &
-                               volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell)
-                       endif !cst_wl
-                    enddo !T
-                 endif ! l_RE
-              enddo !k
-           else
-              d1 = dust_density(1,icell)
-              if (d1 > tiny_dp) then
-                 do k=grain_nRE_start,grain_nRE_end
-                    if (l_RE(k,icell)) then ! le grain a une temperature
-                       temp=Tdust_1grain_nRE(k,icell)
-                       cst_wl=cst_th/(Temp*wl)
-                       if (cst_wl < cst_wl_max) then
-                          E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d1*nbre_grains(k)* &
-                               volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
-                       endif !cst_wl
-                    else ! la grain a une proba de T
-                       do T=1,n_T
-                          temp=tab_Temp(T)
-                          cst_wl=cst_th/(Temp*wl)
-                          if (cst_wl < cst_wl_max) then
-                             E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d1*nbre_grains(k)* &
-                                  volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell)
-                          endif !cst_wl
-                       enddo !T
-                    endif ! l_RE
-                 enddo !k
-              endif
-           endif
+                 enddo !T
+              endif ! l_RE
+           enddo !k
         endif
         E_cell(icell) =  E_cell(icell) + E_emise
      enddo !icell
@@ -2073,7 +1950,7 @@ end subroutine repartition_energie
 
 !**********************************************************************
 
-integer function select_absorbing_grain(lambda,icell, aleat, heating_method) result(k)
+integer function select_absorbing_grain(lambda,icell, aleat, heating_method) result(l)
   ! This routine will select randomly the absorbing/emitting grain
   ! from the CDF of kabs
   ! Because we cannot store all the CDF for all cells
@@ -2085,14 +1962,18 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
   implicit none
 
   integer, intent(in) :: lambda, heating_method, icell
-  integer :: p_icell
   real, intent(in) :: aleat
-  real(kind=dp) :: prob, CDF, norm, d1
-  integer :: kstart, kend, p_k
+  real(kind=dp) :: prob, CDF, norm
+  integer :: p_icell, kstart, kend
+  integer, target :: k, k1
+  integer, pointer :: p_k
 
   if (lvariable_dust) then
      p_icell = icell
+     p_k => k
   else
+     k1 = 1
+     p_k => k1
      p_icell = icell1
   endif
 
@@ -2120,70 +2001,39 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
      if (aleat < 0.5) then ! We start from first grain
         prob = aleat * norm
         CDF = 0.0
-        if (lvariable_dust) then
-           do k=kstart, kend
-              CDF = CDF + C_abs(k,lambda) * dust_density(k,icell) * nbre_grains(k)
-              if (CDF > prob) exit
-           enddo
-        else
-           d1 = dust_density(1,icell)
-           do k=kstart, kend
-              CDF = CDF + C_abs(k,lambda) * d1 * nbre_grains(k)
-              if (CDF > prob) exit
-           enddo
-        endif
+        do k=kstart, kend
+           CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           if (CDF > prob) exit
+        enddo
      else ! We start from the end of the grain size distribution
         prob = (1.0-aleat) * norm
         CDF = 0.0
-        if (lvariable_dust) then
-           do k=kend, kstart, -1
-              CDF = CDF + C_abs(k,lambda) * dust_density(k,icell) * nbre_grains(k)
-              if (CDF > prob) exit
-           enddo
-        else
-           d1 = dust_density(1,icell)
-           do k=kend, kstart, -1
-              CDF = CDF + C_abs(k,lambda) * d1 * nbre_grains(k)
-              if (CDF > prob) exit
-           enddo
-        endif
+        do k=kend, kstart, -1
+           CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           if (CDF > prob) exit
+        enddo
      endif
   else ! Same thing but with lRE to only include dust grains that are at qRE
      if (aleat < 0.5) then ! We start from first grain
         prob = aleat * norm
         CDF = 0.0
-        if (lvariable_dust) then
-           do k=kstart, kend
-              if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * dust_density(k,icell) * nbre_grains(k)
-              if (CDF > prob) exit
-           enddo
-        else
-           d1 = dust_density(1,icell)
-           do k=kstart, kend
-              if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * d1 * nbre_grains(k)
-              if (CDF > prob) exit
-           enddo
-        endif
+        do k=kstart, kend
+           if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           if (CDF > prob) exit
+        enddo
      else ! We start from the end of the grain size distribution
         prob = (1.0-aleat) * norm
         CDF = 0.0
-        if (lvariable_dust) then
-           do k=kend, kstart, -1
-              if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * dust_density(k,icell) * nbre_grains(k)
-              if (CDF > prob) exit
-           enddo
-        else
-           d1 = dust_density(1,icell)
-           do k=kend, kstart, -1
-              if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * d1 * nbre_grains(k)
-              if (CDF > prob) exit
-           enddo
-        endif
+        do k=kend, kstart, -1
+           if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           if (CDF > prob) exit
+        enddo
      endif
   endif
+
   !if (k < kstart) k=kstart
   !if (k > kend)   k=kend
-
+  l = k
 
   return
 
