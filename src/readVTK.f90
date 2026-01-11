@@ -55,18 +55,21 @@ contains
 
   end subroutine readLine
 
-  subroutine readField(file, oldposition, geometry, periodicity, time, newposition)
+  subroutine readField(file, oldposition, geometry, periodicity, time, x1, x2, x3, have_native, newposition)
 
     integer, intent(in) :: file, oldposition
     integer, intent(out) :: geometry
     integer, dimension(3), intent(out) :: periodicity
+    logical, intent(out) :: have_native
     real, intent(out) :: time
+    real, allocatable, intent(out) :: x1(:), x2(:), x3(:)
     integer, intent(out) :: newposition
 
-    integer position, n
+    integer position, n, nPoints
     character (:), allocatable :: line
     integer nfield, lineSize
 
+    have_native = .false.
     position = oldposition
     ! Read the number of FIELD in the header
     call readLine(file, position, line, newposition)
@@ -92,6 +95,38 @@ contains
           ! update file pointer, and add carriage return
           inquire(file, pos=position)
           position=position+1
+       else if(line(1:22) == "X1L_NATIVE_COORDINATES") then
+          have_native = .true.
+          lineSize = newposition-position-1
+          read(line(25:lineSize),*) nPoints
+          allocate(x1(nPoints))
+          read(file,pos=newposition) x1
+          ! update file pointer, and add carriage return
+          inquire(file, pos=position)
+          position=position+1
+        else if(line(1:22) == "X2L_NATIVE_COORDINATES") then
+          lineSize = newposition-position-1
+          read(line(25:lineSize),*) nPoints
+          allocate(x2(nPoints))
+          read(file,pos=newposition) x2
+          ! update file pointer, and add carriage return
+          inquire(file, pos=position)
+          position=position+1
+        else if(line(1:22) == "X3L_NATIVE_COORDINATES") then
+          lineSize = newposition-position-1
+          read(line(25:lineSize),*) nPoints
+          allocate(x3(nPoints))
+          read(file,pos=newposition) x3
+          ! update file pointer, and add carriage return
+          inquire(file, pos=position)
+          position=position+1
+        else if(line(3:22) == "C_NATIVE_COORDINATES") then
+          ! skip this
+          lineSize = newposition-position-1
+          read(line(25:lineSize),*) nPoints
+          ! update file pointer, and add 2 carriage returns
+          inquire(file, pos=position)
+          position=nPoints*4+position+2 ! real=4 bytes (assumed...)
        else
           print *, "Unknown entry: ", line
        endif
@@ -101,6 +136,27 @@ contains
     return
 
   end subroutine readField
+
+  subroutine skipPoints(file, oldposition,newposition)
+    
+    integer, intent(in) :: file, oldposition
+    integer, intent(out) :: newposition
+
+    character (:), allocatable :: line
+
+    real, allocatable :: pts(:)
+
+    integer position, lineSize, nPoints
+    integer i,j,k,n
+
+    position = oldposition
+    call readLine(file, position, line, newposition)
+    lineSize = newposition-position-1
+    read(line(7:lineSize),*) nPoints
+    ! skip the points
+    newposition = newposition + 3*nPoints*4+1 ! real=4 bytes (assumed...)
+    return
+  end subroutine skipPoints
 
   subroutine readPoints(file, oldposition, geometry, dimensions, x1, x2, x3, newposition)
 
@@ -126,9 +182,7 @@ contains
 
     position=newposition
     allocate(pts(3*npoints))
-    allocate(x(dimensions(1),dimensions(2),dimensions(3)))
-    allocate(y(dimensions(1),dimensions(2),dimensions(3)))
-    allocate(z(dimensions(1),dimensions(2),dimensions(3)))
+
 
     read(file,pos=newposition) pts
     ! update file pointer, and add carriage return
@@ -136,6 +190,9 @@ contains
     position=position+1
     newposition=position
 
+    allocate(x(dimensions(1),dimensions(2),dimensions(3)))
+    allocate(y(dimensions(1),dimensions(2),dimensions(3)))
+    allocate(z(dimensions(1),dimensions(2),dimensions(3)))
     ! load cartesian points
     do k = 1, dimensions(3)
        do j = 1, dimensions(2)
@@ -207,12 +264,13 @@ contains
 
   end subroutine readPoints
 
-  subroutine readScalars(file, oldposition, dimensions, array, name, newposition)
+  subroutine readScalars(file, oldposition, dimensions_cell, array, name, newposition)
 
     integer, intent(in) :: file, oldposition
-    integer, dimension(3), intent(in) :: dimensions
+    integer, dimension(3), intent(in) :: dimensions_cell
+    integer, dimension(3) :: dimensions
     real, dimension(:,:,:), intent(out), allocatable :: array
-    character (3), intent(out) :: name
+    character (20), intent(out) :: name
     integer, intent(out) :: newposition
 
 
@@ -220,17 +278,20 @@ contains
     integer position, lineSize
 
     position = oldposition
+    dimensions(1) = max(dimensions_cell(1)-1, 1)
+    dimensions(2) = max(dimensions_cell(2)-1, 1)
+    dimensions(3) = max(dimensions_cell(3)-1, 1)
 
     ! read the name of the scalar
     call readLine(file, position, line, newposition)
     lineSize = newposition-position-1
-    read(line(9:11),*) name
+    read(line(9:lineSize),*) name
     position=newposition
     ! read the lookup table
-    call readLine(file, position, line, position)
+    call readLine(file, position, line, newposition)
     ! read the meat
-    allocate(array(dimensions(1)-1,dimensions(2)-1,dimensions(3)-1))
-    read(file,pos=position) array
+    allocate(array(dimensions(1),dimensions(2),dimensions(3)))
+    read(file,pos=newposition) array
     ! update file pointer, and add carriage return
     inquire(file, pos=position)
     position=position+1
@@ -251,41 +312,59 @@ contains
     integer :: position, newposition
     integer :: lineSize
     integer, dimension(3) :: periodicity
+    logical :: have_native
 
     open(newunit=unit, file=filename,form="unformatted",access="stream",CONVERT='BIG_ENDIAN',status="old")
     position = 1
 
     ! 1st line: 1 vtk Data......
-    call readLine(unit, position, line, position)
+    call readLine(unit, position, line, newposition)
 
     ! 2nd Line : Idefix xxxxx
-    call readLine(unit, position, line, position)
+    position = newposition
+    call readLine(unit, position, line, newposition)
     if (line(1:6) /= "Idefix") call error(trim(filename)//" does not seem to be an Idefix file: "//line(1:6))
     origin = line
 
     ! 3rd Line : BINARY
-    call readLine(unit, position, line, position)
+    position = newposition
+    call readLine(unit, position, line, newposition)
     if (line(1:6) /= "BINARY") call error(trim(filename)//" does not seem to be an Idefix fileis not a binary Idefix file")
 
+    position = newposition
     ! 4th Line : DATASET STRUCTURED (or other)
-    call readLine(unit, position, line, position)
+    call readLine(unit, position, line, newposition)
 
     ! Field (+ geometry, periodicity and time))
+    position = newposition
     call readLine(unit, position, line, newposition)
     if (line(1:5) /= "FIELD") call error("FIELD not found in vtk file: "//trim(filename))
-    call readField(unit, position, geometry, periodicity, time, position)
+    ! don't update file pointer as we read the "FIELD" line again in readField
+    call readField(unit, position, geometry, periodicity, time, x1, x2, x3, have_native, newposition)
 
     ! Dimensions
+    position = newposition
     call readLine(unit, position, line, newposition)
     if (line(1:10) /= "DIMENSIONS") call error("reading DIMENSIONS in vtk file: "//trim(filename))
     lineSize = newposition-position-1
     read(line(11:lineSize),*) dimensions
-    position=newposition
+
 
     ! Points
+    position=newposition
     call readLine(unit, position, line, newposition)
     if (line(1:6) /= "POINTS") call error("reading POINTS in vtk file: "//trim(filename))
-    call readPoints(unit, position, geometry, dimensions, x1, x2, x3, position)
+
+    !have_native = .false.
+    if (have_native) then
+       print *, "New vtk format: Using Idefix native coordinates from input file."
+       ! skip points
+       call skipPoints(unit, position, newposition)
+    else
+      print *, "Old vtk format: reconstructing native coordinates from cartesian coordinates."
+      call readPoints(unit, position, geometry, dimensions, x1, x2, x3, newposition)
+    endif
+    position=newposition
 
     return
 
@@ -302,7 +381,7 @@ contains
 
     integer :: position, newposition
     character (:), allocatable :: line
-    character (3) :: varName
+    character (20) :: varName
     real, allocatable, dimension(:,:,:) :: array
 
     position = old_position

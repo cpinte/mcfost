@@ -72,6 +72,7 @@ contains
        call warning("idefix : using spherical grid")
        nz = (idefix%nx2-1)/2+1
        n_az = idefix%nx3-1
+       if(n_az ==0 ) n_az = 1 ! 2D case
        lregular_theta = .true.
        theta_max = 0.5 * pi - idefix%x2_min
     else
