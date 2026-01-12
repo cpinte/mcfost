@@ -1742,8 +1742,6 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
      call ftpkys(unit,'UNIT',"part.m^-3 [per grain size bin N(a).da]",' ',status)
 
      !  Write the array to the FITS file.
-     !  dens =  densite_pouss
-     ! le d signifie real*8
      dust_dens(:,:) = 0.0
      do icell=1,n_cells
         dust_dens(icell,:) = dust_density(:,icell) * nbre_grains(:) * m3_to_cm3 ! dust_density dim1 is either 1 or n_grains_tot
@@ -1805,8 +1803,6 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   call ftpkys(unit,'UNIT',"g.cm^-3",' ',status)
 
   !  Write the array to the FITS file.
-  !  dens =  densite_pouss
-  ! le d signifie real*8
   dens(:) = 0.0
   do icell=1,n_cells
      dens(icell) = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:)) ! M_grain en g, dust_density dim1 is either 1 or n_grains_tot

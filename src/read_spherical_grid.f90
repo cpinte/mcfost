@@ -173,34 +173,10 @@ contains
     read(1, iostat=ios) rho_dust(:,:,:)
     close(unit=1)
 
-    dust_density = 0.0_dp ! init just in case.
+    dust_density = 0.0_dp
     masse_gaz = 0.0_dp
     disk_zone(1)%diskmass = 0.0
-    ! do i=1, n_rad
-    !     j = 0
-    !     bz : do jj=j_start+1,nz-1 ! 1 extra empty cell in theta on each side
-    !     if (jj==0) cycle bz
-    !         j = j + 1
-    !         do k=1, n_az
-    !             icell = cell_map(i,jj,k)
-    !             T(icell) = T_tmp(i,j,k)
-    !             nHtot(icell) = rho(i,j,k) * 1d3 / mH / wght_per_H ! [H/m^3]
-    !             icompute_atomRT(icell) = dz(i,j,k)
-    !             vfield3d(icell,:) = vtmp(i,j,k,:)
 
-    !             !-> wrapper for dust RT.
-    !             !-> taking into account proper weights assuming only molecular gas in dusty regions
-    !             if (rho_dust(i,j,k) > 0.0) then ! dusty region
-    !                 densite_gaz(icell) = rho(i,j,k) * 1d3 / mu_mH !total molecular gas density in H2/m^3
-    !                 densite_pouss(:,icell) = rho_dust(i,j,k) * 1d3 / mu_mH ! [m^-3]
-    !                 disk_zone(1)%diskmass = disk_zone(1)%diskmass + rho_dust(i,j,k) * volume(icell)
-    !             else !No dust.
-    !                 densite_gaz(icell) = nHtot(icell) * wght_per_H !total atomic gas density in [m^-3]
-    !             endif
-    !             masse_gaz(icell) = rho(i,j,k) * volume(icell)
-    !         enddo ! phi
-    !     enddo bz ! theta
-    ! enddo ! r
     do i=1, n_rad
        bz : do jj=min(0,j_start),nz
           do k=1, n_az
@@ -238,32 +214,19 @@ contains
     enddo ! r
     masse_gaz = masse_gaz * AU3_to_m3 * 1d3 ! [g]
     deallocate(rho,ne_tmp,T_tmp,vt_tmp,dz,vtmp)
-    !total dust mass
+
     disk_zone(1)%diskmass = disk_zone(1)%diskmass * AU3_to_m3 * kg_to_Msun
     if (allocated(rho_dust)) deallocate(rho_dust)
 
-    !dust part see read_pluto.f90
-    ! ********************************** !
     mass = sum(masse_gaz) * g_to_Msun
-    ! mass = sum(densite_gaz * volume) * AU3_to_m3 * mH * g_to_Msun
     if (mass <= 0.0) call error('Gas mass is 0')
-    ! masse_gaz(:) = mH * densite_gaz(:) * volume(:) * AU3_to_m3 ! [g]
-
-    !--> no normalisation of density. The dust and gas densities are provided in the model.
 
     write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
-    ! write(*,*) 'Total  dust mass in model:', real(disk_zone(1)%diskmass),' Msun'
     if (disk_zone(1)%diskmass > 0.0_dp) then
        dust_pop(:)%masse = disk_zone(1)%diskmass
-       !here the densite_pouss gets normalised such that sum(densite_pouss) = 1 [units less]
        call normalize_dust_density()
-       !the units of densite_pouss comes from M_grain in g/cm^3, normalize to give the dust mass if summed.
-       !the density of grains is M_grain x densite_pouss
        if (lemission_atom) ldust_atom = .true.
     endif
-    ! ********************************** !
-    ! write(*,*) "icell_not_empty:", icell_not_empty
-    ! write(*,*) "rho(icell_not_empty)", maxval(densite_pouss(:,icell_not_empty)), densite_gaz(icell_not_empty)
 
     call check_for_zero_electronic_density()
     call print_info_model()

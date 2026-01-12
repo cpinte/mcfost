@@ -816,7 +816,7 @@ subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
   do ilambda=1, n_lambda
      J_abs =  J_abs + C_abs_norm(k,ilambda)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,ilambda))
   enddo ! lambda
-  ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans E_em_1grain
+  ! WARNING : il faut diviser par dust_density car il n'est pas pris en compte dans E_em_1grain
   log_E_abs=log(J_abs*L_packet_th/volume(icell) )
 
   ! Temperature echantillonee juste sup. a la temperature de la cellule
@@ -963,7 +963,7 @@ subroutine Temp_finale_nLTE()
               J_absorbe =  J_absorbe + C_abs_norm(k,lambda)  * (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda))
            enddo ! lambda
 
-           ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans E_em_1grain
+           ! WARNING : il faut diviser par dust_density car il n'est pas pris en compte dans E_em_1grain
            J_absorbe = J_absorbe*L_packet_th/volume(icell)
            if (J_absorbe < tiny_dp) then
               Tdust_1grain(k,icell) = T_min
@@ -1335,7 +1335,7 @@ subroutine Temp_nRE(lconverged)
                  endif
 
               endif ! test : t_cool vs t_abs
-           endif ! densite_pouss > 0.
+           endif ! dust_density > 0.
         endif ! l_dark_zone
      enddo !icell
      !$omp end do

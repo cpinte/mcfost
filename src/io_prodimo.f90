@@ -853,7 +853,7 @@ contains
 
     do zj=1,nz
        do ri=1,n_rad
-          ! Nbre total de grain : le da est deja dans densite_pouss
+          ! Total number of grain. da is already in nbre_grains
           icell = cell_map(ri,zj,1)
           if (lvariable_dust) then
              N = sum(dust_density(:,icell) * nbre_grains(:),mask=mask_not_PAH)

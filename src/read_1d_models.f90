@@ -248,9 +248,7 @@ module read_1d_models
 
 		write(*,*) "Maximum/minimum Temperature in the model [K]:"
 		write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
-		! write(*,*) " --> Density average of the Temperature [K]:"
-		! write(*,*) real(sum(T*nHtot,(sum(densite_pouss,dim=1)==0.0).and.(icompute_atomRT>0)) / &
-		! 	sum(nHtot,(sum(densite_pouss,dim=1)==0.0).and.(icompute_atomRT>0)))
+
 		write(*,*) "Maximum/minimum Hydrogen total density in the model [m^-3]:"
 		write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
 		if (ldust_atom) then

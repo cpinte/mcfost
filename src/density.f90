@@ -28,12 +28,8 @@ module density
   real(kind=dp), dimension(:,:), allocatable :: densite_gaz_midplane   ! densite_gaz gives the midplane density for j=0
   real(kind=dp), dimension(:,:), allocatable :: Surface_density
 
-
-  !real(kind=dp), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells
-
-  ! dust_density * nbre_grains is in en part.cm-3 (replaces previous densite_pouss)  nbre_grains is normalised to 1
+  ! dust_density * nbre_grains is in en part.cm-3, where nbre_grains is normalised to 1
   real(kind=dp), dimension(:,:), allocatable :: dust_density ! p_n_grains, p_n_cells
-  !real(kind=dp), dimension(:), allocatable :: dust_density_factor ! n_cells
   real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
   integer :: icell_not_empty
 
@@ -408,7 +404,7 @@ end subroutine define_gas_density
 subroutine define_dust_density()
 ! Calcule la table de densite
 ! Inclus stratification analytique
-! Calcule les tableaux densite_pouss et masse
+! Calcule les tableaux dust_density et masse
 ! et indique icell_not_empty
 ! C. Pinte : re-ecrit le 27/04/2013
 
@@ -699,7 +695,7 @@ subroutine define_dust_density()
                           Ztilde=z/H
 
                           ! Fit Gaussien du profile de densite
-                          !densite_pouss(l,icell)=  exp(-(1+OmegaTau/Dtilde) * (Ztilde**2/2.))
+                          !dust_density(l,icell)=  exp(-(1+OmegaTau/Dtilde) * (Ztilde**2/2.))
 
                           ! Coefficient de diffusion constant
                           dust_density(l,icell)=  exp( -OmegaTau/Dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
@@ -1985,7 +1981,7 @@ subroutine normalize_dust_density(disk_dust_mass)
 
   ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
   ! Valable que dans le cas cylindrique mais pas de pb dans le cas spherique
-  ! if (lcylindrical) densite_pouss(:,nz+1,:,:) = densite_pouss(:,nz,:,:)
+  ! if (lcylindrical) dust_density(:,nz+1,:,:) = dust_density(:,nz,:,:)
 
   call find_non_empty_cell()
 
