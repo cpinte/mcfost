@@ -507,8 +507,8 @@ subroutine define_dust_density()
         lmin = dust_pop(pop)%ind_debut
         lmax = dust_pop(pop)%ind_fin
      else
-        lmin=1
-        lmax=1
+        lmin=pop
+        lmax=pop
      endif
 
      if (dz%geometry <= 2) then ! Disque
@@ -1897,12 +1897,6 @@ subroutine normalize_dust_density(disk_dust_mass)
         ! Sum dust_density * nbre_grains = 1  over the whole disc
         if (somme > tiny_dp) dust_density(l,:) = dust_density(l,:) / somme
      enddo !l
-  else
-     somme = 0.0_dp
-     do icell=1,n_cells
-        somme = somme + dust_density(1,icell) * volume(icell)
-     enddo
-     if (somme > tiny_dp) dust_density(1,:) = dust_density(1,:) / somme
   endif
 
 
@@ -1913,6 +1907,14 @@ subroutine normalize_dust_density(disk_dust_mass)
 
      if (dz%geometry /= 5) then ! pas de wall ici
         d_p => dust_pop(pop)
+
+        if (.not.lvariable_dust) then
+           somme = 0.0_dp
+           do icell=1,n_cells
+              somme = somme + dust_density(pop,icell) * volume(icell)
+           enddo
+           if (somme > tiny_dp) dust_density(pop,:) = dust_density(pop,:) / somme
+        endif
 
         if (lvariable_dust) then
            mass = 0.0_dp
@@ -1937,16 +1939,16 @@ subroutine normalize_dust_density(disk_dust_mass)
         else ! We avoid the grain loop all together if the dust is the same everywhere
            somme = 0.0_dp
            do icell=1,n_cells
-              somme = somme + dust_density(1,icell) * volume(icell)
+              somme = somme + dust_density(pop,icell) * volume(icell)
            enddo
            mass = somme * d_p%avg_grain_mass * AU3_to_cm3 * g_to_Msun
 
            if (mass > tiny_dp) then
               facteur = d_p%masse / mass * f
-              dust_density(1,:) =  dust_density(1,:) * facteur
+              dust_density(pop,:) =  dust_density(pop,:) * facteur
 
               do icell=1,n_cells
-                 masse(icell) = dust_density(1,icell) * d_p%avg_grain_mass * volume(icell)
+                 masse(icell) = masse(icell) + dust_density(pop,icell) * d_p%avg_grain_mass * volume(icell)
               enddo
            endif
 

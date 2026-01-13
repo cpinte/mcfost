@@ -35,7 +35,7 @@ subroutine allocate_densities(n_cells_max)
   if (lvariable_dust) then
      allocate(dust_density(n_grains_tot,Nc), stat=alloc_status)
   else
-     allocate(dust_density(1,Nc), stat=alloc_status)
+     allocate(dust_density(n_pop,Nc), stat=alloc_status)
   endif
   if (alloc_status > 0) call error('Allocation error dust_density')
   dust_density = 0.0

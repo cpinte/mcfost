@@ -952,11 +952,11 @@ subroutine Temp_finale_nLTE()
   !$omp private(J_absorbe,log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell,p_k) &
   !$omp shared(L_packet_th,Tdust,tab_Temp,n_cells,n_lambda,kappa_abs_LTE,lvariable_dust) &
   !$omp shared(xJ_abs,dust_density,nbre_grains,Tdust_1grain, xT_ech_1grain,log_E_em_1grain) &
-  !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0)
+  !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0, grain)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
      do k=grain_RE_nLTE_start, grain_RE_nLTE_end
-        p_k = merge(k,1,lvariable_dust)
+        p_k = merge(k,grain(k)%pop,lvariable_dust)
         if (dust_density(p_k,icell) > tiny_dp) then
            J_absorbe=0.0
            do lambda=1, n_lambda
@@ -1118,11 +1118,11 @@ subroutine Temp_nRE(lconverged)
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_Tdust, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
      !$omp shared(Tdust_1grain_nRE,log_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid,nbre_grains) &
-     !$omp shared(dust_density,l_dark_zone,Tdust,lchange_nRE,lvariable_dust)
+     !$omp shared(dust_density,l_dark_zone,Tdust,lchange_nRE,lvariable_dust,grain)
 
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
-     p_l = merge(l, 1, lvariable_dust)
+     p_l = merge(l, grain(l)%pop, lvariable_dust)
      !$omp do schedule(dynamic,1)
      do icell=n_cells, 1, -1
         !$ id = omp_get_thread_num() + 1
@@ -1547,7 +1547,7 @@ subroutine update_proba_abs_nRE()
         delta_kappa_abs_qRE = 0.0_dp
         lall_grains_eq = .true.
         do l=grain_nRE_start,grain_nRE_end
-           p_l = merge(l,1,lvariable_dust)
+           p_l = merge(l,grain(l)%pop,lvariable_dust)
            if (lchange_nRE(l,icell)) then ! 1 grain a change de status a cette iteration
               delta_kappa_abs_qRE =  C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
            else
@@ -1647,13 +1647,13 @@ subroutine emission_nRE()
      !$omp private(k,E_emise,Temp,cst_wl,T,icell,p_k,d_k) &
      !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end) &
      !$omp shared(n_cells,l_RE, Tdust_1grain_nRE,n_T,C_abs_norm,dust_density,nbre_grains,volume,tab_Temp,Proba_Tdust) &
-     !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE,lvariable_dust)
+     !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE,lvariable_dust,grain)
      !$omp do
      do icell=1,n_cells
         E_emise = 0.0
 
         do k=grain_nRE_start,grain_nRE_end
-           p_k = merge(k,1,lvariable_dust)
+           p_k = merge(k,grain(k)%pop,lvariable_dust)
            if (l_RE(k,icell)) then ! le grain a une temperature
               if (lchange_nRE(k,icell)) then ! la grain passe en qRE a cette iteration : il faut le compter
                  d_k = dust_density(p_k,icell)
@@ -1754,7 +1754,7 @@ subroutine init_emissivite_nRE()
         E_emise = 0.0_dp
 
         do k=grain_nRE_start,grain_nRE_end
-           p_k = merge(k,1,lvariable_dust)
+           p_k = merge(k,grain(k)%pop,lvariable_dust)
            E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*nbre_grains(k)* volume(icell) * facteur !* Proba_Tdust = 1 pour Tmin
         enddo !k
         Emissivite_nRE_old(icell,lambda) = E_emise
@@ -1835,7 +1835,7 @@ subroutine repartition_energie(lambda)
         E_emise = 0.0
         if (.not.l_dark_zone(icell)) then
            do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-              p_k = merge(k,1,lvariable_dust)
+              p_k = merge(k,grain(k)%pop,lvariable_dust)
               Temp=Tdust_1grain(k,icell)
               if (Temp > tiny_real) then
                  cst_wl=cst_th/(Temp*wl)
@@ -1868,7 +1868,7 @@ subroutine repartition_energie(lambda)
         if (.not.l_dark_zone(icell)) then
 
            do k=grain_nRE_start,grain_nRE_end
-              p_k = merge(k,1,lvariable_dust)
+              p_k = merge(k,grain(k)%pop,lvariable_dust)
               if (l_RE(k,icell)) then ! le grain a une temperature
                  temp=Tdust_1grain_nRE(k,icell)
                  cst_wl=cst_th/(Temp*wl)

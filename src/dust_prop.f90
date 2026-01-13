@@ -795,18 +795,19 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   integer, intent(in) :: lambda, p_lambda
   logical, intent(in), optional :: no_scatt
 
-  integer :: icell
-  integer, target :: k, k1
-  integer, pointer :: p_k
+  integer :: icell, k
+  integer, dimension(n_grains_tot) :: p_k_arr
   real(kind=dp) ::  density, fact, k_abs_RE, k_abs_LTE, k_abs_tot, k_sca_tot, rho0, d1, d_k
   logical :: lcompute_obs,  ldens0, compute_scatt
 
-  k1 = 1
-
   if (lvariable_dust) then
-     p_k => k
+     do k=1, n_grains_tot
+        p_k_arr(k) = k
+     enddo
   else
-     p_k => k1
+     do k=1, n_grains_tot
+        p_k_arr(k) = grain(k)%pop
+     enddo
   endif
 
   if (present(no_scatt)) then
@@ -820,10 +821,8 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   ! c'est pour les prop de diffusion en relatif donc la valeur exacte n'a pas d'importante
   ldens0 = .false.
   if (lvariable_dust) then
-     p_k => k
+     ! nothing to do
   else
-     k1 = 1
-     p_k => k1
      if (icell_not_empty > icell1) then ! icell1==1
         ldens0 = .true.
         dust_density(:,icell1) = dust_density(:,icell_not_empty)
@@ -846,7 +845,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      k_sca_tot = 0.0
 
      do  k=1,n_grains_tot ! Expensive when n_cells is large
-        density = dust_density(p_k,icell) * nbre_grains(k)
+        density = dust_density(p_k_arr(k),icell) * nbre_grains(k)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
         k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
      enddo !k
@@ -856,7 +855,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      if (aniso_method==2) then
         tab_g_pos(icell,lambda) = 0.0
         do  k=1,n_grains_tot ! Expensive when n_cells is large
-           density=dust_density(p_k,icell) * nbre_grains(k)
+           density=dust_density(p_k_arr(k),icell) * nbre_grains(k)
            tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + &
                 C_sca(k,lambda) * density * tab_g(k,lambda)
         enddo ! k
@@ -867,7 +866,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         kappa_abs_LTE(icell,lambda) = 0.0
         do k=grain_RE_LTE_start,grain_RE_LTE_end   ! Expensive when n_cells is large
            kappa_abs_LTE(icell,lambda) =  kappa_abs_LTE(icell,lambda) + &
-                C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+                C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
         enddo
      endif
 
@@ -875,7 +874,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         kappa_abs_nLTE(icell,lambda) = 0.0
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
            kappa_abs_nLTE(icell,lambda) =  kappa_abs_nLTE(icell,lambda) + &
-                C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+                C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
         enddo
      endif
   enddo ! icell
@@ -890,14 +889,14 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         k_abs_LTE = 0.0
 
         do k=1, n_grains_tot
-           k_abs_tot = k_abs_tot + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           k_abs_tot = k_abs_tot + C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
         enddo
         do k=grain_RE_LTE_start,grain_RE_LTE_end
-           k_abs_LTE =  k_abs_LTE + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           k_abs_LTE =  k_abs_LTE + C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
         enddo
         k_abs_RE = k_abs_LTE
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-           k_abs_RE =  k_abs_RE + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           k_abs_RE =  k_abs_RE + C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
         enddo
 
         ! Computing probabilities
@@ -925,7 +924,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         do icell=1, n_cells
            kabs_nLTE_CDF(grain_RE_nLTE_start-1,icell,lambda)=0.0
            do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
-              density=dust_density(p_k,icell) * nbre_grains(k)
+              density=dust_density(p_k_arr(k),icell) * nbre_grains(k)
               kabs_nLTE_CDF(k,icell,lambda) = kabs_nLTE_CDF(k-1,icell,lambda) + &
                    C_abs(k,lambda) * density
            enddo !k
@@ -972,7 +971,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
 
               do  k=1,n_grains_tot
                  ksca_CDF(k,icell,p_lambda) = ksca_CDF(k-1,icell,p_lambda) + C_sca(k,lambda) &
-                 * dust_density(p_k,icell) * nbre_grains(k)
+                 * dust_density(p_k_arr(k),icell) * nbre_grains(k)
               enddo !k
 
               if  (ksca_CDF(n_grains_tot,icell,p_lambda) > tiny_real) then
@@ -1036,7 +1035,8 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   real :: mu, g, g2
 
   integer :: icell, l
-  integer :: k, p_k
+  integer :: k
+  integer, dimension(n_grains_tot) :: p_k_arr
   logical :: ldens0
 
   fact = AU_to_cm * mum_to_cm**2
@@ -1048,6 +1048,16 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   ! c'est pour les prop de diffusion en relatif donc la veleur exacte n'a pas d'importante
   ldens0 = .false.
 
+  if (lvariable_dust) then
+     do k=1, n_grains_tot
+        p_k_arr(k) = k
+     enddo
+  else
+     do k=1, n_grains_tot
+        p_k_arr(k) = grain(k)%pop
+     enddo
+  endif
+
   if (.not.lvariable_dust) then
      if (icell_not_empty > icell1) then
         ldens0 = .true.
@@ -1058,11 +1068,11 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
-  !$omp shared(tab_s11,tab_s12,tab_s22,tab_s33,tab_s34,tab_s44,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos) &
+  !$omp shared(tab_s11,tab_s12,tab_s22,tab_s33,tab_s34,tab_s44,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos,p_k_arr) &
   !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells,fact,lvariable_dust,nbre_grains) &
   !$omp shared(C_ext,C_sca,dust_density,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
   !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,lphase_function_file,s11_file,loverwrite_s12,Pmax) &
-  !$omp private(icell,k,p_k,density,norme,theta,k_sca_tot,mu,g,g2,d1)
+  !$omp private(icell,k,density,norme,theta,k_sca_tot,mu,g,g2,d1)
 
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells
@@ -1078,9 +1088,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
      endif
 
      do  k=1,n_grains_tot
-        ! Use integer index instead of pointer to avoid ifort OpenMP issues
-        p_k = merge(k, 1, lvariable_dust)
-        density=dust_density(p_k,icell) * nbre_grains(k)
+        density=dust_density(p_k_arr(k),icell) * nbre_grains(k)
         if (aniso_method==1) then
            ! Moyennage matrice de mueller (long en cpu ) (le dernier indice est l'angle)
            ! tab_s11 est normalisee a Qsca --> facteur S_grain * density pour que
@@ -1284,15 +1292,9 @@ integer function select_scattering_grain(lambda,icell, aleat) result(l)
   real, intent(in) :: aleat
   real(kind=dp) :: prob, CDF, norm, density, d1
 
-  integer, target :: k, k1
-  integer, pointer :: p_k
+  integer :: p_k_val, k
 
-  if (lvariable_dust) then
-     p_k => k
-  else
-     k1 = 1
-     p_k => k1
-  endif
+  p_k_val = merge(k, grain(k)%pop, lvariable_dust)
 
   if (low_mem_scattering) then
      ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
@@ -1302,7 +1304,8 @@ integer function select_scattering_grain(lambda,icell, aleat) result(l)
         prob = aleat * norm
         CDF = 0.0
         do k=1, n_grains_tot
-           density = dust_density(p_k,icell) * nbre_grains(k)
+           p_k_val = merge(k, grain(k)%pop, lvariable_dust)
+           density = dust_density(p_k_val,icell) * nbre_grains(k)
            CDF = CDF + C_sca(k,lambda) * density
            if (CDF > prob) exit
         enddo
@@ -1310,7 +1313,8 @@ integer function select_scattering_grain(lambda,icell, aleat) result(l)
         prob = (1.0-aleat) * norm
         CDF = 0.0
         do k=n_grains_tot, 1, -1
-           density = dust_density(p_k,icell) * nbre_grains(k)
+           p_k_val = merge(k, grain(k)%pop, lvariable_dust)
+           density = dust_density(p_k_val,icell) * nbre_grains(k)
            CDF = CDF + C_sca(k,lambda) * density
            if (CDF > prob) exit
         enddo
