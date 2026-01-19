@@ -79,12 +79,12 @@ module read1d_models
 			enddo
 			if (atmos_1d%E_corona > 0) then!log10(F_SI) + 3 = log10(F_cgs)
 				atmos_1d%I_coro(:,1) = atmos_1d%I_coro(:,1) * atmos_1d%E_corona / Fnorm
-				write(*,'("lgFcorona="(1F12.4)" W/m^2; lgFcorona(old)="(1F12.4)" W/m^2")') &
+				write(*,'("lgFcorona=",(1F12.4)," W/m^2; lgFcorona(old)=",(1F12.4)," W/m^2")') &
 					log10(atmos_1d%E_corona), log10(Fnorm)
-				write(*,'("max(I)="(1ES14.5E3)" W/m^2/Hz/sr; min(I)="(ES14.5E3)" W/m^2/Hz/sr")') &
+				write(*,'("max(I)=",(1ES14.5E3)," W/m^2/Hz/sr; min(I)=",(ES14.5E3)," W/m^2/Hz/sr")') &
 					maxval(atmos_1d%I_coro), minval(atmos_1d%I_coro)
 			else
-				write(*,'("lgFcorona="(1F12.4)" W/m^2")') log10(Fnorm)
+				write(*,'("lgFcorona=",(1F12.4)," W/m^2")') log10(Fnorm)
 			endif
 		endif
 		close(unit=1)
@@ -276,7 +276,7 @@ module read1d_models
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
         ! write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
-		write(*,'("-- Solving RTE for "(1F6.2)" % of cells")') &
+		write(*,'("-- Solving RTE for ",(1F6.2)," % of cells")') &
 			100.0*real(size(pack(icompute_atomRT,mask=icompute_atomRT>0))) / real(n_cells)
 
 		return

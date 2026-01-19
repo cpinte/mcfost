@@ -93,7 +93,7 @@ module grid
    enddo icell_loop
    N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
    if (N_fixed_ne > 0) then
-      write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+      write(*,'("Found ",(1I5)," cells with fixed electron density values! (",(1I3)," %)")') &
            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
    endif
 
