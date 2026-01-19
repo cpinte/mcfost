@@ -315,9 +315,8 @@ subroutine define_cylindrical_grid()
         ! Selection de la zone correspondante : pente la plus forte
         puiss = 0.0_dp
         do iz=1, n_zones
-           dz=disk_zone(iz)
-           if (dz%region == ir) then
-              p=1+dz%surf-dz%exp_beta
+           if (disk_zone(iz)%region == ir) then
+              p=1+disk_zone(iz)%surf-disk_zone(iz)%exp_beta
               if (p > puiss) then
                  puiss = p
               endif
