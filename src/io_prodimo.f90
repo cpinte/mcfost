@@ -217,7 +217,7 @@ contains
                 eps_PAH = dust_pop(pop)%frac_mass /disk_zone(i)%gas_to_dust  ! fraction en masse (de gaz) des PAHS
 
                 ! 1.209274 = (mH2*nH2 + mHe * mHe) / (nH2 + nHe) avec nHe/nH2 = 10^-1.125
-                ! abondance en nombre par rapport à H-nuclei + correction pour NC
+                ! abondance en nombre par rapport H-nuclei + correction pour NC
                 fPAH(i) = fPAH(i) + (1.209274/masse_PAH) * eps_PAH/3e-7 * (NC/50.)
                 !write(*,*) i, fPAH(i), real(dust_pop(pop)%frac_mass * disk_zone(i)%diskmass), real(dust_pop(pop)%frac_mass),  real(disk_zone(i)%diskmass)
              endif  ! PAH
@@ -812,8 +812,8 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-    ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
-    ! C_ext = a² microns² -> 1e-8 cm²             \
+    ! tau est sans dimension : [kappa * lvol = density * a**2 * lvol]
+    ! C_ext = a**2 microns**2 -> 1e-8 cm**2             \
     ! density en cm-3                      > reste facteur 149595.0
     ! longueur de vol en AU = 1.5e13 cm   /
     facteur = AU_to_cm * mum_to_cm**2
