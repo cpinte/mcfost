@@ -146,7 +146,7 @@ module elecdensity
     !locally
     if (k > 0 .and. k < n_cells + 1) then
        write(*,*) " -- Electron given for that cell --"
-       write(*,'("  -- cell #"(1I5)," id#"(1I2)" T="(1F14.4)" K, nHtot="(1ES17.8E3)" m-3")') k, id, T(k), nHtot(k)
+       write(*,'("  -- cell #",(1I5),", id#",(1I2)," T=",(1F14.4)," K, nHtot=",(1ES17.8E3)," m-3")') k, id, T(k), nHtot(k)
     else!for all
        write(*,*) " -- Max electron given for all cells --"
     endif
@@ -155,11 +155,11 @@ module elecdensity
 
        if (ell==0) then
 
-          write(*,'("  >> H- fjk="(1ES17.8E3))') max_fjk(ell)
+          write(*,'("  >> H- fjk=",(1ES17.8E3))') max_fjk(ell)
           !(1F18.1)" (x10^10)
        else
 
-          write(*,'("  >> "(1A)" fjk="(1ES17.8E3))') elems(list_elem(ell))%id, max_fjk(list_elem(ell))
+          write(*,'("  >> ",(1A)," fjk=",(1ES17.8E3))') elems(list_elem(ell))%id, max_fjk(list_elem(ell))
 
        endif
     enddo
@@ -555,12 +555,12 @@ module elecdensity
 
     if (verbose) then
        write(*,*) " ---------------------------------------------------- "
-       write(*,'("ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
+       write(*,'("ne(min)=",(1ES16.8E3)," m^-3 ;ne(max)=",(1ES16.8E3)," m^-3")') &
          real(minval(ne,mask=icompute_atomRT>0)), real(maxval(ne))
-       write(*,'("   >>>  Diff to previous solution="(1ES13.5E3)" at cell "(1I7))') epsilon, ik_max
+       write(*,'("   >>>  Diff to previous solution=",(1ES13.5E3)," at cell ",(1I7))') epsilon, ik_max
        write(*,*) " T = ", real(T(ik_max))," nH = ", real(nHtot(ik_max))
        write(*,*) " "
-       write(*,'("Ionisation fraction of HII "(1ES13.5E3, 1ES13.5E3))') real(max_f_HII), real(min_f_HII)
+       write(*,'("Ionisation fraction of HII ",(1ES13.5E3),", ",(1ES13.5E3))') real(max_f_HII), real(min_f_HII)
       !  write(*,'("nH/ne "(1ES13.5E3, 1ES13.5E3))') maxval(nHtot/ne,mask=ne>0), minval(nHtot/ne,mask=ne>0)
       ! call show_electron_given_per_elem(0, 0, max_fjk)
        write(*,*) " ---------------------------------------------------- "
@@ -809,7 +809,7 @@ module elecdensity
 
    !call FTG2Dd(unit,1,-999,shape(ne),naxes(1),naxes(2),ne,anynull,EOF)
 
-   write(*,'("  -- min(ne)="(1ES20.7E3)" m^-3; max(ne)="(1ES20.7E3)" m^-3")') &
+   write(*,'("  -- min(ne)=",(1ES20.7E3)," m^-3; max(ne)=",(1ES20.7E3)," m^-3")') &
       real(minval(ne,mask=(ne>0))), real(maxval(ne))
 
    return
