@@ -23,7 +23,7 @@ wl_list_contrib = ["1.0","100","1000"]
 
 
 # flag to skip the calculations and set-up the thresholds in a easy way
-compute_models = False
+compute_models = True
 
 # change this to test results downloaded from other machines
 test_dir = "."
