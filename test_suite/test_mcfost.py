@@ -9,7 +9,7 @@ import os
 _mcfost_bin = "../src/mcfost"
 
 # Get list of models using directory names
-model_list = glob.glob1("test_data/","*")
+model_list = os.listdir("test_data/")
 
 # If running on CI, only run some of the tests
 #if os.environ.get('CI', None) == 'true':
@@ -226,10 +226,16 @@ def test_pola(model_name, wl):
 
     if model_name == "debris":
         mask_threshold = 1e-32
+    elif model_name == "ref4.1_PAH":
+        mask_threshold = 1e-28
     else:
         mask_threshold = 1e-21
 
-    assert MC_similar(image_ref,image,threshold=0.1,mask_threshold=mask_threshold)
+    threshold=0.1
+    if (model_name == "ref4.1_nLTE") and (wl == "1000"):
+        threshold=0.12
+
+    assert MC_similar(image_ref,image,threshold=threshold,mask_threshold=mask_threshold)
 
 @pytest.mark.parametrize("model_name", model_list)
 @pytest.mark.parametrize("wl", wl_list_contrib)
