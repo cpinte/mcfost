@@ -43,7 +43,7 @@ module mhd2mcfost
         ldust_moments = .false.
 
 
-        write(FormatLine,'("(1",A,",I3)")') "A", 512
+        write(FormatLine,'("(A",I0,")")') 512
 
         !There will be an error if lphantom_file is true. Because density_files and density_file
         !stores pluto's model name. But also the filename from phantom.. So to date, the two

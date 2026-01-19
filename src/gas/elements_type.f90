@@ -182,7 +182,7 @@ module elements_type
 
 
         !read abundances
-        write(FormatLine,'("(1",A,",I3)")') "A", 10
+        write(FormatLine,'("(A",I0,")")') 10
         open(unit=1, file=TRIM(mcfost_utils)//TRIM(ABUNDANCE_FILE),status="old")!,access="stream",form='formatted')
         !count number of elemental abundances and rewind to the first element in the file
         ! inquire(1, pos=cursor_init)

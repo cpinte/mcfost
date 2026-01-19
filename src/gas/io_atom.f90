@@ -43,8 +43,7 @@ module io_atom
 
       open(unit=atomunit,file=trim(mcfost_utils)//trim(path_to_atoms)//trim(atom%filename),status="old")
       !FormatLine = "(1A<MAX_LENGTH>)" !not working with ifort
-      write(FormatLine,'("(1",A,",I3)")') "A", 512
-
+      write(FormatLine,'("(A",I0,")")') 512
       !Read ID and fill atom abundance and weight
       CALL read_line(atomunit, FormatLine, inputline, Nread)
       read(inputline,*) IDread
@@ -471,7 +470,7 @@ module io_atom
       character(len=2) :: IDread
 
 
-      write(FormatLine,'("(1",A,",I3)")') "A", 512
+      write(FormatLine,'("(A",I0,")")') 512
       if (N_atoms > 1) then
          write(*,*) "Reading ", N_atoms, " atoms"
       else
