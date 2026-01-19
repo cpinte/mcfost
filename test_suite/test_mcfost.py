@@ -9,7 +9,7 @@ import os
 _mcfost_bin = "../src/mcfost"
 
 # Get list of models using directory names
-model_list = glob.glob("*",root_dir="test_data/")
+model_list = os.listdir("test_data/")
 
 # If running on CI, only run some of the tests
 #if os.environ.get('CI', None) == 'true':
