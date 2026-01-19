@@ -2089,7 +2089,7 @@ end function integrate_trap_array
    character(len=20), intent(out) :: tokens(10)
    integer, intent(out) :: numTokens
 
-   integer :: i, p1, p2, len_line
+   integer :: p1, p2, len_line
 
    len_line = len_trim(line)
    numTokens = 0

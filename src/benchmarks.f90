@@ -171,8 +171,6 @@ subroutine readMolecule_benchmark2()
   character(len=80) :: junk
   integer :: i, iPart
 
-  real :: molecularWeight
-
   open(1, file=mol(1)%filename, status="old", form="formatted")
 
   read(1,'(a)') mol(1)%name
