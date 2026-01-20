@@ -263,13 +263,13 @@ module atom_transfer
             n_rayons = healpix_npix(healpix_lorder)
             allocate(xmux(n_rayons),xmu(n_rayons),xmuy(n_rayons),wmu(n_rayons))
             wmu(:) = healpix_weight(healpix_lorder)
-            write(*,'(" ****-> Using "(1I8)" pixels for healpix, resolution of "(1F12.3)" degrees")') n_rayons,  &
+            write(*,'(" ****-> Using ",(1I8)," pixels for healpix, resolution of ",(1F12.3)," degrees")') n_rayons,  &
                  healpix_angular_resolution(healpix_lorder)
             call healpix_sphere(healpix_lorder,xmu,xmux,xmuy)
             conv_speed_limit = conv_speed_limit_healpix
          else if (etape==2) then
             n_rayons = N_rayons_mc
-            write(*,'(" ****-> Using "(1I4)" rays for Monte-Carlo step, ~resolution of "(1F12.3)" degrees")') n_rayons, &
+            write(*,'(" ****-> Using ",(1I4)," rays for Monte-Carlo step, ~resolution of ",(1F12.3)," degrees")') n_rayons, &
                  360.0 * sqrt(pi/real(n_rayons))/pi
             allocate(wmu(n_rayons))
             wmu(:) = 1.0_dp / real(n_rayons,kind=dp)
@@ -331,7 +331,7 @@ module atom_transfer
             !           of the populations and electronic density.
             !
             !                    goes with maxIter
-            write(*,'(" *** Iteration #"(1I4)"; step #"(1I1)"; threshold: "(1ES11.2E3)"; Nrays: "(1I5))') &
+            write(*,'(" *** Iteration #",(1I4),"; step #",(1I1),"; threshold: ",(1ES11.2E3),"; Nrays: ",(1I5))') &
                      n_iter, etape, precision, n_rayons
             ! write(*,'("  -- min(diff_loc)="(1ES13.5E3))') minval(diff_loc,mask=(icompute_atomRT>0).and.(diff_loc >= 1d-2 * precision))
             ! if (n_iterate_ne > 0) &
@@ -500,13 +500,13 @@ module atom_transfer
                   .and.(.not.lprevious_converged) ) then
                iorder = n_iter - Ng_Ndelay
                if (ng_rest) then
-                  write(*,'(" -> Acceleration relaxes... "(1I2)" / "(1I2))') iorder-i0_rest, Ng_Nperiod
+                  write(*,'(" -> Acceleration relaxes... ",(1I2)," / ",(1I2))') iorder-i0_rest, Ng_Nperiod
                   if (iorder-i0_rest == Ng_Nperiod) ng_rest = .false.
                else
                   i0_rest = iorder
                   iacc = iacc + 1
                   ng_index = Neq_Ng - mod(iacc-1,Neq_ng)
-                  write(*,'(" -> Accumulate solutions... "(1I2)" / "(1I2))') iacc, Neq_ng
+                  write(*,'(" -> Accumulate solutions... ",(1I2)," / ",(1I2))') iacc, Neq_ng
                   !index 1 is the running one in the main loop for new values.
                   ngpop(:,:,:,ng_index) = ngpop(:,:,:,1)
                   accelerated = (iacc==Neq_ng)
@@ -552,7 +552,7 @@ module atom_transfer
                id = 1
                dne = 0.0_dp !=max(dne_loc)
                dne_loc(:) = abs(1.0_dp - ne(:)/(1d-100 + ngpop(1,NactiveAtoms+1,:,1)))
-               ! write(*,'("  OLD ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
+               ! write(*,'("  OLD ne(min)=",(1ES17.8E3)," m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') &
                !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                !$omp parallel &
                !$omp default(none) &
@@ -598,7 +598,7 @@ module atom_transfer
                end do
                !$omp end do
                !$omp end parallel
-               ! write(*,'("  NEW ne(min)="(1ES16.8E3)" m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
+               ! write(*,'("  NEW ne(min)=",(1ES16.8E3)," m^-3 ;ne(max)="(1ES16.8E3)" m^-3")') &
                !    minval(ne,mask=(icompute_atomRT>0)), maxval(ne)
                ! write(*,*) ''
                if ((dne < 1d-4 * precision).and.(.not.lcswitch_enabled)) then
@@ -708,25 +708,25 @@ module atom_transfer
 
             if (accelerated) then
                ! write(*,'("            "(1A13))') "(Accelerated)"
-               write(*,'("            ("(1A11)" #"(1I4)")")') "Accelerated", n_iter_accel
+               write(*,'("            (",(1A11)," #",(1I4),")")') "Accelerated", n_iter_accel
             endif
             do nact=1,NactiveAtoms
-               write(*,'("                  "(1A2))') ActiveAtoms(nact)%p%ID
-               ! write(*,'("             Atom "(1A2))') ActiveAtoms(nact)%p%ID
-               write(*,'("   >>> dpop="(1ES13.5E3))') dM(nact)
+               write(*,'("                  ",(1A2))') ActiveAtoms(nact)%p%ID
+               ! write(*,'("             Atom ",(1A2))') ActiveAtoms(nact)%p%ID
+               write(*,'("   >>> dpop=",(1ES13.5E3))') dM(nact)
             enddo
             if (l_iterate_ne) then
                write(*,*) ""
-               write(*,'("                  "(1A2))') "ne"
-               write(*,'("   >>> dne="(1ES13.5E3))') dne
+               write(*,'("                  ",(1A2))') "ne"
+               write(*,'("   >>> dne=",(1ES13.5E3))') dne
             endif
             write(*,*) ""
-            write(*,'(" <<->> diff="(1ES13.5E3)," old="(1ES13.5E3))') diff, diff_old
-            write(*,'("   ->> diffcont="(1ES13.5E3))') diff_cont
-            write(*,'("   ->> speed="(1ES12.4E3)"; acc="(1ES12.4E3))') conv_speed, conv_acc
+            write(*,'(" <<->> diff=",(1ES13.5E3),", old=",(1ES13.5E3))') diff, diff_old
+            write(*,'("   ->> diffcont=",(1ES13.5E3))') diff_cont
+            write(*,'("   ->> speed=",(1ES12.4E3),"; acc=",(1ES12.4E3))') conv_speed, conv_acc
             unconverged_cells = size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0)))
             unconverged_fraction = 100.*real(unconverged_cells) / real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
-            write(*,"('   ->> Unconverged cells #'(1I6)'; fraction:'(1F6.2)'%')") unconverged_cells, unconverged_fraction
+            write(*,"('   ->> Unconverged cells #',(1I6),'; fraction:',(1F6.2),'%')") unconverged_cells, unconverged_fraction
             write(*,*) "      -------------------------------------------------- "
             diff_old = diff
             conv_acc = conv_speed
@@ -778,7 +778,7 @@ module atom_transfer
             call system_clock(cend_iter,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpuend_iter)
             time_iteration = real(cend_iter - cstart_iter)/real(time_tick)
-            write(*,'("  --> time iteration="(1F12.4)" min (cpu : "(1F8.4)")")') &
+            write(*,'("  --> time iteration=",(1F12.4)," min (cpu : ",(1F8.4),")")') &
                   mod(time_iteration/60.0,60.0), mod((cpuend_iter-cpustart_iter)/60.0,60.0)
             time_iter_avg = time_iter_avg + time_iteration
             ! -> will be averaged with the number of iterations done for this step
@@ -787,7 +787,7 @@ module atom_transfer
             ! if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
             if ( (n_iter > maxIter/4).and.(unconverged_fraction < 3.0).or.&
                ((unconverged_fraction < 3.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
-               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
+               write(*,'("WARNING: there are less than ",(1F6.2)," % of unconverged cells after ",(1I4)," iterations")') &
                   unconverged_fraction, n_iter
                write(*,*) " -> forcing convergence"
                lconverged = .true.
@@ -820,22 +820,22 @@ module atom_transfer
          !-> for this step
          time_iter_avg = time_iter_avg / real(n_iter)
 
-         write(*,'("<time iteration>="(1F8.4)" min; <time step>="(1F8.4)" min")') mod(time_iter_avg/60.,60.), &
+         write(*,'("<time iteration>=",(1F8.4)," min; <time step>=",(1F8.4)," min")') mod(time_iter_avg/60.,60.), &
                  mod(n_iter * time_iter_avg/60.,60.)
-         write(*,'(" --> ~time step (cpu)="(1F8.4)" min")') mod(n_iter * time_iter_avg * nb_proc/60.,60.)
+         write(*,'(" --> ~time step (cpu)=",(1F8.4)," min")') mod(n_iter * time_iter_avg * nb_proc/60.,60.)
 
          if (allocated(xmu)) deallocate(xmux,xmuy,xmu)
          if (allocated(wmu)) deallocate(wmu)
 
-         ! write(*,'("  <step #"(1I1)" done! :: threshold="(1ES17.8E3)">")') etape,  precision
-         write(*,'("  <step #"(1I1)" done!>")') etape
+         ! write(*,'("  <step #",(1I1)," done! :: threshold="(1ES17.8E3)">")') etape,  precision
+         write(*,'("  <step #",(1I1)," done!>")') etape
 
       end do step_loop
 
       ! -------------------------------- CLEANING ------------------------------------------ !
 
       if (n_iterate_ne > 0) then
-         write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+         write(*,'("ne(min)=",(1ES17.8E3)," m^-3 ;ne(max)=",(1ES17.8E3)," m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
          call write_electron
          tab_xc => null()
       endif
@@ -901,7 +901,7 @@ module atom_transfer
       ! else
       !    dv = 2*sqrt( maxval(sum(vfield3d**2,dim=2)) )
       ! endif
-      ! write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
+      ! write(*,'("maximum gradv=",(1F12.3)," km/s")') dv*1d-3
       ! return
 
       ! Evaluate the max velocity gradient between pairs of cells directly from
@@ -983,7 +983,7 @@ module atom_transfer
       !$omp end do
       !$omp end parallel
       deallocate(stream)
-      write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
+      write(*,'("maximum gradv=",(1F12.3)," km/s")') dv*1d-3
 
       return
 
@@ -1036,7 +1036,7 @@ module atom_transfer
          !$omp end parallel
       endif
 
-      write(*,'("maximum gradv="(1F12.3)" km/s")') dv*1d-3
+      write(*,'("maximum gradv=",(1F12.3)," km/s")') dv*1d-3
 
       return
    end subroutine compute_max_relative_velocity
@@ -1219,11 +1219,11 @@ module atom_transfer
 
       if (laccretion_shock) then
          !3 + lg(Facc) = lg(Facc) erg/cm2/s
-         if (max_Facc>0) write(*,'("max(lgFacc)="(1F7.3)" W/m^2; min(lgFacc)="(1F7.3)" W/m^2")') &
+         if (max_Facc>0) write(*,'("max(lgFacc)=",(1F7.3)," W/m^2; min(lgFacc)=",(1F7.3)," W/m^2")') &
             log10(max_Facc), log10(min_Facc)
-         if (max_Tshock>0) write(*,'("max(Tshock)="(1I8)" K; min(Tshock)="(1I8)" K")') &
+         if (max_Tshock>0) write(*,'("max(Tshock)=",(1I8)," K; min(Tshock)=",(1I8)," K")') &
             nint(max_Tshock), nint(min_Tshock)
-         if (max_Thp>0) write(*,'("max(Thp)="(1I6)" K; min(Thp)="(1I6)" K")') &
+         if (max_Thp>0) write(*,'("max(Thp)=",(1I6)," K; min(Thp)=",(1I6)," K")') &
             nint(max_Thp), nint(min_Thp)
       endif
 
@@ -1834,4 +1834,4 @@ end module atom_transfer
          ! else
          !    v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
          ! endif
-         ! write(*,'("maximum gradv="(1F12.3)" km/s")') v_char*1d-3
+         ! write(*,'("maximum gradv=",(1F12.3)," km/s")') v_char*1d-3

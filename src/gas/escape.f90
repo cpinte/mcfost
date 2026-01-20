@@ -365,9 +365,9 @@ module escape
             deallocate(stream)
         endif
 
-        write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') &
+        write(*,'("max(<gradv>)=",(1ES17.8E3)," s^-1; min(<gradv>)=",(1ES17.8E3)," s^-1")') &
             maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
-        write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') &
+        write(*,'("max(<l>)=",(1ES17.8E3)," m; min(<l>)=",(1ES17.8E3)," m")') &
             maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
         do i_star=1, n_etoiles
             write(*,*) "star #", i_star
@@ -375,17 +375,17 @@ module escape
             !it uses the average distance to the star as reference point in the cell.
             where (d_to_star(:,i_star) > 0) &
                 wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
-            write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') &
+            write(*,'("  -- max(<d>)=",(1ES17.8E3),"; min(<d>)=",(1ES17.8E3))') &
                 maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
-            write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') &
+            write(*,'("  -- max(W)=",(1ES17.8E3),"; min(W)=",(1ES17.8E3))') &
                 maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
-            write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') &
+            write(*,'("  -- max(dOmegac)=",(1ES17.8E3),"; min(dOmegac)=",(1ES17.8E3))') &
                 maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
             if (laccretion_shock) then
                 write(*,*) " Shock covers ", 100.0 * f_shock(i_star), " % of star #", i_star
-                write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') &
+                write(*,'("  -- max(dOmega_shock)=",(1ES17.8E3),"; min(dOmega_shock)=",(1ES17.8E3))') &
                     maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
-                write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') &
+                write(*,'("  -- max(dOmega*)=",(1ES17.8E3),"; min(dOmega*)=",(1ES17.8E3))') &
                     maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
                 write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
             endif
@@ -574,9 +574,9 @@ module escape
             f_shock = real(n_rays_shock) / real(n_rays_star)
         endif
 
-        write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') &
+        write(*,'("max(<gradv>)=",(1ES17.8E3)," s^-1; min(<gradv>)=",(1ES17.8E3)," s^-1")') &
             maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
-        write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') &
+        write(*,'("max(<l>)=",(1ES17.8E3)," m; min(<l>)=",(1ES17.8E3)," m")') &
             maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
         do i_star=1, n_etoiles
             write(*,*) "star #", i_star
@@ -584,17 +584,17 @@ module escape
             !it uses the average distance to the star as reference point in the cell.
             where (d_to_star(:,i_star) > 0) &
                 wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
-            write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') &
+            write(*,'("  -- max(<d>)=",(1ES17.8E3),"; min(<d>)=",(1ES17.8E3))') &
                 maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
-            write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') &
+            write(*,'("  -- max(W)=",(1ES17.8E3),"; min(W)=",(1ES17.8E3))') &
                 maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
-            write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') &
+            write(*,'("  -- max(dOmegac)=",(1ES17.8E3),"; min(dOmegac)=",(1ES17.8E3))') &
                 maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
             if (laccretion_shock) then
                 write(*,*) " Shock covers ", 100.0 * f_shock(i_star), " % of star #", i_star
-                write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') &
+                write(*,'("  -- max(dOmega_shock)=",(1ES17.8E3),"; min(dOmega_shock)=",(1ES17.8E3))') &
                     maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
-                write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') &
+                write(*,'("  -- max(dOmega*)=",(1ES17.8E3),"; min(dOmega*)=",(1ES17.8E3))') &
                     maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
                 write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
             endif
@@ -799,7 +799,7 @@ module escape
 
             n_iter = n_iter + 1
             ng_index = Neq_ng - mod(n_iter-1,Neq_ng)
-            write(*,'(" *** Iteration #"(1I4)"; threshold: "(1ES11.2E3)"; Nrays: "(1I5))') &
+            write(*,'(" *** Iteration #",(1I4),"; threshold: ",(1ES11.2E3),"; Nrays: ",(1I5))') &
                      n_iter, precision, n_rayons
             ibar = 0
             n_cells_done = 0
@@ -1037,21 +1037,21 @@ module escape
             endif
 
             do nact=1,NactiveAtoms
-               write(*,'("                  "(1A2))') ActiveAtoms(nact)%p%ID
-               write(*,'("   >>> dpop="(1ES13.5E3))') dM(nact)
+               write(*,'("                  ",(1A2))') ActiveAtoms(nact)%p%ID
+               write(*,'("   >>> dpop=",(1ES13.5E3))') dM(nact)
             enddo
             if (l_iterate_ne) then
                write(*,*) ""
-               write(*,'("                  "(1A2))') "ne"
-               write(*,'("   >>> dne="(1ES13.5E3))') dne
+               write(*,'("                  ",(1A2))') "ne"
+               write(*,'("   >>> dne=",(1ES13.5E3))') dne
             endif
             write(*,*) ""
-            write(*,'(" <<->> diff="(1ES13.5E3)," old="(1ES13.5E3))') diff, diff_old
-            write(*,'("   ->> diffcont="(1ES13.5E3))') diff_cont
-            write(*,'("   ->> speed="(1ES12.4E3)"; acc="(1ES12.4E3))') conv_speed, conv_acc
+            write(*,'(" <<->> diff=",(1ES13.5E3),", old=",(1ES13.5E3))') diff, diff_old
+            write(*,'("   ->> diffcont=",(1ES13.5E3))') diff_cont
+            write(*,'("   ->> speed=",(1ES12.4E3),"; acc=",(1ES12.4E3))') conv_speed, conv_acc
             unconverged_cells = size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0)))
             unconverged_fraction = 100.*real(unconverged_cells) / real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
-            write(*,"('   ->> Unconverged cells #'(1I6)'; fraction:'(1F6.2)'%')") unconverged_cells, unconverged_fraction
+            write(*,"('   ->> Unconverged cells #',(1I6),'; fraction:',(1F6.2),'%')") unconverged_cells, unconverged_fraction
             write(*,*) "      -------------------------------------------------- "
             diff_old = diff
             conv_acc = conv_speed
@@ -1094,7 +1094,7 @@ module escape
             call system_clock(cend_iter,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpuend_iter)
             time_iteration = real(cend_iter - cstart_iter)/real(time_tick)
-            write(*,'("  --> time iteration="(1F12.4)" min (cpu : "(1F8.4)")")') &
+            write(*,'("  --> time iteration=",(1F12.4)," min (cpu : ",(1F8.4),")")') &
                   mod(time_iteration/60.0,60.0), mod((cpuend_iter-cpustart_iter)/60.0,60.0)
             time_iter_avg = time_iter_avg + time_iteration
             ! -> will be averaged with the number of iterations done for this step
@@ -1103,7 +1103,7 @@ module escape
             ! if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
             if ( (n_iter > maxIter/4).and.(unconverged_fraction < 3.0).or.&
                ((unconverged_fraction < 3.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
-               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
+               write(*,'("WARNING: there are less than ",(1F6.2)," % of unconverged cells after ",(1I4)," iterations")') &
                   unconverged_fraction, n_iter
                write(*,*) " -> forcing convergence"
                lconverged = .true.
@@ -1136,9 +1136,9 @@ module escape
         !-> for this step
         time_iter_avg = time_iter_avg / real(n_iter)
 
-        write(*,'("<time iteration>="(1F8.4)" min; <time step>="(1F8.4)" min")') mod(time_iter_avg/60.,60.), &
+        write(*,'("<time iteration>=",(1F8.4)," min; <time step>=",(1F8.4)," min")') mod(time_iter_avg/60.,60.), &
                  mod(n_iter * time_iter_avg/60.,60.)
-        write(*,'(" --> ~time step (cpu)="(1F8.4)" min")') mod(n_iter * time_iter_avg * nb_proc/60.,60.)
+        write(*,'(" --> ~time step (cpu)=",(1F8.4)," min")') mod(n_iter * time_iter_avg * nb_proc/60.,60.)
 
         if (allocated(wmu)) deallocate(wmu)
         call dealloc_escape_variables
@@ -1146,7 +1146,7 @@ module escape
       ! -------------------------------- CLEANING ------------------------------------------ !
 
       if (n_iterate_ne > 0) then
-        write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+        write(*,'("ne(min)=",(1ES17.8E3)," m^-3 ;ne(max)=",(1ES17.8E3)," m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
         tab_xc => null()
       endif
 

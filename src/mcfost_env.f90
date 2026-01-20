@@ -15,7 +15,7 @@ module mcfost_env
   character(len=128) :: raw_webpage  = "https://raw.githubusercontent.com/cpinte/mcfost/master/src/"
   character(len=32)  :: version_file  = "mcfost_env.f90"
 
-  ! Syst�me
+  ! SystÃ¨me
   integer :: nb_proc
   integer, parameter :: cache_line_size = 64 ! 64 bytes = 16 floats = 8 double, from Core 2 Duo to i7 + Xeon Phi
 

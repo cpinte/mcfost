@@ -144,10 +144,7 @@ contains
 
     character (:), allocatable :: line
 
-    real, allocatable :: pts(:)
-
     integer position, lineSize, nPoints
-    integer i,j,k,n
 
     position = oldposition
     call readLine(file, position, line, newposition)
