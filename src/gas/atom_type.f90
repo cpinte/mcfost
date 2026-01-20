@@ -331,7 +331,7 @@ module atom_type
          case ('X')
             L = 19
          case DEFAULT
-            write(*,'("Orbit " (1A1) "unknown")') orbit
+            write(*,'("Orbit ",(1A1)," unknown")') orbit
             unknown_orbital = .true.
       end select
       return
@@ -509,7 +509,7 @@ module atom_type
          endif
       enddo
 
-      if (print_message) write(*,'(" ** cswitch for next iteration: "(1ES17.8E3))') new_cs
+      if (print_message) write(*,'(" ** cswitch for next iteration: ",(1ES17.8E3))') new_cs
 
 
       return

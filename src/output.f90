@@ -3605,7 +3605,7 @@ subroutine write_atomic_maps(atom)
          do ii=1, RT_n_incl
             do iaz=1, RT_n_az
 
-               write(im_ori, '("_i="(1F5.1)"a="(1F5.1))') tab_rt_incl(ii), tab_rt_az(iaz)
+               write(im_ori, '("_i=",(1F5.1),"a=",(1F5.1))') tab_rt_incl(ii), tab_rt_az(iaz)
 
                status=0
                call ftgiou (unit,status)
