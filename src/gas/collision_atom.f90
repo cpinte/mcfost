@@ -284,7 +284,7 @@ module collision_atom
     n = 0
     !it is still important to read an END in the file
     key = "   "
-    write(FormatLine,'("(1"A,I5")")') "A", Nmax_line_per_collision*10
+    write(FormatLine,'("(A",I0,")")') Nmax_line_per_collision*10
     do while(key /= END_OF_FILE)
       ! read(unit,'(1A<Nmax_line_per_collision*10>)',iostat=status) inputline
       read(unit,FormatLine,iostat=status) inputline
@@ -644,7 +644,7 @@ module collision_atom
     sumscl = 0.0
     kr = 0 ; i = 0 ;j = 0
 
-    write(FormatLine,'("(1"A,I5")")') "A", Nmax_line_per_collision
+    write(FormatLine,'("(A",I0,")")') Nmax_line_per_collision
 
     Nlines = size(atom%collision_lines)
 

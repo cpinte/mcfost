@@ -306,10 +306,10 @@ module gas_contopac
             ! exphckT(icell) = exp(-hc_k/T(icell)/lambda_base)!exp(-hnu/kT) = exphckT**(lambda_base/lambda(nm))
          endif
       enddo
-		write(*,'("allocate "(1F6.4)" GB for alphai_bell_berr_part")') real(sizeof(alphai_bell_berr_part))/1024./1024./1024.
-		write(*,'("allocate "(1F6.4)" GB for j0_bell_berr")') real(sizeof(j0_theta_bell_berr))/1024./1024./1024.
-		write(*,'("allocate "(1F6.4)" GB for -hnu_k")') real(sizeof(hnu_k))/1024./1024./1024.
-		write(*,'(" -> max(hnu_k)="(1ES14.5E3)"; min(hnu_k)="(ES14.5E3))') maxval(hnu_k), minval(hnu_k)
+		write(*,'("allocate ",(1F6.4)," GB for alphai_bell_berr_part")') real(sizeof(alphai_bell_berr_part))/1024./1024./1024.
+		write(*,'("allocate ",(1F6.4)," GB for j0_bell_berr")') real(sizeof(j0_theta_bell_berr))/1024./1024./1024.
+		write(*,'("allocate ",(1F6.4)," GB for -hnu_k")') real(sizeof(hnu_k))/1024./1024./1024.
+		write(*,'(" -> max(hnu_k)=",(1ES14.5E3),"; min(hnu_k)=",(ES14.5E3))') maxval(hnu_k), minval(hnu_k)
 		! write(*,'("allocate "(1F6.4)" GB for exp(-hc/kT)")') real(sizeof(exphckT))/1024./1024./1024.
 		! write(*,'(" -> max(ehnukt)="(1ES14.5E3)"; min(ehnukt)="(ES14.5E3))') maxval(exphckT(:)), minval(exphckT(:),mask=icompute_AtomRT>0)
 

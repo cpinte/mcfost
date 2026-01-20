@@ -316,7 +316,7 @@ subroutine define_cylindrical_grid()
         puiss = 0.0_dp
         do iz=1, n_zones
            if (disk_zone(iz)%region == ir) then
-              p=1+dz%surf-dz%exp_beta
+              p=1+disk_zone(iz)%surf-disk_zone(iz)%exp_beta
               if (p > puiss) then
                  puiss = p
               endif

@@ -114,7 +114,7 @@ module abo
             neff2_0 = BARKLEM_DF_NEFF2
             barklem_data = BARKLEM_DF_DATA
          case default
-            write(*,'((1A2) " Unrocognised Barklem transition")') btype
+            write(*,'((1A2)," Unrocognised Barklem transition")') btype
             res = .false.
             return
       end select

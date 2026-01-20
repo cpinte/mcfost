@@ -1117,7 +1117,7 @@ subroutine mcfost_v()
   write(*,fmt='(" with INTEL compiler version ",i4)')  __INTEL_COMPILER
 #endif
 #if defined (__GFORTRAN__)
-  write(*,fmt='(" with GFORTRAN compiler version ",i2,".",i1,"."i1)') __GNUC__ , __GNUC_MINOR__,  __GNUC_PATCHLEVEL__
+  write(*,fmt='(" with GFORTRAN compiler version ",i2,".",i1,".",i1)') __GNUC__ , __GNUC_MINOR__,  __GNUC_PATCHLEVEL__
 #endif
 #if defined (__G95__)
   write(*,fmt='(" with G95 compiler version ",i1,".",i2)') __G95__, __G95_MINOR__
@@ -2089,7 +2089,7 @@ end function integrate_trap_array
    character(len=20), intent(out) :: tokens(10)
    integer, intent(out) :: numTokens
 
-   integer :: i, p1, p2, len_line
+   integer :: p1, p2, len_line
 
    len_line = len_trim(line)
    numTokens = 0
