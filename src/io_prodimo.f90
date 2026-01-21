@@ -217,7 +217,7 @@ contains
                 eps_PAH = dust_pop(pop)%frac_mass /disk_zone(i)%gas_to_dust  ! fraction en masse (de gaz) des PAHS
 
                 ! 1.209274 = (mH2*nH2 + mHe * mHe) / (nH2 + nHe) avec nHe/nH2 = 10^-1.125
-                ! abondance en nombre par rapport H-nuclei + correction pour NC
+                ! abondance en nombre par rapport à H-nuclei + correction pour NC
                 fPAH(i) = fPAH(i) + (1.209274/masse_PAH) * eps_PAH/3e-7 * (NC/50.)
                 !write(*,*) i, fPAH(i), real(dust_pop(pop)%frac_mass * disk_zone(i)%diskmass), real(dust_pop(pop)%frac_mass),  real(disk_zone(i)%diskmass)
              endif  ! PAH
@@ -365,7 +365,7 @@ contains
 
     integer :: status,unit,blocksize,bitpix,naxis
     integer, dimension(5) :: naxes
-    integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, icell, i, iRegion, k
+    integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, icell, i, iRegion, k, p_l
     integer :: iPAH_start, iPAH_end, n_grains_PAH
     real (kind=dp) :: n_photons_envoyes, energie_photon, facteur, N
     real :: wl, norme, Ttmp
@@ -812,8 +812,8 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-    ! tau est sans dimension : [kappa * lvol = density * a**2 * lvol]
-    ! C_ext = a**2 microns**2 -> 1e-8 cm**2             \
+    ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
+    ! C_ext = a² microns² -> 1e-8 cm²             \
     ! density en cm-3                      > reste facteur 149595.0
     ! longueur de vol en AU = 1.5e13 cm   /
     facteur = AU_to_cm * mum_to_cm**2
@@ -823,8 +823,11 @@ contains
           icell = cell_map(ri,zj,1)
           do lambda=1,n_lambda
              do l= grain_RE_LTE_start, grain_RE_LTE_end
-                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * densite_pouss(l,icell) * facteur
-                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * densite_pouss(l,icell) * facteur
+                p_l = merge(l, 1, lvariable_dust)
+                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * &
+                     dust_density(p_l,icell) * nbre_grains(l) * facteur
+                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * &
+                     dust_density(p_l,icell) * nbre_grains(l) * facteur
              enddo ! l
           enddo ! lambda
        enddo ! ri
@@ -850,18 +853,32 @@ contains
 
     do zj=1,nz
        do ri=1,n_rad
-          ! Nbre total de grain : le da est deja dans densite_pouss
+          ! Total number of grain. da is already in nbre_grains
           icell = cell_map(ri,zj,1)
-          N = sum(densite_pouss(:,icell),mask=mask_not_PAH)
-          N_grains(ri,zj,0) = N
-          if (N > 0) then
-             N_grains(ri,zj,1) = sum(densite_pouss(:,icell) * r_grain(:),mask=mask_not_PAH) / N
-             N_grains(ri,zj,2) = sum(densite_pouss(:,icell) * r_grain(:)**2,mask=mask_not_PAH) / N
-             N_grains(ri,zj,3) = sum(densite_pouss(:,icell) * r_grain(:)**3,mask=mask_not_PAH) / N
+          if (lvariable_dust) then
+             N = sum(dust_density(:,icell) * nbre_grains(:),mask=mask_not_PAH)
+             N_grains(ri,zj,0) = N
+             if (N > 0) then
+                N_grains(ri,zj,1) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:),mask=mask_not_PAH) / N
+                N_grains(ri,zj,2) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
+                N_grains(ri,zj,3) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
+             else
+                N_grains(ri,zj,1) = 0.0
+                N_grains(ri,zj,2) = 0.0
+                N_grains(ri,zj,3) = 0.0
+             endif
           else
-             N_grains(ri,zj,1) = 0.0
-             N_grains(ri,zj,2) = 0.0
-             N_grains(ri,zj,3) = 0.0
+             N = sum(dust_density(1,icell) * nbre_grains(:),mask=mask_not_PAH)
+             N_grains(ri,zj,0) = N
+             if (N > 0) then
+                N_grains(ri,zj,1) = sum(dust_density(1,icell) * nbre_grains(:) * r_grain(:),mask=mask_not_PAH) / N
+                N_grains(ri,zj,2) = sum(dust_density(1,icell) * nbre_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
+                N_grains(ri,zj,3) = sum(dust_density(1,icell) * nbre_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
+             else
+                N_grains(ri,zj,1) = 0.0
+                N_grains(ri,zj,2) = 0.0
+                N_grains(ri,zj,3) = 0.0
+             endif
           endif
        enddo
     enddo
@@ -947,7 +964,13 @@ contains
        do ri=1, n_rad
           do zj=1,nz
              icell = cell_map(ri,zj,k)
-             dens(ri,zj) = sum(densite_pouss(iPAH_start:iPAH_end, icell) * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
+             if (lvariable_dust) then
+                dens(ri,zj) = sum(dust_density(iPAH_start:iPAH_end, icell) * nbre_grains(iPAH_start:iPAH_end) &
+                     * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
+             else
+                dens(ri,zj) = sum(dust_density(1, icell) * nbre_grains(iPAH_start:iPAH_end) &
+                     * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
+             endif
           enddo
        enddo
        call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -975,8 +998,9 @@ contains
              icell = cell_map(ri,zj,1)
              do lambda=1,n_lambda
                 do l= iPAH_start, iPAH_end
-                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * densite_pouss(l,icell)
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * densite_pouss(l,icell)
+                   p_l = merge(l, 1, lvariable_dust)
+                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
                 enddo ! l
              enddo ! lambda
           enddo ! ri
@@ -1003,13 +1027,14 @@ contains
              icell = cell_map(ri,zj,1)
              norme = 0.0
              do l= iPAH_start, iPAH_end
+                p_l = merge(l, 1, lvariable_dust)
                 if (lPAH_nRE) then
                    Ttmp = Tdust_1grain_nRE(l,icell)
                 else
                    Ttmp = Tdust_1grain(l,icell)
                 endif
-                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * densite_pouss(l,icell)
-                norme = norme + densite_pouss(l,icell)
+                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * dust_density(p_l,icell) * nbre_grains(l)
+                norme = norme + dust_density(p_l,icell) * nbre_grains(l)
              enddo ! l
              TPAH_eq(ri,zj,1) = (TPAH_eq(ri,zj,1)/norme)**0.25
           enddo ! ri

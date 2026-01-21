@@ -244,7 +244,7 @@ contains
              icell = cell_map(i,j,phik)
 
              densite_gaz(icell) = rho(i,i2,i3) * udens
-             densite_pouss(:,icell) = rho(i,i2,i3) * udens
+             dust_density(:,icell) = rho(i,i2,i3) * udens
 
              vfield3d(icell,1)  = vx1(i,i2,i3) * uvelocity! vr
              vfield3d(icell,2)  = (vx3(i,i2,i3) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
