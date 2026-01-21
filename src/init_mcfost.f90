@@ -13,7 +13,7 @@ module init_mcfost
   use utils
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters
-  use read1d_models, only : read_model_1d
+  use read_1d_models, only : read_model_1d
   use read_idefix, only : read_idefix_parameters
   use read_pluto, only : read_pluto_parameters
   use read_spherical_grid, only : read_spherical_grid_parameters

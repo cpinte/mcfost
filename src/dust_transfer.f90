@@ -25,7 +25,7 @@ module dust_transfer
   use init_mcfost
   use SPH2mcfost
   use ML_ProDiMo
-  use read1d_models, only : setup_model1d_to_mcfost !to check
+  use read_1d_models, only : setup_model1d_to_mcfost !to check
   use mhd2mcfost, only : setup_mhd_to_mcfost !to check
   use read_fargo3d, only : read_fargo3d_files
   use read_athena, only : read_athena_model
