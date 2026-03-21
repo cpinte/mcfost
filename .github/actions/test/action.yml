@@ -14,10 +14,7 @@ runs:
     - name: download reference data for test suite
       shell: bash
       working-directory: test_suite
-      run: |
-        wget -nv https://ipag.osug.fr/~pintec/mcfost/test_data_0c484a1a905c13bea4c3bc0494ba288daddbe779.tgz
-        rm -rf test_data
-        tar xzf test_data_0c484a1a905c13bea4c3bc0494ba288daddbe779.tgz
+      run: ./get_test_data.sh
 
     # Only do this if not in manylinux docker container
     - uses: actions/setup-python@v5
