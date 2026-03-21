@@ -956,7 +956,7 @@ subroutine Temp_finale_nLTE()
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
      do k=grain_RE_nLTE_start, grain_RE_nLTE_end
-        p_k = merge(k,grain(k)%pop,lvariable_dust)
+        p_k = merge(k,grain(k)%zone,lvariable_dust)
         if (dust_density(p_k,icell) > tiny_dp) then
            J_absorbe=0.0
            do lambda=1, n_lambda
@@ -1122,7 +1122,7 @@ subroutine Temp_nRE(lconverged)
 
      id = 1 ! pour code sequentiel
      ! ganulation faible car le temps calcul depend fortement des cellules
-     p_l = merge(l, grain(l)%pop, lvariable_dust)
+     p_l = merge(l, grain(l)%zone, lvariable_dust)
      !$omp do schedule(dynamic,1)
      do icell=n_cells, 1, -1
         !$ id = omp_get_thread_num() + 1
@@ -1547,7 +1547,7 @@ subroutine update_proba_abs_nRE()
         delta_kappa_abs_qRE = 0.0_dp
         lall_grains_eq = .true.
         do l=grain_nRE_start,grain_nRE_end
-           p_l = merge(l,grain(l)%pop,lvariable_dust)
+           p_l = merge(l,grain(l)%zone,lvariable_dust)
            if (lchange_nRE(l,icell)) then ! 1 grain a change de status a cette iteration
               delta_kappa_abs_qRE =  C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
            else
@@ -1653,7 +1653,7 @@ subroutine emission_nRE()
         E_emise = 0.0
 
         do k=grain_nRE_start,grain_nRE_end
-           p_k = merge(k,grain(k)%pop,lvariable_dust)
+           p_k = merge(k,grain(k)%zone,lvariable_dust)
            if (l_RE(k,icell)) then ! le grain a une temperature
               if (lchange_nRE(k,icell)) then ! la grain passe en qRE a cette iteration : il faut le compter
                  d_k = dust_density(p_k,icell)
@@ -1754,7 +1754,7 @@ subroutine init_emissivite_nRE()
         E_emise = 0.0_dp
 
         do k=grain_nRE_start,grain_nRE_end
-           p_k = merge(k,grain(k)%pop,lvariable_dust)
+           p_k = merge(k,grain(k)%zone,lvariable_dust)
            E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*nbre_grains(k)* volume(icell) * facteur !* Proba_Tdust = 1 pour Tmin
         enddo !k
         Emissivite_nRE_old(icell,lambda) = E_emise
@@ -1835,7 +1835,7 @@ subroutine repartition_energie(lambda)
         E_emise = 0.0
         if (.not.l_dark_zone(icell)) then
            do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-              p_k = merge(k,grain(k)%pop,lvariable_dust)
+              p_k = merge(k,grain(k)%zone,lvariable_dust)
               Temp=Tdust_1grain(k,icell)
               if (Temp > tiny_real) then
                  cst_wl=cst_th/(Temp*wl)
@@ -1868,7 +1868,7 @@ subroutine repartition_energie(lambda)
         if (.not.l_dark_zone(icell)) then
 
            do k=grain_nRE_start,grain_nRE_end
-              p_k = merge(k,grain(k)%pop,lvariable_dust)
+              p_k = merge(k,grain(k)%zone,lvariable_dust)
               if (l_RE(k,icell)) then ! le grain a une temperature
                  temp=Tdust_1grain_nRE(k,icell)
                  cst_wl=cst_th/(Temp*wl)

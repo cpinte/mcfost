@@ -1744,7 +1744,8 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
      !  Write the array to the FITS file.
      dust_dens(:,:) = 0.0
      do icell=1,n_cells
-        dust_dens(icell,:) = dust_density(:,icell) * nbre_grains(:) * m3_to_cm3 ! dust_density dim1 is either 1 or n_grains_tot
+        dust_dens(icell,:) = merge(dust_density(:,icell), dust_density(grain(:)%zone,icell), lvariable_dust) * &
+             nbre_grains(:) * m3_to_cm3
      enddo !icell
 
      call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
@@ -1805,7 +1806,8 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   !  Write the array to the FITS file.
   dens(:) = 0.0
   do icell=1,n_cells
-     dens(icell) = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:)) ! M_grain en g, dust_density dim1 is either 1 or n_grains_tot
+     dens(icell) = sum(merge(dust_density(:,icell), dust_density(grain(:)%zone,icell), lvariable_dust) * &
+          nbre_grains(:) * M_grain(:))
   enddo
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
@@ -2921,7 +2923,7 @@ subroutine taille_moyenne_grains()
   implicit none
 
   real(kind=dp) :: somme
-  integer :: l, icell
+  integer :: l, icell, p_l
   real, dimension(:), allocatable :: a_moyen
 
   integer :: nc,status,unit,blocksize,bitpix,naxis
@@ -2944,8 +2946,9 @@ subroutine taille_moyenne_grains()
   do icell=1, nc
      somme=0.0
      do l=1, n_grains_tot
-        a_moyen(icell) = a_moyen(icell) + dust_density(l,icell) * nbre_grains(l) * r_grain(l)**2
-        somme = somme + dust_density(l,icell)  * nbre_grains(l)
+        p_l = merge(l, grain(l)%zone, lvariable_dust)
+        a_moyen(icell) = a_moyen(icell) + dust_density(p_l,icell) * nbre_grains(l) * r_grain(l)**2
+        somme = somme + dust_density(p_l,icell)  * nbre_grains(l)
      enddo
      a_moyen(icell) = sqrt(a_moyen(icell) / somme)
   enddo

@@ -806,7 +806,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      enddo
   else
      do k=1, n_grains_tot
-        p_k_arr(k) = grain(k)%pop
+        p_k_arr(k) = grain(k)%zone
      enddo
   endif
 
@@ -1054,7 +1054,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
      enddo
   else
      do k=1, n_grains_tot
-        p_k_arr(k) = grain(k)%pop
+        p_k_arr(k) = grain(k)%zone
      enddo
   endif
 

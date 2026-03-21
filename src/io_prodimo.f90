@@ -823,7 +823,7 @@ contains
           icell = cell_map(ri,zj,1)
           do lambda=1,n_lambda
              do l= grain_RE_LTE_start, grain_RE_LTE_end
-                p_l = merge(l, 1, lvariable_dust)
+                p_l = merge(l, grain(l)%zone, lvariable_dust)
                 opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * &
                      dust_density(p_l,icell) * nbre_grains(l) * facteur
                 opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * &
@@ -868,12 +868,12 @@ contains
                 N_grains(ri,zj,3) = 0.0
              endif
           else
-             N = sum(dust_density(1,icell) * nbre_grains(:),mask=mask_not_PAH)
+             N = sum(dust_density(grain(:)%zone,icell) * nbre_grains(:),mask=mask_not_PAH)
              N_grains(ri,zj,0) = N
              if (N > 0) then
-                N_grains(ri,zj,1) = sum(dust_density(1,icell) * nbre_grains(:) * r_grain(:),mask=mask_not_PAH) / N
-                N_grains(ri,zj,2) = sum(dust_density(1,icell) * nbre_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
-                N_grains(ri,zj,3) = sum(dust_density(1,icell) * nbre_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
+                N_grains(ri,zj,1) = sum(dust_density(grain(:)%zone,icell) * nbre_grains(:) * r_grain(:),mask=mask_not_PAH) / N
+                N_grains(ri,zj,2) = sum(dust_density(grain(:)%zone,icell) * nbre_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
+                N_grains(ri,zj,3) = sum(dust_density(grain(:)%zone,icell) * nbre_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
              else
                 N_grains(ri,zj,1) = 0.0
                 N_grains(ri,zj,2) = 0.0
@@ -968,7 +968,7 @@ contains
                 dens(ri,zj) = sum(dust_density(iPAH_start:iPAH_end, icell) * nbre_grains(iPAH_start:iPAH_end) &
                      * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
              else
-                dens(ri,zj) = sum(dust_density(1, icell) * nbre_grains(iPAH_start:iPAH_end) &
+                dens(ri,zj) = sum(dust_density(grain(iPAH_start:iPAH_end)%zone, icell) * nbre_grains(iPAH_start:iPAH_end) &
                      * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
              endif
           enddo
@@ -997,11 +997,11 @@ contains
           do ri=1,n_rad
              icell = cell_map(ri,zj,1)
              do lambda=1,n_lambda
-                do l= iPAH_start, iPAH_end
-                   p_l = merge(l, 1, lvariable_dust)
-                   opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
-                   opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
-                enddo ! l
+                 do l= iPAH_start, iPAH_end
+                    p_l = merge(l, grain(l)%zone, lvariable_dust)
+                    opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+                    opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+                 enddo ! l
              enddo ! lambda
           enddo ! ri
        enddo !zj
@@ -1027,15 +1027,15 @@ contains
              icell = cell_map(ri,zj,1)
              norme = 0.0
              do l= iPAH_start, iPAH_end
-                p_l = merge(l, 1, lvariable_dust)
-                if (lPAH_nRE) then
-                   Ttmp = Tdust_1grain_nRE(l,icell)
-                else
-                   Ttmp = Tdust_1grain(l,icell)
-                endif
-                TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * dust_density(p_l,icell) * nbre_grains(l)
-                norme = norme + dust_density(p_l,icell) * nbre_grains(l)
-             enddo ! l
+                 p_l = merge(l, grain(l)%zone, lvariable_dust)
+                 if (lPAH_nRE) then
+                    Ttmp = Tdust_1grain_nRE(l,icell)
+                 else
+                    Ttmp = Tdust_1grain(l,icell)
+                 endif
+                 TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * dust_density(p_l,icell) * nbre_grains(l)
+                 norme = norme + dust_density(p_l,icell) * nbre_grains(l)
+              enddo ! l
              TPAH_eq(ri,zj,1) = (TPAH_eq(ri,zj,1)/norme)**0.25
           enddo ! ri
        enddo !zj

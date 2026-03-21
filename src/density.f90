@@ -29,7 +29,7 @@ module density
   real(kind=dp), dimension(:,:), allocatable :: Surface_density
 
   ! dust_density * nbre_grains is in en part.cm-3, where nbre_grains is normalised to 1
-  real(kind=dp), dimension(:,:), allocatable :: dust_density ! p_n_grains, p_n_cells
+  real(kind=dp), dimension(:,:), allocatable :: dust_density ! (n_grains_tot or n_zones, n_cells)
   real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
   integer :: icell_not_empty
 
@@ -428,9 +428,11 @@ subroutine define_dust_density()
   ! Pour simus Dubrulle
   real, parameter :: gamma = 2.0 ! exposant de turbulence, 2 pour turbulence compressible
 
-  logical :: lwarning
+  logical :: done_zone(n_zones), lwarning
+  integer :: p_l
 
   lwarning = .true.
+  done_zone = .false.
 
   dust_density = 0.0
   masse = 0.0
@@ -500,6 +502,11 @@ subroutine define_dust_density()
   do pop=1, n_pop
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
+
+     if (.not.lvariable_dust) then
+        if (done_zone(izone)) cycle
+        done_zone(izone) = .true.
+     endif
 
      ! if the dust is the same everywhere, we do not need to
      ! loop over grain sizes
@@ -589,7 +596,8 @@ subroutine define_dust_density()
                        density = sqrt(correct_strat(l)) * cst_pous(pop)*fact_exp * &
                             exp(- (((z-z0)/(dz%sclht*puffed))**2*(correct_strat(l))) / coeff_exp)
                     endif
-                    dust_density(l,icell) = density
+                    p_l = merge(l, izone, lvariable_dust)
+                    dust_density(p_l,icell) = density
 
                  enddo !l
               enddo !k
@@ -604,14 +612,15 @@ subroutine define_dust_density()
                     do j=j_start,nz
                        if (j==0) cycle
                        icell = cell_map(i,j,k)
-                       somme = somme + dust_density(l,icell)  *  (z_lim(i,abs(j)+1) - z_lim(i,abs(j)))
+                       p_l = merge(l, izone, lvariable_dust)
+                       somme = somme + dust_density(p_l,icell)  *  (z_lim(i,abs(j)+1) - z_lim(i,abs(j)))
                     enddo ! j
 
                     if (somme > tiny_dp) then
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          dust_density(l,icell) = dust_density(l,icell) * Surface_density(i,k)/somme
+                          dust_density(p_l,icell) = dust_density(p_l,icell) * Surface_density(i,k)/somme
                        enddo ! j
                     endif
                  enddo ! l
@@ -635,13 +644,14 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          norme = norme + dust_density(l,icell)
+                          p_l = merge(l, izone, lvariable_dust)
+                          norme = norme + dust_density(p_l,icell)
                        enddo !j
 
                        ! Si tous les grains sont sedimentes, on les met dans le plan median
                        if (norme < 1.0e-200_dp) then
                           icell = cell_map(i,1,k)
-                          dust_density(l,icell)  = 1.0_sp
+                          dust_density(p_l,icell)  = 1.0_sp
                           norme = 1.0_dp
 
                           if (lwarning) then
@@ -654,7 +664,7 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          if (norme > tiny_dp) dust_density(l,icell) = dust_density(l,icell) / norme * rho0
+                          if (norme > tiny_dp) dust_density(p_l,icell) = dust_density(p_l,icell) / norme * rho0
                        enddo !j
                     enddo ! l
                  enddo ! k
@@ -690,44 +700,45 @@ subroutine define_dust_density()
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
 
-                          !calculate h & z/h
-                          z = z_grid(icell)
-                          Ztilde=z/H
+                           p_l = merge(l, izone, lvariable_dust)
+                           !calculate h & z/h
+                           z = z_grid(icell)
+                           Ztilde=z/H
 
-                          ! Fit Gaussien du profile de densite
-                          !dust_density(l,icell)=  exp(-(1+OmegaTau/Dtilde) * (Ztilde**2/2.))
+                           ! Fit Gaussien du profile de densite
+                           !dust_density(p_l,icell)=  exp(-(1+OmegaTau/Dtilde) * (Ztilde**2/2.))
 
-                          ! Coefficient de diffusion constant
-                          dust_density(l,icell)=  exp( -OmegaTau/Dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
-                       enddo!j
+                           ! Coefficient de diffusion constant
+                           dust_density(p_l,icell)=  exp( -OmegaTau/Dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
+                        enddo!j
 
-                       ! normalization en z
-                       norme = 0.0
-                       do j=j_start,nz
-                          if (j==0) cycle
-                          icell = cell_map(i,j,k)
-                          norme = norme + dust_density(l,icell)
-                       enddo !j
+                        ! normalization en z
+                        norme = 0.0
+                        do j=j_start,nz
+                           if (j==0) cycle
+                           icell = cell_map(i,j,k)
+                           norme = norme + dust_density(p_l,icell)
+                        enddo !j
 
-                       ! Si tous les grains sont sedimentes, on les met dans le plan median
-                       if (norme < 1e-200_dp) then
-                          icell = cell_map(i,1,k)
-                          dust_density(l,icell)  = 1.0_sp
-                          norme = 1.0_dp
+                        ! Si tous les grains sont sedimentes, on les met dans le plan median
+                        if (norme < 1e-200_dp) then
+                           icell = cell_map(i,1,k)
+                           dust_density(p_l,icell)  = 1.0_sp
+                           norme = 1.0_dp
 
-                          if (lwarning) then
-                             write(*,*)
-                             write(*,*) "WARNING : Vertical settling unresolved for"
-                             write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
-                             lwarning = .false. ! on ne fait un warning qu'1 fois par rayon --> 1 seule fois au total
-                          endif
-                       endif
+                           if (lwarning) then
+                              write(*,*)
+                              write(*,*) "WARNING : Vertical settling unresolved for"
+                              write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
+                              lwarning = .false. ! on ne fait un warning qu'1 fois par rayon --> 1 seule fois au total
+                           endif
+                        endif
 
-                       do j=j_start,nz
-                          if (j==0) cycle
-                          icell = cell_map(i,j,k)
-                          if (norme > tiny_dp) dust_density(l,icell) = dust_density(l,icell) / norme * rho0
-                       enddo !j
+                        do j=j_start,nz
+                           if (j==0) cycle
+                           icell = cell_map(i,j,k)
+                           if (norme > tiny_dp) dust_density(p_l,icell) = dust_density(p_l,icell) / norme * rho0
+                        enddo !j
 
                     enddo ! l
                  enddo ! k
@@ -738,11 +749,12 @@ subroutine define_dust_density()
         lwarning = .true.
         if (lmigration) then
            ! distribution en taille de grains avant la migration
-           do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-              do icell=1,n_cells
-                 N_tot(l) = N_tot(l) + dust_density(l,icell)*nbre_grains(l) * volume(icell)
-              enddo ! icell
-           enddo !l
+            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+               p_l = merge(l, izone, lvariable_dust)
+               do icell=1,n_cells
+                  N_tot(l) = N_tot(l) + dust_density(p_l,icell)*nbre_grains(l) * volume(icell)
+               enddo ! icell
+            enddo !l
 
            do i=1, n_rad
               do k=1, n_az
@@ -770,7 +782,8 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          dust_density(l,icell) = 0.0
+                          p_l = merge(l, izone, lvariable_dust)
+                          dust_density(p_l,icell) = 0.0
                        enddo !j
                     endif
                  enddo ! l
@@ -778,16 +791,18 @@ subroutine define_dust_density()
            enddo !i
 
            ! distribution en taille de grains apres la migration
-           do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-              do icell=1,n_cells
-                 N_tot2(l) = N_tot2(l) + dust_density(l,icell) * nbre_grains(l) * volume(icell)
-              enddo ! i
-           enddo ! l
+            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+               p_l = merge(l, izone, lvariable_dust)
+               do icell=1,n_cells
+                  N_tot2(l) = N_tot2(l) + dust_density(p_l,icell) * nbre_grains(l) * volume(icell)
+               enddo ! i
+            enddo ! l
 
            ! Renormalisation : on garde le meme nombre de grains par taille que avant la migration
            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
               if (N_tot2(l) > tiny_dp) then
-                 dust_density(l,:) = dust_density(l,:) * N_tot(l)/N_tot2(l)
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,:) = dust_density(p_l,:) * N_tot(l)/N_tot2(l)
               endif
            enddo ! l
 
@@ -810,20 +825,24 @@ subroutine define_dust_density()
 
            if (rcyl2 > rmax2 - z2) then
               do l=lmin,lmax
-                 dust_density(l,icell) = 1e-20
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,icell) = 1e-20
               enddo
            else if (rcyl2 < rmin2 - z2) then
               do l=lmin,lmax
-                 dust_density(l,icell) = 1e-20
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,icell) = 1e-20
               enddo
            else if (rcyl2 < rin2 - z2) then
               do l=lmin,lmax
-                 dust_density(l,icell) =  cst_pous(pop) * rsph**(dz%surf) &
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,icell) =  cst_pous(pop) * rsph**(dz%surf) &
                       * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
               enddo
            else
               do l=lmin,lmax
-                 dust_density(l,icell) = cst_pous(pop) * rsph**(dz%surf)
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,icell) = cst_pous(pop) * rsph**(dz%surf)
               enddo
            endif
         enddo ! icell
@@ -867,7 +886,8 @@ subroutine define_dust_density()
                  endif
 
                  do l=lmin,lmax
-                    dust_density(l,icell) = density
+                    p_l = merge(l, izone, lvariable_dust)
+                    dust_density(p_l,icell) = density
                  enddo
               enddo !k
            enddo bz_debris !j
@@ -921,6 +941,11 @@ subroutine define_density_wall3D()
   write(*,*) "*********************************************************"
   write(*,*) "Adding 3D wall structure ...."
 
+  if (lvariable_dust) then
+     allocate(dust_density(n_grains_tot,n_cells), stat=alloc_status)
+  else
+     allocate(dust_density(n_zones,n_cells), stat=alloc_status)
+  endif
   allocate(density_wall(n_grains_tot,n_cells), stat=alloc_status)
   allocate(masse_wall(n_cells), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error wall')
@@ -1900,62 +1925,74 @@ subroutine normalize_dust_density(disk_dust_mass)
   endif
 
 
-  ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
-  do pop=1, n_pop
-     izone=dust_pop(pop)%zone
+  ! Normalisation poussiere: re-calcul masse totale par zone a partir de la densite (utile quand edge /= 0)
+  do izone=1, n_zones
      dz=disk_zone(izone)
 
      if (dz%geometry /= 5) then ! pas de wall ici
-        d_p => dust_pop(pop)
 
         if (.not.lvariable_dust) then
            somme = 0.0_dp
            do icell=1,n_cells
-              somme = somme + dust_density(pop,icell) * volume(icell)
+              somme = somme + dust_density(izone,icell) * volume(icell)
            enddo
-           if (somme > tiny_dp) dust_density(pop,:) = dust_density(pop,:) / somme
+           if (somme > tiny_dp) dust_density(izone,:) = dust_density(izone,:) / somme
         endif
 
         if (lvariable_dust) then
            mass = 0.0_dp
-           do icell=1,n_cells
-              do l=d_p%ind_debut,d_p%ind_fin
-                 mass=mass + (dust_density(l,icell) * nbre_grains(l) *1.0_dp) * M_grain(l) * volume(icell)
-              enddo !l
-           enddo !icell
+           do pop=1, n_pop
+              if (dust_pop(pop)%zone == izone) then
+                 d_p => dust_pop(pop)
+                 do icell=1,n_cells
+                    do l=d_p%ind_debut,d_p%ind_fin
+                       mass=mass + (dust_density(l,icell) * nbre_grains(l) *1.0_dp) * M_grain(l) * volume(icell)
+                    enddo !l
+                 enddo !icell
+              endif
+           enddo
            mass =  mass * AU3_to_cm3 * g_to_Msun
 
            if (mass > tiny_dp) then
-              facteur = d_p%masse / mass * f
+              facteur = dz%diskmass / mass * f
 
-              mass = 0.0_dp
-              do icell=1,n_cells
-                 do l=d_p%ind_debut,d_p%ind_fin
-                    dust_density(l,icell) = dust_density(l,icell) * facteur
-                    masse(icell) = masse(icell) + dust_density(l,icell)* nbre_grains(l) * M_grain(l) * volume(icell)
-                 enddo !l
-              enddo ! icell
+              do pop=1, n_pop
+                 if (dust_pop(pop)%zone == izone) then
+                    d_p => dust_pop(pop)
+                    do icell=1,n_cells
+                       do l=d_p%ind_debut,d_p%ind_fin
+                          dust_density(l,icell) = dust_density(l,icell) * facteur
+                          masse(icell) = masse(icell) + dust_density(l,icell)* nbre_grains(l) * M_grain(l) * volume(icell)
+                       enddo !l
+                    enddo ! icell
+                 endif
+              enddo
            endif
         else ! We avoid the grain loop all together if the dust is the same everywhere
-           somme = 0.0_dp
-           do icell=1,n_cells
-              somme = somme + dust_density(pop,icell) * volume(icell)
+           mass = 0.0_dp
+           do pop=1, n_pop
+              if (dust_pop(pop)%zone == izone) then
+                 mass = mass + dust_pop(pop)%avg_grain_mass * AU3_to_cm3 * g_to_Msun
+              endif
            enddo
-           mass = somme * d_p%avg_grain_mass * AU3_to_cm3 * g_to_Msun
 
            if (mass > tiny_dp) then
-              facteur = d_p%masse / mass * f
-              dust_density(pop,:) =  dust_density(pop,:) * facteur
+              facteur = dz%diskmass / mass * f
+              dust_density(izone,:) =  dust_density(izone,:) * facteur
 
-              do icell=1,n_cells
-                 masse(icell) = masse(icell) + dust_density(pop,icell) * d_p%avg_grain_mass * volume(icell)
+              do pop=1, n_pop
+                 if (dust_pop(pop)%zone == izone) then
+                    do icell=1,n_cells
+                       masse(icell) = masse(icell) + dust_density(izone,icell) * dust_pop(pop)%avg_grain_mass * volume(icell)
+                    enddo
+                 endif
               enddo
            endif
 
         endif ! lvariable_dust
 
      endif ! test wall
-  enddo ! pop
+  enddo ! izone
 
   masse(:) = masse(:) * AU3_to_cm3
 

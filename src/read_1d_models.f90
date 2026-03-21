@@ -15,7 +15,7 @@ module read_1d_models
         use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, &
              lcalc_ne, check_for_zero_electronic_density
 	use density, only : dust_density
-	use grains, only : M_grain, nbre_grains
+	use grains, only : M_grain, nbre_grains, dust_pop
 
 	implicit none
 
@@ -229,7 +229,7 @@ module read_1d_models
 	subroutine print_info_model
 		real(kind=dp) :: v_char
 		real(kind=dp) ::  dust_dens_max, dust_dens_min, rho_d
-		integer :: icell
+		integer :: icell, pop
 
 		v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
 
@@ -254,7 +254,14 @@ module read_1d_models
 		if (ldust_atom) then
 			dust_dens_max = 0d0; dust_dens_min = 1d30
 			do icell=1, n_cells
-                                rho_d = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:)) ! dust_density dim1 is either 1 or n_grains_tot
+                                if (lvariable_dust) then
+                                   rho_d = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:))
+                                else
+                                   rho_d = 0.0_dp
+                                   do pop=1, n_pop
+                                      rho_d = rho_d + dust_density(dust_pop(pop)%zone,icell) * nbre_grains(pop) * M_grain(pop)
+                                   enddo
+                                endif
                                 if (rho_d<=0.0) cycle
 				dust_dens_min = min(dust_dens_min,rho_d)
                                 dust_dens_max = max(dust_dens_max,rho_d)
