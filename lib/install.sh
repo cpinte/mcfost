@@ -130,7 +130,7 @@ pushd .
 
 #-- Downloading libraries
 #wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
-git clone git@github.com:cpinte/sprng2.0b.git
+git clone https://github.com/cpinte/sprng2.0b.git
 #wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.3.0.tar.gz
 wget  -O cfitsio-4.3.0.tar.gz  "https://drive.usercontent.google.com/download?export=download&id=1qIz6nr1sv40FjvVooiYIuCpnJoDyUGTg&confirm=t" # temporary due to issues on heasarc
 git clone https://github.com/cpinte/voro
