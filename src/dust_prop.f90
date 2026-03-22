@@ -200,6 +200,14 @@ subroutine build_grain_size_distribution()
         nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
      enddo !k
 
+     ! If we use a shared spatial profile per zone, we must include the population mass fraction
+     ! in nbre_grains so then dust_density(izone, icell) * nbre_grains(k) gives the correct
+     ! number density for population p size k.
+     if (.not.lvariable_dust) then
+        nbre_grains(d_p%ind_debut:d_p%ind_fin) = nbre_grains(d_p%ind_debut:d_p%ind_fin) * &
+             d_p%frac_mass / d_p%avg_grain_mass
+     endif
+
      ! Total radius is kept constant with coating
      if (d_p%lcoating) then
         correct_fact_r =  (1-d_p%component_volume_fraction(2))**(1./3)  ! r_core = r_tot * correct_fact_r
@@ -1294,8 +1302,6 @@ integer function select_scattering_grain(lambda,icell, aleat) result(l)
 
   integer :: p_k_val, k
 
-  p_k_val = merge(k, grain(k)%pop, lvariable_dust)
-
   if (low_mem_scattering) then
      ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
      norm =  kappa(icell,lambda) * tab_albedo_pos(icell,lambda) / (AU_to_cm * mum_to_cm**2)
@@ -1304,7 +1310,7 @@ integer function select_scattering_grain(lambda,icell, aleat) result(l)
         prob = aleat * norm
         CDF = 0.0
         do k=1, n_grains_tot
-           p_k_val = merge(k, grain(k)%pop, lvariable_dust)
+           p_k_val = merge(k, grain(k)%zone, lvariable_dust)
            density = dust_density(p_k_val,icell) * nbre_grains(k)
            CDF = CDF + C_sca(k,lambda) * density
            if (CDF > prob) exit
@@ -1313,7 +1319,7 @@ integer function select_scattering_grain(lambda,icell, aleat) result(l)
         prob = (1.0-aleat) * norm
         CDF = 0.0
         do k=n_grains_tot, 1, -1
-           p_k_val = merge(k, grain(k)%pop, lvariable_dust)
+           p_k_val = merge(k, grain(k)%zone, lvariable_dust)
            density = dust_density(p_k_val,icell) * nbre_grains(k)
            CDF = CDF + C_sca(k,lambda) * density
            if (CDF > prob) exit

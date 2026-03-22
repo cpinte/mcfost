@@ -1926,73 +1926,55 @@ subroutine normalize_dust_density(disk_dust_mass)
 
 
   ! Normalisation poussiere: re-calcul masse totale par zone a partir de la densite (utile quand edge /= 0)
-  do izone=1, n_zones
-     dz=disk_zone(izone)
+  masse(:) = 0.0_dp
+  if (lvariable_dust) then
+     do pop=1, n_pop
+        d_p => dust_pop(pop)
+        somme = 0.0_dp
+        do icell=1, n_cells
+           do l=d_p%ind_debut, d_p%ind_fin
+              somme = somme + dust_density(l,icell) * nbre_grains(l) * M_grain(l) * volume(icell)
+           enddo
+        enddo
+        somme =  somme * AU3_to_cm3 * g_to_Msun
 
-     if (dz%geometry /= 5) then ! pas de wall ici
-
-        if (.not.lvariable_dust) then
+        if (somme > tiny_dp) then
+           facteur = d_p%masse / somme
+           do icell=1, n_cells
+              do l=d_p%ind_debut, d_p%ind_fin
+                 dust_density(l,icell) = dust_density(l,icell) * facteur
+                 masse(icell) = masse(icell) + (dust_density(l,icell)* nbre_grains(l) * M_grain(l) * volume(icell))
+              enddo
+           enddo
+        endif
+     enddo
+  else   ! case .not.lvariable_dust
+     do izone=1, n_zones
+        dz=disk_zone(izone)
+        if (dz%geometry /= 5) then
            somme = 0.0_dp
            do icell=1,n_cells
               somme = somme + dust_density(izone,icell) * volume(icell)
            enddo
-           if (somme > tiny_dp) dust_density(izone,:) = dust_density(izone,:) / somme
-        endif
 
-        if (lvariable_dust) then
-           mass = 0.0_dp
-           do pop=1, n_pop
-              if (dust_pop(pop)%zone == izone) then
-                 d_p => dust_pop(pop)
-                 do icell=1,n_cells
-                    do l=d_p%ind_debut,d_p%ind_fin
-                       mass=mass + (dust_density(l,icell) * nbre_grains(l) *1.0_dp) * M_grain(l) * volume(icell)
-                    enddo !l
-                 enddo !icell
-              endif
-           enddo
-           mass =  mass * AU3_to_cm3 * g_to_Msun
-
-           if (mass > tiny_dp) then
-              facteur = dz%diskmass / mass * f
-
-              do pop=1, n_pop
-                 if (dust_pop(pop)%zone == izone) then
-                    d_p => dust_pop(pop)
-                    do icell=1,n_cells
-                       do l=d_p%ind_debut,d_p%ind_fin
-                          dust_density(l,icell) = dust_density(l,icell) * facteur
-                          masse(icell) = masse(icell) + dust_density(l,icell)* nbre_grains(l) * M_grain(l) * volume(icell)
-                       enddo !l
-                    enddo ! icell
-                 endif
-              enddo
-           endif
-        else ! We avoid the grain loop all together if the dust is the same everywhere
-           mass = 0.0_dp
-           do pop=1, n_pop
-              if (dust_pop(pop)%zone == izone) then
-                 mass = mass + dust_pop(pop)%avg_grain_mass * AU3_to_cm3 * g_to_Msun
-              endif
-           enddo
-
-           if (mass > tiny_dp) then
-              facteur = dz%diskmass / mass * f
+           if (somme > tiny_dp) then
+              ! We scale dust_density(izone,:) so it integrates to the total mass of the zone in g
+              facteur = (dz%diskmass * f) / (somme * AU3_to_cm3 * g_to_Msun)
               dust_density(izone,:) =  dust_density(izone,:) * facteur
 
               do pop=1, n_pop
                  if (dust_pop(pop)%zone == izone) then
                     do icell=1,n_cells
-                       masse(icell) = masse(icell) + dust_density(izone,icell) * dust_pop(pop)%avg_grain_mass * volume(icell)
+                       ! dust_density already contains the total zone mass in g/cm3
+                       ! We still need to multiply by populate mass fraction to get masse(icell)
+                       masse(icell) = masse(icell) + dust_density(izone,icell) * dust_pop(pop)%frac_mass * volume(icell)
                     enddo
                  endif
               enddo
            endif
-
-        endif ! lvariable_dust
-
-     endif ! test wall
-  enddo ! izone
+        endif
+     enddo
+  endif
 
   masse(:) = masse(:) * AU3_to_cm3
 
