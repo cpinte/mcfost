@@ -1145,6 +1145,10 @@ contains
           etoile(i_etoile)%vz = vxyz_ptmass(3,i_etoile) * uvelocity
 
           etoile(i_etoile)%M = xyzmh_ptmass(4,i_etoile) * usolarmass
+
+          if (.not.etoile(i_etoile)%force_Mdot) then
+             etoile(i_etoile)%Mdot = xyzmh_ptmass(16,i_etoile) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
+          endif
        enddo
     else
 

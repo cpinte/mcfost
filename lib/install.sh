@@ -129,7 +129,8 @@ mkdir include/hdf5
 pushd .
 
 #-- Downloading libraries
-wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
+#wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
+git clone https://github.com/cpinte/sprng2.0b.git
 #wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.3.0.tar.gz
 wget  -O cfitsio-4.3.0.tar.gz  "https://drive.usercontent.google.com/download?export=download&id=1qIz6nr1sv40FjvVooiYIuCpnJoDyUGTg&confirm=t" # temporary due to issues on heasarc
 git clone https://github.com/cpinte/voro
@@ -153,7 +154,7 @@ fi
 # SPRNG
 #-------------------------------------------
 echo "Compiling SPRNG ..."
-tar xzvf sprng2.0b.tar.gz
+mv sprng2.0b sprng2.0
 \cp -f "$SYSTEM/make.CHOICES" sprng2.0
 \cp -f "$SYSTEM/make.INTEL" sprng2.0/SRC
 if [ "$SYSTEM" = "gfortran" ] ; then
