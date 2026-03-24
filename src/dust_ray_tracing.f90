@@ -813,14 +813,16 @@ subroutine calc_Jth(lambda)
   ! 25/09/08
 
   integer, intent(in) :: lambda
-  integer :: l, T, icell, p_icell
+
   real(kind=dp) ::  Temp, cst_wl, wl, coeff_exp, cst_E
+  integer, target :: l, l0
+  integer :: T, icell, p_icell
+  integer :: p_l ! Removed pointer to avoid issues with changing indices
 
   ! longueur d'onde en metre
   wl = tab_lambda(lambda)*1.e-6
 
   J_th(:) = 0.0
-
 
   ! Intensite specifique emission thermique
   if ((l_em_disk_image).or.(lsed)) then
@@ -848,18 +850,21 @@ subroutine calc_Jth(lambda)
         !$omp end parallel
      endif !lRE_LTE
 
+     ! p_l is now set inside the loops below to handle zone-based indexing when lvariable_dust is false
+
      if (lRE_nLTE) then
         cst_E=2.0*hp*c_light**2
         do icell=1,n_cells
            do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-              Temp=Tdust_1grain(l,icell)
-              if (Temp*wl > 3.e-4) then
-                 cst_wl=cst_th/(Temp*wl)
-                 coeff_exp=exp(cst_wl)
-                 J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                      C_abs_norm(l,lambda) * densite_pouss(l,icell)
-              endif
-           enddo ! l
+               p_l = merge(l, grain(l)%zone, lvariable_dust)
+               Temp=Tdust_1grain(l,icell)
+               if (Temp*wl > 3.e-4) then
+                  cst_wl=cst_th/(Temp*wl)
+                  coeff_exp=exp(cst_wl)
+                  J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                       C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+               endif
+            enddo ! l
         enddo ! icell
      endif !lRE_nLTE
 
@@ -867,26 +872,28 @@ subroutine calc_Jth(lambda)
         do icell=1,n_cells
            do l=grain_nRE_start,grain_nRE_end
               if (l_RE(l,icell)) then ! le grain a une temperature
-                 Temp=Tdust_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
-                 if (Temp*wl > 3.e-4) then
-                    cst_wl=cst_th/(Temp*wl)
-                    coeff_exp=exp(cst_wl)
-                    J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                         C_abs_norm(l,lambda)*densite_pouss(l,icell)
-                 endif !cst_wl
-              else ! ! la grain a une proba de T
+                  p_l = merge(l, grain(l)%zone, lvariable_dust)
+                  Temp=Tdust_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
+                  if (Temp*wl > 3.e-4) then
+                     cst_wl=cst_th/(Temp*wl)
+                     coeff_exp=exp(cst_wl)
+                     J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                          C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+                  endif !cst_wl
+              else ! ! la grain a une proba de T  ---> todo: we can compute BB outside of loop
                  do T=1,n_T
                     temp=tab_Temp(T)
                     if (Temp*wl > 3.e-4) then
                        cst_wl=cst_th/(Temp*wl)
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(l,lambda)*densite_pouss(l,icell) * Proba_Tdust(T,l,icell)
+                            C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l) * Proba_Tdust(T,l,icell)
                     endif !cst_wl
                  enddo ! T
               endif ! l_RE
            enddo ! l
         enddo ! icell
+
      endif !lnRE
 
   endif ! lsed or lemission_disk
