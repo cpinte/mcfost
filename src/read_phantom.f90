@@ -461,7 +461,7 @@ contains
        extra_heating,ndusttypes,SPH_grainsizes,     &
        mask,n_SPH,ldust_moments,dust_moments,mass_per_H,ierr)
 
-    use utils_hdf5, only:open_hdf5file,    &
+    use HDF5_utils, only:open_hdf5file,    &
          close_hdf5file,   &
          open_hdf5group,   &
          close_hdf5group,  &
@@ -927,10 +927,10 @@ contains
        if (hi > 0.) then
           ! calculate particle mass
           pmassi = massoftype(ifile,itypei)
-         
+
           ! rescale by apr - if there's no apr this does nothing
           pmassi = pmassi / (2.**(apr_level(i) - 1))
-          
+
           if (use_dust_particles .and. dustfluidtype==2 .and. ndusttypes==1 .and. itypei==2) then
              j = j + 1
              particle_id(j) = i
@@ -943,7 +943,7 @@ contains
                 vy(j) = vyi * uvelocity
                 vz(j) = vzi * uvelocity
              endif
-             
+
              T_gas(j) = T_gasi
 
              rhodusti = pmassi * (hfact/hi)**3  * udens ! g/cm**3
