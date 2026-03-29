@@ -4253,35 +4253,40 @@ contains
    integer,        intent(out) :: error
    integer :: errors(12)
    integer,         parameter :: dim0 = 1
-   integer(SIZE_T), parameter :: sdim = 100
    integer(HSIZE_T) :: dims(1) = (/dim0/)
    integer(HSIZE_T) :: maxdims(1)
    integer(HID_T) :: filetype,memtype,space,dset
-   character(LEN=sdim), allocatable, target :: rdata(:)
-   integer(SIZE_T) :: str_size
+   character(:), allocatable, target :: rdata_buf
+   integer(SIZE_T) :: str_size, buf_size
    type(c_ptr) :: f_ptr
    call h5lexists_f(id,name,got,error)
    if (.not.got) return
    call h5dopen_f(id,name,dset,errors(1))
    call h5dget_type_f(dset,filetype,errors(2))
    call h5tget_size_f(filetype,str_size,errors(3))
-   if (str_size > sdim+1) then
-      print*,'ERROR: Character LEN is too small'
-      stop
+   if (str_size > len(str, kind=SIZE_T)) then
+      print*,'WARNING: read_hdf5_string: string in file is longer than output variable for '//trim(name)
+      error = 1
+      got = .false.
+      call h5dclose_f(dset,errors(9))
+      call h5tclose_f(filetype,errors(11))
+      return
    endif
+   ! Use the file's string size as the buffer size
+   buf_size = str_size
    call h5dget_space_f(dset,space,errors(4))
    call h5sget_simple_extent_dims_f(space,dims,maxdims,errors(5))
-   allocate(rdata(1:dims(1)))
+   allocate(character(len=buf_size) :: rdata_buf)
    call H5Tcopy_f(H5T_FORTRAN_S1,memtype,errors(6))
-   call H5Tset_size_f(memtype,sdim,errors(7))
-   f_ptr = C_LOC(rdata(1)(1:1))
+   call H5Tset_size_f(memtype,buf_size,errors(7))
+   f_ptr = C_LOC(rdata_buf(1:1))
    call H5Dread_f(dset,memtype,f_ptr,errors(8),space)
    call H5Dclose_f(dset,errors(9))
    call H5Sclose_f(space,errors(10))
    call H5Tclose_f(filetype,errors(11))
    call H5Tclose_f(memtype,errors(12))
-   str = rdata(1)
-   deallocate(rdata)
+   str = rdata_buf
+   deallocate(rdata_buf)
    error = maxval(abs(errors))
    if (error /= 0) got = .false.
   end subroutine read_hdf5_string
