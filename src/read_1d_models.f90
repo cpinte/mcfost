@@ -1,4 +1,4 @@
-module read1d_models
+module read_1d_models
 !
 ! Interface with stellar atmosphere models such as MARCS, Kurucz, CMFGEN and MULTI.
 ! The input file is in a format which is common to all of these codes (that have very different formatting).
@@ -7,15 +7,15 @@ module read1d_models
 ! TO DO:
 !	direct interface with these different codes (and format)
 !
-	use parametres
-	use messages
-	use mcfost_env
-	use constantes
-    use elements_type
-    use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, &
-         lcalc_ne, check_for_zero_electronic_density
-	use density, only : densite_pouss
-	use grains, only : M_grain
+        use parametres
+        use messages
+        use mcfost_env
+        use constantes
+        use elements_type
+        use grid, only : cell_map, vfield3d, alloc_atomrt_grid, nHtot, ne, v_char, lmagnetized, vturb, T, icompute_atomRT, &
+             lcalc_ne, check_for_zero_electronic_density
+	use density, only : dust_density
+	use grains, only : M_grain, nbre_grains, dust_pop
 
 	implicit none
 
@@ -79,12 +79,12 @@ module read1d_models
 			enddo
 			if (atmos_1d%E_corona > 0) then!log10(F_SI) + 3 = log10(F_cgs)
 				atmos_1d%I_coro(:,1) = atmos_1d%I_coro(:,1) * atmos_1d%E_corona / Fnorm
-				write(*,'("lgFcorona="(1F12.4)" W/m^2; lgFcorona(old)="(1F12.4)" W/m^2")') &
+				write(*,'("lgFcorona=",(1F12.4)," W/m^2; lgFcorona(old)=",(1F12.4)," W/m^2")') &
 					log10(atmos_1d%E_corona), log10(Fnorm)
-				write(*,'("max(I)="(1ES14.5E3)" W/m^2/Hz/sr; min(I)="(ES14.5E3)" W/m^2/Hz/sr")') &
+				write(*,'("max(I)=",(1ES14.5E3)," W/m^2/Hz/sr; min(I)=",(ES14.5E3)," W/m^2/Hz/sr")') &
 					maxval(atmos_1d%I_coro), minval(atmos_1d%I_coro)
 			else
-				write(*,'("lgFcorona="(1F12.4)" W/m^2")') log10(Fnorm)
+				write(*,'("lgFcorona=",(1F12.4)," W/m^2")') log10(Fnorm)
 			endif
 		endif
 		close(unit=1)
@@ -229,7 +229,7 @@ module read1d_models
 	subroutine print_info_model
 		real(kind=dp) :: v_char
 		real(kind=dp) ::  dust_dens_max, dust_dens_min, rho_d
-		integer :: icell
+		integer :: icell, pop
 
 		v_char = sqrt( maxval(sum(vfield3d**2,dim=2)) )
 
@@ -248,18 +248,23 @@ module read1d_models
 
 		write(*,*) "Maximum/minimum Temperature in the model [K]:"
 		write(*,*) real(maxval(T)), real(minval(T,mask=icompute_atomRT>0))
-		! write(*,*) " --> Density average of the Temperature [K]:"
-		! write(*,*) real(sum(T*nHtot,(sum(densite_pouss,dim=1)==0.0).and.(icompute_atomRT>0)) / &
-		! 	sum(nHtot,(sum(densite_pouss,dim=1)==0.0).and.(icompute_atomRT>0)))
+
 		write(*,*) "Maximum/minimum Hydrogen total density in the model [m^-3]:"
 		write(*,*) real(maxval(nHtot)), real(minval(nHtot,mask=icompute_atomRT>0))
 		if (ldust_atom) then
 			dust_dens_max = 0d0; dust_dens_min = 1d30
 			do icell=1, n_cells
-				rho_d = sum(densite_pouss(:,icell) * M_grain(:))
-				if (rho_d<=0.0) cycle
+                                if (lvariable_dust) then
+                                   rho_d = sum(dust_density(:,icell) * nbre_grains(:) * M_grain(:))
+                                else
+                                   rho_d = 0.0_dp
+                                   do pop=1, n_pop
+                                      rho_d = rho_d + dust_density(dust_pop(pop)%zone,icell) * nbre_grains(pop) * M_grain(pop)
+                                   enddo
+                                endif
+                                if (rho_d<=0.0) cycle
 				dust_dens_min = min(dust_dens_min,rho_d)
-				dust_dens_max = max(dust_dens_max,rho_d)
+                                dust_dens_max = max(dust_dens_max,rho_d)
 			enddo
 			write(*,*) "Maximum/minimum dust total density in the model [kg m^-3]:"
 			write(*,*) 1d3*dust_dens_max, 1d3*dust_dens_min
@@ -276,7 +281,7 @@ module read1d_models
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
         write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"
         ! write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT<0)), " dark zones"
-		write(*,'("-- Solving RTE for "(1F6.2)" % of cells")') &
+		write(*,'("-- Solving RTE for ",(1F6.2)," % of cells")') &
 			100.0*real(size(pack(icompute_atomRT,mask=icompute_atomRT>0))) / real(n_cells)
 
 		return
@@ -300,4 +305,4 @@ module read1d_models
 		return
 	end subroutine check_for_coronal_illumination
 
-end module read1d_models
+end module read_1d_models

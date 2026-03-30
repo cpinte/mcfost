@@ -43,8 +43,7 @@ module io_atom
 
       open(unit=atomunit,file=trim(mcfost_utils)//trim(path_to_atoms)//trim(atom%filename),status="old")
       !FormatLine = "(1A<MAX_LENGTH>)" !not working with ifort
-      write(FormatLine,'("(1"A,I3")")') "A", 512
-
+      write(FormatLine,'("(A",I0,")")') 512
       !Read ID and fill atom abundance and weight
       CALL read_line(atomunit, FormatLine, inputline, Nread)
       read(inputline,*) IDread
@@ -350,9 +349,9 @@ module io_atom
                !        atom%continua(kr)%lambdamin = 0.05 * atom%continua(kr)%lambda0
                !        atom%continua(kr)%lambdamin = max(10.0_dp, 1d-2 * atom%continua(kr)%lambda0)
                !!tmp
-               write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') &
+               write(*,'(" Continuum ",(1I3)," -> ",(1I3)," at ",(1F12.5)," nm")') &
                   atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
-               write(*,'(" -> lower edge cut at "(1F12.5)" nm !")') atom%continua(kr)%lambdamin
+               write(*,'(" -> lower edge cut at ",(1F12.5)," nm !")') atom%continua(kr)%lambdamin
 
                if (atom%continua(kr)%lambdamin>=atom%continua(kr)%lambda0) then
                   write(*,*) "Minimum wavelength for continuum is larger than continuum edge."
@@ -471,7 +470,7 @@ module io_atom
       character(len=2) :: IDread
 
 
-      write(FormatLine,'("(1"A,I3")")') "A", 512
+      write(FormatLine,'("(A",I0,")")') 512
       if (N_atoms > 1) then
          write(*,*) "Reading ", N_atoms, " atoms"
       else
@@ -992,10 +991,10 @@ module io_atom
 
 
    do l=1,atom%Nlevel
-      write(*,"('Level #'(1I3))") l
-      write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') &
+      write(*,"('Level #',(1I3))") l
+      write(*,'("  -- min(n)=",(1ES20.7E3)," m^-3; max(n)=",(1ES20.7E3)," m^-3")') &
            minval(atom%n(l,:),mask=(atom%n(l,:)>0)), maxval(atom%n(l,:))
-      write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  &
+      write(*,'("  -- min(nstar)=",(1ES20.7E3)," m^-3; max(nstar)=",(1ES20.7E3)," m^-3")')  &
            minval(atom%nstar(l,:),mask=(atom%nstar(l,:)>0)), maxval(atom%nstar(l,:))
    enddo
 

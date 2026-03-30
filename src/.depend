@@ -41,12 +41,11 @@ read_DustEM.o : read_DustEM.f90 utils.o messages.o grains.o
 read_gadget2.o : read_gadget2.f90 utils.o constants.o parameters.o
 read_opacity.o : read_opacity.f90 read_DustEM.o utils.o mcfost_env.o wavelengths.o grains.o parameters.o
 read_param.o : read_param.f90 messages.o sha.o constants.o wavelengths.o molecular_emission.o grains.o parameters.o
-read_phantom.o : read_phantom.f90 utils_hdf5.o mess_up_SPH.o constants.o messages.o io_phantom_utils.o parameters.o
+read_phantom.o : read_phantom.f90 hdf5_utils.o mess_up_SPH.o constants.o messages.o io_phantom_utils.o parameters.o
 scattering.o : scattering.f90 read_opacity.o utils.o grains.o wavelengths.o constants.o parameters.o
 sha.o : sha.f90
 spherical_grid.o : spherical_grid.f90 messages.o cylindrical_grid.o parameters.o constants.o
 stars.o : stars.f90 grid.o wavelengths.o messages.o constants.o utils.o parameters.o
 thermal_emission.o : thermal_emission.f90 radiation_field.o cylindrical_grid.o density.o input.o stars.o grid.o PAH.o utils.o Temperature.o dust_prop.o grains.o constants.o parameters.o
 utils.o : utils.f90 operating_system.o messages.o sha.o constants.o random_numbers.o mcfost_env.o
-utils_hdf5.o : utils_hdf5.f90
 wavelengths.o : wavelengths.f90 messages.o parameters.o mcfost_env.o

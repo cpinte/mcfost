@@ -153,8 +153,8 @@ module wavelengths_gas
 
       if (limage) then
          write(*,*) 'Atom ', line%atom%id
-         write(*,'("  line "(1I2)"->"(1I2)"; Vmax (Ray-Trace)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
-         write(*,'("   lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
+         write(*,'("  line ",(1I2),"->",(1I2),"; Vmax (Ray-Trace)=",(1F12.3)," km/s")') line%j, line%i, real(line%vmax)*1d-3
+         write(*,'("   lamin=",(1F12.3)," lam0=",(1F12.3)," lamax=",(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
       ! else
       !    write(*,'("line "(1I2)"->"(1I2)"; Vmax (non-LTE)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
       !    write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
@@ -353,10 +353,10 @@ module wavelengths_gas
       if (associated(subgrid_line,line_lambda_grid_dv)) then
          if (art_hv > 0.0) then
          !eventually overwrite with a user defined resol.
-            write(*,'("R="(1F7.3)" km/s; optimal:"(1F7.3)" km/s")') art_hv, hv
+            write(*,'("R=",(1F7.3)," km/s; optimal:",(1F7.3)," km/s")') art_hv, hv
             hv = art_hv
          else
-            write(*,'("R="(1F7.3)" km/s")') hv
+            write(*,'("R=",(1F7.3)," km/s")') hv
          endif
       else
          !doesn't matter, irregular grid
@@ -908,7 +908,7 @@ module wavelengths_gas
       write(*,*) "Number of max freq points for all trans :", Nlambda_max_trans
 
       n_lambda_cont = size(tab_lambda_cont)
-      write(*,'("Wavelength grid: "(1F12.4)" nm to",(1F12.4)" nm")') minval(lambda),maxval(lambda)
+      write(*,'("Wavelength grid: ",(1F12.4)," nm to",(1F12.4)," nm")') minval(lambda),maxval(lambda)
 
       return
    end subroutine make_wavelengths_nlte
@@ -1740,10 +1740,10 @@ module wavelengths_gas
       !now lambda will be stored in micron for compatibility
       !but a lots of atomic variables use nm.
       if (lfrom_file) then
-         write(*,'("Wavelength grid: "(1F12.4)" nm to ",(1F12.4)" nm")') minval(tab_lambda_nm),maxval(tab_lambda_nm)
-         write(*,'(" -> "(1F12.4)" mum to ",(1F12.4)" mum")') minval(lambda),maxval(lambda)
+         write(*,'("Wavelength grid: ",(1F12.4)," nm to ",(1F12.4)," nm")') minval(tab_lambda_nm),maxval(tab_lambda_nm)
+         write(*,'(" -> ",(1F12.4)," mum to ",(1F12.4)," mum")') minval(lambda),maxval(lambda)
       else
-         write(*,'("Wavelength grid: "(1F12.4)" nm to",(1F12.4)" nm")') minval(lambda),maxval(lambda)
+         write(*,'("Wavelength grid: ",(1F12.4)," nm to",(1F12.4)," nm")') minval(lambda),maxval(lambda)
       endif
 
       return

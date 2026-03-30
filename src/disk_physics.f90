@@ -3,7 +3,7 @@ module disk_physics
   use grains
   use mcfost_env
   use dust_prop
-  use density, only : densite_gaz, densite_pouss
+  use density, only : densite_gaz, dust_density
   use constantes
   use stars, only : spectre_etoiles
   use messages
@@ -19,7 +19,7 @@ contains
 
 
 subroutine compute_othin_sublimation_radius()
-  ! Dans le cas optiquement mince, ne dépend que de la température (et spectre) de l'étoile
+  ! Dans le cas optiquement mince, ne depend que de la temperature (et spectre) de l'etoile
 
   implicit none
 
@@ -45,7 +45,7 @@ subroutine compute_othin_sublimation_radius()
   enddo
   E_dust = E_dust * 2.0*pi*hp*c_light**2
 
-  ! Emission étoiles
+  ! Emission etoiles
   do i=1, n_etoiles
      E_etoile = 0.0
      do lambda=1, n_lambda
@@ -143,7 +143,7 @@ subroutine sublimate_dust()
 
               if (.not.dust_pop(ipop)%is_PAH) then
                  if (Tdust(icell) > dust_pop(ipop)%T_sub) then
-                    densite_pouss(k,icell) = 0.0
+                    dust_density(k,icell) = 0.0
                  endif
               endif
            enddo
@@ -160,7 +160,7 @@ subroutine sublimate_dust()
         do k=1,n_az
            icell = cell_map(i,j,k)
            do l=1,n_grains_tot
-              mass=mass + densite_pouss(l,icell) * M_grain(l) * (volume(icell) * AU3_to_cm3)
+              mass=mass + dust_density(l,icell) * nbre_grains(l) * M_grain(l) * (volume(icell) * AU3_to_cm3)
            enddo
         enddo
      enddo
