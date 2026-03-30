@@ -25,7 +25,7 @@ module dust_transfer
   use init_mcfost
   use SPH2mcfost
   use ML_ProDiMo
-  use read1d_models, only : setup_model1d_to_mcfost !to check
+  use read_1d_models, only : setup_model1d_to_mcfost !to check
   use mhd2mcfost, only : setup_mhd_to_mcfost !to check
   use read_fargo3d, only : read_fargo3d_files
   use read_athena, only : read_athena_model
@@ -42,8 +42,7 @@ subroutine transfert_poussiere()
 ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
 ! 20/04/2023
 
-  use thermal_emission, only : frac_E_stars, frac_E_disk
-  use MRW, only : make_MRW_step, initialize_cumulative_zeta
+  use MRW, only : initialize_cumulative_zeta
   use utils
   implicit none
 
@@ -68,7 +67,7 @@ subroutine transfert_poussiere()
 
   real(kind=dp) :: x,y,z, u,v,w, lmin, lmax
   real :: rand, tau
-  integer :: i, icell, p_icell, n_SPH
+  integer :: i, icell, p_icell
   logical :: flag_star, flag_scatt, flag_ISM
 
   logical :: laffichage, flag_em_nRE, lcompute_dust_prop
@@ -107,21 +106,20 @@ subroutine transfert_poussiere()
   ! Building the dust grain population
   call build_grain_size_distribution()
 
-  if (lphantom_file .or. lgadget2_file .or. lascii_SPH_file) then
-     call setup_SPH2mcfost(density_file, limits_file, n_SPH, extra_heating)
+  laffichage=.true.
+
+  if (lVoronoi) then
+     if (lmhd_voronoi) then
+        call setup_mhd_to_mcfost() !uses sph_to_voronoi
+     else
+        call setup_SPH2mcfost(extra_heating)
+     endif
      call setup_grid()
-  else if (lmhd_voronoi) then
-     call setup_mhd_to_mcfost() !uses sph_to_voronoi
-     call setup_grid()
-  else
+  else ! Setting up a regular grid
      call setup_grid()
      call define_grid() ! included in setup_phantom2mcfost
      call stars_cell_indices()
-  endif
 
-  laffichage=.true.
-
-  if (.not.(lphantom_file .or. lgadget2_file .or. lascii_SPH_file .or. lmhd_voronoi)) then ! already done by setup_SPH2mcfost
      call allocate_densities()
      if (ldensity_file) then
         call read_density_file()
@@ -135,7 +133,7 @@ subroutine transfert_poussiere()
         call read_athena_model()
      else if (lsphere_model) then
         !on a structured spherical grid
-        call read_spherical_model(density_file)
+        call read_spherical_model(density_files(1))
      else if (lmodel_1d) then !1d spherically symmetric "stellar atmosphere" models
         call setup_model1d_to_mcfost()
      else if (lidefix) then
@@ -213,17 +211,11 @@ subroutine transfert_poussiere()
      if (loptical_depth_to_cell) call write_optical_depth_to_cell(1)
 
      write(*,*) ""
-     write(*,*) "Dust properties in cell #", icell_ref
-     p_icell = icell_ref
+     write(*,*) "Dust properties in cell #", icell_not_empty
+     p_icell = icell_not_empty
      if (aniso_method==2) write(*,*) "g             ", tab_g_pos(p_icell,1)
      write(*,*) "albedo        ", tab_albedo_pos(p_icell,1)
-     if (lsepar_pola.and.(scattering_method == 2)) then
-        if (lmueller) then
-           write(*,*) "polarisability", maxval(-tab_mueller_pos(1,2,:,p_icell,1))
-        else
-           write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
-        endif
-     endif
+     if (lsepar_pola.and.(scattering_method == 2)) write(*,*) "polarisability", maxval(-tab_s12_o_s11_pos(:,p_icell,1))
      if (lopacite_only) call exit(0)
 
      if (l_em_disk_image) then ! le disque �met
@@ -482,11 +474,7 @@ subroutine transfert_poussiere()
         lambda = ind_etape - first_etape_obs + 1
 
         if (.not.lMueller_pos_multi .and. lscatt_ray_tracing) then
-           if (lmueller) then
-              call calc_local_scattering_matrices_mueller(lambda, p_lambda) ! Todo : this is not good, we compute this twice
-           else
-              call calc_local_scattering_matrices(lambda, p_lambda)
-           endif
+           call calc_local_scattering_matrices(lambda, p_lambda) ! Todo : this is not good, we compute this twice
         endif
 
         if (lspherical.or.l3D) then
@@ -875,8 +863,7 @@ subroutine emit_packet(id,lambda, icell,x0,y0,z0,u0,v0,w0,stokes,flag_star,flag_
   real :: rand, rand2, rand3, rand4
   integer :: i_star
 
-  real(kind=dp) :: w02, srw02
-  real :: argmt
+  real(kind=dp) :: w02
 
   real :: hc_lk, correct_spot, cos_thet_spot, x_spot, y_spot, z_spot
 
@@ -977,6 +964,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   ! - separer 1ere diffusion et reste
   ! - lom supprime !
 
+  use MRW, only : make_MRW_step, gamma_MRW
+
   integer, intent(in) :: id
   integer, intent(inout) :: lambda, p_lambda
   integer, target, intent(inout) :: icell
@@ -986,9 +975,11 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   logical, intent(inout) :: flag_star, flag_ISM, lpacket_alive
   logical, intent(out) :: flag_scatt
 
-  real(kind=dp) :: u1,v1,w1, phi, cospsi, w02, srw02, argmt
+  real(kind=dp), dimension(4,4) :: M
+  real(kind=dp) :: u1,v1,w1, phi, cospsi
+  !real(kind=dp) :: Planck_opacity, rec_Planck_opacity, d, diff_coeff
   integer :: taille_grain, itheta
-  integer :: n_iterations
+  integer :: n_iteractions_in_cell, icell_old
   integer, pointer :: p_icell
   real :: rand, rand2, tau, dvol
 
@@ -1006,13 +997,13 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
   if (lvariable_dust) then
      p_icell => icell
   else
-     p_icell => icell_ref
+     p_icell => icell1
   endif
 
   ! Boucle sur les interactions du paquets:
   ! - on avance le paquet
   ! - on le fait interagir avec la poussiere si besoin
-  n_iterations = 0
+  n_iteractions_in_cell = 0
   infinie : do
 
      ! Longueur de vol
@@ -1030,26 +1021,34 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      !   if (.not.flag_star) Stokes=0.
      !endif
 
-!     d = 0.
-!     reciprocal_Plank_kappa = 1.
-!     if ((n_iterations > 5) .and. Tdust(icell) > 1) then
-!        d = distance_to_closest_wall()
-!        call diffusion_opacity()
-!     endif
-!
-!     do while  (d > gamma_MRW * reciprocal_Plank_kappa)
-!        call make_MRW_step(id,icell, x,y,z,d, Stokes(1))
-!        d = distance_to_closest_wall()
-!        ! todo : do we update the rec_plack_kappa ???
-!     enddo
+     ! Do we need to perform a MRW ?
+     !if ((n_iteractions_in_cell > 5)) then
+     !   d = distance_to_closest_wall(icell,x,y,z)
+     !   call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
+     !
+     !   !write(*,*) icell, d, rec_Planck_opacity,  d * rec_Planck_opacity, gamma_MRW
+     !   !read(*,*)
+     !
+     !   do while  (d * rec_Planck_opacity > gamma_MRW )
+     !      write(*,*) "MRW"
+     !      call make_MRW_step(id,icell, x,y,z,Stokes(1), d, rec_Planck_opacity)
+     !      d = distance_to_closest_wall(icell,x,y,z)
+     !      ! todo : do we update the rec_plack_opacity ???
+     !      !call compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
+     !   enddo
+     !
+     !   ! MRW is finished, we choose wl and direction
+     !endif
 
- !    icell_old = icell
+     ! now that MRW is done, we perform the normal propagation
+     icell_old = icell
      call physical_length(id,lambda,p_lambda,Stokes,icell,x,y,z,u,v,w,flag_star,flag_direct_star,tau,dvol,flag_sortie,lpacket_alive)
- !    if (icell == icell_old) then
- !       n_iterations = n_iterations + 1
- !    else
- !       n_iterations = 0
- !    endif
+     if (icell == icell_old) then
+        n_iteractions_in_cell = n_iteractions_in_cell + 1
+        !write(*,*) "icell=", icell, n_iteractions_in_cell
+     else
+        n_iteractions_in_cell = 0
+     endif
 
      if (flag_sortie) return ! Vie du photon terminee
 
@@ -1084,7 +1083,7 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
      endif ! lmono
 
 
-     if (rand < tab_albedo_pos(p_icell,lambda)) then ! Diffusion
+     if (rand < tab_albedo_pos(p_icell,lambda)) then ! Scatttering event
         flag_scatt=.true.
         flag_direct_star = .false.
 
@@ -1102,14 +1101,8 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
               if (lsepar_pola) then
-                 ! Nouveaux param�tres de Stokes
-                 if (lmueller) then
-                    call new_stokes_mueller(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                 else if (laggregate) then
-                    call  new_stokes_gmm(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                 else
-                    call new_stokes(lambda,itheta,rand2,taille_grain,u,v,w,u1,v1,w1,stokes)
-                 endif
+                 call get_Mueller_matrix_per_grain(lambda,itheta,rand2,taille_grain, M)
+                 call update_Stokes(Stokes,u,v,w,u1,v1,w1,M)
               endif
            else ! fonction de phase HG
               call hg(tab_g(taille_grain,lambda),rand, itheta, COSPSI) !HG
@@ -1122,7 +1115,6 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               PHI = PI * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Param�tres de Stokes non modifi�s
            endif
 
         else ! methode 2 : diffusion sur la population de grains
@@ -1139,13 +1131,9 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               PHI = PI * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Nouveaux param�tres de Stokes
               if (lsepar_pola) then
-                 if (lmueller) then
-                    call new_stokes_mueller_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
-                 else
-                    call new_stokes_pos(p_lambda,itheta,rand2,p_icell,u,v,w,u1,v1,w1,Stokes)
-		 endif
+                 call get_Mueller_matrix_per_cell(lambda,itheta,rand2,p_icell, M)
+                 call update_Stokes(Stokes,u,v,w,u1,v1,w1,M)
 	      endif
            else ! fonction de phase HG
               call hg(tab_g_pos(p_icell,lambda),rand, itheta, cospsi) !HG
@@ -1158,14 +1146,13 @@ subroutine propagate_packet(id,lambda,p_lambda,icell,x,y,z,u,v,w,stokes,flag_sta
               phi = pi * ( 2.0 * rand - 1.0 )
               ! direction de propagation apres diffusion
               call cdapres(cospsi, phi, u, v, w, u1, v1, w1)
-              ! Param�tres de Stokes non modifi�s
            endif
         endif
 
         ! Mise a jour direction de vol
         u = u1 ; v = v1 ; w = w1
 
-     else ! Absorption
+     else ! Absorption + eventual re-emission
 
         if ((.not.lmono).and.lnRE) then
            ! fraction d'energie absorbee par les grains hors equilibre

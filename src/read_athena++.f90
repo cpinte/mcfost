@@ -1,6 +1,7 @@
 module read_athena
 
   use parametres
+  use constantes
   use messages
   use mcfost_env
   use grid
@@ -8,8 +9,9 @@ module read_athena
   use density
   use stars, only : compute_stellar_parameters
   use hdf5
-  use utils_hdf5 ! mentiplay
-  use hdf5_utils ! needed to read attributes, need to merge everything
+  use HDF5_utils, only: open_hdf5file, close_hdf5file,   &
+       open_hdf5group, close_hdf5group,                   &
+       hdf_read_attribute, hdf_read_dataset, HID_T
   !use h5lt ! we can use this instead, official hdf5 high level library
 
   implicit none
@@ -317,7 +319,7 @@ contains
              icell = cell_map(i,j,phik)
 
              densite_gaz(icell) =  rho(i,jj,phik) * udens
-             densite_pouss(:,icell) = rho(i,jj,phik) * udens
+             dust_density(:,icell) = rho(i,jj,phik) * udens
 
              vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
              vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1
@@ -333,7 +335,7 @@ contains
     ! Calcul de la masse de gaz de la zone
     mass = 0.
     do icell=1,n_cells
-       mass = mass + densite_gaz(icell) *  masse_mol_gaz * volume(icell)
+       mass = mass + densite_gaz(icell) *  mu_mH * volume(icell)
     enddo !icell
     mass =  mass * AU3_to_m3 * g_to_Msun
 
@@ -344,7 +346,7 @@ contains
        ! Somme sur les zones pour densite finale
        do icell=1,n_cells
           densite_gaz(icell) = densite_gaz(icell) * facteur
-          masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+          masse_gaz(icell) = densite_gaz(icell) * mu_mH * volume(icell) * AU3_to_m3
        enddo ! icell
     else
        call error('Gas mass is 0')

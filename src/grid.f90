@@ -19,7 +19,7 @@ module grid
   procedure(indice_cellule_cyl), pointer :: indice_cellule => null()
   procedure(test_exit_grid_cyl), pointer :: test_exit_grid => null()
   procedure(define_cylindrical_grid), pointer :: define_grid => null()
-  procedure(distance_to_closest_wall_Voronoi), pointer :: distance_to_closest_wall => null()
+  procedure(distance_to_closest_wall_cyl), pointer :: distance_to_closest_wall => null()
 
   real(kind=dp) :: v_char, B_char
   logical :: lcalc_ne, lmagnetized
@@ -32,7 +32,6 @@ module grid
   contains
 
   subroutine alloc_atomrt_grid()
-    integer(kind=8) :: mem_alloc_local = 0
 
     !merge vturb and v_turb (molecular emission)
     !TO DO: move vturb in molecular emission in grid.f90
@@ -94,7 +93,7 @@ module grid
    enddo icell_loop
    N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
    if (N_fixed_ne > 0) then
-      write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+      write(*,'("Found ",(1I5)," cells with fixed electron density values! (",(1I3)," %)")') &
            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
    endif
 
@@ -274,7 +273,6 @@ end subroutine define_physical_zones
 subroutine setup_grid()
 
   logical, save :: lfirst = .true.
-  integer :: mem_size
 
   if (.not.lVoronoi) then
      nrz = n_rad * nz
@@ -343,6 +341,7 @@ subroutine setup_grid()
         indice_cellule => indice_cellule_cyl
         test_exit_grid => test_exit_grid_cyl
         define_grid => define_cylindrical_grid
+        distance_to_closest_wall => distance_to_closest_wall_cyl
      else if (grid_type == 2) then
         lcylindrical = .false.
         lspherical = .true.
@@ -352,6 +351,7 @@ subroutine setup_grid()
         indice_cellule => indice_cellule_sph
         test_exit_grid => test_exit_grid_sph
         define_grid => define_cylindrical_grid ! same routine at the moment
+        distance_to_closest_wall => distance_to_closest_wall_sph
      else
         call error("Unknown grid type")
      endif

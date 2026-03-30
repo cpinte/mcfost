@@ -27,16 +27,28 @@ runs:
         echo "INTEL_PATH=/home/runner/intel/oneapi" >> "$GITHUB_ENV"
         sudo chown root /bin/tar && sudo chmod u+s /bin/tar # tar needs to run as root to extract when restoring the cache
 
-    - name: fix gcc issue on the runner (GNU / macos)
-      if: matrix.compiler == 'gfortran' && matrix.os == 'macos'
+    - name: fix gcc issue on the runner (GNU / macos intel)
+      if: matrix.compiler == 'gfortran' && matrix.os == 'macos-intel'
       shell: bash
       run: |
         brew reinstall gcc@13
         ln -s /usr/local/bin/gcc-13 /usr/local/bin/gcc
         ln -s /usr/local/bin/g++-13 /usr/local/bin/g++
+        ln -s /usr/local/bin/gfortran-13 /usr/local/bin/gfortran
+
+    - name: fix gcc issue on the runner (GNU / macos arm)
+      if: matrix.compiler == 'gfortran' && matrix.os == 'macos-arm'
+      shell: bash
+      run: |
+        sudo chown -R $(whoami) /usr/local
+        brew reinstall gcc@13
+        ln -s /opt/homebrew/bin/gcc-13 /usr/local/bin/gcc
+        ln -s /opt/homebrew/bin/g++-13 /usr/local/bin/g++
+        ln -s /opt/homebrew/bin/gfortran-13 /usr/local/bin/gfortran
+        export PATH=/usr/local/bin:${PATH}
 
     - name: install intel compilers (intel / macos)
-      if: matrix.compiler == 'ifort' && matrix.os == 'macos'
+      if: matrix.compiler == 'ifort' && matrix.os == 'macos-intel'
       shell: bash
       run: |
         wget -nv https://registrationcenter-download.intel.com/akdlm/IRC_NAS/2fbce033-15f4-4e13-8d14-f5a2016541ce/m_fortran-compiler-classic_p_2023.2.0.49001_offline.dmg &
@@ -51,12 +63,12 @@ runs:
     # Cache other dependencies for mcfost to avoid downloading/installing them each time this workflow runs
     - name: cache dependencies
       id: cache-deps
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ${{ env.MCFOST_INSTALL }}/include
           ${{ env.MCFOST_INSTALL }}/lib/${{ matrix.compiler }}
-        key: mcfost-deps-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
+        key: mcfost-TEST-deps-${{ matrix.os }}-${{ matrix.compiler }}-${{ hashFiles('lib/install.sh') }}
 
     - name: unset setuid bit for tar if cache not found
       if: matrix.compiler == 'ifort' && matrix.os == 'linux' && steps.cache-deps.outputs.cache-hit != 'true'
@@ -70,5 +82,7 @@ runs:
       working-directory: lib
       run: |
         [ ! "$SETVARS_COMPLETED" == 1 ] && test -f "$INTEL_PATH"/setvars.sh && . "$INTEL_PATH"/setvars.sh
-        sudo chmod o+w /usr/local/include /usr/local/lib
+        sudo chown -R $(whoami) /usr/local
+        mkdir -p /usr/local/include /usr/local/lib
+        chmod o+wr /usr/local/include /usr/local/lib
         ./install.sh

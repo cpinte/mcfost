@@ -51,8 +51,15 @@ Contributing
 ------------
 We welcome contributions, including (but not limited to):
 
-1. Code, via [pull request](https://github.com/cpinte/mcfost/pulls). Please read developer section of user guide for guidelines.
-2. Documentation, also by [pull request](https://github.com/cpinte/mcfost/pulls). Docs can be edited in the docs/ directory of the main code.
+1. Code, via [pull request](https://github.com/cpinte/mcfost/pulls). Please read the developer section of the user guide for guidelines. 
+We use the [pre-commit](https://pre-commit.com) framework to automatically fix
+some coding bad practices.
+It is recommended to install pre-commit by running the following commands from the top level of the repo
+```shell
+python3 -m pip install pre-commit
+pre-commit install
+```
+2. Documentation, also by [pull request](https://github.com/cpinte/mcfost/pulls). Docs can be edited in the docs/ directory of the main code. 
 3. Suggestions for features or bug reports, via the [issue tracker](https://github.com/cpinte/mcfost/issues/new). Please file bugs via github rather than by email.
 
 Questions?

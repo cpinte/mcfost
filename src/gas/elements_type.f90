@@ -78,11 +78,9 @@ module elements_type
          'Th','Pa','U ','Np','Pu','Am','Cm','Bk','Cf','Es'/
 
 
-
     contains
 
     subroutine dealloc_elements()
-        integer :: n
 
         deallocate(Tpf)
         deallocate(elems)
@@ -139,7 +137,7 @@ module elements_type
         !
         ! Also read partition function
 
-        integer :: EOF, n, blocksize, unit, i, j, syst_status
+        integer :: EOF, n, blocksize, unit, i, j
         integer :: NAXIST(1), naxis_found, hdutype,  Nread
         ! integer :: cursor_init
         character(len=256) :: some_comments
@@ -184,7 +182,7 @@ module elements_type
 
 
         !read abundances
-        write(FormatLine,'("(1"A,I3")")') "A", 10
+        write(FormatLine,'("(A",I0,")")') 10
         open(unit=1, file=TRIM(mcfost_utils)//TRIM(ABUNDANCE_FILE),status="old")!,access="stream",form='formatted')
         !count number of elemental abundances and rewind to the first element in the file
         ! inquire(1, pos=cursor_init)

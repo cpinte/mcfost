@@ -29,23 +29,21 @@ module io_atom
    !
       integer, intent(in) :: atomunit
       type (AtomType), intent(inout), target :: atom
-      real(kind=dp) :: dummy
       character(len=2) :: IDread
       character(len=512) :: inputline, FormatLine
       logical :: find_abund, res
       real, allocatable, dimension(:) :: levelNumber
       logical, dimension(:), allocatable :: determined, parse_labs
       character(len=20) :: shapeChar, vdWChar, nuDepChar
-      real(kind=dp) :: f, lambdaji, lambdamin
-      integer :: Nread, i,j, EOF, nll, nc, kr, la
+      real(kind=dp) :: f, lambdaji
+      integer :: Nread, i,j, EOF, nll, kr, la
 
       EOF = 0
       res = .false.
 
       open(unit=atomunit,file=trim(mcfost_utils)//trim(path_to_atoms)//trim(atom%filename),status="old")
       !FormatLine = "(1A<MAX_LENGTH>)" !not working with ifort
-      write(FormatLine,'("(1"A,I3")")') "A", 512
-
+      write(FormatLine,'("(A",I0,")")') 512
       !Read ID and fill atom abundance and weight
       CALL read_line(atomunit, FormatLine, inputline, Nread)
       read(inputline,*) IDread
@@ -134,7 +132,7 @@ module io_atom
          read(inputline,*) atom%E(i), atom%g(i), atom%label(i), &
                            atom%stage(i), levelNumber(i)
          atom%E(i) = atom%E(i) * HP*C_LIGHT / (CM_TO_M)
-      end do 
+      end do
 
       ! Check if there is at least one continuum transition
       if (atom%stage(atom%Nlevel) /= atom%stage(atom%Nlevel-1)+1) then
@@ -168,14 +166,14 @@ module io_atom
          atom%lines(kr)%g_lande_eff = -99.0
          atom%lines(kr)%glande_i = -99.0; atom%lines(kr)%glande_j = -99.0
 
-         call read_line(atomunit, FormatLine, inputline, Nread)                       
+         call read_line(atomunit, FormatLine, inputline, Nread)
          Nread = len(trim(inputline))
          !!write(*,*) Nread, inputline(1:Nread)
          read(inputline(1:Nread),*) j, i, f, shapeChar, atom%lines(kr)%qwing, vdWChar,&
                atom%lines(kr)%cvdWaals(1), atom%lines(kr)%cvdWaals(2), &
                atom%lines(kr)%cvdWaals(3), atom%lines(kr)%cvdWaals(4), &
                atom%lines(kr)%Grad, atom%lines(kr)%cStark
- 
+
          !indexes in the atomic model are C indexes!
          i = i + 1
          j = j + 1
@@ -188,7 +186,7 @@ module io_atom
          atom%i_trans(kr) = atom%lines(kr)%i
          atom%j_trans(kr) = atom%lines(kr)%j
 
-         !because levels correspond to different transitions, 
+         !because levels correspond to different transitions,
          !we need to test if the level has already been indentified
          if (.not.parse_labs(atom%lines(kr)%i)) then
             call parse_label(atom%label(atom%lines(kr)%i),&
@@ -351,10 +349,10 @@ module io_atom
                !        atom%continua(kr)%lambdamin = 0.05 * atom%continua(kr)%lambda0
                !        atom%continua(kr)%lambdamin = max(10.0_dp, 1d-2 * atom%continua(kr)%lambda0)
                !!tmp
-               write(*,'(" Continuum "(1I3)" -> "(1I3)" at "(1F12.5)" nm")') &
+               write(*,'(" Continuum ",(1I3)," -> ",(1I3)," at ",(1F12.5)," nm")') &
                   atom%continua(kr)%i, atom%continua(kr)%j, atom%continua(kr)%lambda0
-               write(*,'(" -> lower edge cut at "(1F12.5)" nm !")') atom%continua(kr)%lambdamin
-     
+               write(*,'(" -> lower edge cut at ",(1F12.5)," nm !")') atom%continua(kr)%lambdamin
+
                if (atom%continua(kr)%lambdamin>=atom%continua(kr)%lambda0) then
                   write(*,*) "Minimum wavelength for continuum is larger than continuum edge."
                   write(*,*) kr, atom%continua(kr)%lambda0, atom%continua(kr)%lambdamin
@@ -372,12 +370,12 @@ module io_atom
             case default
 
                call error("nudepchar!")
-            
+
          end select
       enddo !bound-free
 
       atom%set_ltepops = .true. !by default compute lte populations
-      !non-LTE pops in electronic density ? write non-LTE pops to file ? 
+      !non-LTE pops in electronic density ? write non-LTE pops to file ?
       atom%NLTEpops = .false. ! set to true during non-LTE loop (initial /= 1).
                               ! true if read from file (initial==1).
 
@@ -413,7 +411,7 @@ module io_atom
          allocate(atom%n(atom%Nlevel,n_cells))
          atom%n = 0.0_dp
          select case (atom%initial)
-            case (0) 
+            case (0)
                write(*,*) " -> Setting initial solution to LTE "
             case (1)
                write(*,*) " -> Setting initial solution to OLD_POPS " ! non-LTE + LTE
@@ -465,20 +463,17 @@ module io_atom
    end subroutine read_Model_Atom
 
    subroutine read_atomic_models()
-      integer :: EOF=0,Nread, nmet, mmet, nblancks, nact, npass
-      integer :: kr, k, imax, ic
-      real(kind=dp) :: min_resol, max_resol
+      integer :: Nread, nmet, mmet, nact, npass
       integer :: unit = 1
       character(len=15) :: FormatLine
-      character(len=512) :: popsfile, filename, inputline
+      character(len=512) :: inputline
       character(len=2) :: IDread
-      type (AtomType), pointer :: atom
 
 
-      write(FormatLine,'("(1"A,I3")")') "A", 512
+      write(FormatLine,'("(A",I0,")")') 512
       if (N_atoms > 1) then
          write(*,*) "Reading ", N_atoms, " atoms"
-      else 
+      else
          write(*,*) "Reading ", N_atoms, " atom"
       endif
 
@@ -643,7 +638,7 @@ module io_atom
    integer,  optional :: iter, step
    integer :: unit, blocksize, naxes(5), naxis,group, bitpix, fpixel
    logical :: extend, simple, lte_only
-   integer :: nelements, hdutype, status, k, sys_status
+   integer :: nelements, status, sys_status
    character(len=512) :: cmd, popsF
    character(len=10000) :: step_c, iter_c
 
@@ -801,8 +796,8 @@ module io_atom
    ! ---------------------------------------------------------- !
    type (AtomType), intent(inout) :: atom
    integer :: unit, status, blocksize, naxis,group, bitpix, fpixel
-   logical :: extend, simple, anynull, show_warning = .true.
-   integer :: nelements, naxis2(4), Nl, naxis_found, hdutype, l, icell
+   logical :: extend, simple, anynull
+   integer :: nelements, naxis2(4), naxis_found, hdutype, l
    character(len=256) :: some_comments, popsF
    integer :: i, k
    real(kind=dp) :: ntotal
@@ -996,10 +991,10 @@ module io_atom
 
 
    do l=1,atom%Nlevel
-      write(*,"('Level #'(1I3))") l
-      write(*,'("  -- min(n)="(1ES20.7E3)" m^-3; max(n)="(1ES20.7E3)" m^-3")') &
+      write(*,"('Level #',(1I3))") l
+      write(*,'("  -- min(n)=",(1ES20.7E3)," m^-3; max(n)=",(1ES20.7E3)," m^-3")') &
            minval(atom%n(l,:),mask=(atom%n(l,:)>0)), maxval(atom%n(l,:))
-      write(*,'("  -- min(nstar)="(1ES20.7E3)" m^-3; max(nstar)="(1ES20.7E3)" m^-3")')  &
+      write(*,'("  -- min(nstar)=",(1ES20.7E3)," m^-3; max(nstar)=",(1ES20.7E3)," m^-3")')  &
            minval(atom%nstar(l,:),mask=(atom%nstar(l,:)>0)), maxval(atom%nstar(l,:))
    enddo
 

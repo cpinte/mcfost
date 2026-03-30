@@ -10,7 +10,8 @@ module cylindrical_grid
        move_to_grid_cyl, define_cylindrical_grid, build_cylindrical_cell_mapping,  cell_map, cell_map_i, cell_map_j,&
        cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, delta_z, r_grid, z_grid, phi_grid, tab_region, &
        z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, cos_phi_lim, sin_phi_lim, volume, l_dark_zone, zmax, &
-       delta_cell_dark_zone, ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone
+       delta_cell_dark_zone, ri_in_dark_zone, ri_out_dark_zone, zj_sup_dark_zone, zj_inf_dark_zone, l_is_dark_zone, &
+       distance_to_closest_wall_cyl
 
   real(kind=dp), parameter, public :: prec_grille=1.0e-14_dp
 
@@ -45,8 +46,6 @@ contains
 
     integer :: i,j,k,icell, ntot, ntot2, alloc_status
     integer :: istart,iend,jstart,jend,kstart,kend, istart2,iend2,jstart2,jend2,kstart2,kend2
-
-    icell_ref = 1
 
     istart = 1
     iend = n_rad
@@ -199,7 +198,7 @@ subroutine define_cylindrical_grid()
   real(kind=dp), dimension(nz) :: dcos_theta
   real(kind=dp) ::   r_i, r_f, dr, fac, r0, H, hzone
   real(kind=dp) :: delta_r, ln_delta_r, delta_r_in, ln_delta_r_in
-  real(kind=dp) :: theta, dtheta, delta_phi, Vi, dr2
+  real(kind=dp) :: dtheta, delta_phi, Vi, dr2
   integer :: ir, iz, n_cells_tmp, n_rad_region, n_rad_in_region, n_empty, istart, alloc_status, jc
 
   type(disk_zone_type) :: dz
@@ -317,7 +316,7 @@ subroutine define_cylindrical_grid()
         puiss = 0.0_dp
         do iz=1, n_zones
            if (disk_zone(iz)%region == ir) then
-              p=1+dz%surf-dz%exp_beta
+              p=1+disk_zone(iz)%surf-disk_zone(iz)%exp_beta
               if (p > puiss) then
                  puiss = p
               endif
@@ -1177,9 +1176,9 @@ end subroutine define_cylindrical_grid
 
   !***********************************************************
 
-  real(dp) function distance_to_closest_wall_cyl(id,icell,x,y,z) result(s)
+  real(dp) function distance_to_closest_wall_cyl(icell,x,y,z) result(s)
 
-    integer, intent(in) :: id, icell
+    integer, intent(in) :: icell
     real(kind=dp), intent(in) :: x,y,z
 
     real(dp) :: r,s1,s2,s3,s4,s5,s6,z0
@@ -1196,8 +1195,8 @@ end subroutine define_cylindrical_grid
     ! z walls
     z0 = abs(z)
     zj0 = abs(zj0)
-    s3 = z_lim(ri0,abs(zj0)+1) - z
-    s4 = z - z_lim(ri0,abs(zj0))
+    s3 = z_lim(ri0,abs(zj0)+1) - z0
+    s4 = z0 - z_lim(ri0,abs(zj0))
 
     if (l3D) then
        ! phi walls

@@ -18,11 +18,10 @@ module broad
       !for each transition individually
       integer, intent(in) :: icell
       type (AtomicLine), intent(in) :: line
-      integer :: k
       real(kind=dp) :: radfreq_to_vel
       real(kind=dp) :: adamp, vdw, vth
       real(kind=dp) :: line_damping
-      real(kind=dp) :: Qelast, Gj
+
 
       line_damping = line%Grad
       vth = vbroad(T(icell), line%atom%weight, vturb(icell))
@@ -80,9 +79,9 @@ module broad
       real(kind=dp), intent(out) :: GvdW
       integer, intent(in) :: icell
       type (AtomicLine), intent(in) :: line
-      integer :: i, j, ic, Z, k
+      integer :: i, j, ic, Z
       real(kind=dp) :: vrel35_H, vrel35_He, fourPIeps0, deltaR
-      real(kind=dp) :: cross, gammaCorrH, gammaCorrHe, C625
+      real(kind=dp) :: cross, C625
 
       j = line%j
       i = line%i
@@ -142,7 +141,7 @@ module broad
       real(kind=dp), intent(out) :: GStark
       integer, intent(in) :: icell
       type (AtomicLine), intent(in) :: line
-      integer :: k, ic, Z
+      integer :: ic, Z
       real(kind=dp) :: C4, C, Cm, melONamu, cStark23, cStark
       real(kind=dp) :: neff_u, neff_l, vrel, ERYDBERG
 
@@ -195,9 +194,8 @@ module broad
       real(kind=dp), intent(out) :: GStark
       integer, intent(in) :: icell
       type (AtomicLine), intent(in) :: line
-      real(kind=dp) :: n_upper, n_lower, Gstark2
-      real :: Z, K, dn, a1, gs
-      real(kind=dp) :: C, nelectric
+      real(kind=dp) :: n_upper, n_lower, nelectric
+      real :: Z, dn, a1, gs
 
       Z = 1.0 + line%atom%stage(line%i)
 

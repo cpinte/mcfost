@@ -100,7 +100,7 @@ km/s to +10 km/s in delta v of 0.05 km/s (200 channels):
    10 100                       # vmax (km.s^-1), n_speed
    T 1.e-4 abundance.fits.gz    # cst molecule abundance ?, abundance, abundance file
    T  1                         # ray tracing ?,  number of lines in ray-tracing
-   2                            # transition numbers
+   3                            # transition numbers
 
 If you need a molecular map + corresponding continuum, the recommended workflow is then::
 

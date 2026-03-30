@@ -27,8 +27,6 @@ void progress_bar(float progress)
     std::cout << std::endl;
 }
 
-#define n_elements(x) (sizeof(x) / sizeof((x)[0]))
-
 int index_star(int icell, int n_stars, int *stars_id)
 {
   int k;

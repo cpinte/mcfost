@@ -31,9 +31,9 @@ module constantes
 
   real(kind=dp), parameter :: Na = 6.022140857e23_dp   ! Nombre d'Avogadro CODATA 2014
   real(kind=dp), parameter :: amu = 1.0_dp/Na          ! atomic mass unit [g]
-  real(kind=dp), parameter :: masseH = 1.007825032231_dp * amu   ! H atom mass [g] CODATA 2014
-  real, parameter :: mu = 2.3                          ! [g]  2.3 following Walker 2004
-  real, parameter :: masse_mol_gaz = mu * masseH
+  real(kind=dp), parameter :: mH = 1.007825032231_dp * amu   ! H atom mass [g] CODATA 2014
+  real, parameter :: mu = 2.3                          ! [mH] 2.3 following Walker 2004
+  real, parameter :: mu_mH = mu * mH                   ! mean molecular weight [g]
   real, parameter :: T_Cmb = 2.7260                    ! K
 
   real(kind=dp), parameter ::  e_ion_hmin = 0.754 * electron_charge !Ionization energy (affinity) Hmin in [J]

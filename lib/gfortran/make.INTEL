@@ -1,6 +1,6 @@
 AR = ar
 ARFLAGS = cr
-#If your system does not have ranlib, then replace next statement with 
+#If your system does not have ranlib, then replace next statement with
 #RANLIB = echo
 RANLIB = ranlib
 CC = gcc
@@ -15,7 +15,7 @@ FSUFFIX = F
 MPIF77 = mpif77
 MPICC = mpicc
 
-# To use MPI, set the MPIDIR to location of mpi library, and MPILIB 
+# To use MPI, set the MPIDIR to location of mpi library, and MPILIB
 # to name of mpi library. Remove # signs from beginning of next 3 lines.
 # Also, if the previous compilation was without MPI, type: make realclean
 # before compiling for mpi.
@@ -27,10 +27,10 @@ MPICC = mpicc
 # Please include mpi header file path, if needed
 
 #CFLAGS = -O3 -DLittleEndian $(PMLCGDEF) $(MPIDEF) -D$(PLAT)  -I/usr/local/mpi/include -I/usr/local/mpi/build/LINUX/ch_p4/include
-CFLAGS = -m64 -O3 -DLittleEndian $(PMLCGDEF) $(MPIDEF) -D$(PLAT) -DPOINTER_SIZE=8
+CFLAGS = -m64 -O3 -DLittleEndian $(PMLCGDEF) $(MPIDEF) -D$(PLAT) -DPOINTER_SIZE=8 -fpermissive
 CLDFLAGS =  -m64 -O3 -DPOINTER_SIZE=8 -D_LONG_LONG
 #FFLAGS = -O3 $(PMLCGDEF) $(MPIDEF) -D$(PLAT)  -I/usr/local/mpi/include -I/usr/local/mpi/build/LINUX/ch_p4/include -I.
 FFLAGS = -m64 -O3 $(PMLCGDEF) $(MPIDEF) -D$(PLAT) -DPOINTER_SIZE=8
-F77LDFLAGS =  -m64 -O3 
+F77LDFLAGS =  -m64 -O3
 
 CPP = cpp -P

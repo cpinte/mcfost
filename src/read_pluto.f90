@@ -1,6 +1,7 @@
 module read_pluto
 
   use parametres
+  use constantes
   use messages
   use mcfost_env
   use grid
@@ -186,6 +187,7 @@ contains
     file_types(2) = "vx1"
     file_types(3) = "vx2"
     file_types(4) = "vx3"
+    iunit=1
     do l=1, 4
        filename = trim(pluto%dir)//"/"//trim(file_types(l))//"."//trim(trim(pluto%id))//".dbl"
        write(*,*) "Reading "//trim(filename)
@@ -242,7 +244,7 @@ contains
              icell = cell_map(i,j,phik)
 
              densite_gaz(icell) = rho(i,i2,i3) * udens
-             densite_pouss(:,icell) = rho(i,i2,i3) * udens
+             dust_density(:,icell) = rho(i,i2,i3) * udens
 
              vfield3d(icell,1)  = vx1(i,i2,i3) * uvelocity! vr
              vfield3d(icell,2)  = (vx3(i,i2,i3) + r_grid(icell)/ulength_au * Omega) * uvelocity ! vphi : planet at r=1
@@ -257,7 +259,7 @@ contains
     ! Calcul de la masse de gaz de la zone
     mass = 0.
     do icell=1,n_cells
-       mass = mass + densite_gaz(icell) *  masse_mol_gaz * volume(icell)
+       mass = mass + densite_gaz(icell) *  mu_mH * volume(icell)
     enddo !icell
     mass =  mass * AU3_to_m3 * g_to_Msun
 
@@ -268,7 +270,7 @@ contains
        ! Somme sur les zones pour densite finale
        do icell=1,n_cells
           densite_gaz(icell) = densite_gaz(icell) * facteur
-          masse_gaz(icell) = densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+          masse_gaz(icell) = densite_gaz(icell) * mu_mH * volume(icell) * AU3_to_m3
        enddo ! icell
     else
        call error('Gas mass is 0')

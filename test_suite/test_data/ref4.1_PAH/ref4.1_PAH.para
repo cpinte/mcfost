@@ -42,18 +42,23 @@
 
 #Density structure
   1                       zone type : 1 = disk, 2 = tappered-edge disk, 3 = envelope, 4 = debris disk, 5 = wall
-  1.e-3    100.		  dust mass,  gas-to-dust mass ratio
+  1.e-5    100.		  dust mass,  gas-to-dust mass ratio
   10.  100.0  2           scale height, reference radius (AU), unused for envelope, vertical profile exponent (only for debris disk)
   1.0  0.0    300.  100.  Rin, edge, Rout, Rc (AU) Rc is only used for tappered-edge & debris disks (Rout set to 8*Rc if Rout==0)
   1.125                   flaring exponent, unused for envelope
   -0.5  0.0    	          surface density exponent (or -gamma for tappered-edge disk or volume density for envelope), usually < 0, -gamma_exp (or alpha_in & alpha_out for debris disk)
 
 #Grain properties
-  1  Number of species
-  Mie  1 2  0.0  1.0  0.9 Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
+  2  Number of species
+  Mie   1 2    0.0  1.0   0.9  Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
   Draine_Si_sUV.dat  1.0  Optical indices file, volume fraction
   1	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
-  0.03  1000.0 3.5 100 	  amin, amax [mum], aexp, n_grains (log distribution)
+  0.03  1000.0 3.5 50 	  amin, amax [mum], aexp, n_grains (log distribution)
+
+  Mie   1 2    0.0  1.e-3   0.9  Grain type (Mie or DHS), N_components, mixing rule (1 = EMT or 2 = coating),  porosity, mass fraction, Vmax (for DHS)
+  PAHneu.dat  1.0  Optical indices file, volume fraction
+  3	                  Heating method : 1 = RE + LTE, 2 = RE + NLTE, 3 = NRE
+  5e-4  5e-4 3.5 1 	  amin, amax [mum], aexp, n_grains (log distribution)
 
 #Molecular RT settings
   T T T                   lpop, laccurate_pop, LTE

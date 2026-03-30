@@ -45,7 +45,6 @@ module see
         integer(kind=8) :: mem_alloc_local
         integer :: kr, n, icell, l, i, j
         real(kind=dp) :: wl, anu1, e1, b1
-        real(kind=dp) :: anu2, e2, b2!higher prec integ
         type(AtomType), pointer :: atom
 
         mem_alloc_local = 0
@@ -218,7 +217,7 @@ module see
         endif
 
         if (limit_mem > 0) xcoupling_cont => cross_coupling_cont_i
-        write(*,'("  Total memory allocated in NLTEloop:"(1F14.3)" GB")') mem_alloc_local / 1024./1024./1024.
+        write(*,'("  Total memory allocated in NLTEloop:",(1F14.3)," GB")') mem_alloc_local / 1024./1024./1024.
 
         return
     end subroutine alloc_nlte_var
@@ -291,7 +290,7 @@ module see
 
     subroutine dealloc_nlte_var()
     !free space after non-lte loop.
-        integer :: n, kr
+        integer :: n
         type (AtomType), pointer :: atom
 
         deallocate(psi,eta_atoms,chi_up,chi_down,uji_down)
@@ -378,9 +377,9 @@ module see
         if ((maxval(atom%n(:,icell)) < 0.0)) then
             write(*,*) ""
             write(*,*) atom%ID, " id=",id, " icell=",icell
-            write(*,'("nstar: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel) !*ntotal
-            write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel) !*ntotal
-            write(*,'("b: "*(ES14.5E3))') (atom%n(l,icell)/ndag(l),l=1,atom%Nlevel) !*ntotal
+            write(*,'("nstar: ",*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel) !*ntotal
+            write(*,'("n: ",*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel) !*ntotal
+            write(*,'("b: ",*(ES14.5E3))') (atom%n(l,icell)/ndag(l),l=1,atom%Nlevel) !*ntotal
             do l=1, atom%Nlevel
                 write(*, '(1I3, *(ES14.5E3))') l, (atom%Gamma(l,lp,id), lp=1, atom%Nlevel)
             enddo
@@ -392,9 +391,9 @@ module see
             write(*,*) atom%ID
             write(*,*) "(SEE) BUG pops", " id=",id, " icell=",icell
             write(*,*) "T=", t(icell), ' ne=', ne(icell)," nH=", nHtot(icell)
-            write(*,'("ilevel: "*(1I4))') (l, l=1, atom%Nlevel)
-            write(*,'("n: "*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
-            write(*,'("ndag: "*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)
+            write(*,'("ilevel: ",*(1I4))') (l, l=1, atom%Nlevel)
+            write(*,'("n: ",*(ES14.5E3))') (atom%n(l,icell),l=1,atom%Nlevel)
+            write(*,'("ndag: ",*(ES14.5E3))') (ndag(l),l=1,atom%Nlevel)
             write(*,*) "Gamma:"
             write(*,'(*(I14))') (l, l=1, atom%Nlevel)
             do l=1, atom%Nlevel
@@ -655,12 +654,12 @@ module see
         real(kind=dp), intent(in) :: dOmega
         real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
         real(kind=dp), dimension(Nlambda_max_line) :: phi0
-        type(AtomType), pointer :: atom, atom2
+        type(AtomType), pointer :: atom
         integer :: kr, i, j, Nl, Nr, Nb, ip, jp, Nrp, Nbp
         integer :: i0, l, nact, krr
         real(kind=dp) :: jbar_up, jbar_down, xcc_down, xcc_up
-        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star, gij
-        real(kind=dp) :: ehnukt, ehnukt1
+        real(kind=dp) :: wl, wphi, anu, ni_on_nj_star, gij
+        real(kind=dp) :: ehnukt
 ! write(*,*) icell, T(icell)
         atom_loop : do nact = 1, Nactiveatoms
             atom => ActiveAtoms(nact)%p
@@ -1125,9 +1124,9 @@ module see
             dfne = abs(fvar(neq_ne,id))
 
             if (verbose) then
-                write(*,'("niter #"(1I5))') n_iter
-                write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfpop="(1ES17.8E3)" dfne="(1ES17.8E3))') delta_f, dfpop, dfne
-                write(*,'("non-LTE ionisation ne="(1ES17.8E3)" m^-3; nedag="(1ES17.8E3)" m^-3")') ne(icell), npop_dag(Neq_ne,id)
+                write(*,'("niter #",(1I5))') n_iter
+                write(*,'("non-LTE ionisation delta=",(1ES17.8E3)," dfpop=",(1ES17.8E3)," dfne=",(1ES17.8E3))') delta_f, dfpop, dfne
+                write(*,'("non-LTE ionisation ne=",(1ES17.8E3)," m^-3; nedag=",(1ES17.8E3)," m^-3")') ne(icell), npop_dag(Neq_ne,id)
                 ! stop
             endif
 
@@ -1140,9 +1139,9 @@ module see
                     if (verbose) then
                         write(*,*) ""
                         write(*,*) "-> (non-LTE ionisation): Not enough iterations to converge after second try"
-                        write(*,'("cell #"(1I7)"; proc #"(1I3)", niter #"(1I5))') icell, id, n_iter
-                        write(*,'("maxIter: "(1I5)"; damp="(1I4))')  max_iter, nint(d_damp)
-                        write(*,'("non-LTE ionisation delta="(1ES17.8E3)" dfpop="(1ES17.8E3)" dfne="(1ES17.8E3))') &
+                        write(*,'("cell #",(1I7),"; proc #",(1I3),", niter #",(1I5))') icell, id, n_iter
+                        write(*,'("maxIter: ",(1I5),"; damp=",(1I4))')  max_iter, nint(d_damp)
+                        write(*,'("non-LTE ionisation delta=",(1ES17.8E3)," dfpop=",(1ES17.8E3)," dfne=",(1ES17.8E3))') &
                              delta_f, dfpop, dfne
                         write(*,*) ""
                     endif
@@ -1183,7 +1182,7 @@ module see
         enddo
         at => null()
 
-        if (verbose) write(*,'("(DELTA) non-LTE ionisation dM="(1ES17.8E3)" dne="(1ES17.8E3) )') dM, dne
+        if (verbose) write(*,'("(DELTA) non-LTE ionisation dM=",(1ES17.8E3)," dne=",(1ES17.8E3))') dM, dne
 
         ! ne_new(icell) = ne(icell)
         ngpop(1,NactiveAtoms+1,icell,1) = ne(icell)
@@ -1200,7 +1199,7 @@ module see
     type (Element), intent(in) :: Elem
     real(kind=dp), dimension(:), intent(inout) :: fjk, dfjk
     real(kind=dp) :: sum1, sum2
-    integer :: j,  Nstage
+    integer :: j
     !return Nj / Ntot
     !for neutral j * Nj/Ntot = 0
 
@@ -1877,8 +1876,7 @@ module see
         type(AtomType), pointer :: atom
         integer :: kr, i, j, Nl, Nr, Nb, nact
         real(kind=dp) :: jbar_up, jbar_down
-        real(kind=dp) :: wl, wphi, anu, anu1, ni_on_nj_star, gij
-        real(kind=dp) :: ehnukt
+        real(kind=dp) :: wphi, ni_on_nj_star, gij
 
         atom_loop : do nact = 1, Nactiveatoms
             atom => ActiveAtoms(nact)%p

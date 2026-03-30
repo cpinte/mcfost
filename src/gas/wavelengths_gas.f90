@@ -61,8 +61,7 @@ module wavelengths_gas
       ! real(kind=dp), dimension(Nlambda_cont_log) :: make_sub_wavelength_grid_cont_log_nu
       type (AtomicContinuum), intent(in) :: cont
       real(kind=dp), dimension(cont%Nlambda) :: make_sub_wavelength_grid_cont_log_nu
-      real(kind=dp) :: resol
-      integer :: la, N1, N2
+      integer :: N1, N2
       real(kind=dp) :: l0, l1
       real(kind=dp) :: nu1, nu0, nu2, dnu
 
@@ -98,7 +97,7 @@ module wavelengths_gas
       ! ------------------------------------------------------------ !
       ! Compute the line bounds : lamndamin and lambdamax
       ! the total extent of line in the atom's frame (no velocity).
-      ! if limage is .false. : 
+      ! if limage is .false. :
       !  vmax is computed from the maximum thermal width of the line.
       ! and from the "natural" width of the line.
       ! if limage is .true :
@@ -154,8 +153,8 @@ module wavelengths_gas
 
       if (limage) then
          write(*,*) 'Atom ', line%atom%id
-         write(*,'("  line "(1I2)"->"(1I2)"; Vmax (Ray-Trace)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
-         write(*,'("   lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
+         write(*,'("  line ",(1I2),"->",(1I2),"; Vmax (Ray-Trace)=",(1F12.3)," km/s")') line%j, line%i, real(line%vmax)*1d-3
+         write(*,'("   lamin=",(1F12.3)," lam0=",(1F12.3)," lamax=",(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
       ! else
       !    write(*,'("line "(1I2)"->"(1I2)"; Vmax (non-LTE)="(1F12.3)" km/s")') line%j, line%i, real(line%vmax)*1d-3
       !    write(*,'(" lamin="(1F12.3)" lam0="(1F12.3)" lamax="(1F12.3))') line%lambdamin, line%lambda0, line%lambdamax
@@ -170,7 +169,7 @@ module wavelengths_gas
       real(kind=dp), dimension(Nlambda) :: line_lambda_grid
       type (atomicline), intent(inout) :: line
       real(kind=dp) ::  vcore, vwing, vth_max
-      integer :: la, Nmid
+      integer :: Nmid
       integer :: N_wing, N_core
 
 
@@ -244,7 +243,7 @@ module wavelengths_gas
       real(kind=dp), dimension(Nlambda) :: line_lambda_grid_dv
       type (atomicline), intent(inout) :: line
       real(kind=dp) ::  vwing
-      integer :: la, Nmid
+      integer :: la
 
       !not the exact width at a given cell, but the maximum extent!
       vwing = line%vmax
@@ -261,7 +260,7 @@ module wavelengths_gas
    end function line_lambda_grid_dv
 
    subroutine deallocate_wavelengths_gasrt()!(lambda)
-   use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
+   use wavelengths, only : tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda
       ! real(kind=dp), intent(inout), allocatable, dimension(:) :: lambda
       if (allocated(tab_lambda)) deallocate(tab_lambda) !lambda
       if (allocated(tab_lambda_inf)) then
@@ -284,12 +283,12 @@ module wavelengths_gas
       integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda
       integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved, Nwaves, check_new_freq
       type (AtomType), pointer :: atom
-      integer :: alloc_status, lac, la, nb, krr, max_Nlambda_indiv, Noverlap, ib, ir
+      integer :: alloc_status, lac, la, max_Nlambda_indiv, Noverlap, ib, ir
       real(kind=dp), dimension(:), allocatable :: tmp_grid, tmp_grid2, all_l0, all_l1
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
       integer, dimension(:), allocatable :: sorted_indexes
-      real(kind=dp) :: max_cont, l0, l1, dvmin, min_lines, min_cont
+      real(kind=dp) :: max_cont, l0, l1, min_lines, min_cont
       real :: hv_loc !like hv
       real, parameter :: prec_vel = 0.0 !remove points is abs(hv_loc-hv)>prec_vel
       logical :: check_for_overlap
@@ -354,10 +353,10 @@ module wavelengths_gas
       if (associated(subgrid_line,line_lambda_grid_dv)) then
          if (art_hv > 0.0) then
          !eventually overwrite with a user defined resol.
-            write(*,'("R="(1F7.3)" km/s; optimal:"(1F7.3)" km/s")') art_hv, hv
+            write(*,'("R=",(1F7.3)," km/s; optimal:",(1F7.3)," km/s")') art_hv, hv
             hv = art_hv
          else
-            write(*,'("R="(1F7.3)" km/s")') hv
+            write(*,'("R=",(1F7.3)," km/s")') hv
          endif
       else
          !doesn't matter, irregular grid
@@ -613,7 +612,7 @@ module wavelengths_gas
                Nmore_cont_freq = Nmore_cont_freq + 1
             endif
 
-            !and below first bound-free if the bluest line wavelength is below 
+            !and below first bound-free if the bluest line wavelength is below
             !the lower continuum wavelength !
             if (l0 < min_cont) then
                Nmore_cont_freq = Nmore_cont_freq + 1
@@ -909,7 +908,7 @@ module wavelengths_gas
       write(*,*) "Number of max freq points for all trans :", Nlambda_max_trans
 
       n_lambda_cont = size(tab_lambda_cont)
-      write(*,'("Wavelength grid: "(1F12.4)" nm to",(1F12.4)" nm")') minval(lambda),maxval(lambda)
+      write(*,'("Wavelength grid: ",(1F12.4)," nm to",(1F12.4)," nm")') minval(lambda),maxval(lambda)
 
       return
    end subroutine make_wavelengths_nlte
@@ -1247,7 +1246,7 @@ module wavelengths_gas
       integer :: Ntrans, Ncont, Nlines, Nlambda_cont, Nlambda
       integer :: n, kr, Nlam, Nmore_cont_freq, Nremoved, Nwaves, check_new_freq
       type (AtomType), pointer :: atom
-      integer :: alloc_status, lac, la, nb, krr
+      integer :: alloc_status, lac, la
       real(kind=dp), dimension(:), allocatable :: tmp_grid, tmp_grid2, all_l0, all_l1
       integer, parameter :: Ngroup_max = 1000
       real(kind=dp), dimension(Ngroup_max) :: group_blue_tmp, group_red_tmp, Nline_per_group_tmp
@@ -1741,10 +1740,10 @@ module wavelengths_gas
       !now lambda will be stored in micron for compatibility
       !but a lots of atomic variables use nm.
       if (lfrom_file) then
-         write(*,'("Wavelength grid: "(1F12.4)" nm to ",(1F12.4)" nm")') minval(tab_lambda_nm),maxval(tab_lambda_nm)
-         write(*,'(" -> "(1F12.4)" mum to ",(1F12.4)" mum")') minval(lambda),maxval(lambda)
+         write(*,'("Wavelength grid: ",(1F12.4)," nm to ",(1F12.4)," nm")') minval(tab_lambda_nm),maxval(tab_lambda_nm)
+         write(*,'(" -> ",(1F12.4)," mum to ",(1F12.4)," mum")') minval(lambda),maxval(lambda)
       else
-         write(*,'("Wavelength grid: "(1F12.4)" nm to",(1F12.4)" nm")') minval(lambda),maxval(lambda)
+         write(*,'("Wavelength grid: ",(1F12.4)," nm to",(1F12.4)," nm")') minval(lambda),maxval(lambda)
       endif
 
       return

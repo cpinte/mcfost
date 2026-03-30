@@ -3,7 +3,7 @@ module init_mcfost
   use parametres
   use naleat
   use grains, only : aggregate_file, mueller_aggregate_file
-  use density, only : species_removed, T_rm
+  use density, only : species_removed, T_rm, is_density_file_Voronoi
   use molecular_emission
   !$ use omp_lib
   use benchmarks
@@ -13,7 +13,7 @@ module init_mcfost
   use utils
   use read_fargo3d, only : read_fargo3d_parameters
   use read_athena, only : read_athena_parameters
-  use read1d_models, only : read_model_1d
+  use read_1d_models, only : read_model_1d
   use read_idefix, only : read_idefix_parameters
   use read_pluto, only : read_pluto_parameters
   use read_spherical_grid, only : read_spherical_grid_parameters
@@ -46,8 +46,8 @@ subroutine set_default_variables()
   limg=.false.
   lorigine=.false.
   laggregate=.false.
-  lmueller=.false.
-  lper_size = .false.
+  lFresnel=.false.
+  lFresnel_per_size = .false.
   l3D=.false.
   lopacite_only=.false.
   lseed=.false.
@@ -133,7 +133,6 @@ subroutine set_default_variables()
   lforce_Mgas = .false.
   lforce_SPH_amin = .false.
   lforce_SPH_amax = .false.
-  lascii_SPH_file = .false.
   lgadget2_file=.false.
   llimits_file = .false.
   lsigma_file = .false.
@@ -178,6 +177,8 @@ subroutine set_default_variables()
   lcasa=.false.
   lJy = .false.
   lplanet_az = .false.
+  delta_planet_az = 0
+  idelta_planet_az = 0
   which_planet = 0
   lML = .false.
   lcorrect_density_elongated_cells=.false.
@@ -193,14 +194,17 @@ subroutine set_default_variables()
   lvphi_Kep = .false.
   lfluffy = .false.
   ldelete_hill_sphere = .false.
-  ldelete_inside_rsph = .false.
+  lmask_inside_rsph = .false.
   ldelete_outside_rsph = .false.
   ldelete_above_theta = .false.
+  lmask_outside_rsph = .false.
+  lmask_above_theta = .false.
   lrandomize_Voronoi = .false.
   lrandomize_azimuth = .false.
   lrandomize_gap = .false.
   lrandomize_outside_gap = .false.
   lcentre_on_sink = .false.
+  lexpand_z = .false.
   lwrite_column_density = .false.
   lwrite_mol_column_density = .false.
   lwrite_velocity = .false.
@@ -218,6 +222,9 @@ subroutine set_default_variables()
   loverwrite_s12 = .false.
   lnot_random_Voronoi = .false.
   lignore_sink=.false.
+  lstar_bb = .false.
+  lwrite_abundance = .false.
+  lheader_only = .false.
 
   tmp_dir = "./"
 
@@ -245,7 +252,7 @@ subroutine get_mcfost_utils_dir()
 
   integer :: i, n_dir
 
- ! Test if MCFOST_UTILS is defined
+  ! Test if MCFOST_UTILS is defined
   call get_environment_variable('MCFOST_UTILS',mcfost_utils)
   if (mcfost_utils == "") call error("environnement variable MCFOST_UTILS is not defined.")
   call get_environment_variable('MY_MCFOST_UTILS',my_mcfost_utils)
@@ -292,7 +299,7 @@ subroutine initialisation_mcfost()
   character(len=4) :: n_chiffres
   character(len=128)  :: fmt1, fargo3d_dir, fargo3d_id, athena_file, idefix_file, pluto_dir, pluto_id
 
-  logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lstar_bb, lold_PA
+  logical :: lresol, lMC_bins, lPA, lzoom, lmc, lHG, lonly_scatt, lupdate, lno_T, lno_SED, lpola, lold_PA
 
   real :: nphot_img = 0.0, n_rad_opt = 0, nz_opt = 0, n_T_opt = 0
 
@@ -317,7 +324,6 @@ subroutine initialisation_mcfost()
   lno_T = .false.
   lno_SED = .false.
   lpola = .false.
-  lstar_bb = .false.
   star_force_Mdot(:) = .false.
   star_Mdot(:) = 0.0
   lold_PA = .false.
@@ -522,27 +528,21 @@ subroutine initialisation_mcfost()
      case("-aggregate")
         laggregate=.true.
         i_arg = i_arg+1
-        if (lmueller) call error ("You can't use both -aggregate and -mueller options")
-        if (lper_size) call error ("You can't use both -aggregate and -mueller_size options")
         if (i_arg > nbr_arg) call error("GMM input file needed")
         call get_command_argument(i_arg,aggregate_file)
         i_arg = i_arg+1
         if (i_arg > nbr_arg) call error("GMM input file needed")
         call get_command_argument(i_arg,mueller_aggregate_file)
-     case("-mueller")
-        lmueller=.true.
+     case("-Fresnel")
+        lFresnel=.true.
         i_arg = i_arg+1
-        if (laggregate) call error ("You can't use both  -mueller and -aggregate options")
-        if (lper_size) call error ("You can't use both -mueller and -mueller_size options")
         if (i_arg > nbr_arg) call error("Mueller input file needed")
         call get_command_argument(i_arg,mueller_file)
         i_arg = i_arg+1
-     case("-mueller_size")
-        lper_size = .true.
+     case("-Fresnel_size")
+        lFresnel_per_size = .true.
         i_arg = i_arg+1
-        if (laggregate) call error ("You can't use both -mueller_size and -aggregate options")
-        if (lmueller) call error ("You can't use both -mueller_size and -mueller options")
-        lmueller=.true.
+        lFresnel=.true.
         if (i_arg > nbr_arg) call error("Mueller input pathfile needed")
         call get_command_argument(i_arg,mueller_file)
         i_arg = i_arg+1
@@ -782,6 +782,13 @@ subroutine initialisation_mcfost()
      case("-photodissociation","-photo_dissociation","-photo-dissociation")
         i_arg = i_arg + 1
         lphoto_dissociation=.true.
+        photodissociation_factor = 1.0
+     case("-photodissociation-factor","-photo_dissociation_factor","-photo-dissociation-factor")
+        i_arg = i_arg + 1
+        lphoto_dissociation=.true.
+        call get_command_argument(i_arg,s)
+        i_arg= i_arg+1
+        read(s,*,iostat=ios) photodissociation_factor
      case("-photodesorption","-photo_desorption","-photo-desorption")
         i_arg = i_arg + 1
         lphoto_desorption=.true.
@@ -826,7 +833,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         ldensity_file=.true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-start_step")
         i_arg = i_arg + 1
@@ -847,19 +855,22 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case ("-model_1d")
         i_arg = i_arg + 1
         lmodel_1d = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-sphere_mesh")
         i_arg = i_arg + 1
         lsphere_model = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-zeeman_polarisation")
      	call error("Zeeman polarisation not yet!")
@@ -961,15 +972,6 @@ subroutine initialisation_mcfost()
            density_files(i) = s
         enddo
         if (.not.llimits_file) limits_file = "phantom.limits"
-     case("-ascii_SPH")
-        i_arg = i_arg + 1
-        lascii_SPH_file = .true.
-        lVoronoi = .true.
-        l3D = .true.
-        call get_command_argument(i_arg,s)
-        density_file = s
-        i_arg = i_arg + 1
-        if (.not.llimits_file) limits_file = "phantom.limits"
      case("-SPH_amin")
         lforce_SPH_amin = .true.
         i_arg = i_arg + 1
@@ -991,7 +993,8 @@ subroutine initialisation_mcfost()
         lVoronoi = .true.
         l3D = .true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
         if (.not.llimits_file) limits_file = "gadget2.limits"
      case("-limits_file","-limits")
@@ -1124,7 +1127,8 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         lread_Seb_Charnoz2=.true.
         call get_command_argument(i_arg,s)
-        density_file = s
+        allocate(density_files(1))
+        density_files(1) = s
         i_arg = i_arg + 1
      case("-only_top")
         i_arg = i_arg+1
@@ -1296,6 +1300,14 @@ subroutine initialisation_mcfost()
         call get_command_argument(i_arg,s)
         read(s,*) planet_az
         i_arg = i_arg + 1
+     case("-delta_planet_az")
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) idelta_planet_az
+        i_arg = i_arg + 1
+        call get_command_argument(i_arg,s)
+        read(s,*) delta_planet_az
+        i_arg = i_arg + 1
      case("-planet")
         i_arg = i_arg + 1
         call get_command_argument(i_arg,s)
@@ -1359,11 +1371,23 @@ subroutine initialisation_mcfost()
      case("-delete_Hill_sphere")
         i_arg = i_arg + 1
         ldelete_Hill_sphere = .true.
-     case("-delete_inside_rsph")
+     case("-mask_inside_rsph")
         i_arg = i_arg + 1
-        ldelete_inside_rsph = .true.
+        lmask_inside_rsph = .true.
         call get_command_argument(i_arg,s)
         read(s,*) rsph_min
+        i_arg = i_arg + 1
+     case("-mask_outside_rsph")
+        i_arg = i_arg + 1
+        lmask_outside_rsph = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) rsph_mask_max
+        i_arg = i_arg + 1
+     case("-mask_above_latitude")
+        i_arg = i_arg + 1
+        lmask_above_theta = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) theta_mask_max
         i_arg = i_arg + 1
      case("-delete_outside_rsph")
         i_arg = i_arg + 1
@@ -1394,6 +1418,12 @@ subroutine initialisation_mcfost()
         lrandomize_Voronoi = .true.
         call get_command_argument(i_arg,s)
         read(s,*) gap_factor
+        i_arg = i_arg + 1
+     case("-expand_z","-expand-z","-ez")
+        i_arg = i_arg + 1
+        lexpand_z = .true.
+        call get_command_argument(i_arg,s)
+        read(s,*) expand_z_factor
         i_arg = i_arg + 1
      case("-cd","-column_density")
         i_arg = i_arg + 1
@@ -1453,6 +1483,10 @@ subroutine initialisation_mcfost()
         i_arg = i_arg + 1
         read(pluto_id,*,iostat=ios) i
         if (ios/=0) call error("pluto dump number needed")
+     case("-header_only")
+        i_arg = i_arg + 1
+        lheader_only = .true.
+        lstop_after_init = .true.
      case("-old_PA")
         i_arg = i_arg + 1
         lold_PA = .true.
@@ -1473,6 +1507,9 @@ subroutine initialisation_mcfost()
      case("-ignore_sink")
         i_arg = i_arg + 1
         lignore_sink=.true.
+     case("-write_abundance")
+        i_arg = i_arg + 1
+        lwrite_abundance=.true.
       case default
         write(*,*) "Error: unknown option: "//trim(s)
         write(*,*) "Use 'mcfost -h' to get list of available options"
@@ -1486,6 +1523,8 @@ subroutine initialisation_mcfost()
   else
      call read_para(para)
   endif
+
+  if (ldensity_file) call is_density_file_Voronoi()
 
   if (lfargo3d) then
      l3D = .true.
@@ -1509,13 +1548,13 @@ subroutine initialisation_mcfost()
    write(*,*) "------------------------------------------------"
    call warning(" THERE ARE PROBABLY SOME CHECKS TO DO MORE ")
    write(*,*) "------------------------------------------------"
-   call read_model_1d(density_file)
+   call read_model_1d(density_files(1))
   endif
   if (lsphere_model) then
      !could be 3d or 2d (2.5d). Depends on flag l3D or N_az>1
      n_zones = 1
      disk_zone(1)%geometry = 2
-     call read_spherical_grid_parameters(density_file)
+     call read_spherical_grid_parameters(density_files(1))
   endif
 
   if (lidefix) then
@@ -1584,10 +1623,6 @@ subroutine initialisation_mcfost()
   endif
 
   write(*,*) 'Input file read successfully'
-
-!   if ((lsphere_model.or.lmodel_1d).and.(lascii_sph_file.or.lphantom_file)) then
-!    call error("Cannot use Phantom and MHD files at the same time presently.")
-!   end if
 
   ! Correction sur les valeurs du .para
   if (lProDiMo) then
@@ -1780,8 +1815,8 @@ subroutine initialisation_mcfost()
      write (*,'(" Sequential code")')
   endif
 
-  if ((l_sym_ima).and.(abs(ang_disque+90) > 1e-6)) then
-     call warning("PA different from zero: removing image symetry")
+  if ((l_sym_ima).and.(abs(ang_disque) > 1e-6)) then
+     call warning("Disque is not horizontal: removing image symetry")
      l_sym_ima=.false.
      do imol=1,n_molecules
         mol(imol)%l_sym_ima = .false.
@@ -1851,8 +1886,6 @@ end subroutine initialisation_mcfost
 !********************************************************************
 
 subroutine display_help()
-! Ajout du cas ou les matrices de Mueller sont donnees en entrees
-! 20/04/2023
 
   implicit none
 
@@ -1915,6 +1948,7 @@ subroutine display_help()
   write(*,*) "        : -n_MC_bins <n_inclinations> <n_azimuth> (default : 10 1)"
   write(*,*) "        : -planet_az <angle> [deg] : adjust the model azimuth so that the planet is at"
   write(*,*) "                                     desired azimuth in the map"
+  write(*,*) "        : -delta_planet_az <n> <angle> [deg] : add n azimuth directions around planet_az"
   write(*,*) "        : -planet <sink_particle_number> : select the sink particle used to"
   write(*,*) "                                           perform the dump rotation"
   write(*,*) "        : -turn-off_planets : sink particles with id > 1 will not emit"
@@ -1979,29 +2013,11 @@ subroutine display_help()
   write(*,*) "        : -op <wavelength> (microns) : computes dust properties at"
   write(*,*) "                                    specified wavelength and stops"
   write(*,*) "        : -aggregate <GMM_input_file> <GMM_output_file>"
-  write(*,*) "        : -mueller <Mueller_input_file> "
-  write(*,*) "     "
-  write(*,*) "        Mueller_input_file contain the mean mueller matrix averaged"
-  write(*,*) "        over the size distribution. Every element is divided by s11."
-  write(*,*) "        The format of the input file must be the following."
-  write(*,*) "     "
-  write(*,*) "             Qext        Qsca        <cos(theta)> "
-  write(*,*) "          Qext_value  Qsca_value  <cos(theta)>_value "
-  write(*,*) "     "
-  write(*,*) "     "
-  write(*,*) "                               Mueller Scattering Matrix "
-  write(*,*) "       an_value   s11_value   s12_value   s13_value    s14_value "
-  write(*,*) "                  s21_value   s22_value   s23_value    s24_value "
-  write(*,*) "                  s31_value   s32_value   s33_value    s34_value "
-  write(*,*) "                  s41_value   s42_value   s43_value    s44_value "
-  write(*,*) "       an_value   s11_value   s12_value   s13_value    s14_value "
-  write(*,*) "                  s21_value   s22_value   s23_value    s24_value "
-  write(*,*) "     ....... "
-  write(*,*) "     "
-  write(*,*) "        : -mueller_size <Mueller_input_pathfile> "
-  write(*,*) "                   Argument pathfile contain the size of each grain, and the path"
-  write(*,*) "                   for each associated matrix for every grain size, sorted"
-  write(*,*) "                   from the first to the last grain size considered."
+  write(*,*) "        : -Fresnel <Mueller_matrix_input_file>  Uses a Mueller matrix from the Fresnel database"
+  write(*,*) "        : -Fresnel_per_size <Mueller_matricesinput_pathfile> "
+!  write(*,*) "                   Argument pathfile contain the size of each grain, and the path"
+!  write(*,*) "                   for each associated matrix for every grain size, sorted"
+!  write(*,*) "                   from the first to the last grain size considered."
   write(*,*) "     "
   write(*,*) "        : -optical_depth_map ot -tau_map   : create an map of the optical depth"
   write(*,*) "        : -tau=1_surface : creates a map of the tau=1 surface"
@@ -2025,6 +2041,7 @@ subroutine display_help()
   write(*,*) "        : -freeze-out <T>"
   write(*,*) "        : -freeze-out_depletion <relative depletion> between 0 and 1"
   write(*,*) "        : -photo-dissociation"
+  write(*,*) "        : -photo-dissociation-factor <factor> : factor aplied to CD at which photo-dissociation happens"
   write(*,*) "        : -photo-desorption"
   write(*,*) "        : -prodimo"
   write(*,*) "        : -prodimo_fPAH : force a fPAH value for ProDiMo"
@@ -2079,12 +2096,14 @@ subroutine display_help()
   write(*,*) "        : -no_vz : force the vertical velocities to be 0"
   write(*,*) "        : -vphi_Kep : force the azimuthal velocities to be Keplerian"
   write(*,*) "        : -centre_on_sink <number> : centre the model on the sink particle"
+  write(*,*) "        : -expand_z <factor> : multipky all z values by factor"
   write(*,*) "        : -SPH_amin <size> [mum] : force the grain size that follow the gas"
   write(*,*) "        : -SPH_amax <size> [mum] : force the grain size that follow the dust"
   write(*,*) "                                   (only works with 1 grain size dump)"
   write(*,*) "        : -force_Mgas : force the gas mass to be the value given the mcfost parameter file"
   write(*,*) "        : -not_random_Voronoi : force the particle order to remain the same"
   write(*,*) "        : -ignore_sink : forces nptmass to 0, ie not stars in mcfost"
+  write(*,*) "        : -header_only : only read the data and print some basic information"
   write(*,*) ""
   write(*,*) "You can find the full documentation at:"
   write(*,*) trim(doc_webpage)

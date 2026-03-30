@@ -39,14 +39,14 @@ contains
     integer, allocatable, dimension(:) :: npartoftype
     real(dp), allocatable, dimension(:,:) :: massoftype !(maxfiles,maxtypes)
     real(dp) :: hfact,umass,utime,ulength,gmw,x2
-    integer(kind=1), allocatable, dimension(:) :: itype,ifiles
+    integer(kind=1), allocatable, dimension(:) :: itype,ifiles,apr_level
     real(4),  allocatable, dimension(:) :: tmp
     real(dp), allocatable, dimension(:) :: grainsize,graindens
     real(dp), allocatable, dimension(:) :: dudt,tmp_dp,gastemperature
     real(dp), allocatable, dimension(:,:) :: xyzh,xyzmh_ptmass,vxyz_ptmass,dustfrac,vxyzu,nucleation
     type(dump_h) :: hdr
     logical :: got_h,got_dustfrac,got_itype,tagged,matched
-    logical :: got_temperature,got_u,lpotential,do_nucleation
+    logical :: got_temperature,got_u,lpotential,got_apr
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max, ndustsmall, ndustlarge
 
     ! We first read the number of particules in each phantom file
@@ -110,7 +110,7 @@ contains
        write(*,*) "---- Done"
     enddo ! ifile
 
-    allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot),gastemperature(np_tot))
+    allocate(xyzh(4,np_tot),itype(np_tot),vxyzu(4,np_tot),gastemperature(np_tot),apr_level(np_tot))
     allocate(dustfrac(ndusttypes,np_tot),grainsize(ndusttypes),graindens(ndusttypes))
     allocate(dudt(np_tot),ifiles(np_tot),massoftype(n_files,ntypes_max),npartoftype(ntypes_tot))
     if (ldust_moments) allocate(nucleation(n_nucleation,np_tot))
@@ -222,6 +222,7 @@ contains
        got_itype = .false.
        got_temperature = .false.
        got_u = .false.
+       got_apr = .false.
        ! skip each block that is too small
        nblockarrays = narraylengths*nblocks
 
@@ -313,6 +314,10 @@ contains
                             got_itype = .true.
                             read(iunit,iostat=ierr) itype(np0+1:np0+np)
                             itype(np0+1:np0+np) = itype(np0+1:np0+np) + ntypes0 ! shifting types for succesive files
+                         case('apr_level')
+                            matched = .true.
+                            got_apr = .true.
+                            read(iunit,iostat=ierr) apr_level(np0+1:np0+np)
                          case default
                             read(iunit,iostat=ierr)
                          end select
@@ -370,6 +375,9 @@ contains
              enddo
           enddo
        enddo ! block
+
+       ! for backwards compatibility with pre-apr files
+       if (.not.got_apr) apr_level(:) = int(1,kind=1)
 
        if (lpotential) then
           call extract('x2',xyzmh_ptmass(1,nptmass_found+1),hdr,ierr)
@@ -433,7 +441,7 @@ contains
             vxyzu,gastemperature,itype,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass,vxyz_ptmass,&
             hfact,umass,utime,ulength,graindens,ndudt,dudt,ifiles, &
             n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
-            SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos)
+            SPH_grainsizes,massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
        write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
     else
        n_SPH = 0
@@ -441,7 +449,7 @@ contains
     endif
 
     write(*,*) "Phantom dump file processed ok"
-    deallocate(xyzh,itype,vxyzu)
+    deallocate(xyzh,itype,vxyzu,apr_level)
     if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass,vxyz_ptmass)
 
   end subroutine read_phantom_bin_files
@@ -453,7 +461,7 @@ contains
        extra_heating,ndusttypes,SPH_grainsizes,     &
        mask,n_SPH,ldust_moments,dust_moments,mass_per_H,ierr)
 
-    use utils_hdf5, only:open_hdf5file,    &
+    use HDF5_utils, only:open_hdf5file,    &
          close_hdf5file,   &
          open_hdf5group,   &
          close_hdf5group,  &
@@ -476,7 +484,7 @@ contains
 
     character(len=200) :: filename
 
-    logical :: got_dustfrac,got_itype
+    logical :: got_dustfrac,got_itype,got_apr
 
     integer :: ifile, np0, ntypes0, np_tot, ntypes_tot, ntypes_max
     integer :: np,ntypes,nptmass,dustfluidtype,ndudt
@@ -485,7 +493,7 @@ contains
     integer, parameter :: maxtypes = 100
     integer, parameter :: nsinkproperties = 17
 
-    integer(kind=1), allocatable, dimension(:) :: itype, ifiles
+    integer(kind=1), allocatable, dimension(:) :: itype, ifiles, apr_level
     real(4),  allocatable, dimension(:)   :: tmp, tmp_header
     real(dp), allocatable, dimension(:)   :: dudt, tmp_dp,gastemperature
     real(dp), allocatable, dimension(:)   :: grainsize, graindens
@@ -558,7 +566,8 @@ contains
          dudt(np_tot),                          &
          ifiles(np_tot),                        &
          massoftype(n_files,ntypes_max),        &
-         npartoftype(ntypes_tot))
+         npartoftype(ntypes_tot),               &
+         apr_level(np_tot))
 
     ! Read file data
     np0 = 0
@@ -626,6 +635,7 @@ contains
 
        got_dustfrac = .false.
        got_itype = .false.
+       got_apr = .false.
        ndudt = 0
 
        ! TODO: read particle arrays
@@ -636,8 +646,13 @@ contains
        call read_from_hdf5(vxyzu(1:3,np0+1:np0+np),'vxyz',hdf5_group_id,got,ierr)
        call read_from_hdf5(dustfrac(1:ndusttypes,np0+1:np0+np),'dustfrac',hdf5_group_id,got,ierr)
        if (got) got_dustfrac = .true.
+       call read_from_hdf5(apr_level(np0+1:np0+np),'apr_level',hdf5_group_id,got,ierr)
+       if (got) got_apr = .true.
 
        if (ierr /= 0) call error("cannot read Phantom HDF particles group in "//trim(filename))
+
+       ! for backwards compatibilty with pre-apr files
+       if (.not.got_apr) apr_level(:) = int(1,kind=1)
 
        ! close the particles group
        call close_hdf5group(hdf5_group_id,ierr)
@@ -702,13 +717,13 @@ contains
          massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass,       &
          utime,ulength,graindens,ndudt,dudt,ifiles,   &
          n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id,SPH_grainsizes,     &
-         massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos)
+         massgas,massdust,rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
 
     write(*,"(a,i8,a)") ' Using ',n_SPH,' particles from Phantom file'
 
     write(*,*) "Phantom dump file processed ok"
     ierr = 0
-    deallocate(xyzh,itype,vxyzu)
+    deallocate(xyzh,itype,vxyzu,apr_level)
     if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass,vxyz_ptmass)
 
   end subroutine read_phantom_hdf_files
@@ -728,15 +743,18 @@ contains
     integer :: i
 
     ! Modifying SPH dump
-    if (ldelete_Hill_sphere .or. ldelete_inside_rsph .or. ldelete_outside_rsph .or. ldelete_above_theta) then
+    if (ldelete_Hill_sphere .or. lmask_inside_rsph .or. lmask_outside_rsph .or. lmask_above_theta .or. &
+         ldelete_outside_rsph .or. ldelete_above_theta) then
        allocate(mask(np))
        mask(:) = 0
     endif
 
     if (ldelete_Hill_sphere)  call mask_Hill_sphere(np, nptmass, xyzh, xyzmh_ptmass,ulength, mask)
-    if (ldelete_inside_rsph)  call mask_inside_rsph(np, xyzh, ulength, rsph_min, mask)
-    if (ldelete_outside_rsph) call mask_outside_rsph(np, xyzh, ulength, rsph_max, mask)
-    if (ldelete_above_theta)  call mask_above_theta(np, xyzh, ulength, theta_max, mask)
+    if (lmask_inside_rsph)  call mask_inside_rsph(np, xyzh, ulength, rsph_min, mask)
+    if (lmask_outside_rsph) call mask_outside_rsph(np, xyzh, ulength, rsph_mask_max, mask)
+    if (ldelete_outside_rsph) call delete_outside_rsph(np, xyzh, ulength, rsph_max, mask)
+    if (ldelete_above_theta)  call delete_above_theta(np, xyzh, ulength, theta_max, mask)
+    if (lmask_above_theta)  call mask_above_theta(np, xyzh, ulength, theta_mask_max, mask)
 
     if (lrandomize_azimuth)     call randomize_azimuth(np, xyzh, vxyzu, mask)
     if (lrandomize_gap)         call randomize_gap(np, nptmass, xyzh, vxyzu, xyzmh_ptmass,ulength, gap_factor, .true.)
@@ -753,6 +771,8 @@ contains
        enddo
     endif
 
+    if (lexpand_z) call expand_z(np, xyzh, vxyzu, expand_z_factor)
+
     return
 
   end subroutine modify_dump
@@ -760,10 +780,10 @@ contains
   !*************************************************************************
 
   subroutine phantom_2_mcfost(np,nptmass,ntypes,ndusttypes,ldust_moments,n_files,dustfluidtype,xyzh, &
-       vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass,vxyz_ptmass,hfact,umass, &
+       vxyzu,gastemperature,iphase,grainsize,dustfrac,nucleation,massoftype,xyzmh_ptmass_in,vxyz_ptmass_in,hfact,umass, &
        utime, ulength,graindens,ndudt,dudt,ifiles, &
        n_SPH,x,y,z,h,vx,vy,vz,T_gas,particle_id, &
-       SPH_grainsizes, massgas,massdust, rhogas,rhodust,dust_moments,extra_heating,ieos)
+       SPH_grainsizes, massgas,massdust, rhogas,rhodust,dust_moments,extra_heating,ieos,apr_level)
 
     ! Convert phantom quantities & units to mcfost quantities & units
     !
@@ -773,20 +793,21 @@ contains
     ! extra_heating is in W
 
     use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad, Ggrav
-    use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az
+    use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az, &
+         idelta_planet_az, delta_planet_az
     use parametres, only : lscale_length_units,scale_length_units_factor,lscale_mass_units,scale_mass_units_factor
 
     ! Input arguments
     integer, intent(in) :: np,nptmass,ntypes,ndusttypes, n_files,dustfluidtype
     logical, intent(in) :: ldust_moments
     real(dp), dimension(4,np), intent(in) :: xyzh,vxyzu
-    integer(kind=1), dimension(np), intent(in) :: iphase, ifiles
+    integer(kind=1), dimension(np), intent(in) :: iphase, ifiles, apr_level
     real(dp), dimension(ndusttypes,np), intent(in) :: dustfrac
     real(dp), dimension(ndusttypes),    intent(in) :: grainsize ! code units
     real(dp), dimension(ndusttypes),    intent(in) :: graindens
     real(dp), dimension(n_files,ntypes), intent(in) :: massoftype
     real(dp), intent(in) :: hfact,umass,utime,ulength
-    real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass, vxyz_ptmass
+    real(dp), dimension(:,:), intent(in) :: xyzmh_ptmass_in, vxyz_ptmass_in
     real(dp), dimension(:,:), intent(inout), allocatable :: nucleation
     real(dp), dimension(:), intent(in) :: gastemperature
     integer, intent(in) :: ndudt
@@ -800,12 +821,12 @@ contains
     real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
     real, dimension(:), allocatable, intent(out) :: extra_heating
 
-
     type(star_type), dimension(:), allocatable :: etoile_old
-    integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile
-    real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi
+    integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile,n_skip,nsinkproperties
+    real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi,pmassi
     real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
     real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
+    real(dp), allocatable :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
 
     logical :: use_dust_particles = .false. ! 2-fluid: choose to use dust
     logical :: lupdate_photosphere
@@ -904,6 +925,12 @@ contains
 
        itypei = abs(iphase(i))
        if (hi > 0.) then
+          ! calculate particle mass
+          pmassi = massoftype(ifile,itypei)
+
+          ! rescale by apr - if there's no apr this does nothing
+          pmassi = pmassi / (2.**(apr_level(i) - 1))
+
           if (use_dust_particles .and. dustfluidtype==2 .and. ndusttypes==1 .and. itypei==2) then
              j = j + 1
              particle_id(j) = i
@@ -916,11 +943,13 @@ contains
                 vy(j) = vyi * uvelocity
                 vz(j) = vzi * uvelocity
              endif
+
              T_gas(j) = T_gasi
-             rhodusti = massoftype(ifile,itypei) * (hfact/hi)**3  * udens ! g/cm**3
+
+             rhodusti = pmassi * (hfact/hi)**3  * udens ! g/cm**3
              gasfraci = dustfrac(1,i)
              rhodust(1,j) = rhodusti
-             massdust(1,j) = massoftype(ifile,itypei) * usolarmass ! Msun
+             massdust(1,j) = pmassi * usolarmass ! Msun
              rhogas(j) = gasfraci*rhodusti
              massgas(j) = gasfraci*massdust(1,j)
           elseif (.not. use_dust_particles .and. itypei==1) then
@@ -939,14 +968,15 @@ contains
              if (ldust_moments) dust_moments(:,j) = nucleation(1:4,i) ! indexing is different from phantom as I read starting at k0
 
              T_gas(j) = T_gasi
-             rhogasi = massoftype(ifile,itypei) *(hfact/hi)**3  * udens ! g/cm**3
+
+             rhogasi = pmassi *(hfact/hi)**3  * udens ! g/cm**3
              dustfraci = sum(dustfrac(:,i))
              if (dustfluidtype==1) then
                 rhogas(j) = rhogasi
              else
                 rhogas(j) = (1 - dustfraci)*rhogasi
              endif
-             massgas(j) =  massoftype(ifile,itypei) * usolarmass ! Msun
+             massgas(j) =  pmassi * usolarmass ! Msun
              do k=1,ndusttypes
                 rhodust(k,j) = dustfrac(k,i)*rhogasi
                 massdust(k,j) = dustfrac(k,i)*massgas(j)
@@ -987,25 +1017,40 @@ contains
        ldudt_implicit = .false.
     endif
 
+    allocate(xyzmh_ptmass,source=xyzmh_ptmass_in)
+    allocate(vxyz_ptmass,source=vxyz_ptmass_in)
+    nsinkproperties = size(xyzmh_ptmass_in,dim=1)
     n_etoiles_old = n_etoiles
     if (lignore_sink) then
        n_etoiles = 0
     else
        write(*,*) "# Stars/planets:"
        n_etoiles = 0
+       n_skip    = 0
        do i=1,nptmass
-          n_etoiles = n_etoiles + 1
-          if (real(xyzmh_ptmass(4,i)) * scale_mass_units_factor > 0.013) then
-             write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
-                  real(xyzmh_ptmass(4,i) * usolarmass), "Msun, Mdot=", &
-                  real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+          if (xyzmh_ptmass_in(4,i) < 0.) then
+             n_skip = n_skip + 1
           else
-             write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass(1:3,i) * ulength_au), "au, M=", &
-                  real(xyzmh_ptmass(4,i) * GxMsun/GxMjup * usolarmass), "Mjup, Mdot=", &
-                  real(xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+             n_etoiles = n_etoiles + 1
+             if (n_etoiles /= i) then
+                ! Move live particle to front of array
+                xyzmh_ptmass(:,n_etoiles) = xyzmh_ptmass_in(:,i)
+                vxyz_ptmass(:,n_etoiles)  = vxyz_ptmass_in(:,i)
+             endif
+             if (real(xyzmh_ptmass_in(4,i)) * usolarmass > 0.013) then
+                write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass_in(1:3,i) * ulength_au), "au, M=", &
+                      real(xyzmh_ptmass_in(4,i) * usolarmass), "Msun, Mdot=", &
+                      real(xyzmh_ptmass_in(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+             else
+                write(*,*) "Planet #", i, "xyz=", real(xyzmh_ptmass_in(1:3,i) * ulength_au), "au, M=", &
+                      real(xyzmh_ptmass_in(4,i) * GxMsun/GxMjup * usolarmass), "Mjup, Mdot=", &
+                      real(xyzmh_ptmass_in(16,i) * usolarmass / utime_scaled * year_to_s ), "Msun/yr"
+             endif
+             if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass_in(1:3,i) - xyzmh_ptmass_in(1:3,1))*ulength_au), "au"
           endif
-          if (i>1) write(*,*)  "       distance=", real(norm2(xyzmh_ptmass(1:3,i) - xyzmh_ptmass(1:3,1))*ulength_au), "au"
        enddo
+       if (n_skip > 0) write(*,*) "Skipped ", n_skip," dead sink particles..."
+       if (n_etoiles_old == 0) n_etoiles_old = n_etoiles
     endif
 
     if (lupdate_velocities) then
@@ -1066,13 +1111,21 @@ contains
        if (nptmass == 2) which_planet=2
        if (which_planet > nptmass) call error("specified sink particle does not exist")
 
-       RT_n_az = 1
+
        RT_az_min = planet_az + atan2(xyzmh_ptmass(2,which_planet) - xyzmh_ptmass(2,1), &
             xyzmh_ptmass(1,which_planet) - xyzmh_ptmass(1,1)) &
             / deg_to_rad
-       RT_az_max = RT_az_min
        write(*,*) "Moving sink particle #", which_planet, "to azimuth =", planet_az
        write(*,*) "WARNING: updating the azimuth to:", RT_az_min
+
+       if (idelta_planet_az == 0) then
+          RT_n_az = 1
+          RT_az_max = RT_az_min
+       else
+          RT_n_az = 2 * idelta_planet_az+1
+          RT_az_min = RT_az_min - delta_planet_az
+          RT_az_max = RT_az_min + 2*delta_planet_az
+       endif
     endif
 
     if (lfix_star) then
@@ -1092,6 +1145,10 @@ contains
           etoile(i_etoile)%vz = vxyz_ptmass(3,i_etoile) * uvelocity
 
           etoile(i_etoile)%M = xyzmh_ptmass(4,i_etoile) * usolarmass
+
+          if (.not.etoile(i_etoile)%force_Mdot) then
+             etoile(i_etoile)%Mdot = xyzmh_ptmass(16,i_etoile) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
+          endif
        enddo
     else
 
@@ -1118,15 +1175,15 @@ contains
        deallocate(etoile_old)
 
        if (n_etoiles > 0) then
-          etoile(:)%x = xyzmh_ptmass(1,:) * ulength_au
-          etoile(:)%y = xyzmh_ptmass(2,:) * ulength_au
-          etoile(:)%z = xyzmh_ptmass(3,:) * ulength_au
-
-          etoile(:)%vx = vxyz_ptmass(1,:) * uvelocity
-          etoile(:)%vy = vxyz_ptmass(2,:) * uvelocity
-          etoile(:)%vz = vxyz_ptmass(3,:) * uvelocity
-
-          etoile(:)%M = xyzmh_ptmass(4,:) * usolarmass
+         do i=1,n_etoiles
+             etoile(i)%x = xyzmh_ptmass(1,i) * ulength_au
+             etoile(i)%y = xyzmh_ptmass(2,i) * ulength_au
+             etoile(i)%z = xyzmh_ptmass(3,i) * ulength_au
+             etoile(i)%vx = vxyz_ptmass(1,i) * uvelocity
+             etoile(i)%vy = vxyz_ptmass(2,i) * uvelocity
+             etoile(i)%vz = vxyz_ptmass(3,i) * uvelocity
+             etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
+         enddo
 
           do i=1, n_etoiles
              if (.not.etoile(i)%force_Mdot) then
@@ -1179,6 +1236,11 @@ contains
           endif
        endif
     endif
+
+    if (lheader_only) stop
+
+    if (allocated(xyzmh_ptmass)) deallocate(xyzmh_ptmass)
+    if (allocated(vxyz_ptmass)) deallocate(vxyz_ptmass)
 
     return
 

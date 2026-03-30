@@ -5,7 +5,7 @@ module voigts
 
     use constantes, only : pi, sqrtpi
     use mcfost_env, only : dp
-    
+
     implicit none
 
     real(kind=dp), dimension(7) :: Aj, Bj, Cj
@@ -60,21 +60,20 @@ module voigts
                 w4 = exp(u) - w4/v4 !cdexp, can be optimized by splitting the exp on real and imag parts
             endif
             VoigtHumlicek(i) = real(w4,kind=dp)!w4%re
-            if (present(F)) then 
+            if (present(F)) then
                 F(i) = aimag(w4)!w4%im
             endif
 
         enddo
-    
+
         return
     end function VoigtHumlicek
 
- 
+
     function VoigtThomson(N, a, v, vbroad)
         integer, intent(in) :: N
         real(kind=dp), intent(in) :: a, vbroad, v(N)
         real(kind=dp) :: VoigtThomson(N)
-        integer :: i
         real(kind=dp) :: f, rr, eta, ap
 
         ap = a * vbroad
@@ -91,7 +90,7 @@ module voigts
         !because Thomson is in units of 1/vbroad/sqrtpi already
         VoigtThomson = eta * ( vbroad * f / pi / sqrtpi / ((vbroad*v)**2 + f**2) ) + &
             (1.0_dp - eta) * exp(-(v*vbroad/f)**2) * vbroad / f
-    
+
         return
     end function VoigtThomson
 
@@ -104,16 +103,16 @@ module voigts
       ap = vth * a
       f = (vth**5 + 2.69269*vth**4 * ap + 2.42843*vth**3 * ap**2 + &
          4.47163*vth**2*ap**3 + 0.07842*vth*ap**4 + ap**5)**(1./5.)
-	
+
       eta = 1.36603*(ap/f) - 0.47719*(ap/f)**2+0.11116*(ap/f)**3
       max_voigt_profile = eta / f / pi + (1.0-eta) / sqrt(pi) / f
 
-      return 
+      return
    end function max_voigt_profile
 
    function dmax_voigt(vth,a,eps)
    !Evaluate the distance in units of vth, at which the voigt profile
-   ! reaches "eps * d" value : the value of the voigt profile in units of 
+   ! reaches "eps * d" value : the value of the voigt profile in units of
    ! its peak. The Thomson approximation is used.
     real(kind=dp) :: dmax_voigt
     real, intent(in) :: eps
@@ -126,9 +125,9 @@ module voigts
 
 	f = (vth**5 + 2.69269*vth**4 * ap + 2.42843*vth**3 * ap**2 + &
 	    4.47163*vth**2*ap**3 + 0.07842*vth*ap**4 + ap**5)**(1./5.)
-	
+
 	eta = 1.36603*(ap/f) - 0.47719*(ap/f)**2+0.11116*(ap/f)**3
-	
+
 	dmax_voigt = eta * sqrt(f/pi/peak_frac - f**2) + (1.0 - eta) * f * sqrt(-log(sqrt(pi)*f*peak_frac))
     ! write(*,*) "eta=", eta
     ! write(*,*) "xp(L) = ", sqrt(f/pi/peak_frac - f**2)

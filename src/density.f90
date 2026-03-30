@@ -8,6 +8,7 @@ module density
   use utils
   use messages
   use stars, only : compute_stellar_parameters
+  !$ use omp_lib
 
   implicit none
   save
@@ -16,20 +17,19 @@ module density
   integer, public :: species_removed
   real, public :: T_rm
 
-  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, densite_pouss, masse, icell_not_empty
-
-  public :: define_density, define_density_wall3d, define_dust_density, read_density_file, &
+  public :: densite_gaz, masse_gaz, surface_density, densite_gaz_midplane, dust_density, masse, icell_not_empty, &
+       define_density, define_density_wall3d, define_dust_density, read_density_file, is_density_file_Voronoi, &
        densite_seb_charnoz2, densite_seb_charnoz, remove_species, read_sigma_file, normalize_dust_density, &
-       reduce_density
-
+       reduce_density, read_Voronoi_fits_file, find_non_empty_cell
 
   private
 
   real(kind=dp), dimension(:), allocatable :: densite_gaz, masse_gaz ! n_rad, nz, n_az, Unites: part.m-3 et g : H2
-  real(kind=dp), dimension(:), allocatable :: densite_gaz_midplane   ! densite_gaz gives the midplane density for j=0
-  real(kind=dp), dimension(:), allocatable :: Surface_density
+  real(kind=dp), dimension(:,:), allocatable :: densite_gaz_midplane   ! densite_gaz gives the midplane density for j=0
+  real(kind=dp), dimension(:,:), allocatable :: Surface_density
 
-  real(kind=dp), dimension(:,:), allocatable :: densite_pouss ! n_grains, n_cells en part.cm-3
+  ! dust_density * nbre_grains is in en part.cm-3, where nbre_grains is normalised to 1
+  real(kind=dp), dimension(:,:), allocatable :: dust_density ! (n_grains_tot or n_zones, n_cells)
   real(kind=dp), dimension(:), allocatable :: masse  !en g ! n_cells
   integer :: icell_not_empty
 
@@ -37,8 +37,21 @@ module density
 
 subroutine define_density()
 
+  ! 1 grain -> 100 grains
+
+  ! 0.37s  -> 1.9s
+  write(*,*) "A"
+
   call define_gas_density()
+  ! 0.8s after OpenMP -> 2.4s
+  write(*,*) "B"
+
   call define_dust_density()
+  ! 1.4s ->  40.7s
+  write(*,*) "C"
+  !stop
+
+
 
   return
 
@@ -55,15 +68,16 @@ subroutine define_gas_density()
   integer :: i,j, k, izone, alloc_status, icell
   real(kind=dp), dimension(n_zones) :: cst_gaz
   real(kind=dp) :: z, density, fact_exp, rsph, mass, puffed, facteur, z0, phi, surface, H, C, somme
-  real(kind=dp) :: rcyl2, z2, rin2, rmax2, rmin2, rsph0, rcyl, coeff_exp
+  real(kind=dp) :: rcyl2, z2, rin2, rmax2, rmin2, rcyl, coeff_exp
 
   type(disk_zone_type) :: dz
 
   ! Tableau temporaire pour densite gaz dans 1 zone (pour renormaliser zone par zone)
   ! Pas besoin dans la poussiere car a chaque pop, il y a des tailles de grains independantes
-  real(kind=dp), dimension(:), allocatable :: densite_gaz_tmp, densite_gaz_midplane_tmp
+  real(kind=dp), dimension(:), allocatable :: densite_gaz_tmp
+  real(kind=dp), dimension(:,:), allocatable :: densite_gaz_midplane_tmp
 
-  allocate(densite_gaz_tmp(n_cells), densite_gaz_midplane_tmp(n_rad), stat=alloc_status)
+  allocate(densite_gaz_tmp(n_cells), densite_gaz_midplane_tmp(n_rad,n_az), stat=alloc_status)
   densite_gaz_tmp = 0.0 ; densite_gaz_midplane_tmp = 0.0
   densite_gaz = 0.0 ;
 
@@ -89,14 +103,31 @@ subroutine define_gas_density()
 
      ! Facteur multiplicatif pour passer en masse de gaz
      ! puis en nH2/AU**3 puis en nH2/m**3
-     cst_gaz(izone) = C * dz%diskmass * dz%gas_to_dust / masse_mol_gaz * Msun_to_g / AU3_to_m3
+     cst_gaz(izone) = C * dz%diskmass * dz%gas_to_dust / mu_mH * Msun_to_g / AU3_to_m3
   enddo
 
   do izone=1, n_zones
      dz=disk_zone(izone)
      densite_gaz_tmp = 0.0
 
+     rin2 = dz%rin**2
+     rmin2 = dz%rmin**2
+     rmax2 = dz%rmax**2
+
+     mass = 0.0_dp
+
+     !$omp parallel default(none) &
+     !$omp private(i,j,k,icell,rcyl,rcyl2,z,z2,rsph,phi,H,puffed,fact_exp,coeff_exp,z0,density,somme) &
+     !$omp shared(rin2,rmin2,rmax2) &
+     !$omp shared(n_zones,izone,dz,disk_zone,n_rad,nz,n_az,j_start,cell_map,densite_gaz_tmp) &
+     !$omp shared(densite_gaz_midplane_tmp) &
+     !$omp shared(lwarp,r_grid,z_grid,phi_grid,lpuffed_rim,puffed_rim_h,puffed_rim_r,puffed_rim_delta_r) &
+     !$omp shared(z_warp,ltilt,tilt_angle,lsigma_file,cst_gaz,z_lim,lgap_gaussian,f_gap_gaussian) &
+     !$omp shared(r_gap_gaussian,sigma_gap_gaussian,n_cells,z_scaling_env,surface_density,volume) &
+     !$omp reduction(+: mass)
+
      if (dz%geometry <= 2) then ! Disque
+        !$omp do schedule(dynamic)
         do i=1, n_rad
            bz : do j=min(0,j_start),nz
               !if (j==0) cycle bz
@@ -159,33 +190,36 @@ subroutine define_gas_density()
                  if (j/=0) then
                     densite_gaz_tmp(icell) = density
                  else
-                    densite_gaz_midplane_tmp(i) = density
+                    densite_gaz_midplane_tmp(i,k) = density
                  endif
 
               enddo !k
            enddo bz !j
 
            if ((lSigma_file).and.(izone==1)) then
-              ! Normalisation pour densite de surface dans fichier
-              ! todo : only works for k = 1
-              somme = 0.0
-              bz2 : do j=min(1,j_start),nz
-                 somme = somme + densite_gaz_tmp(cell_map(i,j,1)) *  (z_lim(i,j+1) - z_lim(i,j))
-              enddo bz2
-              if (somme > tiny_dp) then
-                 do j=min(1,j_start),nz
-                    densite_gaz_tmp(cell_map(i,j,1)) = densite_gaz_tmp(cell_map(i,j,1)) * Surface_density(i)/somme
-                 enddo ! j
-                 densite_gaz_midplane_tmp(i) = densite_gaz_midplane_tmp(i) * Surface_density(i)/somme
-              endif
+              do k=1, n_az
+                 ! Normalisation pour densite de surface dans fichier
+                 somme = 0.0
+                 bz2 : do j=min(1,j_start),nz
+                    if (j==0) cycle bz2
+                    somme = somme + densite_gaz_tmp(cell_map(i,j,k)) *  (z_lim(i,abs(j)+1) - z_lim(i,abs(j)))
+                 enddo bz2
+
+                 if (somme > tiny_dp) then
+                    bz3 : do j=min(1,j_start),nz
+                       if (j==0) cycle bz3
+                       densite_gaz_tmp(cell_map(i,j,k)) = densite_gaz_tmp(cell_map(i,j,k)) * Surface_density(i,k)/somme
+                    enddo bz3
+                    densite_gaz_midplane_tmp(i,k) = densite_gaz_midplane_tmp(i,k) * Surface_density(i,k)/somme
+                 endif
+              enddo !k
            endif
         enddo ! i
+        !$omp end do
 
      else if (dz%geometry == 3) then ! envelope
-        rin2 = dz%rin**2
-        rmin2 = dz%rmin**2
-        rmax2 = dz%rmax**2
 
+        !$omp do schedule(dynamic)
         do i=1, n_rad
            do j=j_start,nz
               do k=1, n_az
@@ -217,14 +251,15 @@ subroutine define_gas_density()
                  if (j/=0) then
                     densite_gaz_tmp(icell) = density
                  else
-                    densite_gaz_midplane_tmp(i) = density
+                    densite_gaz_midplane_tmp(i,k) = density
                  endif
               enddo !k
            enddo !j
         enddo !i
+        !$omp end do
 
      else if (dz%geometry == 4) then ! debris
-        k=1
+        !$omp do schedule(dynamic)
         do i=1, n_rad
            bz_debris : do j=j_start,nz
               if (j==0) cycle bz_debris
@@ -261,72 +296,104 @@ subroutine define_gas_density()
               enddo ! k
            enddo bz_debris !j
         enddo !i
+        !$omp end do
 
      endif ! dz%geometry
 
      if (lgap_Gaussian) then
         write(*,*) "GAP", f_gap_gaussian, r_gap_gaussian, sigma_gap_gaussian
+        !$omp do schedule(dynamic)
         do icell=1, n_cells
            densite_gaz_tmp(icell) = densite_gaz_tmp(icell) * (1.0 - f_gap_Gaussian * &
                 exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
         enddo
+        !$omp end do
      endif
+
+
 
      !----------------------------------------
      ! Normalisation masse de gaz par zone
      !----------------------------------------
-
      ! Calcul de la masse de gaz de la zone
-     mass = 0.
+     !$omp do schedule(static)
      do icell = 1, n_cells
-        mass = mass + densite_gaz_tmp(icell) *  masse_mol_gaz * volume(icell)
+        mass = mass + densite_gaz_tmp(icell) * volume(icell)
      enddo
-     mass =  mass * AU3_to_m3 * g_to_Msun
+     !$omp end do
+     ! End parallel for reduction + on mass
+     !$omp end parallel
 
-     ! Normalisation
+     mass =  mass * mu_mH * AU3_to_m3 * g_to_Msun
+
+     !$omp parallel default(none) &
+     !$omp private(i,k,j,icell) &
+     !$omp shared(dz,mass, facteur,volume,lcavity,cavity,masse_gaz,n_rad,nz,n_az,j_start) &
+     !$omp shared(lcorrect_density,densite_gaz,densite_gaz_tmp,densite_gaz_midplane,densite_gaz_midplane_tmp) &
+     !$omp shared(correct_density_Rin,correct_density_Rout,correct_density_factor,cell_map)
+
+     ! Adding zone density to total density
      if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
         facteur = dz%diskmass * dz%gas_to_dust / mass
-        !     write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
-
-        ! Somme sur les zones pour densite finale
+        !write(*,*) "VERIF gas mass: zone ",  izone, dz%diskmass * dz%gas_to_dust, mass, facteur
+        !$omp do schedule(dynamic)
         do i=1,n_rad
-           bz_gas_mass2 : do j=min(1,j_start),nz
-              if (j==0) cycle
-              do k=1, n_az
+           do k=1, n_az
+              bz_gas_mass2 : do j=min(1,j_start),nz
+                 if (j==0) cycle bz_gas_mass2
                  icell = cell_map(i,j,k)
                  densite_gaz(icell) = densite_gaz(icell) + densite_gaz_tmp(icell) * facteur
-              enddo !k
-              densite_gaz_midplane(i) = densite_gaz_midplane(i) + densite_gaz_midplane_tmp(i) * facteur
-           enddo bz_gas_mass2
+              enddo bz_gas_mass2
+              densite_gaz_midplane(i,k) = densite_gaz_midplane(i,k) + densite_gaz_midplane_tmp(i,k) * facteur
+           enddo !k
         enddo ! i
+        !$omp end do
      endif
+     !$omp end parallel
+
   enddo ! n_zones
+
+
+  facteur = (mu_mH * AU3_to_m3)
+  !$omp parallel default(none) &
+  !$omp private(icell,surface) &
+  !$omp shared(lcavity,cavity,r_grid,densite_gaz,correct_density_Rin,correct_density_Rout,correct_density_factor) &
+  !$omp shared(masse_gaz,volume,n_cells,z_grid,lcorrect_density, facteur)
 
   ! Ajout cavite vide
   if (lcavity) then
+     !$omp do schedule(static)
      do icell=1, n_cells
         surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
         if (abs(z_grid(icell)) > surface) then
            densite_gaz(icell) = 0.0_dp
         endif
      enddo
+     !$omp end do
   endif
 
   ! Tableau de masse de gaz
+  !$omp do schedule(static)
   do icell=1,n_cells
-     masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+     masse_gaz(icell) =  densite_gaz(icell) * volume(icell) * facteur
   enddo
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+  !$omp end do
 
   if (lcorrect_density) then
      write(*,*) "Correcting density ..."
+     !$omp do schedule(static)
      do icell=1, n_cells
         if ((r_grid(icell) >= correct_density_Rin).and.(r_grid(icell) <= correct_density_Rout)) then
            densite_gaz(icell) = densite_gaz(icell) *  correct_density_factor
            masse_gaz(icell) = masse_gaz(icell) *  correct_density_factor
         endif
      enddo
+     !$omp end do
   end if
+
+  !$omp end parallel
+
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
 
   return
 
@@ -337,24 +404,23 @@ end subroutine define_gas_density
 subroutine define_dust_density()
 ! Calcule la table de densite
 ! Inclus stratification analytique
-! Calcule les tableaux densite_pouss et masse
+! Calcule les tableaux dust_density et masse
 ! et indique icell_not_empty
 ! C. Pinte : re-ecrit le 27/04/2013
 
   implicit none
 
-  integer :: i,j, k, icell, l, izone, pop
+  integer :: i,j, k, icell, l, izone, pop, lmin, lmax
   real(kind=dp), dimension(n_pop) :: cst, cst_pous
-  real(kind=dp) :: rcyl, rsph, mass
+  real(kind=dp) :: rcyl, rsph
   real(kind=dp) :: z, fact_exp, coeff_exp, density, OmegaTau, h_H2
-  real(kind=dp) :: puffed, facteur, z0, phi, surface, norme
+  real(kind=dp) :: puffed, z0, phi, surface, norme
 
   real(kind=dp), dimension(n_grains_tot) :: correct_strat, N_tot, N_tot2
 
-  real(kind=dp) :: rho0, ztilde, Dtilde, h, s_opt, somme, rcyl2, z2, rmin2, rin2, rmax2, rsph0
+  real(kind=dp) :: rho0, ztilde, Dtilde, h, s_opt, somme, rcyl2, z2, rmin2, rin2, rmax2
 
   type(disk_zone_type) :: dz
-  type(dust_pop_type), pointer :: d_p
 
   ! Pour simus Seb
   real, parameter :: Sc = 1.5 ! nbre de Schmidt
@@ -362,11 +428,13 @@ subroutine define_dust_density()
   ! Pour simus Dubrulle
   real, parameter :: gamma = 2.0 ! exposant de turbulence, 2 pour turbulence compressible
 
-  logical :: lwarning
+  logical :: done_zone(n_zones), lwarning
+  integer :: p_l
 
   lwarning = .true.
+  done_zone = .false.
 
-  densite_pouss = 0.0
+  dust_density = 0.0
   masse = 0.0
 
   ! Coefficient de diffusion constant
@@ -410,10 +478,10 @@ subroutine define_dust_density()
      cst_pous(i) = cst(i)/dust_pop(i)%avg_grain_mass
   enddo
 
-  do  l=1,n_grains_tot
-     ! Correction stratification
-     if (lvariable_dust.and.(settling_type == 1)) then
-        ! loi de puissance
+  ! Corrective factor for dust stratification
+  correct_strat(:) = 1.0 ! for no settling
+  if (lvariable_dust.and.(settling_type == 1)) then ! we can precalculate in the case of a power-law
+     do  l=1,n_grains_tot
         a_strat = max(a_strat,minval(r_grain))
         if (r_grain(l) > a_strat) then
            correct_strat(l) = (r_grain(l)/a_strat)**exp_strat   ! (h_gas/h_dust)^2
@@ -421,28 +489,37 @@ subroutine define_dust_density()
            correct_strat(l) = 1.0
         endif
         ! loi exponentielle (Garaud , Barriere 2004)
-        !        correct_strat(k) = exp(r_grain(k)*fact_strat)/exp(amin*fact_strat)
-     else
-        correct_strat(l) = 1.0
-     endif
-  enddo !k
+        ! correct_strat(k) = exp(r_grain(k)*fact_strat)/exp(amin*fact_strat)
+     enddo !k
+  endif
 
   ! Pour normalisation apres migration radiale
   N_tot(:) = 0.0 ; N_tot2(:) = 0.0 ;
 
+  ! TODO : this section is slow when there are many cells, need to do a variable split like for the opacity
+  ! (indeed much faster with only 1 grain size)
   ! Boucle pop a l'exterieur pour pouvoir superposer differente pop
   do pop=1, n_pop
      izone=dust_pop(pop)%zone
      dz=disk_zone(izone)
 
+     if (.not.lvariable_dust) then
+        if (done_zone(izone)) cycle
+        done_zone(izone) = .true.
+     endif
+
+     ! if the dust is the same everywhere, we do not need to
+     ! loop over grain sizes
+     if (lvariable_dust) then
+        lmin = dust_pop(pop)%ind_debut
+        lmax = dust_pop(pop)%ind_fin
+     else
+        lmin=pop
+        lmax=pop
+     endif
+
      if (dz%geometry <= 2) then ! Disque
-
         do i=1, n_rad
-           rho0 = densite_gaz_midplane(i) ! midplane density (j=0)
-
-           !write(*,*) "     ", rcyl, rho0*masse_mol_gaz*cm_to_m**2, dust_pop(pop)%rho1g_avg
-           !write(*,*) "s_opt", rcyl, s_opt/1000.
-
            bz : do j=j_start,nz
               if (j==0) cycle bz
 
@@ -485,11 +562,13 @@ subroutine define_dust_density()
                  endif
 
                  ! Densite de la poussiere
-                 do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 do l=lmin,lmax
                     ! Settling a la Dubrulle
                     if (lvariable_dust.and.(settling_type == 2)) then
-                       !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f)) ! echelle de hauteur du rapport gaz/poussiere / H_gaz
-                       !hd_H=h_H*(1d0+h_H**2)**(-0.5)                           ! echelle de hauteur de la poussiere / H_gaz
+                       rho0 = densite_gaz_midplane(i,k) ! midplane density (j=0)
+                       ! echelle de hauteur de la poussiere / H_gaz
+                       !h_H=(1d0/(1d0+gamma))**(0.25)*sqrt(alpha/(Omega*tau_f))
+                       !hd_H=h_H*(1d0+h_H**2)**(-0.5)
                        if (rho0 > tiny_dp) then
                           OmegaTau = omega_tau(rho0,H,l)
                           h_H2= sqrt(1./(1.+gamma)) * alpha/OmegaTau
@@ -498,7 +577,6 @@ subroutine define_dust_density()
                           correct_strat(l) = 1.0
                        endif
                     endif
-
 
                     if (rcyl > dz%rmax) then
                        density = 0.0
@@ -511,14 +589,16 @@ subroutine define_dust_density()
                        !      exp(-((rcyl-dz%rin)**2*(correct_strat(l)))/(2.*dz%edge**2))
 
                        ! Pas de strat radial dans edge
-                       density = nbre_grains(l) * sqrt(correct_strat(l)) *  &
-                            cst_pous(pop)*fact_exp * exp(-(((z-z0)/(dz%sclht*puffed))**2*(correct_strat(l)))/(coeff_exp))*&
+                       density = sqrt(correct_strat(l)) * cst_pous(pop)*fact_exp * &
+                            exp(- (((z-z0)/(dz%sclht*puffed))**2*(correct_strat(l))) / coeff_exp) *&
                             exp(-((rcyl-dz%rin)**2)/(2.*dz%edge**2))
                     else
-                       density = nbre_grains(l) * sqrt(correct_strat(l)) * cst_pous(pop)*fact_exp * &
-                            exp(-(((z-z0)/(dz%sclht*puffed))**2*(correct_strat(l)))/(coeff_exp))
+                       density = sqrt(correct_strat(l)) * cst_pous(pop)*fact_exp * &
+                            exp(- (((z-z0)/(dz%sclht*puffed))**2*(correct_strat(l))) / coeff_exp)
                     endif
-                    densite_pouss(l,icell) = density
+                    p_l = merge(l, izone, lvariable_dust)
+                    dust_density(p_l,icell) = density
+
                  enddo !l
               enddo !k
            enddo bz !j
@@ -527,25 +607,28 @@ subroutine define_dust_density()
               ! Normalisation pour densite de surface dans fichier
               ! todo : only works for k = 1
               do k=1,n_az
-                 do  l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+                 do l=lmin,lmax
                     somme = 0.0
                     do j=j_start,nz
                        if (j==0) cycle
                        icell = cell_map(i,j,k)
-                       somme = somme + densite_pouss(l,icell)  *  (z_lim(i,j+1) - z_lim(i,j))
+                       p_l = merge(l, izone, lvariable_dust)
+                       somme = somme + dust_density(p_l,icell)  *  (z_lim(i,abs(j)+1) - z_lim(i,abs(j)))
                     enddo ! j
+
                     if (somme > tiny_dp) then
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          densite_pouss(l,icell) = densite_pouss(l,icell)  * Surface_density(i)/somme * nbre_grains(l)
+                          dust_density(p_l,icell) = dust_density(p_l,icell) * Surface_density(i,k)/somme
                        enddo ! j
                     endif
                  enddo ! l
               enddo ! k
            endif
 
-
+           ! We need to renormalise in case there is not enough resolution in z
+           ! TODO : find a way to avoid looping twice as it can be slow if we have many cells
            if (lvariable_dust.and.(settling_type == 2)) then
               if (lspherical) then
                  call error("settling following Dubrulle's prescription is only", &
@@ -561,13 +644,14 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          norme = norme + densite_pouss(l,icell)
+                          p_l = merge(l, izone, lvariable_dust)
+                          norme = norme + dust_density(p_l,icell)
                        enddo !j
 
                        ! Si tous les grains sont sedimentes, on les met dans le plan median
                        if (norme < 1.0e-200_dp) then
                           icell = cell_map(i,1,k)
-                          densite_pouss(l,icell)  = 1.0_sp
+                          dust_density(p_l,icell)  = 1.0_sp
                           norme = 1.0_dp
 
                           if (lwarning) then
@@ -580,7 +664,7 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          if (norme > tiny_dp) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
+                          if (norme > tiny_dp) dust_density(p_l,icell) = dust_density(p_l,icell) / norme * rho0
                        enddo !j
                     enddo ! l
                  enddo ! k
@@ -599,13 +683,13 @@ subroutine define_dust_density()
            endif
 
            do i=1, n_rad
-              rho0 = densite_gaz_midplane(i) ! pour dependance en R : pb en coord sperique
               icell = cell_map(i,1,1)
               rcyl = r_grid(icell)
               H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
 
               if ((rcyl > dz%rmin).and.(rcyl < dz%rmax)) then
                  do k=1, n_az
+                    rho0 = densite_gaz_midplane(i,k) ! pour dependance en R : pb en coord sperique
 
                     ! Renormalisation pour  les cas ou il y a peu de resolution en z
                     do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
@@ -616,44 +700,45 @@ subroutine define_dust_density()
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
 
-                          !calculate h & z/h
-                          z = z_grid(icell)
-                          Ztilde=z/H
+                           p_l = merge(l, izone, lvariable_dust)
+                           !calculate h & z/h
+                           z = z_grid(icell)
+                           Ztilde=z/H
 
-                          ! Fit Gaussien du profile de densite
-                          !densite_pouss(l,icell)=  exp(-(1+OmegaTau/Dtilde) * (Ztilde**2/2.))
+                           ! Fit Gaussien du profile de densite
+                           !dust_density(p_l,icell)=  exp(-(1+OmegaTau/Dtilde) * (Ztilde**2/2.))
 
-                          ! Coefficient de diffusion constant
-                          densite_pouss(l,icell)=  exp( -OmegaTau/Dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
-                       enddo!j
+                           ! Coefficient de diffusion constant
+                           dust_density(p_l,icell)=  exp( -OmegaTau/Dtilde * (exp(Ztilde**2/2.)-1) - Ztilde**2/2 )  ! formule 19
+                        enddo!j
 
-                       ! normalization en z
-                       norme = 0.0
-                       do j=j_start,nz
-                          if (j==0) cycle
-                          icell = cell_map(i,j,k)
-                          norme = norme + densite_pouss(l,icell)
-                       enddo !j
+                        ! normalization en z
+                        norme = 0.0
+                        do j=j_start,nz
+                           if (j==0) cycle
+                           icell = cell_map(i,j,k)
+                           norme = norme + dust_density(p_l,icell)
+                        enddo !j
 
-                       ! Si tous les grains sont sedimentes, on les met dans le plan median
-                       if (norme < 1e-200_dp) then
-                          icell = cell_map(i,1,k)
-                          densite_pouss(l,icell)  = 1.0_sp
-                          norme = 1.0_dp
+                        ! Si tous les grains sont sedimentes, on les met dans le plan median
+                        if (norme < 1e-200_dp) then
+                           icell = cell_map(i,1,k)
+                           dust_density(p_l,icell)  = 1.0_sp
+                           norme = 1.0_dp
 
-                          if (lwarning) then
-                             write(*,*)
-                             write(*,*) "WARNING : Vertical settling unresolved for"
-                             write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
-                             lwarning = .false. ! on ne fait un warning qu'1 fois par rayon --> 1 seule fois au total
-                          endif
-                       endif
+                           if (lwarning) then
+                              write(*,*)
+                              write(*,*) "WARNING : Vertical settling unresolved for"
+                              write(*,*) "grain larger than", r_grain(l), "at R > ", real(rcyl)
+                              lwarning = .false. ! on ne fait un warning qu'1 fois par rayon --> 1 seule fois au total
+                           endif
+                        endif
 
-                       do j=j_start,nz
-                          if (j==0) cycle
-                          icell = cell_map(i,j,k)
-                          if (norme > tiny_dp) densite_pouss(l,icell) = densite_pouss(l,icell) / norme * rho0 * nbre_grains(l)
-                       enddo !j
+                        do j=j_start,nz
+                           if (j==0) cycle
+                           icell = cell_map(i,j,k)
+                           if (norme > tiny_dp) dust_density(p_l,icell) = dust_density(p_l,icell) / norme * rho0
+                        enddo !j
 
                     enddo ! l
                  enddo ! k
@@ -664,21 +749,22 @@ subroutine define_dust_density()
         lwarning = .true.
         if (lmigration) then
            ! distribution en taille de grains avant la migration
-           do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-              do icell=1,n_cells
-                 N_tot(l) = N_tot(l) + densite_pouss(l,icell) * volume(icell)
-              enddo ! icell
-           enddo !l
+            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+               p_l = merge(l, izone, lvariable_dust)
+               do icell=1,n_cells
+                  N_tot(l) = N_tot(l) + dust_density(p_l,icell)*nbre_grains(l) * volume(icell)
+               enddo ! icell
+            enddo !l
 
            do i=1, n_rad
               do k=1, n_az
                  rho0 = densite_gaz(cell_map(i,1,k)) ! pour dependance en R : pb en coord sperique
                  !s_opt = rho_g * cs / (rho * Omega)    ! cs = H * Omega ! on doit trouver 1mm vers 50AU
-                 !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+                 !omega_tau= dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * mu_mH/m_to_cm**3 * H*AU_to_cm)
                  icell = cell_map(i,1,k)
                  rcyl = r_grid(icell)
                  H = dz%sclht * (rcyl/dz%rref)**dz%exp_beta
-                 s_opt = (rho0*masse_mol_gaz*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
+                 s_opt = (rho0*mu_mH*cm_to_m**3  /dust_pop(pop)%rho1g_avg) *  H * AU_to_m * m_to_mum
 
                  !write(*,*) "r=", rcyl, "a_migration =", s_opt
 
@@ -696,7 +782,8 @@ subroutine define_dust_density()
                        do j=j_start,nz
                           if (j==0) cycle
                           icell = cell_map(i,j,k)
-                          densite_pouss(l,icell) = 0.0
+                          p_l = merge(l, izone, lvariable_dust)
+                          dust_density(p_l,icell) = 0.0
                        enddo !j
                     endif
                  enddo ! l
@@ -704,16 +791,18 @@ subroutine define_dust_density()
            enddo !i
 
            ! distribution en taille de grains apres la migration
-           do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-              do icell=1,n_cells
-                 N_tot2(l) = N_tot2(l) + densite_pouss(l,icell) * volume(icell)
-              enddo ! i
-           enddo ! l
+            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
+               p_l = merge(l, izone, lvariable_dust)
+               do icell=1,n_cells
+                  N_tot2(l) = N_tot2(l) + dust_density(p_l,icell) * nbre_grains(l) * volume(icell)
+               enddo ! i
+            enddo ! l
 
            ! Renormalisation : on garde le meme nombre de grains par taille que avant la migration
            do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
               if (N_tot2(l) > tiny_dp) then
-                 densite_pouss(l,:) = densite_pouss(l,:) * N_tot(l)/N_tot2(l)
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,:) = dust_density(p_l,:) * N_tot(l)/N_tot2(l)
               endif
            enddo ! l
 
@@ -735,24 +824,27 @@ subroutine define_dust_density()
            rsph  = sqrt(rcyl2 + z2)
 
            if (rcyl2 > rmax2 - z2) then
-              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 densite_pouss(l,icell) = 1e-20
+              do l=lmin,lmax
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,icell) = 1e-20
               enddo
            else if (rcyl2 < rmin2 - z2) then
-              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 densite_pouss(l,icell) = 1e-20
+              do l=lmin,lmax
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,icell) = 1e-20
               enddo
            else if (rcyl2 < rin2 - z2) then
-              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 densite_pouss(l,icell) = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf) &
+              do l=lmin,lmax
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,icell) =  cst_pous(pop) * rsph**(dz%surf) &
                       * exp(-((rsph-dz%rin)**2)/(2.*dz%edge**2))
               enddo
            else
-              do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                 densite_pouss(l,icell) = nbre_grains(l) * cst_pous(pop) * rsph**(dz%surf)
+              do l=lmin,lmax
+                 p_l = merge(l, izone, lvariable_dust)
+                 dust_density(p_l,icell) = cst_pous(pop) * rsph**(dz%surf)
               enddo
            endif
-
         enddo ! icell
 
      else if (dz%geometry == 4) then ! disque de debris
@@ -792,8 +884,10 @@ subroutine define_dust_density()
                     density =  cst_pous(pop) * ( (rcyl/dz%Rc)**(-2*dz%surf) + (rcyl/dz%Rc)**(-2*dz%moins_gamma_exp) )**(-0.5) * &
                          exp( - (abs(z -z0)/h)**dz%vert_exponent)
                  endif
-                 do l=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
-                    densite_pouss(l,icell) = density * nbre_grains(l)
+
+                 do l=lmin,lmax
+                    p_l = merge(l, izone, lvariable_dust)
+                    dust_density(p_l,icell) = density
                  enddo
               enddo !k
            enddo bz_debris !j
@@ -803,23 +897,25 @@ subroutine define_dust_density()
 
   enddo ! pop
 
+
   ! Ajout cavite vide
   if (lcavity) then
      do icell=1,n_cells
         surface = cavity%sclht * (r_grid(icell) / cavity%rref)**cavity%exp_beta
         if (abs(z_grid(icell)) > surface) then
-           densite_pouss(:,icell) = 0.0_sp
+           dust_density(:,icell) = 0.0_sp
         endif
      enddo
   endif
 
   if (lgap_Gaussian) then
      do icell=1, n_cells
-        densite_pouss(:,icell) = densite_pouss(:,icell) * (1.0 - f_gap_Gaussian * &
+        dust_density(:,icell) = dust_density(:,icell) * (1.0 - f_gap_Gaussian * &
              exp(-0.5 * ((r_grid(icell) - r_gap_Gaussian) / sigma_gap_Gaussian)**2 ))
      enddo
   endif
 
+  ! TODO : this is slow too when using many cells
   call normalize_dust_density()
 
   return
@@ -845,6 +941,11 @@ subroutine define_density_wall3D()
   write(*,*) "*********************************************************"
   write(*,*) "Adding 3D wall structure ...."
 
+  if (lvariable_dust) then
+     allocate(dust_density(n_grains_tot,n_cells), stat=alloc_status)
+  else
+     allocate(dust_density(n_zones,n_cells), stat=alloc_status)
+  endif
   allocate(density_wall(n_grains_tot,n_cells), stat=alloc_status)
   allocate(masse_wall(n_cells), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error wall')
@@ -927,7 +1028,7 @@ subroutine define_density_wall3D()
   write(*,*) 'Wall dust mass:', real(sum(masse_wall)*g_to_Msun),' Msun'
 
   ! superposition du mur sur le disque
-  densite_pouss(:,:) = densite_pouss(:,:) + density_wall(:,:)
+  dust_density(:,:) = dust_density(:,:) + density_wall(:,:)
   masse(:) = masse(:) + masse_wall(:)
 
   write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
@@ -937,6 +1038,49 @@ subroutine define_density_wall3D()
   return
 
 end subroutine define_density_wall3D
+
+!********************************************************************
+
+subroutine is_density_file_Voronoi()
+
+  integer :: unit, status, naxis, readwrite, blocksize, nfound
+  character(len=8) :: comment
+  integer, dimension(4) :: naxes
+
+  status=0
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  call ftgiou(unit,status)
+
+  ! Opening file
+  readwrite=0
+  write(*,*) "Checking "//trim(density_files(1))
+  call ftopen(unit,density_files(1),readwrite,blocksize,status)
+  if (status /= 0) call error("density file needed")
+
+  !nfound=0
+  call ftgkyj(unit,'NAXIS',naxis,comment,status)
+  if (status /= 0) call error("error reading density file")
+
+  nfound=0
+  call ftgknj(unit,'NAXIS',1,4,naxes,nfound,status)
+
+  if (naxis == 1) then
+     write(*,*) "Found 1D density structure, using a Voronoi mesh"
+     lVoronoi = .true.
+     l3D = .true.
+     n_cells = naxes(1)
+  else
+     write(*,*) "Found a structured mesh"
+     lVoronoi = .false.
+  endif
+
+  ! Closing file
+  call ftclos(unit, status)
+  call ftfiou(unit, status)
+
+  return
+
+end subroutine is_density_file_Voronoi
 
 !********************************************************************
 
@@ -960,7 +1104,7 @@ subroutine read_density_file()
   character(len=80) :: comment
 
   integer :: k, l, i, n_a, read_n_a, read_gas_density, read_gas_velocity, jj, icell, phik, n_sink
-  real(kind=dp) :: somme, mass, facteur
+  real(kind=dp) :: mass, facteur
   real :: a, tmp, gas2dust
 
   real :: m_star, x_star, y_star, z_star, vx_star, vy_star, vz_star
@@ -994,10 +1138,10 @@ subroutine read_density_file()
   !  Get an unused Logical Unit Number to use to open the FITS file.
   call ftgiou(unit,status)
 
-  write(*,*) "Reading density file : "//trim(density_file)
+  write(*,*) "Reading density file : "//trim(density_files(1))
 
   readwrite=0
-  call ftopen(unit,density_file,readwrite,blocksize,status)
+  call ftopen(unit,density_files(1),readwrite,blocksize,status)
   if (status /= 0) call error("density file needed")
 
   ! Do we read the gas density ?
@@ -1114,9 +1258,10 @@ subroutine read_density_file()
   !  determine the size of density file
   write(*,*) "Reading dust density ..."
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+
   if ((nfound /= 3) .and. (nfound /= 4)) then
      write(*,*) "I found", nfound, "axis instead of 3 or 4"
-     call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_file)//' file')
+     call error('failed to read the NAXIS keyword in HDU 1 of '//trim(density_files(1))//' file')
   endif
 
   if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az) ) then
@@ -1125,7 +1270,7 @@ subroutine read_density_file()
      write(*,*) naxes(2), nz
      write(*,*) naxes(3), n_az
      !write(*,*) naxes(4), n_a
-     call error(trim(density_file)//" does not have the right dimensions in HDU 1.")
+     call error(trim(density_files(1))//" does not have the right dimensions in HDU 1.")
   endif
 
   if (nfound == 3) then
@@ -1176,6 +1321,7 @@ subroutine read_density_file()
      else
         allocate(sph_dens_dp(n_rad,nz,n_az,n_a))
      endif
+
      sph_dens_dp = 0.0_dp
      call ftgpvd(unit,group,firstpix,npixels,nullval,sph_dens_dp,anynull,status)
      sph_dens = real(sph_dens_dp,kind=sp)
@@ -1350,7 +1496,7 @@ subroutine read_density_file()
      if (nfound /= 3) then
         write(*,*) 'Gas density:'
         write(*,*) "I found", nfound, "axis instead of 3, status=", status
-        call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
+        call error('failed to read the NAXISn keywords of '//trim(density_files(1)))
      endif
 
      if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az) ) then
@@ -1358,7 +1504,7 @@ subroutine read_density_file()
         write(*,*) naxes(1), n_rad
         write(*,*) naxes(2), nz
         write(*,*) naxes(3), n_az
-        call error(trim(density_file)//" does not have the right dimensions.")
+        call error(trim(density_files(1))//" does not have the right dimensions.")
      endif
      npixels=naxes(1)*naxes(2)*naxes(3)
 
@@ -1423,7 +1569,7 @@ subroutine read_density_file()
      if (nfound /= 4) then
         write(*,*) 'Gas velocity:'
         write(*,*) "I found", nfound, "axis instead of 4"
-        call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
+        call error('failed to read the NAXISn keywords of '//trim(density_files(1))//' file.')
      endif
 
      if ((naxes(1) /= n_rad).or.((naxes(2) /= nz).and.(naxes(2) /= 2*nz)).or.(naxes(3) /= n_az).or.(naxes(4) /= 3) ) then
@@ -1432,7 +1578,7 @@ subroutine read_density_file()
         write(*,*) naxes(2), nz
         write(*,*) naxes(3), n_az
         write(*,*) naxes(4), 3
-        call error(trim(density_file)//" does not have the right dimensions.")
+        call error(trim(density_files(1))//" does not have the right dimensions.")
      endif
      npixels=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
@@ -1464,6 +1610,7 @@ subroutine read_density_file()
 
   call ftclos(unit, status)
   call ftfiou(unit, status)
+
 
   ! Passing the densities and velocities to mcfost arrays
   do k=1, n_az
@@ -1501,7 +1648,7 @@ subroutine read_density_file()
   ! Calcul de la masse de gaz de la zone
   mass = 0.
   do icell=1,n_cells
-     mass = mass + densite_gaz(icell) *  masse_mol_gaz * volume(icell)
+     mass = mass + densite_gaz(icell) *  mu_mH * volume(icell)
   enddo !icell
   mass =  mass * AU3_to_m3 * g_to_Msun
 
@@ -1519,8 +1666,9 @@ subroutine read_density_file()
 
   ! Tableau de masse de gaz
   do icell=1,n_cells
-     masse_gaz(icell) =  densite_gaz(icell) * masse_mol_gaz * volume(icell) * AU3_to_m3
+     masse_gaz(icell) =  densite_gaz(icell) * mu_mH * volume(icell) * AU3_to_m3
   enddo ! icell
+  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
 
   if (lvariable_dust) then
      write(*,*) "Differential spatial distribution"
@@ -1540,7 +1688,7 @@ subroutine read_density_file()
                     jj = abs(j)
                  endif
                  do i=1, n_rad
-                    densite_pouss(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,1)
+                    dust_density(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,1)
                  enddo ! phik
               enddo ! j
            enddo ! i
@@ -1559,7 +1707,7 @@ subroutine read_density_file()
                  endif
                  if (j==0) cycle
                  do i=1, n_rad
-                    densite_pouss(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,n_a)
+                    dust_density(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,n_a)
                  enddo ! phik
               enddo ! j
            enddo ! i
@@ -1580,7 +1728,7 @@ subroutine read_density_file()
                     jj = abs(j)
                  endif
                  do i=1, n_rad
-                    densite_pouss(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,l) + f * &
+                    dust_density(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,l) + f * &
                          ( sph_dens(i,jj,phik,l+1) -  sph_dens(i,jj,phik,l) )
                  enddo ! phik
               enddo ! j
@@ -1603,22 +1751,141 @@ subroutine read_density_file()
                  jj = abs(j)
               endif
               do i=1, n_rad
-                 densite_pouss(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,1)
+                 dust_density(k,cell_map(i,j,phik)) = sph_dens(i,jj,phik,1)
               enddo ! phik
            enddo ! j
         enddo ! i
      enddo ! k
   endif  !lvariable_dust
 
-  write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
   call normalize_dust_density()
   deallocate(sph_dens,a_sph)
-
-
 
   return
 
 end subroutine read_density_file
+
+!**********************************************************
+
+subroutine read_Voronoi_fits_file(filename, x,y,z,h,vx,vy,vz,particle_id, massgas,n_points)
+
+
+  character(len=*), intent(in) :: filename
+
+  real(dp), intent(out), dimension(:),   allocatable :: x,y,z,h,vx,vy,vz,massgas
+  integer, intent(out), dimension(:),   allocatable :: particle_id
+  integer, intent(out) :: n_points
+
+  real, dimension(:,:), allocatable :: xyz_sp
+  real(kind=dp), dimension(:,:), allocatable :: xyz_dp
+  real, dimension(:), allocatable :: mass_sp
+
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,npixels,hdutype, bitpix, nullval, i
+  logical :: anynull
+  character(len=80) :: comment
+  integer, dimension(4) :: naxes
+
+
+  write(*,*) "Reading Voronoi fits file: "//trim(filename)
+
+  ! Lecture donnees
+  status=0
+  !  Get an unused Logical Unit Number to use to open the FITS file.
+  call ftgiou(unit,status)
+
+  readwrite=0
+  call ftopen(unit,filename,readwrite,blocksize,status)
+  if (status /= 0) call error("density file needed")
+
+  status = 0
+  group=1
+  firstpix=1
+  nullval=-999
+  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+
+  if ((nfound /= 1)) then
+     write(*,*) "I found", nfound, "axis instead of 1"
+     call error('failed to read the NAXIS keyword in HDU 1 of '//trim(filename))
+  endif
+
+  n_points = naxes(1)
+  npixels = naxes(1)
+
+  allocate(massgas(n_points), x(n_points),y(n_points),z(n_points), h(n_points), particle_id(n_points))
+  h = 1e-6 * huge_dp
+
+  bitpix = 0
+  call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+  if (bitpix==-32) then
+     allocate(mass_sp(n_points))
+     call ftgpve(unit,group,firstpix,npixels,nullval,mass_sp,anynull,status)
+     massgas = mass_sp
+     deallocate(mass_sp)
+  else if (bitpix==-64) then
+     call ftgpvd(unit,group,firstpix,npixels,nullval,massgas,anynull,status)
+  else
+     call error("cannot read bitpix in fits file")
+  endif
+
+
+  !---------------------------------------------------------
+  ! hdu2 is particle positions
+  !---------------------------------------------------------
+  !  move to next hdu
+  call ftmrhd(unit,1,hdutype,status)
+  nfound=1
+  ! Check dimensions
+  naxes(:) = 0
+  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
+  if (nfound /= 2) then
+     write(*,*) 'HDU 2 has', nfound, 'dimensions.'
+     call error('did not find 2 dimension in HDU 2')
+  endif
+  if ((naxes(1) /= 3)) then
+     write(*,*) "HDU2 dim 1 is ", naxes(1), "instead of 3"
+     call error("HDU 2 does not have the right dimension")
+  endif
+  if ((naxes(2) /= n_points)) then
+     write(*,*) "HDU2 dim 2 is ", naxes(3), "instead of ", n_points
+     call error("HDU 2 does not have the right dimension")
+  endif
+
+  npixels=naxes(1)*naxes(2)
+
+  bitpix=0
+  call ftgkyj(unit,"bitpix",bitpix,comment,status)
+
+  ! read_image
+  if (bitpix==-32) then
+     allocate(xyz_sp(3,n_cells))
+     call ftgpve(unit,group,firstpix,npixels,nullval,xyz_sp,anynull,status)
+     x = xyz_sp(1,:)
+     y = xyz_sp(2,:)
+     z = xyz_sp(3,:)
+     deallocate(xyz_sp)
+  else if (bitpix==-64) then
+     allocate(xyz_dp(3,n_cells))
+     call ftgpvd(unit,group,firstpix,npixels,nullval,xyz_dp,anynull,status)
+     x = xyz_dp(1,:)
+     y = xyz_dp(2,:)
+     z = xyz_dp(3,:)
+     deallocate(xyz_dp)
+  else
+     call error("cannot read bitpix in fits file")
+  endif
+
+  ! Defining a smoothing length
+  h = 0.02 * sqrt(x*x+y*y+z*z)
+
+  do i=1,n_points
+     particle_id(i) = i
+  enddo
+  SPH_keep_particles = 1.0
+
+  return
+
+end subroutine read_Voronoi_fits_file
 
 !**********************************************************
 
@@ -1645,48 +1912,73 @@ subroutine normalize_dust_density(disk_dust_mass)
 
   ! Normalisation : on a 1 grain de chaque taille dans le disque
   ! puis on a 1 grain en tout dans le disque
-  do l=1,n_grains_tot
-     somme=0.0_dp
-     do icell=1,n_cells
-        if (densite_pouss(l,icell) <= 0.0_dp) densite_pouss(l,icell) = 0.0_dp
-        somme=somme+densite_pouss(l,icell)*volume(icell)
-     enddo !icell
-     if (somme > tiny_dp) densite_pouss(l,:) = densite_pouss(l,:) / somme * nbre_grains(l) ! nbre_grains pour avoir Sum densite_pouss = 1  dans le disque
-  enddo !l
-
-  ! Normalisation poussiere: re-calcul masse totale par population a partir de la densite (utile quand edge /= 0)
-  do pop=1, n_pop
-     izone=dust_pop(pop)%zone
-     dz=disk_zone(izone)
-
-     if (dz%geometry /= 5) then ! pas de wall ici
-        d_p => dust_pop(pop)
-        mass = 0.0_dp
-
+  if (lvariable_dust) then
+     do l=1,n_grains_tot
+        somme=0.0_dp
         do icell=1,n_cells
-           do l=d_p%ind_debut,d_p%ind_fin
-              mass=mass + (densite_pouss(l,icell) *1.0_dp) * M_grain(l) * volume(icell)
-           enddo !l
+           if (dust_density(l,icell) <= 0.0_dp) dust_density(l,icell) = 0.0_dp
+           somme=somme+dust_density(l,icell)*volume(icell)
         enddo !icell
-        mass =  mass * AU3_to_cm3 * g_to_Msun
+        ! Sum dust_density * nbre_grains = 1  over the whole disc
+        if (somme > tiny_dp) dust_density(l,:) = dust_density(l,:) / somme
+     enddo !l
+  endif
 
-        if (mass > tiny_dp) then
-           facteur = d_p%masse / mass * f
 
-           mass = 0.0_dp
-           do icell=1,n_cells
-              do l=d_p%ind_debut,d_p%ind_fin
-                 densite_pouss(l,icell) = densite_pouss(l,icell) * facteur
-                 masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
-              enddo !l
-           enddo ! icell
+  ! Normalisation poussiere: re-calcul masse totale par zone a partir de la densite (utile quand edge /= 0)
+  masse(:) = 0.0_dp
+  if (lvariable_dust) then
+     do pop=1, n_pop
+        d_p => dust_pop(pop)
+        somme = 0.0_dp
+        do icell=1, n_cells
+           do l=d_p%ind_debut, d_p%ind_fin
+              somme = somme + dust_density(l,icell) * nbre_grains(l) * M_grain(l) * volume(icell)
+           enddo
+        enddo
+        somme =  somme * AU3_to_cm3 * g_to_Msun
+
+        if (somme > tiny_dp) then
+           facteur = d_p%masse / somme
+           do icell=1, n_cells
+              do l=d_p%ind_debut, d_p%ind_fin
+                 dust_density(l,icell) = dust_density(l,icell) * facteur
+                 masse(icell) = masse(icell) + (dust_density(l,icell)* nbre_grains(l) * M_grain(l) * volume(icell))
+              enddo
+           enddo
         endif
-     endif ! test wall
-  enddo ! pop
+     enddo
+  else   ! case .not.lvariable_dust
+     do izone=1, n_zones
+        dz=disk_zone(izone)
+        if (dz%geometry /= 5) then
+           somme = 0.0_dp
+           do icell=1,n_cells
+              somme = somme + dust_density(izone,icell) * volume(icell)
+           enddo
+
+           if (somme > tiny_dp) then
+              ! We scale dust_density(izone,:) so it integrates to the total mass of the zone in g
+              facteur = (dz%diskmass * f) / (somme * AU3_to_cm3 * g_to_Msun)
+              dust_density(izone,:) =  dust_density(izone,:) * facteur
+
+              do pop=1, n_pop
+                 if (dust_pop(pop)%zone == izone) then
+                    do icell=1,n_cells
+                       ! dust_density already contains the total zone mass in g/cm3
+                       ! We still need to multiply by populate mass fraction to get masse(icell)
+                       masse(icell) = masse(icell) + dust_density(izone,icell) * dust_pop(pop)%frac_mass * volume(icell)
+                    enddo
+                 endif
+              enddo
+           endif
+        endif
+     enddo
+  endif
 
   masse(:) = masse(:) * AU3_to_cm3
 
-  !write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+  write(*,*) 'Total dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
   if (sum(masse) < tiny_dp) call error("Something went wrong, there is no dust in the disk")
 
   if (lcorrect_density) then
@@ -1698,30 +1990,44 @@ subroutine normalize_dust_density(disk_dust_mass)
               if (j==0) cycle
               do k=1, n_az
                  icell = cell_map(i,j,k)
-                 densite_pouss(:,icell) = densite_pouss(:,icell) * correct_density_factor
+                 dust_density(:,icell) = dust_density(:,icell) * correct_density_factor
                  masse(icell) = masse(icell) *  correct_density_factor
               enddo !k
            enddo ! j
         endif
      enddo
 
-     !write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
+     write(*,*) 'Total corrected dust mass in model:', real(sum(masse)*g_to_Msun),' Msun'
   endif
 
   ! Remplissage a zero pour z > zmax que l'en envoie sur l'indice j=0
   ! Valable que dans le cas cylindrique mais pas de pb dans le cas spherique
-  ! if (lcylindrical) densite_pouss(:,nz+1,:,:) = densite_pouss(:,nz,:,:)
+  ! if (lcylindrical) dust_density(:,nz+1,:,:) = dust_density(:,nz,:,:)
+
+  call find_non_empty_cell()
+
+  return
+
+end subroutine normalize_dust_density
+
+!**********************************************************
+
+subroutine find_non_empty_cell()
+
+  integer :: icell
 
   search_not_empty : do icell=1,n_cells
-     if (masse(icell) > 0.0_sp) then
+     if (masse(icell) > tiny_real) then
         icell_not_empty = icell
         exit search_not_empty
      endif
   enddo search_not_empty
 
+  write(*,*) "Reference cell is #", icell_not_empty
+
   return
 
-end subroutine normalize_dust_density
+end subroutine find_non_empty_cell
 
 !**********************************************************
 
@@ -1735,7 +2041,7 @@ subroutine read_Sigma_file()
   integer, dimension(2) :: naxes
   logical :: anynull
   character(len=80) :: comment
-  real, dimension(:), allocatable :: sigma_sp
+  real, dimension(:,:), allocatable :: sigma_sp
 
   ! Lecture donnees
   status=0
@@ -1759,8 +2065,8 @@ subroutine read_Sigma_file()
 
   ! determine the size of density file
   nfound = 0 ! to fix ifort bug
-  call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound > 2) then
+  call ftgknj(unit,'NAXIS',1,2,naxes,nfound,status)
+  if ((nfound < 1).or.(nfound > 2)) then
      write(*,*) "nfound = ", nfound, "instead of 1 or 2"
      call error('failed to read the NAXISn keywords of '//trim(sigma_file)//' file.')
   endif
@@ -1786,12 +2092,12 @@ subroutine read_Sigma_file()
   call ftgkyj(unit,"bitpix",bitpix,comment,status)
 
   ! read_image
-  allocate(Surface_density(n_rad), stat=alloc_status)
+  allocate(Surface_density(n_rad,n_az), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error Sigma')
   Surface_density = 0.0_dp
 
   if (bitpix==-32) then
-     allocate(sigma_sp(n_rad))
+     allocate(sigma_sp(n_rad,n_az))
      sigma_sp = 0.0_dp
      call ftgpve(unit,group,firstpix,npixels,nullval,sigma_sp,anynull,status)
      surface_density = real(sigma_sp,kind=dp)
@@ -1826,7 +2132,7 @@ real(kind=dp) function omega_tau(rho,H,l)
   ipop = grain(l)%pop
   !write(*,*) ipop, dust_pop(ipop)%rho1g_avg, rho
   if (rho > tiny_dp) then
-     omega_tau = dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * masse_mol_gaz/m_to_cm**3 * H*AU_to_cm)
+     omega_tau = dust_pop(ipop)%rho1g_avg*(r_grain(l)*mum_to_cm) / (rho * mu_mH/m_to_cm**3 * H*AU_to_cm)
   else
      omega_tau = huge_dp
   endif
@@ -1877,8 +2183,8 @@ subroutine densite_Seb_Charnoz()
         if (is_diff(Dz,Dz_mcfost))  write(*,*) "Pb Dz cell", i,j
 
         icell = cell_map(i,j,1) ! only 2D
-        densite_pouss(:,icell) = density_Seb(:) / (volume(icell)*AU3_to_cm3) ! comversion en densite volumique
-        Somme = Somme +  1.6 * 4.*pi/3. *  (mum_to_cm)**3 * sum( density_Seb(:) * r_grain(:)**3 )
+        dust_density(:,icell) = density_Seb(:) / (volume(icell)*AU3_to_cm3) ! comversion en densite volumique
+        Somme = Somme +  1.6 * 4.*pi/3. *  (mum_to_cm)**3 * sum( dust_density(:,icell) * r_grain(:)**3 )
      enddo ! j
   enddo !i
   write(*,*) "Dust mass from Seb's file :", real(Somme * g_to_Msun), "Msun"
@@ -1887,28 +2193,30 @@ subroutine densite_Seb_Charnoz()
   ! les methodes de chauffages etc, ne changent pas
 
   do k=1, n_grains_tot
-     N_grains(k) = sum(densite_pouss(k,:))
+     somme = 0.0_dp
+     do icell=1,n_cells
+        somme = somme + dust_density(k,icell) * volume(icell)
+     enddo
+     N_grains(k) = somme
   enddo
   nbre_grains(:) = N_grains(:)/sum(N_grains(:))
 
+  ! We need to redivide by nbre_grains
+  do k=1, n_grains_tot
+     dust_density(k,:) = dust_density(k,:)/ nbre_grains(k)
+  enddo
 
   do icell=1,n_cells
      do l=1,n_grains_tot
-        masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+        masse(icell) = masse(icell) + dust_density(l,icell) * nbre_grains(l) * M_grain(l) * volume(icell)
      enddo !l
   enddo ! icell
 
   masse(:) = masse(:) * AU3_to_cm3 * 1600./3500 ! TMP
 
-  search_not_empty : do icell=1,n_cells
-     if (masse(icell) > 0.0_sp) then
-        icell_not_empty = icell
-        exit search_not_empty
-     endif
-  enddo search_not_empty
-
-
   write(*,*) 'Total dust mass in model  :', real(sum(masse)*g_to_Msun),'Msun'
+
+  call find_non_empty_cell()
 
   write(*,*) "Done"
   write(*,*) "***********************************************"
@@ -1939,10 +2247,10 @@ subroutine densite_Seb_Charnoz2()
   call ftgiou(unit,status)
 
   write(*,*) "Density structure from Seb. Charnoz" ;
-  write(*,*) "Reading density file : "//trim(density_file)
+  write(*,*) "Reading density file : "//trim(density_files(1))
 
   readwrite=0
-  call ftopen(unit,density_file,readwrite,blocksize,status)
+  call ftopen(unit,density_files(1),readwrite,blocksize,status)
   if (status /= 0) call error("density file needed")
 
   group=1
@@ -1951,13 +2259,13 @@ subroutine densite_Seb_Charnoz2()
 
   !  determine the size of density file
   call ftgknj(unit,'NAXIS',1,10,naxes,nfound,status)
-  if (nfound /= 2) call error('failed to read the NAXISn keywords of '//trim(density_file)//' file.')
+  if (nfound /= 2) call error('failed to read the NAXISn keywords of '//trim(density_files(1))//' file.')
 
   if ((naxes(1) /= n_rad).or.(naxes(2) /= nz) ) then
      write(*,*) "# fits_file vs mcfost_grid"
      write(*,*) naxes(1), n_rad
      write(*,*) naxes(2), nz
-     call error(trim(density_file)//" does not have the right dimensions.")
+     call error(trim(density_files(1))//" does not have the right dimensions.")
   endif
 
   npixels=naxes(1)*naxes(2)
@@ -1987,39 +2295,30 @@ subroutine densite_Seb_Charnoz2()
   do k=1,n_grains_tot
      do i=1, n_rad
         do j=1,nz
-           densite_pouss(k,cell_map(i,j,1)) = dens(i,j) ! only 2D
+           dust_density(k,cell_map(i,j,1)) = dens(i,j) ! only 2D
         enddo
      enddo
   enddo
 
   ! kg/m^3  ---> part/cm^3
-  densite_pouss = densite_pouss / ( (cm_to_m)**3  * dust_pop(1)%avg_grain_mass * 1e3)
+  dust_density = dust_density / ( (cm_to_m)**3  * dust_pop(1)%avg_grain_mass * 1e3)
 
   ! BUG correction : il manque un facteur
-  densite_pouss = densite_pouss * 1e-6
-
-
-  do l=1,n_grains_tot
-     densite_pouss(l,:) = densite_pouss(l,:)*nbre_grains(l)
-  enddo
+  dust_density = dust_density * 1e-6
   write(*,*) "Done"
 
   do icell=1,n_cells
      do l=1,n_grains_tot
-        masse(icell) = masse(icell) + densite_pouss(l,icell) * M_grain(l) * volume(icell)
+        masse(icell) = masse(icell) + dust_density(l,icell) * nbre_grains(l) * M_grain(l) * volume(icell)
      enddo !l
   enddo ! icell
 
   masse(:) = masse(:) * AU3_to_cm3
 
-  search_not_empty : do icell=1,n_cells
-     if (masse(icell) > 0.0_sp) then
-        icell_not_empty = icell
-        exit search_not_empty
-     endif
-  enddo search_not_empty
-
   write(*,*) 'Total dust mass in model :', real(sum(masse)*g_to_Msun),' Msun'
+
+  call find_non_empty_cell()
+
   write(*,*) "Density from Seb. Charnoz set up OK"
 
   return
@@ -2040,7 +2339,7 @@ subroutine remove_species()
   do icell=1,n_cells
      do k=1,n_grains_tot
         if (grain(k)%pop==species_removed) then
-           if (Tdust(icell) > T_rm) densite_pouss(k,icell) = 0.0
+           if (Tdust(icell) > T_rm) dust_density(k,icell) = 0.0
         endif
      enddo
   enddo
@@ -2048,7 +2347,7 @@ subroutine remove_species()
   mass = 0.0
   do icell=1,n_cells
      do k=1,n_grains_tot
-        mass=mass + densite_pouss(k,icell) * M_grain(k) * (volume(icell) * AU3_to_cm3)
+        mass=mass + dust_density(k,icell) * nbre_grains(k) * M_grain(k) * (volume(icell) * AU3_to_cm3)
      enddo
   enddo
   mass =  mass/Msun_to_g
@@ -2068,7 +2367,7 @@ subroutine reduce_density(icell, factor)
 
   densite_gaz(icell)     = factor * densite_gaz(icell)
   masse_gaz(icell)       = factor * masse_gaz(icell)
-  densite_pouss(:,icell) = factor * densite_pouss(:,icell)
+  dust_density(:,icell) = factor * dust_density(:,icell)
   masse(icell)           = factor * masse(icell)
 
   return
