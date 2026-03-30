@@ -10,6 +10,7 @@ module input
   use messages
   use wavelengths
   use temperature
+  use density, only : dust_density
 
   implicit none
 
@@ -57,12 +58,15 @@ subroutine readmolecule(imol)
   ! remplit Aul, Bul, Blu + les f,   Level_energy, transfreq,
   ! iTransUpper, iTransLower + les donnees de collisions
 
+  use utils, only : split_line
+
   integer, intent(in) :: imol
   integer, parameter :: nCollTemp_max = 50
 
-  character(len=515) :: filename, dir
-  character(len=80) :: junk
-  integer :: i, j, iLow, iUp, iPart, ios
+  character(len=512) :: filename, dir
+  character(len=80) :: junk, line
+  character(len=20)  :: tokens(10)
+  integer :: i, j, iLow, iUp, iPart, ios, numtokens
   real :: a, freq, eu, molecularWeight
   real, dimension(nCollTemp_max) :: collrates_tmp, colltemps_tmp
 
@@ -86,16 +90,30 @@ subroutine readmolecule(imol)
 
   read(1,*) junk
   read(1,*) molecularWeight
-  masse_mol = masseH * molecularWeight
+  mol(imol)%molecularWeight = molecularWeight
 
   read(1,*) junk
   read(1,*) nLevels
 
-  allocate(Level_energy(nLevels),poids_stat_g(nLevels),j_qnb(nLevels))
+  allocate(Level_energy(nLevels),poids_stat_g(nLevels),j_qnb(nLevels),v_qnb(nLevels))
 
   read(1,*) junk
+  lrovib = .false.
   do i = 1, nLevels
-     read(1,*) j, Level_energy(i), poids_stat_g(i) , j_qnb(i)
+     read(1,'(A)', iostat=ios) line
+     call split_line(line, tokens, numTokens)
+
+     ! Parse based on number of tokens
+     read(tokens(1),*) j
+     read(tokens(2),*) Level_energy(i)
+     read(tokens(3),*) poids_stat_g(i)
+     if (numTokens == 4) read(tokens(4),*) j_qnb(i) !
+     if (numTokens == 5) then ! rovib file
+        lrovib = .true.
+        read(tokens(4),*) v_qnb(i)
+        read(tokens(5),*) j_qnb(i)
+     endif
+
      Level_energy(i) = Level_energy(i) / 8065.541  ! per cm to ev
   enddo
 
@@ -186,7 +204,7 @@ subroutine lect_Temperature()
 
   !future: lgas_transfer. Dust could not always be present in the gas RT.
   if (lemission_atom) then
-     there_is_dust = (maxval(densite_pouss) > 0_dp)
+     there_is_dust = (maxval(dust_density) > 0_dp)
      if ( .not.there_is_dust ) then
         call warning("(lect_Temperature) Do not attempt to read Tdust file when there is not dust!")
         return
@@ -727,7 +745,7 @@ subroutine read_phase_function(phase_function_file)
 
   character(len=512), intent(in) :: phase_function_file
 
-  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, hdutype, i
+  integer :: status, readwrite, unit, blocksize,nfound,group,firstpix,nbuffer,npixels, i
   real :: nullval
   integer, dimension(2) :: naxes
   logical :: anynull

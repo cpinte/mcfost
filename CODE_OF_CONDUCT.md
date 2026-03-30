@@ -61,7 +61,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported in confidence to the project leader at
-[christophe AT monash.edu](mailto:christophe.pinte@monash.edu). All complaints will be reviewed and
+[christophe AT univ-grenoble-alpes.fr](mailto:christophe.pinte@univ-grenoble-alpes.fr). All complaints will be reviewed and
 investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the

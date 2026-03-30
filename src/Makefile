@@ -3,6 +3,7 @@
 #------------------------------------------------------------------------------#
 
 IS_DARWIN := $(shell uname | tr '[a-z]' '[A-Z]' 2>&1 | grep -c DARWIN)
+cpu =  $(shell uname -m)
 
 KNOWN_SYSTEM=no
 
@@ -142,7 +143,11 @@ ifeq ($(SYSTEM), gfortran)
     CXX= g++
     CCFLAGS= -Wall -pedantic -m64 -O3 -funroll-loops -ffinite-math-only -fno-trapping-math
     COMPFLAGS= -fopenmp
-    LIBCXX= -lstdc++
+    ifeq ($(cpu),arm64)
+        LIBCXX= -lstdc++ -Wl,-ld_classic # for github action
+    else
+        LIBCXX= -lstdc++
+    endif
     ifneq ($(shell $(CC) -v 2>&1 | grep -c "clang"), 0)
         LIBCXX= -lc++
     endif
@@ -234,10 +239,10 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 me
           grains.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90 \
           elements_type.f90 Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 \
           read_DustEM.f90 Temperature.f90 density.f90 read_opacity.f90 scattering.f90 \
-          read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90	\
+          read_fargo3d.f90 hdf5_utils.f90 read_athena++.f90	\
           readVTK.f90 read_idefix.f90 read_pluto.f90 voigts.f90 	\
           coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90            \
-          read1d_models.f90 read_spherical_grid.f90	\
+          read_1d_models.f90 read_spherical_grid.f90	\
           input.f90 benchmarks.f90 atom_type.f90  \
           wavelengths_gas.f90 broad.f90                             \
           read_param.f90 dust_ray_tracing.f90 uplow.f90 abo.f90     \
@@ -306,8 +311,11 @@ endif
 
 operating_system.f90 : sha.o
 	printf "module os\n  implicit none\n" > operating_system.f90
-	uname | awk \
+	uname -s | awk \
 		'{print "  character(len=7), parameter :: operating_system = \""$$1"\""}' \
+		>> operating_system.f90
+	uname -m | awk \
+		'{print "  character(len=7), parameter :: architecture = \""$$1"\""}' \
 		>> operating_system.f90
 	printf "end module os\n" >> operating_system.f90
 

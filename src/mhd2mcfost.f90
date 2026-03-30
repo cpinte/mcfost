@@ -43,7 +43,7 @@ module mhd2mcfost
         ldust_moments = .false.
 
 
-        write(FormatLine,'("(1"A,I3")")') "A", 512
+        write(FormatLine,'("(A",I0,")")') 512
 
         !There will be an error if lphantom_file is true. Because density_files and density_file
         !stores pluto's model name. But also the filename from phantom.. So to date, the two
@@ -261,7 +261,7 @@ module mhd2mcfost
    !      close(unit=1)
 
    !      !rho -> nH
-   !      nHtot = nHtot * 1d3 / masseH / wght_per_H
+   !      nHtot = nHtot * 1d3 / mH / wght_per_H
 
    !      write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT>0)), " density zones"
    !      write(*,*) "Read ", size(pack(icompute_atomRT,mask=icompute_atomRT==0)), " transparent zones"

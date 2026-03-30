@@ -503,7 +503,7 @@ subroutine calc_xI_scatt(id,lambda,p_lambda,icell, phik,psup,l,stokes,flag_star)
   if (lvariable_dust) then
      p_icell = icell
   else
-     p_icell = icell_ref
+     p_icell = icell1
   endif
 
   do ibin = 1, RT_n_incl
@@ -565,7 +565,7 @@ subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_s
   if (lvariable_dust) then
      p_icell = icell
   else
-     p_icell = icell_ref
+     p_icell = icell1
   endif
 
   do ibin = 1, RT_n_incl
@@ -670,9 +670,9 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   !$omp default(none) &
   !$omp private(icell,p_icell,facteur,kappa_sca,kappa_ext,itype,I_scatt) &
   !$omp shared(n_cells,energie_photon,volume,n_az_rt,n_theta_rt,kappa,kappa_factor,N_type_flux,lambda,iRT) &
-  !$omp shared(J_th,xI_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes,nb_proc,tab_albedo_pos,lvariable_dust,icell_ref)
+  !$omp shared(J_th,xI_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes,nb_proc,tab_albedo_pos,lvariable_dust,icell1)
 
-  p_icell = icell_ref
+  p_icell = icell1
 
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
@@ -750,9 +750,9 @@ subroutine init_dust_source_fct2(lambda,p_lambda,ibin)
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(lambda,n_cells,nang_ray_tracing,eps_dust2,I_sca2,J_th,kappa,kappa_factor,eps_dust2_star,lsepar_pola) &
-  !$omp shared(lsepar_contrib,n_Stokes,nang_ray_tracing_star,nb_proc,tab_albedo_pos,icell_ref,lvariable_dust) &
+  !$omp shared(lsepar_contrib,n_Stokes,nang_ray_tracing_star,nb_proc,tab_albedo_pos,icell1,lvariable_dust) &
   !$omp private(icell,p_icell,dir,iscatt,Q,U,kappa_ext)
-  p_icell = icell_ref
+  p_icell = icell1
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
      if (lvariable_dust) p_icell = icell
@@ -813,14 +813,16 @@ subroutine calc_Jth(lambda)
   ! 25/09/08
 
   integer, intent(in) :: lambda
-  integer :: l, T, icell, p_icell
+
   real(kind=dp) ::  Temp, cst_wl, wl, coeff_exp, cst_E
+  integer, target :: l, l0
+  integer :: T, icell, p_icell
+  integer :: p_l ! Removed pointer to avoid issues with changing indices
 
   ! longueur d'onde en metre
   wl = tab_lambda(lambda)*1.e-6
 
   J_th(:) = 0.0
-
 
   ! Intensite specifique emission thermique
   if ((l_em_disk_image).or.(lsed)) then
@@ -829,9 +831,9 @@ subroutine calc_Jth(lambda)
         !$omp parallel &
         !$omp default(none) &
         !$omp shared(n_cells,Tdust,wl,lambda,kappa_abs_LTE,kappa_factor,cst_E,J_th) &
-        !$omp shared(lvariable_dust,icell_ref) &
+        !$omp shared(lvariable_dust,icell1) &
         !$omp private(icell,p_icell,Temp,cst_wl,coeff_exp)
-        p_icell = icell_ref
+        p_icell = icell1
         !$omp do
         do icell=1, n_cells
            if (lvariable_dust) p_icell = icell
@@ -848,18 +850,21 @@ subroutine calc_Jth(lambda)
         !$omp end parallel
      endif !lRE_LTE
 
+     ! p_l is now set inside the loops below to handle zone-based indexing when lvariable_dust is false
+
      if (lRE_nLTE) then
         cst_E=2.0*hp*c_light**2
         do icell=1,n_cells
            do l=grain_RE_nLTE_start,grain_RE_nLTE_end
-              Temp=Tdust_1grain(l,icell)
-              if (Temp*wl > 3.e-4) then
-                 cst_wl=cst_th/(Temp*wl)
-                 coeff_exp=exp(cst_wl)
-                 J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                      C_abs_norm(l,lambda) * densite_pouss(l,icell)
-              endif
-           enddo ! l
+               p_l = merge(l, grain(l)%zone, lvariable_dust)
+               Temp=Tdust_1grain(l,icell)
+               if (Temp*wl > 3.e-4) then
+                  cst_wl=cst_th/(Temp*wl)
+                  coeff_exp=exp(cst_wl)
+                  J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                       C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+               endif
+            enddo ! l
         enddo ! icell
      endif !lRE_nLTE
 
@@ -867,26 +872,28 @@ subroutine calc_Jth(lambda)
         do icell=1,n_cells
            do l=grain_nRE_start,grain_nRE_end
               if (l_RE(l,icell)) then ! le grain a une temperature
-                 Temp=Tdust_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
-                 if (Temp*wl > 3.e-4) then
-                    cst_wl=cst_th/(Temp*wl)
-                    coeff_exp=exp(cst_wl)
-                    J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                         C_abs_norm(l,lambda)*densite_pouss(l,icell)
-                 endif !cst_wl
-              else ! ! la grain a une proba de T
+                  p_l = merge(l, grain(l)%zone, lvariable_dust)
+                  Temp=Tdust_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
+                  if (Temp*wl > 3.e-4) then
+                     cst_wl=cst_th/(Temp*wl)
+                     coeff_exp=exp(cst_wl)
+                     J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
+                          C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+                  endif !cst_wl
+              else ! ! la grain a une proba de T  ---> todo: we can compute BB outside of loop
                  do T=1,n_T
                     temp=tab_Temp(T)
                     if (Temp*wl > 3.e-4) then
                        cst_wl=cst_th/(Temp*wl)
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(l,lambda)*densite_pouss(l,icell) * Proba_Tdust(T,l,icell)
+                            C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l) * Proba_Tdust(T,l,icell)
                     endif !cst_wl
                  enddo ! T
               endif ! l_RE
            enddo ! l
         enddo ! icell
+
      endif !lnRE
 
   endif ! lsed or lemission_disk
@@ -1076,7 +1083,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,icell_ref,energie_photon,volume) &
+  !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,icell1,energie_photon,volume) &
   !$omp shared(tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
   !$omp shared(lsepar_pola,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
   !$omp shared(s11_save,tab_cosw,tab_sinw,nb_proc,kappa,kappa_factor,tab_albedo_pos) &
@@ -1098,8 +1105,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   ROP(4,4) = 1.0_dp
 
   if (.not.lvariable_dust) then   ! we precalculate the s11 as they are all the same
-     icell = icell_ref
-
+     icell = icell1
      do dir=0,1
         do iscatt = 1, nang_ray_tracing
            ! Loop over the specific intensity bins
@@ -1122,7 +1128,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
      enddo ! dir
   endif ! .not.lvariable_dust
 
-  p_icell = icell_ref
+  p_icell = icell1
   !$omp do schedule(static, n_cells/nb_proc)
   do icell = 1, n_cells
      !$ id = omp_get_thread_num() + 1
@@ -1269,7 +1275,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   !$omp parallel &
   !$omp default(none) &
   !$omp shared(n_cells,lambda,p_lambda,ibin,I_spec_star,nang_ray_tracing_star,cos_thet_ray_tracing_star) &
-  !$omp shared(lvariable_dust,r_grid,z_grid,icell_ref,omega_ray_tracing_star,lsepar_pola) &
+  !$omp shared(lvariable_dust,r_grid,z_grid,icell1,omega_ray_tracing_star,lsepar_pola) &
   !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
   !$omp shared(energie_photon,volume,tab_albedo_pos,kappa,kappa_factor,eps_dust2_star) &
   !$omp private(id,icell,p_icell,stokes,x,y,z,norme,u,v,w,dir,iscatt,cos_scatt,k,omega,cosw,sinw,RPO,ROP,S) &
@@ -1290,7 +1296,7 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 
   stokes(:) = 0.0_dp
 
-  p_icell = icell_ref
+  p_icell = icell1
 
   !$omp do
   do icell=1, n_cells

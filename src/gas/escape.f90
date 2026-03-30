@@ -126,11 +126,11 @@ module escape
         integer, parameter :: order = 1
 
         if ((lcylindrical)) then
-            call warning("(count_neighbours) Not tested for cylindrical grid yet") 
+            call warning("(count_neighbours) Not tested for cylindrical grid yet")
         endif
 
         if ((lvoronoi)) then
-            call error("(count_neighbours) Not working for voronoi grid yet") 
+            call error("(count_neighbours) Not working for voronoi grid yet")
         endif
 
         !spherical grid
@@ -310,7 +310,7 @@ module escape
                 call progress_bar(ibar)
                 !$omp atomic
                 ibar = ibar+1
-            endif             
+            endif
         enddo
         !$omp end do
         !$omp end parallel
@@ -347,7 +347,7 @@ module escape
                     ! if (.not.lintersect) cycle
                     ! if (lintersect) then
                     n_rays_star(i_star) = n_rays_star(i_star) + 1
-                    if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then 
+                    if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then
                         !fraction actually because all rays touch the star here
                         Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell)
                         n_rays_shock(i_star) = n_rays_shock(i_star) + 1
@@ -365,9 +365,9 @@ module escape
             deallocate(stream)
         endif
 
-        write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') &
+        write(*,'("max(<gradv>)=",(1ES17.8E3)," s^-1; min(<gradv>)=",(1ES17.8E3)," s^-1")') &
             maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
-        write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') &
+        write(*,'("max(<l>)=",(1ES17.8E3)," m; min(<l>)=",(1ES17.8E3)," m")') &
             maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
         do i_star=1, n_etoiles
             write(*,*) "star #", i_star
@@ -375,17 +375,17 @@ module escape
             !it uses the average distance to the star as reference point in the cell.
             where (d_to_star(:,i_star) > 0) &
                 wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
-            write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') &
+            write(*,'("  -- max(<d>)=",(1ES17.8E3),"; min(<d>)=",(1ES17.8E3))') &
                 maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
-            write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') &
+            write(*,'("  -- max(W)=",(1ES17.8E3),"; min(W)=",(1ES17.8E3))') &
                 maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
-            write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') &
+            write(*,'("  -- max(dOmegac)=",(1ES17.8E3),"; min(dOmegac)=",(1ES17.8E3))') &
                 maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
             if (laccretion_shock) then
                 write(*,*) " Shock covers ", 100.0 * f_shock(i_star), " % of star #", i_star
-                write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') &
+                write(*,'("  -- max(dOmega_shock)=",(1ES17.8E3),"; min(dOmega_shock)=",(1ES17.8E3))') &
                     maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
-                write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') &
+                write(*,'("  -- max(dOmega*)=",(1ES17.8E3),"; min(dOmega*)=",(1ES17.8E3))') &
                     maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
                 write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
             endif
@@ -409,7 +409,7 @@ module escape
         real(kind=dp) :: x0,y0,z0,x1,y1,z1,u,v,w
         real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
         integer :: next_cell, iray, icell_in, n_rayons
-        real :: rand, rand2, rand3, rand4
+        real :: rand, rand2, rand3
         real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1, f_shock(n_etoiles)
         integer :: n_rays_shock(n_etoiles), n_rays_star(n_etoiles)
         real(kind=dp) :: l,l_contrib, l_void_before, Tchoc, rho_shock(n_etoiles)
@@ -503,7 +503,7 @@ module escape
 
                 call intersect_stars(x0,y0,z0, u,v,w, lintersect_stars, i_star, icell_star)!will intersect
 
-                !to do propagate along the ray to get dv_max    
+                !to do propagate along the ray to get dv_max
 
                 previous_cell = 0 ! unused, just for Voronoi
                 call cross_cell(x0,y0,z0, u,v,w,icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
@@ -526,7 +526,7 @@ module escape
                         inf : do
                             if (next_cell==icell_star) then
                                 !in shock ??
-                                if (is_inshock(id, iray, i_star, icell_in, xa, xb, xc, Tchoc, F1, T1)) then 
+                                if (is_inshock(id, iray, i_star, icell_in, xa, xb, xc, Tchoc, F1, T1)) then
                                     dOmega_shock(icell,i_star) = dOmega_shock(icell,i_star) + wei
                                     Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell_in)
                                     n_rays_shock(i_star) = n_rays_shock(i_star) + 1
@@ -561,7 +561,7 @@ module escape
                 call progress_bar(ibar)
                 !$omp atomic
                 ibar = ibar+1
-            endif             
+            endif
         enddo
         !$omp end do
         !$omp end parallel
@@ -573,10 +573,10 @@ module escape
             Tchoc_average = Tchoc_average / rho_shock
             f_shock = real(n_rays_shock) / real(n_rays_star)
         endif
-      
-        write(*,'("max(<gradv>)="(1ES17.8E3)" s^-1; min(<gradv>)="(1ES17.8E3)" s^-1")') &
+
+        write(*,'("max(<gradv>)=",(1ES17.8E3)," s^-1; min(<gradv>)=",(1ES17.8E3)," s^-1")') &
             maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
-        write(*,'("max(<l>)="(1ES17.8E3)" m; min(<l>)="(1ES17.8E3)" m")') &
+        write(*,'("max(<l>)=",(1ES17.8E3)," m; min(<l>)=",(1ES17.8E3)," m")') &
             maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
         do i_star=1, n_etoiles
             write(*,*) "star #", i_star
@@ -584,17 +584,17 @@ module escape
             !it uses the average distance to the star as reference point in the cell.
             where (d_to_star(:,i_star) > 0) &
                 wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
-            write(*,'("  -- max(<d>)="(1ES17.8E3)"; min(<d>)="(1ES17.8E3))') &
+            write(*,'("  -- max(<d>)=",(1ES17.8E3),"; min(<d>)=",(1ES17.8E3))') &
                 maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
-            write(*,'("  -- max(W)="(1ES17.8E3)"; min(W)="(1ES17.8E3))') &
+            write(*,'("  -- max(W)=",(1ES17.8E3),"; min(W)=",(1ES17.8E3))') &
                 maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
-            write(*,'("  -- max(dOmegac)="(1ES17.8E3)"; min(dOmegac)="(1ES17.8E3))') &
+            write(*,'("  -- max(dOmegac)=",(1ES17.8E3),"; min(dOmegac)=",(1ES17.8E3))') &
                 maxval(domega_core(:,i_star)), minval(domega_core(:,i_star),icompute_atomRT>0)
             if (laccretion_shock) then
                 write(*,*) " Shock covers ", 100.0 * f_shock(i_star), " % of star #", i_star
-                write(*,'("  -- max(dOmega_shock)="(1ES17.8E3)"; min(dOmega_shock)="(1ES17.8E3))') &
+                write(*,'("  -- max(dOmega_shock)=",(1ES17.8E3),"; min(dOmega_shock)=",(1ES17.8E3))') &
                     maxval(domega_shock(:,i_star)), minval(domega_shock(:,i_star),icompute_atomRT>0)
-                write(*,'("  -- max(dOmega*)="(1ES17.8E3)"; min(dOmega*)="(1ES17.8E3))') &
+                write(*,'("  -- max(dOmega*)=",(1ES17.8E3),"; min(dOmega*)=",(1ES17.8E3))') &
                     maxval(domega_star(:,i_star)), minval(domega_star(:,i_star),icompute_atomRT>0)
                 write(*,*) "  -- <Tshock> = ", Tchoc_average(i_star), ' K'
             endif
@@ -617,7 +617,7 @@ module escape
     !   - optically thin excitation with no lines for continua
     !   - MC rays (no healpix)
         integer :: iray, n_iter, id, i, alloc_status, n_rayons
-        integer :: nact, imax, icell_max, icell_max_2
+        integer :: nact
         integer :: icell, ilevel, nb, nr, unconverged_cells
         integer, parameter :: maxIter = 80
         !ray-by-ray integration of the SEE
@@ -636,7 +636,7 @@ module escape
         logical :: l_iterate, l_iterate_ne
         integer :: n_xc
         real(kind=dp), dimension(:), pointer :: tab_xc
-      
+
         !convergence check
         type (AtomType), pointer :: at
         integer(kind=8) :: mem_alloc_local
@@ -647,7 +647,7 @@ module escape
         !-> overall the non-LTE loop
         real :: time_nlte, time_nlte_loop, time_nlte_cpu
         real :: cpu_time_begin, cpu_time_end, time_nlte_loop_cpu
-        integer :: count_start, count_end, itime
+        integer :: count_start, count_end
         !-> for a single iteration
         integer :: cstart_iter, cend_iter
         real :: time_iteration, cpustart_iter, cpuend_iter, time_iter_avg
@@ -799,14 +799,14 @@ module escape
 
             n_iter = n_iter + 1
             ng_index = Neq_ng - mod(n_iter-1,Neq_ng)
-            write(*,'(" *** Iteration #"(1I4)"; threshold: "(1ES11.2E3)"; Nrays: "(1I5))') &
+            write(*,'(" *** Iteration #",(1I4),"; threshold: ",(1ES11.2E3),"; Nrays: ",(1I5))') &
                      n_iter, precision, n_rayons
             ibar = 0
             n_cells_done = 0
 
             stream = 0.0
             stream(:) = [(init_sprng(gtype, i-1,nb_proc,seed,SPRNG_DEFAULT),i=1,nb_proc)]
- 
+
             l_iterate_ne = .false.
             if( n_iterate_ne > 0 ) then
                l_iterate_ne = ( mod(n_iter,n_iterate_ne)==0 ) .and. (n_iter>Ndelay_iterate_ne)
@@ -942,7 +942,7 @@ module escape
                     write(*,*) " *** stopping electronic density convergence at iteration ", n_iter
                     n_iterate_ne = 0
                 endif
-               endif 
+               endif
             end if
             !***********************************************************!
 
@@ -1022,9 +1022,9 @@ module escape
                   !TO DO: takes time with large grid
                 !   call opacity_atom_bf_loc(icell, n_xc, tab_xc, chi_cont(:,icell), eta_cont(:,icell))
 !background continua not needed if no continuum RT
-                  if (limit_mem < 2) then 
-                    call calc_contopac_loc(icell,n_xc,tab_xc)  
-                  endif   
+                  if (limit_mem < 2) then
+                    call calc_contopac_loc(icell,n_xc,tab_xc)
+                  endif
 
                end if !if l_iterate
             end do cell_loop2 !icell
@@ -1037,21 +1037,21 @@ module escape
             endif
 
             do nact=1,NactiveAtoms
-               write(*,'("                  "(1A2))') ActiveAtoms(nact)%p%ID
-               write(*,'("   >>> dpop="(1ES13.5E3))') dM(nact)
+               write(*,'("                  ",(1A2))') ActiveAtoms(nact)%p%ID
+               write(*,'("   >>> dpop=",(1ES13.5E3))') dM(nact)
             enddo
             if (l_iterate_ne) then
                write(*,*) ""
-               write(*,'("                  "(1A2))') "ne"
-               write(*,'("   >>> dne="(1ES13.5E3))') dne
+               write(*,'("                  ",(1A2))') "ne"
+               write(*,'("   >>> dne=",(1ES13.5E3))') dne
             endif
             write(*,*) ""
-            write(*,'(" <<->> diff="(1ES13.5E3)," old="(1ES13.5E3))') diff, diff_old
-            write(*,'("   ->> diffcont="(1ES13.5E3))') diff_cont
-            write(*,'("   ->> speed="(1ES12.4E3)"; acc="(1ES12.4E3))') conv_speed, conv_acc
+            write(*,'(" <<->> diff=",(1ES13.5E3),", old=",(1ES13.5E3))') diff, diff_old
+            write(*,'("   ->> diffcont=",(1ES13.5E3))') diff_cont
+            write(*,'("   ->> speed=",(1ES12.4E3),"; acc=",(1ES12.4E3))') conv_speed, conv_acc
             unconverged_cells = size(pack(lcell_converged,mask=(.not.lcell_converged).and.(icompute_atomRT>0)))
             unconverged_fraction = 100.*real(unconverged_cells) / real(size(pack(icompute_atomRT,mask=icompute_atomRT>0)))
-            write(*,"('   ->> Unconverged cells #'(1I6)'; fraction:'(1F6.2)'%')") unconverged_cells, unconverged_fraction
+            write(*,"('   ->> Unconverged cells #',(1I6),'; fraction:',(1F6.2),'%')") unconverged_cells, unconverged_fraction
             write(*,*) "      -------------------------------------------------- "
             diff_old = diff
             conv_acc = conv_speed
@@ -1094,7 +1094,7 @@ module escape
             call system_clock(cend_iter,count_rate=time_tick,count_max=time_max)
             call cpu_time(cpuend_iter)
             time_iteration = real(cend_iter - cstart_iter)/real(time_tick)
-            write(*,'("  --> time iteration="(1F12.4)" min (cpu : "(1F8.4)")")') &
+            write(*,'("  --> time iteration=",(1F12.4)," min (cpu : ",(1F8.4),")")') &
                   mod(time_iteration/60.0,60.0), mod((cpuend_iter-cpustart_iter)/60.0,60.0)
             time_iter_avg = time_iter_avg + time_iteration
             ! -> will be averaged with the number of iterations done for this step
@@ -1103,7 +1103,7 @@ module escape
             ! if ((n_iter > maxIter/4).and.(unconverged_fraction < 5.0)) then
             if ( (n_iter > maxIter/4).and.(unconverged_fraction < 3.0).or.&
                ((unconverged_fraction < 3.0).and.(time_nlte + time_iteration >= 0.5*safe_stop_time)) ) then
-               write(*,'("WARNING: there are less than "(1F6.2)" % of unconverged cells after "(1I4)" iterations")') &
+               write(*,'("WARNING: there are less than ",(1F6.2)," % of unconverged cells after ",(1I4)," iterations")') &
                   unconverged_fraction, n_iter
                write(*,*) " -> forcing convergence"
                lconverged = .true.
@@ -1136,9 +1136,9 @@ module escape
         !-> for this step
         time_iter_avg = time_iter_avg / real(n_iter)
 
-        write(*,'("<time iteration>="(1F8.4)" min; <time step>="(1F8.4)" min")') mod(time_iter_avg/60.,60.), &
+        write(*,'("<time iteration>=",(1F8.4)," min; <time step>=",(1F8.4)," min")') mod(time_iter_avg/60.,60.), &
                  mod(n_iter * time_iter_avg/60.,60.)
-        write(*,'(" --> ~time step (cpu)="(1F8.4)" min")') mod(n_iter * time_iter_avg * nb_proc/60.,60.)
+        write(*,'(" --> ~time step (cpu)=",(1F8.4)," min")') mod(n_iter * time_iter_avg * nb_proc/60.,60.)
 
         if (allocated(wmu)) deallocate(wmu)
         call dealloc_escape_variables
@@ -1146,7 +1146,7 @@ module escape
       ! -------------------------------- CLEANING ------------------------------------------ !
 
       if (n_iterate_ne > 0) then
-        write(*,'("ne(min)="(1ES17.8E3)" m^-3 ;ne(max)="(1ES17.8E3)" m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
+        write(*,'("ne(min)=",(1ES17.8E3)," m^-3 ;ne(max)=",(1ES17.8E3)," m^-3")') minval(ne,mask=icompute_atomRT>0), maxval(ne)
         tab_xc => null()
       endif
 
@@ -1180,8 +1180,8 @@ module escape
         integer, intent(in) :: id, icell
         real, parameter :: fact_tau = 3.0
         real(kind=dp), parameter :: prec_vel = 1.0 / Rsun ! [s^-1]
-        integer :: ns, nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
-        real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds
+        integer :: ns, nact, i, j, kr, n0, nb, nr, Nl, l, i0
+        real(kind=dp) :: tau0, beta, chi_ij, Icore, dvds
         type(AtomType), pointer :: at
         real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij
         real(kind=dp) :: jbar_down, jbar_up, ehnukt, anu, tau_max
@@ -1219,12 +1219,12 @@ module escape
 
                 !pops inversions
                 if (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell) <= 0.0) cycle atr_loop
-         
+
                 !assumes the underlying radiation is flat across the line.
                 !or take n0 as a function of velocity
                 Icore = Itot(n0,1,id)
 
-   
+
                 !could be stored in mem.
                 chi_ij = hc_fourPI * at%lines(kr)%Bij * (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell))
                 tau_escape = fact_tau * chi_ij * mean_length_scale(icell) / vth
@@ -1334,7 +1334,7 @@ module escape
       integer, intent(in) :: N
       real(kind=dp), dimension(N), intent(in) :: lambda
       real(kind=dp), dimension(N) :: I_sobolev_1ray, Icore(N)
-      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before, Q, P(4)
+      real(kind=dp) :: x0, y0, z0, x1, y1, z1, l, l_contrib, l_void_before
       real(kind=dp), dimension(N) :: Snu, tau, dtau, chi, coronal_irrad
       integer :: kr, nat, nl
       integer, target :: icell
@@ -1352,7 +1352,7 @@ module escape
 
       I_sobolev_1ray(:) = 0.0_dp
 
-      p_icell => icell_ref
+      p_icell => icell1
       if (lvariable_dust) p_icell => icell
 
       ! Will the ray intersect a star
@@ -1376,7 +1376,7 @@ module escape
                 do nat=1, NactiveAtoms
                     do kr=1, ActiveAtoms(nat)%p%nline
                         nl = ActiveAtoms(nat)%p%lines(kr)%Nr - ActiveAtoms(nat)%p%lines(kr)%Nb + 1
-                        I0_line(1:nl,kr,nat,id) = Icore(ActiveAtoms(nat)%p%lines(kr)%Nb:ActiveAtoms(nat)%p%lines(kr)%Nr) 
+                        I0_line(1:nl,kr,nat,id) = Icore(ActiveAtoms(nat)%p%lines(kr)%Nb:ActiveAtoms(nat)%p%lines(kr)%Nr)
                     enddo
                 enddo
                return
@@ -1442,8 +1442,8 @@ module escape
         real(kind=dp), intent(in) :: dOmega
         real, parameter :: fact_tau = 3.0
         real(kind=dp), parameter :: prec_vel = 1.0 / Rsun ! [s^-1]
-        integer :: ns, nact, i, j, kc, kr, n0, nb, nr, Nl, l, i0
-        real(kind=dp) :: tau0, beta, chi_ij, Icore, l0, dvds, tau_max
+        integer :: ns, nact, i, j, kr, n0, nb, nr, Nl, l, i0
+        real(kind=dp) :: tau0, beta, chi_ij, Icore, dvds, tau_max
         type(AtomType), pointer :: at
         real(kind=dp) :: ni_on_nj_star, tau_escape, vth, gij, jbar_down, jbar_up, ehnukt, anu
         real(kind=dp), dimension(Nlambda_max_trans) :: Ieff, xl
@@ -1468,11 +1468,11 @@ module escape
 
                 !pops inversions
                 if (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell) <= 0.0) cycle atr_loop
-         
+
                 !assumes the underlying radiation is flat across the line.
                 !or take n0 as a function of velocity
                 Icore = maxval(I0_line(:,kr,nact,id)) !shock + star weighted by the solid angle
-   
+
                 !could be stored in mem.
                 chi_ij = hc_fourPI * at%lines(kr)%Bij * (at%n(i,icell)-at%lines(kr)%gij*at%n(j,icell))
                 tau_escape = fact_tau * chi_ij * ds(iray,id) / vth
@@ -1577,7 +1577,7 @@ module escape
         integer :: kr, i, j, ip, jp, krr, Nbp, Nrp, i0, Nl, Nb, Nr, l
         real(kind=dp) :: ni_on_nj_star, gij, wl, ehnukt, anu
         real(kind=dp) :: jbar_down, jbar_up, xcc_down, xcc_up
-        real(kind=dp), dimension(Nlambda_max_trans) :: Ieff, dtau
+        real(kind=dp), dimension(Nlambda_max_trans) :: Ieff
 
 
         !first loop to get the contributions from the different transitions
@@ -1596,7 +1596,7 @@ module escape
         if (present(rates)) then
             if (.not.rates) return
         else !not present, return, equivalent to .false.
-            return 
+            return
         endif
 
         !accumulate rates
@@ -1683,8 +1683,7 @@ module escape
         type (AtomicContinuum), intent(inout) :: cont
         integer :: i, j, nact, kr
         real(kind=dp) :: ni_on_nj_star, Jbar_down, Jbar_up, xcc_down, xcc_up
-        real(kind=dp) :: ehnukt, anu, wl
-        integer :: Nb, Nr, Nl, i0, l
+        integer :: Nb, Nr, Nl, i0
         integer :: ip, jp, krr, Nrp, Nbp
 
         !cont%Rji init at tab_Aji_cont
@@ -1700,7 +1699,7 @@ module escape
         Nb = cont%Nb; Nr = cont%Nr
         Nl = Nr-Nb + 1
         i0 = Nb - 1
-        
+
         ! xcc_down = 0.0
         ! do l=1, Nl
         !     if (l==1) then

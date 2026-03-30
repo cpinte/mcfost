@@ -387,7 +387,7 @@ subroutine Mueller_input(lambda, k_abs,k_sca,gsca)
 
   character(len=128) :: string, filename
 
-  integer :: EoF, alloc_status,iformat,nlam,nmu,ilam,iline,iang,nang, l
+  integer :: EoF, alloc_status,iformat,nlam,iang,nang, l
   logical :: lscat
   real(dp), dimension(:), allocatable :: angles,wavel,kabs,ksca,g
   real(dp), dimension(:,:), allocatable :: f11,f12,f22,f33,f34,f44
@@ -426,7 +426,7 @@ subroutine Mueller_input(lambda, k_abs,k_sca,gsca)
   allocate(wavel(nlam),kabs(nlam),ksca(nlam),g(nlam), stat = alloc_status)
 
   ! Read wavelengths, opacities and g
-  do ilam=1,nlam
+  do l=1,nlam
      read(1,*) wavel(l), kabs(l), ksca(l), g(l)
   enddo
 
@@ -435,14 +435,14 @@ subroutine Mueller_input(lambda, k_abs,k_sca,gsca)
   if (wl > maxval(wavel)) call error("Mueller matrices: wavelength is larger than tabulated")
 
   if (wavel(2) >  wavel(1)) then ! increasing order
-     do ilam=1,nlam
+     do l=1,nlam
         if  (wavel(l) > wl) then
            frac = (wavel(l) - wl) / (wavel(l) - wavel(l-1))
            exit
         endif
      enddo
   else ! decreasing order
-     do ilam=1,nlam
+     do l=1,nlam
         if  (wavel(l) < wl) then
            frac = (wl - wavel(l)) / (wavel(l-1) - wavel(l))
            exit
@@ -450,6 +450,7 @@ subroutine Mueller_input(lambda, k_abs,k_sca,gsca)
      enddo
   endif
   if ((frac > 1) .or. (frac < 0)) call error("Mueller matrices: interpolation error")
+  frac_m1 = 1.0_dp - frac
 
   if (lscat) then
      allocate(angles(nang), f11(nlam,nang),f12(nlam,nang),f22(nlam,nang),&
@@ -461,27 +462,28 @@ subroutine Mueller_input(lambda, k_abs,k_sca,gsca)
      enddo
 
      ! Read the scattering matrix.
-     do ilam=1,nlam
+     do l=1,nlam
         do iang=1,nang
-           read(1,*) f11(ilam,iang),f12(ilam,iang), f22(ilam,iang), f33(ilam,iang), f34(ilam,iang), f44(ilam,iang)
+           read(1,*) f11(l,iang),f12(l,iang), f22(l,iang), f33(l,iang), f34(l,iang), f44(l,iang)
         enddo
      enddo
   endif
   close(1)
 
   ! Interpolate at correct wavelength
-  ! todo : find ilam
+  ! todo : find l
+  call error("Mueller input: interpolation was never implemented")
 
-  k_abs = kabs(ilam-1) * frac + kabs(ilam) * frac_m1
-  k_sca = ksca(ilam-1) * frac + ksca(ilam) * frac_m1
-  gsca = ksca(ilam-1) * frac + ksca(ilam) * frac_m1
+  k_abs = kabs(l-1) * frac + kabs(l) * frac_m1
+  k_sca = ksca(l-1) * frac + ksca(l) * frac_m1
+  gsca = ksca(l-1) * frac + ksca(l) * frac_m1
 
-  s11(:) = f11(ilam-1,:) * frac + f11(ilam,:) * frac_m1
-  s12(:) = f11(ilam-1,:) * frac + f12(ilam,:) * frac_m1
-  s22(:) = f11(ilam-1,:) * frac + f22(ilam,:) * frac_m1
-  s33(:) = f11(ilam-1,:) * frac + f33(ilam,:) * frac_m1
-  s34(:) = f11(ilam-1,:) * frac + f34(ilam,:) * frac_m1
-  s44(:) = f11(ilam-1,:) * frac + f44(ilam,:) * frac_m1
+  s11(:) = f11(l-1,:) * frac + f11(l,:) * frac_m1
+  s12(:) = f11(l-1,:) * frac + f12(l,:) * frac_m1
+  s22(:) = f11(l-1,:) * frac + f22(l,:) * frac_m1
+  s33(:) = f11(l-1,:) * frac + f33(l,:) * frac_m1
+  s34(:) = f11(l-1,:) * frac + f34(l,:) * frac_m1
+  s44(:) = f11(l-1,:) * frac + f44(l,:) * frac_m1
 
   ! Deallocate arrays
   deallocate(wavel,kabs,ksca,g)
@@ -507,7 +509,7 @@ subroutine normalise_Mueller_matrix(lambda,taille_grain, s11,s12,s22,s33,s34,s44
   ! as we assume it is mostly diffraction that has been missed by the sampling
 
   integer :: j
-  real(kind=dp) :: norm, somme_prob, theta, dtheta
+  real(kind=dp) :: norm, theta, dtheta
 
   ! Integration S11 pour tirer angle
   if (scattering_method==1) then
@@ -1213,7 +1215,7 @@ subroutine update_Stokes(S,u0,v0,w0,u1,v1,w1, M)
   real(kind=dp), dimension(4,4), intent(in) :: M
   real(kind=dp), dimension(4), intent(inout) :: S
 
-  real :: sinw, cosw, omega, theta, costhet,  xnyp, stok_I0, norme, frac_m1
+  real :: sinw, cosw, omega, theta, costhet,  xnyp
   real(kind=dp) :: v1pi, v1pj, v1pk, S1_0
   real(kind=dp), dimension(4,4) :: ROP, RPO
   real(kind=dp), dimension(4) :: C, D

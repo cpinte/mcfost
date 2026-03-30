@@ -62,8 +62,8 @@ module parametres
 
   ! Atomic line radiative transfer
   logical :: lexit_after_nonlte_loop, lstop_after_jnu
-  logical :: lemission_atom, lelectron_scattering, lforce_lte,  &
-            	ldissolve, loutput_rates, lzeeman_polarisation, ldust_atom
+  logical :: lemission_atom, lelectron_scattering, lforce_lte
+  logical :: ldissolve, loutput_rates, lzeeman_polarisation, ldust_atom
   integer :: N_rayons_mc, istep_start, istep_end
 
   !HEALpix
@@ -124,9 +124,9 @@ module parametres
   integer :: n_az, j_start, pj_start
   ! Nombre de cellules totale
   integer :: n_cells, nrz, p_n_cells
-  integer, target :: icell_ref
+  integer, target :: icell1 = 1
   logical :: lregular_theta
-  real :: theta_max
+  real :: theta_max, theta_mask_max
 
   logical :: letape_th, limg, lorigine, laggregate, lFresnel, lFresnel_per_size, l3D, lremove, lwarp, lcavity, ltilt, lwall
   logical :: lopacite_only, lseed, ldust_prop, ldisk_struct, lwrite_velocity, loptical_depth_to_cell, ltau_map, lreemission_stats
@@ -139,7 +139,7 @@ module parametres
   integer :: ISR_model ! 0 : no ISM radiation field, 1 : ProDiMo, 2 : Bate & Keto
   integer :: vfield_coord ! 1 : Cartesian, 2 : cylindrical, 3 : spherical
 
-  logical :: lfargo3d, lathena, lidefix, lpluto, lsphere_model, lmodel_1d !future lsymspheric
+  logical :: lfargo3d, lathena, lidefix, lpluto, lsphere_model, lmodel_1d, lheader_only !future lsymspheric
 
   ! benchmarks
   logical :: lbenchmark_Pascucci, lbenchmark_vanZadelhoff1, lbenchmark_vanZadelhoff2, lDutrey94, lHH30mol
@@ -151,7 +151,7 @@ module parametres
 
   logical :: lSeb_Charnoz, lread_Seb_Charnoz, lread_Seb_Charnoz2, lread_Misselt, lread_DustEM
   logical :: lread_grain_size_distrib, lphase_function_file,ltau_surface, lflux_fraction_surface
-  logical :: lwrite_column_density, lwrite_mol_column_density
+  logical :: lwrite_column_density, lwrite_mol_column_density, lwrite_abundance
   character(len=8) :: sflux_fraction, stau_surface
   real(kind=dp) :: flux_fraction
   real :: tau_surface
@@ -159,9 +159,9 @@ module parametres
   ! Phantom
   logical :: ldudt_implicit, lscale_length_units, lscale_mass_units, lignore_dust
   logical :: ldelete_Hill_sphere, lrandomize_Voronoi, lrandomize_azimuth, lrandomize_gap, lrandomize_outside_gap, lcentre_on_sink
-  logical :: ldelete_inside_rsph, ldelete_outside_rsph, ldelete_above_theta
+  logical :: lmask_inside_rsph, ldelete_outside_rsph, ldelete_above_theta, lmask_outside_rsph, lmask_above_theta, lexpand_z
   real(kind=dp) :: ufac_implicit,scale_length_units_factor,scale_mass_units_factor,correct_density_factor_elongated_cells
-  real(kind=dp) :: SPH_amin, SPH_amax, fluffyness, gap_factor, rsph_min, rsph_max
+  real(kind=dp) :: SPH_amin, SPH_amax, fluffyness, gap_factor, rsph_min, rsph_max, rsph_mask_max, expand_z_factor
   logical :: lupdate_velocities, lno_vr, lno_vz, lvphi_Kep, lfluffy, lnot_random_Voronoi, lignore_sink
   integer :: isink_centre
 
@@ -209,9 +209,9 @@ module parametres
   real :: z_warp, tilt_angle
 
   ! SPH
-  real :: SPH_keep_particles, planet_az
+  real :: SPH_keep_particles, planet_az, delta_planet_az
   logical :: lplanet_az, lfix_star, lcorrect_density_elongated_cells, lturn_off_planets, lturn_off_Lacc, lforce_Mdot
-  integer :: which_planet
+  integer :: which_planet, idelta_planet_az
 
   logical :: lgap_Gaussian
   real :: f_gap_Gaussian, r_gap_Gaussian, sigma_gap_Gaussian
@@ -240,6 +240,8 @@ module parametres
 
   integer :: n_etoiles
   type(star_type), dimension(:), allocatable :: etoile
+  logical :: lstar_bb
+
 
   ! Spot
   real :: T_spot, surf_fraction_spot, theta_spot, phi_spot

@@ -6,7 +6,7 @@
 # required by MCFOST:
 #
 #  - SPRNG
-#  - CFITSIO
+#  - cfitsio
 #  - Voro++
 #  - XGBoost and dependencies (optional)
 #  - astrochem and dependencies (optional)
@@ -129,11 +129,12 @@ mkdir include/hdf5
 pushd .
 
 #-- Downloading libraries
-wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
-wget -N http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-4.3.0.tar.gz
+#wget -N http://sprng.org/Version2.0/sprng2.0b.tar.gz
+git clone https://github.com/cpinte/sprng2.0b.git
+git clone https://github.com/HEASARC/cfitsio.git
 git clone https://github.com/cpinte/voro
 if [ "$SKIP_HDF5" != "yes" ]; then
-    wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
+    wget -N https://support.hdfgroup.org/releases/hdf5/v1_14/v1_14_6/downloads/hdf5-1.14.6.tar.gz
 fi
 if [ "$MCFOST_XGBOOST" = "yes" ]; then
     git clone --recursive https://github.com/dmlc/xgboost
@@ -152,7 +153,7 @@ fi
 # SPRNG
 #-------------------------------------------
 echo "Compiling SPRNG ..."
-tar xzvf sprng2.0b.tar.gz
+mv sprng2.0b sprng2.0
 \cp -f "$SYSTEM/make.CHOICES" sprng2.0
 \cp -f "$SYSTEM/make.INTEL" sprng2.0/SRC
 if [ "$SYSTEM" = "gfortran" ] ; then
@@ -176,9 +177,8 @@ echo "Done"
 # CFITSIO
 #-------------------------------------------
 echo "Compiling CFITSIO ..."
-tar xzvf cfitsio-4.3.0.tar.gz
-mv cfitsio-4.3.0 cfitsio
 cd cfitsio
+git checkout cfitsio-4.4.1
 ./configure --enable-ssse3 --disable-curl
 
 make
@@ -189,7 +189,7 @@ echo "Done"
 #-------------------------------------------
 # Voro++
 #-------------------------------------------
-echo "Compiling Voro++ ..."
+echo "Compiling Voro++ library ..."
 if [ "$SYSTEM" = "ifort" ]; then
     \cp -f ifort/config.mk voro
 elif [ "$SYSTEM" = "ifx" ]; then
@@ -201,7 +201,10 @@ fi
 cd voro
 # Allowing for up to 1e8 particles (1e7 by default)
 \cp -f ../voro++/config.hh src/
-make
+cd src
+pwd
+make libvoro++.a
+cd -
 \cp src/libvoro++.a ../lib
 mkdir -p ../include/voro++
 \cp src/*.hh ../include/voro++/
@@ -279,10 +282,9 @@ fi
 # HDF5
 #---------------------------------------------
 if [ "$SKIP_HDF5" != "yes" ]; then
-    wget -N https://support.hdfgroup.org/ftp/HDF5/current/src/hdf5-1.10.5.tar.bz2
     echo "Compiling HDF5 ..."
-    tar xjvf hdf5-1.10.5.tar.bz2
-    cd hdf5-1.10.5
+    tar xzvf hdf5-1.14.6.tar.gz
+    cd hdf5-1.14.6
     mkdir -p "$HOME/hdf5_install_tmp"
     ./configure --prefix="$HOME/hdf5_install_tmp" --enable-fortran --disable-shared
     make install

@@ -82,7 +82,7 @@
   T 1.e-4 abundance.fits.gz   cst molecule abundance ?, abundance, abundance file
   T  2                       ray tracing ?,  number of lines in ray-tracing
   2 3	 		  transition numbers
-  -10.0 10.0 40     	  vmin and vmax [km/s], number of velocity bins betwen 0 and vmax
+  -10.0 10.0 40     	  vmin and vmax [km/s], number of velocity bins betwen vmin and vmax
 
 #Atoms settings / share some informations with molecules
 1		#number of atoms

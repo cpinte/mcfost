@@ -32,11 +32,15 @@ subroutine allocate_densities(n_cells_max)
   if (alloc_status > 0) call error('Allocation error mass')
   masse = 0.0
 
-  allocate(densite_pouss(n_grains_tot,Nc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error densite_pouss')
-  densite_pouss = 0.0
+  if (lvariable_dust) then
+     allocate(dust_density(n_grains_tot,Nc), stat=alloc_status)
+  else
+     allocate(dust_density(n_zones,Nc), stat=alloc_status)
+  endif
+  if (alloc_status > 0) call error('Allocation error dust_density')
+  dust_density = 0.0
 
-  allocate(densite_gaz(Nc), densite_gaz_midplane(n_rad), masse_gaz(Nc), stat=alloc_status)
+  allocate(densite_gaz(Nc), densite_gaz_midplane(n_rad,n_az), masse_gaz(Nc), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error densite_gaz')
   densite_gaz = 0.0 ; densite_gaz_midplane = 0.0 ; masse_gaz = 0.0
 
@@ -46,7 +50,7 @@ end subroutine allocate_densities
 
 subroutine deallocate_densities
 
-  if (allocated(masse)) deallocate(masse,densite_pouss,densite_gaz,densite_gaz_midplane,masse_gaz)
+  if (allocated(masse)) deallocate(masse,dust_density,densite_gaz,densite_gaz_midplane,masse_gaz)
 
   return
 
@@ -296,9 +300,9 @@ subroutine alloc_dynamique(n_cells_max)
      if (alloc_status > 0) call error('Allocation error vfield')
      vfield=0.0 !; vx=0.0 ; vy=0.0
 
-     allocate(v_turb(Nc), v_line(Nc), deltaVmax(Nc), stat=alloc_status)
+     allocate(v_turb2(Nc), dv_line(Nc), deltaVmax(Nc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error sigma2')
-     v_turb = 0.0 ; v_line = 0.0 ;   deltaVmax = 0.0
+     v_turb2 = 0.0 ; dv_line = 0.0 ;   deltaVmax = 0.0
 
      allocate(tab_dnu_o_freq(Nc), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error tab_dnu')
@@ -846,7 +850,7 @@ subroutine dealloc_emission_mol()
 
   call deallocate_stellar_spectra()
 
-  deallocate(Level_energy,poids_stat_g,j_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
+  deallocate(Level_energy,poids_stat_g,j_qnb,v_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
        iCollUpper,iCollLower)
 

@@ -32,7 +32,6 @@ module grid
   contains
 
   subroutine alloc_atomrt_grid()
-    integer(kind=8) :: mem_alloc_local = 0
 
     !merge vturb and v_turb (molecular emission)
     !TO DO: move vturb in molecular emission in grid.f90
@@ -94,7 +93,7 @@ module grid
    enddo icell_loop
    N_fixed_ne = size(pack(icompute_atomRT,mask=(icompute_atomRT==2)))
    if (N_fixed_ne > 0) then
-      write(*,'("Found "(1I5)" cells with fixed electron density values! ("(1I3)" %)")') &
+      write(*,'("Found ",(1I5)," cells with fixed electron density values! (",(1I3)," %)")') &
            N_fixed_ne, nint(real(N_fixed_ne) / real(n_cells) * 100)
    endif
 
@@ -274,7 +273,6 @@ end subroutine define_physical_zones
 subroutine setup_grid()
 
   logical, save :: lfirst = .true.
-  integer :: mem_size
 
   if (.not.lVoronoi) then
      nrz = n_rad * nz
