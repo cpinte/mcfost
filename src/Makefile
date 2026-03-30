@@ -239,10 +239,10 @@ SOURCES = mcfost_env.f90 parameters.f90 constants.f90 healpix_mod.f90 sha.f90 me
           grains.f90 cylindrical_grid.f90 spherical_grid.f90 kdtree2.f90 \
           elements_type.f90 Voronoi.f90 grid.f90 wavelengths.f90 stars.f90 \
           read_DustEM.f90 Temperature.f90 density.f90 read_opacity.f90 scattering.f90 \
-          read_fargo3d.f90 hdf5_utils.f90 utils_hdf5.f90 read_athena++.f90	\
+          read_fargo3d.f90 hdf5_utils.f90 read_athena++.f90	\
           readVTK.f90 read_idefix.f90 read_pluto.f90 voigts.f90 	\
           coated_sphere.f90 dust_prop.f90 molecular_emission.f90 PAH.f90            \
-          read1d_models.f90 read_spherical_grid.f90	\
+          read_1d_models.f90 read_spherical_grid.f90	\
           input.f90 benchmarks.f90 atom_type.f90  \
           wavelengths_gas.f90 broad.f90                             \
           read_param.f90 dust_ray_tracing.f90 uplow.f90 abo.f90     \

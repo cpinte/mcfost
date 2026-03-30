@@ -9,8 +9,9 @@ module read_athena
   use density
   use stars, only : compute_stellar_parameters
   use hdf5
-  use utils_hdf5 ! mentiplay
-  use hdf5_utils ! needed to read attributes, need to merge everything
+  use HDF5_utils, only: open_hdf5file, close_hdf5file,   &
+       open_hdf5group, close_hdf5group,                   &
+       hdf_read_attribute, hdf_read_dataset, HID_T
   !use h5lt ! we can use this instead, official hdf5 high level library
 
   implicit none
@@ -318,7 +319,7 @@ contains
              icell = cell_map(i,j,phik)
 
              densite_gaz(icell) =  rho(i,jj,phik) * udens
-             densite_pouss(:,icell) = rho(i,jj,phik) * udens
+             dust_density(:,icell) = rho(i,jj,phik) * udens
 
              vfield3d(icell,1)  = vx1(i,jj,phik) * uvelocity! vr
              vfield3d(icell,2)  = (vx3(i,jj,phik) + r_grid(icell)/ulength_au * Omega_p) * uvelocity ! vphi : planet at r=1

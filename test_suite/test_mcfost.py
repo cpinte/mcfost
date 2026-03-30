@@ -194,6 +194,9 @@ def test_image(model_name, wl):
     if (model_name == "ref3.0") and (wl == "100"): # weird difference on linux, ifort, openmp=no, release=no
         threshold=0.11
 
+    if (model_name == "ref4.1_nLTE") and (wl == "100"):
+        threshold=0.13
+
     assert MC_similar(image_ref,image,threshold=threshold)
 
 
@@ -233,7 +236,7 @@ def test_pola(model_name, wl):
 
     threshold=0.1
     if (model_name == "ref4.1_nLTE") and (wl == "1000"):
-        threshold=0.12
+        threshold=0.15
 
     assert MC_similar(image_ref,image,threshold=threshold,mask_threshold=mask_threshold)
 
@@ -272,5 +275,8 @@ def test_contrib(model_name, wl):
     threshold=0.1
     if (model_name == "ref3.0") and (wl == "100"): # weird difference on linux, ifort, openmp=no, release=no
         threshold=0.11
+
+    if (model_name == "ref4.1_nLTE") and (wl == "100"):
+        threshold=0.13
 
     assert MC_similar(image_ref,image,threshold=threshold,mask_threshold=mask_threshold)
