@@ -1,8 +1,8 @@
 module benchmarks
 
-  use parametres
+  use parameters
   use mcfost_env
-  use constantes
+  use constants
   use grains
   use messages
   use molecular_emission
@@ -97,7 +97,7 @@ subroutine readMolecule_benchmark1()
   nLevels = 2
   nTrans_tot  = 1
 
-  allocate(Level_energy(nLevels),poids_stat_g(nLevels),j_qnb(nLevels))
+  allocate(Level_energy(nLevels),stat_weight_g(nLevels),j_qnb(nLevels))
   allocate(Aul(1:nTrans_tot),fAul(nTrans_tot))
   allocate(Bul(1:nTrans_tot),fBul(nTrans_tot))
   allocate(Blu(1:nTrans_tot),fBlu(nTrans_tot))
@@ -105,9 +105,9 @@ subroutine readMolecule_benchmark1()
   allocate(itransUpper(1:nTrans_tot))
   allocate(itransLower(1:nTrans_tot))
 
-  poids_stat_g(1) = 1.0_dp
+  stat_weight_g(1) = 1.0_dp
 
-  read(1,*) Delta_E, poids_stat_g(2), Aul(1), Kul
+  read(1,*) Delta_E, stat_weight_g(2), Aul(1), Kul
 
   Level_energy(1) = 0.0_dp
   Level_energy(2) = Delta_E  / 8065.541  ! per cm to ev
@@ -120,7 +120,7 @@ subroutine readMolecule_benchmark1()
   ! Transformation Aul -> Bul
   Bul(1) = Aul(1) * (c_light**2)/(2.d0*hp*(transfreq(1))**3)
   ! Transformation Bul -> Blu
-  Blu(1) = Bul(1) * poids_stat_g(2)/poids_stat_g(1)
+  Blu(1) = Bul(1) * stat_weight_g(2)/stat_weight_g(1)
 
   fAul(:) = Aul(:) * hp * transfreq(:)/(4*pi)
   fBul(:) = Bul(:) * hp * transfreq(:)/(4*pi)
@@ -180,7 +180,7 @@ subroutine readMolecule_benchmark2()
   read(1,*) nLevels, nTrans_tot
 
   allocate(Level_energy(1:nLevels))
-  allocate(poids_stat_g(1:nLevels))
+  allocate(stat_weight_g(1:nLevels))
   allocate(j_qnb(1:nLevels))
 
   allocate(Aul(nTrans_tot),fAul(nTrans_tot))
@@ -194,8 +194,8 @@ subroutine readMolecule_benchmark2()
 
   Level_energy = Level_energy / 8065.541  ! per cm to ev
 
-  read(1,*) poids_stat_g(1:nLevels)
-!  j_qnb(1:nLevels) = (poids_stat_g(1:nLevels) - 1.)/2.
+  read(1,*) stat_weight_g(1:nLevels)
+!  j_qnb(1:nLevels) = (stat_weight_g(1:nLevels) - 1.)/2.
 
   read(1,*) itransUpper(1:nTrans_tot)
   read(1,*) itransLower(1:nTrans_tot)
@@ -208,7 +208,7 @@ subroutine readMolecule_benchmark2()
      ! Transformation Aul -> Bul
      Bul(i) = Aul(i) * (c_light**2)/(2.d0*hp*(transfreq(i))**3)
      ! Transformation Bul -> Blu
-     Blu(i) = Bul(i) * poids_stat_g(iTransUpper(i))/poids_stat_g(iTransLower(i))
+     Blu(i) = Bul(i) * stat_weight_g(iTransUpper(i))/stat_weight_g(iTransLower(i))
   enddo
 
   fAul(:) = Aul(:) * hp * transfreq(:)/(4*pi)
@@ -261,7 +261,7 @@ subroutine init_GG_Tau_mol()
   enddo
 
   icell = icell1
-  write(*,*) "Density @ 100 AU", real(densite_gaz(icell) / 100.**3 * (sqrt(r_grid(icell)**2 + z_grid(icell)) / 100.)**2.75)
+  write(*,*) "Density @ 100 AU", real(gas_density(icell) / 100.**3 * (sqrt(r_grid(icell)**2 + z_grid(icell)) / 100.)**2.75)
 
   return
 
@@ -308,7 +308,7 @@ subroutine init_benchmark_vanZadelhoff1()
 
   !tab_abundance = abundance
 
-  write(*,*) "Density", real(densite_gaz(icell1) * &
+  write(*,*) "Density", real(gas_density(icell1) * &
        (r_grid(icell1)**2 + z_grid(icell1)**2)/rmin**2)
 
   return
@@ -319,7 +319,7 @@ end subroutine init_benchmark_vanZadelhoff1
 
 subroutine init_benchmark_vanzadelhoff2()
   ! Lecture de la structure du modele de van Zadelhoff 2a/b
-  ! et ajustement sur la grille de mcfost
+  ! et ajustement sur la grid de mcfost
   ! C. Pinte
   ! 13/07/07
 
@@ -330,7 +330,7 @@ subroutine init_benchmark_vanzadelhoff2()
   integer :: i, j, ri, l, icell, zj, k
   real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_T, tmp_v, tmp_vturb, log_tmp_r, log_tmp_nH2
 
-  real :: junk, rayon, log_rayon, frac
+  real :: junk, radius, log_radius, frac
 
   ldust_mol = .false.
 
@@ -348,7 +348,7 @@ subroutine init_benchmark_vanzadelhoff2()
   ! Conversion en AU
   tmp_r(:) = tmp_r(:) * cm_to_AU
 
-  ! Interpolation sur la grille de mcfost
+  ! Interpolation sur la grid de mcfost
   ! Distance en log
   ! densite en log
   ! T, V et vturb en lineaire cf Fig 2 van Zadelhoff 2002
@@ -356,27 +356,27 @@ subroutine init_benchmark_vanzadelhoff2()
   log_tmp_nH2(:) = log(tmp_nH2(:))
 
   do ri=1, n_rad
-     ! Recherche rayon dans def bench
+     ! Recherche radius dans def bench
      icell = cell_map(ri,1,1)
-     rayon = sqrt(r_grid(icell)**2+z_grid(icell)**2)
-     log_rayon = log(rayon)
+     radius = sqrt(r_grid(icell)**2+z_grid(icell)**2)
+     log_radius = log(radius)
 
      l=2
-     ! rayon est entre tmp_r(l-1) et tmp_r(l)
+     ! radius est entre tmp_r(l-1) et tmp_r(l)
      search : do i=l, n_lines
-        if (tmp_r(i) >= rayon) then
+        if (tmp_r(i) >= radius) then
            l = i
            exit search
         endif
      enddo search
      if (l > n_lines) l = n_lines
 
-     frac = (log_rayon - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
+     frac = (log_radius - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
 
      do zj=1, nz
         k=1
         icell = cell_map(ri,zj,k)
-        densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+        gas_density(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
         Tdust(icell) =  tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
         Tcin(icell) = tmp_T(l-1) + frac * (tmp_T(l) - tmp_T(l-1))
         vfield(icell) = tmp_v(l-1) + frac * (tmp_v(l) - tmp_v(l-1))
@@ -389,7 +389,7 @@ subroutine init_benchmark_vanzadelhoff2()
   v_turb2 = v_turb2 * 1.0e6
 
   ! Conversion part.m-3
-  densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3
+  gas_density(:) = gas_density(:) / (cm_to_m)**3
 
   linfall = .true.
   lkeplerian = .false.
@@ -411,7 +411,7 @@ subroutine init_benchmark_water1()
 
   ldust_mol = .false.
 
-  densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
+  gas_density = 1.e4 / (cm_to_m)**3 ! part.m-3
   Tcin = 40.
   vfield = 0.0
   v_turb2 = 0.0
@@ -441,7 +441,7 @@ subroutine init_benchmark_water2()
 
   ldust_mol = .false.
 
-  densite_gaz = 1.e4 / (cm_to_m)**3 ! part.m-3
+  gas_density = 1.e4 / (cm_to_m)**3 ! part.m-3
   Tcin = 40.
   v_turb2 = 0.0
 
@@ -476,7 +476,7 @@ subroutine init_benchmark_water3()
   real, dimension(n_lines) :: tmp_r, tmp_nH2, tmp_Tkin, tmp_T, tmp_v, tmp_vturb
   real, dimension(n_lines) :: log_tmp_r, log_tmp_nH2, log_tmp_T, log_tmp_Tkin, log_tmp_v
 
-  real :: rayon, log_rayon, frac
+  real :: radius, log_radius, frac
 
   ldust_mol = .true.
 
@@ -493,7 +493,7 @@ subroutine init_benchmark_water3()
   ! Conversion en AU
   tmp_r(:) = tmp_r(:) * cm_to_AU
 
-  ! Interpolation sur la grille de mcfost
+  ! Interpolation sur la grid de mcfost
   ! Distance en log
   ! densite en log
   ! Tkin, T, V et vturb
@@ -505,41 +505,41 @@ subroutine init_benchmark_water3()
 
 
   do ri=1, n_rad
-     ! Recherche rayon dans def bench
+     ! Recherche radius dans def bench
      icell = cell_map(ri,1,1)
-     rayon = sqrt(r_grid(icell)**2+z_grid(icell)**2)
-     log_rayon = log(rayon)
+     radius = sqrt(r_grid(icell)**2+z_grid(icell)**2)
+     log_radius = log(radius)
 
 
-     if (rayon < 2.0) then
+     if (radius < 2.0) then
         do zj=1, nz
            k=1
            icell = cell_map(ri,zj,k)
-           densite_gaz(icell) = tmp_nH2(1)
+           gas_density(icell) = tmp_nH2(1)
            Tdust(icell) = tmp_T(1)
            Tcin(icell) =  tmp_Tkin(1)
         enddo
 
      else
         l=2
-        ! rayon est entre tmp_r(l-1) et tmp_r(l)
+        ! radius est entre tmp_r(l-1) et tmp_r(l)
         search : do i=l, n_lines
-           if (tmp_r(i) >= rayon) then
+           if (tmp_r(i) >= radius) then
               l = i
               exit search
            endif
         enddo search
         if (l > n_lines) l = n_lines
 
-        frac = (log_rayon - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
+        frac = (log_radius - log_tmp_r(l-1)) / (log_tmp_r(l) - log_tmp_r(l-1))
         do zj=1, nz
            k=1
            icell = cell_map(ri,zj,k)
-           densite_gaz(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
+           gas_density(icell) = exp( log_tmp_nH2(l-1) + frac * (log_tmp_nH2(l) - log_tmp_nH2(l-1)) )
            Tdust(icell) = exp( log_tmp_T(l-1) + frac * (log_tmp_T(l) - log_tmp_T(l-1)) )
            Tcin(icell) = exp( log_tmp_Tkin(l-1) + frac * (log_tmp_Tkin(l) - log_tmp_Tkin(l-1)) )
 
-           if (rayon < 5.95) then
+           if (radius < 5.95) then
               vfield(icell) = 0.0
               v_turb2(icell) = 9.
            else
@@ -551,7 +551,7 @@ subroutine init_benchmark_water3()
 
   enddo
 
-  ! Conversion FWHM ---> vitesse
+  ! Conversion FWHM ---> velocity
   v_turb2 = v_turb2 / (2.*sqrt(log(2.)))**2
 
   ! Conversion vitesses en m.s-1
@@ -559,7 +559,7 @@ subroutine init_benchmark_water3()
   v_turb2 = v_turb2 * 1.0e6
 
   ! Conversion part.m-3
-  densite_gaz(:) = densite_gaz(:) / (cm_to_m)**3
+  gas_density(:) = gas_density(:) / (cm_to_m)**3
 
   linfall = .true.
   lkeplerian = .false.

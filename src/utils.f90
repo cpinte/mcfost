@@ -2,7 +2,7 @@ module utils
 
   use mcfost_env
   use naleat, only : stream
-  use constantes
+  use constants
   use sha
   use messages
 
@@ -626,8 +626,8 @@ function calc_mu0(mu,a)
      denom = sqrt(q3)
      theta = acos(r/denom)
      mu01 = -2.0_dp*qh*cos(theta/3.0_dp) - a1/3.0_dp
-     mu02 = -2._dp*qh*cos((theta + deux_pi)/3.0_dp) - a1/3.0_dp
-     mu03 = -2._dp*qh*cos((theta + quatre_pi)/3.0_dp) - a1/3.0_dp
+     mu02 = -2._dp*qh*cos((theta + two_pi)/3.0_dp) - a1/3.0_dp
+     mu03 = -2._dp*qh*cos((theta + four_pi)/3.0_dp) - a1/3.0_dp
      if ((mu01 > 0.0_dp).and.(mu02 > 0.0_dp)) then
         call error("calc_mu0: 2 positives roots, mu01, mu02")
      else if ((mu01 > 0.0_dp).and.(mu03 > 0.0_dp)) then
@@ -642,7 +642,7 @@ function calc_mu0(mu,a)
 
   else
      factor = sqrt(r**2 - q3) + abs(r)
-     factor3 = factor**un_tiers
+     factor3 = factor**one_third
      calc_mu0 = -1.0_dp*sign(1.0_dp,r)*(factor3 + q/factor3) - a1/3.0_dp
   endif
 

@@ -1,7 +1,7 @@
 module SPH2mcfost
 
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use utils
   use sort, only : find_kth_smallest_inplace
   use density, only : normalize_dust_density, reduce_density, read_Voronoi_fits_file, find_non_empty_cell
@@ -193,7 +193,7 @@ contains
     ! mask : integer array, 1 if a SPH particle will be made transparent, 2 if deleted before tesselation
     ! ************************************************************************************ !
     use Voronoi_grid
-    use density, only : densite_gaz, masse_gaz, dust_density, masse
+    use density, only : gas_density, gas_mass, dust_density, dust_mass
     use grains, only : n_grains_tot, M_grain
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
@@ -222,7 +222,7 @@ contains
     real(dp), allocatable, dimension(:) :: gsize, grainsize_f, dN_ds, N_monomers, rho_monomers
     real(dp), dimension(4) :: lambsol
 
-    real(dp) :: mass, Mtot, Mtot_dust, facteur, a, mass_factor
+    real(dp) :: mass, Mtot, Mtot_dust, factor, a, mass_factor
     real :: f, limit_threshold, density_factor
     integer :: icell, l, k, iSPH, n_force_empty, i, id_n, ierr, N_pb
 
@@ -231,7 +231,7 @@ contains
     real(dp), parameter :: a0 = 1.28e-4 ! microns. Siess et al 2022
 
     real(dp), dimension(4) :: ki, err
-    real(dp) ::rhoi, norm, mdust, mdust_tot, factor
+    real(dp) ::rhoi, norm, mdust, mdust_tot
 
 
     if (lcorrect_density_elongated_cells) then
@@ -299,29 +299,29 @@ contains
     !*************************
     ! Densities
     !*************************
-    call allocate_densities(n_cells_max = n_SPH + n_etoiles) ! we allocate all the SPH particule for libmcfost
-    ! Tableau de densite et masse de gaz
+    call allocate_densities(n_cells_max = n_SPH + n_stars) ! we allocate all the SPH particule for libmcfost
+    ! Tableau de densite et mass de gaz
     !do icell=1,n_cells
-    !   densite_gaz(icell) = rho(icell) / mu_mH * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
-    !   masse_gaz(icell) =  densite_gaz(icell) * mu_mH * volume(icell)
+    !   gas_density(icell) = rho(icell) / mu_mH * m3_to_cm3 ! rho is in g/cm^3 --> part.m^3
+    !   gas_mass(icell) =  gas_density(icell) * mu_mH * volume(icell)
     !enddo
-    !masse_gaz(:) = masse_gaz(:) * AU3_to_cm3
+    !gas_mass(:) = gas_mass(:) * AU3_to_cm3
 
     ! I need to work with masses, as Voronoi and SPH volume could be different
     do icell=1,n_cells
        iSPH = Voronoi(icell)%id
        if (iSPH > 0) then
-          masse_gaz(icell)    = massgas(iSPH) * Msun_to_g ! en g
-          densite_gaz(icell)  = masse_gaz(icell) /  (mu_mH * volume(icell) * AU3_to_m3)
+          gas_mass(icell)    = massgas(iSPH) * Msun_to_g ! en g
+          gas_density(icell)  = gas_mass(icell) /  (mu_mH * volume(icell) * AU3_to_m3)
        else ! star
-          masse_gaz(icell)    = 0.
-          densite_gaz(icell)  = 0.
+          gas_mass(icell)    = 0.
+          gas_density(icell)  = 0.
        endif
     enddo
 
     mass = 0.
     do icell=1,n_cells
-       mass = mass + masse_gaz(icell)
+       mass = mass + gas_mass(icell)
     enddo !icell
     mass =  mass * g_to_Msun
 
@@ -329,19 +329,19 @@ contains
        write(*,*) "Forcing gas mass to value in parameter file rather"
        ! Normalisation
        if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
-          facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+          factor = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
 
-          ! Somme sur les zones pour densite finale
+          ! total_sum sur les zones pour densite finale
           do icell=1,n_cells
-             densite_gaz(icell) = densite_gaz(icell) * facteur
-             masse_gaz(icell) = masse_gaz(icell) * facteur
+             gas_density(icell) = gas_density(icell) * factor
+             gas_mass(icell) = gas_mass(icell) * factor
           enddo ! icell
        else
           call error('Gas mass is 0 in hydero file')
        endif
     endif
 
-    ! Tableau de densite et masse de poussiere
+    ! Tableau de densite et mass de poussiere
     ! interpolation en taille
     if (ldust_moments) then
        write(*,*) "Reconstructing grain size distribution from moments ..."
@@ -366,8 +366,8 @@ contains
        !$omp parallel &
        !$omp default(none) &
        !$omp private(icell,iSPH,use_single_grain,rhoi,ki,err,ierr,lambsol,rho_monomers,a,i,norm,mdust) &
-       !$omp shared(n_cells,Voronoi,densite_gaz,n_grains_tot,r_grain,mass_factor,dN_ds,N_monomers) &
-       !$omp shared(dust_density,nbre_grains,dust_moments,masse_gaz,volume) &
+       !$omp shared(n_cells,Voronoi,gas_density,n_grains_tot,r_grain,mass_factor,dN_ds,N_monomers) &
+       !$omp shared(dust_density,n_grains,dust_moments,gas_mass,volume) &
        !$omp reduction(+:N_pb)
        !$omp do schedule(dynamic,1)
        do icell=1,n_cells
@@ -375,7 +375,7 @@ contains
           if (iSPH > 0) then
              use_single_grain = .false.
 
-             !rhoi =  densite_gaz(icell) * cm_to_m**3 ! check that it is in cgs
+             !rhoi =  gas_density(icell) * cm_to_m**3 ! check that it is in cgs
              ki = dust_moments(:,iSPH) !/ mass_per_H
 
              call reconstruct_gamma_dist(ki,lambsol,err,ierr)
@@ -417,7 +417,7 @@ contains
 
           mass = 0.0_dp
           do l=1,n_grains_tot
-             mass=mass + (dust_density(l,icell) * nbre_grains(l) *1.0_dp) * M_grain(l)
+             mass=mass + (dust_density(l,icell) * n_grains(l) *1.0_dp) * M_grain(l)
           enddo !l
           mass = mass * volume(icell)
 
@@ -429,7 +429,7 @@ contains
              dust_density(:,icell) = dust_density(:,icell) * factor
           endif
        enddo !icell
-       call normalize_dust_density(mdust_tot) ! this should only calculates the array masse
+       call normalize_dust_density(mdust_tot) ! this should only calculates the array mass
 
     elseif (ndusttypes >= 1) then
        lvariable_dust = .true.
@@ -509,7 +509,7 @@ contains
           iSPH = Voronoi(icell)%id
           if (iSPH > 0) then
              Mtot = Mtot +  massgas(icell)
-             !Mtot_dust = Mtot_dust + masse_gaz(icell)* (sum(dustfrac(:,iSPH)))
+             !Mtot_dust = Mtot_dust + gas_mass(icell)* (sum(dustfrac(:,iSPH)))
              Mtot_dust = Mtot_dust + sum(massdust(:,icell))
           endif
        enddo
@@ -532,13 +532,13 @@ contains
              l=1
              do k=1,n_grains_tot
                 if (r_grain(k) < a_SPH(1)) then ! small grains
-                   dust_density(k,icell) = rho_dust(1) / nbre_grains(k)
+                   dust_density(k,icell) = rho_dust(1) / n_grains(k)
                 else if (r_grain(k) > a_SPH(ndusttypes+1)) then ! large grains
-                   dust_density(k,icell) = rho_dust(ndusttypes+1) / nbre_grains(k)
+                   dust_density(k,icell) = rho_dust(ndusttypes+1) / n_grains(k)
                 else ! interpolation
                    if (r_grain(k) > a_sph(l+1)) l = l+1
                    f = (log(r_grain(k))-log_a_sph(l))/(log_a_sph(l+1)-log_a_sph(l))
-                   dust_density(k,icell) = (rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))) / nbre_grains(k)
+                   dust_density(k,icell) = (rho_dust(l) + f * (rho_dust(l+1)  - rho_dust(l))) / n_grains(k)
                 endif
              enddo !k
           else ! iSPH == 0, star
@@ -548,23 +548,23 @@ contains
 
        ! Using the parameter file gas-to-dust ratio for now
        ! until phantom provides a proper grain size distribution
-       call normalize_dust_density( sum(masse_gaz) * g_to_Msun / disk_zone(1)%gas_to_dust)
+       call normalize_dust_density( sum(gas_mass) * g_to_Msun / disk_zone(1)%gas_to_dust)
 
     else ! ndusttypes = 0 : using the gas density
        lvariable_dust = .false.
        write(*,*) "Using gas-to-dust ratio in mcfost parameter file"
 
        do icell=1,n_cells
-          masse(icell) = 0.
-          dust_density(1,icell) = densite_gaz(icell)
+          dust_mass(icell) = 0.
+          dust_density(1,icell) = gas_density(icell)
           do k=1,n_grains_tot
-             masse(icell) = masse(icell) + dust_density(1,icell) * nbre_grains(k) * M_grain(k) * volume(icell)
+             dust_mass(icell) = dust_mass(icell) + dust_density(1,icell) * n_grains(k) * M_grain(k) * volume(icell)
           enddo
        enddo
-       masse(:) = masse(:) * AU3_to_cm3
-       f = 1./disk_zone(1)%gas_to_dust * sum(masse_gaz)/sum(masse)
+       dust_mass(:) = dust_mass(:) * AU3_to_cm3
+       f = 1./disk_zone(1)%gas_to_dust * sum(gas_mass)/sum(dust_mass)
        dust_density(:,:) = dust_density(:,:) * f
-       masse(:) = masse(:) * f
+       dust_mass(:) = dust_mass(:) * f
     endif ! ndusttypes == 0
 
     !*************************
@@ -625,8 +625,8 @@ contains
 
     if (ndusttypes >= 1) deallocate(a_SPH,log_a_SPH,rho_dust)
 
-    write(*,*) 'Total  gas mass in model :',  real(sum(masse_gaz) * g_to_Msun),' Msun'
-    write(*,*) 'Total dust mass in model :', real(sum(masse) * g_to_Msun),' Msun'
+    write(*,*) 'Total  gas mass in model :',  real(sum(gas_mass) * g_to_Msun),' Msun'
+    write(*,*) 'Total dust mass in model :', real(sum(dust_mass) * g_to_Msun),' Msun'
 
     call find_non_empty_cell()
 
@@ -647,8 +647,8 @@ contains
     ! rho : gas density
     ! mask : -1 means skip, 0 means transparent, 1 means compute atomic transfer
     ! ************************************************************************************ !
-    use parametres
-    use constantes,   only : mH
+    use parameters
+    use constants,   only : mH
     use Voronoi_grid, only : Voronoi, volume
     use disk_physics, only : compute_othin_sublimation_radius
     use mem
@@ -816,7 +816,7 @@ contains
   subroutine delete_masked_particles()
 
     use Voronoi_grid
-    use density, only : densite_gaz, masse_gaz, dust_density, masse
+    use density, only : gas_density, gas_mass, dust_density, dust_mass
 
     integer :: icell, k
 
@@ -824,9 +824,9 @@ contains
     do icell=1, n_cells
        if (Voronoi(icell)%masked == 1) then ! 1 is transparent
           k=k+1
-          masse_gaz(icell)       = 0.
-          densite_gaz(icell)     = 0.
-          masse(icell)           = 0.
+          gas_mass(icell)       = 0.
+          gas_density(icell)     = 0.
+          dust_mass(icell)           = 0.
           dust_density(:,icell) = 0.
        endif
     enddo
@@ -842,38 +842,38 @@ contains
   subroutine delete_Hill_sphere()
 
     use Voronoi_grid
-    use density, only : densite_gaz, masse_gaz, dust_density, masse
+    use density, only : gas_density, gas_mass, dust_density, dust_mass
 
     integer :: istar, icell, n_delete
     real(kind=dp) :: d2, r_Hill2, r_hill, dx, dy, dz
 
     ! We assume that the central star is the actual star
     ! and following sink particles are planets
-    do istar=2, n_etoiles
+    do istar=2, n_stars
        n_delete = 0
 
-       d2 = (etoile(istar)%x - etoile(1)%x)**2 + &
-            (etoile(istar)%y - etoile(1)%y)**2 + &
-            (etoile(istar)%z - etoile(1)%z)**2
-       r_Hill2 = d2 * (etoile(istar)%m / (3*etoile(1)%m))**(2./3)
+       d2 = (star(istar)%x - star(1)%x)**2 + &
+            (star(istar)%y - star(1)%y)**2 + &
+            (star(istar)%z - star(1)%z)**2
+       r_Hill2 = d2 * (star(istar)%m / (3*star(1)%m))**(2./3)
        r_Hill = sqrt(r_Hill2)
 
        write(*,*) "Sink particle #", istar, "Hill radius =", r_Hill, "au"
 
        cell_loop : do icell=1, n_cells
           if (icell == istar) cycle cell_loop
-          dx = Voronoi(icell)%xyz(1) - etoile(istar)%x
+          dx = Voronoi(icell)%xyz(1) - star(istar)%x
           if (dx > r_Hill) cycle cell_loop
-          dy = Voronoi(icell)%xyz(2) - etoile(istar)%y
+          dy = Voronoi(icell)%xyz(2) - star(istar)%y
           if (dy > r_Hill) cycle cell_loop
-          dz = Voronoi(icell)%xyz(3) - etoile(istar)%z
+          dz = Voronoi(icell)%xyz(3) - star(istar)%z
           if (dz > r_Hill) cycle cell_loop
 
           d2 = dx**2 + dy**2 + dz**2
           if (d2 < r_Hill2) then ! particle is in Hill sphere
-             masse_gaz(icell)    = 0.
-             densite_gaz(icell) = 0.
-             masse(icell) = 0.
+             gas_mass(icell)    = 0.
+             gas_density(icell) = 0.
+             dust_mass(icell) = 0.
              dust_density(:,icell) = 0.
              n_delete = n_delete + 1
           endif

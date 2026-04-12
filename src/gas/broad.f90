@@ -1,6 +1,6 @@
 module broad
 
-   use constantes
+   use constants
    use atom_type
    use elements_type
    use grid, only : T, ne, vturb

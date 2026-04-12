@@ -1,6 +1,6 @@
 module read_opacity
 
-  use parametres
+  use parameters
   use grains
   use wavelengths
   use mcfost_env

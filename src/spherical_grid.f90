@@ -1,21 +1,21 @@
 module spherical_grid
 
-  use constantes
-  use parametres
+  use constants
+  use parameters
   use cylindrical_grid, only: cell2cylindrical, cell_map, cell_map_i, cell_map_j, cell_map_k, lexit_cell, r_lim, r_lim_2, r_lim_3, &
-       delta_z, r_grid, z_grid, phi_grid, tab_region, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
+       cell_height, r_grid, z_grid, phi_grid, region_map, z_lim, w_lim, theta_lim, tan_theta_lim, tan_phi_lim, &
        volume, l_dark_zone, zmax, cos_phi_lim, sin_phi_lim
   use messages
 
   implicit none
 
-  public :: cross_spherical_cell, pos_em_cellule_sph, indice_cellule_sph, test_exit_grid_sph, &
+  public :: cross_spherical_cell, pos_em_cell_sph, index_cell_sph, test_exit_grid_sph, &
        move_to_grid_sph, distance_to_closest_wall_sph
 
 
   private
 
-  real(kind=dp), parameter :: prec_grille=1.0e-14_dp
+  real(kind=dp), parameter :: grid_prec=1.0e-14_dp
   real(kind=dp), parameter :: prec_grille_sph=1.0e-7_dp
 
 
@@ -45,7 +45,7 @@ contains
 
 !******************************************************************************
 
-  subroutine indice_cellule_sph(xin,yin,zin, icell)
+  subroutine index_cell_sph(xin,yin,zin, icell)
 
   implicit none
 
@@ -122,7 +122,7 @@ contains
 
   return
 
-end subroutine indice_cellule_sph
+end subroutine index_cell_sph
 
 !******************************************************************************
 
@@ -202,7 +202,7 @@ end subroutine indice_cellule_sph_theta
 
     ! Todo : can be calculated outside
 
-    ! Petit delta pour franchir la limite de la cellule
+    ! Petit delta pour franchir la limite de la cell
     ! et ne pas etre pile-poil dessus
     correct_moins = 1.0_dp - prec_grille_sph
     correct_plus = 1.0_dp + prec_grille_sph
@@ -235,11 +235,11 @@ end subroutine indice_cellule_sph_theta
        ! on avance ou recule en r ? -> produit scalaire
        dotprod = b
        if (dotprod < 0.0_dp) then
-          ! on recule : on cherche rayon inf�rieur
+          ! on recule : on cherche radius inf�rieur
           c=(r0_2-r_lim_2(ri0-1)*correct_moins)
           delta=b*b-c
-          if (delta < 0.0_dp) then ! on ne rencontre pas le rayon inf�rieur
-             ! on cherche le rayon sup�rieur
+          if (delta < 0.0_dp) then ! on ne rencontre pas le radius inf�rieur
+             ! on cherche le radius sup�rieur
              c=(r0_2-r_lim_2(ri0)*correct_plus)
              delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
              delta_rad=1
@@ -247,7 +247,7 @@ end subroutine indice_cellule_sph_theta
              delta_rad=-1
           endif
        else
-          ! on avance : on cherche le rayon sup�rieur
+          ! on avance : on cherche le radius sup�rieur
           c=(r0_2-r_lim_2(ri0)*correct_plus)
           delta=max(b*b-c,0.0_dp) ! on force 0.0 si pb de precision qui donnerait delta=-epsilon
           delta_rad=1
@@ -257,7 +257,7 @@ end subroutine indice_cellule_sph_theta
        if (s < 0.0_dp) then
           s=-b+rac
        else if (s==0.0_dp) then
-          s=prec_grille
+          s=grid_prec
        endif
 
        ! 2) position interface inclinaison
@@ -348,7 +348,7 @@ end subroutine indice_cellule_sph_theta
              t_phi = 1.0e30
              delta_phi = 0
           else
-             ! Quelle cellule on va franchir
+             ! Quelle cell on va franchir
              if (dotprod > 0.0) then
                 tan_angle_lim = tan_phi_lim(phik0)
                 delta_phi=1
@@ -358,7 +358,7 @@ end subroutine indice_cellule_sph_theta
                 tan_angle_lim = tan_phi_lim(phik0m1)
                 delta_phi=-1
              endif
-             ! Longueur av interserction
+             ! length av interserction
              if (tan_angle_lim > 1.0d299) then ! inclus le cas 90 deg
                 t_phi = -x0/u
              else
@@ -385,7 +385,7 @@ end subroutine indice_cellule_sph_theta
     if ((s < t).and.(s < t_phi)) then ! r
        l=s
        delta_vol=s
-       ! Position au bord de la cellule suivante
+       ! Position au bord de la cell suivante
        x1=x0+delta_vol*u
        y1=y0+delta_vol*v
        z1=z0+delta_vol*w
@@ -393,7 +393,7 @@ end subroutine indice_cellule_sph_theta
        thetaj1 = thetaj0
        phik1 = phik0
 
-       ! Calcul de l'indice theta quand on rentre dans la cellule ri=1
+       ! Calcul de l'indice theta quand on rentre dans la cell ri=1
        ! Todo : calcul indice phi aussi ???
        if (ri0 == 0) then
           call indice_cellule_sph_theta(x1,y1,z1,thetaj1,phik1)
@@ -408,7 +408,7 @@ end subroutine indice_cellule_sph_theta
     else if (t < t_phi) then ! theta
        l=t
        delta_vol=t
-       ! Position au bord de la cellule suivante
+       ! Position au bord de la cell suivante
        x1=x0+delta_vol*u
        y1=y0+delta_vol*v
        z1=z0+delta_vol*w
@@ -421,7 +421,7 @@ end subroutine indice_cellule_sph_theta
     else
        l=t_phi
        delta_vol=correct_plus*t_phi
-       ! Position au bord de la cellule suivante
+       ! Position au bord de la cell suivante
        x1=x0+delta_vol*u
        y1=y0+delta_vol*v
        z1=z0+delta_vol*w
@@ -433,7 +433,7 @@ end subroutine indice_cellule_sph_theta
     endif
 
     ! Correction if z1==0, otherwise dotprod (in z) will be 0 at the next iteration
-    if (z1 == 0.0_dp) z1 = prec_grille
+    if (z1 == 0.0_dp) z1 = grid_prec
 
     !call cylindrical2cell(ri1,zj1,1, next_cell)
     next_cell = cell_map(ri1,thetaj1,phik1)
@@ -515,7 +515,7 @@ end subroutine indice_cellule_sph_theta
     call cell2cylindrical(icell, ri0,zj0, tmp_k) ! converting current cell index
 
     ! locate current cell index
-    call indice_cellule_sph(x,y,z, icell)
+    call index_cell_sph(x,y,z, icell)
     ri = cell_map_i(icell)
 
     ! Patch pour eviter BUG sur position radiale
@@ -527,7 +527,7 @@ end subroutine indice_cellule_sph_theta
        z = z * factor
 
        ! On verifie que c'est OK maintenant
-       call indice_cellule_sph(x,y,z, icell)
+       call index_cell_sph(x,y,z, icell)
        ri = cell_map_i(icell)
        if (ri==0) then
           call error("BUG in verif_cell_position_sph")
@@ -560,8 +560,8 @@ end subroutine indice_cellule_sph_theta
 !***********************************************************
 
   subroutine move_to_grid_sph(id, x,y,z,u,v,w, icell,lintersect)
-    ! Calcule la position au bord de la grille dans
-    ! la direction donnee pour grille spherique
+    ! Calcule la position au bord de la grid dans
+    ! la direction donnee pour grid spherique
     ! C. Pinte
     ! 01/08/07
 
@@ -600,14 +600,14 @@ end subroutine indice_cellule_sph_theta
 
     delta_vol = s1
 
-    ! Position au bord de la grille
+    ! Position au bord de la grid
     x1=x0+delta_vol*u
     y1=y0+delta_vol*v
     z1=z0+delta_vol*w
 
-    ! Determination de l'indice de la premiere cellule traversee
+    ! Determination de l'indice de la premiere cell traversee
     ! pour initialiser la propagation
-    call indice_cellule_sph(x1,y1,z1, icell)
+    call index_cell_sph(x1,y1,z1, icell)
     x=x1 ; y=y1 ; z=z1
 
     return
@@ -616,9 +616,9 @@ end subroutine indice_cellule_sph_theta
 
 !***********************************************************
 
-  subroutine pos_em_cellule_sph(icell ,aleat1,aleat2,aleat3,x,y,z)
+  subroutine pos_em_cell_sph(icell ,rand1,rand2,rand3,x,y,z)
 ! Choisit la position d'emission uniformement
-! dans la cellule (ri,thetaj)
+! dans la cell (ri,thetaj)
 ! Geometrie spherique
 ! C. Pinte
 ! 08/06/07
@@ -626,7 +626,7 @@ end subroutine indice_cellule_sph_theta
   implicit none
 
   integer, intent(in) :: icell
-  real, intent(in) :: aleat1, aleat2, aleat3
+  real, intent(in) :: rand1, rand2, rand3
   real(kind=dp), intent(out) :: x,y,z
 
   real(kind=dp) :: r, theta, phi, r_cos_theta
@@ -637,23 +637,23 @@ end subroutine indice_cellule_sph_theta
   phik = cell_map_k(icell)
 
   ! Position radiale
-  r=(r_lim_3(ri-1)+aleat1*(r_lim_3(ri)-r_lim_3(ri-1)))**un_tiers
+  r=(r_lim_3(ri-1)+rand1*(r_lim_3(ri)-r_lim_3(ri-1)))**one_third
 
   ! Position theta
   if (l3D) then
-     theta = theta_lim(abs(thetaj)-1)+aleat2*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1))
+     theta = theta_lim(abs(thetaj)-1)+rand2*(theta_lim(abs(thetaj))-theta_lim(abs(thetaj)-1))
      !if (thetaj < 0) theta = - theta
   else
-     if (aleat2 > 0.5_dp) then
-        theta = theta_lim(thetaj-1)+(2.0_dp*(aleat2-0.5_dp))*(theta_lim(thetaj)-theta_lim(thetaj-1))
+     if (rand2 > 0.5_dp) then
+        theta = theta_lim(thetaj-1)+(2.0_dp*(rand2-0.5_dp))*(theta_lim(thetaj)-theta_lim(thetaj-1))
      else
-        theta = -(theta_lim(thetaj-1)+(2.0_dp*aleat2)*(theta_lim(thetaj)-theta_lim(thetaj-1)))
+        theta = -(theta_lim(thetaj-1)+(2.0_dp*rand2)*(theta_lim(thetaj)-theta_lim(thetaj-1)))
      endif
   endif
   ! BUG ??? : ca doit etre uniforme en w, non ??
 
   ! Position azimuthale
-  phi = 2.0_dp*pi * (real(phik)-1.0_dp+aleat3)/real(n_az)
+  phi = 2.0_dp*pi * (real(phik)-1.0_dp+rand3)/real(n_az)
 
   ! x et y
   z=r*sin(theta)
@@ -662,14 +662,14 @@ end subroutine indice_cellule_sph_theta
   y=r_cos_theta*sin(phi)
 
 !!$  ! Position theta
-!!$  if (aleat2 > 0.5) then
-!!$     w=w_lim(thetaj-1)+(2.0_dp*(aleat2-0.5_dp))*(w_lim(thetaj)-w_lim(thetaj-1))
+!!$  if (rand2 > 0.5) then
+!!$     w=w_lim(thetaj-1)+(2.0_dp*(rand2-0.5_dp))*(w_lim(thetaj)-w_lim(thetaj-1))
 !!$  else
-!!$     w=-(w_lim(thetaj-1)+(2.0_dp*aleat2)*(w_lim(thetaj)-w_lim(thetaj-1)))
+!!$     w=-(w_lim(thetaj-1)+(2.0_dp*rand2)*(w_lim(thetaj)-w_lim(thetaj-1)))
 !!$  endif
 !!$
 !!$  ! Position azimuthale
-!!$  phi = 2.0_dp*pi * (real(phik)-1.0_dp+aleat3)/real(n_az)
+!!$  phi = 2.0_dp*pi * (real(phik)-1.0_dp+rand3)/real(n_az)
 !!$
 !!$  ! x et y
 !!$  z=r*w
@@ -682,13 +682,13 @@ end subroutine indice_cellule_sph_theta
 !  x = r*cos(phi)
 !  y = r*sin(phi)
 
- ! call indice_cellule_sph(x,y,z,ri_tmp,thetaj_tmp)
+ ! call index_cell_sph(x,y,z,ri_tmp,thetaj_tmp)
  ! if (ri /= ri_tmp) then
  !    write(*,*) "Bug ri", ri, ri_tmp, sqrt(x*x+y*y)
  !    read(*,*)
  ! else if (thetaj /= thetaj_tmp) then
  !    write(*,*) "Bug zj", w, thetaj, thetaj_tmp
- !    call indice_cellule_sph(x,y,-z,ri_tmp,thetaj_tmp)
+ !    call index_cell_sph(x,y,-z,ri_tmp,thetaj_tmp)
  !    write(*,*) -z, thetaj_tmp
  !    read(*,*)
  ! endif
@@ -696,6 +696,6 @@ end subroutine indice_cellule_sph_theta
 
   return
 
-end subroutine pos_em_cellule_sph
+end subroutine pos_em_cell_sph
 
 end module spherical_grid

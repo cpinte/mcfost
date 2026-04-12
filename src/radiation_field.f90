@@ -1,8 +1,8 @@
 module radiation_field
 
-  use parametres
+  use parameters
   use mcfost_env
-  use constantes
+  use constants
   use dust_prop, only : kappa_abs_LTE, kappa_factor
   use messages
   use wavelengths
@@ -16,7 +16,7 @@ module radiation_field
   private
 
   ! pour stockage des cellules par lequelles on passe
-  ! longueur de vol cumulee dans la cellule
+  ! length de vol cumulee dans la cell
   real(kind=dp), dimension(:,:), allocatable :: xKJ_abs ! n_cells, id
   ! xJabs represente J_lambda dans le bin lambda -> bin en log : xJabs varie comme lambda.F_lambda
   real(kind=dp), dimension(:,:,:), allocatable :: xJ_abs ! n_cells, n_lambda, nb_proc
@@ -70,7 +70,7 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
            psup = 1
         else
            phi_pos = atan2(xm,ym)
-           phi_k = floor(  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt ) + 1
+           phi_k = floor(  modulo(phi_pos, two_pi) / two_pi * n_az_rt ) + 1
            if (phi_k > n_az_rt) phi_k=n_az_rt
 
            if (zm > 0.0_dp) then
@@ -83,8 +83,8 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
         if (lsepar_pola) then
            call calc_xI_scatt_pola(id,lambda,p_lambda,icell,phi_k,psup,l,Stokes(:),flag_star)
         else
-           ! ralentit d'un facteur 5 le calcul de SED
-           ! facteur limitant
+           ! ralentit d'un factor 5 le calcul de SED
+           ! factor limitant
            call calc_xI_scatt(id,lambda,p_lambda,icell,phi_k,psup,l,Stokes(1),flag_star)
         endif
 
@@ -97,15 +97,15 @@ subroutine save_radiation_field(id,lambda,p_lambda,icell, Stokes, l,  x0,y0,z0, 
            zm = 0.5_dp * (z0 + z1)
            phi_pos = atan2(xm,ym)
 
-           phi_vol = atan2(-u,-v) + deux_pi ! deux_pi pour assurer diff avec phi_pos > 0
+           phi_vol = atan2(-u,-v) + two_pi ! two_pi pour assurer diff avec phi_pos > 0
 
            !  if (l_sym_ima) then
-           !     delta_phi = modulo(phi_vol - phi_pos, deux_pi)
-           !     if (delta_phi > pi) delta_phi = deux_pi - delta_phi
+           !     delta_phi = modulo(phi_vol - phi_pos, two_pi)
+           !     if (delta_phi > pi) delta_phi = two_pi - delta_phi
            !     phi_I =  nint( delta_phi  / pi * (n_phi_I -1) ) + 1
            !     if (phi_I > n_phi_I) phi_I = n_phi_I
            !  else
-           phi_I =  floor( modulo(phi_vol - phi_pos, deux_pi) / deux_pi * n_phi_I ) + 1
+           phi_I =  floor( modulo(phi_vol - phi_pos, two_pi) / two_pi * n_phi_I ) + 1
            if (phi_I > n_phi_I) phi_I = 1
            !  endif
 
@@ -207,8 +207,8 @@ subroutine reset_radiation_field()
 !
 !  frac_E_stars = 0.0 ; frac_E_disk = 0.0 ; E_totale = 0.0
 !
-!  spectre_etoiles_cumul = 0.0
-!  spectre_etoiles = 0.0
+!  star_spectrum_cumul = 0.0
+!  star_spectrum = 0.0
 !  spectre_emission_cumul = 0.0
 !
 !  prob_E_cell = 0.0

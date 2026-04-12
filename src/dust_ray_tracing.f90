@@ -2,8 +2,8 @@ module dust_ray_tracing
   ! RT 1 : calcul l'intensite specifique diffusee dans les directions souhaitees. : mode prefere pour SED et pour 3D
   ! RT 2 : sauvegarde l'intensite specifique et sa dependence angulaire : mode preferee pour image 2D
 
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use stars, only : E_stars
   use scattering
   use Temperature
@@ -291,7 +291,7 @@ subroutine init_directions_ray_tracing()
   enddo
 
   if (.not. allocated(star_position)) then
-     allocate(star_position(n_etoiles,RT_n_incl,RT_n_az,2), star_vr(n_etoiles,RT_n_incl,RT_n_az), stat=alloc_status)
+     allocate(star_position(n_stars,RT_n_incl,RT_n_az,2), star_vr(n_stars,RT_n_incl,RT_n_az), stat=alloc_status)
      if (alloc_status > 0) call error('Allocation error star_position')
   endif
 
@@ -324,7 +324,7 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
   uv0 = tab_uv_rt(ibin) ; w0 = tab_w_rt(ibin) ! epsilon needed here
 
   ! Calcul angle phi a la position
-  phi_pos = modulo(atan2(x,y) + deux_pi,deux_pi)
+  phi_pos = modulo(atan2(x,y) + two_pi,two_pi)
 
   ! Nouvelle orientation: les directions de ray-tracing sont definies par rapport a l'axe de ref y
   ! il faut se replacer dans ce cas en fct de la position
@@ -341,7 +341,7 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
      ! if (l_sym_ima) then
      !    phi = pi * real(iscatt-1) / real(nang_ray_tracing-1) + pi
      ! else
-     phi = deux_pi * real(iscatt) / real(N)
+     phi = two_pi * real(iscatt) / real(N)
      ! endif
 
      phi = phi - phi_pos
@@ -383,7 +383,7 @@ subroutine angles_scatt_rt2(id,ibin,x,y,z,u,v,w,lstar)
 
            !     le plan de diffusion est a +ou- 90deg de la normale
            ! Ne doit pas etre utilise en ray-tracing !!! teste OK sans
-           !theta = theta  + pi_sur_deux
+           !theta = theta  + half_pi
 
            !----dans les matrices de rotation l'angle est omega = 2 * theta-----
            omega = 2.0_dp * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
@@ -452,7 +452,7 @@ subroutine angles_scatt_rt1(id,u,v,w)
            if (theta >= pi) theta = 0.0_dp
 
            !     le plan de diffusion est a +ou- 90deg de la normale
-           theta = theta + pi_sur_deux
+           theta = theta + half_pi
 
            !----dans les matrices de rotation l'angle est omega = 2 * theta-----
            omega = 2.0_dp * theta
@@ -480,13 +480,13 @@ end subroutine angles_scatt_rt1
 subroutine calc_xI_scatt(id,lambda,p_lambda,icell, phik,psup,l,stokes,flag_star)
   ! RT1
   ! Calcul les matrices de Mueller pour une direction de diffusion
-  ! lance dans chaque cellule traversee
+  ! lance dans chaque cell traversee
   ! utilise les resultats de angles_scatt_rt1
   ! C. Pinte
   ! 13/09/09, version intiale  19/01/08
 
   implicit none
-  ! pour chaque cellule stocke le champ diffusee par un paquet dans les directions
+  ! pour chaque cell stocke le champ diffusee par un paquet dans les directions
   ! de ray-tracing ibin et dir en fonction de atan2(x,y) : ie un paquet
   ! n'allume qu'un seul endroit de l'anneau au lieu de partout avant,
   ! mais la taille des tableaux est la meme
@@ -533,7 +533,7 @@ end subroutine calc_xI_scatt
 subroutine calc_xI_scatt_pola(id,lambda,p_lambda,icell,phik,psup,l,stokes,flag_star)
   ! RT1
   ! Calcul les matrices de Mueller pour une direction de diffusion
-  ! lance dans chaque cellule traversee
+  ! lance dans chaque cell traversee
   ! utilise les resultats de angles_scatt_rt1
   ! C. Pinte
   ! 13/09/09, version intiale  19/01/08
@@ -642,7 +642,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
 
   integer :: itype, iRT
   integer :: icell, p_icell
-  real(kind=dp) :: facteur, energie_photon, n_photons_envoyes, kappa_sca, kappa_ext
+  real(kind=dp) :: factor, photon_energy, n_sent_photons, kappa_sca, kappa_ext
 
   iRT = RT2d_to_RT1d(ibin, iaz)
 
@@ -652,15 +652,15 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   call calc_Jth(lambda)
   !unpolarized_Stokes = 0. ;   unpolarized_Stokes(1) = 1.
 
-  ! TODO : la taille de eps_dust1 est le facteur limitant pour le temps de calcul
+  ! TODO : la taille de eps_dust1 est le factor limitant pour le temps de calcul
 
   if (lmono0) then ! image
-     energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
-          (real(nbre_photons_loop)*real(nbre_photons_image) *  AU_to_cm * pi)
+     photon_energy = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
+          (real(n_photons_loop)*real(n_photons_image) *  AU_to_cm * pi)
   else ! SED
-     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-     energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
-          (n_photons_envoyes *  AU_to_cm * pi) !lambda.F_lambda
+     n_sent_photons = sum(n_phot_envoyes(lambda,:))
+     photon_energy = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
+          (n_sent_photons *  AU_to_cm * pi) !lambda.F_lambda
   endif
 
   !write(*,*) "TATA", lambda, kappa(1,lambda), tab_albedo_pos(1,lambda)
@@ -668,8 +668,8 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   ! Intensite specifique diffusion
   !$omp parallel &
   !$omp default(none) &
-  !$omp private(icell,p_icell,facteur,kappa_sca,kappa_ext,itype,I_scatt) &
-  !$omp shared(n_cells,energie_photon,volume,n_az_rt,n_theta_rt,kappa,kappa_factor,N_type_flux,lambda,iRT) &
+  !$omp private(icell,p_icell,factor,kappa_sca,kappa_ext,itype,I_scatt) &
+  !$omp shared(n_cells,photon_energy,volume,n_az_rt,n_theta_rt,kappa,kappa_factor,N_type_flux,lambda,iRT) &
   !$omp shared(J_th,xI_scatt,eps_dust1,lsepar_pola,lsepar_contrib,n_Stokes,nb_proc,tab_albedo_pos,lvariable_dust,icell1)
 
   p_icell = icell1
@@ -677,7 +677,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
   !$omp do schedule(static,n_cells/nb_proc)
   do icell=1, n_cells
      if (lvariable_dust) p_icell = icell
-     facteur = energie_photon / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
+     factor = photon_energy / volume(icell) * n_az_rt * n_theta_rt ! n_az_rt * n_theta_rt car subdivision virtuelle des cellules
      kappa_ext = kappa(p_icell,lambda) * kappa_factor(icell)
      kappa_sca = kappa_ext * tab_albedo_pos(p_icell,lambda)
 
@@ -686,7 +686,7 @@ subroutine init_dust_source_fct1(lambda,ibin,iaz)
      ! TODO : les lignes suivantes sont tres cheres en OpenMP
      if (kappa_ext > tiny_dp) then
         do itype=1,N_type_flux
-           I_scatt(:,:,itype) = sum(xI_scatt(:,:,itype,iRT,icell,:),dim=3) * facteur * kappa_sca
+           I_scatt(:,:,itype) = sum(xI_scatt(:,:,itype,iRT,icell,:),dim=3) * factor * kappa_sca
         enddo ! itype
 
         eps_dust1(:,:,1,icell) =  (I_scatt(:,:,1) +  J_th(icell)) / kappa_ext
@@ -819,7 +819,7 @@ subroutine calc_Jth(lambda)
   integer :: T, icell, p_icell
   integer :: p_l ! Removed pointer to avoid issues with changing indices
 
-  ! longueur d'onde en metre
+  ! length d'onde en metre
   wl = tab_lambda(lambda)*1.e-6
 
   J_th(:) = 0.0
@@ -839,7 +839,7 @@ subroutine calc_Jth(lambda)
            if (lvariable_dust) p_icell = icell
            Temp=Tdust(icell) ! que LTE pour le moment
            if (Temp*wl > 3.e-4) then
-              cst_wl=cst_th/(Temp*wl)
+              cst_wl=thermal_const/(Temp*wl)
               coeff_exp=exp(cst_wl)
               J_th(icell) = cst_E/((wl**5)*(coeff_exp-1.0)) * wl * kappa_abs_LTE(p_icell,lambda) * kappa_factor(icell) ! Teste OK en mode SED avec echantillonnage lineaire du plan image
            else
@@ -859,10 +859,10 @@ subroutine calc_Jth(lambda)
                p_l = merge(l, grain(l)%zone, lvariable_dust)
                Temp=Tdust_1grain(l,icell)
                if (Temp*wl > 3.e-4) then
-                  cst_wl=cst_th/(Temp*wl)
+                  cst_wl=thermal_const/(Temp*wl)
                   coeff_exp=exp(cst_wl)
                   J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                       C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+                       C_abs_norm(l,lambda) * dust_density(p_l,icell) * n_grains(l)
                endif
             enddo ! l
         enddo ! icell
@@ -875,19 +875,19 @@ subroutine calc_Jth(lambda)
                   p_l = merge(l, grain(l)%zone, lvariable_dust)
                   Temp=Tdust_1grain_nRE(l,icell) ! WARNING : TODO : this does not work in 3D
                   if (Temp*wl > 3.e-4) then
-                     cst_wl=cst_th/(Temp*wl)
+                     cst_wl=thermal_const/(Temp*wl)
                      coeff_exp=exp(cst_wl)
                      J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                          C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+                          C_abs_norm(l,lambda) * dust_density(p_l,icell) * n_grains(l)
                   endif !cst_wl
               else ! ! la grain a une proba de T  ---> todo: we can compute BB outside of loop
                  do T=1,n_T
                     temp=tab_Temp(T)
                     if (Temp*wl > 3.e-4) then
-                       cst_wl=cst_th/(Temp*wl)
+                       cst_wl=thermal_const/(Temp*wl)
                        coeff_exp=exp(cst_wl)
                        J_th(icell) = J_th(icell) + cst_E/((wl**5)*(coeff_exp-1.0)) * wl * &
-                            C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l) * Proba_Tdust(T,l,icell)
+                            C_abs_norm(l,lambda) * dust_density(p_l,icell) * n_grains(l) * Proba_Tdust(T,l,icell)
                     endif !cst_wl
                  enddo ! T
               endif ! l_RE
@@ -912,7 +912,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   integer, intent(in) :: lambda, p_lambda, ibin
 
   real(kind=dp), dimension(4) :: Stokes, S, C, D
-  real(kind=dp) :: x, y, z, u, v, w, phi, w02, facteur, energie_photon, kappa_sca
+  real(kind=dp) :: x, y, z, u, v, w, phi, w02, factor, photon_energy, kappa_sca
   real(kind=dp) :: u_ray_tracing, v_ray_tracing, w_ray_tracing, uv0, w0
 
   real(kind=dp), dimension(:,:,:,:), allocatable :: Inu ! sum of I_spec over cpus
@@ -921,7 +921,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   integer :: theta_I, phi_I, dir, iscatt, id
   integer :: k, alloc_status, i1, i2, icell, p_icell
   real :: cos_scatt, sum_sin, f1, f2, sin_scatt, phi_scatt
-  real(kind=dp) :: omega, sinw, cosw, n_photons_envoyes, v1pi, v1pj, v1pk, xnyp, costhet, theta
+  real(kind=dp) :: omega, sinw, cosw, n_sent_photons, v1pi, v1pj, v1pk, xnyp, costhet, theta
 
   integer, parameter :: N_super = 5 ! number of elements (N_super^2) to average the phase function
   ! 5 cree un leger surcout dans le cas avec strat (qq 10 sec par inclinaison et par lambda)
@@ -948,12 +948,12 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
   id = 1
 
   if (lmono0) then ! image
-     energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
-          (real(nbre_photons_loop)*real(nbre_photons_image) *  AU_to_cm * pi)
+     photon_energy = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
+          (real(n_photons_loop)*real(n_photons_image) *  AU_to_cm * pi)
   else ! SED
-     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-     energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
-          (n_photons_envoyes *  AU_to_cm * pi)
+     n_sent_photons = sum(n_phot_envoyes(lambda,:))
+     photon_energy = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
+          (n_sent_photons *  AU_to_cm * pi)
   endif
 
   ! Position : virtuelle !!
@@ -979,7 +979,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
   do dir=0,1
      do iscatt = 1, nang_ray_tracing
-        phi_scatt = deux_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
+        phi_scatt = two_pi * real(iscatt) / real(nang_ray_tracing)  ! todo : precalculate this section
 
         ! Direction of the various rays that will sampled a "cylindrical" cell
         u_ray_tracing = uv0 * sin(phi_scatt)
@@ -998,7 +998,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                     f2 = real(i2) / (N_super + 1)
 
                     w = (2.0_dp * ((real(theta_I,kind=dp) - f1) / real(n_theta_I,kind=dp) ) - 1.0_dp) * (2*dir-1)
-                    phi = deux_pi * (real(phi_I,kind=dp) - f2) / real(n_phi_I,kind=dp)
+                    phi = two_pi * (real(phi_I,kind=dp) - f2) / real(n_phi_I,kind=dp)
 
                     w02 = sqrt(1.0_dp-w*w)
                     u = w02 * sin(phi)
@@ -1020,7 +1020,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
                  enddo !i1
               enddo !i2
 
-              ! Normalization du facteur sin ici
+              ! Normalization du factor sin ici
               ! tab_sin_scatt depends on ibin !!!
               tab_sin_scatt_norm(:,:,theta_I,phi_I,iscatt,dir) = tab_sin_scatt_norm(:,:,theta_I,phi_I,iscatt,dir) / sum_sin
 
@@ -1028,7 +1028,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
                  ! On prend le milieu du bin uniquement pour la pola, car les fct sont plus smooth
                  w = (2.0_dp * ((real(theta_I,kind=dp) - 0.5) / real(n_theta_I,kind=dp) ) - 1.0_dp) * (2*dir-1)
-                 phi = deux_pi * (real(phi_I,kind=dp) - 0.5) / real(n_phi_I,kind=dp)
+                 phi = two_pi * (real(phi_I,kind=dp) - 0.5) / real(n_phi_I,kind=dp)
 
                  w02 = sqrt(1.0_dp-w*w)
                  u = w02 * sin(phi)
@@ -1057,7 +1057,7 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
                  !     le plan de diffusion est a +ou- 90deg de la normale
                  ! Ne doit pas etre utilise en ray-tracing !!! teste OK sans
-                 !theta = theta  + pi_sur_deux
+                 !theta = theta  + half_pi
 
                  !----dans les matrices de rotation l'angle est omega = 2 * theta-----
                  omega = 2.0_dp * theta ! A verifier: le moins est pour corriger un bug de signe trouve par Marshall (supprime)
@@ -1083,13 +1083,13 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
 
   !$omp parallel &
   !$omp default(none) &
-  !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,icell1,energie_photon,volume) &
+  !$omp shared(lvariable_dust,Inu,I_sca2,n_cells,tab_s11_pos,uv0,w0,n_Stokes,icell1,photon_energy,volume) &
   !$omp shared(tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
   !$omp shared(lsepar_pola,tab_k,tab_sin_scatt_norm,lambda,p_lambda,n_phi_I,n_theta_I,nang_ray_tracing,lsepar_contrib) &
   !$omp shared(s11_save,tab_cosw,tab_sinw,nb_proc,kappa,kappa_factor,tab_albedo_pos) &
   !$omp private(iscatt,id,u_ray_tracing,v_ray_tracing,w_ray_tracing,theta_I,phi_I,i1,i2,u,v,w,cos_scatt,sin_scatt) &
   !$omp private(sum_sin,icell,p_icell,stokes,s11,k,alloc_status,dir,phi_scatt) &
-  !$omp private(s12,s22,s33,s34,s44,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,facteur,kappa_sca)
+  !$omp private(s12,s22,s33,s34,s44,M,ROP,RPO,v1pi,v1pj,v1pk,xnyp,costhet,theta,omega,cosw,sinw,C,D,S,factor,kappa_sca)
   id = 1 ! pour code sequentiel
 
   ! Matrice de Mueller
@@ -1223,9 +1223,9 @@ subroutine calc_Isca_rt2(lambda,p_lambda,ibin)
      enddo ! dir
 
      ! Normalisation
-     facteur = energie_photon / volume(icell)
+     factor = photon_energy / volume(icell)
      kappa_sca = kappa(p_icell,lambda) * kappa_factor(icell) * tab_albedo_pos(p_icell,lambda)
-     I_sca2(:,:,:,icell) =  I_sca2(:,:,:,icell) *  facteur * kappa_sca
+     I_sca2(:,:,:,icell) =  I_sca2(:,:,:,icell) *  factor * kappa_sca
   enddo ! icell
   !$omp enddo
   !$omp end parallel
@@ -1247,26 +1247,26 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
 
   integer :: dir, iscatt, id
   real(kind=dp), dimension(4) :: Stokes, S, C, D
-  real(kind=dp) :: x, y, z, u, v, w, facteur, kappa_sca
+  real(kind=dp) :: x, y, z, u, v, w, factor, kappa_sca
 
   real(kind=dp), dimension(4,4) ::  M, ROP, RPO
 
   integer :: k, icell, p_icell
   real :: s11, s22, s12, s33, s34, s44, cos_scatt
-  real(kind=dp) :: omega, sinw, cosw, norme, energie_photon, n_photons_envoyes
+  real(kind=dp) :: omega, sinw, cosw, norm, photon_energy, n_sent_photons
 
   real(kind=dp), parameter :: prec = 0._dp
 
   if (lmono0) then ! image
-     energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
-          (real(nbre_photons_loop)*real(nbre_photons_image) *  AU_to_cm * pi)
+     photon_energy = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
+          (real(n_photons_loop)*real(n_photons_image) *  AU_to_cm * pi)
   else ! SED
-     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-     energie_photon = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
-          (n_photons_envoyes *  AU_to_cm * pi)
+     n_sent_photons = sum(n_phot_envoyes(lambda,:))
+     photon_energy = (E_stars(lambda) + E_disk(lambda)) * tab_lambda(lambda) * 1.0e-6  / &
+          (n_sent_photons *  AU_to_cm * pi)
   endif
 
-  if (n_etoiles > 1) then
+  if (n_stars > 1) then
      write(*,*) "WARNING : RT2 needs to be updated for multiple stars"
      write(*,*) " if extra stars/planets emit significantly"
   endif
@@ -1277,9 +1277,9 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
   !$omp shared(n_cells,lambda,p_lambda,ibin,I_spec_star,nang_ray_tracing_star,cos_thet_ray_tracing_star) &
   !$omp shared(lvariable_dust,r_grid,z_grid,icell1,omega_ray_tracing_star,lsepar_pola) &
   !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
-  !$omp shared(energie_photon,volume,tab_albedo_pos,kappa,kappa_factor,eps_dust2_star) &
-  !$omp private(id,icell,p_icell,stokes,x,y,z,norme,u,v,w,dir,iscatt,cos_scatt,k,omega,cosw,sinw,RPO,ROP,S) &
-  !$omp private(s11,s22,s12,s33,s34,s44,C,D,M,facteur,kappa_sca)
+  !$omp shared(photon_energy,volume,tab_albedo_pos,kappa,kappa_factor,eps_dust2_star) &
+  !$omp private(id,icell,p_icell,stokes,x,y,z,norm,u,v,w,dir,iscatt,cos_scatt,k,omega,cosw,sinw,RPO,ROP,S) &
+  !$omp private(s11,s22,s12,s33,s34,s44,C,D,M,factor,kappa_sca)
   id = 1 ! sequentiel
 
   ! Matrice de Mueller
@@ -1314,10 +1314,10 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
      y = r_grid(icell) ! doit juste etre non nul
      z = z_grid(icell) ! sert a rien
 
-     norme = sqrt(y**2 + z**2)
+     norm = sqrt(y**2 + z**2)
      u = 0.0_dp
-     v = y / norme
-     w = z / norme
+     v = y / norm
+     w = z / norm
 
      ! cos_scatt_ray_tracing correspondants
      call angles_scatt_rt2(id,ibin,x,y,z,u,v,w,.true.)
@@ -1425,9 +1425,9 @@ subroutine calc_Isca_rt2_star(lambda,p_lambda,ibin)
      enddo ! dir
 
      ! Normalisation
-     facteur = energie_photon / volume(icell)
+     factor = photon_energy / volume(icell)
      kappa_sca = kappa(p_icell,lambda) * kappa_factor(icell) * tab_albedo_pos(p_icell,lambda)
-     eps_dust2_star(:,:,:,icell) =  eps_dust2_star(:,:,:,icell) *  facteur * kappa_sca
+     eps_dust2_star(:,:,:,icell) =  eps_dust2_star(:,:,:,icell) *  factor * kappa_sca
 
   enddo ! icell
   !$omp end do
@@ -1440,7 +1440,7 @@ end subroutine calc_Isca_rt2_star
 !***********************************************************
 
 function dust_source_fct(icell, x,y,z)
-  ! La direction du rayon est maintenant fixee le long de l'axe x
+  ! La direction du radius est maintenant fixee le long de l'axe x
   ! l'angle de diffusion ne depend que de la position x, y, z
 
   integer, intent(in) :: icell
@@ -1467,12 +1467,12 @@ function dust_source_fct(icell, x,y,z)
         endif
         ! Cette methode est OK mais on voit les cellules
         phi_pos = atan2(x,y)
-        k = floor(modulo(phi_pos, deux_pi) / deux_pi * n_az_rt) + 1
+        k = floor(modulo(phi_pos, two_pi) / two_pi * n_az_rt) + 1
         if (k > n_az_rt) k = n_az_rt
      endif
 
      ! OK : lisse les images par rapport a la methode en dessous
-!---     xi_az =  modulo(phi_pos, deux_pi) / deux_pi * n_az_rt + 0.5
+!---     xi_az =  modulo(phi_pos, two_pi) / two_pi * n_az_rt + 0.5
 !---     phi_k =  floor(xi_az)
 !---     frac = xi_az - phi_k
 !---     un_m_frac = 1.0_dp - frac
@@ -1536,13 +1536,13 @@ function dust_source_fct(icell, x,y,z)
 
 
      ! Patch : dans les cas ou frac_z est > 1 ou < 0  !!!!!
-     ! ca veut surement dire que l'on est pas dans la bonne cellule
+     ! ca veut surement dire que l'on est pas dans la bonne cell
      frac_z = max(min(1.0,frac_z),0.0)
      frac_r = max(min(1.0,frac_r),0.0)
 
 
      ! Calcul angle phi a la position
-     phi_pos = modulo(atan2(x,y) + deux_pi,deux_pi)
+     phi_pos = modulo(atan2(x,y) + two_pi,two_pi)
 
      if (z > 0.0_dp) then
         dir=1
@@ -1553,7 +1553,7 @@ function dust_source_fct(icell, x,y,z)
      !----------------------------------------------------
      ! Emissivite du champ diffuse plusieurs fois
      !----------------------------------------------------
-     xiscatt = max(phi_pos/deux_pi  * nang_ray_tracing, 0.0_dp)
+     xiscatt = max(phi_pos/two_pi  * nang_ray_tracing, 0.0_dp)
 
      iscatt1 = floor(xiscatt)
      frac = xiscatt - iscatt1
@@ -1618,7 +1618,7 @@ function dust_source_fct(icell, x,y,z)
      !----------------------------------------------------
      ! Emissivite du champ stellaire diffuse 1 fois
      !----------------------------------------------------
-     xiscatt =  max(phi_pos/deux_pi  * nang_ray_tracing_star, 0.0_dp)
+     xiscatt =  max(phi_pos/two_pi  * nang_ray_tracing_star, 0.0_dp)
 
      iscatt1 = floor(xiscatt)
      frac = xiscatt - iscatt1
@@ -1713,29 +1713,29 @@ function interpolate_Stokes_QU(PI_deuxtheta1,PI_deuxtheta2,frac1)
   real(dp), intent(in) :: frac1
   real, dimension(2) :: interpolate_Stokes_QU
 
-  real :: PxI1, PxI2, PxI, deux_theta1, deux_theta2, deux_theta
+  real :: PxI1, PxI2, PxI, two_theta1, two_theta2, two_theta
 
-  !PxI1 = sqrt(QU1(1)**2 + QU1(2)**2) ; deux_theta1 = atan2(QU1(2),QU1(1))
-  !PxI2 = sqrt(QU2(1)**2 + QU2(2)**2) ; deux_theta2 = atan2(QU2(2),QU2(1))
+  !PxI1 = sqrt(QU1(1)**2 + QU1(2)**2) ; two_theta1 = atan2(QU1(2),QU1(1))
+  !PxI2 = sqrt(QU2(1)**2 + QU2(2)**2) ; two_theta2 = atan2(QU2(2),QU2(1))
 
-  ! Using PxI and deux_theta
-  PxI1 = PI_deuxtheta1(1) ; deux_theta1 = PI_deuxtheta1(2)
-  PxI2 = PI_deuxtheta2(1) ; deux_theta2 = PI_deuxtheta2(2)
+  ! Using PxI and two_theta
+  PxI1 = PI_deuxtheta1(1) ; two_theta1 = PI_deuxtheta1(2)
+  PxI2 = PI_deuxtheta2(1) ; two_theta2 = PI_deuxtheta2(2)
 
   ! Linear interpolation of polarized intensity
   PxI = PxI2 * (1.0_dp-frac1) + PxI1 * frac1
 
   ! Making sure there is no wrapping before the linear interpolation in angle
-  if (abs(deux_theta2 - deux_theta1) >= pi) then
-     if (deux_theta2 > deux_theta1) then
-        deux_theta1 = deux_theta1 + deux_pi
+  if (abs(two_theta2 - two_theta1) >= pi) then
+     if (two_theta2 > two_theta1) then
+        two_theta1 = two_theta1 + two_pi
      else
-        deux_theta2 = deux_theta2 + deux_pi
+        two_theta2 = two_theta2 + two_pi
      endif
   endif
-  deux_theta = deux_theta2 * (1.0_dp-frac1) + deux_theta1 * frac1
+  two_theta = two_theta2 * (1.0_dp-frac1) + two_theta1 * frac1
 
-  interpolate_Stokes_QU = PxI * [cos(deux_theta),-sin(deux_theta)] ! - sign to match IAU convention
+  interpolate_Stokes_QU = PxI * [cos(two_theta),-sin(two_theta)] ! - sign to match IAU convention
 
   return
 

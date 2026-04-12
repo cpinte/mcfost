@@ -8,9 +8,9 @@ module lte
    use atom_type
    use elements_type
    use grid, only : ne, T, icompute_atomRT, nHmin, nHtot
-   use constantes
+   use constants
    use occupation_probability, only : wocc_n
-   use parametres, only : ldissolve, n_cells, loutput_rates
+   use parameters, only : ldissolve, n_cells, loutput_rates
    !$ use omp_lib
 
    implicit none

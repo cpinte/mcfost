@@ -1,6 +1,6 @@
 module mol_transfer
 
-  use parametres
+  use parameters
   use naleat
   use utils
   use molecular_emission
@@ -170,7 +170,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
   real :: rand, rand2, rand3, fac_etape, factor
 
-  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, maxdiff, norme
+  real(kind=dp) :: x0, y0, z0, u0, v0, w0, w02, srw02, argmt, diff, maxdiff, norm
 
   real(kind=dp), dimension(nLevels,nb_proc)  :: pop, pop_old
 
@@ -233,7 +233,7 @@ subroutine NLTE_mol_line_transfer(imol)
 
      if (etape==1) then
         lfixed_Rays = .true. ;  ispeed(1) = -n_speed ; ispeed(2) = n_speed
-        n_rayons = 2 ! TR 1D : 1 rayon qui monte, 1 rayon qui descend
+        n_rayons = 2 ! TR 1D : 1 radius qui monte, 1 radius qui descend
         iray_start=1
         fac_etape = 1.0
         lprevious_converged = .false.
@@ -297,10 +297,10 @@ subroutine NLTE_mol_line_transfer(imol)
         !$omp parallel &
         !$omp default(none) &
         !$omp private(id,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02) &
-        !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norme,iv,icell,factor,tab_nLevel_old) &
+        !$omp private(argmt,n_iter_loc,lconverged_loc,diff,norm,iv,icell,factor,tab_nLevel_old) &
         !$omp shared(imol,stream,n_rad,nz,n_az,n_rayons,iray_start,Doppler_P_x_freq,tab_nLevel,n_level_comp) &
         !$omp shared(deltaVmax,ispeed,r_grid,z_grid,phi_grid,lcompute_molRT,lkeplerian,n_cells) &
-        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cellule) &
+        !$omp shared(tab_speed,lfixed_Rays,lnotfixed_Rays,pop_old,pop,labs,n_speed,max_n_iter_loc,etape,pos_em_cell) &
         !$omp shared(nTrans_tot,tab_Trans,n_cells_done,ibar) &
         !$omp reduction(max:maxdiff)
 
@@ -324,7 +324,7 @@ subroutine NLTE_mol_line_transfer(imol)
               do iray=iray_start, iray_start-1+n_rayons
 
                  if (etape==1) then
-                    ! Position = milieu de la cellule
+                    ! Position = milieu de la cell
                     x0 = r_grid(icell) * cos(phi_grid(icell))
                     y0 = r_grid(icell) * sin(phi_grid(icell))
                     z0 = z_grid(icell)
@@ -339,23 +339,23 @@ subroutine NLTE_mol_line_transfer(imol)
                        u0 = 0.0_dp
                        v0 = 0.0_dp
                     else
-                       norme = sqrt(x0*x0 + y0*y0 + z0*z0)
+                       norm = sqrt(x0*x0 + y0*y0 + z0*z0)
                        if (iray==1) then
-                          u0 = x0/norme
-                          v0 = y0/norme
-                          w0 = z0/norme
+                          u0 = x0/norm
+                          v0 = y0/norm
+                          w0 = z0/norm
                        else
-                          u0 = -x0/norme
-                          v0 = -y0/norme
-                          w0 = -z0/norme
+                          u0 = -x0/norm
+                          v0 = -y0/norm
+                          w0 = -z0/norm
                        endif
                     endif
                  else
-                    ! Position aleatoire dans la cellule
+                    ! Position aleatoire dans la cell
                     rand  = sprng(stream(id))
                     rand2 = sprng(stream(id))
                     rand3 = sprng(stream(id))
-                    call pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+                    call pos_em_cell(icell ,rand,rand2,rand3,x0,y0,z0)
 
                     ! Direction de propagation aleatoire
                     rand = sprng(stream(id))
@@ -368,14 +368,14 @@ subroutine NLTE_mol_line_transfer(imol)
                     V0 = SRW02 * sin(ARGMT)
                  endif
 
-                 ! Echantillonnage aleatoire du champ de vitesse
+                 ! Echantillonnage aleatoire du champ de velocity
                  if (lnotfixed_Rays) then
                     do iv=ispeed(1),ispeed(2)
                        rand = sprng(stream(id)) ; tab_speed(iv,id) =  2.0_dp * (rand - 0.5_dp) * deltaVmax(icell)
                     enddo
                  endif
 
-                 ! Integration le long du rayon
+                 ! Integration le long du radius
                  call integ_ray_mol(id,imol,icell,x0,y0,z0,u0,v0,w0,iray,labs, ispeed,tab_speed(:,id), &
                       nTrans_tot, tab_Trans)
               enddo ! iray
@@ -483,7 +483,7 @@ end subroutine NLTE_mol_line_transfer
 
 subroutine emission_line_map(imol,ibin,iaz)
   ! Creation de la carte d'emission moleculaire
-  ! (ou du spectre s'il n'y a qu'un seul pixel)
+  ! (ou du spectrum s'il n'y a qu'un seul pixel)
   ! par ray-tracing dans une direction donnee
   ! C. Pinte
   ! 12/04/07
@@ -609,7 +609,7 @@ subroutine emission_line_map(imol,ibin,iaz)
      if (l_sym_ima_mol) then
         cst_phi = pi  / real(n_phi_RT,kind=dp)
      else
-        cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
+        cst_phi = two_pi  / real(n_phi_RT,kind=dp)
      endif
 
      !$omp do schedule(dynamic,1)
@@ -670,14 +670,14 @@ subroutine emission_line_map(imol,ibin,iaz)
   endif
 
   ! --------------------------
-  ! Ajout flux etoile
+  ! Ajout flux star
   ! --------------------------
   do i = 1, mol(imol)%nTrans_raytracing
-     lambda =  mol(imol)%indice_Trans_raytracing(i) ! == iTrans
+     lambda =  mol(imol)%index_trans_ray_tracing(i) ! == iTrans
      call compute_stars_map(lambda, ibin, iaz, u, v, w, taille_pix, dx, dy, lresolved)
 
      do iv = 1, n_speed_rt
-        spectre(:,:,iv,i,ibin,iaz) = spectre(:,:,iv,i,ibin,iaz) + stars_map(:,:,1)
+        spectrum(:,:,iv,i,ibin,iaz) = spectrum(:,:,iv,i,ibin,iaz) + stars_map(:,:,1)
      enddo
      continu(:,:,i,ibin,iaz) = continu(:,:,i,ibin,iaz) + stars_map(:,:,1)
   enddo
@@ -751,7 +751,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
 
      iray = 1
 
-     ! L'obs est en dehors de la grille
+     ! L'obs est en dehors de la grid
      ri = 2*n_rad ; zj=1 ; phik=1
 
      ! Boucle sur les sous-pixels qui calcule l'intensite au centre
@@ -763,12 +763,12 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
            y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
            z0 = pixelcorner(3) + (i - 0.5_dp) * sdx(3) + (j-0.5_dp) * sdy(3)
 
-           ! On se met au bord de la grille : propagation a l'envers
+           ! On se met au bord de la grid : propagation a l'envers
            call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
-           if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+           if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
               call integ_ray_mol(id,imol,icell,x0,y0,z0,u0,v0,w0,iray,labs,ispeed,tab_speed_rt, &
-                   nTrans_raytracing, mol(imol)%indice_Trans_raytracing)
+                   nTrans_raytracing, mol(imol)%index_trans_ray_tracing)
               ! Flux recu dans le pixel
               IP(:,:) = IP(:,:) +  I0(:,:,iray,id)
               IPc(:) = IPc(:) +  I0c(:,iray,id)
@@ -827,7 +827,7 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   ! et multiplication par la frequence pour avoir du nu.F_nu
   ! Warning IP, IPc are smaller array (dimension mol(imol)%nTrans_raytracing)
   do i=1,mol(imol)%nTrans_raytracing
-     iTrans = mol(imol)%indice_Trans_raytracing(i)
+     iTrans = mol(imol)%index_trans_ray_tracing(i)
      IP(:,i) = IP(:,i) * transfreq(iTrans)
      IPc(i) = IPc(i) * transfreq(iTrans)
   enddo
@@ -835,10 +835,10 @@ subroutine intensite_pixel_mol(id,imol,ibin,iaz,n_iter_min,n_iter_max,ipix,jpix,
   ! profil de raie non convolue teste ok avec torus
 
   if (RT_line_method==1) then ! Sommation implicite sur les pixels
-     spectre(1,1,:,:,ibin,iaz) = spectre(1,1,:,:,ibin,iaz) + IP(:,:)
+     spectrum(1,1,:,:,ibin,iaz) = spectrum(1,1,:,:,ibin,iaz) + IP(:,:)
      continu(1,1,:,ibin,iaz) = continu(1,1,:,ibin,iaz) + IPc(:)
   else
-     spectre(ipix,jpix,:,:,ibin,iaz) = IP(:,:)
+     spectrum(ipix,jpix,:,:,ibin,iaz) = IP(:,:)
      continu(ipix,jpix,:,ibin,iaz) = IPc(:)
   endif
 
@@ -913,13 +913,13 @@ subroutine init_dust_mol(imol)
         tab_delta_lambda(iTrans) = tab_lambda_sup(iTrans) - tab_lambda_inf(iTrans)
      enddo
 
-     if (lbenchmark_water3) then ! opacite en loi de puissance
+     if (lbenchmark_water3) then ! opacity en loi de puissance
         write(*,*) "WARNING : hard-coded gas_dust =", gas_dust
 
         do iTrans=1,nTrans_tot
            wl = tab_lambda(iTrans)
 
-           ! Loi d'opacite (cm^2 par g de poussiere)
+           ! Loi d'opacity (cm^2 par g de poussiere)
            if (wl > 250) then
               kap = 10. * (wl/250.)**(-2.0)
            else
@@ -930,7 +930,7 @@ subroutine init_dust_mol(imol)
            ! AU_to_cm**2 car on veut kappa_abs_LTE en AU-1
            write(*,*) "TODO : the water benchmark 3 needs to be updated for cell pointer in opacity table"
            do icell=1,n_cells
-              kappa_abs_LTE(icell,iTrans) =  kap * (densite_gaz(icell) * cm_to_m**3) * mu_mH / &
+              kappa_abs_LTE(icell,iTrans) =  kap * (gas_density(icell) * cm_to_m**3) * mu_mH / &
                    gas_dust / cm_to_AU
            enddo
 
@@ -940,13 +940,13 @@ subroutine init_dust_mol(imol)
         kappa(:,:) = kappa_abs_LTE(:,:)
 
      else ! cas par defaut
-        call init_indices_optiques()
+        call init_optical_indices()
 
         ! On recalcule les proprietes optiques
         write(*,*) "Computing dust properties for", nTrans_tot, "wavelength"
         do iTrans=iTrans_min,iTrans_max
            call prop_grains(iTrans)
-           call opacite(iTrans, iTrans, no_scatt=.true.)
+           call opacity(iTrans, iTrans, no_scatt=.true.)
         enddo
      endif
 
@@ -1017,11 +1017,11 @@ subroutine init_molecular_disk(imol)
      if (.not.lVoronoi) then ! Velocities are defined from SPH files in Voronoi mode
         if (lcylindrical_rotation) then ! Midplane Keplerian velocity
            do icell=1, n_cells
-              vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
+              vfield(icell) = sqrt(Ggrav * sum(star%M) * Msun_to_kg /  (r_grid(icell) * AU_to_m) )
            enddo
         else ! dependance en z
            do icell=1, n_cells
-              vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg * r_grid(icell)**2 / &
+              vfield(icell) = sqrt(Ggrav * sum(star%M) * Msun_to_kg * r_grid(icell)**2 / &
                    ((r_grid(icell)**2 + z_grid(icell)**2)**1.5 * AU_to_m) )
            enddo
         endif
@@ -1094,7 +1094,7 @@ subroutine init_abundance(imol)
 
   do icell=1, n_cells
      lcompute_molRT(icell) = (tab_abundance(icell) > tiny_real) .and. &
-          (densite_gaz(icell) > tiny_real) .and. (Tcin(icell) > 1.)
+          (gas_density(icell) > tiny_real) .and. (Tcin(icell) > 1.)
   enddo
 
   return
@@ -1153,9 +1153,9 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
   Icorner(:) = center(:) - ( 0.5 * npix_x * dx(:) +  0.5 * npix_y * dy(:))
 
   ! We only consider the 1st transition for now
-  iTrans = mol(imol)%indice_Trans_raytracing(1)
+  iTrans = mol(imol)%index_trans_ray_tracing(1)
 
-  ! Tableau vitesse
+  ! Tableau velocity
   !nTrans_raytracing = mol(imol)%nTrans_raytracing
   ispeed(1) = 1 ; ispeed(2) = mol(imol)%n_speed_rt
 
@@ -1184,10 +1184,10 @@ subroutine emission_line_tau_surface_map(imol,tau,ibin,iaz)
         ! Ray tracing : on se propage dans l'autre sens
         u0 = -u ; v0 = -v ; w0 = -w
 
-        ! On se met au bord de la grille : propagation a l'envers
+        ! On se met au bord de la grid : propagation a l'envers
         call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
-        if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+        if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
            lpacket_alive = .true.
            call physical_length_mol(imol,iTrans,icell,x0,y0,z0,u0,v0,w0,ispeed,tab_speed_rt,tau,flag_sortie)
            if (flag_sortie) then ! We do not reach the surface tau=1
@@ -1263,12 +1263,12 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
 
   ! We only consider the 1st transition for now
   iTrans = 1
-  iiTrans = mol(imol)%indice_Trans_raytracing(iTrans)
+  iiTrans = mol(imol)%index_trans_ray_tracing(iTrans)
 
   ! Corrective factor : we want the flux before we take into account the pixel size
   factor = flux_fraction / (taille_pix / (distance*pc_to_AU))**2 /  transfreq(iiTrans)
 
-  ! Tableau vitesse
+  ! Tableau velocity
   !nTrans_raytracing = mol(imol)%nTrans_raytracing
   ispeed(1) = 1 ; ispeed(2) = mol(imol)%n_speed_rt
 
@@ -1278,7 +1278,7 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
   !$omp private(i,j,id,icell,lintersect,x0,y0,z0,u0,v0,w0) &
   !$omp private(flag_sortie,lpacket_alive,pixelcenter,Flux) &
   !$omp shared(flux_fraction,Icorner,imol,iTrans,iiTrans,dx,dy,u,v,w,ispeed,tab_speed_rt) &
-  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid,spectre,factor)
+  !$omp shared(taille_pix,npix_x,npix_y,ibin,iaz,tau_surface_map,move_to_grid,spectrum,factor)
   id = 1 ! pour code sequentiel
 
   tau_surface_map = 0.0_dp
@@ -1297,13 +1297,13 @@ subroutine emission_line_energy_fraction_surface_map(imol,flux_fraction,ibin,iaz
         ! Ray tracing : on se propage dans l'autre sens
         u0 = -u ; v0 = -v ; w0 = -w
 
-        ! On se met au bord de la grille : propagation a l'envers
+        ! On se met au bord de la grid : propagation a l'envers
         call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
 
         ! Maximum flux in pixel
-        Flux = maxval(spectre(i,j,:,iTrans,ibin,iaz)) * factor
+        Flux = maxval(spectrum(i,j,:,iTrans,ibin,iaz)) * factor
 
-        if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+        if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
            lpacket_alive = .true.
            call physical_length_mol_Flux(imol,iiTrans,icell,x0,y0,z0,u0,v0,w0,ispeed,tab_speed_rt,Flux,flag_sortie)
            if (flag_sortie) then ! We do not reach the surface tau=1

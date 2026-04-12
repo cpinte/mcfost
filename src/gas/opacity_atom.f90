@@ -3,7 +3,7 @@ module Opacity_atom
 
    use atom_type
    use grid
-   use parametres
+   use parameters
    use broad, Only               : line_damping
    use voigts, only              : voigt
    use occupation_probability, only : f_dissolve
@@ -13,7 +13,7 @@ module Opacity_atom
    use wavelengths, only         :  n_lambda
    use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_cont, n_lambda_cont, tab_lambda_cont, tab_lambda_nm, &
                                     peak_gauss_limit, Nlambda_line_gauss_log, Nlambda_line_gauss_lin
-   use constantes, only          : c_light
+   use constants, only          : c_light
    use molecular_emission, only  : v_proj, ds
    use utils, only               : linear_1D_sorted
    !$ use omp_lib

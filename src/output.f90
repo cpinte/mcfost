@@ -1,11 +1,11 @@
 module output
 
-  use parametres
+  use parameters
   use grains
   use temperature
   use radiation_field, only : J0, xJ_abs
   use thermal_emission, only : E_totale, nbre_reemission
-  use constantes
+  use constants
   use dust_prop
   use molecular_emission
   use dust_ray_tracing, only : n_phot_envoyes, Stokes_ray_tracing, tau_surface_map, stars_map, tau_map
@@ -37,7 +37,7 @@ module output
   real(kind=dp), dimension(:,:), allocatable :: star_origin
 
   ! Line transfer
-  real, dimension(:,:,:,:,:,:), allocatable :: spectre ! speed,trans,thetai,phi,x,y
+  real, dimension(:,:,:,:,:,:), allocatable :: spectrum ! speed,trans,thetai,phi,x,y
   real, dimension(:,:,:,:,:), allocatable :: continu ! trans,thetai,phi,x,y
   real(kind=dp), allocatable, dimension(:,:,:,:) :: Flux_total !total flux  when line transfer ("high resolution SED")
 
@@ -178,15 +178,15 @@ subroutine allocate_mol_maps(imol)
      npix_x = npix_x_save ; npix_y = npix_y_save ! we update the value after the SED calculation
 
      write(*,*) "WARNING : memory size if lots of pixels"
-     allocate(spectre(npix_x,npix_y,n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
+     allocate(spectrum(npix_x,npix_y,n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
           continu(npix_x,npix_y,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(npix_x,npix_y,1), stat=alloc_status)
   else
      RT_line_method = 1 ! utilisation de pixels circulaires
-     allocate(spectre(1,1,n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
+     allocate(spectrum(1,1,n_speed_rt,nTrans_raytracing,RT_n_incl,RT_n_az), &
           continu(1,1,nTrans_raytracing,RT_n_incl,RT_n_az), stars_map(1,1,1), stat=alloc_status)
   endif
-  if (alloc_status > 0) call error('Allocation error spectre')
-  spectre=0.0
+  if (alloc_status > 0) call error('Allocation error spectrum')
+  spectrum=0.0
   continu=0.0
   stars_map=0.0
 
@@ -259,7 +259,7 @@ end subroutine deallocate_atom_maps
 
 subroutine deallocate_mol_maps()
 
-  deallocate(spectre,continu)
+  deallocate(spectrum,continu)
   return
 
 end subroutine deallocate_mol_maps
@@ -609,8 +609,8 @@ subroutine write_stokes_fits()
   character(len = 512) :: filename
   logical :: simple, extend
 
-  real, dimension(n_lambda) :: n_photons_envoyes
-  real :: facteur, pixel_scale_x, pixel_scale_y
+  real, dimension(n_lambda) :: n_sent_photons
+  real :: factor, pixel_scale_x, pixel_scale_y
 
   real :: o_star, frac_star, somme_disk
   real, dimension(n_cells) :: o_disk
@@ -706,10 +706,10 @@ subroutine write_stokes_fits()
 
 
   lambda=1
-  n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(lambda,:)))
-  E_totale(lambda) = E_totale(lambda)/n_photons_envoyes(lambda)
-  facteur = E_totale(lambda) * tab_lambda(lambda) * 1.0e-6
-  stoke_io = stoke_io * facteur
+  n_sent_photons(lambda) = real(sum(n_phot_envoyes(lambda,:)))
+  E_totale(lambda) = E_totale(lambda)/n_sent_photons(lambda)
+  factor = E_totale(lambda) * tab_lambda(lambda) * 1.0e-6
+  stoke_io = stoke_io * factor
 
   !  Get an unused Logical Unit Number to use to open the FITS file.
   call ftgiou ( unit, status )
@@ -1331,7 +1331,7 @@ subroutine ecriture_sed_ray_tracing()
 
   call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
-  ! Second HDU avec longueur d'onde
+  ! Second HDU avec length d'onde
   call FTCRHD(unit, status)
   bitpix=-32
   naxis=1
@@ -1607,7 +1607,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 ! Ecrit les table de densite du gaz en g/cm^3
 ! de la poussiere en g/cm^3 et en particules
 ! + coordonnees r et z en AU
-! + les tailles et masse des grains
+! + les tailles et mass des grains
 ! C. Pinte
 ! 3/06/06
 
@@ -1680,7 +1680,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
 
   dens = 0.0
 
-  dens(:) = densite_gaz(1:n_cells) * mu_mH / m3_to_cm3 ! nH2/m**3 --> g/cm**3
+  dens(:) = gas_density(1:n_cells) * mu_mH / m3_to_cm3 ! nH2/m**3 --> g/cm**3
 
   ! le e signifie real*4
   call ftppre(unit,group,fpixel,nelements,dens,status)
@@ -1745,7 +1745,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
      dust_dens(:,:) = 0.0
      do icell=1,n_cells
         dust_dens(icell,:) = merge(dust_density(:,icell), dust_density(grain(:)%zone,icell), lvariable_dust) * &
-             nbre_grains(:) * m3_to_cm3
+             n_grains(:) * m3_to_cm3
      enddo !icell
 
      call ftpprd(unit,group,fpixel,nelements,dust_dens,status)
@@ -1807,7 +1807,7 @@ subroutine write_disk_struct(lparticle_density,lcolumn_density,lvelocity)
   dens(:) = 0.0
   do icell=1,n_cells
      dens(icell) = sum(merge(dust_density(:,icell), dust_density(grain(:)%zone,icell), lvariable_dust) * &
-          nbre_grains(:) * M_grain(:))
+          n_grains(:) * M_grain(:))
   enddo
   call ftppre(unit,group,fpixel,nelements,dens,status)
 
@@ -2257,7 +2257,7 @@ subroutine ecriture_J(step)
   character(len=512) :: filename
 
   real, dimension(n_cells,n_lambda) :: Jio
-  real(kind=dp) :: n_photons_envoyes, energie_photon
+  real(kind=dp) :: n_sent_photons, photon_energy
 
 
   ! Step1
@@ -2277,10 +2277,10 @@ subroutine ecriture_J(step)
      ! Step 2
      filename = trim(data_dir)//"/J.fits.gz"
      do lambda=1, n_lambda2
-        n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-        energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
+        n_sent_photons = sum(n_phot_envoyes(lambda,:))
+        photon_energy = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_sent_photons * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
         do icell=1, n_cells
-           Jio(icell,lambda) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * energie_photon/volume(icell)
+           Jio(icell,lambda) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * photon_energy/volume(icell)
         enddo
      enddo
   endif
@@ -2336,7 +2336,7 @@ subroutine ecriture_J(step)
 
   call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
-  ! Second HDU avec longueur d'onde
+  ! Second HDU avec length d'onde
   call FTCRHD(unit, status)
   bitpix=-32
   naxis=1
@@ -2461,7 +2461,7 @@ function compute_UV_field() result(G)
   integer :: lambda, l, icell
   integer, parameter :: n=200
 
-  real(kind=dp) :: n_photons_envoyes, energie_photon
+  real(kind=dp) :: n_sent_photons, photon_energy
   real(kind=dp), dimension(:,:), allocatable :: J ! n_lambda,n_cells
   real(kind=dp), dimension(n) :: wl, J_interp
   real(kind=dp), dimension(n_lambda) :: lamb
@@ -2472,10 +2472,10 @@ function compute_UV_field() result(G)
   if (alloc_status /= 0) call error("allocation error in compute_UV_field")
 
   do lambda=1, n_lambda
-     n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-     energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes ! F_lambda here
+     n_sent_photons = sum(n_phot_envoyes(lambda,:))
+     photon_energy = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_sent_photons ! F_lambda here
      do icell=1, n_cells
-        J(lambda,icell) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * energie_photon/volume(icell)
+        J(lambda,icell) = (sum(xJ_abs(icell,lambda,:)) + J0(icell,lambda)) * photon_energy/volume(icell)
      enddo
   enddo
   lamb(:) = tab_lambda(:) * 1e-6 ! en m
@@ -2862,7 +2862,7 @@ subroutine ecriture_Tex(imol,ext)
         nUp = tab_nLevel(icell,iUp)
         nLow =  tab_nLevel(icell,iLow)
         if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
-           Tex(icell,iTrans) = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
+           Tex(icell,iTrans) = cst / log(  (nUp * stat_weight_g(iLow))  / (nLow * stat_weight_g(iUp) ))
         endif
      enddo ! icell
   enddo !iTrans
@@ -2922,7 +2922,7 @@ subroutine taille_moyenne_grains()
 
   implicit none
 
-  real(kind=dp) :: somme
+  real(kind=dp) :: total_sum
   integer :: l, icell, p_l
   real, dimension(:), allocatable :: a_moyen
 
@@ -2944,13 +2944,13 @@ subroutine taille_moyenne_grains()
   a_moyen(:) = 0.
 
   do icell=1, nc
-     somme=0.0
+     total_sum=0.0
      do l=1, n_grains_tot
         p_l = merge(l, grain(l)%zone, lvariable_dust)
-        a_moyen(icell) = a_moyen(icell) + dust_density(p_l,icell) * nbre_grains(l) * r_grain(l)**2
-        somme = somme + dust_density(p_l,icell)  * nbre_grains(l)
+        a_moyen(icell) = a_moyen(icell) + dust_density(p_l,icell) * n_grains(l) * r_grain(l)**2
+        total_sum = total_sum + dust_density(p_l,icell)  * n_grains(l)
      enddo
-     a_moyen(icell) = sqrt(a_moyen(icell) / somme)
+     a_moyen(icell) = sqrt(a_moyen(icell) / total_sum)
   enddo
 
   filename = "average_grain_size.fits.gz"
@@ -3004,8 +3004,8 @@ subroutine ecriture_sed(ised)
   integer, intent(in) :: ised
 
   integer :: lambda
-  real :: facteur
-  real, dimension(n_lambda2) :: n_photons_envoyes
+  real :: factor
+  real, dimension(n_lambda2) :: n_sent_photons
 
   character(len=512) :: filename
 
@@ -3044,13 +3044,13 @@ subroutine ecriture_sed(ised)
 
   ! Energie d'un photon / Temps
   ! Ca donne lambda Flambda a une distance = R_etoile
-  ! E_photon = sigma*T_etoile**4  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)) * real(N_thet)*real(N_phi)
+  ! E_photon = sigma*T_etoile**4  / (real(n_photons_loop)*real(n_photons_eq_th)) * real(N_thet)*real(N_phi)
   ! Ca donne lambda Flambda sur le detecteur
   if (l_sym_centrale) then
-     !E_photon = L_tot  / (real(nbre_photons_loop)*real(nbre_photons_eq_th)*(distance*pc_to_AU)**2) * real(N_thet)*real(N_phi)
-     E_photon1 = L_packet_th * (real(N_thet)*real(N_phi)/quatre_pi) / (distance*pc_to_AU)**2
+     !E_photon = L_tot  / (real(n_photons_loop)*real(n_photons_eq_th)*(distance*pc_to_AU)**2) * real(N_thet)*real(N_phi)
+     E_photon1 = L_packet_th * (real(N_thet)*real(N_phi)/four_pi) / (distance*pc_to_AU)**2
   else
-     E_photon1 = L_packet_th * (real(2*N_thet)*real(N_phi)/quatre_pi) / (distance*pc_to_AU)**2
+     E_photon1 = L_packet_th * (real(2*N_thet)*real(N_phi)/four_pi) / (distance*pc_to_AU)**2
   endif
 
   if (ised == 1) then
@@ -3068,8 +3068,8 @@ subroutine ecriture_sed(ised)
      nelements=naxes(1)*naxes(2)*naxes(3)
 
      do lambda=1,n_lambda
-        facteur =  E_photon1 * tab_lambda(lambda)/tab_delta_lambda(lambda)
-        sed1_io(lambda,:,:) = sum(sed(lambda,:,:,:),dim=3) * facteur
+        factor =  E_photon1 * tab_lambda(lambda)/tab_delta_lambda(lambda)
+        sed1_io(lambda,:,:) = sum(sed(lambda,:,:,:),dim=3) * factor
      enddo
 
      ! le e signifie real*4
@@ -3077,11 +3077,11 @@ subroutine ecriture_sed(ised)
 
      L_bol1 = sum(sed) * E_photon1
   else
-     ! Energie totale emise a une distance emise egale au rayon stellaire
+     ! Energie totale emise a une distance emise egale au radius stellaire
      ! on chosit cette distance pour calibrer le flux / pi*B(lambda)
      do lambda=1, n_lambda2
-        n_photons_envoyes(lambda) = real(sum(n_phot_envoyes(lambda,:)))
-        E_totale(lambda) = E_totale(lambda)/n_photons_envoyes(lambda)
+        n_sent_photons(lambda) = real(sum(n_phot_envoyes(lambda,:)))
+        E_totale(lambda) = E_totale(lambda)/n_sent_photons(lambda)
      enddo
 
      naxis=4
@@ -3097,15 +3097,15 @@ subroutine ecriture_sed(ised)
      nelements=naxes(1)*naxes(2)*naxes(3)*naxes(4)
 
      do lambda=1,n_lambda2
-        facteur = E_totale(lambda) * tab_lambda(lambda) * 1.0e-6
-        sed2_io(lambda,:,:,1) = sum(sed(lambda,:,:,:),dim=3) * facteur
-        sed2_io(lambda,:,:,2) = sum(sed_q(lambda,:,:,:),dim=3) * facteur
-        sed2_io(lambda,:,:,3) = sum(sed_u(lambda,:,:,:),dim=3) * facteur
-        sed2_io(lambda,:,:,4) = sum(sed_v(lambda,:,:,:),dim=3) * facteur
-        sed2_io(lambda,:,:,5) = sum(sed_star(lambda,:,:,:),dim=3) * facteur
-        sed2_io(lambda,:,:,6) = sum(sed_star_scat(lambda,:,:,:),dim=3) * facteur
-        sed2_io(lambda,:,:,7) = sum(sed_disk(lambda,:,:,:),dim=3) * facteur
-        sed2_io(lambda,:,:,8) = sum(sed_disk_scat(lambda,:,:,:),dim=3) * facteur
+        factor = E_totale(lambda) * tab_lambda(lambda) * 1.0e-6
+        sed2_io(lambda,:,:,1) = sum(sed(lambda,:,:,:),dim=3) * factor
+        sed2_io(lambda,:,:,2) = sum(sed_q(lambda,:,:,:),dim=3) * factor
+        sed2_io(lambda,:,:,3) = sum(sed_u(lambda,:,:,:),dim=3) * factor
+        sed2_io(lambda,:,:,4) = sum(sed_v(lambda,:,:,:),dim=3) * factor
+        sed2_io(lambda,:,:,5) = sum(sed_star(lambda,:,:,:),dim=3) * factor
+        sed2_io(lambda,:,:,6) = sum(sed_star_scat(lambda,:,:,:),dim=3) * factor
+        sed2_io(lambda,:,:,7) = sum(sed_disk(lambda,:,:,:),dim=3) * factor
+        sed2_io(lambda,:,:,8) = sum(sed_disk_scat(lambda,:,:,:),dim=3) * factor
         sed2_io(lambda,:,:,9) = sum(n_phot_sed(lambda,:,:,:),dim=3)
      enddo
 
@@ -3139,7 +3139,7 @@ subroutine ecriture_sed(ised)
 
   call ftpkys(unit,'BUNIT',"W.m-2",'lambda.F_lambda',status)
 
-  ! Second HDU avec longueur d'onde
+  ! Second HDU avec length d'onde
   call FTCRHD(unit, status)
   bitpix=-32
   naxis=1
@@ -3165,7 +3165,7 @@ subroutine ecriture_sed(ised)
   !  Check for any error, and if so print out error messages
   if (status > 0) call print_error(status)
 
-!  write(*,*) "Nbre paquets recus", real(nbre_photons_loop)*real(nbre_photons_eq_th), sum(sed), sum(sed)/(real(nbre_photons_loop)*real(nbre_photons_eq_th))
+!  write(*,*) "Nbre paquets recus", real(n_photons_loop)*real(n_photons_eq_th), sum(sed), sum(sed)/(real(n_photons_loop)*real(n_photons_eq_th))
 
   return
 
@@ -3246,9 +3246,9 @@ subroutine ecriture_spectre(imol)
 
   real, dimension(:,:,:), allocatable ::  O ! nv, nTrans, n_cells
   real, dimension(mol(imol)%nTrans_rayTracing) :: freq
-  integer, dimension(mol(imol)%nTrans_rayTracing) :: indice_Trans
+  integer, dimension(mol(imol)%nTrans_rayTracing) :: index_trans
 
-  real, dimension(:,:,:), allocatable :: spectre_casa
+  real, dimension(:,:,:), allocatable :: spectrum_casa
 
   real :: pixel_scale_x, pixel_scale_y, W2m2_to_Jy, factor
 
@@ -3278,7 +3278,7 @@ subroutine ecriture_spectre(imol)
      naxes(2)=npix_y
      naxes(3)=mol(imol)%n_speed_rt ! velocity
      nelements=naxes(1)*naxes(2)*naxes(3)
-     allocate(spectre_casa(naxes(1),naxes(2),naxes(3)))
+     allocate(spectrum_casa(naxes(1),naxes(2),naxes(3)))
   else
      naxis=6
      if (RT_line_method==1) then
@@ -3322,7 +3322,7 @@ subroutine ecriture_spectre(imol)
 
   if (lcasa) then
      call ftpkys(unit,'BUNIT',"JY/PIXEL",'',status)
-     call ftpkyd(unit,'RESTFREQ',Transfreq(mol(imol)%indice_Trans_rayTracing(1)),-7,'',status)
+     call ftpkyd(unit,'RESTFREQ',Transfreq(mol(imol)%index_trans_ray_tracing(1)),-7,'',status)
      call ftpkys(unit,'BTYPE',"Intensity",' ',status)
   else
      if (lJy) then
@@ -3338,27 +3338,27 @@ subroutine ecriture_spectre(imol)
      if (RT_line_method==1) then
         ! On ajoute les 2 parties du spectres
         do iv = -mol(imol)%n_speed_rt, -1
-           spectre(1,1,iv,:,:,:) = spectre(1,1,iv,:,:,:) + spectre(1,1,-iv,:,:,:)
+           spectrum(1,1,iv,:,:,:) = spectrum(1,1,iv,:,:,:) + spectrum(1,1,-iv,:,:,:)
         enddo
         ! On symetrise
         do iv = 1, mol(imol)%n_speed_rt
-           spectre(1,1,iv,:,:,:) = spectre(1,1,-iv,:,:,:)
+           spectrum(1,1,iv,:,:,:) = spectrum(1,1,-iv,:,:,:)
         enddo
-        spectre(1,1,0,:,:,:) = spectre(1,1,0,:,:,:) * 2.
+        spectrum(1,1,0,:,:,:) = spectrum(1,1,0,:,:,:) * 2.
         ! On divise par deux
-        spectre = spectre * 0.5
+        spectrum = spectrum * 0.5
      else
         xcenter = npix_x/2 + modulo(npix_x,2)
         if (lkeplerian) then ! profil de raie inverse des 2 cotes
            !iv_center = mol(imol)%n_speed_rt/2
            do i=xcenter+1,npix_x
               do iv=1, mol(imol)%n_speed_rt
-                 spectre(i,:,iv,:,:,:) = spectre(npix_x-i+1,:,mol(imol)%n_speed_rt-iv+1,:,:,:)
+                 spectrum(i,:,iv,:,:,:) = spectrum(npix_x-i+1,:,mol(imol)%n_speed_rt-iv+1,:,:,:)
               enddo
            enddo
         else ! infall : meme profil de raie des 2 cotes
            do i=xcenter+1,npix_x
-              spectre(i,:,:,:,:,:) = spectre(npix_x-i+1,:,:,:,:,:)
+              spectrum(i,:,:,:,:,:) = spectrum(npix_x-i+1,:,:,:,:,:)
            enddo
         endif
      endif ! lkeplerian
@@ -3366,21 +3366,21 @@ subroutine ecriture_spectre(imol)
 
   factor = 1.0
   if (lcasa) then
-     W2m2_to_Jy = 1e26 / Transfreq(mol(imol)%indice_Trans_rayTracing(1))
+     W2m2_to_Jy = 1e26 / Transfreq(mol(imol)%index_trans_ray_tracing(1))
 
-     spectre_casa(:,:,:) = spectre(:,:,:,1,1,1) * W2m2_to_Jy
+     spectrum_casa(:,:,:) = spectrum(:,:,:,1,1,1) * W2m2_to_Jy
 
      ! Write the array to the FITS file.
-     call ftppre(unit,group,fpixel,nelements,spectre_casa,status)
-     deallocate(spectre_casa)
+     call ftppre(unit,group,fpixel,nelements,spectrum_casa,status)
+     deallocate(spectrum_casa)
   else
      if (lJy) then
-        factor = 1e26 / Transfreq(mol(imol)%indice_Trans_rayTracing(1))
-        spectre = spectre * factor
+        factor = 1e26 / Transfreq(mol(imol)%index_trans_ray_tracing(1))
+        spectrum = spectrum * factor
      endif
 
      ! Write the array to the FITS file.
-     call ftppre(unit,group,fpixel,nelements,spectre,status)
+     call ftppre(unit,group,fpixel,nelements,spectrum,status)
   endif
 
   if (.not.lcasa) then
@@ -3433,11 +3433,11 @@ subroutine ecriture_spectre(imol)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      do i=1, mol(imol)%nTrans_rayTracing
-        indice_Trans(i) = mol(imol)%indice_Trans_rayTracing(i)
+        index_trans(i) = mol(imol)%index_trans_ray_tracing(i)
      enddo
 
      !  Write the array to the FITS file.
-     call ftpprj(unit,group,fpixel,nelements,indice_Trans,status)
+     call ftpprj(unit,group,fpixel,nelements,index_trans,status)
 
      !------------------------------------------------------------------------------
      ! HDU 4 : Transition frequencies
@@ -3454,7 +3454,7 @@ subroutine ecriture_spectre(imol)
      call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
      do i=1,mol(imol)%nTrans_rayTracing
-        freq(i) = Transfreq(mol(imol)%indice_Trans_rayTracing(i))
+        freq(i) = Transfreq(mol(imol)%index_trans_ray_tracing(i))
      enddo
 
      !  Write the array to the FITS file.
@@ -3881,7 +3881,7 @@ subroutine write_star_properties(unit,status)
   ! - the mass, Teff and radius of the stars
 
   use dust_ray_tracing, only : star_position, star_vr
-  use parametres, only : etoile
+  use parameters, only : star
 
   integer, intent(in) :: unit
   integer, intent(inout) :: status
@@ -3891,14 +3891,14 @@ subroutine write_star_properties(unit,status)
   integer :: group,fpixel,nelements
   logical :: simple, extend
 
-  real, dimension(3,n_etoiles) :: star_prop
+  real, dimension(3,n_stars) :: star_prop
 
   group=1
   fpixel=1
   bitpix=-32
 
   naxis = 4
-  naxes(1) = n_etoiles
+  naxes(1) = n_stars
   naxes(2)= RT_n_incl
   naxes(3)= RT_n_az
   naxes(4)= 2
@@ -3919,7 +3919,7 @@ subroutine write_star_properties(unit,status)
   ! radial velocities
   !------------------------
   naxis = 3
-  naxes(1) = n_etoiles
+  naxes(1) = n_stars
   naxes(2)= RT_n_incl
   naxes(3)= RT_n_az
   nelements=naxes(1)*naxes(2)*naxes(3)
@@ -3940,7 +3940,7 @@ subroutine write_star_properties(unit,status)
   !---------------------------------
   naxis = 2
   naxes(1) = 3
-  naxes(2) = n_etoiles
+  naxes(2) = n_stars
   nelements=naxes(1)*naxes(2)
 
   ! create new hdu
@@ -3951,9 +3951,9 @@ subroutine write_star_properties(unit,status)
 
   call ftpkys(unit,'UNIT',"Msun, K, Rsun",'',status)
 
-  star_prop(1,:) = etoile(1:n_etoiles)%M
-  star_prop(2,:) = etoile(1:n_etoiles)%T
-  star_prop(3,:) = etoile(1:n_etoiles)%r / Rsun_to_AU
+  star_prop(1,:) = star(1:n_stars)%M
+  star_prop(2,:) = star(1:n_stars)%T
+  star_prop(3,:) = star(1:n_stars)%r / Rsun_to_AU
 
   !  Write the array to the FITS file.
   call ftppre(unit,group,fpixel,nelements,star_prop,status)

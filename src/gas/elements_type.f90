@@ -4,7 +4,7 @@ module elements_type
     !molecules and atoms overlap.
 
     use mcfost_env, only : dp, mcfost_utils
-    use constantes
+    use constants
     use utils !do not forget to add the math module un int
 
     implicit none

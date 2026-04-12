@@ -10,7 +10,7 @@ module abo
 
    use atom_type, only  : AtomType, parse_label, ATOM_LABEL_WIDTH
    use utils
-   use constantes
+   use constants
    use elements_type, only : atomic_weights
    use mcfost_env, only : dp, mcfost_utils! convert from the relative location of atomic data
                                           ! to mcfost's environnement folders.

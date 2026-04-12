@@ -1,6 +1,6 @@
 module integrate
 
-  use constantes, only: dp
+  use constants, only: dp
 
   implicit none
 
@@ -13,7 +13,7 @@ module integrate
 
  abstract interface
     pure real function func(x)
-      use constantes, only: dp
+      use constants, only: dp
       real(kind=dp), intent(in) :: x
     end function func
  end interface

@@ -10,7 +10,7 @@ program BIGCRUNCH
   ! Grenoble, Exeter, Grenoble, Santiago
   !
   !***********************************************************
-  use parametres
+  use parameters
   use init_mcfost
   use dust_transfer
   use mol_transfer
@@ -37,7 +37,7 @@ program BIGCRUNCH
   !To do -> extract from ldust_transfer everything whuch defines the grid
   !-> possibility to set ldust_transfer to .false. and go to the full gas RT.
   if (ldust_transfer) then
-     call transfert_poussiere()
+     call dust_transfer_sub()
   endif
 
   ! Emission moleculaire ...

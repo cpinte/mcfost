@@ -4,7 +4,7 @@
 ! TO DO: check derivative of collision rates
 !        Derivative is not always Cij/ne (depends on the law)
 module collision_atom
-   use constantes
+   use constants
    use atom_type
    use grid, only : ne, T
    use elements_type

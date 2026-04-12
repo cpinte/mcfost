@@ -1,7 +1,7 @@
 module Temperature
 
   use mcfost_env
-  use parametres
+  use parameters
 
   implicit none
   save

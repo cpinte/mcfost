@@ -1,7 +1,7 @@
 module atom_type
 
    use mcfost_env, only : dp
-   use constantes, only   : mel, AMU_KG, E_RYDBERG, vtherm
+   use constants, only   : mel, AMU_KG, E_RYDBERG, vtherm
    use messages, only : error
 
    implicit none

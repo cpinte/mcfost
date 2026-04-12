@@ -1,7 +1,7 @@
 module read_pluto
 
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use messages
   use mcfost_env
   use grid
@@ -120,7 +120,7 @@ contains
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
 
-    real(dp) :: Ggrav_pluto, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
+    real(dp) :: Ggrav_pluto, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, factor
 
     real(dp), dimension(n_planets_max) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
     real(dp) :: Omega
@@ -243,7 +243,7 @@ contains
 
              icell = cell_map(i,j,phik)
 
-             densite_gaz(icell) = rho(i,i2,i3) * udens
+             gas_density(icell) = rho(i,i2,i3) * udens
              dust_density(:,icell) = rho(i,i2,i3) * udens
 
              vfield3d(icell,1)  = vx1(i,i2,i3) * uvelocity! vr
@@ -256,27 +256,27 @@ contains
 
     ! Normalisation density : copy and paste from read_density_file for now : needs to go in subroutine
 
-    ! Calcul de la masse de gaz de la zone
+    ! Calcul de la mass de gaz de la zone
     mass = 0.
     do icell=1,n_cells
-       mass = mass + densite_gaz(icell) *  mu_mH * volume(icell)
+       mass = mass + gas_density(icell) *  mu_mH * volume(icell)
     enddo !icell
     mass =  mass * AU3_to_m3 * g_to_Msun
 
     ! Normalisation
     if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
-       facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+       factor = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
 
-       ! Somme sur les zones pour densite finale
+       ! total_sum sur les zones pour densite finale
        do icell=1,n_cells
-          densite_gaz(icell) = densite_gaz(icell) * facteur
-          masse_gaz(icell) = densite_gaz(icell) * mu_mH * volume(icell) * AU3_to_m3
+          gas_density(icell) = gas_density(icell) * factor
+          gas_mass(icell) = gas_density(icell) * mu_mH * volume(icell) * AU3_to_m3
        enddo ! icell
     else
        call error('Gas mass is 0')
     endif
 
-    write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+    write(*,*) 'Total  gas mass in model:', real(sum(gas_mass) * g_to_Msun),' Msun'
     call normalize_dust_density()
 
     write(*,*) "Done"

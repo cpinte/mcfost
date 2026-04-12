@@ -1,12 +1,12 @@
 module read_fargo3d
 
-  use parametres
+  use parameters
   use messages
   use mcfost_env
   use grid
   use cylindrical_grid
   use density
-  use constantes
+  use constants
   use stars, only : compute_stellar_parameters
 
   implicit none
@@ -136,7 +136,7 @@ contains
     character(len=128) :: filename
     character(len=16), dimension(4) :: file_types
 
-    real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, facteur
+    real(dp) :: Ggrav_fargo3d, umass, usolarmass, ulength, utime, udens, uvelocity, ulength_au, mass, factor
 
     real(dp), dimension(n_planets_max) :: x, y, z, vx, vy, vz, Mp, Omega_p, time
     real(dp) :: Omega
@@ -254,7 +254,7 @@ contains
           do phik=1, n_az
              icell = cell_map(i,j,phik)
 
-             densite_gaz(icell) = fargo3d_density(phik,i,jj) * udens
+             gas_density(icell) = fargo3d_density(phik,i,jj) * udens
              dust_density(:,icell) = fargo3d_density(phik,i,jj) * udens
 
              vfield3d(icell,1)  = fargo3d_vy(phik,i,jj) * uvelocity ! vr
@@ -266,32 +266,32 @@ contains
     deallocate(fargo3d_density,fargo3d_vx,fargo3d_vy,fargo3d_vz)
 
     !write(*,*) maxval(vfield3d(:,1))/1000., maxval(vfield3d(:,2))/1000., maxval(vfield3d(:,3))/1000.
-    !write(*,*) etoile(2)%vx/1000., etoile(2)%vy/1000., etoile(2)%vz/1000.
+    !write(*,*) star(2)%vx/1000., star(2)%vy/1000., star(2)%vz/1000.
     !stop
 
     ! Normalisation density : copy and paste from read_density_file for now : needs to go in subroutine
 
-    ! Calcul de la masse de gaz de la zone
+    ! Calcul de la mass de gaz de la zone
     mass = 0.
     do icell=1,n_cells
-       mass = mass + densite_gaz(icell) *  mu_mH * volume(icell)
+       mass = mass + gas_density(icell) *  mu_mH * volume(icell)
     enddo !icell
     mass =  mass * AU3_to_m3 * g_to_Msun
 
     ! Normalisation
     if (mass > 0.0) then ! pour le cas ou gas_to_dust = 0.
-       facteur = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
+       factor = disk_zone(1)%diskmass * disk_zone(1)%gas_to_dust / mass
 
-       ! Somme sur les zones pour densite finale
+       ! total_sum sur les zones pour densite finale
        do icell=1,n_cells
-          densite_gaz(icell) = densite_gaz(icell) * facteur
-          masse_gaz(icell) = densite_gaz(icell) * mu_mH * volume(icell) * AU3_to_m3
+          gas_density(icell) = gas_density(icell) * factor
+          gas_mass(icell) = gas_density(icell) * mu_mH * volume(icell) * AU3_to_m3
        enddo ! icell
     else
        call error('Gas mass is 0')
     endif
 
-    write(*,*) 'Total  gas mass in model:', real(sum(masse_gaz) * g_to_Msun),' Msun'
+    write(*,*) 'Total  gas mass in model:', real(sum(gas_mass) * g_to_Msun),' Msun'
     call normalize_dust_density()
 
     write(*,*) "Done"
@@ -349,8 +349,8 @@ contains
     real, intent(in), optional :: az_offset
 
 
-    integer :: n_etoiles_old, i
-    type(star_type), dimension(:), allocatable :: etoile_old
+    integer :: n_stars_old, i
+    type(star_type), dimension(:), allocatable :: star_old
 
     if (n_planets > 0) then
        simu_time = time(n_planets) * utime
@@ -361,66 +361,66 @@ contains
     ! Checking units :
     ! Omega_p * uvelocity == 29.78 km/s : OK
 
-    n_etoiles_old = n_etoiles
-    n_etoiles = 1 + n_planets
+    n_stars_old = n_stars
+    n_stars = 1 + n_planets
 
     if (lfix_star) then
        write(*,*) ""
        write(*,*) "Stellar parameters will not be updated, only the star positions, velocities and masses"
-       if (n_etoiles /= n_etoiles_old) call error("Wrong number of stars in mcfost parameter files")
+       if (n_stars /= n_stars_old) call error("Wrong number of stars in mcfost parameter files")
     else
        write(*,*) ""
        write(*,*) "Updating the stellar properties:"
-       write(*,*) "There are now", n_etoiles, "stars in the model"
+       write(*,*) "There are now", n_stars, "stars in the model"
 
        ! Saving if the accretion rate was forced
-       allocate(etoile_old(n_etoiles_old))
-       if (allocated(etoile)) then
-          etoile_old(:) = etoile(:)
-          deallocate(etoile)
+       allocate(star_old(n_stars_old))
+       if (allocated(star)) then
+          star_old(:) = star(:)
+          deallocate(star)
        endif
-       allocate(etoile(n_etoiles))
-       do i=1, min(n_etoiles, n_etoiles_old)
-          etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
-          etoile(i)%Mdot = etoile_old(i)%Mdot
+       allocate(star(n_stars))
+       do i=1, min(n_stars, n_stars_old)
+          star(i)%force_Mdot = star_old(i)%force_Mdot
+          star(i)%Mdot = star_old(i)%Mdot
        enddo
        ! If we have new stars
-       do i=n_etoiles_old,n_etoiles
-          etoile(i)%force_Mdot = .false.
-          etoile(i)%Mdot = 0.
+       do i=n_stars_old,n_stars
+          star(i)%force_Mdot = .false.
+          star(i)%Mdot = 0.
        enddo
-       deallocate(etoile_old)
-       etoile(:)%find_spectrum = .true.
+       deallocate(star_old)
+       star(:)%find_spectrum = .true.
     endif
 
-    etoile(1)%x = 0_dp ; etoile(1)%y = 0_dp ; etoile(1)%z = 0_dp
-    etoile(1)%vx = 0_dp ; etoile(1)%vy = 0_dp ; etoile(1)%vz = 0_dp
-    etoile(1)%M = 1_dp * usolarmass
+    star(1)%x = 0_dp ; star(1)%y = 0_dp ; star(1)%z = 0_dp
+    star(1)%vx = 0_dp ; star(1)%vy = 0_dp ; star(1)%vz = 0_dp
+    star(1)%M = 1_dp * usolarmass
 
     do i=1, n_planets
        ! -x and -y as phi is defined differently in fargo3d
-       etoile(i+1)%x = -x(i) * ulength_au
-       etoile(i+1)%y = -y(i) * ulength_au
-       etoile(i+1)%z =  z(i) * ulength_au
+       star(i+1)%x = -x(i) * ulength_au
+       star(i+1)%y = -y(i) * ulength_au
+       star(i+1)%z =  z(i) * ulength_au
 
        ! -vx and -y as phi is defined differently in fargo3d
-       etoile(i+1)%vx = -vx(i) * uvelocity
-       etoile(i+1)%vy = -vy(i) * uvelocity
-       etoile(i+1)%vz =  vz(i) * uvelocity
+       star(i+1)%vx = -vx(i) * uvelocity
+       star(i+1)%vy = -vy(i) * uvelocity
+       star(i+1)%vz =  vz(i) * uvelocity
 
-       etoile(i+1)%M = Mp(i) * usolarmass
+       star(i+1)%M = Mp(i) * usolarmass
     enddo
 
-    do i=1,n_etoiles
-       if (etoile(i)%M > 0.013) then
-          write(*,*) "Star   #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
-               real(etoile(i)%M), "Msun, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
+    do i=1,n_stars
+       if (star(i)%M > 0.013) then
+          write(*,*) "Star   #", i, "xyz=", real(star(i)%x), real(star(i)%y), real(star(i)%z), "au, M=", &
+               real(star(i)%M), "Msun, Mdot=", real(star(i)%Mdot), "Msun/yr"
        else
-          write(*,*) "Planet #", i, "xyz=", real(etoile(i)%x), real(etoile(i)%y), real(etoile(i)%z), "au, M=", &
-               real(etoile(i)%M * GxMsun/GxMjup), "MJup, Mdot=", real(etoile(i)%Mdot), "Msun/yr"
+          write(*,*) "Planet #", i, "xyz=", real(star(i)%x), real(star(i)%y), real(star(i)%z), "au, M=", &
+               real(star(i)%M * GxMsun/GxMjup), "MJup, Mdot=", real(star(i)%Mdot), "Msun/yr"
        endif
-       if (i>1) write(*,*)  "       distance=", real(sqrt((etoile(i)%x - etoile(1)%x)**2 + &
-            (etoile(i)%y - etoile(1)%y)**2 + (etoile(i)%z - etoile(1)%z)**2)), "au"
+       if (i>1) write(*,*)  "       distance=", real(sqrt((star(i)%x - star(1)%x)**2 + &
+            (star(i)%y - star(1)%y)**2 + (star(i)%z - star(1)%z)**2)), "au"
     enddo
     if (.not.lfix_star) call compute_stellar_parameters()
 

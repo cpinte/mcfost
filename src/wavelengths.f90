@@ -1,7 +1,7 @@
 module wavelengths
 
   use mcfost_env, only : dp, band
-  use parametres
+  use parameters
   use messages
 
   implicit none
@@ -39,7 +39,7 @@ subroutine init_lambda()
   tab_amu1_coating=0.0; tab_amu2_coating=0.0;
 
   if (lmono0) then
-     ! Lecture longueur d'onde
+     ! Lecture length d'onde
      read(band,*) tab_lambda(1)
      tab_delta_lambda(1) = 1.0
      tab_lambda_inf(1) = tab_lambda(1)

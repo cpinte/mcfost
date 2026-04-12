@@ -1,9 +1,9 @@
 module dust_prop
 
   use mcfost_env
-  use parametres
+  use parameters
   use grains
-  use constantes
+  use constants
   use wavelengths
   use density
   use cylindrical_grid
@@ -38,23 +38,23 @@ subroutine build_grain_size_distribution()
   implicit none
 
   integer :: k, pop
-  real :: a, nbre_tot_grains
+  real :: a, n_grains_total
   real(kind=dp) :: exp_grains, sqrt_exp_grains
-  real :: masse_pop
+  real :: pop_mass
   real :: correct_fact_r
 
   type(dust_pop_type), pointer :: d_p
 
-  integer :: ios, status, n_comment, n_grains, alloc_status
+  integer :: ios, status, n_comment, n_grains_file, alloc_status
   real :: fbuffer
 
   ! **************************************************
   ! Tableaux relatifs aux grains
   ! **************************************************
-  allocate(nbre_grains(n_grains_tot), r_grain(n_grains_tot),  r_grain_min(n_grains_tot), r_grain_max(n_grains_tot), &
+  allocate(n_grains(n_grains_tot), r_grain(n_grains_tot),  r_grain_min(n_grains_tot), r_grain_max(n_grains_tot), &
        S_grain(n_grains_tot), M_grain(n_grains_tot), r_core(n_grains_tot), grain(n_grains_tot), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error r_grain')
-  nbre_grains = 0.0   ; r_core=0.0
+  n_grains = 0.0   ; r_core=0.0
   r_grain=0.0 ; r_grain_min=0.0 ; r_grain_max=0.0 ; S_grain=0.0 ; M_grain=0.0
 
   ! Boucle sur les populations de grains
@@ -79,14 +79,14 @@ subroutine build_grain_size_distribution()
 
         ! On compte les lignes avec des donnees
         status=0
-        n_grains=1 ! On a deja lu une ligne en cherchant les commentaires
+        n_grains_file=1 ! On a deja lu une ligne en cherchant les commentaires
         do while(status==0)
-           n_grains=n_grains+1
+           n_grains_file=n_grains_file+1
            read(1,*,iostat=status)
         enddo
-        n_grains = n_grains - 1
+        n_grains_file = n_grains_file - 1
 
-        if (n_grains /= n_grains_tot) call error("the number of grains must be the same as in the parameter file.")
+        if (n_grains_file /= n_grains_tot) call error("the number of grains must be the same as in the parameter file.")
 
         ! Lecture proprement dite
         rewind(1)
@@ -96,25 +96,25 @@ subroutine build_grain_size_distribution()
         enddo
 
         ! Lecture indices
-        masse_pop = 0.0
-        do k=1,n_grains
-           read(1,*) a, nbre_grains(k)
+        pop_mass = 0.0
+        do k=1,n_grains_file
+           read(1,*) a, n_grains(k)
 
            r_grain(k) = a ! micron
            S_grain(k) = pi * a**2 ! micron^2
-           M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * d_p%rho1g_avg ! masse en g
+           M_grain(k) = four_thirds_pi * (a*mum_to_cm)**3 * d_p%rho1g_avg ! mass en g
 
            ! Multiplication par a car da = a.dln(a)
-           nbre_grains(k) =  nbre_grains(k) * a
+           n_grains(k) =  n_grains(k) * a
            grain(k)%methode_chauffage = d_p%methode_chauffage
            grain(k)%zone = d_p%zone
            grain(k)%pop = pop
-           masse_pop = masse_pop + nbre_grains(k)
+           pop_mass = pop_mass + n_grains(k)
 
            if (d_p%is_PAH) grain(k)%is_PAH = .true.
         enddo ! k
 
-        d_p%avg_grain_mass = sum(M_grain(:) * nbre_grains(:)) / sum(nbre_grains(:))
+        d_p%avg_grain_mass = sum(M_grain(:) * n_grains(:)) / sum(n_grains(:))
 
      else ! lread_grain_size_distribution
 
@@ -126,20 +126,20 @@ subroutine build_grain_size_distribution()
 
         if (abs(d_p%amin - d_p%amax) < 1.0e-5 * d_p%amax) then
            a=d_p%amin
-           d_p%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * a**3 * d_p%rho1g_avg
+           d_p%avg_grain_mass = four_thirds_pi * mum_to_cm**3 * a**3 * d_p%rho1g_avg
         else
            if (abs(d_p%aexp - 4.) > 1.0e-5) then
               if (abs(d_p%aexp - 1.) > 1.0e-5) then
-                 d_p%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * d_p%rho1g_avg * &
+                 d_p%avg_grain_mass = four_thirds_pi * mum_to_cm**3 * d_p%rho1g_avg * &
                       (1-d_p%aexp)/(4-d_p%aexp)*(d_p%amax**(4-d_p%aexp)-d_p%amin**(4-d_p%aexp)) / &
                       (d_p%amax**(1-d_p%aexp)-d_p%amin**(1-d_p%aexp))
               else
-                 d_p%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * d_p%rho1g_avg /(4-d_p%aexp) * &
+                 d_p%avg_grain_mass = four_thirds_pi * mum_to_cm**3 * d_p%rho1g_avg /(4-d_p%aexp) * &
                       (d_p%amax**(4-d_p%aexp)-d_p%amin**(4-d_p%aexp)) / &
                       (log(d_p%amax)-log(d_p%amin))
               endif
            else
-              d_p%avg_grain_mass = quatre_tiers_pi * mum_to_cm**3 * d_p%rho1g_avg *&
+              d_p%avg_grain_mass = four_thirds_pi * mum_to_cm**3 * d_p%rho1g_avg *&
                    (1-d_p%aexp)*(log(d_p%amax)-log(d_p%amin)) / &
                    (d_p%amax**(1-d_p%aexp)-d_p%amin**(1-d_p%aexp))
            endif
@@ -154,7 +154,7 @@ subroutine build_grain_size_distribution()
         endif
 
         ! Taille des grains (recursif)
-        masse_pop = nbre_grains(d_p%ind_debut)
+        pop_mass = n_grains(d_p%ind_debut)
         exp_grains =  exp((1.0_dp/real(d_p%n_grains,kind=dp)) * log(d_p%amax/d_p%amin))
         sqrt_exp_grains = sqrt(exp_grains)
         do  k=d_p%ind_debut, d_p%ind_fin
@@ -169,42 +169,42 @@ subroutine build_grain_size_distribution()
            r_grain_max(k) = a*sqrt_exp_grains ! taille max
 
            S_grain(k) = pi * a**2 ! micron^2
-           M_grain(k) = quatre_tiers_pi * (a*mum_to_cm)**3 * d_p%rho1g_avg ! masse en g
+           M_grain(k) = four_thirds_pi * (a*mum_to_cm)**3 * d_p%rho1g_avg ! mass en g
 
            ! Multiplication par a car da = a.dln(a)
-           nbre_grains(k) = a**(-d_p%aexp) * a
+           n_grains(k) = a**(-d_p%aexp) * a
            grain(k)%methode_chauffage = d_p%methode_chauffage
            grain(k)%zone = d_p%zone
            grain(k)%pop = pop
-           masse_pop = masse_pop + nbre_grains(k)
+           pop_mass = pop_mass + n_grains(k)
 
            if (d_p%is_PAH) grain(k)%is_PAH = .true.
         enddo !k
 
      endif ! lread_grain_size_distribution
 
-     masse_pop = masse_pop * d_p%avg_grain_mass
+     pop_mass = pop_mass * d_p%avg_grain_mass
 
 
-     ! Normalisation du nombre de grains pour atteindre la bonne masse
-     nbre_grains(d_p%ind_debut:d_p%ind_fin) = nbre_grains(d_p%ind_debut:d_p%ind_fin) * d_p%masse/masse_pop
+     ! Normalisation du nombre de grains pour atteindre la bonne mass
+     n_grains(d_p%ind_debut:d_p%ind_fin) = n_grains(d_p%ind_debut:d_p%ind_fin) * d_p%mass/pop_mass
 
      ! Normalisation de tous les grains au sein d'une pop
-     nbre_tot_grains = 0.0
+     n_grains_total = 0.0
      do k=d_p%ind_debut,d_p%ind_fin
-        nbre_tot_grains =  nbre_tot_grains + nbre_grains(k)
+        n_grains_total =  n_grains_total + n_grains(k)
      enddo
 
      ! Fraction de grains de taille k au sein d'une pop
      do  k=d_p%ind_debut,d_p%ind_fin
-        nbre_grains(k) = nbre_grains(k)/nbre_tot_grains
+        n_grains(k) = n_grains(k)/n_grains_total
      enddo !k
 
      ! If we use a shared spatial profile per zone, we must include the population mass fraction
-     ! in nbre_grains so then dust_density(izone, icell) * nbre_grains(k) gives the correct
+     ! in n_grains so then dust_density(izone, icell) * n_grains(k) gives the correct
      ! number density for population p size k.
      if (.not.lvariable_dust) then
-        nbre_grains(d_p%ind_debut:d_p%ind_fin) = nbre_grains(d_p%ind_debut:d_p%ind_fin) * &
+        n_grains(d_p%ind_debut:d_p%ind_fin) = n_grains(d_p%ind_debut:d_p%ind_fin) * &
              d_p%frac_mass / d_p%avg_grain_mass
      endif
 
@@ -223,7 +223,7 @@ end subroutine build_grain_size_distribution
 
 !********************************************************************
 
-subroutine init_indices_optiques()
+subroutine init_optical_indices()
   ! calcule les tableaux tab_amu1 et tab_amu2
   ! aux longueurs d'onde de tab_lambda
   ! C. Pinte
@@ -427,7 +427,7 @@ subroutine init_indices_optiques()
 
         !write (*,*) "Material average density",pop,dust_pop(pop)%rho1g_avg
 
-     else ! fichier d'opacite
+     else ! fichier d'opacity
         if (lfirst) then
            ! We allocate the arrays to save dimension the 1st time we enter this section
            if (.not.lread_opacity_file) then
@@ -440,7 +440,7 @@ subroutine init_indices_optiques()
         endif
 
         if (dust_pop(pop)%n_components > 1) call error("cannot mix dust with opacity file with other component")
-     endif ! fichier d'opacite
+     endif ! fichier d'opacity
   enddo ! pop
 
   if (lfirst.and.lread_opacity_file) call alloc_mem_opacity_file()
@@ -448,7 +448,7 @@ subroutine init_indices_optiques()
 
   return
 
-end subroutine init_indices_optiques
+end subroutine init_optical_indices
 
 !******************************************************************************
 
@@ -487,7 +487,7 @@ function Bruggeman_EMT(lambda,m,f) result(m_eff)
      write(*,*) "Exiting"
   endif
 
-  ! Constantes dielectriques
+  ! constants dielectriques
   eps = m*m
 
   if (n==2) then ! equation du degre 2
@@ -550,8 +550,8 @@ end function Bruggeman_EMT
 
 subroutine prop_grains(lambda)
   ! Calcule les propriétés des grains
-  ! Masse, fraction en nombre, sections efficaces, matrices de muellers
-  ! sortie des routines opacite
+  ! mass, fraction en nombre, sections efficaces, matrices de muellers
+  ! sortie des routines opacity
   ! C. Pinte 7/01/05
   ! Ajout du cas ou les matrices de Mueller sont donnees en entrees
   ! 20/04/2023
@@ -567,7 +567,7 @@ subroutine prop_grains(lambda)
   qext=0.0
   qsca=0.0
 
-  ! Longueur d'onde
+  ! length d'onde
   wavel=tab_lambda(lambda)
 
   ! Prop optiques
@@ -631,8 +631,8 @@ subroutine prop_grains(lambda)
         ! Normalisation des opacites pour etre en AU^-1 pour fichier thermal_emission.f90
         ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
         ! a² microns² -> 1e-8 cm²             \
-        ! density en cm-3                      > reste facteur AU_to_cm * mum_to_cm**2 = 149595.0
-        ! longueur de vol en AU = 1.5e13 cm   /
+        ! density en cm-3                      > reste factor AU_to_cm * mum_to_cm**2 = 149595.0
+        ! length de vol en AU = 1.5e13 cm   /
         C_abs_norm(k,lambda) = C_abs(k,lambda) * AU_to_cm * mum_to_cm**2
      endif ! is_opacity_file
   enddo !k
@@ -641,7 +641,7 @@ subroutine prop_grains(lambda)
 
   ! Opacity files
   ! On refait exactement la meme boucle en sequentielle (pour eviter pb d'allocation en parallel)
-  ! pour les grains definis par un fichier d'opacite
+  ! pour les grains definis par un fichier d'opacity
   ! Boucle a l'endroit cette fois
   do  k=1,n_grains_tot
      pop = grain(k)%pop
@@ -664,14 +664,14 @@ subroutine prop_grains(lambda)
 
   ! Verif normalization
   !-- do  k=1,n_grains_tot
-  !--    norme = 0.0
+  !--    norm = 0.0
   !--    dtheta = pi/real(nang_scatt)
   !--    do j=2,nang_scatt ! probabilite de diffusion jusqu'a l'angle j, on saute j=0 car sin(theta) = 0
   !--       theta = real(j)*dtheta
-  !--       norme =  norme +   tab_s11(j,k,lambda)*sin(theta)*dtheta
+  !--       norm =  norm +   tab_s11(j,k,lambda)*sin(theta)*dtheta
   !--    enddo
   !--    qsca= C_sca(lambda,k)/S_grain(k)
-  !--    write(*,*) "Verif phase function (a<<lambda) : ", tab_lambda(lambda), r_grain(k), norme/qsca, qsca
+  !--    write(*,*) "Verif phase function (a<<lambda) : ", tab_lambda(lambda), r_grain(k), norm/qsca, qsca
   !-- enddo
 
   return
@@ -788,8 +788,8 @@ end subroutine read_saved_dust_prop
 
 !******************************************************************************
 
-subroutine opacite(lambda, p_lambda, no_scatt)
-! Calcule la table d'opacite et ksca_CDF
+subroutine opacity(lambda, p_lambda, no_scatt)
+! Calcule la table d'opacity et ksca_CDF
 ! Inclus stratification empirique
 ! Utilise les resultats des routine densite et prop_grains
 ! Doit etre utilise juste apres prop_grain : lambda ne doit pas changer entre 2
@@ -824,8 +824,8 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      compute_scatt = .true.
   endif
 
-  ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
-  ! on la met à nbre_grains et on effacera apres
+  ! Attention : dans le cas no_strat, il ne faut pas que la cell (1,1,1) soit vide.
+  ! on la met à n_grains et on effacera apres
   ! c'est pour les prop de diffusion en relatif donc la valeur exacte n'a pas d'importante
   ldens0 = .false.
   if (lvariable_dust) then
@@ -847,13 +847,13 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      endif
   endif
 
-  ! Calcul opacite et probabilite de diffusion
+  ! Calcul opacity et probabilite de diffusion
   do icell=1, p_n_cells
      kappa(icell,lambda) = 0.0
      k_sca_tot = 0.0
 
      do  k=1,n_grains_tot ! Expensive when n_cells is large
-        density = dust_density(p_k_arr(k),icell) * nbre_grains(k)
+        density = dust_density(p_k_arr(k),icell) * n_grains(k)
         kappa(icell,lambda) = kappa(icell,lambda) + C_ext(k,lambda) * density
         k_sca_tot = k_sca_tot + C_sca(k,lambda) * density
      enddo !k
@@ -863,7 +863,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
      if (aniso_method==2) then
         tab_g_pos(icell,lambda) = 0.0
         do  k=1,n_grains_tot ! Expensive when n_cells is large
-           density=dust_density(p_k_arr(k),icell) * nbre_grains(k)
+           density=dust_density(p_k_arr(k),icell) * n_grains(k)
            tab_g_pos(icell,lambda) = tab_g_pos(icell,lambda) + &
                 C_sca(k,lambda) * density * tab_g(k,lambda)
         enddo ! k
@@ -874,7 +874,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         kappa_abs_LTE(icell,lambda) = 0.0
         do k=grain_RE_LTE_start,grain_RE_LTE_end   ! Expensive when n_cells is large
            kappa_abs_LTE(icell,lambda) =  kappa_abs_LTE(icell,lambda) + &
-                C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
+                C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * n_grains(k)
         enddo
      endif
 
@@ -882,7 +882,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         kappa_abs_nLTE(icell,lambda) = 0.0
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
            kappa_abs_nLTE(icell,lambda) =  kappa_abs_nLTE(icell,lambda) + &
-                C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
+                C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * n_grains(k)
         enddo
      endif
   enddo ! icell
@@ -897,14 +897,14 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         k_abs_LTE = 0.0
 
         do k=1, n_grains_tot
-           k_abs_tot = k_abs_tot + C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
+           k_abs_tot = k_abs_tot + C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * n_grains(k)
         enddo
         do k=grain_RE_LTE_start,grain_RE_LTE_end
-           k_abs_LTE =  k_abs_LTE + C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
+           k_abs_LTE =  k_abs_LTE + C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * n_grains(k)
         enddo
         k_abs_RE = k_abs_LTE
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
-           k_abs_RE =  k_abs_RE + C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * nbre_grains(k)
+           k_abs_RE =  k_abs_RE + C_abs(k,lambda) * dust_density(p_k_arr(k),icell) * n_grains(k)
         enddo
 
         ! Computing probabilities
@@ -932,7 +932,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
         do icell=1, n_cells
            kabs_nLTE_CDF(grain_RE_nLTE_start-1,icell,lambda)=0.0
            do  k=grain_RE_nLTE_start, grain_RE_nLTE_end
-              density=dust_density(p_k_arr(k),icell) * nbre_grains(k)
+              density=dust_density(p_k_arr(k),icell) * n_grains(k)
               kabs_nLTE_CDF(k,icell,lambda) = kabs_nLTE_CDF(k-1,icell,lambda) + &
                    C_abs(k,lambda) * density
            enddo !k
@@ -945,21 +945,21 @@ subroutine opacite(lambda, p_lambda, no_scatt)
   endif !lnLTE
 
   if (icell_not_empty <= 0) call error("could not find a non empty cell")
-  rho0 = masse(icell_not_empty)/volume(icell_not_empty) ! normalising by density in a non-empty cell
+  rho0 = dust_mass(icell_not_empty)/volume(icell_not_empty) ! normalising by density in a non-empty cell
   if (rho0 < tiny_dp) call error("cannot normalise by density in first non-empty cell")
 
   ! We apply a corrective factor per cell --> to get kappa, we need to do kappa(icell,lambda) * kappa_factor(icell)
   if (lvariable_dust) then
      kappa_factor(:) = 1.0_dp
   else
-     kappa_factor(1:n_cells) = masse(1:n_cells)/volume(1:n_cells) / rho0 ! ie rho / rho(icell_not_empty)
+     kappa_factor(1:n_cells) = dust_mass(1:n_cells)/volume(1:n_cells) / rho0 ! ie rho / rho(icell_not_empty)
   endif
 
   ! Normalisation des opacites kappa_abs pour etre en AU^-1
   ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
   ! a² microns² -> 1e-8 cm²             \
-  ! density en cm-3                      > reste facteur AU_to_cm * mum_to_cm**2 = 149595.0
-  ! longueur de vol en AU = 1.5e13 cm   /
+  ! density en cm-3                      > reste factor AU_to_cm * mum_to_cm**2 = 149595.0
+  ! length de vol en AU = 1.5e13 cm   /
   ! fact =  pi * a * a * 149595.0
   ! les k_abs_XXX n'ont pas besoin d'etre normalise car tout est relatif
   fact = AU_to_cm * mum_to_cm**2
@@ -979,7 +979,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
 
               do  k=1,n_grains_tot
                  ksca_CDF(k,icell,p_lambda) = ksca_CDF(k-1,icell,p_lambda) + C_sca(k,lambda) &
-                 * dust_density(p_k_arr(k),icell) * nbre_grains(k)
+                 * dust_density(p_k_arr(k),icell) * n_grains(k)
               enddo !k
 
               if  (ksca_CDF(n_grains_tot,icell,p_lambda) > tiny_real) then
@@ -1030,7 +1030,7 @@ subroutine opacite(lambda, p_lambda, no_scatt)
 
   return
 
-end subroutine opacite
+end subroutine opacity
 
 !******************************************************************************
 
@@ -1039,7 +1039,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   integer, intent(in) :: lambda, p_lambda
 
   real(kind=dp), parameter :: dtheta = pi/real(nang_scatt)
-  real(kind=dp) :: density, theta, norme, fact, k_sca_tot, d1
+  real(kind=dp) :: density, theta, norm, fact, k_sca_tot, d1
   real :: mu, g, g2
 
   integer :: icell, l
@@ -1050,9 +1050,9 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   fact = AU_to_cm * mum_to_cm**2
   !write(*,*) "Computing local scattering properties", lambda, p_lambda
 
-  ! see opacite()
-  ! Attention : dans le cas no_strat, il ne faut pas que la cellule (1,1,1) soit vide.
-  ! on la met à nbre_grains et on effacera apres
+  ! see opacity()
+  ! Attention : dans le cas no_strat, il ne faut pas que la cell (1,1,1) soit vide.
+  ! on la met à n_grains et on effacera apres
   ! c'est pour les prop de diffusion en relatif donc la veleur exacte n'a pas d'importante
   ldens0 = .false.
 
@@ -1077,10 +1077,10 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp default(none) &
   !$omp shared(tab_s11_pos,tab_s12_o_s11_pos,tab_s22_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos,tab_s44_o_s11_pos) &
   !$omp shared(tab_s11,tab_s12,tab_s22,tab_s33,tab_s34,tab_s44,lambda,p_lambda,n_grains_tot,tab_albedo_pos,prob_s11_pos,p_k_arr) &
-  !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells,fact,lvariable_dust,nbre_grains) &
+  !$omp shared(zmax,kappa,kappa_abs_LTE,ksca_CDF,p_n_cells,fact,lvariable_dust,n_grains) &
   !$omp shared(C_ext,C_sca,dust_density,S_grain,scattering_method,tab_g_pos,aniso_method,tab_g,lisotropic,low_mem_scattering) &
   !$omp shared(lscatt_ray_tracing,letape_th,lsepar_pola,ldust_prop,lphase_function_file,s11_file,loverwrite_s12,Pmax) &
-  !$omp private(icell,k,density,norme,theta,k_sca_tot,mu,g,g2,d1)
+  !$omp private(icell,k,density,norm,theta,k_sca_tot,mu,g,g2,d1)
 
   !$omp do schedule(dynamic,1)
   do icell=1, p_n_cells
@@ -1096,10 +1096,10 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
      endif
 
      do  k=1,n_grains_tot
-        density=dust_density(p_k_arr(k),icell) * nbre_grains(k)
+        density=dust_density(p_k_arr(k),icell) * n_grains(k)
         if (aniso_method==1) then
            ! Moyennage matrice de mueller (long en cpu ) (le dernier indice est l'angle)
-           ! tab_s11 est normalisee a Qsca --> facteur S_grain * density pour que
+           ! tab_s11 est normalisee a Qsca --> factor S_grain * density pour que
            ! tab_s11_pos soit normalisee a k_sca_tot
            tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) + &
                 tab_s11(:,k,lambda) * S_grain(k) * density
@@ -1125,12 +1125,12 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
         tab_s11_pos(:,icell,p_lambda) = s11_file(:)
 
         ! Normalisation of phase-function to k_sca_tot, ie like the internal routines
-        norme = 0.0
+        norm = 0.0
         do l=1,nang_scatt-1 ! on saute j=0 & nang_scatt car sin(theta) = 0
            theta = real(l)*dtheta
-           norme = norme + tab_s11_pos(l,icell,p_lambda)*sin(theta)*dtheta
+           norm = norm + tab_s11_pos(l,icell,p_lambda)*sin(theta)*dtheta
         enddo
-        tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * k_sca_tot / norme
+        tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * k_sca_tot / norm
      endif
 
      if (k_sca_tot > tiny_real) then
@@ -1155,20 +1155,20 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            ! Normalisation des matrices de Mueller (idem que dans mueller_Mie)
            do l=0,nang_scatt
               if (tab_s11_pos(l,icell,p_lambda) > tiny_real) then
-                 norme=1.0/tab_s11_pos(l,icell,p_lambda)
+                 norm=1.0/tab_s11_pos(l,icell,p_lambda)
                  if (lsepar_pola) then
-                    tab_s12_o_s11_pos(l,icell,p_lambda)=tab_s12_o_s11_pos(l,icell,p_lambda)*norme
-                    tab_s22_o_s11_pos(l,icell,p_lambda)=tab_s22_o_s11_pos(l,icell,p_lambda)*norme
-                    tab_s33_o_s11_pos(l,icell,p_lambda)=tab_s33_o_s11_pos(l,icell,p_lambda)*norme
-                    tab_s34_o_s11_pos(l,icell,p_lambda)=tab_s34_o_s11_pos(l,icell,p_lambda)*norme
-                    tab_s44_o_s11_pos(l,icell,p_lambda)=tab_s44_o_s11_pos(l,icell,p_lambda)*norme
+                    tab_s12_o_s11_pos(l,icell,p_lambda)=tab_s12_o_s11_pos(l,icell,p_lambda)*norm
+                    tab_s22_o_s11_pos(l,icell,p_lambda)=tab_s22_o_s11_pos(l,icell,p_lambda)*norm
+                    tab_s33_o_s11_pos(l,icell,p_lambda)=tab_s33_o_s11_pos(l,icell,p_lambda)*norm
+                    tab_s34_o_s11_pos(l,icell,p_lambda)=tab_s34_o_s11_pos(l,icell,p_lambda)*norm
+                    tab_s44_o_s11_pos(l,icell,p_lambda)=tab_s44_o_s11_pos(l,icell,p_lambda)*norm
                  endif
               endif
            enddo
 
            ! Normalisation : on veut que l'energie total diffusee sur [0,pi] en theta et [0,2pi] en phi = 1
            ! (for ray-tracing)
-           tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * dtheta / (k_sca_tot * deux_pi)
+           tab_s11_pos(:,icell,p_lambda) = tab_s11_pos(:,icell,p_lambda) * dtheta / (k_sca_tot * two_pi)
 
            if (lsepar_pola .and. loverwrite_s12) then
               do l=0,nang_scatt
@@ -1179,7 +1179,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
 
            ! -- ! aniso_method = 2 --> HG
            ! -- gsca = tab_g_pos(icell,lambda)
-           ! -- tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_ray_tracing(:,icell,lambda) / (k_sca_tot * deux_pi)
+           ! -- tab_s11_ray_tracing(:,icell,lambda) =  tab_s11_ray_tracing(:,icell,lambda) / (k_sca_tot * two_pi)
            ! --
            ! -- if (lisotropic) tab_s11_ray_tracing(:,icell,lambda) = 1.0 / (4.* nang_scatt)
         else !aniso_method == 2 : HG
@@ -1189,7 +1189,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
            do l=0,nang_scatt
               g = tab_g_pos(icell,p_lambda) ; g2 = g**2
               mu = cos((real(l))/real(nang_scatt)*pi) ! cos(theta)
-              tab_s11_pos(l,icell,p_lambda) = 1.0/quatre_pi * (1-g2) * (1+g2-2*g*mu)**(-1.5) * dtheta
+              tab_s11_pos(l,icell,p_lambda) = 1.0/four_pi * (1-g2) * (1+g2-2*g*mu)**(-1.5) * dtheta
            enddo
 
            if (lsepar_pola) then
@@ -1204,7 +1204,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
         ! todo :
         ! utiliser tab_s11_pos pour raie tracing et tab_s12_o_s11
         ! 1) normaliser les tab_s12_o_s11
-        ! 2) normaliser les tab_s11 avec  norme = dtheta / (k_sca_tot * deux_pi)
+        ! 2) normaliser les tab_s11 avec  norm = dtheta / (k_sca_tot * two_pi)
 
         ! Multi ou mono-lambda : mono-lambda si 180 * p_n_cells * p_n_lambda >> 1
         ! 1) p_n_lambda = n_lambda au step 1
@@ -1231,7 +1231,7 @@ subroutine calc_local_scattering_matrices(lambda, p_lambda)
   !$omp enddo
   !$omp end parallel
 
-  ! see opacite()
+  ! see opacity()
   ! On remet la densite à zéro si besoin
   if (ldens0) then
      dust_density(:,icell1) = 0.0_sp
@@ -1243,7 +1243,7 @@ end subroutine calc_local_scattering_matrices
 
 !******************************************************************************
 
-integer function select_grainsize_high_mem(lambda,aleat, icell) result(k)
+integer function select_grainsize_high_mem(lambda,rand, icell) result(k)
 !-----------------------------------------------------
 !  Nouvelle version : janvier 04
 !  la dichotomie se fait en comparant les indices
@@ -1257,11 +1257,11 @@ integer function select_grainsize_high_mem(lambda,aleat, icell) result(k)
   implicit none
 
   integer, intent(in) :: lambda, icell
-  real, intent(in) :: aleat
+  real, intent(in) :: rand
   real :: prob
   integer :: kmin, kmax
 
-  prob = aleat ! ksca_CDF(n_grains_tot,icell,lambda) est normalise a 1.0
+  prob = rand ! ksca_CDF(n_grains_tot,icell,lambda) est normalise a 1.0
 
   ! dichotomie
   kmin = 0
@@ -1288,7 +1288,7 @@ end function select_grainsize_high_mem
 
 !***************************************************
 
-integer function select_scattering_grain(lambda,icell, aleat) result(l)
+integer function select_scattering_grain(lambda,icell, rand) result(l)
   ! This routine will select randomly the scattering grain from the CDF of ksca
   ! Because we cannot store all the CDF for all cells (n_grains x ncells x n_lambda),
   ! the CDF is recomputed on the fly here.
@@ -1297,7 +1297,7 @@ integer function select_scattering_grain(lambda,icell, aleat) result(l)
   implicit none
 
   integer, intent(in) :: lambda, icell
-  real, intent(in) :: aleat
+  real, intent(in) :: rand
   real(kind=dp) :: prob, CDF, norm, density, d1
 
   integer :: p_k_val, k
@@ -1306,28 +1306,28 @@ integer function select_scattering_grain(lambda,icell, aleat) result(l)
      ! We scale the random number so that it is between 0 and kappa_sca (= last value of CDF)
      norm =  kappa(icell,lambda) * tab_albedo_pos(icell,lambda) / (AU_to_cm * mum_to_cm**2)
 
-     if (aleat < 0.5) then ! We start from first grain
-        prob = aleat * norm
+     if (rand < 0.5) then ! We start from first grain
+        prob = rand * norm
         CDF = 0.0
         do k=1, n_grains_tot
            p_k_val = merge(k, grain(k)%zone, lvariable_dust)
-           density = dust_density(p_k_val,icell) * nbre_grains(k)
+           density = dust_density(p_k_val,icell) * n_grains(k)
            CDF = CDF + C_sca(k,lambda) * density
            if (CDF > prob) exit
         enddo
      else ! We start from the end of the grain size distribution
-        prob = (1.0-aleat) * norm
+        prob = (1.0-rand) * norm
         CDF = 0.0
         do k=n_grains_tot, 1, -1
            p_k_val = merge(k, grain(k)%zone, lvariable_dust)
-           density = dust_density(p_k_val,icell) * nbre_grains(k)
+           density = dust_density(p_k_val,icell) * n_grains(k)
            CDF = CDF + C_sca(k,lambda) * density
            if (CDF > prob) exit
         enddo
      endif
      l = k
   else
-     l = select_grainsize_high_mem(lambda,aleat, icell) ! is this ever used ?
+     l = select_grainsize_high_mem(lambda,rand, icell) ! is this ever used ?
   endif
 
   return
@@ -1341,7 +1341,7 @@ subroutine write_dust_prop()
 ! 20/04/2023
 
   use fits_utils, only : cfitsWrite
-  use density, only : masse
+  use density, only : dust_mass
 
   integer :: icell, l, p_icell
 
@@ -1368,7 +1368,7 @@ subroutine write_dust_prop()
      p_icell = 1
   endif
 
-  kappa_lambda=real((kappa(icell,:)*kappa_factor(icell)/AU_to_cm)/(masse(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
+  kappa_lambda=real((kappa(icell,:)*kappa_factor(icell)/AU_to_cm)/(dust_mass(icell)/(volume(icell)*AU_to_cm**3))) ! cm^2/g
   albedo_lambda=tab_albedo_pos(icell,:)
 
   call cfitsWrite("!data_dust/lambda.fits.gz",real(tab_lambda),shape(tab_lambda))

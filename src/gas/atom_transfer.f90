@@ -6,15 +6,15 @@
 ! ----------------------------------------------------------------------------------- !
 module atom_transfer
 
-   use parametres
+   use parameters
    use input, only               : lkeplerian, linfall, limb_darkening, mu_limb_darkening, RT_line_method
-   use constantes, only : nm_to_m, m_to_km, km_to_m, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, deux_pi, pc_to_au, sqrtpi, c_light
+   use constants, only : nm_to_m, m_to_km, km_to_m, au_to_m, deg_to_rad, tiny_real, tiny_dp, pi, two_pi, pc_to_au, sqrtpi, c_light
    use io_atom, only : read_atomic_models, write_pops_atom, lany_init4
    use wavelengths, only : n_lambda, tab_lambda, tab_lambda_inf, tab_lambda_sup, tab_delta_lambda, n_lambda2, tab_lambda2
    use wavelengths_gas, only : make_wavelengths_nlte, tab_lambda_nm, tab_lambda_cont, n_lambda_cont, &
                                  deallocate_wavelengths_gasrt, make_wavelengths_raytracing, make_wavelengths_flux, Nlambda_max_line
    use elecdensity, only : solve_ne, write_electron, read_electron
-   use grid, only : T, vturb,nHtot, nHmin, pos_em_cellule, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, &
+   use grid, only : T, vturb,nHtot, nHmin, pos_em_cell, lcalc_ne, move_to_grid, vfield3d, icompute_atomRT, &
         ne, Voronoi, r_grid, phi_grid, z_grid
    use lte, only : ltepops_atoms, LTEpops_atom_loc, LTEpops_H_loc, nH_minus
    use atom_type, only : atoms, atomtype, n_atoms, nactiveatoms, activeAtoms, passiveAtoms, npassiveatoms, &
@@ -42,7 +42,7 @@ module atom_transfer
    use density, only : dust_density
    use temperature, only : Tdust
    use mem, only : clean_mem_dust_mol, realloc_dust_atom, deallocate_em_th_mol,emissivite_dust
-   use dust_prop, only : prop_grains, opacite, init_indices_optiques, kappa_abs_lte, kappa, kappa_factor
+   use dust_prop, only : prop_grains, opacity, init_optical_indices, kappa_abs_lte, kappa, kappa_factor
    use scattering
    use escape, only : alloc_escape_variables, mean_velocity_gradient, nlte_loop_sobolev
 
@@ -363,7 +363,7 @@ module atom_transfer
             !$omp private(nact, at) & ! Acceleration of convergence
             !$omp shared(ne,ngpop,ng_index,Ng_Norder, accelerated, lng_turned_on, Jnu, iloc) & ! Ng's Acceleration of convergence
             !$omp shared(etape,lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy) &
-            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
+            !$omp shared(pos_em_cell,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,omp_chunk_size)
             do icell=1, n_cells
@@ -411,14 +411,14 @@ module atom_transfer
 
 
                   else
-                   ! Position aleatoire dans la cellule
+                   ! Position aleatoire dans la cell
                      do iray=1,n_rayons
 
                         rand  = sprng(stream(id))
                         rand2 = sprng(stream(id))
                         rand3 = sprng(stream(id))
 
-                        call pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+                        call pos_em_cell(icell ,rand,rand2,rand3,x0,y0,z0)
 
                         ! Direction de propagation aleatoire
                         rand = sprng(stream(id))
@@ -891,7 +891,7 @@ module atom_transfer
       integer, parameter :: n_rayons = 10 !50 !100
       integer :: i, next_cell, previous_cell
       integer :: i_star, icell_star
-      logical :: lintersect_stars, lcellule_non_vide
+      logical :: lintersect_stars, lcell_not_empty
       real :: rand, rand2, rand3
       real(kind=dp) :: u, v, w, x0, y0, z0, x, y, z, x1, y1, z1
       real(kind=dp) :: w02, srw02, argmt,l, l_contrib, l_void_before
@@ -929,8 +929,8 @@ module atom_transfer
       !$omp parallel &
       !$omp default(none) &
       !$omp private(id,i1,i2,v1,v2,rand,rand2,rand3,u,v,w,x0,y0,z0,argmt,w02,srw02,x,y,z,i_star,icell_star)&
-      !$omp private(i,x1,y1,z1,l,l_contrib,l_void_before,next_cell,previous_cell,lcellule_non_vide,lintersect_stars)&
-      !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells,stream,cross_cell,pos_em_cellule, test_exit_grid)
+      !$omp private(i,x1,y1,z1,l,l_contrib,l_void_before,next_cell,previous_cell,lcell_not_empty,lintersect_stars)&
+      !$omp shared(dv, icompute_atomRT,vfield3d, n_Cells,stream,cross_cell,pos_em_cell, test_exit_grid)
       !$omp do schedule(static,1)
       do i1=1,n_cells
          !$ id = omp_get_thread_num() + 1
@@ -940,7 +940,7 @@ module atom_transfer
             rand  = sprng(stream(id))
             rand2 = sprng(stream(id))
             rand3 = sprng(stream(id))
-            call pos_em_cellule(i1,rand,rand2,rand3,x,y,z)
+            call pos_em_cell(i1,rand,rand2,rand3,x,y,z)
             rand = sprng(stream(id))
             W = 2.0_dp * rand - 1.0_dp
             W02 =  1.0_dp - W*W
@@ -958,19 +958,19 @@ module atom_transfer
             infinie : do ! Boucle infinie
                i2 = next_cell
                x0=x1 ; y0=y1 ; z0=z1
-               lcellule_non_vide = (i2 <= n_cells)
+               lcell_not_empty = (i2 <= n_cells)
                if (test_exit_grid(i2, x0, y0, z0)) exit infinie
                if (lintersect_stars) then
                   if (i2 == icell_star) exit infinie
                end if
-               if (lcellule_non_vide) then
+               if (lcell_not_empty) then
                   if (icompute_atomRT(i2) == -2) exit infinie
                endif
 
                call cross_cell(x0,y0,z0, u,v,w, i2, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
 
                !compute velocity gradient between cell i1 and crossed cells i2
-               if (lcellule_non_vide) then
+               if (lcell_not_empty) then
                   if (icompute_atomRT(i2)>0) then
                      v2 = v_proj(i2,x1,y1,z1,u,v,w)
                      dv = max(dv,abs(v2-v1))
@@ -1304,14 +1304,14 @@ module atom_transfer
       !BEWARE: by default tab_lambda is associated to tab_lambda_nm which can be long.
       !        Consider using tab_lambda_cont and then interpolate on tab_lambda_nm
       write(*,*) " *** initialising optical indices"
-      call init_indices_optiques()
+      call init_optical_indices()
 
       ! Computing optical dust properties
       ! TO DO: limit_mem options.
       write(*,*) " *** Computing dust properties for", n_lambda, "wavelengths..."
       do la=1, n_lambda !works also for ray-traced lines
          call prop_grains(la)
-         call opacite(la, la, no_scatt=.true.)
+         call opacity(la, la, no_scatt=.true.)
       enddo
 
       do icell=1, n_cells
@@ -1366,7 +1366,7 @@ module atom_transfer
          sdx(:) = dx(:) / real(subpixels,kind=dp)
          sdy(:) = dy(:) / real(subpixels,kind=dp)
 
-       !      !L'obs est en dehors de la grille
+       !      !L'obs est en dehors de la grid
        !      ri = 2*n_rad ; zj=1 ; phik=1
 
          ! Boucle sur les sous-pixels qui calcule l'intensite au centre
@@ -1377,9 +1377,9 @@ module atom_transfer
                x0 = pixelcorner(1) + (i - 0.5_dp) * sdx(1) + (j-0.5_dp) * sdy(1)
                y0 = pixelcorner(2) + (i - 0.5_dp) * sdx(2) + (j-0.5_dp) * sdy(2)
                z0 = pixelcorner(3) + (i - 0.5_dp) * sdx(3) + (j-0.5_dp) * sdy(3)
-               ! On se met au bord de la grille : propagation a l'envers
+               ! On se met au bord de la grid : propagation a l'envers
                call move_to_grid(id, x0,y0,z0,u0,v0,w0, icell,lintersect)
-               if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+               if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
                   call integ_ray_atom(id,icell,x0,y0,z0,u0,v0,w0,iray,labs,n_lambda,tab_lambda_nm)
 
                   I0 = I0 + Itot(:,iray,id)
@@ -1530,7 +1530,7 @@ module atom_transfer
          if (l_sym_ima) then
             cst_phi = pi  / real(n_phi_RT,kind=dp)
          else
-            cst_phi = deux_pi  / real(n_phi_RT,kind=dp)
+            cst_phi = two_pi  / real(n_phi_RT,kind=dp)
          endif
 
          !$omp do schedule(dynamic,1)
@@ -1700,7 +1700,7 @@ module atom_transfer
             u0 = -u ; v0 = -v ; w0 = -w
             !at init x0 is the same everywhere
             call move_to_grid(id, x0(1),y0(1),z0(1),u0,v0,w0, icell,lintersect)
-            if (lintersect) then ! On rencontre la grille, on a potentiellement du flux
+            if (lintersect) then ! On rencontre la grid, on a potentiellement du flux
                call physical_length_atom(id,icell,x0,y0,z0,u0,v0,w0,n_lambda,tab_lambda_nm,tau,flag_sortie)
                !flag_sortie always .false. at the moment. x0,y0,z0 set to 0 before integrating.
                if (flag_sortie) then

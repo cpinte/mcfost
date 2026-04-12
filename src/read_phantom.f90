@@ -1,9 +1,9 @@
 module read_phantom
 
-  use parametres
+  use parameters
   use io_phantom_utils
   use messages
-  use constantes
+  use constants
   use mess_up_SPH
 
   implicit none
@@ -792,10 +792,10 @@ contains
     ! rhodust & rhogas are in g/cm3
     ! extra_heating is in W
 
-    use constantes, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad, Ggrav
-    use parametres, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az, &
+    use constants, only : au_to_cm,Msun_to_g,erg_to_J,m_to_cm, Lsun, cm_to_mum, deg_to_rad, Ggrav
+    use parameters, only : ldudt_implicit,ufac_implicit, lplanet_az, planet_az, lfix_star, RT_az_min, RT_az_max, RT_n_az, &
          idelta_planet_az, delta_planet_az
-    use parametres, only : lscale_length_units,scale_length_units_factor,lscale_mass_units,scale_mass_units_factor
+    use parameters, only : lscale_length_units,scale_length_units_factor,lscale_mass_units,scale_mass_units_factor
 
     ! Input arguments
     integer, intent(in) :: np,nptmass,ntypes,ndusttypes, n_files,dustfluidtype
@@ -821,8 +821,8 @@ contains
     real(dp), dimension(:), allocatable, intent(out) :: SPH_grainsizes ! mum
     real, dimension(:), allocatable, intent(out) :: extra_heating
 
-    type(star_type), dimension(:), allocatable :: etoile_old
-    integer  :: i,j,k,itypei,alloc_status,i_etoile, n_etoiles_old, ifile,n_skip,nsinkproperties
+    type(star_type), dimension(:), allocatable :: star_old
+    integer  :: i,j,k,itypei,alloc_status,i_star, n_stars_old, ifile,n_skip,nsinkproperties
     real(dp) :: xi,yi,zi,hi,vxi,vyi,vzi,T_gasi,rhogasi,rhodusti,gasfraci,dustfraci,totlum,qtermi,pmassi
     real(dp) :: ulength_scaled, umass_scaled, utime_scaled,udens,uerg_per_s,uWatt,ulength_au,ulength_m,usolarmass,uvelocity
     real(dp) :: vphi, vr, phi, cos_phi, sin_phi, r_cyl, r_cyl2, r_sph, G_phantom
@@ -880,7 +880,7 @@ contains
     n_SPH = j
 
     ! TODO : use mcfost quantities directly rather that these intermediate variables
-    ! Voronoi()%x  densite_gaz & densite_pous
+    ! Voronoi()%x  gas_density & densite_pous
     alloc_status = 0
     allocate(rhodust(ndusttypes,n_SPH),massdust(ndusttypes,n_SPH),SPH_grainsizes(ndusttypes),particle_id(n_SPH),&
          x(n_SPH),y(n_SPH),z(n_SPH),h(n_SPH),massgas(n_SPH),rhogas(n_SPH),T_gas(n_SPH),stat=alloc_status)
@@ -1020,22 +1020,22 @@ contains
     allocate(xyzmh_ptmass,source=xyzmh_ptmass_in)
     allocate(vxyz_ptmass,source=vxyz_ptmass_in)
     nsinkproperties = size(xyzmh_ptmass_in,dim=1)
-    n_etoiles_old = n_etoiles
+    n_stars_old = n_stars
     if (lignore_sink) then
-       n_etoiles = 0
+       n_stars = 0
     else
        write(*,*) "# Stars/planets:"
-       n_etoiles = 0
+       n_stars = 0
        n_skip    = 0
        do i=1,nptmass
           if (xyzmh_ptmass_in(4,i) < 0.) then
              n_skip = n_skip + 1
           else
-             n_etoiles = n_etoiles + 1
-             if (n_etoiles /= i) then
+             n_stars = n_stars + 1
+             if (n_stars /= i) then
                 ! Move live particle to front of array
-                xyzmh_ptmass(:,n_etoiles) = xyzmh_ptmass_in(:,i)
-                vxyz_ptmass(:,n_etoiles)  = vxyz_ptmass_in(:,i)
+                xyzmh_ptmass(:,n_stars) = xyzmh_ptmass_in(:,i)
+                vxyz_ptmass(:,n_stars)  = vxyz_ptmass_in(:,i)
              endif
              if (real(xyzmh_ptmass_in(4,i)) * usolarmass > 0.013) then
                 write(*,*) "Star   #", i, "xyz=", real(xyzmh_ptmass_in(1:3,i) * ulength_au), "au, M=", &
@@ -1050,7 +1050,7 @@ contains
           endif
        enddo
        if (n_skip > 0) write(*,*) "Skipped ", n_skip," dead sink particles..."
-       if (n_etoiles_old == 0) n_etoiles_old = n_etoiles
+       if (n_stars_old == 0) n_stars_old = n_stars
     endif
 
     if (lupdate_velocities) then
@@ -1131,108 +1131,108 @@ contains
     if (lfix_star) then
        write(*,*) ""
        write(*,*) "Stellar parameters will not be updated, only the star positions, velocities and masses"
-       if (n_etoiles > n_etoiles_old) then
-          write(*,*) "WARNING: sink with id >", n_etoiles_old, "will be ignored in the RT"
-          n_etoiles = n_etoiles_old
+       if (n_stars > n_stars_old) then
+          write(*,*) "WARNING: sink with id >", n_stars_old, "will be ignored in the RT"
+          n_stars = n_stars_old
        endif
-       do i_etoile = 1, n_etoiles
-          etoile(i_etoile)%x = xyzmh_ptmass(1,i_etoile) * ulength_au
-          etoile(i_etoile)%y = xyzmh_ptmass(2,i_etoile) * ulength_au
-          etoile(i_etoile)%z = xyzmh_ptmass(3,i_etoile) * ulength_au
+       do i_star = 1, n_stars
+          star(i_star)%x = xyzmh_ptmass(1,i_star) * ulength_au
+          star(i_star)%y = xyzmh_ptmass(2,i_star) * ulength_au
+          star(i_star)%z = xyzmh_ptmass(3,i_star) * ulength_au
 
-          etoile(i_etoile)%vx = vxyz_ptmass(1,i_etoile) * uvelocity
-          etoile(i_etoile)%vy = vxyz_ptmass(2,i_etoile) * uvelocity
-          etoile(i_etoile)%vz = vxyz_ptmass(3,i_etoile) * uvelocity
+          star(i_star)%vx = vxyz_ptmass(1,i_star) * uvelocity
+          star(i_star)%vy = vxyz_ptmass(2,i_star) * uvelocity
+          star(i_star)%vz = vxyz_ptmass(3,i_star) * uvelocity
 
-          etoile(i_etoile)%M = xyzmh_ptmass(4,i_etoile) * usolarmass
+          star(i_star)%M = xyzmh_ptmass(4,i_star) * usolarmass
 
-          if (.not.etoile(i_etoile)%force_Mdot) then
-             etoile(i_etoile)%Mdot = xyzmh_ptmass(16,i_etoile) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
+          if (.not.star(i_star)%force_Mdot) then
+             star(i_star)%Mdot = xyzmh_ptmass(16,i_star) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
           endif
        enddo
     else
 
        write(*,*) ""
        write(*,*) "Updating the stellar properties:"
-       write(*,*) "There are now", n_etoiles, "stars in the model"
+       write(*,*) "There are now", n_stars, "stars in the model"
 
        ! Saving if the accretion rate was forced
-       allocate(etoile_old(n_etoiles_old))
-       if (allocated(etoile)) then
-          etoile_old(:) = etoile(:)
-          deallocate(etoile)
+       allocate(star_old(n_stars_old))
+       if (allocated(star)) then
+          star_old(:) = star(:)
+          deallocate(star)
        endif
-       allocate(etoile(n_etoiles))
-       do i=1, min(n_etoiles, n_etoiles_old)
-          etoile(i)%force_Mdot = etoile_old(i)%force_Mdot
-          etoile(i)%Mdot = etoile_old(i)%Mdot
+       allocate(star(n_stars))
+       do i=1, min(n_stars, n_stars_old)
+          star(i)%force_Mdot = star_old(i)%force_Mdot
+          star(i)%Mdot = star_old(i)%Mdot
        enddo
        ! If we have new stars
-       do i=n_etoiles_old+1,n_etoiles
-          etoile(i)%force_Mdot = .false.
-          etoile(i)%Mdot = 0.
+       do i=n_stars_old+1,n_stars
+          star(i)%force_Mdot = .false.
+          star(i)%Mdot = 0.
        enddo
-       deallocate(etoile_old)
+       deallocate(star_old)
 
-       if (n_etoiles > 0) then
-         do i=1,n_etoiles
-             etoile(i)%x = xyzmh_ptmass(1,i) * ulength_au
-             etoile(i)%y = xyzmh_ptmass(2,i) * ulength_au
-             etoile(i)%z = xyzmh_ptmass(3,i) * ulength_au
-             etoile(i)%vx = vxyz_ptmass(1,i) * uvelocity
-             etoile(i)%vy = vxyz_ptmass(2,i) * uvelocity
-             etoile(i)%vz = vxyz_ptmass(3,i) * uvelocity
-             etoile(i)%M = xyzmh_ptmass(4,i) * usolarmass
+       if (n_stars > 0) then
+         do i=1,n_stars
+             star(i)%x = xyzmh_ptmass(1,i) * ulength_au
+             star(i)%y = xyzmh_ptmass(2,i) * ulength_au
+             star(i)%z = xyzmh_ptmass(3,i) * ulength_au
+             star(i)%vx = vxyz_ptmass(1,i) * uvelocity
+             star(i)%vy = vxyz_ptmass(2,i) * uvelocity
+             star(i)%vz = vxyz_ptmass(3,i) * uvelocity
+             star(i)%M = xyzmh_ptmass(4,i) * usolarmass
          enddo
 
-          do i=1, n_etoiles
-             if (.not.etoile(i)%force_Mdot) then
-                etoile(i)%Mdot = xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
+          do i=1, n_stars
+             if (.not.star(i)%force_Mdot) then
+                star(i)%Mdot = xyzmh_ptmass(16,i) * usolarmass / utime_scaled * year_to_s ! Accretion rate is in Msun/year
              endif
           enddo
-          etoile(:)%find_spectrum = .true.
+          star(:)%find_spectrum = .true.
 
           lupdate_photosphere = .false.
-          do i=1,n_etoiles
+          do i=1,n_stars
              if (xyzmh_ptmass(13,i) > tiny_real) then
                 ! sink particle Teff is defined
                 write(*,*) "Using Teff and Lum from phantom:"
                 lupdate_photosphere = .true.
-                etoile(i)%T = max(xyzmh_ptmass(13,i),100.)
+                star(i)%T = max(xyzmh_ptmass(13,i),100.)
                 ! deriving radius from luminosity (Reff is not correct in dump)
-                etoile(i)%r = sqrt(xyzmh_ptmass(12,i) * uWatt / Lsun) * (Tsun/etoile(i)%T)**2
+                star(i)%r = sqrt(xyzmh_ptmass(12,i) * uWatt / Lsun) * (Tsun/star(i)%T)**2
              else if (xyzmh_ptmass(14,i) > tiny_real) then
                 ! sink particle Reff is defined
                 write(*,*) "Using Reff and Lum from phantom:"
                 lupdate_photosphere = .true.
-                etoile(i)%r = xyzmh_ptmass(14,i) * ulength_m / Rsun
-                etoile(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(etoile(i)%r)
+                star(i)%r = xyzmh_ptmass(14,i) * ulength_m / Rsun
+                star(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(star(i)%r)
              else if (xyzmh_ptmass(12,i) > tiny_real) then
                 ! We use the luminosity and a radius estimate
                 write(*,*) "Using Lum from phantom + effective radius from sink:"
-                etoile(i)%T = 100.
-                etoile(i)%r = 0.001
+                star(i)%T = 100.
+                star(i)%r = 0.001
                 if (xyzmh_ptmass(12,i) > tiny_real) then
-                   etoile(i)%r = max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun
-                   if (etoile(i)%r > 0.) etoile(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(etoile(i)%r)
+                   star(i)%r = max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun
+                   if (star(i)%r > 0.) star(i)%T =  Tsun * (xyzmh_ptmass(12,i) * uWatt / Lsun)**0.25 / sqrt(star(i)%r)
                 endif
              else
                 if (lupdate_photosphere) then ! if we updated the 1st sink
-                   etoile(i)%r = max(max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun, 0.001)
-                   etoile(i)%T = 100
+                   star(i)%r = max(max(xyzmh_ptmass(5,i),xyzmh_ptmass(6,i)) * ulength_m / Rsun, 0.001)
+                   star(i)%T = 100
                 endif
              endif
           enddo
 
           if (lupdate_photosphere) then
              lfix_star = .true.
-             do i=1,n_etoiles
-                write(*,*) "Star #",i,"  Teff=", etoile(i)%T, "K, r=", real(etoile(i)%r), "Rsun"
+             do i=1,n_stars
+                write(*,*) "Star #",i,"  Teff=", star(i)%T, "K, r=", real(star(i)%r), "Rsun"
              enddo
              ! Convert radius to au
-             etoile(:)%r = etoile(:)%r * Rsun_to_AU
+             star(:)%r = star(:)%r * Rsun_to_AU
 
-             etoile(:)%lb_body=.true.
+             star(:)%lb_body=.true.
           endif
        endif
     endif
@@ -1264,7 +1264,7 @@ contains
     ! OUTPUT:
     !    temp - temperature [K]
 
-    use constantes, only:kb_on_mh,radconst
+    use constants, only:kb_on_mh,radconst
     real(dp), intent(in) :: rho,u,mu
     integer, intent(in) :: ieos
     real(dp) :: ft,dft,dt

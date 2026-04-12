@@ -2,7 +2,7 @@
 
 module escape
 
-    use parametres
+    use parameters
     use grid
     use cylindrical_grid, only : cell_map_i, cell_map_j, cell_map_k
     use utils, only : progress_bar, Bpnu
@@ -96,12 +96,12 @@ module escape
 
     subroutine alloc_escape_variables()
 
-        allocate(d_to_star(n_cells,n_etoiles),wdi(n_cells,n_etoiles),domega_core(n_cells,n_etoiles))
+        allocate(d_to_star(n_cells,n_stars),wdi(n_cells,n_stars),domega_core(n_cells,n_stars))
         !domega_core does not discriminates between the "shock" and the unperturbed stellar surface.
         !If the accretion shock is there, we split and uses 2 different quantities.
         if (laccretion_shock) then
-            allocate(domega_star(n_cells,n_etoiles),domega_shock(n_cells,n_etoiles))
-            allocate(Tchoc_average(n_etoiles))
+            allocate(domega_star(n_cells,n_stars),domega_shock(n_cells,n_stars))
+            allocate(Tchoc_average(n_stars))
         endif
         allocate(mean_grad_v(n_cells), mean_length_scale(n_cells))
 
@@ -192,9 +192,9 @@ module escape
     !TO DO: include dust in the dOmega and also background opacities
         integer :: icell, id, i_cell, j_cell, k_cell, i
         real(kind=dp) :: v0, v1, r0,  F1, T1
-        real(kind=dp) :: Tchoc, rho_shock(n_etoiles), f_shock(n_etoiles)
-        real(kind=dp) :: x0, y0, z0, x1, y1, z1, u, v, w, w2, dist, max_Tchoc(n_etoiles)
-        integer :: ibar, n_cells_done, n_rays_shock(n_etoiles), n_rays_star(n_etoiles)
+        real(kind=dp) :: T_shock, rho_shock(n_stars), f_shock(n_stars)
+        real(kind=dp) :: x0, y0, z0, x1, y1, z1, u, v, w, w2, dist, max_Tchoc(n_stars)
+        integer :: ibar, n_cells_done, n_rays_shock(n_stars), n_rays_star(n_stars)
         integer :: i_star, icell_star, n_neighbours, iray
         real :: time_gradient, rand, rand2, rand3, rand4
         integer :: count_start, count_end
@@ -232,10 +232,10 @@ module escape
         !$omp default(none) &
         !$omp private(id,icell,x0,y0,z0,j_cell,i_cell,k_cell,cell_neighbours) &
         !$omp private(i_star,icell_star,v0,v1,r0,n_neighbours)&
-        !$omp private(Tchoc,F1,T1,x1,y1,z1,u,v,w,dist,l,l_contrib, l_void_before, previous_cell, next_cell) &
-        !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot,cross_cell)&
+        !$omp private(T_shock,F1,T1,x1,y1,z1,u,v,w,dist,l,l_contrib, l_void_before, previous_cell, next_cell) &
+        !$omp shared(Wdi,d_to_star, dOmega_core,star,Tchoc_average,rho_shock,nHtot,cross_cell)&
         !$omp shared(phi_grid,r_grid,z_grid,ibar, n_cells_done,n_cells,lvoronoi,cell_map_i,cell_map_j,cell_map_k)&
-        !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles,Voronoi,vfield3d)&
+        !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_stars,Voronoi,vfield3d)&
         !$omp shared(laccretion_shock,domega_shock,domega_star,n_max_neighbours)
         !$omp do schedule(static,1)
         do icell=1, n_cells
@@ -257,10 +257,10 @@ module escape
                 v0 = sqrt(sum(vfield3d(icell,:)**2))
             endif
 
-            do i_star = 1, n_etoiles
-                r0 = sqrt((x0-etoile(i_star)%x)**2 + (y0-etoile(i_star)%y)**2 + (z0-etoile(i_star)%z)**2)
+            do i_star = 1, n_stars
+                r0 = sqrt((x0-star(i_star)%x)**2 + (y0-star(i_star)%y)**2 + (z0-star(i_star)%z)**2)
                 d_to_star(icell,i_star) = r0
-                dOmega_core(icell,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(icell,i_star))**2))
+                dOmega_core(icell,i_star) = 0.5*(1.0 - sqrt(1.0 - (star(i_star)%r/d_to_star(icell,i_star))**2))
                 !TO DO: use cell surface
                 ! dOmega_core(icell,i_star) = surface(icell) / r0 / r0
             enddo
@@ -329,7 +329,7 @@ module escape
             rho_shock(:) = 1d-100
             max_Tchoc(:) = 0.0
             id = 1
-            do i_star = 1, n_etoiles
+            do i_star = 1, n_stars
                 rays_loop : do iray=1, n_rayons_sob_step
 
                     rand  = sprng(stream(id))
@@ -347,13 +347,13 @@ module escape
                     ! if (.not.lintersect) cycle
                     ! if (lintersect) then
                     n_rays_star(i_star) = n_rays_star(i_star) + 1
-                    if (is_inshock(id, 1, i_star, icell, x0, y0, z0, Tchoc, F1, T1)) then
+                    if (is_inshock(id, 1, i_star, icell, x0, y0, z0, T_shock, F1, T1)) then
                         !fraction actually because all rays touch the star here
-                        Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell)
+                        Tchoc_average(i_star) = Tchoc_average(i_star) + T_shock * nHtot(icell)
                         n_rays_shock(i_star) = n_rays_shock(i_star) + 1
                         rho_shock(i_star) = rho_shock(i_star) + nHtot(icell)
                         f_shock(i_star) = f_shock(i_star) + 1.0_dp / real(n_rayons_sob_step,kind=dp)
-                        max_Tchoc(i_star) = max(max_Tchoc(i_star), Tchoc)
+                        max_Tchoc(i_star) = max(max_Tchoc(i_star), T_shock)
                      endif
                     ! endif
                 enddo rays_loop !rays
@@ -369,14 +369,14 @@ module escape
             maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
         write(*,'("max(<l>)=",(1ES17.8E3)," m; min(<l>)=",(1ES17.8E3)," m")') &
             maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
-        do i_star=1, n_etoiles
+        do i_star=1, n_stars
             write(*,*) "star #", i_star
             !it is like domega_core, but here I'm assuming all rays "would" hit the star.
             !it uses the average distance to the star as reference point in the cell.
             where (d_to_star(:,i_star) > 0) &
-                wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
+                wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (star(i_star)%r/d_to_star(:,i_star))**2))
             write(*,'("  -- max(<d>)=",(1ES17.8E3),"; min(<d>)=",(1ES17.8E3))') &
-                maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
+                maxval(d_to_star(:,i_star))/star(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/star(i_star)%r
             write(*,'("  -- max(W)=",(1ES17.8E3),"; min(W)=",(1ES17.8E3))') &
                 maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
             write(*,'("  -- max(dOmegac)=",(1ES17.8E3),"; min(dOmegac)=",(1ES17.8E3))') &
@@ -410,9 +410,9 @@ module escape
         real(kind=dp) :: xa,xb,xc,xa1,xb1,xc1,l1,l2,l3
         integer :: next_cell, iray, icell_in, n_rayons
         real :: rand, rand2, rand3
-        real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1, f_shock(n_etoiles)
-        integer :: n_rays_shock(n_etoiles), n_rays_star(n_etoiles)
-        real(kind=dp) :: l,l_contrib, l_void_before, Tchoc, rho_shock(n_etoiles)
+        real(kind=dp) :: W02,SRW02,ARGMT,v0,v1, r0, wei, F1, T1, f_shock(n_stars)
+        integer :: n_rays_shock(n_stars), n_rays_star(n_stars)
+        real(kind=dp) :: l,l_contrib, l_void_before, T_shock, rho_shock(n_stars)
         integer :: ibar, n_cells_done
         integer :: i_star, icell_star
         logical :: lintersect_stars, lintersect
@@ -461,10 +461,10 @@ module escape
         !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,x1,y1,z1,u,v,w) &
         !$omp private(wei,i_star,icell_star,lintersect_stars,v0,v1,r0)&
         !$omp private(l_contrib,l_void_before,l,W02,SRW02,ARGMT,previous_cell,next_cell) &
-        !$omp private(l1,l2,l3,xa,xb,xc,xa1,xb1,xc1,icell_in,Tchoc,F1,T1,lintersect) &
-        !$omp shared(Wdi,d_to_star, dOmega_core,etoile,Tchoc_average,rho_shock,nHtot,cross_cell,test_exit_grid)&
-        !$omp shared(phi_grid,r_grid,z_grid,pos_em_cellule,ibar, n_cells_done,stream,n_cells)&
-        !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_etoiles,f_shock)&
+        !$omp private(l1,l2,l3,xa,xb,xc,xa1,xb1,xc1,icell_in,T_shock,F1,T1,lintersect) &
+        !$omp shared(Wdi,d_to_star, dOmega_core,star,Tchoc_average,rho_shock,nHtot,cross_cell,test_exit_grid)&
+        !$omp shared(phi_grid,r_grid,z_grid,pos_em_cell,ibar, n_cells_done,stream,n_cells)&
+        !$omp shared (mean_grad_v,mean_length_scale,icompute_atomRT,n_stars,f_shock)&
         !$omp shared(laccretion_shock,domega_shock,domega_star,n_rays_shock,n_rayons,n_rays_star)
         !$omp do schedule(static,1)
         do icell=1, n_cells
@@ -481,14 +481,14 @@ module escape
                 rand3 = sprng(stream(id))
 
 
-                call pos_em_cellule(icell,rand,rand2,rand3,x0,y0,z0)
-                do i_star = 1, n_etoiles
-                    r0 = sqrt((x0-etoile(i_star)%x)**2 + (y0-etoile(i_star)%y)**2 + (z0-etoile(i_star)%z)**2)
+                call pos_em_cell(icell,rand,rand2,rand3,x0,y0,z0)
+                do i_star = 1, n_stars
+                    r0 = sqrt((x0-star(i_star)%x)**2 + (y0-star(i_star)%y)**2 + (z0-star(i_star)%z)**2)
                     !distance and solid-angle to the star assuming that all cells can see a star.
                     !it is an average distance from random points in the cell.
                     d_to_star(icell,i_star) = d_to_star(icell,i_star) + wei * r0
                     ! !it is like domega_core, but here I'm assuming all rays "would" hit the star.
-                    !  wdi(icell,i_star) = wdi(icell,i_star) + wei * 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/r0)**2))
+                    !  wdi(icell,i_star) = wdi(icell,i_star) + wei * 0.5*(1.0 - sqrt(1.0 - (star(i_star)%r/r0)**2))
                 enddo
 
                 ! Direction de propagation aleatoire
@@ -526,9 +526,9 @@ module escape
                         inf : do
                             if (next_cell==icell_star) then
                                 !in shock ??
-                                if (is_inshock(id, iray, i_star, icell_in, xa, xb, xc, Tchoc, F1, T1)) then
+                                if (is_inshock(id, iray, i_star, icell_in, xa, xb, xc, T_shock, F1, T1)) then
                                     dOmega_shock(icell,i_star) = dOmega_shock(icell,i_star) + wei
-                                    Tchoc_average(i_star) = Tchoc_average(i_star) + Tchoc * nHtot(icell_in)
+                                    Tchoc_average(i_star) = Tchoc_average(i_star) + T_shock * nHtot(icell_in)
                                     n_rays_shock(i_star) = n_rays_shock(i_star) + 1
                                     rho_shock(i_star) = rho_shock(i_star) + nHtot(icell_in)
                                 else
@@ -578,14 +578,14 @@ module escape
             maxval(mean_grad_v), minval(mean_grad_v,icompute_atomRT>0)
         write(*,'("max(<l>)=",(1ES17.8E3)," m; min(<l>)=",(1ES17.8E3)," m")') &
             maxval(mean_length_scale), minval(mean_length_scale,icompute_atomRT>0)
-        do i_star=1, n_etoiles
+        do i_star=1, n_stars
             write(*,*) "star #", i_star
             !it is like domega_core, but here I'm assuming all rays "would" hit the star.
             !it uses the average distance to the star as reference point in the cell.
             where (d_to_star(:,i_star) > 0) &
-                wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (etoile(i_star)%r/d_to_star(:,i_star))**2))
+                wdi(:,i_star) = 0.5*(1.0 - sqrt(1.0 - (star(i_star)%r/d_to_star(:,i_star))**2))
             write(*,'("  -- max(<d>)=",(1ES17.8E3),"; min(<d>)=",(1ES17.8E3))') &
-                maxval(d_to_star(:,i_star))/etoile(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/etoile(i_star)%r
+                maxval(d_to_star(:,i_star))/star(i_star)%r, minval(d_to_star(:,i_star),icompute_atomRT>0)/star(i_star)%r
             write(*,'("  -- max(W)=",(1ES17.8E3),"; min(W)=",(1ES17.8E3))') &
                 maxval(Wdi(:,i_star)), minval(Wdi(:,i_star),icompute_atomRT>0)
             write(*,'("  -- max(dOmegac)=",(1ES17.8E3),"; min(dOmegac)=",(1ES17.8E3))') &
@@ -702,15 +702,15 @@ module escape
         allocate(chitot(n_lambda, nb_proc),etatot(n_lambda,nb_proc))
         !Radiation field
         allocate(I0_line(Nlambda_max_line,NmaxLine,NactiveAtoms,nb_proc)); I0_line = 0.0_dp
-        allocate(Istar(n_lambda, n_etoiles))
+        allocate(Istar(n_lambda, n_stars))
         !see stars/star_rad()
-        do i=1, n_etoiles
-            Istar(:,i) = Bpnu(n_lambda, tab_lambda_nm, etoile(i)%T*1d0)
+        do i=1, n_stars
+            Istar(:,i) = Bpnu(n_lambda, tab_lambda_nm, star(i)%T*1d0)
             !TO DO: FUV flux here. The coronal flux is added on top of the stellar photosphere radiation, excluding the shock region.
         enddo
         if (laccretion_shock) then
-            allocate(Ishock(n_lambda, n_etoiles))
-            do i=1, n_etoiles
+            allocate(Ishock(n_lambda, n_stars))
+            do i=1, n_stars
                 Ishock(:,i) = Bpnu(n_lambda, tab_lambda_nm, Tchoc_average(i))
                 !par of the spectrum is due to the pre-shock region.
                 if (T_preshock > 0.0 ) then
@@ -819,7 +819,7 @@ module escape
             !$omp private(id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
             !$omp private(l_iterate,weight,diff)&
             !$omp shared(lforce_lte,n_cells,voronoi,r_grid,z_grid,phi_grid,wmu,n_rayons) &
-            !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
+            !$omp shared(pos_em_cell,labs,n_lambda,tab_lambda_nm, icompute_atomRT,lcell_converged,diff_loc,seed,nb_proc,gtype) &
             !$omp shared(stream,n_rayons_mc,lvoronoi,ibar,n_cells_done,l_iterate_ne,Itot,precision,lcswitch_enabled)
             !$omp do schedule(static,1)
             do icell=1, n_cells
@@ -838,14 +838,14 @@ module escape
                 !Init upward radiative rates to 0 and downward radiative rates to 0 or "Aji_cont" for Sobolev.
                 !Init collisional rates
                 call init_rates_escape(id,icell)
-                ! ! Position aleatoire dans la cellule
+                ! ! Position aleatoire dans la cell
                 ! do iray=1,n_rayons
 
                 !     rand  = sprng(stream(id))
                 !     rand2 = sprng(stream(id))
                 !     rand3 = sprng(stream(id))
 
-                !     call pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+                !     call pos_em_cell(icell ,rand,rand2,rand3,x0,y0,z0)
 
                 !     ! Direction de propagation aleatoire
                 !     rand = sprng(stream(id))
@@ -1191,11 +1191,11 @@ module escape
 
         Itot(:,1,id) = 0.0
         if (laccretion_shock) then
-            do i=1, n_etoiles
+            do i=1, n_stars
                 Itot(:,1,id) = Itot(:,1,id) + domega_shock(icell,i) * Ishock(:,i) + domega_star(icell,i)*Istar(:,i)
             enddo
         else
-            do i=1, n_etoiles
+            do i=1, n_stars
                 Itot(:,1,id) = Itot(:,1,id) + domega_core(icell,i) * Istar(:,i)
             enddo
         endif
@@ -1339,13 +1339,13 @@ module escape
       integer :: kr, nat, nl
       integer, target :: icell
       integer, pointer :: p_icell
-      integer :: nbr_cell, next_cell, previous_cell, icell_star, i_star, icell_prev
-      logical :: lcellule_non_vide, lintersect_stars
+      integer :: n_cell, next_cell, previous_cell, icell_star, i_star, icell_prev
+      logical :: lcell_not_empty, lintersect_stars
 
       x1=x;y1=y;z1=z
       x0=x;y0=y;z0=z
       next_cell = icell_in
-      nbr_cell = 0
+      n_cell = 0
       icell_prev = icell_in
 
       tau(:) = 0.0_dp
@@ -1359,11 +1359,11 @@ module escape
       call intersect_stars(x,y,z, u,v,w, lintersect_stars, i_star, icell_star)
       ! Boucle infinie sur les cellules (we go over the grid.)
       infinie : do ! Boucle infinie
-      ! Indice de la cellule
+      ! Indice de la cell
          icell = next_cell
          x0=x1 ; y0=y1 ; z0=z1
 
-         lcellule_non_vide = (icell <= n_cells)
+         lcell_not_empty = (icell <= n_cells)
 
          ! Test sortie ! "The ray has reach the end of the grid"
          if (test_exit_grid(icell, x0, y0, z0)) return
@@ -1385,24 +1385,24 @@ module escape
 
          !Special handling of coronal irradiation from "above".
          !mainly for 1d stellar atmosphere
-         if (lcellule_non_vide) then
+         if (lcell_not_empty) then
             if (icompute_atomRT(icell) == -2) then
-               !Does not return but cell is empty (lcellule_non_vide is .false.)
+               !Does not return but cell is empty (lcell_not_empty is .false.)
                coronal_irrad = linear_1D_sorted(atmos_1d%Ncorona,atmos_1d%x_coro(:), &
                                                    atmos_1d%I_coro(:,1),N,lambda)
                I_sobolev_1ray = I_sobolev_1ray + exp(-tau) * coronal_irrad
-               lcellule_non_vide = .false.
+               lcell_not_empty = .false.
             endif
          endif
 
-         nbr_cell = nbr_cell + 1
+         n_cell = n_cell + 1
 
-         ! Calcul longeur de vol et profondeur optique dans la cellule
+         ! Calcul longeur de vol et profondeur optique dans la cell
          previous_cell = 0 ! unused, just for Voronoi
          call cross_cell(x0,y0,z0, u,v,w,  icell, previous_cell, x1,y1,z1, next_cell,l, l_contrib, l_void_before)
 
          !count opacity only if the cell is filled, else go to next cell
-         if (lcellule_non_vide) then
+         if (lcell_not_empty) then
             chi(:) = 1d-300; Snu(:) = 0.0_dp
             ! opacities in m^-1, l_contrib in au
 
@@ -1418,7 +1418,7 @@ module escape
 
             dtau(:) = l_contrib * chi(:) * AU_to_m !au * m^-1 * au_to_m
 
-            if (nbr_cell==1) then
+            if (n_cell==1) then
                ds(iray,id) = l_contrib * AU_to_m
                psi(:,1,id) = (1.0_dp - exp(-dtau) ) / chi
                dv_proj(iray,id) = v_proj(icell,x1,y1,z1,u,v,w) - v_proj(icell,x0,y0,z0,y,v,w)
@@ -1427,7 +1427,7 @@ module escape
             I_sobolev_1ray = I_sobolev_1ray + exp(-tau) * (1.0_dp - exp(-dtau)) * Snu / chi
             tau(:) = tau(:) + dtau(:) !for next cell
 
-         end if  ! lcellule_non_vide
+         end if  ! lcell_not_empty
 
          icell_prev = icell
          !duplicate with previous_cell, but this avoid problem with Voronoi grid here

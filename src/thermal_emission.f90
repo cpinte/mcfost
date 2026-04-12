@@ -1,7 +1,7 @@
 module thermal_emission
 
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use grains
   use dust_prop
   !$ use omp_lib
@@ -9,7 +9,7 @@ module thermal_emission
   use utils
   use PAH
   use grid
-  use stars, only : spectre_etoiles, E_ISM, E_stars
+  use stars, only : star_spectrum, E_ISM, E_stars
   use input
   use density
   use cylindrical_grid
@@ -30,12 +30,12 @@ module thermal_emission
 
   private
 
-  ! Choix cellule d'emission pour cas monochromatique
+  ! Choix cell d'emission pour cas monochromatique
   real(kind=dp), dimension(:,:), allocatable :: prob_E_cell !n_lambda,0:n_rad*nz
   real(kind=dp), dimension(:), allocatable :: frac_E_stars, frac_E_disk, E_totale !n_lambda
 
-  ! fraction d'energie reemise sur energie etoile
-  ! (Opacite moyenne de Planck * coeff)
+  ! fraction d'energie reemise sur energie star
+  ! (opacity moyenne de Planck * coeff)
   real(kind=dp), dimension(:,:), allocatable :: log_Qcool_minus_extra_heating ! 0:n_T, n_cells
   real(kind=dp), dimension(:,:), allocatable :: log_E_em_1grain  !n_grains,0:n_T
   real(kind=dp), dimension(:,:), allocatable :: E_em_1grain_nRE, log_E_em_1grain_nRE !n_grains,0:n_T
@@ -353,7 +353,7 @@ subroutine repartition_wl_em()
   enddo
 
   L_tot = 2.0*pi*hp*c_light**2 * (E_star_tot + E_disk_tot + E_ISM_tot)
-  L_packet_th = L_tot/nbre_photons_tot
+  L_packet_th = L_tot/n_photons_total
 
   return
 
@@ -361,17 +361,17 @@ end subroutine repartition_wl_em
 
 !***************************************************
 
-subroutine select_wl_em(aleat,lambda)
-! Choix de la longueur d'onde dans le corps noir precedemment cree
+subroutine select_wl_em(rand,lambda)
+! Choix de la length d'onde dans le corps noir precedemment cree
 ! Dichotomie
-! lambda est l'indice de la longueur d'onde
+! lambda est l'indice de la length d'onde
 ! Utilise les résultats de  repartition_wl_em
 ! C. Pinte
 
   implicit none
 
-  real, intent(in) :: aleat
-  integer, intent(out) :: lambda ! indice de longueur d'onde
+  real, intent(in) :: rand
+  integer, intent(out) :: lambda ! indice de length d'onde
 
   integer :: k, kmin, kmax
 
@@ -381,8 +381,8 @@ subroutine select_wl_em(aleat,lambda)
   k=(kmin + kmax)/2
 
   ! Dichotomie
-  do while (spectre_emission_cumul(k) /= aleat)
-     if (spectre_emission_cumul(k) < aleat) then
+  do while (spectre_emission_cumul(k) /= rand)
+     if (spectre_emission_cumul(k) < rand) then
         kmin = k
      else
         kmax = k
@@ -403,7 +403,7 @@ end subroutine select_wl_em
 
 subroutine init_reemission(lheating,dudt)
 ! Pretabule les opacites de Planck en fonction de T et de la position
-! + les termes k dB/dT pour tirage de la longueur d'onde du photon emis
+! + les termes k dB/dT pour tirage de la length d'onde du photon emis
 ! avec correction de temperature
 ! C. Pinte 17/01/05
 
@@ -424,7 +424,7 @@ subroutine init_reemission(lheating,dudt)
 
   write(*,'(a36, $)') " Initializing thermal properties ..."
 
-  cst_E = 2.0*hp*c_light**2 * quatre_pi
+  cst_E = 2.0*hp*c_light**2 * four_pi
 
   call init_tab_temp()
 
@@ -433,9 +433,9 @@ subroutine init_reemission(lheating,dudt)
      ! A une cst pres (pas la meme ds les 2 cas!!)
 
      Temp=tab_Temp(t)
-     cst=cst_th/Temp
+     cst=thermal_const/Temp
      do lambda=1, n_lambda
-        ! longueur d'onde en metre
+        ! length d'onde en metre
         wl = tab_lambda(lambda)*1.e-6
         delta_wl=tab_delta_lambda(lambda)*1.e-6
         cst_wl=cst/wl
@@ -451,7 +451,7 @@ subroutine init_reemission(lheating,dudt)
      enddo !lambda
   enddo ! T
 
-  ! produit par opacite (abs seule) massique
+  ! produit par opacity (abs seule) massique
   ! Todo : this loop is OK in 2D but takes ~ 5sec for 0.5 million cells in 3D
   !$omp parallel default(none) &
   !$omp private(id,icell,T,lambda,integ, Qcool,Qcool0,extra_heating,Qcool_minus_extra_heating,Temp,u_o_dt) &
@@ -550,7 +550,7 @@ subroutine init_reemission(lheating,dudt)
   endif ! low_mem_th_emission
 
   if (lRE_nLTE) then
-     ! produit par opacite (abs seule) massique d'une seule taille de grain
+     ! produit par opacity (abs seule) massique d'une seule taille de grain
      do T=1, n_T
         do k=grain_RE_nLTE_start,grain_RE_nLTE_end
            integ=0.0
@@ -678,7 +678,7 @@ subroutine Temp_LTE(id, icell, Ti, Temp, frac)
      if (log_Qheat <  log_Qcool_minus_extra_heating(1,p_icell)) then
         Temp = T_min ; Ti = 2
      else
-        ! Temperature echantillonee juste sup. a la temperature de la cellule
+        ! Temperature echantillonee juste sup. a la temperature de la cell
         if (id==0) then
            Ti = minval(xT_ech(icell,:))
         else
@@ -707,14 +707,14 @@ end subroutine Temp_LTE
 
 !********************************************************************
 
-subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
-! Calcul de la temperature de la cellule et stokage energie recue + T
+subroutine im_reemission_LTE(id,icell,p_icell,rand1,rand2,lambda)
+! Calcul de la temperature de la cell et stokage energie recue + T
 ! Reemission d'un photon a la bonne longeur d'onde
 
   implicit none
 
   integer, intent(in) :: id, icell, p_icell
-  real, intent(in) ::  aleat1, aleat2
+  real, intent(in) ::  rand1, rand2
   integer, intent(inout) :: lambda
 
   integer :: l, l1, l2, Ti, T1, T2, k, heating_method, p_k
@@ -739,12 +739,12 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
   if (low_mem_th_emission) then
      ! Select absorbing grain
      heating_method = 1 ! LTE
-     k = select_absorbing_grain(lambda,icell, aleat1, heating_method)
+     k = select_absorbing_grain(lambda,icell, rand1, heating_method)
 
      ! Select wavelength
      do while((l2-l1) > 1)
         proba=frac_T1*kdB_dT_1grain_LTE_CDF(l,k,T1)+frac_T2*kdB_dT_1grain_LTE_CDF(l,k,T2)
-        if(aleat2 > proba) then
+        if(rand2 > proba) then
            l1=l
         else
            l2=l
@@ -755,7 +755,7 @@ subroutine im_reemission_LTE(id,icell,p_icell,aleat1,aleat2,lambda)
      ! Select wavelength
      do while((l2-l1) > 1)
         proba=frac_T1*kdB_dT_CDF(l,T1,p_icell)+frac_T2*kdB_dT_CDF(l,T2,p_icell)
-        if(aleat2 > proba) then
+        if(rand2 > proba) then
            l1=l
         else
            l2=l
@@ -772,8 +772,8 @@ end subroutine im_reemission_LTE
 
 !********************************************************************
 
-subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
-! Calcul de la temperature de la cellule
+subroutine im_reemission_NLTE(id,icell,p_icell,rand1,rand2,lambda)
+! Calcul de la temperature de la cell
 ! Reemission d'un photon a la bonne longeur d'onde
 
   use radiation_field, only : xJ_abs, J0
@@ -781,7 +781,7 @@ subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
   implicit none
 
   integer, intent(in) :: id,icell, p_icell
-  real, intent(in) :: aleat1, aleat2
+  real, intent(in) :: rand1, rand2
   integer, intent(inout) :: lambda
 
   integer :: l, l1, l2, T_int, T1, T2, k, kmin, kmax, lambda0, ilambda, heating_method, p_k
@@ -793,14 +793,14 @@ subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
   if (low_mem_th_emission_nLTE) then
      ! Select absorbing grain
      heating_method = 2 ! nLTE
-     k = select_absorbing_grain(lambda0,icell, aleat1, heating_method)
+     k = select_absorbing_grain(lambda0,icell, rand1, heating_method)
   else
      kmin=grain_RE_nLTE_start
      kmax=grain_RE_nLTE_end
      k=(kmin+kmax)/2
 
      do while((kmax-kmin) > 1)
-        if (kabs_nLTE_CDF(k,icell,lambda0) < aleat1) then
+        if (kabs_nLTE_CDF(k,icell,lambda0) < rand1) then
            kmin = k
         else
            kmax = k
@@ -811,7 +811,7 @@ subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
   endif
 
   ! Mean intensity
-  ! Somme sur differents processeurs
+  ! total_sum sur differents processeurs
   J_abs=0.0
   do ilambda=1, n_lambda
      J_abs =  J_abs + C_abs_norm(k,ilambda)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,ilambda))
@@ -819,7 +819,7 @@ subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
   ! WARNING : il faut diviser par dust_density car il n'est pas pris en compte dans E_em_1grain
   log_E_abs=log(J_abs*L_packet_th/volume(icell) )
 
-  ! Temperature echantillonee juste sup. a la temperature de la cellule
+  ! Temperature echantillonee juste sup. a la temperature de la cell
   T_int=maxval(xT_ech_1grain(k,icell,:))
 
   ! On incremente eventuellement la zone de temperature
@@ -852,7 +852,7 @@ subroutine im_reemission_NLTE(id,icell,p_icell,aleat1,aleat2,lambda)
 
   do while((l2-l1) > 1)
      proba=frac_T1*kdB_dT_1grain_nLTE_CDF(l,k,T1)+frac_T2*kdB_dT_1grain_nLTE_CDF(l,k,T2)
-     if(aleat2 > proba) then
+     if(rand2 > proba) then
         l1=l
      else
         l2=l
@@ -868,7 +868,7 @@ end subroutine im_reemission_NLTE
 !********************************************************************
 
 subroutine Temp_finale()
-! Calcule la temperature finale du disque dans chaque cellule
+! Calcule la temperature finale du disque dans chaque cell
 ! Cas de l'"absoprtion continue"
 ! C. Pinte
 ! 24/01/05
@@ -930,7 +930,7 @@ end subroutine set_min_temperature
 !**********************************************************************
 
 subroutine Temp_finale_nLTE()
-! Calcule la temperature finale du disque dans chaque cellule
+! Calcule la temperature finale du disque dans chaque cell
 ! Cas de l'"absoprtion continue"
 ! C. Pinte
 ! 24/01/05
@@ -944,14 +944,14 @@ subroutine Temp_finale_nLTE()
 
   integer :: k, lambda, p_k
 
-  ! Calcul de la temperature de la cellule et stokage energie recue + T
+  ! Calcul de la temperature de la cell et stokage energie recue + T
   ! Utilisation temperature precedente
 
   !$omp parallel &
   !$omp default(none) &
   !$omp private(J_absorbe,log_E_abs,T_int,T1,T2,Temp1,Temp2,Temp,frac,icell,p_k) &
   !$omp shared(L_packet_th,Tdust,tab_Temp,n_cells,n_lambda,kappa_abs_LTE,lvariable_dust) &
-  !$omp shared(xJ_abs,dust_density,nbre_grains,Tdust_1grain, xT_ech_1grain,log_E_em_1grain) &
+  !$omp shared(xJ_abs,dust_density,n_grains,Tdust_1grain, xT_ech_1grain,log_E_em_1grain) &
   !$omp shared(C_abs_norm,volume, grain_RE_nLTE_start, grain_RE_nLTE_end, n_T, T_min, J0, grain)
   !$omp do schedule(dynamic,10)
   do icell=1,n_cells
@@ -973,7 +973,7 @@ subroutine Temp_finale_nLTE()
               if (log_E_abs <  log_E_em_1grain(k,1)) then
                  Tdust_1grain(k,icell) = T_min
               else
-                 ! Temperature echantillonee juste sup. a la temperature de la cellule
+                 ! Temperature echantillonee juste sup. a la temperature de la cell
                  T_int=maxval(xT_ech_1grain(k,icell,:))
 
                  ! On incremente eventuellement la zone de temperature
@@ -1114,10 +1114,10 @@ subroutine Temp_nRE(lconverged)
      !$omp private(kJnu_interp,id,t_cool,t_abs,mean_abs_E,mean_abs_nu,kTu) &
      !$omp private(frac,T1,Temp1,Temp2,T_int,log_E_abs,icell,p_l) &
      !$omp shared(l,kJnu, lambda_Jlambda, lforce_PAH_equilibrium, lforce_PAH_out_equilibrium) &
-     !$omp shared(n_cells, C_abs_norm_o_dnu, xJ_abs, J0, L_packet_th, volume, n_T, disk_zone,etoile) &
+     !$omp shared(n_cells, C_abs_norm_o_dnu, xJ_abs, J0, L_packet_th, volume, n_T, disk_zone,star) &
      !$omp shared(tab_nu, n_lambda, tab_delta_lambda, tab_lambda,en,delta_en,Cabs) &
      !$omp shared(delta_nu_bin,Proba_Tdust, A,B,X,nu_bin,tab_Temp,T_min,T_max,lbenchmark_SHG,lMathis_field,Mathis_field) &
-     !$omp shared(Tdust_1grain_nRE,log_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid,nbre_grains) &
+     !$omp shared(Tdust_1grain_nRE,log_E_em_1grain_nRE,cst_t_cool,C_abs_norm,l_RE,r_grid,n_grains) &
      !$omp shared(dust_density,l_dark_zone,Tdust,lchange_nRE,lvariable_dust,grain)
 
      id = 1 ! pour code sequentiel
@@ -1172,7 +1172,7 @@ subroutine Temp_nRE(lconverged)
                  else ! BB field
                     do lambda=1, n_lambda
                        wl = tab_lambda(lambda)*1e-6
-                       lambda_Jlambda(lambda,id) = (Blambda_dp(wl,etoile(1)%T))*wl / disk_zone(1)%Rin**2 * 7.e-8 !* 7.25965e-08
+                       lambda_Jlambda(lambda,id) = (Blambda_dp(wl,star(1)%T))*wl / disk_zone(1)%Rin**2 * 7.e-8 !* 7.25965e-08
 
                        Int_k_lambda_Jlambda = Int_k_lambda_Jlambda + C_abs_norm(l,lambda) * lambda_Jlambda(lambda,id)
                        kJnu(lambda,id) =   C_abs_norm_o_dnu(lambda)  * lambda_Jlambda(lambda,id)
@@ -1250,7 +1250,7 @@ subroutine Temp_nRE(lconverged)
                  ! Impossible de definir proba de temperature
                  t_cool = 1.0 ; t_abs = 0.0
                  write(*,*) "ERROR : temperature of non equilibrium grains is larger than", T_max
-                 write(*,*) "cell", icell, "R=", real(r_grid(icell)), real(dust_density(p_l,icell) * nbre_grains(l)) , &
+                 write(*,*) "cell", icell, "R=", real(r_grid(icell)), real(dust_density(p_l,icell) * n_grains(l)) , &
                       real(Tdust_1grain_nRE(l,icell))
                  write(*,*) "Exiting"
                  call exit(1)
@@ -1405,14 +1405,14 @@ subroutine Temp_nRE(lconverged)
               delta_wl = tab_delta_lambda(lambda)*1.0e-6
               if (l_RE(l,icell)) then
                  Temp = Tdust_1grain_nRE(l,icell)
-                 cst_wl=cst_th/(Temp*wl)
+                 cst_wl=thermal_const/(Temp*wl)
                  if (cst_wl < 500.) then
                     somme2 = somme2 + C_abs_norm(l,lambda)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
                  endif
               else
                  do T=1, n_T
                     Temp = tab_Temp(T)
-                    cst_wl=cst_th/(Temp*wl)
+                    cst_wl=thermal_const/(Temp*wl)
                     if (cst_wl < 500.) then
                        somme2 = somme2 + C_abs_norm(l,lambda)* 1.0/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl * &
                             Proba_Tdust(T,l,icell)
@@ -1438,8 +1438,8 @@ end subroutine Temp_nRE
 
 !********************************************************************
 
-subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
-! Calcul de la temperature de la cellule
+subroutine im_reemission_qRE(id,icell,p_icell,rand1,rand2,lambda)
+! Calcul de la temperature de la cell
 ! Reemission d'un photon a la bonne longeur d'onde
 
   use radiation_field, only : xJ_abs, J0
@@ -1447,7 +1447,7 @@ subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
   implicit none
 
   integer, intent(in) :: id, icell, p_icell ! p_icell usused
-  real, intent(in) :: aleat1, aleat2
+  real, intent(in) :: rand1, rand2
   integer, intent(inout) :: lambda
 
   integer :: l, l1, l2, T_int, T1, T2, k, lambda0, ilambda, p_k
@@ -1457,18 +1457,18 @@ subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
 
   lambda0=lambda
 
-  k = select_absorbing_grain(lambda0,icell, aleat1, heating_method)
+  k = select_absorbing_grain(lambda0,icell, rand1, heating_method)
 
   ! Mean intensity
-  ! Somme sur differents processeurs
+  ! total_sum sur differents processeurs
   J_abs=0.0
   do ilambda=1, n_lambda
      J_abs =  J_abs + C_abs_norm(k,ilambda)  * (sum(xJ_abs(icell,ilambda,:)) + J0(icell,lambda))
   enddo ! ilambda
-  ! WARNING : il faut diviser par densite_pouss car il n'est pas pris en compte dans E_em_1grain
+  ! WARNING : il faut diviser par dust_density car il n'est pas pris en compte dans E_em_1grain
   log_E_abs=log(J_abs*L_packet_th/volume(icell))
 
-  ! Temperature echantillonee juste sup. a la temperature de la cellule
+  ! Temperature echantillonee juste sup. a la temperature de la cell
   T_int=maxval(xT_ech_1grain_nRE(k,icell,:))
 
   ! On incremente eventuellement la zone de temperature
@@ -1500,7 +1500,7 @@ subroutine im_reemission_qRE(id,icell,p_icell,aleat1,aleat2,lambda)
 
   do while((l2-l1) > 1)
      proba=frac_T1*kdB_dT_1grain_nRE_CDF(l,k,T1)+frac_T2*kdB_dT_1grain_nRE_CDF(l,k,T2)
-     if(aleat2 > proba) then
+     if(rand2 > proba) then
         l1=l
      else
         l2=l
@@ -1549,7 +1549,7 @@ subroutine update_proba_abs_nRE()
         do l=grain_nRE_start,grain_nRE_end
            p_l = merge(l,grain(l)%zone,lvariable_dust)
            if (lchange_nRE(l,icell)) then ! 1 grain a change de status a cette iteration
-              delta_kappa_abs_qRE =  C_abs_norm(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+              delta_kappa_abs_qRE =  C_abs_norm(l,lambda) * dust_density(p_l,icell) * n_grains(l)
            else
               if (.not.l_RE(l,icell)) lall_grains_eq = .false. ! il reste des grains qui ne sont pas a l'equilibre
            endif
@@ -1613,7 +1613,7 @@ subroutine emission_nRE()
   ! proba differentielle en fonction proba emission precedente
 
   !E_abs_nRE est en nbre de paquets !!!
-  frac_E_abs_nRE = E_abs_nRE / nbre_photons_tot
+  frac_E_abs_nRE = E_abs_nRE / n_photons_total
   write(*,*) "Non equilibrium grains have absorbed", real(frac_E_abs_nRE), "of emitted energy"
   write(*,*) "Re-emitting this amount of energy"
 
@@ -1624,10 +1624,10 @@ subroutine emission_nRE()
 
   ! Nouvelle methode : E_paquet reste constante et on modifie le nombre de paquets
   ! + Modification E_paquet pour compenser erreur arrondi du au passage a un entier
-  fn = (nbre_photons_tot * frac_E_abs_nRE) / nbre_photons_loop ! nbre de photons "reel"
-  nbre_photons_eq_th = int( max( fn, 1.0) ) ! nbre de phtons entier
-  ! fn * 1.0 = nbre_photons_eq_th * E_paquet
-  E_paquet = fn /  nbre_photons_eq_th
+  fn = (n_photons_total * frac_E_abs_nRE) / n_photons_loop ! nbre de photons "reel"
+  n_photons_eq_th = int( max( fn, 1.0) ) ! nbre de phtons entier
+  ! fn * 1.0 = n_photons_eq_th * E_paquet
+  E_paquet = fn /  n_photons_eq_th
 
   ! Pour iteration suivante
   E_abs_nRE = 0.0
@@ -1641,12 +1641,12 @@ subroutine emission_nRE()
      delta_wl = tab_delta_lambda(lambda)*1.e-6
      E_cell=0.0
 
-     ! Emission par cellule des PAHs
+     ! Emission par cell des PAHs
 
      !$omp parallel default(none) &
      !$omp private(k,E_emise,Temp,cst_wl,T,icell,p_k,d_k) &
      !$omp shared(lambda,wl,delta_wl,E_cell,E_cell_old,tab_lambda,tab_delta_lambda,grain_nRE_start,grain_nRE_end) &
-     !$omp shared(n_cells,l_RE, Tdust_1grain_nRE,n_T,C_abs_norm,dust_density,nbre_grains,volume,tab_Temp,Proba_Tdust) &
+     !$omp shared(n_cells,l_RE, Tdust_1grain_nRE,n_T,C_abs_norm,dust_density,n_grains,volume,tab_Temp,Proba_Tdust) &
      !$omp shared(Emissivite_nRE_old,cst_wl_max,lchange_nRE,lvariable_dust,grain)
      !$omp do
      do icell=1,n_cells
@@ -1659,9 +1659,9 @@ subroutine emission_nRE()
                  d_k = dust_density(p_k,icell)
                  if (d_k > tiny_dp) then
                     Temp = Tdust_1grain_nRE(k,icell)
-                    cst_wl=cst_th/(Temp*wl)
+                    cst_wl=thermal_const/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
-                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d_k*nbre_grains(k)* &
+                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d_k*n_grains(k)* &
                             volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
                     endif
                  endif
@@ -1671,9 +1671,9 @@ subroutine emission_nRE()
               if (d_k > tiny_dp) then
                  do T=1,n_T
                     temp=tab_Temp(T)
-                    cst_wl=cst_th/(Temp*wl)
+                    cst_wl=thermal_const/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
-                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d_k*nbre_grains(k) &
+                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*d_k*n_grains(k) &
                             * volume(icell)/ ((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell) * delta_wl
                     endif !cst_wl
                  enddo !T
@@ -1732,7 +1732,7 @@ subroutine init_emissivite_nRE()
   implicit none
 
   integer :: lambda, k, icell, p_k
-  real(kind=dp) :: E_emise, facteur, cst_wl, wl
+  real(kind=dp) :: E_emise, factor, cst_wl, wl
   real(kind=dp) :: Temp, cst_wl_max, delta_wl
 
   cst_wl_max = log(huge_real)-1.0e-4
@@ -1741,21 +1741,21 @@ subroutine init_emissivite_nRE()
   do lambda=1, n_lambda
      wl = tab_lambda(lambda)*1.e-6
      delta_wl = tab_delta_lambda(lambda)*1.e-6
-     cst_wl=cst_th/(Temp*wl)
+     cst_wl=thermal_const/(Temp*wl)
 
      if (cst_wl < 100.0) then
-        facteur = 1.0_dp/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
+        factor = 1.0_dp/((wl**5)*(exp(cst_wl)-1.0)) * delta_wl
      else
-        facteur = 0.0_dp
+        factor = 0.0_dp
      endif
 
-     ! Emission par cellule des PAHs
+     ! Emission par cell des PAHs
      do icell=1,n_cells
         E_emise = 0.0_dp
 
         do k=grain_nRE_start,grain_nRE_end
            p_k = merge(k,grain(k)%zone,lvariable_dust)
-           E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*nbre_grains(k)* volume(icell) * facteur !* Proba_Tdust = 1 pour Tmin
+           E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*n_grains(k)* volume(icell) * factor !* Proba_Tdust = 1 pour Tmin
         enddo !k
         Emissivite_nRE_old(icell,lambda) = E_emise
      enddo !icell
@@ -1770,8 +1770,8 @@ end subroutine init_emissivite_nRE
 
 subroutine repartition_energie(lambda)
 ! Calcule la repartition de l'energie emise a la longuer d'onde consideree
-! entre l'etoile et les differentes cellules du disque
-!  - frac_E_star donne fraction emise par etoile
+! entre l'star et les differentes cellules du disque
+!  - frac_E_star donne fraction emise par star
 !  - prob_E_cell donne la proba d'emission cumulée des cellules
 !  - E_totale donne energie totale emise (pour calibration des images)
 ! Utilise une table de temperature pretabulee
@@ -1818,7 +1818,7 @@ subroutine repartition_energie(lambda)
            if (Temp < tiny_real) then
               ! E_cell(icell) = 0.0_dp
            else
-              cst_wl=cst_th/(Temp*wl)
+              cst_wl=thermal_const/(Temp*wl)
               if (cst_wl < cst_wl_max) then
                  E_cell(icell) = 4.0*kappa_abs_LTE(p_icell,lambda)*kappa_factor(icell)*volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
               endif !cst_wl
@@ -1838,9 +1838,9 @@ subroutine repartition_energie(lambda)
               p_k = merge(k,grain(k)%zone,lvariable_dust)
               Temp=Tdust_1grain(k,icell)
               if (Temp > tiny_real) then
-                 cst_wl=cst_th/(Temp*wl)
+                 cst_wl=thermal_const/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
-                    E_emise = E_emise +   4.0*C_abs_norm(k,lambda) * dust_density(p_k,icell)*nbre_grains(k)* &
+                    E_emise = E_emise +   4.0*C_abs_norm(k,lambda) * dust_density(p_k,icell)*n_grains(k)* &
                          volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
                  endif !cst_wl
               endif ! Temp==0.0
@@ -1871,17 +1871,17 @@ subroutine repartition_energie(lambda)
               p_k = merge(k,grain(k)%zone,lvariable_dust)
               if (l_RE(k,icell)) then ! le grain a une temperature
                  temp=Tdust_1grain_nRE(k,icell)
-                 cst_wl=cst_th/(Temp*wl)
+                 cst_wl=thermal_const/(Temp*wl)
                  if (cst_wl < cst_wl_max) then
-                    E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*nbre_grains(k)* &
+                    E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*n_grains(k)* &
                          volume(icell)/((wl**5)*(exp(cst_wl)-1.0))
                  endif !cst_wl
               else ! la grain a une proba de T
                  do T=1,n_T
                     temp=tab_Temp(T)
-                    cst_wl=cst_th/(Temp*wl)
+                    cst_wl=thermal_const/(Temp*wl)
                     if (cst_wl < cst_wl_max) then
-                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*nbre_grains(k)* &
+                       E_emise = E_emise + 4.0*C_abs_norm(k,lambda)*dust_density(p_k,icell)*n_grains(k)* &
                             volume(icell)/((wl**5)*(exp(cst_wl)-1.0)) * Proba_Tdust(T,k,icell)
                     endif !cst_wl
                  enddo !T
@@ -1912,7 +1912,7 @@ subroutine repartition_energie(lambda)
   frac_E_stars(lambda)=E_star/(E_star+E_disk(lambda)+E_ISM(lambda))
   frac_E_disk(lambda)=(E_star+E_disk(lambda))/(E_star+E_disk(lambda)+E_ISM(lambda))
 
-  ! Energie totale emise a une distance emise egale a la distance terre-etoile
+  ! Energie totale emise a une distance emise egale a la distance terre-star
   ! on chosit cette distance pour calibrer le flux / pi*B(lambda)
 
   ! Normalisation
@@ -1931,7 +1931,7 @@ subroutine repartition_energie(lambda)
      prob_E_cell(icell,lambda) = prob_E_cell(icell-1,lambda) + E_cell_corrected(icell)
   enddo
 
-  ! Normalisation du facteur de correction
+  ! Normalisation du factor de correction
   if (lweight_emission) then
      correct_E_emission = correct_E_emission * prob_E_cell(n_cells,lambda) / E_disk(lambda)
   endif
@@ -1950,7 +1950,7 @@ end subroutine repartition_energie
 
 !**********************************************************************
 
-integer function select_absorbing_grain(lambda,icell, aleat, heating_method) result(l)
+integer function select_absorbing_grain(lambda,icell, rand, heating_method) result(l)
   ! This routine will select randomly the absorbing/emitting grain
   ! from the CDF of kabs
   ! Because we cannot store all the CDF for all cells
@@ -1962,7 +1962,7 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
   implicit none
 
   integer, intent(in) :: lambda, heating_method, icell
-  real, intent(in) :: aleat
+  real, intent(in) :: rand
   real(kind=dp) :: prob, CDF, norm
   integer :: p_icell, kstart, kend
   integer, target :: k, k1
@@ -1998,34 +1998,34 @@ integer function select_absorbing_grain(lambda,icell, aleat, heating_method) res
   endif
 
   if (heating_method <= 2) then
-     if (aleat < 0.5) then ! We start from first grain
-        prob = aleat * norm
+     if (rand < 0.5) then ! We start from first grain
+        prob = rand * norm
         CDF = 0.0
         do k=kstart, kend
-           CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * n_grains(k)
            if (CDF > prob) exit
         enddo
      else ! We start from the end of the grain size distribution
-        prob = (1.0-aleat) * norm
+        prob = (1.0-rand) * norm
         CDF = 0.0
         do k=kend, kstart, -1
-           CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * n_grains(k)
            if (CDF > prob) exit
         enddo
      endif
   else ! Same thing but with lRE to only include dust grains that are at qRE
-     if (aleat < 0.5) then ! We start from first grain
-        prob = aleat * norm
+     if (rand < 0.5) then ! We start from first grain
+        prob = rand * norm
         CDF = 0.0
         do k=kstart, kend
-           if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * n_grains(k)
            if (CDF > prob) exit
         enddo
      else ! We start from the end of the grain size distribution
-        prob = (1.0-aleat) * norm
+        prob = (1.0-rand) * norm
         CDF = 0.0
         do k=kend, kstart, -1
-           if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * nbre_grains(k)
+           if (l_RE(k,icell)) CDF = CDF + C_abs(k,lambda) * dust_density(p_k,icell) * n_grains(k)
            if (CDF > prob) exit
         enddo
      endif
@@ -2041,8 +2041,8 @@ end function select_absorbing_grain
 
 !**********************************************************************
 
-subroutine select_cellule(lambda,aleat, icell)
-  ! Sélection de la cellule qui va émettre le photon
+subroutine select_cellule(lambda,rand, icell)
+  ! Sélection de la cell qui va émettre le photon
   ! C. Pinte
   ! 04/02/05
   ! Modif 3D 10/06/05
@@ -2050,7 +2050,7 @@ subroutine select_cellule(lambda,aleat, icell)
   implicit none
 
   integer, intent(in) :: lambda
-  real, intent(in) :: aleat
+  real, intent(in) :: rand
   integer, intent(out) :: icell
   integer :: k, kmin, kmax
 
@@ -2060,7 +2060,7 @@ subroutine select_cellule(lambda,aleat, icell)
   k=(kmin+kmax)/2
 
   do while ((kmax-kmin) > 1)
-     if (prob_E_cell(k,lambda) < aleat) then
+     if (prob_E_cell(k,lambda) < rand) then
         kmin = k
      else
         kmax = k
@@ -2106,7 +2106,7 @@ subroutine define_proba_weight_emission(lambda)
 !--        angle= pi * real(n)/real(nbre_angle+1)! entre 0 et pi
 !--        i = cell_map_i(icell)
 !--        j = cell_map_j(icell)
-!--        x0=1.00001*r_lim(i-1) ! cellule 1 traitee a part
+!--        x0=1.00001*r_lim(i-1) ! cell 1 traitee a part
 !--        y0=0.0
 !--        z0=0.99999*z_lim(i,j+1)
 !--        u0=cos(angle)

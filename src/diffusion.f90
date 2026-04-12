@@ -1,7 +1,7 @@
 module diffusion
 
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use dust_prop
   use messages
   use wavelengths
@@ -23,7 +23,7 @@ subroutine setDiffusion_coeff(i)
 
   integer, intent(in) :: i
 
-  real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
+  real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, total_sum
   integer :: j, k, lambda, icell, p_icell
 
   real(kind=dp), parameter :: precision = 1.0e-1_dp ! Variation de temperature au dela de laquelle le coeff de diff et mis a jour
@@ -44,10 +44,10 @@ subroutine setDiffusion_coeff(i)
        !    write(*,*) "update", i,j, DensE(i,j,k), DensE_m1(i,j,k)
            Temp = DensE(i,j,k)**0.25
 
-           cst=cst_th/Temp
-           somme=0.0_dp
+           cst=thermal_const/Temp
+           total_sum=0.0_dp
            do lambda=1, n_lambda
-              ! longueur d'onde en metre
+              ! length d'onde en metre
               wl = tab_lambda(lambda)*1.e-6
               delta_wl=tab_delta_lambda(lambda)*1.e-6
               cst_wl=cst/wl
@@ -57,11 +57,11 @@ subroutine setDiffusion_coeff(i)
               else
                  dB_dT = 0.0_dp
               endif
-              somme = somme + dB_dT/(kappa(p_icell,lambda) * kappa_factor(icell))  * delta_wl
+              total_sum = total_sum + dB_dT/(kappa(p_icell,lambda) * kappa_factor(icell))  * delta_wl
            enddo
-           ! kappa_R = 4.*sigma * Temp**3 / (pi * somme)
+           ! kappa_R = 4.*sigma * Temp**3 / (pi * total_sum)
            ! Dcoeff = c_light/(3kappa_R) car kappa volumique
-           Dcoeff(i,j,k) =  cst_Dcoeff * somme/Temp**3
+           Dcoeff(i,j,k) =  cst_Dcoeff * total_sum/Temp**3
         endif
      enddo
   enddo
@@ -85,7 +85,7 @@ subroutine setDiffusion_coeff0(i)
 
   integer, intent(in) :: i
 
-  real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, somme
+  real(kind=dp) :: cst_Dcoeff, wl, delta_wl, cst, cst_wl, coeff_exp, dB_dT, Temp, total_sum
   integer :: j, k, lambda, icell, p_icell
 
   cst_Dcoeff = pi/(12.*sigma)
@@ -98,10 +98,10 @@ subroutine setDiffusion_coeff0(i)
         icell = cell_map(i,j,k)
         if (lvariable_dust) p_icell = icell
         Temp=Tdust(icell)
-        cst=cst_th/Temp
-        somme=0.0_dp
+        cst=thermal_const/Temp
+        total_sum=0.0_dp
         do lambda=1, n_lambda
-           ! longueur d'onde en metre
+           ! length d'onde en metre
            wl = tab_lambda(lambda)*1.e-6
            delta_wl=tab_delta_lambda(lambda)*1.e-6
            cst_wl=cst/wl
@@ -111,11 +111,11 @@ subroutine setDiffusion_coeff0(i)
            else
               dB_dT = 0.0_dp
            endif
-           somme = somme + dB_dT/(kappa(p_icell,lambda)*kappa_factor(icell)) * delta_wl
+           total_sum = total_sum + dB_dT/(kappa(p_icell,lambda)*kappa_factor(icell)) * delta_wl
         enddo
-        ! kappa_R = 4.*sigma * Temp**3 / (pi * somme)
+        ! kappa_R = 4.*sigma * Temp**3 / (pi * total_sum)
         ! Dcoeff = c_light/(3kappa_R) car kappa volumique
-        Dcoeff(i,j,k) =  cst_Dcoeff * somme/Temp**3
+        Dcoeff(i,j,k) =  cst_Dcoeff * total_sum/Temp**3
      enddo
   enddo
 
@@ -131,7 +131,7 @@ end subroutine setDiffusion_coeff0
 subroutine Temperature_to_DensE(ri)
   ! Calcule la densite d'energie des cellules a partir de leur
   ! temperature
-  ! Converti toute la grille pour avoir les cellules sur le bord
+  ! Converti toute la grid pour avoir les cellules sur le bord
   ! Execute une seule fois donc pas de soucis
   ! C. Pinte
   ! 15/02/07
@@ -401,14 +401,14 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1, zj_sup_dark_zone(i,k) + delta_cell_dark_zone
            dr = r_grid(cell_map(i,j,1))-r_grid(cell_map(i-1,j,1))
-           dz = delta_z(i,j)
+           dz = cell_height(i,j)
            ! tab_dt(i,j,k) = min(dr,dz)**2/Dcoeff(i,j,k)
            tab_dt(i,j,k) = 1.0_dp/(Dcoeff(i,j,k)*(1.0_dp/dr**2 + 1.0_dp/dz**2))
         enddo !j
      enddo !i
   enddo !k
 
-  ! On prend le mini + un facteur de securite
+  ! On prend le mini + un factor de securite
   dt = stabilite * 0.5 * minval(tab_dt)
 
  ! write(*,*) "dt", dt
@@ -427,7 +427,7 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
      !$omp default(none) &
      !$omp private(i,j,dE_dr_m1,dE_dr_p1,d2E_dr2,delta_E_r,D_Laplacien_E,delta_E,d2E_dz2) &
      !$omp shared(DensE_m1,r_grid,z_grid,Dcoeff,ri_in_dark_zone,ri_out_dark_zone,zj_sup_dark_zone,max_delta_E_r) &
-     !$omp shared(DensE,dt,delta_z,k,n_rad,cell_map)
+     !$omp shared(DensE,dt,cell_height,k,n_rad,cell_map)
      !$omp do schedule(dynamic,10)
      do i=max(ri_in_dark_zone(k) -delta_cell_dark_zone,3), min(ri_out_dark_zone(k)+ delta_cell_dark_zone,n_rad-2)
         do j=1, zj_sup_dark_zone(i,k) + delta_cell_dark_zone
@@ -461,9 +461,9 @@ subroutine iter_Temp_approx_diffusion(stabilite,max_delta_E_r,lconverge)
            !dE_dz_p1 = (DensE_m1(i,j+1,k) - DensE_m1(i,j,k))
            !dE_dz_m1 = (DensE_m1(i,j,k) - DensE_m1(i,j-1,k))
 
-           !d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_dp * delta_z(i)**2)
+           !d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_dp * cell_height(i)**2)
 
-           d2E_dz2  =   Dcoeff(i,j,k) * (DensE_m1(i,j+1,k) + DensE_m1(i,j-1,k) - 2.0 * DensE(i,j,k)) / (2.0 * delta_z(i,j)**2)
+           d2E_dz2  =   Dcoeff(i,j,k) * (DensE_m1(i,j+1,k) + DensE_m1(i,j-1,k) - 2.0 * DensE(i,j,k)) / (2.0 * cell_height(i,j)**2)
 
 
            ! Laplacien
@@ -526,11 +526,11 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
   ! pas de temps pour chacune des cellules
   tab_dt = huge_dp ! pour ne pas selectionner les cellules hors zone de diff
   do j=1, zj_sup_dark_zone(ri,k) + delta_cell_dark_zone
-     dz = delta_z(ri,j)
+     dz = cell_height(ri,j)
      tab_dt(j) = dz**2/Dcoeff(ri,j,k)
   enddo !j
 
-  ! On prend le mini + un facteur de securite
+  ! On prend le mini + un factor de securite
   dt = stabilite * 0.5 * minval(tab_dt)
 
 
@@ -555,9 +555,9 @@ subroutine iter_Temp_approx_diffusion_vertical(ri,stabilite,max_delta_E_r,lconve
      ! Plus stable
   !   Dcoeff_p = Dcoeff(ri,j,k)
   !   Dcoeff_m =  Dcoeff(ri,j,k)
-  !   d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_dp * delta_z(ri)**2)
+  !   d2E_dz2  = (dE_dz_p1*Dcoeff_p - dE_dz_m1*Dcoeff_m) / (2.0_dp * cell_height(ri)**2)
 
-     d2E_dz2  =  Dcoeff(ri,j,k) * (dE_dz_p1 - dE_dz_m1) / (2.0_dp * delta_z(ri,j)**2)
+     d2E_dz2  =  Dcoeff(ri,j,k) * (dE_dz_p1 - dE_dz_m1) / (2.0_dp * cell_height(ri,j)**2)
 
 
   !   write(*,*) "****"
@@ -635,8 +635,8 @@ subroutine compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
   ! Diffusion coefficient is D = 1/(rho * opacity)
   ! This opacity/diffusion coefficient includes scattering
   ! See Min et al 2009 and Robitaille et al 2010
-  use parametres
-  use constantes
+  use parameters
+  use constants
   use wavelengths, only : n_lambda, tab_lambda, tab_delta_lambda
   use Temperature, only : Tdust
   use dust_prop, only : kappa
@@ -645,7 +645,7 @@ subroutine compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
   real(dp), intent(out) :: Planck_opacity,rec_Planck_opacity ! cm2/g (ie per gram of gas)
 
   integer :: lambda
-  real(dp) :: somme, somme2, cst, cst_wl, B, coeff_exp, wl, delta_wl, norm, T !dB_dT
+  real(dp) :: total_sum, somme2, cst, cst_wl, B, coeff_exp, wl, delta_wl, norm, T !dB_dT
 
   integer, pointer :: p_icell
   integer, target :: icell0
@@ -662,12 +662,12 @@ subroutine compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
         p_icell => icell1
      endif
 
-     somme  = 0.0_dp
+     total_sum  = 0.0_dp
      somme2 = 0.0_dp
      norm = 0.0_dp
-     cst    = cst_th/T
+     cst    = thermal_const/T
      do lambda = 1,n_lambda
-        ! longueur d'onde en metre
+        ! length d'onde en metre
         wl       = tab_lambda(lambda)*1.e-6
         delta_wl = tab_delta_lambda(lambda)*1.e-6
         cst_wl   = cst/wl
@@ -679,11 +679,11 @@ subroutine compute_Planck_opacities(icell, Planck_opacity,rec_Planck_opacity)
            B = 0.0_dp
            !dB_dT = 0.0_dp
         endif
-        somme  = somme  + B/kappa(p_icell,lambda)
+        total_sum  = total_sum  + B/kappa(p_icell,lambda)
         somme2  = somme2  + B * kappa(p_icell,lambda)
         norm = norm + B*delta_wl
      enddo
-     rec_Planck_opacity = norm/somme * kappa_factor(icell)
+     rec_Planck_opacity = norm/total_sum * kappa_factor(icell)
      Planck_opacity = somme2/norm * kappa_factor(icell)
   else
      rec_Planck_opacity = 1e-30

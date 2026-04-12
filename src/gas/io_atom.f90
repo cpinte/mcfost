@@ -3,7 +3,7 @@ module io_atom
    use atom_type
    use elements_type
    !use zeeman, only              : Lande_eff, ZeemanMultiplet
-   use constantes
+   use constants
    use uplow
    use abo, only             : get_Barklem_cross_data
    use collision_atom, only      : read_collisions
@@ -17,7 +17,7 @@ module io_atom
 
 
    character(len=*), parameter :: path_to_atoms = "/Atoms/"
-   real(kind=dp), parameter :: C1 = deux_pi * (electron_charge/EPSILON_0) * (electron_charge/mel / C_light)
+   real(kind=dp), parameter :: C1 = two_pi * (electron_charge/EPSILON_0) * (electron_charge/mel / C_light)
    logical :: lany_init4 = .false.
 
    contains

@@ -1,6 +1,6 @@
-module parametres
+module parameters
 !****************************
-! Parametres generaux
+! parameters generaux
 !****************************
 
   use mcfost_env, only : dp
@@ -12,14 +12,14 @@ module parametres
   real(kind=dp) :: simu_time = 0.0
 
   logical :: lpara, lstop_after_init
-  integer :: indice_etape, etape_i, etape_f
+  integer :: step_index, etape_i, etape_f
 
   ! Nombre de photons lances
   logical :: ldust_transfer
-  integer :: nbre_photons_loop, nbre_photons_eq_th, nbre_photons_lambda, nbre_photons_image, nbre_photons_spectre
-  real :: nbre_photons_lim = 1.e4 ! combien de fois plus on aurait recu sans disque
+  integer :: n_photons_loop, n_photons_eq_th, n_photons_lambda, n_photons_image, n_photons_spectrum
+  real :: n_photons_lim = 1.e4 ! combien de fois plus on aurait recu sans disque
   integer :: nnfot1
-  real :: nbre_photons_tot
+  real :: n_photons_total
   real(kind=dp) :: E_paquet
   integer :: n_dif_max_eq_th = 100000 ! Nbre max de dif autorises dans calcul eq. th OUTDATED
   real :: tau_dark_zone_eq_th = 1500 !1500.   15000 pour benchmark a tau=1e6
@@ -29,7 +29,7 @@ module parametres
   ! Nbre d'angles pour echantillonner la fct de phase
   integer, parameter :: nang_scatt = 180  ! TODO : ca bug si c'est pas 180
 
-  ! lvariable_dust = true si les proprites de la poussiere sont variables dans chaque cellule
+  ! lvariable_dust = true si les proprites de la poussiere sont variables dans chaque cell
   logical :: lvariable_dust, lmigration, lhydrostatic, ldust_sublimation
   integer :: settling_type ! 1 = Parametric, 2 = Dubrulle or 3 = Fromang
 
@@ -39,7 +39,7 @@ module parametres
   ! Methode de calcul de la diffusion : a choisir pour optimiser taille memoire et temps cpu
   ! 0 -> automatique
   ! 1 -> choix taille du grain diffuseur + matrice Mueller par grain
-  ! 2 -> matrice de Mueller moyenne par cellule (benchmark)
+  ! 2 -> matrice de Mueller moyenne par cell (benchmark)
   integer :: scattering_method, scattering_method0
   logical :: lscattering_method1
 
@@ -104,7 +104,7 @@ module parametres
   ! le systeme a-t-il une symetrie axiale (ne compte que si N_phi > 1)
   logical :: l_sym_ima, l_sym_centrale, l_sym_axiale
 
-  ! Parametres des cartes
+  ! parameters des cartes
   integer :: N_thet, N_incl, N_phi, capt_interet, delta_capt, capt_inf, capt_sup, capt_debut, capt_fin
   integer ::  npix_x, npix_y, npix_x_save, npix_y_save
   real :: angle_interet, zoom, tau_seuil, wl_seuil, image_offset_centre(3)
@@ -114,10 +114,10 @@ module parametres
   !must be initialized to 0
   integer(kind=8) :: mem_alloc_tot !total memory allocated dynamically or not in bytes
 
-  ! Résolution de la grille de densité
+  ! Résolution de la grid de densité
   ! Nombre de cellules dans la direction r (echantillonage log)
   integer :: grid_type ! 1 = cylindrical, 2 = spherical
-  integer :: n_rad, n_rad_in  ! subdivision de la premiere cellule
+  integer :: n_rad, n_rad_in  ! subdivision de la premiere cell
   ! Nombre de couches verticales ( = de stratifications)
   integer :: nz, p_n_rad, p_nz, p_n_az, p_n_lambda_pos, p_n_lambda_grain
   ! Nombre de cellules azimuthales
@@ -233,13 +233,13 @@ module parametres
      real :: Mdot ! Msun
      real(kind=dp) :: r, x,y,z, vx,vy,vz
      logical :: lb_body, out_model, find_spectrum, force_Mdot
-     character(len=512) :: spectre
+     character(len=512) :: spectrum
      integer :: icell
   end type star_type
   logical :: laccretion_shock
 
-  integer :: n_etoiles
-  type(star_type), dimension(:), allocatable :: etoile
+  integer :: n_stars
+  type(star_type), dimension(:), allocatable :: star
   logical :: lstar_bb
 
 
@@ -277,7 +277,7 @@ module parametres
   logical :: lRT_i_centered
 
   integer :: nLevels
-  real(kind=dp) :: largeur_profile
+  real(kind=dp) :: profile_width
 
   type fargo3d_model
      integer :: nx, ny, nz, realtype
@@ -347,4 +347,4 @@ module parametres
 
   type(symspheric_model) :: atmos_1d
 
-end module parametres
+end module parameters

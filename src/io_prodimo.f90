@@ -1,12 +1,12 @@
 module ProDiMo
 
-  use parametres
+  use parameters
   use dust_prop
-  use constantes
+  use constants
   use molecular_emission
   use utils, only: get_NH, Blambda, Bnu
   use radiation_field, only : xN_abs, xJ_abs
-  use stars, only : spectre_etoiles, ProDiMo_star_HR, E_stars, R_ISM
+  use stars, only : star_spectrum, ProDiMo_star_HR, E_stars, R_ISM
   use read_params
   use sha
   use utils, only : appel_syst
@@ -37,7 +37,7 @@ module ProDiMo
   logical :: lPAH, ProDiMo_other_PAH
   character(len=10) :: sProDiMo_fPAH
 
-  ! Grille de longeurs d'onde
+  ! grid de longeurs d'onde
   character(len=32) :: ProDiMo_tab_wavelength = "ProDiMo_UV3_9.lambda"
   character(len=32), parameter :: DENT_tab_wavelength = "DENT.lambda"
 
@@ -139,11 +139,11 @@ contains
     ! - distance 100pc
     ! - 1 pop de grains loi de puissance
     !
-    ! Must be run after routines taille_grain & define_physical_zones()
+    ! Must be run after routines igrain & define_physical_zones()
 
     ! TODO : linit_gaz
 
-    real :: eps_PAH, mPAH, masse_PAH, norme, a
+    real :: eps_PAH, mPAH, pah_mass, norm, a
     integer :: i, pop, k, NC, NH, alloc_status, ir, iz, NC_0
     real, dimension(:), allocatable :: fPAH
 
@@ -162,8 +162,8 @@ contains
     ! Limite 10x plus haut pour avoir temperature plus propre pour ProDiMo
     !tau_dark_zone_eq_th = 15000.
 
-    fUV_ProDiMo = etoile(1)%fUV
-    slope_UV_ProDiMo = etoile(1)%slope_UV
+    fUV_ProDiMo = star(1)%fUV
+    slope_UV_ProDiMo = star(1)%slope_UV
 
     allocate(xN_abs(n_cells,n_lambda2,nb_proc),  stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error xN_abs')
@@ -196,13 +196,13 @@ contains
        do pop=1, n_pop
           if (dust_pop(pop)%zone == i) then
              if (dust_pop(pop)%is_PAH) then
-                masse_PAH = 0.0 ;
-                norme = 0.0 ;
+                pah_mass = 0.0 ;
+                norm = 0.0 ;
                 do  k=dust_pop(pop)%ind_debut,dust_pop(pop)%ind_fin
                    a = r_grain(k)
                    NC = nint((a*1.e3)**3*468.)   ! number of Carbon atoms (Draine & Li 2001 Eq 8+)
                    NH = get_NH(NC)               ! number of Hydrogen atoms
-                   mPAH = 12 * NC + NH    ! masse du PAH
+                   mPAH = 12 * NC + NH    ! mass du PAH
 
                    if (NC_0 > 0) then
                       if (NC /= NC_0) call error("there can be only 1 type of PAH for ProDiMo")
@@ -210,15 +210,15 @@ contains
                       NC_0 = NC
                    endif
 
-                   masse_PAH = masse_PAH + mPAH * nbre_grains(k)
-                   norme = norme + nbre_grains(k)
+                   pah_mass = pah_mass + mPAH * n_grains(k)
+                   norm = norm + n_grains(k)
                 enddo ! k
-                masse_PAH = masse_PAH / norme  ! masse moyenne des PAHs en mH
-                eps_PAH = dust_pop(pop)%frac_mass /disk_zone(i)%gas_to_dust  ! fraction en masse (de gaz) des PAHS
+                pah_mass = pah_mass / norm  ! mass moyenne des PAHs en mH
+                eps_PAH = dust_pop(pop)%frac_mass /disk_zone(i)%gas_to_dust  ! fraction en dust_mass(de gaz) des PAHS
 
                 ! 1.209274 = (mH2*nH2 + mHe * mHe) / (nH2 + nHe) avec nHe/nH2 = 10^-1.125
                 ! abondance en nombre par rapport à H-nuclei + correction pour NC
-                fPAH(i) = fPAH(i) + (1.209274/masse_PAH) * eps_PAH/3e-7 * (NC/50.)
+                fPAH(i) = fPAH(i) + (1.209274/pah_mass) * eps_PAH/3e-7 * (NC/50.)
                 !write(*,*) i, fPAH(i), real(dust_pop(pop)%frac_mass * disk_zone(i)%diskmass), real(dust_pop(pop)%frac_mass),  real(disk_zone(i)%diskmass)
              endif  ! PAH
           endif ! pop dans la zone
@@ -281,11 +281,11 @@ contains
 
     integer, intent(in) :: lambda
     integer :: ri, zj, phik, icell
-    real(kind=dp) :: n_photons_envoyes, energie_photon, facteur
+    real(kind=dp) :: n_sent_photons, photon_energy, factor
 
     ! Step2
-    n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-    energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes &
+    n_sent_photons = sum(n_phot_envoyes(lambda,:))
+    photon_energy = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_sent_photons &
          * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
 
     do ri=1, n_rad
@@ -293,8 +293,8 @@ contains
           if (zj==0) cycle
           phik=1
           icell = cell_map(ri,zj,phik)
-          facteur = energie_photon / volume(icell)
-          J_prodimo(lambda,ri,zj) =  J_prodimo(lambda,ri,zj) +  facteur * sum(xJ_abs(icell,lambda,:))
+          factor = photon_energy / volume(icell)
+          J_prodimo(lambda,ri,zj) =  J_prodimo(lambda,ri,zj) +  factor * sum(xJ_abs(icell,lambda,:))
           N_ProDiMo(lambda,ri,zj) =  sum(xN_abs(icell,lambda,:))
        enddo
     enddo
@@ -354,7 +354,7 @@ contains
     ! - dust temp
     ! - mean intensity Jnu
     !  ---> nbre de bins entiers entre 91.2 et 205nm
-    ! - Qabs_nu et Qext_nu pour chaque cellule
+    ! - Qabs_nu et Qext_nu pour chaque cell
     ! - gas density pour un rapport gas sur poussiere fixe ---> pour
     ! verification seleument
     ! - zero, first et second moment of the grain size distribution
@@ -367,8 +367,8 @@ contains
     integer, dimension(5) :: naxes
     integer :: group,fpixel,nelements, alloc_status, lambda, ri, zj, l, icell, i, iRegion, k, p_l
     integer :: iPAH_start, iPAH_end, n_grains_PAH
-    real (kind=dp) :: n_photons_envoyes, energie_photon, facteur, N
-    real :: wl, norme, Ttmp
+    real (kind=dp) :: n_sent_photons, photon_energy, factor, N
+    real :: wl, norm, Ttmp
 
     logical :: simple, extend, lPAH_nRE
     character(len=512) :: filename
@@ -376,8 +376,8 @@ contains
 
     real(kind=dp), dimension(n_rad,nz,2) :: grid
     real, dimension(n_rad,nz) :: dens
-    real, dimension(n_rad,nz,0:3) :: N_grains
-    real, dimension(n_lambda) :: spectre
+    real, dimension(n_rad,nz,0:3) :: N_grains_out
+    real, dimension(n_lambda) :: spectrum
     integer, dimension(n_rad) :: which_region
 
     character(len=512) :: para
@@ -385,7 +385,7 @@ contains
     ! Allocation dynamique pour eviter d'utiliser la memeoire stack
     real(kind=dp), dimension(:,:,:), allocatable :: J_ProDiMo_ISM    ! n_lambda,n_rad,nz
     real, dimension(:,:,:), allocatable :: J_io ! n_rad,nz,n_lambda, joue aussi le role de N_io
-    real, dimension(:,:,:,:), allocatable :: opacite ! (n_rad,nz,2,n_lambda)
+    real, dimension(:,:,:,:), allocatable :: opacity ! (n_rad,nz,2,n_lambda)
 
     integer, dimension(:,:,:), allocatable :: is_eq
     real, dimension(:,:,:), allocatable :: TPAH_eq
@@ -419,9 +419,9 @@ contains
     if (alloc_status > 0) call error('Allocation error is_eq forProDiMo.fits.gz')
     is_eq = 0 ; TPAH_eq = 0.0 ; P_TPAH = 0.0
 
-    allocate(opacite(n_rad,nz,2,n_lambda), stat=alloc_status)
-    if (alloc_status > 0) call error('Allocation error opacite forProDiMo.fits.gz')
-    opacite = 0
+    allocate(opacity(n_rad,nz,2,n_lambda), stat=alloc_status)
+    if (alloc_status > 0) call error('Allocation error opacity forProDiMo.fits.gz')
+    opacity = 0
 
     allocate(J_io(n_rad,nz,n_lambda), stat=alloc_status)
     if (alloc_status > 0) call error('Allocation error J_io forProDiMo.fits.gz')
@@ -447,7 +447,7 @@ contains
     call ftinit(unit,trim(filename),blocksize,status)
 
     !------------------------------------------------------------------------------
-    ! HDU 1 : Grille
+    ! HDU 1 : grid
     !------------------------------------------------------------------------------
     bitpix=-64
     naxis=3
@@ -484,9 +484,9 @@ contains
        endif
     endif
 
-    call ftpkye(unit,'Teff',etoile(1)%T,-8,'[K]',status)
-    call ftpkye(unit,'Rstar',real(etoile(1)%r*AU_to_Rsun),-8,'[Rsun]',status)
-    call ftpkye(unit,'Mstar',real(etoile(1)%M),-8,'[Msun]',status)
+    call ftpkye(unit,'Teff',star(1)%T,-8,'[K]',status)
+    call ftpkye(unit,'Rstar',real(star(1)%r*AU_to_Rsun),-8,'[Rsun]',status)
+    call ftpkye(unit,'Mstar',real(star(1)%M),-8,'[Msun]',status)
     call ftpkye(unit,'fUV',fUV_ProDiMo,-3,'',status)
     call ftpkye(unit,'slope_UV',slope_UV_ProDiMo+2.0,-3,'',status) ! on remet le 2
     call ftpkye(unit,'distance',real(distance),-8,'[pc]',status)
@@ -566,11 +566,11 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-    norme = sum(r_grain(:)**2 * nbre_grains(:))
+    norm = sum(r_grain(:)**2 * n_grains(:))
     !if (lRE_nLTE) then
     !   do ri=1, n_rad
     !      do zj=1, nz
-    !         Tdust(ri,zj,1) = sum( Tdust_1grain(ri,zj,:) * r_grain(:)**2 * nbre_grains(:)) / norme
+    !         Tdust(ri,zj,1) = sum( Tdust_1grain(ri,zj,:) * r_grain(:)**2 * n_grains(:)) / norm
     !      enddo !j
     !   enddo !i
     !
@@ -604,7 +604,7 @@ contains
     call ftppre(unit,group,fpixel,nelements,real(tab_lambda,kind=sp),status)
 
     !------------------------------------------------------------------------------
-    ! HDU 4 : Spectre stellaire
+    ! HDU 4 : spectrum stellaire
     !------------------------------------------------------------------------------
     bitpix=-32
     naxis=1
@@ -617,20 +617,20 @@ contains
     !  Write the required header keywords.
     call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-    ! Verif Spectre stellaire
-    !write(*,*) sum(spectre_etoiles) / (sigma * etoile(1)%T**4 * 4 * pi * (etoile(1)%r * AU_to_m)**2 )
+    ! Verif spectrum stellaire
+    !write(*,*) sum(star_spectrum) / (sigma * star(1)%T**4 * 4 * pi * (star(1)%r * AU_to_m)**2 )
 
     ! Conversion en lambda.F_lamda
-    ! Division par 4 * pi * (etoile(1)%r * AU_to_m)**2 pour passer de luminosite a flux
+    ! Division par 4 * pi * (star(1)%r * AU_to_m)**2 pour passer de luminosite a flux
     ! Division par pi pour passer en intensite
-    spectre(:) = spectre_etoiles(:) * tab_lambda(:) / tab_delta_lambda(:) &
-         / (4 * pi * (etoile(1)%r * AU_to_m)**2) / pi
+    spectrum(:) = star_spectrum(:) * tab_lambda(:) / tab_delta_lambda(:) &
+         / (4 * pi * (star(1)%r * AU_to_m)**2) / pi
 
     !  Write the array to the FITS file.
-    call ftppre(unit,group,fpixel,nelements,spectre,status)
+    call ftppre(unit,group,fpixel,nelements,spectrum,status)
 
     !------------------------------------------------------------------------------
-    ! HDU 5 : Spectre ISM (input)
+    ! HDU 5 : spectrum ISM (input)
     !------------------------------------------------------------------------------
     bitpix=-32
     naxis=1
@@ -645,11 +645,11 @@ contains
 
     do lambda=1,n_lambda
        wl = tab_lambda(lambda) * 1e-6
-       spectre(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl
+       spectrum(lambda) = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl
     enddo
 
     !  Write the array to the FITS file.
-    call ftppre(unit,group,fpixel,nelements,spectre,status)
+    call ftppre(unit,group,fpixel,nelements,spectrum,status)
 
     !------------------------------------------------------------------------------
     ! HDU 6 : Champ de radiation en W.m-2 (lambda.F_lambda)
@@ -719,17 +719,17 @@ contains
 
 
     do lambda=1, n_lambda
-       n_photons_envoyes = sum(n_phot_envoyes_ISM(lambda,:))
+       n_sent_photons = sum(n_phot_envoyes_ISM(lambda,:))
 
        wl = tab_lambda(lambda) * 1e-6
-       energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
-           * (4.*pi*R_ISM**2) / n_photons_envoyes / pi
+       photon_energy = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
+           * (4.*pi*R_ISM**2) / n_sent_photons / pi
 
        do ri=1, n_rad
           do zj=1,nz
              icell = cell_map(ri,zj,1)
-             facteur = energie_photon / volume(icell)
-             J_prodimo_ISM(lambda,ri,zj) =  J_prodimo_ISM(lambda,ri,zj) +  facteur * sum(xJ_abs(icell,lambda,:))
+             factor = photon_energy / volume(icell)
+             J_prodimo_ISM(lambda,ri,zj) =  J_prodimo_ISM(lambda,ri,zj) +  factor * sum(xJ_abs(icell,lambda,:))
           enddo
        enddo
     enddo ! lambda
@@ -789,7 +789,7 @@ contains
     do ri=1, n_rad
        do zj=1,nz
           icell = cell_map(ri,zj,1)
-          dens(ri,zj) =  densite_gaz(icell) * mu_mH / m3_to_cm3 ! g.cm^-3
+          dens(ri,zj) =  gas_density(icell) * mu_mH / m3_to_cm3 ! g.cm^-3
        enddo
     enddo
 
@@ -814,26 +814,26 @@ contains
 
     ! tau est sans dimension : [kappa * lvol = density * a² * lvol]
     ! C_ext = a² microns² -> 1e-8 cm²             \
-    ! density en cm-3                      > reste facteur 149595.0
-    ! longueur de vol en AU = 1.5e13 cm   /
-    facteur = AU_to_cm * mum_to_cm**2
-    opacite = 0.0
+    ! density en cm-3                      > reste factor 149595.0
+    ! length de vol en AU = 1.5e13 cm   /
+    factor = AU_to_cm * mum_to_cm**2
+    opacity = 0.0
     do zj=1,nz
        do ri=1,n_rad
           icell = cell_map(ri,zj,1)
           do lambda=1,n_lambda
              do l= grain_RE_LTE_start, grain_RE_LTE_end
                 p_l = merge(l, grain(l)%zone, lvariable_dust)
-                opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * &
-                     dust_density(p_l,icell) * nbre_grains(l) * facteur
-                opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * &
-                     dust_density(p_l,icell) * nbre_grains(l) * facteur
+                opacity(ri,zj,1,lambda) = opacity(ri,zj,1,lambda) + C_ext(l,lambda) * &
+                     dust_density(p_l,icell) * n_grains(l) * factor
+                opacity(ri,zj,2,lambda) = opacity(ri,zj,2,lambda) + C_abs(l,lambda) * &
+                     dust_density(p_l,icell) * n_grains(l) * factor
              enddo ! l
           enddo ! lambda
        enddo ! ri
     enddo !zj
 
-    call ftppre(unit,group,fpixel,nelements,opacite,status)
+    call ftppre(unit,group,fpixel,nelements,opacity,status)
 
     !------------------------------------------------------------------------------
     ! HDU 12 : Moments de la distribution en tailles des grains
@@ -853,39 +853,39 @@ contains
 
     do zj=1,nz
        do ri=1,n_rad
-          ! Total number of grain. da is already in nbre_grains
+          ! Total number of grain. da is already in n_grains
           icell = cell_map(ri,zj,1)
           if (lvariable_dust) then
-             N = sum(dust_density(:,icell) * nbre_grains(:),mask=mask_not_PAH)
-             N_grains(ri,zj,0) = N
+             N = sum(dust_density(:,icell) * n_grains(:),mask=mask_not_PAH)
+             N_grains_out(ri,zj,0) = N
              if (N > 0) then
-                N_grains(ri,zj,1) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:),mask=mask_not_PAH) / N
-                N_grains(ri,zj,2) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
-                N_grains(ri,zj,3) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,1) = sum(dust_density(:,icell) * n_grains(:) * r_grain(:),mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,2) = sum(dust_density(:,icell) * n_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,3) = sum(dust_density(:,icell) * n_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
              else
-                N_grains(ri,zj,1) = 0.0
-                N_grains(ri,zj,2) = 0.0
-                N_grains(ri,zj,3) = 0.0
+                N_grains_out(ri,zj,1) = 0.0
+                N_grains_out(ri,zj,2) = 0.0
+                N_grains_out(ri,zj,3) = 0.0
              endif
           else
-             N = sum(dust_density(grain(:)%zone,icell) * nbre_grains(:),mask=mask_not_PAH)
-             N_grains(ri,zj,0) = N
+             N = sum(dust_density(grain(:)%zone,icell) * n_grains(:),mask=mask_not_PAH)
+             N_grains_out(ri,zj,0) = N
              if (N > 0) then
-                N_grains(ri,zj,1) = sum(dust_density(grain(:)%zone,icell) * nbre_grains(:) * r_grain(:),mask=mask_not_PAH) / N
-                N_grains(ri,zj,2) = sum(dust_density(grain(:)%zone,icell) * nbre_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
-                N_grains(ri,zj,3) = sum(dust_density(grain(:)%zone,icell) * nbre_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,1) = sum(dust_density(grain(:)%zone,icell) * n_grains(:) * r_grain(:),mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,2) = sum(dust_density(grain(:)%zone,icell) * n_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
+                N_grains_out(ri,zj,3) = sum(dust_density(grain(:)%zone,icell) * n_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
              else
-                N_grains(ri,zj,1) = 0.0
-                N_grains(ri,zj,2) = 0.0
-                N_grains(ri,zj,3) = 0.0
+                N_grains_out(ri,zj,1) = 0.0
+                N_grains_out(ri,zj,2) = 0.0
+                N_grains_out(ri,zj,3) = 0.0
              endif
           endif
        enddo
     enddo
 
     ! part.cm^-3 --> part.m^-3
-    N_grains(:,:,0) = N_grains(:,:,0) /  (cm_to_m**3)
-    call ftppre(unit,group,fpixel,nelements,N_grains,status)
+    N_grains_out(:,:,0) = N_grains_out(:,:,0) /  (cm_to_m**3)
+    call ftppre(unit,group,fpixel,nelements,N_grains_out,status)
 
 
     if (mcfost2ProDiMo_version >=3) then
@@ -916,7 +916,7 @@ contains
 
     if (mcfost2ProDiMo_version >=4) then
        !------------------------------------------------------------------------------
-       ! HDU 14 : Spectre stellaire HR
+       ! HDU 14 : spectrum stellaire HR
        !------------------------------------------------------------------------------
        bitpix=-32
        naxis=2
@@ -930,10 +930,10 @@ contains
        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
        ! Conversion en lambda.F_lamda
-       ! Division par 4 * pi * (etoile(1)%r * AU_to_m)**2 pour passer de luminosite a flux
+       ! Division par 4 * pi * (star(1)%r * AU_to_m)**2 pour passer de luminosite a flux
        ! Division par pi pour passer en intensite
        ProDiMo_star_HR(:,2) = ProDiMo_star_HR(:,2) &
-            / (4 * pi * (etoile(1)%r * AU_to_m)**2) / pi
+            / (4 * pi * (star(1)%r * AU_to_m)**2) / pi
 
        !  Write the array to the FITS file.
        call ftppre(unit,group,fpixel,nelements,ProDiMo_star_HR,status)
@@ -965,10 +965,10 @@ contains
           do zj=1,nz
              icell = cell_map(ri,zj,k)
              if (lvariable_dust) then
-                dens(ri,zj) = sum(dust_density(iPAH_start:iPAH_end, icell) * nbre_grains(iPAH_start:iPAH_end) &
+                dens(ri,zj) = sum(dust_density(iPAH_start:iPAH_end, icell) * n_grains(iPAH_start:iPAH_end) &
                      * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
              else
-                dens(ri,zj) = sum(dust_density(grain(iPAH_start:iPAH_end)%zone, icell) * nbre_grains(iPAH_start:iPAH_end) &
+                dens(ri,zj) = sum(dust_density(grain(iPAH_start:iPAH_end)%zone, icell) * n_grains(iPAH_start:iPAH_end) &
                      * M_grain(iPAH_start:iPAH_end)) ! M_grain en g
              endif
           enddo
@@ -992,20 +992,20 @@ contains
        !  Write the required header keywords.
        call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-       opacite = 0.0
+       opacity = 0.0
        do zj=1,nz
           do ri=1,n_rad
              icell = cell_map(ri,zj,1)
              do lambda=1,n_lambda
                  do l= iPAH_start, iPAH_end
                     p_l = merge(l, grain(l)%zone, lvariable_dust)
-                    opacite(ri,zj,1,lambda) = opacite(ri,zj,1,lambda) + C_ext(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
-                    opacite(ri,zj,2,lambda) = opacite(ri,zj,2,lambda) + C_abs(l,lambda) * dust_density(p_l,icell) * nbre_grains(l)
+                    opacity(ri,zj,1,lambda) = opacity(ri,zj,1,lambda) + C_ext(l,lambda) * dust_density(p_l,icell) * n_grains(l)
+                    opacity(ri,zj,2,lambda) = opacity(ri,zj,2,lambda) + C_abs(l,lambda) * dust_density(p_l,icell) * n_grains(l)
                  enddo ! l
              enddo ! lambda
           enddo ! ri
        enddo !zj
-       call ftppre(unit,group,fpixel,nelements,opacite,status)
+       call ftppre(unit,group,fpixel,nelements,opacity,status)
 
        !------------------------------------------------------------------------------
        ! HDU 17 : PAH Teq
@@ -1025,7 +1025,7 @@ contains
        do zj=1,nz
           do ri=1,n_rad
              icell = cell_map(ri,zj,1)
-             norme = 0.0
+             norm = 0.0
              do l= iPAH_start, iPAH_end
                  p_l = merge(l, grain(l)%zone, lvariable_dust)
                  if (lPAH_nRE) then
@@ -1033,10 +1033,10 @@ contains
                  else
                     Ttmp = Tdust_1grain(l,icell)
                  endif
-                 TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * dust_density(p_l,icell) * nbre_grains(l)
-                 norme = norme + dust_density(p_l,icell) * nbre_grains(l)
+                 TPAH_eq(ri,zj,1) = TPAH_eq(ri,zj,1) + Ttmp**4 * dust_density(p_l,icell) * n_grains(l)
+                 norm = norm + dust_density(p_l,icell) * n_grains(l)
               enddo ! l
-             TPAH_eq(ri,zj,1) = (TPAH_eq(ri,zj,1)/norme)**0.25
+             TPAH_eq(ri,zj,1) = (TPAH_eq(ri,zj,1)/norm)**0.25
           enddo ! ri
        enddo !zj
 
@@ -1119,12 +1119,12 @@ contains
           !  Write the required header keywords.
           call ftphpr(unit,simple,bitpix,naxis,naxes,0,1,extend,status)
 
-          ! Trick to moved pack all the grain on index 1 using grain index = tab_region(ri)
+          ! Trick to moved pack all the grain on index 1 using grain index = region_map(ri)
           do ri=1, n_rad
              do zj=1, nz
                 icell = cell_map(ri,zj,1)
-                if (tab_region(i) > 0) then
-                   P_TPAH(:,ri,zj,1) = Proba_Tdust(:,tab_region(ri),icell)
+                if (region_map(i) > 0) then
+                   P_TPAH(:,ri,zj,1) = Proba_Tdust(:,region_map(ri),icell)
                 else
                    P_TPAH(:,ri,zj,1) = 0.0
                 endif
@@ -1228,7 +1228,7 @@ contains
        endif
 
        if (INDEX(line,"! Rphoto_bandint") > 0) then
-          if ((etoile(1)%T > 6000.).or.(etoile(1)%fUV > 0.05)) then
+          if ((star(1)%T > 6000.).or.(star(1)%fUV > 0.05)) then
              write(2,*) .true.,  " ! Rphoto_bandint : set by MCFOST"
           else
              write(2,*) .false., " ! Rphoto_bandint : set by MCFOST"
@@ -1273,7 +1273,7 @@ contains
        endif
     enddo read_loop
 
-    if (etoile(1)%lb_body) then
+    if (star(1)%lb_body) then
        write(2,*) ".true.  ! PlanckSpec : set by MCFOST"
     else
        write(2,*) ".false.  ! PlanckSpec : set by MCFOST"
@@ -1291,7 +1291,7 @@ contains
   subroutine read_mcfost2ProDiMo(para)
     ! Relit le fichier for ProDiMo.fits.gz cree par mcfost pour ProDiMo
     ! afin de redemarrer dessus pour le transfert dans les raies
-    ! Lit les parametres et la structure en temperature
+    ! Lit les parameters et la structure en temperature
     ! A terme le champ de radiation pour calculer le contribution de
     ! lumiere diffusee dans les raies
     !
@@ -1312,10 +1312,10 @@ contains
     character(len=512) :: filename, cmd
 
     !**************************************************************
-    ! 1) Lecture des parametres dans le fichier .para de data_th
+    ! 1) Lecture des parameters dans le fichier .para de data_th
     !**************************************************************
 
-    ! Copie temporaire et lecture du fichier de parametres
+    ! Copie temporaire et lecture du fichier de parameters
     ! car je ne connais pas le nom du fichier .par dans data_th
     n_files = 0
     cmd = "ls data_th/*.par* | wc -l > n_files.tmp" ; call appel_syst(cmd, syst_status)
@@ -1330,7 +1330,7 @@ contains
     call read_para("data_th/forMCFOST.par")
     cmd = "rm -rf data_th/forMCFOST.par" ; call appel_syst(cmd, syst_status)
 
-    ! Parametres par defaut
+    ! parameters par defaut
     ltemp = .false.
     lsed = .false.
     lsed_complete = .false.
@@ -1364,15 +1364,15 @@ contains
        mol(imol)%lcst_abundance = .true.
        mol(imol)%lline = .true.
        read(1,*) mol(imol)%nTrans_raytracing
-       read(1,*) mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)
+       read(1,*) mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)
        !mol(imol)%n_speed = 1 ! inutilise si on ne calcule pas le NLTE
 
 
        mol(imol)%abundance = 1e-6
-       mol(imol)%iLevel_max = maxval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing)) + 2
+       mol(imol)%iLevel_max = maxval(mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing)) + 2
     enddo
     vitesse_turb = 0.0
-    largeur_profile = 15.
+    profile_width = 15.
 
     !lpop = .false. ; lprecise_pop = .false. ; lmol_LTE = .true. ! lmol_LTE force l'utilisation des pop de ProDiMo
 
@@ -1740,7 +1740,7 @@ contains
        call ftgpve(unit,group,firstpix,npixels,nullval,grid,anynull,fits_status)
        !   write(*,*) "Status1 = ", status
 
-       ! Verification grille
+       ! Verification grid
        do ri=1,n_rad
           do zj=1,nz
              icell = cell_map(ri,zj,1)
@@ -1846,7 +1846,7 @@ contains
                 sum_pops(:,:) = sum_pops(:,:) + MCpops(l,:,:)
              enddo !l
 
-             ! On renormalise pour avoir une somme des populations a 1
+             ! On renormalise pour avoir une total_sum des populations a 1
              do l=1, lpops%lmax(i)
                 MCpops(l,:,:) = MCpops(l,:,:) / sum_pops(:,:)
              enddo !l
@@ -1923,7 +1923,7 @@ contains
        enddo
     enddo
     do icell=1, n_cells
-       tab_abundance(icell) = tab_abundance(icell) / densite_gaz(icell) ! conversion nbre en abondance
+       tab_abundance(icell) = tab_abundance(icell) / gas_density(icell) ! conversion nbre en abondance
     enddo
     write(*,*) "Max =", maxval(tab_abundance), "min =", minval(tab_abundance)
 
@@ -1935,16 +1935,16 @@ contains
 !       cst = - hp * Transfreq(iTrans) / kb
 !
 !       write(*,*) "iTrans", iTrans, iLow, iUp
-!       write(*,*), "g", poids_stat_g(iLow), poids_stat_g(iUp)
+!       write(*,*), "g", stat_weight_g(iLow), stat_weight_g(iUp)
 !       do j=1, nz
 !          do i=1, n_rad
 !             nUp = tab_nLevel(i,j,iUp)
 !             nLow =  tab_nLevel(i,j,iLow)
 !             if ((nUp > tiny_real) .and. (nLow > tiny_real) ) then
-!                Tex = cst / log(  (nUp * poids_stat_g(iLow))  / (nLow * poids_stat_g(iUp) ))
+!                Tex = cst / log(  (nUp * stat_weight_g(iLow))  / (nLow * stat_weight_g(iUp) ))
 !
 !                write(*,*) "Cell", i, j, nUp, nLow
-!                write(*,*) "ratio", nUp/nLow, poids_stat_g(iUp)/poids_stat_g(iLow) * exp(- hp * Transfreq(iTrans)/ (kb*Tgas(i,j)))
+!                write(*,*) "ratio", nUp/nLow, stat_weight_g(iUp)/stat_weight_g(iLow) * exp(- hp * Transfreq(iTrans)/ (kb*Tgas(i,j)))
 !                write(*,*) Tex, Tgas(i,j)
 !                read(*,*)
 !             endif
@@ -1960,31 +1960,31 @@ contains
 !       do j=1, nz
 !          tab_nLevel(i,j,1) = 1.0
 !          do l=2, nLevels
-!             tab_nLevel(i,j,l) = tab_nLevel(i,j,l-1) * poids_stat_g(l)/poids_stat_g(l-1) * &
+!             tab_nLevel(i,j,l) = tab_nLevel(i,j,l-1) * stat_weight_g(l)/stat_weight_g(l-1) * &
 !                  exp(- hp * Transfreq(l-1)/ (kb*Tcin(i,j,1)))
 !          enddo
 !
-!          Somme = sum(tab_nLevel(i,l,:))
-!          if (Somme < 1e-30) then
+!          total_sum = sum(tab_nLevel(i,l,:))
+!          if (total_sum < 1e-30) then
 !             write(*,*) "ERROR"
 !             stop
 !          endif
-!          tab_nLevel(i,j,:) = tab_nLevel(i,j,:) * nCO(i,j) / Somme
+!          tab_nLevel(i,j,:) = tab_nLevel(i,j,:) * nCO(i,j) / total_sum
 !       enddo
 !    enddo
 
 
-    ! Vitesse keplerienne
+    ! velocity keplerienne
     do i=1, n_rad
        do j=1, nz
           icell = cell_map(i,j,1)
           r_sph = sqrt(r_grid(icell)**2 + z_grid(icell)**2)
-          ! vfield(i,j) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) ) ! Midplane Keplerian velocity
-          vfield(icell) = sqrt(Ggrav * sum(etoile%M) * Msun_to_kg  * (r_grid(icell) * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
+          ! vfield(i,j) = sqrt(Ggrav * sum(star%M) * Msun_to_kg /  (r_grid(i,j) * AU_to_m) ) ! Midplane Keplerian velocity
+          vfield(icell) = sqrt(Ggrav * sum(star%M) * Msun_to_kg  * (r_grid(icell) * AU_to_m)**2 /  (r_sph * AU_to_m)**3 )
        enddo
     enddo
 
-    ! Vitesse Doppler
+    ! velocity Doppler
     do i=1, n_rad
        do j=1, nz
           icell = cell_map(i,j,1)
@@ -1999,7 +1999,7 @@ contains
 
           sigma2_m1 = 1.0_dp / sigma2
           sigma2_phiProf_m1(icell) = sigma2_m1
-          ! phi(nu) et non pas phi(v) donc facteur c_light et il manque 1/f0
+          ! phi(nu) et non pas phi(v) donc factor c_light et il manque 1/f0
           ! ATTENTION : il ne faut pas oublier de diviser par la freq apres
           norme_phiProf_m1(icell) = c_light / sqrt(pi * sigma2)
        enddo !i

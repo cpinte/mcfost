@@ -21,11 +21,11 @@ module elecdensity
 
    use atom_type, only : atoms, AtomType, hydrogen
    use elements_type
-   use constantes
+   use constants
    use messages, only : Error, Warning
    use input, only : nb_proc
    use mcfost_env, only : dp
-   use parametres, only : n_cells
+   use parameters, only : n_cells
    use utils, only : progress_bar, is_nan_infinity, interp_dp
    use grid, only : T, ne, nHtot, icompute_atomRT
    use fits_utils

@@ -301,7 +301,7 @@ utils.o : sha.f90
 Voronoi.o : voro++_wrapper.o
 
 ifeq ($(MCFOST_GIT),1)
-sha.f90 : ../.git/objects mcfost_env.o
+sha.f90 : mcfost_env.o
 	printf "module sha\n  implicit none\n" > sha.f90
 	git rev-parse HEAD | awk \
 		'{print "  character(len=40), parameter :: sha_id = \""$$1"\""}' \

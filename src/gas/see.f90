@@ -3,7 +3,7 @@ module see
     use atom_type
     use elements_type
     use grid
-    use parametres
+    use parameters
     use gas_contopac, only        : H_bf_Xsection
     use wavelengths, only         : n_lambda
     use wavelengths_gas, only     : Nlambda_max_line, Nlambda_max_trans, Nlambda_max_cont, n_lambda_cont, &
@@ -2034,7 +2034,7 @@ module see
         !$omp default(none) &
         !$omp private(weight,n,id,icell,iray,rand,rand2,rand3,x0,y0,z0,u0,v0,w0,w02,srw02,argmt)&
         !$omp shared(etape,n_cells,voronoi,r_grid,z_grid,phi_grid,n_rayons,xmu,wmu,xmux,xmuy,NactiveAtoms) &
-        !$omp shared(pos_em_cellule,labs,n_lambda,tab_lambda_nm,icompute_atomRT,activeatoms,seed,nb_proc,gtype) &
+        !$omp shared(pos_em_cell,labs,n_lambda,tab_lambda_nm,icompute_atomRT,activeatoms,seed,nb_proc,gtype) &
         !$omp shared(stream,lvoronoi,ibar,n_cells_done,Itot)
         !$omp do schedule(static,1)
         do icell=1, n_cells
@@ -2074,14 +2074,14 @@ module see
                 enddo
 
             else
-                ! Position aleatoire dans la cellule
+                ! Position aleatoire dans la cell
                 do iray=1,n_rayons
 
                     rand  = sprng(stream(id))
                     rand2 = sprng(stream(id))
                     rand3 = sprng(stream(id))
 
-                    call pos_em_cellule(icell ,rand,rand2,rand3,x0,y0,z0)
+                    call pos_em_cell(icell ,rand,rand2,rand3,x0,y0,z0)
 
                     ! Direction de propagation aleatoire
                     rand = sprng(stream(id))

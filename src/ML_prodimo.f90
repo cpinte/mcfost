@@ -3,7 +3,7 @@ module ML_ProDiMo
   use mcfost_env
   use wavelengths
   use prodimo, only : n_phot_envoyes_ISM ! todo : move out of prodimo module
-  use constantes
+  use constants
 
   implicit none
 
@@ -107,33 +107,33 @@ contains
     logical, intent(in) :: lISM
 
     integer :: icell
-    real(kind=dp) :: n_photons_envoyes, energie_photon, facteur
+    real(kind=dp) :: n_sent_photons, photon_energy, factor
     real :: wl
 
     ! Note: this is a slow loop as we are swapping dimensions
     if (.not.lISM) then
        ! Step2
-       n_photons_envoyes = sum(n_phot_envoyes(lambda,:))
-       energie_photon = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_photons_envoyes &
+       n_sent_photons = sum(n_phot_envoyes(lambda,:))
+       photon_energy = hp * c_light**2 / 2. * (E_stars(lambda) + E_disk(lambda)) / n_sent_photons &
             * tab_lambda(lambda) * 1.0e-6  !lambda.F_lambda
 
        do icell=1, n_cells
-          facteur = energie_photon / volume(icell)
-          J_ML(lambda,icell) = facteur * sum(xJ_abs(icell,lambda,:))
+          factor = photon_energy / volume(icell)
+          J_ML(lambda,icell) = factor * sum(xJ_abs(icell,lambda,:))
        enddo
 
        ! reset for ISM radiation
        xJ_abs(:,lambda,:) = 0.0
     else ! Champs ISM
-       n_photons_envoyes = sum(n_phot_envoyes_ISM(lambda,:))
-       if (n_photons_envoyes > 0.) then ! We test if there were ISM packets
+       n_sent_photons = sum(n_phot_envoyes_ISM(lambda,:))
+       if (n_sent_photons > 0.) then ! We test if there were ISM packets
           wl = tab_lambda(lambda) * 1e-6
-          energie_photon = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
-               * (4.*pi*R_ISM**2) / n_photons_envoyes / pi
+          photon_energy = (chi_ISM * 1.71 * Wdil * Blambda(wl,T_ISM_stars) + Blambda(wl,TCmb)) * wl & !lambda.F_lambda
+               * (4.*pi*R_ISM**2) / n_sent_photons / pi
 
           do icell=1, n_cells
-             facteur = energie_photon / volume(icell)
-             J_ML(lambda,icell) =  J_ML(lambda,icell) +  facteur * sum(xJ_abs(icell,lambda,:))
+             factor = photon_energy / volume(icell)
+             J_ML(lambda,icell) =  J_ML(lambda,icell) +  factor * sum(xJ_abs(icell,lambda,:))
           enddo
        endif
     endif
@@ -146,15 +146,15 @@ contains
 
   subroutine xgb_compute_features()
 
-    use grains, only : grain, r_grain, n_grains_tot, nbre_grains
+    use grains, only : grain, r_grain, n_grains_tot, n_grains
     use optical_depth, only : compute_column
     use density, only : dust_density
     use cylindrical_grid, only : r_grid, z_grid
-    use molecular_emission, only : densite_gaz
+    use molecular_emission, only : gas_density
     use temperature, only : Tdust
     use Voronoi_grid, only : Voronoi
 
-    real, dimension(0:3,n_cells) :: N_grains
+    real, dimension(0:3,n_cells) :: N_grains_out
     logical, dimension(n_grains_tot) :: mask_not_PAH
 
     integer, parameter :: n_directions = 4
@@ -166,20 +166,20 @@ contains
     !--- Moments de la distribution de grain
     mask_not_PAH(:) = .not.grain(:)%is_PAH
     do icell=1, n_cells
-       N = sum(dust_density(:,icell) * nbre_grains(:),mask=mask_not_PAH)
-       N_grains(0,icell) = N
+       N = sum(dust_density(:,icell) * n_grains(:),mask=mask_not_PAH)
+       N_grains_out(0,icell) = N
        if (N > 0) then
-          N_grains(1,icell) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:),mask=mask_not_PAH) / N
-          N_grains(2,icell) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
-          N_grains(3,icell) = sum(dust_density(:,icell) * nbre_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
+          N_grains_out(1,icell) = sum(dust_density(:,icell) * n_grains(:) * r_grain(:),mask=mask_not_PAH) / N
+          N_grains_out(2,icell) = sum(dust_density(:,icell) * n_grains(:) * r_grain(:)**2,mask=mask_not_PAH) / N
+          N_grains_out(3,icell) = sum(dust_density(:,icell) * n_grains(:) * r_grain(:)**3,mask=mask_not_PAH) / N
        else
-          N_grains(1,icell) = 0.0
-          N_grains(2,icell) = 0.0
-          N_grains(3,icell) = 0.0
+          N_grains_out(1,icell) = 0.0
+          N_grains_out(2,icell) = 0.0
+          N_grains_out(3,icell) = 0.0
        endif
     enddo
     ! part.cm^-3 --> part.m^-3
-    N_grains(0,:) = N_grains(0,:) /  (cm_to_m**3)
+    N_grains_out(0,:) = N_grains_out(0,:) /  (cm_to_m**3)
 
     if (n_features == 51) then
        !--- Column density
@@ -195,17 +195,17 @@ contains
           feature_Tgas(2,:) = z_grid(:)
        endif
        feature_Tgas(3,:) = Tdust(:)
-       feature_Tgas(4,:) = densite_gaz(:) * mu_mH / m3_to_cm3 ! g.cm^3
+       feature_Tgas(4,:) = gas_density(:) * mu_mH / m3_to_cm3 ! g.cm^3
        feature_Tgas(5:43,:) = J_ML(:,:)
-       feature_Tgas(44:47,:) = N_grains(:,:)
+       feature_Tgas(44:47,:) = N_grains_out(:,:)
        do i=1,n_directions
           feature_Tgas(48+i-1,:) = CD(:,i)  ! CD(n_cells, n_directions)
        enddo
     else if (n_features == 45) then
        feature_Tgas(1,:) = Tdust(:)
-       feature_Tgas(2,:) = densite_gaz(:) * mu_mH / m3_to_cm3 ! g.cm^3
+       feature_Tgas(2,:) = gas_density(:) * mu_mH / m3_to_cm3 ! g.cm^3
        feature_Tgas(3:41,:) = J_ML(:,:)
-       feature_Tgas(42:45,:) = N_grains(:,:)
+       feature_Tgas(42:45,:) = N_grains_out(:,:)
     endif
 
     feature_Tgas = log10(max(feature_Tgas,tiny_real))

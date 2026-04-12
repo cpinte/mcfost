@@ -5,9 +5,9 @@ module wavelengths_gas
 
    use atom_type
    use grid, only : v_char, B_char, vturb, T
-   use constantes
+   use constants
    use utils, only : locate, span, spanl, spanl_dp, span_dp
-   use parametres
+   use parameters
    use utils, only : span, spanl, spanl_dp, span_dp
    use sort, only : index_bubble_sort
    use messages

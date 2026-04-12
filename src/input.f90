@@ -1,8 +1,8 @@
 module input
 
-  use parametres
+  use parameters
   use mcfost_env
-  use constantes
+  use constants
   use molecular_emission
   use grains
   use read_DustEM
@@ -54,7 +54,7 @@ end subroutine read_molecules_names
 
 
 subroutine readmolecule(imol)
-  ! Lit les parametres de la molecule etudiee
+  ! Lit les parameters de la molecule etudiee
   ! remplit Aul, Bul, Blu + les f,   Level_energy, transfreq,
   ! iTransUpper, iTransLower + les donnees de collisions
 
@@ -95,7 +95,7 @@ subroutine readmolecule(imol)
   read(1,*) junk
   read(1,*) nLevels
 
-  allocate(Level_energy(nLevels),poids_stat_g(nLevels),j_qnb(nLevels),v_qnb(nLevels))
+  allocate(Level_energy(nLevels),stat_weight_g(nLevels),j_qnb(nLevels),v_qnb(nLevels))
 
   read(1,*) junk
   lrovib = .false.
@@ -106,7 +106,7 @@ subroutine readmolecule(imol)
      ! Parse based on number of tokens
      read(tokens(1),*) j
      read(tokens(2),*) Level_energy(i)
-     read(tokens(3),*) poids_stat_g(i)
+     read(tokens(3),*) stat_weight_g(i)
      if (numTokens == 4) read(tokens(4),*) j_qnb(i) !
      if (numTokens == 5) then ! rovib file
         lrovib = .true.
@@ -138,7 +138,7 @@ subroutine readmolecule(imol)
      ! Transformation Aul -> Bul
      Bul(i) = a * (c_light**2)/(2.d0*hp*(transfreq(i))**3)
      ! Transformation Bul -> Blu
-     Blu(i) = Bul(i) * poids_stat_g(iUp)/poids_stat_g(iLow)
+     Blu(i) = Bul(i) * stat_weight_g(iUp)/stat_weight_g(iLow)
   enddo
 
   fAul(:) = Aul(:) * hp * transfreq(:)/(4*pi)

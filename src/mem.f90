@@ -1,6 +1,6 @@
 module mem
 
-  use parametres
+  use parameters
   use grains
   use dust_prop
   use naleat
@@ -28,9 +28,9 @@ subroutine allocate_densities(n_cells_max)
      Nc = n_cells
   endif
 
-  allocate(masse(Nc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error mass')
-  masse = 0.0
+  allocate(dust_mass(Nc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error dust_mass')
+  dust_mass = 0.0
 
   if (lvariable_dust) then
      allocate(dust_density(n_grains_tot,Nc), stat=alloc_status)
@@ -40,9 +40,9 @@ subroutine allocate_densities(n_cells_max)
   if (alloc_status > 0) call error('Allocation error dust_density')
   dust_density = 0.0
 
-  allocate(densite_gaz(Nc), densite_gaz_midplane(n_rad,n_az), masse_gaz(Nc), stat=alloc_status)
-  if (alloc_status > 0) call error('Allocation error densite_gaz')
-  densite_gaz = 0.0 ; densite_gaz_midplane = 0.0 ; masse_gaz = 0.0
+  allocate(gas_density(Nc), gas_density_midplane(n_rad,n_az), gas_mass(Nc), stat=alloc_status)
+  if (alloc_status > 0) call error('Allocation error gas_density')
+  gas_density = 0.0 ; gas_density_midplane = 0.0 ; gas_mass = 0.0
 
 end subroutine allocate_densities
 
@@ -50,7 +50,7 @@ end subroutine allocate_densities
 
 subroutine deallocate_densities
 
-  if (allocated(masse)) deallocate(masse,dust_density,densite_gaz,densite_gaz_midplane,masse_gaz)
+  if (allocated(dust_mass)) deallocate(dust_mass,dust_density,gas_density,gas_density_midplane,gas_mass)
 
   return
 
@@ -212,7 +212,7 @@ subroutine alloc_dynamique(n_cells_max)
   ! **************************************************
   ! Tableaux relatifs aux prop optiques des cellules ou des grains
   ! **************************************************
-  if (scattering_method == 2) then ! prop par cellule
+  if (scattering_method == 2) then ! prop par cell
      if (lsepar_pola) then
         mem_size = (5. * nang_scatt) * p_Nc * p_n_lambda_pos * 4. / 1024.**3
      else
@@ -349,7 +349,7 @@ subroutine deallocate_em_th_mol()
   deallocate(tab_albedo_pos)
   if (allocated(tab_g_pos)) deallocate(tab_g_pos)
 
-  if (scattering_method == 2) then ! prop par cellule
+  if (scattering_method == 2) then ! prop par cell
      deallocate(tab_s11_pos,prob_s11_pos)
      if (lsepar_pola) deallocate(tab_s12_o_s11_pos,tab_s33_o_s11_pos,tab_s34_o_s11_pos)
   else ! prop par grains
@@ -430,7 +430,7 @@ end subroutine realloc_dust_mol
 subroutine clean_mem_dust_mol()
 
   ! Ne reste que tab_lambda, tab_delta_lambda, tab_lambda_inf, tab_lambda_sup, kappa, emissivite_dust
-  ! et spectre_etoiles, spectre_etoiles_cumul
+  ! et star_spectrum, star_spectrum_cumul
   deallocate(tab_amu1, tab_amu2,tab_amu1_coating, tab_amu2_coating)
   deallocate(tab_albedo)
   deallocate(C_ext, C_sca, C_abs, C_abs_norm, tab_g)
@@ -760,8 +760,8 @@ subroutine alloc_emission_mol(imol)
   n_speed = mol(imol)%n_speed_rt ! I use the same now
 
   if (lmol_LTE) then ! Reducing memory in LTE mode
-     iTrans_min = minval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
-     iTrans_max = maxval(mol(imol)%indice_Trans_rayTracing(1:mol(imol)%nTrans_raytracing))
+     iTrans_min = minval(mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing))
+     iTrans_max = maxval(mol(imol)%index_trans_ray_tracing(1:mol(imol)%nTrans_raytracing))
 
      level_min = iTransLower(iTrans_min)
      level_max = iTransUpper(iTrans_max)
@@ -793,7 +793,7 @@ subroutine alloc_emission_mol(imol)
   !if (alloc_status > 0) call error('Allocation error maser_map')
   !maser_map = 0.0
 
-  allocate(tab_v(-n_largeur_Doppler*n_speed:n_largeur_Doppler*n_speed), stat=alloc_status)
+  allocate(tab_v(-n_doppler_width*n_speed:n_doppler_width*n_speed), stat=alloc_status)
   if (alloc_status > 0) call error('Allocation error tab_v')
   tab_v=0.0
 
@@ -850,7 +850,7 @@ subroutine dealloc_emission_mol()
 
   call deallocate_stellar_spectra()
 
-  deallocate(Level_energy,poids_stat_g,j_qnb,v_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
+  deallocate(Level_energy,stat_weight_g,j_qnb,v_qnb,Aul,fAul,Bul,fBul,Blu,fBlu,transfreq, &
        itransUpper,itransLower,nCollTrans,nCollTemps,collTemps,collBetween, &
        iCollUpper,iCollLower)
 
